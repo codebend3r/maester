@@ -119,6 +119,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+// A desktop host draws the video under the page, so the page lets it through.
+:root[data-surface='native'] {
+  --color-stage: transparent;
+}
+
+:root[data-surface='native'] body {
+  background: transparent;
+}
+
 h1,
 h2,
 h3,

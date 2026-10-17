@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import type { Engine, HtmlSource } from '@/components/Player/engine'
+import { type Engine, type HtmlSource, sourceKey } from '@/components/Player/engine'
 import styles from '@/components/Player/Player.module.scss'
 import { usePlayerServices } from '@/components/Player/PlayerServices'
+import { NativeStage } from '@/components/Player/NativeStage'
 import { Stage } from '@/components/Player/Stage'
 import { Unplayable } from '@/components/Player/Unplayable'
 import { useLeave } from '@/components/Player/useLeave'
@@ -29,12 +30,52 @@ const fileSelection: TrackSelection = {
 export const Player = ({ engine }: { engine: Engine }) => {
   const { title } = usePlayerServices()
   const leave = useLeave(title.backTo)
+  switch (engine.kind) {
+    case 'html':
+      return <HtmlView engine={engine} onBack={leave} />
+    case 'native':
+      return <NativeView engine={engine} onBack={leave} />
+    default: {
+      const unknown: never = engine
+      return unknown
+    }
+  }
+}
+
+const NativeView = ({
+  engine,
+  onBack,
+}: {
+  engine: Extract<Engine, { kind: 'native' }>
+  onBack: () => void
+}) => {
+  const [failure, setFailure] = useState<string | null>(null)
+  if (failure !== null) {
+    return <Unplayable problems={[failure]} onBack={onBack} onTryAnyway={null} />
+  }
+  return (
+    <NativeStage
+      key={sourceKey(engine.source)}
+      engine={engine}
+      onBack={onBack}
+      onFailure={setFailure}
+    />
+  )
+}
+
+const HtmlView = ({
+  engine,
+  onBack,
+}: {
+  engine: Extract<Engine, { kind: 'html' }>
+  onBack: () => void
+}) => {
   const source = engine.source
   switch (source.kind) {
     case 'server':
-      return <ServerPlayer source={source} onBack={leave} />
+      return <ServerPlayer source={source} onBack={onBack} />
     case 'file':
-      return <FilePlayer source={source} onBack={leave} />
+      return <FilePlayer source={source} onBack={onBack} />
     default: {
       const unknown: never = source
       return unknown
@@ -50,7 +91,9 @@ const FilePlayer = ({
   onBack: () => void
 }) => {
   const [failure, setFailure] = useState<string | null>(null)
-  if (failure) return <Unplayable problems={[failure]} onBack={onBack} onTryAnyway={null} />
+  if (failure !== null) {
+    return <Unplayable problems={[failure]} onBack={onBack} onTryAnyway={null} />
+  }
   return (
     <Stage
       engine={{ kind: 'html', source }}

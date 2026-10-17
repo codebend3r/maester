@@ -39,26 +39,14 @@ const isControlTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && !!target.closest('button, a')
 
 export type StageProps = {
-  engine: Engine
+  engine: Extract<Engine, { kind: 'html' }>
   onBack: () => void
   mode: PlaybackMode
   selection: TrackSelection
   onFailure: (message: string) => void
 }
 
-export const Stage = (props: StageProps) => {
-  const kind = props.engine.kind
-  switch (kind) {
-    case 'html':
-      return <HtmlStage key={kind} {...props} />
-    default: {
-      const unknown: never = kind
-      return unknown
-    }
-  }
-}
-
-const HtmlStage = ({ engine, ...props }: StageProps) => {
+export const Stage = ({ engine, ...props }: StageProps) => {
   const fullscreen = useFullscreen()
   const html = useHtmlEngine({
     source: engine.source,
@@ -97,7 +85,7 @@ export const PlayerChrome = ({
   /** The library file playing, for Playback info; null for a local file. */
   file?: PlaybackFile | null
 }) => {
-  const { title, hostActions, favourite } = usePlayerServices()
+  const { title, hostActions, favourite, chrome, isVolumeFixed } = usePlayerServices()
   const label = title.label
   const { state, duration, actions } = engine
   const seek = actions.seek
@@ -129,7 +117,7 @@ export const PlayerChrome = ({
 
   const closeMenu = () => {
     setOverlay('none')
-    settingsButton.current?.focus()
+    if (settingsButton.current !== null) settingsButton.current.focus()
   }
 
   const showInfo = () => {
@@ -161,10 +149,12 @@ export const PlayerChrome = ({
     const action = shortcutFor(event)
     // Form controls keep their own keys (the radios' arrows, the volume
     // slider's); only Escape reaches past them, to close what they sit in.
-    if (isTypingTarget(event.target) && action?.type !== 'escape') return
+    if (isTypingTarget(event.target) && (action === null || action.type !== 'escape')) return
     // A focused button or link answers Space and Enter itself.
     if (isControlTarget(event.target) && (event.key === ' ' || event.key === 'Enter')) return
     if (!action) return
+    // An engine without the video info overlay leaves `i` to the page.
+    if (action.type === 'toggleStats' && actions.toggleStats === undefined) return
     // With the shortcut list open, the keys only close it.
     if (overlay === 'shortcuts' && action.type !== 'escape' && action.type !== 'showShortcuts') {
       return
@@ -188,7 +178,8 @@ export const PlayerChrome = ({
     idle.wake()
     const target = event.target
     if (overlay !== 'settings' || !(target instanceof Node)) return
-    if (menu.current?.contains(target) || settingsButton.current?.contains(target)) return
+    const isInMenu = menu.current?.contains(target) ?? false
+    if (isInMenu || (settingsButton.current?.contains(target) ?? false)) return
     setOverlay('none')
   }
 
@@ -209,6 +200,24 @@ export const PlayerChrome = ({
 
   const chromeShown = idle.active
 
+  // The scrubber and the clock keep what they showed while the controls are
+  // hidden, so a quiet page changes nothing in the DOM. Adjusting state during
+  // render is React's way to derive this from the previous render.
+  const [held, setHeld] = useState({ time: state.time, buffered: state.buffered })
+  if (chromeShown && (held.time !== state.time || held.buffered !== state.buffered)) {
+    setHeld({ time: state.time, buffered: state.buffered })
+  }
+
+  const tellHost = useEffectEvent((isShown: boolean) => {
+    if (chrome === undefined) return
+    chrome.shown(isShown)
+  })
+  useEffect(() => {
+    tellHost(chromeShown)
+  }, [chromeShown])
+  // The player going away leaves the host's own chrome as it should be.
+  useEffect(() => () => tellHost(true), [])
+
   return (
     <div
       className={[styles.stage, chromeShown ? '' : styles.idle].filter(Boolean).join(' ')}
@@ -220,7 +229,7 @@ export const PlayerChrome = ({
       {state.waiting && !state.paused && <output className={styles.spinner} aria-label="Loading" />}
       {!!bezel && <Bezel key={bezel.id} bezel={bezel} />}
       <p className="visually-hidden" aria-live="polite">
-        {bezel?.text}
+        {bezel?.text ?? null}
       </p>
       <header
         className={[styles.chrome, chromeShown ? '' : styles.chromeHidden]
@@ -263,11 +272,12 @@ export const PlayerChrome = ({
       <Controls
         shown={chromeShown}
         paused={state.paused}
-        time={state.time}
+        time={held.time}
         duration={duration}
-        buffered={state.buffered}
+        buffered={held.buffered}
         volume={volume}
         muted={muted}
+        isVolumeFixed={isVolumeFixed}
         fullscreen={fullscreen.fullscreen}
         subtitlesOn={selection.subtitle != null}
         menuOpen={overlay === 'settings'}
@@ -287,7 +297,12 @@ export const PlayerChrome = ({
           mode={mode}
           file={file}
           tracks={selection.tracks}
-          audio={playingAudio({ mode, tracks: selection.tracks, audio: selection.audio })}
+          audio={playingAudio({
+            mode,
+            tracks: selection.tracks,
+            audio: selection.audio,
+            playsPickedAudio: selection.playsPickedAudio,
+          })}
           onClose={closeInfo}
         />
       )}
@@ -307,7 +322,9 @@ export const PlayerChrome = ({
           onClose={closeMenu}
         />
       )}
-      {overlay === 'shortcuts' && <ShortcutsDialog onClose={() => setOverlay('none')} />}
+      {overlay === 'shortcuts' && (
+        <ShortcutsDialog canShowStats={!!actions.toggleStats} onClose={() => setOverlay('none')} />
+      )}
     </div>
   )
 }

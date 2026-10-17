@@ -1,7 +1,7 @@
 import { type RefObject, useReducer, useRef } from 'react'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
 
-type Ranges = ReadonlyArray<[number, number]>
+export type Ranges = ReadonlyArray<[number, number]>
 
 /** What the stage draws of the element: where it is, what is loaded, whether it plays. All times are file time. */
 export type VideoState = {

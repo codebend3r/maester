@@ -11,6 +11,7 @@ export type PlayerAction =
   | { type: 'stepFrame'; direction: 1 | -1 }
   | { type: 'stepSpeed'; direction: 1 | -1 }
   | { type: 'stepCaptionSize'; direction: 1 | -1 }
+  | { type: 'toggleStats' }
   | { type: 'showShortcuts' }
   | { type: 'escape' }
 
@@ -33,6 +34,7 @@ const FIXED: Record<string, PlayerAction> = {
   m: { type: 'toggleMute' },
   f: { type: 'toggleFullscreen' },
   c: { type: 'toggleSubtitles' },
+  i: { type: 'toggleStats' },
   Home: { type: 'seekToEdge', edge: 'start' },
   End: { type: 'seekToEdge', edge: 'end' },
   ',': { type: 'stepFrame', direction: -1 },
@@ -60,8 +62,15 @@ export const shortcutFor = ({ key, metaKey, ctrlKey, altKey }: KeyPress): Player
   return FIXED[named] ?? null
 }
 
-/** The list the `?` dialog shows, in YouTube's order. */
-export const SHORTCUT_LIST: ReadonlyArray<{ keys: string[]; action: string }> = [
+type ShortcutRow = {
+  keys: readonly string[]
+  action: string
+  /** Listed only by a player whose engine has the video info overlay. */
+  isStats?: boolean
+}
+
+/** Every row the `?` dialog can show, in YouTube's order. */
+const SHORTCUT_ROWS: readonly ShortcutRow[] = [
   { keys: ['k', 'Space'], action: 'Play or pause' },
   { keys: ['j', 'l'], action: 'Back or forward 10 seconds' },
   { keys: ['←', '→'], action: 'Back or forward 5 seconds' },
@@ -74,9 +83,14 @@ export const SHORTCUT_LIST: ReadonlyArray<{ keys: string[]; action: string }> = 
   { keys: ['Home', 'End'], action: 'Start or end' },
   { keys: [',', '.'], action: 'Pause, then one frame back or forward' },
   { keys: ['<', '>'], action: 'Slower or faster' },
+  { keys: ['i'], action: 'Video info', isStats: true },
   { keys: ['?'], action: 'These shortcuts' },
   { keys: ['Esc'], action: 'Close, leave full screen, or back to the library' },
 ]
+
+/** The rows the `?` dialog shows for a player that can or cannot show video info. */
+export const shortcutRows = ({ canShowStats }: { canShowStats: boolean }): readonly ShortcutRow[] =>
+  SHORTCUT_ROWS.filter((row) => canShowStats || row.isStats !== true)
 
 export const SPEEDS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 

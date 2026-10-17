@@ -1,7 +1,9 @@
-import { describe, expect, it, mock, spyOn } from 'bun:test'
-import { act, fireEvent, renderHook, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type ReactNode, useEffect } from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { Player } from '@/components/Player/Player'
 import {
   type HostActions,
@@ -407,5 +409,161 @@ describe('HTML engine stats', () => {
     })
     unmount()
     expect(handle.readStats()).toEqual(nothing)
+  })
+})
+
+describe('PlayerChrome seams for a native host', () => {
+  const IDLE_MS = 10_000
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => jest.useRealTimers())
+
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{children}</MemoryRouter>
+    </QueryClientProvider>
+  )
+
+  const chrome = ({
+    services,
+    actions,
+    time = 20,
+  }: {
+    services: PlayerServices
+    actions: EngineActions
+    time?: number
+  }) => {
+    const engine: EngineHandle = {
+      state: { ...initialVideoState(time), paused: false },
+      duration: 120,
+      position: { current: time },
+      tracks: null,
+      actions,
+      readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
+      focusSurface: () => {},
+      surface: <p>Engine picture</p>,
+      drawsSubtitles: true,
+    }
+    return (
+      <PlayerServicesProvider services={services}>
+        <PlayerChrome
+          engine={engine}
+          onBack={() => {}}
+          mode="direct"
+          selection={selection}
+          subtitleStatus="off"
+          fullscreen={{ fullscreen: false, toggle: () => {} }}
+        />
+      </PlayerServicesProvider>
+    )
+  }
+  const idle = (ms: number) => act(() => jest.advanceTimersByTime(ms))
+  const seekSlider = () => screen.getByRole('slider', { name: 'Seek' })
+
+  it('holds the clock and the scrubber still while the controls are hidden', () => {
+    const services = servicesFor()
+    const actions = actionsFor()
+    const { container, rerender } = render(chrome({ services, actions }), { wrapper })
+    rerender(chrome({ services, actions, time: 30 }))
+    expect(seekSlider()).toHaveAttribute('aria-valuenow', '30')
+    idle(IDLE_MS)
+    rerender(chrome({ services, actions, time: 40 }))
+    expect(seekSlider()).toHaveAttribute('aria-valuenow', '30')
+    expect(container.querySelector('.clock')).toHaveTextContent('0:30')
+    fireEvent.pointerMove(container.querySelector('.stage') ?? container)
+    expect(seekSlider()).toHaveAttribute('aria-valuenow', '40')
+    expect(container.querySelector('.clock')).toHaveTextContent('0:40')
+  })
+
+  it('tells the host when the controls show and hide', () => {
+    const shown = mock((_isShown: boolean) => {})
+    const services: PlayerServices = { ...servicesFor(), chrome: { shown } }
+    const { container, unmount } = render(chrome({ services, actions: actionsFor() }), {
+      wrapper,
+    })
+    expect(shown.mock.calls).toEqual([[true]])
+    idle(IDLE_MS)
+    expect(shown).toHaveBeenLastCalledWith(false)
+    fireEvent.pointerMove(container.querySelector('.stage') ?? container)
+    expect(shown).toHaveBeenLastCalledWith(true)
+    shown.mockClear()
+    idle(IDLE_MS)
+    shown.mockClear()
+    unmount()
+    expect(shown.mock.calls).toEqual([[true]])
+  })
+
+  it('toggles video info only for an engine that has it', () => {
+    const toggleStats = mock(() => {})
+    const withStats = render(
+      chrome({ services: servicesFor(), actions: { ...actionsFor(), toggleStats } }),
+      { wrapper },
+    )
+    // fireEvent answers false when the page prevented the key's default.
+    expect(fireEvent.keyDown(window, { key: 'i' })).toBe(false)
+    expect(toggleStats).toHaveBeenCalledTimes(1)
+    fireEvent.keyDown(window, { key: '?' })
+    expect(screen.getByText('Video info')).toBeInTheDocument()
+    withStats.unmount()
+
+    const actions = actionsFor()
+    render(chrome({ services: servicesFor(), actions }), { wrapper })
+    // The web has no overlay, so `i` stays the page's.
+    expect(fireEvent.keyDown(window, { key: 'i' })).toBe(true)
+    fireEvent.keyDown(window, { key: '?' })
+    expect(screen.getByText('These shortcuts')).toBeInTheDocument()
+    expect(screen.queryByText('Video info')).toBeNull()
+  })
+
+  it('keeps volume fixed when the host says so', () => {
+    const actions = actionsFor()
+    const services: PlayerServices = { ...servicesFor(), isVolumeFixed: true }
+    const { container } = render(chrome({ services, actions }), { wrapper })
+    const slider = screen.getByRole('slider', { name: 'Volume' })
+    expect(slider).toBeDisabled()
+    expect(slider).toHaveAccessibleDescription('Volume is set on your receiver')
+    const mute = screen.getByRole('button', { name: 'Volume is set on your receiver' })
+    expect(mute).toBeDisabled()
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: 'm' })
+    expect(actions.setVolume).not.toHaveBeenCalled()
+    expect(container.querySelector('[aria-live="polite"]')).toHaveTextContent(
+      'Volume is set on your receiver',
+    )
+  })
+
+  it('leaves volume alone on the web', () => {
+    const actions = actionsFor()
+    render(chrome({ services: servicesFor(), actions }), { wrapper })
+    expect(screen.getByRole('slider', { name: 'Volume' })).toBeEnabled()
+    expect(screen.getByRole('slider', { name: 'Volume' })).not.toHaveAccessibleDescription()
+    expect(screen.getByRole('button', { name: 'Mute (m)' })).toBeEnabled()
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(actions.setVolume).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Player shows the host note on Unplayable', () => {
+  const failing = (note: string | undefined) => {
+    const services: PlayerServices = { ...servicesFor(), unplayableNote: note }
+    const { container } = renderWithProviders(
+      <PlayerServicesProvider services={services}>
+        <Player engine={{ kind: 'html', source: { kind: 'file', url: 'blob:broken' } }} />
+      </PlayerServicesProvider>,
+    )
+    const video = container.querySelector('video')
+    expect(video).not.toBeNull()
+    if (video) fireEvent.error(video)
+  }
+
+  it("shows the host's note", () => {
+    failing('raven player could not play this video.')
+    expect(screen.getByText('raven player could not play this video.')).toBeInTheDocument()
+    expect(screen.queryByText("This video can't play in this browser.")).toBeNull()
+  })
+
+  it('keeps the browser wording without a note', () => {
+    failing(undefined)
+    expect(screen.getByText("This video can't play in this browser.")).toBeInTheDocument()
   })
 })

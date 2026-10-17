@@ -20,6 +20,8 @@ export type TrackSelection = {
    * list is on its way, no source should start only to be swapped.
    */
   isWaitingForTracks: boolean
+  /** The engine switches tracks itself, so the menu shows the pick even when nothing is converted. */
+  playsPickedAudio?: boolean
   pickAudio: (index: number | null) => void
   pickSubtitle: (id: string | null) => void
 }
@@ -53,8 +55,11 @@ export const useTrackSelection = ({
 
   const pickSubtitle = (id: string | null) => {
     setSubtitlePick({ id })
-    const track = tracks?.subtitles.find((candidate) => candidate.id === id)
-    setSubtitles({ on: id != null, language: track ? track.language : subtitlePrefs.language })
+    const track = tracks?.subtitles.find((candidate) => candidate.id === id) ?? null
+    setSubtitles({
+      on: id != null,
+      language: track === null ? subtitlePrefs.language : track.language,
+    })
   }
 
   return {
@@ -62,7 +67,7 @@ export const useTrackSelection = ({
     tracksFailed: trackList.isError,
     tracksPending: trackList.isPending,
     audio,
-    isDefaultAudio: audio == null || audio === tracks?.defaultAudio,
+    isDefaultAudio: audio == null || audio === (tracks?.defaultAudio ?? null),
     subtitle,
     isWaitingForTracks: audioLanguage != null && trackList.isPending && audioPick == null,
     pickAudio: (index) => {

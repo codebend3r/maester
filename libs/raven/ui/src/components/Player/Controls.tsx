@@ -1,12 +1,18 @@
 import { formatDuration } from '@raven/core'
-import type { RefObject } from 'react'
+import { type RefObject, useId } from 'react'
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import styles from '@/components/Player/Controls.module.scss'
 import { Scrubber } from '@/components/Player/Scrubber'
+import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
 
 const volumeIcon = ({ volume, muted }: { volume: number; muted: boolean }): IconName => {
   if (muted || volume === 0) return 'muted'
   return volume < 0.5 ? 'volumeLow' : 'volume'
+}
+
+const muteLabel = ({ isVolumeFixed, muted }: { isVolumeFixed: boolean; muted: boolean }) => {
+  if (isVolumeFixed) return FIXED_VOLUME_NOTE
+  return muted ? 'Unmute (m)' : 'Mute (m)'
 }
 
 /** A round icon button for the bar; every one carries its own label. */
@@ -18,6 +24,7 @@ const ControlButton = ({
   expanded,
   className,
   buttonRef,
+  disabled,
 }: {
   icon: IconName
   label: string
@@ -26,6 +33,7 @@ const ControlButton = ({
   expanded?: boolean
   className?: string
   buttonRef?: RefObject<HTMLButtonElement | null>
+  disabled?: boolean
 }) => (
   <button
     ref={buttonRef}
@@ -35,6 +43,7 @@ const ControlButton = ({
     aria-pressed={pressed}
     aria-expanded={expanded}
     title={label}
+    disabled={disabled}
     onClick={onClick}
   >
     <Icon name={icon} size={22} />
@@ -49,6 +58,8 @@ export type ControlsProps = {
   buffered: ReadonlyArray<[number, number]>
   volume: number
   muted: boolean
+  /** The output carries the sound untouched, so the volume cannot change here. */
+  isVolumeFixed?: boolean
   fullscreen: boolean
   subtitlesOn: boolean
   menuOpen: boolean
@@ -75,6 +86,7 @@ export const Controls = ({
   buffered,
   volume,
   muted,
+  isVolumeFixed = false,
   fullscreen,
   subtitlesOn,
   menuOpen,
@@ -87,70 +99,81 @@ export const Controls = ({
   onToggleSubtitles,
   onToggleMenu,
   onToggleFullscreen,
-}: ControlsProps) => (
-  <div className={[styles.controls, shown ? '' : styles.hidden].filter(Boolean).join(' ')}>
-    <div className={styles.timeline}>
-      <Scrubber time={time} duration={duration} buffered={buffered} onSeek={onSeek} />
-    </div>
-    <ControlButton
-      icon={paused ? 'play' : 'pause'}
-      label={paused ? 'Play (k)' : 'Pause (k)'}
-      onClick={onTogglePlay}
-      className={styles.play}
-    />
-    <ControlButton
-      icon="rewind"
-      label="Back 10 seconds (j)"
-      onClick={() => onSkip(-10)}
-      className={styles.back}
-    />
-    <ControlButton
-      icon="forward"
-      label="Forward 10 seconds (l)"
-      onClick={() => onSkip(10)}
-      className={styles.forward}
-    />
-    <div className={styles.volume}>
+}: ControlsProps) => {
+  const fixedNote = useId()
+  return (
+    <div className={[styles.controls, shown ? '' : styles.hidden].filter(Boolean).join(' ')}>
+      <div className={styles.timeline}>
+        <Scrubber time={time} duration={duration} buffered={buffered} onSeek={onSeek} />
+      </div>
       <ControlButton
-        icon={volumeIcon({ volume, muted })}
-        label={muted ? 'Unmute (m)' : 'Mute (m)'}
-        onClick={onToggleMute}
+        icon={paused ? 'play' : 'pause'}
+        label={paused ? 'Play (k)' : 'Pause (k)'}
+        onClick={onTogglePlay}
+        className={styles.play}
       />
-      <input
-        className={styles.volumeSlider}
-        type="range"
-        min={0}
-        max={100}
-        step={1}
-        value={Math.round((muted ? 0 : volume) * 100)}
-        aria-label="Volume"
-        onChange={(event) => onVolume(Number(event.currentTarget.value) / 100)}
+      <ControlButton
+        icon="rewind"
+        label="Back 10 seconds (j)"
+        onClick={() => onSkip(-10)}
+        className={styles.back}
+      />
+      <ControlButton
+        icon="forward"
+        label="Forward 10 seconds (l)"
+        onClick={() => onSkip(10)}
+        className={styles.forward}
+      />
+      <div className={styles.volume}>
+        <ControlButton
+          icon={volumeIcon({ volume, muted })}
+          label={muteLabel({ isVolumeFixed, muted })}
+          onClick={onToggleMute}
+          disabled={isVolumeFixed}
+        />
+        <input
+          className={styles.volumeSlider}
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={Math.round((muted ? 0 : volume) * 100)}
+          aria-label="Volume"
+          aria-describedby={isVolumeFixed ? fixedNote : undefined}
+          disabled={isVolumeFixed}
+          onChange={(event) => onVolume(Number(event.currentTarget.value) / 100)}
+        />
+        {isVolumeFixed && (
+          <span id={fixedNote} className="visually-hidden">
+            {FIXED_VOLUME_NOTE}
+          </span>
+        )}
+      </div>
+      <p className={styles.clock}>
+        <span>{formatDuration(time)}</span>
+        <span className={styles.total}> / {formatDuration(duration)}</span>
+      </p>
+      <ControlButton
+        icon="captions"
+        label={subtitlesOn ? 'Subtitles off (c)' : 'Subtitles on (c)'}
+        pressed={subtitlesOn}
+        onClick={onToggleSubtitles}
+        className={[styles.captions, subtitlesOn ? styles.on : ''].filter(Boolean).join(' ')}
+      />
+      <ControlButton
+        icon="settings"
+        label="Settings"
+        expanded={menuOpen}
+        onClick={onToggleMenu}
+        buttonRef={settingsButton}
+        className={styles.settings}
+      />
+      <ControlButton
+        icon={fullscreen ? 'fullscreenExit' : 'fullscreen'}
+        label={fullscreen ? 'Exit full screen (f)' : 'Full screen (f)'}
+        onClick={onToggleFullscreen}
+        className={styles.fullscreen}
       />
     </div>
-    <p className={styles.clock}>
-      <span>{formatDuration(time)}</span>
-      <span className={styles.total}> / {formatDuration(duration)}</span>
-    </p>
-    <ControlButton
-      icon="captions"
-      label={subtitlesOn ? 'Subtitles off (c)' : 'Subtitles on (c)'}
-      pressed={subtitlesOn}
-      onClick={onToggleSubtitles}
-      className={[styles.captions, subtitlesOn ? styles.on : ''].filter(Boolean).join(' ')}
-    />
-    <ControlButton
-      icon="settings"
-      label="Settings"
-      expanded={menuOpen}
-      onClick={onToggleMenu}
-      buttonRef={settingsButton}
-      className={styles.settings}
-    />
-    <ControlButton
-      icon={fullscreen ? 'fullscreenExit' : 'fullscreen'}
-      label={fullscreen ? 'Exit full screen (f)' : 'Full screen (f)'}
-      onClick={onToggleFullscreen}
-      className={styles.fullscreen}
-    />
-  </div>
-)
+  )
+}

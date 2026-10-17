@@ -40,15 +40,20 @@ export const preferredSubtitle = ({
 
 /**
  * The audio track playing: the picked one, else the file's default. The
- * original file plays its own default track, whichever was picked.
+ * original file plays its own default track, whichever was picked, unless
+ * the engine switches tracks itself.
  */
 export const playingAudio = ({
   mode,
   tracks,
   audio,
+  playsPickedAudio = false,
 }: {
   mode: PlaybackMode
   tracks: MediaTracks | null
   audio: number | null
+  playsPickedAudio?: boolean
 }): number | null =>
-  mode === 'direct' ? (tracks?.defaultAudio ?? null) : (audio ?? tracks?.defaultAudio ?? null)
+  mode === 'direct' && !playsPickedAudio
+    ? (tracks?.defaultAudio ?? null)
+    : (audio ?? tracks?.defaultAudio ?? null)

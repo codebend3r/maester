@@ -1,21 +1,33 @@
 import { useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import styles from '@/components/Player/ShortcutsDialog.module.scss'
-import { SHORTCUT_LIST } from '@/lib/shortcuts'
+import { shortcutRows } from '@/lib/shortcuts'
 
 /**
  * The `?` list, as a modal <dialog>: the browser traps focus inside it and
  * lifts it above a full-screen stage. Escape, `?` again, or the close
  * button put it away.
  */
-export const ShortcutsDialog = ({ onClose }: { onClose: () => void }) => {
+export const ShortcutsDialog = ({
+  onClose,
+  canShowStats = false,
+}: {
+  onClose: () => void
+  canShowStats?: boolean
+}) => {
   const heading = useId()
   const dialog = useRef<HTMLDialogElement>(null)
+  const rows = shortcutRows({ canShowStats })
 
   useEffect(() => {
     const element = dialog.current
-    if (element && !element.open) element.showModal?.()
-    return () => element?.close?.()
+    // A test DOM's dialog may lack showModal or close, so each is checked before it is called.
+    if (element !== null && !element.open && typeof element.showModal === 'function') {
+      element.showModal()
+    }
+    return () => {
+      if (element !== null && typeof element.close === 'function') element.close()
+    }
   }, [])
 
   return (
@@ -43,7 +55,7 @@ export const ShortcutsDialog = ({ onClose }: { onClose: () => void }) => {
         </button>
       </header>
       <dl className={styles.list}>
-        {SHORTCUT_LIST.map(({ keys, action }) => (
+        {rows.map(({ keys, action }) => (
           <div key={action} className={styles.row}>
             <dt className={styles.keys}>
               {keys.map((key) => (

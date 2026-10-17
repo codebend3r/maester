@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'bun:test'
-import { type PlayerAction, shortcutFor, stepCaptionScale, stepSpeed } from '@/lib/shortcuts'
+import {
+  type PlayerAction,
+  shortcutFor,
+  shortcutRows,
+  stepCaptionScale,
+  stepSpeed,
+} from '@/lib/shortcuts'
 
-const press = (
-  key: string,
-  held: Partial<{ metaKey: boolean; ctrlKey: boolean; altKey: boolean }> = {},
-) => shortcutFor({ key, metaKey: false, ctrlKey: false, altKey: false, ...held })
+const press = ({
+  key,
+  ...held
+}: { key: string } & Partial<{ metaKey: boolean; ctrlKey: boolean; altKey: boolean }>) =>
+  shortcutFor({ key, metaKey: false, ctrlKey: false, altKey: false, ...held })
 
 describe('shortcutFor', () => {
   const cases: Array<[string, PlayerAction]> = [
@@ -20,6 +27,8 @@ describe('shortcutFor', () => {
     ['m', { type: 'toggleMute' }],
     ['f', { type: 'toggleFullscreen' }],
     ['c', { type: 'toggleSubtitles' }],
+    ['i', { type: 'toggleStats' }],
+    ['I', { type: 'toggleStats' }],
     ['0', { type: 'seekToFraction', fraction: 0 }],
     ['7', { type: 'seekToFraction', fraction: 0.7 }],
     ['Home', { type: 'seekToEdge', edge: 'start' }],
@@ -35,19 +44,19 @@ describe('shortcutFor', () => {
   ]
 
   it.each(cases)('maps %p', (key, action) => {
-    expect(press(key)).toEqual(action)
+    expect(press({ key })).toEqual(action)
   })
 
   it('leaves keys with a modifier to the browser', () => {
-    expect(press('f', { metaKey: true })).toBeNull()
-    expect(press('l', { ctrlKey: true })).toBeNull()
-    expect(press('k', { altKey: true })).toBeNull()
+    expect(press({ key: 'f', metaKey: true })).toBeNull()
+    expect(press({ key: 'l', ctrlKey: true })).toBeNull()
+    expect(press({ key: 'k', altKey: true })).toBeNull()
   })
 
   it('ignores keys the player does not use', () => {
-    expect(press('q')).toBeNull()
-    expect(press('Tab')).toBeNull()
-    expect(press('F5')).toBeNull()
+    expect(press({ key: 'q' })).toBeNull()
+    expect(press({ key: 'Tab' })).toBeNull()
+    expect(press({ key: 'F5' })).toBeNull()
   })
 })
 
@@ -70,5 +79,17 @@ describe('stepCaptionScale', () => {
     expect(stepCaptionScale({ current: 1, direction: 1 })).toBe(1.25)
     expect(stepCaptionScale({ current: 0.75, direction: -1 })).toBe(0.75)
     expect(stepCaptionScale({ current: 2, direction: 1 })).toBe(2)
+  })
+})
+
+describe('shortcutRows', () => {
+  const keysOf = (canShowStats: boolean) =>
+    shortcutRows({ canShowStats }).map((row) => row.keys.join(' '))
+
+  it('lists video info just before these shortcuts, only when the player can show it', () => {
+    expect(keysOf(true).slice(-3)).toEqual(['i', '?', 'Esc'])
+    expect(keysOf(false)).not.toContain('i')
+    expect(keysOf(false).slice(-2)).toEqual(['?', 'Esc'])
+    expect(keysOf(true).filter((keys) => keys !== 'i')).toEqual(keysOf(false))
   })
 })
