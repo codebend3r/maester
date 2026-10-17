@@ -135,6 +135,11 @@ jobs:
       - name: 🧪 Real headless libmpv tests
         run: bunx nx run @raven/mpv:test:native
 
+      - name: 🧪 Desktop player against headless libmpv
+        run: bunx nx run @raven/desktop:test:native
+        env:
+          RAVEN_E2E_FFMPEG: ${{ github.workspace }}/libs/raven/mpv/native-build/prefix/bin/ffmpeg
+
       - name: 📤 Native playback resources
         uses: actions/upload-artifact@v7
         with:
