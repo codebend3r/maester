@@ -20,6 +20,7 @@ import {
   forgetResume,
   type PlayerState,
   removeRecent,
+  resumeFor,
   watchedShare,
 } from '@/main/playerState'
 import { loggable } from '@/main/servers/serverCalls'
@@ -44,6 +45,8 @@ export type DownloadPlaybackDeps = {
   announce: () => void
   /** A position was recorded as pending for this download, so the server is owed it. */
   onNoted: (input: { downloadId: string }) => void
+  /** The player left the download it was on, for another file or for nothing of this computer's. */
+  onLeft: () => void
 }
 
 export type DownloadPlayback = {
@@ -82,6 +85,11 @@ export type DownloadPlayback = {
   playbackLeft: (input: { fileId: string }) => void
   /** Whether the player is on this download's video, so a deletion waits until it leaves. */
   isPlaying: (downloadId: string) => boolean
+  /**
+   * Whether the player would resume this download partway, short of where it counts as
+   * watched: a title scrubbed back from its end is still being watched.
+   */
+  isMidTitle: (downloadId: string) => boolean
   /**
    * A download's share watched, as Home's recents show one: 1 once it is marked watched, else
    * the share its resume spot gives, null until its file was read. It takes the entry, so the
@@ -234,8 +242,10 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   }
 
   const playFile = (fileId: string | null): void => {
+    const left = playing.downloadId
     playing.fileId = fileId
     playing.downloadId = fileId === null ? null : (entryOfFile(fileId)?.downloadId ?? null)
+    if (left !== null && left !== playing.downloadId) deps.onLeft()
   }
 
   const noteOpened: DownloadPlayback['noteOpened'] = ({ fileId }) => {
@@ -271,6 +281,17 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   // the player is still on clears it.
   const playbackLeft: DownloadPlayback['playbackLeft'] = ({ fileId }) => {
     if (playing.fileId === fileId) playFile(null)
+  }
+
+  const isMidTitle: DownloadPlayback['isMidTitle'] = (downloadId) => {
+    const entry = entryById(store.read(), { downloadId })
+    if (entry === null) return false
+    const state = deps.state.read()
+    const path = videoPathOf(entry)
+    // The spot's own facts stand in until the file is read, so a launch need not wait for it.
+    const file = factsById.get(downloadId) ?? state.resume.find((spot) => spot.path === path)
+    if (file === undefined || resumeFor({ state, file }) === 0) return false
+    return (watchedShare({ state, file }) ?? 0) < entry.watchedPercent / 100
   }
 
   const watchedOf: DownloadPlayback['watchedOf'] = (entry) => {
@@ -328,6 +349,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     notePlaying: ({ fileId }) => playFile(fileId),
     playbackLeft,
     isPlaying: (downloadId) => playing.downloadId === downloadId,
+    isMidTitle,
     watchedOf,
     isWatched: ({ path }) => isMarked(entryAt(path)),
     readFiles,

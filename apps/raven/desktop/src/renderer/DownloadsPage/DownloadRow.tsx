@@ -57,6 +57,28 @@ const focus = (element: HTMLElement | null) => {
   if (element !== null) element.focus()
 }
 
+const MINUTE_MS = 60_000
+
+/** How often the line is read again: well inside a minute, so it is never a minute behind. */
+const DELETES_TICK_MS = 10_000
+
+const deletesInWords = (minutes: number): string =>
+  minutes === 1 ? 'Deletes in 1 minute' : `Deletes in ${minutes} minutes`
+
+/** How long until a download set to delete once watched goes, in whole minutes rounded up. */
+const DeletesIn = ({ at }: { at: number }) => {
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), DELETES_TICK_MS)
+    return () => clearInterval(timer)
+  }, [])
+
+  const minutes = Math.ceil((at - now) / MINUTE_MS)
+  if (minutes <= 0) return null
+  return <span>{deletesInWords(minutes)}</span>
+}
+
 /** Where a download stands: its progress, its wait, why it stopped, or how much of it was watched. */
 const StatusLine = ({ view, textId }: { view: DownloadView; textId: string }) => {
   const { status } = view
@@ -81,12 +103,15 @@ const StatusLine = ({ view, textId }: { view: DownloadView; textId: string }) =>
       return <span>{`Failed: ${status.message}`}</span>
     case 'ready':
       return (
-        <progress
-          className={styles.gauge}
-          max={1}
-          value={view.watched ?? 0}
-          aria-label={watchedLabel(view.watched)}
-        />
+        <>
+          <progress
+            className={styles.gauge}
+            max={1}
+            value={view.watched ?? 0}
+            aria-label={watchedLabel(view.watched)}
+          />
+          {view.deletesAt !== null && <DeletesIn at={view.deletesAt} />}
+        </>
       )
     default: {
       const unreachable: never = status
