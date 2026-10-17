@@ -138,6 +138,21 @@ export class ItemsController {
     return this.media.nextEpisode({ showId: id, libraryIds })
   }
 
+  /**
+   * A random episode of a show or a season, among the files in the libraries
+   * this browser may see, for its Shuffle button; null with none to play.
+   */
+  @Get(':id/random')
+  random(
+    @Param('id', ParseIntPipe) id: number,
+    @Headers('cookie') cookie: string | undefined,
+  ): MediaItem | null {
+    this.requireItem(id)
+    const viewer = this.lock.viewer({ cookie })
+    const libraryIds = this.libraries.ids().filter((libraryId) => viewer.seesLibrary(libraryId))
+    return this.media.randomEpisode({ itemId: id, libraryIds })
+  }
+
   /** Fetches the item from TMDB again now. One TMDB no longer has is gone after, so 404. */
   @AdminOnly()
   @Post(':id/refresh')

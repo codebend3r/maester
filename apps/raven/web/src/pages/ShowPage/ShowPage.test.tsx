@@ -8,7 +8,7 @@ import { POSTER_SIZES } from '@/lib/posters'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { itemDetails, library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
-import { EPISODE_TWO, SEASON_ONE_SUMMARY, SEVERANCE } from '@/test/tv'
+import { EPISODE_ONE, EPISODE_TWO, SEASON_ONE_SUMMARY, SEVERANCE } from '@/test/tv'
 
 const Watching = () => <p>Watching {useParams().id}</p>
 const Elsewhere = () => <p>Show {useParams().id}</p>
@@ -17,6 +17,7 @@ describe('ShowPage', () => {
   const spies = {
     item: spyOn(api, 'getItem'),
     next: spyOn(api, 'nextEpisode'),
+    random: spyOn(api, 'randomEpisode'),
     search: spyOn(api, 'searchMatches'),
     setItemMatch: spyOn(api, 'setItemMatch'),
   }
@@ -43,6 +44,7 @@ describe('ShowPage', () => {
   afterEach(() => {
     spies.item.mockReset()
     spies.next.mockReset()
+    spies.random.mockReset()
     spies.search.mockReset()
     spies.setItemMatch.mockReset()
   })
@@ -59,6 +61,20 @@ describe('ShowPage', () => {
       'href',
       '/watch/13',
     )
+  })
+
+  it('plays a random episode of the show on Shuffle', async () => {
+    spies.random.mockImplementation(async () => EPISODE_ONE)
+    open()
+    await userEvent.click(await screen.findByRole('button', { name: 'Shuffle' }))
+    expect(await screen.findByText('Watching 12')).toBeInTheDocument()
+    expect(spies.random.mock.calls).toEqual([[4]])
+  })
+
+  it('offers no Shuffle for a show with no episodes on disk', async () => {
+    open({ details: { ...SEVERANCE, children: [] } })
+    await screen.findByRole('heading', { level: 1, name: 'Severance' })
+    expect(screen.queryByRole('button', { name: 'Shuffle' })).toBeNull()
   })
 
   it('says it is a show, and names its library on the way back', async () => {

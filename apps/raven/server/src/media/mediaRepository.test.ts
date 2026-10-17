@@ -280,6 +280,41 @@ describe("listing a TV library's shows", () => {
     ).toBe('Special - S01E01.mkv')
   })
 
+  it('picks a random episode of a show, watched or not, as the die falls', () => {
+    const libraryIds = [state.libraryId]
+    const pick = (roll: number) =>
+      fileName(media().randomEpisode({ itemId: state.aired, libraryIds, roll: () => roll })?.id)
+    expect(pick(0)).toBe('Aired - S01E01.mkv')
+    expect(pick(0.49)).toBe('Aired - S01E01.mkv')
+    expect(pick(0.5)).toBe('Aired - S01E02.mkv')
+    expect(pick(0.999)).toBe('Aired - S01E02.mkv')
+  })
+
+  it('picks from one season alone when asked for the season', () => {
+    const seasonId =
+      database
+        .get()
+        .db.prepare<[number], { id: number }>(
+          "SELECT id FROM items WHERE parent_id = ? AND type = 'season' AND number = 1",
+        )
+        .get(state.special)?.id ?? -1
+    const libraryIds = [state.libraryId]
+    const pick = (roll: number) =>
+      fileName(media().randomEpisode({ itemId: seasonId, libraryIds, roll: () => roll })?.id)
+    expect(pick(0)).toBe('Special - S01E01.mkv')
+    expect(pick(0.999)).toBe('Special - S01E01.mkv')
+  })
+
+  it('has no random episode outside the libraries asked about, nor under an episode', () => {
+    const episodeId =
+      database
+        .get()
+        .db.prepare<[], { id: number }>("SELECT id FROM items WHERE type = 'episode' LIMIT 1")
+        .get()?.id ?? -1
+    expect(media().randomEpisode({ itemId: state.aired, libraryIds: [] })).toBeNull()
+    expect(media().randomEpisode({ itemId: episodeId, libraryIds: [state.libraryId] })).toBeNull()
+  })
+
   it('has none once every episode is watched', () => {
     const viewing = new ViewingRepository(database.get(), media())
     viewing.report({ id: state.ids.get('Aired - S01E02.mkv') ?? -1, position: 60 })
@@ -556,6 +591,18 @@ describe('what is watched, card by card', () => {
     expect(next()).toBe(first[0])
     finish(first[1] ?? -1)
     expect(next()).toBe(second[0])
+  })
+
+  it('gives each episode one chance at random, playing its best file', () => {
+    const { showId, episodeIds } = addShow({ title: 'Dice', count: 2 })
+    const first = filesOf({ episodeId: episodeIds[0] ?? -1, heights: [720, 1080] })
+    const second = filesOf({ episodeId: episodeIds[1] ?? -1, heights: [1080] })
+    const libraryIds = [state.libraryId]
+    const pick = (roll: number) =>
+      media().randomEpisode({ itemId: showId, libraryIds, roll: () => roll })?.id
+    expect(pick(0)).toBe(first[1])
+    expect(pick(0.5)).toBe(second[0])
+    expect(pick(0.999)).toBe(second[0])
   })
 
   it('judges the next episode by the libraries it is asked about alone', () => {
