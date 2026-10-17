@@ -105,7 +105,8 @@ mpv's default `b_lundef=false` linked libmpv with `-undefined dynamic_lookup`, w
 shipped that gap as unresolved symbols and crashed the window surface in
 `pl_glslang_init`; the build passes `-Db_lundef=true` so a missing library fails the link.
 `audit:native` also reads `nm`: each undefined symbol must bind to a library the file
-loads (only the addon may look up N-API from its host), and libmpv must define glslang.
+loads (only the addon may look up N-API and libuv from its host), and libmpv must define
+glslang.
 
 The addon uses node-addon-api 8.5.0 and N-API 8 with Node 24.19.0 headers checked
 against Node's official SHASUMS256.txt, independent of Electron's ABI. The headers and
