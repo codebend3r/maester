@@ -7,7 +7,7 @@ import type {
   MediaItem,
 } from '@raven/core'
 import { type FormEvent, useId, useState } from 'react'
-import { Button } from '@raven/ui'
+import { Button, Icon } from '@raven/ui'
 import { MovieFiles } from '@/components/MovieFiles/MovieFiles'
 import { api } from '@/lib/api'
 import { afterItemEdited } from '@/lib/invalidate'
@@ -54,7 +54,8 @@ export const editionFrom = (versions: readonly ItemDetails['versions'][number][]
  * page shows, each beside what TMDB says. A field written over keeps TMDB's
  * words underneath, and "Use TMDB's" puts them back; a refresh never
  * touches an edit. The wand puts the file name's edition in brackets after
- * the title.
+ * the title. Cancel sits at the top, as Done does in Edit images, and Save
+ * at the end of the form.
  */
 export const MetadataEditor = ({
   details,
@@ -122,12 +123,14 @@ export const MetadataEditor = ({
       </p>
       {state.isError && (
         <p className={styles.error} role="alert">
+          <Icon name="alert" size={16} />
           {state.error.message}
         </p>
       )}
       {save.isError && (
         <p className={styles.error} role="alert">
-          Could not save: {save.error.message}
+          <Icon name="alert" size={16} />
+          <span>Could not save: {save.error.message}</span>
         </p>
       )}
       {draft && original && (

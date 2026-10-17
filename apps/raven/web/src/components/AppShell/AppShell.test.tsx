@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { LIBRARY_KINDS } from '@raven/core'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -35,17 +35,35 @@ const renderShell = (route: string) =>
   )
 
 const nav = () => screen.getByRole('navigation', { name: 'Main' })
+const tabs = () => screen.getByRole('navigation', { name: 'Tabs' })
+const logo = () => screen.getByRole('link', { name: 'raven' })
 const toggle = () => screen.getByRole('button', { name: 'Side menu' })
 const iconOf = (element: HTMLElement) => element.querySelector('svg')?.dataset.icon
 const iconsOf = (element: HTMLElement) =>
   [...element.querySelectorAll('svg')].map((svg) => svg.dataset.icon)
 
+// `all` matches any screen and `not all` none, so only a medium screen
+// matches the side menu's query for one.
+const real = window.matchMedia.bind(window)
+const screenOf =
+  (size: 'wide' | 'medium') =>
+  (query: string): MediaQueryList =>
+    real(size === 'medium' && query === '(max-width: 64rem)' ? 'all' : 'not all')
+
 describe('AppShell', () => {
-  const spies = { list: spyOn(api, 'listLibraries') }
+  const spies = { list: spyOn(api, 'listLibraries'), media: spyOn(window, 'matchMedia') }
+
+  beforeEach(() => {
+    spies.media.mockImplementation(screenOf('wide'))
+  })
 
   afterEach(() => {
     cleanup()
     spies.list.mockReset()
+  })
+
+  afterAll(() => {
+    spies.media.mockRestore()
   })
 
   it('links home from the logo, named by its word alone', () => {
@@ -56,10 +74,11 @@ describe('AppShell', () => {
     expect(home.querySelector('img')).toHaveAttribute('src', '/brand/raven-mark-on-dark.svg')
   })
 
-  it('leads with Home, a house, marked on the page it opens on', () => {
+  it('leads with the logo, then Home, a house, marked on the page it opens on', () => {
     spies.list.mockImplementation(async () => [])
     renderShell('/')
-    const [first] = within(nav()).getAllByRole('link')
+    const [brand, first] = within(nav()).getAllByRole('link')
+    expect(brand).toBe(logo())
     expect(first).toHaveAccessibleName('Home')
     expect(first).toHaveAttribute('href', '/')
     expect(first).toHaveAttribute('aria-current', 'page')
@@ -94,7 +113,7 @@ describe('AppShell', () => {
     )
   })
 
-  it('leads with Home and Favourites, then the pinned libraries, with Libraries and Settings last', async () => {
+  it('leads with the logo, Home and Favourites, then the pinned libraries, with Libraries and Settings last', async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
     renderShell('/')
     await within(nav()).findByRole('link', { name: 'Movies' })
@@ -102,7 +121,7 @@ describe('AppShell', () => {
       within(nav())
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Home', 'Favourites', 'Movies', 'Libraries', 'Settings'])
+    ).toEqual(['raven', 'Home', 'Favourites', 'Movies', 'Libraries', 'Settings'])
   })
 
   it('opens a page a link leads to at its top', async () => {
@@ -322,5 +341,85 @@ describe('AppShell', () => {
 
     shell.unmount()
     expect(stream?.closed).toBe(true)
+  })
+
+  it('heads the pinned libraries while open, leaving a rule in their place once collapsed', async () => {
+    spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
+    renderShell('/')
+    await within(nav()).findByRole('link', { name: 'Movies' })
+    expect(within(nav()).getByText('Pinned')).toBeInTheDocument()
+    expect(within(logo()).getByText('raven')).not.toHaveClass('visually-hidden')
+
+    await userEvent.click(toggle())
+    expect(within(nav()).queryByText('Pinned')).toBeNull()
+    expect(within(nav()).getByRole('list', { name: 'Pinned' })).toBeInTheDocument()
+    expect(within(logo()).getByText('raven')).toHaveClass('visually-hidden')
+  })
+
+  it('has no Pinned heading with nothing pinned', () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell('/')
+    expect(within(nav()).queryByText('Pinned')).toBeNull()
+  })
+
+  it('keeps to its icons on a medium screen, where the toggle and B step aside', async () => {
+    spies.media.mockImplementation(screenOf('medium'))
+    spies.list.mockImplementation(async () => [
+      library({ id: 1, name: 'Tutorials', settings: { ...library().settings, locked: true } }),
+    ])
+    renderShell('/')
+    await within(nav()).findByRole('link', { name: 'Tutorials (locked)' })
+    expect(within(nav()).getByRole('link', { name: 'Home' })).toHaveAttribute('title', 'Home')
+    expect(within(nav()).getByRole('link', { name: 'Tutorials (locked)' })).toHaveAttribute(
+      'title',
+      'Tutorials (locked)',
+    )
+    expect(within(logo()).getByText('raven')).toHaveClass('visually-hidden')
+    expect(within(nav()).queryByText('Pinned')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Side menu' })).toBeNull()
+    expect(screen.queryByRole('complementary', { name: 'Tip' })).toBeNull()
+    expect(within(nav()).queryByText(`v${ravenVersion}`)).toBeNull()
+
+    await userEvent.keyboard('b')
+    expect(useSideMenu.getState().collapsed).toBe(false)
+  })
+
+  it('gives a phone Home, Libraries, Favourites and Settings in a tab bar', () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell('/favourites')
+    const links = within(tabs()).getAllByRole('link')
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Home', '/'],
+      ['Libraries', '/libraries'],
+      ['Favourites', '/favourites'],
+      ['Settings', '/settings'],
+    ])
+    expect(links.map(iconOf)).toEqual(['home', 'libraries', 'heart', 'settings'])
+    expect(within(tabs()).getByRole('link', { name: 'Favourites' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(within(tabs()).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('marks Libraries in the tab bar on any library, a pinned one too', async () => {
+    spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
+    renderShell('/libraries/3')
+    await within(nav()).findByRole('link', { name: 'Movies' })
+    expect(within(tabs()).getByRole('link', { name: 'Libraries' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(within(nav()).getByRole('link', { name: 'Libraries' })).not.toHaveAttribute(
+      'aria-current',
+    )
+  })
+
+  it('puts the theme button in the corner of every page', async () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell('/libraries')
+    const theme = within(screen.getByRole('main')).getByRole('button', { name: 'Theme' })
+    await userEvent.click(theme)
+    expect(screen.getByRole('menu', { name: 'Theme' })).toBeInTheDocument()
   })
 })

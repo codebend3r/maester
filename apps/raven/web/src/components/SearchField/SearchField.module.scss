@@ -1,0 +1,21 @@
+// The field's look is elements.scss's and its size and place the caller's,
+// so this is in :where(), which carries no weight: a caller's class wins.
+// It draws only the browser's clear button, which is otherwise the system's
+// own glyph in the system's colours, as the close icon in lichen.
+:where(.field)::-webkit-search-cancel-button {
+  width: 1rem;
+  height: 1rem;
+  background: var(--color-lichen);
+  cursor: pointer;
+  appearance: none;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M7 7l10 10M17 7L7 17'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+:where(.field)::-webkit-search-cancel-button:hover {
+  background: var(--color-bark);
+}
+
+:where(.field)::-webkit-search-decoration {
+  appearance: none;
+}

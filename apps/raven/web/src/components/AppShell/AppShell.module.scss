@@ -1,49 +1,40 @@
 .shell {
-  // The side menu's padding and its links', which the logo lines up with.
-  --side-inline: var(--space-3);
-  --link-inline: var(--space-2);
+  // The tab bar's rows, padding and hairline (TabBar.module.scss), which a
+  // phone's page leaves room for under itself.
+  --tab-bar-height: calc(var(--control-size-large) + 2 * var(--space-0) + 1px);
 
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
-  grid-template-areas:
-    'header header'
-    'side main';
+  grid-template-areas: 'side main';
   min-height: 100dvh;
 }
 
-// The mark starts where the side menu's icons do, so the page has one left
-// edge from the logo down.
-.header {
-  grid-area: header;
-  display: grid;
-  padding: var(--space-3) calc(var(--side-inline) + var(--link-inline));
-  border-bottom: 1px solid var(--color-moss);
-}
-
-.home {
-  justify-self: start;
-  text-decoration: none;
-}
-
-// The menu's column: its links, then Libraries, Settings and the toggle at
-// its foot. The frost's blur would make the menu a stacking context only
-// while a card is pointed at, moving the tip under the page and back, so the
-// menu is always one: over the page (for the tip), still under a card's open
-// menu, which comes later.
+// The menu holds still as the page scrolls: as tall as the screen, the logo
+// at its top and the dock at its foot, with only the links between scrolling
+// when more libraries are pinned than there is room for. Its top padding is
+// main's --page-top, so the logo sits level with the theme button. The
+// frost's blur would make the menu a stacking context only while a card is
+// pointed at, moving the tip under the page and back, so the menu is always
+// one: over the page (for the tip), still under a card's open menu, which
+// comes later.
 .side {
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 1;
   grid-area: side;
+  align-self: start;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, max-content) minmax(var(--space-1), 1fr) auto;
   grid-template-areas:
+    'logo'
     'links'
+    '.'
     'dock';
-  gap: var(--space-3);
-  min-width: 11rem;
-  padding: var(--space-5) var(--side-inline) var(--space-3);
-  border-right: 1px solid var(--color-moss);
+  row-gap: var(--space-3);
+  width: 15.5rem;
+  height: 100dvh;
+  padding: var(--space-5) var(--space-1) var(--space-4);
+  border-right: 1px solid var(--color-line-faint);
 }
 
 // While a card's picture is behind the page, the menu frosts over it.
@@ -61,42 +52,86 @@
   }
 }
 
+// The mark lines up over the icons below it.
+.home {
+  grid-area: logo;
+  justify-self: start;
+  display: grid;
+  align-items: center;
+  height: var(--field-size);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-bark);
+  text-decoration: none;
+}
+
+// Its padding leaves room for a row's focus ring, which the scrolling would
+// otherwise clip.
 .links {
   grid-area: links;
   display: grid;
   align-content: start;
   gap: var(--space-0);
+  min-height: 0;
+  padding: var(--space-1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
-// Its row runs down to the foot of the page, which gives it room to stick to
-// the bottom of the screen on a long page instead of waiting at the end.
-// Clear like the links above, so a picture behind the page shows through.
-// Over any pinned links that pass under it.
-.dock {
-  position: sticky;
-  bottom: var(--space-3);
-  z-index: 1;
-  grid-area: dock;
-  align-self: end;
+// Over the pinned libraries while the menu is open.
+.eyebrow {
+  padding: calc(var(--space-3) + var(--space-0)) var(--space-2) var(--space-0);
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+// In the heading's place once the menu is down to its icons: a short rule.
+.rule {
   display: grid;
-  gap: var(--space-3);
+  padding: var(--space-2) var(--space-1);
+
+  &::before {
+    content: '';
+    border-top: 1px solid var(--color-line);
+  }
 }
 
-// Libraries and Settings, set off from the links above by a rule.
+.pinned {
+  display: grid;
+  gap: var(--space-0);
+}
+
+.pinnedItem {
+  display: grid;
+  min-width: 0;
+}
+
+// Libraries and Settings, then raven's version and the toggle under a rule.
+.dock {
+  grid-area: dock;
+  display: grid;
+  gap: var(--space-2);
+  padding-inline: var(--space-1);
+}
+
 .manage {
   display: grid;
   gap: var(--space-0);
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--color-moss);
 }
 
-// The toggle, with raven's version beside it while the menu is open.
 .foot {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto auto;
   grid-template-areas: 'toggle version';
+  justify-content: space-between;
   align-items: center;
   gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-line-faint);
 }
 
 // The toggle holds the tip, so the tip points at it rather than the links.
@@ -104,6 +139,15 @@
   position: relative;
   grid-area: toggle;
   display: grid;
+}
+
+.foot .toggleButton {
+  border-radius: var(--radius-md);
+  color: var(--color-lichen);
+
+  &:hover {
+    color: var(--color-bark);
+  }
 }
 
 .version {
@@ -118,49 +162,54 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--link-inline);
+  gap: var(--space-2);
+  min-height: var(--control-size);
+  padding: var(--space-0) var(--space-2);
   border-radius: var(--radius-md);
   color: var(--color-lichen);
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
   text-decoration: none;
 
-  &:hover,
-  &[aria-current='page'] {
-    background: var(--color-canopy);
+  &:hover {
+    background: var(--color-hover);
     color: var(--color-bark);
+  }
+
+  &[aria-current='page'] {
+    --icon-tint: 0.4;
+
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
+
+  &[aria-current='page']:hover {
+    background: var(--color-moss-hi);
   }
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .navLink {
-    transition: background-color 120ms ease-out;
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
   }
 }
 
-// Pinned libraries sit under the fixed links, set off by a rule.
-.pinned {
-  display: grid;
-  gap: var(--space-0);
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--color-moss);
+.label {
+  overflow-wrap: anywhere;
 }
 
-.pinnedItem {
-  display: grid;
-  min-width: 0;
-
-  .navLink {
-    overflow-wrap: anywhere;
-  }
-}
-
-// Down to its icons: each link keeps its name for screen readers and as a tooltip.
-.collapsed {
-  --side-inline: var(--space-1);
-
+// Down to its icons, by the toggle or on a medium screen: each row keeps its
+// name for screen readers and as a tooltip, and the mark stands alone.
+@mixin icons-only {
   .side {
-    min-width: 0;
+    width: auto;
+  }
+
+  .home {
+    justify-self: center;
+    padding-inline: var(--space-2);
   }
 
   .navLink {
@@ -172,6 +221,16 @@
     grid-template-columns: auto;
     grid-template-areas: 'toggle';
     justify-content: center;
+  }
+}
+
+.collapsed {
+  @include icons-only;
+}
+
+@media (max-width: 64rem) {
+  .shell {
+    @include icons-only;
   }
 }
 
@@ -187,7 +246,7 @@
   width: max-content;
   max-width: min(30rem, calc(100vw - 2 * var(--space-3)));
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-moss);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   background: var(--color-canopy);
   box-shadow: var(--shadow-menu);
@@ -201,8 +260,8 @@
     left: calc(1.25rem - var(--space-0));
     width: var(--space-1);
     height: var(--space-1);
-    border-right: 1px solid var(--color-moss);
-    border-bottom: 1px solid var(--color-moss);
+    border-right: 1px solid var(--color-line);
+    border-bottom: 1px solid var(--color-line);
     background: var(--color-canopy);
     rotate: 45deg;
   }
@@ -221,87 +280,56 @@
   }
 }
 
+// The page and the theme button share one cell, the button in its top
+// corner. The page's first row keeps --corner-clearance free at its right,
+// and the room under the page clears the tab bar on a phone.
 .main {
+  --page-top: var(--space-5);
+  --corner-clearance: calc(var(--field-size) + var(--space-3));
+  --tab-bar-room: 0px;
+
   grid-area: main;
   display: grid;
   grid-template-columns: minmax(0, var(--max-width));
+  grid-template-areas: 'page';
   align-content: start;
   justify-content: center;
-  padding: var(--space-5) clamp(var(--space-3), 4vw, var(--space-6)) var(--space-8);
+  min-width: 0;
+  padding: var(--page-top) var(--gutter) calc(var(--section-gap) + var(--tab-bar-room));
+}
+
+.page {
+  grid-area: page;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+}
+
+// Over an item page's backdrop and its header, still under a dialog's top
+// layer. Its menu rises over the selection bar while it is open.
+.corner {
+  grid-area: page;
+  z-index: 2;
+  align-self: start;
+  justify-self: end;
+
+  &:has([aria-expanded='true']) {
+    z-index: 4;
+  }
 }
 
 @media (max-width: 48rem) {
   .shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto 1fr;
-    grid-template-areas:
-      'header'
-      'side'
-      'main';
+    grid-template-areas: 'main';
   }
 
-  // In line with the toggle that leads the menu row.
-  .header {
-    padding-inline: clamp(var(--space-3), 4vw, var(--space-6));
-  }
-
-  // One row across the top: the toggle, the links, then Libraries and
-  // Settings. With many pinned libraries the row scrolls sideways by itself,
-  // so the page never does. Each column is as wide as its link, so the links
-  // sit side by side instead of shrinking over each other.
   .side {
-    grid-template-columns: repeat(3, max-content);
-    grid-template-rows: auto;
-    grid-template-areas: 'toggle links manage';
-    align-items: center;
-    gap: var(--space-1);
-    min-width: 0;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-moss);
-    overflow-x: auto;
-  }
-
-  // Collapsing narrows the column on a wide screen; the row keeps its edge.
-  .side,
-  .collapsed .side {
-    padding: var(--space-1) clamp(var(--space-3), 4vw, var(--space-6));
-  }
-
-  .links,
-  .manage {
-    grid-auto-flow: column;
-    grid-auto-columns: max-content;
-  }
-
-  // Its parts take their places in the row, all but the version, which the
-  // row has no room for.
-  .dock,
-  .foot {
-    display: contents;
-  }
-
-  .version {
     display: none;
   }
 
-  .manage {
-    grid-area: manage;
-    padding: 0 0 0 var(--space-1);
-    border-top: 0;
-    border-left: 1px solid var(--color-moss);
-  }
-
-  .navLink {
-    white-space: nowrap;
-  }
-
-  .pinned {
-    grid-auto-flow: column;
-    grid-auto-columns: max-content;
-    padding-top: 0;
-    padding-left: var(--space-1);
-    border-top: 0;
-    border-left: 1px solid var(--color-moss);
+  .main {
+    --tab-bar-room: calc(var(--tab-bar-height) + env(safe-area-inset-bottom));
   }
 }
 

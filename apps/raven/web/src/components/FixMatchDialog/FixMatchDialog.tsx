@@ -92,7 +92,8 @@ const Candidate = ({
  * and listed best first, and points a
  * file (or a whole show) at the result the viewer chooses, or at nothing.
  * `match` does the pointing; whatever is chosen is kept by folder, so
- * renames and re-downloads keep it.
+ * renames and re-downloads keep it. Not a movie and Cancel sit in a footer
+ * that stays in view as the results scroll.
  */
 export const FixMatchDialog = <T,>({
   type,
@@ -193,7 +194,6 @@ export const FixMatchDialog = <T,>({
               <label htmlFor={ids.year}>Year</label>
               <input
                 id={ids.year}
-                className={styles.yearInput}
                 inputMode="numeric"
                 value={typed.year.text}
                 onChange={(event) => typed.year.setText(event.target.value)}
@@ -208,6 +208,7 @@ export const FixMatchDialog = <T,>({
 
         {(choose.isError || results.isError) && (
           <p role="alert" className={styles.error}>
+            <Icon name="alert" size={16} />
             {(choose.error ?? results.error)?.message ?? 'Something went wrong.'}
           </p>
         )}
@@ -240,16 +241,22 @@ export const FixMatchDialog = <T,>({
             </ul>
           )}
         </section>
-
-        <footer className={allowNone ? styles.actions : styles.actionsEnd}>
-          {allowNone && (
-            <Button disabled={choose.isPending} onClick={() => choose.mutate(null)}>
-              {NOT_A[type]}
-            </Button>
-          )}
-          <Button onClick={onClose}>Cancel</Button>
-        </footer>
       </div>
+
+      <footer className={styles.actions}>
+        {allowNone && (
+          <Button
+            className={styles.none}
+            disabled={choose.isPending}
+            onClick={() => choose.mutate(null)}
+          >
+            {NOT_A[type]}
+          </Button>
+        )}
+        <Button className={styles.cancel} onClick={onClose}>
+          Cancel
+        </Button>
+      </footer>
     </dialog>
   )
 }

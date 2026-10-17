@@ -1,16 +1,73 @@
+// Everything down the middle, the block centred in most of the screen's height.
 .page {
   display: grid;
-  grid-template-columns: minmax(0, var(--measure));
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  justify-items: center;
   gap: var(--space-4);
-  justify-items: start;
-  padding-top: var(--space-6);
-  color: var(--color-lichen);
+  min-block-size: 70vh;
+  text-align: center;
+}
+
+// Twice the home hero's size: 104px on a phone to 208px on a wide screen.
+// The poster is sized in ems, so it keeps its place between the figures.
+.figures {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-bark);
+  font-family: var(--font-display);
+  font-size: calc(var(--font-size-display) * 2);
+  line-height: 1;
+}
+
+.poster {
+  display: grid;
+  place-items: center;
+  width: 0.68em;
+  aspect-ratio: 2 / 3;
+  border: var(--border-thick) dashed color-mix(in srgb, var(--color-bark) 40%, transparent);
+  border-radius: var(--radius-lg);
+  rotate: -4deg;
+}
+
+.mark {
+  width: 46%;
+  height: auto;
+  opacity: 0.5;
 }
 
 .title {
-  font-family: var(--font-display);
-  font-size: var(--font-size-hero);
-  font-weight: 400;
+  font-size: var(--font-size-2xl);
   line-height: var(--line-tight);
-  color: var(--color-bark);
+}
+
+.copy {
+  max-width: var(--measure);
+  color: var(--color-birch);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-body);
+  text-wrap: pretty;
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+@media (max-width: 48rem) {
+  .figures {
+    gap: var(--space-1);
+  }
+}
+
+// Stacked, each as wide as the other, rather than off a narrow phone.
+@media (max-width: 30rem) {
+  .actions {
+    grid-auto-flow: row;
+    justify-content: stretch;
+  }
 }

@@ -9,7 +9,7 @@ import {
   type MatchItemType,
 } from '@raven/core'
 import { useId, useState } from 'react'
-import { Button } from '@raven/ui'
+import { Button, Icon } from '@raven/ui'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { api } from '@/lib/api'
 import { afterItemEdited } from '@/lib/invalidate'
@@ -105,7 +105,8 @@ const Options = ({
 /**
  * Edit images: every poster, backdrop and logo a movie could show (a show
  * has no logo), the current one marked, and the files that are this movie,
- * since they share them.
+ * since they share them. A choice takes at once, so the panel has no Save,
+ * only Done at its top.
  */
 export const ImageEditor = ({
   details,
@@ -177,12 +178,14 @@ export const ImageEditor = ({
 
       {options.isError && (
         <p className={styles.error} role="alert">
+          <Icon name="alert" size={16} />
           {options.error.message}
         </p>
       )}
       {choose.isError && (
         <p className={styles.error} role="alert">
-          Could not change the picture: {choose.error.message}
+          <Icon name="alert" size={16} />
+          <span>Could not change the picture: {choose.error.message}</span>
         </p>
       )}
       {options.isPending && !options.isError && (

@@ -1,4 +1,28 @@
+// A panel as the page's first row, so it keeps clear of the theme button
+// in the corner, the icon in the accent beside the reason.
 .message {
-  max-width: var(--measure);
-  color: var(--color-lichen);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'icon reason';
+  align-items: start;
+  gap: var(--space-2);
+  justify-self: start;
+  max-width: min(var(--measure), calc(100% - var(--corner-clearance, 0px)));
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+  color: var(--color-leaf-bright);
+
+  // As tall as a line, so it sits centred on the reason's first.
+  svg {
+    grid-area: icon;
+    block-size: 1lh;
+  }
+}
+
+.reason {
+  grid-area: reason;
+  color: var(--color-birch);
+  overflow-wrap: anywhere;
 }
