@@ -161,6 +161,10 @@ test('real libmpv loads generated MKV, observes, seeks, switches audio/subtitles
         assert.equal(await player.read({ name }), false)
       }),
     )
+    // The addon forces the cache on with its own sizes, whatever the stream.
+    assert.equal(await player.read({ name: 'options/cache' }), true)
+    assert.equal(await player.read({ name: 'options/demuxer-max-bytes' }), 1_073_741_824)
+    assert.equal(await player.read({ name: 'options/demuxer-max-back-bytes' }), 268_435_456)
     await (['aid', 'sid'] as const).reduce(async (previous, name) => {
       await previous
       await value.eventAfter({

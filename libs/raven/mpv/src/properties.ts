@@ -39,6 +39,10 @@ export const propertyGuards = {
   'options/osc': isBoolean,
   'options/input-default-bindings': isBoolean,
   'options/input-vo-keyboard': isBoolean,
+  // mpv reports `cache=yes` as the flag `true` and `no` as `false`.
+  'options/cache': union(isBoolean, oneOf(['auto'])),
+  'options/demuxer-max-bytes': isNumber,
+  'options/demuxer-max-back-bytes': isNumber,
   'ffmpeg-version': isString,
   'time-pos': nullable(isNumber),
   duration: nullable(isNumber),

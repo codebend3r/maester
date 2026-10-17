@@ -1,9 +1,26 @@
 import type { PlayerCommand, PlayerEvent } from '@raven/core'
 import type { PortLike } from '@/main/player/playerPort'
-import type { PlayerOutcome, PlayerService } from '@/main/player/playerService'
+import type {
+  FailureExplainer,
+  PlayerOutcome,
+  PlayerService,
+  ResolvedSource,
+} from '@/main/player/playerService'
 import type { Timers } from '@/main/stateStore'
 
 const OK: PlayerOutcome = { ok: true }
+
+export const NO_SERVERS_MESSAGE = 'This player knows no servers.'
+
+/** Server sources for a player that knows no servers: every server title is refused. */
+export const NO_SERVERS = {
+  resolve: async (): Promise<ResolvedSource> => ({ ok: false, message: NO_SERVERS_MESSAGE }),
+}
+
+/** An explainer for a player that never opens a server title. */
+export const noExplanation: FailureExplainer = async () => {
+  throw new Error(NO_SERVERS_MESSAGE)
+}
 
 /** Timers that run only when the test fires them; `pending` holds what is set and not cleared. */
 export const fakeTimers = () => {
@@ -93,6 +110,8 @@ export const fakeService = ({
       log.push('reset')
       flags.resets += 1
     },
+    resetIfServer: async () => {},
+    dispose: () => {},
     applyOutput: async () => {},
     applyDisplay: async () => {},
   }

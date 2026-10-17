@@ -1,9 +1,9 @@
 import { strict as assert } from 'node:assert'
-import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { createServer } from 'node:http'
+import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { createRequire } from 'node:module'
 import { basename, join, resolve } from 'node:path'
-import { after, describe, test } from 'node:test'
+import { after, before, describe, test } from 'node:test'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { setFlagsFromString } from 'node:v8'
 import { runInNewContext } from 'node:vm'
@@ -16,15 +16,34 @@ import {
   type PlayerEvent,
 } from '@raven/core'
 import { type MpvEvent, openMpv } from '@raven/mpv'
-import { makeTrackClip } from '@/e2e/clips'
+import { CLIP_SECONDS, type Clips, makeClips, makeTrackClip } from '@/e2e/clips'
+import {
+  FIXTURE_MEDIA,
+  type FixtureMode,
+  type FixtureRequest,
+  type FixtureServer,
+  startFixtureServer,
+} from '@/e2e/fixtureServer'
+import type { ServerEntry } from '@/main/desktopConfig'
 import { addonPathFor } from '@/main/player/engine'
 import {
   createPlayerService,
+  type FailureExplainer,
   PLAYER_MESSAGES,
   type PlayerOutcome,
+  type ResolvedSource,
   resolveSourceWith,
+  SIDECAR_BUDGET_MS,
+  type ServerTarget,
 } from '@/main/player/playerService'
 import { tracksFromMpv } from '@/main/player/tracksFromMpv'
+import { createServerCalls, fetchThrough } from '@/main/servers/serverCalls'
+import {
+  createServerSources,
+  SOURCE_MESSAGES,
+  TRACKS_TIMEOUT_MS,
+} from '@/main/servers/serverSources'
+import { NO_SERVERS, noExplanation } from '@/main/test/playerFakes'
 import { createNodeTimers } from '@/main/timers'
 
 const WAIT_MS = 10000
@@ -176,7 +195,13 @@ const where =
 const near = ({ value, target, within }: { value: number; target: number; within: number }) =>
   Math.abs(value - target) <= within
 
-const openHarness = async () => {
+type Servers = Parameters<typeof resolveSourceWith>[0]['servers']
+
+const openHarness = async ({
+  servers = NO_SERVERS,
+  explain = noExplanation,
+  serverStallMs,
+}: { servers?: Servers; explain?: FailureExplainer; serverStallMs?: number } = {}) => {
   const events: PlayerEvent[] = []
   // What mpv itself said, in stream order, without the property changes.
   const raw: MpvEvent[] = []
@@ -193,9 +218,11 @@ const openHarness = async () => {
   })
   const service = createPlayerService({
     mpv,
-    resolveSource: resolveSourceWith({ grants: { fileOf } }),
+    resolveSource: resolveSourceWith({ grants: { fileOf }, servers }),
+    explain,
     canChooseAo: false,
     timers: createNodeTimers(),
+    ...(serverStallMs === undefined ? {} : { serverStallMs }),
     onActivity: () => {},
     onFirstFrame: () => {},
     warn: (message) => {
@@ -292,9 +319,16 @@ const openHarness = async () => {
   const errorsOf = () => events.filter(where({ type: 'error' }))
   const endingsOf = () => events.filter(where({ type: 'ended' }))
 
+  /** As main tears an engine down: the service forgets its timers, then mpv goes. */
+  const destroy = () => {
+    service.dispose()
+    return mpv.destroy()
+  }
+
   return {
     mpv,
     service,
+    destroy,
     events,
     raw,
     warnings,
@@ -316,14 +350,14 @@ const withHarness = async (run: (harness: Harness) => Promise<void>) => {
   try {
     await run(harness)
   } finally {
-    await harness.mpv.destroy()
+    await harness.destroy()
   }
 }
 
 const destroyWithin = async ({ harness, ms }: { harness: Harness; ms: number }) => {
   const started = Date.now()
   const outcome = await Promise.race([
-    harness.mpv.destroy().then(() => 'destroyed' as const),
+    harness.destroy().then(() => 'destroyed' as const),
     sleep(ms).then(() => 'hung' as const),
   ])
   assert.equal(outcome, 'destroyed', `destroy took longer than ${ms} ms`)
@@ -812,11 +846,1350 @@ describe('the desktop player service against headless libmpv', () => {
     assert.ok(elapsed < DESTROY_MS)
     assert.equal(harness.events.length, heard, 'events arrived after the reset')
     await released({ deadline: Date.now() + DESTROY_MS })
+    // `dispose` latches the service as dead, so nothing is asked of the destroyed mpv.
     assert.deepEqual(await harness.send({ type: 'play' }), {
       ok: false,
-      reason: 'refused',
-      message: PLAYER_MESSAGES.failed,
+      reason: 'engine',
+      message: PLAYER_MESSAGES.engineStopped,
     })
+  })
+})
+
+/** A request a fixture listener heard: its path and the `Cookie` header it carried. */
+type Seen = { path: string; cookie: string | null }
+
+const SIDECAR_VTT = 'WEBVTT\n\n00:00.000 --> 00:29.000\nraven server sidecar\n'
+
+/** Serves `bytes` with byte ranges, as raven's media controller does. */
+const serveBytes = ({
+  request,
+  response,
+  bytes,
+}: {
+  request: IncomingMessage
+  response: ServerResponse
+  bytes: Buffer
+}) => {
+  const range = /^bytes=(\d+)-(\d*)$/u.exec(request.headers.range ?? '')
+  if (range === null) {
+    response.writeHead(200, {
+      'content-type': 'video/x-matroska',
+      'accept-ranges': 'bytes',
+      'content-length': bytes.length,
+    })
+    response.end(bytes)
+    return
+  }
+  const start = Number(range[1] ?? 0)
+  const last = range[2] ?? ''
+  const end = last === '' ? bytes.length - 1 : Math.min(Number(last), bytes.length - 1)
+  if (start >= bytes.length) {
+    response.writeHead(416, { 'content-range': `bytes */${bytes.length}` })
+    response.end()
+    return
+  }
+  response.writeHead(206, {
+    'content-type': 'video/x-matroska',
+    'accept-ranges': 'bytes',
+    'content-range': `bytes ${start}-${end}/${bytes.length}`,
+    'content-length': end - start + 1,
+  })
+  response.end(bytes.subarray(start, end + 1))
+}
+
+/** The redirecting title: media 3's file answers 302 to `redirectTo` when one is given. */
+const REDIRECTING = 3
+
+/**
+ * A stand-in raven server: every `/api/media/<id>/file` is the track clip, its
+ * `external-0` sidecar a short WebVTT, and media 3 may redirect to another listener.
+ */
+const listenFixture = async ({ redirectTo }: { redirectTo: string | null }) => {
+  const seen: Seen[] = []
+  const fixture = createServer((request, response) => {
+    const path = request.url ?? ''
+    seen.push({ path, cookie: request.headers.cookie ?? null })
+    if (redirectTo !== null && path === `/api/media/${REDIRECTING}/file`) {
+      response.writeHead(302, { location: `${redirectTo}${path}` })
+      response.end()
+      return
+    }
+    if (/^\/api\/media\/\d+\/file$/u.test(path)) {
+      serveBytes({ request, response, bytes: whole })
+      return
+    }
+    if (/^\/api\/media\/\d+\/subtitles\/external-0$/u.test(path)) {
+      response.writeHead(200, { 'content-type': 'text/vtt' })
+      response.end(SIDECAR_VTT)
+      return
+    }
+    response.writeHead(404)
+    response.end()
+  })
+  await new Promise<void>((resolveListen) => {
+    fixture.listen(0, '127.0.0.1', () => resolveListen())
+  })
+  const bound = fixture.address()
+  if (bound === null || typeof bound === 'string') throw new Error('No fixture port')
+  return {
+    origin: `http://127.0.0.1:${bound.port}`,
+    seen,
+    close: () =>
+      new Promise<void>((resolveClose) => {
+        fixture.closeAllConnections()
+        fixture.close(() => resolveClose())
+      }),
+  }
+}
+
+const SERVER_IDS = {
+  home: '00000000-0000-4000-8000-0000000000a1',
+  elsewhere: '00000000-0000-4000-8000-0000000000b2',
+} as const
+
+const targetFor = ({
+  serverId,
+  origin,
+  mediaId,
+  cookie,
+  hasSidecar = false,
+}: {
+  serverId: string
+  origin: string
+  mediaId: number
+  cookie: string | null
+  hasSidecar?: boolean
+}): ServerTarget => ({
+  kind: 'server',
+  serverId,
+  mediaId,
+  url: `${origin}/api/media/${mediaId}/file`,
+  headerFields: cookie === null ? '' : `Cookie: raven_unlock=${cookie}`,
+  sidecars: hasSidecar
+    ? [
+        {
+          url: `${origin}/api/media/${mediaId}/subtitles/external-0`,
+          title: 'English',
+          language: 'en',
+        },
+      ]
+    : [],
+})
+
+const serversOf = (targets: readonly ServerTarget[]): Servers => ({
+  resolve: async ({ serverId, mediaId }): Promise<ResolvedSource> => {
+    const target = targets.find(
+      (candidate) => candidate.serverId === serverId && candidate.mediaId === mediaId,
+    )
+    return target === undefined ? { ok: false, message: 'Unknown title' } : { ok: true, target }
+  },
+})
+
+const serverLoad = ({ target }: { target: ServerTarget }): PlayerCommand => ({
+  type: 'load',
+  source: { kind: 'server', serverId: target.serverId, mediaId: target.mediaId },
+  start: 0,
+  audio: null,
+  subtitle: null,
+})
+
+/**
+ * Two servers, `elsewhere` being where the redirecting title on `home` points, and the
+ * titles the tests load from them.
+ */
+const startServers = async () => {
+  const elsewhere = await listenFixture({ redirectTo: null })
+  const home = await listenFixture({ redirectTo: elsewhere.origin })
+  const titles = {
+    home: targetFor({
+      serverId: SERVER_IDS.home,
+      origin: home.origin,
+      mediaId: 1,
+      cookie: 'home.secret',
+      hasSidecar: true,
+    }),
+    elsewhere: targetFor({
+      serverId: SERVER_IDS.elsewhere,
+      origin: elsewhere.origin,
+      mediaId: 2,
+      cookie: 'elsewhere.secret',
+      hasSidecar: true,
+    }),
+    redirecting: targetFor({
+      serverId: SERVER_IDS.home,
+      origin: home.origin,
+      mediaId: REDIRECTING,
+      cookie: 'home.secret',
+    }),
+    bare: targetFor({
+      serverId: SERVER_IDS.elsewhere,
+      origin: elsewhere.origin,
+      mediaId: 4,
+      cookie: null,
+    }),
+  } as const
+  return {
+    home,
+    elsewhere,
+    titles,
+    servers: serversOf(Object.values(titles)),
+    close: async () => {
+      await Promise.all([home.close(), elsewhere.close()])
+    },
+  }
+}
+type ServerFixture = Awaited<ReturnType<typeof startServers>>
+
+// Started and closed by the describe that uses it, so its tests also run one at a time.
+const serverFixture: { current: ServerFixture | null } = { current: null }
+
+/** Runs `run` on a harness that knows the fixture servers, from fresh request logs. */
+const withServers = async ({
+  explain = noExplanation,
+  run,
+}: {
+  explain?: FailureExplainer
+  run: (input: { harness: Harness; fixture: ServerFixture }) => Promise<void>
+}) => {
+  const fixture = serverFixture.current
+  if (fixture === null) throw new Error('The fixture servers are not running')
+  fixture.home.seen.splice(0)
+  fixture.elsewhere.seen.splice(0)
+  const harness = await openHarness({ servers: fixture.servers, explain })
+  try {
+    await run({ harness, fixture })
+  } finally {
+    await harness.destroy()
+  }
+}
+
+const cookiesSeen = ({ seen }: { seen: readonly Seen[] }) =>
+  Array.from(new Set(seen.map(({ cookie }) => cookie)))
+
+const playingServer = ({ harness, target }: { harness: Harness; target: ServerTarget }) =>
+  harness.eventAfter({
+    label: `${target.url} playing`,
+    matches: where({ type: 'paused', holds: (event) => !event.paused }),
+    action: () => harness.sendOk(serverLoad({ target })),
+  })
+
+describe('server titles against headless libmpv', () => {
+  before(async () => {
+    serverFixture.current = await startServers()
+  })
+  after(async () => {
+    const fixture = serverFixture.current
+    serverFixture.current = null
+    if (fixture !== null) await fixture.close()
+  })
+
+  test("load A then at once load B: A's origin never sees B's cookie", async () => {
+    await withServers({
+      run: async ({ harness, fixture }) => {
+        await Array.from({ length: 6 }, (_value, index) => index).reduce(async (previous) => {
+          await previous
+          await harness.sendOk(serverLoad({ target: fixture.titles.home }))
+          await playingServer({ harness, target: fixture.titles.elsewhere })
+          // A's sidecar request may still be in flight as B replaces it.
+          await sleep(100)
+        }, Promise.resolve())
+        await sleep(SETTLE_MS)
+        assert.ok(fixture.home.seen.length > 0, 'the first server was never asked for its title')
+        assert.deepEqual(cookiesSeen({ seen: fixture.home.seen }), ['raven_unlock=home.secret'])
+        assert.deepEqual(cookiesSeen({ seen: fixture.elsewhere.seen }), [
+          'raven_unlock=elsewhere.secret',
+        ])
+        assert.ok(
+          fixture.elsewhere.seen.some(({ path }) => path === '/api/media/2/subtitles/external-0'),
+          "B's sidecar was never fetched",
+        )
+        assert.deepEqual(harness.errorsOf(), [])
+      },
+    })
+  })
+
+  test('a server file that redirects to another origin is an error, and that origin hears nothing', async () => {
+    const asked: Parameters<FailureExplainer>[0][] = []
+    await withServers({
+      explain: async (input) => {
+        asked.push(input)
+        return { reason: 'open', message: 'The server sent raven player elsewhere.' }
+      },
+      run: async ({ harness, fixture }) => {
+        const failure = await harness.eventAfter({
+          label: 'the redirect refused',
+          matches: where({ type: 'error' }),
+          action: () => harness.sendOk(serverLoad({ target: fixture.titles.redirecting })),
+        })
+        assert.deepEqual(failure, {
+          type: 'error',
+          reason: 'open',
+          message: 'The server sent raven player elsewhere.',
+        })
+        assert.deepEqual(
+          asked.map(({ phase }) => phase),
+          ['loading'],
+        )
+        await sleep(SETTLE_MS)
+        assert.ok(
+          fixture.home.seen.some(({ path }) => path === `/api/media/${REDIRECTING}/file`),
+          'the redirecting title was never asked for',
+        )
+        assert.deepEqual(fixture.elsewhere.seen, [])
+      },
+    })
+  })
+
+  test('a local file, then a title with no cookie, after a server title send no Cookie header', async () => {
+    await withServers({
+      run: async ({ harness, fixture }) => {
+        await playingServer({ harness, target: fixture.titles.home })
+        await harness.playing({ fileId: 't1' })
+        await sleep(SETTLE_MS)
+        const heard = fixture.home.seen.length + fixture.elsewhere.seen.length
+        await harness.waitFor({
+          label: 'the local file reading on',
+          check: async () => ((await harness.mpv.read({ name: 'time-pos' })) ?? 0) > 0.2,
+        })
+        assert.equal(fixture.home.seen.length + fixture.elsewhere.seen.length, heard)
+        await playingServer({ harness, target: fixture.titles.bare })
+        await sleep(SETTLE_MS)
+        assert.ok(fixture.elsewhere.seen.length > 0, 'the cookie-less title was never asked for')
+        assert.deepEqual(cookiesSeen({ seen: fixture.elsewhere.seen }), [null])
+        assert.deepEqual(harness.errorsOf(), [])
+      },
+    })
+  })
+})
+
+const FIXTURE_PIN = '2468'
+const FIXTURE_PASSWORD = 'Fixture-Admin-2026!'
+const FIXTURE_SERVER = {
+  id: '00000000-0000-4000-8000-0000000000c3',
+  name: 'Fixture',
+} as const
+/** Where the fixture starts to trickle a file: past either clip's first second, short of its end. */
+const THROTTLE_SHARE = 0.1
+/**
+ * A server title's `reconnect_delay_max=3` lets FFmpeg retry a dropped stream after 0, 1
+ * and 3 s, so a title whose server went away or restarted stops about 4 s after mpv ran
+ * out of what it had (4.5 s measured).
+ */
+const RECONNECT_DELAYS_MS = 4000
+const LOST_BOUND_MS = RECONNECT_DELAYS_MS + 4000
+const LOST_WAIT_MS = 10_000
+/**
+ * A server that accepts and then sends nothing would hold a title for about two minutes
+ * of lavf timeouts and reconnects; the service's stall budget stops it first. This suite
+ * shortens the budget, and a hung title stops once mpv has played what it had (at most
+ * the throttled share of the clip) and then waited the budget.
+ */
+const STALL_TEST_MS = 3000
+const HUNG_BOUND_MS = STALL_TEST_MS + CLIP_SECONDS * THROTTLE_SHARE * 1000 + 3000
+/** How far past the budget a title that never opens may stop: the track list and mpv's stop. */
+const OPENING_SLACK_MS = 3000
+/** How long the throttled clip takes to use up what came at full speed, on a busy runner. */
+const DRAIN_WAIT_MS = 20_000
+/** How far past a budget a title may start: opening the clip over loopback, on a busy runner. */
+const BUDGET_SLACK_MS = 3000
+
+const mp4Clips: { pending: Promise<Clips> | null } = { pending: null }
+/** The MP4 clips the fixture serves as its second title, made once by the first fixture. */
+const fixtureClips = () => {
+  mp4Clips.pending ??= makeClips()
+  return mp4Clips.pending
+}
+after(async () => {
+  if (mp4Clips.pending === null) return
+  const { folder } = await mp4Clips.pending
+  await rm(folder, { recursive: true, force: true })
+})
+
+const startFixture = async ({ mode }: { mode: FixtureMode }) => {
+  const { first, second } = await fixtureClips()
+  return startFixtureServer({ clips: { first, second, tracks: clip.path }, mode })
+}
+
+type Jar = readonly { name: string; value: string }[]
+
+/** The `name=value` of each `Set-Cookie`, as a session would keep them. */
+const cookiesFrom = (response: Response): Jar =>
+  response.headers.getSetCookie().flatMap((line) => {
+    const [pair = ''] = line.split(';')
+    const split = pair.indexOf('=')
+    if (split <= 0) return []
+    return [{ name: pair.slice(0, split).trim(), value: pair.slice(split + 1).trim() }]
+  })
+
+const unlockWith = async ({
+  fixture,
+  path,
+  body,
+}: {
+  fixture: FixtureServer
+  path: string
+  body: Record<string, string>
+}): Promise<Jar> => {
+  const response = await fetch(`${fixture.origin}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  assert.equal(response.status, 200, `${path} answered ${response.status}`)
+  return cookiesFrom(response)
+}
+
+const unlockPin = ({ fixture }: { fixture: FixtureServer }) =>
+  unlockWith({ fixture, path: '/api/lock/unlock', body: { pin: FIXTURE_PIN } })
+
+/**
+ * The server sources main builds, over the fixture: `jar` stands in for the server's
+ * session, which sends its cookies with main's own calls and hands them to `cookiesFor`.
+ */
+const sourcesFor = ({ fixture, jar }: { fixture: FixtureServer; jar: Jar }) => {
+  const warnings: string[] = []
+  const entry: ServerEntry = { ...FIXTURE_SERVER, origin: fixture.origin, addedAt: 0 }
+  const serverOf = (serverId: string) => (serverId === entry.id ? entry : null)
+  const warn = (message: string) => {
+    warnings.push(message)
+  }
+  const sent = jar.map(({ name, value }) => `${name}=${value}`).join('; ')
+  const calls = createServerCalls({
+    serverOf,
+    fetchFor: () =>
+      fetchThrough((url, init) => {
+        const headers = new Headers(init.headers)
+        if (sent !== '') headers.set('cookie', sent)
+        return fetch(url, { ...init, headers })
+      }),
+    warn,
+  })
+  return {
+    sources: createServerSources({ serverOf, cookiesFor: async () => jar, calls, warn }),
+    warnings,
+  }
+}
+
+type Asked = Parameters<FailureExplainer>[0]
+
+/** Runs `run` on a harness whose server titles resolve and explain through the fixture. */
+const withFixtureTitles = async ({
+  fixture,
+  jar,
+  serverStallMs,
+  run,
+}: {
+  fixture: FixtureServer
+  jar: Jar
+  serverStallMs?: number
+  run: (input: {
+    harness: Harness
+    asked: readonly Asked[]
+    sourceWarnings: readonly string[]
+  }) => Promise<void>
+}) => {
+  const asked: Asked[] = []
+  const { sources, warnings: sourceWarnings } = sourcesFor({ fixture, jar })
+  const harness = await openHarness({
+    servers: sources,
+    explain: async (input) => {
+      asked.push(input)
+      return sources.explain(input)
+    },
+    serverStallMs,
+  })
+  try {
+    await run({ harness, asked, sourceWarnings })
+  } finally {
+    await harness.destroy()
+  }
+}
+
+const titleLoad = ({
+  mediaId,
+  subtitle = null,
+}: {
+  mediaId: number
+  subtitle?: string | null
+}): PlayerCommand => ({
+  type: 'load',
+  source: { kind: 'server', serverId: FIXTURE_SERVER.id, mediaId },
+  start: 0,
+  audio: null,
+  subtitle,
+})
+
+const playingTitle = ({
+  harness,
+  mediaId,
+  subtitle = null,
+  timeoutMs = WAIT_MS,
+}: {
+  harness: Harness
+  mediaId: number
+  subtitle?: string | null
+  timeoutMs?: number
+}) =>
+  harness.eventAfter({
+    label: `media ${mediaId} playing`,
+    matches: where({ type: 'paused', holds: (event) => !event.paused }),
+    action: () => harness.sendOk(titleLoad({ mediaId, subtitle })),
+    timeoutMs,
+  })
+
+const requestsTo = ({
+  log,
+  path,
+  from = 0,
+}: {
+  log: readonly FixtureRequest[]
+  path: string
+  from?: number
+}) => log.slice(from).filter((request) => request.path === path)
+
+const fileOfMedia = (mediaId: number) => `/api/media/${mediaId}/file`
+const SIDECAR_PATH = `/api/media/${FIXTURE_MEDIA.first}/subtitles/external-0`
+
+/** The first byte a `Range: bytes=<n>-` header asks for, or null for a whole file. */
+const rangeStart = (range: string | null) => {
+  const match = /^bytes=(\d+)-/u.exec(range ?? '')
+  return match === null ? null : Number(match[1])
+}
+
+const externalTrackId = async ({ harness }: { harness: Harness }) =>
+  (await harness.mpv.read({ name: 'track-list' })).find(
+    (track) => track.type === 'sub' && track.external === true,
+  )?.id ?? null
+
+/**
+ * Plays a title until mpv has read what the throttle lets through and waits on the rest,
+ * and answers the byte the fixture holds it at.
+ */
+const playingUpToThrottle = async ({
+  harness,
+  fixture,
+  mediaId,
+}: {
+  harness: Harness
+  fixture: FixtureServer
+  mediaId: number
+}) => {
+  const path = mediaId === FIXTURE_MEDIA.second ? (await fixtureClips()).second : clip.path
+  const held = Math.floor((await stat(path)).size * THROTTLE_SHARE)
+  fixture.throttle({ byte: held })
+  await playingTitle({ harness, mediaId })
+  await harness.nextEvent({
+    label: 'the clock moving past a second',
+    matches: where({ type: 'time', holds: (event) => event.time >= 1 }),
+  })
+  return held
+}
+
+/**
+ * Plays the track clip until mpv has used up what the throttle let through and waits on
+ * the trickle, then runs `action` and answers the error that follows and how long after
+ * `action` it came, so a test can pin how long the page waits.
+ */
+const failingWhenDrained = async ({
+  harness,
+  fixture,
+  label,
+  action,
+  timeoutMs,
+}: {
+  harness: Harness
+  fixture: FixtureServer
+  label: string
+  action: () => Promise<void>
+  timeoutMs: number
+}) => {
+  await playingUpToThrottle({ harness, fixture, mediaId: FIXTURE_MEDIA.first })
+  await harness.waitFor({
+    label: 'mpv waiting on the trickle',
+    check: async () => (await harness.mpv.read({ name: 'paused-for-cache' })) === true,
+    deadline: Date.now() + DRAIN_WAIT_MS,
+  })
+  const started = Date.now()
+  const failure = await harness.eventAfter({
+    label,
+    matches: where({ type: 'error' }),
+    action,
+    timeoutMs,
+  })
+  return { failure, elapsed: Date.now() - started }
+}
+
+describe('server titles from a raven fixture server', () => {
+  const holder: { fixture: FixtureServer | null } = { fixture: null }
+  const fixtureNow = () => {
+    if (holder.fixture === null) throw new Error('The fixture server is not running')
+    return holder.fixture
+  }
+  before(async () => {
+    holder.fixture = await startFixture({
+      mode: { pin: FIXTURE_PIN, isLocked: true, admin: { kind: 'off' } },
+    })
+  })
+  after(async () => {
+    const fixture = holder.fixture
+    holder.fixture = null
+    if (fixture !== null) await fixture.close()
+  })
+
+  test('plays a server title with its unlock cookie on every file request', async () => {
+    const fixture = fixtureNow()
+    const jar = await unlockPin({ fixture })
+    await withFixtureTitles({
+      fixture,
+      jar,
+      run: async ({ harness }) => {
+        const mark = fixture.requests.length
+        await playingTitle({ harness, mediaId: FIXTURE_MEDIA.first })
+        const files = requestsTo({
+          log: fixture.requests,
+          path: fileOfMedia(FIXTURE_MEDIA.first),
+          from: mark,
+        })
+        assert.ok(files.length > 0, 'mpv never asked for the file')
+        assert.ok(
+          files.every(({ hasUnlock }) => hasUnlock),
+          'a file request went without the unlock cookie',
+        )
+        assert.ok(
+          files.some(({ range }) => range !== null),
+          'mpv never asked for a byte range',
+        )
+        assert.ok(
+          files.every(({ hasOtherCookie, hasAdmin }) => !hasOtherCookie && !hasAdmin),
+          'a file request carried a cookie the session does not hold',
+        )
+        assert.deepEqual(harness.errorsOf(), [])
+      },
+    })
+  })
+
+  test("adds the server's sidecar through the same cookie, and it can be picked", async () => {
+    const fixture = fixtureNow()
+    const jar = await unlockPin({ fixture })
+    await withFixtureTitles({
+      fixture,
+      jar,
+      run: async ({ harness }) => {
+        const mark = fixture.requests.length
+        await playingTitle({ harness, mediaId: FIXTURE_MEDIA.first })
+        // The first snapshot waits for the sidecar, so its tracks already hold it.
+        const settled = harness.events.findLast(where({ type: 'tracks' }))?.tracks ?? null
+        assert.ok(settled, 'no tracks after the snapshot')
+        assert.deepEqual(
+          settled.subtitles.map(({ id, source, language }) => ({ id, source, language })),
+          [
+            { id: 'embedded-0', source: 'embedded', language: 'en' },
+            { id: 'external-0', source: 'external', language: 'en' },
+          ],
+        )
+        assert.deepEqual(
+          settled,
+          tracksFromMpv({
+            list: await harness.mpv.read({ name: 'track-list' }),
+            frameRate: await harness.mpv.read({ name: 'container-fps' }),
+          }),
+        )
+        const sidecars = requestsTo({ log: fixture.requests, path: SIDECAR_PATH, from: mark })
+        assert.ok(sidecars.length > 0, 'mpv never asked for the sidecar')
+        assert.ok(
+          sidecars.every(({ method, hasUnlock }) => method === 'GET' && hasUnlock),
+          'the sidecar request went without the unlock cookie',
+        )
+        const external = await externalTrackId({ harness })
+        assert.ok(external !== null, 'mpv did not list the sidecar')
+        await harness.sendOk({ type: 'subtitle', id: 'external-0' })
+        assert.equal(await harness.mpv.read({ name: 'sid' }), external)
+      },
+    })
+  })
+
+  test('a title the server refuses is an open error the source explains', async () => {
+    const fixture = fixtureNow()
+    await withFixtureTitles({
+      fixture,
+      jar: [],
+      run: async ({ harness, asked, sourceWarnings }) => {
+        const mark = fixture.requests.length
+        const failure = await harness.eventAfter({
+          label: 'the locked title refused',
+          matches: where({ type: 'error' }),
+          action: () => harness.sendOk(titleLoad({ mediaId: FIXTURE_MEDIA.first })),
+        })
+        assert.deepEqual(failure, {
+          type: 'error',
+          reason: 'locked',
+          message: SOURCE_MESSAGES.relocked(FIXTURE_SERVER.name),
+        })
+        assert.deepEqual(
+          asked.map(({ phase }) => phase),
+          ['loading'],
+        )
+        const files = requestsTo({
+          log: fixture.requests,
+          path: fileOfMedia(FIXTURE_MEDIA.first),
+          from: mark,
+        })
+        assert.ok(files.length > 0, 'mpv never asked for the file')
+        assert.ok(files.every(({ hasUnlock }) => !hasUnlock))
+        assert.deepEqual(
+          sourceWarnings.filter((warning) => warning.includes('its tracks answered 423')),
+          [`no sidecars from ${FIXTURE_SERVER.name}: its tracks answered 423`],
+        )
+        assert.deepEqual(
+          harness.raw.filter((event) => event.type === 'file-loaded'),
+          [],
+          'mpv opened the locked title',
+        )
+      },
+    })
+  })
+
+  test('a title that is not on the server is an open error that says it is gone', async () => {
+    const fixture = fixtureNow()
+    const jar = await unlockPin({ fixture })
+    await withFixtureTitles({
+      fixture,
+      jar,
+      run: async ({ harness, asked }) => {
+        const failure = await harness.eventAfter({
+          label: 'the missing title refused',
+          matches: where({ type: 'error' }),
+          action: () => harness.sendOk(titleLoad({ mediaId: 9 })),
+        })
+        assert.deepEqual(failure, {
+          type: 'error',
+          reason: 'open',
+          message: SOURCE_MESSAGES.gone(FIXTURE_SERVER.name),
+        })
+        assert.deepEqual(
+          asked.map(({ phase }) => phase),
+          ['loading'],
+        )
+      },
+    })
+  })
+
+  test('an HTML page where the file should be is an open error, not a playlist', async () => {
+    const fixture = fixtureNow()
+    const jar = await unlockPin({ fixture })
+    await withFixtureTitles({
+      fixture,
+      jar,
+      run: async ({ harness, asked }) => {
+        const failure = await harness.eventAfter({
+          label: 'the page refused',
+          matches: where({ type: 'error' }),
+          action: () => harness.sendOk(titleLoad({ mediaId: FIXTURE_MEDIA.page })),
+        })
+        assert.deepEqual(failure, {
+          type: 'error',
+          reason: 'open',
+          message: SOURCE_MESSAGES.cannotOpen(FIXTURE_SERVER.name),
+        })
+        assert.deepEqual(
+          asked.map(({ phase }) => phase),
+          ['loading'],
+        )
+        assert.deepEqual(
+          harness.raw.filter((event) => event.type === 'file-loaded'),
+          [],
+          'mpv opened the page',
+        )
+      },
+    })
+  })
+
+  test('a title that redirects is an open error, and the place it points hears nothing', async () => {
+    const fixture = fixtureNow()
+    const jar = await unlockPin({ fixture })
+    const elsewhere = fixture.elsewhere.requests.length
+    await withFixtureTitles({
+      fixture,
+      jar,
+      run: async ({ harness, asked }) => {
+        const mark = fixture.requests.length
+        const failure = await harness.eventAfter({
+          label: 'the redirect refused',
+          matches: where({ type: 'error' }),
+          action: () => harness.sendOk(titleLoad({ mediaId: FIXTURE_MEDIA.redirecting })),
+        })
+        assert.deepEqual(failure, {
+          type: 'error',
+          reason: 'open',
+          message: SOURCE_MESSAGES.cannotOpen(FIXTURE_SERVER.name),
+        })
+        assert.deepEqual(
+          asked.map(({ phase }) => phase),
+          ['loading'],
+        )
+        await sleep(SETTLE_MS)
+        assert.ok(
+          requestsTo({
+            log: fixture.requests,
+            path: fileOfMedia(FIXTURE_MEDIA.redirecting),
+            from: mark,
+          }).some(({ hasUnlock }) => hasUnlock),
+          'the redirecting title was never asked for',
+        )
+        assert.deepEqual(fixture.elsewhere.requests.slice(elsewhere), [])
+      },
+    })
+  })
+
+  test('reads a server title ahead into the cache while it is paused', async () => {
+    const fixture = fixtureNow()
+    const jar = await unlockPin({ fixture })
+    await withFixtureTitles({
+      fixture,
+      jar,
+      run: async ({ harness }) => {
+        await playingTitle({ harness, mediaId: FIXTURE_MEDIA.first })
+        await harness.sendOk({ type: 'pause' })
+        const paused = (await harness.mpv.read({ name: 'time-pos' })) ?? Number.NaN
+        // The addon's own cache options, which a server title runs under too.
+        assert.equal(await harness.mpv.read({ name: 'options/cache' }), true)
+        assert.equal(await harness.mpv.read({ name: 'options/demuxer-max-bytes' }), 1_073_741_824)
+        assert.equal(
+          await harness.mpv.read({ name: 'options/demuxer-max-back-bytes' }),
+          268_435_456,
+        )
+        // mpv's own read-ahead without the cache is a second; the cache holds the whole clip.
+        // Any range heard so far counts, the snapshot's included.
+        await harness.waitFor({
+          label: `the cache running from ${paused} to the end of the clip`,
+          check: async () =>
+            harness.events
+              .filter(where({ type: 'buffered' }))
+              .some((event) => event.ranges.some(({ start, end }) => start <= paused && end >= 29)),
+        })
+      },
+    })
+  })
+
+  test('removing the server stops its title and says only that the server is gone', async () => {
+    const fixture = fixtureNow()
+    const jar = await unlockPin({ fixture })
+    await withFixtureTitles({
+      fixture,
+      jar,
+      run: async ({ harness }) => {
+        await playingTitle({ harness, mediaId: FIXTURE_MEDIA.first })
+        const heard = harness.events.length
+        await harness.service.resetIfServer(FIXTURE_SERVER.id)
+        await harness.waitFor({
+          label: 'mpv idle after the removal',
+          check: async () => (await harness.mpv.read({ name: 'track-list' })).length === 0,
+        })
+        await sleep(SETTLE_MS)
+        // Only the service's own word: nothing mpv's stop could be mistaken for.
+        assert.deepEqual(
+          harness.events.slice(heard),
+          [{ type: 'error', reason: 'open', message: PLAYER_MESSAGES.serverGone }],
+          'the page heard more than that the server is gone',
+        )
+      },
+    })
+  })
+})
+
+describe('a slow raven fixture server', () => {
+  const holder: { fixture: FixtureServer | null } = { fixture: null }
+  const fixtureNow = () => {
+    if (holder.fixture === null) throw new Error('The fixture server is not running')
+    return holder.fixture
+  }
+  before(async () => {
+    holder.fixture = await startFixture({
+      mode: { pin: FIXTURE_PIN, isLocked: true, admin: { kind: 'off' } },
+    })
+  })
+  after(async () => {
+    const fixture = holder.fixture
+    holder.fixture = null
+    if (fixture !== null) await fixture.close()
+  })
+
+  test('seeks past what has arrived with a byte range from there', async () => {
+    const fixture = fixtureNow()
+    const jar = await unlockPin({ fixture })
+    try {
+      await withFixtureTitles({
+        fixture,
+        jar,
+        run: async ({ harness }) => {
+          // The MP4: the track clip's embedded subtitle spans the whole clip, so mpv seeks
+          // back to its first cluster to show it, through the bytes the fixture holds.
+          const held = await playingUpToThrottle({
+            harness,
+            fixture,
+            mediaId: FIXTURE_MEDIA.second,
+          })
+          const mark = fixture.requests.length
+          await harness.eventAfter({
+            label: 'time near 25',
+            matches: where({
+              type: 'time',
+              holds: (event) => near({ value: event.time, target: 25, within: 1 }),
+            }),
+            action: () => harness.sendOk({ type: 'seek', time: 25 }),
+          })
+          const ranged = requestsTo({
+            log: fixture.requests,
+            path: fileOfMedia(FIXTURE_MEDIA.second),
+            from: mark,
+          })
+          assert.ok(
+            ranged.some(({ range, hasUnlock }) => hasUnlock && (rangeStart(range) ?? 0) > held),
+            `no range past byte ${held}: ${JSON.stringify(ranged.map(({ range }) => range))}`,
+          )
+          assert.deepEqual(harness.errorsOf(), [])
+        },
+      })
+    } finally {
+      fixture.throttle({ byte: null })
+    }
+  })
+
+  test('a server restart mid-film is a lock the page can answer', async () => {
+    const fixture = fixtureNow()
+    const jar = await unlockPin({ fixture })
+    try {
+      await withFixtureTitles({
+        fixture,
+        jar,
+        run: async ({ harness, asked }) => {
+          const { failure, elapsed } = await failingWhenDrained({
+            harness,
+            fixture,
+            label: 'the relocked title stopping',
+            action: async () => {
+              fixture.relock()
+              fixture.disconnect()
+            },
+            timeoutMs: LOST_WAIT_MS,
+          })
+          assert.ok(elapsed < LOST_BOUND_MS, `the relocked title stopped after ${elapsed} ms`)
+          assert.deepEqual(failure, {
+            type: 'error',
+            reason: 'locked',
+            message: SOURCE_MESSAGES.relocked(FIXTURE_SERVER.name),
+          })
+          assert.deepEqual(
+            asked.map(({ phase }) => phase),
+            ['loaded'],
+          )
+          assert.deepEqual(harness.endingsOf(), [])
+        },
+      })
+    } finally {
+      fixture.throttle({ byte: null })
+    }
+  })
+
+  test('a slow track list holds the title no longer than its budget', async () => {
+    const fixture = fixtureNow()
+    const jar = await unlockPin({ fixture })
+    const release = fixture.stall({ path: /\/tracks$/u })
+    try {
+      await withFixtureTitles({
+        fixture,
+        jar,
+        run: async ({ harness, sourceWarnings }) => {
+          const mark = fixture.requests.length
+          const started = Date.now()
+          await playingTitle({ harness, mediaId: FIXTURE_MEDIA.first })
+          const elapsed = Date.now() - started
+          assert.ok(elapsed >= TRACKS_TIMEOUT_MS, `played after ${elapsed} ms`)
+          assert.ok(elapsed < TRACKS_TIMEOUT_MS + BUDGET_SLACK_MS, `played after ${elapsed} ms`)
+          assert.deepEqual(
+            (harness.events.findLast(where({ type: 'tracks' }))?.tracks.subtitles ?? []).map(
+              ({ id }) => id,
+            ),
+            ['embedded-0'],
+          )
+          assert.ok(
+            sourceWarnings.includes(
+              `no sidecars from ${FIXTURE_SERVER.name}: its tracks did not answer in time`,
+            ),
+            JSON.stringify(sourceWarnings),
+          )
+          assert.deepEqual(
+            requestsTo({ log: fixture.requests, path: SIDECAR_PATH, from: mark }),
+            [],
+          )
+          assert.deepEqual(harness.errorsOf(), [])
+        },
+      })
+    } finally {
+      release()
+    }
+  })
+
+  test('a slow sidecar starts the title without it, then selects it as it lands', async () => {
+    const fixture = fixtureNow()
+    const jar = await unlockPin({ fixture })
+    const release = fixture.stall({ path: /\/subtitles\/external-0$/u })
+    try {
+      await withFixtureTitles({
+        fixture,
+        jar,
+        run: async ({ harness }) => {
+          const started = Date.now()
+          await playingTitle({
+            harness,
+            mediaId: FIXTURE_MEDIA.first,
+            subtitle: 'external-0',
+            timeoutMs: SIDECAR_BUDGET_MS + WAIT_MS,
+          })
+          const elapsed = Date.now() - started
+          assert.ok(elapsed >= SIDECAR_BUDGET_MS, `played after ${elapsed} ms`)
+          assert.ok(elapsed < SIDECAR_BUDGET_MS + BUDGET_SLACK_MS, `played after ${elapsed} ms`)
+          assert.deepEqual(
+            (harness.events.findLast(where({ type: 'tracks' }))?.tracks.subtitles ?? []).map(
+              ({ id }) => id,
+            ),
+            ['embedded-0'],
+          )
+          assert.ok(
+            harness.warnings.includes('server sidecars are slow; the title starts without them'),
+          )
+          assert.equal(await harness.mpv.read({ name: 'sid' }), false)
+          const landed = harness.nextEvent({
+            label: 'the late sidecar listed',
+            matches: where({
+              type: 'tracks',
+              holds: (event) => event.tracks.subtitles.some(({ id }) => id === 'external-0'),
+            }),
+          })
+          release()
+          await landed
+          await harness.waitFor({
+            label: 'the late sidecar selected',
+            check: async () => {
+              const external = await externalTrackId({ harness })
+              return external !== null && (await harness.mpv.read({ name: 'sid' })) === external
+            },
+          })
+        },
+      })
+    } finally {
+      release()
+    }
+  })
+
+  test('a load still resolving when its server goes is refused and fetches nothing', async () => {
+    const fixture = fixtureNow()
+    const jar = await unlockPin({ fixture })
+    const release = fixture.stall({ path: /\/tracks$/u })
+    try {
+      await withFixtureTitles({
+        fixture,
+        jar,
+        run: async ({ harness }) => {
+          const mark = fixture.requests.length
+          const outcome = harness.send(titleLoad({ mediaId: FIXTURE_MEDIA.first }))
+          await harness.waitFor({
+            label: 'the track list asked for',
+            check: async () =>
+              requestsTo({
+                log: fixture.requests,
+                path: `/api/media/${FIXTURE_MEDIA.first}/tracks`,
+                from: mark,
+              }).length > 0,
+          })
+          await harness.service.resetIfServer(FIXTURE_SERVER.id)
+          release()
+          assert.deepEqual(await outcome, {
+            ok: false,
+            reason: 'refused',
+            message: PLAYER_MESSAGES.serverGone,
+          })
+          await sleep(SETTLE_MS)
+          assert.deepEqual(
+            requestsTo({
+              log: fixture.requests,
+              path: fileOfMedia(FIXTURE_MEDIA.first),
+              from: mark,
+            }),
+            [],
+          )
+          assert.deepEqual(harness.events, [])
+        },
+      })
+    } finally {
+      release()
+    }
+  })
+})
+
+describe('a raven fixture server under the admin lock', () => {
+  const holder: { fixture: FixtureServer | null } = { fixture: null }
+  before(async () => {
+    holder.fixture = await startFixture({
+      mode: {
+        pin: FIXTURE_PIN,
+        isLocked: true,
+        admin: { kind: 'password', password: FIXTURE_PASSWORD },
+      },
+    })
+  })
+  after(async () => {
+    const fixture = holder.fixture
+    holder.fixture = null
+    if (fixture !== null) await fixture.close()
+  })
+
+  test('plays once both cookies are in, and every file request carries both', async () => {
+    const fixture = holder.fixture
+    if (fixture === null) throw new Error('The fixture server is not running')
+    const admin = await unlockWith({
+      fixture,
+      path: '/api/admin/unlock',
+      body: { password: FIXTURE_PASSWORD },
+    })
+    const jar = [...admin, ...(await unlockPin({ fixture }))]
+    await withFixtureTitles({
+      fixture,
+      jar,
+      run: async ({ harness }) => {
+        const mark = fixture.requests.length
+        await playingTitle({ harness, mediaId: FIXTURE_MEDIA.first })
+        const files = requestsTo({
+          log: fixture.requests,
+          path: fileOfMedia(FIXTURE_MEDIA.first),
+          from: mark,
+        })
+        assert.ok(files.length > 0, 'mpv never asked for the file')
+        assert.ok(
+          files.every(
+            ({ hasUnlock, hasAdmin, hasOtherCookie }) => hasUnlock && hasAdmin && !hasOtherCookie,
+          ),
+          'a file request went without both cookies',
+        )
+        assert.deepEqual(harness.errorsOf(), [])
+      },
+    })
+  })
+})
+
+describe('a raven fixture server with no admin password', () => {
+  test('hides a locked title whatever PIN went in, and the page hears it is gone', async () => {
+    const fixture = await startFixture({
+      mode: { pin: FIXTURE_PIN, isLocked: true, admin: { kind: 'noPassword' } },
+    })
+    try {
+      const admin = await fetch(`${fixture.origin}/api/admin`)
+      assert.deepEqual(await admin.json(), { state: 'on', available: false })
+      const jar = await unlockPin({ fixture })
+      await withFixtureTitles({
+        fixture,
+        jar,
+        run: async ({ harness, asked }) => {
+          const failure = await harness.eventAfter({
+            label: 'the hidden title refused',
+            matches: where({ type: 'error' }),
+            action: () => harness.sendOk(titleLoad({ mediaId: FIXTURE_MEDIA.first })),
+          })
+          assert.deepEqual(failure, {
+            type: 'error',
+            reason: 'open',
+            message: SOURCE_MESSAGES.gone(FIXTURE_SERVER.name),
+          })
+          assert.deepEqual(
+            asked.map(({ phase }) => phase),
+            ['loading'],
+          )
+        },
+      })
+    } finally {
+      await fixture.close()
+    }
+  })
+})
+
+describe("the raven fixture server's wrong PINs", () => {
+  test('answer 429 after five in a row, the right PIN too, for a minute', async () => {
+    const clock = { now: 1_000_000 }
+    const { first, second } = await fixtureClips()
+    const fixture = await startFixtureServer({
+      clips: { first, second, tracks: clip.path },
+      mode: { pin: FIXTURE_PIN, isLocked: true, admin: { kind: 'off' } },
+      now: () => clock.now,
+    })
+    const tryPin = async (pin: string) => {
+      const response = await fetch(`${fixture.origin}/api/lock/unlock`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      })
+      return response.status
+    }
+    try {
+      const wrong = await Array.from({ length: 5 }).reduce<Promise<number[]>>(
+        async (previous) => [...(await previous), await tryPin('0000')],
+        Promise.resolve([]),
+      )
+      assert.deepEqual(wrong, [401, 401, 401, 401, 401])
+      assert.equal(await tryPin(FIXTURE_PIN), 429)
+      clock.now += 59_999
+      assert.equal(await tryPin(FIXTURE_PIN), 429)
+      clock.now += 1
+      assert.equal(await tryPin(FIXTURE_PIN), 200)
+    } finally {
+      await fixture.close()
+    }
+  })
+})
+
+describe('a raven fixture server that goes away mid-film', () => {
+  test('is a lost connection, and the clock stays where it stopped', async () => {
+    const fixture = await startFixture({
+      mode: { pin: FIXTURE_PIN, isLocked: true, admin: { kind: 'off' } },
+    })
+    try {
+      const jar = await unlockPin({ fixture })
+      await withFixtureTitles({
+        fixture,
+        jar,
+        run: async ({ harness, asked }) => {
+          const { failure, elapsed } = await failingWhenDrained({
+            harness,
+            fixture,
+            label: 'the lost title stopping',
+            action: () => fixture.close(),
+            timeoutMs: LOST_WAIT_MS,
+          })
+          assert.ok(elapsed < LOST_BOUND_MS, `the lost title stopped after ${elapsed} ms`)
+          assert.deepEqual(failure, {
+            type: 'error',
+            reason: 'network',
+            message: SOURCE_MESSAGES.lost(FIXTURE_SERVER.name),
+          })
+          assert.deepEqual(
+            asked.map(({ phase }) => phase),
+            ['loaded'],
+          )
+          const at = harness.events.indexOf(failure)
+          const times = harness.events.filter(where({ type: 'time' }))
+          assert.ok(
+            harness.events.slice(at).every((event) => event.type !== 'time'),
+            'the clock moved after the title stopped',
+          )
+          assert.ok(
+            (times.at(-1)?.time ?? 0) >= 1,
+            `the clock stopped at ${times.at(-1)?.time ?? 'nothing'}`,
+          )
+          assert.deepEqual(harness.endingsOf(), [])
+        },
+      })
+    } finally {
+      await fixture.close()
+    }
+  })
+
+  test('a server that sends the headers of a file and then nothing is a lost connection within the budget', async () => {
+    const fixture = await startFixture({
+      mode: { pin: FIXTURE_PIN, isLocked: true, admin: { kind: 'off' } },
+    })
+    try {
+      const jar = await unlockPin({ fixture })
+      fixture.stallFiles()
+      await withFixtureTitles({
+        fixture,
+        jar,
+        serverStallMs: STALL_TEST_MS,
+        run: async ({ harness, asked }) => {
+          const mark = fixture.requests.length
+          const started = Date.now()
+          const failure = await harness.eventAfter({
+            label: 'the stalled title stopping',
+            matches: where({ type: 'error' }),
+            action: () => harness.sendOk(titleLoad({ mediaId: FIXTURE_MEDIA.first })),
+            timeoutMs: STALL_TEST_MS + WAIT_MS,
+          })
+          const elapsed = Date.now() - started
+          assert.ok(elapsed >= STALL_TEST_MS, `the stalled title stopped after ${elapsed} ms`)
+          assert.ok(
+            elapsed < STALL_TEST_MS + OPENING_SLACK_MS,
+            `the stalled title stopped after ${elapsed} ms`,
+          )
+          assert.deepEqual(failure, {
+            type: 'error',
+            reason: 'network',
+            message: PLAYER_MESSAGES.lost,
+          })
+          assert.deepEqual(asked, [])
+          assert.ok(
+            requestsTo({
+              log: fixture.requests,
+              path: fileOfMedia(FIXTURE_MEDIA.first),
+              from: mark,
+            }).length > 0,
+            'mpv never asked for the file',
+          )
+          assert.deepEqual(
+            harness.raw.filter((event) => event.type === 'file-loaded'),
+            [],
+            'mpv opened the stalled file',
+          )
+          await sleep(SETTLE_MS)
+          assert.deepEqual(harness.errorsOf(), [failure])
+        },
+      })
+    } finally {
+      await fixture.close()
+    }
+  })
+
+  test('a server that hangs is a lost connection once the title has waited its budget', async () => {
+    const fixture = await startFixture({
+      mode: { pin: FIXTURE_PIN, isLocked: true, admin: { kind: 'off' } },
+    })
+    try {
+      const jar = await unlockPin({ fixture })
+      await withFixtureTitles({
+        fixture,
+        jar,
+        serverStallMs: STALL_TEST_MS,
+        run: async ({ harness, asked }) => {
+          await playingUpToThrottle({ harness, fixture, mediaId: FIXTURE_MEDIA.first })
+          const started = Date.now()
+          const failure = await harness.eventAfter({
+            label: 'the hung title stopping',
+            matches: where({ type: 'error' }),
+            action: async () => {
+              fixture.hang()
+            },
+            timeoutMs: HUNG_BOUND_MS + WAIT_MS,
+          })
+          const elapsed = Date.now() - started
+          assert.ok(elapsed >= STALL_TEST_MS, `the hung title stopped after ${elapsed} ms`)
+          assert.ok(elapsed < HUNG_BOUND_MS, `the hung title stopped after ${elapsed} ms`)
+          assert.deepEqual(failure, {
+            type: 'error',
+            reason: 'network',
+            message: PLAYER_MESSAGES.lost,
+          })
+          assert.deepEqual(asked, [])
+          await harness.waitFor({
+            label: 'mpv idle after the stall',
+            check: async () => (await harness.mpv.read({ name: 'track-list' })).length === 0,
+          })
+          const at = harness.events.indexOf(failure)
+          assert.ok(
+            harness.events.slice(at).every((event) => event.type !== 'time'),
+            'the clock moved after the title stopped',
+          )
+        },
+      })
+    } finally {
+      await fixture.close()
+    }
   })
 })
 
