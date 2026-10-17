@@ -79,7 +79,7 @@ jobs:
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       HOMEBREW_NO_AUTO_UPDATE: '1'
-      # This run's Nx Agents are Linux; the native macOS tasks must stay on this runner.
+      # This run's Nx Agents are Linux; the macOS tasks must stay on this runner.
       NX_CLOUD_DISTRIBUTED_EXECUTION: 'false'
     steps:
       - name: 📥 Checkout exact PR head
@@ -139,6 +139,8 @@ jobs:
     env:
       # Keeps the Xcode version the cached app is keyed on the same as the native job's.
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      # This run's Nx Agents are Linux; the macOS tasks must stay on this runner.
+      NX_CLOUD_DISTRIBUTED_EXECUTION: 'false'
     steps:
       - name: 📥 Checkout exact PR head
         uses: actions/checkout@v7
@@ -208,6 +210,8 @@ jobs:
       # The source-built ffmpeg has VideoToolbox; `-allow_sw 1` falls back to Apple's
       # software H.264 encoder on a VM without a hardware one.
       RAVEN_E2E_FFMPEG: ${{ github.workspace }}/libs/raven/mpv/native-build/prefix/bin/ffmpeg
+      # This run's Nx Agents are Linux; the macOS tasks must stay on this runner.
+      NX_CLOUD_DISTRIBUTED_EXECUTION: 'false'
     steps:
       - name: 📥 Checkout exact PR head
         uses: actions/checkout@v7
