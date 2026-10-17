@@ -1,6 +1,6 @@
 ---
 name: get-started
-description: Use when setting up maester on a new machine or fresh clone, onboarding to the repo, or when `bun run verify` (or the lefthook pre-push hook, which runs the same checks) fails on tasks nobody changed. Covers errors like "Failed to inspect Python interpreter", "Bad CPU type in executable", `Executable not found in $PATH: "ffmpeg"`, `uvx: command not found`, and a wrong Bun version.
+description: Use when setting up maester on a new machine or fresh clone, onboarding to the repo, or when `bun run verify` (or the lefthook pre-push hook, which runs the same checks) fails on tasks nobody changed. Covers errors like "Failed to inspect Python interpreter", "Bad CPU type in executable", `Executable not found in $PATH: "ffmpeg"`, `uvx: command not found`, `nx: command not found` on `nx login`, and a wrong Bun version.
 ---
 
 # Get started
@@ -11,14 +11,17 @@ A fresh clone that fails `verify` almost always has an environment problem, not 
 
 ## 1. Check the tools
 
-| Tool               | Why                                                            | Check                                 | Install                                                      |
-| ------------------ | -------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------ |
-| Bun                | Runs everything; must match `packageManager` in `package.json` | `bun --version`                       | `curl -fsSL https://bun.sh/install \| bash -s bun-v<pinned>` |
-| uv / uvx           | Python lint, format and tests; `uvx typos` spellcheck          | `uv --version`                        | `brew install uv`                                            |
-| Python 3.12        | `apps/luwin/api` pins `>=3.12,<3.13`; `scripts` uses its env   | `uv python find 3.12`                 | `uv python install 3.12`                                     |
-| ffmpeg and ffprobe | `@raven/server` and `@raven/core` tests make real clips        | `ffmpeg -version && ffprobe -version` | `brew install ffmpeg`                                        |
+| Tool               | Why                                                                                                   | Check                                 | Install                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------ |
+| Bun                | Runs everything; must match `packageManager` in `package.json`                                        | `bun --version`                       | `curl -fsSL https://bun.sh/install \| bash -s bun-v<pinned>` |
+| uv / uvx           | Python lint, format and tests; `uvx typos` spellcheck                                                 | `uv --version`                        | `brew install uv`                                            |
+| Python 3.12        | `apps/luwin/api` pins `>=3.12,<3.13`; `scripts` uses its env                                          | `uv python find 3.12`                 | `uv python install 3.12`                                     |
+| ffmpeg and ffprobe | `@raven/server` and `@raven/core` tests make real clips                                               | `ffmpeg -version && ffprobe -version` | `brew install ffmpeg`                                        |
+| Nx CLI (optional)  | `nx login`, which signs this machine in to the Nx Cloud workspace that `nxCloudId` in `nx.json` names | `nx --version`                        | `brew install nx`                                            |
 
 Run `uv python install 3.12` even when some Python is on the PATH. uv only accepts 3.12, and it fails outright on a broken interpreter it meets while searching (see below), so a uv-managed 3.12 is the reliable fix.
+
+`verify` and every task run through `bunx nx`, so the global Nx CLI is only for `nx login`. That command opens a browser, so run it yourself rather than through an agent (in Claude Code, `! nx login`). Homebrew's `nx` can be newer than the `nx` pinned in `package.json`; inside the repo it hands off to the pinned one, so `nx --version` printing a newer `Global` than `Local` is expected.
 
 ## 2. Install and verify
 
@@ -39,6 +42,7 @@ Nx ends with a `Failed tasks:` list. Rerun just one to see its output: `bunx nx 
 | `Failed to inspect Python interpreter ... /usr/local/bin/python3` / `Bad CPU type in executable`     | A leftover Intel Homebrew in `/usr/local` on Apple silicon without Rosetta | `uv python install 3.12`; optionally remove the stale `/usr/local` Homebrew |
 | `Executable not found in $PATH: "ffmpeg"`, `spawn ffmpeg ENOENT` in `@raven/server` or `@raven/core` | ffmpeg not installed                                                       | `brew install ffmpeg`                                                       |
 | `spellcheck` fails with `uvx: command not found`                                                     | uv not installed                                                           | `brew install uv`                                                           |
+| `nx login` fails with `nx: command not found`                                                        | No global Nx CLI; the repo's Nx lives in `node_modules`                    | `brew install nx`                                                           |
 | Odd failures in many tasks at once, env values you didn't set                                        | A `.env` at the repo root; Nx loads it into every task                     | Move it to `apps/<product>/.env`                                            |
 | `bun --version` differs from `packageManager` in `package.json`                                      | Wrong Bun installed                                                        | Install the pinned Bun                                                      |
 | `format:check` or `lint:*` fails on files you edited                                                 | A real issue in your change                                                | `bun run format`, `bun run lint:fix`, then fix what remains by hand         |
