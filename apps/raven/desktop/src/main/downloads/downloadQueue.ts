@@ -245,6 +245,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   const launch: { sweeping: Promise<void> | null } = { sweeping: null }
   /** The one timer that tries the files waiting on an outage again. */
   const outage: { retry: unknown } = { retry: undefined }
+  /** The files the outage retry requeued, until they fail, finish or the viewer acts on them. */
+  const retried = new Set<string>()
   /** Asleep from a suspend until the settle after the wake; nothing starts meanwhile. */
   const sleep: { isAsleep: boolean; settle: unknown } = { isAsleep: false, settle: undefined }
 
@@ -257,7 +259,11 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
 
   const told = (downloadId: string): void => {
     const entry = entryById(store.read(), { downloadId })
-    if (entry !== null && entry.status.kind === 'failed') deps.onFailed(entry)
+    const isRetried = retried.delete(downloadId)
+    if (entry === null || entry.status.kind !== 'failed') return
+    // The outage was told when it began, and the row still says so.
+    if (isRetried && entry.status.reason === 'unreachable') return
+    deps.onFailed(entry)
   }
 
   const failEntry = ({
@@ -665,6 +671,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   }
 
   const announceReady = (downloadId: string): void => {
+    retried.delete(downloadId)
     const ready = entryById(store.read(), { downloadId })
     if (ready !== null) deps.onFinished(ready)
   }
@@ -741,7 +748,16 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     })
   }
 
-  const resumeEach = (downloadIds: readonly string[]): void => {
+  const resumeEach = ({
+    downloadIds,
+    isRetry,
+  }: {
+    downloadIds: readonly string[]
+    isRetry: boolean
+  }): void => {
+    downloadIds.forEach((downloadId) =>
+      isRetry ? retried.add(downloadId) : retried.delete(downloadId),
+    )
     store.update((state) =>
       downloadIds.reduce((next, downloadId) => resume(next, { downloadId }), state),
     )
@@ -751,12 +767,13 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
 
   const retryOutages: DownloadQueue['retryOutages'] = () => {
     if (isDisposed) return
-    resumeEach(
-      store
+    resumeEach({
+      downloadIds: store
         .read()
         .entries.filter(isWaitingOnOutage)
         .map(({ downloadId }) => downloadId),
-    )
+      isRetry: true,
+    })
   }
 
   // One unlock lifts the lock for every file of the server, so one Resume takes them all.
@@ -768,10 +785,11 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
           .read()
           .entries.filter((other) => other.serverId === entry.serverId && isRelocked(other))
       : [entry]
-    resumeEach(relocked.map((other) => other.downloadId))
+    resumeEach({ downloadIds: relocked.map((other) => other.downloadId), isRetry: false })
   }
 
-  const retryOne: DownloadQueue['retry'] = ({ downloadId }) => resumeEach([downloadId])
+  const retryOne: DownloadQueue['retry'] = ({ downloadId }) =>
+    resumeEach({ downloadIds: [downloadId], isRetry: false })
 
   const pauseAll: DownloadQueue['pauseAll'] = async () => {
     saveBytes(() => true)
@@ -781,12 +799,13 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   }
 
   const resumeAll: DownloadQueue['resumeAll'] = () => {
-    resumeEach(
-      store
+    resumeEach({
+      downloadIds: store
         .read()
         .entries.filter((entry) => entry.status.kind === 'paused')
         .map(({ downloadId }) => downloadId),
-    )
+      isRetry: false,
+    })
   }
 
   const onSuspend: DownloadQueue['onSuspend'] = () => {

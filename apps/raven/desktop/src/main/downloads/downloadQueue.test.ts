@@ -1075,6 +1075,20 @@ describe('the outage retry', () => {
     expect(retries(world.pending)).toHaveLength(1)
   })
 
+  it('tells of the outage once, not again each time a retry finds it still there', async () => {
+    const world = setup({ entries: [entryFor(1), entryFor(2)], access: async () => unreachable })
+    world.queue.kick()
+    await until(() => world.statusOf(1)?.kind === 'failed' && world.statusOf(2)?.kind === 'paused')
+    expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
+    world.fireAfter(OUTAGE_RETRY_MS)
+    await until(() => world.media.asked.length === 4 && world.statusOf(1)?.kind === 'failed')
+    await ticks(10)
+    expect(world.failed).toHaveLength(1)
+    world.queue.retry({ downloadId: idOf(1) })
+    await until(() => world.media.asked.length === 5)
+    await until(() => world.failed.length === 2)
+  })
+
   it('requeues at launch what waits on an outage, and nothing the viewer paused', async () => {
     const world = setup({
       entries: [
