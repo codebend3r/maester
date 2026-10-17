@@ -12,7 +12,7 @@ import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MetadataService } from '@/metadata/metadataService'
 import type { ExternalScore, ScoreProvider, ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
 import { Scores } from '@/metadata/scores'
-import { GIVE_UP_AFTER, RETRY_MS, ScoreSweep } from '@/metadata/scoreSweep'
+import { GIVE_UP_AFTER, REQUEST_TRIES, RETRY_MS, ScoreSweep } from '@/metadata/scoreSweep'
 import { BLANK_ITEM, type MetadataFetch, type TmdbClient } from '@/metadata/tmdbClient'
 import { ScannerService } from '@/scanner/scannerService'
 import { adminCookie, holdOpen, NOT_WATCHING, testConfig } from '@/test/app'
@@ -138,6 +138,7 @@ describe('the score sweep', () => {
     const libraries = new LibrariesRepository(database.get())
     const sweep = new ScoreSweep(repository, new Scores(repository, omdb, mdblist), libraries, {
       score: tmdbScore,
+      enabled: true,
     })
     sweeps.push(sweep)
     return { sweep, repository, libraries, tmdbScore }
@@ -208,8 +209,7 @@ describe('the score sweep', () => {
         itemIds: [itemId],
       }),
     )
-    const total = metadata().requestScores(id)
-    libraries.startRatingsRefresh({ id, at: new Date().toISOString(), total })
+    libraries.startRatingsRefresh({ id, at: new Date().toISOString(), shouldAsk: true })
     return id
   }
   const isFinished = (libraryId: number): boolean => {
@@ -795,8 +795,10 @@ describe('the score sweep', () => {
 
     expect(askedFor(mdblist.lookUp).toSorted()).toEqual(['1', '2', '3'])
     expect(metadata().requestsLeft(libraryId)).toBe(1)
-    expect(sweep.pause()).toBeNull()
-    expect(sweep.requestsPause()).toBeNull()
+    expect(sweep.requestsPause()).toEqual({
+      reason: 'unavailable',
+      resumesAt: new Date(Date.now() + RETRY_MS).toISOString(),
+    })
 
     mdblist.state.answer = () => [rottenTomatoes(9.1)]
     await vi.advanceTimersByTimeAsync(RETRY_MS - 1000)
@@ -810,6 +812,40 @@ describe('the score sweep', () => {
 
     await vi.advanceTimersByTimeAsync(2 * RETRY_MS)
     expect(mdblist.lookUp).toHaveBeenCalledTimes(4)
+  })
+
+  it('gives up a requested title MDBList always fails on after three tries, keeping its scores, and finishes', async () => {
+    fakeClock()
+    const [failing = -1, other = -1] = movies(['1', '2'])
+    metadata().saveScores({ itemId: failing, provider: 'mdblist', scores: [rottenTomatoes(7)] })
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    stampMdblist({ itemId: failing, at: yesterday })
+    stampMdblist({ itemId: other, at: yesterday })
+    const libraryId = refresh([failing, other])
+    const mdblist = fakeSource({
+      provider: 'mdblist',
+      answer: ({ tmdbId }) =>
+        tmdbId === '1' ? new Error('MDBList answered 500.') : [rottenTomatoes(9.1)],
+    })
+    const { sweep } = sweepWith({ omdb: OMDB_OFF().source, mdblist: mdblist.source })
+    const tries = () => askedFor(mdblist.lookUp).filter((tmdbId) => tmdbId === '1').length
+
+    sweep.kick()
+    await sweep.whenIdle()
+    expect(tries()).toBe(1)
+    expect(metadata().requestsLeft(libraryId)).toBe(1)
+
+    // Asked again 15 minutes after a drain that answered, 30 after one that did not.
+    await vi.advanceTimersByTimeAsync(3 * RETRY_MS)
+    await sweep.whenIdle()
+    expect(tries()).toBe(REQUEST_TRIES)
+    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(isFinished(libraryId)).toBe(true)
+    expect(rows(failing)).toEqual([{ source: 'rottenTomatoes', value: 7, provider: 'mdblist' }])
+
+    await vi.advanceTimersByTimeAsync(4 * RETRY_MS)
+    expect(tries()).toBe(REQUEST_TRIES)
+    expect(sweep.requestsPause()).toBeNull()
   })
 
   it("settles the requests OMDb answered once MDBList's key is refused", async () => {

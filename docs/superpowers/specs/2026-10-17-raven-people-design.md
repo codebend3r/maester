@@ -224,7 +224,10 @@ Migration 28:
   - Else TMDB's score alone.
 
   Should that source change mid-Refresh (a key refused or taken away), what the new one already answered since the Refresh began settles too.
-- **Retries.** A drain that leaves requests the settling source can still be asked for today wakes 15 minutes later, so a requested title that failed is asked again then, not the next day.
+- **Retries.** A drain that leaves requests the settling source can still be asked for today wakes 15 minutes later, with the status `waiting` for `unavailable` until then, so a requested title that failed is asked again the same day: 15 minutes after a drain that got answers, which forgets its failures, and 30 minutes or more after one that got none, whose failures the next drain still skips.
+- **Giving up.** After three failures of the settling source on a requested title, counted since a restart, the request goes with a log line naming the item's id, and the title keeps the scores it had.
+- **Nothing to settle.** With no score source that has a usable key and TMDB off or refused, no request could ever settle, so a Refresh asks for nothing and its ratings part finishes at once while the quick scan runs.
+- **Starting and finishing.** The requests and the Refresh's start are written in one transaction. A Refresh whose last request left outside the sweep (the title deleted, or settled by Refresh details) finishes when its status is next read.
 - **Status.** `Library.ratingsRefresh` is one of:
   - `idle` (`finishedAt`);
   - `running` (`done`, `total`, `startedAt`);

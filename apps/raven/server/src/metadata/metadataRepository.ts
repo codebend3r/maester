@@ -821,26 +821,6 @@ export class MetadataRepository {
       .flatMap(toDueScores)
   }
 
-  /**
-   * Asks for fresh scores for each movie and show a library holds, reached
-   * up from its files through their episodes and seasons, but those raven
-   * made up. Answers how many it asked for.
-   */
-  requestScores(libraryId: number): number {
-    return this.db
-      .prepare<{ libraryId: number; local: string }>(
-        `WITH RECURSIVE up(id) AS (
-           SELECT mi.item_id FROM media m JOIN media_items mi ON mi.media_id = m.id
-            WHERE m.library_id = @libraryId
-           UNION SELECT i.parent_id FROM items i JOIN up ON i.id = up.id
-            WHERE i.parent_id IS NOT NULL)
-         INSERT OR IGNORE INTO score_requests (library_id, item_id)
-         SELECT @libraryId, i.id FROM up JOIN items i ON i.id = up.id
-          WHERE i.type IN ('movie', 'show') AND i.tmdb_id NOT GLOB @local`,
-      )
-      .run({ libraryId, local: `${LOCAL}*` }).changes
-  }
-
   /** How many titles a library's Refresh asked for are still waiting. */
   requestsLeft(libraryId: number): number {
     return (

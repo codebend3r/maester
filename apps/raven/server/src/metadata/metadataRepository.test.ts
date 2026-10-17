@@ -306,7 +306,9 @@ describe('the libraries holding each item, and the people cleared up', () => {
         )
         .all()
 
-    expect(stored.requestScores(ids.shows)).toBe(2)
+    const libraries = new LibrariesRepository(database.get())
+    const at = new Date().toISOString()
+    expect(libraries.startRatingsRefresh({ id: ids.shows, at, shouldAsk: true })).toBe(2)
     expect(requested()).toEqual(
       [
         { library_id: ids.shows, item_id: ids.show },
@@ -316,14 +318,13 @@ describe('the libraries holding each item, and the people cleared up', () => {
     expect(stored.requestsLeft(ids.shows)).toBe(2)
     expect(stored.requestsLeft(ids.films)).toBe(0)
     expect(stored.isRequested(filmsOnly)).toBe(false)
-    expect(stored.requestScores(ids.shows)).toBe(0)
 
     stored.clearRequest(ids.movie)
     expect(stored.requestsLeft(ids.shows)).toBe(1)
     expect(stored.isRequested(ids.movie)).toBe(false)
     expect(stored.requestedTitles(10).map((title) => title.itemId)).toEqual([ids.show])
 
-    new LibrariesRepository(database.get()).remove(ids.shows)
+    libraries.remove(ids.shows)
     expect(requested()).toEqual([])
     expect(stored.hasRequests()).toBe(false)
   })
@@ -685,8 +686,9 @@ describe("each provider's scores", () => {
       )
     expect(isDue()).toEqual([false, false])
 
-    expect(stored.requestScores(libraryId)).toBe(1)
-    libraries.startRatingsRefresh({ id: libraryId, at: daysAgo(1), total: 1 })
+    expect(libraries.startRatingsRefresh({ id: libraryId, at: daysAgo(1), shouldAsk: true })).toBe(
+      1,
+    )
 
     expect(isDue()).toEqual([true, true])
     expect(

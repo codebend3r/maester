@@ -16,31 +16,43 @@ export class RatingsRefresh {
   constructor(
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
-    @Inject(ScannerService) private readonly scanner: ScannerService,
-    @Inject(ScoreSweep) private readonly scoreSweep: ScoreSweep,
+    @Inject(ScannerService) private readonly scanner: Pick<ScannerService, 'quickScan'>,
+    @Inject(ScoreSweep)
+    private readonly scoreSweep: Pick<ScoreSweep, 'kick' | 'canSettle' | 'requestsPause'>,
   ) {}
 
   /**
    * Asks for the library's titles unless a Refresh of it is under way, which
-   * keeps its count, then quick-scans the library and wakes the sweep. A
-   * library with no titles finishes at once.
+   * keeps its count, then quick-scans the library and wakes the sweep. With
+   * no source that could ever settle a request, it asks for nothing, and so
+   * does a library with no titles: either finishes at once.
    */
   start(libraryId: number): void {
     if (this.libraries.ratingsRefresh(libraryId).startedAt == null) {
-      const at = new Date().toISOString()
-      const total = this.metadata.requestScores(libraryId)
-      this.libraries.startRatingsRefresh({ id: libraryId, at, total })
-      if (total === 0) this.libraries.finishRatingsRefreshes(at)
+      this.libraries.startRatingsRefresh({
+        id: libraryId,
+        at: new Date().toISOString(),
+        shouldAsk: this.scoreSweep.canSettle(),
+      })
     }
     this.scanner.quickScan(libraryId)
     this.scoreSweep.kick()
   }
 
-  /** Where the library's Refresh stands, and why it waits when it does. */
+  /**
+   * Where the library's Refresh stands, and why it waits when it does. One
+   * whose last title left outside the sweep (the title deleted, or its
+   * scores fetched by Refresh details) finishes here.
+   */
   status(libraryId: number): RatingsRefreshStatus {
     const { startedAt, total, finishedAt } = this.libraries.ratingsRefresh(libraryId)
     if (startedAt == null) return { state: 'idle', finishedAt }
     const left = this.metadata.requestsLeft(libraryId)
+    if (left === 0) {
+      const at = new Date().toISOString()
+      this.libraries.finishRatingsRefreshes(at)
+      return { state: 'idle', finishedAt: at }
+    }
     const progress = { done: Math.max(0, total - left), total, startedAt }
     const pause = this.scoreSweep.requestsPause()
     return pause == null

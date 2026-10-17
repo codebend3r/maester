@@ -131,7 +131,7 @@ describe('libraries', () => {
     ])
   })
 
-  it('remembers a Refresh, and finishes each with no title left waiting', () => {
+  it('remembers a Refresh, and finishes each with no title left waiting, or none asked for', () => {
     const libraries = new LibrariesRepository(database.get())
     const { metadata } = repositories(database.get())
     const index = new MediaIndex(database.get())
@@ -155,12 +155,16 @@ describe('libraries', () => {
     const { id: waiting } = library('Waiting')
     const { id: done, itemId: doneItem } = library('Done')
     const { id: idle } = library('Idle')
+    const { id: unasked } = library('Unasked')
     expect(libraries.ratingsRefresh(idle)).toEqual({ startedAt: null, total: 0, finishedAt: null })
 
     const at = '2026-10-17T09:00:00.000Z'
-    libraries.startRatingsRefresh({ id: waiting, at, total: metadata.requestScores(waiting) })
-    libraries.startRatingsRefresh({ id: done, at, total: metadata.requestScores(done) })
+    expect(libraries.startRatingsRefresh({ id: waiting, at, shouldAsk: true })).toBe(1)
+    expect(libraries.startRatingsRefresh({ id: done, at, shouldAsk: true })).toBe(1)
+    expect(libraries.startRatingsRefresh({ id: unasked, at, shouldAsk: false })).toBe(0)
     expect(libraries.ratingsRefresh(waiting)).toEqual({ startedAt: at, total: 1, finishedAt: null })
+    expect(libraries.ratingsRefresh(unasked)).toEqual({ startedAt: null, total: 0, finishedAt: at })
+    expect(metadata.requestsLeft(unasked)).toBe(0)
     metadata.clearRequest(doneItem)
 
     const finished = '2026-10-17T09:05:00.000Z'

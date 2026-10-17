@@ -33,6 +33,13 @@ const TMDB_ROUND = 50
  */
 export const GIVE_UP_AFTER = 3
 
+/**
+ * How many times the source that settles a Refresh's request may fail on
+ * its title before the Refresh gives the title up, so one that source
+ * always fails on cannot hold the Refresh open, or keep spending calls.
+ */
+export const REQUEST_TRIES = 3
+
 /** Why the sweep stopped with scores still due, and when it starts again. */
 export type ScorePause = { reason: 'budget' | 'unavailable'; resumesAt: string }
 
@@ -102,18 +109,21 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     isClosed: boolean
     /** The items each source failed on, which later rounds and drains skip until it answers again. */
     failed: Record<Asked, ReadonlySet<number>>
+    /** How often the source that settles each requested item has failed on it, since a restart. */
+    requestFailures: ReadonlyMap<number, number>
   } = {
     pause: null,
     wake: null,
     isClosed: false,
     failed: { mdblist: new Set(), omdb: new Set(), tmdb: new Set() },
+    requestFailures: new Map(),
   }
 
   constructor(
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(Scores) private readonly scores: Scores,
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
-    @Inject(TmdbClient) private readonly tmdb: Pick<TmdbClient, 'score'>,
+    @Inject(TmdbClient) private readonly tmdb: Pick<TmdbClient, 'score' | 'enabled'>,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -142,6 +152,14 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /**
+   * Whether a Refresh's request could ever be settled: a score source has a
+   * usable key, or TMDB can be asked for its own score.
+   */
+  canSettle(): boolean {
+    return this.scores.settler() != null || this.tmdb.enabled
+  }
+
+  /**
    * Why the titles a Refresh asked for wait, and until when: the sweep's own
    * pause, else midnight UTC while the source that settles them has spent
    * its day, which `pause` leaves out while another source still has calls.
@@ -165,7 +183,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
       case 'done':
         return
       case 'requests':
-        this.wakeAt({ at: retry, pause: null, why: 'requests' })
+        this.wakeAt({ at: retry, pause: 'unavailable', why: 'requests' })
         return
       case 'someSpent':
         this.wakeAt({ at: afterMidnight(new Date()), pause: null, why: 'spent' })
@@ -238,6 +256,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
       ...this.state.failed,
       [asked]: new Set([...this.state.failed[asked], ...failedIds]),
     }
+    if (!this.state.isClosed) this.countRequestFailures({ round, failedIds })
     const hasAnswered = answered > 0 ? new Set([...answeredBy, asked]) : answeredBy
     if (answered === 0 && failedIds.length > 0) return { isSilent: true, answeredBy: hasAnswered }
     if (answered === 0 && round.isCurrent()) return { isSilent: false, answeredBy: hasAnswered }
@@ -270,13 +289,51 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /**
+   * Counts the failures of the source that settles a Refresh's requests on
+   * the titles it asked for, and gives up each title it has failed on
+   * `REQUEST_TRIES` times: its request goes, and it keeps the scores it had.
+   */
+  private countRequestFailures({
+    round,
+    failedIds,
+  }: {
+    round: Round
+    failedIds: readonly number[]
+  }): void {
+    if (round.asked !== (this.scores.settler()?.provider ?? 'tmdb')) return
+    const failed = new Set(failedIds)
+    const counts = round.due
+      .filter((title) => title.isRequested && failed.has(title.itemId))
+      .reduce(
+        (counted, { itemId }) => counted.set(itemId, (counted.get(itemId) ?? 0) + 1),
+        new Map(this.state.requestFailures),
+      )
+    const givenUp = [...counts].flatMap(([itemId, count]) =>
+      count >= REQUEST_TRIES ? [itemId] : [],
+    )
+    givenUp.forEach((itemId) => {
+      this.metadata.clearRequest(itemId)
+      this.logger.warn(
+        `Gave up on item ${itemId} for a Refresh after ${REQUEST_TRIES} failed calls; it keeps the scores it had.`,
+      )
+    })
+    this.state.requestFailures = new Map(
+      [...counts].filter(([itemId]) => !givenUp.includes(itemId)),
+    )
+  }
+
+  /**
    * Settles the requests the source that settles them has answered since
    * their Refresh began, which matters once that source has changed (a key
-   * refused or taken away), and finishes each Refresh with nothing left.
+   * refused or taken away), forgets the failures counted on titles no
+   * longer requested, and finishes each Refresh with nothing left.
    */
   private settle(): void {
     const settler = this.scores.settler()
     if (settler != null) this.metadata.settleRequests(settler.provider)
+    this.state.requestFailures = new Map(
+      [...this.state.requestFailures].filter(([itemId]) => this.metadata.isRequested(itemId)),
+    )
     this.libraries.finishRatingsRefreshes(new Date().toISOString())
   }
 
