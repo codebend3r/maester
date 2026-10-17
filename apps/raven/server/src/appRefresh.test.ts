@@ -135,11 +135,16 @@ const refreshServer = ({
 
 describe('a library Refresh', () => {
   const tmdb = fakeTmdb({ movies: MOVIES, mdblist: MDBLIST })
-  const holding: { mdblist: ReturnType<typeof holdOpen> | null } = { mdblist: null }
-  // MDBList's answers wait while they are held, so a Refresh stays under way.
+  const holding: { mdblist: ReturnType<typeof holdOpen> | null; isMdblistDown: boolean } = {
+    mdblist: null,
+    isMdblistDown: false,
+  }
+  // MDBList's answers wait while they are held, so a Refresh stays under way, and fail while it is down.
   const fetch: MetadataFetch = async ({ url, init }) => {
+    const isMdblist = new URL(url).host === 'api.mdblist.com'
+    if (isMdblist && holding.isMdblistDown) throw new TypeError('fetch failed')
     const held = holding.mdblist
-    if (held && new URL(url).host === 'api.mdblist.com') {
+    if (held && isMdblist) {
       held.gate.reach()
       await held.opened
     }
@@ -215,16 +220,30 @@ describe('a library Refresh', () => {
     expect((await library()).ratingsRefresh.state).toBe('idle')
   })
 
+  it('waits for MDBList while it is down, saying when it asks again', async () => {
+    holding.isMdblistDown = true
+
+    const refreshed = await refresh()
+    expect(refreshed.ratingsRefresh).toMatchObject({ state: 'running', done: 0, total: 3 })
+    await server.settle()
+
+    const { ratingsRefresh } = await library()
+    if (ratingsRefresh.state !== 'waiting')
+      throw new Error(`The Refresh is ${ratingsRefresh.state}`)
+    expect(ratingsRefresh).toMatchObject({ done: 0, total: 3, reason: 'unavailable' })
+    const wait = Date.parse(ratingsRefresh.resumesAt) - Date.now()
+    expect(wait).toBeGreaterThan(14 * 60_000)
+    expect(wait).toBeLessThanOrEqual(15 * 60_000)
+  })
+
   it('drops what it asked for with the library', async () => {
-    const mdblist = holdMdblist()
+    // MDBList is still down, so the Refresh still waits on every title.
     await refresh()
-    await mdblist.reached
     expect(server.requests()).toBe(3)
 
     await server.api().deleteLibrary(server.state.libraryId)
 
     expect(server.requests()).toBe(0)
-    mdblist.letGo()
   })
 })
 

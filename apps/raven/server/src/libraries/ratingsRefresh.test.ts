@@ -127,4 +127,17 @@ describe("a library's Refresh", () => {
     expect(refresh.status(id)).toEqual({ state: 'idle', finishedAt: expect.any(String) })
     expect(libraries().ratingsRefresh(id)).toMatchObject({ startedAt: null, total: 2 })
   })
+
+  it('starts anew when pressed after its last title left outside the sweep, unread', () => {
+    const { id, itemIds } = library('Again')
+    const sweep = { kick: vi.fn(), canSettle: () => true, requestsPause: () => null }
+    const refresh = new RatingsRefresh(libraries(), metadata(), scanner(), sweep)
+
+    refresh.start(id)
+    itemIds.forEach((itemId) => metadata().clearRequest(itemId))
+    refresh.start(id)
+
+    expect(metadata().requestsLeft(id)).toBe(2)
+    expect(refresh.status(id)).toMatchObject({ state: 'running', done: 0, total: 2 })
+  })
 })

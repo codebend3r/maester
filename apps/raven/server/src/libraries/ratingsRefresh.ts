@@ -23,15 +23,18 @@ export class RatingsRefresh {
 
   /**
    * Asks for the library's titles unless a Refresh of it is under way, which
-   * keeps its count, then quick-scans the library and wakes the sweep. With
-   * no source that could ever settle a request, it asks for nothing, and so
-   * does a library with no titles: either finishes at once.
+   * keeps its count, then quick-scans the library and wakes the sweep. One
+   * whose last title has gone counts as over, so a press then starts anew.
+   * With no source that could ever settle a request, it asks for nothing,
+   * and so does a library with no titles: either finishes at once.
    */
   start(libraryId: number): void {
+    const at = new Date().toISOString()
+    this.libraries.finishRatingsRefreshes(at)
     if (this.libraries.ratingsRefresh(libraryId).startedAt == null) {
       this.libraries.startRatingsRefresh({
         id: libraryId,
-        at: new Date().toISOString(),
+        at,
         shouldAsk: this.scoreSweep.canSettle(),
       })
     }
