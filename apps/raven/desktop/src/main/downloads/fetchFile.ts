@@ -208,7 +208,7 @@ const download = async ({
   canRestart,
   ...input
 }: FetchInput & { canRestart: boolean }): Promise<FetchOutcome> => {
-  const { fetch, url, part, signal, stallMs, expectedSize, onProgress } = input
+  const { fetch, url, part, signal, timers, stallMs, expectedSize, onProgress } = input
   const from = await part.size()
   if (from === expectedSize) {
     onProgress(from)
@@ -218,16 +218,29 @@ const download = async ({
     await part.truncate()
     return download({ ...input, canRestart: false })
   }
+  // A server that takes the request and never answers it stalls the file as a silent body does.
+  const late = new AbortController()
+  const wait: { isStalled: boolean } = { isStalled: false }
+  const timer = timers.set({
+    run: () => {
+      wait.isStalled = true
+      late.abort()
+    },
+    ms: stallMs ?? DOWNLOAD_STALL_MS,
+  })
   const answer = await fetch({
     url,
     headers: from > 0 ? { Range: `bytes=${from}-` } : {},
-    signal,
-  }).then(
-    (response) => ({ isFailed: false as const, response }),
-    (error: unknown) => ({ isFailed: true as const, error }),
-  )
+    signal: AbortSignal.any([signal, late.signal]),
+  })
+    .then(
+      (response) => ({ isFailed: false as const, response }),
+      (error: unknown) => ({ isFailed: true as const, error }),
+    )
+    .finally(() => timers.clear(timer))
   if (answer.isFailed) {
-    const reason = signal.aborted && isAbortError(answer.error) ? 'aborted' : 'unreachable'
+    const isAborted = signal.aborted && isAbortError(answer.error)
+    const reason = isAborted ? 'aborted' : wait.isStalled ? 'stalled' : 'unreachable'
     return failure({ reason, bytes: from })
   }
   const { response } = answer
