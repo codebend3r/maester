@@ -506,6 +506,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   const handleRequest = async (request: DesktopRequest): Promise<DesktopReply> => {
     switch (request.type) {
       case 'ready':
+        // A page that says ready is a new page, playing nothing: a reload mid-play left no
+        // unmount to say the player left its file.
+        deps.downloads.notePlaying({ fileId: null })
         deps.onReady()
         return DONE
       case 'openDialog':
