@@ -5,6 +5,7 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses'
 import type { ForgeConfig } from '@electron-forge/shared-types'
 import { FuseV1Options, FuseVersion } from '@electron/fuses'
 import { VIDEO_EXTENSIONS } from '@raven/core'
+import { MakerDmg } from './src/build/dmgMaker'
 import {
   adHocApps,
   documentTypes,
@@ -37,7 +38,7 @@ const config: ForgeConfig = {
     extraResource: [MPV_STAGING],
     ...signing,
   },
-  makers: [new MakerZIP({}, ['darwin'])],
+  makers: [new MakerDmg({}, ['darwin']), new MakerZIP({}, ['darwin'])],
   plugins: [
     new FusesPlugin({
       version: FuseVersion.V1,
