@@ -89,7 +89,7 @@ export const DownloadsPage = () => {
               className={styles.meter}
               min={0}
               max={disk.total}
-              value={disk.total - disk.free}
+              value={disk.used}
               aria-label="Disk"
               aria-describedby={lineId}
             />
@@ -97,7 +97,7 @@ export const DownloadsPage = () => {
         )}
         {disk === null && space.isError && <p className={styles.line}>{space.error.message}</p>}
       </header>
-      {downloads.isError && (
+      {list === null && downloads.isError && (
         <p className={styles.note} role="alert">
           {downloads.error.message}
         </p>

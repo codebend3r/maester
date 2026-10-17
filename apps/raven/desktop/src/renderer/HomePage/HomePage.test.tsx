@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DOWNLOADS_KEY } from '@/renderer/desktop/downloadsApi'
-import { watchedLabel } from '@/renderer/HomePage/HomePage'
 import { DL_1, DL_2, DL_3, DL_4, DL_5, viewOf } from '@/renderer/test/downloadFakes'
 import { fakeClient, renderDesktop, STUB_ROUTES } from '@/renderer/test/render'
 import { DESKTOP_REQUESTS, type DesktopReply, type DesktopRequest } from '@/shared/protocol'
@@ -213,15 +212,5 @@ describe('HomePage', () => {
     expect(
       await screen.findByRole('button', { name: 'Downloads, 1 in progress' }),
     ).toBeInTheDocument()
-  })
-})
-
-describe('watchedLabel', () => {
-  it('rounds the share to a percent', () => {
-    expect(watchedLabel(0.333)).toBe('33% watched')
-  })
-
-  it('says Not started when there is no share', () => {
-    expect(watchedLabel(null)).toBe('Not started')
   })
 })

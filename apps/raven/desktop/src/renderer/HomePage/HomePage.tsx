@@ -3,14 +3,12 @@ import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { isInProgress, useDownloads } from '@/renderer/desktop/downloadsApi'
+import { watchedLabel } from '@/renderer/desktop/watched'
 import styles from '@/renderer/HomePage/HomePage.module.scss'
 import { RECENTS_KEY, useOpenReply } from '@/renderer/Shell/openReply'
 import { useDesktop } from '@/renderer/stores/desktop'
 import { useDragging } from '@/renderer/stores/dragging'
 import { DESKTOP_REPLIES, type RecentView } from '@/shared/protocol'
-
-export const watchedLabel = (watched: number | null): string =>
-  watched === null ? 'Not started' : `${Math.round(watched * 100)}% watched`
 
 /** Downloads' button, with the count of what is still queued or downloading. */
 const DownloadsButton = () => {

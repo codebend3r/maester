@@ -2,9 +2,16 @@ import { describe, expect, it } from 'bun:test'
 import { formatBytes } from '@raven/core'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { DL_1, DL_2, downloadsMain, SPACE, viewOf } from '@/renderer/test/downloadFakes'
-import { renderDesktop } from '@/renderer/test/render'
-import { sentOfType } from '@/renderer/test/serverFakes'
+import {
+  DL_1,
+  DL_2,
+  downloadsMain,
+  settleInAct,
+  SPACE,
+  viewOf,
+} from '@/renderer/test/downloadFakes'
+import { fakeClient, renderDesktop } from '@/renderer/test/render'
+import { heldReply, sentOfType } from '@/renderer/test/serverFakes'
 
 const TWO = [viewOf({ downloadId: DL_1 }), viewOf({ downloadId: DL_2, label: 'S01E02 Half Loop' })]
 
@@ -74,6 +81,27 @@ describe('Settings, Downloads', () => {
       expect(within(section).getByRole('button', { name: 'Delete all downloads' })).toBeDisabled(),
     )
     expect(within(section).getByRole('heading', { name: 'Downloads' })).toHaveFocus()
+  })
+
+  it('sends one Delete all however often it is pressed while main works', async () => {
+    const main = downloadsMain({ downloads: TWO })
+    const held = heldReply()
+    const client = fakeClient({
+      request: async (request) =>
+        request.type === 'deleteAllDownloads' ? held.promise : main.respond(request),
+    })
+    renderDesktop({ client, route: '/settings' })
+    const section = await screen.findByRole('region', { name: 'Downloads' })
+    const deleteAll = within(section).getByRole('button', { name: 'Delete all downloads' })
+    await waitFor(() => expect(deleteAll).toBeEnabled())
+    await userEvent.click(deleteAll)
+    const confirm = within(section).getByRole('button', { name: 'Delete all' })
+    await userEvent.dblClick(confirm)
+    expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    expect(sentOfType({ client, type: 'deleteAllDownloads' })).toHaveLength(1)
+    await settleInAct(() => held.resolve(main.respond({ type: 'deleteAllDownloads' })))
+    expect(within(section).getByRole('button', { name: 'Delete all downloads' })).toBeDisabled()
+    expect(sentOfType({ client, type: 'deleteAllDownloads' })).toHaveLength(1)
   })
 
   it('holds Delete all downloads while there are none', async () => {

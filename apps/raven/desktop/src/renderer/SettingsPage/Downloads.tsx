@@ -20,6 +20,8 @@ export const Downloads = ({ className }: { className?: string }) => {
   const wasAsking = useRef(false)
   const questionId = useId()
   const [isAsking, setIsAsking] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const isDeletingNow = useRef(false)
 
   const data = downloads.data ?? null
   const hasDownloads = (data?.downloads.length ?? 0) > 0
@@ -39,7 +41,12 @@ export const Downloads = ({ className }: { className?: string }) => {
   }, [isAsking])
 
   const deleteAll = async () => {
+    if (isDeletingNow.current) return
+    isDeletingNow.current = true
+    setIsDeleting(true)
     await change({ type: 'deleteAllDownloads' })
+    isDeletingNow.current = false
+    setIsDeleting(false)
     setIsAsking(false)
   }
 
@@ -85,9 +92,11 @@ export const Downloads = ({ className }: { className?: string }) => {
             {question}
           </p>
           <div className={styles.confirmActions}>
+            {/* aria-disabled, not disabled: disabling the focused button would drop focus to the page. */}
             <Button
               tone="danger"
               aria-describedby={questionId}
+              aria-disabled={isDeleting}
               onClick={() => void deleteAll()}
               onKeyDown={backOnEscape}
             >

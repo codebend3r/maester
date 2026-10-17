@@ -62,6 +62,12 @@
   grid-auto-flow: column;
   gap: var(--space-1);
   justify-content: start;
+
+  // Held while main deletes; still focusable, so focus stays on it.
+  button[aria-disabled='true'] {
+    cursor: progress;
+    opacity: 0.55;
+  }
 }
 
 .folder {
