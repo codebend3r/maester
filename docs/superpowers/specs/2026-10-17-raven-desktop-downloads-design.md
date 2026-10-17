@@ -149,6 +149,7 @@ type DownloadEntry = {
   label: string                 // "The Two Towers", "S02E04 Trojan Horse"; tidied like a recent's
   group: {
     kind: 'movie' | 'episode' | 'season' | 'show' | 'saga'
+    key: string                 // the group on its server: "show:<itemId>", "saga:<libraryId>:<tmdbId>", "movie:<mediaId>"
     title: string               // "The Lord of the Rings", "Severance"
     order: number               // play order within the group: season * 10000 + episode, or the saga's index
   }
@@ -182,7 +183,7 @@ Progress positions for a download are kept where every local file's are: `player
 
 ## Expanding a link
 
-`expand.ts` turns a `DownloadRequest` into the files to fetch. Five reads join the allowlist in `allowlist.ts`, each a `GET` main makes on its own and the page may also make: three for the expansion, two for fetching (below).
+`expand.ts` turns a `DownloadRequest` into the files to fetch. Five reads join the allowlist in `allowlist.ts`, each a `GET` main makes on its own: three for the expansion, which the page may also make, and two for fetching (below), which `isPageCall` keeps to main, so the page never reads a ticket or an origin. `getSagas` answers every saga of the library with a whole `MediaItem` per movie, so its reply may run to `MAX_SAGAS_REPLY_CHARS` (8 MiB); every other call keeps the 1 MiB `MAX_REPLY_CHARS`.
 
 | Call | Path | For |
 | --- | --- | --- |
@@ -196,7 +197,7 @@ Progress positions for a download are kept where every local file's are: `player
 - `item` that is a show: `getItem(show)` gives its seasons; `getItem(season)` for each, in order, gives its episodes; each episode's `primary` is the file. A season: the same from the season. An episode or a movie: its `versions[0]` (best first).
 - `saga`: `getSagas(libraryId)`, the saga whose `tmdbId` matches, its `media` in order.
 
-Each file arrives as a `MediaItem`, which carries `size`, `container`, `duration` and `libraryId`. The group's `watchedPercent` is read once per library. A file already downloaded or in the queue is skipped, so downloading a show after one of its episodes adds the rest. The expansion is capped at `DOWNLOAD_MAX_FILES = 500` files in one ask; past it the ask is refused with "That is more than raven player downloads at once." A locked answer (`LOCKED_STATUS` in `@raven/core`, 423) from any read opens `UnlockDialog`, a `404` with the admin lock on asks for the admin password, as `ServerPage` does today; after unlocking, the expansion runs again. `GET /api/libraries/:id` is public, so `watchedPercent` is readable before the unlock.
+Each file arrives as a `MediaItem`, which carries `size`, `container`, `duration` and `libraryId`. Both episodes of a two-episode file name it as their `primary`, so the files are kept once per media id, as the first, before the cap and the skip. An episode, a season and a show all take the group key `show:<itemId>` of their show, so an episode downloaded alone sorts with its season downloaded later, and two shows of one name stay apart. The group's `watchedPercent` is read once per library. A file already downloaded or in the queue is skipped, so downloading a show after one of its episodes adds the rest. The expansion is capped at `DOWNLOAD_MAX_FILES = 500` files in one ask; past it the ask is refused with "That is more than raven player downloads at once." A locked answer (`LOCKED_STATUS` in `@raven/core`, 423) from any read opens `UnlockDialog`, a `404` with the admin lock on asks for the admin password, as `ServerPage` does today; after unlocking, the expansion runs again. `GET /api/libraries/:id` is public, so `watchedPercent` is readable before the unlock.
 
 The expansion's answer is the ask the dialog shows:
 

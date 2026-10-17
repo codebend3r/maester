@@ -1,4 +1,5 @@
 import type { PlayRequest } from '@raven/core'
+import type { DownloadService } from '@/main/downloads/downloadService'
 import { loggable } from '@/main/servers/serverCalls'
 import { TRUST_MESSAGES, type ServerTrust, type TrustOutcome } from '@/main/servers/serverTrust'
 import { messageOf } from '@/shared/messageOf'
@@ -8,29 +9,13 @@ import type { DesktopReply } from '@/shared/protocol'
 export const LINK_MESSAGES = {
   unreadable:
     'raven player could not read that link. It opens raven://play and raven://download links and raven watch pages.',
-  downloadsSoon: 'raven player cannot download titles yet.',
 } as const
 
 const LINK_LOG_MAX = 100
 
-export const replyForTrust = ({
-  outcome,
-  request,
-}: {
-  outcome: TrustOutcome
-  request: PlayRequest
-}): DesktopReply => {
+/** What a link answers when trust kept no server for it: nothing after a no, else why not. */
+const replyForUntrusted = (outcome: Exclude<TrustOutcome, { kind: 'trusted' }>): DesktopReply => {
   switch (outcome.kind) {
-    case 'trusted':
-      return {
-        type: 'playServer',
-        target: {
-          serverId: outcome.server.id,
-          mediaId: request.mediaId,
-          at: request.at,
-          next: request.next,
-        },
-      }
     case 'declined':
       return { type: 'done' }
     case 'full':
@@ -50,17 +35,41 @@ export const replyForTrust = ({
   }
 }
 
+export const replyForTrust = ({
+  outcome,
+  request,
+}: {
+  outcome: TrustOutcome
+  request: PlayRequest
+}): DesktopReply =>
+  outcome.kind === 'trusted'
+    ? {
+        type: 'playServer',
+        target: {
+          serverId: outcome.server.id,
+          mediaId: request.mediaId,
+          at: request.at,
+          next: request.next,
+        },
+      }
+    : replyForUntrusted(outcome)
+
 export type LinkOpener = {
   open: (input: { link: string; from: 'link' | 'app' }) => Promise<DesktopReply>
   openBatch: (links: readonly string[]) => Promise<DesktopReply>
 }
 
-/** Turns a `raven://play` link or a pasted watch page into a reply, asking trust about its server first. */
+/**
+ * Turns a `raven://play` link, a pasted watch page or a `raven://download` link into a reply,
+ * asking trust about its server first.
+ */
 export const createLinkOpener = ({
   trust,
+  downloads,
   warn,
 }: {
   trust: Pick<ServerTrust, 'trust'>
+  downloads: Pick<DownloadService, 'ask'>
   warn: (message: string) => void
 }): LinkOpener => {
   const safeWarn = (message: string): void => {
@@ -71,22 +80,33 @@ export const createLinkOpener = ({
     }
   }
 
-  const open: LinkOpener['open'] = async ({ link, from }) => {
-    const request = readPlayLink(link)
-    if (request === null) {
-      if (readDownloadLink(link) !== null) {
-        return { type: 'refused', message: LINK_MESSAGES.downloadsSoon }
-      }
-      safeWarn(`raven player could not read a link: ${loggable(link.slice(0, LINK_LOG_MAX))}`)
-      return { type: 'refused', message: LINK_MESSAGES.unreadable }
-    }
-    const outcome = await Promise.resolve()
-      .then(() => trust.trust({ origin: request.origin, from }))
+  const askTrust = ({
+    origin,
+    from,
+  }: {
+    origin: string
+    from: 'link' | 'app'
+  }): Promise<TrustOutcome> =>
+    Promise.resolve()
+      .then(() => trust.trust({ origin, from }))
       .catch((error: unknown): TrustOutcome => {
-        safeWarn(`raven player could not trust ${request.origin}: ${loggable(messageOf(error))}`)
+        safeWarn(`raven player could not trust ${origin}: ${loggable(messageOf(error))}`)
         return { kind: 'unsaved' }
       })
-    return replyForTrust({ outcome, request })
+
+  const open: LinkOpener['open'] = async ({ link, from }) => {
+    const request = readPlayLink(link)
+    if (request !== null) {
+      return replyForTrust({ outcome: await askTrust({ origin: request.origin, from }), request })
+    }
+    const download = readDownloadLink(link)
+    if (download !== null) {
+      const outcome = await askTrust({ origin: download.origin, from })
+      if (outcome.kind !== 'trusted') return replyForUntrusted(outcome)
+      return downloads.ask({ serverId: outcome.server.id, target: download.target })
+    }
+    safeWarn(`raven player could not read a link: ${loggable(link.slice(0, LINK_LOG_MAX))}`)
+    return { type: 'refused', message: LINK_MESSAGES.unreadable }
   }
 
   return {

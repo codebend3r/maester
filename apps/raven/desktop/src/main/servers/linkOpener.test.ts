@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import type { PlayRequest } from '@raven/core'
 import { EMPTY_CONFIG, type ConfigStore, type ServerEntry } from '@/main/desktopConfig'
+import type { DownloadService } from '@/main/downloads/downloadService'
 import { LINK_MESSAGES, createLinkOpener, replyForTrust } from '@/main/servers/linkOpener'
 import {
   TRUST_MESSAGES,
@@ -8,7 +9,7 @@ import {
   type ServerTrust,
   type TrustOutcome,
 } from '@/main/servers/serverTrust'
-import { isDesktopReply } from '@/shared/protocol'
+import { isDesktopReply, type DesktopReply } from '@/shared/protocol'
 import { fakeTimers } from '@/main/test/playerFakes'
 
 const ORIGIN = 'https://raven.example'
@@ -24,13 +25,38 @@ const REQUEST: PlayRequest = { origin: ORIGIN, mediaId: 7, at: 30, next: [8] }
 
 const LINK = 'raven://play?server=https%3A%2F%2Fraven.example&media=7&at=30&next=8'
 
+const ASK_REPLY: DesktopReply = {
+  type: 'downloadAsk',
+  ask: {
+    askId: '00000000-0000-4000-8000-0000000000aa',
+    serverId: SERVER.id,
+    serverName: SERVER.name,
+    autoDelete: false,
+    status: { kind: 'locked' },
+  },
+}
+
 type TrustInput = Parameters<ServerTrust['trust']>[0]
+type AskInput = Parameters<DownloadService['ask']>[0]
+
+/** A download service that records each ask and answers `ASK_REPLY`. */
+const fakeDownloads = () => {
+  const asks: AskInput[] = []
+  const downloads: Pick<DownloadService, 'ask'> = {
+    ask: async (input) => {
+      asks.push(input)
+      return ASK_REPLY
+    },
+  }
+  return { asks, downloads }
+}
 
 const setup = ({
   outcome = { kind: 'trusted', server: SERVER, isNew: true },
 }: { outcome?: TrustOutcome | (() => Promise<TrustOutcome>) } = {}) => {
   const asked: TrustInput[] = []
   const warnings: string[] = []
+  const { asks, downloads } = fakeDownloads()
   const opener = createLinkOpener({
     trust: {
       trust: async (input) => {
@@ -38,9 +64,10 @@ const setup = ({
         return typeof outcome === 'function' ? outcome() : outcome
       },
     },
+    downloads,
     warn: (message) => warnings.push(message),
   })
-  return { opener, asked, warnings }
+  return { opener, asked, asks, warnings }
 }
 
 describe('replyForTrust', () => {
@@ -105,16 +132,56 @@ describe('createLinkOpener', () => {
   })
 
   it.each([
-    ['raven://download?server=https%3A%2F%2Fraven.example&media=7'],
-    ['raven://download?server=https%3A%2F%2Fraven.example&item=10'],
-    ['raven://download?server=https%3A%2F%2Fraven.example&saga=1%3A100'],
-  ])('refuses the download link %j for now and never trusts', async (link) => {
+    ['raven://download?server=https%3A%2F%2Fraven.example&media=7', { kind: 'media', mediaId: 7 }],
+    ['raven://download?server=https%3A%2F%2Fraven.example&item=10', { kind: 'item', itemId: 10 }],
+    [
+      'raven://download?server=https%3A%2F%2Fraven.example&saga=1%3A100',
+      { kind: 'saga', libraryId: 1, tmdbId: '100' },
+    ],
+  ] as const)(
+    'trusts the server of %j, then answers what the download ask answered',
+    async (link, target) => {
+      const world = setup()
+      expect(await world.opener.open({ link, from: 'link' })).toEqual(ASK_REPLY)
+      expect(world.asked).toEqual([{ origin: ORIGIN, from: 'link' }])
+      expect(world.asks).toEqual([{ serverId: SERVER.id, target }])
+    },
+  )
+
+  it('asks about a pasted download link as from the app', async () => {
     const world = setup()
+    await world.opener.open({
+      link: 'raven://download?server=https%3A%2F%2Fraven.example&media=7',
+      from: 'app',
+    })
+    expect(world.asked).toEqual([{ origin: ORIGIN, from: 'app' }])
+  })
+
+  it('is done when the prompt for a download link was declined, and asks nothing', async () => {
+    const world = setup({ outcome: { kind: 'declined' } })
+    const link = 'raven://download?server=https%3A%2F%2Fraven.example&media=7'
+    expect(await world.opener.open({ link, from: 'link' })).toEqual({ type: 'done' })
+    expect(world.asks).toEqual([])
+  })
+
+  it.each([
+    [{ kind: 'busy' } as const, TRUST_MESSAGES.busy],
+    [{ kind: 'unreachable', origin: ORIGIN } as const, TRUST_MESSAGES.unreachable(ORIGIN)],
+  ])('refuses a download link when trust is %j, and asks nothing', async (outcome, message) => {
+    const world = setup({ outcome })
+    const link = 'raven://download?server=https%3A%2F%2Fraven.example&item=10'
+    expect(await world.opener.open({ link, from: 'link' })).toEqual({ type: 'refused', message })
+    expect(world.asks).toEqual([])
+  })
+
+  it('refuses rather than throws when trust rejects for a download link', async () => {
+    const world = setup({ outcome: () => Promise.reject(new Error('dialog crashed')) })
+    const link = 'raven://download?server=https%3A%2F%2Fraven.example&item=10'
     expect(await world.opener.open({ link, from: 'link' })).toEqual({
       type: 'refused',
-      message: LINK_MESSAGES.downloadsSoon,
+      message: TRUST_MESSAGES.unsaved,
     })
-    expect(world.asked).toEqual([])
+    expect(world.asks).toEqual([])
   })
 
   it.each([
@@ -260,7 +327,11 @@ describe('createLinkOpener over the real trust', () => {
       timers: fakeTimers().timers,
       warn: (message) => warnings.push(message),
     })
-    const opener = createLinkOpener({ trust, warn: (message) => warnings.push(message) })
+    const opener = createLinkOpener({
+      trust,
+      downloads: fakeDownloads().downloads,
+      warn: (message) => warnings.push(message),
+    })
     const answer = (isYes: boolean) => answers.splice(0, 1).forEach((resolve) => resolve(isYes))
     return { opener, asked, answer, probes, warnings }
   }

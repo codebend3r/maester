@@ -9,14 +9,22 @@ import {
   useState,
 } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { applyDownloadsEvent } from '@/renderer/desktop/downloadsApi'
 import { useDesktop } from '@/renderer/desktop/DesktopContext'
+import { DownloadDialog } from '@/renderer/Shell/DownloadDialog'
 import { OpenLinkDialog } from '@/renderer/Shell/OpenLinkDialog'
-import { applyReply, NoticeContext, play, playServer } from '@/renderer/Shell/openReply'
+import {
+  applyReply,
+  DownloadAskContext,
+  NoticeContext,
+  play,
+  playServer,
+} from '@/renderer/Shell/openReply'
 import { UpdateNotice } from '@/renderer/Shell/UpdateNotice'
 import { HideUpdateProvider, UPDATES_KEY } from '@/renderer/Shell/updateState'
 import { useFileDrop } from '@/renderer/Shell/useFileDrop'
 import styles from '@/renderer/Shell/Shell.module.scss'
-import type { DesktopEvent, DesktopReply } from '@/shared/protocol'
+import type { DesktopEvent, DesktopReply, DownloadAsk } from '@/shared/protocol'
 
 const NOTICE_MS = 6000
 
@@ -34,6 +42,12 @@ export const Shell = () => {
   const [notice, setNotice] = useState<{ message: string } | null>(null)
   const showNotice = useCallback((message: string) => setNotice({ message }), [])
   const [isOpenLinkShown, setIsOpenLinkShown] = useState(false)
+  // `instance` counts the asks shown, so an ask main sends again opens a dialog of its own.
+  const [shown, setShown] = useState<{ ask: DownloadAsk; instance: number } | null>(null)
+  const showDownloadAsk = useCallback(
+    (ask: DownloadAsk) => setShown((last) => ({ ask, instance: (last?.instance ?? 0) + 1 })),
+    [],
+  )
   // The newer version main announced, until See what's new or Dismiss; kept for the session only.
   const [update, setUpdate] = useState<string | null>(null)
   const queryClient = useQueryClient()
@@ -50,7 +64,8 @@ export const Shell = () => {
     if (heading !== null) heading.focus()
   }, [])
 
-  const openReply = (reply: DesktopReply) => applyReply({ reply, navigate, pathname, showNotice })
+  const openReply = (reply: DesktopReply) =>
+    applyReply({ reply, navigate, pathname, showNotice, showDownloadAsk })
   const isDragging = useFileDrop({ client, onReply: openReply })
 
   const onEvent = useEffectEvent((event: DesktopEvent) => {
@@ -71,6 +86,10 @@ export const Shell = () => {
         setUpdate(event.version)
         // Settings reads main's status again, so an open Updates section shows the release too.
         return void queryClient.invalidateQueries({ queryKey: UPDATES_KEY })
+      case 'downloadAsk':
+        return showDownloadAsk(event.ask)
+      case 'downloads':
+        return void applyDownloadsEvent({ queryClient, event })
       default: {
         const unreachable: never = event
         return unreachable
@@ -118,23 +137,28 @@ export const Shell = () => {
   return (
     <DraggingContext.Provider value={isDragging}>
       <NoticeContext.Provider value={showNotice}>
-        <HideUpdateProvider value={hideUpdate}>
-          <div className={styles.shell}>
-            <div ref={page} className={styles.page}>
-              <Outlet />
-            </div>
-            {isUpdateShown && update !== null && (
-              <div ref={updateLayer} className={styles.updates}>
-                <UpdateNotice className={styles.update} version={update} onClose={hideUpdate} />
+        <DownloadAskContext.Provider value={showDownloadAsk}>
+          <HideUpdateProvider value={hideUpdate}>
+            <div className={styles.shell}>
+              <div ref={page} className={styles.page}>
+                <Outlet />
               </div>
+              {isUpdateShown && update !== null && (
+                <div ref={updateLayer} className={styles.updates}>
+                  <UpdateNotice className={styles.update} version={update} onClose={hideUpdate} />
+                </div>
+              )}
+            </div>
+            {isOpenLinkShown && <OpenLinkDialog onClose={() => setIsOpenLinkShown(false)} />}
+            {shown !== null && (
+              <DownloadDialog key={shown.instance} ask={shown.ask} onClose={() => setShown(null)} />
             )}
-          </div>
-          {isOpenLinkShown && <OpenLinkDialog onClose={() => setIsOpenLinkShown(false)} />}
-          {/* Always mounted: a live region is announced when its text changes, not when it appears. */}
-          <output className={styles.notices}>
-            {notice !== null && <span className={styles.notice}>{notice.message}</span>}
-          </output>
-        </HideUpdateProvider>
+            {/* Always mounted: a live region is announced when its text changes, not when it appears. */}
+            <output className={styles.notices}>
+              {notice !== null && <span className={styles.notice}>{notice.message}</span>}
+            </output>
+          </HideUpdateProvider>
+        </DownloadAskContext.Provider>
       </NoticeContext.Provider>
     </DraggingContext.Provider>
   )

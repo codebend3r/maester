@@ -2,6 +2,7 @@ import { describe, expect, it, jest, mock, spyOn } from 'bun:test'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NavigationType } from 'react-router-dom'
+import { DOWNLOADS_KEY } from '@/renderer/desktop/downloadsApi'
 import { fakeClient, renderDesktop, STUB_ROUTES } from '@/renderer/test/render'
 
 const ID_A = '11111111-1111-4111-8111-111111111111'
@@ -147,6 +148,34 @@ describe('Shell', () => {
     menu.subscribe(heard)
     await client.emit({ type: 'player', action: 'togglePlay' })
     expect(heard).toHaveBeenCalledWith('togglePlay')
+  })
+
+  it('opens the download dialog for a downloadAsk event', async () => {
+    const client = fakeClient()
+    renderDesktop({ client, routes: STUB_ROUTES })
+    await settled()
+    await client.emit({
+      type: 'downloadAsk',
+      ask: {
+        askId: ID_A,
+        serverId: ID_B,
+        serverName: 'Vhagar',
+        autoDelete: false,
+        status: { kind: 'locked' },
+      },
+    })
+    expect(await screen.findByRole('dialog', { name: 'Locked library' })).toBeInTheDocument()
+  })
+
+  it('seeds the downloads query from a downloads event', async () => {
+    const client = fakeClient()
+    const { queryClient } = renderDesktop({ client, routes: STUB_ROUTES })
+    await settled()
+    await client.emit({ type: 'downloads', downloads: [], autoDeleteDefault: true })
+    expect(queryClient.getQueryState(DOWNLOADS_KEY)?.data).toEqual({
+      downloads: [],
+      autoDeleteDefault: true,
+    })
   })
 
   it('shows a notice in a status region, then clears it after six seconds', async () => {

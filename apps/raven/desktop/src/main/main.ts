@@ -9,6 +9,7 @@ import {
   rename,
   rm,
   stat,
+  statfs,
   writeFile,
 } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -45,6 +46,9 @@ import {
 import { CONFIG_FILE, type ConfigStore, loadConfig, setOutput } from '@/main/desktopConfig'
 import { createDesktopService, type DesktopService } from '@/main/desktopService'
 import { diagnosticsText, readEngineDiagnostics, unavailableReason } from '@/main/diagnostics'
+import { createDownloadService } from '@/main/downloads/downloadService'
+import { DOWNLOADS_FILE } from '@/main/downloads/downloadState'
+import { DOWNLOADS_DEBOUNCE_MS, loadDownloads } from '@/main/downloads/downloadStore'
 import { createFileHandler } from '@/main/fileProtocol'
 import { createGrants, type Grants } from '@/main/grants'
 import { createHelpActions } from '@/main/help'
@@ -126,6 +130,7 @@ const PRODUCT_NAME = 'raven player'
 const STORE_NOTICES = {
   state: 'raven player could not save your recent videos.',
   config: 'raven player could not save its settings.',
+  downloads: 'raven player could not save its downloads.',
 } as const
 // Finder sends one `open-file` per file; this gathers a multi-file open into one batch.
 const OPEN_BATCH_MS = 100
@@ -461,6 +466,34 @@ const startApp = (): void => {
       warn,
     })
 
+    const downloadsFile = join(userData, DOWNLOADS_FILE)
+    const downloadsStore = createJsonStore({
+      fs: stateFs,
+      file: downloadsFile,
+      initial: await loadDownloads({ fs: stateFs, file: downloadsFile, now: Date.now }),
+      timers,
+      debounceMs: DOWNLOADS_DEBOUNCE_MS,
+      onError: (error) => {
+        reportError({ text: 'raven player could not save its downloads.', error })
+        send({ type: 'notice', message: STORE_NOTICES.downloads })
+      },
+    })
+    const downloads = createDownloadService({
+      store: downloadsStore,
+      config,
+      calls: serverCalls,
+      userData,
+      space: {
+        mkdir: (path) => mkdir(path, { recursive: true }).then(() => undefined),
+        statfs: (path) => statfs(path),
+      },
+      timers,
+      now: Date.now,
+      newId: randomUUID,
+      send,
+      warn,
+    })
+
     const updateSource = updateSourceFrom({ isPackaged: app.isPackaged, env: process.env })
     const updates = createUpdateService({
       config,
@@ -545,9 +578,10 @@ const startApp = (): void => {
       config,
       serverCalls,
       trust,
-      links: createLinkOpener({ trust, warn }),
+      links: createLinkOpener({ trust, downloads, warn }),
       openExternal: (url) => shell.openExternal(url),
       updates,
+      downloads,
     })
 
     // mpv stops before the stores flush and before Electron tears the window down.
@@ -557,7 +591,7 @@ const startApp = (): void => {
         destroy: () =>
           players.current === null ? Promise.resolve() : players.current.engine.destroy(),
       },
-      stores: [store, config],
+      stores: [store, config, downloadsStore],
       writes: { hasPending: serverCalls.hasPendingWrites, settle: serverCalls.settleWrites },
       log,
       warn,

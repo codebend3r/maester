@@ -61,6 +61,90 @@ export const isServerView = object({ serverId: isOpaqueId, origin: isString, nam
 
 export type ServerView = Infer<typeof isServerView>
 
+/** A container becomes `video.<container>` on disk, so only a short lowercase name passes. */
+export const isContainerName = (value: unknown): value is string =>
+  isString(value) && /^[a-z0-9]{1,8}$/u.test(value)
+
+/** A sidecar's track id becomes `subtitles/<trackId>.vtt` on disk, so only the server's `external-<n>` passes. */
+export const isSidecarTrackId = (value: unknown): value is string =>
+  isString(value) && /^external-\d+$/u.test(value)
+
+export const isDownloadKind = oneOf(['movie', 'episode', 'season', 'show', 'saga'])
+
+export type DownloadKind = Infer<typeof isDownloadKind>
+
+/**
+ * Where a download sits in its group. `key` names the group on its server: `show:<itemId>` for an
+ * episode, season or show, `saga:<libraryId>:<tmdbId>` or `movie:<mediaId>`. `order` is the play
+ * order, a season times 10000 plus the episode, or a saga's index.
+ */
+export const isDownloadGroup = object({
+  kind: isDownloadKind,
+  key: isString,
+  title: isString,
+  order: isNumber,
+})
+
+export type DownloadGroup = Infer<typeof isDownloadGroup>
+
+export const isDownloadStatus = union(
+  object({ kind: oneOf(['queued']) }),
+  object({ kind: oneOf(['downloading']), bytes: isNumber }),
+  object({ kind: oneOf(['paused']), bytes: isNumber, message: nullable(isString) }),
+  object({ kind: oneOf(['failed']), bytes: isNumber, message: isString }),
+  object({ kind: oneOf(['ready']) }),
+)
+
+export type DownloadStatus = Infer<typeof isDownloadStatus>
+
+/** What the download dialog shows: the files to fetch, or the lock to lift before main can list them. */
+export const isDownloadAskStatus = union(
+  object({
+    kind: oneOf(['ready']),
+    title: isString,
+    downloadKind: isDownloadKind,
+    files: isNumber,
+    bytes: isNumber,
+    free: isNumber,
+    fits: isBoolean,
+  }),
+  object({ kind: oneOf(['locked']) }),
+  object({ kind: oneOf(['hidden']) }),
+)
+
+export type DownloadAskStatus = Infer<typeof isDownloadAskStatus>
+
+/** A download link main has expanded and holds under `askId` until the page answers it. */
+export const isDownloadAsk = object({
+  askId: isOpaqueId,
+  serverId: isOpaqueId,
+  serverName: isString,
+  autoDelete: isBoolean,
+  status: isDownloadAskStatus,
+})
+
+export type DownloadAsk = Infer<typeof isDownloadAsk>
+
+/** A download as the page shows it: by its opaque id, with no server id, media id or path. */
+export const isDownloadView = object({
+  downloadId: isOpaqueId,
+  label: isString,
+  group: isDownloadGroup,
+  serverName: isString,
+  size: isNumber,
+  status: isDownloadStatus,
+  autoDelete: isBoolean,
+  watched: nullable(isNumber),
+  deletesAt: nullable(isNumber),
+  needsUnlock: isBoolean,
+})
+
+export type DownloadView = Infer<typeof isDownloadView>
+
+export const isSpaceView = object({ free: isNumber, total: isNumber, used: isNumber })
+
+export type SpaceView = Infer<typeof isSpaceView>
+
 /** An audio track's index as a pick names it: a whole number, 0 or more. */
 export const isTrackIndex = (value: unknown): value is number =>
   isNumber(value) && Number.isInteger(value) && value >= 0
@@ -164,6 +248,22 @@ export const isDesktopRequest = union(
   object({ type: oneOf(['checkForUpdates']) }),
   // No URL: main opens the release page it built from the tag (Ruling 19).
   object({ type: oneOf(['openRelease']) }),
+  object({ type: oneOf(['confirmDownload']), askId: isOpaqueId, autoDelete: isBoolean }),
+  object({ type: oneOf(['declineDownload']), askId: isOpaqueId }),
+  object({ type: oneOf(['retryDownloadAsk']), askId: isOpaqueId }),
+  object({ type: oneOf(['listDownloads']) }),
+  object({ type: oneOf(['openDownload']), downloadId: isOpaqueId }),
+  object({ type: oneOf(['pauseDownload']), downloadId: isOpaqueId }),
+  object({ type: oneOf(['resumeDownload']), downloadId: isOpaqueId }),
+  object({ type: oneOf(['retryDownload']), downloadId: isOpaqueId }),
+  object({ type: oneOf(['deleteDownload']), downloadId: isOpaqueId }),
+  object({ type: oneOf(['setDownloadAutoDelete']), downloadId: isOpaqueId, autoDelete: isBoolean }),
+  object({ type: oneOf(['pauseAllDownloads']) }),
+  object({ type: oneOf(['resumeAllDownloads']) }),
+  object({ type: oneOf(['deleteAllDownloads']) }),
+  object({ type: oneOf(['readSpace']) }),
+  object({ type: oneOf(['setDownloadDefaults']), autoDelete: isBoolean }),
+  object({ type: oneOf(['showDownloadsFolder']) }),
 )
 
 export type DesktopRequest = Infer<typeof isDesktopRequest>
@@ -185,11 +285,18 @@ export const isDesktopReply = union(
   object({ type: oneOf(['serverUnreachable']), message: isString }),
   object({ type: oneOf(['servers']), servers: listOf(isServerView) }),
   object({ type: oneOf(['updates']), status: isUpdateStatus }),
+  object({ type: oneOf(['downloadAsk']), ask: isDownloadAsk }),
+  object({
+    type: oneOf(['downloads']),
+    downloads: listOf(isDownloadView),
+    autoDeleteDefault: isBoolean,
+  }),
+  object({ type: oneOf(['space']), space: isSpaceView }),
 )
 
 export type DesktopReply = Infer<typeof isDesktopReply>
 
-/** What main pushes on its own: menu actions (File > Open Link among them), `open-file`, links, notices. */
+/** What main pushes on its own: menu actions (File > Open Link among them), `open-file`, links, downloads, notices. */
 export const isDesktopEvent = union(
   object({ type: oneOf(['play']), target: isPlayTarget }),
   object({ type: oneOf(['player']), action: isMenuPlayerAction }),
@@ -198,6 +305,12 @@ export const isDesktopEvent = union(
   object({ type: oneOf(['playServer']), target: isServerTarget }),
   object({ type: oneOf(['openLink']) }),
   object({ type: oneOf(['updateAvailable']), version: isString }),
+  object({ type: oneOf(['downloadAsk']), ask: isDownloadAsk }),
+  object({
+    type: oneOf(['downloads']),
+    downloads: listOf(isDownloadView),
+    autoDeleteDefault: isBoolean,
+  }),
 )
 
 export type DesktopEvent = Infer<typeof isDesktopEvent>

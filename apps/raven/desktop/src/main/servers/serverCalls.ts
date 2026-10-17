@@ -1,6 +1,7 @@
 import { isLockState } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import {
+  isPageCall,
   isWrite,
   matchCall,
   requestFor,
@@ -11,6 +12,8 @@ import { SERVER_GONE } from '@/shared/protocol'
 
 export const CALL_TIMEOUT_MS = 10_000
 export const MAX_REPLY_CHARS = 1_048_576
+/** `getSagas` answers every saga of a library with a whole `MediaItem` per movie, so it reads past the usual cap. */
+export const MAX_SAGAS_REPLY_CHARS = 8 * 1_048_576
 export const MAX_IN_FLIGHT = 6
 /** Slots past `MAX_IN_FLIGHT` that only a `PUT` or `POST` may take, so reads never starve a save or an unlock. */
 export const WRITE_RESERVE = 2
@@ -29,7 +32,7 @@ export type ServerFetch = (input: {
   headers: Record<string, string>
   body: string | null
   timeoutMs: number
-}) => Promise<{ status: number; text: () => Promise<string> }>
+}) => Promise<{ status: number; text: (input: { maxChars: number }) => Promise<string> }>
 
 export type ServerCallResult =
   | { ok: true; status: number; body: string }
@@ -47,11 +50,12 @@ export type ServerCalls = {
   settleWrites: () => Promise<void>
 }
 
-/** Reads a reply's text, stopping one chunk past `MAX_REPLY_CHARS`, so a huge one is never held whole. */
+/** Reads a reply's text, stopping one chunk past `maxChars`, so a huge one is never held whole. */
 const readCapped = async ({
   reader,
   decoder,
   text,
+  maxChars,
 }: {
   reader: {
     read: () => Promise<{ done: true; value?: undefined } | { done: false; value: Uint8Array }>
@@ -59,11 +63,12 @@ const readCapped = async ({
   }
   decoder: TextDecoder
   text: string
+  maxChars: number
 }): Promise<string> => {
   const { done, value } = await reader.read()
   if (done) return `${text}${decoder.decode()}`
   const next = `${text}${decoder.decode(value, { stream: true })}`
-  if (next.length <= MAX_REPLY_CHARS) return readCapped({ reader, decoder, text: next })
+  if (next.length <= maxChars) return readCapped({ reader, decoder, text: next, maxChars })
   await reader.cancel().catch(() => undefined)
   return next
 }
@@ -87,10 +92,15 @@ export const fetchThrough =
     const stream = response.body
     return {
       status: response.status,
-      text: () =>
+      text: ({ maxChars }) =>
         stream === null
           ? Promise.resolve('')
-          : readCapped({ reader: stream.getReader(), decoder: new TextDecoder(), text: '' }),
+          : readCapped({
+              reader: stream.getReader(),
+              decoder: new TextDecoder(),
+              text: '',
+              maxChars,
+            }),
     }
   }
 
@@ -98,6 +108,10 @@ const headersFor = ({ body }: { body: string | null }): Record<string, string> =
   body === null
     ? { accept: 'application/json' }
     : { accept: 'application/json', 'content-type': 'application/json' }
+
+/** How many characters of a call's reply main reads. */
+export const replyCapFor = (call: AllowedCall): number =>
+  call.name === 'getSagas' ? MAX_SAGAS_REPLY_CHARS : MAX_REPLY_CHARS
 
 const reasonOf = (error: unknown): string => (error instanceof Error ? error.message : 'unknown')
 
@@ -170,6 +184,7 @@ export const createServerCalls = ({
     call: AllowedCall
   }): Promise<ServerCallResult> => {
     const { method, path, body } = requestFor(call)
+    const maxChars = replyCapFor(call)
     try {
       const reply = await fetchFor(server.id)({
         url: `${server.origin}${path}`,
@@ -178,8 +193,8 @@ export const createServerCalls = ({
         body,
         timeoutMs: CALL_TIMEOUT_MS,
       })
-      const text = await reply.text()
-      if (text.length > MAX_REPLY_CHARS) {
+      const text = await reply.text({ maxChars })
+      if (text.length > maxChars) {
         safeWarn(`${loggable(server.name)} sent too much for ${method} ${path}`)
         return { ok: false, message: CALL_MESSAGES.tooBig(server.name) }
       }
@@ -236,7 +251,7 @@ export const createServerCalls = ({
 
   const callFromPage: ServerCalls['callFromPage'] = async ({ serverId, method, path, body }) => {
     const allowed = matchCall({ method, path, body })
-    if (allowed === null) {
+    if (allowed === null || !isPageCall(allowed)) {
       safeWarn(`refused a page call off the allowlist: ${loggable(method)} ${loggable(path)}`)
       return { ok: false, message: CALL_MESSAGES.offList }
     }
@@ -271,7 +286,7 @@ export const probeServer = async ({
       timeoutMs: CALL_TIMEOUT_MS,
     })
     if (reply.status !== 200) return false
-    const text = await reply.text()
+    const text = await reply.text({ maxChars: MAX_REPLY_CHARS })
     if (text.length > MAX_REPLY_CHARS) return false
     const parsed = parseJson(text)
     return parsed.ok && isLockState(parsed.value)

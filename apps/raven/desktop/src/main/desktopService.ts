@@ -1,6 +1,7 @@
 import { basename, dirname } from 'node:path'
 import { type OutputSettings, titleFromFileName } from '@raven/core'
 import { type ConfigStore, type DesktopConfig, pickOutput } from '@/main/desktopConfig'
+import type { DownloadService } from '@/main/downloads/downloadService'
 import { grantNext } from '@/main/folder'
 import type { GrantedFile, GrantRefusal, Grants } from '@/main/grants'
 import {
@@ -76,6 +77,7 @@ export type DesktopServiceDeps = {
   links: LinkOpener
   openExternal: (url: string) => Promise<void>
   updates: UpdateService
+  downloads: DownloadService
 }
 
 export type DesktopService = {
@@ -531,6 +533,30 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return checkForUpdates()
       case 'openRelease':
         return openRelease()
+      case 'confirmDownload':
+        return deps.downloads.confirm({ askId: request.askId, autoDelete: request.autoDelete })
+      case 'declineDownload':
+        return deps.downloads.decline({ askId: request.askId })
+      case 'retryDownloadAsk':
+        return deps.downloads.retryAsk({ askId: request.askId })
+      case 'listDownloads':
+        return deps.downloads.list()
+      case 'readSpace':
+        return deps.downloads.readSpace()
+      case 'setDownloadDefaults':
+        return deps.downloads.setDefaults({ autoDelete: request.autoDelete })
+      // The page may send these already; main refuses them until it can act on them.
+      case 'openDownload':
+      case 'pauseDownload':
+      case 'resumeDownload':
+      case 'retryDownload':
+      case 'deleteDownload':
+      case 'setDownloadAutoDelete':
+      case 'pauseAllDownloads':
+      case 'resumeAllDownloads':
+      case 'deleteAllDownloads':
+      case 'showDownloadsFolder':
+        return refused(MESSAGES.unknownRequest)
       default: {
         const unreachable: never = request
         return unreachable
