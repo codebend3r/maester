@@ -3,6 +3,7 @@ import {
   type DesignToken,
   Icon,
   THEMES,
+  TOKEN_GROUPS,
   type ThemeId,
   contrastRatio,
 } from '@raven/ui'
@@ -131,7 +132,7 @@ const ThemeStrip = ({ worn }: { worn: ThemeId }) => (
 
 export const ColourSection = ({ tokens }: { tokens: readonly DesignToken[] }) => {
   const { theme, valueOf } = useWornColours()
-  const colours = tokens.filter((token) => token.group === 'colour')
+  const colours = tokens.filter((token) => token.group === TOKEN_GROUPS.colour)
   const tokenNamed = (name: string) => colours.find((token) => token.name === name)
   const valueNamed = (name: string) => {
     const token = tokenNamed(name)

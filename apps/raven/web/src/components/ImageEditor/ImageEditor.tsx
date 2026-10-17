@@ -16,7 +16,7 @@ import { useId, useState } from 'react'
 import { Button, Icon, KEYS } from '@raven/ui'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { api } from '@/lib/api'
-import { afterItemEdited } from '@/lib/invalidate'
+import { EDITED_PARTS, afterItemEdited } from '@/lib/invalidate'
 import { versionFacts } from '@/lib/itemFacts'
 import { itemImagesQuery } from '@/lib/queries'
 import styles from '@/components/ImageEditor/ImageEditor.module.scss'
@@ -135,7 +135,7 @@ export const ImageEditor = ({
   const choose = useMutation({
     mutationFn: ({ kind, option }: { kind: ChoosableImageKind; option: ImageOption }) =>
       api.chooseItemImage({ id: details.id, kind, choice: choiceOf(option) }),
-    onSuccess: (updated) => afterItemEdited({ queryClient, updated, part: 'images' }),
+    onSuccess: (updated) => afterItemEdited({ queryClient, updated, part: EDITED_PARTS.images }),
   })
   const libraryName = (libraryId: number) =>
     libraries.find((library) => library.id === libraryId)?.name ?? ''

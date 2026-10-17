@@ -49,7 +49,7 @@ export const useHoverBackdrop = (url: string | null) => {
   const linger = () => after({ ms: LINGER_MS, run: () => hide(url) })
   return {
     onPointerEnter: (event: PointerEvent) => {
-      if (event.pointerType !== 'mouse') return
+      if (event.pointerType !== POINTER_TYPES.mouse) return
       after({ ms: REST_MS, run: () => show(url) })
     },
     onPointerLeave: linger,

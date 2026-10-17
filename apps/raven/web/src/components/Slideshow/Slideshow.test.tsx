@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import { act, render } from '@testing-library/react'
-import { SLIDE_MS, Slideshow, slideRoles } from '@/components/Slideshow/Slideshow'
+import { LESS_MOTION, SLIDE_MS, Slideshow, slideRoles } from '@/components/Slideshow/Slideshow'
 
 const SLIDES = ['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg']
 
@@ -63,7 +63,7 @@ describe('Slideshow', () => {
     const real = window.matchMedia.bind(window)
     // `all` matches any screen and `not all` none, so only the ask for less motion holds.
     const matchMedia = spyOn(window, 'matchMedia').mockImplementation((query) =>
-      real(query === '(prefers-reduced-motion: reduce)' ? 'all' : 'not all'),
+      real(query === LESS_MOTION ? 'all' : 'not all'),
     )
     const { container } = render(<Slideshow slides={SLIDES} motion="slide" />)
     act(() => jest.advanceTimersByTime(SLIDE_MS * 3))

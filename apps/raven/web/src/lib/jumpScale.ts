@@ -14,7 +14,7 @@ import {
   sortParts,
 } from '@raven/core'
 import { mediaEntryKey, showEntryKey } from '@/lib/entryKeys'
-import { LETTERS, type Letter, mediaLetter, showLetter } from '@/lib/letters'
+import { LETTERS, type Letter, SPECIAL_LETTERS, mediaLetter, showLetter } from '@/lib/letters'
 
 /** One step of the jump strip. */
 export type JumpMark = {
@@ -245,7 +245,10 @@ const rulers = ({
   title: listed({
     list: LETTERS,
     item: (entry) => entry.letter,
-    face: (letter) => ({ label: letter, name: letter === '#' ? 'Numbers and symbols' : letter }),
+    face: (letter) => ({
+      label: letter,
+      name: letter === SPECIAL_LETTERS.numbers ? 'Numbers and symbols' : letter,
+    }),
   }),
   added: dates((entry) => entry.added),
   changed: dates((entry) => entry.changed),
@@ -288,7 +291,8 @@ export const jumpScale = ({
 }): JumpScale | null => {
   const { field, direction } = sortParts(sort)
   const hasShows = shows.length > 0
-  if (field === 'random' || (hasShows && field === 'changed')) return null
+  if (field === SORT_FIELD_NAMES.random || (hasShows && field === SORT_FIELD_NAMES.changed))
+    return null
   const ruler = rulers({ source, hasShows })[field]
   const values = [
     ...shows.map((entry) => fromShow({ entry, source })),

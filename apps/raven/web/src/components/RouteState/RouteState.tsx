@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Icon } from '@raven/ui'
 import { Loading } from '@/components/Skeleton/Skeleton'
-import type { RoutePending } from '@/lib/routeQuery'
+import { ROUTE_STATES, type RoutePending } from '@/lib/routeQuery'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/components/RouteState/RouteState.module.scss'
 
@@ -20,16 +20,16 @@ export const RouteState = ({
   shape: ReactNode
 }) => {
   switch (state.state) {
-    case 'missing':
+    case ROUTE_STATES.missing:
       return <NotFoundPage />
-    case 'error':
+    case ROUTE_STATES.error:
       return (
         <p className={styles.message} role="alert">
           <Icon name="alert" />
           <span className={styles.reason}>{state.message}</span>
         </p>
       )
-    case 'loading':
+    case ROUTE_STATES.loading:
       return <Loading label={`Opening the ${noun}`}>{shape}</Loading>
     default: {
       const unknown: never = state

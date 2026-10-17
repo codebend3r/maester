@@ -157,6 +157,9 @@ export const afterWatching = ({
     ],
   })
 
+/** What of an item an editor changes: its pictures or its metadata. */
+export const EDITED_PARTS = { images: 'images', metadata: 'metadata' } as const
+
 /** An item's pictures or metadata were edited: its page takes the answer, its editor and the listings read again. */
 export const afterItemEdited = ({
   queryClient,
@@ -165,7 +168,7 @@ export const afterItemEdited = ({
 }: {
   queryClient: QueryClient
   updated: ItemDetails
-  part: 'images' | 'metadata'
+  part: (typeof EDITED_PARTS)[keyof typeof EDITED_PARTS]
 }): Promise<unknown> => {
   queryClient.setQueryData(queryKeys.item(updated.id), updated)
   return refetch({
@@ -173,7 +176,9 @@ export const afterItemEdited = ({
     filters: [
       {
         queryKey:
-          part === 'images' ? queryKeys.itemImages(updated.id) : queryKeys.itemMetadata(updated.id),
+          part === EDITED_PARTS.images
+            ? queryKeys.itemImages(updated.id)
+            : queryKeys.itemMetadata(updated.id),
       },
       { queryKey: queryKeys.libraries },
       { queryKey: queryKeys.home },

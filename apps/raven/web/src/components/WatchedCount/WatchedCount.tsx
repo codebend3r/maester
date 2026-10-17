@@ -1,4 +1,4 @@
-import { watchedStateOf } from '@raven/core'
+import { WATCHED_STATES, watchedStateOf } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { plural } from '@/lib/plural'
 import styles from '@/components/WatchedCount/WatchedCount.module.scss'
@@ -13,8 +13,8 @@ type Counted = {
 /** "Watched", or "6 unwatched episodes"; null when none is watched. */
 const wordsOf = ({ watched, total, unit = 'episode' }: Counted): string | null => {
   const state = watchedStateOf({ watched, total })
-  if (state === 'unwatched') return null
-  if (state === 'watched') return 'Watched'
+  if (state === WATCHED_STATES.unwatched) return null
+  if (state === WATCHED_STATES.watched) return 'Watched'
   return plural({ n: total - watched, one: `unwatched ${unit}`, many: `unwatched ${unit}s` })
 }
 
@@ -38,13 +38,13 @@ export const WatchedCount = ({
   ...counted
 }: Counted & { decorative?: boolean; className?: string }) => {
   const state = watchedStateOf(counted)
-  if (state === 'unwatched') return null
+  if (state === WATCHED_STATES.unwatched) return null
   return (
     <span
       className={[styles.count, className ?? ''].filter(Boolean).join(' ')}
       aria-hidden={decorative ? 'true' : undefined}
     >
-      {state === 'watched' ? (
+      {state === WATCHED_STATES.watched ? (
         <Icon name="check" size={14} />
       ) : (
         <span aria-hidden="true">{counted.total - counted.watched}</span>

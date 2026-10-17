@@ -1,6 +1,6 @@
 import type { DesignToken } from '@raven/ui'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
-import { type Sample, groupTokens } from '@/pages/DesignPage/tokenGroups'
+import { SAMPLES, type Sample, groupTokens } from '@/pages/DesignPage/tokenGroups'
 import styles from '@/pages/DesignPage/TokensSection.module.scss'
 
 const SAMPLE_TEXT = 'The raven reads every folder'
@@ -9,75 +9,75 @@ const SAMPLE_TEXT = 'The raven reads every folder'
 const TokenSample = ({ name, sample }: { name: string; sample: Sample }) => {
   const value = `var(${name})`
   switch (sample) {
-    case 'bar':
+    case SAMPLES.bar:
       return <span className={styles.bar} style={{ width: value }} />
-    case 'width':
+    case SAMPLES.width:
       return <span className={styles.bar} style={{ width: `min(${value}, 100%)` }} />
-    case 'radius':
+    case SAMPLES.radius:
       return <span className={styles.radius} style={{ borderRadius: value }} />
-    case 'family':
+    case SAMPLES.family:
       return (
         <span className={styles.family} style={{ fontFamily: value }}>
           {SAMPLE_TEXT}
         </span>
       )
-    case 'size':
+    case SAMPLES.size:
       return (
         <span className={styles.size} style={{ fontSize: value }}>
           {SAMPLE_TEXT}
         </span>
       )
-    case 'line':
+    case SAMPLES.line:
       return (
         <span className={styles.line} style={{ lineHeight: value }}>
           {`${SAMPLE_TEXT}, then waits for the next one, and the next.`}
         </span>
       )
-    case 'tracking':
+    case SAMPLES.tracking:
       return (
         <span className={styles.tracking} style={{ letterSpacing: value }}>
           Weirwood at Night
         </span>
       )
-    case 'eyebrow':
+    case SAMPLES.eyebrow:
       return (
         <span className={styles.eyebrow} style={{ letterSpacing: value }}>
           Design system
         </span>
       )
-    case 'ease':
+    case SAMPLES.ease:
       return <span className={styles.ease} style={{ transitionTimingFunction: value }} />
-    case 'shadow':
+    case SAMPLES.shadow:
       return <span className={styles.shadow} style={{ boxShadow: value }} />
-    case 'textShadow':
+    case SAMPLES.textShadow:
       return (
         <span className={styles.textShadow} style={{ textShadow: value }}>
           Subtitles
         </span>
       )
-    case 'fade':
+    case SAMPLES.fade:
       return (
         <span className={styles.fade}>
           <span className={styles.fadeOver} style={{ backgroundImage: value }} />
         </span>
       )
-    case 'glow':
+    case SAMPLES.glow:
       return (
         <span className={styles.glowGround}>
           <span className={styles.glow} style={{ opacity: value }} />
         </span>
       )
-    case 'height':
+    case SAMPLES.height:
       return <span className={styles.height} style={{ height: value }} />
-    case 'border':
+    case SAMPLES.border:
       return <span className={styles.border} style={{ borderTopWidth: value }} />
-    case 'focus':
+    case SAMPLES.focus:
       return (
         <span className={styles.focus} style={{ outline: value }}>
           Focused
         </span>
       )
-    case 'none':
+    case SAMPLES.none:
       return null
     default: {
       const unknown: never = sample

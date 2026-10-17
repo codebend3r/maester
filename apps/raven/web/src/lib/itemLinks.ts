@@ -1,4 +1,5 @@
 import {
+  ITEM_TYPES,
   type Infer,
   type ItemSummary,
   type MediaItem,
@@ -17,9 +18,9 @@ export const seasonPath = ({ showId, season }: { showId: number; season: number 
 
 /** Where an item's page lives, or null for one that has no page of its own. */
 export const itemPath = (item: ItemSummary): AppPath | null => {
-  if (item.type === 'movie') return `/movies/${item.id}`
-  if (item.type === 'show') return `/shows/${item.id}`
-  if (item.type === 'episode') return `/episodes/${item.id}`
+  if (item.type === ITEM_TYPES.movie) return `/movies/${item.id}`
+  if (item.type === ITEM_TYPES.show) return `/shows/${item.id}`
+  if (item.type === ITEM_TYPES.episode) return `/episodes/${item.id}`
   return item.show && item.season != null
     ? seasonPath({ showId: item.show.id, season: item.season })
     : null

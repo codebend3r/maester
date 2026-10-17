@@ -1,4 +1,4 @@
-import { Icon, THEMES, type ThemeId } from '@raven/ui'
+import { Icon, KEYS, THEMES, type ThemeId } from '@raven/ui'
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { useTheme } from '@/stores/theme'
 import styles from '@/components/ThemePicker/ThemePicker.module.scss'
@@ -53,16 +53,16 @@ export const ThemePicker = ({ className }: { className?: string }) => {
   const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
     const items = Array.from(list.current?.querySelectorAll('button') ?? [])
     const index = items.findIndex((item) => item === document.activeElement)
-    if (event.key === 'Escape') {
+    if (event.key === KEYS.escape) {
       event.preventDefault()
       close({ refocus: true })
-    } else if (event.key === 'ArrowDown') {
+    } else if (event.key === KEYS.arrowDown) {
       event.preventDefault()
       items[(index + 1) % items.length]?.focus()
-    } else if (event.key === 'ArrowUp') {
+    } else if (event.key === KEYS.arrowUp) {
       event.preventDefault()
       items[index <= 0 ? items.length - 1 : index - 1]?.focus()
-    } else if (event.key === 'Tab') {
+    } else if (event.key === KEYS.tab) {
       setOpen(false)
     }
   }

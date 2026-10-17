@@ -1,5 +1,5 @@
 import { Component, type ReactNode, useEffect, useRef } from 'react'
-import { useLocation, useNavigationType } from 'react-router-dom'
+import { NavigationType, useLocation, useNavigationType } from 'react-router-dom'
 import { holdInPlace } from '@/lib/holdInPlace'
 
 /** The card at the top of a page: its place among the page's cards, its key, and how far down the screen it sat. */
@@ -99,7 +99,7 @@ export const useScrollReset = (): void => {
   useEffect(() => {
     if (shown.current === pathname) return
     shown.current = pathname
-    if (navigationType !== 'POP') window.scrollTo({ top: 0 })
+    if (navigationType !== NavigationType.Pop) window.scrollTo({ top: 0 })
   }, [pathname, navigationType])
 
   // A second quick Back stops the hold the first started, so two never
@@ -108,7 +108,7 @@ export const useScrollReset = (): void => {
   // arrives, with replace, which changes the key while the hold must go on.
   const holding = useRef<(() => void) | null>(null)
   useEffect(() => {
-    if (navigationType !== 'POP') return
+    if (navigationType !== NavigationType.Pop) return
     holding.current?.()
     holding.current = null
     const card = topCards.get(key)

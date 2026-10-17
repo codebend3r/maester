@@ -1,5 +1,5 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query'
-import { type ServerEvent, parseServerEvent } from '@raven/core'
+import { SERVER_EVENT_TYPES, type ServerEvent, parseServerEvent } from '@raven/core'
 import { useEffect } from 'react'
 import { api } from '@/lib/api'
 import { afterLibraryEvent, afterReconnect } from '@/lib/invalidate'
@@ -13,7 +13,7 @@ const follow = ({
   event: ServerEvent
 }): Promise<unknown> => {
   switch (event.type) {
-    case 'library':
+    case SERVER_EVENT_TYPES.library:
       return afterLibraryEvent({ queryClient, libraryId: event.libraryId })
     default: {
       const unknown: never = event.type

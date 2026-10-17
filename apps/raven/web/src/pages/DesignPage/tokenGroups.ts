@@ -1,41 +1,56 @@
-import type { DesignToken } from '@raven/ui'
+import { type DesignToken, TOKEN_GROUPS } from '@raven/ui'
+
+/** The tokens in ui's `globals.scss` that get a sample of their own. */
+const SAMPLED_TOKENS = {
+  focusRing: '--focus-ring',
+  borderThick: '--border-thick',
+  maxWidth: '--max-width',
+  measure: '--measure',
+  fieldSize: '--field-size',
+  trackingEyebrow: '--tracking-eyebrow',
+  shadowText: '--shadow-text',
+  glow: '--glow',
+} as const
 
 /** How a token is drawn at its true size beside its value. */
-export type Sample =
+export const SAMPLES = {
   /** A bar as wide as the step. */
-  | 'bar'
+  bar: 'bar',
   /** A bar as wide as the measure, or as the row allows. */
-  | 'width'
+  width: 'width',
   /** A box with the corners. */
-  | 'radius'
+  radius: 'radius',
   /** A line in the face. */
-  | 'family'
+  family: 'family',
   /** A line at the size, in the display serif. */
-  | 'size'
+  size: 'size',
   /** A paragraph set to the line height. */
-  | 'line'
+  line: 'line',
   /** A title drawn in by the tracking. */
-  | 'tracking'
+  tracking: 'tracking',
   /** An eyebrow opened up by it. */
-  | 'eyebrow'
+  eyebrow: 'eyebrow',
   /** A square that moves along the curve while the row is pointed at. */
-  | 'ease'
+  ease: 'ease',
   /** A card lifted by the shadow. */
-  | 'shadow'
+  shadow: 'shadow',
   /** A word lifted by it, as subtitles are. */
-  | 'textShadow'
+  textShadow: 'textShadow',
   /** A picture with the fade over it. */
-  | 'fade'
+  fade: 'fade',
   /** A colour wash as strong as the glow. */
-  | 'glow'
+  glow: 'glow',
   /** A control as tall as the size. */
-  | 'height'
+  height: 'height',
   /** A dashed line as thick as the border. */
-  | 'border'
+  border: 'border',
   /** Something focused, with the ring around it. */
-  | 'focus'
+  focus: 'focus',
   /** Nothing to draw. */
-  | 'none'
+  none: 'none',
+} as const
+
+export type Sample = (typeof SAMPLES)[keyof typeof SAMPLES]
 
 export type TokenRow = DesignToken & { sample: Sample }
 
@@ -54,11 +69,11 @@ const named =
     prefixes.some((prefix) => token.name.startsWith(prefix))
 
 const sizeSample = (name: string): Sample => {
-  if (name === '--focus-ring') return 'focus'
-  if (name === '--border-thick') return 'border'
-  if (name === '--max-width' || name === '--measure') return 'width'
-  if (name.startsWith('--control-size') || name === '--field-size') return 'height'
-  return 'none'
+  if (name === SAMPLED_TOKENS.focusRing) return SAMPLES.focus
+  if (name === SAMPLED_TOKENS.borderThick) return SAMPLES.border
+  if (name === SAMPLED_TOKENS.maxWidth || name === SAMPLED_TOKENS.measure) return SAMPLES.width
+  if (name.startsWith('--control-size') || name === SAMPLED_TOKENS.fieldSize) return SAMPLES.height
+  return SAMPLES.none
 }
 
 /**
@@ -68,8 +83,28 @@ const sizeSample = (name: string): Sample => {
 const GROUPS: readonly Group[] = [
   {
     name: 'Spacing',
-    has: (token) => token.group === 'space' || SPACING.has(token.name),
-    sample: () => 'bar',
+    has: (token) => token.group === TOKEN_GROUPS.space || SPACING.has(token.name),
+    sample: () => SAMPLES.bar,
+  },
+  {
+    name: 'Radius',
+    has: (token) => token.group === TOKEN_GROUPS.radius,
+    sample: () => SAMPLES.radius,
+  },
+  {
+    name: 'Typefaces',
+    has: (token) => token.group === TOKEN_GROUPS.font,
+    sample: () => SAMPLES.family,
+  },
+  {
+    name: 'Type scale',
+    has: (token) => token.group === TOKEN_GROUPS.fontSize,
+    sample: () => SAMPLES.size,
+  },
+  {
+    name: 'Line height',
+    has: (token) => token.group === TOKEN_GROUPS.line,
+    sample: () => SAMPLES.line,
   },
   { name: 'Radius', has: (token) => token.group === 'radius', sample: () => 'radius' },
   { name: 'Typefaces', has: (token) => token.group === 'font', sample: () => 'family' },
@@ -78,18 +113,24 @@ const GROUPS: readonly Group[] = [
   {
     name: 'Tracking',
     has: named('--tracking-'),
-    sample: (name) => (name === '--tracking-eyebrow' ? 'eyebrow' : 'tracking'),
+    sample: (name) =>
+      name === SAMPLED_TOKENS.trackingEyebrow ? SAMPLES.eyebrow : SAMPLES.tracking,
   },
-  { name: 'Easing', has: named('--ease-'), sample: () => 'ease' },
+  { name: 'Easing', has: named('--ease-'), sample: () => SAMPLES.ease },
   {
     name: 'Shadows',
     has: named('--shadow-'),
-    sample: (name) => (name === '--shadow-text' ? 'textShadow' : 'shadow'),
+    sample: (name) => (name === SAMPLED_TOKENS.shadowText ? SAMPLES.textShadow : SAMPLES.shadow),
   },
   {
     name: 'Fades and glow',
-    has: named('--fade-', '--glow'),
-    sample: (name) => (name === '--glow' ? 'glow' : 'fade'),
+    has: named('--fade-', SAMPLED_TOKENS.glow),
+    sample: (name) => (name === SAMPLED_TOKENS.glow ? SAMPLES.glow : SAMPLES.fade),
+  },
+  {
+    name: 'Layout and focus',
+    has: (token) => token.group !== TOKEN_GROUPS.colour,
+    sample: sizeSample,
   },
   { name: 'Layout and focus', has: (token) => token.group !== 'colour', sample: sizeSample },
 ]

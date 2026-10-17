@@ -22,10 +22,10 @@ export const toneOfPixels = (data: ArrayLike<number>): LogoTone => {
     },
     { light: 0, weight: 0 },
   )
-  if (weight <= 0) return 'mixed'
+  if (weight <= 0) return LOGO_TONES.mixed
   const mean = light / weight
-  if (mean < 1 / 3) return 'dark'
-  return mean > 2 / 3 ? 'light' : 'mixed'
+  if (mean < 1 / 3) return LOGO_TONES.dark
+  return mean > 2 / 3 ? LOGO_TONES.light : LOGO_TONES.mixed
 }
 
 /**
@@ -42,11 +42,11 @@ export const logoTone = (image: HTMLImageElement): LogoTone => {
   canvas.width = width
   canvas.height = height
   const context = canvas.getContext('2d')
-  if (!context) return 'mixed'
+  if (!context) return LOGO_TONES.mixed
   try {
     context.drawImage(image, 0, 0, width, height)
     return toneOfPixels(context.getImageData(0, 0, width, height).data)
   } catch {
-    return 'mixed'
+    return LOGO_TONES.mixed
   }
 }

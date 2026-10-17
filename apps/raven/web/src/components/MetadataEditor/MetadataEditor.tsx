@@ -11,7 +11,7 @@ import { type FormEvent, useId, useState } from 'react'
 import { Button, Icon } from '@raven/ui'
 import { MovieFiles } from '@/components/MovieFiles/MovieFiles'
 import { api } from '@/lib/api'
-import { afterItemEdited } from '@/lib/invalidate'
+import { EDITED_PARTS, afterItemEdited } from '@/lib/invalidate'
 import { itemMetadataQuery } from '@/lib/queries'
 import styles from '@/components/MetadataEditor/MetadataEditor.module.scss'
 
@@ -97,7 +97,7 @@ export const MetadataEditor = ({
   const save = useMutation({
     mutationFn: (change: ItemMetadataChange) => api.setItemMetadata({ id: details.id, change }),
     onSuccess: async (updated) => {
-      await afterItemEdited({ queryClient, updated, part: 'metadata' })
+      await afterItemEdited({ queryClient, updated, part: EDITED_PARTS.metadata })
       onDone()
     },
   })

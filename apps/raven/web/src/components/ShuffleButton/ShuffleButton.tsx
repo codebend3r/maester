@@ -41,8 +41,8 @@ export const ShuffleButton = ({ itemId, children }: { itemId: number; children: 
     <Button
       icon="shuffle"
       onClick={pick}
-      disabled={state !== 'idle'}
-      aria-busy={state === 'picking'}
+      disabled={state !== PICK_STATES.idle}
+      aria-busy={state === PICK_STATES.picking}
     >
       {LABELS[state] ?? children}
     </Button>

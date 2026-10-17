@@ -1,8 +1,11 @@
 import { type ItemSummary, type MediaItem, sortTitle } from '@raven/core'
 
+/** The letter that gathers the titles starting with no letter: numbers, symbols, or nothing. */
+export const SPECIAL_LETTERS = { numbers: '#' } as const
+
 /** The letter picker's letters: # for titles that start with no letter, then A to Z. */
 export const LETTERS = [
-  '#',
+  SPECIAL_LETTERS.numbers,
   'A',
   'B',
   'C',
@@ -38,7 +41,7 @@ const isLetter = (value: string): value is Letter => LETTERS.some((letter) => le
 /** The letter a title starts with, its accent dropped (Émile is under E), else #. */
 export const letterOf = (title: string): Letter => {
   const first = title.trim().normalize('NFD').charAt(0).toUpperCase()
-  return first !== '#' && isLetter(first) ? first : '#'
+  return first !== SPECIAL_LETTERS.numbers && isLetter(first) ? first : SPECIAL_LETTERS.numbers
 }
 
 /**

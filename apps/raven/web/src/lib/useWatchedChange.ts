@@ -1,4 +1,4 @@
-import type { WatchedChange, WatchedState } from '@raven/core'
+import { WATCHED_STATES, type WatchedChange, type WatchedState } from '@raven/core'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { afterWatched } from '@/lib/invalidate'
@@ -34,5 +34,5 @@ export const useWatchedToggle = ({
   targets: WatchedChange['targets']
 }) => {
   const { mutate } = useWatchedChange()
-  return { state, onToggle: () => mutate({ watched: state !== 'watched', targets }) }
+  return { state, onToggle: () => mutate({ watched: state !== WATCHED_STATES.watched, targets }) }
 }
