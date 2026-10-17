@@ -68,6 +68,7 @@ export const applyReply = ({
     case 'servers':
     case 'serverReply':
     case 'serverUnreachable':
+    case 'updates':
       return
     default: {
       const unreachable: never = reply

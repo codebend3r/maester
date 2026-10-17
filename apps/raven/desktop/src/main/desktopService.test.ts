@@ -10,6 +10,8 @@ import { CALL_MESSAGES, type ServerCallResult } from '@/main/servers/serverCalls
 import { removeServer } from '@/main/servers/serverList'
 import { TRUST_MESSAGES, type TrustOutcome } from '@/main/servers/serverTrust'
 import type { DesktopReply } from '@/shared/protocol'
+import { createUpdateService, UPDATE_COPY } from '@/main/updateService'
+import { UPDATE_PROBLEMS, type UpdateCheck } from '@/main/updates'
 import type { OutputSettings } from '@raven/core'
 
 type Entry = { real: string; isFile: boolean; size: number; mtimeMs: number }
@@ -71,7 +73,9 @@ const setup = ({
   trustOutcome = { kind: 'declined' },
   callResult = { ok: true, status: 200, body: '{}' },
   failBrowser = false,
+  updateAnswers = [],
 }: {
+  updateAnswers?: UpdateCheck[]
   failOutputWrite?: boolean
   failOutputRead?: boolean
   trustOutcome?: TrustOutcome
@@ -167,7 +171,25 @@ const setup = ({
   const batches: (readonly string[])[] = []
   const browsed: string[] = []
   const server = { calls, trusted, removed, opened, batches, browsed }
+  const updateQueue = [...updateAnswers]
+  const releasePages: string[] = []
+  const releases = { checks: 0, opened: releasePages }
+  const updates = createUpdateService({
+    config,
+    check: async () => {
+      releases.checks += 1
+      return updateQueue.shift() ?? { ok: true, finding: { kind: 'current' } }
+    },
+    current: '0.5.4',
+    now: () => clock.now,
+    openExternal: async (url) => {
+      releases.opened.push(url)
+    },
+    announce: () => undefined,
+    warn: () => undefined,
+  })
   const service = createDesktopService({
+    updates,
     config,
     serverCalls: {
       callFromPage: async (input) => {
@@ -260,6 +282,7 @@ const setup = ({
     store,
     config,
     server,
+    releases,
     table,
     stats,
     spies,
@@ -1334,5 +1357,85 @@ describe('server titles', () => {
         await ask({ service, request: { type: 'openRecent', recentId: dune!.recentId } }),
       ).toEqual({ type: 'refused', message: MESSAGES.unknownRecent })
     })
+  })
+})
+
+describe('updates', () => {
+  type Service = ReturnType<typeof setup>['service']
+  const ask = ({ service, request }: { service: Service; request: unknown }) =>
+    service.handle({ kind: 'page', request })
+  const PAGE = 'https://github.com/codebend3r/maester/releases/tag/v0.6.0'
+  const NEWER: UpdateCheck = {
+    ok: true,
+    finding: { kind: 'newer', version: '0.6.0', pageUrl: PAGE },
+  }
+
+  it('answers readUpdates with the status and checks nothing', async () => {
+    const { service, releases } = setup({ files: {} })
+    expect(await ask({ service, request: { type: 'readUpdates' } })).toEqual({
+      type: 'updates',
+      status: { isEnabled: true, current: '0.5.4', checkedAt: null, latest: null, problem: null },
+    })
+    expect(releases.checks).toBe(0)
+  })
+
+  it('turns the launch check off and on, answering the new status', async () => {
+    const { service, config } = setup({ files: {} })
+    const off = await ask({ service, request: { type: 'setUpdateCheck', isEnabled: false } })
+    expect(off).toMatchObject({ type: 'updates', status: { isEnabled: false } })
+    expect(config.read().updates.isEnabled).toBe(false)
+    const on = await ask({ service, request: { type: 'setUpdateCheck', isEnabled: true } })
+    expect(on).toMatchObject({ type: 'updates', status: { isEnabled: true } })
+  })
+
+  it('refuses a switch set by a string and changes nothing', async () => {
+    const { service, config } = setup({ files: {} })
+    expect(await ask({ service, request: { type: 'setUpdateCheck', isEnabled: 'false' } })).toEqual(
+      { type: 'refused', message: MESSAGES.unknownRequest },
+    )
+    expect(config.read().updates.isEnabled).toBe(true)
+  })
+
+  it('checks when asked and answers the status the check left', async () => {
+    const { service, releases, clock } = setup({ files: {}, updateAnswers: [NEWER] })
+    expect(await ask({ service, request: { type: 'checkForUpdates' } })).toEqual({
+      type: 'updates',
+      status: {
+        isEnabled: true,
+        current: '0.5.4',
+        checkedAt: clock.now,
+        latest: '0.6.0',
+        problem: null,
+      },
+    })
+    expect(releases.checks).toBe(1)
+  })
+
+  it('answers a failed check with its problem, not a refusal', async () => {
+    const { service } = setup({
+      files: {},
+      updateAnswers: [{ ok: false, problem: UPDATE_PROBLEMS.busy }],
+    })
+    expect(await ask({ service, request: { type: 'checkForUpdates' } })).toMatchObject({
+      type: 'updates',
+      status: { latest: null, problem: UPDATE_PROBLEMS.busy },
+    })
+  })
+
+  it('refuses openRelease before a newer release is found and opens nothing', async () => {
+    const { service, releases } = setup({ files: {} })
+    expect(await ask({ service, request: { type: 'openRelease' } })).toEqual({
+      type: 'refused',
+      message: UPDATE_COPY.noRelease,
+    })
+    expect(UPDATE_COPY.noRelease).toContain('has not found a newer release')
+    expect(releases.opened).toEqual([])
+  })
+
+  it('opens the release page once a newer release is found', async () => {
+    const { service, releases } = setup({ files: {}, updateAnswers: [NEWER] })
+    await ask({ service, request: { type: 'checkForUpdates' } })
+    expect(await ask({ service, request: { type: 'openRelease' } })).toEqual({ type: 'done' })
+    expect(releases.opened).toEqual([PAGE])
   })
 })

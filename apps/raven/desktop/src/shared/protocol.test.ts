@@ -23,12 +23,21 @@ import {
   isServerTarget,
   isServerView,
   isTrackChoice,
+  isUpdateStatus,
   PLAYER_PORT_CHANNEL,
   PLAYER_PORT_MESSAGE,
 } from '@/shared/protocol'
 
 const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
 const other = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+
+const UPDATES = {
+  isEnabled: true,
+  current: '0.5.4',
+  checkedAt: null,
+  latest: null,
+  problem: 'GitHub did not answer.',
+} as const
 
 describe('constants', () => {
   it('names the app origin, the file scheme and the two channels', () => {
@@ -162,6 +171,10 @@ describe('isDesktopRequest', () => {
     [{ type: 'openInBrowser', serverId: id, mediaId: 7 }],
     [{ type: 'noteServerTitle', serverId: id, mediaId: 7, label: 'Dune', watched: 0.5 }],
     [{ type: 'noteServerTitle', serverId: id, mediaId: 7, label: 'Dune', watched: null }],
+    [{ type: 'readUpdates' }],
+    [{ type: 'setUpdateCheck', isEnabled: false }],
+    [{ type: 'checkForUpdates' }],
+    [{ type: 'openRelease' }],
   ])('accepts %j', (value) => {
     expect(isDesktopRequest(value)).toBe(true)
   })
@@ -199,6 +212,8 @@ describe('isDesktopRequest', () => {
     ],
     ['a server added without an origin', { type: 'addServer' }],
     ['a rename to a number', { type: 'renameServer', serverId: id, name: 7 }],
+    ['an update switch set by a string', { type: 'setUpdateCheck', isEnabled: 'true' }],
+    ['an update switch with no value', { type: 'setUpdateCheck' }],
     ['an unknown type', { type: 'readFile', path: '/etc/hosts' }],
     ['no type', {}],
     ['a string', 'ready'],
@@ -245,6 +260,13 @@ describe('isDesktopReply', () => {
       },
     ],
     [{ type: 'servers', servers: [] }],
+    [{ type: 'updates', status: UPDATES }],
+    [
+      {
+        type: 'updates',
+        status: { ...UPDATES, checkedAt: 1_700_000_000_000, latest: '0.6.0', problem: null },
+      },
+    ],
   ])('accepts %j', (value) => {
     expect(isDesktopReply(value)).toBe(true)
   })
@@ -253,6 +275,18 @@ describe('isDesktopReply', () => {
     expect(isDesktopReply({ type: 'serverReply', body: '' })).toBe(false)
     expect(isDesktopReply({ type: 'serverUnreachable' })).toBe(false)
     expect(isDesktopReply({ type: 'servers', servers: ['https://raven.example'] })).toBe(false)
+  })
+
+  it('rejects an update status whose latest is a number or that lacks a field', () => {
+    expect(isDesktopReply({ type: 'updates', status: { ...UPDATES, latest: 3 } })).toBe(false)
+    expect(isDesktopReply({ type: 'updates', status: { ...UPDATES, isEnabled: 'yes' } })).toBe(
+      false,
+    )
+    expect(isDesktopReply({ type: 'updates' })).toBe(false)
+    expect(
+      isUpdateStatus({ isEnabled: true, current: '0.5.4', checkedAt: null, latest: null }),
+    ).toBe(false)
+    expect(isUpdateStatus(UPDATES)).toBe(true)
   })
 
   it('rejects a refusal without a message and an unknown type', () => {
@@ -313,6 +347,7 @@ describe('isDesktopEvent', () => {
     [{ type: 'notice', message: 'raven links open in a later release' }],
     [{ type: 'playServer', target: { serverId: id, mediaId: 7, at: 30, next: [8] } }],
     [{ type: 'openLink' }],
+    [{ type: 'updateAvailable', version: '0.6.0' }],
   ])('accepts %j', (value) => {
     expect(isDesktopEvent(value)).toBe(true)
   })
@@ -322,6 +357,8 @@ describe('isDesktopEvent', () => {
     ['navigating home, which nothing in main sends', { type: 'navigate', to: 'home' }],
     ['recentsChanged, which nothing in main sends', { type: 'recentsChanged' }],
     ['a notice without a message', { type: 'notice' }],
+    ['a newer release without its version', { type: 'updateAvailable' }],
+    ['a newer release with a number for its version', { type: 'updateAvailable', version: 6 }],
     ['openRecent, which only the page asks for', { type: 'openRecent' }],
     [
       'a server title queueing a fractional id',

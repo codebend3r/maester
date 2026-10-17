@@ -6,6 +6,8 @@ const setup = ({ isDevelopment = false }: { isDevelopment?: boolean } = {}) => {
   const sent: DesktopEvent[] = []
   const dialogs = { opened: 0 }
   const devTools = { toggles: 0 }
+  const help = { showLogs: 0, showCrashReports: 0, copyDiagnostics: 0 }
+  const updates = { checks: 0 }
   const template = menuTemplate({
     appName: 'raven player',
     isDevelopment,
@@ -19,9 +21,21 @@ const setup = ({ isDevelopment = false }: { isDevelopment?: boolean } = {}) => {
       toggleDevTools: () => {
         devTools.toggles += 1
       },
+      showLogs: () => {
+        help.showLogs += 1
+      },
+      showCrashReports: () => {
+        help.showCrashReports += 1
+      },
+      copyDiagnostics: () => {
+        help.copyDiagnostics += 1
+      },
+      checkForUpdates: () => {
+        updates.checks += 1
+      },
     },
   })
-  return { template, sent, dialogs, devTools }
+  return { template, sent, dialogs, devTools, help, updates }
 }
 
 const everyItem = (entries: readonly MenuEntry[]): MenuEntry[] =>
@@ -84,6 +98,7 @@ describe('menuTemplate', () => {
       'about',
       'separator',
       'Settings…',
+      'Check for Updates…',
       'separator',
       'hide',
       'hideOthers',
@@ -91,6 +106,19 @@ describe('menuTemplate', () => {
       'separator',
       'quit',
     ])
+  })
+
+  it('checks for updates from the app menu, with no accelerator', () => {
+    const { template, updates, sent } = setup()
+    const check = itemOf({
+      menu: topLevel({ template, name: 'raven player' }),
+      label: 'Check for Updates…',
+    })
+    expect(check.id).toBe('check-for-updates')
+    expect(check.accelerator).toBeUndefined()
+    click(check)
+    expect(updates.checks).toBe(1)
+    expect(sent).toEqual([])
   })
 
   it('opens the dialog from Open… with Command O', () => {
@@ -205,17 +233,27 @@ describe('menuTemplate', () => {
     })
   })
 
-  it('leaves out the items later steps add', () => {
-    const { template } = setup()
-    const labels = everyItem(template).map((entry) => entry.label)
-    ;[
-      'Check for Updates',
-      'Check for Updates…',
-      'Show Logs',
-      'Show Crash Reports',
-      'Copy Diagnostics',
-    ].forEach((label) => {
-      expect(labels).not.toContain(label)
-    })
+  it('ends Help with the logs, the crash reports and the diagnostics', () => {
+    const { template, help } = setup()
+    const menu = topLevel({ template, name: 'Help' })
+    expect(
+      (menu.submenu ?? []).map((entry) => ({
+        label: entry.label ?? entry.type,
+        id: entry.id ?? null,
+        accelerator: entry.accelerator ?? null,
+      })),
+    ).toEqual([
+      { label: 'Keyboard Shortcuts', id: null, accelerator: null },
+      { label: 'separator', id: null, accelerator: null },
+      { label: 'Show Logs', id: 'show-logs', accelerator: null },
+      { label: 'Show Crash Reports', id: 'show-crash-reports', accelerator: null },
+      { label: 'Copy Diagnostics', id: 'copy-diagnostics', accelerator: null },
+    ])
+    click(itemOf({ menu, label: 'Show Logs' }))
+    expect(help).toEqual({ showLogs: 1, showCrashReports: 0, copyDiagnostics: 0 })
+    click(itemOf({ menu, label: 'Show Crash Reports' }))
+    expect(help).toEqual({ showLogs: 1, showCrashReports: 1, copyDiagnostics: 0 })
+    click(itemOf({ menu, label: 'Copy Diagnostics' }))
+    expect(help).toEqual({ showLogs: 1, showCrashReports: 1, copyDiagnostics: 1 })
   })
 })

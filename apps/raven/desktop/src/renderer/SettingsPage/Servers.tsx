@@ -228,6 +228,7 @@ export const Servers = ({ className }: { className?: string }) => {
       case 'output':
       case 'serverReply':
       case 'serverUnreachable':
+      case 'updates':
         return refuse(UNCHANGED)
       default: {
         const unreachable: never = reply

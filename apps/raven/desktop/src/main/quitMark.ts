@@ -1,6 +1,7 @@
 /**
  * The quit budget mark (spec Review Focus 5): `raven-quit-ms` from the first `before-quit`
- * to just before the process ends, printed once, on stdout until the log lands.
+ * to the first `will-quit` (every window closed, mpv stopped, the stores written) or the
+ * quit gate giving up, written once to the log, and on stdout unpackaged (Ruling 13).
  */
 export const createQuitMark = ({
   isEnabled,

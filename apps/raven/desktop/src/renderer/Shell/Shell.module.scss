@@ -23,3 +23,40 @@
   box-shadow: var(--shadow-menu);
   font-size: var(--font-size-sm);
 }
+
+// The page, then the update notice in its own row after it, so the notice takes its own
+// height at the end of the page instead of covering its last controls.
+.shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'page'
+    'update';
+}
+
+.page {
+  grid-area: page;
+  min-width: 0;
+}
+
+// Sticks to the bottom of the window while the page scrolls under it, and comes to rest
+// in its own row once the page's end is in view.
+.updates {
+  grid-area: update;
+  position: sticky;
+  inset-block-end: 0;
+  display: grid;
+  grid-template-areas: 'notice';
+  justify-items: end;
+  padding: 0 var(--space-4) var(--space-4);
+  pointer-events: none;
+
+  @media (max-width: 30rem) {
+    justify-items: stretch;
+    padding: 0 var(--space-2) var(--space-2);
+  }
+}
+
+.update {
+  grid-area: notice;
+}
