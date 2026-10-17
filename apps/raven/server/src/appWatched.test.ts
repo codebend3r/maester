@@ -59,8 +59,13 @@ describe('marking videos watched', () => {
     targets: WatchTarget[]
     cookie?: string
   }) => api(cookie).setWatched({ watched, targets })
-  const watchedFile = async (name: string, cookie?: string): Promise<boolean> =>
-    (await api(cookie).getMedia(id(name))).watched
+  const watchedFile = async ({
+    name,
+    cookie,
+  }: {
+    name: string
+    cookie?: string
+  }): Promise<boolean> => (await api(cookie).getMedia(id(name))).watched
   const childrenOf = async (name: string): Promise<ItemChild[]> =>
     (await api().getItem(item(name))).children
   const createLibrary = async (input: LibraryInput): Promise<number> => {
@@ -185,8 +190,8 @@ describe('marking videos watched', () => {
       body: { watched: true, targets: [{ kind: 'media', id: id('Ronin (1998).mp4') }] },
     })
     expect(response.statusCode).toBe(204)
-    expect(await watchedFile('Ronin (1998).mp4')).toBe(true)
-    expect(await watchedFile('Heat (1995).mp4')).toBe(false)
+    expect(await watchedFile({ name: 'Ronin (1998).mp4' })).toBe(true)
+    expect(await watchedFile({ name: 'Heat (1995).mp4' })).toBe(false)
   })
 
   it('puts a mark in the history, and takes it out again', async () => {
@@ -194,7 +199,7 @@ describe('marking videos watched', () => {
     expect(entry).toMatchObject({ plays: 0, furthest: 0, watched: true, marked: true })
     expect(entry?.media.id).toBe(id('Ronin (1998).mp4'))
     await setWatched({ watched: false, targets: [{ kind: 'media', id: id('Ronin (1998).mp4') }] })
-    expect(await watchedFile('Ronin (1998).mp4')).toBe(false)
+    expect(await watchedFile({ name: 'Ronin (1998).mp4' })).toBe(false)
     expect(await api().listHistory({ libraryId: state.open, limit: 10 })).toEqual([])
   })
 
@@ -211,7 +216,7 @@ describe('marking videos watched', () => {
       watched: false,
       targets: [{ kind: 'item', id: item('Heat (1995)'), libraryId: state.open }],
     })
-    expect(await watchedFile('Heat (1995).mp4')).toBe(false)
+    expect(await watchedFile({ name: 'Heat (1995).mp4' })).toBe(false)
   })
 
   it('marks every episode under a show, and counts them on the season', async () => {
@@ -251,13 +256,17 @@ describe('marking videos watched', () => {
     })
     expect(response.statusCode).toBe(204)
     const pin = await unlock()
-    expect(await watchedFile('Lesson One.mp4', cookies(state.admin, pin))).toBe(false)
+    expect(await watchedFile({ name: 'Lesson One.mp4', cookie: cookies(state.admin, pin) })).toBe(
+      false,
+    )
     await setWatched({
       watched: true,
       targets: [{ kind: 'media', id: lesson }],
       cookie: cookies(state.admin, pin),
     })
-    expect(await watchedFile('Lesson One.mp4', cookies(state.admin, pin))).toBe(true)
+    expect(await watchedFile({ name: 'Lesson One.mp4', cookie: cookies(state.admin, pin) })).toBe(
+      true,
+    )
     await setWatched({
       watched: false,
       targets: [{ kind: 'media', id: lesson }],

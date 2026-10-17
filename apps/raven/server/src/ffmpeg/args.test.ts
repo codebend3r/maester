@@ -56,7 +56,8 @@ describe('streamArgs', () => {
     tonemap: false,
     streamShift: 1,
   }
-  const after = (args: string[], flag: string): string | undefined => args[args.indexOf(flag) + 1]
+  const after = ({ args, flag }: { args: string[]; flag: string }): string | undefined =>
+    args[args.indexOf(flag) + 1]
 
   describe('on a GPU', () => {
     const vaapi: VideoEncoder = { kind: 'vaapi', device: '/dev/dri/renderD128' }
@@ -67,27 +68,27 @@ describe('streamArgs', () => {
       expect(beforeInput(args)).toEqual(
         expect.arrayContaining(['-hwaccel', 'vaapi', '-hwaccel_output_format', 'vaapi']),
       )
-      expect(after(args, '-init_hw_device')).toBe('vaapi=va:/dev/dri/renderD128')
-      expect(after(args, '-vf')).toBe("scale_vaapi=w=-2:h='min(1080,ih)':format=nv12")
-      expect(after(args, '-c:v')).toBe('h264_vaapi')
+      expect(after({ args, flag: '-init_hw_device' })).toBe('vaapi=va:/dev/dri/renderD128')
+      expect(after({ args, flag: '-vf' })).toBe("scale_vaapi=w=-2:h='min(1080,ih)':format=nv12")
+      expect(after({ args, flag: '-c:v' })).toBe('h264_vaapi')
       expect(args).not.toContain('-pix_fmt')
     })
 
     it('keeps HDR on the GPU too, converting its colours to BT.709 rather than tone mapping on the CPU', () => {
       const args = streamArgs({ ...base, mode: 'transcode', tonemap: true, encoder: vaapi })
       expect(beforeInput(args)).toEqual(expect.arrayContaining(['-hwaccel_output_format', 'vaapi']))
-      expect(after(args, '-vf')).toBe(
+      expect(after({ args, flag: '-vf' })).toBe(
         "scale_vaapi=w=-2:h='min(1080,ih)':format=nv12:out_color_matrix=bt709:out_color_primaries=bt709:out_color_transfer=bt709:out_range=tv",
       )
-      expect(after(args, '-vf')).not.toContain('zscale')
+      expect(after({ args, flag: '-vf' })).not.toContain('zscale')
     })
 
     it('decodes a codec the GPU may not know on the CPU, then uploads it to encode', () => {
       const args = streamArgs({ ...base, mode: 'transcode', videoCodec: 'mpeg4', encoder: vaapi })
       expect(beforeInput(args)).not.toContain('-hwaccel')
-      expect(after(args, '-filter_hw_device')).toBe('va')
-      expect(after(args, '-vf')).toBe("scale=w=-2:h='min(1080,ih)',format=nv12,hwupload")
-      expect(after(args, '-c:v')).toBe('h264_vaapi')
+      expect(after({ args, flag: '-filter_hw_device' })).toBe('va')
+      expect(after({ args, flag: '-vf' })).toBe("scale=w=-2:h='min(1080,ih)',format=nv12,hwupload")
+      expect(after({ args, flag: '-c:v' })).toBe('h264_vaapi')
     })
 
     it('decodes and encodes on the Apple media engine with VideoToolbox', () => {
@@ -96,30 +97,30 @@ describe('streamArgs', () => {
         mode: 'transcode',
         encoder: { kind: 'videotoolbox' },
       })
-      expect(after(beforeInput(args), '-hwaccel')).toBe('videotoolbox')
-      expect(after(args, '-c:v')).toBe('h264_videotoolbox')
-      expect(after(args, '-vf')).toBe("scale=w=-2:h='min(1080,ih)'")
+      expect(after({ args: beforeInput(args), flag: '-hwaccel' })).toBe('videotoolbox')
+      expect(after({ args, flag: '-c:v' })).toBe('h264_videotoolbox')
+      expect(after({ args, flag: '-vf' })).toBe("scale=w=-2:h='min(1080,ih)'")
     })
 
     it('leaves a remux alone, since nothing is encoded', () => {
       const args = streamArgs({ ...base, mode: 'remux', encoder: vaapi })
       expect(args).not.toContain('-hwaccel')
       expect(args).not.toContain('-init_hw_device')
-      expect(after(args, '-c:v')).toBe('copy')
+      expect(after({ args, flag: '-c:v' })).toBe('copy')
     })
   })
 
   it('copies the video, keeps the file clock and converts the chosen audio', () => {
     const args = streamArgs({ ...base, mode: 'remux' })
     expect(args.indexOf('-ss')).toBeLessThan(args.indexOf('-i'))
-    expect(after(args, '-ss')).toBe('61.5')
+    expect(after({ args, flag: '-ss' })).toBe('61.5')
     expect(args).toContain('-copyts')
     expect(args).toContain('0:a:2')
-    expect(after(args, '-c:v')).toBe('copy')
-    expect(after(args, '-tag:v')).toBe('hvc1')
-    expect(after(args, '-c:a')).toBe('aac')
-    expect(after(args, '-output_ts_offset')).toBe('1')
-    expect(after(args, '-movflags')).toContain('frag_discont')
+    expect(after({ args, flag: '-c:v' })).toBe('copy')
+    expect(after({ args, flag: '-tag:v' })).toBe('hvc1')
+    expect(after({ args, flag: '-c:a' })).toBe('aac')
+    expect(after({ args, flag: '-output_ts_offset' })).toBe('1')
+    expect(after({ args, flag: '-movflags' })).toContain('frag_discont')
     expect(args.at(-1)).toBe('pipe:1')
   })
 
@@ -135,8 +136,8 @@ describe('streamArgs', () => {
       maxHeight: 720,
       quality: 'high',
     })
-    expect(after(args, '-vf')).toBe("scale=w=-2:h='min(720,ih)'")
-    expect(after(args, '-crf')).toBe('18')
+    expect(after({ args, flag: '-vf' })).toBe("scale=w=-2:h='min(720,ih)'")
+    expect(after({ args, flag: '-crf' })).toBe('18')
     const low = streamArgs({
       input: '/m/a.mkv',
       start: 0,
@@ -149,15 +150,15 @@ describe('streamArgs', () => {
       maxHeight: 2160,
       quality: 'low',
     })
-    expect(after(low, '-b:v')).toBe('4M')
-    expect(after(low, '-vf')).toBe("scale=w=-2:h='min(2160,ih)'")
+    expect(after({ args: low, flag: '-b:v' })).toBe('4M')
+    expect(after({ args: low, flag: '-vf' })).toBe("scale=w=-2:h='min(2160,ih)'")
   })
 
   it('re-encodes the video for a transcode, tone mapping HDR', () => {
     const args = streamArgs({ ...base, mode: 'transcode', start: 0, tonemap: true })
     expect(args).not.toContain('-ss')
-    expect(after(args, '-c:v')).toBe('libx264')
-    expect(after(args, '-vf')).toBe(`scale=w=-2:h='min(1080,ih)',${TONEMAP_FILTER}`)
+    expect(after({ args, flag: '-c:v' })).toBe('libx264')
+    expect(after({ args, flag: '-vf' })).toBe(`scale=w=-2:h='min(1080,ih)',${TONEMAP_FILTER}`)
     expect(args).not.toContain('-tag:v')
   })
 

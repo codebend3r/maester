@@ -73,12 +73,12 @@ export const createGate = ({ limit }: { limit: number }): Gate => {
 
 export type TaskQueue = {
   /** Queues `task` under `key`; a key already queued or running is ignored. */
-  push: (key: string, task: () => Promise<void>) => void
+  push: (args: { key: string; task: () => Promise<void> }) => void
   /**
    * Like `push`, but a key that is running is queued once more, to run
    * after it: for work that changed what the running task has already read.
    */
-  again: (key: string, task: () => Promise<void>) => void
+  again: (args: { key: string; task: () => Promise<void> }) => void
   /** Drops a queued task that has not started yet. */
   cancel: (key: string) => void
   /** Resolves once nothing is queued or running. */
@@ -124,12 +124,12 @@ export const createTaskQueue = ({ concurrency }: { concurrency: number }): TaskQ
   }
 
   return {
-    push: (key, task) => {
+    push: ({ key, task }) => {
       if (queued.has(key) || running.has(key)) return
       queued.set(key, task)
       pump()
     },
-    again: (key, task) => {
+    again: ({ key, task }) => {
       if (queued.has(key)) return
       if (running.has(key)) after.set(key, task)
       else queued.set(key, task)

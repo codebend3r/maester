@@ -17,7 +17,7 @@ const MEDIA_EVENTS = [
   'error',
 ] as const
 
-export type MediaEventName = (typeof MEDIA_EVENTS)[number]
+type MediaEventName = (typeof MEDIA_EVENTS)[number]
 
 export type MediaListeners = Partial<Record<MediaEventName, (element: HTMLVideoElement) => void>>
 
@@ -33,14 +33,14 @@ export const useVideoEvents = ({
   videoRef: RefObject<HTMLVideoElement | null>
   on: MediaListeners
 }): void => {
-  const handle = useEffectEvent((name: MediaEventName, element: HTMLVideoElement) =>
-    on[name]?.(element),
+  const handle = useEffectEvent(
+    ({ name, element }: { name: MediaEventName; element: HTMLVideoElement }) => on[name]?.(element),
   )
   useEffect(() => {
     const element = videoRef.current
     if (!element) return undefined
     const unsubscribe = MEDIA_EVENTS.map((name) => {
-      const listener = () => handle(name, element)
+      const listener = () => handle({ name, element })
       element.addEventListener(name, listener)
       return () => element.removeEventListener(name, listener)
     })

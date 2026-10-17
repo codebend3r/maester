@@ -116,12 +116,12 @@ export class MetadataService implements OnApplicationBootstrap {
    * minutes), so another follows it.
    */
   enqueue(libraryId: number): void {
-    this.queue.again(`library:${libraryId}`, () => this.pass(libraryId))
+    this.queue.again({ key: `library:${libraryId}`, task: () => this.pass(libraryId) })
   }
 
   /** Queues other metadata work, so it never runs beside a pass. */
   schedule({ key, task }: { key: string; task: () => Promise<void> }): void {
-    this.queue.push(key, task)
+    this.queue.push({ key, task })
   }
 
   /**
@@ -139,7 +139,7 @@ export class MetadataService implements OnApplicationBootstrap {
     // Names are read again first, so a parser that now reads the name right gets its say.
     this.files.retitle({ libraryId, kind })
     // A pass already running has tried these files, so another follows it.
-    this.queue.again(`library:${libraryId}`, () => this.pass(libraryId))
+    this.queue.again({ key: `library:${libraryId}`, task: () => this.pass(libraryId) })
     return count
   }
 
@@ -149,14 +149,17 @@ export class MetadataService implements OnApplicationBootstrap {
    * left off for a type that is not matched. Fix match choices stay.
    */
   changeKind({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
-    this.queue.again(
-      `kind:${libraryId}:${kind}`,
-      this.logged(`type change of library ${libraryId}`, async () => {
-        // Claude was told the old type, and the places may mean other groups now.
-        this.decisions.forget(libraryId)
-        this.relayoutNow(libraryId)
-        this.files.rename({ libraryId, kind })
-        await this.pass(libraryId)
+    this.queue.again({
+      key: `kind:${libraryId}:${kind}`,
+      task: this.logged({
+        what: `type change of library ${libraryId}`,
+        task: async () => {
+          // Claude was told the old type, and the places may mean other groups now.
+          this.decisions.forget(libraryId)
+          this.relayoutNow(libraryId)
+          this.files.rename({ libraryId, kind })
+          await this.pass(libraryId)
+        },
       }),
     )
   }
@@ -170,19 +173,22 @@ export class MetadataService implements OnApplicationBootstrap {
    * picks stay too; where it was unsure or chose nothing, it is asked again.
    */
   changePreference({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
-    this.queue.again(
-      `prefer:${libraryId}:${kind}`,
-      this.logged(`type change of library ${libraryId}`, async () => {
-        // Forgetting a sure pick would unlink its group, and the clear-up could
-        // delete the item, edits and all, before a new lookup was sure.
-        this.decisions.forgetUnsure(libraryId)
-        // The layout saved with this change is read even when the type moved on since.
-        this.relayoutNow(libraryId)
-        // A type changed again since then is matched by the change queued after this one.
-        if (this.libraries.get(libraryId)?.settings.kind !== kind) return
-        this.files.retryUnmatched(libraryId)
-        await this.repick({ libraryId, kind })
-        await this.pass(libraryId)
+    this.queue.again({
+      key: `prefer:${libraryId}:${kind}`,
+      task: this.logged({
+        what: `type change of library ${libraryId}`,
+        task: async () => {
+          // Forgetting a sure pick would unlink its group, and the clear-up could
+          // delete the item, edits and all, before a new lookup was sure.
+          this.decisions.forgetUnsure(libraryId)
+          // The layout saved with this change is read even when the type moved on since.
+          this.relayoutNow(libraryId)
+          // A type changed again since then is matched by the change queued after this one.
+          if (this.libraries.get(libraryId)?.settings.kind !== kind) return
+          this.files.retryUnmatched(libraryId)
+          await this.repick({ libraryId, kind })
+          await this.pass(libraryId)
+        },
       }),
     )
   }
@@ -249,17 +255,20 @@ export class MetadataService implements OnApplicationBootstrap {
    * it, which reads the settings as they are then.
    */
   changeLayout({ libraryId }: { libraryId: number }): void {
-    this.queue.again(
-      `layout:${libraryId}`,
-      this.logged(`layout change of library ${libraryId}`, async () => {
-        this.relayoutNow(libraryId)
-        await this.pass(libraryId)
+    this.queue.again({
+      key: `layout:${libraryId}`,
+      task: this.logged({
+        what: `layout change of library ${libraryId}`,
+        task: async () => {
+          this.relayoutNow(libraryId)
+          await this.pass(libraryId)
+        },
       }),
     )
   }
 
   /** The queue drops a task that throws without a word, so a failure is logged here. */
-  private logged(what: string, task: () => Promise<void>): () => Promise<void> {
+  private logged({ what, task }: { what: string; task: () => Promise<void> }): () => Promise<void> {
     return async () => {
       try {
         await task()

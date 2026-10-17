@@ -24,8 +24,15 @@ const respond =
     return next()
   }
 
-const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
-  new Response(JSON.stringify(body), { status, headers })
+const json = ({
+  body,
+  status = 200,
+  headers = {},
+}: {
+  body: unknown
+  status?: number
+  headers?: Record<string, string>
+}) => new Response(JSON.stringify(body), { status, headers })
 
 describe('TmdbClient', () => {
   it('reads a movie with its credits, rating, content rating and pictures', async () => {
@@ -105,25 +112,31 @@ describe('TmdbClient', () => {
   })
 
   it('takes a logo with no language when none is in the language, and never an SVG', () => {
-    const logo = (path: string, language: string | null) => ({
+    const logo = ({ path, language }: { path: string; language: string | null }) => ({
       file_path: path,
       iso_639_1: language,
     })
     expect(
       pickLogo({
-        logos: [logo('/a.svg', 'en'), logo('/b.png', 'fr'), logo('/c.png', null)],
+        logos: [
+          logo({ path: '/a.svg', language: 'en' }),
+          logo({ path: '/b.png', language: 'fr' }),
+          logo({ path: '/c.png', language: null }),
+        ],
         language: 'en',
       }),
     ).toBe('/c.png')
-    expect(pickLogo({ logos: [logo('/a.svg', 'en')], language: 'en' })).toBeNull()
+    expect(
+      pickLogo({ logos: [logo({ path: '/a.svg', language: 'en' })], language: 'en' }),
+    ).toBeNull()
     expect(pickLogo({ logos: undefined, language: 'en' })).toBeNull()
   })
 
   it('sends the token as a bearer token and the language on every call', async () => {
     const seen: Array<{ url: string; authorization: string | undefined }> = []
-    const client = new TmdbClient(config(), async (url, init) => {
+    const client = new TmdbClient(config(), async ({ url, init }) => {
       seen.push({ url, authorization: init.headers.authorization })
-      return json({ results: [] })
+      return json({ body: { results: [] } })
     })
     await client.searchMovies({ query: 'The Matrix', year: 1999 })
     expect(seen[0]?.authorization).toBe('Bearer secret-token')
@@ -134,9 +147,9 @@ describe('TmdbClient', () => {
 
   it('sends a decomposed title composed, as TMDB finds nothing for the other form', async () => {
     const seen: string[] = []
-    const client = new TmdbClient(config(), async (url) => {
+    const client = new TmdbClient(config(), async ({ url }) => {
       seen.push(url)
-      return json({ results: [] })
+      return json({ body: { results: [] } })
     })
     await client.searchShows({ query: 'Sho\u0304gun', year: 2024 })
     await client.searchMovies({ query: 'Ame\u0301lie', year: null })
@@ -146,10 +159,13 @@ describe('TmdbClient', () => {
 
   it('sends a 32-character API key as api_key instead', async () => {
     const seen: Array<{ url: string; authorization: string | undefined }> = []
-    const client = new TmdbClient(config('0123456789abcdef0123456789abcdef'), async (url, init) => {
-      seen.push({ url, authorization: init.headers.authorization })
-      return json({ results: [] })
-    })
+    const client = new TmdbClient(
+      config('0123456789abcdef0123456789abcdef'),
+      async ({ url, init }) => {
+        seen.push({ url, authorization: init.headers.authorization })
+        return json({ body: { results: [] } })
+      },
+    )
     await client.searchMovies({ query: 'Heat', year: null })
     expect(seen[0]?.authorization).toBeUndefined()
     expect(seen[0]?.url).toContain('api_key=0123456789abcdef0123456789abcdef')
@@ -161,8 +177,10 @@ describe('TmdbClient', () => {
       respond([
         () =>
           json({
-            ...movieBody({ id: 1, title: 'X', released: '2000-01-01' }),
-            poster_path: '/../../etc/passwd',
+            body: {
+              ...movieBody({ id: 1, title: 'X', released: '2000-01-01' }),
+              poster_path: '/../../etc/passwd',
+            },
           }),
       ]),
     )
@@ -170,7 +188,7 @@ describe('TmdbClient', () => {
   })
 
   it('says a 404 is not found, and stays healthy', async () => {
-    const client = new TmdbClient(config(), respond([() => json({}, 404)]))
+    const client = new TmdbClient(config(), respond([() => json({ body: {}, status: 404 })]))
     await expect(client.movie('9')).rejects.toMatchObject({ kind: 'not-found' })
     expect(client.state().state).toBe('ok')
   })
@@ -179,7 +197,7 @@ describe('TmdbClient', () => {
     const calls = { count: 0 }
     const client = new TmdbClient(config(), async () => {
       calls.count += 1
-      return json({}, 401)
+      return json({ body: {}, status: 401 })
     })
     await expect(client.movie('1')).rejects.toMatchObject({ kind: 'unauthorized' })
     await expect(client.movie('2')).rejects.toBeInstanceOf(TmdbError)
@@ -192,7 +210,10 @@ describe('TmdbClient', () => {
   it('waits out a 429 and tries again', async () => {
     const client = new TmdbClient(
       config(),
-      respond([() => json({}, 429, { 'retry-after': '0' }), () => json({ results: [] })]),
+      respond([
+        () => json({ body: {}, status: 429, headers: { [RAVEN_HEADERS.retryAfter]: '0' } }),
+        () => json({ body: { results: [] } }),
+      ]),
     )
     await expect(client.searchMovies({ query: 'x', year: null })).resolves.toEqual([])
   })
@@ -220,7 +241,7 @@ describe('TmdbClient', () => {
     await expect(slow.movie('1')).rejects.toMatchObject({ kind: 'unavailable' })
     expect(slow.state().error).toBe('TMDB did not answer within 10 seconds.')
 
-    const broken = new TmdbClient(config(), respond([() => json({}, 503)]))
+    const broken = new TmdbClient(config(), respond([() => json({ body: {}, status: 503 })]))
     await expect(broken.movie('1')).rejects.toMatchObject({ kind: 'unavailable' })
   })
 

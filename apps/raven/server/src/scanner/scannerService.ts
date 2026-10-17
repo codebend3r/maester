@@ -194,7 +194,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     this.statuses.delete(libraryId)
   }
 
-  private update(libraryId: number, patch: Partial<ScanStatus>): void {
+  private update({ libraryId, patch }: { libraryId: number; patch: Partial<ScanStatus> }): void {
     this.statuses.set(libraryId, { ...this.status(libraryId), ...patch })
   }
 
@@ -258,7 +258,10 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         library,
         scope: { kind: 'library' },
         onFound: (count) =>
-          this.update(library.id, { found: this.status(library.id).found + count }),
+          this.update({
+            libraryId: library.id,
+            patch: { found: this.status(library.id).found + count },
+          }),
       })
       this.update(library.id, {
         state: 'indexing',
@@ -271,7 +274,10 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
       await this.probe({
         toProbe,
         onProbed: () =>
-          this.update(library.id, { processed: this.status(library.id).processed + 1 }),
+          this.update({
+            libraryId: library.id,
+            patch: { processed: this.status(library.id).processed + 1 },
+          }),
       })
       // Thumbnails that timed out on an earlier pass get another go.
       this.thumbnails.retryPending()
@@ -331,7 +337,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
       }
       const at = new Date().toISOString()
       this.libraries.markQuickScan({ id: library.id, at })
-      this.update(library.id, { quickScannedAt: at })
+      this.update({ libraryId: library.id, patch: { quickScannedAt: at } })
       this.logger.log(`Quick scan of "${library.name}": ${summary({ walk, changes, toProbe })}`)
     } catch (error) {
       this.logger.warn(`Quick scan of "${library.name}" failed: ${errorMessage(error)}`)

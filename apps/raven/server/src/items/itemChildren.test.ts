@@ -87,25 +87,30 @@ describe("a page's children", () => {
       ],
     })
     state.seasons = [seasonOne.id, seasonTwo.id]
-    const episode = (season: { episodes: Map<number, number> }, number: number) =>
-      season.episodes.get(number) ?? -1
+    const episode = ({
+      season,
+      number,
+    }: {
+      season: { episodes: Map<number, number> }
+      number: number
+    }) => season.episodes.get(number) ?? -1
     // Episode 1 is in both libraries, the open copy watched part way; episode 2 only in the
     // locked one; episode 3 has no file. Season 2's only episode sits in the locked library.
     metadata.link({
       mediaIds: [file({ libraryId: state.open, path: 'Andor/S01E01.mkv' })],
-      itemIds: [episode(seasonOne, 1)],
+      itemIds: [episode({ season: seasonOne, number: 1 })],
     })
     metadata.link({
       mediaIds: [file({ libraryId: state.locked, path: 'Andor/S01E01 2160p.mkv' })],
-      itemIds: [episode(seasonOne, 1)],
+      itemIds: [episode({ season: seasonOne, number: 1 })],
     })
     metadata.link({
       mediaIds: [file({ libraryId: state.locked, path: 'Andor/S01E02.mkv' })],
-      itemIds: [episode(seasonOne, 2)],
+      itemIds: [episode({ season: seasonOne, number: 2 })],
     })
     metadata.link({
       mediaIds: [file({ libraryId: state.locked, path: 'Andor/S02E01.mkv' })],
-      itemIds: [episode(seasonTwo, 1)],
+      itemIds: [episode({ season: seasonTwo, number: 1 })],
     })
     new ViewingRepository(database.get(), stores().media).report({
       id: state.files.get('Andor/S01E01.mkv') ?? -1,
@@ -147,7 +152,7 @@ describe("a page's children", () => {
       viewer: viewerHiding({ hidden: -1, metadata }),
       metadata,
       media,
-    }).flatMap((child) => (child.type === 'episode' ? [child] : []))
+    }).flatMap((child) => (child.type === ITEM_TYPES.episode ? [child] : []))
     expect(rows.map((row) => [row.episode, row.summary, row.released, row.runtime])).toEqual([
       [1, 'What happens in 1.', '2022-09-01', 41],
       [2, 'What happens in 2.', '2022-09-02', 42],
@@ -161,7 +166,7 @@ describe("a page's children", () => {
       viewer: viewerHiding({ hidden: state.open, metadata }),
       metadata,
       media,
-    }).flatMap((child) => (child.type === 'episode' ? [child] : []))
+    }).flatMap((child) => (child.type === ITEM_TYPES.episode ? [child] : []))
     expect(hidden.map((row) => row.primary?.id ?? null)).toEqual([
       state.files.get('Andor/S01E01 2160p.mkv'),
       state.files.get('Andor/S01E02.mkv'),
@@ -190,7 +195,7 @@ describe("a page's children", () => {
           (child) => (child.type === 'season' ? [child.watchedCount] : []),
         ),
         episodes: itemChildren({ parentId: seasonOne, viewer, metadata, media }).flatMap((child) =>
-          child.type === 'episode' ? [child.watched] : [],
+          child.type === ITEM_TYPES.episode ? [child.watched] : [],
         ),
       }
     }

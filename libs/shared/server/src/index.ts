@@ -1,6 +1,7 @@
 export * from '@/compressResponses'
 export * from '@/cookies'
 export * from '@/env'
+export * from '@/http'
 export * from '@/secrets'
 export * from '@/serveWebApp'
 export * from '@/spaFallbackFilter'

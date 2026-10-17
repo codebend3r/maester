@@ -64,10 +64,10 @@ describe('createTaskQueue', () => {
       await tick(5)
       ran.push(key)
     }
-    queue.push('a', task('a'))
-    queue.push('a', task('a again'))
-    queue.push('b', task('b'))
-    queue.push('c', task('c'))
+    queue.push({ key: 'a', task: task('a') })
+    queue.push({ key: 'a', task: task('a again') })
+    queue.push({ key: 'b', task: task('b') })
+    queue.push({ key: 'c', task: task('c') })
     await queue.idle()
     expect(ran.toSorted()).toEqual(['a', 'b', 'c'])
     expect(queue.size()).toBe(0)
@@ -80,13 +80,13 @@ describe('createTaskQueue', () => {
       await tick(5)
       ran.push(label)
     }
-    queue.push('a', task('first'))
-    queue.again('a', task('second'))
-    queue.again('a', task('third'))
-    queue.push('a', task('ignored'))
+    queue.push({ key: 'a', task: task('first') })
+    queue.again({ key: 'a', task: task('second') })
+    queue.again({ key: 'a', task: task('third') })
+    queue.push({ key: 'a', task: task('ignored') })
     // Queued and not yet running, it is an ordinary push.
-    queue.again('b', task('b'))
-    queue.again('b', task('b ignored'))
+    queue.again({ key: 'b', task: task('b') })
+    queue.again({ key: 'b', task: task('b ignored') })
     expect(queue.size()).toBe(3)
     await queue.idle()
     expect(ran).toEqual(['first', 'b', 'third'])
@@ -95,11 +95,17 @@ describe('createTaskQueue', () => {
   it('survives a failing task', async () => {
     const queue = createTaskQueue({ concurrency: 1 })
     const ran: string[] = []
-    queue.push('bad', async () => {
-      throw new Error('boom')
+    queue.push({
+      key: 'bad',
+      task: async () => {
+        throw new Error('boom')
+      },
     })
-    queue.push('good', async () => {
-      ran.push('good')
+    queue.push({
+      key: 'good',
+      task: async () => {
+        ran.push('good')
+      },
     })
     await queue.idle()
     expect(ran).toEqual(['good'])
@@ -108,12 +114,18 @@ describe('createTaskQueue', () => {
   it('drops a cancelled task before it starts', async () => {
     const queue = createTaskQueue({ concurrency: 1 })
     const ran: string[] = []
-    queue.push('first', async () => {
-      await tick(5)
-      ran.push('first')
+    queue.push({
+      key: 'first',
+      task: async () => {
+        await tick(5)
+        ran.push('first')
+      },
     })
-    queue.push('second', async () => {
-      ran.push('second')
+    queue.push({
+      key: 'second',
+      task: async () => {
+        ran.push('second')
+      },
     })
     queue.cancel('second')
     await queue.idle()

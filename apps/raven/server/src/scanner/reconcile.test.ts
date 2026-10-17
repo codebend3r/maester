@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { type IndexedFile, changesAnything, reconcile } from '@/scanner/reconcile'
 import type { FoundFile } from '@/scanner/walk'
 
-const found = (path: string, size = 100, mtimeMs = 1): FoundFile => ({
+const found = ({
+  path,
+  size = 100,
+  mtimeMs = 1,
+}: {
+  path: string
+  size?: number
+  mtimeMs?: number
+}): FoundFile => ({
   path,
   root: '/m',
   size,
@@ -21,10 +29,10 @@ describe('reconcile', () => {
         ['/m/kept.mp4', { id: 1 }],
         ['/m/gone.mp4', { id: 2, size: 50 }],
       ]),
-      found: [found('/m/kept.mp4'), found('/m/new.mp4', 70)],
+      found: [found({ path: '/m/kept.mp4' }), found({ path: '/m/new.mp4', size: 70 })],
     })
     expect(changes).toEqual({
-      added: [found('/m/new.mp4', 70)],
+      added: [found({ path: '/m/new.mp4', size: 70 })],
       moved: [],
       changed: [],
       gone: [2],
@@ -35,9 +43,11 @@ describe('reconcile', () => {
   it('follows a file renamed or moved: the same size and time under a new path', () => {
     const changes = reconcile({
       known: known([['/m/Old Name.mp4', { id: 4, size: 300, mtimeMs: 9 }]]),
-      found: [found('/m/Folder/New Name.mp4', 300, 9)],
+      found: [found({ path: '/m/Folder/New Name.mp4', size: 300, mtimeMs: 9 })],
     })
-    expect(changes.moved).toEqual([{ id: 4, file: found('/m/Folder/New Name.mp4', 300, 9) }])
+    expect(changes.moved).toEqual([
+      { id: 4, file: found({ path: '/m/Folder/New Name.mp4', size: 300, mtimeMs: 9 }) },
+    ])
     expect(changes.added).toEqual([])
     expect(changes.gone).toEqual([])
   })
@@ -48,7 +58,7 @@ describe('reconcile', () => {
         ['/m/a.mp4', { id: 1 }],
         ['/m/b.mp4', { id: 2 }],
       ]),
-      found: [found('/m/c.mp4'), found('/m/d.mp4')],
+      found: [found({ path: '/m/c.mp4' }), found({ path: '/m/d.mp4' })],
     })
     expect(changes.moved).toEqual([])
     expect(changes.gone).toEqual([1, 2])
@@ -61,9 +71,14 @@ describe('reconcile', () => {
         ['/m/replaced.mp4', { id: 1 }],
         ['/m/unprobed.mp4', { id: 2, probed: false }],
       ]),
-      found: [found('/m/replaced.mp4', 200, 5), found('/m/unprobed.mp4')],
+      found: [
+        found({ path: '/m/replaced.mp4', size: 200, mtimeMs: 5 }),
+        found({ path: '/m/unprobed.mp4' }),
+      ],
     })
-    expect(changes.changed).toEqual([{ id: 1, file: found('/m/replaced.mp4', 200, 5) }])
+    expect(changes.changed).toEqual([
+      { id: 1, file: found({ path: '/m/replaced.mp4', size: 200, mtimeMs: 5 }) },
+    ])
     expect(changes.unprobed).toEqual([{ id: 2, path: '/m/unprobed.mp4' }])
     expect(changesAnything(changes)).toBe(true)
   })
@@ -71,7 +86,7 @@ describe('reconcile', () => {
   it('has nothing to write when the disk matches the index', () => {
     const changes = reconcile({
       known: known([['/m/kept.mp4', { id: 1, probed: false }]]),
-      found: [found('/m/kept.mp4')],
+      found: [found({ path: '/m/kept.mp4' })],
     })
     expect(changesAnything(changes)).toBe(false)
   })

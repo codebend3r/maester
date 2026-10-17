@@ -94,7 +94,7 @@ const DEFAULT_WATCH: WatchOptions = {
 export class AppModule {
   static register({
     config,
-    metadataFetch = (url, init) => fetch(url, init),
+    metadataFetch = ({ url, init }) => fetch(url, init),
     aiFetch = (input, init) => fetch(input, init),
     watch = {},
   }: {

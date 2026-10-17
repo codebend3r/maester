@@ -21,6 +21,7 @@ import { mediaItem } from '@/test/fixtures'
 import { DEFAULT_PLAYBACK_STATE, renderWithProviders } from '@/test/render'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
+/** A host as the web's is: new services on every render, the player only once they are in the store. */
 const TestPlayer = ({
   media,
   backTo,

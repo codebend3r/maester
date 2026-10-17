@@ -51,7 +51,7 @@ export class ThumbnailService implements OnApplicationBootstrap {
   }
 
   enqueue(id: number): void {
-    this.queue.push(String(id), () => this.generate(id))
+    this.queue.push({ key: String(id), task: () => this.generate(id) })
   }
 
   /** Forget media that is gone: drop its queued work and its cached file. */

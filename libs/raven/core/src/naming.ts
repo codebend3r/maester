@@ -96,7 +96,7 @@ const readIds = (name: string): NameIds => {
   return { tmdb: first('tmdb'), imdb: first('imdb'), tvdb: first('tvdb') }
 }
 
-const mergeIds = (first: NameIds, second: NameIds): NameIds => ({
+const mergeIds = ({ first, second }: { first: NameIds; second: NameIds }): NameIds => ({
   tmdb: first.tmdb ?? second.tmdb,
   imdb: first.imdb ?? second.imdb,
   tvdb: first.tvdb ?? second.tvdb,
@@ -243,7 +243,7 @@ export const parseMovieName = ({
     title,
     year,
     edition: fromFile.edition ?? fromFolder?.edition ?? null,
-    ids: mergeIds(fromFile.ids, fromFolder?.ids ?? NO_IDS),
+    ids: mergeIds({ first: fromFile.ids, second: fromFolder?.ids ?? NO_IDS }),
     alternatives,
   }
 }
@@ -449,6 +449,9 @@ export const seasonFolderNumber = (name: string): number | null => {
 const COUNTRY_SUFFIX =
   /\s*\((US|UK|AU|CA|NZ|IE|JP|KR|FR|DE|IT|ES|BR|MX|IN|CN|SE|NO|DK|NL|BE|PL|RU|TR|ZA)\)$/i
 
+/** Sonarr's country codes that TMDB, keeping to ISO 3166-1, writes another way. */
+const TMDB_COUNTRIES: Readonly<Record<string, string>> = { UK: 'GB' }
+
 /**
  * A name without Sonarr's country suffix, and the country it gives as TMDB
  * writes it: `The Office (UK)` is `The Office` from GB. A name without one
@@ -490,7 +493,7 @@ export const parseEpisodeName = ({
   fallbackShow?: string
 }): ParsedEpisodeName => {
   const stem = stripTags(stemOf(fileName))
-  const ids = mergeIds(readIds(fileName), readIds(folder))
+  const ids = mergeIds({ first: readIds(fileName), second: readIds(folder) })
   const segments = folder.split(/[\\/]/).filter((segment) => segment !== '')
   const showFolder = segments[0] ?? ''
   const seasonFolder = segments.map(seasonFolderNumber).findLast((number) => number != null) ?? null

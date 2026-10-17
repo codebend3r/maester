@@ -221,12 +221,17 @@ export const scoreCandidates = ({
     }),
   )
   // Popularity only tells apart results that share the title and are not ruled out by country.
-  const isPopularityMeasured = (result: SearchResult, index: number): boolean =>
-    titles[index] === 1 && !isElsewhere(result)
+  const isPopularityMeasured = ({
+    result,
+    index,
+  }: {
+    result: SearchResult
+    index: number
+  }): boolean => titles[index] === 1 && !isElsewhere(result)
   const mostPopular = Math.max(
     0,
     ...results.flatMap((result, index) =>
-      isPopularityMeasured(result, index) ? [result.popularity ?? 0] : [],
+      isPopularityMeasured({ result, index }) ? [result.popularity ?? 0] : [],
     ),
   )
   const scores = results.map((result, index) => {
@@ -245,7 +250,7 @@ export const scoreCandidates = ({
       {
         weight: WEIGHTS.popularity,
         value:
-          isPopularityMeasured(result, index) && mostPopular > 0
+          isPopularityMeasured({ result, index }) && mostPopular > 0
             ? (result.popularity ?? 0) / mostPopular
             : null,
       },
