@@ -11,6 +11,8 @@ import {
   union,
 } from '@/schema'
 
+export const PLAYER_SOURCE_KINDS = { server: 'server', file: 'file' } as const
+
 /**
  * What the player opens. The renderer names a server title or a file the
  * main process granted it, never a path or a URL.
@@ -21,6 +23,20 @@ export const isPlayerSource = union(
 )
 
 export type PlayerSource = Infer<typeof isPlayerSource>
+
+export const PLAYER_COMMANDS = {
+  load: 'load',
+  play: 'play',
+  pause: 'pause',
+  seek: 'seek',
+  audio: 'audio',
+  subtitle: 'subtitle',
+  volume: 'volume',
+  speed: 'speed',
+  subtitleScale: 'subtitleScale',
+  stats: 'stats',
+  stop: 'stop',
+} as const
 
 export const isPlayerCommand = union(
   object({
@@ -50,6 +66,18 @@ export const isPlayerErrorReason = oneOf(['open', 'decode', 'network', 'locked',
 
 export type PlayerErrorReason = Infer<typeof isPlayerErrorReason>
 
+export const PLAYER_EVENTS = {
+  time: 'time',
+  buffered: 'buffered',
+  paused: 'paused',
+  waiting: 'waiting',
+  duration: 'duration',
+  rate: 'rate',
+  tracks: 'tracks',
+  ended: 'ended',
+  error: 'error',
+} as const
+
 export const isPlayerEvent = union(
   object({ type: oneOf(['time']), time: isNumber }),
   object({ type: oneOf(['buffered']), ranges: listOf(isTimeRange) }),
@@ -77,7 +105,13 @@ export const isPlayerReply = union(
   object({ id: isNumber, ok: oneOf([false]), reason: isPlayerRefusalReason, message: isString }),
 )
 
-export const isAudioProfile = oneOf(['pcm', 'passthrough', 'headphones'])
+export const AUDIO_PROFILES = {
+  pcm: 'pcm',
+  passthrough: 'passthrough',
+  headphones: 'headphones',
+} as const
+
+export const isAudioProfile = oneOf(Object.values(AUDIO_PROFILES))
 
 /** mpv's `audio-spdif` vocabulary. */
 export const isPassthroughFormat = oneOf(['ac3', 'eac3', 'dts', 'dts-hd', 'truehd'])

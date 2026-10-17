@@ -146,7 +146,13 @@ describe('marking cards watched', () => {
     watching().set({ cards: cards().resolve({ targets, viewer }), watched, at: NOW })
   }
   const file = (id: number): WatchTarget => ({ kind: 'media', id })
-  const item = (id: number, libraryId: number | null = null): WatchTarget => ({
+  const item = ({
+    id,
+    libraryId = null,
+  }: {
+    id: number
+    libraryId?: number | null
+  }): WatchTarget => ({
     kind: 'item',
     id,
     libraryId,
@@ -200,7 +206,7 @@ describe('marking cards watched', () => {
 
   it('writes one History row for a three-version movie named three times', () => {
     const { ids, itemId } = addMovie({ title: 'Alexander', heights: [2160, 1080, 720] })
-    set({ watched: true, targets: [...ids.map(file), item(itemId)] })
+    set({ watched: true, targets: [...ids.map(file), item({ id: itemId })] })
     expect(
       rows(
         'SELECT id FROM plays WHERE media_id IN (SELECT value FROM json_each(?))',
@@ -240,9 +246,9 @@ describe('marking cards watched', () => {
   it('marks a two-episode file once for both its episodes', () => {
     const { episodeIds } = addShow({ title: 'Doubled', count: 2 })
     const shared = linkFile({ name: 'Doubled S01E01-E02', itemIds: episodeIds })
-    set({ watched: true, targets: episodeIds.map((id) => item(id)) })
+    set({ watched: true, targets: episodeIds.map((id) => item({ id })) })
     expect(playsOf(shared).map((play) => play.kind)).toEqual(['marked'])
-    set({ watched: false, targets: [item(episodeIds[1] ?? -1)] })
+    set({ watched: false, targets: [item({ id: episodeIds[1] ?? -1 })] })
     expect(episodeIds.map((id) => stores().media.watchedEpisodes([id]).length)).toEqual([0, 0])
   })
 
@@ -250,10 +256,10 @@ describe('marking cards watched', () => {
     const { showId, episodeIds } = addShow({ title: 'Andor', count: 3 })
     const files = episodeIds.map((id, at) => linkFile({ name: `Andor ${at}`, itemIds: [id] }))
     viewing().report({ id: files[1] ?? -1, position: 10 })
-    set({ watched: true, targets: [item(showId)] })
-    expect(files.map((id) => playsOf(id).filter((play) => play.kind === 'marked').length)).toEqual([
-      1, 1, 1,
-    ])
+    set({ watched: true, targets: [item({ id: showId })] })
+    expect(
+      files.map((id) => playsOf(id).filter((play) => play.kind === PLAY_KINDS.marked).length),
+    ).toEqual([1, 1, 1])
     expect(spotOf(files[1] ?? -1)).toBeUndefined()
   })
 
@@ -278,7 +284,7 @@ describe('marking cards watched', () => {
     )
     viewing().report({ id: done, position: 60, at: NOW })
     viewing().report({ id: started, position: 20, at: NOW })
-    set({ watched: false, targets: [item(showId)] })
+    set({ watched: false, targets: [item({ id: showId })] })
     expect(playsOf(done).map((play) => play.kind)).toEqual(['cleared'])
     expect(playsOf(started).map((play) => play.kind)).toEqual(['played'])
     expect(spotOf(started)).toBe(20)
@@ -303,10 +309,10 @@ describe('marking cards watched', () => {
       watched: true,
       targets: [
         file(hidden.ids[0] ?? -1),
-        item(hidden.itemId),
-        item(hidden.itemId, state.otherId),
+        item({ id: hidden.itemId }),
+        item({ id: hidden.itemId, libraryId: state.otherId }),
         file(987_654),
-        item(987_654),
+        item({ id: 987_654 }),
         file(shown.ids[0] ?? -1),
       ],
       viewer,
@@ -319,7 +325,7 @@ describe('marking cards watched', () => {
     const { itemId } = addMovie({ title: 'Twice Over', heights: [1080] })
     const there = addFile({ libraryId: state.otherId, name: 'Twice Over elsewhere' })
     stores().metadata.link({ mediaIds: [there], itemIds: [itemId] })
-    set({ watched: true, targets: [item(itemId, state.otherId)] })
+    set({ watched: true, targets: [item({ id: itemId, libraryId: state.otherId })] })
     expect(watchedOf(there)).toBe(true)
     expect(
       stores()

@@ -256,18 +256,24 @@ describe('readCut', () => {
 })
 
 describe('canSplitByCut', () => {
-  const cut = (label: string, key: string) => ({ cut: { label, key } })
+  const cut = ({ label, key }: { label: string; key: string }) => ({ cut: { label, key } })
 
   it('tells files apart by their cuts’ keys, the plain cut counting as one', () => {
-    expect(canSplitByCut([{ cut: null }, cut('Final Cut', 'final')])).toBe(true)
-    expect(canSplitByCut([cut('Extended', 'extended'), cut('Theatrical Cut', 'theatrical')])).toBe(
-      true,
-    )
+    expect(canSplitByCut([{ cut: null }, cut({ label: 'Final Cut', key: 'final' })])).toBe(true)
+    expect(
+      canSplitByCut([
+        cut({ label: 'Extended', key: 'extended' }),
+        cut({ label: 'Theatrical Cut', key: 'theatrical' }),
+      ]),
+    ).toBe(true)
   })
 
   it('finds nothing to tell apart in one cut named two ways, or in plain copies', () => {
     expect(
-      canSplitByCut([cut("Director's Cut", 'directors'), cut('Directors Edition', 'directors')]),
+      canSplitByCut([
+        cut({ label: "Director's Cut", key: 'directors' }),
+        cut({ label: 'Directors Edition', key: 'directors' }),
+      ]),
     ).toBe(false)
     expect(canSplitByCut([{ cut: null }, { cut: null }])).toBe(false)
   })
@@ -369,7 +375,7 @@ describe('splitCountry', () => {
 })
 
 describe('parseEpisodeName', () => {
-  const episode = (path: string, fallbackShow = '') => {
+  const episode = (path: string) => {
     const parts = path.split('/')
     return parseEpisodeName({
       fileName: parts.at(-1) ?? '',
@@ -418,7 +424,10 @@ describe('parseEpisodeName', () => {
   it('reads the show from the file at a library root or in a season folder, then the library', () => {
     expect(episode('Severance - S01E02 - Half Loop.mkv').show).toBe('Severance')
     expect(episode('Season 1/Severance - S01E02.mkv').show).toBe('Severance')
-    expect(episode('Season 1/S01E02.mkv', 'Severance').show).toBe('Severance')
+    expect(
+      parseEpisodeName({ fileName: 'S01E02.mkv', folder: 'Season 1', fallbackShow: 'Severance' })
+        .show,
+    ).toBe('Severance')
   })
 
   it('keeps the show as the file names it, for when the folder is misspelt', () => {

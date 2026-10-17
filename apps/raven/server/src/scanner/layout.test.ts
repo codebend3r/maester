@@ -9,7 +9,12 @@ import {
 } from '@/scanner/layout'
 import type { FoundFile } from '@/scanner/walk'
 
-const found = (path: string, root: string): FoundFile => ({ path, root, size: 1, mtimeMs: 1 })
+const found = ({ path, root }: { path: string; root: string }): FoundFile => ({
+  path,
+  root,
+  size: 1,
+  mtimeMs: 1,
+})
 
 describe('title roots', () => {
   it('roots a show under its letter folder, and a flat show at the library path', () => {
@@ -47,7 +52,7 @@ describe('title roots', () => {
 
   it("looks for a show's poster in its own folder under the letter", () => {
     const [file] = withTitleRoots({
-      files: [found('/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', '/m/TV')],
+      files: [found({ path: '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', root: '/m/TV' })],
       kind: 'shows',
       layout: 'auto',
     })
@@ -81,10 +86,10 @@ describe('title roots', () => {
       layoutsOf({
         roots: ['/m/TV', '/m/Reality'],
         files: [
-          found('/m/TV/A/Andor/Season 1/a.mkv', '/m/TV'),
-          found('/m/TV/B/Bluey/Season 1/b.mkv', '/m/TV'),
-          found('/m/TV/Requests/Cupertino/Season 1/c.mkv', '/m/TV'),
-          found('/m/Reality/Alone/Season 1/d.mkv', '/m/Reality'),
+          found({ path: '/m/TV/A/Andor/Season 1/a.mkv', root: '/m/TV' }),
+          found({ path: '/m/TV/B/Bluey/Season 1/b.mkv', root: '/m/TV' }),
+          found({ path: '/m/TV/Requests/Cupertino/Season 1/c.mkv', root: '/m/TV' }),
+          found({ path: '/m/Reality/Alone/Season 1/d.mkv', root: '/m/Reality' }),
         ],
         kind: 'shows',
         layout: 'auto',
@@ -96,7 +101,7 @@ describe('title roots', () => {
   })
 })
 
-const row = (id: number, path: string, folder: string) => ({
+const row = ({ id, path, folder }: { id: number; path: string; folder: string }) => ({
   id,
   path,
   folder,
@@ -105,9 +110,13 @@ const row = (id: number, path: string, folder: string) => ({
 
 describe('planRelayout', () => {
   const lettered = [
-    row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'A/Andor/Season 1'),
-    row(2, '/m/TV/A/Ahsoka/Season 1/Ahsoka - S01E01.mkv', 'A/Ahsoka/Season 1'),
-    row(3, '/m/Reality/Alone/Season 1/Alone - S01E01.mkv', 'Alone/Season 1'),
+    row({ id: 1, path: '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', folder: 'A/Andor/Season 1' }),
+    row({
+      id: 2,
+      path: '/m/TV/A/Ahsoka/Season 1/Ahsoka - S01E01.mkv',
+      folder: 'A/Ahsoka/Season 1',
+    }),
+    row({ id: 3, path: '/m/Reality/Alone/Season 1/Alone - S01E01.mkv', folder: 'Alone/Season 1' }),
   ]
 
   it('moves files indexed under their letter, and leaves a flat path alone', () => {
@@ -137,7 +146,9 @@ describe('planRelayout', () => {
 
   it('moves a Fix match kept for a movie folder under a letter', () => {
     const plan = planRelayout({
-      rows: [row(4, '/m/Movies/A/Alien (1979)/Alien (1979).mkv', 'A/Alien (1979)')],
+      rows: [
+        row({ id: 4, path: '/m/Movies/A/Alien (1979)/Alien (1979).mkv', folder: 'A/Alien (1979)' }),
+      ],
       roots: ['/m/Movies'],
       kind: 'movies',
       layout: 'auto',
@@ -153,12 +164,16 @@ describe('planRelayout', () => {
   it("drops a group folder's Fix match once its files sit under several places, though some did not move", () => {
     const plan = planRelayout({
       rows: [
-        row(
-          1,
-          '/m/TV/Requests/Cupertino/Season 1/Cupertino - S01E01.mkv',
-          'Requests/Cupertino/Season 1',
-        ),
-        row(2, '/m/TV/Requests/Chernobyl/Chernobyl - S01E01.mkv', 'Requests/Chernobyl'),
+        row({
+          id: 1,
+          path: '/m/TV/Requests/Cupertino/Season 1/Cupertino - S01E01.mkv',
+          folder: 'Requests/Cupertino/Season 1',
+        }),
+        row({
+          id: 2,
+          path: '/m/TV/Requests/Chernobyl/Chernobyl - S01E01.mkv',
+          folder: 'Requests/Chernobyl',
+        }),
       ],
       roots: ['/m/TV'],
       kind: 'shows',
@@ -173,7 +188,7 @@ describe('planRelayout', () => {
 
   it("moves a Fix match kept for a letter folder holding one loose movie to the movie's file", () => {
     const plan = planRelayout({
-      rows: [row(6, '/m/Movies/H/Heat (1995).mp4', 'H')],
+      rows: [row({ id: 6, path: '/m/Movies/H/Heat (1995).mp4', folder: 'H' })],
       roots: ['/m/Movies'],
       kind: 'movies',
       layout: 'auto',
@@ -188,8 +203,8 @@ describe('planRelayout', () => {
   it('drops a Fix match kept for a letter folder holding several loose movies', () => {
     const plan = planRelayout({
       rows: [
-        row(6, '/m/Movies/H/Heat (1995).mp4', 'H'),
-        row(7, '/m/Movies/H/Hereditary (2018).mp4', 'H'),
+        row({ id: 6, path: '/m/Movies/H/Heat (1995).mp4', folder: 'H' }),
+        row({ id: 7, path: '/m/Movies/H/Hereditary (2018).mp4', folder: 'H' }),
       ],
       roots: ['/m/Movies'],
       kind: 'movies',
@@ -201,7 +216,7 @@ describe('planRelayout', () => {
 
   it('moves nothing in a library that is never matched, though it has letter folders', () => {
     const plan = planRelayout({
-      rows: [row(5, '/m/Home/A/Beach/clip.mp4', 'A/Beach')],
+      rows: [row({ id: 5, path: '/m/Home/A/Beach/clip.mp4', folder: 'A/Beach' })],
       roots: ['/m/Home'],
       kind: 'other',
       layout: 'auto',
@@ -212,7 +227,9 @@ describe('planRelayout', () => {
 
   it('moves files back under their letter when the library is set to flat', () => {
     const plan = planRelayout({
-      rows: [row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1')],
+      rows: [
+        row({ id: 1, path: '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', folder: 'Andor/Season 1' }),
+      ],
       roots: ['/m/TV'],
       kind: 'shows',
       layout: 'flat',
@@ -225,8 +242,12 @@ describe('planRelayout', () => {
   it('leaves Fix matches where they are when setting flat merges their shows into one', () => {
     const plan = planRelayout({
       rows: [
-        row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1'),
-        row(2, '/m/TV/A/Ahsoka/Season 1/Ahsoka - S01E01.mkv', 'Ahsoka/Season 1'),
+        row({ id: 1, path: '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', folder: 'Andor/Season 1' }),
+        row({
+          id: 2,
+          path: '/m/TV/A/Ahsoka/Season 1/Ahsoka - S01E01.mkv',
+          folder: 'Ahsoka/Season 1',
+        }),
       ],
       roots: ['/m/TV'],
       kind: 'shows',
@@ -244,7 +265,9 @@ describe('planRelayout', () => {
 
   it("drops a Fix match kept for a place with no files once a title lands there, and moves the title's own there", () => {
     const plan = planRelayout({
-      rows: [row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1')],
+      rows: [
+        row({ id: 1, path: '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', folder: 'Andor/Season 1' }),
+      ],
       roots: ['/m/TV'],
       kind: 'shows',
       layout: 'flat',
@@ -258,8 +281,12 @@ describe('planRelayout', () => {
 
   it("drops a whole letter's Fix match whichever order its files come in", () => {
     const rows = [
-      row(1, '/m/TV/K/K/Season 1/K - S01E01.mkv', 'K/K/Season 1'),
-      row(2, '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv', 'K/Kingdom/Season 1'),
+      row({ id: 1, path: '/m/TV/K/K/Season 1/K - S01E01.mkv', folder: 'K/K/Season 1' }),
+      row({
+        id: 2,
+        path: '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv',
+        folder: 'K/Kingdom/Season 1',
+      }),
     ]
     const planFor = (ordered: typeof rows) =>
       planRelayout({
@@ -276,8 +303,12 @@ describe('planRelayout', () => {
   it("keeps a show's Fix match at its place when setting flat brings its letter's other shows there", () => {
     const plan = planRelayout({
       rows: [
-        row(1, '/m/TV/K/K/Season 1/K - S01E01.mkv', 'K/Season 1'),
-        row(2, '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv', 'Kingdom/Season 1'),
+        row({ id: 1, path: '/m/TV/K/K/Season 1/K - S01E01.mkv', folder: 'K/Season 1' }),
+        row({
+          id: 2,
+          path: '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv',
+          folder: 'Kingdom/Season 1',
+        }),
       ],
       roots: ['/m/TV'],
       kind: 'shows',
@@ -289,8 +320,12 @@ describe('planRelayout', () => {
 
   it('keeps a Fix match through setting flat and back, though its letter holds other shows', () => {
     const rows = [
-      row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1'),
-      row(2, '/m/TV/A/Ahsoka/Season 1/Ahsoka - S01E01.mkv', 'Ahsoka/Season 1'),
+      row({ id: 1, path: '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', folder: 'Andor/Season 1' }),
+      row({
+        id: 2,
+        path: '/m/TV/A/Ahsoka/Season 1/Ahsoka - S01E01.mkv',
+        folder: 'Ahsoka/Season 1',
+      }),
     ]
     const planFor = ({ layout, files }: { layout: 'auto' | 'flat'; files: typeof rows }) =>
       planRelayout({ rows: files, roots: ['/m/TV'], kind: 'shows', layout, overrides: ['Andor'] })
@@ -311,8 +346,12 @@ describe('planRelayout', () => {
   it('keeps a Fix match when another library path brings more of its show from under a letter', () => {
     const plan = planRelayout({
       rows: [
-        row(1, '/m/TV1/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1'),
-        row(2, '/m/TV2/A/Andor/Season 2/Andor - S02E01.mkv', 'A/Andor/Season 2'),
+        row({ id: 1, path: '/m/TV1/Andor/Season 1/Andor - S01E01.mkv', folder: 'Andor/Season 1' }),
+        row({
+          id: 2,
+          path: '/m/TV2/A/Andor/Season 2/Andor - S02E01.mkv',
+          folder: 'A/Andor/Season 2',
+        }),
       ],
       roots: ['/m/TV1', '/m/TV2'],
       kind: 'shows',
@@ -325,9 +364,21 @@ describe('planRelayout', () => {
   it("drops a letter's Fix match left behind by its show when another show takes its place", () => {
     const plan = planRelayout({
       rows: [
-        row(1, '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv', 'K/Kingdom/Season 1'),
-        row(2, '/m/TV/Requests/Kingdom/Season 2/Kingdom - S02E01.mkv', 'Requests/Kingdom/Season 2'),
-        row(3, '/m/TV/Requests/K/Season 1/K - S01E01.mkv', 'Requests/K/Season 1'),
+        row({
+          id: 1,
+          path: '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv',
+          folder: 'K/Kingdom/Season 1',
+        }),
+        row({
+          id: 2,
+          path: '/m/TV/Requests/Kingdom/Season 2/Kingdom - S02E01.mkv',
+          folder: 'Requests/Kingdom/Season 2',
+        }),
+        row({
+          id: 3,
+          path: '/m/TV/Requests/K/Season 1/K - S01E01.mkv',
+          folder: 'Requests/K/Season 1',
+        }),
       ],
       roots: ['/m/TV'],
       kind: 'shows',
@@ -347,7 +398,7 @@ describe('planRelayout', () => {
   it("moves a loose movie's own Fix match, and drops its letter folder's, when both would land on it", () => {
     const planFor = (overrides: string[]) =>
       planRelayout({
-        rows: [row(6, '/m/Movies/H/Heat (1995).mp4', 'H')],
+        rows: [row({ id: 6, path: '/m/Movies/H/Heat (1995).mp4', folder: 'H' })],
         roots: ['/m/Movies'],
         kind: 'movies',
         layout: 'auto',
@@ -365,8 +416,16 @@ describe('planRelayout', () => {
 
   it('moves Fix matches along a chain, and drops one left at its end with no files', () => {
     const rows = [
-      row(1, '/m/TV/Requests/K/Season 1/K - S01E01.mkv', 'Requests/K/Season 1'),
-      row(2, '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv', 'K/Kingdom/Season 1'),
+      row({
+        id: 1,
+        path: '/m/TV/Requests/K/Season 1/K - S01E01.mkv',
+        folder: 'Requests/K/Season 1',
+      }),
+      row({
+        id: 2,
+        path: '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv',
+        folder: 'K/Kingdom/Season 1',
+      }),
     ]
     const chain = planRelayout({
       rows,
@@ -396,8 +455,8 @@ describe('planRelayout', () => {
   it("moves a loose movie's Fix match with it when the library is set to flat", () => {
     const plan = planRelayout({
       rows: [
-        row(6, '/m/Movies/H/Heat (1995).mp4', ''),
-        row(7, '/m/Movies/H/Hereditary (2018).mp4', ''),
+        row({ id: 6, path: '/m/Movies/H/Heat (1995).mp4', folder: '' }),
+        row({ id: 7, path: '/m/Movies/H/Hereditary (2018).mp4', folder: '' }),
       ],
       roots: ['/m/Movies'],
       kind: 'movies',
@@ -409,7 +468,10 @@ describe('planRelayout', () => {
 
   it("moves a loose episode's Fix match with it when the library is set to flat", () => {
     const plan = planRelayout({
-      rows: [row(8, '/m/TV/A/Archer - S01E01.mkv', ''), row(9, '/m/TV/A/Atlanta - S01E01.mkv', '')],
+      rows: [
+        row({ id: 8, path: '/m/TV/A/Archer - S01E01.mkv', folder: '' }),
+        row({ id: 9, path: '/m/TV/A/Atlanta - S01E01.mkv', folder: '' }),
+      ],
       roots: ['/m/TV'],
       kind: 'shows',
       layout: 'flat',
@@ -421,10 +483,10 @@ describe('planRelayout', () => {
   it('changes nothing in a library whose files were already read again', () => {
     const plan = planRelayout({
       rows: [
-        row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1'),
-        row(2, '/m/TV/K/Season 1/K - S01E01.mkv', 'K/Season 1'),
-        row(3, '/m/TV/A/Archer - S01E01.mkv', ''),
-        row(4, '/m/TV/Pilot.mkv', ''),
+        row({ id: 1, path: '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', folder: 'Andor/Season 1' }),
+        row({ id: 2, path: '/m/TV/K/Season 1/K - S01E01.mkv', folder: 'K/Season 1' }),
+        row({ id: 3, path: '/m/TV/A/Archer - S01E01.mkv', folder: '' }),
+        row({ id: 4, path: '/m/TV/Pilot.mkv', folder: '' }),
       ],
       roots: ['/m/TV/'],
       kind: 'shows',

@@ -56,7 +56,7 @@ describe('the image cache', () => {
     state.ffmpeg = new CountingFfmpeg(config, { playback: () => DEFAULT_PLAYBACK_SETTINGS })
     state.cache = new ImageCache(
       config,
-      async (url) => {
+      async ({ url }) => {
         state.calls.push(url)
         return new Response(FAKE_JPEG, { headers: { 'content-type': 'image/jpeg' } })
       },

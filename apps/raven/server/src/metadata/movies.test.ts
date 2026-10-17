@@ -267,19 +267,24 @@ describe('movie metadata', () => {
     const [saga] = await sagas()
     expect(saga?.backdrop).toEqual({ type: 'slideshow', motion: 'fade' })
     const heat = saga?.media.find((media) => media.item?.title === 'Heat')?.item
-    const pick = (payload: InjectOptions['payload'], sagaId = saga?.tmdbId ?? '') =>
-      asAdmin({ method: 'PUT', url: `${url}/${sagaId}/backdrop`, payload })
+    const pick = ({
+      payload,
+      sagaId = saga?.tmdbId ?? '',
+    }: {
+      payload: InjectOptions['payload']
+      sagaId?: string
+    }) => asAdmin({ method: 'PUT', url: `${url}/${sagaId}/backdrop`, payload })
 
     const still = { type: 'still', itemId: heat?.id }
-    expect((await pick(still)).json()).toEqual(still)
+    expect((await pick({ payload: still })).json()).toEqual(still)
     expect((await sagas())[0]?.backdrop).toEqual(still)
     const slideshow = { type: 'slideshow', motion: 'kenBurns' }
-    expect((await pick(slideshow)).json()).toEqual(slideshow)
+    expect((await pick({ payload: slideshow })).json()).toEqual(slideshow)
     expect((await sagas())[0]?.backdrop).toEqual(slideshow)
 
-    expect((await pick({ type: 'still', itemId: 999_999 })).statusCode).toBe(400)
-    expect((await pick({ type: 'slideshow', motion: 'spin' })).statusCode).toBe(400)
-    expect((await pick(slideshow, '2344')).statusCode).toBe(404)
+    expect((await pick({ payload: { type: 'still', itemId: 999_999 } })).statusCode).toBe(400)
+    expect((await pick({ payload: { type: 'slideshow', motion: 'spin' } })).statusCode).toBe(400)
+    expect((await pick({ payload: slideshow, sagaId: '2344' })).statusCode).toBe(404)
     const viewer = await app().inject({
       method: 'PUT',
       url: `${url}/${saga?.tmdbId}/backdrop`,

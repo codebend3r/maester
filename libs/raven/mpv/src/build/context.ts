@@ -25,7 +25,6 @@ export const isSource = (value: unknown): value is Infer<typeof isSourceShape> =
   /^https:\/\/github\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/.test(value.repository) &&
   value.url ===
     `${value.repository.replace('github.com', 'codeload.github.com')}/tar.gz/${value.commit}`
-export type Source = Infer<typeof isSource>
 export const digest = (content: Uint8Array | string) =>
   createHash('sha256').update(content).digest('hex')
 export const sources = async () => {

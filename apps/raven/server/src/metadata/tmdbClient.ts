@@ -15,15 +15,27 @@ import { type RateLimit, createRateLimit } from '@/scanner/concurrency'
  * The slice of `fetch` metadata uses, injected so tests answer for TMDB and
  * OMDb and never touch the network.
  */
-export type MetadataFetch = (
-  url: string,
-  init: { headers: Record<string, string>; signal: AbortSignal },
-) => Promise<Response>
+export type MetadataFetch = (request: {
+  url: string
+  init: { headers: Record<string, string>; signal: AbortSignal }
+}) => Promise<Response>
 
 /** The DI token the fetch is provided under. */
 export const METADATA_FETCH = Symbol('METADATA_FETCH')
 
 const API = 'https://api.themoviedb.org/3'
+
+/** The path segment TMDB files each type it is looked up as under. */
+export const TMDB_SEGMENTS = { movie: 'movie', show: 'tv' } as const satisfies Record<
+  MatchItemType,
+  string
+>
+
+/** TMDB's search routes, which the client calls and the test fake answers. */
+export const TMDB_SEARCH_ROUTES = { movie: '/search/movie', show: '/search/tv' } as const
+
+/** The country whose ratings and release dates stand in for one TMDB has none for. */
+const COUNTRIES = { us: 'US' } as const
 
 /** One call may take this long before it counts as TMDB being down. */
 const TIMEOUT_MS = 10_000
@@ -44,7 +56,18 @@ const API_KEY = /^[a-f0-9]{32}$/i
 /** The only image paths raven ever fetches: `/abc123.jpg`, nothing that could leave TMDB's CDN. */
 export const TMDB_IMAGE_PATH = /^\/[A-Za-z0-9_-]+\.(jpg|png)$/
 
-export type TmdbErrorKind = 'unauthorized' | 'not-found' | 'unavailable'
+/** The other databases' ids TMDB can find a movie or show by. */
+export const TMDB_EXTERNAL_SOURCES = { imdbId: 'imdb_id', tvdbId: 'tvdb_id' } as const
+
+type TmdbExternalSource = (typeof TMDB_EXTERNAL_SOURCES)[keyof typeof TMDB_EXTERNAL_SOURCES]
+
+export const TMDB_ERROR_KINDS = {
+  unauthorized: 'unauthorized',
+  notFound: 'not-found',
+  unavailable: 'unavailable',
+} as const
+
+export type TmdbErrorKind = (typeof TMDB_ERROR_KINDS)[keyof typeof TMDB_ERROR_KINDS]
 
 /** 401 is a wrong token, 404 an id TMDB no longer has, and anything else TMDB being away. */
 export class TmdbError extends Error {
@@ -357,13 +380,7 @@ const person = (
     : null
 }
 
-export const castCredits = ({
-  cast,
-  job,
-}: {
-  cast: unknown
-  job: 'cast' | 'guest'
-}): FetchedCredit[] =>
+const castCredits = ({ cast, job }: { cast: unknown; job: 'cast' | 'guest' }): FetchedCredit[] =>
   records(cast)
     .toSorted((a, b) => (number(a.order) ?? 0) - (number(b.order) ?? 0))
     .slice(0, CAST_LIMIT)
@@ -667,7 +684,13 @@ export class TmdbClient {
     return this.config.metadataLanguage.slice(0, 2)
   }
 
-  private async get(path: string, params: Record<string, string> = {}): Promise<unknown> {
+  private async get({
+    path,
+    params = {},
+  }: {
+    path: string
+    params?: Record<string, string>
+  }): Promise<unknown> {
     const token = this.config.tmdbApiToken
     if (token == null || this.status.refused) {
       throw new TmdbError({ kind: 'unauthorized', message: 'TMDB is not configured.' })
@@ -686,12 +709,7 @@ export class TmdbClient {
 
     const attempt = async (retriesLeft: number): Promise<unknown> => {
       const response = await this.limit
-        .run(() =>
-          this.fetch(url, {
-            headers,
-            signal: AbortSignal.timeout(TIMEOUT_MS),
-          }),
-        )
+        .run(() => this.fetch({ url, init: { headers, signal: AbortSignal.timeout(TIMEOUT_MS) } }))
         .catch((error: unknown) => {
           const reason =
             error instanceof Error && error.name === 'TimeoutError'
@@ -741,10 +759,13 @@ export class TmdbClient {
     /** Takes in titles TMDB keeps out of an ordinary search. */
     includeAdult?: boolean
   }): Promise<SearchResult[]> {
-    const body = await this.get('/search/movie', {
-      query: composed(query),
-      include_adult: String(includeAdult),
-      ...(year == null ? {} : { year: String(year) }),
+    const body = await this.get({
+      path: TMDB_SEARCH_ROUTES.movie,
+      params: {
+        query: composed(query),
+        include_adult: String(includeAdult),
+        ...(year == null ? {} : { year: String(year) }),
+      },
     })
     return records(record(body).results).flatMap((entry) => toSearchResult(entry) ?? [])
   }
@@ -756,17 +777,23 @@ export class TmdbClient {
     query: string
     year: number | null
   }): Promise<SearchResult[]> {
-    const body = await this.get('/search/tv', {
-      query: composed(query),
-      include_adult: 'false',
-      ...(year == null ? {} : { first_air_date_year: String(year) }),
+    const body = await this.get({
+      path: TMDB_SEARCH_ROUTES.show,
+      params: {
+        query: composed(query),
+        include_adult: 'false',
+        ...(year == null ? {} : { first_air_date_year: String(year) }),
+      },
     })
     return records(record(body).results).flatMap((entry) => toSearchResult(entry) ?? [])
   }
 
   async show(tmdbId: string): Promise<FetchedItem> {
-    const body = await this.get(`/tv/${encodeURIComponent(tmdbId)}`, {
-      append_to_response: 'aggregate_credits,content_ratings,external_ids,reviews',
+    const body = await this.get({
+      path: `/tv/${encodeURIComponent(tmdbId)}`,
+      params: {
+        append_to_response: 'aggregate_credits,content_ratings,external_ids,reviews',
+      },
     })
     const show = toShow({ body, country: this.config.metadataCountry })
     if (!show) {
@@ -786,8 +813,11 @@ export class TmdbClient {
     showTmdbId: string
     number: number
   }): Promise<{ season: FetchedItem; episodes: FetchedItem[] }> {
-    const body = await this.get(`/tv/${encodeURIComponent(showTmdbId)}/season/${seasonNumber}`, {
-      append_to_response: 'credits',
+    const body = await this.get({
+      path: `/tv/${encodeURIComponent(showTmdbId)}/season/${seasonNumber}`,
+      params: {
+        append_to_response: 'credits',
+      },
     })
     const season = toSeason(body)
     if (!season) {
@@ -808,7 +838,10 @@ export class TmdbClient {
     source: 'imdb_id' | 'tvdb_id'
   }): Promise<{ movies: string[]; shows: string[] }> {
     const body = record(
-      await this.get(`/find/${encodeURIComponent(id)}`, { external_source: source }),
+      await this.get({
+        path: `/find/${encodeURIComponent(id)}`,
+        params: { external_source: source },
+      }),
     )
     const ids = (results: unknown): string[] =>
       records(results).flatMap((entry) => idOf(entry.id) ?? [])
@@ -848,7 +881,7 @@ export class TmdbClient {
     const aliases = records(titled.titles ?? titled.results).flatMap(
       (entry) => text(entry.title) ?? [],
     )
-    if (type === 'movie') return { type, aliases, runtime: number(body.runtime) || null }
+    if (type === ITEM_TYPES.movie) return { type, aliases, runtime: number(body.runtime) || null }
     return {
       type,
       aliases,
@@ -886,17 +919,23 @@ export class TmdbClient {
    * reviews.
    */
   async movieExtras(tmdbId: string): Promise<MovieExtras> {
-    const body = await this.get(`/movie/${encodeURIComponent(tmdbId)}`, {
-      append_to_response: 'images',
-      include_image_language: `${this.language},null`,
+    const body = await this.get({
+      path: `/movie/${encodeURIComponent(tmdbId)}`,
+      params: {
+        append_to_response: 'images',
+        include_image_language: `${this.language},null`,
+      },
     })
     return toMovieExtras({ movie: record(body), language: this.language })
   }
 
   async movie(tmdbId: string): Promise<FetchedItem> {
-    const body = await this.get(`/movie/${encodeURIComponent(tmdbId)}`, {
-      append_to_response: 'credits,release_dates,external_ids,reviews,images',
-      include_image_language: `${this.language},null`,
+    const body = await this.get({
+      path: `/movie/${encodeURIComponent(tmdbId)}`,
+      params: {
+        append_to_response: 'credits,release_dates,external_ids,reviews,images',
+        include_image_language: `${this.language},null`,
+      },
     })
     const movie = toMovie({ body, country: this.config.metadataCountry, language: this.language })
     if (!movie) {

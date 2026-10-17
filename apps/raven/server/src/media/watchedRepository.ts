@@ -3,6 +3,9 @@ import { DatabaseService } from '@/db/database'
 import { fileWatched } from '@/media/mediaSql'
 import type { WatchCard } from '@/media/watchedCards'
 
+/** What a play is, as the `plays.kind` column holds it: a real one, a Mark as watched, or a real one Mark as unwatched set aside. */
+export const PLAY_KINDS = { played: 'played', marked: 'marked', cleared: 'cleared' } as const
+
 /** Marks cards watched or unwatched, by the rule that a file is watched when a `marked` play or a counting `played` one says so. */
 @Injectable()
 export class WatchedRepository {

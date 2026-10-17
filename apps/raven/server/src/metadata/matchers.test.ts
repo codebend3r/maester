@@ -159,25 +159,28 @@ describe('matching by library type', () => {
     await database.close()
   })
 
-  const under = (name: string, path: string) => fileAt(`${join(database.dir(), name)}/${path}`)
+  const under = ({ name, path }: { name: string; path: string }) =>
+    fileAt(`${join(database.dir(), name)}/${path}`)
 
   it('matches movie files one by one, and a show folder as one', () => {
     const { matchers } = services()
-    const heat = under('Films', 'Heat (1995)/Heat (1995).mkv')
-    const extra = under('Films', 'Heat (1995)/Featurettes/Making Of.mkv')
+    const heat = under({ name: 'Films', path: 'Heat (1995)/Heat (1995).mkv' })
+    const extra = under({ name: 'Films', path: 'Heat (1995)/Featurettes/Making Of.mkv' })
     expect(matchers.movie.groups([heat, extra])).toEqual([[heat], [extra]])
-    const first = under('Shows', 'Severance/Season 01/Severance - S01E01.mkv')
-    const second = under('Shows', 'Severance/Season 01/Severance - S01E02.mkv')
+    const first = under({ name: 'Shows', path: 'Severance/Season 01/Severance - S01E01.mkv' })
+    const second = under({ name: 'Shows', path: 'Severance/Season 01/Severance - S01E02.mkv' })
     expect(matchers.show.groups([first, second])).toEqual([[first, second]])
   })
 
   it('keeps a Fix match for a folder of one movie, or for a whole show folder', () => {
     const { matchers } = services()
-    const heat = matchers.movie.fixGroup(under('Films', 'Heat (1995)/Heat (1995).mkv'))
+    const heat = matchers.movie.fixGroup(
+      under({ name: 'Films', path: 'Heat (1995)/Heat (1995).mkv' }),
+    )
     expect(heat.place).toBe('Heat (1995)')
     expect(heat.files.map((file) => file.fileName)).toEqual(['Heat (1995).mkv'])
     const show = matchers.show.fixGroup(
-      under('Shows', 'Severance/Season 01/Severance - S01E01.mkv'),
+      under({ name: 'Shows', path: 'Severance/Season 01/Severance - S01E01.mkv' }),
     )
     expect(show.place).toBe('Severance')
     expect(show.files).toHaveLength(4)
@@ -185,8 +188,8 @@ describe('matching by library type', () => {
 
   it('keeps the poster beside one copy of a movie when another library has a copy without one', async () => {
     const { images, metadata, matchers, pass } = services()
-    const heat = under('Films', 'Heat (1995)/Heat (1995).mkv')
-    const uhd = under('Films 4K', 'Heat (1995)/Heat (1995) 2160p.mkv')
+    const heat = under({ name: 'Films', path: 'Heat (1995)/Heat (1995).mkv' })
+    const uhd = under({ name: 'Films 4K', path: 'Heat (1995)/Heat (1995) 2160p.mkv' })
     const poster = join(database.dir(), 'Films', 'Heat (1995)', 'poster.jpg')
 
     await matchers.movie.match({ files: [heat], pass: pass() })
@@ -201,10 +204,10 @@ describe('matching by library type', () => {
 
   it('places a show folder: extras off, and the still kept whichever version comes last', async () => {
     const { images, metadata, files, matchers, pass } = services()
-    const thumbed = under('Shows', 'Severance/Season 01/Severance - S01E01.mkv')
-    const plain = under('Shows', 'Severance/Season 01/Severance - S01E01 2160p.mkv')
-    const second = under('Shows', 'Severance/Season 01/Severance - S01E02.mkv')
-    const extra = under('Shows', 'Severance/Featurettes/Making Of.mkv')
+    const thumbed = under({ name: 'Shows', path: 'Severance/Season 01/Severance - S01E01.mkv' })
+    const plain = under({ name: 'Shows', path: 'Severance/Season 01/Severance - S01E01 2160p.mkv' })
+    const second = under({ name: 'Shows', path: 'Severance/Season 01/Severance - S01E02.mkv' })
+    const extra = under({ name: 'Shows', path: 'Severance/Featurettes/Making Of.mkv' })
     const still = join(
       database.dir(),
       'Shows',
@@ -237,7 +240,10 @@ describe('matching by library type', () => {
 
   it('searches a show again without its edition words when the whole name finds nothing', async () => {
     const { files, matchers, pass } = services()
-    const uncut = under('Shows', 'Severance (Uncut)/Season 01/Severance (Uncut) - S01E01.mkv')
+    const uncut = under({
+      name: 'Shows',
+      path: 'Severance (Uncut)/Season 01/Severance (Uncut) - S01E01.mkv',
+    })
     await matchers.show.match({ files: [uncut], pass: pass() })
     expect(files.byId(uncut.id)?.match).toBe('matched')
   })

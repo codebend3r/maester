@@ -40,7 +40,7 @@ const exists = async (path: string): Promise<boolean> =>
     () => false,
   )
 
-const temporary = (dir: string, extension: string): string =>
+const temporary = ({ dir, extension }: { dir: string; extension: string }): string =>
   join(dir, `.${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`)
 
 export const contentTypeOf = (path: string): string =>
@@ -83,7 +83,13 @@ export class ImageCache {
   }
 
   /** Runs `make` once per key at a time; later callers wait on the same promise. */
-  private once(key: string, make: () => Promise<string | null>): Promise<string | null> {
+  private once({
+    key,
+    make,
+  }: {
+    key: string
+    make: () => Promise<string | null>
+  }): Promise<string | null> {
     const running = this.working.get(key)
     if (running) return running
     const started = make().finally(() => this.working.delete(key))
@@ -91,7 +97,7 @@ export class ImageCache {
     return started
   }
 
-  private warnOnce(key: string, message: string): void {
+  private warnOnce({ key, message }: { key: string; message: string }): void {
     if (this.warned.has(key)) return
     this.warned.add(key)
     this.logger.warn(message)
@@ -103,28 +109,34 @@ export class ImageCache {
     const size = `w${width}`
     const dir = join(this.root, 'tmdb', size)
     const target = join(dir, path.slice(1))
-    return this.once(target, async () => {
-      if (await exists(target)) return target
-      return this.downloads.run(async () => {
-        const response = await this.fetch(`https://image.tmdb.org/t/p/${size}${path}`, {
-          headers: { accept: 'image/*' },
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        }).catch(() => null)
-        if (!response?.ok) {
-          this.warnOnce(path, `TMDB could not serve ${size}${path}`)
-          return null
-        }
-        const temp = temporary(dir, path.endsWith('.png') ? 'png' : 'jpg')
-        try {
-          await writeFile(temp, Buffer.from(await response.arrayBuffer()))
-          await rename(temp, target)
-          return target
-        } catch (error) {
-          await rm(temp, { force: true })
-          this.warnOnce(path, `Could not cache ${path}: ${String(error)}`)
-          return null
-        }
-      })
+    return this.once({
+      key: target,
+      make: async () => {
+        if (await exists(target)) return target
+        return this.downloads.run(async () => {
+          const response = await this.fetch({
+            url: `https://image.tmdb.org/t/p/${size}${path}`,
+            init: {
+              headers: { [HEADERS.accept]: RAVEN_CONTENT_TYPES.anyImage },
+              signal: AbortSignal.timeout(TIMEOUT_MS),
+            },
+          }).catch(() => null)
+          if (!response?.ok) {
+            this.warnOnce({ key: path, message: `TMDB could not serve ${size}${path}` })
+            return null
+          }
+          const temp = temporary({ dir, extension: path.endsWith('.png') ? 'png' : 'jpg' })
+          try {
+            await writeFile(temp, Buffer.from(await response.arrayBuffer()))
+            await rename(temp, target)
+            return target
+          } catch (error) {
+            await rm(temp, { force: true })
+            this.warnOnce({ key: path, message: `Could not cache ${path}: ${String(error)}` })
+            return null
+          }
+        })
+      },
     })
   }
 
@@ -140,34 +152,40 @@ export class ImageCache {
     source: string
     width: ImageWidth
   }): Promise<string | null> {
-    return this.once(`${itemId}-${kind}-${width}`, async () => {
-      const info = await stat(source).catch(() => null)
-      if (!info?.isFile()) return null
-      const dir = join(this.root, 'local')
-      const prefix = `${itemId}-${kind}-`
-      const current = `${prefix}${Math.round(info.mtimeMs)}-`
-      const target = join(dir, `${current}${width}.jpg`)
-      if (await exists(target)) return target
-      const temp = temporary(dir, 'jpg')
-      try {
-        await this.scales.run(() =>
-          this.ffmpeg.exec(imageScaleArgs({ input: source, output: temp, width })),
+    return this.once({
+      key: `${itemId}-${kind}-${width}`,
+      make: async () => {
+        const info = await stat(source).catch(() => null)
+        if (!info?.isFile()) return null
+        const dir = join(this.root, 'local')
+        const prefix = `${itemId}-${kind}-`
+        const current = `${prefix}${Math.round(info.mtimeMs)}-`
+        const target = join(dir, `${current}${width}.jpg`)
+        if (await exists(target)) return target
+        const temp = temporary({ dir, extension: 'jpg' })
+        try {
+          await this.scales.run(() =>
+            this.ffmpeg.exec(imageScaleArgs({ input: source, output: temp, width })),
+          )
+          if (!(await exists(temp))) throw new Error('ffmpeg wrote nothing')
+          await rename(temp, target)
+        } catch (error) {
+          await rm(temp, { force: true })
+          this.warnOnce({
+            key: source,
+            message: `Could not read the image ${source}: ${String(error)}`,
+          })
+          return null
+        }
+        // Scales of the picture before it changed, at any width, and any named before widths were.
+        const names = await readdir(dir).catch((): string[] => [])
+        await Promise.all(
+          names
+            .filter((name) => name.startsWith(prefix) && !name.startsWith(current))
+            .map((name) => rm(join(dir, name), { force: true })),
         )
-        if (!(await exists(temp))) throw new Error('ffmpeg wrote nothing')
-        await rename(temp, target)
-      } catch (error) {
-        await rm(temp, { force: true })
-        this.warnOnce(source, `Could not read the image ${source}: ${String(error)}`)
-        return null
-      }
-      // Scales of the picture before it changed, at any width, and any named before widths were.
-      const names = await readdir(dir).catch((): string[] => [])
-      await Promise.all(
-        names
-          .filter((name) => name.startsWith(prefix) && !name.startsWith(current))
-          .map((name) => rm(join(dir, name), { force: true })),
-      )
-      return target
+        return target
+      },
     })
   }
 

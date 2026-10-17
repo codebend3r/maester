@@ -157,7 +157,7 @@ describe('a matching pass', () => {
   })
 
   it('searches with adult titles for a film TMDB leaves out, taking only its own title', async () => {
-    const ask = (title: string, year: number) =>
+    const ask = ({ title, year }: { title: string; year: number }) =>
       pass().resolve({
         type: 'movie',
         fix: { kind: 'none' },
@@ -165,11 +165,14 @@ describe('a matching pass', () => {
         nfoPath: null,
         titles: [{ title, year }],
       })
-    await expect(ask('Paprika', 1991)).resolves.toMatchObject({ kind: 'matched', tmdbId: '50270' })
+    await expect(ask({ title: 'Paprika', year: 1991 })).resolves.toMatchObject({
+      kind: 'matched',
+      tmdbId: '50270',
+    })
     expect(
       searches().some((url) => url.includes('query=Paprika') && url.includes('include_adult=true')),
     ).toBe(true)
-    await expect(ask('Unheard Of', 2001)).resolves.toEqual({ kind: 'unmatched' })
+    await expect(ask({ title: 'Unheard Of', year: 2001 })).resolves.toEqual({ kind: 'unmatched' })
   })
 
   it('leaves files unmatched when nothing is found, or TMDB has no such id', async () => {

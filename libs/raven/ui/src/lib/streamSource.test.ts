@@ -130,7 +130,13 @@ const fakeVideo = () => {
 }
 
 /** Responses by start time; each is a list of [from, to] chunks. */
-const setup = (streams: Record<string, Array<[number, number]>>, ok = true) => {
+const setup = ({
+  streams = {},
+  ok = true,
+}: {
+  streams?: Record<string, Array<[number, number]>>
+  ok?: boolean
+} = {}) => {
   const sourceEvents = listeners()
   const sourceState = { readyState: 'closed', ended: 0, duration: NaN, mime: '' }
   const { buffer, state: bufferState } = fakeBuffer(sourceState)
@@ -184,6 +190,9 @@ const setup = (streams: Record<string, Array<[number, number]>>, ok = true) => {
   }
   return { environment, bufferState, sourceState, fetched, aborted }
 }
+
+/** The URL a test's stream starts at `start` from, the key of its chunks in `setup`. */
+const streamUrl = (start: number) => `from-${start}`
 
 const settle = async () => {
   await Promise.all(
@@ -248,7 +257,7 @@ describe('createStreamSession', () => {
 
   it('starts a seek cleanly when it cuts the running stream off partway through a fragment', async () => {
     const video = fakeVideo()
-    const { environment, fetched, bufferState } = setup({ 'from-200': [[199, 203]] })
+    const { environment, fetched, bufferState } = setup({ streams: { 'from-200': [[199, 203]] } })
     // A whole fragment and the first part of the next, then nothing more yet.
     const stalled: StreamEnvironment = {
       ...environment,
@@ -287,7 +296,7 @@ describe('createStreamSession', () => {
   it('waits for a running stream to reach a seek just past its edge', async () => {
     const video = fakeVideo()
     const never = new Promise<never>(() => {})
-    const { environment, fetched } = setup({})
+    const { environment, fetched } = setup()
     const slow: StreamEnvironment = {
       ...environment,
       fetch: async (url, init) => {
@@ -316,7 +325,7 @@ describe('createStreamSession', () => {
 
   it('reports a stream the server could not make', async () => {
     const video = fakeVideo()
-    const { environment } = setup({}, false)
+    const { environment } = setup({ ok: false })
     const errors: string[] = []
     createStreamSession({
       video,
@@ -342,7 +351,7 @@ describe('createStreamSession', () => {
       onError: (message) => calls.push(`error: ${message}`),
       onUnreachable: () => calls.push('unreachable'),
       environment: {
-        ...setup({}).environment,
+        ...setup().environment,
         fetch: async () => {
           throw new TypeError('Failed to fetch')
         },
@@ -362,7 +371,7 @@ describe('createStreamSession', () => {
       url: () => 'x',
       onError: (message) => calls.push(`error: ${message}`),
       onUnreachable: () => calls.push('unreachable'),
-      environment: setup({}, false).environment,
+      environment: setup({ ok: false }).environment,
     })
     await settle()
     expect(calls).toEqual(['error: The server could not convert this video (500).'])
@@ -370,7 +379,7 @@ describe('createStreamSession', () => {
 
   it('does not call an origin unreachable once it has delivered a chunk', async () => {
     const calls: string[] = []
-    const base = setup({})
+    const base = setup()
     createStreamSession({
       video: fakeVideo(),
       mime: 'video/mp4',
@@ -416,7 +425,7 @@ describe('createStreamSession', () => {
       onError: (message) => calls.push(`error: ${message}`),
       onUnreachable: () => calls.push('unreachable'),
       environment: {
-        ...setup({}).environment,
+        ...setup().environment,
         fetch: async () => {
           throw new DOMException('aborted', 'AbortError')
         },
@@ -435,7 +444,7 @@ describe('createStreamSession', () => {
       start: 0,
       url: () => 'x',
       onError: (message) => errors.push(message),
-      environment: { ...setup({}).environment, createMediaSource: () => null },
+      environment: { ...setup().environment, createMediaSource: () => null },
     })
     await settle()
     expect(errors).toEqual(["This browser can't play converted video."])
@@ -443,7 +452,7 @@ describe('createStreamSession', () => {
 
   it('stops and stays quiet once destroyed', async () => {
     const video = fakeVideo()
-    const { environment, fetched } = setup({}, false)
+    const { environment, fetched } = setup({ ok: false })
     const errors: string[] = []
     const session = createStreamSession({
       video,

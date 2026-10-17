@@ -5,7 +5,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { type WatchFolder, type Watching, watchEachFolder, watchTree } from '@/scanner/folderWatch'
 
 /** Resolves once `check` holds, polling, or fails after `ms`. */
-const eventually = async (check: () => boolean, ms = 5_000): Promise<void> => {
+const eventually = async ({
+  check,
+  ms = 5_000,
+}: {
+  check: () => boolean
+  ms?: number
+}): Promise<void> => {
   const until = Date.now() + ms
   const poll = async (): Promise<void> => {
     if (check()) return
@@ -51,26 +57,26 @@ describe.each(WAYS)('watching %s', (_way, watchFolder) => {
   it('reports a file added deep in the tree', async () => {
     const file = join(state.root, 'Movies', 'Heat (1995)', 'Heat (1995).mkv')
     await writeFile(file, 'x')
-    await eventually(() => state.seen.includes(file))
+    await eventually({ check: () => state.seen.includes(file) })
   })
 
   it('watches a folder that turns up, and what is put in it', async () => {
     const folder = join(state.root, 'Movies', 'Ronin (1998)')
     await mkdir(folder)
-    await eventually(() => state.seen.includes(folder))
+    await eventually({ check: () => state.seen.includes(folder) })
     await new Promise((resolve) => setTimeout(resolve, 300))
     const file = join(folder, 'Ronin (1998).mkv')
     await writeFile(file, 'x')
-    await eventually(() => state.seen.includes(file))
+    await eventually({ check: () => state.seen.includes(file) })
   })
 
   it('reports both ends of a rename', async () => {
     const before = join(state.root, 'Movies', 'Heat (1995)', 'heat.mkv')
     const after = join(state.root, 'Movies', 'Heat (1995)', 'Heat (1995).mkv')
     await writeFile(before, 'x')
-    await eventually(() => state.seen.includes(before))
+    await eventually({ check: () => state.seen.includes(before) })
     await rename(before, after)
-    await eventually(() => state.seen.includes(after))
+    await eventually({ check: () => state.seen.includes(after) })
     expect(state.errors).toEqual([])
   })
 
@@ -81,7 +87,7 @@ describe.each(WAYS)('watching %s', (_way, watchFolder) => {
       onChange: () => undefined,
       onError: (error) => errors.push(error),
     })
-    await eventually(() => errors.length > 0)
+    await eventually({ check: () => errors.length > 0 })
     watch.close()
   })
 })

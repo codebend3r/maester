@@ -10,7 +10,7 @@ import {
   stemOf,
 } from '@/metadata/places'
 
-const file = (path: string, root = '/tv') => {
+const file = ({ path, root = '/tv' }: { path: string; root?: string }) => {
   const inside = path.slice(root.length + 1)
   const slash = inside.lastIndexOf('/')
   return {
@@ -29,27 +29,27 @@ describe('where a file sits', () => {
   })
 
   it('places a file by its path inside the library, and finds the root from it', () => {
-    const inFolder = file('/tv/Severance/Season 01/Severance - S01E01.mkv')
+    const inFolder = file({ path: '/tv/Severance/Season 01/Severance - S01E01.mkv' })
     expect(filePlace(inFolder)).toBe('Severance/Season 01/Severance - S01E01.mkv')
     expect(rootOf(inFolder)).toBe('/tv')
-    const atRoot = file('/tv/Severance - S01E01.mkv')
+    const atRoot = file({ path: '/tv/Severance - S01E01.mkv' })
     expect(filePlace(atRoot)).toBe('Severance - S01E01.mkv')
     expect(rootOf(atRoot)).toBe('/tv')
   })
 
   it('keeps a show by its folder, every season under it included', () => {
-    const episode = file('/tv/Severance/Season 01/Severance - S01E01.mkv')
+    const episode = file({ path: '/tv/Severance/Season 01/Severance - S01E01.mkv' })
     expect(showFolderOf(episode)).toBe('Severance')
     expect(showPlace(episode)).toBe('Severance')
     expect(showDirOf(episode)).toBe('/tv/Severance')
   })
 
   it('keeps a file at the root, or in a bare season folder, by itself', () => {
-    const atRoot = file('/tv/Severance - S01E01.mkv')
+    const atRoot = file({ path: '/tv/Severance - S01E01.mkv' })
     expect(showFolderOf(atRoot)).toBeNull()
     expect(showPlace(atRoot)).toBe('Severance - S01E01.mkv')
     expect(showDirOf(atRoot)).toBe('/tv')
-    const seasonOnly = file('/tv/Season 01/Severance - S01E01.mkv')
+    const seasonOnly = file({ path: '/tv/Season 01/Severance - S01E01.mkv' })
     expect(showFolderOf(seasonOnly)).toBeNull()
     expect(showPlace(seasonOnly)).toBe('Season 01/Severance - S01E01.mkv')
     expect(showDirOf(seasonOnly)).toBe('/tv/Season 01')
@@ -83,23 +83,23 @@ describe('where a file sits', () => {
 
   it("keeps a group's decision where its Fix match is kept", () => {
     const none = () => []
-    const episode = file('/tv/Severance/Season 01/Severance - S01E01.mkv')
+    const episode = file({ path: '/tv/Severance/Season 01/Severance - S01E01.mkv' })
     expect(groupPlaceOf({ type: 'show', file: episode, folderFiles: none })).toBe('Severance')
-    const loose = file('/tv/Severance - S01E01.mkv')
+    const loose = file({ path: '/tv/Severance - S01E01.mkv' })
     expect(groupPlaceOf({ type: 'show', file: loose, folderFiles: none })).toBe(
       'Severance - S01E01.mkv',
     )
-    const heat = file('/films/Heat (1995)/Heat (1995) 1080p.mkv', '/films')
-    const heatUhd = file('/films/Heat (1995)/Heat (1995) 2160p.mkv', '/films')
+    const heat = file({ path: '/films/Heat (1995)/Heat (1995) 1080p.mkv', root: '/films' })
+    const heatUhd = file({ path: '/films/Heat (1995)/Heat (1995) 2160p.mkv', root: '/films' })
     expect(groupPlaceOf({ type: 'movie', file: heat, folderFiles: () => [heat, heatUhd] })).toBe(
       'Heat (1995)',
     )
-    const shared = file('/films/Michael Mann/Heat (1995).mkv', '/films')
-    const thief = file('/films/Michael Mann/Thief (1981).mkv', '/films')
+    const shared = file({ path: '/films/Michael Mann/Heat (1995).mkv', root: '/films' })
+    const thief = file({ path: '/films/Michael Mann/Thief (1981).mkv', root: '/films' })
     expect(groupPlaceOf({ type: 'movie', file: shared, folderFiles: () => [shared, thief] })).toBe(
       'Michael Mann/Heat (1995).mkv',
     )
-    const atRoot = file('/films/Heat (1995).mkv', '/films')
+    const atRoot = file({ path: '/films/Heat (1995).mkv', root: '/films' })
     expect(groupPlaceOf({ type: 'movie', file: atRoot, folderFiles: none })).toBe('Heat (1995).mkv')
   })
 })

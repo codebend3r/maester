@@ -13,7 +13,7 @@ import { playerQueriesFor } from '@/lib/playerQueries'
 /** The ways to play, best first, for one audio track; a step down belongs to one ladder. */
 type Ladder = { modes: readonly PlaybackMode[]; audio: number | null }
 
-const sameLadder = (a: Ladder, b: Ladder): boolean =>
+const sameLadder = ({ a, b }: { a: Ladder; b: Ladder }): boolean =>
   a.audio === b.audio &&
   a.modes.length === b.modes.length &&
   a.modes.every((mode, index) => mode === b.modes[index])
@@ -69,7 +69,7 @@ export const usePlaybackLadder = ({
     modes: plan.modes.length === 0 && forced ? ['direct'] : plan.modes,
     audio,
   }
-  const step = fallback != null && sameLadder(fallback.ladder, ladder) ? fallback.step : 0
+  const step = fallback != null && sameLadder({ a: fallback.ladder, b: ladder }) ? fallback.step : 0
   const mode = ladder.modes[step]
   if (failure != null || mode == null) {
     return {

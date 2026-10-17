@@ -1,4 +1,17 @@
-import type { MetadataFetch } from '@/metadata/tmdbClient'
+import { CONTENT_TYPES, HEADERS } from '@shared/server'
+import { RAVEN_CONTENT_TYPES } from '@/http'
+import {
+  type MetadataFetch,
+  TMDB_EXTERNAL_SOURCES,
+  TMDB_SEARCH_ROUTES,
+  TMDB_SEGMENTS,
+} from '@/metadata/tmdbClient'
+
+/** The hosts the fake answers for besides TMDB's API. */
+const HOSTS = { omdb: 'www.omdbapi.com', images: 'image.tmdb.org' } as const
+
+/** What a query flag such as `include_adult=true` says when it is on. */
+const QUERY_FLAGS = { true: 'true' } as const
 
 /** The bytes TMDB's CDN answers with here: enough of a JPEG to tell it apart. */
 export const FAKE_JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0xff, 0xd9])
@@ -234,8 +247,11 @@ export const seasonBody = ({
   })),
 })
 
-const json = (body: unknown, status = 200): Response =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+const json = ({ body, status = 200 }: { body: unknown; status?: number }): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { [HEADERS.contentType]: CONTENT_TYPES.json },
+  })
 
 const yearOf = (released: string): number => Number(released.slice(0, 4))
 
@@ -290,27 +306,30 @@ export const fakeTmdb = ({
     }
   }
 
-  const fetch: MetadataFetch = async (url) => {
+  const fetch: MetadataFetch = async ({ url }) => {
     state.calls.push(url)
     if (state.down) throw new TypeError('fetch failed')
     const parsed = new URL(url)
     if (parsed.host === 'www.omdbapi.com') {
       state.omdbCalls += 1
       if (parsed.searchParams.get('apikey') !== 'omdb-key') {
-        return json({ Response: 'False', Error: 'Invalid API key!' }, 401)
+        return json({ body: { Response: 'False', Error: 'Invalid API key!' }, status: 401 })
       }
-      if (state.omdbSpent) return json({ Response: 'False', Error: 'Request limit reached!' }, 401)
+      if (state.omdbSpent)
+        return json({ body: { Response: 'False', Error: 'Request limit reached!' }, status: 401 })
       const scores = state.omdb[parsed.searchParams.get('i') ?? '']
-      if (!scores) return json({ Response: 'False', Error: 'Error getting data.' })
+      if (!scores) return json({ body: { Response: 'False', Error: 'Error getting data.' } })
       return json({
-        Response: 'True',
-        Ratings: [
-          ...(scores.imdb ? [{ Source: 'Internet Movie Database', Value: scores.imdb }] : []),
-          ...(scores.rottenTomatoes
-            ? [{ Source: 'Rotten Tomatoes', Value: scores.rottenTomatoes }]
-            : []),
-          ...(scores.metacritic ? [{ Source: 'Metacritic', Value: scores.metacritic }] : []),
-        ],
+        body: {
+          Response: 'True',
+          Ratings: [
+            ...(scores.imdb ? [{ Source: 'Internet Movie Database', Value: scores.imdb }] : []),
+            ...(scores.rottenTomatoes
+              ? [{ Source: 'Rotten Tomatoes', Value: scores.rottenTomatoes }]
+              : []),
+            ...(scores.metacritic ? [{ Source: 'Metacritic', Value: scores.metacritic }] : []),
+          ],
+        },
       })
     }
     if (parsed.host === 'image.tmdb.org') {
@@ -385,8 +404,10 @@ export const fakeTmdb = ({
         source === 'tvdb_id' ? show.tvdbId === id : source === 'imdb_id' && `tt${show.id}` === id,
       )
       return json({
-        movie_results: movieHits.map((movie) => ({ id: movie.id })),
-        tv_results: showHits.map((show) => ({ id: show.id })),
+        body: {
+          movie_results: movieHits.map((movie) => ({ id: movie.id })),
+          tv_results: showHits.map((show) => ({ id: show.id })),
+        },
       })
     }
 
@@ -395,8 +416,8 @@ export const fakeTmdb = ({
       const show = state.shows.find((entry) => String(entry.id) === season[1])
       const number = Number(season[2])
       return show && show.seasons[number]
-        ? json(seasonBody({ show, number }))
-        : json({ status_code: 34 }, 404)
+        ? json({ body: seasonBody({ show, number }) })
+        : json({ body: { status_code: 34 }, status: 404 })
     }
 
     const show = /^\/tv\/(\d+)$/.exec(path)
@@ -417,7 +438,7 @@ export const fakeTmdb = ({
                 }
               : {}),
           })
-        : json({ status_code: 34 }, 404)
+        : json({ body: { status_code: 34 }, status: 404 })
     }
 
     const images = /^\/(movie|tv)\/(\d+)\/images$/.exec(path)
@@ -427,8 +448,8 @@ export const fakeTmdb = ({
         images[1] === 'movie'
           ? state.movies.some((entry) => entry.id === id)
           : state.shows.some((entry) => entry.id === id)
-      if (!known) return json({ status_code: 34 }, 404)
-      const picture = (name: string, language: string | null) => ({
+      if (!known) return json({ body: { status_code: 34 }, status: 404 })
+      const picture = ({ name, language }: { name: string; language: string | null }) => ({
         file_path: `/${name}${id}.jpg`,
         width: 2000,
         height: 3000,
@@ -436,10 +457,18 @@ export const fakeTmdb = ({
         vote_average: 5,
       })
       return json({
-        id,
-        posters: [picture('poster', 'en'), picture('alt', null)],
-        backdrops: [picture('backdrop', null), picture('scene', 'en')],
-        logos: images[1] === 'movie' ? logosOf(id) : [],
+        body: {
+          id,
+          posters: [
+            picture({ name: 'poster', language: 'en' }),
+            picture({ name: 'alt', language: null }),
+          ],
+          backdrops: [
+            picture({ name: 'backdrop', language: null }),
+            picture({ name: 'scene', language: 'en' }),
+          ],
+          logos: images[1] === TMDB_SEGMENTS.movie ? logosOf(id) : [],
+        },
       })
     }
 
@@ -457,7 +486,7 @@ export const fakeTmdb = ({
                 type: '',
               })),
             })
-          : json({ status_code: 34 }, 404)
+          : json({ body: { status_code: 34 }, status: 404 })
       }
       const found = state.movies.find((entry) => entry.id === id)
       return found
@@ -469,7 +498,7 @@ export const fakeTmdb = ({
               type: '',
             })),
           })
-        : json({ status_code: 34 }, 404)
+        : json({ body: { status_code: 34 }, status: 404 })
     }
 
     const movie = /^\/movie\/(\d+)$/.exec(path)
@@ -490,9 +519,9 @@ export const fakeTmdb = ({
                 }
               : {}),
           })
-        : json({ status_code: 34 }, 404)
+        : json({ body: { status_code: 34 }, status: 404 })
     }
-    return json({ status_code: 34 }, 404)
+    return json({ body: { status_code: 34 }, status: 404 })
   }
 
   return { fetch, state, hold }

@@ -27,9 +27,9 @@ describe('MatchFactsCache', () => {
         { id: 8195, title: 'Ronin', released: '1998-09-25', runtime: 122 },
       ],
     })
-    const fetch: MetadataFetch = async (url, init) => {
+    const fetch: MetadataFetch = async ({ url, init }) => {
       if (held != null && new URL(url).pathname === held.path) await held.until
-      return tmdb.fetch(url, init)
+      return tmdb.fetch({ url, init })
     }
     const client = new TmdbClient({ ...readServerConfig({}), tmdbApiToken: 'secret-token' }, fetch)
     return { tmdb, client, cache: new MatchFactsCache(client) }
