@@ -1,4 +1,4 @@
-import { relative, sep } from 'node:path'
+import { isAbsolute, relative, sep } from 'node:path'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   entryById,
@@ -68,22 +68,35 @@ export type DownloadPlayback = {
   /** The title of the download whose video is at `path`, else null. */
   labelOf: (input: { path: string }) => string | null
   /**
+   * Whether `path` lies in the downloads folder but is no download's video: a deleted download
+   * that a play queue still holds a grant for, since a grant outlives its download.
+   */
+  isStaleDownload: (input: { path: string }) => boolean
+  /**
    * Where the server had a granted download when it was confirmed, for a file with no local
    * resume spot; 0 once a position was noted here, and for any other file.
    */
   serverPositionOf: (input: { fileId: string }) => number
   /**
-   * The page opened a granted file: the player is on it, and the next position noted for a
+   * The page opened a granted file: the page is on it, and the next position noted for a
    * download's video is a play.
    */
   noteOpened: (input: { fileId: string }) => void
   /** A position saved for a granted file; for a download's video, what the server will hear. */
   notePosition: (input: { fileId: string; position: number; duration: number | null }) => void
-  /** What the player loaded: a granted file, or nothing of this computer's (a server title, Home). */
+  /**
+   * What the engine loaded: a granted file, or nothing of this computer's (a server title, the
+   * player hiding for Home).
+   */
   notePlaying: (input: { fileId: string | null }) => void
-  /** The play page left this file; a player already on the next file stays on it. */
+  /** The play page left this file; a page already on the next file stays on it. */
   playbackLeft: (input: { fileId: string }) => void
-  /** Whether the player is on this download's video, so a deletion waits until it leaves. */
+  /** A page said ready: a new page, on no file, though the engine may not have stopped yet. */
+  noteNewPage: () => void
+  /**
+   * Whether the page or the engine is on this download's video, so a deletion waits until
+   * both have left it.
+   */
   isPlaying: (downloadId: string) => boolean
   /**
    * Whether the player would resume this download partway, short of where it counts as
@@ -105,6 +118,11 @@ export type DownloadPlayback = {
 }
 
 const refused = (message: string): DesktopReply => ({ type: 'refused', message })
+
+/** A granted file one side of the player is on, and the download whose video it is, if any. */
+type Slot = { fileId: string | null; downloadId: string | null }
+
+const NO_SLOT: Slot = { fileId: null, downloadId: null }
 
 /** Drops these videos' recents and resume spots; the same state when it names none of them. */
 const forgetVideos = (state: PlayerState, { paths }: { paths: readonly string[] }): PlayerState => {
@@ -129,11 +147,12 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   const downloadIdByFile = new Map<string, string>()
   /** Videos opened and not played yet: the first position noted for one is its play. */
   const freshFiles = new Set<string>()
-  /** The granted file the player is on, and the download whose video it is, if any. */
-  const playing: { fileId: string | null; downloadId: string | null } = {
-    fileId: null,
-    downloadId: null,
-  }
+  /**
+   * What the page opened and what the engine loaded, kept apart so neither clears the other:
+   * the engine stopping while the page still plays a file, or the page leaving a file the
+   * engine still has, leaves the download playing.
+   */
+  const playing: { page: Slot; engine: Slot } = { page: NO_SLOT, engine: NO_SLOT }
 
   const videoPathOf = ({ serverId, mediaId, container }: DownloadEntry): string =>
     videoPathFor({ userData: deps.userData, serverId, mediaId, container })
@@ -238,16 +257,30 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     return DOWNLOAD_MESSAGES.downloadedFrom(deps.serverNameOf(serverId))
   }
 
-  const playFile = (fileId: string | null): void => {
-    const left = playing.downloadId
-    playing.fileId = fileId
-    playing.downloadId = fileId === null ? null : (entryOfFile(fileId)?.downloadId ?? null)
-    if (left !== null && left !== playing.downloadId) deps.onLeft()
+  const isStaleDownload: DownloadPlayback['isStaleDownload'] = ({ path }) => {
+    const inside = relative(downloadsDirFor({ userData: deps.userData }), path)
+    const isInFolder = inside !== '' && !isAbsolute(inside) && inside.split(sep)[0] !== '..'
+    return isInFolder && entryAt(path) === null
+  }
+
+  const playingIds = (): (string | null)[] => [playing.page.downloadId, playing.engine.downloadId]
+
+  /** Puts one side on a file, or on none, and says so once no side is on a download it was on. */
+  const play = ({ side, fileId }: { side: keyof typeof playing; fileId: string | null }): void => {
+    const before = playingIds()
+    playing[side] = {
+      fileId,
+      downloadId: fileId === null ? null : (entryOfFile(fileId)?.downloadId ?? null),
+    }
+    const now = playingIds()
+    if (before.some((downloadId) => downloadId !== null && !now.includes(downloadId))) {
+      deps.onLeft()
+    }
   }
 
   const noteOpened: DownloadPlayback['noteOpened'] = ({ fileId }) => {
-    playFile(fileId)
-    if (playing.downloadId !== null) freshFiles.add(fileId)
+    play({ side: 'page', fileId })
+    if (playing.page.downloadId !== null) freshFiles.add(fileId)
   }
 
   const notePosition: DownloadPlayback['notePosition'] = ({ fileId, position, duration }) => {
@@ -275,9 +308,9 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   }
 
   // The page may say it left one file after the next one opened, so only a leave of the file
-  // the player is still on clears it.
+  // the page is still on clears it.
   const playbackLeft: DownloadPlayback['playbackLeft'] = ({ fileId }) => {
-    if (playing.fileId === fileId) playFile(null)
+    if (playing.page.fileId === fileId) play({ side: 'page', fileId: null })
   }
 
   const isMidTitle: DownloadPlayback['isMidTitle'] = (downloadId) => {
@@ -340,12 +373,14 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     sidecarsOf,
     fromLabelOf,
     labelOf: ({ path }) => entryAt(path)?.label ?? null,
+    isStaleDownload,
     serverPositionOf: ({ fileId }) => entryOfFile(fileId)?.serverPosition ?? 0,
     noteOpened,
     notePosition,
-    notePlaying: ({ fileId }) => playFile(fileId),
+    notePlaying: ({ fileId }) => play({ side: 'engine', fileId }),
     playbackLeft,
-    isPlaying: (downloadId) => playing.downloadId === downloadId,
+    noteNewPage: () => play({ side: 'page', fileId: null }),
+    isPlaying: (downloadId) => playingIds().includes(downloadId),
     isMidTitle,
     watchedOf,
     isWatched: ({ path }) => isMarked(entryAt(path)),

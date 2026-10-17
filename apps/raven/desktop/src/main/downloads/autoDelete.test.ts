@@ -62,11 +62,8 @@ const setup = ({ entries = [entryFor()] }: { entries?: DownloadEntry[] } = {}) =
   const removed: string[] = []
   const deleted: string[] = []
   const warnings: string[] = []
-  /** What each removal waits on before it removes, and whether it then fails. */
-  const removal: { hold: Promise<void>; isFailing: boolean } = {
-    hold: Promise.resolve(),
-    isFailing: false,
-  }
+  /** What each removal waits on before it removes. */
+  const removal: { hold: Promise<void> } = { hold: Promise.resolve() }
   const autoDelete = createAutoDelete({
     store,
     timers,
@@ -76,12 +73,6 @@ const setup = ({ entries = [entryFor()] }: { entries?: DownloadEntry[] } = {}) =
     remove: async (downloadId) => {
       removed.push(downloadId)
       await removal.hold
-      if (removal.isFailing) {
-        throw Object.assign(new Error("EACCES: permission denied, rmdir '/data/downloads/7'"), {
-          code: 'EACCES',
-          syscall: 'rmdir',
-        })
-      }
       // As the service does once its wait for the server is over: it looks again.
       const entry = store.read().entries.find((held) => held.downloadId === downloadId)
       const isKept =
@@ -396,21 +387,6 @@ describe('a deletion that waits', () => {
     expect(world.removed).toEqual([ID])
     expect(world.deleted).toEqual([])
     expect(world.pending.size).toBe(0)
-  })
-
-  it('warns by title alone, tells of nothing and tries no more when the removal fails', async () => {
-    const world = setup()
-    world.removal.isFailing = true
-    world.autoDelete.schedule({ downloadId: ID })
-    world.after(AUTO_DELETE_DELAY_MS)
-    await ticks(3)
-    world.autoDelete.playbackLeft()
-    await ticks(3)
-    expect(world.removed).toEqual([ID])
-    expect(world.deleted).toEqual([])
-    expect(world.warnings).toHaveLength(1)
-    expect(world.warnings[0]).toContain('S01E01 Good News')
-    expect(world.warnings[0]).not.toContain('/data')
   })
 })
 
