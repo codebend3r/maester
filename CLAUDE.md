@@ -48,7 +48,7 @@ These apply to every TypeScript project: everything but `@luwin/api` and the Pyt
 
 ## CSS
 
-These apply to the web apps, `@raven/web` and `@rookery/web`. Each app has its own tokens, so "the app's `globals.scss`" means `libs/raven/ui/src/styles/globals.scss` for raven and `apps/rookery/web/src/styles/globals.scss` for rookery.
+These apply to the web apps, `@raven/web` and `@rookery/web`, to `@raven/ui`, whose styles both raven clients import, and to the desktop renderer in `@raven/desktop`. Each app has its own tokens, so "the app's `globals.scss`" means `libs/raven/ui/src/styles/globals.scss` for raven and `apps/rookery/web/src/styles/globals.scss` for rookery.
 
 - Component styles are SCSS modules (`*.module.scss`), imported through the `@/` alias, never a relative path. The `react-ts-css` editor extension flags aliased imports as unresolved; that is a tooling bug to fix in tooling, not a reason to relativize the import.
 - Raven's shared styles live in `libs/raven/ui/src/styles/`; rookery's remain in its web app. The app's `globals.scss` holds the design tokens, resets and typographic primitives. raven also has `libs/raven/ui/src/styles/elements.scss`, the default look of each element, inside `:where()` so any class beats it. Everything else belongs in a component module.
@@ -69,23 +69,25 @@ An Nx 23 monorepo over Bun workspaces (`apps/*/*`, `libs/*/*`, `scripts`). Proje
 
 Shared tool config lives at the root, so every project lints and compiles by the same rules:
 
-- `tsconfig.base.json` holds the compiler options; `tooling/tsconfig/nest.json` and `tooling/tsconfig/react.json` add a server's or a web app's. A project's `tsconfig.json` extends one and adds its `paths`, its `include` and whatever sets it apart (core's empty `types`).
-- `tooling/oxlint/base.json` holds the lint rules, `nest.json` and `react.json` add a server's or a web app's. A project's `.oxlintrc.json` extends one and adds its ignores, its file overrides and whatever sets it apart.
+- `tsconfig.base.json` holds the compiler options; `tooling/tsconfig/nest.json` and `tooling/tsconfig/react.json` add a server's or a web app's, and `tooling/tsconfig/node.json` adds Node's types for Node code that is neither (`@raven/mpv`, the desktop's main process and preload). A project's `tsconfig.json` extends one and adds its `paths`, its `include` and whatever sets it apart (core's empty `types`).
+- `tooling/oxlint/base.json` holds the lint rules, `nest.json` and `react.json` add a server's or a web app's, and `node.json` the Node environment for the rest (`@raven/mpv`, `@raven/desktop`). A project's `.oxlintrc.json` extends one and adds its ignores, its file overrides and whatever sets it apart.
 - gale lints the SCSS, reading each styled project's `gale.json`. That extends `tooling/gale/recommended-scss.json`, a copy of the rules in `stylelint-config-recommended` 18.0.0 and `stylelint-config-recommended-scss` 17.0.1, because gale 0.2.5 can't load those packages, and then `tooling/gale/rules.json`, the repo's own SCSS rules. `tooling/web` holds the asset declarations and the bun test SCSS loader they share, plus `check-coverage.ts`: raven web's `test` target runs it after the tests and fails when total line or function coverage drops below the floors its `test:coverage` script names.
 - oxfmt has no `extends`, so each project keeps its own `.oxfmtrc.json`; keep their options identical.
 - `nx.json` lists `tsconfig.base.json` and `tooling/` as shared inputs, so a change there reruns every project's tasks.
 
-| Project           | Path                  | What                                                                          |
-| ----------------- | --------------------- | ----------------------------------------------------------------------------- |
-| `@luwin/api`      | `apps/luwin/api`      | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite       |
-| `@raven/server`   | `apps/raven/server`   | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest         |
-| `@raven/web`      | `apps/raven/web`      | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom |
-| `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check      |
-| `@raven/ui`       | `libs/raven/ui`       | Shared React player, engine/services contracts, primitives and styles         |
-| `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest    |
-| `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom      |
-| `@shared/server`  | `libs/shared/server`  | The servers' shared scaffolding: web app serving, SQLite migrations, env      |
-| `scripts`         | `scripts`             | Repo tooling; its Python is linted with luwin's pinned ruff and config        |
+| Project           | Path                  | What                                                                                                      |
+| ----------------- | --------------------- | --------------------------------------------------------------------------------------------------------- |
+| `@luwin/api`      | `apps/luwin/api`      | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite                                   |
+| `@raven/server`   | `apps/raven/server`   | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest                                     |
+| `@raven/web`      | `apps/raven/web`      | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom                             |
+| `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check                                  |
+| `@raven/ui`       | `libs/raven/ui`       | Shared React player, engine/services contracts, primitives and styles                                     |
+| `@raven/mpv`      | `libs/raven/mpv`      | N-API addon over our pinned libmpv build: macOS video surface, typed async wrapper                        |
+| `@raven/desktop`  | `apps/raven/desktop`  | raven player: Electron 44 and Forge, renderer on `@raven/ui`, libmpv through `@raven/mpv`, Playwright e2e |
+| `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest                                |
+| `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom                                  |
+| `@shared/server`  | `libs/shared/server`  | The servers' shared scaffolding: web app serving, SQLite migrations, env                                  |
+| `scripts`         | `scripts`             | Repo tooling; its Python is linted with luwin's pinned ruff and config                                    |
 
 Python projects declare `package.json` scripts that call uv (`uv run pytest -q`, `uv run ruff check .`); Nx runs them in the project's folder. There is no Python Nx plugin and no uv workspace.
 
