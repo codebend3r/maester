@@ -120,15 +120,9 @@ jobs:
       - name: 🏗️ Build TypeScript wrapper
         run: bunx nx run @raven/mpv:build
 
-      # fetch:libmpv is an Nx cached task, so Nx Cloud restores the 7 minute source build
-      # for any run with the same inputs. .nx/cache is the fallback with no token (a
-      # fork's PR) and the first-run seed; it is keyed on the same native sources.
-      - name: 💾 Cache Nx tasks
-        uses: actions/cache@v5
-        with:
-          path: .nx/cache
-          key: nx-desktop-darwin-arm64-xcode26.6-${{ hashFiles('libs/raven/mpv/native/**', 'libs/raven/mpv/src/build/**', 'libs/raven/mpv/package.json', 'bun.lock', 'tsconfig.base.json') }}
-
+      # fetch:libmpv is an Nx cached task, so Nx Cloud restores the source build for any
+      # run with the same inputs. With no token (a fork's PR) it builds cold: Nx 23 ties
+      # .nx/cache to a per-machine database, so restoring it on a fresh runner never hits.
       - name: 🎞️ Build self-contained libmpv and MoltenVK from source
         run: bunx nx run @raven/mpv:fetch:libmpv
 
