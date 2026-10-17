@@ -247,6 +247,24 @@ describe("a filmography's entries", () => {
     ])
   })
 
+  it("counts raven's own acting credit as themselves by its role, and no other work", () => {
+    const show = summary({ id: 50, title: 'Late Night', type: 'show' })
+    const [entry] = toEntries({
+      ...NONE,
+      rows: [],
+      localCredits: [
+        { item: show, job: 'cast', role: 'Himself', tmdbId: '77', released: '2001-01-01' },
+        { item: show, job: 'producer', role: 'Host', tmdbId: '77', released: '2001-01-01' },
+        { item: show, job: 'creator', role: null, tmdbId: '77', released: '2001-01-01' },
+      ],
+    })
+    expect(entry?.credits).toEqual([
+      { department: 'acting', role: 'Himself', episodes: null, isSelf: true },
+      { department: 'producing', role: 'Host', episodes: null, isSelf: false },
+      { department: 'writing', role: null, episodes: null, isSelf: false },
+    ])
+  })
+
   it('lists undated titles first, then the newest, then by title', () => {
     const entries = toEntries({
       ...NONE,

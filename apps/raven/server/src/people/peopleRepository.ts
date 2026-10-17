@@ -3,6 +3,7 @@ import { isMatchItemType, isNumber, listOf, type PersonProfile } from '@raven/co
 import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
+import { photoVersionOf } from '@/metadata/metadataRepository'
 import type { FetchedPerson, FetchedPersonCredit } from '@/metadata/tmdbClient'
 
 /** One of a person's TMDB credits as stored, with raven's item for its title. */
@@ -22,9 +23,11 @@ export type FilmographyRow = Pick<
   itemId: number | null
 }
 
-/** A person's TMDB id, what TMDB says of them, and when their filmography was fetched. */
+/** A person's TMDB id, name and photo, what TMDB says of them, and when their filmography was fetched. */
 export type StoredProfile = {
   tmdbId: string
+  name: string
+  photoVersion: string | null
   /** Null until a filmography has been fetched. */
   profile: PersonProfile | null
   fetchedAt: string | null
@@ -32,6 +35,8 @@ export type StoredProfile = {
 
 type ProfileRow = {
   tmdb_id: string
+  name: string
+  photo: string | null
   imdb_id: string | null
   birthday: string | null
   deathday: string | null
@@ -69,14 +74,16 @@ export class PeopleRepository {
   profile(personId: number): StoredProfile | null {
     const row = this.db
       .prepare<[number], ProfileRow>(
-        `SELECT tmdb_id, imdb_id, birthday, deathday, place_of_birth, biography, known_for,
-                filmography_fetched_at
+        `SELECT tmdb_id, name, photo, imdb_id, birthday, deathday, place_of_birth, biography,
+                known_for, filmography_fetched_at
            FROM people WHERE id = ?`,
       )
       .get(personId)
     if (!row) return null
     return {
       tmdbId: row.tmdb_id,
+      name: row.name,
+      photoVersion: photoVersionOf(row.photo),
       fetchedAt: row.filmography_fetched_at,
       profile:
         row.filmography_fetched_at == null

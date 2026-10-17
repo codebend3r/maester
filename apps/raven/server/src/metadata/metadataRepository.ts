@@ -98,6 +98,10 @@ export type StoredPerson = Pick<PersonDetails, 'id' | 'tmdbId' | 'name' | 'photo
   credits: LocalCredit[]
 }
 
+/** Changes whenever a person's TMDB photo does; null when they have none. */
+export const photoVersionOf = (photo: string | null): string | null =>
+  photo == null ? null : versionOf(`tmdb:${photo}`)
+
 const DAY_MS = 24 * 60 * 60 * 1000
 
 /** A person whose filmography was fetched this recently keeps their id with no credits left. */
@@ -721,7 +725,7 @@ export class MetadataRepository {
       id: row.id,
       tmdbId: row.tmdb_id,
       name: row.name,
-      photoVersion: row.photo == null ? null : versionOf(`tmdb:${row.photo}`),
+      photoVersion: photoVersionOf(row.photo),
       credits: credits.flatMap((credit) => {
         const item = summaries.get(credit.item_id)
         return item && isCreditJob(credit.job)
@@ -760,7 +764,7 @@ export class MetadataRepository {
                 name: row.name,
                 job: row.job,
                 role: row.role,
-                photoVersion: row.photo == null ? null : versionOf(`tmdb:${row.photo}`),
+                photoVersion: photoVersionOf(row.photo),
               },
             ]
           : [],

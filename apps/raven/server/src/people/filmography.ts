@@ -77,12 +77,16 @@ const unlistedOf = ({
   local: readonly LocalCredit[]
 }): FilmographyCredit[] =>
   local
-    .map((credit) => ({
-      department: LOCAL_DEPARTMENTS[credit.job],
-      role: credit.role,
-      episodes: null,
-      isSelf: false,
-    }))
+    .map((credit) => {
+      const department = LOCAL_DEPARTMENTS[credit.job]
+      return {
+        department,
+        role: credit.role,
+        episodes: null,
+        // raven's own credits carry no genres, so only the role can say.
+        isSelf: department === 'acting' && SELF_ROLE.test(credit.role ?? ''),
+      }
+    })
     .filter((credit) => !listed.some((known) => known.department === credit.department))
 
 const byReleased = (a: FilmographyEntry, b: FilmographyEntry): number => {

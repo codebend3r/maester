@@ -1,6 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { BLANK_ITEM, type FetchedPerson, TmdbError } from '@/metadata/tmdbClient'
-import { DEADLINE_MS, FAILURE_MEMORY_MS, FRESH_DAYS, Filmographies } from '@/people/filmographies'
+import {
+  DEADLINE_MS,
+  FAILURE_MEMORY_MS,
+  FRESH_DAYS,
+  Filmographies,
+  MOST_WAITING,
+} from '@/people/filmographies'
 import { PeopleRepository } from '@/people/peopleRepository'
 import { testDatabase } from '@/test/database'
 import { repositories } from '@/test/repositories'
@@ -101,7 +107,10 @@ describe("a person's filmography from TMDB", () => {
       people(),
       repositories(database.get()).metadata,
     )
-    return { tmdb, filmographies, personId: newPerson() }
+    /** What a page would say of the filmography. */
+    const stateOf = (personId: number) =>
+      filmographies.read({ personId, sees: () => true, localCredits: [] }).state
+    return { tmdb, filmographies, stateOf, personId: newPerson() }
   }
 
   beforeAll(database.open)
@@ -111,10 +120,10 @@ describe("a person's filmography from TMDB", () => {
   })
 
   it('is ready once fetched, with what TMDB says of them, and not asked again while fresh', async () => {
-    const { tmdb, filmographies, personId } = setUp()
-    expect(filmographies.state({ personId })).toBe('unavailable')
+    const { tmdb, filmographies, stateOf, personId } = setUp()
+    expect(stateOf(personId)).toBe('unavailable')
     await filmographies.ensure({ personId })
-    expect(filmographies.state({ personId })).toBe('ready')
+    expect(stateOf(personId)).toBe('ready')
     expect(people().profile(personId)).toMatchObject({
       profile: { imdbId: 'nm0000206', birthday: '1964-09-02', knownFor: 'Acting' },
       fetchedAt: expect.any(String),
@@ -129,51 +138,51 @@ describe("a person's filmography from TMDB", () => {
 
   it('is pending while TMDB takes longer than the deadline, and ready once it answers', async () => {
     vi.useFakeTimers()
-    const { tmdb, filmographies, personId } = setUp()
+    const { tmdb, filmographies, stateOf, personId } = setUp()
     const letGo = tmdb.hold()
     const ensuring = filmographies.ensure({ personId })
     await vi.advanceTimersByTimeAsync(DEADLINE_MS)
     await ensuring
-    expect(filmographies.state({ personId })).toBe('pending')
+    expect(stateOf(personId)).toBe('pending')
     expect(filmographies.read({ personId, sees: () => true, localCredits: [] })).toEqual({
       state: 'pending',
     })
     letGo()
     // A page asking again waits on the same fetch.
     await filmographies.ensure({ personId })
-    expect(filmographies.state({ personId })).toBe('ready')
+    expect(stateOf(personId)).toBe('ready')
     expect(tmdb.state.calls).toBe(1)
   })
 
   it('is unavailable with TMDB off, and asks it nothing', async () => {
-    const { tmdb, filmographies, personId } = setUp()
+    const { tmdb, filmographies, stateOf, personId } = setUp()
     tmdb.state.enabled = false
     await filmographies.ensure({ personId })
-    expect(filmographies.state({ personId })).toBe('unavailable')
+    expect(stateOf(personId)).toBe('unavailable')
     expect(tmdb.state.calls).toBe(0)
   })
 
   it('is unavailable when TMDB fails, and asks again only once ten minutes have passed', async () => {
     vi.useFakeTimers()
-    const { tmdb, filmographies, personId } = setUp()
+    const { tmdb, filmographies, stateOf, personId } = setUp()
     tmdb.state.error = new TmdbError({ kind: 'unavailable', message: 'TMDB could not be reached.' })
     await filmographies.ensure({ personId })
-    expect(filmographies.state({ personId })).toBe('unavailable')
+    expect(stateOf(personId)).toBe('unavailable')
     vi.advanceTimersByTime(FAILURE_MEMORY_MS - 1)
     await filmographies.ensure({ personId })
     expect(tmdb.state.calls).toBe(1)
-    expect(filmographies.state({ personId })).toBe('unavailable')
+    expect(stateOf(personId)).toBe('unavailable')
 
     tmdb.state.error = null
     vi.advanceTimersByTime(1)
     await filmographies.ensure({ personId })
     expect(tmdb.state.calls).toBe(2)
-    expect(filmographies.state({ personId })).toBe('ready')
+    expect(stateOf(personId)).toBe('ready')
   })
 
   it('serves a stale filmography at once, and fetches it again behind it', async () => {
     vi.useFakeTimers()
-    const { tmdb, filmographies, personId } = setUp()
+    const { tmdb, filmographies, stateOf, personId } = setUp()
     await filmographies.ensure({ personId })
     const fetchedAt = people().profile(personId)?.fetchedAt
     vi.advanceTimersByTime(FRESH_DAYS * DAY_MS)
@@ -181,7 +190,7 @@ describe("a person's filmography from TMDB", () => {
     // Were it to wait for TMDB, no deadline would ever come under fake timers.
     await filmographies.ensure({ personId })
     expect(tmdb.state.calls).toBe(2)
-    expect(filmographies.state({ personId })).toBe('ready')
+    expect(stateOf(personId)).toBe('ready')
     expect(people().profile(personId)?.fetchedAt).toBe(fetchedAt)
     letGo()
     await vi.waitFor(() => expect(people().profile(personId)?.fetchedAt).not.toBe(fetchedAt))
@@ -190,7 +199,7 @@ describe("a person's filmography from TMDB", () => {
   })
 
   it('asks TMDB once for two views at the same time', async () => {
-    const { tmdb, filmographies, personId } = setUp()
+    const { tmdb, filmographies, stateOf, personId } = setUp()
     const letGo = tmdb.hold()
     const both = Promise.all([
       filmographies.ensure({ personId }),
@@ -199,31 +208,46 @@ describe("a person's filmography from TMDB", () => {
     letGo()
     await both
     expect(tmdb.state.calls).toBe(1)
-    expect(filmographies.state({ personId })).toBe('ready')
+    expect(stateOf(personId)).toBe('ready')
   })
 
   it('fetches two people at once, and the next when one is done', async () => {
     vi.useFakeTimers()
-    const { tmdb, filmographies } = setUp()
+    const { tmdb, filmographies, stateOf } = setUp()
     const personIds = [newPerson(), newPerson(), newPerson()]
     const letGo = tmdb.hold()
     const ensuring = Promise.all(personIds.map((personId) => filmographies.ensure({ personId })))
     await vi.advanceTimersByTimeAsync(DEADLINE_MS)
     await ensuring
     expect(tmdb.state.calls).toBe(2)
-    expect(personIds.map((personId) => filmographies.state({ personId }))).toEqual([
-      'pending',
-      'pending',
-      'pending',
-    ])
+    expect(personIds.map(stateOf)).toEqual(['pending', 'pending', 'pending'])
+    letGo()
+    await vi.waitFor(() => expect(personIds.map(stateOf)).toEqual(['ready', 'ready', 'ready']))
+    expect(tmdb.state.calls).toBe(3)
+  })
+
+  it('turns a person away once twenty wait their turn, and fetches them when asked again', async () => {
+    vi.useFakeTimers()
+    const { tmdb, filmographies, stateOf } = setUp()
+    const waiting = Array.from({ length: 2 + MOST_WAITING }, newPerson)
+    const turnedAway = newPerson()
+    const letGo = tmdb.hold()
+    const ensuring = Promise.all(waiting.map((personId) => filmographies.ensure({ personId })))
+    await vi.advanceTimersByTimeAsync(DEADLINE_MS)
+    await ensuring
+    expect(waiting.map(stateOf).every((state) => state === 'pending')).toBe(true)
+
+    // It answers at once, with no deadline to wait out.
+    await filmographies.ensure({ personId: turnedAway })
+    expect(stateOf(turnedAway)).toBe('unavailable')
+    expect(tmdb.state.calls).toBe(2)
+
     letGo()
     await vi.waitFor(() =>
-      expect(personIds.map((personId) => filmographies.state({ personId }))).toEqual([
-        'ready',
-        'ready',
-        'ready',
-      ]),
+      expect(waiting.map(stateOf).every((state) => state === 'ready')).toBe(true),
     )
-    expect(tmdb.state.calls).toBe(3)
+    await filmographies.ensure({ personId: turnedAway })
+    expect(stateOf(turnedAway)).toBe('ready')
+    expect(tmdb.state.calls).toBe(3 + MOST_WAITING)
   })
 })

@@ -322,6 +322,7 @@ describe('a library locked behind the PIN', () => {
 
 /** A title only a locked library holds is on raven for a person's page only once the PIN opens it. */
 describe("a person's filmography beside a locked library", () => {
+  const tmdb = fakeTmdb({ movies: [{ id: 603, title: 'The Matrix', released: '1999-03-31' }] })
   const state: {
     root: string
     admin: string
@@ -347,9 +348,7 @@ describe("a person's filmography beside a locked library", () => {
       },
       quiet: true,
       watch: NOT_WATCHING,
-      metadataFetch: fakeTmdb({
-        movies: [{ id: 603, title: 'The Matrix', released: '1999-03-31' }],
-      }).fetch,
+      metadataFetch: tmdb.fetch,
     })
     await state.app.init()
     state.admin = await adminCookie(state.app)
@@ -375,24 +374,31 @@ describe("a person's filmography beside a locked library", () => {
     await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
-  it('names the item only for a browser the PIN opened the library for', async () => {
+  it('asks TMDB only for a browser that finds them in raven, and names the item only for one the PIN opened the library for', async () => {
     const pageFor = async (...cookie: string[]) => {
       const person = await apiFor({ app: app(), cookie: cookies(...cookie) }).getPerson(state.keanu)
-      if (person.filmography.state !== 'ready') {
-        throw new Error(`Filmography ${person.filmography.state}`)
-      }
       return {
-        matrix: person.filmography.entries.find((entry) => entry.tmdbId === '603')?.item ?? null,
+        state: person.filmography.state,
+        matrix:
+          person.filmography.state === 'ready'
+            ? (person.filmography.entries.find((entry) => entry.tmdbId === '603')?.item ?? null)
+            : null,
         credits: person.credits.map((credit) => credit.item.id),
       }
     }
-    expect(await pageFor(state.admin)).toEqual({ matrix: null, credits: [] })
-    // While the admin lock holds, the PIN opens nothing.
-    expect(await pageFor(state.pin)).toEqual({ matrix: null, credits: [] })
+    // Keanu's one title is out of this browser's sight, so TMDB is not asked about him.
+    expect(await pageFor(state.admin)).toEqual({ state: 'unavailable', matrix: null, credits: [] })
+    expect(tmdb.state.personCalls).toBe(0)
+
     expect(await pageFor(state.admin, state.pin)).toEqual({
+      state: 'ready',
       matrix: expect.objectContaining({ id: state.matrix, title: 'The Matrix' }),
       credits: [state.matrix],
     })
+    expect(tmdb.state.personCalls).toBe(1)
+    expect(await pageFor(state.admin)).toEqual({ state: 'ready', matrix: null, credits: [] })
+    // While the admin lock holds, the PIN opens nothing.
+    expect(await pageFor(state.pin)).toEqual({ state: 'ready', matrix: null, credits: [] })
   })
 })
 

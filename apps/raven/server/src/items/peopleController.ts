@@ -41,15 +41,20 @@ export class PeopleController {
     @Param('id', ParseIntPipe) id: number,
     @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
   ): Promise<PersonDetails> {
-    // Before the person is read, so the name and photo are what TMDB just said.
-    await this.filmographies.ensure({ personId: id })
     const person = this.metadata.person(id)
     if (!person) throw new NotFoundException(`No person ${id}`)
     const viewer = this.lock.viewer({ cookie })
     const credits = person.credits.filter((credit) => viewer.seesItem(credit.item.id))
+    // Only someone this browser finds in raven is worth asking TMDB about,
+    // so walking every id asks it nothing.
+    if (credits.length > 0) await this.filmographies.ensure({ personId: id })
+    // Read again, for the name and photo a fetch just brought.
+    const latest = this.people.profile(id) ?? { ...person, profile: null }
     return {
       ...person,
-      profile: this.people.profile(id)?.profile ?? null,
+      name: latest.name,
+      photoVersion: latest.photoVersion,
+      profile: latest.profile,
       filmography: this.filmographies.read({
         personId: id,
         sees: viewer.seesLibrary,

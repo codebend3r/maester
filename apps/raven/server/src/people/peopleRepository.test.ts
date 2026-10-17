@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { photoVersionOf } from '@/metadata/metadataRepository'
 import { BLANK_ITEM, type FetchedPerson, type FetchedPersonCredit } from '@/metadata/tmdbClient'
 import { PeopleRepository } from '@/people/peopleRepository'
 import { testDatabase } from '@/test/database'
@@ -87,6 +88,8 @@ describe("the people store's filmographies", () => {
   it('has no profile until a filmography is fetched, and nothing for no one', () => {
     expect(people().profile(state.personId)).toEqual({
       tmdbId: '6384',
+      name: 'Keanu Reeves',
+      photoVersion: null,
       profile: null,
       fetchedAt: null,
     })
@@ -103,6 +106,8 @@ describe("the people store's filmographies", () => {
     })
     expect(people().profile(state.personId)).toEqual({
       tmdbId: '6384',
+      name: 'Keanu Charles Reeves',
+      photoVersion: photoVersionOf('/keanu-new.jpg'),
       fetchedAt: '2026-10-17T12:00:00.000Z',
       profile: {
         imdbId: 'nm0000206',

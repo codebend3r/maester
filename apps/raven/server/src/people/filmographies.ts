@@ -18,16 +18,22 @@ export const FAILURE_MEMORY_MS = 600_000
 /** How long a first view waits for TMDB before it answers `pending`. */
 export const DEADLINE_MS = 2500
 
+/** How many people are fetched at once. */
+const AT_ONCE = 2
+
+/** How many fetches may wait their turn; past that, a page goes without until the line moves. */
+export const MOST_WAITING = 20
+
 /**
  * Each person's whole filmography from TMDB, fetched when their page is
  * first asked for and again once it is two weeks old. One fetch per person
- * at a time, and two people at once.
+ * at a time, two people at once, and twenty more waiting.
  */
 @Injectable()
 export class Filmographies {
   private readonly logger = new Logger(Filmographies.name)
   private readonly inFlight = new Map<number, Promise<void>>()
-  private readonly gate = createGate({ limit: 2 })
+  private readonly gate = createGate({ limit: AT_ONCE })
   private readonly failedAt = new Map<number, number>()
 
   constructor(
@@ -51,12 +57,6 @@ export class Filmographies {
     }
     if (!this.mayFetch(personId)) return
     await this.withinDeadline(this.fetch({ personId, tmdbId }))
-  }
-
-  /** `ready` once a filmography is stored, `pending` while the first is fetched, else `unavailable`. */
-  state({ personId }: { personId: number }): PersonFilmography['state'] {
-    const fetchedAt = this.people.profile(personId)?.fetchedAt ?? null
-    return fetchedAt == null ? this.waiting(personId) : 'ready'
   }
 
   /** What a viewer who sees the libraries `sees` passes may see of a person's filmography. */
@@ -100,6 +100,8 @@ export class Filmographies {
   private fetch({ personId, tmdbId }: { personId: number; tmdbId: string }): Promise<void> {
     const running = this.inFlight.get(personId)
     if (running) return running
+    // A full line is no failure of this person's, so the next view tries again.
+    if (this.inFlight.size >= AT_ONCE + MOST_WAITING) return Promise.resolve()
     const fetching = this.load({ personId, tmdbId }).finally(() => {
       this.inFlight.delete(personId)
     })
