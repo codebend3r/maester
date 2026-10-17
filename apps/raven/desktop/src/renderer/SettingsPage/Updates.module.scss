@@ -1,0 +1,74 @@
+.updates {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  justify-items: start;
+  min-width: 0;
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: var(--font-size-lg);
+    font-weight: 400;
+  }
+
+  p {
+    max-width: var(--measure);
+  }
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  cursor: pointer;
+
+  input:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.hint {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.results {
+  display: grid;
+  max-width: var(--measure);
+}
+
+.lines {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-2);
+  justify-content: start;
+
+  // Held while main checks; still focusable, so focus stays on it.
+  button[aria-disabled='true'] {
+    cursor: progress;
+    opacity: 0.55;
+  }
+
+  button:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 30rem) {
+    grid-auto-flow: row;
+  }
+}
+
+.refusal {
+  padding-inline-start: var(--space-2);
+  border-inline-start: var(--border-thick) solid var(--color-leaf-bright);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}

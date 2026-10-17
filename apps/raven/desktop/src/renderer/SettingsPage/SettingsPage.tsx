@@ -6,6 +6,7 @@ import { useDesktop } from '@/renderer/desktop/DesktopContext'
 import { Servers } from '@/renderer/SettingsPage/Servers'
 import styles from '@/renderer/SettingsPage/SettingsPage.module.scss'
 import { ThisComputer } from '@/renderer/SettingsPage/ThisComputer'
+import { Updates } from '@/renderer/SettingsPage/Updates'
 import { RECENTS_KEY } from '@/renderer/Shell/openReply'
 
 export const SettingsPage = () => {
@@ -43,6 +44,7 @@ export const SettingsPage = () => {
       </header>
       <Servers className={styles.servers} />
       <ThisComputer className={styles.computer} />
+      <Updates className={styles.updates} />
       <section className={styles.section} aria-labelledby="recents-title">
         <h2 id="recents-title">Recents</h2>
         <p>raven player remembers the videos you open and where you stopped.</p>
