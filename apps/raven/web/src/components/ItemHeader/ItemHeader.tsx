@@ -1,5 +1,5 @@
 import type { Rating, SlideshowMotion } from '@raven/core'
-import { type ReactNode, useState } from 'react'
+import { Fragment, type ReactNode, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ButtonLink, Icon } from '@raven/ui'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
@@ -22,17 +22,24 @@ export type HeaderBackdrop =
   | { type: 'picture'; url: string }
   | { type: 'slideshow'; slides: readonly string[]; motion: SlideshowMotion }
 
+/** How far through the item the viewer is, 0 to 1, and the words for it: "2 of 3 watched", "23m left". */
+export type HeaderProgress = { fraction: number; label: string }
+
 /** A page's one picture behind its header, or none while it has none. */
 export const pictureBackdrop = (url: string | null): HeaderBackdrop | null =>
   url == null ? null : { type: 'picture', url }
 
-const Backdrop = ({ backdrop }: { backdrop: HeaderBackdrop }) => {
+const BackdropPicture = ({ backdrop }: { backdrop: HeaderBackdrop }) => {
   switch (backdrop.type) {
     case 'picture':
-      return <img className={styles.backdrop} src={backdrop.url} alt="" decoding="async" />
+      return <img className={styles.backdropPicture} src={backdrop.url} alt="" decoding="async" />
     case 'slideshow':
       return (
-        <Slideshow className={styles.backdrop} slides={backdrop.slides} motion={backdrop.motion} />
+        <Slideshow
+          className={styles.backdropPicture}
+          slides={backdrop.slides}
+          motion={backdrop.motion}
+        />
       )
     default: {
       const unknown: never = backdrop
@@ -40,6 +47,16 @@ const Backdrop = ({ backdrop }: { backdrop: HeaderBackdrop }) => {
     }
   }
 }
+
+/**
+ * The picture behind the top of the page, faded into the night at its foot
+ * and its left, where the title reads. Decorative, and it takes no clicks.
+ */
+const Backdrop = ({ backdrop }: { backdrop: HeaderBackdrop }) => (
+  <div className={styles.backdrop} aria-hidden="true">
+    <BackdropPicture backdrop={backdrop} />
+  </div>
+)
 
 /** The content's columns for each kind of picture, or for none. */
 const LAYOUTS = {
@@ -59,15 +76,19 @@ const Picture = ({ picture, title }: { picture: HeaderPicture; title: string }) 
   const content = picture.url ? (
     <img src={picture.url} alt="" decoding="async" />
   ) : (
-    <span aria-hidden="true">{title.slice(0, 1)}</span>
+    <span className={styles.letter} aria-hidden="true">
+      {title.slice(0, 1)}
+    </span>
   )
   if (!picture.play) return <div className={className}>{content}</div>
   const { label, ...link } = picture.play
   return (
     <Link {...link} className={`${className} ${styles.playable}`} aria-label={label}>
       {content}
-      <span className={styles.playMark} aria-hidden="true">
-        <Icon name="play" size={28} />
+      <span className={styles.playCorner} aria-hidden="true">
+        <span className={styles.playMark}>
+          <Icon name="play" size={22} />
+        </span>
       </span>
     </Link>
   )
@@ -76,7 +97,7 @@ const Picture = ({ picture, title }: { picture: HeaderPicture; title: string }) 
 /**
  * The title as its logo, else in display type. A logo that fails to load
  * falls back to the words. The shadow falls from a wrapper, so it follows
- * the logo as drawn, whitened or not.
+ * the logo as drawn, recoloured or not.
  */
 const TitleArt = ({ title, logo }: { title: string; logo: string | null }) => {
   const [hasFailed, setFailed] = useState(false)
@@ -93,16 +114,56 @@ const TitleArt = ({ title, logo }: { title: string; logo: string | null }) => {
   )
 }
 
+/** A thin line of how far through it is, its words beside it. */
+const Progress = ({ progress }: { progress: HeaderProgress }) => (
+  <p className={styles.progress}>
+    <span className={styles.track} aria-hidden="true">
+      <span
+        className={styles.fill}
+        style={{ width: `${Math.round(Math.min(1, Math.max(0, progress.fraction)) * 100)}%` }}
+      />
+    </span>
+    <span className={styles.progressLabel}>{progress.label}</span>
+  </p>
+)
+
 /**
- * The top of a movie, show or episode page: the way back over the corner of
- * the backdrop, the backdrop fading into the page behind it, the picture (a poster, or an episode's still), the title
- * in display type with who made it beneath, the facts, the scores, and the
- * page's actions. A picture that plays its video shows a play mark on hover
- * and focus. On a narrow screen the picture sits above the rest.
+ * Parts of a line, a quiet dot between each, for a line of facts. A part
+ * never breaks, and a line that wraps does so after a dot, so the next
+ * starts flush. The line's own element sets its colour and size.
+ */
+export const Dotted = ({ parts }: { parts: readonly string[] }) =>
+  parts.map((part, index) => (
+    <Fragment key={part}>
+      <span className={styles.part}>
+        {part}
+        {index < parts.length - 1 && (
+          <span className={styles.dot} aria-hidden="true">
+            ·
+          </span>
+        )}
+      </span>
+      <wbr />
+    </Fragment>
+  ))
+
+const NO_EYEBROW: readonly string[] = []
+
+/**
+ * The top of a movie, show, season, episode or saga page: the way back in
+ * a glass pill, the backdrop running behind it to the page's edges and
+ * fading into the night, then the picture (a poster, or an episode's still,
+ * with a play button on it when it plays) beside what the item is (a small
+ * line over the title), the title in display type or as its logo, who made
+ * it, the content rating and facts, the scores, how far through it the
+ * viewer is, and the page's actions: `children` first (Play, favourite,
+ * Watched), then `manage` (the editors and the menu) on a row of their own.
+ * On a narrow screen the picture sits above the rest.
  */
 export const ItemHeader = ({
   titleId,
   title,
+  eyebrow = NO_EYEBROW,
   byline,
   contentRating,
   facts,
@@ -112,11 +173,15 @@ export const ItemHeader = ({
   backdrop,
   logo = null,
   back,
+  progress,
   children,
+  manage,
 }: {
   titleId: string
   title: string
-  /** "Directed by ...", "Created by ...", or an episode's show and number. */
+  /** What the item is, above its title: "Show", a season's show, "Saga · 3 movies". */
+  eyebrow?: readonly string[]
+  /** "Directed by ...", "Created by ...". */
   byline: string | null
   contentRating: string | null
   facts: readonly string[]
@@ -128,40 +193,59 @@ export const ItemHeader = ({
   backdrop: HeaderBackdrop | null
   /** The title as art, shown in its place: a movie's logo. */
   logo?: string | null
-  /** Where the page goes back to, laid over the backdrop's top corner. */
+  /** Where the page goes back to, over the backdrop's top corner. */
   back: { to: string; label: string }
-  /** The page's actions: Play, favourite, the menu. */
+  /** A line of how far through the item the viewer is, where the page has one. */
+  progress?: HeaderProgress
+  /** The page's own actions: Play, favourite, Watched, Select. */
   children?: ReactNode
+  /** The actions that change the item: the editors, Fix match, the file's menu. */
+  manage?: ReactNode
 }) => (
-  <header className={styles.hero}>
+  <header className={backdrop ? `${styles.hero} ${styles.withBackdrop}` : styles.hero}>
     {backdrop && <Backdrop backdrop={backdrop} />}
     <div className={styles.top}>
-      <ButtonLink to={back.to} icon="back" className={styles.back}>
-        {back.label}
+      <ButtonLink tone="pill" to={back.to} icon="back" className={styles.back}>
+        <span className={styles.backLabel}>{back.label}</span>
       </ButtonLink>
     </div>
     <div className={LAYOUTS[picture?.shape ?? 'none']}>
       {picture && <Picture picture={picture} title={title} />}
       <div className={styles.details}>
+        {eyebrow.length > 0 && (
+          <p className={styles.eyebrow}>
+            <Dotted parts={eyebrow} />
+          </p>
+        )}
         <h1 id={titleId} className={styles.title}>
           <TitleArt key={logo ?? 'none'} title={title} logo={logo} />
         </h1>
         {byline && <p className={styles.byline}>{byline}</p>}
         {(contentRating != null || facts.length > 0) && (
+          // Words that wrap as text does, so long genres take a second line on a phone.
           <p className={styles.facts}>
             {contentRating != null && (
-              <span className={styles.badge}>
-                <span className="visually-hidden">Rated </span>
-                {contentRating}
-              </span>
+              <>
+                <span className={`${styles.part} ${styles.ratedPart}`}>
+                  <span className={styles.rated}>
+                    <span className="visually-hidden">Rated </span>
+                    {contentRating}
+                  </span>
+                </span>
+                <wbr />
+              </>
             )}
-            {facts.map((fact) => (
-              <span key={fact}>{fact}</span>
-            ))}
+            <Dotted parts={facts} />
           </p>
         )}
         <RatingChips ratings={ratings} shouldShowEverySource={shouldShowEverySource} />
-        {children && <div className={styles.actions}>{children}</div>}
+        {progress && <Progress progress={progress} />}
+        {(!!children || !!manage) && (
+          <div className={styles.actions}>
+            {!!children && <div className={styles.group}>{children}</div>}
+            {!!manage && <div className={`${styles.group} ${styles.manage}`}>{manage}</div>}
+          </div>
+        )}
       </div>
     </div>
   </header>
@@ -187,7 +271,7 @@ export const ItemHeaderSkeleton = ({ picture }: { picture: HeaderPicture['shape'
         <Bone shape="hero" width="most" />
         <Bone shape="text" width="half" />
         <Bone shape="small" width="short" />
-        <span className={styles.actions}>
+        <span className={styles.group}>
           <Bone shape="button" />
           <Bone shape="button" />
         </span>

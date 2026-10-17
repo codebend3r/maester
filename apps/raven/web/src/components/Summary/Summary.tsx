@@ -5,7 +5,10 @@ import styles from '@/components/Summary/Summary.module.scss'
 /** A summary longer than this gets clamped to three lines with More. */
 const LONG_SUMMARY = 240
 
-/** An item's tagline and summary, the summary clamped to three lines behind More when it runs long. */
+/**
+ * An item's tagline in the serif and its summary as a lead beneath, the
+ * summary clamped to three lines behind More when it runs long.
+ */
 export const Summary = ({
   tagline,
   summary,
@@ -34,6 +37,7 @@ export const Summary = ({
       )}
       {long && (
         <Button
+          tone="ghost"
           className={styles.more}
           aria-expanded={expanded}
           aria-controls={id}

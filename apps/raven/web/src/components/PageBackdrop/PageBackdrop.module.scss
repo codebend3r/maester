@@ -11,7 +11,9 @@
   pointer-events: none;
 }
 
-// Faint, and fading towards the foot, so text over it keeps its contrast.
+// Faint, and fading towards the foot, so text over it keeps its contrast;
+// fainter still on a light theme, by the theme's colour wash, and gone in
+// high contrast.
 .layer {
   grid-area: layer;
   width: 100%;
@@ -24,7 +26,7 @@
 }
 
 .shown {
-  opacity: 0.32;
+  opacity: calc(var(--glow) * 0.55);
 }
 
 @media (prefers-reduced-motion: no-preference) {

@@ -1,60 +1,57 @@
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
+  gap: var(--section-gap);
 }
 
-.favourited {
-  color: var(--color-leaf-bright);
+// Filled once it is a favourite, springing to its size as it is pressed.
+.favourite {
+  &[aria-pressed='true'] {
+    --icon-tint: 1;
+  }
+
+  > svg {
+    scale: 0.9;
+  }
+
+  &[aria-pressed='true'] > svg {
+    scale: 1;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    > svg {
+      transition: scale 300ms var(--ease-spring);
+    }
+  }
 }
 
-// The summary, then the file's video, audio and subtitles; beside each
-// other where both are there and the screen is wide enough.
+// The summary beside the file's facts, or the facts beside the episodes
+// either side; one above the other on a narrower screen.
 .about {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
   align-items: start;
+  gap: var(--space-6) var(--space-7);
 }
 
-.besideFile {
-  grid-template-columns: minmax(0, 1fr) minmax(16rem, 24rem);
-  grid-template-areas: 'summary file';
-  column-gap: var(--space-6);
-
-  .summary {
-    grid-area: summary;
-  }
-
-  .file {
-    grid-area: file;
-  }
+.besides {
+  grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
+  grid-template-areas: 'main aside';
 }
 
-.file {
-  display: grid;
+.main {
+  grid-area: main;
 }
 
-.facts {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.fact {
-  display: grid;
-  grid-template-columns: 6rem minmax(0, 1fr);
-  gap: var(--space-2);
-
-  dt {
-    color: var(--color-lichen);
-  }
+.aside {
+  grid-area: aside;
 }
 
 @media (max-width: 64rem) {
-  .besideFile {
+  .besides {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      'summary'
-      'file';
+      'main'
+      'aside';
   }
 }

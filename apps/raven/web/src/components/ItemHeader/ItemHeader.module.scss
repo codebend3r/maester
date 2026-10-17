@@ -1,58 +1,107 @@
-// The backdrop and the content share one cell, the backdrop beneath.
+// The way back, then the picture and the details. The backdrop is laid out
+// apart from them, from the header's own corner.
 .hero {
+  --backdrop-height: 45rem;
+  // How far the picture and title drop below the way back, so the backdrop
+  // shows between them.
+  --hero-drop: calc(var(--space-10) + var(--space-8));
+  // The poster's width, and a still's.
+  --poster-width: 17.5rem;
+  --still-width: 26.25rem;
+
+  // Not a layer of its own: the backdrop, which runs on below the header,
+  // goes under the whole page's content, the summary after it included,
+  // and the theme button stays over the corner.
+  position: relative;
   display: grid;
-  grid-template-areas: 'hero';
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'top'
+    'content';
+  gap: var(--space-5);
   min-width: 0;
 }
 
-.backdrop,
-.top,
-.content {
-  grid-area: hero;
+.withBackdrop {
+  row-gap: var(--hero-drop);
 }
 
-// The way back sits in the backdrop's top corner, over the content, on a
-// glass of the night so it reads over any picture.
+// Behind the page's top padding and the corner, to the edges of the page
+// the shell pads: decorative, under everything else on the page.
+.backdrop {
+  position: absolute;
+  inset: calc(-1 * var(--page-top, var(--space-5))) calc(-1 * var(--gutter)) auto;
+  z-index: -1;
+  display: grid;
+  grid-template-areas: 'backdrop';
+  height: var(--backdrop-height);
+  overflow: hidden;
+  pointer-events: none;
+
+  // The night rises from the foot and runs in from the left, where the
+  // title reads, so the words keep their contrast over any picture.
+  &::after {
+    content: '';
+    grid-area: backdrop;
+    background:
+      linear-gradient(
+        90deg,
+        var(--color-night) 0%,
+        color-mix(in srgb, var(--color-night) 55%, transparent) 45%,
+        transparent 80%
+      ),
+      linear-gradient(to top, var(--color-night), transparent 55%);
+  }
+}
+
+// As strong as the theme's colour wash: faint on a light theme, gone in
+// high contrast.
+.backdropPicture {
+  grid-area: backdrop;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  opacity: var(--glow);
+  mask-image: linear-gradient(to bottom, var(--color-stage) 35%, transparent);
+}
+
+// At least a field tall, so its middle lines up with the theme button, and
+// clear of the corner the button takes.
 .top {
-  z-index: 2;
-  align-self: start;
-  justify-self: start;
-  padding: var(--space-3) var(--space-4);
+  grid-area: top;
+  display: grid;
+  justify-items: start;
+  align-items: center;
+  min-height: var(--field-size);
+  padding-inline-end: var(--corner-clearance, 0);
 }
 
+// A touch more glass than a pill's own, as it always sits on a picture.
+// No wider than its row, a long name cut short, so it never runs under
+// the theme button or off a phone's edge.
 .back {
-  border-color: transparent;
+  max-width: 100%;
   background: var(--color-night-glass);
 }
 
-// Decorative: a picture, or a saga's slideshow, fading into the night behind
-// the page. Its opacity would paint it over the content, and its clicks with
-// it, so it takes none and the content sits above.
-.backdrop {
-  width: 100%;
-  height: 100%;
-  max-height: 34rem;
-  object-fit: cover;
-  object-position: center top;
-  border-radius: var(--radius-md);
-  opacity: 0.45;
-  mask-image: linear-gradient(to bottom, var(--color-stage) 30%, transparent 100%);
-  pointer-events: none;
+.backLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .content {
-  z-index: 1;
+  grid-area: content;
   display: grid;
-  grid-template-columns: clamp(9rem, 22vw, 16rem) minmax(0, 1fr);
-  grid-template-areas: 'poster details';
+  grid-template-columns: var(--poster-width) minmax(0, 1fr);
+  grid-template-areas: 'picture details';
   align-items: end;
-  gap: var(--space-5);
-  padding: var(--space-8) var(--space-4) 0;
+  gap: calc(var(--space-5) + var(--space-1));
 }
 
-// An episode's still is wider than a poster, so its column is too.
 .withStill {
-  grid-template-columns: clamp(12rem, 30vw, 24rem) minmax(0, 1fr);
+  grid-template-columns: var(--still-width) minmax(0, 1fr);
 }
 
 .noPicture {
@@ -60,20 +109,18 @@
   grid-template-areas: 'details';
 }
 
-// The picture, its stand-in letter and the play mark share one cell.
+// The picture, its stand-in letter and the play button share one cell.
 .picture {
-  grid-area: poster;
+  grid-area: picture;
   display: grid;
-  grid-template-areas: 'picture';
-  place-items: center;
+  // One cell exactly the frame's size, so a picture of another shape is
+  // cropped to it rather than pushing the play button out of sight.
+  grid-template: 'picture' minmax(0, 1fr) / minmax(0, 1fr);
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--color-canopy);
-  box-shadow: var(--shadow-panel);
-  color: var(--color-lichen);
-  font-family: var(--font-display);
-  font-size: var(--font-size-hero);
+  box-shadow: var(--shadow-hero);
   text-decoration: none;
 
   > * {
@@ -91,75 +138,89 @@
   aspect-ratio: 16 / 9;
 }
 
-// Above the picture, whose hover filter paints it as a layer of its own.
+.letter {
+  place-self: center;
+  color: var(--color-lichen);
+  font-family: var(--font-display);
+  font-size: var(--font-size-title);
+}
+
+// The play button's place: the picture's bottom corner, inset.
+.playCorner {
+  display: grid;
+  place-items: end;
+  padding: var(--space-2);
+}
+
+// Round, on dark glass, in the picture's own light whatever the theme.
 .playMark {
-  position: relative;
-  z-index: 1;
   display: grid;
   place-items: center;
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: 50%;
-  background: var(--color-scrim);
-  color: var(--color-bark);
-  opacity: 0;
-
-  @media (prefers-reduced-motion: no-preference) {
-    transition:
-      opacity 120ms ease-out,
-      background-color 120ms ease-out;
-  }
+  width: var(--control-size-tall);
+  height: var(--control-size-tall);
+  border-radius: var(--radius-pill);
+  background: var(--color-picture-scrim);
+  backdrop-filter: blur(8px);
+  color: var(--color-on-picture);
 }
 
 .playable {
-  img {
-    @media (prefers-reduced-motion: no-preference) {
-      transition: filter 150ms ease-out;
-    }
+  &:hover .playMark,
+  &:focus-visible .playMark {
+    background: var(--color-leaf);
+    color: var(--color-on-leaf);
   }
 
-  &:hover,
   &:focus-visible {
-    img {
-      filter: brightness(1.12);
-    }
+    outline: var(--focus-ring);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: transform 300ms var(--ease-out);
 
     .playMark {
-      opacity: 1;
+      transition:
+        background-color 150ms ease,
+        color 150ms ease;
     }
-  }
 
-  &:hover .playMark {
-    background: var(--color-leaf);
-  }
-}
-
-// Touch screens have no hover to reveal it.
-@media (hover: none) {
-  .playMark {
-    opacity: 1;
+    &:hover {
+      transform: translateY(calc(-1 * var(--space-1)));
+    }
   }
 }
 
 .details {
+  container-type: inline-size;
   grid-area: details;
   display: grid;
   align-content: end;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-width: 0;
+}
+
+.eyebrow {
+  color: var(--color-birch);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
 }
 
 .title {
   font-family: var(--font-display);
-  font-size: var(--font-size-hero);
+  font-size: var(--font-size-title);
   font-weight: 400;
-  line-height: var(--line-tight);
+  line-height: var(--line-display);
+  letter-spacing: var(--tracking-display);
+  text-wrap: balance;
   overflow-wrap: anywhere;
 }
 
 // The logo stands where the title would, held to a title's size, with the
-// same shadow the words have against a bright backdrop. The shadow is the
-// wrapper's, so it adds to the logo's own whitening filter.
+// shadow the words would want against a bright backdrop. The shadow is the
+// wrapper's, so it adds to the logo's own recolouring filter.
 .logo {
   display: block;
   filter: drop-shadow(var(--shadow-text));
@@ -168,66 +229,153 @@
 .logoImage {
   display: block;
   width: auto;
-  max-width: min(30rem, 100%);
+  max-width: min(32rem, 100%);
   height: auto;
-  max-height: 8rem;
+  max-height: 9rem;
   object-fit: contain;
   object-position: left bottom;
 }
 
 .byline {
-  color: var(--color-lichen);
-  font-size: var(--font-size-lg);
+  color: var(--color-birch);
+  font-size: var(--font-size-md);
 }
 
 .facts {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  align-items: center;
-  gap: var(--space-3);
-  font-weight: 600;
-}
-
-.badge {
-  padding: 0 var(--space-1);
-  border: 1px solid var(--color-lichen);
-  border-radius: var(--radius-sm);
+  color: var(--color-lichen);
   font-size: var(--font-size-sm);
+  line-height: var(--line-relaxed);
 }
 
+// Each part keeps to one line while it fits on one, and wraps inside only
+// when it is longer than a whole line, as a long network's name can be.
+.part {
+  display: inline-block;
+  max-width: 100%;
+}
+
+// Room between the rating's box and the first fact.
+.ratedPart {
+  padding-inline-end: var(--space-2);
+}
+
+.rated {
+  display: inline-block;
+  padding: 0 var(--space-1);
+  border: 1px solid color-mix(in srgb, var(--color-bark) 40%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--color-bark);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  line-height: var(--line-body);
+}
+
+.dot {
+  padding-inline: var(--space-1);
+  color: var(--color-moss-line);
+}
+
+.progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: min(26rem, 100%);
+}
+
+.track {
+  display: grid;
+  height: 5px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-bark) 14%, transparent);
+}
+
+.fill {
+  border-radius: var(--radius-pill);
+  background: var(--color-leaf-bright);
+}
+
+.progressLabel {
+  color: var(--color-birch);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+// Play and its neighbours, then the editors on a row of their own. Every
+// button in it stands tall.
 .actions {
+  --control-size: var(--control-size-tall);
+
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+
+.group {
   display: grid;
   grid-auto-flow: column;
   justify-content: start;
   align-items: center;
-  gap: var(--space-1);
-  padding-top: var(--space-2);
+  gap: var(--space-2);
 }
 
-@media (max-width: 40rem) {
-  .content {
+// The editors are the admin's; with the admin lock on, the row is empty.
+.manage:empty {
+  display: none;
+}
+
+@media (max-width: 64rem) {
+  .hero {
+    --backdrop-height: 38.75rem;
+    --hero-drop: calc(2 * var(--space-8));
+    --poster-width: 13.75rem;
+    --still-width: 20rem;
+  }
+}
+
+@media (max-width: 48rem) {
+  .hero {
+    --backdrop-height: 32.5rem;
+    --hero-drop: var(--space-10);
+    --poster-width: 9.375rem;
+  }
+
+  .content,
+  .withStill {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      'poster'
+      'picture'
       'details';
-    justify-items: start;
     gap: var(--space-4);
-    padding: var(--space-6) 0 0;
   }
 
   .picture {
-    width: min(12rem, 60vw);
+    width: var(--poster-width);
   }
 
   .still {
-    width: min(24rem, 100%);
+    width: 100%;
+  }
+}
+
+// Where the details are narrow, on a phone or beside a still on a middling
+// screen, each row of actions breaks into even cells, the first, Play,
+// across the whole row. How narrow hangs on the side menu's width as much as
+// the screen's, so the details' own width decides.
+@container (max-width: 27rem) {
+  .group {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+    justify-content: stretch;
+
+    > :first-child {
+      grid-column: 1 / -1;
+    }
   }
 
-  // Facts wrap on a phone rather than run off the edge.
-  .facts {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(auto-fit, minmax(min-content, max-content));
-    gap: var(--space-1) var(--space-3);
+  .manage > :first-child {
+    grid-column: auto;
   }
 }

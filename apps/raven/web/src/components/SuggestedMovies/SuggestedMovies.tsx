@@ -2,7 +2,9 @@ import type { AiSuggestion, MediaItem, UnmatchedFile } from '@raven/core'
 import { useId, useRef, useState } from 'react'
 import { AiSuggestionCard } from '@/components/AiSuggestionCard/AiSuggestionCard'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
+import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
+import { plural } from '@/lib/plural'
 import { useReturnFocus } from '@/lib/useReturnFocus'
 import styles from '@/components/SuggestedMovies/SuggestedMovies.module.scss'
 
@@ -76,8 +78,8 @@ const SuggestedMovieEntry = ({
 }
 
 /**
- * The AI lookup's suggestions in a movie library's Not matched tab, above
- * its files; nothing when it has none.
+ * The AI lookup's suggestions in a movie library's Not matched tab, under a
+ * ruled heading counting them, above its files; nothing when it has none.
  */
 export const SuggestedMovies = ({
   files,
@@ -91,9 +93,12 @@ export const SuggestedMovies = ({
   if (suggested.length === 0) return null
   return (
     <section className={styles.section} aria-labelledby={headingId}>
-      <h2 id={headingId} className={styles.heading}>
+      <SectionHeading
+        id={headingId}
+        aside={plural({ n: suggested.length, one: 'suggestion', many: 'suggestions' })}
+      >
         Suggested by AI
-      </h2>
+      </SectionHeading>
       <ul className={styles.list}>
         {suggested.map((entry) => (
           <SuggestedMovieEntry key={entry.suggestion.place} entry={entry} libraryId={libraryId} />

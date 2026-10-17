@@ -1,15 +1,21 @@
+// The poster beside what was suggested and why, then Fix match and Accept
+// at the end, under a hairline.
 .card {
   display: grid;
   grid-template-columns: 4rem minmax(0, 1fr);
   grid-template-areas:
     'poster text'
-    'poster actions';
+    'actions actions';
   align-items: start;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-lg);
   background: var(--color-canopy);
+
+  @media (max-width: 30rem) {
+    grid-template-columns: 3rem minmax(0, 1fr);
+  }
 }
 
 .poster {
@@ -18,10 +24,11 @@
   place-items: center;
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--color-moss);
   color: var(--color-lichen);
   font-family: var(--font-display);
+  box-shadow: var(--shadow-poster);
 
   img {
     width: 100%;
@@ -33,44 +40,42 @@
 .text {
   grid-area: text;
   display: grid;
-  gap: var(--space-0);
+  gap: var(--space-1);
   min-width: 0;
 }
 
 .title {
   font-family: var(--font-display);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-lg);
   line-height: var(--line-tight);
   overflow-wrap: break-word;
 }
 
 .reason {
-  color: var(--color-lichen);
+  color: var(--color-birch);
   font-size: var(--font-size-sm);
   line-height: var(--line-body);
   overflow-wrap: anywhere;
 }
 
 .error {
-  padding: var(--space-2) var(--space-3);
-  border-left: 2px solid var(--color-leaf-bright);
-  background: var(--color-night);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
   font-size: var(--font-size-sm);
+
+  svg {
+    color: var(--color-leaf-bright);
+  }
 }
 
 .actions {
   grid-area: actions;
   display: grid;
   grid-auto-flow: column;
-  justify-content: start;
+  justify-content: end;
   gap: var(--space-1);
-}
-
-@media (max-width: 30rem) {
-  .card {
-    grid-template-columns: 3rem minmax(0, 1fr);
-    grid-template-areas:
-      'poster text'
-      'actions actions';
-  }
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line-faint);
 }

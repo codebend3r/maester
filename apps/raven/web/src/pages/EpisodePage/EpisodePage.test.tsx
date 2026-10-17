@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ItemDetails } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
@@ -7,7 +7,7 @@ import { api } from '@/lib/api'
 import { EpisodePage } from '@/pages/EpisodePage/EpisodePage'
 import { library, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
-import { EPISODE_TWO, episodeDetails } from '@/test/tv'
+import { EPISODE_ONE, EPISODE_TWO, SEASON_ONE, SEVERANCE, episodeDetails } from '@/test/tv'
 
 describe('EpisodePage', () => {
   const spies = {
@@ -61,6 +61,37 @@ describe('EpisodePage', () => {
       'href',
       '/shows/4/seasons/1',
     )
+  })
+
+  it('says how much is left of an episode started, and draws the line of it', async () => {
+    open()
+    expect(await screen.findByText('45m left')).toBeInTheDocument()
+  })
+
+  it('leads to the episodes either side in its season, in the same library', async () => {
+    spies.libraries.mockImplementation(async () => [library({ id: 2, name: 'TV' })])
+    spies.tracks.mockImplementation(async () => ({
+      audio: [],
+      subtitles: [],
+      defaultAudio: null,
+      frameRate: null,
+    }))
+    spies.item.mockImplementation(async (id) => {
+      if (id === 4) return SEVERANCE
+      if (id === 5) return SEASON_ONE
+      return id === 6 ? episodeDetails(EPISODE_ONE) : episodeDetails(EPISODE_TWO)
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="episodes/:id" element={<EpisodePage />} />
+      </Routes>,
+      { route: '/episodes/7' },
+    )
+    const either = await screen.findByRole('navigation', { name: 'Episodes either side' })
+    const previous = within(either).getByRole('link', { name: 'Previous: Good News About Hell' })
+    expect(previous).toHaveAttribute('href', `/episodes/6?library=${EPISODE_TWO.libraryId}`)
+    expect(within(previous).getByText('S01E01')).toBeInTheDocument()
+    expect(within(either).queryByRole('link', { name: /^Next/ })).toBeNull()
   })
 
   it('plays from its still', async () => {

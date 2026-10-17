@@ -1,6 +1,6 @@
 import styles from '@/components/TmdbCredit/TmdbCredit.module.scss'
 
-/** TMDB's attribution, which every page showing its data carries at its foot. */
+/** TMDB's attribution, which every page showing its data carries at its foot, in a quiet line. */
 export const TmdbCredit = () => (
   <footer className={styles.credit}>
     <a href="https://www.themoviedb.org/" className={styles.logo} rel="noreferrer" target="_blank">

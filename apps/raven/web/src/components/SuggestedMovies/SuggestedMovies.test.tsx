@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SuggestedMovies, suggestedMoviesOf } from '@/components/SuggestedMovies/SuggestedMovies'
 import { api } from '@/lib/api'
@@ -113,6 +113,13 @@ describe('SuggestedMovies', () => {
       }),
     )
     expect(spies.setMatch).toHaveBeenCalledWith({ mediaId: 1, tmdbId: '201000' })
+  })
+
+  it('counts the suggestions beside its heading', () => {
+    renderWithProviders(<SuggestedMovies files={FILES} libraryId={2} />)
+    const section = screen.getByRole('region', { name: 'Suggested by AI' })
+    expect(within(section).getByRole('heading', { level: 2 })).toHaveTextContent('Suggested by AI')
+    expect(within(section).getByText('3 suggestions')).toBeInTheDocument()
   })
 
   it('makes a card for each movie of a folder that holds two, labelled by its file', () => {
