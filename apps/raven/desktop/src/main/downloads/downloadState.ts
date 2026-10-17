@@ -10,16 +10,18 @@ import {
   oneOf,
 } from '@raven/core'
 import {
+  isContainerName,
   isDownloadGroup,
   isDownloadStatus,
   isOpaqueId,
+  isSidecarTrackId,
   type DownloadStatus,
 } from '@/shared/protocol'
 
 export const DOWNLOADS_FILE = 'downloads.json'
 
 /** A subtitle file kept beside the video: `trackId` is the server's `external-<n>`. */
-export const isSidecar = object({ trackId: isString, title: isString, language: isString })
+export const isSidecar = object({ trackId: isSidecarTrackId, title: isString, language: isString })
 
 /** What the server has not heard yet: a play to record, and the last position to report. */
 export const isPending = object({ play: isBoolean, position: nullable(isNumber), at: isNumber })
@@ -30,7 +32,7 @@ export const isDownloadEntry = object({
   mediaId: isMediaId,
   label: isString,
   group: isDownloadGroup,
-  container: isString,
+  container: isContainerName,
   size: isNumber,
   duration: nullable(isNumber),
   watchedPercent: isNumber,
@@ -273,6 +275,7 @@ export const noteWatched = (
     },
   })
 
+/** `play` is sticky: a position report must not erase a play the server has not heard. */
 export const notePending = (
   state: DownloadsState,
   {
@@ -284,7 +287,10 @@ export const notePending = (
 ): DownloadsState =>
   changeEntry(state, {
     downloadId,
-    change: (entry) => ({ ...entry, pending: { play, position, at } }),
+    change: (entry) => ({
+      ...entry,
+      pending: { play: entry.pending.play || play, position, at },
+    }),
   })
 
 /** Clears what a sync sent; a position saved during the call differs from `sentPosition` and stays. */
@@ -302,7 +308,7 @@ export const clearPending = (
   })
 
 const groupKey = (entry: DownloadEntry): string =>
-  JSON.stringify([entry.serverId, entry.group.title])
+  JSON.stringify([entry.serverId, entry.group.kind, entry.group.title])
 
 /**
  * Newest group first, by the newest `createdAt` among its rows, with a group's rows together

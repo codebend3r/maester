@@ -76,6 +76,17 @@ describe('the guards', () => {
     expect(isDownloadsState({ ...EMPTY_DOWNLOADS, version: 2 })).toBe(false)
   })
 
+  it('refuses a container or a track id that is not a safe path segment', () => {
+    expect(isDownloadEntry(entry({ container: '../x' }))).toBe(false)
+    expect(isDownloadEntry(entry({ container: 'MKV' }))).toBe(false)
+    expect(isDownloadEntry(entry({ container: 'mkv' }))).toBe(true)
+    const withTrack = (trackId: string) =>
+      entry({ sidecars: [{ trackId, title: 'English', language: 'en' }] })
+    expect(isDownloadEntry(withTrack('embedded-0'))).toBe(false)
+    expect(isDownloadEntry(withTrack('external-../x'))).toBe(false)
+    expect(isDownloadEntry(withTrack('external-2'))).toBe(true)
+  })
+
   it('refuses a download id that is not opaque', () => {
     expect(isDownloadEntry(entry({ downloadId: 'one' }))).toBe(false)
   })
@@ -324,6 +335,17 @@ describe('pending', () => {
     expect(next.entries[0]?.pending).toEqual({ play: true, position: 42, at: 9 })
   })
 
+  it('notePending keeps a play the server has not heard when a position report follows', () => {
+    const played = notePending(stateOf(entry()), {
+      downloadId: ID,
+      play: true,
+      position: 10,
+      at: 1,
+    })
+    const next = notePending(played, { downloadId: ID, play: false, position: 20, at: 2 })
+    expect(next.entries[0]?.pending).toEqual({ play: true, position: 20, at: 2 })
+  })
+
   it('clearPending clears the play and the position it sent', () => {
     const state = stateOf(entry({ pending: { play: true, position: 42, at: 9 } }))
     const next = clearPending(state, { downloadId: ID, sentPosition: 42 })
@@ -389,6 +411,18 @@ describe('sortDownloads', () => {
       }),
       row(3, 'Show', 2, 20),
     ]
+    expect(sortDownloads(rows).map((each) => each.mediaId)).toEqual([2, 1, 3])
+  })
+
+  it('keeps a movie and a saga of the same title on one server apart', () => {
+    const of = (n: number, kind: 'movie' | 'saga', order: number, createdAt: number) =>
+      entry({
+        downloadId: id(n),
+        mediaId: n,
+        group: { kind, title: 'Dune', order },
+        createdAt,
+      })
+    const rows = [of(1, 'movie', 0, 10), of(2, 'saga', 1, 30), of(3, 'movie', 2, 20)]
     expect(sortDownloads(rows).map((each) => each.mediaId)).toEqual([2, 1, 3])
   })
 
