@@ -129,7 +129,10 @@ export const createJsonStore = <T>({
     read: () => value,
     isDirty: () => savedVersion !== version,
     update: (change) => {
-      value = change(value)
+      const next = change(value)
+      // A change that kept the same value has nothing to write.
+      if (next === value) return
+      value = next
       version += 1
       cancelTimer()
       timer = timers.set(() => {
