@@ -2,6 +2,7 @@ import { relative, sep } from 'node:path'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   entryById,
+  forgetServerPosition,
   notePending,
   noteWatched,
   sameGroup,
@@ -54,6 +55,11 @@ export type DownloadPlayback = {
   fromLabelOf: (input: { path: string }) => string | null
   /** The title of the download whose video is at `path`, else null. */
   labelOf: (input: { path: string }) => string | null
+  /**
+   * Where the server had a granted download when it was confirmed, for a file with no local
+   * resume spot; 0 once a position was noted here, and for any other file.
+   */
+  serverPositionOf: (input: { fileId: string }) => number
   /** The page opened a granted file: the next position noted for a download's video is a play. */
   noteOpened: (input: { fileId: string }) => void
   /** A position saved for a granted file; for a download's video, what the server will hear. */
@@ -194,12 +200,15 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     freshFiles.delete(fileId)
     const at = deps.now()
     deps.change((state) =>
-      noteWatched(notePending(state, { downloadId, play: isPlay, position, at }), {
-        downloadId,
-        position,
-        duration,
-        at,
-      }),
+      noteWatched(
+        notePending(forgetServerPosition(state, { downloadId }), {
+          downloadId,
+          play: isPlay,
+          position,
+          at,
+        }),
+        { downloadId, position, duration, at },
+      ),
     )
     deps.onNoted({ downloadId })
   }
@@ -255,6 +264,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     sidecarsOf,
     fromLabelOf,
     labelOf: ({ path }) => entryAt(path)?.label ?? null,
+    serverPositionOf: ({ fileId }) => entryOfFile(fileId)?.serverPosition ?? 0,
     noteOpened,
     notePosition,
     notePlaying,

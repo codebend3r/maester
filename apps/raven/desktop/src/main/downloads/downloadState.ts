@@ -65,6 +65,11 @@ export const isDownloadEntry = object({
   status: isEntryStatus,
   autoDelete: isBoolean,
   watchedAt: nullable(isNumber),
+  /**
+   * Where the server had playback when the download was confirmed, so a title streamed partway
+   * opens there; 0 once a position is noted here, after which the local resume spot decides.
+   */
+  serverPosition: isNumber,
   pending: isPending,
   createdAt: isNumber,
 })
@@ -346,6 +351,16 @@ export const noteWatched = (
       if (entry.watchedAt !== null || total === null || total <= 0) return entry
       return position / total >= entry.watchedPercent / 100 ? { ...entry, watchedAt: at } : entry
     },
+  })
+
+/** A position was noted here, so the server's resume spot no longer says where the file starts. */
+export const forgetServerPosition = (
+  state: DownloadsState,
+  { downloadId }: { downloadId: string },
+): DownloadsState =>
+  changeEntry(state, {
+    downloadId,
+    change: (entry) => (entry.serverPosition === 0 ? entry : { ...entry, serverPosition: 0 }),
   })
 
 /**

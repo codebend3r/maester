@@ -10,6 +10,7 @@ import {
   entryByMedia,
   fail,
   finish,
+  forgetServerPosition,
   isDownloadEntry,
   isDownloadsState,
   isWaitingOnOutage,
@@ -51,6 +52,7 @@ const entry = (overrides: Partial<DownloadEntry> = {}): DownloadEntry => ({
   status: { kind: 'queued' },
   autoDelete: false,
   watchedAt: null,
+  serverPosition: 0,
   pending: NO_PENDING,
   createdAt: 100,
   ...overrides,
@@ -538,6 +540,18 @@ describe('pending', () => {
   })
 })
 
+describe('forgetServerPosition', () => {
+  it("drops the server's resume spot once a position is noted here", () => {
+    const next = forgetServerPosition(stateOf(entry({ serverPosition: 4200 })), { downloadId: ID })
+    expect(next.entries[0]?.serverPosition).toBe(0)
+  })
+
+  it('returns the same state when there is none', () => {
+    const state = stateOf(entry())
+    expect(forgetServerPosition(state, { downloadId: ID })).toBe(state)
+  })
+})
+
 describe('bytesOf', () => {
   it('is the size when ready, else the status bytes, else 0', () => {
     expect(bytesOf(entry({ status: { kind: 'ready' } }))).toBe(1000)
@@ -677,6 +691,7 @@ describe('an unknown download id', () => {
       'notePending',
       () => notePending(state, { downloadId: unknown, play: true, position: 1, at: 1 }),
     ],
+    ['forgetServerPosition', () => forgetServerPosition(state, { downloadId: unknown })],
     [
       'clearPending',
       () =>

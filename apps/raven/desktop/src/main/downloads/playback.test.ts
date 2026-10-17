@@ -57,6 +57,7 @@ const entryFor = (overrides: Partial<DownloadEntry>): DownloadEntry => ({
   status: { kind: 'ready' },
   autoDelete: false,
   watchedAt: null,
+  serverPosition: 0,
   pending: NO_PENDING,
   createdAt: NOW - 1000,
   ...overrides,
@@ -478,6 +479,34 @@ describe('notePosition', () => {
       furthest: 100,
       at: NOW,
     })
+  })
+})
+
+describe('where a download starts', () => {
+  it("answers the server's resume spot for a download, and 0 for any other file", async () => {
+    const world = setup({
+      entries: [entryFor({ serverPosition: 4200 })],
+      videos: { [VIDEO]: FILE, [MOVIE_PATH]: FILE },
+    })
+    expect(world.playback.serverPositionOf({ fileId: await opened(world) })).toBe(4200)
+    expect(world.playback.serverPositionOf({ fileId: await granted(world, MOVIE_PATH) })).toBe(0)
+    expect(world.playback.serverPositionOf({ fileId: UNKNOWN_ID })).toBe(0)
+  })
+
+  it('forgets it once a position is noted, so only the local spot decides from then on', async () => {
+    const world = setup({
+      entries: [entryFor({ serverPosition: 4200 })],
+      videos: { [VIDEO]: FILE },
+    })
+    const fileId = await opened(world)
+    world.playback.notePosition({ fileId, position: 100, duration: 3000 })
+    expect(world.playback.serverPositionOf({ fileId })).toBe(0)
+    expect(entryOf(world)?.serverPosition).toBe(0)
+  })
+
+  it('answers 0 for a download the server had no spot for', async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE } })
+    expect(world.playback.serverPositionOf({ fileId: await opened(world) })).toBe(0)
   })
 })
 

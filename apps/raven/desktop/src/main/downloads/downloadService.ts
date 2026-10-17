@@ -66,6 +66,7 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     | 'sidecarsOf'
     | 'fromLabelOf'
     | 'labelOf'
+    | 'serverPositionOf'
     | 'noteOpened'
     | 'notePosition'
     | 'notePlaying'
@@ -385,6 +386,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     sidecarsOf: playback.sidecarsOf,
     fromLabelOf: playback.fromLabelOf,
     labelOf: playback.labelOf,
+    serverPositionOf: playback.serverPositionOf,
     noteOpened: playback.noteOpened,
     notePosition: playback.notePosition,
     notePlaying: playback.notePlaying,
