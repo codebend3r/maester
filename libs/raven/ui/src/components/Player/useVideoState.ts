@@ -15,17 +15,30 @@ export type VideoState = {
   rate: number
 }
 
+export const VIDEO_EVENTS = {
+  moved: 'moved',
+  sought: 'sought',
+  buffered: 'buffered',
+  duration: 'duration',
+  ended: 'ended',
+  played: 'played',
+  paused: 'paused',
+  waiting: 'waiting',
+  flowing: 'flowing',
+  rate: 'rate',
+} as const
+
 export type VideoEvent =
-  | { type: 'moved'; time: number; buffered: Ranges }
-  | { type: 'sought'; time: number }
-  | { type: 'buffered'; buffered: Ranges }
-  | { type: 'duration'; duration: number | null }
-  | { type: 'ended' }
-  | { type: 'played' }
-  | { type: 'paused' }
-  | { type: 'waiting' }
-  | { type: 'flowing' }
-  | { type: 'rate'; rate: number }
+  | { type: typeof VIDEO_EVENTS.moved; time: number; buffered: Ranges }
+  | { type: typeof VIDEO_EVENTS.sought; time: number }
+  | { type: typeof VIDEO_EVENTS.buffered; buffered: Ranges }
+  | { type: typeof VIDEO_EVENTS.duration; duration: number | null }
+  | { type: typeof VIDEO_EVENTS.ended }
+  | { type: typeof VIDEO_EVENTS.played }
+  | { type: typeof VIDEO_EVENTS.paused }
+  | { type: typeof VIDEO_EVENTS.waiting }
+  | { type: typeof VIDEO_EVENTS.flowing }
+  | { type: typeof VIDEO_EVENTS.rate; rate: number }
 
 export const initialVideoState = (startAt: number): VideoState => ({
   time: startAt,
@@ -39,25 +52,25 @@ export const initialVideoState = (startAt: number): VideoState => ({
 
 export const videoReducer = (state: VideoState, event: VideoEvent): VideoState => {
   switch (event.type) {
-    case 'moved':
+    case VIDEO_EVENTS.moved:
       return { ...state, time: event.time, buffered: event.buffered }
-    case 'sought':
+    case VIDEO_EVENTS.sought:
       return { ...state, time: event.time, ended: false }
-    case 'buffered':
+    case VIDEO_EVENTS.buffered:
       return { ...state, buffered: event.buffered }
-    case 'duration':
+    case VIDEO_EVENTS.duration:
       return { ...state, elementDuration: event.duration }
-    case 'ended':
+    case VIDEO_EVENTS.ended:
       return { ...state, ended: true }
-    case 'played':
+    case VIDEO_EVENTS.played:
       return { ...state, paused: false, ended: false }
-    case 'paused':
+    case VIDEO_EVENTS.paused:
       return { ...state, paused: true }
-    case 'waiting':
+    case VIDEO_EVENTS.waiting:
       return { ...state, waiting: true }
-    case 'flowing':
+    case VIDEO_EVENTS.flowing:
       return { ...state, waiting: false }
-    case 'rate':
+    case VIDEO_EVENTS.rate:
       return { ...state, rate: event.rate }
     default: {
       const unknown: never = event
@@ -107,7 +120,7 @@ export const useVideoState = ({
     if (element.readyState < HTMLMediaElement.HAVE_METADATA) return
     position.current = fileTime()
     dispatch({
-      type: 'moved',
+      type: VIDEO_EVENTS.moved,
       time: position.current,
       buffered: bufferedRanges({ element, shift }),
     })
@@ -119,35 +132,38 @@ export const useVideoState = ({
       timeupdate: moved,
       seeked: moved,
       progress: (element) =>
-        dispatch({ type: 'buffered', buffered: bufferedRanges({ element, shift }) }),
+        dispatch({ type: VIDEO_EVENTS.buffered, buffered: bufferedRanges({ element, shift }) }),
       durationchange: (element) => {
         const total = element.duration - shift
-        dispatch({ type: 'duration', duration: Number.isFinite(total) && total > 0 ? total : null })
+        dispatch({
+          type: VIDEO_EVENTS.duration,
+          duration: Number.isFinite(total) && total > 0 ? total : null,
+        })
       },
       play: () => {
         // Play is intent; only playing confirms frames for progress and history.
         playing.current = true
-        dispatch({ type: 'waiting' })
-        dispatch({ type: 'played' })
+        dispatch({ type: VIDEO_EVENTS.waiting })
+        dispatch({ type: VIDEO_EVENTS.played })
       },
       playing: () => {
         playing.current = true
-        dispatch({ type: 'played' })
-        dispatch({ type: 'flowing' })
+        dispatch({ type: VIDEO_EVENTS.played })
+        dispatch({ type: VIDEO_EVENTS.flowing })
       },
       ended: () => {
         position.current = fileTime()
-        dispatch({ type: 'ended' })
+        dispatch({ type: VIDEO_EVENTS.ended })
       },
-      waiting: () => dispatch({ type: 'waiting' }),
+      waiting: () => dispatch({ type: VIDEO_EVENTS.waiting }),
       pause: (element) => {
         // Letting go of a source on the way to another pauses too; that is not the viewer.
         if (element.readyState === HTMLMediaElement.HAVE_NOTHING) return
         position.current = fileTime()
         playing.current = false
-        dispatch({ type: 'paused' })
+        dispatch({ type: VIDEO_EVENTS.paused })
       },
-      ratechange: (element) => dispatch({ type: 'rate', rate: element.playbackRate }),
+      ratechange: (element) => dispatch({ type: VIDEO_EVENTS.rate, rate: element.playbackRate }),
     },
   })
 
@@ -158,7 +174,7 @@ export const useVideoState = ({
     const to = clamp({ value: target, min: 0, max: Math.max(0, (duration ?? Infinity) - 0.5) })
     element.currentTime = to + shift
     position.current = to
-    dispatch({ type: 'sought', time: to })
+    dispatch({ type: VIDEO_EVENTS.sought, time: to })
   }
 
   return {
@@ -169,6 +185,6 @@ export const useVideoState = ({
     fileTime,
     seek,
     /** The browser refused to start playing. */
-    refused: () => dispatch({ type: 'paused' }),
+    refused: () => dispatch({ type: VIDEO_EVENTS.paused }),
   }
 }

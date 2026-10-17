@@ -2,6 +2,7 @@ import {
   type ApiClient,
   type MediaItem,
   type MediaTracks,
+  PLAYBACK_MODES,
   type PlaybackMode,
   type StreamMode,
   type VideoRange,
@@ -137,7 +138,10 @@ const Conversion = ({ file: { media, api }, mode }: { file: PlaybackFile; mode: 
       facts={[
         {
           term: 'Video codec',
-          value: mode === 'remux' ? `${codecLabel(media.videoCodec)}, copied as it is` : transcoded,
+          value:
+            mode === PLAYBACK_MODES.remux
+              ? `${codecLabel(media.videoCodec)}, copied as it is`
+              : transcoded,
         },
         // Every converted stream's audio is stereo AAC.
         { term: 'Audio codec', value: media.audioCodec == null ? null : 'AAC stereo, re-encoded' },
@@ -254,7 +258,10 @@ export const PlaybackInfo = ({
               { term: 'Method', value: METHODS[mode] },
               {
                 term: 'Delivery',
-                value: mode === 'direct' ? 'The file as it is' : 'Fragmented MP4 through MSE',
+                value:
+                  mode === PLAYBACK_MODES.direct
+                    ? 'The file as it is'
+                    : 'Fragmented MP4 through MSE',
               },
             ]}
           />
@@ -271,7 +278,7 @@ export const PlaybackInfo = ({
               },
             ]}
           />
-          {file != null && mode !== 'direct' && <Conversion file={file} mode={mode} />}
+          {file != null && mode !== PLAYBACK_MODES.direct && <Conversion file={file} mode={mode} />}
           {file != null && <OriginalFile file={file} tracks={tracks} audio={audio} />}
         </div>
       </dialog>

@@ -1,5 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 
+const LOCATION_KEYS = { default: 'default' } as const
+
 /**
  * Leaves the player as the browser's own Back would, for the page that
  * opened it, which comes back scrolled where it was. A player opened
@@ -9,6 +11,6 @@ import { useLocation, useNavigate } from 'react-router-dom'
  */
 export const useLeave = (fallback: string): (() => void) => {
   const navigate = useNavigate()
-  const isFirstEntry = useLocation().key === 'default'
+  const isFirstEntry = useLocation().key === LOCATION_KEYS.default
   return () => void (isFirstEntry ? navigate(fallback) : navigate(-1))
 }

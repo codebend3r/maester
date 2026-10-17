@@ -1,19 +1,43 @@
+import { KEYS } from '@/lib/keyboard'
+
+export const PLAYER_ACTIONS = {
+  togglePlay: 'togglePlay',
+  seekBy: 'seekBy',
+  seekToFraction: 'seekToFraction',
+  seekToEdge: 'seekToEdge',
+  volumeBy: 'volumeBy',
+  toggleMute: 'toggleMute',
+  toggleFullscreen: 'toggleFullscreen',
+  toggleSubtitles: 'toggleSubtitles',
+  stepFrame: 'stepFrame',
+  stepSpeed: 'stepSpeed',
+  stepCaptionSize: 'stepCaptionSize',
+  toggleStats: 'toggleStats',
+  showShortcuts: 'showShortcuts',
+  escape: 'escape',
+} as const
+
+/** Where Home and End seek to. */
+export const SEEK_EDGES = { start: 'start', end: 'end' } as const
+
+type SeekEdge = (typeof SEEK_EDGES)[keyof typeof SEEK_EDGES]
+
 /** Something the player does in answer to a key. */
 export type PlayerAction =
-  | { type: 'togglePlay' }
-  | { type: 'seekBy'; seconds: number }
-  | { type: 'seekToFraction'; fraction: number }
-  | { type: 'seekToEdge'; edge: 'start' | 'end' }
-  | { type: 'volumeBy'; delta: number }
-  | { type: 'toggleMute' }
-  | { type: 'toggleFullscreen' }
-  | { type: 'toggleSubtitles' }
-  | { type: 'stepFrame'; direction: 1 | -1 }
-  | { type: 'stepSpeed'; direction: 1 | -1 }
-  | { type: 'stepCaptionSize'; direction: 1 | -1 }
-  | { type: 'toggleStats' }
-  | { type: 'showShortcuts' }
-  | { type: 'escape' }
+  | { type: typeof PLAYER_ACTIONS.togglePlay }
+  | { type: typeof PLAYER_ACTIONS.seekBy; seconds: number }
+  | { type: typeof PLAYER_ACTIONS.seekToFraction; fraction: number }
+  | { type: typeof PLAYER_ACTIONS.seekToEdge; edge: SeekEdge }
+  | { type: typeof PLAYER_ACTIONS.volumeBy; delta: number }
+  | { type: typeof PLAYER_ACTIONS.toggleMute }
+  | { type: typeof PLAYER_ACTIONS.toggleFullscreen }
+  | { type: typeof PLAYER_ACTIONS.toggleSubtitles }
+  | { type: typeof PLAYER_ACTIONS.stepFrame; direction: 1 | -1 }
+  | { type: typeof PLAYER_ACTIONS.stepSpeed; direction: 1 | -1 }
+  | { type: typeof PLAYER_ACTIONS.stepCaptionSize; direction: 1 | -1 }
+  | { type: typeof PLAYER_ACTIONS.toggleStats }
+  | { type: typeof PLAYER_ACTIONS.showShortcuts }
+  | { type: typeof PLAYER_ACTIONS.escape }
 
 export type KeyPress = {
   key: string
@@ -23,30 +47,30 @@ export type KeyPress = {
 }
 
 const FIXED: Record<string, PlayerAction> = {
-  k: { type: 'togglePlay' },
-  ' ': { type: 'togglePlay' },
-  j: { type: 'seekBy', seconds: -10 },
-  l: { type: 'seekBy', seconds: 10 },
-  ArrowLeft: { type: 'seekBy', seconds: -5 },
-  ArrowRight: { type: 'seekBy', seconds: 5 },
-  ArrowUp: { type: 'volumeBy', delta: 0.05 },
-  ArrowDown: { type: 'volumeBy', delta: -0.05 },
-  m: { type: 'toggleMute' },
-  f: { type: 'toggleFullscreen' },
-  c: { type: 'toggleSubtitles' },
-  i: { type: 'toggleStats' },
-  Home: { type: 'seekToEdge', edge: 'start' },
-  End: { type: 'seekToEdge', edge: 'end' },
-  ',': { type: 'stepFrame', direction: -1 },
-  '.': { type: 'stepFrame', direction: 1 },
-  '<': { type: 'stepSpeed', direction: -1 },
-  '>': { type: 'stepSpeed', direction: 1 },
-  '+': { type: 'stepCaptionSize', direction: 1 },
-  '=': { type: 'stepCaptionSize', direction: 1 },
-  '-': { type: 'stepCaptionSize', direction: -1 },
-  _: { type: 'stepCaptionSize', direction: -1 },
-  '?': { type: 'showShortcuts' },
-  Escape: { type: 'escape' },
+  k: { type: PLAYER_ACTIONS.togglePlay },
+  [KEYS.space]: { type: PLAYER_ACTIONS.togglePlay },
+  j: { type: PLAYER_ACTIONS.seekBy, seconds: -10 },
+  l: { type: PLAYER_ACTIONS.seekBy, seconds: 10 },
+  ArrowLeft: { type: PLAYER_ACTIONS.seekBy, seconds: -5 },
+  ArrowRight: { type: PLAYER_ACTIONS.seekBy, seconds: 5 },
+  ArrowUp: { type: PLAYER_ACTIONS.volumeBy, delta: 0.05 },
+  ArrowDown: { type: PLAYER_ACTIONS.volumeBy, delta: -0.05 },
+  m: { type: PLAYER_ACTIONS.toggleMute },
+  f: { type: PLAYER_ACTIONS.toggleFullscreen },
+  c: { type: PLAYER_ACTIONS.toggleSubtitles },
+  i: { type: PLAYER_ACTIONS.toggleStats },
+  Home: { type: PLAYER_ACTIONS.seekToEdge, edge: SEEK_EDGES.start },
+  End: { type: PLAYER_ACTIONS.seekToEdge, edge: SEEK_EDGES.end },
+  ',': { type: PLAYER_ACTIONS.stepFrame, direction: -1 },
+  '.': { type: PLAYER_ACTIONS.stepFrame, direction: 1 },
+  '<': { type: PLAYER_ACTIONS.stepSpeed, direction: -1 },
+  '>': { type: PLAYER_ACTIONS.stepSpeed, direction: 1 },
+  '+': { type: PLAYER_ACTIONS.stepCaptionSize, direction: 1 },
+  '=': { type: PLAYER_ACTIONS.stepCaptionSize, direction: 1 },
+  '-': { type: PLAYER_ACTIONS.stepCaptionSize, direction: -1 },
+  _: { type: PLAYER_ACTIONS.stepCaptionSize, direction: -1 },
+  '?': { type: PLAYER_ACTIONS.showShortcuts },
+  Escape: { type: PLAYER_ACTIONS.escape },
 }
 
 /**
@@ -57,7 +81,8 @@ const FIXED: Record<string, PlayerAction> = {
  */
 export const shortcutFor = ({ key, metaKey, ctrlKey, altKey }: KeyPress): PlayerAction | null => {
   if (metaKey || ctrlKey || altKey) return null
-  if (/^[0-9]$/.test(key)) return { type: 'seekToFraction', fraction: Number(key) / 10 }
+  if (/^[0-9]$/.test(key))
+    return { type: PLAYER_ACTIONS.seekToFraction, fraction: Number(key) / 10 }
   const named = key.length === 1 ? key.toLowerCase() : key
   return FIXED[named] ?? null
 }

@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { type Engine, type HtmlSource, sourceKey } from '@/components/Player/engine'
+import { PLAYER_SOURCE_KINDS } from '@raven/core'
+import { ENGINE_KINDS, type Engine, type HtmlSource, sourceKey } from '@/components/Player/engine'
 import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
 import { NativeStage } from '@/components/Player/NativeStage'
 import { Stage } from '@/components/Player/Stage'
 import { Unplayable } from '@/components/Player/Unplayable'
 import { useLeave } from '@/components/Player/useLeave'
-import { usePlaybackLadder } from '@/components/Player/usePlaybackLadder'
+import { PLAYBACK_STATUSES, usePlaybackLadder } from '@/components/Player/usePlaybackLadder'
 import { type TrackSelection, useTrackSelection } from '@/components/Player/useTrackSelection'
 
 const Waiting = () => (
@@ -31,9 +32,9 @@ export const Player = ({ engine }: { engine: Engine }) => {
   const { title } = useHostServices()
   const leave = useLeave(title.backTo)
   switch (engine.kind) {
-    case 'html':
+    case ENGINE_KINDS.html:
       return <HtmlView engine={engine} onBack={leave} />
-    case 'native':
+    case ENGINE_KINDS.native:
       return <NativeView engine={engine} onBack={leave} />
     default: {
       const unknown: never = engine
@@ -72,9 +73,9 @@ const HtmlView = ({
 }) => {
   const source = engine.source
   switch (source.kind) {
-    case 'server':
+    case PLAYER_SOURCE_KINDS.server:
       return <ServerPlayer source={source} onBack={onBack} />
-    case 'file':
+    case PLAYER_SOURCE_KINDS.file:
       return <FilePlayer source={source} onBack={onBack} />
     default: {
       const unknown: never = source
@@ -120,13 +121,13 @@ const ServerPlayer = ({
     isDefaultAudio: selection.isDefaultAudio,
   })
   switch (playback.status) {
-    case 'waiting':
+    case PLAYBACK_STATUSES.waiting:
       return <Waiting />
-    case 'unplayable':
+    case PLAYBACK_STATUSES.unplayable:
       return (
         <Unplayable onBack={onBack} problems={playback.problems} onTryAnyway={playback.tryAnyway} />
       )
-    case 'playing':
+    case PLAYBACK_STATUSES.playing:
       if (selection.isWaitingForTracks) return <Waiting />
       return (
         <Stage

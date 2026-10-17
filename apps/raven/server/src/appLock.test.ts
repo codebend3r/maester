@@ -1,3 +1,4 @@
+import { HEADERS } from '@shared/server'
 import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -12,6 +13,7 @@ import {
   viewsFor,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { AUDIENCES } from '@/admin/adminGuard'
 import { createApp } from '@/app'
 import { CONTROLLERS } from '@/appModule'
 import { LOCKED_SCAN_ERROR } from '@/libraries/librariesController'
@@ -226,7 +228,7 @@ describe('a library locked behind the PIN', () => {
     await expect(api().unlock('1234')).rejects.toMatchObject({ status: 401 })
     const { response, cookie } = await unlock('3001')
     expect(response.statusCode).toBe(200)
-    expect(response.headers['set-cookie']).toContain('HttpOnly')
+    expect(response.headers[HEADERS.setCookie]).toContain('HttpOnly')
     await expect(api(cookie).listMedia({ libraryId: state.private })).resolves.toHaveLength(1)
     expect(await api(cookie).getLock()).toEqual({ available: true, unlocked: true })
 
@@ -238,7 +240,7 @@ describe('a library locked behind the PIN', () => {
 
     // The cookie that forgets the session is only in the response's headers.
     const locked = await app().inject({ method: 'POST', url: '/api/lock/lock' })
-    expect(locked.headers['set-cookie']).toContain('Max-Age=0')
+    expect(locked.headers[HEADERS.setCookie]).toContain('Max-Age=0')
     await expect(
       api('raven_unlock=1.forged').listMedia({ libraryId: state.private }),
     ).rejects.toMatchObject({ status: 423 })
@@ -562,7 +564,7 @@ describe('the admin lock', () => {
     })
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({ state: 'off' })
-    expect(response.headers['set-cookie']).toContain('HttpOnly')
+    expect(response.headers[HEADERS.setCookie]).toContain('HttpOnly')
     expect(
       await status(api('raven_admin=99999999999999..forged').getMediaLocation(state.openVideo)),
     ).toBe(403)

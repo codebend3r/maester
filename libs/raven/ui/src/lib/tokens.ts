@@ -1,4 +1,14 @@
-export type TokenGroup = 'colour' | 'space' | 'radius' | 'font' | 'font-size' | 'line' | 'other'
+export const TOKEN_GROUPS = {
+  colour: 'colour',
+  space: 'space',
+  radius: 'radius',
+  font: 'font',
+  fontSize: 'font-size',
+  line: 'line',
+  other: 'other',
+} as const
+
+export type TokenGroup = (typeof TOKEN_GROUPS)[keyof typeof TOKEN_GROUPS]
 
 /** One custom property declared on :root, and the comment written above it. */
 export type DesignToken = {
@@ -10,16 +20,16 @@ export type DesignToken = {
 
 /** Longest prefix first, so `--font-size-` is not read as `--font-`. */
 const GROUPS: ReadonlyArray<[string, TokenGroup]> = [
-  ['--color-', 'colour'],
-  ['--space-', 'space'],
-  ['--radius-', 'radius'],
-  ['--font-size-', 'font-size'],
-  ['--font-', 'font'],
-  ['--line-', 'line'],
+  ['--color-', TOKEN_GROUPS.colour],
+  ['--space-', TOKEN_GROUPS.space],
+  ['--radius-', TOKEN_GROUPS.radius],
+  ['--font-size-', TOKEN_GROUPS.fontSize],
+  ['--font-', TOKEN_GROUPS.font],
+  ['--line-', TOKEN_GROUPS.line],
 ]
 
 const groupOf = (name: string): TokenGroup =>
-  GROUPS.find(([prefix]) => name.startsWith(prefix))?.[1] ?? 'other'
+  GROUPS.find(([prefix]) => name.startsWith(prefix))?.[1] ?? TOKEN_GROUPS.other
 
 const DECLARATION = /^(--[\w-]+):\s*(.+);$/
 const COMMENT = /^\/\/\s?(.*)$/

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { type ApiClient, type MediaItem, parseServerEvent } from '@raven/core'
+import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { MetadataService } from '@/metadata/metadataService'
@@ -110,7 +111,7 @@ describe('refreshing a library as its folders change', () => {
     const response = await fetch(`${await app().getUrl()}${api().eventsUrl()}`, {
       signal: abort.signal,
     })
-    expect(response.headers.get('content-type')).toContain('text/event-stream')
+    expect(response.headers.get(HEADERS.contentType)).toContain(CONTENT_TYPES.eventStream)
     const reader = response.body?.getReader()
     await copyFile(at('Heat (1995) 1080p.mp4'), at('Heat (1995) copy.mp4'))
     const read = async (text: string): Promise<string> => {

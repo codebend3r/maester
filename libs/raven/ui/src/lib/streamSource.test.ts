@@ -204,10 +204,12 @@ describe('createStreamSession', () => {
   it('streams from the start point onto the shifted clock and ends the stream', async () => {
     const video = fakeVideo()
     const { environment, bufferState, sourceState, fetched } = setup({
-      'from-120': [
-        [119, 121],
-        [121, 123],
-      ],
+      streams: {
+        'from-120': [
+          [119, 121],
+          [121, 123],
+        ],
+      },
     })
     const errors: string[] = []
     createStreamSession({
@@ -232,8 +234,7 @@ describe('createStreamSession', () => {
   it('lets the browser seek inside what is buffered, and restarts outside it', async () => {
     const video = fakeVideo()
     const { environment, fetched, bufferState } = setup({
-      'from-0': [[1, 31]],
-      'from-200': [[199, 203]],
+      streams: { 'from-0': [[1, 31]], 'from-200': [[199, 203]] },
     })
     createStreamSession({
       video,
@@ -263,7 +264,7 @@ describe('createStreamSession', () => {
       ...environment,
       fetch: async (url, init) => {
         const response = await environment.fetch(url, init)
-        if (url !== 'from-0') return response
+        if (url !== streamUrl(0)) return response
         return {
           ...response,
           body: new ReadableStream({
@@ -281,7 +282,7 @@ describe('createStreamSession', () => {
       mime: 'video/mp4',
       duration: 600,
       start: 0,
-      url: (start) => `from-${start}`,
+      url: streamUrl,
       onError: (message) => errors.push(message),
       environment: stalled,
     })

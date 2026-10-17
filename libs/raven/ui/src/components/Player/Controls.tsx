@@ -71,7 +71,7 @@ const MenuPill = ({
   onToggle: (section: MenuSection) => void
 }) => {
   const title = MENU_TITLES[section]
-  const showsTitle = section !== 'playback' || value == null
+  const showsTitle = section !== MENU_SECTIONS.playback || value == null
   return (
     <button
       ref={buttonRef}
@@ -221,7 +221,7 @@ export const Controls = ({
         <span className={styles.total}> / {formatDuration(duration)}</span>
       </p>
       <div className={styles.pills}>
-        {MENU_SECTIONS.map((section) => (
+        {Object.values(MENU_SECTIONS).map((section) => (
           <MenuPill
             key={section}
             section={section}

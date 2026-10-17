@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { MEDIA_PROBE_BYTES, type MediaOrigin, isMediaTicket } from '@raven/core'
+import { CONTENT_TYPES, ENCODINGS, HEADERS, HTTP_METHODS, CACHE_POLICIES } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import type { ServerConfig } from '@/config'
@@ -116,7 +117,7 @@ describe('the media plane routes', () => {
   it('lists the media origins best first, uncached', async () => {
     const response = await on().app.inject({ method: 'GET', url: '/api/media-origins' })
     expect(response.statusCode).toBe(200)
-    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
     expect(response.json()).toEqual({ origins: ORIGINS })
     await expect(apiFor({ app: on().app }).getMediaOrigins()).resolves.toEqual({
       origins: ORIGINS,
@@ -128,15 +129,17 @@ describe('the media plane routes', () => {
       on().app.inject({ method: 'GET', url: `/api/media-origins/ping${query}` })
     const small = await ping('?bytes=1000')
     expect(small.statusCode).toBe(200)
-    expect(small.headers['content-length']).toBe('1000')
-    expect(small.headers['content-type']).toBe('application/octet-stream')
-    expect(small.headers['cache-control']).toBe('no-store')
+    expect(small.headers[HEADERS.contentLength]).toBe('1000')
+    expect(small.headers[HEADERS.contentType]).toBe(CONTENT_TYPES.octetStream)
+    expect(small.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
     expect(small.rawPayload).toHaveLength(1000)
-    expect((await ping('?bytes=99999999')).headers['content-length']).toBe(String(MIB))
-    expect((await ping('?bytes=0')).headers['content-length']).toBe('1')
-    expect((await ping('?bytes=lots')).headers['content-length']).toBe(String(MEDIA_PROBE_BYTES))
+    expect((await ping('?bytes=99999999')).headers[HEADERS.contentLength]).toBe(String(MIB))
+    expect((await ping('?bytes=0')).headers[HEADERS.contentLength]).toBe('1')
+    expect((await ping('?bytes=lots')).headers[HEADERS.contentLength]).toBe(
+      String(MEDIA_PROBE_BYTES),
+    )
     const plain = await ping('')
-    expect(plain.headers['content-length']).toBe(String(MEDIA_PROBE_BYTES))
+    expect(plain.headers[HEADERS.contentLength]).toBe(String(MEDIA_PROBE_BYTES))
     expect(plain.rawPayload).toHaveLength(MEDIA_PROBE_BYTES)
   })
 
@@ -144,10 +147,10 @@ describe('the media plane routes', () => {
     const response = await on().app.inject({
       method: 'GET',
       url: '/api/media-origins/ping?bytes=5000',
-      headers: { 'accept-encoding': 'gzip, br' },
+      headers: { [HEADERS.acceptEncoding]: 'gzip, br' },
     })
-    expect(response.headers['content-encoding']).toBeUndefined()
-    expect(response.headers['content-length']).toBe('5000')
+    expect(response.headers[HEADERS.contentEncoding]).toBeUndefined()
+    expect(response.headers[HEADERS.contentLength]).toBe('5000')
   })
 
   it('hands out a ticket for a video the browser may see, uncached', async () => {
@@ -157,7 +160,7 @@ describe('the media plane routes', () => {
       url: `/api/media/${on().video}/ticket`,
     })
     expect(response.statusCode).toBe(200)
-    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
     const body: unknown = response.json()
     expect(isMediaTicket(body)).toBe(true)
     const ticket = await apiFor({ app: on().app }).getMediaTicket(on().video)
@@ -173,7 +176,7 @@ describe('the media plane routes', () => {
     const client = apiFor({ app: off().app })
     await expect(client.getMediaOrigins()).resolves.toEqual({ origins: [] })
     const listed = await off().app.inject({ method: 'GET', url: '/api/media-origins' })
-    expect(listed.headers['cache-control']).toBe('no-store')
+    expect(listed.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
     await expect(client.getMediaTicket(off().video)).rejects.toMatchObject({ status: 503 })
     const missing = await off().app.inject({ method: 'GET', url: '/api/media/987654/ticket' })
     expect(missing.statusCode).toBe(404)
@@ -363,7 +366,7 @@ describe('the media plane routes', () => {
         headers: { range: 'bytes=0-99' },
       })
       expect(file.statusCode).toBe(206)
-      expect(file.headers['content-range']).toMatch(/^bytes 0-99\//)
+      expect(file.headers[HEADERS.contentRange]).toMatch(/^bytes 0-99\//)
       const subtitles = await asBrowser({
         url: `/api/media/${locked()}/subtitles/external-0?t=${ticket}`,
       })
@@ -383,10 +386,10 @@ describe('the media plane routes', () => {
       const ticket = await ticketFor(locked())
       const response = await asBrowser({
         url: `/api/media/${locked()}/subtitles/external-0?t=${ticket}`,
-        headers: { 'accept-encoding': 'br' },
+        headers: { [HEADERS.acceptEncoding]: ENCODINGS.br },
       })
       expect(response.statusCode).toBe(200)
-      expect(response.headers['content-encoding']).toBe('br')
+      expect(response.headers[HEADERS.contentEncoding]).toBe(ENCODINGS.br)
       const vary = String(response.headers.vary)
         .split(',')
         .map((name) => name.trim().toLowerCase())

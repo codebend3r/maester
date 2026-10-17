@@ -1,7 +1,7 @@
 import { type PlaybackMode, describeMode } from '@raven/core'
 import { type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
-import { MENU_TITLES, type MenuSection } from '@/components/Player/menus'
+import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
 import { playingAudio } from '@/components/Player/selection'
 import styles from '@/components/Player/SettingsMenu.module.scss'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
@@ -187,11 +187,11 @@ export const SettingsMenu = ({
 
   const body = (() => {
     switch (section) {
-      case 'audio':
+      case MENU_SECTIONS.audio:
         return <AudioGroup {...group} />
-      case 'subtitles':
+      case MENU_SECTIONS.subtitles:
         return <SubtitleGroup {...group} />
-      case 'playback':
+      case MENU_SECTIONS.playback:
         return (
           <>
             <div className={styles.playing}>
