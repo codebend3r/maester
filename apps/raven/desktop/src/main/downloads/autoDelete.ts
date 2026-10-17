@@ -15,8 +15,11 @@ export type AutoDeleteDeps = {
   isPlaying: (downloadId: string) => boolean
   /** Whether the player would resume this download partway, short of where it counts as watched. */
   isMidTitle: (downloadId: string) => boolean
-  /** The download service's removal, which lets the server hear what was watched first. */
-  remove: (downloadId: string) => Promise<void>
+  /**
+   * The download service's removal: it lets the server hear what was watched first, then
+   * answers false without removing when the download is no longer due or the viewer is on it.
+   */
+  remove: (downloadId: string) => Promise<boolean>
   onDeleted: (entry: DownloadEntry) => void
   warn: (message: string) => void
 }
@@ -46,9 +49,24 @@ type Clock =
   | { kind: 'held' }
   | { kind: 'deleting' }
 
+/** How a removal the clock started went. */
+type Removal = 'removed' | 'kept' | 'failed'
+
 /** When a download counts as watched, for a ready one set to delete once watched; else null. */
 const watchedAtOf = (entry: DownloadEntry | null): number | null =>
   entry !== null && entry.status.kind === 'ready' && entry.autoDelete ? entry.watchedAt : null
+
+/** Whether a download's ten minutes have run out: ready, set to delete once watched, and watched. */
+export const isDueForDeletion = ({
+  entry,
+  now,
+}: {
+  entry: DownloadEntry | null
+  now: number
+}): boolean => {
+  const watchedAt = watchedAtOf(entry)
+  return watchedAt !== null && watchedAt + AUTO_DELETE_DELAY_MS <= now
+}
 
 export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
   const { store, timers } = deps
@@ -66,12 +84,33 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
 
   const deleteNow = async (entry: DownloadEntry): Promise<void> => {
     const { downloadId } = entry
-    try {
-      await deps.remove(downloadId)
-    } finally {
-      if (clocks.get(downloadId)?.kind === 'deleting') clocks.delete(downloadId)
+    const removal = await deps.remove(downloadId).then(
+      (isRemoved): Removal => (isRemoved ? 'removed' : 'kept'),
+      (error: unknown): Removal => {
+        deps.warn(
+          `raven player could not delete ${loggable(entry.label)} after watching: ${loggable(errorText(error))}`,
+        )
+        return 'failed'
+      },
+    )
+    // A switch turned off or on while the removal waited has already replaced this clock.
+    const isOwn = clocks.get(downloadId)?.kind === 'deleting'
+    if (isOwn) clocks.delete(downloadId)
+    switch (removal) {
+      case 'removed':
+        return deps.onDeleted(entry)
+      case 'kept':
+        // Read again as the download stands now: held while the viewer is on it.
+        if (isOwn) armFromStore(downloadId)
+        return
+      case 'failed':
+        // Tried again at the next launch, not in a loop of failures now.
+        return
+      default: {
+        const unreachable: never = removal
+        return unreachable
+      }
     }
-    if (entryOf(downloadId) === null) deps.onDeleted(entry)
   }
 
   /** The time came: deletes the download, or holds it while the viewer is still on it. */
@@ -86,7 +125,7 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
     clocks.set(downloadId, { kind: 'deleting' })
     deleteNow(entry).catch((error: unknown) => {
       deps.warn(
-        `raven player could not delete ${loggable(entry.label)} after watching: ${loggable(errorText(error))}`,
+        `raven player could not finish deleting ${loggable(entry.label)}: ${loggable(errorText(error))}`,
       )
     })
   }
@@ -98,12 +137,18 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
     clocks.set(downloadId, { kind: 'running', at, timer: timers.set(() => due(downloadId), wait) })
   }
 
+  /** A clock at `watchedAt` plus the delay, read off the store now; none when not set to delete. */
+  const armFromStore = (downloadId: string): void => {
+    const watchedAt = watchedAtOf(entryOf(downloadId))
+    if (watchedAt === null) return cancel({ downloadId })
+    arm({ downloadId, at: watchedAt + AUTO_DELETE_DELAY_MS })
+  }
+
   const rebuild: AutoDelete['rebuild'] = () => {
-    store.read().entries.forEach((entry) => {
-      const watchedAt = watchedAtOf(entry)
-      if (watchedAt === null || clocks.has(entry.downloadId)) return
-      arm({ downloadId: entry.downloadId, at: watchedAt + AUTO_DELETE_DELAY_MS })
-    })
+    store
+      .read()
+      .entries.filter((entry) => watchedAtOf(entry) !== null && !clocks.has(entry.downloadId))
+      .forEach(({ downloadId }) => armFromStore(downloadId))
   }
 
   const schedule: AutoDelete['schedule'] = ({ downloadId }) => {

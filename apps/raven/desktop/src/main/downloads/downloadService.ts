@@ -1,6 +1,6 @@
 import type { ConfigStore } from '@/main/desktopConfig'
 import { createDownloadAsks, type DownloadAsks } from '@/main/downloads/asks'
-import { createAutoDelete } from '@/main/downloads/autoDelete'
+import { createAutoDelete, isDueForDeletion } from '@/main/downloads/autoDelete'
 import { DOWNLOAD_MESSAGES, failedMessage, pausedMessage } from '@/main/downloads/downloadMessages'
 import {
   createDownloadQueue,
@@ -148,10 +148,10 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     now: deps.now,
     isPlaying: (downloadId) => playback.isPlaying(downloadId),
     isMidTitle: (downloadId) => playback.isMidTitle(downloadId),
-    // Through `remove`, so what was watched reaches the server first.
-    remove: async (downloadId) => {
-      await remove({ downloadId })
-    },
+    // The viewer may open the file, or switch the option off, while the removal waits on the
+    // server, so it looks again before it removes.
+    remove: (downloadId) =>
+      removeAfterSync({ downloadId, isKept: () => isKeptAfterAll(downloadId) }),
     onDeleted: (entry) => {
       notice(DOWNLOAD_MESSAGES.deletedAfterWatching(entry.label))
       announce()
@@ -321,10 +321,32 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     return list()
   }
 
+  /**
+   * Waits for the server to hear what was watched, then removes the download unless `isKept`
+   * says otherwise by then. True once it removed it.
+   */
+  const removeAfterSync = async ({
+    downloadId,
+    isKept,
+  }: {
+    downloadId: string
+    isKept: () => boolean
+  }): Promise<boolean> => {
+    await waitForSync(sync.runFor({ downloadIds: [downloadId] }))
+    if (isKept()) return false
+    await queue.remove({ downloadId })
+    return true
+  }
+
+  const isKeptAfterAll = (downloadId: string): boolean =>
+    !isDueForDeletion({ entry: entryById(store.read(), { downloadId }), now: deps.now() }) ||
+    playback.isPlaying(downloadId) ||
+    playback.isMidTitle(downloadId)
+
+  // The viewer's own Delete removes whatever is playing.
   const remove: DownloadService['remove'] = async ({ downloadId }) => {
     if (!isKnown(downloadId)) return unknown()
-    await waitForSync(sync.runFor({ downloadIds: [downloadId] }))
-    await queue.remove({ downloadId })
+    await removeAfterSync({ downloadId, isKept: () => false })
     return list()
   }
 

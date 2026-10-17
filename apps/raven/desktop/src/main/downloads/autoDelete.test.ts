@@ -81,7 +81,16 @@ const setup = ({ entries = [entryFor()] }: { entries?: DownloadEntry[] } = {}) =
           syscall: 'rmdir',
         })
       }
+      // As the service does once its wait for the server is over: it looks again.
+      const entry = store.read().entries.find((held) => held.downloadId === downloadId)
+      const isKept =
+        entry === undefined ||
+        !entry.autoDelete ||
+        playing.has(downloadId) ||
+        midTitle.has(downloadId)
+      if (isKept) return false
       store.update((state) => remove(state, { downloadId }))
+      return true
     },
     onDeleted: (entry) => deleted.push(entry.label),
     warn: (message) => warnings.push(message),
@@ -283,12 +292,52 @@ describe('a deletion that waits', () => {
     expect(world.deleted).toEqual(['S01E01 Good News'])
   })
 
-  it('warns by title alone and tells of nothing when the removal fails', async () => {
+  it('holds a download the removal kept because it was opened meanwhile, until playback leaves', async () => {
+    const world = setup()
+    const held = Promise.withResolvers<void>()
+    world.removal.hold = held.promise
+    world.autoDelete.schedule({ downloadId: ID })
+    world.after(AUTO_DELETE_DELAY_MS)
+    world.playing.add(ID)
+    held.resolve()
+    await ticks(3)
+    expect(world.store.read().entries).toHaveLength(1)
+    expect(world.deleted).toEqual([])
+    expect(world.autoDelete.deletesAt({ downloadId: ID })).toBeNull()
+    world.playing.delete(ID)
+    world.autoDelete.playbackLeft()
+    await ticks(3)
+    expect(world.removed).toEqual([ID, ID])
+    expect(world.deleted).toEqual(['S01E01 Good News'])
+  })
+
+  it('leaves alone a download switched off while its removal waited', async () => {
+    const world = setup()
+    const held = Promise.withResolvers<void>()
+    world.removal.hold = held.promise
+    world.autoDelete.schedule({ downloadId: ID })
+    world.after(AUTO_DELETE_DELAY_MS)
+    world.store.update((state) => setAutoDelete(state, { downloadId: ID, autoDelete: false }))
+    world.autoDelete.cancel({ downloadId: ID })
+    held.resolve()
+    await ticks(3)
+    world.autoDelete.playbackLeft()
+    await ticks(3)
+    expect(world.store.read().entries).toHaveLength(1)
+    expect(world.removed).toEqual([ID])
+    expect(world.deleted).toEqual([])
+    expect(world.pending.size).toBe(0)
+  })
+
+  it('warns by title alone, tells of nothing and tries no more when the removal fails', async () => {
     const world = setup()
     world.removal.isFailing = true
     world.autoDelete.schedule({ downloadId: ID })
     world.after(AUTO_DELETE_DELAY_MS)
     await ticks(3)
+    world.autoDelete.playbackLeft()
+    await ticks(3)
+    expect(world.removed).toEqual([ID])
     expect(world.deleted).toEqual([])
     expect(world.warnings).toHaveLength(1)
     expect(world.warnings[0]).toContain('S01E01 Good News')
