@@ -108,6 +108,22 @@ const readJson = (text: string): unknown => {
   }
 }
 
+/**
+ * The origin a server listed, cut down to scheme, host and port, or null when it is
+ * not a plain http or https address: `net.fetch` also reads `file:`, so the server's
+ * word is never taken as it comes.
+ */
+const trustedOrigin = (origin: MediaOrigin): MediaOrigin | null => {
+  try {
+    const url = new URL(origin.url)
+    const isWeb = url.protocol === 'http:' || url.protocol === 'https:'
+    if (!isWeb || url.username !== '' || url.password !== '') return null
+    return { kind: origin.kind, url: url.origin }
+  } catch {
+    return null
+  }
+}
+
 export const createMediaAccess = ({
   calls,
   serverOf,
@@ -129,14 +145,38 @@ export const createMediaAccess = ({
     return { origin, ...answer }
   }
 
+  /** A log line never fails an access: the pick it belongs to is held for good. */
+  const safeWarn = (message: string): void => {
+    try {
+      warn(message)
+    } catch {
+      // Nothing is left to tell.
+    }
+  }
+
+  /** Never rejects: a pick is held for good, so a rejected one would fail every later call. */
   const pickFor = async (server: ServerEntry): Promise<MediaOrigin | null> => {
-    const reply = await calls.call({ serverId: server.id, call: { name: 'getMediaOrigins' } })
-    const body = reply.ok && reply.status === 200 ? readJson(reply.body) : null
+    const reply = await calls
+      .call({ serverId: server.id, call: { name: 'getMediaOrigins' } })
+      .catch(() => null)
+    const body = reply?.ok && reply.status === 200 ? readJson(reply.body) : null
     if (!isMediaOrigins(body)) {
-      warn(`${loggable(server.name)} did not list media origins raven player can read`)
+      safeWarn(`${loggable(server.name)} did not list media origins raven player can read`)
       return null
     }
-    const settled = await Promise.allSettled(body.origins.map(probeOne))
+    const checked = body.origins.map((origin) => ({
+      kind: origin.kind,
+      trusted: trustedOrigin(origin),
+    }))
+    const refused = checked.filter((entry) => entry.trusted === null).map((entry) => entry.kind)
+    if (refused.length > 0) {
+      safeWarn(
+        `${loggable(server.name)} listed media origins raven player does not trust: ${refused.join(', ')}`,
+      )
+    }
+    const settled = await Promise.allSettled(
+      checked.flatMap((entry) => (entry.trusted === null ? [] : [probeOne(entry.trusted)])),
+    )
     return pickReachable(
       settled.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
     )

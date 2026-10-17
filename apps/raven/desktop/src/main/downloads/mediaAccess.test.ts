@@ -302,6 +302,74 @@ describe('createMediaAccess', () => {
     expect(warnings.join(' ')).not.toContain('tkt')
   })
 
+  it('drops origins that are not plain http or https, probing none of them', async () => {
+    const hostile: MediaOrigin[] = [
+      { kind: 'lan', url: 'file:///etc/hosts?' },
+      { kind: 'tailnet', url: '/relative' },
+      { kind: 'public', url: 'javascript:alert(1)' },
+      { kind: 'lan', url: 'http://user:pass@192.168.1.9:3000' },
+    ]
+    const { probe, asked } = answeringProbe({})
+    const { access, warnings } = run({ replies: withOrigins(hostile), probe })
+    const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
+    expect(succeeded(outcome)).toEqual({ kind: 'cookie' })
+    expect(asked).toEqual([])
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toContain('Vhagar')
+    expect(warnings[0]).toContain('lan, tailnet, public, lan')
+    expect(warnings.join(' ')).not.toMatch(/etc|relative|javascript|pass/u)
+  })
+
+  it('keeps a trusted origin beside a dropped one', async () => {
+    const { probe, asked } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
+    const { access } = run({
+      replies: withOrigins([{ kind: 'lan', url: 'file:///etc/hosts?' }, LAN]),
+      probe,
+    })
+    const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
+    expect(succeeded(outcome)).toMatchObject({ kind: 'origin', url: LAN.url })
+    expect(asked).toHaveLength(1)
+  })
+
+  it('cuts an origin with a path, query or trailing slash down to its origin', async () => {
+    const { probe, asked } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
+    const { access } = run({
+      replies: withOrigins([{ kind: 'lan', url: `${LAN.url}/base/?x=1#h` }]),
+      probe,
+    })
+    const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
+    expect(asked.map((entry) => entry.url)).toEqual([
+      `${LAN.url}/api/media-origins/ping?bytes=${MEDIA_PROBE_BYTES}`,
+    ])
+    expect(succeeded(outcome)).toMatchObject({ kind: 'origin', url: LAN.url })
+  })
+
+  it('treats an origins call that rejects as a failed read, and does not hold the rejection', async () => {
+    const { probe } = answeringProbe({})
+    const warnings: string[] = []
+    const access = createMediaAccess({
+      calls: {
+        call: async () => {
+          throw new Error('boom http://10.0.0.1')
+        },
+      },
+      serverOf: () => SERVER,
+      probe,
+      now: () => 0,
+      warn: (message) => {
+        warnings.push(message)
+      },
+    })
+    expect(succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))).toEqual({
+      kind: 'cookie',
+    })
+    expect(succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))).toEqual({
+      kind: 'cookie',
+    })
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).not.toContain('10.0.0.1')
+  })
+
   it('answers unreachable for a server that is gone', async () => {
     const { probe } = answeringProbe({})
     const { access, log } = run({ replies: {}, probe, server: null })
