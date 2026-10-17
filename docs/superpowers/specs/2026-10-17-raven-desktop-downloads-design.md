@@ -182,7 +182,7 @@ Progress positions for a download are kept where every local file's are: `player
 
 ## Expanding a link
 
-`expand.ts` turns a `DownloadRequest` into the files to fetch. Five reads join the allowlist in `allowlist.ts`, each a `GET` main makes on its own: three for the expansion, which the page may also make, and two for fetching (below), which `isPageCall` keeps to main, so the page never reads a ticket or an origin.
+`expand.ts` turns a `DownloadRequest` into the files to fetch. Five reads join the allowlist in `allowlist.ts`, each a `GET` main makes on its own: three for the expansion, which the page may also make, and two for fetching (below), which `isPageCall` keeps to main, so the page never reads a ticket or an origin. `getSagas` answers every saga of the library with a whole `MediaItem` per movie, so its reply may run to `MAX_SAGAS_REPLY_CHARS` (8 MiB); every other call keeps the 1 MiB `MAX_REPLY_CHARS`.
 
 | Call | Path | For |
 | --- | --- | --- |

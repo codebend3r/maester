@@ -9,10 +9,12 @@ import {
   CALL_TIMEOUT_MS,
   MAX_IN_FLIGHT,
   MAX_REPLY_CHARS,
+  MAX_SAGAS_REPLY_CHARS,
   WRITE_RESERVE,
   createServerCalls,
   fetchThrough,
   probeServer,
+  replyCapFor,
   type ServerFetch,
 } from '@/main/servers/serverCalls'
 
@@ -128,6 +130,7 @@ describe('the call values', () => {
   it('has the timeout, the reply cap, the in-flight cap and the messages', () => {
     expect(CALL_TIMEOUT_MS).toBe(10_000)
     expect(MAX_REPLY_CHARS).toBe(1_048_576)
+    expect(MAX_SAGAS_REPLY_CHARS).toBe(8 * 1_048_576)
     expect(MAX_IN_FLIGHT).toBe(6)
     expect(WRITE_RESERVE).toBe(2)
     expect(CALL_MESSAGES.unknownServer).toBe('That server is no longer in raven player.')
@@ -159,7 +162,7 @@ describe('fetchThrough', () => {
       timeoutMs: 5,
     })
     expect(answer.status).toBe(201)
-    expect(await answer.text()).toBe('{"a":1}')
+    expect(await answer.text({ maxChars: MAX_REPLY_CHARS })).toBe('{"a":1}')
     expect(seen).toHaveLength(1)
     const [{ url, init }] = seen
     expect(url).toBe('https://raven.example/api/media/7/progress')
@@ -200,9 +203,23 @@ describe('fetchThrough', () => {
       body: null,
       timeoutMs: 1000,
     })
-    const text = await answer.text()
+    const text = await answer.text({ maxChars: MAX_REPLY_CHARS })
     expect(text.length).toBeGreaterThan(MAX_REPLY_CHARS)
     expect(text.length).toBeLessThan(MAX_REPLY_CHARS * 4)
+  })
+
+  it('reads a reply up to the cap it is given', async () => {
+    const through = fetchThrough(() =>
+      Promise.resolve(new Response('x'.repeat(MAX_REPLY_CHARS * 2))),
+    )
+    const answer = await through({
+      url: 'https://raven.example/api/libraries/3/sagas',
+      method: 'GET',
+      headers: {},
+      body: null,
+      timeoutMs: 1000,
+    })
+    expect(await answer.text({ maxChars: MAX_SAGAS_REPLY_CHARS })).toHaveLength(MAX_REPLY_CHARS * 2)
   })
 
   it('reads a reply with no body as empty text', async () => {
@@ -215,7 +232,7 @@ describe('fetchThrough', () => {
       timeoutMs: 1000,
     })
     expect(answer.status).toBe(204)
-    expect(await answer.text()).toBe('')
+    expect(await answer.text({ maxChars: MAX_REPLY_CHARS })).toBe('')
   })
 
   describe('against a real server', () => {
@@ -298,7 +315,7 @@ describe('fetchThrough', () => {
           timeoutMs: 50,
         })
         expect(answer.status).toBe(200)
-        const outcome = await answer.text().then(
+        const outcome = await answer.text({ maxChars: MAX_REPLY_CHARS }).then(
           () => 'read',
           () => 'failed',
         )
@@ -419,6 +436,48 @@ describe('createServerCalls.call', () => {
     const edge = setup({ answer: () => reply({ text: 'x'.repeat(MAX_REPLY_CHARS) }) })
     const result = await edge.calls.call({ serverId: SERVER.id, call: { name: 'getLock' } })
     expect(result.ok).toBe(true)
+  })
+
+  describe('the reply cap', () => {
+    const PAST_ONE_MIB = 'x'.repeat(MAX_REPLY_CHARS * 2)
+
+    /** Server calls over `fetchThrough`, so the cap is the one the real stream read keeps. */
+    const streaming = ({ text }: { text: string }) =>
+      createServerCalls({
+        serverOf: () => SERVER,
+        fetchFor: () => fetchThrough(() => Promise.resolve(new Response(text))),
+        warn: () => undefined,
+      })
+
+    it('reads getSagas up to MAX_SAGAS_REPLY_CHARS and every other call up to MAX_REPLY_CHARS', () => {
+      expect(replyCapFor({ name: 'getSagas', libraryId: 3 })).toBe(MAX_SAGAS_REPLY_CHARS)
+      expect(replyCapFor({ name: 'getLibrary', libraryId: 3 })).toBe(MAX_REPLY_CHARS)
+      expect(replyCapFor({ name: 'getItem', itemId: 3 })).toBe(MAX_REPLY_CHARS)
+      expect(replyCapFor({ name: 'getLock' })).toBe(MAX_REPLY_CHARS)
+    })
+
+    it('reads a getSagas reply past 1 MiB and under 8 MiB whole', async () => {
+      const calls = streaming({ text: PAST_ONE_MIB })
+      expect(
+        await calls.call({ serverId: SERVER.id, call: { name: 'getSagas', libraryId: 3 } }),
+      ).toEqual({ ok: true, status: 200, body: PAST_ONE_MIB })
+    })
+
+    it("still cuts another call's reply past 1 MiB", async () => {
+      const calls = streaming({ text: PAST_ONE_MIB })
+      expect(
+        await calls.call({ serverId: SERVER.id, call: { name: 'getLibrary', libraryId: 3 } }),
+      ).toEqual({ ok: false, message: CALL_MESSAGES.tooBig('raven.example') })
+    })
+
+    it('answers tooBig for a getSagas reply past MAX_SAGAS_REPLY_CHARS', async () => {
+      const { calls } = setup({
+        answer: () => reply({ text: 'x'.repeat(MAX_SAGAS_REPLY_CHARS + 1) }),
+      })
+      expect(
+        await calls.call({ serverId: SERVER.id, call: { name: 'getSagas', libraryId: 3 } }),
+      ).toEqual({ ok: false, message: CALL_MESSAGES.tooBig('raven.example') })
+    })
   })
 
   it('passes an error status and its body on for the page to read', async () => {
