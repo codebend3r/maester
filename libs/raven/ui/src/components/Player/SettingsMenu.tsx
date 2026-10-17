@@ -52,7 +52,16 @@ const Option = ({
  */
 export const SettingsMenu = ({
   menuRef,
-  selection: { tracks, tracksFailed, tracksPending, audio, subtitle, pickAudio, pickSubtitle },
+  selection: {
+    tracks,
+    tracksFailed,
+    tracksPending,
+    audio,
+    subtitle,
+    playsPickedAudio,
+    pickAudio,
+    pickSubtitle,
+  },
   subtitleStatus,
   rate,
   mode,
@@ -73,11 +82,12 @@ export const SettingsMenu = ({
   const id = useId()
   const heading = `${id}-heading`
   const first = useRef<HTMLFieldSetElement>(null)
-  const playing = playingAudio({ mode, tracks, audio })
+  const playing = playingAudio({ mode, tracks, audio, playsPickedAudio })
 
   // Opening the menu puts the keyboard on the chosen option of the first group.
   useEffect(() => {
-    first.current?.querySelector<HTMLInputElement>('input:checked')?.focus()
+    const checked = first.current?.querySelector<HTMLInputElement>('input:checked') ?? null
+    if (checked !== null) checked.focus()
   }, [])
 
   const tracksNote = tracksFailed ? 'Tracks unavailable.' : tracksPending ? 'Reading tracks' : null

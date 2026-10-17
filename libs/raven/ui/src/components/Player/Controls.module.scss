@@ -43,8 +43,14 @@
     transition: background-color 120ms ease-out;
   }
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: var(--color-canopy-haze);
+  }
+
+  // As `elements.scss` dims a disabled field.
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
   }
 }
 

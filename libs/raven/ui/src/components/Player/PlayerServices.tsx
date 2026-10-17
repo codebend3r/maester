@@ -28,6 +28,9 @@ export type PlayerTitle = {
   next: { to: string; state: unknown; label: string } | null
 }
 
+/** A track pick a person made by hand: an audio index and a subtitle id. */
+export type TrackChoice = { audio: number | null; subtitle: string | null }
+
 export type PlayerServices = {
   title: PlayerTitle
   progress: ProgressSink
@@ -38,6 +41,14 @@ export type PlayerServices = {
   hostActions?: HostActions
   /** Without it the player shows no heart, as a local file has no favourite. */
   favourite?: PlayerFavourite
+  /** The host remembers picks by hand: where to start, and where to save the next. */
+  trackPicks?: { start: TrackChoice | null; save: (choice: TrackChoice) => void }
+  /** Told when the controls show and hide (the desktop's traffic lights follow them). */
+  chrome?: { shown: (isShown: boolean) => void }
+  /** The output carries the bitstream untouched, so volume and mute do nothing. */
+  isVolumeFixed?: boolean
+  /** Replaces Unplayable's "This video can't play in this browser." */
+  unplayableNote?: string
 }
 
 const Services = createContext<PlayerServices | null>(null)

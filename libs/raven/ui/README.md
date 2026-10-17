@@ -1,6 +1,6 @@
 # @raven/ui
 
-Raven's shared player and HTML playback engine, extracted without changing browser behavior. The library does not import the web app, its API singleton or its library pages. Hosts supply an `Engine` and `PlayerServicesProvider`, inside their own React Router and TanStack Query providers. Import `@raven/ui/styles.css` once for tokens, element defaults and component styles.
+Raven's shared player and HTML playback engine, extracted without changing browser behavior. The library does not import the web app, its API singleton or its library pages. Hosts supply an `Engine` (`html`, or `native` with a `NativePlayer`: a command channel and an event stream to a player in another process) and `PlayerServicesProvider`, inside their own React Router and TanStack Query providers. Import `@raven/ui/styles.css` once for tokens, element defaults and component styles.
 
 ## Build and consume
 
@@ -13,7 +13,7 @@ bunx nx run @raven/ui:test
 bun run dev:raven
 ```
 
-The build cleans output, bundles ESM and CSS with Vite, emits declarations with TypeScript, then rewrites declaration aliases with tsc-alias. `dev` watches the library bundle; `dev:raven` runs that watcher alongside the server and web dev servers. Generated JavaScript is build output only; source and configuration are TypeScript. Hosts may pass `progress.duration`, `hostActions` and `favourite` in the player services; the web passes only `favourite`, and without it the player shows no heart.
+The build cleans output, bundles ESM and CSS with Vite, emits declarations with TypeScript, then rewrites declaration aliases with tsc-alias. `dev` watches the library bundle; `dev:raven` runs that watcher alongside the server and web dev servers. Generated JavaScript is build output only; source and configuration are TypeScript. Hosts may pass `progress.duration`, `hostActions` and `favourite` in the player services, and a native host also `trackPicks`, `chrome`, `isVolumeFixed` and `unplayableNote`; the web passes only `favourite`, and without it the player shows no heart.
 
 Peer dependencies are React 19.3.0, React DOM 19.3.0, React Router DOM 7.18.4, TanStack React Query 5.103.1 and zustand 5.0.15, supplied by the host. `@raven/core` is a workspace dependency. All stay external to the bundle, including React's JSX runtime, so hosts share one React, router, cache and preference store.
 

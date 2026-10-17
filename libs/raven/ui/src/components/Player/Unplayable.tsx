@@ -18,7 +18,13 @@ export const Unplayable = ({
   onBack: () => void
   onTryAnyway: (() => void) | null
 }) => {
-  const { title, posterUrl: thumbnail, escape, escapeFeedback } = usePlayerServices()
+  const {
+    title,
+    posterUrl: thumbnail,
+    escape,
+    escapeFeedback,
+    unplayableNote,
+  } = usePlayerServices()
 
   return (
     <section className={styles.unplayable} aria-labelledby="unplayable-title">
@@ -30,7 +36,7 @@ export const Unplayable = ({
         <h1 id="unplayable-title" className={styles.panelTitle}>
           {title.label}
         </h1>
-        <p>This video can't play in this browser.</p>
+        <p>{unplayableNote ?? "This video can't play in this browser."}</p>
         <ul className={styles.problems}>
           {problems.map((problem) => (
             <li key={problem}>{problem}</li>

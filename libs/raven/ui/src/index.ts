@@ -9,9 +9,17 @@ export type {
   PlayerServices,
   PlayerTitle,
   ProgressSink,
+  TrackChoice,
 } from '@/components/Player/PlayerServices'
 export type { PlayerAction } from '@/lib/shortcuts'
-export type { Engine, EngineActions, EngineHandle, HtmlSource } from '@/components/Player/engine'
+export { fromPlayerEvent } from '@/components/Player/fromPlayerEvent'
+export type {
+  Engine,
+  EngineActions,
+  EngineHandle,
+  HtmlSource,
+  NativePlayer,
+} from '@/components/Player/engine'
 export type { VideoState, VideoEvent } from '@/components/Player/useVideoState'
 export { ICON_NAMES, Icon } from '@/components/Icon/Icon'
 export type { IconName, IconSize } from '@/components/Icon/Icon'

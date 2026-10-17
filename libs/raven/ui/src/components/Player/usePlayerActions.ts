@@ -2,8 +2,10 @@ import type { BezelState } from '@/components/Player/Bezel'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import type { EngineHandle } from '@/components/Player/engine'
 import { preferredSubtitle } from '@/components/Player/selection'
+import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
 import { type PlayerAction, stepCaptionScale, stepSpeed } from '@/lib/shortcuts'
 import { languageName } from '@raven/core'
+import { usePlayerServices } from '@/components/Player/PlayerServices'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 /** Frames per second to step by when the file does not say. */
@@ -47,6 +49,7 @@ export const usePlayerActions = ({
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)
   const subtitles = usePlayerPrefs((prefs) => prefs.subtitles)
+  const { isVolumeFixed = false } = usePlayerServices()
   const seek = actions.seek
 
   const togglePlay = () => {
@@ -54,7 +57,13 @@ export const usePlayerActions = ({
     else actions.pause()
   }
 
+  const flashFixedVolume = () => flash({ icon: 'volume', text: FIXED_VOLUME_NOTE })
+
   const changeVolume = (next: number) => {
+    if (isVolumeFixed) {
+      flashFixedVolume()
+      return
+    }
     const nextVolume = clamp({ value: next, min: 0, max: 1 })
     const nextMuted = nextVolume === 0
     actions.setVolume({ volume: nextVolume, muted: nextMuted })
@@ -62,6 +71,10 @@ export const usePlayerActions = ({
   }
 
   const toggleMute = () => {
+    if (isVolumeFixed) {
+      flashFixedVolume()
+      return
+    }
     actions.setVolume({ volume, muted: !muted })
     flash({ icon: !muted ? 'muted' : 'volume', text: !muted ? 'Muted' : 'Sound on' })
   }
@@ -72,7 +85,7 @@ export const usePlayerActions = ({
   }
 
   const toggleSubtitles = () => {
-    const hasAny = !!selection.tracks?.subtitles.some((track) => track.supported)
+    const hasAny = selection.tracks?.subtitles.some((track) => track.supported) ?? false
     if (!hasAny && selection.subtitle == null) {
       flash({ icon: 'captions', text: 'No subtitles' })
       return
@@ -142,6 +155,10 @@ export const usePlayerActions = ({
         flash({ icon: 'captions', text: `Subtitles ${Math.round(next * 100)}%` })
         return
       }
+      case 'toggleStats':
+        if (actions.toggleStats === undefined) return
+        actions.toggleStats()
+        return
       case 'showShortcuts':
         setOverlay((current) => (current === 'shortcuts' ? 'none' : 'shortcuts'))
         return

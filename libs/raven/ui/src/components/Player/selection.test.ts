@@ -73,4 +73,9 @@ describe('playingAudio', () => {
     expect(playingAudio({ mode: 'direct', tracks, audio: 1 })).toBe(0)
     expect(playingAudio({ mode: 'direct', tracks: null, audio: 1 })).toBeNull()
   })
+
+  it('plays the picked track in direct play when the engine switches tracks itself', () => {
+    expect(playingAudio({ mode: 'direct', tracks, audio: 1, playsPickedAudio: true })).toBe(1)
+    expect(playingAudio({ mode: 'direct', tracks, audio: null, playsPickedAudio: true })).toBe(0)
+  })
 })
