@@ -4,17 +4,34 @@ import styles from '@/pages/DesignPage/DesignPage.module.scss'
 export const TextSection = () => (
   <DesignSection
     id="text"
-    title="Text"
     intro="The display serif sets the top three heading levels; the body face sets the rest and everything you read."
   >
     <Specimen name="Headings" note="h1 is a page's title; h6 labels a small group.">
-      <div className={styles.stack}>
-        <h1>Heading one</h1>
-        <h2>Heading two</h2>
-        <h3>Heading three</h3>
-        <h4>Heading four</h4>
-        <h5>Heading five</h5>
-        <h6>Heading six</h6>
+      <div className={styles.headings}>
+        <div className={styles.headingRow}>
+          <code className={styles.tag}>h1</code>
+          <h1>Heading one</h1>
+        </div>
+        <div className={styles.headingRow}>
+          <code className={styles.tag}>h2</code>
+          <h2>Heading two</h2>
+        </div>
+        <div className={styles.headingRow}>
+          <code className={styles.tag}>h3</code>
+          <h3>Heading three</h3>
+        </div>
+        <div className={styles.headingRow}>
+          <code className={styles.tag}>h4</code>
+          <h4>Heading four</h4>
+        </div>
+        <div className={styles.headingRow}>
+          <code className={styles.tag}>h5</code>
+          <h5>Heading five</h5>
+        </div>
+        <div className={styles.headingRow}>
+          <code className={styles.tag}>h6</code>
+          <h6>Heading six</h6>
+        </div>
       </div>
     </Specimen>
 
@@ -44,7 +61,12 @@ export const TextSection = () => (
 
     <Specimen name="Preformatted">
       <pre>
-        <code>{`docker compose up -d --build\nopen http://localhost:8484`}</code>
+        <code>
+          <span className={styles.prompt}>$ </span>
+          {'docker compose up -d --build\n'}
+          <span className={styles.prompt}>$ </span>
+          {'open http://localhost:8484'}
+        </code>
       </pre>
     </Specimen>
 

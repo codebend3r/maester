@@ -1,0 +1,184 @@
+.rows {
+  display: grid;
+}
+
+// Name, value, sample: three across where there is room, stacked where not.
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(11.25rem, 100%), 1fr));
+  gap: var(--space-1) var(--space-4);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line-faint);
+}
+
+.name code,
+.value code {
+  padding: 0;
+  border: 0;
+  background: none;
+  overflow-wrap: anywhere;
+}
+
+.name code {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.value {
+  display: grid;
+  gap: 2px;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+
+  code {
+    color: inherit;
+    font-size: inherit;
+  }
+}
+
+.note {
+  color: var(--color-lichen);
+}
+
+.sample {
+  display: grid;
+  justify-items: start;
+  min-width: 0;
+  color: var(--color-bark);
+}
+
+.bar {
+  height: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-lichen);
+}
+
+.radius {
+  width: 3.5rem;
+  height: 2.5rem;
+  border: 1.5px solid var(--color-lichen);
+  background: var(--color-moss);
+}
+
+.family,
+.size {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.family {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-tight);
+}
+
+// The descenders need the room the solid line height takes away.
+.size {
+  padding-bottom: 0.18em;
+  font-family: var(--font-display);
+  line-height: var(--line-heading);
+}
+
+.line {
+  max-width: 20rem;
+  font-size: var(--font-size-sm);
+}
+
+.tracking {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-tight);
+}
+
+.eyebrow {
+  color: var(--color-birch);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.ease {
+  width: var(--control-size);
+  height: var(--control-size);
+  border-radius: var(--radius-md);
+  background: var(--color-lichen);
+}
+
+// The curve plays as the row is pointed at; under reduced motion the square
+// stays where it is.
+@media (prefers-reduced-motion: no-preference) {
+  .ease {
+    transition-property: transform;
+    transition-duration: 500ms;
+  }
+
+  .row:hover .ease {
+    transform: translateX(7.5rem) rotate(8deg);
+  }
+}
+
+.shadow {
+  width: 3.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+}
+
+.textShadow {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-birch), var(--color-lichen));
+  color: var(--color-on-picture);
+  font-weight: 600;
+}
+
+// A made-up picture, the fade laid over it.
+.fade,
+.glowGround {
+  display: grid;
+  grid-template-areas: 'stack';
+  width: 8rem;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+.fade {
+  background: linear-gradient(135deg, var(--color-leaf-bright), var(--color-moss));
+}
+
+.fadeOver {
+  grid-area: stack;
+}
+
+.glowGround {
+  border: 1px solid var(--color-line);
+  background: var(--color-night);
+}
+
+.glow {
+  grid-area: stack;
+  background: radial-gradient(circle at 35% 40%, var(--color-leaf), transparent 70%);
+}
+
+.height {
+  width: 6rem;
+  border-radius: var(--radius-md);
+  background: var(--color-moss);
+}
+
+.border {
+  width: 6rem;
+  border-top-style: dashed;
+  border-top-color: var(--color-lichen);
+}
+
+.focus {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-moss);
+  font-size: var(--font-size-sm);
+  outline-offset: 3px;
+}

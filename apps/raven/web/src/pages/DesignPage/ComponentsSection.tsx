@@ -1,6 +1,6 @@
 import { DEFAULT_LIBRARY_SETTINGS, type LibrarySettings } from '@raven/core'
 import { useRef, useState } from 'react'
-import { Button, ButtonLink, ICON_NAMES, Icon, Controls } from '@raven/ui'
+import { Button, ButtonLink, Controls } from '@raven/ui'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
@@ -13,6 +13,7 @@ import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
+import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { ShowGrid } from '@/components/ShowCard/ShowCard'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
@@ -20,6 +21,7 @@ import { WatchedMark } from '@/components/WatchedMark/WatchedMark'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { useSearch } from '@/lib/useSearch'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
+import { IconSet } from '@/pages/DesignPage/IconSet'
 import {
   FEATURED_SAMPLE,
   SAMPLE_CREDITS,
@@ -62,27 +64,35 @@ const ControlsDemo = () => {
   const [paused, setPaused] = useState(true)
   return (
     <div className={styles.stage}>
-      <Controls
-        shown
-        paused={paused}
-        time={2400}
-        duration={6120}
-        buffered={[[0, 2700]]}
-        volume={0.7}
-        muted={false}
-        fullscreen={false}
-        subtitlesOn
-        menuOpen={false}
-        settingsButton={settingsButton}
-        onTogglePlay={() => setPaused((current) => !current)}
-        onSeek={noop}
-        onSkip={noop}
-        onVolume={noop}
-        onToggleMute={noop}
-        onToggleSubtitles={noop}
-        onToggleMenu={noop}
-        onToggleFullscreen={noop}
-      />
+      <span className={styles.picture} aria-hidden="true" />
+      <div className={styles.controlsLayer}>
+        <Controls
+          shown
+          paused={paused}
+          time={2400}
+          duration={6120}
+          buffered={[[0, 2700]]}
+          chapters={[0, 1260, 2880, 4380]}
+          volume={0.7}
+          muted={false}
+          fullscreen={false}
+          subtitlesOn
+          menuValues={{
+            subtitles: 'English',
+            audio: 'English 5.1',
+            playback: '1080p · Direct play',
+          }}
+          menuOpen={false}
+          settingsButton={settingsButton}
+          onTogglePlay={() => setPaused((current) => !current)}
+          onSeek={noop}
+          onSkip={noop}
+          onVolume={noop}
+          onToggleMute={noop}
+          onToggleMenu={noop}
+          onToggleFullscreen={noop}
+        />
+      </div>
     </div>
   )
 }
@@ -90,12 +100,11 @@ const ControlsDemo = () => {
 export const ComponentsSection = () => (
   <DesignSection
     id="components"
-    title="Components"
     intro="Every shared component, with made-up videos. Nothing here saves; the library dialog and folder browser are left out because they change real libraries."
   >
     <Specimen
       name="Button"
-      note="Quiet by default; primary for the one action a screen is for, and large where that action is the page's whole point."
+      note="Quiet by default; primary for the one action a screen is for, and large where that action is the page's whole point. Danger is an outline; a way back is a pill."
     >
       <div className={styles.row}>
         <Button tone="primary" size="large" icon="play">
@@ -108,11 +117,14 @@ export const ComponentsSection = () => (
         <Button tone="danger" icon="trash">
           Delete for good
         </Button>
+        <Button tone="ghost" icon="history">
+          History
+        </Button>
         <Button icon="close" aria-label="Close" />
         <Button disabled icon="rescan">
           Rescan
         </Button>
-        <ButtonLink to="/" icon="back">
+        <ButtonLink tone="pill" to="/" icon="back">
           Libraries
         </ButtonLink>
       </div>
@@ -120,16 +132,9 @@ export const ComponentsSection = () => (
 
     <Specimen
       name="Icon"
-      note="Line icons on a 24 grid, decorative unless their control is labelled."
+      note="Line icons on a 24 grid, drawn at 28 here, decorative unless their control is labelled. Point at one to see how it moves in a control; press it to copy its name."
     >
-      <ul className={styles.icons}>
-        {ICON_NAMES.map((name) => (
-          <li key={name} className={styles.icon}>
-            <Icon name={name} size={24} />
-            <code>{name}</code>
-          </li>
-        ))}
-      </ul>
+      <IconSet />
     </Specimen>
 
     <Specimen
@@ -147,25 +152,25 @@ export const ComponentsSection = () => (
     </Specimen>
 
     <Specimen name="ScanStatus">
-      <div className={styles.fields}>
+      <ul className={styles.cards}>
         {SAMPLE_SCANS.map(({ label, scan }) => (
-          <div key={label} className={styles.field}>
-            <span className={styles.hint}>{label}</span>
+          <li key={label} className={styles.card}>
+            <span className={styles.eyebrowLabel}>{label}</span>
             <ScanStatus scan={scan} />
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </Specimen>
 
     <Specimen name="PlaybackNote" note="Only for a video this browser cannot play.">
-      <div className={styles.stack}>
+      <ul className={styles.ruledList}>
         {SAMPLE_MEDIA.slice(0, 4).map((media) => (
-          <div key={media.id} className={styles.noteRow}>
-            <span>{media.title}</span>
+          <li key={media.id} className={styles.noteRow}>
+            <span className={styles.noteTitle}>{media.title}</span>
             <PlaybackNote media={media} />
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </Specimen>
 
     <Specimen name="MediaCard" note="With its menu, a resume line, a favourite and HDR.">
@@ -190,6 +195,7 @@ export const ComponentsSection = () => (
 
     <Specimen
       name="ItemHeader"
+      isWide
       note="The top of a movie's page, with the way back to its library, without its backdrop here."
     >
       <ItemHeader
@@ -208,6 +214,13 @@ export const ComponentsSection = () => (
         </Button>
         <Button icon="heart" aria-label="Favourite" aria-pressed />
       </ItemHeader>
+    </Specimen>
+
+    <Specimen
+      name="SectionHeading"
+      note="A section's title in the serif, ruled off from what follows, with room at its right for a count or the section's own controls."
+    >
+      <SectionHeading aside="6 people">Cast &amp; Crew</SectionHeading>
     </Specimen>
 
     <Specimen
@@ -234,7 +247,7 @@ export const ComponentsSection = () => (
       <MediaGrid items={SAMPLE_MEDIA} />
     </Specimen>
 
-    <Specimen name="MediaList">
+    <Specimen name="MediaList" isWide>
       <MediaList items={SAMPLE_MEDIA} />
     </Specimen>
 
@@ -247,6 +260,14 @@ export const ComponentsSection = () => (
     </Specimen>
 
     <Specimen
+      name="LibraryToolbar"
+      isWide
+      note="Its search, sort, views and Play all, saving to nothing here."
+    >
+      <ToolbarDemo />
+    </Specimen>
+
+    <Specimen
       name="Skeleton"
       note="What a page shows while it waits: the shape of what is coming, which a screen reader hears as one line."
     >
@@ -254,10 +275,6 @@ export const ComponentsSection = () => (
         <MediaGridSkeleton posters count={4} />
         <MediaTilesSkeleton />
       </Loading>
-    </Specimen>
-
-    <Specimen name="LibraryToolbar">
-      <ToolbarDemo />
     </Specimen>
 
     <Specimen name="Controls" note="The player's bar; play and pause work here, nothing else does.">

@@ -1,6 +1,6 @@
 import { describe, expect, it, mock, spyOn } from 'bun:test'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { Scrubber } from '@/components/Player/Scrubber'
+import { Scrubber, chapterMask } from '@/components/Player/Scrubber'
 
 describe('Scrubber', () => {
   it('previews pointer dragging, clamps it, and seeks only on release', () => {
@@ -42,5 +42,30 @@ describe('Scrubber', () => {
     fireEvent.pointerDown(slider, { button: 1, clientX: 10 })
     fireEvent.pointerUp(slider, { clientX: 10 })
     expect(seek).not.toHaveBeenCalled()
+  })
+
+  it('cuts a gap into the track at each chapter inside the video', () => {
+    expect(chapterMask({ chapters: [], duration: 100 })).toBeNull()
+    expect(chapterMask({ chapters: [0, 100, 140], duration: 100 })).toBeNull()
+    const mask = chapterMask({ chapters: [50, 25], duration: 100 })
+    expect(mask).toBe(
+      [
+        'linear-gradient(to right, var(--color-stage) 0% calc(25% - var(--chapter-gap) / 2)',
+        'transparent calc(25% - var(--chapter-gap) / 2) calc(25% + var(--chapter-gap) / 2)',
+        'var(--color-stage) calc(25% + var(--chapter-gap) / 2) calc(50% - var(--chapter-gap) / 2)',
+        'transparent calc(50% - var(--chapter-gap) / 2) calc(50% + var(--chapter-gap) / 2)',
+        'var(--color-stage) calc(50% + var(--chapter-gap) / 2) 100%)',
+      ].join(', '),
+    )
+  })
+
+  it('draws an unbroken track without chapters', () => {
+    const { container, rerender } = render(
+      <Scrubber time={0} duration={100} buffered={[]} onSeek={() => {}} />,
+    )
+    const rail = container.querySelector('.rail')
+    expect(rail?.getAttribute('style') ?? '').not.toContain('mask')
+    rerender(<Scrubber time={0} duration={100} buffered={[]} chapters={[40]} onSeek={() => {}} />)
+    expect(rail?.getAttribute('style') ?? '').toContain('40%')
   })
 })

@@ -56,7 +56,7 @@ export type PlayerServices = {
   isVolumeFixed?: boolean
   /** Replaces Unplayable's "This video can't play in this browser." */
   unplayableNote?: string
-  /** Plays this title in another player: Unplayable's first action, and the settings menu's last. */
+  /** Plays this title in another player: Unplayable's first action, and a row in the Playback menu. */
   handoff?: Handoff
   /** The native engine's error, before Unplayable shows it, for a host that can recover (a relocked library). */
   onEngineError?: (error: { reason: PlayerErrorReason; message: string }) => void

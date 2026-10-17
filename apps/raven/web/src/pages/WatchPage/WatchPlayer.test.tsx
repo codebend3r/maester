@@ -237,12 +237,12 @@ describe('WatchPlayer Open in raven player', () => {
     expect(screen.queryByRole('button', { name: 'Open in raven player' })).toBeNull()
   })
 
-  it('offers nothing in the settings menu while this browser has not asked for it', async () => {
+  it('offers nothing in the playback menu while this browser has not asked for it', async () => {
     renderWithProviders(
       <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
+    const menu = await screen.findByRole('dialog', { name: 'Playback' })
     expect(within(menu).queryByRole('button', { name: 'Open in raven player' })).toBeNull()
   })
 
@@ -316,8 +316,8 @@ describe('WatchPlayer Open in raven player', () => {
       }),
     )
     playingAt({ video, seconds: 42.7 })
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
+    const menu = await screen.findByRole('dialog', { name: 'Playback' })
     await userEvent.click(within(menu).getByRole('button', { name: 'Open in raven player' }))
     expect(order).toEqual(['pause', 'open'])
     expect(open.mock.calls).toEqual([

@@ -36,7 +36,7 @@ export const Unplayable = ({
     <section className={styles.unplayable} aria-labelledby="unplayable-title">
       {!!thumbnail && <img className={styles.backdrop} src={thumbnail} alt="" aria-hidden="true" />}
       <div className={styles.panel}>
-        <Button icon="back" className={styles.panelBack} onClick={onBack}>
+        <Button tone="ghost" icon="back" className={styles.panelBack} onClick={onBack}>
           Back
         </Button>
         <h1 id="unplayable-title" className={styles.panelTitle}>
@@ -61,7 +61,7 @@ export const Unplayable = ({
             </Button>
           )}
           {escape && (
-            <Button icon={escape.icon ?? 'copy'} onClick={escape.run}>
+            <Button icon={escape.icon ?? 'copy'} className={styles.escape} onClick={escape.run}>
               {escape.label}
             </Button>
           )}

@@ -76,7 +76,10 @@ test.describe.serial('choosing how this computer sends sound', () => {
         await openFile({ app, path: clips.first })
         await expect(page.getByRole('heading', { name: 'Clip 01', exact: true })).toBeVisible()
         await expect(page.locator('html')).toHaveAttribute('data-surface', 'native')
-        await expect(page.getByRole('slider', { name: 'Volume' })).toBeDisabled()
+        // The mute button, since the slider hides on a window as narrow as CI's.
+        await expect(
+          page.getByRole('button', { name: 'Volume is set on your receiver' }),
+        ).toBeDisabled()
       },
     })
   })

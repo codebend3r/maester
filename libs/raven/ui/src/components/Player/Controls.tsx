@@ -1,7 +1,8 @@
 import { formatDuration } from '@raven/core'
-import { type RefObject, useId } from 'react'
+import { type ReactNode, type RefObject, useId } from 'react'
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import styles from '@/components/Player/Controls.module.scss'
+import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
 import { Scrubber } from '@/components/Player/Scrubber'
 import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
 
@@ -15,40 +16,83 @@ const muteLabel = ({ isVolumeFixed, muted }: { isVolumeFixed: boolean; muted: bo
   return muted ? 'Unmute (m)' : 'Mute (m)'
 }
 
-/** A round icon button for the bar; every one carries its own label. */
+/** What each pill wears in place of its words on a phone. */
+const MENU_ICONS = {
+  subtitles: 'captions',
+  audio: 'headphones',
+  playback: 'settings',
+} as const satisfies Record<MenuSection, IconName>
+
+const classes = (...names: ReadonlyArray<string | false | undefined>): string =>
+  names.filter(Boolean).join(' ')
+
+/** A round button for the bar; every one carries its own label. */
 const ControlButton = ({
-  icon,
   label,
   onClick,
-  pressed,
-  expanded,
   className,
-  buttonRef,
   disabled,
+  children,
 }: {
-  icon: IconName
   label: string
   onClick: () => void
-  pressed?: boolean
-  expanded?: boolean
   className?: string
-  buttonRef?: RefObject<HTMLButtonElement | null>
   disabled?: boolean
+  children: ReactNode
 }) => (
   <button
-    ref={buttonRef}
     type="button"
-    className={[styles.button, className ?? ''].filter(Boolean).join(' ')}
+    className={classes(styles.button, className)}
     aria-label={label}
-    aria-pressed={pressed}
-    aria-expanded={expanded}
     title={label}
     disabled={disabled}
     onClick={onClick}
   >
-    <Icon name={icon} size={22} />
+    {children}
   </button>
 )
+
+/**
+ * A glass pill naming a menu and what it is set to, "Subtitles · English".
+ * The quality pill shows only its value, "4K · Direct play". On a phone
+ * each shrinks to its icon, its label unchanged.
+ */
+const MenuPill = ({
+  section,
+  value,
+  open,
+  buttonRef,
+  onToggle,
+}: {
+  section: MenuSection
+  value: string | null
+  open: boolean
+  buttonRef: RefObject<HTMLButtonElement | null> | undefined
+  onToggle: (section: MenuSection) => void
+}) => {
+  const title = MENU_TITLES[section]
+  const showsTitle = section !== 'playback' || value == null
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      className={classes(styles.pill, open && styles.open)}
+      aria-label={value == null ? title : `${title}: ${value}`}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      onClick={() => onToggle(section)}
+    >
+      <span className={styles.pillIcon}>
+        <Icon name={MENU_ICONS[section]} size={20} />
+      </span>
+      <span className={styles.pillText}>
+        {showsTitle && title}
+        {showsTitle && value != null && <span className={styles.dot}> · </span>}
+        {value}
+      </span>
+    </button>
+  )
+}
 
 export type ControlsProps = {
   shown: boolean
@@ -56,27 +100,33 @@ export type ControlsProps = {
   time: number
   duration: number | null
   buffered: ReadonlyArray<[number, number]>
+  /** Where each chapter starts, in seconds; without them the timeline is unbroken. */
+  chapters?: readonly number[]
   volume: number
   muted: boolean
   /** The output carries the sound untouched, so the volume cannot change here. */
   isVolumeFixed?: boolean
   fullscreen: boolean
   subtitlesOn: boolean
-  menuOpen: boolean
+  /** What each pill says it is set to: "English", "English 5.1", "4K · Direct play". */
+  menuValues?: Partial<Record<MenuSection, string | null>>
+  /** The menu showing, if any. */
+  menuOpen: MenuSection | false
+  /** Held by the open menu's pill, for focus to go back to when the menu closes. */
   settingsButton: RefObject<HTMLButtonElement | null>
   onTogglePlay: () => void
   onSeek: (time: number) => void
   onSkip: (seconds: number) => void
   onVolume: (volume: number) => void
   onToggleMute: () => void
-  onToggleSubtitles: () => void
-  onToggleMenu: () => void
+  onToggleMenu: (section: MenuSection) => void
   onToggleFullscreen: () => void
 }
 
 /**
- * The bar along the bottom: the timeline, then play, skips, volume and the
- * clock on the left, subtitles, settings and full screen on the right.
+ * The bar along the bottom: the timeline, then play, the skips, volume and
+ * the clock on the left, and glass pills for subtitles, audio, quality and
+ * full screen on the right.
  */
 export const Controls = ({
   shown,
@@ -84,11 +134,13 @@ export const Controls = ({
   time,
   duration,
   buffered,
+  chapters,
   volume,
   muted,
   isVolumeFixed = false,
   fullscreen,
   subtitlesOn,
+  menuValues = {},
   menuOpen,
   settingsButton,
   onTogglePlay,
@@ -96,41 +148,56 @@ export const Controls = ({
   onSkip,
   onVolume,
   onToggleMute,
-  onToggleSubtitles,
   onToggleMenu,
   onToggleFullscreen,
 }: ControlsProps) => {
   const fixedNote = useId()
+  const values: Record<MenuSection, string | null> = {
+    subtitles: menuValues.subtitles ?? (subtitlesOn ? 'On' : 'Off'),
+    audio: menuValues.audio ?? null,
+    playback: menuValues.playback ?? null,
+  }
+  const fullscreenLabel = fullscreen ? 'Exit full screen' : 'Full screen'
   return (
-    <div className={[styles.controls, shown ? '' : styles.hidden].filter(Boolean).join(' ')}>
+    <div className={classes(styles.controls, !shown && styles.hidden)}>
       <div className={styles.timeline}>
-        <Scrubber time={time} duration={duration} buffered={buffered} onSeek={onSeek} />
+        <Scrubber
+          time={time}
+          duration={duration}
+          buffered={buffered}
+          chapters={chapters}
+          onSeek={onSeek}
+        />
       </div>
       <ControlButton
-        icon={paused ? 'play' : 'pause'}
         label={paused ? 'Play (k)' : 'Pause (k)'}
         onClick={onTogglePlay}
         className={styles.play}
-      />
+      >
+        <Icon name={paused ? 'play' : 'pause'} size={24} />
+      </ControlButton>
       <ControlButton
-        icon="rewind"
         label="Back 10 seconds (j)"
         onClick={() => onSkip(-10)}
-        className={styles.back}
-      />
+        className={classes(styles.skip, styles.back)}
+      >
+        -10
+      </ControlButton>
       <ControlButton
-        icon="forward"
         label="Forward 10 seconds (l)"
         onClick={() => onSkip(10)}
-        className={styles.forward}
-      />
+        className={classes(styles.skip, styles.forward)}
+      >
+        +10
+      </ControlButton>
       <div className={styles.volume}>
         <ControlButton
-          icon={volumeIcon({ volume, muted })}
           label={muteLabel({ isVolumeFixed, muted })}
           onClick={onToggleMute}
           disabled={isVolumeFixed}
-        />
+        >
+          <Icon name={volumeIcon({ volume, muted })} size={22} />
+        </ControlButton>
         <input
           className={styles.volumeSlider}
           type="range"
@@ -153,27 +220,29 @@ export const Controls = ({
         <span>{formatDuration(time)}</span>
         <span className={styles.total}> / {formatDuration(duration)}</span>
       </p>
-      <ControlButton
-        icon="captions"
-        label={subtitlesOn ? 'Subtitles off (c)' : 'Subtitles on (c)'}
-        pressed={subtitlesOn}
-        onClick={onToggleSubtitles}
-        className={[styles.captions, subtitlesOn ? styles.on : ''].filter(Boolean).join(' ')}
-      />
-      <ControlButton
-        icon="settings"
-        label="Settings"
-        expanded={menuOpen}
-        onClick={onToggleMenu}
-        buttonRef={settingsButton}
-        className={styles.settings}
-      />
-      <ControlButton
-        icon={fullscreen ? 'fullscreenExit' : 'fullscreen'}
-        label={fullscreen ? 'Exit full screen (f)' : 'Full screen (f)'}
-        onClick={onToggleFullscreen}
-        className={styles.fullscreen}
-      />
+      <div className={styles.pills}>
+        {MENU_SECTIONS.map((section) => (
+          <MenuPill
+            key={section}
+            section={section}
+            value={values[section]}
+            open={menuOpen === section}
+            buttonRef={menuOpen === section ? settingsButton : undefined}
+            onToggle={onToggleMenu}
+          />
+        ))}
+        <button
+          type="button"
+          className={styles.pill}
+          aria-label={`${fullscreenLabel} (f)`}
+          onClick={onToggleFullscreen}
+        >
+          <span className={styles.pillIcon}>
+            <Icon name={fullscreen ? 'fullscreenExit' : 'fullscreen'} size={20} />
+          </span>
+          <span className={styles.pillText}>{fullscreenLabel}</span>
+        </button>
+      </div>
     </div>
   )
 }

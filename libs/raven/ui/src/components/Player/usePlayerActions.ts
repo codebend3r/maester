@@ -1,6 +1,7 @@
 import type { BezelState } from '@/components/Player/Bezel'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import type { EngineHandle } from '@/components/Player/engine'
+import type { MenuSection } from '@/components/Player/menus'
 import { preferredSubtitle } from '@/components/Player/selection'
 import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
 import { type PlayerAction, stepCaptionScale, stepSpeed } from '@/lib/shortcuts'
@@ -14,8 +15,8 @@ const FALLBACK_FRAME_RATE = 24
 const clamp = ({ value, min, max }: { value: number; min: number; max: number }): number =>
   Math.min(max, Math.max(min, value))
 
-/** What sits over the picture besides the controls: at most one of the two. */
-export type Overlay = 'none' | 'settings' | 'shortcuts'
+/** What sits over the picture besides the controls: one pill's menu or the shortcuts, never both. */
+export type Overlay = 'none' | 'shortcuts' | MenuSection
 
 /**
  * What the player does, for the keys and the buttons alike: `act` answers a
@@ -164,7 +165,7 @@ export const usePlayerActions = ({
         return
       case 'escape':
         if (overlay === 'shortcuts') setOverlay(() => 'none')
-        else if (overlay === 'settings') closeMenu()
+        else if (overlay !== 'none') closeMenu()
         else if (closeInfo) closeInfo()
         else if (document.fullscreenElement) void document.exitFullscreen()
         else leave()

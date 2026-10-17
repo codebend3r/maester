@@ -1,15 +1,18 @@
+// Dark glass over the picture in every theme, like the player's menus.
 .dialog {
   display: grid;
   // Centred by the browser in the top layer; its own margin does that.
   padding: var(--space-4);
-  border: 1px solid var(--color-moss);
-  color: var(--color-bark);
+  border: 1px solid color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+  color: var(--color-on-picture);
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--space-3);
   width: min(var(--measure), 100%);
   max-height: calc(100dvh - 2 * var(--space-3));
-  border-radius: var(--radius-md);
-  background: var(--color-canopy);
+  border-radius: var(--radius-xl);
+  background: var(--color-picture-glass);
+  box-shadow: var(--shadow-popover);
+  backdrop-filter: blur(14px);
 }
 
 .dialog:not([open]) {
@@ -36,18 +39,18 @@
 .close {
   display: grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--control-size);
+  height: var(--control-size);
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: var(--color-lichen);
+  color: var(--color-on-picture-soft);
   cursor: pointer;
 
   &:hover {
-    background: var(--color-moss);
-    color: var(--color-bark);
+    background: color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+    color: var(--color-on-picture);
   }
 }
 
@@ -74,17 +77,18 @@
 .key {
   min-width: 1.75rem;
   padding: 0.1rem var(--space-1);
-  border: 1px solid var(--color-moss);
+  border: 1px solid color-mix(in srgb, var(--color-on-picture) 16%, transparent);
   border-bottom-width: 2px;
   border-radius: var(--radius-sm);
-  background: var(--color-night);
-  color: var(--color-bark);
+  background: color-mix(in srgb, var(--color-on-picture) 8%, transparent);
+  box-shadow: none;
+  color: var(--color-on-picture);
   font-family: var(--font-body);
   font-size: var(--font-size-xs);
   text-align: center;
 }
 
 .action {
-  color: var(--color-lichen);
+  color: var(--color-on-picture-soft);
   font-size: var(--font-size-sm);
 }

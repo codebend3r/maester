@@ -1,27 +1,71 @@
 import { formatDuration } from '@raven/core'
-import { type PointerEvent, useRef, useState } from 'react'
+import { type CSSProperties, type PointerEvent, useRef, useState } from 'react'
 import styles from '@/components/Player/Scrubber.module.scss'
 
+const share = ({ time, duration }: { time: number; duration: number }): number =>
+  duration > 0 ? Math.min(100, Math.max(0, (time / duration) * 100)) : 0
+
 const percent = ({ time, duration }: { time: number; duration: number }): string =>
-  `${duration > 0 ? Math.min(100, Math.max(0, (time / duration) * 100)) : 0}%`
+  `${share({ time, duration })}%`
+
+const NO_CHAPTERS: readonly number[] = []
+
+const gapStart = (at: number): string => `calc(${at}% - var(--chapter-gap) / 2)`
+const gapEnd = (at: number): string => `calc(${at}% + var(--chapter-gap) / 2)`
 
 /**
- * The timeline: what is buffered, what has played, and a leaf for the
- * playhead. Hovering shows the time under the pointer. Dragging previews
- * and seeks once, on release, so a converted stream is not restarted for
- * every pixel. The keyboard reaches it through the player's own arrows,
- * Home and End.
+ * A mask that cuts a gap into the track at each chapter's start, so the
+ * buffered and played stretches break there too. A mask reads only alpha,
+ * so any opaque colour does for the parts that show. Null without chapters
+ * inside the video.
+ */
+export const chapterMask = ({
+  chapters,
+  duration,
+}: {
+  chapters: readonly number[]
+  duration: number
+}): string | null => {
+  const cuts = chapters
+    .filter((start) => start > 0 && start < duration)
+    .toSorted((a, b) => a - b)
+    .map((start) => share({ time: start, duration }))
+  if (cuts.length === 0) return null
+  const solid = 'var(--color-stage)'
+  const stops = cuts.reduce<{ from: string; parts: string[] }>(
+    (acc, at) => ({
+      from: gapEnd(at),
+      parts: [
+        ...acc.parts,
+        `${solid} ${acc.from} ${gapStart(at)}`,
+        `transparent ${gapStart(at)} ${gapEnd(at)}`,
+      ],
+    }),
+    { from: '0%', parts: [] },
+  )
+  return `linear-gradient(to right, ${[...stops.parts, `${solid} ${stops.from} 100%`].join(', ')})`
+}
+
+/**
+ * The timeline: what is buffered, what has played, and a round thumb for
+ * the playhead, broken at each chapter when the video has them. Hovering
+ * shows the time under the pointer. Dragging previews and seeks once, on
+ * release, so a converted stream is not restarted for every pixel. The
+ * keyboard reaches it through the player's own arrows, Home and End.
  */
 export const Scrubber = ({
   time,
   duration,
   buffered,
+  chapters = NO_CHAPTERS,
   onSeek,
 }: {
   time: number
   duration: number | null
   /** File-time ranges. */
   buffered: ReadonlyArray<[number, number]>
+  /** Where each chapter starts, in seconds of the file. */
+  chapters?: readonly number[]
   onSeek: (time: number) => void
 }) => {
   const track = useRef<HTMLDivElement>(null)
@@ -29,6 +73,10 @@ export const Scrubber = ({
   const [dragging, setDragging] = useState<number | null>(null)
   const total = duration ?? 0
   const shown = dragging ?? time
+  const mask = chapterMask({ chapters, duration: total })
+  const railStyle: CSSProperties | undefined = mask
+    ? { maskImage: mask, WebkitMaskImage: mask }
+    : undefined
 
   const timeAt = (clientX: number): number => {
     const box = track.current?.getBoundingClientRect()
@@ -80,7 +128,7 @@ export const Scrubber = ({
       onPointerCancel={() => setDragging(null)}
       onPointerLeave={() => setHover(null)}
     >
-      <span className={styles.rail} aria-hidden="true">
+      <span className={styles.rail} style={railStyle} aria-hidden="true">
         {buffered.map(([start, end]) => (
           <span
             key={`${start}-${end}`}

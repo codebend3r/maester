@@ -18,6 +18,14 @@ import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { Bezel } from '@/components/Player/Bezel'
 import { Controls } from '@/components/Player/Controls'
+import { Icon } from '@/components/Icon/Icon'
+import { type MenuSection, isMenuSection } from '@/components/Player/menus'
+import {
+  aboutLine,
+  audioPillLabel,
+  qualityLabel,
+  subtitlePillLabel,
+} from '@/components/Player/playbackFacts'
 import styles from '@/components/Player/Player.module.scss'
 import { type PlaybackFile, PlaybackInfo } from '@/components/Player/PlaybackInfo'
 import { playingAudio } from '@/components/Player/selection'
@@ -68,7 +76,11 @@ export const Stage = ({ engine, ...props }: StageProps) => {
   )
 }
 
-/** Shared controls consume only the engine handle, never the picture's DOM. */
+/**
+ * Shared controls consume only the engine handle, never the picture's DOM:
+ * the top bar with the way back, the title and what is playing, the bar at
+ * the bottom, and the menus and dialogs over the picture.
+ */
 export const PlayerChrome = ({
   engine,
   onBack,
@@ -86,16 +98,17 @@ export const PlayerChrome = ({
   subtitleStatus: SubtitleStatus
   renderSubtitles?: (lifted: boolean) => ReactNode
   fullscreen: ReturnType<typeof useFullscreen>
-  /** The library file playing, for Playback info; null for a local file. */
+  /** The library file playing, for the line under the title and Playback info; null for a local file. */
   file?: PlaybackFile | null
 }) => {
   const { title, hostActions, favourite, chrome, isVolumeFixed, handoff } = usePlayerServices()
+  const media = file?.media ?? null
   const label = title.label
   const { state, duration, actions } = engine
   const seek = actions.seek
   const root = useRef<HTMLDivElement>(null)
   const menu = useRef<HTMLDialogElement>(null)
-  const settingsButton = useRef<HTMLButtonElement>(null)
+  const menuButton = useRef<HTMLButtonElement>(null)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)
   useWatchProgress({ state, position: engine.position, duration })
@@ -122,8 +135,11 @@ export const PlayerChrome = ({
 
   const closeMenu = () => {
     setOverlay('none')
-    if (settingsButton.current !== null) settingsButton.current.focus()
+    if (menuButton.current !== null) menuButton.current.focus()
   }
+
+  const toggleMenu = (section: MenuSection) =>
+    overlay === section ? closeMenu() : setOverlay(section)
 
   const showInfo = () => {
     closeMenu()
@@ -184,9 +200,9 @@ export const PlayerChrome = ({
   const onStagePointerDown = (event: SyntheticEvent) => {
     idle.wake()
     const target = event.target
-    if (overlay !== 'settings' || !(target instanceof Node)) return
+    if (!isMenuSection(overlay) || !(target instanceof Node)) return
     const isInMenu = menu.current?.contains(target) ?? false
-    if (isInMenu || (settingsButton.current?.contains(target) ?? false)) return
+    if (isInMenu || (menuButton.current?.contains(target) ?? false)) return
     setOverlay('none')
   }
 
@@ -212,6 +228,7 @@ export const PlayerChrome = ({
   }
 
   const chromeShown = idle.active
+  const about = aboutLine({ media, label, mode })
 
   // The scrubber and the clock keep what they showed while the controls are
   // hidden, so a quiet page changes nothing in the DOM. Adjusting state during
@@ -241,6 +258,12 @@ export const PlayerChrome = ({
       {engine.surface}
       {!engine.drawsSubtitles && (renderSubtitles?.(chromeShown) ?? null)}
       {state.waiting && !state.paused && <output className={styles.spinner} aria-label="Loading" />}
+      {state.paused && chromeShown && (
+        // The picture under it takes the click; this only says a click will play.
+        <span className={styles.paused} aria-hidden="true">
+          <Icon name="play" size={40} />
+        </span>
+      )}
       {!!bezel && <Bezel key={bezel.id} bezel={bezel} />}
       <p className="visually-hidden" aria-live="polite">
         {bezel?.text ?? null}
@@ -250,10 +273,18 @@ export const PlayerChrome = ({
           .filter(Boolean)
           .join(' ')}
       >
-        <Button icon="back" aria-label="Back" className={styles.back} onClick={onBack} />
+        <Button
+          tone="ghost"
+          icon="back"
+          aria-label="Back"
+          className={styles.back}
+          onClick={onBack}
+        />
         <h1 className={styles.title}>{label}</h1>
+        <p className={styles.about}>{about}</p>
         {favourite && (
           <Button
+            tone="ghost"
             icon="heart"
             aria-label="Favourite"
             aria-pressed={favourite.isFavourite}
@@ -268,6 +299,7 @@ export const PlayerChrome = ({
             to={nextLink.to}
             state={nextLink.state}
             replace
+            tone="ghost"
             icon="next"
             className={styles.next}
             aria-label={`Next: ${nextLink.label}`}
@@ -279,7 +311,9 @@ export const PlayerChrome = ({
         {resumedAt != null && (
           <p className={styles.resumed} aria-live="polite">
             <span>Resumed at {formatDuration(resumedAt)}</span>
-            <Button onClick={startOver}>Start over</Button>
+            <Button tone="ghost" className={styles.startOver} onClick={startOver}>
+              Start over
+            </Button>
           </p>
         )}
       </header>
@@ -294,15 +328,24 @@ export const PlayerChrome = ({
         isVolumeFixed={isVolumeFixed}
         fullscreen={fullscreen.fullscreen}
         subtitlesOn={selection.subtitle != null}
-        menuOpen={overlay === 'settings'}
-        settingsButton={settingsButton}
+        menuValues={{
+          subtitles: subtitlePillLabel(selection.subtitle),
+          audio: audioPillLabel({
+            mode,
+            tracks: selection.tracks,
+            audio: selection.audio,
+            playsPickedAudio: selection.playsPickedAudio,
+          }),
+          playback: qualityLabel({ media, mode }),
+        }}
+        menuOpen={isMenuSection(overlay) ? overlay : false}
+        settingsButton={menuButton}
         onTogglePlay={controls.togglePlay}
         onSeek={seek}
         onSkip={(seconds) => controls.act({ type: 'seekBy', seconds })}
         onVolume={controls.changeVolume}
         onToggleMute={controls.toggleMute}
-        onToggleSubtitles={controls.toggleSubtitles}
-        onToggleMenu={() => (overlay === 'settings' ? closeMenu() : setOverlay('settings'))}
+        onToggleMenu={toggleMenu}
         onToggleFullscreen={fullscreen.toggle}
       />
       {infoOpen && (
@@ -320,8 +363,11 @@ export const PlayerChrome = ({
           onClose={closeInfo}
         />
       )}
-      {overlay === 'settings' && (
+      {isMenuSection(overlay) && (
         <SettingsMenu
+          // A menu of its own for each pill, so switching puts the keyboard in the new one.
+          key={overlay}
+          section={overlay}
           menuRef={menu}
           selection={{
             ...selection,
