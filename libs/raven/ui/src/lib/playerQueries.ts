@@ -37,9 +37,9 @@ export const playerQueriesFor = (api: ApiClient) => ({
       staleTime: Infinity,
       retry: false,
       refetchInterval: (query) => {
-        if (query.state.dataUpdatedAt === 0) return TICKET_REFRESH_MS
-        // A refused refresh (a relocked library answers 423) is retried gently, not every second.
+        // A refused fetch, the first included, is retried gently: a relocked library answers 423.
         if (query.state.status === 'error') return REFUSED_RETRY_MS
+        if (query.state.dataUpdatedAt === 0) return TICKET_REFRESH_MS
         return Math.max(
           MIN_REFRESH_WAIT_MS,
           query.state.dataUpdatedAt + TICKET_REFRESH_MS - Date.now(),
