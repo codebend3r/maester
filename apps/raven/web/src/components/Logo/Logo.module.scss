@@ -6,6 +6,13 @@
   gap: var(--space-1);
 }
 
+// The word is only read out, so the mark takes the one column, with no gap
+// beside it to pull it off centre.
+.markOnly {
+  grid-template-columns: auto;
+  grid-template-areas: 'mark';
+}
+
 // The width follows from the height, so the image keeps the mark's shape.
 .mark {
   grid-area: mark;

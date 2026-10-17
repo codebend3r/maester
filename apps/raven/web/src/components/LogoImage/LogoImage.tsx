@@ -1,11 +1,14 @@
+import { themeOf } from '@raven/ui'
 import { useState } from 'react'
-import { isDarkLogo } from '@/lib/logoTone'
+import { type LogoTone, logoTone } from '@/lib/logoTone'
+import { useTheme } from '@/stores/theme'
 import styles from '@/components/LogoImage/LogoImage.module.scss'
 
 /**
- * A title's logo, the art TMDB keeps on a clear ground. One that reads as
- * dark once it has loaded would vanish on the night, so it is drawn in
- * white. A caller's className sizes and places it.
+ * A title's logo, the art TMDB keeps on a clear ground. Once it has loaded,
+ * one that would vanish on the theme's ground is redrawn in one colour: a
+ * dark logo in white on a dark theme, a light one in ink on a light theme.
+ * A caller's className sizes and places it.
  */
 export const LogoImage = ({
   src,
@@ -20,10 +23,13 @@ export const LogoImage = ({
   loading?: 'lazy' | 'eager'
   onError?: () => void
 }) => {
-  const [isDark, setDark] = useState(false)
-  const classes = [className, isDark ? styles.whitened : undefined].filter(
-    (name): name is string => !!name,
-  )
+  const [tone, setTone] = useState<LogoTone>('mixed')
+  const ground = themeOf(useTheme((state) => state.theme)).tone
+  const recolour =
+    (tone === 'dark' && ground === 'dark' && styles.whitened) ||
+    (tone === 'light' && ground === 'light' && styles.inked) ||
+    undefined
+  const classes = [className, recolour].filter((name): name is string => !!name)
   return (
     <img
       className={classes.length > 0 ? classes.join(' ') : undefined}
@@ -31,7 +37,7 @@ export const LogoImage = ({
       alt={alt}
       loading={loading}
       decoding="async"
-      onLoad={(event) => setDark(isDarkLogo(event.currentTarget))}
+      onLoad={(event) => setTone(logoTone(event.currentTarget))}
       onError={onError}
     />
   )

@@ -8,6 +8,14 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>raven</title>
+    <script>
+      // The saved theme goes on before first paint, so it never flashes the
+      // default; stores/theme.ts takes over once the app loads.
+      try {
+        const theme = localStorage.getItem('raven-theme')
+        if (theme) document.documentElement.dataset.theme = theme
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

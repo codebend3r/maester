@@ -1,49 +1,85 @@
 // Design tokens and the few true primitives. Component styles live next to
 // their component as *.module.scss and use only these values.
 
-// The palette is the weirwood itself: a godswood at night for the ground,
-// bone-white bark for text, and red leaves kept for exactly two jobs, where
-// you stopped watching and the one action a screen is for.
+// Every colour a theme can change is declared here with Verdigris's value,
+// the default; themes.scss gives each theme its own. The names stay the
+// weirwood's whatever the theme: night is the page even when it is
+// parchment.
 :root {
+  // The palette is the weirwood itself: a godswood at night for the ground,
+  // bone-white bark for text, and red leaves kept for exactly two jobs, where
+  // you stopped watching and the one action a screen is for.
   --color-night: #15201e;
+  // Cards and panels.
   --color-canopy: #1c2b28;
+  // A card under the pointer.
+  --color-canopy-hi: #223430;
+  // Below the ground: wells, and the frame around the desktop window.
+  --color-deep: #0f1816;
+  // A selected row, quiet buttons and chips.
   --color-moss: #2c3e3a;
+  --color-moss-hi: #364a45;
   --color-bark: #e6e1d6;
   // 7:1 on --color-night, 6:1 on --color-canopy.
   --color-lichen: #9db0a8;
-  // A cooler bark, for what is typed into home's search beside the bark
-  // title: 10:1 on --color-canopy.
+  // A cooler bark, for body text beside a bark title: 10:1 on --color-canopy.
   --color-birch: #cfdcd2;
-  // Fills behind bark text: 5.4:1.
+  // Fills behind --color-on-leaf text: the one action a screen is for.
   --color-leaf: #a8262f;
-  // Thin marks on the dark ground (progress lines): 3.7:1 on --color-night.
+  --color-leaf-hi: #b8303a;
+  --color-on-leaf: #ffffff;
+  // Thin marks on the ground (progress lines, alerts): 3.7:1 on --color-night.
   --color-leaf-bright: #d8414a;
   // How sure Fix match is of a result, and nothing else, so the red leaves
   // keep their two jobs: fern for a Strong match (9.2:1 on --color-night),
-  // amber for a Possible one (8.7:1). As a fill they carry night text.
+  // amber for a Possible one (8.7:1). As a fill they carry night text; the
+  // light themes darken both so that holds on their pale ground.
   --color-fern: #8fcf9f;
   --color-amber: #e3b45f;
-  // A quiet edge that still clears 3:1 on --color-night: a Weak match's stamp.
+  // Large numerals and what is disabled, never body text: it clears 3:1 on
+  // --color-night, as a Weak match's stamp in Fix match must.
   --color-moss-line: #5d736c;
+  // How strongly a hero's colour wash shows, 0 to 1.
+  --glow: 0.6;
+  // Hairlines: bark mixed into the ground, so they follow the theme.
+  --color-line-faint: color-mix(in srgb, var(--color-bark) 6%, transparent);
+  --color-line: color-mix(in srgb, var(--color-bark) 10%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--color-bark) 16%, transparent);
+  // A row under the pointer that has no fill of its own.
+  --color-hover: color-mix(in srgb, var(--color-bark) 5%, transparent);
   // Letterboxing around the video is real black, not a tint.
   --color-stage: #000000;
   --color-scrim: rgb(0 0 0 / 55%);
   // The dark track under a line drawn over a picture (the resume line).
   --color-shade: rgb(0 0 0 / 45%);
-  // The ground as glass over a picture: the bezel, score chips over posters.
-  --color-night-glass: rgb(21 32 30 / 72%);
-  // Deep enough to read bark-white subtitles over snow.
-  --color-night-veil: rgb(21 32 30 / 78%);
+  // What sits on a picture keeps one look in every theme: light text over a
+  // dark scrim, and dark glass for the chrome.
+  --color-on-picture: #f1ece2;
+  --color-on-picture-soft: rgb(246 242 234 / 85%);
+  --color-picture-scrim: rgb(10 14 13 / 60%);
+  --color-picture-glass: rgb(10 14 13 / 72%);
+  // The ground as glass over a picture: score chips over posters.
+  --color-night-glass: color-mix(in srgb, var(--color-night) 72%, transparent);
+  // Deeper: a check or a count over a poster.
+  --color-night-veil: color-mix(in srgb, var(--color-night) 78%, transparent);
+  // The ground as glass under floating chrome: the tab bar, the theme button.
+  --color-night-haze: color-mix(in srgb, var(--color-night) 85%, transparent);
   // Frost on glass: the side menu over a card's picture, blurred behind it.
   --color-frost-glass: rgb(150 185 235 / 12%);
-  // The canopy over the picture: the player's settings menu, and a control
-  // button under the pointer.
-  --color-canopy-glass: rgb(28 43 40 / 96%);
-  --color-canopy-haze: rgb(28 43 40 / 85%);
+  // The canopy over the page: a popover, a menu.
+  --color-canopy-glass: color-mix(in srgb, var(--color-canopy) 96%, transparent);
+  --color-canopy-haze: color-mix(in srgb, var(--color-canopy) 85%, transparent);
   // Faint marks over the picture: the timeline's track and the spinner's
   // ring, and what of the timeline is loaded.
-  --color-bark-faint: rgb(230 225 214 / 22%);
-  --color-lichen-faint: rgb(157 176 168 / 45%);
+  --color-bark-faint: rgb(241 236 226 / 22%);
+  --color-lichen-faint: rgb(241 236 226 / 45%);
+  // Brand marks keep their own colours in every theme.
+  --color-brand-rotten-tomatoes: #d8414a;
+  --color-brand-imdb: #e3b45f;
+  --color-brand-imdb-ink: #1a1408;
+  --color-brand-metacritic: #5a9e5f;
+  --color-brand-metacritic-low: #b8303a;
+  --color-brand-tmdb: #2b7466;
   // Darkness rising from the bottom of the picture, or falling from its top,
   // so the controls and the title read over anything.
   --fade-from-bottom: linear-gradient(to top, rgb(0 0 0 / 75%), rgb(0 0 0 / 0%));
@@ -52,6 +88,11 @@
   // Shadows under what floats: a menu, and a larger panel or poster.
   --shadow-menu: 0 8px 24px rgb(0 0 0 / 40%);
   --shadow-panel: 0 12px 32px rgb(0 0 0 / 45%);
+  // A poster in a row, and the one a page is about.
+  --shadow-poster: 0 14px 30px rgb(0 0 0 / 25%);
+  --shadow-hero: 0 40px 80px rgb(0 0 0 / 45%);
+  // A popover over the page: the theme picker.
+  --shadow-popover: 0 24px 60px rgb(0 0 0 / 35%);
   // A hairline that keeps a light mark apart from a light picture.
   --shadow-outline: 0 0 0 2px rgb(0 0 0 / 35%);
   // Lifts subtitle text off a bright frame.
@@ -64,31 +105,73 @@
   --space-4: 1.5rem;
   --space-5: 2rem;
   --space-6: 3rem;
+  --space-7: 4rem;
   --space-8: 5rem;
+  // Between the sections of a long page: home's, the design page's.
+  --space-10: 7rem;
+  // The page's own inset from the frame: 20px on a phone up to 56px.
+  --gutter: clamp(1.25rem, 4vw, 3.5rem);
+  // Between a page's sections: 48px on a phone up to 72px.
+  --section-gap: clamp(3rem, 5vw, 4.5rem);
   // A desktop host sets this so the player header clears the window's traffic lights.
   --titlebar-inset: 0px;
 
+  // Rating boxes and keys.
   --radius-sm: 4px;
+  // Buttons and thumbnails.
   --radius-md: 8px;
+  // Cards, posters and fields.
+  --radius-lg: 12px;
+  // Panels: a library's row, the theme picker, review cards.
+  --radius-xl: 16px;
+  // Chips, pills and round buttons.
+  --radius-pill: 999px;
 
   --font-display: 'Young Serif', georgia, serif;
   --font-body: 'Instrument Sans Variable', system-ui, sans-serif;
   // Code, keys and anything typed exactly.
   --font-mono: ui-monospace, 'SF Mono', menlo, consolas, monospace;
 
+  // Badges over a poster and the tab bar's labels: 11px.
+  --font-size-2xs: 0.6875rem;
   --font-size-xs: 0.8rem;
   --font-size-sm: 0.9rem;
   --font-size-md: 1rem;
   --font-size-lg: 1.25rem;
   --font-size-xl: 1.75rem;
-  --font-size-hero: clamp(2.25rem, 6vw, 4.5rem);
+  // A section's heading, ruled off under it: 28px up to 36px.
+  --font-size-2xl: clamp(1.75rem, 1.25rem + 1.5vw, 2.25rem);
+  // A page's title: 44px up to 68px.
+  --font-size-hero: clamp(2.75rem, 2rem + 3vw, 4.25rem);
+  // The title of the movie, show or person a page is about: 44px up to 84px.
+  --font-size-title: clamp(2.75rem, 1.5rem + 5vw, 5.25rem);
+  // Home's featured title: 52px up to 104px.
+  --font-size-display: clamp(3.25rem, 2rem + 6vw, 6.5rem);
 
+  // Display and hero titles, set solid.
+  --line-display: 0.95;
+  --line-heading: 1.05;
   --line-tight: 1.1;
   --line-body: 1.5;
+  // A lead paragraph under a large title.
+  --line-relaxed: 1.6;
+
+  // Large serif titles draw in a little; eyebrows open up.
+  --tracking-display: -0.02em;
+  --tracking-eyebrow: 0.12em;
+
+  // A card lifting under the pointer.
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  // A toggle or a heart springing past its mark and back.
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --max-width: 110rem;
   // How tall a control stands, a button or a field: room for a finger.
   --control-size: 2.5rem;
+  // A field, and a round button in a page's header.
+  --field-size: 2.75rem;
+  // A page's own actions under its title: Play, Resume, the heart.
+  --control-size-tall: 3rem;
   // The one action a page is for, standing out from the rest: Play all.
   --control-size-large: 3.5rem;
   // A readable measure for prose: empty states, errors, the dialog.
@@ -117,6 +200,11 @@ body {
   font-size: var(--font-size-md);
   line-height: var(--line-body);
   -webkit-font-smoothing: antialiased;
+
+  // A new theme washes in rather than snapping.
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background-color 400ms ease;
+  }
 }
 
 // A desktop host draws the video under the page, so the page lets it through.
@@ -158,7 +246,9 @@ a {
   color: inherit;
 }
 
-:focus-visible {
+// Weightless, so a field's own focus glow in elements.scss replaces the ring
+// instead of drawing under it.
+:where(:focus-visible) {
   outline: var(--focus-ring);
   outline-offset: 3px;
 }

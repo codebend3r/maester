@@ -1,4 +1,5 @@
 import type { LibraryIconName } from '@raven/core'
+import styles from '@/components/Icon/Icon.module.scss'
 
 /** Every icon a library can wear, and the app's own. */
 export type IconName =
@@ -11,6 +12,7 @@ export type IconName =
   | 'check'
   | 'folder'
   | 'up'
+  | 'download'
   | 'alert'
   | 'copy'
   | 'search'
@@ -57,124 +59,331 @@ export type IconName =
   | 'lock'
   | 'unlock'
 
-// The frames the film and TV icons share; each variant draws its mark inside one.
-const FILM = 'M4 3h16v18H4zM8 3v18M16 3v18M4 7.5h4M4 12h4M4 16.5h4M16 7.5h4M16 12h4M16 16.5h4'
-const TV = 'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5'
+/**
+ * An icon's drawing, up to three paths: the outline, the soft tint under its
+ * main shape, and the solid marks (sparks, hearts, notes, dots).
+ */
+type Drawing = { stroke: string; fill?: string; marks?: string }
 
-const PATHS: Record<IconName, string> = {
-  back: 'M15 18l-6-6 6-6',
-  plus: 'M12 5v14M5 12h14',
-  rescan: 'M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6',
-  edit: 'M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4',
-  wand: 'M4 20l10-10M14 10l1.5-1.5M17 3v2M17 9v2M14 6h2M20 6h2M19 15v2M19 21v2M16 18h2M22 18h2',
-  close: 'M6 6l12 12M18 6L6 18',
-  check: 'M5 12.5l4.5 4.5L19 7.5',
-  folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z',
-  up: 'M12 19V5M5 12l7-7 7 7',
-  alert: 'M12 4l9 16H3L12 4zM12 10v4M12 17.5v.5',
-  copy: 'M9 9h10v10H9zM5 15V5h10',
-  search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4',
-  trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
-  more: 'M12 5.5v.5M12 12v.5M12 18.5v.5',
-  heart: 'M12 21s-8-5.3-8-11a4.5 4.5 0 0 1 8-2.8 4.5 4.5 0 0 1 8 2.8c0 5.7-8 11-8 11z',
-  play: 'M7 4.5v15l12.5-7.5z',
-  pause: 'M8 5v14M16 5v14',
-  rewind: 'M11 7l-5 5 5 5M18 7l-5 5 5 5',
-  forward: 'M13 7l5 5-5 5M6 7l5 5-5 5',
-  volume: 'M4 9.5h3.5L12 6v12l-4.5-3.5H4zM15.5 9.5a3.5 3.5 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10',
-  volumeLow: 'M4 9.5h3.5L12 6v12l-4.5-3.5H4zM15.5 9.5a3.5 3.5 0 0 1 0 5',
-  muted: 'M4 9.5h3.5L12 6v12l-4.5-3.5H4zM16 9.5l5 5M21 9.5l-5 5',
-  captions:
-    'M4 5.5h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1zM10.5 10a2 2 0 1 0 0 4M17 10a2 2 0 1 0 0 4',
-  settings: 'M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4',
-  fullscreen: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
-  fullscreenExit: 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5',
-  keyboard: 'M3 6.5h18v11H3zM7 10.5h.01M11 10.5h.01M15 10.5h.01M8 14h8',
-  pin: 'M12 17v5M9 4h6M10 4v6l-4 4v3h12v-3l-4-4V4',
-  grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
-  list: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
-  tiles: 'M3 5h7v5H3zM13 6h8M13 9h5M3 14h7v5H3zM13 15h8M13 18h5',
-  grouped: 'M4 4h7M4 7h7v5H4zM13 7h7v5h-7zM4 15h7M4 18h7v2H4zM13 18h7v2h-7z',
-  shuffle: 'M4 7h3l10 10h3M4 17h3l3-3M14 10l3-3h3M18 4l3 3-3 3M18 14l3 3-3 3',
-  history: 'M4 11a8 8 0 1 1 2.3 5.7M4 5v6h6M12 8v4l3 2',
-  next: 'M9 6l6 6-6 6',
-  film: FILM,
-  filmSpark: `${FILM}M12 8.6L12.8 11.2 14.4 12 12.8 12.8 12 15.4 11.2 12.8 9.6 12 11.2 11.2z`,
-  tv: TV,
-  tvSpark: `${TV}M12 10.5L13 13 15.5 14 13 15 12 17.5 11 15 8.5 14 11 13z`,
-  filmHeart: `${FILM}M12 14.6s-2.6-1.7-2.6-3.6a1.5 1.5 0 0 1 2.6-.9 1.5 1.5 0 0 1 2.6.9c0 1.9-2.6 3.6-2.6 3.6z`,
-  tvHeart: `${TV}M12 16.6s-2.6-1.7-2.6-3.6a1.5 1.5 0 0 1 2.6-.9 1.5 1.5 0 0 1 2.6.9c0 1.9-2.6 3.6-2.6 3.6z`,
-  globe:
-    'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zM3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9M12 3c-2.5 2.5-3.8 5.5-3.8 9s1.3 6.5 3.8 9',
-  image: 'M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M14 9a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0',
-  ascending: 'M7 20V4M3 8l4-4 4 4M13 7h3M13 12h5M13 17h7',
-  descending: 'M7 4v16M3 16l4 4 4-4M13 7h7M13 12h5M13 17h3',
-  trophy: 'M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v6M8 20h8',
-  youtube:
-    'M6 5.5h12a3.5 3.5 0 0 1 3.5 3.5v6a3.5 3.5 0 0 1-3.5 3.5H6A3.5 3.5 0 0 1 2.5 15V9A3.5 3.5 0 0 1 6 5.5zM10 9.5v5l4.5-2.5z',
-  video: 'M3 7h12v10H3zM15 10.5l6-3.5v10l-6-3.5',
-  tvGlobe: `${TV}M12 10a4 4 0 1 0 0 8 4 4 0 1 0 0-8zM8 14h8M12 10c-1.1 1.1-1.6 2.5-1.6 4s.5 2.9 1.6 4M12 10c1.1 1.1 1.6 2.5 1.6 4s-.5 2.9-1.6 4`,
-  fourK: 'M3 6h18v12H3zM9.5 15V9l-3 4.5h4.5M13.5 9v6M17.5 9l-4 3.5M15 11.2l2.5 3.8',
-  musicVideo: `${TV}M13 16.2v-5.4l2.4 1M13 16.2a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0z`,
-  standUp: 'M12 2.5a3 3 0 0 0-3 3v3a3 3 0 0 0 6 0v-3a3 3 0 0 0-3-3zM9 7h6M12 11.5V21M8 21h8',
-  gamepad:
-    'M7.5 7.5h9a4.5 4.5 0 0 1 4.5 4.5v1.5a3.5 3.5 0 0 1-6.3 2.1L14 14.5h-4l-.7 1.1A3.5 3.5 0 0 1 3 13.5V12a4.5 4.5 0 0 1 4.5-4.5zM7.5 10.5v3M6 12h3M15.5 11.5h.01M17.5 13h.01',
-  octagon:
-    'M8.4 3.2h7.2l5.2 5.2v7.2l-5.2 5.2H8.4l-5.2-5.2V8.4zM10 7.2h4l2.8 2.8v4L14 16.8h-4L7.2 14v-4z',
-  basketball:
-    'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zM3 12h18M12 3v18M5.6 5.7C7.6 7.4 8.6 9.6 8.6 12s-1 4.6-3 6.3M18.4 5.7c-2 1.7-3 3.9-3 6.3s1 4.6 3 6.3',
-  soccer:
-    'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zM12 7.5l4.3 3.1-1.6 5h-5.4l-1.6-5zM12 7.5V3M16.3 10.6l4.3-1.4M14.7 15.6l2.6 3.7M9.3 15.6l-2.6 3.7M7.7 10.6L3.4 9.2',
-  americanFootball:
-    'M5 19C3.5 14 5 8.5 9 5.5S16.5 3 19 5c1.5 5 0 10.5-4 13.5S7.5 20.5 5 19zM9.5 14.5l5-5M11 11.5l1.5 1.5M12.5 10l1.5 1.5M9.5 13l1.5 1.5',
-  headphones: 'M4 14a8 8 0 0 1 16 0M4 14h3.5v6.5H4zM16.5 14H20v6.5h-3.5z',
-  music:
-    'M9 18V5.5l11-2V16M9 9.5l11-2M9 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM20 16a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z',
-  disc: 'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zM12 10a2 2 0 1 0 0 4 2 2 0 1 0 0-4zM12 6.5a5.5 5.5 0 0 1 5.5 5.5',
-  podcast:
-    'M12 7.5a2 2 0 1 0 0 4 2 2 0 1 0 0-4zM8.5 13a5 5 0 1 1 7 0M6 15.5a8.5 8.5 0 1 1 12 0M12 14.5v6',
-  audiobook:
-    'M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5c-3.5-.5-6.5 0-8.5 1.5zM12 6.5v13',
-  libraries: 'M3 4h4v16H3zM9 4h4v16H9zM14.6 5l3.6-1 3.4 15-3.6 1z',
-  home: 'M3 11.5L12 4l9 7.5M5.5 9.5V20h5v-5.5h3V20h5V9.5',
-  playback: 'M3 5h18v14H3zM10 9v6l5-3z',
-  'file-play': 'M6 3h8l4 4v14H6zM14 3v4h4M10.5 11v6l4.5-3z',
-  convert: 'M4 8h13M14 5l3 3-3 3M20 16H7M10 13l-3 3 3 3',
-  resize: 'M4 9V4h5M4 4l6 6M20 15v5h-5M20 20l-6-6',
-  gauge: 'M4 17a8 8 0 1 1 16 0M12 17l4-5M7.5 12.5l1 .6',
-  chip: 'M7 7h10v10H7zM10 10h4v4h-4zM9.5 3v4M14.5 3v4M9.5 17v4M14.5 17v4M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4',
-  sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2.5v2M12 19.5v2M4.6 4.6L6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4',
-  reset: 'M4 11a8 8 0 1 1 2.3 5.7M4 5v6h6',
-  split: 'M10 12H3M7 8l-4 4 4 4M14 12h7M17 8l4 4-4 4',
-  merge: 'M6 3l6 6v12M18 3l-6 6M8 17l4 4 4-4',
-  sidebar: 'M4 5h16v14H4zM9.5 5v14',
-  lock: 'M5 11h14v10H5zM8 11V7.5a4 4 0 0 1 8 0V11M12 15v2',
-  unlock: 'M5 11h14v10H5zM8 11V7.5a4 4 0 0 1 7.7-1.5M12 15v2',
+const roundRect = ({ x, y, w, h, r }: { x: number; y: number; w: number; h: number; r: number }) =>
+  `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 -${r} ${r}h-${w - 2 * r}a${r} ${r} 0 0 1 -${r} -${r}v-${h - 2 * r}a${r} ${r} 0 0 1 ${r} -${r}z`
+
+const circle = ({ cx, cy, r }: { cx: number; cy: number; r: number }) =>
+  `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 -${2 * r} 0z`
+
+/** A four-pointed spark, the mark inside the anime icons and the wand. */
+const spark = ({ cx, cy, r }: { cx: number; cy: number; r: number }) =>
+  `M${cx} ${cy - r}c${r * 0.15} ${r * 0.6} ${r * 0.4} ${r * 0.85} ${r} ${r}c-${r * 0.6} ${r * 0.15} -${r * 0.85} ${r * 0.4} -${r} ${r}c-${r * 0.15} -${r * 0.6} -${r * 0.4} -${r * 0.85} -${r} -${r}c${r * 0.6} -${r * 0.15} ${r * 0.85} -${r * 0.4} ${r} -${r}z`
+
+const smallHeart = ({ cx, cy }: { cx: number; cy: number }) =>
+  `M${cx} ${cy + 2.3}s-3-1.9-3-4a1.6 1.6 0 0 1 3-.9 1.6 1.6 0 0 1 3 .9c0 2.1-3 4-3 4z`
+
+const smallPlay = ({ x, y, h }: { x: number; y: number; h: number }) =>
+  `M${x} ${y + 0.5}v${h - 1}a.6.6 0 0 0 .9.5l${h * 0.8} -${h / 2 - 0.5}a.6.6 0 0 0 0-1l-${h * 0.8} -${h / 2 - 0.5}a.6.6 0 0 0 -.9.5z`
+
+// The frames the film and TV icons share; each variant draws its mark inside one.
+const FILM = `${roundRect({ x: 4, y: 3, w: 16, h: 18, r: 2.5 })}M8 3v18M16 3v18M6 6.5h.01M6 10h.01M6 14h.01M6 17.5h.01M18 6.5h.01M18 10h.01M18 14h.01M18 17.5h.01`
+const FILM_FILL = 'M8 3h8v18H8z'
+const TV_FILL = roundRect({ x: 3, y: 7.5, w: 18, h: 13, r: 2.5 })
+const TV = `${TV_FILL}M8.5 3.5l3.5 4 3.5-4`
+const HEART =
+  'M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z'
+const PLAY = 'M8 5.6v12.8a1 1 0 0 0 1.5.9l10.2-6.4a1 1 0 0 0 0-1.8L9.5 4.7A1 1 0 0 0 8 5.6z'
+const SPEAKER = 'M4.5 10a1 1 0 0 1 1-1h2.5l4-3.5v13L8 15H5.5a1 1 0 0 1-1-1z'
+const LOCK_BODY = roundRect({ x: 5, y: 10.5, w: 14, h: 10, r: 2.5 })
+const PANEL = roundRect({ x: 3.5, y: 4.5, w: 17, h: 15, r: 2.5 })
+const SCREEN = roundRect({ x: 3, y: 5.5, w: 18, h: 13, r: 2.5 })
+const BALL = circle({ cx: 12, cy: 12, r: 8.5 })
+const BARS = `${roundRect({ x: 6.5, y: 5, w: 3.5, h: 14, r: 1.2 })}${roundRect({ x: 14, y: 5, w: 3.5, h: 14, r: 1.2 })}`
+const DOUBLE_BACK = 'M11.5 7.5L6.5 12l5 4.5zM18.5 7.5l-5 4.5 5 4.5z'
+const DOUBLE_ON = 'M12.5 7.5l5 4.5-5 4.5zM5.5 7.5l5 4.5-5 4.5z'
+const HOUSE =
+  'M4 10.6a2 2 0 0 1 .7-1.5l6-5.1a2 2 0 0 1 2.6 0l6 5.1a2 2 0 0 1 .7 1.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z'
+const PAGE = 'M14 3.5H8a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.5z'
+const BOOK =
+  'M12 6.5C10 5 7 4.6 4.2 4.9a.8.8 0 0 0-.7.8v11.8a.8.8 0 0 0 .9.8c2.8-.3 5.6.1 7.6 1.6 2-1.5 4.8-1.9 7.6-1.6a.8.8 0 0 0 .9-.8V5.7a.8.8 0 0 0-.7-.8C17 4.6 14 5 12 6.5z'
+const PAD =
+  'M7.5 7h9a4.5 4.5 0 0 1 4.5 4.5v2.3a3.2 3.2 0 0 1-5.8 1.9L14.4 14.5H9.6l-.8 1.2A3.2 3.2 0 0 1 3 13.8v-2.3A4.5 4.5 0 0 1 7.5 7z'
+const FOOTBALL =
+  'M18.8 5.2c1.3 4.6-.1 9.4-3.6 12.1s-8.4 2.9-10 1.5c-1.3-4.6.1-9.4 3.6-12.1s8.4-2.9 10-1.5z'
+const STOP = 'M8.6 3.5h6.8l5.1 5.1v6.8l-5.1 5.1H8.6l-5.1-5.1V8.6z'
+const EARCUPS = `${roundRect({ x: 4, y: 14, w: 4, h: 6.5, r: 1.5 })}${roundRect({ x: 16, y: 14, w: 4, h: 6.5, r: 1.5 })}`
+
+const DRAWINGS: Record<IconName, Drawing> = {
+  home: {
+    stroke:
+      'M4 10.6a2 2 0 0 1 .7-1.5l6-5.1a2 2 0 0 1 2.6 0l6 5.1a2 2 0 0 1 .7 1.5V18a2 2 0 0 1-2 2h-3v-5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v5H6a2 2 0 0 1-2-2z',
+    fill: HOUSE,
+  },
+  libraries: {
+    stroke: `${roundRect({ x: 3, y: 4, w: 4, h: 16, r: 1.2 })}${roundRect({ x: 9, y: 4, w: 4, h: 16, r: 1.2 })}M14.9 5.7l2.6-.7a1 1 0 0 1 1.2.7l3.2 12.6a1 1 0 0 1-.7 1.2l-2.6.7a1 1 0 0 1-1.2-.7L14.2 6.9a1 1 0 0 1 .7-1.2zM3 8h4M9 8h4`,
+    fill: roundRect({ x: 9, y: 4, w: 4, h: 16, r: 1.2 }),
+  },
+  heart: { stroke: HEART, fill: HEART },
+  settings: {
+    stroke: `M4 7.5h8M18 7.5h2M4 16.5h2M12 16.5h8${circle({ cx: 15, cy: 7.5, r: 2.5 })}${circle({ cx: 9, cy: 16.5, r: 2.5 })}`,
+    fill: `${circle({ cx: 15, cy: 7.5, r: 2.5 })}${circle({ cx: 9, cy: 16.5, r: 2.5 })}`,
+  },
+  sidebar: {
+    stroke: `${PANEL}M9.5 4.5v15`,
+    fill: 'M9.5 4.5H6a2.5 2.5 0 0 0-2.5 2.5v10A2.5 2.5 0 0 0 6 19.5h3.5z',
+  },
+  search: {
+    stroke: `${circle({ cx: 11, cy: 11, r: 6.5 })}M16 16l4 4`,
+    fill: circle({ cx: 11, cy: 11, r: 6.5 }),
+  },
+  back: { stroke: 'M14.5 6.5L9 12l5.5 5.5' },
+  next: { stroke: 'M9.5 6.5L15 12l-5.5 5.5' },
+  up: { stroke: 'M12 19V5.5M6 11l6-6 6 6' },
+  download: { stroke: 'M12 4.5V15M7.5 10.5l4.5 4.5 4.5-4.5M5 19.5h14' },
+  plus: { stroke: 'M12 5.5v13M5.5 12h13' },
+  close: { stroke: 'M7 7l10 10M17 7L7 17' },
+  check: { stroke: 'M5.5 12.5l4 4 9-9' },
+  more: {
+    stroke: '',
+    marks: `${circle({ cx: 12, cy: 5.5, r: 1.4 })}${circle({ cx: 12, cy: 12, r: 1.4 })}${circle({ cx: 12, cy: 18.5, r: 1.4 })}`,
+  },
+  edit: { stroke: 'M14.5 5.5l4 4L9 19H5v-4zM12.5 7.5l4 4', fill: 'M14.5 5.5l4 4L9 19H5v-4z' },
+  wand: {
+    stroke: 'M4.5 19.5L14 10M12.5 8.5l3 3',
+    marks: `${spark({ cx: 17.5, cy: 5.5, r: 2.5 })}${spark({ cx: 19.5, cy: 15.5, r: 1.8 })}${spark({ cx: 8.5, cy: 5, r: 1.5 })}`,
+  },
+  rescan: { stroke: 'M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4' },
+  reset: { stroke: 'M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v4h4' },
+  history: {
+    stroke: 'M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v4h4M12 8.5V12l2.5 1.5',
+    fill: circle({ cx: 12, cy: 12, r: 7.5 }),
+  },
+  folder: {
+    stroke:
+      'M3.5 17V6.5a2 2 0 0 1 2-2h3.3a1.5 1.5 0 0 1 1.1.5l1.6 1.8h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2zM3.5 10h17',
+    fill: 'M3.5 10h17V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z',
+  },
+  alert: {
+    stroke:
+      'M10.3 4.9a2 2 0 0 1 3.4 0l7 12.1a2 2 0 0 1-1.7 3h-14a2 2 0 0 1-1.7-3zM12 9.5v4M12 16.8v.2',
+    fill: 'M10.3 4.9a2 2 0 0 1 3.4 0l7 12.1a2 2 0 0 1-1.7 3h-14a2 2 0 0 1-1.7-3z',
+  },
+  copy: {
+    stroke: `${roundRect({ x: 8.5, y: 8.5, w: 11, h: 11, r: 2 })}M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2`,
+    fill: roundRect({ x: 8.5, y: 8.5, w: 11, h: 11, r: 2 }),
+  },
+  trash: {
+    stroke:
+      'M4.5 7h15M9.5 7V5.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V7M6.5 7l.8 11.2a2 2 0 0 0 2 1.8h5.4a2 2 0 0 0 2-1.8L17.5 7M10 11v5M14 11v5',
+    fill: 'M6.5 7l.8 11.2a2 2 0 0 0 2 1.8h5.4a2 2 0 0 0 2-1.8L17.5 7z',
+  },
+  pin: {
+    stroke:
+      'M9 4.5h6M10 4.5v5.2l-3.2 3.6a1 1 0 0 0-.3.7V15a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1a1 1 0 0 0-.3-.7L14 9.7V4.5M12 16v4.5',
+    fill: 'M10 4.5v5.2l-3.2 3.6a1 1 0 0 0-.3.7V15a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1a1 1 0 0 0-.3-.7L14 9.7V4.5z',
+  },
+  lock: { stroke: `${LOCK_BODY}M8 10.5V8a4 4 0 0 1 8 0v2.5M12 14.5v2`, fill: LOCK_BODY },
+  unlock: { stroke: `${LOCK_BODY}M8 10.5V8a4 4 0 0 1 7.6-1.8M12 14.5v2`, fill: LOCK_BODY },
+  image: {
+    stroke: `${PANEL}M3.5 16l4.6-4.6a1.5 1.5 0 0 1 2.1 0L15 16.2M13.5 14.7l1.6-1.6a1.5 1.5 0 0 1 2.1 0l3.3 3.3`,
+    fill: PANEL,
+    marks: circle({ cx: 15.5, cy: 9, r: 1.5 }),
+  },
+  grid: {
+    stroke: `${roundRect({ x: 4, y: 4, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 13.5, y: 4, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 4, y: 13.5, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 13.5, y: 13.5, w: 6.5, h: 6.5, r: 1.5 })}`,
+    fill: `${roundRect({ x: 4, y: 4, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 13.5, y: 13.5, w: 6.5, h: 6.5, r: 1.5 })}`,
+  },
+  list: {
+    stroke: 'M9.5 6.5h10M9.5 12h10M9.5 17.5h10',
+    marks: `${circle({ cx: 5, cy: 6.5, r: 1.2 })}${circle({ cx: 5, cy: 12, r: 1.2 })}${circle({ cx: 5, cy: 17.5, r: 1.2 })}`,
+  },
+  tiles: {
+    stroke: `${roundRect({ x: 3.5, y: 5, w: 7, h: 5, r: 1.5 })}${roundRect({ x: 3.5, y: 14, w: 7, h: 5, r: 1.5 })}M13.5 6.5h7M13.5 9h4.5M13.5 15.5h7M13.5 18h4.5`,
+    fill: `${roundRect({ x: 3.5, y: 5, w: 7, h: 5, r: 1.5 })}${roundRect({ x: 3.5, y: 14, w: 7, h: 5, r: 1.5 })}`,
+  },
+  grouped: {
+    stroke: `M4 4.5h7M4 15h7${roundRect({ x: 4, y: 7, w: 7, h: 5, r: 1.5 })}${roundRect({ x: 13, y: 7, w: 7, h: 5, r: 1.5 })}${roundRect({ x: 4, y: 17.5, w: 7, h: 3, r: 1 })}${roundRect({ x: 13, y: 17.5, w: 7, h: 3, r: 1 })}`,
+    fill: `${roundRect({ x: 4, y: 7, w: 7, h: 5, r: 1.5 })}${roundRect({ x: 13, y: 7, w: 7, h: 5, r: 1.5 })}`,
+  },
+  ascending: { stroke: 'M7 19.5v-15M3.5 8L7 4.5 10.5 8M13.5 7h3M13.5 12h5M13.5 17h7' },
+  descending: { stroke: 'M7 4.5v15M3.5 16L7 19.5l3.5-3.5M13.5 7h7M13.5 12h5M13.5 17h3' },
+  convert: { stroke: 'M4.5 8.5h13M14.5 5.5l3 3-3 3M19.5 15.5h-13M9.5 12.5l-3 3 3 3' },
+  resize: { stroke: 'M4.5 9.5v-5h5M4.5 4.5l6 6M19.5 14.5v5h-5M19.5 19.5l-6-6' },
+  split: { stroke: 'M10 12H3.5M6.5 9l-3 3 3 3M14 12h6.5M17.5 9l3 3-3 3M12 5v14' },
+  merge: {
+    stroke:
+      'M6.5 4l4.3 4.3a3 3 0 0 1 .9 2.1V20M17.5 4l-4.3 4.3a3 3 0 0 0-.7 1.1M8.5 16.5L12 20l3.5-3.5',
+  },
+  gauge: {
+    stroke: 'M4.5 17a7.5 7.5 0 1 1 15 0M12 16.5l3.5-4.5M7.5 12.5l.9.5M12 8.5v1M16.5 12.5l-.2.1',
+    fill: 'M4.5 17a7.5 7.5 0 1 1 15 0z',
+    marks: circle({ cx: 12, cy: 16.5, r: 1.6 }),
+  },
+  chip: {
+    stroke: `${roundRect({ x: 6.5, y: 6.5, w: 11, h: 11, r: 2 })}${roundRect({ x: 9.5, y: 9.5, w: 5, h: 5, r: 1 })}M9.5 3.5v3M14.5 3.5v3M9.5 17.5v3M14.5 17.5v3M3.5 9.5h3M3.5 14.5h3M17.5 9.5h3M17.5 14.5h3`,
+    fill: roundRect({ x: 9.5, y: 9.5, w: 5, h: 5, r: 1 }),
+  },
+  sun: {
+    stroke: `${circle({ cx: 12, cy: 12, r: 3.8 })}M12 3v1.8M12 19.2V21M5.6 5.6l1.3 1.3M17.1 17.1l1.3 1.3M3 12h1.8M19.2 12H21M5.6 18.4l1.3-1.3M17.1 6.9l1.3-1.3`,
+    fill: circle({ cx: 12, cy: 12, r: 3.8 }),
+  },
+  keyboard: {
+    stroke: `${roundRect({ x: 3, y: 6, w: 18, h: 12, r: 2.5 })}M7 10h.01M10.3 10h.01M13.7 10h.01M17 10h.01M8 14h8`,
+    fill: roundRect({ x: 3, y: 6, w: 18, h: 12, r: 2.5 }),
+  },
+  play: { stroke: PLAY, fill: PLAY },
+  pause: { stroke: BARS, fill: BARS },
+  rewind: { stroke: DOUBLE_BACK, fill: DOUBLE_BACK },
+  forward: { stroke: DOUBLE_ON, fill: DOUBLE_ON },
+  shuffle: {
+    stroke:
+      'M4 16.5h2.6a3 3 0 0 0 2.3-1.1l.6-.7M14.5 9.3l.6-.7a3 3 0 0 1 2.3-1.1H20M4 7.5h2.6a3 3 0 0 1 2.3 1.1l6.2 6.8a3 3 0 0 0 2.3 1.1H20M17.5 5l2.5 2.5-2.5 2.5M17.5 14l2.5 2.5-2.5 2.5',
+  },
+  volume: { stroke: `${SPEAKER}M15.5 9.5a3.5 3.5 0 0 1 0 5M18.3 7a7 7 0 0 1 0 10`, fill: SPEAKER },
+  volumeLow: { stroke: `${SPEAKER}M15.5 9.5a3.5 3.5 0 0 1 0 5`, fill: SPEAKER },
+  muted: { stroke: `${SPEAKER}M16 10l4 4M20 10l-4 4`, fill: SPEAKER },
+  captions: {
+    stroke: `${SCREEN}M10.5 10.2a2 2 0 1 0 0 3.6M16.5 10.2a2 2 0 1 0 0 3.6`,
+    fill: SCREEN,
+  },
+  fullscreen: {
+    stroke:
+      'M4.5 9V6.5a2 2 0 0 1 2-2H9M15 4.5h2.5a2 2 0 0 1 2 2V9M19.5 15v2.5a2 2 0 0 1-2 2H15M9 19.5H6.5a2 2 0 0 1-2-2V15',
+  },
+  fullscreenExit: {
+    stroke:
+      'M9 4.5V7a2 2 0 0 1-2 2H4.5M15 4.5V7a2 2 0 0 0 2 2h2.5M15 19.5V17a2 2 0 0 1 2-2h2.5M9 19.5V17a2 2 0 0 0-2-2H4.5',
+  },
+  playback: {
+    stroke: roundRect({ x: 3, y: 5, w: 18, h: 14, r: 2.5 }),
+    fill: roundRect({ x: 3, y: 5, w: 18, h: 14, r: 2.5 }),
+    marks: smallPlay({ x: 10, y: 9, h: 6 }),
+  },
+  'file-play': {
+    stroke: `${PAGE}M14 3.5v4h4`,
+    fill: PAGE,
+    marks: smallPlay({ x: 10.3, y: 11, h: 5.4 }),
+  },
+  film: { stroke: FILM, fill: FILM_FILL },
+  filmSpark: { stroke: FILM, fill: FILM_FILL, marks: spark({ cx: 12, cy: 12, r: 3 }) },
+  filmHeart: { stroke: FILM, fill: FILM_FILL, marks: smallHeart({ cx: 12, cy: 12 }) },
+  tv: { stroke: TV, fill: TV_FILL },
+  tvSpark: { stroke: TV, fill: TV_FILL, marks: spark({ cx: 12, cy: 14, r: 3.2 }) },
+  tvHeart: { stroke: TV, fill: TV_FILL, marks: smallHeart({ cx: 12, cy: 14 }) },
+  tvGlobe: {
+    stroke: `${TV}${circle({ cx: 12, cy: 14, r: 3.8 })}M8.2 14h7.6M12 10.2c-1 1-1.5 2.3-1.5 3.8s.5 2.8 1.5 3.8M12 10.2c1 1 1.5 2.3 1.5 3.8s-.5 2.8-1.5 3.8`,
+    fill: TV_FILL,
+  },
+  musicVideo: {
+    stroke: `${TV}M12.2 16.4V11l2.6 1`,
+    fill: TV_FILL,
+    marks: circle({ cx: 10.6, cy: 16.4, r: 1.6 }),
+  },
+  video: {
+    stroke: `${roundRect({ x: 3, y: 6.5, w: 12.5, h: 11, r: 2.5 })}M15.5 10.5l4.6-2.8a.6.6 0 0 1 .9.5v7.6a.6.6 0 0 1-.9.5l-4.6-2.8`,
+    fill: roundRect({ x: 3, y: 6.5, w: 12.5, h: 11, r: 2.5 }),
+  },
+  youtube: {
+    stroke: roundRect({ x: 2.5, y: 5.5, w: 19, h: 13, r: 4 }),
+    fill: roundRect({ x: 2.5, y: 5.5, w: 19, h: 13, r: 4 }),
+    marks: smallPlay({ x: 10, y: 9, h: 6 }),
+  },
+  fourK: {
+    stroke: `${SCREEN}M9.5 15V9l-3 4.2h4.2M13.5 9v6M17.3 9l-3.8 3.4M15 11.2l2.4 3.8`,
+    fill: SCREEN,
+  },
+  globe: {
+    stroke: `${BALL}M3.5 12h17M12 3.5c2.3 2.3 3.5 5.2 3.5 8.5s-1.2 6.2-3.5 8.5M12 3.5c-2.3 2.3-3.5 5.2-3.5 8.5s1.2 6.2 3.5 8.5`,
+    fill: BALL,
+  },
+  trophy: {
+    stroke:
+      'M7.5 4.5h9v4.5a4.5 4.5 0 0 1-9 0zM7.5 6.5h-2a.5.5 0 0 0-.5.5 3 3 0 0 0 2.6 3M16.5 6.5h2a.5.5 0 0 1 .5.5 3 3 0 0 1-2.6 3M12 13.5V17M8.5 20h7a.5.5 0 0 0 .5-.5 2.5 2.5 0 0 0-2.5-2.5h-3A2.5 2.5 0 0 0 8 19.5a.5.5 0 0 0 .5.5z',
+    fill: 'M7.5 4.5h9v4.5a4.5 4.5 0 0 1-9 0z',
+  },
+  standUp: {
+    stroke: `${roundRect({ x: 9, y: 2.5, w: 6, h: 9.5, r: 3 })}M6.5 10a5.5 5.5 0 0 0 11 0M12 15.5v5M8.5 20.5h7`,
+    fill: roundRect({ x: 9, y: 2.5, w: 6, h: 9.5, r: 3 }),
+  },
+  gamepad: {
+    stroke: `${PAD}M7.5 9.8v3.4M5.8 11.5h3.4`,
+    fill: PAD,
+    marks: `${circle({ cx: 15.5, cy: 10.6, r: 1 })}${circle({ cx: 17.6, cy: 12.6, r: 1 })}`,
+  },
+  octagon: {
+    stroke: `${STOP}M10.3 7.5h3.4l2.8 2.8v3.4l-2.8 2.8h-3.4l-2.8-2.8v-3.4z`,
+    fill: STOP,
+  },
+  basketball: {
+    stroke: `${BALL}M3.5 12h17M12 3.5v17M6 6c1.8 1.6 2.8 3.7 2.8 6s-1 4.4-2.8 6M18 6c-1.8 1.6-2.8 3.7-2.8 6s1 4.4 2.8 6`,
+    fill: BALL,
+  },
+  soccer: {
+    stroke: `${BALL}M12 8V3.5M15.8 10.8l4.2-1.3M14.4 15.3l2.6 3.6M9.6 15.3L7 18.9M8.2 10.8L4 9.5`,
+    fill: BALL,
+    marks: 'M12 7.6l4.2 3-1.6 5H9.4l-1.6-5z',
+  },
+  americanFootball: {
+    stroke: `${FOOTBALL}M9.5 14.5l5-5M10.8 11.6l1.6 1.6M12.4 10l1.6 1.6`,
+    fill: FOOTBALL,
+  },
+  headphones: { stroke: `M4 15v-2.5a8 8 0 0 1 16 0V15${EARCUPS}`, fill: EARCUPS },
+  music: {
+    stroke: 'M9 17.5V6.3a1 1 0 0 1 .8-1l9-1.7a1 1 0 0 1 1.2 1v10.9M9 9.5l11-2',
+    marks: `${circle({ cx: 6.5, cy: 17.5, r: 2.5 })}${circle({ cx: 17.5, cy: 15.5, r: 2.5 })}`,
+  },
+  disc: {
+    stroke: `${BALL}${circle({ cx: 12, cy: 12, r: 2 })}M12 6.5a5.5 5.5 0 0 1 5.5 5.5`,
+    fill: BALL,
+  },
+  podcast: {
+    stroke: 'M8.5 13a5 5 0 1 1 7 0M6 15.5a8.5 8.5 0 1 1 12 0M12 13.5v7',
+    marks: circle({ cx: 12, cy: 9.5, r: 2 }),
+  },
+  audiobook: { stroke: `${BOOK}M12 6.5v13`, fill: BOOK },
 }
 
-const isIconName = (name: string): name is IconName => name in PATHS
+/** Arrows nudge their own way under the pointer instead of popping. */
+const NUDGES: Partial<Record<IconName, string>> = {
+  back: styles.nudgeBack,
+  rewind: styles.nudgeBack,
+  next: styles.nudgeOn,
+  forward: styles.nudgeOn,
+  convert: styles.nudgeOn,
+  up: styles.nudgeUp,
+  download: styles.nudgeDown,
+}
+
+const isIconName = (name: string): name is IconName => name in DRAWINGS
 
 /** Every icon there is, for the design page. */
-export const ICON_NAMES: readonly IconName[] = Object.keys(PATHS).filter(isIconName)
+export const ICON_NAMES: readonly IconName[] = Object.keys(DRAWINGS).filter(isIconName)
 
 /** How wide an icon is: pixels, or ems of the text it sits in, to grow and shrink with it. */
 export type IconSize = number | `${number}em`
 
-/** Line icons. Decorative by default: pair them with text or an aria-label on the control. */
-export const Icon = ({ name, size = 20 }: { name: IconName; size?: IconSize }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={1.8}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    focusable="false"
-    data-icon={name}
-  >
-    <path d={PATHS[name]} />
-  </svg>
-)
+/**
+ * Line icons with a soft tint under their main shape, which doubles while
+ * the control around them is pointed at; a control marks itself current by
+ * setting `--icon-tint`. Decorative by default: pair them with text or an
+ * aria-label on the control.
+ */
+export const Icon = ({ name, size = 20 }: { name: IconName; size?: IconSize }) => {
+  const { stroke, fill, marks } = DRAWINGS[name]
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      data-icon={name}
+      className={`${styles.icon} ${NUDGES[name] ?? styles.pop}`}
+    >
+      {!!fill && <path className={styles.fill} d={fill} fill="currentColor" stroke="none" />}
+      {!!stroke && <path d={stroke} />}
+      {!!marks && <path className={styles.marks} d={marks} fill="currentColor" stroke="none" />}
+    </svg>
+  )
+}

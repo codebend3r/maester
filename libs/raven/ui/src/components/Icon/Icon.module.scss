@@ -1,0 +1,140 @@
+// Marks spin and the icon pops past its own box, so nothing clips them.
+.icon {
+  overflow: visible;
+}
+
+// The soft tint under the main shape: 20% at rest, more where a control
+// sets --icon-tint, as the current page's link does.
+.fill {
+  fill-opacity: var(--icon-tint, 0.2);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.marks {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+// The control an icon sits in, directly or through one wrapper (a library's
+// icon with its lock), pointed at, doubles its tint. The colour change holds
+// under reduced motion; the motion below does not.
+$hovered: ":is(a, button, summary, label, [role='button']):hover";
+$through: '#{$hovered} > span';
+
+@media (hover: hover) {
+  #{$hovered} > .icon .fill,
+  #{$through} > .icon .fill {
+    fill-opacity: min(1, calc(var(--icon-tint, 0.2) * 2));
+  }
+}
+
+// It squashes and springs past full size, or an arrow nudges its way, and
+// solid marks spin in last.
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  #{$hovered} > .pop,
+  #{$through} > .pop {
+    animation: pop 500ms var(--ease-spring);
+  }
+
+  #{$hovered} > .nudgeBack,
+  #{$through} > .nudgeBack {
+    animation: nudge-back 450ms ease-in-out;
+  }
+
+  #{$hovered} > .nudgeOn,
+  #{$through} > .nudgeOn {
+    animation: nudge-on 450ms ease-in-out;
+  }
+
+  #{$hovered} > .nudgeUp,
+  #{$through} > .nudgeUp {
+    animation: nudge-up 450ms ease-in-out;
+  }
+
+  #{$hovered} > .nudgeDown,
+  #{$through} > .nudgeDown {
+    animation: nudge-down 450ms ease-in-out;
+  }
+
+  #{$hovered} > .icon .marks,
+  #{$through} > .icon .marks {
+    animation: mark 500ms var(--ease-spring) 100ms both;
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+
+  28% {
+    transform: scale(0.86) rotate(-7deg);
+  }
+
+  62% {
+    transform: scale(1.16) rotate(4deg);
+  }
+
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes nudge-back {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  45% {
+    transform: translateX(-3px);
+  }
+}
+
+@keyframes nudge-on {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  45% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes nudge-up {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  45% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes nudge-down {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  45% {
+    transform: translateY(3px);
+  }
+}
+
+@keyframes mark {
+  0% {
+    transform: scale(0) rotate(-60deg);
+  }
+
+  60% {
+    transform: scale(1.35) rotate(10deg);
+  }
+
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}

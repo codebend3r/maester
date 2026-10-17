@@ -1,0 +1,160 @@
+// The themes a viewer can pick, each the same set of colours as globals.scss
+// declares on :root. A theme applies to whatever wears its attribute: the
+// page, on <html>, or a preview of it in the theme picker. Verdigris is
+// here too, so a preview of it shows true under any other theme. The list
+// the picker reads, with each theme's name and note, is THEMES in
+// lib/themes.ts.
+
+[data-theme='verdigris'] {
+  --color-night: #15201e;
+  --color-canopy: #1c2b28;
+  --color-canopy-hi: #223430;
+  --color-deep: #0f1816;
+  --color-moss: #2c3e3a;
+  --color-moss-hi: #364a45;
+  --color-bark: #e6e1d6;
+  --color-lichen: #9db0a8;
+  --color-birch: #cfdcd2;
+  --color-leaf: #a8262f;
+  --color-leaf-hi: #b8303a;
+  --color-on-leaf: #ffffff;
+  --color-leaf-bright: #d8414a;
+  --color-fern: #8fcf9f;
+  --color-amber: #e3b45f;
+  --color-moss-line: #5d736c;
+  --glow: 0.6;
+
+  color-scheme: dark;
+}
+
+[data-theme='bronze'] {
+  --color-night: #1c1813;
+  --color-canopy: #241f18;
+  --color-canopy-hi: #2b251d;
+  --color-deep: #13100c;
+  --color-moss: #3a3125;
+  --color-moss-hi: #463b2d;
+  --color-bark: #ece3d3;
+  --color-lichen: #b3a48c;
+  --color-birch: #dacdb8;
+  --color-leaf: #2b7466;
+  --color-leaf-hi: #236a5d;
+  --color-on-leaf: #ffffff;
+  --color-leaf-bright: #4fb3a0;
+  --color-fern: #8fcf9f;
+  --color-amber: #e3b45f;
+  --color-moss-line: #77684f;
+  --glow: 0.45;
+
+  color-scheme: dark;
+}
+
+[data-theme='nocturne'] {
+  --color-night: #111725;
+  --color-canopy: #171f31;
+  --color-canopy-hi: #1d263a;
+  --color-deep: #0b0f19;
+  --color-moss: #252f48;
+  --color-moss-hi: #2e3a56;
+  --color-bark: #e3e6ef;
+  --color-lichen: #99a1ba;
+  --color-birch: #c5cadb;
+  --color-leaf: #a9502a;
+  --color-leaf-hi: #9a4723;
+  --color-on-leaf: #ffffff;
+  --color-leaf-bright: #e58a5a;
+  --color-fern: #8fcf9f;
+  --color-amber: #e3b45f;
+  --color-moss-line: #5b6480;
+  --glow: 0.55;
+
+  color-scheme: dark;
+}
+
+[data-theme='oxblood'] {
+  --color-night: #1e1214;
+  --color-canopy: #27181b;
+  --color-canopy-hi: #2f1d20;
+  --color-deep: #150c0e;
+  --color-moss: #3d2528;
+  --color-moss-hi: #4a2d31;
+  --color-bark: #f0e3dd;
+  --color-lichen: #bba099;
+  --color-birch: #ddc8c1;
+  --color-leaf: #d0a24a;
+  --color-leaf-hi: #ddb15a;
+  --color-on-leaf: #1e1214;
+  --color-leaf-bright: #d0a24a;
+  --color-fern: #8fcf9f;
+  --color-amber: #e3b45f;
+  --color-moss-line: #7f625d;
+  --glow: 0.5;
+
+  color-scheme: dark;
+}
+
+[data-theme='patina'] {
+  --color-night: #ebe5d8;
+  --color-canopy: #f4efe4;
+  --color-canopy-hi: #e2dccd;
+  --color-deep: #ddd6c6;
+  --color-moss: #d5ddd2;
+  --color-moss-hi: #c8d2c5;
+  --color-bark: #1b2825;
+  --color-lichen: #4a5e57;
+  --color-birch: #2f403b;
+  --color-leaf: #a8262f;
+  --color-leaf-hi: #8e1e27;
+  --color-on-leaf: #ffffff;
+  --color-leaf-bright: #a8262f;
+  --color-fern: #255c37;
+  --color-amber: #744a0e;
+  --color-moss-line: #6c7d76;
+  --glow: 0.3;
+
+  color-scheme: light;
+}
+
+[data-theme='mint'] {
+  --color-night: #dff0e7;
+  --color-canopy: #ecf7f1;
+  --color-canopy-hi: #d2e8dc;
+  --color-deep: #cfe4d9;
+  --color-moss: #c3e3d3;
+  --color-moss-hi: #b2d9c6;
+  --color-bark: #0f2e27;
+  --color-lichen: #3f6358;
+  --color-birch: #21453c;
+  --color-leaf: #c4473a;
+  --color-leaf-hi: #a83a2f;
+  --color-on-leaf: #ffffff;
+  --color-leaf-bright: #c4473a;
+  --color-fern: #2a6640;
+  --color-amber: #7f5312;
+  --color-moss-line: #658479;
+  --glow: 0.28;
+
+  color-scheme: light;
+}
+
+[data-theme='contrast'] {
+  --color-night: #000000;
+  --color-canopy: #0f0f0f;
+  --color-canopy-hi: #1a1a1a;
+  --color-deep: #000000;
+  --color-moss: #2a2a2a;
+  --color-moss-hi: #3a3a3a;
+  --color-bark: #ffffff;
+  --color-lichen: #e6e6e6;
+  --color-birch: #ffffff;
+  --color-leaf: #ffd60a;
+  --color-leaf-hi: #ffe347;
+  --color-on-leaf: #000000;
+  --color-leaf-bright: #ffd60a;
+  --color-fern: #8fcf9f;
+  --color-amber: #e3b45f;
+  --color-moss-line: #c2c2c2;
+  --glow: 0;
+
+  color-scheme: dark;
+}

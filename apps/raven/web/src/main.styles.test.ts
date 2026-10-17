@@ -30,7 +30,7 @@ const expectPlayerOverridesAfterPrimitives = (css: string) => {
   const quiet = ruleIndex({
     css,
     selector: /^\._quiet_[\w-]+$/,
-    declaration: 'border-color:var(--color-moss)',
+    declaration: 'background:var(--color-moss)',
   })
   const back = ruleIndex({
     css,
