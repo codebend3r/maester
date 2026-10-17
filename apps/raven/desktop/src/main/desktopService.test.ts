@@ -90,6 +90,8 @@ const fakeDownloads = () => {
       return { ...DOWNLOADS_REPLY, autoDeleteDefault: input.autoDelete }
     },
     views: () => [],
+    onSuspend: () => undefined,
+    onResume: () => undefined,
     dispose: () => undefined,
     pause: async (input) => {
       note('pause', input)

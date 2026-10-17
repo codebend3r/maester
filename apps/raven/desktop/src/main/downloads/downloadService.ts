@@ -66,6 +66,10 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
   /** Called when a server is removed from raven player (Ruling 17). */
   removeServer: (input: { serverId: string }) => Promise<void>
   showFolder: () => Promise<DesktopReply>
+  /** Main's `powerMonitor` `suspend`: every fetch stops and its file waits for the wake. */
+  onSuspend: () => void
+  /** Main's `powerMonitor` `resume`: files start again once the network has had a moment. */
+  onResume: () => void
   /** Stops the events and every fetch; after it the page hears nothing more. */
   dispose: () => void
 }
@@ -287,9 +291,10 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     queue.dispose()
   }
 
-  // A launch picks up what the last run left, once the folders no download names are gone.
+  // A launch picks up what the last run left, once the folders no download names are gone,
+  // and tries again what an outage stopped.
   Promise.all([queue.sweep({ wasSetAside: deps.wasSetAside }), deps.ready])
-    .then(queue.kick)
+    .then(queue.retryOutages)
     .catch((error: unknown) => {
       deps.warn(`raven player could not resume its downloads: ${loggable(errorText(error))}`)
     })
@@ -313,6 +318,8 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     removeAll,
     removeServer: queue.removeServer,
     showFolder,
+    onSuspend: queue.onSuspend,
+    onResume: queue.onResume,
     dispose,
   }
 }

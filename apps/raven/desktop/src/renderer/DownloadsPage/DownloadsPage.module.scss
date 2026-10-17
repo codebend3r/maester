@@ -38,13 +38,15 @@
     -webkit-app-region: no-drag;
   }
 
+  // Pause all and Resume all may both show, which leaves no room beside Back.
   @media (max-width: 30rem) {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      'back bulk'
-      'title title'
-      'line line'
-      'meter meter';
+      'back'
+      'title'
+      'bulk'
+      'line'
+      'meter';
   }
 }
 
@@ -63,6 +65,14 @@
 
 .bulk {
   grid-area: bulk;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  justify-content: end;
+
+  @media (max-width: 30rem) {
+    justify-content: start;
+  }
 }
 
 .line {

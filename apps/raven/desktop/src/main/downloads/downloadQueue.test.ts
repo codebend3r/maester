@@ -5,7 +5,9 @@ import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   createDownloadQueue,
   DOWNLOAD_CONCURRENCY,
+  OUTAGE_RETRY_MS,
   RENEWAL_MIN_MS,
+  RESUME_SETTLE_MS,
 } from '@/main/downloads/downloadQueue'
 import {
   EMPTY_DOWNLOADS,
@@ -336,6 +338,43 @@ describe('a relock', () => {
     expect(world.network.fileRequests().map(({ url }) => url)).toEqual([
       fileUrl(1),
       fileUrl(1, 'two'),
+    ])
+  })
+})
+
+describe('resuming after a relock', () => {
+  it("requeues every file of that server the relock paused, and no other's", () => {
+    const relocked = { kind: 'paused', bytes: 0, reason: 'relocked' } as const
+    const world = setup({
+      entries: [
+        entryFor(1, { status: relocked }),
+        entryFor(2, { status: relocked }),
+        entryFor(3, { status: { kind: 'paused', bytes: 0, reason: 'viewer' } }),
+        entryFor(5, { serverId: OTHER_SERVER_ID, status: relocked }),
+      ],
+      access: () => new Promise<AccessOutcome>(() => undefined),
+    })
+    world.queue.resume({ downloadId: idOf(2) })
+    expect([1, 2, 3, 5].map(world.statusOf)).toEqual([
+      { kind: 'queued' },
+      { kind: 'queued' },
+      { kind: 'paused', bytes: 0, reason: 'viewer' },
+      relocked,
+    ])
+  })
+
+  it('resumes only the file asked when it was paused for another reason', () => {
+    const world = setup({
+      entries: [
+        entryFor(1, { status: { kind: 'paused', bytes: 0, reason: 'viewer' } }),
+        entryFor(2, { status: { kind: 'paused', bytes: 0, reason: 'viewer' } }),
+      ],
+      access: () => new Promise<AccessOutcome>(() => undefined),
+    })
+    world.queue.resume({ downloadId: idOf(1) })
+    expect([1, 2].map(world.statusOf)).toEqual([
+      { kind: 'queued' },
+      { kind: 'paused', bytes: 0, reason: 'viewer' },
     ])
   })
 })
@@ -909,6 +948,142 @@ describe('a relaunch', () => {
     await world.queue.sweep({ wasSetAside: false })
     expect(world.drive.removed).toEqual([])
     expect(world.warnings).toEqual([])
+  })
+})
+
+describe('the outage retry', () => {
+  const unreachable: AccessOutcome = {
+    ok: false,
+    reason: 'unreachable',
+    message: 'raven player could not reach Vhagar.',
+  }
+  const retries = (pending: ReturnType<typeof setup>['pending']) =>
+    [...pending.values()].filter(({ ms }) => ms === OUTAGE_RETRY_MS)
+
+  it('tries a server again every five minutes while its files wait on an outage', async () => {
+    const reachable = { value: false }
+    const world = setup({
+      entries: [entryFor(1), entryFor(2)],
+      access: async () => (reachable.value ? FAR_TICKET : unreachable),
+    })
+    world.queue.kick()
+    await until(() => world.statusOf(2)?.kind === 'paused')
+    expect(OUTAGE_RETRY_MS).toBe(300_000)
+    expect(retries(world.pending)).toHaveLength(1)
+    reachable.value = true
+    world.fireAfter(OUTAGE_RETRY_MS)
+    await until(() => world.network.fileRequests().length === 2)
+    expect([1, 2].map(world.statusOf)).toEqual([
+      { kind: 'downloading', bytes: 0 },
+      { kind: 'downloading', bytes: 0 },
+    ])
+    expect(retries(world.pending)).toEqual([])
+  })
+
+  it('arms one retry however many files wait, and another after a retry that fails', async () => {
+    const world = setup({
+      entries: [entryFor(1), entryFor(2), entryFor(3)],
+      access: async () => unreachable,
+    })
+    world.queue.kick()
+    await until(() => world.statusOf(3)?.kind === 'paused')
+    await ticks(10)
+    expect(retries(world.pending)).toHaveLength(1)
+    world.fireAfter(OUTAGE_RETRY_MS)
+    await until(() => world.media.asked.length === 4 && world.statusOf(1)?.kind === 'failed')
+    await ticks(10)
+    expect(retries(world.pending)).toHaveLength(1)
+  })
+
+  it('requeues at launch what waits on an outage, and nothing the viewer paused', async () => {
+    const world = setup({
+      entries: [
+        entryFor(1, { status: { kind: 'paused', bytes: 0, reason: 'unreachable' } }),
+        entryFor(2, { status: { kind: 'failed', bytes: 0, reason: 'unreachable', message: '' } }),
+        entryFor(3, { status: { kind: 'paused', bytes: 0, reason: 'viewer' } }),
+        entryFor(4, { status: { kind: 'failed', bytes: 0, reason: 'changed', message: '' } }),
+      ],
+    })
+    world.queue.retryOutages()
+    await until(() => world.network.fileRequests().length === 2)
+    expect(world.network.fileRequests().map(({ url }) => url)).toEqual([fileUrl(1), fileUrl(2)])
+    expect(world.statusOf(3)).toEqual({ kind: 'paused', bytes: 0, reason: 'viewer' })
+    expect(world.statusOf(4)).toEqual({ kind: 'failed', bytes: 0, reason: 'changed', message: '' })
+  })
+
+  it('drops the retry once nothing waits on an outage, and at dispose', async () => {
+    const world = setup({ entries: [entryFor(1), entryFor(2)], access: async () => unreachable })
+    world.queue.kick()
+    await until(() => world.statusOf(2)?.kind === 'paused')
+    await world.queue.remove({ downloadId: idOf(1) })
+    expect(retries(world.pending)).toHaveLength(1)
+    await world.queue.remove({ downloadId: idOf(2) })
+    expect(retries(world.pending)).toEqual([])
+    const again = setup({ entries: [entryFor(1)], access: async () => unreachable })
+    again.queue.kick()
+    await until(() => again.statusOf(1)?.kind === 'failed')
+    again.queue.dispose()
+    expect(retries(again.pending)).toEqual([])
+  })
+
+  it('holds what waits on an outage for the viewer on Pause all, so no retry starts it', async () => {
+    const world = setup({ entries: [entryFor(1), entryFor(2)], access: async () => unreachable })
+    world.queue.kick()
+    await until(() => world.statusOf(2)?.kind === 'paused')
+    await world.queue.pauseAll()
+    expect([1, 2].map(world.statusOf)).toEqual([
+      { kind: 'paused', bytes: 0, reason: 'viewer' },
+      { kind: 'paused', bytes: 0, reason: 'viewer' },
+    ])
+    expect(retries(world.pending)).toEqual([])
+  })
+})
+
+describe('a sleep', () => {
+  it('stops every fetch, leaves its files downloading with no failure, and starts none', async () => {
+    const world = setup({ entries: [entryFor(1), entryFor(2), entryFor(3)] })
+    world.queue.kick()
+    await until(() => world.network.fileRequests().length === 2)
+    world.queue.onSuspend()
+    expect(world.network.fileRequests().every(({ signal }) => signal.aborted)).toBe(true)
+    await ticks(10)
+    world.queue.kick()
+    await ticks(10)
+    expect(world.network.fileRequests()).toHaveLength(2)
+    expect([1, 2, 3].map(world.statusOf)).toEqual([
+      { kind: 'downloading', bytes: 0 },
+      { kind: 'downloading', bytes: 0 },
+      { kind: 'queued' },
+    ])
+    expect(world.failed).toEqual([])
+  })
+
+  it('starts them again from the bytes on disk once the wake has settled', async () => {
+    const world = setup({ entries: [entryFor(1, { size: 8 })] })
+    world.network.answers.file = serving({ size: 8, sent: 4, isEnding: false })
+    world.queue.kick()
+    await until(() => world.drive.sizeOf(partOf(1)) === 4)
+    world.queue.onSuspend()
+    await ticks(10)
+    world.queue.onResume()
+    await ticks(10)
+    expect(world.network.fileRequests()).toHaveLength(1)
+    expect(RESUME_SETTLE_MS).toBe(5000)
+    world.fireAfter(RESUME_SETTLE_MS)
+    await until(() => world.network.fileRequests().length === 2)
+    expect(world.network.fileRequests()[1]?.headers).toEqual({ Range: 'bytes=4-' })
+    expect(world.media.forgotten).toContain(SERVER_ID)
+  })
+
+  it('requeues on the wake what waits on an outage', async () => {
+    const world = setup({
+      entries: [entryFor(1, { status: { kind: 'paused', bytes: 0, reason: 'unreachable' } })],
+    })
+    world.queue.onSuspend()
+    world.queue.onResume()
+    world.fireAfter(RESUME_SETTLE_MS)
+    await until(() => world.network.fileRequests().length === 1)
+    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 0 })
   })
 })
 
