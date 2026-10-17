@@ -274,7 +274,7 @@ describe('the media server', () => {
         const [movie] = await listMedia(library.id)
         const response = await app().inject({
           method: 'GET',
-          url: api().fileUrl(movie?.id ?? -1),
+          url: api().fileUrl({ id: movie?.id ?? -1 }),
           headers: { range: 'bytes=0-99', 'accept-encoding': BROWSER_ENCODINGS },
         })
         expect(response.statusCode).toBe(206)
@@ -291,7 +291,7 @@ describe('the media server', () => {
         const [, episode] = await listMedia(library.id)
         const response = await app().inject({
           method: 'GET',
-          url: api().fileUrl(episode?.id ?? -1),
+          url: api().fileUrl({ id: episode?.id ?? -1 }),
           headers: { 'accept-encoding': BROWSER_ENCODINGS },
         })
         expect(response.statusCode).toBe(200)
@@ -305,7 +305,7 @@ describe('the media server', () => {
         const [movie] = await listMedia(library.id)
         const response = await app().inject({
           method: 'GET',
-          url: api().fileUrl(movie?.id ?? -1),
+          url: api().fileUrl({ id: movie?.id ?? -1 }),
           headers: { range: `bytes=${(movie?.size ?? 0) + 10}-` },
         })
         expect(response.statusCode).toBe(416)

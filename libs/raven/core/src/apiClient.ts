@@ -110,6 +110,9 @@ export type FetchResponse = {
   text: () => Promise<string>
 }
 
+/** A media origin and the ticket that opens a video on it, which stands in for the cookie. */
+export type MediaAccess = { origin: MediaOrigin; ticket: string }
+
 export type FetchLike = (url: string, init?: FetchInit) => Promise<FetchResponse>
 
 export class ApiError extends Error {
@@ -187,19 +190,36 @@ export const createApiClient = ({
   const root = baseUrl.replace(/\/+$/, '')
   const url = (path: string): string => `${root}${path}`
 
+  /** A media path on the origin `access` names, with its ticket; on this server's own without. */
+  const mediaUrl = ({
+    path,
+    query,
+    access,
+  }: {
+    path: string
+    query: Record<string, string>
+    access: MediaAccess | null
+  }): string => {
+    const queryString = toQueryString(access === null ? query : { ...query, t: access.ticket })
+    return `${access === null ? root : access.origin.url}${path}${queryString === '' ? '' : `?${queryString}`}`
+  }
+
   /** Calls the server, failing with its own message when it says no. */
   const call = async ({
     path,
+    href = url(path),
     method = 'GET',
     accept = 'application/json',
     body,
   }: {
     path: string
+    /** A full address, for the media origins; `path` is then unused. */
+    href?: string
     method?: string
     accept?: string
     body?: unknown
   }): Promise<FetchResponse> => {
-    const response = await fetch(url(path), {
+    const response = await fetch(href, {
       method,
       headers: body === undefined ? { accept } : { accept, 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -226,8 +246,8 @@ export const createApiClient = ({
   }
 
   /** A plain-text body, such as WebVTT. */
-  const sendForText = async (path: string): Promise<string> =>
-    (await call({ path, accept: 'text/vtt' })).text()
+  const sendForText = async (href: string): Promise<string> =>
+    (await call({ path: '', href, accept: 'text/vtt' })).text()
 
   const expect = async <T>({
     request,
@@ -784,7 +804,8 @@ export const createApiClient = ({
         : url(`/api/images/${kind}${option.ref}`),
 
     /** The original file, served with byte ranges: what a player loads for direct play. */
-    fileUrl: (mediaId: number): string => url(`/api/media/${mediaId}/file`),
+    fileUrl: ({ id, access = null }: { id: number; access?: MediaAccess | null }): string =>
+      mediaUrl({ path: `/api/media/${id}/file`, query: {}, access }),
 
     /** The server's event stream: `ServerEvent`s, read with `parseServerEvent`. */
     eventsUrl: (): string => url('/api/events'),
@@ -822,14 +843,20 @@ export const createApiClient = ({
       id,
       trackId,
       window = 0,
+      access = null,
     }: {
       id: number
       trackId: string
       window?: number
+      access?: MediaAccess | null
     }): Promise<SubtitleCue[]> =>
       parseWebVtt(
         await sendForText(
-          `/api/media/${id}/subtitles/${encodeURIComponent(trackId)}?${toQueryString({ window: String(window) })}`,
+          mediaUrl({
+            path: `/api/media/${id}/subtitles/${encodeURIComponent(trackId)}`,
+            query: { window: String(window) },
+            access,
+          }),
         ),
       ),
 
@@ -843,18 +870,22 @@ export const createApiClient = ({
       mode,
       start,
       audio,
+      access = null,
     }: {
       id: number
       mode: StreamMode
       start: number
       audio: number | null
+      access?: MediaAccess | null
     }): string =>
-      url(
-        `/api/media/${id}/stream?${toQueryString({
+      mediaUrl({
+        path: `/api/media/${id}/stream`,
+        query: {
           mode,
           start: String(Math.max(0, Math.round(start * 1000) / 1000)),
           ...(audio == null ? {} : { audio: String(audio) }),
-        })}`,
-      ),
+        },
+        access,
+      }),
   }
 }

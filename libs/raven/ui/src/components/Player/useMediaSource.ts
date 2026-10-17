@@ -25,7 +25,7 @@ export const sourceFor = ({
   mime: string | null
 }): VideoSource =>
   mode === 'direct' || mime == null
-    ? { kind: 'file', url: api.fileUrl(id) }
+    ? { kind: 'file', url: api.fileUrl({ id }) }
     : { kind: 'stream', mime, url: (start) => api.streamUrl({ id, mode, start, audio }) }
 
 const failureMessage = (error: MediaError | null): string => {

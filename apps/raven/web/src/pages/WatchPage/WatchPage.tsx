@@ -84,7 +84,7 @@ export const WatchPlayer = ({
   const [next, ...after] = upNext
   const resumable = media.position > 0 && media.position < (media.duration ?? Infinity) - 10
   const copyLink = () => {
-    const link = new URL(api.fileUrl(media.id), window.location.origin).href
+    const link = new URL(api.fileUrl({ id: media.id }), window.location.origin).href
     navigator.clipboard.writeText(link).then(
       () => setCopied('Link copied. Paste it into VLC or IINA to play it there.'),
       () => setCopied(`Copy this link: ${link}`),
