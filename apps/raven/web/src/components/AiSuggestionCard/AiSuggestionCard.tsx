@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AiSuggestion } from '@raven/core'
 import { type Ref, useId } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button } from '@raven/ui'
+import { Button, Icon } from '@raven/ui'
 import { api } from '@/lib/api'
 import { afterMatch } from '@/lib/invalidate'
 import styles from '@/components/AiSuggestionCard/AiSuggestionCard.module.scss'
@@ -15,7 +15,8 @@ export const suggestedName = (suggestion: AiSuggestion): string =>
  * What the AI lookup suggests for files it was not sure of: the poster, the
  * title and year, and the reason it gave. Accept points the files at it with
  * the call Fix match makes, so it is kept as a Fix match; Fix match opens
- * the search to choose another. Both wait for the admin lock to be off.
+ * the search to choose another, with Accept at the end as the primary
+ * action. Both wait for the admin lock to be off.
  */
 export const AiSuggestionCard = ({
   suggestion,
@@ -57,6 +58,7 @@ export const AiSuggestionCard = ({
         <p className={styles.reason}>{suggestion.reason}</p>
         {accepting.isError && (
           <p role="alert" className={styles.error}>
+            <Icon name="alert" size={16} />
             {accepting.error.message}
           </p>
         )}
@@ -64,20 +66,20 @@ export const AiSuggestionCard = ({
       <AdminOnly>
         <footer className={styles.actions}>
           <Button
-            tone="primary"
-            disabled={accepting.isPending}
-            aria-label={`Accept ${name} for ${subject}`}
-            onClick={() => accepting.mutate()}
-          >
-            Accept
-          </Button>
-          <Button
             ref={fixRef}
             icon="search"
             aria-label={`Fix match for ${subject}`}
             onClick={onFix}
           >
             Fix match
+          </Button>
+          <Button
+            tone="primary"
+            disabled={accepting.isPending}
+            aria-label={`Accept ${name} for ${subject}`}
+            onClick={() => accepting.mutate()}
+          >
+            Accept
           </Button>
         </footer>
       </AdminOnly>

@@ -2,6 +2,7 @@ import type { Credit, CreditJob } from '@raven/core'
 import { useId, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@raven/ui'
+import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
 import styles from '@/components/CastRow/CastRow.module.scss'
 
@@ -52,9 +53,11 @@ const initials = (name: string): string =>
     .join('')
 
 /**
- * Cast & Crew: round photos in a row that scrolls sideways, snapping to each
- * person. The buttons scroll a page at a time; the list itself scrolls with
- * the keyboard too, since it takes focus.
+ * Cast & Crew: a ruled heading with round previous and next buttons beside
+ * it, over large round photos (initials where TMDB has none) in a row that
+ * scrolls sideways, snapping to each person, with name and role beneath.
+ * The buttons scroll a page at a time; the list itself scrolls with the
+ * keyboard too, since it takes focus.
  */
 export const CastRow = ({
   credits,
@@ -76,15 +79,29 @@ export const CastRow = ({
 
   return (
     <section className={styles.section} aria-labelledby={id}>
-      <header className={styles.header}>
-        <h2 id={id} className={styles.heading}>
-          {title}
-        </h2>
-        <div className={styles.buttons}>
-          <Button icon="back" aria-label="Earlier in the cast" onClick={() => page(-1)} />
-          <Button icon="next" aria-label="Later in the cast" onClick={() => page(1)} />
-        </div>
-      </header>
+      <SectionHeading
+        id={id}
+        aside={
+          <>
+            <Button
+              tone="ghost"
+              icon="back"
+              aria-label="Earlier in the cast"
+              className={styles.scroll}
+              onClick={() => page(-1)}
+            />
+            <Button
+              tone="ghost"
+              icon="next"
+              aria-label="Later in the cast"
+              className={styles.scroll}
+              onClick={() => page(1)}
+            />
+          </>
+        }
+      >
+        {title}
+      </SectionHeading>
       {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrolling region must take focus to scroll by keyboard */}
       <ul ref={list} className={styles.row} tabIndex={0} aria-labelledby={id}>
         {members.map((member) => {
@@ -99,8 +116,10 @@ export const CastRow = ({
                     <span aria-hidden="true">{initials(member.name)}</span>
                   )}
                 </span>
-                <span className={styles.name}>{member.name}</span>
-                <span className={styles.role}>{member.roles.join(' / ')}</span>
+                <span className={styles.caption}>
+                  <span className={styles.name}>{member.name}</span>
+                  <span className={styles.role}>{member.roles.join(' / ')}</span>
+                </span>
               </Link>
             </li>
           )

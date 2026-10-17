@@ -5,6 +5,7 @@ import {
   type MatchItemType,
   type MediaItem,
   formatDuration,
+  formatRuntime,
 } from '@raven/core'
 import { useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -13,18 +14,25 @@ import { Button, ButtonLink } from '@raven/ui'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
-import { ItemHeader, pictureBackdrop } from '@/components/ItemHeader/ItemHeader'
+import {
+  type HeaderProgress,
+  ItemHeader,
+  pictureBackdrop,
+} from '@/components/ItemHeader/ItemHeader'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
+import { EpisodeNeighbours } from '@/components/PlayableItemView/EpisodeNeighbours'
+import { FileFacts } from '@/components/PlayableItemView/FileFacts'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { Versions } from '@/components/Versions/Versions'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
-import { directedBy, episodeByline, episodeFacts, fileFacts, movieFacts } from '@/lib/itemFacts'
+import { directedBy, episodeByline, episodeFacts, movieFacts } from '@/lib/itemFacts'
 import { episodeBackPath, inLibrary, itemPath, watchLink } from '@/lib/itemLinks'
+import { progressOf } from '@/lib/mediaProgress'
 import { displaySettingsQuery, librariesQuery, tracksQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
 import { useMediaMutations } from '@/lib/useMediaMutations'
@@ -36,6 +44,8 @@ type Facts = { details: ItemDetails; primary: MediaItem }
 type PlayableConfig = {
   matchType: MatchItemType
   back: (facts: Facts & { libraries: readonly Library[] }) => { to: string; label: string }
+  /** The small line over the title: an episode's show and number. */
+  eyebrow: (details: ItemDetails) => string[]
   byline: (details: ItemDetails) => string | null
   facts: (facts: Facts) => string[]
   /** A movie has a poster and a backdrop; an episode has its still, else the file's frame grab, for both. */
@@ -47,6 +57,10 @@ type PlayableConfig = {
   /** Whether every score's source gets a chip, one with none saying so. */
   showsEveryScore: boolean
   showsReviews: boolean
+  /** Whether the header says how long is left of a video started, with its line. */
+  showsTimeLeft: boolean
+  /** Whether the episodes either side follow the file. */
+  showsNeighbours: boolean
   castTitle: string | undefined
 }
 
@@ -57,6 +71,7 @@ const PLAYABLE = {
       to: `/libraries/${primary.libraryId}`,
       label: libraries.find((entry) => entry.id === primary.libraryId)?.name ?? 'Library',
     }),
+    eyebrow: () => [],
     byline: directedBy,
     facts: movieFacts,
     pictures: 'poster and backdrop',
@@ -65,6 +80,8 @@ const PLAYABLE = {
     showsContentRating: true,
     showsEveryScore: true,
     showsReviews: true,
+    showsTimeLeft: false,
+    showsNeighbours: false,
     castTitle: undefined,
   },
   episode: {
@@ -73,7 +90,8 @@ const PLAYABLE = {
       to: episodeBackPath({ item: details, libraryId: primary.libraryId }),
       label: details.show?.title ?? 'Library',
     }),
-    byline: episodeByline,
+    eyebrow: (details) => [episodeByline(details)].filter(Boolean),
+    byline: () => null,
     facts: episodeFacts,
     pictures: 'still',
     editable: false,
@@ -81,18 +99,28 @@ const PLAYABLE = {
     showsContentRating: false,
     showsEveryScore: false,
     showsReviews: false,
+    showsTimeLeft: true,
+    showsNeighbours: true,
     castTitle: 'Guest stars & crew',
   },
 } as const satisfies Record<'movie' | 'episode', PlayableConfig>
 
+/** How much of a video started is left, with its line; nothing for one not started. */
+const timeLeft = (media: MediaItem): HeaderProgress | undefined => {
+  const fraction = progressOf(media)
+  const left = formatRuntime((media.duration ?? 0) - media.position)
+  return fraction > 0 && left ? { fraction, label: `${left} left` } : undefined
+}
+
 /**
  * A movie's or an episode's page once the item, the library's files it
  * shows and the version Play starts are known: the header with Play,
- * favourite and, with the admin lock off, the editors and the file's menu
- * (its picture plays too), whether this browser needs that version
- * converted or cannot play it, then the summary, the file, its versions and
- * the people. Only Edit images lists every library's files, since the
- * pictures are the item's wherever its files are.
+ * favourite and Watched, and with the admin lock off the editors and the
+ * file's menu (its picture plays too), whether this browser cannot play
+ * that version, then the summary beside the file's facts, its versions, an
+ * episode's neighbours, the people, a movie's reviews and TMDB's credit.
+ * Only Edit images lists every library's files, since the pictures are the
+ * item's wherever its files are.
  */
 export const PlayableItemView = ({
   kind,
@@ -112,7 +140,7 @@ export const PlayableItemView = ({
 }) => {
   const details = { ...item, versions }
   const config: PlayableConfig = PLAYABLE[kind]
-  const ids = { title: useId(), file: useId() }
+  const titleId = useId()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -125,26 +153,27 @@ export const PlayableItemView = ({
   const showsLogo = useQuery(displaySettingsQuery).data?.titles !== 'text'
   const known = libraries.data ?? []
   const back = config.back({ details, primary, libraries: known })
-  const facts = fileFacts({ media: primary, tracks: tracks.data })
   const tagline = config.showsTagline ? details.tagline : null
-  const hasSummary = !!tagline || !!details.summary
   const play = watchLink({ media: primary })
   const playPicture = { ...play, label: `Play ${details.title}` }
   const still =
     api.itemImageUrl({ id: details.id, kind: 'still', version: details.backdropVersion }) ??
     api.thumbnailUrl(primary)
+  const hasSummary = !!tagline || !!details.summary
 
   return (
-    <article className={styles.page} aria-labelledby={ids.title}>
+    <article className={styles.page} aria-labelledby={titleId}>
       <ItemHeader
         back={back}
-        titleId={ids.title}
+        titleId={titleId}
+        eyebrow={config.eyebrow(details)}
         title={details.title}
         byline={config.byline(details)}
         contentRating={config.showsContentRating ? details.contentRating : null}
         facts={config.facts({ details, primary })}
         ratings={details.ratings}
         shouldShowEverySource={config.showsEveryScore}
+        progress={config.showsTimeLeft ? timeLeft(primary) : undefined}
         logo={
           showsLogo
             ? api.itemImageUrl({ id: details.id, kind: 'logo', version: details.logoVersion })
@@ -173,6 +202,52 @@ export const PlayableItemView = ({
               picture: { shape: 'still', url: still, play: playPicture },
               backdrop: pictureBackdrop(still),
             })}
+        manage={
+          <AdminOnly>
+            {config.editable && (
+              <>
+                <Button
+                  icon="edit"
+                  aria-pressed={editingImages}
+                  onClick={() => setEditingImages((editing) => !editing)}
+                >
+                  Edit images
+                </Button>
+                <Button
+                  icon="edit"
+                  aria-pressed={editingMetadata}
+                  onClick={() => setEditingMetadata((editing) => !editing)}
+                >
+                  Edit metadata
+                </Button>
+              </>
+            )}
+            {/* Without its favourite and watched, which the page has beside it, all the menu holds needs the admin lock off. */}
+            <MediaMenu
+              media={primary}
+              open={menuOpen}
+              onOpenChange={setMenuOpen}
+              inline
+              matchType={config.matchType}
+              aiMatch={details.aiMatch}
+              withFavourite={false}
+              withWatched={false}
+              onMatched={(updated) => {
+                const page = updated.item ? itemPath(updated.item) : null
+                navigate(
+                  page == null
+                    ? `/libraries/${updated.libraryId}`
+                    : inLibrary({ page, libraryId: updated.libraryId }),
+                  { replace: true },
+                )
+              }}
+              onDeleted={() => {
+                if (details.versions.length <= 1) navigate(back.to)
+                else void queryClient.invalidateQueries({ queryKey: queryKeys.item(details.id) })
+              }}
+            />
+          </AdminOnly>
+        }
       >
         <ButtonLink tone="primary" icon="play" to={play.to} state={play.state}>
           {primary.position > 0 ? `Resume from ${formatDuration(primary.position)}` : 'Play'}
@@ -181,57 +256,13 @@ export const PlayableItemView = ({
           icon="heart"
           aria-label="Favourite"
           aria-pressed={primary.favourite}
-          className={primary.favourite ? styles.favourited : undefined}
+          className={styles.favourite}
           onClick={() => favourite.mutate(!primary.favourite)}
         />
         <WatchedToggle
           state={primary.watched ? 'watched' : 'unwatched'}
           onToggle={() => watched.mutate(!primary.watched)}
         />
-        <AdminOnly>
-          {config.editable && (
-            <>
-              <Button
-                icon="edit"
-                aria-pressed={editingImages}
-                onClick={() => setEditingImages((editing) => !editing)}
-              >
-                Edit images
-              </Button>
-              <Button
-                icon="edit"
-                aria-pressed={editingMetadata}
-                onClick={() => setEditingMetadata((editing) => !editing)}
-              >
-                Edit metadata
-              </Button>
-            </>
-          )}
-          {/* Without its favourite and watched, which the page has beside it, all the menu holds needs the admin lock off. */}
-          <MediaMenu
-            media={primary}
-            open={menuOpen}
-            onOpenChange={setMenuOpen}
-            inline
-            matchType={config.matchType}
-            aiMatch={details.aiMatch}
-            withFavourite={false}
-            withWatched={false}
-            onMatched={(updated) => {
-              const page = updated.item ? itemPath(updated.item) : null
-              navigate(
-                page == null
-                  ? `/libraries/${updated.libraryId}`
-                  : inLibrary({ page, libraryId: updated.libraryId }),
-                { replace: true },
-              )
-            }}
-            onDeleted={() => {
-              if (details.versions.length <= 1) navigate(back.to)
-              else void queryClient.invalidateQueries({ queryKey: queryKeys.item(details.id) })
-            }}
-          />
-        </AdminOnly>
       </ItemHeader>
 
       <PlaybackNote media={primary} />
@@ -252,28 +283,28 @@ export const PlayableItemView = ({
         )}
       </AdminOnly>
 
-      <div
-        className={
-          hasSummary && facts.length > 0 ? `${styles.about} ${styles.besideFile}` : styles.about
-        }
-      >
-        <Summary tagline={tagline} summary={details.summary} className={styles.summary} />
-        {facts.length > 0 && (
-          <section className={styles.file} aria-labelledby={ids.file}>
-            <h2 id={ids.file} className="visually-hidden">
-              File
-            </h2>
-            <dl className={styles.facts}>
-              {facts.map((fact) => (
-                <div key={fact.label} className={styles.fact}>
-                  <dt>{fact.label}</dt>
-                  <dd>{fact.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        )}
-      </div>
+      {config.showsNeighbours ? (
+        <>
+          <Summary tagline={null} summary={details.summary} />
+          <div className={`${styles.about} ${styles.besides}`}>
+            <FileFacts media={primary} tracks={tracks.data} className={styles.main} />
+            <EpisodeNeighbours
+              episode={details}
+              libraryId={primary.libraryId}
+              className={styles.aside}
+            />
+          </div>
+        </>
+      ) : (
+        <div className={hasSummary ? `${styles.about} ${styles.besides}` : styles.about}>
+          <Summary tagline={tagline} summary={details.summary} className={styles.main} />
+          <FileFacts
+            media={primary}
+            tracks={tracks.data}
+            className={hasSummary ? styles.aside : undefined}
+          />
+        </div>
+      )}
 
       <Versions versions={details.versions} libraries={known} />
       <CastRow credits={details.credits} title={config.castTitle} />

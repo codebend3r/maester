@@ -1,0 +1,78 @@
+.neighbours {
+  display: grid;
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+// The still at the left, which way, the title and the number beside it.
+.card {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  grid-template-areas:
+    'still direction'
+    'still title'
+    'still code';
+  align-content: center;
+  column-gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+  text-decoration: none;
+
+  &:hover {
+    background: var(--color-canopy-hi);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background-color 150ms ease;
+  }
+}
+
+.still {
+  grid-area: still;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-moss);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.direction {
+  grid-area: direction;
+  align-self: end;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.title {
+  grid-area: title;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.code {
+  grid-area: code;
+  align-self: start;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}

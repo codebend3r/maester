@@ -1,17 +1,23 @@
 .summary {
   display: grid;
   justify-items: start;
-  gap: var(--space-1);
-  max-width: 48rem;
+  gap: var(--space-3);
 }
 
+// The tagline in the serif, the summary as a lead under it.
 .tagline {
-  color: var(--color-lichen);
-  font-style: italic;
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-tight);
+  text-wrap: balance;
 }
 
 .text {
-  line-height: var(--line-body);
+  max-width: 42rem;
+  color: var(--color-birch);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-relaxed);
+  text-wrap: pretty;
 }
 
 .clamped {
@@ -21,7 +27,8 @@
   overflow: hidden;
 }
 
+// A word on the summary's own left edge, lit only under the pointer.
 .more {
-  min-height: 2rem;
-  padding: 0 var(--space-2);
+  min-height: var(--space-5);
+  padding: 0;
 }

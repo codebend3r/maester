@@ -1,49 +1,48 @@
 .section {
   display: grid;
-  gap: var(--space-2);
-}
-
-.heading {
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
-  font-weight: 400;
+  gap: var(--space-4);
 }
 
 .list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
-// Avatar, author and time on the first row, the stars beneath, then the text and Read.
+// Who wrote it, then the first lines, then Read.
 .card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
+}
+
+// The avatar, the author over when, and the score at the right.
+.head {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    'avatar author when'
-    'avatar stars stars'
-    'text text text'
-    'read read read';
+    'avatar author score'
+    'avatar when score';
   align-items: center;
-  gap: var(--space-0) var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
-  background: var(--color-canopy);
+  column-gap: var(--space-2);
 }
 
 .avatar {
   grid-area: avatar;
   display: grid;
   place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: var(--control-size);
+  height: var(--control-size);
   overflow: hidden;
-  border-radius: 50%;
-  background: var(--color-moss);
-  color: var(--color-lichen);
-  font-size: var(--font-size-sm);
-  font-weight: 700;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(160deg, var(--color-moss-hi), var(--color-canopy-hi));
+  color: var(--color-birch);
+  font-family: var(--font-display);
+  font-size: var(--font-size-md);
 
   img {
     width: 100%;
@@ -54,71 +53,55 @@
 
 .author {
   grid-area: author;
+  align-self: end;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .when {
   grid-area: when;
+  align-self: start;
   color: var(--color-lichen);
   font-size: var(--font-size-xs);
 }
 
-.stars {
-  grid-area: stars;
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  font-size: var(--font-size-sm);
-  letter-spacing: 0.05em;
+.score {
+  grid-area: score;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-variant-numeric: tabular-nums;
 }
 
-.starFull {
-  color: var(--color-bark);
-}
-
-.starHalf {
-  background: linear-gradient(90deg, var(--color-bark) 50%, var(--color-moss) 50%);
-  background-clip: text;
-  color: transparent;
-}
-
-.starEmpty {
-  color: var(--color-moss);
+.outOf {
+  color: var(--color-lichen);
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
 }
 
 .text {
-  grid-area: text;
   display: -webkit-box;
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  padding-top: var(--space-1);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-body);
+  color: var(--color-birch);
+  line-height: var(--line-relaxed);
   white-space: pre-line;
   overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 
+// A word on the card's own left edge, lit only under the pointer.
 .read {
-  grid-area: read;
   justify-self: start;
-  min-height: 2rem;
-  padding: 0 var(--space-2);
+  min-height: var(--space-5);
+  padding: 0;
 }
 
 .dialog {
   width: min(var(--measure), calc(100vw - 2 * var(--space-3)));
   max-height: calc(100dvh - 2 * var(--space-3));
   padding: 0;
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
-  background: var(--color-canopy);
-  color: var(--color-bark);
-
-  &::backdrop {
-    background: var(--color-scrim);
-  }
 }
 
 .dialogBody {
@@ -127,26 +110,9 @@
   padding: var(--space-4);
 }
 
-.dialogHeader {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    'avatar title when'
-    'avatar stars stars';
-  align-items: center;
-  gap: var(--space-0) var(--space-2);
-
-  .avatar {
-    grid-area: avatar;
-  }
-
-  .stars {
-    grid-area: stars;
-  }
-}
-
 .dialogTitle {
-  grid-area: title;
+  grid-area: author;
+  align-self: end;
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
   font-weight: 400;
@@ -154,7 +120,8 @@
 }
 
 .whole {
-  line-height: var(--line-body);
+  color: var(--color-birch);
+  line-height: var(--line-relaxed);
   white-space: pre-line;
   overflow-wrap: anywhere;
 }

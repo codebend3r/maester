@@ -1,6 +1,7 @@
 import { type Review, timeAgo } from '@raven/core'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@raven/ui'
+import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
 import styles from '@/components/ReviewCards/ReviewCards.module.scss'
 
@@ -16,32 +17,18 @@ const initials = (name: string): string =>
     .join('')
     .toUpperCase()
 
-/** A score out of 10 as stars out of five, halves allowed: 7 becomes 3.5. */
-export const starsOf = (rating: number): number => Math.round(rating) / 2
+const score = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 })
 
-const Stars = ({ rating }: { rating: number }) => {
-  const stars = starsOf(rating)
-  return (
-    <span className={styles.stars}>
-      {[1, 2, 3, 4, 5].map((star) => (
-        <span
-          key={star}
-          className={
-            stars >= star
-              ? styles.starFull
-              : stars >= star - 0.5
-                ? styles.starHalf
-                : styles.starEmpty
-          }
-          aria-hidden="true"
-        >
-          ★
-        </span>
-      ))}
-      <span className="visually-hidden">{stars} out of 5 stars</span>
+/** A reviewer's score out of 10, in the serif, read out in full. */
+const Score = ({ rating }: { rating: number }) => (
+  <span className={styles.score}>
+    <span aria-hidden="true">
+      {score.format(rating)}
+      <span className={styles.outOf}>/10</span>
     </span>
-  )
-}
+    <span className="visually-hidden">{score.format(rating)} out of 10</span>
+  </span>
+)
 
 const Avatar = ({ review }: { review: Review }) => {
   const [failed, setFailed] = useState(false)
@@ -67,13 +54,13 @@ const ReviewDialog = ({ review, onClose }: { review: Review; onClose: () => void
   return (
     <dialog ref={dialog} className={styles.dialog} aria-labelledby={id} onClose={onClose}>
       <div className={styles.dialogBody}>
-        <header className={styles.dialogHeader}>
+        <header className={styles.head}>
           <Avatar review={review} />
           <h2 id={id} className={styles.dialogTitle}>
             {review.author}
           </h2>
           <span className={styles.when}>{timeAgo({ at: review.writtenAt })}</span>
-          {review.rating != null && <Stars rating={review.rating} />}
+          {review.rating != null && <Score rating={review.rating} />}
         </header>
         <p className={styles.whole}>{review.content}</p>
         <footer className={styles.dialogActions}>
@@ -91,12 +78,14 @@ const ReviewCard = ({ review }: { review: Review }) => {
   const [open, setOpen] = useState(false)
   return (
     <li className={styles.card}>
-      <Avatar review={review} />
-      <span className={styles.author}>{review.author}</span>
-      <span className={styles.when}>{timeAgo({ at: review.writtenAt })}</span>
-      {review.rating != null && <Stars rating={review.rating} />}
+      <span className={styles.head}>
+        <Avatar review={review} />
+        <span className={styles.author}>{review.author}</span>
+        <span className={styles.when}>{timeAgo({ at: review.writtenAt })}</span>
+        {review.rating != null && <Score rating={review.rating} />}
+      </span>
       <p className={styles.text}>{review.content}</p>
-      <Button className={styles.read} onClick={() => setOpen(true)}>
+      <Button tone="ghost" className={styles.read} onClick={() => setOpen(true)}>
         Read
       </Button>
       {open && <ReviewDialog review={review} onClose={() => setOpen(false)} />}
@@ -104,15 +93,17 @@ const ReviewCard = ({ review }: { review: Review }) => {
   )
 }
 
-/** Reviews by TMDB members, newest first, up to ten, each as a card with Read for the whole thing. */
+/**
+ * Reviews by TMDB members, newest first, up to ten, each a card on the
+ * canopy: who wrote it and when, their score out of 10, the first lines,
+ * and Read for the whole thing.
+ */
 export const ReviewCards = ({ reviews }: { reviews: readonly Review[] }) => {
   const id = useId()
   if (reviews.length === 0) return null
   return (
     <section className={styles.section} aria-labelledby={id}>
-      <h2 id={id} className={styles.heading}>
-        Reviews from TMDB members
-      </h2>
+      <SectionHeading id={id}>Reviews from TMDB members</SectionHeading>
       <ul className={styles.list}>
         {reviews.slice(0, SHOWN).map((review) => (
           <ReviewCard key={review.id} review={review} />

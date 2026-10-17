@@ -59,4 +59,35 @@ describe('ItemHeader', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Saving Private Ryan')
     expect(screen.queryByRole('img')).toBeNull()
   })
+
+  it('says what the item is over its title, how far through it is, and its actions in two rows', () => {
+    render(
+      <MemoryRouter>
+        <ItemHeader
+          titleId="title"
+          eyebrow={['Saga', '3 movies']}
+          title="The Lord of the Rings Collection"
+          byline={null}
+          contentRating="PG-13"
+          facts={['2001 to 2003', '8h 54m in all']}
+          ratings={[]}
+          backdrop={null}
+          progress={{ fraction: 2 / 3, label: '2 of 3 watched' }}
+          back={{ to: '/libraries/4/sagas', label: 'Sagas' }}
+          manage={<button type="button">Edit backdrop</button>}
+        >
+          <button type="button">Play all</button>
+        </ItemHeader>
+      </MemoryRouter>,
+    )
+    expect(screen.getByText('Saga')).toBeInTheDocument()
+    expect(screen.getByText('3 movies')).toBeInTheDocument()
+    expect(screen.getByText('PG-13')).toHaveTextContent('Rated PG-13')
+    expect(screen.getByText('8h 54m in all')).toBeInTheDocument()
+    expect(screen.getByText('2 of 3 watched')).toBeInTheDocument()
+    const play = screen.getByRole('button', { name: 'Play all' })
+    const edit = screen.getByRole('button', { name: 'Edit backdrop' })
+    expect(play.parentElement).not.toBe(edit.parentElement)
+    expect(play.parentElement?.parentElement).toBe(edit.parentElement?.parentElement)
+  })
 })

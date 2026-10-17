@@ -1,13 +1,6 @@
 .section {
   display: grid;
-  gap: var(--space-2);
-}
-
-.heading {
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
-  font-weight: 400;
-  line-height: var(--line-tight);
+  gap: var(--space-3);
 }
 
 // The cards are a collection, so they are placed by the grid, not by name.

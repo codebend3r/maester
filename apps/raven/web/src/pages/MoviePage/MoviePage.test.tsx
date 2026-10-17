@@ -155,6 +155,33 @@ describe('MoviePage', () => {
     expect(screen.getByText('English, Spanish')).toBeInTheDocument()
   })
 
+  it("lists the file's container, bitrate and size after its tracks", async () => {
+    open({ details: itemDetails() })
+    const file = await screen.findByRole('region', { name: 'File' })
+    expect(
+      within(file)
+        .getAllByRole('term')
+        .map((term) => term.textContent),
+    ).toEqual(['Video', 'Audio', 'Subtitles', 'Container', 'Bitrate', 'Size'])
+    expect(within(file).getByText('MKV')).toBeInTheDocument()
+    expect(within(file).getByText('2.2 Mb/s')).toBeInTheDocument()
+    expect(within(file).getByText('1.6 GB')).toBeInTheDocument()
+  })
+
+  it('fills the heart of a favourite, and favours one that is not', async () => {
+    const calls: unknown[] = []
+    const set = spyOn(api, 'setFavourite').mockImplementation(async (input) => {
+      calls.push(input)
+      return matchedMovie({ favourite: input.favourite })
+    })
+    open({ details: itemDetails({ versions: [matchedMovie({ favourite: true })] }) })
+    const heart = await screen.findByRole('button', { name: 'Favourite' })
+    expect(heart).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(heart)
+    set.mockRestore()
+    expect(calls).toEqual([{ id: 7, favourite: false }])
+  })
+
   it('describes untagged audio without a language', async () => {
     open({ details: itemDetails() })
     spies.tracks.mockImplementation(async () => ({
