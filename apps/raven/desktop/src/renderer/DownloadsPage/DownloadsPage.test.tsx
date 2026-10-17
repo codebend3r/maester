@@ -267,6 +267,20 @@ describe('DownloadsPage', () => {
     expect(sentOfType({ client, type: 'deleteDownload' })).toEqual([])
   })
 
+  it.each([
+    ['downloading', { kind: 'downloading', bytes: 1.2 * GB } as const, 1.2 * GB],
+    ['paused', { kind: 'paused', bytes: 0.5 * GB, message: null } as const, 0.5 * GB],
+    ['failed', { kind: 'failed', bytes: 0.3 * GB, message: 'Not enough space' } as const, 0.3 * GB],
+    ['queued', { kind: 'queued' } as const, 0],
+  ])('asks to free only the bytes on disk for a %s row', async (_name, status, bytes) => {
+    await openPage({ downloads: [viewOf({ status })] })
+    const row = await rowOf('S01E01 Good News')
+    await userEvent.click(within(row).getByRole('button', { name: 'Delete S01E01 Good News' }))
+    expect(
+      within(row).getByText(`Delete S01E01 Good News? ${formatBytes(bytes)} will be freed.`),
+    ).toBeInTheDocument()
+  })
+
   it('deletes a row once asked, and the page keeps the focus', async () => {
     const { client } = await openPage({ downloads: ROWS })
     const row = await rowOf('The Two Towers (2002)')

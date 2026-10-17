@@ -10,6 +10,7 @@ import {
   type MediaOriginKind,
 } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
+import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import { CALL_MESSAGES, loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { isSidecarTrackId, SERVER_GONE } from '@/shared/protocol'
@@ -216,7 +217,7 @@ export const createMediaAccess = ({
     })
     if (!reply.ok) return { ok: false, reason: 'unreachable', message: reply.message }
     if (reply.status === LOCKED_STATUS) {
-      return { ok: false, reason: 'locked', message: `${server.name} locked this library again` }
+      return { ok: false, reason: 'locked', message: DOWNLOAD_MESSAGES.relocked(server.name) }
     }
     if (reply.status === NOT_FOUND_STATUS) {
       return { ok: false, reason: 'gone', message: EXPAND_MESSAGES.gone(server.name) }

@@ -75,6 +75,9 @@ export const OUTAGE_RETRY_MS = 300_000
 /** How long a wake from sleep is given for the network to come back before files start again. */
 export const RESUME_SETTLE_MS = 5000
 
+/** The most of a subtitle kept; a larger one is skipped rather than read whole into memory. */
+export const SIDECAR_MAX_BYTES = 16 * 1024 ** 2
+
 const NOT_FOUND_STATUS = 404
 
 /** The parts of `node:fs/promises` the queue uses; main passes a recursive `mkdir` and a forced, recursive `rm`. */
@@ -151,6 +154,43 @@ const stopReasonOf = (signal: AbortSignal): StopReason | null => {
   const reason: unknown = signal.reason
   if (!(reason instanceof DOMException)) return null
   return STOP_REASONS.find((known) => known === reason.message) ?? null
+}
+
+/** A body's text, read only up to `max` bytes: past them, the rest is never read. */
+const textUpTo = async ({
+  body,
+  max,
+  signal,
+}: {
+  body: ReadableStream<Uint8Array> | null
+  max: number
+  signal: AbortSignal
+}): Promise<{ kind: 'text'; text: string } | { kind: 'tooBig' }> => {
+  const decoder = new TextDecoder()
+  const read: { bytes: number; text: string; isOver: boolean } = {
+    bytes: 0,
+    text: '',
+    isOver: false,
+  }
+  const sink = new WritableStream<Uint8Array>({
+    write: (chunk) => {
+      read.bytes += chunk.length
+      if (read.bytes > max) {
+        read.isOver = true
+        throw new RangeError('The subtitle is larger than raven player keeps')
+      }
+      read.text += decoder.decode(chunk, { stream: true })
+    },
+  })
+  try {
+    await (body ?? new ReadableStream<Uint8Array>({ start: (c) => c.close() })).pipeTo(sink, {
+      signal,
+    })
+  } catch (error) {
+    if (read.isOver) return { kind: 'tooBig' }
+    throw error
+  }
+  return { kind: 'text', text: read.text + decoder.decode() }
 }
 
 const isRelocked = ({ status }: DownloadEntry): boolean =>
@@ -243,40 +283,65 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     told(entry.downloadId)
   }
 
-  /** The disk is full: this file fails, and the files of its group still waiting wait paused. */
-  const failForSpace = (entry: DownloadEntry): void => {
-    store.update((state) => {
-      const failed = fail(state, { downloadId: entry.downloadId, reason: 'noSpace' })
-      return failed.entries
-        .filter(
-          (other) =>
-            other.downloadId !== entry.downloadId &&
-            other.status.kind === 'queued' &&
-            sameGroup({ a: entry, b: other }),
-        )
-        .reduce(
-          (next, other) => pause(next, { downloadId: other.downloadId, reason: 'noSpace' }),
-          failed,
-        )
-    })
-    told(entry.downloadId)
-  }
+  type RunPick = (input: { downloadId: string; run: Run }) => boolean
 
   const stopRuns = ({
     reason,
     isStopped,
   }: {
     reason: StopReason
-    isStopped: (input: { downloadId: string; run: Run }) => boolean
+    isStopped: RunPick
   }): Promise<void> => {
     const stopped = [...running].filter(([downloadId, run]) => isStopped({ downloadId, run }))
     stopped.forEach(([, run]) => run.stop.abort(stopping(reason)))
     return Promise.all(stopped.map(([, run]) => run.done)).then(() => undefined)
   }
 
+  /**
+   * Writes what each picked run's part holds while its file is still downloading, before a
+   * pause or a stop: progress is otherwise saved only every `PROGRESS_STEP_BYTES`.
+   */
+  const saveBytes = (isSaved: RunPick): void => {
+    const saved = [...running].filter(([downloadId, run]) => isSaved({ downloadId, run }))
+    store.update((state) =>
+      saved.reduce(
+        (next, [downloadId, run]) => advance(next, { downloadId, bytes: run.disk.bytes }),
+        state,
+      ),
+    )
+  }
+
+  /**
+   * The disk is full: this file fails, and the files of its group still waiting wait paused,
+   * a run already reading one's ticket stopped with it.
+   */
+  const failForSpace = (entry: DownloadEntry): void => {
+    const waiting = store
+      .read()
+      .entries.filter(
+        (other) =>
+          other.downloadId !== entry.downloadId &&
+          other.status.kind === 'queued' &&
+          sameGroup({ a: entry, b: other }),
+      )
+      .map(({ downloadId }) => downloadId)
+    store.update((state) =>
+      waiting.reduce(
+        (next, downloadId) => pause(next, { downloadId, reason: 'noSpace' }),
+        fail(state, { downloadId: entry.downloadId, reason: 'noSpace' }),
+      ),
+    )
+    stopRuns({
+      reason: 'pause',
+      isStopped: ({ downloadId }) => waiting.includes(downloadId),
+    }).catch(() => undefined)
+    told(entry.downloadId)
+  }
+
   /** Every other waiting or running file of the job's server waits paused for `reason`. */
   const pauseServerOf = ({ job, reason }: { job: Job; reason: PauseReason }): void => {
     const { entry, server } = job
+    saveBytes(({ run }) => run.serverId === server.id)
     store.update((state) => pauseServer(state, { serverId: server.id, reason }))
     stopRuns({
       reason: 'pause',
@@ -393,7 +458,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   }
 
   /** Fails or pauses the file for why its fetch stopped short. */
-  const settleFailure = (job: Job, outcome: Failure): void => {
+  const settleFailure = ({ job, outcome }: { job: Job; outcome: Failure }): void => {
     const { entry, server } = job
     switch (outcome.reason) {
       case 'locked':
@@ -467,7 +532,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     const isRenewal = stopReasonOf(signal) === 'refresh'
     const isRefused = outcome.reason === 'unauthorized' || outcome.reason === 'locked'
     if (!isRenewal && !(isRefused && !hasRetried)) {
-      settleFailure(job, outcome)
+      settleFailure({ job, outcome })
       return null
     }
     const next = await accessOf(job)
@@ -502,14 +567,15 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     track: SubtitleTrack
   }): Promise<Sidecar | null> => {
     const { entry, server, signal: stop } = job
-    const skipped = (): null => {
+    const skipped = (why = ''): null => {
       if (!stop.aborted) {
-        deps.warn(`raven player skipped subtitle ${track.id} of ${loggable(entry.label)}`)
+        deps.warn(`raven player skipped subtitle ${track.id} of ${loggable(entry.label)}${why}`)
       }
       return null
     }
     const late = new AbortController()
     const timer = timers.set(() => late.abort(), DOWNLOAD_STALL_MS)
+    const signal = AbortSignal.any([stop, late.signal])
     try {
       const response = await deps.fetchFor({ serverId: entry.serverId, access })({
         url: sidecarUrlFor({
@@ -519,14 +585,15 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
           trackId: track.id,
         }),
         headers: {},
-        signal: AbortSignal.any([stop, late.signal]),
+        signal,
       })
       if (response.status !== 200) {
         if (response.body !== null) await response.body.cancel().catch(() => undefined)
         return skipped()
       }
-      const text = await new Response(response.body).text()
-      await fs.writeFile(sidecarPathFor({ ...partsOf(entry), trackId: track.id }), text)
+      const read = await textUpTo({ body: response.body, max: SIDECAR_MAX_BYTES, signal })
+      if (read.kind === 'tooBig') return skipped(': it is larger than 16 MiB')
+      await fs.writeFile(sidecarPathFor({ ...partsOf(entry), trackId: track.id }), read.text)
       return { trackId: track.id, title: track.title ?? '', language: track.language ?? '' }
     } catch {
       return skipped()
@@ -570,6 +637,14 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       return
     }
     const job: Job = { entry, server, signal, disk }
+    // A crash between the rename and the next save leaves the video whole and the file not ready.
+    const whole = await fs.size(videoPathFor(partsOf(entry)))
+    if (signal.aborted) return
+    if (whole === entry.size) {
+      store.update((state) => finish(state, { downloadId }))
+      announceReady(downloadId)
+      return
+    }
     const { free } = await readSpace({ fs: deps.space, dir: downloadsDirFor({ userData }) })
     // A resumed or retried file needs only what its part lacks, whatever its status says.
     const onDisk = await fs.size(partPathFor(partsOf(entry)))
@@ -585,6 +660,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     const access = await accessOf(job)
     if (access === null) return
     store.update((state) => start(state, { downloadId }))
+    // A pause or a failure that came while the ticket was read stands, and this run lets go.
+    if ((entryById(store.read(), { downloadId })?.status.kind ?? null) !== 'downloading') return
     await fs.mkdir(entryDirFor(partsOf(entry)))
     if (signal.aborted) return
     const fetched = await fetchVideo({ job, access, hasRetried: false })
@@ -594,6 +671,10 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     await fs.rename(partPathFor(partsOf(entry)), videoPathFor(partsOf(entry)))
     // The video is in place, so the file is ready whatever was asked of it meanwhile.
     store.update((state) => finish(setSidecars(state, { downloadId, sidecars }), { downloadId }))
+    announceReady(downloadId)
+  }
+
+  const announceReady = (downloadId: string): void => {
     const ready = entryById(store.read(), { downloadId })
     if (ready !== null) deps.onFinished(ready)
   }
@@ -643,6 +724,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     stopRuns({ reason, isStopped: (candidate) => candidate.downloadId === downloadId })
 
   const pauseOne: DownloadQueue['pause'] = async ({ downloadId }) => {
+    saveBytes((candidate) => candidate.downloadId === downloadId)
     store.update((state) => pause(state, { downloadId, reason: 'viewer' }))
     await stopOne({ downloadId, reason: 'pause' })
     kick()
@@ -699,6 +781,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   const retryOne: DownloadQueue['retry'] = ({ downloadId }) => resumeEach([downloadId])
 
   const pauseAll: DownloadQueue['pauseAll'] = async () => {
+    saveBytes(() => true)
     store.update(pauseEverything)
     syncOutageRetry()
     await stopRuns({ reason: 'pause', isStopped: () => true })
@@ -718,6 +801,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     sleep.isAsleep = true
     timers.clear(sleep.settle)
     sleep.settle = undefined
+    saveBytes(() => true)
     stopRuns({ reason: 'suspend', isStopped: () => true }).catch(() => undefined)
   }
 
@@ -836,6 +920,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   }
 
   const dispose: DownloadQueue['dispose'] = () => {
+    saveBytes(() => true)
     isDisposed = true
     clearOutageRetry()
     timers.clear(sleep.settle)

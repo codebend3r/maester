@@ -34,6 +34,24 @@ const actionOf = (status: DownloadStatus): RowAction => {
   }
 }
 
+/** What deleting the row frees: the whole file once ready, else what its status says is on disk. */
+const bytesOnDisk = ({ status, size }: DownloadView): number => {
+  switch (status.kind) {
+    case 'ready':
+      return size
+    case 'queued':
+      return 0
+    case 'downloading':
+    case 'paused':
+    case 'failed':
+      return status.bytes
+    default: {
+      const unreachable: never = status
+      return unreachable
+    }
+  }
+}
+
 const focus = (element: HTMLElement | null) => {
   if (element !== null) element.focus()
 }
@@ -163,7 +181,7 @@ export const DownloadRow = ({
       {mode === 'delete' ? (
         <>
           <p id={ids.question} className={styles.question}>
-            {`Delete ${label}? ${formatBytes(view.size)} will be freed.`}
+            {`Delete ${label}? ${formatBytes(bytesOnDisk(view))} will be freed.`}
           </p>
           <div className={styles.confirm}>
             {/* aria-disabled, not disabled: disabling the focused button would drop focus to the page. */}

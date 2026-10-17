@@ -152,6 +152,10 @@ export const queue = (
   return { ...state, entries: [...state.entries, ...added] }
 }
 
+/**
+ * Only a queued file starts: a run begins for one, and a pause or a failure that came while it
+ * read its ticket must stand.
+ */
 export const start = (
   state: DownloadsState,
   { downloadId }: { downloadId: string },
@@ -161,9 +165,9 @@ export const start = (
     change: (entry) => {
       switch (entry.status.kind) {
         case 'queued':
+          return withStatus(entry, { status: { kind: 'downloading', bytes: 0 } })
         case 'paused':
         case 'failed':
-          return withStatus(entry, { status: { kind: 'downloading', bytes: bytesOf(entry) } })
         case 'downloading':
         case 'ready':
           return entry
@@ -182,7 +186,7 @@ export const advance = (
   changeEntry(state, {
     downloadId,
     change: (entry) =>
-      entry.status.kind === 'downloading'
+      entry.status.kind === 'downloading' && entry.status.bytes !== bytes
         ? withStatus(entry, { status: { kind: 'downloading', bytes } })
         : entry,
   })
