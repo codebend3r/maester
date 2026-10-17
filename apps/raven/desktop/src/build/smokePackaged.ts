@@ -9,6 +9,7 @@ import { versionOf } from '@/build/dmgMaker'
 import {
   logLinesSince,
   SMOKE_QUIT_MS,
+  SMOKE_STAGES,
   SMOKE_START_MS,
   type SmokeStage,
   smokeGaps,
@@ -121,13 +122,14 @@ const smoke = async ({ project }: { project: string }): Promise<number> => {
   // Killed here whether the smoke passed, failed or threw, so no app outlives it.
   try {
     const hasStarted = await waitUntil({
-      isDone: async () => (await gapsFor({ stage: 'started' })).length === 0 || lifecycle.hasExited,
+      isDone: async () =>
+        (await gapsFor({ stage: SMOKE_STAGES.started })).length === 0 || lifecycle.hasExited,
       deadline: Date.now() + SMOKE_START_MS,
     })
-    const startGaps = await gapsFor({ stage: 'started' })
+    const startGaps = await gapsFor({ stage: SMOKE_STAGES.started })
     if (!hasStarted || startGaps.length > 0) {
       return fail({
-        stage: 'started',
+        stage: SMOKE_STAGES.started,
         why: lifecycle.hasExited
           ? [...startGaps, 'raven player exited by itself before SIGTERM']
           : startGaps,
@@ -136,13 +138,14 @@ const smoke = async ({ project }: { project: string }): Promise<number> => {
 
     child.kill('SIGTERM')
     await waitUntil({
-      isDone: async () => lifecycle.hasExited && (await gapsFor({ stage: 'quit' })).length === 0,
+      isDone: async () =>
+        lifecycle.hasExited && (await gapsFor({ stage: SMOKE_STAGES.quit })).length === 0,
       deadline: Date.now() + SMOKE_QUIT_MS,
     })
-    const quitGaps = await gapsFor({ stage: 'quit' })
+    const quitGaps = await gapsFor({ stage: SMOKE_STAGES.quit })
     if (!lifecycle.hasExited || quitGaps.length > 0) {
       return fail({
-        stage: 'quit',
+        stage: SMOKE_STAGES.quit,
         why: lifecycle.hasExited
           ? quitGaps
           : [...quitGaps, `an exit within ${SMOKE_QUIT_MS} ms of SIGTERM`],

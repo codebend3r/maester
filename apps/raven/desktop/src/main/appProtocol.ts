@@ -1,6 +1,12 @@
+import { HTTP_METHODS } from '@/shared/protocol'
 import { basename, resolve, sep } from 'node:path'
 import { extensionOf } from '@raven/core'
 import { isAppUrl } from '@/main/security'
+
+/** The only methods raven player's own protocols answer. */
+export const ALLOWED_METHODS = [HTTP_METHODS.get, HTTP_METHODS.head].join(', ')
+
+const ROOT_PATH = '/'
 
 export const CONTENT_SECURITY_POLICY =
   "default-src 'self'; img-src 'self' data:; media-src 'self' raven-file:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
@@ -72,8 +78,8 @@ export const createAppHandler = ({
     const url = parse(request.url)
     if (url === null) return answer({ status: 400 })
     if (!isAppUrl(request.url)) return answer({ status: 404 })
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      return answer({ status: 405, headers: { Allow: 'GET, HEAD' } })
+    if (request.method !== HTTP_METHODS.get && request.method !== HTTP_METHODS.head) {
+      return answer({ status: 405, headers: { Allow: ALLOWED_METHODS } })
     }
 
     const decoded = decode(url.pathname)
@@ -81,7 +87,8 @@ export const createAppHandler = ({
     // A backslash separates path segments on Windows, so it never belongs in a name here.
     if (decoded.includes('\\')) return answer({ status: 403 })
 
-    const relative = decoded === '/' || decoded === '' ? 'index.html' : decoded.replace(/^\/+/, '')
+    const relative =
+      decoded === ROOT_PATH || decoded === '' ? 'index.html' : decoded.replace(/^\/+/, '')
     const path = resolve(base, relative)
     if (!isInside({ root: base, path })) return answer({ status: 403 })
 
@@ -90,7 +97,7 @@ export const createAppHandler = ({
 
     return answer({
       status: 200,
-      body: request.method === 'HEAD' ? null : bytes,
+      body: request.method === HTTP_METHODS.head ? null : bytes,
       headers: {
         'Content-Type': contentTypeOf(basename(path)),
         'Content-Length': `${bytes.byteLength}`,

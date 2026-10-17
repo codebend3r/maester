@@ -12,7 +12,7 @@ import {
   type ToolRun,
 } from '@/build/bundleAudit'
 import { versionOf } from '@/build/dmgMaker'
-import { listSignables } from '@/build/machO'
+import { listSignables, SIGNABLE_KINDS } from '@/build/machO'
 
 const execFileAsync = promisify(execFile)
 
@@ -74,7 +74,7 @@ const audit = async ({ project }: { project: string }): Promise<number> => {
     return 1
   }
   const paths = (await listSignables({ app }))
-    .filter(({ kind }) => kind === 'machO')
+    .filter(({ kind }) => kind === SIGNABLE_KINDS.machO)
     .map(({ path }) => path)
   const audited = await auditFiles({ app, paths })
   const plistVersion = (

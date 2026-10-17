@@ -20,14 +20,14 @@ export const END_MARGIN_S = 10
 export const RECENT_KINDS = { file: 'file', server: 'server' } as const
 
 const isFileRecent = object({
-  kind: oneOf(['file']),
+  kind: oneOf([RECENT_KINDS.file]),
   path: isString,
   openedAt: isNumber,
 })
 
 /** A server title, by ids. `watched` is only for Home's bar: the server keeps where to resume. */
 const isServerRecent = object({
-  kind: oneOf(['server']),
+  kind: oneOf([RECENT_KINDS.server]),
   serverId: isOpaqueId,
   mediaId: isMediaId,
   label: isString,
@@ -97,9 +97,9 @@ const upsertFirst = <T extends { path: string }>({
 /** One key per recent, whichever kind: a file by its path, a server title by its server and media ids. */
 export const recentKey = (entry: RecentEntry): string => {
   switch (entry.kind) {
-    case 'file':
+    case RECENT_KINDS.file:
       return `file:${entry.path}`
-    case 'server':
+    case RECENT_KINDS.server:
       return `server:${entry.serverId}:${entry.mediaId}`
     default: {
       const unreachable: never = entry
@@ -154,7 +154,7 @@ export const noteServerRecent = ({
   withRecent({
     state,
     entry: {
-      kind: 'server',
+      kind: RECENT_KINDS.server,
       serverId,
       mediaId,
       label: tidyText({ text: label, max: RECENT_LABEL_MAX }),
@@ -185,7 +185,9 @@ export const removeServerRecents = ({
   serverId: string
 }): PlayerState => ({
   ...state,
-  recents: state.recents.filter((entry) => entry.kind !== 'server' || entry.serverId !== serverId),
+  recents: state.recents.filter(
+    (entry) => entry.kind !== RECENT_KINDS.server || entry.serverId !== serverId,
+  ),
 })
 
 export const clearRecents = (state: PlayerState): PlayerState => ({ ...state, recents: [] })

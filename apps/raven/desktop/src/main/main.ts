@@ -15,8 +15,8 @@ import { join } from 'node:path'
 import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { Readable } from 'node:stream'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { VIDEO_EXTENSIONS } from '@raven/core'
-import { type Mpv, type MpvSurface, openMpv } from '@raven/mpv'
+import { PLAYER_SOURCE_KINDS, VIDEO_EXTENSIONS } from '@raven/core'
+import { MPV_PROPERTIES, MPV_SURFACE_KINDS, type Mpv, type MpvSurface, openMpv } from '@raven/mpv'
 import {
   app,
   BrowserWindow,
@@ -35,6 +35,7 @@ import {
   session,
   shell,
 } from 'electron'
+import { PLATFORMS } from '@/build/forgeOptions'
 import { createAppHandler } from '@/main/appProtocol'
 import {
   BUDGET_WINDOW_MS,
@@ -59,6 +60,8 @@ import { displayReading } from '@/main/player/displayOptions'
 import {
   addonPathFor,
   ENGINE_MESSAGES,
+  ENGINE_MODES,
+  ENGINE_STATUSES,
   engineModeFrom,
   engineOptionsFor,
   openEngine,
@@ -112,6 +115,7 @@ import { placeWindow } from '@/main/windowBounds'
 import {
   APP_ORIGIN,
   APP_SCHEME,
+  DESKTOP_EVENTS,
   type DesktopEvent,
   type DesktopReply,
   FILE_SCHEME,
@@ -119,6 +123,8 @@ import {
 } from '@/shared/protocol'
 
 const launchedAt = performance.now()
+
+const USER_DATA_HOOK = 'RAVEN_DESKTOP_USER_DATA'
 
 const PRODUCT_NAME = 'raven player'
 const STORE_NOTICES = {
@@ -145,13 +151,13 @@ const showWindowButtons = ({
   window: BrowserWindow
   isVisible: boolean
 }): void => {
-  if (process.platform !== 'darwin') return
+  if (process.platform !== PLATFORMS.darwin) return
   window.setWindowButtonVisibility(isVisible)
 }
 
 // A test hook: a packaged app never reads it, so the environment cannot move its data.
 const userDataOverrideOf = (): string | null => {
-  const override = app.isPackaged ? undefined : process.env.RAVEN_DESKTOP_USER_DATA
+  const override = app.isPackaged ? undefined : process.env[USER_DATA_HOOK]
   return override === undefined || override === '' ? null : override
 }
 
@@ -286,7 +292,7 @@ const startApp = (): void => {
       engine:
         engine === null
           ? {
-              kind: 'unavailable',
+              kind: ENGINE_STATUSES.unavailable,
               reason: unavailableReason({
                 mode: engineMode(),
                 note: player === null ? null : player.engineNote(),
@@ -382,7 +388,7 @@ const startApp = (): void => {
       debounceMs: STATE_DEBOUNCE_MS,
       onError: (error) => {
         reportError({ text: 'raven player could not save its state.', error })
-        send({ type: 'notice', message: STORE_NOTICES.state })
+        send({ type: DESKTOP_EVENTS.notice, message: STORE_NOTICES.state })
       },
     })
     const configFile = join(userData, CONFIG_FILE)
@@ -395,7 +401,7 @@ const startApp = (): void => {
       debounceMs: 0,
       onError: (error) => {
         reportError({ text: 'raven player could not save its settings.', error })
-        send({ type: 'notice', message: STORE_NOTICES.config })
+        send({ type: DESKTOP_EVENTS.notice, message: STORE_NOTICES.config })
       },
     })
     // Listed before any server session is made, so none of the folders it removes is
@@ -467,7 +473,7 @@ const startApp = (): void => {
       current: app.getVersion(),
       now: Date.now,
       openExternal: (url) => shell.openExternal(url),
-      announce: (version) => send({ type: 'updateAvailable', version }),
+      announce: (version) => send({ type: DESKTOP_EVENTS.updateAvailable, version }),
       warn,
     })
     // Once, on the first page's `ready`, so the page is listening for the announcement.
@@ -607,7 +613,7 @@ const startApp = (): void => {
       openPath: (path) => shell.openPath(path),
       writeClipboard: (text) => clipboard.writeText(text),
       diagnostics: readDiagnostics,
-      notify: (message) => send({ type: 'notice', message }),
+      notify: (message) => send({ type: DESKTOP_EVENTS.notice, message }),
       warn,
     })
     // The actions settle every failure themselves; this only keeps a surprise off the floor.
@@ -621,7 +627,7 @@ const startApp = (): void => {
     const checkFromMenu = createMenuCheck({
       updates,
       current: app.getVersion(),
-      announce: (version) => send({ type: 'updateAvailable', version }),
+      announce: (version) => send({ type: DESKTOP_EVENTS.updateAvailable, version }),
       show: async (options) => {
         const window = liveWindow()
         const { response } =
@@ -753,7 +759,7 @@ const answerRequests = ({ service, grants }: { service: DesktopService; grants: 
     handle: (envelope) => {
       const fileId = describedFileId(envelope)
       const file = fileId === null ? null : grants.fileOf(fileId)
-      if (file !== null) log.info(openLine({ kind: 'file', path: file.path }))
+      if (file !== null) log.info(openLine({ kind: PLAYER_SOURCE_KINDS.file, path: file.path }))
       return service.handle(envelope)
     },
     warn,
@@ -914,8 +920,8 @@ const attachPlayer = ({
     },
   })
 
-  const surfaceFor = (kind: 'window' | 'headless'): MpvSurface =>
-    kind === 'window' ? { kind, handle: window.getNativeWindowHandle() } : { kind }
+  const surfaceFor = (kind: MpvSurface['kind']): MpvSurface =>
+    kind === MPV_SURFACE_KINDS.window ? { kind, handle: window.getNativeWindowHandle() } : { kind }
 
   const openNative = async (surface: MpvSurface): Promise<NativeEngine> => {
     const mpv = await openMpv({
@@ -937,7 +943,7 @@ const attachPlayer = ({
         mpv,
         resolveSource: resolveSourceWith({ grants, servers }),
         explain: sources.explain,
-        canChooseAo: mode === 'window',
+        canChooseAo: mode === ENGINE_MODES.window,
         timers,
         onActivity: activity.report,
         onFirstFrame: marks.firstFrame,
@@ -956,7 +962,9 @@ const attachPlayer = ({
 
   const openLogged = async (surface: MpvSurface): Promise<NativeEngine> => {
     const opened = await openNative(surface)
-    const ffmpeg = await opened.mpv.read({ name: 'ffmpeg-version' }).catch(() => 'unknown')
+    const ffmpeg = await opened.mpv
+      .read({ name: MPV_PROPERTIES.ffmpegVersion })
+      .catch(() => 'unknown')
     log.info(`video engine ready: ${opened.mpv.version}, FFmpeg ${ffmpeg}`)
     return opened
   }
@@ -973,7 +981,7 @@ const attachPlayer = ({
           open: openLogged,
           warn: (message) => warn(`raven player could not open its video engine: ${message}`),
         })
-        if (opened.status === 'unavailable') engineNote = opened.message
+        if (opened.status === ENGINE_STATUSES.unavailable) engineNote = opened.message
         return opened
       } catch (error) {
         engineNote = ENGINE_MESSAGES.unavailable

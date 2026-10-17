@@ -9,11 +9,15 @@ export type GrantedFile = {
   mtimeMs: number
 }
 
-export type GrantRefusal = 'missing' | 'not-a-file' | 'not-a-video'
+export const GRANT_REFUSALS = {
+  missing: 'missing',
+  notAFile: 'not-a-file',
+  notAVideo: 'not-a-video',
+} as const
 
-export type GrantResult =
-  | { ok: true; file: Readonly<GrantedFile> }
-  | { ok: false; reason: GrantRefusal }
+export type GrantRefusal = (typeof GRANT_REFUSALS)[keyof typeof GRANT_REFUSALS]
+
+type GrantResult = { ok: true; file: Readonly<GrantedFile> } | { ok: false; reason: GrantRefusal }
 
 export type GrantFs = {
   realpath: (path: string) => Promise<string>
@@ -49,14 +53,15 @@ export const createGrants = ({ fs, newId }: { fs: GrantFs; newId: () => string }
   }
 
   const grant = async (path: string): Promise<GrantResult> => {
-    if (!isAbsolute(path)) return refuse('missing')
+    if (!isAbsolute(path)) return refuse(GRANT_REFUSALS.missing)
     const real = await attempt(() => fs.realpath(path))
-    if (real === null) return refuse('missing')
+    if (real === null) return refuse(GRANT_REFUSALS.missing)
     // The real name counts too: a link called trailer.mp4 must not expose a non-video.
-    if (!isVideoFile(basename(path)) || !isVideoFile(basename(real))) return refuse('not-a-video')
+    if (!isVideoFile(basename(path)) || !isVideoFile(basename(real)))
+      return refuse(GRANT_REFUSALS.notAVideo)
     const stats = await attempt(() => fs.stat(real))
-    if (stats === null) return refuse('missing')
-    if (!stats.isFile()) return refuse('not-a-file')
+    if (stats === null) return refuse(GRANT_REFUSALS.missing)
+    if (!stats.isFile()) return refuse(GRANT_REFUSALS.notAFile)
 
     const fileId = idByPath.get(real) ?? unusedId(ID_DRAWS)
     const file = Object.freeze({

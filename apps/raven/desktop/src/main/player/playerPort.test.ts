@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from 'bun:test'
-import { isPlayerReply } from '@raven/core'
+import { isPlayerReply, PLAYER_COMMANDS } from '@raven/core'
 import { connectPort, MAX_PENDING, UNKNOWN_COMMAND } from '@/main/player/playerPort'
 import { fakePort, fakeService } from '@/main/test/playerFakes'
 
@@ -128,7 +128,7 @@ describe('connectPort', () => {
   test('answers a failing service with a refusal and keeps going', async () => {
     const service = fakeService({
       outcome: (command) => {
-        if (command.type === 'stats') throw new Error('boom')
+        if (command.type === PLAYER_COMMANDS.stats) throw new Error('boom')
         return { ok: true }
       },
     })

@@ -1,16 +1,22 @@
-import { ENGINE_MESSAGES, type EngineMode } from '@/main/player/engine'
+import { MPV_PROPERTIES } from '@raven/mpv'
+import {
+  ENGINE_MESSAGES,
+  ENGINE_MODES,
+  ENGINE_STATUSES,
+  type EngineMode,
+} from '@/main/player/engine'
 
 type DisplayInfo = { refreshRate: number; edrHeadroom: number }
 
 export type EngineDiagnostics =
   | {
-      kind: 'native'
+      kind: typeof ENGINE_STATUSES.native
       mpv: string
       ffmpeg: string | null
       hwdecCurrent: string | null
       display: DisplayInfo | null
     }
-  | { kind: 'unavailable'; reason: string }
+  | { kind: typeof ENGINE_STATUSES.unavailable; reason: string }
 
 export type DiagnosticsInput = {
   app: { version: string; isPackaged: boolean; arch: string }
@@ -26,7 +32,9 @@ export type DiagnosticsInput = {
  */
 export type DiagnosableMpv = {
   version: string
-  read: (input: { name: 'ffmpeg-version' | 'hwdec-current' }) => Promise<string>
+  read: (input: {
+    name: typeof MPV_PROPERTIES.ffmpegVersion | typeof MPV_PROPERTIES.hwdecCurrent
+  }) => Promise<string>
   display: () => DisplayInfo
 }
 
@@ -72,15 +80,21 @@ export const readEngineDiagnostics = async ({
 }: {
   mpv: DiagnosableMpv
   readMs?: number
-}): Promise<Extract<EngineDiagnostics, { kind: 'native' }>> => {
+}): Promise<Extract<EngineDiagnostics, { kind: typeof ENGINE_STATUSES.native }>> => {
   const [ffmpeg, hwdecCurrent] = await Promise.all([
-    readWithin({ read: () => mpv.read({ name: 'ffmpeg-version' }), ms: readMs }),
-    readWithin({ read: () => mpv.read({ name: 'hwdec-current' }), ms: readMs }),
+    readWithin({ read: () => mpv.read({ name: MPV_PROPERTIES.ffmpegVersion }), ms: readMs }),
+    readWithin({ read: () => mpv.read({ name: MPV_PROPERTIES.hwdecCurrent }), ms: readMs }),
   ])
-  return { kind: 'native', mpv: mpv.version, ffmpeg, hwdecCurrent, display: displayOrNull(mpv) }
+  return {
+    kind: ENGINE_STATUSES.native,
+    mpv: mpv.version,
+    ffmpeg,
+    hwdecCurrent,
+    display: displayOrNull(mpv),
+  }
 }
 
-export const STILL_OPENING = 'still opening'
+const STILL_OPENING = 'still opening'
 
 /** Why there is no engine to read: off for this run, what the engine said as it fell back, or not yet open. */
 export const unavailableReason = ({
@@ -89,7 +103,7 @@ export const unavailableReason = ({
 }: {
   mode: EngineMode
   note: string | null
-}): string => (mode === 'off' ? ENGINE_MESSAGES.off : (note ?? STILL_OPENING))
+}): string => (mode === ENGINE_MODES.off ? ENGINE_MESSAGES.off : (note ?? STILL_OPENING))
 
 const engineLines = ({
   engine,
@@ -101,7 +115,7 @@ const engineLines = ({
   // Electron reports 0 for a display whose rate it does not know.
   const hz = displayHz !== null && displayHz > 0 ? displayHz : 'unknown'
   switch (engine.kind) {
-    case 'native':
+    case ENGINE_STATUSES.native:
       return [
         `Video engine: ${engine.mpv}, FFmpeg ${engine.ffmpeg ?? 'unknown'}`,
         // The profile the addon sets, not a reading (Ruling 14).
@@ -110,7 +124,7 @@ const engineLines = ({
           ? `Display: ${hz} Hz, EDR headroom unknown`
           : `Display: ${hz} Hz (mpv ${engine.display.refreshRate} Hz), EDR headroom ${engine.display.edrHeadroom.toFixed(1)}`,
       ]
-    case 'unavailable':
+    case ENGINE_STATUSES.unavailable:
       return [
         `Video engine: unavailable (${engine.reason})`,
         'Hardware decoding: unknown',

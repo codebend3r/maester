@@ -10,6 +10,7 @@ import {
   LOG_FILES,
   LOG_LINE_MAX,
   LOG_MAX_BYTES,
+  LOG_FS_OPS,
   LOG_QUEUE_MAX,
   SILENT_LOG,
   createLog,
@@ -48,18 +49,18 @@ const createFakeFs = (initial: Record<string, string> = {}) => {
   }
 
   const fs: LogFs = {
-    mkdir: async (path, options) => {
-      calls.push({ op: 'mkdir', args: [path, options] })
-      check({ op: 'mkdir', path })
+    mkdir: async ({ path, options }) => {
+      calls.push({ op: LOG_FS_OPS.mkdir, args: [path, options] })
+      check({ op: LOG_FS_OPS.mkdir, path })
     },
     size: async (path) => {
-      calls.push({ op: 'size', args: [path] })
-      check({ op: 'size', path })
+      calls.push({ op: LOG_FS_OPS.size, args: [path] })
+      check({ op: LOG_FS_OPS.size, path })
       const text = disk.get(path)
       return text === undefined ? null : bytes(text)
     },
-    appendFile: async (path, data, options) => {
-      calls.push({ op: 'appendFile', args: [path, data, options] })
+    appendFile: async ({ path, data, options }) => {
+      calls.push({ op: LOG_FS_OPS.appendFile, args: [path, data, options] })
       inFlight.now += 1
       inFlight.max = Math.max(inFlight.max, inFlight.now)
       const hold = holds.shift()
@@ -68,13 +69,13 @@ const createFakeFs = (initial: Record<string, string> = {}) => {
         await hold.released
       }
       inFlight.now -= 1
-      check({ op: 'appendFile', path })
+      check({ op: LOG_FS_OPS.appendFile, path })
       disk.set(path, `${disk.get(path) ?? ''}${data}`)
       appended.splice(0).forEach((resolve) => resolve())
     },
-    rename: async (from, to) => {
-      calls.push({ op: 'rename', args: [from, to] })
-      check({ op: 'rename', path: from })
+    rename: async ({ from, to }) => {
+      calls.push({ op: LOG_FS_OPS.rename, args: [from, to] })
+      check({ op: LOG_FS_OPS.rename, path: from })
       const text = disk.get(from)
       if (text === undefined) throw fsError({ code: 'ENOENT', path: from })
       disk.delete(from)
@@ -765,7 +766,8 @@ describe('createLog', () => {
 
     it('keeps logging when an older file is locked', async () => {
       const { log, disk, errors, state } = setup({ files: { [FILE]: full(10), ...kept } })
-      state.refuse = ({ op, path }) => (op === 'rename' && path === `${FILE}.2` ? 'EACCES' : null)
+      state.refuse = ({ op, path }) =>
+        op === LOG_FS_OPS.rename && path === `${FILE}.2` ? 'EACCES' : null
       log.info('r'.repeat(19))
       await log.flush()
       expect(disk.get(FILE)).toBe(line50)
@@ -776,7 +778,7 @@ describe('createLog', () => {
 
     it('drops the batch when the live file cannot move, then rotates once it can', async () => {
       const { log, disk, errors, state } = setup({ files: { [FILE]: full(10) } })
-      state.refuse = ({ op, path }) => (op === 'rename' && path === FILE ? 'EBUSY' : null)
+      state.refuse = ({ op, path }) => (op === LOG_FS_OPS.rename && path === FILE ? 'EBUSY' : null)
       log.info('lost')
       await log.flush()
       expect(disk.get(FILE)).toBe(full(10))
@@ -923,7 +925,7 @@ describe('createLog', () => {
   describe('failures', () => {
     it('never throws when the disk refuses', async () => {
       const { log, disk, errors, state } = setup()
-      state.refuse = ({ op }) => (op === 'appendFile' ? 'ENOSPC' : null)
+      state.refuse = ({ op }) => (op === LOG_FS_OPS.appendFile ? 'ENOSPC' : null)
       expect(() => log.info('one')).not.toThrow()
       await log.flush()
       log.info('two')
@@ -939,15 +941,15 @@ describe('createLog', () => {
 
     it('reports each kind of failure once', async () => {
       const { log, errors, state } = setup()
-      state.refuse = ({ op }) => (op === 'mkdir' ? 'EACCES' : null)
+      state.refuse = ({ op }) => (op === LOG_FS_OPS.mkdir ? 'EACCES' : null)
       log.info('one')
       await log.flush()
       log.info('two')
       await log.flush()
-      state.refuse = ({ op }) => (op === 'size' ? 'EIO' : null)
+      state.refuse = ({ op }) => (op === LOG_FS_OPS.size ? 'EIO' : null)
       log.info('three')
       await log.flush()
-      state.refuse = ({ op }) => (op === 'appendFile' ? 'EIO' : null)
+      state.refuse = ({ op }) => (op === LOG_FS_OPS.appendFile ? 'EIO' : null)
       log.info('four')
       await log.flush()
       log.info('five')
@@ -961,13 +963,13 @@ describe('createLog', () => {
 
     it('never reports the same kind twice, even after a recovery', async () => {
       const { log, errors, state, disk } = setup()
-      state.refuse = ({ op }) => (op === 'appendFile' ? 'ENOSPC' : null)
+      state.refuse = ({ op }) => (op === LOG_FS_OPS.appendFile ? 'ENOSPC' : null)
       log.info('one')
       await log.flush()
       state.refuse = () => null
       log.info('two')
       await log.flush()
-      state.refuse = ({ op }) => (op === 'appendFile' ? 'ENOSPC' : null)
+      state.refuse = ({ op }) => (op === LOG_FS_OPS.appendFile ? 'ENOSPC' : null)
       log.info('three')
       await log.flush()
       expect(errors).toHaveLength(1)
@@ -976,7 +978,7 @@ describe('createLog', () => {
 
     it('prepares the folder again after a failure', async () => {
       const { log, calls, disk, state } = setup()
-      state.refuse = ({ op }) => (op === 'mkdir' ? 'ENOENT' : null)
+      state.refuse = ({ op }) => (op === LOG_FS_OPS.mkdir ? 'ENOENT' : null)
       log.info('one')
       await log.flush()
       state.refuse = () => null
@@ -1000,7 +1002,7 @@ describe('createLog', () => {
           throw new Error('console gone')
         },
       })
-      state.refuse = ({ op }) => (op === 'appendFile' ? 'EIO' : null)
+      state.refuse = ({ op }) => (op === LOG_FS_OPS.appendFile ? 'EIO' : null)
       log.info('one')
       await log.flush()
       state.refuse = () => null

@@ -1,9 +1,9 @@
 import { MESSAGES } from '@/main/desktopService'
 import { errorText, isFsError } from '@/main/log/errorText'
-import { APP_ORIGIN, type DesktopReply } from '@/shared/protocol'
+import { APP_ORIGIN, DESKTOP_REPLIES, type DesktopReply } from '@/shared/protocol'
 
 const REFUSED = {
-  type: 'refused',
+  type: DESKTOP_REPLIES.refused,
   message: MESSAGES.unknownRequest,
 } as const satisfies DesktopReply
 
@@ -33,7 +33,9 @@ export const createRequestHandler = ({
     }
     try {
       const reply = await handle(payload)
-      if (reply.type === 'refused') warn(`raven player refused a request: ${reply.message}`)
+      if (reply.type === DESKTOP_REPLIES.refused) {
+        warn(`raven player refused a request: ${reply.message}`)
+      }
       return reply
     } catch (error) {
       warn(`raven player failed to answer a request: ${describeError(error)}`)

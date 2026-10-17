@@ -318,7 +318,7 @@ export const createLog = ({
       await fs.remove(oldest)
     } catch (cause) {
       // The next move replaces it anyway, so a refusal costs nothing but a report.
-      if (!isMissingFile(cause)) report(new LogWriteError({ op: 'remove', cause }))
+      if (!isMissingFile(cause)) report(new LogWriteError({ op: LOG_FS_OPS.remove, cause }))
     }
   }
 
@@ -327,7 +327,7 @@ export const createLog = ({
       await fs.rename({ from, to })
     } catch (cause) {
       if (isMissingFile(cause)) return
-      const error = new LogWriteError({ op: 'rename', cause })
+      const error = new LogWriteError({ op: LOG_FS_OPS.rename, cause })
       // Only the live file has to move. A locked or damaged older file is reported and skipped,
       // which may cost that file's history (the next move replaces its target) but never stops
       // the log; failing to move the live file drops the batch, so it never grows past the cap.
@@ -360,7 +360,10 @@ export const createLog = ({
     }
     const count = Math.max(fitted.taken, 1)
     const data = lines.slice(0, count).join('')
-    await attempt({ op: 'appendFile', run: () => fs.appendFile(file, data, { mode: 0o600 }) })
+    await attempt({
+      op: LOG_FS_OPS.appendFile,
+      run: () => fs.appendFile({ path: file, data, options: { mode: 0o600 } }),
+    })
     return writeLines({ lines: lines.slice(count), size: size + byteLength(data) })
   }
 

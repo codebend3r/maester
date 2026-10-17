@@ -1,5 +1,5 @@
-import { languageTag, type MediaTracks } from '@raven/core'
-import type { MpvTrack } from '@raven/mpv'
+import { languageTag, type MediaTracks, SUBTITLE_SOURCES } from '@raven/core'
+import { MPV_TRACK_TYPES, type MpvTrack } from '@raven/mpv'
 
 type Subtitle = MediaTracks['subtitles'][number]
 
@@ -7,12 +7,14 @@ const SUBTITLE_ID = /^(embedded|external)-(\d+)$/
 
 /** The one place subtitle ids are numbered: each source counts its own entries in list order. */
 const subtitleEntries = (list: readonly MpvTrack[]) => {
-  const subs = list.filter((track) => track.type === 'sub')
+  const subs = list.filter((track) => track.type === MPV_TRACK_TYPES.sub)
   return subs.map((track, position) => {
-    const source = track.external === true ? ('external' as const) : ('embedded' as const)
+    const source = track.external === true ? SUBTITLE_SOURCES.external : SUBTITLE_SOURCES.embedded
     const sourceIndex = subs
       .slice(0, position)
-      .filter((earlier) => (earlier.external === true) === (source === 'external')).length
+      .filter(
+        (earlier) => (earlier.external === true) === (source === SUBTITLE_SOURCES.external),
+      ).length
     return { track, source, id: `${source}-${sourceIndex}` }
   })
 }
@@ -25,7 +27,7 @@ export const tracksFromMpv = ({
   frameRate: number | null
 }): MediaTracks => {
   const audio = list
-    .filter((track) => track.type === 'audio')
+    .filter((track) => track.type === MPV_TRACK_TYPES.audio)
     .map((track, index) => {
       const channels = track['demux-channel-count'] ?? null
       return {
@@ -60,7 +62,7 @@ export const tracksFromMpv = ({
 }
 
 export const aidFor = ({ list, index }: { list: readonly MpvTrack[]; index: number }) =>
-  list.filter((track) => track.type === 'audio')[index]?.id ?? null
+  list.filter((track) => track.type === MPV_TRACK_TYPES.audio)[index]?.id ?? null
 
 export const sidFor = ({ list, id }: { list: readonly MpvTrack[]; id: string }) => {
   if (!SUBTITLE_ID.test(id)) return null

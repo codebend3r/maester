@@ -8,18 +8,14 @@ import { join } from 'node:path'
  * not read tsconfig `paths`, so it imports nothing from the project.
  */
 
-export const MPV_SOURCE = join(
-  '..',
-  '..',
-  '..',
-  'libs',
-  'raven',
-  'mpv',
-  'resources',
-  'darwin-arm64',
-)
+const MPV_SOURCE = join('..', '..', '..', 'libs', 'raven', 'mpv', 'resources', 'darwin-arm64')
 export const MPV_STAGING = join('staging', 'mpv')
-export const MPV_MACH_O = ['raven_mpv.node', 'lib/libmpv.2.dylib', 'lib/libMoltenVK.dylib'] as const
+export const MPV_FILES = {
+  addon: 'raven_mpv.node',
+  libmpv: 'lib/libmpv.2.dylib',
+  moltenVk: 'lib/libMoltenVK.dylib',
+} as const
+export const MPV_MACH_O = [MPV_FILES.addon, MPV_FILES.libmpv, MPV_FILES.moltenVk] as const
 export const STAGED_PATHS = [...MPV_MACH_O, 'provenance'] as const
 
 export const missingMpvFiles = ({ exists }: { exists: (relative: string) => boolean }): string[] =>

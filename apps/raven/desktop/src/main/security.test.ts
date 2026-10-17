@@ -4,6 +4,7 @@ import {
   isExternalLink,
   isPermissionAllowed,
   isTrustedSender,
+  PERMISSIONS,
   windowOpenFor,
 } from '@/main/security'
 
@@ -64,7 +65,7 @@ describe('windowOpenFor', () => {
 
 describe('isPermissionAllowed', () => {
   it('allows fullscreen and nothing else', () => {
-    expect(isPermissionAllowed('fullscreen')).toBe(true)
+    expect(isPermissionAllowed(PERMISSIONS.fullscreen)).toBe(true)
     expect(
       ['media', 'notifications', 'clipboard-read', 'openExternal', 'geolocation', ''].map(
         isPermissionAllowed,

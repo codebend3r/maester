@@ -5,6 +5,11 @@ import { join } from 'node:path'
  * tsconfig `paths`, so this file imports nothing from the project.
  */
 
+export const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, NodeJS.Platform>
+
+/** The packager's paths for what goes in the asar. */
+const PACKAGED_PATHS = { project: '', manifest: '/package.json', dist: '/dist' } as const
+
 export const DOCUMENT_UTIS = [
   'public.movie',
   'public.mpeg-4',
@@ -142,7 +147,10 @@ export const signingFrom = (env: Readonly<Record<string, string | undefined>>): 
  * so Bun's symlinked node_modules stays out along with the sources.
  */
 export const isPackagedPath = (file: string): boolean =>
-  file === '' || file === '/package.json' || file === '/dist' || file.startsWith('/dist/')
+  file === PACKAGED_PATHS.project ||
+  file === PACKAGED_PATHS.manifest ||
+  file === PACKAGED_PATHS.dist ||
+  file.startsWith(`${PACKAGED_PATHS.dist}/`)
 
 /**
  * The packaged apps to sign ad hoc: none off macOS, and none when an identity signs the app
@@ -162,6 +170,6 @@ export const adHocApps = ({
   outputPaths: readonly string[]
   appName: string
 }): string[] => {
-  if (platform !== 'darwin' || signing.osxSign !== undefined) return []
+  if (platform !== PLATFORMS.darwin || signing.osxSign !== undefined) return []
   return outputPaths.map((folder) => join(folder, `${appName}.app`))
 }

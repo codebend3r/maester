@@ -1,6 +1,12 @@
 import { isAbsolute } from 'node:path'
 import type { Timers } from '@/main/stateStore'
-import { type DesktopEvent, type DesktopReply, MAX_QUEUE } from '@/shared/protocol'
+import {
+  DESKTOP_EVENTS,
+  DESKTOP_REPLIES,
+  type DesktopEvent,
+  type DesktopReply,
+  MAX_QUEUE,
+} from '@/shared/protocol'
 
 // The first item plays and the rest queue, so a batch past this has nowhere to go.
 const BATCH_CAP = MAX_QUEUE + 1
@@ -68,20 +74,20 @@ export const launchPaths = ({
 /** What the page is told after main opens files or links on its own (Finder, a second launch, `open-url`). */
 export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
   switch (reply.type) {
-    case 'play':
-      return { type: 'play', target: reply.target }
-    case 'playServer':
-      return { type: 'playServer', target: reply.target }
-    case 'refused':
-      return { type: 'notice', message: reply.message }
-    case 'file':
-    case 'recents':
-    case 'output':
-    case 'done':
-    case 'servers':
-    case 'serverReply':
-    case 'serverUnreachable':
-    case 'updates':
+    case DESKTOP_REPLIES.play:
+      return { type: DESKTOP_EVENTS.play, target: reply.target }
+    case DESKTOP_REPLIES.playServer:
+      return { type: DESKTOP_EVENTS.playServer, target: reply.target }
+    case DESKTOP_REPLIES.refused:
+      return { type: DESKTOP_EVENTS.notice, message: reply.message }
+    case DESKTOP_REPLIES.file:
+    case DESKTOP_REPLIES.recents:
+    case DESKTOP_REPLIES.output:
+    case DESKTOP_REPLIES.done:
+    case DESKTOP_REPLIES.servers:
+    case DESKTOP_REPLIES.serverReply:
+    case DESKTOP_REPLIES.serverUnreachable:
+    case DESKTOP_REPLIES.updates:
       return null
     default: {
       const unreachable: never = reply

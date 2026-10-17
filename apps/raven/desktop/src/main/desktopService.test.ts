@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { dirname, basename } from 'node:path'
-import { isOpaqueId, MAX_QUEUE } from '@/shared/protocol'
+import { DESKTOP_REPLIES, isOpaqueId, MAX_QUEUE } from '@/shared/protocol'
 import { createGrants } from '@/main/grants'
 import { createStateStore, type StateFs, type Timers } from '@/main/stateStore'
 import { EMPTY_STATE } from '@/main/playerState'
@@ -8,7 +8,7 @@ import { createDesktopService, MESSAGES } from '@/main/desktopService'
 import { EMPTY_CONFIG, type ConfigStore, type DesktopConfig } from '@/main/desktopConfig'
 import { CALL_MESSAGES, type ServerCallResult } from '@/main/servers/serverCalls'
 import { removeServer } from '@/main/servers/serverList'
-import { TRUST_MESSAGES, type TrustOutcome } from '@/main/servers/serverTrust'
+import { TRUST_MESSAGES, TRUST_OUTCOME_KINDS, type TrustOutcome } from '@/main/servers/serverTrust'
 import type { DesktopReply } from '@/shared/protocol'
 import { createUpdateService, UPDATE_COPY } from '@/main/updateService'
 import { UPDATE_PROBLEMS, type UpdateCheck } from '@/main/updates'
@@ -200,7 +200,7 @@ const setup = ({
     trust: {
       trust: async (input) => {
         server.trusted.push(input)
-        if (trustOutcome.kind === 'trusted') {
+        if (trustOutcome.kind === TRUST_OUTCOME_KINDS.trusted) {
           config.update((current) => ({
             ...current,
             servers: [...current.servers, trustOutcome.server],
@@ -295,7 +295,7 @@ const setup = ({
 }
 
 const idOf = (reply: Awaited<ReturnType<ReturnType<typeof setup>['service']['openPaths']>>) => {
-  if (reply.type !== 'play') throw new Error(`expected play, got ${reply.type}`)
+  if (reply.type !== DESKTOP_REPLIES.play) throw new Error(`expected play, got ${reply.type}`)
   return reply.target
 }
 
@@ -458,7 +458,7 @@ describe('describeFile', () => {
     const { service, spies, store } = setup({ files: show })
     const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
     const reply = await describeFile({ service, fileId })
-    if (reply.type !== 'file') throw new Error(`expected file, got ${reply.type}`)
+    if (reply.type !== DESKTOP_REPLIES.file) throw new Error(`expected file, got ${reply.type}`)
     expect(reply.file).toMatchObject({
       fileId,
       label: 'Episode 1',
@@ -478,7 +478,7 @@ describe('describeFile', () => {
     const { service } = setup({ files: show })
     const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 10.mkv']))
     const reply = await describeFile({ service, fileId })
-    expect(reply.type === 'file' && reply.file.next).toBeNull()
+    expect(reply.type === DESKTOP_REPLIES.file && reply.file.next).toBeNull()
   })
 
   it('prefers a granted queue entry over the folder', async () => {
@@ -491,7 +491,7 @@ describe('describeFile', () => {
       ]),
     )
     const reply = await describeFile({ service, fileId: target.fileId, queue: target.queue })
-    if (reply.type !== 'file') throw new Error('expected file')
+    if (reply.type !== DESKTOP_REPLIES.file) throw new Error('expected file')
     expect(reply.file.next!.label).toBe('Film')
     expect(reply.file.next!.queue).toEqual(target.queue.slice(1))
   })
@@ -507,7 +507,7 @@ describe('describeFile', () => {
       fileId: target.fileId,
       queue: [stranger, ...target.queue],
     })
-    if (reply.type !== 'file') throw new Error('expected file')
+    if (reply.type !== DESKTOP_REPLIES.file) throw new Error('expected file')
     expect(reply.file.next!.label).toBe('Episode 10')
     expect(reply.file.next!.queue).toEqual([])
   })
@@ -517,7 +517,7 @@ describe('describeFile', () => {
     const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
     const stranger = '00000000-0000-4000-8000-0000000000ff'
     const reply = await describeFile({ service, fileId, queue: [stranger] })
-    expect(reply.type === 'file' && reply.file.next!.label).toBe('Episode 2')
+    expect(reply.type === DESKTOP_REPLIES.file && reply.file.next!.label).toBe('Episode 2')
   })
 
   it('walks the folder of the real file when the opened path is a symlink', async () => {
@@ -526,7 +526,7 @@ describe('describeFile', () => {
     })
     const { fileId } = idOf(await service.openPaths(['/links/watch.mkv']))
     const reply = await describeFile({ service, fileId })
-    if (reply.type !== 'file') throw new Error('expected file')
+    if (reply.type !== DESKTOP_REPLIES.file) throw new Error('expected file')
     expect(reply.file.folder).toBe('Show')
     expect(reply.file.next!.label).toBe('Episode 2')
   })
@@ -568,7 +568,7 @@ describe('savePosition', () => {
     const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
     expect(await save({ service, fileId, position: 40, duration: 120 })).toEqual({ type: 'done' })
     const reply = await describe1({ service, fileId })
-    expect(reply.type === 'file' && reply.file.resumeAt).toBe(40)
+    expect(reply.type === DESKTOP_REPLIES.file && reply.file.resumeAt).toBe(40)
   })
 
   it('starts at 0 once the file changed on disk and was granted again', async () => {
@@ -580,7 +580,7 @@ describe('savePosition', () => {
     table.set('/m/Show/Episode 1.mkv', { ...entry, mtimeMs: 2000 })
     const again = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
     const reply = await describe1({ service, fileId: again.fileId })
-    expect(reply.type === 'file' && reply.file.resumeAt).toBe(0)
+    expect(reply.type === DESKTOP_REPLIES.file && reply.file.resumeAt).toBe(0)
   })
 
   it('is refused notOpen for an id that was never granted', async () => {
@@ -631,7 +631,7 @@ describe('saveTracks', () => {
     const { service } = setup({ files: show })
     const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
     const reply = await describing({ service, fileId })
-    expect(reply.type === 'file' && reply.file.tracks).toBeNull()
+    expect(reply.type === DESKTOP_REPLIES.file && reply.file.tracks).toBeNull()
   })
 
   it('stores the pick and hands it back on the next describeFile', async () => {
@@ -642,7 +642,10 @@ describe('saveTracks', () => {
       type: 'done',
     })
     const reply = await describing({ service, fileId })
-    expect(reply.type === 'file' && reply.file.tracks).toEqual({ audio: 1, subtitle: 'embedded-0' })
+    expect(reply.type === DESKTOP_REPLIES.file && reply.file.tracks).toEqual({
+      audio: 1,
+      subtitle: 'embedded-0',
+    })
     expect(store.read().tracks).toEqual([
       { path: '/m/Show/Episode 1.mkv', audio: 1, subtitle: 'embedded-0', pickedAt: 7000 },
     ])
@@ -798,7 +801,8 @@ describe('a failing dependency', () => {
 describe('recents', () => {
   const recents = async (service: ReturnType<typeof setup>['service']) => {
     const reply = await service.handle({ kind: 'page', request: { type: 'listRecents' } })
-    if (reply.type !== 'recents') throw new Error(`expected recents, got ${reply.type}`)
+    if (reply.type !== DESKTOP_REPLIES.recents)
+      throw new Error(`expected recents, got ${reply.type}`)
     return reply.recents
   }
   const open = async ({
@@ -848,7 +852,7 @@ describe('recents', () => {
       kind: 'page',
       request: { type: 'openRecent', recentId: recent.recentId },
     })
-    expect(reply.type === 'play' && reply.target.queue).toEqual([])
+    expect(reply.type === DESKTOP_REPLIES.play && reply.target.queue).toEqual([])
     table.delete('/m/Show/Episode 1.mkv')
     expect(
       await service.handle({
@@ -1028,7 +1032,8 @@ describe('server titles', () => {
     service.handle({ kind: 'page', request })
   const recents = async ({ service }: { service: Service }) => {
     const reply = await ask({ service, request: { type: 'listRecents' } })
-    if (reply.type !== 'recents') throw new Error(`expected recents, got ${reply.type}`)
+    if (reply.type !== DESKTOP_REPLIES.recents)
+      throw new Error(`expected recents, got ${reply.type}`)
     return reply.recents
   }
   const noteDune = ({ service, serverId = SERVER }: { service: Service; serverId?: string }) =>

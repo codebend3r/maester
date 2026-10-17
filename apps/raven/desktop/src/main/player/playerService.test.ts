@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import type { OutputSettings, PlayerCommand, PlayerEvent } from '@raven/core'
 import {
+  type OutputSettings,
+  PLAYER_EVENTS,
+  type PlayerCommand,
+  type PlayerEvent,
+} from '@raven/core'
+import {
+  MPV_COMMANDS,
   type MpvEvent,
   type MpvProperty,
   type MpvPropertyValue,
@@ -51,9 +58,12 @@ const LIST: MpvTrack[] = [
   mpvTrack({ id: 2, type: 'sub', lang: 'spa', codec: 'subrip' }),
 ]
 
+/** The one file the fake grants know. */
+const FILE_ID = 'f1'
+
 const LOAD = {
   type: 'load',
-  source: { kind: 'file', fileId: 'f1' },
+  source: { kind: 'file', fileId: FILE_ID },
   start: 0,
   audio: null,
   subtitle: 'embedded-0',
@@ -138,17 +148,19 @@ const fakeServers = () => {
   }
 }
 
-type ExplainMode = 'answer' | 'hold' | 'reject'
+const EXPLAIN_MODES = { answer: 'answer', hold: 'hold', reject: 'reject' } as const
+
+type ExplainMode = (typeof EXPLAIN_MODES)[keyof typeof EXPLAIN_MODES]
 
 /** An explainer that answers `LOCKED`, rejects, or holds its answer until `release`. */
 const fakeExplain = () => {
   const asked: Parameters<FailureExplainer>[0][] = []
   const held: (() => void)[] = []
-  const state: { mode: ExplainMode } = { mode: 'answer' }
+  const state: { mode: ExplainMode } = { mode: EXPLAIN_MODES.answer }
   const explain: FailureExplainer = async (input) => {
     asked.push(input)
-    if (state.mode === 'reject') throw new Error('explain failed')
-    if (state.mode === 'hold') {
+    if (state.mode === EXPLAIN_MODES.reject) throw new Error('explain failed')
+    if (state.mode === EXPLAIN_MODES.hold) {
       await new Promise<void>((resume) => {
         held.push(resume)
       })
@@ -366,7 +378,7 @@ const createTimedTimers = () => {
 }
 
 const fileOf = (fileId: string) =>
-  fileId === 'f1' ? { fileId, path: '/m/Film.mkv', name: 'Film.mkv', size: 1, mtimeMs: 1 } : null
+  fileId === FILE_ID ? { fileId, path: '/m/Film.mkv', name: 'Film.mkv', size: 1, mtimeMs: 1 } : null
 
 const setup = ({ timers }: { timers?: Timers } = {}) => {
   const mpv = createFakeMpv()
@@ -488,7 +500,7 @@ describe('resolveSourceWith', () => {
   const resolve = resolveSourceWith({ grants: { fileOf }, servers: fakeServers().servers })
 
   test('a granted file resolves to its path', async () => {
-    expect(await resolve({ kind: 'file', fileId: 'f1' })).toEqual({
+    expect(await resolve({ kind: 'file', fileId: FILE_ID })).toEqual({
       ok: true,
       target: { kind: 'file', path: '/m/Film.mkv' },
     })
@@ -597,7 +609,8 @@ describe('createPlayerService', () => {
         { type: 'waiting', waiting: false },
       ])
       const tracks = events[4]
-      if (tracks === undefined || tracks.type !== 'tracks') throw new Error('expected tracks')
+      if (tracks === undefined || tracks.type !== PLAYER_EVENTS.tracks)
+        throw new Error('expected tracks')
       expect(tracks.tracks.audio.map((track) => track.language)).toEqual(['en', 'fr'])
       expect(tracks.tracks.subtitles.map((track) => track.id)).toEqual(['embedded-0', 'embedded-1'])
       expect(tracks.tracks.frameRate).toBe(23.976)
@@ -623,8 +636,9 @@ describe('createPlayerService', () => {
       const { mpv, events, warnings, loaded } = setup()
       mpv.failOn('read track-list')
       await loaded()
-      const tracks = events.find((event) => event.type === 'tracks')
-      if (tracks === undefined || tracks.type !== 'tracks') throw new Error('expected tracks')
+      const tracks = events.find((event) => event.type === PLAYER_EVENTS.tracks)
+      if (tracks === undefined || tracks.type !== PLAYER_EVENTS.tracks)
+        throw new Error('expected tracks')
       expect(tracks.tracks.audio).toEqual([])
       expect(warnings.some((warning) => warning.includes('track-list'))).toBe(true)
     })
@@ -1029,18 +1043,20 @@ describe('createPlayerService', () => {
         service.receive({ type: 'property', name: 'pause', data: index % 2 === 0 })
       })
       await settle()
-      expect(events.filter((event) => event.type === 'time')).toEqual([{ type: 'time', time: 1 }])
+      expect(events.filter((event) => event.type === PLAYER_EVENTS.time)).toEqual([
+        { type: 'time', time: 1 },
+      ])
       // Six pauses and resumes in a burst: one read in flight, then one more after it.
       expect(mpv.reads).toEqual(['time-pos', 'time-pos'])
       expect(clock.pending.size).toBe(1)
       expect([...clock.pending.values()].map((timer) => timer.ms)).toEqual([TIME_MS])
       clock.fire()
-      expect(events.filter((event) => event.type === 'time')).toEqual([
+      expect(events.filter((event) => event.type === PLAYER_EVENTS.time)).toEqual([
         { type: 'time', time: 1 },
         { type: 'time', time: 1.2 },
       ])
       clock.fire()
-      expect(events.filter((event) => event.type === 'time').length).toBe(2)
+      expect(events.filter((event) => event.type === PLAYER_EVENTS.time).length).toBe(2)
     })
 
     test('a time held for the window is dropped when a seek is sent', async () => {
@@ -1131,7 +1147,8 @@ describe('createPlayerService', () => {
         { type: 'paused', paused: true },
       ])
       const tracks = events[4]
-      if (tracks === undefined || tracks.type !== 'tracks') throw new Error('expected tracks')
+      if (tracks === undefined || tracks.type !== PLAYER_EVENTS.tracks)
+        throw new Error('expected tracks')
       expect(tracks.tracks.frameRate).toBe(25)
       expect(activity).toEqual([{ isPlaying: false, isShowing: true }])
     })
@@ -1171,9 +1188,9 @@ describe('createPlayerService', () => {
       ])
       clock.fire()
       service.receive({ type: 'property', name: 'demuxer-cache-state', data: null })
-      expect(events.map((event) => (event.type === 'buffered' ? event.ranges.length : -1))).toEqual(
-        [1, 2, 0],
-      )
+      expect(
+        events.map((event) => (event.type === PLAYER_EVENTS.buffered ? event.ranges.length : -1)),
+      ).toEqual([1, 2, 0])
     })
   })
 
@@ -1733,9 +1750,9 @@ describe('createPlayerService', () => {
       clear()
       waiting({ service, data: true })
       clock.advance(SERVER_STALL_MS - 1)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
       clock.advance(1)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([
         { type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost },
       ])
       expect(mpv.log).toEqual(['stop'])
@@ -1745,7 +1762,7 @@ describe('createPlayerService', () => {
       service.receive({ type: 'end-file', reason: 'error', error: -10 })
       waiting({ service, data: false })
       await settle()
-      expect(events.filter(({ type }) => type === 'error')).toHaveLength(1)
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toHaveLength(1)
       expect(clock.pending.size).toBe(0)
     })
 
@@ -1757,7 +1774,7 @@ describe('createPlayerService', () => {
       clock.advance(SERVER_STALL_MS - 1)
       waiting({ service, data: false })
       clock.advance(SERVER_STALL_MS * 2)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
       expect(stalls(clock.pending)).toEqual([])
     })
 
@@ -1770,9 +1787,9 @@ describe('createPlayerService', () => {
       clock.advance(SERVER_STALL_MS - 1)
       time(31.5)
       clock.advance(SERVER_STALL_MS - 1)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
       clock.advance(1)
-      expect(events.filter(({ type }) => type === 'error')).toHaveLength(1)
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toHaveLength(1)
     })
 
     test('a local file is never stopped for waiting', async () => {
@@ -1782,7 +1799,7 @@ describe('createPlayerService', () => {
       waiting({ service, data: true })
       expect(stalls(clock.pending)).toEqual([])
       clock.advance(SERVER_STALL_MS * 2)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
     })
 
     test('a paused title that is not waiting is never stopped', async () => {
@@ -1792,7 +1809,7 @@ describe('createPlayerService', () => {
       service.receive({ type: 'property', name: 'pause', data: true })
       expect(stalls(clock.pending)).toEqual([])
       clock.advance(SERVER_STALL_MS * 2)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
     })
 
     test('a stop, a file load or a reset clears the budget', async () => {
@@ -1812,7 +1829,7 @@ describe('createPlayerService', () => {
       await service.reset()
       expect(stalls(clock.pending)).toEqual([])
       clock.advance(SERVER_STALL_MS * 2)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
     })
 
     test('a new server load starts a budget of its own', async () => {
@@ -1824,9 +1841,9 @@ describe('createPlayerService', () => {
       expect(await service.handle(OTHER_LOAD)).toEqual({ ok: true })
       expect(stalls(clock.pending)).toHaveLength(1)
       clock.advance(1)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
       clock.advance(SERVER_STALL_MS - 1)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([
         { type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost },
       ])
     })
@@ -1836,9 +1853,9 @@ describe('createPlayerService', () => {
       const { service, mpv, events, activity } = setup({ timers: clock.timers })
       expect(await service.handle(SERVER_LOAD)).toEqual({ ok: true })
       clock.advance(SERVER_STALL_MS - 1)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
       clock.advance(1)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([
         { type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost },
       ])
       expect(mpv.log.at(-1)).toBe('stop')
@@ -1847,8 +1864,8 @@ describe('createPlayerService', () => {
       service.receive({ type: 'file-loaded' })
       service.receive({ type: 'end-file', reason: 'error', error: -13 })
       await settle()
-      expect(events.filter(({ type }) => type === 'error')).toHaveLength(1)
-      expect(events.filter(({ type }) => type === 'paused')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toHaveLength(1)
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.paused)).toEqual([])
     })
 
     test('a stall budget that runs out while the load waits on mpv sends no loadfile', async () => {
@@ -1865,7 +1882,7 @@ describe('createPlayerService', () => {
         message: PLAYER_MESSAGES.lost,
       })
       expect(mpv.log.some((entry) => entry.startsWith('loadfile'))).toBe(false)
-      expect(events.filter(({ type }) => type === 'error')).toHaveLength(1)
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toHaveLength(1)
     })
 
     test('a stall budget that runs out while the loadfile waits answers refused', async () => {
@@ -1894,9 +1911,9 @@ describe('createPlayerService', () => {
       service.receive({ type: 'playback-restart' })
       await settle()
       clock.advance(SERVER_STALL_MS - 1)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
       clock.advance(1)
-      expect(events.filter(({ type }) => type === 'error')).toHaveLength(1)
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toHaveLength(1)
     })
 
     test('a time read that finds the clock still keeps the budget running', async () => {
@@ -1910,7 +1927,7 @@ describe('createPlayerService', () => {
       service.receive({ type: 'playback-restart' })
       await settle()
       clock.advance(1)
-      expect(events.filter(({ type }) => type === 'error')).toHaveLength(1)
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toHaveLength(1)
     })
 
     test('file-loaded ends the opening budget', async () => {
@@ -1923,7 +1940,7 @@ describe('createPlayerService', () => {
       await settle()
       expect(stalls(clock.pending)).toEqual([])
       clock.advance(SERVER_STALL_MS * 2)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
     })
 
     test('a local file opening has no budget', async () => {
@@ -1932,7 +1949,7 @@ describe('createPlayerService', () => {
       expect(await service.handle(LOAD)).toEqual({ ok: true })
       expect(stalls(clock.pending)).toEqual([])
       clock.advance(SERVER_STALL_MS * 2)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
     })
 
     test('a stop or a reset while opening clears the budget', async () => {
@@ -1945,7 +1962,7 @@ describe('createPlayerService', () => {
       await service.reset()
       expect(stalls(clock.pending)).toEqual([])
       clock.advance(SERVER_STALL_MS * 2)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
     })
 
     test('dispose drops the budget and tells no one', async () => {
@@ -2006,14 +2023,14 @@ describe('createPlayerService', () => {
       clock.advance(SIDECAR_BUDGET_MS)
       await settle()
       await settle()
-      expect(events.filter(({ type }) => type === 'paused')).toHaveLength(1)
-      expect(events.findLast(({ type }) => type === 'waiting')).toEqual({
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.paused)).toHaveLength(1)
+      expect(events.findLast(({ type }) => type === PLAYER_EVENTS.waiting)).toEqual({
         type: 'waiting',
         waiting: true,
       })
       expect(stalls(clock.pending)).toHaveLength(1)
       clock.advance(SERVER_STALL_MS)
-      expect(events.filter(({ type }) => type === 'error')).toEqual([
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([
         { type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost },
       ])
       mpv.release()
@@ -2157,7 +2174,7 @@ describe('createPlayerService', () => {
     test('the sidecars are added in order before the track list is read', async () => {
       const { mpv, loaded } = setup()
       await loaded(SERVER_LOAD)
-      expect(mpv.commands.filter(([name]) => name === 'sub-add')).toEqual([
+      expect(mpv.commands.filter(([name]) => name === MPV_COMMANDS.subAdd)).toEqual([
         ['sub-add', SIDECAR_URLS[0], 'auto', 'Spanish', 'es'],
         ['sub-add', SIDECAR_URLS[1], 'auto', '', ''],
       ])
@@ -2171,14 +2188,14 @@ describe('createPlayerService', () => {
     test('a file adds no sidecars', async () => {
       const { mpv, loaded } = setup()
       await loaded()
-      expect(mpv.commands.filter(([name]) => name === 'sub-add')).toEqual([])
+      expect(mpv.commands.filter(([name]) => name === MPV_COMMANDS.subAdd)).toEqual([])
     })
 
     test('a failing sidecar is warned, without its URL, and the next one still added', async () => {
       const { mpv, types, warnings, loaded } = setup()
       mpv.failOn(`sub-add ${SIDECAR_URLS[0]}`)
       await loaded(SERVER_LOAD)
-      expect(mpv.commands.filter(([name]) => name === 'sub-add').length).toBe(2)
+      expect(mpv.commands.filter(([name]) => name === MPV_COMMANDS.subAdd).length).toBe(2)
       expect(warnings).toEqual(['mpv sub-add of sidecar 0 failed: mpv request failed (-12)'])
       expect(types()).toEqual(['paused', 'duration', 'rate', 'waiting', 'tracks'])
     })
@@ -2192,7 +2209,7 @@ describe('createPlayerService', () => {
       mpv.release()
       await loading
       await settle()
-      expect(mpv.commands.filter(([name]) => name === 'sub-add').length).toBe(1)
+      expect(mpv.commands.filter(([name]) => name === MPV_COMMANDS.subAdd).length).toBe(1)
       expect(mpv.reads).toEqual([])
       expect(events).toEqual([])
     })
@@ -2254,7 +2271,7 @@ describe('createPlayerService', () => {
       const { service, explainer, events, loaded, clear } = setup()
       await loaded(SERVER_LOAD)
       clear()
-      explainer.use('hold')
+      explainer.use(EXPLAIN_MODES.hold)
       service.receive({ type: 'end-file', reason: 'error', error: -13 })
       await settle()
       expect(await service.handle(LOAD)).toEqual({ ok: true })
@@ -2267,7 +2284,7 @@ describe('createPlayerService', () => {
       const { service, explainer, events, loaded, clear } = setup()
       await loaded(SERVER_LOAD)
       clear()
-      explainer.use('reject')
+      explainer.use(EXPLAIN_MODES.reject)
       service.receive({ type: 'end-file', reason: 'error', error: -13 })
       await settle()
       expect(events).toEqual([{ type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost }])
@@ -2306,7 +2323,7 @@ describe('createPlayerService', () => {
       mpv.release()
       await resetting
       expect(await loading).toEqual({ ok: true })
-      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
     })
 
     test('resetIfServer leaves a file alone', async () => {
@@ -2374,7 +2391,7 @@ describe('createPlayerService', () => {
       expect(warnings).toEqual(['server sidecars are slow; the title starts without them'])
       mpv.release()
       await settle()
-      expect(mpv.commands.filter(([name]) => name === 'sub-add').length).toBe(2)
+      expect(mpv.commands.filter(([name]) => name === MPV_COMMANDS.subAdd).length).toBe(2)
       expect(SIDECAR_BUDGET_MS).toBe(3000)
     })
 

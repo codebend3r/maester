@@ -41,9 +41,9 @@ const FIXTURE_ADMIN_KINDS = { off: 'off', password: 'password', noPassword: 'noP
  *   so a locked title answers 404 whatever PIN went in.
  */
 export type FixtureAdmin =
-  | { kind: 'off' }
-  | { kind: 'password'; password: string }
-  | { kind: 'noPassword' }
+  | { kind: typeof FIXTURE_ADMIN_KINDS.off }
+  | { kind: typeof FIXTURE_ADMIN_KINDS.password; password: string }
+  | { kind: typeof FIXTURE_ADMIN_KINDS.noPassword }
 
 export type FixtureMode = { pin: string; isLocked: boolean; admin: FixtureAdmin }
 
@@ -148,6 +148,8 @@ const TRICKLE_BYTES = 2048
 const TRICKLE_MS = 100
 
 const MEDIA_ROUTE = /^\/api\/media\/(\d+)(\/.*)?$/u
+const MP4_EXTENSION = '.mp4'
+const RANGE_OUTCOMES = { unsatisfiable: 'unsatisfiable' } as const
 
 const fileOf = (mediaId: number) => `/api/media/${mediaId}/file`
 
@@ -244,19 +246,19 @@ const rangeOf = ({
 }: {
   header: string | undefined
   size: number
-}): { start: number; end: number } | 'unsatisfiable' | null => {
+}): { start: number; end: number } | typeof RANGE_OUTCOMES.unsatisfiable | null => {
   const match = /^bytes=(\d*)-(\d*)/u.exec((header ?? '').trim())
   if (match === null) return null
   const [, rawStart = '', rawEnd = ''] = match
   if (rawStart === '' && rawEnd === '') return null
   if (rawStart === '') {
     const suffix = Number(rawEnd)
-    if (suffix === 0) return 'unsatisfiable'
+    if (suffix === 0) return RANGE_OUTCOMES.unsatisfiable
     return { start: Math.max(0, size - suffix), end: size - 1 }
   }
   const start = Number(rawStart)
   const end = rawEnd === '' ? size - 1 : Math.min(Number(rawEnd), size - 1)
-  if (start >= size || end < start) return 'unsatisfiable'
+  if (start >= size || end < start) return RANGE_OUTCOMES.unsatisfiable
   return { start, end }
 }
 
@@ -297,7 +299,7 @@ const trickle = ({
 }
 
 const contentTypeOf = (path: string) =>
-  extname(path).toLowerCase() === '.mp4' ? 'video/mp4' : 'video/x-matroska'
+  extname(path).toLowerCase() === MP4_EXTENSION ? 'video/mp4' : 'video/x-matroska'
 
 const listen = async (server: Server): Promise<string> => {
   await new Promise<void>((resolve) => {
@@ -387,7 +389,7 @@ export const startFixtureServer = async ({
   }) => {
     const range = rangeOf({ header: request.headers.range, size: bytes.length })
     const common = { 'accept-ranges': 'bytes', 'content-type': contentTypeOf(path) }
-    if (range === 'unsatisfiable') {
+    if (range === RANGE_OUTCOMES.unsatisfiable) {
       response.writeHead(416, { ...common, 'content-range': `bytes */${bytes.length}` })
       response.end()
       return
@@ -413,11 +415,11 @@ export const startFixtureServer = async ({
 
   const adminHolds = (cookies: ReadonlyMap<string, string>): boolean => {
     switch (mode.admin.kind) {
-      case 'off':
+      case FIXTURE_ADMIN_KINDS.off:
         return false
-      case 'noPassword':
+      case FIXTURE_ADMIN_KINDS.noPassword:
         return true
-      case 'password':
+      case FIXTURE_ADMIN_KINDS.password:
         return !admins.has(cookies.get(ADMIN_COOKIE) ?? '')
       default: {
         const unreachable: never = mode.admin
@@ -428,11 +430,11 @@ export const startFixtureServer = async ({
 
   const adminLockOf = (cookies: ReadonlyMap<string, string>) => {
     switch (mode.admin.kind) {
-      case 'off':
+      case FIXTURE_ADMIN_KINDS.off:
         return { state: 'off' }
-      case 'noPassword':
+      case FIXTURE_ADMIN_KINDS.noPassword:
         return { state: 'on', available: false }
-      case 'password':
+      case FIXTURE_ADMIN_KINDS.password:
         return adminHolds(cookies) ? { state: 'on', available: true } : { state: 'off' }
       default: {
         const unreachable: never = mode.admin
@@ -468,7 +470,7 @@ export const startFixtureServer = async ({
     }
     const route = `${request.method ?? ''} ${rest}`
     switch (route) {
-      case 'GET ':
+      case MEDIA_ROUTES.item:
         return sendJson({
           response,
           status: 200,
@@ -479,13 +481,13 @@ export const startFixtureServer = async ({
             fileName: basename(title.path),
           }),
         })
-      case 'GET /tracks':
+      case MEDIA_ROUTES.tracks:
         return sendJson({ response, status: 200, body: FIXTURE_TRACKS })
-      case 'GET /subtitles/external-0':
+      case MEDIA_ROUTES.sidecar:
         response.writeHead(200, { 'content-type': 'text/vtt; charset=utf-8' })
         response.end(FIXTURE_SIDECAR)
         return
-      case 'GET /file':
+      case MEDIA_ROUTES.file:
         if (mediaId === FIXTURE_MEDIA.redirecting) {
           response.writeHead(302, { location: `${elsewhere.origin}${fileOf(mediaId)}` })
           response.end()
@@ -497,8 +499,8 @@ export const startFixtureServer = async ({
           return
         }
         return sendFile({ request, response, path: title.path, bytes: title.bytes })
-      case 'PUT /progress':
-      case 'POST /plays':
+      case MEDIA_ROUTES.progress:
+      case MEDIA_ROUTES.plays:
         return sendEmpty({ response, status: 204 })
       default:
         return sendJson({ response, status: 404, body: { message: 'Not found' } })
@@ -537,12 +539,12 @@ export const startFixtureServer = async ({
     body: string | null
   }) => {
     switch (mode.admin.kind) {
-      case 'noPassword':
+      case FIXTURE_ADMIN_KINDS.noPassword:
         return sendJson({ response, status: 503, body: { message: NO_PASSWORD } })
       // Already off for this browser: there is nothing to turn off.
-      case 'off':
+      case FIXTURE_ADMIN_KINDS.off:
         return sendJson({ response, status: 200, body: { state: 'off' } })
-      case 'password':
+      case FIXTURE_ADMIN_KINDS.password:
         break
       default: {
         const unreachable: never = mode.admin
@@ -584,18 +586,18 @@ export const startFixtureServer = async ({
     const path = request.url ?? ''
     const cookies = cookiesOf(request)
     const route = `${request.method ?? ''} ${path}`
-    if (route === 'GET /api/lock') {
+    if (route === API_ROUTES.lock) {
       return sendJson({
         response,
         status: 200,
         body: { available: true, unlocked: isUnlocked(cookies) },
       })
     }
-    if (route === 'POST /api/lock/unlock') return answerUnlock({ response, body })
-    if (route === 'GET /api/admin') {
+    if (route === API_ROUTES.unlock) return answerUnlock({ response, body })
+    if (route === API_ROUTES.admin) {
       return sendJson({ response, status: 200, body: adminLockOf(cookies) })
     }
-    if (route === 'POST /api/admin/unlock') return answerAdminUnlock({ response, body })
+    if (route === API_ROUTES.adminUnlock) return answerAdminUnlock({ response, body })
     const media = MEDIA_ROUTE.exec(path)
     if (media === null) return sendJson({ response, status: 404, body: { message: 'Not found' } })
     return answerMedia({ request, response, mediaId: Number(media[1]), rest: media[2] ?? '' })

@@ -46,13 +46,13 @@ const ROUTE_KINDS = { media: 'media', fixed: 'fixed' } as const
 
 type Route =
   | {
-      kind: 'media'
+      kind: typeof ROUTE_KINDS.media
       method: ServerMethod
       pattern: RegExp
       read: (input: { mediaId: number; body: Body }) => AllowedCall | null
     }
   | {
-      kind: 'fixed'
+      kind: typeof ROUTE_KINDS.fixed
       method: ServerMethod
       path: string
       read: (input: { body: Body }) => AllowedCall | null
@@ -62,12 +62,12 @@ const NONE = { kind: BODY_KINDS.none } as const satisfies Body
 
 const readBody = (body: string | null): Body => {
   if (body === null) return NONE
-  if (body.length > MAX_BODY) return { kind: 'bad' }
+  if (body.length > MAX_BODY) return { kind: BODY_KINDS.bad }
   try {
     const value: unknown = JSON.parse(body)
-    return { kind: 'json', value }
+    return { kind: BODY_KINDS.json, value }
   } catch {
-    return { kind: 'bad' }
+    return { kind: BODY_KINDS.bad }
   }
 }
 
@@ -77,7 +77,7 @@ const isSecret = (value: string): boolean => value.length <= MAX_SECRET
 const bare =
   (call: AllowedCall) =>
   ({ body }: { body: Body }): AllowedCall | null =>
-    body.kind === 'none' ? call : null
+    body.kind === BODY_KINDS.none ? call : null
 
 // Matched on the whole string, digits only, so no query, fragment, dot segment,
 // escape, extra slash or absolute URL can match; `$` without the `m` flag ends the input.
@@ -86,21 +86,21 @@ const ROUTES: readonly Route[] = [
     kind: ROUTE_KINDS.media,
     method: SERVER_METHODS.get,
     pattern: /^\/api\/media\/([1-9]\d{0,15})$/u,
-    read: ({ mediaId, body }) => bare({ name: 'getMedia', mediaId })({ body }),
+    read: ({ mediaId, body }) => bare({ name: CALL_NAMES.getMedia, mediaId })({ body }),
   },
   {
     kind: ROUTE_KINDS.media,
     method: SERVER_METHODS.get,
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/tracks$/u,
-    read: ({ mediaId, body }) => bare({ name: 'getTracks', mediaId })({ body }),
+    read: ({ mediaId, body }) => bare({ name: CALL_NAMES.getTracks, mediaId })({ body }),
   },
   {
     kind: ROUTE_KINDS.media,
     method: SERVER_METHODS.put,
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/progress$/u,
     read: ({ mediaId, body }) =>
-      body.kind === 'json' && isProgressChange(body.value)
-        ? { name: 'saveProgress', mediaId, position: body.value.position }
+      body.kind === BODY_KINDS.json && isProgressChange(body.value)
+        ? { name: CALL_NAMES.saveProgress, mediaId, position: body.value.position }
         : null,
   },
   {
@@ -121,8 +121,8 @@ const ROUTES: readonly Route[] = [
     method: SERVER_METHODS.post,
     path: API_PATHS.unlock,
     read: ({ body }) =>
-      body.kind === 'json' && isUnlockRequest(body.value) && isSecret(body.value.pin)
-        ? { name: 'unlock', pin: body.value.pin }
+      body.kind === BODY_KINDS.json && isUnlockRequest(body.value) && isSecret(body.value.pin)
+        ? { name: CALL_NAMES.unlock, pin: body.value.pin }
         : null,
   },
   { kind: 'fixed', method: 'GET', path: '/api/admin', read: bare({ name: 'getAdminLock' }) },
@@ -137,8 +137,10 @@ const ROUTES: readonly Route[] = [
     method: SERVER_METHODS.post,
     path: API_PATHS.adminUnlock,
     read: ({ body }) =>
-      body.kind === 'json' && isAdminUnlockRequest(body.value) && isSecret(body.value.password)
-        ? { name: 'unlockAdmin', password: body.value.password }
+      body.kind === BODY_KINDS.json &&
+      isAdminUnlockRequest(body.value) &&
+      isSecret(body.value.password)
+        ? { name: CALL_NAMES.unlockAdmin, password: body.value.password }
         : null,
   },
 ]
@@ -161,9 +163,9 @@ const matchRoute = ({
   body: Body
 }): AllowedCall | null => {
   switch (route.kind) {
-    case 'fixed':
+    case ROUTE_KINDS.fixed:
       return route.path === path ? route.read({ body }) : null
-    case 'media': {
+    case ROUTE_KINDS.media: {
       const mediaId = mediaIdOf({ pattern: route.pattern, path })
       return mediaId === null ? null : route.read({ mediaId, body })
     }
@@ -185,7 +187,7 @@ export const matchCall = ({
   body: string | null
 }): AllowedCall | null => {
   const read = readBody(body)
-  if (read.kind === 'bad') return null
+  if (read.kind === BODY_KINDS.bad) return null
   return ROUTES.reduce<AllowedCall | null>(
     (found, route) =>
       found ?? (route.method === method ? matchRoute({ route, path, body: read }) : null),
@@ -236,15 +238,15 @@ export const requestFor = (
 /** Whether a call changes what the server holds, so quitting waits for it. */
 export const isWrite = (call: AllowedCall): boolean => {
   switch (call.name) {
-    case 'saveProgress':
-    case 'recordPlay':
+    case CALL_NAMES.saveProgress:
+    case CALL_NAMES.recordPlay:
       return true
-    case 'getMedia':
-    case 'getTracks':
-    case 'getLock':
-    case 'unlock':
-    case 'getAdminLock':
-    case 'unlockAdmin':
+    case CALL_NAMES.getMedia:
+    case CALL_NAMES.getTracks:
+    case CALL_NAMES.getLock:
+    case CALL_NAMES.unlock:
+    case CALL_NAMES.getAdminLock:
+    case CALL_NAMES.unlockAdmin:
       return false
     default: {
       const unreachable: never = call

@@ -2,13 +2,14 @@ import { basename, dirname } from 'node:path'
 import { type OutputSettings, titleFromFileName } from '@raven/core'
 import { type ConfigStore, type DesktopConfig, pickOutput } from '@/main/desktopConfig'
 import { grantNext } from '@/main/folder'
-import type { GrantedFile, GrantRefusal, Grants } from '@/main/grants'
+import { GRANT_REFUSALS, type GrantedFile, type GrantRefusal, type Grants } from '@/main/grants'
 import {
   addRecent,
   clearRecents,
   type FileFacts,
   noteServerRecent,
   type PlayerState,
+  RECENT_KINDS,
   type RecentEntry,
   recentKey,
   removeRecentByKey,
@@ -22,18 +23,27 @@ import {
 import type { LinkOpener } from '@/main/servers/linkOpener'
 import { CALL_MESSAGES, type ServerCalls } from '@/main/servers/serverCalls'
 import { cleanName, renameServer, serverById } from '@/main/servers/serverList'
-import { TRUST_MESSAGES, type ServerTrust, type TrustOutcome } from '@/main/servers/serverTrust'
+import {
+  TRUST_MESSAGES,
+  TRUST_OUTCOME_KINDS,
+  TRUST_SOURCES,
+  type ServerTrust,
+  type TrustOutcome,
+} from '@/main/servers/serverTrust'
 import type { StateStore, Timers } from '@/main/stateStore'
 import { UPDATE_COPY, type UpdateService } from '@/main/updateService'
 import { serverOriginOf, watchUrlFor } from '@/shared/playLink'
 import {
   type AudioDevice,
   type DesktopReply,
+  DESKTOP_REQUESTS,
   type DesktopRequest,
+  ENVELOPE_KINDS,
   type InvokeEnvelope,
   isInvokeEnvelope,
   MAX_QUEUE,
   type RecentView,
+  DESKTOP_REPLIES,
 } from '@/shared/protocol'
 
 export const MESSAGES = {
@@ -86,16 +96,16 @@ export type DesktopService = {
   openLinks: (links: readonly string[]) => Promise<DesktopReply>
 }
 
-const DONE = { type: 'done' } as const satisfies DesktopReply
+const DONE = { type: DESKTOP_REPLIES.done } as const satisfies DesktopReply
 
 const refused = (message: string): DesktopReply => ({ type: 'refused', message })
 
 const messageFor = (reason: GrantRefusal): string => {
   switch (reason) {
-    case 'missing':
+    case GRANT_REFUSALS.missing:
       return MESSAGES.missing
-    case 'not-a-video':
-    case 'not-a-file':
+    case GRANT_REFUSALS.notAVideo:
+    case GRANT_REFUSALS.notAFile:
       return MESSAGES.notVideo
     default: {
       const unreachable: never = reason
@@ -122,19 +132,19 @@ const replyForAdd = ({
   config: DesktopConfig
 }): DesktopReply => {
   switch (outcome.kind) {
-    case 'trusted':
+    case TRUST_OUTCOME_KINDS.trusted:
       return serversOf(config)
-    case 'declined':
+    case TRUST_OUTCOME_KINDS.declined:
       return DONE
-    case 'full':
+    case TRUST_OUTCOME_KINDS.full:
       return refused(TRUST_MESSAGES.full)
-    case 'busy':
+    case TRUST_OUTCOME_KINDS.busy:
       return refused(TRUST_MESSAGES.busy)
-    case 'unreachable':
+    case TRUST_OUTCOME_KINDS.unreachable:
       return refused(TRUST_MESSAGES.unreachable(outcome.origin))
-    case 'invalid':
+    case TRUST_OUTCOME_KINDS.invalid:
       return refused(MESSAGES.badServer)
-    case 'unsaved':
+    case TRUST_OUTCOME_KINDS.unsaved:
       return refused(TRUST_MESSAGES.unsaved)
     default: {
       const unreachable: never = outcome
@@ -217,7 +227,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   }
 
   const describeFile = async (
-    request: Extract<DesktopRequest, { type: 'describeFile' }>,
+    request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.describeFile }>,
   ): Promise<DesktopReply> => {
     const file = grants.fileOf(request.fileId)
     if (file === null) return refused(MESSAGES.notOpen)
@@ -253,7 +263,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     return DONE
   }
 
-  const saveTracks = (request: Extract<DesktopRequest, { type: 'saveTracks' }>): DesktopReply => {
+  const saveTracks = (
+    request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.saveTracks }>,
+  ): DesktopReply => {
     const file = grants.fileOf(request.fileId)
     if (file === null) return refused(MESSAGES.notOpen)
     store.update((state) =>
@@ -308,7 +320,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     entry: RecentEntry
   }): Promise<RecentView | null> => {
     switch (entry.kind) {
-      case 'file':
+      case RECENT_KINDS.file:
         return {
           recentId: recentIdFor({ entry }),
           label: titleFromFileName(basename(entry.path)),
@@ -368,7 +380,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     const entry = entryById.get(recentId)
     if (entry === undefined) return refused(MESSAGES.unknownRecent)
     switch (entry.kind) {
-      case 'file': {
+      case RECENT_KINDS.file: {
         const result = await grants.grant(entry.path)
         if (!result.ok) return refused(messageFor(result.reason))
         return { type: 'play', target: { fileId: result.file.fileId, queue: [] } }
@@ -399,7 +411,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   }
 
   const serverCall = async (
-    request: Extract<DesktopRequest, { type: 'serverCall' }>,
+    request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.serverCall }>,
   ): Promise<DesktopReply> => {
     const result = await deps.serverCalls.callFromPage({
       serverId: request.serverId,
@@ -414,7 +426,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   const addServer = async ({ origin: address }: { origin: string }): Promise<DesktopReply> => {
     const origin = serverOriginOf(address)
     if (origin === null) return refused(MESSAGES.badServer)
-    const outcome = await deps.trust.trust({ origin, from: 'app' })
+    const outcome = await deps.trust.trust({ origin, from: TRUST_SOURCES.app })
     return replyForAdd({ outcome, config: config.read() })
   }
 
@@ -460,7 +472,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   }
 
   const noteServerTitle = (
-    request: Extract<DesktopRequest, { type: 'noteServerTitle' }>,
+    request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.noteServerTitle }>,
   ): DesktopReply => {
     const { serverId, mediaId, label, watched } = request
     if (serverById({ config: config.read(), serverId }) === null) {
@@ -482,36 +494,36 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
 
   const handleRequest = async (request: DesktopRequest): Promise<DesktopReply> => {
     switch (request.type) {
-      case 'ready':
+      case DESKTOP_REQUESTS.ready:
         deps.onReady()
         return DONE
-      case 'openDialog':
+      case DESKTOP_REQUESTS.openDialog:
         return openDialog()
-      case 'describeFile':
+      case DESKTOP_REQUESTS.describeFile:
         return describeFile(request)
       case DESKTOP_REQUESTS.savePosition:
         return recordPosition(request)
-      case 'listRecents':
+      case DESKTOP_REQUESTS.listRecents:
         return listRecents()
-      case 'openRecent':
+      case DESKTOP_REQUESTS.openRecent:
         return openRecent({ recentId: request.recentId })
       case DESKTOP_REQUESTS.removeRecent:
         return dropRecent({ recentId: request.recentId })
-      case 'clearRecents':
+      case DESKTOP_REQUESTS.clearRecents:
         return dropAllRecents()
-      case 'saveTracks':
+      case DESKTOP_REQUESTS.saveTracks:
         return saveTracks(request)
-      case 'windowButtons':
+      case DESKTOP_REQUESTS.windowButtons:
         deps.setWindowButtons(request.isVisible)
         return DONE
-      case 'readOutput':
+      case DESKTOP_REQUESTS.readOutput:
         return { type: 'output', ...(await deps.output.read()) }
-      case 'writeOutput':
+      case DESKTOP_REQUESTS.writeOutput:
         await deps.output.write(pickOutput(request.output))
         return DONE
-      case 'serverCall':
+      case DESKTOP_REQUESTS.serverCall:
         return serverCall(request)
-      case 'listServers':
+      case DESKTOP_REQUESTS.listServers:
         return serversOf(config.read())
       case DESKTOP_REQUESTS.addServer:
         return addServer({ origin: request.origin })
@@ -519,19 +531,19 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return renameOne({ serverId: request.serverId, name: request.name })
       case DESKTOP_REQUESTS.removeServer:
         return removeOne({ serverId: request.serverId })
-      case 'openLink':
-        return deps.links.open({ link: request.link, from: 'app' })
-      case 'openInBrowser':
+      case DESKTOP_REQUESTS.openLink:
+        return deps.links.open({ link: request.link, from: TRUST_SOURCES.app })
+      case DESKTOP_REQUESTS.openInBrowser:
         return openInBrowser({ serverId: request.serverId, mediaId: request.mediaId })
-      case 'noteServerTitle':
+      case DESKTOP_REQUESTS.noteServerTitle:
         return noteServerTitle(request)
-      case 'readUpdates':
+      case DESKTOP_REQUESTS.readUpdates:
         return { type: 'updates', status: deps.updates.status() }
-      case 'setUpdateCheck':
+      case DESKTOP_REQUESTS.setUpdateCheck:
         return { type: 'updates', status: deps.updates.setEnabled(request.isEnabled) }
-      case 'checkForUpdates':
+      case DESKTOP_REQUESTS.checkForUpdates:
         return checkForUpdates()
-      case 'openRelease':
+      case DESKTOP_REQUESTS.openRelease:
         return openRelease()
       default: {
         const unreachable: never = request
@@ -542,9 +554,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
 
   const route = (envelope: InvokeEnvelope): Promise<DesktopReply> => {
     switch (envelope.kind) {
-      case 'page':
+      case ENVELOPE_KINDS.page:
         return handleRequest(envelope.request)
-      case 'drop':
+      case ENVELOPE_KINDS.drop:
         return openPaths(envelope.paths)
       default: {
         const unreachable: never = envelope

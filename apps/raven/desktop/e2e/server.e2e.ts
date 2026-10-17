@@ -28,6 +28,7 @@ import {
   trustPrompts,
   withApp,
 } from '@/e2e/harness'
+import { DESKTOP_REPLIES } from '@/shared/protocol'
 
 const PIN = '3001'
 const ADMIN_PASSWORD = 'raven fixture admin'
@@ -242,7 +243,7 @@ const openSettings = async ({ page }: { page: Page }) => {
 
 const serverIdsOf = async ({ page }: { page: Page }): Promise<string[]> => {
   const reply = await requestFromPage({ page, request: { type: 'listServers' } })
-  return reply !== null && reply.type === 'servers'
+  return reply !== null && reply.type === DESKTOP_REPLIES.servers
     ? reply.servers.map(({ serverId }) => serverId)
     : []
 }
@@ -329,7 +330,7 @@ test.describe.serial('playing a title from a locked raven server', () => {
         // Stored under its origin's host until someone renames it.
         const listed = await requestFromPage({ page, request: { type: 'listServers' } })
         expect(
-          listed !== null && listed.type === 'servers'
+          listed !== null && listed.type === DESKTOP_REPLIES.servers
             ? listed.servers.map(({ name, origin }) => ({ name, origin }))
             : [],
         ).toEqual([{ name: hostOf({ fixture }), origin: fixture.origin }])

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import type { MpvTrack } from '@raven/mpv'
+import { MPV_TRACK_TYPES, type MpvTrack } from '@raven/mpv'
 import { aidFor, sidFor, tracksFromMpv } from '@/main/player/tracksFromMpv'
 
 const mpvTrack = (fields: Pick<MpvTrack, 'id' | 'type'> & Partial<MpvTrack>): MpvTrack => ({
@@ -88,12 +88,12 @@ test('hearing-impaired flags map to hearingImpaired', () => {
 test('defaultAudio is the flagged default, else the first, else null', () => {
   expect(tracksFromMpv({ list, frameRate: null }).defaultAudio).toBe(0)
   const flaggedSecond = list.map((track) =>
-    track.type === 'audio' ? { ...track, default: track.id === 2 } : track,
+    track.type === MPV_TRACK_TYPES.audio ? { ...track, default: track.id === 2 } : track,
   )
   expect(tracksFromMpv({ list: flaggedSecond, frameRate: null }).defaultAudio).toBe(1)
   const unflagged = list.map((track) => ({ ...track, default: false }))
   expect(tracksFromMpv({ list: unflagged, frameRate: null }).defaultAudio).toBe(0)
-  const noAudio = list.filter((track) => track.type !== 'audio')
+  const noAudio = list.filter((track) => track.type !== MPV_TRACK_TYPES.audio)
   expect(tracksFromMpv({ list: noAudio, frameRate: null }).defaultAudio).toBeNull()
 })
 

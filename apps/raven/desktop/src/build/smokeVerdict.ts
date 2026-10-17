@@ -1,8 +1,8 @@
 export const SMOKE_START_MS = 30_000
 export const SMOKE_QUIT_MS = 5_000
 
-export const SMOKE_STAGES = ['started', 'quit'] as const
-export type SmokeStage = (typeof SMOKE_STAGES)[number]
+export const SMOKE_STAGES = { started: 'started', quit: 'quit' } as const
+export type SmokeStage = (typeof SMOKE_STAGES)[keyof typeof SMOKE_STAGES]
 
 const ENGINE_READY = 'video engine ready: mpv v'
 const ENGINE_FAILED = 'could not open its video engine'
@@ -13,9 +13,9 @@ const TEST_HOOK_PREFIX = 'RAVEN_DESKTOP_'
 const needlesFor = ({ stage, version }: { stage: SmokeStage; version: string }): string[] => {
   const started = [`launch raven player ${version} (packaged)`, ENGINE_READY, LAUNCH_MARK]
   switch (stage) {
-    case 'started':
+    case SMOKE_STAGES.started:
       return started
-    case 'quit':
+    case SMOKE_STAGES.quit:
       return [...started, QUIT_MARK]
     default: {
       const unreachable: never = stage

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { join } from 'node:path'
-import { MPV_MACH_O, missingMpvFiles, STAGED_PATHS, stageMpv } from '@/build/stageMpv'
+import { MPV_FILES, MPV_MACH_O, missingMpvFiles, STAGED_PATHS, stageMpv } from '@/build/stageMpv'
 
 const FROM = '/repo/libs/raven/mpv/resources/darwin-arm64'
 const TO = '/repo/apps/raven/desktop/staging/mpv/darwin-arm64'
@@ -27,9 +27,9 @@ describe('missingMpvFiles', () => {
   })
 
   it('names the Mach-O files that are not there', () => {
-    expect(missingMpvFiles({ exists: (relative) => relative !== 'lib/libMoltenVK.dylib' })).toEqual(
-      ['lib/libMoltenVK.dylib'],
-    )
+    expect(missingMpvFiles({ exists: (relative) => relative !== MPV_FILES.moltenVk })).toEqual([
+      'lib/libMoltenVK.dylib',
+    ])
   })
 
   it('checks the addon and both dylibs', () => {

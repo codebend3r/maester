@@ -17,11 +17,18 @@ import {
 } from '@/main/servers/serverCalls'
 
 type Sent = Parameters<ServerFetch>[0]
+const ANSWER_KINDS = {
+  reply: 'reply',
+  hold: 'hold',
+  reject: 'reject',
+  failText: 'failText',
+} as const
+
 type Answer =
-  | { kind: 'reply'; status: number; text: string }
-  | { kind: 'hold'; status: number; text: string }
-  | { kind: 'reject' }
-  | { kind: 'failText' }
+  | { kind: typeof ANSWER_KINDS.reply; status: number; text: string }
+  | { kind: typeof ANSWER_KINDS.hold; status: number; text: string }
+  | { kind: typeof ANSWER_KINDS.reject }
+  | { kind: typeof ANSWER_KINDS.failText }
 
 const SERVER: ServerEntry = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -40,7 +47,7 @@ const OTHER: ServerEntry = {
 const LOCK_STATE = '{"available":true,"unlocked":false}'
 
 const reply = ({ status = 200, text = '{}' }: { status?: number; text?: string } = {}): Answer => ({
-  kind: 'reply',
+  kind: ANSWER_KINDS.reply,
   status,
   text,
 })
@@ -53,20 +60,20 @@ const fakeFetch = ({ answer = () => reply() }: { answer?: (sent: Sent) => Answer
     sent.push(input)
     const answered = answer(input)
     switch (answered.kind) {
-      case 'reply':
+      case ANSWER_KINDS.reply:
         return Promise.resolve({
           status: answered.status,
           text: () => Promise.resolve(answered.text),
         })
-      case 'hold':
+      case ANSWER_KINDS.hold:
         return new Promise((resolve) => {
           held.push(() =>
             resolve({ status: answered.status, text: () => Promise.resolve(answered.text) }),
           )
         })
-      case 'reject':
+      case ANSWER_KINDS.reject:
         return Promise.reject(new Error('net::ERR_CONNECTION_REFUSED'))
-      case 'failText':
+      case ANSWER_KINDS.failText:
         return Promise.resolve({
           status: 200,
           text: () => Promise.reject(new Error('The operation was aborted due to timeout')),
@@ -357,7 +364,7 @@ describe('createServerCalls.call', () => {
   })
 
   it('answers unreachable and warns when the fetch rejects, without the secret', async () => {
-    const { calls, warnings } = setup({ answer: () => ({ kind: 'reject' }) })
+    const { calls, warnings } = setup({ answer: () => ({ kind: ANSWER_KINDS.reject }) })
     const result = await calls.call({
       serverId: SERVER.id,
       call: { name: 'unlock', pin: 'very-secret-pin' },
@@ -370,7 +377,7 @@ describe('createServerCalls.call', () => {
   })
 
   it('answers unreachable when reading the reply fails', async () => {
-    const { calls, warnings } = setup({ answer: () => ({ kind: 'failText' }) })
+    const { calls, warnings } = setup({ answer: () => ({ kind: ANSWER_KINDS.failText }) })
     const result = await calls.call({ serverId: SERVER.id, call: { name: 'getLock' } })
     expect(result).toEqual({ ok: false, message: CALL_MESSAGES.unreachable('raven.example') })
     expect(warnings).toHaveLength(1)
@@ -423,7 +430,7 @@ describe('createServerCalls.call', () => {
 
   it('answers busy for a seventh call held at once, without fetching it', async () => {
     const { calls, sent, releaseAll } = setup({
-      answer: () => ({ kind: 'hold', status: 200, text: '{}' }),
+      answer: () => ({ kind: ANSWER_KINDS.hold, status: 200, text: '{}' }),
     })
     const held = Array.from({ length: MAX_IN_FLIGHT }, (_, n) =>
       calls.call({ serverId: SERVER.id, call: { name: 'getMedia', mediaId: n + 1 } }),
@@ -438,7 +445,7 @@ describe('createServerCalls.call', () => {
 
   it('keeps WRITE_RESERVE slots that reads cannot take, so six held reads never starve a save', async () => {
     const { calls, sent, releaseAll } = setup({
-      answer: () => ({ kind: 'hold', status: 204, text: '' }),
+      answer: () => ({ kind: ANSWER_KINDS.hold, status: 204, text: '' }),
     })
     const reads = Array.from({ length: MAX_IN_FLIGHT }, (_, n) =>
       calls.call({ serverId: SERVER.id, call: { name: 'getMedia', mediaId: n + 1 } }),
@@ -461,7 +468,7 @@ describe('createServerCalls.call', () => {
 
   it('refuses a read once MAX_IN_FLIGHT writes are held, while a write still goes', async () => {
     const { calls, sent, releaseAll } = setup({
-      answer: () => ({ kind: 'hold', status: 204, text: '' }),
+      answer: () => ({ kind: ANSWER_KINDS.hold, status: 204, text: '' }),
     })
     const writes = Array.from({ length: MAX_IN_FLIGHT }, (_, n) =>
       calls.call({ serverId: SERVER.id, call: { name: 'recordPlay', mediaId: n + 1 } }),
@@ -482,7 +489,9 @@ describe('createServerCalls.call', () => {
   it('counts calls in flight per server and frees a slot once a call settles', async () => {
     const { calls, sent, release } = setup({
       answer: (input) =>
-        input.url.startsWith(SERVER.origin) ? { kind: 'hold', status: 200, text: '{}' } : reply(),
+        input.url.startsWith(SERVER.origin)
+          ? { kind: ANSWER_KINDS.hold, status: 200, text: '{}' }
+          : reply(),
     })
     const held = Array.from({ length: MAX_IN_FLIGHT }, () =>
       calls.call({ serverId: SERVER.id, call: { name: 'getLock' } }),
@@ -504,7 +513,7 @@ describe('createServerCalls.call', () => {
   })
 
   it('frees a slot after a call that failed', async () => {
-    const { calls, sent } = setup({ answer: () => ({ kind: 'reject' }) })
+    const { calls, sent } = setup({ answer: () => ({ kind: ANSWER_KINDS.reject }) })
     await Promise.all(
       Array.from({ length: MAX_IN_FLIGHT }, () =>
         calls.call({ serverId: SERVER.id, call: { name: 'getLock' } }),
@@ -577,7 +586,10 @@ describe('createServerCalls log lines', () => {
 
   it('escapes the server name it logs', async () => {
     const odd: ServerEntry = { ...SERVER, name: `raven${HIDDEN}FORGED` }
-    const { calls, warnings } = setup({ servers: [odd], answer: () => ({ kind: 'reject' }) })
+    const { calls, warnings } = setup({
+      servers: [odd],
+      answer: () => ({ kind: ANSWER_KINDS.reject }),
+    })
     await calls.call({ serverId: odd.id, call: { name: 'getLock' } })
     const big = setup({
       servers: [odd],
@@ -590,7 +602,7 @@ describe('createServerCalls log lines', () => {
   })
 
   it('answers every call when the log throws', async () => {
-    const down = setup({ answer: () => ({ kind: 'reject' }), isWarnBroken: true })
+    const down = setup({ answer: () => ({ kind: ANSWER_KINDS.reject }), isWarnBroken: true })
     expect(await down.calls.call({ serverId: SERVER.id, call: { name: 'getLock' } })).toEqual({
       ok: false,
       message: CALL_MESSAGES.unreachable('raven.example'),
@@ -708,7 +720,7 @@ describe('createServerCalls.callFromPage', () => {
 describe('pending writes', () => {
   it('holds settleWrites until a held saveProgress is released', async () => {
     const { calls, release } = setup({
-      answer: () => ({ kind: 'hold', status: 204, text: '' }),
+      answer: () => ({ kind: ANSWER_KINDS.hold, status: 204, text: '' }),
     })
     expect(calls.hasPendingWrites()).toBe(false)
     const save = calls.call({
@@ -729,7 +741,7 @@ describe('pending writes', () => {
 
   it('does not count a held read', async () => {
     const { calls, releaseAll } = setup({
-      answer: () => ({ kind: 'hold', status: 200, text: '{}' }),
+      answer: () => ({ kind: ANSWER_KINDS.hold, status: 200, text: '{}' }),
     })
     const read = calls.call({ serverId: SERVER.id, call: { name: 'getMedia', mediaId: 1 } })
     expect(calls.hasPendingWrites()).toBe(false)
@@ -740,7 +752,7 @@ describe('pending writes', () => {
 
   it('counts recordPlay as a write', async () => {
     const { calls, releaseAll } = setup({
-      answer: () => ({ kind: 'hold', status: 204, text: '' }),
+      answer: () => ({ kind: ANSWER_KINDS.hold, status: 204, text: '' }),
     })
     const play = calls.call({ serverId: SERVER.id, call: { name: 'recordPlay', mediaId: 1 } })
     expect(calls.hasPendingWrites()).toBe(true)
@@ -751,7 +763,7 @@ describe('pending writes', () => {
 
   it('waits only for the writes in flight when it was called', async () => {
     const { calls, release } = setup({
-      answer: () => ({ kind: 'hold', status: 204, text: '' }),
+      answer: () => ({ kind: ANSWER_KINDS.hold, status: 204, text: '' }),
     })
     const first = calls.call({
       serverId: SERVER.id,
@@ -768,7 +780,7 @@ describe('pending writes', () => {
   })
 
   it('settles a write that failed', async () => {
-    const { calls } = setup({ answer: () => ({ kind: 'reject' }) })
+    const { calls } = setup({ answer: () => ({ kind: ANSWER_KINDS.reject }) })
     const save = calls.call({
       serverId: SERVER.id,
       call: { name: 'saveProgress', mediaId: 1, position: 5 },
@@ -820,8 +832,8 @@ describe('probeServer', () => {
   })
 
   it('is false for a rejection or a reply that cannot be read', async () => {
-    expect(await probe({ kind: 'reject' })).toBe(false)
-    expect(await probe({ kind: 'failText' })).toBe(false)
+    expect(await probe({ kind: ANSWER_KINDS.reject })).toBe(false)
+    expect(await probe({ kind: ANSWER_KINDS.failText })).toBe(false)
   })
 
   it('is false for a reply past MAX_REPLY_CHARS', async () => {

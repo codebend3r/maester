@@ -14,6 +14,7 @@ const PROJECT_DIR = join(import.meta.dirname, '..')
 const QUIT_MS = 10_000
 // Every budget mark main prints on stdout (Ruling 14): `raven-<name> <n>` on a line of its own.
 const MARK_LINE = /^raven-([a-z][a-z0-9-]*) (\d+(?:\.\d+)?)$/
+const QUIT_OUTCOMES = { closed: 'closed', timeout: 'timeout' } as const
 
 /** The marks main has printed so far, in order, and whether its stdout has closed. */
 export type Marks = {
@@ -168,21 +169,21 @@ export const closeApp = async ({ app }: { app: ElectronApplication }): Promise<v
   if (hasExited(app)) return
   const deadline = new AbortController()
   const outcome = await Promise.race([
-    app.close().then(() => 'closed' as const),
-    delay(QUIT_MS, 'timeout' as const, { signal: deadline.signal }),
+    app.close().then(() => QUIT_OUTCOMES.closed),
+    delay(QUIT_MS, QUIT_OUTCOMES.timeout, { signal: deadline.signal }),
   ])
   deadline.abort()
-  if (outcome === 'closed') return
+  if (outcome === QUIT_OUTCOMES.closed) return
   app.process().kill('SIGKILL')
   throw new Error(`raven player did not quit within ${QUIT_MS} ms.`)
 }
 
 /** Headless mpv (`vo=null`, `ao=null`), or none, which is the html fallback's run (Ruling 15). */
-export type MpvMode = 'headless' | 'off'
+export type MpvMode = typeof ENGINE_MODES.headless | typeof ENGINE_MODES.off
 
 export const launchApp = async ({
   userData,
-  mpv = 'headless',
+  mpv = ENGINE_MODES.headless,
   env = {},
 }: {
   userData: string
@@ -256,6 +257,11 @@ export const openUrl = async ({ app, url }: { app: ElectronApplication; url: str
 
 const TRUST_PROMPTS_KEY = 'ravenE2eTrustPrompts'
 
+/** How a test answers main's trust sheet. */
+const TRUST_ANSWERS = { add: 'add', cancel: 'cancel' } as const
+
+type TrustAnswer = (typeof TRUST_ANSWERS)[keyof typeof TRUST_ANSWERS]
+
 /**
  * Answers main's trust sheet without showing it, and records what it asked. main reads
  * `dialog.showMessageBox` at each call, so the stand-in takes its place.
@@ -265,7 +271,7 @@ export const stubTrustPrompt = async ({
   answer,
 }: {
   app: ElectronApplication
-  answer: 'add' | 'cancel'
+  answer: TrustAnswer
 }): Promise<void> => {
   await app.evaluate(
     ({ dialog }, { key, response }) => {
@@ -288,7 +294,7 @@ export const stubTrustPrompt = async ({
       }
       Reflect.set(dialog, 'showMessageBox', ask)
     },
-    { key: TRUST_PROMPTS_KEY, response: answer === 'add' ? 0 : 1 },
+    { key: TRUST_PROMPTS_KEY, response: answer === TRUST_ANSWERS.add ? 0 : 1 },
   )
 }
 
@@ -366,8 +372,8 @@ export const watchedPercent = async ({
   page: Page
   label: string
 }): Promise<number | null> => {
-  const reply = await requestFromPage({ page, request: { type: 'listRecents' } })
-  if (reply === null || reply.type !== 'recents') return null
+  const reply = await requestFromPage({ page, request: { type: DESKTOP_REQUESTS.listRecents } })
+  if (reply === null || reply.type !== DESKTOP_REPLIES.recents) return null
   const recent = reply.recents.find((entry) => entry.label === label)
   if (recent === undefined || recent.watched === null) return null
   return Math.round(recent.watched * 100)
