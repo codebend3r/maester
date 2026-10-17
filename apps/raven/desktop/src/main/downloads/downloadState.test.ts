@@ -70,7 +70,7 @@ describe('the guards', () => {
     const full = entry({
       sidecars: [{ trackId: 'external-3', title: 'English', language: 'en' }],
       status: { kind: 'paused', bytes: 10, reason: 'viewer' },
-      pending: { play: true, position: 12, at: 5 },
+      pending: { play: true, position: 12, furthest: 30, at: 5 },
     })
     expect(isDownloadEntry(full)).toBe(true)
     expect(isDownloadsState(stateOf(full))).toBe(true)
@@ -454,7 +454,20 @@ describe('pending', () => {
       position: 42,
       at: 9,
     })
-    expect(next.entries[0]?.pending).toEqual({ play: true, position: 42, at: 9 })
+    expect(next.entries[0]?.pending).toEqual({ play: true, position: 42, furthest: 42, at: 9 })
+  })
+
+  it('notePending keeps the furthest position through a scrub back, and raises it past', () => {
+    const watched = notePending(stateOf(entry()), {
+      downloadId: ID,
+      play: true,
+      position: 190,
+      at: 1,
+    })
+    const back = notePending(watched, { downloadId: ID, play: false, position: 140, at: 2 })
+    expect(back.entries[0]?.pending).toEqual({ play: true, position: 140, furthest: 190, at: 2 })
+    const past = notePending(back, { downloadId: ID, play: false, position: 195, at: 3 })
+    expect(past.entries[0]?.pending).toEqual({ play: true, position: 195, furthest: 195, at: 3 })
   })
 
   it('notePending keeps a play the server has not heard when a position report follows', () => {
@@ -465,30 +478,63 @@ describe('pending', () => {
       at: 1,
     })
     const next = notePending(played, { downloadId: ID, play: false, position: 20, at: 2 })
-    expect(next.entries[0]?.pending).toEqual({ play: true, position: 20, at: 2 })
+    expect(next.entries[0]?.pending).toEqual({ play: true, position: 20, furthest: 20, at: 2 })
   })
 
-  it('clearPending clears the play and the position it sent', () => {
-    const state = stateOf(entry({ pending: { play: true, position: 42, at: 9 } }))
-    const next = clearPending(state, { downloadId: ID, sentPlay: true, sentPosition: 42 })
-    expect(next.entries[0]?.pending).toEqual({ play: false, position: null, at: 9 })
+  it('clearPending clears the play, the position and the furthest it sent', () => {
+    const state = stateOf(entry({ pending: { play: true, position: 42, furthest: 42, at: 9 } }))
+    const next = clearPending(state, {
+      downloadId: ID,
+      sentPlay: true,
+      sentPosition: 42,
+      sentFurthest: 42,
+    })
+    expect(next.entries[0]?.pending).toEqual({ play: false, position: null, furthest: null, at: 9 })
   })
 
   it('clearPending keeps a play it did not send', () => {
-    const state = stateOf(entry({ pending: { play: true, position: 42, at: 9 } }))
-    const next = clearPending(state, { downloadId: ID, sentPlay: false, sentPosition: 42 })
-    expect(next.entries[0]?.pending).toEqual({ play: true, position: null, at: 9 })
+    const state = stateOf(entry({ pending: { play: true, position: 42, furthest: 42, at: 9 } }))
+    const next = clearPending(state, {
+      downloadId: ID,
+      sentPlay: false,
+      sentPosition: 42,
+      sentFurthest: 42,
+    })
+    expect(next.entries[0]?.pending).toEqual({ play: true, position: null, furthest: null, at: 9 })
   })
 
   it('clearPending keeps a newer position', () => {
-    const state = stateOf(entry({ pending: { play: true, position: 60, at: 12 } }))
-    const next = clearPending(state, { downloadId: ID, sentPlay: true, sentPosition: 42 })
-    expect(next.entries[0]?.pending).toEqual({ play: false, position: 60, at: 12 })
+    const state = stateOf(entry({ pending: { play: true, position: 60, furthest: 60, at: 12 } }))
+    const next = clearPending(state, {
+      downloadId: ID,
+      sentPlay: true,
+      sentPosition: 42,
+      sentFurthest: 42,
+    })
+    expect(next.entries[0]?.pending).toEqual({ play: false, position: 60, furthest: 60, at: 12 })
+  })
+
+  it('clearPending keeps a furthest raised past the one it sent', () => {
+    const state = stateOf(entry({ pending: { play: false, position: 70, furthest: 99, at: 12 } }))
+    const next = clearPending(state, {
+      downloadId: ID,
+      sentPlay: false,
+      sentPosition: null,
+      sentFurthest: 95,
+    })
+    expect(next).toBe(state)
   })
 
   it('clearPending of nothing pending returns the same state', () => {
     const state = stateOf(entry())
-    expect(clearPending(state, { downloadId: ID, sentPlay: true, sentPosition: null })).toBe(state)
+    expect(
+      clearPending(state, {
+        downloadId: ID,
+        sentPlay: true,
+        sentPosition: null,
+        sentFurthest: null,
+      }),
+    ).toBe(state)
   })
 })
 
@@ -633,7 +679,13 @@ describe('an unknown download id', () => {
     ],
     [
       'clearPending',
-      () => clearPending(state, { downloadId: unknown, sentPlay: true, sentPosition: null }),
+      () =>
+        clearPending(state, {
+          downloadId: unknown,
+          sentPlay: true,
+          sentPosition: null,
+          sentFurthest: null,
+        }),
     ],
   ])('%s returns the same state', (_name, run) => {
     expect(run()).toBe(state)

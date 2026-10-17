@@ -34,7 +34,7 @@ export type Sync = {
 }
 
 const hasPending = ({ pending }: DownloadEntry): boolean =>
-  pending.play || pending.position !== null
+  pending.play || pending.position !== null || pending.furthest !== null
 
 const isSuccess = (status: number): boolean => status >= 200 && status < 300
 
@@ -93,6 +93,31 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
       .forEach((downloadId) => logged.delete(downloadId))
   }
 
+  /**
+   * The furthest position, when it is past the last: the server keeps how far a play got as the
+   * most it hears, so it hears this before a scrub back. True when the round may go on.
+   */
+  const sendFurthest = async (downloadId: string): Promise<boolean> => {
+    const entry = entryOf(downloadId)
+    if (entry === null) return false
+    const { furthest, position } = entry.pending
+    if (furthest === null || (position !== null && furthest <= position)) return true
+    const isSaved = await deliver({
+      entry,
+      call: { name: 'saveProgress', mediaId: entry.mediaId, position: furthest },
+    })
+    if (!isSaved) return false
+    store.update((state) =>
+      clearPending(state, {
+        downloadId,
+        sentPlay: false,
+        sentPosition: null,
+        sentFurthest: furthest,
+      }),
+    )
+    return true
+  }
+
   // The play goes first: the server must hear it before a position that may mark the title watched.
   const send = async (downloadId: string): Promise<void> => {
     const first = entryOf(downloadId)
@@ -106,10 +131,16 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
       // delivery is at least once, so a play can be recorded twice but never none.
       if (!isPlayed) return
       store.update((state) =>
-        clearPending(state, { downloadId, sentPlay: true, sentPosition: null }),
+        clearPending(state, {
+          downloadId,
+          sentPlay: true,
+          sentPosition: null,
+          sentFurthest: null,
+        }),
       )
     }
-    // Read again: the position may have moved while the play was out.
+    if (!(await sendFurthest(downloadId))) return
+    // Read again: the position may have moved while the play or the furthest was out.
     const entry = entryOf(downloadId)
     const position = entry?.pending.position ?? null
     if (entry === null || position === null) return
@@ -118,8 +149,14 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
       call: { name: 'saveProgress', mediaId: entry.mediaId, position },
     })
     if (!isSaved) return
+    // A furthest no further than this position is covered by it.
     store.update((state) =>
-      clearPending(state, { downloadId, sentPlay: false, sentPosition: position }),
+      clearPending(state, {
+        downloadId,
+        sentPlay: false,
+        sentPosition: position,
+        sentFurthest: position,
+      }),
     )
   }
 

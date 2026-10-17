@@ -1178,7 +1178,7 @@ describe('playing a download', () => {
       savePosition(state, { file: factsOf(VIDEO), position: 750, duration: 3000, at: NOW }),
     )
     world.service.notePosition({ fileId, position: 750, duration: 3000 })
-    expect(entryOf(world)?.pending).toEqual({ play: true, position: 750, at: NOW })
+    expect(entryOf(world)?.pending).toEqual({ play: true, position: 750, furthest: 750, at: NOW })
     expect(world.service.views()[0]?.watched).toBe(0.25)
     world.fire()
     expect(lastList(world)[0]?.watched).toBe(0.25)
@@ -1267,7 +1267,7 @@ describe('reaching the server', () => {
   const VIDEO = `${DOWNLOADS}/${SERVER_ID}/11/video.mkv`
   const OTHER_VIDEO = `${DOWNLOADS}/${SERVER_ID}/12/video.mkv`
   const FILE: Video = { size: 2 * GIB, mtimeMs: MTIME }
-  const PLAYED = { play: true, position: 750, at: NOW }
+  const PLAYED = { play: true, position: 750, furthest: 750, at: NOW }
   const progress = (mediaId: number, position: number): string =>
     keyOf({ name: 'saveProgress', mediaId, position })
   const playOf = (mediaId: number): string => keyOf({ name: 'recordPlay', mediaId })
