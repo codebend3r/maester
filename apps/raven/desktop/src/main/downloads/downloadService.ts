@@ -140,6 +140,25 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   const announcing: { timer: unknown } = { timer: undefined }
   let isDisposed = false
 
+  // Declared before everything that reads it. Its own dependencies are read only once a clock
+  // runs, after construction, so they may come later.
+  const deleteClock = createAutoDelete({
+    store,
+    timers: deps.timers,
+    now: deps.now,
+    isPlaying: (downloadId) => playback.isPlaying(downloadId),
+    isMidTitle: (downloadId) => playback.isMidTitle(downloadId),
+    // Through `remove`, so what was watched reaches the server first.
+    remove: async (downloadId) => {
+      await remove({ downloadId })
+    },
+    onDeleted: (entry) => {
+      notice(DOWNLOAD_MESSAGES.deletedAfterWatching(entry.label))
+      announce()
+    },
+    warn: deps.warn,
+  })
+
   const serverNameOf = (serverId: string): string =>
     serverById(config.read(), { serverId })?.name ?? ''
 
@@ -266,23 +285,6 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     warn: deps.warn,
     change,
     list,
-  })
-
-  // The clock removes through `remove`, so what was watched reaches the server first.
-  const deleteClock = createAutoDelete({
-    store,
-    timers: deps.timers,
-    now: deps.now,
-    isPlaying: playback.isPlaying,
-    isMidTitle: playback.isMidTitle,
-    remove: async (downloadId) => {
-      await remove({ downloadId })
-    },
-    onDeleted: (entry) => {
-      notice(DOWNLOAD_MESSAGES.deletedAfterWatching(entry.label))
-      announce()
-    },
-    warn: deps.warn,
   })
 
   // Only the page asking for the list sends what is pending; the list that events and replies carry does not.
