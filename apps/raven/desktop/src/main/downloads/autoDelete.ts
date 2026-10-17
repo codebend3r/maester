@@ -18,6 +18,7 @@ export type AutoDeleteDeps = {
   /**
    * The download service's removal: it lets the server hear what was watched first, then
    * answers false without removing when the download is no longer due or the viewer is on it.
+   * A folder that would not go is only logged there, and the next launch's sweep removes it.
    */
   remove: (downloadId: string) => Promise<boolean>
   onDeleted: (entry: DownloadEntry) => void
@@ -55,7 +56,7 @@ type Clock =
   | { kind: 'deleting' }
 
 /** How a removal the clock started went. */
-type Removal = 'removed' | 'kept' | 'failed'
+type Removal = 'removed' | 'kept'
 
 /** When a download counts as watched, for a ready one set to delete once watched; else null. */
 const watchedAtOf = (entry: DownloadEntry | null): number | null =>
@@ -89,15 +90,7 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
 
   const deleteNow = async (entry: DownloadEntry): Promise<void> => {
     const { downloadId } = entry
-    const removal = await deps.remove(downloadId).then(
-      (isRemoved): Removal => (isRemoved ? 'removed' : 'kept'),
-      (error: unknown): Removal => {
-        deps.warn(
-          `raven player could not delete ${loggable(entry.label)} after watching: ${loggable(errorText(error))}`,
-        )
-        return 'failed'
-      },
-    )
+    const removal: Removal = (await deps.remove(downloadId)) ? 'removed' : 'kept'
     // A switch turned off or on while the removal waited has already replaced this clock.
     const isOwn = clocks.get(downloadId)?.kind === 'deleting'
     if (isOwn) clocks.delete(downloadId)
@@ -107,9 +100,6 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
       case 'kept':
         // Read again as the download stands now: held while the viewer is on it.
         if (isOwn) armFromStore(downloadId)
-        return
-      case 'failed':
-        // Tried again at the next launch, not in a loop of failures now.
         return
       default: {
         const unreachable: never = removal

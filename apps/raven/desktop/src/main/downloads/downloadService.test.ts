@@ -1651,10 +1651,27 @@ describe('deleting once watched', () => {
     expect(world.sent).toContainEqual(DELETED)
   })
 
-  it('runs a deletion held for the file playing once the player is on nothing of this computer', async () => {
+  it('keeps a deletion held while the page plays its file though the engine stopped, until the page leaves', async () => {
     const world = settingUp({ watchedAt: NOW - 3 * MINUTE })
     await until(() => world.service.views()[0]?.deletesAt !== null)
-    await play(world)
+    const fileId = await play(world)
+    world.service.notePlaying({ fileId })
+    after(world, 7 * MINUTE)
+    await ticks(10)
+    world.service.notePlaying({ fileId: null })
+    await ticks(10)
+    expect(entries(world)).toHaveLength(1)
+    world.service.playbackLeft({ fileId })
+    await until(() => entries(world).length === 0)
+    expect(world.sent).toContainEqual(DELETED)
+  })
+
+  it('runs a deletion held for the file the engine plays once the engine is on nothing of this computer', async () => {
+    const world = settingUp({ watchedAt: NOW - 3 * MINUTE })
+    await until(() => world.service.views()[0]?.deletesAt !== null)
+    const fileId = await play(world)
+    world.service.notePlaying({ fileId })
+    world.service.playbackLeft({ fileId })
     after(world, 7 * MINUTE)
     await ticks(10)
     expect(entries(world)).toHaveLength(1)

@@ -112,6 +112,14 @@ describe('the guards', () => {
     ).toBe(false)
   })
 
+  it("takes a library's Watched at only as a whole percentage from 1 to 100, as core's guard does", () => {
+    expect(isDownloadEntry(entry({ watchedPercent: 1 }))).toBe(true)
+    expect(isDownloadEntry(entry({ watchedPercent: 100 }))).toBe(true)
+    expect(isDownloadEntry(entry({ watchedPercent: 0 }))).toBe(false)
+    expect(isDownloadEntry(entry({ watchedPercent: 101 }))).toBe(false)
+    expect(isDownloadEntry(entry({ watchedPercent: 89.5 }))).toBe(false)
+  })
+
   it('refuses a container or a track id that is not a safe path segment', () => {
     expect(isDownloadEntry(entry({ container: '../x' }))).toBe(false)
     expect(isDownloadEntry(entry({ container: 'MKV' }))).toBe(false)

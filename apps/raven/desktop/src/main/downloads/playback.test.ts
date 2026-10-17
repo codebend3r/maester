@@ -385,6 +385,18 @@ describe('what names a download', () => {
     expect(world.playback.fromLabelOf({ path: videoOf(11, OTHER_SERVER_ID) })).toBe('Downloaded')
   })
 
+  it('knows a path in the downloads folder no download names, as a deleted one a queue still holds', () => {
+    const world = setup({ entries: [entryFor({})] })
+    expect(world.playback.isStaleDownload({ path: VIDEO })).toBe(false)
+    expect(world.playback.isStaleDownload({ path: videoOf(12) })).toBe(true)
+    expect(world.playback.isStaleDownload({ path: videoOf(11, OTHER_SERVER_ID) })).toBe(true)
+    expect(world.playback.isStaleDownload({ path: MOVIE_PATH })).toBe(false)
+    expect(world.playback.isStaleDownload({ path: `${DOWNLOADS}/../Movies/x.mkv` })).toBe(false)
+    expect(world.playback.isStaleDownload({ path: `${USER_DATA}/downloads-old/x.mkv` })).toBe(false)
+    removing(world)
+    expect(world.playback.isStaleDownload({ path: VIDEO })).toBe(true)
+  })
+
   it("names a download's video by its title, and nothing for another file", () => {
     const world = setup({ entries: [entryFor({})] })
     expect(world.playback.labelOf({ path: VIDEO })).toBe('S01E01 Good News')
@@ -567,7 +579,47 @@ describe('what is playing', () => {
     expect(world.playback.isPlaying(ID)).toBe(false)
   })
 
-  it('says each time the player leaves a download, and at no other move', async () => {
+  it('keeps a download playing while the page plays it, though the engine stopped, until the page leaves', async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE } })
+    const fileId = await opened(world)
+    world.playback.noteOpened({ fileId })
+    world.playback.notePlaying({ fileId })
+    world.playback.notePlaying({ fileId: null })
+    expect(world.playback.isPlaying(ID)).toBe(true)
+    expect(world.left.count).toBe(0)
+    world.playback.playbackLeft({ fileId })
+    expect(world.playback.isPlaying(ID)).toBe(false)
+    expect(world.left.count).toBe(1)
+  })
+
+  it('keeps a download playing while the engine plays it, though the page left, until the engine stops', async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE } })
+    const fileId = await opened(world)
+    world.playback.noteOpened({ fileId })
+    world.playback.notePlaying({ fileId })
+    world.playback.playbackLeft({ fileId })
+    expect(world.playback.isPlaying(ID)).toBe(true)
+    expect(world.left.count).toBe(0)
+    world.playback.notePlaying({ fileId: null })
+    expect(world.playback.isPlaying(ID)).toBe(false)
+    expect(world.left.count).toBe(1)
+  })
+
+  it("clears only the page's file when a new page says ready", async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE } })
+    const fileId = await opened(world)
+    world.playback.noteOpened({ fileId })
+    world.playback.notePlaying({ fileId })
+    world.playback.noteNewPage()
+    expect(world.playback.isPlaying(ID)).toBe(true)
+    world.playback.noteOpened({ fileId })
+    world.playback.notePlaying({ fileId: null })
+    world.playback.noteNewPage()
+    expect(world.playback.isPlaying(ID)).toBe(false)
+    expect(world.left.count).toBe(1)
+  })
+
+  it('says each time neither the page nor the engine is on a download any more, and at no other move', async () => {
     const world = setup({
       entries: [entryFor({}), SECOND],
       videos: { ...shelved(entryFor({}), SECOND), [MOVIE_PATH]: FILE },
@@ -579,10 +631,14 @@ describe('what is playing', () => {
     world.playback.notePlaying({ fileId: first })
     world.playback.playbackLeft({ fileId: second })
     expect(world.left.count).toBe(0)
+    // The engine is still on the first until it loads the second.
     world.playback.noteOpened({ fileId: second })
+    expect(world.left.count).toBe(0)
+    world.playback.notePlaying({ fileId: second })
     expect(world.left.count).toBe(1)
     world.playback.notePlaying({ fileId: null })
     world.playback.notePlaying({ fileId: null })
+    expect(world.left.count).toBe(1)
     world.playback.noteOpened({ fileId: movie })
     expect(world.left.count).toBe(2)
     world.playback.noteOpened({ fileId: first })

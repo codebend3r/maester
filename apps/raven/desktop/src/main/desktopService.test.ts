@@ -98,6 +98,7 @@ const fakeDownloads = ({
     fromLabelOf: ({ path }) =>
       path.startsWith(`${DOWNLOADED}/`) ? 'Downloaded from Vhagar' : null,
     labelOf: ({ path }) => DOWNLOAD_LABELS.get(path) ?? null,
+    isStaleDownload: ({ path }) => path.startsWith(`${DOWNLOADED}/`) && !DOWNLOAD_LABELS.has(path),
     serverPositionOf: () => serverPosition,
     isWatched: ({ path }) => watched.includes(path),
     // The first download's next is the second, as its group would have it; any other file has none.
@@ -725,6 +726,23 @@ describe('describeFile', () => {
     })
     expect(reply.file.next).toMatchObject({ label: 'S01E02 Half Loop' })
     expect(reached).toEqual([{ name: 'noteOpened', input: { fileId: target.fileId } }])
+  })
+
+  it('refuses a deleted download a queue still names as missing, so it rejoins no recents', async () => {
+    const DELETED_DOWNLOAD = `${DOWNLOADED}/13/video.mkv`
+    const { service, spies, reached } = setup({
+      files: { ...show, [DOWNLOAD_ONE]: {}, [DELETED_DOWNLOAD]: {} },
+    })
+    const target = idOf(await service.openPaths([DOWNLOAD_ONE, DELETED_DOWNLOAD]))
+    const [queued = ''] = target.queue
+    expect(await describeFile({ service, fileId: queued })).toEqual({
+      type: 'refused',
+      message: MESSAGES.missing,
+    })
+    expect(reached).toEqual([])
+    const listed = await service.handle({ kind: 'page', request: { type: 'listRecents' } })
+    expect(listed.type === 'recents' && listed.recents).toEqual([])
+    expect(spies.recentDocuments).toEqual([])
   })
 
   it('keeps a download out of File > Open Recent', async () => {

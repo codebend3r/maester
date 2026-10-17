@@ -68,6 +68,7 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     | 'sidecarsOf'
     | 'fromLabelOf'
     | 'labelOf'
+    | 'isStaleDownload'
     | 'serverPositionOf'
     | 'noteOpened'
     | 'notePosition'
@@ -88,9 +89,9 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     resumeAll: () => DesktopReply
     removeAll: () => Promise<DesktopReply>
     /**
-     * The page said ready: a new page, playing nothing, since a reload mid-play left no unmount
-     * to say the player left its file. The first one starts the clocks of what deletes once
-     * watched, so what they tell at launch reaches a page that listens.
+     * The page said ready: a new page, on no file, since a reload mid-play left no unmount to
+     * say the page left its file. The first one starts the clocks of what deletes once watched,
+     * so what they tell at launch reaches a page that listens.
      */
     pageReady: () => void
     /** Called when a server is removed from raven player (Ruling 17). */
@@ -464,7 +465,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     resumeAll,
     removeAll,
     pageReady: () => {
-      playback.notePlaying({ fileId: null })
+      playback.noteNewPage()
       firstPage.ready()
     },
     removeServer: queue.removeServer,
@@ -474,6 +475,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     sidecarsOf: playback.sidecarsOf,
     fromLabelOf: playback.fromLabelOf,
     labelOf: playback.labelOf,
+    isStaleDownload: playback.isStaleDownload,
     serverPositionOf: playback.serverPositionOf,
     noteOpened: playback.noteOpened,
     notePosition: playback.notePosition,
