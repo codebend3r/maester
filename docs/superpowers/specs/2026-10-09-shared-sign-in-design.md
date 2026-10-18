@@ -9,6 +9,11 @@ rest of that spec (chat, inbox, admin, the rest of the web app) stands.
 Paths: `apps/rookery/` is new; luwin's module paths such as
 `luwin/web/auth.py` are relative to `apps/luwin/api/`.
 
+Partly superseded by `2026-10-17-supabase-sign-in-design.md`: raven signs in
+with Supabase, not rookery, and is not part of this design. This design stays
+in force for rookery and luwin until they migrate (step 8 there). Then its
+Plex-as-identity, shared-cookie and Plex-owner decisions are replaced.
+
 ## Goal
 
 luwin and rookery share one sign-in. A friend signs in once, with their
