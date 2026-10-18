@@ -11,6 +11,7 @@ import { Reflector } from '@nestjs/core'
 import { LOCKED_STATUS, isString } from '@raven/core'
 import { HTTP_METHODS } from '@shared/server'
 import { AdminService } from '@/admin/adminService'
+import { AuthSessions } from '@/auth/authSessions'
 import { LockService, PRIVACIES, type Privacy } from '@/lock/lockService'
 import { isMediaPlaneRoute } from '@/media/mediaPlaneMark'
 import { MediaTickets } from '@/media/mediaTickets'
@@ -102,11 +103,17 @@ export class LockGuard implements CanActivate {
     @Inject(LockService) private readonly lock: Pick<LockService, 'viewer'>,
     @Inject(AdminService) private readonly admin: Pick<AdminService, 'isLocked'>,
     @Inject(MediaTickets) private readonly tickets: Pick<MediaTickets, 'verify'>,
+    @Inject(AuthSessions) private readonly sessions: Pick<AuthSessions, 'isTicket'>,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const mark = lockMarkOf([context.getHandler(), context.getClass()])
     if (!isPrivacy(mark)) return true
+    if (
+      isMediaPlaneRoute([context.getHandler(), context.getClass()]) &&
+      this.sessions.isTicket({ request: context.switchToHttp().getRequest<object>() })
+    )
+      return true
     const { params, query, cookie } = requestParts(context)
     const id = Number(params.id)
     const ticket = query.t

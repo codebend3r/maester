@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import type { Anthropic } from '@anthropic-ai/sdk'
-import { type HwAccel, isHwAccel, oneOf } from '@raven/core'
+import { type AuthConfig, type HwAccel, isHwAccel, oneOf } from '@raven/core'
+import { readAuthConfig } from '@/auth/authConfig'
 import { readMediaPlaneConfig, type MediaPlaneConfig } from '@/media/mediaPlaneConfig'
 import { flag, type ListenConfig, readListenConfig, wholeNumber } from '@shared/server'
 
@@ -64,6 +65,7 @@ export type ServerConfig = ListenConfig & {
   adminPassword: string | null
   /** Where the browser fetches media straight from the server, and who may ask: all off until configured. */
   mediaPlane: MediaPlaneConfig
+  auth: AuthConfig
 }
 
 /** The DI token the config is provided under. */
@@ -106,4 +108,5 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   libraryPin: env.LIBRARY_PIN?.trim() || null,
   adminPassword: env.ADMIN_PASSWORD?.trim() || null,
   mediaPlane: readMediaPlaneConfig(env),
+  auth: readAuthConfig(env),
 })

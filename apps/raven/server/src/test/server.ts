@@ -15,7 +15,7 @@ const isMethod = (value: string): value is Method => METHODS.some((method) => me
  * with no port. `cookie` goes with every request, as a browser's would, and
  * so does the browser's offer of compression, unpacked as its fetch would.
  */
-const injectFetch =
+export const injectFetch =
   ({ app, cookie }: { app: NestFastifyApplication; cookie?: string }): FetchLike =>
   async (url, init = {}) => {
     const method = init.method ?? 'GET'

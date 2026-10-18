@@ -27,6 +27,7 @@
     "@shared/server": "workspace:*",
     "better-sqlite3": "13.0.3",
     "fastify": "5.12.5",
+    "jose": "6.2.12",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2"
   },

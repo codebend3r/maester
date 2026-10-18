@@ -34,16 +34,22 @@ These are not claimed as completed by the foundation PR:
 
 ## PR 2: raven-auth-server
 
-- [ ] Add raven-core constants, guards and derived contracts for auth configuration, accounts, access refusals and owner member management; API client methods consume them.
-- [ ] Read optional auth config from raven's product environment. Partial/invalid settings fail closed for new account endpoints, while existing routes retain their current behavior.
-- [ ] Verify JWTs against the configured JWKS, pin issuer/audience/algorithms and distinguish invalid identity from unavailable infrastructure. Provide injectable key and HTTP seams for tests.
-- [ ] Decode the fixed host-only browser cookie, including chunks and base64url sessions. Bearer takes precedence; cookies never authorize writes.
-- [ ] Resolve current membership using the user's JWT and `current_membership()`, without caching membership or accepting role/status claims. Validate PostgREST responses at the boundary.
-- [ ] Introduce a request caller seam and authenticated account endpoints. New owner-management endpoints require the authoritative approved owner regardless of the existing admin password/PIN locks.
-- [ ] Add account-bound ticket preparation without allowing an account ticket to turn a removed account into a legacy anonymous caller. Keep existing ticket behavior until cutover and protect new ticket issuance immediately.
-- [ ] Test valid/expired/wrong-algorithm JWTs, malformed cookies, missing/pending/revoked accounts, owner-only RPCs, outages, current revocation and existing-route compatibility.
-- [ ] Document endpoint/config behavior and explicitly state that existing library access is not yet gated.
-- [ ] Run affected project tests and workspace verification; create the PR with `supabase-foundation` as its base.
+- [x] Add raven-core constants, guards and derived contracts for auth configuration, accounts, access refusals and owner member management; API client methods consume them.
+- [x] Read optional auth config from raven's product environment. Partial/invalid settings fail closed for new account endpoints, while existing routes retain their current behavior.
+- [x] Verify JWTs against the configured JWKS, pin issuer/audience/algorithms and distinguish invalid identity from unavailable infrastructure. Provide injectable key and HTTP seams for tests.
+- [x] Decode the fixed host-only browser cookie, including chunks and base64url sessions. Bearer takes precedence; cookies never authorize writes.
+- [x] Resolve current membership using the user's JWT and `current_membership()`, without caching membership or accepting role/status claims. Validate PostgREST responses at the boundary.
+- [x] Introduce a request caller seam and authenticated account endpoints. New owner-management endpoints require the authoritative approved owner regardless of the existing admin password/PIN locks.
+- [x] Add account-bound ticket preparation without allowing an account ticket to turn a removed account into a legacy anonymous caller. Keep existing ticket behavior until cutover and protect new ticket issuance immediately.
+- [x] Test valid/expired/wrong-algorithm JWTs, malformed cookies, missing/pending/revoked accounts, owner-only RPCs, outages, current revocation and existing-route compatibility.
+- [x] Document endpoint/config behavior and explicitly state that existing library access is not yet gated.
+- [x] Run affected project tests and workspace verification before opening the child PR against `supabase-foundation`.
+
+### Server validation findings
+
+- The real local Supabase stack works end to end with raven's default remote JWKS verifier and user-scoped RPC calls. Owner listing, member refusal, approval and removal were verified without replacing the member's JWT. The local database was reset to its seed afterward.
+- New playback tickets are opaque, bounded, process-local capabilities. They retain the issuing JWT only in server memory and recheck membership at redemption. They expire at the earlier of five minutes and that JWT's expiry, so the desktop follow-up must renew sessions and reacquire tickets before later seeks/subtitle requests. Do not promise six-hour uninterrupted capability URLs before that client work is validated.
+- The server's complete test suite and workspace verification pass. Existing library/admin/PIN access is retained; only the new endpoints and account-ticket redemptions enforce account authorization in this PR.
 
 ## Later PR stack
 

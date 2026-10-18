@@ -9,6 +9,28 @@ A light, self-hosted video library and player. Point it at folders of videos; it
 
 raven is the `apps/raven/` folder of an Nx workspace; the [root README](../../README.md) covers the workspace.
 
+## Supabase account preparation
+
+The account foundation is additive, not the login cutover. **Existing library, media and admin-password access remains unchanged**, even when Supabase is configured. Login/signup screens, owner approval UI and desktop integration follow in later PRs; only then will the server enforce account access everywhere.
+
+Set all three in `apps/raven/.env`: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `RAVEN_WEB_URL`. Both URLs are origins, with HTTPS required except on loopback. No service-role key is used or accepted. Compose already passes the product env file to the server. For a local stack, use `http://127.0.0.1:54321`, the local publishable key and `http://localhost:5173`. See the [database runbook](supabase/README.md) for setup and owner bootstrap.
+
+| Endpoint | Access |
+|---|---|
+| `GET /api/auth/config` | Public, safe connection settings only; `off`, `unavailable` or `ready` |
+| `GET /api/me` | Valid account session; pending/removed users can see their own status |
+| `GET /api/auth/members?pageSize=100&pageOffset=0` | Approved owner only |
+| `POST /api/auth/members/:id/status` | Approved owner with Bearer; body `{"status":"approved"}` or `{"status":"revoked"}` |
+| `POST /api/auth/media/:id/ticket` | Approved account with Bearer, plus the existing library/PIN visibility rules |
+
+New account endpoints are protected from their first deployment, independent of the old admin-password cookie. Supabase's current membership is checked on every account request and ticket redemption, without a membership cache or trusting JWT role/status claims. A stale owner request is checked again by the database RPC before a write. Missing identity returns `401`, pending/removed/non-owner access `403`, infrastructure failure `503`. Missing or partial configuration leaves protected account endpoints unavailable, not open.
+
+Browser sessions use a fixed host-only `maester-auth` cookie, including chunked/base64url values. Cookies authorize only GET/HEAD; every write requires Bearer. The API client can take a synchronous `accessToken` callback, but never sends it to explicit media/subtitle URLs. Account JWTs and refresh credentials never belong in query strings or logs.
+
+New account playback tickets are random opaque capabilities, kept only in server memory, capped globally and per account. They last at most five minutes and never beyond the issuing access JWT's expiry; server restart invalidates them. They carry no JWT in the URL and recheck current approval on every range, stream or subtitle request. Invalid or removed-account tickets never fall back to legacy anonymous playback. Existing legacy tickets and routes remain unchanged until cutover.
+
+The desktop follow-up must renew the account session and acquire fresh tickets before subsequent media requests when a ticket expires. Long-running seek/subtitle playback needs end-to-end validation before enforcement; do not assume these five-minute tickets behave like legacy six-hour tickets. Existing continuous streams and buffered bytes are not forcibly recalled by this preparation PR.
+
 ## Run it with Docker
 
 1. Edit the volumes in `apps/raven/docker-compose.yml` so each media folder is mounted read-only under `/media`.

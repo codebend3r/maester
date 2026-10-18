@@ -148,6 +148,7 @@ describe('the lock guard and a media ticket', () => {
       },
       { isLocked: () => isAdminLocked },
       { verify: ({ ticket, id }) => ticket === VALID && id === 7 },
+      { isTicket: () => false },
     )
 
   const contextOf = ({

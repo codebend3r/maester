@@ -1,8 +1,10 @@
+import { AUTH_HEADERS } from '@raven/core'
+
 /** Header names raven uses beyond `@shared/server`'s `HEADERS`, in lower case as Node hands incoming ones over. */
 export const RAVEN_HEADERS = {
   acceptRanges: 'accept-ranges',
-  authorization: 'authorization',
-  cookie: 'cookie',
+  authorization: AUTH_HEADERS.authorization,
+  cookie: AUTH_HEADERS.cookie,
   forwardedFor: 'x-forwarded-for',
   retryAfter: 'retry-after',
   userAgent: 'user-agent',
