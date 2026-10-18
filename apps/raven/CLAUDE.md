@@ -16,6 +16,8 @@ raven's projects live in the workspace described by the root `CLAUDE.md`, which 
 
 The image builds from the repo root: `docker build -f apps/raven/Dockerfile .`. `Dockerfile.dockerignore` allowlists what it copies; a new path the image needs goes there too.
 
+Supabase Auth preparation lives in `@raven/supabase` (`apps/raven/supabase`). Its runbook is `supabase/README.md`, and its raven-first design is `docs/superpowers/specs/2026-10-17-supabase-sign-in-design.md`. Membership is pending until the explicitly bootstrapped owner approves it; user metadata never grants ownership. This foundation does not yet gate the existing library routes. No cloud deployment or owner bootstrap happens as part of a PR.
+
 ## Conventions
 
 The TypeScript, code style and CSS rules are in the root `CLAUDE.md`. raven adds:

@@ -13,6 +13,8 @@
 - Writing: no em dashes or en dashes anywhere, including comments and UI copy.
 - `e2e`, `test:native`, `make`, `audit:bundle` and `smoke:packaged` need macOS on Apple Silicon, so `verify` and `affected` leave them out and the PR checks' desktop jobs, behind the required `🖥️ Desktop` check, run them. Locally they run only on such a Mac, and `smoke:packaged` uses your own `~/Library/Application Support/raven` and `~/Library/Logs/raven`. A packaged app reads no test hook, so the smoke also makes the real launch check against GitHub and writes `updates.checkedAt` into that folder's `desktop-config.json`, moving an older file to version 3.
 
+- `@raven/supabase`'s `test:db` and `lint:db` need Docker and a running local stack. `verify` and `affected` leave those targets out; the PR checks' `🗄️ Supabase` job starts the stack and runs them.
+
 ## TypeScript
 
 These apply to every TypeScript project: everything but `@luwin/api` and the Python in `scripts`.
@@ -103,6 +105,7 @@ Shared tool config lives at the root, so every project lints and compiles by the
 | Project           | Path                  | What                                                                                                      |
 | ----------------- | --------------------- | --------------------------------------------------------------------------------------------------------- |
 | `@luwin/api`      | `apps/luwin/api`      | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite                                   |
+| `@raven/supabase` | `apps/raven/supabase` | Supabase Auth configuration, membership approval, migrations, local seed and database tests               |
 | `@raven/server`   | `apps/raven/server`   | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest                                     |
 | `@raven/web`      | `apps/raven/web`      | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom                             |
 | `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check                                  |
