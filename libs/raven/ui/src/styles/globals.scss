@@ -45,6 +45,8 @@
   --color-line-faint: color-mix(in srgb, var(--color-bark) 6%, transparent);
   --color-line: color-mix(in srgb, var(--color-bark) 10%, transparent);
   --color-line-strong: color-mix(in srgb, var(--color-bark) 16%, transparent);
+  // A track behind a progress line or score.
+  --color-track: color-mix(in srgb, var(--color-bark) 14%, transparent);
   // A row under the pointer that has no fill of its own.
   --color-hover: color-mix(in srgb, var(--color-bark) 5%, transparent);
   // Letterboxing around the video is real black, not a tint.
@@ -58,6 +60,8 @@
   --color-on-picture-soft: rgb(246 242 234 / 85%);
   --color-picture-scrim: rgb(10 14 13 / 60%);
   --color-picture-glass: rgb(10 14 13 / 72%);
+  // The ground washed over a backdrop behind page content.
+  --color-night-wash: color-mix(in srgb, var(--color-night) 55%, transparent);
   // The ground as glass over a picture: score chips over posters.
   --color-night-glass: color-mix(in srgb, var(--color-night) 72%, transparent);
   // Deeper: a check or a count over a poster.
@@ -80,6 +84,8 @@
   --color-brand-metacritic: #5a9e5f;
   --color-brand-metacritic-low: #b8303a;
   --color-brand-tmdb: #2b7466;
+  // TMDB's teal lightened to read as a thin bar on the ground.
+  --color-brand-tmdb-line: #4fb3a0;
   // Darkness rising from the bottom of the picture, or falling from its top,
   // so the controls and the title read over anything.
   --fade-from-bottom: linear-gradient(to top, rgb(0 0 0 / 75%), rgb(0 0 0 / 0%));
@@ -156,8 +162,10 @@
   // A lead paragraph under a large title.
   --line-relaxed: 1.6;
 
-  // Large serif titles draw in a little; eyebrows open up.
+  // Large serif titles draw in a little; labels and eyebrows open up.
   --tracking-display: -0.02em;
+  --tracking-tight: -0.01em;
+  --tracking-label: 0.06em;
   --tracking-eyebrow: 0.12em;
 
   // A card lifting under the pointer.

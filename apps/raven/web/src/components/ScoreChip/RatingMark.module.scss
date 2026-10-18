@@ -55,11 +55,3 @@
   background: var(--color-brand-metacritic-low);
   color: var(--color-on-picture);
 }
-
-// A source with no score: its name outlined in the page's greys, so it
-// reads as there but empty.
-.unscored {
-  border: 1px solid var(--color-line-strong);
-  background: transparent;
-  color: var(--color-lichen);
-}

@@ -44,12 +44,7 @@
     content: '';
     grid-area: backdrop;
     background:
-      linear-gradient(
-        90deg,
-        var(--color-night) 0%,
-        color-mix(in srgb, var(--color-night) 55%, transparent) 45%,
-        transparent 80%
-      ),
+      linear-gradient(90deg, var(--color-night) 0%, var(--color-night-wash) 45%, transparent 80%),
       linear-gradient(to top, var(--color-night), transparent 55%);
   }
 }
@@ -273,7 +268,7 @@
   height: 5px;
   overflow: hidden;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-bark) 14%, transparent);
+  background: var(--color-track);
 }
 
 .fill {

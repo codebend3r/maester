@@ -111,24 +111,21 @@ describe('MoviePage', () => {
     expect(screen.getByText('1h 37m')).toBeInTheDocument()
     expect(screen.getByText('Crime')).toBeInTheDocument()
     expect(screen.queryByText('Romance')).toBeNull()
-    expect(screen.getByRole('listitem', { name: 'TMDB audience score, 82%' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('listitem', { name: 'TMDB: 8.2 out of 10. Average user rating.' }),
+    ).toBeInTheDocument()
     expect(screen.getByText('Every table has a story.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Films' })).toHaveAttribute('href', '/libraries/2')
   })
 
-  it('shows all four scores, marking the sources that have none for the movie', async () => {
+  it('shows the scores the movie has, leaving out the sources that have none', async () => {
     open({ details: itemDetails() })
     const ratings = await screen.findByRole('list', { name: 'Ratings' })
     expect(
       within(ratings)
         .getAllByRole('listitem')
         .map((chip) => chip.getAttribute('aria-label')),
-    ).toEqual([
-      'Rotten Tomatoes: no score',
-      'IMDb: no score',
-      'Metacritic: no score',
-      'TMDB audience score, 82%',
-    ])
+    ).toEqual(['TMDB: 8.2 out of 10. Average user rating.'])
   })
 
   it('says nothing of a version the server converts for this browser', async () => {
@@ -387,12 +384,7 @@ describe('MoviePage', () => {
     })
     await screen.findByRole('heading', { level: 1, name: 'Busboys' })
     expect(screen.queryByRole('region', { name: 'Summary' })).toBeNull()
-    // Every source still has its chip, each saying it has no score.
-    expect(
-      within(screen.getByRole('list', { name: 'Ratings' })).getAllByRole('listitem', {
-        name: /no score/,
-      }),
-    ).toHaveLength(4)
+    expect(screen.queryByRole('list', { name: 'Ratings' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Cast & Crew' })).toBeNull()
     expect(screen.queryByText(/Directed by/)).toBeNull()
   })

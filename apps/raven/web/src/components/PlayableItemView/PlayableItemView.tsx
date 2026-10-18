@@ -58,8 +58,6 @@ type PlayableConfig = {
   editable: boolean
   showsTagline: boolean
   showsContentRating: boolean
-  /** Whether every score's source gets a chip, one with none saying so. */
-  showsEveryScore: boolean
   showsReviews: boolean
   /** Whether the header says how long is left of a video started, with its line. */
   showsTimeLeft: boolean
@@ -82,7 +80,6 @@ const PLAYABLE = {
     editable: true,
     showsTagline: true,
     showsContentRating: true,
-    showsEveryScore: true,
     showsReviews: true,
     showsTimeLeft: false,
     showsNeighbours: false,
@@ -101,7 +98,6 @@ const PLAYABLE = {
     editable: false,
     showsTagline: false,
     showsContentRating: false,
-    showsEveryScore: false,
     showsReviews: false,
     showsTimeLeft: true,
     showsNeighbours: true,
@@ -176,7 +172,6 @@ export const PlayableItemView = ({
         contentRating={config.showsContentRating ? details.contentRating : null}
         facts={config.facts({ details, primary })}
         ratings={details.ratings}
-        shouldShowEverySource={config.showsEveryScore}
         progress={config.showsTimeLeft ? timeLeft(primary) : undefined}
         logo={
           showsLogo

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { Icon } from '@raven/ui'
 import { type BackFallback, BackButton } from '@/components/BackButton/BackButton'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
-import { RatingChips } from '@/components/RatingChips/RatingChips'
+import { RatingPanel } from '@/components/RatingPanel/RatingPanel'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { Slideshow } from '@/components/Slideshow/Slideshow'
 import type { watchLink } from '@/lib/itemLinks'
@@ -180,7 +180,6 @@ export const ItemHeader = ({
   contentRating,
   facts,
   ratings,
-  shouldShowEverySource = false,
   picture,
   backdrop,
   logo = null,
@@ -198,8 +197,6 @@ export const ItemHeader = ({
   contentRating: string | null
   facts: readonly string[]
   ratings: readonly Rating[]
-  /** A chip for every source, saying which have no score: a movie's page. */
-  shouldShowEverySource?: boolean
   /** Left out for a page with no picture beside its title. */
   picture?: HeaderPicture
   backdrop: HeaderBackdrop | null
@@ -248,7 +245,7 @@ export const ItemHeader = ({
             <Dotted parts={facts} />
           </p>
         )}
-        <RatingChips ratings={ratings} shouldShowEverySource={shouldShowEverySource} />
+        <RatingPanel ratings={ratings} />
         {progress && <Progress progress={progress} />}
         {(!!children || !!manage) && (
           <div className={styles.actions}>

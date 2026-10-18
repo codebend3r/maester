@@ -1,0 +1,7 @@
+.score {
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-0);
+  font-variant-numeric: tabular-nums;
+}

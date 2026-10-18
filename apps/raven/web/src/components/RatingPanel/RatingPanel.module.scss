@@ -1,0 +1,204 @@
+// Glass keeps the scores readable over an item's backdrop.
+.panel {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(6rem, max-content);
+  justify-self: start;
+  max-width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-night-wash);
+  backdrop-filter: blur(12px);
+
+  // The label and the item's own label replace the clipped tooltip here.
+  @container (max-width: 30rem) {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    overflow: hidden;
+  }
+}
+
+.item {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  outline: none;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background-color 150ms var(--ease-out);
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: var(--color-hover);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: -2px;
+  }
+
+  & + & {
+    border-inline-start: 1px solid var(--color-line);
+  }
+
+  &:first-child {
+    border-radius: calc(var(--radius-lg) - 1px) 0 0 calc(var(--radius-lg) - 1px);
+  }
+
+  &:last-child {
+    border-radius: 0 calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0;
+  }
+
+  &:only-child {
+    border-radius: calc(var(--radius-lg) - 1px);
+  }
+
+  @container (max-width: 30rem) {
+    border-radius: 0;
+
+    &:first-child,
+    &:last-child,
+    &:only-child {
+      border-radius: 0;
+    }
+
+    &:nth-child(odd) {
+      border-inline-start: 0;
+    }
+
+    &:nth-child(n + 3) {
+      border-block-start: 1px solid var(--color-line);
+    }
+  }
+}
+
+.rottenTomatoes {
+  --source-colour: var(--color-brand-rotten-tomatoes);
+}
+
+.imdb {
+  --source-colour: var(--color-brand-imdb);
+}
+
+.metacritic {
+  --source-colour: var(--color-brand-metacritic);
+}
+
+.tmdb {
+  --source-colour: var(--color-brand-tmdb-line);
+}
+
+.score {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: baseline;
+  gap: var(--space-0);
+}
+
+.value {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--line-heading);
+}
+
+.scale {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+}
+
+.track {
+  height: 3px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-track);
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--source-colour);
+}
+
+.label {
+  color: var(--color-birch);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+// Over the item, in the page's text colour: the item's own label carries it
+// to a screen reader, so it shows only when the pointer or focus is there.
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 50%;
+  z-index: 10;
+  display: grid;
+  gap: var(--space-0);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-bark);
+  box-shadow: var(--shadow-menu);
+  color: var(--color-night);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  translate: -50% 0;
+  visibility: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    background: var(--color-bark);
+    translate: -50% -50%;
+    rotate: 45deg;
+  }
+
+  .item:first-child & {
+    left: 0;
+    translate: 0 0;
+
+    &::after {
+      left: var(--space-4);
+    }
+  }
+
+  .item:last-child:not(:first-child) & {
+    right: 0;
+    left: auto;
+    translate: 0 0;
+
+    &::after {
+      right: var(--space-4);
+      left: auto;
+      translate: 50% -50%;
+    }
+  }
+
+  .item:hover &,
+  .item:focus-visible & {
+    visibility: visible;
+  }
+
+  @container (max-width: 30rem) {
+    display: none;
+  }
+}
+
+.site {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}

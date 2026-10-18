@@ -1,6 +1,6 @@
 import { RATING_SOURCES, type Rating, type RatingSource } from '@raven/core'
 import type { ReactNode } from 'react'
-import styles from '@/components/RatingMark/RatingMark.module.scss'
+import styles from '@/components/ScoreChip/RatingMark.module.scss'
 
 /** A fresh tomato at 60% or more, a splat below. */
 export const isFresh = (rating: Rating): boolean => rating.value >= 6
@@ -106,13 +106,3 @@ export const RatingMark = ({ rating, size = 26 }: { rating: Rating; size?: numbe
     }
   }
 }
-
-/**
- * A source's mark with no score to draw it from, for a chip that says the
- * source has none: its name in the page's greys, in its shape, outlined.
- */
-export const SourceMark = ({ source, size = 26 }: { source: RatingSource; size?: number }) => (
-  <Mark className={`${LOOKS[source]} ${styles.unscored}`} size={size}>
-    {WORDS[source]}
-  </Mark>
-)

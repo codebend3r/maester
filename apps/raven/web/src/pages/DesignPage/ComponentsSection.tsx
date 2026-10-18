@@ -10,7 +10,8 @@ import { MediaGroups } from '@/components/MediaGroups/MediaGroups'
 import { MediaList } from '@/components/MediaList/MediaList'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
-import { RatingChips } from '@/components/RatingChips/RatingChips'
+import { ScoreChip } from '@/components/ScoreChip/ScoreChip'
+import { RatingPanel } from '@/components/RatingPanel/RatingPanel'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
@@ -224,14 +225,23 @@ export const ComponentsSection = () => (
     </Specimen>
 
     <Specimen
-      name="RatingChips"
-      note="One chip per source. Rotten Tomatoes is a tomato from 60% and a splat below; Metacritic's square is green from 61, yellow from 40, red under. A movie's page gives every source a chip, a dashed one for a source with no score."
+      name="RatingPanel"
+      note="A movie's scores in one frame: the score, a bar in the source's colour and its name. Hover or focus a score for the site and what the number means. A source with no score is left out."
     >
       <div className={styles.stack}>
-        <RatingChips ratings={SAMPLE_RATINGS} />
-        <RatingChips ratings={SAMPLE_RATINGS_LOW} />
-        <RatingChips ratings={SAMPLE_RATINGS_RED} />
-        <RatingChips ratings={SAMPLE_RATINGS.slice(0, 1)} shouldShowEverySource />
+        <RatingPanel ratings={SAMPLE_RATINGS} />
+        <RatingPanel ratings={SAMPLE_RATINGS_LOW} />
+      </div>
+    </Specimen>
+
+    <Specimen
+      name="ScoreChip"
+      note="A score on a card. Rotten Tomatoes is a tomato from 60% and a splat below; Metacritic's square is green from 61, yellow from 40, red under."
+    >
+      <div className={styles.row}>
+        {[...SAMPLE_RATINGS, ...SAMPLE_RATINGS_LOW, ...SAMPLE_RATINGS_RED].map((rating) => (
+          <ScoreChip key={`${rating.source}-${rating.value}`} rating={rating} />
+        ))}
       </div>
     </Specimen>
 
