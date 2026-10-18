@@ -171,21 +171,11 @@ const fetchBare = ({
 const fetchReleases: UpdateFetch = fetchBare
 
 /**
- * Ruling 6's probe: its time is from the call to the first chunk of the body, the rest of
- * which is dropped. The timeout covers the read too, so a probe that stalls rejects.
+ * A media origin's probe, which `mediaAccess` times over the whole body. The timeout's signal
+ * aborts the body's read too, so a probe that stalls mid-body fails at the timeout.
  */
-const probeOrigin: ProbeFetch = async ({ url, timeoutMs }) => {
-  const startedAt = performance.now()
-  const response = await fetchBare({
-    url,
-    init: { headers: {}, signal: AbortSignal.timeout(timeoutMs) },
-  })
-  const reader = response.body === null ? null : response.body.getReader()
-  if (reader !== null) await reader.read()
-  const firstByteMs = performance.now() - startedAt
-  if (reader !== null) await reader.cancel().catch(() => undefined)
-  return { status: response.status, firstByteMs }
-}
+const fetchProbe: ProbeFetch = ({ url, timeoutMs }) =>
+  fetchBare({ url, init: { headers: {}, signal: AbortSignal.timeout(timeoutMs) } })
 
 /** A download's `.part`, opened to append; its size is read from disk each time. */
 const openPart = async (path: string): Promise<PartFile> => {
@@ -548,7 +538,8 @@ const startApp = (): void => {
       access: createMediaAccess({
         calls: serverCalls,
         serverOf,
-        probe: probeOrigin,
+        probe: fetchProbe,
+        probeClock: () => performance.now(),
         now: Date.now,
         warn,
       }),

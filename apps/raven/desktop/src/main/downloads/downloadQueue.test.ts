@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import type { MediaTracks } from '@raven/core'
+import { MEDIA_PROBE_BYTES, type MediaTracks } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
@@ -20,7 +20,11 @@ import {
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import { DOWNLOAD_STALL_MS } from '@/main/downloads/fetchFile'
-import { createMediaAccess, type AccessOutcome } from '@/main/downloads/mediaAccess'
+import {
+  createMediaAccess,
+  type AccessOutcome,
+  type ProbeFetch,
+} from '@/main/downloads/mediaAccess'
 import { SPACE_RESERVE_BYTES } from '@/main/downloads/space'
 import {
   COOKIE_ACCESS,
@@ -57,6 +61,12 @@ const SERVERS: ServerEntry[] = [
   { id: SERVER_ID, origin: 'https://vhagar.example', name: 'Vhagar', addedAt: 1 },
   { id: OTHER_SERVER_ID, origin: 'https://syrax.example', name: 'Syrax', addedAt: 2 },
 ]
+
+/** Every origin answers its ping with the whole body at once. */
+const wholePing: ProbeFetch = async () => ({
+  ok: true,
+  body: new Blob([new Uint8Array(MEDIA_PROBE_BYTES)]).stream(),
+})
 
 const idOf = (n: number): string => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 
@@ -519,7 +529,8 @@ describe('an outage', () => {
     const media = createMediaAccess({
       calls,
       serverOf: (serverId) => SERVERS.find((server) => server.id === serverId) ?? null,
-      probe: async () => ({ status: 200, firstByteMs: 1 }),
+      probe: wholePing,
+      probeClock: () => 0,
       now: () => NOW,
       warn: () => undefined,
     })
@@ -635,7 +646,8 @@ describe('the ticket', () => {
     const media = createMediaAccess({
       calls: fakeCalls(table).calls,
       serverOf: (serverId) => SERVERS.find((server) => server.id === serverId) ?? null,
-      probe: async () => ({ status: 200, firstByteMs: 1 }),
+      probe: wholePing,
+      probeClock: () => 0,
       now: () => NOW,
       warn: () => undefined,
     })
