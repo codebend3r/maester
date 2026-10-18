@@ -8,7 +8,8 @@ from luwin.clients import ClientError, FakeRavenClient, RavenClient
 from luwin.clients.raven import RavenTitle, quality_of
 from luwin.config import Settings
 from luwin.memo import Memo
-from luwin.tools.raven import search_library
+from luwin.tools import raven as raven_tool
+from luwin.tools.raven import closeness, search_library
 
 BASE = "http://raven.test"
 LIBRARIES = [
@@ -144,3 +145,27 @@ async def test_an_unreachable_raven_is_said_once_not_retried(services):
     assert isinstance(reply, Failed) and not reply.retryable
     assert "raven at http://raven.test isn't answering" in reply.content
     assert "Don't call search_library again" in reply.content
+
+
+async def test_the_title_itself_comes_first_and_alone_on_the_cards(services, monkeypatch):
+    monkeypatch.setattr(raven_tool, "MAX_MATCHES", 2)
+    titles = [RavenTitle(4, "Movies", "movie", f"Lighthouse {n}", 2019, n) for n in range(3)]
+    titles += [
+        RavenTitle(7, "TV Shows", "show", "House of Cards", 2013, 55834),
+        RavenTitle(7, "TV Shows", "show", "House", 2004, 15266, episodes=177),
+        RavenTitle(4, "Movies", "movie", "Road House", 1989, 5386),
+    ]
+    reply = await search_library(ctx_with(services, FakeRavenClient(titles=titles)), "house")
+    assert [m["title"] for m in reply.content["matches"]] == ["House", "House of Cards"]
+    assert [t.title for t in reply.titles] == ["House"]
+    assert reply.titles[0].links[0].url == "http://raven.test/shows/15266?library=7"
+
+
+def test_closeness_ranks_the_title_its_prefix_its_word_then_any_match():
+    def title(name):
+        return RavenTitle(1, "Movies", "movie", name, None, 1)
+
+    assert [
+        closeness(title(t), "House")
+        for t in ("The House", "House of Gucci", "Road House", "Grindhouse")
+    ] == [0, 1, 2, 3]

@@ -29,6 +29,29 @@ from luwin.clients import ClientError
 from luwin.clients.raven import RavenTitle
 
 MAX_MATCHES = 20
+# Titles shown as cards when nothing matches exactly: the closest few, not every substring hit.
+MAX_CARDS = 6
+ARTICLES = ("the ", "a ", "an ")
+
+
+def _bare(text: str) -> str:
+    """A title as compared: lower case, without a leading article."""
+    lowered = text.strip().lower()
+    return next((lowered[len(a) :] for a in ARTICLES if lowered.startswith(a)), lowered)
+
+
+def closeness(found: RavenTitle, query: str) -> int:
+    """How well a title fits what was searched, best first: the title itself ("House"), one
+    that starts with it ("House of Cards"), one with it as a word ("Road House"), then any
+    title containing it ("Lighthouse"). raven finds them all, sorted by title alone."""
+    title, wanted = _bare(found.title), _bare(query)
+    if title == wanted:
+        return 0
+    if title.startswith(f"{wanted} ") or title.startswith(f"{wanted}:"):
+        return 1
+    if f" {wanted} " in f" {title} ":
+        return 2
+    return 3
 
 
 def copy_label(copy: RavenTitle) -> str:
@@ -86,6 +109,8 @@ async def search_library(
             "searched right now. Don't call search_library again this turn: say raven is "
             "unreachable, and that the admin can check it."
         )
+    # Stable, so titles that fit as well keep raven's order.
+    found = sorted(found, key=lambda t: closeness(t, title))
     matches = [
         {
             "title": t.title,
@@ -105,4 +130,6 @@ async def search_library(
         reply["note"] = "Nothing in raven matches; it isn't on the server under that title."
     elif len(found) > MAX_MATCHES:
         reply["note"] = f"{len(found) - MAX_MATCHES} more matches left out; search more narrowly."
-    return Shown(reply, shown_titles(found[:MAX_MATCHES], raven.base_url))
+    exact = [t for t in found if closeness(t, title) == 0]
+    cards = shown_titles(exact or found[:MAX_MATCHES], raven.base_url)
+    return Shown(reply, cards if exact else cards[:MAX_CARDS])

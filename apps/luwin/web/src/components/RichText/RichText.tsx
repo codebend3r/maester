@@ -7,6 +7,8 @@ const SegmentView = ({ segment }: { segment: Segment }) => {
       return segment.text
     case SEGMENT_KINDS.strong:
       return <strong className={styles.strong}>{segment.text}</strong>
+    case SEGMENT_KINDS.emphasis:
+      return <em className={styles.emphasis}>{segment.text}</em>
     case SEGMENT_KINDS.link:
       return (
         <a className={styles.link} href={segment.href} target="_blank" rel="noopener noreferrer">
@@ -20,7 +22,7 @@ const SegmentView = ({ segment }: { segment: Segment }) => {
   }
 }
 
-/** A reply's text with its links clickable and its bold bold; the rest as written. */
+/** A reply's text with its links clickable, its bold bold and its italics italic. */
 export const RichText = ({ text }: { text: string }) =>
   parseRichText(text).map((segment, index) => (
     <SegmentView key={`${index}-${segment.text}`} segment={segment} />

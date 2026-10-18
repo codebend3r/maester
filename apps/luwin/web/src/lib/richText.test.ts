@@ -15,6 +15,14 @@ describe('parseRichText', () => {
     ])
   })
 
+  it('reads *single asterisks* as italics, not a lone star', () => {
+    expect(parseRichText('I found *House* (2004), rated 4 * 2.')).toEqual([
+      { kind: 'text', text: 'I found ' },
+      { kind: 'emphasis', text: 'House' },
+      { kind: 'text', text: ' (2004), rated 4 * 2.' },
+    ])
+  })
+
   it('links a bare address without spelling it out, leaving the full stop after it', () => {
     expect(parseRichText('See https://raven.test/shows/9?library=7.')).toEqual([
       { kind: 'text', text: 'See ' },

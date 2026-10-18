@@ -24,6 +24,7 @@ import logging
 import os
 import secrets
 import shutil
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -37,6 +38,7 @@ from luwin.agent.tools import Tier
 from luwin.chat.identity import IdentityService
 from luwin.chat.service import ChatService
 from luwin.clients import RavenClient
+from luwin.clients.curl import CurlTransport
 from luwin.config import load_env_file, load_settings
 from luwin.evals import CASES_DIR, Case, build_agent
 from luwin.evals.world import EVAL_USER, build_world
@@ -110,7 +112,9 @@ class Sandbox:
         self.model = model
         # One Claude Code client and one raven client for every world.
         self.client = None if model == FAKE_MODEL else ClaudeCodeModel()
-        self.raven = RavenClient(raven_url) if raven_url else None
+        # On a Mac, Local Network privacy can keep this Python off a raven on the LAN; curl gets through.
+        transport = CurlTransport() if sys.platform == "darwin" else None
+        self.raven = RavenClient(raven_url, transport=transport) if raven_url else None
         self.cases = {p.stem: Case.load(p) for p in sorted(cases_dir.glob("*.yaml"))}
         self.world = self._open(BLANK)
         self.auth = SandboxAuth(self)
