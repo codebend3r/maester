@@ -13,7 +13,7 @@ import { Dotted } from '@/components/ItemHeader/ItemHeader'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
-import { ScoreChip } from '@/components/ScoreChip/ScoreChip'
+import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { PartlyWatched } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { mediaEntryKey } from '@/lib/entryKeys'
@@ -121,7 +121,7 @@ const SagaFilm = ({
           <Dotted parts={filmFacts(media)} />
           {score && (
             <span className={styles.score}>
-              <ScoreChip rating={score} />
+              <RatingBadge rating={score} />
             </span>
           )}
           <PartlyWatched media={media} />

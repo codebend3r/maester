@@ -1,0 +1,41 @@
+// The icon lies over the field's start and lets clicks through to it.
+.search {
+  display: grid;
+  grid-template-areas: 'field';
+  align-items: center;
+}
+
+// An underline rather than a box, in the display face.
+.input {
+  grid-area: field;
+  width: 100%;
+  padding: 0 var(--space-0) 0 calc(var(--space-0) + 1.25rem + var(--space-2));
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-bark) 20%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-bark);
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  text-overflow: ellipsis;
+
+  &:hover:not(:focus-visible) {
+    border-bottom-color: color-mix(in srgb, var(--color-bark) 40%, transparent);
+  }
+
+  // The underline thickens and darkens in place of the field's ring.
+  &:focus-visible {
+    border-bottom-color: var(--color-bark);
+    outline: none;
+    box-shadow: 0 1px 0 var(--color-bark);
+  }
+}
+
+.icon {
+  grid-area: field;
+  justify-self: start;
+  display: grid;
+  padding-inline-start: var(--space-0);
+  color: var(--color-lichen);
+  pointer-events: none;
+}

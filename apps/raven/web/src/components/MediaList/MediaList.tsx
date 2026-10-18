@@ -10,11 +10,11 @@ import {
   resolutionLabel,
   sortTitle,
 } from '@raven/core'
+import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
-import { ScoreChip } from '@/components/ScoreChip/ScoreChip'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
@@ -102,7 +102,7 @@ const MediaRow = ({
           const rating = media.item?.ratings.find((entry) => entry.source === column.source)
           return (
             <td key={column.source} className={`${styles.number} ${styles.roomy}`}>
-              {rating && <ScoreChip rating={rating} />}
+              {rating && <RatingBadge rating={rating} />}
             </td>
           )
         })}

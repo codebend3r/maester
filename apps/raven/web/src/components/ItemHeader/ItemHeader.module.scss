@@ -26,11 +26,11 @@
   row-gap: var(--hero-drop);
 }
 
-// Behind the page's top padding and the corner, to the edges of the page
-// the shell pads: decorative, under everything else on the page.
+// Behind the shell's bar and the page's top padding, to the edges of the
+// page the shell pads: decorative, under everything else on the page.
 .backdrop {
   position: absolute;
-  inset: calc(-1 * var(--page-top, var(--space-5))) calc(-1 * var(--gutter)) auto;
+  inset: calc(-1 * var(--page-start, var(--space-5))) calc(-1 * var(--gutter)) auto;
   z-index: -1;
   display: grid;
   grid-template-areas: 'backdrop';

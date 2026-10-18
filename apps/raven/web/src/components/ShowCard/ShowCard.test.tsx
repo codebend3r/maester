@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test'
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { ShowCard, ShowGrid, ShowGridSkeleton } from '@/components/ShowCard/ShowCard'
 import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
 import { POSTER_SIZES } from '@/lib/posters'
@@ -84,6 +84,13 @@ describe('ShowCard', () => {
     const tiles = renderWithProviders({ ui: <ShowTiles shows={[showEntry()]} /> })
     expect(tiles.container.querySelector('img')).toHaveAttribute('srcset', srcset)
     expect(tiles.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.showTile)
+  })
+
+  it("shows a tile's scores as the ratings panel does, each in a badge", () => {
+    renderWithProviders({ ui: <ShowTiles shows={[showEntry()]} /> })
+    const ratings = screen.getByRole('list', { name: 'Ratings' })
+    expect(within(ratings).getByText('TMDB: 8.2 out of 10')).toBeInTheDocument()
+    expect(within(ratings).getByText('/10')).toBeInTheDocument()
   })
 
   it('gives an ended show both years, and no play button once every episode is watched', () => {

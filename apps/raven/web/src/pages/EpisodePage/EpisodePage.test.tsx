@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ItemDetails } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
@@ -25,8 +25,9 @@ describe('EpisodePage', () => {
   const open = ({
     details = episodeDetails(EPISODE_TWO),
     route = '/episodes/7',
-  }: { details?: ItemDetails; route?: string } = {}) => {
-    spies.item.mockImplementation(async () => details)
+    show,
+  }: { details?: ItemDetails; route?: string; show?: ItemDetails } = {}) => {
+    spies.item.mockImplementation(async (id) => (show && id === show.id ? show : details))
     spies.libraries.mockImplementation(async () => [
       library({ id: 2, name: 'TV' }),
       library({ id: 3, name: '4K TV' }),
@@ -96,6 +97,16 @@ describe('EpisodePage', () => {
     expect(previous).toHaveAttribute('href', `/episodes/6?library=${EPISODE_TWO.libraryId}`)
     expect(within(previous).getByText('S01E01')).toBeInTheDocument()
     expect(within(either).queryByRole('link', { name: /^Next/ })).toBeNull()
+  })
+
+  it("lies under its season's backdrop, which is its show's, and under its still for a show with none", async () => {
+    const backdrop = () =>
+      document.querySelector<HTMLImageElement>('img[alt=""][src*="/images/"]')?.src ?? ''
+    open({ show: { ...SEVERANCE, backdropVersion: 'b4' } })
+    await waitFor(() => expect(backdrop()).toContain('/api/items/4/images/backdrop?v=b4'))
+    cleanup()
+    open({ show: { ...SEVERANCE, backdropVersion: null } })
+    await waitFor(() => expect(backdrop()).toContain('/api/items/7/images/still?v=still1'))
   })
 
   it('plays from its still', async () => {

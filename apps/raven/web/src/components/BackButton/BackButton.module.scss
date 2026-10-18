@@ -1,11 +1,10 @@
 // A touch more glass than a pill's own, so it holds on a backdrop picture
 // as well as on a plain page. As wide as its label, and no wider than its
-// row less the corner the theme button takes, a long name cut short, so it
-// never runs under the button or off a phone's edge. A page places it with
-// `grid-area` alone.
+// row, a long name cut short, so it never runs off a phone's edge. A page
+// places it with `grid-area` alone.
 .back {
   justify-self: start;
-  max-width: calc(100% - var(--corner-clearance, 0px));
+  max-width: 100%;
   background: var(--color-night-glass);
 }
 

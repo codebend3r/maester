@@ -61,13 +61,13 @@
 }
 
 // One row of pills on glass, scrolling sideways where the page is too narrow
-// for all of them, and never under the theme button.
+// for all of them.
 .contents {
   position: sticky;
   top: var(--space-2);
   z-index: 5;
   justify-self: start;
-  max-width: calc(100% - var(--corner-clearance, 0px));
+  max-width: 100%;
   padding: var(--space-0);
   overflow-x: auto;
   border: 1px solid var(--color-line);

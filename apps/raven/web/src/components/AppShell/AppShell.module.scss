@@ -280,22 +280,42 @@
   }
 }
 
-// The page and the theme button share one cell, the button in its top
-// corner. The page's first row keeps --corner-clearance free at its right,
-// and the room under the page clears the tab bar on a phone.
+// The bar over the page, then the page, and under it the room that clears
+// the tab bar on a phone. --page-start is how far the page sits under
+// main's top, which an item's backdrop reaches up through to cover the bar.
 .main {
   --page-top: var(--space-5);
-  --corner-clearance: calc(var(--field-size) + var(--space-3));
+  --bar-gap: var(--space-5);
+  --page-start: calc(var(--page-top) + var(--field-size) + var(--bar-gap));
   --tab-bar-room: 0px;
 
   grid-area: main;
   display: grid;
   grid-template-columns: minmax(0, var(--max-width));
-  grid-template-areas: 'page';
+  grid-template-areas:
+    'bar'
+    'page';
   align-content: start;
   justify-content: center;
+  row-gap: var(--bar-gap);
   min-width: 0;
   padding: var(--page-top) var(--gutter) calc(var(--section-gap) + var(--tab-bar-room));
+}
+
+// The search at the start, as wide as reads well, the theme button at the end.
+.bar {
+  grid-area: bar;
+  display: grid;
+  grid-template-columns: minmax(0, 26.25rem) auto;
+  grid-template-areas: 'search theme';
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--field-size);
+}
+
+.search {
+  grid-area: search;
 }
 
 .page {
@@ -305,13 +325,11 @@
   align-content: start;
 }
 
-// Over an item page's backdrop and its header, still under a dialog's top
-// layer. Its menu rises over the selection bar while it is open.
+// Over an item page's backdrop, still under a dialog's top layer. Its menu
+// rises over the page and the selection bar while it is open.
 .corner {
-  grid-area: page;
+  grid-area: theme;
   z-index: 2;
-  align-self: start;
-  justify-self: end;
 
   &:has([aria-expanded='true']) {
     z-index: 4;

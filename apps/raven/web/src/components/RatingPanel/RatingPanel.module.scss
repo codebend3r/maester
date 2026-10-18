@@ -135,6 +135,61 @@
   white-space: nowrap;
 }
 
+// The panel in one line, for a card's facts or a table's cell: the score
+// and the name side by side, the bar running the frame's width under them.
+.badge {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    'score label'
+    'track track';
+  align-items: baseline;
+  column-gap: var(--space-0);
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-night-wash);
+  line-height: var(--line-tight);
+  white-space: nowrap;
+}
+
+.badgeScore {
+  grid-area: score;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: baseline;
+  gap: 1px;
+  padding: 2px 0 2px var(--space-0);
+}
+
+.badgeValue {
+  color: var(--color-bark);
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.badgeScale {
+  color: var(--color-lichen);
+  font-size: var(--font-size-2xs);
+}
+
+.badgeLabel {
+  grid-area: label;
+  padding-inline-end: var(--space-0);
+  color: var(--color-birch);
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.badgeTrack {
+  grid-area: track;
+  height: 2px;
+  background: var(--color-track);
+}
+
 // Over the item, in the page's text colour: the item's own label carries it
 // to a screen reader, so it shows only when the pointer or focus is there.
 .tooltip {

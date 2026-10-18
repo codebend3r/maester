@@ -11,7 +11,7 @@ import {
 } from '@raven/core'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button, Icon, type IconName, usePlayerPrefs } from '@raven/ui'
+import { Button, CONTROLS_LINGER_SECONDS, Icon, type IconName, usePlayerPrefs } from '@raven/ui'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useCanManage } from '@/lib/adminLock'
@@ -250,6 +250,55 @@ const BrowserPlayback = () => {
   )
 }
 
+/**
+ * Settings few need, which this browser keeps for itself, so neither the
+ * admin lock nor Reset to defaults has a say in them. For now, how long the
+ * player's controls linger.
+ */
+const AdvancedSection = () => {
+  const ids = { heading: useId(), linger: useId() }
+  const lingerSeconds = usePlayerPrefs((prefs) => prefs.controlsLingerSeconds)
+  const setLingerSeconds = usePlayerPrefs((prefs) => prefs.setControlsLingerSeconds)
+  const lingerWords = `${lingerSeconds} seconds`
+  return (
+    <section className={styles.section} aria-labelledby={ids.heading}>
+      <header className={styles.sectionHead}>
+        <h2 id={ids.heading} className={styles.heading}>
+          <Titled icon="settings">Advanced</Titled>
+        </h2>
+        <p className={styles.help}>For this browser only.</p>
+      </header>
+      <div className={styles.setting}>
+        <label htmlFor={ids.linger} className={styles.legend}>
+          <Titled icon="playback">Hide the player's controls after</Titled>
+        </label>
+        <div className={styles.slider}>
+          <input
+            id={ids.linger}
+            type="range"
+            className={styles.range}
+            min={CONTROLS_LINGER_SECONDS.min}
+            max={CONTROLS_LINGER_SECONDS.max}
+            step={1}
+            value={lingerSeconds}
+            aria-valuetext={lingerWords}
+            onChange={(event) => setLingerSeconds(Number(event.target.value))}
+          />
+          {/* The slider's own value text says it to a screen reader. */}
+          <span className={styles.sliderValue} aria-hidden="true">
+            {lingerWords}
+          </span>
+        </div>
+        <p className={styles.hint}>
+          How long the controls and the cursor stay over the video once the mouse, the keys and
+          clicks go quiet, from {CONTROLS_LINGER_SECONDS.min} to {CONTROLS_LINGER_SECONDS.max}{' '}
+          seconds.
+        </p>
+      </div>
+    </section>
+  )
+}
+
 /** Whole seconds until `deadline`, counted down as they pass. */
 const Countdown = ({ deadline }: { deadline: number }) => {
   const [now, setNow] = useState(() => Date.now())
@@ -433,7 +482,8 @@ const AdminLockSection = () => {
 
 /**
  * `/settings`: how the server plays video, and how pages look, for every
- * viewer, then the admin lock at the foot, for this browser. Each change
+ * viewer, then the advanced settings and the admin lock at the foot, for
+ * this browser. Each change
  * shows at once and saves on its own behind it, put back if the save
  * fails; Reset to defaults puts the server's settings back at once, after a
  * second click to be sure. With the admin lock on, the settings can be read
@@ -639,6 +689,7 @@ export const SettingsPage = () => {
           />
         )}
       </SettingsSection>
+      <AdvancedSection />
       <AdminLockSection />
     </section>
   )

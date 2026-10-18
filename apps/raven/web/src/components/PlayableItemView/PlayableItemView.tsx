@@ -35,14 +35,17 @@ import { api } from '@/lib/api'
 import { directedBy, episodeByline, episodeFacts, movieFacts } from '@/lib/itemFacts'
 import { episodeBackPath, inLibrary, itemPath, watchLink } from '@/lib/itemLinks'
 import { progressOf } from '@/lib/mediaProgress'
-import { displaySettingsQuery, librariesQuery, tracksQuery } from '@/lib/queries'
+import { displaySettingsQuery, itemQuery, librariesQuery, tracksQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import styles from '@/components/PlayableItemView/PlayableItemView.module.scss'
 
 type Facts = { details: ItemDetails; primary: MediaItem }
 
-/** A movie has a poster and a backdrop; an episode has its still, else the file's frame grab, for both. */
+/**
+ * A movie has a poster and a backdrop. An episode has its still, else the
+ * file's frame grab, under its season's backdrop, which is its show's.
+ */
 const PAGE_PICTURES = { posterAndBackdrop: 'poster and backdrop', still: 'still' } as const
 
 /** How a movie's page and an episode's page differ; everything else they share. */
@@ -149,6 +152,8 @@ export const PlayableItemView = ({
   const { favourite, watched } = useMediaMutations({ media: primary })
   const libraries = useQuery(librariesQuery)
   const tracks = useQuery(tracksQuery(primary.id))
+  // The neighbours read the show too, so the backdrop costs no request of its own.
+  const show = useQuery(itemQuery(item.show?.id ?? null))
   // A logo until Settings says to spell titles out, as a fresh install does.
   const showsLogo = useQuery(displaySettingsQuery).data?.titles !== TITLE_DISPLAYS.text
   const known = libraries.data ?? []
@@ -159,6 +164,15 @@ export const PlayableItemView = ({
   const still =
     api.itemImageUrl({ id: details.id, kind: 'still', version: details.backdropVersion }) ??
     api.thumbnailUrl(primary)
+  const showBackdrop = show.data
+    ? api.itemImageUrl({
+        id: show.data.id,
+        kind: 'backdrop',
+        version: show.data.backdropVersion,
+      })
+    : null
+  // The still stands in only for a show with no backdrop, not while the show is read.
+  const episodeBackdrop = item.show && show.isPending ? null : (showBackdrop ?? still)
   const hasSummary = !!tagline || !!details.summary
 
   return (
@@ -199,7 +213,7 @@ export const PlayableItemView = ({
             }
           : {
               picture: { shape: 'still', url: still, play: playPicture },
-              backdrop: pictureBackdrop(still),
+              backdrop: pictureBackdrop(episodeBackdrop),
             })}
         manage={
           <AdminOnly>

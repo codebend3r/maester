@@ -11,12 +11,12 @@ import {
   resolutionLabel,
   sortFact,
 } from '@raven/core'
+import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
-import { ScoreChip } from '@/components/ScoreChip/ScoreChip'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
@@ -133,7 +133,7 @@ const MediaTile = ({
           <ul className={styles.scores} aria-label="Ratings">
             {media.item.ratings.map((rating) => (
               <li key={rating.source}>
-                <ScoreChip rating={rating} />
+                <RatingBadge rating={rating} />
               </li>
             ))}
           </ul>

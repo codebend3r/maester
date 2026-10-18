@@ -134,6 +134,26 @@
   border: 0;
 }
 
+// The slider as wide as reads well, its value in words at its end.
+.slider {
+  display: grid;
+  grid-template-columns: minmax(0, 20rem) auto;
+  grid-template-areas: 'range value';
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.range {
+  grid-area: range;
+  width: 100%;
+}
+
+.sliderValue {
+  grid-area: value;
+  font-variant-numeric: tabular-nums;
+}
+
 // A legend sits outside its fieldset's grid, so no gap reaches it.
 .legend {
   padding: 0 0 var(--space-2);
