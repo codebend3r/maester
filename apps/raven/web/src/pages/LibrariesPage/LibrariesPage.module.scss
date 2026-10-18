@@ -223,11 +223,9 @@
   --icon-tint: 0.9;
 }
 
-// The admin lock off gives a card four buttons or five, which need a wide
-// card to sit beside the details; anything narrower puts them under the
-// details, as wide as they need, as many to a line as fit.
-@container (max-width: 64rem) {
-  .details:has(.actions > :nth-child(4)) {
+// The buttons under the details, as wide as they need, as many to a line as fit.
+@mixin actions-under-details($children) {
+  .details:has(.actions > :nth-child(#{$children})) {
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
       'icon name'
@@ -238,12 +236,25 @@
     row-gap: var(--space-1);
   }
 
-  .details:has(.actions > :nth-child(4)) .actions {
+  .details:has(.actions > :nth-child(#{$children})) .actions {
     grid-auto-flow: row;
     grid-template-columns: repeat(auto-fill, minmax(7.5rem, max-content));
     justify-content: start;
     padding-top: var(--space-2);
   }
+}
+
+// The admin lock off gives a card five buttons or six (Pin and History, then
+// Refresh, Rescan, Edit and Match again where its type is matched), which
+// need a wide card to sit beside the details; anything narrower puts them
+// under the details. Six need a little more width than five, or the folders
+// beside them break inside a path.
+@container (max-width: 67.2rem) {
+  @include actions-under-details(6);
+}
+
+@container (max-width: 64rem) {
+  @include actions-under-details(4);
 }
 
 @container (max-width: 40rem) {

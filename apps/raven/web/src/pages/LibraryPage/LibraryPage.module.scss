@@ -101,13 +101,14 @@
 
 // The admin lock off gives the header four buttons, five or six, which leave
 // the title too little room beside them on a narrower page; then they go
-// under it, six at a wider width than four. A phone always puts them under it.
+// under it, five or six at a wider width than four, so a long name keeps its
+// words whole. A phone always puts them under it.
 @container (max-width: 48rem) {
   @include actions-under-title(4);
 }
 
 @container (max-width: 64rem) {
-  @include actions-under-title(6);
+  @include actions-under-title(5);
 }
 
 @container (max-width: 30rem) {
