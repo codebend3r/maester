@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { AUTH_CONFIG_STATES, AUTH_COOKIE } from '@raven/core'
-import type { ReadyAuthConfig } from '@/lib/authClient'
+import { AUTH_EVENTS, type ReadyAuthConfig } from '@/lib/authClient'
 import { queryClient, queryKeys } from '@/lib/queryClient'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { createSelectionStore } from '@/stores/selection'
@@ -150,5 +150,49 @@ describe('useAuthSession account changes', () => {
     expect(stale(queryKeys.libraries)).toBe(true)
     expect(stale(queryKeys.authConfig)).toBe(false)
     expect(queryClient.getQueryData<ReadyAuthConfig>(queryKeys.authConfig)).toEqual(config)
+  })
+})
+
+describe('useAuthSession recovery', () => {
+  const started = async () => {
+    const fake = fakeAuthClient()
+    useAuthSession.getState().start({ config, createClient: () => fake.client })
+    await settled()
+    return fake
+  }
+
+  it('is not a recovery session by default, nor after an ordinary sign in', async () => {
+    const fake = await started()
+    expect(useAuthSession.getState().isRecovery).toBe(false)
+
+    fake.emit({ event: 'SIGNED_IN', session: fakeSession() })
+
+    expect(useAuthSession.getState().isRecovery).toBe(false)
+  })
+
+  it('is one from the recovery event until the session ends, through refreshes', async () => {
+    const fake = await started()
+
+    fake.emit({ event: AUTH_EVENTS.passwordRecovery, session: fakeSession() })
+    expect(useAuthSession.getState().isRecovery).toBe(true)
+
+    fake.emit({ event: 'TOKEN_REFRESHED', session: fakeSession({ accessToken: 'newer' }) })
+    fake.emit({ event: 'SIGNED_IN', session: fakeSession() })
+    expect(useAuthSession.getState().isRecovery).toBe(true)
+
+    fake.emit({ event: 'SIGNED_OUT', session: null })
+    expect(useAuthSession.getState().isRecovery).toBe(false)
+  })
+
+  it('ends when another account signs in, or when asked', async () => {
+    const fake = await started()
+    fake.emit({ event: AUTH_EVENTS.passwordRecovery, session: fakeSession({ userId: 'u1' }) })
+
+    fake.emit({ event: 'SIGNED_IN', session: fakeSession({ userId: 'u2' }) })
+    expect(useAuthSession.getState().isRecovery).toBe(false)
+
+    fake.emit({ event: AUTH_EVENTS.passwordRecovery, session: fakeSession({ userId: 'u2' }) })
+    useAuthSession.getState().endRecovery()
+    expect(useAuthSession.getState().isRecovery).toBe(false)
   })
 })

@@ -1,27 +1,13 @@
 import { useMutation } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { resendFailureCopy } from '@/lib/authErrors'
 import { AUTH_QUERY, AUTH_ROUTES } from '@/lib/authRoutes'
+import { useCooldown } from '@/lib/useCooldown'
 import { AuthScreen, Brand } from '@/pages/SignInPage/AuthScreen'
 import { useAuthSession } from '@/stores/authSession'
 import signInStyles from '@/pages/SignInPage/SignInPage.module.scss'
 import styles from '@/pages/CheckEmailPage/CheckEmailPage.module.scss'
-
-const RESEND_COOLDOWN_SECONDS = 60
-const SECOND_MS = 1000
-
-/** Counts down from `seconds` once started; `0` is not counting. */
-const useCooldown = () => {
-  const [secondsLeft, setSecondsLeft] = useState(0)
-  useEffect(() => {
-    if (secondsLeft <= 0) return
-    const timer = setTimeout(() => setSecondsLeft((now) => now - 1), SECOND_MS)
-    return () => clearTimeout(timer)
-  }, [secondsLeft])
-  return { secondsLeft, start: () => setSecondsLeft(RESEND_COOLDOWN_SECONDS) }
-}
 
 const Resend = ({ address }: { address: string }) => {
   const client = useAuthSession((state) => state.client)

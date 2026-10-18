@@ -11,6 +11,8 @@ export const AUTH_ERRORS = {
   weakPassword: 'weak_password',
 } as const
 
+export const AUTH_EVENTS = { passwordRecovery: 'PASSWORD_RECOVERY' } as const
+
 export type ReadyAuthConfig = Extract<AuthConfig, { state: typeof AUTH_CONFIG_STATES.ready }>
 
 export type AuthClient = Pick<
