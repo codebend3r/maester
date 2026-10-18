@@ -11,6 +11,7 @@ import { CardLinks } from '@/components/CardLink/CardLink'
 import { MediaOriginProbe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { createQueryClient } from '@/lib/queryClient'
 import { PrefetchPlaybackSettings } from '@/lib/prefetchPlaybackSettings'
+import { StartAuthSession } from '@/lib/startAuthSession'
 import { followTheme } from '@/stores/theme'
 
 const queryClient = createQueryClient()
@@ -22,13 +23,15 @@ if (rootElement) {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <PrefetchPlaybackSettings>
-            <MediaOriginProbe>
-              <CardLinks>
-                <AppRoutes />
-              </CardLinks>
-            </MediaOriginProbe>
-          </PrefetchPlaybackSettings>
+          <StartAuthSession>
+            <PrefetchPlaybackSettings>
+              <MediaOriginProbe>
+                <CardLinks>
+                  <AppRoutes />
+                </CardLinks>
+              </MediaOriginProbe>
+            </PrefetchPlaybackSettings>
+          </StartAuthSession>
         </BrowserRouter>
       </QueryClientProvider>
     </StrictMode>,

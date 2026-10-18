@@ -1,0 +1,25 @@
+// The whole screen, the notice in the middle of it.
+.screen {
+  display: grid;
+  place-items: center;
+  min-block-size: 100dvh;
+  padding: var(--space-4);
+}
+
+.panel {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  max-inline-size: min(var(--measure), 100%);
+}
+
+.title {
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-tight);
+}
+
+.copy {
+  color: var(--color-birch);
+  line-height: var(--line-body);
+  text-wrap: pretty;
+}

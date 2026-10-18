@@ -35,6 +35,10 @@ export const createQueryClient = (): QueryClient =>
  */
 export const queryKeys = {
   ...playerQueryKeys,
+  /** Everything the sign-in gate reads, one prefix to ask again together. */
+  auth: ['auth'],
+  authConfig: ['auth', 'config'],
+  account: (userId: string | null) => ['auth', 'account', userId],
   libraries: ['libraries'],
   library: (id: number | null) => ['libraries', id],
   media: ({

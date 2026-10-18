@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
+import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { PinPrompt } from '@/components/PinPrompt/PinPrompt'
 import { DesignPage } from '@/pages/DesignPage/DesignPage'
 import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
@@ -23,26 +24,28 @@ import { WatchPage } from '@/pages/WatchPage/WatchPage'
 export const AppRoutes = () => (
   <>
     <Routes>
-      <Route element={<AppShell />}>
-        <Route index element={<HomePage />} />
-        <Route path="libraries" element={<LibrariesPage />} />
-        <Route path="libraries/:id" element={<LibraryPage />} />
-        <Route path="libraries/:id/history" element={<HistoryPage />} />
-        <Route path="libraries/:id/:section" element={<LibraryPage />} />
-        <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
-        <Route path="movies/:id" element={<MoviePage />} />
-        <Route path="shows/:id" element={<ShowPage />} />
-        <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
-        <Route path="episodes/:id" element={<EpisodePage />} />
-        <Route path="people/:id" element={<PersonPage />} />
-        <Route path="favourites" element={<FavouritesPage />} />
-        <Route path="streams" element={<StreamsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="design" element={<DesignPage />} />
-        <Route path="*" element={<NotFoundPage />} />
+      <Route element={<AuthGate />}>
+        <Route element={<AppShell />}>
+          <Route index element={<HomePage />} />
+          <Route path="libraries" element={<LibrariesPage />} />
+          <Route path="libraries/:id" element={<LibraryPage />} />
+          <Route path="libraries/:id/history" element={<HistoryPage />} />
+          <Route path="libraries/:id/:section" element={<LibraryPage />} />
+          <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
+          <Route path="movies/:id" element={<MoviePage />} />
+          <Route path="shows/:id" element={<ShowPage />} />
+          <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
+          <Route path="episodes/:id" element={<EpisodePage />} />
+          <Route path="people/:id" element={<PersonPage />} />
+          <Route path="favourites" element={<FavouritesPage />} />
+          <Route path="streams" element={<StreamsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="design" element={<DesignPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+        {/* The player takes the whole screen, outside the browsing frame. */}
+        <Route path="watch/:id" element={<WatchPage />} />
       </Route>
-      {/* The player takes the whole screen, outside the browsing frame. */}
-      <Route path="watch/:id" element={<WatchPage />} />
       {/* So do signing in, linked from nowhere yet, and the page to get raven from. */}
       <Route path="sign-in" element={<SignInPage onSignIn={signInUnavailable} />} />
       <Route path="get" element={<GetPage />} />
