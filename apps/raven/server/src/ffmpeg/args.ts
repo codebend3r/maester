@@ -83,6 +83,13 @@ const VIDEO_CODECS = { h264: 'h264', hevc: 'hevc' } as const
 const GPU_DECODES: ReadonlySet<string> = new Set([VIDEO_CODECS.h264, VIDEO_CODECS.hevc])
 
 /**
+ * A size the viewer asked for is a ceiling, and an encoder's own target only
+ * averages to it: a 2 second buffer lets scenes peak but not past it.
+ */
+const ceiling = (bitrate: number | null): string[] =>
+  bitrate == null ? [] : ['-maxrate', String(bitrate), '-bufsize', String(bitrate * 2)]
+
+/**
  * The flags before `-i` and the video encoding after it, for a transcode.
  *
  * - Software: libx264 on the CPU, as fast as quality allows.
@@ -111,7 +118,6 @@ const transcodeVideo = ({
 }): { input: string[]; output: string[] } => {
   const scale = scaleTo(maxHeight)
   const squeeze = QUALITY[quality]
-  const cap = bitrate == null ? null : String(bitrate)
   const cpuFilters = [`scale=${scale}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
   // A keyframe every two seconds keeps fragments small, so playback starts
   // and seeks quickly.
@@ -124,9 +130,8 @@ const transcodeVideo = ({
         '-c:v',
         'h264_videotoolbox',
         '-b:v',
-        cap ?? squeeze.bitrate,
-        // A size is a ceiling, and the encoder's own target only averages to it.
-        ...(cap == null ? [] : ['-maxrate', cap]),
+        bitrate == null ? squeeze.bitrate : String(bitrate),
+        ...ceiling(bitrate),
         ...shared,
         '-pix_fmt',
         'yuv420p',
@@ -155,16 +160,7 @@ const transcodeVideo = ({
       output: [
         '-c:v',
         'h264_vaapi',
-        ...(bitrate == null
-          ? ['-qp', squeeze.qp]
-          : [
-              '-b:v',
-              String(bitrate),
-              '-maxrate',
-              String(bitrate),
-              '-bufsize',
-              String(bitrate * 2),
-            ]),
+        ...(bitrate == null ? ['-qp', squeeze.qp] : ['-b:v', String(bitrate), ...ceiling(bitrate)]),
         ...shared,
         '-vf',
         filters.join(','),
@@ -181,8 +177,7 @@ const transcodeVideo = ({
       'veryfast',
       '-crf',
       squeeze.crf,
-      // A bitrate ask is a ceiling on top of the quality: a 2 second buffer lets scenes peak.
-      ...(bitrate == null ? [] : ['-maxrate', String(bitrate), '-bufsize', String(bitrate * 2)]),
+      ...ceiling(bitrate),
       ...shared,
       '-pix_fmt',
       'yuv420p',

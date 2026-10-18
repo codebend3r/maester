@@ -2,7 +2,6 @@ import {
   type ApiClient,
   type MediaItem,
   type PlaybackMode,
-  type StreamQuality,
   DEFAULT_PLAYBACK_SETTINGS,
   PLAYBACK_MODES,
   offeredQualities,
@@ -12,6 +11,14 @@ import { useMemo, useState } from 'react'
 import { browserCanPlay, browserCanStream } from '@/lib/canPlay'
 import { useQuery } from '@tanstack/react-query'
 import { playerQueriesFor } from '@/lib/playerQueries'
+import { originalDetails } from '@/components/Player/playbackFacts'
+import {
+  PICK_KINDS,
+  type PlayPick,
+  type PlayChoices,
+  choiceGroups,
+} from '@/components/Player/playChoices'
+import type { Rendition } from '@/components/Player/rendition'
 import type { Delivery } from '@/lib/streamSource'
 
 /** The ways to play, best first, for one audio track; a step down belongs to one ladder. */
@@ -24,18 +31,6 @@ const sameLadder = ({ a, b }: { a: Ladder; b: Ladder }): boolean =>
 
 /** A way of playing the connection could not carry, and what it did carry. */
 export type StepDown = { from: PlaybackMode; delivery: Delivery }
-
-/** The ways this file can play right now, and the viewer's pick among them. */
-export type ModeChoice = {
-  modes: readonly PlaybackMode[]
-  pick: (mode: PlaybackMode) => void
-  /** The sizes a transcode can be asked for, largest first; empty when the server converts nothing. */
-  qualities: readonly StreamQuality[]
-  /** The size playing, or null for the original or the server's own settings. */
-  quality: StreamQuality | null
-  /** Converts down to a size: a transcode, asked for at it. */
-  pickQuality: (quality: StreamQuality) => void
-}
 
 export const PLAYBACK_STATUSES = {
   waiting: 'waiting',
@@ -58,14 +53,12 @@ export type PlaybackStatus =
    */
   | {
       status: typeof PLAYBACK_STATUSES.playing
-      mode: PlaybackMode
+      rendition: Rendition
       fail: (message: string) => void
       slow: ((delivery: Delivery) => void) | null
       /** Why this is a transcode, when the connection is the reason. */
       steppedDown: StepDown | null
-      choice: ModeChoice
-      /** The size this transcode is asked for; null when it is not one, or the settings size it. */
-      quality: StreamQuality | null
+      choices: PlayChoices
     }
 
 /**
@@ -107,8 +100,7 @@ export const usePlaybackLadder = ({
   const [fallback, setFallback] = useState<{ ladder: Ladder; step: number } | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [steppedDown, setSteppedDown] = useState<StepDown | null>(null)
-  const [picked, setPicked] = useState<PlaybackMode | null>(null)
-  const [quality, setQuality] = useState<StreamQuality | null>(null)
+  const [picked, setPicked] = useState<PlayPick | null>(null)
 
   // The server's settings say whether to force the original file and what it
   // converts; a plan made without them starts a stream it may refuse.
@@ -121,7 +113,11 @@ export const usePlaybackLadder = ({
   const failedStep =
     fallback != null && sameLadder({ a: fallback.ladder, b: ladder }) ? fallback.step : 0
   const lighter = ladder.modes.indexOf(PLAYBACK_MODES.transcode)
-  const pickedStep = picked == null ? -1 : ladder.modes.indexOf(picked)
+  const pickedMode = (() => {
+    if (picked == null) return null
+    return picked.kind === PICK_KINDS.mode ? picked.mode : PLAYBACK_MODES.transcode
+  })()
+  const pickedStep = pickedMode == null ? -1 : ladder.modes.indexOf(pickedMode)
   const stepped = steppedDown != null && lighter >= 0 ? Math.max(failedStep, lighter) : failedStep
   const step = Math.max(stepped, pickedStep)
   const mode = ladder.modes[step]
@@ -132,35 +128,35 @@ export const usePlaybackLadder = ({
       tryAnyway: failure == null && !forced ? () => setForced(true) : null,
     }
   }
+  const isConverting = mode === PLAYBACK_MODES.transcode
+  const rendition: Rendition = {
+    mode,
+    quality: isConverting && picked?.kind === PICK_KINDS.size ? picked.quality : null,
+  }
   return {
     status: PLAYBACK_STATUSES.playing,
-    mode,
+    rendition,
     fail: (message) => {
       if (step + 1 < ladder.modes.length) setFallback({ ladder, step: step + 1 })
       else setFailure(message)
     },
     slow: lighter > step ? (delivery) => setSteppedDown({ from: mode, delivery }) : null,
-    steppedDown: mode === PLAYBACK_MODES.transcode ? steppedDown : null,
-    quality: mode === PLAYBACK_MODES.transcode ? quality : null,
-    choice: {
-      modes: ladder.modes,
-      // A pick starts over from that way: what failed or was too slow before no longer holds.
-      pick: (next) => {
+    steppedDown: isConverting ? steppedDown : null,
+    choices: {
+      groups: choiceGroups({
+        modes: ladder.modes,
+        rendition,
+        qualities: ladder.modes.includes(PLAYBACK_MODES.transcode)
+          ? offeredQualities({
+              media,
+              maxHeight: policy?.maxHeight ?? DEFAULT_PLAYBACK_SETTINGS.maxHeight,
+            })
+          : [],
+        original: originalDetails(media),
+      }),
+      // A pick starts over from there: what failed or was too slow before no longer holds.
+      select: (next) => {
         setPicked(next)
-        setQuality(null)
-        setFallback(null)
-        setSteppedDown(null)
-      },
-      qualities: ladder.modes.includes(PLAYBACK_MODES.transcode)
-        ? offeredQualities({
-            media,
-            maxHeight: policy?.maxHeight ?? DEFAULT_PLAYBACK_SETTINGS.maxHeight,
-          })
-        : [],
-      quality: mode === PLAYBACK_MODES.transcode ? quality : null,
-      pickQuality: (next) => {
-        setPicked(PLAYBACK_MODES.transcode)
-        setQuality(next)
         setFallback(null)
         setSteppedDown(null)
       },

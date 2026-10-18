@@ -21,6 +21,7 @@ import {
   PLAYBACK_MODES,
   STREAM_QUALITIES,
   STREAM_TIME_SHIFT,
+  type StreamQuality,
   TRANSCODINGS,
   isStreamMode,
   isStreamQuality,
@@ -41,6 +42,33 @@ import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
 import { StreamSessions } from '@/streams/streamSessions'
 import { trackStream } from '@/streams/trackStream'
+
+/** The size a viewer asked a transcode for, or null for the server's settings. */
+const streamSizeOf = ({
+  quality,
+  mode,
+}: {
+  quality: string | undefined
+  mode: string | undefined
+}): (typeof STREAM_QUALITIES)[StreamQuality] | null => {
+  if (quality == null) return null
+  if (!isStreamQuality(quality)) {
+    throw new BadRequestException('quality must be one of the listed sizes')
+  }
+  if (mode !== PLAYBACK_MODES.transcode) {
+    throw new BadRequestException('quality applies to a transcode only')
+  }
+  return STREAM_QUALITIES[quality]
+}
+
+/** The server's setting is the ceiling a viewer's pick can not lift. */
+const capHeight = ({
+  size,
+  maxHeight,
+}: {
+  size: ReturnType<typeof streamSizeOf>
+  maxHeight: number
+}): number => Math.min(size?.height ?? maxHeight, maxHeight)
 
 /**
  * What a player needs beyond the file itself: the tracks to choose from,
@@ -138,16 +166,7 @@ export class PlaybackController {
     if (playback.transcoding === TRANSCODINGS.remuxOnly && mode === PLAYBACK_MODES.transcode) {
       throw new ForbiddenException('Transcoding is off in Settings; only remuxing is on.')
     }
-    const size = (() => {
-      if (quality == null) return null
-      if (!isStreamQuality(quality)) {
-        throw new BadRequestException('quality must be one of the listed sizes')
-      }
-      if (mode !== PLAYBACK_MODES.transcode) {
-        throw new BadRequestException('quality applies to a transcode only')
-      }
-      return STREAM_QUALITIES[quality]
-    })()
+    const size = streamSizeOf({ quality, mode })
     const from = start == null ? 0 : Number(start)
     if (!Number.isFinite(from) || from < 0) {
       throw new BadRequestException('start must be a number of seconds')
@@ -181,8 +200,7 @@ export class PlaybackController {
         tonemap,
         streamShift: STREAM_TIME_SHIFT,
         encoder,
-        // The server's setting is the ceiling a viewer's pick can not lift.
-        maxHeight: Math.min(size?.height ?? playback.maxHeight, playback.maxHeight),
+        maxHeight: capHeight({ size, maxHeight: playback.maxHeight }),
         quality: playback.quality,
         bitrate: size?.bitrate ?? null,
       }),

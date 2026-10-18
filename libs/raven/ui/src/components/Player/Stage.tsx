@@ -1,10 +1,5 @@
 import { KEYS } from '@/lib/keyboard'
-import {
-  PLAYER_SOURCE_KINDS,
-  type PlaybackMode,
-  type StreamQuality,
-  formatDuration,
-} from '@raven/core'
+import { PLAYER_SOURCE_KINDS, formatDuration } from '@raven/core'
 import {
   type ReactNode,
   type SyntheticEvent,
@@ -16,7 +11,9 @@ import {
 import type { Engine, EngineHandle } from '@/components/Player/engine'
 import type { Handoff, PlayerFavourite } from '@/components/Player/PlayerServices'
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
-import type { ModeChoice, StepDown } from '@/components/Player/usePlaybackLadder'
+import type { PlayChoices } from '@/components/Player/playChoices'
+import type { Rendition } from '@/components/Player/rendition'
+import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import type { Delivery } from '@/lib/streamSource'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import { Button, ButtonLink } from '@/components/Button/Button'
@@ -27,7 +24,6 @@ import { type MenuSection, isMenuSection } from '@/components/Player/menus'
 import {
   aboutLine,
   audioPillLabel,
-  originalDetails,
   qualityLabel,
   subtitlePillLabel,
 } from '@/components/Player/playbackFacts'
@@ -67,15 +63,13 @@ const isPressedByControl = (event: KeyboardEvent): boolean => {
 export type StageProps = {
   engine: Extract<Engine, { kind: 'html' }>
   onBack: () => void
-  mode: PlaybackMode
-  /** The size a transcode is asked for; null for the server's settings. */
-  quality?: StreamQuality | null
+  rendition: Rendition
   selection: TrackSelection
   onFailure: (message: string) => void
   /** The connection cannot carry the converted stream as fast as it plays. */
   onSlow?: (delivery: Delivery) => void
   steppedDown?: StepDown | null
-  choice?: ModeChoice | null
+  choices?: PlayChoices | null
 }
 
 export const Stage = ({ engine, ...props }: StageProps) => {
@@ -104,20 +98,18 @@ export const Stage = ({ engine, ...props }: StageProps) => {
 export const PlayerChrome = ({
   engine,
   onBack,
-  mode,
-  quality = null,
+  rendition,
   selection,
   subtitleStatus,
   renderSubtitles,
   fullscreen,
   file = null,
   steppedDown = null,
-  choice = null,
+  choices = null,
 }: {
   engine: EngineHandle
   onBack: () => void
-  mode: PlaybackMode
-  quality?: StreamQuality | null
+  rendition: Rendition
   selection: TrackSelection
   subtitleStatus: SubtitleStatus
   renderSubtitles?: (lifted: boolean) => ReactNode
@@ -127,8 +119,9 @@ export const PlayerChrome = ({
   /** Why the picture dropped to a transcode, when the connection is the reason. */
   steppedDown?: StepDown | null
   /** The ways to play this file and the viewer's pick among them; null where there is one. */
-  choice?: ModeChoice | null
+  choices?: PlayChoices | null
 }) => {
+  const { mode, quality } = rendition
   const { title, hostActions, favourite, chrome, isVolumeFixed, handoff } = useHostServices()
   const media = file?.media ?? null
   const label = title.label
@@ -423,8 +416,7 @@ export const PlayerChrome = ({
           rate={state.rate}
           mode={mode}
           steppedDown={steppedDown}
-          choice={choice}
-          original={media ? originalDetails(media) : null}
+          choices={choices}
           onPickRate={controls.changeRate}
           onShowInfo={showInfo}
           onClose={closeMenu}

@@ -1,11 +1,7 @@
-import {
-  PLAYBACK_MODES,
-  type PlaybackMode,
-  STREAM_TIME_SHIFT,
-  type StreamQuality,
-} from '@raven/core'
+import { PLAYBACK_MODES, STREAM_TIME_SHIFT } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import type { EngineHandle, EngineStats, HtmlSource } from '@/components/Player/engine'
+import type { Rendition } from '@/components/Player/rendition'
 import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
 import { SubtitleOverlay } from '@/components/Player/SubtitleOverlay'
@@ -21,16 +17,14 @@ const ENGINE_NAME = 'HTML video'
 
 export const useHtmlEngine = ({
   source,
-  mode,
-  quality = null,
+  rendition,
   selection,
   onFailure,
   onSlow,
   toggleFullscreen,
 }: {
   source: HtmlSource
-  mode: PlaybackMode
-  quality?: StreamQuality | null
+  rendition: Rendition
   selection: TrackSelection
   onFailure: (message: string) => void
   onSlow?: (delivery: Delivery) => void
@@ -43,7 +37,7 @@ export const useHtmlEngine = ({
   const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
   const captionScale = usePlayerPrefs((prefs) => prefs.captionScale)
   const setCaptionScale = usePlayerPrefs((prefs) => prefs.setCaptionScale)
-  const shift = mode === PLAYBACK_MODES.direct ? 0 : STREAM_TIME_SHIFT
+  const shift = rendition.mode === PLAYBACK_MODES.direct ? 0 : STREAM_TIME_SHIFT
   const playback = useVideoState({
     videoRef,
     shift,
@@ -53,9 +47,8 @@ export const useHtmlEngine = ({
   useMediaSource({
     videoRef,
     source,
-    mode,
+    rendition,
     audio: selection.audio,
-    quality,
     position: playback.position,
     playing: playback.playing,
     onRefused: playback.refused,

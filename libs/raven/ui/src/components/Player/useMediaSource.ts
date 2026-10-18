@@ -10,6 +10,7 @@ import {
 import { type RefObject, useEffect, useEffectEvent, useRef } from 'react'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
 import type { HtmlSource } from '@/components/Player/engine'
+import type { Rendition } from '@/components/Player/rendition'
 import { type Delivery, browserEnvironment, createStreamSession } from '@/lib/streamSource'
 
 export const VIDEO_SOURCE_KINDS = { file: 'file', stream: 'stream' } as const
@@ -67,9 +68,8 @@ const failureMessage = (error: MediaError | null): string => {
 export const useMediaSource = ({
   videoRef,
   source: htmlSource,
-  mode,
+  rendition,
   audio,
-  quality = null,
   position,
   playing,
   onRefused,
@@ -78,9 +78,8 @@ export const useMediaSource = ({
 }: {
   videoRef: RefObject<HTMLVideoElement | null>
   source: HtmlSource
-  mode: PlaybackMode
+  rendition: Rendition
   audio: number | null
-  quality?: StreamQuality | null
   position: RefObject<number>
   playing: RefObject<boolean>
   /** The browser would not start playing. */
@@ -88,6 +87,7 @@ export const useMediaSource = ({
   onFailure: (message: string) => void
   onSlow?: (delivery: Delivery) => void
 }): void => {
+  const { mode, quality } = rendition
   const mime =
     mode === PLAYBACK_MODES.direct || htmlSource.kind === PLAYER_SOURCE_KINDS.file
       ? null

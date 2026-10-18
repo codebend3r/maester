@@ -1,16 +1,11 @@
-import {
-  PLAYBACK_MODES,
-  type PlaybackMode,
-  STREAM_QUALITIES,
-  describeMode,
-  formatBitrate,
-} from '@raven/core'
+import { type PlaybackMode, describeMode } from '@raven/core'
 import { type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
 import { stepDownNote } from '@/components/Player/playbackFacts'
 import { playingAudio } from '@/components/Player/selection'
-import type { ModeChoice, StepDown } from '@/components/Player/usePlaybackLadder'
+import type { ChoiceGroup as Group, PlayChoices } from '@/components/Player/playChoices'
+import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/SettingsMenu.module.scss'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
@@ -132,80 +127,30 @@ const SubtitleGroup = ({ labelledBy, selection, subtitleStatus }: GroupProps) =>
   )
 }
 
-const ModeGroup = ({
+const ChoiceGroup = ({
   name,
-  mode,
-  modes,
-  choice,
+  group,
+  select,
 }: {
   name: string
-  mode: PlaybackMode
-  modes: readonly PlaybackMode[]
-  choice: ModeChoice
+  group: Group
+  select: PlayChoices['select']
 }) => (
   <fieldset className={styles.group}>
-    <legend className={styles.legend}>Play as</legend>
-    {modes.map((candidate) => (
+    <legend className={styles.legend}>{group.legend}</legend>
+    {group.options.map((option) => (
       <Option
-        key={candidate}
-        name={`${name}-mode`}
-        checked={candidate === mode}
-        label={describeMode(candidate)}
-        onSelect={() => choice.pick(candidate)}
+        key={option.label}
+        name={name}
+        checked={option.isChecked}
+        label={option.label}
+        isInline={group.isInline}
+        details={option.details ?? undefined}
+        onSelect={() => select(option.pick)}
       />
     ))}
   </fieldset>
 )
-
-/** Plex's list: the original first, then each size the file can be converted down to. */
-const QualityGroup = ({
-  name,
-  mode,
-  choice,
-  original,
-}: {
-  name: string
-  mode: PlaybackMode
-  choice: ModeChoice
-  original: string | null
-}) => {
-  const [best] = choice.modes
-  return (
-    <fieldset className={styles.group}>
-      <legend className={styles.legend}>Quality</legend>
-      {best != null && best !== PLAYBACK_MODES.transcode && (
-        <Option
-          name={`${name}-quality`}
-          checked={mode !== PLAYBACK_MODES.transcode}
-          label="Play original quality"
-          isInline
-          details={original ?? undefined}
-          onSelect={() => choice.pick(best)}
-        />
-      )}
-      {mode === PLAYBACK_MODES.transcode && choice.quality == null && (
-        // Converted at the size the server's settings give it: a step down or a pick of the mode alone.
-        <Option
-          name={`${name}-quality`}
-          checked
-          label="Converted at the server's size"
-          onSelect={() => choice.pick(PLAYBACK_MODES.transcode)}
-        />
-      )}
-      {choice.qualities.map((key) => (
-        <Option
-          key={key}
-          name={`${name}-quality`}
-          checked={choice.quality === key}
-          label={`Convert to ${STREAM_QUALITIES[key].label}`}
-          isInline
-          details={formatBitrate(STREAM_QUALITIES[key].bitrate) ?? undefined}
-          onSelect={() => choice.pickQuality(key)}
-        />
-      ))}
-    </fieldset>
-  )
-}
 
 const SpeedGroup = ({
   name,
@@ -247,8 +192,7 @@ export const SettingsMenu = ({
   rate,
   mode,
   steppedDown = null,
-  choice = null,
-  original = null,
+  choices = null,
   onPickRate,
   onShowInfo,
   onClose,
@@ -263,9 +207,7 @@ export const SettingsMenu = ({
   mode: PlaybackMode
   steppedDown?: StepDown | null
   /** The ways the file can play, when the viewer may pick one; a local file has one. */
-  choice?: ModeChoice | null
-  /** The original file's bitrate and picture, as the first quality reads. */
-  original?: string | null
+  choices?: PlayChoices | null
   onPickRate: (rate: number) => void
   onShowInfo: () => void
   onClose: () => void
@@ -283,13 +225,6 @@ export const SettingsMenu = ({
     if (checked !== null) checked.focus()
   }, [])
 
-  // Sizes take over the conversion: the mode list then only picks between the file as it is and a remux.
-  const hasSizes = !!choice && choice.qualities.length > 0
-  const asModes = (choice?.modes ?? []).filter(
-    (candidate) => !hasSizes || candidate !== PLAYBACK_MODES.transcode,
-  )
-  const hasModeList = asModes.length > 1
-
   const body = (() => {
     switch (section) {
       case MENU_SECTIONS.audio:
@@ -299,14 +234,18 @@ export const SettingsMenu = ({
       case MENU_SECTIONS.playback:
         return (
           <>
-            {hasSizes && choice && (
-              <QualityGroup name={id} mode={mode} choice={choice} original={original} />
-            )}
+            {choices?.groups.map((each, index) => (
+              <ChoiceGroup
+                key={each.legend}
+                name={`${id}-choice-${index}`}
+                group={each}
+                select={choices.select}
+              />
+            ))}
             <div className={styles.playing}>
-              {hasModeList && choice && (
-                <ModeGroup name={id} mode={mode} modes={asModes} choice={choice} />
+              {(choices?.groups.length ?? 0) === 0 && (
+                <p className={styles.mode}>{describeMode(mode)}</p>
               )}
-              {!hasModeList && !hasSizes && <p className={styles.mode}>{describeMode(mode)}</p>}
               {!!steppedDown && <p className={styles.note}>{stepDownNote(steppedDown)}</p>}
               <button type="button" className={styles.info} onClick={onShowInfo}>
                 <span>Playback info</span>

@@ -267,7 +267,8 @@ export const planPlayback = ({
 /**
  * The sizes a viewer can convert a file down to: the ones smaller than the
  * file, in frame and in bitrate where the file's is known, and not over the
- * height the server's settings cap a transcode at. Largest first.
+ * height the server's settings cap a transcode at. Largest first. A file
+ * not probed yet has no size to be under, so it is offered every one.
  */
 export const offeredQualities = ({
   media,
@@ -276,14 +277,16 @@ export const offeredQualities = ({
   media: MediaItem
   maxHeight: number
 }): StreamQuality[] =>
-  isStreamQuality.values.filter((key) => {
-    const size = STREAM_QUALITIES[key]
-    return (
-      size.height <= maxHeight &&
-      size.height <= (media.height ?? Infinity) &&
-      size.bitrate < (media.bitrate ?? Infinity)
-    )
-  })
+  isStreamQuality.values
+    .filter((key) => {
+      const size = STREAM_QUALITIES[key]
+      return (
+        size.height <= maxHeight &&
+        size.height <= (media.height ?? Infinity) &&
+        size.bitrate < (media.bitrate ?? Infinity)
+      )
+    })
+    .toSorted((a, b) => STREAM_QUALITIES[b].bitrate - STREAM_QUALITIES[a].bitrate)
 
 /** What each mode means for the viewer, for the settings menu. */
 export const describeMode = (mode: PlaybackMode): string => {
