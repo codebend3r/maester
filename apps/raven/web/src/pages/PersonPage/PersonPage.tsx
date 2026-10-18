@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { CreditJob, ItemSummary, PersonDetails } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
+import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { Bone, SkeletonCards } from '@/components/Skeleton/Skeleton'
@@ -73,6 +74,9 @@ const Card = ({ item, role }: { item: ItemSummary; role: string | null }) => {
 const PersonSkeleton = () => (
   <>
     <div className={styles.header}>
+      <span className={styles.back}>
+        <Bone shape="button" />
+      </span>
       <span className={styles.photo}>
         <Bone shape="fill" />
       </span>
@@ -95,6 +99,7 @@ const PersonView = ({ person }: { person: PersonDetails }) => {
   return (
     <article className={styles.page} aria-labelledby={id}>
       <header className={styles.header}>
+        <BackButton fallback={HOME} className={styles.back} />
         <span className={photo ? styles.photo : `${styles.photo} ${styles.initials}`}>
           {photo ? (
             <img src={photo} alt="" decoding="async" />

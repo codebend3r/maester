@@ -8,7 +8,7 @@ import {
 import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, useNavigationType } from 'react-router-dom'
 import { Player } from '@/components/Player/Player'
 import type { PlayerFavourite, PlayerTitle } from '@/components/Player/PlayerServices'
 import { api } from '@/test/api'
@@ -468,6 +468,24 @@ describe('the player’s Back', () => {
     renderWithProviders({ ui: app(), route: '/watch/7' })
     await userEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(await screen.findByText('The library')).toBeInTheDocument()
+  })
+
+  it('replaces the player with the library, so the library has no way back into the video', async () => {
+    const Arrival = () => <p>{`The library, by ${useNavigationType()}`}</p>
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="libraries/2" element={<Arrival />} />
+          <Route
+            path="watch/7"
+            element={<TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />}
+          />
+        </Routes>
+      ),
+      route: '/watch/7',
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(await screen.findByText('The library, by REPLACE')).toBeInTheDocument()
   })
 })
 

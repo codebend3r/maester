@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import type { HistoryEntry } from '@raven/core'
 import { useId, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Button, ButtonLink } from '@raven/ui'
+import { Button } from '@raven/ui'
+import { BackButton } from '@/components/BackButton/BackButton'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
@@ -88,9 +89,7 @@ export const HistoryPage = () => {
 
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
-      <ButtonLink to={`/libraries/${id}`} tone="pill" icon="back" className={styles.back}>
-        {name}
-      </ButtonLink>
+      <BackButton fallback={{ to: `/libraries/${id}`, label: name }} />
 
       <header className={styles.header}>
         <h1 id={ids.title}>History</h1>

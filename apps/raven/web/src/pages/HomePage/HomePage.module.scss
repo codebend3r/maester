@@ -18,6 +18,19 @@
   padding-inline-end: var(--corner-clearance, 0);
 }
 
+.back {
+  grid-area: back;
+}
+
+// With a way back, it takes the corner row and the title and search drop
+// under it; without, they take the corner row themselves.
+.header:has(.back) {
+  grid-template-areas:
+    'back back'
+    'title search';
+  padding-inline-end: 0;
+}
+
 .title {
   grid-area: title;
   color: var(--color-lichen);
@@ -150,6 +163,13 @@
       'search search';
     gap: var(--space-2);
     padding-inline-end: 0;
+  }
+
+  .header:has(.back) {
+    grid-template-areas:
+      'back back'
+      'title .'
+      'search search';
   }
 
   .title {

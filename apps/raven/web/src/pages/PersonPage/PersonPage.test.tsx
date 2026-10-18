@@ -132,4 +132,27 @@ describe('PersonPage', () => {
     expect(container.querySelector('header img')).toBeNull()
     expect(screen.queryByText(/In your libraries/)).toBeNull()
   })
+
+  it('steps back to the page it came from, else links home', async () => {
+    spy.mockImplementation(async () => ({
+      id: 7,
+      name: 'Keanu Reeves',
+      photoVersion: null,
+      credits: [],
+    }))
+    const page = (
+      <Routes>
+        <Route path="people/:id" element={<PersonPage />} />
+      </Routes>
+    )
+    renderWithProviders({ ui: page, route: '/people/7', behind: ['/movies/1'] })
+    await screen.findByRole('heading', { level: 1, name: 'Keanu Reeves' })
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Home' })).toBeNull()
+    cleanup()
+    renderWithProviders({ ui: page, route: '/people/7' })
+    await screen.findByRole('heading', { level: 1, name: 'Keanu Reeves' })
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/')
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+  })
 })

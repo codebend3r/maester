@@ -1,12 +1,27 @@
-// Everything down the middle, the block centred in most of the screen's height.
+// The way back in the corner row, then everything down the middle, the block
+// centred in what is left of most of the screen's height.
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  align-content: center;
-  justify-items: center;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'back'
+    'body';
   gap: var(--space-4);
   min-block-size: 70vh;
   text-align: center;
+}
+
+.back {
+  grid-area: back;
+}
+
+.body {
+  grid-area: body;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-4);
 }
 
 // Twice the home hero's size: 104px on a phone to 208px on a wide screen.

@@ -1,5 +1,10 @@
-// A panel as the page's first row, so it keeps clear of the theme button
-// in the corner, the icon in the accent beside the reason.
+// The way back, then the panel.
+.failed {
+  display: grid;
+  gap: var(--space-4);
+}
+
+// The icon in the accent beside the reason.
 .message {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -7,7 +12,7 @@
   align-items: start;
   gap: var(--space-2);
   justify-self: start;
-  max-width: min(var(--measure), calc(100% - var(--corner-clearance, 0px)));
+  max-width: min(var(--measure), 100%);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-lg);

@@ -1,4 +1,6 @@
 import { designTokens } from '@raven/ui/designTokens'
+import { Link } from 'react-router-dom'
+import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { ColourSection } from '@/pages/DesignPage/ColourSection'
 import { ComponentsSection } from '@/pages/DesignPage/ComponentsSection'
 import { ContentSection } from '@/pages/DesignPage/ContentSection'
@@ -17,6 +19,7 @@ import styles from '@/pages/DesignPage/DesignPage.module.scss'
  */
 export const DesignPage = () => (
   <article className={styles.page} aria-labelledby="design-title">
+    <BackButton fallback={HOME} />
     <header className={styles.header}>
       <p className={styles.eyebrow}>Design system</p>
       <h1 id="design-title" className={styles.title}>
@@ -31,12 +34,18 @@ export const DesignPage = () => (
       <ol className={styles.contentsList}>
         {SECTIONS.map((section) => (
           <li key={section.id}>
-            <a href={`#${section.id}`} className={styles.contentsLink}>
+            {/* A plain #anchor pushes an entry the router did not make, which costs Back its place in the app. */}
+            <Link
+              to={{ hash: section.id }}
+              replace
+              className={styles.contentsLink}
+              onClick={() => document.getElementById(section.id)?.scrollIntoView()}
+            >
               <span className={styles.contentsNumber} aria-hidden="true">
                 {sectionNumber(section.id)}
               </span>
               {section.title}
-            </a>
+            </Link>
           </li>
         ))}
       </ol>

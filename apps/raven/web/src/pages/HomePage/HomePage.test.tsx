@@ -54,6 +54,19 @@ describe('HomePage', () => {
     expect(screen.queryAllByRole('listitem')).toEqual([])
   })
 
+  it('shows no Back on a first visit, and steps back once the app has been browsed', async () => {
+    open({ inProgress: [], shelves: [] })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+    // Home is the top of the app, so with nothing behind it there is no fallback link either.
+    expect(screen.queryAllByRole('link')).toEqual([])
+    cleanup()
+    spies.home.mockImplementation(async () => ({ inProgress: [], shelves: [] }))
+    renderWithProviders({ ui: <HomePage />, route: '/', behind: ['/libraries'] })
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(screen.queryAllByRole('link')).toEqual([])
+  })
+
   it('puts what is in progress first, then a row for each pinned library', async () => {
     open({
       inProgress: [{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }],

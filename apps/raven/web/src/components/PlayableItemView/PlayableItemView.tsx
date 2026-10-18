@@ -12,6 +12,7 @@ import { useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink } from '@raven/ui'
+import type { BackFallback } from '@/components/BackButton/BackButton'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
@@ -47,7 +48,7 @@ const PAGE_PICTURES = { posterAndBackdrop: 'poster and backdrop', still: 'still'
 /** How a movie's page and an episode's page differ; everything else they share. */
 type PlayableConfig = {
   matchType: MatchItemType
-  back: (facts: Facts & { libraries: readonly Library[] }) => { to: string; label: string }
+  back: (facts: Facts & { libraries: readonly Library[] }) => BackFallback
   /** The small line over the title: an episode's show and number. */
   eyebrow: (details: ItemDetails) => string[]
   byline: (details: ItemDetails) => string | null

@@ -2,7 +2,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type Library, isScanning } from '@raven/core'
 import { useId } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
-import { ButtonLink } from '@raven/ui'
 import { useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
@@ -34,10 +33,6 @@ const LibraryView = ({ library, section }: { library: Library; section: LibraryS
 
   return (
     <section className={styles.page} aria-labelledby={titleId}>
-      <ButtonLink to="/libraries" tone="pill" icon="back" className={styles.back}>
-        Libraries
-      </ButtonLink>
-
       <LibraryHeader titleId={titleId} library={library} actions={actions} isShut={isShut} />
 
       {lock.state === LIBRARY_LOCK_STATES.shut && (

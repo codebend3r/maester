@@ -25,15 +25,12 @@
   gap: var(--space-3);
 }
 
-// The first row, as tall as the theme button and clear of it.
 .eyebrow {
   display: grid;
   grid-template-columns: var(--space-5) auto;
   justify-content: start;
   gap: var(--space-2);
   align-items: center;
-  min-height: var(--field-size);
-  padding-inline-end: var(--corner-clearance, 0);
   color: var(--color-birch);
   font-size: var(--font-size-xs);
   font-weight: 600;

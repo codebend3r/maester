@@ -5,16 +5,20 @@
   max-width: 56rem;
 }
 
-// The page's first row: the title, and Reset to defaults at its right,
-// both clear of the theme button in the corner.
+// The way back, then the title with Reset to defaults at its right. The way
+// back takes the corner row, so the theme button clears the rest.
 .header {
   display: grid;
   grid-template-columns: 1fr auto;
-  grid-template-areas: 'title reset';
+  grid-template-areas:
+    'back back'
+    'title reset';
   align-items: end;
-  gap: var(--space-3);
-  min-height: var(--field-size);
-  padding-inline-end: var(--corner-clearance, 0);
+  gap: var(--space-4) var(--space-3);
+}
+
+.back {
+  grid-area: back;
 }
 
 .title {
@@ -348,6 +352,7 @@
   .header {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
+      'back'
       'title'
       'reset';
     justify-items: start;

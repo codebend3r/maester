@@ -1,4 +1,5 @@
 import { ButtonLink, themeOf } from '@raven/ui'
+import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { useTheme } from '@/stores/theme'
 import styles from '@/pages/NotFoundPage/NotFoundPage.module.scss'
 
@@ -17,25 +18,28 @@ export const NotFoundPage = () => {
   const tone = useTheme((state) => themeOf(state.theme).tone)
   return (
     <section className={styles.page}>
-      <p className={styles.figures} aria-hidden="true">
-        <span>4</span>
-        <span className={styles.poster}>
-          <img src={MARKS[tone]} alt="" width={646} height={705} className={styles.mark} />
-        </span>
-        <span>4</span>
-      </p>
-      <h1 className={styles.title}>Nothing lives at this address</h1>
-      <p className={styles.copy}>
-        The library or video may have been removed, or the link is incomplete.
-      </p>
-      <nav className={styles.actions} aria-label="Ways back">
-        <ButtonLink to="/libraries" tone="primary" size="large">
-          Back to libraries
-        </ButtonLink>
-        <ButtonLink to="/" size="large">
-          Go home
-        </ButtonLink>
-      </nav>
+      <BackButton fallback={HOME} className={styles.back} />
+      <div className={styles.body}>
+        <p className={styles.figures} aria-hidden="true">
+          <span>4</span>
+          <span className={styles.poster}>
+            <img src={MARKS[tone]} alt="" width={646} height={705} className={styles.mark} />
+          </span>
+          <span>4</span>
+        </p>
+        <h1 className={styles.title}>Nothing lives at this address</h1>
+        <p className={styles.copy}>
+          The library or video may have been removed, or the link is incomplete.
+        </p>
+        <nav className={styles.actions} aria-label="Ways back">
+          <ButtonLink to="/libraries" tone="primary" size="large">
+            Back to libraries
+          </ButtonLink>
+          <ButtonLink to="/" size="large">
+            Go home
+          </ButtonLink>
+        </nav>
+      </div>
     </section>
   )
 }

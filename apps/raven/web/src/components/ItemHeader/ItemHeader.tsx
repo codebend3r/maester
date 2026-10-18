@@ -1,7 +1,8 @@
 import type { Rating, SlideshowMotion } from '@raven/core'
 import { Fragment, type ReactNode, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ButtonLink, Icon } from '@raven/ui'
+import { Icon } from '@raven/ui'
+import { type BackFallback, BackButton } from '@/components/BackButton/BackButton'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { Bone } from '@/components/Skeleton/Skeleton'
@@ -205,7 +206,7 @@ export const ItemHeader = ({
   /** The title as art, shown in its place: a movie's logo. */
   logo?: string | null
   /** Where the page goes back to, over the backdrop's top corner. */
-  back: { to: string; label: string }
+  back: BackFallback
   /** A line of how far through the item the viewer is, where the page has one. */
   progress?: HeaderProgress
   /** The page's own actions: Play, favourite, Watched, Select. */
@@ -216,9 +217,7 @@ export const ItemHeader = ({
   <header className={backdrop ? `${styles.hero} ${styles.withBackdrop}` : styles.hero}>
     {backdrop && <Backdrop backdrop={backdrop} />}
     <div className={styles.top}>
-      <ButtonLink tone="pill" to={back.to} icon="back" className={styles.back}>
-        <span className={styles.backLabel}>{back.label}</span>
-      </ButtonLink>
+      <BackButton fallback={back} />
     </div>
     <div className={LAYOUTS[picture?.shape ?? PICTURE_SHAPES.none]}>
       {picture && <Picture picture={picture} title={title} />}

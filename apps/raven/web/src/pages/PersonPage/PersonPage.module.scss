@@ -4,15 +4,19 @@
   gap: var(--space-6);
 }
 
-// The page's first row, clear of the theme button in the corner: the photo
-// beside the name, which stack on a phone.
+// The way back, then the photo beside the name, which stack on a phone.
 .header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas: 'photo named';
+  grid-template-areas:
+    'back back'
+    'photo named';
   align-items: center;
   gap: var(--space-4) var(--space-5);
-  padding-inline-end: var(--corner-clearance, 0);
+}
+
+.back {
+  grid-area: back;
 }
 
 .photo {
@@ -152,6 +156,7 @@
   .header {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
+      'back'
       'photo'
       'named';
     align-items: start;
