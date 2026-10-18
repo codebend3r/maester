@@ -11,7 +11,7 @@
   "scripts": {
     "affected": "bun run --sequential spellcheck typescript-only one-command-per-script dead-code dead-css affected:tasks",
     "affected:tasks": "nx affected -t lint:py lint:ts lint:css format:check typecheck test build",
-    "audit": "bash scripts/audit_claude_md.sh",
+    "claude-audit": "bash scripts/audit_claude_md.sh",
     "build": "nx run-many -t build",
     "dead-code": "nx run maester:dead-code",
     "dead-css": "nx run maester:dead-css",

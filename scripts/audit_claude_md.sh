@@ -16,7 +16,7 @@ CHUNK_BYTES=200000
 JOBS=8
 # Haiku at medium effort keeps the push fast; the deterministic checks have
 # already caught everything a tool can.
-MODEL=claude-haiku-5-5
+MODEL=claude-sonnet-5-5
 EFFORT=medium
 
 schema='{
