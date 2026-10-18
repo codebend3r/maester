@@ -202,7 +202,7 @@ export const listenForPlayer = ({
     if (connection.status !== CONNECTION_STATUSES.native || opened === null) return
     const gone = opened
     opened = null
-    become({ status: 'unavailable', message })
+    become({ status: CONNECTION_STATUSES.unavailable, message })
     // After the listeners still to hear this event (the page among them) have heard it.
     queueMicrotask(gone.close)
   }
@@ -223,7 +223,7 @@ export const listenForPlayer = ({
 
   const deadline = setTimeout(() => {
     if (connection.status !== CONNECTION_STATUSES.waiting) return
-    become({ status: 'unavailable', message: PLAYER_NOT_HANDED })
+    become({ status: CONNECTION_STATUSES.unavailable, message: PLAYER_NOT_HANDED })
   }, waitMs)
 
   const onMessage = (event: MessageEvent) => {
@@ -241,12 +241,12 @@ export const listenForPlayer = ({
         const [port] = ports
         if (port === undefined || ports.length !== 1) return
         opened = nativePlayerOver({ port, timeoutMs: REPLY_TIMEOUT_MS })
-        become({ status: 'native', player: watched(opened) })
+        become({ status: CONNECTION_STATUSES.native, player: watched(opened) })
         return
       }
       case PLAYER_CONNECTION_STATUSES.unavailable:
         if (ports.length !== 0) return
-        become({ status: 'unavailable', message: offered.message })
+        become({ status: CONNECTION_STATUSES.unavailable, message: offered.message })
         return
       default: {
         const unreachable: never = offered

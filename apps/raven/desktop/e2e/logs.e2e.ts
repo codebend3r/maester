@@ -3,7 +3,12 @@ import { basename, dirname, join } from 'node:path'
 import { playLinkFor } from '@raven/core'
 import { expect, type Page, test } from '@playwright/test'
 import { type Clips, makeClips, makeTrackClip } from '@/e2e/clips'
-import { FIXTURE_MEDIA, type FixtureServer, startFixtureServer } from '@/e2e/fixtureServer'
+import {
+  FIXTURE_ADMIN_KINDS,
+  FIXTURE_MEDIA,
+  type FixtureServer,
+  startFixtureServer,
+} from '@/e2e/fixtureServer'
 import {
   freshUserData,
   logPathFor,
@@ -12,6 +17,7 @@ import {
   readLog,
   removeDir,
   stubTrustPrompt,
+  TRUST_ANSWERS,
   withApp,
 } from '@/e2e/harness'
 
@@ -122,14 +128,14 @@ test.describe.serial('the raven player log', () => {
     const userData = await freshUserData()
     const fixture: FixtureServer = await startFixtureServer({
       clips: { first: clips.first, second: clips.second, tracks: tracks.path },
-      mode: { pin: PIN, isLocked: true, admin: { kind: 'off' } },
+      mode: { pin: PIN, isLocked: true, admin: { kind: FIXTURE_ADMIN_KINDS.off } },
     })
     try {
       await withApp({
         userData,
         run: async ({ app, page }) => {
           await expect(homeHeading(page)).toBeVisible()
-          await stubTrustPrompt({ app, answer: 'add' })
+          await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
           await openUrl({
             app,
             url: playLinkFor({

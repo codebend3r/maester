@@ -11,6 +11,7 @@ import {
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   type DesktopRequest,
+  DOWNLOAD_STATUS_KINDS,
   type DownloadView,
   type SpaceView,
 } from '@/shared/protocol'
@@ -58,9 +59,13 @@ const dropsAny = ({ before, after }: ListMove): boolean => {
 
 const finishesAny = ({ before, after }: ListMove): boolean => {
   const wasReady = new Set(
-    before.filter((view) => view.status.kind === 'ready').map((view) => view.downloadId),
+    before
+      .filter((view) => view.status.kind === DOWNLOAD_STATUS_KINDS.ready)
+      .map((view) => view.downloadId),
   )
-  return after.some((view) => view.status.kind === 'ready' && !wasReady.has(view.downloadId))
+  return after.some(
+    (view) => view.status.kind === DOWNLOAD_STATUS_KINDS.ready && !wasReady.has(view.downloadId),
+  )
 }
 
 /**
@@ -94,23 +99,24 @@ export const useSpace = (): UseQueryResult<SpaceView> => {
 
 /** Queued or downloading: what Home's badge counts and what Pause all stops. */
 export const isInProgress = (view: DownloadView): boolean =>
-  view.status.kind === 'queued' || view.status.kind === 'downloading'
+  view.status.kind === DOWNLOAD_STATUS_KINDS.queued ||
+  view.status.kind === DOWNLOAD_STATUS_KINDS.downloading
 
 /** What the Downloads page and Settings ask main to change. */
 export type DownloadsChange = Extract<
   DesktopRequest,
   {
     type:
-      | 'pauseDownload'
-      | 'resumeDownload'
-      | 'retryDownload'
-      | 'deleteDownload'
-      | 'setDownloadAutoDelete'
-      | 'pauseAllDownloads'
-      | 'resumeAllDownloads'
-      | 'deleteAllDownloads'
-      | 'setDownloadDefaults'
-      | 'showDownloadsFolder'
+      | typeof DESKTOP_REQUESTS.pauseDownload
+      | typeof DESKTOP_REQUESTS.resumeDownload
+      | typeof DESKTOP_REQUESTS.retryDownload
+      | typeof DESKTOP_REQUESTS.deleteDownload
+      | typeof DESKTOP_REQUESTS.setDownloadAutoDelete
+      | typeof DESKTOP_REQUESTS.pauseAllDownloads
+      | typeof DESKTOP_REQUESTS.resumeAllDownloads
+      | typeof DESKTOP_REQUESTS.deleteAllDownloads
+      | typeof DESKTOP_REQUESTS.setDownloadDefaults
+      | typeof DESKTOP_REQUESTS.showDownloadsFolder
   }
 >
 
@@ -130,27 +136,27 @@ export const useChangeDownloads = (): ((request: DownloadsChange) => Promise<boo
       return false
     }
     switch (reply.type) {
-      case 'downloads':
+      case DESKTOP_REPLIES.downloads:
         setDownloads({ queryClient, event: reply })
         // Not awaited, and it cannot reject: the change is made, and the line follows the disk's read.
         void queryClient.invalidateQueries({ queryKey: SPACE_KEY })
         return true
-      case 'done':
+      case DESKTOP_REPLIES.done:
         return true
-      case 'refused':
+      case DESKTOP_REPLIES.refused:
         showNotice(reply.message)
         return false
-      case 'play':
-      case 'playServer':
-      case 'file':
-      case 'recents':
-      case 'output':
-      case 'serverReply':
-      case 'serverUnreachable':
-      case 'servers':
-      case 'updates':
-      case 'downloadAsk':
-      case 'space':
+      case DESKTOP_REPLIES.play:
+      case DESKTOP_REPLIES.playServer:
+      case DESKTOP_REPLIES.file:
+      case DESKTOP_REPLIES.recents:
+      case DESKTOP_REPLIES.output:
+      case DESKTOP_REPLIES.serverReply:
+      case DESKTOP_REPLIES.serverUnreachable:
+      case DESKTOP_REPLIES.servers:
+      case DESKTOP_REPLIES.updates:
+      case DESKTOP_REPLIES.downloadAsk:
+      case DESKTOP_REPLIES.space:
         showNotice(UNREACHED)
         return false
       default: {

@@ -1,5 +1,11 @@
 import type { MenuItemConstructorOptions } from 'electron'
-import type { DesktopEvent, MenuPlayerAction } from '@/shared/protocol'
+import {
+  DESKTOP_EVENTS,
+  type DesktopEvent,
+  MENU_PLAYER_ACTIONS,
+  type MenuPlayerAction,
+  NAVIGATION_TARGETS,
+} from '@/shared/protocol'
 
 export type MenuActions = {
   openDialog: () => void
@@ -23,11 +29,11 @@ export type MenuEntry = Omit<MenuItemConstructorOptions, 'click' | 'submenu'> & 
 const SEPARATOR = { type: 'separator' } as const satisfies MenuEntry
 
 const PLAYBACK = [
-  { label: 'Play or Pause', action: 'togglePlay' },
-  { label: 'Skip Back', action: 'skipBack' },
-  { label: 'Skip Forward', action: 'skipForward' },
-  { label: 'Next', action: 'next' },
-  { label: 'Video Info', action: 'stats' },
+  { label: 'Play or Pause', action: MENU_PLAYER_ACTIONS.togglePlay },
+  { label: 'Skip Back', action: MENU_PLAYER_ACTIONS.skipBack },
+  { label: 'Skip Forward', action: MENU_PLAYER_ACTIONS.skipForward },
+  { label: 'Next', action: MENU_PLAYER_ACTIONS.next },
+  { label: 'Video Info', action: MENU_PLAYER_ACTIONS.stats },
 ] as const satisfies readonly { label: string; action: MenuPlayerAction }[]
 
 /**
@@ -44,7 +50,8 @@ export const menuTemplate = ({
   isDevelopment: boolean
   actions: MenuActions
 }): MenuEntry[] => {
-  const player = (action: MenuPlayerAction) => () => actions.send({ type: 'player', action })
+  const player = (action: MenuPlayerAction) => () =>
+    actions.send({ type: DESKTOP_EVENTS.player, action })
 
   return [
     {
@@ -55,7 +62,8 @@ export const menuTemplate = ({
         {
           label: 'Settings…',
           accelerator: 'CommandOrControl+,',
-          click: () => actions.send({ type: 'navigate', to: 'settings' }),
+          click: () =>
+            actions.send({ type: DESKTOP_EVENTS.navigate, to: NAVIGATION_TARGETS.settings }),
         },
         { label: 'Check for Updates…', id: 'check-for-updates', click: actions.checkForUpdates },
         SEPARATOR,
@@ -79,7 +87,7 @@ export const menuTemplate = ({
         {
           label: 'Open Link…',
           accelerator: 'CommandOrControl+L',
-          click: () => actions.send({ type: 'openLink' }),
+          click: () => actions.send({ type: DESKTOP_EVENTS.openLink }),
         },
         SEPARATOR,
         { role: 'close' },

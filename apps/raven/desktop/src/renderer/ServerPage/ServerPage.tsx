@@ -7,6 +7,7 @@ import {
   type MediaItem,
   mediaLabel,
   PLAYER_ERROR_REASONS,
+  PLAYER_SOURCE_KINDS,
   type PlayerSource,
 } from '@raven/core'
 import {
@@ -38,6 +39,7 @@ import {
 } from '@/renderer/ServerPage/serverServices'
 import { useDesktop } from '@/renderer/stores/desktop'
 import {
+  DESKTOP_REQUESTS,
   isOpaqueId,
   MENU_PLAYER_ACTIONS,
   type MenuPlayerAction,
@@ -263,7 +265,7 @@ const Ready = ({
   const services = useMemo(() => ({ ...base, isVolumeFixed: isOutputFixed }), [base, isOutputFixed])
   const { resumeAt } = services.title
   const source = useMemo<PlayerSource>(
-    () => ({ kind: 'server', serverId, mediaId: media.id }),
+    () => ({ kind: PLAYER_SOURCE_KINDS.server, serverId, mediaId: media.id }),
     [serverId, media.id],
   )
 
@@ -361,7 +363,7 @@ const NativeTitle = ({
     requestQuietly({
       client,
       request: {
-        type: 'noteServerTitle',
+        type: DESKTOP_REQUESTS.noteServerTitle,
         serverId,
         mediaId: media.data.id,
         label: mediaLabel(media.data),

@@ -8,7 +8,9 @@ export const LOG_LINE_MAX = 4096
 export const LOG_BURST_LINES = 200
 export const LOG_BURST_MS = 10_000
 
-export type LogLevel = 'info' | 'warn' | 'error'
+const LOG_LEVELS = { info: 'info', warn: 'warn', error: 'error' } as const
+
+type LogLevel = (typeof LOG_LEVELS)[keyof typeof LOG_LEVELS]
 
 export type LogFs = {
   mkdir: (input: { path: string; options: { recursive: true; mode: number } }) => Promise<unknown>
@@ -408,7 +410,7 @@ export const createLog = ({
 
   const noteDropped = (at: number): void => {
     if (dropped === 0) return
-    queued.push(logLine({ at, level: 'warn', message: `log: ${dropped} lines dropped` }))
+    queued.push(logLine({ at, level: LOG_LEVELS.warn, message: `log: ${dropped} lines dropped` }))
     dropped = 0
   }
 
@@ -441,11 +443,11 @@ export const createLog = ({
     }
 
   return {
-    info: write({ level: 'info', isCounted: true }),
-    warn: write({ level: 'warn', isCounted: true }),
-    error: write({ level: 'error', isCounted: true }),
+    info: write({ level: LOG_LEVELS.info, isCounted: true }),
+    warn: write({ level: LOG_LEVELS.warn, isCounted: true }),
+    error: write({ level: LOG_LEVELS.error, isCounted: true }),
     // The marks are the lines the budget table is measured from, and a handful a minute.
-    mark: write({ level: 'info', isCounted: false }),
+    mark: write({ level: LOG_LEVELS.info, isCounted: false }),
     flush: () => {
       // A quit must not lose the count of a flood still inside its window.
       try {

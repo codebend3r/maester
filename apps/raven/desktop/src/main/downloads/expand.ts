@@ -1,10 +1,13 @@
 import {
+  ADMIN_LOCK_STATES,
+  DOWNLOAD_TARGET_KINDS,
   episodeCode,
   isAdminLock,
   isItemDetails,
   isLibrary,
   isMediaItem,
   isSagaList,
+  ITEM_TYPES,
   itemLabel,
   LOCKED_STATUS,
   mediaLabel,
@@ -14,9 +17,9 @@ import {
   type ItemSummary,
   type MediaItem,
 } from '@raven/core'
-import type { AllowedCall } from '@/main/servers/allowlist'
+import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import { CALL_MESSAGES, type ServerCalls } from '@/main/servers/serverCalls'
-import type { DownloadGroup, DownloadKind } from '@/shared/protocol'
+import { DOWNLOAD_KINDS, type DownloadGroup, type DownloadKind } from '@/shared/protocol'
 
 export const DOWNLOAD_MAX_FILES = 500
 
@@ -27,11 +30,20 @@ export type ExpandedFile = {
   watchedPercent: number
 }
 
+export const EXPAND_REASONS = {
+  locked: 'locked',
+  hidden: 'hidden',
+  gone: 'gone',
+  unreachable: 'unreachable',
+  tooMany: 'tooMany',
+  unreadable: 'unreadable',
+} as const
+
 export type Expansion =
   | { ok: true; kind: DownloadKind; title: string; files: ExpandedFile[] }
   | {
       ok: false
-      reason: 'locked' | 'hidden' | 'gone' | 'unreachable' | 'tooMany' | 'unreadable'
+      reason: (typeof EXPAND_REASONS)[keyof typeof EXPAND_REASONS]
       message: string
     }
 
@@ -80,7 +92,7 @@ const episodeOrder = ({
 
 /** An episode, its season and its show share one group, whichever of them was asked for. */
 const showGroupKey = ({ id, type, show }: Pick<ItemSummary, 'id' | 'type' | 'show'>): string => {
-  if (type === 'show') return `show:${id}`
+  if (type === ITEM_TYPES.show) return `show:${id}`
   // The server names no show only for a season or episode it cannot place under one.
   return show === null ? `item:${id}` : `show:${show.id}`
 }
@@ -119,10 +131,10 @@ const fail = ({ reason, message }: Pick<Failure, 'reason' | 'message'>): Read<ne
 
 /** Whether a 404 is the admin lock hiding the title, which the admin password lifts. */
 const isHiddenByAdminLock = async ({ calls, serverId }: Pick<Server, 'calls' | 'serverId'>) => {
-  const result = await calls.call({ serverId, call: { name: 'getAdminLock' } })
+  const result = await calls.call({ serverId, call: { name: CALL_NAMES.getAdminLock } })
   if (!result.ok || !isSuccess(result.status)) return false
   const lock = parse(result.body)
-  return isAdminLock(lock) && lock.state === 'on' && lock.available
+  return isAdminLock(lock) && lock.state === ADMIN_LOCK_STATES.on && lock.available
 }
 
 const read = async <T>({
@@ -133,40 +145,43 @@ const read = async <T>({
   guard,
 }: Server & { call: AllowedCall; guard: Guard<T> }): Promise<Read<T>> => {
   const result = await calls.call({ serverId, call })
-  if (!result.ok) return fail({ reason: 'unreachable', message: result.message })
+  if (!result.ok) return fail({ reason: EXPAND_REASONS.unreachable, message: result.message })
   if (result.status === LOCKED_STATUS) {
-    return fail({ reason: 'locked', message: LOCKED_MESSAGE(serverName) })
+    return fail({ reason: EXPAND_REASONS.locked, message: LOCKED_MESSAGE(serverName) })
   }
   if (result.status === 404) {
     return (await isHiddenByAdminLock({ calls, serverId }))
-      ? fail({ reason: 'hidden', message: HIDDEN_MESSAGE(serverName) })
-      : fail({ reason: 'gone', message: EXPAND_MESSAGES.gone(serverName) })
+      ? fail({ reason: EXPAND_REASONS.hidden, message: HIDDEN_MESSAGE(serverName) })
+      : fail({ reason: EXPAND_REASONS.gone, message: EXPAND_MESSAGES.gone(serverName) })
   }
   if (!isSuccess(result.status)) {
-    return fail({ reason: 'unreachable', message: CALL_MESSAGES.unreachable(serverName) })
+    return fail({
+      reason: EXPAND_REASONS.unreachable,
+      message: CALL_MESSAGES.unreachable(serverName),
+    })
   }
   const value = parse(result.body)
   return guard(value)
     ? { ok: true, value }
-    : fail({ reason: 'unreadable', message: EXPAND_MESSAGES.unreadable(serverName) })
+    : fail({ reason: EXPAND_REASONS.unreadable, message: EXPAND_MESSAGES.unreadable(serverName) })
 }
 
 const episodesOf = (details: ItemDetails): Entry[] =>
   details.children.flatMap((child) =>
-    child.type === 'episode' && child.primary !== null
+    child.type === ITEM_TYPES.episode && child.primary !== null
       ? [{ media: child.primary, label: episodeLabel(child), order: episodeOrder(child) }]
       : [],
   )
 
 const goneFor = (server: Server): Read<never> =>
-  fail({ reason: 'gone', message: EXPAND_MESSAGES.gone(server.serverName) })
+  fail({ reason: EXPAND_REASONS.gone, message: EXPAND_MESSAGES.gone(server.serverName) })
 
 const draftOfMedia = (media: MediaItem): Draft => {
   const item = media.item
-  if (item?.type !== 'episode') {
+  if (item?.type !== ITEM_TYPES.episode) {
     const title = mediaLabel(media)
     return {
-      kind: 'movie',
+      kind: DOWNLOAD_KINDS.movie,
       title,
       groupTitle: title,
       groupKey: movieGroupKey(media),
@@ -174,7 +189,7 @@ const draftOfMedia = (media: MediaItem): Draft => {
     }
   }
   return {
-    kind: 'episode',
+    kind: DOWNLOAD_KINDS.episode,
     title: mediaLabel(media),
     groupTitle: item.show?.title ?? item.title,
     groupKey: showGroupKey(item),
@@ -189,14 +204,16 @@ const draftOfShow = async ({
   server: Server
   details: ItemDetails
 }): Promise<Read<Draft>> => {
-  const seasonIds = details.children.flatMap((child) => (child.type === 'season' ? [child.id] : []))
+  const seasonIds = details.children.flatMap((child) =>
+    child.type === ITEM_TYPES.season ? [child.id] : [],
+  )
   const entries = await seasonIds.reduce<Promise<Read<Entry[]>>>(
     async (previous, itemId) => {
       const soFar = await previous
       if (!soFar.ok) return soFar
       const season = await read({
         ...server,
-        call: { name: 'getItem', itemId },
+        call: { name: CALL_NAMES.getItem, itemId },
         guard: isItemDetails,
       })
       if (!season.ok) return season
@@ -208,7 +225,7 @@ const draftOfShow = async ({
   return {
     ok: true,
     value: {
-      kind: 'show',
+      kind: DOWNLOAD_KINDS.show,
       title: details.title,
       groupTitle: details.title,
       groupKey: showGroupKey(details),
@@ -226,19 +243,23 @@ const draftOfItem = async ({
 }): Promise<Read<Draft>> => {
   const first = details.versions[0]
   switch (details.type) {
-    case 'movie': {
-      if (first === undefined) return goneFor(server)
-      return {
-        ok: true,
-        value: { ...draftOfMedia(first), kind: 'movie', groupKey: movieGroupKey(first) },
-      }
-    }
-    case 'episode': {
+    case ITEM_TYPES.movie: {
       if (first === undefined) return goneFor(server)
       return {
         ok: true,
         value: {
-          kind: 'episode',
+          ...draftOfMedia(first),
+          kind: DOWNLOAD_KINDS.movie,
+          groupKey: movieGroupKey(first),
+        },
+      }
+    }
+    case ITEM_TYPES.episode: {
+      if (first === undefined) return goneFor(server)
+      return {
+        ok: true,
+        value: {
+          kind: DOWNLOAD_KINDS.episode,
           title: itemLabel(details),
           groupTitle: details.show?.title ?? details.title,
           groupKey: showGroupKey(details),
@@ -246,18 +267,18 @@ const draftOfItem = async ({
         },
       }
     }
-    case 'season':
+    case ITEM_TYPES.season:
       return {
         ok: true,
         value: {
-          kind: 'season',
+          kind: DOWNLOAD_KINDS.season,
           title: itemLabel(details),
           groupTitle: details.show?.title ?? details.title,
           groupKey: showGroupKey(details),
           entries: episodesOf(details),
         },
       }
-    case 'show':
+    case ITEM_TYPES.show:
       return draftOfShow({ server, details })
     default: {
       const unreachable: never = details.type
@@ -274,26 +295,26 @@ const draftOf = async ({
   target: DownloadTarget
 }): Promise<Read<Draft>> => {
   switch (target.kind) {
-    case 'media': {
+    case DOWNLOAD_TARGET_KINDS.media: {
       const media = await read({
         ...server,
-        call: { name: 'getMedia', mediaId: target.mediaId },
+        call: { name: CALL_NAMES.getMedia, mediaId: target.mediaId },
         guard: isMediaItem,
       })
       return media.ok ? { ok: true, value: draftOfMedia(media.value) } : media
     }
-    case 'item': {
+    case DOWNLOAD_TARGET_KINDS.item: {
       const details = await read({
         ...server,
-        call: { name: 'getItem', itemId: target.itemId },
+        call: { name: CALL_NAMES.getItem, itemId: target.itemId },
         guard: isItemDetails,
       })
       return details.ok ? draftOfItem({ server, details: details.value }) : details
     }
-    case 'saga': {
+    case DOWNLOAD_TARGET_KINDS.saga: {
       const sagas = await read({
         ...server,
-        call: { name: 'getSagas', libraryId: target.libraryId },
+        call: { name: CALL_NAMES.getSagas, libraryId: target.libraryId },
         guard: isSagaList,
       })
       if (!sagas.ok) return sagas
@@ -302,7 +323,7 @@ const draftOf = async ({
       return {
         ok: true,
         value: {
-          kind: 'saga',
+          kind: DOWNLOAD_KINDS.saga,
           title: saga.name,
           groupTitle: saga.name,
           groupKey: sagaGroupKey(target),
@@ -331,7 +352,7 @@ const watchedPercents = ({
       if (!soFar.ok) return soFar
       const library = await read({
         ...server,
-        call: { name: 'getLibrary', libraryId },
+        call: { name: CALL_NAMES.getLibrary, libraryId },
         guard: isLibrary,
       })
       if (!library.ok) return library
@@ -360,7 +381,7 @@ export const expandTarget = async ({
   const { kind, title, groupTitle, groupKey } = draft.value
   const entries = oncePerFile(draft.value.entries)
   if (entries.length > DOWNLOAD_MAX_FILES) {
-    return { ok: false, reason: 'tooMany', message: EXPAND_MESSAGES.tooMany }
+    return { ok: false, reason: EXPAND_REASONS.tooMany, message: EXPAND_MESSAGES.tooMany }
   }
   const kept = entries.filter(({ media }) => !skip(media.id))
   const libraryIds = [...new Set(kept.map(({ media }) => media.libraryId))]

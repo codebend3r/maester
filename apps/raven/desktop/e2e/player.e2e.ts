@@ -35,6 +35,8 @@ const distanceFrom = async ({ page, seconds }: { page: Page; seconds: number }) 
 
 const homeHeading = (page: Page) => page.getByRole('heading', { name: 'raven player' })
 
+const DRAG_EVENTS = { enter: 'dragenter', drop: 'drop' } as const
+
 /** Sends the window a drag event carrying a File the page made. */
 const forgedDrag = ({
   page,
@@ -42,7 +44,7 @@ const forgedDrag = ({
   name,
 }: {
   page: Page
-  type: 'dragenter' | 'drop'
+  type: (typeof DRAG_EVENTS)[keyof typeof DRAG_EVENTS]
   name: string
 }) =>
   page.evaluate(
@@ -64,10 +66,10 @@ const dropOverlay = (page: Page) => page.getByText('Drop to play')
  */
 const dropForgedFileOnHome = async ({ page, name }: { page: Page; name: string }) => {
   await expect(async () => {
-    await forgedDrag({ page, type: 'dragenter', name })
+    await forgedDrag({ page, type: DRAG_EVENTS.enter, name })
     await expect(dropOverlay(page)).toBeVisible({ timeout: 500 })
   }).toPass()
-  await forgedDrag({ page, type: 'drop', name })
+  await forgedDrag({ page, type: DRAG_EVENTS.drop, name })
   await expect(dropOverlay(page)).toBeHidden()
 }
 
@@ -76,8 +78,8 @@ const dropForgedFileOnHome = async ({ page, name }: { page: Page; name: string }
  * window's drop listener is long attached; the watch route shows no overlay to wait for.
  */
 const dropForgedFile = async ({ page, name }: { page: Page; name: string }) => {
-  await forgedDrag({ page, type: 'dragenter', name })
-  await forgedDrag({ page, type: 'drop', name })
+  await forgedDrag({ page, type: DRAG_EVENTS.enter, name })
+  await forgedDrag({ page, type: DRAG_EVENTS.drop, name })
 }
 
 /** A notice over the watch route sits wholly above the controls bar's timeline. */

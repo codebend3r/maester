@@ -1,5 +1,6 @@
 import type { RavenDesktopBridge } from '@/shared/bridge'
 import {
+  DESKTOP_REPLIES,
   type DesktopEvent,
   type DesktopReply,
   type DesktopRequest,
@@ -14,7 +15,7 @@ export type DesktopClient = {
 }
 
 const UNREADABLE = {
-  type: 'refused',
+  type: DESKTOP_REPLIES.refused,
   message: 'raven player could not read its own reply.',
 } as const satisfies DesktopReply
 

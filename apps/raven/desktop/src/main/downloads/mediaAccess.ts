@@ -13,6 +13,7 @@ import {
 import type { ServerEntry } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
+import { CALL_NAMES } from '@/main/servers/allowlist'
 import { CALL_MESSAGES, loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { isSidecarTrackId, SERVER_GONE } from '@/shared/protocol'
 
@@ -38,14 +39,23 @@ export type ProbeFetch = (input: {
   timeoutMs: number
 }) => Promise<{ status: number; firstByteMs: number }>
 
+export const ACCESS_KINDS = { origin: 'origin', cookie: 'cookie' } as const
+
 /** `renewAt` is when the queue reads a new ticket, in epoch ms by raven player's clock. */
 export type Access =
-  | { kind: 'origin'; url: string; ticket: string; renewAt: number }
-  | { kind: 'cookie' }
+  | { kind: typeof ACCESS_KINDS.origin; url: string; ticket: string; renewAt: number }
+  | { kind: typeof ACCESS_KINDS.cookie }
+
+export const ACCESS_REFUSALS = {
+  locked: 'locked',
+  unreachable: 'unreachable',
+  unreadable: 'unreadable',
+  gone: 'gone',
+} as const
 
 export type AccessOutcome =
   | { ok: true; access: Access }
-  | { ok: false; reason: 'locked' | 'unreachable' | 'unreadable' | 'gone'; message: string }
+  | { ok: false; reason: (typeof ACCESS_REFUSALS)[keyof typeof ACCESS_REFUSALS]; message: string }
 
 export type MediaAccess = {
   accessFor: (input: { serverId: string; mediaId: number }) => Promise<AccessOutcome>
@@ -77,9 +87,9 @@ const mediaUrlFor = ({
 }): string => {
   if (!isMediaId(mediaId)) throw new RangeError('A download needs a media id')
   switch (access.kind) {
-    case 'origin':
+    case ACCESS_KINDS.origin:
       return `${access.url}/api/media/${mediaId}/${path}?${toQueryString({ t: access.ticket })}`
-    case 'cookie':
+    case ACCESS_KINDS.cookie:
       return `${origin}/api/media/${mediaId}/${path}`
     default: {
       const unreachable: never = access
@@ -171,7 +181,7 @@ export const createMediaAccess = ({
   /** Never rejects: a pick is held for good, so a rejected one would fail every later call. */
   const pickFor = async (server: ServerEntry): Promise<MediaOrigin | null> => {
     const reply = await calls
-      .call({ serverId: server.id, call: { name: 'getMediaOrigins' } })
+      .call({ serverId: server.id, call: { name: CALL_NAMES.getMediaOrigins } })
       .catch(() => null)
     const body = reply?.ok && reply.status === 200 ? readJson(reply.body) : null
     if (!isMediaOrigins(body)) {
@@ -215,31 +225,39 @@ export const createMediaAccess = ({
   }): Promise<AccessOutcome> => {
     const reply = await calls.call({
       serverId: server.id,
-      call: { name: 'getMediaTicket', mediaId },
+      call: { name: CALL_NAMES.getMediaTicket, mediaId },
     })
-    if (!reply.ok) return { ok: false, reason: 'unreachable', message: reply.message }
+    if (!reply.ok) return { ok: false, reason: ACCESS_REFUSALS.unreachable, message: reply.message }
     if (reply.status === LOCKED_STATUS) {
-      return { ok: false, reason: 'locked', message: DOWNLOAD_MESSAGES.relocked(server.name) }
+      return {
+        ok: false,
+        reason: ACCESS_REFUSALS.locked,
+        message: DOWNLOAD_MESSAGES.relocked(server.name),
+      }
     }
     if (reply.status === NOT_FOUND_STATUS) {
-      return { ok: false, reason: 'gone', message: EXPAND_MESSAGES.gone(server.name) }
+      return { ok: false, reason: ACCESS_REFUSALS.gone, message: EXPAND_MESSAGES.gone(server.name) }
     }
     // A proxy in front of a restarting server answers 502 to 504: an outage, not a refusal.
     if (reply.status >= 500) {
-      return { ok: false, reason: 'unreachable', message: CALL_MESSAGES.unreachable(server.name) }
+      return {
+        ok: false,
+        reason: ACCESS_REFUSALS.unreachable,
+        message: CALL_MESSAGES.unreachable(server.name),
+      }
     }
     const body = reply.status === 200 ? readJson(reply.body) : null
     if (!isMediaTicket(body)) {
       return {
         ok: false,
-        reason: 'unreadable',
+        reason: ACCESS_REFUSALS.unreadable,
         message: `${server.name} sent something raven player cannot read.`,
       }
     }
     return {
       ok: true,
       access: {
-        kind: 'origin',
+        kind: ACCESS_KINDS.origin,
         url: origin.url,
         ticket: body.ticket,
         renewAt: now() + TICKET_RENEW_MS,
@@ -250,9 +268,10 @@ export const createMediaAccess = ({
   return {
     accessFor: async ({ serverId, mediaId }) => {
       const server = serverOf(serverId)
-      if (server === null) return { ok: false, reason: 'unreachable', message: SERVER_GONE }
+      if (server === null)
+        return { ok: false, reason: ACCESS_REFUSALS.unreachable, message: SERVER_GONE }
       const origin = await pickOf(server)
-      if (origin === null) return { ok: true, access: { kind: 'cookie' } }
+      if (origin === null) return { ok: true, access: { kind: ACCESS_KINDS.cookie } }
       return ticketAccess({ server, origin, mediaId })
     },
     forget: (serverId) => {

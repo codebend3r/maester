@@ -19,13 +19,20 @@ import {
   type FileFacts,
   forgetResume,
   type PlayerState,
+  RECENT_KINDS,
   removeRecent,
   resumeFor,
   watchedShare,
 } from '@/main/playerState'
 import { loggable } from '@/main/servers/serverCalls'
 import type { StateStore } from '@/main/stateStore'
-import { type DesktopReply, isOpaqueId, MAX_QUEUE } from '@/shared/protocol'
+import {
+  DESKTOP_REPLIES,
+  type DesktopReply,
+  DOWNLOAD_STATUS_KINDS,
+  isOpaqueId,
+  MAX_QUEUE,
+} from '@/shared/protocol'
 
 export type DownloadPlaybackDeps = {
   /** Read here; every change goes through `change`, so the page hears it. */
@@ -117,17 +124,19 @@ export type DownloadPlayback = {
   forget: (entries: readonly DownloadEntry[]) => void
 }
 
-const refused = (message: string): DesktopReply => ({ type: 'refused', message })
+const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
 
 /** A granted file one side of the player is on, and the download whose video it is, if any. */
 type Slot = { fileId: string | null; downloadId: string | null }
 
 const NO_SLOT: Slot = { fileId: null, downloadId: null }
 
+const PLAY_SIDES = { page: 'page', engine: 'engine' } as const
+
 /** Drops these videos' recents and resume spots; the same state when it names none of them. */
 const forgetVideos = (state: PlayerState, { paths }: { paths: readonly string[] }): PlayerState => {
   const isNamed = (path: string): boolean =>
-    state.recents.some((recent) => recent.kind === 'file' && recent.path === path) ||
+    state.recents.some((recent) => recent.kind === RECENT_KINDS.file && recent.path === path) ||
     state.resume.some((spot) => spot.path === path)
   return paths
     .filter(isNamed)
@@ -194,7 +203,9 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
       sameGroup({ a: entry, b: other }),
     )
     const index = group.findIndex(({ downloadId }) => downloadId === entry.downloadId)
-    return group.slice(index + 1).filter((other) => other.status.kind === 'ready')
+    return group
+      .slice(index + 1)
+      .filter((other) => other.status.kind === DOWNLOAD_STATUS_KINDS.ready)
   }
 
   /** The first of `entries` whose video can still be granted. */
@@ -210,7 +221,8 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
 
   const open: DownloadPlayback['open'] = async ({ downloadId }) => {
     const entry = entryById(store.read(), { downloadId })
-    if (entry === null || entry.status.kind !== 'ready') return refused(DOWNLOAD_MESSAGES.unknown)
+    if (entry === null || entry.status.kind !== DOWNLOAD_STATUS_KINDS.ready)
+      return refused(DOWNLOAD_MESSAGES.unknown)
     const later = laterReady(entry).slice(0, MAX_QUEUE)
     const fileId = await grantVideo(entry)
     if (fileId === null) {
@@ -230,7 +242,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
       }),
     )
     return {
-      type: 'play',
+      type: DESKTOP_REPLIES.play,
       target: {
         fileId,
         queue: queued.flatMap((queuedId) => (queuedId === null ? [] : [queuedId])),
@@ -282,7 +294,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   }
 
   const noteOpened: DownloadPlayback['noteOpened'] = ({ fileId }) => {
-    play({ side: 'page', fileId })
+    play({ side: PLAY_SIDES.page, fileId })
     if (playing.page.downloadId !== null) freshFiles.add(fileId)
   }
 
@@ -313,7 +325,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   // The page may say it left one file after the next one opened, so only a leave of the file
   // the page is still on clears it.
   const playbackLeft: DownloadPlayback['playbackLeft'] = ({ fileId }) => {
-    if (playing.page.fileId === fileId) play({ side: 'page', fileId: null })
+    if (playing.page.fileId === fileId) play({ side: PLAY_SIDES.page, fileId: null })
   }
 
   const isMidTitle: DownloadPlayback['isMidTitle'] = (downloadId) => {
@@ -380,9 +392,9 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     serverPositionOf: ({ fileId }) => entryOfFile(fileId)?.serverPosition ?? 0,
     noteOpened,
     notePosition,
-    notePlaying: ({ fileId }) => play({ side: 'engine', fileId }),
+    notePlaying: ({ fileId }) => play({ side: PLAY_SIDES.engine, fileId }),
     playbackLeft,
-    noteNewPage: () => play({ side: 'page', fileId: null }),
+    noteNewPage: () => play({ side: PLAY_SIDES.page, fileId: null }),
     isPlaying: (downloadId) => playingIds().includes(downloadId),
     isMidTitle,
     watchedOf,

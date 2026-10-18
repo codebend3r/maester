@@ -1,5 +1,6 @@
 import { LOCKED_STATUS } from '@raven/core'
 import type { Timers } from '@/main/stateStore'
+import { HTTP_HEADERS } from '@/shared/httpHeaders'
 
 export const PROGRESS_STEP_BYTES = 8 * 1024 ** 2
 export const PROGRESS_STEP_MS = 1000
@@ -22,19 +23,22 @@ export type PartFile = {
   close: () => Promise<void>
 }
 
+export const FETCH_REASONS = {
+  aborted: 'aborted',
+  unreachable: 'unreachable',
+  stalled: 'stalled',
+  changed: 'changed',
+  locked: 'locked',
+  unauthorized: 'unauthorized',
+  space: 'space',
+  status: 'status',
+} as const
+
 export type FetchOutcome =
   | { ok: true; bytes: number }
   | {
       ok: false
-      reason:
-        | 'aborted'
-        | 'unreachable'
-        | 'stalled'
-        | 'changed'
-        | 'locked'
-        | 'unauthorized'
-        | 'space'
-        | 'status'
+      reason: (typeof FETCH_REASONS)[keyof typeof FETCH_REASONS]
       status: number | null
       bytes: number
     }
@@ -58,9 +62,21 @@ type FetchInput = {
 type Answer = Awaited<ReturnType<StreamFetch>>
 
 /** Why the sink stopped the pipe, so the outcome is not guessed from the error that comes out of it. */
-type Stop = { kind: 'overflow' } | { kind: 'space' } | { kind: 'write'; error: unknown }
+const STOP_KINDS = { overflow: 'overflow', space: 'space', write: 'write' } as const
 
-type Plan = 'append' | 'restart' | 'changed' | 'unexpected'
+type Stop =
+  | { kind: typeof STOP_KINDS.overflow }
+  | { kind: typeof STOP_KINDS.space }
+  | { kind: typeof STOP_KINDS.write; error: unknown }
+
+const PLANS = {
+  append: 'append',
+  restart: 'restart',
+  changed: 'changed',
+  unexpected: 'unexpected',
+} as const
+
+type Plan = (typeof PLANS)[keyof typeof PLANS]
 
 const failure = ({
   reason,
@@ -89,13 +105,13 @@ const refusalFor = (status: number): { reason: FailureReason; status: number } |
   if (status >= 200 && status < 300) return null
   switch (status) {
     case 401:
-      return { reason: 'unauthorized', status }
+      return { reason: FETCH_REASONS.unauthorized, status }
     case LOCKED_STATUS:
-      return { reason: 'locked', status }
+      return { reason: FETCH_REASONS.locked, status }
     case UNSATISFIABLE_RANGE_STATUS:
-      return { reason: 'changed', status }
+      return { reason: FETCH_REASONS.changed, status }
     default:
-      return { reason: 'status', status }
+      return { reason: FETCH_REASONS.status, status }
   }
 }
 
@@ -108,9 +124,9 @@ const planFor = ({
   from: number
   rangeStart: number | null
 }): Plan => {
-  if (status !== 200 && status !== 206) return 'unexpected'
-  if (from === 0) return status === 200 ? 'append' : 'changed'
-  return status === 206 && rangeStart === from ? 'append' : 'restart'
+  if (status !== 200 && status !== 206) return PLANS.unexpected
+  if (from === 0) return status === 200 ? PLANS.append : PLANS.changed
+  return status === 206 && rangeStart === from ? PLANS.append : PLANS.restart
 }
 
 const discard = async (body: Answer['body']): Promise<void> => {
@@ -153,13 +169,15 @@ const streamToPart = async ({
       timers.clear(stall.handle)
       const total = progress.bytes + chunk.length
       if (total > expectedSize) {
-        stop.value = { kind: 'overflow' }
+        stop.value = { kind: STOP_KINDS.overflow }
         throw new Error('The body is longer than the file')
       }
       try {
         await part.append(chunk)
       } catch (error) {
-        stop.value = isNoSpace(error) ? { kind: 'space' } : { kind: 'write', error }
+        stop.value = isNoSpace(error)
+          ? { kind: STOP_KINDS.space }
+          : { kind: STOP_KINDS.write, error }
         throw new Error('The chunk could not be written', { cause: error })
       }
       progress.bytes = total
@@ -186,19 +204,24 @@ const streamToPart = async ({
   timers.clear(stall.handle)
 
   const end = stop.value
-  if (end?.kind === 'overflow') {
+  if (end?.kind === STOP_KINDS.overflow) {
     await part.truncate()
-    return failure({ reason: 'changed', bytes: 0 })
+    return failure({ reason: FETCH_REASONS.changed, bytes: 0 })
   }
-  if (end?.kind === 'space') return failure({ reason: 'space', bytes: progress.bytes })
-  if (end?.kind === 'write') throw end.error
+  if (end?.kind === STOP_KINDS.space)
+    return failure({ reason: FETCH_REASONS.space, bytes: progress.bytes })
+  if (end?.kind === STOP_KINDS.write) throw end.error
   if (piped.isFailed) {
-    const reason = signal.aborted ? 'aborted' : stall.isStalled ? 'stalled' : 'unreachable'
+    const reason = signal.aborted
+      ? FETCH_REASONS.aborted
+      : stall.isStalled
+        ? FETCH_REASONS.stalled
+        : FETCH_REASONS.unreachable
     return failure({ reason, bytes: progress.bytes })
   }
   if (progress.bytes !== expectedSize) {
     await part.truncate()
-    return failure({ reason: 'changed', bytes: 0 })
+    return failure({ reason: FETCH_REASONS.changed, bytes: 0 })
   }
   onProgress(progress.bytes)
   return { ok: true, bytes: progress.bytes }
@@ -216,7 +239,7 @@ const download = async ({
   }
   if (from > expectedSize) {
     await part.truncate()
-    if (!canRestart) return failure({ reason: 'changed', bytes: 0 })
+    if (!canRestart) return failure({ reason: FETCH_REASONS.changed, bytes: 0 })
     return download({ ...input, canRestart: false })
   }
   // A server that takes the request and never answers it stalls the file as a silent body does.
@@ -241,7 +264,11 @@ const download = async ({
     .finally(() => timers.clear(timer))
   if (answer.isFailed) {
     const isAborted = signal.aborted && isAbortError(answer.error)
-    const reason = isAborted ? 'aborted' : wait.isStalled ? 'stalled' : 'unreachable'
+    const reason = isAborted
+      ? FETCH_REASONS.aborted
+      : wait.isStalled
+        ? FETCH_REASONS.stalled
+        : FETCH_REASONS.unreachable
     return failure({ reason, bytes: from })
   }
   const { response } = answer
@@ -258,27 +285,27 @@ const download = async ({
   const plan = planFor({
     status: response.status,
     from,
-    rangeStart: contentRangeStart(response.headers.get('content-range')),
+    rangeStart: contentRangeStart(response.headers.get(HTTP_HEADERS.contentRange)),
   })
   switch (plan) {
-    case 'append':
+    case PLANS.append:
       return streamToPart({
         ...input,
         body: response.body,
         from,
         stallMs: stallMs ?? DOWNLOAD_STALL_MS,
       })
-    case 'restart':
+    case PLANS.restart:
       await discard(response.body)
       await part.truncate()
-      if (!canRestart) return failure({ reason: 'changed', bytes: 0 })
+      if (!canRestart) return failure({ reason: FETCH_REASONS.changed, bytes: 0 })
       return download({ ...input, canRestart: false })
-    case 'changed':
+    case PLANS.changed:
       await discard(response.body)
-      return failure({ reason: 'changed', bytes: from })
-    case 'unexpected':
+      return failure({ reason: FETCH_REASONS.changed, bytes: from })
+    case PLANS.unexpected:
       await discard(response.body)
-      return failure({ reason: 'status', status: response.status, bytes: from })
+      return failure({ reason: FETCH_REASONS.status, status: response.status, bytes: from })
     default: {
       const unreachable: never = plan
       throw new Error(`Unknown plan ${String(unreachable)}`)

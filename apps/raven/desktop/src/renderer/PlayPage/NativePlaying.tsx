@@ -1,5 +1,11 @@
 import { PLAYER_COMMANDS, PLAYER_EVENTS, type PlayerSource } from '@raven/core'
-import { type NativePlayer, Player, type PlayerServices, useHostPlayer } from '@raven/ui'
+import {
+  ENGINE_KINDS,
+  type NativePlayer,
+  Player,
+  type PlayerServices,
+  useHostPlayer,
+} from '@raven/ui'
 import { useEffect, useMemo, useRef } from 'react'
 import { isEngineGone, isEngineStop, PlayerRefusal } from '@/renderer/desktop/playerConnection'
 
@@ -71,5 +77,5 @@ export const NativePlaying = ({
     [player, onLost],
   )
 
-  return isHosting && <Player engine={{ kind: 'native', player: watched, source }} />
+  return isHosting && <Player engine={{ kind: ENGINE_KINDS.native, player: watched, source }} />
 }

@@ -9,7 +9,7 @@ import { ThisComputer } from '@/renderer/SettingsPage/ThisComputer'
 import { Updates } from '@/renderer/SettingsPage/Updates'
 import { RECENTS_KEY } from '@/renderer/Shell/openReply'
 import { useDesktop } from '@/renderer/stores/desktop'
-import { DESKTOP_REPLIES } from '@/shared/protocol'
+import { DESKTOP_REPLIES, DESKTOP_REQUESTS } from '@/shared/protocol'
 
 export const SettingsPage = () => {
   const { client } = useDesktop()
@@ -25,7 +25,7 @@ export const SettingsPage = () => {
   const clear = async () => {
     // Emptied first: a live region announces a change, so the same text twice needs a gap.
     setStatus('')
-    const reply = await client.request({ type: 'clearRecents' })
+    const reply = await client.request({ type: DESKTOP_REQUESTS.clearRecents })
     if (reply.type === DESKTOP_REPLIES.refused) {
       setStatus(reply.message)
       return

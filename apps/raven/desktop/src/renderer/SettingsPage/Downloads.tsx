@@ -1,8 +1,9 @@
 import { formatBytes } from '@raven/core'
-import { Button } from '@raven/ui'
+import { Button, KEYS } from '@raven/ui'
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { useChangeDownloads, useDownloads, useSpace } from '@/renderer/desktop/downloadsApi'
 import styles from '@/renderer/SettingsPage/Downloads.module.scss'
+import { DESKTOP_REQUESTS } from '@/shared/protocol'
 
 const focus = (element: HTMLElement | null) => {
   if (element !== null) element.focus()
@@ -44,14 +45,14 @@ export const Downloads = ({ className }: { className?: string }) => {
     if (isDeletingNow.current) return
     isDeletingNow.current = true
     setIsDeleting(true)
-    await change({ type: 'deleteAllDownloads' })
+    await change({ type: DESKTOP_REQUESTS.deleteAllDownloads })
     isDeletingNow.current = false
     setIsDeleting(false)
     setIsAsking(false)
   }
 
   const backOnEscape = (event: KeyboardEvent) => {
-    if (event.key !== 'Escape') return
+    if (event.key !== KEYS.escape) return
     event.preventDefault()
     setIsAsking(false)
   }
@@ -80,7 +81,10 @@ export const Downloads = ({ className }: { className?: string }) => {
             checked={data.autoDeleteDefault}
             aria-checked={data.autoDeleteDefault}
             onChange={(event) =>
-              void change({ type: 'setDownloadDefaults', autoDelete: event.target.checked })
+              void change({
+                type: DESKTOP_REQUESTS.setDownloadDefaults,
+                autoDelete: event.target.checked,
+              })
             }
           />
           Delete once watched by default
@@ -122,7 +126,7 @@ export const Downloads = ({ className }: { className?: string }) => {
         <Button
           className={styles.show}
           icon="folder"
-          onClick={() => void change({ type: 'showDownloadsFolder' })}
+          onClick={() => void change({ type: DESKTOP_REQUESTS.showDownloadsFolder })}
         >
           Show in Finder
         </Button>

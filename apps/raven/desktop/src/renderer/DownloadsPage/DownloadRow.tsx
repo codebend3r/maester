@@ -1,5 +1,5 @@
 import { formatBytes } from '@raven/core'
-import { Button, type IconName, UnlockDialog } from '@raven/ui'
+import { Button, type IconName, KEYS, UNLOCK_SECRETS, UnlockDialog } from '@raven/ui'
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { useDesktop } from '@/renderer/stores/desktop'
 import { UNREACHED, useChangeDownloads } from '@/renderer/desktop/downloadsApi'
@@ -9,25 +9,34 @@ import styles from '@/renderer/DownloadsPage/DownloadsPage.module.scss'
 import { SERVER_COPY } from '@/renderer/ServerPage/serverServices'
 import { useOpenReply } from '@/renderer/Shell/openReply'
 import { useNotice } from '@/renderer/stores/notice'
-import { DESKTOP_REQUESTS, type DownloadStatus, type DownloadView } from '@/shared/protocol'
+import {
+  DESKTOP_REQUESTS,
+  DOWNLOAD_STATUS_KINDS,
+  type DownloadStatus,
+  type DownloadView,
+} from '@/shared/protocol'
 
 /** What a row shows: the download, or the question before it is deleted. */
-type RowMode = 'view' | 'delete'
+const ROW_MODES = { view: 'view', delete: 'delete' } as const
 
-/** The one action a row's status allows beside Delete. */
-type RowAction = { name: 'Play' | 'Pause' | 'Resume' | 'Retry'; icon: IconName }
+type RowMode = (typeof ROW_MODES)[keyof typeof ROW_MODES]
+
+/** The one action a row's status allows beside Delete; its name is the button's label. */
+const ROW_ACTIONS = { play: 'Play', pause: 'Pause', resume: 'Resume', retry: 'Retry' } as const
+
+type RowAction = { name: (typeof ROW_ACTIONS)[keyof typeof ROW_ACTIONS]; icon: IconName }
 
 const actionOf = (status: DownloadStatus): RowAction => {
   switch (status.kind) {
-    case 'ready':
-      return { name: 'Play', icon: 'play' }
-    case 'queued':
-    case 'downloading':
-      return { name: 'Pause', icon: 'pause' }
-    case 'paused':
-      return { name: 'Resume', icon: 'download' }
-    case 'failed':
-      return { name: 'Retry', icon: 'rescan' }
+    case DOWNLOAD_STATUS_KINDS.ready:
+      return { name: ROW_ACTIONS.play, icon: 'play' }
+    case DOWNLOAD_STATUS_KINDS.queued:
+    case DOWNLOAD_STATUS_KINDS.downloading:
+      return { name: ROW_ACTIONS.pause, icon: 'pause' }
+    case DOWNLOAD_STATUS_KINDS.paused:
+      return { name: ROW_ACTIONS.resume, icon: 'download' }
+    case DOWNLOAD_STATUS_KINDS.failed:
+      return { name: ROW_ACTIONS.retry, icon: 'rescan' }
     default: {
       const unreachable: never = status
       return unreachable
@@ -38,13 +47,13 @@ const actionOf = (status: DownloadStatus): RowAction => {
 /** What deleting the row frees: the whole file once ready, else what its status says is on disk. */
 const bytesOnDisk = ({ status, size }: DownloadView): number => {
   switch (status.kind) {
-    case 'ready':
+    case DOWNLOAD_STATUS_KINDS.ready:
       return size
-    case 'queued':
+    case DOWNLOAD_STATUS_KINDS.queued:
       return 0
-    case 'downloading':
-    case 'paused':
-    case 'failed':
+    case DOWNLOAD_STATUS_KINDS.downloading:
+    case DOWNLOAD_STATUS_KINDS.paused:
+    case DOWNLOAD_STATUS_KINDS.failed:
       return status.bytes
     default: {
       const unreachable: never = status
@@ -83,7 +92,7 @@ const DeletesIn = ({ at }: { at: number }) => {
 const StatusLine = ({ view, textId }: { view: DownloadView; textId: string }) => {
   const { status } = view
   switch (status.kind) {
-    case 'downloading':
+    case DOWNLOAD_STATUS_KINDS.downloading:
       return (
         <>
           <span id={textId}>{`${formatBytes(status.bytes)} of ${formatBytes(view.size)}`}</span>
@@ -95,13 +104,13 @@ const StatusLine = ({ view, textId }: { view: DownloadView; textId: string }) =>
           />
         </>
       )
-    case 'queued':
+    case DOWNLOAD_STATUS_KINDS.queued:
       return <span>Waiting</span>
-    case 'paused':
+    case DOWNLOAD_STATUS_KINDS.paused:
       return <span>{status.message ?? 'Paused'}</span>
-    case 'failed':
+    case DOWNLOAD_STATUS_KINDS.failed:
       return <span>{`Failed: ${status.message}`}</span>
-    case 'ready':
+    case DOWNLOAD_STATUS_KINDS.ready:
       return (
         <>
           <progress
@@ -133,7 +142,7 @@ export const DownloadRow = ({
   const change = useChangeDownloads()
   const openReply = useOpenReply()
   const showNotice = useNotice((state) => state.show)
-  const [mode, setMode] = useState<RowMode>('view')
+  const [mode, setMode] = useState<RowMode>(ROW_MODES.view)
   const [isUnlocking, setIsUnlocking] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const isDeletingNow = useRef(false)
@@ -149,8 +158,8 @@ export const DownloadRow = ({
   useEffect(() => {
     const previous = previousMode.current
     previousMode.current = mode
-    if (mode === 'delete') return focus(cancelButton.current)
-    if (previous === 'view') return
+    if (mode === ROW_MODES.delete) return focus(cancelButton.current)
+    if (previous === ROW_MODES.view) return
     const active = document.activeElement
     const isFocusLost = active === null || active === document.body
     if (!isFocusLost && !(row.current?.contains(active) ?? false)) return
@@ -167,16 +176,16 @@ export const DownloadRow = ({
 
   const act = async () => {
     switch (action.name) {
-      case 'Play':
+      case ROW_ACTIONS.play:
         return play()
-      case 'Pause':
-        return change({ type: 'pauseDownload', downloadId })
-      case 'Resume':
+      case ROW_ACTIONS.pause:
+        return change({ type: DESKTOP_REQUESTS.pauseDownload, downloadId })
+      case ROW_ACTIONS.resume:
         // A library locked again needs its PIN before main can fetch from it.
         if (view.needsUnlock) return setIsUnlocking(true)
-        return change({ type: 'resumeDownload', downloadId })
-      case 'Retry':
-        return change({ type: 'retryDownload', downloadId })
+        return change({ type: DESKTOP_REQUESTS.resumeDownload, downloadId })
+      case ROW_ACTIONS.retry:
+        return change({ type: DESKTOP_REQUESTS.retryDownload, downloadId })
       default: {
         const unreachable: never = action.name
         return unreachable
@@ -188,17 +197,17 @@ export const DownloadRow = ({
     if (isDeletingNow.current) return
     isDeletingNow.current = true
     setIsDeleting(true)
-    const isDeleted = await change({ type: 'deleteDownload', downloadId })
+    const isDeleted = await change({ type: DESKTOP_REQUESTS.deleteDownload, downloadId })
     isDeletingNow.current = false
     setIsDeleting(false)
-    setMode('view')
+    setMode(ROW_MODES.view)
     if (isDeleted) onDeleted()
   }
 
   const backOnEscape = (event: KeyboardEvent) => {
-    if (event.key !== 'Escape') return
+    if (event.key !== KEYS.escape) return
     event.preventDefault()
-    setMode('view')
+    setMode(ROW_MODES.view)
   }
 
   // A movie is its own group, so its row names the server alone rather than its title twice.
@@ -208,8 +217,8 @@ export const DownloadRow = ({
   ].join(' · ')
 
   return (
-    <li ref={row} className={mode === 'view' ? styles.row : styles.asking}>
-      {mode === 'delete' ? (
+    <li ref={row} className={mode === ROW_MODES.view ? styles.row : styles.asking}>
+      {mode === ROW_MODES.delete ? (
         <>
           <p id={ids.question} className={styles.question}>
             {`Delete ${label}? ${formatBytes(bytesOnDisk(view))} will be freed.`}
@@ -225,7 +234,11 @@ export const DownloadRow = ({
             >
               Delete
             </Button>
-            <Button ref={cancelButton} onClick={() => setMode('view')} onKeyDown={backOnEscape}>
+            <Button
+              ref={cancelButton}
+              onClick={() => setMode(ROW_MODES.view)}
+              onKeyDown={backOnEscape}
+            >
               Cancel
             </Button>
           </div>
@@ -243,7 +256,7 @@ export const DownloadRow = ({
           <div className={styles.actions}>
             <Button
               className={styles.act}
-              tone={action.name === 'Play' ? 'primary' : 'quiet'}
+              tone={action.name === ROW_ACTIONS.play ? 'primary' : 'quiet'}
               icon={action.icon}
               aria-label={`${action.name} ${label}`}
               onClick={() => void act()}
@@ -259,7 +272,7 @@ export const DownloadRow = ({
                 aria-describedby={ids.label}
                 onChange={(event) =>
                   void change({
-                    type: 'setDownloadAutoDelete',
+                    type: DESKTOP_REQUESTS.setDownloadAutoDelete,
                     downloadId,
                     autoDelete: event.target.checked,
                   })
@@ -273,7 +286,7 @@ export const DownloadRow = ({
               tone="danger"
               icon="trash"
               aria-label={`Delete ${label}`}
-              onClick={() => setMode('delete')}
+              onClick={() => setMode(ROW_MODES.delete)}
             >
               Delete
             </Button>
@@ -282,12 +295,12 @@ export const DownloadRow = ({
       )}
       {isUnlocking && (
         <UnlockDialog
-          secret="pin"
+          secret={UNLOCK_SECRETS.pin}
           hint={SERVER_COPY.pinHint(view.serverName)}
           unlock={(entered) => serverApiFor({ client, serverId: view.serverId }).unlock(entered)}
           onUnlocked={() => {
             setIsUnlocking(false)
-            return change({ type: 'resumeDownload', downloadId })
+            return change({ type: DESKTOP_REQUESTS.resumeDownload, downloadId })
           }}
           onClose={() => setIsUnlocking(false)}
         />

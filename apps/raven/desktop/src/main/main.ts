@@ -53,7 +53,12 @@ import { createDownloadService, type DownloadService } from '@/main/downloads/do
 import { DOWNLOADS_FILE } from '@/main/downloads/downloadState'
 import { DOWNLOADS_DEBOUNCE_MS, loadDownloads } from '@/main/downloads/downloadStore'
 import type { PartFile, StreamFetch } from '@/main/downloads/fetchFile'
-import { type Access, createMediaAccess, type ProbeFetch } from '@/main/downloads/mediaAccess'
+import {
+  ACCESS_KINDS,
+  type Access,
+  createMediaAccess,
+  type ProbeFetch,
+} from '@/main/downloads/mediaAccess'
 import { createFileHandler } from '@/main/fileProtocol'
 import { createGrants, type Grants } from '@/main/grants'
 import { createHelpActions } from '@/main/help'
@@ -492,7 +497,7 @@ const startApp = (): void => {
       debounceMs: DOWNLOADS_DEBOUNCE_MS,
       onError: (error) => {
         reportError({ text: 'raven player could not save its downloads.', error })
-        send({ type: 'notice', message: STORE_NOTICES.downloads })
+        send({ type: DESKTOP_EVENTS.notice, message: STORE_NOTICES.downloads })
       },
     })
     // The cookie path rides the server's own session; an origin gets a ticket and no cookie.
@@ -504,7 +509,7 @@ const startApp = (): void => {
       access: Access
     }): StreamFetch => {
       switch (access.kind) {
-        case 'cookie':
+        case ACCESS_KINDS.cookie:
           return ({ url, headers, signal }) =>
             sessions.sessionOf(serverId).fetch(url, {
               headers,
@@ -513,7 +518,7 @@ const startApp = (): void => {
               redirect: 'error',
               cache: 'no-store',
             })
-        case 'origin':
+        case ACCESS_KINDS.origin:
           return ({ url, headers, signal }) => fetchBare({ url, init: { headers, signal } })
         default: {
           const unreachable: never = access
@@ -1054,7 +1059,9 @@ const attachPlayer = ({
   // Told as each load begins, in the order the loads come: a server title that resolves
   // slowly must not clear a download loaded after it.
   const resolveSource: typeof resolveFrom = (source) => {
-    downloads.notePlaying({ fileId: source.kind === 'file' ? source.fileId : null })
+    downloads.notePlaying({
+      fileId: source.kind === PLAYER_SOURCE_KINDS.file ? source.fileId : null,
+    })
     return resolveFrom(source)
   }
   const sleepGuard = createSleepGuard({

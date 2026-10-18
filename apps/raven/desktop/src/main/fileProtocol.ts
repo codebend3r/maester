@@ -1,4 +1,5 @@
 import { HTTP_METHODS } from '@/shared/protocol'
+import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { extensionOf } from '@raven/core'
 import { ALLOWED_METHODS } from '@/main/appProtocol'
 import type { Grants } from '@/main/grants'
@@ -71,7 +72,10 @@ const answer = ({
   body?: ReadableStream<Uint8Array> | null
   headers?: Record<string, string>
 }): Response =>
-  new Response(body, { status, headers: { ...headers, 'X-Content-Type-Options': 'nosniff' } })
+  new Response(body, {
+    status,
+    headers: { ...headers, [HTTP_HEADERS.contentTypeOptions]: 'nosniff' },
+  })
 
 const hostOf = (url: string): string | null => {
   try {
@@ -92,7 +96,7 @@ export const createFileHandler = ({
 }): ((request: Request) => Promise<Response>) => {
   return async (request) => {
     if (request.method !== HTTP_METHODS.get && request.method !== HTTP_METHODS.head) {
-      return answer({ status: 405, headers: { Allow: ALLOWED_METHODS } })
+      return answer({ status: 405, headers: { [HTTP_HEADERS.allow]: ALLOWED_METHODS } })
     }
     const host = hostOf(request.url)
     const file = host === null ? null : grants.fileOf(host)
@@ -104,20 +108,24 @@ export const createFileHandler = ({
     const { size } = stats
     const isHead = request.method === HTTP_METHODS.head
     const common = {
-      'Accept-Ranges': 'bytes',
-      'Content-Type': contentTypeFor(file.name),
-      'Cache-Control': 'no-store',
+      [HTTP_HEADERS.acceptRanges]: 'bytes',
+      [HTTP_HEADERS.contentType]: contentTypeFor(file.name),
+      [HTTP_HEADERS.cacheControl]: 'no-store',
     }
 
     if (size === 0) {
-      return answer({ status: 200, headers: { ...common, 'Content-Length': '0' } })
+      return answer({ status: 200, headers: { ...common, [HTTP_HEADERS.contentLength]: '0' } })
     }
 
-    const range = parseRange({ header: request.headers.get('Range'), size })
+    const range = parseRange({ header: request.headers.get(HTTP_HEADERS.range), size })
     if (range.kind === BYTE_RANGE_KINDS.unsatisfiable) {
       return answer({
         status: 416,
-        headers: { ...common, 'Content-Length': '0', 'Content-Range': `bytes */${size}` },
+        headers: {
+          ...common,
+          [HTTP_HEADERS.contentLength]: '0',
+          [HTTP_HEADERS.contentRange]: `bytes */${size}`,
+        },
       })
     }
 
@@ -125,9 +133,9 @@ export const createFileHandler = ({
       range.kind === BYTE_RANGE_KINDS.range ? range : { start: 0, end: size - 1 }
     const headers = {
       ...common,
-      'Content-Length': `${end - start + 1}`,
+      [HTTP_HEADERS.contentLength]: `${end - start + 1}`,
       ...(range.kind === BYTE_RANGE_KINDS.range && {
-        'Content-Range': `bytes ${start}-${end}/${size}`,
+        [HTTP_HEADERS.contentRange]: `bytes ${start}-${end}/${size}`,
       }),
     }
     const status = range.kind === BYTE_RANGE_KINDS.range ? 206 : 200

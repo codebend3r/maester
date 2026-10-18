@@ -22,9 +22,11 @@ export const UPDATE_COPY = {
   unopened: 'raven player could not open the release page.',
 } as const
 
+const DIALOG_TYPES = { info: 'info', warning: 'warning' } as const
+
 /** What `dialog.showMessageBox` is given. */
 export type UpdateDialogOptions = {
-  type: 'info' | 'warning'
+  type: (typeof DIALOG_TYPES)[keyof typeof DIALOG_TYPES]
   message: string
   detail: string
   buttons: string[]
@@ -44,7 +46,7 @@ export const updateDialogFor = ({
 }): UpdateDialog => {
   if (!check.ok) {
     return {
-      type: 'warning',
+      type: DIALOG_TYPES.warning,
       message: UPDATE_COPY.failed,
       detail: check.problem,
       buttons: ['OK'],
@@ -57,7 +59,7 @@ export const updateDialogFor = ({
   switch (finding.kind) {
     case UPDATE_FINDING_KINDS.newer:
       return {
-        type: 'info',
+        type: DIALOG_TYPES.info,
         message: UPDATE_COPY.newer(finding.version),
         detail: UPDATE_COPY.newerDetail,
         buttons: ['See Release', 'Later'],
@@ -67,7 +69,7 @@ export const updateDialogFor = ({
       }
     case UPDATE_FINDING_KINDS.current:
       return {
-        type: 'info',
+        type: DIALOG_TYPES.info,
         message: UPDATE_COPY.current(current),
         detail: '',
         buttons: ['OK'],
@@ -83,7 +85,7 @@ export const updateDialogFor = ({
 }
 
 const unopenedDialog = (): UpdateDialogOptions => ({
-  type: 'warning',
+  type: DIALOG_TYPES.warning,
   message: UPDATE_COPY.unopened,
   detail: '',
   buttons: ['OK'],

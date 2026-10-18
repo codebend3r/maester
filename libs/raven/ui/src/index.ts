@@ -1,7 +1,7 @@
 // Primitive styles must precede the player's equal-specificity overrides in the CSS bundle.
 export { Button, ButtonLink } from '@/components/Button/Button'
 export type { ButtonTone, ButtonSize } from '@/components/Button/Button'
-export { UnlockDialog } from '@/components/UnlockDialog/UnlockDialog'
+export { UNLOCK_SECRETS, UnlockDialog } from '@/components/UnlockDialog/UnlockDialog'
 export type { UnlockSecret } from '@/components/UnlockDialog/UnlockDialog'
 export { Player } from '@/components/Player/Player'
 export { useHostPlayer } from '@/stores/playerServices'
@@ -14,8 +14,10 @@ export type {
   ProgressSink,
   TrackChoice,
 } from '@/components/Player/PlayerServices'
+export { PLAYER_ACTIONS } from '@/lib/shortcuts'
 export type { PlayerAction } from '@/lib/shortcuts'
 export { fromPlayerEvent } from '@/components/Player/fromPlayerEvent'
+export { ENGINE_KINDS } from '@/components/Player/engine'
 export type {
   Engine,
   EngineActions,

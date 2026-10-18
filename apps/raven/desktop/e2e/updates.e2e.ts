@@ -12,7 +12,7 @@ import {
   withApp,
 } from '@/e2e/harness'
 import { type ReleasesFixture, startReleasesFixture } from '@/e2e/releasesFixture'
-import { DESKTOP_REPLIES } from '@/shared/protocol'
+import { DESKTOP_REPLIES, DESKTOP_REQUESTS } from '@/shared/protocol'
 
 const CONFIG_FILE = 'desktop-config.json'
 const NOTICE_WAIT_MS = 10_000
@@ -48,7 +48,7 @@ const updateNotice = (page: Page) => page.getByRole('complementary', { name: 'Up
 
 /** What main says about the release check, once it has an answer from the fixture. */
 const checkedStatus = async (page: Page) => {
-  const reply = await requestFromPage({ page, request: { type: 'readUpdates' } })
+  const reply = await requestFromPage({ page, request: { type: DESKTOP_REQUESTS.readUpdates } })
   if (reply === null || reply.type !== DESKTOP_REPLIES.updates || reply.status.checkedAt === null) {
     return null
   }

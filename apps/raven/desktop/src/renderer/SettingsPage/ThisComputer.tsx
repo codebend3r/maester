@@ -11,7 +11,7 @@ import { OUTPUT_KEY } from '@/renderer/PlayPage/playerServices'
 import styles from '@/renderer/SettingsPage/ThisComputer.module.scss'
 import { useDesktop } from '@/renderer/stores/desktop'
 import { CARRIED_FORMATS, carriesPassthrough } from '@/shared/carriedOutput'
-import { type AudioDevice, DESKTOP_REPLIES } from '@/shared/protocol'
+import { type AudioDevice, DESKTOP_REPLIES, DESKTOP_REQUESTS } from '@/shared/protocol'
 
 /** Under `OUTPUT_KEY`, so saving invalidates this read and the Play page's together. */
 const COMPUTER_KEY = [...OUTPUT_KEY, 'computer'] as const
@@ -53,7 +53,7 @@ export const ThisComputer = ({ className }: { className?: string }) => {
   const read = useQuery({
     queryKey: COMPUTER_KEY,
     queryFn: async (): Promise<Read> => {
-      const reply = await client.request({ type: 'readOutput' })
+      const reply = await client.request({ type: DESKTOP_REQUESTS.readOutput })
       if (reply.type === DESKTOP_REPLIES.output) return reply
       throw new Error(reply.type === DESKTOP_REPLIES.refused ? reply.message : UNREADABLE)
     },
@@ -68,7 +68,9 @@ export const ThisComputer = ({ className }: { className?: string }) => {
 
   const write = async ({ pick, base }: { pick: Pick; base: OutputSettings }) => {
     const next = pick.apply(confirmed.current ?? base)
-    const reply = await client.request({ type: 'writeOutput', output: next }).catch(() => null)
+    const reply = await client
+      .request({ type: DESKTOP_REQUESTS.writeOutput, output: next })
+      .catch(() => null)
     if (reply === null || reply.type !== DESKTOP_REPLIES.done) {
       settle(pick.id)
       setRefusal(reply !== null && reply.type === DESKTOP_REPLIES.refused ? reply.message : UNSAVED)

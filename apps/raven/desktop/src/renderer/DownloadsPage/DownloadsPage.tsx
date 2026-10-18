@@ -11,7 +11,12 @@ import {
 } from '@/renderer/desktop/downloadsApi'
 import { DownloadRow } from '@/renderer/DownloadsPage/DownloadRow'
 import styles from '@/renderer/DownloadsPage/DownloadsPage.module.scss'
-import { DESKTOP_REQUESTS, type DownloadView, type SpaceView } from '@/shared/protocol'
+import {
+  DESKTOP_REQUESTS,
+  DOWNLOAD_STATUS_KINDS,
+  type DownloadView,
+  type SpaceView,
+} from '@/shared/protocol'
 
 const EMPTY =
   'Nothing downloaded yet. Open a title in raven on the web and choose Download to raven player.'
@@ -34,7 +39,9 @@ const RESUME_ALL: Bulk = {
 /** Pause all while anything is queued or downloading, and Resume all while anything waits paused. */
 const bulksOf = (downloads: DownloadView[]): Bulk[] => [
   ...(downloads.some(isInProgress) ? [PAUSE_ALL] : []),
-  ...(downloads.some((view) => view.status.kind === 'paused') ? [RESUME_ALL] : []),
+  ...(downloads.some((view) => view.status.kind === DOWNLOAD_STATUS_KINDS.paused)
+    ? [RESUME_ALL]
+    : []),
 ]
 
 const spaceLine = ({ used, free, total }: SpaceView): string =>

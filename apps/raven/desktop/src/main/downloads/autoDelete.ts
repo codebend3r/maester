@@ -3,6 +3,7 @@ import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { errorText } from '@/main/log/errorText'
 import { loggable } from '@/main/servers/serverCalls'
 import { TIMER_MAX_MS, type Timers } from '@/main/stateStore'
+import { DOWNLOAD_STATUS_KINDS } from '@/shared/protocol'
 
 /** A download set to delete once watched goes this long after it counts as watched. */
 export const AUTO_DELETE_DELAY_MS = 600_000
@@ -46,21 +47,27 @@ export type AutoDelete = {
   dispose: () => void
 }
 
+const CLOCK_KINDS = { running: 'running', held: 'held', deleting: 'deleting' } as const
+
 /**
  * Where a download stands with its deletion: its ten minutes running, held once they ran out
  * while the title played or was left partway, or being deleted.
  */
 type Clock =
-  | { kind: 'running'; at: number; timer: unknown }
-  | { kind: 'held' }
-  | { kind: 'deleting' }
+  | { kind: typeof CLOCK_KINDS.running; at: number; timer: unknown }
+  | { kind: typeof CLOCK_KINDS.held }
+  | { kind: typeof CLOCK_KINDS.deleting }
+
+const REMOVALS = { removed: 'removed', kept: 'kept' } as const
 
 /** How a removal the clock started went. */
-type Removal = 'removed' | 'kept'
+type Removal = (typeof REMOVALS)[keyof typeof REMOVALS]
 
 /** When a download counts as watched, for a ready one set to delete once watched; else null. */
 const watchedAtOf = (entry: DownloadEntry | null): number | null =>
-  entry !== null && entry.status.kind === 'ready' && entry.autoDelete ? entry.watchedAt : null
+  entry !== null && entry.status.kind === DOWNLOAD_STATUS_KINDS.ready && entry.autoDelete
+    ? entry.watchedAt
+    : null
 
 /** Whether a download's ten minutes have run out: ready, set to delete once watched, and watched. */
 export const isDueForDeletion = ({
@@ -84,20 +91,20 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
 
   const cancel: AutoDelete['cancel'] = ({ downloadId }) => {
     const clock = clocks.get(downloadId)
-    if (clock?.kind === 'running') timers.clear(clock.timer)
+    if (clock?.kind === CLOCK_KINDS.running) timers.clear(clock.timer)
     clocks.delete(downloadId)
   }
 
   const deleteNow = async (entry: DownloadEntry): Promise<void> => {
     const { downloadId } = entry
-    const removal: Removal = (await deps.remove(downloadId)) ? 'removed' : 'kept'
+    const removal: Removal = (await deps.remove(downloadId)) ? REMOVALS.removed : REMOVALS.kept
     // A switch turned off or on while the removal waited has already replaced this clock.
-    const isOwn = clocks.get(downloadId)?.kind === 'deleting'
+    const isOwn = clocks.get(downloadId)?.kind === CLOCK_KINDS.deleting
     if (isOwn) clocks.delete(downloadId)
     switch (removal) {
-      case 'removed':
+      case REMOVALS.removed:
         return deps.onDeleted(entry)
-      case 'kept':
+      case REMOVALS.kept:
         // Read again as the download stands now: held while the viewer is on it.
         if (isOwn) armFromStore(downloadId)
         return
@@ -110,14 +117,14 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
 
   /** The time came: deletes the download, or holds it while the viewer is still on it. */
   const due = (downloadId: string): void => {
-    if (isDisposed || clocks.get(downloadId)?.kind === 'deleting') return
+    if (isDisposed || clocks.get(downloadId)?.kind === CLOCK_KINDS.deleting) return
     const entry = entryOf(downloadId)
     if (entry === null || watchedAtOf(entry) === null) return cancel({ downloadId })
     if (deps.isPlaying(downloadId) || deps.isMidTitle(downloadId)) {
-      clocks.set(downloadId, { kind: 'held' })
+      clocks.set(downloadId, { kind: CLOCK_KINDS.held })
       return
     }
-    clocks.set(downloadId, { kind: 'deleting' })
+    clocks.set(downloadId, { kind: CLOCK_KINDS.deleting })
     deleteNow(entry).catch((error: unknown) => {
       deps.warn(
         `raven player could not finish deleting ${loggable(entry.label)}: ${loggable(errorText(error))}`,
@@ -135,7 +142,7 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
       run: () => arm({ downloadId, at }),
       ms: Math.min(wait, TIMER_MAX_MS),
     })
-    clocks.set(downloadId, { kind: 'running', at, timer })
+    clocks.set(downloadId, { kind: CLOCK_KINDS.running, at, timer })
   }
 
   /** A clock at `watchedAt` plus the delay, read off the store now; none when not set to delete. */
@@ -157,18 +164,18 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
     if (clock === undefined || watchedAtOf(entryOf(downloadId)) === null) {
       return armFromStore(downloadId)
     }
-    if (clock.kind === 'held') due(downloadId)
+    if (clock.kind === CLOCK_KINDS.held) due(downloadId)
   }
 
   const playbackLeft: AutoDelete['playbackLeft'] = () => {
     ;[...clocks]
-      .filter(([, clock]) => clock.kind === 'held')
+      .filter(([, clock]) => clock.kind === CLOCK_KINDS.held)
       .forEach(([downloadId]) => due(downloadId))
   }
 
   const rearm: AutoDelete['rearm'] = () => {
     ;[...clocks].forEach(([downloadId, clock]) => {
-      if (clock.kind !== 'running') return
+      if (clock.kind !== CLOCK_KINDS.running) return
       timers.clear(clock.timer)
       arm({ downloadId, at: clock.at })
     })
@@ -176,7 +183,7 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
 
   const deletesAt: AutoDelete['deletesAt'] = ({ downloadId }) => {
     const clock = clocks.get(downloadId)
-    return clock?.kind === 'running' ? clock.at : null
+    return clock?.kind === CLOCK_KINDS.running ? clock.at : null
   }
 
   const dispose: AutoDelete['dispose'] = () => {

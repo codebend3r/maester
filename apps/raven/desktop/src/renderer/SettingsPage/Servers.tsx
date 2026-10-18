@@ -8,7 +8,7 @@ import { RECENTS_KEY } from '@/renderer/Shell/openReply'
 import { useDesktop } from '@/renderer/stores/desktop'
 import {
   DESKTOP_REPLIES,
-  type DESKTOP_REQUESTS,
+  DESKTOP_REQUESTS,
   type DesktopRequest,
   type ServerView,
 } from '@/shared/protocol'
@@ -110,7 +110,7 @@ const ServerRow = ({
 
   const openRename = () => {
     setName(server.name)
-    onMode('rename')
+    onMode(ROW_MODES.rename)
   }
 
   const save = async (event: FormEvent) => {
@@ -123,7 +123,7 @@ const ServerRow = ({
   const backOnEscape = (event: KeyboardEvent) => {
     if (event.key !== KEYS.escape) return
     event.preventDefault()
-    onMode('view')
+    onMode(ROW_MODES.view)
   }
 
   const content = () => {
@@ -149,7 +149,7 @@ const ServerRow = ({
               <Button type="submit" tone="primary" onKeyDown={backOnEscape}>
                 Save
               </Button>
-              <Button onClick={() => onMode('view')} onKeyDown={backOnEscape}>
+              <Button onClick={() => onMode(ROW_MODES.view)} onKeyDown={backOnEscape}>
                 Cancel
               </Button>
             </div>
@@ -170,7 +170,11 @@ const ServerRow = ({
               >
                 Remove
               </Button>
-              <Button ref={keepButton} onClick={() => onMode('view')} onKeyDown={backOnEscape}>
+              <Button
+                ref={keepButton}
+                onClick={() => onMode(ROW_MODES.view)}
+                onKeyDown={backOnEscape}
+              >
                 Keep
               </Button>
             </div>
@@ -190,7 +194,7 @@ const ServerRow = ({
                 tone="danger"
                 aria-label={`Remove ${server.name}`}
                 aria-describedby={removeRefusalId ?? undefined}
-                onClick={() => onMode('remove')}
+                onClick={() => onMode(ROW_MODES.remove)}
               >
                 Remove
               </Button>
@@ -239,7 +243,7 @@ export const Servers = ({ className }: { className?: string }) => {
     setRefusal(null)
     const refuse = (message: string): Answer => {
       setRefusal({ message, about })
-      return { kind: 'refused' }
+      return { kind: ANSWER_KINDS.refused }
     }
     const reply = await client.request(change).catch(() => null)
     if (reply === null) return refuse(UNCHANGED)
@@ -248,10 +252,10 @@ export const Servers = ({ className }: { className?: string }) => {
         queryClient.setQueryData(SERVERS_KEY, reply.servers)
         // A removed server takes its recents with it, so Home reads them again.
         await queryClient.invalidateQueries({ queryKey: RECENTS_KEY })
-        return { kind: 'servers', servers: reply.servers }
+        return { kind: ANSWER_KINDS.servers, servers: reply.servers }
       // The person said no to main's prompt, so there is nothing to say.
       case DESKTOP_REPLIES.done:
-        return { kind: 'declined' }
+        return { kind: ANSWER_KINDS.declined }
       case DESKTOP_REPLIES.refused:
         return refuse(reply.message)
       case DESKTOP_REPLIES.play:
@@ -280,7 +284,10 @@ export const Servers = ({ className }: { className?: string }) => {
     isAddingNow.current = true
     setIsAdding(true)
     const before = new Set((servers.data ?? []).map((server) => server.serverId))
-    const answer = await send({ change: { type: 'addServer', origin }, about: { kind: 'add' } })
+    const answer = await send({
+      change: { type: DESKTOP_REQUESTS.addServer, origin },
+      about: { kind: ABOUT_KINDS.add },
+    })
     isAddingNow.current = false
     setIsAdding(false)
     if (answer.kind === ANSWER_KINDS.refused) return focus(addressField.current)
@@ -293,8 +300,8 @@ export const Servers = ({ className }: { className?: string }) => {
 
   const rename = async ({ server, name }: { server: ServerView; name: string }) => {
     const answer = await send({
-      change: { type: 'renameServer', serverId: server.serverId, name },
-      about: { kind: 'rename', serverId: server.serverId },
+      change: { type: DESKTOP_REQUESTS.renameServer, serverId: server.serverId, name },
+      about: { kind: ABOUT_KINDS.rename, serverId: server.serverId },
     })
     if (answer.kind !== ANSWER_KINDS.servers) return false
     setActive(null)
@@ -308,8 +315,8 @@ export const Servers = ({ className }: { className?: string }) => {
 
   const remove = async ({ server }: { server: ServerView }) => {
     const answer = await send({
-      change: { type: 'removeServer', serverId: server.serverId },
-      about: { kind: 'remove', serverId: server.serverId },
+      change: { type: DESKTOP_REQUESTS.removeServer, serverId: server.serverId },
+      about: { kind: ABOUT_KINDS.remove, serverId: server.serverId },
     })
     if (answer.kind !== ANSWER_KINDS.servers) return
     // Main keeps a server whose removal it could not save, and answers with it still listed.
@@ -317,7 +324,7 @@ export const Servers = ({ className }: { className?: string }) => {
       setActive(null)
       setRefusal({
         message: `raven player could not remove ${server.name}. Try again.`,
-        about: { kind: 'remove', serverId: server.serverId },
+        about: { kind: ABOUT_KINDS.remove, serverId: server.serverId },
       })
       return
     }
@@ -328,7 +335,7 @@ export const Servers = ({ className }: { className?: string }) => {
   }
 
   const modeOf = (serverId: string): RowMode =>
-    active !== null && active.serverId === serverId ? active.mode : 'view'
+    active !== null && active.serverId === serverId ? active.mode : ROW_MODES.view
 
   const changeMode = ({ serverId, mode }: { serverId: string; mode: RowMode }) => {
     // An editor opening or closing starts afresh, so no field is invalid from an old answer.
@@ -377,10 +384,13 @@ export const Servers = ({ className }: { className?: string }) => {
                 mode={mode}
                 renameRefusalId={
                   mode === ROW_MODES.rename
-                    ? refusalIdFor({ serverId: server.serverId, kind: 'rename' })
+                    ? refusalIdFor({ serverId: server.serverId, kind: ABOUT_KINDS.rename })
                     : null
                 }
-                removeRefusalId={refusalIdFor({ serverId: server.serverId, kind: 'remove' })}
+                removeRefusalId={refusalIdFor({
+                  serverId: server.serverId,
+                  kind: ABOUT_KINDS.remove,
+                })}
                 onMode={(next) => changeMode({ serverId: server.serverId, mode: next })}
                 onRename={rename}
                 onRemove={(change) => void remove(change)}

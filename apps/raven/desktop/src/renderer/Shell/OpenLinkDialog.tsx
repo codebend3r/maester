@@ -3,7 +3,7 @@ import { Button, KEYS } from '@raven/ui'
 import styles from '@/renderer/Shell/OpenLinkDialog.module.scss'
 import { useOpenReply } from '@/renderer/Shell/openReply'
 import { useDesktop } from '@/renderer/stores/desktop'
-import { DESKTOP_REPLIES, type DesktopReply } from '@/shared/protocol'
+import { DESKTOP_REPLIES, DESKTOP_REQUESTS, type DesktopReply } from '@/shared/protocol'
 
 const UNOPENED = 'raven player could not open that link. Try again.'
 
@@ -16,18 +16,18 @@ type Outcome =
   | { kind: typeof OUTCOME_KINDS.stay; message: string }
 
 const outcomeOf = (reply: DesktopReply | null): Outcome => {
-  if (reply === null) return { kind: 'stay', message: UNOPENED }
+  if (reply === null) return { kind: OUTCOME_KINDS.stay, message: UNOPENED }
   switch (reply.type) {
     case DESKTOP_REPLIES.play:
     case DESKTOP_REPLIES.playServer:
     // A download link leaves for the download dialog, which applying the reply opens.
     case DESKTOP_REPLIES.downloadAsk:
-      return { kind: 'play', reply }
+      return { kind: OUTCOME_KINDS.play, reply }
     // The person said no to the trust prompt, so there is nothing to say.
     case DESKTOP_REPLIES.done:
-      return { kind: 'close' }
+      return { kind: OUTCOME_KINDS.close }
     case DESKTOP_REPLIES.refused:
-      return { kind: 'stay', message: reply.message }
+      return { kind: OUTCOME_KINDS.stay, message: reply.message }
     case DESKTOP_REPLIES.file:
     case DESKTOP_REPLIES.recents:
     case DESKTOP_REPLIES.output:
@@ -37,7 +37,7 @@ const outcomeOf = (reply: DesktopReply | null): Outcome => {
     case DESKTOP_REPLIES.updates:
     case DESKTOP_REPLIES.downloads:
     case DESKTOP_REPLIES.space:
-      return { kind: 'stay', message: UNOPENED }
+      return { kind: OUTCOME_KINDS.stay, message: UNOPENED }
     default: {
       const unreachable: never = reply
       return unreachable
@@ -94,7 +94,9 @@ export const OpenLinkDialog = ({ onClose }: { onClose: () => void }) => {
     isAsking.current = true
     setRefusal('')
     setIsPending(true)
-    const reply = await client.request({ type: 'openLink', link: pasted }).catch(() => null)
+    const reply = await client
+      .request({ type: DESKTOP_REQUESTS.openLink, link: pasted })
+      .catch(() => null)
     isAsking.current = false
     if (isClosed.current) return
     setIsPending(false)

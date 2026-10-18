@@ -8,7 +8,7 @@ import styles from '@/renderer/HomePage/HomePage.module.scss'
 import { RECENTS_KEY, useOpenReply } from '@/renderer/Shell/openReply'
 import { useDesktop } from '@/renderer/stores/desktop'
 import { useDragging } from '@/renderer/stores/dragging'
-import { DESKTOP_REPLIES, type RecentView } from '@/shared/protocol'
+import { DESKTOP_REPLIES, DESKTOP_REQUESTS, type RecentView } from '@/shared/protocol'
 
 /** Downloads' button, with the count of what is still queued or downloading. */
 const DownloadsButton = () => {
@@ -47,18 +47,22 @@ export const HomePage = () => {
   const recents = useQuery({
     queryKey: RECENTS_KEY,
     queryFn: async (): Promise<RecentView[]> => {
-      const reply = await client.request({ type: 'listRecents' })
+      const reply = await client.request({ type: DESKTOP_REQUESTS.listRecents })
       if (reply.type === DESKTOP_REPLIES.recents) return reply.recents
       if (reply.type === DESKTOP_REPLIES.refused) throw new Error(reply.message)
       throw new Error('raven player could not list your recent videos.')
     },
   })
 
-  const choose = async () => openReply(await client.request({ type: 'openDialog' }))
+  const choose = async () => openReply(await client.request({ type: DESKTOP_REQUESTS.openDialog }))
   const open = async (recent: RecentView) =>
-    openReply(await client.request({ type: 'openRecent', recentId: recent.recentId }))
+    openReply(
+      await client.request({ type: DESKTOP_REQUESTS.openRecent, recentId: recent.recentId }),
+    )
   const remove = async (recent: RecentView) => {
-    openReply(await client.request({ type: 'removeRecent', recentId: recent.recentId }))
+    openReply(
+      await client.request({ type: DESKTOP_REQUESTS.removeRecent, recentId: recent.recentId }),
+    )
     await queryClient.invalidateQueries({ queryKey: RECENTS_KEY })
   }
 

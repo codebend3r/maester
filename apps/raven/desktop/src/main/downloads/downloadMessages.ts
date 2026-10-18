@@ -1,14 +1,19 @@
-import type { FailReason, PauseReason } from '@/main/downloads/downloadState'
+import {
+  FAIL_REASONS,
+  PAUSE_REASONS,
+  type FailReason,
+  type PauseReason,
+} from '@/main/downloads/downloadState'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
-import { SERVER_GONE, type DownloadKind } from '@/shared/protocol'
+import { DOWNLOAD_KINDS, SERVER_GONE, type DownloadKind } from '@/shared/protocol'
 
 /** What the files of an ask of each kind are called, many at a time. */
 const FILE_NOUNS = {
-  movie: 'movies',
-  saga: 'movies',
-  episode: 'episodes',
-  season: 'episodes',
-  show: 'episodes',
+  [DOWNLOAD_KINDS.movie]: 'movies',
+  [DOWNLOAD_KINDS.saga]: 'movies',
+  [DOWNLOAD_KINDS.episode]: 'episodes',
+  [DOWNLOAD_KINDS.season]: 'episodes',
+  [DOWNLOAD_KINDS.show]: 'episodes',
 } as const satisfies Record<DownloadKind, string>
 
 export const DOWNLOAD_MESSAGES = {
@@ -63,13 +68,13 @@ export const pausedMessage = ({
   serverName: string
 }): string | null => {
   switch (reason) {
-    case 'viewer':
+    case PAUSE_REASONS.viewer:
       return null
-    case 'noSpace':
+    case PAUSE_REASONS.noSpace:
       return DOWNLOAD_MESSAGES.noSpace
-    case 'relocked':
+    case PAUSE_REASONS.relocked:
       return naming({ serverName, words: DOWNLOAD_MESSAGES.relocked })
-    case 'unreachable':
+    case PAUSE_REASONS.unreachable:
       return naming({ serverName, words: DOWNLOAD_MESSAGES.unreachable })
     default: {
       const unreachable: never = reason
@@ -89,20 +94,20 @@ export const failedMessage = ({
   serverName: string
 }): string => {
   switch (reason) {
-    case 'noSpace':
+    case FAIL_REASONS.noSpace:
       return DOWNLOAD_MESSAGES.noSpace
-    case 'changed':
+    case FAIL_REASONS.changed:
       return DOWNLOAD_MESSAGES.changed
-    case 'unauthorized':
+    case FAIL_REASONS.unauthorized:
       return naming({
         serverName,
         words: (name) => DOWNLOAD_MESSAGES.answered({ serverName: name, status: 401 }),
       })
-    case 'unreachable':
+    case FAIL_REASONS.unreachable:
       return naming({ serverName, words: DOWNLOAD_MESSAGES.unreachable })
-    case 'gone':
+    case FAIL_REASONS.gone:
       return naming({ serverName, words: EXPAND_MESSAGES.gone })
-    case 'other':
+    case FAIL_REASONS.other:
       return message
     default: {
       const unreachable: never = reason

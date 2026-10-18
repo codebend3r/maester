@@ -1,5 +1,5 @@
 import { formatBytes } from '@raven/core'
-import { Button, UnlockDialog } from '@raven/ui'
+import { Button, KEYS, UNLOCK_SECRETS, type UnlockSecret, UnlockDialog } from '@raven/ui'
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -20,13 +20,15 @@ import { useNotice } from '@/renderer/stores/notice'
 import {
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
+  DOWNLOAD_ASK_KINDS,
+  DOWNLOAD_KINDS,
   type DesktopReply,
   type DesktopRequest,
   type DownloadAsk,
   type DownloadKind,
 } from '@/shared/protocol'
 
-type ReadyStatus = Extract<DownloadAsk['status'], { kind: 'ready' }>
+type ReadyStatus = Extract<DownloadAsk['status'], { kind: typeof DOWNLOAD_ASK_KINDS.ready }>
 
 const TITLE = 'Download to raven player'
 
@@ -41,12 +43,12 @@ const askMain = ({
 
 const nounFor = ({ kind, files }: { kind: DownloadKind; files: number }): string => {
   switch (kind) {
-    case 'movie':
-    case 'saga':
+    case DOWNLOAD_KINDS.movie:
+    case DOWNLOAD_KINDS.saga:
       return files === 1 ? 'movie' : 'movies'
-    case 'episode':
-    case 'season':
-    case 'show':
+    case DOWNLOAD_KINDS.episode:
+    case DOWNLOAD_KINDS.season:
+    case DOWNLOAD_KINDS.show:
       return files === 1 ? 'episode' : 'episodes'
     default: {
       const unreachable: never = kind
@@ -97,7 +99,7 @@ const ReadyDialog = ({
   // The player listens on the window: a key pressed here stays here. Escape closes the dialog itself.
   const keepKeys = (event: KeyboardEvent) => {
     event.stopPropagation()
-    if (event.key !== 'Escape') return
+    if (event.key !== KEYS.escape) return
     event.preventDefault()
     close()
   }
@@ -171,7 +173,7 @@ const LockedDialog = ({
   onClose,
 }: {
   ask: DownloadAsk
-  secret: 'pin' | 'adminPassword'
+  secret: UnlockSecret
   onClose: () => void
 }) => {
   const { client } = useDesktop()
@@ -197,11 +199,13 @@ const LockedDialog = ({
     <UnlockDialog
       secret={secret}
       hint={
-        secret === 'pin'
+        secret === UNLOCK_SECRETS.pin
           ? SERVER_COPY.pinHint(ask.serverName)
           : SERVER_COPY.adminHint(ask.serverName)
       }
-      unlock={(entered) => (secret === 'pin' ? api.unlock(entered) : api.unlockAdmin(entered))}
+      unlock={(entered) =>
+        secret === UNLOCK_SECRETS.pin ? api.unlock(entered) : api.unlockAdmin(entered)
+      }
       onUnlocked={retry}
       onClose={() => {
         void askMain({
@@ -217,12 +221,12 @@ const LockedDialog = ({
 export const DownloadDialog = ({ ask, onClose }: { ask: DownloadAsk; onClose: () => void }) => {
   const { status } = ask
   switch (status.kind) {
-    case 'ready':
+    case DOWNLOAD_ASK_KINDS.ready:
       return <ReadyDialog ask={ask} status={status} onClose={onClose} />
-    case 'locked':
-      return <LockedDialog ask={ask} secret="pin" onClose={onClose} />
-    case 'hidden':
-      return <LockedDialog ask={ask} secret="adminPassword" onClose={onClose} />
+    case DOWNLOAD_ASK_KINDS.locked:
+      return <LockedDialog ask={ask} secret={UNLOCK_SECRETS.pin} onClose={onClose} />
+    case DOWNLOAD_ASK_KINDS.hidden:
+      return <LockedDialog ask={ask} secret={UNLOCK_SECRETS.adminPassword} onClose={onClose} />
     default: {
       const unreachable: never = status
       return unreachable

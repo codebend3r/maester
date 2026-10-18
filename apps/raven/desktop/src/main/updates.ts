@@ -1,4 +1,5 @@
 import { isBoolean, isString, listOf, object } from '@raven/core'
+import { HTTP_HEADERS } from '@/shared/httpHeaders'
 
 export const RELEASES_URL = 'https://api.github.com/repos/codebend3r/maester/releases?per_page=100'
 const GITHUB_API_ORIGIN = 'https://api.github.com'
@@ -192,11 +193,9 @@ type PageRead =
   | { ok: false; problem: string }
 
 /** The header GitHub names the next page of the list in. */
-export const LINK_HEADER = 'link'
-
 const linkOf = (headers: { get: (name: string) => string | null }): string | null => {
   try {
-    return headers.get(LINK_HEADER)
+    return headers.get(HTTP_HEADERS.link)
   } catch {
     return null
   }
@@ -292,7 +291,10 @@ export const checkForUpdates = async ({
 }): Promise<UpdateCheck> => {
   // One deadline for every page, so the whole check is bounded, not each request.
   const init = {
-    headers: { accept: 'application/vnd.github+json', 'user-agent': `raven-player/${current}` },
+    headers: {
+      [HTTP_HEADERS.accept]: 'application/vnd.github+json',
+      [HTTP_HEADERS.userAgent]: `raven-player/${current}`,
+    },
     signal: AbortSignal.timeout(UPDATE_TIMEOUT_MS),
   }
   return walk({

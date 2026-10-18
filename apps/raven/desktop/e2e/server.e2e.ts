@@ -2,6 +2,7 @@ import { type PlayRequest, playLinkFor } from '@raven/core'
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test'
 import { makeClips, makeTrackClip } from '@/e2e/clips'
 import {
+  FIXTURE_ADMIN_KINDS,
   FIXTURE_MEDIA,
   type FixtureAdmin,
   type FixtureRequest,
@@ -9,6 +10,7 @@ import {
   routesOf,
   startFixtureServer,
 } from '@/e2e/fixtureServer'
+import { ENGINE_MODES } from '@/main/player/engine'
 import type { ServerMethod } from '@/main/servers/allowlist'
 import { SERVER_METHODS } from '@/shared/protocol'
 import {
@@ -25,10 +27,11 @@ import {
   serverPartitions,
   stubBrowser,
   stubTrustPrompt,
+  TRUST_ANSWERS,
   trustPrompts,
   withApp,
 } from '@/e2e/harness'
-import { DESKTOP_REPLIES } from '@/shared/protocol'
+import { DESKTOP_REPLIES, DESKTOP_REQUESTS } from '@/shared/protocol'
 
 const PIN = '3001'
 const ADMIN_PASSWORD = 'raven fixture admin'
@@ -242,7 +245,7 @@ const openSettings = async ({ page }: { page: Page }) => {
 }
 
 const serverIdsOf = async ({ page }: { page: Page }): Promise<string[]> => {
-  const reply = await requestFromPage({ page, request: { type: 'listServers' } })
+  const reply = await requestFromPage({ page, request: { type: DESKTOP_REQUESTS.listServers } })
   return reply !== null && reply.type === DESKTOP_REPLIES.servers
     ? reply.servers.map(({ serverId }) => serverId)
     : []
@@ -268,7 +271,7 @@ test.describe.serial('playing a title from a locked raven server', () => {
 
   test.beforeAll(async () => {
     userData = await freshUserData()
-    started = await startLockedFixture({ admin: { kind: 'off' }, skew })
+    started = await startLockedFixture({ admin: { kind: FIXTURE_ADMIN_KINDS.off }, skew })
   })
 
   test.afterAll(async () => {
@@ -284,7 +287,7 @@ test.describe.serial('playing a title from a locked raven server', () => {
         userData: ownUserData,
         run: async ({ app, page }) => {
           await expect(homeHeading(page)).toBeVisible()
-          await stubTrustPrompt({ app, answer: 'cancel' })
+          await stubTrustPrompt({ app, answer: TRUST_ANSWERS.cancel })
           await openUrl({ app, url: linkTo({ fixture, mediaId: 1, at: 0, next: [] }) })
           await expect.poll(() => trustPrompts({ app })).toEqual([promptFor({ fixture })])
 
@@ -321,14 +324,17 @@ test.describe.serial('playing a title from a locked raven server', () => {
       userData,
       run: async ({ app, page, output: printed }) => {
         await expect(homeHeading(page)).toBeVisible()
-        await stubTrustPrompt({ app, answer: 'add' })
+        await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
         await openUrl({ app, url: linkTo({ fixture, mediaId: 1, at: 0, next: [] }) })
         await expect(unlockDialog({ page, title: 'Locked library' })).toBeVisible()
         expect(await trustPrompts({ app })).toEqual([promptFor({ fixture })])
         // The probe after the yes is the first thing the server hears.
         expect(routesOf(loggedSince({ fixture, from })).at(0) ?? null).toBe('GET /api/lock')
         // Stored under its origin's host until someone renames it.
-        const listed = await requestFromPage({ page, request: { type: 'listServers' } })
+        const listed = await requestFromPage({
+          page,
+          request: { type: DESKTOP_REQUESTS.listServers },
+        })
         expect(
           listed !== null && listed.type === DESKTOP_REPLIES.servers
             ? listed.servers.map(({ name, origin }) => ({ name, origin }))
@@ -399,7 +405,7 @@ test.describe.serial('playing a title from a locked raven server', () => {
       userData,
       run: async ({ app, page }) => {
         await expect(homeHeading(page)).toBeVisible()
-        await stubTrustPrompt({ app, answer: 'add' })
+        await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
         const recent = page.getByRole('button', { name: /Fixture One/ })
         await expect(recent).toContainText(hostOf({ fixture }))
         await recent.click()
@@ -495,7 +501,7 @@ test.describe.serial('playing a title from a locked raven server', () => {
       userData: ownUserData,
       run: async ({ app, page }) => {
         await expect(homeHeading(page)).toBeVisible()
-        await stubTrustPrompt({ app, answer: 'add' })
+        await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
         await openSettings({ page })
         await page.getByLabel('Server address').fill(fixture.origin)
         await page.getByRole('button', { name: 'Add server' }).click()
@@ -561,7 +567,7 @@ test.describe('playing a title while the admin lock hides it', () => {
   test.beforeAll(async () => {
     userData = await freshUserData()
     fixture = await startLockedFixture({
-      admin: { kind: 'password', password: ADMIN_PASSWORD },
+      admin: { kind: FIXTURE_ADMIN_KINDS.password, password: ADMIN_PASSWORD },
       skew: { ms: 0 },
     })
   })
@@ -578,7 +584,7 @@ test.describe('playing a title while the admin lock hides it', () => {
       userData,
       run: async ({ app, page, output: printed }) => {
         await expect(homeHeading(page)).toBeVisible()
-        await stubTrustPrompt({ app, answer: 'add' })
+        await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
         await openUrl({ app, url: linkTo({ fixture: running, mediaId: 1, at: 0, next: [] }) })
         await expect(unlockDialog({ page, title: 'Admin lock' })).toBeVisible()
         await enterSecret({
@@ -613,7 +619,10 @@ test.describe('a server title without the video engine', () => {
 
   test.beforeAll(async () => {
     userData = await freshUserData()
-    fixture = await startLockedFixture({ admin: { kind: 'off' }, skew: { ms: 0 } })
+    fixture = await startLockedFixture({
+      admin: { kind: FIXTURE_ADMIN_KINDS.off },
+      skew: { ms: 0 },
+    })
   })
 
   test.afterAll(async () => {
@@ -626,10 +635,10 @@ test.describe('a server title without the video engine', () => {
     const running = fixture
     await withApp({
       userData,
-      mpv: 'off',
+      mpv: ENGINE_MODES.off,
       run: async ({ app, page }) => {
         await expect(homeHeading(page)).toBeVisible()
-        await stubTrustPrompt({ app, answer: 'add' })
+        await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
         await stubBrowser({ app })
         await openUrl({
           app,

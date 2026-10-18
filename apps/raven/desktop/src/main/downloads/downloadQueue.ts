@@ -7,7 +7,9 @@ import {
   entryById,
   fail,
   finish,
+  FAIL_REASONS,
   isWaitingOnOutage,
+  PAUSE_REASONS,
   pause,
   pauseEverything,
   pauseServer,
@@ -26,12 +28,15 @@ import {
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import {
   DOWNLOAD_STALL_MS,
+  FETCH_REASONS,
   fetchToFile,
   type FetchOutcome,
   type PartFile,
   type StreamFetch,
 } from '@/main/downloads/fetchFile'
 import {
+  ACCESS_KINDS,
+  ACCESS_REFUSALS,
   fileUrlFor,
   sidecarUrlFor,
   type Access,
@@ -51,10 +56,11 @@ import {
 } from '@/main/downloads/space'
 import { removeFolder, sweepDownloads } from '@/main/downloads/sweep'
 import { errorText } from '@/main/log/errorText'
+import { CALL_NAMES } from '@/main/servers/allowlist'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { sidecarTracksOf } from '@/main/servers/sidecarTracks'
 import { TIMER_MAX_MS, type Timers } from '@/main/stateStore'
-import { isOpaqueId, SERVER_GONE } from '@/shared/protocol'
+import { DOWNLOAD_STATUS_KINDS, isOpaqueId, SERVER_GONE } from '@/shared/protocol'
 
 export const DOWNLOAD_CONCURRENCY = 2
 
@@ -135,9 +141,15 @@ export type DownloadQueue = {
 }
 
 /** Why a run's fetch was aborted: a renewed ticket fetches again, the rest leave the entry as the caller set it. */
-const STOP_REASONS = ['refresh', 'pause', 'remove', 'suspend', 'dispose'] as const
+const STOP_REASONS = {
+  refresh: 'refresh',
+  pause: 'pause',
+  remove: 'remove',
+  suspend: 'suspend',
+  dispose: 'dispose',
+} as const
 
-type StopReason = (typeof STOP_REASONS)[number]
+type StopReason = (typeof STOP_REASONS)[keyof typeof STOP_REASONS]
 
 // An AbortError, so `fetchToFile` reads a stopped fetch as aborted rather than unreachable.
 const stopping = (reason: StopReason): DOMException => new DOMException(reason, 'AbortError')
@@ -146,10 +158,12 @@ const stopReasonOf = (signal: AbortSignal): StopReason | null => {
   if (!signal.aborted) return null
   const reason: unknown = signal.reason
   if (!(reason instanceof DOMException)) return null
-  return STOP_REASONS.find((known) => known === reason.message) ?? null
+  return Object.values(STOP_REASONS).find((known) => known === reason.message) ?? null
 }
 
 /** A body's text, read only up to `max` bytes: past them, the rest is never read. */
+const TEXT_READS = { text: 'text', tooBig: 'tooBig' } as const
+
 const textUpTo = async ({
   body,
   max,
@@ -158,7 +172,9 @@ const textUpTo = async ({
   body: ReadableStream<Uint8Array> | null
   max: number
   signal: AbortSignal
-}): Promise<{ kind: 'text'; text: string } | { kind: 'tooBig' }> => {
+}): Promise<
+  { kind: typeof TEXT_READS.text; text: string } | { kind: typeof TEXT_READS.tooBig }
+> => {
   const decoder = new TextDecoder()
   const read: { bytes: number; text: string; isOver: boolean } = {
     bytes: 0,
@@ -180,14 +196,14 @@ const textUpTo = async ({
       signal,
     })
   } catch (error) {
-    if (read.isOver) return { kind: 'tooBig' }
+    if (read.isOver) return { kind: TEXT_READS.tooBig }
     throw error
   }
-  return { kind: 'text', text: read.text + decoder.decode() }
+  return { kind: TEXT_READS.text, text: read.text + decoder.decode() }
 }
 
 const isRelocked = ({ status }: DownloadEntry): boolean =>
-  status.kind === 'paused' && status.reason === 'relocked'
+  status.kind === DOWNLOAD_STATUS_KINDS.paused && status.reason === PAUSE_REASONS.relocked
 
 /** A file being fetched: `stop` aborts it, and `done` settles once it has let go of its files. */
 type Run = { serverId: string; stop: AbortController; done: Promise<void>; disk: RunDisk }
@@ -259,9 +275,9 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   const told = (downloadId: string): void => {
     const entry = entryById(store.read(), { downloadId })
     const isRetried = retried.delete(downloadId)
-    if (entry === null || entry.status.kind !== 'failed') return
+    if (entry === null || entry.status.kind !== DOWNLOAD_STATUS_KINDS.failed) return
     // The outage was told when it began, and the row still says so.
-    if (isRetried && entry.status.reason === 'unreachable') return
+    if (isRetried && entry.status.reason === FAIL_REASONS.unreachable) return
     deps.onFailed(entry)
   }
 
@@ -316,18 +332,18 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       .entries.filter(
         (other) =>
           other.downloadId !== entry.downloadId &&
-          other.status.kind === 'queued' &&
+          other.status.kind === DOWNLOAD_STATUS_KINDS.queued &&
           sameGroup({ a: entry, b: other }),
       )
       .map(({ downloadId }) => downloadId)
     store.update((state) =>
       waiting.reduce(
-        (next, downloadId) => pause(next, { downloadId, reason: 'noSpace' }),
-        fail(state, { downloadId: entry.downloadId, reason: 'noSpace' }),
+        (next, downloadId) => pause(next, { downloadId, reason: PAUSE_REASONS.noSpace }),
+        fail(state, { downloadId: entry.downloadId, reason: FAIL_REASONS.noSpace }),
       ),
     )
     stopRuns({
-      reason: 'pause',
+      reason: STOP_REASONS.pause,
       isStopped: ({ downloadId }) => waiting.includes(downloadId),
     }).catch(() => undefined)
     told(entry.downloadId)
@@ -339,7 +355,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     saveBytes(({ run }) => run.serverId === server.id)
     store.update((state) => pauseServer(state, { serverId: server.id, reason }))
     stopRuns({
-      reason: 'pause',
+      reason: STOP_REASONS.pause,
       isStopped: ({ downloadId, run }) =>
         run.serverId === server.id && downloadId !== entry.downloadId,
     }).catch(() => undefined)
@@ -347,7 +363,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
 
   /** The server locked its library again: every file of it waits paused, running ones too. */
   const relock = (job: Job): void => {
-    pauseServerOf({ job, reason: 'relocked' })
+    pauseServerOf({ job, reason: PAUSE_REASONS.relocked })
     deps.warn(`${loggable(job.server.name)} locked ${loggable(job.entry.label)}'s library again`)
   }
 
@@ -356,8 +372,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
    * server's files wait paused, so an outage costs one failure rather than the whole queue.
    */
   const failUnreachable = (job: Job): void => {
-    failEntry({ entry: job.entry, reason: 'unreachable' })
-    pauseServerOf({ job, reason: 'unreachable' })
+    failEntry({ entry: job.entry, reason: FAIL_REASONS.unreachable })
+    pauseServerOf({ job, reason: PAUSE_REASONS.unreachable })
     syncOutageRetry()
     deps.warn(
       `raven player could not reach ${loggable(job.server.name)} for ${loggable(job.entry.label)}`,
@@ -374,17 +390,17 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     if (outcome === null || signal.aborted) return null
     if (outcome.ok) return outcome.access
     switch (outcome.reason) {
-      case 'locked':
+      case ACCESS_REFUSALS.locked:
         relock(job)
         return null
-      case 'unreachable':
+      case ACCESS_REFUSALS.unreachable:
         failUnreachable(job)
         return null
-      case 'unreadable':
-        failEntry({ entry, reason: 'other', message: outcome.message })
+      case ACCESS_REFUSALS.unreadable:
+        failEntry({ entry, reason: FAIL_REASONS.other, message: outcome.message })
         return null
-      case 'gone':
-        failEntry({ entry, reason: 'gone' })
+      case ACCESS_REFUSALS.gone:
+        failEntry({ entry, reason: FAIL_REASONS.gone })
         return null
       default: {
         const unreachable: never = outcome.reason
@@ -401,10 +417,10 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     access: Access
     refresh: AbortController
   }): unknown => {
-    if (access.kind !== 'origin') return undefined
+    if (access.kind !== ACCESS_KINDS.origin) return undefined
     const ms = access.renewAt - deps.now()
     const delay = Math.min(Math.max(ms, RENEWAL_MIN_MS), TIMER_MAX_MS)
-    return timers.set({ run: () => refresh.abort(stopping('refresh')), ms: delay })
+    return timers.set({ run: () => refresh.abort(stopping(STOP_REASONS.refresh)), ms: delay })
   }
 
   const fetchOnce = async ({
@@ -456,26 +472,26 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   const settleFailure = ({ job, outcome }: { job: Job; outcome: Failure }): void => {
     const { entry, server } = job
     switch (outcome.reason) {
-      case 'locked':
+      case FETCH_REASONS.locked:
         relock(job)
         return
-      case 'space':
+      case FETCH_REASONS.space:
         failForSpace(entry)
         return
-      case 'changed':
-        failEntry({ entry, reason: 'changed' })
+      case FETCH_REASONS.changed:
+        failEntry({ entry, reason: FAIL_REASONS.changed })
         return
-      case 'unreachable':
-      case 'stalled':
-      case 'aborted':
+      case FETCH_REASONS.unreachable:
+      case FETCH_REASONS.stalled:
+      case FETCH_REASONS.aborted:
         // The origin picked may be the one that went away; the next file probes again.
         deps.access.forget(server.id)
         failUnreachable(job)
         return
-      case 'unauthorized':
-        failEntry({ entry, reason: 'unauthorized' })
+      case FETCH_REASONS.unauthorized:
+        failEntry({ entry, reason: FAIL_REASONS.unauthorized })
         return
-      case 'status': {
+      case FETCH_REASONS.status: {
         const status = outcome.status ?? 0
         // A proxy in front of a restarting server answers 502 to 504: an outage, not a refusal.
         if (status >= 500) {
@@ -484,12 +500,12 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
           return
         }
         if (status === NOT_FOUND_STATUS) {
-          failEntry({ entry, reason: 'gone' })
+          failEntry({ entry, reason: FAIL_REASONS.gone })
           return
         }
         failEntry({
           entry,
-          reason: 'other',
+          reason: FAIL_REASONS.other,
           message: DOWNLOAD_MESSAGES.answered({ serverName: server.name, status }),
         })
         return
@@ -524,8 +540,9 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     if (outcome.ok) return access
     // The part is closed now, so the bytes it holds can be kept.
     store.update((state) => advance(state, { downloadId: entry.downloadId, bytes: outcome.bytes }))
-    const isRenewal = stopReasonOf(signal) === 'refresh'
-    const isRefused = outcome.reason === 'unauthorized' || outcome.reason === 'locked'
+    const isRenewal = stopReasonOf(signal) === STOP_REASONS.refresh
+    const isRefused =
+      outcome.reason === FETCH_REASONS.unauthorized || outcome.reason === FETCH_REASONS.locked
     if (!isRenewal && !(isRefused && !hasRetried)) {
       settleFailure({ job, outcome })
       return null
@@ -539,7 +556,10 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   const tracksOf = async ({ entry, signal }: Job): Promise<SubtitleTrack[]> => {
     const reply = await unlessStopped({
       task: deps.calls
-        .call({ serverId: entry.serverId, call: { name: 'getTracks', mediaId: entry.mediaId } })
+        .call({
+          serverId: entry.serverId,
+          call: { name: CALL_NAMES.getTracks, mediaId: entry.mediaId },
+        })
         .catch(() => null),
       signal,
     })
@@ -587,7 +607,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
         return skipped()
       }
       const read = await textUpTo({ body: response.body, max: SIDECAR_MAX_BYTES, signal })
-      if (read.kind === 'tooBig') return skipped(': it is larger than 16 MiB')
+      if (read.kind === TEXT_READS.tooBig) return skipped(': it is larger than 16 MiB')
       await fs.writeFile(sidecarPathFor({ ...partsOf(entry), trackId: track.id }), read.text)
       return { trackId: track.id, title: track.title ?? '', language: track.language ?? '' }
     } catch {
@@ -628,7 +648,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     if (entry === null) return
     const server = deps.serverOf(entry.serverId)
     if (server === null) {
-      failEntry({ entry, reason: 'other', message: SERVER_GONE })
+      failEntry({ entry, reason: FAIL_REASONS.other, message: SERVER_GONE })
       return
     }
     const job: Job = { entry, server, signal, disk }
@@ -656,7 +676,11 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     if (access === null) return
     store.update((state) => start(state, { downloadId }))
     // A pause or a failure that came while the ticket was read stands, and this run lets go.
-    if ((entryById(store.read(), { downloadId })?.status.kind ?? null) !== 'downloading') return
+    if (
+      (entryById(store.read(), { downloadId })?.status.kind ?? null) !==
+      DOWNLOAD_STATUS_KINDS.downloading
+    )
+      return
     await fs.mkdir(entryDirFor(partsOf(entry)))
     if (signal.aborted) return
     const fetched = await fetchVideo({ job, access, hasRetried: false })
@@ -684,7 +708,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     work({ downloadId, signal: stop.signal, disk })
       .catch((error: unknown) => {
         if (stop.signal.aborted) return
-        failEntry({ entry, reason: 'other', message: errorText(error) })
+        failEntry({ entry, reason: FAIL_REASONS.other, message: errorText(error) })
         deps.warn(`raven player could not download ${loggable(entry.label)}`)
       })
       .finally(() => {
@@ -710,8 +734,12 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     const isIdle = (entry: DownloadEntry): boolean => !running.has(entry.downloadId)
     const { entries } = store.read()
     // A file left downloading by the last run goes first: it was under way.
-    const resumed = entries.filter((entry) => entry.status.kind === 'downloading' && isIdle(entry))
-    const queued = entries.filter((entry) => entry.status.kind === 'queued' && isIdle(entry))
+    const resumed = entries.filter(
+      (entry) => entry.status.kind === DOWNLOAD_STATUS_KINDS.downloading && isIdle(entry),
+    )
+    const queued = entries.filter(
+      (entry) => entry.status.kind === DOWNLOAD_STATUS_KINDS.queued && isIdle(entry),
+    )
     const next = [...resumed, ...queued].slice(0, slots)
     next.forEach(begin)
   }
@@ -721,8 +749,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
 
   const pauseOne: DownloadQueue['pause'] = async ({ downloadId }) => {
     saveBytes((candidate) => candidate.downloadId === downloadId)
-    store.update((state) => pause(state, { downloadId, reason: 'viewer' }))
-    await stopOne({ downloadId, reason: 'pause' })
+    store.update((state) => pause(state, { downloadId, reason: PAUSE_REASONS.viewer }))
+    await stopOne({ downloadId, reason: STOP_REASONS.pause })
     kick()
   }
 
@@ -794,14 +822,14 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     saveBytes(() => true)
     store.update(pauseEverything)
     syncOutageRetry()
-    await stopRuns({ reason: 'pause', isStopped: () => true })
+    await stopRuns({ reason: STOP_REASONS.pause, isStopped: () => true })
   }
 
   const resumeAll: DownloadQueue['resumeAll'] = () => {
     resumeEach({
       downloadIds: store
         .read()
-        .entries.filter((entry) => entry.status.kind === 'paused')
+        .entries.filter((entry) => entry.status.kind === DOWNLOAD_STATUS_KINDS.paused)
         .map(({ downloadId }) => downloadId),
       isRetry: false,
     })
@@ -813,7 +841,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     timers.clear(sleep.settle)
     sleep.settle = undefined
     saveBytes(() => true)
-    stopRuns({ reason: 'suspend', isStopped: () => true }).catch(() => undefined)
+    stopRuns({ reason: STOP_REASONS.suspend, isStopped: () => true }).catch(() => undefined)
   }
 
   const onResume: DownloadQueue['onResume'] = () => {
@@ -841,7 +869,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     store.update((state) => remove(state, { downloadId }))
     deps.onRemoved([entry])
     syncOutageRetry()
-    await stopOne({ downloadId, reason: 'remove' })
+    await stopOne({ downloadId, reason: STOP_REASONS.remove })
     await removing({
       path: entryDirFor(partsOf(entry)),
       what: `the files of ${loggable(entry.label)}`,
@@ -856,7 +884,10 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     if (dropped.length > 0) deps.onRemoved(dropped)
     syncOutageRetry()
     deps.access.forget(serverId)
-    await stopRuns({ reason: 'remove', isStopped: ({ run }) => run.serverId === serverId })
+    await stopRuns({
+      reason: STOP_REASONS.remove,
+      isStopped: ({ run }) => run.serverId === serverId,
+    })
     await removing({
       path: serverDirFor({ userData, serverId }),
       what: "a removed server's downloads",
@@ -869,7 +900,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     store.update(removeAll)
     if (dropped.length > 0) deps.onRemoved(dropped)
     syncOutageRetry()
-    await stopRuns({ reason: 'remove', isStopped: () => true })
+    await stopRuns({ reason: STOP_REASONS.remove, isStopped: () => true })
     await removing({ path: downloadsDirFor({ userData }), what: 'its downloads' })
   }
 
@@ -879,7 +910,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     clearOutageRetry()
     timers.clear(sleep.settle)
     sleep.settle = undefined
-    running.forEach((run) => run.stop.abort(stopping('dispose')))
+    running.forEach((run) => run.stop.abort(stopping(STOP_REASONS.dispose)))
   }
 
   return {
