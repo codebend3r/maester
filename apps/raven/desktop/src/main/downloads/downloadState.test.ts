@@ -463,6 +463,55 @@ describe('what a removed download owes its server', () => {
     ])
   })
 
+  it('folds a title owed a high position with no furthest so the furthest is not below the position', () => {
+    const first = remove(
+      stateOf(
+        entry({
+          downloadId: id(1),
+          mediaId: 1,
+          pending: { play: false, position: 180, furthest: null, at: 50 },
+        }),
+      ),
+      { downloadId: id(1) },
+    )
+    const again = queue(first, {
+      entries: [
+        entry({
+          downloadId: id(4),
+          mediaId: 1,
+          pending: { play: false, position: null, furthest: 40, at: 90 },
+        }),
+      ],
+    })
+    expect(remove(again, { downloadId: id(4) }).owed).toEqual([
+      {
+        serverId: SERVER_A,
+        mediaId: 1,
+        pending: { play: false, position: 180, furthest: 180, at: 90 },
+      },
+    ])
+  })
+
+  it('folds a title whose furthest already reaches the position without changing it', () => {
+    const first = remove(owing, { downloadId: id(1) })
+    const again = queue(first, {
+      entries: [
+        entry({
+          downloadId: id(4),
+          mediaId: 1,
+          pending: { play: false, position: 185, furthest: null, at: 90 },
+        }),
+      ],
+    })
+    expect(remove(again, { downloadId: id(4) }).owed).toEqual([
+      {
+        serverId: SERVER_A,
+        mediaId: 1,
+        pending: { play: true, position: 185, furthest: 190, at: 90 },
+      },
+    ])
+  })
+
   it('owedOf finds an owed item by server and media, or null', () => {
     const owed = remove(owing, { downloadId: id(1) })
     expect(owedOf(owed, { serverId: SERVER_A, mediaId: 1 })?.pending).toEqual(PLAYED)
