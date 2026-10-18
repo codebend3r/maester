@@ -5,7 +5,7 @@ export type ServerMethod = (typeof SERVER_METHODS)[keyof typeof SERVER_METHODS]
 export const MAX_BODY = 4096
 export const MAX_SECRET = 256
 
-/** The eight calls main makes for the page, by name. */
+/** The calls main makes for the page, by name. */
 export const CALL_NAMES = {
   getMedia: 'getMedia',
   getTracks: 'getTracks',
@@ -15,6 +15,11 @@ export const CALL_NAMES = {
   unlock: 'unlock',
   getAdminLock: 'getAdminLock',
   unlockAdmin: 'unlockAdmin',
+  getItem: 'getItem',
+  getLibrary: 'getLibrary',
+  getSagas: 'getSagas',
+  getMediaOrigins: 'getMediaOrigins',
+  getMediaTicket: 'getMediaTicket',
 } as const
 
 export type AllowedCall =
@@ -26,13 +31,19 @@ export type AllowedCall =
   | { name: typeof CALL_NAMES.unlock; pin: string }
   | { name: typeof CALL_NAMES.getAdminLock }
   | { name: typeof CALL_NAMES.unlockAdmin; password: string }
+  | { name: typeof CALL_NAMES.getItem; itemId: number }
+  | { name: typeof CALL_NAMES.getLibrary; libraryId: number }
+  | { name: typeof CALL_NAMES.getSagas; libraryId: number }
+  | { name: typeof CALL_NAMES.getMediaOrigins }
+  | { name: typeof CALL_NAMES.getMediaTicket; mediaId: number }
 
-/** The fixed paths among the calls; the media calls' paths carry the media id. */
+/** The fixed paths among the calls; the numbered calls' paths carry an id. */
 export const API_PATHS = {
   lock: '/api/lock',
   unlock: '/api/lock/unlock',
   admin: '/api/admin',
   adminUnlock: '/api/admin/unlock',
+  mediaOrigins: '/api/media-origins',
 } as const
 
 const BODY_KINDS = { none: 'none', json: 'json', bad: 'bad' } as const
@@ -42,14 +53,14 @@ type Body =
   | { kind: typeof BODY_KINDS.json; value: unknown }
   | { kind: typeof BODY_KINDS.bad }
 
-const ROUTE_KINDS = { media: 'media', fixed: 'fixed' } as const
+const ROUTE_KINDS = { numbered: 'numbered', fixed: 'fixed' } as const
 
 type Route =
   | {
-      kind: typeof ROUTE_KINDS.media
+      kind: typeof ROUTE_KINDS.numbered
       method: ServerMethod
       pattern: RegExp
-      read: (input: { mediaId: number; body: Body }) => AllowedCall | null
+      read: (input: { id: number; body: Body }) => AllowedCall | null
     }
   | {
       kind: typeof ROUTE_KINDS.fixed
@@ -83,31 +94,61 @@ const bare =
 // escape, extra slash or absolute URL can match; `$` without the `m` flag ends the input.
 const ROUTES: readonly Route[] = [
   {
-    kind: ROUTE_KINDS.media,
+    kind: ROUTE_KINDS.numbered,
     method: SERVER_METHODS.get,
     pattern: /^\/api\/media\/([1-9]\d{0,15})$/u,
-    read: ({ mediaId, body }) => bare({ name: CALL_NAMES.getMedia, mediaId })({ body }),
+    read: ({ id, body }) => bare({ name: CALL_NAMES.getMedia, mediaId: id })({ body }),
   },
   {
-    kind: ROUTE_KINDS.media,
+    kind: ROUTE_KINDS.numbered,
     method: SERVER_METHODS.get,
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/tracks$/u,
-    read: ({ mediaId, body }) => bare({ name: CALL_NAMES.getTracks, mediaId })({ body }),
+    read: ({ id, body }) => bare({ name: CALL_NAMES.getTracks, mediaId: id })({ body }),
   },
   {
-    kind: ROUTE_KINDS.media,
+    kind: ROUTE_KINDS.numbered,
     method: SERVER_METHODS.put,
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/progress$/u,
-    read: ({ mediaId, body }) =>
+    read: ({ id, body }) =>
       body.kind === BODY_KINDS.json && isProgressChange(body.value)
-        ? { name: CALL_NAMES.saveProgress, mediaId, position: body.value.position }
+        ? { name: CALL_NAMES.saveProgress, mediaId: id, position: body.value.position }
         : null,
   },
   {
-    kind: ROUTE_KINDS.media,
+    kind: ROUTE_KINDS.numbered,
     method: SERVER_METHODS.post,
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/plays$/u,
-    read: ({ mediaId, body }) => bare({ name: CALL_NAMES.recordPlay, mediaId })({ body }),
+    read: ({ id, body }) => bare({ name: CALL_NAMES.recordPlay, mediaId: id })({ body }),
+  },
+  {
+    kind: ROUTE_KINDS.numbered,
+    method: SERVER_METHODS.get,
+    pattern: /^\/api\/items\/([1-9]\d{0,15})$/u,
+    read: ({ id, body }) => bare({ name: CALL_NAMES.getItem, itemId: id })({ body }),
+  },
+  {
+    kind: ROUTE_KINDS.numbered,
+    method: SERVER_METHODS.get,
+    pattern: /^\/api\/libraries\/([1-9]\d{0,15})$/u,
+    read: ({ id, body }) => bare({ name: CALL_NAMES.getLibrary, libraryId: id })({ body }),
+  },
+  {
+    kind: ROUTE_KINDS.numbered,
+    method: SERVER_METHODS.get,
+    pattern: /^\/api\/libraries\/([1-9]\d{0,15})\/sagas$/u,
+    read: ({ id, body }) => bare({ name: CALL_NAMES.getSagas, libraryId: id })({ body }),
+  },
+  {
+    kind: ROUTE_KINDS.numbered,
+    method: SERVER_METHODS.get,
+    pattern: /^\/api\/media\/([1-9]\d{0,15})\/ticket$/u,
+    read: ({ id, body }) => bare({ name: CALL_NAMES.getMediaTicket, mediaId: id })({ body }),
+  },
+  {
+    kind: ROUTE_KINDS.fixed,
+    method: SERVER_METHODS.get,
+    path: API_PATHS.mediaOrigins,
+    read: bare({ name: CALL_NAMES.getMediaOrigins }),
   },
   {
     kind: ROUTE_KINDS.fixed,
@@ -143,12 +184,12 @@ const ROUTES: readonly Route[] = [
   },
 ]
 
-/** The id a media route captured, when it is a media id written the one way it can be. */
-const mediaIdOf = ({ pattern, path }: { pattern: RegExp; path: string }): number | null => {
+/** The id a numbered route captured, when it is an id written the one way it can be. */
+const idOf = ({ pattern, path }: { pattern: RegExp; path: string }): number | null => {
   const digits = pattern.exec(path)?.[1] ?? null
   if (digits === null) return null
-  const mediaId = Number(digits)
-  return isMediaId(mediaId) && String(mediaId) === digits ? mediaId : null
+  const id = Number(digits)
+  return isMediaId(id) && String(id) === digits ? id : null
 }
 
 const matchRoute = ({
@@ -163,9 +204,9 @@ const matchRoute = ({
   switch (route.kind) {
     case ROUTE_KINDS.fixed:
       return route.path === path ? route.read({ body }) : null
-    case ROUTE_KINDS.media: {
-      const mediaId = mediaIdOf({ pattern: route.pattern, path })
-      return mediaId === null ? null : route.read({ mediaId, body })
+    case ROUTE_KINDS.numbered: {
+      const id = idOf({ pattern: route.pattern, path })
+      return id === null ? null : route.read({ id, body })
     }
     default: {
       const unreachable: never = route
@@ -174,7 +215,7 @@ const matchRoute = ({
   }
 }
 
-/** One of the eight calls the page may make, read from what it sent, or null for anything else. */
+/** One of the thirteen allowlisted calls, read from what was sent, or null for anything else. */
 export const matchCall = ({
   method,
   path,
@@ -226,6 +267,20 @@ export const requestFor = (
         path: API_PATHS.adminUnlock,
         body: JSON.stringify({ password: call.password }),
       }
+    case CALL_NAMES.getItem:
+      return { method: SERVER_METHODS.get, path: `/api/items/${call.itemId}`, body: null }
+    case CALL_NAMES.getLibrary:
+      return { method: SERVER_METHODS.get, path: `/api/libraries/${call.libraryId}`, body: null }
+    case CALL_NAMES.getSagas:
+      return {
+        method: SERVER_METHODS.get,
+        path: `/api/libraries/${call.libraryId}/sagas`,
+        body: null,
+      }
+    case CALL_NAMES.getMediaOrigins:
+      return { method: SERVER_METHODS.get, path: API_PATHS.mediaOrigins, body: null }
+    case CALL_NAMES.getMediaTicket:
+      return { method: SERVER_METHODS.get, path: `/api/media/${call.mediaId}/ticket`, body: null }
     default: {
       const unreachable: never = call
       return unreachable
@@ -245,7 +300,40 @@ export const isWrite = (call: AllowedCall): boolean => {
     case CALL_NAMES.unlock:
     case CALL_NAMES.getAdminLock:
     case CALL_NAMES.unlockAdmin:
+    case CALL_NAMES.getItem:
+    case CALL_NAMES.getLibrary:
+    case CALL_NAMES.getSagas:
+    case CALL_NAMES.getMediaOrigins:
+    case CALL_NAMES.getMediaTicket:
       return false
+    default: {
+      const unreachable: never = call
+      return unreachable
+    }
+  }
+}
+
+/**
+ * Whether the page may make a call. A media ticket and the origin list are main's alone:
+ * main builds every media URL itself, so the page never holds a ticket or learns an origin.
+ */
+export const isPageCall = (call: AllowedCall): boolean => {
+  switch (call.name) {
+    case CALL_NAMES.getMediaOrigins:
+    case CALL_NAMES.getMediaTicket:
+      return false
+    case CALL_NAMES.getMedia:
+    case CALL_NAMES.getTracks:
+    case CALL_NAMES.saveProgress:
+    case CALL_NAMES.recordPlay:
+    case CALL_NAMES.getLock:
+    case CALL_NAMES.unlock:
+    case CALL_NAMES.getAdminLock:
+    case CALL_NAMES.unlockAdmin:
+    case CALL_NAMES.getItem:
+    case CALL_NAMES.getLibrary:
+    case CALL_NAMES.getSagas:
+      return true
     default: {
       const unreachable: never = call
       return unreachable

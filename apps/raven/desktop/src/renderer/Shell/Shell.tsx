@@ -1,6 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { applyDownloadsEvent } from '@/renderer/desktop/downloadsApi'
+import { DownloadDialog } from '@/renderer/Shell/DownloadDialog'
 import { OpenLinkDialog } from '@/renderer/Shell/OpenLinkDialog'
 import { applyReply, play, playServer } from '@/renderer/Shell/openReply'
 import { UpdateNotice } from '@/renderer/Shell/UpdateNotice'
@@ -8,6 +10,7 @@ import { UPDATES_KEY } from '@/renderer/Shell/updateState'
 import { useFileDrop } from '@/renderer/Shell/useFileDrop'
 import styles from '@/renderer/Shell/Shell.module.scss'
 import { useDesktop } from '@/renderer/stores/desktop'
+import { useDownloadAsk } from '@/renderer/stores/downloadAsk'
 import { useNotice } from '@/renderer/stores/notice'
 import { useUpdateNotice } from '@/renderer/stores/updateNotice'
 import { DESKTOP_EVENTS, type DesktopEvent, type DesktopReply } from '@/shared/protocol'
@@ -24,6 +27,9 @@ export const Shell = () => {
   const notice = useNotice((state) => state.notice)
   const showNotice = useNotice((state) => state.show)
   const clearNotice = useNotice((state) => state.clear)
+  const shownAsk = useDownloadAsk((state) => state.shown)
+  const showDownloadAsk = useDownloadAsk((state) => state.show)
+  const closeDownloadAsk = useDownloadAsk((state) => state.close)
   const [isOpenLinkShown, setIsOpenLinkShown] = useState(false)
   const update = useUpdateNotice((state) => state.version)
   const announceUpdate = useUpdateNotice((state) => state.announce)
@@ -57,7 +63,8 @@ export const Shell = () => {
     [clearNotice, hideUpdate],
   )
 
-  const openReply = (reply: DesktopReply) => applyReply({ reply, navigate, pathname, showNotice })
+  const openReply = (reply: DesktopReply) =>
+    applyReply({ reply, navigate, pathname, showNotice, showDownloadAsk })
   useFileDrop({ client, onReply: openReply })
 
   const onEvent = useEffectEvent((event: DesktopEvent) => {
@@ -78,6 +85,10 @@ export const Shell = () => {
         announceUpdate(event.version)
         // Settings reads main's status again, so an open Updates section shows the release too.
         return void queryClient.invalidateQueries({ queryKey: UPDATES_KEY })
+      case DESKTOP_EVENTS.downloadAsk:
+        return showDownloadAsk(event.ask)
+      case DESKTOP_EVENTS.downloads:
+        return void applyDownloadsEvent({ queryClient, event })
       default: {
         const unreachable: never = event
         return unreachable
@@ -135,6 +146,9 @@ export const Shell = () => {
         )}
       </div>
       {isOpenLinkShown && <OpenLinkDialog onClose={() => setIsOpenLinkShown(false)} />}
+      {shownAsk !== null && (
+        <DownloadDialog key={shownAsk.instance} ask={shownAsk.ask} onClose={closeDownloadAsk} />
+      )}
       {/* Always mounted: a live region is announced when its text changes, not when it appears. */}
       <output className={styles.notices}>
         {notice !== null && <span className={styles.notice}>{notice.message}</span>}

@@ -78,6 +78,8 @@ export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
       return { type: DESKTOP_EVENTS.play, target: reply.target }
     case DESKTOP_REPLIES.playServer:
       return { type: DESKTOP_EVENTS.playServer, target: reply.target }
+    case DESKTOP_REPLIES.downloadAsk:
+      return { type: DESKTOP_EVENTS.downloadAsk, ask: reply.ask }
     case DESKTOP_REPLIES.refused:
       return { type: DESKTOP_EVENTS.notice, message: reply.message }
     case DESKTOP_REPLIES.file:
@@ -88,6 +90,8 @@ export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
     case DESKTOP_REPLIES.serverReply:
     case DESKTOP_REPLIES.serverUnreachable:
     case DESKTOP_REPLIES.updates:
+    case DESKTOP_REPLIES.downloads:
+    case DESKTOP_REPLIES.space:
       return null
     default: {
       const unreachable: never = reply
