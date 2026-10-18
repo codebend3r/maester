@@ -15,7 +15,7 @@ export const AUTH_QUERY = {
   email: 'email',
 } as const
 
-const HOME = '/'
+export const HOME_PATH = '/'
 const DELETE_CHARACTER = 0x7f
 const FIRST_PRINTABLE = 0x20
 
@@ -35,12 +35,12 @@ const isAuthPath = (pathname: string): boolean => {
  * could leave the origin, or lands on an auth page, is refused.
  */
 export const safeReturnPath = (value: string | null): string => {
-  if (!value?.startsWith('/') || value.startsWith('//')) return HOME
-  if (value.includes('\\') || hasControlCharacter(value)) return HOME
+  if (!value?.startsWith('/') || value.startsWith('//')) return HOME_PATH
+  if (value.includes('\\') || hasControlCharacter(value)) return HOME_PATH
   const { origin } = window.location
   const url = URL.parse(value, origin)
-  if (!url || url.origin !== origin) return HOME
-  return isAuthPath(url.pathname) ? HOME : value
+  if (!url || url.origin !== origin) return HOME_PATH
+  return isAuthPath(url.pathname) ? HOME_PATH : value
 }
 
 export const signInPath = ({ returnTo }: { returnTo: string }): string =>
@@ -48,3 +48,7 @@ export const signInPath = ({ returnTo }: { returnTo: string }): string =>
 
 export const checkEmailPath = ({ email }: { email: string }): string =>
   `${AUTH_ROUTES.checkEmail}?${new URLSearchParams({ [AUTH_QUERY.email]: email })}`
+
+/** Where an email link lands: raven's confirm route on its own web address. */
+export const confirmUrl = ({ webUrl }: { webUrl: string }): string =>
+  `${webUrl.replace(/\/+$/, '')}${AUTH_ROUTES.confirm}`

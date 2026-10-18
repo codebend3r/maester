@@ -1,12 +1,11 @@
 import { useMutation } from '@tanstack/react-query'
-import { type FormEvent, type ReactNode, useId, useState } from 'react'
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { type FormEvent, useId, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Icon } from '@raven/ui'
-import { Logo } from '@/components/Logo/Logo'
-import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { AUTH_ERRORS } from '@/lib/authClient'
+import { errorCodeOf, resendFailureCopy } from '@/lib/authErrors'
 import { AUTH_QUERY, AUTH_ROUTES, checkEmailPath, safeReturnPath } from '@/lib/authRoutes'
-import { PosterWall } from '@/pages/SignInPage/PosterWall'
+import { AuthScreen, Brand } from '@/pages/SignInPage/AuthScreen'
 import { useAuthSession } from '@/stores/authSession'
 import styles from '@/pages/SignInPage/SignInPage.module.scss'
 
@@ -24,14 +23,8 @@ const FAILURE_COPY = {
   [SIGN_IN_FAILURES.failed]: 'Sign in failed. Try again.',
 } as const satisfies Record<SignInFailure, string>
 
-const HOME = '/'
-
-/** The `code` a Supabase auth error carries; a network failure has none. */
-const codeOf = (error: unknown): unknown =>
-  typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
-
 const failureOf = (error: unknown): SignInFailure => {
-  switch (codeOf(error)) {
+  switch (errorCodeOf(error)) {
     case AUTH_ERRORS.invalidCredentials:
       return SIGN_IN_FAILURES.invalidCredentials
     case AUTH_ERRORS.emailNotConfirmed:
@@ -40,41 +33,6 @@ const failureOf = (error: unknown): SignInFailure => {
       return SIGN_IN_FAILURES.failed
   }
 }
-
-const resendFailureCopy = (error: unknown): string =>
-  codeOf(error) === AUTH_ERRORS.overEmailSendRateLimit
-    ? 'Wait a moment before asking again.'
-    : 'Could not resend. Try again.'
-
-const Brand = () => (
-  <span className={styles.brand}>
-    <Logo />
-  </span>
-)
-
-const Frame = ({ children }: { children: ReactNode }) => (
-  <div className={styles.page}>
-    <PosterWall />
-    <main className={styles.side}>{children}</main>
-  </div>
-)
-
-const Waiting = () => (
-  <section className={styles.form}>
-    <Brand />
-    <output className={styles.lead}>Checking your account</output>
-  </section>
-)
-
-const Unavailable = () => (
-  <section className={styles.form}>
-    <Brand />
-    <header className={styles.welcome}>
-      <h1 className={styles.title}>Sign in is temporarily unavailable</h1>
-      <p className={styles.lead}>raven could not reach its accounts. Try again in a moment.</p>
-    </header>
-  </section>
-)
 
 const SignInForm = ({ returnPath }: { returnPath: string }) => {
   const ids = { email: useId(), password: useId(), error: useId() }
@@ -217,44 +175,15 @@ const SignInForm = ({ returnPath }: { returnPath: string }) => {
  * email or password, an email not yet confirmed (which can be sent again)
  * and any other failure each say so under the password, marked as the field
  * to fix. Once in, the viewer goes to the path they came from, `return_to`,
- * or home. While accounts are off the page is not there; while they cannot
- * be reached it says so instead of showing a form that cannot work.
+ * or home.
  */
 export const SignInPage = () => {
-  const access = useAccessState()
   const [params] = useSearchParams()
   const returnPath = safeReturnPath(params.get(AUTH_QUERY.returnTo))
 
-  switch (access.kind) {
-    case ACCESS_KINDS.disabled:
-      return <Navigate replace to={HOME} />
-    case ACCESS_KINDS.approved:
-      return <Navigate replace to={returnPath} />
-    case ACCESS_KINDS.pending:
-    case ACCESS_KINDS.revoked:
-      return <Navigate replace to={AUTH_ROUTES.pending} />
-    case ACCESS_KINDS.loading:
-      return (
-        <Frame>
-          <Waiting />
-        </Frame>
-      )
-    case ACCESS_KINDS.unavailable:
-    case ACCESS_KINDS.failed:
-      return (
-        <Frame>
-          <Unavailable />
-        </Frame>
-      )
-    case ACCESS_KINDS.signedOut:
-      return (
-        <Frame>
-          <SignInForm returnPath={returnPath} />
-        </Frame>
-      )
-    default: {
-      const unreachable: never = access
-      return unreachable
-    }
-  }
+  return (
+    <AuthScreen approvedTo={returnPath}>
+      <SignInForm returnPath={returnPath} />
+    </AuthScreen>
+  )
 }

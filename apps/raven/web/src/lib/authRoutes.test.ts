@@ -3,6 +3,7 @@ import {
   AUTH_QUERY,
   AUTH_ROUTES,
   checkEmailPath,
+  confirmUrl,
   safeReturnPath,
   signInPath,
 } from '@/lib/authRoutes'
@@ -72,6 +73,17 @@ describe('checkEmailPath', () => {
   it('carries the address encoded', () => {
     expect(checkEmailPath({ email: 'jordan+raven@example.com' })).toBe(
       `${AUTH_ROUTES.checkEmail}?${AUTH_QUERY.email}=jordan%2Braven%40example.com`,
+    )
+  })
+})
+
+describe('confirmUrl', () => {
+  it('puts the confirm route on the web address, whatever trailing slash it has', () => {
+    expect(confirmUrl({ webUrl: 'https://raven.example.test' })).toBe(
+      'https://raven.example.test/auth/confirm',
+    )
+    expect(confirmUrl({ webUrl: 'https://raven.example.test/' })).toBe(
+      'https://raven.example.test/auth/confirm',
     )
   })
 })
