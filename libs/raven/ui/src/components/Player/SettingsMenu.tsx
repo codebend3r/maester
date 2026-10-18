@@ -28,6 +28,7 @@ const Option = ({
   name,
   checked,
   disabled,
+  isInline,
   label,
   details,
   onSelect,
@@ -35,11 +36,17 @@ const Option = ({
   name: string
   checked: boolean
   disabled?: boolean
+  /** Whether the detail sits beside the label instead of under it. */
+  isInline?: boolean
   label: string
   details?: string
   onSelect: () => void
 }) => (
-  <label className={[styles.option, disabled ? styles.disabled : ''].filter(Boolean).join(' ')}>
+  <label
+    className={[styles.option, disabled ? styles.disabled : '', isInline ? styles.inline : '']
+      .filter(Boolean)
+      .join(' ')}
+  >
     <input
       className={styles.radio}
       type="radio"
@@ -169,6 +176,7 @@ const QualityGroup = ({
           name={`${name}-quality`}
           checked={mode !== PLAYBACK_MODES.transcode}
           label="Play original quality"
+          isInline
           details={original ?? undefined}
           onSelect={() => choice.pick(best)}
         />
@@ -179,6 +187,7 @@ const QualityGroup = ({
           name={`${name}-quality`}
           checked={choice.quality === key}
           label={`Convert to ${STREAM_QUALITIES[key].label}`}
+          isInline
           details={formatBitrate(STREAM_QUALITIES[key].bitrate) ?? undefined}
           onSelect={() => choice.pickQuality(key)}
         />
