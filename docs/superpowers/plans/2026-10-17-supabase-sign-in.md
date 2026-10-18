@@ -51,11 +51,23 @@ These are not claimed as completed by the foundation PR:
 - New playback tickets are opaque, bounded, process-local capabilities. They retain the issuing JWT only in server memory and recheck membership at redemption. They expire at the earlier of five minutes and that JWT's expiry, so the desktop follow-up must renew sessions and reacquire tickets before later seeks/subtitle requests. Do not promise six-hour uninterrupted capability URLs before that client work is validated.
 - The server's complete test suite and workspace verification pass. Existing library/admin/PIN access is retained; only the new endpoints and account-ticket redemptions enforce account authorization in this PR.
 
+## PR 3: raven-auth-ui
+
+Task plan: `2026-10-18-raven-auth-ui.md`, stacked on `supabase-spec-status` (#242).
+
+- [x] Add the Supabase browser client with the host-only `maester-auth` cookie the server decodes, and a session store, access state and route guard that gate only the web app (the server still gates nothing existing).
+- [x] Sign in, sign up and check email with a resend cooldown, `/auth/confirm` with `token_hash` and `verifyOtp` (hash removed from the URL first), forgot and reset password, and a pending or removed screen.
+- [x] Settings > Account for everyone and Settings > Users for the owner: Pending, Approved and Removed tabs, Approve and Remove access.
+- [x] Validate return paths, refresh once on a refused call, and clear account state on sign out and account switches.
+- [x] Document the routes and the gating in `apps/raven/README.md`.
+- [x] Walk the flow on the local stack: sign up, confirm in a second browser, Pending, owner approval, Check again, Remove access, forgot and reset.
+- [ ] Not verifiable locally: Netlify forwarding and SSE, real SMTP, the cloud redirect allowlist and a second real device. The staging check below covers them.
+
 ## Later PR stack
 
 | Branch | Scope | Cutover dependency |
 |---|---|---|
-| `raven-auth-ui` | Login, signup, confirmation, recovery, pending and Settings > Users. Task plan: `2026-10-18-raven-auth-ui.md` | Test the complete owner approval flow in staging |
+| `raven-auth-ui` | Login, signup, confirmation, recovery, pending and Settings > Users. Task plan: [`2026-10-18-raven-auth-ui.md`](2026-10-18-raven-auth-ui.md) | Test the complete owner approval flow in staging |
 | `raven-auth-desktop` | Main-owned session, login, pending, secure storage and playback tickets | Release before enforcement |
 | `raven-auth-enforcement` | Account gate across every protected API/media path, owner-only management, remove admin-password authorization, bind PIN state to accounts | Configure production and verify anonymous access is denied |
 | `raven-account-data` | Per-account progress, plays, watched and favourites with owner adoption | Follow-up; viewing data is shared until this ships |

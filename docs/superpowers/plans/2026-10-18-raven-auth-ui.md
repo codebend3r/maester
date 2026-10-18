@@ -41,7 +41,7 @@
 - [x] **Step 1:** In the scratchpad, install the latest `@supabase/supabase-js` and `@supabase/ssr` that are at least two weeks old (`bun pm view <pkg> time`). Note the exact versions.
 - [x] **Step 2:** Create `createBrowserClient(url, key, { cookieOptions: { name: 'maester-auth' } })` under happy-dom, store a session whose JSON is over 4 KB, and print `document.cookie`. Confirm the names are `maester-auth` or `maester-auth.0`, `.1`, the value is `base64-` plus base64url, and a sign out removes every chunk.
 - [x] **Step 3:** Feed that `document.cookie` to the server's decoder (`apps/raven/server/src/auth/accessToken.ts`, `accessTokenOf` with method `GET`) in a scratch bun script and confirm it returns the session's `access_token`. If it does not, the plan changes to a hand-written `storage` for `@supabase/supabase-js`; stop and report.
-- [ ] **Step 4:** Against the local stack (`bunx nx run @raven/supabase:start`), confirm `signUp` delivers a Mailpit email whose link carries `token_hash` and `type`, and that `verifyOtp({ token_hash, type })` from a client with no session creates one.
+- [x] **Step 4:** Against the local stack (`bunx nx run @raven/supabase:start`), confirm `signUp` delivers a Mailpit email whose link carries `token_hash` and `type`, and that `verifyOtp({ token_hash, type })` from a client with no session creates one.
 - [x] **Step 5:** Write the versions and findings into this file. No commit of scratch code.
 
 **Spike results (2026-10-18):**
@@ -49,7 +49,8 @@
 - Versions: `@supabase/supabase-js` 2.117.2 (2026-09-25; 2.117.3 and 2.118.0 are under two weeks old) and `@supabase/ssr` 0.12.7 (2026-09-08).
 - Steps 2 and 3 pass under happy-dom with a stubbed token endpoint: a small session is one `maester-auth` cookie, a 6 KB one is `maester-auth.0` to `.2`, values start `base64-`, and the server's `accessTokenOf` (GET) returns the session's exact `access_token` for both. No hand-written storage needed.
 - Sign out under happy-dom leaves empty-valued entries (`maester-auth.0=`), not absent ones. Task 4's test asserts no `maester-auth*` entry has a value; the server reads an empty value as no token.
-- Step 4 (Mailpit) not run here; the stack was down. The confirmation template links `{{ .SiteURL }}/auth/confirm?token_hash=...&type=email` (recovery uses `type=recovery`), so signup confirmation is `verifyOtp` type `email`, not `signup`. Task 7 is corrected below. `site_url` is `http://localhost:5173`, so the link ignores `emailRedirectTo` and lands on raven's `/auth/confirm`; the Task 11 walkthrough confirms `verifyOtp` with no prior session.
+- Step 4 (Mailpit) not run here; the stack was down. The confirmation template links `{{ .SiteURL }}/auth/confirm?token_hash=...&type=email` (recovery uses `type=recovery`), so signup confirmation is `verifyOtp` type `email`, not `signup`. Task 7 is corrected below. `site_url` is `http://localhost:5173`, so the link ignores `emailRedirectTo` and lands on raven's `/auth/confirm`; the Task 11 walkthrough confirmed `verifyOtp` with no prior session (below).
+- Step 4 (2026-10-18, Task 11 walkthrough on the local stack): a fresh sign up delivered "Confirm your raven account" to Mailpit linking `http://localhost:5173/auth/confirm?token_hash=...&type=email`; opened in a second browser context with no session, `/auth/confirm` removed the hash from the URL, `verifyOtp` created the session and the visitor landed on Pending. The same link opened again showed the expired or used screen. The recovery email links the same way with `type=recovery`.
 
 ### Task 1: Dependencies and the auth client seam
 
@@ -62,10 +63,10 @@
 - Produces: `type AuthClient` = the slice of the Supabase auth API used (`signInWithPassword`, `signUp`, `signOut`, `resend`, `resetPasswordForEmail`, `updateUser`, `verifyOtp`, `refreshSession`, `getSession`, `onAuthStateChange`), written as `Pick<SupabaseClient['auth'], ...>`.
 - Produces: `createAuthClient({ config }: { config: ReadyAuthConfig }): AuthClient` building `createBrowserClient` with `cookieOptions: { name: config.cookieName, sameSite: 'lax', path: '/' }` and no `domain`; `type ReadyAuthConfig = Extract<AuthConfig, { state: 'ready' }>` written with `AUTH_CONFIG_STATES.ready`.
 
-- [ ] **Step 1:** Add both dependencies at the Task 0 versions to `@raven/web`; `bun install`. Knip must not flag them once Task 1 imports them.
-- [ ] **Step 2:** Test `createAuthClient` with `document.cookie`: after a stored session the cookie is named `maester-auth` (never a `sb-` name), has no `Domain`, and signing out leaves no `maester-auth*` cookie.
-- [ ] **Step 3:** Implement `authClient.ts`; the test passes.
-- [ ] **Step 4:** Commit `MAE: add the Supabase browser client to raven web`.
+- [x] **Step 1:** Add both dependencies at the Task 0 versions to `@raven/web`; `bun install`. Knip must not flag them once Task 1 imports them.
+- [x] **Step 2:** Test `createAuthClient` with `document.cookie`: after a stored session the cookie is named `maester-auth` (never a `sb-` name), has no `Domain`, and signing out leaves no `maester-auth*` cookie.
+- [x] **Step 3:** Implement `authClient.ts`; the test passes.
+- [x] **Step 4:** Commit `MAE: add the Supabase browser client to raven web`.
 
 ### Task 2: Auth routes and return paths
 
@@ -77,9 +78,9 @@
 - Produces: `safeReturnPath(value: string | null): string` returning `value` only if it starts with exactly one `/`, has no backslash, control character or `//` prefix, and parses on `window.location.origin` to the same origin; otherwise `'/'`. A path that is an auth route also becomes `'/'`.
 - Produces: `signInPath({ returnTo }: { returnTo: string }): string`.
 
-- [ ] **Step 1:** Test `safeReturnPath` for the Review Focus inputs (each returns `'/'`), for `/libraries/3?x=1#y` (kept) and for `/sign-in` (returns `'/'`).
-- [ ] **Step 2:** Implement it; tests pass.
-- [ ] **Step 3:** Commit `MAE: add raven's auth routes and a safe return path`.
+- [x] **Step 1:** Test `safeReturnPath` for the Review Focus inputs (each returns `'/'`), for `/libraries/3?x=1#y` (kept) and for `/sign-in` (returns `'/'`).
+- [x] **Step 2:** Implement it; tests pass.
+- [x] **Step 3:** Commit `MAE: add raven's auth routes and a safe return path`.
 
 ### Task 3: Session store, access state and route guard
 
@@ -93,12 +94,12 @@
 - Produces: `authConfigQuery`, `accountQuery(userId)` (retry 0; keyed by user id so a switch cannot show another account's data), `useAccessState(): AccessState`.
 - Produces: `<AuthGate>` route element: `disabled` and `approved` render `<Outlet />`; `signedOut` navigates to `signInPath({ returnTo: current })`; `pending` and `revoked` navigate to `AUTH_ROUTES.pending`; `loading` shows a loading screen; `failed` shows "Account access is temporarily unavailable" with Try again; `unavailable` renders the outlet (server not gated yet).
 
-- [ ] **Step 1:** Test `accessStateOf` for every kind, including `/api/me` 503 and network error becoming `failed`, a 403 `pending` refusal becoming `pending`, and a 401 `signed_out` becoming `signedOut`.
-- [ ] **Step 2:** Test the store with a fake `AuthClient`: boot with and without a session, an `onAuthStateChange` event updates `session`, `accessToken()` is null when signed out.
-- [ ] **Step 3:** Implement both; `api` passes `accessToken: () => useAuthSession.getState().accessToken()`; `main.tsx` starts the store once the config query resolves.
-- [ ] **Step 4:** Test `AuthGate` per kind, including that a 503 on `/api/me` shows Try again and does not navigate (Review Focus).
-- [ ] **Step 5:** Wrap the browsing routes and `watch/:id` in `AuthGate` in `AppRoutes.tsx`; the auth routes sit outside it.
-- [ ] **Step 6:** Commit `MAE: gate raven web on the signed-in account`.
+- [x] **Step 1:** Test `accessStateOf` for every kind, including `/api/me` 503 and network error becoming `failed`, a 403 `pending` refusal becoming `pending`, and a 401 `signed_out` becoming `signedOut`.
+- [x] **Step 2:** Test the store with a fake `AuthClient`: boot with and without a session, an `onAuthStateChange` event updates `session`, `accessToken()` is null when signed out.
+- [x] **Step 3:** Implement both; `api` passes `accessToken: () => useAuthSession.getState().accessToken()`; `main.tsx` starts the store once the config query resolves.
+- [x] **Step 4:** Test `AuthGate` per kind, including that a 503 on `/api/me` shows Try again and does not navigate (Review Focus).
+- [x] **Step 5:** Wrap the browsing routes and `watch/:id` in `AuthGate` in `AppRoutes.tsx`; the auth routes sit outside it.
+- [x] **Step 6:** Commit `MAE: gate raven web on the signed-in account`.
 
 ### Task 4: Refresh retry, sign out and account switches
 
@@ -111,11 +112,11 @@
 - Produces: in `api.ts`, a `fetch` wrapper that on an `ApiError` with `refusal.reason === AUTH_REFUSALS.signedOut` calls `refreshSession()` once and repeats the request once; a second refusal signs out.
 - Produces: the store clears the query client when `onAuthStateChange` reports a different `userId` than before.
 
-- [ ] **Step 1:** Test the retry: first 401 `signed_out`, refresh succeeds, second call carries the new token and succeeds; a second 401 does not loop and ends signed out.
-- [ ] **Step 2:** Test `signOut` and a user switch empty the query cache, close the PIN prompt and clear selection (Review Focus).
-- [ ] **Step 3:** Test that after `signOut` with a three-chunk session, `document.cookie` holds no `maester-auth` entry (Review Focus).
-- [ ] **Step 4:** Implement; tests pass.
-- [ ] **Step 5:** Commit `MAE: refresh once, clear account state on sign out and switches`.
+- [x] **Step 1:** Test the retry: first 401 `signed_out`, refresh succeeds, second call carries the new token and succeeds; a second 401 does not loop and ends signed out.
+- [x] **Step 2:** Test `signOut` and a user switch empty the query cache, close the PIN prompt and clear selection (Review Focus).
+- [x] **Step 3:** Test that after `signOut` with a three-chunk session, `document.cookie` holds no `maester-auth` entry (Review Focus).
+- [x] **Step 4:** Implement; tests pass.
+- [x] **Step 5:** Commit `MAE: refresh once, clear account state on sign out and switches`.
 
 ### Task 5: Sign in
 
@@ -127,9 +128,9 @@
 - Produces: the existing page reshaped for email and password: the Server field and "Keep me signed in" go (no server choice on web, and the session always persists); Name becomes Email (`type="email"`, `autoComplete="username"`); links to sign up and forgot password; on success navigate to `safeReturnPath(return_to)`. Remove `SignIn`, `SignInDetails` and `signInUnavailable` if nothing else reads them (knip).
 - Error copy: `invalidCredentials` "Email or password is wrong."; `emailNotConfirmed` offers resend and links to check-email; anything else "Sign in failed. Try again."
 
-- [ ] **Step 1:** Update the tests: success goes to the return path, an `//evil` return goes home, each error code shows its copy and marks the password invalid.
-- [ ] **Step 2:** Implement; tests, `lint:css` and `typecheck` pass.
-- [ ] **Step 3:** Commit `MAE: sign in to raven with an email and password`.
+- [x] **Step 1:** Update the tests: success goes to the return path, an `//evil` return goes home, each error code shows its copy and marks the password invalid.
+- [x] **Step 2:** Implement; tests, `lint:css` and `typecheck` pass.
+- [x] **Step 3:** Commit `MAE: sign in to raven with an email and password`.
 
 ### Task 6: Sign up and check email
 
@@ -140,9 +141,9 @@
 - `SignUpPage`: email, password, confirm password (matched client-side), copy that explains email verification and manual approval; calls `signUp({ email, password, options: { emailRedirectTo: <webUrl>/auth/confirm } })`; always navigates to `AUTH_ROUTES.checkEmail` with `email`, including for an already registered address (non-enumerating, Review Focus); `weakPassword` shows the server's message.
 - `CheckEmailPage`: names the address, `Resend` calls `auth.resend({ type: 'signup', email })` then disables for 60 seconds with a visible countdown; `overEmailSendRateLimit` shows "Wait a moment before asking again."
 
-- [ ] **Step 1:** Tests: mismatch blocks submit, existing-user and new-user navigate identically, resend disables for 60 s (fake timers) and re-enables, rate limit copy shows.
-- [ ] **Step 2:** Implement both pages; tests pass.
-- [ ] **Step 3:** Commit `MAE: sign up for raven and ask to check email`.
+- [x] **Step 1:** Tests: mismatch blocks submit, existing-user and new-user navigate identically, resend disables for 60 s (fake timers) and re-enables, rate limit copy shows.
+- [x] **Step 2:** Implement both pages; tests pass.
+- [x] **Step 3:** Commit `MAE: sign up for raven and ask to check email`.
 
 ### Task 7: Confirm
 
@@ -152,9 +153,9 @@
 **Interfaces:**
 - Reads `token_hash` and `type` (`email` or `recovery`, otherwise an error; the confirmation template in `apps/raven/supabase/templates` links with `type=email`), immediately replaces the URL with `AUTH_ROUTES.confirm` (no query), then `verifyOtp({ token_hash, type })`. `email` goes to `/` (the gate then shows pending or the library); `recovery` goes to `AUTH_ROUTES.reset`. `otpExpired` or any failure shows "This link has expired or was already used" with a link to resend (`checkEmail` for `email`, `forgot` for `recovery`).
 
-- [ ] **Step 1:** Tests: the URL has no `token_hash` before `verifyOtp` resolves and after it fails; success and failure for both types; a second render with no params shows the error, not a spinner; opened with no prior session (a second browser).
-- [ ] **Step 2:** Implement; tests pass.
-- [ ] **Step 3:** Commit `MAE: confirm an email link on raven`.
+- [x] **Step 1:** Tests: the URL has no `token_hash` before `verifyOtp` resolves and after it fails; success and failure for both types; a second render with no params shows the error, not a spinner; opened with no prior session (a second browser).
+- [x] **Step 2:** Implement; tests pass.
+- [x] **Step 3:** Commit `MAE: confirm an email link on raven`.
 
 ### Task 8: Forgot and reset password
 
@@ -165,9 +166,9 @@
 - `ForgotPasswordPage`: email; calls `resetPasswordForEmail(email, { redirectTo: <webUrl>/auth/confirm })`; always shows the same "If that address has an account, a link is on its way" message, whatever the result except a rate limit.
 - `ResetPasswordPage`: reachable only with a recovery session (else navigates to `forgot`); new password plus confirmation; `updateUser({ password })`; on success goes to `/`.
 
-- [ ] **Step 1:** Tests: identical message for a known and unknown address, reset without a session redirects, mismatch blocks, success navigates, `weakPassword` copy.
-- [ ] **Step 2:** Implement both; tests pass.
-- [ ] **Step 3:** Commit `MAE: recover a raven password`.
+- [x] **Step 1:** Tests: identical message for a known and unknown address, reset without a session redirects, mismatch blocks, success navigates, `weakPassword` copy.
+- [x] **Step 2:** Implement both; tests pass.
+- [x] **Step 3:** Commit `MAE: recover a raven password`.
 
 ### Task 9: Pending and removed
 
@@ -177,9 +178,9 @@
 **Interfaces:**
 - Renders outside `AppShell`: "Waiting for approval" for `pending`, "Your access was removed" for `revoked`; buttons `Check again` (refetches `accountQuery`; on `approved` navigates to `/`, which the gate now lets through) and `Sign out` (`signOut`). Signed out visitors are sent to sign in; approved ones to `/`.
 
-- [ ] **Step 1:** Tests for both variants, Check again turning approved navigates home, Check again still pending stays, sign out clears the session.
-- [ ] **Step 2:** Implement; tests pass.
-- [ ] **Step 3:** Commit `MAE: show raven's pending and removed screen`.
+- [x] **Step 1:** Tests for both variants, Check again turning approved navigates home, Check again still pending stays, sign out clears the session.
+- [x] **Step 2:** Implement; tests pass.
+- [x] **Step 3:** Commit `MAE: show raven's pending and removed screen`.
 
 ### Task 10: Settings > Account and Users
 
@@ -191,9 +192,9 @@
 - `AccountSection`: shown only while auth is on; email, access status, `Sign out`.
 - `UsersSection`: shown only when the signed-in account `isOwner`; tabs Pending, Approved, Removed from `MEMBER_STATUSES`; rows email plus `Approve` (on pending and revoked) and `Remove access` (on approved and pending); the owner's own row has no actions. `useMembers` reads `api.listMembers` and invalidates on `setMemberStatus`, keyed by user id. A 403 `not_owner` hides the section. Remove access asks to confirm.
 
-- [ ] **Step 1:** Tests: a non-owner sees Account but not Users, an owner sees the three tabs with the right members, Approve moves a row and refetches, Remove asks first, the owner row has no buttons, a failed change shows its message.
-- [ ] **Step 2:** Implement; tests pass.
-- [ ] **Step 3:** Commit `MAE: manage raven accounts from Settings`.
+- [x] **Step 1:** Tests: a non-owner sees Account but not Users, an owner sees the three tabs with the right members, Approve moves a row and refetches, Remove asks first, the owner row has no buttons, a failed change shows its message.
+- [x] **Step 2:** Implement; tests pass.
+- [x] **Step 3:** Commit `MAE: manage raven accounts from Settings`.
 
 ### Task 11: Docs, wiring and verification
 
@@ -201,13 +202,25 @@
 - Modify: `apps/raven/README.md`, `docs/superpowers/plans/2026-10-17-supabase-sign-in.md` (link the later-stack row to this plan and tick what ships)
 - No source files.
 
-- [ ] **Step 1:** README: the auth routes, that web gates itself only when the server reports `ready`, and that the server does not yet gate existing routes.
-- [ ] **Step 2:** Run `bunx nx run @raven/web:test`, `:typecheck`, `:lint:ts`, `:lint:css`, `:format:check`, then `bun run verify` from the worktree root. All pass, coverage floors held.
-- [ ] **Step 3:** Local walkthrough with the `run` skill: start the Supabase stack and raven with `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `RAVEN_WEB_URL` set; sign up, open the Mailpit link in a private window, see Pending; sign in as the seeded owner, approve, see the other window's Check again let it in; Remove access and see the next request refuse. Note what was and was not seen.
-- [ ] **Step 4:** Not verifiable here, listed in the PR: Netlify forwarding and SSE, real SMTP, cloud redirect allowlist, a second real device.
+- [x] **Step 1:** README: the auth routes, that web gates itself only when the server reports `ready`, and that the server does not yet gate existing routes.
+- [x] **Step 2:** Run `bunx nx run @raven/web:test`, `:typecheck`, `:lint:ts`, `:lint:css`, `:format:check`, then `bun run verify` from the worktree root. All pass, coverage floors held.
+- [x] **Step 3:** Local walkthrough with the `run` skill: start the Supabase stack and raven with `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `RAVEN_WEB_URL` set; sign up, open the Mailpit link in a private window, see Pending; sign in as the seeded owner, approve, see the other window's Check again let it in; Remove access and see the next request refuse. Note what was and was not seen.
+- [x] **Step 4:** Not verifiable here, listed in the PR: Netlify forwarding and SSE, real SMTP, cloud redirect allowlist, a second real device.
 - [ ] **Step 5:** Push and open the PR with base `supabase-spec-status` per `pr-format`, with screenshots of each new screen from the local stack.
 
 ---
+
+**Deviations from the tasks above that later PRs should know:**
+
+- Task 3: `StartAuthSession` (`lib/startAuthSession.tsx`) starts the store from `main.tsx`, watching the config query so a retry that reaches the server still starts it. `useAccount` (Task 9) is the one observer of `/api/me`, shared by the gate, the pending page and Settings.
+- Task 4: `queryClient` is an exported singleton (`lib/queryClient.ts`) so the store and `api` can reach it outside React. `refreshingFetch` sits under `createApiClient`; calls refused together share one refresh, and a rejected refresh token signs out. `signOut` falls back to a local sign out when Supabase cannot be reached. A first sign in marks the cache stale instead of clearing it, since the account query is keyed by user id. `clearAccountState` resets the queries rather than removing them (the walkthrough found that clearing twice stranded the gate on its loading screen), and the store sets the session before clearing, so refetched queries carry the new token. Sign out leaves one `401` on `/api/me` as the reset refetches it without a token.
+- Task 5: the sign in page redirects home while accounts are off, shows a notice while they are unavailable and forwards a visitor already signed in; `checkEmailPath` was added for the unconfirmed address link.
+- Task 6: `AuthScreen` (the poster wall frame and the access states), `authErrors` and `confirmUrl` are shared by the auth pages. `confirmUrl` builds on the config `webUrl`, but the email link itself ignores `emailRedirectTo` and uses the stack's `site_url`.
+- Task 7: the confirm page leaves for home or the reset page only once the session is in the store, so the gate never bounces to sign in, and `AuthScreen` keeps a visitor who is already signed in on the page until the link is spent. An unknown type or a missing token spends nothing.
+- Task 8: `useAuthSession` tracks `isRecovery` from `PASSWORD_RECOVERY`, so a reload forgets a recovery session and the visitor asks again. `PasswordFields` is shared with sign up and `useCooldown` with check email. Supabase limits a recovery email to one a minute per address; the forgot page shows its rate limit copy.
+- Task 10: `Titled` and `memberStatus.ts` are shared by the Settings sections. Account shows only while the viewer is approved.
+- Still open for the PR: the screenshots (taken locally, kept outside the repo) and the items in step 4.
+
 
 ## Self-review
 
