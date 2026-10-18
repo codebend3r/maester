@@ -154,6 +154,8 @@ export type DownloadView = Infer<typeof isDownloadView>
 
 export const isSpaceView = object({ free: isNumber, total: isNumber, used: isNumber })
 
+export type SpaceView = Infer<typeof isSpaceView>
+
 /** An audio track's index as a pick names it: a whole number, 0 or more. */
 export const isTrackIndex = (value: unknown): value is number =>
   isNumber(value) && Number.isInteger(value) && value >= 0
