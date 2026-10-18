@@ -91,7 +91,7 @@ The web app can also be served from Netlify, with `/api` proxied to the Funnel a
 
 1. Create a site from the GitHub repo. Leave the base directory empty, the repo root, and set the package directory to `apps/raven/web`. Its `netlify.toml` holds the build command, the publish folder, Bun's version and the single-page app's fallback.
 2. In the site's environment variables, set `RAVEN_API_ORIGIN` to the Funnel address, `https://raven.<tailnet>.ts.net`. The build writes it into a `_redirects` file, and fails on Netlify without it.
-3. So the side menu shows the build number (`X.Y.Z.N`) and not `package.json`'s `X.Y.Z`, add a build hook under Build & deploy, Build hooks, for `main`, and save its URL as the repo secret `NETLIFY_BUILD_HOOK`. Netlify builds a push before CI has tagged it, so after the tag exists `main-smoke-test.yml` calls the hook, and `netlify-build.sh` (the build command) bakes the tag on that commit into the build as `VITE_RAVEN_VERSION`. Until the secret exists the `netlify` job warns and skips, and the site keeps `X.Y.Z`.
+3. Production builds of `main` automatically show the same build number (`X.Y.Z.N`) as the Docker image for that commit. `netlify-build.sh` fetches the full Git history and tags, then uses the existing tag or calculates the build number with CI's `scripts/bump_version.sh --print build`. No build hook or GitHub secret is needed, even when Netlify builds before CI tags the commit. A failed version lookup fails the build rather than publishing the base version. Deploy previews keep `package.json`'s `X.Y.Z`. Separate deployments can briefly run different commits while they roll out; their version labels describe their own builds.
 
 #### The control plane and the media plane
 
