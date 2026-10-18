@@ -1503,6 +1503,18 @@ export const STREAM_MODES = isStreamMode.values
  * The sizes a viewer can ask a transcode for: the frame it is scaled down
  * to and the bitrate it is held under, in bits per second.
  */
+const STREAM_QUALITY_KEYS = [
+  'high1080',
+  'medium1080',
+  'standard1080',
+  'low1080',
+  'high720',
+  'medium720',
+  'low720',
+  'sd480',
+  'mobile328',
+] as const
+
 export const STREAM_QUALITIES = {
   high1080: { label: '1080p HD (High)', height: 1080, bitrate: 20_000_000 },
   medium1080: { label: '1080p HD (Medium)', height: 1080, bitrate: 12_000_000 },
@@ -1513,13 +1525,14 @@ export const STREAM_QUALITIES = {
   low720: { label: '720p HD', height: 720, bitrate: 2_000_000 },
   sd480: { label: '480p', height: 480, bitrate: 1_500_000 },
   mobile328: { label: '328p', height: 328, bitrate: 700_000 },
-} as const satisfies Record<string, { label: string; height: number; bitrate: number }>
+} as const satisfies Record<
+  (typeof STREAM_QUALITY_KEYS)[number],
+  { label: string; height: number; bitrate: number }
+>
 
-export type StreamQuality = keyof typeof STREAM_QUALITIES
+export const isStreamQuality = oneOf(STREAM_QUALITY_KEYS)
 
-export const isStreamQuality = oneOf(
-  Object.keys(STREAM_QUALITIES).filter((key): key is StreamQuality => key in STREAM_QUALITIES),
-)
+export type StreamQuality = Infer<typeof isStreamQuality>
 
 /** How far an origin reaches: the home network, the tailnet or the open internet. */
 export const MEDIA_ORIGIN_KINDS = { lan: 'lan', tailnet: 'tailnet', public: 'public' } as const

@@ -125,6 +125,8 @@ const transcodeVideo = ({
         'h264_videotoolbox',
         '-b:v',
         cap ?? squeeze.bitrate,
+        // A size is a ceiling, and the encoder's own target only averages to it.
+        ...(cap == null ? [] : ['-maxrate', cap]),
         ...shared,
         '-pix_fmt',
         'yuv420p',
@@ -153,7 +155,16 @@ const transcodeVideo = ({
       output: [
         '-c:v',
         'h264_vaapi',
-        ...(cap == null ? ['-qp', squeeze.qp] : ['-b:v', cap, '-maxrate', cap]),
+        ...(bitrate == null
+          ? ['-qp', squeeze.qp]
+          : [
+              '-b:v',
+              String(bitrate),
+              '-maxrate',
+              String(bitrate),
+              '-bufsize',
+              String(bitrate * 2),
+            ]),
         ...shared,
         '-vf',
         filters.join(','),

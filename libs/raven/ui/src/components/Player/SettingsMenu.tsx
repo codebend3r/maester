@@ -135,15 +135,17 @@ const SubtitleGroup = ({ labelledBy, selection, subtitleStatus }: GroupProps) =>
 const ModeGroup = ({
   name,
   mode,
+  modes,
   choice,
 }: {
   name: string
   mode: PlaybackMode
+  modes: readonly PlaybackMode[]
   choice: ModeChoice
 }) => (
   <fieldset className={styles.group}>
     <legend className={styles.legend}>Play as</legend>
-    {choice.modes.map((candidate) => (
+    {modes.map((candidate) => (
       <Option
         key={candidate}
         name={`${name}-mode`}
@@ -179,6 +181,15 @@ const QualityGroup = ({
           isInline
           details={original ?? undefined}
           onSelect={() => choice.pick(best)}
+        />
+      )}
+      {mode === PLAYBACK_MODES.transcode && choice.quality == null && (
+        // Converted at the size the server's settings give it: a step down or a pick of the mode alone.
+        <Option
+          name={`${name}-quality`}
+          checked
+          label="Converted at the server's size"
+          onSelect={() => choice.pick(PLAYBACK_MODES.transcode)}
         />
       )}
       {choice.qualities.map((key) => (
@@ -272,6 +283,13 @@ export const SettingsMenu = ({
     if (checked !== null) checked.focus()
   }, [])
 
+  // Sizes take over the conversion: the mode list then only picks between the file as it is and a remux.
+  const hasSizes = !!choice && choice.qualities.length > 0
+  const asModes = (choice?.modes ?? []).filter(
+    (candidate) => !hasSizes || candidate !== PLAYBACK_MODES.transcode,
+  )
+  const hasModeList = asModes.length > 1
+
   const body = (() => {
     switch (section) {
       case MENU_SECTIONS.audio:
@@ -281,15 +299,14 @@ export const SettingsMenu = ({
       case MENU_SECTIONS.playback:
         return (
           <>
-            {!!choice && choice.qualities.length > 0 && (
+            {hasSizes && choice && (
               <QualityGroup name={id} mode={mode} choice={choice} original={original} />
             )}
             <div className={styles.playing}>
-              {choice && choice.modes.length > 1 ? (
-                <ModeGroup name={id} mode={mode} choice={choice} />
-              ) : (
-                <p className={styles.mode}>{describeMode(mode)}</p>
+              {hasModeList && choice && (
+                <ModeGroup name={id} mode={mode} modes={asModes} choice={choice} />
               )}
+              {!hasModeList && !hasSizes && <p className={styles.mode}>{describeMode(mode)}</p>}
               {!!steppedDown && <p className={styles.note}>{stepDownNote(steppedDown)}</p>}
               <button type="button" className={styles.info} onClick={onShowInfo}>
                 <span>Playback info</span>

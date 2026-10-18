@@ -101,4 +101,20 @@ describe('SettingsMenu playback section', () => {
     expect(sizes.getByRole('radio', { name: /Convert to 480p/ })).toBeChecked()
     expect(sizes.getByRole('radio', { name: /Convert to 1080p HD \(High\)/ })).not.toBeChecked()
   })
+
+  it('shows a transcode with no size picked as its own checked row, and keeps it out of Play as', () => {
+    renderPlayback({
+      choice: choiceOf({
+        modes: [PLAYBACK_MODES.direct, PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode],
+        qualities: ['sd480'],
+      }),
+    })
+    const sizes = within(screen.getByRole('group', { name: 'Quality' }))
+    expect(sizes.getByRole('radio', { name: /Converted at the server's size/ })).toBeChecked()
+    expect(sizes.getByRole('radio', { name: /Play original quality/ })).not.toBeChecked()
+    expect(sizes.getByRole('radio', { name: /Convert to 480p/ })).not.toBeChecked()
+    const modes = within(screen.getByRole('group', { name: 'Play as' }))
+    expect(modes.queryByRole('radio', { name: /Video and audio converted/ })).toBeNull()
+    expect(modes.getByRole('radio', { name: /Playing the original file/ })).not.toBeChecked()
+  })
 })

@@ -111,7 +111,7 @@ export const useMediaSource = ({
   // failure the browser queued for the old one can land in between; it
   // must not count against the new one. A file's ticket is part of the
   // key because a new ticket re-attaches it.
-  const wanted = `${id}:${mode}:${audio ?? 'default'}:${quality ?? 'settings'}:${originUrl ?? 'host'}:${fileTicket ?? ''}`
+  const wanted = JSON.stringify([id, mode, audio, quality, originUrl, fileTicket])
   const attached = useRef<string | null>(null)
   const report = (message: string) => {
     if (attached.current === wanted) onFailure(message)

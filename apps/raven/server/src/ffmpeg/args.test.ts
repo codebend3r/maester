@@ -174,6 +174,8 @@ describe('streamArgs', () => {
       bitrate: 3_000_000,
     })
     expect(after({ args: toolbox, flag: '-b:v' })).toBe('3000000')
+    expect(after({ args: toolbox, flag: '-maxrate' })).toBe('3000000')
+    expect(after({ args: vaapi, flag: '-bufsize' })).toBe('6000000')
     expect(streamArgs({ ...base, mode: 'transcode' })).not.toContain('-maxrate')
   })
 
