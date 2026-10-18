@@ -529,6 +529,20 @@
     "properties": {},
     "type": "object"
   },
+  "search_library": {
+    "additionalProperties": false,
+    "properties": {
+      "title": {
+        "description": "The title, or a word from it.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "type": "object"
+  },
   "search_media": {
     "additionalProperties": false,
     "properties": {

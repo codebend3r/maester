@@ -56,6 +56,8 @@ def named(services: Services) -> list[tuple[str, Pingable]]:
         found += [(f"{label} on {host}", client) for host, client in sorted(clients.items())]
     if services.fleet is not None:
         found.append(("the fleet monitor", services.fleet))
+    if services.raven is not None:
+        found.append(("raven", services.raven))
     return found
 
 

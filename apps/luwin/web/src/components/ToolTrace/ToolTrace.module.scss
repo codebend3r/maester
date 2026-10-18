@@ -1,0 +1,47 @@
+.trace {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.summary {
+  color: var(--color-ash);
+  cursor: pointer;
+}
+
+.calls {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.call {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.name {
+  font-family: var(--font-mono);
+}
+
+.ok {
+  color: var(--color-pass);
+}
+
+.failed {
+  color: var(--color-alert);
+}
+
+.code {
+  overflow: auto;
+  max-height: 16rem;
+  padding: var(--space-2);
+  background: var(--color-ground);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

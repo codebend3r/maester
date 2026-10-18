@@ -1,0 +1,91 @@
+.reply {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+}
+
+.thinking {
+  color: var(--color-ash);
+}
+
+.text {
+  font-family: var(--font-display);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ask {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-2);
+}
+
+.choices {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.choice {
+  display: grid;
+  gap: var(--space-1);
+  width: 100%;
+  text-align: left;
+}
+
+.detail {
+  color: var(--color-ash);
+  font-size: var(--font-size-xs);
+}
+
+.failure {
+  color: var(--color-alert);
+}
+
+.cause {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-alert);
+  font-size: var(--font-size-sm);
+}
+
+.trace {
+  padding: var(--space-2);
+  background: var(--color-ground);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.passed,
+.failed {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-ground);
+  font-size: var(--font-size-sm);
+}
+
+.passed {
+  color: var(--color-pass);
+}
+
+.failed {
+  color: var(--color-alert);
+}
+
+.failures {
+  display: grid;
+  gap: var(--space-1);
+}

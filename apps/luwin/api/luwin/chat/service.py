@@ -17,9 +17,11 @@ from __future__ import annotations
 
 import logging
 import secrets
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from typing import Any
 
-from luwin.agent.loop import Agent, TurnFailed
+from luwin.agent.loop import Agent, ToolTrace, TurnFailed
 from luwin.agent.runner import (
     AwaitingApproval,
     AwaitingConfirmation,
@@ -28,7 +30,7 @@ from luwin.agent.runner import (
     Errored,
     HeldForMaintenance,
 )
-from luwin.agent.tools import Choice, Tier
+from luwin.agent.tools import Choice, Tier, Title
 from luwin.chat.identity import IdentityService
 from luwin.chat.split import split_reply
 from luwin.guides import guide
@@ -36,6 +38,8 @@ from luwin.notify import Notice
 from luwin.store import PendingAction, Store
 
 log = logging.getLogger("luwin.chat")
+
+OnTool = Callable[[ToolTrace], Any]
 
 UNLINKED_HELP = (
     "Hi! I'm luwin, the concierge for this Plex server. Your Plex account doesn't have "
@@ -64,6 +68,9 @@ class ChatResponse:
     confirmations: list[PendingAction] = field(default_factory=list)
     choices: list[Choice] = field(default_factory=list)
     notices: tuple[Notice, ...] = ()
+    titles: tuple[Title, ...] = ()
+    # Why the turn broke, for a caller that may show it (the sandbox); never for a friend.
+    failure: str | None = None
 
     @property
     def text(self) -> str:
@@ -120,22 +127,30 @@ class ChatService:
 
     # -- messages ---------------------------------------------------------
 
-    async def handle_message(self, user: ChatUser, text: str) -> ChatResponse:
+    async def handle_message(
+        self, user: ChatUser, text: str, *, on_tool: OnTool | None = None
+    ) -> ChatResponse:
         tier = self.tier_for(user)
         if tier == Tier.UNLINKED:
             return ChatResponse(chunks=split_reply(UNLINKED_HELP))
-        return await self.follow_up(user.id, tier, text)
+        return await self.follow_up(user.id, tier, text, on_tool=on_tool)
 
-    async def follow_up(self, user_id: str, tier: Tier, text: str) -> ChatResponse:
+    async def follow_up(
+        self, user_id: str, tier: Tier, text: str, *, on_tool: OnTool | None = None
+    ) -> ChatResponse:
         """A turn as `user_id` at `tier`: their message, or one the server starts for them
-        (what they asked for during maintenance has run)."""
+        (what they asked for during maintenance has run). `on_tool` hears each tool call
+        as it finishes."""
+        failure = None
         try:
-            reply = await self.agent.respond(user_id, tier, text)
+            reply = await self.agent.respond(user_id, tier, text, on_tool=on_tool)
         except TurnFailed as failed:
             ref = secrets.token_hex(3)
             log.exception("agent failed for user %s (ref %s)", user_id, ref)
             # What the turn's tools already did still reaches the user and the admin.
-            reply = replace(failed.reply, text=ERROR_REPLY.format(ref=ref), choices=[])
+            reply = replace(failed.reply, text=ERROR_REPLY.format(ref=ref), choices=[], titles=[])
+            cause = failed.__cause__
+            failure = f"{type(cause).__name__}: {cause}" if cause else None
 
         confirmations = [p for p in (self.store.get_pending(i) for i in reply.pending_ids) if p]
         return ChatResponse(
@@ -143,10 +158,16 @@ class ChatService:
             confirmations=confirmations,
             choices=reply.choices,
             notices=tuple(reply.notices),
+            titles=tuple(reply.titles),
+            failure=failure,
         )
 
-    async def pick(self, user: ChatUser, choice: Choice) -> ChatResponse:
-        return await self.handle_message(user, f"I pick: {choice.display} ({choice.value})")
+    async def pick(
+        self, user: ChatUser, choice: Choice, *, on_tool: OnTool | None = None
+    ) -> ChatResponse:
+        return await self.handle_message(
+            user, f"I pick: {choice.display} ({choice.value})", on_tool=on_tool
+        )
 
     # -- buttons ----------------------------------------------------------
 

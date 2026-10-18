@@ -46,6 +46,8 @@ from luwin.agent.tools import (
     NeedsApproval,
     Ok,
     Refused,
+    Shown,
+    Title,
     ToolContext,
     ToolRegistry,
     ToolSpec,
@@ -109,6 +111,7 @@ class ToolOutcome:
     status: Status = Done()
     choices: tuple[Choice, ...] = ()
     notices: tuple[Notice, ...] = ()
+    titles: tuple[Title, ...] = ()
 
     @property
     def is_error(self) -> bool:
@@ -302,6 +305,8 @@ class ToolRunner:
         match result:
             case Choices():
                 return ToolOutcome(result.as_content(), choices=tuple(result.shown))
+            case Shown(content, titles):
+                return ToolOutcome(content, titles=titles)
             case Ok(content, notices):
                 return ToolOutcome(content, notices=notices)
             case Refused(content, notices):

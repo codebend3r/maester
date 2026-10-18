@@ -2,7 +2,7 @@
 
 The AI assistant of the maester suite, a concierge for a private Plex server. Friends talk to it in plain language; it requests movies and shows, works out why something will not play, explains lag with live server data, and hands the admin an approval queue instead of a group chat thread.
 
-Its chat app comes next: a standalone app, and a helper window that drops into raven and rookery. Sign-in is already rookery's: friends sign in once with Plex, and luwin trusts that session. Until the chat app lands, luwin runs its agent and tools, its API, the Seerr webhook and the scheduled jobs, and writes the notices it would send to its log.
+Its chat app is under way: a standalone app, and later a helper window that drops into raven and rookery. Sign-in is already rookery's: friends sign in once with Plex, and luwin trusts that session. The chat page (`web/`) talks to luwin's chat API and runs locally through Vite; luwin also runs its agent and tools, the Seerr webhook and the scheduled jobs, and still writes the notices it would send to its log.
 
 luwin is the suite's maester: it serves the house, answers its questions, and sends the ravens.
 
@@ -76,8 +76,8 @@ The board follows the issues. `uv run python scripts/sync_board.py`, run from th
 | --------- | ----------------------------------------------------------------------------------------------- |
 | Language  | Python 3.12, `uv`, `ruff`, `pytest`, run through the workspace's Nx and Bun                     |
 | LLM       | Anthropic Python SDK, Messages API tool-use loop, `claude-opus-5-5` by default, prompt caching  |
-| Chat      | luwin's own app, next: standalone, or a helper window inside raven and rookery                  |
-| Web       | FastAPI: luwin's `/api`, the Seerr webhook, `/health` (a Tautulli webhook comes later)          |
+| Chat      | luwin's own app (`@luwin/web`): React 19, Vite 8, TanStack Query, zustand, SCSS modules        |
+| Web       | FastAPI: luwin's `/api` (chat streamed as server-sent events), the Seerr webhook, `/health`     |
 | Sign-in   | rookery's `maester_session` cookie, checked with rookery's internal session lookup              |
 | Storage   | SQLite on a `/data` volume: users, conversations, audit log, reports, pending actions           |
 | Services  | Seerr, Sonarr, Radarr, SABnzbd, Tautulli, Plex, Wizarr over their REST APIs                     |
@@ -90,7 +90,7 @@ luwin is the `apps/luwin/` folder of an Nx workspace; the [root README](../../RE
 ```
 apps/luwin/
 ├── api/                    the @luwin/api Nx project: a Python 3.12 package run through uv
-│   ├── package.json        Nx targets: dev, test, eval, lint:py, format
+│   ├── package.json        Nx targets: dev, sandbox, test, eval, lint:py, format
 │   ├── pyproject.toml, uv.lock
 │   ├── luwin/
 │   │   ├── agent/          tool-use loop, tool registry, guardrails, prompts
@@ -103,11 +103,13 @@ apps/luwin/
 │   │   ├── jobs/           scheduled work: the digest, the sweeper, space samples, the NAS report
 │   │   ├── store/          SQLite schema, migrations, audit log
 │   │   ├── evals/          the eval runner and the fake world a case runs in
+│   │   ├── sandbox.py      the chat API over an eval case's fakes, with no sign-in, for testing
 │   │   ├── app.py          wires settings into clients, store, agent, admin console and web app
 │   │   ├── config.py       environment, read once
 │   │   └── *.py            shared modules: service registry, title ownership, media, notices
 │   ├── evals/cases/        scripted conversations against the fakes, one YAML file each
 │   └── tests/
+├── web/                    the @luwin/web Nx project: the chat page, React on Vite
 ├── docs/                   architecture, deferred work, NAS deployment
 ├── Dockerfile              the image, built from the repo root
 ├── docker-compose.yml      the container on Meleys
@@ -121,14 +123,14 @@ Still to come: `api/luwin/guides/` for the device setup guides the model answers
 
 ## Getting started
 
-**Prerequisites.** [Bun](https://bun.sh) at the version the root `package.json` pins, and [uv](https://docs.astral.sh/uv/) (`brew install uv`); uv fetches Python 3.12 from `api/.python-version` if it is missing. You also need an Anthropic API key, the URLs and API keys of the services, and a running rookery with the service token it gave luwin. The file health check needs `ffmpeg` on your `PATH`; the Docker image ships it, along with Ookla's `speedtest` CLI. Outside Docker, leave `SPEEDTEST_HOST` empty so the speed test is off.
+**Prerequisites.** [Bun](https://bun.sh) at the version the root `package.json` pins, and [uv](https://docs.astral.sh/uv/) (`brew install uv`); uv fetches Python 3.12 from `api/.python-version` if it is missing. You also need an Anthropic API key for the server (local testing runs on Claude Code instead; see Sandbox), the URLs and API keys of the services, and a running rookery with the service token it gave luwin. The file health check needs `ffmpeg` on your `PATH`; the Docker image ships it, along with Ookla's `speedtest` CLI. Outside Docker, leave `SPEEDTEST_HOST` empty so the speed test is off.
 
 ```bash
 git clone https://github.com/codebend3r/maester.git
 cd maester
 bun install                                     # Nx, and the git hooks: ruff on staged Python files
 cp apps/luwin/.env.example apps/luwin/.env  # fill in service URLs, API keys and the Anthropic key
-bun run dev:luwin                             # starts the web app and the scheduled jobs on one loop
+bun run dev:luwin                             # the API and jobs on :8020, the chat page on :5190
 ```
 
 `.env` lives beside `docker-compose.yml`, in `apps/luwin/`, where compose reads it too. Keep none at the repo root: Nx loads a root `.env` into every task it runs.
@@ -137,7 +139,11 @@ Checks run through Nx from the repo root: `bunx nx run @luwin/api:test`, `bunx n
 
 **Sign-in.** luwin runs no sign-in of its own. rookery signs friends in with Plex and sets the `maester_session` cookie; luwin reads it and asks rookery whose it is, at `ROOKERY_URL` with `ROOKERY_SERVICE_TOKEN`, caching each answer for 30 seconds. A request without a live session gets a 401 naming `ROOKERY_PUBLIC_URL`'s login page. What someone may do is luwin's call: the account that owns the Plex server (`PLEX_TOKEN`'s) is the admin, a Plex account whose email or Plex username matches a Seerr user is a friend, and the admin can set any user's tier with `POST /api/admin/users/{user_id}/tier`. Anyone else is signed in but turned away with whom to ask for an invite. The design is in [`docs/superpowers/specs/2026-10-09-shared-sign-in-design.md`](../../docs/superpowers/specs/2026-10-09-shared-sign-in-design.md).
 
-**Chat.** There is no chat front end yet; luwin's own app comes next. Until it does, everything luwin would tell someone (approvals, ready messages, the digest, the NAS report) goes to its log.
+**Chat.** The chat page is `web/` (`@luwin/web`), at http://localhost:5190 in development, where Vite proxies `/api` to luwin on port 8020. Its routes are `POST /api/chat` (one turn, streamed as server-sent events), `/api/chat/pick`, `/api/chat/decide` and `/api/chat/forget`, all for a friend or above. The image doesn't serve the page yet, and there is no inbox, so everything luwin would tell someone (approvals, ready messages, the digest, the NAS report) still goes to its log (`docs/deferred.md`, L-4 to L-8).
+
+**Sandbox.** To try questions and read the answers without the NAS, rookery or Plex, run `bun run sandbox:luwin` and open http://localhost:5190. It serves the same chat API over an eval case's fake services (`api/evals/cases/`, or a blank world), except raven: it searches the real library at `RAVEN_URL` (from the environment or `apps/luwin/.env`; http://localhost:5174 when unset), so "is Dune on the server?" gets a real answer, with each title shown under the reply as its logo and a link to every copy in raven. On a Mac the sandbox reaches raven through `curl` (`luwin/clients/curl.py`), since macOS's Local Network privacy can keep the project's Python off the LAN. It keeps everything in memory, asks no sign-in, listens on 127.0.0.1 only, and restarts itself whenever luwin's code changes (starting the conversation fresh). The page then shows the sandbox bar (pick the case, the tier, start over), the case's own messages with what each one expects, and under every reply the tool calls it made, their arguments and answers, the notices it sent (an approval comes with Approve and Deny), and whether it met the case. The conversation survives a page reload (it is kept in the browser, tied to the sandbox's current world, so a sandbox restart or another case starts it fresh); a turn that breaks shows the exception behind its error reference. The model is Claude Haiku 5.5 (`--model` names another), reached through headless Claude Code on your own sign-in (`claude -p`), never an API key: only the deployed server uses `ANTHROPIC_API_KEY`. The sandbox needs `claude` on your `PATH`, signed in. For working on the page itself, `uv run --project api luwin-sandbox --model fake` from `apps/luwin/` answers every turn with a scripted line, and `--case <file stem>` opens a case first.
+
+**raven.** `RAVEN_URL` is raven's address, http://192.168.50.6:8484 on the NAS. `search_library` asks its `/api/home/search` what every unlocked library holds and links friends to the title's page there, so use an address their browsers open too. A library raven keeps locked behind its PIN stays out of the answers.
 
 **Seerr and the arrs.** luwin works out which host holds a title's 1080p or 4K copy from Seerr's own records, so each Radarr and Sonarr in Seerr's settings must use the same address (host, port and base path) as its `RADARR_<HOST>_URL` or `SONARR_<HOST>_URL` here. A server Seerr reaches by another name is refused rather than guessed.
 

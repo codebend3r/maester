@@ -8,7 +8,8 @@ the same methods over in-memory data, so tools and evals run without a stack.
 `probe` reads the media files themselves, with ffprobe on the read-only mount.
 `speedtest` measures the internet connection from the container's own host.
 `plextv` reads and changes friends' library shares as the server owner.
-The fleet monitor, the speed test and plex.tv are optional: None where not set up.
+`raven` is the suite's own library, searched the way friends browse it.
+The fleet monitor, the speed test, plex.tv and raven are optional: None where not set up.
 `rookery` (who a session cookie belongs to) is the web app's, not the tools',
 so it sits outside `Services`.
 """
@@ -21,6 +22,7 @@ from luwin.clients.media import FakeFileProbe, FileProbe, MediaProbe
 from luwin.clients.plex import FakePlexClient, Plex, PlexClient
 from luwin.clients.plextv import FakePlexTv, PlexAccount, PlexTv, PlexTvClient
 from luwin.clients.radarr import FakeRadarrClient, Radarr, RadarrClient
+from luwin.clients.raven import FakeRavenClient, Raven, RavenClient
 from luwin.clients.rookery import Account, FakeRookery, Rookery, RookeryClient
 from luwin.clients.sabnzbd import FakeSabnzbdClient, Sabnzbd, SabnzbdClient
 from luwin.clients.seerr import FakeSeerrClient, Seerr, SeerrClient
@@ -45,6 +47,7 @@ class Services:
     fleet: FleetMonitor | None  # CPU and memory per NAS; None when not set up
     speedtest: SpeedTester | None  # None when SPEEDTEST_HOST isn't set
     plextv: PlexTv | None = None  # None without the owner's PLEX_TOKEN
+    raven: Raven | None = None  # None without RAVEN_URL
 
 
 __all__ = [
@@ -55,6 +58,7 @@ __all__ = [
     "FakePlexClient",
     "FakePlexTv",
     "FakeRadarrClient",
+    "FakeRavenClient",
     "FakeRookery",
     "FakeSabnzbdClient",
     "FakeSeerrClient",
@@ -70,6 +74,7 @@ __all__ = [
     "PlexClient",
     "PlexTvClient",
     "RadarrClient",
+    "RavenClient",
     "Rookery",
     "RookeryClient",
     "SabnzbdClient",

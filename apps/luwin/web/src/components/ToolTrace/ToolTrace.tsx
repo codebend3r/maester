@@ -1,0 +1,32 @@
+import styles from '@/components/ToolTrace/ToolTrace.module.scss'
+import type { ToolCall } from '@/lib/events'
+
+const pretty = (text: string): string => {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2)
+  } catch {
+    return text
+  }
+}
+
+/** Each tool call a turn made, its arguments and what it answered, folded until opened. */
+export const ToolTrace = ({ tools }: { tools: ToolCall[] }) => (
+  <details className={styles.trace}>
+    <summary className={styles.summary}>
+      {tools.length} tool {tools.length === 1 ? 'call' : 'calls'}:{' '}
+      {tools.map((tool) => tool.name).join(', ')}
+    </summary>
+    <ol className={styles.calls}>
+      {tools.map((tool, index) => (
+        <li key={`${tool.name}-${index}`} className={styles.call}>
+          <p className={styles.name}>
+            {tool.name}{' '}
+            <span className={tool.ok ? styles.ok : styles.failed}>{tool.ok ? 'ok' : 'error'}</span>
+          </p>
+          <pre className={styles.code}>{JSON.stringify(tool.input, null, 2)}</pre>
+          <pre className={styles.code}>{pretty(tool.result)}</pre>
+        </li>
+      ))}
+    </ol>
+  </details>
+)

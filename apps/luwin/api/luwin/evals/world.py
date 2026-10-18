@@ -22,6 +22,7 @@ from luwin.clients import (
     FakeFleetMonitor,
     FakePlexClient,
     FakeRadarrClient,
+    FakeRavenClient,
     FakeSabnzbdClient,
     FakeSeerrClient,
     FakeSonarrClient,
@@ -36,6 +37,7 @@ from luwin.clients.media import Inspection, Track
 from luwin.clients.plex import PlexItem, PlexSeason, Version
 from luwin.clients.plextv import FakePlexTv, OwnedServer, Section, Share
 from luwin.clients.radarr import Movie
+from luwin.clients.raven import RavenTitle
 from luwin.clients.sabnzbd import Download
 from luwin.clients.seerr import (
     ArrServer,
@@ -457,6 +459,26 @@ def _speedtest(seed: dict[str, Any]) -> FakeSpeedTest:
     return FakeSpeedTest(host=seed.get("host", "meleys"), result=result)
 
 
+def _raven(seed: dict[str, Any]) -> FakeRavenClient:
+    """raven's libraries as a case lists them: each entry one library's copy of a title."""
+    return FakeRavenClient(
+        titles=[
+            RavenTitle(
+                library_id=int(t.get("library_id", 1)),
+                library=t.get("library", "Movies"),
+                kind=t.get("kind", "movie"),
+                title=t["title"],
+                year=t.get("year"),
+                item_id=int(t.get("item_id", n + 1)),
+                quality=t.get("quality"),
+                hdr=bool(t.get("hdr", False)),
+                episodes=t.get("episodes"),
+            )
+            for n, t in enumerate(seed.get("titles", []))
+        ]
+    )
+
+
 def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
     hosts = seed.get("hosts", ["meleys", "vermithor"])
     radarr, sonarr = seed.get("radarr", {}), seed.get("sonarr", {})
@@ -475,6 +497,7 @@ def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
         fleet=_fleet(seed["fleet"]) if "fleet" in seed else None,
         speedtest=_speedtest(seed["speedtest"]) if "speedtest" in seed else None,
         plextv=_plextv(seed.get("plextv", {})),
+        raven=_raven(seed.get("raven", {})),
     )
     # Services that answer like unreachable ones: "plex", or "radarr:vermithor" per host.
     for name in seed.get("down", []):

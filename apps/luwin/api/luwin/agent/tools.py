@@ -151,6 +151,34 @@ class Choices:
 
 
 @dataclass(frozen=True)
+class TitleLink:
+    label: str
+    url: str
+
+
+@dataclass(frozen=True)
+class Title:
+    """A title a tool found, for the chat to show beside the reply: its logo and where it opens.
+
+    `key` names the title across calls, so one found twice is shown once.
+    """
+
+    key: str
+    title: str
+    year: int | None
+    logo_url: str | None
+    links: tuple[TitleLink, ...]
+
+
+@dataclass(frozen=True)
+class Shown:
+    """Return this to answer the model with `content` and show the user `titles` with the reply."""
+
+    content: Any
+    titles: tuple[Title, ...]
+
+
+@dataclass(frozen=True)
 class Approval:
     """Ask the admin: `notice` goes up with Approve/Deny buttons, and the press runs `decide`.
 
