@@ -4,6 +4,7 @@ import { ENGINE_KINDS, type Engine, type HtmlSource, sourceKey } from '@/compone
 import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
 import { NativeStage } from '@/components/Player/NativeStage'
+import { DIRECT_RENDITION } from '@/components/Player/rendition'
 import { Stage } from '@/components/Player/Stage'
 import { Unplayable } from '@/components/Player/Unplayable'
 import { useLeave } from '@/components/Player/useLeave'
@@ -99,7 +100,7 @@ const FilePlayer = ({
     <Stage
       engine={{ kind: 'html', source }}
       onBack={onBack}
-      mode="direct"
+      rendition={DIRECT_RENDITION}
       selection={fileSelection}
       onFailure={setFailure}
     />
@@ -133,11 +134,12 @@ const ServerPlayer = ({
         <Stage
           engine={{ kind: 'html', source }}
           onBack={onBack}
-          mode={playback.mode}
+          rendition={playback.rendition}
           selection={selection}
           onFailure={playback.fail}
           onSlow={playback.slow ?? undefined}
           steppedDown={playback.steppedDown}
+          choices={playback.choices}
         />
       )
     default: {

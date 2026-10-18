@@ -155,6 +155,30 @@ describe('streamArgs', () => {
     expect(after({ args: low, flag: '-vf' })).toBe("scale=w=-2:h='min(2160,ih)'")
   })
 
+  it('holds a transcode under the bitrate a viewer asked for', () => {
+    const software = streamArgs({ ...base, mode: 'transcode', maxHeight: 720, bitrate: 3_000_000 })
+    expect(after({ args: software, flag: '-maxrate' })).toBe('3000000')
+    expect(after({ args: software, flag: '-bufsize' })).toBe('6000000')
+    const vaapi = streamArgs({
+      ...base,
+      mode: 'transcode',
+      encoder: { kind: 'vaapi', device: '/dev/dri/renderD128' },
+      bitrate: 3_000_000,
+    })
+    expect(after({ args: vaapi, flag: '-b:v' })).toBe('3000000')
+    expect(vaapi).not.toContain('-qp')
+    const toolbox = streamArgs({
+      ...base,
+      mode: 'transcode',
+      encoder: { kind: 'videotoolbox' },
+      bitrate: 3_000_000,
+    })
+    expect(after({ args: toolbox, flag: '-b:v' })).toBe('3000000')
+    expect(after({ args: toolbox, flag: '-maxrate' })).toBe('3000000')
+    expect(after({ args: vaapi, flag: '-bufsize' })).toBe('6000000')
+    expect(streamArgs({ ...base, mode: 'transcode' })).not.toContain('-maxrate')
+  })
+
   it('re-encodes the video for a transcode, tone mapping HDR', () => {
     const args = streamArgs({ ...base, mode: 'transcode', start: 0, tonemap: true })
     expect(args).not.toContain('-ss')

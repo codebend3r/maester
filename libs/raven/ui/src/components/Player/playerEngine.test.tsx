@@ -15,6 +15,7 @@ import { type ReactNode, useEffect } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { Player } from '@/components/Player/Player'
 import type { HostActions, PlayerServices } from '@/components/Player/PlayerServices'
+import { DIRECT_RENDITION } from '@/components/Player/rendition'
 import { PlayerChrome } from '@/components/Player/Stage'
 import { Unplayable } from '@/components/Player/Unplayable'
 import type { EngineActions, EngineHandle } from '@/components/Player/engine'
@@ -183,7 +184,7 @@ describe('PlayerChrome with a fake engine handle', () => {
         <PlayerChrome
           engine={engine}
           onBack={() => {}}
-          mode="direct"
+          rendition={DIRECT_RENDITION}
           selection={selection}
           subtitleStatus="off"
           fullscreen={{ fullscreen: false, toggle: () => {} }}
@@ -230,7 +231,7 @@ describe('PlayerChrome Playback info', () => {
         <PlayerChrome
           engine={engine}
           onBack={() => {}}
-          mode="direct"
+          rendition={DIRECT_RENDITION}
           selection={selection}
           subtitleStatus="off"
           fullscreen={{ fullscreen: false, toggle: () => {} }}
@@ -275,7 +276,7 @@ describe('PlayerChrome host actions', () => {
         <PlayerChrome
           engine={engine}
           onBack={() => {}}
-          mode="direct"
+          rendition={DIRECT_RENDITION}
           selection={selection}
           subtitleStatus="off"
           fullscreen={{ fullscreen: false, toggle: () => {} }}
@@ -360,7 +361,7 @@ describe('HTML engine surface focus', () => {
     const Probe = () => {
       const { engine } = useHtmlEngine({
         source: { kind: 'file', url: 'blob:local-clip' },
-        mode: 'direct',
+        rendition: DIRECT_RENDITION,
         selection,
         onFailure: () => {},
         toggleFullscreen: () => {},
@@ -386,7 +387,7 @@ describe('HTML engine stats', () => {
     const Probe = () => {
       const { engine } = useHtmlEngine({
         source: { kind: 'file', url: 'blob:local-clip' },
-        mode: 'direct',
+        rendition: DIRECT_RENDITION,
         selection,
         onFailure: () => {},
         toggleFullscreen: () => {},
@@ -463,7 +464,7 @@ describe('PlayerChrome seams for a native host', () => {
       <PlayerChrome
         engine={engine}
         onBack={() => {}}
-        mode="direct"
+        rendition={DIRECT_RENDITION}
         selection={selection}
         subtitleStatus="off"
         fullscreen={{ fullscreen: false, toggle: () => {} }}
@@ -694,7 +695,7 @@ describe('PlayerChrome handoff in the playback menu', () => {
         <PlayerChrome
           engine={engine}
           onBack={() => {}}
-          mode="direct"
+          rendition={DIRECT_RENDITION}
           selection={selection}
           subtitleStatus="off"
           fullscreen={{ fullscreen: false, toggle: () => {} }}

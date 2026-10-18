@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { Engine } from '@/components/Player/engine'
+import { DIRECT_RENDITION } from '@/components/Player/rendition'
 import { PlayerChrome } from '@/components/Player/Stage'
 import { useNativeEngine } from '@/components/Player/useNativeEngine'
 import { useFullscreen } from '@/components/Player/useStageChrome'
@@ -31,7 +32,7 @@ export const NativeStage = ({
     <PlayerChrome
       engine={native.engine}
       onBack={onBack}
-      mode="direct"
+      rendition={DIRECT_RENDITION}
       selection={native.selection}
       subtitleStatus={native.selection.subtitle ? 'ready' : 'off'}
       fullscreen={fullscreen}

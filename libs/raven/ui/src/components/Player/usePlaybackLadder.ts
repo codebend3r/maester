@@ -4,12 +4,21 @@ import {
   type PlaybackMode,
   DEFAULT_PLAYBACK_SETTINGS,
   PLAYBACK_MODES,
+  offeredQualities,
   planPlayback,
 } from '@raven/core'
 import { useMemo, useState } from 'react'
 import { browserCanPlay, browserCanStream } from '@/lib/canPlay'
 import { useQuery } from '@tanstack/react-query'
 import { playerQueriesFor } from '@/lib/playerQueries'
+import { originalDetails } from '@/components/Player/playbackFacts'
+import {
+  PICK_KINDS,
+  type PlayPick,
+  type PlayChoices,
+  choiceGroups,
+} from '@/components/Player/playChoices'
+import type { Rendition } from '@/components/Player/rendition'
 import type { Delivery } from '@/lib/streamSource'
 
 /** The ways to play, best first, for one audio track; a step down belongs to one ladder. */
@@ -44,11 +53,12 @@ export type PlaybackStatus =
    */
   | {
       status: typeof PLAYBACK_STATUSES.playing
-      mode: PlaybackMode
+      rendition: Rendition
       fail: (message: string) => void
       slow: ((delivery: Delivery) => void) | null
       /** Why this is a transcode, when the connection is the reason. */
       steppedDown: StepDown | null
+      choices: PlayChoices
     }
 
 /**
@@ -58,6 +68,8 @@ export type PlaybackStatus =
  * only when every way has failed is the file unplayable. A new audio track
  * starts again at the top, unless the connection already proved too slow
  * for anything but a transcode: that holds for the rest of the playback.
+ * The viewer can pick any way the plan offers; it starts there, and a
+ * failure steps down from it.
  */
 export const usePlaybackLadder = ({
   media,
@@ -88,6 +100,7 @@ export const usePlaybackLadder = ({
   const [fallback, setFallback] = useState<{ ladder: Ladder; step: number } | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [steppedDown, setSteppedDown] = useState<StepDown | null>(null)
+  const [picked, setPicked] = useState<PlayPick | null>(null)
 
   // The server's settings say whether to force the original file and what it
   // converts; a plan made without them starts a stream it may refuse.
@@ -100,7 +113,13 @@ export const usePlaybackLadder = ({
   const failedStep =
     fallback != null && sameLadder({ a: fallback.ladder, b: ladder }) ? fallback.step : 0
   const lighter = ladder.modes.indexOf(PLAYBACK_MODES.transcode)
-  const step = steppedDown != null && lighter >= 0 ? Math.max(failedStep, lighter) : failedStep
+  const pickedMode = (() => {
+    if (picked == null) return null
+    return picked.kind === PICK_KINDS.mode ? picked.mode : PLAYBACK_MODES.transcode
+  })()
+  const pickedStep = pickedMode == null ? -1 : ladder.modes.indexOf(pickedMode)
+  const stepped = steppedDown != null && lighter >= 0 ? Math.max(failedStep, lighter) : failedStep
+  const step = Math.max(stepped, pickedStep)
   const mode = ladder.modes[step]
   if (failure != null || mode == null) {
     return {
@@ -109,14 +128,38 @@ export const usePlaybackLadder = ({
       tryAnyway: failure == null && !forced ? () => setForced(true) : null,
     }
   }
+  const isConverting = mode === PLAYBACK_MODES.transcode
+  const rendition: Rendition = {
+    mode,
+    quality: isConverting && picked?.kind === PICK_KINDS.size ? picked.quality : null,
+  }
   return {
     status: PLAYBACK_STATUSES.playing,
-    mode,
+    rendition,
     fail: (message) => {
       if (step + 1 < ladder.modes.length) setFallback({ ladder, step: step + 1 })
       else setFailure(message)
     },
     slow: lighter > step ? (delivery) => setSteppedDown({ from: mode, delivery }) : null,
-    steppedDown: mode === PLAYBACK_MODES.transcode ? steppedDown : null,
+    steppedDown: isConverting ? steppedDown : null,
+    choices: {
+      groups: choiceGroups({
+        modes: ladder.modes,
+        rendition,
+        qualities: ladder.modes.includes(PLAYBACK_MODES.transcode)
+          ? offeredQualities({
+              media,
+              maxHeight: policy?.maxHeight ?? DEFAULT_PLAYBACK_SETTINGS.maxHeight,
+            })
+          : [],
+        original: originalDetails(media),
+      }),
+      // A pick starts over from there: what failed or was too slow before no longer holds.
+      select: (next) => {
+        setPicked(next)
+        setFallback(null)
+        setSteppedDown(null)
+      },
+    },
   }
 }

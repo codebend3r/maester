@@ -65,6 +65,7 @@ import {
   type SplitRequest,
   type LiveStream,
   type StreamMode,
+  type StreamQuality,
   type SubtitleCue,
   type UnlockRequest,
   IMAGE_SOURCES,
@@ -990,18 +991,21 @@ export const createApiClient = ({
      * A converted stream as fragmented MP4, starting at `start` seconds into
      * the file and stamped with file time plus `STREAM_TIME_SHIFT`. `audio`
      * picks the track by its `0:a:N` index; left out, the default plays.
+     * `quality` sizes a transcode; left out, the server's settings do.
      */
     streamUrl: ({
       id,
       mode,
       start,
       audio,
+      quality = null,
       access = null,
     }: {
       id: number
       mode: StreamMode
       start: number
       audio: number | null
+      quality?: StreamQuality | null
       access?: MediaAccess | null
     }): string =>
       mediaUrl({
@@ -1010,6 +1014,7 @@ export const createApiClient = ({
           mode,
           start: String(Math.max(0, Math.round(start * 1000) / 1000)),
           ...(audio == null ? {} : { audio: String(audio) }),
+          ...(quality == null ? {} : { quality }),
         },
         access,
       }),

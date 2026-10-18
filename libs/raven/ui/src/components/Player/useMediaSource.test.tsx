@@ -87,7 +87,7 @@ const Harness = ({
   useMediaSource({
     videoRef,
     source: { kind: 'server', media, api, mediaPlane },
-    mode,
+    rendition: { mode, quality: null },
     audio: null,
     position,
     playing,

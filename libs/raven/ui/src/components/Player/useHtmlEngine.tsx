@@ -1,6 +1,7 @@
-import { PLAYBACK_MODES, type PlaybackMode, STREAM_TIME_SHIFT } from '@raven/core'
+import { PLAYBACK_MODES, STREAM_TIME_SHIFT } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import type { EngineHandle, EngineStats, HtmlSource } from '@/components/Player/engine'
+import type { Rendition } from '@/components/Player/rendition'
 import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
 import { SubtitleOverlay } from '@/components/Player/SubtitleOverlay'
@@ -16,14 +17,14 @@ const ENGINE_NAME = 'HTML video'
 
 export const useHtmlEngine = ({
   source,
-  mode,
+  rendition,
   selection,
   onFailure,
   onSlow,
   toggleFullscreen,
 }: {
   source: HtmlSource
-  mode: PlaybackMode
+  rendition: Rendition
   selection: TrackSelection
   onFailure: (message: string) => void
   onSlow?: (delivery: Delivery) => void
@@ -36,7 +37,7 @@ export const useHtmlEngine = ({
   const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
   const captionScale = usePlayerPrefs((prefs) => prefs.captionScale)
   const setCaptionScale = usePlayerPrefs((prefs) => prefs.setCaptionScale)
-  const shift = mode === PLAYBACK_MODES.direct ? 0 : STREAM_TIME_SHIFT
+  const shift = rendition.mode === PLAYBACK_MODES.direct ? 0 : STREAM_TIME_SHIFT
   const playback = useVideoState({
     videoRef,
     shift,
@@ -46,7 +47,7 @@ export const useHtmlEngine = ({
   useMediaSource({
     videoRef,
     source,
-    mode,
+    rendition,
     audio: selection.audio,
     position: playback.position,
     playing: playback.playing,
@@ -108,7 +109,7 @@ export const useHtmlEngine = ({
     const element = videoRef.current
     if (!element) return { engine: ENGINE_NAME, viewport: null, frame: null, frames: null }
     // Missing outside a real browser.
-    const quality = element.getVideoPlaybackQuality?.() ?? null
+    const frameQuality = element.getVideoPlaybackQuality?.() ?? null
     return {
       engine: ENGINE_NAME,
       viewport:
@@ -121,8 +122,8 @@ export const useHtmlEngine = ({
           : null,
       frame:
         element.videoWidth > 0 ? { width: element.videoWidth, height: element.videoHeight } : null,
-      frames: quality
-        ? { dropped: quality.droppedVideoFrames, total: quality.totalVideoFrames }
+      frames: frameQuality
+        ? { dropped: frameQuality.droppedVideoFrames, total: frameQuality.totalVideoFrames }
         : null,
     }
   }

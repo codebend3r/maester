@@ -4,6 +4,7 @@ import { Icon } from '@/components/Icon/Icon'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
 import { stepDownNote } from '@/components/Player/playbackFacts'
 import { playingAudio } from '@/components/Player/selection'
+import type { ChoiceGroup as Group, PlayChoices } from '@/components/Player/playChoices'
 import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/SettingsMenu.module.scss'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
@@ -22,6 +23,7 @@ const Option = ({
   name,
   checked,
   disabled,
+  isInline,
   label,
   details,
   onSelect,
@@ -29,11 +31,17 @@ const Option = ({
   name: string
   checked: boolean
   disabled?: boolean
+  /** Whether the detail sits beside the label instead of under it. */
+  isInline?: boolean
   label: string
   details?: string
   onSelect: () => void
 }) => (
-  <label className={[styles.option, disabled ? styles.disabled : ''].filter(Boolean).join(' ')}>
+  <label
+    className={[styles.option, disabled ? styles.disabled : '', isInline ? styles.inline : '']
+      .filter(Boolean)
+      .join(' ')}
+  >
     <input
       className={styles.radio}
       type="radio"
@@ -119,6 +127,31 @@ const SubtitleGroup = ({ labelledBy, selection, subtitleStatus }: GroupProps) =>
   )
 }
 
+const ChoiceGroup = ({
+  name,
+  group,
+  select,
+}: {
+  name: string
+  group: Group
+  select: PlayChoices['select']
+}) => (
+  <fieldset className={styles.group}>
+    <legend className={styles.legend}>{group.legend}</legend>
+    {group.options.map((option) => (
+      <Option
+        key={option.label}
+        name={name}
+        checked={option.isChecked}
+        label={option.label}
+        isInline={group.isInline}
+        details={option.details ?? undefined}
+        onSelect={() => select(option.pick)}
+      />
+    ))}
+  </fieldset>
+)
+
 const SpeedGroup = ({
   name,
   rate,
@@ -159,6 +192,7 @@ export const SettingsMenu = ({
   rate,
   mode,
   steppedDown = null,
+  choices = null,
   onPickRate,
   onShowInfo,
   onClose,
@@ -172,6 +206,8 @@ export const SettingsMenu = ({
   rate: number
   mode: PlaybackMode
   steppedDown?: StepDown | null
+  /** The ways the file can play, when the viewer may pick one; a local file has one. */
+  choices?: PlayChoices | null
   onPickRate: (rate: number) => void
   onShowInfo: () => void
   onClose: () => void
@@ -198,8 +234,18 @@ export const SettingsMenu = ({
       case MENU_SECTIONS.playback:
         return (
           <>
+            {choices?.groups.map((each, index) => (
+              <ChoiceGroup
+                key={each.legend}
+                name={`${id}-choice-${index}`}
+                group={each}
+                select={choices.select}
+              />
+            ))}
             <div className={styles.playing}>
-              <p className={styles.mode}>{describeMode(mode)}</p>
+              {(choices?.groups.length ?? 0) === 0 && (
+                <p className={styles.mode}>{describeMode(mode)}</p>
+              )}
               {!!steppedDown && <p className={styles.note}>{stepDownNote(steppedDown)}</p>}
               <button type="button" className={styles.info} onClick={onShowInfo}>
                 <span>Playback info</span>

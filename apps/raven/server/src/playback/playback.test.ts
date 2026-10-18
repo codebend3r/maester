@@ -255,15 +255,21 @@ describe('playback', () => {
     })
 
     // Addresses the client would never build, so written by hand.
-    it('rejects a bad mode, start or audio track', async () => {
+    it('rejects a bad mode, start, audio track or quality', async () => {
       const statuses = await Promise.all(
-        ['mode=burn', 'mode=remux&start=soon', 'mode=remux&audio=7'].map(
+        [
+          'mode=burn',
+          'mode=remux&start=soon',
+          'mode=remux&audio=7',
+          'mode=transcode&quality=huge',
+          'mode=remux&quality=sd480',
+        ].map(
           async (query) =>
             (await app().inject({ method: 'GET', url: `/api/media/${movieId()}/stream?${query}` }))
               .statusCode,
         ),
       )
-      expect(statuses).toEqual([400, 400, 400])
+      expect(statuses).toEqual([400, 400, 400, 400, 400])
     })
   })
 })
