@@ -1,4 +1,9 @@
-import { PLAYBACK_MODES, type PlaybackMode, STREAM_TIME_SHIFT } from '@raven/core'
+import {
+  PLAYBACK_MODES,
+  type PlaybackMode,
+  STREAM_TIME_SHIFT,
+  type StreamQuality,
+} from '@raven/core'
 import { useEffect, useRef } from 'react'
 import type { EngineHandle, EngineStats, HtmlSource } from '@/components/Player/engine'
 import styles from '@/components/Player/Player.module.scss'
@@ -17,6 +22,7 @@ const ENGINE_NAME = 'HTML video'
 export const useHtmlEngine = ({
   source,
   mode,
+  quality = null,
   selection,
   onFailure,
   onSlow,
@@ -24,6 +30,7 @@ export const useHtmlEngine = ({
 }: {
   source: HtmlSource
   mode: PlaybackMode
+  quality?: StreamQuality | null
   selection: TrackSelection
   onFailure: (message: string) => void
   onSlow?: (delivery: Delivery) => void
@@ -48,6 +55,7 @@ export const useHtmlEngine = ({
     source,
     mode,
     audio: selection.audio,
+    quality,
     position: playback.position,
     playing: playback.playing,
     onRefused: playback.refused,
@@ -108,7 +116,7 @@ export const useHtmlEngine = ({
     const element = videoRef.current
     if (!element) return { engine: ENGINE_NAME, viewport: null, frame: null, frames: null }
     // Missing outside a real browser.
-    const quality = element.getVideoPlaybackQuality?.() ?? null
+    const frameQuality = element.getVideoPlaybackQuality?.() ?? null
     return {
       engine: ENGINE_NAME,
       viewport:
@@ -121,8 +129,8 @@ export const useHtmlEngine = ({
           : null,
       frame:
         element.videoWidth > 0 ? { width: element.videoWidth, height: element.videoHeight } : null,
-      frames: quality
-        ? { dropped: quality.droppedVideoFrames, total: quality.totalVideoFrames }
+      frames: frameQuality
+        ? { dropped: frameQuality.droppedVideoFrames, total: frameQuality.totalVideoFrames }
         : null,
     }
   }

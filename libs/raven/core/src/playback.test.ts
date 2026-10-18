@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   type PlaybackPolicy,
   checkDirectPlay,
+  offeredQualities,
   planPlayback,
   streamMimeType,
   videoCodecString,
@@ -241,5 +242,46 @@ describe('streamMimeType', () => {
     expect(streamMimeType({ media: mediaItem({ audioCodec: null }), mode: 'remux' })).toBe(
       'video/mp4; codecs="avc1.640028"',
     )
+  })
+})
+
+describe('offeredQualities', () => {
+  it('lists the sizes below the file, largest first', () => {
+    const uhd = mediaItem({ width: 3840, height: 2160, bitrate: 24_200_000 })
+    expect(offeredQualities({ media: uhd, maxHeight: 2160 })).toEqual([
+      'high1080',
+      'medium1080',
+      'standard1080',
+      'low1080',
+      'high720',
+      'medium720',
+      'low720',
+      'sd480',
+      'mobile328',
+    ])
+  })
+
+  it('leaves out what the file or the server’s cap is already under', () => {
+    const hd = mediaItem({ width: 1920, height: 1080, bitrate: 9_000_000 })
+    expect(offeredQualities({ media: hd, maxHeight: 1080 })).toEqual([
+      'low1080',
+      'high720',
+      'medium720',
+      'low720',
+      'sd480',
+      'mobile328',
+    ])
+    expect(offeredQualities({ media: hd, maxHeight: 720 })).toEqual([
+      'high720',
+      'medium720',
+      'low720',
+      'sd480',
+      'mobile328',
+    ])
+  })
+
+  it('offers every size within the cap for a file not probed yet', () => {
+    const unprobed = mediaItem({ width: null, height: null, bitrate: null })
+    expect(offeredQualities({ media: unprobed, maxHeight: 720 })).toHaveLength(5)
   })
 })

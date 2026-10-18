@@ -2,8 +2,10 @@ import {
   type ApiClient,
   type MediaItem,
   type PlaybackMode,
+  type StreamQuality,
   DEFAULT_PLAYBACK_SETTINGS,
   PLAYBACK_MODES,
+  offeredQualities,
   planPlayback,
 } from '@raven/core'
 import { useMemo, useState } from 'react'
@@ -22,6 +24,18 @@ const sameLadder = ({ a, b }: { a: Ladder; b: Ladder }): boolean =>
 
 /** A way of playing the connection could not carry, and what it did carry. */
 export type StepDown = { from: PlaybackMode; delivery: Delivery }
+
+/** The ways this file can play right now, and the viewer's pick among them. */
+export type ModeChoice = {
+  modes: readonly PlaybackMode[]
+  pick: (mode: PlaybackMode) => void
+  /** The sizes a transcode can be asked for, largest first; empty when the server converts nothing. */
+  qualities: readonly StreamQuality[]
+  /** The size playing, or null for the original or the server's own settings. */
+  quality: StreamQuality | null
+  /** Converts down to a size: a transcode, asked for at it. */
+  pickQuality: (quality: StreamQuality) => void
+}
 
 export const PLAYBACK_STATUSES = {
   waiting: 'waiting',
@@ -49,6 +63,9 @@ export type PlaybackStatus =
       slow: ((delivery: Delivery) => void) | null
       /** Why this is a transcode, when the connection is the reason. */
       steppedDown: StepDown | null
+      choice: ModeChoice
+      /** The size this transcode is asked for; null when it is not one, or the settings size it. */
+      quality: StreamQuality | null
     }
 
 /**
@@ -58,6 +75,8 @@ export type PlaybackStatus =
  * only when every way has failed is the file unplayable. A new audio track
  * starts again at the top, unless the connection already proved too slow
  * for anything but a transcode: that holds for the rest of the playback.
+ * The viewer can pick any way the plan offers; it starts there, and a
+ * failure steps down from it.
  */
 export const usePlaybackLadder = ({
   media,
@@ -88,6 +107,8 @@ export const usePlaybackLadder = ({
   const [fallback, setFallback] = useState<{ ladder: Ladder; step: number } | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [steppedDown, setSteppedDown] = useState<StepDown | null>(null)
+  const [picked, setPicked] = useState<PlaybackMode | null>(null)
+  const [quality, setQuality] = useState<StreamQuality | null>(null)
 
   // The server's settings say whether to force the original file and what it
   // converts; a plan made without them starts a stream it may refuse.
@@ -100,7 +121,9 @@ export const usePlaybackLadder = ({
   const failedStep =
     fallback != null && sameLadder({ a: fallback.ladder, b: ladder }) ? fallback.step : 0
   const lighter = ladder.modes.indexOf(PLAYBACK_MODES.transcode)
-  const step = steppedDown != null && lighter >= 0 ? Math.max(failedStep, lighter) : failedStep
+  const pickedStep = picked == null ? -1 : ladder.modes.indexOf(picked)
+  const stepped = steppedDown != null && lighter >= 0 ? Math.max(failedStep, lighter) : failedStep
+  const step = Math.max(stepped, pickedStep)
   const mode = ladder.modes[step]
   if (failure != null || mode == null) {
     return {
@@ -118,5 +141,29 @@ export const usePlaybackLadder = ({
     },
     slow: lighter > step ? (delivery) => setSteppedDown({ from: mode, delivery }) : null,
     steppedDown: mode === PLAYBACK_MODES.transcode ? steppedDown : null,
+    quality: mode === PLAYBACK_MODES.transcode ? quality : null,
+    choice: {
+      modes: ladder.modes,
+      // A pick starts over from that way: what failed or was too slow before no longer holds.
+      pick: (next) => {
+        setPicked(next)
+        setQuality(null)
+        setFallback(null)
+        setSteppedDown(null)
+      },
+      qualities: ladder.modes.includes(PLAYBACK_MODES.transcode)
+        ? offeredQualities({
+            media,
+            maxHeight: policy?.maxHeight ?? DEFAULT_PLAYBACK_SETTINGS.maxHeight,
+          })
+        : [],
+      quality: mode === PLAYBACK_MODES.transcode ? quality : null,
+      pickQuality: (next) => {
+        setPicked(PLAYBACK_MODES.transcode)
+        setQuality(next)
+        setFallback(null)
+        setSteppedDown(null)
+      },
+    },
   }
 }

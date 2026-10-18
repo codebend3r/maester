@@ -96,6 +96,79 @@ describe('usePlaybackLadder', () => {
     expect(otherTrack.mode).toBe(PLAYBACK_MODES.transcode)
   })
 
+  it('lets the viewer pick a way, and the pick outranks a step down', () => {
+    setBrowserSupport((mime) => !mime.includes('mlpa'))
+    setStreamSupport(() => true)
+    const { result } = renderHook(
+      () =>
+        usePlaybackLadder({
+          api,
+          media: mediaItem({ audioCodec: 'truehd' }),
+          audio: null,
+          isDefaultAudio: true,
+        }),
+      { wrapper: withSettings },
+    )
+    const remux = result.current
+    if (remux.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
+    expect(remux.choice.modes).toEqual([PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode])
+    act(() => remux.slow?.({ delivered: 39_000_000, needed: 70_000_000 }))
+    const slowed = result.current
+    if (slowed.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
+    expect(slowed.mode).toBe(PLAYBACK_MODES.transcode)
+
+    act(() => slowed.choice.pick(PLAYBACK_MODES.remux))
+    const picked = result.current
+    if (picked.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
+    expect(picked.mode).toBe(PLAYBACK_MODES.remux)
+    expect(picked.steppedDown).toBeNull()
+
+    // A failure steps down from the pick.
+    act(() => picked.fail('broke'))
+    const failed = result.current
+    if (failed.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
+    expect(failed.mode).toBe(PLAYBACK_MODES.transcode)
+  })
+
+  it('converts down to a size the viewer picks, and goes back to the original', () => {
+    setBrowserSupport((mime) => !mime.includes('mlpa'))
+    setStreamSupport(() => true)
+    const { result } = renderHook(
+      () =>
+        usePlaybackLadder({
+          api,
+          media: mediaItem({
+            audioCodec: 'truehd',
+            width: 1920,
+            height: 1080,
+            bitrate: 24_000_000,
+          }),
+          audio: null,
+          isDefaultAudio: true,
+        }),
+      { wrapper: withSettings },
+    )
+    const remux = result.current
+    if (remux.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
+    expect(remux.quality).toBeNull()
+    expect(remux.choice.qualities).toContain('sd480')
+    // The default settings cap a transcode at 1080p, and the file is no taller.
+    expect(remux.choice.qualities[0]).toBe('high1080')
+
+    act(() => remux.choice.pickQuality('sd480'))
+    const small = result.current
+    if (small.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
+    expect(small.mode).toBe(PLAYBACK_MODES.transcode)
+    expect(small.quality).toBe('sd480')
+    expect(small.choice.quality).toBe('sd480')
+
+    act(() => small.choice.pick(PLAYBACK_MODES.remux))
+    const back = result.current
+    if (back.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
+    expect(back.mode).toBe(PLAYBACK_MODES.remux)
+    expect(back.quality).toBeNull()
+  })
+
   it('offers no step down when nothing lighter is left', () => {
     setBrowserSupport((mime) => !mime.includes('mlpa'))
     setStreamSupport((mime) => !mime.includes('avc1'))

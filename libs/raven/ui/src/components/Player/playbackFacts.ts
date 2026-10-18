@@ -3,6 +3,8 @@ import {
   type MediaTracks,
   PLAYBACK_MODES,
   type PlaybackMode,
+  STREAM_QUALITIES,
+  type StreamQuality,
   type SubtitleTrack,
   formatBitrate,
   formatChannels,
@@ -71,12 +73,26 @@ export const aboutLine = ({
 export const qualityLabel = ({
   media,
   mode,
+  quality = null,
 }: {
   media: MediaItem | null
   mode: PlaybackMode
+  quality?: StreamQuality | null
 }): string => {
+  if (mode === PLAYBACK_MODES.transcode && quality != null) {
+    return joined({ parts: [`${STREAM_QUALITIES[quality].height}p`, MODE_NAMES[mode]] })
+  }
   const picture = media && mode !== PLAYBACK_MODES.transcode ? resolutionLabel(media) : null
   return joined({ parts: [picture, MODE_NAMES[mode]] })
+}
+
+/** "24.2 Mbps, 4K HDR" for the original in the quality list; null before the file is probed. */
+export const originalDetails = (media: MediaItem): string | null => {
+  const text = joined({
+    parts: [formatBitrate(media.bitrate), pictureLabel(media)],
+    separator: ', ',
+  })
+  return text === '' ? null : text
 }
 
 /** "English 5.1" for the audio pill; null until the tracks are read. */

@@ -4,8 +4,11 @@ import {
   PLAYBACK_MODES,
   type PlaybackMode,
   type PlaybackSettings,
+  STREAM_QUALITIES,
   type StreamMode,
+  type StreamQuality,
   TRANSCODINGS,
+  isStreamQuality,
 } from '@/contract'
 
 /**
@@ -260,6 +263,27 @@ export const planPlayback = ({
     problems: check.problems,
   }
 }
+
+/**
+ * The sizes a viewer can convert a file down to: the ones smaller than the
+ * file, in frame and in bitrate where the file's is known, and not over the
+ * height the server's settings cap a transcode at. Largest first.
+ */
+export const offeredQualities = ({
+  media,
+  maxHeight,
+}: {
+  media: MediaItem
+  maxHeight: number
+}): StreamQuality[] =>
+  isStreamQuality.values.filter((key) => {
+    const size = STREAM_QUALITIES[key]
+    return (
+      size.height <= maxHeight &&
+      size.height <= (media.height ?? Infinity) &&
+      size.bitrate < (media.bitrate ?? Infinity)
+    )
+  })
 
 /** What each mode means for the viewer, for the settings menu. */
 export const describeMode = (mode: PlaybackMode): string => {

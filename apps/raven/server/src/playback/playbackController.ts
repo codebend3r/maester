@@ -19,9 +19,11 @@ import {
   type MediaTicket,
   type MediaTracks,
   PLAYBACK_MODES,
+  STREAM_QUALITIES,
   STREAM_TIME_SHIFT,
   TRANSCODINGS,
   isStreamMode,
+  isStreamQuality,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS, wholeNumber, CACHE_POLICIES } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
@@ -124,6 +126,7 @@ export class PlaybackController {
     @Query('mode') mode: string | undefined,
     @Query('start') start: string | undefined,
     @Query('audio') audio: string | undefined,
+    @Query('quality') quality: string | undefined,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
@@ -135,6 +138,16 @@ export class PlaybackController {
     if (playback.transcoding === TRANSCODINGS.remuxOnly && mode === PLAYBACK_MODES.transcode) {
       throw new ForbiddenException('Transcoding is off in Settings; only remuxing is on.')
     }
+    const size = (() => {
+      if (quality == null) return null
+      if (!isStreamQuality(quality)) {
+        throw new BadRequestException('quality must be one of the listed sizes')
+      }
+      if (mode !== PLAYBACK_MODES.transcode) {
+        throw new BadRequestException('quality applies to a transcode only')
+      }
+      return STREAM_QUALITIES[quality]
+    })()
     const from = start == null ? 0 : Number(start)
     if (!Number.isFinite(from) || from < 0) {
       throw new BadRequestException('start must be a number of seconds')
@@ -168,8 +181,10 @@ export class PlaybackController {
         tonemap,
         streamShift: STREAM_TIME_SHIFT,
         encoder,
-        maxHeight: playback.maxHeight,
+        // The server's setting is the ceiling a viewer's pick can not lift.
+        maxHeight: Math.min(size?.height ?? playback.maxHeight, playback.maxHeight),
         quality: playback.quality,
+        bitrate: size?.bitrate ?? null,
       }),
     )
     // The response closes when it finishes or when the client goes away;

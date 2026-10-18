@@ -1,10 +1,16 @@
-import { type PlaybackMode, describeMode } from '@raven/core'
+import {
+  PLAYBACK_MODES,
+  type PlaybackMode,
+  STREAM_QUALITIES,
+  describeMode,
+  formatBitrate,
+} from '@raven/core'
 import { type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
 import { stepDownNote } from '@/components/Player/playbackFacts'
 import { playingAudio } from '@/components/Player/selection'
-import type { StepDown } from '@/components/Player/usePlaybackLadder'
+import type { ModeChoice, StepDown } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/SettingsMenu.module.scss'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
@@ -119,6 +125,68 @@ const SubtitleGroup = ({ labelledBy, selection, subtitleStatus }: GroupProps) =>
   )
 }
 
+const ModeGroup = ({
+  name,
+  mode,
+  choice,
+}: {
+  name: string
+  mode: PlaybackMode
+  choice: ModeChoice
+}) => (
+  <fieldset className={styles.group}>
+    <legend className={styles.legend}>Play as</legend>
+    {choice.modes.map((candidate) => (
+      <Option
+        key={candidate}
+        name={`${name}-mode`}
+        checked={candidate === mode}
+        label={describeMode(candidate)}
+        onSelect={() => choice.pick(candidate)}
+      />
+    ))}
+  </fieldset>
+)
+
+/** Plex's list: the original first, then each size the file can be converted down to. */
+const QualityGroup = ({
+  name,
+  mode,
+  choice,
+  original,
+}: {
+  name: string
+  mode: PlaybackMode
+  choice: ModeChoice
+  original: string | null
+}) => {
+  const [best] = choice.modes
+  return (
+    <fieldset className={styles.group}>
+      <legend className={styles.legend}>Quality</legend>
+      {best != null && best !== PLAYBACK_MODES.transcode && (
+        <Option
+          name={`${name}-quality`}
+          checked={mode !== PLAYBACK_MODES.transcode}
+          label="Play original quality"
+          details={original ?? undefined}
+          onSelect={() => choice.pick(best)}
+        />
+      )}
+      {choice.qualities.map((key) => (
+        <Option
+          key={key}
+          name={`${name}-quality`}
+          checked={choice.quality === key}
+          label={`Convert to ${STREAM_QUALITIES[key].label}`}
+          details={formatBitrate(STREAM_QUALITIES[key].bitrate) ?? undefined}
+          onSelect={() => choice.pickQuality(key)}
+        />
+      ))}
+    </fieldset>
+  )
+}
+
 const SpeedGroup = ({
   name,
   rate,
@@ -159,6 +227,8 @@ export const SettingsMenu = ({
   rate,
   mode,
   steppedDown = null,
+  choice = null,
+  original = null,
   onPickRate,
   onShowInfo,
   onClose,
@@ -172,6 +242,10 @@ export const SettingsMenu = ({
   rate: number
   mode: PlaybackMode
   steppedDown?: StepDown | null
+  /** The ways the file can play, when the viewer may pick one; a local file has one. */
+  choice?: ModeChoice | null
+  /** The original file's bitrate and picture, as the first quality reads. */
+  original?: string | null
   onPickRate: (rate: number) => void
   onShowInfo: () => void
   onClose: () => void
@@ -198,8 +272,15 @@ export const SettingsMenu = ({
       case MENU_SECTIONS.playback:
         return (
           <>
+            {!!choice && choice.qualities.length > 0 && (
+              <QualityGroup name={id} mode={mode} choice={choice} original={original} />
+            )}
             <div className={styles.playing}>
-              <p className={styles.mode}>{describeMode(mode)}</p>
+              {choice && choice.modes.length > 1 ? (
+                <ModeGroup name={id} mode={mode} choice={choice} />
+              ) : (
+                <p className={styles.mode}>{describeMode(mode)}</p>
+              )}
               {!!steppedDown && <p className={styles.note}>{stepDownNote(steppedDown)}</p>}
               <button type="button" className={styles.info} onClick={onShowInfo}>
                 <span>Playback info</span>

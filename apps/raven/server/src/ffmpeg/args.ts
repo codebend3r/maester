@@ -100,15 +100,18 @@ const transcodeVideo = ({
   tonemap,
   maxHeight,
   quality,
+  bitrate,
 }: {
   encoder: VideoEncoder
   videoCodec: string | null
   tonemap: boolean
   maxHeight: number
   quality: TranscodeQuality
+  bitrate: number | null
 }): { input: string[]; output: string[] } => {
   const scale = scaleTo(maxHeight)
   const squeeze = QUALITY[quality]
+  const cap = bitrate == null ? null : String(bitrate)
   const cpuFilters = [`scale=${scale}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
   // A keyframe every two seconds keeps fragments small, so playback starts
   // and seeks quickly.
@@ -121,7 +124,7 @@ const transcodeVideo = ({
         '-c:v',
         'h264_videotoolbox',
         '-b:v',
-        squeeze.bitrate,
+        cap ?? squeeze.bitrate,
         ...shared,
         '-pix_fmt',
         'yuv420p',
@@ -147,7 +150,14 @@ const transcodeVideo = ({
           ? ['-hwaccel', 'vaapi', '-hwaccel_device', 'va', '-hwaccel_output_format', 'vaapi']
           : []),
       ],
-      output: ['-c:v', 'h264_vaapi', '-qp', squeeze.qp, ...shared, '-vf', filters.join(',')],
+      output: [
+        '-c:v',
+        'h264_vaapi',
+        ...(cap == null ? ['-qp', squeeze.qp] : ['-b:v', cap, '-maxrate', cap]),
+        ...shared,
+        '-vf',
+        filters.join(','),
+      ],
     }
   }
 
@@ -160,6 +170,8 @@ const transcodeVideo = ({
       'veryfast',
       '-crf',
       squeeze.crf,
+      // A bitrate ask is a ceiling on top of the quality: a 2 second buffer lets scenes peak.
+      ...(bitrate == null ? [] : ['-maxrate', String(bitrate), '-bufsize', String(bitrate * 2)]),
       ...shared,
       '-pix_fmt',
       'yuv420p',
@@ -181,6 +193,7 @@ export const encoderTestArgs = (encoder: VideoEncoder): string[] => {
     tonemap: false,
     maxHeight: 1080,
     quality: 'medium',
+    bitrate: null,
   })
   return [
     ...QUIET,
@@ -218,6 +231,7 @@ export const streamArgs = ({
   encoder = SOFTWARE,
   maxHeight = 1080,
   quality = 'medium',
+  bitrate = null,
 }: {
   input: string
   start: number
@@ -232,6 +246,8 @@ export const streamArgs = ({
   /** The frame a transcode is scaled down to, and how hard it is squeezed: the playback settings. */
   maxHeight?: number
   quality?: TranscodeQuality
+  /** A ceiling on the transcode's video bitrate in bits per second, when the viewer asked for a size. */
+  bitrate?: number | null
 }): string[] => {
   const video =
     mode === PLAYBACK_MODES.remux
@@ -240,7 +256,7 @@ export const streamArgs = ({
           input: [],
           output: ['-c:v', 'copy', ...(videoCodec === VIDEO_CODECS.hevc ? ['-tag:v', 'hvc1'] : [])],
         }
-      : transcodeVideo({ encoder, videoCodec, tonemap, maxHeight, quality })
+      : transcodeVideo({ encoder, videoCodec, tonemap, maxHeight, quality, bitrate })
   return [
     ...QUIET,
     ...video.input,

@@ -4,6 +4,7 @@ import {
   PLAYBACK_MODES,
   PLAYER_SOURCE_KINDS,
   type PlaybackMode,
+  type StreamQuality,
   streamMimeType,
 } from '@raven/core'
 import { type RefObject, useEffect, useEffectEvent, useRef } from 'react'
@@ -23,6 +24,7 @@ export const sourceFor = ({
   id,
   mode,
   audio,
+  quality = null,
   mime,
   access,
 }: {
@@ -31,6 +33,8 @@ export const sourceFor = ({
   mode: PlaybackMode
   /** The `0:a:N` track to play, or null for the file's default. */
   audio: number | null
+  /** The size a transcode is asked for; null for the server's settings. */
+  quality?: StreamQuality | null
   /** The converted stream's type; null for direct play, which needs none. */
   mime: string | null
   /** Read for each URL built, so a stream's next request carries the newest ticket. */
@@ -41,7 +45,7 @@ export const sourceFor = ({
     : {
         kind: VIDEO_SOURCE_KINDS.stream,
         mime,
-        url: (start) => api.streamUrl({ id, mode, start, audio, access: access() }),
+        url: (start) => api.streamUrl({ id, mode, start, audio, quality, access: access() }),
       }
 
 const failureMessage = (error: MediaError | null): string => {
@@ -65,6 +69,7 @@ export const useMediaSource = ({
   source: htmlSource,
   mode,
   audio,
+  quality = null,
   position,
   playing,
   onRefused,
@@ -75,6 +80,7 @@ export const useMediaSource = ({
   source: HtmlSource
   mode: PlaybackMode
   audio: number | null
+  quality?: StreamQuality | null
   position: RefObject<number>
   playing: RefObject<boolean>
   /** The browser would not start playing. */
@@ -105,7 +111,7 @@ export const useMediaSource = ({
   // failure the browser queued for the old one can land in between; it
   // must not count against the new one. A file's ticket is part of the
   // key because a new ticket re-attaches it.
-  const wanted = `${id}:${mode}:${audio ?? 'default'}:${originUrl ?? 'host'}:${fileTicket ?? ''}`
+  const wanted = `${id}:${mode}:${audio ?? 'default'}:${quality ?? 'settings'}:${originUrl ?? 'host'}:${fileTicket ?? ''}`
   const attached = useRef<string | null>(null)
   const report = (message: string) => {
     if (attached.current === wanted) onFailure(message)
@@ -181,7 +187,7 @@ export const useMediaSource = ({
     attached.current = wanted
     const videoSource: VideoSource =
       api != null && typeof id === 'number'
-        ? sourceFor({ api, id, mode, audio, mime, access: () => accessRef.current })
+        ? sourceFor({ api, id, mode, audio, quality, mime, access: () => accessRef.current })
         : { kind: 'file', url: String(id) }
     return attach({
       element,
@@ -189,5 +195,5 @@ export const useMediaSource = ({
       duration: knownDuration,
       isRemote: originUrl != null,
     })
-  }, [videoRef, id, knownDuration, api, mode, audio, mime, wanted, originUrl])
+  }, [videoRef, id, knownDuration, api, mode, audio, quality, mime, wanted, originUrl])
 }
