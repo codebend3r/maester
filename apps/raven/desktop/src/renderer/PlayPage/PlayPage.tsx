@@ -9,8 +9,15 @@ import {
   useState,
 } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import type { OutputSettings } from '@raven/core'
-import { Button, Player, type PlayerServices, useHostPlayer, useKeyShortcut } from '@raven/ui'
+import { type OutputSettings, PLAYER_SOURCE_KINDS } from '@raven/core'
+import {
+  Button,
+  ENGINE_KINDS,
+  Player,
+  type PlayerServices,
+  useHostPlayer,
+  useKeyShortcut,
+} from '@raven/ui'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import { CONNECTION_STATUSES } from '@/renderer/desktop/playerConnection'
 import { NativePlaying } from '@/renderer/PlayPage/NativePlaying'
@@ -155,7 +162,7 @@ const Playing = ({
     <NativePlaying
       services={services}
       player={player}
-      source={{ kind: 'file', fileId: file.fileId }}
+      source={{ kind: PLAYER_SOURCE_KINDS.file, fileId: file.fileId }}
       resumeAt={file.resumeAt}
       onLost={onLost}
     />
@@ -167,7 +174,12 @@ const HtmlPlaying = ({ services, fileId }: { services: PlayerServices; fileId: s
   const isHosting = useHostPlayer(services)
   return (
     isHosting && (
-      <Player engine={{ kind: 'html', source: { kind: 'file', url: fileUrlFor(fileId) } }} />
+      <Player
+        engine={{
+          kind: ENGINE_KINDS.html,
+          source: { kind: PLAYER_SOURCE_KINDS.file, url: fileUrlFor(fileId) },
+        }}
+      />
     )
   )
 }
@@ -178,7 +190,7 @@ const readOutput = async ({
 }: {
   client: DesktopClient
 }): Promise<OutputSettings | null> => {
-  const reply = await client.request({ type: 'readOutput' })
+  const reply = await client.request({ type: DESKTOP_REQUESTS.readOutput })
   return reply.type === DESKTOP_REPLIES.output ? reply.output : null
 }
 
@@ -225,7 +237,7 @@ const PlayPage = ({ fileId, queue }: { fileId: string; queue: string[] }) => {
   const file = useQuery({
     queryKey: ['desktop', 'file', fileId, queue],
     queryFn: async (): Promise<LocalFile> => {
-      const reply = await client.request({ type: 'describeFile', fileId, queue })
+      const reply = await client.request({ type: DESKTOP_REQUESTS.describeFile, fileId, queue })
       if (reply.type === DESKTOP_REPLIES.file) return reply.file
       if (reply.type === DESKTOP_REPLIES.refused) throw new Error(reply.message)
       throw new Error(NOT_OPENABLE)

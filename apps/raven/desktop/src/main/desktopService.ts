@@ -100,7 +100,7 @@ export type DesktopService = {
 
 const DONE = { type: DESKTOP_REPLIES.done } as const satisfies DesktopReply
 
-const refused = (message: string): DesktopReply => ({ type: 'refused', message })
+const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
 
 const messageFor = (reason: GrantRefusal): string => {
   switch (reason) {
@@ -117,7 +117,7 @@ const messageFor = (reason: GrantRefusal): string => {
 }
 
 const serversOf = (config: DesktopConfig): DesktopReply => ({
-  type: 'servers',
+  type: DESKTOP_REPLIES.servers,
   servers: config.servers.map((server) => ({
     serverId: server.id,
     origin: server.origin,
@@ -194,7 +194,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       return refused(refusal && !refusal.ok ? messageFor(refusal.reason) : MESSAGES.unknownRequest)
     }
     return {
-      type: 'play',
+      type: DESKTOP_REPLIES.play,
       target: { fileId: first.fileId, queue: rest.map((file) => file.fileId) },
     }
   }
@@ -251,7 +251,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     deps.downloads.noteOpened({ fileId: file.fileId })
     const downloadedFrom = deps.downloads.fromLabelOf({ path: file.path })
     return {
-      type: 'file',
+      type: DESKTOP_REPLIES.file,
       file: {
         fileId: file.fileId,
         label: titleOf(file),
@@ -378,7 +378,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     const state = store.read()
     const views = await Promise.all(state.recents.map((entry) => viewOf({ state, entry })))
     return {
-      type: 'recents',
+      type: DESKTOP_REPLIES.recents,
       recents: views.filter((view): view is RecentView => view !== null),
     }
   }
@@ -402,7 +402,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       return refused(CALL_MESSAGES.unknownServer)
     }
     // The server keeps where to resume, so a recent starts at 0 and the page asks it.
-    return { type: 'playServer', target: { serverId, mediaId, at: 0, next: [] } }
+    return { type: DESKTOP_REPLIES.playServer, target: { serverId, mediaId, at: 0, next: [] } }
   }
 
   const openRecent = async ({ recentId }: { recentId: string }): Promise<DesktopReply> => {
@@ -412,7 +412,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       case RECENT_KINDS.file: {
         const result = await grants.grant(entry.path)
         if (!result.ok) return refused(messageFor(result.reason))
-        return { type: 'play', target: { fileId: result.file.fileId, queue: [] } }
+        return { type: DESKTOP_REPLIES.play, target: { fileId: result.file.fileId, queue: [] } }
       }
       case RECENT_KINDS.server:
         return playServer({ serverId: entry.serverId, mediaId: entry.mediaId })
@@ -448,8 +448,8 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       path: request.path,
       body: request.body,
     })
-    if (!result.ok) return { type: 'serverUnreachable', message: result.message }
-    return { type: 'serverReply', status: result.status, body: result.body }
+    if (!result.ok) return { type: DESKTOP_REPLIES.serverUnreachable, message: result.message }
+    return { type: DESKTOP_REPLIES.serverReply, status: result.status, body: result.body }
   }
 
   const addServer = async ({ origin: address }: { origin: string }): Promise<DesktopReply> => {
@@ -515,7 +515,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
 
   const checkForUpdates = async (): Promise<DesktopReply> => {
     await deps.updates.checkNow()
-    return { type: 'updates', status: deps.updates.status() }
+    return { type: DESKTOP_REPLIES.updates, status: deps.updates.status() }
   }
 
   const openRelease = async (): Promise<DesktopReply> =>
@@ -547,7 +547,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         deps.setWindowButtons(request.isVisible)
         return DONE
       case DESKTOP_REQUESTS.readOutput:
-        return { type: 'output', ...(await deps.output.read()) }
+        return { type: DESKTOP_REPLIES.output, ...(await deps.output.read()) }
       case DESKTOP_REQUESTS.writeOutput:
         await deps.output.write(pickOutput(request.output))
         return DONE
@@ -568,9 +568,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       case DESKTOP_REQUESTS.noteServerTitle:
         return noteServerTitle(request)
       case DESKTOP_REQUESTS.readUpdates:
-        return { type: 'updates', status: deps.updates.status() }
+        return { type: DESKTOP_REPLIES.updates, status: deps.updates.status() }
       case DESKTOP_REQUESTS.setUpdateCheck:
-        return { type: 'updates', status: deps.updates.setEnabled(request.isEnabled) }
+        return { type: DESKTOP_REPLIES.updates, status: deps.updates.setEnabled(request.isEnabled) }
       case DESKTOP_REQUESTS.checkForUpdates:
         return checkForUpdates()
       case DESKTOP_REQUESTS.openRelease:

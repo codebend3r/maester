@@ -14,6 +14,7 @@ import {
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import {
   EXPAND_MESSAGES,
+  EXPAND_REASONS,
   expandTarget,
   type ExpandedFile,
   type Expansion,
@@ -22,6 +23,10 @@ import { downloadsDirFor, fits, readSpace, type SpaceFs } from '@/main/downloads
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { serverById } from '@/main/servers/serverList'
 import {
+  DESKTOP_EVENTS,
+  DESKTOP_REPLIES,
+  DOWNLOAD_ASK_KINDS,
+  DOWNLOAD_STATUS_KINDS,
   isContainerName,
   SERVER_GONE,
   type DesktopEvent,
@@ -62,7 +67,7 @@ type HeldAsk = { serverId: string; target: DownloadTarget; expansion: Expansion;
 
 type Server = { serverId: string; serverName: string }
 
-const refused = (message: string): DesktopReply => ({ type: 'refused', message })
+const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
 
 /**
  * Each file becomes `<mediaId>/video.<container>` on disk, so both must be safe to name a file
@@ -94,7 +99,7 @@ const entryOf = ({
   duration: file.media.duration,
   watchedPercent: file.watchedPercent,
   sidecars: [],
-  status: { kind: 'queued' },
+  status: { kind: DOWNLOAD_STATUS_KINDS.queued },
   autoDelete,
   watchedAt: null,
   serverPosition: file.media.position,
@@ -130,10 +135,14 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     // The files already on their way take their room first; the dialog names only the new ones.
     const owed = store
       .read()
-      .entries.filter(({ status }) => status.kind === 'queued' || status.kind === 'downloading')
+      .entries.filter(
+        ({ status }) =>
+          status.kind === DOWNLOAD_STATUS_KINDS.queued ||
+          status.kind === DOWNLOAD_STATUS_KINDS.downloading,
+      )
       .reduce((sum, entry) => sum + Math.max(entry.size - bytesOf(entry), 0), 0)
     return {
-      kind: 'ready',
+      kind: DOWNLOAD_ASK_KINDS.ready,
       title: expansion.title,
       downloadKind: expansion.kind,
       files: expansion.files.length,
@@ -162,14 +171,14 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
       return { ok: true, status: await readyStatus(expansion) }
     }
     switch (expansion.reason) {
-      case 'locked':
-        return { ok: true, status: { kind: 'locked' } }
-      case 'hidden':
-        return { ok: true, status: { kind: 'hidden' } }
-      case 'gone':
-      case 'unreachable':
-      case 'tooMany':
-      case 'unreadable':
+      case EXPAND_REASONS.locked:
+        return { ok: true, status: { kind: DOWNLOAD_ASK_KINDS.locked } }
+      case EXPAND_REASONS.hidden:
+        return { ok: true, status: { kind: DOWNLOAD_ASK_KINDS.hidden } }
+      case EXPAND_REASONS.gone:
+      case EXPAND_REASONS.unreachable:
+      case EXPAND_REASONS.tooMany:
+      case EXPAND_REASONS.unreadable:
         return { ok: false, message: expansion.message }
       default: {
         const unreachable: never = expansion.reason
@@ -203,7 +212,7 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     }
     asks.set(askId, { serverId, target, expansion, at: now() })
     return {
-      type: 'downloadAsk',
+      type: DESKTOP_REPLIES.downloadAsk,
       ask: {
         askId,
         serverId,
@@ -257,7 +266,7 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     const [first] = fresh
     if (first !== undefined) {
       deps.send({
-        type: 'notice',
+        type: DESKTOP_EVENTS.notice,
         message: DOWNLOAD_MESSAGES.queued({
           files: fresh.length,
           kind: expansion.kind,
@@ -271,7 +280,7 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
 
   const decline: DownloadAsks['decline'] = ({ askId }) => {
     asks.delete(askId)
-    return { type: 'done' }
+    return { type: DESKTOP_REPLIES.done }
   }
 
   return { ask, retryAsk, confirm, decline, clear: () => asks.clear() }

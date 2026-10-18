@@ -13,7 +13,12 @@ import { useDesktop } from '@/renderer/stores/desktop'
 import { useDownloadAsk } from '@/renderer/stores/downloadAsk'
 import { useNotice } from '@/renderer/stores/notice'
 import { useUpdateNotice } from '@/renderer/stores/updateNotice'
-import { DESKTOP_EVENTS, type DesktopEvent, type DesktopReply } from '@/shared/protocol'
+import {
+  DESKTOP_EVENTS,
+  DESKTOP_REQUESTS,
+  type DesktopEvent,
+  type DesktopReply,
+} from '@/shared/protocol'
 
 const NOTICE_MS = 6000
 
@@ -104,7 +109,7 @@ export const Shell = () => {
     if (!hasSaidReady.current) {
       hasSaidReady.current = true
       // Main holds what it was asked to open until the page is listening.
-      void client.request({ type: 'ready' })
+      void client.request({ type: DESKTOP_REQUESTS.ready })
     }
     return unsubscribe
   }, [client])

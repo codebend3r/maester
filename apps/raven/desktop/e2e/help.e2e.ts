@@ -1,5 +1,6 @@
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test'
 import { freshUserData, type MpvMode, readLog, removeDir, withApp } from '@/e2e/harness'
+import { ENGINE_MODES } from '@/main/player/engine'
 
 const COPIED_KEY = 'ravenE2eCopied'
 
@@ -80,7 +81,7 @@ const copiedDiagnostics = async ({
 test.describe('the Help menu', () => {
   test('copies diagnostics from the Help menu', async () => {
     const text = await copiedDiagnostics({
-      mpv: 'headless',
+      mpv: ENGINE_MODES.headless,
       // Until the engine is open the diagnostics say it is still opening.
       ready: async ({ userData }) => {
         await expect
@@ -97,7 +98,7 @@ test.describe('the Help menu', () => {
   })
 
   test('copies diagnostics that say why the engine is unavailable', async () => {
-    const text = await copiedDiagnostics({ mpv: 'off', ready: async () => undefined })
+    const text = await copiedDiagnostics({ mpv: ENGINE_MODES.off, ready: async () => undefined })
     expect(text.startsWith('raven player ')).toBe(true)
     expect(text).toContain('Video engine: unavailable (The video engine is off for this run.)')
   })

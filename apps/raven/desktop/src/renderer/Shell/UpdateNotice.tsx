@@ -3,7 +3,7 @@ import styles from '@/renderer/Shell/UpdateNotice.module.scss'
 import { UNOPENED } from '@/renderer/Shell/updateState'
 import { useDesktop } from '@/renderer/stores/desktop'
 import { useNotice } from '@/renderer/stores/notice'
-import { DESKTOP_REPLIES } from '@/shared/protocol'
+import { DESKTOP_REPLIES, DESKTOP_REQUESTS } from '@/shared/protocol'
 
 /**
  * The quiet word that a newer release is out (Ruling 19). The page never holds the release
@@ -22,7 +22,7 @@ export const UpdateNotice = ({
   const showNotice = useNotice((state) => state.show)
 
   const open = async () => {
-    const reply = await client.request({ type: 'openRelease' }).catch(() => null)
+    const reply = await client.request({ type: DESKTOP_REQUESTS.openRelease }).catch(() => null)
     onClose()
     if (reply !== null && reply.type === DESKTOP_REPLIES.done) return
     showNotice(reply !== null && reply.type === DESKTOP_REPLIES.refused ? reply.message : UNOPENED)

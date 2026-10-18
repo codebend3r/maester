@@ -2,7 +2,12 @@ import { type ApiClient, createApiClient, type FetchLike, type FetchResponse } f
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import { useDesktop } from '@/renderer/stores/desktop'
-import { DESKTOP_REPLIES, isServerMethod, type ServerView } from '@/shared/protocol'
+import {
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  isServerMethod,
+  type ServerView,
+} from '@/shared/protocol'
 
 /** A server call that never reached the server: main could not, or would not, make it. */
 export class ServerUnreachable extends Error {
@@ -40,7 +45,7 @@ export const bridgedFetch =
     // Every call is a path on the server itself, never another origin or a relative one.
     if (!url.startsWith('/') || url.startsWith('//')) throw new ServerUnreachable(NOT_MADE)
     const reply = await client.request({
-      type: 'serverCall',
+      type: DESKTOP_REQUESTS.serverCall,
       serverId,
       method,
       path: url,
@@ -73,7 +78,7 @@ export const useServers = (): UseQueryResult<ServerView[]> => {
   return useQuery({
     queryKey: SERVERS_KEY,
     queryFn: async () => {
-      const reply = await client.request({ type: 'listServers' })
+      const reply = await client.request({ type: DESKTOP_REQUESTS.listServers })
       if (reply.type === DESKTOP_REPLIES.servers) return reply.servers
       throw new Error(reply.type === DESKTOP_REPLIES.refused ? reply.message : NO_SERVERS)
     },

@@ -2,8 +2,16 @@ import { randomBytes } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { basename, extname } from 'node:path'
-import { isMediaTracks, isRecord, isString, type MediaTracks } from '@raven/core'
+import {
+  ADMIN_LOCK_STATES,
+  isMediaTracks,
+  isRecord,
+  isString,
+  type MediaTracks,
+  SUBTITLE_SOURCES,
+} from '@raven/core'
 import { API_PATHS } from '@/main/servers/allowlist'
+import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { SERVER_METHODS } from '@/shared/protocol'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
@@ -31,7 +39,11 @@ const MEDIA_ROUTES = {
   plays: `${SERVER_METHODS.post} /plays`,
 } as const
 
-const FIXTURE_ADMIN_KINDS = { off: 'off', password: 'password', noPassword: 'noPassword' } as const
+export const FIXTURE_ADMIN_KINDS = {
+  off: 'off',
+  password: 'password',
+  noPassword: 'noPassword',
+} as const
 
 /**
  * The admin lock as this browser meets it:
@@ -105,7 +117,7 @@ const FIXTURE_TRACKS = {
   subtitles: [
     {
       id: 'embedded-0',
-      source: 'embedded',
+      source: SUBTITLE_SOURCES.embedded,
       codec: 'subrip',
       language: 'en',
       title: null,
@@ -116,7 +128,7 @@ const FIXTURE_TRACKS = {
     },
     {
       id: 'external-0',
-      source: 'external',
+      source: SUBTITLE_SOURCES.external,
       codec: 'subrip',
       language: 'en',
       title: null,
@@ -228,8 +240,8 @@ const sendJson = ({
   cookie?: string | null
 }) => {
   response.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    ...(cookie === null ? {} : { 'set-cookie': cookie }),
+    [HTTP_HEADERS.contentType]: 'application/json; charset=utf-8',
+    ...(cookie === null ? {} : { [HTTP_HEADERS.setCookie]: cookie }),
   })
   response.end(JSON.stringify(body))
 }
@@ -388,17 +400,22 @@ export const startFixtureServer = async ({
     bytes: Buffer
   }) => {
     const range = rangeOf({ header: request.headers.range, size: bytes.length })
-    const common = { 'accept-ranges': 'bytes', 'content-type': contentTypeOf(path) }
+    const common = {
+      [HTTP_HEADERS.acceptRanges]: 'bytes',
+      [HTTP_HEADERS.contentType]: contentTypeOf(path),
+    }
     if (range === RANGE_OUTCOMES.unsatisfiable) {
-      response.writeHead(416, { ...common, 'content-range': `bytes */${bytes.length}` })
+      response.writeHead(416, { ...common, [HTTP_HEADERS.contentRange]: `bytes */${bytes.length}` })
       response.end()
       return
     }
     const { start, end } = range ?? { start: 0, end: bytes.length - 1 }
     response.writeHead(range === null ? 200 : 206, {
       ...common,
-      ...(range === null ? {} : { 'content-range': `bytes ${start}-${end}/${bytes.length}` }),
-      'content-length': end - start + 1,
+      ...(range === null
+        ? {}
+        : { [HTTP_HEADERS.contentRange]: `bytes ${start}-${end}/${bytes.length}` }),
+      [HTTP_HEADERS.contentLength]: end - start + 1,
     })
     if (isFileStalled) {
       response.flushHeaders()
@@ -431,11 +448,13 @@ export const startFixtureServer = async ({
   const adminLockOf = (cookies: ReadonlyMap<string, string>) => {
     switch (mode.admin.kind) {
       case FIXTURE_ADMIN_KINDS.off:
-        return { state: 'off' }
+        return { state: ADMIN_LOCK_STATES.off }
       case FIXTURE_ADMIN_KINDS.noPassword:
-        return { state: 'on', available: false }
+        return { state: ADMIN_LOCK_STATES.on, available: false }
       case FIXTURE_ADMIN_KINDS.password:
-        return adminHolds(cookies) ? { state: 'on', available: true } : { state: 'off' }
+        return adminHolds(cookies)
+          ? { state: ADMIN_LOCK_STATES.on, available: true }
+          : { state: ADMIN_LOCK_STATES.off }
       default: {
         const unreachable: never = mode.admin
         return unreachable
@@ -484,7 +503,7 @@ export const startFixtureServer = async ({
       case MEDIA_ROUTES.tracks:
         return sendJson({ response, status: 200, body: FIXTURE_TRACKS })
       case MEDIA_ROUTES.sidecar:
-        response.writeHead(200, { 'content-type': 'text/vtt; charset=utf-8' })
+        response.writeHead(200, { [HTTP_HEADERS.contentType]: 'text/vtt; charset=utf-8' })
         response.end(FIXTURE_SIDECAR)
         return
       case MEDIA_ROUTES.file:
@@ -494,7 +513,7 @@ export const startFixtureServer = async ({
           return
         }
         if (mediaId === FIXTURE_MEDIA.page) {
-          response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+          response.writeHead(200, { [HTTP_HEADERS.contentType]: 'text/html; charset=utf-8' })
           response.end(FIXTURE_PAGE)
           return
         }
@@ -543,7 +562,7 @@ export const startFixtureServer = async ({
         return sendJson({ response, status: 503, body: { message: NO_PASSWORD } })
       // Already off for this browser: there is nothing to turn off.
       case FIXTURE_ADMIN_KINDS.off:
-        return sendJson({ response, status: 200, body: { state: 'off' } })
+        return sendJson({ response, status: 200, body: { state: ADMIN_LOCK_STATES.off } })
       case FIXTURE_ADMIN_KINDS.password:
         break
       default: {
@@ -569,7 +588,7 @@ export const startFixtureServer = async ({
     return sendJson({
       response,
       status: 200,
-      body: { state: 'off' },
+      body: { state: ADMIN_LOCK_STATES.off },
       cookie: `${ADMIN_COOKIE}=${token}; ${COOKIE_ATTRIBUTES}; Max-Age=${ADMIN_MAX_AGE_S}`,
     })
   }

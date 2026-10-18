@@ -1,8 +1,9 @@
-import type { PlayerAction, PlayerServices } from '@raven/ui'
+import { PLAYER_ACTIONS, type PlayerAction, type PlayerServices } from '@raven/ui'
 import { listOf, object } from '@raven/core'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import type { MenuHub } from '@/renderer/desktop/menuHub'
 import {
+  DESKTOP_REQUESTS,
   type DesktopRequest,
   isOpaqueId,
   type LocalFile,
@@ -36,15 +37,15 @@ export const OUTPUT_KEY = ['desktop', 'output'] as const
 export const playerActionFor = (action: MenuPlayerAction): PlayerAction | null => {
   switch (action) {
     case MENU_PLAYER_ACTIONS.togglePlay:
-      return { type: 'togglePlay' }
+      return { type: PLAYER_ACTIONS.togglePlay }
     case MENU_PLAYER_ACTIONS.skipBack:
-      return { type: 'seekBy', seconds: -10 }
+      return { type: PLAYER_ACTIONS.seekBy, seconds: -10 }
     case MENU_PLAYER_ACTIONS.skipForward:
-      return { type: 'seekBy', seconds: 10 }
+      return { type: PLAYER_ACTIONS.seekBy, seconds: 10 }
     case MENU_PLAYER_ACTIONS.showShortcuts:
-      return { type: 'showShortcuts' }
+      return { type: PLAYER_ACTIONS.showShortcuts }
     case MENU_PLAYER_ACTIONS.stats:
-      return { type: 'toggleStats' }
+      return { type: PLAYER_ACTIONS.toggleStats }
     case MENU_PLAYER_ACTIONS.next:
       return null
     default: {
@@ -84,7 +85,12 @@ export const servicesFor = ({
   const savePosition = (position: number) =>
     requestQuietly({
       client,
-      request: { type: 'savePosition', fileId: file.fileId, position, duration: length },
+      request: {
+        type: DESKTOP_REQUESTS.savePosition,
+        fileId: file.fileId,
+        position,
+        duration: length,
+      },
     })
   return {
     title: {
@@ -132,12 +138,15 @@ export const servicesFor = ({
       save: ({ audio, subtitle }) =>
         requestQuietly({
           client,
-          request: { type: 'saveTracks', fileId: file.fileId, audio, subtitle },
+          request: { type: DESKTOP_REQUESTS.saveTracks, fileId: file.fileId, audio, subtitle },
         }),
     },
     chrome: {
       shown: (isShown) =>
-        requestQuietly({ client, request: { type: 'windowButtons', isVisible: isShown } }),
+        requestQuietly({
+          client,
+          request: { type: DESKTOP_REQUESTS.windowButtons, isVisible: isShown },
+        }),
     },
     unplayableNote: ENGINE_NOTES[engine],
   }

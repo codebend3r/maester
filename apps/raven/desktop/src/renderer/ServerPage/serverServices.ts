@@ -12,7 +12,13 @@ import type { PlayerServices } from '@raven/ui'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import type { MenuHub } from '@/renderer/desktop/menuHub'
 import { playerActionFor, requestQuietly } from '@/renderer/PlayPage/playerServices'
-import { DESKTOP_REPLIES, type DesktopReply, SERVER_GONE, type ServerView } from '@/shared/protocol'
+import {
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  type DesktopReply,
+  SERVER_GONE,
+  type ServerView,
+} from '@/shared/protocol'
 
 /** What the Shell leaves in `location.state` when it opens a server title. */
 export const isServerPlayState = object({ at: isNumber, next: listOf(isMediaId) })
@@ -61,7 +67,8 @@ export const openInBrowser = ({
   client: DesktopClient
   serverId: string
   mediaId: number
-}): Promise<DesktopReply> => client.request({ type: 'openInBrowser', serverId, mediaId })
+}): Promise<DesktopReply> =>
+  client.request({ type: DESKTOP_REQUESTS.openInBrowser, serverId, mediaId })
 
 /** Main's reason for not opening the browser, or null when it did. */
 export const browserRefusalOf = (reply: DesktopReply): string | null =>
@@ -139,7 +146,7 @@ export const serverServicesFor = ({
         requestQuietly({
           client,
           request: {
-            type: 'noteServerTitle',
+            type: DESKTOP_REQUESTS.noteServerTitle,
             serverId,
             mediaId: media.id,
             label,
@@ -164,7 +171,10 @@ export const serverServicesFor = ({
     },
     chrome: {
       shown: (isShown) =>
-        requestQuietly({ client, request: { type: 'windowButtons', isVisible: isShown } }),
+        requestQuietly({
+          client,
+          request: { type: DESKTOP_REQUESTS.windowButtons, isVisible: isShown },
+        }),
     },
     unplayableNote: SERVER_COPY.unplayable(server.name),
     onEngineError,

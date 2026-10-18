@@ -1,4 +1,5 @@
 import { HTTP_METHODS } from '@/shared/protocol'
+import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { basename, resolve, sep } from 'node:path'
 import { extensionOf } from '@raven/core'
 import { isAppUrl } from '@/main/security'
@@ -41,8 +42,8 @@ const answer = ({
     status,
     headers: {
       ...headers,
-      'Content-Security-Policy': CONTENT_SECURITY_POLICY,
-      'X-Content-Type-Options': 'nosniff',
+      [HTTP_HEADERS.contentSecurityPolicy]: CONTENT_SECURITY_POLICY,
+      [HTTP_HEADERS.contentTypeOptions]: 'nosniff',
     },
   })
 
@@ -79,7 +80,7 @@ export const createAppHandler = ({
     if (url === null) return answer({ status: 400 })
     if (!isAppUrl(request.url)) return answer({ status: 404 })
     if (request.method !== HTTP_METHODS.get && request.method !== HTTP_METHODS.head) {
-      return answer({ status: 405, headers: { Allow: ALLOWED_METHODS } })
+      return answer({ status: 405, headers: { [HTTP_HEADERS.allow]: ALLOWED_METHODS } })
     }
 
     const decoded = decode(url.pathname)
@@ -99,8 +100,8 @@ export const createAppHandler = ({
       status: 200,
       body: request.method === HTTP_METHODS.head ? null : bytes,
       headers: {
-        'Content-Type': contentTypeOf(basename(path)),
-        'Content-Length': `${bytes.byteLength}`,
+        [HTTP_HEADERS.contentType]: contentTypeOf(basename(path)),
+        [HTTP_HEADERS.contentLength]: `${bytes.byteLength}`,
       },
     })
   }

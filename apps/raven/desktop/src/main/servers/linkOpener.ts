@@ -11,7 +11,7 @@ import {
 } from '@/main/servers/serverTrust'
 import { messageOf } from '@/shared/messageOf'
 import { readDownloadLink, readPlayLink } from '@/shared/playLink'
-import type { DesktopReply } from '@/shared/protocol'
+import { DESKTOP_REPLIES, type DesktopReply } from '@/shared/protocol'
 
 export const LINK_MESSAGES = {
   unreadable:
@@ -26,17 +26,17 @@ const replyForUntrusted = (
 ): DesktopReply => {
   switch (outcome.kind) {
     case TRUST_OUTCOME_KINDS.declined:
-      return { type: 'done' }
+      return { type: DESKTOP_REPLIES.done }
     case TRUST_OUTCOME_KINDS.full:
-      return { type: 'refused', message: TRUST_MESSAGES.full }
+      return { type: DESKTOP_REPLIES.refused, message: TRUST_MESSAGES.full }
     case TRUST_OUTCOME_KINDS.busy:
-      return { type: 'refused', message: TRUST_MESSAGES.busy }
+      return { type: DESKTOP_REPLIES.refused, message: TRUST_MESSAGES.busy }
     case TRUST_OUTCOME_KINDS.unreachable:
-      return { type: 'refused', message: TRUST_MESSAGES.unreachable(outcome.origin) }
+      return { type: DESKTOP_REPLIES.refused, message: TRUST_MESSAGES.unreachable(outcome.origin) }
     case TRUST_OUTCOME_KINDS.invalid:
-      return { type: 'refused', message: TRUST_MESSAGES.invalid }
+      return { type: DESKTOP_REPLIES.refused, message: TRUST_MESSAGES.invalid }
     case TRUST_OUTCOME_KINDS.unsaved:
-      return { type: 'refused', message: TRUST_MESSAGES.unsaved }
+      return { type: DESKTOP_REPLIES.refused, message: TRUST_MESSAGES.unsaved }
     default: {
       const unreachable: never = outcome
       return unreachable
@@ -53,7 +53,7 @@ export const replyForTrust = ({
 }): DesktopReply =>
   outcome.kind === TRUST_OUTCOME_KINDS.trusted
     ? {
-        type: 'playServer',
+        type: DESKTOP_REPLIES.playServer,
         target: {
           serverId: outcome.server.id,
           mediaId: request.mediaId,
@@ -115,14 +115,14 @@ export const createLinkOpener = ({
       return downloads.ask({ serverId: outcome.server.id, target: download.target })
     }
     safeWarn(`raven player could not read a link: ${loggable(link.slice(0, LINK_LOG_MAX))}`)
-    return { type: 'refused', message: LINK_MESSAGES.unreadable }
+    return { type: DESKTOP_REPLIES.refused, message: LINK_MESSAGES.unreadable }
   }
 
   return {
     open,
     openBatch: async (links) => {
       const [first, ...dropped] = links
-      if (first === undefined) return { type: 'done' }
+      if (first === undefined) return { type: DESKTOP_REPLIES.done }
       // A page can fire links in a burst; acting on each would stack prompts or replace the video over and over.
       if (dropped.length > 0) {
         safeWarn(

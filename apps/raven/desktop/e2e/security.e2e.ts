@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { playLinkFor } from '@raven/core'
 import { expect, test } from '@playwright/test'
 import { type Clips, makeClips } from '@/e2e/clips'
-import { routesOf, startFixtureServer } from '@/e2e/fixtureServer'
+import { FIXTURE_ADMIN_KINDS, routesOf, startFixtureServer } from '@/e2e/fixtureServer'
 import { API_PATHS } from '@/main/servers/allowlist'
 import {
   browserOpens,
@@ -16,10 +16,17 @@ import {
   serverPartitions,
   stubBrowser,
   stubTrustPrompt,
+  TRUST_ANSWERS,
   trustPrompts,
   withApp,
 } from '@/e2e/harness'
-import { DESKTOP_REPLIES, isDesktopReply } from '@/shared/protocol'
+import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import {
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  isDesktopReply,
+  SERVER_METHODS,
+} from '@/shared/protocol'
 
 // Written out rather than imported, so the test checks the header against the spec, not
 // against the module that sends it.
@@ -132,7 +139,7 @@ test.describe('the security baseline', () => {
     const ownUserData = await freshUserData()
     const elsewhere = await startListener({
       answer: ({ response }) => {
-        response.writeHead(200, { 'content-type': 'application/json' })
+        response.writeHead(200, { [HTTP_HEADERS.contentType]: 'application/json' })
         response.end('{"available":true,"unlocked":false}')
       },
     })
@@ -147,7 +154,7 @@ test.describe('the security baseline', () => {
         userData: ownUserData,
         run: async ({ app, page }) => {
           await expect(page.getByRole('heading', { name: 'raven player' })).toBeVisible()
-          await stubTrustPrompt({ app, answer: 'add' })
+          await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
           await openUrl({
             app,
             url: playLinkFor({ origin: redirecting.origin, mediaId: 1, at: 0, next: [] }),
@@ -160,8 +167,10 @@ test.describe('the security baseline', () => {
           ])
           expect(redirecting.requests).toEqual(['GET /api/lock'])
           expect(elsewhere.requests).toEqual([])
-          expect(await requestFromPage({ page, request: { type: 'listServers' } })).toEqual({
-            type: 'servers',
+          expect(
+            await requestFromPage({ page, request: { type: DESKTOP_REQUESTS.listServers } }),
+          ).toEqual({
+            type: DESKTOP_REPLIES.servers,
             servers: [],
           })
         },
@@ -186,7 +195,7 @@ test.describe('the security baseline', () => {
     const ownUserData = await freshUserData()
     const elsewhere = await startListener({
       answer: ({ response }) => {
-        response.writeHead(200, { 'content-type': 'application/json' })
+        response.writeHead(200, { [HTTP_HEADERS.contentType]: 'application/json' })
         response.end('{}')
       },
     })
@@ -194,8 +203,8 @@ test.describe('the security baseline', () => {
       answer: ({ request, response }) => {
         if (request.url === API_PATHS.lock) {
           response.writeHead(200, {
-            'content-type': 'application/json',
-            'set-cookie': 'raven_unlock=a.b; Path=/api; HttpOnly; SameSite=Strict',
+            [HTTP_HEADERS.contentType]: 'application/json',
+            [HTTP_HEADERS.setCookie]: 'raven_unlock=a.b; Path=/api; HttpOnly; SameSite=Strict',
           })
           response.end('{"available":true,"unlocked":true}')
           return
@@ -209,7 +218,7 @@ test.describe('the security baseline', () => {
         userData: ownUserData,
         run: async ({ app, page }) => {
           await expect(page.getByRole('heading', { name: 'raven player' })).toBeVisible()
-          await stubTrustPrompt({ app, answer: 'add' })
+          await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
           await stubBrowser({ app })
           await openUrl({
             app,
@@ -234,20 +243,23 @@ test.describe('the security baseline', () => {
     const { app, page } = running()
     const fixture = await startFixtureServer({
       clips: { first: clips.first, second: clips.second, tracks: clips.first },
-      mode: { pin: '3001', isLocked: false, admin: { kind: 'off' } },
+      mode: { pin: '3001', isLocked: false, admin: { kind: FIXTURE_ADMIN_KINDS.off } },
     })
     try {
-      await stubTrustPrompt({ app, answer: 'add' })
+      await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
       const added = await requestFromPage({
         page,
-        request: { type: 'addServer', origin: fixture.origin },
+        request: { type: DESKTOP_REQUESTS.addServer, origin: fixture.origin },
       })
       const [serverId = ''] =
         added !== null && added.type === DESKTOP_REPLIES.servers
           ? added.servers.map((s) => s.serverId)
           : []
       expect(serverId).not.toBe('')
-      const listed = await requestFromPage({ page, request: { type: 'listServers' } })
+      const listed = await requestFromPage({
+        page,
+        request: { type: DESKTOP_REQUESTS.listServers },
+      })
       expect(
         listed !== null && listed.type === DESKTOP_REPLIES.servers
           ? listed.servers.map((s) => s.serverId)
@@ -257,23 +269,26 @@ test.describe('the security baseline', () => {
 
       // Real server routes the page has no business calling, and allowed ones bent out of shape.
       const forgeries = [
-        { method: 'GET', path: '/api/media/1/location', body: null },
-        { method: 'GET', path: '/api/admin/settings', body: null },
-        { method: 'PUT', path: '/api/admin/settings', body: '{"pin":"0000"}' },
-        { method: 'GET', path: '/api/media/1/file', body: null },
-        { method: 'GET', path: '/api/media/1?x=1', body: null },
-        { method: 'GET', path: '/api/media/1/../../admin/settings', body: null },
-        { method: 'GET', path: `${fixture.elsewhere.origin}/api/media/1`, body: null },
-        { method: 'POST', path: '/api/media/1/plays', body: '{"extra":true}' },
+        { method: SERVER_METHODS.get, path: '/api/media/1/location', body: null },
+        { method: SERVER_METHODS.get, path: '/api/admin/settings', body: null },
+        { method: SERVER_METHODS.put, path: '/api/admin/settings', body: '{"pin":"0000"}' },
+        { method: SERVER_METHODS.get, path: '/api/media/1/file', body: null },
+        { method: SERVER_METHODS.get, path: '/api/media/1?x=1', body: null },
+        { method: SERVER_METHODS.get, path: '/api/media/1/../../admin/settings', body: null },
+        { method: SERVER_METHODS.get, path: `${fixture.elsewhere.origin}/api/media/1`, body: null },
+        { method: SERVER_METHODS.post, path: '/api/media/1/plays', body: '{"extra":true}' },
       ]
       const replies = await Promise.all(
         forgeries.map((forgery) =>
-          requestFromPage({ page, request: { type: 'serverCall', serverId, ...forgery } }),
+          requestFromPage({
+            page,
+            request: { type: DESKTOP_REQUESTS.serverCall, serverId, ...forgery },
+          }),
         ),
       )
       expect(replies).toEqual(
         forgeries.map(() => ({
-          type: 'serverUnreachable',
+          type: DESKTOP_REPLIES.serverUnreachable,
           message: 'raven player does not make that call.',
         })),
       )
@@ -281,24 +296,30 @@ test.describe('the security baseline', () => {
       const unknown = await requestFromPage({
         page,
         request: {
-          type: 'serverCall',
+          type: DESKTOP_REQUESTS.serverCall,
           serverId: '00000000-0000-4000-8000-000000000000',
-          method: 'GET',
+          method: SERVER_METHODS.get,
           path: '/api/media/1',
           body: null,
         },
       })
       expect(unknown).toEqual({
-        type: 'serverUnreachable',
+        type: DESKTOP_REPLIES.serverUnreachable,
         message: 'That server is no longer in raven player.',
       })
 
       // A call on the list still goes through, so the refusals above are the allowlist's.
       const allowed = await requestFromPage({
         page,
-        request: { type: 'serverCall', serverId, method: 'GET', path: '/api/lock', body: null },
+        request: {
+          type: DESKTOP_REQUESTS.serverCall,
+          serverId,
+          method: SERVER_METHODS.get,
+          path: API_PATHS.lock,
+          body: null,
+        },
       })
-      expect(allowed?.type ?? null).toBe('serverReply')
+      expect(allowed?.type ?? null).toBe(DESKTOP_REPLIES.serverReply)
       expect(routesOf(fixture.requests.slice(probed))).toEqual(['GET /api/lock'])
       expect(routesOf(fixture.elsewhere.requests)).toEqual([])
     } finally {
@@ -344,7 +365,7 @@ test.describe('the security baseline', () => {
     const refusals = (replies ?? []).map((reply) => (isDesktopReply(reply) ? reply : null))
     expect(refusals).toEqual(
       Array.from({ length: 5 }, () => ({
-        type: 'refused',
+        type: DESKTOP_REPLIES.refused,
         message: 'Drop a video file to play it.',
       })),
     )

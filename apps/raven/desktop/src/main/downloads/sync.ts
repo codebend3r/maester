@@ -10,7 +10,7 @@ import {
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { errorText } from '@/main/log/errorText'
-import type { AllowedCall } from '@/main/servers/allowlist'
+import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import type { Timers } from '@/main/stateStore'
 
@@ -51,12 +51,21 @@ const isLogged = (status: number): boolean => status === 403 || status === 404
  * How a call went: the server took it, refused it for good or for now (a 403 or a 404),
  * answered something else, or could not be reached.
  */
-type Delivery = 'taken' | 'denied' | 'refused' | 'unreachable'
+const DELIVERIES = {
+  taken: 'taken',
+  denied: 'denied',
+  refused: 'refused',
+  unreachable: 'unreachable',
+} as const
+
+type Delivery = (typeof DELIVERIES)[keyof typeof DELIVERIES]
 
 /** What a send is for: a download, or what a removed download still owed its server. */
+const OWING_KINDS = { entry: 'entry', owed: 'owed' } as const
+
 type Owing =
-  | { kind: 'entry'; downloadId: string }
-  | { kind: 'owed'; serverId: string; mediaId: number }
+  | { kind: typeof OWING_KINDS.entry; downloadId: string }
+  | { kind: typeof OWING_KINDS.owed; serverId: string; mediaId: number }
 
 /** What an owing has pending now, with what its calls need. A removed download has no title. */
 type Due = {
@@ -67,14 +76,14 @@ type Due = {
   pending: Pending
 }
 
-const entryOwing = (downloadId: string): Owing => ({ kind: 'entry', downloadId })
+const entryOwing = (downloadId: string): Owing => ({ kind: OWING_KINDS.entry, downloadId })
 
 /** One string per owing, so the maps can key by it: a download id, or its server and media. */
 const keyOf = (owing: Owing): string => {
   switch (owing.kind) {
-    case 'entry':
+    case OWING_KINDS.entry:
       return owing.downloadId
-    case 'owed':
+    case OWING_KINDS.owed:
       return JSON.stringify([owing.serverId, owing.mediaId])
     default: {
       const unreachable: never = owing
@@ -85,13 +94,13 @@ const keyOf = (owing: Owing): string => {
 
 const dueIn = (state: DownloadsState, owing: Owing): Due | null => {
   switch (owing.kind) {
-    case 'entry': {
+    case OWING_KINDS.entry: {
       const entry = entryById(state, owing)
       if (entry === null) return null
       const { serverId, mediaId, label, pending } = entry
       return { owing, serverId, mediaId, label, pending }
     }
-    case 'owed': {
+    case OWING_KINDS.owed: {
       const owed = owedOf(state, owing)
       if (owed === null) return null
       return {
@@ -146,15 +155,15 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
     const result = await calls.call({ serverId: due.serverId, call })
     if (!result.ok) {
       unreachable.add(due.serverId)
-      return 'unreachable'
+      return DELIVERIES.unreachable
     }
     const key = keyOf(due.owing)
     if (isSuccess(result.status)) {
       unreachable.delete(due.serverId)
       logged.delete(key)
-      return 'taken'
+      return DELIVERIES.taken
     }
-    if (!isLogged(result.status)) return 'refused'
+    if (!isLogged(result.status)) return DELIVERIES.refused
     if (!logged.has(key)) {
       logged.set(key, due.owing)
       const what = due.label === null ? 'a deleted download' : loggable(due.label)
@@ -162,7 +171,7 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
         `raven player could not tell its server what was watched of ${what}: it answered ${result.status}`,
       )
     }
-    return 'denied'
+    return DELIVERIES.denied
   }
 
   /**
@@ -172,10 +181,10 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
    */
   const notTaken = ({ due, delivery }: { due: Due; delivery: Delivery }): boolean => {
     const { owing } = due
-    if (delivery === 'denied' && owing.kind === 'owed') {
+    if (delivery === DELIVERIES.denied && owing.kind === OWING_KINDS.owed) {
       store.update((state) => dropOwed(state, owing))
     }
-    return delivery !== 'unreachable'
+    return delivery !== DELIVERIES.unreachable
   }
 
   /**
@@ -196,7 +205,7 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
     const sent = { sentPlay, sentPosition, sentFurthest }
     const { owing, serverId, mediaId } = due
     store.update((state) =>
-      owing.kind === 'entry' && entryById(state, owing) !== null
+      owing.kind === OWING_KINDS.entry && entryById(state, owing) !== null
         ? clearPending(state, { downloadId: owing.downloadId, ...sent })
         : clearOwed(state, { serverId, mediaId, ...sent }),
     )
@@ -222,16 +231,17 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
    */
   const sendFurthest = async (owing: Owing): Promise<Delivery> => {
     const due = dueOf(owing)
-    if (due === null) return 'refused'
+    if (due === null) return DELIVERIES.refused
     const { furthest, position } = due.pending
-    if (furthest === null || (position !== null && furthest <= position)) return 'taken'
+    if (furthest === null || (position !== null && furthest <= position)) return DELIVERIES.taken
     const delivery = await deliver({
       due,
-      call: { name: 'saveProgress', mediaId: due.mediaId, position: furthest },
+      call: { name: CALL_NAMES.saveProgress, mediaId: due.mediaId, position: furthest },
     })
-    if (delivery !== 'taken') return notTaken({ due, delivery }) ? 'refused' : 'unreachable'
+    if (delivery !== DELIVERIES.taken)
+      return notTaken({ due, delivery }) ? DELIVERIES.refused : DELIVERIES.unreachable
     clearSent({ due, sentPlay: false, sentPosition: null, sentFurthest: furthest })
-    return 'taken'
+    return DELIVERIES.taken
   }
 
   /**
@@ -244,24 +254,24 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
     if (first.pending.play) {
       const played = await deliver({
         due: first,
-        call: { name: 'recordPlay', mediaId: first.mediaId },
+        call: { name: CALL_NAMES.recordPlay, mediaId: first.mediaId },
       })
       // The play stays pending when the answer was lost, though the server may have taken it:
       // delivery is at least once, so a play can be recorded twice but never none.
-      if (played !== 'taken') return notTaken({ due: first, delivery: played })
+      if (played !== DELIVERIES.taken) return notTaken({ due: first, delivery: played })
       clearSent({ due: first, sentPlay: true, sentPosition: null, sentFurthest: null })
     }
     const reached = await sendFurthest(owing)
-    if (reached !== 'taken') return reached !== 'unreachable'
+    if (reached !== DELIVERIES.taken) return reached !== DELIVERIES.unreachable
     // Read again: the position may have moved while the play or the furthest was out.
     const due = dueOf(owing)
     const position = due?.pending.position ?? null
     if (due === null || position === null) return true
     const saved = await deliver({
       due,
-      call: { name: 'saveProgress', mediaId: due.mediaId, position },
+      call: { name: CALL_NAMES.saveProgress, mediaId: due.mediaId, position },
     })
-    if (saved !== 'taken') return notTaken({ due, delivery: saved })
+    if (saved !== DELIVERIES.taken) return notTaken({ due, delivery: saved })
     // A furthest no further than this position is covered by it.
     clearSent({ due, sentPlay: false, sentPosition: position, sentFurthest: position })
     return true
@@ -324,7 +334,7 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
       inFlight.delete(key)
       const isTouched = touchedDuring.delete(key)
       const next = dueOf(owing)
-      if (isTouched && owing.kind === 'entry' && next !== null && hasPending(next)) {
+      if (isTouched && owing.kind === OWING_KINDS.entry && next !== null && hasPending(next)) {
         debounce(owing.downloadId)
       }
       pruneLogged()
@@ -372,7 +382,11 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
     const { entries, owed } = store.read()
     return runEach([
       ...entries.map(({ downloadId }) => entryOwing(downloadId)),
-      ...owed.map(({ serverId, mediaId }): Owing => ({ kind: 'owed', serverId, mediaId })),
+      ...owed.map(({ serverId, mediaId }): Owing => ({
+        kind: OWING_KINDS.owed,
+        serverId,
+        mediaId,
+      })),
     ])
   }
 

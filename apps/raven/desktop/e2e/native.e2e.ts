@@ -1,6 +1,12 @@
 import { execFile } from 'node:child_process'
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test'
-import { PLAYER_COMMANDS, PLAYER_EVENTS, type PlayerCommand } from '@raven/core'
+import {
+  PLAYER_COMMANDS,
+  PLAYER_EVENTS,
+  PLAYER_REFUSAL_REASONS,
+  PLAYER_SOURCE_KINDS,
+  type PlayerCommand,
+} from '@raven/core'
 import { type Clips, makeClips, makeTrackClip } from '@/e2e/clips'
 import {
   closeApp,
@@ -269,7 +275,7 @@ test.describe.serial('playing a local file through mpv', () => {
           requests
             .map(({ command }) => command)
             .filter((command) => command.type === PLAYER_COMMANDS.audio),
-        ).toEqual([{ type: 'audio', index: 1 }])
+        ).toEqual([{ type: PLAYER_COMMANDS.audio, index: 1 }])
         await expectClockAdvancing(page)
       },
     })
@@ -288,7 +294,7 @@ test.describe.serial('playing a local file through mpv', () => {
         expect(
           requests.find(({ command }) => command.type === PLAYER_COMMANDS.load)?.command ?? null,
         ).toMatchObject({
-          type: 'load',
+          type: PLAYER_COMMANDS.load,
           audio: 1,
           subtitle: 'embedded-0',
         })
@@ -392,26 +398,32 @@ test.describe.serial('playing a local file through mpv', () => {
         await tapPlayerPort({ page })
 
         const ungranted = '00000000-0000-4000-8000-000000000000'
-        const load = { type: 'load', start: 0, audio: null, subtitle: null }
+        const load = { type: PLAYER_COMMANDS.load, start: 0, audio: null, subtitle: null }
         const forgeries = [
-          { id: 'one', command: { type: 'play' } },
+          { id: 'one', command: { type: PLAYER_COMMANDS.play } },
           { id: 9001, command: { type: 'run', args: ['loadfile', clips.first] } },
           { id: 9002, command: ['loadfile', clips.first, 'replace'] },
           { id: 9003, command: { type: 'loadfile', url: clips.first } },
           { id: 9004, command: { ...load, source: { kind: 'path', path: clips.first } } },
-          { id: 9005, command: { ...load, source: { kind: 'file', fileId: ungranted } } },
-          { id: 9006, command: { ...load, source: { kind: 'file', fileId: clips.first } } },
+          {
+            id: 9005,
+            command: { ...load, source: { kind: PLAYER_SOURCE_KINDS.file, fileId: ungranted } },
+          },
+          {
+            id: 9006,
+            command: { ...load, source: { kind: PLAYER_SOURCE_KINDS.file, fileId: clips.first } },
+          },
           {
             id: 9007,
             command: {
               ...load,
-              source: { kind: 'file', fileId: ungranted, path: clips.first },
+              source: { kind: PLAYER_SOURCE_KINDS.file, fileId: ungranted, path: clips.first },
               path: clips.first,
               options: { 'access-references': 'yes' },
             },
           },
           // A command the port knows, so the port still answers after all of the above.
-          { id: 9008, command: { type: 'subtitleScale', scale: 1 } },
+          { id: 9008, command: { type: PLAYER_COMMANDS.subtitleScale, scale: 1 } },
         ]
         await postOnPort({ page, messages: forgeries })
         await expect.poll(async () => (await trafficOf({ page })).replies.length).toBe(8)
@@ -420,13 +432,13 @@ test.describe.serial('playing a local file through mpv', () => {
         const unknown = 'raven player does not understand that command.'
         const notOpen = 'That video is no longer open. Open it again from Home.'
         expect(replies).toEqual([
-          { id: 9001, ok: false, reason: 'refused', message: unknown },
-          { id: 9002, ok: false, reason: 'refused', message: unknown },
-          { id: 9003, ok: false, reason: 'refused', message: unknown },
-          { id: 9004, ok: false, reason: 'refused', message: unknown },
-          { id: 9005, ok: false, reason: 'refused', message: notOpen },
-          { id: 9006, ok: false, reason: 'refused', message: notOpen },
-          { id: 9007, ok: false, reason: 'refused', message: notOpen },
+          { id: 9001, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: unknown },
+          { id: 9002, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: unknown },
+          { id: 9003, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: unknown },
+          { id: 9004, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: unknown },
+          { id: 9005, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: notOpen },
+          { id: 9006, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: notOpen },
+          { id: 9007, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: notOpen },
           { id: 9008, ok: true },
         ])
         expect(events).toEqual([])

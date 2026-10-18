@@ -9,6 +9,7 @@ import {
   type AllowedCall,
   type ServerMethod,
 } from '@/main/servers/allowlist'
+import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { SERVER_GONE, SERVER_METHODS } from '@/shared/protocol'
 
 export const CALL_TIMEOUT_MS = 10_000
@@ -107,12 +108,15 @@ export const fetchThrough =
 
 const headersFor = ({ body }: { body: string | null }): Record<string, string> =>
   body === null
-    ? { accept: 'application/json' }
-    : { accept: 'application/json', 'content-type': 'application/json' }
+    ? { [HTTP_HEADERS.accept]: 'application/json' }
+    : {
+        [HTTP_HEADERS.accept]: 'application/json',
+        [HTTP_HEADERS.contentType]: 'application/json',
+      }
 
 /** How many characters of a call's reply main reads. */
 export const replyCapFor = (call: AllowedCall): number =>
-  call.name === 'getSagas' ? MAX_SAGAS_REPLY_CHARS : MAX_REPLY_CHARS
+  call.name === CALL_NAMES.getSagas ? MAX_SAGAS_REPLY_CHARS : MAX_REPLY_CHARS
 
 const reasonOf = (error: unknown): string => (error instanceof Error ? error.message : 'unknown')
 

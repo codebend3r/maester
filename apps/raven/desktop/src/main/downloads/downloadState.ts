@@ -11,7 +11,13 @@ import {
   oneOf,
   union,
 } from '@raven/core'
-import { isContainerName, isDownloadGroup, isOpaqueId, isSidecarTrackId } from '@/shared/protocol'
+import {
+  DOWNLOAD_STATUS_KINDS,
+  isContainerName,
+  isDownloadGroup,
+  isOpaqueId,
+  isSidecarTrackId,
+} from '@/shared/protocol'
 
 export const DOWNLOADS_FILE = 'downloads.json'
 
@@ -35,21 +41,42 @@ const isPending = object({
 })
 
 /** Why a download waits paused: the viewer paused it, or the queue did for the disk, a relock or an outage. */
-const isPauseReason = oneOf(['viewer', 'noSpace', 'relocked', 'unreachable'])
+export const PAUSE_REASONS = {
+  viewer: 'viewer',
+  noSpace: 'noSpace',
+  relocked: 'relocked',
+  unreachable: 'unreachable',
+} as const
+
+const isPauseReason = oneOf(Object.values(PAUSE_REASONS))
 
 /** Why a download failed. Only `other` has words of its own, kept in the status's `message`. */
-const isFailReason = oneOf(['noSpace', 'changed', 'unauthorized', 'unreachable', 'gone', 'other'])
+export const FAIL_REASONS = {
+  noSpace: 'noSpace',
+  changed: 'changed',
+  unauthorized: 'unauthorized',
+  unreachable: 'unreachable',
+  gone: 'gone',
+  other: 'other',
+} as const
+
+const isFailReason = oneOf(Object.values(FAIL_REASONS))
 
 /**
  * A download's status as `downloads.json` keeps it: why it stopped is a reason, and the page's
  * words are built from it when the page reads it, so renaming a server changes no reason.
  */
 const isEntryStatus = union(
-  object({ kind: oneOf(['queued']) }),
-  object({ kind: oneOf(['downloading']), bytes: isNumber }),
-  object({ kind: oneOf(['paused']), bytes: isNumber, reason: isPauseReason }),
-  object({ kind: oneOf(['failed']), bytes: isNumber, reason: isFailReason, message: isString }),
-  object({ kind: oneOf(['ready']) }),
+  object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.queued]) }),
+  object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.downloading]), bytes: isNumber }),
+  object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.paused]), bytes: isNumber, reason: isPauseReason }),
+  object({
+    kind: oneOf([DOWNLOAD_STATUS_KINDS.failed]),
+    bytes: isNumber,
+    reason: isFailReason,
+    message: isString,
+  }),
+  object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.ready]) }),
 )
 
 export const isDownloadEntry = object({
@@ -121,13 +148,13 @@ export const entryByMedia = (
 export const bytesOf = (entry: DownloadEntry): number => {
   const { status } = entry
   switch (status.kind) {
-    case 'queued':
+    case DOWNLOAD_STATUS_KINDS.queued:
       return 0
-    case 'ready':
+    case DOWNLOAD_STATUS_KINDS.ready:
       return entry.size
-    case 'downloading':
-    case 'paused':
-    case 'failed':
+    case DOWNLOAD_STATUS_KINDS.downloading:
+    case DOWNLOAD_STATUS_KINDS.paused:
+    case DOWNLOAD_STATUS_KINDS.failed:
       return status.bytes
     default: {
       const unreachable: never = status
@@ -185,12 +212,14 @@ export const start = (
     downloadId,
     change: (entry) => {
       switch (entry.status.kind) {
-        case 'queued':
-          return withStatus(entry, { status: { kind: 'downloading', bytes: 0 } })
-        case 'paused':
-        case 'failed':
-        case 'downloading':
-        case 'ready':
+        case DOWNLOAD_STATUS_KINDS.queued:
+          return withStatus(entry, {
+            status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 },
+          })
+        case DOWNLOAD_STATUS_KINDS.paused:
+        case DOWNLOAD_STATUS_KINDS.failed:
+        case DOWNLOAD_STATUS_KINDS.downloading:
+        case DOWNLOAD_STATUS_KINDS.ready:
           return entry
         default: {
           const unreachable: never = entry.status
@@ -207,17 +236,20 @@ export const advance = (
   changeEntry(state, {
     downloadId,
     change: (entry) =>
-      entry.status.kind === 'downloading' && entry.status.bytes !== bytes
-        ? withStatus(entry, { status: { kind: 'downloading', bytes } })
+      entry.status.kind === DOWNLOAD_STATUS_KINDS.downloading && entry.status.bytes !== bytes
+        ? withStatus(entry, { status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes } })
         : entry,
   })
 
 const isPausable = (entry: DownloadEntry): boolean =>
-  entry.status.kind === 'queued' || entry.status.kind === 'downloading'
+  entry.status.kind === DOWNLOAD_STATUS_KINDS.queued ||
+  entry.status.kind === DOWNLOAD_STATUS_KINDS.downloading
 
 const paused = (entry: DownloadEntry, { reason }: { reason: PauseReason }): DownloadEntry =>
   isPausable(entry)
-    ? withStatus(entry, { status: { kind: 'paused', bytes: bytesOf(entry), reason } })
+    ? withStatus(entry, {
+        status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: bytesOf(entry), reason },
+      })
     : entry
 
 export const pause = (
@@ -241,7 +273,8 @@ export const pauseServer = (
 
 /** Whether a file waits on an outage, which the queue tries again on its own. */
 export const isWaitingOnOutage = ({ status }: DownloadEntry): boolean =>
-  (status.kind === 'paused' || status.kind === 'failed') && status.reason === 'unreachable'
+  (status.kind === DOWNLOAD_STATUS_KINDS.paused || status.kind === DOWNLOAD_STATUS_KINDS.failed) &&
+  status.reason === PAUSE_REASONS.unreachable
 
 /**
  * The viewer's Pause all: what runs or waits pauses, and so does what waits on an outage, or
@@ -254,7 +287,13 @@ export const pauseEverything = (state: DownloadsState): DownloadsState => {
     ...state,
     entries: state.entries.map((entry) =>
       isTouched(entry)
-        ? withStatus(entry, { status: { kind: 'paused', bytes: bytesOf(entry), reason: 'viewer' } })
+        ? withStatus(entry, {
+            status: {
+              kind: DOWNLOAD_STATUS_KINDS.paused,
+              bytes: bytesOf(entry),
+              reason: PAUSE_REASONS.viewer,
+            },
+          })
         : entry,
     ),
   }
@@ -267,8 +306,9 @@ export const resume = (
   changeEntry(state, {
     downloadId,
     change: (entry) =>
-      entry.status.kind === 'paused' || entry.status.kind === 'failed'
-        ? withStatus(entry, { status: { kind: 'queued' } })
+      entry.status.kind === DOWNLOAD_STATUS_KINDS.paused ||
+      entry.status.kind === DOWNLOAD_STATUS_KINDS.failed
+        ? withStatus(entry, { status: { kind: DOWNLOAD_STATUS_KINDS.queued } })
         : entry,
   })
 
@@ -284,10 +324,10 @@ export const fail = (
   changeEntry(state, {
     downloadId,
     change: (entry) =>
-      entry.status.kind === 'ready'
+      entry.status.kind === DOWNLOAD_STATUS_KINDS.ready
         ? entry
         : withStatus(entry, {
-            status: { kind: 'failed', bytes: bytesOf(entry), reason, message },
+            status: { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: bytesOf(entry), reason, message },
           }),
   })
 
@@ -298,7 +338,9 @@ export const finish = (
   changeEntry(state, {
     downloadId,
     change: (entry) =>
-      entry.status.kind === 'ready' ? entry : withStatus(entry, { status: { kind: 'ready' } }),
+      entry.status.kind === DOWNLOAD_STATUS_KINDS.ready
+        ? entry
+        : withStatus(entry, { status: { kind: DOWNLOAD_STATUS_KINDS.ready } }),
   })
 
 /** Whether the server has yet to hear something of this download or owed item. */

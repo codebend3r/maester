@@ -1,0 +1,15 @@
+export const HTTP_HEADERS = {
+  accept: 'accept',
+  acceptRanges: 'accept-ranges',
+  allow: 'allow',
+  cacheControl: 'cache-control',
+  contentLength: 'content-length',
+  contentRange: 'content-range',
+  contentSecurityPolicy: 'content-security-policy',
+  contentType: 'content-type',
+  contentTypeOptions: 'x-content-type-options',
+  link: 'link',
+  range: 'range',
+  setCookie: 'set-cookie',
+  userAgent: 'user-agent',
+} as const

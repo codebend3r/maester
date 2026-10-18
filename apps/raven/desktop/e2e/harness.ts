@@ -265,7 +265,7 @@ export const openUrl = async ({ app, url }: { app: ElectronApplication; url: str
 const TRUST_PROMPTS_KEY = 'ravenE2eTrustPrompts'
 
 /** How a test answers main's trust sheet. */
-const TRUST_ANSWERS = { add: 'add', cancel: 'cancel' } as const
+export const TRUST_ANSWERS = { add: 'add', cancel: 'cancel' } as const
 
 type TrustAnswer = (typeof TRUST_ANSWERS)[keyof typeof TRUST_ANSWERS]
 

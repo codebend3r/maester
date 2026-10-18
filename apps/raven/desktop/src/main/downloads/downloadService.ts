@@ -10,6 +10,7 @@ import {
 import {
   bytesOf,
   entryById,
+  PAUSE_REASONS,
   setAutoDelete,
   setAutoDeleteDefault,
   sortDownloads,
@@ -29,7 +30,15 @@ import { errorText } from '@/main/log/errorText'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { serverById } from '@/main/servers/serverList'
 import type { Timers } from '@/main/stateStore'
-import type { DesktopEvent, DesktopReply, DownloadStatus, DownloadView } from '@/shared/protocol'
+import {
+  DESKTOP_EVENTS,
+  DESKTOP_REPLIES,
+  DOWNLOAD_STATUS_KINDS,
+  type DesktopEvent,
+  type DesktopReply,
+  type DownloadStatus,
+  type DownloadView,
+} from '@/shared/protocol'
 
 /** The `downloads` event goes out at most once in this long, so progress cannot flood the page. */
 export const DOWNLOADS_EVENT_MS = 250
@@ -106,9 +115,9 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
   }
 
 /** The list as both the `downloads` reply and the `downloads` event carry it. */
-type DownloadsList = Extract<DesktopEvent, { type: 'downloads' }>
+type DownloadsList = Extract<DesktopEvent, { type: typeof DESKTOP_EVENTS.downloads }>
 
-const refused = (message: string): DesktopReply => ({ type: 'refused', message })
+const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
 
 /** A stored status as the page reads it: its reason in words, named by the server's name now. */
 export const viewStatusOf = ({
@@ -119,19 +128,19 @@ export const viewStatusOf = ({
   serverName: string
 }): DownloadStatus => {
   switch (status.kind) {
-    case 'queued':
-    case 'downloading':
-    case 'ready':
+    case DOWNLOAD_STATUS_KINDS.queued:
+    case DOWNLOAD_STATUS_KINDS.downloading:
+    case DOWNLOAD_STATUS_KINDS.ready:
       return status
-    case 'paused':
+    case DOWNLOAD_STATUS_KINDS.paused:
       return {
-        kind: 'paused',
+        kind: DOWNLOAD_STATUS_KINDS.paused,
         bytes: status.bytes,
         message: pausedMessage({ reason: status.reason, serverName }),
       }
-    case 'failed':
+    case DOWNLOAD_STATUS_KINDS.failed:
       return {
-        kind: 'failed',
+        kind: DOWNLOAD_STATUS_KINDS.failed,
         bytes: status.bytes,
         message: failedMessage({ reason: status.reason, message: status.message, serverName }),
       }
@@ -187,12 +196,14 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         autoDelete: entry.autoDelete,
         watched: playback.watchedOf(entry),
         deletesAt: deleteClock.deletesAt({ downloadId: entry.downloadId }),
-        needsUnlock: entry.status.kind === 'paused' && entry.status.reason === 'relocked',
+        needsUnlock:
+          entry.status.kind === DOWNLOAD_STATUS_KINDS.paused &&
+          entry.status.reason === PAUSE_REASONS.relocked,
       }
     })
 
   const list = (): DownloadsList => ({
-    type: 'downloads',
+    type: DESKTOP_EVENTS.downloads,
     downloads: views(),
     autoDeleteDefault: store.read().autoDeleteDefault,
   })
@@ -217,7 +228,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   }
 
   const notice = (message: string): void => {
-    if (!isDisposed) deps.send({ type: 'notice', message })
+    if (!isDisposed) deps.send({ type: DESKTOP_EVENTS.notice, message })
   }
 
   const sync = createSync({ store, calls: deps.calls, timers: deps.timers, warn: deps.warn })
@@ -280,7 +291,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     onAwake: () => deleteClock.rearm(),
     onFailed: (entry) => {
       const { status } = entry
-      if (status.kind !== 'failed') return
+      if (status.kind !== DOWNLOAD_STATUS_KINDS.failed) return
       const why = failedMessage({
         reason: status.reason,
         message: status.message,
@@ -398,7 +409,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
       dir: downloadsDirFor({ userData: deps.userData }),
     })
     const used = store.read().entries.reduce((sum, entry) => sum + bytesOf(entry), 0)
-    return { type: 'space', space: { free, total, used } }
+    return { type: DESKTOP_REPLIES.space, space: { free, total, used } }
   }
 
   const setDefaults: DownloadService['setDefaults'] = ({ autoDelete }) => {
@@ -410,7 +421,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     const dir = downloadsDirFor({ userData: deps.userData })
     await deps.space.mkdir(dir)
     deps.showItemInFolder(dir)
-    return { type: 'done' }
+    return { type: DESKTOP_REPLIES.done }
   }
 
   const dispose = (): void => {
@@ -439,7 +450,9 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   // network, so the server hears what was watched before the file goes.
   const resumeLaunch = async (): Promise<void> => {
     await Promise.all([queue.sweep({ wasSetAside: deps.wasSetAside }), deps.ready])
-    playback.readFiles(store.read().entries.filter(({ status }) => status.kind === 'ready'))
+    playback.readFiles(
+      store.read().entries.filter(({ status }) => status.kind === DOWNLOAD_STATUS_KINDS.ready),
+    )
     queue.retryOutages()
     await Promise.all([startClocks(), sync.runAll()])
   }

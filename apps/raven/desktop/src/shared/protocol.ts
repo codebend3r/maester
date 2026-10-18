@@ -80,7 +80,15 @@ export const isContainerName = (value: unknown): value is string =>
 export const isSidecarTrackId = (value: unknown): value is string =>
   isString(value) && /^external-\d+$/u.test(value)
 
-export const isDownloadKind = oneOf(['movie', 'episode', 'season', 'show', 'saga'])
+export const DOWNLOAD_KINDS = {
+  movie: 'movie',
+  episode: 'episode',
+  season: 'season',
+  show: 'show',
+  saga: 'saga',
+} as const
+
+export const isDownloadKind = oneOf(Object.values(DOWNLOAD_KINDS))
 
 export type DownloadKind = Infer<typeof isDownloadKind>
 
@@ -98,20 +106,34 @@ export const isDownloadGroup = object({
 
 export type DownloadGroup = Infer<typeof isDownloadGroup>
 
+export const DOWNLOAD_STATUS_KINDS = {
+  queued: 'queued',
+  downloading: 'downloading',
+  paused: 'paused',
+  failed: 'failed',
+  ready: 'ready',
+} as const
+
 export const isDownloadStatus = union(
-  object({ kind: oneOf(['queued']) }),
-  object({ kind: oneOf(['downloading']), bytes: isNumber }),
-  object({ kind: oneOf(['paused']), bytes: isNumber, message: nullable(isString) }),
-  object({ kind: oneOf(['failed']), bytes: isNumber, message: isString }),
-  object({ kind: oneOf(['ready']) }),
+  object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.queued]) }),
+  object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.downloading]), bytes: isNumber }),
+  object({
+    kind: oneOf([DOWNLOAD_STATUS_KINDS.paused]),
+    bytes: isNumber,
+    message: nullable(isString),
+  }),
+  object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.failed]), bytes: isNumber, message: isString }),
+  object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.ready]) }),
 )
 
 export type DownloadStatus = Infer<typeof isDownloadStatus>
 
+export const DOWNLOAD_ASK_KINDS = { ready: 'ready', locked: 'locked', hidden: 'hidden' } as const
+
 /** What the download dialog shows: the files to fetch, or the lock to lift before main can list them. */
 export const isDownloadAskStatus = union(
   object({
-    kind: oneOf(['ready']),
+    kind: oneOf([DOWNLOAD_ASK_KINDS.ready]),
     title: isString,
     downloadKind: isDownloadKind,
     files: isNumber,
@@ -119,8 +141,8 @@ export const isDownloadAskStatus = union(
     free: isNumber,
     fits: isBoolean,
   }),
-  object({ kind: oneOf(['locked']) }),
-  object({ kind: oneOf(['hidden']) }),
+  object({ kind: oneOf([DOWNLOAD_ASK_KINDS.locked]) }),
+  object({ kind: oneOf([DOWNLOAD_ASK_KINDS.hidden]) }),
 )
 
 export type DownloadAskStatus = Infer<typeof isDownloadAskStatus>

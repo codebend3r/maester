@@ -7,7 +7,7 @@ import { useDesktop } from '@/renderer/stores/desktop'
 import { useUpdateNotice } from '@/renderer/stores/updateNotice'
 import {
   DESKTOP_REPLIES,
-  type DESKTOP_REQUESTS,
+  DESKTOP_REQUESTS,
   type DesktopRequest,
   type UpdateStatus,
 } from '@/shared/protocol'
@@ -58,7 +58,7 @@ export const Updates = ({ className }: { className?: string }) => {
   const read = useQuery({
     queryKey: UPDATES_KEY,
     queryFn: async (): Promise<UpdateStatus> => {
-      const reply = await client.request({ type: 'readUpdates' })
+      const reply = await client.request({ type: DESKTOP_REQUESTS.readUpdates })
       if (reply.type === DESKTOP_REPLIES.updates) return reply.status
       throw new Error(reply.type === DESKTOP_REPLIES.refused ? reply.message : UNREADABLE)
     },
@@ -92,7 +92,10 @@ export const Updates = ({ className }: { className?: string }) => {
     lastPick.current += 1
     const pick = lastPick.current
     setPicked(isEnabled)
-    await send({ request: { type: 'setUpdateCheck', isEnabled }, fallback: UNCHANGED })
+    await send({
+      request: { type: DESKTOP_REQUESTS.setUpdateCheck, isEnabled },
+      fallback: UNCHANGED,
+    })
     if (pick === lastPick.current) setPicked(null)
   }
 
@@ -100,7 +103,10 @@ export const Updates = ({ className }: { className?: string }) => {
     if (isCheckingNow.current) return
     isCheckingNow.current = true
     setIsChecking(true)
-    const isAnswered = await send({ request: { type: 'checkForUpdates' }, fallback: UNCHECKED })
+    const isAnswered = await send({
+      request: { type: DESKTOP_REQUESTS.checkForUpdates },
+      fallback: UNCHECKED,
+    })
     isCheckingNow.current = false
     setIsChecking(false)
     if (!isAnswered) return
@@ -110,7 +116,7 @@ export const Updates = ({ className }: { className?: string }) => {
 
   const openRelease = async () => {
     setRefusal('')
-    const reply = await client.request({ type: 'openRelease' }).catch(() => null)
+    const reply = await client.request({ type: DESKTOP_REQUESTS.openRelease }).catch(() => null)
     // The page is open now, so the Shell's notice has said what it had to.
     if (reply !== null && reply.type === DESKTOP_REPLIES.done) return hideUpdate()
     setRefusal(reply !== null && reply.type === DESKTOP_REPLIES.refused ? reply.message : UNOPENED)
