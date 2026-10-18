@@ -103,7 +103,7 @@ Any other origin gets no CORS headers, so a foreign page cannot read the bytes.
 - `createApiClient` takes `mediaBaseUrl` beside `baseUrl` (default: `baseUrl`). `streamUrl`, `fileUrl`, `thumbnailUrl` and the subtitles call build on it and take a `ticket` that becomes `t=`.
 - `useMediaSource` passes the picked origin and the current ticket.
 - `WatchPage`'s "open in VLC/IINA" link uses the media origin and a ticket, so it works outside the browser too.
-- The desktop app passes nothing new and keeps today's behaviour.
+- The desktop's downloads fetch through the media plane; see the downloads spec, `2026-10-17-raven-desktop-downloads-design.md`. Its streaming passes nothing new and keeps today's behaviour.
 
 ### Netlify
 
