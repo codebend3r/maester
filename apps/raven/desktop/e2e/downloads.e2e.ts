@@ -31,6 +31,7 @@ import {
   isDownloadsState,
 } from '@/main/downloads/downloadState'
 import { entryDirFor, partPathFor, videoPathFor } from '@/main/downloads/space'
+import { DESKTOP_REPLIES, DESKTOP_REQUESTS, SERVER_METHODS } from '@/shared/protocol'
 
 const PIN = '3001'
 const LOCKED: FixtureMode = { pin: PIN, isLocked: true, admin: { kind: 'off' } }
@@ -49,8 +50,8 @@ const LATE_REPORT_WAIT_MS = 20_000
 const NOTICE_WAIT_MS = 10_000
 const MINUTE_MS = 60_000
 // What a download played offline owes its server: the play, then where it stopped.
-const PLAYED = { method: 'POST', path: '/api/media/1/plays' } as const
-const SAVED = { method: 'PUT', path: '/api/media/1/progress' } as const
+const PLAYED = { method: SERVER_METHODS.post, path: '/api/media/1/plays' } as const
+const SAVED = { method: SERVER_METHODS.put, path: '/api/media/1/progress' } as const
 // Two launches, a hang and a late report.
 const OFFLINE_TEST_MS = 120_000
 
@@ -109,7 +110,7 @@ const fileFetches = ({
 }: {
   requests: readonly FixtureRequest[]
   mediaId: number
-}) => requestsTo({ requests, method: 'GET', path: `/api/media/${mediaId}/file` })
+}) => requestsTo({ requests, method: SERVER_METHODS.get, path: `/api/media/${mediaId}/file` })
 
 /** A request a media origin takes: a ticket and no cookie of any kind. */
 const isTicketOnly = ({ hasTicket, hasUnlock, hasAdmin, hasOtherCookie }: FixtureRequest) =>
@@ -249,8 +250,8 @@ const expectReady = async ({ page, label, size }: { page: Page; label: string; s
 }
 
 const serverIdOf = async ({ page }: { page: Page }): Promise<string> => {
-  const reply = await requestFromPage({ page, request: { type: 'listServers' } })
-  const [server] = reply !== null && reply.type === 'servers' ? reply.servers : []
+  const reply = await requestFromPage({ page, request: { type: DESKTOP_REQUESTS.listServers } })
+  const [server] = reply !== null && reply.type === DESKTOP_REPLIES.servers ? reply.servers : []
   if (server === undefined) throw new Error('raven player keeps no server.')
   return server.serverId
 }
@@ -303,7 +304,7 @@ test.describe.serial('downloading through a media origin', () => {
     expect(files.every(isTicketOnly)).toBe(true)
     const sidecars = requestsTo({
       requests: fixture.elsewhere.requests,
-      method: 'GET',
+      method: SERVER_METHODS.get,
       path: '/api/media/1/subtitles/external-0',
     })
     expect(sidecars.length).toBeGreaterThan(0)
@@ -311,7 +312,7 @@ test.describe.serial('downloading through a media origin', () => {
     // The ticket came from the server itself, behind the PIN; the file never did.
     const tickets = requestsTo({
       requests: fixture.requests,
-      method: 'GET',
+      method: SERVER_METHODS.get,
       path: '/api/media/1/ticket',
     })
     expect(tickets.length).toBeGreaterThan(0)
@@ -533,7 +534,11 @@ test.describe.serial('downloading through the server', () => {
     expect(files.length).toBeGreaterThan(0)
     expect(files.every(({ hasUnlock, hasTicket }) => hasUnlock && !hasTicket)).toBe(true)
     expect(
-      requestsTo({ requests: fixture.requests, method: 'GET', path: '/api/media/1/ticket' }),
+      requestsTo({
+        requests: fixture.requests,
+        method: SERVER_METHODS.get,
+        path: '/api/media/1/ticket',
+      }),
     ).toEqual([])
     expect(routesOf(fixture.elsewhere.requests)).toEqual([])
   })

@@ -796,9 +796,9 @@ export const startFixtureServer = async ({
     request: IncomingMessage
     response: ServerResponse
   }): (() => void) | null => {
-    if (request.method !== 'GET') return null
+    if (request.method !== SERVER_METHODS.get) return null
     const { pathname, query } = partsOf(request.url ?? '')
-    if (pathname === '/api/media-origins') {
+    if (pathname === API_PATHS.mediaOrigins) {
       const origins = mediaPlane ? [{ kind: 'lan', url: elsewhere.origin }] : []
       return () => sendJson({ response, status: 200, body: { origins } })
     }
@@ -826,7 +826,7 @@ export const startFixtureServer = async ({
     request: IncomingMessage
     response: ServerResponse
   }) => {
-    if (!mediaPlane || request.method !== 'GET') return sendMissing(response)
+    if (!mediaPlane || request.method !== SERVER_METHODS.get) return sendMissing(response)
     const { pathname, query } = partsOf(request.url ?? '')
     if (pathname === PING_PATH) return sendPing({ response, query })
     const route = MEDIA_PLANE_ROUTE.exec(pathname)
