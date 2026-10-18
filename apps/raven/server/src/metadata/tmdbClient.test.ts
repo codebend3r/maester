@@ -97,7 +97,7 @@ describe('TmdbClient', () => {
     expect(tmdb.state.calls.at(-1)).toContain('include_image_language=en%2Cnull')
   })
 
-  it('lists every PNG logo for Edit images, passing over an SVG, and none for a show', async () => {
+  it("lists every PNG logo for Edit images, a movie's or a show's, passing over an SVG", async () => {
     const tmdb = fakeTmdb({
       movies: [{ id: 603, title: 'The Matrix', released: '1999-03-31' }],
       shows: [{ id: 1399, title: 'Game of Thrones', first: '2011-04-17', seasons: {} }],
@@ -109,7 +109,21 @@ describe('TmdbClient', () => {
       ['/logo603.png', 'en'],
       ['/logo603-plain.png', null],
     ])
-    expect((await client.images({ type: 'show', tmdbId: '1399' })).logo).toEqual([])
+    expect(
+      (await client.images({ type: 'show', tmdbId: '1399' })).logo.map((logo) => logo.path),
+    ).toEqual(['/logo1399-fr.png', '/logo1399.png', '/logo1399-plain.png'])
+  })
+
+  it("reads a show's logo with the show, or alone for a show stored before", async () => {
+    const tmdb = fakeTmdb({
+      movies: [],
+      shows: [{ id: 1399, title: 'Game of Thrones', first: '2011-04-17', seasons: {} }],
+    })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    expect((await client.show('1399')).images.logo).toBe('/logo1399.png')
+    expect(tmdb.state.calls.at(-1)).toContain('include_image_language=en%2Cnull')
+    expect(await client.showLogo('1399')).toBe('/logo1399.png')
+    expect(new URL(tmdb.state.calls.at(-1) ?? '').pathname).toBe('/3/tv/1399/images')
   })
 
   it('takes a logo with no language when none is in the language, and never an SVG', () => {
@@ -357,7 +371,7 @@ describe('toShow and toSeason', () => {
   }
 
   it('reads a show with its creator, aggregate credits, rating and network', () => {
-    const parsed = toShow({ body: showBody(show), country: 'GB' })
+    const parsed = toShow({ body: showBody(show), country: 'GB', language: 'en' })
     expect(parsed).toMatchObject({
       type: 'show',
       tmdbId: '95396',
@@ -380,7 +394,8 @@ describe('toShow and toSeason', () => {
 
   it('leaves a show that still airs without an end', () => {
     expect(
-      toShow({ body: showBody({ ...show, last: undefined }), country: 'US' })?.ended,
+      toShow({ body: showBody({ ...show, last: undefined }), country: 'US', language: 'en' })
+        ?.ended,
     ).toBeNull()
   })
 

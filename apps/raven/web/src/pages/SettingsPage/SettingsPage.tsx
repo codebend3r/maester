@@ -28,9 +28,9 @@ type Choices<V extends string | number> = Record<V, { label: string; hint: strin
 const TITLES: Choices<DisplaySettings['titles']> = {
   logo: {
     label: 'Logo',
-    hint: 'A movie’s page shows its title as TMDB’s logo art where it has one, else in words.',
+    hint: 'A movie’s or show’s page shows its title as TMDB’s logo art where it has one, else in words.',
   },
-  text: { label: 'Text', hint: 'Every movie’s page spells its title out in type.' },
+  text: { label: 'Text', hint: 'Every movie’s and show’s page spells its title out in type.' },
 }
 
 const DIRECT_PLAY: Choices<PlaybackSettings['directPlay']> = {

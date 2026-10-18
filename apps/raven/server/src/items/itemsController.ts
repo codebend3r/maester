@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Headers,
   HttpCode,
@@ -21,6 +22,7 @@ import {
   ITEM_IMAGE_KINDS,
   ITEM_TYPES,
   type ImageOption,
+  isFavouriteChange,
   isImageChoice,
   isItemImageKind,
   isItemMetadataChange,
@@ -34,7 +36,7 @@ import {
   type MediaItem,
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
-import { AdminOnly } from '@/admin/adminGuard'
+import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { RAVEN_HEADERS } from '@/http'
 import { isChoosableImageKind } from '@/items/imageKinds'
 import { itemChildren } from '@/items/itemChildren'
@@ -42,7 +44,9 @@ import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
+import { FAVOURITE_OUTCOMES } from '@/media/favouriteOutcomes'
 import { MediaRepository } from '@/media/mediaRepository'
+import { TitleFavourites } from '@/media/titleFavourites'
 import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
 import { ItemImagesRepository, STORED_IMAGE_SOURCES } from '@/metadata/itemImagesRepository'
 import { ItemOverrides } from '@/metadata/itemOverrides'
@@ -67,6 +71,7 @@ export class ItemsController {
     @Inject(TmdbClient) private readonly tmdb: TmdbClient,
     @Inject(LockService) private readonly lock: LockService,
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
+    @Inject(TitleFavourites) private readonly titleFavourites: TitleFavourites,
   ) {}
 
   private requireItem(id: number): void {
@@ -86,6 +91,7 @@ export class ItemsController {
         tmdbId: details.tmdbId,
         sees: (libraryId) => viewer.seesLibrary(libraryId),
       }),
+      favourite: this.titleFavourites.favouriteOf(id),
       versions: this.media.forItem(id).filter((item) => viewer.seesLibrary(item.libraryId)),
       children: itemChildren({ parentId: id, viewer, metadata: this.metadata, media: this.media }),
     }
@@ -119,6 +125,30 @@ export class ItemsController {
       })
     if (moved == null) throw new NotFoundException('TMDB has no show with that id.')
     return this.details({ id: moved, cookie })
+  }
+
+  /** Marks a show or season a favourite, or not; a movie's or episode's files are favourites instead. */
+  @ForViewers()
+  @Put(':id/favourite')
+  setFavourite(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+  ): ItemDetails {
+    if (!isFavouriteChange(body)) throw new BadRequestException('favourite must be true or false')
+    const outcome = this.titleFavourites.set({ itemId: id, favourite: body.favourite })
+    switch (outcome) {
+      case FAVOURITE_OUTCOMES.done:
+        return this.details({ id, cookie })
+      case FAVOURITE_OUTCOMES.missing:
+        throw new NotFoundException(`No show or season ${id}`)
+      case FAVOURITE_OUTCOMES.locked:
+        throw new ForbiddenException('A locked library’s shows cannot be favourites.')
+      default: {
+        const unknown: never = outcome
+        return unknown
+      }
+    }
   }
 
   @Get(':id')
@@ -218,9 +248,8 @@ export class ItemsController {
   }
 
   /**
-   * Edit images: every poster and backdrop a movie or show could show, and
-   * every logo a movie could, the one beside the media first, then TMDB's,
-   * with the current one marked.
+   * Edit images: every poster, backdrop and logo a movie or show could show,
+   * the one beside the media first, then TMDB's, with the current one marked.
    */
   @AdminOnly()
   @Get(':id/images')
@@ -274,8 +303,7 @@ export class ItemsController {
     return {
       poster: options(ITEM_IMAGE_KINDS.poster),
       backdrop: options(ITEM_IMAGE_KINDS.backdrop),
-      // A show's page shows no logo, so it has none to choose.
-      logo: type === ITEM_TYPES.movie ? options(ITEM_IMAGE_KINDS.logo) : [],
+      logo: options(ITEM_IMAGE_KINDS.logo),
     }
   }
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   type AdminLock,
@@ -183,6 +183,26 @@ describe('MoviePage', () => {
     await userEvent.click(heart)
     set.mockRestore()
     expect(calls).toEqual([{ id: 7, favourite: false }])
+  })
+
+  it('has no heart in a locked library, but keeps one to unmark a favourite left there', async () => {
+    const locked = library({
+      id: 2,
+      name: 'Films',
+      settings: { ...library().settings, locked: true },
+    })
+    open({ details: itemDetails({ versions: [matchedMovie()] }), libraries: [locked] })
+    await screen.findByRole('heading', { level: 1, name: 'Busboys' })
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Favourite' })).toBeNull())
+    cleanup()
+    open({
+      details: itemDetails({ versions: [matchedMovie({ favourite: true })] }),
+      libraries: [locked],
+    })
+    expect(await screen.findByRole('button', { name: 'Favourite' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
   })
 
   it('describes untagged audio without a language', async () => {

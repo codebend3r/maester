@@ -66,6 +66,37 @@ describe('ShowPage', () => {
     )
   })
 
+  it("shows the title as the show's logo", async () => {
+    open({ details: { ...SEVERANCE, logoVersion: 'abc' } })
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Severance' })
+    expect(heading.querySelector('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('/api/items/4/images/logo'),
+    )
+  })
+
+  it('marks the show a favourite from its heart, before the server answers', async () => {
+    const answer = Promise.withResolvers<ItemDetails>()
+    const mark = spyOn(api, 'setItemFavourite').mockImplementation(() => answer.promise)
+    open({ details: { ...SEVERANCE, favourite: false } })
+    const heart = await screen.findByRole('button', { name: 'Favourite' })
+    expect(heart).toHaveAttribute('aria-pressed', 'false')
+    await userEvent.click(heart)
+    expect(mark.mock.calls).toEqual([[{ id: 4, favourite: true }]])
+    expect(screen.getByRole('button', { name: 'Favourite' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    answer.resolve({ ...SEVERANCE, favourite: true })
+    mark.mockRestore()
+  })
+
+  it('has no heart for a show only a locked library holds', async () => {
+    open({ details: { ...SEVERANCE, favourite: null } })
+    await screen.findByRole('heading', { level: 1, name: 'Severance' })
+    expect(screen.queryByRole('button', { name: 'Favourite' })).toBeNull()
+  })
+
   it('plays a random episode of the show on Shuffle', async () => {
     spies.random.mockImplementation(async () => EPISODE_ONE)
     open()

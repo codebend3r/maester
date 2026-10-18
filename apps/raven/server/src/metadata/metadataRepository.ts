@@ -3,6 +3,7 @@ import {
   type Credit,
   isCreditJob,
   isItemType,
+  isMatchItemType,
   isRatingSource,
   isStringArray,
   ITEM_IMAGE_KINDS,
@@ -10,6 +11,7 @@ import {
   type ItemDetails,
   type ItemSummary,
   type ItemType,
+  type MatchItemType,
   type PersonDetails,
   type Rating,
   RATING_KINDS,
@@ -521,18 +523,23 @@ export class MetadataRepository {
   }
 
   /**
-   * Movies stored before raven kept sagas or logos, which have yet to learn
-   * them. Items raven made up are never fetched, so none of them is listed.
+   * Movies stored before raven kept sagas or logos, and shows stored before
+   * it kept logos, which have yet to learn them. Items raven made up are
+   * never fetched, so none of them is listed.
    */
-  extrasUnchecked(): Array<{ id: number; tmdbId: string }> {
+  extrasUnchecked(): Array<{ id: number; type: MatchItemType; tmdbId: string }> {
     return this.db
-      .prepare<[string], { id: number; tmdb_id: string }>(
-        `SELECT id, tmdb_id FROM items
-          WHERE type = 'movie' AND (saga_checked = 0 OR logo_checked = 0) AND tmdb_id NOT GLOB ?
+      .prepare<[string], { id: number; type: string; tmdb_id: string }>(
+        `SELECT id, type, tmdb_id FROM items
+          WHERE ((type = 'movie' AND (saga_checked = 0 OR logo_checked = 0))
+                 OR (type = 'show' AND logo_checked = 0))
+            AND tmdb_id NOT GLOB ?
           ORDER BY id`,
       )
       .all(`${LOCAL}*`)
-      .map((row) => ({ id: row.id, tmdbId: row.tmdb_id }))
+      .flatMap((row) =>
+        isMatchItemType(row.type) ? [{ id: row.id, type: row.type, tmdbId: row.tmdb_id }] : [],
+      )
   }
 
   /** Notes the saga a movie belongs to and TMDB's logo for it, or that it has neither. */
@@ -548,8 +555,16 @@ export class MetadataRepository {
     })()
   }
 
-  /** An item's page, apart from its files, its children and the AI note, which the caller adds. */
-  details(id: number): Omit<ItemDetails, 'versions' | 'children' | 'aiMatch'> | null {
+  /** Notes TMDB's logo for a show, or that it has none. */
+  saveShowLogo({ itemId, logo }: { itemId: number; logo: string | null }): void {
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE items SET logo_checked = 1 WHERE id = ?').run(itemId)
+      this.images.setTmdbLogo({ itemId, logo })
+    })()
+  }
+
+  /** An item's page, apart from its files, its children, the AI note and its favourite mark, which the caller adds. */
+  details(id: number): Omit<ItemDetails, 'versions' | 'children' | 'aiMatch' | 'favourite'> | null {
     const row = this.db.prepare<[number], ItemRow>('SELECT * FROM shown_items WHERE id = ?').get(id)
     const summary = this.summaries([id]).get(id)
     if (!row || !summary) return null

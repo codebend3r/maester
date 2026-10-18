@@ -594,12 +594,16 @@ export class MediaRepository {
     }))
   }
 
-  /** Every favourite across every library, or in `libraryId` alone, most recently marked first. */
+  /**
+   * Every favourite across every library, or in `libraryId` alone, most
+   * recently marked first. A locked library's are left out, whether or not
+   * the PIN is entered.
+   */
   listFavourites({ libraryId = null }: { libraryId?: number | null } = {}): MediaItem[] {
     return this.items(
       this.db
         .prepare<{ libraryId: number | null }, MediaRow>(
-          `${SELECT_MEDIA} WHERE f.media_id IS NOT NULL
+          `${SELECT_MEDIA} WHERE f.media_id IS NOT NULL AND l.locked = 0
               AND (@libraryId IS NULL OR m.library_id = @libraryId)
             ORDER BY f.added_at DESC, m.id DESC`,
         )

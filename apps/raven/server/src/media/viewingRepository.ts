@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import type { HistoryEntry } from '@raven/core'
 import { DatabaseService } from '@/db/database'
+import { FAVOURITE_OUTCOMES, type FavouriteOutcome } from '@/media/favouriteOutcomes'
 import { MediaRepository } from '@/media/mediaRepository'
 import { fileWatched } from '@/media/mediaSql'
 
@@ -37,22 +38,30 @@ export class ViewingRepository {
 
   /**
    * Marking a favourite again keeps its original time, so the list does not
-   * reshuffle. False when there is no such video.
+   * reshuffle. A locked library's videos are never marked, whether or not
+   * the PIN is entered, but unmarking always goes through, so a favourite
+   * left behind in a library locked since can still be cleared.
    */
-  setFavourite({ id, favourite }: { id: number; favourite: boolean }): boolean {
+  setFavourite({ id, favourite }: { id: number; favourite: boolean }): FavouriteOutcome {
     return this.db.transaction(() => {
-      if (!this.exists(id)) return false
+      const row = this.db
+        .prepare<[number], { locked: number }>(
+          'SELECT l.locked FROM media m JOIN libraries l ON l.id = m.library_id WHERE m.id = ?',
+        )
+        .get(id)
+      if (!row) return FAVOURITE_OUTCOMES.missing
       if (!favourite) {
         this.db.prepare('DELETE FROM favourites WHERE media_id = ?').run(id)
-        return true
+        return FAVOURITE_OUTCOMES.done
       }
+      if (row.locked) return FAVOURITE_OUTCOMES.locked
       this.db
         .prepare(
           `INSERT INTO favourites (media_id, added_at) VALUES (?, ?)
            ON CONFLICT (media_id) DO NOTHING`,
         )
         .run(id, new Date().toISOString())
-      return true
+      return FAVOURITE_OUTCOMES.done
     })()
   }
 

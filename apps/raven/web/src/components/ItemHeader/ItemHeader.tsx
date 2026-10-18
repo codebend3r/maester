@@ -200,7 +200,7 @@ export const ItemHeader = ({
   /** Left out for a page with no picture beside its title. */
   picture?: HeaderPicture
   backdrop: HeaderBackdrop | null
-  /** The title as art, shown in its place: a movie's logo. */
+  /** The title as art, shown in its place: a movie's or show's logo. */
   logo?: string | null
   /** Where the page goes back to, over the backdrop's top corner. */
   back: BackFallback

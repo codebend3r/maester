@@ -151,7 +151,7 @@ export type FakeShow = {
   seasons: Record<number, FakeEpisode[]>
 }
 
-/** A show as `/tv/{id}` answers with aggregate credits, content ratings and external ids. */
+/** A show as `/tv/{id}` answers with aggregate credits, content ratings, external ids and images. */
 export const showBody = (show: FakeShow): Record<string, unknown> => ({
   id: show.id,
   name: show.title,
@@ -181,6 +181,7 @@ export const showBody = (show: FakeShow): Record<string, unknown> => ({
     tvdb_id: show.tvdbId == null ? null : Number(show.tvdbId),
   },
   content_ratings: { results: [{ iso_3166_1: 'US', rating: 'TV-MA' }] },
+  images: { logos: logosOf(show.id) },
   aggregate_credits: {
     cast: [
       {
@@ -479,7 +480,7 @@ export const fakeTmdb = ({
             picture({ name: 'backdrop', language: null }),
             picture({ name: 'scene', language: 'en' }),
           ],
-          logos: images[1] === TMDB_SEGMENTS.movie ? logosOf(id) : [],
+          logos: logosOf(id),
         },
       })
     }

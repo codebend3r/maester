@@ -71,17 +71,16 @@ export class HomeController {
 
   /**
    * What `?q=` finds in every library, pinned or not, by title: a row for
-   * each library holding a match, and nothing for a blank search. Libraries
-   * still locked stay out.
+   * each library holding a match, and nothing for a blank search. Locked
+   * libraries stay out, whether or not the PIN is entered.
    */
   @Get('search')
-  search(
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
-    @Query('q') q: unknown,
-  ): HomeSearch {
+  search(@Query('q') q: unknown): HomeSearch {
     const search = isString(q) ? q.trim() : ''
     if (!search) return []
-    return this.seenBy(this.lock.viewer({ cookie }))
+    return this.libraries
+      .list()
+      .filter((library) => !library.settings.locked)
       .map((library) => this.shelf({ library, search, sort: 'title', limit: SEARCH_SHELF_SIZE }))
       .filter(
         (shelf) => (shelf.type === HOME_SHELF_TYPES.shows ? shelf.shows : shelf.media).length > 0,

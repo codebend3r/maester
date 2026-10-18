@@ -4,6 +4,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   Inject,
@@ -35,6 +36,7 @@ import { ERROR_CODES, errorMessage } from '@/errorMessage'
 import { RAVEN_CACHE_POLICIES, RAVEN_HEADERS } from '@/http'
 import { sendImage } from '@/items/sendImage'
 import { PrivateBy } from '@/lock/lockGuard'
+import { FAVOURITE_OUTCOMES } from '@/media/favouriteOutcomes'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
@@ -137,10 +139,19 @@ export class MediaController {
       body,
       message: 'favourite must be true or false',
     })
-    if (!this.viewing.setFavourite({ id, favourite })) {
-      throw new NotFoundException(`No media ${id}`)
+    const outcome = this.viewing.setFavourite({ id, favourite })
+    switch (outcome) {
+      case FAVOURITE_OUTCOMES.done:
+        return this.find(id)
+      case FAVOURITE_OUTCOMES.missing:
+        throw new NotFoundException(`No media ${id}`)
+      case FAVOURITE_OUTCOMES.locked:
+        throw new ForbiddenException('A locked library’s videos cannot be favourites.')
+      default: {
+        const unknown: never = outcome
+        return unknown
+      }
     }
-    return this.find(id)
   }
 
   /**

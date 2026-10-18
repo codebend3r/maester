@@ -9,6 +9,7 @@ import {
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { ButtonLink, Icon } from '@raven/ui'
+import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import {
   Dotted,
   ItemHeader,
@@ -34,6 +35,7 @@ import { watchLink } from '@/lib/itemLinks'
 import { plural } from '@/lib/plural'
 import { itemQuery } from '@/lib/queries'
 import { ROUTE_STATES, routeState, useRouteId } from '@/lib/routeQuery'
+import { useItemFavourite } from '@/lib/useItemFavourite'
 import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
@@ -136,6 +138,7 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
     targets: [{ kind: 'item', id: season.id, libraryId: null }],
   })
   const watchedWords = `${watchedCount} of ${count} watched`
+  const favourite = useItemFavourite({ item: season })
   return (
     <SelectionScope
       {...sourceOf(
@@ -171,6 +174,9 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
             <ButtonLink tone="primary" icon="play" {...watchLink({ media: nextFile })}>
               {nextCode ? `Play ${nextCode}` : 'Play'}
             </ButtonLink>
+          )}
+          {season.favourite != null && (
+            <FavouriteButton isFavourite={season.favourite} onToggle={favourite.mutate} />
           )}
           {hasFiles && <ShuffleButton itemId={season.id}>Shuffle season</ShuffleButton>}
           {hasFiles && <ShuffleButton itemId={show.id}>Shuffle show</ShuffleButton>}

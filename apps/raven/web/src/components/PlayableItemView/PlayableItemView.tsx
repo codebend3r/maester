@@ -15,6 +15,7 @@ import { Button, ButtonLink } from '@raven/ui'
 import type { BackFallback } from '@/components/BackButton/BackButton'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { CastRow } from '@/components/CastRow/CastRow'
+import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import {
   type HeaderProgress,
@@ -37,6 +38,7 @@ import { episodeBackPath, inLibrary, itemPath, watchLink } from '@/lib/itemLinks
 import { progressOf } from '@/lib/mediaProgress'
 import { displaySettingsQuery, itemQuery, librariesQuery, tracksQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
+import { useCanFavourite } from '@/lib/useCanFavourite'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import styles from '@/components/PlayableItemView/PlayableItemView.module.scss'
 
@@ -150,6 +152,8 @@ export const PlayableItemView = ({
   const [editingImages, setEditingImages] = useState(false)
   const [editingMetadata, setEditingMetadata] = useState(false)
   const { favourite, watched } = useMediaMutations({ media: primary })
+  // A locked library's videos are never marked, but one marked before it locked can be unmarked.
+  const canFavourite = useCanFavourite(primary.libraryId) || primary.favourite
   const libraries = useQuery(librariesQuery)
   const tracks = useQuery(tracksQuery(primary.id))
   // The neighbours read the show too, so the backdrop costs no request of its own.
@@ -265,13 +269,9 @@ export const PlayableItemView = ({
         <ButtonLink tone="primary" icon="play" to={play.to} state={play.state}>
           {primary.position > 0 ? `Resume from ${formatDuration(primary.position)}` : 'Play'}
         </ButtonLink>
-        <Button
-          icon="heart"
-          aria-label="Favourite"
-          aria-pressed={primary.favourite}
-          className={styles.favourite}
-          onClick={() => favourite.mutate(!primary.favourite)}
-        />
+        {canFavourite && (
+          <FavouriteButton isFavourite={primary.favourite} onToggle={favourite.mutate} />
+        )}
         <WatchedToggle
           state={primary.watched ? 'watched' : 'unwatched'}
           onToggle={() => watched.mutate(!primary.watched)}

@@ -1,0 +1,65 @@
+.card {
+  min-width: 0;
+}
+
+.link {
+  display: grid;
+  gap: var(--space-2);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+
+  &:hover .title {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+}
+
+// The poster, or the title's initial where there is none.
+.poster {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  box-shadow: var(--shadow-poster);
+  color: var(--color-lichen);
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: translate 250ms var(--ease-out);
+
+    .link:hover & {
+      translate: 0 calc(-1 * var(--space-0));
+    }
+  }
+}
+
+.words {
+  display: grid;
+  gap: var(--space-0);
+  min-width: 0;
+}
+
+.title {
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+// The show and year as one line of text, a dot between them.
+.facts {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+
+  span + span::before {
+    content: ' · ';
+  }
+}

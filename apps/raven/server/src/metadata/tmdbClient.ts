@@ -131,7 +131,7 @@ export type FetchedItem = {
     poster: string | null
     backdrop: string | null
     still: string | null
-    /** A movie's title as art: a PNG on a clear ground. */
+    /** A movie's or show's title as art: a PNG on a clear ground. */
     logo: string | null
   }
   credits: FetchedCredit[]
@@ -468,13 +468,16 @@ const aggregateCredits = (credits: Record<string, unknown>): FetchedCredit[] => 
   ),
 ]
 
-/** A show with its aggregate credits, content ratings and external ids appended. */
+/** A show with its aggregate credits, content ratings, external ids and images appended. */
 export const toShow = ({
   body,
   country,
+  language,
 }: {
   body: unknown
   country: string
+  /** ISO 639-1, for the logo: `en`. */
+  language: string
 }): FetchedItem | null => {
   const show = record(body)
   const tmdbId = idOf(show.id)
@@ -509,7 +512,7 @@ export const toShow = ({
       poster: imagePath(show.poster_path),
       backdrop: imagePath(show.backdrop_path),
       still: null,
-      logo: null,
+      logo: pickLogo({ logos: record(show.images).logos, language }),
     },
     credits: mergeCredits([...creators, ...aggregateCredits(record(show.aggregate_credits))]),
     rating: tmdbRating(show),
@@ -806,10 +809,11 @@ export class TmdbClient {
     const body = await this.get({
       path: `/tv/${encodeURIComponent(tmdbId)}`,
       params: {
-        append_to_response: 'aggregate_credits,content_ratings,external_ids,reviews',
+        append_to_response: 'aggregate_credits,content_ratings,external_ids,reviews,images',
+        include_image_language: `${this.language},null`,
       },
     })
-    const show = toShow({ body, country: this.config.metadataCountry })
+    const show = toShow({ body, country: this.config.metadataCountry, language: this.language })
     if (!show) {
       throw new TmdbError({
         kind: TMDB_ERROR_KINDS.unavailable,
@@ -947,6 +951,18 @@ export class TmdbClient {
       },
     })
     return toMovieExtras({ movie: record(body), language: this.language })
+  }
+
+  /**
+   * Only a show's logo, for a show stored before raven kept them: its
+   * pictures, in one call, and no credits, seasons or reviews.
+   */
+  async showLogo(tmdbId: string): Promise<string | null> {
+    const body = await this.get({
+      path: `/tv/${encodeURIComponent(tmdbId)}/images`,
+      params: { include_image_language: `${this.language},null` },
+    })
+    return pickLogo({ logos: record(body).logos, language: this.language })
   }
 
   async movie(tmdbId: string): Promise<FetchedItem> {

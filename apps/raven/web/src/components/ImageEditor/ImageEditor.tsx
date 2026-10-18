@@ -45,10 +45,10 @@ const choiceOf = (option: ImageOption): ImageChoice =>
     ? { source: IMAGE_SOURCES.local }
     : { source: IMAGE_SOURCES.tmdb, ref: option.ref }
 
-/** A movie's pictures include its logo; a show's page shows none, so it has no logo to choose. */
+/** A movie and a show each choose a poster, a backdrop and a logo. */
 const KINDS_OF: Record<MatchItemType, readonly ChoosableImageKind[]> = {
   movie: ['poster', 'backdrop', 'logo'],
-  show: ['poster', 'backdrop'],
+  show: ['poster', 'backdrop', 'logo'],
 }
 
 const GRIDS: Record<ChoosableImageKind, string | undefined> = {
@@ -110,8 +110,8 @@ const Options = ({
 )
 
 /**
- * Edit images: every poster, backdrop and logo a movie could show (a show
- * has no logo), the current one marked, and the files that are this movie,
+ * Edit images: every poster, backdrop and logo a movie or show could show,
+ * the current one marked, and the files that are this movie,
  * since they share them. A choice takes at once, so the panel has no Save,
  * only Done at its top.
  */

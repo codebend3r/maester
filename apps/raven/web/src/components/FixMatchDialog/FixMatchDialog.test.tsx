@@ -43,6 +43,8 @@ describe('Fix match', () => {
     item: spyOn(api, 'getItem'),
     search: spyOn(api, 'searchMatches'),
     setMatch: spyOn(api, 'setMatch'),
+    // The menu reads the libraries, to know which are locked; matching reads them again.
+    libraries: spyOn(api, 'listLibraries').mockImplementation(async () => []),
   }
 
   afterEach(() => {

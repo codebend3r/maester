@@ -5,6 +5,8 @@ import {
   type HistoryEntry,
   type HomeSearch,
   type HomeShelf,
+  type ItemDetails,
+  type ItemSummary,
   type LibrarySettings,
   type MediaItem,
   type PosterEntry,
@@ -13,6 +15,7 @@ import {
 } from '@raven/core'
 import { type Edit, edit, editAll } from '@/lib/optimistic'
 import {
+  favouriteTitlesQuery,
   favouritesQuery,
   homeQuery,
   inProgressQuery,
@@ -54,6 +57,32 @@ export const withoutEntry = ({
   entries: PosterEntry[]
   id: number
 }): PosterEntry[] => entries.filter((entry) => entry.media.id !== id)
+
+/**
+ * A show or season marked or unmarked as a favourite: its own page, and
+ * the favourites, which an unmarked one leaves. A marked one joins them once
+ * read again, since the page's details are not a card's summary.
+ */
+export const itemFavouriteEdits = ({
+  item,
+  favourite,
+}: {
+  item: ItemDetails
+  favourite: boolean
+}): Edit[] => [
+  edit({
+    queryKey: itemQuery(item.id).queryKey,
+    update: (details) => (details.favourite === favourite ? details : { ...details, favourite }),
+  }),
+  edit({
+    queryKey: favouriteTitlesQuery.queryKey,
+    update: (titles: ItemSummary[]) => {
+      if (favourite) return titles
+      const kept = titles.filter((title) => title.id !== item.id)
+      return kept.length === titles.length ? titles : kept
+    },
+  }),
+]
 
 /**
  * A video marked or unmarked as a favourite wherever a heart or its menu
