@@ -35,7 +35,7 @@
         "zustand": "5.0.15",
       },
       "devDependencies": {
-        "@codebend3r/gale": "0.2.5",
+        "@codebend3r/gale": "0.3.1",
         "@electron-forge/cli": "8.0.1",
         "@electron-forge/maker-base": "8.0.1",
         "@electron-forge/maker-zip": "8.0.1",
@@ -104,7 +104,7 @@
         "zustand": "5.0.15",
       },
       "devDependencies": {
-        "@codebend3r/gale": "0.2.5",
+        "@codebend3r/gale": "0.3.1",
         "@happy-dom/global-registrator": "20.14.5",
         "@testing-library/jest-dom": "7.0.1",
         "@testing-library/react": "16.3.3",
@@ -158,7 +158,7 @@
         "react-router-dom": "7.18.4",
       },
       "devDependencies": {
-        "@codebend3r/gale": "0.2.5",
+        "@codebend3r/gale": "0.3.1",
         "@happy-dom/global-registrator": "20.14.5",
         "@testing-library/jest-dom": "7.0.1",
         "@testing-library/react": "16.3.3",
@@ -213,7 +213,7 @@
         "@raven/core": "workspace:*",
       },
       "devDependencies": {
-        "@codebend3r/gale": "0.2.5",
+        "@codebend3r/gale": "0.3.1",
         "@happy-dom/global-registrator": "20.14.5",
         "@testing-library/jest-dom": "7.0.1",
         "@testing-library/react": "16.3.3",
@@ -291,7 +291,7 @@
 
     "@clack/prompts": ["@clack/prompts@1.7.0", "", { "dependencies": { "@clack/core": "1.4.3", "fast-string-width": "^3.0.2", "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-y7/yvZ2TPAnR9+jnc00klvNNLkJiXFFrQA/hlLCcxA9a2A4zQIOimyFQ9XfwYKiGD1fb5GY8vbKIIgO8d5Tb2A=="],
 
-    "@codebend3r/gale": ["@codebend3r/gale@0.2.5", "", { "bin": { "gale": "bin/gale.cjs" } }, "sha512-NbVEoQY2WhWhyk2qmyJSKRNzcjOfr21TXs07vT9mJfxnOs8gMkiVo1TvlEuRzSTfM0Hnf4wNw2wJZ63g00WJuw=="],
+    "@codebend3r/gale": ["@codebend3r/gale@0.3.1", "", { "bin": { "gale": "bin/gale.cjs" } }, "sha512-Ic/ArAUvppo06qekSLKH9K9iodRsLm1Rl4xGHSSKg+EvihLWQaHlLJo+7kSyl870Xt/ql2UPT0HNeLj1OM2CMA=="],
 
     "@electron-forge/cli": ["@electron-forge/cli@8.0.1", "", { "dependencies": { "@electron-forge/core": "8.0.1", "@electron-forge/core-utils": "8.0.1", "@electron-forge/shared-types": "8.0.1", "@electron/get": "^5.1.0", "commander": "^11.1.0", "debug": "^4.3.1", "listr2": "^11.1.0", "semver": "^7.2.1" }, "bin": { "electron-forge": "dist/electron-forge.js", "electron-forge-vscode-nix": "script/vscode.sh", "electron-forge-vscode-win": "script/vscode.cmd" } }, "sha512-zbkmgt7vtL8OBY7YDwVizhCfAHJLpmQtA35iOKGWPpLWRZbGADVyIUZz3QZrbc2V81/BkrBerURIBXdd/fnyhQ=="],
 
