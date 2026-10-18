@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor } from '@testing-library/react'
+import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Route, Routes, useLocation } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import {
   type AuthConfig,
   ApiError,
@@ -13,8 +14,10 @@ import {
 import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { api } from '@/lib/api'
 import { AUTH_ROUTES } from '@/lib/authRoutes'
+import { queryClient, queryKeys } from '@/lib/queryClient'
+import { signOut } from '@/lib/signOut'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { ACCOUNT_ID, fakeAccount } from '@/test/authClient'
+import { ACCOUNT_ID, fakeAccount, fakeAuthClient, fakeSession } from '@/test/authClient'
 import { renderWithProviders } from '@/test/render'
 
 const ready: AuthConfig = {
@@ -63,9 +66,12 @@ const refused = ({ status, reason }: { status: number; reason: ApiError['refusal
 
 describe('AuthGate', () => {
   const getMe = spyOn(api, 'getMe')
+  const getAuthConfig = spyOn(api, 'getAuthConfig')
 
   afterEach(() => {
     getMe.mockReset()
+    getAuthConfig.mockReset()
+    queryClient.clear()
   })
 
   it('shows a loading screen until the account is read', () => {
@@ -172,5 +178,47 @@ describe('AuthGate', () => {
     renderGate()
     expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByTestId('where')).toBeNull())
+  })
+
+  it('goes to sign in after Sign out although the gate reads what the sign out empties', async () => {
+    const user = userEvent.setup()
+    getMe.mockResolvedValue(fakeAccount())
+    getAuthConfig.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve(ready), 30)),
+    )
+    const fake = fakeAuthClient({
+      session: fakeSession(),
+      calls: {
+        signOut: async () => {
+          fake.emit({ event: 'SIGNED_OUT', session: null })
+          // Supabase answers after its listeners ran, long enough for the page to render.
+          await new Promise((resolve) => setTimeout(resolve, 10))
+          return { error: null }
+        },
+      },
+    })
+    useAuthSession.setState({ client: null, session: null, status: AUTH_SESSION_STATUSES.booting })
+    useAuthSession.getState().start({ config: ready, createClient: () => fake.client })
+    const LeaveButton = () => {
+      const client = useQueryClient()
+      return <button onClick={() => signOut({ queryClient: client })}>Leave</button>
+    }
+    queryClient.setQueryData(queryKeys.authConfig, ready)
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/libraries/3']}>
+          <Routes>
+            <Route element={<AuthGate />}>
+              <Route path="*" element={<LeaveButton />} />
+            </Route>
+            <Route path={AUTH_ROUTES.signIn} element={<Where />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Leave' }))
+
+    expect(await screen.findByTestId('where')).toHaveTextContent(AUTH_ROUTES.signIn)
   })
 })

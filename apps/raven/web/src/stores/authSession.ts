@@ -72,7 +72,6 @@ export const useAuthSession = create<AuthSessionState>()((set, get) => ({
     client.onAuthStateChange((event, session) => {
       const previous = get().session
       const next = summaryOf(session)
-      followAccount({ previous, next })
       set({
         session: next,
         isRecovery:
@@ -80,6 +79,7 @@ export const useAuthSession = create<AuthSessionState>()((set, get) => ({
           (event === AUTH_EVENTS.passwordRecovery ||
             (get().isRecovery && previous?.userId === next.userId)),
       })
+      followAccount({ previous, next })
     })
     const settle = (session: Session | null) =>
       set({ session: summaryOf(session), status: AUTH_SESSION_STATUSES.ready })
