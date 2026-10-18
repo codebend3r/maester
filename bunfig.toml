@@ -1,0 +1,3 @@
+[install]
+# Every dependency is pinned; bun add never writes a range.
+exact = true

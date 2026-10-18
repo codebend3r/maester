@@ -9,31 +9,48 @@
   ],
   "type": "module",
   "scripts": {
+    "affected": "bun run --sequential spellcheck typescript-only one-command-per-script dead-code dead-css affected:tasks",
+    "affected:tasks": "nx affected -t lint:py lint:ts lint:css format:check typecheck test build",
+    "audit": "bash scripts/audit_claude_md.sh",
+    "build": "nx run-many -t build",
+    "dead-code": "nx run maester:dead-code",
+    "dead-css": "nx run maester:dead-css",
+    "desktop:audit:bundle": "nx run @raven/desktop:audit:bundle",
+    "desktop:build": "nx run @raven/desktop:build",
+    "desktop:e2e": "nx run @raven/desktop:e2e",
+    "desktop:make": "nx run @raven/desktop:make",
+    "desktop:smoke:packaged": "nx run @raven/desktop:smoke:packaged",
+    "desktop:test:native": "nx run @raven/desktop:test:native",
     "dev:luwin": "nx run @luwin/api:dev",
     "dev:raven": "nx run-many -t dev -p @raven/server @raven/ui @raven/web",
     "dev:rookery": "nx run-many -t dev -p @rookery/server @rookery/web",
-    "build": "nx run-many -t build",
-    "test": "nx run-many -t test",
-    "typecheck": "nx run-many -t typecheck",
-    "lint": "nx run-many -t lint:py lint:ts lint:css",
-    "lint:fix": "nx run-many -t lint:py:fix lint:ts:fix lint:css:fix",
     "format": "nx run-many -t format",
     "format:check": "nx run-many -t format:check",
-    "spellcheck": "nx run maester:spellcheck",
-    "typescript-only": "nx run maester:typescript-only",
+    "graph": "nx graph",
+    "lint": "nx run-many -t lint:py lint:ts lint:css",
+    "lint:css": "nx run-many -t lint:css",
+    "lint:fix": "nx run-many -t lint:py:fix lint:ts:fix lint:css:fix",
+    "lint:py": "nx run-many -t lint:py",
+    "lint:ts": "nx run-many -t lint:ts",
+    "lint-staged": "lint-staged",
+    "mpv:native": "nx run-many -p @raven/mpv -t audit:native test:native",
     "one-command-per-script": "nx run maester:one-command-per-script",
-    "verify": "nx run-many -t spellcheck typescript-only one-command-per-script lint:py lint:ts lint:css format:check typecheck test build",
-    "verify:uncached": "bun run verify --skip-nx-cache",
-    "affected": "bun run --sequential spellcheck typescript-only one-command-per-script affected:tasks",
-    "affected:tasks": "nx affected -t lint:py lint:ts lint:css format:check typecheck test build",
-    "graph": "nx graph"
+    "spellcheck": "nx run maester:spellcheck",
+    "test": "nx run-many -t test",
+    "typecheck": "nx run-many -t typecheck",
+    "typescript-only": "nx run maester:typescript-only",
+    "verify": "nx run-many -t spellcheck typescript-only one-command-per-script dead-code dead-css lint:py lint:ts lint:css format:check typecheck test build",
+    "verify:uncached": "bun run verify --skip-nx-cache"
   },
   "devDependencies": {
+    "knip": "6.41.0",
     "lefthook": "2.1.15",
     "lint-staged": "17.6.0",
     "nx": "23.2.1",
     "oxfmt": "0.68.0",
-    "oxlint": "1.83.0"
+    "oxlint": "1.83.0",
+    "sass": "1.104.1",
+    "typescript": "6.0.3"
   },
   "packageManager": "bun@1.4.2",
   "nx": {
@@ -47,15 +64,74 @@
       },
       "spellcheck": {
         "command": "uvx typos@1.51.1",
-        "cache": false
+        "cache": true,
+        "inputs": [
+          "{workspaceRoot}/**/*"
+        ]
       },
       "typescript-only": {
         "command": "bash scripts/check_typescript_only.sh",
-        "cache": false
+        "cache": true,
+        "inputs": [
+          "{workspaceRoot}/**/*.{js,jsx,mjs,cjs}",
+          "{workspaceRoot}/scripts/check_typescript_only.sh"
+        ]
       },
       "one-command-per-script": {
         "command": "bash scripts/check_one_command_per_script.sh",
-        "cache": false
+        "cache": true,
+        "inputs": [
+          "{workspaceRoot}/**/package.json",
+          "{workspaceRoot}/scripts/check_one_command_per_script.sh"
+        ]
+      },
+      "dead-code": {
+        "command": "knip --no-progress",
+        "cache": true,
+        "dependsOn": [
+          {
+            "projects": [
+              "@raven/core"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "{workspaceRoot}/**/*.{ts,tsx,json,yml,yaml,toml}",
+          {
+            "externalDependencies": [
+              "knip"
+            ]
+          }
+        ]
+      },
+      "dead-css": {
+        "command": "bun tooling/web/check-dead-css.ts",
+        "cache": true,
+        "dependsOn": [
+          {
+            "projects": [
+              "@raven/core",
+              "@raven/ui"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "{workspaceRoot}/apps/**/*.{ts,tsx,scss}",
+          "{workspaceRoot}/libs/**/*.{ts,tsx,scss}",
+          "{workspaceRoot}/**/package.json",
+          "{workspaceRoot}/**/gale.json",
+          "{workspaceRoot}/**/tsconfig*.json",
+          "{workspaceRoot}/tooling/tsconfig/*.json",
+          "{workspaceRoot}/tooling/web/check-dead-css.ts",
+          {
+            "externalDependencies": [
+              "sass",
+              "typescript"
+            ]
+          }
+        ]
       }
     }
   },

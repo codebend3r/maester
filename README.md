@@ -37,10 +37,10 @@ Every pull request runs each of these on every project, one step each, spread ac
 
 The git hooks are lefthook's (`lefthook.yml`):
 
-| Hook         | What it runs                                                                                          |
-| ------------ | ----------------------------------------------------------------------------------------------------- |
-| `pre-commit` | lint-staged (`lint-staged.config.ts`): oxlint, oxfmt, gale and ruff fix the staged files              |
-| `pre-push`   | The checks `bun run verify` runs, one at a time: spellcheck through build, stopping at the first fail |
+| Hook         | What it runs                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pre-commit` | lint-staged (`lint-staged.config.ts`): oxlint, oxfmt, gale and ruff fix the staged files                                                                      |
+| `pre-push`   | The checks `bun run verify` runs but `dead-code` and `dead-css`, which the PR checks run, one at a time: spellcheck through build, stopping at the first fail |
 
 Start a product with `bun run dev:luwin` or `bun run dev:raven`, then open it here:
 

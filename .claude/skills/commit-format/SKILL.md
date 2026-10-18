@@ -83,4 +83,4 @@ MAE: reject out-of-tier tool calls in the runner
 
 ## Reporting back
 
-In chat only, one line per action: `✅ committed <sha7> — MAE: <subject>`, `🚀 pushed <branch>`.
+In chat only, one line per action: `✅ committed <sha7>: MAE: <subject>`, `🚀 pushed <branch>`.

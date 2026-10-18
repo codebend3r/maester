@@ -4,18 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "typecheck": "tsgo --noEmit",
-    "lint:ts": "oxlint",
-    "lint:ts:fix": "oxlint --fix",
-    "lint:css": "gale \"src/**/*.scss\"",
-    "lint:css:fix": "gale --fix \"src/**/*.scss\"",
+    "dev": "vite",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
+    "lint:css": "gale \"src/**/*.scss\"",
+    "lint:css:fix": "gale --fix \"src/**/*.scss\"",
+    "lint:ts": "oxlint",
+    "lint:ts:fix": "oxlint --fix",
+    "preview": "vite preview",
     "test": "bun test --dots",
-    "test:watch": "bun test --dots --watch"
+    "test:watch": "bun test --dots --watch",
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@fontsource-variable/instrument-sans": "5.3.0",

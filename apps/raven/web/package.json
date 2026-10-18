@@ -7,20 +7,20 @@
     "#package": "./package.json"
   },
   "scripts": {
-    "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "typecheck": "tsgo --noEmit",
-    "lint:ts": "oxlint",
-    "lint:ts:fix": "oxlint --fix",
-    "lint:css": "gale \"src/**/*.scss\"",
-    "lint:css:fix": "gale --fix \"src/**/*.scss\"",
+    "dev": "vite",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
+    "lint:css": "gale \"src/**/*.scss\"",
+    "lint:css:fix": "gale --fix \"src/**/*.scss\"",
+    "lint:ts": "oxlint",
+    "lint:ts:fix": "oxlint --fix",
+    "preview": "vite preview",
     "test": "bun run --sequential test:run test:coverage",
-    "test:run": "bun test --dots --parallel --coverage --coverage-reporter=lcov",
     "test:coverage": "bun ../../../tooling/web/check-coverage.ts --lines 96 --functions 88",
-    "test:watch": "bun test --dots --watch"
+    "test:run": "bun test --dots --parallel --coverage --coverage-reporter=lcov",
+    "test:watch": "bun test --dots --watch",
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@fontsource-variable/instrument-sans": "5.3.0",
