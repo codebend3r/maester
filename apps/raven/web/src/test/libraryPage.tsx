@@ -16,15 +16,17 @@ const Address = () => {
  * Opens a library's page at `route`, routed as the app routes it: All at
  * the library's own address, each other tab beneath it, and the player.
  * The library and its listings come from whatever the test spies serve;
- * `libraries` is the list the side menu has read, if any, and `adminLock`
- * the admin lock, off unless given.
+ * `behind` is the pages before it in history, `libraries` the list the side
+ * menu has read, if any, and `adminLock` the admin lock, off unless given.
  */
 export const renderLibraryPage = ({
   route = '/libraries/2',
+  behind,
   libraries = null,
   adminLock,
 }: {
   route?: string
+  behind?: string[]
   libraries?: Library[] | null
   adminLock?: AdminLock
 } = {}) =>
@@ -40,6 +42,7 @@ export const renderLibraryPage = ({
       </>
     ),
     route,
+    behind,
     libraries,
     adminLock,
   })
