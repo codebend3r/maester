@@ -4,10 +4,12 @@ import {
   PLAYBACK_MODES,
   type PlaybackMode,
   type SubtitleTrack,
+  formatBitrate,
   formatChannels,
   resolutionLabel,
 } from '@raven/core'
 import { playingAudio } from '@/components/Player/selection'
+import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import { audioLabel, subtitleLabel } from '@/lib/trackLabels'
 
 /** How each mode reads in the chrome, short enough for a pill. */
@@ -15,6 +17,13 @@ const MODE_NAMES = {
   direct: 'Direct play',
   remux: 'Audio converted',
   transcode: 'Converted',
+} as const satisfies Record<PlaybackMode, string>
+
+/** Each mode as the subject of a sentence. */
+const MODE_NOUNS = {
+  direct: 'the original file',
+  remux: 'the remux',
+  transcode: 'the transcode',
 } as const satisfies Record<PlaybackMode, string>
 
 const joined = ({
@@ -86,3 +95,12 @@ export const audioPillLabel = ({
 /** The subtitles pill's language, or Off. */
 export const subtitlePillLabel = (subtitle: SubtitleTrack | null): string =>
   subtitle ? subtitleLabel(subtitle).name : 'Off'
+
+/** Why the picture is a transcode when the connection could not carry the way above it. */
+export const stepDownNote = ({ from, delivery }: StepDown): string => {
+  const carried = formatBitrate(delivery.delivered)
+  const needed = formatBitrate(delivery.needed)
+  return needed == null
+    ? `Switched to a transcode because the connection carried only ${carried}.`
+    : `Switched to a transcode because the connection carried ${carried} and ${MODE_NOUNS[from]} needs ${needed}.`
+}

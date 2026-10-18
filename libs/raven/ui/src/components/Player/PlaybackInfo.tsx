@@ -19,6 +19,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useId, useState } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import type { EngineStats } from '@/components/Player/engine'
+import { stepDownNote } from '@/components/Player/playbackFacts'
+import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/PlaybackInfo.module.scss'
 import { playerQueriesFor } from '@/lib/playerQueries'
 import { audioLabel } from '@/lib/trackLabels'
@@ -219,6 +221,7 @@ const OriginalFile = ({
 export const PlaybackInfo = ({
   readStats,
   mode,
+  steppedDown = null,
   file,
   tracks,
   audio,
@@ -226,6 +229,8 @@ export const PlaybackInfo = ({
 }: {
   readStats: () => EngineStats
   mode: PlaybackMode
+  /** Why this is a transcode, when the connection is the reason. */
+  steppedDown?: StepDown | null
   file: PlaybackFile | null
   tracks: MediaTracks | null
   /** The audio track playing. */
@@ -253,6 +258,7 @@ export const PlaybackInfo = ({
         <div className={styles.sections}>
           <Facts
             title="Playback"
+            note={steppedDown && stepDownNote(steppedDown)}
             facts={[
               { term: 'Player', value: stats.engine },
               { term: 'Method', value: METHODS[mode] },

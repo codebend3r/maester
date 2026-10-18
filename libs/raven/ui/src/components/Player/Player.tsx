@@ -136,6 +136,8 @@ const ServerPlayer = ({
           mode={playback.mode}
           selection={selection}
           onFailure={playback.fail}
+          onSlow={playback.slow ?? undefined}
+          steppedDown={playback.steppedDown}
         />
       )
     default: {

@@ -5,6 +5,7 @@ import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
 import { SubtitleOverlay } from '@/components/Player/SubtitleOverlay'
 import { useMediaSource } from '@/components/Player/useMediaSource'
+import type { Delivery } from '@/lib/streamSource'
 import { useSubtitleCues } from '@/components/Player/useSubtitleCues'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
@@ -18,12 +19,14 @@ export const useHtmlEngine = ({
   mode,
   selection,
   onFailure,
+  onSlow,
   toggleFullscreen,
 }: {
   source: HtmlSource
   mode: PlaybackMode
   selection: TrackSelection
   onFailure: (message: string) => void
+  onSlow?: (delivery: Delivery) => void
   toggleFullscreen: () => void
 }) => {
   const { title, posterUrl } = useHostServices()
@@ -49,6 +52,7 @@ export const useHtmlEngine = ({
     playing: playback.playing,
     onRefused: playback.refused,
     onFailure,
+    onSlow,
   })
   useVideoEvents({
     videoRef,
