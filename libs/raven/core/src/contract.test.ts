@@ -545,6 +545,11 @@ describe('the request bodies', () => {
     expect(isTmdbId('603')).toBe(true)
     expect(isTmdbId('tt0133093')).toBe(false)
     expect(isMatchChoice({ tmdbId: '603' })).toBe(true)
+    expect(isMatchChoice({ tmdbId: 'tv:216581' })).toBe(true)
+    expect(isMatchChoice({ tmdbId: 'tv:' })).toBe(false)
+    expect(isMatchChoice({ tmdbId: 'tv:../216581' })).toBe(false)
+    expect(isMatchChoice({ tmdbId: 'tt1234567' })).toBe(false)
+    expect(isShowMatchChoice({ tmdbId: 'tv:216581' })).toBe(false)
     expect(isMatchChoice({ tmdbId: null })).toBe(true)
     expect(isMatchChoice({ tmdbId: 603 })).toBe(false)
     expect(isShowMatchChoice({ tmdbId: '95396' })).toBe(true)
@@ -595,6 +600,7 @@ describe('the AI lookup', () => {
 
   it('takes a suggestion with a TMDB id, and a file Not matched lists with one or none', () => {
     expect(isAiSuggestion(suggestion)).toBe(true)
+    expect(isAiSuggestion({ ...suggestion, tmdbId: 'tv:216581' })).toBe(true)
     expect(isAiSuggestion({ ...suggestion, tmdbId: 'tt123' })).toBe(false)
     expect(isAiSuggestion({ ...suggestion, reason: null })).toBe(false)
     expect(isUnmatchedFile({ ...mediaItem(), aiSuggestion: suggestion })).toBe(true)

@@ -1100,6 +1100,19 @@ export type ItemMetadataChange = Infer<typeof isItemMetadataChange>
 /** TMDB's ids are digits, which raven keeps as text. */
 export const isTmdbId = (value: unknown): value is string => isString(value) && /^\d+$/.test(value)
 
+/** A TV documentary kept as a movie uses a separate namespace from TMDB's movie ids. */
+export const TMDB_MATCH_PREFIXES = { tvMovie: 'tv:' } as const
+
+export const isTvMovieId = (
+  value: unknown,
+): value is `${typeof TMDB_MATCH_PREFIXES.tvMovie}${string}` =>
+  isString(value) &&
+  value.startsWith(TMDB_MATCH_PREFIXES.tvMovie) &&
+  isTmdbId(value.slice(TMDB_MATCH_PREFIXES.tvMovie.length))
+
+/** A movie or show match, including a TV documentary watched as one movie. */
+export const isMatchId = (value: unknown): value is string => isTmdbId(value) || isTvMovieId(value)
+
 /** One of TMDB's search results, offered by Fix match. */
 export const isMatchCandidate = object({
   tmdbId: isString,
@@ -1135,7 +1148,7 @@ export const isLibraryPlace = (value: unknown): value is string =>
  * Accepting it is a Fix match to `tmdbId`.
  */
 export const isAiSuggestion = object({
-  tmdbId: isTmdbId,
+  tmdbId: isMatchId,
   title: isString,
   year: nullable(isNumber),
   /** TMDB's path for the poster, served through `candidatePosterUrl`. */
@@ -1538,7 +1551,7 @@ export type AdminUnlockRequest = Infer<typeof isAdminUnlockRequest>
 
 /** `PUT /api/media/:id/match`: a TMDB id for Fix match, or null for a file that is not one at all. */
 export const isMatchChoice = object({
-  tmdbId: nullable(isTmdbId),
+  tmdbId: nullable(isMatchId),
 })
 
 export type MatchChoice = Infer<typeof isMatchChoice>

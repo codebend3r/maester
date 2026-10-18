@@ -228,6 +228,7 @@ describe('TmdbClient', () => {
       respond([
         () => json({ body: {}, status: 429, headers: { [RAVEN_HEADERS.retryAfter]: '0' } }),
         () => json({ body: { results: [] } }),
+        () => json({ body: { results: [] } }),
       ]),
     )
     await expect(client.searchMovies({ query: 'x', year: null })).resolves.toEqual([])
@@ -303,6 +304,102 @@ describe('TmdbClient', () => {
       originalLanguage: 'ja',
       countries: ['JP'],
     })
+  })
+
+  it('finds a TV documentary when the movie catalogue has no result, keeping its source for every lookup', async () => {
+    const tmdb = fakeTmdb({
+      movies: [],
+      shows: [
+        {
+          id: 216581,
+          title: 'Dahmer on Dahmer: A Serial Killer Speaks',
+          first: '2017-11-11',
+          genreIds: [99, 80],
+          alternativeTitles: ['Dahmer on Dahmer'],
+          seasons: {},
+        },
+        { id: 1, title: 'Dahmer on Dahmer: A Drama', first: '2017-11-11', seasons: {} },
+      ],
+    })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    const results = await client.searchMovies({ query: 'Dahmer on Dahmer', year: 2017 })
+    expect(results.map((result) => result.tmdbId)).toEqual(['tv:216581'])
+    const tvSearch = new URL(tmdb.state.calls[1] ?? '')
+    expect(tvSearch.pathname).toBe('/3/search/tv')
+    expect(tvSearch.searchParams.get('first_air_date_year')).toBe('2017')
+    expect(tvSearch.searchParams.has('year')).toBe(false)
+    expect(await client.movie('tv:216581')).toMatchObject({
+      type: 'movie',
+      tmdbId: 'tv:216581',
+      title: 'Dahmer on Dahmer: A Serial Killer Speaks',
+      year: 2017,
+      runtime: null,
+      saga: null,
+      images: { poster: '/showposter216581.jpg' },
+      imdbId: 'tt216581',
+    })
+    expect(await client.matchFacts({ type: 'movie', tmdbId: 'tv:216581' })).toEqual({
+      type: 'movie',
+      aliases: ['Dahmer on Dahmer'],
+      runtime: null,
+    })
+    expect(await client.alternativeTitles({ type: 'movie', tmdbId: 'tv:216581' })).toEqual([
+      'Dahmer on Dahmer',
+    ])
+    expect(
+      (await client.images({ type: 'movie', tmdbId: 'tv:216581' })).poster.length,
+    ).toBeGreaterThan(0)
+    expect(await client.movieExtras('tv:216581')).toEqual({ saga: null, logo: '/logo216581.png' })
+    expect(tmdb.state.calls.some((url) => new URL(url).pathname.includes('/movie/'))).toBe(false)
+  })
+
+  it('still offers a TV documentary when a search without a year returns an unrelated movie', async () => {
+    const client = new TmdbClient(
+      config(),
+      respond([
+        () =>
+          json({
+            body: {
+              results: [
+                {
+                  id: 1379106,
+                  title: 'My Son Jeffrey: The Dahmer Family Tapes',
+                  release_date: '2023-09-18',
+                },
+              ],
+            },
+          }),
+        () =>
+          json({
+            body: {
+              results: [
+                {
+                  id: 216581,
+                  name: 'Dahmer on Dahmer: A Serial Killer Speaks',
+                  first_air_date: '2017-11-11',
+                  genre_ids: [99],
+                },
+              ],
+            },
+          }),
+      ]),
+    )
+    expect(
+      (await client.searchMovies({ query: 'Dahmer on Dahmer', year: null })).map(
+        (result) => result.tmdbId,
+      ),
+    ).toEqual(['1379106', 'tv:216581'])
+  })
+
+  it('does not search TV when movies are found, or return scripted TV for an empty movie search', async () => {
+    const tmdb = fakeTmdb({
+      movies: [{ id: 1, title: 'Heat', released: '1995-12-15' }],
+      shows: [{ id: 2, title: 'Severance', first: '2022-02-18', seasons: {} }],
+    })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    expect((await client.searchMovies({ query: 'Heat', year: 1995 }))[0]?.tmdbId).toBe('1')
+    expect(tmdb.state.calls).toHaveLength(1)
+    expect(await client.searchMovies({ query: 'Severance', year: 2022 })).toEqual([])
   })
 
   it("reads a show's seasons, episode total and aliases for Fix match, in one call", async () => {

@@ -134,6 +134,33 @@ describe('AiMatcher', () => {
     expect(outcome).toMatchObject({ kind: 'undecided' })
   })
 
+  it('can choose a TV documentary offered as a movie, preserving its source id', async () => {
+    const group: AiGroup = { ...WILD, kind: 'documentaries', type: 'movie' }
+    const claude = fakeClaude({
+      lookups: {
+        [group.place]: [
+          { kind: 'search', type: 'movie', query: 'Wild Arctic', year: null },
+          {
+            kind: 'choose',
+            tmdbId: 'tv:80001',
+            confidence: 'low',
+            reason: 'TV documentary released as one movie.',
+          },
+        ],
+      },
+    })
+    const matcher = new AiMatcher(
+      config,
+      new AiClient(config, claude.fetch),
+      new TmdbClient(config, tmdb.fetch),
+    )
+    expect(await matcher.decide(group)).toMatchObject({
+      kind: 'chosen',
+      pick: { tmdbId: 'tv:80001', title: 'Wild Arctic' },
+      confidence: 'low',
+    })
+  })
+
   it('takes a refusal as no decision', async () => {
     const { outcome, requests } = await lookUp({ replies: [{ kind: 'refuse' }] })
     expect(outcome).toMatchObject({ kind: 'undecided' })

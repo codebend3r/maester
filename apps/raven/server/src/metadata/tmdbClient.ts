@@ -6,6 +6,10 @@ import {
   isNumber,
   isRecord,
   isString,
+  isTvMovieId,
+  foldTitle,
+  TMDB_GENRES,
+  TMDB_MATCH_PREFIXES,
   type MatchItemType,
   CREDIT_JOBS,
   ITEM_TYPES,
@@ -35,6 +39,12 @@ export const TMDB_SEGMENTS = { movie: 'movie', show: 'tv' } as const satisfies R
   MatchItemType,
   string
 >
+
+/** A library's movie can be catalogued by TMDB as a TV documentary. Keep the namespaces distinct. */
+const sourceOf = ({ type, tmdbId }: { type: MatchItemType; tmdbId: string }) =>
+  type === ITEM_TYPES.movie && isTvMovieId(tmdbId)
+    ? { type: ITEM_TYPES.show, tmdbId: tmdbId.slice(TMDB_MATCH_PREFIXES.tvMovie.length) }
+    : { type, tmdbId }
 
 /** TMDB's search routes, which the client calls and the test fake answers. */
 export const TMDB_SEARCH_ROUTES = { movie: '/search/movie', show: '/search/tv' } as const
@@ -784,7 +794,23 @@ export class TmdbClient {
         ...(year == null ? {} : { year: String(year) }),
       },
     })
-    return records(record(body).results).flatMap((entry) => toSearchResult(entry) ?? [])
+    const movies = records(record(body).results).flatMap((entry) => toSearchResult(entry) ?? [])
+    const wanted = foldTitle(query)
+    const hasTitle = movies.some((movie) =>
+      [movie.title, movie.originalTitle].some(
+        (title) => title != null && ` ${foldTitle(title)} `.includes(` ${wanted} `),
+      ),
+    )
+    if (hasTitle || includeAdult) return movies
+    // Some feature-length releases are filed only under TV. A movie search
+    // can return unrelated films instead, especially with no year filter.
+    const shows = await this.searchShows({ query, year })
+    return [
+      ...movies,
+      ...shows
+        .filter((show) => show.genreIds.includes(TMDB_GENRES.documentary))
+        .map((show) => ({ ...show, tmdbId: `${TMDB_MATCH_PREFIXES.tvMovie}${show.tmdbId}` })),
+    ]
   }
 
   async searchShows({
@@ -874,9 +900,10 @@ export class TmdbClient {
     type: MatchItemType
     tmdbId: string
   }): Promise<string[]> {
+    const source = sourceOf({ type, tmdbId })
     const body = record(
       await this.get({
-        path: `/${TMDB_SEGMENTS[type]}/${encodeURIComponent(tmdbId)}/alternative_titles`,
+        path: `/${TMDB_SEGMENTS[source.type]}/${encodeURIComponent(source.tmdbId)}/alternative_titles`,
       }),
     )
     // A movie's come as `titles`, a show's as `results`.
@@ -889,9 +916,10 @@ export class TmdbClient {
    * titles, in one call.
    */
   async matchFacts({ type, tmdbId }: { type: MatchItemType; tmdbId: string }): Promise<MatchFacts> {
+    const source = sourceOf({ type, tmdbId })
     const body = record(
       await this.get({
-        path: `/${TMDB_SEGMENTS[type]}/${encodeURIComponent(tmdbId)}`,
+        path: `/${TMDB_SEGMENTS[source.type]}/${encodeURIComponent(source.tmdbId)}`,
         params: {
           append_to_response: 'alternative_titles',
         },
@@ -902,7 +930,9 @@ export class TmdbClient {
     const aliases = records(titled.titles ?? titled.results).flatMap(
       (entry) => text(entry.title) ?? [],
     )
-    if (type === ITEM_TYPES.movie) return { type, aliases, runtime: number(body.runtime) || null }
+    if (type === ITEM_TYPES.movie) {
+      return { type, aliases, runtime: source.type === type ? number(body.runtime) || null : null }
+    }
     return {
       type,
       aliases,
@@ -922,9 +952,10 @@ export class TmdbClient {
    * the language details come in and without text, most voted first.
    */
   async images({ type, tmdbId }: { type: MatchItemType; tmdbId: string }): Promise<TmdbImages> {
+    const source = sourceOf({ type, tmdbId })
     const body = record(
       await this.get({
-        path: `/${TMDB_SEGMENTS[type]}/${encodeURIComponent(tmdbId)}/images`,
+        path: `/${TMDB_SEGMENTS[source.type]}/${encodeURIComponent(source.tmdbId)}/images`,
         params: {
           include_image_language: `${this.language},null`,
         },
@@ -943,6 +974,12 @@ export class TmdbClient {
    * reviews.
    */
   async movieExtras(tmdbId: string): Promise<MovieExtras> {
+    if (isTvMovieId(tmdbId)) {
+      return {
+        saga: null,
+        logo: await this.showLogo(tmdbId.slice(TMDB_MATCH_PREFIXES.tvMovie.length)),
+      }
+    }
     const body = await this.get({
       path: `/movie/${encodeURIComponent(tmdbId)}`,
       params: {
@@ -966,6 +1003,11 @@ export class TmdbClient {
   }
 
   async movie(tmdbId: string): Promise<FetchedItem> {
+    if (isTvMovieId(tmdbId)) {
+      const show = await this.show(tmdbId.slice(TMDB_MATCH_PREFIXES.tvMovie.length))
+      // TV runtimes describe an episode, not the combined movie file.
+      return { ...show, type: ITEM_TYPES.movie, tmdbId, ended: null, runtime: null }
+    }
     const body = await this.get({
       path: `/movie/${encodeURIComponent(tmdbId)}`,
       params: {

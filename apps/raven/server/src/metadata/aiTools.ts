@@ -1,6 +1,7 @@
 import type { Anthropic } from '@anthropic-ai/sdk'
 import {
   isMatchItemType,
+  isMatchId,
   isNumber,
   isString,
   isTmdbId,
@@ -80,7 +81,7 @@ export const isEpisodesInput = object({
 })
 
 export const isChooseInput = object({
-  tmdbId: nullable(isTmdbId),
+  tmdbId: nullable(isMatchId),
   confidence: isAiConfidence,
   reason: isText,
 })
