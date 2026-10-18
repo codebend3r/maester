@@ -45,6 +45,10 @@ jobs:
       # Only this job runs Nx. Nx Cloud's remote cache restores the libmpv source build a
       # run on the same inputs already did; unset (no secret, a fork's PR), nothing does.
       NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+      # Nx Cloud cancels the older pipeline when a second one starts on the same branch,
+      # so on a PR this run would cancel the PR checks' Nx Agents. A branch name of its
+      # own keeps the two apart.
+      NX_BRANCH: desktop-release-${{ github.head_ref || github.ref_name }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
