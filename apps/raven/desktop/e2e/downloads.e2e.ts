@@ -13,10 +13,12 @@ import {
   type FixtureServer,
   routesOf,
   startFixtureServer,
+  ticketFor,
 } from '@/e2e/fixtureServer'
 import {
   freshUserData,
   openUrl,
+  readLog,
   removeDir,
   requestFromPage,
   stubTrustPrompt,
@@ -275,9 +277,9 @@ test.describe.serial('downloading through a media origin', () => {
   test('asks before a download link, then fetches the file from the origin with a ticket alone', async () => {
     const fixture = server()
     const size = sizeOf(FIXTURE_MEDIA.first)
-    const serverId = await withApp({
+    const { serverId, output: printed } = await withApp({
       userData,
-      run: async ({ app, page }) => {
+      run: async ({ app, page, output }) => {
         await expect(homeHeading(page)).toBeVisible()
         await stubTrustPrompt({ app, answer: 'add' })
         await download({
@@ -289,7 +291,7 @@ test.describe.serial('downloading through a media origin', () => {
         })
         await openDownloads({ page })
         await expectReady({ page, label: 'Fixture One', size })
-        return serverIdOf({ page })
+        return { serverId: await serverIdOf({ page }), output }
       },
     })
 
@@ -315,6 +317,11 @@ test.describe.serial('downloading through a media origin', () => {
     expect(tickets.length).toBeGreaterThan(0)
     expect(tickets.every(({ hasUnlock }) => hasUnlock)).toBe(true)
     expect(fileFetches({ requests: fixture.requests, mediaId: FIXTURE_MEDIA.first })).toEqual([])
+    // The ticket rides in the file's address alone: main never prints, logs or keeps it.
+    const ticket = ticketFor(FIXTURE_MEDIA.first)
+    expect(printed.lines().filter((line) => line.includes(ticket))).toEqual([])
+    expect((await readLog({ userData })).filter((line) => line.includes(ticket))).toEqual([])
+    expect(await readFile(join(userData, DOWNLOADS_FILE), 'utf8')).not.toContain(ticket)
 
     const stored = await storedDownloads({ userData })
     expect(

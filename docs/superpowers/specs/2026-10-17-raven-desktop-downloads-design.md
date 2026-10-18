@@ -6,7 +6,7 @@ Status: shipped, as six stacked PRs built from `docs/superpowers/plans/2026-10-1
 
 raven player plays a title from a raven server by streaming it. Without the server, on a plane or in a house with no connection to the NAS, there is nothing to play. This lets a viewer keep a copy of a server's titles on the computer the player runs on: a movie, a saga, a show, a season or one episode, with its sidecar subtitles. Kept titles play through the native engine from the local copy, with the same controls and resume as any other title, and what was watched reaches the server once it is reachable again.
 
-The desktop app is the only client this is for. The web app's one part is the way in: the pages that already offer "Open in raven player" offer "Download to raven player" beside it. The server changes nothing.
+The desktop app is the only client this is for. The web app's one part is the way in: a "Download to raven player" button beside Play on the movie, episode, season, show and saga pages, shown while Settings' "Open videos in raven player" is on. The watch page, which offers "Open in raven player", gets none. The server changes nothing.
 
 Decided with the user:
 
@@ -381,6 +381,6 @@ What else differs from the proposal:
 - "Downloaded <title>" also shows while the Downloads page is open. Delete all can race a download confirmed while it runs (rare).
 - A held deletion shows nothing on its row. A rewatch reads 100%, since `watchedAt` is first reached. Empty `downloads/<serverId>/` folders stay after a season goes.
 - Home's bar reads "Not started" for a fresh download that will open at the server's spot.
-- An episode downloaded alone takes `versions[0]`, while a season or show takes each episode's `primary`, so one episode can be downloaded in two versions.
+- An episode's page sends `media=` with the file Play starts there, while a season or show takes each episode's `primary`, so where the page shows another file than the season's `primary` (a page kept to another library, say), one episode can be downloaded in two versions. An `item=` link naming an episode, which raven web never builds, takes `versions[0]`.
 - The ask creates `userData/downloads` when it reads free space, before Download.
 - Follow-up: swap `mediaAccess`'s pick for core's `pickOrigin`, which landed on `main` (#204) after the stack was cut.

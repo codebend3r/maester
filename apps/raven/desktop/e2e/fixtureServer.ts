@@ -204,7 +204,7 @@ const MEDIA_PLANE_ROUTE = /^\/api\/media\/(\d+)\/(file|subtitles\/external-0)$/u
 const fileOf = (mediaId: number) => `/api/media/${mediaId}/file`
 
 /** The ticket the fixture issues for a title, and the only one its media origin takes for it. */
-const ticketFor = (mediaId: number) => `fixture-ticket-${mediaId}`
+export const ticketFor = (mediaId: number) => `fixture-ticket-${mediaId}`
 
 const FIXTURE_SHOW = { id: FIXTURE_ITEMS.show, title: 'Fixture Show' }
 
