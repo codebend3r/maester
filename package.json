@@ -88,6 +88,14 @@
       "dead-code": {
         "command": "knip --no-progress",
         "cache": true,
+        "dependsOn": [
+          {
+            "projects": [
+              "@raven/core"
+            ],
+            "target": "build"
+          }
+        ],
         "inputs": [
           "{workspaceRoot}/**/*.{ts,tsx,json,yml,yaml,toml}",
           {
