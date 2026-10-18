@@ -1112,7 +1112,14 @@ describe('server titles against headless libmpv', () => {
       run: async ({ harness, fixture }) => {
         await Array.from({ length: 6 }, (_value, index) => index).reduce(async (previous) => {
           await previous
+          const heard = fixture.home.seen.length
           await harness.sendOk(serverLoad({ target: fixture.titles.home }))
+          // mpv opens a file on its own thread after it takes the loadfile, so a B sent
+          // before then replaces A before A asks for anything, leaving nothing to check.
+          await harness.waitFor({
+            label: 'the first server asked for its title',
+            check: async () => fixture.home.seen.length > heard,
+          })
           await playingServer({ harness, target: fixture.titles.elsewhere })
           // A's sidecar request may still be in flight as B replaces it.
           await sleep(100)
