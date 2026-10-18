@@ -379,12 +379,14 @@
   }
 }
 
-// A fifth action, as a show's Shuffle is, takes a row holding a wide action
-// to about 47rem, and a sixth, as a season's second Shuffle is, to about
-// 60rem, so such a row breaks up to 64rem too: into even cells at least as
-// wide as the wide action, which then needs no row of its own. A cell also
-// takes at least a quarter of the row, so no fourth fits beside three: five
-// actions never read four and one left alone.
+// A fifth action takes a row holding a wide action to about 47rem, and a
+// season's seven (Play, the heart, two Shuffles, Download, Watched, Select)
+// to just under 64rem, so such a row breaks up to 64rem too: into even cells
+// at least as wide as the wide action, which then needs no row of its own. A
+// cell also takes at least a quarter of the row, so no fourth fits beside
+// three: five actions never read four and one left alone. Seven drop that
+// floor, so where four cells fit they read four and three, not three, three
+// and one.
 // A range, not `max-width`: this selector outranks the 40rem block's, so it
 // starts above 40rem to leave the narrower widths to that block.
 @container (40rem < width <= 64rem) {
@@ -392,5 +394,9 @@
     grid-auto-flow: row;
     grid-template-columns: repeat(auto-fill, minmax(max(15rem, 25%), 1fr));
     justify-content: stretch;
+  }
+
+  .group:has(> [data-wide]):has(> :nth-child(7)) {
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
   }
 }
