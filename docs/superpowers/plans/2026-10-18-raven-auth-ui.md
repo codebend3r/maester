@@ -38,11 +38,18 @@
 
 **Files:** scratchpad only. Record outcomes in this plan under "Spike results" before Task 1.
 
-- [ ] **Step 1:** In the scratchpad, install the latest `@supabase/supabase-js` and `@supabase/ssr` that are at least two weeks old (`bun pm view <pkg> time`). Note the exact versions.
-- [ ] **Step 2:** Create `createBrowserClient(url, key, { cookieOptions: { name: 'maester-auth' } })` under happy-dom, store a session whose JSON is over 4 KB, and print `document.cookie`. Confirm the names are `maester-auth` or `maester-auth.0`, `.1`, the value is `base64-` plus base64url, and a sign out removes every chunk.
-- [ ] **Step 3:** Feed that `document.cookie` to the server's decoder (`apps/raven/server/src/auth/accessToken.ts`, `accessTokenOf` with method `GET`) in a scratch bun script and confirm it returns the session's `access_token`. If it does not, the plan changes to a hand-written `storage` for `@supabase/supabase-js`; stop and report.
+- [x] **Step 1:** In the scratchpad, install the latest `@supabase/supabase-js` and `@supabase/ssr` that are at least two weeks old (`bun pm view <pkg> time`). Note the exact versions.
+- [x] **Step 2:** Create `createBrowserClient(url, key, { cookieOptions: { name: 'maester-auth' } })` under happy-dom, store a session whose JSON is over 4 KB, and print `document.cookie`. Confirm the names are `maester-auth` or `maester-auth.0`, `.1`, the value is `base64-` plus base64url, and a sign out removes every chunk.
+- [x] **Step 3:** Feed that `document.cookie` to the server's decoder (`apps/raven/server/src/auth/accessToken.ts`, `accessTokenOf` with method `GET`) in a scratch bun script and confirm it returns the session's `access_token`. If it does not, the plan changes to a hand-written `storage` for `@supabase/supabase-js`; stop and report.
 - [ ] **Step 4:** Against the local stack (`bunx nx run @raven/supabase:start`), confirm `signUp` delivers a Mailpit email whose link carries `token_hash` and `type`, and that `verifyOtp({ token_hash, type })` from a client with no session creates one.
-- [ ] **Step 5:** Write the versions and findings into this file. No commit of scratch code.
+- [x] **Step 5:** Write the versions and findings into this file. No commit of scratch code.
+
+**Spike results (2026-10-18):**
+
+- Versions: `@supabase/supabase-js` 2.117.2 (2026-09-25; 2.117.3 and 2.118.0 are under two weeks old) and `@supabase/ssr` 0.12.7 (2026-09-08).
+- Steps 2 and 3 pass under happy-dom with a stubbed token endpoint: a small session is one `maester-auth` cookie, a 6 KB one is `maester-auth.0` to `.2`, values start `base64-`, and the server's `accessTokenOf` (GET) returns the session's exact `access_token` for both. No hand-written storage needed.
+- Sign out under happy-dom leaves empty-valued entries (`maester-auth.0=`), not absent ones. Task 4's test asserts no `maester-auth*` entry has a value; the server reads an empty value as no token.
+- Step 4 (Mailpit) not run here; the stack was down. The confirmation template links `{{ .SiteURL }}/auth/confirm?token_hash=...&type=email` (recovery uses `type=recovery`), so signup confirmation is `verifyOtp` type `email`, not `signup`. Task 7 is corrected below. `site_url` is `http://localhost:5173`, so the link ignores `emailRedirectTo` and lands on raven's `/auth/confirm`; the Task 11 walkthrough confirms `verifyOtp` with no prior session.
 
 ### Task 1: Dependencies and the auth client seam
 
@@ -143,7 +150,7 @@
 - Create: `apps/raven/web/src/pages/ConfirmPage/` (`.tsx`, `.module.scss`, `.test.tsx`)
 
 **Interfaces:**
-- Reads `token_hash` and `type` (`signup` or `recovery`, otherwise an error), immediately replaces the URL with `AUTH_ROUTES.confirm` (no query), then `verifyOtp({ token_hash, type })`. `signup` goes to `/` (the gate then shows pending or the library); `recovery` goes to `AUTH_ROUTES.reset`. `otpExpired` or any failure shows "This link has expired or was already used" with a link to resend (`checkEmail` for signup, `forgot` for recovery).
+- Reads `token_hash` and `type` (`email` or `recovery`, otherwise an error; the confirmation template in `apps/raven/supabase/templates` links with `type=email`), immediately replaces the URL with `AUTH_ROUTES.confirm` (no query), then `verifyOtp({ token_hash, type })`. `email` goes to `/` (the gate then shows pending or the library); `recovery` goes to `AUTH_ROUTES.reset`. `otpExpired` or any failure shows "This link has expired or was already used" with a link to resend (`checkEmail` for `email`, `forgot` for `recovery`).
 
 - [ ] **Step 1:** Tests: the URL has no `token_hash` before `verifyOtp` resolves and after it fails; success and failure for both types; a second render with no params shows the error, not a spinner; opened with no prior session (a second browser).
 - [ ] **Step 2:** Implement; tests pass.
