@@ -9,7 +9,8 @@ import { STREAM_TIME_SHIFT } from '@raven/core'
  * buffered is the browser's business; seeking outside it aborts the running
  * request and starts a new stream there. Reading stops while a minute is
  * buffered ahead, which holds ffmpeg back through the pipe, and what is
- * more than half a minute behind is let go.
+ * more than half a minute behind is let go. Under memory pressure that
+ * back buffer shrinks, so a full buffer cannot strand the playhead.
  *
  * The browser objects are described structurally so tests can stand in for
  * them; the real ones satisfy these types.
@@ -23,7 +24,13 @@ export const MEDIA_SOURCE_STATES = { closed: 'closed', open: 'open', ended: 'end
 /** What a source buffer fires when an append or a removal is done, or has failed. */
 export const BUFFER_EVENTS = { updateEnd: 'updateend', error: 'error' } as const
 
-const ERROR_NAMES = { quotaExceeded: 'QuotaExceededError', abort: 'AbortError' } as const
+export const ERROR_NAMES = { quotaExceeded: 'QuotaExceededError', abort: 'AbortError' } as const
+export const STREAM_EVENTS = {
+  timeUpdate: 'timeupdate',
+  seeking: 'seeking',
+  sourceOpen: 'sourceopen',
+  abort: 'abort',
+} as const
 
 type Ranges = {
   readonly length: number
@@ -92,6 +99,10 @@ type SessionState = {
 const MAX_AHEAD_SECONDS = 60
 /** Keep this much behind the playhead for quick skips back. */
 const KEEP_BEHIND_SECONDS = 30
+/** Keep a decoding runway, but not thirty seconds of compressed video, when memory is full. */
+const QUOTA_KEEP_BEHIND_SECONDS = 5
+/** Batch normal removals instead of making an MSE update on every timeupdate. */
+const EVICT_INTERVAL_SECONDS = 5
 /** How close to a buffered edge still counts as inside it. */
 const EDGE_SECONDS = 0.1
 /**
@@ -112,13 +123,27 @@ const rangeAt = ({ ranges, time }: { ranges: Ranges; time: number }): [number, n
   ) ?? null
 
 /** Resolves on the first of `types`; the returned promise never rejects. */
-const nextEvent = ({ target, types }: { target: VideoLike; types: string[] }): Promise<void> =>
+const nextEvent = ({
+  target,
+  types,
+  signal,
+}: {
+  target: VideoLike
+  types: string[]
+  signal: AbortSignal | null
+}): Promise<void> =>
   new Promise((resolve) => {
+    if (signal?.aborted ?? false) {
+      resolve()
+      return
+    }
     const done = () => {
       types.forEach((type) => target.removeEventListener(type, done))
+      signal?.removeEventListener(STREAM_EVENTS.abort, done)
       resolve()
     }
     types.forEach((type) => target.addEventListener(type, done))
+    signal?.addEventListener(STREAM_EVENTS.abort, done)
   })
 
 const updateEnd = (buffer: SourceBufferLike): Promise<void> =>
@@ -213,15 +238,33 @@ export const createStreamSession = <S extends MediaSourceLike>({
     if (buffer.updating) await updateEnd(buffer)
   }
 
-  const evictBehind = async (buffer: SourceBufferLike): Promise<boolean> => {
-    const cutoff = video.currentTime - KEEP_BEHIND_SECONDS
+  const evictBehind = async ({
+    buffer,
+    generation,
+    keepBehind = KEEP_BEHIND_SECONDS,
+    interval = EVICT_INTERVAL_SECONDS,
+  }: {
+    buffer: SourceBufferLike
+    generation: number
+    keepBehind?: number
+    interval?: number
+  }): Promise<boolean> => {
+    const cutoff = video.currentTime - keepBehind
     const first = rangesOf(buffer.buffered)[0]
-    if (!first || first[0] >= cutoff) return false
+    if (!first || cutoff - first[0] <= interval) return false
     await settle(buffer)
+    if (!current(generation)) return false
     buffer.remove(first[0], cutoff)
     await updateEnd(buffer)
-    return true
+    return (rangesOf(buffer.buffered)[0]?.[0] ?? Infinity) > first[0]
   }
+
+  const waitForPlayback = (): Promise<void> =>
+    nextEvent({
+      target: video,
+      types: [STREAM_EVENTS.timeUpdate, STREAM_EVENTS.seeking],
+      signal: state.controller?.signal ?? null,
+    })
 
   const ahead = (buffer: SourceBufferLike): number => {
     const range = rangeAt({ ranges: buffer.buffered, time: video.currentTime })
@@ -237,8 +280,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
     generation: number
   }): Promise<void> => {
     if (!current(generation) || ahead(buffer) < MAX_AHEAD_SECONDS) return
-    await evictBehind(buffer)
-    await nextEvent({ target: video, types: ['timeupdate', 'seeking'] })
+    await waitForPlayback()
     return waitForRoom({ buffer, generation })
   }
 
@@ -251,17 +293,29 @@ export const createStreamSession = <S extends MediaSourceLike>({
     chunk: Uint8Array<ArrayBuffer>
     generation: number
   }): Promise<void> => {
+    if (!current(generation)) return
+    // Prune even when delivery never gets a minute ahead. Otherwise old
+    // frames occupy the quota while a slower stream is trying to catch up.
+    await evictBehind({ buffer, generation })
     await waitForRoom({ buffer, generation })
     if (!current(generation)) return
     try {
       await settle(buffer)
+      if (!current(generation)) return
       buffer.appendBuffer(chunk)
       await updateEnd(buffer)
     } catch (error) {
       if (!isQuotaError(error)) throw error
-      // Full: let go of what is behind, or wait for playback to use some up.
-      const freed = await evictBehind(buffer)
-      if (!freed) await nextEvent({ target: video, types: ['timeupdate', 'seeking'] })
+      // Thirty seconds can itself exceed the quota. Retaining all of it
+      // deadlocks once playback reaches the end and cannot wake this retry.
+      const freed = await evictBehind({
+        buffer,
+        generation,
+        keepBehind: QUOTA_KEEP_BEHIND_SECONDS,
+        interval: 0,
+      })
+      if (!current(generation)) return
+      if (!freed) await waitForPlayback()
       return append({ buffer, chunk, generation })
     }
   }
@@ -275,6 +329,10 @@ export const createStreamSession = <S extends MediaSourceLike>({
     buffer: SourceBufferLike
     generation: number
   }): Promise<void> => {
+    if (!current(generation)) {
+      await reader.cancel().catch(() => undefined)
+      return
+    }
     const { done, value } = await reader.read()
     if (!current(generation)) {
       await reader.cancel().catch(() => undefined)
@@ -353,7 +411,8 @@ export const createStreamSession = <S extends MediaSourceLike>({
   }
 
   const onOpen = () => {
-    if (!source || state.destroyed) return
+    // MSE fires sourceopen again when a seek reopens an ended source.
+    if (!source || state.destroyed || state.buffer) return
     try {
       state.buffer = source.addSourceBuffer(mime)
     } catch {
@@ -362,7 +421,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
     }
     if (duration != null && duration > 0) source.duration = duration + STREAM_TIME_SHIFT
     video.currentTime = start + STREAM_TIME_SHIFT
-    video.addEventListener('seeking', onSeeking)
+    video.addEventListener(STREAM_EVENTS.seeking, onSeeking)
     void load(start)
   }
 
@@ -370,7 +429,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
     // Reported on the next tick, so the caller has its session before hearing about it.
     queueMicrotask(() => fail("This browser can't play converted video."))
   } else {
-    source.addEventListener('sourceopen', onOpen)
+    source.addEventListener(STREAM_EVENTS.sourceOpen, onOpen)
     state.detach = environment.attach(source)
   }
 
@@ -379,8 +438,8 @@ export const createStreamSession = <S extends MediaSourceLike>({
       state.destroyed = true
       state.generation += 1
       state.controller?.abort()
-      video.removeEventListener('seeking', onSeeking)
-      source?.removeEventListener('sourceopen', onOpen)
+      video.removeEventListener(STREAM_EVENTS.seeking, onSeeking)
+      source?.removeEventListener(STREAM_EVENTS.sourceOpen, onOpen)
       state.detach()
     },
   }
