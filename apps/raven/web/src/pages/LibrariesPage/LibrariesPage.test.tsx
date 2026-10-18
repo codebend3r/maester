@@ -311,11 +311,11 @@ describe('LibrariesPage', () => {
     renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })
     expect(await screen.findByRole('button', { name: 'Pin Clips' })).toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Folders' })).toBeNull()
-    expect(screen.queryByText('/media/vermithor/Clips')).toBeNull()
+    expect(screen.queryByText('/media/vermithor')).toBeNull()
     cleanup()
 
     renderWithProviders({ ui: <LibrariesPage /> })
-    expect(await screen.findByText('/media/vermithor/Clips')).toBeInTheDocument()
+    expect(await screen.findByText('/media/vermithor')).toBeInTheDocument()
   })
 
   it('says how to add the first library while the admin lock is on', async () => {
