@@ -19,6 +19,7 @@ import {
   fitsTier,
   isMatchChoice,
   isMatchItemType,
+  isTvMovieId,
   type MatchCandidate,
   type MatchItemType,
   type MatchSubject,
@@ -336,6 +337,9 @@ export class MatchController {
       throw new BadRequestException('Only files in a library of movies or shows can be matched.')
     }
     const tmdbId = body.tmdbId
+    if (isTvMovieId(tmdbId) && matchTypeFor(kind) !== ITEM_TYPES.movie) {
+      throw new BadRequestException('A TV documentary movie match needs a movie library.')
+    }
     if (tmdbId != null) this.requireTmdb()
     await this.service.fixMatch({ mediaId: id, tmdbId }).catch(tmdbFailure)
     const updated = this.media.get(id)

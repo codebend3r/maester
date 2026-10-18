@@ -256,6 +256,13 @@ const json = ({ body, status = 200 }: { body: unknown; status?: number }): Respo
 
 const yearOf = (released: string): number => Number(released.slice(0, 4))
 
+/** TMDB ignores punctuation missing from a filesystem-safe title, such as a subtitle's colon. */
+const searchWords = (title: string): string =>
+  title
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+
 /**
  * TMDB in miniature: searches by a title or alternative title holding the
  * query (year optional), `/find` by IMDb id, and movies by id. `down` makes every call fail as if TMDB were
@@ -351,7 +358,7 @@ export const fakeTmdb = ({
       const results = state.movies.filter(
         (movie) =>
           [movie.title, ...(movie.alternativeTitles ?? [])].some((each) =>
-            each.toLowerCase().includes(title.toLowerCase()),
+            searchWords(each).includes(searchWords(title)),
           ) &&
           (year == null || Math.abs(yearOf(movie.released) - Number(year)) <= 1) &&
           (isAdultIncluded || !movie.isHiddenFromSearch),
@@ -379,7 +386,7 @@ export const fakeTmdb = ({
       const results = state.shows.filter(
         (show) =>
           [show.title, ...(show.alternativeTitles ?? [])].some((each) =>
-            each.toLowerCase().includes(title.toLowerCase()),
+            searchWords(each).includes(searchWords(title)),
           ) &&
           (year == null || Math.abs(yearOf(show.first) - Number(year)) <= 1),
       )
