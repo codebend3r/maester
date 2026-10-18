@@ -63,7 +63,7 @@ Every page in the shell has one at the top of its header:
 
 ## 2. Folders on a library card
 
-`groupFolders(paths)` splits each path at its last `/`:
+`foldersByParent(paths)` splits each path at its last `/`:
 - It answers `{ parent, names }[]` in the order the parents first appear.
 - A path directly under `/` has the parent `/`.
 

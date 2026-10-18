@@ -140,24 +140,33 @@
   font-variant-numeric: tabular-nums;
 }
 
-// The folders as chips, in as many columns as the card has room for; a
-// long path wraps inside its chip.
+// The folders a line to a parent, its names after it. The lines share the
+// parent column, so the names line up under one another. The column is capped
+// at half the width, so a long parent wraps inside it and leaves the names
+// room; a long name wraps in its own column.
 .paths {
   grid-area: paths;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
-  gap: var(--space-1);
+  grid-template-columns: fit-content(50%) minmax(0, 1fr);
+  gap: var(--space-0) var(--space-3);
 }
 
 .path {
-  justify-self: start;
-  max-width: 100%;
-  padding: var(--space-0) var(--space-2);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-bark) 7%, transparent);
-  color: var(--color-birch);
-  font-family: var(--font-mono);
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
   font-size: var(--font-size-xs);
+}
+
+.parent {
+  color: var(--color-lichen);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.names {
+  color: var(--color-birch);
+  font-family: var(--font-body);
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -246,6 +255,15 @@
       'icon paths'
       'icon status'
       'actions actions';
+  }
+
+  .paths {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .path {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
   }
 
   .actions {

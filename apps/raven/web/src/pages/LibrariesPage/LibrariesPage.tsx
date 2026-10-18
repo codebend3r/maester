@@ -13,6 +13,7 @@ import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useCanManage } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { librarySettingsEdits } from '@/lib/edits'
+import { foldersByParent } from '@/lib/folders'
 import { afterPins } from '@/lib/invalidate'
 import { KINDS } from '@/lib/libraryKinds'
 import { LIBRARY_LOCK_STATES, lockState } from '@/lib/libraryLock'
@@ -68,11 +69,12 @@ const PinButton = ({ library }: { library: Library }) => {
 
 /**
  * A library's card: its type icon in a well beside its name, its counts,
- * its folders and how its scan stands, and at its right Pin and the
- * library page's own actions. The picture of its newest video fades in at
- * the card's right. While it is locked to this browser it shows only its
- * name, type and counts; the server sends no more, and a list cached from
- * before is held to the same. Its folders show only while the admin lock is off.
+ * its folders grouped by the folder that holds them, how its scan stands,
+ * and at its right Pin and the library page's own actions. The picture of
+ * its newest video fades in at the card's right. While it is locked to
+ * this browser it shows only its name, type and counts; the server sends no
+ * more, and a list cached from before is held to the same. Its folders show
+ * only while the admin lock is off.
  */
 const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) => {
   const actions = useLibraryActions(library)
@@ -102,9 +104,10 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
         </span>
         {paths.length > 0 && (
           <ul className={styles.paths} aria-label="Folders">
-            {paths.map((path) => (
-              <li key={path} className={styles.path}>
-                {path}
+            {foldersByParent(paths).map(({ parent, names }) => (
+              <li key={parent} className={styles.path}>
+                <span className={styles.parent}>{parent}</span>
+                <span className={styles.names}>{names.join(' · ')}</span>
               </li>
             ))}
           </ul>
