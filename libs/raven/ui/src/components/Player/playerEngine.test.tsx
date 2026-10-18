@@ -333,6 +333,27 @@ describe('Player HTML local files', () => {
   })
 })
 
+describe('the line under a local file’s title', () => {
+  const aboutOf = (services: PlayerServices) => {
+    usePlayerServices.setState({ services })
+    renderWithProviders({
+      ui: <Player engine={{ kind: 'html', source: { kind: 'file', url: 'blob:local-clip' } }} />,
+    })
+    return screen.getByRole('heading', { level: 1, name: 'Local clip' }).nextElementSibling
+  }
+
+  it('says only how it plays when the host names no context', () => {
+    expect(aboutOf(servicesFor())).toHaveTextContent(/^Direct play$/)
+  })
+
+  it('says where it came from before how it plays', () => {
+    const services = servicesFor()
+    expect(
+      aboutOf({ ...services, title: { ...services.title, context: 'Downloaded from Vhagar' } }),
+    ).toHaveTextContent(/^Downloaded from Vhagar · Direct play$/)
+  })
+})
+
 describe('HTML engine surface focus', () => {
   it('is safe before the surface exists and after it unmounts', () => {
     const handles: EngineHandle[] = []

@@ -97,6 +97,7 @@ const entryOf = ({
   status: { kind: 'queued' },
   autoDelete,
   watchedAt: null,
+  serverPosition: file.media.position,
   pending: NO_PENDING,
   createdAt,
 })

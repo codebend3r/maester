@@ -138,7 +138,13 @@ export type ServerTarget = {
   headerFields: string
   sidecars: readonly { url: string; title: string; language: string }[]
 }
-type LoadTarget = { kind: typeof PLAYER_SOURCE_KINDS.file; path: string } | ServerTarget
+export type LocalSidecar = { path: string; title: string; language: string }
+type FileTarget = {
+  kind: typeof PLAYER_SOURCE_KINDS.file
+  path: string
+  sidecars: readonly LocalSidecar[]
+}
+type LoadTarget = FileTarget | ServerTarget
 export type ResolvedSource = { ok: true; target: LoadTarget } | { ok: false; message: string }
 export type FailureExplainer = (input: {
   target: ServerTarget
@@ -172,6 +178,7 @@ export const resolveSourceWith =
   ({
     grants,
     servers,
+    sidecarsOf,
   }: {
     grants: Pick<Grants, 'fileOf'>
     servers: {
@@ -179,6 +186,8 @@ export const resolveSourceWith =
         source: Extract<PlayerSource, { kind: typeof PLAYER_SOURCE_KINDS.server }>,
       ) => Promise<ResolvedSource>
     }
+    /** The subtitle files that belong to a granted file, keyed by its `fileId`. */
+    sidecarsOf: (fileId: string) => readonly LocalSidecar[]
   }) =>
   async (source: PlayerSource): Promise<ResolvedSource> => {
     switch (source.kind) {
@@ -187,7 +196,14 @@ export const resolveSourceWith =
       case PLAYER_SOURCE_KINDS.file: {
         const file = grants.fileOf(source.fileId)
         if (file === null) return { ok: false, message: PLAYER_MESSAGES.notOpen }
-        return { ok: true, target: { kind: PLAYER_SOURCE_KINDS.file, path: file.path } }
+        return {
+          ok: true,
+          target: {
+            kind: PLAYER_SOURCE_KINDS.file,
+            path: file.path,
+            sidecars: sidecarsOf(source.fileId),
+          },
+        }
       }
       default: {
         const unreachable: never = source
@@ -270,6 +286,38 @@ const locationOf = (target: LoadTarget): string => {
   }
 }
 
+type Sidecar = { location: string; title: string; language: string }
+
+/** What `sub-add` is given for each of a target's sidecars: a URL for a server, a path for a file. */
+const sidecarsOfTarget = (target: LoadTarget): readonly Sidecar[] => {
+  switch (target.kind) {
+    case PLAYER_SOURCE_KINDS.file:
+      return target.sidecars.map(({ path, title, language }) => ({
+        location: path,
+        title,
+        language,
+      }))
+    case PLAYER_SOURCE_KINDS.server:
+      return target.sidecars.map(({ url, title, language }) => ({
+        location: url,
+        title,
+        language,
+      }))
+    default: {
+      const unreachable: never = target
+      return unreachable
+    }
+  }
+}
+
+const subAddArgs = ({ location, title, language }: Sidecar): string[] => [
+  MPV_COMMANDS.subAdd,
+  location,
+  'auto',
+  title,
+  language,
+]
+
 const clamp = ({ value, min, max }: { value: number; min: number; max: number }) =>
   Math.min(max, Math.max(min, value))
 
@@ -338,11 +386,13 @@ export const createPlayerService = ({
   // What the newest load opened, and its ticket, which an ending explains and a server's
   // removal stops.
   let opened: LoadTarget | null = null
-  // mpv's warnings name the file it plays, which the log must not hold (Ruling 12).
+  // mpv's warnings name the file it plays and its sidecars, which the log must not hold
+  // (Ruling 12). Whole paths go first so a name inside one is not replaced on its own.
   const withoutOpenFile = (message: string): string => {
     if (opened === null || opened.kind !== PLAYER_SOURCE_KINDS.file) return message
-    const { path } = opened
-    return message.replaceAll(path, OPEN_FILE).replaceAll(basename(path), OPEN_FILE)
+    const paths = [opened.path, ...opened.sidecars.map(({ path }) => path)]
+    const named = [...paths, ...paths.map((path) => basename(path))].filter((name) => name !== '')
+    return named.reduce((text, name) => text.replaceAll(name, OPEN_FILE), message)
   }
   // These run inside the wrapper's event drain, so nothing they throw may escape.
   const warn = (message: string) => {
@@ -632,20 +682,18 @@ export const createPlayerService = ({
     }
   }
 
-  /** Adds a server's sidecars one at a time, in order; false when overtaken. */
+  /** Adds a title's sidecars one at a time, in order; false when overtaken. */
   const addSidecars = ({
     sidecars,
     token,
   }: {
-    sidecars: ServerTarget['sidecars']
+    sidecars: readonly Sidecar[]
     token: number
   }): Promise<boolean> =>
     sidecars.reduce<Promise<boolean>>(async (chain, sidecar, position) => {
       if (!(await chain)) return false
       try {
-        await mpv.command({
-          args: [MPV_COMMANDS.subAdd, sidecar.url, 'auto', sidecar.title, sidecar.language],
-        })
+        await mpv.command({ args: subAddArgs(sidecar) })
       } catch (error) {
         warn(`mpv sub-add of sidecar ${position} failed: ${messageOf(error)}`)
       }
@@ -653,16 +701,18 @@ export const createPlayerService = ({
     }, Promise.resolve(true))
 
   /**
-   * Waits for a server title's sidecars, but no longer than `SIDECAR_BUDGET_MS`: a slow
-   * server must not hold the first events back. Late sidecars still go in, in order, and
+   * Waits for a title's sidecars, but no longer than `SIDECAR_BUDGET_MS`: a slow
+   * server or disk must not hold the first events back. Late sidecars still go in, in order, and
    * reach the page through `track-list`; `pending` is that chain when it outlasted the
    * budget, and `isCurrent` is false when the load was overtaken.
    */
   const sidecarsWithinBudget = async ({
     sidecars,
+    kind,
     token,
   }: {
-    sidecars: ServerTarget['sidecars']
+    sidecars: readonly Sidecar[]
+    kind: LoadTarget['kind']
     token: number
   }): Promise<{ isCurrent: boolean; pending: Promise<boolean> | null }> => {
     const budget: { handle: unknown } = { handle: null }
@@ -673,7 +723,7 @@ export const createPlayerService = ({
     try {
       const outcome = await Promise.race([adding, late])
       if (outcome !== SIDECAR_LATE) return { isCurrent: outcome && token === epoch, pending: null }
-      warn('server sidecars are slow; the title starts without them')
+      warn(`${kind} sidecars are slow; the title starts without them`)
       return { isCurrent: token === epoch, pending: adding }
     } finally {
       timers.clear(budget.handle)
@@ -706,11 +756,12 @@ export const createPlayerService = ({
   }
 
   const snapshot = async (token: number) => {
-    const server = serverOpened()
+    const toAdd = opened === null ? [] : sidecarsOfTarget(opened)
+    // With nothing to add there is nothing to wait for, so no budget timer is armed.
     const sidecars =
-      server === null
+      opened === null || toAdd.length === 0
         ? { isCurrent: true, pending: null }
-        : await sidecarsWithinBudget({ sidecars: server.sidecars, token })
+        : await sidecarsWithinBudget({ sidecars: toAdd, kind: opened.kind, token })
     if (!sidecars.isCurrent) return
     const list = await readOr({ name: MPV_PROPERTIES.trackList, fallback: [] })
     const fps = await readOr({ name: MPV_PROPERTIES.containerFps, fallback: null })

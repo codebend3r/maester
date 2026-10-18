@@ -23,6 +23,11 @@ export type PlayerFavourite = {
 
 export type PlayerTitle = {
   label: string
+  /**
+   * Where the title came from, which the line under it names before how it plays:
+   * "Downloaded from Vhagar · Direct play". Left out, the line names no source.
+   */
+  context?: string | null
   duration: number | null
   resumeAt: number
   backTo: string

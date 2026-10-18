@@ -236,9 +236,24 @@ export const savePosition = ({
   }
 }
 
-export const resumeFor = ({ state, file }: { state: PlayerState; file: FileFacts }): number => {
+/** Drops the path's resume spot; with none, the same state, so the store writes nothing. */
+export const forgetResume = ({ state, path }: { state: PlayerState; path: string }): PlayerState =>
+  state.resume.some((entry) => entry.path === path)
+    ? { ...state, resume: state.resume.filter((entry) => entry.path !== path) }
+    : state
+
+/** Where the file starts: its saved spot, or `fallback` when it has none (a download's server spot). */
+export const resumeFor = ({
+  state,
+  file,
+  fallback = 0,
+}: {
+  state: PlayerState
+  file: FileFacts
+  fallback?: number
+}): number => {
   const saved = savedFor({ state, file })
-  if (!saved) return 0
+  if (!saved) return fallback
   return isFinished(saved) ? 0 : saved.position
 }
 

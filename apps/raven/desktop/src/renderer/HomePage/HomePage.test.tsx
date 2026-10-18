@@ -70,6 +70,25 @@ describe('HomePage', () => {
     expect(screen.getByRole('progressbar', { name: 'Not started' })).toBeInTheDocument()
   })
 
+  it('says a recent watched whole is 100% watched', async () => {
+    renderDesktop({
+      client: fakeClient({
+        request: answering({
+          recents: [
+            {
+              recentId: RECENT_1,
+              label: 'S01E01 Good News',
+              from: 'Downloaded from Vhagar',
+              watched: 1,
+            },
+          ],
+        }),
+      }),
+      routes: STUB_ROUTES,
+    })
+    expect(await screen.findByRole('progressbar', { name: '100% watched' })).toBeInTheDocument()
+  })
+
   it('opens a recent by its id', async () => {
     const client = fakeClient({
       request: answering({

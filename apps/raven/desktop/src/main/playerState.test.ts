@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   EMPTY_STATE,
   END_MARGIN_S,
+  forgetResume,
   RECENTS_CAP,
   RESUME_CAP,
   TRACKS_CAP,
@@ -496,6 +497,32 @@ describe('resumeFor', () => {
       at: 1,
     })
     expect(resumeFor({ state: unknown, file: facts({ path: '/a' }) })).toBe(40)
+  })
+
+  it('returns the fallback only when the file has no saved spot', () => {
+    expect(resumeFor({ state: saved, file: facts({ path: '/other' }), fallback: 4200 })).toBe(4200)
+    expect(
+      resumeFor({ state: saved, file: facts({ path: '/a', size: 999 }), fallback: 4200 }),
+    ).toBe(4200)
+    expect(resumeFor({ state: saved, file: facts({ path: '/a' }), fallback: 4200 })).toBe(40)
+  })
+})
+
+describe('forgetResume', () => {
+  const saved = [facts({ path: '/a' }), facts({ path: '/b' })].reduce(
+    (state, file) => savePosition({ state, file, position: 40, duration: 120, at: 1 }),
+    addRecent({ state: EMPTY_STATE, path: '/a', at: 1 }),
+  )
+
+  it("drops the path's resume spot and keeps the others and the recents", () => {
+    const forgotten = forgetResume({ state: saved, path: '/a' })
+    expect(forgotten.resume.map((entry) => entry.path)).toEqual(['/b'])
+    expect(resumeFor({ state: forgotten, file: facts({ path: '/a' }) })).toBe(0)
+    expect(forgotten.recents).toEqual(saved.recents)
+  })
+
+  it('hands back the same state when the path has no spot, so nothing is written', () => {
+    expect(forgetResume({ state: saved, path: '/other' })).toBe(saved)
   })
 })
 

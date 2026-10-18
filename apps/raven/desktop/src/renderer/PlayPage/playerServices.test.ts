@@ -19,6 +19,7 @@ const FILE: LocalFile = {
   fileId: A,
   label: 'Clip 01',
   folder: 'Clips',
+  isDownload: false,
   resumeAt: 42,
   next: null,
   tracks: null,
@@ -53,11 +54,20 @@ describe('servicesFor', () => {
   it('describes the title with no next video', () => {
     expect(setup().services.title).toEqual({
       label: 'Clip 01',
+      context: null,
       duration: null,
       resumeAt: 42,
       backTo: '/',
       next: null,
     })
+  })
+
+  it('names where a download came from, and no folder for any other file', () => {
+    const download = setup({
+      file: { ...FILE, folder: 'Downloaded from Vhagar', isDownload: true },
+    })
+    expect(download.services.title.context).toBe('Downloaded from Vhagar')
+    expect(setup().services.title.context).toBeNull()
   })
 
   it('links the next video with its queue', () => {
@@ -81,6 +91,7 @@ describe('servicesFor', () => {
 
   it('saves the position with the length it was told', () => {
     const { services, client } = setup()
+    services.progress.started()
     services.progress.duration!(30)
     services.progress.save(12)
     services.progress.left(20)
@@ -95,6 +106,20 @@ describe('servicesFor', () => {
       fileId: A,
       position: 20,
       duration: 30,
+    })
+  })
+
+  it('sends no position for a file left before playback started', () => {
+    const { services, client } = setup()
+    services.progress.left(42)
+    expect(client.request).not.toHaveBeenCalled()
+    services.progress.started()
+    services.progress.left(43)
+    expect(client.request).toHaveBeenCalledWith({
+      type: 'savePosition',
+      fileId: A,
+      position: 43,
+      duration: null,
     })
   })
 

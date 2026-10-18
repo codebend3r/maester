@@ -41,6 +41,7 @@ const CLIP_A: LocalFile = {
   fileId: A,
   label: 'Clip 01',
   folder: 'Clips',
+  isDownload: false,
   resumeAt: 0,
   next: { fileId: B, label: 'Clip 02', queue: [] },
   tracks: null,
@@ -49,6 +50,7 @@ const CLIP_B: LocalFile = {
   fileId: B,
   label: 'Clip 02',
   folder: 'Clips',
+  isDownload: false,
   resumeAt: 0,
   next: null,
   tracks: null,
@@ -112,6 +114,24 @@ describe('PlayPage', () => {
     expect(await screen.findByText('Resumed at 1:05')).toBeInTheDocument()
   })
 
+  it('says under the title where a download came from', async () => {
+    const download: LocalFile = { ...CLIP_A, folder: 'Downloaded from Vhagar', isDownload: true }
+    const client = fakeClient({
+      request: describing((fileId) => ({ type: 'file', file: fileId === A ? download : CLIP_B })),
+    })
+    renderDesktop({ client, route: `/play/${A}` })
+    await videoElement()
+    expect(screen.getByText('Downloaded from Vhagar · Direct play')).toBeInTheDocument()
+  })
+
+  it('names no folder under the title of a file that is no download', async () => {
+    renderDesktop({ client: fakeClient({ request: clips }), route: `/play/${A}` })
+    await videoElement()
+    const about = screen.getByRole('heading', { level: 1, name: 'Clip 01' }).nextElementSibling
+    expect(about).toHaveTextContent(/^Direct play$/)
+    expect(screen.queryByText(/Clips/)).toBeNull()
+  })
+
   it('links the next video', async () => {
     renderDesktop({ client: fakeClient({ request: clips }), route: `/play/${A}` })
     await videoElement()
@@ -169,6 +189,22 @@ describe('PlayPage', () => {
     )
     expect(saved).toBeGreaterThan(-1)
     expect(described).toBeGreaterThan(saved)
+  })
+
+  it('sends no position for a video left before it played, and sends one once it played', async () => {
+    const client = fakeClient({ request: clips })
+    const { router } = renderDesktop({ client, route: `/play/${A}` })
+    await videoElement()
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    const saves = () =>
+      client.request.mock.calls.filter(([request]) => request.type === 'savePosition')
+    expect(saves()).toEqual([])
+    await act(() => router.navigate(`/play/${A}`))
+    fireEvent(await videoElement(), new Event('playing'))
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(saves().length).toBeGreaterThan(0)
   })
 
   it('names the page it shows while main describes the file', async () => {

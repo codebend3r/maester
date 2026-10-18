@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { createRequire } from 'node:module'
-import { basename, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { setFlagsFromString } from 'node:v8'
@@ -38,6 +38,7 @@ import {
   createPlayerService,
   type FailureExplainer,
   PLAYER_MESSAGES,
+  type LocalSidecar,
   type PlayerOutcome,
   type ResolvedSource,
   resolveSourceWith,
@@ -147,15 +148,28 @@ const referencePath = (reference: Reference) => join(nested, `${reference} 01.mk
 const paths = {
   t1: clip.path,
   t2: join(clip.folder, 'Sidecar 01.mkv'),
+  local: join(clip.folder, 'Local 01.mkv'),
   bad: join(clip.folder, 'notes.mkv'),
   missing: join(clip.folder, 'Gone 01.mkv'),
   damaged: join(clip.folder, 'Damaged 01.mkv'),
   cut: join(clip.folder, 'Cut 01.mkv'),
 } as const
 type FileId = keyof typeof paths | Reference
+// Beside no clip's name and outside mpv's subtitle search folders, so only `sub-add` can find it.
+const LOCAL_SIDECAR: LocalSidecar = {
+  path: join(clip.folder, 'vtt', 'English.vtt'),
+  title: 'Local English',
+  language: 'en',
+}
+const sidecarsOf = (fileId: string): readonly LocalSidecar[] =>
+  fileId === 'local' ? [LOCAL_SIDECAR] : []
 const whole = await readFile(clip.path)
 await Promise.all([
   copyFile(clip.path, paths.t2),
+  copyFile(clip.path, paths.local),
+  mkdir(dirname(LOCAL_SIDECAR.path)).then(() =>
+    writeFile(LOCAL_SIDECAR.path, 'WEBVTT\n\n00:00.000 --> 00:29.000\nraven local sidecar\n'),
+  ),
   writeFile(
     join(clip.folder, 'Sidecar 01.srt'),
     '1\n00:00:00,000 --> 00:00:29,000\nraven sidecar fixture\n',
@@ -231,7 +245,7 @@ const openHarness = async ({
   })
   const service = createPlayerService({
     mpv,
-    resolveSource: resolveSourceWith({ grants: { fileOf }, servers }),
+    resolveSource: resolveSourceWith({ grants: { fileOf }, servers, sidecarsOf }),
     explain,
     canChooseAo: false,
     timers: createNodeTimers(),
@@ -473,6 +487,27 @@ describe('the desktop player service against headless libmpv', () => {
       )
       assert.ok(external, 'mpv did not load the sidecar')
       await sendOk({ type: 'subtitle', id: SIDECAR_ID })
+      assert.equal(await mpv.read({ name: 'sid' }), external.id)
+    })
+  })
+
+  test("adds a local file's sidecar by path, titled, and it can be picked", async () => {
+    await withHarness(async ({ mpv, events, playing, sendOk }) => {
+      await playing({ fileId: 'local' })
+      const settled = events.findLast(where({ type: 'tracks' }))?.tracks ?? null
+      assert.ok(settled, 'no tracks after the snapshot')
+      assert.deepEqual(
+        settled.subtitles.map(({ id, source }) => ({ id, source })),
+        [
+          { id: 'embedded-0', source: 'embedded' },
+          { id: 'external-0', source: 'external' },
+        ],
+      )
+      assert.equal(settled.subtitles[1]?.title, LOCAL_SIDECAR.title)
+      const list = await mpv.read({ name: 'track-list' })
+      const external = list.find((track) => track.type === 'sub' && track.external === true)
+      assert.ok(external, 'mpv did not load the local sidecar')
+      await sendOk({ type: 'subtitle', id: 'external-0' })
       assert.equal(await mpv.read({ name: 'sid' }), external.id)
     })
   })

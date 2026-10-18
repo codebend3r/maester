@@ -19,6 +19,7 @@ import {
   createPlayerService,
   type FailureExplainer,
   guardedMpv,
+  type LocalSidecar,
   type MpvControl,
   OBSERVED,
   PER_FILE_OPTIONS,
@@ -376,10 +377,20 @@ const createTimedTimers = () => {
   return { timers, advance, pending }
 }
 
+type SidecarsOf = Parameters<typeof resolveSourceWith>[0]['sidecarsOf']
+
+const FILE_SIDECARS = [
+  { path: '/m/Film.en.vtt', title: 'English', language: 'en' },
+  { path: '/m/Film.es.vtt', title: '', language: '' },
+] as const satisfies readonly LocalSidecar[]
+
 const fileOf = (fileId: string) =>
   fileId === FILE_ID ? { fileId, path: '/m/Film.mkv', name: 'Film.mkv', size: 1, mtimeMs: 1 } : null
 
-const setup = ({ timers }: { timers?: Timers } = {}) => {
+const setup = ({
+  timers,
+  sidecarsOf = () => [],
+}: { timers?: Timers; sidecarsOf?: SidecarsOf } = {}) => {
   const mpv = createFakeMpv()
   const clock = createFakeTimers()
   const servers = fakeServers()
@@ -390,7 +401,7 @@ const setup = ({ timers }: { timers?: Timers } = {}) => {
   const counts = { firstFrames: 0 }
   const service = createPlayerService({
     mpv: mpv.control,
-    resolveSource: resolveSourceWith({ grants: { fileOf }, servers: servers.servers }),
+    resolveSource: resolveSourceWith({ grants: { fileOf }, servers: servers.servers, sidecarsOf }),
     explain: explainer.explain,
     canChooseAo: false,
     timers: timers ?? clock.timers,
@@ -453,7 +464,11 @@ describe('hardening', () => {
     const mpv = createFakeMpv()
     createPlayerService({
       mpv: mpv.control,
-      resolveSource: resolveSourceWith({ grants: { fileOf }, servers: fakeServers().servers }),
+      resolveSource: resolveSourceWith({
+        grants: { fileOf },
+        servers: fakeServers().servers,
+        sidecarsOf: () => [],
+      }),
       explain: fakeExplain().explain,
       canChooseAo: false,
       timers: createFakeTimers().timers,
@@ -470,7 +485,11 @@ describe('hardening', () => {
     const warnings: string[] = []
     const service = createPlayerService({
       mpv: mpv.control,
-      resolveSource: resolveSourceWith({ grants: { fileOf }, servers: fakeServers().servers }),
+      resolveSource: resolveSourceWith({
+        grants: { fileOf },
+        servers: fakeServers().servers,
+        sidecarsOf: () => [],
+      }),
       explain: fakeExplain().explain,
       canChooseAo: false,
       timers: createFakeTimers().timers,
@@ -496,13 +515,48 @@ describe('hardening', () => {
 })
 
 describe('resolveSourceWith', () => {
-  const resolve = resolveSourceWith({ grants: { fileOf }, servers: fakeServers().servers })
+  const resolve = resolveSourceWith({
+    grants: { fileOf },
+    servers: fakeServers().servers,
+    sidecarsOf: () => [],
+  })
 
   test('a granted file resolves to its path', async () => {
     expect(await resolve({ kind: 'file', fileId: FILE_ID })).toEqual({
       ok: true,
-      target: { kind: 'file', path: '/m/Film.mkv' },
+      target: { kind: 'file', path: '/m/Film.mkv', sidecars: [] },
     })
+  })
+
+  test('a granted file carries the sidecars asked of its file id', async () => {
+    const asked: string[] = []
+    const withSidecars = resolveSourceWith({
+      grants: { fileOf },
+      servers: fakeServers().servers,
+      sidecarsOf: (fileId) => {
+        asked.push(fileId)
+        return FILE_SIDECARS
+      },
+    })
+    expect(await withSidecars({ kind: 'file', fileId: 'f1' })).toEqual({
+      ok: true,
+      target: { kind: 'file', path: '/m/Film.mkv', sidecars: FILE_SIDECARS },
+    })
+    expect(asked).toEqual(['f1'])
+  })
+
+  test('an unknown file asks for no sidecars', async () => {
+    const asked: string[] = []
+    const withSidecars = resolveSourceWith({
+      grants: { fileOf },
+      servers: fakeServers().servers,
+      sidecarsOf: (fileId) => {
+        asked.push(fileId)
+        return FILE_SIDECARS
+      },
+    })
+    await withSidecars({ kind: 'file', fileId: 'nope' })
+    expect(asked).toEqual([])
   })
 
   test('an unknown file is refused', async () => {
@@ -816,6 +870,23 @@ describe('createPlayerService', () => {
       expect(warnings).toEqual([
         "mpv error file: Cannot open file '<file>': Permission denied",
         'mpv warn demux: <file>: bad index',
+      ])
+    })
+
+    test('a warning names a sidecar only as <file>, by its path or its name', async () => {
+      const { service, warnings, loaded } = setup({ sidecarsOf: () => FILE_SIDECARS })
+      await loaded()
+      warnings.splice(0)
+      service.receive({
+        type: 'log',
+        level: 'error',
+        prefix: 'sub',
+        text: "Can't open subtitle file /m/Film.en.vtt",
+      })
+      service.receive({ type: 'log', level: 'warn', prefix: 'sub', text: 'Film.es.vtt: bad cue' })
+      expect(warnings).toEqual([
+        "mpv error sub: Can't open subtitle file <file>",
+        'mpv warn sub: <file>: bad cue',
       ])
     })
   })
@@ -1315,7 +1386,11 @@ describe('createPlayerService', () => {
       const events: PlayerEvent[] = []
       const service = createPlayerService({
         mpv: mpv.control,
-        resolveSource: resolveSourceWith({ grants: { fileOf }, servers: fakeServers().servers }),
+        resolveSource: resolveSourceWith({
+          grants: { fileOf },
+          servers: fakeServers().servers,
+          sidecarsOf: () => [],
+        }),
         explain: fakeExplain().explain,
         canChooseAo: false,
         timers: createFakeTimers().timers,
@@ -2188,6 +2263,47 @@ describe('createPlayerService', () => {
       const { mpv, loaded } = setup()
       await loaded()
       expect(mpv.commands.filter(([name]) => name === MPV_COMMANDS.subAdd)).toEqual([])
+    })
+
+    test('a file with sidecars adds each by path, in order, after the loadfile', async () => {
+      const { mpv, loaded } = setup({ sidecarsOf: () => FILE_SIDECARS })
+      await loaded()
+      expect(mpv.commands.filter(([name]) => name === 'sub-add')).toEqual([
+        ['sub-add', '/m/Film.en.vtt', 'auto', 'English', 'en'],
+        ['sub-add', '/m/Film.es.vtt', 'auto', '', ''],
+      ])
+      const added = mpv.timeline.indexOf('sub-add /m/Film.es.vtt auto  ')
+      expect(mpv.timeline.indexOf('loadfile /m/Film.mkv replace -1 start=0')).toBeLessThan(
+        mpv.timeline.indexOf('sub-add /m/Film.en.vtt auto English en'),
+      )
+      expect(mpv.timeline.indexOf('read track-list')).toBeGreaterThan(added)
+    })
+
+    test('a failing file sidecar is warned, without its path, and the next one still added', async () => {
+      const { mpv, types, warnings, loaded } = setup({ sidecarsOf: () => FILE_SIDECARS })
+      mpv.failOn('sub-add /m/Film.en.vtt')
+      await loaded()
+      expect(mpv.commands.filter(([name]) => name === 'sub-add').length).toBe(2)
+      expect(warnings).toEqual(['mpv sub-add of sidecar 0 failed: mpv request failed (-12)'])
+      expect(types()).toEqual(['paused', 'duration', 'rate', 'waiting', 'tracks'])
+    })
+
+    test('a file with no sidecars sets no budget timer', async () => {
+      const { clock, loaded } = setup()
+      await loaded()
+      expect(clock.pending.size).toBe(0)
+    })
+
+    test('slow file sidecars hold the first snapshot back no longer than the budget', async () => {
+      const { mpv, clock, types, warnings, loaded } = setup({ sidecarsOf: () => FILE_SIDECARS })
+      mpv.hold('sub-add')
+      await loaded()
+      expect(mpv.reads).toEqual([])
+      expect([...clock.pending.values()].map(({ ms }) => ms)).toEqual([SIDECAR_BUDGET_MS])
+      clock.fire()
+      await settle()
+      expect(types()).toEqual(['paused', 'duration', 'rate', 'waiting', 'tracks'])
+      expect(warnings).toEqual(['file sidecars are slow; the title starts without them'])
     })
 
     test('a failing sidecar is warned, without its URL, and the next one still added', async () => {

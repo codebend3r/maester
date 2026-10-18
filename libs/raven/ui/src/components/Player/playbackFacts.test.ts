@@ -75,6 +75,28 @@ describe('aboutLine', () => {
   it('says only how a local file plays', () => {
     expect(aboutLine({ media: null, label: 'clip.mp4', mode: 'direct' })).toBe('Direct play')
   })
+
+  it('puts where the title came from first, when the host names it', () => {
+    expect(
+      aboutLine({
+        media: null,
+        label: 'S01E01 Good News',
+        mode: 'direct',
+        context: 'Downloaded from Vhagar',
+      }),
+    ).toBe('Downloaded from Vhagar · Direct play')
+    expect(
+      aboutLine({
+        media: { ...uhd, year: 2019 },
+        label: 'Abominable',
+        mode: 'direct',
+        context: 'Downloaded from Vhagar',
+      }),
+    ).toBe('Downloaded from Vhagar · 2019 · 4K HDR · Direct play')
+    expect(aboutLine({ media: null, label: 'clip.mp4', mode: 'direct', context: null })).toBe(
+      'Direct play',
+    )
+  })
 })
 
 describe('qualityLabel', () => {
