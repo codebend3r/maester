@@ -50,7 +50,6 @@ export const isDownloadsState = object({
   autoDeleteDefault: isBoolean,
 })
 
-export type Sidecar = Infer<typeof isSidecar>
 export type Pending = Infer<typeof isPending>
 export type DownloadEntry = Infer<typeof isDownloadEntry>
 export type DownloadsState = Infer<typeof isDownloadsState>
