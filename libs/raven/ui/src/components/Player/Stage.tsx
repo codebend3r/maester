@@ -11,6 +11,8 @@ import {
 import type { Engine, EngineHandle } from '@/components/Player/engine'
 import type { Handoff, PlayerFavourite } from '@/components/Player/PlayerServices'
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
+import type { StepDown } from '@/components/Player/usePlaybackLadder'
+import type { Delivery } from '@/lib/streamSource'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { Bezel } from '@/components/Player/Bezel'
@@ -54,6 +56,9 @@ export type StageProps = {
   mode: PlaybackMode
   selection: TrackSelection
   onFailure: (message: string) => void
+  /** The connection cannot carry the converted stream as fast as it plays. */
+  onSlow?: (delivery: Delivery) => void
+  steppedDown?: StepDown | null
 }
 
 export const Stage = ({ engine, ...props }: StageProps) => {
@@ -88,6 +93,7 @@ export const PlayerChrome = ({
   renderSubtitles,
   fullscreen,
   file = null,
+  steppedDown = null,
 }: {
   engine: EngineHandle
   onBack: () => void
@@ -98,6 +104,8 @@ export const PlayerChrome = ({
   fullscreen: ReturnType<typeof useFullscreen>
   /** The library file playing, for the line under the title and Playback info; null for a local file. */
   file?: PlaybackFile | null
+  /** Why the picture dropped to a transcode, when the connection is the reason. */
+  steppedDown?: StepDown | null
 }) => {
   const { title, hostActions, favourite, chrome, isVolumeFixed, handoff } = useHostServices()
   const media = file?.media ?? null
@@ -356,6 +364,7 @@ export const PlayerChrome = ({
         <PlaybackInfo
           readStats={engine.readStats}
           mode={mode}
+          steppedDown={steppedDown}
           file={file}
           tracks={selection.tracks}
           audio={playingAudio({
@@ -381,6 +390,7 @@ export const PlayerChrome = ({
           subtitleStatus={subtitleStatus}
           rate={state.rate}
           mode={mode}
+          steppedDown={steppedDown}
           onPickRate={controls.changeRate}
           onShowInfo={showInfo}
           onClose={closeMenu}

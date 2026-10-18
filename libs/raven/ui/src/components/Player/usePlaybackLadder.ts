@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react'
 import { browserCanPlay, browserCanStream } from '@/lib/canPlay'
 import { useQuery } from '@tanstack/react-query'
 import { playerQueriesFor } from '@/lib/playerQueries'
+import type { Delivery } from '@/lib/streamSource'
 
 /** The ways to play, best first, for one audio track; a step down belongs to one ladder. */
 type Ladder = { modes: readonly PlaybackMode[]; audio: number | null }
@@ -18,6 +19,9 @@ const sameLadder = ({ a, b }: { a: Ladder; b: Ladder }): boolean =>
   a.audio === b.audio &&
   a.modes.length === b.modes.length &&
   a.modes.every((mode, index) => mode === b.modes[index])
+
+/** A way of playing the connection could not carry, and what it did carry. */
+export type StepDown = { from: PlaybackMode; delivery: Delivery }
 
 export const PLAYBACK_STATUSES = {
   waiting: 'waiting',
@@ -33,11 +37,18 @@ export type PlaybackStatus =
       problems: string[]
       tryAnyway: (() => void) | null
     }
-  /** `fail` steps down to the next way, or gives up once none is left. */
+  /**
+   * `fail` steps down to the next way, or gives up once none is left. `slow`
+   * steps down to a transcode, the one way lighter on the connection; it is
+   * null when there is none below.
+   */
   | {
       status: typeof PLAYBACK_STATUSES.playing
       mode: PlaybackMode
       fail: (message: string) => void
+      slow: ((delivery: Delivery) => void) | null
+      /** Why this is a transcode, when the connection is the reason. */
+      steppedDown: StepDown | null
     }
 
 /**
@@ -45,7 +56,8 @@ export type PlaybackStatus =
  * take it; otherwise, or for any audio track but the default, the server
  * converts it. When a way fails mid-play, the next one down is tried, and
  * only when every way has failed is the file unplayable. A new audio track
- * starts again at the top.
+ * starts again at the top, unless the connection already proved too slow
+ * for anything but a transcode: that holds for the rest of the playback.
  */
 export const usePlaybackLadder = ({
   media,
@@ -75,6 +87,7 @@ export const usePlaybackLadder = ({
   const [forced, setForced] = useState(false)
   const [fallback, setFallback] = useState<{ ladder: Ladder; step: number } | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
+  const [steppedDown, setSteppedDown] = useState<StepDown | null>(null)
 
   // The server's settings say whether to force the original file and what it
   // converts; a plan made without them starts a stream it may refuse.
@@ -84,7 +97,10 @@ export const usePlaybackLadder = ({
     modes: plan.modes.length === 0 && forced ? [PLAYBACK_MODES.direct] : plan.modes,
     audio,
   }
-  const step = fallback != null && sameLadder({ a: fallback.ladder, b: ladder }) ? fallback.step : 0
+  const failedStep =
+    fallback != null && sameLadder({ a: fallback.ladder, b: ladder }) ? fallback.step : 0
+  const lighter = ladder.modes.indexOf(PLAYBACK_MODES.transcode)
+  const step = steppedDown != null && lighter >= 0 ? Math.max(failedStep, lighter) : failedStep
   const mode = ladder.modes[step]
   if (failure != null || mode == null) {
     return {
@@ -100,5 +116,7 @@ export const usePlaybackLadder = ({
       if (step + 1 < ladder.modes.length) setFallback({ ladder, step: step + 1 })
       else setFailure(message)
     },
+    slow: lighter > step ? (delivery) => setSteppedDown({ from: mode, delivery }) : null,
+    steppedDown: mode === PLAYBACK_MODES.transcode ? steppedDown : null,
   }
 }

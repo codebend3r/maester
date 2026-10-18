@@ -7,6 +7,7 @@ import {
   type MediaSourceLike,
   type SourceBufferLike,
   type StreamEnvironment,
+  type Delivery,
   type VideoLike,
   createStreamSession,
 } from '@/lib/streamSource'
@@ -201,7 +202,9 @@ const setup = ({
   }
   const fetched: string[] = []
   const aborted: string[] = []
+  const clock = { ms: 0 }
   const environment: StreamEnvironment = {
+    now: () => clock.ms,
     createMediaSource: () => source,
     attach: () => {
       queueMicrotask(() => {
@@ -226,7 +229,24 @@ const setup = ({
       }
     },
   }
-  return { environment, bufferState, sourceState, fetched, aborted }
+  return { environment, bufferState, sourceState, fetched, aborted, clock }
+}
+
+/** A response body the test feeds by hand, chunk by chunk. */
+const handFed = () => {
+  const held: { controller: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>> | null } = {
+    controller: null,
+  }
+  const body = new ReadableStream<Uint8Array<ArrayBuffer>>({
+    start: (controller) => {
+      held.controller = controller
+    },
+  })
+  const push = (chunk: number[]) => {
+    if (!held.controller) throw new Error('No stream controller')
+    held.controller.enqueue(new Uint8Array(chunk))
+  }
+  return { body, push }
 }
 
 /** The URL a test's stream starts at `start` from, the key of its chunks in `setup`. */
@@ -239,6 +259,82 @@ const settle = async () => {
 }
 
 describe('createStreamSession', () => {
+  /**
+   * One second of video per chunk from `from`, each `secondsApart` of wall
+   * time after the last, with the playhead left where the stream started.
+   */
+  const deliver = async ({
+    chunks,
+    secondsApart,
+    quotaSeconds = Infinity,
+  }: {
+    chunks: number
+    secondsApart: number
+    quotaSeconds?: number
+  }) => {
+    const video = fakeVideo()
+    const base = setup({ quotaSeconds })
+    const fed = handFed()
+    const reports: Delivery[] = []
+    const session = createStreamSession({
+      video,
+      mime: 'video/mp4',
+      duration: 600,
+      start: 0,
+      url: streamUrl,
+      onError: () => {},
+      onSlow: (delivery) => reports.push(delivery),
+      environment: {
+        ...base.environment,
+        fetch: async () => ({ ok: true, status: 200, body: fed.body }),
+      },
+    })
+    await settle()
+    const feed = async (count: number, first: number): Promise<void> => {
+      if (count === 0) return
+      fed.push([first, first + 1])
+      await settle()
+      base.clock.ms += secondsApart * 1000
+      return feed(count - 1, first + 1)
+    }
+    await feed(chunks, 1)
+    return { video, base, fed, reports, session, feed }
+  }
+
+  it('reports a stream that arrives slower than it plays', async () => {
+    const { reports, session } = await deliver({ chunks: 10, secondsApart: 2 })
+    // Two bytes a chunk: eight chunks over sixteen seconds carry eight seconds of video.
+    expect(reports).toEqual([{ delivered: 8, needed: 16 }])
+    session.destroy()
+  })
+
+  it('reports a slow stream once', async () => {
+    const { reports, session } = await deliver({ chunks: 30, secondsApart: 2 })
+    expect(reports).toHaveLength(1)
+    session.destroy()
+  })
+
+  it('leaves a stream that keeps up alone', async () => {
+    const { reports, session } = await deliver({ chunks: 40, secondsApart: 0.5 })
+    expect(reports).toEqual([])
+    session.destroy()
+  })
+
+  it('does not hold a full buffer against the connection', async () => {
+    const { video, base, reports, session, feed } = await deliver({
+      chunks: 20,
+      secondsApart: 0.1,
+      quotaSeconds: 20,
+    })
+    // The twentieth second waits for room while the clock runs on.
+    base.clock.ms += 30_000
+    video.currentTime = 19
+    await settle()
+    await feed(5, 21)
+    expect(reports).toEqual([])
+    session.destroy()
+  })
+
   it('reclaims a smaller back buffer when the quota holds less than thirty seconds', async () => {
     const video = fakeVideo()
     const { environment, bufferState, fetched } = setup({

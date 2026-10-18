@@ -12,6 +12,11 @@ import { STREAM_TIME_SHIFT } from '@raven/core'
  * more than half a minute behind is let go. Under memory pressure that
  * back buffer shrinks, so a full buffer cannot strand the playhead.
  *
+ * While nothing holds the reading back, the session also times how much
+ * video arrives against the clock. A connection that cannot carry the
+ * stream as fast as it plays is reported once, so the player can step
+ * down to a lighter one instead of stalling every few seconds.
+ *
  * The browser objects are described structurally so tests can stand in for
  * them; the real ones satisfy these types.
  */
@@ -76,6 +81,8 @@ type StreamResponse = {
  * the very type `createMediaSource` made.
  */
 export type StreamEnvironment<S extends MediaSourceLike = MediaSourceLike> = {
+  /** Milliseconds on a steady clock, to time delivery by. */
+  now: () => number
   createMediaSource: () => S | null
   /** Points the video at the source; the returned function lets go of it again. */
   attach: (source: S) => () => void
@@ -83,6 +90,16 @@ export type StreamEnvironment<S extends MediaSourceLike = MediaSourceLike> = {
 }
 
 export type StreamSession = { destroy: () => void }
+
+/** How fast a stream arrives and how fast it would have to, in bits per second. */
+export type Delivery = {
+  delivered: number
+  /** Null when not a whole frame of video arrived to say what it weighs. */
+  needed: number | null
+}
+
+/** Where delivery was timed from: the wall clock, the delivered edge and the bytes since. */
+type Meter = { wall: number; edge: number; bytes: number }
 
 type SessionState = {
   /** Bumped by every new stream and by destroy, so stale work can tell it is stale. */
@@ -93,6 +110,10 @@ type SessionState = {
   /** File time the running stream started at, while one runs. */
   streamingFrom: number | null
   detach: () => void
+  /** Timing delivery since nothing last held the reading back; null until the next append. */
+  meter: Meter | null
+  /** A slow stream is reported once a session. */
+  reportedSlow: boolean
 }
 
 /** Stop reading while this much is buffered ahead of the playhead. */
@@ -110,6 +131,20 @@ const EDGE_SECONDS = 0.1
  * rather than starting over: ffmpeg outruns playback, so it gets there first.
  */
 const REACH_SECONDS = 10
+/** Wall seconds of free-running delivery timed before judging the connection. */
+const SLOW_WINDOW_SECONDS = 15
+/**
+ * Seconds of video per wall second below which a stream is slow: under one,
+ * the playhead catches up with what has arrived and stalls. A 4K remux at
+ * nine tenths of real time stalls every half minute or so.
+ */
+const SLOW_PACE = 1
+/**
+ * A slow stream with this much buffered ahead is not yet starving the
+ * playhead, which keeps a connection that dips for a moment, or a window
+ * timed a fragment short, from costing the picture.
+ */
+const SLOW_AHEAD_SECONDS = 10
 
 const rangesOf = (ranges: Ranges): Array<[number, number]> =>
   Array.from({ length: ranges.length }, (_, index): [number, number] => [
@@ -190,6 +225,7 @@ export const browserEnvironment = (video: HTMLVideoElement): StreamEnvironment<M
     }
   },
   fetch: (url, init) => window.fetch(url, init),
+  now: () => performance.now(),
 })
 
 export const createStreamSession = <S extends MediaSourceLike>({
@@ -200,6 +236,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
   url,
   onError,
   onUnreachable,
+  onSlow,
   environment,
 }: {
   video: VideoLike
@@ -215,6 +252,8 @@ export const createStreamSession = <S extends MediaSourceLike>({
    * the origin could not be reached. Called before `onError` hears of it.
    */
   onUnreachable?: () => void
+  /** The connection carries this stream slower than it plays. Called at most once. */
+  onSlow?: (delivery: Delivery) => void
   environment: StreamEnvironment<S>
 }): StreamSession => {
   const state: SessionState = {
@@ -224,6 +263,8 @@ export const createStreamSession = <S extends MediaSourceLike>({
     buffer: null,
     streamingFrom: null,
     detach: () => {},
+    meter: null,
+    reportedSlow: false,
   }
   const source = environment.createMediaSource()
 
@@ -280,8 +321,46 @@ export const createStreamSession = <S extends MediaSourceLike>({
     generation: number
   }): Promise<void> => {
     if (!current(generation) || ahead(buffer) < MAX_AHEAD_SECONDS) return
+    // Held back, delivery runs at the pace of playback, not the connection.
+    state.meter = null
     await waitForPlayback()
     return waitForRoom({ buffer, generation })
+  }
+
+  /** The end of what the running stream has delivered, on the shifted clock. */
+  const deliveredEdge = (buffer: SourceBufferLike): number => {
+    const from = (state.streamingFrom ?? 0) + STREAM_TIME_SHIFT
+    return Math.max(
+      from,
+      ...rangesOf(buffer.buffered)
+        .map(([, end]) => end)
+        .filter((end) => end >= from),
+    )
+  }
+
+  /** Counts an appended chunk, and once a window is timed, judges the connection by it. */
+  const measure = ({ buffer, bytes }: { buffer: SourceBufferLike; bytes: number }) => {
+    const now = environment.now()
+    const edge = deliveredEdge(buffer)
+    const meter = state.meter
+    // Timing starts at the first chunk, so ffmpeg's start-up is not held against the connection.
+    if (meter == null) {
+      state.meter = { wall: now, edge, bytes: 0 }
+      return
+    }
+    const counted = { ...meter, bytes: meter.bytes + bytes }
+    const seconds = (now - meter.wall) / 1000
+    if (seconds < SLOW_WINDOW_SECONDS) {
+      state.meter = counted
+      return
+    }
+    state.meter = { wall: now, edge, bytes: 0 }
+    const arrived = edge - meter.edge
+    if (state.reportedSlow || arrived / seconds >= SLOW_PACE) return
+    if (ahead(buffer) >= SLOW_AHEAD_SECONDS) return
+    state.reportedSlow = true
+    const bits = counted.bytes * 8
+    onSlow?.({ delivered: bits / seconds, needed: arrived > 0 ? bits / arrived : null })
   }
 
   const append = async ({
@@ -306,6 +385,8 @@ export const createStreamSession = <S extends MediaSourceLike>({
       await updateEnd(buffer)
     } catch (error) {
       if (!isQuotaError(error)) throw error
+      // A full buffer means delivery has outrun playback.
+      state.meter = null
       // Thirty seconds can itself exceed the quota. Retaining all of it
       // deadlocks once playback reaches the end and cannot wake this retry.
       const freed = await evictBehind({
@@ -346,6 +427,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
       return
     }
     await append({ buffer, chunk: value, generation })
+    if (current(generation)) measure({ buffer, bytes: value.byteLength })
     return pump({ reader, buffer, generation })
   }
 
@@ -359,6 +441,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
     const controller = new AbortController()
     state.controller = controller
     state.streamingFrom = from
+    state.meter = null
     try {
       // A network read can stop partway through a fragment, and removing
       // what is buffered leaves the parser holding that fragment; the new
@@ -395,10 +478,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
   const reachable = ({ buffer, time }: { buffer: SourceBufferLike; time: number }): boolean => {
     const from = state.streamingFrom
     if (from == null) return false
-    const delivered = rangesOf(buffer.buffered)
-      .map(([, end]) => end - STREAM_TIME_SHIFT)
-      .filter((end) => end >= from)
-    const edge = Math.max(from, ...delivered)
+    const edge = deliveredEdge(buffer) - STREAM_TIME_SHIFT
     return from - EDGE_SECONDS <= time && time <= edge + REACH_SECONDS
   }
 

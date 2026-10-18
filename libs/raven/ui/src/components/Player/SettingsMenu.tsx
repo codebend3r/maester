@@ -2,7 +2,9 @@ import { type PlaybackMode, describeMode } from '@raven/core'
 import { type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
+import { stepDownNote } from '@/components/Player/playbackFacts'
 import { playingAudio } from '@/components/Player/selection'
+import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/SettingsMenu.module.scss'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
@@ -156,6 +158,7 @@ export const SettingsMenu = ({
   subtitleStatus,
   rate,
   mode,
+  steppedDown = null,
   onPickRate,
   onShowInfo,
   onClose,
@@ -168,6 +171,7 @@ export const SettingsMenu = ({
   subtitleStatus: SubtitleStatus
   rate: number
   mode: PlaybackMode
+  steppedDown?: StepDown | null
   onPickRate: (rate: number) => void
   onShowInfo: () => void
   onClose: () => void
@@ -196,6 +200,7 @@ export const SettingsMenu = ({
           <>
             <div className={styles.playing}>
               <p className={styles.mode}>{describeMode(mode)}</p>
+              {!!steppedDown && <p className={styles.note}>{stepDownNote(steppedDown)}</p>}
               <button type="button" className={styles.info} onClick={onShowInfo}>
                 <span>Playback info</span>
                 <Icon name="next" size={16} />

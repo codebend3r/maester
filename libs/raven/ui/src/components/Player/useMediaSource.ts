@@ -9,7 +9,7 @@ import {
 import { type RefObject, useEffect, useEffectEvent, useRef } from 'react'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
 import type { HtmlSource } from '@/components/Player/engine'
-import { browserEnvironment, createStreamSession } from '@/lib/streamSource'
+import { type Delivery, browserEnvironment, createStreamSession } from '@/lib/streamSource'
 
 export const VIDEO_SOURCE_KINDS = { file: 'file', stream: 'stream' } as const
 
@@ -57,7 +57,8 @@ const failureMessage = (error: MediaError | null): string => {
  * Points the video at its source: the file itself, or a converted stream
  * through Media Source Extensions. A change of mode or audio track rebuilds
  * it where playback was, playing on if it was playing. A source that fails
- * says why through `onFailure`.
+ * says why through `onFailure`, and a stream the connection cannot keep up
+ * with says so through `onSlow`.
  */
 export const useMediaSource = ({
   videoRef,
@@ -68,6 +69,7 @@ export const useMediaSource = ({
   playing,
   onRefused,
   onFailure,
+  onSlow,
 }: {
   videoRef: RefObject<HTMLVideoElement | null>
   source: HtmlSource
@@ -78,6 +80,7 @@ export const useMediaSource = ({
   /** The browser would not start playing. */
   onRefused: () => void
   onFailure: (message: string) => void
+  onSlow?: (delivery: Delivery) => void
 }): void => {
   const mime =
     mode === PLAYBACK_MODES.direct || htmlSource.kind === PLAYER_SOURCE_KINDS.file
@@ -109,6 +112,9 @@ export const useMediaSource = ({
   }
   // A running stream outlives renders; its failures reach the latest `report`.
   const fail = useEffectEvent((message: string) => report(message))
+  const slow = useEffectEvent((delivery: Delivery) => {
+    if (attached.current === wanted) onSlow?.(delivery)
+  })
   const unreachable = useEffectEvent(() => {
     if (htmlSource.kind === PLAYER_SOURCE_KINDS.server) htmlSource.mediaPlane?.reportUnreachable()
   })
@@ -161,6 +167,7 @@ export const useMediaSource = ({
         url: source.url,
         onError: (message) => fail(message),
         onUnreachable: isRemote ? () => unreachable() : undefined,
+        onSlow: (delivery) => slow(delivery),
         environment: browserEnvironment(element),
       })
       play()

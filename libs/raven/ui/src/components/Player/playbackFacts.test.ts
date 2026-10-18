@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import type { MediaTracks, SubtitleTrack } from '@raven/core'
+import { type MediaTracks, PLAYBACK_MODES, type SubtitleTrack } from '@raven/core'
 import {
   aboutLine,
   audioPillLabel,
   pictureLabel,
   qualityLabel,
+  stepDownNote,
   subtitlePillLabel,
 } from '@/components/Player/playbackFacts'
 import { mediaItem } from '@/test/fixtures'
@@ -107,5 +108,24 @@ describe('subtitlePillLabel', () => {
   it('names the language showing, or Off', () => {
     expect(subtitlePillLabel(SUBTITLE)).toBe('French')
     expect(subtitlePillLabel(null)).toBe('Off')
+  })
+})
+
+describe('stepDownNote', () => {
+  it('says what the connection carried against what the stream needed', () => {
+    expect(
+      stepDownNote({
+        from: PLAYBACK_MODES.remux,
+        delivery: { delivered: 39_200_000, needed: 69_800_000 },
+      }),
+    ).toBe(
+      'Switched to a transcode because the connection carried 39.2 Mb/s and the remux needs 69.8 Mb/s.',
+    )
+  })
+
+  it('names only what was carried when the need is unknown', () => {
+    expect(
+      stepDownNote({ from: PLAYBACK_MODES.remux, delivery: { delivered: 800_000, needed: null } }),
+    ).toBe('Switched to a transcode because the connection carried only 800 kb/s.')
   })
 })

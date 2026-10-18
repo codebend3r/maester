@@ -1,8 +1,15 @@
 import { afterEach, describe, expect, it, jest, mock, spyOn } from 'bun:test'
-import type { MediaItem, MediaStreams, MediaTracks, PlaybackMode } from '@raven/core'
+import {
+  type MediaItem,
+  type MediaStreams,
+  type MediaTracks,
+  PLAYBACK_MODES,
+  type PlaybackMode,
+} from '@raven/core'
 import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { EngineStats } from '@/components/Player/engine'
+import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import { PlaybackInfo } from '@/components/Player/PlaybackInfo'
 import { api } from '@/test/api'
 import { mediaItem } from '@/test/fixtures'
@@ -53,8 +60,10 @@ const renderInfo = ({
   readStats = () => STILL,
   onClose = () => {},
   playback = DEFAULT_PLAYBACK_STATE,
+  steppedDown = null,
 }: {
   mode?: PlaybackMode
+  steppedDown?: StepDown | null
   media?: MediaItem | null
   audio?: number | null
   readStats?: () => EngineStats
@@ -66,6 +75,7 @@ const renderInfo = ({
       <PlaybackInfo
         readStats={readStats}
         mode={mode}
+        steppedDown={steppedDown}
         file={media && { media, api }}
         tracks={TRACKS}
         audio={audio}
@@ -86,6 +96,26 @@ const valueOf = ({ title, term }: { title: string; term: string }): string | nul
   within(section(title)).queryByText(term)?.nextElementSibling?.textContent ?? null
 
 describe('PlaybackInfo', () => {
+  it('says when the connection put the picture on a transcode', () => {
+    renderInfo({
+      mode: PLAYBACK_MODES.transcode,
+      steppedDown: {
+        from: PLAYBACK_MODES.remux,
+        delivery: { delivered: 39_200_000, needed: 69_800_000 },
+      },
+    })
+    expect(
+      screen.getByText(
+        'Switched to a transcode because the connection carried 39.2 Mb/s and the remux needs 69.8 Mb/s.',
+      ),
+    ).toBeTruthy()
+  })
+
+  it('gives no reason for a transcode the connection did not cause', () => {
+    renderInfo({ mode: PLAYBACK_MODES.transcode })
+    expect(screen.queryByText(/Switched to a transcode/)).toBeNull()
+  })
+
   it('shows the live figures and reads them again each second', async () => {
     jest.useFakeTimers()
     try {
