@@ -9,12 +9,11 @@ import '@raven/ui/styles.css'
 import { AppRoutes } from '@/AppRoutes'
 import { CardLinks } from '@/components/CardLink/CardLink'
 import { MediaOriginProbe } from '@/components/MediaOriginProbe/MediaOriginProbe'
-import { createQueryClient } from '@/lib/queryClient'
+import { queryClient } from '@/lib/queryClient'
 import { PrefetchPlaybackSettings } from '@/lib/prefetchPlaybackSettings'
 import { StartAuthSession } from '@/lib/startAuthSession'
 import { followTheme } from '@/stores/theme'
 
-const queryClient = createQueryClient()
 followTheme()
 const rootElement = document.getElementById('root')
 

@@ -41,9 +41,13 @@ type Listener = (event: AuthChangeEvent, session: Session | null) => void
 
 /**
  * An auth client that answers `getSession` with `session` and tells whoever
- * listened about the events `emit` sends; every other call fails the test.
+ * listened about the events `emit` sends; every other call fails the test
+ * unless `calls` answers it.
  */
-export const fakeAuthClient = ({ session = null }: { session?: Session | null } = {}) => {
+export const fakeAuthClient = ({
+  session = null,
+  calls = {},
+}: { session?: Session | null; calls?: Partial<AuthClient> } = {}) => {
   const listeners = new Set<Listener>()
   const client: AuthClient = {
     signInWithPassword: unused,
@@ -70,6 +74,7 @@ export const fakeAuthClient = ({ session = null }: { session?: Session | null } 
         },
       }
     },
+    ...calls,
   }
   return {
     client,

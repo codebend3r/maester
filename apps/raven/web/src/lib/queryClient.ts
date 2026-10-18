@@ -29,6 +29,9 @@ export const createQueryClient = (): QueryClient =>
     },
   })
 
+/** The tab's one cache, which signing out or switching accounts empties from outside React. */
+export const queryClient = createQueryClient()
+
 /**
  * Every cache key, in one place. An id may be null for a query that waits on
  * it (`skipToken`); the key still names what it would hold.

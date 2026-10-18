@@ -1,6 +1,8 @@
 import type { Session } from '@supabase/supabase-js'
 import { create } from 'zustand'
 import { type AuthClient, type ReadyAuthConfig, createAuthClient } from '@/lib/authClient'
+import { clearAccountState } from '@/lib/clearAccountState'
+import { queryClient, queryKeys } from '@/lib/queryClient'
 
 export const AUTH_SESSION_STATUSES = { booting: 'booting', ready: 'ready' } as const
 export type AuthSessionStatus = (typeof AUTH_SESSION_STATUSES)[keyof typeof AUTH_SESSION_STATUSES]
@@ -20,6 +22,30 @@ type AuthSessionState = {
 const summaryOf = (session: Session | null): SessionSummary | null =>
   session === null ? null : { accessToken: session.access_token, userId: session.user.id }
 
+/**
+ * What the previous account left behind is dropped whenever the account
+ * changes, a sign out in another tab or an expired session included. A first
+ * sign in after nobody was signed in keeps the cache but marks it stale: the
+ * server refused what was asked for before, and the account query is keyed by
+ * user, so nothing of another account can show.
+ */
+const followAccount = ({
+  previous,
+  next,
+}: {
+  previous: SessionSummary | null
+  next: SessionSummary | null
+}): void => {
+  if (previous?.userId === next?.userId) return
+  if (previous !== null) {
+    clearAccountState({ queryClient })
+    return
+  }
+  void queryClient.invalidateQueries({
+    predicate: (query) => query.queryKey[0] !== queryKeys.auth[0],
+  })
+}
+
 /** Who is signed in on this browser, and the token every `/api/` call carries. */
 export const useAuthSession = create<AuthSessionState>()((set, get) => ({
   client: null,
@@ -29,7 +55,11 @@ export const useAuthSession = create<AuthSessionState>()((set, get) => ({
     if (get().client !== null) return
     const client = createClient({ config })
     set({ client })
-    client.onAuthStateChange((_event, session) => set({ session: summaryOf(session) }))
+    client.onAuthStateChange((_event, session) => {
+      const next = summaryOf(session)
+      followAccount({ previous: get().session, next })
+      set({ session: next })
+    })
     const settle = (session: Session | null) =>
       set({ session: summaryOf(session), status: AUTH_SESSION_STATUSES.ready })
     client.getSession().then(
