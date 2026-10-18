@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import {
   BUFFER_EVENTS,
+  ERROR_NAMES,
   MEDIA_SOURCE_STATES,
+  STREAM_EVENTS,
   type MediaSourceLike,
   type SourceBufferLike,
   type StreamEnvironment,
@@ -22,6 +24,7 @@ const listeners = () => {
       map.get(type)?.delete(listener)
     },
     emit: (type: string) => [...(map.get(type) ?? [])].forEach((listener) => listener()),
+    count: (type: string) => map.get(type)?.size ?? 0,
   }
 }
 
@@ -40,18 +43,28 @@ const rangesFrom = (ranges: Array<[number, number]>) => ({
  * of the cut-off fragment, and like the real one it throws unless the
  * source is open.
  */
-const fakeBuffer = (source: { readyState: string }) => {
+const fakeBuffer = ({
+  source,
+  onReopen,
+  quotaSeconds,
+}: {
+  source: { readyState: string }
+  onReopen: () => void
+  quotaSeconds: number
+}) => {
   const events = listeners()
   const state: {
     ranges: Array<[number, number]>
     updating: boolean
     appended: number
+    quotaFailures: number
     /** Where the cut-off fragment the parser holds carries on, if it holds one. */
     cutAt: number | null
   } = {
     ranges: [],
     updating: false,
     appended: 0,
+    quotaFailures: 0,
     cutAt: null,
   }
   const finish = (type: (typeof BUFFER_EVENTS)[keyof typeof BUFFER_EVENTS]) =>
@@ -64,6 +77,7 @@ const fakeBuffer = (source: { readyState: string }) => {
   const reopen = () => {
     if (source.readyState === MEDIA_SOURCE_STATES.ended) {
       source.readyState = MEDIA_SOURCE_STATES.open
+      queueMicrotask(onReopen)
     }
   }
   const buffer: SourceBufferLike = {
@@ -75,6 +89,11 @@ const fakeBuffer = (source: { readyState: string }) => {
     },
     appendBuffer: (data) => {
       const [from = 0, to = 0, cut = 0] = data
+      const stored = state.ranges.reduce((total, [start, end]) => total + end - start, 0)
+      if (stored + to - from > quotaSeconds) {
+        state.quotaFailures += 1
+        throw new DOMException('The buffer is full.', ERROR_NAMES.quotaExceeded)
+      }
       reopen()
       state.updating = true
       if (state.cutAt != null && state.cutAt !== from) {
@@ -117,18 +136,22 @@ const fakeBuffer = (source: { readyState: string }) => {
 const fakeVideo = () => {
   const events = listeners()
   const state = { time: 0 }
-  const video: VideoLike & { emit: (type: string) => void } = {
+  const video: VideoLike & {
+    emit: (type: string) => void
+    count: (type: string) => number
+  } = {
     get currentTime() {
       return state.time
     },
     set currentTime(time: number) {
       state.time = time
-      queueMicrotask(() => events.emit('seeking'))
+      queueMicrotask(() => events.emit(STREAM_EVENTS.seeking))
     },
     buffered: rangesFrom([]),
     addEventListener: events.addEventListener,
     removeEventListener: events.removeEventListener,
     emit: events.emit,
+    count: events.count,
   }
   return video
 }
@@ -137,9 +160,11 @@ const fakeVideo = () => {
 const setup = ({
   streams = {},
   ok = true,
+  quotaSeconds = Infinity,
 }: {
   streams?: Record<string, Array<[number, number]>>
   ok?: boolean
+  quotaSeconds?: number
 } = {}) => {
   const sourceEvents = listeners()
   const sourceState: { readyState: string; ended: number; duration: number; mime: string } = {
@@ -148,7 +173,11 @@ const setup = ({
     duration: NaN,
     mime: '',
   }
-  const { buffer, state: bufferState } = fakeBuffer(sourceState)
+  const { buffer, state: bufferState } = fakeBuffer({
+    source: sourceState,
+    onReopen: () => sourceEvents.emit(STREAM_EVENTS.sourceOpen),
+    quotaSeconds,
+  })
   const source: MediaSourceLike = {
     get readyState() {
       return sourceState.readyState
@@ -177,13 +206,13 @@ const setup = ({
     attach: () => {
       queueMicrotask(() => {
         sourceState.readyState = MEDIA_SOURCE_STATES.open
-        sourceEvents.emit('sourceopen')
+        sourceEvents.emit(STREAM_EVENTS.sourceOpen)
       })
       return () => {}
     },
     fetch: async (url, { signal }) => {
       fetched.push(url)
-      signal.addEventListener('abort', () => aborted.push(url))
+      signal.addEventListener(STREAM_EVENTS.abort, () => aborted.push(url))
       const chunks = streams[url] ?? []
       return {
         ok,
@@ -210,6 +239,105 @@ const settle = async () => {
 }
 
 describe('createStreamSession', () => {
+  it('reclaims a smaller back buffer when the quota holds less than thirty seconds', async () => {
+    const video = fakeVideo()
+    const { environment, bufferState, fetched } = setup({
+      streams: {
+        'from-0': [
+          [1, 16],
+          [16, 21],
+          [21, 26],
+        ],
+      },
+      quotaSeconds: 20,
+    })
+    const errors: string[] = []
+    const session = createStreamSession({
+      video,
+      mime: 'video/mp4',
+      duration: 600,
+      start: 0,
+      url: streamUrl,
+      onError: (message) => errors.push(message),
+      environment,
+    })
+    await settle()
+    expect(bufferState.appended).toBe(2)
+    expect(bufferState.quotaFailures).toBeGreaterThan(0)
+
+    video.currentTime = 20
+    await settle()
+    expect(bufferState.appended).toBe(3)
+    expect(bufferState.ranges).toEqual([[15, 26]])
+    expect(fetched).toEqual(['from-0'])
+    expect(errors).toEqual([])
+    session.destroy()
+  })
+
+  it('prunes old frames even when a slow stream never gets a minute ahead', async () => {
+    const video = fakeVideo()
+    const base = setup()
+    const pending: { controller: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>> | null } =
+      {
+        controller: null,
+      }
+    const body = new ReadableStream<Uint8Array<ArrayBuffer>>({
+      start: (controller) => {
+        pending.controller = controller
+      },
+    })
+    const session = createStreamSession({
+      video,
+      mime: 'video/mp4',
+      duration: 600,
+      start: 0,
+      url: streamUrl,
+      onError: () => {},
+      environment: {
+        ...base.environment,
+        fetch: async () => ({ ok: true, status: 200, body }),
+      },
+    })
+    if (!pending.controller) throw new Error('No stream controller')
+    pending.controller.enqueue(new Uint8Array([1, 51]))
+    await settle()
+    video.currentTime = 50
+    await settle()
+    pending.controller.enqueue(new Uint8Array([51, 56]))
+    pending.controller.close()
+    await settle()
+    expect(base.bufferState.ranges).toEqual([[20, 56]])
+    session.destroy()
+  })
+
+  it('cancels a full-buffer wait and removes its listeners on destroy', async () => {
+    const video = fakeVideo()
+    const { environment, bufferState } = setup({
+      streams: {
+        'from-0': [
+          [1, 70],
+          [70, 75],
+        ],
+      },
+    })
+    const session = createStreamSession({
+      video,
+      mime: 'video/mp4',
+      duration: 600,
+      start: 0,
+      url: streamUrl,
+      onError: () => {},
+      environment,
+    })
+    await settle()
+    expect(video.count(STREAM_EVENTS.timeUpdate)).toBe(1)
+    session.destroy()
+    await settle()
+    expect(video.count(STREAM_EVENTS.timeUpdate)).toBe(0)
+    expect(video.count(STREAM_EVENTS.seeking)).toBe(0)
+    expect(bufferState.appended).toBe(1)
+  })
+
   it('streams from the start point onto the shifted clock and ends the stream', async () => {
     const video = fakeVideo()
     const { environment, bufferState, sourceState, fetched } = setup({
@@ -437,7 +565,7 @@ describe('createStreamSession', () => {
       environment: {
         ...setup().environment,
         fetch: async () => {
-          throw new DOMException('aborted', 'AbortError')
+          throw new DOMException('aborted', ERROR_NAMES.abort)
         },
       },
     })

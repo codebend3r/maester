@@ -121,6 +121,7 @@ describe('streamArgs', () => {
     expect(after({ args, flag: '-c:a' })).toBe('aac')
     expect(after({ args, flag: '-output_ts_offset' })).toBe('1')
     expect(after({ args, flag: '-movflags' })).toContain('frag_discont')
+    expect(after({ args, flag: '-frag_duration' })).toBe('1000000')
     expect(args.at(-1)).toBe('pipe:1')
   })
 
@@ -160,6 +161,7 @@ describe('streamArgs', () => {
     expect(after({ args, flag: '-c:v' })).toBe('libx264')
     expect(after({ args, flag: '-vf' })).toBe(`scale=w=-2:h='min(1080,ih)',${TONEMAP_FILTER}`)
     expect(args).not.toContain('-tag:v')
+    expect(after({ args, flag: '-frag_duration' })).toBe('1000000')
   })
 
   it('maps no audio for a silent file', () => {

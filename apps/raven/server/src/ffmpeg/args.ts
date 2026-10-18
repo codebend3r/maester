@@ -272,6 +272,10 @@ export const streamArgs = ({
     'mp4',
     '-movflags',
     'frag_keyframe+empty_moov+default_base_moof+frag_discont',
+    // A remux cannot shorten the source GOP. Flush at least every second
+    // even between keyframes so slow reads do not hold several seconds of A/V.
+    '-frag_duration',
+    '1000000',
     'pipe:1',
   ]
 }
