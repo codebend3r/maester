@@ -55,7 +55,7 @@ These are not claimed as completed by the foundation PR:
 
 | Branch | Scope | Cutover dependency |
 |---|---|---|
-| `raven-auth-ui` | Login, signup, confirmation, recovery, pending and Settings > Users | Test the complete owner approval flow in staging |
+| `raven-auth-ui` | Login, signup, confirmation, recovery, pending and Settings > Users. Task plan: `2026-10-18-raven-auth-ui.md` | Test the complete owner approval flow in staging |
 | `raven-auth-desktop` | Main-owned session, login, pending, secure storage and playback tickets | Release before enforcement |
 | `raven-auth-enforcement` | Account gate across every protected API/media path, owner-only management, remove admin-password authorization, bind PIN state to accounts | Configure production and verify anonymous access is denied |
 | `raven-account-data` | Per-account progress, plays, watched and favourites with owner adoption | Follow-up; viewing data is shared until this ships |
