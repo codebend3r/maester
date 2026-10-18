@@ -3,6 +3,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from luwin.agent.tools import Tier, registry
+from luwin.clients import FakeRavenClient
 from luwin.memo import Memo
 from luwin.tools import service_health as health
 from luwin.tools.service_health import service_health
@@ -22,6 +23,14 @@ async def test_everything_up(ctx):
         "Radarr on vermithor", "SABnzbd on meleys", "SABnzbd on vermithor", "Tautulli on meleys",
         "Tautulli on vermithor",
     ]  # fmt: skip
+
+
+async def test_raven_is_checked_when_it_is_set_up(ctx):
+    ctx.services.fleet = None
+    ctx.services.raven = FakeRavenClient()
+    ctx.services.raven.down = True
+    out = await service_health(ctx)
+    assert not out["all_up"] and [d["service"] for d in out["down"]] == ["raven"]
 
 
 async def test_what_is_down_is_named_with_why_and_a_hung_one_times_out(ctx, monkeypatch):

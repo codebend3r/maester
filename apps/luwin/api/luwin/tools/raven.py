@@ -14,7 +14,18 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from luwin.agent.tools import Refused, Result, Shown, Tier, Title, TitleLink, ToolContext, tool
+from luwin.agent.tools import (
+    Failed,
+    Refused,
+    Result,
+    Shown,
+    Tier,
+    Title,
+    TitleLink,
+    ToolContext,
+    tool,
+)
+from luwin.clients import ClientError
 from luwin.clients.raven import RavenTitle
 
 MAX_MATCHES = 20
@@ -63,10 +74,18 @@ async def search_library(
     raven = ctx.services.raven
     if raven is None:
         return Refused("raven isn't set up on this server (RAVEN_URL).")
-    found = await raven.search(title)
-    if not found and title.lower().endswith("s"):
-        # raven matches part of a title, so "Terminators" finds what "Terminator" does.
-        found = await raven.search(title[:-1])
+    try:
+        found = await raven.search(title)
+        if not found and title.lower().endswith("s"):
+            # raven matches part of a title, so "Terminators" finds what "Terminator" does.
+            found = await raven.search(title[:-1])
+    except ClientError as exc:
+        # Asking again won't reach it either; the model should say so and stop.
+        return Failed(
+            f"raven at {raven.base_url} isn't answering ({exc.detail}), so its library can't be "
+            "searched right now. Don't call search_library again this turn: say raven is "
+            "unreachable, and that the admin can check it."
+        )
     matches = [
         {
             "title": t.title,

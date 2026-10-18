@@ -3,7 +3,7 @@
 import pytest
 import respx
 
-from luwin.agent.tools import Refused, Tier, Title, TitleLink, ToolContext
+from luwin.agent.tools import Failed, Refused, Tier, Title, TitleLink, ToolContext
 from luwin.clients import ClientError, FakeRavenClient, RavenClient
 from luwin.clients.raven import RavenTitle, quality_of
 from luwin.config import Settings
@@ -135,3 +135,12 @@ async def test_a_plural_finds_what_the_singular_does(services):
     raven = FakeRavenClient(titles=[RavenTitle(4, "4K Movies", "movie", "The Terminator", 1984, 9)])
     reply = await search_library(ctx_with(services, raven), "Terminators")
     assert [m["title"] for m in reply.content["matches"]] == ["The Terminator"]
+
+
+async def test_an_unreachable_raven_is_said_once_not_retried(services):
+    raven = FakeRavenClient()
+    raven.down = True
+    reply = await search_library(ctx_with(services, raven), "Dune")
+    assert isinstance(reply, Failed) and not reply.retryable
+    assert "raven at http://raven.test isn't answering" in reply.content
+    assert "Don't call search_library again" in reply.content
