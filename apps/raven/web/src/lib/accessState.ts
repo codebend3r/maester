@@ -111,11 +111,18 @@ export const accessStateOf = ({
   return accountState(account)
 }
 
+/** The signed-in account's `/api/me`, asked for only while accounts are on and someone is signed in. */
+export const useAccount = () => {
+  const config = useQuery(authConfigQuery)
+  const session = useAuthSession((state) => state.session)
+  const isReady = config.data?.state === AUTH_CONFIG_STATES.ready
+  return useQuery(accountQuery(isReady ? (session?.userId ?? null) : null))
+}
+
 export const useAccessState = (): AccessState => {
   const config = useQuery(authConfigQuery)
   const status = useAuthSession((state) => state.status)
   const session = useAuthSession((state) => state.session)
-  const isReady = config.data?.state === AUTH_CONFIG_STATES.ready
-  const account = useQuery(accountQuery(isReady ? (session?.userId ?? null) : null))
+  const account = useAccount()
   return accessStateOf({ config, session: { status, session }, account })
 }

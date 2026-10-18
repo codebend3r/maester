@@ -16,6 +16,7 @@ import { StreamsPage } from '@/pages/StreamsPage/StreamsPage'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
+import { PendingPage } from '@/pages/PendingPage/PendingPage'
 import { PersonPage } from '@/pages/PersonPage/PersonPage'
 import { GetPage } from '@/pages/GetPage/GetPage'
 import { AUTH_ROUTES } from '@/lib/authRoutes'
@@ -52,13 +53,14 @@ export const AppRoutes = () => (
         {/* The player takes the whole screen, outside the browsing frame. */}
         <Route path="watch/:id" element={<WatchPage />} />
       </Route>
-      {/* So do signing in, which the gate sends a signed out visitor to, signing up, the page that asks to check email, the page an email link opens, the pages to ask for a new password and to choose one, and the page to get raven from. */}
+      {/* So do signing in, which the gate sends a signed out visitor to, signing up, the page that asks to check email, the page an email link opens, the pages to ask for a new password and to choose one, the page that waits for approval, and the page to get raven from. */}
       <Route path={AUTH_ROUTES.signIn} element={<SignInPage />} />
       <Route path={AUTH_ROUTES.signUp} element={<SignUpPage />} />
       <Route path={AUTH_ROUTES.checkEmail} element={<CheckEmailPage />} />
       <Route path={AUTH_ROUTES.confirm} element={<ConfirmPage />} />
       <Route path={AUTH_ROUTES.forgot} element={<ForgotPasswordPage />} />
       <Route path={AUTH_ROUTES.reset} element={<ResetPasswordPage />} />
+      <Route path={AUTH_ROUTES.pending} element={<PendingPage />} />
       <Route path="get" element={<GetPage />} />
     </Routes>
     {/* Over any page, the player too: whatever sits in a locked library asks for the PIN. */}
