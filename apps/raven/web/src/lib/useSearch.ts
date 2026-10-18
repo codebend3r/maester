@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useState } from 'react'
-import { useLocation, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 /** How long a search box waits after the last keystroke before it searches. */
 const SEARCH_DELAY_MS = 200
@@ -36,12 +36,16 @@ export type Search = ReturnType<typeof useSearch>
  * or Back lands on it again. The query is written once it settles,
  * replacing the entry rather than stacking one per pause, and an address
  * the box did not write, as the side menu's link back to the page, puts its
- * search in the box.
+ * search in the box. Given a `page`, the box searches that page from
+ * anywhere: elsewhere it starts empty, and a query settling there opens the
+ * page on it.
  */
-export const useAddressSearch = (): Search => {
+export const useAddressSearch = ({ page }: { page?: string } = {}): Search => {
   const [address, setAddress] = useSearchParams()
-  const { key } = useLocation()
-  const asked = address.get('q') ?? ''
+  const navigate = useNavigate()
+  const { key, pathname } = useLocation()
+  const away = page != null && pathname !== page ? page : null
+  const asked = away == null ? (address.get('q') ?? '') : ''
   const search = useSearch({ initial: asked })
   const { query, searchFor } = search
   // Let a queued navigation commit before a local query can replace its address.
@@ -49,6 +53,10 @@ export const useAddressSearch = (): Search => {
 
   useEffect(() => {
     if (deferredQuery !== query || deferredQuery === asked) return
+    if (away != null) {
+      void navigate(`${away}?${new URLSearchParams({ q: deferredQuery })}`)
+      return
+    }
     setAddress(
       (current) => {
         const next = new URLSearchParams(current)
@@ -58,7 +66,7 @@ export const useAddressSearch = (): Search => {
       },
       { replace: true },
     )
-  }, [asked, query, deferredQuery, setAddress])
+  }, [asked, away, query, deferredQuery, navigate, setAddress])
 
   // Navigation can return to the same address before a pending query reaches it.
   const [heard, setHeard] = useState({ key, asked })

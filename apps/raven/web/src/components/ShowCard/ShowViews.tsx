@@ -12,7 +12,7 @@ import {
 import { useState } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { Icon } from '@raven/ui'
-import { ScoreChip } from '@/components/ScoreChip/ScoreChip'
+import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
@@ -132,7 +132,7 @@ const ShowRow = ({ entry }: { entry: ShowEntry }) => {
         const rating = entry.show.ratings.find((it) => it.source === column.source)
         return (
           <td key={column.source} className={`${styles.number} ${styles.roomy}`}>
-            {rating && <ScoreChip rating={rating} />}
+            {rating && <RatingBadge rating={rating} />}
           </td>
         )
       })}
@@ -235,7 +235,7 @@ const ShowTile = ({ entry, sort }: { entry: ShowEntry; sort: MediaSort | undefin
           <ul className={styles.scores} aria-label="Ratings">
             {entry.show.ratings.map((rating) => (
               <li key={rating.source}>
-                <ScoreChip rating={rating} />
+                <RatingBadge rating={rating} />
               </li>
             ))}
           </ul>

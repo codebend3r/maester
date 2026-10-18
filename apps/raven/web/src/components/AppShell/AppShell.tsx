@@ -8,6 +8,7 @@ import { useIsMediumScreen } from '@/components/AppShell/useIsMediumScreen'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { Logo } from '@/components/Logo/Logo'
 import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
+import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
 import { useFollowAdminLock } from '@/lib/adminLock'
 import { librariesQuery } from '@/lib/queries'
@@ -80,7 +81,8 @@ const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
  * the toggle and stays that way across visits; on a medium screen it is
  * down to its icons whatever the toggle says, so there the toggle and B
  * step aside. A phone has no side menu but a tab bar along the foot of the
- * screen. The theme button sits in the page's top corner. While a card's
+ * screen. Over every page, a bar holds the search through every library
+ * and, in its corner, the theme button. While a card's
  * picture is behind the page, the menu frosts over it. While the frame is
  * open, what the pages show follows the server's changes, and the admin
  * lock coming on or going off. The player leaves the frame behind for the
@@ -195,7 +197,10 @@ export const AppShell = () => {
         </div>
       </nav>
       <main className={styles.main}>
-        <ThemePicker className={styles.corner} />
+        <div className={styles.bar}>
+          <SiteSearch className={styles.search} />
+          <ThemePicker className={styles.corner} />
+        </div>
         <div className={styles.page}>
           <TopCardNote pageKey={key}>
             <Outlet />

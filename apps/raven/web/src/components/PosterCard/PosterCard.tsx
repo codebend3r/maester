@@ -10,13 +10,13 @@ import {
   pickScore,
   sortFact,
 } from '@raven/core'
+import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark, FavouriteWords } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterOverlay } from '@/components/PosterOverlay/PosterOverlay'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
-import { ScoreChip } from '@/components/ScoreChip/ScoreChip'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
@@ -152,7 +152,7 @@ export const PosterCard = ({
           ))}
           {score && (
             <span className={styles.fact}>
-              <ScoreChip rating={score} />
+              <RatingBadge rating={score} />
             </span>
           )}
           <FavouriteWords media={media} />

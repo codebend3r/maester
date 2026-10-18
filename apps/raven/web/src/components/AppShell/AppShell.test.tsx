@@ -420,6 +420,14 @@ describe('AppShell', () => {
     )
   })
 
+  it('puts the search through every library over every page', () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell('/libraries')
+    expect(
+      within(screen.getByRole('main')).getByRole('searchbox', { name: 'Search every library' }),
+    ).toHaveAttribute('placeholder', 'Search every library')
+  })
+
   it('puts the theme button in the corner of every page', async () => {
     spies.list.mockImplementation(async () => [])
     renderShell('/libraries')

@@ -99,6 +99,30 @@ const RatingItem = ({ rating }: { rating: Rating }) => {
 }
 
 /**
+ * One score where a card or a row has a line for it: the panel's score,
+ * scale and name in a small frame, its bar along the frame's foot.
+ */
+export const RatingBadge = ({ rating }: { rating: Rating }) => {
+  const source = SOURCES[rating.source]
+  const score = source.score(rating)
+  return (
+    <span className={`${styles.badge} ${source.className}`}>
+      <span className="visually-hidden">{`${source.site}: ${score}${source.spoken}`}</span>
+      <span className={styles.badgeScore} aria-hidden="true">
+        <span className={styles.badgeValue}>{score}</span>
+        <span className={styles.badgeScale}>{source.shown}</span>
+      </span>
+      <span className={styles.badgeLabel} aria-hidden="true">
+        {source.label}
+      </span>
+      <span className={styles.badgeTrack} aria-hidden="true">
+        <span className={styles.fill} style={{ width: barWidth(rating) }} />
+      </span>
+    </span>
+  )
+}
+
+/**
  * A movie's scores in one framed panel: each source's score over a bar in
  * its colour and its name, with the full name and what the number means in
  * a tooltip on hover or focus. A source with no score is left out.

@@ -3,6 +3,7 @@ import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type Home, type HomeSearch, type ItemDetails, mediaLabel } from '@raven/core'
 import { Link, useLocation } from 'react-router-dom'
+import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { HomePage } from '@/pages/HomePage/HomePage'
@@ -202,6 +203,7 @@ describe('HomePage', () => {
     expect(await screen.findByText(/Pin a library/)).toBeInTheDocument()
   })
 
+  // The box is the shell's, over every page; home shows what it finds.
   describe('searching every library', () => {
     const HOME: Home = {
       inProgress: [{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }],
@@ -221,6 +223,7 @@ describe('HomePage', () => {
           <>
             <Link to="/">Back home</Link>
             <AddressProbe />
+            <SiteSearch />
             <HomePage />
           </>
         ),

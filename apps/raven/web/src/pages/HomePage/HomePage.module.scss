@@ -6,29 +6,22 @@
   gap: var(--section-gap);
 }
 
-// The title, small, and the search at the right, clear of the theme button
-// in the corner; on a phone the search takes a row of its own under them.
+// The title, small, under the way back when there is one.
 .header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 26.25rem);
-  grid-template-areas: 'title search';
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'title';
   gap: var(--space-4);
-  min-height: var(--field-size);
-  padding-inline-end: var(--corner-clearance, 0);
+}
+
+.header:has(.back) {
+  grid-template-areas:
+    'back'
+    'title';
 }
 
 .back {
   grid-area: back;
-}
-
-// With a way back, it takes the corner row and the title and search drop
-// under it; without, they take the corner row themselves.
-.header:has(.back) {
-  grid-template-areas:
-    'back back'
-    'title search';
-  padding-inline-end: 0;
 }
 
 .title {
@@ -37,49 +30,6 @@
   font-size: var(--font-size-lg);
   line-height: var(--line-tight);
   letter-spacing: normal;
-}
-
-// The icon lies over the field's start and lets clicks through to it.
-.search {
-  grid-area: search;
-  display: grid;
-  grid-template-areas: 'field';
-  align-items: center;
-}
-
-// An underline rather than a box, in the display face.
-.input {
-  grid-area: field;
-  width: 100%;
-  padding: 0 var(--space-0) 0 calc(var(--space-0) + 1.25rem + var(--space-2));
-  border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-bark) 20%, transparent);
-  border-radius: 0;
-  background: transparent;
-  color: var(--color-bark);
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
-  text-overflow: ellipsis;
-
-  &:hover:not(:focus-visible) {
-    border-bottom-color: color-mix(in srgb, var(--color-bark) 40%, transparent);
-  }
-
-  // The underline thickens and darkens in place of the field's ring.
-  &:focus-visible {
-    border-bottom-color: var(--color-bark);
-    outline: none;
-    box-shadow: 0 1px 0 var(--color-bark);
-  }
-}
-
-.searchIcon {
-  grid-area: field;
-  justify-self: start;
-  display: grid;
-  padding-inline-start: var(--space-0);
-  color: var(--color-lichen);
-  pointer-events: none;
 }
 
 .message {
@@ -134,10 +84,6 @@
 }
 
 @media (max-width: 64rem) {
-  .header {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
-  }
-
   .row {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -151,31 +97,6 @@
 
   .skeletonPoster {
     width: min(14.375rem, 62%);
-  }
-}
-
-// Only the title's row needs to clear the corner; the search runs full width under it.
-@media (max-width: 48rem) {
-  .header {
-    grid-template-columns: minmax(0, 1fr) var(--corner-clearance, 0);
-    grid-template-areas:
-      'title .'
-      'search search';
-    gap: var(--space-2);
-    padding-inline-end: 0;
-  }
-
-  .header:has(.back) {
-    grid-template-areas:
-      'back back'
-      'title .'
-      'search search';
-  }
-
-  .title {
-    display: grid;
-    align-items: center;
-    min-height: var(--field-size);
   }
 }
 

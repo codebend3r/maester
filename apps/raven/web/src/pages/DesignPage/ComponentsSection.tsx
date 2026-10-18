@@ -10,8 +10,7 @@ import { MediaGroups } from '@/components/MediaGroups/MediaGroups'
 import { MediaList } from '@/components/MediaList/MediaList'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
-import { ScoreChip } from '@/components/ScoreChip/ScoreChip'
-import { RatingPanel } from '@/components/RatingPanel/RatingPanel'
+import { RatingBadge, RatingPanel } from '@/components/RatingPanel/RatingPanel'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
@@ -235,12 +234,12 @@ export const ComponentsSection = () => (
     </Specimen>
 
     <Specimen
-      name="ScoreChip"
-      note="A score on a card. Rotten Tomatoes is a tomato from 60% and a splat below; Metacritic's square is green from 61, yellow from 40, red under."
+      name="RatingBadge"
+      note="The panel in one line, where a card or a table row has room for one score: the score, its scale and the source's name, with the bar along the frame's foot."
     >
       <div className={styles.row}>
         {[...SAMPLE_RATINGS, ...SAMPLE_RATINGS_LOW, ...SAMPLE_RATINGS_RED].map((rating) => (
-          <ScoreChip key={`${rating.source}-${rating.value}`} rating={rating} />
+          <RatingBadge key={`${rating.source}-${rating.value}`} rating={rating} />
         ))}
       </div>
     </Specimen>

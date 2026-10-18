@@ -6,19 +6,16 @@ import {
   type Library,
   matchTypeFor,
 } from '@raven/core'
-import { Icon } from '@raven/ui'
 import { type ReactNode, useId } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
-import { SearchField } from '@/components/SearchField/SearchField'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { ShowCard } from '@/components/ShowCard/ShowCard'
 import { Bone, Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { POSTER_SIZES } from '@/lib/posters'
 import { homeQuery, homeSearchQuery, librariesQuery } from '@/lib/queries'
-import { useAddressSearch } from '@/lib/useSearch'
 import { ContinueWatching } from '@/pages/HomePage/ContinueWatching'
 import { HomeHero } from '@/pages/HomePage/HomeHero'
 import { featuredOf } from '@/pages/HomePage/featured'
@@ -219,47 +216,30 @@ const Shelves = ({ libraries }: { libraries: Library[] }) => {
 }
 
 /**
- * `/`: a search through every library, then the newest arrivals with
- * artwork taking turns in the hero, then what is being watched, as wide
- * tiles, then a row for each pinned library with its eight newest
- * arrivals, in the side menu's order. A search, which rides in the address
- * as `?q=`, shows what it found in place of all of it. Libraries still
- * locked stay off it until the PIN opens them.
+ * `/`: the newest arrivals with artwork taking turns in the hero, then what
+ * is being watched, as wide tiles, then a row for each pinned library with
+ * its eight newest arrivals, in the side menu's order. A search from the
+ * shell's bar, which rides in the address as `?q=`, shows what it found in
+ * place of all of it. Libraries still locked stay off it until the PIN
+ * opens them.
  */
 export const HomePage = () => {
-  const ids = { title: useId(), search: useId() }
-  const search = useAddressSearch()
+  const titleId = useId()
+  const [address] = useSearchParams()
+  const query = (address.get('q') ?? '').trim()
   const libraries = useQuery(librariesQuery)
   const known = libraries.data ?? []
 
   return (
-    <section className={styles.page} aria-labelledby={ids.title}>
+    <section className={styles.page} aria-labelledby={titleId}>
       <header className={styles.header}>
         <BackButton fallback={null} className={styles.back} />
-        <h1 id={ids.title} className={styles.title}>
+        <h1 id={titleId} className={styles.title}>
           Home
         </h1>
-        <search className={styles.search}>
-          <label htmlFor={ids.search} className="visually-hidden">
-            Search every library
-          </label>
-          <SearchField
-            id={ids.search}
-            search={search}
-            className={styles.input}
-            placeholder="Search every library"
-          />
-          <span className={styles.searchIcon}>
-            <Icon name="search" size={20} />
-          </span>
-        </search>
       </header>
 
-      {search.query ? (
-        <SearchResults query={search.query} libraries={known} />
-      ) : (
-        <Shelves libraries={known} />
-      )}
+      {query ? <SearchResults query={query} libraries={known} /> : <Shelves libraries={known} />}
     </section>
   )
 }

@@ -11,8 +11,8 @@ import {
 } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { useState } from 'react'
+import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
-import { ScoreChip } from '@/components/ScoreChip/ScoreChip'
 import { PosterOverlay } from '@/components/PosterOverlay/PosterOverlay'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
@@ -98,7 +98,7 @@ const ShowFacts = ({
     ))}
     {score && (
       <span className={styles.fact}>
-        <ScoreChip rating={score} />
+        <RatingBadge rating={score} />
       </span>
     )}
     <WatchedCountWords watched={entry.watchedEpisodes} total={entry.episodes} />
