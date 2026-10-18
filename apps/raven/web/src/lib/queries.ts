@@ -249,3 +249,11 @@ export const accountQuery = (userId: string | null) =>
     queryFn: userId === null ? skipToken : () => api.getMe(),
     retry: false,
   })
+
+/** Every account on this raven. Keyed by the owner asking, so another account never reads this list, and never retried: a refusal is the answer. */
+export const membersQuery = (userId: string) =>
+  queryOptions({
+    queryKey: queryKeys.members(userId),
+    queryFn: () => api.listMembers(),
+    retry: false,
+  })

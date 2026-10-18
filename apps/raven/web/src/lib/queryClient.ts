@@ -42,6 +42,8 @@ export const queryKeys = {
   auth: ['auth'],
   authConfig: ['auth', 'config'],
   account: (userId: string | null) => ['auth', 'account', userId],
+  /** Every account on this raven, as the owner who asked for them sees it. */
+  members: (userId: string) => ['auth', 'members', userId],
   libraries: ['libraries'],
   library: (id: number | null) => ['libraries', id],
   media: ({

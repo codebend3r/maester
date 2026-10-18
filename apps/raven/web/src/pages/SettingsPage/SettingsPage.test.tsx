@@ -3,6 +3,8 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import userEvent from '@testing-library/user-event'
 import {
   ApiError,
+  AUTH_CONFIG_STATES,
+  AUTH_COOKIE,
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,
   type PlaybackSettingsState,
@@ -11,6 +13,8 @@ import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@raven/ui'
 import { api } from '@/lib/api'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
 import { held } from '@/test/held'
+import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
+import { fakeAccount } from '@/test/authClient'
 import { renderWithProviders } from '@/test/render'
 
 const STATE: PlaybackSettingsState = {
@@ -361,5 +365,63 @@ describe('Advanced on SettingsPage', () => {
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
     ).toEqual(['Playback', 'Display', 'Advanced', 'Admin'])
     expect(slider()).toBeEnabled()
+  })
+})
+
+describe('accounts on SettingsPage', () => {
+  const spies = {
+    playback: spyOn(api, 'getPlaybackSettings'),
+    me: spyOn(api, 'getMe'),
+    members: spyOn(api, 'listMembers'),
+  }
+  const ready = {
+    state: AUTH_CONFIG_STATES.ready,
+    supabaseUrl: 'http://127.0.0.1:54321',
+    publishableKey: 'sb_publishable_test',
+    webUrl: 'http://localhost:8484',
+    cookieName: AUTH_COOKIE,
+  } as const
+
+  beforeEach(() => {
+    spies.playback.mockImplementation(async () => STATE)
+    spies.members.mockResolvedValue([])
+  })
+  afterEach(() => {
+    cleanup()
+    Object.values(spies).forEach((spy) => spy.mockReset())
+    useAuthSession.setState({ client: null, session: null })
+  })
+
+  const headings = () =>
+    screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
+
+  const renderSignedIn = ({ isOwner }: { isOwner: boolean }) => {
+    const account = fakeAccount({ isOwner })
+    useAuthSession.setState({
+      status: AUTH_SESSION_STATUSES.ready,
+      session: { accessToken: 't', userId: account.id },
+    })
+    spies.me.mockResolvedValue(account)
+    renderWithProviders({ ui: <SettingsPage />, authConfig: ready })
+  }
+
+  it('shows neither Account nor Users while accounts are off', () => {
+    renderWithProviders({ ui: <SettingsPage /> })
+    expect(headings()).toEqual(['Playback', 'Display', 'Advanced', 'Admin'])
+    expect(spies.me).not.toHaveBeenCalled()
+    expect(spies.members).not.toHaveBeenCalled()
+  })
+
+  it('shows Account but not Users to a member', async () => {
+    renderSignedIn({ isOwner: false })
+    await screen.findByRole('heading', { name: 'Account' })
+    expect(headings()).toEqual(['Playback', 'Display', 'Account', 'Advanced', 'Admin'])
+    expect(spies.members).not.toHaveBeenCalled()
+  })
+
+  it('shows Account and Users, after Display, to the owner', async () => {
+    renderSignedIn({ isOwner: true })
+    await screen.findByRole('heading', { name: 'Users' })
+    expect(headings()).toEqual(['Playback', 'Display', 'Account', 'Users', 'Advanced', 'Admin'])
   })
 })
