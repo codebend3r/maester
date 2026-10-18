@@ -39,26 +39,30 @@ const Unavailable = () => (
 /**
  * The screen every signed out page of the auth flow sits in, beside the poster
  * wall. While accounts are off the page is not there; a visitor already in is
- * sent on, to `approvedTo` once approved; while accounts cannot be reached it
- * says so instead of showing a form that cannot work. `children` is the form.
+ * sent on, to `approvedTo` once approved, unless `shouldKeepVisitor` leaves
+ * that to the page; while accounts cannot be reached it says so instead of
+ * showing a form that cannot work. `children` is the form.
  */
 export const AuthScreen = ({
   approvedTo = HOME_PATH,
+  shouldKeepVisitor = false,
   children,
 }: {
   approvedTo?: string
+  shouldKeepVisitor?: boolean
   children: ReactNode
 }) => {
   const access = useAccessState()
+  const kept = <Frame>{children}</Frame>
 
   switch (access.kind) {
     case ACCESS_KINDS.disabled:
       return <Navigate replace to={HOME_PATH} />
     case ACCESS_KINDS.approved:
-      return <Navigate replace to={approvedTo} />
+      return shouldKeepVisitor ? kept : <Navigate replace to={approvedTo} />
     case ACCESS_KINDS.pending:
     case ACCESS_KINDS.revoked:
-      return <Navigate replace to={AUTH_ROUTES.pending} />
+      return shouldKeepVisitor ? kept : <Navigate replace to={AUTH_ROUTES.pending} />
     case ACCESS_KINDS.loading:
       return (
         <Frame>
@@ -73,7 +77,7 @@ export const AuthScreen = ({
         </Frame>
       )
     case ACCESS_KINDS.signedOut:
-      return <Frame>{children}</Frame>
+      return kept
     default: {
       const unreachable: never = access
       return unreachable

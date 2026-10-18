@@ -20,6 +20,7 @@ import { PersonPage } from '@/pages/PersonPage/PersonPage'
 import { GetPage } from '@/pages/GetPage/GetPage'
 import { AUTH_ROUTES } from '@/lib/authRoutes'
 import { CheckEmailPage } from '@/pages/CheckEmailPage/CheckEmailPage'
+import { ConfirmPage } from '@/pages/ConfirmPage/ConfirmPage'
 import { SignInPage } from '@/pages/SignInPage/SignInPage'
 import { SignUpPage } from '@/pages/SignUpPage/SignUpPage'
 import { WatchPage } from '@/pages/WatchPage/WatchPage'
@@ -49,10 +50,11 @@ export const AppRoutes = () => (
         {/* The player takes the whole screen, outside the browsing frame. */}
         <Route path="watch/:id" element={<WatchPage />} />
       </Route>
-      {/* So do signing in, which the gate sends a signed out visitor to, signing up, the page that asks to check email, and the page to get raven from. */}
+      {/* So do signing in, which the gate sends a signed out visitor to, signing up, the page that asks to check email, the page an email link opens, and the page to get raven from. */}
       <Route path={AUTH_ROUTES.signIn} element={<SignInPage />} />
       <Route path={AUTH_ROUTES.signUp} element={<SignUpPage />} />
       <Route path={AUTH_ROUTES.checkEmail} element={<CheckEmailPage />} />
+      <Route path={AUTH_ROUTES.confirm} element={<ConfirmPage />} />
       <Route path="get" element={<GetPage />} />
     </Routes>
     {/* Over any page, the player too: whatever sits in a locked library asks for the PIN. */}
