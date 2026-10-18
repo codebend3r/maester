@@ -44,7 +44,7 @@ Things that would make this a failure even if it technically works:
 - A download that deletes itself while it is playing, or deletes an episode the viewer is in the middle of.
 - A half-written file that looks finished: a download is "ready" only once every byte the server promised is on disk.
 - A download that fills the disk: the app refuses to start one that will not fit, and leaves a reserve.
-- Progress that the server never hears of, or hears twice as two plays, or that overwrites a later streamed position with an older offline one.
+- Progress that the server never hears of, or hears twice as two plays, or that overwrites a later streamed position with an older offline one (one cross-device race is accepted; see Outcomes).
 - A page that can make the main process fetch an arbitrary URL or write an arbitrary path.
 
 ## What the viewer sees
@@ -144,7 +144,7 @@ The file is named `video.<container>` from `MediaItem.container`, never from the
 
 ## State
 
-`downloads.json`, version 1, read once at launch through `loadJson` with a guard built from core's combinators (a bad file is kept aside as `.corrupt-<time>` and the app starts with none, as the others do, and that launch's sweep keeps every folder), written through the same debounced `JsonStore` as `player-state.json`, flushed on `before-quit`.
+`downloads.json`, version 1, read once at launch through `loadJson` with a guard built from core's combinators (a bad file is kept aside as `.corrupt-<time>` and the app starts with none, as the others do, and that launch's sweep keeps every folder of the servers it keeps), written through the same debounced `JsonStore` as `player-state.json`, flushed on `before-quit`.
 
 ```ts
 type DownloadEntry = {
@@ -380,7 +380,7 @@ What else differs from the proposal:
 - An offline position synced after a later one streamed on another device moves the server's resume spot back, until another report moves it. Nothing on the desktop can tell: the server takes no time with a play or a report, and `getMedia` gives none for its resume spot. Dated reports beside dated plays are a server follow-up.
 - "Downloaded <title>" also shows while the Downloads page is open. Delete all can race a download confirmed while it runs (rare).
 - A held deletion shows nothing on its row. A rewatch reads 100%, since `watchedAt` is first reached. Empty `downloads/<serverId>/` folders stay after a season goes.
-- Home's bar reads "Not started" for a fresh download that will open at the server's spot.
+- Home's bar and the download's row read "Not started" for a fresh download that will open at the server's spot.
 - An episode's page sends `media=` with the file Play starts there, while a season or show takes each episode's `primary`, so where the page shows another file than the season's `primary` (a page kept to another library, say), one episode can be downloaded in two versions. An `item=` link naming an episode, which raven web never builds, takes `versions[0]`.
 - The ask creates `userData/downloads` when it reads free space, before Download.
 - Follow-up: swap `mediaAccess`'s pick for core's `pickOrigin`, which landed on `main` (#204) after the stack was cut.

@@ -21,7 +21,7 @@ Plex on the LAN reads from the NAS directly, so its ceiling is the LAN. raven's 
 - At home, a browser on the Netlify site plays a 4K remux as smoothly as Plex does on the LAN.
 - Away, playback uses the fastest route that reaches Vhagar, and steps down to a transcode when that route cannot carry the file's bitrate.
 - The PIN and the admin lock keep working, with their cookies still first party.
-- Nothing changes for the web app served by Vhagar itself, or for the desktop app.
+- Nothing changes for the web app served by Vhagar itself, or for the desktop app's streaming (its downloads use the media plane; see `2026-10-17-raven-desktop-downloads-design.md`).
 
 ## Non goals
 
