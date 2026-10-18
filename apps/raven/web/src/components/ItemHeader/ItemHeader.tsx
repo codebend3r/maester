@@ -206,7 +206,10 @@ export const ItemHeader = ({
   back: BackFallback
   /** A line of how far through the item the viewer is, where the page has one. */
   progress?: HeaderProgress
-  /** The page's own actions: Play, favourite, Watched, Select. */
+  /**
+   * The page's own actions: Play, favourite, Watched, Select. One whose label
+   * cannot shrink marks itself `data-wide`, and the row makes room for it.
+   */
   children?: ReactNode
   /** The actions that change the item: the editors, Fix match, the file's menu. */
   manage?: ReactNode

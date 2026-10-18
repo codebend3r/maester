@@ -20,11 +20,11 @@ describe('DownloadButton', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('takes the class that gives it a whole row where the header breaks its actions into cells', () => {
+  it('marks itself wide, so the header makes room for its label', () => {
     usePlayerPrefs.setState({ opensInRavenPlayer: true })
     render(<DownloadButton target={{ kind: 'saga', libraryId: 2, tmdbId: '119' }} />)
-    expect(screen.getByRole('button', { name: 'Download to raven player' }).className).toMatch(
-      /download/u,
+    expect(screen.getByRole('button', { name: 'Download to raven player' })).toHaveAttribute(
+      'data-wide',
     )
   })
 
