@@ -1,6 +1,6 @@
 # Supabase sign-in: raven first
 
-Date: 2026-10-17. Status: revised scope requested by the user; technical validation and implementation plan still required.
+Date: 2026-10-17. Status: raven-first scope approved; foundation implementation in progress.
 
 ## Goal
 
@@ -8,7 +8,7 @@ Ship the shortest safe path to a raven library that requires a login. Anyone can
 
 This replaces the earlier suite-first delivery order in this document. rookery, luwin, cross-app single sign-on and Google sign-in are not prerequisites for raven. The existing `2026-10-09-shared-sign-in-design.md` continues to describe rookery and luwin until their later migration.
 
-There is no detailed Supabase implementation plan yet. Write `docs/superpowers/plans/2026-10-17-supabase-sign-in.md` after the focused technical checks below, using this sequence rather than the previous suite-first PR stack.
+The implementation plan is `docs/superpowers/plans/2026-10-17-supabase-sign-in.md`. It records foundation validation results and the remaining browser, deployment and desktop checks required before cutover.
 
 ## Scope decisions
 

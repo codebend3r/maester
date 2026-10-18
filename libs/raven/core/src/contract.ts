@@ -15,6 +15,77 @@ import {
 } from '@/schema'
 import { MAX_WATCH_TARGETS } from '@/watched'
 
+export const MEMBER_STATUSES = {
+  pending: 'pending',
+  approved: 'approved',
+  revoked: 'revoked',
+} as const
+export const isMemberStatus = oneOf(Object.values(MEMBER_STATUSES))
+
+export const AUTH_CONFIG_STATES = {
+  off: 'off',
+  unavailable: 'unavailable',
+  ready: 'ready',
+} as const
+export const AUTH_COOKIE = 'maester-auth'
+export const AUTH_HEADERS = {
+  authorization: 'authorization',
+  cookie: 'cookie',
+  apiKey: 'apikey',
+} as const
+export const AUTH_SCHEME = 'Bearer'
+export const AUTH_API_PREFIX = '/api/'
+export const AUTH_METHODS = { get: 'GET', head: 'HEAD', post: 'POST' } as const
+export const AUTH_PARAMS = { id: 'id', pageSize: 'pageSize', pageOffset: 'pageOffset' } as const
+export const AUTH_PATHS = {
+  config: '/api/auth/config',
+  me: '/api/me',
+  members: '/api/auth/members',
+  memberStatus: '/api/auth/members/:id/status',
+  ticket: '/api/auth/media/:id/ticket',
+} as const
+
+export const isAccountId = (value: unknown): value is string =>
+  isString(value) && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+
+export const isAuthConfig = union(
+  object({ state: oneOf([AUTH_CONFIG_STATES.off, AUTH_CONFIG_STATES.unavailable]) }),
+  object({
+    state: oneOf([AUTH_CONFIG_STATES.ready]),
+    supabaseUrl: isString,
+    publishableKey: isString,
+    webUrl: isString,
+    cookieName: oneOf([AUTH_COOKIE]),
+  }),
+)
+export type AuthConfig = Infer<typeof isAuthConfig>
+
+export const isAccount = object({
+  id: isAccountId,
+  email: isString,
+  status: isMemberStatus,
+  isOwner: isBoolean,
+})
+export type Account = Infer<typeof isAccount>
+export const isAccountList = listOf(isAccount)
+export const isMemberStatusChange = object({
+  status: oneOf([MEMBER_STATUSES.approved, MEMBER_STATUSES.revoked]),
+})
+export type MemberStatusChange = Infer<typeof isMemberStatusChange>
+
+export const AUTH_REFUSALS = {
+  signedOut: 'signed_out',
+  pending: 'pending',
+  revoked: 'revoked',
+  notOwner: 'not_owner',
+  unavailable: 'unavailable',
+} as const
+export const isAuthRefusal = object({
+  reason: oneOf(Object.values(AUTH_REFUSALS)),
+  message: isString,
+})
+export type AuthRefusal = Infer<typeof isAuthRefusal>
+
 /**
  * The API contract between the media server and every client. Anything a
  * client renders, or the server returns, is one of these shapes, so the web
@@ -1429,7 +1500,7 @@ export type StreamMode = Infer<typeof isStreamMode>
 export const STREAM_MODES = isStreamMode.values
 
 /** How far an origin reaches: the home network, the tailnet or the open internet. */
-const MEDIA_ORIGIN_KINDS = { lan: 'lan', tailnet: 'tailnet', public: 'public' } as const
+export const MEDIA_ORIGIN_KINDS = { lan: 'lan', tailnet: 'tailnet', public: 'public' } as const
 
 export const isMediaOriginKind = oneOf(Object.values(MEDIA_ORIGIN_KINDS))
 

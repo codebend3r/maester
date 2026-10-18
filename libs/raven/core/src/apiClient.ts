@@ -1,5 +1,19 @@
 import {
   type AdminLock,
+  type Account,
+  type AuthConfig,
+  type AuthRefusal,
+  type MemberStatusChange,
+  AUTH_HEADERS,
+  AUTH_API_PREFIX,
+  AUTH_METHODS,
+  AUTH_PARAMS,
+  AUTH_PATHS,
+  AUTH_SCHEME,
+  isAccount,
+  isAccountList,
+  isAuthConfig,
+  isAuthRefusal,
   type AdminUnlockRequest,
   type ChoosableImageKind,
   type DirectoryListing,
@@ -126,11 +140,21 @@ export type FetchLike = (url: string, init?: FetchInit) => Promise<FetchResponse
 
 export class ApiError extends Error {
   readonly status: number
+  readonly refusal: AuthRefusal | null
 
-  constructor({ status, message }: { status: number; message: string }) {
+  constructor({
+    status,
+    message,
+    refusal = null,
+  }: {
+    status: number
+    message: string
+    refusal?: AuthRefusal | null
+  }) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.refusal = refusal
   }
 }
 
@@ -192,9 +216,11 @@ export type ApiClient = ReturnType<typeof createApiClient>
 export const createApiClient = ({
   baseUrl = '',
   fetch,
+  accessToken = () => null,
 }: {
   baseUrl?: string
   fetch: FetchLike
+  accessToken?: () => string | null
 }) => {
   const root = baseUrl.replace(/\/+$/, '')
   const url = (path: string): string => `${root}${path}`
@@ -228,18 +254,26 @@ export const createApiClient = ({
     accept?: string
     body?: unknown
   }): Promise<FetchResponse> => {
+    // Absolute media URLs are a separate trust boundary, even when their origin
+    // happens to match the server. Only the generated API URL receives credentials.
+    const token = href === url(path) && path.startsWith(AUTH_API_PREFIX) ? accessToken() : null
     const response = await fetch(href, {
       method,
-      headers: body === undefined ? { accept } : { accept, 'content-type': 'application/json' },
+      headers: {
+        ...(body === undefined ? { accept } : { accept, 'content-type': 'application/json' }),
+        ...(token === null ? {} : { [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${token}` }),
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
     if (!response.ok) {
+      const responseBody = await readJson(response)
       throw new ApiError({
         status: response.status,
         message: errorMessage({
-          body: await readJson(response),
+          body: responseBody,
           fallback: response.statusText || 'Request failed',
         }),
+        refusal: isAuthRefusal(responseBody) ? responseBody : null,
       })
     }
     return response
@@ -303,6 +337,48 @@ export const createApiClient = ({
   }): string => url(`/api/items/${id}/images/${kind}?${toQueryString({ v: version })}`)
 
   return {
+    getAuthConfig: (): Promise<AuthConfig> =>
+      expect({ request: send({ path: AUTH_PATHS.config }), guard: isAuthConfig }),
+
+    getMe: (): Promise<Account> =>
+      expect({ request: send({ path: AUTH_PATHS.me }), guard: isAccount }),
+
+    listMembers: ({
+      pageSize = 100,
+      pageOffset = 0,
+    }: { pageSize?: number; pageOffset?: number } = {}): Promise<Account[]> =>
+      expect({
+        request: send({
+          path: `${AUTH_PATHS.members}?${toQueryString({ [AUTH_PARAMS.pageSize]: String(pageSize), [AUTH_PARAMS.pageOffset]: String(pageOffset) })}`,
+        }),
+        guard: isAccountList,
+      }),
+
+    setMemberStatus: ({
+      id,
+      change,
+    }: {
+      id: string
+      change: MemberStatusChange
+    }): Promise<Account> =>
+      expect({
+        request: send({
+          path: AUTH_PATHS.memberStatus.replace(`:${AUTH_PARAMS.id}`, encodeURIComponent(id)),
+          method: AUTH_METHODS.post,
+          body: change,
+        }),
+        guard: isAccount,
+      }),
+
+    getAccountMediaTicket: ({ id }: { id: number }): Promise<MediaTicket> =>
+      expect({
+        request: send({
+          path: AUTH_PATHS.ticket.replace(`:${AUTH_PARAMS.id}`, String(id)),
+          method: AUTH_METHODS.post,
+        }),
+        guard: isMediaTicket,
+      }),
+
     listLibraries: (): Promise<Library[]> =>
       expect({ request: send({ path: '/api/libraries' }), guard: isLibraryList }),
 

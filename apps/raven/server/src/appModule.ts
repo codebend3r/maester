@@ -1,5 +1,12 @@
 import { type DynamicModule, Module } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
+import type { JWTVerifyGetKey } from 'jose'
+import { AccountGuard } from '@/auth/accountGuard'
+import { AccountTickets } from '@/auth/accountTickets'
+import { AuthBackend } from '@/auth/authBackend'
+import { AuthController } from '@/auth/authController'
+import { AUTH_VERIFY, AuthSessions } from '@/auth/authSessions'
+import { AUTH_FETCH, createTokenVerifier, type AuthFetch } from '@/auth/tokenVerifier'
 import { AdminController } from '@/admin/adminController'
 import { AdminGuard } from '@/admin/adminGuard'
 import { AdminService } from '@/admin/adminService'
@@ -81,6 +88,7 @@ export const CONTROLLERS = [
   LockController,
   AdminController,
   StreamsController,
+  AuthController,
 ] as const
 
 /** Folders stay still for 2 s before a refresh. */
@@ -101,11 +109,15 @@ export class AppModule {
     metadataFetch = ({ url, init }) => fetch(url, init),
     aiFetch = (input, init) => fetch(input, init),
     watch = {},
+    authFetch = ({ url, init }) => fetch(url, init),
+    authKeys,
   }: {
     config: ServerConfig
     metadataFetch?: MetadataFetch
     aiFetch?: AiFetch
     watch?: Partial<WatchOptions>
+    authFetch?: AuthFetch
+    authKeys?: JWTVerifyGetKey
   }): DynamicModule {
     assertRoutesMarked(CONTROLLERS)
     return {
@@ -113,6 +125,14 @@ export class AppModule {
       controllers: [...CONTROLLERS],
       providers: [
         { provide: SERVER_CONFIG, useValue: config },
+        { provide: AUTH_FETCH, useValue: authFetch },
+        {
+          provide: AUTH_VERIFY,
+          useValue: createTokenVerifier({ config: config.auth, keys: authKeys, authFetch }),
+        },
+        AuthBackend,
+        AuthSessions,
+        AccountTickets,
         { provide: METADATA_FETCH, useValue: metadataFetch },
         { provide: AI_FETCH, useValue: aiFetch },
         { provide: WATCH_OPTIONS, useValue: { ...DEFAULT_WATCH, ...watch } },
@@ -154,6 +174,9 @@ export class AppModule {
         LockService,
         MediaTickets,
         StreamSessions,
+        // Account routes and new account tickets are protected immediately;
+        // existing library routes keep their current access until cutover.
+        { provide: APP_GUARD, useClass: AccountGuard },
         // Every route passes the lock first; those marked PrivateBy, or on a controller that is, are held.
         { provide: APP_GUARD, useClass: LockGuard },
         // Then the admin lock, which holds back the routes marked AdminOnly.

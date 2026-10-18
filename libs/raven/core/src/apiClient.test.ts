@@ -11,6 +11,13 @@ import {
 } from '@/apiClient'
 import {
   DEFAULT_SAGA_BACKDROP,
+  AUTH_CONFIG_STATES,
+  AUTH_HEADERS,
+  AUTH_PATHS,
+  AUTH_REFUSALS,
+  AUTH_SCHEME,
+  MEMBER_STATUSES,
+  MEDIA_ORIGIN_KINDS,
   type HomeShelf,
   type ItemImageOptions,
   type ItemMetadataState,
@@ -44,6 +51,90 @@ const clientReturning = (response: FetchResponse) => {
   })
   return { client, calls }
 }
+
+describe('account API client', () => {
+  it('reads public configuration and preserves structured refusals', async () => {
+    const config = { state: AUTH_CONFIG_STATES.off }
+    expect(await clientReturning(respond({ body: config })).client.getAuthConfig()).toEqual(config)
+    const refusal = { reason: AUTH_REFUSALS.pending, message: 'Awaiting approval.' }
+    await expect(
+      clientReturning(respond({ status: 403, body: refusal })).client.getMe(),
+    ).rejects.toMatchObject({ status: 403, refusal, message: refusal.message })
+  })
+
+  it('checks responses before exposing account data', async () => {
+    const bad = clientReturning(respond({ body: { email: 'not-a-complete-account' } }))
+    await expect(bad.client.getMe()).rejects.toMatchObject({ status: 502 })
+    await expect(bad.client.listMembers()).rejects.toMatchObject({ status: 502 })
+  })
+
+  it('re-reads the token for every API request and stops sending it after sign out', async () => {
+    const calls: Call[] = []
+    let token: string | null = 'session-token'
+    const client = createApiClient({
+      accessToken: () => token,
+      fetch: async (url, init) => {
+        calls.push({ url, init })
+        return respond({ body: { state: AUTH_CONFIG_STATES.off } })
+      },
+    })
+    await client.getAuthConfig()
+    token = null
+    await client.getAuthConfig()
+    expect(calls[0]?.init?.headers?.[AUTH_HEADERS.authorization] ?? null).toBe(
+      `${AUTH_SCHEME} session-token`,
+    )
+    expect(calls[1]?.init?.headers?.[AUTH_HEADERS.authorization] ?? null).toBeNull()
+  })
+
+  it('never sends Bearer to explicit media URLs, including same-origin subtitle fetches', async () => {
+    const calls: Call[] = []
+    const client = createApiClient({
+      baseUrl: 'https://raven.example.test',
+      accessToken: () => 'private-token',
+      fetch: async (url, init) => {
+        calls.push({ url, init })
+        return respond({ body: 'WEBVTT\n\n' })
+      },
+    })
+    await client.getSubtitles({ id: 7, trackId: 'external-0' })
+    await client.getSubtitles({
+      id: 7,
+      trackId: 'external-0',
+      access: {
+        origin: { kind: MEDIA_ORIGIN_KINDS.public, url: 'https://media.example.test' },
+        ticket: 'opaque-ticket',
+      },
+    })
+    expect(calls).toHaveLength(2)
+    calls.forEach(({ init }) =>
+      expect(init?.headers?.[AUTH_HEADERS.authorization] ?? null).toBeNull(),
+    )
+    expect(client.fileUrl({ id: 7 })).not.toContain('private-token')
+  })
+
+  it('sends bounded member-list options and explicit status writes', async () => {
+    const account = {
+      id: '30000000-0000-4000-8000-000000000001',
+      email: 'member@maester.test',
+      status: MEMBER_STATUSES.approved,
+      isOwner: false,
+    }
+    const list = clientReturning(respond({ body: [account] }))
+    expect(await list.client.listMembers({ pageSize: 10, pageOffset: 20 })).toEqual([account])
+    expect(list.calls[0]?.url ?? '').toContain(`${AUTH_PATHS.members}?pageSize=10&pageOffset=20`)
+    const write = clientReturning(respond({ body: account }))
+    expect(
+      await write.client.setMemberStatus({
+        id: account.id,
+        change: { status: MEMBER_STATUSES.approved },
+      }),
+    ).toEqual(account)
+    expect(write.calls[0]?.init?.body ?? '').toBe(
+      JSON.stringify({ status: MEMBER_STATUSES.approved }),
+    )
+  })
+})
 
 describe('createApiClient', () => {
   it('returns media that passes the guard', async () => {

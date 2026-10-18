@@ -15,6 +15,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { AUDIENCES } from '@/admin/adminGuard'
 import { createApp } from '@/app'
+import { AUTH_PATHS } from '@raven/core'
 import { CONTROLLERS } from '@/appModule'
 import { HIDDEN_SCAN_ERROR, LOCKED_SCAN_ERROR } from '@/libraries/librariesController'
 import { LOCK_MARKS } from '@/lock/lockGuard'
@@ -212,6 +213,7 @@ describe('a library locked behind the PIN', () => {
             {
               method: route.method,
               url: route.path.replace(':id', String(ids[route.lock])).replace(/:\w+/g, 'poster'),
+              expectedStatus: route.path === AUTH_PATHS.ticket ? 503 : 423,
             },
           ],
     )
@@ -223,7 +225,9 @@ describe('a library locked behind the PIN', () => {
         return `${method} ${url} ${response.statusCode}`
       }),
     )
-    expect(answers).toEqual(held.map(({ method, url }) => `${method} ${url} 423`))
+    expect(answers).toEqual(
+      held.map(({ method, url, expectedStatus }) => `${method} ${url} ${expectedStatus}`),
+    )
   })
 
   it('opens with the PIN, and shuts again when locked', async () => {

@@ -2,6 +2,8 @@ import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
 import { compressResponses, serveWebApp } from '@shared/server'
 import { AppModule, CONTROLLERS } from '@/appModule'
+import type { JWTVerifyGetKey } from 'jose'
+import type { AuthFetch } from '@/auth/tokenVerifier'
 import type { ServerConfig } from '@/config'
 import type { AiFetch } from '@/metadata/aiClient'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
@@ -19,6 +21,8 @@ export const createApp = async ({
   metadataFetch,
   aiFetch,
   watch,
+  authFetch,
+  authKeys,
 }: {
   config: ServerConfig
   quiet?: boolean
@@ -28,9 +32,11 @@ export const createApp = async ({
   aiFetch?: AiFetch
   /** Shorter waits for the folder watcher in tests. */
   watch?: Partial<WatchOptions>
+  authFetch?: AuthFetch
+  authKeys?: JWTVerifyGetKey
 }): Promise<NestFastifyApplication> => {
   const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule.register({ config, metadataFetch, aiFetch, watch }),
+    AppModule.register({ config, metadataFetch, aiFetch, watch, authFetch, authKeys }),
     new FastifyAdapter(),
     { logger: quiet ? false : ['log', 'warn', 'error'] },
   )
