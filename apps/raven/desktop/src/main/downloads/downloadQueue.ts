@@ -1,4 +1,4 @@
-import { isMediaTracks, type SubtitleTrack } from '@raven/core'
+import { isMediaTracks, oneOf, type SubtitleTrack } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
@@ -149,6 +149,8 @@ const STOP_REASONS = {
   dispose: 'dispose',
 } as const
 
+const isStopReason = oneOf(Object.values(STOP_REASONS))
+
 type StopReason = (typeof STOP_REASONS)[keyof typeof STOP_REASONS]
 
 // An AbortError, so `fetchToFile` reads a stopped fetch as aborted rather than unreachable.
@@ -158,7 +160,7 @@ const stopReasonOf = (signal: AbortSignal): StopReason | null => {
   if (!signal.aborted) return null
   const reason: unknown = signal.reason
   if (!(reason instanceof DOMException)) return null
-  return Object.values(STOP_REASONS).find((known) => known === reason.message) ?? null
+  return isStopReason(reason.message) ? reason.message : null
 }
 
 /** A body's text, read only up to `max` bytes: past them, the rest is never read. */

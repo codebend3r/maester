@@ -343,7 +343,7 @@ The stack started from `main` before the direct media client stack landed (plan 
 4. **Playing and syncing** (#211). `openDownload`, grants that know their download, the file target's sidecars, resume and watched detection, `sync`, Home's recents for downloads.
 5. **Auto-delete** (#214). `autoDelete`, the per-row switch and the default, the deferred deletion, the notices.
 6. **Web button, e2e and docs** (#226). The web's `DownloadButton` on the five redesigned pages and its Settings copy, last so the desktop can answer the link it offers; the fixture-server suite; `apps/raven/README.md`; `apps/raven/CLAUDE.md` (its Desktop section counts the allowlist's calls, which become thirteen, and the direct media spec's line that the desktop "passes nothing new" gives way to the downloads); the desktop spec's follow-ups; and this document's outcomes.
-7. **Follow-ups.** `mediaAccess` picks with core's `pickOrigin`, its probes timed over the whole ping body as the web player times them.
+7. **Follow-ups.** `mediaAccess` picks with core's `pickOrigin`, its probes timed over the whole ping body as the web player times them; `mergePending` keeps a merged owed record's furthest at or above its position; the downloads code compares against main's `as const` objects, not string literals; and a title's action row holding Download stops at three columns between 40 and 64rem.
 
 Every log line the downloads write goes through the app's log and its redaction, as the Desktop section of `apps/raven/CLAUDE.md` requires: a line names a download by its title through `loggable`, never by its path.
 
