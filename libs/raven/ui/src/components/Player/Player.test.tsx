@@ -15,7 +15,7 @@ import { api } from '@/test/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
 import { DEFAULT_PLAYBACK_STATE, renderWithProviders } from '@/test/render'
-import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostPlayer } from '@/stores/playerServices'
 
 /** A host as the web's is: new services on every render, the player only once they are in the store. */
@@ -286,6 +286,26 @@ describe('the player controls', () => {
     expect(video.currentTime).toBe(0)
     press('Escape')
     expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).toBeNull()
+  })
+
+  it('plays or pauses on Space with a bar button focused, never pressing it, while Enter still does', () => {
+    const fullscreen = spyOn(document.documentElement, 'requestFullscreen').mockImplementation(
+      async () => undefined,
+    )
+    const play = spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(async () => undefined)
+    renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    })
+    const button = screen.getByRole('button', { name: 'Full screen (f)' })
+    act(() => button.focus())
+    const down = fireEvent.keyDown(button, { key: ' ' })
+    const up = fireEvent.keyUp(button, { key: ' ' })
+    expect([down, up]).toEqual([false, false])
+    expect(play).toHaveBeenCalledTimes(1)
+    expect(fireEvent.keyDown(button, { key: 'Enter' })).toBe(true)
+    expect(fullscreen).not.toHaveBeenCalled()
+    fullscreen.mockRestore()
+    play.mockRestore()
   })
 
   it('leaves keys alone while the volume slider has them', () => {
@@ -605,12 +625,15 @@ describe('the player chrome', () => {
 
 // Last in the file: with the fake timers ahead of them, the Back tests above time out.
 describe('the controls fading out', () => {
-  const IDLE_MS = 10_000
+  const IDLE_MS = 5_000
   beforeEach(() => {
     stubTracks()
     jest.useFakeTimers()
   })
-  afterEach(() => jest.useRealTimers())
+  afterEach(() => {
+    jest.useRealTimers()
+    usePlayerPrefs.getState().setControlsLingerSeconds(CONTROLS_LINGER_SECONDS.initial)
+  })
 
   const renderPlayer = () =>
     renderWithProviders({
@@ -619,7 +642,7 @@ describe('the controls fading out', () => {
   const bar = () => screen.getByRole('slider', { name: 'Seek' }).closest('.controls')
   const idle = (ms: number) => act(() => jest.advanceTimersByTime(ms))
 
-  it('hides the controls and the cursor after ten idle seconds, paused or not', () => {
+  it('hides the controls and the cursor after five idle seconds, paused or not', () => {
     const { container } = renderPlayer()
     idle(IDLE_MS - 1)
     expect(bar()).not.toHaveClass('hidden')
@@ -633,7 +656,7 @@ describe('the controls fading out', () => {
     ['a mouse move', () => fireEvent.pointerMove(screen.getByRole('slider', { name: 'Seek' }))],
     ['a key press', () => press('x')],
     ['a click', () => fireEvent.pointerDown(screen.getByRole('slider', { name: 'Seek' }))],
-  ])('brings them back on %s, and hides them again ten seconds later', (_name, wake) => {
+  ])('brings them back on %s, and hides them again five seconds later', (_name, wake) => {
     renderPlayer()
     idle(IDLE_MS)
     expect(bar()).toHaveClass('hidden')
@@ -643,6 +666,19 @@ describe('the controls fading out', () => {
     expect(bar()).not.toHaveClass('hidden')
     idle(1)
     expect(bar()).toHaveClass('hidden')
+  })
+
+  it('lingers as long as the setting says, kept to between three and ten seconds', () => {
+    usePlayerPrefs.getState().setControlsLingerSeconds(8)
+    renderPlayer()
+    idle(7_999)
+    expect(bar()).not.toHaveClass('hidden')
+    idle(1)
+    expect(bar()).toHaveClass('hidden')
+    usePlayerPrefs.getState().setControlsLingerSeconds(1)
+    expect(usePlayerPrefs.getState().controlsLingerSeconds).toBe(CONTROLS_LINGER_SECONDS.min)
+    usePlayerPrefs.getState().setControlsLingerSeconds(30)
+    expect(usePlayerPrefs.getState().controlsLingerSeconds).toBe(CONTROLS_LINGER_SECONDS.max)
   })
 
   it('hides them although a control still has focus', () => {

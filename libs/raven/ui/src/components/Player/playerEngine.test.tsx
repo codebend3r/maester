@@ -405,7 +405,7 @@ describe('HTML engine stats', () => {
 })
 
 describe('PlayerChrome seams for a native host', () => {
-  const IDLE_MS = 10_000
+  const IDLE_MS = 5_000
   beforeEach(() => jest.useFakeTimers())
   afterEach(() => jest.useRealTimers())
 

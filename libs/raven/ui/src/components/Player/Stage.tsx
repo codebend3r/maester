@@ -40,15 +40,23 @@ import { PLAYER_ACTIONS, type PlayerAction, shortcutFor } from '@/lib/shortcuts'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostServices } from '@/stores/playerServices'
 
-/**
- * How long the controls and cursor linger after the last mouse move, key
- * press or click. Nothing holds them past it: not a pause, an open menu or a
- * focused button.
- */
-const IDLE_MS = 10_000
-
 const isControlTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && !!target.closest('button, a')
+
+const isInDialog = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement && !!target.closest('dialog')
+
+/**
+ * Whether a focused button or link answers the key itself: Enter anywhere,
+ * Space only in a menu or dialog. On the bar Space plays or pauses, as
+ * YouTube's does, rather than pressing the button clicked last, Full screen
+ * among them.
+ */
+const isPressedByControl = (event: KeyboardEvent): boolean => {
+  if (!isControlTarget(event.target)) return false
+  if (event.key === KEYS.enter) return true
+  return event.key === KEYS.space && isInDialog(event.target)
+}
 
 export type StageProps = {
   engine: Extract<Engine, { kind: 'html' }>
@@ -119,7 +127,9 @@ export const PlayerChrome = ({
   const muted = usePlayerPrefs((prefs) => prefs.muted)
   useWatchProgress({ state, position: engine.position, duration })
   const nextLink = useUpNext({ ended: state.ended })
-  const idle = useIdle(IDLE_MS)
+  // Nothing holds the controls past this: not a pause, an open menu or a focused button.
+  const lingerSeconds = usePlayerPrefs((prefs) => prefs.controlsLingerSeconds)
+  const idle = useIdle(lingerSeconds * 1_000)
   const { bezel, flash } = useBezel()
   const [overlay, setOverlay] = useState<Overlay>(OVERLAYS.none)
   // Apart from the overlay: it stays open over the video, menus and all.
@@ -180,9 +190,7 @@ export const PlayerChrome = ({
     // slider's); only Escape reaches past them, to close what they sit in.
     const isEscape = action !== null && action.type === PLAYER_ACTIONS.escape
     if (isTypingTarget(event.target) && !isEscape) return
-    // A focused button or link answers Space and Enter itself.
-    const isPress = event.key === KEYS.space || event.key === KEYS.enter
-    if (isControlTarget(event.target) && isPress) return
+    if (isPressedByControl(event)) return
     if (!action) return
     // An engine without the video info overlay leaves `i` to the page.
     if (action.type === PLAYER_ACTIONS.toggleStats && actions.toggleStats === undefined) return
@@ -197,9 +205,19 @@ export const PlayerChrome = ({
     event.preventDefault()
     controls.act(action)
   })
+  // A button presses itself on Space's keyup, so the bar's are stopped there too.
+  const onKeyUp = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key !== KEYS.space || !isControlTarget(event.target) || isInDialog(event.target))
+      return
+    event.preventDefault()
+  })
   useEffect(() => {
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKeyUp)
+    }
   }, [])
 
   const onHostAction = useEffectEvent((action: PlayerAction) => {

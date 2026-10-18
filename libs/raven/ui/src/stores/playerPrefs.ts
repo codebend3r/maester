@@ -1,6 +1,13 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
+/** How many seconds the player's controls linger once nothing stirs: the slider's ends and where it starts. */
+export const CONTROLS_LINGER_SECONDS = { min: 3, max: 10, initial: 5 } as const
+
+/** A whole number of seconds within the slider's ends. */
+const withinLinger = (seconds: number): number =>
+  Math.min(CONTROLS_LINGER_SECONDS.max, Math.max(CONTROLS_LINGER_SECONDS.min, Math.round(seconds)))
+
 type PlayerPrefs = {
   volume: number
   muted: boolean
@@ -12,14 +19,20 @@ type PlayerPrefs = {
   audioLanguage: string | null
   /** Whether this browser offers "Open in raven player"; off, since a page cannot tell the app is installed. */
   opensInRavenPlayer: boolean
+  /** How many seconds the controls and cursor linger after the last mouse move, key press or click. */
+  controlsLingerSeconds: number
   setVolume: ({ volume, muted }: { volume: number; muted: boolean }) => void
   setCaptionScale: (captionScale: number) => void
   setSubtitles: (subtitles: { on: boolean; language: string | null }) => void
   setAudioLanguage: (audioLanguage: string | null) => void
   setOpensInRavenPlayer: (isOn: boolean) => void
+  setControlsLingerSeconds: (seconds: number) => void
 }
 
-/** Volume, subtitles and audio language carry over from one video to the next, and across visits. */
+/**
+ * Volume, subtitles, audio language and how long the controls linger carry
+ * over from one video to the next, and across visits.
+ */
 export const usePlayerPrefs = create<PlayerPrefs>()(
   persist(
     (set) => ({
@@ -29,11 +42,13 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
       subtitles: { on: false, language: null },
       audioLanguage: null,
       opensInRavenPlayer: false,
+      controlsLingerSeconds: CONTROLS_LINGER_SECONDS.initial,
       setVolume: ({ volume, muted }) => set({ volume, muted }),
       setCaptionScale: (captionScale) => set({ captionScale }),
       setSubtitles: (subtitles) => set({ subtitles }),
       setAudioLanguage: (audioLanguage) => set({ audioLanguage }),
       setOpensInRavenPlayer: (isOn) => set({ opensInRavenPlayer: isOn }),
+      setControlsLingerSeconds: (seconds) => set({ controlsLingerSeconds: withinLinger(seconds) }),
     }),
     {
       name: 'raven-player',
@@ -45,6 +60,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         subtitles,
         audioLanguage,
         opensInRavenPlayer,
+        controlsLingerSeconds,
       }) => ({
         volume,
         muted,
@@ -52,6 +68,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         subtitles,
         audioLanguage,
         opensInRavenPlayer,
+        controlsLingerSeconds,
       }),
     },
   ),

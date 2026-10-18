@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   ApiError,
@@ -7,7 +7,7 @@ import {
   DEFAULT_PLAYBACK_SETTINGS,
   type PlaybackSettingsState,
 } from '@raven/core'
-import { usePlayerPrefs } from '@raven/ui'
+import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@raven/ui'
 import { api } from '@/lib/api'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
 import { held } from '@/test/held'
@@ -324,5 +324,42 @@ describe('Open videos in raven player on SettingsPage', () => {
     expect(await screen.findByText('The server is away.')).toBeInTheDocument()
     await userEvent.click(toggle())
     expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(true)
+  })
+})
+
+describe('Advanced on SettingsPage', () => {
+  const spies = { get: spyOn(api, 'getPlaybackSettings') }
+
+  beforeEach(() => spies.get.mockImplementation(async () => STATE))
+  afterEach(() => {
+    Object.values(spies).forEach((spy) => spy.mockReset())
+    usePlayerPrefs.getState().setControlsLingerSeconds(CONTROLS_LINGER_SECONDS.initial)
+  })
+
+  const slider = () => screen.getByRole('slider', { name: "Hide the player's controls after" })
+
+  it("sets how long the player's controls linger, from three to ten seconds, five at first", () => {
+    renderWithProviders({ ui: <SettingsPage />, playback: null })
+    const advanced = screen.getByRole('region', { name: 'Advanced' })
+    expect(within(advanced).getByRole('slider')).toBe(slider())
+    expect(slider()).toHaveValue('5')
+    expect(slider()).toHaveAttribute('min', '3')
+    expect(slider()).toHaveAttribute('max', '10')
+    expect(slider()).toHaveAttribute('aria-valuetext', '5 seconds')
+    fireEvent.change(slider(), { target: { value: '8' } })
+    expect(usePlayerPrefs.getState().controlsLingerSeconds).toBe(8)
+    expect(within(advanced).getByText('8 seconds')).toBeInTheDocument()
+  })
+
+  it('sits before the admin lock and stays open while the lock is on', () => {
+    renderWithProviders({
+      ui: <SettingsPage />,
+      playback: null,
+      adminLock: { state: 'on', available: true },
+    })
+    expect(
+      screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
+    ).toEqual(['Playback', 'Display', 'Advanced', 'Admin'])
+    expect(slider()).toBeEnabled()
   })
 })
