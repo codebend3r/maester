@@ -49,6 +49,7 @@ import {
   type ShowListing,
   type ShowMatchChoice,
   type SplitRequest,
+  type LiveStream,
   type StreamMode,
   type SubtitleCue,
   type UnlockRequest,
@@ -79,6 +80,7 @@ import {
   isMediaOrigins,
   isMediaStreams,
   isMediaTicket,
+  isLiveStreamList,
   isMediaTracks,
   isPersonDetails,
   isPlaybackSettingsState,
@@ -862,6 +864,15 @@ export const createApiClient = ({
       expect({ request: send({ path: '/api/media-origins' }), guard: isMediaOrigins }),
 
     /** A short-lived ticket that stands in for the cookie on this video's media requests to another origin. */
+    /** What the server is sending to whom right now. Admin only. */
+    listLiveStreams: (): Promise<LiveStream[]> =>
+      expect({ request: send({ path: '/api/streams' }), guard: isLiveStreamList }),
+
+    /** Ends one stream's connections; the player may ask again. Admin only. */
+    stopStream: async (id: string): Promise<void> => {
+      await send({ path: `/api/streams/${encodeURIComponent(id)}/stop`, method: 'POST' })
+    },
+
     getMediaTicket: (id: number): Promise<MediaTicket> =>
       expect({ request: send({ path: `/api/media/${id}/ticket` }), guard: isMediaTicket }),
 

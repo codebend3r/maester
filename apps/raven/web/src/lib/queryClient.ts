@@ -104,6 +104,8 @@ export const queryKeys = {
   lock: ['lock'],
   /** Whether the admin lock holds in this browser. */
   adminLock: ['admin'],
+  /** What the server is streaming to whom right now, for the admin. */
+  liveStreams: ['streams'],
   displaySettings: ['settings', 'display'],
   nextEpisode: (showId: number) => ['items', showId, 'next'],
   person: (id: number | null) => ['people', id],

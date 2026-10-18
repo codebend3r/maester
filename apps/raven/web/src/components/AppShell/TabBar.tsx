@@ -1,5 +1,6 @@
 import { Icon, type IconName } from '@raven/ui'
 import { Link } from 'react-router-dom'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
 import styles from '@/components/AppShell/TabBar.module.scss'
 
@@ -39,6 +40,9 @@ export const TabBar = () => (
       label="Libraries"
     />
     <Tab to="/favourites" patterns={['/favourites']} icon="heart" label="Favourites" />
+    <AdminOnly>
+      <Tab to="/streams" patterns={['/streams']} icon="playback" label="Streams" />
+    </AdminOnly>
     <Tab to="/settings" patterns={['/settings']} icon="settings" label="Settings" />
   </nav>
 )

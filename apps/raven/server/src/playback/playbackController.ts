@@ -10,6 +10,7 @@ import {
   Param,
   ParseIntPipe,
   Query,
+  Req,
   Res,
   ServiceUnavailableException,
 } from '@nestjs/common'
@@ -23,7 +24,7 @@ import {
   isStreamMode,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS, wholeNumber, CACHE_POLICIES } from '@shared/server'
-import type { FastifyReply } from 'fastify'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import { streamArgs } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
@@ -36,6 +37,8 @@ import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MediaTickets } from '@/media/mediaTickets'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
+import { StreamSessions } from '@/streams/streamSessions'
+import { trackStream } from '@/streams/trackStream'
 
 /**
  * What a player needs beyond the file itself: the tracks to choose from,
@@ -52,6 +55,7 @@ export class PlaybackController {
     @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
     @Inject(MediaTickets) private readonly tickets: MediaTickets,
+    @Inject(StreamSessions) private readonly streams: StreamSessions,
   ) {}
 
   private fileOf(id: number): MediaFile {
@@ -120,6 +124,7 @@ export class PlaybackController {
     @Query('mode') mode: string | undefined,
     @Query('start') start: string | undefined,
     @Query('audio') audio: string | undefined,
+    @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (!isStreamMode(mode)) throw new BadRequestException('mode must be remux or transcode')
@@ -170,6 +175,7 @@ export class PlaybackController {
     // The response closes when it finishes or when the client goes away;
     // killing an ffmpeg that already exited does nothing.
     reply.raw.on('close', () => child.kill('SIGKILL'))
+    trackStream({ sessions: this.streams, mediaId: id, mode, request, reply })
     await reply
       .header(HEADERS.contentType, RAVEN_CONTENT_TYPES.mp4)
       .header(HEADERS.cacheControl, CACHE_POLICIES.noStore)

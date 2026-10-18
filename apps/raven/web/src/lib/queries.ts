@@ -208,6 +208,16 @@ export const adminLockQuery = queryOptions({
   },
 })
 
+/** How often the Streams page asks who is streaming: often enough that Stop answers and a new stream shows within moments. */
+const LIVE_STREAMS_POLL_MS = 2000
+
+/** Who is streaming right now. Admin only, so a page asks only while the admin lock is off. */
+export const liveStreamsQuery = queryOptions({
+  queryKey: queryKeys.liveStreams,
+  queryFn: () => api.listLiveStreams(),
+  refetchInterval: LIVE_STREAMS_POLL_MS,
+})
+
 export const metadataHealthQuery = queryOptions({
   queryKey: queryKeys.metadataHealth,
   queryFn: () => api.getMetadataHealth(),

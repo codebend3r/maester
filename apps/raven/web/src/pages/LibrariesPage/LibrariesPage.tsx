@@ -72,13 +72,15 @@ const PinButton = ({ library }: { library: Library }) => {
  * library page's own actions. The picture of its newest video fades in at
  * the card's right. While it is locked to this browser it shows only its
  * name, type and counts; the server sends no more, and a list cached from
- * before is held to the same.
+ * before is held to the same. Its folders show only while the admin lock is off.
  */
 const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) => {
   const actions = useLibraryActions(library)
   const backdrop = !isShut && library.backdrop && api.libraryBackdropUrl(library.backdrop)
   const lockNote = isShut ? ' · Locked' : ' · Unlocked'
-  const paths = isShut ? [] : library.paths
+  // The server sends no folders to a browser with the admin lock on; this holds a list cached from before to the same.
+  const canManage = useCanManage()
+  const paths = isShut || !canManage ? [] : library.paths
 
   return (
     <li className={styles.row}>

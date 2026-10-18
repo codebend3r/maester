@@ -243,10 +243,20 @@ The admin lock keeps what only an admin should do out of every other browser's r
 - raven can be watched, not managed. No library can be added, edited, deleted, rescanned or matched again, and the server's folders cannot be browsed. No Fix match, AI suggestion, **Refresh details**, **Edit metadata** or **Edit images** can be saved, and no duplicate split apart or put back together. **Playback** and **Display** in **Settings** can be read but not changed. The buttons and menu items for all of this are left out, and the server answers `403` to them.
 - A library's sort, view, grouping and pin still change: its page and the Libraries page save them through a route of their own, `PUT /api/libraries/:id/view`, which takes nothing else.
 - No video can be deleted, and no file's path is shown: the card menu leaves out **Delete** and where the file lives, and the server answers `403` to both.
+- No folder is shown: a library's folders are left off the Libraries page and out of the API, and so is what a failed scan says about them. **Streams** is left out of the menu, and the server answers `403` to its routes.
 
 The toggle is at the foot of **Settings**. Turning it off asks for `ADMIN_PASSWORD` and holds in that browser only, until it is turned on again there: a refresh, a closed browser, a server restart or a redeploy leaves it off. The browser keeps its cookie for 400 days, renewed each time a page reads the lock. Changing `ADMIN_PASSWORD` turns the lock back on in every browser, the way to shut out one that should no longer have it. The cookie is signed with a secret raven makes once and keeps in its database (in `DATA_DIR`), so starting from an empty data folder turns it back on too. Turning it on waits 15 seconds before it holds, with the seconds counting down beside it; unticked again in that time, it goes off with no password, so a slip of the finger costs nothing. Five wrong passwords in a row make it wait a minute.
 
 `ADMIN_PASSWORD` must be 10 characters or more, with lower and upper case letters, a digit and a symbol. Without it, or with a weaker one (the server logs a warning on start), the lock stays on everywhere.
+
+## Streams
+
+**Streams** in the side menu, with the [admin lock](#admin-lock) off, lists what the server is sending right now: the video and its library, the device and browser it goes to, the address it came from, how it is sent (direct play, remuxing or transcoding) and how far along it is. The list is read every two seconds.
+
+- **One stream is one viewer's use of one video.** raven has no accounts, so a stream is told apart by the address and the `User-Agent` header of its requests. Behind a proxy the address is the first one in `X-Forwarded-For`; the header is the client's to set, so it is a label and nothing more. Device and browser are read from `User-Agent` the same way.
+- **Live** means a request, a progress report or bytes going out within the last 30 seconds. A paused player drops off once it stops pulling bytes, and comes back when it plays. Progress is the spot the player last reported, every 10 seconds of playback.
+- **Stop** closes the stream's connections and kills its ffmpeg. The player is free to ask again, and a stream that comes back is listed as a new one.
+- Streams are held in memory: a restart empties the list.
 
 ## Metadata
 

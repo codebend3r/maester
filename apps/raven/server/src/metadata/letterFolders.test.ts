@@ -131,7 +131,7 @@ describe('letter and group folders', () => {
     })
   const libraryOf = async (id: number): Promise<Library> =>
     shape({
-      response: await app().inject({ method: 'GET', url: `/api/libraries/${id}` }),
+      response: await asAdmin({ method: 'GET', url: `/api/libraries/${id}` }),
       guard: isLibrary,
     })
   const putLayout = async (folderLayout: 'auto' | 'flat') => {

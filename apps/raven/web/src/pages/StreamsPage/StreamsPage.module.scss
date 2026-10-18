@@ -1,0 +1,186 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.header {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.back {
+  justify-self: start;
+}
+
+.heading {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.summary {
+  color: var(--color-lichen);
+  font-variant-numeric: tabular-nums;
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+// A card is a container, so its details lay out by its own width, whatever
+// the side menu takes.
+.row {
+  container-type: inline-size;
+  display: grid;
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
+}
+
+.rowSkeleton {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
+}
+
+.details {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr) auto;
+  grid-template-areas:
+    'frame title actions'
+    'frame library actions'
+    'frame facts actions'
+    'frame progress actions'
+    'error error error';
+  gap: var(--space-1) var(--space-4);
+  align-content: start;
+  padding: var(--space-4);
+}
+
+.frame {
+  grid-area: frame;
+  align-self: start;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--color-moss);
+}
+
+.thumbnail {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.title {
+  grid-area: title;
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-tight);
+  overflow-wrap: anywhere;
+}
+
+.library {
+  grid-area: library;
+  color: var(--color-birch);
+  font-size: var(--font-size-sm);
+}
+
+.facts {
+  grid-area: facts;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+  gap: var(--space-2) var(--space-4);
+  padding-top: var(--space-2);
+}
+
+.fact {
+  display: grid;
+  gap: var(--space-0);
+  align-content: start;
+}
+
+.factName {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+}
+
+.factValue {
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.progress {
+  grid-area: progress;
+  display: grid;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+}
+
+.bar {
+  height: var(--space-1);
+}
+
+.time {
+  color: var(--color-birch);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  grid-area: actions;
+  align-self: center;
+}
+
+.error {
+  grid-area: error;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--color-leaf-bright);
+  border-radius: var(--radius-sm);
+  background: var(--color-night);
+  font-size: var(--font-size-sm);
+}
+
+@container (max-width: 40rem) {
+  .details {
+    grid-template-columns: 6rem minmax(0, 1fr);
+    grid-template-areas:
+      'frame title'
+      'frame library'
+      'facts facts'
+      'progress progress'
+      'actions actions'
+      'error error';
+  }
+
+  .actions {
+    justify-self: start;
+    padding-top: var(--space-2);
+  }
+}
+
+.empty {
+  display: grid;
+  grid-template-columns: minmax(0, var(--measure));
+  grid-template-areas:
+    'back'
+    'body';
+  gap: var(--space-6);
+  color: var(--color-lichen);
+}
+
+.emptyBody {
+  grid-area: body;
+  display: grid;
+  gap: var(--space-4);
+  justify-items: start;
+}
+
+.emptyTitle {
+  color: var(--color-bark);
+}
