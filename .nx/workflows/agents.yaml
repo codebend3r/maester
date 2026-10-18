@@ -20,13 +20,21 @@ launch-templates:
             ~/.bun/install/cache
             ~/.cache/uv
           base-branch: 'main'
-      # raven's server and core tests encode real clips with ffmpeg. Bun's
-      # installer needs unzip.
-      - name: Install ffmpeg and unzip
+      # raven's server and core tests encode real clips with ffmpeg. The image's
+      # apt has ffmpeg 4.4, which puts those clips' cues 23ms late, so the agents
+      # install a pinned static build instead. luwin's tests read time zones from
+      # tzdata, which the image leaves out. Bun's installer needs unzip.
+      - name: Install ffmpeg, tzdata and unzip
         script: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg unzip
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata unzip
+          build=ffmpeg-n9.0.2-28-g669f5ab083-linux64-gpl-9.0
+          curl -fsSL -o "/tmp/$build.tar.xz" "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-17-20-51/$build.tar.xz"
+          echo "cc171d4d373f9ca633741d38fae6a17cd914075818febb1465f6f64e6d57f7ca  /tmp/$build.tar.xz" | sha256sum -c -
+          tar -xf "/tmp/$build.tar.xz" -C /tmp
+          sudo install -m 755 "/tmp/$build/bin/ffmpeg" "/tmp/$build/bin/ffprobe" /usr/local/bin/
+          ffmpeg -version | head -n 1
       # Bun's version comes from `packageManager` in package.json. Each Python
       # project's .python-version picks its interpreter, which uv downloads.
       - name: Install Bun and uv
