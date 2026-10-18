@@ -146,7 +146,9 @@ export const budgetWindowFrom = ({
 
 /**
  * The test hook's retry for what the downloads owe their servers, read only unpackaged; null
- * leaves the spec's five minutes. It only shortens them, so a value past them is ignored too.
+ * leaves the spec's five minutes. It only shortens them, so a value past them is ignored, and
+ * so is one under the budget hook's floor: a retry that fast against a server that cannot be
+ * reached would spin, writing a warning each try.
  */
 export const syncRetryFrom = ({
   isPackaged,
@@ -159,5 +161,5 @@ export const syncRetryFrom = ({
   const value = env[SYNC_RETRY_HOOK] ?? ''
   if (!WHOLE_NUMBER.test(value)) return null
   const ms = Number(value)
-  return ms > 0 && ms <= SYNC_RETRY_MS ? ms : null
+  return ms >= HOOK_MIN_MS && ms <= SYNC_RETRY_MS ? ms : null
 }

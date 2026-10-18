@@ -178,7 +178,7 @@ const setup = ({
   player = EMPTY_STATE,
   startAt = NOW,
   isPageReady = true,
-  syncRetryMs,
+  syncRetryMs = SYNC_RETRY_MS,
 }: {
   replies?: Record<string, Reply>
   free?: number
@@ -193,7 +193,7 @@ const setup = ({
   startAt?: number
   /** Whether the page says ready at once, as it does a moment after every launch. */
   isPageReady?: boolean
-  /** The sync's retry, as main's test hook sets it; none leaves the spec's five minutes. */
+  /** The sync's retry, as main passes it; the spec's five minutes unless a test shortens it. */
   syncRetryMs?: number
 } = {}) => {
   const table: Record<string, Reply> = {

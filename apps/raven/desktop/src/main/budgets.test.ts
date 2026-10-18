@@ -177,7 +177,7 @@ describe('syncRetryFrom', () => {
     expect(syncRetryFrom({ isPackaged: true, env: env('2000') })).toBeNull()
   })
 
-  test('unpackaged, only a whole number from 1 to the five minutes it shortens counts', () => {
+  test('unpackaged, only a whole number from 100 to the five minutes it shortens counts', () => {
     expect(syncRetryFrom({ isPackaged: false, env: env(undefined) })).toBeNull()
     expect(syncRetryFrom({ isPackaged: false, env: env('') })).toBeNull()
     expect(syncRetryFrom({ isPackaged: false, env: env('abc') })).toBeNull()
@@ -185,7 +185,9 @@ describe('syncRetryFrom', () => {
     expect(syncRetryFrom({ isPackaged: false, env: env('-2000') })).toBeNull()
     expect(syncRetryFrom({ isPackaged: false, env: env('1500.5') })).toBeNull()
     expect(syncRetryFrom({ isPackaged: false, env: env('300001') })).toBeNull()
-    expect(syncRetryFrom({ isPackaged: false, env: env('1') })).toBe(1)
+    expect(syncRetryFrom({ isPackaged: false, env: env('1') })).toBeNull()
+    expect(syncRetryFrom({ isPackaged: false, env: env('99') })).toBeNull()
+    expect(syncRetryFrom({ isPackaged: false, env: env('100') })).toBe(100)
     expect(syncRetryFrom({ isPackaged: false, env: env('2000') })).toBe(2000)
     expect(syncRetryFrom({ isPackaged: false, env: env('300000') })).toBe(SYNC_RETRY_MS)
   })

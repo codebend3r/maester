@@ -976,14 +976,16 @@ export const startFixtureServer = async ({
     },
   })
 
+  // Home first: a stored `port` is free again only since the last fixture closed, and a
+  // listener taking any free port first could be handed that very one.
+  const origin = await listen({ server: home.server, port })
   const elsewhere = {
-    origin: await listen({ server: away.server, port: 0 }),
+    origin: await listen({ server: away.server, port: 0 }).catch(async (error: unknown) => {
+      await shut(home.server)
+      throw error
+    }),
     requests: away.requests,
   }
-  const origin = await listen({ server: home.server, port }).catch(async (error: unknown) => {
-    await shut(away.server)
-    throw error
-  })
 
   const stall = ({ path }: { path: RegExp }) => {
     const opened: { release: () => void } = { release: () => {} }

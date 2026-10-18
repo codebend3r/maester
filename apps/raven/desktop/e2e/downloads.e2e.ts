@@ -38,7 +38,10 @@ const THROTTLE_BYTE = 262_144
 const SYNC_RETRY_HOOK_MS = '2000'
 // A download is a local copy of a small clip, though the origin's probe may wait its 2 s.
 const READY_WAIT_MS = 15_000
-// The late report waits for the launch's own try to fail, then for a retry or two.
+// A failed try to report: the launch's own, or the 2 s retry's when the launch's came before
+// main's output was read.
+const FAILED_TRY_WAIT_MS = 20_000
+// The late report waits for a retry or two once the server is back.
 const LATE_REPORT_WAIT_MS = 20_000
 // The notice stays 6 s, and a launch deletion tells of itself once the page says ready.
 const NOTICE_WAIT_MS = 10_000
@@ -439,15 +442,17 @@ test.describe.serial('downloading through a media origin', () => {
       env: { RAVEN_DESKTOP_SYNC_RETRY_MS: SYNC_RETRY_HOOK_MS },
       run: async ({ page, output }) => {
         await expect(homeHeading(page)).toBeVisible()
-        // The launch's own try finds the server still gone, so only the retry can reach it.
+        // A try finds the server still gone, so only a later retry can reach it.
         await expect
-          .poll(() =>
-            output
-              .lines()
-              .some(
-                (line) =>
-                  line.includes(`${PLAYED.method} ${PLAYED.path}`) && line.includes('failed'),
-              ),
+          .poll(
+            () =>
+              output
+                .lines()
+                .some(
+                  (line) =>
+                    line.includes(`${PLAYED.method} ${PLAYED.path}`) && line.includes('failed'),
+                ),
+            { timeout: FAILED_TRY_WAIT_MS },
           )
           .toBe(true)
         // A restarted server forgets every unlock, and nothing in this launch gives the PIN

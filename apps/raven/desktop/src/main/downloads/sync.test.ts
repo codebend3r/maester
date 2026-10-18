@@ -69,7 +69,7 @@ const gate = () => {
 const setup = ({
   entries = [entryFor()],
   owed = [],
-  retryMs,
+  retryMs = SYNC_RETRY_MS,
 }: { entries?: DownloadEntry[]; owed?: Owed[]; retryMs?: number } = {}) => {
   const store = memoryStore({ ...EMPTY_DOWNLOADS, entries, owed })
   const { timers, pending } = fakeTimers()

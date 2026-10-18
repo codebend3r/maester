@@ -66,7 +66,7 @@ export type DownloadServiceDeps = {
   /** `downloads.json` could not be read and was set aside, so the launch sweep keeps every folder. */
   wasSetAside: boolean
   /** How often the sync tries its servers again; the spec's five minutes unless main's test hook shortens it. */
-  syncRetryMs?: number
+  syncRetryMs: number
 } & Pick<DownloadPlaybackDeps, 'grants' | 'state' | 'stat'>
 
 type ById = { downloadId: string }
