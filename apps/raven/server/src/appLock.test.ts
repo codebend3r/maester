@@ -234,11 +234,11 @@ describe('a library locked behind the PIN', () => {
     await expect(api(cookie).listMedia({ libraryId: state.private })).resolves.toHaveLength(1)
     expect(await api(cookie).getLock()).toEqual({ available: true, unlocked: true })
 
-    await api(cookie).setFavourite({ id: state.privateVideo, favourite: true })
-    const favourites = async (holding?: string) =>
-      (await api(holding).listFavourites()).map((entry) => entry.media.id)
-    expect(await favourites(cookie)).toEqual([state.privateVideo])
-    expect(await favourites()).toEqual([])
+    // A locked library's videos are never favourites, even with the PIN entered.
+    await expect(
+      api(cookie).setFavourite({ id: state.privateVideo, favourite: true }),
+    ).rejects.toMatchObject({ status: 403 })
+    expect(await api(cookie).listFavourites()).toEqual([])
 
     // The cookie that forgets the session is only in the response's headers.
     const locked = await app().inject({ method: 'POST', url: '/api/lock/lock' })
@@ -265,11 +265,11 @@ describe('a library locked behind the PIN', () => {
     expect(await home()).toEqual({ inProgress: [], shelves: [state.open] })
   })
 
-  it('keeps a locked library out of a search from home until it is unlocked', async () => {
+  it('keeps a locked library out of a search from home, even once it is unlocked', async () => {
     const { cookie } = await unlock('3001')
     const found = async (holding?: string) =>
       (await api(holding).searchHome('e')).map((shelf) => shelf.libraryId)
-    expect(await found(cookie)).toEqual([state.open, state.private])
+    expect(await found(cookie)).toEqual([state.open])
     expect(await found()).toEqual([state.open])
   })
 

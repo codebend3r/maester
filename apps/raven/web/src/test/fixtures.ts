@@ -143,6 +143,7 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   genres: ['Comedy', 'Drama', 'Crime', 'Romance'],
   backdropVersion: 'b1',
   logoVersion: null,
+  favourite: null,
   aiMatch: null,
   reviews: [],
   credits: [

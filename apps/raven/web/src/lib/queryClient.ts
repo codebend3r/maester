@@ -69,6 +69,7 @@ export const queryKeys = {
   /** Where a video's file lives, for its menu. */
   mediaLocation: (id: number) => ['media', id, 'location'],
   favourites: ['favourites'],
+  favouriteTitles: ['favourites', 'titles'],
   /** What is in progress and each pinned library's newest arrivals. */
   home: ['home'],
   /** A search from home, under home's key so whatever reads home again reads it again too. */
@@ -130,6 +131,8 @@ export const queryKeys = {
 export const mutationKeys = {
   /** Any video's favourite: they all show in the same listings. */
   favourite: ['favourite'],
+  /** Any show's or season's favourite: they all show on Favourites. */
+  itemFavourite: ['item-favourite'],
   /** Any mark as watched or unwatched: marks and their answers keep their order. */
   watched: ['watched'],
   /** Any library's pin: they all show in the libraries list and on home. */

@@ -8,7 +8,9 @@ import {
   type MediaItem,
   type ShowListing,
   isHome,
+  isFavouriteTitles,
   isItemDetails,
+  isItemImageOptions,
   isLibrary,
   isMediaItem,
   isMediaList,
@@ -16,6 +18,8 @@ import {
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
+import { DatabaseService } from '@/db/database'
+import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { type InjectOptions, adminCookie, injectAs, testConfig } from '@/test/app'
@@ -362,6 +366,50 @@ describe('TV show metadata', () => {
       'Ben Stiller:director',
       'Ben Stiller:producer',
     ])
+  })
+
+  it("serves a show's logo, offers it in Edit images, and learns an older show's in the sweep", async () => {
+    const id = (await showNamed('Severance')).show.id
+    const version = (await item(id)).logoVersion
+    expect(version).toEqual(expect.any(String))
+    const options = shape({
+      response: await asAdmin({ method: 'GET', url: `/api/items/${id}/images` }),
+      guard: isItemImageOptions,
+    })
+    expect(options.logo.find((option) => option.current)?.ref).toBe('/logo95396.png')
+
+    const db = app().get(DatabaseService).db
+    db.prepare("DELETE FROM item_images WHERE kind = 'logo' AND item_id = ?").run(id)
+    db.prepare('UPDATE items SET logo_checked = 0 WHERE id = ?').run(id)
+    expect((await item(id)).logoVersion).toBeNull()
+    await app().get(ItemRefresher).sweep()
+    expect((await item(id)).logoVersion).toBe(version)
+  })
+
+  it('marks a show and a season as favourites, but not an episode', async () => {
+    const show = await item((await showNamed('Severance')).show.id)
+    const season = show.children[0]
+    expect(show.favourite).toBe(false)
+    const mark = (target: number | undefined, favourite: unknown) =>
+      app().inject({
+        method: 'PUT',
+        url: `/api/items/${target}/favourite`,
+        payload: { favourite },
+      })
+    const marked = await mark(show.id, true)
+    expect(shape({ response: marked, guard: isItemDetails }).favourite).toBe(true)
+    expect((await mark(season?.id, true)).statusCode).toBe(200)
+    const episode = (await item(season?.id)).children[0]
+    expect((await mark(episode?.id, true)).statusCode).toBe(404)
+    expect((await mark(show.id, 'yes')).statusCode).toBe(400)
+    const titles = shape({
+      response: await app().inject({ method: 'GET', url: '/api/favourites/titles' }),
+      guard: isFavouriteTitles,
+    })
+    expect(titles.map((title) => title.id)).toEqual([season?.id, show.id])
+    await mark(show.id, false)
+    await mark(season?.id, false)
+    expect((await item(show.id)).favourite).toBe(false)
   })
 
   it("gives a show's seasons their episode counts, and a season's episodes what their rows show", async () => {

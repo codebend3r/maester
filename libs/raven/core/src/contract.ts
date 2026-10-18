@@ -648,8 +648,14 @@ export const isItemDetails = object({
   genres: isStringArray,
   /** The backdrop's version; for an episode, its still's. */
   backdropVersion: nullable(isString),
-  /** The title as TMDB's art, on a clear ground; null when it has none, and for anything but a movie. */
+  /** The title as TMDB's art, on a clear ground; null when it has none, and for a season or episode. */
   logoVersion: nullable(isString),
+  /**
+   * Whether a show or season is a favourite; null where it cannot be one: a
+   * movie or episode, whose files are favourites instead, or one only locked
+   * libraries hold.
+   */
+  favourite: nullable(isBoolean),
   /**
    * Why the AI lookup matched it, when it did, being sure; null when a
    * search, an id or Fix match did, and for a season or episode.
@@ -728,6 +734,13 @@ export type PosterEntry = Infer<typeof isPosterEntry>
  * same way.
  */
 export const isPosterEntries = listOf(isPosterEntry)
+
+/**
+ * `GET /api/favourites/titles`: every show and season marked a favourite,
+ * most recently marked first. Videos are favourites by file, in
+ * `GET /api/favourites`.
+ */
+export const isFavouriteTitles = listOf(isItemSummary)
 
 /** How a saga's slideshow moves from one movie's backdrop to the next. */
 export const SLIDESHOW_MOTIONS = { fade: 'fade', kenBurns: 'kenBurns', slide: 'slide' } as const
@@ -858,7 +871,7 @@ export const isPersonDetails = object({
 
 export type PersonDetails = Infer<typeof isPersonDetails>
 
-/** A logo is the title drawn as art, on a clear ground, for a movie's page. */
+/** A logo is the title drawn as art, on a clear ground, for a movie's or show's page. */
 export const ITEM_IMAGE_KINDS = {
   poster: 'poster',
   backdrop: 'backdrop',
@@ -915,11 +928,11 @@ export const isImageOption = object({
 
 export type ImageOption = Infer<typeof isImageOption>
 
-/** Everything a movie or show could show as its poster and backdrop, and a movie as its logo. */
+/** Everything a movie or show could show as its poster, backdrop and logo. */
 export const isItemImageOptions = object({
   poster: listOf(isImageOption),
   backdrop: listOf(isImageOption),
-  /** TMDB's PNG logos; none for a show, whose page shows no logo. */
+  /** TMDB's PNG logos. */
   logo: listOf(isImageOption),
 })
 
@@ -1034,7 +1047,7 @@ export const DISPLAY_CHOICES = {
 
 /** How pages look, set once for every viewer in Settings. */
 export const isDisplaySettings = object({
-  /** `logo` shows a movie's title as its logo where TMDB has one; `text` always spells it out. */
+  /** `logo` shows a movie's or show's title as its logo where TMDB has one; `text` always spells it out. */
   titles: oneOf(DISPLAY_CHOICES.titles),
 })
 

@@ -157,28 +157,37 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
       fn: ({ id }) => guard.run(() => this.refresh(id)),
     })
     guard.reportStop()
-    await this.fillMovieExtras()
+    await this.fillTitleExtras()
     await this.scores.fillDue()
     await this.pictures.clearUp()
   }
 
   /**
-   * Asks TMDB for the saga and logo of each movie stored before raven kept
-   * them: the movie with its pictures, one call each, so no credits or
-   * scores are fetched again. One TMDB no longer has is noted as in no saga
-   * and with no logo; the sweep that refreshes it forgets it.
+   * Asks TMDB for the saga and logo of each movie, and the logo of each
+   * show, stored before raven kept them: only its pictures and saga, one
+   * call each, so no credits or scores are fetched again. One TMDB no longer
+   * has is noted as in no saga and with no logo; the sweep that refreshes it
+   * forgets it.
    */
-  private async fillMovieExtras(): Promise<void> {
+  private async fillTitleExtras(): Promise<void> {
     const guard = new PassGuard({
       logger: this.logger,
-      failed: "Could not read a movie's saga and logo",
+      failed: "Could not read a title's saga and logo",
       stopped: 'Reading sagas and logos stopped for now',
     })
     await mapWithConcurrency({
       items: this.metadata.extrasUnchecked(),
       limit: PASS_CONCURRENCY,
-      fn: ({ id, tmdbId }) =>
+      fn: ({ id, type, tmdbId }) =>
         guard.run(async () => {
+          if (type === ITEM_TYPES.show) {
+            const logo = await this.tmdb.showLogo(tmdbId).catch((error: unknown) => {
+              if (notFound(error)) return null
+              throw error
+            })
+            this.metadata.saveShowLogo({ itemId: id, logo })
+            return
+          }
           const extras = await this.tmdb.movieExtras(tmdbId).catch((error: unknown) => {
             if (notFound(error)) return { saga: null, logo: null }
             throw error

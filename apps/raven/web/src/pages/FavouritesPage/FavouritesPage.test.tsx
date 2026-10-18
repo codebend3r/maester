@@ -1,4 +1,4 @@
-import { describe, expect, it, spyOn } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type PosterEntry, mediaLabel } from '@raven/core'
@@ -11,6 +11,14 @@ import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEASON_ONE_CARD } from '@/test/tv'
 
 describe('FavouritesPage', () => {
+  const titles = spyOn(api, 'listFavouriteTitles')
+  beforeEach(() => {
+    titles.mockImplementation(async () => [])
+  })
+  afterEach(() => {
+    titles.mockReset()
+  })
+
   it('lists every favourite as a card', async () => {
     const spy = spyOn(api, 'listFavourites').mockImplementation(async () => [
       { media: mediaItem({ id: 1, title: 'First', favourite: true }), poster: null },
@@ -51,6 +59,30 @@ describe('FavouritesPage', () => {
     expect(container.querySelector('img')?.getAttribute('srcset')).toContain(
       '/api/items/5/images/poster?v=p5&w=185 185w',
     )
+    spy.mockRestore()
+  })
+
+  it('lists favourite shows and seasons before the videos, each opening its page', async () => {
+    titles.mockImplementation(async () => [
+      itemSummary({ id: 90, type: 'show', title: 'Severance', year: 2022 }),
+      SEASON_ONE_CARD,
+    ])
+    const spy = spyOn(api, 'listFavourites').mockImplementation(async () => [
+      { media: matchedMovie({ favourite: true }), poster: itemSummary() },
+    ])
+    renderWithProviders({ ui: <FavouritesPage /> })
+    expect(await screen.findByRole('link', { name: /^Severance/ })).toHaveAttribute(
+      'href',
+      '/shows/90',
+    )
+    expect(screen.getByText('3 favourites')).toBeInTheDocument()
+    const pills = within(screen.getByRole('group', { name: 'Show' }))
+      .getAllByRole('button')
+      .map((pill) => pill.textContent)
+    expect(pills).toEqual(['All', 'Shows', 'Seasons', 'Movies'])
+    await userEvent.click(screen.getByRole('button', { name: 'Shows' }))
+    expect(screen.getByText('1 favourite')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Busboys' })).toBeNull()
     spy.mockRestore()
   })
 
@@ -101,7 +133,7 @@ describe('FavouritesPage', () => {
     it('offers each kind among the favourites, and narrows to the one picked', async () => {
       const spy = serve({ entries: [MOVIE, EPISODE, HOME_VIDEO] })
       expect(await screen.findByRole('link', { name: 'Busboys' })).toBeInTheDocument()
-      expect(screen.getByText('3 videos')).toBeInTheDocument()
+      expect(screen.getByText('3 favourites')).toBeInTheDocument()
       const pills = within(screen.getByRole('group', { name: 'Show' }))
         .getAllByRole('button')
         .map((pill) => pill.textContent)
@@ -116,7 +148,7 @@ describe('FavouritesPage', () => {
       expect(screen.getByRole('link', { name: mediaLabel(EPISODE_TWO) })).toBeInTheDocument()
       expect(screen.queryByRole('link', { name: 'Busboys' })).toBeNull()
       expect(screen.queryByRole('link', { name: 'Birthday' })).toBeNull()
-      expect(screen.getByText('1 video')).toBeInTheDocument()
+      expect(screen.getByText('1 favourite')).toBeInTheDocument()
       expect(screen.getByTestId('address')).toHaveTextContent('?kind=episodes')
 
       await userEvent.click(screen.getByRole('button', { name: 'Other videos' }))

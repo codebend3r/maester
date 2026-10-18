@@ -4,27 +4,6 @@
   gap: var(--section-gap);
 }
 
-// Filled once it is a favourite, springing to its size as it is pressed.
-.favourite {
-  &[aria-pressed='true'] {
-    --icon-tint: 1;
-  }
-
-  > svg {
-    scale: 0.9;
-  }
-
-  &[aria-pressed='true'] > svg {
-    scale: 1;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    > svg {
-      transition: scale 300ms var(--ease-spring);
-    }
-  }
-}
-
 // The summary beside the file's facts, or the facts beside the episodes
 // either side; one above the other on a narrower screen.
 .about {

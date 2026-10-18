@@ -66,6 +66,7 @@ export const details = (overrides: Partial<ItemDetails>): ItemDetails => ({
   studio: null,
   genres: [],
   logoVersion: null,
+  favourite: null,
   aiMatch: null,
   credits: [],
   reviews: [],

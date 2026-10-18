@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { FAVOURITE_OUTCOMES } from '@/media/favouriteOutcomes'
 import { MediaIndex } from '@/media/mediaIndex'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { testDatabase } from '@/test/database'
@@ -288,15 +289,29 @@ describe('play history', () => {
   it('says when there is no such video, and writes nothing', () => {
     expect(viewing().report({ id: 999_999, position: 30 })).toBe(false)
     expect(viewing().recordPlay({ id: 999_999 })).toBe(false)
-    expect(viewing().setFavourite({ id: 999_999, favourite: true })).toBe(false)
+    expect(viewing().setFavourite({ id: 999_999, favourite: true })).toBe(
+      FAVOURITE_OUTCOMES.missing,
+    )
   })
 
   it('marks and unmarks a favourite', () => {
     const libraryId = createLibrary('loved')
     const id = add({ libraryId, name: 'film' })
-    expect(viewing().setFavourite({ id, favourite: true })).toBe(true)
+    expect(viewing().setFavourite({ id, favourite: true })).toBe(FAVOURITE_OUTCOMES.done)
     expect(media().get(id)?.favourite).toBe(true)
-    expect(viewing().setFavourite({ id, favourite: false })).toBe(true)
+    expect(viewing().setFavourite({ id, favourite: false })).toBe(FAVOURITE_OUTCOMES.done)
     expect(media().get(id)?.favourite).toBe(false)
+  })
+
+  it('never marks a locked library’s video, but unmarks one', () => {
+    const libraryId = libraries().create({
+      name: 'hidden',
+      paths: ['/hidden'],
+      settings: { locked: true },
+    }).id
+    const id = add({ libraryId, name: 'secret' })
+    expect(viewing().setFavourite({ id, favourite: true })).toBe(FAVOURITE_OUTCOMES.locked)
+    expect(media().get(id)?.favourite).toBe(false)
+    expect(viewing().setFavourite({ id, favourite: false })).toBe(FAVOURITE_OUTCOMES.done)
   })
 })

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   ITEM_TYPES,
   type ItemDetails,
+  TITLE_DISPLAYS,
   type SeasonSummary,
   episodeCode,
   watchedStateOf,
@@ -12,6 +13,7 @@ import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button, ButtonLink } from '@raven/ui'
 import { CastRow } from '@/components/CastRow/CastRow'
+import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { ItemHeader, ItemHeaderSkeleton, pictureBackdrop } from '@/components/ItemHeader/ItemHeader'
@@ -33,8 +35,9 @@ import { seasonEntryKey } from '@/lib/entryKeys'
 import { createdBy, showFacts } from '@/lib/itemFacts'
 import { itemPath, watchLink } from '@/lib/itemLinks'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
-import { librariesQuery, nextEpisodeQuery } from '@/lib/queries'
+import { displaySettingsQuery, librariesQuery, nextEpisodeQuery } from '@/lib/queries'
 import { ROUTE_STATES, useRouteItem } from '@/lib/routeQuery'
+import { useItemFavourite } from '@/lib/useItemFavourite'
 import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import styles from '@/pages/ShowPage/ShowPage.module.scss'
@@ -79,6 +82,9 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   const [editingImages, setEditingImages] = useState(false)
   const [editingMetadata, setEditingMetadata] = useState(false)
   const next = useQuery(nextEpisodeQuery(details.id))
+  const favourite = useItemFavourite({ item: details })
+  // A logo until Settings says to spell titles out, as a fresh install does.
+  const showsLogo = useQuery(displaySettingsQuery).data?.titles !== TITLE_DISPLAYS.text
   const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId
   const libraryName = useQuery(librariesQuery).data?.find((entry) => entry.id === libraryId)?.name
   const code = next.data?.item ? episodeCode(next.data.item) : null
@@ -112,6 +118,11 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
           titleId={ids.title}
           eyebrow={['Show']}
           title={details.title}
+          logo={
+            showsLogo
+              ? api.itemImageUrl({ id: details.id, kind: 'logo', version: details.logoVersion })
+              : null
+          }
           byline={createdBy(details)}
           contentRating={details.contentRating}
           facts={showFacts(details)}
@@ -157,6 +168,9 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
             <ButtonLink tone="primary" icon="play" {...watchLink({ media: next.data })}>
               {code ? `Play ${code}` : 'Play'}
             </ButtonLink>
+          )}
+          {details.favourite != null && (
+            <FavouriteButton isFavourite={details.favourite} onToggle={favourite.mutate} />
           )}
           {episodeCount > 0 && <ShuffleButton itemId={details.id}>Shuffle</ShuffleButton>}
           <WatchedToggle {...toggle} />

@@ -24,6 +24,7 @@ import { ImageEditorDialog } from '@/components/ImageEditor/ImageEditorDialog'
 import { api } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { itemQuery, mediaLocationQuery } from '@/lib/queries'
+import { useCanFavourite } from '@/lib/useCanFavourite'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import styles from '@/components/MediaMenu/MediaMenu.module.scss'
 
@@ -203,6 +204,8 @@ const MenuBody = ({
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
   const { favourite, watched, remove, refresh } = useMediaMutations({ media })
+  // A locked library's videos are never marked, but one marked before it locked can be unmarked.
+  const canFavourite = useCanFavourite(media.libraryId) || media.favourite
   const matchable = matchType != null && media.match !== MATCH_STATES.off
   const item = media.item
   // Only a movie's details carry an AI note: an episode's never do.
@@ -263,7 +266,7 @@ const MenuBody = ({
           className={styles.list}
           onKeyDown={onKeyDown}
         >
-          {withFavourite && (
+          {withFavourite && canFavourite && (
             <MenuItem
               icon="heart"
               label={media.favourite ? 'Remove favourite' : 'Favourite'}

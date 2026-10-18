@@ -407,6 +407,16 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE libraries ADD COLUMN full_scanned_at TEXT;
   ALTER TABLE libraries ADD COLUMN quick_scanned_at TEXT;
   `,
+  // A show's logo sits in item_images as a movie's does; shows stored before
+  // learn theirs from TMDB once, in the daily sweep. Shows and seasons can
+  // be favourites as videos can, one row each, by item.
+  `
+  UPDATE items SET logo_checked = 0 WHERE type = 'show';
+  CREATE TABLE item_favourites (
+    item_id INTEGER PRIMARY KEY REFERENCES items (id) ON DELETE CASCADE,
+    added_at TEXT NOT NULL
+  );
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

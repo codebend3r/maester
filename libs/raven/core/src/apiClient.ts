@@ -18,6 +18,7 @@ import {
   type ItemImageOptions,
   type ItemMetadataChange,
   type ItemMetadataState,
+  type ItemSummary,
   type JoinRequest,
   type Library,
   type LibraryBackdrop,
@@ -63,6 +64,7 @@ import {
   isHistory,
   isHome,
   isHomeSearch,
+  isFavouriteTitles,
   isItemDetails,
   isItemImageOptions,
   isItemMetadataState,
@@ -421,6 +423,23 @@ export const createApiClient = ({
         guard: isMediaItem,
       }),
 
+    /** Marks a show or season a favourite, or not, and answers with its page. */
+    setItemFavourite: ({
+      id,
+      favourite,
+    }: {
+      id: number
+      favourite: boolean
+    }): Promise<ItemDetails> =>
+      expect({
+        request: send({
+          path: `/api/items/${id}/favourite`,
+          method: 'PUT',
+          body: { favourite } satisfies FavouriteChange,
+        }),
+        guard: isItemDetails,
+      }),
+
     /** Marks every target watched or unwatched; a target in a library this browser may not see is skipped. */
     setWatched: async ({ watched, targets }: WatchedChange): Promise<void> => {
       await send({
@@ -433,6 +452,10 @@ export const createApiClient = ({
     /** Every favourite across every library with the poster its card shows, most recently favourited first. */
     listFavourites: (): Promise<PosterEntry[]> =>
       expect({ request: send({ path: '/api/favourites' }), guard: isPosterEntries }),
+
+    /** Every show and season marked a favourite, most recently marked first. */
+    listFavouriteTitles: (): Promise<ItemSummary[]> =>
+      expect({ request: send({ path: '/api/favourites/titles' }), guard: isFavouriteTitles }),
 
     /** A library's videos with a saved spot, the most recently watched first, each with its poster. */
     listInProgress: (libraryId: number): Promise<PosterEntry[]> =>

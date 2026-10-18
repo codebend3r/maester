@@ -100,6 +100,11 @@ export const favouritesQuery = queryOptions({
   queryFn: () => api.listFavourites(),
 })
 
+export const favouriteTitlesQuery = queryOptions({
+  queryKey: queryKeys.favouriteTitles,
+  queryFn: () => api.listFavouriteTitles(),
+})
+
 export const homeQuery = queryOptions({
   queryKey: queryKeys.home,
   queryFn: () => api.getHome(),

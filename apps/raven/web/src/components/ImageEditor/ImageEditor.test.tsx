@@ -158,14 +158,14 @@ describe('ImageEditor', () => {
     )
   })
 
-  it('has no logo tab for a show, whose page shows none', async () => {
+  it('has a logo tab for a show, as for a movie', async () => {
     open({ itemKind: ITEM_TYPES.show })
     const tabs = await screen.findByRole('tablist', { name: 'Pictures' })
     expect(
       within(tabs)
         .getAllByRole('tab')
         .map((tab) => tab.textContent),
-    ).toEqual(['Poster2', 'Backdrop1'])
+    ).toEqual(['Poster2', 'Backdrop1', 'Logo2'])
   })
 
   it('lists the linked files that share the pictures, and closes with Done', async () => {
