@@ -108,6 +108,15 @@
       "dead-css": {
         "command": "bun tooling/web/check-dead-css.ts",
         "cache": true,
+        "dependsOn": [
+          {
+            "projects": [
+              "@raven/core",
+              "@raven/ui"
+            ],
+            "target": "build"
+          }
+        ],
         "inputs": [
           "{workspaceRoot}/apps/**/*.{ts,tsx,scss}",
           "{workspaceRoot}/libs/**/*.{ts,tsx,scss}",
