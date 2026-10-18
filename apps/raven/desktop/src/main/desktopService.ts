@@ -559,17 +559,29 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return deps.downloads.readSpace()
       case DESKTOP_REQUESTS.setDownloadDefaults:
         return deps.downloads.setDefaults({ autoDelete: request.autoDelete })
-      // The page may send these already; main refuses them until it can act on them.
-      case DESKTOP_REQUESTS.openDownload:
       case DESKTOP_REQUESTS.pauseDownload:
+        return deps.downloads.pause({ downloadId: request.downloadId })
       case DESKTOP_REQUESTS.resumeDownload:
+        return deps.downloads.resume({ downloadId: request.downloadId })
       case DESKTOP_REQUESTS.retryDownload:
+        return deps.downloads.retry({ downloadId: request.downloadId })
       case DESKTOP_REQUESTS.deleteDownload:
+        return deps.downloads.remove({ downloadId: request.downloadId })
       case DESKTOP_REQUESTS.setDownloadAutoDelete:
+        return deps.downloads.setAutoDelete({
+          downloadId: request.downloadId,
+          autoDelete: request.autoDelete,
+        })
       case DESKTOP_REQUESTS.pauseAllDownloads:
+        return deps.downloads.pauseAll()
       case DESKTOP_REQUESTS.resumeAllDownloads:
+        return deps.downloads.resumeAll()
       case DESKTOP_REQUESTS.deleteAllDownloads:
+        return deps.downloads.removeAll()
       case DESKTOP_REQUESTS.showDownloadsFolder:
+        return deps.downloads.showFolder()
+      // The page may send this already; main refuses it until it can play a download.
+      case DESKTOP_REQUESTS.openDownload:
         return refused(MESSAGES.unknownRequest)
       default: {
         const unreachable: never = request

@@ -1,22 +1,35 @@
 import { describe, expect, it } from 'bun:test'
 import { LOCKED_STATUS, type DownloadTarget, type MediaItem, type Saga } from '@raven/core'
 import { EMPTY_CONFIG, type ConfigStore, type DesktopConfig } from '@/main/desktopConfig'
+import { ASK_TTL_MS } from '@/main/downloads/asks'
+import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
-  ASK_TTL_MS,
   createDownloadService,
-  DOWNLOAD_MESSAGES,
   DOWNLOADS_EVENT_MS,
+  viewStatusOf,
 } from '@/main/downloads/downloadService'
 import {
   EMPTY_DOWNLOADS,
   NO_PENDING,
   type DownloadEntry,
   type DownloadsState,
+  type EntryStatus,
 } from '@/main/downloads/downloadState'
+import { RESUME_SETTLE_MS } from '@/main/downloads/downloadQueue'
 import { DOWNLOADS_DEBOUNCE_MS } from '@/main/downloads/downloadStore'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
+import type { AccessOutcome } from '@/main/downloads/mediaAccess'
 import { SPACE_RESERVE_BYTES } from '@/main/downloads/space'
 import { createJsonStore, type StateFs } from '@/main/stateStore'
+import {
+  fakeAccess,
+  fakeDisk,
+  fakeNetwork,
+  serving,
+  ticketFor,
+  ticks,
+  until,
+} from '@/main/test/downloadFakes'
 import { fakeTimers } from '@/main/test/playerFakes'
 import {
   details,
@@ -39,6 +52,13 @@ const GIB = 1024 ** 3
 const BLOCK = 4096
 
 const SERVER = { id: SERVER_ID, origin: 'https://vhagar.example', name: 'Vhagar', addedAt: 1 }
+
+const DOWNLOADS = `${USER_DATA}/downloads`
+
+const FAR_TICKET = ticketFor({ ticket: 'one', renewAt: NOW + 6 * 3_600_000 })
+
+/** An access read that never answers, so a queued file waits where it is. */
+const NEVER = (): Promise<AccessOutcome> => new Promise(() => undefined)
 
 const missing = (): Error => Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
 
@@ -129,11 +149,15 @@ const setup = ({
   free = 412 * GIB,
   total = 1000 * GIB,
   initial = EMPTY_DOWNLOADS,
+  access = NEVER,
+  disk = {},
 }: {
   replies?: Record<string, Reply>
   free?: number
   total?: number
   initial?: DownloadsState
+  access?: () => Promise<AccessOutcome>
+  disk?: Record<string, number>
 } = {}) => {
   const table: Record<string, Reply> = {
     [libraryCall]: ok(library({ id: 1, watchedPercent: 90 })),
@@ -156,6 +180,10 @@ const setup = ({
   const sent: DesktopEvent[] = []
   const warnings: string[] = []
   const made: string[] = []
+  const shown: string[] = []
+  const drive = fakeDisk(disk)
+  const network = fakeNetwork()
+  const media = fakeAccess(access)
   const service = createDownloadService({
     store,
     config,
@@ -172,8 +200,30 @@ const setup = ({
     newId: sequentialIds(),
     send: (event) => sent.push(event),
     warn: (message) => warnings.push(message),
+    access: media.access,
+    fetchFor: network.fetchFor,
+    fs: drive.fs,
+    showItemInFolder: (path) => shown.push(path),
+    ready: Promise.resolve(),
+    wasSetAside: false,
   })
-  return { service, store, config, table, log, fire, pending, clock, sent, warnings, made }
+  return {
+    service,
+    store,
+    config,
+    table,
+    log,
+    fire,
+    pending,
+    clock,
+    sent,
+    warnings,
+    made,
+    shown,
+    drive,
+    network,
+    media,
+  }
 }
 
 type World = ReturnType<typeof setup>
@@ -224,7 +274,11 @@ describe('constants', () => {
     ).toBe('Downloading S01E02 Half Loop from Vhagar')
     expect(DOWNLOAD_MESSAGES.noSpace).toBe('Not enough space')
     expect(DOWNLOAD_MESSAGES.changed).toBe('The file changed on the server')
+    expect(DOWNLOAD_MESSAGES.answered({ serverName: 'Vhagar', status: 401 })).toBe(
+      'Vhagar answered 401',
+    )
     expect(DOWNLOAD_MESSAGES.relocked('Vhagar')).toBe('Vhagar locked this library again')
+    expect(DOWNLOAD_MESSAGES.unreachable('Vhagar')).toBe('Vhagar could not be reached')
     expect(DOWNLOAD_MESSAGES.downloaded('Dune')).toBe('Downloaded Dune')
     expect(DOWNLOAD_MESSAGES.failed({ label: 'Dune', why: 'Not enough space' })).toBe(
       'Could not download Dune: Not enough space',
@@ -266,6 +320,39 @@ describe('ask', () => {
     })
     const ask = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
     expect(ask.status).toMatchObject({ kind: 'ready', fits: false })
+  })
+
+  it('fits less while other files are queued or downloading, and shows only its own bytes', async () => {
+    const room = 41 * GIB + SPACE_RESERVE_BYTES + 5 * GIB
+    const alone = setup({ replies: { [mediaCall(9)]: ok(MOVIE) }, free: room })
+    expect(
+      (await askFor({ world: alone, target: { kind: 'media', mediaId: 9 } })).status,
+    ).toMatchObject({ kind: 'ready', bytes: 41 * GIB, fits: true })
+    const busy = setup({
+      replies: { [mediaCall(9)]: ok(MOVIE) },
+      free: room,
+      initial: {
+        ...EMPTY_DOWNLOADS,
+        entries: [
+          entryFor({ mediaId: 11, size: 4 * GIB, status: { kind: 'queued' } }),
+          entryFor({
+            downloadId: '00000000-0000-4000-8000-0000000000a1',
+            mediaId: 12,
+            size: 4 * GIB,
+            status: { kind: 'downloading', bytes: 2 * GIB },
+          }),
+          entryFor({
+            downloadId: '00000000-0000-4000-8000-0000000000a2',
+            mediaId: 13,
+            size: 40 * GIB,
+            status: { kind: 'paused', bytes: 0, reason: 'viewer' },
+          }),
+        ],
+      },
+    })
+    expect(
+      (await askFor({ world: busy, target: { kind: 'media', mediaId: 9 } })).status,
+    ).toMatchObject({ kind: 'ready', bytes: 41 * GIB, fits: false })
   })
 
   it('counts and sizes only the files not yet downloaded', async () => {
@@ -345,6 +432,18 @@ describe('ask', () => {
     ).toEqual({ type: 'refused', message: EXPAND_MESSAGES.unreadable('Vhagar') })
     expect(world.warnings.join('\n')).toContain('Fellowship (2001)')
     expect(world.warnings.join('\n')).not.toContain('../../x')
+  })
+
+  it.each([
+    ['below 0', -1],
+    ['0', 0],
+    ['not whole', 2.5],
+  ])('refuses a file whose size is %s, and warns by its title', async (_name, size) => {
+    const world = setup({ replies: { [mediaCall(9)]: ok({ ...MOVIE, size }) } })
+    expect(
+      await world.service.ask({ serverId: SERVER_ID, target: { kind: 'media', mediaId: 9 } }),
+    ).toEqual({ type: 'refused', message: EXPAND_MESSAGES.unreadable('Vhagar') })
+    expect(world.warnings.join('\n')).toContain('Fellowship (2001)')
   })
 
   it('refuses a server raven player no longer keeps, and calls nothing', async () => {
@@ -571,23 +670,19 @@ describe('list and views', () => {
       label: 'Dune (2021)',
       group: { kind: 'movie', key: 'movie:41', title: 'Dune (2021)', order: 0 },
       createdAt: NOW - 5000,
-      status: { kind: 'paused', bytes: 7, message: null },
+      status: { kind: 'paused', bytes: 7, reason: 'viewer' },
       watchedAt: NOW - 100,
     })
     const newer = entryFor({ status: { kind: 'downloading', bytes: GIB }, autoDelete: true })
-    const orphan = entryFor({
-      downloadId: '00000000-0000-4000-8000-0000000000a2',
-      serverId: OTHER_SERVER_ID,
-      createdAt: NOW - 9000,
-    })
     const world = setup({
-      initial: { ...EMPTY_DOWNLOADS, entries: [older, orphan, newer], autoDeleteDefault: true },
+      initial: { ...EMPTY_DOWNLOADS, entries: [older, newer], autoDeleteDefault: true },
     })
     expect(world.service.list()).toEqual({
       type: 'downloads',
       downloads: [
         {
           downloadId: newer.downloadId,
+          serverId: SERVER_ID,
           label: 'S01E01 Good News',
           group: { kind: 'season', key: 'show:4', title: 'Severance', order: 10_001 },
           serverName: 'Vhagar',
@@ -599,18 +694,16 @@ describe('list and views', () => {
           needsUnlock: false,
         },
         expect.objectContaining({ downloadId: older.downloadId, watched: null }),
-        expect.objectContaining({ downloadId: orphan.downloadId, serverName: '' }),
       ],
       autoDeleteDefault: true,
     })
     expect(world.service.views()).toEqual(downloadsOf(world.service.list()).downloads)
   })
 
-  it('carries no path, origin or media id to the page', () => {
+  it('carries no path, origin or media id to the page, only the server by its id', () => {
     const world = setup({ initial: { ...EMPTY_DOWNLOADS, entries: [entryFor({})] } })
     const text = JSON.stringify(world.service.list())
     expect(text).not.toContain('vhagar.example')
-    expect(text).not.toContain(SERVER_ID)
     expect(text).not.toContain('mediaId')
     expect(text).not.toContain(USER_DATA)
   })
@@ -640,7 +733,8 @@ describe('readSpace', () => {
       type: 'space',
       space: { free: 412 * GIB, total: 1000 * GIB, used: 4 * GIB },
     })
-    expect(world.made).toEqual([`${USER_DATA}/downloads`])
+    // The queue reads the same folder before it starts each file.
+    expect(new Set(world.made)).toEqual(new Set([DOWNLOADS]))
   })
 })
 
@@ -677,5 +771,282 @@ describe('the downloads event', () => {
     expect([...world.pending.values()].filter(({ ms }) => ms === DOWNLOADS_EVENT_MS)).toEqual([])
     world.fire()
     expect(world.sent).toEqual([])
+  })
+})
+
+describe('the queue', () => {
+  const ID = '0f8fad5b-d9cb-469f-a165-70867728950e'
+  const OTHER_ID = '00000000-0000-4000-8000-0000000000a1'
+  const UNKNOWN_ID = '00000000-0000-4000-8000-0000000000ff'
+  const PART = `${DOWNLOADS}/${SERVER_ID}/11/video.mkv.part`
+  const queuedFile = (overrides: Partial<DownloadEntry> = {}): DownloadEntry =>
+    entryFor({ size: 8, status: { kind: 'queued' }, ...overrides })
+  const holding = (...entries: DownloadEntry[]): DownloadsState => ({
+    ...EMPTY_DOWNLOADS,
+    entries,
+  })
+  const statusOf = (world: World, downloadId = ID) =>
+    world.store.read().entries.find((entry) => entry.downloadId === downloadId)?.status ?? null
+
+  it('resumes at launch what the last run left, from the bytes on disk', async () => {
+    const world = setup({
+      initial: holding(entryFor({ size: 8192, status: { kind: 'downloading', bytes: 4096 } })),
+      access: async () => FAR_TICKET,
+      disk: { [PART]: 4096 },
+    })
+    world.network.answers.file = serving({ size: 8192, sent: 0, isEnding: false })
+    await until(() => world.network.fileRequests().length === 1)
+    expect(world.network.fileRequests()[0]?.headers).toEqual({ Range: 'bytes=4096-' })
+  })
+
+  it('drops at launch the downloads of a server raven player no longer keeps', async () => {
+    const world = setup({
+      initial: holding(entryFor({}), entryFor({ downloadId: OTHER_ID, serverId: OTHER_SERVER_ID })),
+      disk: { [`${DOWNLOADS}/${OTHER_SERVER_ID}/11/video.mkv`]: 8 },
+    })
+    await until(() => world.drive.removed.length === 1)
+    expect(world.drive.removed).toEqual([`${DOWNLOADS}/${OTHER_SERVER_ID}`])
+    expect(world.store.read().entries.map(({ downloadId }) => downloadId)).toEqual([ID])
+  })
+
+  it('starts what a confirmation queues', async () => {
+    const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) }, access: async () => FAR_TICKET })
+    const ask = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    await world.service.confirm({ askId: ask.askId, autoDelete: false })
+    await until(() => world.network.fileRequests().length === 1)
+    expect(world.network.fileRequests()[0]?.url).toContain('/api/media/9/file?t=one')
+  })
+
+  it('hands pauseDownload to the queue, which stops the fetch, and answers the list', async () => {
+    const world = setup({ initial: holding(queuedFile()), access: async () => FAR_TICKET })
+    await until(() => world.network.fileRequests().length === 1)
+    const reply = downloadsOf(await world.service.pause({ downloadId: ID }))
+    expect(reply.downloads[0]?.status).toEqual({ kind: 'paused', bytes: 0, message: null })
+    expect(world.network.fileRequests()[0]?.signal.aborted).toBe(true)
+  })
+
+  it('resumes and retries through the queue', async () => {
+    const world = setup({
+      initial: holding(
+        queuedFile({ status: { kind: 'paused', bytes: 0, reason: 'viewer' } }),
+        queuedFile({
+          downloadId: OTHER_ID,
+          mediaId: 12,
+          status: { kind: 'failed', bytes: 0, reason: 'other', message: 'x' },
+        }),
+      ),
+      access: async () => FAR_TICKET,
+    })
+    expect(downloadsOf(world.service.resume({ downloadId: ID })).downloads).toContainEqual(
+      expect.objectContaining({ downloadId: ID, status: { kind: 'queued' } }),
+    )
+    world.service.retry({ downloadId: OTHER_ID })
+    await until(() => world.network.fileRequests().length === 2)
+  })
+
+  it('pauses all and resumes all', async () => {
+    const world = setup({
+      initial: holding(queuedFile(), queuedFile({ downloadId: OTHER_ID, mediaId: 12 })),
+      access: async () => FAR_TICKET,
+    })
+    await until(() => world.network.fileRequests().length === 2)
+    const paused = downloadsOf(await world.service.pauseAll())
+    expect(paused.downloads.map(({ status }) => status.kind)).toEqual(['paused', 'paused'])
+    const resumed = downloadsOf(world.service.resumeAll())
+    expect(resumed.downloads.map(({ status }) => status.kind)).toEqual(['queued', 'queued'])
+    await until(() => world.network.fileRequests().length === 4)
+  })
+
+  it('sets one download to delete once watched', () => {
+    const world = setup({ initial: holding(entryFor({})) })
+    const reply = downloadsOf(world.service.setAutoDelete({ downloadId: ID, autoDelete: true }))
+    expect(reply.downloads[0]?.autoDelete).toBe(true)
+    expect(world.store.read().entries[0]?.autoDelete).toBe(true)
+  })
+
+  it('refuses an action on a download it does not hold', async () => {
+    const world = setup({ initial: holding(entryFor({})) })
+    const unknown = { type: 'refused', message: DOWNLOAD_MESSAGES.unknown } as const
+    expect(await world.service.pause({ downloadId: UNKNOWN_ID })).toEqual(unknown)
+    expect(world.service.resume({ downloadId: UNKNOWN_ID })).toEqual(unknown)
+    expect(world.service.retry({ downloadId: UNKNOWN_ID })).toEqual(unknown)
+    expect(await world.service.remove({ downloadId: UNKNOWN_ID })).toEqual(unknown)
+    expect(world.service.setAutoDelete({ downloadId: UNKNOWN_ID, autoDelete: true })).toEqual(
+      unknown,
+    )
+  })
+
+  it('removes a download and answers the list without it', async () => {
+    const world = setup({
+      initial: holding(entryFor({}), entryFor({ downloadId: OTHER_ID, mediaId: 12 })),
+    })
+    const reply = downloadsOf(await world.service.remove({ downloadId: ID }))
+    expect(reply.downloads.map(({ downloadId }) => downloadId)).toEqual([OTHER_ID])
+    expect(world.drive.removed).toContain(`${DOWNLOADS}/${SERVER_ID}/11`)
+  })
+
+  it('answers deleteAllDownloads with an empty list and removes the downloads folder', async () => {
+    const world = setup({
+      initial: {
+        ...holding(entryFor({}), entryFor({ downloadId: OTHER_ID, mediaId: 12 })),
+        autoDeleteDefault: true,
+      },
+    })
+    expect(await world.service.removeAll()).toEqual({
+      type: 'downloads',
+      downloads: [],
+      autoDeleteDefault: true,
+    })
+    expect(world.drive.removed).toContain(DOWNLOADS)
+  })
+
+  it("removes a server's downloads", async () => {
+    const world = setup({ initial: holding(entryFor({})) })
+    await world.service.removeServer({ serverId: SERVER_ID })
+    expect(world.store.read().entries).toEqual([])
+    expect(world.drive.removed).toContain(`${DOWNLOADS}/${SERVER_ID}`)
+    expect(world.media.forgotten).toEqual([SERVER_ID])
+  })
+
+  it('shows the downloads folder, made first', async () => {
+    const world = setup()
+    expect(await world.service.showFolder()).toEqual({ type: 'done' })
+    expect(world.shown).toEqual([DOWNLOADS])
+    expect(world.made).toEqual([DOWNLOADS])
+  })
+
+  it('says Downloaded <label> when a file finishes', async () => {
+    const world = setup({ initial: holding(queuedFile()), access: async () => FAR_TICKET })
+    world.network.answers.file = serving({ size: 8 })
+    await until(() => statusOf(world)?.kind === 'ready')
+    expect(world.sent).toContainEqual({ type: 'notice', message: 'Downloaded S01E01 Good News' })
+  })
+
+  it('says Could not download <label>: <why> when a file fails', async () => {
+    const world = setup({ initial: holding(queuedFile()), access: async () => FAR_TICKET })
+    world.network.answers.file = () => ({ status: 404, body: null })
+    await until(() => statusOf(world)?.kind === 'failed')
+    expect(world.sent).toContainEqual({
+      type: 'notice',
+      message: `Could not download S01E01 Good News: ${EXPAND_MESSAGES.gone('Vhagar')}`,
+    })
+  })
+
+  it('says nothing for a file the viewer paused', async () => {
+    const world = setup({ initial: holding(queuedFile()), access: async () => FAR_TICKET })
+    await until(() => world.network.fileRequests().length === 1)
+    await world.service.pause({ downloadId: ID })
+    await ticks(10)
+    expect(world.sent.filter(({ type }) => type === 'notice')).toEqual([])
+  })
+
+  it('marks a row paused by a relock as needing the unlock, even once its server is renamed', () => {
+    const world = setup({
+      initial: holding(
+        entryFor({ status: { kind: 'paused', bytes: 0, reason: 'relocked' } }),
+        entryFor({
+          downloadId: OTHER_ID,
+          mediaId: 12,
+          status: { kind: 'paused', bytes: 0, reason: 'viewer' },
+        }),
+      ),
+    })
+    expect(world.service.views().map(({ needsUnlock }) => needsUnlock)).toEqual([true, false])
+    world.config.update((config) => ({
+      ...config,
+      servers: config.servers.map((server) => ({ ...server, name: 'Caraxes' })),
+    }))
+    const [relocked] = world.service.views()
+    expect(relocked?.needsUnlock).toBe(true)
+    expect(relocked?.status).toEqual({
+      kind: 'paused',
+      bytes: 0,
+      message: DOWNLOAD_MESSAGES.relocked('Caraxes'),
+    })
+  })
+
+  it("words each stopped row by its reason and its server's name", () => {
+    const stopped = (n: number, status: EntryStatus): DownloadEntry =>
+      entryFor({
+        downloadId: `00000000-0000-4000-8000-0000000000b${n}`,
+        mediaId: 20 + n,
+        createdAt: NOW - n,
+        status,
+      })
+    const world = setup({
+      initial: holding(
+        stopped(1, { kind: 'paused', bytes: 1, reason: 'viewer' }),
+        stopped(2, { kind: 'paused', bytes: 2, reason: 'noSpace' }),
+        stopped(3, { kind: 'paused', bytes: 3, reason: 'unreachable' }),
+        stopped(4, { kind: 'failed', bytes: 4, reason: 'noSpace', message: '' }),
+        stopped(5, { kind: 'failed', bytes: 5, reason: 'changed', message: '' }),
+        stopped(6, { kind: 'failed', bytes: 6, reason: 'unauthorized', message: '' }),
+        stopped(7, { kind: 'failed', bytes: 7, reason: 'unreachable', message: '' }),
+        stopped(8, { kind: 'failed', bytes: 8, reason: 'gone', message: '' }),
+        stopped(9, { kind: 'failed', bytes: 9, reason: 'other', message: 'write EIO' }),
+      ),
+    })
+    expect(world.service.views().map(({ status }) => status)).toEqual([
+      { kind: 'paused', bytes: 1, message: null },
+      { kind: 'paused', bytes: 2, message: 'Not enough space' },
+      { kind: 'paused', bytes: 3, message: 'Vhagar could not be reached' },
+      { kind: 'failed', bytes: 4, message: 'Not enough space' },
+      { kind: 'failed', bytes: 5, message: 'The file changed on the server' },
+      { kind: 'failed', bytes: 6, message: 'Vhagar answered 401' },
+      { kind: 'failed', bytes: 7, message: 'Vhagar could not be reached' },
+      { kind: 'failed', bytes: 8, message: EXPAND_MESSAGES.gone('Vhagar') },
+      { kind: 'failed', bytes: 9, message: 'write EIO' },
+    ])
+  })
+
+  it('says the server is gone for a reason that names a server raven player no longer keeps', () => {
+    expect(
+      viewStatusOf({ status: { kind: 'paused', bytes: 0, reason: 'relocked' }, serverName: '' }),
+    ).toEqual({ kind: 'paused', bytes: 0, message: SERVER_GONE })
+    expect(
+      viewStatusOf({
+        status: { kind: 'failed', bytes: 0, reason: 'gone', message: '' },
+        serverName: '',
+      }),
+    ).toEqual({ kind: 'failed', bytes: 0, message: SERVER_GONE })
+    expect(
+      viewStatusOf({ status: { kind: 'paused', bytes: 0, reason: 'noSpace' }, serverName: '' }),
+    ).toEqual({ kind: 'paused', bytes: 0, message: 'Not enough space' })
+  })
+
+  it('requeues at launch what an outage stopped', async () => {
+    const world = setup({
+      initial: holding(queuedFile({ status: { kind: 'paused', bytes: 0, reason: 'unreachable' } })),
+      access: async () => FAR_TICKET,
+    })
+    await until(() => world.network.fileRequests().length === 1)
+    expect(statusOf(world)).toEqual({ kind: 'downloading', bytes: 0 })
+  })
+
+  it('stops its fetches on a sleep without a word, and starts them again after the wake', async () => {
+    const world = setup({ initial: holding(queuedFile()), access: async () => FAR_TICKET })
+    await until(() => world.network.fileRequests().length === 1)
+    world.service.onSuspend()
+    expect(world.network.fileRequests()[0]?.signal.aborted).toBe(true)
+    await ticks(10)
+    expect(statusOf(world)).toEqual({ kind: 'downloading', bytes: 0 })
+    world.service.onResume()
+    const settle = [...world.pending].find(([, timer]) => timer.ms === RESUME_SETTLE_MS)
+    expect(settle).toBeDefined()
+    world.pending.delete(settle?.[0] ?? 0)
+    settle?.[1].run()
+    await until(() => world.network.fileRequests().length === 2)
+    expect(world.sent.filter(({ type }) => type === 'notice')).toEqual([])
+  })
+
+  it('sends no downloads event after dispose, even as its fetches stop', async () => {
+    const world = setup({ initial: holding(queuedFile()), access: async () => FAR_TICKET })
+    await until(() => world.network.fileRequests().length === 1)
+    world.service.dispose()
+    expect(world.network.fileRequests()[0]?.signal.aborted).toBe(true)
+    await ticks(10)
+    world.fire()
+    expect(world.sent).toEqual([])
+    expect(statusOf(world)).toEqual({ kind: 'downloading', bytes: 0 })
   })
 })

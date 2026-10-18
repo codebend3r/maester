@@ -3,13 +3,16 @@ import {
   isDownloadsState,
   type DownloadsState,
 } from '@/main/downloads/downloadState'
-import { loadJson, type JsonStore, type StateFs } from '@/main/stateStore'
+import { readJsonFile, type JsonStore, type StateFs } from '@/main/stateStore'
 
 export type DownloadsStore = JsonStore<DownloadsState>
 
 export const DOWNLOADS_DEBOUNCE_MS = 1000
 
-export const loadDownloads = ({
+/** The downloads, and whether an unreadable `downloads.json` was set aside to load them empty. */
+export type LoadedDownloads = { state: DownloadsState; wasSetAside: boolean }
+
+export const loadDownloads = async ({
   fs,
   file,
   now,
@@ -17,5 +20,18 @@ export const loadDownloads = ({
   fs: StateFs
   file: string
   now: () => number
-}): Promise<DownloadsState> =>
-  loadJson({ fs, file, now, guard: isDownloadsState, empty: EMPTY_DOWNLOADS })
+}): Promise<LoadedDownloads> => {
+  const read = await readJsonFile({ fs, file, now, guard: isDownloadsState })
+  switch (read.kind) {
+    case 'read':
+      return { state: read.value, wasSetAside: false }
+    case 'missing':
+      return { state: EMPTY_DOWNLOADS, wasSetAside: false }
+    case 'setAside':
+      return { state: EMPTY_DOWNLOADS, wasSetAside: true }
+    default: {
+      const unreachable: never = read
+      return unreachable
+    }
+  }
+}

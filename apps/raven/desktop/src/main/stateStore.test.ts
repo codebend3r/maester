@@ -7,6 +7,7 @@ import {
   ERROR_CODES,
   isMissingFile,
   loadJson,
+  readJsonFile,
   loadState,
   type StateFs,
   type Timers,
@@ -407,6 +408,21 @@ describe('loadJson', () => {
     expect(await load(fs)).toEqual(EMPTY_CONFIG)
     expect(files.has(CONFIG)).toBe(false)
     expect(files.get(`${CONFIG}.corrupt-1700000000000`)).toBe(text)
+  })
+})
+
+describe('readJsonFile', () => {
+  const now = () => 1700000000000
+  const CONFIG = '/data/desktop-config.json'
+  const read = (fs: StateFs) => readJsonFile({ fs, file: CONFIG, now, guard: isDesktopConfig })
+
+  it('says a file is missing, read, or set aside', async () => {
+    expect(await read(createFakeFs().fs)).toEqual({ kind: 'missing' })
+    const written = createFakeFs({ [CONFIG]: JSON.stringify(EMPTY_CONFIG) })
+    expect(await read(written.fs)).toEqual({ kind: 'read', value: EMPTY_CONFIG })
+    const broken = createFakeFs({ [CONFIG]: '{"version":1,' })
+    expect(await read(broken.fs)).toEqual({ kind: 'setAside' })
+    expect(broken.files.get(`${CONFIG}.corrupt-1700000000000`)).toBe('{"version":1,')
   })
 })
 

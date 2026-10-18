@@ -136,9 +136,10 @@ export const isDownloadAsk = object({
 
 export type DownloadAsk = Infer<typeof isDownloadAsk>
 
-/** A download as the page shows it: by its opaque id, with no server id, media id or path. */
+/** A download as the page shows it: it and its server by opaque ids, with no media id, origin or path. */
 export const isDownloadView = object({
   downloadId: isOpaqueId,
+  serverId: isOpaqueId,
   label: isString,
   group: isDownloadGroup,
   serverName: isString,
@@ -153,6 +154,8 @@ export const isDownloadView = object({
 export type DownloadView = Infer<typeof isDownloadView>
 
 export const isSpaceView = object({ free: isNumber, total: isNumber, used: isNumber })
+
+export type SpaceView = Infer<typeof isSpaceView>
 
 /** An audio track's index as a pick names it: a whole number, 0 or more. */
 export const isTrackIndex = (value: unknown): value is number =>

@@ -10,12 +10,13 @@ import {
   useState,
 } from 'react'
 import type { DesktopClient } from '@/renderer/desktop/client'
+import { useDesktop } from '@/renderer/stores/desktop'
+import { UNREACHED } from '@/renderer/desktop/downloadsApi'
 import { serverApiFor } from '@/renderer/desktop/serverApi'
 import styles from '@/renderer/Shell/DownloadDialog.module.scss'
 import { useOpenReply } from '@/renderer/Shell/openReply'
-import { useNotice } from '@/renderer/stores/notice'
 import { SERVER_COPY } from '@/renderer/ServerPage/serverServices'
-import { useDesktop } from '@/renderer/stores/desktop'
+import { useNotice } from '@/renderer/stores/notice'
 import {
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
@@ -28,7 +29,6 @@ import {
 type ReadyStatus = Extract<DownloadAsk['status'], { kind: 'ready' }>
 
 const TITLE = 'Download to raven player'
-const UNREACHED = 'raven player could not reach its downloads. Try again.'
 
 /** Main's answer, or null when the request itself failed. */
 const askMain = ({

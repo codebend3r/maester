@@ -8,23 +8,39 @@ import {
   nullable,
   object,
   oneOf,
+  union,
 } from '@raven/core'
-import {
-  isContainerName,
-  isDownloadGroup,
-  isDownloadStatus,
-  isOpaqueId,
-  isSidecarTrackId,
-  type DownloadStatus,
-} from '@/shared/protocol'
+import { isContainerName, isDownloadGroup, isOpaqueId, isSidecarTrackId } from '@/shared/protocol'
 
 export const DOWNLOADS_FILE = 'downloads.json'
 
 /** A subtitle file kept beside the video: `trackId` is the server's `external-<n>`. */
 const isSidecar = object({ trackId: isSidecarTrackId, title: isString, language: isString })
 
+/** A file's size as the server gives it: a whole number of bytes above 0, or nothing to fetch. */
+export const isFileSize = (value: unknown): value is number =>
+  isNumber(value) && Number.isSafeInteger(value) && value > 0
+
 /** What the server has not heard yet: a play to record, and the last position to report. */
 const isPending = object({ play: isBoolean, position: nullable(isNumber), at: isNumber })
+
+/** Why a download waits paused: the viewer paused it, or the queue did for the disk, a relock or an outage. */
+const isPauseReason = oneOf(['viewer', 'noSpace', 'relocked', 'unreachable'])
+
+/** Why a download failed. Only `other` has words of its own, kept in the status's `message`. */
+const isFailReason = oneOf(['noSpace', 'changed', 'unauthorized', 'unreachable', 'gone', 'other'])
+
+/**
+ * A download's status as `downloads.json` keeps it: why it stopped is a reason, and the page's
+ * words are built from it when the page reads it, so renaming a server changes no reason.
+ */
+const isEntryStatus = union(
+  object({ kind: oneOf(['queued']) }),
+  object({ kind: oneOf(['downloading']), bytes: isNumber }),
+  object({ kind: oneOf(['paused']), bytes: isNumber, reason: isPauseReason }),
+  object({ kind: oneOf(['failed']), bytes: isNumber, reason: isFailReason, message: isString }),
+  object({ kind: oneOf(['ready']) }),
+)
 
 export const isDownloadEntry = object({
   downloadId: isOpaqueId,
@@ -33,11 +49,11 @@ export const isDownloadEntry = object({
   label: isString,
   group: isDownloadGroup,
   container: isContainerName,
-  size: isNumber,
+  size: isFileSize,
   duration: nullable(isNumber),
   watchedPercent: isNumber,
   sidecars: listOf(isSidecar),
-  status: isDownloadStatus,
+  status: isEntryStatus,
   autoDelete: isBoolean,
   watchedAt: nullable(isNumber),
   pending: isPending,
@@ -50,6 +66,10 @@ export const isDownloadsState = object({
   autoDeleteDefault: isBoolean,
 })
 
+export type PauseReason = Infer<typeof isPauseReason>
+export type FailReason = Infer<typeof isFailReason>
+export type EntryStatus = Infer<typeof isEntryStatus>
+export type Sidecar = Infer<typeof isSidecar>
 export type Pending = Infer<typeof isPending>
 export type DownloadEntry = Infer<typeof isDownloadEntry>
 export type DownloadsState = Infer<typeof isDownloadsState>
@@ -106,10 +126,7 @@ const changeEntry = (
   }
 }
 
-const withStatus = (
-  entry: DownloadEntry,
-  { status }: { status: DownloadStatus },
-): DownloadEntry => ({
+const withStatus = (entry: DownloadEntry, { status }: { status: EntryStatus }): DownloadEntry => ({
   ...entry,
   status,
 })
@@ -128,6 +145,10 @@ export const queue = (
   return { ...state, entries: [...state.entries, ...added] }
 }
 
+/**
+ * Only a queued file starts: a run begins for one, and a pause or a failure that came while it
+ * read its ticket must stand.
+ */
 export const start = (
   state: DownloadsState,
   { downloadId }: { downloadId: string },
@@ -137,9 +158,9 @@ export const start = (
     change: (entry) => {
       switch (entry.status.kind) {
         case 'queued':
+          return withStatus(entry, { status: { kind: 'downloading', bytes: 0 } })
         case 'paused':
         case 'failed':
-          return withStatus(entry, { status: { kind: 'downloading', bytes: bytesOf(entry) } })
         case 'downloading':
         case 'ready':
           return entry
@@ -158,7 +179,7 @@ export const advance = (
   changeEntry(state, {
     downloadId,
     change: (entry) =>
-      entry.status.kind === 'downloading'
+      entry.status.kind === 'downloading' && entry.status.bytes !== bytes
         ? withStatus(entry, { status: { kind: 'downloading', bytes } })
         : entry,
   })
@@ -166,27 +187,48 @@ export const advance = (
 const isPausable = (entry: DownloadEntry): boolean =>
   entry.status.kind === 'queued' || entry.status.kind === 'downloading'
 
-const paused = (entry: DownloadEntry, { message }: { message: string | null }): DownloadEntry =>
+const paused = (entry: DownloadEntry, { reason }: { reason: PauseReason }): DownloadEntry =>
   isPausable(entry)
-    ? withStatus(entry, { status: { kind: 'paused', bytes: bytesOf(entry), message } })
+    ? withStatus(entry, { status: { kind: 'paused', bytes: bytesOf(entry), reason } })
     : entry
 
 export const pause = (
   state: DownloadsState,
-  { downloadId, message }: { downloadId: string; message: string | null },
+  { downloadId, reason }: { downloadId: string; reason: PauseReason },
 ): DownloadsState =>
-  changeEntry(state, { downloadId, change: (entry) => paused(entry, { message }) })
+  changeEntry(state, { downloadId, change: (entry) => paused(entry, { reason }) })
 
 export const pauseServer = (
   state: DownloadsState,
-  { serverId, message }: { serverId: string; message: string | null },
+  { serverId, reason }: { serverId: string; reason: PauseReason },
 ): DownloadsState => {
   const isTouched = (entry: DownloadEntry): boolean =>
     entry.serverId === serverId && isPausable(entry)
   if (!state.entries.some(isTouched)) return state
   return {
     ...state,
-    entries: state.entries.map((entry) => (isTouched(entry) ? paused(entry, { message }) : entry)),
+    entries: state.entries.map((entry) => (isTouched(entry) ? paused(entry, { reason }) : entry)),
+  }
+}
+
+/** Whether a file waits on an outage, which the queue tries again on its own. */
+export const isWaitingOnOutage = ({ status }: DownloadEntry): boolean =>
+  (status.kind === 'paused' || status.kind === 'failed') && status.reason === 'unreachable'
+
+/**
+ * The viewer's Pause all: what runs or waits pauses, and so does what waits on an outage, or
+ * the outage retry would start it again. A relocked file keeps its reason, so it still unlocks.
+ */
+export const pauseEverything = (state: DownloadsState): DownloadsState => {
+  const isTouched = (entry: DownloadEntry): boolean => isPausable(entry) || isWaitingOnOutage(entry)
+  if (!state.entries.some(isTouched)) return state
+  return {
+    ...state,
+    entries: state.entries.map((entry) =>
+      isTouched(entry)
+        ? withStatus(entry, { status: { kind: 'paused', bytes: bytesOf(entry), reason: 'viewer' } })
+        : entry,
+    ),
   }
 }
 
@@ -202,16 +244,23 @@ export const resume = (
         : entry,
   })
 
+/** `message` is the words of an `other` failure; every other reason says it all and keeps none. */
 export const fail = (
   state: DownloadsState,
-  { downloadId, message }: { downloadId: string; message: string },
+  {
+    downloadId,
+    reason,
+    message = '',
+  }: { downloadId: string; reason: FailReason; message?: string },
 ): DownloadsState =>
   changeEntry(state, {
     downloadId,
     change: (entry) =>
       entry.status.kind === 'ready'
         ? entry
-        : withStatus(entry, { status: { kind: 'failed', bytes: bytesOf(entry), message } }),
+        : withStatus(entry, {
+            status: { kind: 'failed', bytes: bytesOf(entry), reason, message },
+          }),
   })
 
 export const finish = (
@@ -232,6 +281,9 @@ export const remove = (
     ? { ...state, entries: state.entries.filter((entry) => entry.downloadId !== downloadId) }
     : state
 
+export const removeAll = (state: DownloadsState): DownloadsState =>
+  state.entries.length === 0 ? state : { ...state, entries: [] }
+
 export const removeServer = (
   state: DownloadsState,
   { serverId }: { serverId: string },
@@ -239,6 +291,19 @@ export const removeServer = (
   const kept = state.entries.filter((entry) => entry.serverId !== serverId)
   return kept.length === state.entries.length ? state : { ...state, entries: kept }
 }
+
+/** The subtitles a finished download keeps beside its video. */
+export const setSidecars = (
+  state: DownloadsState,
+  { downloadId, sidecars }: { downloadId: string; sidecars: readonly Sidecar[] },
+): DownloadsState =>
+  changeEntry(state, {
+    downloadId,
+    change: (entry) =>
+      entry.sidecars.length === 0 && sidecars.length === 0
+        ? entry
+        : { ...entry, sidecars: [...sidecars] },
+  })
 
 export const setAutoDelete = (
   state: DownloadsState,

@@ -36,23 +36,23 @@ describe('loadDownloads', () => {
     expect(DOWNLOADS_DEBOUNCE_MS).toBe(1000)
   })
 
-  it('loads EMPTY_DOWNLOADS for a missing file', async () => {
+  it('loads EMPTY_DOWNLOADS for a missing file, and set nothing aside', async () => {
     const { fs, files } = createFakeFs()
-    expect(await load(fs)).toEqual(EMPTY_DOWNLOADS)
+    expect(await load(fs)).toEqual({ state: EMPTY_DOWNLOADS, wasSetAside: false })
     expect(files.size).toBe(0)
   })
 
-  it('keeps an unreadable file as .corrupt-<now> and loads empty', async () => {
+  it('keeps an unreadable file as .corrupt-<now>, loads empty and says it set one aside', async () => {
     const { fs, files } = createFakeFs({ [FILE]: '{"version":1,' })
-    expect(await load(fs)).toEqual(EMPTY_DOWNLOADS)
+    expect(await load(fs)).toEqual({ state: EMPTY_DOWNLOADS, wasSetAside: true })
     expect(files.has(FILE)).toBe(false)
     expect(files.get(`${FILE}.corrupt-${NOW}`)).toBe('{"version":1,')
   })
 
-  it('keeps valid JSON of the wrong shape', async () => {
+  it('keeps valid JSON of the wrong shape, and says it set one aside', async () => {
     const text = JSON.stringify({ version: 1, entries: [{ status: { kind: 'stalled' } }] })
     const { fs, files } = createFakeFs({ [FILE]: text })
-    expect(await load(fs)).toEqual(EMPTY_DOWNLOADS)
+    expect(await load(fs)).toEqual({ state: EMPTY_DOWNLOADS, wasSetAside: true })
     expect(files.get(`${FILE}.corrupt-${NOW}`)).toBe(text)
   })
 
@@ -79,6 +79,6 @@ describe('loadDownloads', () => {
       ],
     })
     const { fs } = createFakeFs({ [FILE]: JSON.stringify(written) })
-    expect(await load(fs)).toEqual(written)
+    expect(await load(fs)).toEqual({ state: written, wasSetAside: false })
   })
 })

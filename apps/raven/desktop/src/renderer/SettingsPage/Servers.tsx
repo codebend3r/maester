@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button, KEYS } from '@raven/ui'
+import { useDownloads } from '@/renderer/desktop/downloadsApi'
 import { SERVERS_KEY, useServers } from '@/renderer/desktop/serverApi'
 import styles from '@/renderer/SettingsPage/Servers.module.scss'
 import { RECENTS_KEY } from '@/renderer/Shell/openReply'
@@ -54,8 +55,16 @@ const focus = (element: HTMLElement | null) => {
   if (element !== null) element.focus()
 }
 
+/** Removing a server deletes its downloads too, so the question says so when it has any. */
+const removalQuestion = ({ name, downloads }: { name: string; downloads: number }): string => {
+  const signsOut = `Remove ${name}? This signs raven player out of it`
+  if (downloads === 0) return `${signsOut}.`
+  return `${signsOut} and deletes its ${downloads} ${downloads === 1 ? 'download' : 'downloads'}.`
+}
+
 const ServerRow = ({
   server,
+  downloads,
   mode,
   renameRefusalId,
   removeRefusalId,
@@ -64,6 +73,8 @@ const ServerRow = ({
   onRemove,
 }: {
   server: ServerView
+  /** How many downloads raven player keeps from this server. */
+  downloads: number
   mode: RowMode
   /** The section's alert, while it speaks of this row's rename. */
   renameRefusalId: string | null
@@ -148,7 +159,7 @@ const ServerRow = ({
         return (
           <div className={styles.confirm}>
             <p id={questionId} className={styles.question}>
-              Remove {server.name}? This signs raven player out of it.
+              {removalQuestion({ name: server.name, downloads })}
             </p>
             <div className={styles.confirmActions}>
               <Button
@@ -205,6 +216,7 @@ export const Servers = ({ className }: { className?: string }) => {
   const { client } = useDesktop()
   const queryClient = useQueryClient()
   const servers = useServers()
+  const downloads = useDownloads()
   const heading = useRef<HTMLHeadingElement>(null)
   const addressField = useRef<HTMLInputElement>(null)
   const isAddingNow = useRef(false)
@@ -337,6 +349,8 @@ export const Servers = ({ className }: { className?: string }) => {
   }
 
   const list = servers.data ?? null
+  const downloadsOf = (serverId: string): number =>
+    (downloads.data?.downloads ?? []).filter((view) => view.serverId === serverId).length
   const isAddRefused = refusal !== null && refusal.about.kind === ABOUT_KINDS.add
 
   return (
@@ -359,6 +373,7 @@ export const Servers = ({ className }: { className?: string }) => {
               <ServerRow
                 key={server.serverId}
                 server={server}
+                downloads={downloadsOf(server.serverId)}
                 mode={mode}
                 renameRefusalId={
                   mode === ROW_MODES.rename
