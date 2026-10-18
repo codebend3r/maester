@@ -18,7 +18,8 @@
 #
 # `build` is CI's, run after every merge into main: it tags HEAD vX.Y.Z.N, the
 # Nth build of X.Y.Z, and writes nothing, since four numbers are not semver and
-# the files stay at X.Y.Z. A build tag counts as its X.Y.Z, so the next bump
+# the files stay at X.Y.Z. N is the number of commits on main since vX.Y.Z, so
+# merges that build at the same time each get their own. A build tag counts as its X.Y.Z, so the next bump
 # drops the build number: 0.3.1.5 patch -> 0.3.2.
 set -euo pipefail
 
@@ -119,8 +120,11 @@ case "$target" in
     ;;
   build)
     [ "$current" = "$major.$minor.$patch" ] || die "$current is a prerelease; only X.Y.Z releases get builds"
-    builds=$(git tag --list "v$current.*" | sed -n "s/^v${current//./\\.}\.\([1-9][0-9]*\)$/\1/p")
-    next="$current.$(($(sort -n <<< "${builds:-0}" | tail -n 1) + 1))"
+    # The merges on top of the release, not the tags already pushed, so a
+    # commit's build number is the same whatever order its runs finish in.
+    merges=$(git rev-list --count --first-parent "v$current..HEAD" 2>/dev/null) \
+      || die "v$current is not reachable from HEAD; run git fetch --tags"
+    next="$current.$merges"
     ;;
   *)
     next=${target#v}

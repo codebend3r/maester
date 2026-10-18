@@ -17,10 +17,9 @@ on:
 permissions:
   contents: read
 
-# Every merge gets checked, so queue runs rather than cancelling them.
-concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: false
+# No concurrency group: GitHub keeps one pending run per group and cancels the
+# rest, and every merge has to finish and get its tag. A build number is the
+# merge's place in main (scripts/bump_version.sh), so runs can overlap.
 
 jobs:
   # Worked out before anything is built, since the images carry it; tagged
@@ -135,6 +134,7 @@ jobs:
       IMAGE: raven:ci
       PUBLISHED: ghcr.io/${{ github.repository_owner }}/raven
       VERSION: ${{ needs.version.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
     # Every build is published, even one whose merge left raven's code alone:
     # the image carries the build's version, which raven's side menu shows, so
     # each tag reaches Vhagar.
@@ -160,6 +160,13 @@ jobs:
           docker tag "$IMAGE" "$PUBLISHED:latest"
           docker push "$PUBLISHED:$VERSION"
           docker push "$PUBLISHED:$GITHUB_SHA"
+          # Runs overlap, so an older merge can finish after a newer one;
+          # only the tip of main may move :latest, or Vhagar would roll back.
+          tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$tip" != "$GITHUB_SHA" ]; then
+            echo "$GITHUB_SHA is no longer the tip of main, so :latest stays."
+            exit 0
+          fi
           docker push "$PUBLISHED:latest"
 
   # Netlify builds every push to main by itself, before the tag exists, so it
