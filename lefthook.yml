@@ -42,5 +42,5 @@ pre-push:
 
     # Last, once every deterministic check has passed: Claude Code reads the
     # commits being pushed against CLAUDE.md for the rules no linter checks.
-    # - name: 🧭 CLAUDE.md audit
-    #   run: bash scripts/audit_claude_md.sh
+    - name: 🧭 CLAUDE.md audit
+      run: bash scripts/audit_claude_md.sh
