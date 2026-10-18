@@ -1,4 +1,5 @@
 import { RATING_SOURCES, type Rating, type RatingSource } from '@raven/core'
+import { RATING_SOURCE_LABELS } from '@/lib/ratingSources'
 import styles from '@/components/RatingPanel/RatingPanel.module.scss'
 
 /** Every source, in the order the panel lists them. */
@@ -19,40 +20,40 @@ const outOfTen = (rating: Rating): string => rating.value.toFixed(1)
  */
 const SOURCES = {
   rottenTomatoes: {
-    site: 'Rotten Tomatoes',
+    site: RATING_SOURCE_LABELS.rottenTomatoes,
     label: 'Tomatometer',
     meaning: 'Critics who reviewed it positively',
     score: percent,
     shown: '%',
     spoken: '%',
-    colour: styles.rottenTomatoes,
+    className: styles.rottenTomatoes,
   },
   imdb: {
-    site: 'IMDb',
+    site: RATING_SOURCE_LABELS.imdb,
     label: 'IMDb',
     meaning: 'Average user rating',
     score: outOfTen,
     shown: '/10',
     spoken: ' out of 10',
-    colour: styles.imdb,
+    className: styles.imdb,
   },
   metacritic: {
-    site: 'Metacritic',
+    site: RATING_SOURCE_LABELS.metacritic,
     label: 'Metascore',
     meaning: 'Weighted critic score',
     score: percent,
     shown: '/100',
     spoken: ' out of 100',
-    colour: styles.metacritic,
+    className: styles.metacritic,
   },
   tmdb: {
-    site: 'TMDB',
+    site: RATING_SOURCE_LABELS.tmdb,
     label: 'TMDB',
     meaning: 'Average user rating',
     score: outOfTen,
     shown: '/10',
     spoken: ' out of 10',
-    colour: styles.tmdb,
+    className: styles.tmdb,
   },
 } as const satisfies Record<
   RatingSource,
@@ -63,7 +64,7 @@ const SOURCES = {
     score: (rating: Rating) => string
     shown: string
     spoken: string
-    colour: string | undefined
+    className: string | undefined
   }
 >
 
@@ -74,7 +75,7 @@ const RatingItem = ({ rating }: { rating: Rating }) => {
   const score = source.score(rating)
   return (
     <li
-      className={`${styles.item} ${source.colour}`}
+      className={`${styles.item} ${source.className}`}
       // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focus is how the keyboard reaches the tooltip
       tabIndex={0}
       aria-label={`${source.site}: ${score}${source.spoken}. ${source.meaning}.`}
@@ -89,7 +90,7 @@ const RatingItem = ({ rating }: { rating: Rating }) => {
       <span className={styles.label} aria-hidden="true">
         {source.label}
       </span>
-      <span role="tooltip" className={styles.tooltip}>
+      <span className={styles.tooltip} aria-hidden="true">
         <span className={styles.site}>{source.site}</span>
         <span>{source.meaning}</span>
       </span>

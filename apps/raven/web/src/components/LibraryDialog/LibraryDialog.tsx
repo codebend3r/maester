@@ -9,7 +9,6 @@ import {
   METADATA_SERVICE_STATES,
   PATH_LAYOUTS,
   type PathLayout,
-  type RatingSource,
   defaultLibrarySettings,
   isLibraryKind,
   isRatingSource,
@@ -26,14 +25,8 @@ import { api } from '@/lib/api'
 import { KINDS, libraryIconOf } from '@/lib/libraryKinds'
 import { afterLibrarySaved } from '@/lib/invalidate'
 import { lockQuery, metadataHealthQuery } from '@/lib/queries'
+import { RATING_SOURCE_LABELS } from '@/lib/ratingSources'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
-
-const RATINGS_LABELS: Record<RatingSource, string> = {
-  tmdb: 'TMDB',
-  imdb: 'IMDb',
-  rottenTomatoes: 'Rotten Tomatoes',
-  metacritic: 'Metacritic',
-}
 
 /** What Edit library calls each way a path was read. */
 const pathLayoutLabel = ({
@@ -408,7 +401,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                 >
                   {isRatingSource.values.map((source) => (
                     <option key={source} value={source}>
-                      {RATINGS_LABELS[source]}
+                      {RATING_SOURCE_LABELS[source]}
                     </option>
                   ))}
                 </select>

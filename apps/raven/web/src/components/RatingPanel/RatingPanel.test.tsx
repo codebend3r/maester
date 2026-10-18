@@ -37,15 +37,18 @@ describe('RatingPanel', () => {
     ])
   })
 
-  it('names the source and its meaning in a tooltip, and the label under the score', () => {
+  it('names the source and its meaning in a visual tooltip, and the label under the score', () => {
     render(
       <RatingPanel
         ratings={[{ source: 'rottenTomatoes', kind: 'critic', value: 9.2, votes: null }]}
       />,
     )
     const item = screen.getByRole('listitem')
-    const tooltip = within(item).getByRole('tooltip', { hidden: true })
-    expect(tooltip).toHaveTextContent('Rotten TomatoesCritics who reviewed it positively')
+    const meaning = within(item).getByText('Critics who reviewed it positively')
+    expect(meaning.parentElement).toHaveTextContent(
+      'Rotten TomatoesCritics who reviewed it positively',
+    )
+    expect(meaning.parentElement).toHaveAttribute('aria-hidden', 'true')
     expect(item).toHaveTextContent('Tomatometer')
   })
 

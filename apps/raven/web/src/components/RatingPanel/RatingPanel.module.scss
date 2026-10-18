@@ -1,5 +1,4 @@
-// The scores in one frame, side by side, divided by hairlines. Glass over
-// the backdrop, so it follows the theme's ground.
+// Glass keeps the scores readable over an item's backdrop.
 .panel {
   display: grid;
   grid-auto-flow: column;
@@ -8,13 +7,11 @@
   max-width: 100%;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-night) 55%, transparent);
+  background: var(--color-night-wash);
   backdrop-filter: blur(12px);
 
-  // Two to a row, where four will not fit. A tooltip would be clipped by
-  // the frame here, and a touch screen has no hover, so the label and the
-  // list item's own label carry the source.
-  @media (max-width: 30rem) {
+  // The label and the item's own label replace the clipped tooltip here.
+  @container (max-width: 30rem) {
     grid-auto-flow: row;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
@@ -22,21 +19,20 @@
   }
 }
 
-// One source. Its colour is set by the class beside this one.
 .item {
   position: relative;
   display: grid;
   gap: var(--space-1);
-  padding: var(--space-2) 1.125rem 0.75rem;
+  padding: var(--space-2) var(--space-3);
   outline: none;
 
   @media (prefers-reduced-motion: no-preference) {
-    transition: background-color 150ms ease;
+    transition: background-color 150ms var(--ease-out);
   }
 
   &:hover,
   &:focus-visible {
-    background: color-mix(in srgb, var(--color-bark) 8%, transparent);
+    background: var(--color-hover);
   }
 
   &:focus-visible {
@@ -60,8 +56,7 @@
     border-radius: calc(var(--radius-lg) - 1px);
   }
 
-  @media (max-width: 30rem) {
-    padding-inline: var(--space-3);
+  @container (max-width: 30rem) {
     border-radius: 0;
 
     &:first-child,
@@ -101,34 +96,33 @@
   grid-auto-flow: column;
   justify-content: start;
   align-items: baseline;
-  gap: 0.1875rem;
+  gap: var(--space-0);
 }
 
 .value {
   font-family: var(--font-display);
-  font-size: 1.625rem;
+  font-size: var(--font-size-xl);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
-  line-height: 1;
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--line-heading);
 }
 
 .scale {
   color: var(--color-lichen);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-xs);
 }
 
-// The score as a share of the bar, in the source's own colour.
 .track {
   height: 3px;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--color-bark) 14%, transparent);
   overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-track);
 }
 
 .fill {
   display: block;
   height: 100%;
-  border-radius: 2px;
+  border-radius: var(--radius-pill);
   background: var(--source-colour);
 }
 
@@ -136,7 +130,7 @@
   color: var(--color-birch);
   font-size: var(--font-size-xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -149,19 +143,18 @@
   left: 50%;
   z-index: 10;
   display: grid;
-  gap: 0.125rem;
-  padding: var(--space-2) 0.875rem;
-  border-radius: 10px;
+  gap: var(--space-0);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
   background: var(--color-bark);
   box-shadow: var(--shadow-menu);
   color: var(--color-night);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-xs);
   white-space: nowrap;
   pointer-events: none;
   translate: -50% 0;
   visibility: hidden;
 
-  // The arrow points down at the item.
   &::after {
     content: '';
     position: absolute;
@@ -169,8 +162,8 @@
     left: 50%;
     width: 10px;
     height: 10px;
-    margin: -5px 0 0 -5px;
     background: var(--color-bark);
+    translate: -50% -50%;
     rotate: 45deg;
   }
 
@@ -179,7 +172,7 @@
     translate: 0 0;
 
     &::after {
-      left: 1.5rem;
+      left: var(--space-4);
     }
   }
 
@@ -189,8 +182,9 @@
     translate: 0 0;
 
     &::after {
+      right: var(--space-4);
       left: auto;
-      right: 1.5rem;
+      translate: 50% -50%;
     }
   }
 
@@ -199,7 +193,7 @@
     visibility: visible;
   }
 
-  @media (max-width: 30rem) {
+  @container (max-width: 30rem) {
     display: none;
   }
 }

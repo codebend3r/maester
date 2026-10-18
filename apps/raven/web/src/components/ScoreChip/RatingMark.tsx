@@ -1,6 +1,6 @@
 import { RATING_SOURCES, type Rating, type RatingSource } from '@raven/core'
 import type { ReactNode } from 'react'
-import styles from '@/components/RatingMark/RatingMark.module.scss'
+import styles from '@/components/ScoreChip/RatingMark.module.scss'
 
 /** A fresh tomato at 60% or more, a splat below. */
 export const isFresh = (rating: Rating): boolean => rating.value >= 6

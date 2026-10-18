@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { render, screen } from '@testing-library/react'
-import { ScoreChip, ratingLabel } from '@/components/RatingChips/RatingChips'
+import { ScoreChip, ratingLabel } from '@/components/ScoreChip/ScoreChip'
 
 describe('ScoreChip', () => {
   it('labels the score for a screen reader', () => {
