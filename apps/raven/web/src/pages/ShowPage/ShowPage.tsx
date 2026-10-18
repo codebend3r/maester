@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import {
+  DOWNLOAD_TARGET_KINDS,
   ITEM_TYPES,
   type ItemDetails,
   TITLE_DISPLAYS,
@@ -174,7 +175,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
             <FavouriteButton isFavourite={details.favourite} onToggle={favourite.mutate} />
           )}
           {episodeCount > 0 && <ShuffleButton itemId={details.id}>Shuffle</ShuffleButton>}
-          <DownloadButton target={{ kind: 'item', itemId: details.id }} />
+          <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.item, itemId: details.id }} />
           <WatchedToggle {...toggle} />
           <SelectButton />
         </ItemHeader>

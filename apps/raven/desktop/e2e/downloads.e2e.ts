@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { type DownloadTarget, downloadLinkFor, formatBytes } from '@raven/core'
+import {
+  DOWNLOAD_TARGET_KINDS,
+  type DownloadTarget,
+  downloadLinkFor,
+  formatBytes,
+} from '@raven/core'
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test'
 import { makeClips, makeTrackClip } from '@/e2e/clips'
 import {
@@ -287,7 +292,7 @@ test.describe.serial('downloading through a media origin', () => {
           app,
           page,
           fixture,
-          target: { kind: 'media', mediaId: FIXTURE_MEDIA.first },
+          target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: FIXTURE_MEDIA.first },
           question: `Download Fixture One (1 movie, ${formatBytes(size)}) from ${hostOf({ fixture })}?`,
         })
         await openDownloads({ page })
@@ -364,7 +369,7 @@ test.describe.serial('downloading through a media origin', () => {
           app,
           page,
           fixture,
-          target: { kind: 'media', mediaId: FIXTURE_MEDIA.second },
+          target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: FIXTURE_MEDIA.second },
           question: `Download ${label} (1 movie, ${formatBytes(size)})`,
         })
         await openDownloads({ page })
@@ -522,7 +527,7 @@ test.describe.serial('downloading through the server', () => {
           app,
           page,
           fixture,
-          target: { kind: 'media', mediaId: FIXTURE_MEDIA.first },
+          target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: FIXTURE_MEDIA.first },
           question: `Download Fixture One (1 movie, ${formatBytes(size)})`,
         })
         await openDownloads({ page })
@@ -560,7 +565,7 @@ test.describe.serial('downloading through the server', () => {
             app,
             page,
             fixture,
-            target: { kind: 'item', itemId: FIXTURE_ITEMS.season },
+            target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: FIXTURE_ITEMS.season },
             question: `(2 episodes, ${formatBytes(bytes)})`,
           })
           await expect(downloadsButton({ page, count: 2 })).toBeVisible()

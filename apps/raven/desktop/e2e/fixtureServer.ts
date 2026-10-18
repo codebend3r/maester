@@ -201,6 +201,9 @@ const SAGAS_PATH = `${LIBRARY_PATH}/sagas`
 // What a media origin serves for a ticket: a title's file and its sidecar.
 const MEDIA_PLANE_ROUTE = /^\/api\/media\/(\d+)\/(file|subtitles\/external-0)$/u
 
+/** What `MEDIA_PLANE_ROUTE` captures for a title's file; anything else it matches is the sidecar. */
+const MEDIA_PLANE_FILE = 'file'
+
 const fileOf = (mediaId: number) => `/api/media/${mediaId}/file`
 
 /** The ticket the fixture issues for a title, and the only one its media origin takes for it. */
@@ -836,7 +839,7 @@ export const startFixtureServer = async ({
     if (query.get(TICKET_PARAM) !== ticketFor(mediaId)) {
       return sendJson({ response, status: 401, body: { message: 'That ticket is not valid.' } })
     }
-    if (route[2] !== 'file') return sendSidecar(response)
+    if (route[2] !== MEDIA_PLANE_FILE) return sendSidecar(response)
     return sendFile({ request, response, path: title.path, bytes: title.bytes })
   }
 
