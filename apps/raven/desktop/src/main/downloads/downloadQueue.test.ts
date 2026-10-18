@@ -137,6 +137,7 @@ const setup = ({
   const failed: DownloadEntry[] = []
   const dropped: (readonly DownloadEntry[])[] = []
   const warnings: string[] = []
+  const wakes = { settled: 0 }
   const queue = createDownloadQueue({
     store,
     serverOf: (serverId) => servers.find((server) => server.id === serverId) ?? null,
@@ -156,6 +157,9 @@ const setup = ({
     onFinished: (entry) => finished.push(entry),
     onFailed: (entry) => failed.push(entry),
     onRemoved: (removed) => dropped.push(removed),
+    onAwake: () => {
+      wakes.settled += 1
+    },
   })
   const statusOf = (n: number) => entryById(store.read(), { downloadId: idOf(n) })?.status ?? null
   /** Runs the timers set for `ms`, and only those. */
@@ -175,6 +179,7 @@ const setup = ({
     failed,
     dropped,
     warnings,
+    wakes,
     pending,
     statusOf,
     fireAfter,
@@ -1183,6 +1188,16 @@ describe('a sleep', () => {
     await until(() => world.network.fileRequests().length === 2)
     expect(world.network.fileRequests()[1]?.headers).toEqual({ Range: 'bytes=4-' })
     expect(world.media.forgotten).toContain(SERVER_ID)
+  })
+
+  it('says the wake has settled once, after the settle and not before', () => {
+    const world = setup()
+    world.queue.onSuspend()
+    world.queue.onResume()
+    world.queue.onResume()
+    expect(world.wakes.settled).toBe(0)
+    world.fireAfter(RESUME_SETTLE_MS)
+    expect(world.wakes.settled).toBe(1)
   })
 
   it('requeues on the wake what waits on an outage', async () => {

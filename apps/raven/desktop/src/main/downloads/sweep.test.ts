@@ -5,6 +5,7 @@ import {
   NO_PENDING,
   type DownloadEntry,
   type DownloadsState,
+  type Owed,
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { removeFolder, sweepDownloads } from '@/main/downloads/sweep'
@@ -59,14 +60,16 @@ const memoryStore = (initial: DownloadsState): DownloadsStore => {
 
 const setup = ({
   entries = [],
+  owed = [],
   disk = {},
   servers = SERVERS,
 }: {
   entries?: DownloadEntry[]
+  owed?: Owed[]
   disk?: Record<string, number>
   servers?: ServerEntry[]
 } = {}) => {
-  const store = memoryStore({ ...EMPTY_DOWNLOADS, entries })
+  const store = memoryStore({ ...EMPTY_DOWNLOADS, entries, owed })
   const drive = fakeDisk(disk)
   const warnings: string[] = []
   const dropped: (readonly DownloadEntry[])[] = []
@@ -114,6 +117,18 @@ describe('sweepDownloads', () => {
     expect(world.dropped.map((entries) => entries.map(({ downloadId }) => downloadId))).toEqual([
       [idOf(9)],
     ])
+  })
+
+  it('finishes the removal of a server no longer kept: its downloads owe it nothing and its owed goes', async () => {
+    const pending = { play: true, position: 750, furthest: 750, at: 5 }
+    const kept: Owed = { serverId: SERVER_ID, mediaId: 4, pending }
+    const world = setup({
+      entries: [entryFor(1, { pending }), entryFor(9, { serverId: GONE_SERVER_ID, pending })],
+      owed: [kept, { serverId: GONE_SERVER_ID, mediaId: 3, pending }],
+    })
+    await world.sweep({ wasSetAside: false })
+    expect(world.store.read().entries.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
+    expect(world.store.read().owed).toEqual([kept])
   })
 
   it('drops nothing and removes no server folder when the config holds no server', async () => {

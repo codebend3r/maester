@@ -240,6 +240,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   ): Promise<DesktopReply> => {
     const file = grants.fileOf(request.fileId)
     if (file === null) return refused(MESSAGES.notOpen)
+    // A grant outlives its download, so a play queue can reach a deleted one: it is missing,
+    // and must not rejoin Home's recents before its load fails.
+    if (deps.downloads.isStaleDownload({ path: file.path })) return refused(MESSAGES.missing)
     store.update((state) => addRecent({ state, path: file.path, at: now() }))
     // A download's file is video.<container> in a folder named by its media id, and stays listed
     // after a delete, so File > Open Recent leaves it to Home's recents.
@@ -521,6 +524,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   const handleRequest = async (request: DesktopRequest): Promise<DesktopReply> => {
     switch (request.type) {
       case DESKTOP_REQUESTS.ready:
+        deps.downloads.pageReady()
         deps.onReady()
         return DONE
       case DESKTOP_REQUESTS.openDialog:
@@ -606,6 +610,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return deps.downloads.showFolder()
       case DESKTOP_REQUESTS.openDownload:
         return deps.downloads.open({ downloadId: request.downloadId })
+      case DESKTOP_REQUESTS.playbackLeft:
+        deps.downloads.playbackLeft({ fileId: request.fileId })
+        return DONE
       default: {
         const unreachable: never = request
         return unreachable

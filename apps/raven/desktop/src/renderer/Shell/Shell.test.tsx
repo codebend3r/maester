@@ -6,6 +6,7 @@ import { DOWNLOADS_KEY } from '@/renderer/desktop/downloadsApi'
 import { useDragging } from '@/renderer/stores/dragging'
 import { useNotice } from '@/renderer/stores/notice'
 import { useUpdateNotice } from '@/renderer/stores/updateNotice'
+import { DL_5, viewOf } from '@/renderer/test/downloadFakes'
 import { fakeClient, renderDesktop, STUB_ROUTES } from '@/renderer/test/render'
 import { DESKTOP_REQUESTS } from '@/shared/protocol'
 
@@ -184,6 +185,30 @@ describe('Shell', () => {
       downloads: [],
       autoDeleteDefault: true,
     })
+  })
+
+  it("lists Home's recents again when a downloads event drops a download, not for progress", async () => {
+    const client = fakeClient()
+    renderDesktop({ client, routes: STUB_ROUTES })
+    await settled()
+    const listings = () =>
+      client.request.mock.calls.filter(([request]) => request.type === 'listRecents').length
+    expect(listings()).toBe(1)
+    const ready = viewOf({ downloadId: DL_5, status: { kind: 'ready' } })
+    const downloading = viewOf({ status: { kind: 'downloading', bytes: 1 } })
+    await client.emit({
+      type: 'downloads',
+      downloads: [ready, downloading],
+      autoDeleteDefault: false,
+    })
+    await client.emit({
+      type: 'downloads',
+      downloads: [ready, { ...downloading, status: { kind: 'downloading', bytes: 2 } }],
+      autoDeleteDefault: false,
+    })
+    expect(listings()).toBe(1)
+    await client.emit({ type: 'downloads', downloads: [downloading], autoDeleteDefault: false })
+    await waitFor(() => expect(listings()).toBe(2))
   })
 
   it('shows a notice in a status region, then clears it after six seconds', async () => {

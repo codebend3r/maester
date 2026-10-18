@@ -5,6 +5,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query'
 import { useDesktop } from '@/renderer/stores/desktop'
+import { RECENTS_KEY } from '@/renderer/Shell/openReply'
 import { useNotice } from '@/renderer/stores/notice'
 import {
   DESKTOP_REPLIES,
@@ -48,28 +49,33 @@ const setDownloads = ({ queryClient, event }: ListChange) =>
     autoDeleteDefault: event.autoDeleteDefault,
   })
 
-/** A file finished or left the list: what moves the disk's numbers, unlike progress. */
-const movesDisk = ({ before, after }: { before: DownloadView[]; after: DownloadView[] }) => {
+type ListMove = { before: DownloadView[]; after: DownloadView[] }
+
+const dropsAny = ({ before, after }: ListMove): boolean => {
   const kept = new Set(after.map((view) => view.downloadId))
+  return before.some((view) => !kept.has(view.downloadId))
+}
+
+const finishesAny = ({ before, after }: ListMove): boolean => {
   const wasReady = new Set(
     before.filter((view) => view.status.kind === 'ready').map((view) => view.downloadId),
   )
-  return (
-    before.some((view) => !kept.has(view.downloadId)) ||
-    after.some((view) => view.status.kind === 'ready' && !wasReady.has(view.downloadId))
-  )
+  return after.some((view) => view.status.kind === 'ready' && !wasReady.has(view.downloadId))
 }
 
 /**
  * What main pushes when a download changes: it replaces what the list holds. The disk is read
- * again only when a file finished or left, never for progress, which comes four times a second.
+ * again only when a file finished or left, never for progress, which comes four times a second,
+ * and Home's recents only when one left, as one deleted once watched leaves them too.
  */
 export const applyDownloadsEvent = ({ queryClient, event }: ListChange) => {
   const before = queryClient.getQueryData<DownloadsData>(DOWNLOADS_KEY)?.downloads ?? []
   setDownloads({ queryClient, event })
-  if (!movesDisk({ before, after: event.downloads })) return
-  // Not awaited, and it cannot reject: the line follows the disk's read.
-  void queryClient.invalidateQueries({ queryKey: SPACE_KEY })
+  const move = { before, after: event.downloads }
+  const isDropped = dropsAny(move)
+  // Neither is awaited, and neither can reject: each list follows its own read.
+  if (isDropped) void queryClient.invalidateQueries({ queryKey: RECENTS_KEY })
+  if (isDropped || finishesAny(move)) void queryClient.invalidateQueries({ queryKey: SPACE_KEY })
 }
 
 /** The disk raven player keeps its downloads on. */

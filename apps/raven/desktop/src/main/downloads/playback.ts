@@ -1,4 +1,4 @@
-import { relative, sep } from 'node:path'
+import { isAbsolute, relative, sep } from 'node:path'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   entryById,
@@ -20,6 +20,7 @@ import {
   forgetResume,
   type PlayerState,
   removeRecent,
+  resumeFor,
   watchedShare,
 } from '@/main/playerState'
 import { loggable } from '@/main/servers/serverCalls'
@@ -44,6 +45,8 @@ export type DownloadPlaybackDeps = {
   announce: () => void
   /** A position was recorded as pending for this download, so the server is owed it. */
   onNoted: (input: { downloadId: string }) => void
+  /** The player left the download it was on, for another file or for nothing of this computer's. */
+  onLeft: () => void
 }
 
 export type DownloadPlayback = {
@@ -65,21 +68,47 @@ export type DownloadPlayback = {
   /** The title of the download whose video is at `path`, else null. */
   labelOf: (input: { path: string }) => string | null
   /**
+   * Whether `path` lies in the downloads folder but is no download's video: a deleted download
+   * that a play queue still holds a grant for, since a grant outlives its download.
+   */
+  isStaleDownload: (input: { path: string }) => boolean
+  /**
    * Where the server had a granted download when it was confirmed, for a file with no local
    * resume spot; 0 once a position was noted here, and for any other file.
    */
   serverPositionOf: (input: { fileId: string }) => number
-  /** The page opened a granted file: the next position noted for a download's video is a play. */
+  /**
+   * The page opened a granted file: the page is on it, and the next position noted for a
+   * download's video is a play.
+   */
   noteOpened: (input: { fileId: string }) => void
   /** A position saved for a granted file; for a download's video, what the server will hear. */
   notePosition: (input: { fileId: string; position: number; duration: number | null }) => void
-  /** What the player loaded: a granted file, or nothing of this computer's (a server title, Home). */
+  /**
+   * What the engine loaded: a granted file, or nothing of this computer's (a server title, the
+   * player hiding for Home).
+   */
   notePlaying: (input: { fileId: string | null }) => void
+  /** The play page left this file; a page already on the next file stays on it. */
+  playbackLeft: (input: { fileId: string }) => void
+  /** A page said ready: a new page, on no file, though the engine may not have stopped yet. */
+  noteNewPage: () => void
+  /**
+   * Whether the page or the engine is on this download's video, so a deletion waits until
+   * both have left it.
+   */
+  isPlaying: (downloadId: string) => boolean
+  /**
+   * Whether the player would resume this download partway, short of where it counts as
+   * watched: a title scrubbed back from its end is still being watched.
+   */
+  isMidTitle: (downloadId: string) => boolean
   /**
    * A download's share watched, as Home's recents show one: 1 once it is marked watched, else
-   * the share its resume spot gives, null until its file was read.
+   * the share its resume spot gives, null until its file was read. It takes the entry, so the
+   * views read every row's share without searching the list for each.
    */
-  watchedOf: (downloadId: string) => number | null
+  watchedOf: (entry: DownloadEntry) => number | null
   /** Whether the video at `path` is a download marked watched, which Home's recent shows whole. */
   isWatched: (input: { path: string }) => boolean
   /** Reads these ready downloads' files for their share watched, then tells the page. */
@@ -89,6 +118,11 @@ export type DownloadPlayback = {
 }
 
 const refused = (message: string): DesktopReply => ({ type: 'refused', message })
+
+/** A granted file one side of the player is on, and the download whose video it is, if any. */
+type Slot = { fileId: string | null; downloadId: string | null }
+
+const NO_SLOT: Slot = { fileId: null, downloadId: null }
 
 /** Drops these videos' recents and resume spots; the same state when it names none of them. */
 const forgetVideos = (state: PlayerState, { paths }: { paths: readonly string[] }): PlayerState => {
@@ -116,8 +150,12 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   const downloadIdByFile = new Map<string, string>()
   /** Videos opened and not played yet: the first position noted for one is its play. */
   const freshFiles = new Set<string>()
-  /** The download the player loaded, so a deletion can wait until the player leaves it. */
-  const playing: { downloadId: string | null } = { downloadId: null }
+  /**
+   * What the page opened and what the engine loaded, kept apart so neither clears the other:
+   * the engine stopping while the page still plays a file, or the page leaving a file the
+   * engine still has, leaves the download playing.
+   */
+  const playing: { page: Slot; engine: Slot } = { page: NO_SLOT, engine: NO_SLOT }
 
   const videoPathOf = ({ serverId, mediaId, container }: DownloadEntry): string =>
     videoPathFor({ userData: deps.userData, serverId, mediaId, container })
@@ -222,8 +260,30 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     return DOWNLOAD_MESSAGES.downloadedFrom(deps.serverNameOf(serverId))
   }
 
+  const isStaleDownload: DownloadPlayback['isStaleDownload'] = ({ path }) => {
+    const inside = relative(downloadsDirFor({ userData: deps.userData }), path)
+    const isInFolder = inside !== '' && !isAbsolute(inside) && inside.split(sep)[0] !== '..'
+    return isInFolder && entryAt(path) === null
+  }
+
+  const playingIds = (): (string | null)[] => [playing.page.downloadId, playing.engine.downloadId]
+
+  /** Puts one side on a file, or on none, and says so once no side is on a download it was on. */
+  const play = ({ side, fileId }: { side: keyof typeof playing; fileId: string | null }): void => {
+    const before = playingIds()
+    playing[side] = {
+      fileId,
+      downloadId: fileId === null ? null : (entryOfFile(fileId)?.downloadId ?? null),
+    }
+    const now = playingIds()
+    if (before.some((downloadId) => downloadId !== null && !now.includes(downloadId))) {
+      deps.onLeft()
+    }
+  }
+
   const noteOpened: DownloadPlayback['noteOpened'] = ({ fileId }) => {
-    if (entryOfFile(fileId) !== null) freshFiles.add(fileId)
+    play({ side: 'page', fileId })
+    if (playing.page.downloadId !== null) freshFiles.add(fileId)
   }
 
   const notePosition: DownloadPlayback['notePosition'] = ({ fileId, position, duration }) => {
@@ -250,13 +310,26 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     deps.onNoted({ downloadId })
   }
 
-  const notePlaying: DownloadPlayback['notePlaying'] = ({ fileId }) => {
-    playing.downloadId = fileId === null ? null : (entryOfFile(fileId)?.downloadId ?? null)
+  // The page may say it left one file after the next one opened, so only a leave of the file
+  // the page is still on clears it.
+  const playbackLeft: DownloadPlayback['playbackLeft'] = ({ fileId }) => {
+    if (playing.page.fileId === fileId) play({ side: 'page', fileId: null })
   }
 
-  const watchedOf: DownloadPlayback['watchedOf'] = (downloadId) => {
-    if (isMarked(entryById(store.read(), { downloadId }))) return 1
-    const file = factsById.get(downloadId)
+  const isMidTitle: DownloadPlayback['isMidTitle'] = (downloadId) => {
+    const entry = entryById(store.read(), { downloadId })
+    if (entry === null) return false
+    const state = deps.state.read()
+    const path = videoPathOf(entry)
+    // The spot's own facts stand in until the file is read, so a launch need not wait for it.
+    const file = factsById.get(downloadId) ?? state.resume.find((spot) => spot.path === path)
+    if (file === undefined || resumeFor({ state, file }) === 0) return false
+    return (watchedShare({ state, file }) ?? 0) < entry.watchedPercent / 100
+  }
+
+  const watchedOf: DownloadPlayback['watchedOf'] = (entry) => {
+    if (isMarked(entry)) return 1
+    const file = factsById.get(entry.downloadId)
     return file === undefined ? null : watchedShare({ state: deps.state.read(), file })
   }
 
@@ -303,10 +376,15 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     sidecarsOf,
     fromLabelOf,
     labelOf: ({ path }) => entryAt(path)?.label ?? null,
+    isStaleDownload,
     serverPositionOf: ({ fileId }) => entryOfFile(fileId)?.serverPosition ?? 0,
     noteOpened,
     notePosition,
-    notePlaying,
+    notePlaying: ({ fileId }) => play({ side: 'engine', fileId }),
+    playbackLeft,
+    noteNewPage: () => play({ side: 'page', fileId: null }),
+    isPlaying: (downloadId) => playingIds().includes(downloadId),
+    isMidTitle,
     watchedOf,
     isWatched: ({ path }) => isMarked(entryAt(path)),
     readFiles,

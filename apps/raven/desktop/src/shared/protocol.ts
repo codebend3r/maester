@@ -255,6 +255,7 @@ export const DESKTOP_REQUESTS = {
   readSpace: 'readSpace',
   setDownloadDefaults: 'setDownloadDefaults',
   showDownloadsFolder: 'showDownloadsFolder',
+  playbackLeft: 'playbackLeft',
 } as const
 
 /** What the page asks main for. No variant carries a file path; a server call names its server by id. */
@@ -338,6 +339,8 @@ export const isDesktopRequest = union(
   object({ type: oneOf([DESKTOP_REQUESTS.readSpace]) }),
   object({ type: oneOf([DESKTOP_REQUESTS.setDownloadDefaults]), autoDelete: isBoolean }),
   object({ type: oneOf([DESKTOP_REQUESTS.showDownloadsFolder]) }),
+  // The play page left this file, so a deletion waiting for the player to leave it can run.
+  object({ type: oneOf([DESKTOP_REQUESTS.playbackLeft]), fileId: isOpaqueId }),
 )
 
 export type DesktopRequest = Infer<typeof isDesktopRequest>

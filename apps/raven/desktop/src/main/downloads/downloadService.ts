@@ -1,5 +1,6 @@
 import type { ConfigStore } from '@/main/desktopConfig'
 import { createDownloadAsks, type DownloadAsks } from '@/main/downloads/asks'
+import { createAutoDelete, isDueForDeletion } from '@/main/downloads/autoDelete'
 import { DOWNLOAD_MESSAGES, failedMessage, pausedMessage } from '@/main/downloads/downloadMessages'
 import {
   createDownloadQueue,
@@ -67,10 +68,12 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     | 'sidecarsOf'
     | 'fromLabelOf'
     | 'labelOf'
+    | 'isStaleDownload'
     | 'serverPositionOf'
     | 'noteOpened'
     | 'notePosition'
     | 'notePlaying'
+    | 'playbackLeft'
     | 'isWatched'
   > & {
     list: () => DesktopReply
@@ -85,6 +88,12 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     pauseAll: () => Promise<DesktopReply>
     resumeAll: () => DesktopReply
     removeAll: () => Promise<DesktopReply>
+    /**
+     * The page said ready: a new page, on no file, since a reload mid-play left no unmount to
+     * say the page left its file. The first one starts the clocks of what deletes once watched,
+     * so what they tell at launch reaches a page that listens.
+     */
+    pageReady: () => void
     /** Called when a server is removed from raven player (Ruling 17). */
     removeServer: (input: { serverId: string }) => Promise<void>
     showFolder: () => Promise<DesktopReply>
@@ -137,6 +146,29 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   const { store, config } = deps
   const announcing: { timer: unknown } = { timer: undefined }
   let isDisposed = false
+  const firstPage: { ready: () => void } = { ready: () => undefined }
+  const isPageReady = new Promise<void>((resolve) => {
+    firstPage.ready = resolve
+  })
+
+  // Declared before everything that reads it. Its own dependencies are read only once a clock
+  // runs, after construction, so they may come later.
+  const deleteClock = createAutoDelete({
+    store,
+    timers: deps.timers,
+    now: deps.now,
+    isPlaying: (downloadId) => playback.isPlaying(downloadId),
+    isMidTitle: (downloadId) => playback.isMidTitle(downloadId),
+    // The viewer may open the file, or switch the option off, while the removal waits on the
+    // server, so it looks again before it removes.
+    remove: (downloadId) =>
+      removeAfterSync({ downloadId, isKept: () => isKeptAfterAll(downloadId) }),
+    onDeleted: (entry) => {
+      notice(DOWNLOAD_MESSAGES.deletedAfterWatching(entry.label))
+      announce()
+    },
+    warn: deps.warn,
+  })
 
   const serverNameOf = (serverId: string): string =>
     serverById({ config: config.read(), serverId })?.name ?? ''
@@ -153,8 +185,8 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         size: entry.size,
         status: viewStatusOf({ status: entry.status, serverName }),
         autoDelete: entry.autoDelete,
-        watched: playback.watchedOf(entry.downloadId),
-        deletesAt: null,
+        watched: playback.watchedOf(entry),
+        deletesAt: deleteClock.deletesAt({ downloadId: entry.downloadId }),
         needsUnlock: entry.status.kind === 'paused' && entry.status.reason === 'relocked',
       }
     })
@@ -212,7 +244,13 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     serverNameOf,
     change,
     announce,
-    onNoted: sync.touch,
+    // Every position noted may set when the title counts as watched, or clear the spot a held
+    // deletion waits on.
+    onNoted: (input) => {
+      sync.touch(input)
+      deleteClock.schedule(input)
+    },
+    onLeft: () => deleteClock.playbackLeft(),
   })
 
   const queue = createDownloadQueue({
@@ -233,7 +271,13 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
       notice(DOWNLOAD_MESSAGES.downloaded(entry.label))
       playback.readFiles([entry])
     },
-    onRemoved: playback.forget,
+    onRemoved: (entries) => {
+      playback.forget(entries)
+      entries.forEach(({ downloadId }) => deleteClock.cancel({ downloadId }))
+    },
+    // After the settle, so a deletion that came due in the sleep finds the network back and
+    // the server hears what was watched first.
+    onAwake: () => deleteClock.rearm(),
     onFailed: (entry) => {
       const { status } = entry
       if (status.kind !== 'failed') return
@@ -294,16 +338,41 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     return list()
   }
 
+  /**
+   * Waits for the server to hear what was watched, then removes the download unless `isKept`
+   * says otherwise by then. True once it removed it.
+   */
+  const removeAfterSync = async ({
+    downloadId,
+    isKept,
+  }: {
+    downloadId: string
+    isKept: () => boolean
+  }): Promise<boolean> => {
+    await waitForSync(sync.runFor({ downloadIds: [downloadId] }))
+    if (isKept()) return false
+    await queue.remove({ downloadId })
+    return true
+  }
+
+  const isKeptAfterAll = (downloadId: string): boolean =>
+    !isDueForDeletion({ entry: entryById(store.read(), { downloadId }), now: deps.now() }) ||
+    playback.isPlaying(downloadId) ||
+    playback.isMidTitle(downloadId)
+
+  // The viewer's own Delete removes whatever is playing.
   const remove: DownloadService['remove'] = async ({ downloadId }) => {
     if (!isKnown(downloadId)) return unknown()
-    await waitForSync(sync.runFor({ downloadIds: [downloadId] }))
-    await queue.remove({ downloadId })
+    await removeAfterSync({ downloadId, isKept: () => false })
     return list()
   }
 
   const setAutoDeleteOf: DownloadService['setAutoDelete'] = ({ downloadId, autoDelete }) => {
     if (!isKnown(downloadId)) return unknown()
-    change((state) => setAutoDelete(state, { downloadId, autoDelete }))
+    const at = deps.now()
+    change((state) => setAutoDelete(state, { downloadId, autoDelete, at }))
+    if (autoDelete) deleteClock.schedule({ downloadId })
+    else deleteClock.cancel({ downloadId })
     return list()
   }
 
@@ -350,16 +419,29 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     announcing.timer = undefined
     asks.clear()
     sync.dispose()
+    deleteClock.dispose()
     queue.dispose()
   }
 
+  // `send` drops an event while there is no window, so a deletion due at once waits for the
+  // first page to say ready before it tells of itself. A page that never does starts none.
+  const startClocks = async (): Promise<void> => {
+    await isPageReady
+    if (isDisposed) return
+    deleteClock.rebuild()
+    // The page may have listed the downloads before their clocks ran.
+    if (views().some(({ deletesAt }) => deletesAt !== null)) announce()
+  }
+
   // A launch picks up what the last run left, once the folders no download names are gone,
-  // reads each file it kept for its share watched, and tries again what an outage stopped.
+  // reads each file it kept for its share watched, tries again what an outage stopped and
+  // starts the clocks of what deletes once watched. A deletion due at once waits for the
+  // network, so the server hears what was watched before the file goes.
   const resumeLaunch = async (): Promise<void> => {
     await Promise.all([queue.sweep({ wasSetAside: deps.wasSetAside }), deps.ready])
     playback.readFiles(store.read().entries.filter(({ status }) => status.kind === 'ready'))
     queue.retryOutages()
-    await sync.runAll()
+    await Promise.all([startClocks(), sync.runAll()])
   }
   resumeLaunch().catch((error: unknown) => {
     deps.warn(`raven player could not resume its downloads: ${loggable(errorText(error))}`)
@@ -382,6 +464,10 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     pauseAll,
     resumeAll,
     removeAll,
+    pageReady: () => {
+      playback.noteNewPage()
+      firstPage.ready()
+    },
     removeServer: queue.removeServer,
     showFolder,
     open: playback.open,
@@ -389,10 +475,12 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     sidecarsOf: playback.sidecarsOf,
     fromLabelOf: playback.fromLabelOf,
     labelOf: playback.labelOf,
+    isStaleDownload: playback.isStaleDownload,
     serverPositionOf: playback.serverPositionOf,
     noteOpened: playback.noteOpened,
     notePosition: playback.notePosition,
     notePlaying: playback.notePlaying,
+    playbackLeft: playback.playbackLeft,
     isWatched: playback.isWatched,
     onSuspend: queue.onSuspend,
     onResume: queue.onResume,

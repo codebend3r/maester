@@ -53,16 +53,13 @@ import { removeFolder, sweepDownloads } from '@/main/downloads/sweep'
 import { errorText } from '@/main/log/errorText'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { sidecarTracksOf } from '@/main/servers/sidecarTracks'
-import type { Timers } from '@/main/stateStore'
+import { TIMER_MAX_MS, type Timers } from '@/main/stateStore'
 import { isOpaqueId, SERVER_GONE } from '@/shared/protocol'
 
 export const DOWNLOAD_CONCURRENCY = 2
 
 /** The soonest a renewal comes, so a ticket already due is not read again at once. */
 export const RENEWAL_MIN_MS = 60_000
-
-/** Node runs a longer delay at once, so no timer is ever armed for more. */
-const TIMER_MAX_MS = 2 ** 31 - 1
 
 /** How often the files waiting on an outage are tried again, while any waits. */
 export const OUTAGE_RETRY_MS = 300_000
@@ -106,6 +103,8 @@ export type DownloadQueueDeps = {
   onFailed: (entry: DownloadEntry) => void
   /** The downloads `remove`, `removeServer`, `removeAll` and the sweep dropped. */
   onRemoved: (entries: readonly DownloadEntry[]) => void
+  /** A wake from sleep has settled: the network has had its moment. */
+  onAwake: () => void
 }
 
 export type DownloadQueue = {
@@ -827,6 +826,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
         // A wake may come on another network, so each server's origin is picked again.
         deps.servers().forEach(({ id }) => deps.access.forget(id))
         retryOutages()
+        deps.onAwake()
       },
       ms: RESUME_SETTLE_MS,
     })

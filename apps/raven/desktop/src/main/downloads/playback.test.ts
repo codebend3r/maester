@@ -163,6 +163,7 @@ const setup = ({
   const statted: string[] = []
   const told = { lists: 0 }
   const noted: string[] = []
+  const left = { count: 0 }
   const playback = createDownloadPlayback({
     store,
     userData: USER_DATA,
@@ -181,6 +182,9 @@ const setup = ({
       told.lists += 1
     },
     onNoted: ({ downloadId }) => noted.push(downloadId),
+    onLeft: () => {
+      left.count += 1
+    },
   })
   return {
     playback,
@@ -196,6 +200,7 @@ const setup = ({
     statted,
     told,
     noted,
+    left,
   }
 }
 
@@ -380,6 +385,18 @@ describe('what names a download', () => {
     expect(world.playback.fromLabelOf({ path: videoOf(11, OTHER_SERVER_ID) })).toBe('Downloaded')
   })
 
+  it('knows a path in the downloads folder no download names, as a deleted one a queue still holds', () => {
+    const world = setup({ entries: [entryFor({})] })
+    expect(world.playback.isStaleDownload({ path: VIDEO })).toBe(false)
+    expect(world.playback.isStaleDownload({ path: videoOf(12) })).toBe(true)
+    expect(world.playback.isStaleDownload({ path: videoOf(11, OTHER_SERVER_ID) })).toBe(true)
+    expect(world.playback.isStaleDownload({ path: MOVIE_PATH })).toBe(false)
+    expect(world.playback.isStaleDownload({ path: `${DOWNLOADS}/../Movies/x.mkv` })).toBe(false)
+    expect(world.playback.isStaleDownload({ path: `${USER_DATA}/downloads-old/x.mkv` })).toBe(false)
+    removing(world)
+    expect(world.playback.isStaleDownload({ path: VIDEO })).toBe(true)
+  })
+
   it("names a download's video by its title, and nothing for another file", () => {
     const world = setup({ entries: [entryFor({})] })
     expect(world.playback.labelOf({ path: VIDEO })).toBe('S01E01 Good News')
@@ -525,6 +542,149 @@ describe('notePosition', () => {
   })
 })
 
+describe('what is playing', () => {
+  const SECOND = episodeOf(2)
+
+  it('holds a download playing from the moment the page opens its file until the page leaves it', async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE } })
+    const fileId = await opened(world)
+    expect(world.playback.isPlaying(ID)).toBe(false)
+    world.playback.noteOpened({ fileId })
+    expect(world.playback.isPlaying(ID)).toBe(true)
+    world.playback.playbackLeft({ fileId })
+    expect(world.playback.isPlaying(ID)).toBe(false)
+  })
+
+  it('keeps the next file playing when the page leaves the one before it late', async () => {
+    const world = setup({ entries: [entryFor({}), SECOND], videos: shelved(entryFor({}), SECOND) })
+    const first = await opened(world)
+    const second = await opened(world, SECOND.downloadId)
+    world.playback.noteOpened({ fileId: first })
+    world.playback.noteOpened({ fileId: second })
+    expect(world.playback.isPlaying(ID)).toBe(false)
+    world.playback.playbackLeft({ fileId: first })
+    expect(world.playback.isPlaying(SECOND.downloadId)).toBe(true)
+  })
+
+  it('leaves a download for a file that is no download, a server title and the player hiding', async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE, [MOVIE_PATH]: FILE } })
+    const fileId = await opened(world)
+    const movie = await granted(world, MOVIE_PATH)
+    world.playback.noteOpened({ fileId })
+    world.playback.noteOpened({ fileId: movie })
+    expect(world.playback.isPlaying(ID)).toBe(false)
+    world.playback.notePlaying({ fileId })
+    expect(world.playback.isPlaying(ID)).toBe(true)
+    world.playback.notePlaying({ fileId: null })
+    expect(world.playback.isPlaying(ID)).toBe(false)
+  })
+
+  it('keeps a download playing while the page plays it, though the engine stopped, until the page leaves', async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE } })
+    const fileId = await opened(world)
+    world.playback.noteOpened({ fileId })
+    world.playback.notePlaying({ fileId })
+    world.playback.notePlaying({ fileId: null })
+    expect(world.playback.isPlaying(ID)).toBe(true)
+    expect(world.left.count).toBe(0)
+    world.playback.playbackLeft({ fileId })
+    expect(world.playback.isPlaying(ID)).toBe(false)
+    expect(world.left.count).toBe(1)
+  })
+
+  it('keeps a download playing while the engine plays it, though the page left, until the engine stops', async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE } })
+    const fileId = await opened(world)
+    world.playback.noteOpened({ fileId })
+    world.playback.notePlaying({ fileId })
+    world.playback.playbackLeft({ fileId })
+    expect(world.playback.isPlaying(ID)).toBe(true)
+    expect(world.left.count).toBe(0)
+    world.playback.notePlaying({ fileId: null })
+    expect(world.playback.isPlaying(ID)).toBe(false)
+    expect(world.left.count).toBe(1)
+  })
+
+  it("clears only the page's file when a new page says ready", async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE } })
+    const fileId = await opened(world)
+    world.playback.noteOpened({ fileId })
+    world.playback.notePlaying({ fileId })
+    world.playback.noteNewPage()
+    expect(world.playback.isPlaying(ID)).toBe(true)
+    world.playback.noteOpened({ fileId })
+    world.playback.notePlaying({ fileId: null })
+    world.playback.noteNewPage()
+    expect(world.playback.isPlaying(ID)).toBe(false)
+    expect(world.left.count).toBe(1)
+  })
+
+  it('says each time neither the page nor the engine is on a download any more, and at no other move', async () => {
+    const world = setup({
+      entries: [entryFor({}), SECOND],
+      videos: { ...shelved(entryFor({}), SECOND), [MOVIE_PATH]: FILE },
+    })
+    const first = await opened(world)
+    const second = await opened(world, SECOND.downloadId)
+    const movie = await granted(world, MOVIE_PATH)
+    world.playback.noteOpened({ fileId: first })
+    world.playback.notePlaying({ fileId: first })
+    world.playback.playbackLeft({ fileId: second })
+    expect(world.left.count).toBe(0)
+    // The engine is still on the first until it loads the second.
+    world.playback.noteOpened({ fileId: second })
+    expect(world.left.count).toBe(0)
+    world.playback.notePlaying({ fileId: second })
+    expect(world.left.count).toBe(1)
+    world.playback.notePlaying({ fileId: null })
+    world.playback.notePlaying({ fileId: null })
+    expect(world.left.count).toBe(1)
+    world.playback.noteOpened({ fileId: movie })
+    expect(world.left.count).toBe(2)
+    world.playback.noteOpened({ fileId: first })
+    world.playback.playbackLeft({ fileId: first })
+    expect(world.left.count).toBe(3)
+  })
+})
+
+describe('a title left partway', () => {
+  /** A player state holding a resume spot for the video at `position` of 3000. */
+  const spotAt = (position: number, path = VIDEO): PlayerState =>
+    savePosition({ state: EMPTY_STATE, file: factsOf(path), position, duration: 3000, at: 1 })
+
+  it('reads a download as left partway while it resumes short of where it counts as watched', () => {
+    const world = setup({ entries: [entryFor({})], player: spotAt(1500) })
+    expect(world.playback.isMidTitle(ID)).toBe(true)
+  })
+
+  it.each([
+    ['resumes past where it counts as watched', spotAt(2800)],
+    ['was played to its end', spotAt(2995)],
+    ['has no resume spot', EMPTY_STATE],
+    ["holds only another file's spot", spotAt(1500, MOVIE_PATH)],
+  ])('reads a download as no longer partway once it %s', (_, player) => {
+    const world = setup({ entries: [entryFor({})], player })
+    expect(world.playback.isMidTitle(ID)).toBe(false)
+  })
+
+  it('reads a download it does not hold as not partway', () => {
+    const world = setup({ entries: [entryFor({})], player: spotAt(1500) })
+    expect(world.playback.isMidTitle(UNKNOWN_ID)).toBe(false)
+  })
+
+  it('reads the spot of a replaced file as none, once its facts are read', async () => {
+    const world = setup({
+      entries: [entryFor({})],
+      videos: { [VIDEO]: { size: 2 * GIB, mtimeMs: MTIME + 1 } },
+      player: spotAt(1500),
+    })
+    world.playback.readFiles([entryFor({})])
+    await until(() => world.statted.length === 1)
+    await ticks(3)
+    expect(world.playback.isMidTitle(ID)).toBe(false)
+  })
+})
+
 describe('where a download starts', () => {
   it("answers the server's resume spot for a download, and 0 for any other file", async () => {
     const world = setup({
@@ -565,11 +725,11 @@ describe('the share watched', () => {
     )
     const entries = [entryFor({}), entryFor({ downloadId: OTHER_ID, mediaId: 12 })]
     const world = setup({ entries, videos: shelved(...entries), player })
-    expect(world.playback.watchedOf(ID)).toBeNull()
+    expect(world.playback.watchedOf(entryFor({}))).toBeNull()
     world.playback.readFiles(entries)
     await until(() => world.told.lists === 1)
-    expect(world.playback.watchedOf(ID)).toBe(0.5)
-    expect(world.playback.watchedOf(OTHER_ID)).toBeNull()
+    expect(world.playback.watchedOf(entryFor({}))).toBe(0.5)
+    expect(world.playback.watchedOf(entryFor({ downloadId: OTHER_ID, mediaId: 12 }))).toBeNull()
     expect(world.statted.toSorted()).toEqual([VIDEO, replaced])
   })
 
@@ -578,8 +738,8 @@ describe('the share watched', () => {
       entries: [entryFor({ watchedAt: NOW }), entryFor({ downloadId: OTHER_ID, mediaId: 12 })],
       player: remembering(VIDEO, videoOf(12)),
     })
-    expect(world.playback.watchedOf(ID)).toBe(1)
-    expect(world.playback.watchedOf(OTHER_ID)).toBeNull()
+    expect(world.playback.watchedOf(entryFor({ watchedAt: NOW }))).toBe(1)
+    expect(world.playback.watchedOf(entryFor({ downloadId: OTHER_ID, mediaId: 12 }))).toBeNull()
     expect(world.playback.isWatched({ path: VIDEO })).toBe(true)
     expect(world.playback.isWatched({ path: videoOf(12) })).toBe(false)
     expect(world.playback.isWatched({ path: MOVIE_PATH })).toBe(false)
@@ -591,7 +751,7 @@ describe('the share watched', () => {
     await until(() => world.statted.length === 1)
     await ticks(5)
     expect(world.told.lists).toBe(0)
-    expect(world.playback.watchedOf(ID)).toBeNull()
+    expect(world.playback.watchedOf(entryFor({}))).toBeNull()
   })
 
   it('keeps nothing for a download removed while its file was read', async () => {
@@ -609,7 +769,7 @@ describe('the share watched', () => {
     world.state.update((state) =>
       savePosition({ state, file: factsOf(VIDEO), position: 1500, duration: 3000, at: 1 }),
     )
-    expect(world.playback.watchedOf(ID)).toBeNull()
+    expect(world.playback.watchedOf(entryFor({}))).toBeNull()
     expect(world.told.lists).toBe(0)
   })
 
@@ -620,7 +780,7 @@ describe('the share watched', () => {
       savePosition({ state, file: factsOf(VIDEO), position: 750, duration: 3000, at: NOW }),
     )
     world.playback.notePosition({ fileId, position: 750, duration: 3000 })
-    expect(world.playback.watchedOf(ID)).toBe(0.25)
+    expect(world.playback.watchedOf(entryFor({}))).toBe(0.25)
   })
 })
 
@@ -633,10 +793,10 @@ describe('forget', () => {
     })
     const fileId = await opened(world)
     world.playback.notePosition({ fileId, position: 100, duration: 3000 })
-    expect(world.playback.watchedOf(ID)).not.toBeNull()
+    expect(world.playback.watchedOf(entryFor({}))).not.toBeNull()
     removing(world)
     expect(pathsIn(world.state.read())).toEqual({ recents: [MOVIE_PATH], resume: [MOVIE_PATH] })
-    expect(world.playback.watchedOf(ID)).toBeNull()
+    expect(world.playback.watchedOf(entryFor({}))).toBeNull()
   })
 
   it('leaves the player state as it was when nothing names the removed download', () => {
