@@ -1,0 +1,210 @@
+// The scores in one frame, side by side, divided by hairlines. Glass over
+// the backdrop, so it follows the theme's ground.
+.panel {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(6rem, max-content);
+  justify-self: start;
+  max-width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-night) 55%, transparent);
+  backdrop-filter: blur(12px);
+
+  // Two to a row, where four will not fit. A tooltip would be clipped by
+  // the frame here, and a touch screen has no hover, so the label and the
+  // list item's own label carry the source.
+  @media (max-width: 30rem) {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    overflow: hidden;
+  }
+}
+
+// One source. Its colour is set by the class beside this one.
+.item {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) 1.125rem 0.75rem;
+  outline: none;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background-color 150ms ease;
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in srgb, var(--color-bark) 8%, transparent);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: -2px;
+  }
+
+  & + & {
+    border-inline-start: 1px solid var(--color-line);
+  }
+
+  &:first-child {
+    border-radius: calc(var(--radius-lg) - 1px) 0 0 calc(var(--radius-lg) - 1px);
+  }
+
+  &:last-child {
+    border-radius: 0 calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0;
+  }
+
+  &:only-child {
+    border-radius: calc(var(--radius-lg) - 1px);
+  }
+
+  @media (max-width: 30rem) {
+    padding-inline: var(--space-3);
+    border-radius: 0;
+
+    &:first-child,
+    &:last-child,
+    &:only-child {
+      border-radius: 0;
+    }
+
+    &:nth-child(odd) {
+      border-inline-start: 0;
+    }
+
+    &:nth-child(n + 3) {
+      border-block-start: 1px solid var(--color-line);
+    }
+  }
+}
+
+.rottenTomatoes {
+  --source-colour: var(--color-brand-rotten-tomatoes);
+}
+
+.imdb {
+  --source-colour: var(--color-brand-imdb);
+}
+
+.metacritic {
+  --source-colour: var(--color-brand-metacritic);
+}
+
+.tmdb {
+  --source-colour: var(--color-brand-tmdb-line);
+}
+
+.score {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: baseline;
+  gap: 0.1875rem;
+}
+
+.value {
+  font-family: var(--font-display);
+  font-size: 1.625rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.scale {
+  color: var(--color-lichen);
+  font-size: 0.8125rem;
+}
+
+// The score as a share of the bar, in the source's own colour.
+.track {
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-bark) 14%, transparent);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--source-colour);
+}
+
+.label {
+  color: var(--color-birch);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+// Over the item, in the page's text colour: the item's own label carries it
+// to a screen reader, so it shows only when the pointer or focus is there.
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 50%;
+  z-index: 10;
+  display: grid;
+  gap: 0.125rem;
+  padding: var(--space-2) 0.875rem;
+  border-radius: 10px;
+  background: var(--color-bark);
+  box-shadow: var(--shadow-menu);
+  color: var(--color-night);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  pointer-events: none;
+  translate: -50% 0;
+  visibility: hidden;
+
+  // The arrow points down at the item.
+  &::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    background: var(--color-bark);
+    rotate: 45deg;
+  }
+
+  .item:first-child & {
+    left: 0;
+    translate: 0 0;
+
+    &::after {
+      left: 1.5rem;
+    }
+  }
+
+  .item:last-child:not(:first-child) & {
+    right: 0;
+    left: auto;
+    translate: 0 0;
+
+    &::after {
+      left: auto;
+      right: 1.5rem;
+    }
+  }
+
+  .item:hover &,
+  .item:focus-visible & {
+    visibility: visible;
+  }
+
+  @media (max-width: 30rem) {
+    display: none;
+  }
+}
+
+.site {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}

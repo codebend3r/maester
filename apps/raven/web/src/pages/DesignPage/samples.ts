@@ -224,7 +224,7 @@ export const SAMPLE_RATINGS_LOW: Rating[] = [
   { source: 'metacritic', kind: 'critic', value: 5.2, votes: null },
 ]
 
-/** Metacritic's red, in a row of its own: a row has one chip per source. */
+/** Metacritic's red. */
 export const SAMPLE_RATINGS_RED: Rating[] = [
   { source: 'metacritic', kind: 'critic', value: 2.9, votes: null },
 ]

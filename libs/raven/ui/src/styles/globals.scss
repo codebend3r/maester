@@ -80,6 +80,8 @@
   --color-brand-metacritic: #5a9e5f;
   --color-brand-metacritic-low: #b8303a;
   --color-brand-tmdb: #2b7466;
+  // TMDB's teal lightened to read as a thin bar on the ground.
+  --color-brand-tmdb-line: #4fb3a0;
   // Darkness rising from the bottom of the picture, or falling from its top,
   // so the controls and the title read over anything.
   --fade-from-bottom: linear-gradient(to top, rgb(0 0 0 / 75%), rgb(0 0 0 / 0%));
