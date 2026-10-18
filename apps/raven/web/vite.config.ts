@@ -1,10 +1,20 @@
 import { fileURLToPath } from 'node:url'
 import { URL_PROTOCOLS } from '@raven/core'
-import { type Plugin, defineConfig } from 'vite'
+import { type Plugin, defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
-/** The environment variables the build reads. */
-const ENV = { apiOrigin: 'RAVEN_API_ORIGIN', netlify: 'NETLIFY' } as const
+/** The environment variables the build and the dev server read. */
+const ENV = {
+  apiOrigin: 'RAVEN_API_ORIGIN',
+  devApiOrigin: 'RAVEN_DEV_API_ORIGIN',
+  netlify: 'NETLIFY',
+} as const
+
+/** raven's own folder, whose `.env` (beside the compose file) the dev server reads too. */
+const RAVEN_DIR = fileURLToPath(new URL('..', import.meta.url))
+
+/** Where the dev server proxies /api without RAVEN_DEV_API_ORIGIN: the local server (`nx run @raven/server:dev`). */
+const LOCAL_API_ORIGIN = 'http://localhost:8484'
 
 /** What Netlify sets `NETLIFY` to in its builds. */
 const NETLIFY_VALUES = { on: 'true' } as const
@@ -40,18 +50,54 @@ const netlifyApiProxy = (): Plugin => ({
   },
 })
 
-export default defineConfig({
-  plugins: [react(), netlifyApiProxy()],
+/**
+ * The raven the dev server proxies /api to: RAVEN_DEV_API_ORIGIN from the
+ * shell, else from raven's `.env`, else the local server. An http or https
+ * origin with no path, such as http://192.168.50.6:8484 for Vhagar.
+ */
+const devApiOrigin = (mode: string): string => {
+  const origin =
+    process.env[ENV.devApiOrigin] ?? loadEnv(mode, RAVEN_DIR, '')[ENV.devApiOrigin] ?? ''
+  if (!origin) return LOCAL_API_ORIGIN
+  const url = URL.canParse(origin) ? new URL(origin) : null
+  const isWeb = url?.protocol === URL_PROTOCOLS.http || url?.protocol === URL_PROTOCOLS.https
+  if (!url || !isWeb || url.origin !== origin.replace(/\/+$/, '')) {
+    throw new Error(
+      `RAVEN_DEV_API_ORIGIN must be an http or https origin with no path, such as http://192.168.50.6:8484, not ${origin}`,
+    )
+  }
+  return url.origin
+}
+
+/**
+ * Restarts the dev server when raven's `.env` changes, so editing
+ * RAVEN_DEV_API_ORIGIN there switches the backend without a manual restart.
+ */
+const restartOnRavenEnv = (): Plugin => ({
+  name: 'raven-restart-on-env',
+  apply: 'serve',
+  configureServer(server) {
+    const envFile = `${RAVEN_DIR}.env`
+    server.watcher.add(envFile)
+    server.watcher.on('change', (file) => {
+      if (file === envFile) void server.restart()
+    })
+  },
+})
+
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), netlifyApiProxy(), restartOnRavenEnv()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
-    // The server runs on its own port in development (`nx run @raven/server:dev`);
-    // in Docker it serves this app itself and nothing is proxied.
+    // The server runs on its own port in development, or on another machine
+    // (`devApiOrigin`); in Docker it serves this app itself and nothing is proxied.
+    // The Host header follows the target, as a raven behind a name expects.
     proxy: {
-      '/api': 'http://localhost:8484',
+      '/api': { target: devApiOrigin(mode), changeOrigin: true },
     },
   },
-})
+}))

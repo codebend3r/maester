@@ -297,6 +297,14 @@ bun run verify         # spellcheck, TypeScript only, one command per script, li
 
 The dev server reads `apps/raven/.env`, the file the compose file reads, so `LIBRARY_PIN`, `ADMIN_PASSWORD` and the metadata keys work the same in development. Restart it after changing the file.
 
+To run the web app against another raven, Vhagar's for one, without copying its database, set `RAVEN_DEV_API_ORIGIN` and start Vite alone:
+
+```bash
+RAVEN_DEV_API_ORIGIN=http://192.168.50.6:8484 bunx nx run @raven/web:dev
+```
+
+Vite then proxies `/api` there instead of to `http://localhost:8484`. It takes an http or https origin with no path. Set in the shell, it wins; set in `apps/raven/.env`, editing the line restarts Vite onto the new backend, and removing it goes back to the local server. Everything the page does lands on that raven: watched marks, progress, favourites and, with its admin lock off, edits and deletes. Video streams through the proxy too, unless that raven's `RAVEN_WEB_ORIGINS` lists Vite's origin.
+
 `/design` shows the logo in each of its versions, the palette, every token, how each HTML element is drawn and every shared component. It is not in the side menu. Element styles live in `libs/raven/ui/src/styles/elements.scss`, written in `:where()` so a component's own class always wins. The logo's files are in `apps/raven/web/public/brand`, and the favicons beside them in `public`.
 
 The player is built from `libs/raven/ui`, not copied into the web app. Both clients import its built exports and `@raven/ui/styles.css`. Its [library README](../../libs/raven/ui/README.md) documents peers, exports and tests. `dev:raven` also watches the library bundle.
