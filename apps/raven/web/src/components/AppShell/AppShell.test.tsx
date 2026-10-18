@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { isLibraryKind } from '@raven/core'
+import { type AdminLock, isLibraryKind } from '@raven/core'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
@@ -14,7 +14,7 @@ import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { MEDIUM_SCREEN } from '@/components/AppShell/useIsMediumScreen'
 
-const renderShell = (route: string) =>
+const renderShell = (route: string, adminLock?: AdminLock) =>
   renderWithProviders({
     ui: (
       <Routes>
@@ -35,6 +35,7 @@ const renderShell = (route: string) =>
       </Routes>
     ),
     route,
+    adminLock,
   })
 
 const nav = () => screen.getByRole('navigation', { name: 'Main' })
@@ -118,7 +119,7 @@ describe('AppShell', () => {
     )
   })
 
-  it('leads with the logo, Home and Favourites, then the pinned libraries, with Libraries and Settings last', async () => {
+  it('leads with the logo, Home and Favourites, then the pinned libraries, with Libraries, Streams and Settings last', async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
     renderShell('/')
     await within(nav()).findByRole('link', { name: 'Movies' })
@@ -126,7 +127,14 @@ describe('AppShell', () => {
       within(nav())
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['raven', 'Home', 'Favourites', 'Movies', 'Libraries', 'Settings'])
+    ).toEqual(['raven', 'Home', 'Favourites', 'Movies', 'Libraries', 'Streams', 'Settings'])
+  })
+
+  it('leaves Streams out of the menus and the tab bar while the admin lock is on', async () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell('/', { state: 'on', available: true })
+    expect(await within(nav()).findByRole('link', { name: 'Settings' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Streams' })).toBeNull()
   })
 
   it('opens a page a link leads to at its top', async () => {
@@ -389,7 +397,7 @@ describe('AppShell', () => {
     expect(useSideMenu.getState().collapsed).toBe(false)
   })
 
-  it('gives a phone Home, Libraries, Favourites and Settings in a tab bar', () => {
+  it('gives a phone Home, Libraries, Favourites, Streams and Settings in a tab bar', () => {
     spies.list.mockImplementation(async () => [])
     renderShell('/favourites')
     const links = within(tabs()).getAllByRole('link')
@@ -397,9 +405,10 @@ describe('AppShell', () => {
       ['Home', '/'],
       ['Libraries', '/libraries'],
       ['Favourites', '/favourites'],
+      ['Streams', '/streams'],
       ['Settings', '/settings'],
     ])
-    expect(links.map(iconOf)).toEqual(['home', 'libraries', 'heart', 'settings'])
+    expect(links.map(iconOf)).toEqual(['home', 'libraries', 'heart', 'playback', 'settings'])
     expect(within(tabs()).getByRole('link', { name: 'Favourites' })).toHaveAttribute(
       'aria-current',
       'page',

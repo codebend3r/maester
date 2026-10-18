@@ -289,6 +289,20 @@ describe('LibrariesPage', () => {
     expect(screen.queryByRole('button', { name: 'Rescan' })).toBeNull()
   })
 
+  it('shows the folders only while the admin lock is off, even in a list cached with them', async () => {
+    spies.list.mockImplementation(async () => [
+      library({ name: 'Clips', paths: ['/media/vermithor/Clips'] }),
+    ])
+    renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })
+    expect(await screen.findByRole('button', { name: 'Pin Clips' })).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Folders' })).toBeNull()
+    expect(screen.queryByText('/media/vermithor/Clips')).toBeNull()
+    cleanup()
+
+    renderWithProviders({ ui: <LibrariesPage /> })
+    expect(await screen.findByText('/media/vermithor/Clips')).toBeInTheDocument()
+  })
+
   it('says how to add the first library while the admin lock is on', async () => {
     spies.list.mockImplementation(async () => [])
     renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })

@@ -3,6 +3,7 @@ import type {
   ItemDetails,
   ItemSummary,
   Library,
+  LiveStream,
   MediaItem,
   MetadataHealth,
   Review,
@@ -189,5 +190,19 @@ export const review = (overrides: Partial<Review> = {}): Review => ({
   content: 'A fine film, if a little long.',
   url: 'https://www.themoviedb.org/review/abc',
   writtenAt: '2026-10-01T12:00:00.000Z',
+  ...overrides,
+})
+
+export const liveStream = (overrides: Partial<LiveStream> = {}): LiveStream => ({
+  id: 'stream-1',
+  media: mediaItem(),
+  libraryName: 'Films',
+  mode: 'direct',
+  browser: 'Chrome 141',
+  device: 'Mac',
+  address: '203.0.113.9',
+  startedAt: '2026-10-18T18:00:00.000Z',
+  lastSeenAt: '2026-10-18T18:10:00.000Z',
+  position: 754,
   ...overrides,
 })

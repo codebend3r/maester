@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { AUDIENCES } from '@/admin/adminGuard'
 import { createApp } from '@/app'
 import { CONTROLLERS } from '@/appModule'
-import { LOCKED_SCAN_ERROR } from '@/libraries/librariesController'
+import { HIDDEN_SCAN_ERROR, LOCKED_SCAN_ERROR } from '@/libraries/librariesController'
 import { LOCK_MARKS } from '@/lock/lockGuard'
 import type { Privacy } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
@@ -525,7 +525,7 @@ describe('the admin lock', () => {
   })
 
   it('lets anyone sort, view, group or pin a library, and change nothing else of it', async () => {
-    const before = await api().getLibrary(state.open)
+    const before = await api(state.admin).getLibrary(state.open)
     const { kind, sort, view, groupBy, pinned } = before.settings
     const another = <T>({ values, current }: { values: readonly T[]; current: T }): T =>
       values.find((value) => value !== current) ?? current
@@ -555,6 +555,20 @@ describe('the admin lock', () => {
       paths: before.paths,
       settings: { ...before.settings, ...change },
     })
+  })
+
+  it("says an open library's scan failed without naming its folders while the lock is on", async () => {
+    const created = await api(state.admin).createLibrary({
+      name: 'Gone',
+      paths: [at('Missing')],
+    })
+    await app().get(ScannerService).whenIdle(created.id)
+    try {
+      expect((await api().getLibrary(created.id)).scan.error).toBe(HIDDEN_SCAN_ERROR)
+      expect((await api(state.admin).getLibrary(created.id)).scan.error).toContain(at('Missing'))
+    } finally {
+      await api(state.admin).deleteLibrary(created.id)
+    }
   })
 
   it('turns off only with the password', async () => {

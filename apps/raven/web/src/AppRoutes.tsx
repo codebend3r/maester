@@ -11,6 +11,7 @@ import { EpisodePage } from '@/pages/EpisodePage/EpisodePage'
 import { MoviePage } from '@/pages/MoviePage/MoviePage'
 import { SeasonPage } from '@/pages/SeasonPage/SeasonPage'
 import { SagaPage } from '@/pages/SagaPage/SagaPage'
+import { StreamsPage } from '@/pages/StreamsPage/StreamsPage'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
@@ -35,6 +36,7 @@ export const AppRoutes = () => (
         <Route path="episodes/:id" element={<EpisodePage />} />
         <Route path="people/:id" element={<PersonPage />} />
         <Route path="favourites" element={<FavouritesPage />} />
+        <Route path="streams" element={<StreamsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="design" element={<DesignPage />} />
         <Route path="*" element={<NotFoundPage />} />

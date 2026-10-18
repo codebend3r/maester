@@ -27,6 +27,7 @@ import {
   isProgressChange,
   isRecord,
   isString,
+  PLAYBACK_MODES,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
@@ -43,6 +44,8 @@ import { RANGE_OUTCOMES, RANGE_UNITS, parseRange } from '@/media/range'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { parseBody } from '@/parseBody'
 import { ScannerService } from '@/scanner/scannerService'
+import { clientOf, trackStream } from '@/streams/trackStream'
+import { StreamSessions } from '@/streams/streamSessions'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 const errorCode = (error: unknown): string =>
@@ -81,6 +84,7 @@ export class MediaController {
     @Inject(MediaArtifacts) private readonly artifacts: MediaArtifacts,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(ScannerService) private readonly scanner: ScannerService,
+    @Inject(StreamSessions) private readonly streams: StreamSessions,
   ) {}
 
   private find(id: number): MediaItem {
@@ -110,12 +114,17 @@ export class MediaController {
   @ForViewers()
   @Put(':id/progress')
   @HttpCode(204)
-  saveProgress(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): void {
+  saveProgress(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+  ): void {
     const { position } = parseBody({
       guard: isProgressChange,
       body,
       message: 'position must be a number of seconds',
     })
+    this.streams.report({ mediaId: id, client: clientOf(request), position })
     if (!this.viewing.report({ id, position })) {
       throw new NotFoundException(`No media ${id}`)
     }
@@ -196,6 +205,13 @@ export class MediaController {
     const info = await stat(file.path).catch(() => null)
     if (!info?.isFile()) throw new NotFoundException('The file is no longer on disk')
 
+    trackStream({
+      sessions: this.streams,
+      mediaId: id,
+      mode: PLAYBACK_MODES.direct,
+      request,
+      reply,
+    })
     const size = info.size
     const range = parseRange({ header: request.headers.range, size })
     reply

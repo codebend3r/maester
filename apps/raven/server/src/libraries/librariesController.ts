@@ -42,6 +42,7 @@ import {
   SAGA_BACKDROP_TYPES,
 } from '@raven/core'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
+import { AdminService } from '@/admin/adminService'
 import { RAVEN_HEADERS } from '@/http'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
@@ -69,6 +70,10 @@ const listParams = (query: unknown): MediaListParams =>
 
 /** A locked library's scan failure, in place of the message, which names its folders. */
 export const LOCKED_SCAN_ERROR = 'The last scan ran into trouble. Enter the PIN to see what.'
+
+/** A scan's failure for a viewer the admin lock keeps from the folders it names. */
+export const HIDDEN_SCAN_ERROR =
+  'The last scan ran into trouble. Turn the admin lock off in Settings to see what.'
 
 /** What a query flag such as `?watched=true` says when it is on. */
 const QUERY_FLAGS = { true: 'true' } as const
@@ -98,6 +103,7 @@ export class LibrariesController {
     @Inject(MetadataService) private readonly metadata: MetadataService,
     @Inject(LibraryWatcher) private readonly watcher: LibraryWatcher,
     @Inject(LockService) private readonly lock: LockService,
+    @Inject(AdminService) private readonly admin: AdminService,
   ) {}
 
   /** A library can only be locked behind a PIN that can open it again. */
@@ -114,19 +120,31 @@ export class LibrariesController {
    * video's picture. Without `canSee` a library still locked to the browser
    * keeps its folders, its picture and what its last scan said about them
    * (which names the folders) to itself, and shows only its name, type and
-   * counts. Every route says which, so none reveals a locked library by
-   * leaving it out: the public ones ask the lock, while the guarded ones,
-   * and creating a library, pass true, as whoever reaches them sees it all.
+   * counts. Without `isAdmin`, which is the admin lock off in this browser,
+   * no library shows its folders or the scan failure that names them: only
+   * the admin sees where files live. Every route says which, so none
+   * reveals a locked library by leaving it out: the public ones ask the
+   * lock, while the guarded ones, and creating a library, pass true, as
+   * whoever reaches them sees it all.
    */
-  private withStatus({ record, canSee }: { record: LibraryRecord; canSee: boolean }): Library {
+  private withStatus({
+    record,
+    canSee,
+    isAdmin,
+  }: {
+    record: LibraryRecord
+    canSee: boolean
+    isAdmin: boolean
+  }): Library {
     const scan = this.scanner.status(record.id)
-    if (canSee) return { ...record, scan, backdrop: this.media.backdropOf(record.id) }
+    if (canSee && isAdmin) return { ...record, scan, backdrop: this.media.backdropOf(record.id) }
+    const hiddenError = canSee ? HIDDEN_SCAN_ERROR : LOCKED_SCAN_ERROR
     return {
       ...record,
       paths: [],
       layouts: [],
-      scan: { ...scan, error: scan.error == null ? null : LOCKED_SCAN_ERROR },
-      backdrop: null,
+      scan: { ...scan, error: scan.error == null ? null : hiddenError },
+      backdrop: canSee ? this.media.backdropOf(record.id) : null,
     }
   }
 
@@ -144,7 +162,13 @@ export class LibrariesController {
     return this.libraries
       .list()
       .filter((record) => viewer.listsLibrary(record.id))
-      .map((record) => this.withStatus({ record, canSee: viewer.seesLibrary(record.id) }))
+      .map((record) =>
+        this.withStatus({
+          record,
+          canSee: viewer.seesLibrary(record.id),
+          isAdmin: !this.admin.isLocked({ cookie }),
+        }),
+      )
   }
 
   /**
@@ -160,7 +184,11 @@ export class LibrariesController {
     const record = this.find(id)
     const viewer = this.lock.viewer({ cookie })
     if (!viewer.listsLibrary(id)) throw new NotFoundException(`No library ${id}`)
-    return this.withStatus({ record, canSee: viewer.seesLibrary(id) })
+    return this.withStatus({
+      record,
+      canSee: viewer.seesLibrary(id),
+      isAdmin: !this.admin.isLocked({ cookie }),
+    })
   }
 
   /** Creating a library starts its first scan; the response already reports it as scanning. */
@@ -171,7 +199,7 @@ export class LibrariesController {
     const record = this.libraries.create(this.parseLockable(body))
     this.scanner.scan(record.id)
     this.watcher.sync()
-    return this.withStatus({ record, canSee: true })
+    return this.withStatus({ record, canSee: true, isAdmin: true })
   }
 
   /**
@@ -198,7 +226,7 @@ export class LibrariesController {
     }
     if (!samePaths({ before: before.paths, after: record.paths })) this.scanner.scan(id)
     this.watcher.sync()
-    return this.withStatus({ record, canSee: true })
+    return this.withStatus({ record, canSee: true, isAdmin: true })
   }
 
   /**
@@ -208,7 +236,11 @@ export class LibrariesController {
    */
   @ForViewers()
   @Put(':id/view')
-  setView(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Library {
+  setView(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+  ): Library {
     const { name, paths } = this.find(id)
     const settings = parseBody({
       guard: isLibraryViewChange,
@@ -217,7 +249,7 @@ export class LibrariesController {
     })
     const record = this.libraries.update({ id, input: { name, paths, settings } })
     if (!record) throw new NotFoundException(`No library ${id}`)
-    return this.withStatus({ record, canSee: true })
+    return this.withStatus({ record, canSee: true, isAdmin: !this.admin.isLocked({ cookie }) })
   }
 
   @AdminOnly()
@@ -242,7 +274,7 @@ export class LibrariesController {
   scan(@Param('id', ParseIntPipe) id: number): Library {
     const record = this.find(id)
     this.scanner.scan(id)
-    return this.withStatus({ record, canSee: true })
+    return this.withStatus({ record, canSee: true, isAdmin: true })
   }
 
   /**
@@ -262,7 +294,7 @@ export class LibrariesController {
     }
     this.metadata.retryUnmatched(id)
     // Read again, so the count of files not matched is the one after the retry.
-    return this.withStatus({ record: this.find(id), canSee: true })
+    return this.withStatus({ record: this.find(id), canSee: true, isAdmin: true })
   }
 
   /** The library's played videos, last played first; `watched=true` keeps the ones watched. */

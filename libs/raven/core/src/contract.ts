@@ -377,10 +377,11 @@ export const isLibrary = object({
   name: isString,
   /**
    * Absolute folder paths as the server sees them (container paths under
-   * Docker). None while the library is locked to this browser.
+   * Docker). None while the library is locked to this browser, and none
+   * while the admin lock holds: only the admin sees where files live.
    */
   paths: isStringArray,
-  /** How each path was read on its last full scan, in path order. None while the library is locked to this browser. */
+  /** How each path was read on its last full scan, in path order. None while the library is locked to this browser or the admin lock holds. */
   layouts: listOf(isLibraryPathLayout),
   itemCount: isNumber,
   /** Files no movie or show was found for; 0 in a library that is not matched. */
@@ -1425,6 +1426,31 @@ export type MediaTicket = Infer<typeof isMediaTicket>
 
 /** How long a media ticket is valid. */
 export const MEDIA_TICKET_SECONDS = 21_600
+
+/**
+ * A video the server is sending to one browser or device right now, as the
+ * admin's Streams page lists it. `browser` and `device` are read from the
+ * User-Agent header, so they are the client's own word for itself;
+ * `address` is where the requests came from, which behind a proxy is the
+ * address the proxy forwards. `position` is the last spot the player
+ * reported, in seconds, and null until it reports one.
+ */
+export const isLiveStream = object({
+  id: isString,
+  media: isMediaItem,
+  libraryName: isString,
+  mode: isPlaybackMode,
+  browser: isString,
+  device: isString,
+  address: isString,
+  startedAt: isString,
+  lastSeenAt: isString,
+  position: nullable(isNumber),
+})
+
+export type LiveStream = Infer<typeof isLiveStream>
+
+export const isLiveStreamList = listOf(isLiveStream)
 
 /** The player fetches a new ticket this long before the old one expires. */
 export const MEDIA_TICKET_REFRESH_SECONDS = 600

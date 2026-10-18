@@ -8,6 +8,7 @@ import { useIsMediumScreen } from '@/components/AppShell/useIsMediumScreen'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { Logo } from '@/components/Logo/Logo'
 import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
 import { useFollowAdminLock } from '@/lib/adminLock'
@@ -167,6 +168,15 @@ export const AppShell = () => {
               label="Libraries"
               isIconsOnly={isIconsOnly}
             />
+            <AdminOnly>
+              <NavItem
+                to="/streams"
+                patterns={['/streams']}
+                icon={<Icon name="playback" />}
+                label="Streams"
+                isIconsOnly={isIconsOnly}
+              />
+            </AdminOnly>
             <NavItem
               to="/settings"
               patterns={['/settings']}

@@ -3,7 +3,9 @@ export const RAVEN_HEADERS = {
   acceptRanges: 'accept-ranges',
   authorization: 'authorization',
   cookie: 'cookie',
+  forwardedFor: 'x-forwarded-for',
   retryAfter: 'retry-after',
+  userAgent: 'user-agent',
 } as const
 
 /** Content types raven sends or reads beyond `@shared/server`'s `CONTENT_TYPES`. */

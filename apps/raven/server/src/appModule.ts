@@ -50,6 +50,8 @@ import { OmdbScores } from '@/metadata/omdbScores'
 import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
 import { PlaybackController } from '@/playback/playbackController'
 import { SubtitlesService } from '@/playback/subtitlesService'
+import { StreamsController } from '@/streams/streamsController'
+import { StreamSessions } from '@/streams/streamSessions'
 import { TracksService } from '@/playback/tracksService'
 import { assertRoutesMarked } from '@/routeMarks'
 import { watchFolder } from '@/scanner/folderWatch'
@@ -77,6 +79,7 @@ export const CONTROLLERS = [
   EventsController,
   LockController,
   AdminController,
+  StreamsController,
 ] as const
 
 /** Folders stay still for 2 s before a refresh. */
@@ -148,6 +151,7 @@ export class AppModule {
         AdminService,
         LockService,
         MediaTickets,
+        StreamSessions,
         // Every route passes the lock first; those marked PrivateBy, or on a controller that is, are held.
         { provide: APP_GUARD, useClass: LockGuard },
         // Then the admin lock, which holds back the routes marked AdminOnly.
