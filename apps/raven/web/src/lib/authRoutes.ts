@@ -45,3 +45,6 @@ export const safeReturnPath = (value: string | null): string => {
 
 export const signInPath = ({ returnTo }: { returnTo: string }): string =>
   `${AUTH_ROUTES.signIn}?${new URLSearchParams({ [AUTH_QUERY.returnTo]: returnTo })}`
+
+export const checkEmailPath = ({ email }: { email: string }): string =>
+  `${AUTH_ROUTES.checkEmail}?${new URLSearchParams({ [AUTH_QUERY.email]: email })}`

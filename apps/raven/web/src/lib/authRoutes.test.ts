@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { AUTH_QUERY, AUTH_ROUTES, safeReturnPath, signInPath } from '@/lib/authRoutes'
+import {
+  AUTH_QUERY,
+  AUTH_ROUTES,
+  checkEmailPath,
+  safeReturnPath,
+  signInPath,
+} from '@/lib/authRoutes'
 
 describe('safeReturnPath', () => {
   it.each([
@@ -58,6 +64,14 @@ describe('signInPath', () => {
     expect(path).toBe(`${AUTH_ROUTES.signIn}?${AUTH_QUERY.returnTo}=%2Flibraries%2F3%3Fx%3D1%23y`)
     expect(new URL(path, window.location.origin).searchParams.get(AUTH_QUERY.returnTo)).toBe(
       '/libraries/3?x=1#y',
+    )
+  })
+})
+
+describe('checkEmailPath', () => {
+  it('carries the address encoded', () => {
+    expect(checkEmailPath({ email: 'jordan+raven@example.com' })).toBe(
+      `${AUTH_ROUTES.checkEmail}?${AUTH_QUERY.email}=jordan%2Braven%40example.com`,
     )
   })
 })

@@ -18,7 +18,8 @@ import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { PersonPage } from '@/pages/PersonPage/PersonPage'
 import { GetPage } from '@/pages/GetPage/GetPage'
-import { SignInPage, signInUnavailable } from '@/pages/SignInPage/SignInPage'
+import { AUTH_ROUTES } from '@/lib/authRoutes'
+import { SignInPage } from '@/pages/SignInPage/SignInPage'
 import { WatchPage } from '@/pages/WatchPage/WatchPage'
 
 export const AppRoutes = () => (
@@ -46,8 +47,8 @@ export const AppRoutes = () => (
         {/* The player takes the whole screen, outside the browsing frame. */}
         <Route path="watch/:id" element={<WatchPage />} />
       </Route>
-      {/* So do signing in, linked from nowhere yet, and the page to get raven from. */}
-      <Route path="sign-in" element={<SignInPage onSignIn={signInUnavailable} />} />
+      {/* So do signing in, which the gate sends a signed out visitor to, and the page to get raven from. */}
+      <Route path={AUTH_ROUTES.signIn} element={<SignInPage />} />
       <Route path="get" element={<GetPage />} />
     </Routes>
     {/* Over any page, the player too: whatever sits in a locked library asks for the PIN. */}

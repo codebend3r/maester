@@ -129,7 +129,7 @@
 }
 
 // A field's own look, drawn around an input and what sits beside it in the
-// field: the server's dot, the password's Show.
+// field: the password's Show.
 .box {
   display: grid;
   align-items: center;
@@ -167,32 +167,6 @@
     outline: none;
     box-shadow: none;
   }
-}
-
-.server {
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas: 'dot input';
-  column-gap: var(--space-1);
-  padding-inline-start: var(--space-2);
-
-  .boxed {
-    grid-area: input;
-    padding-inline-start: 0;
-  }
-}
-
-// Hollow until raven knows the server answers.
-.dot {
-  grid-area: dot;
-  width: var(--space-1);
-  height: var(--space-1);
-  border: 1.5px solid var(--color-lichen);
-  border-radius: var(--radius-pill);
-}
-
-.answering {
-  border-color: var(--color-brand-metacritic);
-  background: var(--color-brand-metacritic);
 }
 
 .secret {
@@ -242,36 +216,25 @@
   grid-area: text;
 }
 
-.keep {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-2);
-  align-items: center;
-  justify-content: start;
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-}
-
-// The box fills with the theme's play colour, its tick in the ink drawn on it.
-.check {
-  width: 1.375rem;
-  height: 1.375rem;
-  border-width: var(--border-thick);
-  border-radius: var(--radius-sm);
-
-  &::before {
-    width: 0.75rem;
-    height: 0.75rem;
-    background: var(--color-on-leaf);
-  }
-
-  &:checked {
-    border-color: var(--color-leaf);
-    background: var(--color-leaf);
-  }
-}
-
 .submit {
   min-height: var(--control-size-tall);
   font-size: var(--font-size-md);
+}
+
+.forgot {
+  justify-self: start;
+  font-size: var(--font-size-sm);
+}
+
+// What to do about an email not yet confirmed, under the alert that says so.
+.unconfirmed {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.switch {
+  color: var(--color-birch);
+  font-size: var(--font-size-sm);
 }
