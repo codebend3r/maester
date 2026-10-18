@@ -11,6 +11,7 @@ maester is a self-hosted media suite: a library and player, an AI assistant for 
 | Project           | Path                  | What                                                                   |
 | ----------------- | --------------------- | ---------------------------------------------------------------------- |
 | `@luwin/api`      | `apps/luwin/api`      | luwin's agent, tools, chat and FastAPI app; Python 3.12 run through uv |
+| `@raven/supabase` | `apps/raven/supabase` | raven's Supabase Auth configuration and membership approval database   |
 | `@raven/server`   | `apps/raven/server`   | raven's media server: NestJS on Fastify, SQLite index, ffmpeg          |
 | `@raven/web`      | `apps/raven/web`      | raven's library and player: React 19 on Vite                           |
 | `@raven/core`     | `libs/raven/core`     | raven's platform-agnostic core: API types, client, direct-play check   |

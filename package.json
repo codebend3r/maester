@@ -139,6 +139,7 @@
   "trustedDependencies": [
     "@parcel/watcher",
     "lefthook",
-    "nx"
+    "nx",
+    "supabase"
   ]
 }

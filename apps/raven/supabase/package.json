@@ -1,0 +1,48 @@
+{
+  "name": "@raven/supabase",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:keys": "bash scripts/keys.sh",
+    "db:login": "supabase login --workdir ..",
+    "db:link": "supabase link --workdir ..",
+    "db:start": "bun run --sequential db:keys db:containers",
+    "db:containers": "supabase start --workdir .. -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
+    "db:stop": "supabase stop --workdir ..",
+    "db:reset": "supabase db reset --workdir ..",
+    "db:status": "supabase status --workdir ..",
+    "test:db": "supabase test db --workdir ..",
+    "lint:db": "supabase db lint --workdir .. --local --schema public,private --fail-on warning",
+    "deploy": "bun run --sequential deploy:check deploy:db deploy:config",
+    "deploy:check": "bash scripts/production.sh diff",
+    "deploy:db": "supabase db push --workdir ..",
+    "deploy:config": "bash scripts/production.sh push",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "devDependencies": {
+    "oxfmt": "0.68.0",
+    "supabase": "2.121.0"
+  },
+  "nx": {
+    "projectType": "application",
+    "tags": [
+      "scope:raven",
+      "lang:sql"
+    ],
+    "includedScripts": [
+      "db:keys",
+      "db:login",
+      "db:link",
+      "db:start",
+      "db:stop",
+      "db:reset",
+      "db:status",
+      "test:db",
+      "lint:db",
+      "deploy",
+      "format",
+      "format:check"
+    ]
+  }
+}
