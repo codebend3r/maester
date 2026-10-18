@@ -29,6 +29,7 @@ describe('LibraryPage', () => {
     view: spyOn(api, 'setLibraryView'),
     lockState: spyOn(api, 'getLock'),
     lock: spyOn(api, 'lock'),
+    refresh: spyOn(api, 'refreshLibrary'),
   }
   const state: { sent: LibraryViewChange[]; listed: Array<{ sort?: MediaSort; seed?: number }> } = {
     sent: [],
@@ -73,6 +74,7 @@ describe('LibraryPage', () => {
     spies.view.mockReset()
     spies.lockState.mockReset()
     spies.lock.mockReset()
+    spies.refresh.mockReset()
     state.sent = []
     state.listed = []
   })
@@ -321,16 +323,20 @@ describe('LibraryPage', () => {
     )
   })
 
-  it('refreshes the library from its header, and shows how far the refresh has got', async () => {
-    const running = library({
-      id: 2,
-      ratingsRefresh: { state: 'running', done: 1200, total: 3400, startedAt: ISO },
-    })
-    const refresh = spyOn(api, 'refreshLibrary').mockImplementation(async () => running)
+  it('refreshes the library from its header', async () => {
+    spies.refresh.mockImplementation(async () => library({ id: 2 }))
     serve()
     await userEvent.click(await screen.findByRole('button', { name: 'Refresh Movies' }))
-    expect(refresh).toHaveBeenCalledWith(2)
-    refresh.mockRestore()
+    expect(spies.refresh).toHaveBeenCalledWith(2)
+  })
+
+  it('says why a refresh was refused, below the tabs', async () => {
+    spies.refresh.mockRejectedValue(new Error('The server is busy'))
+    serve()
+    await userEvent.click(await screen.findByRole('button', { name: 'Refresh Movies' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not refresh: The server is busy',
+    )
   })
 
   it('shows a running refresh under the scan status, while the admin lock is off', async () => {

@@ -14,8 +14,8 @@ const count = new Intl.NumberFormat()
 
 /**
  * The library's name, type and counts, how its scan stands, and at their
- * right what can be done to it: its history, Refresh, Rescan, Match again, Edit, and
- * Lock once open.
+ * right what can be done to it: its history, Refresh, Rescan, Match again,
+ * Edit, and Lock once open.
  */
 export const LibraryHeader = ({
   titleId,

@@ -3,10 +3,16 @@ import { type Library, isScanning } from '@raven/core'
 /** While a scan counts files, so the counts climb live. */
 export const SCAN_POLL_MS = 1500
 
-/** While a Refresh asks for ratings; each answer moves the count, but no faster than this matters. */
+/**
+ * While a Refresh asks for ratings; each answer moves the count, but no
+ * faster than this matters.
+ */
 export const RATINGS_POLL_MS = 5000
 
-/** A timer past about 24 days overflows and fires at once, and a wait is never longer than a day. */
+/**
+ * A timer past about 24 days overflows and fires at once, and a wait is
+ * never longer than a day.
+ */
 const LONGEST_WAIT_MS = 24 * 60 * 60 * 1000
 
 const delayOf = ({ library, now }: { library: Library; now: number }): number | false => {

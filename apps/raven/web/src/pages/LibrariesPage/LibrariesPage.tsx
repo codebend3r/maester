@@ -5,7 +5,11 @@ import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { Button } from '@raven/ui'
-import { LibraryActions, useLibraryActions } from '@/components/LibraryActions/LibraryActions'
+import {
+  LibraryActionErrors,
+  LibraryActions,
+  useLibraryActions,
+} from '@/components/LibraryActions/LibraryActions'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { RatingsStatus } from '@/components/RatingsStatus/RatingsStatus'
@@ -117,11 +121,7 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
         <div className={styles.status}>
           <ScanStatus scan={library.scan} />
           <RatingsStatus refresh={library.ratingsRefresh} />
-          {actions.rematch.isError && (
-            <p className={styles.error} role="alert">
-              Could not match again: {actions.rematch.error.message}
-            </p>
-          )}
+          <LibraryActionErrors actions={actions} className={styles.error} />
         </div>
         <div className={styles.actions}>
           <PinButton library={library} />
@@ -158,7 +158,8 @@ export const LibrariesPage = () => {
   const canManage = useCanManage()
   const libraries = useQuery({
     ...librariesQuery,
-    // Poll only while something is scanning or a Refresh runs, so the counts climb live.
+    // Poll while something scans (1.5 s) or a Refresh runs (5 s), so the counts
+    // climb live, and read once when a waiting Refresh resumes.
     refetchInterval: (query) => libraryPollDelay({ libraries: query.state.data ?? [] }),
   })
 

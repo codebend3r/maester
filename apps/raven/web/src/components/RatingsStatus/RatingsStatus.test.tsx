@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import { cleanup, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { RatingsRefresh } from '@raven/core'
+import { useState } from 'react'
 import { RatingsStatus } from '@/components/RatingsStatus/RatingsStatus'
 import { renderWithProviders } from '@/test/render'
 
@@ -47,6 +49,24 @@ describe('RatingsStatus', () => {
       ),
     })
     expect(screen.queryByText(/ratings/i)).toBeNull()
+  })
+
+  it('keeps its live region mounted, so the first line is announced when it fills', async () => {
+    const Harness = () => {
+      const [refresh, setRefresh] = useState<RatingsRefresh>({ state: 'idle', finishedAt: null })
+      return (
+        <>
+          <button onClick={() => setRefresh(running)}>Start</button>
+          <RatingsStatus refresh={refresh} />
+        </>
+      )
+    }
+    const { container } = renderWithProviders({ ui: <Harness /> })
+    const region = container.querySelector('[aria-live="polite"]')
+    expect(region?.textContent).toBe('')
+    await userEvent.click(screen.getByRole('button', { name: 'Start' }))
+    expect(container.querySelector('[aria-live="polite"]')).toBe(region)
+    expect(region?.textContent).toBe('Refreshing ratings · 1,200 of 3,400')
   })
 
   it('says nothing while the admin lock is on', () => {

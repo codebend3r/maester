@@ -12,8 +12,8 @@ import { queryKeys } from '@/lib/queryClient'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 
 /**
- * Refresh, Rescan and Match again for a library. The caller holds them, as Match
- * again's error shows on its page below the tabs and in its row below the
+ * Refresh, Rescan and Match again for a library. The caller holds them, as
+ * their errors show on its page below the tabs and in its row below the
  * scan's status.
  */
 export const useLibraryActions = (library: Library) => {
@@ -50,10 +50,34 @@ export const useLibraryActions = (library: Library) => {
 }
 
 /**
- * A library's history, and Refresh, Rescan, Match again and Edit with the admin lock
- * off, in its page's header and on its card on the Libraries page, as words
- * alone. Each names its library to a screen reader, as the list has the same
- * buttons on every card.
+ * Why Refresh, Rescan or Match again was refused, one line each, for the
+ * caller to place where its errors show.
+ */
+export const LibraryActionErrors = ({
+  actions: { refresh, rescan, rematch },
+  className,
+}: {
+  actions: ReturnType<typeof useLibraryActions>
+  className: string
+}) =>
+  [
+    { verb: 'refresh', failure: refresh.error },
+    { verb: 'rescan', failure: rescan.error },
+    { verb: 'match again', failure: rematch.error },
+  ].map(
+    ({ verb, failure }) =>
+      failure && (
+        <p key={verb} className={className} role="alert">
+          Could not {verb}: {failure.message}
+        </p>
+      ),
+  )
+
+/**
+ * A library's history, and Refresh, Rescan, Match again and Edit with the
+ * admin lock off, in its page's header and on its card on the Libraries page,
+ * as words alone. Each names its library to a screen reader, as the list has
+ * the same buttons on every card.
  */
 export const LibraryActions = ({
   library,
@@ -84,7 +108,7 @@ export const LibraryActions = ({
       <AdminOnly>
         <Button
           disabled={refresh.isPending}
-          title="Look for new files and fetch every title's ratings again"
+          title="Look for new files and fetch ratings again. While a refresh is under way, it scans again and retries what waits."
           onClick={() => refresh.mutate()}
         >
           Refresh{whose}
