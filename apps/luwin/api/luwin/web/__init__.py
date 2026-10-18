@@ -10,12 +10,15 @@ from fastapi.responses import JSONResponse
 from luwin import __version__
 from luwin.web.api import Api
 from luwin.web.auth import Refused
+from luwin.web.chat import ChatApi
 from luwin.web.seerr import SeerrWebhook
 
 
-def create_app(*, seerr: SeerrWebhook | None = None, api: Api | None = None) -> FastAPI:
-    """Build the app; with neither `seerr` nor `api`, only /health is served (the CI smoke
-    test)."""
+def create_app(
+    *, seerr: SeerrWebhook | None = None, api: Api | None = None, chat: ChatApi | None = None
+) -> FastAPI:
+    """Build the app; with none of `seerr`, `api` and `chat`, only /health is served (the CI
+    smoke test)."""
     app = FastAPI(title="luwin", version=__version__, docs_url=None, redoc_url=None)
 
     @app.exception_handler(Refused)
@@ -41,4 +44,6 @@ def create_app(*, seerr: SeerrWebhook | None = None, api: Api | None = None) -> 
         app.include_router(seerr.router())
     if api is not None:
         app.include_router(api.router())
+    if chat is not None:
+        app.include_router(chat.router())
     return app

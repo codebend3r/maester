@@ -16,6 +16,7 @@ dependencies = [
 [project.scripts]
 luwin = "luwin.__main__:main"
 luwin-eval = "luwin.evals:main"
+luwin-sandbox = "luwin.sandbox:main"
 
 [dependency-groups]
 dev = [

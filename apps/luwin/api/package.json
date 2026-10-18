@@ -10,6 +10,7 @@
     "format:check": "uv run ruff format --check .",
     "lint:py": "uv run ruff check .",
     "lint:py:fix": "uv run ruff check --fix .",
+    "sandbox": "uv run --directory .. --project api luwin-sandbox",
     "test": "uv run pytest -q"
   },
   "nx": {
@@ -20,6 +21,7 @@
     ],
     "includedScripts": [
       "dev",
+      "sandbox",
       "test",
       "eval",
       "lint:py",

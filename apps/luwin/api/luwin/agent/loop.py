@@ -18,7 +18,7 @@ from typing import Any
 from luwin.agent.limits import LimitExceeded, RateLimiter
 from luwin.agent.prompts import SYSTEM_PROMPT
 from luwin.agent.runner import AwaitingConfirmation, ToolOutcome, ToolRunner
-from luwin.agent.tools import Choice, Tier, ToolContext
+from luwin.agent.tools import Choice, Tier, Title, ToolContext
 from luwin.clients import Services
 from luwin.config import Settings
 from luwin.memo import Memo
@@ -57,10 +57,22 @@ class AgentReply:
     choices: list[Choice] = field(default_factory=list)
     # What tools asked to post outside the reply: admin notices and approvals.
     notices: list[Notice] = field(default_factory=list)
+    # Titles tools found, shown with the reply (a logo, links); each once.
+    titles: list[Title] = field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
     iterations: int = 0
+
+
+@dataclass(frozen=True)
+class ToolTrace:
+    """One tool call as a turn ran it, for a caller that shows the turn's work."""
+
+    name: str
+    input: dict[str, Any]
+    ok: bool
+    result: str
 
 
 class TurnFailed(Exception):
@@ -181,6 +193,7 @@ class Agent:
         text: str,
         *,
         on_text: Callable[[str], Any] | None = None,
+        on_tool: Callable[[ToolTrace], Any] | None = None,
     ) -> AgentReply:
         if self.limiter:
             try:
@@ -191,7 +204,7 @@ class Agent:
 
         reply = AgentReply(text="")
         try:
-            await self._turn(user_id, tier, text, reply, on_text)
+            await self._turn(user_id, tier, text, reply, on_text, on_tool)
         except Exception as exc:
             raise TurnFailed(reply) from exc
         finally:
@@ -206,6 +219,7 @@ class Agent:
         text: str,
         reply: AgentReply,
         on_text: Callable[[str], Any] | None,
+        on_tool: Callable[[ToolTrace], Any] | None,
     ) -> None:
         """Run one turn, recording into `reply` as it goes."""
         ctx = self._context(user_id, tier)
@@ -259,11 +273,15 @@ class Agent:
                 reply.tool_calls.append(
                     {"name": block.name, "input": block.input, "ok": not outcome.is_error}
                 )
+                if on_tool:
+                    on_tool(ToolTrace(block.name, block.input, not outcome.is_error, outcome.text))
                 if isinstance(outcome.status, AwaitingConfirmation):
                     reply.pending_ids.append(outcome.status.pending_id)
                 if outcome.choices:  # the latest picker wins
                     reply.choices = list(outcome.choices)
                 reply.notices.extend(outcome.notices)
+                seen = {t.key for t in reply.titles}
+                reply.titles.extend(t for t in outcome.titles if t.key not in seen)
                 results.append(outcome.as_result_block(block.id))
             messages.append({"role": "user", "content": results})
             self.store.append_message(

@@ -1,0 +1,50 @@
+import { type FormEvent, type KeyboardEvent, useState } from 'react'
+import { Button, BUTTON_TONES } from '@/components/Button/Button'
+import styles from '@/components/Composer/Composer.module.scss'
+import { useChat } from '@/stores/chat'
+
+const KEYS = { enter: 'Enter' } as const
+
+/** Where you write to luwin: Enter sends, Shift+Enter starts a new line. */
+export const Composer = () => {
+  const [text, setText] = useState('')
+  const send = useChat((state) => state.send)
+  const isBusy = useChat((state) => state.isBusy)
+  const message = text.trim()
+  const canSend = !isBusy && message !== ''
+
+  const submit = () => {
+    if (!canSend) return
+    setText('')
+    void send({ text: message })
+  }
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    submit()
+  }
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== KEYS.enter || event.shiftKey) return
+    event.preventDefault()
+    submit()
+  }
+
+  return (
+    <form className={styles.composer} onSubmit={onSubmit}>
+      <label className={styles.label} htmlFor="composer-message">
+        Message luwin
+      </label>
+      <textarea
+        id="composer-message"
+        className={styles.input}
+        rows={2}
+        value={text}
+        placeholder="is Dune on the server?"
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={onKeyDown}
+      />
+      <Button type="submit" tone={BUTTON_TONES.primary} className={styles.send} disabled={!canSend}>
+        Send
+      </Button>
+    </form>
+  )
+}

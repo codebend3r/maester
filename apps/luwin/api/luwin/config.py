@@ -300,6 +300,9 @@ class Settings:
     wizarr_api_key: str = setting("", "WIZARR_API_KEY", _raw)
     # plex.tv, where friends' library shares live; the account is `PLEX_TOKEN`'s.
     plex_tv_url: str = setting("https://plex.tv", "PLEX_TV_URL", _url)
+    # raven, the suite's own library: searched for what is on the server, and the address
+    # its links open, so it must be one friends' browsers reach too. Empty for none.
+    raven_url: str = setting("", "RAVEN_URL", _url)
     # rookery, which owns sign-in: its LAN address, which luwin asks who a session
     # belongs to with the service token; and the public address browsers sign in at.
     rookery_url: str = setting("", "ROOKERY_URL", _url, required=True)

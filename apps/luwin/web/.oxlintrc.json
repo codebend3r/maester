@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../../tooling/oxlint/react.json"],
+  "ignorePatterns": ["dist", "public"],
+  "overrides": [
+    {
+      // Vite needs a default export; ambient .d.ts files declare, they don't export.
+      "files": ["vite.config.ts", "**/*.d.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
+      // Declaration merging into bun:test's Matchers requires `interface`.
+      "files": ["**/*.d.ts"],
+      "rules": {
+        "typescript/consistent-type-definitions": "off"
+      }
+    },
+    {
+      "files": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test/**", "src/test-setup.ts"],
+      "rules": {
+        "no-console": "off",
+        "typescript/no-non-null-assertion": "off",
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}

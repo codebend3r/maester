@@ -32,6 +32,7 @@ from luwin.clients import (
     PlexClient,
     PlexTvClient,
     RadarrClient,
+    RavenClient,
     Rookery,
     RookeryClient,
     SabnzbdClient,
@@ -52,6 +53,7 @@ from luwin.store import Store
 from luwin.web import create_app
 from luwin.web.api import Api
 from luwin.web.auth import Auth, SessionVerifier
+from luwin.web.chat import ChatApi
 from luwin.web.seerr import SeerrWebhook
 
 # Importing the tools package registers every tool module into app_registry.
@@ -82,6 +84,7 @@ def build_services(cfg: Settings, instances: list[Instance]) -> Services:
         ),
         speedtest=OoklaSpeedTest(cfg.speedtest_host) if cfg.speedtest_host else None,
         plextv=PlexTvClient(cfg.plex_tv_url, cfg.plex_token) if cfg.plex_token else None,
+        raven=RavenClient(cfg.raven_url) if cfg.raven_url else None,
     )
 
 
@@ -141,7 +144,7 @@ def build(
     scheduler = Scheduler(scheduled(services, store, cfg, kill), store=store, notifier=notifier)
     rookery = rookery or RookeryClient(cfg.rookery_url, cfg.rookery_service_token)
     auth = Auth(SessionVerifier(rookery), identity, sign_in=f"{cfg.rookery_public_url}/login")
-    web = create_app(seerr=seerr, api=Api(auth, console))
+    web = create_app(seerr=seerr, api=Api(auth, console), chat=ChatApi(auth, chat, notifier))
     return App(cfg, store, services, agent, chat, console, web, kill, scheduler)
 
 

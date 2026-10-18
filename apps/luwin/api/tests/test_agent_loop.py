@@ -65,9 +65,13 @@ async def test_tool_call_round_trip(world):
         tool_message([("search_media", {"query": "dune"})], text="Let me look."),
         text_message("There are two: 2021 and 1984. Which one?"),
     )
-    reply = await agent.respond("u1", Tier.FRIEND, "get dune")
+    traces = []
+    reply = await agent.respond("u1", Tier.FRIEND, "get dune", on_tool=traces.append)
     assert reply.text.startswith("There are two")
     assert reply.tool_calls == [{"name": "search_media", "input": {"query": "dune"}, "ok": True}]
+    (trace,) = traces
+    assert trace.name == "search_media" and trace.input == {"query": "dune"} and trace.ok
+    assert "1984" in trace.result
     second = model.messages.calls[1]["messages"]
     assert second[-2]["role"] == "assistant" and second[-2]["content"][-1]["type"] == "tool_use"
     assert second[-1]["role"] == "user" and second[-1]["content"][0]["type"] == "tool_result"

@@ -19,6 +19,15 @@ section 5, and the sign-in decisions and config below (`PLEX_CLIENT_ID`,
 `SESSION_SECRET`, `PUBLIC_URL`); users are keyed by rookery's user id.
 In the order of work, step 2 is only the `inbox` table and step 3 is that
 spec's luwin step.
+Amended 2026-10-18 by the chat page and sandbox: step 4 is built in
+`luwin/web/chat.py` with `decide` answering JSON (an approved action runs a
+tool, not a model turn), `pick` and `forget` routes, and no history route
+yet. The first slice of step 8 is `apps/luwin/web/` (`@luwin/web`): the
+chat page, with zustand for the conversation and TanStack Query for
+`/api/me`, per the workspace rules that replaced "no global state library".
+`luwin/sandbox.py` serves the chat routes over an eval case's fakes with no
+sign-in, for testing answers locally. What is left is in `apps/luwin/docs/deferred.md`
+(L-4 to L-8).
 
 Paths: module paths such as `maester/chat/service.py` and `tests/` are
 relative to `apps/maester/api/`; `docs/`, `.env.example` and compose are

@@ -211,8 +211,13 @@ def publish_report(
     return True
 
 
-def build_agent(model_name: str, registry: ToolRegistry, services: Any, store: Any) -> Agent:
-    if model_name == "fake":
+def build_agent(
+    model_name: str, registry: ToolRegistry, services: Any, store: Any, model_client: Any = None
+) -> Agent:
+    """An agent over the case's world; `model_client` replaces the API client when given."""
+    if model_client is not None:
+        client: Any = model_client
+    elif model_name == "fake":
         from tests.fake_model import FakeModel, text_message
 
         client: Any = FakeModel.scripted(*[text_message("(fake reply)") for _ in range(200)])

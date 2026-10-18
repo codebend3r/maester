@@ -81,7 +81,7 @@ async def show_details(services: Services, details: MediaDetails) -> dict[str, A
     "check_availability",
     "Whether a movie or show is on the server: which versions (1080p, 4K, HEVC re-encode) "
     "with size and bitrate, for shows how many episodes of each season are present, and a "
-    "plex_link per copy that opens it in Plex; include the link in your reply. For shows it "
+    "plex_link per copy that opens it in Plex; link it in your reply. For shows it "
     "also gives sonarr_host, the host follow_show needs, and for anime how many files of "
     "each season have English audio.",
     tier=Tier.FRIEND,
