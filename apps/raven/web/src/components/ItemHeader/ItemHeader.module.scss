@@ -384,7 +384,7 @@
 // 60rem, so such a row breaks up to 64rem too: into even cells at least as
 // wide as the wide action, which then needs no row of its own. A cell also
 // takes at least a quarter of the row, so no fourth fits beside three: five
-// actions read three and two, never four and one left alone.
+// actions never read four and one left alone.
 // A range, not `max-width`: this selector outranks the 40rem block's, so it
 // starts above 40rem to leave the narrower widths to that block.
 @container (40rem < width <= 64rem) {

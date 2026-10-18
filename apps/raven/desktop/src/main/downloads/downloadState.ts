@@ -273,8 +273,8 @@ export const pauseServer = (
 
 /** Whether a file waits on an outage, which the queue tries again on its own. */
 export const isWaitingOnOutage = ({ status }: DownloadEntry): boolean =>
-  (status.kind === DOWNLOAD_STATUS_KINDS.paused || status.kind === DOWNLOAD_STATUS_KINDS.failed) &&
-  status.reason === PAUSE_REASONS.unreachable
+  (status.kind === DOWNLOAD_STATUS_KINDS.paused && status.reason === PAUSE_REASONS.unreachable) ||
+  (status.kind === DOWNLOAD_STATUS_KINDS.failed && status.reason === FAIL_REASONS.unreachable)
 
 /**
  * The viewer's Pause all: what runs or waits pauses, and so does what waits on an outage, or
