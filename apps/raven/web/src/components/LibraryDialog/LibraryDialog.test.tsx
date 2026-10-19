@@ -68,6 +68,25 @@ describe('LibraryDialog', () => {
     expect(screen.queryByRole('combobox', { name: 'Ratings shown' })).toBeNull()
   })
 
+  it('names the keys the other ratings need, and that shows get two of them only from MDBList', () => {
+    renderWithProviders({
+      ui: (
+        <LibraryDialog
+          library={library({ settings: { ...library().settings, kind: 'shows' } })}
+          onClose={() => undefined}
+        />
+      ),
+    })
+    const hint = screen.getByText(/IMDb, Rotten Tomatoes and Metacritic need/)
+    expect(hint.textContent).toContain(
+      'IMDb, Rotten Tomatoes and Metacritic need MDBLIST_API_KEY or OMDB_API_KEY; shows get Rotten Tomatoes and Metacritic only from MDBList.',
+    )
+    expect(Array.from(hint.querySelectorAll('code')).map((code) => code.textContent)).toEqual([
+      'MDBLIST_API_KEY',
+      'OMDB_API_KEY',
+    ])
+  })
+
   it('says how to turn on posters and details while TMDB is off', async () => {
     renderWithProviders({ ui: <LibraryDialog onClose={() => undefined} /> })
     const type = screen.getByRole('group', { name: 'Type' })

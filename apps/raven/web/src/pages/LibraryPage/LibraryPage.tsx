@@ -1,12 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { type Library, isScanning } from '@raven/core'
+import type { Library } from '@raven/core'
 import { useId } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
-import { useLibraryActions } from '@/components/LibraryActions/LibraryActions'
+import { LibraryActionErrors, useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Bone } from '@/components/Skeleton/Skeleton'
+import { libraryPollDelay } from '@/lib/libraryPolling'
 import { LIBRARY_LOCK_STATES, useLibraryLock } from '@/lib/libraryLock'
 import { librariesQuery, libraryQuery } from '@/lib/queries'
 import { ROUTE_STATES, routeState, useRouteId } from '@/lib/routeQuery'
@@ -43,11 +44,7 @@ const LibraryView = ({ library, section }: { library: Library; section: LibraryS
         <>
           <LibraryTabs library={library} current={section} />
 
-          {actions.rematch.isError && (
-            <p className={styles.message} role="alert">
-              Could not match again: {actions.rematch.error.message}
-            </p>
-          )}
+          <LibraryActionErrors actions={actions} className={styles.message} />
 
           {/* Keyed by its tab, so moving to another starts its body afresh. */}
           <section key={section} className={styles.section} aria-label={SECTIONS[section].label}>
@@ -86,7 +83,7 @@ export const LibraryPage = () => {
     placeholderData: () =>
       queryClient.getQueryData(librariesQuery.queryKey)?.find((entry) => entry.id === libraryId),
     refetchInterval: (current) =>
-      current.state.data && isScanning(current.state.data.scan) ? 1500 : false,
+      libraryPollDelay({ libraries: current.state.data ? [current.state.data] : [] }),
   })
   const page = routeState({ id: libraryId, query: library })
   if (section == null) return <NotFoundPage />

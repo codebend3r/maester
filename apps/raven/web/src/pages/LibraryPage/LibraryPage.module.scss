@@ -69,6 +69,8 @@
 
 .status {
   grid-area: status;
+  display: grid;
+  gap: var(--space-0);
 }
 
 .actions {
@@ -79,11 +81,9 @@
   gap: var(--space-1);
 }
 
-// The admin lock off gives the header four buttons or five, which leave the
-// title too little room beside them on a narrower page; then they go under
-// it, as many to a line as fit. A phone always puts them under it.
-@container (max-width: 48rem) {
-  .heading:has(.actions > :nth-child(4)) {
+// The buttons under the title, as many to a line as fit.
+@mixin actions-under-title($children) {
+  .heading:has(.actions > :nth-child(#{$children})) {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       'title'
@@ -92,11 +92,23 @@
       'actions';
   }
 
-  .heading:has(.actions > :nth-child(4)) .actions {
+  .heading:has(.actions > :nth-child(#{$children})) .actions {
     grid-auto-flow: row;
     grid-template-columns: repeat(auto-fill, minmax(7.5rem, max-content));
     padding-top: var(--space-2);
   }
+}
+
+// The admin lock off gives the header four buttons, five or six, which leave
+// the title too little room beside them on a narrower page; then they go
+// under it, five or six at a wider width than four, so a long name keeps its
+// words whole. A phone always puts them under it.
+@container (max-width: 48rem) {
+  @include actions-under-title(4);
+}
+
+@container (max-width: 64rem) {
+  @include actions-under-title(5);
 }
 
 @container (max-width: 30rem) {
