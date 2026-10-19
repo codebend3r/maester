@@ -56,8 +56,16 @@ const HLS_WAIT_AHEAD = 2
 /** How many times a request cuts its segment again when the listed file cannot be read. */
 const MAX_READ_MISSES = 2
 
-/** How long a request waits for its segment, or the init for a run, before giving up. */
+/** How long a request waits for its segment before giving up. */
 export const HLS_SEGMENT_WAIT_MS = 30_000
+
+/**
+ * How long an init with no run waits for a segment request to start one
+ * before it starts its own at 0. Short, since a player may ask for the
+ * init alone first and wait for it before asking for any segment, as
+ * ExoPlayer's `HlsMediaChunk` does.
+ */
+export const HLS_INIT_GRACE_MS = 1500
 
 /** How many sessions the server keeps; minting one more drops the longest idle. */
 export const HLS_SESSION_CAP = 8
@@ -280,8 +288,9 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
 
   /**
    * The `ftyp moov` every segment of the session plays after, cut from a
-   * run's first file. With no run, it waits for the next one a segment
-   * request starts, and only when none does starts one at segment 0.
+   * run's first file and kept for the session's life, rests included. With
+   * no run, it waits `HLS_INIT_GRACE_MS` for a segment request to start
+   * one, and then starts one at segment 0 itself.
    */
   async init({ session }: { session: string }): Promise<Uint8Array> {
     return this.cutInit({ entry: this.entryOf(session), mayStart: false })
@@ -447,7 +456,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
         resolve()
       }
       const cancel = this.clock.after({
-        ms: HLS_SEGMENT_WAIT_MS,
+        ms: HLS_INIT_GRACE_MS,
         run: () => {
           entry.launches.delete(launched)
           reject(new LaunchTimeout())

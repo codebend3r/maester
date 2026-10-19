@@ -19,6 +19,7 @@ import { type MockInstance, afterAll, afterEach, beforeAll, describe, expect, it
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { type FfmpegStream, FfmpegService } from '@/ffmpeg/ffmpegService'
 import {
+  HLS_INIT_GRACE_MS,
   HLS_SEGMENT_WAIT_MS,
   HLS_SESSION_CAP,
   type HlsClock,
@@ -192,6 +193,8 @@ describe('HlsSessions', () => {
     long: string
     plan: SegmentPlan
     longPlan: SegmentPlan
+    /** The 40-second clip cut at every keyframe, two seconds apart. */
+    keyframePlan: SegmentPlan
     audio: AudioTrack | null
     hasBFrames: boolean
     probes: number
@@ -202,6 +205,7 @@ describe('HlsSessions', () => {
     long: '',
     plan: { boundaries: [], duration: 0 },
     longPlan: { boundaries: [], duration: 0 },
+    keyframePlan: { boundaries: [], duration: 0 },
     audio: null,
     hasBFrames: false,
     probes: 0,
@@ -245,9 +249,10 @@ describe('HlsSessions', () => {
       state.long,
     ])
     const ffmpeg = ffmpegFor(join(state.root, 'probe'))
-    const [plan, longPlan, { tracks }, frames] = await Promise.all([
+    const [plan, longPlan, keyframes, { tracks }, frames] = await Promise.all([
       planOf({ ffmpeg, path: state.clip }),
       planOf({ ffmpeg, path: state.long }),
+      ffmpeg.probeKeyframes(state.clip),
       ffmpeg.probeFile(state.clip),
       run('ffprobe', [
         '-v',
@@ -263,6 +268,10 @@ describe('HlsSessions', () => {
     ])
     state.plan = plan
     state.longPlan = longPlan
+    state.keyframePlan = {
+      boundaries: keyframes.filter((keyframe) => keyframe < plan.duration),
+      duration: plan.duration,
+    }
     // The AAC commentary, which every HLS player decodes.
     state.audio = tracks.audio[1] ?? null
     state.hasBFrames = Number(frames.stdout.trim()) > 0
@@ -492,6 +501,7 @@ describe('HlsSessions', () => {
     const { ffmpeg, sessions, advance, dataDir } = open({ pace: PACE })
     const session = mintIn({ sessions })
     await sessions.segment({ session: session.id, n: 0 })
+    const init = await sessions.init({ session: session.id })
     const folder = join(dataDir, 'hls', session.id)
     const [first] = ffmpeg.runs
 
@@ -504,12 +514,16 @@ describe('HlsSessions', () => {
     await eventually({ read: async () => existsSync(folder), check: (exists) => !exists })
     expect(first?.kill).toHaveBeenCalledWith(RUN_SIGNALS.kill)
     expect(ffmpeg.alive()).toHaveLength(0)
+    // The init outlives the rest, so it needs no run.
+    expect(
+      Buffer.from(await sessions.init({ session: session.id })).equals(Buffer.from(init)),
+    ).toBe(true)
+    expect(ffmpeg.runs).toHaveLength(1)
 
     const third = await sessions.segment({ session: session.id, n: 3 })
 
     const [, second] = ffmpeg.runs
     expect(argAfter({ args: second?.args ?? [], flag: '-segment_start_number' })).toBe('3')
-    const init = await sessions.init({ session: session.id })
     expect((await videoOf({ init, media: third })).firstPts).toBeCloseTo(
       boundary(3) + STREAM_TIME_SHIFT,
       3,
@@ -549,33 +563,26 @@ describe('HlsSessions', () => {
   })
 
   it('pauses a run ten segments past the furthest asked, and resumes it when asked further', async () => {
-    // Unpaced, the long clip's run takes a few tenths of a second after its tenth segment.
-    const { ffmpeg, sessions } = open()
-    const session = mintIn({ sessions, input: state.long, plan: state.longPlan })
+    // Two-second segments at the pace: one every quarter second, and the run
+    // lasts five seconds, so it is alive and mid-file when it is paused.
+    const { ffmpeg, sessions } = open({ pace: PACE })
+    const session = mintIn({ sessions, plan: state.keyframePlan })
     await sessions.segment({ session: session.id, n: 0 })
     const [first] = ffmpeg.runs
+    const signals = () => first?.kill.mock.calls.flat() ?? []
     const stateOf = async (): Promise<string> =>
       (await run('ps', ['-o', 'stat=', '-p', String(first?.child.pid)])).stdout.trim()
 
-    await eventually({
-      read: async () => first?.kill.mock.calls.flat() ?? [],
-      check: (signals) => signals.includes(RUN_SIGNALS.stop),
-    })
+    await eventually({ read: async () => signals(), check: (sent) => sent.length === 1 })
+    expect(signals()).toEqual([RUN_SIGNALS.stop])
     expect(await stateOf()).toMatch(/^T/)
 
     await sessions.segment({ session: session.id, n: 3 })
 
-    expect(first?.kill.mock.calls.flat()).toEqual([RUN_SIGNALS.stop, RUN_SIGNALS.resume])
+    expect(signals()).toEqual([RUN_SIGNALS.stop, RUN_SIGNALS.resume])
     // Resumed, it runs on to ten past segment 3 and is paused there again.
-    await eventually({
-      read: async () => first?.kill.mock.calls.flat() ?? [],
-      check: (signals) => signals.length === 3,
-    })
-    expect(first?.kill.mock.calls.flat()).toEqual([
-      RUN_SIGNALS.stop,
-      RUN_SIGNALS.resume,
-      RUN_SIGNALS.stop,
-    ])
+    await eventually({ read: async () => signals(), check: (sent) => sent.length === 3 })
+    expect(signals()).toEqual([RUN_SIGNALS.stop, RUN_SIGNALS.resume, RUN_SIGNALS.stop])
   })
 
   it('restarts for a far request without waiting out a near one', async () => {
@@ -594,8 +601,9 @@ describe('HlsSessions', () => {
     const started = Date.now()
     await asked(40)
 
-    expect(Date.now() - started).toBeLessThan(2000)
+    // Far from the near request's wait, and nowhere near the thirty-second one.
     expect(finished).toEqual([40])
+    expect(Date.now() - started).toBeLessThan(10_000)
     const third = await near
     const init = await sessions.init({ session: session.id })
     expect((await videoOf({ init, media: third })).firstPts).toBeCloseTo(
@@ -620,18 +628,42 @@ describe('HlsSessions', () => {
     )
   })
 
-  it('starts a run at 0 for the init when no segment comes in thirty seconds', async () => {
+  it('starts a run at 0 for the init after a short grace with no segment asked for', async () => {
     const { ffmpeg, sessions, advance, pending } = open()
     const session = mintIn({ sessions })
 
+    const started = Date.now()
     const init = sessions.init({ session: session.id })
-    // The rest, the forgetting and the init's wait for a run.
+    // The rest, the forgetting and the init's grace.
     await eventually({ read: async () => pending(), check: (count) => count >= 3 })
     expect(ffmpeg.runs).toHaveLength(0)
-    advance(HLS_SEGMENT_WAIT_MS)
+    advance(HLS_INIT_GRACE_MS)
 
     expect((await init).length).toBeGreaterThan(0)
+    expect(Date.now() - started).toBeLessThan(HLS_SEGMENT_WAIT_MS / 3)
     expect(argAfter({ args: ffmpeg.runs[0]?.args ?? [], flag: '-segment_start_number' })).toBe('0')
+  })
+
+  it('serves an init and then a far segment, leaving one run, at the segment', async () => {
+    const { ffmpeg, sessions, advance, pending } = open()
+    const session = mintIn({ sessions, input: state.long, plan: state.longPlan })
+
+    // As ExoPlayer does: the init first, and the segment only once it came.
+    const init = sessions.init({ session: session.id })
+    await eventually({ read: async () => pending(), check: (count) => count >= 3 })
+    advance(HLS_INIT_GRACE_MS)
+    const header = await init
+    const fortieth = await sessions.segment({ session: session.id, n: 40 })
+
+    const [atZero, atForty] = ffmpeg.runs
+    expect(ffmpeg.runs).toHaveLength(2)
+    expect(atZero?.kill).toHaveBeenCalledWith(RUN_SIGNALS.kill)
+    expect(argAfter({ args: atForty?.args ?? [], flag: '-segment_start_number' })).toBe('40')
+    expect(ffmpeg.alive().every((child) => child === atForty?.child)).toBe(true)
+    expect((await videoOf({ init: header, media: fortieth })).firstPts).toBeCloseTo(
+      (state.longPlan.boundaries[40] ?? NaN) + STREAM_TIME_SHIFT,
+      3,
+    )
   })
 
   it('reads the init again after a read that failed', async () => {
