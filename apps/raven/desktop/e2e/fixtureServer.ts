@@ -42,6 +42,15 @@ const API_ROUTES = {
   adminUnlock: `${SERVER_METHODS.post} ${API_PATHS.adminUnlock}`,
 } as const
 
+/** The path of one of a title's routes, as a request to the server carries it. */
+export const MEDIA_PATHS = {
+  file: (mediaId: number) => `/api/media/${mediaId}/file`,
+  sidecar: (mediaId: number) => `/api/media/${mediaId}/subtitles/external-0`,
+  ticket: (mediaId: number) => `/api/media/${mediaId}/ticket`,
+  progress: (mediaId: number) => `/api/media/${mediaId}/progress`,
+  plays: (mediaId: number) => `/api/media/${mediaId}/plays`,
+} as const
+
 /** `METHOD rest` for a title's routes, `rest` being what follows `/api/media/<id>`. */
 const MEDIA_ROUTES = {
   item: `${SERVER_METHODS.get} `,
