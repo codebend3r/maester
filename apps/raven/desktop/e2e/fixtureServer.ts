@@ -197,6 +197,7 @@ const TRICKLE_MS = 100
 const LOCKED_MESSAGE = 'This library is locked.'
 const PROBE_MAX_BYTES = 1_048_576
 const TICKET_PARAM = 't'
+const PROBE_BYTES_PARAM = 'bytes'
 // Only parses a request's own path and query; nothing is ever fetched from it.
 const URL_BASE = 'http://fixture.invalid'
 
@@ -254,7 +255,7 @@ export const containerOf = (path: string) => extname(path).slice(1).toLowerCase(
 
 /** How many bytes the probe asked for, as the server reads `bytes`. */
 const probeLengthOf = (query: URLSearchParams): number => {
-  const asked = Number(query.get('bytes') ?? MEDIA_PROBE_BYTES)
+  const asked = Number(query.get(PROBE_BYTES_PARAM) ?? MEDIA_PROBE_BYTES)
   if (!Number.isSafeInteger(asked)) return MEDIA_PROBE_BYTES
   return Math.min(Math.max(asked, 1), PROBE_MAX_BYTES)
 }
