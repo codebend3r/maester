@@ -400,6 +400,7 @@ describe('migrations', () => {
 
   it('gives every viewing row to the local account, leaving out rows whose video or title is gone', () => {
     const before = new Sqlite(join(state.dir, 'raven.db'))
+    // The version just before the account migration.
     const shipped = 30
     MIGRATIONS.slice(0, shipped).forEach((sql) => before.exec(sql))
     before.pragma(`user_version = ${shipped}`)
@@ -487,6 +488,23 @@ describe('migrations', () => {
     insert.run(VIEWING_ACCOUNTS.local, BUG_REPORT_STATUSES.new, '{"problems":[]}')
     expect(count()).toEqual({ reports: 1 })
     expect(() => insert.run(VIEWING_ACCOUNTS.local, BUG_REPORT_STATUSES.new, 'not json')).toThrow()
+    database.onModuleDestroy()
+  })
+
+  it('adds a keyframes column, empty, beside the tracks of a version-32 database', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 32).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 32')
+    before.exec(
+      `INSERT INTO libraries (id, name, created_at) VALUES (1, 'Test', '2026-01-01');
+       INSERT INTO media (id, library_id, path, file_name, folder, title, container, size, mtime_ms, added_at)
+       VALUES (1, 1, '/m/a.mkv', 'a.mkv', '/m', 'a', 'mkv', 1, 1, '2026-01-01');`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.pragma('user_version', { simple: true })).toBe(MIGRATIONS.length)
+    expect(database.db.prepare('SELECT keyframes FROM media').get()).toEqual({ keyframes: null })
     database.onModuleDestroy()
   })
 })

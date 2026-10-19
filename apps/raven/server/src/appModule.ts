@@ -26,6 +26,7 @@ import { ItemsController } from '@/items/itemsController'
 import { MatchController } from '@/items/matchController'
 import { PeopleController } from '@/items/peopleController'
 import { ReviewsController } from '@/items/reviewsController'
+import { KeyframesService } from '@/hls/keyframesService'
 import { LibrariesController } from '@/libraries/librariesController'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { RatingsRefresh } from '@/libraries/ratingsRefresh'
@@ -204,6 +205,7 @@ export class AppModule {
         FfmpegService,
         ThumbnailService,
         TracksService,
+        KeyframesService,
         SubtitlesService,
         MediaArtifacts,
         ScannerService,

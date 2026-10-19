@@ -544,6 +544,11 @@ export const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX bug_reports_account ON bug_reports (account_id, created_at);
   `,
+  // The video keyframes of a file in seconds, a JSON array probed once on its
+  // first HLS play and cleared when the file changes, like its tracks.
+  `
+  ALTER TABLE media ADD COLUMN keyframes TEXT;
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

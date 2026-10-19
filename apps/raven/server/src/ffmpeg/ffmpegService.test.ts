@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -18,6 +18,12 @@ describe('FfmpegService', () => {
       '#!/bin/sh\necho "Invalid data found when processing input" >&2\nexit 1\n',
     )
     await writeFile(join(state.dir, 'works'), '#!/bin/sh\nexit 0\n')
+    // Prints its arguments, then three packets in decode order.
+    await writeFile(
+      join(state.dir, 'packets'),
+      '#!/bin/sh\necho "$@" > "$0.args"\nprintf "2.000000,K__\\n0.000000,K__\\n1.000000,___\\n"\n',
+    )
+    await chmod(join(state.dir, 'packets'), 0o755)
     await writeFile(join(state.dir, 'renderD128'), '')
     await chmod(join(state.dir, 'works'), 0o755)
     await chmod(join(state.dir, 'slow'), 0o755)
@@ -51,6 +57,22 @@ describe('FfmpegService', () => {
     const failure = service('broken').probeFile('/media/a.mkv')
     await expect(failure).rejects.toThrow('Invalid data found when processing input')
     await expect(failure).rejects.not.toBeInstanceOf(FfmpegTimeoutError)
+  })
+
+  it("lists a file's video keyframes from ffprobe's packets, without decoding", async () => {
+    expect(await service('packets').probeKeyframes('/media/a.mkv')).toEqual([0, 2])
+    expect(await readFile(join(state.dir, 'packets.args'), 'utf8')).toBe(
+      '-v error -select_streams v:0 -show_entries packet=pts_time,flags -of csv=p=0 /media/a.mkv\n',
+    )
+  })
+
+  it("reports a keyframe probe's failure and timeout as probeFile does", async () => {
+    await expect(service('broken').probeKeyframes('/media/a.mkv')).rejects.toThrow(
+      'Invalid data found when processing input',
+    )
+    await expect(service('slow').probeKeyframes('/media/a.mkv')).rejects.toBeInstanceOf(
+      FfmpegTimeoutError,
+    )
   })
 
   describe('choosing how transcodes encode', () => {

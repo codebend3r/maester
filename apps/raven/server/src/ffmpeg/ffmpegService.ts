@@ -14,6 +14,7 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { encoderTestArgs } from '@/ffmpeg/args'
 import { SOFTWARE, type VideoEncoder, encoderCandidates } from '@/ffmpeg/encoder'
+import { parseKeyframes } from '@/ffmpeg/keyframes'
 import { type ProbeResult, parseProbe } from '@/ffmpeg/probe'
 import { type FileTracks, parseTracks } from '@/ffmpeg/tracks'
 
@@ -83,6 +84,37 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
       )
       const parsed: unknown = JSON.parse(stdout)
       return parsed
+    } catch (error) {
+      if (wasKilled(error)) {
+        throw new FfmpegTimeoutError({ tool: 'ffprobe', seconds: this.config.ffmpegTimeoutSeconds })
+      }
+      throw new Error(failureText(error), { cause: error })
+    }
+  }
+
+  /**
+   * The seconds of the file's video keyframes, ascending and cut to three
+   * decimals. ffprobe lists packets without decoding them, but it still
+   * reads the whole file.
+   */
+  async probeKeyframes(path: string): Promise<number[]> {
+    try {
+      const { stdout } = await run(
+        this.config.ffprobePath,
+        [
+          '-v',
+          'error',
+          '-select_streams',
+          'v:0',
+          '-show_entries',
+          'packet=pts_time,flags',
+          '-of',
+          'csv=p=0',
+          path,
+        ],
+        { maxBuffer: 256 * 1024 * 1024, timeout: this.config.ffmpegTimeoutSeconds * 1000 },
+      )
+      return parseKeyframes(stdout)
     } catch (error) {
       if (wasKilled(error)) {
         throw new FfmpegTimeoutError({ tool: 'ffprobe', seconds: this.config.ffmpegTimeoutSeconds })

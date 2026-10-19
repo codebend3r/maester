@@ -53,6 +53,22 @@ describe('the media index', () => {
     expect(index().storedTracks(id)).toBeNull()
   })
 
+  it('keeps the keyframes saved for a file, and forgets them when the file changes', () => {
+    const id = add('keyframes')
+    expect(index().storedKeyframes(id)).toBeNull()
+    index().saveKeyframes({ id, keyframes: [0, 2.5, 4.004] })
+    expect(index().storedKeyframes(id)).toEqual([0, 2.5, 4.004])
+    index().markChanged({ id, size: 200, mtimeMs: 2 })
+    expect(index().storedKeyframes(id)).toBeNull()
+  })
+
+  it('reads keyframes that no longer parse as none', () => {
+    const id = add('garbled')
+    index().saveKeyframes({ id, keyframes: [1] })
+    database.get().db.prepare('UPDATE media SET keyframes = ? WHERE id = ?').run('["a"]', id)
+    expect(index().storedKeyframes(id)).toBeNull()
+  })
+
   it('counts a file probed before tracks were stored as not probed, so the scan probes it again', () => {
     index().saveProbe({ id: add('with'), probe: PROBE, tracks: TRACKS })
     const before = add('before')
