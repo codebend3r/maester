@@ -6,6 +6,9 @@ import { renderWithProviders } from '@/test/render'
 /** Stands in for the player: says which video the page went to. */
 const Watching = () => <p>Watching {useParams().id}</p>
 
+/** Stands in for an item's page, where a test puts the page behind the library. */
+const Item = () => <p>Item {useParams().id}</p>
+
 /** Prints where the page is, path and query string, so a test can read where it went and what it wrote there. */
 const Address = () => {
   const { pathname, search } = useLocation()
@@ -16,15 +19,17 @@ const Address = () => {
  * Opens a library's page at `route`, routed as the app routes it: All at
  * the library's own address, each other tab beneath it, and the player.
  * The library and its listings come from whatever the test spies serve;
- * `libraries` is the list the side menu has read, if any, and `adminLock`
- * the admin lock, off unless given.
+ * `behind` is the pages before it in history, `libraries` the list the side
+ * menu has read, if any, and `adminLock` the admin lock, off unless given.
  */
 export const renderLibraryPage = ({
   route = '/libraries/2',
+  behind,
   libraries = null,
   adminLock,
 }: {
   route?: string
+  behind?: string[]
   libraries?: Library[] | null
   adminLock?: AdminLock
 } = {}) =>
@@ -35,11 +40,13 @@ export const renderLibraryPage = ({
           <Route path="libraries/:id" element={<LibraryPage />} />
           <Route path="libraries/:id/:section" element={<LibraryPage />} />
           <Route path="watch/:id" element={<Watching />} />
+          <Route path="movies/:id" element={<Item />} />
         </Routes>
         <Address />
       </>
     ),
     route,
+    behind,
     libraries,
     adminLock,
   })

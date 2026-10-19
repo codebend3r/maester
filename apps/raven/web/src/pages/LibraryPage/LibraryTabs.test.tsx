@@ -59,18 +59,20 @@ describe('LibraryPage tabs', () => {
   const open = ({
     kind = 'movies',
     route = '/libraries/2',
+    behind,
     settings = {},
     adminLock,
   }: {
     kind?: LibraryKind
     route?: string
+    behind?: string[]
     settings?: Partial<LibrarySettings>
     adminLock?: AdminLock
   } = {}) => {
     spies.get.mockImplementation(async () =>
       library({ id: 2, name: 'Films', settings: { ...library().settings, kind, ...settings } }),
     )
-    renderLibraryPage({ route, adminLock })
+    renderLibraryPage({ route, behind, adminLock })
   }
 
   it('offers the tabs its type has, with All open first', async () => {
@@ -190,6 +192,17 @@ describe('LibraryPage tabs', () => {
     expect(screen.getByTestId('address')).toHaveTextContent('/libraries/2/in-progress')
     await userEvent.click(screen.getByRole('link', { name: 'All' }))
     expect(await screen.findByRole('link', { name: /Wide/ })).toBeInTheDocument()
+  })
+
+  it('swaps tabs in place, so Back leaves the library rather than stepping through them', async () => {
+    open({ behind: ['/movies/1'] })
+    await screen.findByRole('link', { name: /Wide/ })
+    await userEvent.click(screen.getByRole('link', { name: 'In progress' }))
+    expect(await screen.findByText(/Nothing in progress in Films/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('link', { name: 'Favourites' }))
+    expect(await screen.findByText(/No favourites in Films yet/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.getByTestId('address')).toHaveTextContent(/^\/movies\/1$/)
   })
 
   it('says why nothing is in progress in a library that does not save where videos stop', async () => {

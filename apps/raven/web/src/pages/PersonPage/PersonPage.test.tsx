@@ -112,6 +112,9 @@ const Address = () => {
   return <output aria-label="Address">{`${pathname}${search}`}</output>
 }
 
+/** Stands in for the page behind the person's, where Back should land. */
+const Behind = () => <p>Behind</p>
+
 const renderPerson = ({
   route = '/people/7',
   behind = [],
@@ -121,6 +124,7 @@ const renderPerson = ({
       <>
         <Routes>
           <Route path="people/:id" element={<PersonPage />} />
+          <Route path="movies/:id" element={<Behind />} />
         </Routes>
         <Address />
       </>
