@@ -92,6 +92,8 @@ Migration 27:
 ### Fetching
 
 - **Single-flight.** One fetch per person at a time, at most 2 people at once.
+- **Who starts it.** A first fetch starts only for a viewer who can see at least one of the person's titles. A person whose titles are all hidden from the viewer is never looked up.
+- **A full line.** At most 2 lookups run and 20 wait. Past that, the answer says `pending` without queueing, and the page's next ask tries again.
 - **First view.** The fetch runs inline with a deadline of 2,500 ms. Past it, the answer says `pending`, the fetch carries on, and the page asks again every 1,500 ms.
 - **Stale.** A filmography older than 14 days is served as it is and fetched again in the background.
 - **Failure.** A failed fetch is remembered for 10 minutes, so polling doesn't retry it.

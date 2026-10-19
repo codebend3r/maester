@@ -5,12 +5,13 @@ import { PRODUCTION_STATISTICS } from '@/test/queryPlans'
 /**
  * Tables the copy has no statistics for, as `ANALYZE` gives an empty table
  * none: `ai_decisions` was empty on the real server, and `saga_backdrops`
- * and `item_favourites` came after the copy was taken.
+ * and `item_favourites` and `person_credits` came after the copy was taken.
  */
 const NOT_IN_THE_COPY: ReadonlySet<string> = new Set([
   'ai_decisions',
   'saga_backdrops',
   'item_favourites',
+  'person_credits',
 ])
 
 /** A `sqlite_stat1` row's table and index, as one comparable key. */

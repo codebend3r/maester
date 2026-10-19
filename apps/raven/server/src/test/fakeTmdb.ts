@@ -128,6 +128,144 @@ export const movieBody = (movie: FakeMovie): Record<string, unknown> => ({
   },
 })
 
+/** One entry of a person's `combined_credits`: cast with a character, or crew with a job and department. */
+type FakePersonCredit = {
+  creditId: string
+  mediaType: 'movie' | 'tv'
+  id: number
+  title: string
+  /** YYYY-MM-DD; left out for a title with no date. */
+  date?: string
+  poster?: string | null
+  genreIds?: number[]
+  /** A show's `episode_count`. */
+  episodes?: number
+} & ({ character: string } | { job: string; department: string })
+
+export type FakePerson = {
+  id: number
+  name: string
+  photo?: string | null
+  imdbId?: string
+  birthday?: string
+  deathday?: string
+  placeOfBirth?: string
+  biography?: string
+  knownFor?: string
+  credits: FakePersonCredit[]
+}
+
+/** Keanu Reeves, who is in the fake movies' cast: a title raven has, one it lacks, shows and crew work. */
+export const keanuReeves: FakePerson = {
+  id: 6384,
+  name: 'Keanu Reeves',
+  photo: '/keanu.jpg',
+  imdbId: 'nm0000206',
+  birthday: '1964-09-02',
+  placeOfBirth: 'Beirut, Lebanon',
+  biography: 'Keanu Charles Reeves is a Canadian actor.',
+  knownFor: 'Acting',
+  credits: [
+    {
+      creditId: 'keanu-matrix',
+      mediaType: 'movie',
+      id: 603,
+      title: 'The Matrix',
+      date: '1999-03-31',
+      poster: '/poster603.jpg',
+      genreIds: [28, 878],
+      character: 'Neo',
+    },
+    {
+      creditId: 'keanu-john-wick',
+      mediaType: 'movie',
+      id: 245891,
+      title: 'John Wick',
+      date: '2014-10-22',
+      poster: '/poster245891.jpg',
+      genreIds: [28, 53],
+      character: 'John Wick',
+    },
+    {
+      creditId: 'keanu-dogstar',
+      mediaType: 'tv',
+      id: 9100,
+      title: 'Dogstar Diaries',
+      date: '1999-06-01',
+      poster: '/showposter9100.jpg',
+      genreIds: [99],
+      episodes: 12,
+      character: 'Bassist',
+    },
+    {
+      creditId: 'keanu-late-show',
+      mediaType: 'tv',
+      id: 9101,
+      title: 'The Late Show',
+      date: '1993-08-30',
+      poster: null,
+      genreIds: [10767],
+      episodes: 3,
+      character: 'Self',
+    },
+    {
+      creditId: 'keanu-bill-and-ted',
+      mediaType: 'movie',
+      id: 501170,
+      title: 'Bill & Ted Face the Music',
+      date: '2020-08-27',
+      poster: '/poster501170.jpg',
+      genreIds: [35, 878],
+      job: 'Executive Producer',
+      department: 'Production',
+    },
+    {
+      creditId: 'keanu-thanks',
+      mediaType: 'movie',
+      id: 9003,
+      title: 'A Film With Thanks',
+      genreIds: [18],
+      job: 'Thanks',
+      department: 'Crew',
+    },
+  ],
+}
+
+/** A person as `/person/{id}` answers with combined credits and external ids appended. */
+export const personBody = (person: FakePerson): Record<string, unknown> => {
+  const entry = (credit: FakePersonCredit): Record<string, unknown> => ({
+    credit_id: credit.creditId,
+    media_type: credit.mediaType,
+    id: credit.id,
+    adult: false,
+    ...(credit.mediaType === 'movie'
+      ? { title: credit.title, release_date: credit.date ?? '' }
+      : { name: credit.title, first_air_date: credit.date ?? '', episode_count: credit.episodes }),
+    poster_path: credit.poster ?? null,
+    genre_ids: credit.genreIds ?? [],
+  })
+  const cast = person.credits.flatMap((credit) =>
+    'character' in credit ? [{ ...entry(credit), character: credit.character, order: 0 }] : [],
+  )
+  const crew = person.credits.flatMap((credit) =>
+    'job' in credit ? [{ ...entry(credit), job: credit.job, department: credit.department }] : [],
+  )
+  return {
+    id: person.id,
+    name: person.name,
+    adult: false,
+    profile_path: person.photo ?? null,
+    imdb_id: person.imdbId ?? null,
+    birthday: person.birthday ?? null,
+    deathday: person.deathday ?? null,
+    place_of_birth: person.placeOfBirth ?? null,
+    biography: person.biography ?? '',
+    known_for_department: person.knownFor ?? null,
+    external_ids: { imdb_id: person.imdbId ?? null },
+    combined_credits: { cast, crew },
+  }
+}
+
 export type FakeEpisode = { number: number; title: string; aired: string }
 
 export type FakeShow = {
@@ -263,27 +401,31 @@ const searchWords = (title: string): string =>
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
 
-/**
- * TMDB in miniature: searches by a title or alternative title holding the
- * query (year optional), `/find` by IMDb id, and movies by id. `down` makes every call fail as if TMDB were
- * unreachable, and `failing` lists the paths (after `/3`) whose calls fail
- * the same way, by prefix; `omdbSpent` makes OMDb answer as it does once a
- * key's day is used up; `calls` records each URL asked for. `hold` keeps the
- * searches for a title waiting until it is let go, so a pass stays busy.
- */
 /** OMDb's answer for an IMDb id, as its `Ratings` strings. */
 export type FakeOmdb = Record<
   string,
   { imdb?: string; rottenTomatoes?: string; metacritic?: string }
 >
 
+/**
+ * TMDB in miniature: searches by a title or alternative title holding the
+ * query (year optional), `/find` by IMDb id, and movies by id. `down` makes every call fail as if TMDB were
+ * unreachable, and `failing` lists the paths (after `/3`) whose calls fail
+ * the same way, by prefix; `omdbSpent` makes OMDb answer as it does once a
+ * key's day is used up; `calls` records each URL asked for. `hold` keeps the
+ * searches for a title waiting until it is let go, so a pass stays busy, and
+ * `holdPerson` does the same for one person's `/person/{id}`; `personCalls`
+ * counts those.
+ */
 export const fakeTmdb = ({
   movies,
   shows = [],
+  people = [keanuReeves],
   omdb = {},
 }: {
   movies: FakeMovie[]
   shows?: FakeShow[]
+  people?: FakePerson[]
   omdb?: FakeOmdb
 }) => {
   const calls: string[] = []
@@ -295,8 +437,10 @@ export const fakeTmdb = ({
     calls,
     movies,
     shows,
+    people,
     omdb,
     omdbCalls: 0,
+    personCalls: 0,
   }
   // Searches kept waiting, by lower-cased title, and what lets each go.
   const held = new Map<string, Promise<void>>()
@@ -310,6 +454,22 @@ export const fakeTmdb = ({
     )
     return () => {
       held.delete(title.toLowerCase())
+      gate.open()
+    }
+  }
+
+  // People kept waiting, by TMDB id, and what lets each go.
+  const heldPeople = new Map<number, Promise<void>>()
+  const holdPerson = (id: number): (() => void) => {
+    const gate = { open: () => {} }
+    heldPeople.set(
+      id,
+      new Promise((resolve) => {
+        gate.open = resolve
+      }),
+    )
+    return () => {
+      heldPeople.delete(id)
       gate.open()
     }
   }
@@ -525,6 +685,16 @@ export const fakeTmdb = ({
         : json({ body: { status_code: 34 }, status: 404 })
     }
 
+    const person = /^\/person\/(\d+)$/.exec(path)
+    if (person) {
+      state.personCalls += 1
+      await heldPeople.get(Number(person[1]))
+      const found = state.people.find((entry) => String(entry.id) === person[1])
+      return found
+        ? json({ body: personBody(found) })
+        : json({ body: { status_code: 34 }, status: 404 })
+    }
+
     const movie = /^\/movie\/(\d+)$/.exec(path)
     if (movie) {
       const found = state.movies.find((entry) => String(entry.id) === movie[1])
@@ -550,5 +720,5 @@ export const fakeTmdb = ({
     return json({ body: { status_code: 34 }, status: 404 })
   }
 
-  return { fetch, state, hold }
+  return { fetch, state, hold, holdPerson }
 }

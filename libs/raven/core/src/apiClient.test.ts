@@ -655,8 +655,11 @@ describe('the metadata calls', () => {
   it('fetches a person and builds avatar URLs', async () => {
     const person: PersonDetails = {
       id: 5,
+      tmdbId: '6384',
       name: 'Keanu Reeves',
       photoVersion: 'k',
+      profile: null,
+      filmography: { state: 'unavailable' },
       credits: [{ item: itemSummary(), job: 'cast', role: 'Neo' }],
     }
     const { client, calls } = clientReturning(respond({ body: person }))
@@ -746,6 +749,21 @@ describe('the metadata calls', () => {
       'http://nas:8484/api/people/5/photo?v=x',
     )
     expect(client.candidatePosterUrl('/abc.jpg')).toBe('http://nas:8484/api/images/poster/abc.jpg')
+  })
+
+  it('lists a TMDB poster at each width, the middle as its src and the widest at its own URL', () => {
+    const { client } = clientReturning(respond({}))
+    expect(client.tmdbPosterSources('/abc.jpg').srcSet).toContain(
+      `${client.candidatePosterUrl('/abc.jpg')} 500w`,
+    )
+    expect(client.tmdbPosterSources('/abc.jpg')).toEqual({
+      src: 'http://nas:8484/api/images/poster/abc.jpg?w=342',
+      srcSet: [
+        'http://nas:8484/api/images/poster/abc.jpg?w=185 185w',
+        'http://nas:8484/api/images/poster/abc.jpg?w=342 342w',
+        'http://nas:8484/api/images/poster/abc.jpg 500w',
+      ].join(', '),
+    })
   })
 
   it("lists a poster at each of its widths, the widest at the poster's own URL", () => {

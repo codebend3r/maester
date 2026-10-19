@@ -3,7 +3,8 @@ import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { LOCAL, localEpisode, localSeason } from '@/metadata/localItems'
 import { MatchFiles } from '@/metadata/matchFiles'
-import type { FetchedItem } from '@/metadata/tmdbClient'
+import { BLANK_ITEM, type FetchedItem, type FetchedPerson } from '@/metadata/tmdbClient'
+import { PeopleRepository } from '@/people/peopleRepository'
 import { testDatabase } from '@/test/database'
 import { repositories } from '@/test/repositories'
 
@@ -206,5 +207,129 @@ describe('the pictures that stand for an item', () => {
     expect(backdropOf(ids.bare)).toBe(ids.show)
     expect(backdropOf(ids.movie)).toBe(ids.movie)
     expect(images.backdropFor(ids.plain)).toBeNull()
+  })
+})
+
+describe('the libraries holding each item, and the people cleared up', () => {
+  const database = testDatabase('raven-holding-each-')
+  const metadata = () => repositories(database.get()).metadata
+  const ids = { shows: 0, films: 0, show: 0, episode: 0, movie: 0, bare: 0 }
+
+  /** A file in `libraryId` under `root`, as a scan leaves it. */
+  const file = ({ libraryId, root, name }: { libraryId: number; root: string; name: string }) =>
+    new MediaIndex(database.get()).insert({
+      libraryId,
+      kind: 'other',
+      file: { path: `${root}/${name}`, root, size: 1, mtimeMs: 1 },
+    })
+
+  beforeAll(async () => {
+    await database.open()
+    const libraries = new LibrariesRepository(database.get())
+    ids.shows = libraries.create({ name: 'Shows', paths: ['/tv'], settings: { kind: 'shows' } }).id
+    ids.films = libraries.create({
+      name: 'Films',
+      paths: ['/films'],
+      settings: { kind: 'movies' },
+    }).id
+    const stored = metadata()
+    ids.show = stored.save({ item: show })
+    ids.episode =
+      stored
+        .saveSeason({
+          showId: ids.show,
+          number: 1,
+          season: localSeason({ showTmdbId: '500', number: 1 }),
+          episodes: [episode(1)],
+        })
+        .episodes.get(1) ?? 0
+    const movie = (tmdbId: string): FetchedItem => ({
+      ...BLANK_ITEM,
+      type: 'movie',
+      tmdbId,
+      number: null,
+      title: `Movie ${tmdbId}`,
+    })
+    ids.movie = stored.save({ item: movie('600') })
+    ids.bare = stored.save({ item: movie('601') })
+    stored.link({
+      mediaIds: [file({ libraryId: ids.shows, root: '/tv', name: 'Slow Horses/S01E01.mkv' })],
+      itemIds: [ids.episode],
+    })
+    stored.link({
+      mediaIds: [
+        file({ libraryId: ids.films, root: '/films', name: 'Movie 600.mkv' }),
+        file({ libraryId: ids.shows, root: '/tv', name: 'Movie 600.mkv' }),
+      ],
+      itemIds: [ids.movie],
+    })
+  })
+
+  afterAll(database.close)
+
+  it("reaches a show through its episodes' files, and leaves out an item with none", () => {
+    const holding = metadata().librariesHoldingEach([ids.show, ids.movie, ids.bare, ids.show])
+    expect([...holding.keys()].toSorted()).toEqual([ids.show, ids.movie].toSorted())
+    expect(holding.get(ids.show)).toEqual([ids.shows])
+    expect(holding.get(ids.movie)?.toSorted()).toEqual([ids.shows, ids.films].toSorted())
+    expect(metadata().librariesHoldingEach([]).size).toBe(0)
+  })
+
+  it('keeps a person with no credits whose filmography was fetched lately, and their credits go with them', () => {
+    const stored = metadata()
+    const people = new PeopleRepository(database.get())
+    const gone = stored.save({
+      item: {
+        ...BLANK_ITEM,
+        type: 'movie',
+        tmdbId: '602',
+        number: null,
+        title: 'Gone',
+        credits: [
+          { tmdbId: '1', name: 'Seen Yesterday', photo: null, job: 'cast', role: null },
+          { tmdbId: '2', name: 'Seen Long Ago', photo: null, job: 'cast', role: null },
+          { tmdbId: '3', name: 'Never Seen', photo: null, job: 'cast', role: null },
+        ],
+      },
+    })
+    const [yesterday, longAgo, never] = stored.credits(gone).map((credit) => credit.personId)
+    const person: FetchedPerson = {
+      tmdbId: '1',
+      name: 'Someone',
+      photo: null,
+      imdbId: null,
+      birthday: null,
+      deathday: null,
+      placeOfBirth: null,
+      biography: null,
+      knownFor: null,
+      credits: [
+        {
+          creditId: 'c1',
+          type: 'movie',
+          tmdbId: '602',
+          title: 'Gone',
+          released: null,
+          poster: null,
+          genreIds: [],
+          department: 'Acting',
+          role: null,
+          episodes: null,
+          position: 0,
+        },
+      ],
+    }
+    const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60_000).toISOString()
+    people.saveFilmography({ personId: yesterday!, tmdbId: '1', person, at: daysAgo(1) })
+    people.saveFilmography({ personId: longAgo!, tmdbId: '2', person, at: daysAgo(200) })
+    expect(people.filmographyRows(longAgo!)).toHaveLength(1)
+
+    stored.clearUp()
+    expect(stored.get(gone)).toBeNull()
+    expect(people.profile(yesterday!)).not.toBeNull()
+    expect(people.filmographyRows(yesterday!)).toHaveLength(1)
+    expect(people.profile(longAgo!)).toBeNull()
+    expect(people.filmographyRows(longAgo!)).toEqual([])
+    expect(people.profile(never!)).toBeNull()
   })
 })

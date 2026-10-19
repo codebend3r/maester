@@ -43,8 +43,11 @@ describe('PersonPage', () => {
   it("lists what raven holds of a person's, grouped by job, as poster cards", async () => {
     spy.mockImplementation(async () => ({
       id: 7,
+      tmdbId: '700',
       name: 'Keanu Reeves',
       photoVersion: 'k1',
+      profile: null,
+      filmography: { state: 'unavailable' },
       credits: [
         { item: MATRIX, job: 'cast', role: 'Neo' },
         { item: SHOW, job: 'director', role: 'Director' },
@@ -85,8 +88,11 @@ describe('PersonPage', () => {
   it("counts their credits over their name, and each group's titles by its heading", async () => {
     spy.mockImplementation(async () => ({
       id: 7,
+      tmdbId: '700',
       name: 'Keanu Reeves',
       photoVersion: 'k1',
+      profile: null,
+      filmography: { state: 'unavailable' },
       credits: [
         { item: MATRIX, job: 'cast', role: 'Neo' },
         { item: SHOW, job: 'guest', role: 'Himself' },
@@ -113,8 +119,11 @@ describe('PersonPage', () => {
   it('shows their initials where they have no photo, and says when nothing credits them', async () => {
     spy.mockImplementation(async () => ({
       id: 8,
+      tmdbId: '800',
       name: 'Bertha Navarro',
       photoVersion: null,
+      profile: null,
+      filmography: { state: 'unavailable' },
       credits: [],
     }))
     const { container } = renderWithProviders({
@@ -136,8 +145,11 @@ describe('PersonPage', () => {
   it('steps back to the page it came from, else links home', async () => {
     spy.mockImplementation(async () => ({
       id: 7,
+      tmdbId: '700',
       name: 'Keanu Reeves',
       photoVersion: null,
+      profile: null,
+      filmography: { state: 'unavailable' },
       credits: [],
     }))
     const page = (

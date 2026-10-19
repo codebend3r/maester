@@ -7,10 +7,11 @@ import {
   TmdbError,
   mergeCredits,
   pickLogo,
+  toPerson,
   toSeason,
   toShow,
 } from '@/metadata/tmdbClient'
-import { fakeTmdb, movieBody, seasonBody, showBody } from '@/test/fakeTmdb'
+import { fakeTmdb, keanuReeves, movieBody, personBody, seasonBody, showBody } from '@/test/fakeTmdb'
 
 const config = (token: string | null = 'secret-token') => ({
   ...readServerConfig({}),
@@ -528,5 +529,212 @@ describe('mergeCredits', () => {
         { tmdbId: '1', name: 'A', photo: null, job: 'writer', role: 'Story' },
       ]),
     ).toEqual([{ tmdbId: '1', name: 'A', photo: null, job: 'writer', role: 'Screenplay / Story' }])
+  })
+})
+
+describe('toPerson and person', () => {
+  const credit = (fields: Record<string, unknown>) => ({
+    credit_id: 'c1',
+    media_type: 'movie',
+    id: 1,
+    title: 'A Film',
+    ...fields,
+  })
+  const withCredits = ({ cast = [], crew = [] }: { cast?: unknown[]; crew?: unknown[] }) => ({
+    id: 5,
+    name: 'Someone',
+    combined_credits: { cast, crew },
+  })
+
+  it('reads a person and every credit, cast before crew, as movies and shows', () => {
+    const parsed = toPerson(personBody(keanuReeves))
+    expect(parsed).toMatchObject({
+      tmdbId: '6384',
+      name: 'Keanu Reeves',
+      photo: '/keanu.jpg',
+      imdbId: 'nm0000206',
+      birthday: '1964-09-02',
+      deathday: null,
+      placeOfBirth: 'Beirut, Lebanon',
+      knownFor: 'Acting',
+    })
+    expect(
+      parsed?.credits.map(({ creditId, type, department, role, episodes, position }) => ({
+        creditId,
+        type,
+        department,
+        role,
+        episodes,
+        position,
+      })),
+    ).toEqual([
+      {
+        creditId: 'keanu-matrix',
+        type: 'movie',
+        department: 'Acting',
+        role: 'Neo',
+        episodes: null,
+        position: 0,
+      },
+      {
+        creditId: 'keanu-john-wick',
+        type: 'movie',
+        department: 'Acting',
+        role: 'John Wick',
+        episodes: null,
+        position: 1,
+      },
+      {
+        creditId: 'keanu-dogstar',
+        type: 'show',
+        department: 'Acting',
+        role: 'Bassist',
+        episodes: 12,
+        position: 2,
+      },
+      {
+        creditId: 'keanu-late-show',
+        type: 'show',
+        department: 'Acting',
+        role: 'Self',
+        episodes: 3,
+        position: 3,
+      },
+      {
+        creditId: 'keanu-bill-and-ted',
+        type: 'movie',
+        department: 'Production',
+        role: 'Executive Producer',
+        episodes: null,
+        position: 4,
+      },
+      {
+        creditId: 'keanu-thanks',
+        type: 'movie',
+        department: 'Crew',
+        role: 'Thanks',
+        episodes: null,
+        position: 5,
+      },
+    ])
+    expect(parsed?.credits[3]).toMatchObject({
+      genreIds: [10767],
+      poster: null,
+      released: '1993-08-30',
+    })
+  })
+
+  it("takes a show's name and first air date, and passes over any other media type", () => {
+    const parsed = toPerson(
+      withCredits({
+        cast: [
+          {
+            credit_id: 'a',
+            media_type: 'tv',
+            id: 2,
+            name: 'A Show',
+            first_air_date: '2020-01-01',
+            episode_count: 4,
+          },
+          { credit_id: 'b', media_type: 'person', id: 3, name: 'Not A Title' },
+        ],
+      }),
+    )
+    expect(parsed?.credits).toMatchObject([
+      { type: 'show', title: 'A Show', released: '2020-01-01', episodes: 4 },
+    ])
+  })
+
+  it('drops an adult credit, one with no title and one with no id', () => {
+    const parsed = toPerson(
+      withCredits({
+        cast: [
+          credit({ credit_id: 'adult', adult: true }),
+          credit({ credit_id: 'untitled', title: '' }),
+          credit({ credit_id: 'no-id', id: null }),
+          credit({ credit_id: 'kept' }),
+        ],
+      }),
+    )
+    expect(parsed?.credits.map((entry) => entry.creditId)).toEqual(['kept'])
+  })
+
+  it('keeps the first of a repeated credit_id, and numbers the credits that stay', () => {
+    const parsed = toPerson(
+      withCredits({
+        cast: [
+          credit({ credit_id: 'x', title: 'First', character: 'One' }),
+          credit({ credit_id: 'x', title: 'Again', character: 'Two' }),
+          credit({ credit_id: 'y', title: 'Other' }),
+        ],
+        crew: [credit({ credit_id: 'x', title: 'Crew', job: 'Director', department: 'Directing' })],
+      }),
+    )
+    expect(parsed?.credits.map((entry) => [entry.title, entry.position])).toEqual([
+      ['First', 0],
+      ['Other', 1],
+    ])
+  })
+
+  it('reads a crew credit with its department and job as the role', () => {
+    const parsed = toPerson(
+      withCredits({
+        crew: [
+          credit({ job: 'Director', department: 'Directing' }),
+          credit({ credit_id: 'c2', job: 'Writer' }),
+        ],
+      }),
+    )
+    expect(parsed?.credits.map((entry) => [entry.department, entry.role])).toEqual([
+      ['Directing', 'Director'],
+      ['Crew', 'Writer'],
+    ])
+  })
+
+  it('reads an empty string as nothing', () => {
+    const parsed = toPerson({
+      ...withCredits({
+        cast: [credit({ character: '', release_date: '', first_air_date: '', poster_path: '' })],
+      }),
+      biography: '',
+      place_of_birth: '',
+      imdb_id: '',
+    })
+    expect(parsed).toMatchObject({ biography: null, placeOfBirth: null, imdbId: null })
+    expect(parsed?.credits[0]).toMatchObject({ role: null, released: null, poster: null })
+  })
+
+  it("falls back to external_ids for the person's IMDb id", () => {
+    expect(toPerson({ ...withCredits({}), external_ids: { imdb_id: 'nm1' } })?.imdbId).toBe('nm1')
+    expect(
+      toPerson({ ...withCredits({}), imdb_id: 'nm2', external_ids: { imdb_id: 'nm1' } })?.imdbId,
+    ).toBe('nm2')
+  })
+
+  it('reads nothing from a body with no id or name', () => {
+    expect(toPerson({ id: 1 })).toBeNull()
+    expect(toPerson(null)).toBeNull()
+  })
+
+  it('asks TMDB for the person with credits and external ids appended', async () => {
+    const tmdb = fakeTmdb({ movies: [] })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    const person = await client.person('6384')
+    expect(person).toEqual(toPerson(personBody(keanuReeves)))
+    expect(person.credits).toHaveLength(6)
+    expect(tmdb.state.personCalls).toBe(1)
+    const asked = new URL(tmdb.state.calls[0] ?? '')
+    expect(asked.pathname).toBe('/3/person/6384')
+    expect(asked.searchParams.get('append_to_response')).toBe('combined_credits,external_ids')
+  })
+
+  it('says a person TMDB lacks is not found', async () => {
+    const client = new TmdbClient(config(), fakeTmdb({ movies: [] }).fetch)
+    await expect(client.person('1')).rejects.toMatchObject({ kind: 'not-found' })
+  })
+
+  it('fails as the other calls do for a body it cannot read', async () => {
+    const client = new TmdbClient(config(), respond([() => json({ body: { id: 1 } })]))
+    await expect(client.person('1')).rejects.toMatchObject({ kind: 'unavailable' })
   })
 })

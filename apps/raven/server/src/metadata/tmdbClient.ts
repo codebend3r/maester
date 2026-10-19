@@ -104,6 +104,41 @@ export type FetchedCredit = {
   role: string | null
 }
 
+/** One credit on a person's page: a movie or show they acted in or worked on. */
+export type FetchedPersonCredit = {
+  /** TMDB's own id for the credit, which stays the same between fetches. */
+  creditId: string
+  type: MatchItemType
+  tmdbId: string
+  title: string
+  released: string | null
+  poster: string | null
+  genreIds: number[]
+  /** TMDB's department for a crew credit, and `Acting` for a cast one. */
+  department: string
+  /** The character for cast, the job for crew. */
+  role: string | null
+  /** How many episodes of a show, as TMDB counts them. */
+  episodes: number | null
+  /** Where it came in TMDB's list: cast first, then crew. */
+  position: number
+}
+
+/** A person as TMDB describes them, with every credit it lists. */
+export type FetchedPerson = {
+  tmdbId: string
+  name: string
+  photo: string | null
+  imdbId: string | null
+  birthday: string | null
+  deathday: string | null
+  placeOfBirth: string | null
+  biography: string | null
+  /** The department TMDB knows them for: `Acting`, `Directing`. */
+  knownFor: string | null
+  credits: FetchedPersonCredit[]
+}
+
 /** A review by a TMDB member, as TMDB hands it on. */
 type FetchedReview = {
   tmdbId: string
@@ -245,7 +280,7 @@ const imagePath = (value: unknown): string | null => {
   return path != null && TMDB_IMAGE_PATH.test(path) ? path : null
 }
 
-const yearOf = (date: string | null): number | null => {
+export const yearOf = (date: string | null): number | null => {
   const year = Number(date?.slice(0, 4) ?? '')
   return date != null && /^\d{4}/.test(date) && year > 0 ? year : null
 }
@@ -629,6 +664,77 @@ const toMovie = ({
     ]),
     rating: tmdbRating(movie),
     reviews: toReviews(movie.reviews),
+  }
+}
+
+const mediaTypeOf = (value: unknown): MatchItemType | null =>
+  value === 'movie' ? 'movie' : value === 'tv' ? 'show' : null
+
+/** One entry of `combined_credits`, or null for one raven leaves out. */
+const toPersonCredit = ({
+  entry,
+  department,
+  role,
+}: {
+  entry: Record<string, unknown>
+  department: string
+  role: string | null
+}): Omit<FetchedPersonCredit, 'position'> | null => {
+  const type = mediaTypeOf(entry.media_type)
+  const creditId = idOf(entry.credit_id)
+  const tmdbId = idOf(entry.id)
+  const title = text(entry.title) ?? text(entry.name)
+  if (type == null || creditId == null || tmdbId == null || title == null) return null
+  if (entry.adult === true) return null
+  return {
+    creditId,
+    type,
+    tmdbId,
+    title,
+    released: text(entry.release_date) ?? text(entry.first_air_date),
+    poster: imagePath(entry.poster_path),
+    genreIds: list(entry.genre_ids).filter(isNumber),
+    department,
+    role,
+    episodes: number(entry.episode_count),
+  }
+}
+
+/**
+ * A person with their `combined_credits` and `external_ids` appended, cast
+ * before crew. A credit TMDB lists twice keeps its first place.
+ */
+export const toPerson = (body: unknown): FetchedPerson | null => {
+  const details = record(body)
+  const found = person(details)
+  if (!found) return null
+  const combined = record(details.combined_credits)
+  const listed = [
+    ...records(combined.cast).map((entry) => ({
+      entry,
+      department: 'Acting',
+      role: text(entry.character),
+    })),
+    ...records(combined.crew).map((entry) => ({
+      entry,
+      department: text(entry.department) ?? 'Crew',
+      role: text(entry.job),
+    })),
+  ]
+    .flatMap((source) => toPersonCredit(source) ?? [])
+    .reduce(
+      (byId, credit) => (byId.has(credit.creditId) ? byId : byId.set(credit.creditId, credit)),
+      new Map<string, Omit<FetchedPersonCredit, 'position'>>(),
+    )
+  return {
+    ...found,
+    imdbId: text(details.imdb_id) ?? text(record(details.external_ids).imdb_id),
+    birthday: text(details.birthday),
+    deathday: text(details.deathday),
+    placeOfBirth: text(details.place_of_birth),
+    biography: text(details.biography),
+    knownFor: text(details.known_for_department),
+    credits: [...listed.values()].map((credit, position) => ({ ...credit, position })),
   }
 }
 
@@ -1023,5 +1129,21 @@ export class TmdbClient {
       })
     }
     return movie
+  }
+
+  /** A person and every movie and show TMDB credits them on, in one call. */
+  async person(tmdbId: string): Promise<FetchedPerson> {
+    const body = await this.get({
+      path: `/person/${encodeURIComponent(tmdbId)}`,
+      params: { append_to_response: 'combined_credits,external_ids' },
+    })
+    const found = toPerson(body)
+    if (!found) {
+      throw new TmdbError({
+        kind: 'unavailable',
+        message: `TMDB sent an unreadable person ${tmdbId}.`,
+      })
+    }
+    return found
   }
 }
