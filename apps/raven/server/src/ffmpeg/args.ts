@@ -1,5 +1,16 @@
-import { ENCODER_KINDS, PLAYBACK_MODES, type StreamMode } from '@raven/core'
+import { join } from 'node:path'
+import {
+  type AudioTrack,
+  ENCODER_KINDS,
+  HLS_COPY_AUDIO,
+  HLS_SEGMENT_SECONDS,
+  PLAYBACK_MODES,
+  STREAM_TIME_SHIFT,
+  type StreamMode,
+} from '@raven/core'
 import { SOFTWARE, type VideoEncoder } from '@/ffmpeg/encoder'
+import { SEGMENT_FILE_PATTERN } from '@/hls/segmentFiles'
+import { type SegmentPlan, runSegmentTimes } from '@/hls/segmentPlan'
 
 const QUIET = ['-hide_banner', '-loglevel', 'error', '-nostdin']
 
@@ -89,6 +100,15 @@ const GPU_DECODES: ReadonlySet<string> = new Set([VIDEO_CODECS.h264, VIDEO_CODEC
 const ceiling = (bitrate: number | null): string[] =>
   bitrate == null ? [] : ['-maxrate', String(bitrate), '-bufsize', String(bitrate * 2)]
 
+/** Video flags: those before `-i`, and the encoding after it. */
+type VideoArgs = { input: string[]; output: string[] }
+
+/** A remux's video, copied. Safari and AVPlayer only play HEVC in MP4 under the hvc1 tag. */
+const copyVideo = (videoCodec: string | null): VideoArgs => ({
+  input: [],
+  output: ['-c:v', 'copy', ...(videoCodec === VIDEO_CODECS.hevc ? ['-tag:v', 'hvc1'] : [])],
+})
+
 /**
  * The flags before `-i` and the video encoding after it, for a transcode.
  *
@@ -115,7 +135,7 @@ const transcodeVideo = ({
   maxHeight: number
   quality: TranscodeQuality
   bitrate: number | null
-}): { input: string[]; output: string[] } => {
+}): VideoArgs => {
   const scale = scaleTo(maxHeight)
   const squeeze = QUALITY[quality]
   const cpuFilters = [`scale=${scale}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
@@ -257,11 +277,7 @@ export const streamArgs = ({
 }): string[] => {
   const video =
     mode === PLAYBACK_MODES.remux
-      ? // Safari only plays HEVC in MP4 under the hvc1 tag.
-        {
-          input: [],
-          output: ['-c:v', 'copy', ...(videoCodec === VIDEO_CODECS.hevc ? ['-tag:v', 'hvc1'] : [])],
-        }
+      ? copyVideo(videoCodec)
       : transcodeVideo({ encoder, videoCodec, tonemap, maxHeight, quality, bitrate })
   return [
     ...QUIET,
@@ -299,6 +315,146 @@ export const streamArgs = ({
     '-frag_duration',
     '1000000',
     'pipe:1',
+  ]
+}
+
+/** E-AC-3 carries at most 5.1; a 7.1 track is folded down to it. */
+const EAC3_MAX_CHANNELS = 6
+const STEREO = 2
+
+/** E-AC-3's bitrate for a channel count: 5.1, the layouts between stereo and it, and stereo or mono. */
+const eac3Bitrate = (channels: number): string => {
+  if (channels >= EAC3_MAX_CHANNELS) return '640k'
+  if (channels > STEREO) return '448k'
+  return '224k'
+}
+
+/**
+ * How an HLS stream carries an audio track: copied when Apple's players and
+ * ExoPlayer decode it in fMP4, else E-AC-3 keeping the channels it can.
+ */
+export const hlsAudioArgs = (track: Pick<AudioTrack, 'codec' | 'channels'>): string[] => {
+  if (HLS_COPY_AUDIO.some((codec) => codec === track.codec)) return ['-c:a', 'copy']
+  const channels = Math.min(Math.max(track.channels ?? STEREO, 1), EAC3_MAX_CHANNELS)
+  return ['-c:a', 'eac3', '-ac', String(channels), '-b:a', eac3Bitrate(channels)]
+}
+
+/** Seconds as ffmpeg's arguments take them, to the millisecond like the plan. */
+const secondsArg = (seconds: number): string => seconds.toFixed(3)
+
+/**
+ * The segment muxer's MP4 options. Without `frag_discont`, `use_editlist=0`
+ * and its own `avoid_negative_ts=disabled`, every file's tfdt starts at zero:
+ * the outer `-avoid_negative_ts` does not reach the inner muxer.
+ */
+const SEGMENT_MP4_OPTIONS =
+  'movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont:use_editlist=0:avoid_negative_ts=disabled'
+
+/**
+ * One HLS run: the plan's segments from `from` onwards, each a file of its
+ * own in `folder`, on the file's clock plus `STREAM_TIME_SHIFT`. A run from
+ * any segment cuts exactly the segments a run from zero would (spec, "HLS
+ * muxing (2026-10-19)"):
+ *
+ * - `-copypriorss 0` drops what comes before `-ss`: with B-frames ffmpeg
+ *   seeks 3/23 s early, and a copy would keep the GOP before.
+ * - `-segment_times` are relative to the run's first video packet and
+ *   indexed by the files this run wrote, so they are the boundaries after
+ *   `from` minus boundary `from`. The 5 ms delta absorbs the truncated
+ *   keyframe times' error. The last segment gets a time past the end, since
+ *   an empty list would fall back to the muxer's two-second timer.
+ * - A transcode forces a keyframe at every boundary from `from` on, on the
+ *   file's clock, which `-copyts` keeps.
+ *
+ * The muxer lists each file on stdout once it has closed it, which is how
+ * the server knows a segment is whole.
+ */
+export const hlsArgs = ({
+  input,
+  plan,
+  from,
+  mode,
+  audio,
+  videoCodec,
+  encoder,
+  maxHeight,
+  quality,
+  bitrate,
+  tonemap,
+  folder,
+}: {
+  input: string
+  plan: SegmentPlan
+  /** The segment the run starts at. */
+  from: number
+  mode: StreamMode
+  /** The track to play, or null when the file has no audio. */
+  audio: AudioTrack | null
+  videoCodec: string | null
+  /** How a transcode encodes; a remux encodes nothing. */
+  encoder: VideoEncoder
+  maxHeight: number
+  quality: TranscodeQuality
+  /** A ceiling on the transcode's video bitrate, when the viewer asked for a size. */
+  bitrate: number | null
+  tonemap: boolean
+  folder: string
+}): string[] => {
+  const start = plan.boundaries[from] ?? 0
+  const times = runSegmentTimes({ plan, from })
+  const video =
+    mode === PLAYBACK_MODES.remux
+      ? copyVideo(videoCodec)
+      : transcodeVideo({ encoder, videoCodec, tonemap, maxHeight, quality, bitrate })
+  const keyframes =
+    mode === PLAYBACK_MODES.remux
+      ? []
+      : ['-force_key_frames', plan.boundaries.slice(from).map(secondsArg).join(',')]
+  return [
+    ...QUIET,
+    ...video.input,
+    ...(start > 0 ? ['-ss', secondsArg(start)] : []),
+    '-copyts',
+    '-start_at_zero',
+    '-i',
+    input,
+    '-copypriorss',
+    '0',
+    '-map',
+    '0:v:0',
+    ...(audio == null ? [] : ['-map', `0:a:${audio.index}`]),
+    ...video.output,
+    ...keyframes,
+    ...(audio == null ? [] : hlsAudioArgs(audio)),
+    '-sn',
+    '-dn',
+    '-map_metadata',
+    '-1',
+    '-map_chapters',
+    '-1',
+    '-output_ts_offset',
+    String(STREAM_TIME_SHIFT),
+    '-avoid_negative_ts',
+    'disabled',
+    '-f',
+    'segment',
+    '-segment_format',
+    'mp4',
+    '-segment_format_options',
+    SEGMENT_MP4_OPTIONS,
+    '-segment_times',
+    (times.length > 0 ? times : [plan.duration - start + HLS_SEGMENT_SECONDS])
+      .map(secondsArg)
+      .join(','),
+    '-segment_time_delta',
+    '0.005',
+    '-segment_start_number',
+    String(from),
+    '-segment_list',
+    'pipe:1',
+    '-segment_list_type',
+    'flat',
+    join(folder, SEGMENT_FILE_PATTERN),
   ]
 }
 

@@ -141,6 +141,19 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
    * A failure is logged with ffmpeg's own last line.
    */
   stream(args: string[]): FfmpegStream {
+    return this.spawnTracked({ args, purpose: 'stream' })
+  }
+
+  /**
+   * Starts an HLS segment run, which writes its segments to files and lists
+   * each on stdout as it closes it. Like a stream it has no time limit, its
+   * caller kills it, and the server kills what is left when it stops.
+   */
+  segment(args: string[]): FfmpegStream {
+    return this.spawnTracked({ args, purpose: 'segment run' })
+  }
+
+  private spawnTracked({ args, purpose }: { args: string[]; purpose: string }): FfmpegStream {
     const child = spawn(this.config.ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
     const stderr = { tail: '' }
     child.stderr.on('data', (chunk: Buffer) => {
@@ -151,7 +164,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     child.on('close', (code, signal) => {
       this.streams.delete(child)
       if (code !== 0 && signal == null) {
-        this.logger.warn(`ffmpeg stream failed (${code}): ${lastLine(stderr.tail)}`)
+        this.logger.warn(`ffmpeg ${purpose} failed (${code}): ${lastLine(stderr.tail)}`)
       }
     })
     return child

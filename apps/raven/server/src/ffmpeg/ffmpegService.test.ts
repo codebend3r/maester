@@ -54,6 +54,18 @@ describe('FfmpegService', () => {
     ])
   })
 
+  it('kills a segment run still going when the server stops', async () => {
+    const ffmpeg = service('slow')
+    const child = ffmpeg.segment([])
+    const closed = new Promise<NodeJS.Signals | null>((resolve) => {
+      child.on('close', (_code, signal) => resolve(signal))
+    })
+
+    ffmpeg.onModuleDestroy()
+
+    expect(await closed).toBe('SIGKILL')
+  })
+
   it("passes on ffprobe's own reason for a broken file", async () => {
     const failure = service('broken').probeFile('/media/a.mkv')
     await expect(failure).rejects.toThrow('Invalid data found when processing input')

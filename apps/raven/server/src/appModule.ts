@@ -22,6 +22,7 @@ import { ServerEvents } from '@/events/serverEvents'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { BrowseController } from '@/fs/browseController'
 import { HealthController } from '@/health/healthController'
+import { HLS_CLOCK, HlsSessions, SYSTEM_CLOCK } from '@/hls/hlsSessions'
 import { KeyframesService } from '@/hls/keyframesService'
 import { ItemsController } from '@/items/itemsController'
 import { MatchController } from '@/items/matchController'
@@ -206,6 +207,8 @@ export class AppModule {
         ThumbnailService,
         TracksService,
         KeyframesService,
+        { provide: HLS_CLOCK, useValue: SYSTEM_CLOCK },
+        HlsSessions,
         SubtitlesService,
         MediaArtifacts,
         ScannerService,

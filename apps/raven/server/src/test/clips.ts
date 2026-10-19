@@ -50,16 +50,19 @@ export const encodeClip = async ({
 /**
  * An MKV like a remux in miniature: a keyframe every two seconds, English
  * AC-3 audio (the default) and a Japanese AAC commentary, and an English
- * SRT track holding `cues`.
+ * SRT track holding `cues`. `bFrames` sets how many B-frames x264 may put
+ * between references, which reorders the video so its dts runs behind its pts.
  */
 export const encodeRichClip = async ({
   path,
   seconds = 30,
   cues,
+  bFrames,
 }: {
   path: string
   seconds?: number
   cues: string
+  bFrames?: number
 }): Promise<void> => {
   await mkdir(dirname(path), { recursive: true })
   const srt = `${path}.source.srt`
@@ -95,6 +98,7 @@ export const encodeRichClip = async ({
     'libx264',
     '-g',
     '48',
+    ...(bFrames == null ? [] : ['-bf', String(bFrames)]),
     '-pix_fmt',
     'yuv420p',
     '-c:a:0',
