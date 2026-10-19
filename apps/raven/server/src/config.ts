@@ -31,6 +31,12 @@ export type ServerConfig = ListenConfig & {
    * is retried on the next scan rather than marked as failed.
    */
   ffmpegTimeoutSeconds: number
+  /**
+   * How long the keyframe probe may take. It lists every video packet, so it
+   * reads the whole file: minutes for a remux of tens of gigabytes over a
+   * share, far past what a header probe needs.
+   */
+  keyframeProbeTimeoutSeconds: number
   /** Thumbnail width in pixels; the height follows the aspect ratio. */
   thumbnailWidth: number
   /** Quick-scan every library on boot, picking up whatever changed while the server was down. */
@@ -98,6 +104,7 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   probeConcurrency: Math.max(1, wholeNumber(env.PROBE_CONCURRENCY) ?? 4),
   thumbnailConcurrency: Math.max(1, wholeNumber(env.THUMBNAIL_CONCURRENCY) ?? 2),
   ffmpegTimeoutSeconds: Math.max(1, wholeNumber(env.FFMPEG_TIMEOUT_SECONDS) ?? 90),
+  keyframeProbeTimeoutSeconds: Math.max(1, wholeNumber(env.KEYFRAME_PROBE_TIMEOUT_SECONDS) ?? 1800),
   thumbnailWidth: Math.max(160, wholeNumber(env.THUMBNAIL_WIDTH) ?? 480),
   scanOnStart: flag({ value: env.SCAN_ON_START, fallback: true }),
   quickScanIntervalMinutes: wholeNumber(env.QUICK_SCAN_INTERVAL_MINUTES) ?? 10,

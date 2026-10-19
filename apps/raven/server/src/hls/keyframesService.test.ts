@@ -20,6 +20,21 @@ class CountingFfmpeg extends FfmpegService {
   }
 }
 
+/** A probe that answers only once the test lets it, so a file can change while it runs. */
+class GatedFfmpeg extends FfmpegService {
+  probes = 0
+  release: () => void = () => undefined
+  private readonly gate = new Promise<void>((resolve) => {
+    this.release = resolve
+  })
+
+  override async probeKeyframes(): Promise<number[]> {
+    this.probes += 1
+    await this.gate
+    return [0, 9]
+  }
+}
+
 describe('KeyframesService', () => {
   const database = testDatabase('raven-keyframes-')
   const state = { libraryId: 0, count: 0 }
@@ -119,5 +134,41 @@ describe('KeyframesService', () => {
     await expect(keyframes.of({ id, path: join(database.dir(), 'missing.mkv') })).rejects.toThrow()
     expect(ffmpeg.probes).toBe(2)
     expect(index().storedKeyframes(id)).toBeNull()
+  })
+
+  const gated = () => {
+    const ffmpeg = new GatedFfmpeg(readServerConfig({}), {
+      playback: () => DEFAULT_PLAYBACK_SETTINGS,
+    })
+    return { ffmpeg, keyframes: new KeyframesService(ffmpeg, index()) }
+  }
+
+  it('keeps nothing from a probe that began before the file changed', async () => {
+    const id = add('Replaced.mkv')
+    const { ffmpeg, keyframes } = gated()
+
+    const stale = keyframes.of({ id, path: '/m/replaced.mkv' })
+    index().markChanged({ id, size: 2, mtimeMs: 2 })
+    ffmpeg.release()
+    await stale
+
+    expect(index().storedKeyframes(id)).toBeNull()
+    await keyframes.of({ id, path: '/m/replaced.mkv' })
+    expect(ffmpeg.probes).toBe(2)
+    expect(index().storedKeyframes(id)).toEqual([0, 9])
+  })
+
+  it('does not hand a caller after the change the probe of the old file', async () => {
+    const id = add('Swapped.mkv')
+    const { ffmpeg, keyframes } = gated()
+
+    const stale = keyframes.of({ id, path: '/m/swapped.mkv' })
+    index().markChanged({ id, size: 2, mtimeMs: 2 })
+    const fresh = keyframes.of({ id, path: '/m/swapped.mkv' })
+    ffmpeg.release()
+    await Promise.all([stale, fresh])
+
+    expect(ffmpeg.probes).toBe(2)
+    expect(index().storedKeyframes(id)).toEqual([0, 9])
   })
 })

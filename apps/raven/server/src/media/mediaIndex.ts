@@ -51,9 +51,9 @@ type FileRow = {
   thumbnail: string
 }
 
-/** Its name, and the folder it sits in under the folder its titles sit in (a library path, or a letter or group folder). */
 const isKeyframes = listOf(isNumber)
 
+/** Its name, and the folder it sits in under the folder its titles sit in (a library path, or a letter or group folder). */
 const placeOf = (file: FoundFile): { fileName: string; folder: string } => ({
   fileName: basename(file.path),
   folder: relative(file.root, dirname(file.path)),

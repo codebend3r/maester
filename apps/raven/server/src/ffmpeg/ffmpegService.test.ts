@@ -41,6 +41,7 @@ describe('FfmpegService', () => {
         ffprobePath: join(state.dir, tool),
         ffmpegPath: join(state.dir, tool),
         ffmpegTimeoutSeconds: 1,
+        keyframeProbeTimeoutSeconds: 1,
       },
       { playback: () => DEFAULT_PLAYBACK_SETTINGS },
     )
@@ -73,6 +74,23 @@ describe('FfmpegService', () => {
     await expect(service('slow').probeKeyframes('/media/a.mkv')).rejects.toBeInstanceOf(
       FfmpegTimeoutError,
     )
+  })
+
+  it('gives the keyframe probe its own, longer time limit than a header probe', async () => {
+    await writeFile(join(state.dir, 'sleepy'), '#!/bin/sh\nsleep 2\nprintf "0.000000,K__\\n"\n')
+    await chmod(join(state.dir, 'sleepy'), 0o755)
+    const sleepy = new FfmpegService(
+      {
+        ...readServerConfig({}),
+        ffprobePath: join(state.dir, 'sleepy'),
+        ffmpegTimeoutSeconds: 1,
+        keyframeProbeTimeoutSeconds: 10,
+      },
+      { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+    )
+
+    expect(await sleepy.probeKeyframes('/media/a.mkv')).toEqual([0])
+    await expect(sleepy.probeJson('/media/a.mkv')).rejects.toBeInstanceOf(FfmpegTimeoutError)
   })
 
   describe('choosing how transcodes encode', () => {

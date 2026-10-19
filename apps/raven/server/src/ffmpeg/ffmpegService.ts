@@ -95,7 +95,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
   /**
    * The seconds of the file's video keyframes, ascending and cut to three
    * decimals. ffprobe lists packets without decoding them, but it still
-   * reads the whole file.
+   * reads the whole file, so it has its own time limit.
    */
   async probeKeyframes(path: string): Promise<number[]> {
     try {
@@ -112,12 +112,15 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
           'csv=p=0',
           path,
         ],
-        { maxBuffer: 256 * 1024 * 1024, timeout: this.config.ffmpegTimeoutSeconds * 1000 },
+        { maxBuffer: 256 * 1024 * 1024, timeout: this.config.keyframeProbeTimeoutSeconds * 1000 },
       )
       return parseKeyframes(stdout)
     } catch (error) {
       if (wasKilled(error)) {
-        throw new FfmpegTimeoutError({ tool: 'ffprobe', seconds: this.config.ffmpegTimeoutSeconds })
+        throw new FfmpegTimeoutError({
+          tool: 'ffprobe',
+          seconds: this.config.keyframeProbeTimeoutSeconds,
+        })
       }
       throw new Error(failureText(error), { cause: error })
     }

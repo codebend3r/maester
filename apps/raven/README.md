@@ -535,6 +535,7 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 | `THUMBNAIL_CONCURRENCY`       | `2`                            | Parallel thumbnail runs                      |
 | `THUMBNAIL_WIDTH`             | `480`                          |                                              |
 | `FFMPEG_TIMEOUT_SECONDS`      | `90`                           | Per ffprobe or thumbnail run                 |
+| `KEYFRAME_PROBE_TIMEOUT_SECONDS` | `1800`                      | Per keyframe probe, which reads the whole file |
 | `FFMPEG_PATH`, `FFPROBE_PATH` | `ffmpeg`, `ffprobe`            |                                              |
 | `TMDB_API_TOKEN`              | unset                          | TMDB's API Read Access Token or API key; unset turns metadata off |
 | `METADATA_LANGUAGE`           | `en-US`                        | Language for titles and summaries            |
