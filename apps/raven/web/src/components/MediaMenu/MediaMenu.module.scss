@@ -93,6 +93,21 @@
   }
 }
 
+// Beside its button, not under it: a tile's menu opens over the tile's own
+// words and past its edge instead of hanging off its foot. A narrow screen
+// has no room beside the button, so there it drops below again.
+.beside .list {
+  top: 0;
+  right: calc(100% + var(--space-1));
+}
+
+@media (max-width: 48rem) {
+  .beside .list {
+    top: calc(100% + var(--space-1));
+    right: 0;
+  }
+}
+
 // A popover on the canopy, a hairline round it.
 .list {
   position: absolute;

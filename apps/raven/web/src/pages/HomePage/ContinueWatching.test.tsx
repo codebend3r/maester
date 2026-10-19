@@ -69,8 +69,8 @@ describe('ContinueWatching', () => {
       'Continue watching',
     )
     expect(tiles().map((tile) => tile.textContent)).toEqual([
-      'SeveranceS01E02 · Half Loop45m left',
-      'Busboys20261h 15m left',
+      'SeveranceS01E02 · Half Loop1080p45m left',
+      'Busboys20261080p1h 15m left',
     ])
   })
 
@@ -128,6 +128,30 @@ describe('ContinueWatching', () => {
     renderWithProviders({ ui: <ContinueWatching entries={[{ media: blank, poster: null }]} /> })
     expect(section().querySelectorAll('img')).toHaveLength(0)
     expect(within(section()).getByText('B')).toBeInTheDocument()
+  })
+
+  it('marks its resolution beside the year, and leaves it out of a file not yet probed', () => {
+    const unprobed = mediaItem({
+      id: 8,
+      title: 'Clip',
+      duration: 600,
+      position: 60,
+      width: null,
+      height: null,
+    })
+    renderWithProviders({
+      ui: (
+        <ContinueWatching
+          entries={[
+            { media: MOVIE, poster: MOVIE.item },
+            { media: unprobed, poster: null },
+          ]}
+        />
+      ),
+    })
+    const [movie, clip] = tiles()
+    expect(within(movie!).getByLabelText('Video resolution: 1080p')).toHaveTextContent('1080p')
+    expect(within(clip!).queryByLabelText(/^Video resolution/)).toBeNull()
   })
 
   it("opens the card's menu on a right click", () => {

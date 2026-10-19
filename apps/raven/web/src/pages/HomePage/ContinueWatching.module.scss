@@ -23,18 +23,13 @@
   gap: var(--space-4);
   min-height: 12.5rem;
   padding: var(--space-4);
-  overflow: hidden;
   border-radius: var(--radius-lg);
-  background: var(--color-stage);
   color: var(--color-on-picture);
 
-  // Darkest under the words at the left, so they read on any picture.
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: linear-gradient(110deg, var(--color-picture-scrim) 30%, var(--color-shade));
+  // The open menu hangs past the tile's edge, so the tile itself clips
+  // nothing; its backdrop does, and the open one rises over its neighbours.
+  &:has([aria-expanded='true']) {
+    z-index: 1;
   }
 
   // The ring goes round the whole tile, which the picture's link covers.
@@ -44,11 +39,27 @@
   }
 }
 
+// Darkest under the words at the left, so they read on any picture.
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--color-stage);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, var(--color-picture-scrim) 30%, var(--color-shade));
+  }
+}
+
 // Scaled past the tile's edges, which the blur would otherwise leave pale.
 .tint {
   position: absolute;
   inset: 0;
-  z-index: -2;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -156,6 +167,11 @@
 }
 
 .line {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-1);
   color: var(--color-on-picture-soft);
   font-size: var(--font-size-sm);
 }
