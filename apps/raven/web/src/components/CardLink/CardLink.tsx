@@ -1,3 +1,4 @@
+import type { AppPath } from '@raven/core'
 import {
   type ComponentProps,
   type MouseEvent,
@@ -7,7 +8,6 @@ import {
   useRef,
 } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import type { AppPath } from '@/lib/itemLinks'
 import { type Follow, useCardLinks } from '@/stores/cardLinks'
 
 /**

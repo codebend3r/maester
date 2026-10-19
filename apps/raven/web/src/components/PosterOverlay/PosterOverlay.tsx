@@ -1,9 +1,8 @@
 import { Icon } from '@raven/ui'
-import type { MediaItem } from '@raven/core'
+import type { AppPath, MediaItem } from '@raven/core'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/components/PosterOverlay/PosterOverlay.module.scss'
-import type { AppPath } from '@/lib/itemLinks'
 
 /**
  * What a card lays over its poster: the video's resolution in the top

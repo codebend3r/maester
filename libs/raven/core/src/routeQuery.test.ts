@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { ApiError, LOCKED_STATUS } from '@raven/core'
-import { routeState } from '@/lib/routeQuery'
+import { ApiError, LOCKED_STATUS } from '@/apiClient'
+import { routeState } from '@/routeQuery'
 
 describe('routeState', () => {
   it('is missing without an id', () => {

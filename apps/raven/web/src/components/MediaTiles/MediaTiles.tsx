@@ -3,6 +3,7 @@ import {
   type MatchItemType,
   type MediaItem,
   type MediaSort,
+  cardLink,
   cardTitle,
   codecLabel,
   formatBytes,
@@ -23,7 +24,6 @@ import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
-import { cardLink } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/MediaTiles/MediaTiles.module.scss'

@@ -1,14 +1,7 @@
-import {
-  ITEM_TYPES,
-  type Infer,
-  type ItemSummary,
-  type MediaItem,
-  isBoolean,
-  isMediaItem,
-  isMediaList,
-  object,
-  primaryVersion,
-} from '@raven/core'
+import { ITEM_TYPES, type ItemSummary, type MediaItem, isMediaItem, isMediaList } from '@/contract'
+import { primaryVersion } from '@/items'
+import { toQueryString } from '@/query'
+import { type Infer, isBoolean, object } from '@/schema'
 
 /** An address in the app, from its root. */
 export type AppPath = `/${string}`
@@ -41,7 +34,7 @@ export const inLibrary = ({
   libraryId: number
   file?: number | null
 }): AppPath =>
-  `${page}?${new URLSearchParams({
+  `${page}?${toQueryString({
     library: String(libraryId),
     ...(file == null ? {} : { file: String(file) }),
   })}`

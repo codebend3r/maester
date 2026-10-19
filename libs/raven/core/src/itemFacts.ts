@@ -1,17 +1,10 @@
-import {
-  CREDIT_JOBS,
-  type ItemDetails,
-  type MediaItem,
-  type MediaTracks,
-  codecLabel,
-  formatBytes,
-  formatChannels,
-  formatRuntime,
-  languageName,
-  plural,
-  resolutionLabel,
-} from '@raven/core'
-import { showYears } from '@/lib/itemLinks'
+import { CREDIT_JOBS, type ItemDetails, type MediaItem, type MediaTracks } from '@/contract'
+import { formatBytes, formatChannels, formatRuntime } from '@/format'
+import { showYears } from '@/itemLinks'
+import { languageName } from '@/languageName'
+import { resolutionLabel } from '@/media'
+import { codecLabel } from '@/playback'
+import { plural } from '@/plural'
 
 const present = (facts: ReadonlyArray<string | null>): string[] =>
   facts.filter((fact): fact is string => fact != null)

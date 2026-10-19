@@ -9,7 +9,7 @@ import {
   queueLink,
   readWatchState,
   watchLink,
-} from '@/lib/itemLinks'
+} from '@/itemLinks'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 
 describe('itemPath', () => {
@@ -92,11 +92,14 @@ describe('readWatchState', () => {
 describe('cardLink', () => {
   it("opens a matched movie's page, naming the file when the movie was split onto several cards", () => {
     const item = itemSummary({ id: 4, type: 'movie' })
-    expect(cardLink({ media: mediaItem({ id: 9, item }), pages: true })).toEqual({
+    expect(cardLink({ media: mediaItem({ id: 9, libraryId: 2, item }), pages: true })).toEqual({
       to: '/movies/4?library=2',
     })
     expect(
-      cardLink({ media: mediaItem({ id: 9, item, variant: 'Final Cut' }), pages: true }),
+      cardLink({
+        media: mediaItem({ id: 9, libraryId: 2, item, variant: 'Final Cut' }),
+        pages: true,
+      }),
     ).toEqual({ to: '/movies/4?library=2&file=9' })
   })
 
@@ -117,6 +120,31 @@ describe('inLibrary', () => {
     expect(inLibrary({ page: '/movies/4', libraryId: 3, file: 9 })).toBe(
       '/movies/4?library=3&file=9',
     )
+  })
+
+  it('escapes what a number prints that an address cannot carry, as URLSearchParams did', () => {
+    expect(inLibrary({ page: '/movies/4', libraryId: 1e21 })).toBe('/movies/4?library=1e%2B21')
+    expect(inLibrary({ page: '/movies/4', libraryId: -3, file: 1e21 })).toBe(
+      '/movies/4?library=-3&file=1e%2B21',
+    )
+    expect(inLibrary({ page: '/movies/4', libraryId: Number.NaN, file: 0.5 })).toBe(
+      '/movies/4?library=NaN&file=0.5',
+    )
+    expect(inLibrary({ page: '/movies/4', libraryId: 3, file: 0 })).toBe(
+      '/movies/4?library=3&file=0',
+    )
+  })
+
+  it('escapes the same through a card link', () => {
+    const media = mediaItem({
+      id: 1e21,
+      libraryId: 1e21,
+      variant: 'Final Cut',
+      item: itemSummary({ id: 4, type: 'movie' }),
+    })
+    expect(cardLink({ media, pages: true })).toEqual({
+      to: '/movies/4?library=1e%2B21&file=1e%2B21',
+    })
   })
 })
 

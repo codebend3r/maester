@@ -3,6 +3,8 @@ import {
   type MediaItem,
   RATING_SOURCES,
   type RatingSource,
+  type SortColumn,
+  cardLink,
   cardTitle,
   formatBitrate,
   formatBytes,
@@ -21,9 +23,8 @@ import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { WatchedMark } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
-import { cardLink } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
-import { type SortColumn, useTableSort } from '@/lib/tableSort'
+import { useTableSort } from '@/lib/useTableSort'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/MediaList/MediaList.module.scss'
 

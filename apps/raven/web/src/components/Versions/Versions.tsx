@@ -1,9 +1,8 @@
-import type { Library, MediaItem } from '@raven/core'
+import { type Library, type MediaItem, versionFacts } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@raven/ui'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
-import { versionFacts } from '@/lib/itemFacts'
 import styles from '@/components/Versions/Versions.module.scss'
 
 /**

@@ -8,6 +8,7 @@ import {
   pickScore,
   showEntryKey,
   showSortFact,
+  showYears,
   watchedStateOf,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
@@ -19,7 +20,6 @@ import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { WatchedCount, WatchedCountWords } from '@/components/WatchedCount/WatchedCount'
 import { api } from '@/lib/api'
-import { showYears } from '@/lib/itemLinks'
 import { POSTER_SIZES, type PosterSizes, posterSources } from '@/lib/posters'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'

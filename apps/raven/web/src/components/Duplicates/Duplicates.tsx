@@ -7,8 +7,11 @@ import {
   type PosterEntry,
   type SplitHow,
   canSplitByCut,
+  cardLink,
   cardTitle,
+  inLibrary,
   plural,
+  versionFacts,
 } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
@@ -17,8 +20,6 @@ import { Button } from '@raven/ui'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { api } from '@/lib/api'
 import { afterSplit } from '@/lib/invalidate'
-import { versionFacts } from '@/lib/itemFacts'
-import { cardLink, inLibrary } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/components/Duplicates/Duplicates.module.scss'

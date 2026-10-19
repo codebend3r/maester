@@ -2,6 +2,7 @@ import {
   type MatchItemType,
   type MediaItem,
   type MediaSort,
+  cardLink,
   codecLabel,
   formatBytes,
   formatRuntime,
@@ -10,6 +11,7 @@ import {
   resolutionLabel,
   sortFact,
   timeLeftOf,
+  watchLink,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { CardLink } from '@/components/CardLink/CardLink'
@@ -21,7 +23,6 @@ import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
-import { cardLink, watchLink } from '@/lib/itemLinks'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/MediaCard/MediaCard.module.scss'
 

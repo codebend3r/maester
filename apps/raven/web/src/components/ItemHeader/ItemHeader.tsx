@@ -1,4 +1,4 @@
-import type { Rating, SlideshowMotion } from '@raven/core'
+import type { Rating, SlideshowMotion, watchLink } from '@raven/core'
 import { Fragment, type ReactNode, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@raven/ui'
@@ -7,7 +7,6 @@ import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { RatingPanel } from '@/components/RatingPanel/RatingPanel'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { Slideshow } from '@/components/Slideshow/Slideshow'
-import type { watchLink } from '@/lib/itemLinks'
 import styles from '@/components/ItemHeader/ItemHeader.module.scss'
 
 /** What sits beside the title: a poster, an episode's still, or no picture at all. */

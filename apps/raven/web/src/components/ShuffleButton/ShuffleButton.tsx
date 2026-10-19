@@ -1,8 +1,8 @@
+import { queueLink } from '@raven/core'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { api } from '@/lib/api'
-import { queueLink } from '@/lib/itemLinks'
 
 const PICK_STATES = { idle: 'idle', picking: 'picking', empty: 'empty' } as const
 

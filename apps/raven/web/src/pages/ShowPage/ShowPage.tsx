@@ -3,10 +3,15 @@ import {
   DOWNLOAD_TARGET_KINDS,
   ITEM_TYPES,
   type ItemDetails,
+  ROUTE_STATES,
   type SeasonSummary,
   TITLE_DISPLAYS,
+  createdBy,
   episodeCode,
+  itemPath,
   seasonEntryKey,
+  showFacts,
+  watchLink,
   watchedStateOf,
 } from '@raven/core'
 import { useId, useState } from 'react'
@@ -34,11 +39,9 @@ import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
-import { createdBy, showFacts } from '@/lib/itemFacts'
-import { itemPath, watchLink } from '@/lib/itemLinks'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { displaySettingsQuery, librariesQuery, nextEpisodeQuery } from '@/lib/queries'
-import { ROUTE_STATES, useRouteItem } from '@/lib/routeQuery'
+import { useRouteItem } from '@/lib/routeQuery'
 import { useItemFavourite } from '@/lib/useItemFavourite'
 import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'

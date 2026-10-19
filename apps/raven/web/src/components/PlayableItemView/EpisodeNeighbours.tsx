@@ -1,8 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { type EpisodeSummary, ITEM_TYPES, type ItemDetails, episodeCode } from '@raven/core'
+import {
+  type EpisodeSummary,
+  ITEM_TYPES,
+  type ItemDetails,
+  episodeCode,
+  inLibrary,
+} from '@raven/core'
 import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
-import { inLibrary } from '@/lib/itemLinks'
 import { itemQuery } from '@/lib/queries'
 import styles from '@/components/PlayableItemView/EpisodeNeighbours.module.scss'
 

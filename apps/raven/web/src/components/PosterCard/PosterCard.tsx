@@ -5,11 +5,13 @@ import {
   type MediaItem,
   type MediaSort,
   type RatingSource,
+  cardLink,
   cardTitle,
   formatRuntime,
   mediaEntryKey,
   pickScore,
   sortFact,
+  watchLink,
 } from '@raven/core'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
@@ -22,7 +24,6 @@ import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
-import { cardLink, watchLink } from '@/lib/itemLinks'
 import type { PosterSizes } from '@/lib/posters'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'

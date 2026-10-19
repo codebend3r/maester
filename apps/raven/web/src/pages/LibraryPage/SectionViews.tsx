@@ -14,9 +14,11 @@ import {
   jumpScale,
   matchTypeFor,
   mediaEntryKey,
+  queueLink,
   sagaEntryKey,
   sagaTargets,
   showEntryKey,
+  watchLink,
 } from '@raven/core'
 import { type ReactNode, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -33,7 +35,6 @@ import { Loading } from '@/components/Skeleton/Skeleton'
 import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
 import { useCanManage } from '@/lib/adminLock'
-import { queueLink, watchLink } from '@/lib/itemLinks'
 import {
   duplicatesQuery,
   historyQuery,

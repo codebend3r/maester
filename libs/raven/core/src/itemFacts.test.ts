@@ -6,7 +6,7 @@ import {
   movieFacts,
   runtimeFact,
   versionFacts,
-} from '@/lib/itemFacts'
+} from '@/itemFacts'
 import { itemDetails, mediaItem } from '@/test/fixtures'
 
 describe('runtimeFact', () => {
@@ -19,7 +19,12 @@ describe('runtimeFact', () => {
 
 describe('movie facts', () => {
   it('counts the files only once the movie has two or more', () => {
-    const one = itemDetails({ versions: [mediaItem({ id: 1, duration: null })] })
+    const one = itemDetails({
+      year: 2026,
+      runtime: 97,
+      genres: ['Comedy', 'Drama', 'Crime', 'Romance'],
+      versions: [mediaItem({ id: 1, duration: null })],
+    })
     expect(movieFacts({ details: one, primary: undefined })).toEqual([
       '2026',
       '1h 37m',

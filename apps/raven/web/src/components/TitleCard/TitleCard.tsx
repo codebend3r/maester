@@ -1,6 +1,5 @@
-import type { ItemSummary } from '@raven/core'
+import { type ItemSummary, itemPath } from '@raven/core'
 import { Link } from 'react-router-dom'
-import { itemPath } from '@/lib/itemLinks'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import styles from '@/components/TitleCard/TitleCard.module.scss'
 
