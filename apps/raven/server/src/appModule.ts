@@ -51,10 +51,12 @@ import { ItemPictures } from '@/metadata/itemPictures'
 import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MatchFactsCache } from '@/metadata/matchFactsCache'
 import { MatchFiles } from '@/metadata/matchFiles'
+import { MdblistClient } from '@/metadata/mdblistClient'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { OmdbClient } from '@/metadata/omdbClient'
-import { OmdbScores } from '@/metadata/omdbScores'
+import { Scores } from '@/metadata/scores'
+import { ScoreSweep } from '@/metadata/scoreSweep'
 import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
 import { Filmographies } from '@/people/filmographies'
 import { PeopleRepository } from '@/people/peopleRepository'
@@ -160,10 +162,12 @@ export class AppModule {
         MatchFactsCache,
         Filmographies,
         OmdbClient,
+        MdblistClient,
         AiClient,
         AiMatcher,
         ImageCache,
-        OmdbScores,
+        Scores,
+        ScoreSweep,
         ItemPictures,
         MetadataService,
         ItemRefresher,

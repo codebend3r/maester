@@ -24,8 +24,52 @@ import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
 import { ItemImagesRepository, lineOf, versionOf } from '@/metadata/itemImagesRepository'
 import { LOCAL } from '@/metadata/localItems'
-import type { OmdbScore } from '@/metadata/omdbClient'
+import type { ExternalScore, ScoreProvider, ScoreTitle } from '@/metadata/scoreSources'
 import type { FetchedItem, FetchedSaga, MovieExtras } from '@/metadata/tmdbClient'
+
+/** The column that notes when each provider last answered for an item. */
+const FETCHED_AT = {
+  omdb: 'omdb_fetched_at',
+  mdblist: 'mdblist_fetched_at',
+} as const satisfies Record<ScoreProvider, string>
+
+/**
+ * When an item's scores from each provider are due, as SQL over `items` with
+ * `@before`. MDBList's are due when it has never answered or answered before
+ * then. OMDb's are due for a title with an IMDb id when OMDb has not answered
+ * since, and MDBList has not either or gave it no scores: the titles it does
+ * not know, whose fallback may have failed.
+ */
+const SCORES_DUE = {
+  mdblist: '(mdblist_fetched_at IS NULL OR mdblist_fetched_at < @before)',
+  omdb: `imdb_id IS NOT NULL
+    AND (omdb_fetched_at IS NULL OR omdb_fetched_at < @before)
+    AND (mdblist_fetched_at IS NULL OR mdblist_fetched_at < @before
+         OR NOT EXISTS (SELECT 1 FROM ratings r
+                         WHERE r.item_id = items.id AND r.provider = 'mdblist'))`,
+} as const satisfies Record<ScoreProvider, string>
+
+/** The movies and shows whose scores from `provider` are due, leaving out titles raven made up. */
+const scoresDueWhere = (provider: ScoreProvider): string =>
+  `type IN ('movie', 'show') AND tmdb_id NOT GLOB @local AND ${SCORES_DUE[provider]}`
+
+/**
+ * The order each provider's due scores are fetched in. MDBList's: first the
+ * titles it has never answered that lack a Rotten Tomatoes or Metacritic
+ * score, then the rest it has never answered, then the oldest. OMDb's: those
+ * neither provider has answered for the longest first.
+ */
+const SCORES_ORDER = {
+  mdblist: `CASE WHEN mdblist_fetched_at IS NOT NULL THEN 2
+                 WHEN EXISTS (SELECT 1 FROM ratings r
+                               WHERE r.item_id = items.id AND r.source = 'rottenTomatoes')
+                  AND EXISTS (SELECT 1 FROM ratings r
+                               WHERE r.item_id = items.id AND r.source = 'metacritic') THEN 1
+                 ELSE 0 END,
+            mdblist_fetched_at, id`,
+  // MAX of two columns is NULL when either is, so a stamp never set counts as ''.
+  omdb: "MAX(COALESCE(omdb_fetched_at, ''), COALESCE(mdblist_fetched_at, '')), id",
+} as const satisfies Record<ScoreProvider, string>
 
 /** Rotten Tomatoes and Metacritic are critics; TMDB and IMDb are audiences. */
 const RATING_KIND_OF: Record<RatingSource, Rating['kind']> = {
@@ -106,6 +150,13 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 /** A person whose filmography was fetched this recently keeps their id with no credits left. */
 const FILMOGRAPHY_KEPT_DAYS = 180
+
+/** How old a provider's answer gets before its scores are due again. */
+const SCORES_DUE_DAYS = 30
+
+/** The time before which a provider's answer is due again, as `scoresDue` takes it. */
+export const scoresDueBefore = (): string =>
+  new Date(Date.now() - SCORES_DUE_DAYS * DAY_MS).toISOString()
 
 const genresOf = (json: string): string[] => parseJsonAs({ json, guard: isStringArray }) ?? []
 
@@ -655,42 +706,91 @@ export class MetadataRepository {
     )
   }
 
-  /** Replaces an item's scores from OMDb, and notes when they were fetched. */
-  saveScores({ itemId, scores }: { itemId: number; scores: readonly OmdbScore[] }): void {
+  /**
+   * Stores what one provider answered for an item and notes when. The rows
+   * it wrote before and no longer sends go; the others' rows stay. OMDb
+   * writes over an MDBList score only once MDBList's answer is due again, so
+   * scores from an MDBList that has gone away do not freeze.
+   */
+  saveScores({
+    itemId,
+    provider,
+    scores,
+  }: {
+    itemId: number
+    provider: ScoreProvider
+    scores: readonly ExternalScore[]
+  }): void {
     this.db.transaction(() => {
+      const stamped = this.db
+        .prepare(`UPDATE items SET ${FETCHED_AT[provider]} = ? WHERE id = ?`)
+        .run(new Date().toISOString(), itemId)
+      // The item went while its scores were asked for; a row for it would break the foreign key.
+      if (stamped.changes === 0) return
       this.db
         .prepare(
-          `DELETE FROM ratings WHERE item_id = ? AND source IN ('imdb', 'rottenTomatoes', 'metacritic')`,
+          `DELETE FROM ratings
+            WHERE item_id = ? AND provider = ? AND source <> 'tmdb'
+              AND source NOT IN (SELECT value FROM json_each(?))`,
         )
-        .run(itemId)
-      const insert = this.db.prepare(
-        'INSERT OR REPLACE INTO ratings (item_id, source, value, votes) VALUES (?, ?, ?, NULL)',
+        .run(itemId, provider, JSON.stringify(scores.map((score) => score.source)))
+      const upsert = this.db.prepare(
+        `INSERT INTO ratings (item_id, source, value, votes, provider) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (item_id, source) DO UPDATE
+           SET value = excluded.value, votes = excluded.votes, provider = excluded.provider
+         WHERE ratings.provider = excluded.provider OR excluded.provider = 'mdblist'
+            OR (SELECT COALESCE(mdblist_fetched_at, '') FROM items WHERE id = excluded.item_id) < ?`,
       )
-      scores.forEach((score) => insert.run(itemId, score.source, score.value))
-      this.db
-        .prepare('UPDATE items SET omdb_fetched_at = ? WHERE id = ?')
-        .run(new Date().toISOString(), itemId)
+      const before = scoresDueBefore()
+      scores.forEach((score) =>
+        upsert.run(itemId, score.source, score.value, score.votes, provider, before),
+      )
     })()
   }
 
-  /** Movies and shows with an IMDb id whose OMDb scores are missing or older than `before`, never fetched first. */
-  needingScores({
+  /** Movies and shows whose scores from `provider` are due, in the order they are fetched, as far as `limit` goes. */
+  scoresDue({
+    provider,
     before,
     limit,
   }: {
+    provider: ScoreProvider
     before: string
     limit: number
-  }): Array<{ id: number; imdbId: string }> {
+  }): Array<ScoreTitle & { itemId: number }> {
     return this.db
-      .prepare<[string, number], { id: number; imdb_id: string }>(
-        `SELECT id, imdb_id FROM items
-          WHERE type IN ('movie', 'show') AND imdb_id IS NOT NULL
-            AND (omdb_fetched_at IS NULL OR omdb_fetched_at < ?)
-          ORDER BY omdb_fetched_at IS NOT NULL, fetched_at DESC
-          LIMIT ?`,
+      .prepare<
+        { local: string; before: string; limit: number },
+        { id: number; type: string; tmdb_id: string; imdb_id: string | null }
+      >(
+        `SELECT id, type, tmdb_id, imdb_id FROM items
+          WHERE ${scoresDueWhere(provider)}
+          ORDER BY ${SCORES_ORDER[provider]}
+          LIMIT @limit`,
       )
-      .all(before, limit)
-      .map((row) => ({ id: row.id, imdbId: row.imdb_id }))
+      .all({ local: `${LOCAL}*`, before, limit })
+      .flatMap((row) =>
+        isMatchItemType(row.type)
+          ? [{ itemId: row.id, type: row.type, tmdbId: row.tmdb_id, imdbId: row.imdb_id }]
+          : [],
+      )
+  }
+
+  /** Whether an item's scores from `provider` are still due, by the rule `scoresDue` lists them by. */
+  isScoreDue({
+    itemId,
+    provider,
+    before,
+  }: {
+    itemId: number
+    provider: ScoreProvider
+    before: string
+  }): boolean {
+    return !!this.db
+      .prepare<{ id: number; local: string; before: string }, { id: number }>(
+        `SELECT id FROM items WHERE id = @id AND ${scoresDueWhere(provider)}`,
+      )
+      .get({ id: itemId, local: `${LOCAL}*`, before })
   }
 
   /** A person's page: the movies and shows on disk they are credited on, newest first. */

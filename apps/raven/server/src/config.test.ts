@@ -44,6 +44,20 @@ describe('readServerConfig', () => {
     ).toMatchObject({ anthropicApiKey: null, aiMatchEffort: 'low', aiDailyLimit: 1 })
   })
 
+  it('leaves MDBList off without a key, at 1,000 calls a day', () => {
+    expect(readServerConfig({})).toMatchObject({ mdblistApiKey: null, mdblistDailyLimit: 1000 })
+  })
+
+  it('reads the MDBList key trimmed and its limit, an empty key as none and at least one call a day', () => {
+    expect(
+      readServerConfig({ MDBLIST_API_KEY: ' mdb-key ', MDBLIST_DAILY_LIMIT: '250' }),
+    ).toMatchObject({ mdblistApiKey: 'mdb-key', mdblistDailyLimit: 250 })
+    expect(readServerConfig({ MDBLIST_API_KEY: '  ', MDBLIST_DAILY_LIMIT: '0' })).toMatchObject({
+      mdblistApiKey: null,
+      mdblistDailyLimit: 1,
+    })
+  })
+
   it('has no media plane until its variables are set', () => {
     expect(readServerConfig({}).mediaPlane).toEqual({
       origins: [],

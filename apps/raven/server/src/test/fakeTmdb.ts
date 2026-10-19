@@ -1,5 +1,5 @@
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
-import { RAVEN_CONTENT_TYPES } from '@/http'
+import { RAVEN_CONTENT_TYPES, RAVEN_HEADERS } from '@/http'
 import {
   type MetadataFetch,
   TMDB_EXTERNAL_SOURCES,
@@ -8,7 +8,11 @@ import {
 } from '@/metadata/tmdbClient'
 
 /** The hosts the fake answers for besides TMDB's API. */
-const HOSTS = { omdb: 'www.omdbapi.com', images: 'image.tmdb.org' } as const
+const HOSTS = {
+  omdb: 'www.omdbapi.com',
+  mdblist: 'api.mdblist.com',
+  images: 'image.tmdb.org',
+} as const
 
 /** What a query flag such as `include_adult=true` says when it is on. */
 const QUERY_FLAGS = { true: 'true' } as const
@@ -386,10 +390,18 @@ export const seasonBody = ({
   })),
 })
 
-const json = ({ body, status = 200 }: { body: unknown; status?: number }): Response =>
+const json = ({
+  body,
+  status = 200,
+  headers = {},
+}: {
+  body: unknown
+  status?: number
+  headers?: Record<string, string>
+}): Response =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { [HEADERS.contentType]: CONTENT_TYPES.json },
+    headers: { [HEADERS.contentType]: CONTENT_TYPES.json, ...headers },
   })
 
 const yearOf = (released: string): number => Number(released.slice(0, 4))
@@ -408,11 +420,21 @@ export type FakeOmdb = Record<
 >
 
 /**
+ * MDBList's answer for a title, keyed `movie:<tmdb id>` or `show:<tmdb id>`:
+ * each score as MDBList's 0 to 100 `score`, and the IMDb vote count.
+ */
+export type FakeMdblist = Record<
+  string,
+  { imdb?: number; rottenTomatoes?: number; metacritic?: number; imdbVotes?: number }
+>
+
+/**
  * TMDB in miniature: searches by a title or alternative title holding the
  * query (year optional), `/find` by IMDb id, and movies by id. `down` makes every call fail as if TMDB were
  * unreachable, and `failing` lists the paths (after `/3`) whose calls fail
  * the same way, by prefix; `omdbSpent` makes OMDb answer as it does once a
- * key's day is used up; `calls` records each URL asked for. `hold` keeps the
+ * key's day is used up, and `mdblistSpent` does the same for MDBList with a
+ * 429; `calls` records each URL asked for. `hold` keeps the
  * searches for a title waiting until it is let go, so a pass stays busy, and
  * `holdPerson` does the same for one person's `/person/{id}`; `personCalls`
  * counts those.
@@ -422,11 +444,13 @@ export const fakeTmdb = ({
   shows = [],
   people = [keanuReeves],
   omdb = {},
+  mdblist = {},
 }: {
   movies: FakeMovie[]
   shows?: FakeShow[]
   people?: FakePerson[]
   omdb?: FakeOmdb
+  mdblist?: FakeMdblist
 }) => {
   const calls: string[] = []
   const failing: string[] = []
@@ -439,6 +463,9 @@ export const fakeTmdb = ({
     shows,
     people,
     omdb,
+    mdblist,
+    mdblistSpent: false,
+    mdblistCalls: 0,
     omdbCalls: 0,
     personCalls: 0,
   }
@@ -496,6 +523,60 @@ export const fakeTmdb = ({
               ? [{ Source: 'Rotten Tomatoes', Value: scores.rottenTomatoes }]
               : []),
             ...(scores.metacritic ? [{ Source: 'Metacritic', Value: scores.metacritic }] : []),
+          ],
+        },
+      })
+    }
+    if (parsed.host === HOSTS.mdblist) {
+      state.mdblistCalls += 1
+      if (parsed.searchParams.get('apikey') !== 'mdblist-key') {
+        return json({ body: { error: 'Invalid API key' }, status: 401 })
+      }
+      if (state.mdblistSpent) {
+        return json({
+          body: { error: 'Daily API limit exceeded!' },
+          status: 429,
+          headers: { [RAVEN_HEADERS.retryAfter]: '3600' },
+        })
+      }
+      const title = /^\/tmdb\/(movie|show)\/(\d+)\/$/.exec(parsed.pathname)
+      const scores = title ? state.mdblist[`${title[1]}:${title[2]}`] : undefined
+      if (!title || !scores) return json({ body: { error: 'Not found' }, status: 404 })
+      return json({
+        body: {
+          id: Number(title[2]),
+          type: title[1],
+          ratings: [
+            ...(scores.imdb == null
+              ? []
+              : [
+                  {
+                    source: 'imdb',
+                    value: scores.imdb / 10,
+                    score: scores.imdb,
+                    votes: scores.imdbVotes ?? null,
+                  },
+                ]),
+            ...(scores.rottenTomatoes == null
+              ? []
+              : [
+                  {
+                    source: 'tomatoes',
+                    value: scores.rottenTomatoes,
+                    score: scores.rottenTomatoes,
+                    votes: null,
+                  },
+                ]),
+            ...(scores.metacritic == null
+              ? []
+              : [
+                  {
+                    source: 'metacritic',
+                    value: scores.metacritic,
+                    score: scores.metacritic,
+                    votes: null,
+                  },
+                ]),
           ],
         },
       })

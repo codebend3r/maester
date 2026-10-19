@@ -705,6 +705,7 @@ describe('the metadata calls', () => {
     const metadata: MetadataHealth = {
       tmdb: 'ok',
       omdb: 'off',
+      mdblist: 'off',
       pending: 3,
       error: null,
       lastOk: null,

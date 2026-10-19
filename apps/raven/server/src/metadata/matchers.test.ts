@@ -13,8 +13,9 @@ import { ItemPictures } from '@/metadata/itemPictures'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { createMatchers } from '@/metadata/matchers'
 import { MatchPass } from '@/metadata/matchPass'
+import { MdblistClient } from '@/metadata/mdblistClient'
 import { OmdbClient } from '@/metadata/omdbClient'
-import { OmdbScores } from '@/metadata/omdbScores'
+import { Scores } from '@/metadata/scores'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { encodeImage } from '@/test/clips'
@@ -59,7 +60,11 @@ describe('matching by library type', () => {
         tmdb: new TmdbClient(config, tmdb.fetch),
         metadata,
         files,
-        scores: new OmdbScores(metadata, new OmdbClient(config, tmdb.fetch)),
+        scores: new Scores(
+          metadata,
+          new OmdbClient(config, tmdb.fetch),
+          new MdblistClient(config, tmdb.fetch),
+        ),
         logger: new Logger('MatchersTest'),
         prefer: TIER_SETS.any,
       })

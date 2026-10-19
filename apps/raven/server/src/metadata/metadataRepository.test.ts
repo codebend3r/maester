@@ -3,6 +3,7 @@ import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { LOCAL, localEpisode, localSeason } from '@/metadata/localItems'
 import { MatchFiles } from '@/metadata/matchFiles'
+import type { ExternalScore } from '@/metadata/scoreSources'
 import { BLANK_ITEM, type FetchedItem, type FetchedPerson } from '@/metadata/tmdbClient'
 import { PeopleRepository } from '@/people/peopleRepository'
 import { testDatabase } from '@/test/database'
@@ -331,5 +332,270 @@ describe('the libraries holding each item, and the people cleared up', () => {
     expect(people.profile(longAgo!)).toBeNull()
     expect(people.filmographyRows(longAgo!)).toEqual([])
     expect(people.profile(never!)).toBeNull()
+  })
+})
+
+describe("each provider's scores", () => {
+  const database = testDatabase('raven-scores-')
+  const metadata = () => repositories(database.get()).metadata
+  const DAY_MS = 24 * 60 * 60 * 1000
+  const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS).toISOString()
+
+  const title = ({
+    type = 'movie',
+    tmdbId,
+    imdbId = null,
+  }: {
+    type?: FetchedItem['type']
+    tmdbId: string
+    imdbId?: string | null
+  }): number =>
+    metadata().save({
+      item: { ...BLANK_ITEM, type, tmdbId, number: null, title: `Title ${tmdbId}`, imdbId },
+    })
+  const score = ({
+    source,
+    value,
+    votes = null,
+  }: {
+    source: ExternalScore['source']
+    value: number
+    votes?: number | null
+  }): ExternalScore => ({ source, value, votes })
+  const rows = (itemId: number) =>
+    database
+      .get()
+      .db.prepare<
+        [number],
+        { source: string; value: number; votes: number | null; provider: string }
+      >('SELECT source, value, votes, provider FROM ratings WHERE item_id = ? ORDER BY source')
+      .all(itemId)
+  const stamp = ({
+    itemId,
+    omdb = null,
+    mdblist = null,
+  }: {
+    itemId: number
+    omdb?: string | null
+    mdblist?: string | null
+  }) =>
+    database
+      .get()
+      .db.prepare('UPDATE items SET omdb_fetched_at = ?, mdblist_fetched_at = ? WHERE id = ?')
+      .run(omdb, mdblist, itemId)
+
+  beforeAll(() => database.open())
+  afterAll(database.close)
+
+  it("keeps MDBList's Rotten Tomatoes score when OMDb sends none", () => {
+    const id = title({ tmdbId: '900' })
+    const stored = metadata()
+    stored.saveScores({
+      itemId: id,
+      provider: 'mdblist',
+      scores: [score({ source: 'rottenTomatoes', value: 9.1 })],
+    })
+    stored.saveScores({
+      itemId: id,
+      provider: 'omdb',
+      scores: [score({ source: 'imdb', value: 8 })],
+    })
+    expect(rows(id)).toEqual([
+      { source: 'imdb', value: 8, votes: null, provider: 'omdb' },
+      { source: 'rottenTomatoes', value: 9.1, votes: null, provider: 'mdblist' },
+    ])
+  })
+
+  it("never writes OMDb's IMDb score over MDBList's", () => {
+    const id = title({ tmdbId: '901' })
+    const stored = metadata()
+    stored.saveScores({
+      itemId: id,
+      provider: 'mdblist',
+      scores: [score({ source: 'imdb', value: 8.4, votes: 1200 })],
+    })
+    stored.saveScores({
+      itemId: id,
+      provider: 'omdb',
+      scores: [score({ source: 'imdb', value: 8 })],
+    })
+    expect(rows(id)).toEqual([{ source: 'imdb', value: 8.4, votes: 1200, provider: 'mdblist' }])
+  })
+
+  it("lets OMDb write over MDBList's scores once MDBList's answer is due again, keeping those OMDb does not send", () => {
+    const id = title({ tmdbId: '906' })
+    const stored = metadata()
+    stored.saveScores({
+      itemId: id,
+      provider: 'mdblist',
+      scores: [
+        score({ source: 'rottenTomatoes', value: 9.1 }),
+        score({ source: 'metacritic', value: 8 }),
+      ],
+    })
+    stamp({ itemId: id, mdblist: daysAgo(31) })
+    stored.saveScores({
+      itemId: id,
+      provider: 'omdb',
+      scores: [score({ source: 'rottenTomatoes', value: 5 })],
+    })
+    expect(rows(id)).toEqual([
+      { source: 'metacritic', value: 8, votes: null, provider: 'mdblist' },
+      { source: 'rottenTomatoes', value: 5, votes: null, provider: 'omdb' },
+    ])
+  })
+
+  it("writes MDBList's Rotten Tomatoes score over OMDb's", () => {
+    const id = title({ tmdbId: '902' })
+    const stored = metadata()
+    stored.saveScores({
+      itemId: id,
+      provider: 'omdb',
+      scores: [score({ source: 'rottenTomatoes', value: 5 })],
+    })
+    stored.saveScores({
+      itemId: id,
+      provider: 'mdblist',
+      scores: [score({ source: 'rottenTomatoes', value: 9.1 })],
+    })
+    expect(rows(id)).toEqual([
+      { source: 'rottenTomatoes', value: 9.1, votes: null, provider: 'mdblist' },
+    ])
+  })
+
+  it("drops the Metacritic score MDBList sent before and sends no more, and no one else's", () => {
+    const id = metadata().save({
+      item: {
+        ...BLANK_ITEM,
+        type: 'movie',
+        tmdbId: '903',
+        number: null,
+        title: 'Title 903',
+        rating: { value: 7.1, votes: 50 },
+      },
+    })
+    const stored = metadata()
+    stored.saveScores({
+      itemId: id,
+      provider: 'omdb',
+      scores: [score({ source: 'imdb', value: 7.9 })],
+    })
+    stored.saveScores({
+      itemId: id,
+      provider: 'mdblist',
+      scores: [
+        score({ source: 'rottenTomatoes', value: 9.1 }),
+        score({ source: 'metacritic', value: 7.3 }),
+      ],
+    })
+    stored.saveScores({
+      itemId: id,
+      provider: 'mdblist',
+      scores: [score({ source: 'rottenTomatoes', value: 9 })],
+    })
+    expect(rows(id)).toEqual([
+      { source: 'imdb', value: 7.9, votes: null, provider: 'omdb' },
+      { source: 'rottenTomatoes', value: 9, votes: null, provider: 'mdblist' },
+      { source: 'tmdb', value: 7.1, votes: 50, provider: 'tmdb' },
+    ])
+  })
+
+  it('does nothing for an item that has gone', () => {
+    const id = title({ tmdbId: '904' })
+    metadata().remove(id)
+    expect(() =>
+      metadata().saveScores({
+        itemId: id,
+        provider: 'mdblist',
+        scores: [score({ source: 'rottenTomatoes', value: 9.1 })],
+      }),
+    ).not.toThrow()
+    expect(rows(id)).toEqual([])
+  })
+
+  it("puts MDBList's never-asked titles lacking a critics' score first, then the never-asked, then the oldest", () => {
+    database.get().db.prepare('DELETE FROM items').run()
+    const stored = metadata()
+    const complete = title({ tmdbId: '910' })
+    stored.saveScores({
+      itemId: complete,
+      provider: 'omdb',
+      scores: [
+        score({ source: 'rottenTomatoes', value: 9 }),
+        score({ source: 'metacritic', value: 8 }),
+      ],
+    })
+    const noCritics = title({ type: 'show', tmdbId: '911' })
+    const old = title({ tmdbId: '912' })
+    stamp({ itemId: old, mdblist: daysAgo(35) })
+    const older = title({ tmdbId: '913' })
+    stamp({ itemId: older, mdblist: daysAgo(40) })
+    stamp({ itemId: title({ tmdbId: '914' }), mdblist: daysAgo(1) })
+    title({ tmdbId: `${LOCAL}915` })
+    const season = metadata().save({
+      item: { ...BLANK_ITEM, type: 'season', tmdbId: '911-1', number: 1, title: 'Season 1' },
+      parentId: noCritics,
+    })
+
+    const due = stored.scoresDue({ provider: 'mdblist', before: daysAgo(30), limit: 10 })
+    expect(due.map((item) => item.itemId)).toEqual([noCritics, complete, older, old])
+    expect(due.map((item) => item.itemId)).not.toContain(season)
+    expect(due[0]).toEqual({ itemId: noCritics, type: 'show', tmdbId: '911', imdbId: null })
+    expect(
+      stored
+        .scoresDue({ provider: 'mdblist', before: daysAgo(30), limit: 2 })
+        .map((item) => item.itemId),
+    ).toEqual([noCritics, complete])
+  })
+
+  it("lists OMDb's titles with an IMDb id that it and MDBList have not answered lately, or MDBList does not know, longest unasked first", () => {
+    database.get().db.prepare('DELETE FROM items').run()
+    const stored = metadata()
+    const scoredByMdblist = (itemId: number) =>
+      stored.saveScores({
+        itemId,
+        provider: 'mdblist',
+        scores: [score({ source: 'imdb', value: 8 })],
+      })
+    const unknown = title({ tmdbId: '920', imdbId: 'tt920' })
+    stamp({ itemId: unknown, omdb: daysAgo(40), mdblist: daysAgo(1) })
+    const old = title({ tmdbId: '921', imdbId: 'tt921' })
+    scoredByMdblist(old)
+    stamp({ itemId: old, mdblist: daysAgo(35) })
+    const older = title({ tmdbId: '922', imdbId: 'tt922' })
+    stamp({ itemId: older, omdb: daysAgo(40) })
+    const never = title({ tmdbId: '923', imdbId: 'tt923' })
+    const known = title({ tmdbId: '924', imdbId: 'tt924' })
+    scoredByMdblist(known)
+    stamp({ itemId: known, omdb: daysAgo(40), mdblist: daysAgo(1) })
+    const fresh = title({ tmdbId: '925', imdbId: 'tt925' })
+    stamp({ itemId: fresh, omdb: daysAgo(1) })
+    const noImdb = title({ tmdbId: '926' })
+    const local = title({ tmdbId: `${LOCAL}927`, imdbId: 'tt927' })
+
+    expect(
+      stored
+        .scoresDue({ provider: 'omdb', before: daysAgo(30), limit: 10 })
+        .map((item) => [item.itemId, item.imdbId]),
+    ).toEqual([
+      [never, 'tt923'],
+      [older, 'tt922'],
+      [old, 'tt921'],
+      [unknown, 'tt920'],
+    ])
+    const isDue = (itemId: number) =>
+      (['omdb', 'mdblist'] as const).map((provider) =>
+        stored.isScoreDue({ itemId, provider, before: daysAgo(30) }),
+      )
+    expect([unknown, old, older, never, known, fresh, noImdb, local].map(isDue)).toEqual([
+      [true, false],
+      [true, true],
+      [true, true],
+      [true, true],
+      [false, false],
+      [false, true],
+      [false, true],
+      [false, false],
+    ])
   })
 })

@@ -21,6 +21,7 @@ import { createApp } from '@/app'
 import { DatabaseService } from '@/db/database'
 import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MetadataService } from '@/metadata/metadataService'
+import { ScoreSweep } from '@/metadata/scoreSweep'
 import { ScannerService } from '@/scanner/scannerService'
 import { type InjectOptions, adminCookie, injectAs, testConfig } from '@/test/app'
 import { encodeClip, encodeImage } from '@/test/clips'
@@ -640,5 +641,90 @@ describe('TV show metadata', () => {
       match: 'matched',
       item: { title: 'Pilot' },
     })
+  })
+})
+
+/** OMDb has no critics' scores for a show, so MDBList, when it has a key, is asked instead. */
+describe('TV show scores from MDBList', () => {
+  const tmdb = fakeTmdb({
+    movies: [],
+    shows: [
+      {
+        id: 95396,
+        title: 'Severance',
+        first: '2022-02-18',
+        seasons: { 1: [{ number: 1, title: 'Good News About Hell', aired: '2022-02-18' }] },
+      },
+    ],
+    mdblist: { 'show:95396': { imdb: 87, rottenTomatoes: 96, metacritic: 84, imdbVotes: 300_000 } },
+    omdb: { tt95396: { imdb: '8.7/10' } },
+  })
+  const state: { root: string; app: NestFastifyApplication | null; library: number } = {
+    root: '',
+    app: null,
+    library: 0,
+  }
+  const app = (): NestFastifyApplication => {
+    if (!state.app) throw new Error('app not started')
+    return state.app
+  }
+
+  beforeAll(async () => {
+    state.root = await mkdtemp(join(tmpdir(), 'raven-show-scores-'))
+    const media = join(state.root, 'TV')
+    await encodeClip({
+      path: join(media, 'Severance (2022)', 'Season 01', 'Severance - S01E01.mp4'),
+      seconds: 1,
+    })
+    state.app = await createApp({
+      config: {
+        ...testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
+        tmdbApiToken: 'test-token',
+        omdbApiKey: 'omdb-key',
+        mdblistApiKey: 'mdblist-key',
+      },
+      quiet: true,
+      metadataFetch: tmdb.fetch,
+    })
+    await state.app.init()
+    await state.app.getHttpAdapter().getInstance().ready()
+    const admin = await adminCookie(state.app)
+    state.library = shape({
+      response: await injectAs({ app: state.app, cookie: admin })({
+        method: 'POST',
+        url: '/api/libraries',
+        payload: { name: 'TV', paths: [media], settings: { kind: 'shows' } },
+      }),
+      guard: isLibrary,
+    }).id
+    await app().get(ScannerService).whenIdle(state.library)
+    await app().get(MetadataService).whenIdle()
+    await app().get(ScoreSweep).whenIdle()
+    await app().get(ThumbnailService).whenIdle()
+  })
+
+  afterAll(async () => {
+    await state.app?.close()
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
+  })
+
+  it('gives a show Rotten Tomatoes and Metacritic scores, and asks OMDb nothing', async () => {
+    const listing = shape({
+      response: await app().inject({
+        method: 'GET',
+        url: `/api/libraries/${state.library}/shows`,
+      }),
+      guard: isShowListing,
+    })
+    expect(
+      listing.shows[0]?.show.ratings.map((rating) => [rating.source, rating.value, rating.votes]),
+    ).toEqual([
+      ['rottenTomatoes', 9.6, null],
+      ['imdb', 8.7, 300_000],
+      ['metacritic', 8.4, null],
+      ['tmdb', 8.5, 500],
+    ])
+    expect(tmdb.state.mdblistCalls).toBe(1)
+    expect(tmdb.state.omdbCalls).toBe(0)
   })
 })
