@@ -19,12 +19,12 @@ const entry = ({
   ...rest,
 })
 
-const dayName = ({ date, year = false }: { date: Date; year?: boolean }): string =>
+const dayName = ({ date, hasYear = false }: { date: Date; hasYear?: boolean }): string =>
   new Intl.DateTimeFormat(undefined, {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
-    ...(year ? { year: 'numeric' } : {}),
+    ...(hasYear ? { year: 'numeric' } : {}),
   }).format(date)
 
 const time = (date: Date): string =>
@@ -46,7 +46,7 @@ describe('historyDays', () => {
       ['Today', [1, 2]],
       ['Yesterday', [3]],
       [dayName({ date: new Date(2026, 9, 6) }), [4]],
-      [dayName({ date: new Date(2025, 11, 31), year: true }), [5]],
+      [dayName({ date: new Date(2025, 11, 31), hasYear: true }), [5]],
     ])
   })
 })
