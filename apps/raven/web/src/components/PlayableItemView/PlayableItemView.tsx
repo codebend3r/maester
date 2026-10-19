@@ -15,6 +15,7 @@ import { Button, ButtonLink } from '@raven/ui'
 import type { BackFallback } from '@/components/BackButton/BackButton'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { CastRow } from '@/components/CastRow/CastRow'
+import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import {
@@ -269,6 +270,7 @@ export const PlayableItemView = ({
         <ButtonLink tone="primary" icon="play" to={play.to} state={play.state}>
           {primary.position > 0 ? `Resume from ${formatDuration(primary.position)}` : 'Play'}
         </ButtonLink>
+        <DownloadButton target={{ kind: 'media', mediaId: primary.id }} />
         {canFavourite && (
           <FavouriteButton isFavourite={primary.favourite} onToggle={favourite.mutate} />
         )}

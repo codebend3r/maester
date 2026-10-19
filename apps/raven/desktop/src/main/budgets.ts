@@ -1,3 +1,4 @@
+import { SYNC_RETRY_MS } from '@/main/downloads/sync'
 import type { PlayerActivity } from '@/main/player/playerService'
 import type { Timers } from '@/main/stateStore'
 
@@ -9,6 +10,7 @@ export const PLAYING_SAMPLE_MS = 10_000
 export const BUDGETS = { idleMemoryMb: 300, playingMemoryMb: 700, pausedCpuPercent: 2 } as const
 
 const BUDGET_HOOK = 'RAVEN_DESKTOP_BUDGET_MS'
+const SYNC_RETRY_HOOK = 'RAVEN_DESKTOP_SYNC_RETRY_MS'
 const HOOK_MIN_MS = 100
 const HOOK_MAX_MS = 600_000
 const WHOLE_NUMBER = /^\d+$/
@@ -140,4 +142,24 @@ export const budgetWindowFrom = ({
   if (!WHOLE_NUMBER.test(value)) return null
   const ms = Number(value)
   return ms >= HOOK_MIN_MS && ms <= HOOK_MAX_MS ? ms : null
+}
+
+/**
+ * The test hook's retry for what the downloads owe their servers, read only unpackaged; null
+ * leaves the spec's five minutes. It only shortens them, so a value past them is ignored, and
+ * so is one under the budget hook's floor: a retry that fast against a server that cannot be
+ * reached would spin, writing a warning each try.
+ */
+export const syncRetryFrom = ({
+  isPackaged,
+  env,
+}: {
+  isPackaged: boolean
+  env: Readonly<Record<string, string | undefined>>
+}): number | null => {
+  if (isPackaged) return null
+  const value = env[SYNC_RETRY_HOOK] ?? ''
+  if (!WHOLE_NUMBER.test(value)) return null
+  const ms = Number(value)
+  return ms >= HOOK_MIN_MS && ms <= SYNC_RETRY_MS ? ms : null
 }

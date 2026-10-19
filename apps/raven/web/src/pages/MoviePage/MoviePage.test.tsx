@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { usePlayerPrefs } from '@raven/ui'
 import {
   type AdminLock,
   DEFAULT_DISPLAY_SETTINGS,
@@ -10,6 +11,7 @@ import {
 } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
+import { ravenPlayer } from '@/lib/ravenPlayer'
 import { MoviePage } from '@/pages/MoviePage/MoviePage'
 import { itemDetails, library, matchedMovie } from '@/test/fixtures'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
@@ -463,5 +465,30 @@ describe('MoviePage', () => {
       'aria-pressed',
       'false',
     )
+  })
+
+  describe('Download to raven player', () => {
+    const handoff = spyOn(ravenPlayer, 'open').mockImplementation(() => {})
+
+    afterEach(() => {
+      handoff.mockClear()
+      usePlayerPrefs.setState({ opensInRavenPlayer: false })
+    })
+
+    it('is left out while this browser does not open videos in raven player', async () => {
+      open({ details: itemDetails() })
+      await screen.findByRole('heading', { name: 'Busboys' })
+      expect(screen.queryByRole('button', { name: 'Download to raven player' })).toBeNull()
+    })
+
+    it('hands the file Play starts to raven player', async () => {
+      usePlayerPrefs.setState({ opensInRavenPlayer: true })
+      open({ details: itemDetails() })
+      await userEvent.click(await screen.findByRole('button', { name: 'Download to raven player' }))
+      expect(handoff).toHaveBeenCalledTimes(1)
+      expect(handoff).toHaveBeenCalledWith(
+        `raven://download?server=${encodeURIComponent(window.location.origin)}&media=7`,
+      )
+    })
   })
 })

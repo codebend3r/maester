@@ -65,6 +65,8 @@ export type DownloadServiceDeps = {
   ready: Promise<void>
   /** `downloads.json` could not be read and was set aside, so the launch sweep keeps every folder. */
   wasSetAside: boolean
+  /** How often the sync tries its servers again; the spec's five minutes unless main's test hook shortens it. */
+  syncRetryMs: number
 } & Pick<DownloadPlaybackDeps, 'grants' | 'state' | 'stat'>
 
 type ById = { downloadId: string }
@@ -231,7 +233,13 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     if (!isDisposed) deps.send({ type: DESKTOP_EVENTS.notice, message })
   }
 
-  const sync = createSync({ store, calls: deps.calls, timers: deps.timers, warn: deps.warn })
+  const sync = createSync({
+    store,
+    calls: deps.calls,
+    timers: deps.timers,
+    warn: deps.warn,
+    retryMs: deps.syncRetryMs,
+  })
 
   const runSync = (work: Promise<void>): void => {
     work.catch((error: unknown) => {

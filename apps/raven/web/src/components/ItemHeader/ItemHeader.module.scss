@@ -340,22 +340,53 @@
   }
 }
 
+// A row of actions as even cells, the first, Play, across the whole row.
+@mixin cells {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+  justify-content: stretch;
+
+  > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
 // Where the details are narrow, on a phone or beside a still on a middling
-// screen, each row of actions breaks into even cells, the first, Play,
-// across the whole row. How narrow hangs on the side menu's width as much as
-// the screen's, so the details' own width decides.
+// screen, each row of actions breaks into even cells. How narrow hangs on the
+// side menu's width as much as the screen's, so the details' own width
+// decides.
 @container (max-width: 27rem) {
   .group {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
-    justify-content: stretch;
-
-    > :first-child {
-      grid-column: 1 / -1;
-    }
+    @include cells;
   }
 
   .manage > :first-child {
     grid-column: auto;
+  }
+}
+
+// A wide action (`data-wide`, as Download to raven player is) has a label
+// that neither wraps nor shrinks, so a row of four actions holding one needs
+// about 40rem on one line. Narrower than that, the row breaks into cells, and
+// the wide action takes a row of its own, as no cell holds it.
+@container (max-width: 40rem) {
+  .group:has(> [data-wide]) {
+    @include cells;
+
+    > [data-wide] {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+// A fifth or sixth action, as a show's or season's Shuffle is, takes a row
+// holding a wide action to about 60rem, so that row breaks up to 64rem too:
+// into even cells at least as wide as the wide action, which then needs no
+// row of its own.
+@container (40rem < width <= 64rem) {
+  .group:has(> [data-wide]):has(> :nth-child(5)) {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    justify-content: stretch;
   }
 }

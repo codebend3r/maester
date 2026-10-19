@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { usePlayerPrefs } from '@raven/ui'
 import {
   type AdminLock,
   DEFAULT_SAGA_BACKDROP,
@@ -10,6 +11,7 @@ import {
 } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
+import { ravenPlayer } from '@/lib/ravenPlayer'
 import { POSTER_SIZES } from '@/lib/posters'
 import { SagaPage } from '@/pages/SagaPage/SagaPage'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
@@ -312,5 +314,30 @@ describe('SagaPage', () => {
         ],
       },
     ])
+  })
+
+  describe('Download to raven player', () => {
+    const handoff = spyOn(ravenPlayer, 'open').mockImplementation(() => {})
+
+    afterEach(() => {
+      handoff.mockClear()
+      usePlayerPrefs.setState({ opensInRavenPlayer: false })
+    })
+
+    it('is left out while this browser does not open videos in raven player', async () => {
+      open()
+      await screen.findByRole('heading', { name: 'The Lord of the Rings Collection' })
+      expect(screen.queryByRole('button', { name: 'Download to raven player' })).toBeNull()
+    })
+
+    it('hands the saga to raven player', async () => {
+      usePlayerPrefs.setState({ opensInRavenPlayer: true })
+      open()
+      await userEvent.click(await screen.findByRole('button', { name: 'Download to raven player' }))
+      expect(handoff).toHaveBeenCalledTimes(1)
+      expect(handoff).toHaveBeenCalledWith(
+        `raven://download?server=${encodeURIComponent(window.location.origin)}&saga=2%3A119`,
+      )
+    })
   })
 })

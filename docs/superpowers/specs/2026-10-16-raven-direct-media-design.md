@@ -21,7 +21,7 @@ Plex on the LAN reads from the NAS directly, so its ceiling is the LAN. raven's 
 - At home, a browser on the Netlify site plays a 4K remux as smoothly as Plex does on the LAN.
 - Away, playback uses the fastest route that reaches Vhagar, and steps down to a transcode when that route cannot carry the file's bitrate.
 - The PIN and the admin lock keep working, with their cookies still first party.
-- Nothing changes for the web app served by Vhagar itself, or for the desktop app.
+- Nothing changes for the web app served by Vhagar itself, or for the desktop app's streaming (its downloads use the media plane; see `2026-10-17-raven-desktop-downloads-design.md`).
 
 ## Non goals
 
@@ -103,7 +103,7 @@ Any other origin gets no CORS headers, so a foreign page cannot read the bytes.
 - `createApiClient` takes `mediaBaseUrl` beside `baseUrl` (default: `baseUrl`). `streamUrl`, `fileUrl`, `thumbnailUrl` and the subtitles call build on it and take a `ticket` that becomes `t=`.
 - `useMediaSource` passes the picked origin and the current ticket.
 - `WatchPage`'s "open in VLC/IINA" link uses the media origin and a ticket, so it works outside the browser too.
-- The desktop app passes nothing new and keeps today's behaviour.
+- The desktop's downloads fetch through the media plane; see the downloads spec, `2026-10-17-raven-desktop-downloads-design.md`. Its streaming passes nothing new and keeps today's behaviour.
 
 ### Netlify
 

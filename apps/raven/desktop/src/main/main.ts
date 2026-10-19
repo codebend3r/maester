@@ -45,6 +45,7 @@ import {
   budgetWindowFrom,
   createBudgets,
   PLAYING_SAMPLE_MS,
+  syncRetryFrom,
 } from '@/main/budgets'
 import { CONFIG_FILE, type ConfigStore, loadConfig, setOutput } from '@/main/desktopConfig'
 import { createDesktopService, type DesktopService } from '@/main/desktopService'
@@ -59,6 +60,7 @@ import {
   createMediaAccess,
   type ProbeFetch,
 } from '@/main/downloads/mediaAccess'
+import { SYNC_RETRY_MS } from '@/main/downloads/sync'
 import { createFileHandler } from '@/main/fileProtocol'
 import { createGrants, type Grants } from '@/main/grants'
 import { createHelpActions } from '@/main/help'
@@ -570,6 +572,8 @@ const startApp = (): void => {
       showItemInFolder: (path) => shell.showItemInFolder(path),
       ready: app.whenReady(),
       wasSetAside: loadedDownloads.wasSetAside,
+      // A test hook shortens the five minutes; a packaged app never reads it.
+      syncRetryMs: syncRetryFrom({ isPackaged: app.isPackaged, env: process.env }) ?? SYNC_RETRY_MS,
       grants,
       state: store,
       stat: (path) => stat(path),

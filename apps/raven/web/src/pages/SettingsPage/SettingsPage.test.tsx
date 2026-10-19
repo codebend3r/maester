@@ -294,7 +294,7 @@ describe('Open videos in raven player on SettingsPage', () => {
     expect(within(playback).getByRole('heading', { name: 'This browser' })).toBeInTheDocument()
     expect(toggle()).not.toBeChecked()
     expect(toggle().closest('label')).toHaveTextContent(
-      "Offers raven player for videos this browser cannot play, and in the player's settings. Turn it on only where raven player is installed.",
+      "Offers raven player for videos this browser cannot play, in the player's settings, and Download to raven player on a title's page. Turn it on only where raven player is installed.",
     )
     await userEvent.click(toggle())
     expect(toggle()).toBeChecked()

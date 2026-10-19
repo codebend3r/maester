@@ -4,12 +4,25 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { basename, extname } from 'node:path'
 import {
   ADMIN_LOCK_STATES,
+  DEFAULT_SAGA_BACKDROP,
+  type EpisodeSummary,
+  isItemDetails,
+  isLibrary,
   isMediaTracks,
   isRecord,
+  isSagaList,
   isString,
+  type ItemDetails,
+  type Library,
+  MEDIA_PROBE_BYTES,
+  MEDIA_TICKET_SECONDS,
+  type MediaItem,
   type MediaTracks,
+  type Saga,
+  type SeasonSummary,
   SUBTITLE_SOURCES,
 } from '@raven/core'
+import { details, library, summary } from '@/main/test/serverFakes'
 import { API_PATHS } from '@/main/servers/allowlist'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { SERVER_METHODS } from '@/shared/protocol'
@@ -35,6 +48,7 @@ const MEDIA_ROUTES = {
   tracks: `${SERVER_METHODS.get} /tracks`,
   sidecar: `${SERVER_METHODS.get} /subtitles/external-0`,
   file: `${SERVER_METHODS.get} /file`,
+  ticket: `${SERVER_METHODS.get} /ticket`,
   progress: `${SERVER_METHODS.put} /progress`,
   plays: `${SERVER_METHODS.post} /plays`,
 } as const
@@ -44,6 +58,12 @@ export const FIXTURE_ADMIN_KINDS = {
   password: 'password',
   noPassword: 'noPassword',
 } as const
+
+/**
+ * The library, show, season and saga the fixture holds, by the ids a download link names. The
+ * season's episodes, and the saga's movies, are the first and second titles.
+ */
+export const FIXTURE_ITEMS = { library: 1, show: 10, season: 11, saga: '100' } as const
 
 /**
  * The admin lock as this browser meets it:
@@ -61,7 +81,10 @@ export type FixtureMode = { pin: string; isLocked: boolean; admin: FixtureAdmin 
 
 export type FixtureRequest = {
   method: string
+  /** The path and query as sent, less any media ticket, whose value never reaches the log. */
   path: string
+  /** Whether the query carried a media ticket in `t`. */
+  hasTicket: boolean
   hasUnlock: boolean
   hasAdmin: boolean
   hasOtherCookie: boolean
@@ -80,7 +103,10 @@ export type FixtureServer = {
    * the fields a test needs, never print the log whole.
    */
   requests: FixtureRequest[]
-  /** A second listener the redirecting title points at, with its own log. */
+  /**
+   * A second listener the redirecting title points at, with its own log. With the media plane
+   * on, it is the media origin the server lists, serving files and sidecars for a ticket alone.
+   */
   elsewhere: { origin: string; requests: FixtureRequest[] }
   /** Every cookie value it has handed out, unlock and admin, kept past a relock. */
   issued: () => readonly string[]
@@ -159,11 +185,28 @@ const BODY_MAX_CHARS = 65_536
 const TRICKLE_BYTES = 2048
 const TRICKLE_MS = 100
 
+const LOCKED_MESSAGE = 'This library is locked.'
+const PROBE_MAX_BYTES = 1_048_576
+const TICKET_PARAM = 't'
+// Only parses a request's own path and query; nothing is ever fetched from it.
+const URL_BASE = 'http://fixture.invalid'
+
 const MEDIA_ROUTE = /^\/api\/media\/(\d+)(\/.*)?$/u
 const MP4_EXTENSION = '.mp4'
 const RANGE_OUTCOMES = { unsatisfiable: 'unsatisfiable' } as const
+const ITEM_ROUTE = /^\/api\/items\/(\d+)$/u
+const PING_PATH = '/api/media-origins/ping'
+const LIBRARY_PATH = `/api/libraries/${FIXTURE_ITEMS.library}`
+const SAGAS_PATH = `${LIBRARY_PATH}/sagas`
+// What a media origin serves for a ticket: a title's file and its sidecar.
+const MEDIA_PLANE_ROUTE = /^\/api\/media\/(\d+)\/(file|subtitles\/external-0)$/u
 
 const fileOf = (mediaId: number) => `/api/media/${mediaId}/file`
+
+/** The ticket the fixture issues for a title, and the only one its media origin takes for it. */
+export const ticketFor = (mediaId: number) => `fixture-ticket-${mediaId}`
+
+const FIXTURE_SHOW = { id: FIXTURE_ITEMS.show, title: 'Fixture Show' }
 
 /** A slowed answer: `finish` sends the rest at once, `stop` leaves it as it is. */
 type Slowed = { finish: () => void; stop: () => void }
@@ -177,6 +220,108 @@ type Serve = (input: {
 }) => void
 
 const NO_TRIES: Tries = { failed: 0, waitUntil: 0 }
+
+/** A request's path and query, split as the server reads them; one it cannot read names nothing. */
+const partsOf = (url: string): { pathname: string; query: URLSearchParams } => {
+  if (!URL.canParse(url, URL_BASE)) return { pathname: '', query: new URLSearchParams() }
+  const parsed = new URL(url, URL_BASE)
+  return { pathname: parsed.pathname, query: parsed.searchParams }
+}
+
+/** A request's path for the log, its ticket left out, and whether it carried one. */
+const withoutTicket = (url: string): { path: string; hasTicket: boolean } => {
+  if (!URL.canParse(url, URL_BASE)) return { path: url, hasTicket: false }
+  const parsed = new URL(url, URL_BASE)
+  if (!parsed.searchParams.has(TICKET_PARAM)) return { path: url, hasTicket: false }
+  parsed.searchParams.delete(TICKET_PARAM)
+  return { path: `${parsed.pathname}${parsed.search}`, hasTicket: true }
+}
+
+/** The container the server names a clip by, from its extension: `mkv`, `mp4`. */
+export const containerOf = (path: string) => extname(path).slice(1).toLowerCase()
+
+/** How many bytes the probe asked for, as the server reads `bytes`. */
+const probeLengthOf = (query: URLSearchParams): number => {
+  const asked = Number(query.get('bytes') ?? MEDIA_PROBE_BYTES)
+  if (!Number.isSafeInteger(asked)) return MEDIA_PROBE_BYTES
+  return Math.min(Math.max(asked, 1), PROBE_MAX_BYTES)
+}
+
+const seasonSummary = summary({
+  id: FIXTURE_ITEMS.season,
+  type: 'season',
+  title: 'Season 1',
+  year: null,
+  show: FIXTURE_SHOW,
+  season: 1,
+})
+
+const seasonCard: SeasonSummary = {
+  ...seasonSummary,
+  type: 'season',
+  episodeCount: 2,
+  watchedCount: 0,
+}
+
+const episodeCard = ({
+  id,
+  number,
+  primary,
+}: {
+  id: number
+  number: number
+  primary: MediaItem
+}): EpisodeSummary => ({
+  ...summary({
+    id,
+    type: 'episode',
+    title: primary.title,
+    year: null,
+    show: FIXTURE_SHOW,
+    season: 1,
+    episode: number,
+  }),
+  type: 'episode',
+  summary: null,
+  released: null,
+  runtime: null,
+  stillVersion: null,
+  watched: false,
+  primary,
+})
+
+/** The show, its season and the season's episodes, whose files are `first` and `second`. */
+const itemsOf = ({
+  first,
+  second,
+}: {
+  first: MediaItem
+  second: MediaItem
+}): ReadonlyMap<number, ItemDetails> =>
+  new Map([
+    [
+      FIXTURE_ITEMS.show,
+      details({
+        id: FIXTURE_ITEMS.show,
+        type: 'show',
+        title: FIXTURE_SHOW.title,
+        year: null,
+        tmdbId: String(FIXTURE_ITEMS.show),
+        children: [seasonCard],
+      }),
+    ],
+    [
+      FIXTURE_ITEMS.season,
+      details({
+        ...seasonSummary,
+        tmdbId: String(FIXTURE_ITEMS.season),
+        children: [
+          episodeCard({ id: FIXTURE_ITEMS.season + 1, number: 1, primary: first }),
+          episodeCard({ id: FIXTURE_ITEMS.season + 2, number: 2, primary: second }),
+        ],
+      }),
+    ],
+  ])
 
 const afterWrong = ({ tries, now }: { tries: Tries; now: number }): Tries =>
   tries.failed + 1 < WRONG_TRIES
@@ -313,9 +458,13 @@ const trickle = ({
 const contentTypeOf = (path: string) =>
   extname(path).toLowerCase() === MP4_EXTENSION ? 'video/mp4' : 'video/x-matroska'
 
-const listen = async (server: Server): Promise<string> => {
-  await new Promise<void>((resolve) => {
-    server.listen(0, '127.0.0.1', () => resolve())
+const listen = async ({ server, port }: { server: Server; port: number }): Promise<string> => {
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(port, '127.0.0.1', () => {
+      server.off('error', reject)
+      resolve()
+    })
   })
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('No fixture port')
@@ -332,17 +481,28 @@ const shut = (server: Server): Promise<void> =>
 /**
  * A stand-in raven server on `127.0.0.1`, shaped like `apps/raven/server` (Ruling 1): the
  * PIN and admin locks with their cookies, titles behind the lock, their track list, a
- * sidecar and byte ranges. Its logs say which cookies a request carried, never their
- * values. `now` is the clock the wrong-try wait reads.
+ * sidecar and byte ranges, and a library holding a show, its season and a saga. Each title
+ * reports its file's real size, as a download checks the bytes against it. Its logs say
+ * which cookies a request carried, never their values, and whether it carried a ticket,
+ * never the ticket. `now` is the clock the wrong-try wait and the tickets read.
+ *
+ * With `mediaPlane` on (Ruling 15), the server lists `elsewhere` as its `lan` media origin,
+ * answers the probe, and issues tickets behind the lock, timed in epoch milliseconds as the
+ * server's `MediaTickets` times them. `port` keeps an earlier fixture's address, as a server
+ * that restarts does; 0 takes any free one.
  */
 export const startFixtureServer = async ({
   clips,
   mode,
   now = Date.now,
+  mediaPlane = false,
+  port = 0,
 }: {
   clips: { first: string; second: string; tracks: string }
   mode: FixtureMode
   now?: () => number
+  mediaPlane?: boolean
+  port?: number
 }): Promise<FixtureServer> => {
   if (!isMediaTracks(FIXTURE_TRACKS)) throw new Error('The fixture track list is not a MediaTracks')
   const [tracksBytes, secondBytes] = await Promise.all([
@@ -355,6 +515,40 @@ export const startFixtureServer = async ({
     [FIXTURE_MEDIA.redirecting, { title: 'Fixture Three', path: clips.tracks, bytes: tracksBytes }],
     [FIXTURE_MEDIA.page, { title: 'Fixture Four', path: clips.tracks, bytes: tracksBytes }],
   ])
+  const mediaItems: ReadonlyMap<number, MediaItem> = new Map(
+    [...titles].map(([mediaId, { title, path, bytes }]): [number, MediaItem] => [
+      mediaId,
+      mediaItemFor({
+        id: mediaId,
+        libraryId: FIXTURE_ITEMS.library,
+        title,
+        duration: 30,
+        fileName: basename(path),
+        size: bytes.length,
+        container: containerOf(path),
+      }),
+    ]),
+  )
+  const first = mediaItems.get(FIXTURE_MEDIA.first)
+  const second = mediaItems.get(FIXTURE_MEDIA.second)
+  if (first === undefined || second === undefined) throw new Error('The fixture lost a title')
+  const items = itemsOf({ first, second })
+  const fixtureLibrary: Library = {
+    ...library({ id: FIXTURE_ITEMS.library, watchedPercent: 90 }),
+    name: 'Fixture Library',
+  }
+  const sagas: Saga[] = [
+    {
+      tmdbId: FIXTURE_ITEMS.saga,
+      name: 'Fixture Saga',
+      backdrop: DEFAULT_SAGA_BACKDROP,
+      media: [first, second],
+    },
+  ]
+  if (![...items.values()].every(isItemDetails) || !isLibrary(fixtureLibrary)) {
+    throw new Error('The fixture library is not what the server answers')
+  }
+  if (!isSagaList(sagas)) throw new Error('The fixture saga is not a Saga')
 
   // A restart forgets `unlocks` but not `admins`: the admin cookie outlives the process.
   let unlocks: ReadonlySet<string> = new Set()
@@ -377,7 +571,7 @@ export const startFixtureServer = async ({
     const cookies = cookiesOf(request)
     return {
       method: request.method ?? '',
-      path: request.url ?? '',
+      ...withoutTicket(request.url ?? ''),
       hasUnlock: cookies.has(UNLOCK_COOKIE),
       hasAdmin: cookies.has(ADMIN_COOKIE),
       hasOtherCookie: Array.from(cookies.keys()).some(
@@ -468,6 +662,49 @@ export const startFixtureServer = async ({
 
   const canSee = (cookies: ReadonlyMap<string, string>) => !mode.isLocked || isUnlocked(cookies)
 
+  /**
+   * Answers for what sits in the locked library when this browser may not see it, as the
+   * server's `LockGuard` does: 404 while the admin lock holds, so nothing asks for the PIN,
+   * else 423. False, answering nothing, when it may see it.
+   */
+  const isHeldBack = ({
+    request,
+    response,
+    missing,
+  }: {
+    request: IncomingMessage
+    response: ServerResponse
+    missing: string
+  }): boolean => {
+    const cookies = cookiesOf(request)
+    if (canSee(cookies)) return false
+    const isHidden = adminHolds(cookies)
+    sendJson({
+      response,
+      status: isHidden ? 404 : 423,
+      body: { message: isHidden ? missing : LOCKED_MESSAGE },
+    })
+    return true
+  }
+
+  const sendPing = ({ response, query }: { response: ServerResponse; query: URLSearchParams }) => {
+    const length = probeLengthOf(query)
+    response.writeHead(200, {
+      'content-type': 'application/octet-stream',
+      'content-length': length,
+      'cache-control': 'no-store',
+    })
+    response.end(randomBytes(length))
+  }
+
+  const sendSidecar = (response: ServerResponse) => {
+    response.writeHead(200, { [HTTP_HEADERS.contentType]: 'text/vtt; charset=utf-8' })
+    response.end(FIXTURE_SIDECAR)
+  }
+
+  const sendMissing = (response: ServerResponse) =>
+    sendJson({ response, status: 404, body: { message: 'Not found' } })
+
   const answerMedia = ({
     request,
     response,
@@ -480,32 +717,27 @@ export const startFixtureServer = async ({
     rest: string
   }) => {
     const title = titles.get(mediaId)
-    const cookies = cookiesOf(request)
-    const missing = { message: `No media ${mediaId}` }
-    if (title === undefined) return sendJson({ response, status: 404, body: missing })
-    if (!canSee(cookies)) {
-      if (adminHolds(cookies)) return sendJson({ response, status: 404, body: missing })
-      return sendJson({ response, status: 423, body: { message: 'This library is locked.' } })
-    }
+    const missing = `No media ${mediaId}`
+    if (title === undefined) return sendJson({ response, status: 404, body: { message: missing } })
+    if (isHeldBack({ request, response, missing })) return
     const route = `${request.method ?? ''} ${rest}`
     switch (route) {
       case MEDIA_ROUTES.item:
-        return sendJson({
-          response,
-          status: 200,
-          body: mediaItemFor({
-            id: mediaId,
-            title: title.title,
-            duration: 30,
-            fileName: basename(title.path),
-          }),
-        })
+        return sendJson({ response, status: 200, body: mediaItems.get(mediaId) })
       case MEDIA_ROUTES.tracks:
         return sendJson({ response, status: 200, body: FIXTURE_TRACKS })
       case MEDIA_ROUTES.sidecar:
-        response.writeHead(200, { [HTTP_HEADERS.contentType]: 'text/vtt; charset=utf-8' })
-        response.end(FIXTURE_SIDECAR)
-        return
+        return sendSidecar(response)
+      case MEDIA_ROUTES.ticket:
+        if (!mediaPlane) return sendMissing(response)
+        return sendJson({
+          response,
+          status: 200,
+          body: {
+            ticket: ticketFor(mediaId),
+            expiresAt: now() + MEDIA_TICKET_SECONDS * 1000,
+          },
+        })
       case MEDIA_ROUTES.file:
         if (mediaId === FIXTURE_MEDIA.redirecting) {
           response.writeHead(302, { location: `${elsewhere.origin}${fileOf(mediaId)}` })
@@ -522,8 +754,90 @@ export const startFixtureServer = async ({
       case MEDIA_ROUTES.plays:
         return sendEmpty({ response, status: 204 })
       default:
-        return sendJson({ response, status: 404, body: { message: 'Not found' } })
+        return sendMissing(response)
     }
+  }
+
+  const answerItem = ({
+    request,
+    response,
+    itemId,
+  }: {
+    request: IncomingMessage
+    response: ServerResponse
+    itemId: number
+  }) => {
+    const item = items.get(itemId)
+    const missing = `No item ${itemId}`
+    if (item === undefined) return sendJson({ response, status: 404, body: { message: missing } })
+    if (isHeldBack({ request, response, missing })) return
+    return sendJson({ response, status: 200, body: item })
+  }
+
+  const answerSagas = ({
+    request,
+    response,
+  }: {
+    request: IncomingMessage
+    response: ServerResponse
+  }) => {
+    if (isHeldBack({ request, response, missing: `No library ${FIXTURE_ITEMS.library}` })) return
+    sendJson({ response, status: 200, body: sagas })
+  }
+
+  /**
+   * How the routes of the library and the media plane, which name no title, answer a request;
+   * null for any other request.
+   */
+  const libraryRouteOf = ({
+    request,
+    response,
+  }: {
+    request: IncomingMessage
+    response: ServerResponse
+  }): (() => void) | null => {
+    if (request.method !== SERVER_METHODS.get) return null
+    const { pathname, query } = partsOf(request.url ?? '')
+    if (pathname === API_PATHS.mediaOrigins) {
+      const origins = mediaPlane ? [{ kind: 'lan', url: elsewhere.origin }] : []
+      return () => sendJson({ response, status: 200, body: { origins } })
+    }
+    if (pathname === PING_PATH) {
+      return () => (mediaPlane ? sendPing({ response, query }) : sendMissing(response))
+    }
+    // Public, as the server's is: a library's settings hold nothing the lock keeps back.
+    if (pathname === LIBRARY_PATH) {
+      return () => sendJson({ response, status: 200, body: fixtureLibrary })
+    }
+    if (pathname === SAGAS_PATH) return () => answerSagas({ request, response })
+    const item = ITEM_ROUTE.exec(pathname)
+    if (item === null) return null
+    return () => answerItem({ request, response, itemId: Number(item[1]) })
+  }
+
+  /**
+   * The media origin: a title's file and sidecar for that title's ticket alone. A browser
+   * sends no cookie to another origin, so a cookie here opens nothing.
+   */
+  const answerMediaPlane = ({
+    request,
+    response,
+  }: {
+    request: IncomingMessage
+    response: ServerResponse
+  }) => {
+    if (!mediaPlane || request.method !== SERVER_METHODS.get) return sendMissing(response)
+    const { pathname, query } = partsOf(request.url ?? '')
+    if (pathname === PING_PATH) return sendPing({ response, query })
+    const route = MEDIA_PLANE_ROUTE.exec(pathname)
+    const mediaId = Number(route?.[1] ?? 0)
+    const title = titles.get(mediaId)
+    if (route === null || title === undefined) return sendMissing(response)
+    if (query.get(TICKET_PARAM) !== ticketFor(mediaId)) {
+      return sendJson({ response, status: 401, body: { message: 'That ticket is not valid.' } })
+    }
+    if (route[2] !== 'file') return sendSidecar(response)
+    return sendFile({ request, response, path: title.path, bytes: title.bytes })
   }
 
   const answerUnlock = ({ response, body }: { response: ServerResponse; body: string | null }) => {
@@ -617,8 +931,10 @@ export const startFixtureServer = async ({
       return sendJson({ response, status: 200, body: adminLockOf(cookies) })
     }
     if (route === API_ROUTES.adminUnlock) return answerAdminUnlock({ response, body })
+    const libraryRoute = libraryRouteOf({ request, response })
+    if (libraryRoute !== null) return libraryRoute()
     const media = MEDIA_ROUTE.exec(path)
-    if (media === null) return sendJson({ response, status: 404, body: { message: 'Not found' } })
+    if (media === null) return sendMissing(response)
     return answerMedia({ request, response, mediaId: Number(media[1]), rest: media[2] ?? '' })
   }
 
@@ -656,12 +972,20 @@ export const startFixtureServer = async ({
       ) {
         return sendFile({ request, response, path: clips.tracks, bytes: tracksBytes })
       }
-      return sendJson({ response, status: 404, body: { message: 'Not found' } })
+      return answerMediaPlane({ request, response })
     },
   })
 
-  const elsewhere = { origin: await listen(away.server), requests: away.requests }
-  const origin = await listen(home.server)
+  // Home first: a stored `port` is free again only since the last fixture closed, and a
+  // listener taking any free port first could be handed that very one.
+  const origin = await listen({ server: home.server, port })
+  const elsewhere = {
+    origin: await listen({ server: away.server, port: 0 }).catch(async (error: unknown) => {
+      await shut(home.server)
+      throw error
+    }),
+    requests: away.requests,
+  }
 
   const stall = ({ path }: { path: RegExp }) => {
     const opened: { release: () => void } = { release: () => {} }
