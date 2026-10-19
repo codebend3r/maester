@@ -78,7 +78,7 @@ const SagaFilm = ({
   const menu = useCardMenu({ media, matchType: 'movie', inline: true })
   const { title } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
-  const link = cardLink({ media, pages: true })
+  const link = cardLink({ media, hasPages: true })
   const hasPage = link.state == null
   const tag = TAGS[standing]
   const score = media.item

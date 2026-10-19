@@ -53,7 +53,7 @@ const MediaRow = ({
   const menu = useCardMenu({ media, matchType, inline: true })
   const { title, year } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
-  const link = cardLink({ media, pages: movies })
+  const link = cardLink({ media, hasPages: movies })
   const thumbnail = api.thumbnailUrl(media)
   return (
     <tr className={menu.hostClass} data-entry={mediaEntryKey(media)} {...select.rootProps}>

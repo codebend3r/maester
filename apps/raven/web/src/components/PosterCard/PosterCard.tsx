@@ -97,7 +97,7 @@ export const PosterCard = ({
   const score = media.item
     ? pickScore({ ratings: media.item.ratings, source: ratingsSource })
     : null
-  const link = cardLink({ media, pages: true })
+  const link = cardLink({ media, hasPages: true })
   const hasPage = link.state == null
   const sorted = sort ? sortFact({ media, sort }) : null
   const facts = [

@@ -99,7 +99,7 @@ export const MovieFiles = ({
               return (
                 lead && (
                   <li key={lead.id} className={styles.file}>
-                    <Link to={cardLink({ media: lead, pages: true }).to} className={styles.card}>
+                    <Link to={cardLink({ media: lead, hasPages: true }).to} className={styles.card}>
                       {card.map((file) => file.fileName).join(', ')}
                     </Link>
                   </li>

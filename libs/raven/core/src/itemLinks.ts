@@ -164,12 +164,12 @@ export const readWatchState = ({
  */
 export const cardLink = ({
   media,
-  pages,
+  hasPages,
 }: {
   media: MediaItem
-  pages: boolean
+  hasPages: boolean
 }): { to: AppPath; state?: WatchState } => {
-  const page = pages && media.item ? itemPath(media.item) : null
+  const page = hasPages && media.item ? itemPath(media.item) : null
   if (page == null) return watchLink({ media })
   return {
     to: inLibrary({

@@ -80,7 +80,7 @@ const fromMedia = ({ media, library }: { media: MediaItem; library: Library }): 
       ].filter(isFact),
       addedAt: media.addedAt,
       play: watchLink({ media }),
-      details: cardLink({ media, pages: true }).to,
+      details: cardLink({ media, hasPages: true }).to,
     },
   ]
 }

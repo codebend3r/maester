@@ -51,10 +51,10 @@ const FIXED: Record<string, PlayerAction> = {
   [KEYS.space]: { type: PLAYER_ACTIONS.togglePlay },
   j: { type: PLAYER_ACTIONS.seekBy, seconds: -10 },
   l: { type: PLAYER_ACTIONS.seekBy, seconds: 10 },
-  ArrowLeft: { type: PLAYER_ACTIONS.seekBy, seconds: -5 },
-  ArrowRight: { type: PLAYER_ACTIONS.seekBy, seconds: 5 },
-  ArrowUp: { type: PLAYER_ACTIONS.volumeBy, delta: 0.05 },
-  ArrowDown: { type: PLAYER_ACTIONS.volumeBy, delta: -0.05 },
+  [KEYS.arrowLeft]: { type: PLAYER_ACTIONS.seekBy, seconds: -5 },
+  [KEYS.arrowRight]: { type: PLAYER_ACTIONS.seekBy, seconds: 5 },
+  [KEYS.arrowUp]: { type: PLAYER_ACTIONS.volumeBy, delta: 0.05 },
+  [KEYS.arrowDown]: { type: PLAYER_ACTIONS.volumeBy, delta: -0.05 },
   m: { type: PLAYER_ACTIONS.toggleMute },
   f: { type: PLAYER_ACTIONS.toggleFullscreen },
   c: { type: PLAYER_ACTIONS.toggleSubtitles },
@@ -70,7 +70,7 @@ const FIXED: Record<string, PlayerAction> = {
   '-': { type: PLAYER_ACTIONS.stepCaptionSize, direction: -1 },
   _: { type: PLAYER_ACTIONS.stepCaptionSize, direction: -1 },
   '?': { type: PLAYER_ACTIONS.showShortcuts },
-  Escape: { type: PLAYER_ACTIONS.escape },
+  [KEYS.escape]: { type: PLAYER_ACTIONS.escape },
 }
 
 /**

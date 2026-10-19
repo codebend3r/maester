@@ -56,7 +56,7 @@ export const MediaCard = ({
   const label = mediaLabel(media)
   const select = useSelectable({ key: mediaEntryKey(media), title: label })
   const play = watchLink({ media })
-  const page = cardLink({ media, pages: true })
+  const page = cardLink({ media, hasPages: true })
   const hasPage = page.state == null
   const sorted = sort ? sortFact({ media, sort }) : null
   const timeLeft = timeLeftOf(media)

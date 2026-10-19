@@ -92,25 +92,25 @@ describe('readWatchState', () => {
 describe('cardLink', () => {
   it("opens a matched movie's page, naming the file when the movie was split onto several cards", () => {
     const item = itemSummary({ id: 4, type: 'movie' })
-    expect(cardLink({ media: mediaItem({ id: 9, libraryId: 2, item }), pages: true })).toEqual({
+    expect(cardLink({ media: mediaItem({ id: 9, libraryId: 2, item }), hasPages: true })).toEqual({
       to: '/movies/4?library=2',
     })
     expect(
       cardLink({
         media: mediaItem({ id: 9, libraryId: 2, item, variant: 'Final Cut' }),
-        pages: true,
+        hasPages: true,
       }),
     ).toEqual({ to: '/movies/4?library=2&file=9' })
   })
 
   it("opens the page as the card's own library shows it", () => {
     const media = mediaItem({ id: 9, libraryId: 5, item: itemSummary({ id: 4, type: 'movie' }) })
-    expect(cardLink({ media, pages: true })).toEqual({ to: '/movies/4?library=5' })
+    expect(cardLink({ media, hasPages: true })).toEqual({ to: '/movies/4?library=5' })
   })
 
   it('plays a file straight away where the library has no pages', () => {
     const media = mediaItem({ id: 9, item: itemSummary({ id: 4, type: 'movie' }) })
-    expect(cardLink({ media, pages: false })).toEqual(watchLink({ media }))
+    expect(cardLink({ media, hasPages: false })).toEqual(watchLink({ media }))
   })
 })
 
@@ -142,7 +142,7 @@ describe('inLibrary', () => {
       variant: 'Final Cut',
       item: itemSummary({ id: 4, type: 'movie' }),
     })
-    expect(cardLink({ media, pages: true })).toEqual({
+    expect(cardLink({ media, hasPages: true })).toEqual({
       to: '/movies/4?library=1e%2B21&file=1e%2B21',
     })
   })

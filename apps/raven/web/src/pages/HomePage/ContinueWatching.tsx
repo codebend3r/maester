@@ -78,7 +78,7 @@ const ContinueTile = ({ entry }: { entry: PosterEntry }) => {
   const label = mediaLabel(media)
   const { title, line } = tileWords(media)
   const left = timeLeft(media)
-  const page = cardLink({ media, pages: true })
+  const page = cardLink({ media, hasPages: true })
   const hasPage = page.state == null
   const hasPoster = poster?.posterVersion != null
   const hasResolution = resolutionLabel(media) != null

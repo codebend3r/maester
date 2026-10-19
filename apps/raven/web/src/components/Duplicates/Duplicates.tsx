@@ -27,7 +27,7 @@ import styles from '@/components/Duplicates/Duplicates.module.scss'
 /** The card's poster, opening its page. */
 const Poster = ({ entry }: { entry: PosterEntry }) => (
   <Link
-    {...cardLink({ media: entry.media, pages: true })}
+    {...cardLink({ media: entry.media, hasPages: true })}
     className={styles.poster}
     tabIndex={-1}
     aria-hidden="true"
@@ -143,7 +143,7 @@ const MovieDuplicate = ({
             {movie.cards.map((card) => (
               <li key={card.entry.media.id} className={styles.card}>
                 <h4 className={styles.cardTitle}>
-                  <Link {...cardLink({ media: card.entry.media, pages: true })}>
+                  <Link {...cardLink({ media: card.entry.media, hasPages: true })}>
                     {cardTitle(card.entry.media).title}
                   </Link>
                 </h4>
