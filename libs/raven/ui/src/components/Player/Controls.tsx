@@ -94,62 +94,49 @@ const MenuPill = ({
   )
 }
 
-/** What autoplay's tooltip says it will do. */
-const autoplayNote = ({
-  upNext,
-  autoplay,
-}: {
-  upNext: string | null
-  autoplay: boolean
-}): string => {
-  if (upNext == null) return 'Nothing is up next'
-  return autoplay ? `${upNext} plays next` : `${upNext} waits for you to play it`
-}
-
 /**
- * Autoplay's switch, beside the skips whether or not anything is up next: a
- * faint ring round it while it is on, which fills as the countdown to what
- * is up next runs out in the video's last seconds. Switching it off then
- * stops the countdown.
+ * Next, at the end of the transport whether or not anything is up next: it
+ * plays what is up next now. In the video's last seconds, with autoplay on,
+ * a ring round it fills as the countdown to what is up next runs out.
  */
-const AutoplayButton = ({
+const NextButton = ({
   upNext,
-  autoplay,
   countdown,
-  onToggle,
+  onNext,
 }: {
   upNext: string | null
-  autoplay: boolean
   countdown: number | null
-  onToggle: () => void
-}) => (
-  <button
-    type="button"
-    className={classes(styles.button, styles.autoplay)}
-    aria-label="Autoplay"
-    aria-pressed={autoplay}
-    title={autoplayNote({ upNext, autoplay })}
-    disabled={upNext == null}
-    onClick={onToggle}
-  >
-    <svg className={styles.ring} viewBox="0 0 44 44" aria-hidden="true" focusable="false">
-      <circle className={styles.ringTrack} cx="22" cy="22" r="20" />
+  onNext: () => void
+}) => {
+  const label = upNext == null ? 'Nothing up next' : `Next: ${upNext}`
+  return (
+    <button
+      type="button"
+      className={classes(styles.button, styles.next)}
+      aria-label={label}
+      title={label}
+      disabled={upNext == null}
+      onClick={onNext}
+    >
       {countdown != null && (
-        <circle
-          className={styles.ringFill}
-          cx="22"
-          cy="22"
-          r="20"
-          pathLength={1}
-          strokeDasharray={1}
-          strokeDashoffset={1 - countdown}
-          data-countdown={countdown}
-        />
+        <svg className={styles.ring} viewBox="0 0 44 44" aria-hidden="true" focusable="false">
+          <circle className={styles.ringTrack} cx="22" cy="22" r="20" />
+          <circle
+            className={styles.ringFill}
+            cx="22"
+            cy="22"
+            r="20"
+            pathLength={1}
+            strokeDasharray={1}
+            strokeDashoffset={1 - countdown}
+            data-countdown={countdown}
+          />
+        </svg>
       )}
-    </svg>
-    <Icon name="skipNext" size={18} />
-  </button>
-)
+      <Icon name="skipNext" size={22} />
+    </button>
+  )
+}
 
 export type ControlsProps = {
   shown: boolean
@@ -173,10 +160,12 @@ export type ControlsProps = {
   settingsButton: RefObject<HTMLButtonElement | null>
   /** What is up next, by name; null with nothing to play after this. */
   upNext: string | null
-  autoplay: boolean
   /** How far the countdown to what is up next has run, 0 to 1; null while none runs. */
   countdown: number | null
-  onToggleAutoplay: () => void
+  /** "Ends at 2:20 AM": when the video ends at this speed; null while its length is unknown. */
+  endsAt: string | null
+  onRestart: () => void
+  onNext: () => void
   onTogglePlay: () => void
   onSeek: (time: number) => void
   onSkip: (seconds: number) => void
@@ -187,9 +176,10 @@ export type ControlsProps = {
 }
 
 /**
- * The bar along the bottom: the timeline, then play, the skips, autoplay,
- * volume and the clock on the left, and glass pills for subtitles, audio,
- * quality and full screen on the right.
+ * The bar along the bottom: the time played beside the timeline, then the
+ * transport (back to the start, back 10 seconds, play, forward 10 seconds,
+ * next) and when the video ends on the left, and volume and glass pills for
+ * subtitles, audio, quality and full screen on the right.
  */
 export const Controls = ({
   shown,
@@ -207,9 +197,10 @@ export const Controls = ({
   menuOpen,
   settingsButton,
   upNext,
-  autoplay,
   countdown,
-  onToggleAutoplay,
+  endsAt,
+  onRestart,
+  onNext,
   onTogglePlay,
   onSeek,
   onSkip,
@@ -228,6 +219,7 @@ export const Controls = ({
   return (
     <div className={classes(styles.controls, !shown && styles.hidden)}>
       <div className={styles.timeline}>
+        <span className={styles.elapsed}>{formatDuration(time)}</span>
         <Scrubber
           time={time}
           duration={duration}
@@ -237,32 +229,35 @@ export const Controls = ({
         />
       </div>
       <ControlButton
-        label={paused ? 'Play (k)' : 'Pause (k)'}
-        onClick={onTogglePlay}
-        className={styles.play}
+        label="Back to the start (Home)"
+        onClick={onRestart}
+        className={styles.restart}
       >
-        <Icon name={paused ? 'play' : 'pause'} size={24} />
+        <Icon name="skipPrevious" size={22} />
       </ControlButton>
       <ControlButton
         label="Back 10 seconds (j)"
         onClick={() => onSkip(-10)}
-        className={classes(styles.skip, styles.back)}
+        className={styles.back}
       >
-        -10
+        <Icon name="rewind" size={24} />
+      </ControlButton>
+      <ControlButton
+        label={paused ? 'Play (k)' : 'Pause (k)'}
+        onClick={onTogglePlay}
+        className={styles.play}
+      >
+        <Icon name={paused ? 'play' : 'pause'} size={26} />
       </ControlButton>
       <ControlButton
         label="Forward 10 seconds (l)"
         onClick={() => onSkip(10)}
-        className={classes(styles.skip, styles.forward)}
+        className={styles.forward}
       >
-        +10
+        <Icon name="forward" size={24} />
       </ControlButton>
-      <AutoplayButton
-        upNext={upNext}
-        autoplay={autoplay}
-        countdown={countdown}
-        onToggle={onToggleAutoplay}
-      />
+      <NextButton upNext={upNext} countdown={countdown} onNext={onNext} />
+      {endsAt != null && <p className={styles.ends}>{endsAt}</p>}
       <div className={styles.volume}>
         <ControlButton
           label={muteLabel({ isVolumeFixed, muted })}
@@ -289,10 +284,6 @@ export const Controls = ({
           </span>
         )}
       </div>
-      <p className={styles.clock}>
-        <span>{formatDuration(time)}</span>
-        <span className={styles.total}> / {formatDuration(duration)}</span>
-      </p>
       <div className={styles.pills}>
         {Object.values(MENU_SECTIONS).map((section) => (
           <MenuPill

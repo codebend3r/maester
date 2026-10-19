@@ -185,7 +185,8 @@
 }
 
 // What plays next, when the video came with more to play after it: a pill
-// naming it after a softer "Up next", whose label gives way on a narrow screen.
+// naming it after a softer "Up next". On a phone "Up next" alone stays, so
+// the playing video's title keeps the room.
 .next {
   @include glass-button;
 
@@ -259,11 +260,7 @@
     min-height: var(--field-size);
   }
 
-  .next {
-    max-width: 10rem;
-  }
-
-  .nextLead {
+  .nextLabel {
     display: none;
   }
 

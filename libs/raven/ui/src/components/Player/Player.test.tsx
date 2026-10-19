@@ -350,7 +350,7 @@ describe('the player controls', () => {
     expect(await screen.findByText('Playing the next video')).toBeInTheDocument()
   })
 
-  it('waits at the end with autoplay off, and switches it from the bar', async () => {
+  it('waits at the end with autoplay off, which the Playback menu switches', async () => {
     usePlayerPrefs.setState({ autoplay: false })
     const { container } = renderWithProviders({
       ui: (
@@ -373,8 +373,33 @@ describe('the player controls', () => {
     if (!video) throw new Error('no video')
     fireEvent(video, new Event('ended'))
     expect(screen.queryByText('Playing the next video')).toBeNull()
-    await userEvent.click(screen.getByRole('button', { name: 'Autoplay', pressed: false }))
+    await userEvent.click(screen.getByRole('button', { name: /^Playback/ }))
+    await userEvent.click(
+      within(screen.getByRole('group', { name: 'Autoplay' })).getByRole('radio', { name: 'On' }),
+    )
     expect(usePlayerPrefs.getState().autoplay).toBe(true)
+  })
+
+  it('plays what is up next at once from Next', async () => {
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <TestPlayer
+                media={mediaItem({ container: 'mp4' })}
+                next={{ to: '/watch/8', state: null, label: 'Busboys 2 (2027)' }}
+                backTo="/libraries/2"
+              />
+            }
+          />
+          <Route path="watch/:id" element={<p>Playing the next video</p>} />
+        </Routes>
+      ),
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Next: Busboys 2 (2027)' }))
+    expect(await screen.findByText('Playing the next video')).toBeInTheDocument()
   })
 
   it('counts down to what is up next only in the last seconds', () => {
@@ -398,12 +423,12 @@ describe('the player controls', () => {
     expect(container.querySelector('[data-countdown]')).toHaveAttribute('data-countdown', '0.5')
   })
 
-  it('offers no next video when none came with it, and autoplay has nothing to press', () => {
+  it('offers no next video when none came with it, and Next has nothing to press', () => {
     renderWithProviders({
       ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
     })
     expect(screen.queryByRole('link', { name: /^Up next/ })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Autoplay' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Nothing up next' })).toBeDisabled()
   })
 
   it('favourites the video from the player, and says so', async () => {
@@ -656,19 +681,18 @@ describe('the player chrome', () => {
     expect(screen.getByRole('button', { name: 'Pause (k)' })).toBeInTheDocument()
   })
 
-  it('skips ten seconds either way from the bar', async () => {
+  it('skips ten seconds either way from the bar, and back to the start', async () => {
     const { container } = renderWithProviders({
       ui: <TestPlayer media={uhd} backTo="/libraries/2" />,
     })
     const video = container.querySelector('video')
     if (!video) throw new Error('no video')
-    const forward = screen.getByRole('button', { name: 'Forward 10 seconds (l)' })
-    expect(forward).toHaveTextContent('+10')
-    await userEvent.click(forward)
+    await userEvent.click(screen.getByRole('button', { name: 'Forward 10 seconds (l)' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Forward 10 seconds (l)' }))
+    expect(video.currentTime).toBe(20)
+    await userEvent.click(screen.getByRole('button', { name: 'Back 10 seconds (j)' }))
     expect(video.currentTime).toBe(10)
-    const back = screen.getByRole('button', { name: 'Back 10 seconds (j)' })
-    expect(back).toHaveTextContent('-10')
-    await userEvent.click(back)
+    await userEvent.click(screen.getByRole('button', { name: 'Back to the start (Home)' }))
     expect(video.currentTime).toBe(0)
   })
 })

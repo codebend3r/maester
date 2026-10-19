@@ -40,6 +40,7 @@ export type IconName =
   | 'history'
   | 'next'
   | 'skipNext'
+  | 'skipPrevious'
   | 'wand'
   | 'image'
   | 'ascending'
@@ -99,6 +100,7 @@ const BARS = `${roundRect({ x: 6.5, y: 5, w: 3.5, h: 14, r: 1.2 })}${roundRect({
 const DOUBLE_BACK = 'M11.5 7.5L6.5 12l5 4.5zM18.5 7.5l-5 4.5 5 4.5z'
 const DOUBLE_ON = 'M12.5 7.5l5 4.5-5 4.5zM5.5 7.5l5 4.5-5 4.5z'
 const SKIP_PLAY = 'M6.5 6.5L15 12l-8.5 5.5z'
+const SKIP_BACK = 'M17.5 6.5L9 12l8.5 5.5z'
 const HOUSE =
   'M4 10.6a2 2 0 0 1 .7-1.5l6-5.1a2 2 0 0 1 2.6 0l6 5.1a2 2 0 0 1 .7 1.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z'
 const PAGE = 'M14 3.5H8a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.5z'
@@ -234,6 +236,7 @@ const DRAWINGS: Record<IconName, Drawing> = {
   rewind: { stroke: DOUBLE_BACK, fill: DOUBLE_BACK },
   forward: { stroke: DOUBLE_ON, fill: DOUBLE_ON },
   skipNext: { stroke: `${SKIP_PLAY}M17.5 6.5v11`, fill: SKIP_PLAY },
+  skipPrevious: { stroke: `${SKIP_BACK}M6.5 6.5v11`, fill: SKIP_BACK },
   shuffle: {
     stroke:
       'M4 16.5h2.6a3 3 0 0 0 2.3-1.1l.6-.7M14.5 9.3l.6-.7a3 3 0 0 1 2.3-1.1H20M4 7.5h2.6a3 3 0 0 1 2.3 1.1l6.2 6.8a3 3 0 0 0 2.3 1.1H20M17.5 5l2.5 2.5-2.5 2.5M17.5 14l2.5 2.5-2.5 2.5',

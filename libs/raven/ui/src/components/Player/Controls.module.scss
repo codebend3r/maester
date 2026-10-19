@@ -7,10 +7,10 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(6, auto) minmax(0, 1fr) auto;
+  grid-template-columns: repeat(6, auto) minmax(0, 1fr) repeat(2, auto);
   grid-template-areas:
-    'timeline timeline timeline timeline timeline timeline timeline timeline'
-    'play back forward autoplay volume clock . pills';
+    'timeline timeline timeline timeline timeline timeline timeline timeline timeline'
+    'restart back play forward next ends . volume pills';
   gap: var(--space-2) var(--space-1);
   align-items: center;
   padding: var(--space-6) var(--space-4) var(--space-4);
@@ -27,8 +27,19 @@
   pointer-events: none;
 }
 
+// The time played sits before the scrubber, on its line.
 .timeline {
   grid-area: timeline;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.elapsed {
+  font-size: var(--font-size-md);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .button {
@@ -58,14 +69,12 @@
   }
 }
 
-.play {
-  grid-area: play;
+.restart {
+  grid-area: restart;
 }
 
-.skip {
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+.play {
+  grid-area: play;
 }
 
 .back {
@@ -76,21 +85,13 @@
   grid-area: forward;
 }
 
-// The ring and the mark inside it share the one cell.
-.autoplay {
-  grid-area: autoplay;
+// The countdown's ring and the mark inside it share the one cell.
+.next {
+  grid-area: next;
   grid-template-areas: 'mark';
 
   > * {
     grid-area: mark;
-  }
-
-  &[aria-pressed='false'] {
-    color: var(--color-on-picture-soft);
-  }
-
-  &[aria-pressed='false'] .ringTrack {
-    stroke: transparent;
   }
 }
 
@@ -131,16 +132,12 @@
   accent-color: var(--color-on-picture);
 }
 
-.clock {
-  grid-area: clock;
-  padding-inline-start: var(--space-1);
+.ends {
+  grid-area: ends;
+  padding-inline-start: var(--space-3);
   font-size: var(--font-size-md);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.total {
-  color: var(--color-on-picture-soft);
 }
 
 .pills {
@@ -215,14 +212,14 @@
   }
 }
 
-// On a phone the transport and clock take a row of their own, and mute
-// moves down beside the pills.
+// On a phone the transport takes a row of its own, mute moves down beside
+// the pills, and the end time gives way to the time played.
 @media (max-width: 30rem) {
   .controls {
-    grid-template-columns: repeat(4, auto) minmax(0, 1fr) auto;
+    grid-template-columns: repeat(5, auto) minmax(0, 1fr);
     grid-template-areas:
       'timeline timeline timeline timeline timeline timeline'
-      'play back forward autoplay clock clock'
+      'restart back play forward next .'
       'volume pills pills pills pills pills';
     padding: var(--space-6) var(--space-3) var(--space-3);
   }
@@ -236,7 +233,11 @@
     justify-self: start;
   }
 
-  .clock {
+  .elapsed {
     font-size: var(--font-size-sm);
+  }
+
+  .ends {
+    display: none;
   }
 }

@@ -24,6 +24,7 @@ import { type MenuSection, isMenuSection } from '@/components/Player/menus'
 import {
   aboutLine,
   audioPillLabel,
+  endsAtLabel,
   qualityLabel,
   subtitlePillLabel,
 } from '@/components/Player/playbackFacts'
@@ -33,12 +34,12 @@ import { playingAudio } from '@/components/Player/selection'
 import { SettingsMenu } from '@/components/Player/SettingsMenu'
 import { ShortcutsDialog } from '@/components/Player/ShortcutsDialog'
 import { OVERLAYS, type Overlay, usePlayerActions } from '@/components/Player/usePlayerActions'
-import { useBezel, useFullscreen, useIdle } from '@/components/Player/useStageChrome'
+import { useBezel, useFullscreen, useIdle, useNow } from '@/components/Player/useStageChrome'
 import { useUpNext } from '@/components/Player/useUpNext'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
 import { isInForeignDialog, isTypingTarget } from '@/lib/keyboard'
-import { PLAYER_ACTIONS, type PlayerAction, shortcutFor } from '@/lib/shortcuts'
+import { PLAYER_ACTIONS, type PlayerAction, SEEK_EDGES, shortcutFor } from '@/lib/shortcuts'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostServices } from '@/stores/playerServices'
 
@@ -136,6 +137,8 @@ export const PlayerChrome = ({
   const upNext = useUpNext({ ended: state.ended, time: state.time, duration })
   const nextLink = upNext.next
   const setAutoplay = usePlayerPrefs((prefs) => prefs.setAutoplay)
+  // "Ends at" names a minute, so a step of 15 seconds keeps it true.
+  const now = useNow(15_000)
   // Nothing holds the controls past this: not a pause, an open menu or a focused button.
   const lingerSeconds = usePlayerPrefs((prefs) => prefs.controlsLingerSeconds)
   const idle = useIdle(lingerSeconds * 1_000)
@@ -382,9 +385,10 @@ export const PlayerChrome = ({
         menuOpen={isMenuSection(overlay) ? overlay : false}
         settingsButton={menuButton}
         upNext={nextLink?.label ?? null}
-        autoplay={upNext.autoplay}
         countdown={upNext.countdown}
-        onToggleAutoplay={() => setAutoplay(!upNext.autoplay)}
+        endsAt={endsAtLabel({ now, time: held.time, duration, rate: state.rate })}
+        onRestart={() => controls.act({ type: PLAYER_ACTIONS.seekToEdge, edge: SEEK_EDGES.start })}
+        onNext={upNext.playNext}
         onTogglePlay={controls.togglePlay}
         onSeek={seek}
         onSkip={(seconds) => controls.act({ type: PLAYER_ACTIONS.seekBy, seconds })}
@@ -426,6 +430,8 @@ export const PlayerChrome = ({
           steppedDown={steppedDown}
           choices={choices}
           onPickRate={controls.changeRate}
+          autoplay={upNext.autoplay}
+          onPickAutoplay={setAutoplay}
           onShowInfo={showInfo}
           onClose={closeMenu}
           {...(handoff && { onHandoff: () => handOff(handoff), handoffLabel: handoff.label })}

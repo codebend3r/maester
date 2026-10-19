@@ -17,9 +17,10 @@ const props = (overrides: Partial<ControlsProps> = {}): ControlsProps => ({
   menuOpen: false,
   settingsButton: createRef<HTMLButtonElement>(),
   upNext: 'Busboys 2 (2027)',
-  autoplay: true,
   countdown: null,
-  onToggleAutoplay: () => {},
+  endsAt: 'Ends at 2:20 AM',
+  onRestart: () => {},
+  onNext: () => {},
   onTogglePlay: () => {},
   onSeek: () => {},
   onSkip: () => {},
@@ -31,28 +32,40 @@ const props = (overrides: Partial<ControlsProps> = {}): ControlsProps => ({
 })
 
 describe('Controls', () => {
-  it('switches autoplay beside the skips, saying what plays next', async () => {
-    const onToggleAutoplay = mock(() => {})
-    render(<Controls {...props({ onToggleAutoplay })} />)
-    const autoplay = screen.getByRole('button', { name: 'Autoplay', pressed: true })
-    expect(autoplay).toHaveAttribute('title', 'Busboys 2 (2027) plays next')
-    await userEvent.click(autoplay)
-    expect(onToggleAutoplay).toHaveBeenCalledTimes(1)
+  it('runs the transport in order: start, back, play, forward, next', () => {
+    render(<Controls {...props()} />)
+    const names = screen
+      .getAllByRole('button')
+      .slice(0, 5)
+      .map((button) => button.getAttribute('aria-label'))
+    expect(names).toEqual([
+      'Back to the start (Home)',
+      'Back 10 seconds (j)',
+      'Play (k)',
+      'Forward 10 seconds (l)',
+      'Next: Busboys 2 (2027)',
+    ])
   })
 
-  it('says what waits with autoplay off', () => {
-    render(<Controls {...props({ autoplay: false })} />)
-    expect(screen.getByRole('button', { name: 'Autoplay', pressed: false })).toHaveAttribute(
-      'title',
-      'Busboys 2 (2027) waits for you to play it',
-    )
+  it('goes back to the start and on to what is up next', async () => {
+    const onRestart = mock(() => {})
+    const onNext = mock(() => {})
+    render(<Controls {...props({ onRestart, onNext })} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Back to the start (Home)' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Next: Busboys 2 (2027)' }))
+    expect(onRestart).toHaveBeenCalledTimes(1)
+    expect(onNext).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps autoplay on the bar with nothing up next, unable to press', () => {
+  it('keeps Next on the bar with nothing up next, unable to press', () => {
     render(<Controls {...props({ upNext: null })} />)
-    const autoplay = screen.getByRole('button', { name: 'Autoplay' })
-    expect(autoplay).toBeDisabled()
-    expect(autoplay).toHaveAttribute('title', 'Nothing is up next')
+    expect(screen.getByRole('button', { name: 'Nothing up next' })).toBeDisabled()
+  })
+
+  it('shows the time played beside the timeline and when the video ends', () => {
+    render(<Controls {...props()} />)
+    expect(screen.getByText('40:00')).toBeInTheDocument()
+    expect(screen.getByText('Ends at 2:20 AM')).toBeInTheDocument()
   })
 
   it('fills the ring only while the countdown runs', () => {
@@ -69,8 +82,6 @@ describe('Controls', () => {
     )
     expect(screen.getByRole('button', { name: 'Audio' })).toHaveTextContent(/^Audio$/)
     expect(screen.getByRole('button', { name: 'Playback' })).toHaveTextContent(/^Playback$/)
-    expect(screen.getByText('40:00')).toBeInTheDocument()
-    expect(screen.getByText('/ 1:42:00')).toBeInTheDocument()
   })
 
   it('opens a pill’s menu, and lends the open pill the host’s button ref', async () => {

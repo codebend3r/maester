@@ -39,9 +39,11 @@ const choicesFor = ({
 const renderPlayback = ({
   choices,
   mode = PLAYBACK_MODES.transcode,
+  onPickAutoplay = () => {},
 }: {
   choices: PlayChoices
   mode?: PlaybackMode
+  onPickAutoplay?: (isOn: boolean) => void
 }) =>
   render(
     <SettingsMenu
@@ -53,6 +55,8 @@ const renderPlayback = ({
       mode={mode}
       choices={choices}
       onPickRate={() => {}}
+      autoplay
+      onPickAutoplay={onPickAutoplay}
       onShowInfo={() => {}}
       onClose={() => {}}
     />,
@@ -62,6 +66,15 @@ const converting = { mode: PLAYBACK_MODES.transcode, quality: null } as const sa
 const remuxing = { mode: PLAYBACK_MODES.remux, quality: null } as const satisfies Rendition
 
 describe('SettingsMenu playback section', () => {
+  it('switches autoplay under the speed', async () => {
+    const onPickAutoplay = jest.fn()
+    renderPlayback({ choices: { groups: [], select: () => {} }, onPickAutoplay })
+    const autoplay = screen.getByRole('group', { name: 'Autoplay' })
+    expect(within(autoplay).getByRole('radio', { name: 'On' })).toBeChecked()
+    await userEvent.click(within(autoplay).getByRole('radio', { name: 'Off' }))
+    expect(onPickAutoplay).toHaveBeenCalledWith(false)
+  })
+
   it('lists the ways the file can play and picks one', async () => {
     const select = jest.fn()
     renderPlayback({

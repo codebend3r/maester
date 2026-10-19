@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostServices } from '@/stores/playerServices'
@@ -27,9 +27,9 @@ const countdownAt = ({
 }
 
 /**
- * What plays next, and the countdown to it. With autoplay on, a transition
- * to ended replaces the current watch entry with it; with autoplay off it
- * waits for a click.
+ * What plays next, the countdown to it, and `playNext` to play it now. With
+ * autoplay on, a transition to ended replaces the current watch entry with
+ * it; with autoplay off it waits for a click.
  */
 export const useUpNext = ({
   ended,
@@ -46,15 +46,18 @@ export const useUpNext = ({
   } = useHostServices()
   const autoplay = usePlayerPrefs((prefs) => prefs.autoplay)
   const wasEnded = useRef(false)
+  const playNext = () => {
+    if (next) void navigate(next.to, { replace: true, state: next.state })
+  }
+  const onEnded = useEffectEvent(playNext)
   useEffect(() => {
-    if (ended && !wasEnded.current && next && autoplay) {
-      void navigate(next.to, { replace: true, state: next.state })
-    }
+    if (ended && !wasEnded.current && autoplay) onEnded()
     wasEnded.current = ended
-  }, [ended, next, autoplay, navigate])
+  }, [ended, autoplay])
   return {
     next,
     autoplay,
+    playNext,
     countdown: countdownAt({ time, duration, isCounting: autoplay && next != null }),
   }
 }

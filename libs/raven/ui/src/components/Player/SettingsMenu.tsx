@@ -177,10 +177,39 @@ const SpeedGroup = ({
   </fieldset>
 )
 
+/** Whether what is up next starts by itself once the video ends. */
+const AutoplayGroup = ({
+  name,
+  autoplay,
+  onPickAutoplay,
+}: {
+  name: string
+  autoplay: boolean
+  onPickAutoplay: (isOn: boolean) => void
+}) => (
+  <fieldset className={styles.group}>
+    <legend className={styles.legend}>Autoplay</legend>
+    <div className={styles.speeds}>
+      <Option
+        name={`${name}-autoplay`}
+        checked={autoplay}
+        label="On"
+        onSelect={() => onPickAutoplay(true)}
+      />
+      <Option
+        name={`${name}-autoplay`}
+        checked={!autoplay}
+        label="Off"
+        onSelect={() => onPickAutoplay(false)}
+      />
+    </div>
+  </fieldset>
+)
+
 /**
  * The menu a pill opens over the picture: the audio tracks, the subtitles,
  * or how the file is reaching the browser, with Playback info for the
- * detail, a host's handoff, and the speed under them. Each choice is a
+ * detail, a host's handoff, and the speed and autoplay under them. Each choice is a
  * native radio group, so the arrow keys, the space bar and screen readers
  * all work as they do anywhere else.
  */
@@ -194,6 +223,8 @@ export const SettingsMenu = ({
   steppedDown = null,
   choices = null,
   onPickRate,
+  autoplay,
+  onPickAutoplay,
   onShowInfo,
   onClose,
   onHandoff,
@@ -209,6 +240,8 @@ export const SettingsMenu = ({
   /** The ways the file can play, when the viewer may pick one; a local file has one. */
   choices?: PlayChoices | null
   onPickRate: (rate: number) => void
+  autoplay: boolean
+  onPickAutoplay: (isOn: boolean) => void
   onShowInfo: () => void
   onClose: () => void
   onHandoff?: () => void
@@ -259,6 +292,7 @@ export const SettingsMenu = ({
               )}
             </div>
             <SpeedGroup name={id} rate={rate} onPickRate={onPickRate} />
+            <AutoplayGroup name={id} autoplay={autoplay} onPickAutoplay={onPickAutoplay} />
           </>
         )
       default: {

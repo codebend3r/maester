@@ -62,7 +62,6 @@ const ToolbarDemo = () => {
 const ControlsDemo = () => {
   const settingsButton = useRef<HTMLButtonElement>(null)
   const [paused, setPaused] = useState(true)
-  const [autoplay, setAutoplay] = useState(true)
   return (
     <div className={styles.stage}>
       <span className={styles.picture} aria-hidden="true" />
@@ -85,10 +84,11 @@ const ControlsDemo = () => {
           }}
           menuOpen={false}
           settingsButton={settingsButton}
-          upNext="Blade Runner 2049 (2017)"
-          autoplay={autoplay}
+          upNext="Tears of Steel (2012)"
           countdown={null}
-          onToggleAutoplay={() => setAutoplay((current) => !current)}
+          endsAt="Ends at 2:20 AM"
+          onRestart={noop}
+          onNext={noop}
           onTogglePlay={() => setPaused((current) => !current)}
           onSeek={noop}
           onSkip={noop}

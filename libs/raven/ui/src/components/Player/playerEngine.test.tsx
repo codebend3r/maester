@@ -474,7 +474,7 @@ describe('PlayerChrome seams for a native host', () => {
   const idle = (ms: number) => act(() => jest.advanceTimersByTime(ms))
   const seekSlider = () => screen.getByRole('slider', { name: 'Seek' })
 
-  it('holds the clock and the scrubber still while the controls are hidden', () => {
+  it('holds the time played and the scrubber still while the controls are hidden', () => {
     const services = servicesFor()
     const actions = actionsFor()
     const { container, rerender } = render(chrome({ services, actions }), { wrapper })
@@ -483,10 +483,10 @@ describe('PlayerChrome seams for a native host', () => {
     idle(IDLE_MS)
     rerender(chrome({ services, actions, time: 40 }))
     expect(seekSlider()).toHaveAttribute('aria-valuenow', '30')
-    expect(container.querySelector('.clock')).toHaveTextContent('0:30')
+    expect(container.querySelector('.elapsed')).toHaveTextContent('0:30')
     fireEvent.pointerMove(container.querySelector('.stage') ?? container)
     expect(seekSlider()).toHaveAttribute('aria-valuenow', '40')
-    expect(container.querySelector('.clock')).toHaveTextContent('0:40')
+    expect(container.querySelector('.elapsed')).toHaveTextContent('0:40')
   })
 
   it('tells the host when the controls show and hide', () => {
