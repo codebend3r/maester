@@ -13,10 +13,12 @@ export const useCardMenu = ({
   media,
   matchType,
   inline = false,
+  beside = false,
 }: {
   media: MediaItem
   matchType: MatchItemType | null
   inline?: boolean
+  beside?: boolean
 }) => {
   const [open, setOpen] = useState(false)
   const selecting = useSelection((state) => state.selecting)
@@ -33,6 +35,7 @@ export const useCardMenu = ({
         open={open}
         onOpenChange={setOpen}
         inline={inline}
+        beside={beside}
         matchType={matchType}
       />
     ),

@@ -119,8 +119,8 @@ describe('jumpScale', () => {
       ],
       source: 'tmdb',
     })
-    expect(strip(scale)).toEqual(['4K', '(1080)', '720', '(480)', '(SD)'])
-    expect(scale?.marks[1]?.name).toBe('1080p')
+    expect(strip(scale)).toEqual(['(8K)', '4K', '(1080)', '720', '(480)', '(320)', '(SD)'])
+    expect(scale?.marks[2]?.name).toBe('1080p')
   })
 
   it('runs years across twenty or so, and decades past that', () => {

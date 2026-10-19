@@ -162,6 +162,8 @@ type MenuProps = {
   onOpenChange: (open: boolean) => void
   /** In a row of its own (list, tiles) instead of over a card's thumbnail. */
   inline?: boolean
+  /** Opens the list to the left of its button, over whatever is beside it, instead of under it. */
+  beside?: boolean
   /** What the library matches its files to; null leaves Fix match and Refresh details out. */
   matchType?: MatchItemType | null
   /** Why the AI lookup matched the file's movie, shown in Fix match; null or left out when it did not. */
@@ -391,7 +393,7 @@ const MenuBody = ({
  * only that button.
  */
 export const MediaMenu = (props: MenuProps) => {
-  const { media, open, onOpenChange, inline = false } = props
+  const { media, open, onOpenChange, inline = false, beside = false } = props
   const id = useId()
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
@@ -400,7 +402,12 @@ export const MediaMenu = (props: MenuProps) => {
   const label = `Options for ${mediaLabel(media)}`
 
   return (
-    <div ref={root} className={inline ? `${styles.root} ${styles.inline}` : styles.root}>
+    <div
+      ref={root}
+      className={[styles.root, inline && styles.inline, beside && styles.beside]
+        .filter((name): name is string => !!name)
+        .join(' ')}
+    >
       <button
         ref={trigger}
         type="button"

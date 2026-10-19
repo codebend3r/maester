@@ -6,11 +6,13 @@ import {
   episodeCode,
   formatRuntime,
   mediaLabel,
+  resolutionLabel,
 } from '@raven/core'
 import { Button, Icon } from '@raven/ui'
 import { useId, useState } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
+import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
@@ -71,13 +73,14 @@ const Tint = ({ entry: { media, poster } }: { entry: PosterEntry }) => {
  */
 const ContinueTile = ({ entry }: { entry: PosterEntry }) => {
   const { media, poster } = entry
-  const menu = useCardMenu({ media, matchType: null })
+  const menu = useCardMenu({ media, matchType: null, beside: true })
   const label = mediaLabel(media)
   const { title, line } = tileWords(media)
   const left = timeLeft(media)
   const page = cardLink({ media, pages: true })
   const hasPage = page.state == null
   const hasPoster = poster?.posterVersion != null
+  const hasResolution = resolutionLabel(media) != null
 
   return (
     <li className={`${styles.tile} ${menu.hostClass}`}>
@@ -109,7 +112,12 @@ const ContinueTile = ({ entry }: { entry: PosterEntry }) => {
         ) : (
           <span className={styles.title}>{title}</span>
         )}
-        {line && <span className={styles.line}>{line}</span>}
+        {(line || hasResolution) && (
+          <span className={styles.line}>
+            {line && <span>{line}</span>}
+            <ResolutionChip media={media} />
+          </span>
+        )}
         {left && (
           <span className={styles.progress}>
             <ResumeBar media={media} className={styles.bar} />
@@ -117,7 +125,9 @@ const ContinueTile = ({ entry }: { entry: PosterEntry }) => {
           </span>
         )}
       </span>
-      <Tint entry={entry} />
+      <span className={styles.backdrop}>
+        <Tint entry={entry} />
+      </span>
       {menu.menu}
     </li>
   )

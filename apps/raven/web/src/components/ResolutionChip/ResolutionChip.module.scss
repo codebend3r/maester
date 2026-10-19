@@ -13,3 +13,39 @@
   letter-spacing: var(--tracking-label);
   white-space: nowrap;
 }
+
+// A tier fills the chip with its own colour, dark ink on it, so the
+// tiers tell apart at a glance; the hairline keeps it off a pale picture.
+.p320,
+.p480,
+.hd,
+.fullHd,
+.uhd,
+.uhd8k {
+  box-shadow: var(--shadow-outline);
+  color: var(--color-resolution-ink);
+}
+
+.p320 {
+  background: var(--color-resolution-320);
+}
+
+.p480 {
+  background: var(--color-resolution-480);
+}
+
+.hd {
+  background: var(--color-resolution-720);
+}
+
+.fullHd {
+  background: var(--color-resolution-1080);
+}
+
+.uhd {
+  background: var(--color-resolution-4k);
+}
+
+.uhd8k {
+  background: var(--color-resolution-8k);
+}
