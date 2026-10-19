@@ -256,6 +256,43 @@ Two things the spike learned about the dev loop:
 
 Not verified by the spike, left for PR 4: Metro resolving `@raven/core` through the Bun workspace symlink (the spike's `file:` dependency copied core into `node_modules`), `@formatjs/intl-displaynames`'s `exports` map, which Metro warns about and falls back from, HDR output, and anything on a real device.
 
+### HLS muxing (2026-10-19)
+
+A throwaway spike in a scratch folder, on ffmpeg 9.0.2 (Homebrew, `libx265` and `libx264`). Two 90-second clips with an irregular GOP, built from twelve lavfi sources of uneven length so scene cuts land between the forced keyframes, encoded with `-g 240 -keyint_min 12 -sc_threshold 40`: an HEVC MKV (x265's default open GOP, so CRA keyframes with leading pictures) and an H.264 MP4 at 24000/1001 fps, whose keyframes fall between milliseconds. The segment plan is Ruling 11's, from the keyframes ffprobe lists. Each output file was split after `moov` into `init.mp4` and the segment, written into a VOD playlist (`EXT-X-VERSION:7`, `EXT-X-MAP`, `EXT-X-PLAYLIST-TYPE:VOD`), served over HTTP and played by AVFoundation on the Mac, by AVPlayer in the Apple TV 4K simulator (tvOS 27) through `react-native-video` 6.19.3 on Expo 58.0.14 and `react-native-tvos` 0.88.0-0, and by ExoPlayer (Media3 1.8.0) in the Android TV emulator (API 36) through the same app. The pinned versions built as they are.
+
+| Question | Answer |
+| --- | --- |
+| Does a run started at segment 4 cut the same segments as a run from 0? | Yes, once four things the ruling did not list are added (below). Segments 4 to 8 then have the same first pts and the same video packet count in both runs, on both clips, and from starts at 1, 3, 5 and 8 on the MP4. On remux their `mdat` is byte for byte the same; on transcode the counts and pts match and the bytes differ slightly, as an encoder's do. |
+| Do the per-file splits make a valid fMP4 stream? | Yes. `tfdt` runs on across segments with gaps under a millisecond, the inits from every run's first file are byte-identical, and each segment's `mfhd` sequence numbers start again at 1. ffmpeg's own HLS reader decodes every variant without a warning. |
+| Do AVPlayer and ExoPlayer play it? | Yes, both, remux (HEVC tagged `hvc1`, AAC copied) and transcode (H.264). Each loaded the 89.959-second duration, seeked from 4 seconds to 38 or 50.5 and played on to the end, across the join between a segment from the first run and one from the restarted run. AVPlayer reported no errors and no stalls; ExoPlayer decoded with `c2.goldfish.hevc.decoder` and `c2.goldfish.h264.decoder` with no errors. The restarting per-file `mfhd` numbers bothered neither. |
+| Is the `-f hls` fallback needed? | No. Measured anyway, its cut rule is a catch-up grid anchored on the run's own start: segment `k` ends at the first keyframe at or after `start + 6(k + 1)`, so a short segment follows a long gap, and a restart numbers and cuts from the new start. It is not restart-invariant against a plan from the keyframes. |
+
+What Ruling 10's command needed besides what it lists, each found by a run that went wrong without it:
+
+- **`-segment_times` is relative to the run's first video packet,** not the file's clock: the segment muxer adds the reference stream's first pts to every entry, and indexes the list by files written in this run, not by `-segment_start_number`. Absolute times made a run from segment 4 write one file to the end.
+- **`-copypriorss 0` after the input.** With B-frames, ffmpeg seeks 3/23 of a second before `-ss`, lands on the keyframe before, and a stream copy keeps that whole earlier GOP. `-copypriorss 0` drops what comes before `-ss`.
+- **`frag_discont`, `use_editlist=0` and `avoid_negative_ts=disabled` in `-segment_format_options`.** Without them each file's `tfdt` starts again at zero; the outer `-avoid_negative_ts disabled` does not reach the inner MP4 muxer.
+- **Keyframe times truncated, never rounded, and `-segment_time_delta 0.005`.** A keyframe at 79.996583 rounded to 79.997 made `-copypriorss 0` drop it and the run wrote no video at all; one at 30.488792 rounded up made the cut miss it by a segment. Truncated times sit at or just before the real keyframe, and the five-millisecond delta absorbs the sub-millisecond error left in the relative times, well under one frame at 120 fps.
+
+The command the server runs, here for a remux from segment 4 of the HEVC clip (boundaries 41.458, 51.458, 59.542, 69.542, 80.042):
+
+```
+ffmpeg -ss 41.458 -copyts -start_at_zero -i <input> -copypriorss 0 \
+  -map 0:v:0 -map 0:a:<audio> -c:v copy -tag:v hvc1 <hlsAudioArgs> \
+  -sn -dn -map_metadata -1 -map_chapters -1 \
+  -output_ts_offset 1 -avoid_negative_ts disabled \
+  -f segment -segment_format mp4 \
+  -segment_format_options movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont:use_editlist=0:avoid_negative_ts=disabled \
+  -segment_times 10.000,18.084,28.084,38.584 -segment_time_delta 0.005 \
+  -segment_start_number 4 <folder>/seg_%d.mp4
+```
+
+A transcode replaces `-c:v copy -tag:v hvc1` with the encoder's arguments and `-force_key_frames` at the plan's boundaries from the run's start onwards, on the file's clock (`41.458,51.458,...`), since `-copyts` keeps it.
+
+One seam remains at a restart. The first segment of a restarted run starts its audio at the keyframe's pts, while the run before ended the previous segment's audio at the keyframe's dts, so where segments from two runs meet there is an audio gap as long as the video's reorder delay (0.09 to 0.21 seconds in the spike). Both players played through it. Only the join at a restart has it; segments within one run meet exactly.
+
+Not verified: real devices, HDR and Dolby Vision, a real film's GOP, sources with edit lists or a nonzero start time, AC-3 and E-AC-3 in the fMP4 segments, `EXT-X-INDEPENDENT-SEGMENTS` with open-GOP remux segments (the spike's playlists left the tag out), subtitle renditions, and the on-demand server itself: the spike served pre-cut folders, and both players fetched every segment of a small file at once, which Ruling 13's run-ahead limit has to bear. The Android emulator decoded at about two thirds of real time, a limit of the headless emulator, not of the stream.
+
 ## Left to the builder
 
 - The exact `canPlay` tables per platform. Start from Apple's documented formats and ExoPlayer's, narrow from what fails on the real devices.
