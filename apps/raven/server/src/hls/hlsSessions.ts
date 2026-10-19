@@ -79,7 +79,15 @@ export const RUN_SIGNALS = { kill: 'SIGKILL', stop: 'SIGSTOP', resume: 'SIGCONT'
 /** What every run of a session encodes with: the file, and what the caller decided for it. */
 export type HlsEncoding = Omit<
   Parameters<typeof hlsArgs>[0],
-  'plan' | 'from' | 'mode' | 'audio' | 'folder' | 'segmentClock' | 'timeBase' | 'startTime'
+  | 'plan'
+  | 'from'
+  | 'mode'
+  | 'audio'
+  | 'folder'
+  | 'segmentClock'
+  | 'timeBase'
+  | 'startTime'
+  | 'seekKeyframes'
 >
 
 /** A minted session: what it plays, and the plan its playlist and its runs share. */
@@ -154,6 +162,9 @@ type Entry = {
   session: HlsSession
   audio: AudioTrack | null
   encoding: HlsEncoding
+  keyframesFor: (() => readonly number[] | null) | null
+  /** Whether it has said that a restart without keyframes may start late. */
+  hasWarnedOfSeek: boolean
   folder: string
   lastAskedAt: number
   cancelTimers: () => void
@@ -266,6 +277,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     plan,
     startTime,
     encoding,
+    keyframesFor = null,
   }: {
     mediaId: number
     mode: StreamMode
@@ -274,6 +286,11 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     plan: SegmentPlan
     startTime: number
     encoding: HlsEncoding
+    /**
+     * For a source whose seek lands mid-GOP (MPEG-TS), its keyframes as
+     * far as they are known when a run starts; null for any other.
+     */
+    keyframesFor?: (() => readonly number[] | null) | null
   }): HlsSession {
     const kept = [...this.entries.values()]
     if (kept.length >= HLS_SESSION_CAP) {
@@ -294,6 +311,8 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
       session,
       audio,
       encoding,
+      keyframesFor,
+      hasWarnedOfSeek: false,
       folder: join(this.root, session.id),
       lastAskedAt: this.clock.now(),
       cancelTimers: () => undefined,
@@ -583,6 +602,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     const child = this.ffmpeg.segment(
       hlsArgs({
         ...entry.encoding,
+        seekKeyframes: this.seekKeyframesOf({ entry, from }),
         plan: entry.session.plan,
         from,
         mode: entry.session.mode,
@@ -621,6 +641,25 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     })
     entry.run = run
     return run
+  }
+
+  /** A transport stream's keyframes for a restart, saying once per session when they are not probed yet. */
+  private seekKeyframesOf({
+    entry,
+    from,
+  }: {
+    entry: Entry
+    from: number
+  }): readonly number[] | null {
+    if (!entry.keyframesFor) return null
+    const keyframes = entry.keyframesFor()
+    if (keyframes == null && from > 0 && !entry.hasWarnedOfSeek) {
+      entry.hasWarnedOfSeek = true
+      this.logger.warn(
+        `Media ${entry.session.mediaId}'s keyframes are not probed yet, so a restart at segment ${from} may start late`,
+      )
+    }
+    return keyframes
   }
 
   private finished({ entry, run, name }: { entry: Entry; run: Run; name: string }): void {

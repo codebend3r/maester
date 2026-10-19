@@ -75,6 +75,7 @@ const FILES = {
   gap: 'Gap (2026).mp4',
   late: 'Late (2026).mkv',
   warm: 'Warm (2026).mp4',
+  broadcast: 'Broadcast (2026).ts',
 } as const
 
 type Clip = keyof typeof FILES
@@ -107,7 +108,13 @@ describe('the HLS route', () => {
     admin: string
     unlocked: string
     ids: Record<Clip, number>
-  } = { root: '', app: null, admin: '', unlocked: '', ids: { rich: 0, gap: 0, late: 0, warm: 0 } }
+  } = {
+    root: '',
+    app: null,
+    admin: '',
+    unlocked: '',
+    ids: { rich: 0, gap: 0, late: 0, warm: 0, broadcast: 0 },
+  }
 
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
@@ -188,6 +195,7 @@ describe('the HLS route', () => {
       }),
       writeFile(join(media, 'Late (2026).en.srt'), LATE_SIDECAR),
       encodeClip({ path: join(media, FILES.warm), seconds: 2 }),
+      encodeClip({ path: join(media, FILES.broadcast), seconds: 12, startAt: 10 }),
     ])
     state.app = await createApp({
       config: {
@@ -220,7 +228,13 @@ describe('the HLS route', () => {
       if (id == null) throw new Error(`${FILES[clip]} was not scanned`)
       return id
     }
-    state.ids = { rich: idOf('rich'), gap: idOf('gap'), late: idOf('late'), warm: idOf('warm') }
+    state.ids = {
+      rich: idOf('rich'),
+      gap: idOf('gap'),
+      late: idOf('late'),
+      warm: idOf('warm'),
+      broadcast: idOf('broadcast'),
+    }
     const unlock = await state.app.inject({
       method: 'POST',
       url: '/api/lock/unlock',
@@ -449,6 +463,25 @@ describe('the HLS route', () => {
       expect(spy).toHaveBeenCalledWith(join(state.root, 'media', FILES.warm))
     } finally {
       probe.finish([0])
+      spy.mockRestore()
+    }
+  })
+
+  it("opens a transport stream's transcode without waiting for its keyframe probe", async () => {
+    const probe: { finish: (keyframes: number[]) => void } = { finish: () => undefined }
+    const spy = vi.spyOn(app().get(FfmpegService), 'probeKeyframes').mockImplementation(
+      () =>
+        new Promise<number[]>((resolve) => {
+          probe.finish = resolve
+        }),
+    )
+    try {
+      const response = await get(masterUrl({ clip: 'broadcast', mode: PLAYBACK_MODES.transcode }))
+
+      expect(response.statusCode).toBe(200)
+      expect(spy).toHaveBeenCalledTimes(1)
+    } finally {
+      probe.finish([])
       spy.mockRestore()
     }
   })

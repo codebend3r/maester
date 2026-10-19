@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Inject,
+  Logger,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -37,6 +38,7 @@ import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, wholeNumber } from '@shared/ser
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AccessRechecks } from '@/auth/accessRechecks'
 import { AuthSessions } from '@/auth/authSessions'
+import { errorMessage } from '@/errorMessage'
 import { VIDEO_CODECS, hlsAudioCodec, transcodeBitrate } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
@@ -193,6 +195,8 @@ export class HlsController {
     @Inject(AuthSessions) private readonly callers: AuthSessions,
   ) {}
 
+  private readonly logger = new Logger(HlsController.name)
+
   /**
    * Opens a session for one way of playing the file and lists its variant
    * and a rendition for each text subtitle track. Nothing is converted
@@ -240,9 +244,9 @@ export class HlsController {
       throw new ConflictException('Keyframes lie too far apart in this file to remux; transcode it')
     }
 
-    const seekKeyframes =
+    const keyframesFor =
       streamMode === PLAYBACK_MODES.transcode && isTransportStream(output)
-        ? await this.keyframes.of({ id, path: file.path })
+        ? this.transportKeyframes(file)
         : null
     const { tonemap, encoder } = await videoEncodingOf({
       ffmpeg: this.ffmpeg,
@@ -268,8 +272,8 @@ export class HlsController {
         bitrate,
         tonemap,
         frameRate: clock.frameRate,
-        seekKeyframes,
       },
+      keyframesFor,
     })
 
     const uris = urisOf({ session, ticket: ticket ?? null })
@@ -417,6 +421,23 @@ export class HlsController {
           timestampMap: { mpegts: STREAM_TIME_SHIFT * MPEG_TS_HZ, local: 0 },
         }),
       )
+  }
+
+  /**
+   * How a transport stream's restarts find its keyframes. The run from 0
+   * needs none, so the playlist never waits for the whole-file probe: it
+   * starts here in the background, and a restart uses what is stored by
+   * then.
+   */
+  private transportKeyframes(file: MediaFile): () => readonly number[] | null {
+    this.keyframes
+      .of({ id: file.id, path: file.path })
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Could not read the keyframes of media ${file.id}: ${errorMessage(error)}`,
+        ),
+      )
+    return () => this.index.storedKeyframes(file.id)
   }
 
   private fileOf(id: number): MediaFile {

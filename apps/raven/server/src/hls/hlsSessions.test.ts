@@ -307,7 +307,7 @@ describe('HlsSessions', () => {
     audio = state.audio,
     startTime = 0,
     frameRate = 24,
-    seekKeyframes = null,
+    keyframesFor = null,
   }: {
     sessions: HlsSessions
     mediaId?: number
@@ -317,7 +317,7 @@ describe('HlsSessions', () => {
     audio?: AudioTrack | null
     startTime?: number
     frameRate?: number | null
-    seekKeyframes?: readonly number[] | null
+    keyframesFor?: (() => readonly number[] | null) | null
   }): HlsSession =>
     sessions.mint({
       mediaId,
@@ -335,8 +335,8 @@ describe('HlsSessions', () => {
         bitrate: null,
         tonemap: false,
         frameRate,
-        seekKeyframes,
       },
+      keyframesFor,
     })
 
   /** ffprobe's reading of the video in a segment played after its init. */
@@ -444,7 +444,7 @@ describe('HlsSessions', () => {
       audio: state.audio && { ...state.audio, index: 0 },
       startTime: source.clock?.start ?? 0,
       frameRate: source.clock?.frameRate ?? null,
-      seekKeyframes: source.seekKeyframes,
+      keyframesFor: source.seekKeyframes && (() => source.seekKeyframes),
     })
     const numbers = Array.from({ length: source.plan.boundaries.length - from }, (_, k) => from + k)
     const media = await numbers.reduce<Promise<Uint8Array[]>>(
@@ -511,6 +511,37 @@ describe('HlsSessions', () => {
       })
       expect([...fromTwo.entries()]).toEqual([...fromZero.entries()].filter(([n]) => n >= 2))
       ;[...fromZero.values()].slice(0, -1).forEach(({ count }) => expect(count).toBe(150))
+    })
+
+    it('restarts in one input before the keyframes are probed, and in two once they are', async () => {
+      const { ffmpeg, sessions } = open()
+      const probed: { keyframes: readonly number[] | null } = { keyframes: null }
+      const { source } = ts
+      const restartAtTwo = async () => {
+        const session = mintIn({
+          sessions,
+          input: source.path,
+          plan: source.plan,
+          mode: PLAYBACK_MODES.transcode,
+          audio: state.audio && { ...state.audio, index: 0 },
+          startTime: source.clock?.start ?? 0,
+          frameRate: source.clock?.frameRate ?? null,
+          keyframesFor: () => probed.keyframes,
+        })
+        const media = await sessions.segment({ session: session.id, n: 2 })
+        return videoOf({ init: await sessions.init({ session: session.id }), media })
+      }
+
+      // Without them the run still plays, from wherever its seek lands.
+      await restartAtTwo()
+      probed.keyframes = source.seekKeyframes
+      const later = await restartAtTwo()
+
+      expect(ffmpeg.runs.map(({ args }) => args.filter((arg) => arg === '-i').length)).toEqual([
+        1, 2,
+      ])
+      expect(later.firstPts).toBeCloseTo((source.plan.boundaries[2] ?? NaN) + STREAM_TIME_SHIFT, 2)
+      expect(later.count).toBe(150)
     })
   })
 
