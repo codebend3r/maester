@@ -11,6 +11,8 @@ describe('ResolutionChip', () => {
   })
 
   it.each([
+    [{ width: 480, height: 320 }, '320p', 'p320'],
+    [{ width: 854, height: 480 }, '480p', 'p480'],
     [{ width: 1280, height: 720 }, '720p', 'hd'],
     [{ width: 1920, height: 1080 }, '1080p', 'fullHd'],
     [{ width: 3840, height: 2160 }, '4K', 'uhd'],
@@ -21,7 +23,7 @@ describe('ResolutionChip', () => {
   })
 
   it('leaves SD on plain glass', () => {
-    render(<ResolutionChip media={mediaItem({ width: 640, height: 360 })} />)
+    render(<ResolutionChip media={mediaItem({ width: 426, height: 240 })} />)
     expect(screen.getByLabelText('Video resolution: SD')).toHaveAttribute('class', styles.chip)
   })
 

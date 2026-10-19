@@ -79,7 +79,9 @@
   --color-lichen-faint: rgb(241 236 226 / 45%);
   // A resolution chip's fill, one per tier, kept in every theme like the
   // brand marks since the chip sits on a picture: cooler for less, warmer
-  // and brighter for more. Each carries --color-resolution-ink at 7:1 or better.
+  // and brighter for more, SD alone on glass. Each carries --color-resolution-ink at 7:1 or better.
+  --color-resolution-320: #cbb8a3;
+  --color-resolution-480: #b5c79a;
   --color-resolution-720: #a9bccc;
   --color-resolution-1080: #7fd1b9;
   --color-resolution-4k: #e8c069;
