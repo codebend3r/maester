@@ -77,6 +77,14 @@
   // ring, and what of the timeline is loaded.
   --color-bark-faint: rgb(241 236 226 / 22%);
   --color-lichen-faint: rgb(241 236 226 / 45%);
+  // A resolution chip's fill, one per tier, kept in every theme like the
+  // brand marks since the chip sits on a picture: cooler for less, warmer
+  // and brighter for more. Each carries --color-resolution-ink at 7:1 or better.
+  --color-resolution-720: #a9bccc;
+  --color-resolution-1080: #7fd1b9;
+  --color-resolution-4k: #e8c069;
+  --color-resolution-8k: #cfaef5;
+  --color-resolution-ink: #10161a;
   // Brand marks keep their own colours in every theme.
   --color-brand-rotten-tomatoes: #d8414a;
   --color-brand-imdb: #e3b45f;
