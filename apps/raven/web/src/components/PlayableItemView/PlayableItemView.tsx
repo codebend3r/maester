@@ -29,6 +29,7 @@ import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { EpisodeNeighbours } from '@/components/PlayableItemView/EpisodeNeighbours'
 import { FileFacts } from '@/components/PlayableItemView/FileFacts'
+import { SagaLink } from '@/components/SagaLink/SagaLink'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
@@ -66,6 +67,8 @@ type PlayableConfig = {
   showsTagline: boolean
   showsContentRating: boolean
   showsReviews: boolean
+  /** Whether a link to the saga the movie is in sits under the header. */
+  showsSaga: boolean
   /** Whether the header says how long is left of a video started, with its line. */
   showsTimeLeft: boolean
   /** Whether the episodes either side follow the file. */
@@ -88,6 +91,7 @@ const PLAYABLE = {
     showsTagline: true,
     showsContentRating: true,
     showsReviews: true,
+    showsSaga: true,
     showsTimeLeft: false,
     showsNeighbours: false,
     castTitle: undefined,
@@ -106,6 +110,7 @@ const PLAYABLE = {
     showsTagline: false,
     showsContentRating: false,
     showsReviews: false,
+    showsSaga: false,
     showsTimeLeft: true,
     showsNeighbours: true,
     castTitle: 'Guest stars & crew',
@@ -284,6 +289,8 @@ export const PlayableItemView = ({
       <PlaybackNote media={primary} />
 
       {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
+
+      {config.showsSaga && <SagaLink itemId={details.id} libraryId={primary.libraryId} />}
 
       <AdminOnly>
         {config.editable && editingImages && (
