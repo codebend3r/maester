@@ -693,9 +693,9 @@ export const startFixtureServer = async ({
   const sendPing = ({ response, query }: { response: ServerResponse; query: URLSearchParams }) => {
     const length = probeLengthOf(query)
     response.writeHead(200, {
-      'content-type': 'application/octet-stream',
-      'content-length': length,
-      'cache-control': 'no-store',
+      [HTTP_HEADERS.contentType]: 'application/octet-stream',
+      [HTTP_HEADERS.contentLength]: length,
+      [HTTP_HEADERS.cacheControl]: 'no-store',
     })
     response.end(randomBytes(length))
   }

@@ -36,7 +36,13 @@ import {
   isDownloadsState,
 } from '@/main/downloads/downloadState'
 import { entryDirFor, partPathFor, videoPathFor } from '@/main/downloads/space'
-import { DESKTOP_REPLIES, DESKTOP_REQUESTS, SERVER_METHODS } from '@/shared/protocol'
+import {
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  DOWNLOAD_KINDS,
+  DOWNLOAD_STATUS_KINDS,
+  SERVER_METHODS,
+} from '@/shared/protocol'
 
 const PIN = '3001'
 const LOCKED: FixtureMode = { pin: PIN, isLocked: true, admin: { kind: 'off' } }
@@ -338,7 +344,12 @@ test.describe.serial('downloading through a media origin', () => {
         size: bytes,
       })),
     ).toEqual([
-      { mediaId: FIXTURE_MEDIA.first, label: 'Fixture One', status: { kind: 'ready' }, size },
+      {
+        mediaId: FIXTURE_MEDIA.first,
+        label: 'Fixture One',
+        status: { kind: DOWNLOAD_STATUS_KINDS.ready },
+        size,
+      },
     ])
     const video = videoPathFor({
       userData,
@@ -609,13 +620,13 @@ test.describe.serial('downloading through the server', () => {
           serverId,
           mediaId: FIXTURE_MEDIA.first,
           label: 'Fixture One',
-          group: { kind: 'movie', key: 'movie:1', title: 'Fixture One', order: 0 },
+          group: { kind: DOWNLOAD_KINDS.movie, key: 'movie:1', title: 'Fixture One', order: 0 },
           container,
           size: sizeOf(FIXTURE_MEDIA.first),
           duration: 30,
           watchedPercent: 90,
           sidecars: [],
-          status: { kind: 'ready' },
+          status: { kind: DOWNLOAD_STATUS_KINDS.ready },
           autoDelete: true,
           watchedAt: at - 11 * MINUTE_MS,
           serverPosition: 0,
