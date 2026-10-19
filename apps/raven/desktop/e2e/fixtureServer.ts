@@ -489,7 +489,7 @@ const shut = (server: Server): Promise<void> =>
  * which cookies a request carried, never their values, and whether it carried a ticket,
  * never the ticket. `now` is the clock the wrong-try wait and the tickets read.
  *
- * With `mediaPlane` on (Ruling 15), the server lists `elsewhere` as its `lan` media origin,
+ * With `hasMediaPlane` on (Ruling 15), the server lists `elsewhere` as its `lan` media origin,
  * answers the probe, and issues tickets behind the lock, timed in epoch milliseconds as the
  * server's `MediaTickets` times them. `port` keeps an earlier fixture's address, as a server
  * that restarts does; 0 takes any free one.
@@ -498,13 +498,13 @@ export const startFixtureServer = async ({
   clips,
   mode,
   now = Date.now,
-  mediaPlane = false,
+  hasMediaPlane = false,
   port = 0,
 }: {
   clips: { first: string; second: string; tracks: string }
   mode: FixtureMode
   now?: () => number
-  mediaPlane?: boolean
+  hasMediaPlane?: boolean
   port?: number
 }): Promise<FixtureServer> => {
   if (!isMediaTracks(FIXTURE_TRACKS)) throw new Error('The fixture track list is not a MediaTracks')
@@ -732,7 +732,7 @@ export const startFixtureServer = async ({
       case MEDIA_ROUTES.sidecar:
         return sendSidecar(response)
       case MEDIA_ROUTES.ticket:
-        if (!mediaPlane) return sendMissing(response)
+        if (!hasMediaPlane) return sendMissing(response)
         return sendJson({
           response,
           status: 200,
@@ -802,11 +802,11 @@ export const startFixtureServer = async ({
     if (request.method !== SERVER_METHODS.get) return null
     const { pathname, query } = partsOf(request.url ?? '')
     if (pathname === API_PATHS.mediaOrigins) {
-      const origins = mediaPlane ? [{ kind: 'lan', url: elsewhere.origin }] : []
+      const origins = hasMediaPlane ? [{ kind: 'lan', url: elsewhere.origin }] : []
       return () => sendJson({ response, status: 200, body: { origins } })
     }
     if (pathname === PING_PATH) {
-      return () => (mediaPlane ? sendPing({ response, query }) : sendMissing(response))
+      return () => (hasMediaPlane ? sendPing({ response, query }) : sendMissing(response))
     }
     // Public, as the server's is: a library's settings hold nothing the lock keeps back.
     if (pathname === LIBRARY_PATH) {
@@ -829,7 +829,7 @@ export const startFixtureServer = async ({
     request: IncomingMessage
     response: ServerResponse
   }) => {
-    if (!mediaPlane || request.method !== SERVER_METHODS.get) return sendMissing(response)
+    if (!hasMediaPlane || request.method !== SERVER_METHODS.get) return sendMissing(response)
     const { pathname, query } = partsOf(request.url ?? '')
     if (pathname === PING_PATH) return sendPing({ response, query })
     const route = MEDIA_PLANE_ROUTE.exec(pathname)

@@ -95,8 +95,8 @@ const sizeOf = (mediaId: number): number => {
   return size
 }
 
-const startLockedFixture = ({ mediaPlane }: { mediaPlane: boolean }) =>
-  startFixtureServer({ clips: fixtureClips, mode: LOCKED, mediaPlane })
+const startLockedFixture = ({ hasMediaPlane }: { hasMediaPlane: boolean }) =>
+  startFixtureServer({ clips: fixtureClips, mode: LOCKED, hasMediaPlane })
 
 const linkTo = ({ fixture, target }: { fixture: FixtureServer; target: DownloadTarget }) =>
   downloadLinkFor({ origin: fixture.origin, target })
@@ -278,7 +278,7 @@ test.describe.serial('downloading through a media origin', () => {
 
   test.beforeAll(async () => {
     userData = await freshUserData()
-    started = await startLockedFixture({ mediaPlane: true })
+    started = await startLockedFixture({ hasMediaPlane: true })
   })
 
   test.afterAll(async () => {
@@ -484,7 +484,7 @@ test.describe.serial('downloading through a media origin', () => {
         const back = await startFixtureServer({
           clips: fixtureClips,
           mode: { ...LOCKED, isLocked: false },
-          mediaPlane: true,
+          hasMediaPlane: true,
           port,
         })
         started = back
@@ -518,7 +518,7 @@ test.describe.serial('downloading through the server', () => {
 
   test.beforeAll(async () => {
     userData = await freshUserData()
-    started = await startLockedFixture({ mediaPlane: false })
+    started = await startLockedFixture({ hasMediaPlane: false })
   })
 
   test.afterAll(async () => {
