@@ -7,7 +7,6 @@ import {
   type ImageChoice,
   type ImageOption,
   type ItemDetails,
-  KEYS,
   LANGUAGE_FALLBACKS,
   type Library,
   type MatchItemType,
