@@ -121,6 +121,7 @@
     },
     "apps/raven/supabase": {
       "name": "@raven/supabase",
+      "version": "0.6.2",
       "devDependencies": {
         "oxfmt": "0.68.0",
         "supabase": "2.121.0",
