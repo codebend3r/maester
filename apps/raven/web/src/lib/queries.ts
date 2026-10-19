@@ -243,3 +243,29 @@ export const displaySettingsQuery = queryOptions({
   queryFn: () => api.getDisplaySettings(),
   staleTime: 60_000,
 })
+
+/** Whether accounts are on: the server's setting, which only a restart changes, so one read serves the visit. */
+export const authConfigQuery = queryOptions({
+  queryKey: queryKeys.authConfig,
+  queryFn: () => api.getAuthConfig(),
+  staleTime: Infinity,
+})
+
+/**
+ * Who the signed-in user is. Keyed by user id so another account never reads
+ * this one's answer, and never retried: a refusal is the answer.
+ */
+export const accountQuery = (userId: string | null) =>
+  queryOptions({
+    queryKey: queryKeys.account(userId),
+    queryFn: userId === null ? skipToken : () => api.getMe(),
+    retry: false,
+  })
+
+/** Every account on this raven. Keyed by the owner asking, so another account never reads this list, and never retried: a refusal is the answer. */
+export const membersQuery = (userId: string) =>
+  queryOptions({
+    queryKey: queryKeys.members(userId),
+    queryFn: () => api.listMembers(),
+    retry: false,
+  })

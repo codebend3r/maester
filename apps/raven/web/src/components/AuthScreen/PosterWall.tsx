@@ -1,4 +1,4 @@
-import styles from '@/pages/SignInPage/SignInPage.module.scss'
+import styles from '@/components/AuthScreen/AuthScreen.module.scss'
 
 type Tile = { hue: number; lightness: number; opacity: number }
 

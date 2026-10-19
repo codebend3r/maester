@@ -29,12 +29,21 @@ export const createQueryClient = (): QueryClient =>
     },
   })
 
+/** The tab's one cache, which signing out or switching accounts empties from outside React. */
+export const queryClient = createQueryClient()
+
 /**
  * Every cache key, in one place. An id may be null for a query that waits on
  * it (`skipToken`); the key still names what it would hold.
  */
 export const queryKeys = {
   ...playerQueryKeys,
+  /** Everything the sign-in gate reads, one prefix to ask again together. */
+  auth: ['auth'],
+  authConfig: ['auth', 'config'],
+  account: (userId: string | null) => ['auth', 'account', userId],
+  /** Every account on this raven, as the owner who asked for them sees it. */
+  members: (userId: string) => ['auth', 'members', userId],
   libraries: ['libraries'],
   library: (id: number | null) => ['libraries', id],
   media: ({

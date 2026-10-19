@@ -11,7 +11,7 @@ raven is the `apps/raven/` folder of an Nx workspace; the [root README](../../RE
 
 ## Supabase account preparation
 
-The account foundation is additive, not the login cutover. **Existing library, media and admin-password access remains unchanged**, even when Supabase is configured. Login/signup screens, owner approval UI and desktop integration follow in later PRs; only then will the server enforce account access everywhere.
+The account foundation is additive, not the login cutover. **Existing library, media and admin-password access remains unchanged**, even when Supabase is configured. The web app has its sign-in screens and the owner's approval screen (below); desktop integration follows in a later PR, and only then will the server enforce account access everywhere.
 
 Set all three in `apps/raven/.env`: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `RAVEN_WEB_URL`. Both URLs are origins, with HTTPS required except on loopback. No service-role key is used or accepted. Compose already passes the product env file to the server. For a local stack, use `http://127.0.0.1:54321`, the local publishable key and `http://localhost:5173`. See the [database runbook](supabase/README.md) for setup and owner bootstrap.
 
@@ -30,6 +30,24 @@ Browser sessions use a fixed host-only `maester-auth` cookie, including chunked/
 New account playback tickets are random opaque capabilities, kept only in server memory, capped globally and per account. They last at most five minutes and never beyond the issuing access JWT's expiry; server restart invalidates them. They carry no JWT in the URL and recheck current approval on every range, stream or subtitle request. Invalid or removed-account tickets never fall back to legacy anonymous playback. Existing legacy tickets and routes remain unchanged until cutover.
 
 The desktop follow-up must renew the account session and acquire fresh tickets before subsequent media requests when a ticket expires. Long-running seek/subtitle playback needs end-to-end validation before enforcement; do not assume these five-minute tickets behave like legacy six-hour tickets. Existing continuous streams and buffered bytes are not forcibly recalled by this preparation PR.
+
+### Accounts in the web app
+
+The web app asks `GET /api/auth/config` once and acts on the answer. With `off`, raven is exactly as before: no gate and no link to any account screen. With `unavailable`, the account screens show a notice and the rest of raven stays as it is. Only with `ready` does the web app gate itself: a signed out visitor goes to sign in and comes back to the page they asked for (the return path is a same-origin path, never a URL), and an account that is pending or removed is held on the pending screen with no library data or shell. The server does not yet gate the existing routes, so this is the web app's own door, not enforcement; that is a later PR.
+
+| Route | What |
+|---|---|
+| `/sign-in` | Email and password, with links to sign up and forgot password |
+| `/sign-up` | Email, password twice, and a note on email verification and manual approval; a new and an already registered address look the same |
+| `/check-email` | Names the address and resends the email, then waits 60 seconds |
+| `/auth/confirm` | Where the email links land: removes `token_hash` from the URL, then spends it once with `verifyOtp` for `type=email` or `type=recovery`. An expired or used link says so and offers a new one |
+| `/forgot-password` | Asks for an email and gives the same answer for every address |
+| `/reset-password` | Opens only for a session a recovery link made; sets the new password |
+| `/pending` | "Waiting for approval" or "Your access was removed", with **Check again** and **Sign out** |
+
+The session lives in the `maester-auth` cookie and is sent as a Bearer token on every `/api` call; a refused call refreshes the session and repeats once. Signing out, or a different account signing in, empties the cached queries, the PIN prompt and the selection.
+
+**Settings, Account** shows the signed-in email and access, with **Sign out**. **Settings, Users** is the owner's: Pending, Approved and Removed tabs, with **Approve** and **Remove access** (which asks first) on each row. The owner's own row has no buttons.
 
 ## Run it with Docker
 

@@ -2,6 +2,8 @@ import { afterEach } from 'bun:test'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { usePlayerPrefs } from '@raven/ui'
+import { queryClient } from '@/lib/queryClient'
+import { useAuthSession } from '@/stores/authSession'
 import { useCardLinks } from '@/stores/cardLinks'
 import { useHoverBackdrops } from '@/stores/hoverBackdrops'
 import { useOriginProbe } from '@/stores/originProbe'
@@ -16,6 +18,7 @@ import { pacePolls, resetPolls } from '@/test/polls'
 
 pacePolls()
 
+const initialAuthSession = useAuthSession.getInitialState()
 const initialPrefs = usePlayerPrefs.getInitialState()
 const initialPageBackdrop = usePageBackdrop.getInitialState()
 const initialSideMenu = useSideMenu.getInitialState()
@@ -33,6 +36,8 @@ const initialSelectionScopes = useSelectionScopes.getInitialState()
 // would refetch from a spy that now answers undefined.
 afterEach(() => {
   cleanup()
+  queryClient.clear()
+  useAuthSession.setState(initialAuthSession, true)
   usePlayerPrefs.setState(initialPrefs, true)
   usePageBackdrop.setState(initialPageBackdrop, true)
   useSideMenu.setState(initialSideMenu, true)

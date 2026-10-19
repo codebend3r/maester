@@ -11,15 +11,19 @@ import {
 } from '@raven/core'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button, CONTROLS_LINGER_SECONDS, Icon, type IconName, usePlayerPrefs } from '@raven/ui'
+import { Button, CONTROLS_LINGER_SECONDS, type IconName, usePlayerPrefs } from '@raven/ui'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
+import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { useCanManage } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { edit, useOptimisticMutation } from '@/lib/optimistic'
 import { plural } from '@/lib/plural'
 import { adminLockQuery, displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
 import { mutationKeys, queryKeys } from '@/lib/queryClient'
+import { AccountSection } from '@/pages/SettingsPage/AccountSection'
+import { Titled } from '@/pages/SettingsPage/Titled'
+import { UsersSection } from '@/pages/SettingsPage/UsersSection'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 
 /** Every value a setting takes, with its words; a value added in `@raven/core` cannot go unlabelled. */
@@ -92,14 +96,6 @@ const ENCODER_NAMES = {
   vaapi: 'VAAPI',
   videotoolbox: 'VideoToolbox',
 }
-
-/** A setting's or a section's title with its icon before it. */
-const Titled = ({ icon, children }: { icon: IconName; children: string }) => (
-  <>
-    <Icon name={icon} />
-    {children}
-  </>
-)
 
 /** One setting as a group of radio cards, each with a line saying what it means; the chosen one is filled. */
 const Setting = <V extends string | number>({
@@ -494,6 +490,8 @@ export const SettingsPage = () => {
   const titleId = useId()
   const queryClient = useQueryClient()
   const [isConfirming, setConfirming] = useState(false)
+  // Accounts show only to an approved viewer; the other states have a screen of their own.
+  const access = useAccessState()
   const playback = useQuery(playbackSettingsQuery)
   const display = useQuery(displaySettingsQuery)
   const save = useOptimisticMutation({
@@ -690,6 +688,14 @@ export const SettingsPage = () => {
           />
         )}
       </SettingsSection>
+      {access.kind === ACCESS_KINDS.approved && (
+        <>
+          <AccountSection account={access.account} />
+          {access.account.isOwner && (
+            <UsersSection key={access.account.id} userId={access.account.id} />
+          )}
+        </>
+      )}
       <AdvancedSection />
       <AdminLockSection />
     </section>
