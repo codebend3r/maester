@@ -1,10 +1,10 @@
 import {
-  PLAYER_SOURCE_KINDS,
-  formatDuration,
   KEYS,
   PLAYER_ACTIONS,
+  PLAYER_SOURCE_KINDS,
   type PlayerAction,
   SEEK_EDGES,
+  formatDuration,
   shortcutFor,
 } from '@raven/core'
 import {

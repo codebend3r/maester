@@ -3,15 +3,15 @@ import {
   FOLDER_LAYOUTS,
   ITEM_TYPES,
   LIBRARY_KINDS,
-  type LibraryIconName,
   LIBRARY_VIEWS,
+  type LibraryIconName,
   type LibraryKind,
   type LibrarySettings,
   type LibraryView,
   MEDIA_GROUPINGS,
   MEDIA_SORTS,
-  type MediaGroupBy,
   type MatchItemType,
+  type MediaGroupBy,
   type MediaSort,
   RATING_SOURCES,
   SORT_FIELD_NAMES,
@@ -214,7 +214,7 @@ export const withLibraryKind = ({
 /**
  * How each type of library looks: what it is called and the icon it wears
  * until the library picks another. What each type can do, posters for a
- * library of movies included, is `KIND_RULES` in `@raven/core`.
+ * library of movies included, is `KIND_RULES` above.
  */
 export const KINDS: Record<LibraryKind, { label: string; icon: LibraryIconName }> = {
   movies: { label: 'Movies', icon: 'film' },

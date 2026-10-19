@@ -1,4 +1,4 @@
-import { SUBTITLE_SOURCES, type AudioTrack, type SubtitleTrack } from '@/contract'
+import { type AudioTrack, SUBTITLE_SOURCES, type SubtitleTrack } from '@/contract'
 import { formatChannels } from '@/format'
 import { languageName } from '@/languageName'
 import { codecLabel } from '@/playback'

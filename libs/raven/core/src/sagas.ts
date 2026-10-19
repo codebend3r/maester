@@ -6,8 +6,7 @@ import {
   type WatchTarget,
 } from '@/contract'
 import { formatRuntime } from '@/format'
-
-const count = new Intl.NumberFormat()
+import { plural } from '@/plural'
 
 /** A movie's backdrop, by the item it belongs to and the version that names the picture, and the movie's title. */
 export type SagaPicture = {
@@ -50,7 +49,7 @@ export const sagaFacts = (saga: Saga): string[] => {
   const first = Math.min(...years)
   const last = Math.max(...years)
   const span = years.length === 0 ? [] : [first === last ? String(first) : `${first} to ${last}`]
-  return [`${count.format(saga.media.length)} movies`, ...span]
+  return [plural({ n: saga.media.length, one: 'movie', many: 'movies' }), ...span]
 }
 
 /**

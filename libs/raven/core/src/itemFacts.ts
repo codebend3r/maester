@@ -1,6 +1,5 @@
 import { CREDIT_JOBS, type ItemDetails, type MediaItem, type MediaTracks } from '@/contract'
 import { formatBytes, formatChannels, formatRuntime } from '@/format'
-import { showYears } from '@/itemLinks'
 import { languageName } from '@/languageName'
 import { resolutionLabel } from '@/media'
 import { codecLabel } from '@/playback'
@@ -8,6 +7,19 @@ import { plural } from '@/plural'
 
 const present = (facts: ReadonlyArray<string | null>): string[] =>
   facts.filter((fact): fact is string => fact != null)
+
+/** "2011 to 2019", "2022 to now", or just the year for a show that began and ended in one. */
+export const showYears = ({
+  year,
+  endedYear,
+}: {
+  year: number | null
+  endedYear: number | null
+}): string | null => {
+  if (year == null) return null
+  if (endedYear == null) return `${year} to now`
+  return endedYear === year ? String(year) : `${year} to ${endedYear}`
+}
 
 /** How long it runs: the file's own length when probed, else TMDB's runtime in minutes. */
 export const runtimeFact = ({

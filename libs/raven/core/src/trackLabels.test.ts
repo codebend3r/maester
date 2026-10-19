@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { SUBTITLE_SOURCES, type AudioTrack, type SubtitleTrack } from '@/contract'
+import { type AudioTrack, SUBTITLE_SOURCES, type SubtitleTrack } from '@/contract'
 import { audioLabel, subtitleLabel } from '@/trackLabels'
 
 const audio = (overrides: Partial<AudioTrack> = {}): AudioTrack => ({

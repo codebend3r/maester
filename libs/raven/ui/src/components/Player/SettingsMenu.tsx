@@ -1,4 +1,4 @@
-import { type PlaybackMode, describeMode, SPEEDS, audioLabel, subtitleLabel } from '@raven/core'
+import { type PlaybackMode, SPEEDS, audioLabel, describeMode, subtitleLabel } from '@raven/core'
 import { type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'

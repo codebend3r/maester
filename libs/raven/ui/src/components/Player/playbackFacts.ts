@@ -6,10 +6,10 @@ import {
   STREAM_QUALITIES,
   type StreamQuality,
   type SubtitleTrack,
+  audioLabel,
   formatBitrate,
   formatChannels,
   resolutionLabel,
-  audioLabel,
   subtitleLabel,
 } from '@raven/core'
 import { playingAudio } from '@/components/Player/selection'

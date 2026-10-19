@@ -7,6 +7,7 @@ import {
   type StreamMode,
   type VideoRange,
   type VideoStream,
+  audioLabel,
   codecLabel,
   formatBitrate,
   formatBytes,
@@ -14,7 +15,6 @@ import {
   formatFrameRate,
   formatSampleRate,
   resolutionLabel,
-  audioLabel,
 } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useId, useState } from 'react'

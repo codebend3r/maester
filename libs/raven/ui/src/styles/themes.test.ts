@@ -3,9 +3,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DEFAULT_THEME, THEMES, parseTokens } from '@raven/core'
 
-const styles = import.meta.dir
-const globals = readFileSync(join(styles, 'globals.scss'), 'utf8')
-const themes = readFileSync(join(styles, 'themes.scss'), 'utf8')
+const globals = readFileSync(join(import.meta.dir, 'globals.scss'), 'utf8')
+const themes = readFileSync(join(import.meta.dir, 'themes.scss'), 'utf8')
 
 /** The declarations in a theme's block of themes.scss, by name. */
 const themeBlock = (id: string): Map<string, string> => {

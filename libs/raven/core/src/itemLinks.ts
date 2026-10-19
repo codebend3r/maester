@@ -156,19 +156,6 @@ export const readWatchState = ({
   id: number | null
 }): WatchState | null => (isWatchState(state) && state.media.id === id ? state : null)
 
-/** "2011 to 2019", "2022 to now", or just the year for a show that began and ended in one. */
-export const showYears = ({
-  year,
-  endedYear,
-}: {
-  year: number | null
-  endedYear: number | null
-}): string | null => {
-  if (year == null) return null
-  if (endedYear == null) return `${year} to now`
-  return endedYear === year ? String(year) : `${year} to ${endedYear}`
-}
-
 /**
  * Where a card goes: a matched item's page as the card's library shows it,
  * where the library has pages, or straight to the player, with the video

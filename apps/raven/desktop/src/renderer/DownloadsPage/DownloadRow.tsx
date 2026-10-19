@@ -1,4 +1,4 @@
-import { formatBytes, KEYS } from '@raven/core'
+import { KEYS, formatBytes } from '@raven/core'
 import { Button, type IconName, UNLOCK_SECRETS, UnlockDialog } from '@raven/ui'
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { useDesktop } from '@/renderer/stores/desktop'

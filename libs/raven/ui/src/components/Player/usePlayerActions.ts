@@ -5,10 +5,10 @@ import type { MenuSection } from '@/components/Player/menus'
 import { preferredSubtitle } from '@/components/Player/selection'
 import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
 import {
-  languageName,
   PLAYER_ACTIONS,
   type PlayerAction,
   SEEK_EDGES,
+  languageName,
   stepCaptionScale,
   stepSpeed,
 } from '@raven/core'

@@ -1,5 +1,5 @@
-import { type PlayerAction } from '@raven/core'
 import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test'
+import type { PlayerAction } from '@raven/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   act,
