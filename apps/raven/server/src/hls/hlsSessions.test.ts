@@ -307,6 +307,7 @@ describe('HlsSessions', () => {
     audio = state.audio,
     startTime = 0,
     frameRate = 24,
+    seekKeyframes = null,
   }: {
     sessions: HlsSessions
     mediaId?: number
@@ -316,6 +317,7 @@ describe('HlsSessions', () => {
     audio?: AudioTrack | null
     startTime?: number
     frameRate?: number | null
+    seekKeyframes?: readonly number[] | null
   }): HlsSession =>
     sessions.mint({
       mediaId,
@@ -333,6 +335,7 @@ describe('HlsSessions', () => {
         bitrate: null,
         tonemap: false,
         frameRate,
+        seekKeyframes,
       },
     })
 
@@ -385,57 +388,94 @@ describe('HlsSessions', () => {
     expect(stdout.trim().split(',')[0]).toBe('eac3')
   })
 
-  describe('a transcode at 23.976 whose picture starts after its sound', () => {
-    const ntsc: { path: string; plan: SegmentPlan; clock: MediaClock | null } = {
-      path: '',
-      plan: { boundaries: [], duration: 0 },
-      clock: null,
-    }
+  /** A clip a transcode plan is cut from, as the HLS route reads it. */
+  type Source = {
+    path: string
+    plan: SegmentPlan
+    clock: MediaClock | null
+    seekKeyframes: readonly number[] | null
+  }
 
-    beforeAll(async () => {
-      ntsc.path = join(state.root, 'ntsc.mkv')
-      await encodeClip({ path: ntsc.path, seconds: 70, frameRate: '24000/1001', videoDelay: 0.125 })
-      const clock = mediaClockOf(await ffmpegFor(join(state.root, 'ntsc')).probeJson(ntsc.path))
-      ntsc.clock = clock
-      ntsc.plan = transcodePlan({
+  const emptySource = (): Source => ({
+    path: '',
+    plan: { boundaries: [], duration: 0 },
+    clock: null,
+    seekKeyframes: null,
+  })
+
+  /** Probes a clip and plans its transcode, with its keyframes when it is a transport stream. */
+  const transcodeSource = async ({
+    path,
+    isTransportStream,
+  }: {
+    path: string
+    isTransportStream: boolean
+  }): Promise<Source> => {
+    const ffmpeg = ffmpegFor(join(state.root, 'probe-sources'))
+    const clock = mediaClockOf(await ffmpeg.probeJson(path))
+    return {
+      path,
+      clock,
+      plan: transcodePlan({
         start: clock.videoStart,
         duration: clock.end ?? 0,
         frameRate: clock.frameRate,
-      })
-    })
-
-    /** Every segment from `from` to the end, asked for in turn, as ffprobe reads each. */
-    const segmentsFrom = async ({ sessions, from }: { sessions: HlsSessions; from: number }) => {
-      const session = mintIn({
-        sessions,
-        input: ntsc.path,
-        plan: ntsc.plan,
-        mode: PLAYBACK_MODES.transcode,
-        // The clip's one track, AAC like the commentary.
-        audio: state.audio && { ...state.audio, index: 0 },
-        startTime: ntsc.clock?.start ?? 0,
-        frameRate: ntsc.clock?.frameRate ?? null,
-      })
-      const numbers = Array.from({ length: ntsc.plan.boundaries.length - from }, (_, k) => from + k)
-      const media = await numbers.reduce<Promise<Uint8Array[]>>(
-        async (done, n) => [...(await done), await sessions.segment({ session: session.id, n })],
-        Promise.resolve([]),
-      )
-      const init = await sessions.init({ session: session.id })
-      const read = await Promise.all(media.map((bytes) => videoOf({ init, media: bytes })))
-      return new Map(read.map(({ count, firstPts }, k) => [from + k, { count, firstPts }]))
+      }),
+      seekKeyframes: isTransportStream ? await ffmpeg.probeKeyframes(path) : null,
     }
+  }
+
+  /** Every transcoded segment from `from` to the end, asked for in turn, as ffprobe reads each. */
+  const segmentsFrom = async ({
+    sessions,
+    source,
+    from,
+  }: {
+    sessions: HlsSessions
+    source: Source
+    from: number
+  }) => {
+    const session = mintIn({
+      sessions,
+      input: source.path,
+      plan: source.plan,
+      mode: PLAYBACK_MODES.transcode,
+      // The clip's one track, AAC like the commentary.
+      audio: state.audio && { ...state.audio, index: 0 },
+      startTime: source.clock?.start ?? 0,
+      frameRate: source.clock?.frameRate ?? null,
+      seekKeyframes: source.seekKeyframes,
+    })
+    const numbers = Array.from({ length: source.plan.boundaries.length - from }, (_, k) => from + k)
+    const media = await numbers.reduce<Promise<Uint8Array[]>>(
+      async (done, n) => [...(await done), await sessions.segment({ session: session.id, n })],
+      Promise.resolve([]),
+    )
+    const init = await sessions.init({ session: session.id })
+    const read = await Promise.all(media.map((bytes) => videoOf({ init, media: bytes })))
+    return new Map(read.map(({ count, firstPts }, k) => [from + k, { count, firstPts }]))
+  }
+
+  describe('a transcode at 23.976 whose picture starts after its sound', () => {
+    const ntsc: { source: Source } = { source: emptySource() }
+
+    beforeAll(async () => {
+      const path = join(state.root, 'ntsc.mkv')
+      await encodeClip({ path, seconds: 70, frameRate: '24000/1001', videoDelay: 0.125 })
+      ntsc.source = await transcodeSource({ path, isTransportStream: false })
+    })
 
     it('cuts the same segments from runs started at 0, 3 and 7, each on its boundary', async () => {
       const { sessions } = open()
+      const { source } = ntsc
       const [fromZero, fromThree, fromSeven] = await Promise.all(
-        [0, 3, 7].map((from) => segmentsFrom({ sessions, from })),
+        [0, 3, 7].map((from) => segmentsFrom({ sessions, source, from })),
       )
 
       // The sound's start can move by an encoder's priming; the picture's cannot.
-      expect(ntsc.clock?.videoStart).toBeGreaterThan((ntsc.clock?.start ?? 0) + 0.1)
-      expect(ntsc.plan.boundaries.length).toBeGreaterThan(10)
-      ntsc.plan.boundaries.forEach((start, n) => {
+      expect(source.clock?.videoStart).toBeGreaterThan((source.clock?.start ?? 0) + 0.1)
+      expect(source.plan.boundaries.length).toBeGreaterThan(10)
+      source.plan.boundaries.forEach((start, n) => {
         expect(fromZero.get(n)?.firstPts).toBeCloseTo(start + STREAM_TIME_SHIFT, 2)
       })
       expect([...fromThree.entries()]).toEqual([...fromZero.entries()].filter(([n]) => n >= 3))
@@ -444,6 +484,33 @@ describe('HlsSessions', () => {
       ;[...fromZero.values()].slice(0, -1).forEach(({ count }) => {
         expect([143, 144]).toContain(count)
       })
+    })
+  })
+
+  describe('a transcode of a transport stream whose keyframes lie ten seconds apart', () => {
+    const ts: { source: Source } = { source: emptySource() }
+
+    beforeAll(async () => {
+      const path = join(state.root, 'broadcast.ts')
+      await encodeClip({ path, seconds: 40, frameRate: '25', keyframeEvery: 10, startAt: 10 })
+      ts.source = await transcodeSource({ path, isTransportStream: true })
+    })
+
+    it('cuts the same segments from a run started at 2 as from one at 0', async () => {
+      const { sessions } = open()
+      const { source } = ts
+      const [fromZero, fromTwo] = await Promise.all(
+        [0, 2].map((from) => segmentsFrom({ sessions, source, from })),
+      )
+
+      // Segment 2 starts 2 s past a keyframe, where a seek alone landed at the next one.
+      expect(source.seekKeyframes?.length).toBe(4)
+      expect(source.plan.boundaries.length).toBeGreaterThan(5)
+      source.plan.boundaries.forEach((start, n) => {
+        expect(fromZero.get(n)?.firstPts).toBeCloseTo(start + STREAM_TIME_SHIFT, 2)
+      })
+      expect([...fromTwo.entries()]).toEqual([...fromZero.entries()].filter(([n]) => n >= 2))
+      ;[...fromZero.values()].slice(0, -1).forEach(({ count }) => expect(count).toBe(150))
     })
   })
 

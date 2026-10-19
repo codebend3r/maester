@@ -76,6 +76,9 @@ export const thumbnailArgs = ({
   output,
 ]
 
+/** Seconds as ffmpeg's arguments take them, to the millisecond like the plan. */
+const secondsArg = (seconds: number): string => seconds.toFixed(3)
+
 /** The scale filter that caps a transcode at `maxHeight` lines without ever upscaling. */
 const scaleTo = (maxHeight: number): string => `w=-2:h='min(${maxHeight},ih)'`
 
@@ -145,6 +148,7 @@ const transcodeVideo = ({
   maxHeight,
   quality,
   bitrate,
+  trimFrom = null,
 }: {
   encoder: VideoEncoder
   videoCodec: string | null
@@ -152,10 +156,13 @@ const transcodeVideo = ({
   maxHeight: number
   quality: TranscodeQuality
   bitrate: number | null
+  /** Drops the frames before this time, on the file's clock, before any other filter. */
+  trimFrom?: number | null
 }): VideoArgs => {
   const scale = scaleTo(maxHeight)
   const squeeze = QUALITY[quality]
-  const cpuFilters = [`scale=${scale}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
+  const trim = trimFrom == null ? [] : [`trim=start=${secondsArg(trimFrom)}`]
+  const cpuFilters = [...trim, `scale=${scale}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
   // A keyframe every two seconds keeps fragments small, so playback starts
   // and seeks quickly.
   const shared = ['-profile:v', 'high', '-g', '48']
@@ -185,7 +192,7 @@ const transcodeVideo = ({
       ? ':out_color_matrix=bt709:out_color_primaries=bt709:out_color_transfer=bt709:out_range=tv'
       : ''
     const filters = gpuDecode
-      ? [`scale_vaapi=${scale}:format=nv12${toBt709}`]
+      ? [...trim, `scale_vaapi=${scale}:format=nv12${toBt709}`]
       : [...cpuFilters, 'format=nv12', 'hwupload']
     return {
       input: [
@@ -370,9 +377,6 @@ export const hlsAudioArgs = (track: Pick<AudioTrack, 'codec' | 'channels'>): str
   ]
 }
 
-/** Seconds as ffmpeg's arguments take them, to the millisecond like the plan. */
-const secondsArg = (seconds: number): string => seconds.toFixed(3)
-
 /**
  * The segment muxer's MP4 options. Without `frag_discont`, `use_editlist=0`
  * and its own `avoid_negative_ts=disabled`, every file's tfdt starts at zero:
@@ -408,13 +412,34 @@ export const segmentClockOf = (version: string | null): SegmentClock => {
 const REMUX_CUT_TOLERANCE = 0.005
 
 /**
- * `-enc_time_base` naming the demuxer's time base. FFmpeg 6.0 named it
- * `demux`, and 9.0 refuses the `-1` that 5.1, which reads segment times as
- * output timestamps, alone takes.
+ * How `-enc_time_base` names the demuxer's time base: `demux` from FFmpeg
+ * 6.1, `-1` before it. 6.0 refuses `demux`, and 9.0 refuses `-1`.
  */
-const DEMUX_TIME_BASE: Record<SegmentClock, string> = {
-  [SEGMENT_CLOCKS.run]: 'demux',
-  [SEGMENT_CLOCKS.output]: '-1',
+export const DEMUX_TIME_BASES = { named: 'demux', numbered: '-1' } as const
+
+export type DemuxTimeBase = (typeof DEMUX_TIME_BASES)[keyof typeof DEMUX_TIME_BASES]
+
+const NAMED_TIME_BASE_SINCE = { major: 6, minor: 1 } as const
+
+/** The demuxer's time base by the name the ffmpeg whose `-version` line this is takes; a build without a release number is new. */
+export const demuxTimeBaseOf = (version: string | null): DemuxTimeBase => {
+  const match = /^ffmpeg version n?(\d+)\.(\d+)/.exec(version ?? '')
+  if (!match) return DEMUX_TIME_BASES.named
+  const [major, minor] = [Number(match[1]), Number(match[2])]
+  const isOlder =
+    major < NAMED_TIME_BASE_SINCE.major ||
+    (major === NAMED_TIME_BASE_SINCE.major && minor < NAMED_TIME_BASE_SINCE.minor)
+  return isOlder ? DEMUX_TIME_BASES.numbered : DEMUX_TIME_BASES.named
+}
+
+/** How a run reads its file: the inputs, which one the audio comes from, and how it cuts. */
+type RunCut = {
+  inputs: string[]
+  audioInput: number
+  /** Where the video filter drops frames from, when the seek alone cannot. */
+  trimFrom: number | null
+  video: string[]
+  tolerance: number
 }
 
 /**
@@ -427,49 +452,73 @@ const DEMUX_TIME_BASE: Record<SegmentClock, string> = {
  * - A transcode's decoder drops the frames before `-ss` plus the file's
  *   start time, whatever `-seek_timestamp` says, so its `-ss` is counted
  *   from the start. Its frames keep their own timestamps
- *   (`-fps_mode passthrough -enc_time_base demux`) rather than moving onto
- *   a grid from 0, so they stay on the plan's frames, and every time it is
- *   given sits half a frame before its boundary, so it lands on that frame
- *   and on no other.
+ *   (`-fps_mode passthrough` and the demuxer's time base) rather than
+ *   moving onto a grid from 0, so they stay on the plan's frames, and every
+ *   time it is given sits half a frame before its boundary, so it lands on
+ *   that frame and on no other.
+ * - MPEG-TS has no seek index, and ffmpeg indexes every packet of it as a
+ *   keyframe, so a seek lands mid-GOP and the decoder starts at the next
+ *   keyframe, which may be past the boundary. Given the file's keyframes, a
+ *   transcode reads the video from just before the keyframe at or before
+ *   the boundary and trims it there exactly, and reads the audio from a
+ *   second input of the same file with the exact seek.
  */
 const runCut = ({
+  input,
   mode,
   plan,
   from,
   startTime,
   frameRate,
-  segmentClock,
+  seekKeyframes,
+  timeBase,
 }: {
+  input: string
   mode: StreamMode
   plan: SegmentPlan
   from: number
   startTime: number
   frameRate: number | null
-  segmentClock: SegmentClock
-}): { seek: string[]; video: string[]; tolerance: number } => {
+  seekKeyframes: readonly number[] | null
+  timeBase: DemuxTimeBase
+}): RunCut => {
   const start = plan.boundaries[from] ?? 0
+  const read = (seek: string[]): string[] => [...seek, '-copyts', '-i', input]
   if (mode === PLAYBACK_MODES.remux) {
     return {
-      seek: start > 0 ? ['-seek_timestamp', '1', '-ss', secondsArg(start)] : [],
+      inputs: read(start > 0 ? ['-seek_timestamp', '1', '-ss', secondsArg(start)] : []),
+      audioInput: 0,
+      trimFrom: null,
       video: [],
       tolerance: REMUX_CUT_TOLERANCE,
     }
   }
   const tolerance = frameRate == null ? REMUX_CUT_TOLERANCE : 0.5 / frameRate
-  const offset = start - tolerance - startTime
+  // The seek counts from `format.start_time` as ffprobe read it, so ffprobe
+  // and ffmpeg must agree on it (FfmpegService warns when they differ).
+  const fromStart = (time: number): string[] =>
+    time - startTime > 0 ? ['-ss', secondsArg(time - startTime)] : []
+  const exact = fromStart(start - tolerance)
+  const video = [
+    '-fps_mode',
+    'passthrough',
+    '-enc_time_base',
+    timeBase,
+    '-force_key_frames',
+    plan.boundaries
+      .slice(from)
+      .map((boundary) => secondsArg(boundary - tolerance))
+      .join(','),
+  ]
+  if (seekKeyframes == null || exact.length === 0) {
+    return { inputs: read(exact), audioInput: 0, trimFrom: null, video, tolerance }
+  }
+  const keyframe = seekKeyframes.findLast((time) => time <= start) ?? null
   return {
-    seek: offset > 0 ? ['-ss', secondsArg(offset)] : [],
-    video: [
-      '-fps_mode',
-      'passthrough',
-      '-enc_time_base',
-      DEMUX_TIME_BASE[segmentClock],
-      '-force_key_frames',
-      plan.boundaries
-        .slice(from)
-        .map((boundary) => secondsArg(boundary - tolerance))
-        .join(','),
-    ],
+    inputs: [...read(keyframe == null ? [] : fromStart(keyframe - tolerance)), ...read(exact)],
+    audioInput: 1,
+    trimFrom: start - tolerance,
+    video,
     tolerance,
   }
 }
@@ -506,8 +555,10 @@ export const hlsArgs = ({
   tonemap,
   startTime,
   frameRate,
+  seekKeyframes,
   folder,
   segmentClock,
+  timeBase,
 }: {
   input: string
   plan: SegmentPlan
@@ -528,8 +579,12 @@ export const hlsArgs = ({
   startTime: number
   /** The video's frame rate, whose frames a transcode's plan is on; null when unknown. */
   frameRate: number | null
+  /** The keyframes of a file whose seek lands mid-GOP (MPEG-TS), which a transcode seeks to; null for any other. */
+  seekKeyframes: readonly number[] | null
   folder: string
   segmentClock: SegmentClock
+  /** How this ffmpeg names the demuxer's time base. */
+  timeBase: DemuxTimeBase
 }): string[] => {
   const start = plan.boundaries[from] ?? 0
   const offsets = runSegmentTimes({ plan, from })
@@ -538,23 +593,28 @@ export const hlsArgs = ({
     segmentClock === SEGMENT_CLOCKS.run
       ? past
       : past.map((offset) => start + offset + STREAM_TIME_SHIFT)
+  const cut = runCut({ input, mode, plan, from, startTime, frameRate, seekKeyframes, timeBase })
   const video =
     mode === PLAYBACK_MODES.remux
       ? copyVideo(videoCodec)
-      : transcodeVideo({ encoder, videoCodec, tonemap, maxHeight, quality, bitrate })
-  const cut = runCut({ mode, plan, from, startTime, frameRate, segmentClock })
+      : transcodeVideo({
+          encoder,
+          videoCodec,
+          tonemap,
+          maxHeight,
+          quality,
+          bitrate,
+          trimFrom: cut.trimFrom,
+        })
   return [
     ...QUIET,
     ...video.input,
-    ...cut.seek,
-    '-copyts',
-    '-i',
-    input,
+    ...cut.inputs,
     '-copypriorss',
     '0',
     '-map',
     '0:v:0',
-    ...(audio == null ? [] : ['-map', `0:a:${audio.index}`]),
+    ...(audio == null ? [] : ['-map', `${cut.audioInput}:a:${audio.index}`]),
     ...video.output,
     ...cut.video,
     ...(audio == null ? [] : hlsAudioArgs(audio)),

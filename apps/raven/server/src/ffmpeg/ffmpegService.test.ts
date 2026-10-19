@@ -1,10 +1,11 @@
 import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { Logger } from '@nestjs/common'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { readServerConfig } from '@/config'
 import { DEFAULT_PLAYBACK_SETTINGS, type HwAccel } from '@raven/core'
-import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
+import { FfmpegService, FfmpegTimeoutError, toolMismatch } from '@/ffmpeg/ffmpegService'
 
 describe('FfmpegService', () => {
   const state = { dir: '' }
@@ -24,6 +25,17 @@ describe('FfmpegService', () => {
       '#!/bin/sh\necho "$@" > "$0.args"\nprintf "2.000000,K__\\n0.000000,K__\\n1.000000,___\\n"\n',
     )
     await chmod(join(state.dir, 'packets'), 0o755)
+    // A Debian ffmpeg beside a Homebrew ffprobe.
+    await writeFile(
+      join(state.dir, 'ffmpeg-5'),
+      '#!/bin/sh\necho "ffmpeg version 5.1.9-0+deb12u1 Copyright"\n',
+    )
+    await writeFile(
+      join(state.dir, 'ffprobe-9'),
+      '#!/bin/sh\necho "ffprobe version 9.0.2 Copyright"\n',
+    )
+    await chmod(join(state.dir, 'ffmpeg-5'), 0o755)
+    await chmod(join(state.dir, 'ffprobe-9'), 0o755)
     await writeFile(join(state.dir, 'renderD128'), '')
     await chmod(join(state.dir, 'works'), 0o755)
     await chmod(join(state.dir, 'slow'), 0o755)
@@ -45,6 +57,36 @@ describe('FfmpegService', () => {
       },
       { playback: () => DEFAULT_PLAYBACK_SETTINGS },
     )
+
+  it('warns at start when ffmpeg and ffprobe are different builds', async () => {
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined)
+    try {
+      await new FfmpegService(
+        {
+          ...readServerConfig({}),
+          ffmpegPath: join(state.dir, 'ffmpeg-5'),
+          ffprobePath: join(state.dir, 'ffprobe-9'),
+        },
+        { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+      ).warnOfMismatchedTools()
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]?.[0])).toContain(
+        'ffmpeg is 5.1.9-0+deb12u1 and ffprobe is 9.0.2',
+      )
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('names no mismatch for one build, or when a tool says nothing', () => {
+    expect(
+      toolMismatch({
+        ffmpeg: 'ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023',
+        ffprobe: 'ffprobe version 6.1.1-3ubuntu5 Copyright (c) 2000-2023',
+      }),
+    ).toBeNull()
+    expect(toolMismatch({ ffmpeg: 'ffmpeg version 9.0.2', ffprobe: null })).toBeNull()
+  })
 
   // Both wait out the same second, side by side.
   it('reports a timeout as a timeout, so the scan can retry later', async () => {

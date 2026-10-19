@@ -59,8 +59,20 @@ const isHdr = (stream: Stream): boolean => {
   return HDR_TRANSFERS.has(transfer) || hasDolbyVision(stream)
 }
 
-/** ffprobe's name for Matroska among the `format_name` it lists. */
-const MATROSKA = 'matroska'
+/** ffprobe's names for the containers the HLS route treats apart, among the `format_name` it lists. */
+const FORMAT_NAMES = { matroska: 'matroska', mpegts: 'mpegts' } as const
+
+const formatOf = (output: unknown): Record<string, unknown> =>
+  isRecord(output) && isRecord(output.format) ? output.format : {}
+
+const formatNamesOf = (output: unknown): string[] => {
+  const name = formatOf(output).format_name
+  return isString(name) ? name.split(',') : []
+}
+
+/** Whether the file is an MPEG transport stream, which has no seek index. */
+export const isTransportStream = (output: unknown): boolean =>
+  formatNamesOf(output).includes(FORMAT_NAMES.mpegts)
 
 /** A number of seconds as ffprobe writes one, which may be negative: "2.500000", "-0.023000". */
 const secondsOf = (value: unknown): number | null => {
@@ -108,11 +120,10 @@ export const mediaClockOf = (output: unknown): MediaClock => {
   const streams = (isRecord(output) && Array.isArray(output.streams) ? output.streams : []).filter(
     isRecord,
   )
-  const format = isRecord(output) && isRecord(output.format) ? output.format : {}
+  const format = formatOf(output)
   const start = secondsOf(format.start_time) ?? 0
   const duration = numeric(format.duration)
-  const isMatroska =
-    isString(format.format_name) && format.format_name.split(',').includes(MATROSKA)
+  const isMatroska = formatNamesOf(output).includes(FORMAT_NAMES.matroska)
   const end = duration == null ? null : isMatroska ? Math.max(duration, start) : start + duration
   const video = videoStreamOf(streams)
   return {

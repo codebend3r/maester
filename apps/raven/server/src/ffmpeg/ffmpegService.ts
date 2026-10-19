@@ -12,7 +12,13 @@ import {
 import { ENCODER_KINDS, HW_ACCELS } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { SettingsRepository } from '@/settings/settingsRepository'
-import { type SegmentClock, encoderTestArgs, segmentClockOf } from '@/ffmpeg/args'
+import {
+  type DemuxTimeBase,
+  type SegmentClock,
+  demuxTimeBaseOf,
+  encoderTestArgs,
+  segmentClockOf,
+} from '@/ffmpeg/args'
 import { SOFTWARE, type VideoEncoder, encoderCandidates } from '@/ffmpeg/encoder'
 import { parseKeyframes } from '@/ffmpeg/keyframes'
 import { type ProbeResult, parseProbe } from '@/ffmpeg/probe'
@@ -58,6 +64,25 @@ const failureText = (error: unknown): string => {
 /** The signals raven sends an ffmpeg it started. */
 export const FFMPEG_SIGNALS = { kill: 'SIGKILL' } as const satisfies Record<string, NodeJS.Signals>
 
+/** The release in a tool's `-version` line: `6.1.1-3ubuntu5` from `ffmpeg version 6.1.1-3ubuntu5 Copyright ...`. */
+const releaseOf = (line: string | null): string | null =>
+  /^\S+ version (\S+)/.exec(line ?? '')?.[1] ?? null
+
+/** What to warn of when ffmpeg and ffprobe are different builds, or null when they match or one is missing. */
+export const toolMismatch = ({
+  ffmpeg,
+  ffprobe,
+}: {
+  ffmpeg: string | null
+  ffprobe: string | null
+}): string | null => {
+  const [ffmpegRelease, ffprobeRelease] = [releaseOf(ffmpeg), releaseOf(ffprobe)]
+  if (ffmpegRelease == null || ffprobeRelease == null || ffmpegRelease === ffprobeRelease) {
+    return null
+  }
+  return `ffmpeg is ${ffmpegRelease} and ffprobe is ${ffprobeRelease}; HLS transcodes seek by ffprobe's reading of a file's start, so use the same build of both`
+}
+
 /** A running ffmpeg whose output is read as it is written. */
 export type FfmpegStream = ChildProcessByStdio<null, Readable, Readable>
 
@@ -67,7 +92,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(FfmpegService.name)
   private filters: Promise<ReadonlySet<string>> | null = null
   private encoder: Promise<VideoEncoder> | null = null
-  private segmentTimes: Promise<SegmentClock> | null = null
+  private versionLine: Promise<string | null> | null = null
   private readonly streams = new Set<FfmpegStream>()
 
   constructor(
@@ -171,15 +196,37 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     return child
   }
 
-  /** How this ffmpeg's segment muxer reads `-segment_times`, from its version, asked once. */
-  segmentClock(): Promise<SegmentClock> {
-    this.segmentTimes ??= this.version().then(segmentClockOf)
-    return this.segmentTimes
+  /** How this ffmpeg's segment muxer reads `-segment_times`, from its version. */
+  async segmentClock(): Promise<SegmentClock> {
+    return segmentClockOf(await this.ffmpegVersion())
   }
 
-  /** Settles the encoder at start, so the log says which one transcodes will use. */
+  /** How this ffmpeg names the demuxer's time base, from its version. */
+  async demuxTimeBase(): Promise<DemuxTimeBase> {
+    return demuxTimeBaseOf(await this.ffmpegVersion())
+  }
+
+  /**
+   * Settles the encoder at start, so the log says which one transcodes will
+   * use, and says when ffprobe and ffmpeg are different builds.
+   */
   onApplicationBootstrap(): void {
     void this.videoEncoder()
+    void this.warnOfMismatchedTools()
+  }
+
+  /**
+   * A transcode seeks from the file's start time as ffprobe reads it, and
+   * builds disagree on it: 5.1 and 6.1 put an AAC-primed file's at -0.023 s,
+   * 9.0 at 0. Two different builds can cut a run off its plan.
+   */
+  async warnOfMismatchedTools(): Promise<void> {
+    const [ffmpeg, ffprobe] = await Promise.all([
+      this.ffmpegVersion(),
+      this.toolVersion(this.config.ffprobePath),
+    ])
+    const mismatch = toolMismatch({ ffmpeg, ffprobe })
+    if (mismatch) this.logger.warn(mismatch)
   }
 
   onModuleDestroy(): void {
@@ -266,8 +313,18 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** "ffmpeg version 7.1.1-1+b1" style first line, or null when ffmpeg is missing. */
   async version(): Promise<string | null> {
+    return this.toolVersion(this.config.ffmpegPath)
+  }
+
+  /** ffmpeg's `-version` line, asked once. */
+  private ffmpegVersion(): Promise<string | null> {
+    this.versionLine ??= this.version()
+    return this.versionLine
+  }
+
+  private async toolVersion(path: string): Promise<string | null> {
     try {
-      const { stdout } = await run(this.config.ffmpegPath, ['-hide_banner', '-version'])
+      const { stdout } = await run(path, ['-hide_banner', '-version'])
       return stdout.split('\n')[0]?.trim() ?? null
     } catch {
       return null

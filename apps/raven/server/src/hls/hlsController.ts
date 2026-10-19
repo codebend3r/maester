@@ -39,7 +39,7 @@ import { AccessRechecks } from '@/auth/accessRechecks'
 import { AuthSessions } from '@/auth/authSessions'
 import { VIDEO_CODECS, hlsAudioCodec, transcodeBitrate } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
-import { mediaClockOf, parseProbe } from '@/ffmpeg/probe'
+import { isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
 import { type HlsSession, HlsSessions } from '@/hls/hlsSessions'
 import { KeyframesService } from '@/hls/keyframesService'
 import {
@@ -240,6 +240,10 @@ export class HlsController {
       throw new ConflictException('Keyframes lie too far apart in this file to remux; transcode it')
     }
 
+    const seekKeyframes =
+      streamMode === PLAYBACK_MODES.transcode && isTransportStream(output)
+        ? await this.keyframes.of({ id, path: file.path })
+        : null
     const { tonemap, encoder } = await videoEncodingOf({
       ffmpeg: this.ffmpeg,
       file,
@@ -264,6 +268,7 @@ export class HlsController {
         bitrate,
         tonemap,
         frameRate: clock.frameRate,
+        seekKeyframes,
       },
     })
 

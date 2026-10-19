@@ -22,7 +22,7 @@ import {
 } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
-import { type SegmentClock, hlsArgs } from '@/ffmpeg/args'
+import { type DemuxTimeBase, type SegmentClock, hlsArgs } from '@/ffmpeg/args'
 import { type FfmpegStream, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { segmentFileName, segmentNumberOf, splitSegmentFile } from '@/hls/segmentFiles'
 import type { SegmentPlan } from '@/hls/segmentPlan'
@@ -79,7 +79,7 @@ export const RUN_SIGNALS = { kill: 'SIGKILL', stop: 'SIGSTOP', resume: 'SIGCONT'
 /** What every run of a session encodes with: the file, and what the caller decided for it. */
 export type HlsEncoding = Omit<
   Parameters<typeof hlsArgs>[0],
-  'plan' | 'from' | 'mode' | 'audio' | 'folder' | 'segmentClock' | 'startTime'
+  'plan' | 'from' | 'mode' | 'audio' | 'folder' | 'segmentClock' | 'timeBase' | 'startTime'
 >
 
 /** A minted session: what it plays, and the plan its playlist and its runs share. */
@@ -540,7 +540,10 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     const old = entry.run
     entry.run = null
     if (old) await this.stop({ run: old, reason: new RunReplaced() })
-    const segmentClock = await this.ffmpeg.segmentClock()
+    const [segmentClock, timeBase] = await Promise.all([
+      this.ffmpeg.segmentClock(),
+      this.ffmpeg.demuxTimeBase(),
+    ])
     entry.runs += 1
     // Each run writes into a folder of its own, so a segment another run
     // wrote stays whole and servable while this one writes its own.
@@ -550,7 +553,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
       await rm(entry.folder, { recursive: true, force: true })
       throw sessionEnded()
     }
-    const run = this.launch({ entry, from, folder, segmentClock })
+    const run = this.launch({ entry, from, folder, segmentClock, timeBase })
     entry.launches.forEach((launched) => launched())
     entry.launches.clear()
     return run
@@ -569,11 +572,13 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     from,
     folder,
     segmentClock,
+    timeBase,
   }: {
     entry: Entry
     from: number
     folder: string
     segmentClock: SegmentClock
+    timeBase: DemuxTimeBase
   }): Run {
     const child = this.ffmpeg.segment(
       hlsArgs({
@@ -585,6 +590,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
         startTime: entry.session.startTime,
         folder,
         segmentClock,
+        timeBase,
       }),
     )
     const run: Run = {

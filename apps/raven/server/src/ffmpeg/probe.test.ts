@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mediaClockOf, parseProbe } from '@/ffmpeg/probe'
+import { isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
 
 /** Trimmed from a real ffprobe run on a 4K HDR episode on the NAS. */
 const hdrEpisode = {
@@ -111,5 +111,16 @@ describe('mediaClockOf', () => {
       }),
     ).toEqual({ start: -0.023, end: null, videoStart: -0.023, frameRate: null })
     expect(mediaClockOf(null)).toEqual({ start: 0, end: null, videoStart: 0, frameRate: null })
+  })
+})
+
+describe('isTransportStream', () => {
+  it('knows MPEG-TS, M2TS included, from the format ffprobe names', () => {
+    expect(
+      ['mpegts', 'matroska,webm', 'mov,mp4,m4a,3gp,3g2,mj2'].map((format_name) =>
+        isTransportStream({ format: { format_name } }),
+      ),
+    ).toEqual([true, false, false])
+    expect(isTransportStream(null)).toBe(false)
   })
 })

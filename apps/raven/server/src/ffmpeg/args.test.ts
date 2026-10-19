@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { SOFTWARE, type VideoEncoder } from '@/ffmpeg/encoder'
 import { transcodePlan } from '@/hls/segmentPlan'
 import {
+  DEMUX_TIME_BASES,
   SEGMENT_CLOCKS,
+  demuxTimeBaseOf,
   TONEMAP_FILTER,
   hlsArgs,
   hlsAudioArgs,
@@ -230,8 +232,10 @@ describe('hlsArgs', () => {
     tonemap: false,
     startTime: 0,
     frameRate: 24,
+    seekKeyframes: null,
     folder: '/d/hls/abc',
     segmentClock: SEGMENT_CLOCKS.run,
+    timeBase: DEMUX_TIME_BASES.named,
   } as const
 
   it('runs the spike’s remux from segment 4 on the file’s clock, listing each finished file on stdout', () => {
@@ -349,14 +353,55 @@ describe('hlsArgs', () => {
     expect(after('-segment_time_delta')).toBe('0.02')
   })
 
-  it('names the demuxer’s time base as FFmpeg before 6.0 does', () => {
+  it('names the demuxer’s time base as this ffmpeg takes it', () => {
     const args = hlsArgs({
       ...base,
       from: 0,
       mode: PLAYBACK_MODES.transcode,
-      segmentClock: SEGMENT_CLOCKS.output,
+      timeBase: DEMUX_TIME_BASES.numbered,
     })
     expect(args[args.indexOf('-enc_time_base') + 1]).toBe('-1')
+  })
+
+  it('reads a transport stream’s video from its keyframe, trimmed, and its sound from the boundary', () => {
+    const args = hlsArgs({
+      ...base,
+      plan: transcodePlan({ start: 11.44, duration: 51.44, frameRate: 25 }),
+      from: 2,
+      mode: PLAYBACK_MODES.transcode,
+      startTime: 11.377,
+      frameRate: 25,
+      seekKeyframes: [11.44, 21.44, 31.44, 41.44],
+    })
+    // The keyframe at or before 23.44 is 21.44; both seeks count from the start, 11.377.
+    expect(args.slice(args.indexOf('-ss'), args.lastIndexOf('-i') + 2)).toEqual([
+      '-ss',
+      '10.043',
+      '-copyts',
+      '-i',
+      '/m/clip.mkv',
+      '-ss',
+      '12.043',
+      '-copyts',
+      '-i',
+      '/m/clip.mkv',
+    ])
+    expect(args).toContain('1:a:1')
+    expect(args[args.indexOf('-vf') + 1]).toBe("trim=start=23.420,scale=w=-2:h='min(1080,ih)'")
+  })
+
+  it('reads a transport stream from the top in one input when its first run needs no seek', () => {
+    const args = hlsArgs({
+      ...base,
+      plan: transcodePlan({ start: 0, duration: 30, frameRate: 25 }),
+      from: 0,
+      mode: PLAYBACK_MODES.transcode,
+      frameRate: 25,
+      seekKeyframes: [0, 10, 20],
+    })
+    expect(args.filter((arg) => arg === '-i')).toHaveLength(1)
+    expect(args).toContain('0:a:1')
+    expect(args[args.indexOf('-vf') + 1]).not.toContain('trim')
   })
 
   it('reads a transcode from the top when its first frame is the file’s', () => {
@@ -374,6 +419,22 @@ describe('hlsArgs', () => {
     const args = hlsArgs({ ...base, from: 0, mode: PLAYBACK_MODES.remux, audio: null })
     expect(args.filter((arg) => arg === '-map')).toHaveLength(1)
     expect(args).not.toContain('-c:a')
+  })
+})
+
+describe('demuxTimeBaseOf', () => {
+  it('names it demux from FFmpeg 6.1, and -1 before', () => {
+    expect(
+      [
+        'ffmpeg version 5.1.9-0+deb12u1 Copyright (c) 2000-2026',
+        'ffmpeg version 6.0.1 Copyright (c) 2000-2023',
+        'ffmpeg version n6.0 Copyright (c) 2000-2023',
+        'ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023',
+        'ffmpeg version 9.0.2 Copyright (c) 2000-2026',
+        'ffmpeg version N-112345-gabcdef Copyright',
+        null,
+      ].map(demuxTimeBaseOf),
+    ).toEqual(['-1', '-1', '-1', 'demux', 'demux', 'demux', 'demux'])
   })
 })
 
