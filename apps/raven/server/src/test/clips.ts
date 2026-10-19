@@ -20,6 +20,8 @@ export const encodeClip = async ({
   size = '320x240',
   keyframeEvery,
   startAt,
+  frameRate = String(CLIP_FPS),
+  videoDelay,
 }: {
   path: string
   seconds?: number
@@ -30,18 +32,24 @@ export const encodeClip = async ({
   keyframeEvery?: number
   /** Where the file's own clock starts, in seconds, as a broadcast recording's does. */
   startAt?: number
+  /** Frames per second, as ffmpeg writes a rate: `24000/1001` for NTSC film. */
+  frameRate?: string
+  /** How long after the sound the picture starts, as in many broadcast recordings. */
+  videoDelay?: number
 }): Promise<void> => {
-  const gop = keyframeEvery == null ? null : String(keyframeEvery * CLIP_FPS)
+  const [top = CLIP_FPS, bottom = 1] = frameRate.split('/').map(Number)
+  const gop = keyframeEvery == null ? null : String(Math.round((keyframeEvery * top) / bottom))
   await mkdir(dirname(path), { recursive: true })
   await run('ffmpeg', [
     '-hide_banner',
     '-loglevel',
     'error',
     '-y',
+    ...(videoDelay == null ? [] : ['-itsoffset', String(videoDelay)]),
     '-f',
     'lavfi',
     '-i',
-    `testsrc2=size=${size}:rate=${CLIP_FPS}:duration=${seconds}`,
+    `testsrc2=size=${size}:rate=${frameRate}:duration=${seconds}`,
     '-f',
     'lavfi',
     '-i',

@@ -1,6 +1,7 @@
 import { PLAYBACK_MODES } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import { SOFTWARE, type VideoEncoder } from '@/ffmpeg/encoder'
+import { transcodePlan } from '@/hls/segmentPlan'
 import {
   SEGMENT_CLOCKS,
   TONEMAP_FILTER,
@@ -227,6 +228,8 @@ describe('hlsArgs', () => {
     quality: 'medium',
     bitrate: null,
     tonemap: false,
+    startTime: 0,
+    frameRate: 24,
     folder: '/d/hls/abc',
     segmentClock: SEGMENT_CLOCKS.run,
   } as const
@@ -323,8 +326,48 @@ describe('hlsArgs', () => {
     expect(args).not.toContain('-tag:v')
     expect(args[args.indexOf('-vf') + 1]).toBe("scale=w=-2:h='min(720,ih)'")
     expect(args[args.indexOf('-maxrate') + 1]).toBe('3000000')
-    expect(args[args.indexOf('-force_key_frames') + 1]).toBe('41.458,51.458,59.542,69.542,80.042')
-    expect(args).toContain('-copypriorss')
+  })
+
+  it("seeks a transcode from the file's start and cuts it half a frame before each boundary", () => {
+    const args = hlsArgs({
+      ...base,
+      plan: transcodePlan({ start: 2.5, duration: 40, frameRate: 25 }),
+      from: 2,
+      mode: PLAYBACK_MODES.transcode,
+      startTime: 2.494,
+      frameRate: 25,
+    })
+    const after = (flag: string) => args[args.indexOf(flag) + 1]
+    // The decoder keeps what is at or after -ss plus the file's start time.
+    expect(args).not.toContain('-seek_timestamp')
+    expect(after('-ss')).toBe('11.986')
+    expect(args.indexOf('-ss')).toBeLessThan(args.indexOf('-i'))
+    expect(after('-fps_mode')).toBe('passthrough')
+    expect(after('-enc_time_base')).toBe('demux')
+    expect(after('-force_key_frames')).toBe('14.480,20.480,26.480,32.480,38.480')
+    expect(after('-segment_times')).toBe('6.000,12.000,18.000,24.000')
+    expect(after('-segment_time_delta')).toBe('0.02')
+  })
+
+  it('names the demuxer’s time base as FFmpeg before 6.0 does', () => {
+    const args = hlsArgs({
+      ...base,
+      from: 0,
+      mode: PLAYBACK_MODES.transcode,
+      segmentClock: SEGMENT_CLOCKS.output,
+    })
+    expect(args[args.indexOf('-enc_time_base') + 1]).toBe('-1')
+  })
+
+  it('reads a transcode from the top when its first frame is the file’s', () => {
+    const args = hlsArgs({
+      ...base,
+      plan: transcodePlan({ start: 0, duration: 30, frameRate: 25 }),
+      from: 0,
+      mode: PLAYBACK_MODES.transcode,
+      frameRate: 25,
+    })
+    expect(args).not.toContain('-ss')
   })
 
   it('maps no audio for a silent file', () => {

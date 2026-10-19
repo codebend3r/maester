@@ -17,6 +17,8 @@ export const CONTENT_TYPES = {
   eventStream: 'text/event-stream',
   html: 'text/html; charset=utf-8',
   json: 'application/json',
+  /** An HLS playlist. */
+  m3u8: 'application/vnd.apple.mpegurl',
   octetStream: 'application/octet-stream',
   vtt: 'text/vtt; charset=utf-8',
 } as const

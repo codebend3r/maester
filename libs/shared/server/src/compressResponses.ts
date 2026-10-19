@@ -7,8 +7,10 @@ import { CONTENT_TYPES, HEADERS } from '@/http'
 // The plugin's own list adds octet-stream, which on a media server is a video.
 // Anything else it takes from mime-db, which marks no video and neither JPEG
 // nor PNG compressible, and leaves out the HLS playlist, which is text.
-const COMPRESSIBLE =
-  /^text\/(?!event-stream)|[+/](?:json|xml)(?:;|$)|^application\/vnd\.apple\.mpegurl(?:;|$)/u
+const COMPRESSIBLE = /^text\/(?!event-stream)|[+/](?:json|xml)(?:;|$)/u
+
+const isCompressible = (type: string): boolean =>
+  COMPRESSIBLE.test(type) || type.split(';', 1)[0]?.trim() === CONTENT_TYPES.m3u8
 
 /** The content codings offered, in order of preference. */
 export const ENCODINGS = { br: 'br', gzip: 'gzip' } as const
@@ -54,7 +56,7 @@ export const compressResponses = async ({
   })
   await app.register(fastifyCompress, {
     encodings: [ENCODINGS.br, ENCODINGS.gzip],
-    customTypes: COMPRESSIBLE,
+    customTypes: isCompressible,
     brotliOptions: { params: { [constants.BROTLI_PARAM_QUALITY]: 4 } },
     zlibOptions: { level: 1 },
     // Responses only: a request body is read exactly as it was sent.

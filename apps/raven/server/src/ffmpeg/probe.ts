@@ -59,15 +59,68 @@ const isHdr = (stream: Stream): boolean => {
   return HDR_TRANSFERS.has(transfer) || hasDolbyVision(stream)
 }
 
+/** ffprobe's name for Matroska among the `format_name` it lists. */
+const MATROSKA = 'matroska'
+
+/** A number of seconds as ffprobe writes one, which may be negative: "2.500000", "-0.023000". */
+const secondsOf = (value: unknown): number | null => {
+  const seconds = isString(value) ? Number(value) : value
+  return isNumber(seconds) ? seconds : null
+}
+
+/** "24000/1001" from ffprobe, as 23.976; null for "0/0" and other nonsense. */
+export const rateOf = (value: unknown): number | null => {
+  if (!isString(value)) return null
+  const [top = NaN, bottom = 1] = value.split('/').map(Number)
+  const rate = top / bottom
+  return isNumber(rate) && rate > 0 && rate < 1000 ? rate : null
+}
+
+const videoStreamOf = (streams: readonly Stream[]): Stream | undefined =>
+  streams.find(
+    (stream) =>
+      stream.codec_type === CODEC_TYPES.video && !disposition({ stream, flag: 'attached_pic' }),
+  )
+
+/** Where a file's media lies on its own clock, which the HLS plans are cut on. */
+export type MediaClock = {
+  /**
+   * Where the file's clock begins, `format.start_time`, or 0 when it names
+   * none. A broadcast recording starts well past 0, and an AAC track's
+   * priming can put it a few milliseconds before. Subtitles, extracted from
+   * zero, are shifted by it.
+   */
+  start: number
+  /** Where the media ends, or null when ffprobe knows no duration. */
+  end: number | null
+  /** The video's first timestamp, where a transcode's first segment starts. */
+  videoStart: number
+  /** The video's frames per second, the grid a transcode's boundaries fall on; null when unknown. */
+  frameRate: number | null
+}
+
 /**
- * Where the file's own clock begins, ffprobe's `format.start_time`, or 0
- * when it names none. A broadcast recording starts well past 0, and an
- * AAC track's priming can put it a few milliseconds before.
+ * Reads the clock from `ffprobe -show_format -show_streams -of json`
+ * output. Matroska measures its duration from 0 on its own timeline, so
+ * there the duration is the end; elsewhere it runs from the start.
  */
-export const startTimeOf = (output: unknown): number => {
+export const mediaClockOf = (output: unknown): MediaClock => {
+  const streams = (isRecord(output) && Array.isArray(output.streams) ? output.streams : []).filter(
+    isRecord,
+  )
   const format = isRecord(output) && isRecord(output.format) ? output.format : {}
-  const start = isString(format.start_time) ? Number(format.start_time) : format.start_time
-  return isNumber(start) ? start : 0
+  const start = secondsOf(format.start_time) ?? 0
+  const duration = numeric(format.duration)
+  const isMatroska =
+    isString(format.format_name) && format.format_name.split(',').includes(MATROSKA)
+  const end = duration == null ? null : isMatroska ? Math.max(duration, start) : start + duration
+  const video = videoStreamOf(streams)
+  return {
+    start,
+    end,
+    videoStart: secondsOf(video?.start_time) ?? start,
+    frameRate: rateOf(video?.r_frame_rate) ?? rateOf(video?.avg_frame_rate),
+  }
 }
 
 /**
@@ -80,10 +133,7 @@ export const parseProbe = (output: unknown): ProbeResult | null => {
   const streams = (Array.isArray(output.streams) ? output.streams : []).filter(isRecord)
   const format = isRecord(output.format) ? output.format : {}
 
-  const video = streams.find(
-    (stream) =>
-      stream.codec_type === CODEC_TYPES.video && !disposition({ stream, flag: 'attached_pic' }),
-  )
+  const video = videoStreamOf(streams)
   const audioTracks = streams.filter((stream) => stream.codec_type === CODEC_TYPES.audio)
   const audio =
     audioTracks.find((stream) => disposition({ stream, flag: 'default' })) ?? audioTracks[0]

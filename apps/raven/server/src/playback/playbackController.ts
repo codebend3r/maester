@@ -4,6 +4,7 @@ import {
   Get,
   Header,
   Inject,
+  Logger,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -19,6 +20,7 @@ import {
   type MediaTicket,
   type MediaTracks,
   STREAM_TIME_SHIFT,
+  TRANSCODINGS,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS, wholeNumber, CACHE_POLICIES } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
@@ -26,9 +28,11 @@ import { AccessRechecks } from '@/auth/accessRechecks'
 import { AccountTickets } from '@/auth/accountTickets'
 import { AuthSessions } from '@/auth/authSessions'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
+import { errorMessage } from '@/errorMessage'
 import { streamArgs } from '@/ffmpeg/args'
 import { FFMPEG_SIGNALS, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { parseStreams } from '@/ffmpeg/streams'
+import { KeyframesService } from '@/hls/keyframesService'
 import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { PrivateBy } from '@/lock/lockGuard'
 import { SettingsRepository } from '@/settings/settingsRepository'
@@ -70,7 +74,10 @@ export class PlaybackController {
     @Inject(AccountTickets) private readonly accountTickets: AccountTickets,
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
     @Inject(AuthSessions) private readonly callers: AuthSessions,
+    @Inject(KeyframesService) private readonly keyframes: KeyframesService,
   ) {}
+
+  private readonly logger = new Logger(PlaybackController.name)
 
   private fileOf(id: number): MediaFile {
     const file = this.index.fileOf(id)
@@ -101,7 +108,27 @@ export class PlaybackController {
 
   @Get(':id/tracks')
   async listTracks(@Param('id', ParseIntPipe) id: number): Promise<MediaTracks> {
-    return (await this.tracks.tracksFor(this.fileOf(id))).tracks
+    const file = this.fileOf(id)
+    const { tracks } = await this.tracks.tracksFor(file)
+    this.warmKeyframes(file)
+    return tracks
+  }
+
+  /**
+   * Every player reads the tracks before it plays, so the whole-file
+   * keyframe probe an HLS remux waits for starts here, in the background,
+   * and is usually done by the time the master playlist is asked for. A
+   * probe already stored or running is not started again.
+   */
+  private warmKeyframes(file: MediaFile): void {
+    if (this.settings.playback().transcoding === TRANSCODINGS.off) return
+    this.keyframes
+      .of({ id: file.id, path: file.path })
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Could not read the keyframes of media ${file.id}: ${errorMessage(error)}`,
+        ),
+      )
   }
 
   /**

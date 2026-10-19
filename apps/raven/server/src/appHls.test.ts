@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -17,8 +17,9 @@ import {
   toQueryString,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
+import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { RAVEN_CONTENT_TYPES } from '@/http'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MediaTickets } from '@/media/mediaTickets'
@@ -64,12 +65,16 @@ const LATE_SIDECAR = [
 
 const LATE_START = 2.5
 
+/** How long the late-starting clip's picture runs. */
+const LATE_SECONDS = 12
+
 type Transcoding = (typeof TRANSCODINGS)[keyof typeof TRANSCODINGS]
 
 const FILES = {
   rich: 'Rich (2026).mkv',
   gap: 'Gap (2026).mp4',
   late: 'Late (2026).mkv',
+  warm: 'Warm (2026).mp4',
 } as const
 
 type Clip = keyof typeof FILES
@@ -102,7 +107,7 @@ describe('the HLS route', () => {
     admin: string
     unlocked: string
     ids: Record<Clip, number>
-  } = { root: '', app: null, admin: '', unlocked: '', ids: { rich: 0, gap: 0, late: 0 } }
+  } = { root: '', app: null, admin: '', unlocked: '', ids: { rich: 0, gap: 0, late: 0, warm: 0 } }
 
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
@@ -151,7 +156,7 @@ describe('the HLS route', () => {
   const playlistAt = async (uri: string) => {
     const response = await get(uri)
     expect(response.statusCode).toBe(200)
-    expect(response.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.m3u8)
+    expect(response.headers[HEADERS.contentType]).toBe(CONTENT_TYPES.m3u8)
     const playlist = decodedBody(response).toString()
     return { response, playlist, uris: urisIn(playlist) }
   }
@@ -168,13 +173,21 @@ describe('the HLS route', () => {
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-hls-app-'))
     const media = join(state.root, 'media')
+    // The sidecar is written beside clips still being encoded, which make the folder only as they start.
+    await mkdir(media, { recursive: true })
     await Promise.all([
       // A minute: ten segments, so the video playlist is long enough to be compressed.
       encodeRichClip({ path: join(media, FILES.rich), seconds: 60, cues: CUES }),
       encodeClip({ path: join(media, FILES.gap), seconds: 30, keyframeEvery: 25 }),
       // AC-3, which has no priming to pull the clock's start before 2.5 s.
-      encodeClip({ path: join(media, FILES.late), seconds: 12, audio: 'ac3', startAt: LATE_START }),
+      encodeClip({
+        path: join(media, FILES.late),
+        seconds: LATE_SECONDS,
+        audio: 'ac3',
+        startAt: LATE_START,
+      }),
       writeFile(join(media, 'Late (2026).en.srt'), LATE_SIDECAR),
+      encodeClip({ path: join(media, FILES.warm), seconds: 2 }),
     ])
     state.app = await createApp({
       config: {
@@ -207,7 +220,7 @@ describe('the HLS route', () => {
       if (id == null) throw new Error(`${FILES[clip]} was not scanned`)
       return id
     }
-    state.ids = { rich: idOf('rich'), gap: idOf('gap'), late: idOf('late') }
+    state.ids = { rich: idOf('rich'), gap: idOf('gap'), late: idOf('late'), warm: idOf('warm') }
     const unlock = await state.app.inject({
       method: 'POST',
       url: '/api/lock/unlock',
@@ -226,7 +239,7 @@ describe('the HLS route', () => {
     const response = await get(masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, ticket }))
 
     expect(response.statusCode).toBe(200)
-    expect(response.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.m3u8)
+    expect(response.headers[HEADERS.contentType]).toBe(CONTENT_TYPES.m3u8)
     const playlist = decodedBody(response).toString()
     expect(playlist.match(/#EXT-X-STREAM-INF/g)).toHaveLength(1)
     expect(attributeOf({ playlist, name: 'CODECS' })).toBe('avc1.640028,ac-3')
@@ -276,10 +289,11 @@ describe('the HLS route', () => {
         ],
       }),
     ])
-    const [start = NaN, duration = NaN] = format.split(',').map(Number)
+    // Matroska counts its duration from 0 on its own clock, wherever the file starts.
+    const [, duration = NaN] = format.split(',').map(Number)
     const total = extinfsIn(playlist).reduce((sum, seconds) => sum + seconds, 0)
 
-    expect(total).toBeCloseTo(start + duration - Number(firstKeyframe), 2)
+    expect(total).toBeCloseTo(duration - Number(firstKeyframe), 2)
     expect(playlist).toContain('#EXT-X-PLAYLIST-TYPE:VOD')
     expect(playlist).toContain('#EXT-X-ENDLIST')
     expect(uris[0]).toContain('/init')
@@ -379,6 +393,63 @@ describe('the HLS route', () => {
       expect(await statuses()).toEqual([200, 403])
     } finally {
       await setTranscoding(TRANSCODINGS.on)
+    }
+  })
+
+  it("lists a late-starting file's segments as long as its media, not its clock", async () => {
+    const { playlist } = await videoPlaylist({ clip: 'late', mode: PLAYBACK_MODES.remux })
+    const total = extinfsIn(playlist).reduce((sum, seconds) => sum + seconds, 0)
+    expect(total).toBeCloseTo(LATE_SECONDS, 1)
+  })
+
+  it('transcodes a late-starting file from its first frame, and again from a later segment', async () => {
+    /** Segment `n` of a new transcode session, asked for first, as ffprobe reads it after its init. */
+    const segmentOf = async (n: number) => {
+      const { uris } = await videoPlaylist({ clip: 'late', mode: PLAYBACK_MODES.transcode })
+      const [init, segment] = await Promise.all(
+        [uris[0] ?? '', uris[n + 1] ?? ''].map((uri) => get(uri)),
+      )
+      const path = join(state.root, `late-transcode-${n}.mp4`)
+      await writeFile(
+        path,
+        Buffer.concat([init?.rawPayload, segment?.rawPayload].flatMap((b) => b ?? [])),
+      )
+      const pts = (
+        await ffprobe({
+          path,
+          args: ['-select_streams', 'v:0', '-show_entries', 'packet=pts_time'],
+        })
+      )
+        .split('\n')
+        .map(Number)
+      return { first: Math.min(...pts), count: pts.length }
+    }
+    const [first, second] = await Promise.all([segmentOf(0), segmentOf(1)])
+
+    // Six seconds at 24 fps from the picture's start, then six more from a run of their own.
+    expect(first).toEqual({ first: LATE_START + STREAM_TIME_SHIFT, count: 144 })
+    expect(second.first).toBeCloseTo(LATE_START + 6 + STREAM_TIME_SHIFT, 3)
+    expect(second.count).toBe(144)
+  })
+
+  it('starts the keyframe probe once when the tracks are read, and does not wait for it', async () => {
+    const probe: { finish: (keyframes: number[]) => void } = { finish: () => undefined }
+    const spy = vi.spyOn(app().get(FfmpegService), 'probeKeyframes').mockImplementation(
+      () =>
+        new Promise<number[]>((resolve) => {
+          probe.finish = resolve
+        }),
+    )
+    try {
+      const url = `/api/media/${state.ids.warm}/tracks`
+      const [first, second] = [await get(url, state.unlocked), await get(url, state.unlocked)]
+
+      expect([first.statusCode, second.statusCode]).toEqual([200, 200])
+      expect(spy).toHaveBeenCalledTimes(1)
+      expect(spy).toHaveBeenCalledWith(join(state.root, 'media', FILES.warm))
+    } finally {
+      probe.finish([0])
+      spy.mockRestore()
     }
   })
 

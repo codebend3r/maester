@@ -58,28 +58,36 @@ describe('remuxPlan', () => {
 
 describe('transcodePlan', () => {
   it('cuts every six seconds and ends at the duration', () => {
-    const plan = transcodePlan({ start: 0, duration: 13 })
+    const plan = transcodePlan({ start: 0, duration: 13, frameRate: 24 })
 
     expect(plan).toEqual({ boundaries: [0, 6, 12], duration: 13 })
     expect(segmentDurations(plan)).toEqual([6, 6, 1])
   })
 
   it('has no short segment when the duration divides evenly', () => {
-    const plan = transcodePlan({ start: 0, duration: 12 })
+    const plan = transcodePlan({ start: 0, duration: 12, frameRate: null })
 
     expect(plan.boundaries).toEqual([0, 6])
     expect(segmentDurations(plan)).toEqual([6, 6])
   })
 
   it("starts at the file's own clock, where a recording's does not begin at zero", () => {
-    const plan = transcodePlan({ start: 2.5, duration: 16 })
+    const plan = transcodePlan({ start: 2.5, duration: 16, frameRate: 25 })
 
     expect(plan).toEqual({ boundaries: [2.5, 8.5, 14.5], duration: 16 })
     expect(segmentDurations(plan)).toEqual([6, 6, 1.5])
   })
 
+  it('puts each boundary on a frame of the video, from its first', () => {
+    const plan = transcodePlan({ start: 0.08, duration: 66, frameRate: 24000 / 1001 })
+
+    // 144 frames of 1001/24000 s, then 288, then 432: no boundary between two frames.
+    expect(plan.boundaries.slice(0, 4)).toEqual([0.08, 6.086, 12.092, 18.098])
+    expect(plan.boundaries[10]).toBe(60.098)
+  })
+
   it('keeps one segment for a duration of nothing', () => {
-    expect(transcodePlan({ start: 0, duration: 0 }).boundaries).toEqual([0])
+    expect(transcodePlan({ start: 0, duration: 0, frameRate: 25 }).boundaries).toEqual([0])
   })
 })
 

@@ -3,6 +3,7 @@ import {
   type AudioTrack,
   ENCODER_KINDS,
   HLS_COPY_AUDIO,
+  HLS_COPY_AUDIO_CODECS,
   HLS_SEGMENT_SECONDS,
   PLAYBACK_MODES,
   STREAM_TIME_SHIFT,
@@ -345,15 +346,12 @@ const eac3Bitrate = (channels: number): string => {
   return '224k'
 }
 
-/** ffprobe's name for E-AC-3, what HLS turns any audio it cannot copy into. */
-const EAC3 = 'eac3'
-
 const copiedCodec = (track: Pick<AudioTrack, 'codec'>): string | null =>
   HLS_COPY_AUDIO.find((codec) => codec === track.codec) ?? null
 
-/** The codec an HLS stream's audio comes out in, by ffprobe's name. */
+/** The codec an HLS stream's audio comes out in, by ffprobe's name: E-AC-3 when it is not copied. */
 export const hlsAudioCodec = (track: Pick<AudioTrack, 'codec'>): string =>
-  copiedCodec(track) ?? EAC3
+  copiedCodec(track) ?? HLS_COPY_AUDIO_CODECS.eac3
 
 /**
  * How an HLS stream carries an audio track: copied when Apple's players and
@@ -362,7 +360,14 @@ export const hlsAudioCodec = (track: Pick<AudioTrack, 'codec'>): string =>
 export const hlsAudioArgs = (track: Pick<AudioTrack, 'codec' | 'channels'>): string[] => {
   if (copiedCodec(track) != null) return ['-c:a', 'copy']
   const channels = Math.min(Math.max(track.channels ?? STEREO, 1), EAC3_MAX_CHANNELS)
-  return ['-c:a', EAC3, '-ac', String(channels), '-b:a', eac3Bitrate(channels)]
+  return [
+    '-c:a',
+    HLS_COPY_AUDIO_CODECS.eac3,
+    '-ac',
+    String(channels),
+    '-b:a',
+    eac3Bitrate(channels),
+  ]
 }
 
 /** Seconds as ffmpeg's arguments take them, to the millisecond like the plan. */
@@ -399,6 +404,76 @@ export const segmentClockOf = (version: string | null): SegmentClock => {
     : SEGMENT_CLOCKS.run
 }
 
+/** How far a remux's cut may sit from its boundary: the truncated keyframe times' error. */
+const REMUX_CUT_TOLERANCE = 0.005
+
+/**
+ * `-enc_time_base` naming the demuxer's time base. FFmpeg 6.0 named it
+ * `demux`, and 9.0 refuses the `-1` that 5.1, which reads segment times as
+ * output timestamps, alone takes.
+ */
+const DEMUX_TIME_BASE: Record<SegmentClock, string> = {
+  [SEGMENT_CLOCKS.run]: 'demux',
+  [SEGMENT_CLOCKS.output]: '-1',
+}
+
+/**
+ * Where a run starts reading and how it cuts: a remux on its keyframes, a
+ * transcode on the frame at each boundary.
+ *
+ * - A remux seeks with `-ss` read as a timestamp (`-seek_timestamp 1`), and
+ *   `-copypriorss 0` drops what comes before it: with B-frames ffmpeg seeks
+ *   3/23 s early, and a copy would keep the GOP before.
+ * - A transcode's decoder drops the frames before `-ss` plus the file's
+ *   start time, whatever `-seek_timestamp` says, so its `-ss` is counted
+ *   from the start. Its frames keep their own timestamps
+ *   (`-fps_mode passthrough -enc_time_base demux`) rather than moving onto
+ *   a grid from 0, so they stay on the plan's frames, and every time it is
+ *   given sits half a frame before its boundary, so it lands on that frame
+ *   and on no other.
+ */
+const runCut = ({
+  mode,
+  plan,
+  from,
+  startTime,
+  frameRate,
+  segmentClock,
+}: {
+  mode: StreamMode
+  plan: SegmentPlan
+  from: number
+  startTime: number
+  frameRate: number | null
+  segmentClock: SegmentClock
+}): { seek: string[]; video: string[]; tolerance: number } => {
+  const start = plan.boundaries[from] ?? 0
+  if (mode === PLAYBACK_MODES.remux) {
+    return {
+      seek: start > 0 ? ['-seek_timestamp', '1', '-ss', secondsArg(start)] : [],
+      video: [],
+      tolerance: REMUX_CUT_TOLERANCE,
+    }
+  }
+  const tolerance = frameRate == null ? REMUX_CUT_TOLERANCE : 0.5 / frameRate
+  const offset = start - tolerance - startTime
+  return {
+    seek: offset > 0 ? ['-ss', secondsArg(offset)] : [],
+    video: [
+      '-fps_mode',
+      'passthrough',
+      '-enc_time_base',
+      DEMUX_TIME_BASE[segmentClock],
+      '-force_key_frames',
+      plan.boundaries
+        .slice(from)
+        .map((boundary) => secondsArg(boundary - tolerance))
+        .join(','),
+    ],
+    tolerance,
+  }
+}
+
 /**
  * One HLS run: the plan's segments from `from` onwards, each a file of its
  * own in `folder`, on the file's own clock plus `STREAM_TIME_SHIFT`. A run
@@ -406,16 +481,13 @@ export const segmentClockOf = (version: string | null): SegmentClock => {
  * FFmpeg 5.1 to 9.0 (spec, "HLS muxing (2026-10-19)"):
  *
  * - The plan's times are the file's own pts, as ffprobe lists them, so the
- *   run keeps them: `-copyts` without `-start_at_zero`, and `-ss` read as a
- *   timestamp (`-seek_timestamp 1`) rather than from the file's start.
- * - `-copypriorss 0` drops what comes before `-ss`: with B-frames ffmpeg
- *   seeks 3/23 s early, and a copy would keep the GOP before.
+ *   run keeps them: `-copyts` without `-start_at_zero`. `runCut` says how it
+ *   seeks to its first boundary.
  * - `-segment_times` are indexed by the files this run wrote: the boundaries
  *   after `from`, as offsets from boundary `from` or as output timestamps by
- *   `segmentClock`. The 5 ms delta absorbs the truncated keyframe times'
- *   error. The last segment gets a time past the end, since an empty list
- *   would fall back to the muxer's two-second timer.
- * - A transcode forces a keyframe at every boundary from `from` on.
+ *   `segmentClock`, within `runCut`'s tolerance. The last segment gets a
+ *   time past the end, since an empty list would fall back to the muxer's
+ *   two-second timer.
  *
  * The muxer lists each file on stdout once it has closed it, which is how
  * the server knows a segment is whole.
@@ -432,6 +504,8 @@ export const hlsArgs = ({
   quality,
   bitrate,
   tonemap,
+  startTime,
+  frameRate,
   folder,
   segmentClock,
 }: {
@@ -450,6 +524,10 @@ export const hlsArgs = ({
   /** A ceiling on the transcode's video bitrate, when the viewer asked for a size. */
   bitrate: number | null
   tonemap: boolean
+  /** Where the file's clock begins, `format.start_time`, which a transcode seeks from. */
+  startTime: number
+  /** The video's frame rate, whose frames a transcode's plan is on; null when unknown. */
+  frameRate: number | null
   folder: string
   segmentClock: SegmentClock
 }): string[] => {
@@ -464,14 +542,11 @@ export const hlsArgs = ({
     mode === PLAYBACK_MODES.remux
       ? copyVideo(videoCodec)
       : transcodeVideo({ encoder, videoCodec, tonemap, maxHeight, quality, bitrate })
-  const keyframes =
-    mode === PLAYBACK_MODES.remux
-      ? []
-      : ['-force_key_frames', plan.boundaries.slice(from).map(secondsArg).join(',')]
+  const cut = runCut({ mode, plan, from, startTime, frameRate, segmentClock })
   return [
     ...QUIET,
     ...video.input,
-    ...(start > 0 ? ['-seek_timestamp', '1', '-ss', secondsArg(start)] : []),
+    ...cut.seek,
     '-copyts',
     '-i',
     input,
@@ -481,7 +556,7 @@ export const hlsArgs = ({
     '0:v:0',
     ...(audio == null ? [] : ['-map', `0:a:${audio.index}`]),
     ...video.output,
-    ...keyframes,
+    ...cut.video,
     ...(audio == null ? [] : hlsAudioArgs(audio)),
     '-sn',
     '-dn',
@@ -502,7 +577,7 @@ export const hlsArgs = ({
     '-segment_times',
     times.map(secondsArg).join(','),
     '-segment_time_delta',
-    '0.005',
+    String(cut.tolerance),
     '-segment_start_number',
     String(from),
     '-segment_list',

@@ -79,7 +79,7 @@ export const RUN_SIGNALS = { kill: 'SIGKILL', stop: 'SIGSTOP', resume: 'SIGCONT'
 /** What every run of a session encodes with: the file, and what the caller decided for it. */
 export type HlsEncoding = Omit<
   Parameters<typeof hlsArgs>[0],
-  'plan' | 'from' | 'mode' | 'audio' | 'folder' | 'segmentClock'
+  'plan' | 'from' | 'mode' | 'audio' | 'folder' | 'segmentClock' | 'startTime'
 >
 
 /** A minted session: what it plays, and the plan its playlist and its runs share. */
@@ -582,6 +582,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
         from,
         mode: entry.session.mode,
         audio: entry.audio,
+        startTime: entry.session.startTime,
         folder,
         segmentClock,
       }),

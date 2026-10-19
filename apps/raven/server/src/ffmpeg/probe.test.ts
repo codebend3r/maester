@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseProbe, startTimeOf } from '@/ffmpeg/probe'
+import { mediaClockOf, parseProbe } from '@/ffmpeg/probe'
 
 /** Trimmed from a real ffprobe run on a 4K HDR episode on the NAS. */
 const hdrEpisode = {
@@ -81,16 +81,35 @@ describe('parseProbe', () => {
   })
 })
 
-describe('startTimeOf', () => {
-  it("reads the format's start, before zero too, and is 0 when there is none", () => {
+describe('mediaClockOf', () => {
+  const video = { codec_type: 'video', start_time: '2.580000', r_frame_rate: '24000/1001' }
+  const audio = { codec_type: 'audio', start_time: '2.500000' }
+
+  it("reads the start, the video's first frame and its rate", () => {
     expect(
-      [
-        { format: { start_time: '2.500000' } },
-        { format: { start_time: '-0.023220' } },
-        { format: { start_time: 'N/A' } },
-        { format: {} },
-        null,
-      ].map(startTimeOf),
-    ).toEqual([2.5, -0.02322, 0, 0, 0])
+      mediaClockOf({
+        format: { format_name: 'mpegts', start_time: '11.375000', duration: '40.062500' },
+        streams: [audio, { ...video, start_time: '11.440000', r_frame_rate: '25/1' }],
+      }),
+    ).toEqual({ start: 11.375, end: 51.4375, videoStart: 11.44, frameRate: 25 })
+  })
+
+  it("takes Matroska's duration as its end, since it counts from 0", () => {
+    const clock = mediaClockOf({
+      format: { format_name: 'matroska,webm', start_time: '2.500000', duration: '14.501000' },
+      streams: [video, audio],
+    })
+    expect(clock).toMatchObject({ start: 2.5, end: 14.501, videoStart: 2.58 })
+    expect(clock.frameRate).toBeCloseTo(23.976, 3)
+  })
+
+  it('starts before zero, skips cover art, and knows nothing it is not told', () => {
+    expect(
+      mediaClockOf({
+        format: { start_time: '-0.023000' },
+        streams: [{ codec_type: 'video', disposition: { attached_pic: 1 }, start_time: '5' }],
+      }),
+    ).toEqual({ start: -0.023, end: null, videoStart: -0.023, frameRate: null })
+    expect(mediaClockOf(null)).toEqual({ start: 0, end: null, videoStart: 0, frameRate: null })
   })
 })

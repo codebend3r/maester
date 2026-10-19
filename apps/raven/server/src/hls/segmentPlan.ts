@@ -65,21 +65,29 @@ export const remuxPlan = ({
 }
 
 /**
- * Cuts a transcode every six seconds from `start`, where the file's own
- * clock begins: the encoder is told to put a keyframe at each.
+ * Cuts a transcode every six seconds from `start`, the video's first frame,
+ * each boundary moved to the nearest frame of `frameRate` after it: six
+ * seconds is not a whole number of frames at 23.976, and a cut between two
+ * frames lands on whichever one a run's own start rounds to. The encoder is
+ * told to put a keyframe at each boundary.
  */
 export const transcodePlan = ({
   start,
   duration,
+  frameRate,
 }: {
   start: number
   duration: number
+  frameRate: number | null
 }): SegmentPlan => {
-  const startMs = toMs(start)
   const durationMs = toMs(duration)
-  const count = Math.max(1, Math.ceil((durationMs - startMs) / SEGMENT_MS))
+  const count = Math.max(1, Math.ceil((durationMs - toMs(start)) / SEGMENT_MS))
+  const offset = (index: number): number =>
+    frameRate == null
+      ? index * HLS_SEGMENT_SECONDS
+      : Math.round(index * HLS_SEGMENT_SECONDS * frameRate) / frameRate
   return fromMs({
-    boundariesMs: Array.from({ length: count }, (_, index) => startMs + index * SEGMENT_MS),
+    boundariesMs: Array.from({ length: count }, (_, index) => toMs(start + offset(index))),
     durationMs,
   })
 }

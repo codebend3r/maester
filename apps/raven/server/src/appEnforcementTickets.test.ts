@@ -21,7 +21,6 @@ import {
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ACCOUNT_TICKET_PREFIX } from '@/auth/accountTickets'
-import { RAVEN_CONTENT_TYPES } from '@/http'
 import { ROUTE_METHODS, type RouteMethod, cookieSet } from '@/test/app'
 import { AUTH_TEST_IDS, authFixture } from '@/test/auth'
 import {
@@ -194,7 +193,7 @@ describe('account tickets on the media paths', () => {
       )}`,
     })
     expect(master.statusCode).toBe(200)
-    expect(master.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.m3u8)
+    expect(master.headers[HEADERS.contentType]).toBe(CONTENT_TYPES.m3u8)
     const carried = `${MEDIA_TICKET_PARAM}=${encodeURIComponent(ticket)}`
     const variant = master.body.split('\n').find((line) => line !== '' && !line.startsWith('#'))
     expect(variant).toContain(carried)

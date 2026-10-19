@@ -1687,7 +1687,7 @@ export const HLS_PATHS = {
   subtitleSegment: '/api/media/:id/hls/:session/subtitles/:trackId/:n',
 } as const
 
-/** The placeholder names in `HLS_PATHS` and the master playlist's query keys; every HLS URI also carries the `MEDIA_TICKET_PARAM`. */
+/** The placeholder names in `HLS_PATHS` and the master playlist's query keys. */
 export const HLS_PARAMS = {
   id: 'id',
   session: 'session',
@@ -1710,8 +1710,16 @@ export const HLS_IDLE_MS = 60_000
 /** How many of a session's latest segments stay on disk. */
 export const HLS_KEPT_SEGMENTS = 30
 
-/** The audio codecs an HLS stream copies; any other becomes E-AC-3. */
-export const HLS_COPY_AUDIO = ['aac', 'ac3', 'eac3', 'alac', 'flac'] as const
+/** ffprobe's names for the audio codecs an HLS stream copies; any other becomes E-AC-3. */
+export const HLS_COPY_AUDIO_CODECS = {
+  aac: 'aac',
+  ac3: 'ac3',
+  eac3: 'eac3',
+  alac: 'alac',
+  flac: 'flac',
+} as const
+
+export const HLS_COPY_AUDIO = Object.values(HLS_COPY_AUDIO_CODECS)
 
 /** A session id is 16 random bytes in base64url without padding. */
 export const isHlsSessionId = (value: unknown): value is string =>

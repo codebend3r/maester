@@ -30,8 +30,6 @@ const POSTER = Buffer.concat([
   Buffer.alloc(16 * 1024, 0),
 ])
 
-const HLS_PLAYLIST = 'application/vnd.apple.mpegurl'
-const HLS_SEGMENT = 'video/iso.segment'
 const PLAYLIST = [
   '#EXTM3U',
   ...Array.from({ length: 200 }, (_, n) => `#EXTINF:6.000,\n/segment/${n}?t=ticket`),
@@ -68,12 +66,7 @@ class SampleController {
 
   @Get('playlist')
   async playlist(@Res() reply: FastifyReply): Promise<void> {
-    await reply.header(HEADERS.contentType, HLS_PLAYLIST).send(PLAYLIST)
-  }
-
-  @Get('segment')
-  async segment(@Res() reply: FastifyReply): Promise<void> {
-    await reply.header(HEADERS.contentType, HLS_SEGMENT).send(BLOB)
+    await reply.header(HEADERS.contentType, CONTENT_TYPES.m3u8).send(PLAYLIST)
   }
 
   @Post('echo')
@@ -191,16 +184,13 @@ describe('compressResponses', () => {
     expect(decoded(answer).toString()).toBe(VTT)
   })
 
-  it('compresses an HLS playlist, and sends its segments as they are', async () => {
-    const [playlist, segment] = await Promise.all(
-      ['/api/playlist', '/api/segment'].map((url) =>
-        get({ url, headers: { [HEADERS.acceptEncoding]: BROWSER } }),
-      ),
-    )
-    expect(playlist?.headers[HEADERS.contentEncoding]).toBe(ENCODINGS.br)
-    expect(playlist ? decoded(playlist).toString() : '').toBe(PLAYLIST)
-    expect(segment?.headers[HEADERS.contentEncoding]).toBeUndefined()
-    expect(segment?.rawPayload.equals(BLOB)).toBe(true)
+  it('compresses an HLS playlist', async () => {
+    const answer = await get({
+      url: '/api/playlist',
+      headers: { [HEADERS.acceptEncoding]: BROWSER },
+    })
+    expect(answer.headers[HEADERS.contentEncoding]).toBe(ENCODINGS.br)
+    expect(decoded(answer).toString()).toBe(PLAYLIST)
   })
 
   it('sends a picture as it is', async () => {

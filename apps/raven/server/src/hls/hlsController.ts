@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common'
 import {
   type AudioTrack,
+  HLS_COPY_AUDIO_CODECS,
   HLS_PARAMS,
   HLS_PATHS,
   HLS_SEGMENT_SECONDS,
@@ -38,7 +39,7 @@ import { AccessRechecks } from '@/auth/accessRechecks'
 import { AuthSessions } from '@/auth/authSessions'
 import { VIDEO_CODECS, hlsAudioCodec, transcodeBitrate } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
-import { parseProbe, startTimeOf } from '@/ffmpeg/probe'
+import { mediaClockOf, parseProbe } from '@/ffmpeg/probe'
 import { type HlsSession, HlsSessions } from '@/hls/hlsSessions'
 import { KeyframesService } from '@/hls/keyframesService'
 import {
@@ -78,7 +79,7 @@ const routeOf = (path: HlsPath): string => path.slice(`/${MEDIA_ROUTES}/`.length
 const MPEG_TS_HZ = 90_000
 
 /** RFC 6381 names HLS players read differently from `MediaSource`, which `audioCodecString` serves. */
-const HLS_AUDIO_STRINGS: Readonly<Record<string, string>> = { flac: 'fLaC' }
+const HLS_AUDIO_STRINGS: Readonly<Record<string, string>> = { [HLS_COPY_AUDIO_CODECS.flac]: 'fLaC' }
 
 /**
  * An HLS path with its placeholders filled in, absolute, and carrying the
@@ -219,12 +220,11 @@ export class HlsController {
 
     const output = await this.ffmpeg.probeJson(file.path)
     const probe = parseProbe(output)
-    const duration = probe?.duration ?? file.duration
-    if (probe?.width == null || probe.height == null || duration == null) {
+    const clock = mediaClockOf(output)
+    const end = clock.end ?? (file.duration == null ? null : clock.start + file.duration)
+    if (probe?.width == null || probe.height == null || end == null) {
       throw new UnprocessableEntityException('This file has no picture of a known length to cut')
     }
-    const startTime = startTimeOf(output)
-    const end = startTime + duration
     const videoString = videoStringOf({ mode: streamMode, file, bitDepth: probe.videoBitDepth })
     if (videoString == null) {
       throw new ConflictException("HLS can't carry this video as it is; transcode it")
@@ -235,7 +235,7 @@ export class HlsController {
             keyframes: await this.keyframes.of({ id, path: file.path }),
             duration: end,
           })
-        : transcodePlan({ start: startTime, duration: end })
+        : transcodePlan({ start: clock.videoStart, duration: end, frameRate: clock.frameRate })
     if (!plan) {
       throw new ConflictException('Keyframes lie too far apart in this file to remux; transcode it')
     }
@@ -254,7 +254,7 @@ export class HlsController {
       audio: audioTrack,
       quality: sized?.key ?? null,
       plan,
-      startTime,
+      startTime: clock.start,
       encoding: {
         input: file.path,
         videoCodec: file.videoCodec,
@@ -263,6 +263,7 @@ export class HlsController {
         quality: playback.quality,
         bitrate,
         tonemap,
+        frameRate: clock.frameRate,
       },
     })
 
@@ -277,7 +278,7 @@ export class HlsController {
       resolution: streamMode === PLAYBACK_MODES.remux ? frame : scaledTo({ ...frame, maxHeight }),
       bandwidth:
         streamMode === PLAYBACK_MODES.remux
-          ? (probe.bitrate ?? Math.round((bytes * 8) / duration))
+          ? (probe.bitrate ?? Math.round((bytes * 8) / playlistLength(plan)))
           : transcodeBitrate({ quality: playback.quality, bitrate }),
     })
     await this.sendPlaylist({ reply, playlist })
@@ -448,7 +449,7 @@ export class HlsController {
   }): Promise<void> {
     // Each URI in it carries a ticket, and the session behind it ends.
     await reply
-      .header(HEADERS.contentType, RAVEN_CONTENT_TYPES.m3u8)
+      .header(HEADERS.contentType, CONTENT_TYPES.m3u8)
       .header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
       .send(playlist)
   }

@@ -28,10 +28,11 @@ import {
   RUN_SIGNALS,
   segmentsPastKeeping,
 } from '@/hls/hlsSessions'
+import { type MediaClock, mediaClockOf } from '@/ffmpeg/probe'
 import { MP4_BOXES, segmentFileName } from '@/hls/segmentFiles'
 import { type SegmentPlan, remuxPlan, transcodePlan } from '@/hls/segmentPlan'
 import { eventually, testConfig } from '@/test/app'
-import { encodeRichClip } from '@/test/clips'
+import { encodeClip, encodeRichClip } from '@/test/clips'
 
 const run = promisify(execFile)
 
@@ -304,6 +305,8 @@ describe('HlsSessions', () => {
     plan = state.plan,
     mode = PLAYBACK_MODES.remux,
     audio = state.audio,
+    startTime = 0,
+    frameRate = 24,
   }: {
     sessions: HlsSessions
     mediaId?: number
@@ -311,6 +314,8 @@ describe('HlsSessions', () => {
     plan?: SegmentPlan
     mode?: StreamMode
     audio?: AudioTrack | null
+    startTime?: number
+    frameRate?: number | null
   }): HlsSession =>
     sessions.mint({
       mediaId,
@@ -318,7 +323,7 @@ describe('HlsSessions', () => {
       audio,
       quality: null,
       plan,
-      startTime: 0,
+      startTime,
       encoding: {
         input,
         videoCodec: 'h264',
@@ -327,6 +332,7 @@ describe('HlsSessions', () => {
         quality: 'medium',
         bitrate: null,
         tonemap: false,
+        frameRate,
       },
     })
 
@@ -377,6 +383,68 @@ describe('HlsSessions', () => {
       path,
     ])
     expect(stdout.trim().split(',')[0]).toBe('eac3')
+  })
+
+  describe('a transcode at 23.976 whose picture starts after its sound', () => {
+    const ntsc: { path: string; plan: SegmentPlan; clock: MediaClock | null } = {
+      path: '',
+      plan: { boundaries: [], duration: 0 },
+      clock: null,
+    }
+
+    beforeAll(async () => {
+      ntsc.path = join(state.root, 'ntsc.mkv')
+      await encodeClip({ path: ntsc.path, seconds: 70, frameRate: '24000/1001', videoDelay: 0.125 })
+      const clock = mediaClockOf(await ffmpegFor(join(state.root, 'ntsc')).probeJson(ntsc.path))
+      ntsc.clock = clock
+      ntsc.plan = transcodePlan({
+        start: clock.videoStart,
+        duration: clock.end ?? 0,
+        frameRate: clock.frameRate,
+      })
+    })
+
+    /** Every segment from `from` to the end, asked for in turn, as ffprobe reads each. */
+    const segmentsFrom = async ({ sessions, from }: { sessions: HlsSessions; from: number }) => {
+      const session = mintIn({
+        sessions,
+        input: ntsc.path,
+        plan: ntsc.plan,
+        mode: PLAYBACK_MODES.transcode,
+        // The clip's one track, AAC like the commentary.
+        audio: state.audio && { ...state.audio, index: 0 },
+        startTime: ntsc.clock?.start ?? 0,
+        frameRate: ntsc.clock?.frameRate ?? null,
+      })
+      const numbers = Array.from({ length: ntsc.plan.boundaries.length - from }, (_, k) => from + k)
+      const media = await numbers.reduce<Promise<Uint8Array[]>>(
+        async (done, n) => [...(await done), await sessions.segment({ session: session.id, n })],
+        Promise.resolve([]),
+      )
+      const init = await sessions.init({ session: session.id })
+      const read = await Promise.all(media.map((bytes) => videoOf({ init, media: bytes })))
+      return new Map(read.map(({ count, firstPts }, k) => [from + k, { count, firstPts }]))
+    }
+
+    it('cuts the same segments from runs started at 0, 3 and 7, each on its boundary', async () => {
+      const { sessions } = open()
+      const [fromZero, fromThree, fromSeven] = await Promise.all(
+        [0, 3, 7].map((from) => segmentsFrom({ sessions, from })),
+      )
+
+      // The sound's start can move by an encoder's priming; the picture's cannot.
+      expect(ntsc.clock?.videoStart).toBeGreaterThan((ntsc.clock?.start ?? 0) + 0.1)
+      expect(ntsc.plan.boundaries.length).toBeGreaterThan(10)
+      ntsc.plan.boundaries.forEach((start, n) => {
+        expect(fromZero.get(n)?.firstPts).toBeCloseTo(start + STREAM_TIME_SHIFT, 2)
+      })
+      expect([...fromThree.entries()]).toEqual([...fromZero.entries()].filter(([n]) => n >= 3))
+      expect([...fromSeven.entries()]).toEqual([...fromZero.entries()].filter(([n]) => n >= 7))
+      // Six seconds at 24000/1001 is 143.856 frames: each segment is 143 or 144 of them.
+      ;[...fromZero.values()].slice(0, -1).forEach(({ count }) => {
+        expect([143, 144]).toContain(count)
+      })
+    })
   })
 
   it('cuts segment 0 then 1 from one run', async () => {
@@ -486,7 +554,7 @@ describe('HlsSessions', () => {
 
   it('cuts the same transcoded segment from any start', async () => {
     const { sessions } = open()
-    const plan = transcodePlan({ start: 0, duration: state.plan.duration })
+    const plan = transcodePlan({ start: 0, duration: state.plan.duration, frameRate: 24 })
     const fromZero = mintIn({ sessions, plan, mode: PLAYBACK_MODES.transcode })
     const fromFive = mintIn({ sessions, plan, mode: PLAYBACK_MODES.transcode })
     const zeroToSix = await [0, 1, 2, 3, 4, 5, 6].reduce<Promise<Uint8Array[]>>(
