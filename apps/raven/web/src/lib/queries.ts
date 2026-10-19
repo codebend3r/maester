@@ -159,10 +159,22 @@ export const nextEpisodeQuery = (showId: number) =>
     queryFn: () => api.nextEpisode(showId),
   })
 
+/** How long a person's page waits between asks while their filmography is on its way. */
+const FILMOGRAPHY_POLL_MS = 1_500
+
+/**
+ * A person, asked for again while the server says their filmography is
+ * `pending`, which is also its answer when its line of lookups is full.
+ * An ask can take the server 2.5 s to answer. A tick that comes round
+ * mid-flight gets the fetch already going rather than a second one, and
+ * the interval starts over once it settles, so asks never overlap.
+ */
 export const personQuery = (id: number | null) =>
   queryOptions({
     queryKey: queryKeys.person(id),
     queryFn: id == null ? skipToken : () => api.getPerson(id),
+    refetchInterval: (query) =>
+      query.state.data?.filmography.state === 'pending' ? FILMOGRAPHY_POLL_MS : false,
   })
 
 /** A search for Fix match, scored against `subject` and best first; an empty title asks for nothing. */
