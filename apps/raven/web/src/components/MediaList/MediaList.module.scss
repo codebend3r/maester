@@ -42,9 +42,15 @@
 }
 
 // The th stays a table cell so the columns size properly; its picture,
-// title, marks and resume line are laid out in here.
+// title, marks and resume line are laid out in here. The floor keeps the
+// title readable: when the columns' breakpoints below misjudge the room
+// (a wider font, a longer label), the table runs over rather than the
+// title wrapping a letter a line.
 .titleCell {
+  --title-floor: 16rem;
+
   display: grid;
+  min-inline-size: var(--title-floor);
   grid-template-columns: auto auto minmax(0, 1fr) auto;
   grid-template-rows: minmax(0, 1fr) auto;
   grid-template-areas:
@@ -125,21 +131,23 @@
   width: 1px;
 }
 
-// A Movies library's year and four scores take room the files' facts do
-// not, so its columns drop sooner.
-@container (max-width: 80rem) {
+// Each breakpoint is the title's floor plus what the columns still showing
+// take: a Movies library's year, scores and file facts come to about
+// 76rem, without the file facts 52rem, and any other library's facts come
+// to about 38rem. A column drops before it would eat into the title.
+@container (max-width: 92rem) {
   .movies .extra {
     display: none;
   }
 }
 
-@container (max-width: 56rem) {
+@container (max-width: 68rem) {
   .movies .roomy {
     display: none;
   }
 }
 
-@container (max-width: 48rem) {
+@container (max-width: 54rem) {
   .extra {
     display: none;
   }
@@ -153,5 +161,9 @@
   .poster,
   .frame {
     display: none;
+  }
+
+  .titleCell {
+    --title-floor: 10rem;
   }
 }
