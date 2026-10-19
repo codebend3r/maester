@@ -175,18 +175,19 @@ export class ItemsController {
   }
 
   /**
-   * A random episode of a show or a season, among the files in the libraries
-   * this browser may see, for its Shuffle button; null with none to play.
+   * The episodes of a show or a season in a random order, among the files in
+   * the libraries this browser may see, for its Shuffle button to play one
+   * after another; empty with none to play.
    */
-  @Get(':id/random')
-  random(
+  @Get(':id/shuffle')
+  shuffle(
     @Param('id', ParseIntPipe) id: number,
     @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
-  ): MediaItem | null {
+  ): MediaItem[] {
     this.requireItem(id)
     const viewer = this.lock.viewer({ cookie })
     const libraryIds = this.libraries.ids().filter((libraryId) => viewer.seesLibrary(libraryId))
-    return this.media.randomEpisode({ itemId: id, libraryIds })
+    return this.media.shuffledEpisodes({ itemId: id, libraryIds })
   }
 
   /** Fetches the item from TMDB again now. One TMDB no longer has is gone after, so 404. */

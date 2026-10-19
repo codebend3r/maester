@@ -3,6 +3,7 @@ import { type MediaTracks, PLAYBACK_MODES, type SubtitleTrack } from '@raven/cor
 import {
   aboutLine,
   audioPillLabel,
+  endsAtLabel,
   pictureLabel,
   qualityLabel,
   stepDownNote,
@@ -149,5 +150,25 @@ describe('stepDownNote', () => {
     expect(
       stepDownNote({ from: PLAYBACK_MODES.remux, delivery: { delivered: 800_000, needed: null } }),
     ).toBe('Switched to a transcode because the connection carried only 800 kb/s.')
+  })
+})
+
+describe('endsAtLabel', () => {
+  // 1:00 AM local time, formatted in the same zone.
+  const now = new Date(2026, 9, 19, 1, 0).getTime()
+  const at = (overrides: Partial<Parameters<typeof endsAtLabel>[0]>) =>
+    endsAtLabel({ now, time: 0, duration: 80 * 60, rate: 1, locale: 'en-US', ...overrides })
+
+  it('names the clock time the video ends', () => {
+    expect(at({})).toBe('Ends at 2:20 AM')
+    expect(at({ time: 20 * 60 })).toBe('Ends at 2:00 AM')
+  })
+
+  it('counts the speed', () => {
+    expect(at({ rate: 2 })).toBe('Ends at 1:40 AM')
+  })
+
+  it('says nothing while the length is unknown', () => {
+    expect(at({ duration: null })).toBeNull()
   })
 })

@@ -13,7 +13,7 @@ import { EPISODE_ONE, EPISODE_TWO, SEASON_ONE, SEVERANCE } from '@/test/tv'
 const Watching = () => <p>Watching {useParams().id}</p>
 
 describe('SeasonPage', () => {
-  const spies = { item: spyOn(api, 'getItem'), random: spyOn(api, 'randomEpisode') }
+  const spies = { item: spyOn(api, 'getItem'), random: spyOn(api, 'shuffleEpisodes') }
 
   const open = (route = '/shows/4/seasons/1') => {
     spies.item.mockImplementation(async (id) => {
@@ -57,7 +57,7 @@ describe('SeasonPage', () => {
   })
 
   it('plays a random episode of the season, or of the whole show, on Shuffle', async () => {
-    spies.random.mockImplementation(async (id) => (id === 5 ? EPISODE_ONE : EPISODE_TWO))
+    spies.random.mockImplementation(async (id) => (id === 5 ? [EPISODE_ONE] : [EPISODE_TWO]))
     open()
     await userEvent.click(await screen.findByRole('button', { name: 'Shuffle season' }))
     expect(await screen.findByText('Watching 12')).toBeInTheDocument()

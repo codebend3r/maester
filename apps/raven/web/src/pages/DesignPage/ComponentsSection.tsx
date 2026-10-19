@@ -84,6 +84,11 @@ const ControlsDemo = () => {
           }}
           menuOpen={false}
           settingsButton={settingsButton}
+          upNext="Tears of Steel (2012)"
+          countdown={null}
+          endsAt="Ends at 2:20 AM"
+          onRestart={noop}
+          onNext={noop}
           onTogglePlay={() => setPaused((current) => !current)}
           onSeek={noop}
           onSkip={noop}

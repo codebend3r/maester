@@ -76,3 +76,13 @@ export const useLeaveFullscreen = (): void =>
     },
     [],
   )
+
+/** The time now, read again every `ms`, for a clock on the page that needs no finer step. */
+export const useNow = (ms: number): number => {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), ms)
+    return () => window.clearInterval(timer)
+  }, [ms])
+  return now
+}

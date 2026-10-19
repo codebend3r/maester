@@ -1,3 +1,5 @@
+import { shuffled } from '@raven/core'
+
 /**
  * mulberry32: a small seeded generator, so a seed always deals the same
  * sequence. Not for anything that needs to be unguessable.
@@ -13,10 +15,5 @@ const generator = (seed: number): (() => number) => {
 }
 
 /** The items in an order fixed by `seed`: the same seed and items always give the same order. */
-export const shuffle = <T>({ items, seed }: { items: readonly T[]; seed: number }): T[] => {
-  const next = generator(seed)
-  return items
-    .map((item) => ({ item, rank: next() }))
-    .toSorted((a, b) => a.rank - b.rank)
-    .map(({ item }) => item)
-}
+export const shuffle = <T>({ items, seed }: { items: readonly T[]; seed: number }): T[] =>
+  shuffled({ items, roll: generator(seed) })

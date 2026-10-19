@@ -346,7 +346,7 @@ describe('ServerPage', () => {
       },
       state: { at: 0, next: [8] },
     })
-    expect(await screen.findByRole('link', { name: 'Next: Episode 2' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Up next: Episode 2' })).toHaveAttribute(
       'href',
       `/server/${S}/8`,
     )
@@ -363,7 +363,7 @@ describe('ServerPage', () => {
         'error',
       ),
     )
-    expect(screen.queryByRole('link', { name: /^Next/ })).toBeNull()
+    expect(screen.queryByRole('link', { name: /^Up next/ })).toBeNull()
   })
 
   it('replaces the entry with the next title when the menu says next', async () => {
@@ -374,7 +374,7 @@ describe('ServerPage', () => {
       },
       state: { at: 0, next: [8, 9] },
     })
-    await screen.findByRole('link', { name: 'Next: Episode 2' })
+    await screen.findByRole('link', { name: 'Up next: Episode 2' })
     await loaded({ fake })
     await act(async () => menu.emit('next'))
     await waitFor(() => expect(router.state.location.pathname).toBe(`/server/${S}/8`))
@@ -467,7 +467,7 @@ describe('ServerPage', () => {
     await act(async () =>
       next.resolve(reply({ body: mediaItemFor({ id: 8, title: 'Episode 2' }) })),
     )
-    await screen.findByRole('link', { name: 'Next: Episode 2' })
+    await screen.findByRole('link', { name: 'Up next: Episode 2' })
     await act(async () => router.navigate('/'))
     const notes = sentOfType({ client, type: 'noteServerTitle' })
     expect(notes.at(-1)).toMatchObject({ type: 'noteServerTitle', watched: 0.4 })

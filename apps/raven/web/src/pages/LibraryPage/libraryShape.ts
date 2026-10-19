@@ -2,8 +2,10 @@ import {
   LIBRARY_VIEWS,
   type LibrarySettings,
   type MediaItem,
+  SHUFFLE_LENGTH,
   type ShowEntry,
   groupMedia,
+  shuffled,
 } from '@raven/core'
 
 /** A library's listing: its shows (none outside a TV library), then the files listed as files. */
@@ -22,8 +24,10 @@ export const NOTHING_LISTED: Listing = { shows: [], files: [] }
 
 /**
  * What Play and Shuffle start: a show's next episode first, then the files
- * in the order the page shows them. The settings are coherent with the
- * library's type, so a grouped view is one its type can show.
+ * in the order the page shows them. Shuffle deals every show's next episode
+ * and every file, and lines up `SHUFFLE_LENGTH` of them to play one after
+ * another. The settings are coherent with the library's type, so a grouped
+ * view is one its type can show.
  */
 export const playQueue = ({
   settings,
@@ -34,7 +38,7 @@ export const playQueue = ({
 }): {
   playable: boolean
   first: () => MediaItem | undefined
-  random: () => MediaItem | undefined
+  shuffled: () => MediaItem[]
 } => {
   const nextEpisodes = listing.shows.flatMap((entry) => entry.next ?? [])
   const shownFiles =
@@ -45,6 +49,6 @@ export const playQueue = ({
   return {
     playable: choices.length > 0,
     first: () => nextEpisodes.at(0) ?? shownFiles.at(0),
-    random: () => choices.at(Math.floor(Math.random() * choices.length)),
+    shuffled: () => shuffled({ items: choices }).slice(0, SHUFFLE_LENGTH),
   }
 }

@@ -277,7 +277,8 @@ describe('LibraryPage', () => {
   it('shuffles to a random video whatever the sort', async () => {
     serve({ settings: { sort: 'title' } })
     await screen.findByRole('link', { name: 'Wide' })
-    const random = spyOn(Math, 'random').mockReturnValue(0.9)
+    // Each video drops in first, so the shuffle deals the listing backwards.
+    const random = spyOn(Math, 'random').mockReturnValue(0)
     await userEvent.click(screen.getByRole('button', { name: 'Shuffle' }))
     random.mockRestore()
     expect(await screen.findByText('Watching 3')).toBeInTheDocument()

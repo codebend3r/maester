@@ -184,12 +184,27 @@
   }
 }
 
-// What plays next, when the video came with more to play after it.
+// What plays next, when the video came with more to play after it: a pill
+// naming it after a softer "Up next". On a phone "Up next" alone stays, so
+// the playing video's title keeps the room.
 .next {
   @include glass-button;
 
   grid-area: next;
+  grid-template-columns: auto auto minmax(0, max-content);
+  max-width: 22rem;
   border-radius: var(--radius-pill);
+}
+
+.nextLead {
+  color: var(--color-on-picture-soft);
+}
+
+.nextLabel {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .title {
@@ -243,6 +258,10 @@
   .favourite {
     min-width: var(--field-size);
     min-height: var(--field-size);
+  }
+
+  .nextLabel {
+    display: none;
   }
 
   .title {

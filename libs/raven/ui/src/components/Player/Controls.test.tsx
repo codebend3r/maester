@@ -16,6 +16,11 @@ const props = (overrides: Partial<ControlsProps> = {}): ControlsProps => ({
   subtitlesOn: true,
   menuOpen: false,
   settingsButton: createRef<HTMLButtonElement>(),
+  upNext: 'Busboys 2 (2027)',
+  countdown: null,
+  endsAt: 'Ends at 2:20 AM',
+  onRestart: () => {},
+  onNext: () => {},
   onTogglePlay: () => {},
   onSeek: () => {},
   onSkip: () => {},
@@ -27,6 +32,49 @@ const props = (overrides: Partial<ControlsProps> = {}): ControlsProps => ({
 })
 
 describe('Controls', () => {
+  it('runs the transport in order: start, back, play, forward, next', () => {
+    render(<Controls {...props()} />)
+    const names = screen
+      .getAllByRole('button')
+      .slice(0, 5)
+      .map((button) => button.getAttribute('aria-label'))
+    expect(names).toEqual([
+      'Back to the start (Home)',
+      'Back 10 seconds (j)',
+      'Play (k)',
+      'Forward 10 seconds (l)',
+      'Next: Busboys 2 (2027)',
+    ])
+  })
+
+  it('goes back to the start and on to what is up next', async () => {
+    const onRestart = mock(() => {})
+    const onNext = mock(() => {})
+    render(<Controls {...props({ onRestart, onNext })} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Back to the start (Home)' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Next: Busboys 2 (2027)' }))
+    expect(onRestart).toHaveBeenCalledTimes(1)
+    expect(onNext).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps Next on the bar with nothing up next, unable to press', () => {
+    render(<Controls {...props({ upNext: null })} />)
+    expect(screen.getByRole('button', { name: 'Nothing up next' })).toBeDisabled()
+  })
+
+  it('shows the time played beside the timeline and when the video ends', () => {
+    render(<Controls {...props()} />)
+    expect(screen.getByText('40:00')).toBeInTheDocument()
+    expect(screen.getByText('Ends at 2:20 AM')).toBeInTheDocument()
+  })
+
+  it('fills the ring only while the countdown runs', () => {
+    const { container, rerender } = render(<Controls {...props()} />)
+    expect(container.querySelector('[data-countdown]')).toBeNull()
+    rerender(<Controls {...props({ countdown: 0.25 })} />)
+    expect(container.querySelector('[data-countdown]')).toHaveAttribute('stroke-dashoffset', '0.75')
+  })
+
   it('names each pill alone when the host says nothing of what it is set to', () => {
     render(<Controls {...props()} />)
     expect(screen.getByRole('button', { name: 'Subtitles: On' })).toHaveTextContent(
@@ -34,8 +82,6 @@ describe('Controls', () => {
     )
     expect(screen.getByRole('button', { name: 'Audio' })).toHaveTextContent(/^Audio$/)
     expect(screen.getByRole('button', { name: 'Playback' })).toHaveTextContent(/^Playback$/)
-    expect(screen.getByText('40:00')).toBeInTheDocument()
-    expect(screen.getByText('/ 1:42:00')).toBeInTheDocument()
   })
 
   it('opens a pill’s menu, and lends the open pill the host’s button ref', async () => {

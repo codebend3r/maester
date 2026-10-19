@@ -282,17 +282,16 @@ describe('marking videos watched', () => {
     expect((await api(unlocked).nextEpisode(item('Mixed')))?.id).toBe(id('Mixed S01E01.mp4'))
   })
 
-  it('picks a random episode among the libraries the browser may see only', async () => {
+  it('shuffles the episodes among the libraries the browser may see only', async () => {
     const pin = await unlock()
     const unlocked = cookies(state.admin, pin)
-    const rolls = Array.from({ length: 12 }, () => undefined)
-    const locked = await Promise.all(rolls.map(() => api().randomEpisode(item('Mixed'))))
-    expect(new Set(locked.map((media) => media?.id))).toEqual(new Set([id('Mixed S01E02.mp4')]))
-    const open = await Promise.all(rolls.map(() => api(unlocked).randomEpisode(item('Mixed'))))
-    open.forEach((media) =>
-      expect([id('Mixed S01E01.mp4'), id('Mixed S01E02.mp4')]).toContain(media?.id),
+    const dealt = (list: readonly { id: number }[]) =>
+      list.map((media) => media.id).toSorted((a, b) => a - b)
+    expect(dealt(await api().shuffleEpisodes(item('Mixed')))).toEqual([id('Mixed S01E02.mp4')])
+    expect(dealt(await api(unlocked).shuffleEpisodes(item('Mixed')))).toEqual(
+      [id('Mixed S01E01.mp4'), id('Mixed S01E02.mp4')].toSorted((a, b) => a - b),
     )
-    expect(await api().randomEpisode(item('Heat (1995)'))).toBeNull()
+    expect(await api().shuffleEpisodes(item('Heat (1995)'))).toEqual([])
   })
 
   it('counts only the libraries the browser may see', async () => {

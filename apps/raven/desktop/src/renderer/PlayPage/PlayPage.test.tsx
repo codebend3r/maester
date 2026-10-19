@@ -135,7 +135,7 @@ describe('PlayPage', () => {
   it('links the next video', async () => {
     renderDesktop({ client: fakeClient({ request: clips }), route: `/play/${A}` })
     await videoElement()
-    expect(screen.getByRole('link', { name: 'Next: Clip 02' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Up next: Clip 02' })).toHaveAttribute(
       'href',
       `/play/${B}`,
     )

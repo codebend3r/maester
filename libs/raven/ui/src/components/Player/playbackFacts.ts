@@ -125,3 +125,27 @@ export const stepDownNote = ({ from, delivery }: StepDown): string => {
     ? `Switched to a transcode because the connection carried only ${carried}.`
     : `Switched to a transcode because the connection carried ${carried} and ${MODE_NOUNS[from]} needs ${needed}.`
 }
+
+/**
+ * "Ends at 2:20 AM": the clock time the video ends at `rate`, from `now`;
+ * null while its length is unknown. `locale` is the browser's unless a test
+ * names one.
+ */
+export const endsAtLabel = ({
+  now,
+  time,
+  duration,
+  rate,
+  locale,
+}: {
+  now: number
+  time: number
+  duration: number | null
+  rate: number
+  locale?: string
+}): string | null => {
+  if (duration == null || rate <= 0) return null
+  const remaining = Math.max(0, duration - time) / rate
+  const clock = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' })
+  return `Ends at ${clock.format(now + remaining * 1_000)}`
+}

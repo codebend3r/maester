@@ -686,10 +686,10 @@ describe('the metadata calls', () => {
     expect(calls[0]?.url).toBe('http://nas:8484/api/items/4/next')
   })
 
-  it('asks for a random episode of a show or a season, which may be none', async () => {
-    const { client, calls } = clientReturning(respond({ body: null }))
-    await expect(client.randomEpisode(5)).resolves.toBeNull()
-    expect(calls[0]?.url).toBe('http://nas:8484/api/items/5/random')
+  it('asks for the episodes of a show or a season in a random order, which may be none', async () => {
+    const { client, calls } = clientReturning(respond({ body: [] }))
+    await expect(client.shuffleEpisodes(5)).resolves.toEqual([])
+    expect(calls[0]?.url).toBe('http://nas:8484/api/items/5/shuffle')
   })
 
   it("re-points a show's files", async () => {

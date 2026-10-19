@@ -6,6 +6,7 @@ import {
   itemPath,
   libraryFiles,
   queryId,
+  queueLink,
   readWatchState,
   watchLink,
 } from '@/lib/itemLinks'
@@ -38,13 +39,39 @@ describe('episodeBackPath', () => {
 describe('watchLink', () => {
   it('hands the video over in router state, with nothing to play after it', () => {
     const media = mediaItem({ id: 9 })
-    expect(watchLink({ media })).toEqual({ to: '/watch/9', state: { media, upNext: [] } })
+    expect(watchLink({ media })).toEqual({
+      to: '/watch/9',
+      state: { media, upNext: [], isShuffled: false },
+    })
   })
 
   it('hands over the videos to play after it, in turn', () => {
     const media = mediaItem({ id: 9 })
     const upNext = [mediaItem({ id: 10 }), mediaItem({ id: 11 })]
-    expect(watchLink({ media, upNext })).toEqual({ to: '/watch/9', state: { media, upNext } })
+    expect(watchLink({ media, upNext })).toEqual({
+      to: '/watch/9',
+      state: { media, upNext, isShuffled: false },
+    })
+  })
+
+  it('marks videos a shuffle dealt', () => {
+    const media = mediaItem({ id: 9 })
+    expect(watchLink({ media, isShuffled: true }).state.isShuffled).toBe(true)
+  })
+})
+
+describe('queueLink', () => {
+  it('plays the first of a queue, with the rest after it', () => {
+    const first = mediaItem({ id: 9 })
+    const rest = [mediaItem({ id: 10 }), mediaItem({ id: 11 })]
+    expect(queueLink({ queue: [first, ...rest] })).toEqual({
+      to: '/watch/9',
+      state: { media: first, upNext: rest, isShuffled: false },
+    })
+  })
+
+  it('has nothing to play from an empty queue', () => {
+    expect(queueLink({ queue: [], isShuffled: true })).toBeNull()
   })
 })
 
@@ -55,9 +82,10 @@ describe('readWatchState', () => {
     expect(readWatchState({ state, id: 10 })).toBeNull()
   })
 
-  it('reads nothing from a direct visit, or state from before the queue', () => {
+  it('reads nothing from a direct visit, or state from before the queue or the shuffle', () => {
     expect(readWatchState({ state: null, id: 9 })).toBeNull()
     expect(readWatchState({ state: { media: mediaItem({ id: 9 }) }, id: 9 })).toBeNull()
+    expect(readWatchState({ state: { media: mediaItem({ id: 9 }), upNext: [] }, id: 9 })).toBeNull()
   })
 })
 

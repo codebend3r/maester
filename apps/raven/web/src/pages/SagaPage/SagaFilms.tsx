@@ -57,17 +57,19 @@ const filmFacts = (media: MediaItem): string[] => {
 /**
  * One movie of the saga on a row: its place in the order in large serif
  * figures (dim once watched), its poster, title, facts and score, whether
- * it is watched or up next, and a round button that plays it. The title opens
- * its page; a right click opens its menu; in select mode a click anywhere
- * on the row selects it.
+ * it is watched or up next, and a round button that plays it and then the
+ * saga's movies after it, `later`. The title opens its page; a right click
+ * opens its menu; in select mode a click anywhere on the row selects it.
  */
 const SagaFilm = ({
   media,
+  later,
   place,
   standing,
   ratingsSource,
 }: {
   media: MediaItem
+  later: MediaItem[]
   place: number
   standing: Standing
   ratingsSource: RatingSource
@@ -131,7 +133,11 @@ const SagaFilm = ({
       {tag && <span className={`${styles.tag} ${tag.className}`}>{tag.label}</span>}
       <span className={styles.end}>
         {hasPage && !select.selecting && (
-          <CardLink {...watchLink({ media })} className={styles.play} aria-label={`Play ${title}`}>
+          <CardLink
+            {...watchLink({ media, upNext: later })}
+            className={styles.play}
+            aria-label={`Play ${title}`}
+          >
             <Icon name="play" size={14} />
           </CardLink>
         )}
@@ -159,6 +165,7 @@ export const SagaFilms = ({
         <SagaFilm
           key={each.id}
           media={each}
+          later={media.slice(index + 1)}
           place={index + 1}
           standing={standing[index] ?? STANDINGS.later}
           ratingsSource={ratingsSource}
