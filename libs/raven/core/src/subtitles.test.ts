@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   activeCues,
   cueRuns,
+  formatWebVtt,
   mergeCues,
   parseWebVtt,
   subtitleWindowRange,
@@ -111,5 +112,45 @@ describe('cueRuns', () => {
 
   it('survives an unbalanced closing tag', () => {
     expect(cueRuns('</i>fine')).toEqual([{ ...plain, text: 'fine' }])
+  })
+})
+
+describe('formatWebVtt', () => {
+  const cues = [
+    { start: 1.5, end: 3, text: 'First' },
+    { start: 3599.9, end: 3601.25, text: 'Across the hour\nin two lines' },
+    { start: 7322.004, end: 7323, text: '<i>Last</i>' },
+  ]
+
+  it('round-trips its cues through parseWebVtt', () => {
+    expect(parseWebVtt(formatWebVtt({ cues, timestampMap: null }))).toEqual(cues)
+  })
+
+  it('writes the header, a blank line, then each cue', () => {
+    expect(formatWebVtt({ cues: cues.slice(0, 1), timestampMap: null })).toBe(
+      'WEBVTT\n\n00:00:01.500 --> 00:00:03.000\nFirst\n\n',
+    )
+  })
+
+  it('writes the timestamp map on the second line', () => {
+    const lines = formatWebVtt({ cues, timestampMap: { mpegts: 90_000, local: 0 } }).split('\n')
+    expect(lines.slice(0, 3)).toEqual([
+      'WEBVTT',
+      'X-TIMESTAMP-MAP=MPEGTS:90000,LOCAL:00:00:00.000',
+      '',
+    ])
+    expect(parseWebVtt(lines.join('\n'))).toEqual(cues)
+  })
+
+  it('writes a map for a segment with no cues', () => {
+    expect(formatWebVtt({ cues: [], timestampMap: { mpegts: 90_000, local: 0 } })).toBe(
+      'WEBVTT\nX-TIMESTAMP-MAP=MPEGTS:90000,LOCAL:00:00:00.000\n\n',
+    )
+  })
+
+  it('formats the local time of the map', () => {
+    expect(formatWebVtt({ cues: [], timestampMap: { mpegts: 0, local: 3661.5 } })).toContain(
+      'LOCAL:01:01:01.500',
+    )
   })
 })

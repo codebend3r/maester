@@ -8,6 +8,13 @@ import {
   isBugReportStatusChange,
   isPlaybackDiagnostics,
   DEFAULT_SAGA_BACKDROP,
+  HLS_COPY_AUDIO,
+  HLS_IDLE_MS,
+  HLS_KEPT_SEGMENTS,
+  HLS_MAX_KEYFRAME_GAP_SECONDS,
+  HLS_PATHS,
+  HLS_SEGMENT_SECONDS,
+  isHlsSessionId,
   MEDIA_PROBE_BYTES,
   MEDIA_TICKET_REFRESH_SECONDS,
   MEDIA_TICKET_SECONDS,
@@ -832,5 +839,30 @@ describe('the bug report guards', () => {
     )
     expect(isBugReport({ ...bugReport(), diagnostics: 'text' })).toBe(false)
     expect(isBugReport({ ...bugReport(), reporter: { accountId: 'local' } })).toBe(false)
+  })
+})
+
+describe('the HLS contract', () => {
+  it('names the routes with placeholders the client fills', () => {
+    expect(HLS_PATHS.master).toBe('/api/media/:id/hls/master.m3u8')
+    expect(HLS_PATHS.subtitleSegment).toBe('/api/media/:id/hls/:session/subtitles/:trackId/:n')
+  })
+
+  it("holds the spike's values", () => {
+    expect(HLS_SEGMENT_SECONDS).toBe(6)
+    expect(HLS_MAX_KEYFRAME_GAP_SECONDS).toBe(20)
+    expect(HLS_IDLE_MS).toBe(60_000)
+    expect(HLS_KEPT_SEGMENTS).toBe(30)
+    expect(HLS_COPY_AUDIO).toEqual(['aac', 'ac3', 'eac3', 'alac', 'flac'])
+  })
+
+  it('takes a session id of 22 base64url characters', () => {
+    expect(isHlsSessionId('AAAAAAAAAAAAAAAAAAAAAA')).toBe(true)
+    expect(isHlsSessionId('a-_Z09a-_Z09a-_Z09a-_Z')).toBe(true)
+    expect(isHlsSessionId('AAAAAAAAAAAAAAAAAAAAA')).toBe(false)
+    expect(isHlsSessionId('AAAAAAAAAAAAAAAAAAAAAAA')).toBe(false)
+    expect(isHlsSessionId('AAAAAAAAAAAAAAAAAAAAA=')).toBe(false)
+    expect(isHlsSessionId('../AAAAAAAAAAAAAAAAAAA')).toBe(false)
+    expect(isHlsSessionId(7)).toBe(false)
   })
 })

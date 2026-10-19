@@ -1677,6 +1677,46 @@ export const MEDIA_TICKET_SECONDS = 21_600
 /** How long an account ticket is valid, at most: it never outlives the token it was minted with. */
 export const ACCOUNT_TICKET_SECONDS = 300
 
+/** The HLS routes, with the same `:name` placeholders the client fills in. */
+export const HLS_PATHS = {
+  master: '/api/media/:id/hls/master.m3u8',
+  video: '/api/media/:id/hls/:session/video.m3u8',
+  init: '/api/media/:id/hls/:session/init',
+  segment: '/api/media/:id/hls/:session/segment/:n',
+  subtitles: '/api/media/:id/hls/:session/subtitles/:trackId',
+  subtitleSegment: '/api/media/:id/hls/:session/subtitles/:trackId/:n',
+} as const
+
+/** The placeholder names in `HLS_PATHS` and the master playlist's query keys. */
+export const HLS_PARAMS = {
+  id: 'id',
+  session: 'session',
+  n: 'n',
+  trackId: 'trackId',
+  mode: 'mode',
+  audio: 'audio',
+  quality: 'quality',
+} as const
+
+/** How long a segment lasts, in seconds; a remux stretches it to the next keyframe. */
+export const HLS_SEGMENT_SECONDS = 6
+
+/** The longest stretch between two keyframes a remux accepts, in seconds. */
+export const HLS_MAX_KEYFRAME_GAP_SECONDS = 20
+
+/** How long a session may go unasked before the server drops it, in milliseconds. */
+export const HLS_IDLE_MS = 60_000
+
+/** How many of a session's latest segments stay on disk. */
+export const HLS_KEPT_SEGMENTS = 30
+
+/** The audio codecs an HLS stream copies; any other becomes E-AC-3. */
+export const HLS_COPY_AUDIO = ['aac', 'ac3', 'eac3', 'alac', 'flac'] as const
+
+/** A session id is 16 random bytes in base64url without padding. */
+export const isHlsSessionId = (value: unknown): value is string =>
+  isString(value) && /^[A-Za-z0-9_-]{22}$/.test(value)
+
 /**
  * A video the server is sending to one browser or device right now, as the
  * admin's Streams page lists it. `browser` and `device` are read from the
