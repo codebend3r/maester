@@ -8,6 +8,7 @@ import {
   type SplitHow,
   canSplitByCut,
   cardTitle,
+  plural,
 } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
@@ -19,7 +20,6 @@ import { afterSplit } from '@/lib/invalidate'
 import { versionFacts } from '@/lib/itemFacts'
 import { cardLink, inLibrary } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
-import { plural } from '@/lib/plural'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/components/Duplicates/Duplicates.module.scss'
 

@@ -3,6 +3,7 @@ import {
   type RatingSource,
   cardTitle,
   formatRuntime,
+  mediaEntryKey,
   pickScore,
   resolutionLabel,
 } from '@raven/core'
@@ -16,7 +17,6 @@ import { PosterFrame } from '@/components/PosterCard/PosterCard'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { PartlyWatched } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
-import { mediaEntryKey } from '@/lib/entryKeys'
 import { cardLink, watchLink } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import { useSelectable } from '@/lib/useSelectable'

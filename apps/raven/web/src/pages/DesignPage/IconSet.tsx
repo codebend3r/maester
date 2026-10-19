@@ -1,8 +1,7 @@
-import { isLibraryIconName } from '@raven/core'
+import { isLibraryIconName, plural } from '@raven/core'
 import { useEffect, useState } from 'react'
 import { ICON_NAMES, Icon, type IconName } from '@raven/ui'
 import { copyText } from '@/lib/clipboard'
-import { plural } from '@/lib/plural'
 import styles from '@/pages/DesignPage/IconSet.module.scss'
 
 /** The player's own icons, grouped apart from the app's. */

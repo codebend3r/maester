@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
+import { sagaPath } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { Link } from 'react-router-dom'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { POSTER_SIZES } from '@/lib/posters'
 import { sagasQuery } from '@/lib/queries'
-import { sagaPath } from '@/lib/sagas'
 import styles from '@/components/SagaLink/SagaLink.module.scss'
 
 /** The most posters the card fans; a longer saga shows its first few. */

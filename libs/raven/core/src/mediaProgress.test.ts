@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { progressOf, timeLeftOf } from '@/lib/mediaProgress'
+import { progressOf, timeLeftOf } from '@/mediaProgress'
 import { mediaItem } from '@/test/fixtures'
 
 describe('progressOf', () => {

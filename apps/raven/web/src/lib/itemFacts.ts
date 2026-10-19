@@ -7,11 +7,11 @@ import {
   formatBytes,
   formatChannels,
   formatRuntime,
+  languageName,
+  plural,
   resolutionLabel,
 } from '@raven/core'
 import { showYears } from '@/lib/itemLinks'
-import { plural } from '@/lib/plural'
-import { languageName } from '@raven/core'
 
 const present = (facts: ReadonlyArray<string | null>): string[] =>
   facts.filter((fact): fact is string => fact != null)

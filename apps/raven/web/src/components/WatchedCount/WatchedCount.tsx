@@ -1,6 +1,5 @@
-import { WATCHED_STATES, watchedStateOf } from '@raven/core'
+import { WATCHED_STATES, plural, watchedStateOf } from '@raven/core'
 import { Icon } from '@raven/ui'
-import { plural } from '@/lib/plural'
 import styles from '@/components/WatchedCount/WatchedCount.module.scss'
 
 type Counted = {

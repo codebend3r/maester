@@ -1,12 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { MediaItem } from '@raven/core'
+import { type MediaItem, plural } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { api } from '@/lib/api'
 import { afterSplit } from '@/lib/invalidate'
 import { cardLink } from '@/lib/itemLinks'
-import { plural } from '@/lib/plural'
 import styles from '@/components/MovieFiles/MovieFiles.module.scss'
 
 /** The movie's other cards in the library, each with its files, best first. */

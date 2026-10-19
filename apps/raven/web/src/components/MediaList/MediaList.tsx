@@ -7,6 +7,7 @@ import {
   formatBitrate,
   formatBytes,
   formatRuntime,
+  mediaEntryKey,
   resolutionLabel,
   sortTitle,
 } from '@raven/core'
@@ -23,7 +24,6 @@ import { api } from '@/lib/api'
 import { cardLink } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import { type SortColumn, useTableSort } from '@/lib/tableSort'
-import { mediaEntryKey } from '@/lib/entryKeys'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/MediaList/MediaList.module.scss'
 

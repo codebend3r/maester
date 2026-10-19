@@ -7,11 +7,11 @@ import {
   type ShowEntry,
   cardTitle,
   formatRuntime,
+  plural,
   resolutionLabel,
 } from '@raven/core'
 import { api } from '@/lib/api'
 import { type AppPath, type WatchState, cardLink, showYears, watchLink } from '@/lib/itemLinks'
-import { plural } from '@/lib/plural'
 
 /** How many arrivals home's hero takes turns with. */
 export const FEATURED_COUNT = 5

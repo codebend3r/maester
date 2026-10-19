@@ -7,6 +7,7 @@ import {
   codecLabel,
   formatBytes,
   formatRuntime,
+  mediaEntryKey,
   mediaLabel,
   resolutionLabel,
   sortFact,
@@ -24,7 +25,6 @@ import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
 import { cardLink } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
-import { mediaEntryKey } from '@/lib/entryKeys'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/MediaTiles/MediaTiles.module.scss'
 

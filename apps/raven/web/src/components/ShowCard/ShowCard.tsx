@@ -6,6 +6,7 @@ import {
   WATCHED_STATES,
   episodeCode,
   pickScore,
+  showEntryKey,
   showSortFact,
   watchedStateOf,
 } from '@raven/core'
@@ -20,7 +21,6 @@ import { WatchedCount, WatchedCountWords } from '@/components/WatchedCount/Watch
 import { api } from '@/lib/api'
 import { showYears } from '@/lib/itemLinks'
 import { POSTER_SIZES, type PosterSizes, posterSources } from '@/lib/posters'
-import { showEntryKey } from '@/lib/entryKeys'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/ShowCard/ShowCard.module.scss'

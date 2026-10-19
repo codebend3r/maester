@@ -8,6 +8,7 @@ import {
   TITLE_DISPLAYS,
   formatDuration,
   formatRuntime,
+  progressOf,
 } from '@raven/core'
 import { useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -38,7 +39,6 @@ import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
 import { directedBy, episodeByline, episodeFacts, movieFacts } from '@/lib/itemFacts'
 import { episodeBackPath, inLibrary, itemPath, watchLink } from '@/lib/itemLinks'
-import { progressOf } from '@/lib/mediaProgress'
 import { displaySettingsQuery, itemQuery, librariesQuery, tracksQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
 import { useCanFavourite } from '@/lib/useCanFavourite'

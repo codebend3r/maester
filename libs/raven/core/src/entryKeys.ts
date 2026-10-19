@@ -1,4 +1,4 @@
-import type { EpisodeSummary, ItemSummary, MediaItem, Saga, SeasonSummary } from '@raven/core'
+import type { EpisodeSummary, ItemSummary, MediaItem, Saga, SeasonSummary } from '@/contract'
 
 /** How a card names its entry, as `data-entry`: the jump strip and select mode find it by this. */
 export const mediaEntryKey = (media: MediaItem): string => `media:${media.id}`

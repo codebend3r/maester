@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import type { HistoryEntry } from '@raven/core'
-import { finishedNote, historyDays, historyNote } from '@/lib/history'
+import type { HistoryEntry } from '@/contract'
+import { finishedNote, historyDays, historyNote } from '@/history'
 import { mediaItem } from '@/test/fixtures'
 
 const entry = ({

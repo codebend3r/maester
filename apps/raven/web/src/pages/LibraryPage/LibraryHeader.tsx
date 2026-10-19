@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Library } from '@raven/core'
+import { KINDS, type Library } from '@raven/core'
 import { Button } from '@raven/ui'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { LibraryActions, type useLibraryActions } from '@/components/LibraryActions/LibraryActions'
@@ -7,7 +7,6 @@ import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { RatingsStatus } from '@/components/RatingsStatus/RatingsStatus'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
-import { KINDS } from '@/lib/libraryKinds'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 const count = new Intl.NumberFormat()

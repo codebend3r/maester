@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { letterOf, mediaLetter, showLetter } from '@/lib/letters'
+import { letterOf, mediaLetter, showLetter } from '@/letters'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 
 describe('letters', () => {

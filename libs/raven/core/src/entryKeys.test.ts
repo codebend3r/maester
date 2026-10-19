@@ -5,7 +5,7 @@ import {
   sagaEntryKey,
   seasonEntryKey,
   showEntryKey,
-} from '@/lib/entryKeys'
+} from '@/entryKeys'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 
 describe('entry keys', () => {

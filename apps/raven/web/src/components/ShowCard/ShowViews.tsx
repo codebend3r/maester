@@ -5,6 +5,7 @@ import {
   type ShowEntry,
   WATCHED_STATES,
   episodeCode,
+  showEntryKey,
   showSortFact,
   sortTitle,
   watchedStateOf,
@@ -19,7 +20,6 @@ import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { showYears } from '@/lib/itemLinks'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { type SortColumn, useTableSort } from '@/lib/tableSort'
-import { showEntryKey } from '@/lib/entryKeys'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/ShowCard/ShowViews.module.scss'
 

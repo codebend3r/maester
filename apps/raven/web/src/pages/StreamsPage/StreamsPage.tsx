@@ -5,6 +5,7 @@ import {
   type PlaybackMode,
   formatDuration,
   mediaLabel,
+  plural,
 } from '@raven/core'
 import { Button } from '@raven/ui'
 import { Link } from 'react-router-dom'
@@ -13,7 +14,6 @@ import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useCanManage } from '@/lib/adminLock'
 import { api } from '@/lib/api'
-import { plural } from '@/lib/plural'
 import { liveStreamsQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/pages/StreamsPage/StreamsPage.module.scss'

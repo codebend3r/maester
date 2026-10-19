@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_LIBRARY_SETTINGS,
   FOLDER_LAYOUTS,
+  KINDS,
   type Library,
   type LibraryInput,
   type LibraryKind,
@@ -12,6 +13,7 @@ import {
   defaultLibrarySettings,
   isLibraryKind,
   isRatingSource,
+  libraryIconOf,
   matchTypeFor,
   validateLibraryInput,
   withLibraryKind,
@@ -22,7 +24,6 @@ import { Button, Icon } from '@raven/ui'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { IconPicker } from '@/components/LibraryDialog/IconPicker'
 import { api } from '@/lib/api'
-import { KINDS, libraryIconOf } from '@/lib/libraryKinds'
 import { afterLibrarySaved } from '@/lib/invalidate'
 import { lockQuery, metadataHealthQuery } from '@/lib/queries'
 import { RATING_SOURCE_LABELS } from '@/lib/ratingSources'

@@ -1,4 +1,4 @@
-import type { MediaItem } from '@raven/core'
+import type { MediaItem } from '@/contract'
 
 /** How far through the video playback stopped, as a fraction for the resume line. */
 export const progressOf = (media: MediaItem): number =>

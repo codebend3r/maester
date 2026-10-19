@@ -7,6 +7,7 @@ import {
   type RatingSource,
   cardTitle,
   formatRuntime,
+  mediaEntryKey,
   pickScore,
   sortFact,
 } from '@raven/core'
@@ -22,7 +23,6 @@ import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
 import { cardLink, watchLink } from '@/lib/itemLinks'
-import { mediaEntryKey } from '@/lib/entryKeys'
 import type { PosterSizes } from '@/lib/posters'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'
