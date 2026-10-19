@@ -8,10 +8,10 @@ import {
   PLAYER_ACTIONS,
   type PlayerAction,
   SEEK_EDGES,
+  languageName,
   stepCaptionScale,
   stepSpeed,
-} from '@/lib/shortcuts'
-import { languageName } from '@raven/core'
+} from '@raven/core'
 import { useHostServices } from '@/stores/playerServices'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 

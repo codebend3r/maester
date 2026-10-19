@@ -1,5 +1,4 @@
-import type { MediaItem } from '@raven/core'
-import { progressOf } from '@/lib/mediaProgress'
+import { type MediaItem, progressOf } from '@raven/core'
 import styles from '@/components/ResumeBar/ResumeBar.module.scss'
 
 /**

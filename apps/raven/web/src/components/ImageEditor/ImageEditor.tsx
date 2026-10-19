@@ -7,10 +7,11 @@ import {
   type ImageChoice,
   type ImageOption,
   type ItemDetails,
+  LANGUAGE_FALLBACKS,
   type Library,
   type MatchItemType,
   languageName,
-  LANGUAGE_FALLBACKS,
+  versionFacts,
 } from '@raven/core'
 import { useId, useState } from 'react'
 import { Button, Icon } from '@raven/ui'
@@ -18,7 +19,6 @@ import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { Tabs } from '@/components/Tabs/Tabs'
 import { api } from '@/lib/api'
 import { EDITED_PARTS, afterItemEdited } from '@/lib/invalidate'
-import { versionFacts } from '@/lib/itemFacts'
 import { itemImagesQuery } from '@/lib/queries'
 import styles from '@/components/ImageEditor/ImageEditor.module.scss'
 

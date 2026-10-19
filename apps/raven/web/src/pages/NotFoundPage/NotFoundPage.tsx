@@ -1,4 +1,5 @@
-import { ButtonLink, themeOf } from '@raven/ui'
+import { themeOf } from '@raven/core'
+import { ButtonLink } from '@raven/ui'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { useTheme } from '@/stores/theme'
 import styles from '@/pages/NotFoundPage/NotFoundPage.module.scss'

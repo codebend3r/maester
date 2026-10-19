@@ -1,12 +1,12 @@
 import {
   DEFAULT_THEME,
   type DesignToken,
-  Icon,
   THEMES,
   TOKEN_GROUPS,
   type ThemeId,
   contrastRatio,
-} from '@raven/ui'
+} from '@raven/core'
+import { Icon } from '@raven/ui'
 import { useTheme } from '@/stores/theme'
 import { DesignSection } from '@/pages/DesignPage/DesignSection'
 import styles from '@/pages/DesignPage/ColourSection.module.scss'

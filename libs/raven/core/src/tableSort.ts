@@ -1,8 +1,6 @@
-import { useState } from 'react'
+export const TABLE_SORT_DIRECTIONS = { asc: 'asc', desc: 'desc' } as const
 
-const TABLE_SORT_DIRECTIONS = { asc: 'asc', desc: 'desc' } as const
-
-export type SortDirection = (typeof TABLE_SORT_DIRECTIONS)[keyof typeof TABLE_SORT_DIRECTIONS]
+export type ColumnDirection = (typeof TABLE_SORT_DIRECTIONS)[keyof typeof TABLE_SORT_DIRECTIONS]
 
 /** What a column header's `aria-sort` says: which way the table is sorted on it, if at all. */
 export const ARIA_SORTS = {
@@ -16,10 +14,10 @@ export type AriaSort = (typeof ARIA_SORTS)[keyof typeof ARIA_SORTS]
 /** What a column sorts by, and which way its first click goes. */
 export type SortColumn<T> = {
   value: (row: T) => number | string | null
-  first: SortDirection
+  first: ColumnDirection
 }
 
-export type ActiveSort<K extends string> = { key: K; direction: SortDirection }
+export type ActiveSort<K extends string> = { key: K; direction: ColumnDirection }
 
 type SortValue = ReturnType<SortColumn<unknown>['value']>
 
@@ -64,7 +62,7 @@ export const nextSort = <K extends string>({
 }: {
   active: ActiveSort<K> | null
   key: K
-  first: SortDirection
+  first: ColumnDirection
 }): ActiveSort<K> | null => {
   if (active?.key !== key) return { key, direction: first }
   if (active.direction === first) {
@@ -77,32 +75,4 @@ export const nextSort = <K extends string>({
     }
   }
   return null
-}
-
-/** Click-to-sort state for a table whose rows are all loaded. */
-export const useTableSort = <T, K extends string>({
-  rows,
-  columns,
-}: {
-  rows: readonly T[]
-  columns: Record<K, SortColumn<T>>
-}): {
-  sorted: T[]
-  active: ActiveSort<K> | null
-  toggle: (key: K) => void
-  ariaSort: (key: K) => AriaSort
-} => {
-  const [active, setActive] = useState<ActiveSort<K> | null>(null)
-  return {
-    sorted: sortRows({ rows, columns, active }),
-    active,
-    toggle: (key) =>
-      setActive((current) => nextSort({ active: current, key, first: columns[key].first })),
-    ariaSort: (key) => {
-      if (active?.key !== key) return ARIA_SORTS.none
-      return active.direction === TABLE_SORT_DIRECTIONS.asc
-        ? ARIA_SORTS.ascending
-        : ARIA_SORTS.descending
-    },
-  }
 }

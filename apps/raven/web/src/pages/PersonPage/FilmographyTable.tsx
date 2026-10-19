@@ -2,6 +2,9 @@ import {
   type FilmographyDepartment,
   type FilmographyEntry,
   type FilmographyTab,
+  type SortColumn,
+  itemPath,
+  plural,
   sortTitle,
 } from '@raven/core'
 import { memo, useState } from 'react'
@@ -9,10 +12,8 @@ import { CardLink } from '@/components/CardLink/CardLink'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { api } from '@/lib/api'
-import { itemPath } from '@/lib/itemLinks'
-import { plural } from '@/lib/plural'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
-import { type SortColumn, useTableSort } from '@/lib/tableSort'
+import { useTableSort } from '@/lib/useTableSort'
 import styles from '@/pages/PersonPage/FilmographyTable.module.scss'
 
 const DEPARTMENT_LABELS: Record<FilmographyDepartment, string> = {

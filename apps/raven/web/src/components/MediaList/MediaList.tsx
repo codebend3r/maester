@@ -3,10 +3,13 @@ import {
   type MediaItem,
   RATING_SOURCES,
   type RatingSource,
+  type SortColumn,
+  cardLink,
   cardTitle,
   formatBitrate,
   formatBytes,
   formatRuntime,
+  mediaEntryKey,
   resolutionLabel,
   sortTitle,
 } from '@raven/core'
@@ -20,10 +23,8 @@ import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { WatchedMark } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
-import { cardLink } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
-import { type SortColumn, useTableSort } from '@/lib/tableSort'
-import { mediaEntryKey } from '@/lib/entryKeys'
+import { useTableSort } from '@/lib/useTableSort'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/MediaList/MediaList.module.scss'
 
@@ -52,7 +53,7 @@ const MediaRow = ({
   const menu = useCardMenu({ media, matchType, inline: true })
   const { title, year } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
-  const link = cardLink({ media, pages: movies })
+  const link = cardLink({ media, hasPages: movies })
   const thumbnail = api.thumbnailUrl(media)
   return (
     <tr className={menu.hostClass} data-entry={mediaEntryKey(media)} {...select.rootProps}>

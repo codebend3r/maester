@@ -9,8 +9,16 @@ import {
   type PosterEntry,
   type UnmatchedFile,
   type WatchTarget,
+  finishedNote,
   isScanning,
+  jumpScale,
   matchTypeFor,
+  mediaEntryKey,
+  queueLink,
+  sagaEntryKey,
+  sagaTargets,
+  showEntryKey,
+  watchLink,
 } from '@raven/core'
 import { type ReactNode, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -27,11 +35,6 @@ import { Loading } from '@/components/Skeleton/Skeleton'
 import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
 import { useCanManage } from '@/lib/adminLock'
-import { mediaEntryKey, sagaEntryKey, showEntryKey } from '@/lib/entryKeys'
-import { finishedNote } from '@/lib/history'
-import { queueLink, watchLink } from '@/lib/itemLinks'
-import { jumpScale } from '@/lib/jumpScale'
-import { sagaTargets } from '@/lib/sagas'
 import {
   duplicatesQuery,
   historyQuery,

@@ -1,4 +1,4 @@
-import { DEFAULT_THEME, type ThemeId, isThemeId } from '@raven/ui'
+import { DEFAULT_THEME, type ThemeId, isThemeId } from '@raven/core'
 import { create } from 'zustand'
 
 /** Where the choice is kept, as the bare id; index.html reads it before first paint. */

@@ -7,6 +7,7 @@ import {
   type StreamMode,
   type VideoRange,
   type VideoStream,
+  audioLabel,
   codecLabel,
   formatBitrate,
   formatBytes,
@@ -23,7 +24,6 @@ import { stepDownNote } from '@/components/Player/playbackFacts'
 import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/PlaybackInfo.module.scss'
 import { playerQueriesFor } from '@/lib/playerQueries'
-import { audioLabel } from '@/lib/trackLabels'
 
 /** How often the live figures are read again. */
 const REFRESH_MS = 1000

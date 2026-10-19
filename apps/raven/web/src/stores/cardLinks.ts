@@ -1,5 +1,5 @@
+import type { AppPath } from '@raven/core'
 import { create } from 'zustand'
-import type { AppPath } from '@/lib/itemLinks'
 
 export type Follow = (link: { to: AppPath; state: unknown }) => void
 

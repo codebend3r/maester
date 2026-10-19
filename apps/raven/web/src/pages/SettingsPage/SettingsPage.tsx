@@ -8,6 +8,7 @@ import {
   type DisplaySettings,
   PLAYBACK_CHOICES,
   type PlaybackSettings,
+  plural,
 } from '@raven/core'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
@@ -18,7 +19,6 @@ import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { useCanManage } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { edit, useOptimisticMutation } from '@/lib/optimistic'
-import { plural } from '@/lib/plural'
 import { adminLockQuery, displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
 import { mutationKeys, queryKeys } from '@/lib/queryClient'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'

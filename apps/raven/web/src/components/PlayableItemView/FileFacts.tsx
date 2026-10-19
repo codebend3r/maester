@@ -1,6 +1,11 @@
-import { type MediaItem, type MediaTracks, formatBitrate, formatBytes } from '@raven/core'
+import {
+  type MediaItem,
+  type MediaTracks,
+  fileFacts,
+  formatBitrate,
+  formatBytes,
+} from '@raven/core'
 import { useId } from 'react'
-import { fileFacts } from '@/lib/itemFacts'
 import styles from '@/components/PlayableItemView/FileFacts.module.scss'
 
 /** The file's facts as label and value: its tracks, then its container, bitrate and size. */

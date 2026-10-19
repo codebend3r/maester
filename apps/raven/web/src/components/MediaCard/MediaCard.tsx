@@ -2,12 +2,16 @@ import {
   type MatchItemType,
   type MediaItem,
   type MediaSort,
+  cardLink,
   codecLabel,
   formatBytes,
   formatRuntime,
+  mediaEntryKey,
   mediaLabel,
   resolutionLabel,
   sortFact,
+  timeLeftOf,
+  watchLink,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { CardLink } from '@/components/CardLink/CardLink'
@@ -19,9 +23,6 @@ import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
-import { cardLink, watchLink } from '@/lib/itemLinks'
-import { mediaEntryKey } from '@/lib/entryKeys'
-import { timeLeftOf } from '@/lib/mediaProgress'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/MediaCard/MediaCard.module.scss'
 
@@ -55,7 +56,7 @@ export const MediaCard = ({
   const label = mediaLabel(media)
   const select = useSelectable({ key: mediaEntryKey(media), title: label })
   const play = watchLink({ media })
-  const page = cardLink({ media, pages: true })
+  const page = cardLink({ media, hasPages: true })
   const hasPage = page.state == null
   const sorted = sort ? sortFact({ media, sort }) : null
   const timeLeft = timeLeftOf(media)

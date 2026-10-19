@@ -1,8 +1,8 @@
+import { ROUTE_STATES, type RoutePending } from '@raven/core'
 import type { ReactNode } from 'react'
 import { Icon } from '@raven/ui'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { Loading } from '@/components/Skeleton/Skeleton'
-import { ROUTE_STATES, type RoutePending } from '@/lib/routeQuery'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/components/RouteState/RouteState.module.scss'
 

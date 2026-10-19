@@ -1,9 +1,8 @@
-import { type PersonDetails, type PersonProfile, ageOn } from '@raven/core'
+import { type PersonDetails, type PersonProfile, ageOn, plural } from '@raven/core'
 import { Button, ButtonLink } from '@raven/ui'
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { api } from '@/lib/api'
-import { plural } from '@/lib/plural'
 import styles from '@/pages/PersonPage/PersonPage.module.scss'
 
 /** The first letters of a name's first two words, for a person with no photo: "Rebecca Ferguson" is RF. */

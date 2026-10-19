@@ -1,5 +1,4 @@
-import { SCAN_STATES, type ScanStatus as Status, isScanning } from '@raven/core'
-import { plural } from '@/lib/plural'
+import { SCAN_STATES, type ScanStatus as Status, isScanning, plural } from '@raven/core'
 import styles from '@/components/ScanStatus/ScanStatus.module.scss'
 
 const count = new Intl.NumberFormat()

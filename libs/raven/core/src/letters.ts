@@ -1,4 +1,5 @@
-import { type ItemSummary, type MediaItem, sortTitle } from '@raven/core'
+import type { ItemSummary, MediaItem } from '@/contract'
+import { sortTitle } from '@/naming'
 
 /** The letter that gathers the titles starting with no letter: numbers, symbols, or nothing. */
 export const SPECIAL_LETTERS = { numbers: '#' } as const

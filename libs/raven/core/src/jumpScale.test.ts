@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
-import type { MediaItem, ShowEntry } from '@raven/core'
-import { mediaEntryKey } from '@/lib/entryKeys'
-import { jumpScale, niceStep } from '@/lib/jumpScale'
+import type { MediaItem, ShowEntry } from '@/contract'
+import { mediaEntryKey } from '@/entryKeys'
+import { jumpScale, niceStep } from '@/jumpScale'
 import { itemSummary, mediaItem, showEntry } from '@/test/fixtures'
 
 /** The strip's marks as `label` for the pressable ones and `(label)` for the rest. */

@@ -1,10 +1,13 @@
 import {
   type MediaItem,
   type RatingSource,
+  cardLink,
   cardTitle,
   formatRuntime,
+  mediaEntryKey,
   pickScore,
   resolutionLabel,
+  watchLink,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { CardLink } from '@/components/CardLink/CardLink'
@@ -16,8 +19,6 @@ import { PosterFrame } from '@/components/PosterCard/PosterCard'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { PartlyWatched } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
-import { mediaEntryKey } from '@/lib/entryKeys'
-import { cardLink, watchLink } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/pages/SagaPage/SagaFilms.module.scss'
@@ -77,7 +78,7 @@ const SagaFilm = ({
   const menu = useCardMenu({ media, matchType: 'movie', inline: true })
   const { title } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
-  const link = cardLink({ media, pages: true })
+  const link = cardLink({ media, hasPages: true })
   const hasPage = link.state == null
   const tag = TAGS[standing]
   const score = media.item

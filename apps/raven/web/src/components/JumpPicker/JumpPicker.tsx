@@ -1,6 +1,6 @@
 import type { RefObject } from 'react'
+import type { JumpScale } from '@raven/core'
 import { holdInPlace } from '@/lib/holdInPlace'
-import type { JumpScale } from '@/lib/jumpScale'
 import styles from '@/components/JumpPicker/JumpPicker.module.scss'
 
 /** What the strip is called aloud, by what it jumps by. */

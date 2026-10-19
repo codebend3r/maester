@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { parseTokens } from '@raven/ui'
+import { parseTokens } from '@raven/core'
 import { groupTokens } from '@/pages/DesignPage/tokenGroups'
 
 const TOKENS = parseTokens(`

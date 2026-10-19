@@ -6,13 +6,14 @@ import {
   STREAM_QUALITIES,
   type StreamQuality,
   type SubtitleTrack,
+  audioLabel,
   formatBitrate,
   formatChannels,
   resolutionLabel,
+  subtitleLabel,
 } from '@raven/core'
 import { playingAudio } from '@/components/Player/selection'
 import type { StepDown } from '@/components/Player/usePlaybackLadder'
-import { audioLabel, subtitleLabel } from '@/lib/trackLabels'
 
 /** How each mode reads in the chrome, short enough for a pill. */
 const MODE_NAMES = {

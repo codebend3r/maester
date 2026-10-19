@@ -1,17 +1,21 @@
 import {
+  type AppPath,
   HOME_SHELF_TYPES,
   type HomeShelf,
   type ItemSummary,
   type Library,
   type MediaItem,
   type ShowEntry,
+  type WatchState,
+  cardLink,
   cardTitle,
   formatRuntime,
+  plural,
   resolutionLabel,
+  showYears,
+  watchLink,
 } from '@raven/core'
 import { api } from '@/lib/api'
-import { type AppPath, type WatchState, cardLink, showYears, watchLink } from '@/lib/itemLinks'
-import { plural } from '@/lib/plural'
 
 /** How many arrivals home's hero takes turns with. */
 export const FEATURED_COUNT = 5
@@ -76,7 +80,7 @@ const fromMedia = ({ media, library }: { media: MediaItem; library: Library }): 
       ].filter(isFact),
       addedAt: media.addedAt,
       play: watchLink({ media }),
-      details: cardLink({ media, pages: true }).to,
+      details: cardLink({ media, hasPages: true }).to,
     },
   ]
 }

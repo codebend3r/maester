@@ -1,4 +1,4 @@
-import type { HistoryEntry } from '@raven/core'
+import type { HistoryEntry } from '@/contract'
 
 /** One day of a library's history, its entries in the order they came. */
 export type HistoryDay = {

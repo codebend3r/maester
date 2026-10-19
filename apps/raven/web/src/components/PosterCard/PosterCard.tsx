@@ -5,10 +5,13 @@ import {
   type MediaItem,
   type MediaSort,
   type RatingSource,
+  cardLink,
   cardTitle,
   formatRuntime,
+  mediaEntryKey,
   pickScore,
   sortFact,
+  watchLink,
 } from '@raven/core'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
@@ -21,8 +24,6 @@ import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
-import { cardLink, watchLink } from '@/lib/itemLinks'
-import { mediaEntryKey } from '@/lib/entryKeys'
 import type { PosterSizes } from '@/lib/posters'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'
@@ -96,7 +97,7 @@ export const PosterCard = ({
   const score = media.item
     ? pickScore({ ratings: media.item.ratings, source: ratingsSource })
     : null
-  const link = cardLink({ media, pages: true })
+  const link = cardLink({ media, hasPages: true })
   const hasPage = link.state == null
   const sorted = sort ? sortFact({ media, sort }) : null
   const facts = [

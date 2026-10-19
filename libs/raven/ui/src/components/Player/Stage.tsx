@@ -1,5 +1,12 @@
-import { KEYS } from '@/lib/keyboard'
-import { PLAYER_SOURCE_KINDS, formatDuration } from '@raven/core'
+import {
+  KEYS,
+  PLAYER_ACTIONS,
+  PLAYER_SOURCE_KINDS,
+  type PlayerAction,
+  SEEK_EDGES,
+  formatDuration,
+  shortcutFor,
+} from '@raven/core'
 import {
   type ReactNode,
   type SyntheticEvent,
@@ -39,7 +46,6 @@ import { useUpNext } from '@/components/Player/useUpNext'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
 import { isInForeignDialog, isTypingTarget } from '@/lib/keyboard'
-import { PLAYER_ACTIONS, type PlayerAction, SEEK_EDGES, shortcutFor } from '@/lib/shortcuts'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostServices } from '@/stores/playerServices'
 

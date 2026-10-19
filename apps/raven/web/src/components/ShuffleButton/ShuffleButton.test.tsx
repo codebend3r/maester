@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
+import { readWatchState } from '@raven/core'
 import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { ShuffleButton } from '@/components/ShuffleButton/ShuffleButton'
 import { api } from '@/lib/api'
-import { readWatchState } from '@/lib/itemLinks'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_ONE, EPISODE_TWO } from '@/test/tv'
 

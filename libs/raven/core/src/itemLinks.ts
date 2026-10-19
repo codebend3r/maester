@@ -1,14 +1,7 @@
-import {
-  ITEM_TYPES,
-  type Infer,
-  type ItemSummary,
-  type MediaItem,
-  isBoolean,
-  isMediaItem,
-  isMediaList,
-  object,
-  primaryVersion,
-} from '@raven/core'
+import { ITEM_TYPES, type ItemSummary, type MediaItem, isMediaItem, isMediaList } from '@/contract'
+import { primaryVersion } from '@/items'
+import { toQueryString } from '@/query'
+import { type Infer, isBoolean, object } from '@/schema'
 
 /** An address in the app, from its root. */
 export type AppPath = `/${string}`
@@ -41,7 +34,7 @@ export const inLibrary = ({
   libraryId: number
   file?: number | null
 }): AppPath =>
-  `${page}?${new URLSearchParams({
+  `${page}?${toQueryString({
     library: String(libraryId),
     ...(file == null ? {} : { file: String(file) }),
   })}`
@@ -163,19 +156,6 @@ export const readWatchState = ({
   id: number | null
 }): WatchState | null => (isWatchState(state) && state.media.id === id ? state : null)
 
-/** "2011 to 2019", "2022 to now", or just the year for a show that began and ended in one. */
-export const showYears = ({
-  year,
-  endedYear,
-}: {
-  year: number | null
-  endedYear: number | null
-}): string | null => {
-  if (year == null) return null
-  if (endedYear == null) return `${year} to now`
-  return endedYear === year ? String(year) : `${year} to ${endedYear}`
-}
-
 /**
  * Where a card goes: a matched item's page as the card's library shows it,
  * where the library has pages, or straight to the player, with the video
@@ -184,12 +164,12 @@ export const showYears = ({
  */
 export const cardLink = ({
   media,
-  pages,
+  hasPages,
 }: {
   media: MediaItem
-  pages: boolean
+  hasPages: boolean
 }): { to: AppPath; state?: WatchState } => {
-  const page = pages && media.item ? itemPath(media.item) : null
+  const page = hasPages && media.item ? itemPath(media.item) : null
   if (page == null) return watchLink({ media })
   return {
     to: inLibrary({

@@ -1,5 +1,5 @@
 import { type ReactNode, useId } from 'react'
-import { KEYS } from '@raven/ui'
+import { KEYS } from '@raven/core'
 import styles from '@/components/Tabs/Tabs.module.scss'
 
 type Tab<T extends string> = { value: T; label: string; count: number }

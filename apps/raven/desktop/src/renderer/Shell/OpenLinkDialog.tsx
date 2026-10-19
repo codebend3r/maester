@@ -1,5 +1,6 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
-import { Button, KEYS } from '@raven/ui'
+import { KEYS } from '@raven/core'
+import { Button } from '@raven/ui'
 import styles from '@/renderer/Shell/OpenLinkDialog.module.scss'
 import { useOpenReply } from '@/renderer/Shell/openReply'
 import { useDesktop } from '@/renderer/stores/desktop'

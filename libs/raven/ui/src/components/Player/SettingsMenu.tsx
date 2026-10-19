@@ -1,4 +1,4 @@
-import { type PlaybackMode, describeMode } from '@raven/core'
+import { type PlaybackMode, SPEEDS, audioLabel, describeMode, subtitleLabel } from '@raven/core'
 import { type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
@@ -9,8 +9,6 @@ import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/SettingsMenu.module.scss'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
-import { SPEEDS } from '@/lib/shortcuts'
-import { audioLabel, subtitleLabel } from '@/lib/trackLabels'
 
 const SUBTITLE_STATUS: Record<SubtitleStatus, string | null> = {
   off: null,

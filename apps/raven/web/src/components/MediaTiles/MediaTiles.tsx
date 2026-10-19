@@ -3,10 +3,12 @@ import {
   type MatchItemType,
   type MediaItem,
   type MediaSort,
+  cardLink,
   cardTitle,
   codecLabel,
   formatBytes,
   formatRuntime,
+  mediaEntryKey,
   mediaLabel,
   resolutionLabel,
   sortFact,
@@ -22,9 +24,7 @@ import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
-import { cardLink } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
-import { mediaEntryKey } from '@/lib/entryKeys'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/MediaTiles/MediaTiles.module.scss'
 
@@ -52,7 +52,7 @@ const MediaTile = ({
 }) => {
   const menu = useCardMenu({ media, matchType })
   const thumbnail = api.thumbnailUrl(media)
-  const link = cardLink({ media, pages: posters })
+  const link = cardLink({ media, hasPages: posters })
   const { year } = cardTitle(media)
   const label = posters ? cardTitle(media).title : mediaLabel(media)
   const select = useSelectable({ key: mediaEntryKey(media), title: label })

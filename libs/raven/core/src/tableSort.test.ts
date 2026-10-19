@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { type SortColumn, nextSort, sortRows } from '@/lib/tableSort'
+import { type SortColumn, nextSort, sortRows } from '@/tableSort'
 
 type Row = { name: string; score: number | null }
 const columns: Record<'name' | 'score', SortColumn<Row>> = {

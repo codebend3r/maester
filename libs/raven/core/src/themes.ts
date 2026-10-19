@@ -16,17 +16,17 @@ type Theme = {
  * colours live in styles/themes.scss under each id, and nowhere else.
  */
 export const THEMES = [
-  { id: 'verdigris', name: 'Verdigris', note: 'Dark teal, oxblood play', tone: 'dark' },
-  { id: 'bronze', name: 'Bronze', note: 'Warm umber, verdigris play', tone: 'dark' },
-  { id: 'nocturne', name: 'Nocturne', note: 'Ink blue, copper play', tone: 'dark' },
-  { id: 'oxblood', name: 'Oxblood', note: 'Deep wine, gilt play', tone: 'dark' },
-  { id: 'patina', name: 'Patina', note: 'Light parchment, teal ink', tone: 'light' },
-  { id: 'mint', name: 'Mint', note: 'Cool mint, coral play', tone: 'light' },
+  { id: 'verdigris', name: 'Verdigris', note: 'Dark teal, oxblood play', tone: THEME_TONES.dark },
+  { id: 'bronze', name: 'Bronze', note: 'Warm umber, verdigris play', tone: THEME_TONES.dark },
+  { id: 'nocturne', name: 'Nocturne', note: 'Ink blue, copper play', tone: THEME_TONES.dark },
+  { id: 'oxblood', name: 'Oxblood', note: 'Deep wine, gilt play', tone: THEME_TONES.dark },
+  { id: 'patina', name: 'Patina', note: 'Light parchment, teal ink', tone: THEME_TONES.light },
+  { id: 'mint', name: 'Mint', note: 'Cool mint, coral play', tone: THEME_TONES.light },
   {
     id: 'contrast',
     name: 'High contrast',
     note: 'Black, white and yellow, 7:1 or more',
-    tone: 'dark',
+    tone: THEME_TONES.dark,
   },
 ] as const satisfies readonly Theme[]
 

@@ -1,4 +1,4 @@
-import { themeOf } from '@raven/ui'
+import { themeOf } from '@raven/core'
 import { Logo } from '@/components/Logo/Logo'
 import { useTheme } from '@/stores/theme'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'

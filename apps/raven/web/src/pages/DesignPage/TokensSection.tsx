@@ -1,4 +1,4 @@
-import type { DesignToken } from '@raven/ui'
+import type { DesignToken } from '@raven/core'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import { SAMPLES, type Sample, groupTokens } from '@/pages/DesignPage/tokenGroups'
 import styles from '@/pages/DesignPage/TokensSection.module.scss'

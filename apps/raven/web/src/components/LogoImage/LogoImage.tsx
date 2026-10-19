@@ -1,4 +1,4 @@
-import { THEME_TONES, themeOf } from '@raven/ui'
+import { THEME_TONES, themeOf } from '@raven/core'
 import { useState } from 'react'
 import { LOGO_TONES, type LogoTone, logoTone } from '@/lib/logoTone'
 import { useTheme } from '@/stores/theme'

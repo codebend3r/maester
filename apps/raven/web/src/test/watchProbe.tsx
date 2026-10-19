@@ -1,5 +1,5 @@
+import { readWatchState } from '@raven/core'
 import { useLocation, useParams } from 'react-router-dom'
-import { readWatchState } from '@/lib/itemLinks'
 
 /** Stands in for the player at `watch/:id`: the video a link opened, and the ones it handed over to play after. */
 export const WatchProbe = () => {

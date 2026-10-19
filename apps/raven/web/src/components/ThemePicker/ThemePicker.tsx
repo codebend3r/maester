@@ -1,4 +1,5 @@
-import { Icon, KEYS, THEMES, type ThemeId } from '@raven/ui'
+import { KEYS, THEMES, type ThemeId } from '@raven/core'
+import { Icon } from '@raven/ui'
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { useTheme } from '@/stores/theme'
 import styles from '@/components/ThemePicker/ThemePicker.module.scss'

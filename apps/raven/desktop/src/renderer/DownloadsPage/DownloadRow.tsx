@@ -1,5 +1,5 @@
-import { formatBytes } from '@raven/core'
-import { Button, type IconName, KEYS, UNLOCK_SECRETS, UnlockDialog } from '@raven/ui'
+import { KEYS, formatBytes } from '@raven/core'
+import { Button, type IconName, UNLOCK_SECRETS, UnlockDialog } from '@raven/ui'
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { useDesktop } from '@/renderer/stores/desktop'
 import { UNREACHED, useChangeDownloads } from '@/renderer/desktop/downloadsApi'

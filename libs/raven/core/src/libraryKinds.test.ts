@@ -9,6 +9,7 @@ import {
   defaultLibrarySettings,
   firstTierFor,
   groupingsFor,
+  libraryIconOf,
   listsShows,
   matchTypeFor,
   matchesAlike,
@@ -221,5 +222,14 @@ describe('matchesAlike', () => {
     expect(matchesAlike({ before: 'movies', after: 'sports' })).toBe(true)
     expect(matchesAlike({ before: 'sports', after: 'other' })).toBe(false)
     expect(matchesAlike({ before: 'youtube', after: 'other' })).toBe(true)
+  })
+})
+
+describe('libraryIconOf', () => {
+  it("wears the icon a library picked, the type's own included, else its type's", () => {
+    expect(libraryIconOf({ kind: 'sports', icon: 'octagon' })).toBe('octagon')
+    expect(libraryIconOf({ kind: 'movies', icon: 'trophy' })).toBe('trophy')
+    expect(libraryIconOf({ kind: 'sports', icon: null })).toBe('trophy')
+    expect(libraryIconOf({ kind: 'movies', icon: null })).toBe('film')
   })
 })

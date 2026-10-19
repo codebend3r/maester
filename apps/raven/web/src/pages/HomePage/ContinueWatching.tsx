@@ -2,11 +2,13 @@ import {
   ITEM_TYPES,
   type MediaItem,
   type PosterEntry,
+  cardLink,
   cardTitle,
   episodeCode,
   formatRuntime,
   mediaLabel,
   resolutionLabel,
+  watchLink,
 } from '@raven/core'
 import { Button, Icon } from '@raven/ui'
 import { useId, useState } from 'react'
@@ -17,7 +19,6 @@ import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
-import { cardLink, watchLink } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/pages/HomePage/ContinueWatching.module.scss'
 
@@ -77,7 +78,7 @@ const ContinueTile = ({ entry }: { entry: PosterEntry }) => {
   const label = mediaLabel(media)
   const { title, line } = tileWords(media)
   const left = timeLeft(media)
-  const page = cardLink({ media, pages: true })
+  const page = cardLink({ media, hasPages: true })
   const hasPage = page.state == null
   const hasPoster = poster?.posterVersion != null
   const hasResolution = resolutionLabel(media) != null

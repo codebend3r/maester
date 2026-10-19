@@ -1,6 +1,6 @@
 # raven device apps: iPhone, iPad, Apple TV and Android TV
 
-Status: proposed, awaiting approval. This builds on the desktop spec, `2026-10-12-raven-desktop-design.md` (its `Engine` and `PlayerServices` contracts, its server list and per-server sessions, and its D1 plan to lift the query layer out of the web app), and on the direct media spec, `2026-10-16-raven-direct-media-design.md` (media origins and media tickets, which are how a native player fetches video without a cookie). It was written from the conversation of 2026-10-17 without a brainstorm; every choice below is either what the user settled in that conversation, marked "decided", or the author's call, marked as such.
+Status: approved 2026-10-18; plan `docs/superpowers/plans/2026-10-18-raven-device-apps.md`. This builds on the desktop spec, `2026-10-12-raven-desktop-design.md` (its `Engine` and `PlayerServices` contracts, its server list and per-server sessions, and its D1 plan to lift the query layer out of the web app), and on the direct media spec, `2026-10-16-raven-direct-media-design.md` (media origins and media tickets, which are how a native player fetches video without a cookie). It was written from the conversation of 2026-10-17 without a brainstorm; every choice below is either what the user settled in that conversation, marked "decided", or the author's call, marked as such.
 
 ## Context
 

@@ -3,9 +3,12 @@ import {
   RATING_SOURCES,
   type RatingSource,
   type ShowEntry,
+  type SortColumn,
   WATCHED_STATES,
   episodeCode,
+  showEntryKey,
   showSortFact,
+  showYears,
   sortTitle,
   watchedStateOf,
 } from '@raven/core'
@@ -16,10 +19,8 @@ import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
-import { showYears } from '@/lib/itemLinks'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
-import { type SortColumn, useTableSort } from '@/lib/tableSort'
-import { showEntryKey } from '@/lib/entryKeys'
+import { useTableSort } from '@/lib/useTableSort'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/ShowCard/ShowViews.module.scss'
 

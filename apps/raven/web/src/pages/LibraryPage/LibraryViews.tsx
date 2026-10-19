@@ -6,6 +6,7 @@ import {
   type ShowEntry,
   listsShows,
   matchTypeFor,
+  plural,
   unmatchedShowsOf,
 } from '@raven/core'
 import { Bucket } from '@/components/Bucket/Bucket'
@@ -17,7 +18,6 @@ import { ShowGrid, ShowGridSkeleton } from '@/components/ShowCard/ShowCard'
 import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
-import { plural } from '@/lib/plural'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 /** A TV library's shows laid out the way its view setting says; the grouped view is the grid, as the page itself splits matched from not. */

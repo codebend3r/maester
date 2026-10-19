@@ -3,6 +3,7 @@ import {
   type AiMatch,
   ITEM_TYPES,
   type ItemSummary,
+  KEYS,
   MATCH_STATES,
   type MatchItemType,
   type MediaItem,
@@ -18,7 +19,7 @@ import {
   useState,
 } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button, Icon, type IconName, KEYS } from '@raven/ui'
+import { Button, Icon, type IconName } from '@raven/ui'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { ImageEditorDialog } from '@/components/ImageEditor/ImageEditorDialog'
 import { api } from '@/lib/api'

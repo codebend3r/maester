@@ -1,6 +1,6 @@
+import { ARIA_SORTS, type AriaSort } from '@raven/core'
 import type { ReactNode } from 'react'
 import { Icon } from '@raven/ui'
-import { ARIA_SORTS, type AriaSort } from '@/lib/tableSort'
 import styles from '@/components/SortHeader/SortHeader.module.scss'
 
 /** A column header that sorts the table on a click; `aria-sort` says which way it points. */
