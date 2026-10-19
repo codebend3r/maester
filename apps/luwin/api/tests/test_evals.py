@@ -19,6 +19,7 @@ from luwin.evals import (
     publish_report,
     report,
     run_case,
+    run_case_and_close,
     summary_bar,
 )
 from luwin.evals.world import EVAL_USER, build_services, build_world
@@ -79,6 +80,32 @@ async def test_run_case_checks_tools_and_reply(tmp_path: Path):
     assert any("expected tool 'search_media'" in f for f in failures)
     assert any("did not match" in f for f in failures)
     assert "FAIL  ambiguous title" in report([bad]) and "0/1 cases passed" in report([bad])
+    store.close()
+
+
+async def test_run_case_and_close_closes_the_client_inside_the_loop():
+    class ClosingModel(FakeModel):
+        is_closed = False
+
+        async def close(self):
+            self.is_closed = True
+
+    case = Case.load(CASES_DIR / "setup_roku.yaml")
+    store = Store(":memory:")
+    closing = ClosingModel.scripted(text_message("Go to plex.tv/link."))
+    agent = Agent(
+        model_client=closing,
+        model="fake",
+        runner=ToolRunner(ToolRegistry()),
+        store=store,
+        services=None,
+        settings=Settings(),
+    )
+    await run_case_and_close(case, agent)
+    assert closing.is_closed
+
+    agent.client = FakeModel.scripted(text_message("Go to plex.tv/link."))
+    await run_case_and_close(case, agent)
     store.close()
 
 

@@ -112,6 +112,20 @@ async def run_case(case: Case, agent: Agent, user_id: str = EVAL_USER) -> CaseRe
     return CaseResult(case, results)
 
 
+async def run_case_and_close(case: Case, agent: Agent) -> CaseResult:
+    """Closes the API client on the loop that opened its connections.
+
+    Left to the garbage collector, it closes them after `asyncio.run` has shut
+    that loop, and every connection logs "Event loop is closed".
+    """
+    try:
+        return await run_case(case, agent)
+    finally:
+        close = getattr(agent.client, "close", None)
+        if close is not None:
+            await close()
+
+
 def load_cases(paths: list[Path] | None = None) -> list[Case]:
     files = paths or sorted(CASES_DIR.glob("*.yaml"))
     return [Case.load(p) for p in files]
@@ -255,7 +269,7 @@ def main(argv: list[str] | None = None) -> int:
     for index, case in enumerate(cases, start=1):
         registry, services, store = build_world(case.services)
         agent = build_agent(model_name, registry, services, store)
-        results.append(asyncio.run(run_case(case, agent)))
+        results.append(asyncio.run(run_case_and_close(case, agent)))
         store.close()
         print(
             progress_line(results[-1], index=index, total=len(cases), is_color=is_color), flush=True
