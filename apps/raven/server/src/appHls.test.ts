@@ -467,6 +467,20 @@ describe('the HLS route', () => {
     }
   })
 
+  it("opens a transport stream's transcode whose keyframe probe fails", async () => {
+    const spy = vi
+      .spyOn(app().get(FfmpegService), 'probeKeyframes')
+      .mockRejectedValue(new Error('ffprobe could not read the file'))
+    try {
+      const response = await get(masterUrl({ clip: 'broadcast', mode: PLAYBACK_MODES.transcode }))
+
+      expect(response.statusCode).toBe(200)
+      expect(spy).toHaveBeenCalledTimes(1)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it("opens a transport stream's transcode without waiting for its keyframe probe", async () => {
     const probe: { finish: (keyframes: number[]) => void } = { finish: () => undefined }
     const spy = vi.spyOn(app().get(FfmpegService), 'probeKeyframes').mockImplementation(

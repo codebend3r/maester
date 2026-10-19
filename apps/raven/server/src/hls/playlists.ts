@@ -7,7 +7,7 @@ import {
 } from '@raven/core'
 import { type SegmentPlan, segmentDurations } from '@/hls/segmentPlan'
 
-export type SubtitleRendition = { track: SubtitleTrack; uri: string }
+type SubtitleRendition = { track: SubtitleTrack; uri: string }
 
 const SUBTITLE_GROUP = 'subs'
 
@@ -18,18 +18,34 @@ const quoted = (value: string): string => `"${value.replace(/["\r\n]/g, '')}"`
 
 const extinf = (seconds: number): string => `#EXTINF:${seconds.toFixed(3)},`
 
-/** `NAME` must be unique within a group: a repeat of a label gets its count after it. */
+/** The label with the first count from `count` on that names nothing in `taken`. */
+const countedName = ({
+  label,
+  taken,
+  count,
+}: {
+  label: string
+  taken: ReadonlySet<string>
+  count: number
+}): string => {
+  const name = `${label} ${count}`
+  return taken.has(name) ? countedName({ label, taken, count: count + 1 }) : name
+}
+
+/**
+ * `NAME` must be unique within a group: a repeat of a label gets the first
+ * count after it that is neither a name given yet nor another track's label.
+ */
 const uniqueNames = (labels: readonly string[]): string[] =>
-  labels.reduce<{ names: string[]; counts: Map<string, number> }>(
-    ({ names, counts }, label) => {
-      const count = (counts.get(label) ?? 0) + 1
-      return {
-        names: [...names, count === 1 ? label : `${label} ${count}`],
-        counts: new Map(counts).set(label, count),
-      }
-    },
-    { names: [], counts: new Map() },
-  ).names
+  labels.reduce<string[]>(
+    (names, label) => [
+      ...names,
+      names.includes(label)
+        ? countedName({ label, taken: new Set([...labels, ...names]), count: 2 })
+        : label,
+    ],
+    [],
+  )
 
 const renditionName = (track: SubtitleTrack): string => {
   const { name, details } = subtitleLabel(track)
@@ -105,7 +121,7 @@ export const mediaPlaylist = ({
     '#EXTM3U',
     '#EXT-X-VERSION:7',
     '#EXT-X-PLAYLIST-TYPE:VOD',
-    `#EXT-X-TARGETDURATION:${Math.ceil(Math.max(...durations))}`,
+    `#EXT-X-TARGETDURATION:${Math.ceil(durations.reduce((longest, seconds) => Math.max(longest, seconds), 0))}`,
     `#EXT-X-MAP:URI=${quoted(initUri)}`,
     ...durations.flatMap((seconds, n) => [extinf(seconds), segmentUri(n)]),
     '#EXT-X-ENDLIST',

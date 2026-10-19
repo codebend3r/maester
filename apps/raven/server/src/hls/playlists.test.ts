@@ -158,6 +158,24 @@ describe('masterPlaylist', () => {
     expect(playlist).toContain('NAME="English",')
     expect(playlist).toContain('NAME="English 2",')
   })
+
+  it('numbers a repeat past a name another track already has', () => {
+    // A tag no language is named for reads as itself, uppercased: "X", "X" and "X 2".
+    const playlist = masterPlaylist({
+      ...VARIANT,
+      mode: PLAYBACK_MODES.remux,
+      subtitles: ['x', 'x', 'x 2'].map((language, index) => ({
+        track: track({ id: `embedded-${index}`, language }),
+        uri: `u${index}`,
+      })),
+    })
+
+    expect([...playlist.matchAll(/NAME="([^"]*)"/g)].map((match) => match[1])).toEqual([
+      'X',
+      'X 3',
+      'X 2',
+    ])
+  })
 })
 
 describe('subtitleSegmentCount', () => {

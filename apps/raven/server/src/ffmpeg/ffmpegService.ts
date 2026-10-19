@@ -12,14 +12,9 @@ import {
 import { ENCODER_KINDS, HW_ACCELS } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { SettingsRepository } from '@/settings/settingsRepository'
-import {
-  type DemuxTimeBase,
-  type SegmentClock,
-  demuxTimeBaseOf,
-  encoderTestArgs,
-  segmentClockOf,
-} from '@/ffmpeg/args'
+import { encoderTestArgs } from '@/ffmpeg/args'
 import { SOFTWARE, type VideoEncoder, encoderCandidates } from '@/ffmpeg/encoder'
+import { type HlsDialect, hlsDialectOf, toolMismatch } from '@/ffmpeg/ffmpegVersion'
 import { parseKeyframes } from '@/ffmpeg/keyframes'
 import { type ProbeResult, parseProbe } from '@/ffmpeg/probe'
 import { type FileTracks, parseTracks } from '@/ffmpeg/tracks'
@@ -63,25 +58,6 @@ const failureText = (error: unknown): string => {
 
 /** The signals raven sends an ffmpeg it started. */
 export const FFMPEG_SIGNALS = { kill: 'SIGKILL' } as const satisfies Record<string, NodeJS.Signals>
-
-/** The release in a tool's `-version` line: `6.1.1-3ubuntu5` from `ffmpeg version 6.1.1-3ubuntu5 Copyright ...`. */
-const releaseOf = (line: string | null): string | null =>
-  /^\S+ version (\S+)/.exec(line ?? '')?.[1] ?? null
-
-/** What to warn of when ffmpeg and ffprobe are different builds, or null when they match or one is missing. */
-export const toolMismatch = ({
-  ffmpeg,
-  ffprobe,
-}: {
-  ffmpeg: string | null
-  ffprobe: string | null
-}): string | null => {
-  const [ffmpegRelease, ffprobeRelease] = [releaseOf(ffmpeg), releaseOf(ffprobe)]
-  if (ffmpegRelease == null || ffprobeRelease == null || ffmpegRelease === ffprobeRelease) {
-    return null
-  }
-  return `ffmpeg is ${ffmpegRelease} and ffprobe is ${ffprobeRelease}; HLS transcodes seek by ffprobe's reading of a file's start, so use the same build of both`
-}
 
 /** A running ffmpeg whose output is read as it is written. */
 export type FfmpegStream = ChildProcessByStdio<null, Readable, Readable>
@@ -196,14 +172,9 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     return child
   }
 
-  /** How this ffmpeg's segment muxer reads `-segment_times`, from its version. */
-  async segmentClock(): Promise<SegmentClock> {
-    return segmentClockOf(await this.ffmpegVersion())
-  }
-
-  /** How this ffmpeg names the demuxer's time base, from its version. */
-  async demuxTimeBase(): Promise<DemuxTimeBase> {
-    return demuxTimeBaseOf(await this.ffmpegVersion())
+  /** How this ffmpeg takes an HLS run's version-dependent flags, from its version. */
+  async hlsDialect(): Promise<HlsDialect> {
+    return hlsDialectOf(await this.ffmpegVersion())
   }
 
   /**

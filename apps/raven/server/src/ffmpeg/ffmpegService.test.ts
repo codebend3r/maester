@@ -5,7 +5,7 @@ import { Logger } from '@nestjs/common'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { readServerConfig } from '@/config'
 import { DEFAULT_PLAYBACK_SETTINGS, type HwAccel } from '@raven/core'
-import { FfmpegService, FfmpegTimeoutError, toolMismatch } from '@/ffmpeg/ffmpegService'
+import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 
 describe('FfmpegService', () => {
   const state = { dir: '' }
@@ -76,16 +76,6 @@ describe('FfmpegService', () => {
     } finally {
       warn.mockRestore()
     }
-  })
-
-  it('names no mismatch for one build, or when a tool says nothing', () => {
-    expect(
-      toolMismatch({
-        ffmpeg: 'ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023',
-        ffprobe: 'ffprobe version 6.1.1-3ubuntu5 Copyright (c) 2000-2023',
-      }),
-    ).toBeNull()
-    expect(toolMismatch({ ffmpeg: 'ffmpeg version 9.0.2', ffprobe: null })).toBeNull()
   })
 
   // Both wait out the same second, side by side.

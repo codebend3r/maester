@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Inject,
-  Logger,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -13,35 +12,21 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common'
 import {
-  type AudioTrack,
-  HLS_COPY_AUDIO_CODECS,
   HLS_PARAMS,
   HLS_PATHS,
-  HLS_SEGMENT_SECONDS,
   MEDIA_TICKET_PARAM,
   PLAYBACK_MODES,
-  STREAM_TIME_SHIFT,
   type StreamMode,
-  SUBTITLE_SOURCES,
-  type SubtitleCue,
   type SubtitleTrack,
-  audioCodecString,
-  formatWebVtt,
   isHlsSessionId,
-  mergeCues,
-  parseWebVtt,
-  subtitleWindowOf,
-  toQueryString,
-  videoCodecString,
 } from '@raven/core'
 import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, wholeNumber } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AccessRechecks } from '@/auth/accessRechecks'
 import { AuthSessions } from '@/auth/authSessions'
-import { errorMessage } from '@/errorMessage'
-import { VIDEO_CODECS, hlsAudioCodec, transcodeBitrate } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
-import { isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
+import { type MediaClock, isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
+import { type HlsPath, sessionUris } from '@/hls/hlsUris'
 import { type HlsSession, HlsSessions } from '@/hls/hlsSessions'
 import { KeyframesService } from '@/hls/keyframesService'
 import {
@@ -50,7 +35,9 @@ import {
   subtitlePlaylist,
   subtitleSegmentCount,
 } from '@/hls/playlists'
-import { type SegmentPlan, remuxPlan, transcodePlan } from '@/hls/segmentPlan'
+import { type SegmentPlan, playlistLength, remuxPlan, transcodePlan } from '@/hls/segmentPlan'
+import { subtitleSegmentVtt, subtitleSpanOf, subtitleWindowsOf } from '@/hls/subtitleSegments'
+import { variantOf, videoStringOf } from '@/hls/variant'
 import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { PrivateBy } from '@/lock/lockGuard'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
@@ -72,105 +59,8 @@ import { RESPONSE_EVENTS, trackStream } from '@/streams/trackStream'
 
 const MEDIA_ROUTES = 'api/media'
 
-type HlsPath = (typeof HLS_PATHS)[keyof typeof HLS_PATHS]
-
 /** An HLS path as this controller's route: what follows its `api/media` prefix. */
 const routeOf = (path: HlsPath): string => path.slice(`/${MEDIA_ROUTES}/`.length)
-
-/** The 90 kHz clock of MPEG-TS, which a WebVTT segment's `X-TIMESTAMP-MAP` ties its cues to. */
-const MPEG_TS_HZ = 90_000
-
-/** RFC 6381 names HLS players read differently from `MediaSource`, which `audioCodecString` serves. */
-const HLS_AUDIO_STRINGS: Readonly<Record<string, string>> = { [HLS_COPY_AUDIO_CODECS.flac]: 'fLaC' }
-
-/**
- * An HLS path with its placeholders filled in, absolute, and carrying the
- * request's ticket when it had one: a relative URI would not inherit it.
- */
-const hlsUri = ({
-  path,
-  values,
-  ticket,
-}: {
-  path: HlsPath
-  values: Readonly<Record<string, string>>
-  ticket: string | null
-}): string => {
-  const filled = path.replace(/:(\w+)/g, (placeholder, name: string) => {
-    const value = values[name]
-    return value == null ? placeholder : encodeURIComponent(value)
-  })
-  return ticket == null ? filled : `${filled}?${toQueryString({ [MEDIA_TICKET_PARAM]: ticket })}`
-}
-
-/** Every URI one session's playlists name. */
-const urisOf = ({ session, ticket }: { session: HlsSession; ticket: string | null }) => {
-  const of = (path: HlsPath, values: Readonly<Record<string, string>> = {}): string =>
-    hlsUri({
-      path,
-      values: {
-        [HLS_PARAMS.id]: String(session.mediaId),
-        [HLS_PARAMS.session]: session.id,
-        ...values,
-      },
-      ticket,
-    })
-  return {
-    video: of(HLS_PATHS.video),
-    init: of(HLS_PATHS.init),
-    segment: (n: number) => of(HLS_PATHS.segment, { [HLS_PARAMS.n]: String(n) }),
-    subtitles: (trackId: string) => of(HLS_PATHS.subtitles, { [HLS_PARAMS.trackId]: trackId }),
-    subtitleSegment: ({ trackId, n }: { trackId: string; n: number }) =>
-      of(HLS_PATHS.subtitleSegment, { [HLS_PARAMS.trackId]: trackId, [HLS_PARAMS.n]: String(n) }),
-  }
-}
-
-/**
- * The stretch a subtitle segment covers, on the file's own clock: the
- * playlists start where the video's first segment does.
- */
-const subtitleSpanOf = ({ plan, n }: { plan: SegmentPlan; n: number }) => {
-  const from = (plan.boundaries[0] ?? 0) + n * HLS_SEGMENT_SECONDS
-  return { from, to: from + HLS_SEGMENT_SECONDS }
-}
-
-/** How long the playlists run: from the first segment's start to the end. */
-const playlistLength = (plan: SegmentPlan): number => plan.duration - (plan.boundaries[0] ?? 0)
-
-/** The frame a transcode comes out at: no taller than `maxHeight`, the width kept in proportion and even. */
-const scaledTo = ({
-  width,
-  height,
-  maxHeight,
-}: {
-  width: number
-  height: number
-  maxHeight: number
-}): { width: number; height: number } => {
-  const scaled = Math.min(height, maxHeight)
-  return { width: Math.round((width * scaled) / height / 2) * 2, height: scaled }
-}
-
-/** A transcode's video is 8-bit H.264 High; a remux's is the file's own. */
-const videoStringOf = ({
-  mode,
-  file,
-  bitDepth,
-}: {
-  mode: StreamMode
-  file: MediaFile
-  bitDepth: number | null
-}): string | null => {
-  if (mode === PLAYBACK_MODES.transcode) {
-    return videoCodecString({ codec: VIDEO_CODECS.h264, bitDepth: null })
-  }
-  return file.videoCodec == null ? null : videoCodecString({ codec: file.videoCodec, bitDepth })
-}
-
-const audioStringOf = (track: AudioTrack): string | null => {
-  const codec = hlsAudioCodec(track)
-  return HLS_AUDIO_STRINGS[codec] ?? audioCodecString(codec)
-}
 
 /**
  * Converted media for players that take HLS rather than Media Source
@@ -195,8 +85,6 @@ export class HlsController {
     @Inject(AuthSessions) private readonly callers: AuthSessions,
   ) {}
 
-  private readonly logger = new Logger(HlsController.name)
-
   /**
    * Opens a session for one way of playing the file and lists its variant
    * and a rendition for each text subtitle track. Nothing is converted
@@ -217,6 +105,7 @@ export class HlsController {
     const playback = this.settings.playback()
     refuseWhatSettingsTurnOff({ playback, mode: streamMode })
     const sized = streamSizeOf({ quality, mode: streamMode })
+    const size = sized?.size ?? null
     const file = this.fileOf(id)
     const bytes = await sizeOnDisk(file)
     const { tracks } = await this.tracks.tracksFor(file)
@@ -229,20 +118,15 @@ export class HlsController {
     if (probe?.width == null || probe.height == null || end == null) {
       throw new UnprocessableEntityException('This file has no picture of a known length to cut')
     }
-    const videoString = videoStringOf({ mode: streamMode, file, bitDepth: probe.videoBitDepth })
+    const videoString = videoStringOf({
+      mode: streamMode,
+      videoCodec: file.videoCodec,
+      bitDepth: probe.videoBitDepth,
+    })
     if (videoString == null) {
       throw new ConflictException("HLS can't carry this video as it is; transcode it")
     }
-    const plan =
-      streamMode === PLAYBACK_MODES.remux
-        ? remuxPlan({
-            keyframes: await this.keyframes.of({ id, path: file.path }),
-            duration: end,
-          })
-        : transcodePlan({ start: clock.videoStart, duration: end, frameRate: clock.frameRate })
-    if (!plan) {
-      throw new ConflictException('Keyframes lie too far apart in this file to remux; transcode it')
-    }
+    const plan = await this.planOf({ mode: streamMode, file, clock, end })
 
     const keyframesFor =
       streamMode === PLAYBACK_MODES.transcode && isTransportStream(output)
@@ -254,41 +138,45 @@ export class HlsController {
       mode: streamMode,
       playback,
     })
-    const maxHeight = capHeight({ size: sized?.size ?? null, maxHeight: playback.maxHeight })
-    const bitrate = sized?.size.bitrate ?? null
+    const maxHeight = capHeight({ size, maxHeight: playback.maxHeight })
+    const bitrate = size?.bitrate ?? null
     const session = this.sessions.mint({
       mediaId: id,
-      mode: streamMode,
-      audio: audioTrack,
-      quality: sized?.key ?? null,
-      plan,
-      startTime: clock.start,
-      encoding: {
+      asked: sized?.key ?? null,
+      source: {
         input: file.path,
+        mode: streamMode,
+        plan,
+        startTime: clock.start,
+        frameRate: clock.frameRate,
+        audio: audioTrack,
         videoCodec: file.videoCodec,
         encoder,
         maxHeight,
         quality: playback.quality,
         bitrate,
         tonemap,
-        frameRate: clock.frameRate,
       },
       keyframesFor,
     })
 
-    const uris = urisOf({ session, ticket: ticket ?? null })
-    const audioString = audioTrack ? audioStringOf(audioTrack) : null
-    const frame = { width: probe.width, height: probe.height }
+    const uris = sessionUris({ session, ticket: ticket ?? null })
     const playlist = masterPlaylist({
       mode: streamMode,
       variantUri: uris.video,
       subtitles: tracks.subtitles.map((track) => ({ track, uri: uris.subtitles(track.id) })),
-      codecs: [videoString, ...(audioString == null ? [] : [audioString])].join(','),
-      resolution: streamMode === PLAYBACK_MODES.remux ? frame : scaledTo({ ...frame, maxHeight }),
-      bandwidth:
-        streamMode === PLAYBACK_MODES.remux
-          ? (probe.bitrate ?? Math.round((bytes * 8) / playlistLength(plan)))
-          : transcodeBitrate({ quality: playback.quality, bitrate }),
+      ...variantOf({
+        mode: streamMode,
+        videoString,
+        audio: audioTrack,
+        frame: { width: probe.width, height: probe.height },
+        plan,
+        fileBitrate: probe.bitrate,
+        bytes,
+        maxHeight,
+        quality: playback.quality,
+        bitrate,
+      }),
     })
     await this.sendPlaylist({ reply, playlist })
   }
@@ -303,7 +191,7 @@ export class HlsController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const opened = this.sessionOf({ id, session })
-    const uris = urisOf({ session: opened, ticket: ticket ?? null })
+    const uris = sessionUris({ session: opened, ticket: ticket ?? null })
     await this.sendPlaylist({
       reply,
       playlist: mediaPlaylist({ plan: opened.plan, initUri: uris.init, segmentUri: uris.segment }),
@@ -361,7 +249,7 @@ export class HlsController {
   ): Promise<void> {
     const opened = this.sessionOf({ id, session })
     await this.textTrackOf({ file: this.fileOf(id), trackId })
-    const uris = urisOf({ session: opened, ticket: ticket ?? null })
+    const uris = sessionUris({ session: opened, ticket: ticket ?? null })
     await this.sendPlaylist({
       reply,
       playlist: subtitlePlaylist({
@@ -393,34 +281,41 @@ export class HlsController {
     if (number == null || number >= subtitleSegmentCount(playlistLength(opened.plan))) {
       throw new NotFoundException(`No subtitle segment ${n} in this stream`)
     }
-    const { from, to } = subtitleSpanOf({ plan: opened.plan, n: number })
-    const first = subtitleWindowOf(from - opened.startTime)
-    const last = subtitleWindowOf(to - opened.startTime)
-    const windows =
-      track.source === SUBTITLE_SOURCES.external
-        ? [0]
-        : Array.from({ length: last - first + 1 }, (_, k) => first + k)
+    const span = subtitleSpanOf({ plan: opened.plan, n: number })
     const texts = await Promise.all(
-      windows.map((window) => this.subtitles.vtt({ file, trackId, window })),
+      subtitleWindowsOf({ track, span, startTime: opened.startTime }).map((window) =>
+        this.subtitles.vtt({ file, trackId, window }),
+      ),
     )
-    const cues = texts
-      .map(parseWebVtt)
-      .reduce<SubtitleCue[]>((existing, incoming) => mergeCues({ existing, incoming }), [])
-      .map((cue) => ({
-        start: cue.start + opened.startTime,
-        end: cue.end + opened.startTime,
-        text: cue.text,
-      }))
-      .filter((cue) => cue.end > from && cue.start < to)
     await reply
       .header(HEADERS.contentType, CONTENT_TYPES.vtt)
       .header(HEADERS.cacheControl, RAVEN_CACHE_POLICIES.privateFiveMinutes)
-      .send(
-        formatWebVtt({
-          cues,
-          timestampMap: { mpegts: STREAM_TIME_SHIFT * MPEG_TS_HZ, local: 0 },
-        }),
-      )
+      .send(subtitleSegmentVtt({ texts, span, startTime: opened.startTime }))
+  }
+
+  /** The segments the session cuts: a remux's at its keyframes, a transcode's on its frames. */
+  private async planOf({
+    mode,
+    file,
+    clock,
+    end,
+  }: {
+    mode: StreamMode
+    file: MediaFile
+    clock: MediaClock
+    end: number
+  }): Promise<SegmentPlan> {
+    const plan =
+      mode === PLAYBACK_MODES.remux
+        ? remuxPlan({
+            keyframes: await this.keyframes.of({ id: file.id, path: file.path }),
+            duration: end,
+          })
+        : transcodePlan({ start: clock.videoStart, duration: end, frameRate: clock.frameRate })
+    if (!plan) {
+      throw new ConflictException('Keyframes lie too far apart in this file to remux; transcode it')
+    }
+    return plan
   }
 
   /**
@@ -430,13 +325,7 @@ export class HlsController {
    * then.
    */
   private transportKeyframes(file: MediaFile): () => readonly number[] | null {
-    this.keyframes
-      .of({ id: file.id, path: file.path })
-      .catch((error: unknown) =>
-        this.logger.warn(
-          `Could not read the keyframes of media ${file.id}: ${errorMessage(error)}`,
-        ),
-      )
+    this.keyframes.warm({ id: file.id, path: file.path })
     return () => this.index.storedKeyframes(file.id)
   }
 
@@ -511,8 +400,8 @@ export class HlsController {
       auth: this.callers,
       mediaId: session.mediaId,
       mode: session.mode,
-      quality: session.quality,
-      audio: session.audio,
+      quality: session.asked,
+      audio: session.audio?.index ?? null,
       request,
       reply,
     })

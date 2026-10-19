@@ -77,9 +77,9 @@ export const parseWebVtt = (text: string): SubtitleCue[] =>
     .filter((cue): cue is SubtitleCue => cue != null)
     .toSorted((a, b) => a.start - b.start || a.end - b.end)
 
-/** Seconds as "HH:MM:SS.mmm", the way WebVTT writes a time. */
+/** Seconds as "HH:MM:SS.mmm", the way WebVTT writes a time; a time that is not a finite number is 0. */
 const formatTimestamp = (seconds: number): string => {
-  const total = Math.round(Math.max(0, seconds) * 1000)
+  const total = Number.isFinite(seconds) ? Math.round(Math.max(0, seconds) * 1000) : 0
   const [hours, minutes, secs] = [
     Math.floor(total / 3_600_000),
     Math.floor(total / 60_000) % 60,

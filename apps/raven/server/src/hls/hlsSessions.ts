@@ -2,7 +2,6 @@ import { randomBytes } from 'node:crypto'
 import { mkdirSync, rmSync } from 'node:fs'
 import { mkdir, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createInterface } from 'node:readline'
 import {
   Inject,
   Injectable,
@@ -10,54 +9,24 @@ import {
   NotFoundException,
   type OnModuleDestroy,
   type OnModuleInit,
-  ServiceUnavailableException,
 } from '@nestjs/common'
 import {
-  type AudioTrack,
   HLS_IDLE_MS,
   HLS_KEPT_SEGMENTS,
   MEDIA_TICKET_SECONDS,
-  type StreamMode,
   type StreamQuality,
 } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
-import { type DemuxTimeBase, type SegmentClock, hlsArgs } from '@/ffmpeg/args'
-import { type FfmpegStream, FfmpegService } from '@/ffmpeg/ffmpegService'
-import { segmentFileName, segmentNumberOf, splitSegmentFile } from '@/hls/segmentFiles'
-import type { SegmentPlan } from '@/hls/segmentPlan'
-
-/** The clock and timers the sessions run on; a test moves them by hand. */
-export type HlsClock = {
-  now: () => number
-  /** Calls `run` after `ms`; what it returns cancels that. */
-  after: ({ ms, run }: { ms: number; run: () => void }) => () => void
-}
-
-/** The DI token the sessions' clock is provided under. */
-export const HLS_CLOCK = Symbol('HLS_CLOCK')
-
-export const SYSTEM_CLOCK: HlsClock = {
-  now: () => Date.now(),
-  after: ({ ms, run }) => {
-    const timer = setTimeout(run, ms)
-    // A session's timer alone never keeps the process alive.
-    timer.unref()
-    return () => clearTimeout(timer)
-  },
-}
-
-/** How many segments a run may finish past the furthest one asked for before it is paused. */
-const HLS_RUN_AHEAD = 10
-
-/** How far past a run's next segment a request still waits for it instead of restarting. */
-const HLS_WAIT_AHEAD = 2
+import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import type { HlsDialect } from '@/ffmpeg/ffmpegVersion'
+import { type HlsSource, hlsArgs } from '@/ffmpeg/hlsArgs'
+import { HLS_CLOCK, type HlsClock } from '@/hls/hlsClock'
+import { splitSegmentFile } from '@/hls/segmentFiles'
+import { RunReplaced, SegmentRun } from '@/hls/segmentRun'
 
 /** How many times a request cuts its segment again when the listed file cannot be read. */
 const MAX_READ_MISSES = 2
-
-/** How long a request waits for its segment before giving up. */
-export const HLS_SEGMENT_WAIT_MS = 30_000
 
 /**
  * How long an init with no run waits for a segment request to start one
@@ -72,40 +41,6 @@ export const HLS_SESSION_CAP = 8
 
 /** A session unasked for this long is forgotten: no ticket that opened it is still good. */
 const HLS_RECORD_MS = MEDIA_TICKET_SECONDS * 1000
-
-/** What a run is sent: killed, paused while it is too far ahead, resumed. */
-export const RUN_SIGNALS = { kill: 'SIGKILL', stop: 'SIGSTOP', resume: 'SIGCONT' } as const
-
-/** What every run of a session encodes with: the file, and what the caller decided for it. */
-export type HlsEncoding = Omit<
-  Parameters<typeof hlsArgs>[0],
-  | 'plan'
-  | 'from'
-  | 'mode'
-  | 'audio'
-  | 'folder'
-  | 'segmentClock'
-  | 'timeBase'
-  | 'startTime'
-  | 'seekKeyframes'
->
-
-/** A minted session: what it plays, and the plan its playlist and its runs share. */
-export type HlsSession = {
-  id: string
-  mediaId: number
-  mode: StreamMode
-  /** The `0:a:N` track it plays, or null for a silent file. */
-  audio: number | null
-  /** The size the viewer asked a transcode for, or null for the settings'. */
-  quality: StreamQuality | null
-  plan: SegmentPlan
-  /**
-   * Where the file's own clock begins, ffprobe's `format.start_time`. The
-   * plan is on that clock, and subtitles, extracted from zero, are not.
-   */
-  startTime: number
-}
 
 /**
  * The segments a session lets go of once `furthest` is asked for: all but
@@ -123,14 +58,6 @@ export const segmentsPastKeeping = ({
 const sessionEnded = (): NotFoundException =>
   new NotFoundException('This stream session has ended; open the stream again')
 
-/** A run killed for a later request; whoever waited on it asks again. */
-class RunReplaced extends Error {
-  constructor() {
-    super('A later request replaced the run')
-    this.name = 'RunReplaced'
-  }
-}
-
 /** No run started while an init waited for one, so it starts one itself. */
 class LaunchTimeout extends Error {
   constructor() {
@@ -139,36 +66,22 @@ class LaunchTimeout extends Error {
   }
 }
 
-type Waiter = { n: number; settle: (error: Error | null) => void }
-
-/** One ffmpeg writing a session's segments, in order, from `from`, into a folder of its own. */
-type Run = {
-  child: FfmpegStream
-  folder: string
-  from: number
-  /** The next segment it finishes. */
-  next: number
-  /** The furthest segment asked for since it started. */
-  furthest: number
-  isPaused: boolean
-  /** Its first segment took too long, so a far request need not wait for it. */
-  hasStalled: boolean
-  waiters: Set<Waiter>
-  /** Settles once ffmpeg has exited and its pipes have closed. */
-  closed: Promise<void>
-}
+/**
+ * A minted session: the media it plays, the size the viewer asked a
+ * transcode for (null for the settings'), and the source every one of its
+ * runs reads.
+ */
+export type HlsSession = HlsSource & { id: string; mediaId: number; asked: StreamQuality | null }
 
 type Entry = {
   session: HlsSession
-  audio: AudioTrack | null
-  encoding: HlsEncoding
   keyframesFor: (() => readonly number[] | null) | null
   /** Whether it has said that a restart without keyframes may start late. */
   hasWarnedOfSeek: boolean
   folder: string
   lastAskedAt: number
   cancelTimers: () => void
-  run: Run | null
+  run: SegmentRun | null
   runs: number
   /** The whole file of each segment on disk. A file not listed here is never served. */
   written: Map<number, string>
@@ -232,9 +145,9 @@ const waitThenRetry = <T>(until: Promise<unknown>): Step<T> => ({
  * segment is whole there, waits when the run is about to write it, and
  * otherwise has the run killed and one started at that segment, which cuts
  * the same segments a run from the start would. A run killed for a later
- * request has first written the segment it was started for, so every
- * request is served in the end. A run ten segments ahead of the furthest
- * asked for is paused until asked further, and only the last
+ * request has first written the segment it was started for, or stalled on
+ * it, so every request is served in the end. A run ten segments ahead of
+ * the furthest asked for is paused until asked further, and only the last
  * `HLS_KEPT_SEGMENTS` behind the furthest asked stay on disk.
  *
  * A session nobody asks for in `HLS_IDLE_MS` rests: its run is killed and
@@ -271,26 +184,18 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   /** Opens a session. Nothing runs until a segment is asked for. */
   mint({
     mediaId,
-    mode,
-    audio,
-    quality,
-    plan,
-    startTime,
-    encoding,
-    keyframesFor = null,
+    asked,
+    source,
+    keyframesFor,
   }: {
     mediaId: number
-    mode: StreamMode
-    audio: AudioTrack | null
-    quality: StreamQuality | null
-    plan: SegmentPlan
-    startTime: number
-    encoding: HlsEncoding
+    asked: StreamQuality | null
+    source: HlsSource
     /**
      * For a source whose seek lands mid-GOP (MPEG-TS), its keyframes as
      * far as they are known when a run starts; null for any other.
      */
-    keyframesFor?: (() => readonly number[] | null) | null
+    keyframesFor: (() => readonly number[] | null) | null
   }): HlsSession {
     const kept = [...this.entries.values()]
     if (kept.length >= HLS_SESSION_CAP) {
@@ -298,19 +203,9 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
         kept.reduce((idlest, entry) => (entry.lastAskedAt < idlest.lastAskedAt ? entry : idlest)),
       )
     }
-    const session = {
-      id: randomBytes(16).toString('base64url'),
-      mediaId,
-      mode,
-      audio: audio?.index ?? null,
-      quality,
-      plan,
-      startTime,
-    }
+    const session = { ...source, id: randomBytes(16).toString('base64url'), mediaId, asked }
     const entry: Entry = {
       session,
-      audio,
-      encoding,
       keyframesFor,
       hasWarnedOfSeek: false,
       folder: join(this.root, session.id),
@@ -453,27 +348,25 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   /** Where segment `n` is, or what to wait for before asking again. */
   private async locate({ entry, n }: { entry: Entry; n: number }): Promise<Step<string>> {
     const run = entry.run
-    if (run) this.ask({ run, n })
+    if (run) run.ask(n)
     const path = entry.written.get(n)
     if (path) {
       await this.prune({ entry, n })
       return ready(path)
     }
-    if (run && n >= run.next && n <= run.next + HLS_WAIT_AHEAD) {
-      return waitThenRetry(this.waitFor({ run, n }))
-    }
-    // A run is not killed before it has written what it was started for,
-    // so two requests far apart cannot keep replacing each other's runs.
-    if (run && run.next === run.from && !run.hasStalled) {
+    if (run && run.writesSoon(n)) return waitThenRetry(run.waitFor(n))
+    // A run is not killed before it has written what it was started for, or
+    // stalled on it, so two requests far apart cannot keep replacing each
+    // other's runs.
+    if (run && !run.mayBeReplaced) {
       return waitThenRetry(
-        this.waitFor({ run, n: run.from }).catch((error: unknown) => {
-          if (error instanceof ServiceUnavailableException) run.hasStalled = true
+        run.waitForStart().catch((error: unknown) => {
           if (error instanceof NotFoundException) throw error
         }),
       )
     }
     const fresh = await this.restart({ entry, from: n })
-    return waitThenRetry(this.waitFor({ run: fresh, n }))
+    return waitThenRetry(fresh.waitFor(n))
   }
 
   private async cutInit({
@@ -512,10 +405,10 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
       return ready(entry.init)
     }
     const run = entry.run
-    if (run && run.next === run.from) return waitThenRetry(this.waitFor({ run, n: run.from }))
+    if (run && !run.hasStarted) return waitThenRetry(run.waitFor(run.from))
     if (!mayStart) return { kind: STEPS.wait, until: this.nextLaunch(entry) }
     const fresh = await this.restart({ entry, from: 0 })
-    return waitThenRetry(this.waitFor({ run: fresh, n: 0 }))
+    return waitThenRetry(fresh.waitFor(0))
   }
 
   /** Whether waiting ended with no run started; the next launch resolves it false. */
@@ -546,23 +439,9 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     })
   }
 
-  /** The run may go `HLS_RUN_AHEAD` past the furthest segment asked for. */
-  private ask({ run, n }: { run: Run; n: number }): void {
-    run.furthest = Math.max(run.furthest, n)
-    if (run.isPaused && run.next - 1 < run.furthest + HLS_RUN_AHEAD) {
-      run.isPaused = false
-      run.child.kill(RUN_SIGNALS.resume)
-    }
-  }
-
-  private async restart({ entry, from }: { entry: Entry; from: number }): Promise<Run> {
-    const old = entry.run
-    entry.run = null
-    if (old) await this.stop({ run: old, reason: new RunReplaced() })
-    const [segmentClock, timeBase] = await Promise.all([
-      this.ffmpeg.segmentClock(),
-      this.ffmpeg.demuxTimeBase(),
-    ])
+  private async restart({ entry, from }: { entry: Entry; from: number }): Promise<SegmentRun> {
+    await this.stopRun({ entry, reason: new RunReplaced() })
+    const dialect = await this.ffmpeg.hlsDialect()
     entry.runs += 1
     // Each run writes into a folder of its own, so a segment another run
     // wrote stays whole and servable while this one writes its own.
@@ -572,72 +451,54 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
       await rm(entry.folder, { recursive: true, force: true })
       throw sessionEnded()
     }
-    const run = this.launch({ entry, from, folder, segmentClock, timeBase })
-    entry.launches.forEach((launched) => launched())
-    entry.launches.clear()
+    const run = this.launch({ entry, from, folder, dialect })
+    this.release(entry)
     return run
   }
 
-  /** Kills a run, paused or not, and deletes the file it was halfway through. */
-  private async stop({ run, reason }: { run: Run; reason: Error }): Promise<void> {
-    ;[...run.waiters].forEach((waiter) => waiter.settle(reason))
-    run.child.kill(RUN_SIGNALS.kill)
-    await run.closed
-    await rm(join(run.folder, segmentFileName(run.next)), { force: true })
+  /** Takes the session's run off it and stops it, failing its waiters with `reason`. */
+  private async stopRun({ entry, reason }: { entry: Entry; reason: Error }): Promise<void> {
+    const run = entry.run
+    entry.run = null
+    if (run) await run.stop(reason)
+  }
+
+  /** Lets every init waiting for a run go and decide again. */
+  private release(entry: Entry): void {
+    entry.launches.forEach((launched) => launched())
+    entry.launches.clear()
   }
 
   private launch({
     entry,
     from,
     folder,
-    segmentClock,
-    timeBase,
+    dialect,
   }: {
     entry: Entry
     from: number
     folder: string
-    segmentClock: SegmentClock
-    timeBase: DemuxTimeBase
-  }): Run {
+    dialect: HlsDialect
+  }): SegmentRun {
     const child = this.ffmpeg.segment(
       hlsArgs({
-        ...entry.encoding,
-        seekKeyframes: this.seekKeyframesOf({ entry, from }),
-        plan: entry.session.plan,
+        source: entry.session,
         from,
-        mode: entry.session.mode,
-        audio: entry.audio,
-        startTime: entry.session.startTime,
         folder,
-        segmentClock,
-        timeBase,
+        seekKeyframes: this.seekKeyframesOf({ entry, from }),
+        dialect,
       }),
     )
-    const run: Run = {
+    const run = new SegmentRun({
       child,
       folder,
       from,
-      next: from,
-      furthest: from,
-      isPaused: false,
-      hasStalled: false,
-      waiters: new Set(),
-      closed: new Promise<void>((resolve) => {
-        child.once('close', () => resolve())
-        child.once('error', () => {
-          if (child.pid === undefined) resolve()
-        })
-      }),
-    }
-    // The segment muxer lists a file on stdout once it has written and flushed all of it.
-    createInterface({ input: child.stdout }).on('line', (line) =>
-      this.finished({ entry, run, name: line.trim() }),
-    )
-    child.once('close', () => this.ended({ entry, run }))
-    // Once spawned, an 'error' (a signal that could not be sent) leaves it running; only
-    // 'close' ends it. One that never spawned has no pid and gets no 'close'.
-    child.once('error', () => {
-      if (child.pid === undefined) this.ended({ entry, run })
+      last: entry.session.plan.boundaries.length - 1,
+      clock: this.clock,
+      onSegment: ({ n, path }) => this.record({ entry, n, path, isFirst: n === from }),
+      onEnd: () => {
+        if (entry.run === run) entry.run = null
+      },
     })
     entry.run = run
     return run
@@ -662,56 +523,25 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     return keyframes
   }
 
-  private finished({ entry, run, name }: { entry: Entry; run: Run; name: string }): void {
-    const n = segmentNumberOf(name)
-    if (n == null || entry.run !== run) return
-    const path = join(run.folder, name)
+  /** Lists a segment a run has written whole, and its run's first file as the init's source. */
+  private record({
+    entry,
+    n,
+    path,
+    isFirst,
+  }: {
+    entry: Entry
+    n: number
+    path: string
+    isFirst: boolean
+  }): void {
     if (entry.written.has(n)) {
       // Another run's copy is whole and may be being read; this one is spare.
       rm(path, { force: true }).catch(() => undefined)
     } else {
       entry.written.set(n, path)
     }
-    run.next = n + 1
-    if (n === run.from && !entry.init) entry.initSource = entry.written.get(n) ?? null
-    ;[...run.waiters].filter((waiter) => waiter.n <= n).forEach((waiter) => waiter.settle(null))
-
-    const isLast = n >= entry.session.plan.boundaries.length - 1
-    if (!run.isPaused && !isLast && n >= run.furthest + HLS_RUN_AHEAD) {
-      run.isPaused = true
-      run.child.kill(RUN_SIGNALS.stop)
-    }
-  }
-
-  private ended({ entry, run }: { entry: Entry; run: Run }): void {
-    if (entry.run === run) entry.run = null
-    ;[...run.waiters].forEach((waiter) =>
-      waiter.settle(new Error(`ffmpeg stopped before writing segment ${waiter.n}`)),
-    )
-  }
-
-  private waitFor({ run, n }: { run: Run; n: number }): Promise<void> {
-    if (run.next > n) return Promise.resolve()
-    return new Promise<void>((resolve, reject) => {
-      const waiter: Waiter = {
-        n,
-        settle: (error) => {
-          run.waiters.delete(waiter)
-          cancel()
-          if (error) {
-            reject(error)
-            return
-          }
-          resolve()
-        },
-      }
-      const cancel = this.clock.after({
-        ms: HLS_SEGMENT_WAIT_MS,
-        run: () =>
-          waiter.settle(new ServiceUnavailableException(`Segment ${n} was not ready in time`)),
-      })
-      run.waiters.add(waiter)
-    })
+    if (isFirst && !entry.init) entry.initSource = entry.written.get(n) ?? null
   }
 
   /** Deletes all but the last `HLS_KEPT_SEGMENTS` at or behind the furthest asked for. */
@@ -733,9 +563,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     this.enqueue({
       entry,
       work: async () => {
-        const run = entry.run
-        entry.run = null
-        if (run) await this.stop({ run, reason: new RunReplaced() })
+        await this.stopRun({ entry, reason: new RunReplaced() })
         entry.written.clear()
         entry.initSource = null
         await rm(entry.folder, { recursive: true, force: true })
@@ -750,15 +578,8 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     if (!this.isKept(entry)) return
     this.entries.delete(entry.session.id)
     entry.cancelTimers()
-    entry.launches.forEach((launched) => launched())
-    entry.launches.clear()
-    const run = entry.run
-    entry.run = null
-    if (run) {
-      ;[...run.waiters].forEach((waiter) => waiter.settle(sessionEnded()))
-      run.child.kill(RUN_SIGNALS.kill)
-    }
-    const cleanup: Promise<void> = (run?.closed ?? Promise.resolve())
+    this.release(entry)
+    const cleanup: Promise<void> = this.stopRun({ entry, reason: sessionEnded() })
       .then(() => rm(entry.folder, { recursive: true, force: true }))
       .catch((error: unknown) =>
         this.logger.warn(`Could not delete a stream's segments: ${errorMessage(error)}`),

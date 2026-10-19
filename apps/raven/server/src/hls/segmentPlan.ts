@@ -94,6 +94,10 @@ export const transcodePlan = ({
 
 export const segmentDurations = (plan: SegmentPlan): number[] => spansMs(plan).map(toSeconds)
 
+/** How long the playlists run: from the first segment's start to the end. */
+export const playlistLength = (plan: SegmentPlan): number =>
+  plan.duration - (plan.boundaries[0] ?? 0)
+
 /**
  * The boundaries after segment `from`, relative to it, for ffmpeg's
  * `-segment_times`: the segment muxer reads them as offsets from the run's

@@ -4,7 +4,6 @@ import {
   Get,
   Header,
   Inject,
-  Logger,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -28,7 +27,6 @@ import { AccessRechecks } from '@/auth/accessRechecks'
 import { AccountTickets } from '@/auth/accountTickets'
 import { AuthSessions } from '@/auth/authSessions'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
-import { errorMessage } from '@/errorMessage'
 import { streamArgs } from '@/ffmpeg/args'
 import { FFMPEG_SIGNALS, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { parseStreams } from '@/ffmpeg/streams'
@@ -77,8 +75,6 @@ export class PlaybackController {
     @Inject(KeyframesService) private readonly keyframes: KeyframesService,
   ) {}
 
-  private readonly logger = new Logger(PlaybackController.name)
-
   private fileOf(id: number): MediaFile {
     const file = this.index.fileOf(id)
     if (!file) throw new NotFoundException(`No media ${id}`)
@@ -122,13 +118,7 @@ export class PlaybackController {
    */
   private warmKeyframes(file: MediaFile): void {
     if (this.settings.playback().transcoding === TRANSCODINGS.off) return
-    this.keyframes
-      .of({ id: file.id, path: file.path })
-      .catch((error: unknown) =>
-        this.logger.warn(
-          `Could not read the keyframes of media ${file.id}: ${errorMessage(error)}`,
-        ),
-      )
+    this.keyframes.warm({ id: file.id, path: file.path })
   }
 
   /**

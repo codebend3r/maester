@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { NotFoundException, ServiceUnavailableException } from '@nestjs/common'
+import { Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import {
   type AudioTrack,
   DEFAULT_PLAYBACK_SETTINGS,
@@ -18,21 +18,21 @@ import {
 import { type MockInstance, afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { type FfmpegStream, FfmpegService } from '@/ffmpeg/ffmpegService'
+import { type MediaClock, mediaClockOf } from '@/ffmpeg/probe'
+import type { HlsClock } from '@/hls/hlsClock'
 import {
   HLS_INIT_GRACE_MS,
-  HLS_SEGMENT_WAIT_MS,
   HLS_SESSION_CAP,
-  type HlsClock,
   type HlsSession,
   HlsSessions,
-  RUN_SIGNALS,
   segmentsPastKeeping,
 } from '@/hls/hlsSessions'
-import { type MediaClock, mediaClockOf } from '@/ffmpeg/probe'
-import { MP4_BOXES, segmentFileName } from '@/hls/segmentFiles'
+import { segmentFileName } from '@/hls/segmentFiles'
 import { type SegmentPlan, remuxPlan, transcodePlan } from '@/hls/segmentPlan'
+import { HLS_SEGMENT_WAIT_MS, RUN_SIGNALS } from '@/hls/segmentRun'
 import { eventually, testConfig } from '@/test/app'
 import { encodeClip, encodeRichClip } from '@/test/clips'
+import { mdatOf, videoTfdt } from '@/test/mp4'
 
 const run = promisify(execFile)
 
@@ -48,20 +48,6 @@ const PACE = 8
 
 /** How many times the 40-second clip plays in the long one: about 21 minutes, 213 segments. */
 const LONG_LOOPS = 32
-
-/** The boxes inside a track and a fragment that hold the clock. */
-const TRACK_BOXES = {
-  track: 'trak',
-  trackHeader: 'tkhd',
-  media: 'mdia',
-  mediaHeader: 'mdhd',
-  trackFragment: 'traf',
-  trackFragmentHeader: 'tfhd',
-  decodeTime: 'tfdt',
-} as const
-
-/** The full box version 1 widens the times before the field read. */
-const WIDE_VERSION = 1
 
 /**
  * ffmpeg as the sessions run it, keeping each run's arguments and process
@@ -111,78 +97,6 @@ const manualClock = () => {
   }
   return { clock, advance, pending: () => state.timers.size }
 }
-
-type Box = { type: string; start: number; end: number; body: number }
-
-const boxesIn = ({ bytes, start, end }: { bytes: Buffer; start: number; end: number }): Box[] => {
-  if (start >= end) return []
-  const small = bytes.readUInt32BE(start)
-  const isLarge = small === 1
-  const size = isLarge ? Number(bytes.readBigUInt64BE(start + 8)) : small
-  const box = {
-    type: bytes.toString('ascii', start + 4, start + 8),
-    start,
-    end: start + size,
-    body: start + (isLarge ? 16 : 8),
-  }
-  return [box, ...boxesIn({ bytes, start: box.end, end })]
-}
-
-const topBoxes = (bytes: Buffer): Box[] => boxesIn({ bytes, start: 0, end: bytes.length })
-
-const inside = ({ bytes, box, type }: { bytes: Buffer; box: Box | undefined; type: string }) =>
-  box
-    ? boxesIn({ bytes, start: box.body, end: box.end }).filter((child) => child.type === type)
-    : []
-
-/** Reads a full box's field `offset` bytes past its version and flags, wider in version 1. */
-const fullBoxField = ({
-  bytes,
-  box,
-  narrow,
-  wide,
-}: {
-  bytes: Buffer
-  box: Box | undefined
-  narrow: number
-  wide: number
-}): number => {
-  if (!box) throw new Error('Missing box')
-  return bytes.readUInt32BE(box.body + (bytes[box.body] === WIDE_VERSION ? wide : narrow))
-}
-
-/** The video track's decode time at the segment's first fragment, in seconds. */
-const videoTfdt = ({ init, media }: { init: Buffer; media: Buffer }): number => {
-  const moov = topBoxes(init).find((box) => box.type === MP4_BOXES.movie)
-  const [trak] = inside({ bytes: init, box: moov, type: TRACK_BOXES.track })
-  const [tkhd] = inside({ bytes: init, box: trak, type: TRACK_BOXES.trackHeader })
-  const [mdia] = inside({ bytes: init, box: trak, type: TRACK_BOXES.media })
-  const [mdhd] = inside({ bytes: init, box: mdia, type: TRACK_BOXES.mediaHeader })
-  const trackId = fullBoxField({ bytes: init, box: tkhd, narrow: 12, wide: 20 })
-  const timescale = fullBoxField({ bytes: init, box: mdhd, narrow: 12, wide: 20 })
-
-  const moof = topBoxes(media).find((box) => box.type === MP4_BOXES.fragment)
-  const traf = inside({ bytes: media, box: moof, type: TRACK_BOXES.trackFragment }).find(
-    (candidate) => {
-      const [tfhd] = inside({ bytes: media, box: candidate, type: TRACK_BOXES.trackFragmentHeader })
-      return tfhd != null && media.readUInt32BE(tfhd.body + 4) === trackId
-    },
-  )
-  const [tfdt] = inside({ bytes: media, box: traf, type: TRACK_BOXES.decodeTime })
-  if (!tfdt) throw new Error('No tfdt for the video track')
-  const decodeTime =
-    media[tfdt.body] === WIDE_VERSION
-      ? Number(media.readBigUInt64BE(tfdt.body + 4))
-      : media.readUInt32BE(tfdt.body + 4)
-  return decodeTime / timescale
-}
-
-const mdatOf = (media: Buffer): Buffer =>
-  Buffer.concat(
-    topBoxes(media)
-      .filter((box) => box.type === MP4_BOXES.mediaData)
-      .map((box) => media.subarray(box.start, box.end)),
-  )
 
 const argAfter = ({ args, flag }: { args: string[]; flag: string }): string | undefined =>
   args[args.indexOf(flag) + 1]
@@ -321,20 +235,20 @@ describe('HlsSessions', () => {
   }): HlsSession =>
     sessions.mint({
       mediaId,
-      mode,
-      audio,
-      quality: null,
-      plan,
-      startTime,
-      encoding: {
+      asked: null,
+      source: {
         input,
+        mode,
+        plan,
+        startTime,
+        frameRate,
+        audio,
         videoCodec: 'h264',
         encoder: SOFTWARE,
         maxHeight: 1080,
         quality: 'medium',
         bitrate: null,
         tonemap: false,
-        frameRate,
       },
       keyframesFor,
     })
@@ -542,6 +456,37 @@ describe('HlsSessions', () => {
       ])
       expect(later.firstPts).toBeCloseTo((source.plan.boundaries[2] ?? NaN) + STREAM_TIME_SHIFT, 2)
       expect(later.count).toBe(150)
+    })
+
+    it('says once per session that a restart before the keyframes are probed may start late', async () => {
+      const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined)
+      try {
+        const { ffmpeg, sessions } = open({ pace: PACE })
+        const { source } = ts
+        const session = mintIn({
+          sessions,
+          input: source.path,
+          plan: source.plan,
+          mode: PLAYBACK_MODES.transcode,
+          audio: state.audio && { ...state.audio, index: 0 },
+          startTime: source.clock?.start ?? 0,
+          frameRate: source.clock?.frameRate ?? null,
+          keyframesFor: () => null,
+        })
+
+        await sessions.segment({ session: session.id, n: 2 })
+        await sessions.segment({ session: session.id, n: 6 })
+
+        expect(
+          ffmpeg.runs.map(({ args }) => argAfter({ args, flag: '-segment_start_number' })),
+        ).toEqual(['2', '6'])
+        const warnings = warn.mock.calls
+          .map(([message]) => String(message))
+          .filter((message) => message.includes('keyframes are not probed'))
+        expect(warnings).toHaveLength(1)
+      } finally {
+        warn.mockRestore()
+      }
     })
   })
 

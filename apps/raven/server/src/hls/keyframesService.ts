@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
+import { errorMessage } from '@/errorMessage'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { MediaIndex, type ProbeTarget } from '@/media/mediaIndex'
 
@@ -10,6 +11,7 @@ import { MediaIndex, type ProbeTarget } from '@/media/mediaIndex'
  */
 @Injectable()
 export class KeyframesService {
+  private readonly logger = new Logger(KeyframesService.name)
   private readonly running = new Map<string, Promise<number[]>>()
 
   constructor(
@@ -34,6 +36,15 @@ export class KeyframesService {
     } finally {
       this.running.delete(key)
     }
+  }
+
+  /** Starts the probe in the background, unless it is stored or running, for a play that may come soon. */
+  warm(target: ProbeTarget): void {
+    this.of(target).catch((error: unknown) =>
+      this.logger.warn(
+        `Could not read the keyframes of media ${target.id}: ${errorMessage(error)}`,
+      ),
+    )
   }
 
   private async probe({

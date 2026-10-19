@@ -148,6 +148,12 @@ describe('formatWebVtt', () => {
     )
   })
 
+  it('writes a time that is not a finite number as zero', () => {
+    expect(
+      formatWebVtt({ cues: [{ start: NaN, end: Infinity, text: 'Lost' }], timestampMap: null }),
+    ).toBe('WEBVTT\n\n00:00:00.000 --> 00:00:00.000\nLost\n\n')
+  })
+
   it('formats the local time of the map', () => {
     expect(formatWebVtt({ cues: [], timestampMap: { mpegts: 0, local: 3661.5 } })).toContain(
       'LOCAL:01:01:01.500',

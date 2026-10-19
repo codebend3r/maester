@@ -39,7 +39,7 @@ export const refuseWhatSettingsTurnOff = ({
   }
 }
 
-export type StreamSize = (typeof STREAM_QUALITIES)[StreamQuality]
+type StreamSize = (typeof STREAM_QUALITIES)[StreamQuality]
 
 /** The size a viewer asked a transcode for, or null for the server's settings. */
 export const streamSizeOf = ({
