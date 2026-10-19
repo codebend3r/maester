@@ -12,7 +12,7 @@ import {
 import { ENCODER_KINDS, HW_ACCELS } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { SettingsRepository } from '@/settings/settingsRepository'
-import { encoderTestArgs } from '@/ffmpeg/args'
+import { type SegmentClock, encoderTestArgs, segmentClockOf } from '@/ffmpeg/args'
 import { SOFTWARE, type VideoEncoder, encoderCandidates } from '@/ffmpeg/encoder'
 import { parseKeyframes } from '@/ffmpeg/keyframes'
 import { type ProbeResult, parseProbe } from '@/ffmpeg/probe'
@@ -67,6 +67,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(FfmpegService.name)
   private filters: Promise<ReadonlySet<string>> | null = null
   private encoder: Promise<VideoEncoder> | null = null
+  private segmentTimes: Promise<SegmentClock> | null = null
   private readonly streams = new Set<FfmpegStream>()
 
   constructor(
@@ -168,6 +169,12 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
       }
     })
     return child
+  }
+
+  /** How this ffmpeg's segment muxer reads `-segment_times`, from its version, asked once. */
+  segmentClock(): Promise<SegmentClock> {
+    this.segmentTimes ??= this.version().then(segmentClockOf)
+    return this.segmentTimes
   }
 
   /** Settles the encoder at start, so the log says which one transcodes will use. */

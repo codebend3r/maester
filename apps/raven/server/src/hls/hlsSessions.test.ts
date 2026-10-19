@@ -1,16 +1,19 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { ServiceUnavailableException } from '@nestjs/common'
+import { NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import {
   type AudioTrack,
   DEFAULT_PLAYBACK_SETTINGS,
   HLS_IDLE_MS,
+  HLS_KEPT_SEGMENTS,
+  MEDIA_TICKET_SECONDS,
   PLAYBACK_MODES,
   STREAM_TIME_SHIFT,
+  type StreamMode,
 } from '@raven/core'
 import { type MockInstance, afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { SOFTWARE } from '@/ffmpeg/encoder'
@@ -22,9 +25,10 @@ import {
   type HlsSession,
   HlsSessions,
   RUN_SIGNALS,
+  segmentsPastKeeping,
 } from '@/hls/hlsSessions'
 import { MP4_BOXES, segmentFileName } from '@/hls/segmentFiles'
-import { type SegmentPlan, remuxPlan } from '@/hls/segmentPlan'
+import { type SegmentPlan, remuxPlan, transcodePlan } from '@/hls/segmentPlan'
 import { eventually, testConfig } from '@/test/app'
 import { encodeRichClip } from '@/test/clips'
 
@@ -33,14 +37,15 @@ const run = promisify(execFile)
 const CUES = '1\n00:00:01,000 --> 00:00:02,000\nHello\n'
 
 /**
- * How a paced run reads: its first `burst` seconds at once, then `rate`
- * times real time, like a share slower than ffmpeg. ffmpeg 9 keeps a rate
- * up to about 12; asked for more, it read slower than real time here.
+ * How many times real time a paced run reads, like a share slower than
+ * ffmpeg: a six-second segment every 0.75 s. `-readrate` is in FFmpeg 5.1
+ * to 9.0 alike; 9.0 keeps a rate up to about 12 and reads slower than real
+ * time when asked for more, and 5.1 has no `-readrate_initial_burst`.
  */
-type Pace = { rate: number; burst?: number }
+const PACE = 8
 
-/** Each run's first segment comes at once, and each next one 1.25 s later. */
-const PACE: Pace = { rate: 4, burst: 7 }
+/** How many times the 40-second clip plays in the long one: about 21 minutes, 213 segments. */
+const LONG_LOOPS = 32
 
 /** The boxes inside a track and a fragment that hold the clock. */
 const TRACK_BOXES = {
@@ -63,18 +68,11 @@ const WIDE_VERSION = 1
  */
 class WatchedFfmpeg extends FfmpegService {
   readonly runs: { args: string[]; child: FfmpegStream; kill: MockInstance }[] = []
-  pace: Pace | null = null
+  pace: number | null = null
 
   override segment(args: string[]): FfmpegStream {
     const pace = this.pace
-    const reading =
-      pace == null
-        ? []
-        : [
-            '-readrate',
-            String(pace.rate),
-            ...(pace.burst == null ? [] : ['-readrate_initial_burst', String(pace.burst)]),
-          ]
+    const reading = pace == null ? [] : ['-readrate', String(pace)]
     const paced = args.flatMap((arg) => (arg === '-i' ? [...reading, arg] : [arg]))
     const child = super.segment(paced)
     this.runs.push({ args, child, kill: vi.spyOn(child, 'kill') })
@@ -230,9 +228,21 @@ describe('HlsSessions', () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-hls-'))
     state.clip = join(state.root, 'clip.mkv')
     state.long = join(state.root, 'long.mkv')
-    await Promise.all([
-      encodeRichClip({ path: state.clip, seconds: 40, cues: CUES, bFrames: 2 }),
-      encodeRichClip({ path: state.long, seconds: 80, cues: CUES }),
+    await encodeRichClip({ path: state.clip, seconds: 40, cues: CUES, bFrames: 2 })
+    await run('ffmpeg', [
+      '-v',
+      'error',
+      '-stream_loop',
+      String(LONG_LOOPS - 1),
+      '-i',
+      state.clip,
+      '-map',
+      '0:v',
+      '-map',
+      '0:a',
+      '-c',
+      'copy',
+      state.long,
     ])
     const ffmpeg = ffmpegFor(join(state.root, 'probe'))
     const [plan, longPlan, { tracks }, frames] = await Promise.all([
@@ -266,7 +276,7 @@ describe('HlsSessions', () => {
     await rm(state.root, { recursive: true, force: true })
   })
 
-  const open = ({ pace = null }: { pace?: Pace | null } = {}) => {
+  const open = ({ pace = null }: { pace?: number | null } = {}) => {
     state.dataDirs += 1
     const dataDir = join(state.root, `data-${state.dataDirs}`)
     const ffmpeg = ffmpegFor(dataDir)
@@ -283,15 +293,17 @@ describe('HlsSessions', () => {
     mediaId = 1,
     input = state.clip,
     plan = state.plan,
+    mode = PLAYBACK_MODES.remux,
   }: {
     sessions: HlsSessions
     mediaId?: number
     input?: string
     plan?: SegmentPlan
+    mode?: StreamMode
   }): HlsSession =>
     sessions.mint({
       mediaId,
-      mode: PLAYBACK_MODES.remux,
+      mode,
       audio: state.audio,
       quality: null,
       plan,
@@ -332,7 +344,7 @@ describe('HlsSessions', () => {
   const boundary = (n: number): number => state.plan.boundaries[n] ?? NaN
 
   it('cuts segment 0 then 1 from one run', async () => {
-    const { ffmpeg, sessions } = open({ pace: PACE })
+    const { ffmpeg, sessions } = open()
     const session = mintIn({ sessions })
 
     await sessions.segment({ session: session.id, n: 0 })
@@ -436,6 +448,29 @@ describe('HlsSessions', () => {
     })
   })
 
+  it('cuts the same transcoded segment from any start', async () => {
+    const { sessions } = open()
+    const plan = transcodePlan({ duration: state.plan.duration })
+    const fromZero = mintIn({ sessions, plan, mode: PLAYBACK_MODES.transcode })
+    const fromFive = mintIn({ sessions, plan, mode: PLAYBACK_MODES.transcode })
+    const zeroToSix = await [0, 1, 2, 3, 4, 5, 6].reduce<Promise<Uint8Array[]>>(
+      async (done, n) => [...(await done), await sessions.segment({ session: fromZero.id, n })],
+      Promise.resolve([]),
+    )
+    await sessions.segment({ session: fromFive.id, n: 5 })
+    const sixAfterFive = await sessions.segment({ session: fromFive.id, n: 6 })
+    const init = await sessions.init({ session: fromZero.id })
+
+    const [afterZero, afterFive] = await Promise.all([
+      videoOf({ init, media: zeroToSix[6] ?? new Uint8Array() }),
+      videoOf({ init, media: sixAfterFive }),
+    ])
+    expect(afterFive.firstPts).toBe(afterZero.firstPts)
+    expect(afterFive.count).toBe(afterZero.count)
+    // The forced keyframe is the first frame at or after the boundary.
+    expect(afterZero.firstPts).toBeCloseTo((plan.boundaries[6] ?? NaN) + STREAM_TIME_SHIFT, 1)
+  })
+
   it('serves a scrub back and forth with one ffmpeg left running', async () => {
     const { ffmpeg, sessions } = open({ pace: PACE })
     const session = mintIn({ sessions })
@@ -443,7 +478,6 @@ describe('HlsSessions', () => {
 
     const served = await Promise.all(asked.map((n) => sessions.segment({ session: session.id, n })))
 
-    expect(ffmpeg.runs).toHaveLength(asked.length)
     expect(ffmpeg.alive().length).toBeLessThanOrEqual(1)
     const init = await sessions.init({ session: session.id })
     const starts = await Promise.all(
@@ -454,7 +488,7 @@ describe('HlsSessions', () => {
     })
   })
 
-  it('drops a session unasked for a minute, its run and its folder', async () => {
+  it('rests a session unasked for a minute, and resumes it with a new run', async () => {
     const { ffmpeg, sessions, advance, dataDir } = open({ pace: PACE })
     const session = mintIn({ sessions })
     await sessions.segment({ session: session.id, n: 0 })
@@ -466,9 +500,34 @@ describe('HlsSessions', () => {
     expect(first?.kill).not.toHaveBeenCalled()
     advance(1)
 
-    expect(first?.kill).toHaveBeenCalledWith(RUN_SIGNALS.kill)
+    // The rest takes its turn after whatever the session was doing.
     await eventually({ read: async () => existsSync(folder), check: (exists) => !exists })
+    expect(first?.kill).toHaveBeenCalledWith(RUN_SIGNALS.kill)
+    expect(ffmpeg.alive()).toHaveLength(0)
+
+    const third = await sessions.segment({ session: session.id, n: 3 })
+
+    const [, second] = ffmpeg.runs
+    expect(argAfter({ args: second?.args ?? [], flag: '-segment_start_number' })).toBe('3')
+    const init = await sessions.init({ session: session.id })
+    expect((await videoOf({ init, media: third })).firstPts).toBeCloseTo(
+      boundary(3) + STREAM_TIME_SHIFT,
+      3,
+    )
+  })
+
+  it('forgets a session once no ticket that opened it can still be good', async () => {
+    const { sessions, advance } = open()
+    const session = mintIn({ sessions })
+
+    advance(HLS_IDLE_MS)
+    expect(sessions.get({ mediaId: 1, session: session.id })).not.toBeNull()
+    advance(MEDIA_TICKET_SECONDS * 1000)
+
     expect(sessions.get({ mediaId: 1, session: session.id })).toBeNull()
+    await expect(sessions.segment({ session: session.id, n: 0 })).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
   })
 
   it('drops the longest idle session to mint one past the cap', () => {
@@ -490,8 +549,8 @@ describe('HlsSessions', () => {
   })
 
   it('pauses a run ten segments past the furthest asked, and resumes it when asked further', async () => {
-    // The first eleven segments come at once, the rest slowly.
-    const { ffmpeg, sessions } = open({ pace: { rate: 2, burst: 67 } })
+    // Unpaced, the long clip's run takes a few tenths of a second after its tenth segment.
+    const { ffmpeg, sessions } = open()
     const session = mintIn({ sessions, input: state.long, plan: state.longPlan })
     await sessions.segment({ session: session.id, n: 0 })
     const [first] = ffmpeg.runs
@@ -507,19 +566,118 @@ describe('HlsSessions', () => {
     await sessions.segment({ session: session.id, n: 3 })
 
     expect(first?.kill.mock.calls.flat()).toEqual([RUN_SIGNALS.stop, RUN_SIGNALS.resume])
-    expect(await stateOf()).not.toMatch(/^T/)
+    // Resumed, it runs on to ten past segment 3 and is paused there again.
+    await eventually({
+      read: async () => first?.kill.mock.calls.flat() ?? [],
+      check: (signals) => signals.length === 3,
+    })
+    expect(first?.kill.mock.calls.flat()).toEqual([
+      RUN_SIGNALS.stop,
+      RUN_SIGNALS.resume,
+      RUN_SIGNALS.stop,
+    ])
+  })
+
+  it('restarts for a far request without waiting out a near one', async () => {
+    const { ffmpeg, sessions } = open({ pace: PACE })
+    const session = mintIn({ sessions, input: state.long, plan: state.longPlan })
+    await sessions.segment({ session: session.id, n: 0 })
+    const finished: number[] = []
+    const asked = (n: number) =>
+      sessions.segment({ session: session.id, n }).then((media) => {
+        finished.push(n)
+        return media
+      })
+
+    // Segment 3 is near the run, which writes it about 2.25 s from now.
+    const near = asked(3)
+    const started = Date.now()
+    await asked(40)
+
+    expect(Date.now() - started).toBeLessThan(2000)
+    expect(finished).toEqual([40])
+    const third = await near
+    const init = await sessions.init({ session: session.id })
+    expect((await videoOf({ init, media: third })).firstPts).toBeCloseTo(
+      (state.longPlan.boundaries[3] ?? NaN) + STREAM_TIME_SHIFT,
+      3,
+    )
+    expect(ffmpeg.alive().length).toBeLessThanOrEqual(1)
+  })
+
+  it('cuts the init from the run the next segment starts, not a run of its own', async () => {
+    const { ffmpeg, sessions } = open()
+    const session = mintIn({ sessions })
+
+    const init = sessions.init({ session: session.id })
+    const fifth = await sessions.segment({ session: session.id, n: 5 })
+
+    expect(ffmpeg.runs).toHaveLength(1)
+    expect(argAfter({ args: ffmpeg.runs[0]?.args ?? [], flag: '-segment_start_number' })).toBe('5')
+    expect((await videoOf({ init: await init, media: fifth })).firstPts).toBeCloseTo(
+      boundary(5) + STREAM_TIME_SHIFT,
+      3,
+    )
+  })
+
+  it('starts a run at 0 for the init when no segment comes in thirty seconds', async () => {
+    const { ffmpeg, sessions, advance, pending } = open()
+    const session = mintIn({ sessions })
+
+    const init = sessions.init({ session: session.id })
+    // The rest, the forgetting and the init's wait for a run.
+    await eventually({ read: async () => pending(), check: (count) => count >= 3 })
+    expect(ffmpeg.runs).toHaveLength(0)
+    advance(HLS_SEGMENT_WAIT_MS)
+
+    expect((await init).length).toBeGreaterThan(0)
+    expect(argAfter({ args: ffmpeg.runs[0]?.args ?? [], flag: '-segment_start_number' })).toBe('0')
+  })
+
+  it('reads the init again after a read that failed', async () => {
+    const { sessions, dataDir } = open()
+    const session = mintIn({ sessions })
+    await sessions.segment({ session: session.id, n: 0 })
+    // The first run's folder holds its first file, which the init is cut from.
+    const source = join(dataDir, 'hls', session.id, '1', segmentFileName(0))
+    await rename(source, `${source}.away`)
+
+    await expect(sessions.init({ session: session.id })).rejects.toThrow()
+    await rename(`${source}.away`, source)
+
+    expect((await sessions.init({ session: session.id })).length).toBeGreaterThan(0)
+  })
+
+  it('keeps a run going after an error event once it has spawned', async () => {
+    const { ffmpeg, sessions } = open({ pace: PACE })
+    const session = mintIn({ sessions })
+    await sessions.segment({ session: session.id, n: 0 })
+
+    ffmpeg.runs[0]?.child.emit('error', new Error('A signal could not be sent'))
+    await sessions.segment({ session: session.id, n: 1 })
+
+    expect(ffmpeg.runs).toHaveLength(1)
   })
 
   it('gives up waiting for a segment after thirty seconds', async () => {
-    const { sessions, advance, pending } = open({ pace: { rate: 0.5 } })
+    const { sessions, advance, pending } = open({ pace: 0.5 })
     const session = mintIn({ sessions })
 
     const waiting = sessions.segment({ session: session.id, n: 0 })
-    // The idle timer and the wait's.
-    await eventually({ read: async () => pending(), check: (count) => count >= 2 })
+    // The rest, the forgetting and the wait.
+    await eventually({ read: async () => pending(), check: (count) => count >= 3 })
     advance(HLS_SEGMENT_WAIT_MS)
 
     await expect(waiting).rejects.toBeInstanceOf(ServiceUnavailableException)
+  })
+
+  it('keeps exactly the last thirty segments at or behind the furthest asked', () => {
+    const segments = Array.from({ length: 41 }, (_, n) => n)
+
+    const gone = segmentsPastKeeping({ segments, furthest: 40 })
+
+    expect(gone).toEqual(Array.from({ length: 11 }, (_, n) => n))
+    expect(segments.filter((n) => !gone.includes(n))).toHaveLength(HLS_KEPT_SEGMENTS)
   })
 
   it('drops every session of a media, and empties the HLS folder on start', async () => {

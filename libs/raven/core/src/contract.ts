@@ -1704,7 +1704,7 @@ export const HLS_SEGMENT_SECONDS = 6
 /** The longest stretch between two keyframes a remux accepts, in seconds. */
 export const HLS_MAX_KEYFRAME_GAP_SECONDS = 20
 
-/** How long a session may go unasked before the server drops it, in milliseconds. */
+/** How long a session may go unasked before the server stops its run and deletes its segments, in milliseconds. */
 export const HLS_IDLE_MS = 60_000
 
 /** How many of a session's latest segments stay on disk. */

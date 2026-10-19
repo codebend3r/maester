@@ -2,9 +2,11 @@ import { PLAYBACK_MODES } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import { SOFTWARE, type VideoEncoder } from '@/ffmpeg/encoder'
 import {
+  SEGMENT_CLOCKS,
   TONEMAP_FILTER,
   hlsArgs,
   hlsAudioArgs,
+  segmentClockOf,
   streamArgs,
   subtitleFileArgs,
   subtitleWindowArgs,
@@ -224,18 +226,20 @@ describe('hlsArgs', () => {
     bitrate: null,
     tonemap: false,
     folder: '/d/hls/abc',
+    segmentClock: SEGMENT_CLOCKS.run,
   } as const
 
-  it('runs the spike’s remux from segment 4, listing each finished file on stdout', () => {
+  it('runs the spike’s remux from segment 4 on the file’s clock, listing each finished file on stdout', () => {
     expect(hlsArgs({ ...base, from: 4, mode: PLAYBACK_MODES.remux })).toEqual([
       '-hide_banner',
       '-loglevel',
       'error',
       '-nostdin',
+      '-seek_timestamp',
+      '1',
       '-ss',
       '41.458',
       '-copyts',
-      '-start_at_zero',
       '-i',
       '/m/clip.mkv',
       '-copypriorss',
@@ -280,6 +284,16 @@ describe('hlsArgs', () => {
     ])
   })
 
+  it('gives FFmpeg before 6.0 the cuts as output timestamps', () => {
+    const args = hlsArgs({
+      ...base,
+      from: 4,
+      mode: PLAYBACK_MODES.remux,
+      segmentClock: SEGMENT_CLOCKS.output,
+    })
+    expect(args[args.indexOf('-segment_times') + 1]).toBe('52.458,60.542,70.542,81.042')
+  })
+
   it('seeks nowhere from a first boundary at zero', () => {
     const args = hlsArgs({ ...base, from: 0, mode: PLAYBACK_MODES.remux })
     expect(args).not.toContain('-ss')
@@ -315,6 +329,28 @@ describe('hlsArgs', () => {
     const args = hlsArgs({ ...base, from: 0, mode: PLAYBACK_MODES.remux, audio: null })
     expect(args.filter((arg) => arg === '-map')).toHaveLength(1)
     expect(args).not.toContain('-c:a')
+  })
+})
+
+describe('segmentClockOf', () => {
+  it('reads segment times from the run’s start from FFmpeg 6.0 on', () => {
+    expect(segmentClockOf('ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023')).toBe(
+      SEGMENT_CLOCKS.run,
+    )
+    expect(segmentClockOf('ffmpeg version 9.0.2 Copyright (c) 2000-2026')).toBe(SEGMENT_CLOCKS.run)
+    expect(segmentClockOf('ffmpeg version 7.1.1-Jellyfin Copyright')).toBe(SEGMENT_CLOCKS.run)
+  })
+
+  it('reads them as output timestamps before 6.0', () => {
+    expect(segmentClockOf('ffmpeg version 5.1.9-0+deb12u1 Copyright (c) 2000-2026')).toBe(
+      SEGMENT_CLOCKS.output,
+    )
+    expect(segmentClockOf('ffmpeg version n4.4.2 Copyright')).toBe(SEGMENT_CLOCKS.output)
+  })
+
+  it('takes a build with no release number, or no ffmpeg, as new', () => {
+    expect(segmentClockOf('ffmpeg version N-118000-gabcdef Copyright')).toBe(SEGMENT_CLOCKS.run)
+    expect(segmentClockOf(null)).toBe(SEGMENT_CLOCKS.run)
   })
 })
 

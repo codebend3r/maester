@@ -351,20 +351,42 @@ const SEGMENT_MP4_OPTIONS =
   'movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont:use_editlist=0:avoid_negative_ts=disabled'
 
 /**
+ * How the segment muxer reads `-segment_times`. From FFmpeg 6.0 it adds the
+ * run's first video pts to each, so they are offsets from the run's start;
+ * before, as in Debian 12's 5.1 that the server image ships, they are output
+ * timestamps.
+ */
+export const SEGMENT_CLOCKS = { run: 'run', output: 'output' } as const
+
+export type SegmentClock = (typeof SEGMENT_CLOCKS)[keyof typeof SEGMENT_CLOCKS]
+
+const RUN_RELATIVE_SINCE = 6
+
+/** The segment clock of the ffmpeg whose `-version` line this is; a build without a release number is new. */
+export const segmentClockOf = (version: string | null): SegmentClock => {
+  const major = /^ffmpeg version n?(\d+)\./.exec(version ?? '')?.[1]
+  return major != null && Number(major) < RUN_RELATIVE_SINCE
+    ? SEGMENT_CLOCKS.output
+    : SEGMENT_CLOCKS.run
+}
+
+/**
  * One HLS run: the plan's segments from `from` onwards, each a file of its
- * own in `folder`, on the file's clock plus `STREAM_TIME_SHIFT`. A run from
- * any segment cuts exactly the segments a run from zero would (spec, "HLS
- * muxing (2026-10-19)"):
+ * own in `folder`, on the file's own clock plus `STREAM_TIME_SHIFT`. A run
+ * from any segment cuts exactly the segments a run from zero would, on
+ * FFmpeg 5.1 to 9.0 (spec, "HLS muxing (2026-10-19)"):
  *
+ * - The plan's times are the file's own pts, as ffprobe lists them, so the
+ *   run keeps them: `-copyts` without `-start_at_zero`, and `-ss` read as a
+ *   timestamp (`-seek_timestamp 1`) rather than from the file's start.
  * - `-copypriorss 0` drops what comes before `-ss`: with B-frames ffmpeg
  *   seeks 3/23 s early, and a copy would keep the GOP before.
- * - `-segment_times` are relative to the run's first video packet and
- *   indexed by the files this run wrote, so they are the boundaries after
- *   `from` minus boundary `from`. The 5 ms delta absorbs the truncated
- *   keyframe times' error. The last segment gets a time past the end, since
- *   an empty list would fall back to the muxer's two-second timer.
- * - A transcode forces a keyframe at every boundary from `from` on, on the
- *   file's clock, which `-copyts` keeps.
+ * - `-segment_times` are indexed by the files this run wrote: the boundaries
+ *   after `from`, as offsets from boundary `from` or as output timestamps by
+ *   `segmentClock`. The 5 ms delta absorbs the truncated keyframe times'
+ *   error. The last segment gets a time past the end, since an empty list
+ *   would fall back to the muxer's two-second timer.
+ * - A transcode forces a keyframe at every boundary from `from` on.
  *
  * The muxer lists each file on stdout once it has closed it, which is how
  * the server knows a segment is whole.
@@ -382,6 +404,7 @@ export const hlsArgs = ({
   bitrate,
   tonemap,
   folder,
+  segmentClock,
 }: {
   input: string
   plan: SegmentPlan
@@ -399,9 +422,15 @@ export const hlsArgs = ({
   bitrate: number | null
   tonemap: boolean
   folder: string
+  segmentClock: SegmentClock
 }): string[] => {
   const start = plan.boundaries[from] ?? 0
-  const times = runSegmentTimes({ plan, from })
+  const offsets = runSegmentTimes({ plan, from })
+  const past = offsets.length > 0 ? offsets : [plan.duration + HLS_SEGMENT_SECONDS]
+  const times =
+    segmentClock === SEGMENT_CLOCKS.run
+      ? past
+      : past.map((offset) => start + offset + STREAM_TIME_SHIFT)
   const video =
     mode === PLAYBACK_MODES.remux
       ? copyVideo(videoCodec)
@@ -413,9 +442,8 @@ export const hlsArgs = ({
   return [
     ...QUIET,
     ...video.input,
-    ...(start > 0 ? ['-ss', secondsArg(start)] : []),
+    ...(start > 0 ? ['-seek_timestamp', '1', '-ss', secondsArg(start)] : []),
     '-copyts',
-    '-start_at_zero',
     '-i',
     input,
     '-copypriorss',
@@ -443,9 +471,7 @@ export const hlsArgs = ({
     '-segment_format_options',
     SEGMENT_MP4_OPTIONS,
     '-segment_times',
-    (times.length > 0 ? times : [plan.duration - start + HLS_SEGMENT_SECONDS])
-      .map(secondsArg)
-      .join(','),
+    times.map(secondsArg).join(','),
     '-segment_time_delta',
     '0.005',
     '-segment_start_number',

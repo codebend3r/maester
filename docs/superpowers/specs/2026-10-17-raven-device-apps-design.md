@@ -156,7 +156,7 @@ GET /api/media/:id/hls/:session/init.mp4?t=...
 ```
 
 - **The playlist is the whole film from the start**, a VOD playlist listing every segment with its duration, so the player's scrubber is the real timeline and a seek is a request for segment `n`. This is how Plex and Jellyfin do it, and it is what makes seeking on a TV feel right. A growing playlist that follows ffmpeg would make the scrubber lie.
-- **Segments are produced on demand.** A session is one ffmpeg run writing segments to a temp folder (`-f segment`, fMP4, six seconds nominal). A request for a segment the session has not written, outside the window it is writing towards, kills the session's ffmpeg and starts one at that segment's start time. A request for a written segment is served from the folder. The server's existing rule holds: the moment the client lets go, ffmpeg is killed; a session is dropped after sixty seconds without a request, its folder deleted.
+- **Segments are produced on demand.** A session is one ffmpeg run writing segments to a temp folder (`-f segment`, fMP4, six seconds nominal). A request for a segment the session has not written, outside the window it is writing towards, kills the session's ffmpeg and starts one at that segment's start time. A request for a written segment is served from the folder. The server's existing rule holds: the moment the client lets go, ffmpeg is killed; after sixty seconds without a request a session's ffmpeg is killed and its folder deleted, while the session itself is kept so that a player paused for longer resumes it.
 - **Segment boundaries.** On transcode, `-force_key_frames` every six seconds makes the segments equal and the playlist exact. On remux, video is copied, so segments can only start on the file's keyframes: the server probes the keyframe timestamps once per file (`ffprobe -skip_frame nokey`), keeps them beside the tracks it already caches, and the playlist's segment durations are the real keyframe gaps. A file whose keyframe gaps exceed twenty seconds plays through transcode instead; the playlist route says so with a 409 the app treats as a step down.
 - **Timestamps** keep the file's clock plus `STREAM_TIME_SHIFT`, as the MSE stream does, so the HLS and MSE outputs agree with each other and with progress reports.
 - **Audio** is selected per session with the same `audio` query as the stream route. Changing the audio track in the player is a new session at the current time.
@@ -274,20 +274,27 @@ What Ruling 10's command needed besides what it lists, each found by a run that 
 - **`frag_discont`, `use_editlist=0` and `avoid_negative_ts=disabled` in `-segment_format_options`.** Without them each file's `tfdt` starts again at zero; the outer `-avoid_negative_ts disabled` does not reach the inner MP4 muxer.
 - **Keyframe times truncated, never rounded, and `-segment_time_delta 0.005`.** A keyframe at 79.996583 rounded to 79.997 made `-copypriorss 0` drop it and the run wrote no video at all; one at 30.488792 rounded up made the cut miss it by a segment. Truncated times sit at or just before the real keyframe, and the five-millisecond delta absorbs the sub-millisecond error left in the relative times, well under one frame at 120 fps.
 
-The command the server runs, here for a remux from segment 4 of the HEVC clip (boundaries 41.458, 51.458, 59.542, 69.542, 80.042):
+The command the server runs, here for a remux from segment 4 of the HEVC clip (boundaries 41.458, 51.458, 59.542, 69.542, 80.042), as amended by the version check below:
 
 ```
-ffmpeg -ss 41.458 -copyts -start_at_zero -i <input> -copypriorss 0 \
+ffmpeg -seek_timestamp 1 -ss 41.458 -copyts -i <input> -copypriorss 0 \
   -map 0:v:0 -map 0:a:<audio> -c:v copy -tag:v hvc1 <hlsAudioArgs> \
   -sn -dn -map_metadata -1 -map_chapters -1 \
   -output_ts_offset 1 -avoid_negative_ts disabled \
   -f segment -segment_format mp4 \
   -segment_format_options movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont:use_editlist=0:avoid_negative_ts=disabled \
   -segment_times 10.000,18.084,28.084,38.584 -segment_time_delta 0.005 \
-  -segment_start_number 4 <folder>/seg_%d.mp4
+  -segment_start_number 4 -segment_list pipe:1 -segment_list_type flat <folder>/seg_%d.mp4
 ```
 
-A transcode replaces `-c:v copy -tag:v hvc1` with the encoder's arguments and `-force_key_frames` at the plan's boundaries from the run's start onwards, on the file's clock (`41.458,51.458,...`), since `-copyts` keeps it.
+A transcode replaces `-c:v copy -tag:v hvc1` with the encoder's arguments and `-force_key_frames` at the plan's boundaries from the run's start onwards, on the file's clock (`41.458,51.458,...`), since `-copyts` keeps it. `-segment_list pipe:1` prints each file's name on stdout once the muxer has flushed and finished it, which is how the server knows a segment is whole.
+
+**FFmpeg versions (2026-10-19, Task 13).** The spike ran 9.0.2 only. CI's checks install Ubuntu 24.04's ffmpeg, 6.1.1, and the server image is `node:24-slim`, Debian 12 (bookworm), whose ffmpeg is 5.1.9. The HLS tests ran on all three in Docker. Two differences changed the command:
+
+- **`-segment_times` became relative in FFmpeg 6.0.** From 6.0 the segment muxer adds the run's first video pts to each entry (`reference_stream_first_pts` in `segment.c`). 5.1 compares each entry with the packets' output timestamps as they are, so there a relative list cut a restarted run's first segment at its next keyframe. The server reads the version once (`ffmpeg -version`). Before 6.0 it passes the same cuts as output timestamps: boundary plus `STREAM_TIME_SHIFT`.
+- **The file's own clock, not `-start_at_zero`.** With `-start_at_zero` the output clock is the file's pts minus the file's start time, while the plan's boundaries are the file's pts as ffprobe lists them. A file whose start time is not zero then has its segments land off the plan. Ubuntu's 6.1 encoder gives the test clip an AAC start of -0.023 s, so its segments start 23 ms late, and a timestamp list on 5.1 could not be written without knowing the start. The run therefore keeps the file's clock: `-copyts` without `-start_at_zero`, and `-seek_timestamp 1`, so that `-ss` is read as a timestamp rather than as an offset from the file's start. On 5.1, 6.1 and 9.0 alike, a run's segment `k` now starts at boundary `k` plus `STREAM_TIME_SHIFT`, for MKV and MP4 clips and for one starting at 2.5 s, and a run from segment 4 or 5 cuts what a run from 0 does. Subtitles extracted with `-start_at_zero` sit on the older clock, so the HLS route (Task 14) has to shift their cues by the file's start time.
+
+`-copypriorss 0`, the segment muxer's MP4 options, `-segment_time_delta` and `-segment_list pipe:1` behave the same on all three. Only the tests' pacing needed a change: `-readrate_initial_burst` is new in 6.1, so they pace with `-readrate` alone.
 
 One seam remains at a restart. The first segment of a restarted run starts its audio at the keyframe's pts, while the run before ended the previous segment's audio at the keyframe's dts, so where segments from two runs meet there is an audio gap as long as the video's reorder delay (0.09 to 0.21 seconds in the spike). Both players played through it. Only the join at a restart has it; segments within one run meet exactly.
 
