@@ -1,0 +1,225 @@
+// The art takes a little more than half the screen; a phone has the form alone.
+.page {
+  display: grid;
+  grid-template-columns: 11fr 9fr;
+  grid-template-areas: 'art form';
+  min-height: 100dvh;
+  background: var(--color-night);
+  color: var(--color-bark);
+
+  @media (max-width: 48rem) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'form';
+  }
+}
+
+// The wall, its fade and the promise share one cell. Size containment keeps
+// the oversized wall from stretching the page; the panel takes the row's
+// height, set by the form and the screen.
+.art {
+  grid-area: art;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'art';
+  overflow: hidden;
+  contain: size;
+  background: var(--color-deep);
+
+  // Into the page at the right, and dark under the promise in every theme.
+  // Over the wall, which its tilt lifts into a layer of its own.
+  &::after {
+    content: '';
+    z-index: 1;
+    grid-area: art;
+    background:
+      linear-gradient(90deg, transparent 40%, var(--color-night)),
+      linear-gradient(to top, var(--color-picture-scrim), transparent 55%);
+  }
+
+  @media (max-width: 48rem) {
+    display: none;
+  }
+}
+
+// Wider than the panel and centred on it, so the tilt leaves no corner bare.
+.wall {
+  grid-area: art;
+  place-self: center;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-3);
+  width: 140%;
+  transform: rotate(-8deg);
+}
+
+.tile {
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    165deg,
+    oklch(var(--lightness) 0.11 var(--hue)),
+    oklch(0.28 0.06 calc(var(--hue) + 30))
+  );
+  opacity: var(--opacity);
+}
+
+.promise {
+  z-index: 2;
+  grid-area: art;
+  align-self: end;
+  max-width: 26rem;
+  padding: var(--space-6);
+  color: var(--color-on-picture);
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-tight);
+  text-shadow: var(--shadow-text);
+  text-wrap: balance;
+}
+
+.side {
+  grid-area: form;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6) var(--space-4);
+}
+
+.card {
+  display: grid;
+  gap: var(--space-5);
+  width: min(100%, 25rem);
+}
+
+.brand {
+  display: grid;
+  justify-self: start;
+}
+
+.welcome {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.title {
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-heading);
+}
+
+.lead {
+  color: var(--color-birch);
+}
+
+// A note beside the form, and the links to the other auth pages.
+.note {
+  color: var(--color-birch);
+  font-size: var(--font-size-sm);
+}
+
+.address {
+  overflow-wrap: anywhere;
+  color: var(--color-bark);
+  font-weight: 600;
+}
+
+.fields {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.input {
+  min-height: var(--control-size-tall);
+}
+
+// A password field's own look, drawn around the input and its Show.
+.box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'input reveal';
+  align-items: center;
+  min-height: var(--control-size-tall);
+  padding-inline-end: var(--space-0);
+  border: 1px solid color-mix(in srgb, var(--color-bark) 12%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: border-color 150ms ease;
+  }
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--color-bark) 28%, transparent);
+  }
+
+  &:has(.boxed:focus-visible) {
+    border-color: var(--color-bark);
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+// The input inside a box leaves the edge and the focus ring to the box.
+.boxed {
+  grid-area: input;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+
+  &:focus-visible,
+  &[aria-invalid='true'] {
+    outline: none;
+    box-shadow: none;
+  }
+}
+
+.reveal {
+  grid-area: reveal;
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-birch);
+}
+
+// The field to fix, held to the alert under it.
+.invalid,
+.invalid:hover {
+  border: var(--border-thick) solid var(--color-leaf-bright);
+}
+
+.invalid:has(.boxed:focus-visible) {
+  border-color: var(--color-leaf-bright);
+}
+
+.alert {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'icon text';
+  gap: var(--space-1);
+  align-items: start;
+  font-size: var(--font-size-sm);
+}
+
+.alertIcon {
+  grid-area: icon;
+  display: grid;
+  color: var(--color-leaf-bright);
+}
+
+.alertText {
+  grid-area: text;
+}
+
+.submit {
+  min-height: var(--control-size-tall);
+  font-size: var(--font-size-md);
+}

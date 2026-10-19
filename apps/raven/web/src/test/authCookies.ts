@@ -1,14 +1,5 @@
 import { spyOn } from 'bun:test'
-import { AUTH_CONFIG_STATES, AUTH_COOKIE } from '@raven/core'
-import type { ReadyAuthConfig } from '@/lib/authClient'
-
-export const readyConfig: ReadyAuthConfig = {
-  state: AUTH_CONFIG_STATES.ready,
-  supabaseUrl: 'http://127.0.0.1:54321',
-  publishableKey: 'sb_publishable_test',
-  webUrl: 'http://localhost:8484',
-  cookieName: AUTH_COOKIE,
-}
+import { AUTH_COOKIE } from '@raven/core'
 
 const encode = (value: unknown): string => Buffer.from(JSON.stringify(value)).toString('base64url')
 

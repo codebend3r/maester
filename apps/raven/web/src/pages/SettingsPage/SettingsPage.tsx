@@ -14,6 +14,7 @@ import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, CONTROLS_LINGER_SECONDS, type IconName, usePlayerPrefs } from '@raven/ui'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
+import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { useCanManage } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { edit, useOptimisticMutation } from '@/lib/optimistic'
@@ -488,6 +489,8 @@ export const SettingsPage = () => {
   const titleId = useId()
   const queryClient = useQueryClient()
   const [isConfirming, setConfirming] = useState(false)
+  // Accounts show only to an approved viewer; the other states have a screen of their own.
+  const access = useAccessState()
   const playback = useQuery(playbackSettingsQuery)
   const display = useQuery(displaySettingsQuery)
   const save = useOptimisticMutation({
@@ -684,8 +687,14 @@ export const SettingsPage = () => {
           />
         )}
       </SettingsSection>
-      <AccountSection />
-      <UsersSection />
+      {access.kind === ACCESS_KINDS.approved && (
+        <>
+          <AccountSection account={access.account} />
+          {access.account.isOwner && (
+            <UsersSection key={access.account.id} userId={access.account.id} />
+          )}
+        </>
+      )}
       <AdvancedSection />
       <AdminLockSection />
     </section>

@@ -2,31 +2,17 @@ import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { AuthApiError } from '@supabase/supabase-js'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Route, Routes, useLocation } from 'react-router-dom'
-import {
-  type AuthConfig,
-  AUTH_CONFIG_STATES,
-  AUTH_COOKIE,
-  ApiError,
-  MEMBER_STATUSES,
-} from '@raven/core'
+import { AUTH_CONFIG_STATES, ApiError, MEMBER_STATUSES } from '@raven/core'
 import { AppRoutes } from '@/AppRoutes'
 import { api } from '@/lib/api'
-import { AUTH_ERRORS, type AuthClient } from '@/lib/authClient'
+import { type AuthClient } from '@/lib/authClient'
+import { AUTH_ERRORS } from '@/lib/authErrors'
 import { AUTH_QUERY, AUTH_ROUTES } from '@/lib/authRoutes'
 import { SignInPage } from '@/pages/SignInPage/SignInPage'
-import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { ACCOUNT_ID, fakeAccount, fakeAuthClient, fakeSession } from '@/test/authClient'
+import { AUTH_SESSION_STATUSES } from '@/stores/authSession'
+import { fakeAccount, fakeSession } from '@/test/authClient'
+import { type AuthPageOptions, renderAuthPage, where } from '@/test/authPage'
 import { held } from '@/test/held'
-import { renderWithProviders } from '@/test/render'
-
-const ready: AuthConfig = {
-  state: AUTH_CONFIG_STATES.ready,
-  supabaseUrl: 'http://127.0.0.1:54321',
-  publishableKey: 'sb_publishable_test',
-  webUrl: 'http://localhost:8484',
-  cookieName: AUTH_COOKIE,
-}
 
 type SignInResult = Awaited<ReturnType<AuthClient['signInWithPassword']>>
 type ResendResult = Awaited<ReturnType<AuthClient['resend']>>
@@ -48,41 +34,8 @@ const refusedResend = (code: string): ResendResult => ({
   error: new AuthApiError('Words from the server', 429, code),
 })
 
-const Where = () => {
-  const { pathname, search } = useLocation()
-  return <p data-testid="where">{`${pathname}${search}`}</p>
-}
-
-const renderSignIn = ({
-  calls = {},
-  authConfig = ready,
-  route = AUTH_ROUTES.signIn,
-  isSessionKept = false,
-  status = AUTH_SESSION_STATUSES.ready,
-}: {
-  calls?: Partial<AuthClient>
-  authConfig?: AuthConfig | null
-  route?: string
-  isSessionKept?: boolean
-  status?: (typeof AUTH_SESSION_STATUSES)[keyof typeof AUTH_SESSION_STATUSES]
-} = {}) => {
-  const fake = fakeAuthClient({ calls })
-  useAuthSession.setState({
-    client: fake.client,
-    status,
-    session: isSessionKept ? { accessToken: 't', userId: ACCOUNT_ID } : null,
-  })
-  return renderWithProviders({
-    authConfig,
-    route,
-    ui: (
-      <Routes>
-        <Route path={AUTH_ROUTES.signIn} element={<SignInPage />} />
-        <Route path="*" element={<Where />} />
-      </Routes>
-    ),
-  })
-}
+const renderSignIn = (options: AuthPageOptions = {}) =>
+  renderAuthPage({ path: AUTH_ROUTES.signIn, page: <SignInPage />, ...options })
 
 const email = () => screen.getByLabelText('Email')
 const password = () => screen.getByLabelText('Password')
@@ -181,7 +134,7 @@ describe('SignInPage', () => {
     })
 
     attempt.answer(signedIn())
-    expect(await screen.findByTestId('where')).toHaveTextContent('/libraries/3?x=1')
+    await waitFor(() => expect(where()).toBe('/libraries/3?x=1'))
   })
 
   it.each([
@@ -194,7 +147,7 @@ describe('SignInPage', () => {
     await fillIn(user)
     await user.click(submit())
 
-    expect(await screen.findByTestId('where')).toHaveTextContent(/^\/$/)
+    await waitFor(() => expect(where()).toBe('/'))
   })
 
   it('says the email or password is wrong, marking the password as the field to fix', async () => {
@@ -362,7 +315,7 @@ describe('SignInPage', () => {
     it('sends a visitor home while accounts are off', async () => {
       renderSignIn({ authConfig: { state: AUTH_CONFIG_STATES.off } })
 
-      expect(await screen.findByTestId('where')).toHaveTextContent(/^\/$/)
+      await waitFor(() => expect(where()).toBe('/'))
     })
 
     it('waits while the config or the stored session is read', () => {
@@ -374,21 +327,21 @@ describe('SignInPage', () => {
 
     it('sends an approved visitor already signed in to the return path', async () => {
       getMe.mockResolvedValue(fakeAccount())
-      renderSignIn({ isSessionKept: true, route: returnTo('/favourites') })
+      renderSignIn({ isSignedIn: true, route: returnTo('/favourites') })
 
-      expect(await screen.findByTestId('where')).toHaveTextContent('/favourites')
+      await waitFor(() => expect(where()).toBe('/favourites'))
     })
 
     it('sends a visitor signed in without approval to the pending screen', async () => {
       getMe.mockResolvedValue(fakeAccount({ status: MEMBER_STATUSES.pending }))
-      renderSignIn({ isSessionKept: true })
+      renderSignIn({ isSignedIn: true })
 
-      expect(await screen.findByTestId('where')).toHaveTextContent(AUTH_ROUTES.pending)
+      await waitFor(() => expect(where()).toBe(AUTH_ROUTES.pending))
     })
 
     it('shows the notice when the account cannot be read', async () => {
       getMe.mockRejectedValue(new ApiError({ status: 503, message: 'Unavailable' }))
-      renderSignIn({ isSessionKept: true })
+      renderSignIn({ isSignedIn: true })
 
       expect(
         await screen.findByRole('heading', { name: 'Sign in is temporarily unavailable' }),
@@ -397,13 +350,7 @@ describe('SignInPage', () => {
   })
 
   it('takes the whole screen at /sign-in, outside the browsing frame', () => {
-    const { client } = fakeAuthClient()
-    useAuthSession.setState({
-      client,
-      status: AUTH_SESSION_STATUSES.ready,
-      session: null,
-    })
-    renderWithProviders({ ui: <AppRoutes />, route: AUTH_ROUTES.signIn, authConfig: ready })
+    renderAuthPage({ path: '*', page: <AppRoutes />, route: AUTH_ROUTES.signIn })
 
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
     expect(screen.getByRole('main')).toContainElement(screen.getByRole('heading', { level: 1 }))

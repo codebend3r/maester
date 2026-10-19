@@ -13,8 +13,9 @@ import {
   LANGUAGE_FALLBACKS,
 } from '@raven/core'
 import { useId, useState } from 'react'
-import { Button, Icon, KEYS } from '@raven/ui'
+import { Button, Icon } from '@raven/ui'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
+import { Tabs } from '@/components/Tabs/Tabs'
 import { api } from '@/lib/api'
 import { EDITED_PARTS, afterItemEdited } from '@/lib/invalidate'
 import { versionFacts } from '@/lib/itemFacts'
@@ -127,7 +128,7 @@ export const ImageEditor = ({
   itemKind?: MatchItemType
   onDone: () => void
 }) => {
-  const ids = { heading: useId(), versions: useId(), tabs: useId() }
+  const ids = { heading: useId(), versions: useId() }
   const [tab, setTab] = useState<ChoosableImageKind>('poster')
   const kinds = KINDS_OF[itemKind]
   const queryClient = useQueryClient()
@@ -200,37 +201,15 @@ export const ImageEditor = ({
       )}
       {options.data && (
         <section className={styles.group}>
-          <div role="tablist" aria-label="Pictures" className={styles.tabs}>
-            {kinds.map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                role="tab"
-                id={`${ids.tabs}-${kind}`}
-                aria-selected={tab === kind}
-                aria-controls={`${ids.tabs}-${kind}-panel`}
-                tabIndex={tab === kind ? 0 : -1}
-                className={styles.tab}
-                onClick={() => setTab(kind)}
-                onKeyDown={(event) => {
-                  if (event.key !== KEYS.arrowLeft && event.key !== KEYS.arrowRight) return
-                  event.preventDefault()
-                  const step = event.key === KEYS.arrowRight ? 1 : kinds.length - 1
-                  const next = kinds[(kinds.indexOf(kind) + step) % kinds.length] ?? kind
-                  setTab(next)
-                  document.getElementById(`${ids.tabs}-${next}`)?.focus()
-                }}
-              >
-                {KIND_LABELS[kind]}
-                <span className={styles.tabCount}>{options.data[kind].length}</span>
-              </button>
-            ))}
-          </div>
-          <div
-            role="tabpanel"
-            id={`${ids.tabs}-${tab}-panel`}
-            aria-labelledby={`${ids.tabs}-${tab}`}
-            className={styles.panel}
+          <Tabs
+            label="Pictures"
+            tabs={kinds.map((kind) => ({
+              value: kind,
+              label: KIND_LABELS[kind],
+              count: options.data[kind].length,
+            }))}
+            chosen={tab}
+            onChoose={setTab}
           >
             <Options
               itemId={details.id}
@@ -239,7 +218,7 @@ export const ImageEditor = ({
               busy={choose.isPending}
               onChoose={(option) => choose.mutate({ kind: tab, option })}
             />
-          </div>
+          </Tabs>
         </section>
       )}
     </section>

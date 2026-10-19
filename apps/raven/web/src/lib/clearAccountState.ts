@@ -10,8 +10,12 @@ import { useUnlockPrompt } from '@/stores/unlockPrompt'
  * query nothing fetches. A mutation under way, the sign out among them, keeps
  * its state for the button that started it.
  */
-export const clearAccountState = ({ queryClient }: { queryClient: QueryClient }): void => {
-  void queryClient.resetQueries()
+export const clearAccountState = async ({
+  queryClient,
+}: {
+  queryClient: QueryClient
+}): Promise<void> => {
   useUnlockPrompt.getState().close()
   useSelectionScopes.getState().scopes.forEach((scope) => scope.store.getState().end())
+  await queryClient.resetQueries()
 }

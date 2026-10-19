@@ -3,24 +3,14 @@ import {
   type AuthRefusal,
   ApiError,
   AUTH_CONFIG_STATES,
-  AUTH_COOKIE,
   AUTH_REFUSALS,
   MEMBER_STATUSES,
 } from '@raven/core'
 import { ACCESS_KINDS, accessStateOf } from '@/lib/accessState'
-import type { ReadyAuthConfig } from '@/lib/authClient'
 import { AUTH_SESSION_STATUSES } from '@/stores/authSession'
-import { fakeAccount } from '@/test/authClient'
+import { fakeAccount, readyConfig } from '@/test/authClient'
 
-const ready: ReadyAuthConfig = {
-  state: AUTH_CONFIG_STATES.ready,
-  supabaseUrl: 'http://127.0.0.1:54321',
-  publishableKey: 'sb_publishable_test',
-  webUrl: 'http://localhost:8484',
-  cookieName: AUTH_COOKIE,
-}
-
-const known = { data: ready, error: null }
+const known = { data: readyConfig, error: null }
 const unknown = { data: undefined, error: null }
 const session = { status: AUTH_SESSION_STATUSES.ready, session: { accessToken: 't', userId: 'u' } }
 const signedOut = { status: AUTH_SESSION_STATUSES.ready, session: null }

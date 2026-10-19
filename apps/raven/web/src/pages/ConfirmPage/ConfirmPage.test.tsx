@@ -3,32 +3,26 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthApiError, type Session } from '@supabase/supabase-js'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
-import {
-  type AuthConfig,
-  AUTH_CONFIG_STATES,
-  AUTH_COOKIE,
-  ApiError,
-  MEMBER_STATUSES,
-} from '@raven/core'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { type AuthConfig, AUTH_CONFIG_STATES, ApiError, MEMBER_STATUSES } from '@raven/core'
 import { AppRoutes } from '@/AppRoutes'
 import { api } from '@/lib/api'
-import { AUTH_ERRORS, type AuthClient, type ReadyAuthConfig } from '@/lib/authClient'
+import { type AuthClient } from '@/lib/authClient'
+import { AUTH_ERRORS } from '@/lib/authErrors'
 import { AUTH_QUERY, AUTH_ROUTES } from '@/lib/authRoutes'
 import { queryKeys } from '@/lib/queryClient'
 import { CONFIRM_TYPES, ConfirmPage } from '@/pages/ConfirmPage/ConfirmPage'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { ACCOUNT_ID, fakeAccount, fakeAuthClient, fakeSession } from '@/test/authClient'
+import {
+  ACCOUNT_ID,
+  fakeAccount,
+  fakeAuthClient,
+  fakeSession,
+  readyConfig,
+} from '@/test/authClient'
+import { Where, renderAuthPage, where } from '@/test/authPage'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
-
-const ready: ReadyAuthConfig = {
-  state: AUTH_CONFIG_STATES.ready,
-  supabaseUrl: 'http://127.0.0.1:54321',
-  publishableKey: 'sb_publishable_test',
-  webUrl: 'http://localhost:8484',
-  cookieName: AUTH_COOKIE,
-}
 
 const TOKEN_HASH = 'pkce_0123456789abcdef'
 
@@ -52,13 +46,6 @@ const linkTo = ({ type, tokenHash = TOKEN_HASH }: { type: string; tokenHash?: st
     [AUTH_QUERY.type]: type,
   })}`
 
-const Where = () => {
-  const { pathname, search } = useLocation()
-  return <p data-testid="where">{`${pathname}${search}`}</p>
-}
-
-const where = () => screen.getByTestId('where').textContent
-
 /**
  * Supabase tells its listeners about the new session before `verifyOtp`
  * resolves; `signedIn` does the same, so a test can see what the page does
@@ -79,7 +66,7 @@ const verified =
 const renderConfirm = async ({
   route,
   verify,
-  authConfig = ready,
+  authConfig = readyConfig,
   session = null,
 }: {
   route: string
@@ -95,7 +82,7 @@ const renderConfirm = async ({
   )
   const fake = fakeAuthClient({ session, calls: { verifyOtp } })
   if (authConfig.state === AUTH_CONFIG_STATES.ready) {
-    useAuthSession.getState().start({ config: ready, createClient: () => fake.client })
+    useAuthSession.getState().start({ config: readyConfig, createClient: () => fake.client })
     await waitFor(() => expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.ready))
   }
   const rendered = renderWithProviders({
@@ -291,7 +278,7 @@ describe('ConfirmPage', () => {
     })
 
     renderWithProviders({
-      authConfig: ready,
+      authConfig: readyConfig,
       route: linkTo({ type: CONFIRM_TYPES.email }),
       ui: (
         <StrictMode>
@@ -316,7 +303,7 @@ describe('ConfirmPage', () => {
     useAuthSession.setState({ client: null, status: AUTH_SESSION_STATUSES.ready, session: null })
     getMe.mockResolvedValue(fakeAccount())
     renderWithProviders({
-      authConfig: ready,
+      authConfig: readyConfig,
       route: linkTo({ type: CONFIRM_TYPES.email }),
       ui: (
         <>
@@ -354,7 +341,7 @@ describe('ConfirmPage', () => {
       session: null,
     })
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    queryClient.setQueryData(queryKeys.authConfig, ready)
+    queryClient.setQueryData(queryKeys.authConfig, readyConfig)
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -452,9 +439,7 @@ describe('ConfirmPage', () => {
   })
 
   it('takes the whole screen at /auth/confirm, outside the gate and the browsing frame', () => {
-    const { client } = fakeAuthClient()
-    useAuthSession.setState({ client, status: AUTH_SESSION_STATUSES.ready, session: null })
-    renderWithProviders({ ui: <AppRoutes />, route: AUTH_ROUTES.confirm, authConfig: ready })
+    renderAuthPage({ path: '*', page: <AppRoutes />, route: AUTH_ROUTES.confirm })
 
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
     expect(screen.getByRole('main')).toContainElement(expired())

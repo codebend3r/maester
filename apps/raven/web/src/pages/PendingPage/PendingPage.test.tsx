@@ -1,13 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Route, Routes, useLocation } from 'react-router-dom'
 import {
   type Account,
-  type AuthConfig,
   ApiError,
   AUTH_CONFIG_STATES,
-  AUTH_COOKIE,
   AUTH_REFUSALS,
   MEMBER_STATUSES,
 } from '@raven/core'
@@ -17,25 +14,10 @@ import { type AuthClient } from '@/lib/authClient'
 import { AUTH_ROUTES, HOME_PATH, signInPath } from '@/lib/authRoutes'
 import { queryKeys } from '@/lib/queryClient'
 import { PendingPage } from '@/pages/PendingPage/PendingPage'
-import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { ACCOUNT_ID, fakeAccount, fakeAuthClient, fakeSession } from '@/test/authClient'
+import { useAuthSession } from '@/stores/authSession'
+import { ACCOUNT_ID, fakeAccount, readyConfig } from '@/test/authClient'
+import { type AuthPageOptions, renderAuthPage, where } from '@/test/authPage'
 import { held } from '@/test/held'
-import { renderWithProviders } from '@/test/render'
-
-const ready: AuthConfig = {
-  state: AUTH_CONFIG_STATES.ready,
-  supabaseUrl: 'http://127.0.0.1:54321',
-  publishableKey: 'sb_publishable_test',
-  webUrl: 'http://localhost:8484',
-  cookieName: AUTH_COOKIE,
-}
-
-const Where = () => {
-  const { pathname, search } = useLocation()
-  return <p data-testid="where">{`${pathname}${search}`}</p>
-}
-
-const where = () => screen.getByTestId('where').textContent
 
 type SignOutResult = Awaited<ReturnType<AuthClient['signOut']>>
 
@@ -50,37 +32,16 @@ const refused = ({ reason }: { reason: (typeof AUTH_REFUSALS)[keyof typeof AUTH_
   refusal({ status: 403, reason: { reason, message: 'Refused' } })
 
 const renderPending = ({
-  authConfig = ready,
-  isSignedIn = true,
-  route = AUTH_ROUTES.pending,
   signOut = async (): Promise<SignOutResult> => ({ error: null }),
-}: {
-  authConfig?: AuthConfig
-  isSignedIn?: boolean
-  route?: string
-  signOut?: AuthClient['signOut']
-} = {}) => {
-  const fake = fakeAuthClient({ calls: { signOut } })
-  useAuthSession.setState({
-    client: fake.client,
-    status: AUTH_SESSION_STATUSES.ready,
-    session: isSignedIn ? { accessToken: 't', userId: ACCOUNT_ID } : null,
+  ...options
+}: AuthPageOptions & { signOut?: AuthClient['signOut'] } = {}) =>
+  renderAuthPage({
+    path: AUTH_ROUTES.pending,
+    page: <PendingPage />,
+    isSignedIn: true,
+    calls: { signOut },
+    ...options,
   })
-  const rendered = renderWithProviders({
-    authConfig,
-    route,
-    ui: (
-      <>
-        <Where />
-        <Routes>
-          <Route path={AUTH_ROUTES.pending} element={<PendingPage />} />
-          <Route path="*" element={null} />
-        </Routes>
-      </>
-    ),
-  })
-  return rendered
-}
 
 describe('PendingPage', () => {
   const getMe = spyOn(api, 'getMe')
@@ -90,7 +51,7 @@ describe('PendingPage', () => {
     accounts.forEach((account) => getMe.mockResolvedValueOnce(account))
 
   beforeEach(() => {
-    getAuthConfig.mockResolvedValue(ready)
+    getAuthConfig.mockResolvedValue(readyConfig)
   })
 
   afterEach(() => {
@@ -355,24 +316,8 @@ describe('PendingPage', () => {
   })
 
   describe('in the app', () => {
-    const renderApp = ({ route }: { route: string }) => {
-      const fake = fakeAuthClient({ session: fakeSession() })
-      useAuthSession.setState({
-        client: fake.client,
-        status: AUTH_SESSION_STATUSES.ready,
-        session: { accessToken: 't', userId: ACCOUNT_ID },
-      })
-      return renderWithProviders({
-        authConfig: ready,
-        route,
-        ui: (
-          <>
-            <Where />
-            <AppRoutes />
-          </>
-        ),
-      })
-    }
+    const renderApp = ({ route }: { route: string }) =>
+      renderAuthPage({ path: '*', page: <AppRoutes />, route, isSignedIn: true })
 
     it.each([
       ['pending', MEMBER_STATUSES.pending, WAITING],

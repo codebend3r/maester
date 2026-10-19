@@ -1,4 +1,12 @@
-import { AUTH_ERRORS } from '@/lib/authClient'
+/** The `code`s of the Supabase auth errors raven tells apart. */
+export const AUTH_ERRORS = {
+  invalidCredentials: 'invalid_credentials',
+  emailNotConfirmed: 'email_not_confirmed',
+  userAlreadyExists: 'user_already_exists',
+  otpExpired: 'otp_expired',
+  overEmailSendRateLimit: 'over_email_send_rate_limit',
+  weakPassword: 'weak_password',
+} as const
 
 export const RATE_LIMITED_COPY = 'Wait a moment before asking again.'
 

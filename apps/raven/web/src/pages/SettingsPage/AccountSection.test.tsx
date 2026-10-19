@@ -1,35 +1,18 @@
-import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
+import { afterEach, describe, expect, it, mock } from 'bun:test'
 import { act, cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  type Account,
-  type AuthConfig,
-  AUTH_CONFIG_STATES,
-  AUTH_COOKIE,
-  MEMBER_STATUSES,
-} from '@raven/core'
-import { api } from '@/lib/api'
+import type { Account } from '@raven/core'
 import type { AuthClient } from '@/lib/authClient'
 import { queryKeys } from '@/lib/queryClient'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { ACCOUNT_ID, fakeAccount, fakeAuthClient } from '@/test/authClient'
+import { ACCOUNT_ID, SIGNED_IN, fakeAccount, fakeAuthClient } from '@/test/authClient'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
-
-const ready: AuthConfig = {
-  state: AUTH_CONFIG_STATES.ready,
-  supabaseUrl: 'http://127.0.0.1:54321',
-  publishableKey: 'sb_publishable_test',
-  webUrl: 'http://localhost:8484',
-  cookieName: AUTH_COOKIE,
-}
 
 type SignOutResult = Awaited<ReturnType<AuthClient['signOut']>>
 
 describe('AccountSection', () => {
-  const getMe = spyOn(api, 'getMe')
-
   const renderAccount = ({
     account = fakeAccount({ email: 'jordan@example.com' }),
     signOut = async (): Promise<SignOutResult> => ({ error: null }),
@@ -37,15 +20,15 @@ describe('AccountSection', () => {
     useAuthSession.setState({
       client: fakeAuthClient({ calls: { signOut } }).client,
       status: AUTH_SESSION_STATUSES.ready,
-      session: { accessToken: 't', userId: ACCOUNT_ID },
+      session: SIGNED_IN,
     })
-    getMe.mockResolvedValue(account)
-    return renderWithProviders({ authConfig: ready, ui: <AccountSection /> })
+    const rendered = renderWithProviders({ ui: <AccountSection account={account} /> })
+    rendered.client.setQueryData(queryKeys.account(ACCOUNT_ID), account)
+    return rendered
   }
 
   afterEach(() => {
     cleanup()
-    getMe.mockReset()
     useAuthSession.setState({ client: null, session: null })
   })
 
@@ -63,29 +46,6 @@ describe('AccountSection', () => {
 
     expect(await screen.findByRole('heading', { name: 'Account' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeVisible()
-  })
-
-  it('is not shown while accounts are off', () => {
-    renderWithProviders({ authConfig: { state: AUTH_CONFIG_STATES.off }, ui: <AccountSection /> })
-
-    expect(screen.queryByRole('heading', { name: 'Account' })).toBeNull()
-    expect(getMe).not.toHaveBeenCalled()
-  })
-
-  it('is not shown while accounts cannot be reached', () => {
-    renderWithProviders({
-      authConfig: { state: AUTH_CONFIG_STATES.unavailable },
-      ui: <AccountSection />,
-    })
-
-    expect(screen.queryByRole('heading', { name: 'Account' })).toBeNull()
-  })
-
-  it('is not shown to an account that is not approved', async () => {
-    renderAccount({ account: fakeAccount({ status: MEMBER_STATUSES.pending }) })
-
-    await waitFor(() => expect(getMe).toHaveBeenCalled())
-    expect(screen.queryByRole('heading', { name: 'Account' })).toBeNull()
   })
 
   it('signs out, and empties what the account left in the cache', async () => {

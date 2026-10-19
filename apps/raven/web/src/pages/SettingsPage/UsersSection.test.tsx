@@ -1,30 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  type Account,
-  type AuthConfig,
-  ApiError,
-  AUTH_CONFIG_STATES,
-  AUTH_COOKIE,
-  AUTH_REFUSALS,
-  MEMBER_STATUSES,
-} from '@raven/core'
+import { type Account, ApiError, AUTH_REFUSALS, MEMBER_STATUSES } from '@raven/core'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
 import { UsersSection } from '@/pages/SettingsPage/UsersSection'
-import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { fakeAccount } from '@/test/authClient'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
-
-const ready: AuthConfig = {
-  state: AUTH_CONFIG_STATES.ready,
-  supabaseUrl: 'http://127.0.0.1:54321',
-  publishableKey: 'sb_publishable_test',
-  webUrl: 'http://localhost:8484',
-  cookieName: AUTH_COOKIE,
-}
 
 const OWNER = fakeAccount({ email: 'owner@example.com', isOwner: true })
 const WAITING_PAT = fakeAccount({
@@ -65,20 +48,11 @@ const emailsShown = () =>
     .map((row) => within(row).getByText(/@example\.com$/).textContent)
 
 describe('UsersSection', () => {
-  const getMe = spyOn(api, 'getMe')
   const listMembers = spyOn(api, 'listMembers')
   const setMemberStatus = spyOn(api, 'setMemberStatus')
   const server: { members: Account[] } = { members: EVERYONE }
 
-  const renderUsers = ({ account = OWNER }: { account?: Account } = {}) => {
-    useAuthSession.setState({
-      client: null,
-      status: AUTH_SESSION_STATUSES.ready,
-      session: { accessToken: 't', userId: account.id },
-    })
-    getMe.mockResolvedValue(account)
-    return renderWithProviders({ authConfig: ready, ui: <UsersSection /> })
-  }
+  const renderUsers = () => renderWithProviders({ ui: <UsersSection userId={OWNER.id} /> })
 
   beforeEach(() => {
     server.members = EVERYONE
@@ -93,28 +67,11 @@ describe('UsersSection', () => {
 
   afterEach(() => {
     cleanup()
-    getMe.mockReset()
     listMembers.mockReset()
     setMemberStatus.mockReset()
-    useAuthSession.setState({ client: null, session: null })
   })
 
   describe('who sees it', () => {
-    it('is not shown to an approved account that does not own raven', async () => {
-      renderUsers({ account: fakeAccount() })
-
-      await waitFor(() => expect(getMe).toHaveBeenCalled())
-      expect(screen.queryByRole('heading', { name: 'Users' })).toBeNull()
-      expect(listMembers).not.toHaveBeenCalled()
-    })
-
-    it('is not shown while accounts are off', () => {
-      renderWithProviders({ authConfig: { state: AUTH_CONFIG_STATES.off }, ui: <UsersSection /> })
-
-      expect(screen.queryByRole('heading', { name: 'Users' })).toBeNull()
-      expect(listMembers).not.toHaveBeenCalled()
-    })
-
     it('is shown to the owner under a Users heading', async () => {
       renderUsers()
 
@@ -319,9 +276,13 @@ describe('UsersSection', () => {
       ).toBeDisabled()
 
       await act(async () => change.answer({ ...WAITING_PAT, status: MEMBER_STATUSES.approved }))
+      // A failed toBeEnabled prints the whole element, which takes seconds; a boolean prints at once.
       await waitFor(() =>
-        expect(screen.getByRole('button', { name: 'Approve sam@example.com' })).toBeEnabled(),
+        expect(
+          screen.getByRole('button', { name: 'Approve sam@example.com' }).hasAttribute('disabled'),
+        ).toBe(false),
       )
+      expect(screen.getByRole('button', { name: 'Approve sam@example.com' })).toBeEnabled()
     })
 
     it('says what went wrong, and keeps the row where it was', async () => {

@@ -1,20 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { AUTH_CONFIG_STATES, AUTH_COOKIE } from '@raven/core'
-import { AUTH_EVENTS, type ReadyAuthConfig } from '@/lib/authClient'
+import { AUTH_EVENTS } from '@/lib/authClient'
 import { queryClient, queryKeys } from '@/lib/queryClient'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { createSelectionStore } from '@/stores/selection'
 import { useSelectionScopes } from '@/stores/selectionScope'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
-import { fakeAuthClient, fakeSession } from '@/test/authClient'
-
-const config: ReadyAuthConfig = {
-  state: AUTH_CONFIG_STATES.ready,
-  supabaseUrl: 'http://127.0.0.1:54321',
-  publishableKey: 'sb_publishable_test',
-  webUrl: 'http://localhost:8484',
-  cookieName: AUTH_COOKIE,
-}
+import { fakeAuthClient, fakeSession, readyConfig as config } from '@/test/authClient'
 
 const settled = () => Promise.resolve().then(() => undefined)
 
@@ -28,7 +19,6 @@ describe('useAuthSession', () => {
 
     expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.ready)
     expect(useAuthSession.getState().session).toEqual({ accessToken: 't1', userId: 'u1' })
-    expect(useAuthSession.getState().accessToken()).toBe('t1')
   })
 
   it('boots signed out without a stored session', async () => {
@@ -39,7 +29,6 @@ describe('useAuthSession', () => {
 
     expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.ready)
     expect(useAuthSession.getState().session).toBeNull()
-    expect(useAuthSession.getState().accessToken()).toBeNull()
   })
 
   it('follows the session through sign in, refresh and sign out', async () => {
@@ -54,11 +43,10 @@ describe('useAuthSession', () => {
       event: 'TOKEN_REFRESHED',
       session: fakeSession({ userId: 'u2', accessToken: 'b' }),
     })
-    expect(useAuthSession.getState().accessToken()).toBe('b')
+    expect(useAuthSession.getState().session?.accessToken).toBe('b')
 
     fake.emit({ event: 'SIGNED_OUT', session: null })
     expect(useAuthSession.getState().session).toBeNull()
-    expect(useAuthSession.getState().accessToken()).toBeNull()
   })
 
   it('starts once, however often it is asked', async () => {
@@ -149,7 +137,8 @@ describe('useAuthSession account changes', () => {
     const stale = (key: readonly unknown[]) => queryClient.getQueryState(key)?.isInvalidated
     expect(stale(queryKeys.libraries)).toBe(true)
     expect(stale(queryKeys.authConfig)).toBe(false)
-    expect(queryClient.getQueryData<ReadyAuthConfig>(queryKeys.authConfig)).toEqual(config)
+    const cached: unknown = queryClient.getQueryData(queryKeys.authConfig)
+    expect(cached).toEqual(config)
   })
 })
 

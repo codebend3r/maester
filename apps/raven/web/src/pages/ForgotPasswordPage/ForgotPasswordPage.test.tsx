@@ -1,32 +1,18 @@
 import { afterEach, describe, expect, it, jest, mock, spyOn } from 'bun:test'
 import { AuthApiError } from '@supabase/supabase-js'
-import { act, screen } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Route, Routes, useLocation } from 'react-router-dom'
-import {
-  type AuthConfig,
-  AUTH_CONFIG_STATES,
-  AUTH_COOKIE,
-  ApiError,
-  MEMBER_STATUSES,
-} from '@raven/core'
+import { AUTH_CONFIG_STATES, ApiError, MEMBER_STATUSES } from '@raven/core'
 import { AppRoutes } from '@/AppRoutes'
 import { api } from '@/lib/api'
-import { AUTH_ERRORS, type AuthClient } from '@/lib/authClient'
+import { type AuthClient } from '@/lib/authClient'
+import { AUTH_ERRORS } from '@/lib/authErrors'
 import { AUTH_ROUTES } from '@/lib/authRoutes'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage/ForgotPasswordPage'
-import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { ACCOUNT_ID, fakeAccount, fakeAuthClient } from '@/test/authClient'
+import { AUTH_SESSION_STATUSES } from '@/stores/authSession'
+import { fakeAccount } from '@/test/authClient'
+import { type AuthPageOptions, passSeconds, renderAuthPage, where } from '@/test/authPage'
 import { held } from '@/test/held'
-import { renderWithProviders } from '@/test/render'
-
-const ready: AuthConfig = {
-  state: AUTH_CONFIG_STATES.ready,
-  supabaseUrl: 'http://127.0.0.1:54321',
-  publishableKey: 'sb_publishable_test',
-  webUrl: 'http://localhost:8484',
-  cookieName: AUTH_COOKIE,
-}
 
 type ResetResult = Awaited<ReturnType<AuthClient['resetPasswordForEmail']>>
 
@@ -39,45 +25,11 @@ const refused = ({ code, status }: { code: string; status: number }): ResetResul
 
 const SENT_MESSAGE = 'If that address has an account, a link is on its way.'
 
-const Where = () => {
-  const { pathname, search } = useLocation()
-  return <p data-testid="where">{`${pathname}${search}`}</p>
-}
-
-const renderForgot = ({
-  calls = {},
-  authConfig = ready,
-  isSessionKept = false,
-  status = AUTH_SESSION_STATUSES.ready,
-}: {
-  calls?: Partial<AuthClient>
-  authConfig?: AuthConfig | null
-  isSessionKept?: boolean
-  status?: (typeof AUTH_SESSION_STATUSES)[keyof typeof AUTH_SESSION_STATUSES]
-} = {}) => {
-  const fake = fakeAuthClient({ calls })
-  useAuthSession.setState({
-    client: fake.client,
-    status,
-    session: isSessionKept ? { accessToken: 't', userId: ACCOUNT_ID } : null,
-  })
-  return renderWithProviders({
-    authConfig,
-    route: AUTH_ROUTES.forgot,
-    ui: (
-      <Routes>
-        <Route path={AUTH_ROUTES.forgot} element={<ForgotPasswordPage />} />
-        <Route path="*" element={<Where />} />
-      </Routes>
-    ),
-  })
-}
+const renderForgot = (options: AuthPageOptions = {}) =>
+  renderAuthPage({ path: AUTH_ROUTES.forgot, page: <ForgotPasswordPage />, ...options })
 
 const email = () => screen.getByLabelText('Email')
 const submit = () => screen.getByRole('button', { name: /^(Send|Sending)/ })
-
-const passSeconds = (seconds: number) =>
-  Array.from({ length: seconds }).forEach(() => act(() => jest.advanceTimersByTime(1000)))
 
 describe('ForgotPasswordPage', () => {
   const getMe = spyOn(api, 'getMe')
@@ -203,7 +155,7 @@ describe('ForgotPasswordPage', () => {
     it('sends a visitor home while accounts are off', async () => {
       renderForgot({ authConfig: { state: AUTH_CONFIG_STATES.off } })
 
-      expect(await screen.findByTestId('where')).toHaveTextContent(/^\/$/)
+      await waitFor(() => expect(where()).toBe('/'))
     })
 
     it('waits while the config or the stored session is read', () => {
@@ -215,21 +167,21 @@ describe('ForgotPasswordPage', () => {
 
     it('sends an approved visitor already signed in home', async () => {
       getMe.mockResolvedValue(fakeAccount())
-      renderForgot({ isSessionKept: true })
+      renderForgot({ isSignedIn: true })
 
-      expect(await screen.findByTestId('where')).toHaveTextContent(/^\/$/)
+      await waitFor(() => expect(where()).toBe('/'))
     })
 
     it('sends a visitor signed in without approval to the pending screen', async () => {
       getMe.mockResolvedValue(fakeAccount({ status: MEMBER_STATUSES.pending }))
-      renderForgot({ isSessionKept: true })
+      renderForgot({ isSignedIn: true })
 
-      expect(await screen.findByTestId('where')).toHaveTextContent(AUTH_ROUTES.pending)
+      await waitFor(() => expect(where()).toBe(AUTH_ROUTES.pending))
     })
 
     it('shows the notice when the account cannot be read', async () => {
       getMe.mockRejectedValue(new ApiError({ status: 503, message: 'Unavailable' }))
-      renderForgot({ isSessionKept: true })
+      renderForgot({ isSignedIn: true })
 
       expect(
         await screen.findByRole('heading', { name: 'Sign in is temporarily unavailable' }),
@@ -238,9 +190,7 @@ describe('ForgotPasswordPage', () => {
   })
 
   it('takes the whole screen at /forgot-password, outside the browsing frame', () => {
-    const { client } = fakeAuthClient()
-    useAuthSession.setState({ client, status: AUTH_SESSION_STATUSES.ready, session: null })
-    renderWithProviders({ ui: <AppRoutes />, route: AUTH_ROUTES.forgot, authConfig: ready })
+    renderAuthPage({ path: '*', page: <AppRoutes />, route: AUTH_ROUTES.forgot })
 
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
     expect(screen.getByRole('main')).toContainElement(screen.getByRole('heading', { level: 1 }))

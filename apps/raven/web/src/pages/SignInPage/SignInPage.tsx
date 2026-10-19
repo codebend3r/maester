@@ -1,63 +1,40 @@
 import { useMutation } from '@tanstack/react-query'
-import { type FormEvent, useId, useState } from 'react'
+import { type FormEvent, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Icon } from '@raven/ui'
-import { AUTH_ERRORS } from '@/lib/authClient'
-import { errorCodeOf, resendFailureCopy } from '@/lib/authErrors'
+import { Button } from '@raven/ui'
+import { EmailField, PasswordField } from '@/components/AuthScreen/AuthFields'
+import { AuthForm, Fields, Lead, Note, SubmitButton } from '@/components/AuthScreen/AuthCard'
+import { AUDIENCES, AuthScreen } from '@/components/AuthScreen/AuthScreen'
+import { AUTH_ERRORS, errorCodeOf, resendFailureCopy } from '@/lib/authErrors'
 import { AUTH_QUERY, AUTH_ROUTES, checkEmailPath, safeReturnPath } from '@/lib/authRoutes'
-import { AuthScreen, Brand } from '@/pages/SignInPage/AuthScreen'
+import { callAuth, resendConfirmation } from '@/lib/session'
 import { useAuthSession } from '@/stores/authSession'
 import styles from '@/pages/SignInPage/SignInPage.module.scss'
 
-const SIGN_IN_FAILURES = {
-  invalidCredentials: 'invalidCredentials',
-  emailNotConfirmed: 'emailNotConfirmed',
-  failed: 'failed',
-} as const
-
-type SignInFailure = (typeof SIGN_IN_FAILURES)[keyof typeof SIGN_IN_FAILURES]
-
-const FAILURE_COPY = {
-  [SIGN_IN_FAILURES.invalidCredentials]: 'Email or password is wrong.',
-  [SIGN_IN_FAILURES.emailNotConfirmed]: 'Confirm your email to sign in.',
-  [SIGN_IN_FAILURES.failed]: 'Sign in failed. Try again.',
-} as const satisfies Record<SignInFailure, string>
-
-const failureOf = (error: unknown): SignInFailure => {
+const failureCopy = (error: unknown): string => {
   switch (errorCodeOf(error)) {
     case AUTH_ERRORS.invalidCredentials:
-      return SIGN_IN_FAILURES.invalidCredentials
+      return 'Email or password is wrong.'
     case AUTH_ERRORS.emailNotConfirmed:
-      return SIGN_IN_FAILURES.emailNotConfirmed
+      return 'Confirm your email to sign in.'
     default:
-      return SIGN_IN_FAILURES.failed
+      return 'Sign in failed. Try again.'
   }
 }
 
 const SignInForm = ({ returnPath }: { returnPath: string }) => {
-  const ids = { email: useId(), password: useId(), error: useId() }
   const navigate = useNavigate()
-  const client = useAuthSession((state) => state.client)
+  const isReady = useAuthSession((state) => state.client !== null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isShown, setShown] = useState(false)
   const signIn = useMutation({
-    mutationFn: async (credentials: { email: string; password: string }) => {
-      if (client === null) throw new Error('Sign in is not ready yet')
-      const { error } = await client.signInWithPassword(credentials)
-      if (error) throw error
-    },
+    mutationFn: (credentials: { email: string; password: string }) =>
+      callAuth((client) => client.signInWithPassword(credentials)),
     onSuccess: () => navigate(returnPath, { replace: true }),
   })
-  const resend = useMutation({
-    mutationFn: async ({ address }: { address: string }) => {
-      if (client === null) throw new Error('Sign in is not ready yet')
-      const { error } = await client.resend({ type: 'signup', email: address })
-      if (error) throw error
-    },
-  })
-  const isFailed = signIn.isError
-  const failure = failureOf(signIn.error)
+  const resend = useMutation({ mutationFn: resendConfirmation })
+  const isUnconfirmed = errorCodeOf(signIn.error) === AUTH_ERRORS.emailNotConfirmed
   const attempted = signIn.variables?.email ?? ''
 
   const submit = (event: FormEvent) => {
@@ -67,79 +44,27 @@ const SignInForm = ({ returnPath }: { returnPath: string }) => {
   }
 
   return (
-    <form className={styles.form} onSubmit={submit}>
-      <Brand />
-      <header className={styles.welcome}>
-        <h1 className={styles.title}>Welcome back</h1>
-        <p className={styles.lead}>Sign in to watch on {window.location.hostname}</p>
-      </header>
-      <div className={styles.fields}>
-        <div className={styles.field}>
-          <label htmlFor={ids.email} className={styles.label}>
-            Email
-          </label>
-          <input
-            id={ids.email}
-            className={styles.input}
-            type="email"
-            name="email"
-            inputMode="email"
-            autoComplete="username"
-            autoCapitalize="none"
-            spellCheck={false}
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </div>
-        <div className={styles.field}>
-          <label htmlFor={ids.password} className={styles.label}>
-            Password
-          </label>
-          <div
-            className={
-              isFailed
-                ? `${styles.box} ${styles.secret} ${styles.invalid}`
-                : `${styles.box} ${styles.secret}`
-            }
-          >
-            <input
-              id={ids.password}
-              className={styles.boxed}
-              type={isShown ? 'text' : 'password'}
-              name="password"
-              autoComplete="current-password"
-              autoCapitalize="none"
-              spellCheck={false}
-              required
-              aria-invalid={isFailed}
-              aria-describedby={isFailed ? ids.error : undefined}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            <Button
-              tone="ghost"
-              className={styles.reveal}
-              aria-controls={ids.password}
-              onClick={() => setShown((now) => !now)}
-            >
-              {isShown ? 'Hide' : 'Show'}
-              <span className="visually-hidden"> password</span>
-            </Button>
-          </div>
-          {isFailed && (
-            <p id={ids.error} role="alert" className={styles.alert}>
-              <span className={styles.alertIcon}>
-                <Icon name="alert" size={18} />
-              </span>
-              <span className={styles.alertText}>{FAILURE_COPY[failure]}</span>
-            </p>
-          )}
-          {isFailed && failure === SIGN_IN_FAILURES.emailNotConfirmed && (
+    <AuthForm
+      title="Welcome back"
+      lead={<Lead>Sign in to watch on {window.location.hostname}</Lead>}
+      onSubmit={submit}
+    >
+      <Fields>
+        <EmailField value={email} onChange={setEmail} />
+        <PasswordField
+          label="Password"
+          autoComplete="current-password"
+          value={password}
+          onChange={setPassword}
+          error={signIn.isError ? failureCopy(signIn.error) : null}
+          isShown={isShown}
+          onToggleShown={() => setShown((now) => !now)}
+        >
+          {isUnconfirmed && (
             <div className={styles.unconfirmed}>
               <Button
                 disabled={resend.isPending}
-                onClick={() => resend.mutate({ address: attempted })}
+                onClick={() => resend.mutate({ email: attempted })}
               >
                 Resend confirmation email
               </Button>
@@ -148,23 +73,18 @@ const SignInForm = ({ returnPath }: { returnPath: string }) => {
               {resend.isError && <output>{resendFailureCopy(resend.error)}</output>}
             </div>
           )}
-        </div>
+        </PasswordField>
         <Link className={styles.forgot} to={AUTH_ROUTES.forgot}>
           Forgot password?
         </Link>
-      </div>
-      <Button
-        type="submit"
-        tone="primary"
-        className={styles.submit}
-        disabled={signIn.isPending || client === null}
-      >
+      </Fields>
+      <SubmitButton isDisabled={signIn.isPending || !isReady}>
         {signIn.isPending ? 'Signing in…' : 'Sign in'}
-      </Button>
-      <p className={styles.switch}>
+      </SubmitButton>
+      <Note>
         New to raven? <Link to={AUTH_ROUTES.signUp}>Create an account</Link>
-      </p>
-    </form>
+      </Note>
+    </AuthForm>
   )
 }
 
@@ -182,7 +102,7 @@ export const SignInPage = () => {
   const returnPath = safeReturnPath(params.get(AUTH_QUERY.returnTo))
 
   return (
-    <AuthScreen approvedTo={returnPath}>
+    <AuthScreen audience={AUDIENCES.signedOut} approvedTo={returnPath}>
       <SignInForm returnPath={returnPath} />
     </AuthScreen>
   )

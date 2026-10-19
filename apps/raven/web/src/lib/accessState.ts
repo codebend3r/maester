@@ -8,7 +8,7 @@ import {
   MEMBER_STATUSES,
 } from '@raven/core'
 import { accountQuery, authConfigQuery } from '@/lib/queries'
-import { type SessionSummary, AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
+import { type AuthSessionState, AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 
 export const ACCESS_KINDS = {
   disabled: 'disabled',
@@ -32,13 +32,12 @@ export type AccessState =
   | { kind: typeof ACCESS_KINDS.revoked }
   | { kind: typeof ACCESS_KINDS.approved; account: Account }
 
+export type AccessKind = AccessState['kind']
+
 /** What `accessStateOf` reads of a query; a `useQuery` result is one. */
 type QueryView<T> = { data: T | undefined; error: Error | null }
 
-type SessionView = {
-  status: (typeof AUTH_SESSION_STATUSES)[keyof typeof AUTH_SESSION_STATUSES]
-  session: SessionSummary | null
-}
+type SessionView = Pick<AuthSessionState, 'status' | 'session'>
 
 const accountState = (account: QueryView<Account>): AccessState => {
   const reason = account.error instanceof ApiError ? account.error.refusal?.reason : undefined

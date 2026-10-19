@@ -1,23 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useId } from 'react'
+import type { Account } from '@raven/core'
 import { Button } from '@raven/ui'
-import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
-import { signOut } from '@/lib/signOut'
+import { signOut } from '@/lib/session'
 import { STATUS_NAMES } from '@/pages/SettingsPage/memberStatus'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
+import accountStyles from '@/pages/SettingsPage/AccountSection.module.scss'
 
-/**
- * Who is signed in, and the way out. Shown only while accounts are on and
- * the viewer is approved, since the other states have a screen of their own.
- */
-export const AccountSection = () => {
+/** Who is signed in, and the way out. */
+export const AccountSection = ({ account }: { account: Account }) => {
   const headingId = useId()
   const queryClient = useQueryClient()
-  const access = useAccessState()
   const end = useMutation({ mutationFn: () => signOut({ queryClient }) })
-  if (access.kind !== ACCESS_KINDS.approved) return null
-  const { account } = access
 
   return (
     <section className={styles.section} aria-labelledby={headingId}>
@@ -27,14 +22,18 @@ export const AccountSection = () => {
         </h2>
         <p className={styles.help}>The account this browser is signed in to.</p>
       </header>
-      <div className={styles.account}>
-        <dl className={styles.facts}>
+      <div className={accountStyles.account}>
+        <dl className={accountStyles.facts}>
           <dt>Email</dt>
           <dd>{account.email}</dd>
           <dt>Access</dt>
           <dd>{STATUS_NAMES[account.status]}</dd>
         </dl>
-        <Button className={styles.signOut} disabled={end.isPending} onClick={() => end.mutate()}>
+        <Button
+          className={accountStyles.signOut}
+          disabled={end.isPending}
+          onClick={() => end.mutate()}
+        >
           {end.isPending ? 'Signing out' : 'Sign out'}
         </Button>
       </div>

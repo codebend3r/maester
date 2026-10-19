@@ -53,7 +53,7 @@ export const AppRoutes = () => (
         {/* The player takes the whole screen, outside the browsing frame. */}
         <Route path="watch/:id" element={<WatchPage />} />
       </Route>
-      {/* So do signing in, which the gate sends a signed out visitor to, signing up, the page that asks to check email, the page an email link opens, the pages to ask for a new password and to choose one, the page that waits for approval, and the page to get raven from. */}
+      {/* So do the account pages, which sit outside the gate they serve, and the page to get raven from. */}
       <Route path={AUTH_ROUTES.signIn} element={<SignInPage />} />
       <Route path={AUTH_ROUTES.signUp} element={<SignUpPage />} />
       <Route path={AUTH_ROUTES.checkEmail} element={<CheckEmailPage />} />

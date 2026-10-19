@@ -1,15 +1,15 @@
-import { afterEach, describe, expect, it, spyOn } from 'bun:test'
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { AuthApiError } from '@supabase/supabase-js'
 import { QueryClient } from '@tanstack/react-query'
 import { AUTH_COOKIE } from '@raven/core'
-import { createAuthClient } from '@/lib/authClient'
-import { signOut } from '@/lib/signOut'
+import { type AuthClient, createAuthClient } from '@/lib/authClient'
+import { callAuth, resendConfirmation, signOut } from '@/lib/session'
 import { useAuthSession } from '@/stores/authSession'
 import { createSelectionStore } from '@/stores/selection'
 import { useSelectionScopes } from '@/stores/selectionScope'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
-import { answer, clearCookies, heldCookies, readyConfig, sessionOf } from '@/test/authCookies'
-import { fakeAuthClient } from '@/test/authClient'
+import { fakeAuthClient, readyConfig } from '@/test/authClient'
+import { answer, clearCookies, heldCookies, sessionOf } from '@/test/authCookies'
 
 const credentials = { email: 'a@example.com', password: 'password' }
 
@@ -28,6 +28,36 @@ const accountState = () => {
 afterEach(() => {
   clearCookies()
   spyOn(globalThis, 'fetch').mockRestore()
+})
+
+describe('callAuth', () => {
+  it('refuses before the session has built its client', async () => {
+    await expect(callAuth(async () => ({ error: null }))).rejects.toThrow(
+      'Accounts are not ready yet',
+    )
+  })
+
+  it('throws the error Supabase answers with, and returns any other answer', async () => {
+    useAuthSession.setState({ client: fakeAuthClient().client })
+    const refusal = new AuthApiError('Refused', 400, 'invalid_credentials')
+
+    await expect(callAuth(async () => ({ error: refusal }))).rejects.toBe(refusal)
+    expect(await callAuth(async () => ({ data: 1, error: null }))).toEqual({ data: 1, error: null })
+  })
+})
+
+describe('resendConfirmation', () => {
+  it('sends the confirmation email again as a sign up resend', async () => {
+    const resend = mock(async (_params: Parameters<AuthClient['resend']>[0]) => ({
+      data: { user: null, session: null },
+      error: null,
+    }))
+    useAuthSession.setState({ client: fakeAuthClient({ calls: { resend } }).client })
+
+    await resendConfirmation({ email: 'a@example.com' })
+
+    expect(resend).toHaveBeenCalledWith({ type: 'signup', email: 'a@example.com' })
+  })
 })
 
 describe('signOut', () => {

@@ -2,12 +2,11 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import {
   type AuthConfig,
   ApiError,
   AUTH_CONFIG_STATES,
-  AUTH_COOKIE,
   AUTH_REFUSALS,
   MEMBER_STATUSES,
 } from '@raven/core'
@@ -15,26 +14,14 @@ import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { api } from '@/lib/api'
 import { AUTH_ROUTES } from '@/lib/authRoutes'
 import { queryClient, queryKeys } from '@/lib/queryClient'
-import { signOut } from '@/lib/signOut'
+import { signOut } from '@/lib/session'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { ACCOUNT_ID, fakeAccount, fakeAuthClient, fakeSession } from '@/test/authClient'
+import { SIGNED_IN, fakeAccount, fakeAuthClient, fakeSession, readyConfig } from '@/test/authClient'
+import { Where } from '@/test/authPage'
 import { renderWithProviders } from '@/test/render'
 
-const ready: AuthConfig = {
-  state: AUTH_CONFIG_STATES.ready,
-  supabaseUrl: 'http://127.0.0.1:54321',
-  publishableKey: 'sb_publishable_test',
-  webUrl: 'http://localhost:8484',
-  cookieName: AUTH_COOKIE,
-}
-
-const Where = () => {
-  const { pathname, search } = useLocation()
-  return <p data-testid="where">{`${pathname}${search}`}</p>
-}
-
 const renderGate = ({
-  authConfig = ready,
+  authConfig = readyConfig,
   isSignedIn = true,
   route = '/libraries/3?x=1',
 }: {
@@ -44,7 +31,7 @@ const renderGate = ({
 } = {}) => {
   useAuthSession.setState({
     status: AUTH_SESSION_STATUSES.ready,
-    session: isSignedIn ? { accessToken: 't', userId: ACCOUNT_ID } : null,
+    session: isSignedIn ? SIGNED_IN : null,
   })
   return renderWithProviders({
     authConfig,
@@ -184,7 +171,7 @@ describe('AuthGate', () => {
     const user = userEvent.setup()
     getMe.mockResolvedValue(fakeAccount())
     getAuthConfig.mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve(ready), 30)),
+      () => new Promise((resolve) => setTimeout(() => resolve(readyConfig), 30)),
     )
     const fake = fakeAuthClient({
       session: fakeSession(),
@@ -198,12 +185,12 @@ describe('AuthGate', () => {
       },
     })
     useAuthSession.setState({ client: null, session: null, status: AUTH_SESSION_STATUSES.booting })
-    useAuthSession.getState().start({ config: ready, createClient: () => fake.client })
+    useAuthSession.getState().start({ config: readyConfig, createClient: () => fake.client })
     const LeaveButton = () => {
       const client = useQueryClient()
       return <button onClick={() => signOut({ queryClient: client })}>Leave</button>
     }
-    queryClient.setQueryData(queryKeys.authConfig, ready)
+    queryClient.setQueryData(queryKeys.authConfig, readyConfig)
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={['/libraries/3']}>

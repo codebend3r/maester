@@ -1,25 +1,15 @@
 import { afterEach, describe, expect, it, jest, mock, spyOn } from 'bun:test'
 import { AuthApiError } from '@supabase/supabase-js'
-import { act, screen } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Route, Routes, useLocation } from 'react-router-dom'
-import { type AuthConfig, AUTH_CONFIG_STATES, AUTH_COOKIE } from '@raven/core'
+import { AUTH_CONFIG_STATES } from '@raven/core'
 import { AppRoutes } from '@/AppRoutes'
-import { AUTH_ERRORS, type AuthClient } from '@/lib/authClient'
+import { type AuthClient } from '@/lib/authClient'
+import { AUTH_ERRORS } from '@/lib/authErrors'
 import { AUTH_ROUTES, checkEmailPath } from '@/lib/authRoutes'
 import { CheckEmailPage } from '@/pages/CheckEmailPage/CheckEmailPage'
-import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { fakeAuthClient } from '@/test/authClient'
+import { type AuthPageOptions, passSeconds, renderAuthPage, where } from '@/test/authPage'
 import { held } from '@/test/held'
-import { renderWithProviders } from '@/test/render'
-
-const ready: AuthConfig = {
-  state: AUTH_CONFIG_STATES.ready,
-  supabaseUrl: 'http://127.0.0.1:54321',
-  publishableKey: 'sb_publishable_test',
-  webUrl: 'http://localhost:8484',
-  cookieName: AUTH_COOKIE,
-}
 
 type ResendResult = Awaited<ReturnType<AuthClient['resend']>>
 
@@ -30,39 +20,13 @@ const refusedResend = (code: string): ResendResult => ({
   error: new AuthApiError('Words from the server', 429, code),
 })
 
-const Where = () => {
-  const { pathname, search } = useLocation()
-  return <p data-testid="where">{`${pathname}${search}`}</p>
-}
-
 const ADDRESS = 'jordan@example.com'
 
 const renderCheckEmail = ({
-  calls = {},
   route = checkEmailPath({ email: ADDRESS }),
-  authConfig = ready,
-}: { calls?: Partial<AuthClient>; route?: string; authConfig?: AuthConfig } = {}) => {
-  const fake = fakeAuthClient({ calls })
-  useAuthSession.setState({
-    client: fake.client,
-    status: AUTH_SESSION_STATUSES.ready,
-    session: null,
-  })
-  return renderWithProviders({
-    authConfig,
-    route,
-    ui: (
-      <Routes>
-        <Route path={AUTH_ROUTES.checkEmail} element={<CheckEmailPage />} />
-        <Route path="*" element={<Where />} />
-      </Routes>
-    ),
-  })
-}
-
-// The countdown arms a timer per second, so each second is its own step.
-const passSeconds = (seconds: number) =>
-  Array.from({ length: seconds }).forEach(() => act(() => jest.advanceTimersByTime(1000)))
+  ...options
+}: AuthPageOptions = {}) =>
+  renderAuthPage({ path: AUTH_ROUTES.checkEmail, page: <CheckEmailPage />, route, ...options })
 
 const resendButton = () => screen.getByRole('button', { name: /^Resend/ })
 
@@ -196,17 +160,11 @@ describe('CheckEmailPage', () => {
   it('sends a visitor home while accounts are off', async () => {
     renderCheckEmail({ authConfig: { state: AUTH_CONFIG_STATES.off } })
 
-    expect(await screen.findByTestId('where')).toHaveTextContent(/^\/$/)
+    await waitFor(() => expect(where()).toBe('/'))
   })
 
   it('takes the whole screen at /check-email, outside the browsing frame', () => {
-    const { client } = fakeAuthClient()
-    useAuthSession.setState({ client, status: AUTH_SESSION_STATUSES.ready, session: null })
-    renderWithProviders({
-      ui: <AppRoutes />,
-      route: checkEmailPath({ email: ADDRESS }),
-      authConfig: ready,
-    })
+    renderAuthPage({ path: '*', page: <AppRoutes />, route: checkEmailPath({ email: ADDRESS }) })
 
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
     expect(screen.getByRole('main')).toContainElement(screen.getByRole('heading', { level: 1 }))

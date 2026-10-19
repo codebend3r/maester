@@ -1,14 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
+import { AuthCard, Lead, Status } from '@/components/AuthScreen/AuthCard'
+import { AUDIENCES, AuthScreen } from '@/components/AuthScreen/AuthScreen'
 import { AUTH_QUERY, AUTH_ROUTES, HOME_PATH } from '@/lib/authRoutes'
-import { AuthScreen, Brand } from '@/pages/SignInPage/AuthScreen'
 import { useAuthSession } from '@/stores/authSession'
-import signInStyles from '@/pages/SignInPage/SignInPage.module.scss'
 import styles from '@/pages/ConfirmPage/ConfirmPage.module.scss'
 
 export const CONFIRM_TYPES = { email: 'email', recovery: 'recovery' } as const
 type ConfirmType = (typeof CONFIRM_TYPES)[keyof typeof CONFIRM_TYPES]
+
+/** Where each kind of link leads once spent, and how to ask for a new one. */
+const LINK_TYPES = {
+  [CONFIRM_TYPES.email]: {
+    destination: HOME_PATH,
+    resend: { to: AUTH_ROUTES.checkEmail, label: 'Send a new confirmation link' },
+  },
+  [CONFIRM_TYPES.recovery]: {
+    destination: AUTH_ROUTES.reset,
+    resend: { to: AUTH_ROUTES.forgot, label: 'Send a new reset link' },
+  },
+} as const satisfies Record<
+  ConfirmType,
+  { destination: string; resend: { to: string; label: string } }
+>
 
 const isConfirmType = (value: unknown): value is ConfirmType =>
   Object.values(CONFIRM_TYPES).some((type) => type === value)
@@ -31,53 +45,27 @@ const linkOf = (params: URLSearchParams): ConfirmLink => {
 const OUTCOMES = { verifying: 'verifying', verified: 'verified', failed: 'failed' } as const
 type Outcome = (typeof OUTCOMES)[keyof typeof OUTCOMES]
 
-const destinationOf = (type: ConfirmType): string => {
-  switch (type) {
-    case CONFIRM_TYPES.email:
-      return HOME_PATH
-    case CONFIRM_TYPES.recovery:
-      return AUTH_ROUTES.reset
-    default: {
-      const unreachable: never = type
-      return unreachable
-    }
-  }
-}
-
-const Verifying = () => (
-  <section className={signInStyles.form}>
-    <Brand />
-    <header className={signInStyles.welcome}>
-      <h1 className={signInStyles.title}>Confirming your link</h1>
-      <output className={signInStyles.lead}>One moment</output>
-    </header>
-  </section>
-)
-
-const RESEND_LINKS = {
-  [CONFIRM_TYPES.email]: { to: AUTH_ROUTES.checkEmail, label: 'Send a new confirmation link' },
-  [CONFIRM_TYPES.recovery]: { to: AUTH_ROUTES.forgot, label: 'Send a new reset link' },
-} as const satisfies Record<ConfirmType, { to: string; label: string }>
+const Verifying = () => <AuthCard title="Confirming your link" lead={<Status>One moment</Status>} />
 
 const Expired = ({ type }: { type: ConfirmType | null }) => {
-  const again = type === null ? null : RESEND_LINKS[type]
+  const again = type === null ? null : LINK_TYPES[type].resend
 
   return (
-    <section className={signInStyles.form}>
-      <Brand />
-      <header className={signInStyles.welcome}>
-        <h1 className={signInStyles.title}>This link has expired or was already used</h1>
-        <p className={signInStyles.lead}>
+    <AuthCard
+      title="This link has expired or was already used"
+      lead={
+        <Lead>
           {again === null
             ? 'Sign in, and ask for a new link from there if you need one.'
             : 'Links work once, for a short time. Ask for a new one.'}
-        </p>
-      </header>
+        </Lead>
+      }
+    >
       <nav className={styles.actions} aria-label="Next steps">
         {again !== null && <Link to={again.to}>{again.label}</Link>}
         <Link to={AUTH_ROUTES.signIn}>Back to sign in</Link>
       </nav>
-    </section>
+    </AuthCard>
   )
 }
 
@@ -93,22 +81,13 @@ export const ConfirmPage = () => {
   const [params] = useSearchParams()
   const [link] = useState(() => linkOf(params))
   const { search } = useLocation()
-  const navigate = useNavigate()
   const client = useAuthSession((state) => state.client)
   const hasSession = useAuthSession((state) => state.session !== null)
-  const isDisabled = useAccessState().kind === ACCESS_KINDS.disabled
   const [outcome, setOutcome] = useState<Outcome>(OUTCOMES.verifying)
   const hasVerified = useRef(false)
 
-  // With accounts off the screen sends the visitor home, which clears the URL too.
-  useEffect(() => {
-    if (search === '' || isDisabled) return
-    navigate(AUTH_ROUTES.confirm, { replace: true })
-  }, [search, isDisabled, navigate])
-
   useEffect(() => {
     if (link.kind !== LINK_KINDS.valid || client === null || search !== '') return
-    // A token works once: no re-run of this effect may spend it again.
     if (hasVerified.current) return
     hasVerified.current = true
     client.verifyOtp({ token_hash: link.tokenHash, type: link.type }).then(
@@ -118,12 +97,15 @@ export const ConfirmPage = () => {
     )
   }, [link, client, search])
 
+  // The same route stays mounted, so the link read above survives the move.
+  if (search !== '') return <Navigate replace to={AUTH_ROUTES.confirm} />
+
   if (link.kind === LINK_KINDS.valid && outcome === OUTCOMES.verified && hasSession) {
-    return <Navigate replace to={destinationOf(link.type)} />
+    return <Navigate replace to={LINK_TYPES[link.type].destination} />
   }
 
   return (
-    <AuthScreen shouldKeepVisitor>
+    <AuthScreen audience={AUDIENCES.anyone}>
       {link.kind === LINK_KINDS.valid && outcome !== OUTCOMES.failed ? (
         <Verifying />
       ) : (

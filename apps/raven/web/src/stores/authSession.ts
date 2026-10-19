@@ -15,7 +15,7 @@ export type AuthSessionStatus = (typeof AUTH_SESSION_STATUSES)[keyof typeof AUTH
 /** The two things the app reads off a Supabase session, so no refresh token reaches a component. */
 export type SessionSummary = { accessToken: string; userId: string }
 
-type AuthSessionState = {
+export type AuthSessionState = {
   client: AuthClient | null
   session: SessionSummary | null
   status: AuthSessionStatus
@@ -28,7 +28,6 @@ type AuthSessionState = {
   endRecovery: () => void
   /** Builds the client once, reads the stored session and follows every change to it. */
   start: (options: { config: ReadyAuthConfig; createClient?: typeof createAuthClient }) => void
-  accessToken: () => string | null
 }
 
 const summaryOf = (session: Session | null): SessionSummary | null =>
@@ -39,7 +38,9 @@ const summaryOf = (session: Session | null): SessionSummary | null =>
  * changes, a sign out in another tab or an expired session included. A first
  * sign in after nobody was signed in keeps the cache but marks it stale: the
  * server refused what was asked for before, and the account query is keyed by
- * user, so nothing of another account can show.
+ * user, so nothing of another account can show. It runs inside Supabase's
+ * auth listener, which must not wait on anything, so a refetch that fails is
+ * left to the queries that show it.
  */
 const followAccount = ({
   previous,
@@ -50,12 +51,12 @@ const followAccount = ({
 }): void => {
   if (previous?.userId === next?.userId) return
   if (previous !== null) {
-    clearAccountState({ queryClient })
+    clearAccountState({ queryClient }).catch(() => undefined)
     return
   }
-  void queryClient.invalidateQueries({
-    predicate: (query) => query.queryKey[0] !== queryKeys.auth[0],
-  })
+  queryClient
+    .invalidateQueries({ predicate: (query) => query.queryKey[0] !== queryKeys.auth[0] })
+    .catch(() => undefined)
 }
 
 /** Who is signed in on this browser, and the token every `/api/` call carries. */
@@ -88,5 +89,4 @@ export const useAuthSession = create<AuthSessionState>()((set, get) => ({
       () => settle(null),
     )
   },
-  accessToken: () => get().session?.accessToken ?? null,
 }))

@@ -1,9 +1,22 @@
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 import type { Account } from '@raven/core'
-import { MEMBER_STATUSES } from '@raven/core'
-import type { AuthClient } from '@/lib/authClient'
+import { AUTH_CONFIG_STATES, AUTH_COOKIE, MEMBER_STATUSES } from '@raven/core'
+import type { AuthClient, ReadyAuthConfig } from '@/lib/authClient'
+import type { SessionSummary } from '@/stores/authSession'
+
+/** What the server says about accounts when they are on, pointing at the local stack. */
+export const readyConfig: ReadyAuthConfig = {
+  state: AUTH_CONFIG_STATES.ready,
+  supabaseUrl: 'http://127.0.0.1:54321',
+  publishableKey: 'sb_publishable_test',
+  webUrl: 'http://localhost:8484',
+  cookieName: AUTH_COOKIE,
+}
 
 export const ACCOUNT_ID = '0b8e6f2a-4c1d-4e3b-9a7f-5d2c1e8b6a40'
+
+/** The session store's view of `fakeAccount` signed in. */
+export const SIGNED_IN: SessionSummary = { accessToken: 't', userId: ACCOUNT_ID }
 
 export const fakeAccount = (overrides: Partial<Account> = {}): Account => ({
   id: ACCOUNT_ID,

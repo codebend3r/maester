@@ -1,22 +1,20 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { type FormEvent, useId, useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { AUTH_CONFIG_STATES } from '@raven/core'
-import { Button } from '@raven/ui'
-import { authConfigQuery } from '@/lib/queries'
-import { AUTH_ERRORS } from '@/lib/authClient'
+import { EmailField, PasswordFields } from '@/components/AuthScreen/AuthFields'
+import { AuthForm, Fields, Lead, Note, SubmitButton } from '@/components/AuthScreen/AuthCard'
+import { AUDIENCES, AuthScreen } from '@/components/AuthScreen/AuthScreen'
 import {
+  AUTH_ERRORS,
   RATE_LIMITED_COPY,
   errorCodeOf,
   isRateLimited,
   weakPasswordMessage,
 } from '@/lib/authErrors'
-import { AUTH_ROUTES, checkEmailPath, confirmUrl } from '@/lib/authRoutes'
-import { AuthScreen, Brand } from '@/pages/SignInPage/AuthScreen'
-import { PasswordFields } from '@/pages/SignUpPage/PasswordFields'
+import { AUTH_ROUTES, checkEmailPath } from '@/lib/authRoutes'
+import { callAuth } from '@/lib/session'
+import { useConfirmUrl } from '@/lib/useConfirmUrl'
 import { useAuthSession } from '@/stores/authSession'
-import signInStyles from '@/pages/SignInPage/SignInPage.module.scss'
-import styles from '@/pages/SignUpPage/SignUpPage.module.scss'
 
 const FAILED_COPY = 'Sign up failed. Try again.'
 
@@ -26,35 +24,28 @@ const failureCopy = (error: unknown): string => {
   return weakPasswordMessage(error) ?? FAILED_COPY
 }
 
-// The same answer for a new address and for one that already has an account,
-// so the page gives nothing away about who is registered.
-const isAlreadyRegistered = (error: unknown): boolean =>
-  errorCodeOf(error) === AUTH_ERRORS.userAlreadyExists
-
 const SignUpForm = () => {
-  const emailId = useId()
   const navigate = useNavigate()
-  const client = useAuthSession((state) => state.client)
-  const config = useQuery(authConfigQuery).data
-  const webUrl = config?.state === AUTH_CONFIG_STATES.ready ? config.webUrl : window.location.origin
+  const isReady = useAuthSession((state) => state.client !== null)
+  const emailRedirectTo = useConfirmUrl()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [hasTried, setTried] = useState(false)
   const signUp = useMutation({
-    mutationFn: async (credentials: { email: string; password: string }) => {
-      if (client === null) throw new Error('Sign up is not ready yet')
-      const { error } = await client.signUp({
-        ...credentials,
-        options: { emailRedirectTo: confirmUrl({ webUrl }) },
-      })
-      if (error && !isAlreadyRegistered(error)) throw error
-    },
+    mutationFn: (credentials: { email: string; password: string }) =>
+      callAuth(async (client) => {
+        const answer = await client.signUp({ ...credentials, options: { emailRedirectTo } })
+        // The same answer for a new address and for one that already has an
+        // account, so the page gives nothing away about who is registered.
+        return errorCodeOf(answer.error) === AUTH_ERRORS.userAlreadyExists
+          ? { error: null }
+          : answer
+      }),
     onSuccess: (_result, { email: address }) =>
       navigate(checkEmailPath({ email: address }), { replace: true }),
   })
   const isMismatched = hasTried && password !== confirmation
-  const isRefused = signUp.isError && !isMismatched
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -64,56 +55,34 @@ const SignUpForm = () => {
   }
 
   return (
-    <form className={signInStyles.form} onSubmit={submit}>
-      <Brand />
-      <header className={signInStyles.welcome}>
-        <h1 className={signInStyles.title}>Create your account</h1>
-        <p className={signInStyles.lead}>Sign up to watch on {window.location.hostname}</p>
-      </header>
-      <p className={styles.note}>
+    <AuthForm
+      title="Create your account"
+      lead={<Lead>Sign up to watch on {window.location.hostname}</Lead>}
+      onSubmit={submit}
+    >
+      <Note>
         We will email you a link to confirm your address. The owner of this raven approves each new
         account by hand, so you can start watching once they have.
-      </p>
-      <div className={signInStyles.fields}>
-        <div className={signInStyles.field}>
-          <label htmlFor={emailId} className={signInStyles.label}>
-            Email
-          </label>
-          <input
-            id={emailId}
-            className={signInStyles.input}
-            type="email"
-            name="email"
-            inputMode="email"
-            autoComplete="username"
-            autoCapitalize="none"
-            spellCheck={false}
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </div>
+      </Note>
+      <Fields>
+        <EmailField value={email} onChange={setEmail} />
         <PasswordFields
+          label="Password"
           password={password}
           confirmation={confirmation}
-          refusal={isRefused ? failureCopy(signUp.error) : null}
+          refusal={signUp.isError ? failureCopy(signUp.error) : null}
           isMismatched={isMismatched}
           onPasswordChange={setPassword}
           onConfirmationChange={setConfirmation}
         />
-      </div>
-      <Button
-        type="submit"
-        tone="primary"
-        className={signInStyles.submit}
-        disabled={signUp.isPending || client === null}
-      >
+      </Fields>
+      <SubmitButton isDisabled={signUp.isPending || !isReady}>
         {signUp.isPending ? 'Creating account…' : 'Create account'}
-      </Button>
-      <p className={signInStyles.switch}>
+      </SubmitButton>
+      <Note>
         Already have an account? <Link to={AUTH_ROUTES.signIn}>Sign in</Link>
-      </p>
-    </form>
+      </Note>
+    </AuthForm>
   )
 }
 
@@ -123,7 +92,7 @@ const SignUpForm = () => {
  * one already registered, the visitor goes on to ask them to check their email.
  */
 export const SignUpPage = () => (
-  <AuthScreen>
+  <AuthScreen audience={AUDIENCES.signedOut}>
     <SignUpForm />
   </AuthScreen>
 )

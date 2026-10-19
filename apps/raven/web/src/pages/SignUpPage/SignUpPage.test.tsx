@@ -2,31 +2,17 @@ import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { AuthApiError } from '@supabase/supabase-js'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Route, Routes, useLocation } from 'react-router-dom'
-import {
-  type AuthConfig,
-  AUTH_CONFIG_STATES,
-  AUTH_COOKIE,
-  ApiError,
-  MEMBER_STATUSES,
-} from '@raven/core'
+import { AUTH_CONFIG_STATES, ApiError, MEMBER_STATUSES } from '@raven/core'
 import { AppRoutes } from '@/AppRoutes'
 import { api } from '@/lib/api'
-import { AUTH_ERRORS, type AuthClient } from '@/lib/authClient'
+import { type AuthClient } from '@/lib/authClient'
+import { AUTH_ERRORS } from '@/lib/authErrors'
 import { AUTH_ROUTES, checkEmailPath } from '@/lib/authRoutes'
 import { SignUpPage } from '@/pages/SignUpPage/SignUpPage'
-import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { ACCOUNT_ID, fakeAccount, fakeAuthClient, fakeSession } from '@/test/authClient'
+import { AUTH_SESSION_STATUSES } from '@/stores/authSession'
+import { fakeAccount, fakeSession } from '@/test/authClient'
+import { type AuthPageOptions, renderAuthPage, where } from '@/test/authPage'
 import { held } from '@/test/held'
-import { renderWithProviders } from '@/test/render'
-
-const ready: AuthConfig = {
-  state: AUTH_CONFIG_STATES.ready,
-  supabaseUrl: 'http://127.0.0.1:54321',
-  publishableKey: 'sb_publishable_test',
-  webUrl: 'http://localhost:8484',
-  cookieName: AUTH_COOKIE,
-}
 
 type SignUpResult = Awaited<ReturnType<AuthClient['signUp']>>
 
@@ -47,39 +33,8 @@ const refusedSignUp = ({ code, message }: { code: string; message: string }): Si
   error: new AuthApiError(message, 422, code),
 })
 
-const Where = () => {
-  const { pathname, search } = useLocation()
-  return <p data-testid="where">{`${pathname}${search}`}</p>
-}
-
-const renderSignUp = ({
-  calls = {},
-  authConfig = ready,
-  isSessionKept = false,
-  status = AUTH_SESSION_STATUSES.ready,
-}: {
-  calls?: Partial<AuthClient>
-  authConfig?: AuthConfig | null
-  isSessionKept?: boolean
-  status?: (typeof AUTH_SESSION_STATUSES)[keyof typeof AUTH_SESSION_STATUSES]
-} = {}) => {
-  const fake = fakeAuthClient({ calls })
-  useAuthSession.setState({
-    client: fake.client,
-    status,
-    session: isSessionKept ? { accessToken: 't', userId: ACCOUNT_ID } : null,
-  })
-  return renderWithProviders({
-    authConfig,
-    route: AUTH_ROUTES.signUp,
-    ui: (
-      <Routes>
-        <Route path={AUTH_ROUTES.signUp} element={<SignUpPage />} />
-        <Route path="*" element={<Where />} />
-      </Routes>
-    ),
-  })
-}
+const renderSignUp = (options: AuthPageOptions = {}) =>
+  renderAuthPage({ path: AUTH_ROUTES.signUp, page: <SignUpPage />, ...options })
 
 const email = () => screen.getByLabelText('Email')
 const password = () => screen.getByLabelText('Password')
@@ -155,7 +110,7 @@ describe('SignUpPage', () => {
     expect(confirmation()).toHaveAccessibleDescription('The passwords do not match.')
     expect(password()).toHaveAttribute('aria-invalid', 'false')
     expect(signUp).not.toHaveBeenCalled()
-    expect(screen.queryByTestId('where')).toBeNull()
+    expect(where()).toBe(AUTH_ROUTES.signUp)
   })
 
   it('drops the mismatch message once the passwords agree, and signs up', async () => {
@@ -192,9 +147,7 @@ describe('SignUpPage', () => {
     })
 
     attempt.answer(created())
-    expect(await screen.findByTestId('where')).toHaveTextContent(
-      checkEmailPath({ email: 'jordan@example.com' }),
-    )
+    await waitFor(() => expect(where()).toBe(checkEmailPath({ email: 'jordan@example.com' })))
   })
 
   it('goes to the same place for an address that already has an account', async () => {
@@ -203,9 +156,7 @@ describe('SignUpPage', () => {
     await fillIn({ user })
     await user.click(submit())
 
-    expect(await screen.findByTestId('where')).toHaveTextContent(
-      checkEmailPath({ email: 'jordan@example.com' }),
-    )
+    await waitFor(() => expect(where()).toBe(checkEmailPath({ email: 'jordan@example.com' })))
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
@@ -223,9 +174,7 @@ describe('SignUpPage', () => {
     await fillIn({ user })
     await user.click(submit())
 
-    expect(await screen.findByTestId('where')).toHaveTextContent(
-      checkEmailPath({ email: 'jordan@example.com' }),
-    )
+    await waitFor(() => expect(where()).toBe(checkEmailPath({ email: 'jordan@example.com' })))
   })
 
   it('shows the server’s words for a weak password, marking the password as the field to fix', async () => {
@@ -317,7 +266,7 @@ describe('SignUpPage', () => {
     it('sends a visitor home while accounts are off', async () => {
       renderSignUp({ authConfig: { state: AUTH_CONFIG_STATES.off } })
 
-      expect(await screen.findByTestId('where')).toHaveTextContent(/^\/$/)
+      await waitFor(() => expect(where()).toBe('/'))
     })
 
     it('waits while the config or the stored session is read', () => {
@@ -329,21 +278,21 @@ describe('SignUpPage', () => {
 
     it('sends an approved visitor already signed in home', async () => {
       getMe.mockResolvedValue(fakeAccount())
-      renderSignUp({ isSessionKept: true })
+      renderSignUp({ isSignedIn: true })
 
-      expect(await screen.findByTestId('where')).toHaveTextContent(/^\/$/)
+      await waitFor(() => expect(where()).toBe('/'))
     })
 
     it('sends a visitor signed in without approval to the pending screen', async () => {
       getMe.mockResolvedValue(fakeAccount({ status: MEMBER_STATUSES.pending }))
-      renderSignUp({ isSessionKept: true })
+      renderSignUp({ isSignedIn: true })
 
-      expect(await screen.findByTestId('where')).toHaveTextContent(AUTH_ROUTES.pending)
+      await waitFor(() => expect(where()).toBe(AUTH_ROUTES.pending))
     })
 
     it('shows the notice when the account cannot be read', async () => {
       getMe.mockRejectedValue(new ApiError({ status: 503, message: 'Unavailable' }))
-      renderSignUp({ isSessionKept: true })
+      renderSignUp({ isSignedIn: true })
 
       expect(
         await screen.findByRole('heading', { name: 'Sign in is temporarily unavailable' }),
@@ -352,9 +301,7 @@ describe('SignUpPage', () => {
   })
 
   it('takes the whole screen at /sign-up, outside the browsing frame', () => {
-    const { client } = fakeAuthClient()
-    useAuthSession.setState({ client, status: AUTH_SESSION_STATUSES.ready, session: null })
-    renderWithProviders({ ui: <AppRoutes />, route: AUTH_ROUTES.signUp, authConfig: ready })
+    renderAuthPage({ path: '*', page: <AppRoutes />, route: AUTH_ROUTES.signUp })
 
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
     expect(screen.getByRole('main')).toContainElement(screen.getByRole('heading', { level: 1 }))

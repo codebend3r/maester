@@ -1,0 +1,48 @@
+.members {
+  display: grid;
+  gap: var(--space-1);
+}
+
+// An account's address at the left, what can be done to it at the right.
+.member {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'email actions';
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+
+  @media (max-width: 30rem) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'email'
+      'actions';
+  }
+}
+
+.email {
+  grid-area: email;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  grid-area: actions;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: end;
+  align-items: center;
+  gap: var(--space-1);
+
+  @media (max-width: 30rem) {
+    grid-auto-flow: row;
+    justify-content: stretch;
+  }
+}
+
+// The question Remove access asks, and whose row has no buttons.
+.aside {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}

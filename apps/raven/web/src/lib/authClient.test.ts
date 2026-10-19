@@ -1,13 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { AUTH_COOKIE } from '@raven/core'
-import { AUTH_ERRORS, createAuthClient } from '@/lib/authClient'
-import {
-  answer,
-  clearCookies,
-  heldCookies,
-  readyConfig as config,
-  sessionOf,
-} from '@/test/authCookies'
+import { createAuthClient } from '@/lib/authClient'
+import { AUTH_ERRORS } from '@/lib/authErrors'
+import { readyConfig as config } from '@/test/authClient'
+import { answer, clearCookies, heldCookies, sessionOf } from '@/test/authCookies'
 
 const credentials = { email: 'a@example.com', password: 'password' }
 

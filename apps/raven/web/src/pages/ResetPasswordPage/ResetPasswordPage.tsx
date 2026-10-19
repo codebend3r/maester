@@ -1,57 +1,46 @@
 import { useMutation } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
-import { Button } from '@raven/ui'
+import { Navigate } from 'react-router-dom'
+import { PasswordFields } from '@/components/AuthScreen/AuthFields'
+import { AuthForm, Fields, Lead, SubmitButton } from '@/components/AuthScreen/AuthCard'
+import { AUDIENCES, AuthScreen } from '@/components/AuthScreen/AuthScreen'
 import { weakPasswordMessage } from '@/lib/authErrors'
 import { AUTH_ROUTES, HOME_PATH } from '@/lib/authRoutes'
-import { AuthScreen, Brand } from '@/pages/SignInPage/AuthScreen'
-import { PasswordFields } from '@/pages/SignUpPage/PasswordFields'
+import { callAuth } from '@/lib/session'
 import { useAuthSession } from '@/stores/authSession'
-import signInStyles from '@/pages/SignInPage/SignInPage.module.scss'
 
 const FAILED_COPY = 'Could not update your password. Try again.'
 
 const ResetPasswordForm = () => {
-  const navigate = useNavigate()
-  const client = useAuthSession((state) => state.client)
+  const isReady = useAuthSession((state) => state.client !== null)
   const isRecovery = useAuthSession((state) => state.isRecovery)
   const endRecovery = useAuthSession((state) => state.endRecovery)
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [hasTried, setTried] = useState(false)
-  // Ending the recovery must not send the visitor to ask for a link while the move home is under way.
-  const [isUpdated, setUpdated] = useState(false)
   const update = useMutation({
-    mutationFn: async (next: string) => {
-      if (client === null) throw new Error('Reset is not ready yet')
-      const { error } = await client.updateUser({ password: next })
-      if (error) throw error
-    },
-    onSuccess: () => {
-      setUpdated(true)
-      endRecovery()
-      navigate(HOME_PATH, { replace: true })
-    },
+    mutationFn: (next: string) => callAuth((client) => client.updateUser({ password: next })),
   })
   const isMismatched = hasTried && password !== confirmation
 
-  if (!isRecovery && !isUpdated) return <Navigate replace to={AUTH_ROUTES.forgot} />
+  if (update.isSuccess) return <Navigate replace to={HOME_PATH} />
+  if (!isRecovery) return <Navigate replace to={AUTH_ROUTES.forgot} />
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
     setTried(true)
     if (password !== confirmation) return
-    update.mutate(password)
+    // Ended once the update reads as done, so the page goes home rather than to ask for a link.
+    update.mutate(password, { onSuccess: endRecovery })
   }
 
   return (
-    <form className={signInStyles.form} onSubmit={submit}>
-      <Brand />
-      <header className={signInStyles.welcome}>
-        <h1 className={signInStyles.title}>Choose a new password</h1>
-        <p className={signInStyles.lead}>Type it twice, so a typo does not lock you out.</p>
-      </header>
-      <div className={signInStyles.fields}>
+    <AuthForm
+      title="Choose a new password"
+      lead={<Lead>Type it twice, so a typo does not lock you out.</Lead>}
+      onSubmit={submit}
+    >
+      <Fields>
         <PasswordFields
           label="New password"
           password={password}
@@ -61,16 +50,11 @@ const ResetPasswordForm = () => {
           onPasswordChange={setPassword}
           onConfirmationChange={setConfirmation}
         />
-      </div>
-      <Button
-        type="submit"
-        tone="primary"
-        className={signInStyles.submit}
-        disabled={update.isPending || client === null}
-      >
+      </Fields>
+      <SubmitButton isDisabled={update.isPending || !isReady}>
         {update.isPending ? 'Updating password…' : 'Update password'}
-      </Button>
-    </form>
+      </SubmitButton>
+    </AuthForm>
   )
 }
 
@@ -81,7 +65,7 @@ const ResetPasswordForm = () => {
  * them in, so the access state does not send them away first.
  */
 export const ResetPasswordPage = () => (
-  <AuthScreen shouldKeepVisitor>
+  <AuthScreen audience={AUDIENCES.anyone}>
     <ResetPasswordForm />
   </AuthScreen>
 )
