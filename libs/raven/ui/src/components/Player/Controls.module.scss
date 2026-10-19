@@ -7,10 +7,10 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(5, auto) minmax(0, 1fr) auto;
+  grid-template-columns: repeat(6, auto) minmax(0, 1fr) auto;
   grid-template-areas:
-    'timeline timeline timeline timeline timeline timeline timeline'
-    'play back forward volume clock . pills';
+    'timeline timeline timeline timeline timeline timeline timeline timeline'
+    'play back forward autoplay volume clock . pills';
   gap: var(--space-2) var(--space-1);
   align-items: center;
   padding: var(--space-6) var(--space-4) var(--space-4);
@@ -74,6 +74,48 @@
 
 .forward {
   grid-area: forward;
+}
+
+// The ring and the mark inside it share the one cell.
+.autoplay {
+  grid-area: autoplay;
+  grid-template-areas: 'mark';
+
+  > * {
+    grid-area: mark;
+  }
+
+  &[aria-pressed='false'] {
+    color: var(--color-on-picture-soft);
+  }
+
+  &[aria-pressed='false'] .ringTrack {
+    stroke: transparent;
+  }
+}
+
+.ring {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  // The countdown fills clockwise from the top.
+  transform: rotate(-90deg);
+}
+
+.ringTrack {
+  stroke: var(--color-bark-faint);
+  stroke-width: 1.5;
+}
+
+.ringFill {
+  stroke: var(--color-on-picture);
+  stroke-width: 2;
+  stroke-linecap: round;
+
+  @media (prefers-reduced-motion: no-preference) {
+    // Smooths the steps between the video's time updates.
+    transition: stroke-dashoffset 250ms linear;
+  }
 }
 
 .volume {
@@ -177,11 +219,11 @@
 // moves down beside the pills.
 @media (max-width: 30rem) {
   .controls {
-    grid-template-columns: repeat(3, auto) minmax(0, 1fr) auto;
+    grid-template-columns: repeat(4, auto) minmax(0, 1fr) auto;
     grid-template-areas:
-      'timeline timeline timeline timeline timeline'
-      'play back forward clock clock'
-      'volume pills pills pills pills';
+      'timeline timeline timeline timeline timeline timeline'
+      'play back forward autoplay clock clock'
+      'volume pills pills pills pills pills';
     padding: var(--space-6) var(--space-3) var(--space-3);
   }
 

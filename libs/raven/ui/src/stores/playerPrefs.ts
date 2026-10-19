@@ -21,17 +21,20 @@ type PlayerPrefs = {
   opensInRavenPlayer: boolean
   /** How many seconds the controls and cursor linger after the last mouse move, key press or click. */
   controlsLingerSeconds: number
+  /** Whether what is up next starts by itself once the video ends. */
+  autoplay: boolean
   setVolume: ({ volume, muted }: { volume: number; muted: boolean }) => void
   setCaptionScale: (captionScale: number) => void
   setSubtitles: (subtitles: { on: boolean; language: string | null }) => void
   setAudioLanguage: (audioLanguage: string | null) => void
   setOpensInRavenPlayer: (isOn: boolean) => void
   setControlsLingerSeconds: (seconds: number) => void
+  setAutoplay: (isOn: boolean) => void
 }
 
 /**
- * Volume, subtitles, audio language and how long the controls linger carry
- * over from one video to the next, and across visits.
+ * Volume, subtitles, audio language, how long the controls linger and
+ * autoplay carry over from one video to the next, and across visits.
  */
 export const usePlayerPrefs = create<PlayerPrefs>()(
   persist(
@@ -43,12 +46,14 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
       audioLanguage: null,
       opensInRavenPlayer: false,
       controlsLingerSeconds: CONTROLS_LINGER_SECONDS.initial,
+      autoplay: true,
       setVolume: ({ volume, muted }) => set({ volume, muted }),
       setCaptionScale: (captionScale) => set({ captionScale }),
       setSubtitles: (subtitles) => set({ subtitles }),
       setAudioLanguage: (audioLanguage) => set({ audioLanguage }),
       setOpensInRavenPlayer: (isOn) => set({ opensInRavenPlayer: isOn }),
       setControlsLingerSeconds: (seconds) => set({ controlsLingerSeconds: withinLinger(seconds) }),
+      setAutoplay: (isOn) => set({ autoplay: isOn }),
     }),
     {
       name: 'raven-player',
@@ -61,6 +66,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         audioLanguage,
         opensInRavenPlayer,
         controlsLingerSeconds,
+        autoplay,
       }) => ({
         volume,
         muted,
@@ -69,6 +75,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         audioLanguage,
         opensInRavenPlayer,
         controlsLingerSeconds,
+        autoplay,
       }),
     },
   ),

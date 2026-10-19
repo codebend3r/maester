@@ -19,7 +19,7 @@ describe('ShowPage', () => {
   const spies = {
     item: spyOn(api, 'getItem'),
     next: spyOn(api, 'nextEpisode'),
-    random: spyOn(api, 'randomEpisode'),
+    random: spyOn(api, 'shuffleEpisodes'),
     search: spyOn(api, 'searchMatches'),
     setItemMatch: spyOn(api, 'setItemMatch'),
   }
@@ -100,7 +100,7 @@ describe('ShowPage', () => {
   })
 
   it('plays a random episode of the show on Shuffle', async () => {
-    spies.random.mockImplementation(async () => EPISODE_ONE)
+    spies.random.mockImplementation(async () => [EPISODE_ONE])
     open()
     await userEvent.click(await screen.findByRole('button', { name: 'Shuffle' }))
     expect(await screen.findByText('Watching 12')).toBeInTheDocument()

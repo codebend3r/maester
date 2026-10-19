@@ -691,11 +691,14 @@ export const createApiClient = ({
         guard: nullable(isMediaItem),
       }),
 
-    /** A random episode of a show or a season, in whichever library holds it, or null with none to play. */
-    randomEpisode: (itemId: number): Promise<MediaItem | null> =>
+    /**
+     * Episodes of a show or a season in a random order, the first to play
+     * first, from whichever libraries hold them; empty with none to play.
+     */
+    shuffleEpisodes: (itemId: number): Promise<MediaItem[]> =>
       expect({
-        request: send({ path: `/api/items/${itemId}/random` }),
-        guard: nullable(isMediaItem),
+        request: send({ path: `/api/items/${itemId}/shuffle` }),
+        guard: isMediaList,
       }),
 
     /** Points every file under a show at another show, keeping their numbers; returns the show they moved to. */

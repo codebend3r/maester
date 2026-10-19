@@ -113,7 +113,10 @@ describe('featuredOf', () => {
       facts: ['2026', '2h 46m', '4K HDR'],
       details: '/movies/105?library=2',
     })
-    expect(featured?.play).toEqual({ to: '/watch/5', state: { media: hdr, upNext: [] } })
+    expect(featured?.play).toEqual({
+      to: '/watch/5',
+      state: { media: hdr, upNext: [], isShuffled: false },
+    })
   })
 
   it('leaves out the facts a file has not been probed for', () => {

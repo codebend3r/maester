@@ -6,16 +6,22 @@ import { ShuffleButton } from '@/components/ShuffleButton/ShuffleButton'
 import { api } from '@/lib/api'
 import { readWatchState } from '@/lib/itemLinks'
 import { renderWithProviders } from '@/test/render'
-import { EPISODE_ONE } from '@/test/tv'
+import { EPISODE_ONE, EPISODE_TWO } from '@/test/tv'
 
 const Watching = () => {
   const id = Number(useParams().id)
   const handed = readWatchState({ state: useLocation().state, id })
-  return <p>Watching {handed ? handed.media.fileName : 'nothing handed over'}</p>
+  const after = (handed?.upNext ?? []).map((media) => media.fileName).join(', ')
+  return (
+    <p>
+      Watching {handed ? handed.media.fileName : 'nothing handed over'}
+      {handed?.isShuffled && `, shuffled, then ${after}`}
+    </p>
+  )
 }
 
 describe('ShuffleButton', () => {
-  const random = spyOn(api, 'randomEpisode')
+  const random = spyOn(api, 'shuffleEpisodes')
 
   const open = () =>
     renderWithProviders({
@@ -33,16 +39,20 @@ describe('ShuffleButton', () => {
     cleanup()
   })
 
-  it('plays what the server picks, handing the video to the player', async () => {
-    random.mockImplementation(async () => EPISODE_ONE)
+  it('plays what the server deals first, handing the rest to the player to play after', async () => {
+    random.mockImplementation(async () => [EPISODE_TWO, EPISODE_ONE])
     open()
     await userEvent.click(screen.getByRole('button', { name: 'Shuffle' }))
-    expect(await screen.findByText(`Watching ${EPISODE_ONE.fileName}`)).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        `Watching ${EPISODE_TWO.fileName}, shuffled, then ${EPISODE_ONE.fileName}`,
+      ),
+    ).toBeInTheDocument()
     expect(random.mock.calls).toEqual([[4]])
   })
 
   it('says so when there is nothing to play', async () => {
-    random.mockImplementation(async () => null)
+    random.mockImplementation(async () => [])
     open()
     await userEvent.click(screen.getByRole('button', { name: 'Shuffle' }))
     expect(await screen.findByRole('button', { name: 'Nothing to play' })).toBeDisabled()

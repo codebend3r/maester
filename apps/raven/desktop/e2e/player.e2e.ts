@@ -129,7 +129,7 @@ test.describe.serial('playing a local file through the web engine fallback', () 
         await expect.poll(() => distanceFrom({ page, seconds: 15 })).toBeLessThanOrEqual(1)
 
         // The AppleDouble sidecar and the text file between them are skipped.
-        await expect(page.getByRole('link', { name: 'Next: Clip 02 Été' })).toBeVisible()
+        await expect(page.getByRole('link', { name: 'Up next: Clip 02 Été' })).toBeVisible()
         // Main has the position before the app quits.
         await expect.poll(() => watchedPercent({ page, label: 'Clip 01' })).toBe(50)
       },

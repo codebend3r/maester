@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { api } from '@/lib/api'
-import { watchLink } from '@/lib/itemLinks'
+import { queueLink } from '@/lib/itemLinks'
 
 const PICK_STATES = { idle: 'idle', picking: 'picking', empty: 'empty' } as const
 
@@ -15,10 +15,11 @@ const LABELS = {
 } as const satisfies Record<PickState, string | null>
 
 /**
- * Plays an episode picked at random from under `itemId`, a show or a season,
- * among the files this browser may see. The server picks, so a show's page
- * offers it without loading a single episode. `children` is the label,
- * "Shuffle" or "Shuffle season".
+ * Plays the episodes under `itemId`, a show or a season, in a random order,
+ * among the files this browser may see: the first at once, the rest one
+ * after another. The server deals them, so a show's page offers it without
+ * loading a single episode. `children` is the label, "Shuffle" or "Shuffle
+ * season".
  */
 export const ShuffleButton = ({ itemId, children }: { itemId: number; children: string }) => {
   const navigate = useNavigate()
@@ -26,13 +27,13 @@ export const ShuffleButton = ({ itemId, children }: { itemId: number; children: 
   const pick = () => {
     setState(PICK_STATES.picking)
     api
-      .randomEpisode(itemId)
-      .then((media) => {
-        if (!media) {
+      .shuffleEpisodes(itemId)
+      .then((queue) => {
+        const link = queueLink({ queue, isShuffled: true })
+        if (!link) {
           setState(PICK_STATES.empty)
           return
         }
-        const link = watchLink({ media })
         navigate(link.to, { state: link.state })
       })
       .catch(() => setState(PICK_STATES.idle))

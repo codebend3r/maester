@@ -43,6 +43,7 @@ export const WatchPage = () => {
         key={page.data.id}
         media={page.data}
         upNext={handed?.upNext ?? []}
+        isShuffled={handed?.isShuffled ?? false}
         backTo={`/libraries/${page.data.libraryId}`}
       />
     )
@@ -75,10 +76,13 @@ export const WatchPage = () => {
 export const WatchPlayer = ({
   media,
   upNext,
+  isShuffled = false,
   backTo,
 }: {
   media: MediaItem
   upNext: readonly MediaItem[]
+  /** The videos after this one were dealt by a shuffle. */
+  isShuffled?: boolean
   backTo: string
 }) => {
   const queryClient = useQueryClient()
@@ -103,7 +107,13 @@ export const WatchPlayer = ({
       duration: media.duration,
       resumeAt: resumable ? media.position : 0,
       backTo,
-      next: next ? { ...watchLink({ media: next, upNext: after }), label: mediaLabel(next) } : null,
+      next: next
+        ? {
+            ...watchLink({ media: next, upNext: after, isShuffled }),
+            label: mediaLabel(next),
+            isShuffled,
+          }
+        : null,
     },
     progress: {
       started: () => {

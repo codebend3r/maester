@@ -454,7 +454,7 @@ test.describe.serial('playing a title from a locked raven server', () => {
         await expect(heading({ page, name: 'Fixture One' })).toBeVisible()
         expect(page.url()).toBe(url)
         await wake(page)
-        await expect(page.getByRole('link', { name: /^Next/ })).toHaveCount(0)
+        await expect(page.getByRole('link', { name: /^Up next/ })).toHaveCount(0)
         expect(
           routesOf(loggedSince({ fixture, from })).filter((route) =>
             route.includes('/api/media/2'),

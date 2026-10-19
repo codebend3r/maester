@@ -181,6 +181,12 @@ describe('SagaPage', () => {
     expect(await screen.findByText('Playing 7, then 8, 9')).toBeInTheDocument()
   })
 
+  it('plays the movies after the one picked from its row', async () => {
+    open()
+    await userEvent.click(await screen.findByRole('link', { name: 'Play The Two Towers' }))
+    expect(await screen.findByText('Playing 8, then 9')).toBeInTheDocument()
+  })
+
   it("leaves the saga's backdrop up when a movie is pointed at", async () => {
     open()
     const card = await screen.findByRole('link', { name: 'The Two Towers' })

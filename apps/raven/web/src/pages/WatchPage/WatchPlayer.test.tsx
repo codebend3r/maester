@@ -251,7 +251,7 @@ describe('WatchPlayer up next', () => {
         </Routes>
       ),
     })
-    expect(screen.getByRole('link', { name: /^Next: Busboys 2/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^Up next: Busboys 2/ })).toHaveAttribute(
       'href',
       '/watch/8',
     )

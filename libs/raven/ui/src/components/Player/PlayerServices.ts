@@ -31,7 +31,8 @@ export type PlayerTitle = {
   duration: number | null
   resumeAt: number
   backTo: string
-  next: { to: string; state: unknown; label: string } | null
+  /** What plays after this one; `isShuffled` for a pick from a shuffle rather than the next in turn. */
+  next: { to: string; state: unknown; label: string; isShuffled?: boolean } | null
 }
 
 /** A track pick a person made by hand: an audio index and a subtitle id. */

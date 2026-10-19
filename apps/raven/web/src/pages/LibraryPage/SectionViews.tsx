@@ -29,7 +29,7 @@ import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
 import { useCanManage } from '@/lib/adminLock'
 import { mediaEntryKey, sagaEntryKey, showEntryKey } from '@/lib/entryKeys'
 import { finishedNote } from '@/lib/history'
-import { watchLink } from '@/lib/itemLinks'
+import { queueLink, watchLink } from '@/lib/itemLinks'
 import { jumpScale } from '@/lib/jumpScale'
 import { sagaTargets } from '@/lib/sagas'
 import {
@@ -233,7 +233,10 @@ const AllSection = ({ library }: { library: Library }) => {
           onChange={view.change}
           playable={queue.playable}
           onPlay={() => watch(queue.first())}
-          onShuffle={() => watch(queue.random())}
+          onShuffle={() => {
+            const link = queueLink({ queue: queue.shuffled(), isShuffled: true })
+            if (link) navigate(link.to, { state: link.state })
+          }}
         />
 
         {view.saveError && (

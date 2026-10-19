@@ -16,6 +16,10 @@ const props = (overrides: Partial<ControlsProps> = {}): ControlsProps => ({
   subtitlesOn: true,
   menuOpen: false,
   settingsButton: createRef<HTMLButtonElement>(),
+  upNext: 'Busboys 2 (2027)',
+  autoplay: true,
+  countdown: null,
+  onToggleAutoplay: () => {},
   onTogglePlay: () => {},
   onSeek: () => {},
   onSkip: () => {},
@@ -27,6 +31,37 @@ const props = (overrides: Partial<ControlsProps> = {}): ControlsProps => ({
 })
 
 describe('Controls', () => {
+  it('switches autoplay beside the skips, saying what plays next', async () => {
+    const onToggleAutoplay = mock(() => {})
+    render(<Controls {...props({ onToggleAutoplay })} />)
+    const autoplay = screen.getByRole('button', { name: 'Autoplay', pressed: true })
+    expect(autoplay).toHaveAttribute('title', 'Busboys 2 (2027) plays next')
+    await userEvent.click(autoplay)
+    expect(onToggleAutoplay).toHaveBeenCalledTimes(1)
+  })
+
+  it('says what waits with autoplay off', () => {
+    render(<Controls {...props({ autoplay: false })} />)
+    expect(screen.getByRole('button', { name: 'Autoplay', pressed: false })).toHaveAttribute(
+      'title',
+      'Busboys 2 (2027) waits for you to play it',
+    )
+  })
+
+  it('keeps autoplay on the bar with nothing up next, unable to press', () => {
+    render(<Controls {...props({ upNext: null })} />)
+    const autoplay = screen.getByRole('button', { name: 'Autoplay' })
+    expect(autoplay).toBeDisabled()
+    expect(autoplay).toHaveAttribute('title', 'Nothing is up next')
+  })
+
+  it('fills the ring only while the countdown runs', () => {
+    const { container, rerender } = render(<Controls {...props()} />)
+    expect(container.querySelector('[data-countdown]')).toBeNull()
+    rerender(<Controls {...props({ countdown: 0.25 })} />)
+    expect(container.querySelector('[data-countdown]')).toHaveAttribute('stroke-dashoffset', '0.75')
+  })
+
   it('names each pill alone when the host says nothing of what it is set to', () => {
     render(<Controls {...props()} />)
     expect(screen.getByRole('button', { name: 'Subtitles: On' })).toHaveTextContent(

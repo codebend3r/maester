@@ -94,6 +94,63 @@ const MenuPill = ({
   )
 }
 
+/** What autoplay's tooltip says it will do. */
+const autoplayNote = ({
+  upNext,
+  autoplay,
+}: {
+  upNext: string | null
+  autoplay: boolean
+}): string => {
+  if (upNext == null) return 'Nothing is up next'
+  return autoplay ? `${upNext} plays next` : `${upNext} waits for you to play it`
+}
+
+/**
+ * Autoplay's switch, beside the skips whether or not anything is up next: a
+ * faint ring round it while it is on, which fills as the countdown to what
+ * is up next runs out in the video's last seconds. Switching it off then
+ * stops the countdown.
+ */
+const AutoplayButton = ({
+  upNext,
+  autoplay,
+  countdown,
+  onToggle,
+}: {
+  upNext: string | null
+  autoplay: boolean
+  countdown: number | null
+  onToggle: () => void
+}) => (
+  <button
+    type="button"
+    className={classes(styles.button, styles.autoplay)}
+    aria-label="Autoplay"
+    aria-pressed={autoplay}
+    title={autoplayNote({ upNext, autoplay })}
+    disabled={upNext == null}
+    onClick={onToggle}
+  >
+    <svg className={styles.ring} viewBox="0 0 44 44" aria-hidden="true" focusable="false">
+      <circle className={styles.ringTrack} cx="22" cy="22" r="20" />
+      {countdown != null && (
+        <circle
+          className={styles.ringFill}
+          cx="22"
+          cy="22"
+          r="20"
+          pathLength={1}
+          strokeDasharray={1}
+          strokeDashoffset={1 - countdown}
+          data-countdown={countdown}
+        />
+      )}
+    </svg>
+    <Icon name="skipNext" size={18} />
+  </button>
+)
+
 export type ControlsProps = {
   shown: boolean
   paused: boolean
@@ -114,6 +171,12 @@ export type ControlsProps = {
   menuOpen: MenuSection | false
   /** Held by the open menu's pill, for focus to go back to when the menu closes. */
   settingsButton: RefObject<HTMLButtonElement | null>
+  /** What is up next, by name; null with nothing to play after this. */
+  upNext: string | null
+  autoplay: boolean
+  /** How far the countdown to what is up next has run, 0 to 1; null while none runs. */
+  countdown: number | null
+  onToggleAutoplay: () => void
   onTogglePlay: () => void
   onSeek: (time: number) => void
   onSkip: (seconds: number) => void
@@ -124,9 +187,9 @@ export type ControlsProps = {
 }
 
 /**
- * The bar along the bottom: the timeline, then play, the skips, volume and
- * the clock on the left, and glass pills for subtitles, audio, quality and
- * full screen on the right.
+ * The bar along the bottom: the timeline, then play, the skips, autoplay,
+ * volume and the clock on the left, and glass pills for subtitles, audio,
+ * quality and full screen on the right.
  */
 export const Controls = ({
   shown,
@@ -143,6 +206,10 @@ export const Controls = ({
   menuValues = {},
   menuOpen,
   settingsButton,
+  upNext,
+  autoplay,
+  countdown,
+  onToggleAutoplay,
   onTogglePlay,
   onSeek,
   onSkip,
@@ -190,6 +257,12 @@ export const Controls = ({
       >
         +10
       </ControlButton>
+      <AutoplayButton
+        upNext={upNext}
+        autoplay={autoplay}
+        countdown={countdown}
+        onToggle={onToggleAutoplay}
+      />
       <div className={styles.volume}>
         <ControlButton
           label={muteLabel({ isVolumeFixed, muted })}

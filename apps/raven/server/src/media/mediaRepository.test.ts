@@ -1,4 +1,4 @@
-import type { ItemType, MediaSort } from '@raven/core'
+import { type ItemType, type MediaSort, SHUFFLE_LENGTH } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import type { Viewer } from '@/lock/lockService'
@@ -280,17 +280,17 @@ describe("listing a TV library's shows", () => {
     ).toBe('Special - S01E01.mkv')
   })
 
-  it('picks a random episode of a show, watched or not, as the die falls', () => {
+  it('deals every episode of a show, watched or not, as the die falls', () => {
     const libraryIds = [state.libraryId]
-    const pick = (roll: number) =>
-      fileName(media().randomEpisode({ itemId: state.aired, libraryIds, roll: () => roll })?.id)
-    expect(pick(0)).toBe('Aired - S01E01.mkv')
-    expect(pick(0.49)).toBe('Aired - S01E01.mkv')
-    expect(pick(0.5)).toBe('Aired - S01E02.mkv')
-    expect(pick(0.999)).toBe('Aired - S01E02.mkv')
+    const deal = (roll: number) =>
+      media()
+        .shuffledEpisodes({ itemId: state.aired, libraryIds, roll: () => roll })
+        .map((item) => fileName(item.id))
+    expect(deal(0.999)).toEqual(['Aired - S01E01.mkv', 'Aired - S01E02.mkv'])
+    expect(deal(0)).toEqual(['Aired - S01E02.mkv', 'Aired - S01E01.mkv'])
   })
 
-  it('picks from one season alone when asked for the season', () => {
+  it('deals from one season alone when asked for the season', () => {
     const seasonId =
       database
         .get()
@@ -299,20 +299,24 @@ describe("listing a TV library's shows", () => {
         )
         .get(state.special)?.id ?? -1
     const libraryIds = [state.libraryId]
-    const pick = (roll: number) =>
-      fileName(media().randomEpisode({ itemId: seasonId, libraryIds, roll: () => roll })?.id)
-    expect(pick(0)).toBe('Special - S01E01.mkv')
-    expect(pick(0.999)).toBe('Special - S01E01.mkv')
+    const deal = (roll: number) =>
+      media()
+        .shuffledEpisodes({ itemId: seasonId, libraryIds, roll: () => roll })
+        .map((item) => fileName(item.id))
+    expect(deal(0)).toEqual(['Special - S01E01.mkv'])
+    expect(deal(0.999)).toEqual(['Special - S01E01.mkv'])
   })
 
-  it('has no random episode outside the libraries asked about, nor under an episode', () => {
+  it('deals no episode outside the libraries asked about, nor under an episode', () => {
     const episodeId =
       database
         .get()
         .db.prepare<[], { id: number }>("SELECT id FROM items WHERE type = 'episode' LIMIT 1")
         .get()?.id ?? -1
-    expect(media().randomEpisode({ itemId: state.aired, libraryIds: [] })).toBeNull()
-    expect(media().randomEpisode({ itemId: episodeId, libraryIds: [state.libraryId] })).toBeNull()
+    expect(media().shuffledEpisodes({ itemId: state.aired, libraryIds: [] })).toEqual([])
+    expect(media().shuffledEpisodes({ itemId: episodeId, libraryIds: [state.libraryId] })).toEqual(
+      [],
+    )
   })
 
   it('has none once every episode is watched', () => {
@@ -593,16 +597,25 @@ describe('what is watched, card by card', () => {
     expect(next()).toBe(second[0])
   })
 
-  it('gives each episode one chance at random, playing its best file', () => {
+  it('deals each episode once, playing its best file', () => {
     const { showId, episodeIds } = addShow({ title: 'Dice', count: 2 })
     const first = filesOf({ episodeId: episodeIds[0] ?? -1, heights: [720, 1080] })
     const second = filesOf({ episodeId: episodeIds[1] ?? -1, heights: [1080] })
     const libraryIds = [state.libraryId]
-    const pick = (roll: number) =>
-      media().randomEpisode({ itemId: showId, libraryIds, roll: () => roll })?.id
-    expect(pick(0)).toBe(first[1])
-    expect(pick(0.5)).toBe(second[0])
-    expect(pick(0.999)).toBe(second[0])
+    const deal = (roll: number) =>
+      media()
+        .shuffledEpisodes({ itemId: showId, libraryIds, roll: () => roll })
+        .map((item) => item.id)
+    expect(deal(0.999)).toEqual([first[1], second[0]])
+    expect(deal(0)).toEqual([second[0], first[1]])
+  })
+
+  it('deals no more than a shuffle lines up', () => {
+    const { showId, episodeIds } = addShow({ title: 'Long', count: SHUFFLE_LENGTH + 1 })
+    episodeIds.forEach((episodeId) => filesOf({ episodeId, heights: [1080] }))
+    expect(
+      media().shuffledEpisodes({ itemId: showId, libraryIds: [state.libraryId] }),
+    ).toHaveLength(SHUFFLE_LENGTH)
   })
 
   it('judges the next episode by the libraries it is asked about alone', () => {

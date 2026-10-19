@@ -3,6 +3,7 @@ import {
   type Infer,
   type ItemSummary,
   type MediaItem,
+  isBoolean,
   isMediaItem,
   isMediaList,
   object,
@@ -111,23 +112,43 @@ export const episodeBackPath = ({
     : seasonPath({ showId: item.show.id, season: item.season })
 }
 
-/** What a link to the player hands over in router state: the video, and the ones to play after it. */
-const isWatchState = object({ media: isMediaItem, upNext: isMediaList })
+/**
+ * What a link to the player hands over in router state: the video, the ones
+ * to play after it, and whether they were shuffled rather than lined up in turn.
+ */
+const isWatchState = object({ media: isMediaItem, upNext: isMediaList, isShuffled: isBoolean })
 
 export type WatchState = Infer<typeof isWatchState>
 
 /**
  * The link to play a video, with the video riding along in router state so
  * the player starts without fetching it again, and any to play after it, in
- * turn, as Play all hands over a saga.
+ * turn, as Play all hands over a saga, or as a shuffle dealt them.
  */
 export const watchLink = ({
   media,
   upNext = [],
+  isShuffled = false,
 }: {
   media: MediaItem
   upNext?: WatchState['upNext']
-}): { to: AppPath; state: WatchState } => ({ to: `/watch/${media.id}`, state: { media, upNext } })
+  isShuffled?: boolean
+}): { to: AppPath; state: WatchState } => ({
+  to: `/watch/${media.id}`,
+  state: { media, upNext, isShuffled },
+})
+
+/** The link to play the first of `queue`, with the rest to play after it; null for an empty queue. */
+export const queueLink = ({
+  queue,
+  isShuffled = false,
+}: {
+  queue: readonly MediaItem[]
+  isShuffled?: boolean
+}): { to: AppPath; state: WatchState } | null => {
+  const [media, ...upNext] = queue
+  return media ? watchLink({ media, upNext, isShuffled }) : null
+}
 
 /**
  * What `watchLink` handed over for video `id`; null for a direct visit, a

@@ -10,11 +10,13 @@ import {
   type PosterEntry,
   type Saga,
   type ShowEntry,
+  SHUFFLE_LENGTH,
   THUMBNAIL_STATES,
   isMatchState,
   isThumbnailState,
   readCut,
   readRelease,
+  shuffled,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import {
@@ -447,12 +449,13 @@ export class MediaRepository {
   }
 
   /**
-   * An episode on disk under `itemId`, a show or a season, picked at random:
-   * every episode is as likely as the next, however many files it has, and
-   * the best of its files in `libraryIds` is the one. Null with no episode
-   * there to play. `roll` is the die, 0 up to 1, so a test can load it.
+   * The episodes on disk under `itemId`, a show or a season, in a random
+   * order, `SHUFFLE_LENGTH` at most: every episode is as likely as the next,
+   * however many files it has, and the best of its files in `libraryIds` is
+   * the one. Empty with no episode there to play. `roll` is the die, 0 up to
+   * 1, so a test can load it.
    */
-  randomEpisode({
+  shuffledEpisodes({
     itemId,
     libraryIds,
     roll = Math.random,
@@ -460,7 +463,7 @@ export class MediaRepository {
     itemId: number
     libraryIds: readonly number[]
     roll?: () => number
-  }): MediaItem | null {
+  }): MediaItem[] {
     const rows = this.db
       .prepare<[number, number, string], { media_id: number }>(
         `WITH files AS (
@@ -478,8 +481,8 @@ export class MediaRepository {
          SELECT media_id FROM ranked WHERE rank = 1 ORDER BY episode_id`,
       )
       .all(itemId, itemId, JSON.stringify(libraryIds))
-    const picked = rows[Math.min(rows.length - 1, Math.floor(roll() * rows.length))]
-    return picked == null ? null : this.get(picked.media_id)
+    const dealt = shuffled({ items: rows.map((row) => row.media_id), roll })
+    return this.getMany(dealt.slice(0, SHUFFLE_LENGTH))
   }
 
   /**

@@ -133,7 +133,9 @@ export const PlayerChrome = ({
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)
   useWatchProgress({ state, position: engine.position, duration })
-  const nextLink = useUpNext({ ended: state.ended })
+  const upNext = useUpNext({ ended: state.ended, time: state.time, duration })
+  const nextLink = upNext.next
+  const setAutoplay = usePlayerPrefs((prefs) => prefs.setAutoplay)
   // Nothing holds the controls past this: not a pause, an open menu or a focused button.
   const lingerSeconds = usePlayerPrefs((prefs) => prefs.controlsLingerSeconds)
   const idle = useIdle(lingerSeconds * 1_000)
@@ -264,7 +266,8 @@ export const PlayerChrome = ({
     })
   }
 
-  const chromeShown = idle.active
+  // The countdown keeps the controls up, so the ring it fills can be seen.
+  const chromeShown = idle.active || upNext.countdown != null
   const about = aboutLine({ media, label, mode, context: title.context ?? null })
 
   // The scrubber and the clock keep what they showed while the controls are
@@ -337,12 +340,13 @@ export const PlayerChrome = ({
             state={nextLink.state}
             replace
             tone="ghost"
-            icon="next"
+            icon={nextLink.isShuffled ? 'shuffle' : 'next'}
             className={styles.next}
-            aria-label={`Next: ${nextLink.label}`}
+            aria-label={`Up next: ${nextLink.label}`}
             title={nextLink.label}
           >
-            Next
+            <span className={styles.nextLead}>Up next</span>
+            <span className={styles.nextLabel}>{nextLink.label}</span>
           </ButtonLink>
         )}
         {resumedAt != null && (
@@ -377,6 +381,10 @@ export const PlayerChrome = ({
         }}
         menuOpen={isMenuSection(overlay) ? overlay : false}
         settingsButton={menuButton}
+        upNext={nextLink?.label ?? null}
+        autoplay={upNext.autoplay}
+        countdown={upNext.countdown}
+        onToggleAutoplay={() => setAutoplay(!upNext.autoplay)}
         onTogglePlay={controls.togglePlay}
         onSeek={seek}
         onSkip={(seconds) => controls.act({ type: PLAYER_ACTIONS.seekBy, seconds })}

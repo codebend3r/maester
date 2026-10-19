@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { Route, Routes, useNavigationType } from 'react-router-dom'
 import { Player } from '@/components/Player/Player'
 import type { PlayerFavourite, PlayerTitle } from '@/components/Player/PlayerServices'
+import { AUTOPLAY_COUNTDOWN_SECONDS } from '@/components/Player/useUpNext'
 import { api } from '@/test/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
@@ -339,7 +340,7 @@ describe('the player controls', () => {
         </Routes>
       ),
     })
-    expect(screen.getByRole('link', { name: /^Next: Busboys 2/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^Up next: Busboys 2/ })).toHaveAttribute(
       'href',
       '/watch/8',
     )
@@ -349,11 +350,60 @@ describe('the player controls', () => {
     expect(await screen.findByText('Playing the next video')).toBeInTheDocument()
   })
 
-  it('offers no next video when none came with it', () => {
+  it('waits at the end with autoplay off, and switches it from the bar', async () => {
+    usePlayerPrefs.setState({ autoplay: false })
+    const { container } = renderWithProviders({
+      ui: (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <TestPlayer
+                media={mediaItem({ container: 'mp4' })}
+                next={{ to: '/watch/8', state: null, label: 'Busboys 2 (2027)' }}
+                backTo="/libraries/2"
+              />
+            }
+          />
+          <Route path="watch/:id" element={<p>Playing the next video</p>} />
+        </Routes>
+      ),
+    })
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    fireEvent(video, new Event('ended'))
+    expect(screen.queryByText('Playing the next video')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Autoplay', pressed: false }))
+    expect(usePlayerPrefs.getState().autoplay).toBe(true)
+  })
+
+  it('counts down to what is up next only in the last seconds', () => {
+    usePlayerPrefs.setState({ autoplay: true })
+    const { container } = renderWithProviders({
+      ui: (
+        <TestPlayer
+          media={mediaItem({ container: 'mp4' })}
+          next={{ to: '/watch/8', state: null, label: 'Busboys 2 (2027)' }}
+          backTo="/libraries/2"
+        />
+      ),
+    })
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    video.currentTime = 600
+    fireEvent(video, new Event('timeupdate'))
+    expect(container.querySelector('[data-countdown]')).toBeNull()
+    video.currentTime = 5812.768 - AUTOPLAY_COUNTDOWN_SECONDS / 2
+    fireEvent(video, new Event('timeupdate'))
+    expect(container.querySelector('[data-countdown]')).toHaveAttribute('data-countdown', '0.5')
+  })
+
+  it('offers no next video when none came with it, and autoplay has nothing to press', () => {
     renderWithProviders({
       ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
     })
-    expect(screen.queryByRole('link', { name: /^Next/ })).toBeNull()
+    expect(screen.queryByRole('link', { name: /^Up next/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Autoplay' })).toBeDisabled()
   })
 
   it('favourites the video from the player, and says so', async () => {
