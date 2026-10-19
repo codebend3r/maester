@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import {
+  DOWNLOAD_TARGET_KINDS,
   type Library,
   SAGA_BACKDROP_TYPES,
   type Saga,
@@ -152,7 +153,13 @@ const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => 
                 Play all
               </ButtonLink>
             )}
-            <DownloadButton target={{ kind: 'saga', libraryId: library.id, tmdbId: saga.tmdbId }} />
+            <DownloadButton
+              target={{
+                kind: DOWNLOAD_TARGET_KINDS.saga,
+                libraryId: library.id,
+                tmdbId: saga.tmdbId,
+              }}
+            />
             {first && <SagaWatchedToggle saga={saga} libraryId={library.id} />}
             <SelectButton />
           </ItemHeader>

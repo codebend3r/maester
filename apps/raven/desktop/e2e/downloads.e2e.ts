@@ -1,13 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { type DownloadTarget, downloadLinkFor, formatBytes } from '@raven/core'
+import {
+  DOWNLOAD_TARGET_KINDS,
+  type DownloadTarget,
+  downloadLinkFor,
+  formatBytes,
+} from '@raven/core'
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test'
 import { makeClips, makeTrackClip } from '@/e2e/clips'
 import {
   containerOf,
   FIXTURE_ITEMS,
   FIXTURE_MEDIA,
+  MEDIA_PATHS,
   type FixtureMode,
   type FixtureRequest,
   type FixtureServer,
@@ -31,7 +37,13 @@ import {
   isDownloadsState,
 } from '@/main/downloads/downloadState'
 import { entryDirFor, partPathFor, videoPathFor } from '@/main/downloads/space'
-import { DESKTOP_REPLIES, DESKTOP_REQUESTS, SERVER_METHODS } from '@/shared/protocol'
+import {
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  DOWNLOAD_KINDS,
+  DOWNLOAD_STATUS_KINDS,
+  SERVER_METHODS,
+} from '@/shared/protocol'
 
 const PIN = '3001'
 const LOCKED: FixtureMode = { pin: PIN, isLocked: true, admin: { kind: 'off' } }
@@ -50,8 +62,14 @@ const LATE_REPORT_WAIT_MS = 20_000
 const NOTICE_WAIT_MS = 10_000
 const MINUTE_MS = 60_000
 // What a download played offline owes its server: the play, then where it stopped.
-const PLAYED = { method: SERVER_METHODS.post, path: '/api/media/1/plays' } as const
-const SAVED = { method: SERVER_METHODS.put, path: '/api/media/1/progress' } as const
+const PLAYED = {
+  method: SERVER_METHODS.post,
+  path: MEDIA_PATHS.plays(FIXTURE_MEDIA.first),
+} as const
+const SAVED = {
+  method: SERVER_METHODS.put,
+  path: MEDIA_PATHS.progress(FIXTURE_MEDIA.first),
+} as const
 // Two launches, a hang and a late report.
 const OFFLINE_TEST_MS = 120_000
 
@@ -84,8 +102,8 @@ const sizeOf = (mediaId: number): number => {
   return size
 }
 
-const startLockedFixture = ({ mediaPlane }: { mediaPlane: boolean }) =>
-  startFixtureServer({ clips: fixtureClips, mode: LOCKED, mediaPlane })
+const startLockedFixture = ({ hasMediaPlane }: { hasMediaPlane: boolean }) =>
+  startFixtureServer({ clips: fixtureClips, mode: LOCKED, hasMediaPlane })
 
 const linkTo = ({ fixture, target }: { fixture: FixtureServer; target: DownloadTarget }) =>
   downloadLinkFor({ origin: fixture.origin, target })
@@ -110,7 +128,7 @@ const fileFetches = ({
 }: {
   requests: readonly FixtureRequest[]
   mediaId: number
-}) => requestsTo({ requests, method: SERVER_METHODS.get, path: `/api/media/${mediaId}/file` })
+}) => requestsTo({ requests, method: SERVER_METHODS.get, path: MEDIA_PATHS.file(mediaId) })
 
 /** A request a media origin takes: a ticket and no cookie of any kind. */
 const isTicketOnly = ({ hasTicket, hasUnlock, hasAdmin, hasOtherCookie }: FixtureRequest) =>
@@ -267,7 +285,7 @@ test.describe.serial('downloading through a media origin', () => {
 
   test.beforeAll(async () => {
     userData = await freshUserData()
-    started = await startLockedFixture({ mediaPlane: true })
+    started = await startLockedFixture({ hasMediaPlane: true })
   })
 
   test.afterAll(async () => {
@@ -287,7 +305,7 @@ test.describe.serial('downloading through a media origin', () => {
           app,
           page,
           fixture,
-          target: { kind: 'media', mediaId: FIXTURE_MEDIA.first },
+          target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: FIXTURE_MEDIA.first },
           question: `Download Fixture One (1 movie, ${formatBytes(size)}) from ${hostOf({ fixture })}?`,
         })
         await openDownloads({ page })
@@ -305,7 +323,7 @@ test.describe.serial('downloading through a media origin', () => {
     const sidecars = requestsTo({
       requests: fixture.elsewhere.requests,
       method: SERVER_METHODS.get,
-      path: '/api/media/1/subtitles/external-0',
+      path: MEDIA_PATHS.sidecar(FIXTURE_MEDIA.first),
     })
     expect(sidecars.length).toBeGreaterThan(0)
     expect(sidecars.every(isTicketOnly)).toBe(true)
@@ -313,7 +331,7 @@ test.describe.serial('downloading through a media origin', () => {
     const tickets = requestsTo({
       requests: fixture.requests,
       method: SERVER_METHODS.get,
-      path: '/api/media/1/ticket',
+      path: MEDIA_PATHS.ticket(FIXTURE_MEDIA.first),
     })
     expect(tickets.length).toBeGreaterThan(0)
     expect(tickets.every(({ hasUnlock }) => hasUnlock)).toBe(true)
@@ -333,7 +351,12 @@ test.describe.serial('downloading through a media origin', () => {
         size: bytes,
       })),
     ).toEqual([
-      { mediaId: FIXTURE_MEDIA.first, label: 'Fixture One', status: { kind: 'ready' }, size },
+      {
+        mediaId: FIXTURE_MEDIA.first,
+        label: 'Fixture One',
+        status: { kind: DOWNLOAD_STATUS_KINDS.ready },
+        size,
+      },
     ])
     const video = videoPathFor({
       userData,
@@ -364,7 +387,7 @@ test.describe.serial('downloading through a media origin', () => {
           app,
           page,
           fixture,
-          target: { kind: 'media', mediaId: FIXTURE_MEDIA.second },
+          target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: FIXTURE_MEDIA.second },
           question: `Download ${label} (1 movie, ${formatBytes(size)})`,
         })
         await openDownloads({ page })
@@ -468,7 +491,7 @@ test.describe.serial('downloading through a media origin', () => {
         const back = await startFixtureServer({
           clips: fixtureClips,
           mode: { ...LOCKED, isLocked: false },
-          mediaPlane: true,
+          hasMediaPlane: true,
           port,
         })
         started = back
@@ -502,7 +525,7 @@ test.describe.serial('downloading through the server', () => {
 
   test.beforeAll(async () => {
     userData = await freshUserData()
-    started = await startLockedFixture({ mediaPlane: false })
+    started = await startLockedFixture({ hasMediaPlane: false })
   })
 
   test.afterAll(async () => {
@@ -522,7 +545,7 @@ test.describe.serial('downloading through the server', () => {
           app,
           page,
           fixture,
-          target: { kind: 'media', mediaId: FIXTURE_MEDIA.first },
+          target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: FIXTURE_MEDIA.first },
           question: `Download Fixture One (1 movie, ${formatBytes(size)})`,
         })
         await openDownloads({ page })
@@ -537,7 +560,7 @@ test.describe.serial('downloading through the server', () => {
       requestsTo({
         requests: fixture.requests,
         method: SERVER_METHODS.get,
-        path: '/api/media/1/ticket',
+        path: MEDIA_PATHS.ticket(FIXTURE_MEDIA.first),
       }),
     ).toEqual([])
     expect(routesOf(fixture.elsewhere.requests)).toEqual([])
@@ -560,7 +583,7 @@ test.describe.serial('downloading through the server', () => {
             app,
             page,
             fixture,
-            target: { kind: 'item', itemId: FIXTURE_ITEMS.season },
+            target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: FIXTURE_ITEMS.season },
             question: `(2 episodes, ${formatBytes(bytes)})`,
           })
           await expect(downloadsButton({ page, count: 2 })).toBeVisible()
@@ -604,13 +627,13 @@ test.describe.serial('downloading through the server', () => {
           serverId,
           mediaId: FIXTURE_MEDIA.first,
           label: 'Fixture One',
-          group: { kind: 'movie', key: 'movie:1', title: 'Fixture One', order: 0 },
+          group: { kind: DOWNLOAD_KINDS.movie, key: 'movie:1', title: 'Fixture One', order: 0 },
           container,
           size: sizeOf(FIXTURE_MEDIA.first),
           duration: 30,
           watchedPercent: 90,
           sidecars: [],
-          status: { kind: 'ready' },
+          status: { kind: DOWNLOAD_STATUS_KINDS.ready },
           autoDelete: true,
           watchedAt: at - 11 * MINUTE_MS,
           serverPosition: 0,

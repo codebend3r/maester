@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  DOWNLOAD_TARGET_KINDS,
   type ItemDetails,
   type Library,
   type MatchItemType,
@@ -270,7 +271,7 @@ export const PlayableItemView = ({
         <ButtonLink tone="primary" icon="play" to={play.to} state={play.state}>
           {primary.position > 0 ? `Resume from ${formatDuration(primary.position)}` : 'Play'}
         </ButtonLink>
-        <DownloadButton target={{ kind: 'media', mediaId: primary.id }} />
+        <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.media, mediaId: primary.id }} />
         {canFavourite && (
           <FavouriteButton isFavourite={primary.favourite} onToggle={favourite.mutate} />
         )}

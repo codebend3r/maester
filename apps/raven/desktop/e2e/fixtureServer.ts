@@ -42,6 +42,15 @@ const API_ROUTES = {
   adminUnlock: `${SERVER_METHODS.post} ${API_PATHS.adminUnlock}`,
 } as const
 
+/** The path of one of a title's routes, as a request to the server carries it. */
+export const MEDIA_PATHS = {
+  file: (mediaId: number) => `/api/media/${mediaId}/file`,
+  sidecar: (mediaId: number) => `/api/media/${mediaId}/subtitles/external-0`,
+  ticket: (mediaId: number) => `/api/media/${mediaId}/ticket`,
+  progress: (mediaId: number) => `/api/media/${mediaId}/progress`,
+  plays: (mediaId: number) => `/api/media/${mediaId}/plays`,
+} as const
+
 /** `METHOD rest` for a title's routes, `rest` being what follows `/api/media/<id>`. */
 const MEDIA_ROUTES = {
   item: `${SERVER_METHODS.get} `,
@@ -188,6 +197,7 @@ const TRICKLE_MS = 100
 const LOCKED_MESSAGE = 'This library is locked.'
 const PROBE_MAX_BYTES = 1_048_576
 const TICKET_PARAM = 't'
+const PROBE_BYTES_PARAM = 'bytes'
 // Only parses a request's own path and query; nothing is ever fetched from it.
 const URL_BASE = 'http://fixture.invalid'
 
@@ -200,6 +210,9 @@ const LIBRARY_PATH = `/api/libraries/${FIXTURE_ITEMS.library}`
 const SAGAS_PATH = `${LIBRARY_PATH}/sagas`
 // What a media origin serves for a ticket: a title's file and its sidecar.
 const MEDIA_PLANE_ROUTE = /^\/api\/media\/(\d+)\/(file|subtitles\/external-0)$/u
+
+/** What `MEDIA_PLANE_ROUTE` captures for a title's file; anything else it matches is the sidecar. */
+const MEDIA_PLANE_FILE = 'file'
 
 const fileOf = (mediaId: number) => `/api/media/${mediaId}/file`
 
@@ -242,7 +255,7 @@ export const containerOf = (path: string) => extname(path).slice(1).toLowerCase(
 
 /** How many bytes the probe asked for, as the server reads `bytes`. */
 const probeLengthOf = (query: URLSearchParams): number => {
-  const asked = Number(query.get('bytes') ?? MEDIA_PROBE_BYTES)
+  const asked = Number(query.get(PROBE_BYTES_PARAM) ?? MEDIA_PROBE_BYTES)
   if (!Number.isSafeInteger(asked)) return MEDIA_PROBE_BYTES
   return Math.min(Math.max(asked, 1), PROBE_MAX_BYTES)
 }
@@ -486,7 +499,7 @@ const shut = (server: Server): Promise<void> =>
  * which cookies a request carried, never their values, and whether it carried a ticket,
  * never the ticket. `now` is the clock the wrong-try wait and the tickets read.
  *
- * With `mediaPlane` on (Ruling 15), the server lists `elsewhere` as its `lan` media origin,
+ * With `hasMediaPlane` on (Ruling 15), the server lists `elsewhere` as its `lan` media origin,
  * answers the probe, and issues tickets behind the lock, timed in epoch milliseconds as the
  * server's `MediaTickets` times them. `port` keeps an earlier fixture's address, as a server
  * that restarts does; 0 takes any free one.
@@ -495,13 +508,13 @@ export const startFixtureServer = async ({
   clips,
   mode,
   now = Date.now,
-  mediaPlane = false,
+  hasMediaPlane = false,
   port = 0,
 }: {
   clips: { first: string; second: string; tracks: string }
   mode: FixtureMode
   now?: () => number
-  mediaPlane?: boolean
+  hasMediaPlane?: boolean
   port?: number
 }): Promise<FixtureServer> => {
   if (!isMediaTracks(FIXTURE_TRACKS)) throw new Error('The fixture track list is not a MediaTracks')
@@ -690,9 +703,9 @@ export const startFixtureServer = async ({
   const sendPing = ({ response, query }: { response: ServerResponse; query: URLSearchParams }) => {
     const length = probeLengthOf(query)
     response.writeHead(200, {
-      'content-type': 'application/octet-stream',
-      'content-length': length,
-      'cache-control': 'no-store',
+      [HTTP_HEADERS.contentType]: 'application/octet-stream',
+      [HTTP_HEADERS.contentLength]: length,
+      [HTTP_HEADERS.cacheControl]: 'no-store',
     })
     response.end(randomBytes(length))
   }
@@ -729,7 +742,7 @@ export const startFixtureServer = async ({
       case MEDIA_ROUTES.sidecar:
         return sendSidecar(response)
       case MEDIA_ROUTES.ticket:
-        if (!mediaPlane) return sendMissing(response)
+        if (!hasMediaPlane) return sendMissing(response)
         return sendJson({
           response,
           status: 200,
@@ -799,11 +812,11 @@ export const startFixtureServer = async ({
     if (request.method !== SERVER_METHODS.get) return null
     const { pathname, query } = partsOf(request.url ?? '')
     if (pathname === API_PATHS.mediaOrigins) {
-      const origins = mediaPlane ? [{ kind: 'lan', url: elsewhere.origin }] : []
+      const origins = hasMediaPlane ? [{ kind: 'lan', url: elsewhere.origin }] : []
       return () => sendJson({ response, status: 200, body: { origins } })
     }
     if (pathname === PING_PATH) {
-      return () => (mediaPlane ? sendPing({ response, query }) : sendMissing(response))
+      return () => (hasMediaPlane ? sendPing({ response, query }) : sendMissing(response))
     }
     // Public, as the server's is: a library's settings hold nothing the lock keeps back.
     if (pathname === LIBRARY_PATH) {
@@ -826,7 +839,7 @@ export const startFixtureServer = async ({
     request: IncomingMessage
     response: ServerResponse
   }) => {
-    if (!mediaPlane || request.method !== SERVER_METHODS.get) return sendMissing(response)
+    if (!hasMediaPlane || request.method !== SERVER_METHODS.get) return sendMissing(response)
     const { pathname, query } = partsOf(request.url ?? '')
     if (pathname === PING_PATH) return sendPing({ response, query })
     const route = MEDIA_PLANE_ROUTE.exec(pathname)
@@ -836,7 +849,7 @@ export const startFixtureServer = async ({
     if (query.get(TICKET_PARAM) !== ticketFor(mediaId)) {
       return sendJson({ response, status: 401, body: { message: 'That ticket is not valid.' } })
     }
-    if (route[2] !== 'file') return sendSidecar(response)
+    if (route[2] !== MEDIA_PLANE_FILE) return sendSidecar(response)
     return sendFile({ request, response, path: title.path, bytes: title.bytes })
   }
 

@@ -12,8 +12,6 @@ import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import {
   createMediaAccess,
   fileUrlFor,
-  ORIGIN_KIND_RANK,
-  pickReachable,
   PROBE_TIMEOUT_MS,
   sidecarUrlFor,
   TICKET_RENEW_MS,
@@ -35,6 +33,7 @@ const SERVER: ServerEntry = {
 
 const NOW = 1_700_000_000_000
 const HOUR_MS = 3_600_000
+const MB = 1_000_000
 
 const LAN: MediaOrigin = { kind: 'lan', url: 'http://192.168.1.5:3000' }
 const LAN_TWO: MediaOrigin = { kind: 'lan', url: 'http://192.168.1.6:3000' }
@@ -43,16 +42,8 @@ const PUBLIC: MediaOrigin = { kind: 'public', url: 'https://media.example.com' }
 
 const originsCall = keyOf({ name: 'getMediaOrigins' })
 const ticketCall = (mediaId: number): string => keyOf({ name: 'getMediaTicket', mediaId })
-
-const probed = ({
-  origin,
-  status = 200,
-  firstByteMs = 10,
-}: {
-  origin: MediaOrigin
-  status?: number
-  firstByteMs?: number
-}) => ({ origin, status, firstByteMs })
+const pingOf = (origin: MediaOrigin): string =>
+  `${origin.url}/api/media-origins/ping?bytes=${MEDIA_PROBE_BYTES}`
 
 const succeeded = (outcome: AccessOutcome): Access => {
   if (!outcome.ok) throw new Error(`expected ok, got ${outcome.reason}`)
@@ -64,44 +55,110 @@ const failed = (outcome: AccessOutcome) => {
   return outcome
 }
 
-/** A probe that answers from `answers` by URL prefix, and records every URL it was asked. */
-const answeringProbe = (
-  answers: Record<string, { status: number; firstByteMs: number } | 'fail'>,
-) => {
-  const asked: { url: string; timeoutMs: number }[] = []
-  const probe: ProbeFetch = async ({ url, timeoutMs }) => {
-    asked.push({ url, timeoutMs })
-    const key = Object.keys(answers).find((prefix) => url.startsWith(prefix))
-    const answer = key === undefined ? 'fail' : (answers[key] ?? 'fail')
-    if (answer === 'fail') throw new Error('timed out')
-    return answer
+/**
+ * How one origin answers its ping. The first chunk lands `firstByteMs` after the probe starts and
+ * the rest at `bytesPerSecond`; `isBroken` errors the body after its first chunk, as the timeout
+ * firing mid-read does.
+ */
+type PingAnswer = {
+  firstByteMs?: number
+  bytesPerSecond?: number
+  bytes?: number
+  status?: number
+  isBroken?: boolean
+}
+
+const FIRST_CHUNK_BYTES = 16_384
+
+/**
+ * Ping answers timed on one fake clock. Every wait is released in time order, one a macrotask, so
+ * probes that run at once each measure only their own times. An origin with no answer rejects, as
+ * a probe that fails to connect does.
+ */
+const pingNetwork = (answers: Record<string, PingAnswer>) => {
+  let time = 0
+  let waits: { at: number; release: () => void }[] = []
+  let isDriving = false
+  const asked: { url: string; timeoutMs: number; at: number }[] = []
+
+  const step = (): void => {
+    const [next, ...rest] = waits.toSorted((a, b) => a.at - b.at)
+    if (next === undefined) {
+      isDriving = false
+      return
+    }
+    waits = rest
+    time = next.at
+    next.release()
+    setTimeout(step, 0)
   }
-  return { probe, asked }
+
+  const until = (at: number): Promise<void> =>
+    new Promise((resolve) => {
+      waits = [...waits, { at, release: resolve }]
+      if (isDriving) return
+      isDriving = true
+      setTimeout(step, 0)
+    })
+
+  const bodyOf = ({ answer, startedAt }: { answer: PingAnswer; startedAt: number }) => {
+    const bytes = answer.bytes ?? MEDIA_PROBE_BYTES
+    const firstAt = startedAt + (answer.firstByteMs ?? 10)
+    const lastAt = firstAt + (bytes / (answer.bytesPerSecond ?? 50 * MB)) * 1000
+    const firstBytes = Math.min(FIRST_CHUNK_BYTES, bytes)
+    const parts = [
+      { at: firstAt, size: firstBytes },
+      { at: lastAt, size: bytes - firstBytes },
+    ].filter((part) => part.size > 0)
+    let sent = 0
+    return new ReadableStream<Uint8Array>({
+      pull: async (controller) => {
+        if (sent > 0 && answer.isBroken === true) throw new Error('The operation was aborted')
+        const part = parts[sent]
+        if (part === undefined) return controller.close()
+        sent += 1
+        await until(part.at)
+        controller.enqueue(new Uint8Array(part.size))
+      },
+    })
+  }
+
+  const probe: ProbeFetch = async ({ url, timeoutMs }) => {
+    asked.push({ url, timeoutMs, at: time })
+    const answer = Object.entries(answers).find(([prefix]) => url.startsWith(prefix))?.[1] ?? null
+    if (answer === null) throw new Error('timed out')
+    const status = answer.status ?? 200
+    return { ok: status >= 200 && status < 300, body: bodyOf({ answer, startedAt: time }) }
+  }
+
+  return { probe, clock: () => time, asked }
 }
 
 const run = ({
   replies,
-  probe,
+  answers,
   server = SERVER,
   now = 0,
 }: {
   replies: Record<string, Reply>
-  probe: ProbeFetch
+  answers: Record<string, PingAnswer>
   server?: ServerEntry | null
   now?: number
 }) => {
   const { calls, log } = fakeCalls(replies)
+  const network = pingNetwork(answers)
   const warnings: string[] = []
   const access = createMediaAccess({
     calls,
     serverOf: (serverId) => (server !== null && serverId === server.id ? server : null),
-    probe,
+    probe: network.probe,
+    probeClock: network.clock,
     now: () => now,
     warn: (message) => {
       warnings.push(message)
     },
   })
-  return { access, log, warnings }
+  return { access, log, warnings, asked: network.asked }
 }
 
 const withOrigins = (origins: MediaOrigin[]): Record<string, Reply> => ({
@@ -109,114 +166,136 @@ const withOrigins = (origins: MediaOrigin[]): Record<string, Reply> => ({
   [ticketCall(7)]: ok({ ticket: 'tkt', expiresAt: 1_000 }),
 })
 
-describe('pickReachable', () => {
-  it('prefers lan over a faster public', () => {
-    const pick = pickReachable([
-      probed({ origin: PUBLIC, firstByteMs: 1 }),
-      probed({ origin: LAN, firstByteMs: 80 }),
-    ])
-    expect(pick).toEqual(LAN)
+const pickedFrom = async ({
+  origins,
+  answers,
+}: {
+  origins: MediaOrigin[]
+  answers: Record<string, PingAnswer>
+}): Promise<Access> => {
+  const { access } = run({ replies: withOrigins(origins), answers })
+  return succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))
+}
+
+describe('the pick', () => {
+  it('takes a tailnet origin over a lan one far slower than it', async () => {
+    const picked = await pickedFrom({
+      origins: [LAN, TAILNET],
+      answers: {
+        [LAN.url]: { firstByteMs: 5, bytesPerSecond: 1 * MB },
+        [TAILNET.url]: { firstByteMs: 5, bytesPerSecond: 20 * MB },
+      },
+    })
+    expect(picked).toMatchObject({ kind: 'origin', url: TAILNET.url })
   })
 
-  it('prefers the faster first byte among two of a kind', () => {
-    const pick = pickReachable([
-      probed({ origin: LAN, firstByteMs: 40 }),
-      probed({ origin: LAN_TWO, firstByteMs: 9 }),
-    ])
-    expect(pick).toEqual(LAN_TWO)
+  it('takes the nearer kind when it is a little slower', async () => {
+    const picked = await pickedFrom({
+      origins: [PUBLIC, TAILNET, LAN],
+      answers: {
+        [PUBLIC.url]: { firstByteMs: 5, bytesPerSecond: 10 * MB },
+        [TAILNET.url]: { firstByteMs: 5, bytesPerSecond: 10 * MB },
+        [LAN.url]: { firstByteMs: 5, bytesPerSecond: 9 * MB },
+      },
+    })
+    expect(picked).toMatchObject({ kind: 'origin', url: LAN.url })
   })
 
-  it('skips an origin that answered 500 or timed out', () => {
-    const pick = pickReachable([
-      probed({ origin: LAN, status: 500 }),
-      probed({ origin: TAILNET, status: 0 }),
-      probed({ origin: PUBLIC }),
-    ])
-    expect(pick).toEqual(PUBLIC)
+  it('counts a slow first byte against an origin', async () => {
+    const picked = await pickedFrom({
+      origins: [LAN, PUBLIC],
+      answers: {
+        [LAN.url]: { firstByteMs: 400, bytesPerSecond: 10 * MB },
+        [PUBLIC.url]: { firstByteMs: 5, bytesPerSecond: 10 * MB },
+      },
+    })
+    expect(picked).toMatchObject({ kind: 'origin', url: PUBLIC.url })
   })
 
-  it('picks null when none answered', () => {
-    expect(pickReachable([probed({ origin: LAN, status: 500 })])).toBeNull()
-    expect(pickReachable([])).toBeNull()
+  it('takes the quicker first byte between two of a kind inside the band', async () => {
+    const picked = await pickedFrom({
+      origins: [LAN, LAN_TWO],
+      answers: {
+        [LAN.url]: { firstByteMs: 12, bytesPerSecond: 10 * MB },
+        [LAN_TWO.url]: { firstByteMs: 6, bytesPerSecond: 10 * MB },
+      },
+    })
+    expect(picked).toMatchObject({ kind: 'origin', url: LAN_TWO.url })
   })
 
-  it('ranks lan before tailnet before public', () => {
-    expect(ORIGIN_KIND_RANK).toEqual({ lan: 0, tailnet: 1, public: 2 })
+  it('leaves out a probe that fails, answers non-2xx, breaks off or ends short', async () => {
+    const picked = await pickedFrom({
+      origins: [LAN, LAN_TWO, TAILNET, { kind: 'tailnet', url: 'http://10.1.1.1:3000' }, PUBLIC],
+      answers: {
+        [LAN_TWO.url]: { status: 503 },
+        [TAILNET.url]: { isBroken: true },
+        'http://10.1.1.1:3000': { bytes: MEDIA_PROBE_BYTES - 1 },
+        [PUBLIC.url]: { firstByteMs: 80, bytesPerSecond: 2 * MB },
+      },
+    })
+    expect(picked).toMatchObject({ kind: 'origin', url: PUBLIC.url })
+  })
+
+  it('answers the cookie path, reading no ticket, when no probe scores', async () => {
+    const { access, log } = run({
+      replies: withOrigins([LAN, LAN_TWO, TAILNET, PUBLIC]),
+      answers: {
+        [LAN_TWO.url]: { status: 500 },
+        [TAILNET.url]: { isBroken: true },
+        [PUBLIC.url]: { bytes: 0 },
+      },
+    })
+    const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
+    expect(succeeded(outcome)).toEqual({ kind: 'cookie' })
+    expect(log).toEqual([originsCall])
   })
 })
 
 describe('createMediaAccess', () => {
   it('answers the cookie path, without probing, when no origin is listed', async () => {
-    const { probe, asked } = answeringProbe({})
-    const { access, log } = run({ replies: withOrigins([]), probe })
+    const { access, log, asked } = run({ replies: withOrigins([]), answers: {} })
     const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
     expect(succeeded(outcome)).toEqual({ kind: 'cookie' })
     expect(asked).toEqual([])
     expect(log).toEqual([originsCall])
   })
 
-  it('starts both probes before either answers, then picks the lan one', async () => {
-    const started: string[] = []
-    const releases: (() => void)[] = []
-    const probe: ProbeFetch = ({ url }) =>
-      new Promise((resolve) => {
-        started.push(url)
-        releases.push(() =>
-          resolve({ status: 200, firstByteMs: url.startsWith(PUBLIC.url) ? 1 : 50 }),
-        )
-      })
-    const { access } = run({ replies: withOrigins([PUBLIC, LAN]), probe })
-    const pending = access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(started).toEqual([
-      `${PUBLIC.url}/api/media-origins/ping?bytes=${MEDIA_PROBE_BYTES}`,
-      `${LAN.url}/api/media-origins/ping?bytes=${MEDIA_PROBE_BYTES}`,
-    ])
-    releases.forEach((release) => release())
-    expect(succeeded(await pending)).toEqual({
+  it('starts every probe before any answers, each with the brief timeout', async () => {
+    const { access, asked } = run({
+      replies: withOrigins([PUBLIC, LAN]),
+      answers: { [PUBLIC.url]: { firstByteMs: 10 }, [LAN.url]: { firstByteMs: 12 } },
+    })
+    expect(succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))).toEqual({
       kind: 'origin',
       url: LAN.url,
       ticket: 'tkt',
       renewAt: TICKET_RENEW_MS,
     })
-  })
-
-  it('hands the brief timeout to each probe', async () => {
-    const { probe, asked } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
-    const { access } = run({ replies: withOrigins([LAN]), probe })
-    await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
     expect(PROBE_TIMEOUT_MS).toBe(2000)
-    expect(asked.map((entry) => entry.timeoutMs)).toEqual([PROBE_TIMEOUT_MS])
+    expect(asked).toEqual([
+      { url: pingOf(PUBLIC), timeoutMs: PROBE_TIMEOUT_MS, at: 0 },
+      { url: pingOf(LAN), timeoutMs: PROBE_TIMEOUT_MS, at: 0 },
+    ])
   })
 
-  it('counts a rejected probe as not answering and falls back to the cookie path', async () => {
-    const { probe } = answeringProbe({})
-    const { access, log } = run({ replies: withOrigins([LAN, PUBLIC]), probe })
+  it('answers the cookie path, reading no ticket, when every probe fails', async () => {
+    const { access, log } = run({ replies: withOrigins([LAN, PUBLIC]), answers: {} })
     const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
     expect(succeeded(outcome)).toEqual({ kind: 'cookie' })
     expect(log).toEqual([originsCall])
   })
 
-  it('skips the origin that failed and uses the one that answered', async () => {
-    const { probe } = answeringProbe({ [PUBLIC.url]: { status: 200, firstByteMs: 20 } })
-    const { access } = run({ replies: withOrigins([LAN, PUBLIC]), probe })
-    const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
-    expect(succeeded(outcome)).toMatchObject({ kind: 'origin', url: PUBLIC.url })
-  })
-
   it('reads a fresh ticket on every call', async () => {
-    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
-    const { access, log } = run({ replies: withOrigins([LAN]), probe })
+    const { access, log } = run({ replies: withOrigins([LAN]), answers: { [LAN.url]: {} } })
     await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
     await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
     expect(log.filter((key) => key === ticketCall(7))).toHaveLength(2)
   })
 
   it('reads the origins once per server across two files, and probes once', async () => {
-    const { probe, asked } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
-    const { access, log } = run({
+    const { access, log, asked } = run({
       replies: { ...withOrigins([LAN]), [ticketCall(8)]: ok({ ticket: 'two', expiresAt: 5 }) },
-      probe,
+      answers: { [LAN.url]: {} },
     })
     await Promise.all([
       access.accessFor({ serverId: SERVER_ID, mediaId: 7 }),
@@ -227,20 +306,24 @@ describe('createMediaAccess', () => {
     expect(asked).toHaveLength(1)
   })
 
-  it('reads the origins again after forget', async () => {
-    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
-    const { access, log } = run({ replies: withOrigins([LAN]), probe })
-    await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
+  it('holds the pick until forget, then reads the origins and probes them again', async () => {
+    const answers: Record<string, PingAnswer> = { [LAN.url]: {}, [TAILNET.url]: {} }
+    const { access, log, asked } = run({ replies: withOrigins([LAN, TAILNET]), answers })
+    const accessed = async () =>
+      succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))
+    expect(await accessed()).toMatchObject({ kind: 'origin', url: LAN.url })
+    answers[LAN.url] = { status: 503 }
+    expect(await accessed()).toMatchObject({ kind: 'origin', url: LAN.url })
     access.forget(SERVER_ID)
-    await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
+    expect(await accessed()).toMatchObject({ kind: 'origin', url: TAILNET.url })
     expect(log.filter((key) => key === originsCall)).toHaveLength(2)
+    expect(asked).toHaveLength(4)
   })
 
   it('answers locked when the ticket read answers the lock status', async () => {
-    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
     const { access } = run({
       replies: { ...withOrigins([LAN]), [ticketCall(7)]: { status: LOCKED_STATUS, body: '' } },
-      probe,
+      answers: { [LAN.url]: {} },
     })
     const outcome = failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))
     expect(outcome.reason).toBe('locked')
@@ -248,20 +331,18 @@ describe('createMediaAccess', () => {
   })
 
   it('answers unreachable when the ticket read fails to connect', async () => {
-    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
     const { access } = run({
       replies: { ...withOrigins([LAN]), [ticketCall(7)]: { unreachable: 'Vhagar is asleep' } },
-      probe,
+      answers: { [LAN.url]: {} },
     })
     const outcome = failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))
     expect(outcome).toEqual({ ok: false, reason: 'unreachable', message: 'Vhagar is asleep' })
   })
 
   it('answers unreadable for a ticket body the guard refuses', async () => {
-    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
     const { access } = run({
       replies: { ...withOrigins([LAN]), [ticketCall(7)]: ok({ ticket: 4 }) },
-      probe,
+      answers: { [LAN.url]: {} },
     })
     expect(failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })).reason).toBe(
       'unreadable',
@@ -269,10 +350,9 @@ describe('createMediaAccess', () => {
   })
 
   it('answers unreadable for a ticket read refused with another 4xx', async () => {
-    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
     const { access } = run({
       replies: { ...withOrigins([LAN]), [ticketCall(7)]: { status: 400, body: '' } },
-      probe,
+      answers: { [LAN.url]: {} },
     })
     expect(failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })).reason).toBe(
       'unreadable',
@@ -282,10 +362,9 @@ describe('createMediaAccess', () => {
   it.each([500, 502, 503, 504])(
     'answers unreachable for a ticket read the proxy answers %i',
     async (status) => {
-      const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
       const { access } = run({
         replies: { ...withOrigins([LAN]), [ticketCall(7)]: { status, body: '' } },
-        probe,
+        answers: { [LAN.url]: {} },
       })
       expect(failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))).toEqual({
         ok: false,
@@ -296,10 +375,9 @@ describe('createMediaAccess', () => {
   )
 
   it('answers gone when the ticket read finds no such title', async () => {
-    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
     const { access } = run({
       replies: { ...withOrigins([LAN]), [ticketCall(7)]: { status: 404, body: '' } },
-      probe,
+      answers: { [LAN.url]: {} },
     })
     expect(failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))).toEqual({
       ok: false,
@@ -311,10 +389,9 @@ describe('createMediaAccess', () => {
   it("renews a ticket a fixed time after it was read, by raven player's clock, whatever its expiry says", async () => {
     expect(TICKET_RENEW_MS).toBe((MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECONDS) * 1000)
     const renewAtFor = async (expiresAt: number) => {
-      const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
       const { access } = run({
         replies: { ...withOrigins([LAN]), [ticketCall(7)]: ok({ ticket: 'tkt', expiresAt }) },
-        probe,
+        answers: { [LAN.url]: {} },
         now: NOW,
       })
       return succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))
@@ -331,12 +408,11 @@ describe('createMediaAccess', () => {
   })
 
   it('falls back to the cookie path, naming no URL, on a bad origins body', async () => {
-    const { probe, asked } = answeringProbe({})
-    const { access, warnings } = run({
+    const { access, warnings, asked } = run({
       replies: {
         [originsCall]: ok({ origins: [{ kind: 'lan', url: 'http://secret.example:3000' }, 7] }),
       },
-      probe,
+      answers: {},
     })
     const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
     expect(succeeded(outcome)).toEqual({ kind: 'cookie' })
@@ -347,10 +423,9 @@ describe('createMediaAccess', () => {
   })
 
   it('falls back to the cookie path, warning once, when the origins read fails', async () => {
-    const { probe } = answeringProbe({})
     const { access, warnings } = run({
       replies: { [originsCall]: { unreachable: 'http://10.0.0.1 refused' } },
-      probe,
+      answers: {},
     })
     const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
     expect(succeeded(outcome)).toEqual({ kind: 'cookie' })
@@ -359,10 +434,9 @@ describe('createMediaAccess', () => {
   })
 
   it('names no ticket in the log', async () => {
-    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
     const { access, warnings } = run({
       replies: { ...withOrigins([LAN]), [ticketCall(7)]: ok({ ticket: 'tkt', expiresAt: 'soon' }) },
-      probe,
+      answers: { [LAN.url]: {} },
     })
     await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
     expect(warnings.join(' ')).not.toContain('tkt')
@@ -375,8 +449,7 @@ describe('createMediaAccess', () => {
       { kind: 'public', url: 'javascript:alert(1)' },
       { kind: 'lan', url: 'http://user:pass@192.168.1.9:3000' },
     ]
-    const { probe, asked } = answeringProbe({})
-    const { access, warnings } = run({ replies: withOrigins(hostile), probe })
+    const { access, warnings, asked } = run({ replies: withOrigins(hostile), answers: {} })
     const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
     expect(succeeded(outcome)).toEqual({ kind: 'cookie' })
     expect(asked).toEqual([])
@@ -387,10 +460,9 @@ describe('createMediaAccess', () => {
   })
 
   it('keeps a trusted origin beside a dropped one', async () => {
-    const { probe, asked } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
-    const { access } = run({
+    const { access, asked } = run({
       replies: withOrigins([{ kind: 'lan', url: 'file:///etc/hosts?' }, LAN]),
-      probe,
+      answers: { [LAN.url]: {} },
     })
     const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
     expect(succeeded(outcome)).toMatchObject({ kind: 'origin', url: LAN.url })
@@ -398,10 +470,9 @@ describe('createMediaAccess', () => {
   })
 
   it('cuts an origin with a path, query or trailing slash down to its origin', async () => {
-    const { probe, asked } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
-    const { access } = run({
+    const { access, asked } = run({
       replies: withOrigins([{ kind: 'lan', url: `${LAN.url}/base/?x=1#h` }]),
-      probe,
+      answers: { [LAN.url]: {} },
     })
     const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })
     expect(asked.map((entry) => entry.url)).toEqual([
@@ -411,7 +482,7 @@ describe('createMediaAccess', () => {
   })
 
   it('treats an origins call that rejects as a failed read, and does not hold the rejection', async () => {
-    const { probe } = answeringProbe({})
+    const network = pingNetwork({})
     const warnings: string[] = []
     const access = createMediaAccess({
       calls: {
@@ -420,7 +491,8 @@ describe('createMediaAccess', () => {
         },
       },
       serverOf: () => SERVER,
-      probe,
+      probe: network.probe,
+      probeClock: network.clock,
       now: () => 0,
       warn: (message) => {
         warnings.push(message)
@@ -437,8 +509,7 @@ describe('createMediaAccess', () => {
   })
 
   it('answers unreachable for a server that is gone', async () => {
-    const { probe } = answeringProbe({})
-    const { access, log } = run({ replies: {}, probe, server: null })
+    const { access, log } = run({ replies: {}, answers: {}, server: null })
     const outcome = failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))
     expect(outcome).toEqual({ ok: false, reason: 'unreachable', message: SERVER_GONE })
     expect(log).toEqual([])

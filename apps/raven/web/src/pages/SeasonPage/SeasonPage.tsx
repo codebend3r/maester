@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import {
+  DOWNLOAD_TARGET_KINDS,
   type EpisodeSummary,
   ITEM_TYPES,
   type ItemDetails,
@@ -181,7 +182,7 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
           )}
           {hasFiles && <ShuffleButton itemId={season.id}>Shuffle season</ShuffleButton>}
           {hasFiles && <ShuffleButton itemId={show.id}>Shuffle show</ShuffleButton>}
-          <DownloadButton target={{ kind: 'item', itemId: season.id }} />
+          <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.item, itemId: season.id }} />
           <WatchedToggle {...toggle} />
           <SelectButton />
         </ItemHeader>

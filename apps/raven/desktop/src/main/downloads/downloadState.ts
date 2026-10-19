@@ -273,8 +273,8 @@ export const pauseServer = (
 
 /** Whether a file waits on an outage, which the queue tries again on its own. */
 export const isWaitingOnOutage = ({ status }: DownloadEntry): boolean =>
-  (status.kind === DOWNLOAD_STATUS_KINDS.paused || status.kind === DOWNLOAD_STATUS_KINDS.failed) &&
-  status.reason === PAUSE_REASONS.unreachable
+  (status.kind === DOWNLOAD_STATUS_KINDS.paused && status.reason === PAUSE_REASONS.unreachable) ||
+  (status.kind === DOWNLOAD_STATUS_KINDS.failed && status.reason === FAIL_REASONS.unreachable)
 
 /**
  * The viewer's Pause all: what runs or waits pauses, and so does what waits on an outage, or
@@ -377,14 +377,17 @@ const furthestOf = (a: number | null, b: number | null): number | null =>
 
 /**
  * Two pending records of one title as one: a play either owes, the newer last position, and the
- * furthest of both, as `notePending` folds a report into what is pending.
+ * furthest of both (never below that position), as `notePending` folds a report into what is
+ * pending.
  */
 const mergePending = ({ a, b }: { a: Pending; b: Pending }): Pending => {
   const [older, newer] = a.at <= b.at ? [a, b] : [b, a]
+  const position = newer.position ?? older.position
+  const furthest = furthestOf(a.furthest, b.furthest)
   return {
     play: a.play || b.play,
-    position: newer.position ?? older.position,
-    furthest: furthestOf(a.furthest, b.furthest),
+    position,
+    furthest: position === null || furthest === null ? furthest : Math.max(furthest, position),
     at: newer.at,
   }
 }

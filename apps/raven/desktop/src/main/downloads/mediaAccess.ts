@@ -6,9 +6,10 @@ import {
   MEDIA_PROBE_BYTES,
   MEDIA_TICKET_REFRESH_SECONDS,
   MEDIA_TICKET_SECONDS,
+  pickOrigin,
   toQueryString,
   type MediaOrigin,
-  type MediaOriginKind,
+  type OriginProbe,
 } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
@@ -27,17 +28,14 @@ export const TICKET_RENEW_MS = (MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECO
 
 const NOT_FOUND_STATUS = 404
 
-/** The nearer the origin, the lower the rank, and the lower rank wins the pick. */
-export const ORIGIN_KIND_RANK = { lan: 0, tailnet: 1, public: 2 } as const satisfies Record<
-  MediaOriginKind,
-  number
->
-
-/** Main builds this on `net.fetch`; it owns the timeout, and a probe that fails or times out rejects. */
+/**
+ * Main builds this on `net.fetch`. It owns the timeout, which covers reading the body too: a probe
+ * that fails rejects, and one that stalls past the timeout errors its body's read.
+ */
 export type ProbeFetch = (input: {
   url: string
   timeoutMs: number
-}) => Promise<{ status: number; firstByteMs: number }>
+}) => Promise<{ ok: boolean; body: ReadableStream<Uint8Array> | null }>
 
 export const ACCESS_KINDS = { origin: 'origin', cookie: 'cookie' } as const
 
@@ -62,17 +60,51 @@ export type MediaAccess = {
   forget: (serverId: string) => void
 }
 
-type Probe = { origin: MediaOrigin; status: number; firstByteMs: number }
-
-/** The origin to fetch from: of those that answered 200, the nearest kind, then the quickest first byte. */
-export const pickReachable = (probes: readonly Probe[]): MediaOrigin | null =>
-  probes
-    .filter((probe) => probe.status === 200)
-    .toSorted(
-      (a, b) =>
-        ORIGIN_KIND_RANK[a.origin.kind] - ORIGIN_KIND_RANK[b.origin.kind] ||
-        a.firstByteMs - b.firstByteMs,
-    )[0]?.origin ?? null
+/**
+ * Times the whole ping body as the web player's probe does: the first byte from the call, then the
+ * body's bytes over the time from its first byte to its last. Null for an answer that is not 2xx or
+ * whose body ends short of `MEDIA_PROBE_BYTES`; it rejects when the fetch fails or times out.
+ */
+const measureOrigin = async ({
+  origin,
+  probe,
+  clock,
+}: {
+  origin: MediaOrigin
+  probe: ProbeFetch
+  clock: () => number
+}): Promise<OriginProbe | null> => {
+  const url = `${origin.url}/api/media-origins/ping?${toQueryString({ bytes: String(MEDIA_PROBE_BYTES) })}`
+  const startedAt = clock()
+  const response = await probe({ url, timeoutMs: PROBE_TIMEOUT_MS })
+  if (response.body === null) return null
+  const reader = response.body.getReader()
+  const countFrom = async (received: number): Promise<number> => {
+    const { done, value } = await reader.read()
+    if (done) return received
+    return countFrom(received + value.length)
+  }
+  try {
+    if (!response.ok) return null
+    const first = await reader.read()
+    const firstByteAt = clock()
+    if (first.done) return null
+    const received = await countFrom(first.value.length)
+    const doneAt = clock()
+    if (received < MEDIA_PROBE_BYTES) return null
+    // A body that lands in one read has no measurable transfer time; a millisecond keeps the rate finite.
+    const measuredMs = doneAt - firstByteAt
+    const transferMs = measuredMs > 0 ? measuredMs : 1
+    return {
+      origin,
+      firstByteMs: firstByteAt - startedAt,
+      bytesPerSecond: received / (transferMs / 1000),
+    }
+  } finally {
+    // Lets go of a body left unread or broken off; one read to its end has nothing left to cancel.
+    await reader.cancel().catch(() => undefined)
+  }
+}
 
 const mediaUrlFor = ({
   access,
@@ -147,27 +179,27 @@ const trustedOrigin = (origin: MediaOrigin): MediaOrigin | null => {
   }
 }
 
+/**
+ * `probeClock` times the probes in monotonic milliseconds, so a wall clock that jumps never skews
+ * one; `now` is the wall clock a ticket's renewal is set by.
+ */
 export const createMediaAccess = ({
   calls,
   serverOf,
   probe,
+  probeClock,
   now,
   warn,
 }: {
   calls: Pick<ServerCalls, 'call'>
   serverOf: (serverId: string) => ServerEntry | null
   probe: ProbeFetch
+  probeClock: () => number
   now: () => number
   warn: (message: string) => void
 }): MediaAccess => {
   /** The pick is held as a promise so two files asking at once share one read and one probe. */
   let picks: ReadonlyMap<string, Promise<MediaOrigin | null>> = new Map()
-
-  const probeOne = async (origin: MediaOrigin): Promise<Probe> => {
-    const url = `${origin.url}/api/media-origins/ping?${toQueryString({ bytes: String(MEDIA_PROBE_BYTES) })}`
-    const answer = await probe({ url, timeoutMs: PROBE_TIMEOUT_MS })
-    return { origin, ...answer }
-  }
 
   /** A log line never fails an access: the pick it belongs to is held for good. */
   const safeWarn = (message: string): void => {
@@ -199,10 +231,16 @@ export const createMediaAccess = ({
       )
     }
     const settled = await Promise.allSettled(
-      checked.flatMap((entry) => (entry.trusted === null ? [] : [probeOne(entry.trusted)])),
+      checked.flatMap((entry) =>
+        entry.trusted === null
+          ? []
+          : [measureOrigin({ origin: entry.trusted, probe, clock: probeClock })],
+      ),
     )
-    return pickReachable(
-      settled.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
+    return pickOrigin(
+      settled.flatMap((result) =>
+        result.status === 'fulfilled' && result.value !== null ? [result.value] : [],
+      ),
     )
   }
 
