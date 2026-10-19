@@ -8,12 +8,14 @@ import {
   type DisplaySettings,
   type ItemDetails,
   type Library,
+  type Saga,
+  DEFAULT_SAGA_BACKDROP,
 } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { MoviePage } from '@/pages/MoviePage/MoviePage'
-import { itemDetails, library, matchedMovie } from '@/test/fixtures'
+import { itemDetails, itemSummary, library, matchedMovie } from '@/test/fixtures'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
@@ -25,6 +27,7 @@ describe('MoviePage', () => {
     item: spyOn(api, 'getItem'),
     libraries: spyOn(api, 'listLibraries'),
     tracks: spyOn(api, 'getTracks'),
+    sagas: spyOn(api, 'listSagas'),
   }
 
   const open = ({
@@ -33,15 +36,18 @@ describe('MoviePage', () => {
     display = DEFAULT_DISPLAY_SETTINGS,
     adminLock,
     libraries = [library({ id: 2, name: 'Films' })],
+    sagas = [],
   }: {
     details: ItemDetails
     route?: string
     display?: DisplaySettings
     adminLock?: AdminLock
     libraries?: Library[]
+    sagas?: Saga[]
   }) => {
     spies.item.mockImplementation(async () => details)
     spies.libraries.mockImplementation(async () => libraries)
+    spies.sagas.mockImplementation(async () => sagas)
     spies.tracks.mockImplementation(async () => ({
       audio: [{ index: 0, codec: 'eac3', channels: 6, language: 'en', title: null, default: true }],
       subtitles: [
@@ -89,6 +95,7 @@ describe('MoviePage', () => {
     spies.item.mockReset()
     spies.libraries.mockReset()
     spies.tracks.mockReset()
+    spies.sagas.mockReset()
   })
 
   it('stands in for the movie while it is read, saying so to a screen reader', async () => {
@@ -118,6 +125,35 @@ describe('MoviePage', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('Every table has a story.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Films' })).toHaveAttribute('href', '/libraries/2')
+  })
+
+  it('links a movie in a saga to the saga, saying which part it is', async () => {
+    const part = (id: number) =>
+      matchedMovie({
+        id,
+        libraryId: 2,
+        item: itemSummary({ id: id * 10, posterVersion: `p${id}` }),
+      })
+    open({
+      details: itemDetails({ id: 40 }),
+      sagas: [
+        {
+          tmdbId: '119',
+          name: 'The Busboys Collection',
+          backdrop: DEFAULT_SAGA_BACKDROP,
+          media: [part(3), part(4), part(5)],
+        },
+      ],
+    })
+    const link = await screen.findByRole('link', { name: /The Busboys Collection/ })
+    expect(link).toHaveAttribute('href', '/libraries/2/sagas/119')
+    expect(link).toHaveTextContent('Part 2 of 3 in the saga')
+  })
+
+  it('shows no saga link for a movie that is in none', async () => {
+    open({ details: itemDetails() })
+    await screen.findByRole('heading', { level: 1, name: 'Busboys' })
+    expect(screen.queryByText(/in the saga/)).toBeNull()
   })
 
   it('shows the scores the movie has, leaving out the sources that have none', async () => {
