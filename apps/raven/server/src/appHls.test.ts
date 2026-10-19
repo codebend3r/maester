@@ -375,7 +375,11 @@ describe('the HLS route', () => {
 
   it('names the codec of the audio track asked for', async () => {
     const aac = await get({
-      url: masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, query: { audio: '1' } }),
+      url: masterUrl({
+        clip: 'rich',
+        mode: PLAYBACK_MODES.remux,
+        query: { [HLS_PARAMS.audio]: '1' },
+      }),
     })
     expect(attributeOf({ playlist: decodedBody(aac).toString(), name: 'CODECS' })).toBe(
       'avc1.640028,mp4a.40.2',
@@ -385,13 +389,22 @@ describe('the HLS route', () => {
   it('refuses a bad mode, audio track or quality with 400', async () => {
     const asked = await Promise.all(
       [
-        masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux }).replace(
-          'mode=remux',
-          'mode=direct',
-        ),
-        masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, query: { audio: '7' } }),
-        masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, query: { quality: 'low720' } }),
-        masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.transcode, query: { quality: 'huge' } }),
+        masterUrl({
+          clip: 'rich',
+          mode: PLAYBACK_MODES.remux,
+          query: { [HLS_PARAMS.mode]: PLAYBACK_MODES.direct },
+        }),
+        masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, query: { [HLS_PARAMS.audio]: '7' } }),
+        masterUrl({
+          clip: 'rich',
+          mode: PLAYBACK_MODES.remux,
+          query: { [HLS_PARAMS.quality]: 'low720' },
+        }),
+        masterUrl({
+          clip: 'rich',
+          mode: PLAYBACK_MODES.transcode,
+          query: { [HLS_PARAMS.quality]: 'huge' },
+        }),
       ].map((url) => get({ url })),
     )
     expect(asked.map(({ statusCode }) => statusCode)).toEqual([400, 400, 400, 400])

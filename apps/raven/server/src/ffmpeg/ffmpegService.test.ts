@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { readServerConfig } from '@/config'
 import { DEFAULT_PLAYBACK_SETTINGS, type HwAccel } from '@raven/core'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
+import { RUN_SIGNALS } from '@/hls/segmentRun'
 
 describe('FfmpegService', () => {
   const state = { dir: '' }
@@ -95,7 +96,7 @@ describe('FfmpegService', () => {
 
     ffmpeg.onModuleDestroy()
 
-    expect(await closed).toBe('SIGKILL')
+    expect(await closed).toBe(RUN_SIGNALS.kill)
   })
 
   it("passes on ffprobe's own reason for a broken file", async () => {

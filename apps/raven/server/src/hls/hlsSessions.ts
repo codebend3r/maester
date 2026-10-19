@@ -240,7 +240,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
    * request's: once it aborts, the init is no longer waited for.
    */
   async init({ session, signal }: { session: string; signal?: AbortSignal }): Promise<Uint8Array> {
-    return this.cutInit({ entry: this.entryOf(session), mayStart: false, signal })
+    return this.cutInit({ entry: this.entryOf(session), canStart: false, signal })
   }
 
   /**
@@ -371,31 +371,31 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
 
   private async cutInit({
     entry,
-    mayStart,
+    canStart,
     signal,
   }: {
     entry: Entry
-    mayStart: boolean
+    canStart: boolean
     signal: AbortSignal | undefined
   }): Promise<Uint8Array> {
     const step = await this.inTurn({
       entry,
       work: async () => {
         signal?.throwIfAborted()
-        return this.initStep({ entry, mayStart })
+        return this.initStep({ entry, canStart })
       },
     })
     if (step.kind === STEPS.ready) return step.value
     const hasTimedOut = await this.timedOut(untilOrGone({ until: step.until, signal }))
-    return this.cutInit({ entry, mayStart: hasTimedOut, signal })
+    return this.cutInit({ entry, canStart: hasTimedOut, signal })
   }
 
   private async initStep({
     entry,
-    mayStart,
+    canStart,
   }: {
     entry: Entry
-    mayStart: boolean
+    canStart: boolean
   }): Promise<Step<Uint8Array>> {
     if (entry.init) return ready(entry.init)
     if (entry.initSource) {
@@ -406,7 +406,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     }
     const run = entry.run
     if (run && !run.hasStarted) return waitThenRetry(run.waitFor(run.from))
-    if (!mayStart) return { kind: STEPS.wait, until: this.nextLaunch(entry) }
+    if (!canStart) return { kind: STEPS.wait, until: this.nextLaunch(entry) }
     const fresh = await this.restart({ entry, from: 0 })
     return waitThenRetry(fresh.waitFor(0))
   }
