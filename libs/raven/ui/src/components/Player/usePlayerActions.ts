@@ -5,13 +5,13 @@ import type { MenuSection } from '@/components/Player/menus'
 import { preferredSubtitle } from '@/components/Player/selection'
 import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
 import {
+  languageName,
   PLAYER_ACTIONS,
   type PlayerAction,
   SEEK_EDGES,
   stepCaptionScale,
   stepSpeed,
-} from '@/lib/shortcuts'
-import { languageName } from '@raven/core'
+} from '@raven/core'
 import { useHostServices } from '@/stores/playerServices'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 

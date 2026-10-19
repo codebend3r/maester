@@ -1,3 +1,4 @@
+import { type PlayerAction } from '@raven/core'
 import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
@@ -23,7 +24,6 @@ import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
 import { initialVideoState, videoReducer } from '@/components/Player/useVideoState'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
-import type { PlayerAction } from '@/lib/shortcuts'
 import { api } from '@/test/api'
 import { renderWithProviders } from '@/test/render'
 import { usePlayerPrefs } from '@/stores/playerPrefs'

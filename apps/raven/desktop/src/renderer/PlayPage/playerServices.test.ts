@@ -1,5 +1,5 @@
+import { type PlayerAction } from '@raven/core'
 import { describe, expect, it, mock, spyOn } from 'bun:test'
-import type { PlayerAction } from '@raven/ui'
 import { createMenuHub } from '@/renderer/desktop/menuHub'
 import {
   ENGINE_NOTES,

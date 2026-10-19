@@ -5,7 +5,7 @@ import {
   shortcutRows,
   stepCaptionScale,
   stepSpeed,
-} from '@/lib/shortcuts'
+} from '@/shortcuts'
 
 const press = ({
   key,

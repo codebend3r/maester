@@ -1,4 +1,4 @@
-import { type DesignToken, TOKEN_GROUPS } from '@raven/ui'
+import { type DesignToken, TOKEN_GROUPS } from '@raven/core'
 
 /** The tokens in ui's `globals.scss` that get a sample of their own. */
 const SAMPLED_TOKENS = {

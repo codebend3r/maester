@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEFAULT_THEME, THEMES, isThemeId, themeOf } from '@/lib/themes'
-import { parseTokens } from '@/lib/tokens'
+import { DEFAULT_THEME, THEMES, parseTokens } from '@raven/core'
 
-const styles = join(import.meta.dir, '..', 'styles')
+const styles = import.meta.dir
 const globals = readFileSync(join(styles, 'globals.scss'), 'utf8')
 const themes = readFileSync(join(styles, 'themes.scss'), 'utf8')
 
@@ -43,12 +42,5 @@ describe('THEMES', () => {
       const block = themes.slice(start, themes.indexOf('\n}', start))
       expect(block).toContain(`color-scheme: ${theme.tone};`)
     })
-  })
-
-  it('knows its ids and nothing else', () => {
-    expect(isThemeId('patina')).toBe(true)
-    expect(isThemeId('sepia')).toBe(false)
-    expect(isThemeId(null)).toBe(false)
-    expect(themeOf('mint').name).toBe('Mint')
   })
 })

@@ -1,7 +1,7 @@
+import { shortcutRows } from '@raven/core'
 import { useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import styles from '@/components/Player/ShortcutsDialog.module.scss'
-import { shortcutRows } from '@/lib/shortcuts'
 
 /**
  * The `?` list, as a modal <dialog>: the browser traps focus inside it and

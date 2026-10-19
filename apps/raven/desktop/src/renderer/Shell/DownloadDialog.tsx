@@ -1,5 +1,5 @@
-import { formatBytes } from '@raven/core'
-import { Button, KEYS, UNLOCK_SECRETS, type UnlockSecret, UnlockDialog } from '@raven/ui'
+import { formatBytes, KEYS } from '@raven/core'
+import { Button, UNLOCK_SECRETS, type UnlockSecret, UnlockDialog } from '@raven/ui'
 import {
   type FormEvent,
   type KeyboardEvent,

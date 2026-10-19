@@ -1,11 +1,7 @@
-import {
-  SUBTITLE_SOURCES,
-  type AudioTrack,
-  type SubtitleTrack,
-  languageName,
-  codecLabel,
-  formatChannels,
-} from '@raven/core'
+import { SUBTITLE_SOURCES, type AudioTrack, type SubtitleTrack } from '@/contract'
+import { formatChannels } from '@/format'
+import { languageName } from '@/languageName'
+import { codecLabel } from '@/playback'
 
 /** How a track reads in a menu: a name, then the details in a quieter line. */
 export type TrackLabel = { name: string; details: string }

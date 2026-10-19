@@ -14,6 +14,7 @@ import {
   formatFrameRate,
   formatSampleRate,
   resolutionLabel,
+  audioLabel,
 } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useId, useState } from 'react'
@@ -23,7 +24,6 @@ import { stepDownNote } from '@/components/Player/playbackFacts'
 import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/PlaybackInfo.module.scss'
 import { playerQueriesFor } from '@/lib/playerQueries'
-import { audioLabel } from '@/lib/trackLabels'
 
 /** How often the live figures are read again. */
 const REFRESH_MS = 1000

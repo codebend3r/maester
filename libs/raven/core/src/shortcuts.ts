@@ -1,4 +1,4 @@
-import { KEYS } from '@/lib/keyboard'
+import { KEYS } from '@/keys'
 
 export const PLAYER_ACTIONS = {
   togglePlay: 'togglePlay',

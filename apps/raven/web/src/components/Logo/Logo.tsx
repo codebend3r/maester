@@ -1,4 +1,4 @@
-import { themeOf } from '@raven/ui'
+import { themeOf } from '@raven/core'
 import { useTheme } from '@/stores/theme'
 import styles from '@/components/Logo/Logo.module.scss'
 

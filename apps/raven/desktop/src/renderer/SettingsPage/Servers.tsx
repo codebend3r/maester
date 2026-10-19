@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
-import { Button, KEYS } from '@raven/ui'
+import { KEYS } from '@raven/core'
+import { Button } from '@raven/ui'
 import { useDownloads } from '@/renderer/desktop/downloadsApi'
 import { SERVERS_KEY, useServers } from '@/renderer/desktop/serverApi'
 import styles from '@/renderer/SettingsPage/Servers.module.scss'

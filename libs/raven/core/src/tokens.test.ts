@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { contrastRatio, parseTokens } from '@/lib/tokens'
+import { contrastRatio, parseTokens } from '@/tokens'
 
 const SCSS = `
 // The palette.

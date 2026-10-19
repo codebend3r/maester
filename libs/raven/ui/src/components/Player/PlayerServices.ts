@@ -1,6 +1,5 @@
-import type { PlayerErrorReason } from '@raven/core'
+import type { PlayerAction, PlayerErrorReason } from '@raven/core'
 import type { IconName } from '@/components/Icon/Icon'
-import type { PlayerAction } from '@/lib/shortcuts'
 
 export type ProgressSink = {
   started: () => void
