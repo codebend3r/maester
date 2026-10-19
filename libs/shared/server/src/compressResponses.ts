@@ -10,7 +10,7 @@ import { CONTENT_TYPES, HEADERS } from '@/http'
 const COMPRESSIBLE = /^text\/(?!event-stream)|[+/](?:json|xml)(?:;|$)/u
 
 const isCompressible = (type: string): boolean =>
-  COMPRESSIBLE.test(type) || type.split(';', 1)[0]?.trim() === CONTENT_TYPES.m3u8
+  COMPRESSIBLE.test(type) || (type.split(';', 1)[0]?.trim() ?? '') === CONTENT_TYPES.m3u8
 
 /** The content codings offered, in order of preference. */
 export const ENCODINGS = { br: 'br', gzip: 'gzip' } as const

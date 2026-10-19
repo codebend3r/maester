@@ -122,7 +122,7 @@ describe('the HLS route', () => {
   }
   const ticketFor = (id: number): string => app().get(MediaTickets).issue({ id }).ticket
 
-  const get = (url: string, cookie?: string) =>
+  const get = ({ url, cookie }: { url: string; cookie?: string }) =>
     app().inject({
       method: 'GET',
       url,
@@ -154,14 +154,14 @@ describe('the HLS route', () => {
 
   /** The master playlist and the URIs in it, asked for with a ticket. */
   const master = async ({ clip, mode }: { clip: Clip; mode: StreamMode }) => {
-    const response = await get(masterUrl({ clip, mode }))
+    const response = await get({ url: masterUrl({ clip, mode }) })
     expect(response.statusCode).toBe(200)
     const playlist = decodedBody(response).toString()
     return { playlist, uris: urisIn(playlist) }
   }
 
   const playlistAt = async (uri: string) => {
-    const response = await get(uri)
+    const response = await get({ url: uri })
     expect(response.statusCode).toBe(200)
     expect(response.headers[HEADERS.contentType]).toBe(CONTENT_TYPES.m3u8)
     const playlist = decodedBody(response).toString()
@@ -250,7 +250,9 @@ describe('the HLS route', () => {
 
   it('opens a remux with one variant, and carries the ticket on every URI', async () => {
     const ticket = ticketFor(state.ids.rich)
-    const response = await get(masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, ticket }))
+    const response = await get({
+      url: masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, ticket }),
+    })
 
     expect(response.statusCode).toBe(200)
     expect(response.headers[HEADERS.contentType]).toBe(CONTENT_TYPES.m3u8)
@@ -276,10 +278,10 @@ describe('the HLS route', () => {
   })
 
   it('carries no ticket on the URIs of a playlist asked for with the cookie', async () => {
-    const response = await get(
-      masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, ticket: null }),
-      state.unlocked,
-    )
+    const response = await get({
+      url: masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, ticket: null }),
+      cookie: state.unlocked,
+    })
     expect(response.statusCode).toBe(200)
     const uris = urisIn(decodedBody(response).toString())
     expect(uris.length).toBeGreaterThan(0)
@@ -316,7 +318,9 @@ describe('the HLS route', () => {
 
   it('serves an init and segments that ffprobe reads, never compressed', async () => {
     const { uris } = await videoPlaylist({ clip: 'rich', mode: PLAYBACK_MODES.remux })
-    const [init, first, second] = await Promise.all(uris.slice(0, 3).map((uri) => get(uri)))
+    const [init, first, second] = await Promise.all(
+      uris.slice(0, 3).map((uri) => get({ url: uri })),
+    )
 
     expect(init?.statusCode).toBe(200)
     expect(init?.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.mp4)
@@ -364,15 +368,15 @@ describe('the HLS route', () => {
     expect(playlist).toContain('#EXT-X-INDEPENDENT-SEGMENTS')
     expect(attributeOf({ playlist, name: 'CODECS' })).toBe('avc1.640028,ac-3')
     const variant = await playlistAt(uris.find((uri) => uri.includes('/video.m3u8')) ?? '')
-    const segment = await get(variant.uris[1] ?? '')
+    const segment = await get({ url: variant.uris[1] ?? '' })
     expect(segment.statusCode).toBe(200)
     expect(segment.rawPayload.subarray(4, 8).toString()).toBe('moof')
   })
 
   it('names the codec of the audio track asked for', async () => {
-    const aac = await get(
-      masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, query: { audio: '1' } }),
-    )
+    const aac = await get({
+      url: masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, query: { audio: '1' } }),
+    })
     expect(attributeOf({ playlist: decodedBody(aac).toString(), name: 'CODECS' })).toBe(
       'avc1.640028,mp4a.40.2',
     )
@@ -388,7 +392,7 @@ describe('the HLS route', () => {
         masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, query: { audio: '7' } }),
         masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, query: { quality: 'low720' } }),
         masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.transcode, query: { quality: 'huge' } }),
-      ].map((url) => get(url)),
+      ].map((url) => get({ url })),
     )
     expect(asked.map(({ statusCode }) => statusCode)).toEqual([400, 400, 400, 400])
   })
@@ -397,7 +401,7 @@ describe('the HLS route', () => {
     const statuses = async () =>
       Promise.all(
         [PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode].map(
-          async (mode) => (await get(masterUrl({ clip: 'rich', mode }))).statusCode,
+          async (mode) => (await get({ url: masterUrl({ clip: 'rich', mode }) })).statusCode,
         ),
       )
     try {
@@ -421,7 +425,7 @@ describe('the HLS route', () => {
     const segmentOf = async (n: number) => {
       const { uris } = await videoPlaylist({ clip: 'late', mode: PLAYBACK_MODES.transcode })
       const [init, segment] = await Promise.all(
-        [uris[0] ?? '', uris[n + 1] ?? ''].map((uri) => get(uri)),
+        [uris[0] ?? '', uris[n + 1] ?? ''].map((uri) => get({ url: uri })),
       )
       const path = join(state.root, `late-transcode-${n}.mp4`)
       await writeFile(
@@ -456,7 +460,10 @@ describe('the HLS route', () => {
     )
     try {
       const url = `/api/media/${state.ids.warm}/tracks`
-      const [first, second] = [await get(url, state.unlocked), await get(url, state.unlocked)]
+      const [first, second] = [
+        await get({ url, cookie: state.unlocked }),
+        await get({ url, cookie: state.unlocked }),
+      ]
 
       expect([first.statusCode, second.statusCode]).toEqual([200, 200])
       expect(spy).toHaveBeenCalledTimes(1)
@@ -472,7 +479,9 @@ describe('the HLS route', () => {
       .spyOn(app().get(FfmpegService), 'probeKeyframes')
       .mockRejectedValue(new Error('ffprobe could not read the file'))
     try {
-      const response = await get(masterUrl({ clip: 'broadcast', mode: PLAYBACK_MODES.transcode }))
+      const response = await get({
+        url: masterUrl({ clip: 'broadcast', mode: PLAYBACK_MODES.transcode }),
+      })
 
       expect(response.statusCode).toBe(200)
       expect(spy).toHaveBeenCalledTimes(1)
@@ -490,7 +499,9 @@ describe('the HLS route', () => {
         }),
     )
     try {
-      const response = await get(masterUrl({ clip: 'broadcast', mode: PLAYBACK_MODES.transcode }))
+      const response = await get({
+        url: masterUrl({ clip: 'broadcast', mode: PLAYBACK_MODES.transcode }),
+      })
 
       expect(response.statusCode).toBe(200)
       expect(spy).toHaveBeenCalledTimes(1)
@@ -501,8 +512,8 @@ describe('the HLS route', () => {
   })
 
   it('answers 409 to a remux of a file with keyframes 25 seconds apart, and transcodes it', async () => {
-    const remux = await get(masterUrl({ clip: 'gap', mode: PLAYBACK_MODES.remux }))
-    const transcode = await get(masterUrl({ clip: 'gap', mode: PLAYBACK_MODES.transcode }))
+    const remux = await get({ url: masterUrl({ clip: 'gap', mode: PLAYBACK_MODES.remux }) })
+    const transcode = await get({ url: masterUrl({ clip: 'gap', mode: PLAYBACK_MODES.transcode }) })
     expect([remux.statusCode, transcode.statusCode]).toEqual([409, 200])
   })
 
@@ -525,7 +536,7 @@ describe('the HLS route', () => {
         `${base}/${session}/subtitles/embedded-0/99${ticket}`,
         // A session of one video is not another's.
         `/api/media/${state.ids.late}/hls/${session}/video.m3u8${otherTicket}`,
-      ].map((url) => get(url)),
+      ].map((url) => get({ url })),
     )
     expect(asked.map(({ statusCode }) => statusCode)).toEqual(asked.map(() => 404))
   })
@@ -533,8 +544,8 @@ describe('the HLS route', () => {
   it('refuses a ticket for another video: 423, or 404 under the admin lock', async () => {
     const wrong = ticketFor(state.ids.gap)
     const url = masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, ticket: wrong })
-    expect((await get(url, state.admin)).statusCode).toBe(423)
-    expect((await get(url)).statusCode).toBe(404)
+    expect((await get({ url, cookie: state.admin })).statusCode).toBe(423)
+    expect((await get({ url })).statusCode).toBe(404)
   })
 
   it("serves a sidecar's cues six seconds at a time, on the file's own clock", async () => {
@@ -545,7 +556,9 @@ describe('the HLS route', () => {
     )
     expect(subtitles.playlist).toContain(`#EXT-X-TARGETDURATION:6`)
 
-    const [first, second] = await Promise.all(subtitles.uris.slice(0, 2).map((uri) => get(uri)))
+    const [first, second] = await Promise.all(
+      subtitles.uris.slice(0, 2).map((uri) => get({ url: uri })),
+    )
     const texts = [first, second].map((response) => {
       expect(response?.statusCode).toBe(200)
       expect(response?.headers[HEADERS.contentType]).toBe(CONTENT_TYPES.vtt)
@@ -578,7 +591,7 @@ describe('the HLS route', () => {
     const subtitles = await playlistAt(
       uris.find((uri) => uri.includes('/subtitles/embedded-0')) ?? '',
     )
-    const third = await get(subtitles.uris[2] ?? '')
+    const third = await get({ url: subtitles.uris[2] ?? '' })
     const cues = parseWebVtt(decodedBody(third).toString())
     // The cue is 12.5 s after the first frame, wherever the muxer that wrote the clip put that.
     const firstFrame = await ffprobe({

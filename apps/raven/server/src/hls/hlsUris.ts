@@ -31,7 +31,13 @@ export const sessionUris = ({
   session: Pick<HlsSession, 'id' | 'mediaId'>
   ticket: string | null
 }) => {
-  const of = (path: HlsPath, values: Readonly<Record<string, string>> = {}): string =>
+  const of = ({
+    path,
+    values = {},
+  }: {
+    path: HlsPath
+    values?: Readonly<Record<string, string>>
+  }): string =>
     hlsUri({
       path,
       values: {
@@ -42,11 +48,15 @@ export const sessionUris = ({
       ticket,
     })
   return {
-    video: of(HLS_PATHS.video),
-    init: of(HLS_PATHS.init),
-    segment: (n: number) => of(HLS_PATHS.segment, { [HLS_PARAMS.n]: String(n) }),
-    subtitles: (trackId: string) => of(HLS_PATHS.subtitles, { [HLS_PARAMS.trackId]: trackId }),
+    video: of({ path: HLS_PATHS.video }),
+    init: of({ path: HLS_PATHS.init }),
+    segment: (n: number) => of({ path: HLS_PATHS.segment, values: { [HLS_PARAMS.n]: String(n) } }),
+    subtitles: (trackId: string) =>
+      of({ path: HLS_PATHS.subtitles, values: { [HLS_PARAMS.trackId]: trackId } }),
     subtitleSegment: ({ trackId, n }: { trackId: string; n: number }) =>
-      of(HLS_PATHS.subtitleSegment, { [HLS_PARAMS.trackId]: trackId, [HLS_PARAMS.n]: String(n) }),
+      of({
+        path: HLS_PATHS.subtitleSegment,
+        values: { [HLS_PARAMS.trackId]: trackId, [HLS_PARAMS.n]: String(n) },
+      }),
   }
 }
