@@ -12,6 +12,7 @@ import {
   keyOf,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
+import { LOCAL } from '@/metadata/localItems'
 
 /** A library as stored, before the scanner's live status is merged in. */
 export type LibraryRecord = {
@@ -27,6 +28,16 @@ export type LibraryRecord = {
 
 /** When a library's last full scan and last quick scan finished; null before each has run. */
 export type ScanTimes = { fullScannedAt: string | null; quickScannedAt: string | null }
+
+/**
+ * A library's Refresh as stored: when the one under way began, null when
+ * none is; how many titles it asked for; and when the last one finished.
+ */
+export type RatingsRefreshRecord = {
+  startedAt: string | null
+  total: number
+  finishedAt: string | null
+}
 
 type LibraryRow = {
   id: number
@@ -49,6 +60,19 @@ type LibraryRow = {
 }
 
 const isSettingName = keyOf(isLibrarySettings.shape)
+
+/**
+ * Asks for fresh scores for each movie and show a library holds, reached up
+ * from its files through their episodes and seasons, but those raven made up.
+ */
+const REQUEST_SCORES = `WITH RECURSIVE up(id) AS (
+    SELECT mi.item_id FROM media m JOIN media_items mi ON mi.media_id = m.id
+     WHERE m.library_id = @id
+    UNION SELECT i.parent_id FROM items i JOIN up ON i.id = up.id
+     WHERE i.parent_id IS NOT NULL)
+  INSERT OR IGNORE INTO score_requests (library_id, item_id)
+  SELECT @id, i.id FROM up JOIN items i ON i.id = up.id
+   WHERE i.type IN ('movie', 'show') AND i.tmdb_id NOT GLOB @local`
 
 /** A 4K frame, as `resolutionLabel` in `@raven/core` reads one: scope encodes shave height, so width counts too. */
 const IS_4K = '(m.width >= 3200 OR m.height >= 1800)'
@@ -239,6 +263,68 @@ export class LibrariesRepository {
   /** When a quick scan of the library finished, kept so a restart does not forget it. */
   markQuickScan({ id, at }: { id: number; at: string }): void {
     this.db.prepare('UPDATE libraries SET quick_scanned_at = ? WHERE id = ?').run(at, id)
+  }
+
+  /**
+   * Begins a Refresh at `at`, asking for fresh scores for each of the
+   * library's movies and shows when `shouldAsk`, in one transaction so no
+   * request is ever left without its start. One that asks for nothing
+   * finishes at once. Answers how many titles it asked for.
+   */
+  startRatingsRefresh({
+    id,
+    at,
+    shouldAsk,
+  }: {
+    id: number
+    at: string
+    shouldAsk: boolean
+  }): number {
+    return this.db.transaction(() => {
+      const total = shouldAsk
+        ? this.db.prepare(REQUEST_SCORES).run({ id, local: `${LOCAL}*` }).changes
+        : 0
+      this.db
+        .prepare(
+          'UPDATE libraries SET ratings_refresh_started_at = ?, ratings_refresh_total = ? WHERE id = ?',
+        )
+        .run(at, total, id)
+      if (total === 0) this.finishRatingsRefreshes(at)
+      return total
+    })()
+  }
+
+  /** The library's Refresh as it was left, across restarts; none for a library that is not there. */
+  ratingsRefresh(id: number): RatingsRefreshRecord {
+    const row = this.db
+      .prepare<
+        [number],
+        {
+          ratings_refresh_started_at: string | null
+          ratings_refresh_total: number
+          ratings_refreshed_at: string | null
+        }
+      >(
+        `SELECT ratings_refresh_started_at, ratings_refresh_total, ratings_refreshed_at
+           FROM libraries WHERE id = ?`,
+      )
+      .get(id)
+    return {
+      startedAt: row?.ratings_refresh_started_at ?? null,
+      total: row?.ratings_refresh_total ?? 0,
+      finishedAt: row?.ratings_refreshed_at ?? null,
+    }
+  }
+
+  /** Finishes, at `at`, each Refresh under way with no title left waiting. */
+  finishRatingsRefreshes(at: string): void {
+    this.db
+      .prepare(
+        `UPDATE libraries SET ratings_refreshed_at = ?, ratings_refresh_started_at = NULL
+          WHERE ratings_refresh_started_at IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM score_requests r WHERE r.library_id = libraries.id)`,
+      )
+      .run(at)
   }
 
   /** Each path a library keeps holds on to what a scan found it to be; a new one starts unread. */

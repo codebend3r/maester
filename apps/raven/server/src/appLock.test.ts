@@ -155,6 +155,20 @@ describe('a library locked behind the PIN', () => {
     })
   })
 
+  it("says where a locked library's Refresh stands while keeping the rest to itself", async () => {
+    const { cookie } = await unlock('3001')
+    const refreshed = await api(cookie).refreshLibrary(state.private)
+    await app().get(ScannerService).whenIdle(state.private)
+    await app().get(MetadataService).whenIdle()
+
+    const shown = await api().getLibrary(state.private)
+
+    expect(shown).toMatchObject({ paths: [], layouts: [], backdrop: null })
+    // Nothing could answer this server's Refresh, so it finished at once.
+    expect(refreshed.ratingsRefresh).toEqual({ state: 'idle', finishedAt: expect.any(String) })
+    expect(shown.ratingsRefresh).toEqual(refreshed.ratingsRefresh)
+  })
+
   it("says a locked library's scan failed without naming its folders", async () => {
     const id = await createLibrary({
       name: 'Gone',

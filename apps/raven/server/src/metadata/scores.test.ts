@@ -28,6 +28,7 @@ const fakeSource = ({
   const source: ScoreSource = {
     provider,
     enabled: () => state.enabled && state.remaining > 0,
+    hasUsableKey: () => state.enabled,
     remaining: () => state.remaining,
     state: () => 'ok',
     lookUp,

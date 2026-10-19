@@ -48,6 +48,8 @@ import {
   isPersonDetails,
   isPersonFilmography,
   isRating,
+  isRatingsRefresh,
+  isRefreshingRatings,
   isReview,
   isSeasonSummary,
   isServerEvent,
@@ -193,6 +195,61 @@ describe('isLibrary', () => {
     expect(isLibrary({ ...library(), settings: { ...library().settings, view: 'poster' } })).toBe(
       false,
     )
+  })
+
+  it('rejects a library that does not say where its ratings refresh stands', () => {
+    const { ratingsRefresh: _ratingsRefresh, ...withoutRefresh } = library()
+    expect(isLibrary(withoutRefresh)).toBe(false)
+  })
+})
+
+describe('isRatingsRefresh', () => {
+  const progress = { done: 2, total: 3, startedAt: '2026-10-17T09:00:00.000Z' }
+
+  it('accepts a refresh that is idle, running, or waiting for a reason until a time', () => {
+    expect(isRatingsRefresh({ state: 'idle', finishedAt: null })).toBe(true)
+    expect(isRatingsRefresh({ state: 'idle', finishedAt: '2026-10-17T10:00:00.000Z' })).toBe(true)
+    expect(isRatingsRefresh({ state: 'running', ...progress })).toBe(true)
+    expect(
+      isRatingsRefresh({
+        state: 'waiting',
+        ...progress,
+        reason: 'budget',
+        resumesAt: '2026-10-18T00:01:00.000Z',
+      }),
+    ).toBe(true)
+  })
+
+  it('rejects a waiting refresh with no time to resume or a reason it does not know', () => {
+    expect(isRatingsRefresh({ state: 'waiting', ...progress, reason: 'budget' })).toBe(false)
+    expect(
+      isRatingsRefresh({
+        state: 'waiting',
+        ...progress,
+        reason: 'tired',
+        resumesAt: '2026-10-18T00:01:00.000Z',
+      }),
+    ).toBe(false)
+    expect(isRatingsRefresh({ state: 'running', done: 2, total: 3 })).toBe(false)
+  })
+
+  it('counts a library as refreshing its ratings while one runs or waits', () => {
+    expect(isRefreshingRatings(library())).toBe(false)
+    expect(
+      isRefreshingRatings(library({ ratingsRefresh: { state: 'running', ...progress } })),
+    ).toBe(true)
+    expect(
+      isRefreshingRatings(
+        library({
+          ratingsRefresh: {
+            state: 'waiting',
+            ...progress,
+            reason: 'unavailable',
+            resumesAt: '2026-10-17T09:15:00.000Z',
+          },
+        }),
+      ),
+    ).toBe(true)
   })
 })
 

@@ -12,7 +12,8 @@ const NAMES = { omdb: 'OMDb', mdblist: 'MDBList' } as const satisfies Record<Sco
  * key and today's calls allow. MDBList is asked first when it can be, and
  * OMDb only for a title MDBList does not know; without MDBList, or once its
  * calls for the day are spent, OMDb is asked. Each provider's answer is kept
- * as its own. A call that fails is noted on its client and tried again on a
+ * as its own, and the settler's also settles a Refresh's request for the
+ * title. A call that fails is noted on its client and tried again on a
  * later sweep.
  */
 @Injectable()
@@ -45,6 +46,18 @@ export class Scores {
       await this.ask({ source: this.omdb, itemId, title })
     }
     return answer != null
+  }
+
+  /**
+   * The source whose answer settles a Refresh's request for a title: MDBList
+   * while it has a usable key, its calls spent or not, as OMDb has no Rotten
+   * Tomatoes or Metacritic score for a show; else OMDb while it has one;
+   * else none, and TMDB's own score settles it.
+   */
+  settler(): ScoreSource | null {
+    if (this.mdblist.hasUsableKey()) return this.mdblist
+    if (this.omdb.hasUsableKey()) return this.omdb
+    return null
   }
 
   /** OMDb while MDBList is the primary and OMDb can be asked too: for the titles MDBList does not know. */
@@ -81,6 +94,7 @@ export class Scores {
         provider: source.provider,
         scores: answer === 'unknown' ? [] : answer,
       })
+      if (this.settler() === source) this.metadata.clearRequest(itemId)
       return answer
     } catch (error) {
       this.logger.warn(

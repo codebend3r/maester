@@ -1053,6 +1053,20 @@ export class TmdbClient {
     }
   }
 
+  /** A movie's or show's TMDB score alone, in one call with nothing appended; null when it has none. */
+  async score({
+    type,
+    tmdbId,
+  }: {
+    type: MatchItemType
+    tmdbId: string
+  }): Promise<FetchedItem['rating']> {
+    const body = await this.get({
+      path: `/${type === ITEM_TYPES.movie ? 'movie' : 'tv'}/${encodeURIComponent(tmdbId)}`,
+    })
+    return tmdbRating(record(body))
+  }
+
   /**
    * Every poster, backdrop and PNG logo TMDB holds for a movie or show, in
    * the language details come in and without text, most voted first.

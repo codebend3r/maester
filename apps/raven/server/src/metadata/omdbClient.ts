@@ -67,11 +67,12 @@ export class OmdbClient implements ScoreSource {
 
   /** Whether there is a key, it has not been refused, and today's calls are not spent. */
   enabled(): boolean {
-    return (
-      this.config.omdbApiKey != null &&
-      !this.status.refused &&
-      this.usedToday() < this.config.omdbDailyLimit
-    )
+    return this.hasUsableKey() && this.usedToday() < this.config.omdbDailyLimit
+  }
+
+  /** Whether there is a key it has not had refused, whether or not today's calls are spent. */
+  hasUsableKey(): boolean {
+    return this.config.omdbApiKey != null && !this.status.refused
   }
 
   /** How many calls are left today. */

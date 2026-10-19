@@ -204,21 +204,32 @@ Migration 28:
 - never overwrites an MDBList row with an OMDb one while MDBList's answer is under 30 days old. Past that, OMDb's answer replaces it, so scores from an MDBList key that has gone away do not freeze.
 
 **Topping up.** Due scores are topped up by a `ScoreSweep` on its own queue, never the metadata queue, within each provider's daily budget (`MDBLIST_DAILY_LIMIT`, default 1000):
+- It is kicked on start, after each matching pass and after each daily sweep.
 - It drains the main source's due titles, then OMDb's for the titles MDBList doesn't know.
 - OMDb is due for a title with an IMDb id when its own answer is missing or a month old, and MDBList's is too or MDBList gave the title no scores.
 - It wakes after UTC midnight whenever a spent source still has titles due.
 - A round stops after three failed calls in a row, and a round with failures and no answer ends the drain.
 - Later rounds and drains skip the titles a source failed on, until a drain gets an answer from that source or every title due from it has failed. Titles that keep failing at the head of the list then cost one call each per try, and each try reaches four titles further down.
-- It wakes 15 minutes after a drain that asked and got no answer at all. A drain that answered and left failures behind waits for the next kick: the daily sweep, or midnight when a budget is spent.
+- It wakes 15 minutes after a drain that asked and got no answer at all. A drain that answered and left failures behind waits for the next kick: a matching pass, the daily sweep, or midnight when a budget is spent. A Refresh's titles are the exception (section 5).
 
 **Health.** It reports `mdblist` beside `omdb`.
 
 ## 5. Refresh
 
 - **Route.** `POST /api/libraries/:id/refresh` (`@AdminOnly`) records the library's movies and shows in `score_requests` (migration 29), quick-scans the library and kicks the sweep. A second press while a refresh runs only quick-scans again.
-- **Order.** Requested titles go first in the sweep, past the 30-day wait, with a light TMDB score fetch.
+- **Order.** Requested titles go first in the sweep, past the 30-day wait, with a light TMDB score fetch. A request makes a title due from a provider until that provider answers after the Refresh began, so each provider is asked once a Refresh. The rule sits in the one predicate that both lists due titles and checks one, and a round that asks nothing while its source is still the one to ask ends the drain.
+- **Settling.** A request is settled by the source that can answer it in full:
+  - MDBList while its key is set and not refused, its calls spent or not. OMDb's answer on a day MDBList's calls are spent leaves the request, as OMDb has no Rotten Tomatoes or Metacritic score for a show.
+  - Else OMDb while its key is set and not refused.
+  - Else TMDB's score alone.
+
+  Should that source change mid-Refresh (a key refused or taken away), what the new one already answered since the Refresh began settles too.
+- **Retries.** A drain that leaves requests the settling source can still be asked for today wakes 15 minutes later, with the status `waiting` for `unavailable` until then, so a requested title that failed is asked again the same day: 15 minutes after a drain that got answers, which forgets its failures, and 30 minutes or more after one that got none, whose failures the next drain still skips.
+- **Giving up.** The settling source's failures on a requested title are counted at most once every 15 minutes, since a restart, so an outage or presses close together give nothing up. Once a title has three counted failures and the first of them is a day old or more, its request goes with a log line naming the item's id, and the title keeps the scores it had.
+- **Nothing to settle.** With no score source that has a usable key and TMDB off or refused, no request could ever settle, so a Refresh asks for nothing and its ratings part finishes at once while the quick scan runs. Should that come about mid-Refresh, say TMDB refusing the token of a server with no score source, every request goes with one log line, and the light TMDB fetch is not tried while TMDB is off or refused.
+- **Starting and finishing.** The requests and the Refresh's start are written in one transaction. A Refresh whose last request left outside the sweep (the title deleted, or settled by Refresh details) finishes when its status is next read, or when Refresh is pressed again, which then starts a new one.
 - **Status.** `Library.ratingsRefresh` is one of:
   - `idle` (`finishedAt`);
   - `running` (`done`, `total`, `startedAt`);
-  - `waiting` (also `reason`: `budget` or `unavailable`, and `resumesAt`).
+  - `waiting` (also `reason`: `budget` or `unavailable`, and `resumesAt`). `budget`, with midnight UTC, whenever the settling source's calls for the day are spent, even while the sweep waits on another source that failed, as nothing settles a request before then; else the sweep's own pause.
 - **Card and header.** Refresh shows beside Rescan, under the admin lock. The status line reads `Refreshing ratings · <done> of <total>`, or `Ratings: <done> of <total> · the rest after midnight UTC (daily limit)`.

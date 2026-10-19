@@ -1,19 +1,29 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Logger } from '@nestjs/common'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { isMediaList } from '@raven/core'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { DatabaseService } from '@/db/database'
+import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { RatingsRefresh } from '@/libraries/ratingsRefresh'
+import { MediaIndex } from '@/media/mediaIndex'
 import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MetadataService } from '@/metadata/metadataService'
 import type { ExternalScore, ScoreProvider, ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
 import { Scores } from '@/metadata/scores'
-import { GIVE_UP_AFTER, RETRY_MS, ScoreSweep } from '@/metadata/scoreSweep'
-import { BLANK_ITEM, type MetadataFetch } from '@/metadata/tmdbClient'
+import {
+  GIVE_UP_AFTER,
+  REQUEST_PATIENCE_MS,
+  REQUEST_TRIES,
+  RETRY_MS,
+  ScoreSweep,
+} from '@/metadata/scoreSweep'
+import { BLANK_ITEM, type MetadataFetch, type TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 import { ScannerService } from '@/scanner/scannerService'
-import { adminCookie, NOT_WATCHING, testConfig } from '@/test/app'
+import { adminCookie, holdOpen, NOT_WATCHING, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { testDatabase } from '@/test/database'
 import { fakeTmdb } from '@/test/fakeTmdb'
@@ -81,6 +91,7 @@ const fakeSource = ({
   const source: ScoreSource = {
     provider,
     enabled: () => hasKey && !state.isRefused && usedToday() < limit,
+    hasUsableKey: () => hasKey && !state.isRefused,
     remaining: () => Math.max(0, limit - usedToday()),
     state: () => {
       if (!hasKey) return 'off'
@@ -105,7 +116,14 @@ const rottenTomatoes = (value: number): ExternalScore => ({
   votes: null,
 })
 
+const imdb = (value: number): ExternalScore => ({ source: 'imdb', value, votes: 100 })
+
 const OMDB_OFF = () => fakeSource({ provider: 'omdb', answer: () => [], hasKey: false })
+
+const MDBLIST_OFF = () => fakeSource({ provider: 'mdblist', answer: () => [], hasKey: false })
+
+/** TMDB's own score for any title, as a Refresh fetches it beside the others. */
+const tmdbAnswering = () => vi.fn<TmdbClient['score']>(async () => ({ value: 7.5, votes: 40 }))
 
 /** The TMDB ids a source was asked about, in order. */
 const askedFor = (lookUp: ReturnType<typeof fakeSource>['lookUp']): string[] =>
@@ -115,11 +133,20 @@ describe('the score sweep', () => {
   const database = testDatabase('raven-score-sweep-')
   const metadata = () => repositories(database.get()).metadata
   const sweeps: ScoreSweep[] = []
-  const sweepWith = ({ omdb, mdblist }: { omdb: ScoreSource; mdblist: ScoreSource }) => {
+  const sweepWith = ({
+    omdb,
+    mdblist,
+    tmdb = { score: tmdbAnswering(), enabled: true },
+  }: {
+    omdb: ScoreSource
+    mdblist: ScoreSource
+    tmdb?: { score: ReturnType<typeof tmdbAnswering>; enabled: boolean }
+  }) => {
     const repository = metadata()
-    const sweep = new ScoreSweep(repository, new Scores(repository, omdb, mdblist))
+    const libraries = new LibrariesRepository(database.get())
+    const sweep = new ScoreSweep(repository, new Scores(repository, omdb, mdblist), libraries, tmdb)
     sweeps.push(sweep)
-    return { sweep, repository }
+    return { sweep, repository, libraries, tmdbScore: tmdb.score }
   }
   const title = ({
     type = 'movie',
@@ -151,6 +178,58 @@ describe('the score sweep', () => {
       .get(itemId)
   const isStamped = (itemIds: number[]): boolean[] =>
     itemIds.map((itemId) => stamps(itemId)?.mdblist != null)
+  const stampMdblist = ({ itemId, at }: { itemId: number; at: string }) =>
+    database
+      .get()
+      .db.prepare('UPDATE items SET mdblist_fetched_at = ? WHERE id = ?')
+      .run(at, itemId)
+  const tmdbScoreOf = (itemId: number): number | null =>
+    database
+      .get()
+      .db.prepare<[number], { value: number }>(
+        "SELECT value FROM ratings WHERE item_id = ? AND source = 'tmdb'",
+      )
+      .get(itemId)?.value ?? null
+  /** A library holding `itemIds`, each in a file of its own. */
+  const libraryHolding = (itemIds: number[]): number => {
+    const libraries = new LibrariesRepository(database.get())
+    const index = new MediaIndex(database.get())
+    const { id } = libraries.create({
+      name: 'Films',
+      paths: ['/films'],
+      settings: { kind: 'movies' },
+    })
+    itemIds.forEach((itemId) =>
+      metadata().link({
+        mediaIds: [
+          index.insert({
+            libraryId: id,
+            kind: 'movies',
+            file: { path: `/films/${itemId}.mkv`, root: '/films', size: 1, mtimeMs: 1 },
+          }),
+        ],
+        itemIds: [itemId],
+      }),
+    )
+    return id
+  }
+  /** A library holding `itemIds` whose Refresh asked for them now, as `RatingsRefresh.start` leaves it. */
+  const refresh = (itemIds: number[]): number => {
+    const id = libraryHolding(itemIds)
+    new LibrariesRepository(database.get()).startRatingsRefresh({
+      id,
+      at: new Date().toISOString(),
+      shouldAsk: true,
+    })
+    return id
+  }
+  const DOWN = () => new Error('MDBList could not be reached.')
+  const isFinished = (libraryId: number): boolean => {
+    const { startedAt, finishedAt } = new LibrariesRepository(database.get()).ratingsRefresh(
+      libraryId,
+    )
+    return startedAt == null && finishedAt != null
+  }
   /** Fake timers from 09:00 UTC, or `at`, so pauses read in whole times. */
   const fakeClock = (at = '2026-10-17T09:00:00.000Z'): void => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
@@ -164,6 +243,7 @@ describe('the score sweep', () => {
   afterAll(database.close)
   afterEach(() => {
     sweeps.splice(0).forEach((sweep) => sweep.onModuleDestroy())
+    database.get().db.prepare('DELETE FROM libraries').run()
     database.get().db.prepare('DELETE FROM items').run()
     vi.useRealTimers()
   })
@@ -620,19 +700,380 @@ describe('the score sweep', () => {
     expect(isStamped(titles)).toEqual([true, true])
     expect(sweep.pause()).toBeNull()
   })
-})
 
-/** A gate that holds a call until it is let go, and says once the call has reached it. */
-const holdOpen = () => {
-  const gate = { open: () => {}, reach: () => {} }
-  const opened = new Promise<void>((resolve) => {
-    gate.open = resolve
+  it("asks first for the titles a Refresh asked for, past the 30-day wait, with TMDB's own score", async () => {
+    fakeClock()
+    const [fresh = -1, requested = -1, never = -1] = movies(['1', '2', '3'])
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    stampMdblist({ itemId: fresh, at: yesterday })
+    stampMdblist({ itemId: requested, at: yesterday })
+    const libraryId = refresh([requested])
+    const mdblist = fakeSource({
+      provider: 'mdblist',
+      answer: () => [rottenTomatoes(9.1)],
+      limit: 1,
+    })
+    const { sweep, tmdbScore } = sweepWith({ omdb: OMDB_OFF().source, mdblist: mdblist.source })
+
+    sweep.kick()
+    await sweep.whenIdle()
+
+    // The title never asked about would come first, but for the one a Refresh asked for.
+    expect(askedFor(mdblist.lookUp)).toEqual(['2'])
+    expect(tmdbScore.mock.calls.map(([asked]) => asked.tmdbId)).toEqual(['2'])
+    expect([fresh, requested, never].map(tmdbScoreOf)).toEqual([null, 7.5, null])
+    expect(rows(requested)).toEqual([{ source: 'rottenTomatoes', value: 9.1, provider: 'mdblist' }])
+    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(isFinished(libraryId)).toBe(true)
   })
-  const reached = new Promise<void>((resolve) => {
-    gate.reach = resolve
+
+  it("keeps a request OMDb answers while MDBList is only out of calls, and settles it with MDBList's answer after midnight UTC", async () => {
+    fakeClock()
+    const shows = ['1', '2', '3'].map((tmdbId) => title({ type: 'show', tmdbId }))
+    const libraryId = refresh(shows)
+    const mdblist = fakeSource({
+      provider: 'mdblist',
+      answer: () => [rottenTomatoes(9.1)],
+      limit: 2,
+    })
+    const omdb = fakeSource({ provider: 'omdb', answer: () => [imdb(8)] })
+    const { sweep } = sweepWith({ omdb: omdb.source, mdblist: mdblist.source })
+
+    sweep.kick()
+    await sweep.whenIdle()
+
+    expect(mdblist.lookUp).toHaveBeenCalledTimes(2)
+    const [third = ''] = askedFor(omdb.lookUp)
+    expect(askedFor(mdblist.lookUp)).not.toContain(third)
+    expect(metadata().requestsLeft(libraryId)).toBe(1)
+    expect(isFinished(libraryId)).toBe(false)
+    expect(sweep.pause()).toBeNull()
+    expect(sweep.requestsPause()).toEqual({ reason: 'budget', resumesAt: MIDNIGHT })
+
+    await vi.advanceTimersByTimeAsync(untilJustBefore(MIDNIGHT) + 1000)
+    await sweep.whenIdle()
+    expect(askedFor(mdblist.lookUp).slice(2)).toEqual([third])
+    expect(omdb.lookUp).toHaveBeenCalledOnce()
+    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(isFinished(libraryId)).toBe(true)
+    expect(sweep.requestsPause()).toBeNull()
   })
-  return { gate, opened, reached }
-}
+
+  it("settles a request with OMDb's answer when MDBList has no key", async () => {
+    const [only = -1] = movies(['1'])
+    const libraryId = refresh([only])
+    const omdb = fakeSource({ provider: 'omdb', answer: () => [rottenTomatoes(5)] })
+    const { sweep } = sweepWith({ omdb: omdb.source, mdblist: MDBLIST_OFF().source })
+
+    sweep.kick()
+    await sweep.whenIdle()
+
+    expect(askedFor(omdb.lookUp)).toEqual(['1'])
+    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(isFinished(libraryId)).toBe(true)
+  })
+
+  it("settles a request with TMDB's score alone when no score source has a key", async () => {
+    const [only = -1] = movies(['1'])
+    const libraryId = refresh([only])
+    const { sweep, tmdbScore } = sweepWith({
+      omdb: OMDB_OFF().source,
+      mdblist: MDBLIST_OFF().source,
+    })
+
+    sweep.kick()
+    await sweep.whenIdle()
+
+    expect(tmdbScore).toHaveBeenCalledOnce()
+    expect(tmdbScoreOf(only)).toBe(7.5)
+    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(isFinished(libraryId)).toBe(true)
+    expect(sweep.pause()).toBeNull()
+  })
+
+  it('asks a requested title that failed again 15 minutes later, and finishes once it answers', async () => {
+    fakeClock()
+    const titles = movies(['1', '2', '3'])
+    const libraryId = refresh(titles)
+    const mdblist = fakeSource({
+      provider: 'mdblist',
+      answer: ({ tmdbId }) =>
+        tmdbId === '1' ? new Error('MDBList answered 500.') : [rottenTomatoes(9.1)],
+    })
+    const { sweep } = sweepWith({ omdb: OMDB_OFF().source, mdblist: mdblist.source })
+
+    sweep.kick()
+    await sweep.whenIdle()
+
+    expect(askedFor(mdblist.lookUp).toSorted()).toEqual(['1', '2', '3'])
+    expect(metadata().requestsLeft(libraryId)).toBe(1)
+    expect(sweep.requestsPause()).toEqual({
+      reason: 'unavailable',
+      resumesAt: new Date(Date.now() + RETRY_MS).toISOString(),
+    })
+
+    mdblist.state.answer = () => [rottenTomatoes(9.1)]
+    await vi.advanceTimersByTimeAsync(RETRY_MS - 1000)
+    expect(mdblist.lookUp).toHaveBeenCalledTimes(3)
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await sweep.whenIdle()
+    expect(askedFor(mdblist.lookUp).slice(3)).toEqual(['1'])
+    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(isFinished(libraryId)).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(2 * RETRY_MS)
+    expect(mdblist.lookUp).toHaveBeenCalledTimes(4)
+  })
+
+  it('gives up a requested title MDBList always fails on only after a day, keeping its scores, and finishes', async () => {
+    fakeClock()
+    const [failing = -1, other = -1] = movies(['1', '2'])
+    metadata().saveScores({ itemId: failing, provider: 'mdblist', scores: [rottenTomatoes(7)] })
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    stampMdblist({ itemId: failing, at: yesterday })
+    stampMdblist({ itemId: other, at: yesterday })
+    const libraryId = refresh([failing, other])
+    const mdblist = fakeSource({
+      provider: 'mdblist',
+      answer: ({ tmdbId }) =>
+        tmdbId === '1' ? new Error('MDBList answered 500.') : [rottenTomatoes(9.1)],
+    })
+    const { sweep } = sweepWith({ omdb: OMDB_OFF().source, mdblist: mdblist.source })
+    const tries = () => askedFor(mdblist.lookUp).filter((tmdbId) => tmdbId === '1').length
+
+    sweep.kick()
+    await sweep.whenIdle()
+    expect(tries()).toBe(1)
+
+    // Asked 15 minutes after a drain that answered, 30 after one that did not.
+    await vi.advanceTimersByTimeAsync(REQUEST_PATIENCE_MS - RETRY_MS)
+    expect(tries()).toBeGreaterThan(REQUEST_TRIES)
+    expect(metadata().requestsLeft(libraryId)).toBe(1)
+
+    await vi.advanceTimersByTimeAsync(2 * RETRY_MS)
+    await sweep.whenIdle()
+    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(isFinished(libraryId)).toBe(true)
+    expect(rows(failing)).toEqual([{ source: 'rottenTomatoes', value: 7, provider: 'mdblist' }])
+
+    const given = tries()
+    await vi.advanceTimersByTimeAsync(4 * RETRY_MS)
+    expect(tries()).toBe(given)
+    expect(sweep.requestsPause()).toBeNull()
+  })
+
+  it('gives nothing up through a two-hour outage, and settles once MDBList answers again', async () => {
+    fakeClock()
+    const titles = movies(['1', '2'])
+    const libraryId = refresh(titles)
+    const mdblist = fakeSource({ provider: 'mdblist', answer: DOWN })
+    const { sweep } = sweepWith({ omdb: OMDB_OFF().source, mdblist: mdblist.source })
+
+    sweep.kick()
+    await sweep.whenIdle()
+    await vi.advanceTimersByTimeAsync(2 * 60 * 60 * 1000)
+    expect(mdblist.lookUp.mock.calls.length).toBeGreaterThan(2 * REQUEST_TRIES)
+    expect(metadata().requestsLeft(libraryId)).toBe(2)
+
+    mdblist.state.answer = () => [rottenTomatoes(9.1)]
+    await vi.advanceTimersByTimeAsync(2 * RETRY_MS)
+    await sweep.whenIdle()
+    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(isFinished(libraryId)).toBe(true)
+  })
+
+  it('gives nothing up for presses close together while MDBList is down', async () => {
+    fakeClock()
+    const titles = movies(['1', '2'])
+    const libraryId = libraryHolding(titles)
+    const mdblist = fakeSource({ provider: 'mdblist', answer: DOWN })
+    const { sweep, repository, libraries } = sweepWith({
+      omdb: OMDB_OFF().source,
+      mdblist: mdblist.source,
+    })
+    const refreshing = new RatingsRefresh(libraries, repository, { quickScan: vi.fn() }, sweep)
+
+    await Array.from({ length: 8 }).reduce<Promise<void>>(
+      (pressed) =>
+        pressed.then(() => {
+          refreshing.start(libraryId)
+          return sweep.whenIdle()
+        }),
+      Promise.resolve(),
+    )
+
+    expect(mdblist.lookUp.mock.calls.length).toBeGreaterThan(2 * REQUEST_TRIES)
+    expect(repository.requestsLeft(libraryId)).toBe(2)
+    expect(refreshing.status(libraryId)).toMatchObject({
+      state: 'waiting',
+      done: 0,
+      total: 2,
+      reason: 'unavailable',
+    })
+  })
+
+  it("says a Refresh waits for midnight UTC while MDBList's day is spent, though OMDb is down", async () => {
+    fakeClock()
+    refresh(movies(['1']))
+    const mdblist = fakeSource({ provider: 'mdblist', answer: () => [rottenTomatoes(9.1)] })
+    mdblist.spend()
+    const omdb = fakeSource({ provider: 'omdb', answer: () => new Error('OMDb answered 500.') })
+    const { sweep } = sweepWith({ omdb: omdb.source, mdblist: mdblist.source })
+
+    sweep.kick()
+    await sweep.whenIdle()
+
+    expect(omdb.lookUp).toHaveBeenCalledOnce()
+    expect(sweep.pause()?.reason).toBe('unavailable')
+    expect(sweep.requestsPause()).toEqual({ reason: 'budget', resumesAt: MIDNIGHT })
+  })
+
+  it('fetches no TMDB score while TMDB is off or refused, and logs nothing for it', async () => {
+    const [only = -1] = movies(['1'])
+    const libraryId = refresh([only])
+    const mdblist = fakeSource({ provider: 'mdblist', answer: () => [rottenTomatoes(9.1)] })
+    const score = vi.fn<TmdbClient['score']>(async () => {
+      throw new TmdbError({ kind: 'unauthorized', message: 'TMDB is not configured.' })
+    })
+    const warn = vi.spyOn(Logger.prototype, 'warn')
+    const { sweep } = sweepWith({
+      omdb: OMDB_OFF().source,
+      mdblist: mdblist.source,
+      tmdb: { score, enabled: false },
+    })
+
+    sweep.kick()
+    await sweep.whenIdle()
+
+    expect(score).not.toHaveBeenCalled()
+    expect(warn).not.toHaveBeenCalled()
+    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    warn.mockRestore()
+  })
+
+  it("leaves a title to the next round when the other title's call spent MDBList's day while TMDB answered", async () => {
+    const titles = movies(['1', '2'])
+    const libraryId = refresh(titles)
+    const events: string[] = []
+    const gate = { isHeld: true, open: () => {} }
+    const opened = new Promise<void>((resolve) => {
+      gate.open = resolve
+    })
+    const score = vi.fn<TmdbClient['score']>(async ({ tmdbId }) => {
+      events.push(`tmdb:${tmdbId}`)
+      if (tmdbId === '1' && gate.isHeld) await opened
+      return { value: 7.5, votes: 40 }
+    })
+    const mdblist = fakeSource({
+      provider: 'mdblist',
+      answer: ({ tmdbId }) => {
+        events.push(`mdblist:${tmdbId}`)
+        // This call is the day's last, as MDBList's own count of calls left can say.
+        mdblist.spend()
+        gate.isHeld = false
+        gate.open()
+        return [rottenTomatoes(9.1)]
+      },
+    })
+    const omdb = fakeSource({
+      provider: 'omdb',
+      answer: ({ tmdbId }) => {
+        events.push(`omdb:${tmdbId}`)
+        return [imdb(8)]
+      },
+    })
+    const { sweep } = sweepWith({
+      omdb: omdb.source,
+      mdblist: mdblist.source,
+      tmdb: { score, enabled: true },
+    })
+
+    sweep.kick()
+    await sweep.whenIdle()
+
+    // The first title is asked in OMDb's own round, with TMDB's score fetched again.
+    expect(events).toEqual(['tmdb:1', 'tmdb:2', 'mdblist:2', 'tmdb:1', 'omdb:1'])
+    expect(metadata().requestsLeft(libraryId)).toBe(1)
+  })
+
+  it('stops every Refresh with one log line once no source can settle it', async () => {
+    const titles = movies(['1', '2'])
+    const libraryId = refresh(titles)
+    // TMDB, the only source, has refused its token since the Refresh began.
+    const tmdb = { score: tmdbAnswering(), enabled: false }
+    const warn = vi.spyOn(Logger.prototype, 'warn')
+    const { sweep } = sweepWith({
+      omdb: OMDB_OFF().source,
+      mdblist: MDBLIST_OFF().source,
+      tmdb,
+    })
+
+    sweep.kick()
+    await sweep.whenIdle()
+
+    expect(tmdb.score).not.toHaveBeenCalled()
+    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(isFinished(libraryId)).toBe(true)
+    expect(warn).toHaveBeenCalledOnce()
+    warn.mockRestore()
+  })
+
+  it('asks once for a title two libraries hold, and finishes both Refreshes', async () => {
+    const [shared = -1] = movies(['1'])
+    const first = refresh([shared])
+    const second = refresh([shared])
+    const mdblist = fakeSource({ provider: 'mdblist', answer: () => [rottenTomatoes(9.1)] })
+    const { sweep } = sweepWith({ omdb: OMDB_OFF().source, mdblist: mdblist.source })
+
+    sweep.kick()
+    await sweep.whenIdle()
+
+    expect(mdblist.lookUp).toHaveBeenCalledOnce()
+    expect([first, second].map(isFinished)).toEqual([true, true])
+  })
+
+  it("settles the requests OMDb answered once MDBList's key is refused", async () => {
+    fakeClock()
+    const titles = movies(['1', '2'])
+    const libraryId = refresh(titles)
+    const mdblist = fakeSource({
+      provider: 'mdblist',
+      answer: () => [rottenTomatoes(9.1)],
+      limit: 1,
+    })
+    const omdb = fakeSource({ provider: 'omdb', answer: () => [rottenTomatoes(5)] })
+    const { sweep } = sweepWith({ omdb: omdb.source, mdblist: mdblist.source })
+
+    sweep.kick()
+    await sweep.whenIdle()
+    expect(omdb.lookUp).toHaveBeenCalledOnce()
+    expect(metadata().requestsLeft(libraryId)).toBe(1)
+
+    mdblist.refuse()
+    sweep.kick()
+    await sweep.whenIdle()
+
+    expect(omdb.lookUp).toHaveBeenCalledOnce()
+    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(isFinished(libraryId)).toBe(true)
+  })
+
+  it('ends a drain whose round asks nothing while its source is still the one to ask', async () => {
+    movies(['1', '2'])
+    const mdblist = fakeSource({ provider: 'mdblist', answer: () => [rottenTomatoes(9.1)] })
+    const { sweep, repository } = sweepWith({ omdb: OMDB_OFF().source, mdblist: mdblist.source })
+    vi.spyOn(repository, 'isScoreDue').mockReturnValue(false)
+    const lists = vi.spyOn(repository, 'scoresDue')
+
+    sweep.kick()
+    await sweep.whenIdle()
+
+    expect(mdblist.lookUp).not.toHaveBeenCalled()
+    expect(lists).toHaveBeenCalledOnce()
+    expect(sweep.pause()).toBeNull()
+  })
+})
 
 /** As a browser with the admin lock off, so the library can be added and scanned. */
 describe('the score sweep beside matching', () => {

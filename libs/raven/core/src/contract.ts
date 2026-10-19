@@ -443,6 +443,38 @@ export const isLibraryBackdrop = union(
 
 export type LibraryBackdrop = Infer<typeof isLibraryBackdrop>
 
+/**
+ * Where a library's Refresh of its ratings stands: `idle`, with when the
+ * last one finished; `running`, with how many of the titles it asked for
+ * are done; or `waiting`, for a source's calls to come back at midnight UTC
+ * (`budget`) or for a source to answer again (`unavailable`).
+ */
+export const RATINGS_REFRESH_STATES = {
+  idle: 'idle',
+  running: 'running',
+  waiting: 'waiting',
+} as const
+
+export const isRatingsRefresh = union(
+  object({ state: oneOf([RATINGS_REFRESH_STATES.idle]), finishedAt: nullable(isString) }),
+  object({
+    state: oneOf([RATINGS_REFRESH_STATES.running]),
+    done: isNumber,
+    total: isNumber,
+    startedAt: isString,
+  }),
+  object({
+    state: oneOf([RATINGS_REFRESH_STATES.waiting]),
+    done: isNumber,
+    total: isNumber,
+    startedAt: isString,
+    reason: oneOf(['budget', 'unavailable']),
+    resumesAt: isString,
+  }),
+)
+
+export type RatingsRefresh = Infer<typeof isRatingsRefresh>
+
 export const isLibrary = object({
   id: isNumber,
   name: isString,
@@ -463,9 +495,14 @@ export const isLibrary = object({
   settings: isLibrarySettings,
   /** null when no video has a picture yet, or while the library is locked to this browser. */
   backdrop: nullable(isLibraryBackdrop),
+  ratingsRefresh: isRatingsRefresh,
 })
 
 export type Library = Infer<typeof isLibrary>
+
+/** Whether a library's ratings are being fetched again, or are waiting to be. */
+export const isRefreshingRatings = (library: Library): boolean =>
+  library.ratingsRefresh.state !== 'idle'
 
 export const isLibraryList = listOf(isLibrary)
 

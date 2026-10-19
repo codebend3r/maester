@@ -35,6 +35,18 @@ export const eventually = async <T>({
   return poll()
 }
 
+/** A gate that holds a call until it is let go, and says once the call has reached it. */
+export const holdOpen = () => {
+  const gate = { open: () => {}, reach: () => {} }
+  const opened = new Promise<void>((resolve) => {
+    gate.open = resolve
+  })
+  const reached = new Promise<void>((resolve) => {
+    gate.reach = resolve
+  })
+  return { gate, opened, reached }
+}
+
 /** What Chrome offers over https: the browser that reaches raven through Netlify. */
 export const BROWSER_ENCODINGS = 'gzip, deflate, br, zstd'
 

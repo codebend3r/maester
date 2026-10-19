@@ -42,6 +42,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
     icon: null,
   },
   backdrop: null,
+  ratingsRefresh: { state: 'idle', finishedAt: null },
   ...overrides,
 })
 
