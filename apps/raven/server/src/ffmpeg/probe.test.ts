@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseProbe } from '@/ffmpeg/probe'
+import { parseProbe, startTimeOf } from '@/ffmpeg/probe'
 
 /** Trimmed from a real ffprobe run on a 4K HDR episode on the NAS. */
 const hdrEpisode = {
@@ -78,5 +78,19 @@ describe('parseProbe', () => {
   it('returns null for a file with nothing playable', () => {
     expect(parseProbe({ streams: [{ codec_type: 'subtitle' }], format: {} })).toBeNull()
     expect(parseProbe('garbage')).toBeNull()
+  })
+})
+
+describe('startTimeOf', () => {
+  it("reads the format's start, before zero too, and is 0 when there is none", () => {
+    expect(
+      [
+        { format: { start_time: '2.500000' } },
+        { format: { start_time: '-0.023220' } },
+        { format: { start_time: 'N/A' } },
+        { format: {} },
+        null,
+      ].map(startTimeOf),
+    ).toEqual([2.5, -0.02322, 0, 0, 0])
   })
 })

@@ -206,6 +206,25 @@ Audio is the usual blocker: most remuxes and many WEB-DLs carry EAC3, DTS or Tru
 
 Playback resumes where you stopped; reaching the library's **Watched at** (95% by default) counts as finished and clears the spot, so the next play starts from the top.
 
+### HLS for native players
+
+Players without Media Source Extensions, AVPlayer on Apple TV and iPhone and ExoPlayer on Android TV, get the same remux or transcode as HLS. The routes are on the media plane, so a media ticket (`?t=`) opens them, and every URI a playlist names carries the request's ticket:
+
+| Route | What it answers |
+| --- | --- |
+| `GET /api/media/:id/hls/master.m3u8?mode=remux\|transcode&audio=&quality=` | Opens a session holding `mode`, `audio` and `quality` (read as for `stream`), and lists one variant with its `CODECS`, `RESOLUTION` and `BANDWIDTH`, plus a WebVTT rendition for each text subtitle track |
+| `GET /api/media/:id/hls/:session/video.m3u8` | The whole film as a VOD playlist of segments, behind its init |
+| `GET /api/media/:id/hls/:session/init` | The `ftyp moov` every segment plays after, `video/mp4` |
+| `GET /api/media/:id/hls/:session/segment/:n` | Segment `n`, `video/iso.segment` |
+| `GET /api/media/:id/hls/:session/subtitles/:trackId` | A text track's playlist, six-second segments on the video's timeline |
+| `GET /api/media/:id/hls/:session/subtitles/:trackId/:n` | The cues showing in segment `n`, as WebVTT with an `X-TIMESTAMP-MAP` |
+
+- **Nothing runs until a segment is asked for.** A session is one ffmpeg at a time cutting six-second segments into `<data>/hls/<session>/`: a request for a segment it is about to write waits, one far from it restarts it there, and it pauses ten segments ahead of the furthest asked for. A session unasked for a minute stops its ffmpeg and deletes its files, and resumes on the next request; one unasked for six hours is forgotten (404, open the master again).
+- **Remux segments start on the file's keyframes,** probed once per file (a whole read, up to `KEYFRAME_PROBE_TIMEOUT_SECONDS`) and kept in the index. A file whose keyframes lie more than twenty seconds apart, or whose video HLS cannot carry, answers `409` to a remux: transcode it. A transcode puts a keyframe every six seconds.
+- **Audio** is copied when it is AAC, AC-3, E-AC-3, ALAC or FLAC, and becomes E-AC-3 otherwise, keeping up to 5.1.
+- **Timestamps** are the file's own clock plus one second, so a file whose clock does not start at zero, as a broadcast recording's does not, has its subtitle cues moved onto it.
+- **Settings** apply as to `stream`: conversion off refuses both modes with `403`, remux only refuses a transcode. Playlists are compressed; the init and segments never are.
+
 ## Audio tracks and subtitles
 
 The settings button (or `c` for subtitles) lists every audio and subtitle track in the file, read with ffprobe when the player opens it. Picking an audio track other than the file's default plays through a remux. The player remembers the last audio language picked, whether subtitles were on, in which language, and how big.

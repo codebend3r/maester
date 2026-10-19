@@ -1,6 +1,9 @@
 import { HLS_MAX_KEYFRAME_GAP_SECONDS, HLS_SEGMENT_SECONDS } from '@raven/core'
 
-/** `boundaries[k]` is segment `k`'s start in seconds; the last segment ends at `duration`. */
+/**
+ * `boundaries[k]` is segment `k`'s start in seconds and the last segment
+ * ends at `duration`, both on the file's own clock.
+ */
 export type SegmentPlan = { boundaries: readonly number[]; duration: number }
 
 const SECOND_MS = 1000
@@ -61,12 +64,22 @@ export const remuxPlan = ({
   return isTooSparse ? null : fromMs({ boundariesMs, durationMs })
 }
 
-/** Cuts a transcode every six seconds: the encoder is told to put a keyframe at each. */
-export const transcodePlan = ({ duration }: { duration: number }): SegmentPlan => {
+/**
+ * Cuts a transcode every six seconds from `start`, where the file's own
+ * clock begins: the encoder is told to put a keyframe at each.
+ */
+export const transcodePlan = ({
+  start,
+  duration,
+}: {
+  start: number
+  duration: number
+}): SegmentPlan => {
+  const startMs = toMs(start)
   const durationMs = toMs(duration)
-  const count = Math.max(1, Math.ceil(durationMs / SEGMENT_MS))
+  const count = Math.max(1, Math.ceil((durationMs - startMs) / SEGMENT_MS))
   return fromMs({
-    boundariesMs: Array.from({ length: count }, (_, index) => index * SEGMENT_MS),
+    boundariesMs: Array.from({ length: count }, (_, index) => startMs + index * SEGMENT_MS),
     durationMs,
   })
 }

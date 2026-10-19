@@ -1687,7 +1687,7 @@ export const HLS_PATHS = {
   subtitleSegment: '/api/media/:id/hls/:session/subtitles/:trackId/:n',
 } as const
 
-/** The placeholder names in `HLS_PATHS` and the master playlist's query keys. */
+/** The placeholder names in `HLS_PATHS` and the master playlist's query keys; every HLS URI also carries the `MEDIA_TICKET_PARAM`. */
 export const HLS_PARAMS = {
   id: 'id',
   session: 'session',

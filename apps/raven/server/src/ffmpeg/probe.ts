@@ -60,6 +60,17 @@ const isHdr = (stream: Stream): boolean => {
 }
 
 /**
+ * Where the file's own clock begins, ffprobe's `format.start_time`, or 0
+ * when it names none. A broadcast recording starts well past 0, and an
+ * AAC track's priming can put it a few milliseconds before.
+ */
+export const startTimeOf = (output: unknown): number => {
+  const format = isRecord(output) && isRecord(output.format) ? output.format : {}
+  const start = isString(format.start_time) ? Number(format.start_time) : format.start_time
+  return isNumber(start) ? start : 0
+}
+
+/**
  * Reads `ffprobe -show_format -show_streams -of json` output. The video is
  * the first stream that is not cover art; the audio is the track flagged
  * default, else the first one.

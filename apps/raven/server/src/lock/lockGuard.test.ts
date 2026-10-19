@@ -133,6 +133,12 @@ describe('the lock marks on routes', () => {
     expect(plane).toEqual([
       'GET /api/media-origins/ping',
       'GET /api/media/:id/file',
+      'GET /api/media/:id/hls/:session/init',
+      'GET /api/media/:id/hls/:session/segment/:n',
+      'GET /api/media/:id/hls/:session/subtitles/:trackId',
+      'GET /api/media/:id/hls/:session/subtitles/:trackId/:n',
+      'GET /api/media/:id/hls/:session/video.m3u8',
+      'GET /api/media/:id/hls/master.m3u8',
       'GET /api/media/:id/stream',
       'GET /api/media/:id/subtitles/:trackId',
     ])

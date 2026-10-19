@@ -303,19 +303,22 @@ describe('HlsSessions', () => {
     input = state.clip,
     plan = state.plan,
     mode = PLAYBACK_MODES.remux,
+    audio = state.audio,
   }: {
     sessions: HlsSessions
     mediaId?: number
     input?: string
     plan?: SegmentPlan
     mode?: StreamMode
+    audio?: AudioTrack | null
   }): HlsSession =>
     sessions.mint({
       mediaId,
       mode,
-      audio: state.audio,
+      audio,
       quality: null,
       plan,
+      startTime: 0,
       encoding: {
         input,
         videoCodec: 'h264',
@@ -351,6 +354,30 @@ describe('HlsSessions', () => {
   }
 
   const boundary = (n: number): number => state.plan.boundaries[n] ?? NaN
+
+  it('cuts segments whose audio it turns into E-AC-3', async () => {
+    const { sessions } = open()
+    const commentary = state.audio
+    if (!commentary) throw new Error('the clip has no AAC track')
+    // Told it is Opus, which HLS players do not take in fMP4, the run encodes the AAC track.
+    const session = mintIn({ sessions, audio: { ...commentary, codec: 'opus' } })
+
+    const media = await sessions.segment({ session: session.id, n: 0 })
+    const path = join(state.root, 'eac3.mp4')
+    await writeFile(path, Buffer.concat([await sessions.init({ session: session.id }), media]))
+    const { stdout } = await run('ffprobe', [
+      '-v',
+      'error',
+      '-select_streams',
+      'a:0',
+      '-show_entries',
+      'stream=codec_name',
+      '-of',
+      'csv=p=0',
+      path,
+    ])
+    expect(stdout.trim().split(',')[0]).toBe('eac3')
+  })
 
   it('cuts segment 0 then 1 from one run', async () => {
     const { ffmpeg, sessions } = open()
@@ -459,7 +486,7 @@ describe('HlsSessions', () => {
 
   it('cuts the same transcoded segment from any start', async () => {
     const { sessions } = open()
-    const plan = transcodePlan({ duration: state.plan.duration })
+    const plan = transcodePlan({ start: 0, duration: state.plan.duration })
     const fromZero = mintIn({ sessions, plan, mode: PLAYBACK_MODES.transcode })
     const fromFive = mintIn({ sessions, plan, mode: PLAYBACK_MODES.transcode })
     const zeroToSix = await [0, 1, 2, 3, 4, 5, 6].reduce<Promise<Uint8Array[]>>(
@@ -611,6 +638,34 @@ describe('HlsSessions', () => {
       3,
     )
     expect(ffmpeg.alive().length).toBeLessThanOrEqual(1)
+  })
+
+  it('lets a request its client left go, starting no run and waiting no more', async () => {
+    const { ffmpeg, sessions } = open({ pace: PACE })
+    const session = mintIn({ sessions, input: state.long, plan: state.longPlan })
+    await sessions.segment({ session: session.id, n: 0 })
+
+    // Gone before its turn came: it decides nothing, so the run at 0 is kept.
+    const far = new AbortController()
+    const leaving = sessions.segment({ session: session.id, n: 40, signal: far.signal })
+    far.abort()
+    await expect(leaving).rejects.toMatchObject({ name: 'AbortError' })
+
+    // Gone while it waits for the run, about 1.5 s before segment 2 is written.
+    const near = new AbortController()
+    const waiting = sessions.segment({ session: session.id, n: 2, signal: near.signal })
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    const abortedAt = Date.now()
+    near.abort()
+    await expect(waiting).rejects.toMatchObject({ name: 'AbortError' })
+
+    expect(Date.now() - abortedAt).toBeLessThan(500)
+    expect(ffmpeg.runs).toHaveLength(1)
+    const init = new AbortController()
+    init.abort()
+    await expect(sessions.init({ session: session.id, signal: init.signal })).rejects.toMatchObject(
+      { name: 'AbortError' },
+    )
   })
 
   it('cuts the init from the run the next segment starts, not a run of its own', async () => {

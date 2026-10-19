@@ -1,6 +1,11 @@
 import { PLAYBACK_MODES, type SubtitleTrack, SUBTITLE_SOURCES } from '@raven/core'
 import { describe, expect, it } from 'vitest'
-import { masterPlaylist, mediaPlaylist, subtitlePlaylist } from '@/hls/playlists'
+import {
+  masterPlaylist,
+  mediaPlaylist,
+  subtitlePlaylist,
+  subtitleSegmentCount,
+} from '@/hls/playlists'
 
 const SPIKE_PLAN = {
   boundaries: [0, 15.5, 22.125, 31.458, 41.458, 51.458, 59.542, 69.542, 80.042],
@@ -152,6 +157,12 @@ describe('masterPlaylist', () => {
     expect(playlist).toContain('NAME="English (The Director)"')
     expect(playlist).toContain('NAME="English",')
     expect(playlist).toContain('NAME="English 2",')
+  })
+})
+
+describe('subtitleSegmentCount', () => {
+  it('counts a short last segment, and none past the end', () => {
+    expect([13.5, 12, 12.0004, 0].map(subtitleSegmentCount)).toEqual([3, 2, 2, 0])
   })
 })
 

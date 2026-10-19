@@ -211,13 +211,17 @@ describe('the default-deny gate', () => {
     const tickets = enforced.app.get(MediaTickets)
     const { ticket } = tickets.issue({ id })
     expect(tickets.verify({ ticket, id })).toBe(true)
-    const response = await send({
-      options: { url: withTicket({ route: ROUTES.file, params: { id }, ticket }) },
-    })
-    expect(outcomeOf({ response })).toMatchObject({
-      status: 401,
-      reason: AUTH_REFUSALS.signedOut,
-    })
+    const responses = await Promise.all(
+      [ROUTES.file, ROUTES.stream, ROUTES.hlsMaster].map((route) =>
+        send({ options: { url: withTicket({ route, params: { id }, ticket }) } }),
+      ),
+    )
+    responses.forEach((response) =>
+      expect(outcomeOf({ response })).toMatchObject({
+        status: 401,
+        reason: AUTH_REFUSALS.signedOut,
+      }),
+    )
   })
 
   it('lets an approved member read with the cookie alone', async () => {

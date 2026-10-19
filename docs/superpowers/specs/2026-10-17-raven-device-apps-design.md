@@ -282,7 +282,7 @@ ffmpeg -seek_timestamp 1 -ss 41.458 -copyts -i <input> -copypriorss 0 \
   -sn -dn -map_metadata -1 -map_chapters -1 \
   -output_ts_offset 1 -avoid_negative_ts disabled \
   -f segment -segment_format mp4 \
-  -segment_format_options movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont:use_editlist=0:avoid_negative_ts=disabled \
+  -segment_format_options movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont+delay_moov:use_editlist=0:avoid_negative_ts=disabled \
   -segment_times 10.000,18.084,28.084,38.584 -segment_time_delta 0.005 \
   -segment_start_number 4 -segment_list pipe:1 -segment_list_type flat <folder>/seg_%d.mp4
 ```
@@ -294,7 +294,7 @@ A transcode replaces `-c:v copy -tag:v hvc1` with the encoder's arguments and `-
 - **`-segment_times` became relative in FFmpeg 6.0.** From 6.0 the segment muxer adds the run's first video pts to each entry (`reference_stream_first_pts` in `segment.c`). 5.1 compares each entry with the packets' output timestamps as they are, so there a relative list cut a restarted run's first segment at its next keyframe. The server reads the version once (`ffmpeg -version`). Before 6.0 it passes the same cuts as output timestamps: boundary plus `STREAM_TIME_SHIFT`.
 - **The file's own clock, not `-start_at_zero`.** With `-start_at_zero` the output clock is the file's pts minus the file's start time, while the plan's boundaries are the file's pts as ffprobe lists them. A file whose start time is not zero then has its segments land off the plan. Ubuntu's 6.1 encoder gives the test clip an AAC start of -0.023 s, so its segments start 23 ms late, and a timestamp list on 5.1 could not be written without knowing the start. The run therefore keeps the file's clock: `-copyts` without `-start_at_zero`, and `-seek_timestamp 1`, so that `-ss` is read as a timestamp rather than as an offset from the file's start. On 5.1, 6.1 and 9.0 alike, a run's segment `k` now starts at boundary `k` plus `STREAM_TIME_SHIFT`, for MKV and MP4 clips and for one starting at 2.5 s, and a run from segment 4 or 5 cuts what a run from 0 does. Subtitles extracted with `-start_at_zero` sit on the older clock, so the HLS route (Task 14) has to shift their cues by the file's start time.
 
-`-copypriorss 0`, the segment muxer's MP4 options, `-segment_time_delta` and `-segment_list pipe:1` behave the same on all three. Only the tests' pacing needed a change: `-readrate_initial_burst` is new in 6.1, so they pace with `-readrate` alone.
+`-copypriorss 0`, the segment muxer's MP4 options, `-segment_time_delta` and `-segment_list pipe:1` behave the same on all three. The spike's clips carried AAC; an AC-3 or E-AC-3 track, copied or encoded from DTS or TrueHD, fails the run with "Cannot write moov atom before AC3 packets" until `delay_moov` joins the movflags (Task 14), which leaves an AAC run's bytes as they were. Only the tests' pacing needed a change: `-readrate_initial_burst` is new in 6.1, so they pace with `-readrate` alone.
 
 One seam remains at a restart. The first segment of a restarted run starts its audio at the keyframe's pts, while the run before ended the previous segment's audio at the keyframe's dts, so where segments from two runs meet there is an audio gap as long as the video's reorder delay (0.09 to 0.21 seconds in the spike). Both players played through it. Only the join at a restart has it; segments within one run meet exactly.
 

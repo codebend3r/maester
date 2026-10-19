@@ -80,15 +80,31 @@ const scaleTo = (maxHeight: number): string => `w=-2:h='min(${maxHeight},ih)'`
 
 export type TranscodeQuality = 'low' | 'medium' | 'high'
 
-/** How hard each encoder squeezes at each quality: a CRF or QP, and a bitrate for VideoToolbox. */
-const QUALITY: Record<TranscodeQuality, { crf: string; qp: string; bitrate: string }> = {
-  low: { crf: '28', qp: '28', bitrate: '4M' },
-  medium: { crf: '23', qp: '23', bitrate: '8M' },
-  high: { crf: '18', qp: '18', bitrate: '16M' },
+/**
+ * How hard each encoder squeezes at each quality: a CRF or QP, and a
+ * bitrate in bits per second for VideoToolbox.
+ */
+const QUALITY: Record<TranscodeQuality, { crf: string; qp: string; bitrate: number }> = {
+  low: { crf: '28', qp: '28', bitrate: 4_000_000 },
+  medium: { crf: '23', qp: '23', bitrate: 8_000_000 },
+  high: { crf: '18', qp: '18', bitrate: 16_000_000 },
 }
 
+/**
+ * The video bitrate a transcode aims for: the viewer's ceiling when they
+ * asked for a size, else VideoToolbox's target for the quality setting,
+ * which the CRF of the other encoders lands near.
+ */
+export const transcodeBitrate = ({
+  quality,
+  bitrate,
+}: {
+  quality: TranscodeQuality
+  bitrate: number | null
+}): number => bitrate ?? QUALITY[quality].bitrate
+
 /** ffprobe's `codec_name` for the codecs the args treat apart. */
-const VIDEO_CODECS = { h264: 'h264', hevc: 'hevc' } as const
+export const VIDEO_CODECS = { h264: 'h264', hevc: 'hevc' } as const
 
 /** Codecs every Intel GPU recent enough for VAAPI decodes; anything else decodes on the CPU. */
 const GPU_DECODES: ReadonlySet<string> = new Set([VIDEO_CODECS.h264, VIDEO_CODECS.hevc])
@@ -150,7 +166,7 @@ const transcodeVideo = ({
         '-c:v',
         'h264_videotoolbox',
         '-b:v',
-        bitrate == null ? squeeze.bitrate : String(bitrate),
+        String(transcodeBitrate({ quality, bitrate })),
         ...ceiling(bitrate),
         ...shared,
         '-pix_fmt',
@@ -329,14 +345,24 @@ const eac3Bitrate = (channels: number): string => {
   return '224k'
 }
 
+/** ffprobe's name for E-AC-3, what HLS turns any audio it cannot copy into. */
+const EAC3 = 'eac3'
+
+const copiedCodec = (track: Pick<AudioTrack, 'codec'>): string | null =>
+  HLS_COPY_AUDIO.find((codec) => codec === track.codec) ?? null
+
+/** The codec an HLS stream's audio comes out in, by ffprobe's name. */
+export const hlsAudioCodec = (track: Pick<AudioTrack, 'codec'>): string =>
+  copiedCodec(track) ?? EAC3
+
 /**
  * How an HLS stream carries an audio track: copied when Apple's players and
  * ExoPlayer decode it in fMP4, else E-AC-3 keeping the channels it can.
  */
 export const hlsAudioArgs = (track: Pick<AudioTrack, 'codec' | 'channels'>): string[] => {
-  if (HLS_COPY_AUDIO.some((codec) => codec === track.codec)) return ['-c:a', 'copy']
+  if (copiedCodec(track) != null) return ['-c:a', 'copy']
   const channels = Math.min(Math.max(track.channels ?? STEREO, 1), EAC3_MAX_CHANNELS)
-  return ['-c:a', 'eac3', '-ac', String(channels), '-b:a', eac3Bitrate(channels)]
+  return ['-c:a', EAC3, '-ac', String(channels), '-b:a', eac3Bitrate(channels)]
 }
 
 /** Seconds as ffmpeg's arguments take them, to the millisecond like the plan. */
@@ -345,10 +371,13 @@ const secondsArg = (seconds: number): string => seconds.toFixed(3)
 /**
  * The segment muxer's MP4 options. Without `frag_discont`, `use_editlist=0`
  * and its own `avoid_negative_ts=disabled`, every file's tfdt starts at zero:
- * the outer `-avoid_negative_ts` does not reach the inner muxer.
+ * the outer `-avoid_negative_ts` does not reach the inner muxer. Without
+ * `delay_moov` an AC-3 or E-AC-3 track, copied or encoded, fails the run
+ * ("Cannot write moov atom before AC3 packets"): its `dac3` box is read
+ * from the first packet. It leaves an AAC run's bytes as they were.
  */
 const SEGMENT_MP4_OPTIONS =
-  'movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont:use_editlist=0:avoid_negative_ts=disabled'
+  'movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont+delay_moov:use_editlist=0:avoid_negative_ts=disabled'
 
 /**
  * How the segment muxer reads `-segment_times`. From FFmpeg 6.0 it adds the

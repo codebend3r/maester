@@ -317,14 +317,20 @@ describe('the media plane routes', () => {
           headers: { origin: NETLIFY, [CORS_HEADERS.requestMethod]: HTTP_METHODS.get },
         })
       const video = on().video
-      const open = await Promise.all(
-        [
-          '/api/media-origins/ping?bytes=10',
-          `/api/media/${video}/file`,
-          `/api/media/${video}/subtitles/external-0`,
-        ].map(ask),
-      )
-      expect(open.map(({ statusCode }) => statusCode)).toEqual([204, 204, 204])
+      const session = 'A'.repeat(22)
+      const paths = [
+        '/api/media-origins/ping?bytes=10',
+        `/api/media/${video}/file`,
+        `/api/media/${video}/subtitles/external-0`,
+        `/api/media/${video}/hls/master.m3u8`,
+        `/api/media/${video}/hls/${session}/video.m3u8`,
+        `/api/media/${video}/hls/${session}/init`,
+        `/api/media/${video}/hls/${session}/segment/0`,
+        `/api/media/${video}/hls/${session}/subtitles/external-0`,
+        `/api/media/${video}/hls/${session}/subtitles/external-0/0`,
+      ]
+      const open = await Promise.all(paths.map(ask))
+      expect(open.map(({ statusCode }) => statusCode)).toEqual(paths.map(() => 204))
       const shut = await Promise.all(
         [`/api/media/${video}`, `/api/media/${video}/ticket`, '/api/media-origins'].map(ask),
       )

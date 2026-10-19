@@ -5,6 +5,9 @@ import { promisify } from 'node:util'
 
 const run = promisify(execFile)
 
+/** The test pattern's frames per second. */
+const CLIP_FPS = 24
+
 /**
  * Encodes a short test-pattern clip with a tone, so the suite exercises the
  * real ffprobe and ffmpeg rather than fixtures. `audio` picks the audio
@@ -15,13 +18,20 @@ export const encodeClip = async ({
   seconds = 6,
   audio = 'aac',
   size = '320x240',
+  keyframeEvery,
+  startAt,
 }: {
   path: string
   seconds?: number
   audio?: 'aac' | 'ac3'
   /** The frame size, `WIDTHxHEIGHT`. */
   size?: string
+  /** Seconds between keyframes, exactly, with no scene cut adding one. */
+  keyframeEvery?: number
+  /** Where the file's own clock starts, in seconds, as a broadcast recording's does. */
+  startAt?: number
 }): Promise<void> => {
+  const gop = keyframeEvery == null ? null : String(keyframeEvery * CLIP_FPS)
   await mkdir(dirname(path), { recursive: true })
   await run('ffmpeg', [
     '-hide_banner',
@@ -31,18 +41,20 @@ export const encodeClip = async ({
     '-f',
     'lavfi',
     '-i',
-    `testsrc2=size=${size}:rate=24:duration=${seconds}`,
+    `testsrc2=size=${size}:rate=${CLIP_FPS}:duration=${seconds}`,
     '-f',
     'lavfi',
     '-i',
     `sine=frequency=440:duration=${seconds}`,
     '-c:v',
     'libx264',
+    ...(gop == null ? [] : ['-g', gop, '-keyint_min', gop, '-sc_threshold', '0']),
     '-pix_fmt',
     'yuv420p',
     '-c:a',
     audio,
     '-shortest',
+    ...(startAt == null ? [] : ['-output_ts_offset', String(startAt)]),
     path,
   ])
 }

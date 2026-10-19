@@ -22,6 +22,7 @@ import { ServerEvents } from '@/events/serverEvents'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { BrowseController } from '@/fs/browseController'
 import { HealthController } from '@/health/healthController'
+import { HlsController } from '@/hls/hlsController'
 import { HLS_CLOCK, HlsSessions, SYSTEM_CLOCK } from '@/hls/hlsSessions'
 import { KeyframesService } from '@/hls/keyframesService'
 import { ItemsController } from '@/items/itemsController'
@@ -90,6 +91,7 @@ export const CONTROLLERS = [
   MediaController,
   MediaOriginsController,
   PlaybackController,
+  HlsController,
   FavouritesController,
   WatchedController,
   HomeController,

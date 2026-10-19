@@ -6,12 +6,14 @@ import {
   TONEMAP_FILTER,
   hlsArgs,
   hlsAudioArgs,
+  hlsAudioCodec,
   segmentClockOf,
   streamArgs,
   subtitleFileArgs,
   subtitleWindowArgs,
   thumbnailArgs,
   thumbnailSeek,
+  transcodeBitrate,
 } from '@/ffmpeg/args'
 
 describe('thumbnailSeek', () => {
@@ -156,7 +158,7 @@ describe('streamArgs', () => {
       maxHeight: 2160,
       quality: 'low',
     })
-    expect(after({ args: low, flag: '-b:v' })).toBe('4M')
+    expect(after({ args: low, flag: '-b:v' })).toBe('4000000')
     expect(after({ args: low, flag: '-vf' })).toBe("scale=w=-2:h='min(2160,ih)'")
   })
 
@@ -269,7 +271,7 @@ describe('hlsArgs', () => {
       '-segment_format',
       'mp4',
       '-segment_format_options',
-      'movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont:use_editlist=0:avoid_negative_ts=disabled',
+      'movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont+delay_moov:use_editlist=0:avoid_negative_ts=disabled',
       '-segment_times',
       '10.000,18.084,28.084,38.584',
       '-segment_time_delta',
@@ -394,6 +396,21 @@ describe('hlsAudioArgs', () => {
       '-b:a',
       '224k',
     ])
+  })
+})
+
+describe('hlsAudioCodec', () => {
+  it('names the codec a track keeps, or E-AC-3 for one it is turned into', () => {
+    expect(['aac', 'flac', 'truehd', 'dts', null].map((codec) => hlsAudioCodec({ codec }))).toEqual(
+      ['aac', 'flac', 'eac3', 'eac3', 'eac3'],
+    )
+  })
+})
+
+describe('transcodeBitrate', () => {
+  it("is the viewer's ceiling, else the quality setting's target", () => {
+    expect(transcodeBitrate({ quality: 'high', bitrate: 3_000_000 })).toBe(3_000_000)
+    expect(transcodeBitrate({ quality: 'high', bitrate: null })).toBe(16_000_000)
   })
 })
 

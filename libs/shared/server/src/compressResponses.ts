@@ -6,8 +6,9 @@ import { CONTENT_TYPES, HEADERS } from '@/http'
 
 // The plugin's own list adds octet-stream, which on a media server is a video.
 // Anything else it takes from mime-db, which marks no video and neither JPEG
-// nor PNG compressible.
-const COMPRESSIBLE = /^text\/(?!event-stream)|[+/](?:json|xml)(?:;|$)/u
+// nor PNG compressible, and leaves out the HLS playlist, which is text.
+const COMPRESSIBLE =
+  /^text\/(?!event-stream)|[+/](?:json|xml)(?:;|$)|^application\/vnd\.apple\.mpegurl(?:;|$)/u
 
 /** The content codings offered, in order of preference. */
 export const ENCODINGS = { br: 'br', gzip: 'gzip' } as const

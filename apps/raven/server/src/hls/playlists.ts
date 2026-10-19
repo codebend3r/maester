@@ -113,6 +113,12 @@ export const mediaPlaylist = ({
   ].join('\n')
 }
 
+const SUBTITLE_SEGMENT_MS = HLS_SEGMENT_SECONDS * 1000
+
+/** How many six-second WebVTT segments a subtitle playlist of `duration` seconds lists. */
+export const subtitleSegmentCount = (duration: number): number =>
+  Math.ceil(Math.round(duration * 1000) / SUBTITLE_SEGMENT_MS)
+
 /** A subtitle track's playlist: six-second WebVTT segments, the last one shorter. */
 export const subtitlePlaylist = ({
   duration,
@@ -122,15 +128,13 @@ export const subtitlePlaylist = ({
   segmentUri: (n: number) => string
 }): string => {
   const durationMs = Math.round(duration * 1000)
-  const segmentMs = HLS_SEGMENT_SECONDS * 1000
-  const count = Math.ceil(durationMs / segmentMs)
   return [
     '#EXTM3U',
     '#EXT-X-VERSION:3',
     '#EXT-X-PLAYLIST-TYPE:VOD',
     `#EXT-X-TARGETDURATION:${HLS_SEGMENT_SECONDS}`,
-    ...Array.from({ length: count }, (_, n) => [
-      extinf(Math.min(segmentMs, durationMs - n * segmentMs) / 1000),
+    ...Array.from({ length: subtitleSegmentCount(duration) }, (_, n) => [
+      extinf(Math.min(SUBTITLE_SEGMENT_MS, durationMs - n * SUBTITLE_SEGMENT_MS) / 1000),
       segmentUri(n),
     ]).flat(),
     '#EXT-X-ENDLIST',

@@ -92,6 +92,11 @@ export type HlsSession = {
   /** The size the viewer asked a transcode for, or null for the settings'. */
   quality: StreamQuality | null
   plan: SegmentPlan
+  /**
+   * Where the file's own clock begins, ffprobe's `format.start_time`. The
+   * plan is on that clock, and subtitles, extracted from zero, are not.
+   */
+  startTime: number
 }
 
 /**
@@ -174,6 +179,30 @@ type Step<T> =
 
 const ready = <T>(value: T): Step<T> => ({ kind: STEPS.ready, value })
 
+/**
+ * Waits for `until`, or rejects with the signal's reason once the request's
+ * client has gone, so a request nobody reads any more starts no run when
+ * its wait ends. What `until` settles with later is let go.
+ */
+const untilOrGone = ({
+  until,
+  signal,
+}: {
+  until: Promise<void>
+  signal: AbortSignal | undefined
+}): Promise<void> => {
+  if (!signal) return until
+  return new Promise<void>((resolve, reject) => {
+    const gone = () => reject(signal.reason)
+    if (signal.aborted) {
+      gone()
+      return
+    }
+    signal.addEventListener('abort', gone, { once: true })
+    until.finally(() => signal.removeEventListener('abort', gone)).then(resolve, reject)
+  })
+}
+
 /** Waits, then decides again; a run replaced under the wait is only a reason to ask again. */
 const waitThenRetry = <T>(until: Promise<unknown>): Step<T> => ({
   kind: STEPS.wait,
@@ -235,6 +264,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     audio,
     quality,
     plan,
+    startTime,
     encoding,
   }: {
     mediaId: number
@@ -242,6 +272,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     audio: AudioTrack | null
     quality: StreamQuality | null
     plan: SegmentPlan
+    startTime: number
     encoding: HlsEncoding
   }): HlsSession {
     const kept = [...this.entries.values()]
@@ -257,6 +288,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
       audio: audio?.index ?? null,
       quality,
       plan,
+      startTime,
     }
     const entry: Entry = {
       session,
@@ -290,19 +322,32 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
    * The `ftyp moov` every segment of the session plays after, cut from a
    * run's first file and kept for the session's life, rests included. With
    * no run, it waits `HLS_INIT_GRACE_MS` for a segment request to start
-   * one, and then starts one at segment 0 itself.
+   * one, and then starts one at segment 0 itself. `signal` is the
+   * request's: once it aborts, the init is no longer waited for.
    */
-  async init({ session }: { session: string }): Promise<Uint8Array> {
-    return this.cutInit({ entry: this.entryOf(session), mayStart: false })
+  async init({ session, signal }: { session: string; signal?: AbortSignal }): Promise<Uint8Array> {
+    return this.cutInit({ entry: this.entryOf(session), mayStart: false, signal })
   }
 
-  /** Segment `n`'s `moof mdat` boxes, once it is whole. */
-  async segment({ session, n }: { session: string; n: number }): Promise<Uint8Array> {
+  /**
+   * Segment `n`'s `moof mdat` boxes, once it is whole. `signal` is the
+   * request's: once it aborts, the request decides nothing more, so a
+   * client that left starts and kills no run.
+   */
+  async segment({
+    session,
+    n,
+    signal,
+  }: {
+    session: string
+    n: number
+    signal?: AbortSignal
+  }): Promise<Uint8Array> {
     const entry = this.entryOf(session)
     if (!Number.isInteger(n) || n < 0 || n >= entry.session.plan.boundaries.length) {
       throw new NotFoundException(`No segment ${n} in this stream`)
     }
-    return this.serve({ entry, n, misses: 0 })
+    return this.serve({ entry, n, misses: 0, signal })
   }
 
   /** Forgets every session playing a media, whose file is gone. */
@@ -358,15 +403,23 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     entry,
     n,
     misses,
+    signal,
   }: {
     entry: Entry
     n: number
     misses: number
+    signal: AbortSignal | undefined
   }): Promise<Uint8Array> {
-    const step = await this.inTurn({ entry, work: () => this.locate({ entry, n }) })
+    const step = await this.inTurn({
+      entry,
+      work: async () => {
+        signal?.throwIfAborted()
+        return this.locate({ entry, n })
+      },
+    })
     if (step.kind === STEPS.wait) {
-      await step.until
-      return this.serve({ entry, n, misses })
+      await untilOrGone({ until: step.until, signal })
+      return this.serve({ entry, n, misses, signal })
     }
     try {
       return splitSegmentFile(await readFile(step.value)).media
@@ -374,7 +427,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
       // Deleted since, as no longer kept or by a rest: cut it again, but not forever.
       if (misses >= MAX_READ_MISSES) throw error
       if (entry.written.get(n) === step.value) entry.written.delete(n)
-      return this.serve({ entry, n, misses: misses + 1 })
+      return this.serve({ entry, n, misses: misses + 1, signal })
     }
   }
 
@@ -407,14 +460,22 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   private async cutInit({
     entry,
     mayStart,
+    signal,
   }: {
     entry: Entry
     mayStart: boolean
+    signal: AbortSignal | undefined
   }): Promise<Uint8Array> {
-    const step = await this.inTurn({ entry, work: () => this.initStep({ entry, mayStart }) })
+    const step = await this.inTurn({
+      entry,
+      work: async () => {
+        signal?.throwIfAborted()
+        return this.initStep({ entry, mayStart })
+      },
+    })
     if (step.kind === STEPS.ready) return step.value
-    const hasTimedOut = await this.timedOut(step.until)
-    return this.cutInit({ entry, mayStart: hasTimedOut })
+    const hasTimedOut = await this.timedOut(untilOrGone({ until: step.until, signal }))
+    return this.cutInit({ entry, mayStart: hasTimedOut, signal })
   }
 
   private async initStep({
