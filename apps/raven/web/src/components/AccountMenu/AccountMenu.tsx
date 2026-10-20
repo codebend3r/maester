@@ -1,18 +1,16 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Account } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
-import { signOut } from '@/lib/session'
 import { useMenu } from '@/lib/useMenu'
+import { useSignOut } from '@/lib/useSignOut'
 import styles from '@/components/AccountMenu/AccountMenu.module.scss'
 
 const Menu = ({ account }: { account: Account }) => {
   const id = useId()
   const { isOpen, toggle, close, root, trigger, list, onKeyDown } = useMenu()
-  const queryClient = useQueryClient()
-  const end = useMutation({ mutationFn: () => signOut({ queryClient }) })
+  const end = useSignOut()
 
   return (
     <div ref={root} className={styles.account}>

@@ -3,21 +3,12 @@ import {
   type AiMatch,
   ITEM_TYPES,
   type ItemSummary,
-  KEYS,
   MATCH_STATES,
   type MatchItemType,
   type MediaItem,
   mediaLabel,
 } from '@raven/core'
-import {
-  Fragment,
-  type KeyboardEvent,
-  type RefObject,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-} from 'react'
+import { Fragment, type RefObject, useEffect, useId, useRef, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, Icon, type IconName } from '@raven/ui'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
@@ -27,6 +18,7 @@ import { copyText } from '@/lib/clipboard'
 import { itemQuery, mediaLocationQuery } from '@/lib/queries'
 import { useCanFavourite } from '@/lib/useCanFavourite'
 import { useMediaMutations } from '@/lib/useMediaMutations'
+import { useMenuList } from '@/lib/useMenu'
 import styles from '@/components/MediaMenu/MediaMenu.module.scss'
 
 /**
@@ -202,7 +194,6 @@ const MenuBody = ({
   root: RefObject<HTMLDivElement | null>
   trigger: RefObject<HTMLButtonElement | null>
 }) => {
-  const list = useRef<HTMLUListElement>(null)
   const [confirming, setConfirming] = useState(false)
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
@@ -217,46 +208,12 @@ const MenuBody = ({
   )
   const artwork = artworkOf(item)
 
-  const items = (): HTMLButtonElement[] =>
-    Array.from(list.current?.querySelectorAll('button') ?? [])
-
-  const close = ({ refocus }: { refocus: boolean }) => {
-    onOpenChange(false)
-    if (refocus) trigger.current?.focus()
-  }
-  // Focus lands on the first item whichever way the menu opened.
-  useEffect(() => {
-    if (open) list.current?.querySelector('button')?.focus()
-  }, [open])
-
-  // A click or tap anywhere else closes it.
-  useEffect(() => {
-    if (!open) return undefined
-    const onPointerDown = (event: PointerEvent) => {
-      if (!(event.target instanceof Node) || !root.current?.contains(event.target)) {
-        onOpenChange(false)
-      }
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open, onOpenChange, root])
-
-  const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
-    const buttons = items()
-    const index = buttons.findIndex((button) => button === document.activeElement)
-    if (event.key === KEYS.escape) {
-      event.preventDefault()
-      close({ refocus: true })
-    } else if (event.key === KEYS.arrowDown) {
-      event.preventDefault()
-      buttons[(index + 1) % buttons.length]?.focus()
-    } else if (event.key === KEYS.arrowUp) {
-      event.preventDefault()
-      buttons[index <= 0 ? buttons.length - 1 : index - 1]?.focus()
-    } else if (event.key === KEYS.tab) {
-      onOpenChange(false)
-    }
-  }
+  const { list, close, onKeyDown } = useMenuList({
+    isOpen: open,
+    setOpen: onOpenChange,
+    root,
+    trigger,
+  })
 
   return (
     <>

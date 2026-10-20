@@ -1,8 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useId } from 'react'
 import type { Account } from '@raven/core'
 import { Button } from '@raven/ui'
-import { signOut } from '@/lib/session'
+import { useSignOut } from '@/lib/useSignOut'
 import { STATUS_NAMES } from '@/pages/SettingsPage/memberStatus'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
@@ -11,8 +10,7 @@ import accountStyles from '@/pages/SettingsPage/AccountSection.module.scss'
 /** Who is signed in, and the way out. */
 export const AccountSection = ({ account }: { account: Account }) => {
   const headingId = useId()
-  const queryClient = useQueryClient()
-  const end = useMutation({ mutationFn: () => signOut({ queryClient }) })
+  const end = useSignOut()
 
   return (
     <section className={styles.section} aria-labelledby={headingId}>

@@ -85,11 +85,10 @@ const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
  * step aside. A phone has no side menu but a tab bar along the foot of the
  * screen. Over every page, a bar holds the search through every library
  * and, in its corner, the theme button and, for whoever is signed in, the
- * account button with Sign out. While a card's
- * picture is behind the page, the menu frosts over it. While the frame is
- * open, what the pages show follows the server's changes, and the admin
- * lock coming on or going off. The player leaves the frame behind for the
- * whole screen.
+ * account button with Sign out. While a card's picture is behind the page,
+ * the menu frosts over it. While the frame is open, what the pages show
+ * follows the server's changes, and the admin lock coming on or going off.
+ * The player leaves the frame behind for the whole screen.
  */
 export const AppShell = () => {
   const navId = useId()

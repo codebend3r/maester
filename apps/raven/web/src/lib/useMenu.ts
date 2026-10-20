@@ -1,17 +1,25 @@
 import { KEYS } from '@raven/core'
-import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
+import { type KeyboardEvent, type RefObject, useEffect, useRef, useState } from 'react'
 
 const ITEMS = '[role^="menuitem"]'
 
 /**
- * A button's menu. It opens with focus on the item checked, else the first,
- * so the arrows start from it, and they go round its items. Escape, Tab or a
- * click outside `root` closes it; Escape hands focus back to the button.
+ * The list of a button's menu whose open state lives elsewhere, as a card's
+ * does. It opens with focus on the item checked, else the first, so the
+ * arrows start from it, and they go round its items. Escape, Tab or a click
+ * outside `root` closes it; Escape hands focus back to `trigger`.
  */
-export const useMenu = () => {
-  const [isOpen, setOpen] = useState(false)
-  const root = useRef<HTMLDivElement>(null)
-  const trigger = useRef<HTMLButtonElement>(null)
+export const useMenuList = ({
+  isOpen,
+  setOpen,
+  root,
+  trigger,
+}: {
+  isOpen: boolean
+  setOpen: (isOpen: boolean) => void
+  root: RefObject<HTMLDivElement | null>
+  trigger: RefObject<HTMLButtonElement | null>
+}) => {
   const list = useRef<HTMLUListElement>(null)
 
   const close = ({ refocus }: { refocus: boolean }) => {
@@ -21,10 +29,10 @@ export const useMenu = () => {
 
   useEffect(() => {
     if (!isOpen) return
-    const items = list.current
+    const menu = list.current
     const first =
-      items?.querySelector<HTMLElement>('[aria-checked="true"]') ??
-      items?.querySelector<HTMLElement>(ITEMS)
+      menu?.querySelector<HTMLElement>('[aria-checked="true"]') ??
+      menu?.querySelector<HTMLElement>(ITEMS)
     first?.focus()
   }, [isOpen])
 
@@ -35,7 +43,7 @@ export const useMenu = () => {
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [isOpen])
+  }, [isOpen, setOpen, root])
 
   const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
     const items = Array.from(list.current?.querySelectorAll<HTMLElement>(ITEMS) ?? [])
@@ -54,5 +62,14 @@ export const useMenu = () => {
     }
   }
 
+  return { list, close, onKeyDown }
+}
+
+/** A button's menu that holds its own open state, with `useMenuList`'s keys, focus and closing. */
+export const useMenu = () => {
+  const [isOpen, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const { list, close, onKeyDown } = useMenuList({ isOpen, setOpen, root, trigger })
   return { isOpen, toggle: () => setOpen((now) => !now), close, root, trigger, list, onKeyDown }
 }
