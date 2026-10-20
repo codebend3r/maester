@@ -3,15 +3,16 @@ import { ITEM_TYPES, type ItemSummary, type ItemType } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { FAVOURITE_OUTCOMES, type FavouriteOutcome } from '@/media/favouriteOutcomes'
+import type { AccountKey, ByAccount } from '@/media/viewingAccountKeys'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
 /** A movie or episode is a favourite by its files; a show or season by itself. */
 const FAVOURITE_TITLE_TYPES: ReadonlySet<ItemType> = new Set([ITEM_TYPES.show, ITEM_TYPES.season])
 
 /**
- * Shows and seasons marked as favourites. A locked library's are left out,
- * whether or not the PIN is entered: one that only locked libraries hold can
- * never be marked, and is never listed.
+ * Shows and seasons each account marked as favourites. A locked library's
+ * are left out, whether or not the PIN is entered: one that only locked
+ * libraries hold can never be marked, and is never listed.
  */
 @Injectable()
 export class TitleFavourites {
@@ -40,14 +41,17 @@ export class TitleFavourites {
     )
   }
 
-  /** A show's or season's mark, or null where it cannot have one, as `ItemDetails.favourite` says. */
-  favouriteOf(itemId: number): boolean | null {
+  /**
+   * `account`'s mark on a show or season, or null where it cannot have one,
+   * as `ItemDetails.favourite` says.
+   */
+  favouriteOf({ itemId, account }: { itemId: number; account: AccountKey }): boolean | null {
     if (!this.canBeFavourite(itemId)) return null
     return !!this.db
-      .prepare<[number], { item_id: number }>(
-        'SELECT item_id FROM item_favourites WHERE item_id = ?',
+      .prepare<[ByAccount, number], { item_id: number }>(
+        'SELECT item_id FROM item_favourites WHERE account_id = @account AND item_id = ?',
       )
-      .get(itemId)
+      .get({ account }, itemId)
   }
 
   /**
@@ -55,12 +59,22 @@ export class TitleFavourites {
    * reshuffle. Unmarking always goes through, so a favourite left behind in
    * a library locked since can still be cleared.
    */
-  set({ itemId, favourite }: { itemId: number; favourite: boolean }): FavouriteOutcome {
+  set({
+    itemId,
+    favourite,
+    account,
+  }: {
+    itemId: number
+    favourite: boolean
+    account: AccountKey
+  }): FavouriteOutcome {
     return this.db.transaction(() => {
       const type = this.metadata.get(itemId)?.type
       if (type == null || !FAVOURITE_TITLE_TYPES.has(type)) return FAVOURITE_OUTCOMES.missing
       if (!favourite) {
-        this.db.prepare('DELETE FROM item_favourites WHERE item_id = ?').run(itemId)
+        this.db
+          .prepare('DELETE FROM item_favourites WHERE account_id = @account AND item_id = ?')
+          .run({ account }, itemId)
         return FAVOURITE_OUTCOMES.done
       }
       if (!this.isOpen({ itemId, locked: this.libraries.lockedIds() })) {
@@ -68,22 +82,26 @@ export class TitleFavourites {
       }
       this.db
         .prepare(
-          `INSERT INTO item_favourites (item_id, added_at) VALUES (?, ?)
-           ON CONFLICT (item_id) DO NOTHING`,
+          `INSERT INTO item_favourites (account_id, item_id, added_at) VALUES (@account, ?, ?)
+           ON CONFLICT (account_id, item_id) DO NOTHING`,
         )
-        .run(itemId, new Date().toISOString())
+        .run({ account }, itemId, new Date().toISOString())
       return FAVOURITE_OUTCOMES.done
     })()
   }
 
-  /** Every favourite show and season a library that is not locked holds, most recently marked first. */
-  list(): ItemSummary[] {
+  /**
+   * Every show and season `account` favoured that a library that is not
+   * locked holds, most recently marked first.
+   */
+  list({ account }: { account: AccountKey }): ItemSummary[] {
     const locked = this.libraries.lockedIds()
     const ids = this.db
-      .prepare<[], { item_id: number }>(
-        'SELECT item_id FROM item_favourites ORDER BY added_at DESC, item_id DESC',
+      .prepare<ByAccount, { item_id: number }>(
+        `SELECT item_id FROM item_favourites WHERE account_id = @account
+          ORDER BY added_at DESC, item_id DESC`,
       )
-      .all()
+      .all({ account })
       .map((row) => row.item_id)
       .filter((itemId) => this.isOpen({ itemId, locked }))
     const summaries = this.metadata.summaries(ids)

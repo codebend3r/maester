@@ -2,10 +2,16 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { ITEM_TYPES } from '@raven/core'
 import Sqlite from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { adoptLegacyDatabase, DatabaseService, MIGRATIONS } from '@/db/database'
+import { VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
+import { PLAY_KINDS } from '@/media/watchedRepository'
+
+/** A kind of play the `plays.kind` CHECK refuses. */
+const UNKNOWN_PLAY_KIND = 'bogus'
 
 describe('the database file', () => {
   const state = { dir: '' }
@@ -389,6 +395,79 @@ describe('migrations', () => {
     expect(
       database.db.prepare('SELECT omdb_fetched_at, mdblist_fetched_at FROM items').get(),
     ).toEqual({ omdb_fetched_at: '2026-01-02', mdblist_fetched_at: null })
+    database.onModuleDestroy()
+  })
+
+  it('gives every viewing row to the local account, leaving out rows whose video or title is gone', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    const shipped = MIGRATIONS.length - 1
+    MIGRATIONS.slice(0, shipped).forEach((sql) => before.exec(sql))
+    before.pragma(`user_version = ${shipped}`)
+    before
+      .prepare(
+        `INSERT INTO items (id, type, tmdb_id, title, sort_title, fetched_at)
+         VALUES (1, ?, '700', 'Andor', 'andor', '2026-01-01')`,
+      )
+      .run(ITEM_TYPES.show)
+    before.exec(
+      `INSERT INTO libraries (id, name, created_at) VALUES (1, 'Movies', '2026-01-01T00:00:00.000Z');
+       INSERT INTO media (id, library_id, path, file_name, folder, title, container, size, mtime_ms, added_at)
+       VALUES (1, 1, '/m/Heat.mkv', 'Heat.mkv', '', 'Heat', 'mkv', 1, 1, '2026-01-01T00:00:00.000Z');
+       INSERT INTO playback_progress (media_id, position, updated_at) VALUES (1, 30, '2026-01-02');
+       INSERT INTO favourites (media_id, added_at) VALUES (1, '2026-01-03');
+       INSERT INTO item_favourites (item_id, added_at) VALUES (1, '2026-01-04');`,
+    )
+    // An old database that once ran without foreign keys can hold rows whose video or title is gone.
+    before.pragma('foreign_keys = OFF')
+    before.exec(
+      `INSERT INTO playback_progress (media_id, position, updated_at) VALUES (99, 30, '2026-01-02');
+       INSERT INTO favourites (media_id, added_at) VALUES (99, '2026-01-03');
+       INSERT INTO item_favourites (item_id, added_at) VALUES (99, '2026-01-04');`,
+    )
+    const play = before.prepare(
+      "INSERT INTO plays (media_id, played_at, furthest, kind) VALUES (1, '2026-01-05', 60, ?)",
+    )
+    play.run(PLAY_KINDS.played)
+    play.run(PLAY_KINDS.marked)
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    const { db } = database
+    expect(db.pragma('foreign_key_check')).toEqual([])
+    const local = { account_id: VIEWING_ACCOUNTS.local }
+    expect(
+      db.prepare('SELECT account_id, media_id, position FROM playback_progress').all(),
+    ).toEqual([{ ...local, media_id: 1, position: 30 }])
+    expect(db.prepare('SELECT account_id, media_id, added_at FROM favourites').all()).toEqual([
+      { ...local, media_id: 1, added_at: '2026-01-03' },
+    ])
+    expect(db.prepare('SELECT account_id, item_id, added_at FROM item_favourites').all()).toEqual([
+      { ...local, item_id: 1, added_at: '2026-01-04' },
+    ])
+    expect(db.prepare('SELECT account_id, kind FROM plays ORDER BY id').all()).toEqual([
+      { ...local, kind: PLAY_KINDS.played },
+      { ...local, kind: PLAY_KINDS.marked },
+    ])
+    expect(() =>
+      db
+        .prepare(
+          "INSERT INTO plays (account_id, media_id, played_at, kind) VALUES (?, 1, '2026-01-06', ?)",
+        )
+        .run(VIEWING_ACCOUNTS.local, UNKNOWN_PLAY_KIND),
+    ).toThrow()
+    db.prepare('DELETE FROM media WHERE id = 1').run()
+    expect(
+      db
+        .prepare(
+          `SELECT (SELECT COUNT(*) FROM playback_progress) AS spots,
+                  (SELECT COUNT(*) FROM favourites) AS favourites,
+                  (SELECT COUNT(*) FROM plays) AS plays`,
+        )
+        .get(),
+    ).toEqual({ spots: 0, favourites: 0, plays: 0 })
+    db.prepare('DELETE FROM items WHERE id = 1').run()
+    expect(db.prepare('SELECT COUNT(*) AS rows FROM item_favourites').get()).toEqual({ rows: 0 })
+    expect(db.pragma('foreign_key_check')).toEqual([])
     database.onModuleDestroy()
   })
 })

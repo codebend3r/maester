@@ -1,6 +1,7 @@
 import { ITEM_TYPES, type ItemChild, type ItemSummary, primaryVersion } from '@raven/core'
 import type { Viewer } from '@/lock/lockService'
 import type { MediaRepository } from '@/media/mediaRepository'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 import type { MetadataRepository } from '@/metadata/metadataRepository'
 
 const ofType = <T extends ItemSummary['type']>({
@@ -14,29 +15,31 @@ const ofType = <T extends ItemSummary['type']>({
 /**
  * A show's seasons or a season's episodes on disk, as its page lists them:
  * a season with how many of its episodes this caller may see, an episode
- * with its row's words and the file Play starts. Both count what is watched
- * in the libraries this caller may see only. Read a few queries for the
- * whole list, never one per child.
+ * with its row's words and the file Play starts. Both count what `account`
+ * watched in the libraries this caller may see only. Read a few queries for
+ * the whole list, never one per child.
  */
 export const itemChildren = ({
   parentId,
   viewer,
   metadata,
   media,
+  account,
 }: {
   parentId: number
   viewer: Viewer
   metadata: MetadataRepository
   media: MediaRepository
+  account: AccountKey
 }): ItemChild[] => {
   const children = metadata.childrenOnDisk(parentId).filter((child) => viewer.seesItem(child.id))
   const episodeIds = ofType({ children, type: ITEM_TYPES.episode })
   const onDisk = metadata.episodesOnDisk(ofType({ children, type: ITEM_TYPES.season }))
   const rows = metadata.episodeRows(episodeIds)
-  const files = media.forItems(episodeIds)
+  const files = media.forItems({ itemIds: episodeIds, account })
   const watched = new Set(
     media
-      .watchedEpisodes([...episodeIds, ...[...onDisk.values()].flat()])
+      .watchedEpisodes({ ids: [...episodeIds, ...[...onDisk.values()].flat()], account })
       .flatMap(({ episodeId, libraryId }) => (viewer.seesLibrary(libraryId) ? [episodeId] : [])),
   )
   return children.flatMap((child): ItemChild[] => {

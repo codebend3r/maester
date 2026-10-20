@@ -4,6 +4,7 @@ import { itemChildren } from '@/items/itemChildren'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import type { Viewer } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { WatchedCards } from '@/media/watchedCards'
 import { WatchedRepository } from '@/media/watchedRepository'
@@ -11,7 +12,7 @@ import { localEpisode, localSeason } from '@/metadata/localItems'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import type { FetchedItem } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
-import { repositories } from '@/test/repositories'
+import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
 const show: FetchedItem = {
   ...localSeason({ showTmdbId: '1', number: 1 }),
@@ -117,6 +118,7 @@ describe("a page's children", () => {
       id: state.files.get('Andor/S01E01.mkv') ?? -1,
       position: 300,
       at: new Date(),
+      account: TEST_ACCOUNTS.a,
     })
   })
 
@@ -129,6 +131,7 @@ describe("a page's children", () => {
       viewer: viewerHiding({ hidden: -1, metadata }),
       metadata,
       media,
+      account: TEST_ACCOUNTS.a,
     })
     expect(
       everything.map((child) => (child.type === ITEM_TYPES.season ? child.episodeCount : null)),
@@ -138,6 +141,7 @@ describe("a page's children", () => {
       viewer: viewerHiding({ hidden: state.locked, metadata }),
       metadata,
       media,
+      account: TEST_ACCOUNTS.a,
     })
     expect(locked.map((child) => child.id)).toEqual([state.seasons[0]])
     expect(
@@ -153,6 +157,7 @@ describe("a page's children", () => {
       viewer: viewerHiding({ hidden: -1, metadata }),
       metadata,
       media,
+      account: TEST_ACCOUNTS.a,
     }).flatMap((child) => (child.type === ITEM_TYPES.episode ? [child] : []))
     expect(rows.map((row) => [row.episode, row.summary, row.released, row.runtime])).toEqual([
       [1, 'What happens in 1.', '2022-09-01', 41],
@@ -167,6 +172,7 @@ describe("a page's children", () => {
       viewer: viewerHiding({ hidden: state.open, metadata }),
       metadata,
       media,
+      account: TEST_ACCOUNTS.a,
     }).flatMap((child) => (child.type === ITEM_TYPES.episode ? [child] : []))
     expect(hidden.map((row) => row.primary?.id ?? null)).toEqual([
       state.files.get('Andor/S01E01 2160p.mkv'),
@@ -187,21 +193,36 @@ describe("a page's children", () => {
       }),
       watched: true,
       at: new Date(),
+      account: TEST_ACCOUNTS.a,
     })
     const [seasonOne = -1] = state.seasons
-    const watchedAmong = (hidden: number) => {
+    const watchedAmong = ({
+      hidden,
+      account = TEST_ACCOUNTS.a,
+    }: {
+      hidden: number
+      account?: AccountKey
+    }) => {
       const viewer = viewerHiding({ hidden, metadata })
+      const read = { viewer, metadata, media, account }
       return {
-        seasons: itemChildren({ parentId: state.showId, viewer, metadata, media }).flatMap(
-          (child) => (child.type === ITEM_TYPES.season ? [child.watchedCount] : []),
+        seasons: itemChildren({ parentId: state.showId, ...read }).flatMap((child) =>
+          child.type === ITEM_TYPES.season ? [child.watchedCount] : [],
         ),
-        episodes: itemChildren({ parentId: seasonOne, viewer, metadata, media }).flatMap((child) =>
+        episodes: itemChildren({ parentId: seasonOne, ...read }).flatMap((child) =>
           child.type === ITEM_TYPES.episode ? [child.watched] : [],
         ),
       }
     }
-    expect(watchedAmong(-1)).toEqual({ seasons: [2, 0], episodes: [true, true] })
-    expect(watchedAmong(state.locked)).toEqual({ seasons: [0], episodes: [false] })
-    expect(watchedAmong(state.open)).toEqual({ seasons: [2, 0], episodes: [true, true] })
+    expect(watchedAmong({ hidden: -1 })).toEqual({ seasons: [2, 0], episodes: [true, true] })
+    expect(watchedAmong({ hidden: state.locked })).toEqual({ seasons: [0], episodes: [false] })
+    expect(watchedAmong({ hidden: state.open })).toEqual({
+      seasons: [2, 0],
+      episodes: [true, true],
+    })
+    expect(watchedAmong({ hidden: -1, account: TEST_ACCOUNTS.b })).toEqual({
+      seasons: [0, 0],
+      episodes: [false, false],
+    })
   })
 })

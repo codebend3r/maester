@@ -1,4 +1,4 @@
-import { type ItemType, type MediaSort, SHUFFLE_LENGTH } from '@raven/core'
+import { type ItemType, MEDIA_SORTS, type MediaSort, SHUFFLE_LENGTH } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import type { Viewer } from '@/lock/lockService'
@@ -8,7 +8,7 @@ import { WatchedCards } from '@/media/watchedCards'
 import { WatchedRepository } from '@/media/watchedRepository'
 import { BLANK_ITEM, type FetchedItem, type FetchedSaga } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
-import { repositories } from '@/test/repositories'
+import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
 type Seed = {
   name: string
@@ -59,7 +59,7 @@ describe('listing a library', () => {
   const media = () => repositories(database.get()).media
   const titles = ({ sort, seed }: { sort: MediaSort; seed?: number }): string[] =>
     media()
-      .list({ libraryId: state.libraryId, sort, seed })
+      .list({ libraryId: state.libraryId, sort, seed, account: TEST_ACCOUNTS.a })
       .map((item) => item.title)
 
   beforeAll(async () => {
@@ -111,7 +111,12 @@ describe('listing a library', () => {
   it('stops at the limit, in sort order', () => {
     expect(
       media()
-        .list({ libraryId: state.libraryId, sort: 'added', limit: 2 })
+        .list({
+          libraryId: state.libraryId,
+          sort: MEDIA_SORTS.added,
+          limit: 2,
+          account: TEST_ACCOUNTS.a,
+        })
         .map((item) => item.title),
     ).toEqual(['Delta', 'Alpha'])
   })
@@ -120,26 +125,36 @@ describe('listing a library', () => {
     const dealt = titles({ sort: 'random', seed: 7 })
     expect(
       media()
-        .list({ libraryId: state.libraryId, sort: 'random', seed: 7, limit: 2 })
+        .list({
+          libraryId: state.libraryId,
+          sort: MEDIA_SORTS.random,
+          seed: 7,
+          limit: 2,
+          account: TEST_ACCOUNTS.a,
+        })
         .map((item) => item.title),
     ).toEqual(dealt.slice(0, 2))
   })
 
   it('reads several videos at once, in the order asked, leaving out ones that are gone', () => {
-    const [alpha, bravo] = media().list({ libraryId: state.libraryId, sort: 'title' })
+    const [alpha, bravo] = media().list({
+      libraryId: state.libraryId,
+      sort: MEDIA_SORTS.title,
+      account: TEST_ACCOUNTS.a,
+    })
     const ids = [bravo?.id ?? -1, 999_999, alpha?.id ?? -1]
     expect(
       media()
-        .getMany(ids)
+        .getMany({ ids, account: TEST_ACCOUNTS.a })
         .map((item) => item.title),
     ).toEqual(['Bravo', 'Alpha'])
-    expect(media().get(999_999)).toBeNull()
+    expect(media().get({ id: 999_999, account: TEST_ACCOUNTS.a })).toBeNull()
   })
 
   it('never hands back a path', () => {
     expect(
       media()
-        .list({ libraryId: state.libraryId })
+        .list({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })
         .every((item) => !('path' in item)),
     ).toBe(true)
   })
@@ -161,8 +176,8 @@ describe("listing a TV library's shows", () => {
   const database = testDatabase('raven-shows-')
   const state = { libraryId: 0, aired: 0, special: 0, ids: new Map<string, number>() }
   const media = () => repositories(database.get()).media
-  const fileName = (id: number | undefined): string =>
-    id == null ? 'none' : (media().get(id)?.fileName ?? 'gone')
+  const fileName = (id: number | null): string =>
+    id == null ? 'none' : (media().get({ id, account: TEST_ACCOUNTS.a })?.fileName ?? 'gone')
 
   /** A show with an episode file for each `[season, episode]`. */
   const addShow = ({
@@ -224,13 +239,17 @@ describe("listing a TV library's shows", () => {
       ],
     })
     const viewing = new ViewingRepository(database.get(), media())
-    viewing.report({ id: state.ids.get('Aired - S01E01.mkv') ?? -1, position: 60 })
+    viewing.report({
+      id: state.ids.get('Aired - S01E01.mkv') ?? -1,
+      position: 60,
+      account: TEST_ACCOUNTS.a,
+    })
   })
 
   afterAll(database.close)
 
   it('gives each show its own first episode not yet watched, specials last, in one go', () => {
-    const shows = media().listShows({ libraryId: state.libraryId })
+    const shows = media().listShows({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })
     expect(shows.map((entry) => [entry.show.title, entry.episodes, entry.next?.fileName])).toEqual([
       ['Aired', 2, 'Aired - S01E02.mkv'],
       ['Special', 2, 'Special - S01E01.mkv'],
@@ -240,7 +259,7 @@ describe("listing a TV library's shows", () => {
   it('stops at the limit', () => {
     expect(
       media()
-        .listShows({ libraryId: state.libraryId, limit: 1 })
+        .listShows({ libraryId: state.libraryId, limit: 1, account: TEST_ACCOUNTS.a })
         .map((entry) => entry.show.title),
     ).toEqual(['Aired'])
   })
@@ -252,7 +271,7 @@ describe("listing a TV library's shows", () => {
     bitrates.run(9_000_000, 'Special%')
     const listed = (sort: 'bitrate-high' | 'bitrate-low') =>
       media()
-        .listShows({ libraryId: state.libraryId, sort })
+        .listShows({ libraryId: state.libraryId, sort, account: TEST_ACCOUNTS.a })
         .map((entry) => [entry.show.title, entry.bitrate])
     expect(listed('bitrate-high')).toEqual([
       ['Special', 9_000_000],
@@ -273,10 +292,22 @@ describe("listing a TV library's shows", () => {
 
   it("answers a show's next episode on its own too", () => {
     expect(
-      fileName(media().nextEpisode({ showId: state.aired, libraryIds: [state.libraryId] })?.id),
+      fileName(
+        media().nextEpisode({
+          showId: state.aired,
+          libraryIds: [state.libraryId],
+          account: TEST_ACCOUNTS.a,
+        })?.id ?? null,
+      ),
     ).toBe('Aired - S01E02.mkv')
     expect(
-      fileName(media().nextEpisode({ showId: state.special, libraryIds: [state.libraryId] })?.id),
+      fileName(
+        media().nextEpisode({
+          showId: state.special,
+          libraryIds: [state.libraryId],
+          account: TEST_ACCOUNTS.a,
+        })?.id ?? null,
+      ),
     ).toBe('Special - S01E01.mkv')
   })
 
@@ -284,7 +315,12 @@ describe("listing a TV library's shows", () => {
     const libraryIds = [state.libraryId]
     const deal = (roll: number) =>
       media()
-        .shuffledEpisodes({ itemId: state.aired, libraryIds, roll: () => roll })
+        .shuffledEpisodes({
+          itemId: state.aired,
+          libraryIds,
+          roll: () => roll,
+          account: TEST_ACCOUNTS.a,
+        })
         .map((item) => fileName(item.id))
     expect(deal(0.999)).toEqual(['Aired - S01E01.mkv', 'Aired - S01E02.mkv'])
     expect(deal(0)).toEqual(['Aired - S01E02.mkv', 'Aired - S01E01.mkv'])
@@ -301,7 +337,12 @@ describe("listing a TV library's shows", () => {
     const libraryIds = [state.libraryId]
     const deal = (roll: number) =>
       media()
-        .shuffledEpisodes({ itemId: seasonId, libraryIds, roll: () => roll })
+        .shuffledEpisodes({
+          itemId: seasonId,
+          libraryIds,
+          roll: () => roll,
+          account: TEST_ACCOUNTS.a,
+        })
         .map((item) => fileName(item.id))
     expect(deal(0)).toEqual(['Special - S01E01.mkv'])
     expect(deal(0.999)).toEqual(['Special - S01E01.mkv'])
@@ -313,19 +354,35 @@ describe("listing a TV library's shows", () => {
         .get()
         .db.prepare<[], { id: number }>("SELECT id FROM items WHERE type = 'episode' LIMIT 1")
         .get()?.id ?? -1
-    expect(media().shuffledEpisodes({ itemId: state.aired, libraryIds: [] })).toEqual([])
-    expect(media().shuffledEpisodes({ itemId: episodeId, libraryIds: [state.libraryId] })).toEqual(
-      [],
-    )
+    expect(
+      media().shuffledEpisodes({ itemId: state.aired, libraryIds: [], account: TEST_ACCOUNTS.a }),
+    ).toEqual([])
+    expect(
+      media().shuffledEpisodes({
+        itemId: episodeId,
+        libraryIds: [state.libraryId],
+        account: TEST_ACCOUNTS.a,
+      }),
+    ).toEqual([])
   })
 
   it('has none once every episode is watched', () => {
     const viewing = new ViewingRepository(database.get(), media())
-    viewing.report({ id: state.ids.get('Aired - S01E02.mkv') ?? -1, position: 60 })
-    expect(media().nextEpisode({ showId: state.aired, libraryIds: [state.libraryId] })).toBeNull()
+    viewing.report({
+      id: state.ids.get('Aired - S01E02.mkv') ?? -1,
+      position: 60,
+      account: TEST_ACCOUNTS.a,
+    })
+    expect(
+      media().nextEpisode({
+        showId: state.aired,
+        libraryIds: [state.libraryId],
+        account: TEST_ACCOUNTS.a,
+      }),
+    ).toBeNull()
     expect(
       media()
-        .listShows({ libraryId: state.libraryId })
+        .listShows({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })
         .find((entry) => entry.show.id === state.aired)?.next,
     ).toBeNull()
   })
@@ -337,7 +394,7 @@ describe('listing what is in progress', () => {
   const media = () => repositories(database.get()).media
   const titles = (): string[] =>
     media()
-      .listInProgress()
+      .listInProgress({ account: TEST_ACCOUNTS.a })
       .map((item) => item.title)
 
   beforeAll(async () => {
@@ -358,7 +415,12 @@ describe('listing what is in progress', () => {
     })
     const viewing = new ViewingRepository(database.get(), media())
     const watch = ({ name, position, at }: { name: string; position: number; at: string }) =>
-      viewing.report({ id: state.ids.get(name) ?? -1, position, at: new Date(at) })
+      viewing.report({
+        id: state.ids.get(name) ?? -1,
+        position,
+        at: new Date(at),
+        account: TEST_ACCOUNTS.a,
+      })
     watch({ name: 'Alpha', position: 30, at: '2026-01-01T00:00:00.000Z' })
     watch({ name: 'Bravo', position: 20, at: '2026-01-02T00:00:00.000Z' })
     // Finished, and barely started: neither keeps a spot.
@@ -372,7 +434,7 @@ describe('listing what is in progress', () => {
     expect(titles()).toEqual(['Bravo', 'Alpha'])
     expect(
       media()
-        .listInProgress()
+        .listInProgress({ account: TEST_ACCOUNTS.a })
         .map((item) => item.position),
     ).toEqual([20, 30])
   })
@@ -485,7 +547,7 @@ describe('what is watched, card by card', () => {
     return ids
   }
   const finish = (id: number): void => {
-    viewing().report({ id, position: 60 })
+    viewing().report({ id, position: 60, account: TEST_ACCOUNTS.a })
   }
   const mark = ({ id, watched }: { id: number; watched: boolean }): void => {
     new WatchedRepository(database.get()).set({
@@ -495,11 +557,12 @@ describe('what is watched, card by card', () => {
       }),
       watched,
       at: new Date(),
+      account: TEST_ACCOUNTS.a,
     })
   }
   const watchedOf = (title: string): boolean | undefined =>
     media()
-      .list({ libraryId: state.libraryId })
+      .list({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })
       .find((item) => item.title.startsWith(title))?.watched
 
   beforeAll(async () => {
@@ -520,7 +583,7 @@ describe('what is watched, card by card', () => {
     expect(watchedOf('Ronin')).toBe(false)
     expect(
       media()
-        .getMany(ids)
+        .getMany({ ids, account: TEST_ACCOUNTS.a })
         .map((item) => item.watched),
     ).toEqual([true, true])
   })
@@ -532,7 +595,7 @@ describe('what is watched, card by card', () => {
       .db.prepare("UPDATE media SET split = 'cut:Final Cut' WHERE id = ?")
       .run(ids[1] ?? -1)
     finish(ids[1] ?? -1)
-    const [theatrical, finalCut] = media().getMany(ids)
+    const [theatrical, finalCut] = media().getMany({ ids, account: TEST_ACCOUNTS.a })
     expect([theatrical?.watched, finalCut?.watched]).toEqual([false, true])
   })
 
@@ -540,10 +603,15 @@ describe('what is watched, card by card', () => {
     const { ids } = addMovie({ title: 'Collateral', heights: [1080] })
     const id = ids[0] ?? -1
     mark({ id, watched: true })
-    viewing().report({ id, position: 20, at: new Date(Date.now() + 3_600_000) })
+    viewing().report({
+      id,
+      position: 20,
+      at: new Date(Date.now() + 3_600_000),
+      account: TEST_ACCOUNTS.a,
+    })
     expect(
       media()
-        .listInProgress()
+        .listInProgress({ account: TEST_ACCOUNTS.a })
         .find((item) => item.id === id),
     ).toMatchObject({
       watched: true,
@@ -558,7 +626,7 @@ describe('what is watched, card by card', () => {
     )
     finish(second ?? -1)
     const movies = media()
-      .listSagas(state.libraryId)
+      .listSagas({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })
       .flatMap((each) => each.media)
     expect(movies.map((item) => [item.id, item.watched])).toEqual(
       expect.arrayContaining([
@@ -578,7 +646,7 @@ describe('what is watched, card by card', () => {
     filesOf({ episodeId: episodeIds[2] ?? -1, heights: [1080] })
     const entry = () =>
       media()
-        .listShows({ libraryId: state.libraryId })
+        .listShows({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })
         .find((each) => each.show.id === showId)
     expect(entry()).toMatchObject({ episodes: 3, watchedEpisodes: 0 })
     finish(shared[0] ?? -1)
@@ -591,7 +659,8 @@ describe('what is watched, card by card', () => {
     const first = filesOf({ episodeId: episodeIds[0] ?? -1, heights: [1080, 720] })
     const second = filesOf({ episodeId: episodeIds[1] ?? -1, heights: [1080] })
     const libraryIds = [state.libraryId]
-    const next = () => media().nextEpisode({ showId, libraryIds })?.id
+    const next = () =>
+      media().nextEpisode({ showId, libraryIds, account: TEST_ACCOUNTS.a })?.id ?? null
     expect(next()).toBe(first[0])
     finish(first[1] ?? -1)
     expect(next()).toBe(second[0])
@@ -604,7 +673,12 @@ describe('what is watched, card by card', () => {
     const libraryIds = [state.libraryId]
     const deal = (roll: number) =>
       media()
-        .shuffledEpisodes({ itemId: showId, libraryIds, roll: () => roll })
+        .shuffledEpisodes({
+          itemId: showId,
+          libraryIds,
+          roll: () => roll,
+          account: TEST_ACCOUNTS.a,
+        })
         .map((item) => item.id)
     expect(deal(0.999)).toEqual([first[1], second[0]])
     expect(deal(0)).toEqual([second[0], first[1]])
@@ -614,7 +688,11 @@ describe('what is watched, card by card', () => {
     const { showId, episodeIds } = addShow({ title: 'Long', count: SHUFFLE_LENGTH + 1 })
     episodeIds.forEach((episodeId) => filesOf({ episodeId, heights: [1080] }))
     expect(
-      media().shuffledEpisodes({ itemId: showId, libraryIds: [state.libraryId] }),
+      media().shuffledEpisodes({
+        itemId: showId,
+        libraryIds: [state.libraryId],
+        account: TEST_ACCOUNTS.a,
+      }),
     ).toHaveLength(SHUFFLE_LENGTH)
   })
 
@@ -628,9 +706,16 @@ describe('what is watched, card by card', () => {
     })
     filesOf({ episodeId: episodeIds[1] ?? -1, heights: [1080] })
     finish(there[0] ?? -1)
-    expect(media().nextEpisode({ showId, libraryIds: [state.libraryId] })?.id).toBe(here[0])
     expect(
-      media().nextEpisode({ showId, libraryIds: [state.libraryId, state.otherId] })?.item?.episode,
+      media().nextEpisode({ showId, libraryIds: [state.libraryId], account: TEST_ACCOUNTS.a })
+        ?.id ?? null,
+    ).toBe(here[0])
+    expect(
+      media().nextEpisode({
+        showId,
+        libraryIds: [state.libraryId, state.otherId],
+        account: TEST_ACCOUNTS.a,
+      })?.item?.episode ?? null,
     ).toBe(2)
   })
 
@@ -643,9 +728,9 @@ describe('what is watched, card by card', () => {
     })
     filesOf({ episodeId: episodeIds[1] ?? -1, heights: [1080] })
     finish(there[0] ?? -1)
-    expect(media().watchedEpisodes(episodeIds)).toEqual([
+    expect(media().watchedEpisodes({ ids: episodeIds, account: TEST_ACCOUNTS.a })).toEqual([
       { episodeId: episodeIds[0], libraryId: state.otherId },
     ])
-    expect(media().watchedEpisodes([])).toEqual([])
+    expect(media().watchedEpisodes({ ids: [], account: TEST_ACCOUNTS.a })).toEqual([])
   })
 })

@@ -12,6 +12,7 @@ import {
 import { DatabaseService } from '@/db/database'
 import { MediaRepository } from '@/media/mediaRepository'
 import { BEST_FIRST, FIRST_ITEM } from '@/media/mediaSql'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 
 /** A movie's file in a library: the card it sits on, and TMDB's own titles for the movie. */
 type FileRow = {
@@ -81,9 +82,10 @@ export class MovieSplits {
    * The movies with more than one file in the library, by title, each with
    * its cards: one while its files share it, more once split apart, the
    * movie's own card first. Every file is read in one go, and every card's
-   * poster in another, however many movies there are.
+   * poster in another, however many movies there are. Each file is as
+   * `account` sees it.
    */
-  list(libraryId: number): Duplicates {
+  list({ libraryId, account }: { libraryId: number; account: AccountKey }): Duplicates {
     const movies = [
       ...groupBy({ rows: this.files(libraryId), key: (row) => String(row.item_id) }).values(),
     ].flatMap((files) => {
@@ -96,7 +98,7 @@ export class MovieSplits {
     })
     const media = new Map(
       this.media
-        .getMany(movies.flatMap(({ cards }) => cards.flat().map((row) => row.id)))
+        .getMany({ ids: movies.flatMap(({ cards }) => cards.flat().map((row) => row.id)), account })
         .map((item) => [item.id, item]),
     )
     const filed = movies.map(({ itemId, cards }) => ({
@@ -134,10 +136,12 @@ export class MovieSplits {
     libraryId,
     mediaId,
     how,
+    account,
   }: {
     libraryId: number
     mediaId: number
     how: SplitHow
+    account: AccountKey
   }): Duplicates {
     const rows = this.files(libraryId)
     const target = rows.find((row) => row.id === mediaId)
@@ -152,7 +156,7 @@ export class MovieSplits {
     if (how === SPLIT_HOWS.apart) {
       // A file's id outlives a rename, so its card can be named by it.
       this.db.transaction(() => card.forEach((row) => update.run(`file:${row.id}`, row.id)))()
-      return this.list(libraryId)
+      return this.list({ libraryId, account })
     }
     const files = card.map((row) => ({ row, cut: cutOf(row) }))
     if (!canSplitByCut(files)) {
@@ -168,11 +172,19 @@ export class MovieSplits {
         group.forEach(({ row }) => update.run(named == null ? null : `cut:${named.label}`, row.id))
       }),
     )()
-    return this.list(libraryId)
+    return this.list({ libraryId, account })
   }
 
   /** Puts every file of the movie in the library back on its one card. */
-  join({ libraryId, itemId }: { libraryId: number; itemId: number }): Duplicates {
+  join({
+    libraryId,
+    itemId,
+    account,
+  }: {
+    libraryId: number
+    itemId: number
+    account: AccountKey
+  }): Duplicates {
     const changed = this.db
       .prepare(
         `UPDATE media SET split = NULL
@@ -182,6 +194,6 @@ export class MovieSplits {
       .run(libraryId, itemId).changes
     if (changed === 0)
       throw new NotFoundException(`No split movie ${itemId} in library ${libraryId}`)
-    return this.list(libraryId)
+    return this.list({ libraryId, account })
   }
 }

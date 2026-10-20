@@ -3,12 +3,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import type { Viewer } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { WatchedCards } from '@/media/watchedCards'
 import { PLAY_KINDS, WatchedRepository } from '@/media/watchedRepository'
 import { BLANK_ITEM, type FetchedItem } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
-import { repositories } from '@/test/repositories'
+import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
 const TRACKS = { audio: [], subtitles: [], defaultAudio: null, frameRate: 24 }
 
@@ -138,12 +139,14 @@ describe('marking cards watched', () => {
     watched,
     targets,
     viewer = EVERYONE,
+    account = TEST_ACCOUNTS.a,
   }: {
     watched: boolean
     targets: WatchTarget[]
     viewer?: Viewer
+    account?: AccountKey
   }): void => {
-    watching().set({ cards: cards().resolve({ targets, viewer }), watched, at: NOW })
+    watching().set({ cards: cards().resolve({ targets, viewer }), watched, at: NOW, account })
   }
   const file = (id: number): WatchTarget => ({ kind: 'media', id })
   const item = ({
@@ -162,10 +165,16 @@ describe('marking cards watched', () => {
       'SELECT kind, furthest, played_at FROM plays WHERE media_id = ? ORDER BY id',
       id,
     )
-  const watchedOf = (id: number): boolean => stores().media.get(id)?.watched ?? false
-  const spotOf = (id: number): number | undefined =>
-    rows<{ position: number }>('SELECT position FROM playback_progress WHERE media_id = ?', id)[0]
-      ?.position
+  const isWatchedBy = ({ id, account }: { id: number; account: AccountKey }): boolean =>
+    stores().media.get({ id, account })?.watched ?? false
+  const isWatched = (id: number): boolean => isWatchedBy({ id, account: TEST_ACCOUNTS.a })
+  const spotBy = ({ id, account }: { id: number; account: AccountKey }): number | undefined =>
+    rows<{ position: number }>(
+      'SELECT position FROM playback_progress WHERE account_id = ? AND media_id = ?',
+      account,
+      id,
+    ).map((spot) => spot.position)[0]
+  const spotOf = (id: number): number | undefined => spotBy({ id, account: TEST_ACCOUNTS.a })
 
   beforeAll(async () => {
     await database.open()
@@ -184,20 +193,25 @@ describe('marking cards watched', () => {
   it('writes one mark on a card’s best file and clears the spots of every file on it', () => {
     const { ids } = addMovie({ title: 'Heat', heights: [720, 2160, 1080] })
     const [small = -1, best = -1, middle = -1] = ids
-    viewing().report({ id: small, position: 30 })
-    viewing().report({ id: middle, position: 20 })
+    viewing().report({ id: small, position: 30, account: TEST_ACCOUNTS.a })
+    viewing().report({ id: middle, position: 20, account: TEST_ACCOUNTS.a })
     set({ watched: true, targets: [file(small)] })
     expect(playsOf(best)).toEqual([{ kind: 'marked', furthest: 60, played_at: NOW.toISOString() }])
     expect(playsOf(small).map((play) => play.kind)).toEqual(['played'])
     expect([spotOf(small), spotOf(middle)]).toEqual([undefined, undefined])
-    expect(ids.map(watchedOf)).toEqual([true, true, true])
+    expect(ids.map(isWatched)).toEqual([true, true, true])
   })
 
   it('leaves a card that is watched already alone, with its spot and no second mark', () => {
     const { ids } = addMovie({ title: 'Ronin', heights: [1080, 720] })
     const [best = -1, other = -1] = ids
     set({ watched: true, targets: [file(best)] })
-    viewing().report({ id: other, position: 20, at: new Date(NOW.getTime() + 3_600_000) })
+    viewing().report({
+      id: other,
+      position: 20,
+      at: new Date(NOW.getTime() + 3_600_000),
+      account: TEST_ACCOUNTS.a,
+    })
     set({ watched: true, targets: [file(other), file(best)] })
     expect(playsOf(best).map((play) => play.kind)).toEqual(['marked'])
     expect(playsOf(other).map((play) => play.kind)).toEqual(['played'])
@@ -219,7 +233,7 @@ describe('marking cards watched', () => {
     const id = addFile({ libraryId: state.libraryId, name: 'Unprobed', duration: null })
     set({ watched: true, targets: [file(id)] })
     expect(playsOf(id)).toEqual([{ kind: 'marked', furthest: 0, played_at: NOW.toISOString() }])
-    expect(watchedOf(id)).toBe(true)
+    expect(isWatched(id)).toBe(true)
   })
 
   it('clears the spot even where the library saves no progress', () => {
@@ -227,9 +241,9 @@ describe('marking cards watched', () => {
     database
       .get()
       .db.prepare(
-        'INSERT INTO playback_progress (media_id, position, updated_at) VALUES (?, 12, ?)',
+        'INSERT INTO playback_progress (account_id, media_id, position, updated_at) VALUES (?, ?, 12, ?)',
       )
-      .run(id, NOW.toISOString())
+      .run(TEST_ACCOUNTS.a, id, NOW.toISOString())
     set({ watched: true, targets: [file(id)] })
     expect(spotOf(id)).toBeUndefined()
   })
@@ -239,7 +253,7 @@ describe('marking cards watched', () => {
     const [theatrical = -1, cut = -1] = ids
     database.get().db.prepare("UPDATE media SET split = 'cut:Final Cut' WHERE id = ?").run(cut)
     set({ watched: true, targets: [file(cut)] })
-    expect([watchedOf(theatrical), watchedOf(cut)]).toEqual([false, true])
+    expect([isWatched(theatrical), isWatched(cut)]).toEqual([false, true])
     expect(playsOf(theatrical)).toEqual([])
   })
 
@@ -249,13 +263,17 @@ describe('marking cards watched', () => {
     set({ watched: true, targets: episodeIds.map((id) => item({ id })) })
     expect(playsOf(shared).map((play) => play.kind)).toEqual(['marked'])
     set({ watched: false, targets: [item({ id: episodeIds[1] ?? -1 })] })
-    expect(episodeIds.map((id) => stores().media.watchedEpisodes([id]).length)).toEqual([0, 0])
+    expect(
+      episodeIds.map(
+        (id) => stores().media.watchedEpisodes({ ids: [id], account: TEST_ACCOUNTS.a }).length,
+      ),
+    ).toEqual([0, 0])
   })
 
   it('marks a whole show, season by season, one mark for each episode', () => {
     const { showId, episodeIds } = addShow({ title: 'Andor', count: 3 })
     const files = episodeIds.map((id, at) => linkFile({ name: `Andor ${at}`, itemIds: [id] }))
-    viewing().report({ id: files[1] ?? -1, position: 10 })
+    viewing().report({ id: files[1] ?? -1, position: 10, account: TEST_ACCOUNTS.a })
     set({ watched: true, targets: [item({ id: showId })] })
     expect(
       files.map((id) => playsOf(id).filter((play) => play.kind === PLAY_KINDS.marked).length),
@@ -267,11 +285,21 @@ describe('marking cards watched', () => {
     const { ids } = addMovie({ title: 'Collateral', heights: [1080, 720] })
     const [best = -1, other = -1] = ids
     set({ watched: true, targets: [file(best)] })
-    viewing().report({ id: other, position: 60, at: new Date(NOW.getTime() + 3_600_000) })
-    viewing().report({ id: best, position: 20, at: new Date(NOW.getTime() + 7_200_000) })
+    viewing().report({
+      id: other,
+      position: 60,
+      at: new Date(NOW.getTime() + 3_600_000),
+      account: TEST_ACCOUNTS.a,
+    })
+    viewing().report({
+      id: best,
+      position: 20,
+      at: new Date(NOW.getTime() + 7_200_000),
+      account: TEST_ACCOUNTS.a,
+    })
     expect(playsOf(best).map((play) => play.kind)).toEqual(['marked', 'played'])
     set({ watched: false, targets: [file(best)] })
-    expect(watchedOf(best)).toBe(false)
+    expect(isWatched(best)).toBe(false)
     expect(playsOf(best).map((play) => play.kind)).toEqual(['cleared'])
     expect(playsOf(other).map((play) => play.kind)).toEqual(['cleared'])
     expect([spotOf(best), spotOf(other)]).toEqual([undefined, undefined])
@@ -282,8 +310,8 @@ describe('marking cards watched', () => {
     const [done = -1, started = -1] = episodeIds.map((id, at) =>
       linkFile({ name: `Season ${at}`, itemIds: [id] }),
     )
-    viewing().report({ id: done, position: 60, at: NOW })
-    viewing().report({ id: started, position: 20, at: NOW })
+    viewing().report({ id: done, position: 60, at: NOW, account: TEST_ACCOUNTS.a })
+    viewing().report({ id: started, position: 20, at: NOW, account: TEST_ACCOUNTS.a })
     set({ watched: false, targets: [item({ id: showId })] })
     expect(playsOf(done).map((play) => play.kind)).toEqual(['cleared'])
     expect(playsOf(started).map((play) => play.kind)).toEqual(['played'])
@@ -293,12 +321,54 @@ describe('marking cards watched', () => {
   it('counts a later play again after an unwatch', () => {
     const { ids } = addMovie({ title: 'Seen Twice', heights: [1080] })
     const id = ids[0] ?? -1
-    viewing().report({ id, position: 60, at: NOW })
+    viewing().report({ id, position: 60, at: NOW, account: TEST_ACCOUNTS.a })
     set({ watched: false, targets: [file(id)] })
-    expect(watchedOf(id)).toBe(false)
-    viewing().report({ id, position: 59, at: new Date(NOW.getTime() + 60_000) })
+    expect(isWatched(id)).toBe(false)
+    viewing().report({
+      id,
+      position: 59,
+      at: new Date(NOW.getTime() + 60_000),
+      account: TEST_ACCOUNTS.a,
+    })
     expect(playsOf(id).map((play) => play.kind)).toEqual(['cleared', 'played'])
-    expect(watchedOf(id)).toBe(true)
+    expect(isWatched(id)).toBe(true)
+  })
+
+  it('marks and unmarks for one account, leaving another’s marks, spots and Up next', () => {
+    const { ids } = addMovie({ title: 'Thief', heights: [1080] })
+    const id = ids[0] ?? -1
+    viewing().report({ id, position: 20, at: NOW, account: TEST_ACCOUNTS.a })
+    viewing().report({ id, position: 25, at: NOW, account: TEST_ACCOUNTS.b })
+    set({ watched: true, targets: [file(id)] })
+    expect(isWatchedBy({ id, account: TEST_ACCOUNTS.a })).toBe(true)
+    expect(isWatchedBy({ id, account: TEST_ACCOUNTS.b })).toBe(false)
+    expect(spotBy({ id, account: TEST_ACCOUNTS.a })).toBeUndefined()
+    expect(spotBy({ id, account: TEST_ACCOUNTS.b })).toBe(25)
+
+    set({ watched: true, targets: [file(id)], account: TEST_ACCOUNTS.b })
+    set({ watched: false, targets: [file(id)], account: TEST_ACCOUNTS.b })
+    expect(isWatchedBy({ id, account: TEST_ACCOUNTS.a })).toBe(true)
+    expect(isWatchedBy({ id, account: TEST_ACCOUNTS.b })).toBe(false)
+    expect(
+      rows<{ kind: string }>(
+        'SELECT kind FROM plays WHERE account_id = ? AND media_id = ? ORDER BY id',
+        TEST_ACCOUNTS.a,
+        id,
+      ).map((play) => play.kind),
+    ).toEqual([PLAY_KINDS.played, PLAY_KINDS.marked])
+
+    const { showId, episodeIds } = addShow({ title: 'Severance', count: 2 })
+    const [first = -1, second = -1] = episodeIds.map((episode, at) =>
+      linkFile({ name: `Severance ${at}`, itemIds: [episode] }),
+    )
+    set({ watched: true, targets: [item({ id: episodeIds[0] ?? -1 })] })
+    const upNextFor = (account: AccountKey) =>
+      stores().media.nextEpisode({ showId, libraryIds: [state.libraryId], account })?.id ?? null
+    expect(upNextFor(TEST_ACCOUNTS.a)).toBe(second)
+    expect(upNextFor(TEST_ACCOUNTS.b)).toBe(first)
+    expect(stores().media.watchedEpisodes({ ids: episodeIds, account: TEST_ACCOUNTS.b })).toEqual(
+      [],
+    )
   })
 
   it('skips a library the viewer may not see, and a target that names nothing', () => {
@@ -317,8 +387,8 @@ describe('marking cards watched', () => {
       ],
       viewer,
     })
-    expect(watchedOf(hidden.ids[0] ?? -1)).toBe(false)
-    expect(watchedOf(shown.ids[0] ?? -1)).toBe(true)
+    expect(isWatched(hidden.ids[0] ?? -1)).toBe(false)
+    expect(isWatched(shown.ids[0] ?? -1)).toBe(true)
   })
 
   it('marks an item in one library only when asked for that library', () => {
@@ -326,10 +396,10 @@ describe('marking cards watched', () => {
     const there = addFile({ libraryId: state.otherId, name: 'Twice Over elsewhere' })
     stores().metadata.link({ mediaIds: [there], itemIds: [itemId] })
     set({ watched: true, targets: [item({ id: itemId, libraryId: state.otherId })] })
-    expect(watchedOf(there)).toBe(true)
+    expect(isWatched(there)).toBe(true)
     expect(
       stores()
-        .media.forItem(itemId)
+        .media.forItem({ itemId, account: TEST_ACCOUNTS.a })
         .filter((each) => each.libraryId === state.libraryId)
         .map((each) => each.watched),
     ).toEqual([false])
