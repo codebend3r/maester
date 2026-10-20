@@ -14,16 +14,37 @@ import {
   upgradeConfig,
   type ServerEntry,
 } from '@/main/desktopConfig'
+import type { SignInConfig } from '@/main/accounts/authEndpoints'
 import type { StateFs } from '@/main/stateStore'
 
 const idFor = ({ n }: { n: number }): string =>
   `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`
+
+const PIN: SignInConfig = {
+  supabaseUrl: 'https://project.supabase.co',
+  publishableKey: 'sb_publishable_example',
+  webUrl: 'https://s1.example',
+}
 
 const entryFor = ({ n }: { n: number }): ServerEntry => ({
   id: idFor({ n }),
   origin: `https://s${n}.example`,
   name: `Server ${n}`,
   addedAt: n,
+  signIn: null,
+})
+
+/** A server entry as a version 1 to 3 file stored it, before it could pin a sign-in. */
+const storedEntryFor = ({ n }: { n: number }) => {
+  const { signIn: _signIn, ...stored } = entryFor({ n })
+  return stored
+}
+
+const storedV3 = ({ servers }: { servers: ReturnType<typeof storedEntryFor>[] }) => ({
+  version: 3 as const,
+  output: DEFAULT_OUTPUT_SETTINGS,
+  servers,
+  updates: { isEnabled: false, checkedAt: 5 },
 })
 
 const missing = ({ path }: { path: string }): Error =>
@@ -55,9 +76,9 @@ describe('isDesktopConfig', () => {
     expect(isDesktopConfig(EMPTY_CONFIG)).toBe(true)
   })
 
-  it('is version 3 with no servers and the release check on', () => {
+  it('is version 4 with no servers and the release check on', () => {
     expect(EMPTY_CONFIG).toEqual({
-      version: 3,
+      version: 4,
       output: DEFAULT_OUTPUT_SETTINGS,
       servers: [],
       updates: { isEnabled: true, checkedAt: null },
@@ -65,15 +86,15 @@ describe('isDesktopConfig', () => {
   })
 
   it('rejects another version', () => {
-    expect(isDesktopConfig({ ...EMPTY_CONFIG, version: 2 })).toBe(false)
-    expect(isDesktopConfig({ ...EMPTY_CONFIG, version: 4 })).toBe(false)
+    expect(isDesktopConfig({ ...EMPTY_CONFIG, version: 3 })).toBe(false)
+    expect(isDesktopConfig({ ...EMPTY_CONFIG, version: 5 })).toBe(false)
   })
 
   it('rejects a config without output, servers or updates', () => {
     const { output, servers, updates } = EMPTY_CONFIG
-    expect(isDesktopConfig({ version: 3, servers, updates })).toBe(false)
-    expect(isDesktopConfig({ version: 3, output, updates })).toBe(false)
-    expect(isDesktopConfig({ version: 3, output, servers })).toBe(false)
+    expect(isDesktopConfig({ version: 4, servers, updates })).toBe(false)
+    expect(isDesktopConfig({ version: 4, output, updates })).toBe(false)
+    expect(isDesktopConfig({ version: 4, output, servers })).toBe(false)
   })
 
   it('rejects update settings that fail their guard', () => {
@@ -110,6 +131,15 @@ describe('isServerEntry', () => {
     expect(isServerEntry({ ...entryFor({ n: 1 }), id: '../x' })).toBe(false)
   })
 
+  it('accepts a pinned sign-in and rejects a missing or malformed one', () => {
+    expect(isServerEntry({ ...entryFor({ n: 1 }), signIn: PIN })).toBe(true)
+    expect(isServerEntry(storedEntryFor({ n: 1 }))).toBe(false)
+    expect(isServerEntry({ ...entryFor({ n: 1 }), signIn: { ...PIN, webUrl: 3 } })).toBe(false)
+    expect(isServerEntry({ ...entryFor({ n: 1 }), signIn: { supabaseUrl: PIN.supabaseUrl } })).toBe(
+      false,
+    )
+  })
+
   it('rejects a missing name or time', () => {
     expect(isServerEntry({ ...entryFor({ n: 1 }), name: undefined })).toBe(false)
     expect(isServerEntry({ ...entryFor({ n: 1 }), addedAt: 'now' })).toBe(false)
@@ -125,33 +155,49 @@ describe('isStoredConfig', () => {
     expect(isStoredConfig({ version: 2, output: DEFAULT_OUTPUT_SETTINGS, servers: [] })).toBe(true)
   })
 
-  it('accepts a version 3 file', () => {
+  it('accepts a version 3 file whose servers have no sign-in', () => {
+    expect(isStoredConfig(storedV3({ servers: [storedEntryFor({ n: 1 })] }))).toBe(true)
+  })
+
+  it('accepts a version 4 file', () => {
     expect(isStoredConfig(EMPTY_CONFIG)).toBe(true)
   })
 
   it('rejects an unknown version', () => {
-    expect(isStoredConfig({ ...EMPTY_CONFIG, version: 4 })).toBe(false)
+    expect(isStoredConfig({ ...EMPTY_CONFIG, version: 5 })).toBe(false)
   })
 })
 
 describe('upgradeConfig', () => {
-  it('turns version 1 into version 3 with no servers and the release check on', () => {
+  it('turns version 1 into version 4 with no servers and the release check on', () => {
     const output = { ...DEFAULT_OUTPUT_SETTINGS, profile: 'passthrough' as const }
     expect(upgradeConfig({ version: 1, output })).toEqual({
-      version: 3,
+      version: 4,
       output,
       servers: [],
       updates: { isEnabled: true, checkedAt: null },
     })
   })
 
-  it('turns version 2 into version 3 with its servers and the release check on', () => {
-    const servers = [entryFor({ n: 1 })]
+  it('turns version 2 into version 4 with its servers unpinned and the release check on', () => {
+    const servers = [storedEntryFor({ n: 1 })]
     expect(upgradeConfig({ version: 2, output: DEFAULT_OUTPUT_SETTINGS, servers })).toEqual({
-      version: 3,
+      version: 4,
       output: DEFAULT_OUTPUT_SETTINGS,
-      servers,
+      servers: [entryFor({ n: 1 })],
       updates: { isEnabled: true, checkedAt: null },
+    })
+  })
+
+  it('turns version 3 into version 4 with every server unpinned and its update settings kept', () => {
+    const upgraded = upgradeConfig(
+      storedV3({ servers: [storedEntryFor({ n: 1 }), storedEntryFor({ n: 2 })] }),
+    )
+    expect(upgraded).toEqual({
+      version: 4,
+      output: DEFAULT_OUTPUT_SETTINGS,
+      servers: [entryFor({ n: 1 }), entryFor({ n: 2 })],
+      updates: { isEnabled: false, checkedAt: 5 },
     })
   })
 
@@ -161,10 +207,10 @@ describe('upgradeConfig', () => {
     expect(Object.keys(upgraded.output).length).toBe(4)
   })
 
-  it('keeps a version 3 config as it is', () => {
+  it('keeps a version 4 config as it is, pins included', () => {
     const config = {
       ...EMPTY_CONFIG,
-      servers: [entryFor({ n: 1 }), entryFor({ n: 2 })],
+      servers: [entryFor({ n: 1 }), { ...entryFor({ n: 2 }), signIn: PIN }],
       updates: { isEnabled: false, checkedAt: 5 },
     }
     expect(upgradeConfig(config)).toEqual(config)
@@ -179,7 +225,7 @@ describe('upgradeConfig', () => {
     expect(fromTwo.updates).toEqual(DEFAULT_UPDATE_SETTINGS)
   })
 
-  it('rebuilds the version 3 update settings from their two fields', () => {
+  it('rebuilds the update settings from their two fields', () => {
     const updates = { isEnabled: false, checkedAt: 5, url: 'https://evil.example/' }
     expect(upgradeConfig({ ...EMPTY_CONFIG, updates }).updates).toEqual({
       isEnabled: false,
@@ -214,12 +260,35 @@ describe('upgradeConfig', () => {
     expect(upgradeConfig({ ...EMPTY_CONFIG, servers }).servers).toEqual(servers.slice(0, 20))
   })
 
-  it('rebuilds each entry from its four fields', () => {
+  it('rebuilds each entry from its five fields', () => {
     const stray = { ...entryFor({ n: 1 }), token: 'secret' }
     const upgraded = upgradeConfig({ ...EMPTY_CONFIG, servers: [stray] })
     expect(upgraded.servers.map((server) => Object.keys(server).toSorted())).toEqual([
-      ['addedAt', 'id', 'name', 'origin'],
+      ['addedAt', 'id', 'name', 'origin', 'signIn'],
     ])
+  })
+
+  it('rebuilds a pinned sign-in from its three fields, with its origins canonical', () => {
+    const stray = {
+      ...entryFor({ n: 1 }),
+      signIn: { ...PIN, supabaseUrl: 'HTTPS://Project.Supabase.co/', token: 'secret' },
+    }
+    const upgraded = upgradeConfig({ ...EMPTY_CONFIG, servers: [stray] })
+    expect(upgraded.servers[0]?.signIn ?? null).toEqual(PIN)
+  })
+
+  it.each([
+    ['an http Supabase URL', { ...PIN, supabaseUrl: 'http://project.supabase.co' }],
+    ['a Supabase URL with a path', { ...PIN, supabaseUrl: 'https://project.supabase.co/auth/v1' }],
+    ['a web URL with credentials', { ...PIN, webUrl: 'https://user:pw@s1.example' }],
+    ['a key that is not publishable', { ...PIN, publishableKey: 'sb_secret_example' }],
+    ['no key', { ...PIN, publishableKey: '' }],
+  ])('drops a stored sign-in with %s and keeps the server', (_, signIn) => {
+    const upgraded = upgradeConfig({
+      ...EMPTY_CONFIG,
+      servers: [{ ...entryFor({ n: 1 }), signIn }],
+    })
+    expect(upgraded.servers).toEqual([entryFor({ n: 1 })])
   })
 
   it.each([
@@ -238,7 +307,10 @@ describe('upgradeConfig', () => {
   })
 
   it('does not mutate its input', () => {
-    const stored = { ...EMPTY_CONFIG, servers: [entryFor({ n: 1 }), entryFor({ n: 1 })] }
+    const stored = {
+      ...EMPTY_CONFIG,
+      servers: [{ ...entryFor({ n: 1 }), signIn: PIN }, entryFor({ n: 1 })],
+    }
     const before = structuredClone(stored)
     upgradeConfig(stored)
     expect(stored).toEqual(before)
@@ -250,24 +322,37 @@ describe('loadConfig', () => {
   const now = () => 1700000000000
   const load = ({ fs }: { fs: StateFs }) => loadConfig({ fs, file: FILE, now })
 
-  it('reads a version 1 file as version 3 with no servers', async () => {
+  it('reads a version 1 file as version 4 with no servers', async () => {
     const output = { ...DEFAULT_OUTPUT_SETTINGS, spatial: true }
     const { fs, files } = fakeFs({ initial: { [FILE]: JSON.stringify({ version: 1, output }) } })
     expect(await load({ fs })).toEqual({ ...EMPTY_CONFIG, output })
     expect([...files.keys()]).toEqual([FILE])
   })
 
-  it('reads a version 2 file as version 3 with its servers', async () => {
-    const servers = [entryFor({ n: 1 })]
-    const written = { version: 2, output: DEFAULT_OUTPUT_SETTINGS, servers }
+  it('reads a version 2 file as version 4 with its servers unpinned', async () => {
+    const written = {
+      version: 2,
+      output: DEFAULT_OUTPUT_SETTINGS,
+      servers: [storedEntryFor({ n: 1 })],
+    }
     const { fs } = fakeFs({ initial: { [FILE]: JSON.stringify(written) } })
-    expect(await load({ fs })).toEqual({ ...EMPTY_CONFIG, servers })
+    expect(await load({ fs })).toEqual({ ...EMPTY_CONFIG, servers: [entryFor({ n: 1 })] })
   })
 
-  it('reads a version 3 file with its update settings', async () => {
-    const written = {
+  it('reads a version 3 file as version 4 with its servers unpinned and its update settings', async () => {
+    const written = storedV3({ servers: [storedEntryFor({ n: 1 })] })
+    const { fs } = fakeFs({ initial: { [FILE]: JSON.stringify(written) } })
+    expect(await load({ fs })).toEqual({
       ...EMPTY_CONFIG,
       servers: [entryFor({ n: 1 })],
+      updates: { isEnabled: false, checkedAt: 5 },
+    })
+  })
+
+  it('reads a version 4 file with its pinned sign-in', async () => {
+    const written = {
+      ...EMPTY_CONFIG,
+      servers: [{ ...entryFor({ n: 1 }), signIn: PIN }],
       updates: { isEnabled: false, checkedAt: 5 },
     }
     const { fs } = fakeFs({ initial: { [FILE]: JSON.stringify(written) } })
@@ -287,7 +372,7 @@ describe('loadConfig', () => {
   })
 
   it('renames a file from a later version aside and starts empty', async () => {
-    const text = JSON.stringify({ ...EMPTY_CONFIG, version: 4 })
+    const text = JSON.stringify({ ...EMPTY_CONFIG, version: 5 })
     const { fs, files } = fakeFs({ initial: { [FILE]: text } })
     expect(await load({ fs })).toEqual(EMPTY_CONFIG)
     expect(files.has(FILE)).toBe(false)
