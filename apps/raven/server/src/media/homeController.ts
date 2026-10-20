@@ -1,4 +1,4 @@
-import { Controller, Get, Headers, Inject, Query } from '@nestjs/common'
+import { Controller, Get, Req, Inject, Query } from '@nestjs/common'
 import {
   HOME_SHELF_TYPES,
   type Home,
@@ -8,7 +8,7 @@ import {
   isString,
   listsShows,
 } from '@raven/core'
-import { RAVEN_HEADERS } from '@/http'
+import type { FastifyRequest } from 'fastify'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { LockService, type Viewer } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
@@ -56,8 +56,8 @@ export class HomeController {
    * library's newest arrivals; libraries still locked stay out.
    */
   @Get()
-  home(@Headers(RAVEN_HEADERS.cookie) cookie: string | undefined): Home {
-    const viewer = this.lock.viewer({ cookie })
+  home(@Req() request: FastifyRequest): Home {
+    const viewer = this.lock.viewer({ request })
     const shelves = this.seenBy(viewer)
       .filter((library) => library.settings.pinned)
       .map((library) => this.shelf({ library, search: '', sort: 'added', limit: SHELF_SIZE }))

@@ -3,7 +3,7 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
+  Req,
   Inject,
   NotFoundException,
   Param,
@@ -34,9 +34,8 @@ import {
   MATCH_STATES,
   MATCH_SUBJECT_KINDS,
 } from '@raven/core'
-import type { FastifyReply } from 'fastify'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AdminOnly } from '@/admin/adminGuard'
-import { RAVEN_HEADERS } from '@/http'
 import { isChoosableImageKind } from '@/items/imageKinds'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
@@ -69,7 +68,7 @@ const DETAILS_DEADLINE_MS = 2500
 
 const WHOLE_NUMBER = /^\d+$/
 
-/** What a search scores against when it is for nothing on disk, or for something this browser may not see. */
+/** What a search scores against when it is for nothing on disk, or for something this caller may not see. */
 const NOTHING_ON_DISK = { onDisk: null, country: null } as const satisfies {
   onDisk: OnDisk | null
   country: string | null
@@ -144,12 +143,12 @@ export class MatchController {
     @Query('libraryId') libraryId: string | undefined,
     @Query('mediaId') mediaId: string | undefined,
     @Query('itemId') itemId: string | undefined,
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Req() request: FastifyRequest,
   ): Promise<MatchCandidate[]> {
     if (!isMatchItemType(type)) throw new BadRequestException('type must be movie or show')
     const typed = splitCountry(query?.trim() ?? '')
     if (!typed.title) throw new BadRequestException('Search for a title.')
-    const preferred = this.preferredBy({ libraryId, cookie })
+    const preferred = this.preferredBy({ libraryId, request })
     const subject = subjectFrom({ mediaId, itemId })
     this.requireTmdb()
     const parsedYear = Number.parseInt(year ?? '', 10)
@@ -159,7 +158,7 @@ export class MatchController {
     ).catch(tmdbFailure)
     const rank = (result: SearchResult): number => (fitsTier({ tier: preferred, result }) ? 0 : 1)
     const ordered = results.toSorted((a, b) => rank(a) - rank(b))
-    const { onDisk, country } = this.onDiskOf({ type, subject, cookie })
+    const { onDisk, country } = this.onDiskOf({ type, subject, request })
     const scoring = {
       title: asked.query,
       year: asked.year,
@@ -192,22 +191,22 @@ export class MatchController {
 
   /**
    * The tier a library's type prefers first; every result for no library,
-   * one raven no longer has, or one the lock keeps from this browser, so the
+   * one raven no longer has, or one the lock keeps from this caller, so the
    * order never tells a hidden library's type, or that it is there.
    */
   private preferredBy({
     libraryId,
-    cookie,
+    request,
   }: {
     libraryId: string | undefined
-    cookie: string | undefined
+    request: FastifyRequest
   }): CandidateTier {
     if (libraryId == null) return {}
     if (!WHOLE_NUMBER.test(libraryId)) {
       throw new BadRequestException('libraryId must be a library id')
     }
     const id = Number(libraryId)
-    if (!this.lock.viewer({ cookie }).seesLibrary(id)) return {}
+    if (!this.lock.viewer({ request }).seesLibrary(id)) return {}
     const kind = this.libraries.get(id)?.settings.kind
     return kind == null ? {} : firstTierFor(kind)
   }
@@ -215,19 +214,19 @@ export class MatchController {
   /**
    * What a search's subject has on disk, and the country its name gives;
    * nothing for no subject, one raven no longer has, or one in a library
-   * the lock keeps from this browser, so the scores never tell it is there.
+   * the lock keeps from this caller, so the scores never tell it is there.
    */
   private onDiskOf({
     type,
     subject,
-    cookie,
+    request,
   }: {
     type: MatchItemType
     subject: MatchSubject | null
-    cookie: string | undefined
+    request: FastifyRequest
   }): { onDisk: OnDisk | null; country: string | null } {
     if (subject == null) return NOTHING_ON_DISK
-    const viewer = this.lock.viewer({ cookie })
+    const viewer = this.lock.viewer({ request })
     // An extra is never matched (`off`), so a trailer's numbers say nothing of the show.
     const files = this.subjectFiles({ type, subject }).filter(
       (file) => file.match !== MATCH_STATES.off && viewer.seesLibrary(file.libraryId),

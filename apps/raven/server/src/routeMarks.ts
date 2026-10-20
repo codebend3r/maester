@@ -3,18 +3,20 @@ import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
 import { Reflector } from '@nestjs/core'
 import { isNumber, isRecord, isString } from '@raven/core'
 import { type Audience, audienceMarkProblems, audienceOf } from '@/admin/adminGuard'
+import { type AccountRequirement, accountRuleOf } from '@/auth/accountGuard'
 import { type LockMark, lockMarkOf, lockMarkProblems } from '@/lock/lockGuard'
 import { isMediaPlaneRoute } from '@/media/mediaPlaneMark'
 
 /** Where a route's mark is read: its handler, then its controller, the first mark found winning. */
 export type MarkTargets = Parameters<Reflector['getAllAndOverride']>[1]
 
-/** A route as its decorators declare it, with what it says to the PIN lock and to the admin lock, and whether it is on the media plane. */
+/** A route as its decorators declare it, with what it says to the PIN lock, to the admin lock and to the account gate, and whether it is on the media plane. */
 export type RouteMark = {
   method: string
   path: string
   lock: LockMark | null
   audience: Audience | null
+  account: AccountRequirement
   mediaPlane: boolean
 }
 
@@ -49,6 +51,7 @@ export const routeMarks = (controllers: readonly Type[]): RouteMark[] =>
           path: joinPath([base, path]),
           lock: lockMarkOf(targets),
           audience: audienceOf(targets),
+          account: accountRuleOf(targets).requirement,
           mediaPlane: isMediaPlaneRoute(targets),
         },
       ]

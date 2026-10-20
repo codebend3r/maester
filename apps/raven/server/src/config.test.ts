@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ACCOUNTS_OPT_OUT, AUTH_ENV } from '@/auth/authConfig'
 import { readServerConfig } from '@/config'
 
 describe('readServerConfig', () => {
@@ -64,6 +65,19 @@ describe('readServerConfig', () => {
       webOrigins: [],
       secret: null,
       problems: [],
+      secretProblems: [],
     })
+  })
+
+  it('opts out of accounts only for exactly the opt-out value', () => {
+    expect(readServerConfig({}).isAccountsOptedOut).toBe(false)
+    expect(readServerConfig({ [AUTH_ENV.accounts]: ACCOUNTS_OPT_OUT }).isAccountsOptedOut).toBe(
+      true,
+    )
+    expect(
+      ['', 'on', 'OFF', ' off', 'false', '0'].map(
+        (value) => readServerConfig({ [AUTH_ENV.accounts]: value }).isAccountsOptedOut,
+      ),
+    ).toEqual([false, false, false, false, false, false])
   })
 })

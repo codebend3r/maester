@@ -1,11 +1,16 @@
 import { type DynamicModule, Module } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
+import type { AuthConfig } from '@raven/core'
 import type { JWTVerifyGetKey } from 'jose'
+import { ACCESS_RECHECK_MS, AccessRechecks, DEFAULT_ACCESS_RECHECK_MS } from '@/auth/accessRechecks'
 import { AccountGuard } from '@/auth/accountGuard'
 import { AccountTickets } from '@/auth/accountTickets'
 import { AuthBackend } from '@/auth/authBackend'
 import { AuthController } from '@/auth/authController'
+import { AUTH_STATE, resolveAuthState } from '@/auth/effectiveAuth'
 import { AUTH_VERIFY, AuthSessions } from '@/auth/authSessions'
+import { Management } from '@/auth/management'
+import { MEMBERSHIP_TTL, MEMBERSHIP_TTL_MS, MembershipLookups } from '@/auth/membershipLookups'
 import { AUTH_FETCH, createTokenVerifier, type AuthFetch } from '@/auth/tokenVerifier'
 import { AdminController } from '@/admin/adminController'
 import { AdminGuard } from '@/admin/adminGuard'
@@ -105,7 +110,7 @@ const DEFAULT_WATCH: WatchOptions = {
 /**
  * Takes its config as an argument so a test can point it at a temporary data
  * dir, the fetches metadata and the AI lookup use so a test can answer for TMDB and Claude, and the
- * watcher's timing so a test need not wait.
+ * watcher's and the access rechecks' timing so a test need not wait.
  */
 @Module({})
 export class AppModule {
@@ -116,6 +121,8 @@ export class AppModule {
     watch = {},
     authFetch = ({ url, init }) => fetch(url, init),
     authKeys,
+    accessRecheckMs = DEFAULT_ACCESS_RECHECK_MS,
+    membershipTtlMs = MEMBERSHIP_TTL_MS,
   }: {
     config: ServerConfig
     metadataFetch?: MetadataFetch
@@ -123,6 +130,8 @@ export class AppModule {
     watch?: Partial<WatchOptions>
     authFetch?: AuthFetch
     authKeys?: JWTVerifyGetKey
+    accessRecheckMs?: number
+    membershipTtlMs?: number
   }): DynamicModule {
     assertRoutesMarked(CONTROLLERS)
     return {
@@ -132,12 +141,25 @@ export class AppModule {
         { provide: SERVER_CONFIG, useValue: config },
         { provide: AUTH_FETCH, useValue: authFetch },
         {
+          provide: AUTH_STATE,
+          inject: [SERVER_CONFIG, SettingsRepository],
+          useFactory: (serverConfig: ServerConfig, settings: SettingsRepository) =>
+            resolveAuthState({ config: serverConfig, settings }),
+        },
+        {
           provide: AUTH_VERIFY,
-          useValue: createTokenVerifier({ config: config.auth, keys: authKeys, authFetch }),
+          inject: [AUTH_STATE],
+          useFactory: (auth: AuthConfig) =>
+            createTokenVerifier({ config: auth, keys: authKeys, authFetch }),
         },
         AuthBackend,
+        { provide: MEMBERSHIP_TTL, useValue: membershipTtlMs },
+        MembershipLookups,
         AuthSessions,
+        Management,
         AccountTickets,
+        { provide: ACCESS_RECHECK_MS, useValue: accessRecheckMs },
+        AccessRechecks,
         { provide: METADATA_FETCH, useValue: metadataFetch },
         { provide: AI_FETCH, useValue: aiFetch },
         { provide: WATCH_OPTIONS, useValue: { ...DEFAULT_WATCH, ...watch } },
@@ -184,8 +206,7 @@ export class AppModule {
         LockService,
         MediaTickets,
         StreamSessions,
-        // Account routes and new account tickets are protected immediately;
-        // existing library routes keep their current access until cutover.
+        // First the account gate: with accounts ready, every route but the open ones needs an account.
         { provide: APP_GUARD, useClass: AccountGuard },
         // Every route passes the lock first; those marked PrivateBy, or on a controller that is, are held.
         { provide: APP_GUARD, useClass: LockGuard },

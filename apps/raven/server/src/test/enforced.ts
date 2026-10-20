@@ -1,0 +1,295 @@
+import { join } from 'node:path'
+import type { NestFastifyApplication } from '@nestjs/platform-fastify'
+import {
+  AUTH_HEADERS,
+  AUTH_PATHS,
+  type ApiClient,
+  ITEM_TYPES,
+  LIBRARY_KINDS,
+  MEDIA_TICKET_PARAM,
+  type MediaOrigin,
+  createApiClient,
+  isAuthRefusal,
+} from '@raven/core'
+import { CACHE_POLICIES, CONTENT_TYPES, HEADERS } from '@shared/server'
+import { createApp } from '@/app'
+import { ACCOUNT_REQUIREMENTS } from '@/auth/accountGuard'
+import { MetadataRepository } from '@/metadata/metadataRepository'
+import { MetadataService } from '@/metadata/metadataService'
+import { ScannerService } from '@/scanner/scannerService'
+import { ThumbnailService } from '@/thumbnails/thumbnailService'
+import { NOT_WATCHING, ROUTE_METHODS, testConfig } from '@/test/app'
+import {
+  AUTH_TEST_CONFIG,
+  AUTH_TEST_IDS,
+  authCookie,
+  authFixture,
+  bearerHeaders,
+} from '@/test/auth'
+import { encodeClip } from '@/test/clips'
+import { fakeTmdb } from '@/test/fakeTmdb'
+import { injectFetch } from '@/test/server'
+
+const { get: GET, post: POST, put: PUT, delete: DELETE } = ROUTE_METHODS
+const { anyone, session, approved, owner } = ACCOUNT_REQUIREMENTS
+
+/**
+ * Every route the server declares, with the account it asks for once
+ * accounts are `ready`. A route missing here, or declared differently, fails
+ * the inventory test, so a new route is never open by accident.
+ */
+export const ROUTES = {
+  adminLock: { method: GET, path: '/api/admin', account: approved },
+  adminKeepUnlocked: { method: POST, path: '/api/admin/keep-unlocked', account: approved },
+  adminRelock: { method: POST, path: '/api/admin/lock', account: approved },
+  adminUnlock: { method: POST, path: '/api/admin/unlock', account: approved },
+  authConfig: { method: GET, path: AUTH_PATHS.config, account: anyone },
+  accountTicket: { method: POST, path: AUTH_PATHS.ticket, account: approved },
+  members: { method: GET, path: AUTH_PATHS.members, account: owner },
+  memberStatus: { method: POST, path: AUTH_PATHS.memberStatus, account: owner },
+  events: { method: GET, path: '/api/events', account: approved },
+  favourites: { method: GET, path: '/api/favourites', account: approved },
+  favouriteTitles: { method: GET, path: '/api/favourites/titles', account: approved },
+  browse: { method: GET, path: '/api/fs/browse', account: owner },
+  health: { method: GET, path: '/api/health', account: anyone },
+  home: { method: GET, path: '/api/home', account: approved },
+  homeSearch: { method: GET, path: '/api/home/search', account: approved },
+  cachedImage: { method: GET, path: '/api/images/:use/:file', account: approved },
+  item: { method: GET, path: '/api/items/:id', account: approved },
+  itemFavourite: { method: PUT, path: '/api/items/:id/favourite', account: approved },
+  itemImages: { method: GET, path: '/api/items/:id/images', account: owner },
+  itemImage: { method: GET, path: '/api/items/:id/images/:kind', account: approved },
+  chooseItemImage: { method: PUT, path: '/api/items/:id/images/:kind', account: owner },
+  itemLocalImage: { method: GET, path: '/api/items/:id/images/:kind/local', account: approved },
+  matchItem: { method: PUT, path: '/api/items/:id/match', account: owner },
+  itemMetadata: { method: GET, path: '/api/items/:id/metadata', account: owner },
+  editItemMetadata: { method: PUT, path: '/api/items/:id/metadata', account: owner },
+  nextEpisode: { method: GET, path: '/api/items/:id/next', account: approved },
+  refreshItem: { method: POST, path: '/api/items/:id/refresh', account: owner },
+  shuffle: { method: GET, path: '/api/items/:id/shuffle', account: approved },
+  libraries: { method: GET, path: '/api/libraries', account: approved },
+  createLibrary: { method: POST, path: '/api/libraries', account: owner },
+  library: { method: GET, path: '/api/libraries/:id', account: approved },
+  updateLibrary: { method: PUT, path: '/api/libraries/:id', account: owner },
+  deleteLibrary: { method: DELETE, path: '/api/libraries/:id', account: owner },
+  duplicates: { method: GET, path: '/api/libraries/:id/duplicates', account: approved },
+  joinDuplicates: { method: POST, path: '/api/libraries/:id/duplicates/join', account: owner },
+  splitDuplicates: { method: POST, path: '/api/libraries/:id/duplicates/split', account: owner },
+  libraryFavourites: { method: GET, path: '/api/libraries/:id/favourites', account: approved },
+  history: { method: GET, path: '/api/libraries/:id/history', account: approved },
+  inProgress: { method: GET, path: '/api/libraries/:id/in-progress', account: approved },
+  matchLibrary: { method: POST, path: '/api/libraries/:id/match', account: owner },
+  libraryMedia: { method: GET, path: '/api/libraries/:id/media', account: approved },
+  refreshLibrary: { method: POST, path: '/api/libraries/:id/refresh', account: owner },
+  sagas: { method: GET, path: '/api/libraries/:id/sagas', account: approved },
+  sagaBackdrop: {
+    method: PUT,
+    path: '/api/libraries/:id/sagas/:sagaId/backdrop',
+    account: owner,
+  },
+  scan: { method: POST, path: '/api/libraries/:id/scan', account: owner },
+  shows: { method: GET, path: '/api/libraries/:id/shows', account: approved },
+  unmatched: { method: GET, path: '/api/libraries/:id/unmatched', account: approved },
+  libraryView: { method: PUT, path: '/api/libraries/:id/view', account: approved },
+  lockState: { method: GET, path: '/api/lock', account: approved },
+  relock: { method: POST, path: '/api/lock/lock', account: approved },
+  unlock: { method: POST, path: '/api/lock/unlock', account: approved },
+  matchSearch: { method: GET, path: '/api/match/search', account: owner },
+  me: { method: GET, path: AUTH_PATHS.me, account: session },
+  mediaOrigins: { method: GET, path: '/api/media-origins', account: approved },
+  ping: { method: GET, path: '/api/media-origins/ping', account: anyone },
+  media: { method: GET, path: '/api/media/:id', account: approved },
+  deleteMedia: { method: DELETE, path: '/api/media/:id', account: owner },
+  mediaFavourite: { method: PUT, path: '/api/media/:id/favourite', account: approved },
+  file: { method: GET, path: '/api/media/:id/file', account: approved },
+  location: { method: GET, path: '/api/media/:id/location', account: owner },
+  matchMedia: { method: PUT, path: '/api/media/:id/match', account: owner },
+  plays: { method: POST, path: '/api/media/:id/plays', account: approved },
+  progress: { method: PUT, path: '/api/media/:id/progress', account: approved },
+  stream: { method: GET, path: '/api/media/:id/stream', account: approved },
+  mediaStreams: { method: GET, path: '/api/media/:id/streams', account: approved },
+  subtitles: { method: GET, path: '/api/media/:id/subtitles/:trackId', account: approved },
+  thumbnail: { method: GET, path: '/api/media/:id/thumbnail', account: approved },
+  mediaTicket: { method: GET, path: '/api/media/:id/ticket', account: approved },
+  tracks: { method: GET, path: '/api/media/:id/tracks', account: approved },
+  person: { method: GET, path: '/api/people/:id', account: approved },
+  personPhoto: { method: GET, path: '/api/people/:id/photo', account: approved },
+  reviewAvatar: { method: GET, path: '/api/reviews/:id/avatar', account: approved },
+  displaySettings: { method: GET, path: '/api/settings/display', account: approved },
+  saveDisplaySettings: { method: PUT, path: '/api/settings/display', account: owner },
+  playbackSettings: { method: GET, path: '/api/settings/playback', account: approved },
+  savePlaybackSettings: { method: PUT, path: '/api/settings/playback', account: owner },
+  streams: { method: GET, path: '/api/streams', account: owner },
+  stopStream: { method: POST, path: '/api/streams/:id/stop', account: owner },
+  watched: { method: PUT, path: '/api/watched', account: approved },
+} as const
+
+export type Route = (typeof ROUTES)[keyof typeof ROUTES]
+
+/** `path` with each `:name` filled from `params`, else with `1`. */
+export const pathOf = ({
+  route,
+  params = {},
+}: {
+  route: Route
+  params?: Record<string, number | string>
+}): string =>
+  route.path
+    .split('/')
+    .map((segment) => (segment.startsWith(':') ? String(params[segment.slice(1)] ?? 1) : segment))
+    .join('/')
+
+/** `route`'s path with a media ticket in `?t=`, as the media plane is asked for it. */
+export const withTicket = ({
+  route,
+  params,
+  ticket,
+}: {
+  route: Route
+  params?: Record<string, number | string>
+  ticket: string
+}): string => `${pathOf({ route, params })}?${MEDIA_TICKET_PARAM}=${ticket}`
+
+/** Who a request comes from, by the account its token names, or none. */
+export const CALLER_KINDS = {
+  anonymous: 'anonymous',
+  unverified: 'unverified',
+  pending: 'pending',
+  revoked: 'revoked',
+  member: 'member',
+  owner: 'owner',
+} as const
+
+export type CallerKind = (typeof CALLER_KINDS)[keyof typeof CALLER_KINDS]
+
+/** How a caller's token travels: the Authorization header, or the web's session cookie. */
+export const TOKEN_CARRIERS = { bearer: 'bearer', cookie: 'cookie' } as const
+
+const CALLER_IDS = {
+  [CALLER_KINDS.unverified]: AUTH_TEST_IDS.missing,
+  [CALLER_KINDS.pending]: AUTH_TEST_IDS.pending,
+  [CALLER_KINDS.revoked]: AUTH_TEST_IDS.revoked,
+  [CALLER_KINDS.member]: AUTH_TEST_IDS.friend,
+  [CALLER_KINDS.owner]: AUTH_TEST_IDS.owner,
+} as const
+
+type AuthFixture = Awaited<ReturnType<typeof authFixture>>
+
+/** The headers `caller` sends, with a freshly minted token carried `via` Bearer or the cookie. */
+export const headersFor = async ({
+  fixture,
+  caller,
+  via,
+}: {
+  fixture: AuthFixture
+  caller: CallerKind
+  via: (typeof TOKEN_CARRIERS)[keyof typeof TOKEN_CARRIERS]
+}): Promise<Record<string, string>> => {
+  if (caller === CALLER_KINDS.anonymous) return {}
+  const token = await fixture.mint({ id: CALLER_IDS[caller] })
+  return via === TOKEN_CARRIERS.bearer
+    ? bearerHeaders({ token })
+    : { [AUTH_HEADERS.cookie]: authCookie({ token }) }
+}
+
+/** An injected response, as far as `outcomeOf` reads it. */
+type Answered = {
+  statusCode: number
+  headers: Record<string, unknown>
+  body: string
+  json: () => unknown
+}
+
+/** What a response says about who may have it: its status, its refusal, and how it may be cached. */
+export const outcomeOf = ({
+  response,
+}: {
+  response: Answered
+}): {
+  status: number
+  reason: string | null
+  isVariedByAccount: boolean
+  isNoStore: boolean
+} => {
+  const isJson = String(response.headers[HEADERS.contentType] ?? '').startsWith(CONTENT_TYPES.json)
+  const body: unknown = isJson && response.body !== '' ? response.json() : null
+  const vary = String(response.headers[HEADERS.vary] ?? '')
+  return {
+    status: response.statusCode,
+    reason: isAuthRefusal(body) ? body.reason : null,
+    isVariedByAccount:
+      vary.includes(AUTH_HEADERS.authorization) && vary.includes(AUTH_HEADERS.cookie),
+    isNoStore: response.headers[HEADERS.cacheControl] === CACHE_POLICIES.noStore,
+  }
+}
+
+const MATRIX = { id: 603, title: 'The Matrix', released: '1999-03-31' } as const
+
+/**
+ * A server with accounts `ready`, on which the owner has made and scanned
+ * one movies library holding The Matrix, matched against a fake TMDB. The
+ * owner manages by Bearer alone; no admin cookie is involved.
+ */
+export const createEnforcedApp = async ({
+  root,
+  fixture,
+  libraryPin = null,
+  mediaSecret = null,
+  mediaOrigins = [],
+  accessRecheckMs,
+}: {
+  root: string
+  fixture: AuthFixture
+  libraryPin?: string | null
+  /** RAVEN_MEDIA_SECRET, for a test that needs a legacy ticket to offer. */
+  mediaSecret?: Buffer | null
+  /** RAVEN_MEDIA_ORIGINS, as the server reads them. */
+  mediaOrigins?: readonly MediaOrigin[]
+  /** How often open SSE and media responses are checked again; a minute when left out. */
+  accessRecheckMs?: number
+}): Promise<{
+  app: NestFastifyApplication
+  mediaDir: string
+  ownerApi: ApiClient
+  ids: { library: number; video: number; item: number | null }
+}> => {
+  const mediaDir = join(root, 'media')
+  await encodeClip({ path: join(mediaDir, 'The Matrix (1999).mp4'), seconds: 1 })
+  const base = testConfig({ dataDir: join(root, 'data'), mediaDir })
+  const app = await createApp({
+    config: {
+      ...base,
+      mediaPlane: { ...base.mediaPlane, origins: [...mediaOrigins], secret: mediaSecret },
+      auth: AUTH_TEST_CONFIG,
+      libraryPin,
+      tmdbApiToken: 'test-token',
+    },
+    authKeys: fixture.keys,
+    authFetch: fixture.fetcher,
+    metadataFetch: fakeTmdb({ movies: [MATRIX] }).fetch,
+    quiet: true,
+    watch: NOT_WATCHING,
+    accessRecheckMs,
+  })
+  await app.init()
+  await app.getHttpAdapter().getInstance().ready()
+  const ownerToken = await fixture.mint({ id: AUTH_TEST_IDS.owner })
+  const ownerApi = createApiClient({
+    fetch: injectFetch({ app }),
+    accessToken: () => ownerToken,
+  })
+  const library = await ownerApi.createLibrary({
+    name: 'Enforced',
+    paths: [mediaDir],
+    settings: { kind: LIBRARY_KINDS.movies },
+  })
+  await app.get(ScannerService).whenIdle(library.id)
+  await app.get(MetadataService).whenIdle()
+  await app.get(ThumbnailService).whenIdle()
+  const video = (await ownerApi.listMedia({ libraryId: library.id }))[0]
+  if (video === undefined) throw new Error('The enforced library scanned no video')
+  const item =
+    app.get(MetadataRepository).find({ type: ITEM_TYPES.movie, tmdbId: String(MATRIX.id) })?.id ??
+    null
+  return { app, mediaDir, ownerApi, ids: { library: library.id, video: video.id, item } }
+}

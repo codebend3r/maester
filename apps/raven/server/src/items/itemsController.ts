@@ -4,7 +4,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
-  Headers,
+  Req,
   HttpCode,
   Inject,
   NotFoundException,
@@ -35,9 +35,8 @@ import {
   type ItemMetadataState,
   type MediaItem,
 } from '@raven/core'
-import type { FastifyReply } from 'fastify'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
-import { RAVEN_HEADERS } from '@/http'
 import { isChoosableImageKind } from '@/items/imageKinds'
 import { itemChildren } from '@/items/itemChildren'
 import { sendImage } from '@/items/sendImage'
@@ -55,6 +54,7 @@ import { isLocal } from '@/metadata/localItems'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { TMDB_IMAGE_PATH, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { ROUTE_PARAMS } from '@/requestParts'
 
 /** Movies, shows, seasons and episodes: their pages, their pictures, and fetching them again. */
 @Controller('api/items')
@@ -78,11 +78,11 @@ export class ItemsController {
     if (!this.metadata.get(id)) throw new NotFoundException(`No item ${id}`)
   }
 
-  /** The item's page, with only the files, children and AI note this browser may see. */
-  private details({ id, cookie }: { id: number; cookie: string | undefined }): ItemDetails {
+  /** The item's page, with only the files, children and AI note this caller may see. */
+  private details({ id, request }: { id: number; request: FastifyRequest }): ItemDetails {
     const details = this.metadata.details(id)
     if (!details) throw new NotFoundException(`No item ${id}`)
-    const viewer = this.lock.viewer({ cookie })
+    const viewer = this.lock.viewer({ request })
     return {
       ...details,
       aiMatch: this.service.aiMatchFor({
@@ -107,7 +107,7 @@ export class ItemsController {
   async setMatch(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: unknown,
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Req() request: FastifyRequest,
   ): Promise<ItemDetails> {
     const item = this.metadata.get(id)
     if (!item) throw new NotFoundException(`No item ${id}`)
@@ -124,7 +124,7 @@ export class ItemsController {
         throw error
       })
     if (moved == null) throw new NotFoundException('TMDB has no show with that id.')
-    return this.details({ id: moved, cookie })
+    return this.details({ id: moved, request })
   }
 
   /** Marks a show or season a favourite, or not; a movie's or episode's files are favourites instead. */
@@ -133,13 +133,13 @@ export class ItemsController {
   setFavourite(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: unknown,
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Req() request: FastifyRequest,
   ): ItemDetails {
     if (!isFavouriteChange(body)) throw new BadRequestException('favourite must be true or false')
     const outcome = this.titleFavourites.set({ itemId: id, favourite: body.favourite })
     switch (outcome) {
       case FAVOURITE_OUTCOMES.done:
-        return this.details({ id, cookie })
+        return this.details({ id, request })
       case FAVOURITE_OUTCOMES.missing:
         throw new NotFoundException(`No show or season ${id}`)
       case FAVOURITE_OUTCOMES.locked:
@@ -153,39 +153,39 @@ export class ItemsController {
 
   @Get(':id')
   get(
-    @Param('id', ParseIntPipe) id: number,
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
   ): ItemDetails {
-    return this.details({ id, cookie })
+    return this.details({ id, request })
   }
 
   /**
-   * A show's first episode not yet watched in the libraries this browser may
+   * A show's first episode not yet watched in the libraries this caller may
    * see, for its Play button; null once every one is.
    */
   @Get(':id/next')
   next(
-    @Param('id', ParseIntPipe) id: number,
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
   ): MediaItem | null {
     this.requireItem(id)
-    const viewer = this.lock.viewer({ cookie })
+    const viewer = this.lock.viewer({ request })
     const libraryIds = this.libraries.ids().filter((libraryId) => viewer.seesLibrary(libraryId))
     return this.media.nextEpisode({ showId: id, libraryIds })
   }
 
   /**
    * The episodes of a show or a season in a random order, among the files in
-   * the libraries this browser may see, for its Shuffle button to play one
+   * the libraries this caller may see, for its Shuffle button to play one
    * after another; empty with none to play.
    */
   @Get(':id/shuffle')
   shuffle(
-    @Param('id', ParseIntPipe) id: number,
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
   ): MediaItem[] {
     this.requireItem(id)
-    const viewer = this.lock.viewer({ cookie })
+    const viewer = this.lock.viewer({ request })
     const libraryIds = this.libraries.ids().filter((libraryId) => viewer.seesLibrary(libraryId))
     return this.media.shuffledEpisodes({ itemId: id, libraryIds })
   }
@@ -196,7 +196,7 @@ export class ItemsController {
   @HttpCode(200)
   async refresh(
     @Param('id', ParseIntPipe) id: number,
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Req() request: FastifyRequest,
   ): Promise<ItemDetails> {
     this.requireItem(id)
     if (!this.tmdb.enabled) {
@@ -209,7 +209,7 @@ export class ItemsController {
       if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
       throw error
     }
-    return this.details({ id, cookie })
+    return this.details({ id, request })
   }
 
   /** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */
@@ -230,7 +230,7 @@ export class ItemsController {
   setMetadata(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: unknown,
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Req() request: FastifyRequest,
   ): ItemDetails {
     this.requireItem(id)
     if (!isItemMetadataChange(body)) {
@@ -245,7 +245,7 @@ export class ItemsController {
       itemId: id,
       change: { ...body, ...(body.title == null ? {} : { title: body.title.trim() }) },
     })
-    return this.details({ id, cookie })
+    return this.details({ id, request })
   }
 
   /**
@@ -315,7 +315,7 @@ export class ItemsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('kind') kind: string,
     @Body() body: unknown,
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Req() request: FastifyRequest,
   ): Promise<ItemDetails> {
     if (!isChoosableImageKind(kind)) throw new NotFoundException(`No ${kind} pictures to choose`)
     this.requireItem(id)
@@ -330,7 +330,7 @@ export class ItemsController {
       kind,
       ref: body.source === IMAGE_SOURCES.tmdb ? body.ref : null,
     })
-    return this.details({ id, cookie })
+    return this.details({ id, request })
   }
 
   /** The picture beside the media, scaled, whatever the item shows: Edit images previews it. */

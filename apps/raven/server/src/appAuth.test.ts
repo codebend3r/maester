@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
-  AUTH_COOKIE,
+  AUTH_CONFIG_STATES,
   AUTH_HEADERS,
   AUTH_METHODS,
   AUTH_PARAMS,
   AUTH_PATHS,
   AUTH_REFUSALS,
-  AUTH_SCHEME,
+  LOCKED_STATUS,
   MEMBER_STATUSES,
   createApiClient,
   isMediaTicket,
@@ -17,29 +17,43 @@ import {
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
-import { AUTH_ENCODINGS } from '@/auth/accessToken'
+import { ADMIN_COOKIE } from '@/admin/adminService'
 import { ACCOUNT_TICKET_PREFIX, AccountTickets } from '@/auth/accountTickets'
 import { AuthSessions } from '@/auth/authSessions'
-import { readServerConfig } from '@/config'
+import { readServerConfig, type ServerConfig } from '@/config'
+import { SettingsRepository } from '@/settings/settingsRepository'
 import { ScannerService } from '@/scanner/scannerService'
-import { AUTH_TEST_CONFIG, AUTH_TEST_FAILURES, AUTH_TEST_IDS, authFixture } from '@/test/auth'
-import { NOT_WATCHING, adminCookie, cookieSet, testConfig } from '@/test/app'
+import {
+  AUTH_TEST_CONFIG,
+  AUTH_TEST_FAILURES,
+  AUTH_TEST_IDS,
+  authCookie,
+  authFixture,
+  bearerHeaders,
+} from '@/test/auth'
+import { NOT_WATCHING, cookieSet, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
-import { apiFor, injectFetch } from '@/test/server'
+import { ROUTES, withTicket } from '@/test/enforced'
+import { injectFetch } from '@/test/server'
+
+/** A cookie shaped like the admin lock's, which a server with accounts ready gives no meaning. */
+const ADMIN_COOKIE_BEFORE_ACCOUNTS = `${ADMIN_COOKIE}=1.2.${'x'.repeat(43)}`
+
+const LIBRARY_PIN = '3001'
+/** These tests change accounts, and the state of the auth service, under tokens they have already used. */
+const NO_REUSE_MS = 0
 
 const accountPath = ({ path, id }: { path: string; id: string | number }) =>
   path.replace(`:${AUTH_PARAMS.id}`, String(id))
-const bearer = (token: string) => ({ [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${token}` })
-const cookie = (token: string) =>
-  `${AUTH_COOKIE}=base64-${Buffer.from(JSON.stringify({ access_token: token })).toString(AUTH_ENCODINGS.base64url)}`
 
 let app: NestFastifyApplication
 let root: string
 let fixture: Awaited<ReturnType<typeof authFixture>>
 let video: number
-let admin: string
 let friendToken: string
 let ownerToken: string
+/** The owner's client: Bearer alone manages. */
+let manager: ReturnType<typeof createApiClient>
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'raven-auth-'))
@@ -50,26 +64,27 @@ beforeAll(async () => {
     config: {
       ...testConfig({ dataDir: join(root, 'data'), mediaDir }),
       auth: AUTH_TEST_CONFIG,
-      libraryPin: '3001',
+      libraryPin: LIBRARY_PIN,
     },
     authKeys: fixture.keys,
     authFetch: fixture.fetcher,
     quiet: true,
     watch: NOT_WATCHING,
+    membershipTtlMs: NO_REUSE_MS,
   })
   await app.init()
   await app.getHttpAdapter().getInstance().ready()
-  admin = await adminCookie(app)
-  const library = await apiFor({ app, cookie: admin }).createLibrary({
-    name: 'Auth test',
-    paths: [mediaDir],
-  })
-  await app.get(ScannerService).whenIdle(library.id)
-  const first = (await apiFor({ app }).listMedia({ libraryId: library.id }))[0]
-  if (first === undefined) throw new Error('Missing test video')
-  video = first.id
   friendToken = await fixture.mint()
   ownerToken = await fixture.mint({ id: AUTH_TEST_IDS.owner })
+  manager = createApiClient({
+    fetch: injectFetch({ app }),
+    accessToken: () => ownerToken,
+  })
+  const library = await manager.createLibrary({ name: 'Auth test', paths: [mediaDir] })
+  await app.get(ScannerService).whenIdle(library.id)
+  const first = (await manager.listMedia({ libraryId: library.id }))[0]
+  if (first === undefined) throw new Error('Missing test video')
+  video = first.id
 })
 
 afterAll(async () => {
@@ -87,7 +102,7 @@ beforeEach(() => {
   fixture.fetcher.mockClear()
 })
 
-describe('new account endpoints, before the library cutover', () => {
+describe('account endpoints', () => {
   it('publishes only safe auth config without a session', async () => {
     const response = await app.inject({ url: AUTH_PATHS.config })
     expect(response.statusCode).toBe(200)
@@ -96,16 +111,19 @@ describe('new account endpoints, before the library cutover', () => {
     expect(fixture.fetcher).not.toHaveBeenCalled()
   })
 
-  it('does not change existing anonymous library access or health', async () => {
+  it('keeps health open and holds the library to an account', async () => {
     const responses = await Promise.all(
-      ['/api/health', '/api/libraries'].map((url) => app.inject({ url })),
+      [ROUTES.health.path, ROUTES.libraries.path].map((url) => app.inject({ url })),
     )
-    expect(responses.map(({ statusCode }) => statusCode)).toEqual([200, 200])
+    expect(responses.map(({ statusCode }) => statusCode)).toEqual([200, 401])
     expect(fixture.fetcher).not.toHaveBeenCalled()
   })
 
   it('requires real identity, not the old admin cookie', async () => {
-    const response = await app.inject({ url: AUTH_PATHS.members, headers: { cookie: admin } })
+    const response = await app.inject({
+      url: AUTH_PATHS.members,
+      headers: { [AUTH_HEADERS.cookie]: ADMIN_COOKIE_BEFORE_ACCOUNTS },
+    })
     expect(response.statusCode).toBe(401)
     expect(response.json()).toMatchObject({ reason: AUTH_REFUSALS.signedOut })
   })
@@ -115,7 +133,7 @@ describe('new account endpoints, before the library cutover', () => {
     expect(await client.getMe()).toEqual(fixture.accounts[AUTH_TEST_IDS.friend])
     const response = await app.inject({
       url: AUTH_PATHS.me,
-      headers: { cookie: cookie(friendToken) },
+      headers: { cookie: authCookie({ token: friendToken }) },
     })
     expect(response.statusCode).toBe(200)
     expect(response.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
@@ -128,7 +146,7 @@ describe('new account endpoints, before the library cutover', () => {
       [AUTH_TEST_IDS.pending, AUTH_TEST_IDS.revoked].map(async (id) => {
         const response = await app.inject({
           url: AUTH_PATHS.me,
-          headers: bearer(await fixture.mint({ id })),
+          headers: bearerHeaders({ token: await fixture.mint({ id }) }),
         })
         expect(response.statusCode).toBe(200)
         expect(response.json()).toEqual(fixture.accounts[id])
@@ -139,7 +157,7 @@ describe('new account endpoints, before the library cutover', () => {
   it('refuses a missing membership instead of inventing an approved account', async () => {
     const response = await app.inject({
       url: AUTH_PATHS.me,
-      headers: bearer(await fixture.mint({ id: AUTH_TEST_IDS.missing })),
+      headers: bearerHeaders({ token: await fixture.mint({ id: AUTH_TEST_IDS.missing }) }),
     })
     expect(response.statusCode).toBe(403)
     expect(response.json()).toMatchObject({ reason: AUTH_REFUSALS.pending })
@@ -148,7 +166,10 @@ describe('new account endpoints, before the library cutover', () => {
   it('refuses bad Bearer even when a valid owner cookie is also present', async () => {
     const response = await app.inject({
       url: AUTH_PATHS.members,
-      headers: { ...bearer('not-a-jwt'), cookie: cookie(ownerToken) },
+      headers: {
+        ...bearerHeaders({ token: 'not-a-jwt' }),
+        cookie: authCookie({ token: ownerToken }),
+      },
     })
     expect(response.statusCode).toBe(401)
   })
@@ -160,7 +181,10 @@ describe('new account endpoints, before the library cutover', () => {
         user_metadata: { is_owner: true },
       },
     })
-    const response = await app.inject({ url: AUTH_PATHS.members, headers: bearer(token) })
+    const response = await app.inject({
+      url: AUTH_PATHS.members,
+      headers: bearerHeaders({ token }),
+    })
     expect(response.statusCode).toBe(403)
     expect(response.json()).toMatchObject({ reason: AUTH_REFUSALS.notOwner })
   })
@@ -170,14 +194,14 @@ describe('new account endpoints, before the library cutover', () => {
     expect(await client.listMembers({ pageSize: 1, pageOffset: 1 })).toHaveLength(1)
     const invalid = await app.inject({
       url: `${AUTH_PATHS.members}?${AUTH_PARAMS.pageSize}=101`,
-      headers: bearer(ownerToken),
+      headers: bearerHeaders({ token: ownerToken }),
     })
     expect(invalid.statusCode).toBe(400)
     await Promise.all(
       [AUTH_TEST_IDS.friend, AUTH_TEST_IDS.pending, AUTH_TEST_IDS.revoked].map(async (id) => {
         const response = await app.inject({
           url: AUTH_PATHS.members,
-          headers: bearer(await fixture.mint({ id })),
+          headers: bearerHeaders({ token: await fixture.mint({ id }) }),
         })
         expect(response.statusCode).toBe(403)
       }),
@@ -192,8 +216,12 @@ describe('new account endpoints, before the library cutover', () => {
         `${AUTH_PARAMS.pageOffset}=9007199254740992`,
       ].map(async (query) => {
         expect(
-          (await app.inject({ url: `${AUTH_PATHS.members}?${query}`, headers: bearer(ownerToken) }))
-            .statusCode,
+          (
+            await app.inject({
+              url: `${AUTH_PATHS.members}?${query}`,
+              headers: bearerHeaders({ token: ownerToken }),
+            })
+          ).statusCode,
         ).toBe(400)
       }),
     )
@@ -203,7 +231,7 @@ describe('new account endpoints, before the library cutover', () => {
     const response = await app.inject({
       method: AUTH_METHODS.post,
       url: accountPath({ path: AUTH_PATHS.memberStatus, id: AUTH_TEST_IDS.pending }),
-      headers: { cookie: cookie(ownerToken) },
+      headers: { cookie: authCookie({ token: ownerToken }) },
       payload: { status: MEMBER_STATUSES.approved },
     })
     expect(response.statusCode).toBe(401)
@@ -231,7 +259,7 @@ describe('new account endpoints, before the library cutover', () => {
       app.inject({
         method: AUTH_METHODS.post,
         url: accountPath({ path: AUTH_PATHS.memberStatus, id }),
-        headers: bearer(ownerToken),
+        headers: bearerHeaders({ token: ownerToken }),
         payload: { status },
       })
     expect((await send({ id: 'invalid', status: MEMBER_STATUSES.approved })).statusCode).toBe(400)
@@ -250,9 +278,13 @@ describe('new account endpoints, before the library cutover', () => {
     AUTH_TEST_FAILURES.network,
     AUTH_TEST_FAILURES.malformed,
     AUTH_TEST_FAILURES.wrongAccount,
+    AUTH_TEST_FAILURES.ambiguous,
   ])('fails closed on unavailable or untrusted membership data: %s', async (failure) => {
     fixture.state.failure = failure
-    const response = await app.inject({ url: AUTH_PATHS.me, headers: bearer(friendToken) })
+    const response = await app.inject({
+      url: AUTH_PATHS.me,
+      headers: bearerHeaders({ token: friendToken }),
+    })
     expect(response.statusCode).toBe(503)
     expect(response.json()).toMatchObject({ reason: AUTH_REFUSALS.unavailable })
     expect(response.body).not.toContain(friendToken)
@@ -260,7 +292,10 @@ describe('new account endpoints, before the library cutover', () => {
 
   it('maps a backend session refusal to signed out', async () => {
     fixture.state.failure = AUTH_TEST_FAILURES.denied
-    const response = await app.inject({ url: AUTH_PATHS.me, headers: bearer(friendToken) })
+    const response = await app.inject({
+      url: AUTH_PATHS.me,
+      headers: bearerHeaders({ token: friendToken }),
+    })
     expect(response.statusCode).toBe(401)
   })
 })
@@ -274,7 +309,7 @@ describe('account-bound playback tickets', () => {
     expect(result.ticket.startsWith(ACCOUNT_TICKET_PREFIX)).toBe(true)
     expect(result.ticket).not.toContain(friendToken)
     const response = await app.inject({
-      url: `/api/media/${video}/file?t=${result.ticket}`,
+      url: withTicket({ route: ROUTES.file, params: { id: video }, ticket: result.ticket }),
       headers: { [HEADERS.range]: 'bytes=0-31' },
     })
     expect(response.statusCode).toBe(206)
@@ -287,14 +322,20 @@ describe('account-bound playback tickets', () => {
     const friend = fixture.accounts[AUTH_TEST_IDS.friend]
     if (friend === undefined) throw new Error('Missing friend')
     fixture.accounts[AUTH_TEST_IDS.friend] = { ...friend, status: MEMBER_STATUSES.revoked }
-    const response = await app.inject({ url: `/api/media/${video}/file?t=${result.ticket}` })
+    const response = await app.inject({
+      url: withTicket({ route: ROUTES.file, params: { id: video }, ticket: result.ticket }),
+    })
     expect(response.statusCode).toBe(403)
     expect(response.json()).toMatchObject({ reason: AUTH_REFUSALS.revoked })
   })
 
   it('never downgrades an invalid account ticket to public legacy access', async () => {
     const response = await app.inject({
-      url: `/api/media/${video}/file?t=${ACCOUNT_TICKET_PREFIX}unknown`,
+      url: withTicket({
+        route: ROUTES.file,
+        params: { id: video },
+        ticket: `${ACCOUNT_TICKET_PREFIX}unknown`,
+      }),
     })
     expect(response.statusCode).toBe(401)
   })
@@ -302,7 +343,11 @@ describe('account-bound playback tickets', () => {
   it('refuses an account ticket for another media id', async () => {
     const result = await client().getAccountMediaTicket({ id: video })
     expect(
-      (await app.inject({ url: `/api/media/${video + 1}/file?t=${result.ticket}` })).statusCode,
+      (
+        await app.inject({
+          url: withTicket({ route: ROUTES.file, params: { id: video + 1 }, ticket: result.ticket }),
+        })
+      ).statusCode,
     ).toBe(401)
   })
 
@@ -311,7 +356,11 @@ describe('account-bound playback tickets', () => {
     await Promise.all(
       ['NaN', '-1', '1.5', '9007199254740992'].map(async (id) => {
         expect(
-          (await app.inject({ url: `/api/media/${id}/file?t=${result.ticket}` })).statusCode,
+          (
+            await app.inject({
+              url: withTicket({ route: ROUTES.file, params: { id }, ticket: result.ticket }),
+            })
+          ).statusCode,
         ).toBe(401)
       }),
     )
@@ -325,7 +374,7 @@ describe('account-bound playback tickets', () => {
         await app.inject({
           method: AUTH_METHODS.post,
           url,
-          headers: { cookie: cookie(friendToken) },
+          headers: { cookie: authCookie({ token: friendToken }) },
         })
       ).statusCode,
     ).toBe(401)
@@ -336,7 +385,7 @@ describe('account-bound playback tickets', () => {
             await app.inject({
               method: AUTH_METHODS.post,
               url,
-              headers: bearer(await fixture.mint({ id })),
+              headers: bearerHeaders({ token: await fixture.mint({ id }) }),
             })
           ).statusCode,
         ).toBe(403)
@@ -347,7 +396,7 @@ describe('account-bound playback tickets', () => {
         await app.inject({
           method: AUTH_METHODS.post,
           url: accountPath({ path: AUTH_PATHS.ticket, id: 999999 }),
-          headers: bearer(friendToken),
+          headers: bearerHeaders({ token: friendToken }),
         })
       ).statusCode,
     ).toBe(404)
@@ -356,7 +405,9 @@ describe('account-bound playback tickets', () => {
   it('expires at the earlier of five minutes and the JWT expiry', async () => {
     const token = await fixture.mint({ expiresIn: 60 })
     const session = await app.get(AuthSessions).authenticate({ token })
-    const result = app.get(AccountTickets).issue({ id: video, session })
+    const request = { headers: bearerHeaders({ token }) }
+    app.get(AuthSessions).bindSession({ request, session, isBearer: true })
+    const result = app.get(AccountTickets).issue({ id: video, request })
     expect(isMediaTicket(result)).toBe(true)
     expect(result.expiresAt).toBe(session.expiresAt)
     await expect(
@@ -364,10 +415,9 @@ describe('account-bound playback tickets', () => {
     ).rejects.toMatchObject({ response: { reason: AUTH_REFUSALS.signedOut } })
   })
 
-  it('does not grant a ticket for a locked library without the existing PIN authorization', async () => {
+  it('grants a ticket for a locked library to the owner only once the PIN is entered, and never to a member', async () => {
     const path = join(root, 'private')
     await encodeClip({ path: join(path, 'Private.Auth.Test.2026.mp4') })
-    const manager = apiFor({ app, cookie: admin })
     const input = { name: 'Locked auth test', paths: [path] }
     const library = await manager.createLibrary(input)
     await app.get(ScannerService).whenIdle(library.id)
@@ -375,35 +425,28 @@ describe('account-bound playback tickets', () => {
     if (first === undefined) throw new Error('Missing private video')
     await manager.updateLibrary({ id: library.id, input: { ...input, settings: { locked: true } } })
     const url = accountPath({ path: AUTH_PATHS.ticket, id: first.id })
-    expect(
-      (await app.inject({ method: AUTH_METHODS.post, url, headers: bearer(friendToken) }))
-        .statusCode,
-    ).toBe(404)
-    expect(
-      (
-        await app.inject({
-          method: AUTH_METHODS.post,
-          url,
-          headers: { ...bearer(ownerToken), cookie: admin },
-        })
-      ).statusCode,
-    ).toBe(423)
+    const mint = ({ headers }: { headers: Record<string, string> }) =>
+      app.inject({ method: AUTH_METHODS.post, url, headers })
+    const owner = bearerHeaders({ token: ownerToken })
+    expect((await mint({ headers: bearerHeaders({ token: friendToken }) })).statusCode).toBe(404)
+    expect((await mint({ headers: owner })).statusCode).toBe(LOCKED_STATUS)
     const unlocked = await app.inject({
-      method: AUTH_METHODS.post,
-      url: '/api/lock/unlock',
-      headers: { cookie: admin },
-      payload: { pin: '3001' },
+      method: ROUTES.unlock.method,
+      url: ROUTES.unlock.path,
+      headers: owner,
+      payload: { pin: LIBRARY_PIN },
     })
-    const issued = await app.inject({
-      method: AUTH_METHODS.post,
-      url,
-      headers: { ...bearer(ownerToken), cookie: `${admin}; ${cookieSet(unlocked)}` },
-    })
+    expect(unlocked.statusCode).toBe(200)
+    const issued = await mint({ headers: { ...owner, [AUTH_HEADERS.cookie]: cookieSet(unlocked) } })
     expect(issued.statusCode).toBe(200)
     const ticket: unknown = issued.json()
     if (!isMediaTicket(ticket)) throw new Error('Missing private ticket')
     expect(
-      (await app.inject({ url: `/api/media/${first.id}/file?t=${ticket.ticket}` })).statusCode,
+      (
+        await app.inject({
+          url: withTicket({ route: ROUTES.file, params: { id: first.id }, ticket: ticket.ticket }),
+        })
+      ).statusCode,
     ).toBe(200)
   })
 })
@@ -419,9 +462,136 @@ it('keeps health available but new account endpoints closed when configuration i
   })
   try {
     await unconfigured.init()
-    expect((await unconfigured.inject({ url: '/api/health' })).statusCode).toBe(200)
+    expect((await unconfigured.inject({ url: ROUTES.health.path })).statusCode).toBe(200)
     expect((await unconfigured.inject({ url: AUTH_PATHS.me })).statusCode).toBe(503)
+    // An unmarked route passes as the legacy browser, with no credentials and no account headers.
+    const libraries = await unconfigured.inject({ url: ROUTES.libraries.path })
+    expect(libraries.statusCode).toBe(200)
+    expect(String(libraries.headers[HEADERS.vary] ?? '')).not.toContain(AUTH_HEADERS.authorization)
+    expect(libraries.headers[HEADERS.cacheControl]).not.toBe(CACHE_POLICIES.noStore)
   } finally {
     await unconfigured.close()
   }
+})
+
+describe('a server that enforced accounts', () => {
+  const start = ({
+    dataDir,
+    auth,
+    isOptedOut = false,
+  }: {
+    dataDir: string
+    auth: ServerConfig['auth']
+    isOptedOut?: boolean
+  }) =>
+    createApp({
+      config: {
+        ...testConfig({ dataDir, mediaDir: root }),
+        auth,
+        isAccountsOptedOut: isOptedOut,
+      },
+      authKeys: fixture.keys,
+      authFetch: fixture.fetcher,
+      quiet: true,
+      watch: NOT_WATCHING,
+    })
+
+  const answers = async ({ server }: { server: NestFastifyApplication }) => {
+    await server.init()
+    const [config, health, me, libraries] = await Promise.all(
+      [AUTH_PATHS.config, ROUTES.health.path, AUTH_PATHS.me, ROUTES.libraries.path].map(
+        async (url) => {
+          const response = await server.inject({ url })
+          return { status: response.statusCode, body: response.json() }
+        },
+      ),
+    )
+    return { config, health, me, libraries }
+  }
+
+  it('fails closed once its Supabase settings are gone, until the operator opts out', async () => {
+    const dataDir = join(root, 'enforced')
+    const ready = await start({ dataDir, auth: AUTH_TEST_CONFIG })
+    try {
+      await ready.init()
+      expect(ready.get(SettingsRepository).accountsEnforcedAt()).not.toBeNull()
+    } finally {
+      await ready.close()
+    }
+
+    const gone = await start({ dataDir, auth: { state: AUTH_CONFIG_STATES.off } })
+    try {
+      const { config, health, me, libraries } = await answers({ server: gone })
+      expect(config).toEqual({
+        status: 200,
+        body: { state: AUTH_CONFIG_STATES.unavailable },
+      })
+      expect(health.status).toBe(200)
+      expect(me).toMatchObject({ status: 503, body: { reason: AUTH_REFUSALS.unavailable } })
+      expect(libraries).toMatchObject({
+        status: 503,
+        body: { reason: AUTH_REFUSALS.unavailable },
+      })
+      expect(gone.get(SettingsRepository).accountsEnforcedAt()).not.toBeNull()
+    } finally {
+      await gone.close()
+    }
+
+    const optedOut = await start({
+      dataDir,
+      auth: { state: AUTH_CONFIG_STATES.off },
+      isOptedOut: true,
+    })
+    try {
+      const { config, health, libraries } = await answers({ server: optedOut })
+      expect(config).toEqual({ status: 200, body: { state: AUTH_CONFIG_STATES.off } })
+      expect(health.status).toBe(200)
+      expect(libraries.status).toBe(200)
+      expect(optedOut.get(SettingsRepository).accountsEnforcedAt()).toBeNull()
+    } finally {
+      await optedOut.close()
+    }
+
+    const forgotten = await start({ dataDir, auth: { state: AUTH_CONFIG_STATES.off } })
+    try {
+      const { config, libraries } = await answers({ server: forgotten })
+      expect(config.body).toEqual({ state: AUTH_CONFIG_STATES.off })
+      expect(libraries.status).toBe(200)
+    } finally {
+      await forgotten.close()
+    }
+  })
+
+  it('keeps the first date it enforced on later ready starts', async () => {
+    const dataDir = join(root, 'dated')
+    const first = await start({ dataDir, auth: AUTH_TEST_CONFIG })
+    const enforcedAt = await first
+      .init()
+      .then(() => first.get(SettingsRepository).accountsEnforcedAt())
+    await first.close()
+    const second = await start({ dataDir, auth: AUTH_TEST_CONFIG })
+    try {
+      await second.init()
+      expect(second.get(SettingsRepository).accountsEnforcedAt()).toBe(enforcedAt)
+    } finally {
+      await second.close()
+    }
+  })
+
+  it('treats the opt-out together with Supabase settings as a conflict that stays closed', async () => {
+    const conflict = await start({
+      dataDir: join(root, 'conflict'),
+      auth: AUTH_TEST_CONFIG,
+      isOptedOut: true,
+    })
+    try {
+      const { config, health, me } = await answers({ server: conflict })
+      expect(config.body).toEqual({ state: AUTH_CONFIG_STATES.unavailable })
+      expect(health.status).toBe(200)
+      expect(me.status).toBe(503)
+      expect(conflict.get(SettingsRepository).accountsEnforcedAt()).toBeNull()
+    } finally {
+      await conflict.close()
+    }
+  })
 })

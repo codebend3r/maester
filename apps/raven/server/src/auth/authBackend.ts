@@ -6,6 +6,7 @@ import {
   AUTH_REFUSALS,
   AUTH_SCHEME,
   type Account,
+  type AuthConfig,
   type MemberStatusChange,
   isAccountId,
   isBoolean,
@@ -16,9 +17,9 @@ import {
   object,
 } from '@raven/core'
 import { CACHE_POLICIES, CONTENT_TYPES, HEADERS } from '@shared/server'
-import { authFailure } from '@/auth/authFailure'
+import { INTEGRITY_FAILURES, IntegrityFailure, authFailure } from '@/auth/authFailure'
 import { AUTH_FETCH, AUTH_REDIRECT_POLICY, type AuthFetch } from '@/auth/tokenVerifier'
-import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { AUTH_STATE } from '@/auth/effectiveAuth'
 
 const RPC_ROOT = '/rest/v1/rpc/'
 const RPCS = {
@@ -34,13 +35,15 @@ const isRows = listOf(
 @Injectable()
 export class AuthBackend {
   constructor(
-    @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
+    @Inject(AUTH_STATE) private readonly auth: AuthConfig,
     @Inject(AUTH_FETCH) private readonly fetcher: AuthFetch,
   ) {}
 
   async current({ token }: { token: string }): Promise<Account | null> {
     const rows = await this.rpc({ token, name: RPCS.current, body: {} })
-    if (rows.length > 1) throw authFailure(AUTH_REFUSALS.unavailable)
+    if (rows.length > 1) {
+      throw new IntegrityFailure({ failure: INTEGRITY_FAILURES.ambiguousMembership })
+    }
     return rows[0] ?? null
   }
 
@@ -95,7 +98,7 @@ export class AuthBackend {
     name: (typeof RPCS)[keyof typeof RPCS]
     body: Record<string, unknown>
   }): Promise<Account[]> {
-    const { auth } = this.config
+    const { auth } = this
     if (auth.state !== AUTH_CONFIG_STATES.ready) throw authFailure(AUTH_REFUSALS.unavailable)
     const response = await this.fetcher({
       url: `${auth.supabaseUrl}${RPC_ROOT}${name}`,
@@ -125,7 +128,9 @@ export class AuthBackend {
       if (code === SQL_ERRORS.missing) throw new NotFoundException('Verified account not found.')
       throw authFailure(AUTH_REFUSALS.unavailable)
     }
-    if (!isRows(value)) throw authFailure(AUTH_REFUSALS.unavailable)
+    if (!isRows(value)) {
+      throw new IntegrityFailure({ failure: INTEGRITY_FAILURES.malformedMembership })
+    }
     return value.map(({ id, email, status, is_owner }) => ({
       id,
       email,

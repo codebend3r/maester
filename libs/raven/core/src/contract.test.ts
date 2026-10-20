@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  ACCOUNT_TICKET_SECONDS,
   DEFAULT_SAGA_BACKDROP,
   MEDIA_PROBE_BYTES,
   MEDIA_TICKET_REFRESH_SECONDS,
@@ -758,5 +759,9 @@ describe('the media plane guards', () => {
     expect(MEDIA_TICKET_SECONDS).toBe(21_600)
     expect(MEDIA_TICKET_REFRESH_SECONDS).toBeLessThan(MEDIA_TICKET_SECONDS)
     expect(MEDIA_PROBE_BYTES).toBe(262_144)
+  })
+
+  it('keeps an account ticket to five minutes', () => {
+    expect(ACCOUNT_TICKET_SECONDS).toBe(300)
   })
 })

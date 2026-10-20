@@ -1,17 +1,15 @@
 import type { ExecutionContext } from '@nestjs/common'
-import { isRecord, isString } from '@raven/core'
+import { isRecord } from '@raven/core'
 
-/** The request a guard is asked about, as far as a guard reads it: its params, its query and its cookie. */
+/** The route parameters the guards read, named once for the routes that declare them. */
+export const ROUTE_PARAMS = { id: 'id' } as const
+
+/** The request a guard is asked about, as far as a guard reads it: its params and its query. */
 export const requestParts = (
   context: ExecutionContext,
-): {
-  params: Record<string, unknown>
-  query: Record<string, unknown>
-  cookie: string | undefined
-} => {
+): { params: Record<string, unknown>; query: Record<string, unknown> } => {
   const request: unknown = context.switchToHttp().getRequest()
-  const headers = isRecord(request) && isRecord(request.headers) ? request.headers : {}
   const params = isRecord(request) && isRecord(request.params) ? request.params : {}
   const query = isRecord(request) && isRecord(request.query) ? request.query : {}
-  return { params, query, cookie: isString(headers.cookie) ? headers.cookie : undefined }
+  return { params, query }
 }

@@ -4,7 +4,11 @@ export const AUTH_ENV = {
   url: 'SUPABASE_URL',
   key: 'SUPABASE_PUBLISHABLE_KEY',
   webUrl: 'RAVEN_WEB_URL',
+  accounts: 'RAVEN_ACCOUNTS',
 } as const
+
+/** The one value of `RAVEN_ACCOUNTS` that reopens a server which once enforced accounts. */
+export const ACCOUNTS_OPT_OUT = 'off'
 
 const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]'] as const
 

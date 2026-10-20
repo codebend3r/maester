@@ -13,9 +13,9 @@ const ofType = <T extends ItemSummary['type']>({
 
 /**
  * A show's seasons or a season's episodes on disk, as its page lists them:
- * a season with how many of its episodes this browser may see, an episode
+ * a season with how many of its episodes this caller may see, an episode
  * with its row's words and the file Play starts. Both count what is watched
- * in the libraries this browser may see only. Read a few queries for the
+ * in the libraries this caller may see only. Read a few queries for the
  * whole list, never one per child.
  */
 export const itemChildren = ({
