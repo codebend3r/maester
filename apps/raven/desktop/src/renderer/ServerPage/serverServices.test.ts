@@ -1,4 +1,5 @@
 import { describe, expect, it, mock, spyOn } from 'bun:test'
+import { createProgressSaver } from '@raven/ui'
 import { createMenuHub } from '@/renderer/desktop/menuHub'
 import { serverApiFor } from '@/renderer/desktop/serverApi'
 import { resumeAtFor, serverServicesFor } from '@/renderer/ServerPage/serverServices'
@@ -36,15 +37,20 @@ const servicesWith = ({
 } = {}) => {
   const client = serverClient({ calls })
   const lastSaved = { current: 0 }
+  const api = serverApiFor({ client, serverId: S })
   const services = serverServicesFor({
     media: EPISODE,
     server: VHAGAR,
-    api: serverApiFor({ client, serverId: S }),
+    api,
     client,
     menu: createMenuHub(),
     at: 0,
     next,
     lastSaved,
+    saver: createProgressSaver({
+      send: (report) => api.saveProgress({ id: EPISODE.id, ...report }),
+      wait: async () => undefined,
+    }),
     length,
     hasRecordedPlay,
     escape,
@@ -128,7 +134,7 @@ describe('serverServicesFor', () => {
     services.progress.save({ position: 40, audio: null })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(lastSaved.current).toBe(40)
-    expect(warn).toHaveBeenCalledTimes(2)
+    expect(warn).toHaveBeenCalledTimes(1)
     warn.mockRestore()
   })
 

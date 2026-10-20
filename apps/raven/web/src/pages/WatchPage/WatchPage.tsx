@@ -14,6 +14,7 @@ import { useState } from 'react'
 import {
   ButtonLink,
   Player,
+  createProgressSaver,
   useHostPlayer,
   useLeaveFullscreen,
   useMediaPlane,
@@ -104,6 +105,9 @@ export const WatchPlayer = ({
   const queryClient = useQueryClient()
   const { favourite } = useMediaMutations({ media })
   const [copied, setCopied] = useState<string | null>(null)
+  const [saver] = useState(() =>
+    createProgressSaver({ send: (report) => api.saveProgress({ id: media.id, ...report }) }),
+  )
   const opensInRavenPlayer = usePlayerPrefs((prefs) => prefs.opensInRavenPlayer)
   const [next, ...after] = upNext
   const resumable = media.position > 0 && media.position < (media.duration ?? Infinity) - 10
@@ -138,11 +142,13 @@ export const WatchPlayer = ({
       started: () => {
         api.recordPlay(media.id).catch(() => undefined)
       },
-      save: ({ position, audio }) => {
-        api.saveProgress({ id: media.id, position, audio }).catch(() => undefined)
-      },
+      save: saver.save,
+      // The lists read again only once the last position is in, or they would show the old spot.
       left: () => {
-        afterWatching({ queryClient, libraryId: media.libraryId }).catch(() => undefined)
+        saver
+          .settled()
+          .then(() => afterWatching({ queryClient, libraryId: media.libraryId }))
+          .catch(() => undefined)
       },
     },
     posterUrl: api.thumbnailUrl(media),

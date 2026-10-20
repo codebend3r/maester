@@ -46,7 +46,14 @@ const ResetPasswordForm = () => {
           label="New password"
           password={password}
           confirmation={confirmation}
-          refusal={update.isError ? (weakPasswordMessage(update.error) ?? FAILED_COPY) : null}
+          refusal={
+            update.isError
+              ? {
+                  password: update.variables,
+                  message: weakPasswordMessage(update.error) ?? FAILED_COPY,
+                }
+              : null
+          }
           isMismatched={isMismatched}
           onPasswordChange={setPassword}
           onConfirmationChange={setConfirmation}

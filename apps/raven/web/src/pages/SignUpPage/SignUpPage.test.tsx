@@ -199,6 +199,27 @@ describe('SignUpPage', () => {
     expect(submit()).toBeEnabled()
   })
 
+  it('drops a weak password refusal once the password changes, since it described the old one', async () => {
+    const user = userEvent.setup()
+    renderSignUp({
+      calls: {
+        signUp: async () =>
+          refusedSignUp({
+            code: AUTH_ERRORS.weakPassword,
+            message: 'Password should be at least 12 characters.',
+          }),
+      },
+    })
+    await fillIn({ user })
+    await user.click(submit())
+    await screen.findByRole('alert')
+
+    await user.type(password(), '-battery')
+
+    expect(screen.queryByText('Password should be at least 12 characters.')).toBeNull()
+    expect(password()).toHaveAttribute('aria-invalid', 'false')
+  })
+
   it('asks to wait when the server limits the emails', async () => {
     const user = userEvent.setup()
     renderSignUp({

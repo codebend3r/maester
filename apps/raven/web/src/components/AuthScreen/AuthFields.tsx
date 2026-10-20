@@ -109,8 +109,9 @@ export const PasswordField = ({
 
 /**
  * A new password typed twice, with one Show and Hide for both. `refusal` is
- * what the server said against the password, shown under it; `isMismatched`
- * marks the confirmation instead. Only one of the two shows at a time.
+ * what the server said against the password it was sent, shown under the
+ * field only while it still holds that password; `isMismatched` marks the
+ * confirmation instead. Only one of the two shows at a time.
  */
 export const PasswordFields = ({
   label,
@@ -124,13 +125,14 @@ export const PasswordFields = ({
   label: string
   password: string
   confirmation: string
-  refusal: string | null
+  refusal: { password: string; message: string } | null
   isMismatched: boolean
   onPasswordChange: (value: string) => void
   onConfirmationChange: (value: string) => void
 }) => {
   const ids = { confirm: useId(), mismatch: useId() }
   const [isShown, setShown] = useState(false)
+  const isRefused = !isMismatched && refusal !== null && refusal.password === password
 
   return (
     <>
@@ -139,7 +141,7 @@ export const PasswordFields = ({
         autoComplete="new-password"
         value={password}
         onChange={onPasswordChange}
-        error={isMismatched ? null : refusal}
+        error={isRefused ? refusal.message : null}
         isShown={isShown}
         onToggleShown={() => setShown((now) => !now)}
         alsoReveals={ids.confirm}

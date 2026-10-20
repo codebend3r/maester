@@ -8,7 +8,7 @@ import {
   mediaLabel,
   object,
 } from '@raven/core'
-import type { PlayerServices } from '@raven/ui'
+import type { PlayerServices, ProgressSaver } from '@raven/ui'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import type { MenuHub } from '@/renderer/desktop/menuHub'
 import { playerActionFor, requestQuietly } from '@/renderer/PlayPage/playerServices'
@@ -93,6 +93,7 @@ export const serverServicesFor = ({
   at,
   next,
   lastSaved,
+  saver,
   length,
   hasRecordedPlay,
   escape,
@@ -107,6 +108,8 @@ export const serverServicesFor = ({
   next: { mediaId: number; label: string; rest: number[] } | null
   /** The page's ref: `progress.save` writes each saved position here, for the relock path. */
   lastSaved: { current: number }
+  /** The page's, so its saves go out in order and a failed one is tried again across rebuilds. */
+  saver: ProgressSaver
   /** The length the engine learned, which the recents share prefers to the server's; a ref, so a rebuild keeps it. */
   length: { current: number | null }
   /** The page's ref, so a player remounted by a relock records no second play. */
@@ -140,10 +143,7 @@ export const serverServicesFor = ({
       },
       save: ({ position, audio }) => {
         lastSaved.current = position
-        callQuietly({
-          call: api.saveProgress({ id: media.id, position, audio }),
-          what: 'save the position',
-        })
+        saver.save({ position, audio })
       },
       left: (position) =>
         requestQuietly({

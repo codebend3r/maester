@@ -8,12 +8,14 @@ import {
   type SubtitleTrack,
 } from '@raven/core'
 import { useMediaOrigin, usePlayerPrefs } from '@raven/ui'
+import { QueryClient } from '@tanstack/react-query'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { WatchProbe } from '@/test/watchProbe'
 import { WatchPlayer as Player, WatchPage } from '@/pages/WatchPage/WatchPage'
 import { api } from '@/lib/api'
+import { queryKeys } from '@/lib/queryClient'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { fakeAccount } from '@/test/authClient'
 import { setBrowserSupport } from '@/test/canPlay'
@@ -186,6 +188,31 @@ describe('Player progress', () => {
     const saved = [...saveSpy.mock.calls]
     saveSpy.mockRestore()
     expect(saved).toEqual([])
+  })
+
+  it('reads the lists again only once the last position is saved, so they show the new spot', async () => {
+    stubTracks()
+    spies.push(spyOn(api, 'recordPlay').mockImplementation(async () => undefined))
+    const saving = held<void>()
+    const saveSpy = spyOn(api, 'saveProgress').mockImplementation(() => saving.promise)
+    spies.push(saveSpy)
+    const client = new QueryClient()
+    client.setQueryData(queryKeys.home, [])
+    const { container, unmount } = renderWithProviders({
+      ui: <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
+      client,
+    })
+    act(() => {
+      container.querySelector('video')!.dispatchEvent(new Event('playing'))
+    })
+    unmount()
+    expect(saveSpy).toHaveBeenCalledTimes(1)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(client.getQueryState(queryKeys.home)?.isInvalidated).toBe(false)
+
+    saving.answer()
+
+    await waitFor(() => expect(client.getQueryState(queryKeys.home)?.isInvalidated).toBe(true))
   })
 })
 

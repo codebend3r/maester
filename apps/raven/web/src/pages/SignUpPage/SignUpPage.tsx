@@ -71,7 +71,11 @@ const SignUpForm = () => {
           label="Password"
           password={password}
           confirmation={confirmation}
-          refusal={signUp.isError ? failureCopy(signUp.error) : null}
+          refusal={
+            signUp.isError
+              ? { password: signUp.variables.password, message: failureCopy(signUp.error) }
+              : null
+          }
           isMismatched={isMismatched}
           onPasswordChange={setPassword}
           onConfirmationChange={setConfirmation}
