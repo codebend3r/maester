@@ -49,3 +49,22 @@ export const audioPlaceFor = ({
   const place = tracks.audio.findIndex((track) => track.index === audio)
   return place < 0 ? null : place
 }
+
+/**
+ * Which of a stream's subtitle renditions to show, by its place among them, or null to leave the
+ * choice to the player. The server's master playlist lists a rendition for each text track, in
+ * the file's order, and only a stream (remux or transcode) has them.
+ */
+export const subtitlePlaceFor = ({
+  mode,
+  tracks,
+  subtitle,
+}: {
+  mode: PlaybackMode
+  tracks: MediaTracks
+  subtitle: string | null
+}): number | null => {
+  if (mode === PLAYBACK_MODES.direct || subtitle === null) return null
+  const place = showable(tracks).findIndex((track) => track.id === subtitle)
+  return place < 0 ? null : place
+}

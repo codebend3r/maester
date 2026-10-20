@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Video from 'react-native-video'
 
 import { touchPicker } from '@/layouts/Picker.touch'
 import {
@@ -178,7 +179,9 @@ const TransportControls = ({ transport }: { transport: Transport }) => {
  * Raven's controls over the video under the thumb: Back, the title and the track pickers along
  * the top, play and pause between the ten-second skips in the middle, the time and the line to
  * drag along the bottom, all inside the safe area while the video fills the screen. They fade
- * once the video has played untouched for the viewer's linger, and a tap brings them back.
+ * once the video has played untouched for the viewer's linger, and a tap brings them back. The
+ * video plays in Picture in Picture when the app is left, and on AirPlay; the silent switch never
+ * mutes it, and leaving the app without Picture in Picture pauses it.
  */
 const PlayerChrome = ({
   title,
@@ -229,7 +232,18 @@ const PlayerChrome = ({
   return (
     <View style={styles.root}>
       <StatusBar hidden={!isVisible} />
-      {surface}
+      {surface !== null && (
+        <Video
+          {...surface}
+          allowsExternalPlayback
+          controls={false}
+          enterPictureInPictureOnLeave
+          ignoreSilentSwitch="ignore"
+          playInBackground={false}
+          resizeMode="contain"
+          style={StyleSheet.absoluteFill}
+        />
+      )}
       <Pressable
         accessibilityLabel={isVisible ? PLAYER_COPY.hideControls : PLAYER_COPY.showControls}
         accessibilityRole="button"
@@ -301,7 +315,7 @@ const PlayerChrome = ({
 }
 
 /** The player under the thumb, on iPhones and iPads. */
-export const touchPlayerChrome: PlayerChromeKit = { PlayerChrome }
+export const touchPlayerChrome: PlayerChromeKit = { PlayerChrome, shouldDrawCaptions: true }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLOURS.ground },
