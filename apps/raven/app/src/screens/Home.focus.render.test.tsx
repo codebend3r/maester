@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
+import { APP_ROUTES } from '@/routes'
 import { Home } from '@/screens/Home'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
@@ -20,7 +21,9 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   Object.defineProperty(platform.default, 'isTV', { get: () => true })
   return platform
 })
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }))
+const mockPush = jest.fn()
+
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }))
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
@@ -75,6 +78,12 @@ describe('Home on a TV', () => {
 
     await fireEvent(first, NATIVE_EVENTS.blur)
     expect(scaleOf()).toEqual([{ scale: 1 }])
+  })
+
+  it("lets the remote open a library from its shelf's title", async () => {
+    await renderHome()
+    await fireEvent.press(await screen.findByRole('link', { name: 'See all in Series' }))
+    expect(mockPush).toHaveBeenCalledWith({ pathname: APP_ROUTES.library, params: { id: '2' } })
   })
 
   it('puts focus on the first card of the first shelf that has one', async () => {

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import { HOME_SHELF_TYPES, ITEM_TYPES, LIBRARY_KINDS, THUMBNAIL_STATES } from '@raven/core'
 
-import { CARD_SHAPES, CONTINUE_WATCHING, homeShelvesOf } from '@/queries/homeShelves'
+import { CARD_SHAPES } from '@/queries/cards'
+import { CONTINUE_WATCHING, homeShelvesOf } from '@/queries/homeShelves'
 import { FILMS, HOME, NAS, SERIES, homeApi } from '@/test/homeServer'
 import { mediaItemFor } from '@/test/mediaItem'
 
@@ -22,6 +23,16 @@ describe('homeShelvesOf', () => {
       ['Busboys', 'Night Train'],
       ['Severance'],
     ])
+  })
+
+  it('names the library each library shelf opens, and none for Continue watching', () => {
+    const shelves = homeShelvesOf({
+      home: HOME,
+      libraries: [FILMS, SERIES],
+      api: homeApi(),
+      headersFor,
+    })
+    expect(shelves.map(({ libraryId }) => libraryId)).toEqual([null, FILMS.id, SERIES.id])
   })
 
   it('shows Continue watching wide, on the backdrop, with how far in it is', () => {

@@ -65,6 +65,13 @@ describe('Home on a phone or tablet', () => {
     expect(mockPush).toHaveBeenCalledWith({ pathname: APP_ROUTES.item, params: { id: '4' } })
   })
 
+  it("opens a library from its shelf's title, as the web's shelf heading links to it", async () => {
+    await renderHome()
+    await fireEvent.press(await screen.findByRole('link', { name: 'See all in Films' }))
+    expect(mockPush).toHaveBeenCalledWith({ pathname: APP_ROUTES.library, params: { id: '1' } })
+    expect(screen.queryByRole('link', { name: 'See all in Continue watching' })).toBeNull()
+  })
+
   it('draws each card as wide as its shape asks: a wide frame, then posters', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { ApiError, LOCKED_STATUS } from '@/apiClient'
-import { routeState } from '@/routeQuery'
+import { routeIdOf, routeState } from '@/routeQuery'
 
 describe('routeState', () => {
   it('is missing without an id', () => {
@@ -59,5 +59,26 @@ describe('routeState', () => {
       state: 'ready',
       data: 'x',
     })
+  })
+})
+
+describe('routeIdOf', () => {
+  it('reads a whole number written in digits', () => {
+    expect(routeIdOf('7')).toBe(7)
+    expect(routeIdOf('0')).toBe(0)
+    expect(routeIdOf('120')).toBe(120)
+  })
+
+  it('reads nothing else as an id', () => {
+    expect(routeIdOf(undefined)).toBeNull()
+    expect(routeIdOf('')).toBeNull()
+    expect(routeIdOf(' 7')).toBeNull()
+    expect(routeIdOf('7.5')).toBeNull()
+    expect(routeIdOf('-1')).toBeNull()
+    expect(routeIdOf('1e3')).toBeNull()
+    expect(routeIdOf('0x10')).toBeNull()
+    expect(routeIdOf('99999999999999999999')).toBeNull()
+    expect(routeIdOf(['7'])).toBeNull()
+    expect(routeIdOf(7)).toBeNull()
   })
 })

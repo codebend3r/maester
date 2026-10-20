@@ -9,6 +9,7 @@ import {
   type PosterEntry,
   type UnmatchedFile,
   type WatchTarget,
+  emptyListingMessage,
   finishedNote,
   isScanning,
   jumpScale,
@@ -61,22 +62,6 @@ import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 /** How many finished videos the tab shows; the History page has the rest. */
 const FINISHED_LIMIT = 48
-
-/** What the page says in place of a listing with nothing in it, or null while there is something. */
-const emptyMessage = ({
-  empty,
-  query,
-  scanning,
-}: {
-  empty: boolean
-  query: string
-  scanning: boolean
-}): string | null => {
-  if (!empty) return null
-  if (query) return `Nothing here matches "${query}".`
-  if (scanning) return 'Looking through the folders. Videos appear here as they are found.'
-  return 'No videos in these folders yet. Check the paths, or add a folder that holds videos.'
-}
 
 /** A tab's `empty`: `message` when its list has nothing in it. */
 const whenEmpty =
@@ -199,10 +184,10 @@ const AllSection = ({ library }: { library: Library }) => {
   })
   const empty =
     listing.state === LISTING_STATES.listed
-      ? emptyMessage({
-          empty: listed.shows.length === 0 && listed.files.length === 0,
+      ? emptyListingMessage({
+          isEmpty: listed.shows.length === 0 && listed.files.length === 0,
           query: view.query,
-          scanning,
+          isScanning: scanning,
         })
       : null
 

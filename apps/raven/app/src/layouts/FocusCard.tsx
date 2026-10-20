@@ -1,0 +1,95 @@
+import { useState } from 'react'
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native'
+
+import type { ShelfCard } from '@/queries/cards'
+import { CardPicture } from '@/layouts/Card'
+import { useReduceMotion } from '@/stores/reduceMotion'
+import { COLOURS, SIZES } from '@/theme/appTheme'
+
+/** How much the focused card grows. */
+const FOCUS_SCALE = 1.08
+
+const GROW_MS = 150
+
+// The web's `--ease-out`, `cubic-bezier(0.2, 0.8, 0.2, 1)`, which the native tokens cannot carry.
+const EASE_OUT = Easing.bezier(0.2, 0.8, 0.2, 1)
+
+/** How tall a focus card's caption stands: its title, then its line. */
+export const FOCUS_CAPTION_HEIGHT = SIZES.space3 + SIZES.textLg * 1.25 + SIZES.text * 1.25
+
+/**
+ * A card the remote moves to, on a shelf or in a grid: it grows and takes the ring while
+ * focused, smoothly unless the system asks for less motion, when it changes at once.
+ * `isPreferred` asks the remote's focus for it, as the screen opens or after a jump.
+ */
+export const FocusCard = ({
+  card,
+  width,
+  isPreferred,
+  onPress,
+}: {
+  card: ShelfCard
+  width: number
+  isPreferred: boolean
+  onPress: () => void
+}) => {
+  const isReduced = useReduceMotion((state) => state.isReduced)
+  const [isFocused, setFocused] = useState(false)
+  const [scale] = useState(() => new Animated.Value(1))
+
+  const grow = (toValue: number) => {
+    if (isReduced) {
+      scale.setValue(toValue)
+      return
+    }
+    Animated.timing(scale, {
+      toValue,
+      duration: GROW_MS,
+      easing: EASE_OUT,
+      useNativeDriver: true,
+    }).start()
+  }
+
+  return (
+    <Pressable
+      accessibilityLabel={card.title}
+      accessibilityRole="button"
+      hasTVPreferredFocus={isPreferred}
+      onBlur={() => {
+        setFocused(false)
+        grow(1)
+      }}
+      onFocus={() => {
+        setFocused(true)
+        grow(FOCUS_SCALE)
+      }}
+      onPress={onPress}
+    >
+      <Animated.View style={[styles.card, { width, transform: [{ scale }] }]}>
+        <CardPicture card={card} ring={isFocused ? SIZES.tvFocusRing : 0} width={width} />
+        <View>
+          <Text numberOfLines={1} style={[styles.title, isFocused && styles.focusedTitle]}>
+            {card.title}
+          </Text>
+          {card.line !== null && (
+            <Text numberOfLines={1} style={styles.line}>
+              {card.line}
+            </Text>
+          )}
+        </View>
+      </Animated.View>
+    </Pressable>
+  )
+}
+
+const styles = StyleSheet.create({
+  card: { gap: SIZES.space3 },
+  title: {
+    color: COLOURS.muted,
+    fontSize: SIZES.textLg,
+    lineHeight: SIZES.textLg * 1.25,
+    fontWeight: '600',
+  },
+  focusedTitle: { color: COLOURS.text },
+  line: { color: COLOURS.muted, fontSize: SIZES.text, lineHeight: SIZES.text * 1.25 },
+})

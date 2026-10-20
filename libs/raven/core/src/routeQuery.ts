@@ -1,4 +1,5 @@
 import { ApiError, isLockedError } from '@/apiClient'
+import { isString } from '@/schema'
 
 export const ROUTE_STATES = {
   missing: 'missing',
@@ -42,4 +43,15 @@ export const routeState = <T>({
   }
   if (query.data === undefined) return { state: ROUTE_STATES.loading }
   return { state: ROUTE_STATES.ready, data: query.data }
+}
+
+/**
+ * The id a route param names: a whole number written in digits and nothing else, so `1e3`,
+ * ` 7` or a param given twice name no page. The address is the viewer's to type, so this is
+ * the guard at its boundary.
+ */
+export const routeIdOf = (param: unknown): number | null => {
+  if (!isString(param) || !/^\d+$/u.test(param)) return null
+  const id = Number(param)
+  return Number.isSafeInteger(id) ? id : null
 }

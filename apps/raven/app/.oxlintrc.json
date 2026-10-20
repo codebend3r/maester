@@ -33,6 +33,14 @@
       }
     },
     {
+      // The polyfill is `toSorted` itself, so it sorts a copy of its own in
+      // place, which nothing else holds.
+      "files": ["src/arrayToSorted.ts"],
+      "rules": {
+        "unicorn/no-array-sort": "off"
+      }
+    },
+    {
       "files": ["src/**/*.test.ts", "src/**/*.test.tsx"],
       "rules": {
         "typescript/no-non-null-assertion": "off",

@@ -1,22 +1,19 @@
-import { useState } from 'react'
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { CARD_SHAPES, type ShelfCard } from '@/queries/homeShelves'
-import { CardPicture } from '@/layouts/Card'
-import { NOTHING_HERE, type ShelfKit, type ShelfProps, type ShelvesProps } from '@/layouts/shelfKit'
-import { useReduceMotion } from '@/stores/reduceMotion'
+import { CARD_SHAPES } from '@/queries/cards'
+import { FocusCard } from '@/layouts/FocusCard'
+import {
+  NOTHING_HERE,
+  SEE_ALL,
+  type ShelfKit,
+  type ShelfProps,
+  type ShelvesProps,
+  seeAllLabelOf,
+} from '@/layouts/shelfKit'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
 /** Card widths in points on a 1920 by 1080 point screen, read from across the room. */
 const CARD_WIDTHS = { [CARD_SHAPES.poster]: 232, [CARD_SHAPES.wide]: 400 } as const
-
-/** How much the focused card grows. */
-const FOCUS_SCALE = 1.08
-
-const GROW_MS = 150
-
-// The web's `--ease-out`, `cubic-bezier(0.2, 0.8, 0.2, 1)`, which the native tokens cannot carry.
-const EASE_OUT = Easing.bezier(0.2, 0.8, 0.2, 1)
 
 const Shelves = ({ title, notice, children }: ShelvesProps) => (
   <ScrollView contentContainerStyle={styles.shelves} style={styles.ground}>
@@ -29,74 +26,38 @@ const Shelves = ({ title, notice, children }: ShelvesProps) => (
 )
 
 /**
- * A card the remote moves to: it grows and takes the ring while focused, smoothly unless the
- * system asks for less motion, when it changes at once.
+ * A shelf's title, and after a library's the way into the library, which the remote reaches
+ * above the row, as the web's shelf heading links to it.
  */
-const FocusCard = ({
-  card,
-  isFirst,
-  onPress,
-}: {
-  card: ShelfCard
-  isFirst: boolean
-  onPress: () => void
-}) => {
-  const isReduced = useReduceMotion((state) => state.isReduced)
-  const [isFocused, setFocused] = useState(false)
-  const [scale] = useState(() => new Animated.Value(1))
-  const width = CARD_WIDTHS[card.shape]
-
-  const grow = (toValue: number) => {
-    if (isReduced) {
-      scale.setValue(toValue)
-      return
-    }
-    Animated.timing(scale, {
-      toValue,
-      duration: GROW_MS,
-      easing: EASE_OUT,
-      useNativeDriver: true,
-    }).start()
-  }
-
+const ShelfTitle = ({ shelf, onOpenLibrary }: Pick<ShelfProps, 'shelf' | 'onOpenLibrary'>) => {
+  const { libraryId } = shelf
   return (
-    <Pressable
-      accessibilityLabel={card.title}
-      accessibilityRole="button"
-      hasTVPreferredFocus={isFirst}
-      onBlur={() => {
-        setFocused(false)
-        grow(1)
-      }}
-      onFocus={() => {
-        setFocused(true)
-        grow(FOCUS_SCALE)
-      }}
-      onPress={onPress}
-    >
-      <Animated.View style={[styles.card, { width, transform: [{ scale }] }]}>
-        <CardPicture card={card} ring={isFocused ? SIZES.tvFocusRing : 0} width={width} />
-        <View>
-          <Text numberOfLines={1} style={[styles.cardTitle, isFocused && styles.focusedTitle]}>
-            {card.title}
-          </Text>
-          {card.line !== null && (
-            <Text numberOfLines={1} style={styles.line}>
-              {card.line}
+    <View style={styles.titleRow}>
+      <Text accessibilityRole="header" style={styles.shelfTitle}>
+        {shelf.title}
+      </Text>
+      {libraryId !== null && (
+        <Pressable
+          accessibilityLabel={seeAllLabelOf(shelf.title)}
+          accessibilityRole="link"
+          onPress={() => onOpenLibrary(libraryId)}
+          style={({ focused }) => [styles.seeAll, focused && styles.focusedLink]}
+        >
+          {({ focused }) => (
+            <Text style={[styles.seeAllLabel, focused === true && styles.focusedLabel]}>
+              {SEE_ALL}
             </Text>
           )}
-        </View>
-      </Animated.View>
-    </Pressable>
+        </Pressable>
+      )}
+    </View>
   )
 }
 
 /** A shelf the remote moves along: its title, then one row, scrolled as focus moves. */
-const Shelf = ({ shelf, onOpen, isFirst = false }: ShelfProps) => (
+const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) => (
   <View style={styles.shelf}>
-    <Text accessibilityRole="header" style={styles.shelfTitle}>
-      {shelf.title}
-    </Text>
+    <ShelfTitle shelf={shelf} onOpenLibrary={onOpenLibrary} />
     {shelf.cards.length === 0 ? (
       <Text style={styles.notice}>{NOTHING_HERE}</Text>
     ) : (
@@ -109,8 +70,9 @@ const Shelf = ({ shelf, onOpen, isFirst = false }: ShelfProps) => (
           <FocusCard
             key={card.key}
             card={card}
-            isFirst={isFirst && index === 0}
+            isPreferred={isFirst && index === 0}
             onPress={() => onOpen(card)}
+            width={CARD_WIDTHS[card.shape]}
           />
         ))}
       </ScrollView>
@@ -136,15 +98,22 @@ const styles = StyleSheet.create({
   },
   notice: { color: COLOURS.muted, fontSize: SIZES.textLg, paddingHorizontal: SIZES.space8 },
   shelf: { gap: SIZES.space1 },
-  shelfTitle: {
-    color: COLOURS.text,
-    fontSize: SIZES.textXl,
-    fontWeight: 'bold',
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.space3,
     paddingHorizontal: SIZES.space8,
   },
+  shelfTitle: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
+  seeAll: {
+    paddingHorizontal: SIZES.space2,
+    paddingVertical: SIZES.space0,
+    borderRadius: SIZES.radius,
+    borderWidth: SIZES.tvFocusRing,
+    borderColor: 'transparent',
+  },
+  focusedLink: { borderColor: COLOURS.text, backgroundColor: COLOURS.quiet },
+  seeAllLabel: { color: COLOURS.muted, fontSize: SIZES.textLg, fontWeight: '600' },
+  focusedLabel: { color: COLOURS.text },
   row: { gap: SIZES.space5, paddingHorizontal: SIZES.space8, paddingVertical: SIZES.space4 },
-  card: { gap: SIZES.space3 },
-  cardTitle: { color: COLOURS.muted, fontSize: SIZES.textLg, fontWeight: '600' },
-  focusedTitle: { color: COLOURS.text },
-  line: { color: COLOURS.muted, fontSize: SIZES.text },
 })

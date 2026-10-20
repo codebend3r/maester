@@ -1,9 +1,16 @@
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { CARD_SHAPES, type ShelfCard } from '@/queries/homeShelves'
-import { CardPicture } from '@/layouts/Card'
-import { NOTHING_HERE, type ShelfKit, type ShelfProps, type ShelvesProps } from '@/layouts/shelfKit'
+import { CARD_SHAPES } from '@/queries/cards'
+import { TouchCard } from '@/layouts/TouchCard'
+import {
+  NOTHING_HERE,
+  SEE_ALL,
+  type ShelfKit,
+  type ShelfProps,
+  type ShelvesProps,
+  seeAllLabelOf,
+} from '@/layouts/shelfKit'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
 /** The web's 48rem: from there on the screen is a tablet's, and the cards grow. */
@@ -39,40 +46,34 @@ const Shelves = ({ title, notice, children }: ShelvesProps) => {
   )
 }
 
-const TouchCard = ({
-  card,
-  width,
-  onPress,
-}: {
-  card: ShelfCard
-  width: number
-  onPress: () => void
-}) => (
-  <Pressable
-    accessibilityLabel={card.title}
-    accessibilityRole="button"
-    onPress={onPress}
-    style={({ pressed }) => [styles.card, { width }, pressed && styles.pressed]}
-  >
-    <CardPicture card={card} width={width} />
-    <View>
-      <Text numberOfLines={1} style={styles.cardTitle}>
-        {card.title}
-      </Text>
-      {card.line !== null && (
-        <Text numberOfLines={1} style={styles.line}>
-          {card.line}
-        </Text>
-      )}
-    </View>
-  </Pressable>
-)
-
 /**
  * A shelf under the thumb: its title, then a row that scrolls sideways and comes to rest on a
  * card's edge, each card as wide as its own shape asks.
  */
-const Shelf = ({ shelf, onOpen }: ShelfProps) => {
+/** A shelf's title, and beside a library's the way into the library, as the web's shelf heading links to it. */
+const ShelfTitle = ({ shelf, onOpenLibrary }: Pick<ShelfProps, 'shelf' | 'onOpenLibrary'>) => {
+  const { libraryId } = shelf
+  return (
+    <View style={styles.titleRow}>
+      <Text accessibilityRole="header" numberOfLines={1} style={styles.shelfTitle}>
+        {shelf.title}
+      </Text>
+      {libraryId !== null && (
+        <Pressable
+          accessibilityLabel={seeAllLabelOf(shelf.title)}
+          accessibilityRole="link"
+          hitSlop={SIZES.space2}
+          onPress={() => onOpenLibrary(libraryId)}
+          style={({ pressed }) => pressed && styles.pressed}
+        >
+          <Text style={styles.seeAll}>{SEE_ALL}</Text>
+        </Pressable>
+      )}
+    </View>
+  )
+}
+
+const Shelf = ({ shelf, onOpen, onOpenLibrary }: ShelfProps) => {
   const widths = useCardWidths()
   const snaps = shelf.cards.reduce<number[]>(
     (offsets, card) => offsets.concat((offsets.at(-1) ?? 0) + widths[card.shape] + SIZES.space3),
@@ -80,9 +81,7 @@ const Shelf = ({ shelf, onOpen }: ShelfProps) => {
   )
   return (
     <View style={styles.shelf}>
-      <Text accessibilityRole="header" style={styles.shelfTitle}>
-        {shelf.title}
-      </Text>
+      <ShelfTitle shelf={shelf} onOpenLibrary={onOpenLibrary} />
       {shelf.cards.length === 0 ? (
         <Text style={styles.notice}>{NOTHING_HERE}</Text>
       ) : (
@@ -121,15 +120,15 @@ const styles = StyleSheet.create({
   },
   notice: { color: COLOURS.muted, fontSize: SIZES.text, paddingHorizontal: SIZES.space3 },
   shelf: { gap: SIZES.space2 },
-  shelfTitle: {
-    color: COLOURS.text,
-    fontSize: SIZES.textLg,
-    fontWeight: 'bold',
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: SIZES.space2,
     paddingHorizontal: SIZES.space3,
   },
-  row: { gap: SIZES.space3, paddingHorizontal: SIZES.space3 },
-  card: { gap: SIZES.space1 },
+  shelfTitle: { flexShrink: 1, color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
+  seeAll: { color: COLOURS.muted, fontSize: SIZES.textSm, fontWeight: '600' },
   pressed: { opacity: 0.6 },
-  cardTitle: { color: COLOURS.text, fontSize: SIZES.textSm, fontWeight: '600' },
-  line: { color: COLOURS.muted, fontSize: SIZES.textXs },
+  row: { gap: SIZES.space3, paddingHorizontal: SIZES.space3 },
 })

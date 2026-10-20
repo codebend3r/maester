@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 
-import { type ShelfCard, homeShelvesOf } from '@/queries/homeShelves'
+import type { ShelfCard } from '@/queries/cards'
+import { homeShelvesOf } from '@/queries/homeShelves'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useServerCookies } from '@/queries/useServerCookies'
 import { Shelf, Shelves } from '@/layouts'
@@ -45,10 +46,19 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
     router.push({ pathname: APP_ROUTES.item, params: { id: String(itemId) } })
   }
 
+  const openLibrary = (libraryId: number) =>
+    router.push({ pathname: APP_ROUTES.library, params: { id: String(libraryId) } })
+
   return (
     <Shelves notice={notice} title={COPY.title}>
       {shelves.map((shelf, index) => (
-        <Shelf key={shelf.key} isFirst={index === focusShelf} onOpen={open} shelf={shelf} />
+        <Shelf
+          key={shelf.key}
+          isFirst={index === focusShelf}
+          onOpen={open}
+          onOpenLibrary={openLibrary}
+          shelf={shelf}
+        />
       ))}
     </Shelves>
   )
@@ -56,7 +66,7 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
 
 /**
  * `/`: what is being watched, then each pinned library's newest, as shelves of cards. A
- * card opens its item. Each server gets a Home of its own, so nothing one showed, its
+ * card opens its item, and a library shelf's title the library. Each server gets a Home of its own, so nothing one showed, its
  * scroll or its focus, carries over to the next.
  */
 export const Home = () => {
