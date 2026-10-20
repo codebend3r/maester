@@ -1,6 +1,8 @@
 import { domainToUnicode } from 'node:url'
 import type { ConfigStore, DesktopConfig, ServerEntry } from '@/main/desktopConfig'
-import { loggable } from '@/main/servers/serverCalls'
+import type { SignInConfig } from '@/main/accounts/authEndpoints'
+import { quietly } from '@/main/log/quietly'
+import { PROBE_KINDS, loggable, type ProbeResult } from '@/main/servers/serverCalls'
 import {
   ADD_REFUSALS,
   NAME_MAX,
@@ -28,8 +30,13 @@ export const TRUST_MESSAGES = {
     'raven player plays titles from it and keeps its sign-in for this server alone. Add only servers you trust.',
   lookalike: (unicode: string) =>
     `Its address is written in other alphabets and reads as \u2068${unicode}\u2069. Letters from other alphabets can look like familiar ones, so check it is the server you mean.`,
+  signInChanged: ({ serverName, host }: { serverName: string; host: string }) =>
+    `${serverName} now signs in through ${host}. Use it?`,
+  signInChangedDetail:
+    'Your password goes to that address when you sign in. Use it only if you trust it.',
   full: 'raven player keeps at most 20 servers. Remove one in Settings first.',
   unreachable: (origin: string) => `No raven server answered at ${origin}.`,
+  badSignIn: "That server's sign-in settings are not ones raven player can use.",
   busy: 'raven player is already asking about another server.',
   invalid:
     'That is not a server address raven player can use. Use one like https://raven.example.ts.net.',
@@ -42,6 +49,7 @@ export const TRUST_OUTCOME_KINDS = {
   full: 'full',
   busy: 'busy',
   unreachable: 'unreachable',
+  badSignIn: 'badSignIn',
   invalid: 'invalid',
   unsaved: 'unsaved',
 } as const
@@ -52,6 +60,7 @@ export type TrustOutcome =
   | { kind: typeof TRUST_OUTCOME_KINDS.full }
   | { kind: typeof TRUST_OUTCOME_KINDS.busy }
   | { kind: typeof TRUST_OUTCOME_KINDS.unreachable; origin: string }
+  | { kind: typeof TRUST_OUTCOME_KINDS.badSignIn }
   | { kind: typeof TRUST_OUTCOME_KINDS.invalid }
   | { kind: typeof TRUST_OUTCOME_KINDS.unsaved }
 
@@ -69,7 +78,7 @@ export type ServerTrustDeps = {
   config: ConfigStore
   /** Only `true` is a yes. */
   confirm: (origin: string) => Promise<unknown>
-  probe: (input: { serverId: string; origin: string }) => Promise<boolean>
+  probe: (input: { serverId: string; origin: string }) => Promise<ProbeResult>
   forget: (serverId: string) => Promise<void>
   onRemoved: (serverId: string) => void
   newId: () => string
@@ -81,20 +90,34 @@ export type ServerTrustDeps = {
 const HIDDEN = /[\p{Cc}\p{Cf}]/u
 
 /**
- * The trust prompt's detail. A punycode host is also spelled out in its own
- * letters, isolated so a right-to-left name cannot reorder the sentence, so a
- * lookalike of a familiar name is visible; the message itself stays punycode.
+ * A punycode host spelled out in its own letters, isolated so a right-to-left name cannot
+ * reorder the sentence, so a lookalike of a familiar name is visible; the message itself
+ * stays punycode. Null for any other host, and for something that is not an origin.
  */
-export const trustDetailFor = ({ origin }: { origin: string }): string => {
-  if (!URL.canParse(origin)) return TRUST_MESSAGES.detail
+const lookalikeNoteFor = ({ origin }: { origin: string }): string | null => {
+  if (!URL.canParse(origin)) return null
   const { hostname } = new URL(origin)
   const isPunycode = hostname.split('.').some((label) => label.startsWith('xn--'))
   const unicode = domainToUnicode(hostname)
-  if (!isPunycode || unicode === '' || unicode === hostname || HIDDEN.test(unicode)) {
-    return TRUST_MESSAGES.detail
-  }
-  return `${TRUST_MESSAGES.detail} ${TRUST_MESSAGES.lookalike(unicode)}`
+  if (!isPunycode || unicode === '' || unicode === hostname || HIDDEN.test(unicode)) return null
+  return TRUST_MESSAGES.lookalike(unicode)
 }
+
+/** A prompt's detail, with the lookalike note when the origin's host reads as another one. */
+export const withLookalikeNote = ({
+  detail,
+  origin,
+}: {
+  detail: string
+  origin: string
+}): string => {
+  const note = lookalikeNoteFor({ origin })
+  return note === null ? detail : `${detail} ${note}`
+}
+
+/** The trust prompt's detail. */
+export const trustDetailFor = ({ origin }: { origin: string }): string =>
+  withLookalikeNote({ detail: TRUST_MESSAGES.detail, origin })
 
 type AddRefusal = Extract<ReturnType<typeof addServer>, { ok: false }>['reason']
 
@@ -107,15 +130,17 @@ const withServer = ({
   id,
   origin,
   at,
+  signIn,
   onRefused,
 }: {
   config: DesktopConfig
   id: string
   origin: string
   at: number
+  signIn: SignInConfig | null
   onRefused: (reason: AddRefusal) => void
 }): DesktopConfig => {
-  const added = addServer({ config, id, origin, at })
+  const added = addServer({ config, id, origin, at, signIn })
   if (!added.ok) {
     onRefused(added.reason)
     return config
@@ -136,13 +161,7 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
   const declinedFromLinks = new Set<string>()
   const state = { isAsking: false }
 
-  const warn = (message: string): void => {
-    try {
-      deps.warn(message)
-    } catch {
-      // A throwing logger must not turn an answer into a rejection.
-    }
-  }
+  const warn = quietly(deps.warn)
 
   /** `work`, or `late` once `TRUST_STEP_MS` passed without it settling. */
   const within = async <T>({ work, late }: { work: Promise<T>; late: () => T }): Promise<T> => {
@@ -192,26 +211,25 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
         },
       )
 
-  const isRaven = (input: { serverId: string; origin: string }): Promise<boolean> =>
+  const probed = (input: { serverId: string; origin: string }): Promise<ProbeResult> =>
     within({
       work: Promise.resolve()
         .then(() => deps.probe(input))
-        .then(
-          (answer) => answer === true,
-          () => false,
-        ),
-      late: () => {
+        .catch((): ProbeResult => ({ kind: PROBE_KINDS.unreachable })),
+      late: (): ProbeResult => {
         warn(`raven player gave up on ${input.origin} after ${TRUST_STEP_MS} ms`)
-        return false
+        return { kind: PROBE_KINDS.unreachable }
       },
     })
 
   const keep = async ({
     serverId,
     origin,
+    signIn,
   }: {
     serverId: string
     origin: string
+    signIn: SignInConfig | null
   }): Promise<TrustOutcome> => {
     const refusal: { reason: AddRefusal | null } = { reason: null }
     try {
@@ -221,6 +239,7 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
           id: serverId,
           origin,
           at: deps.now(),
+          signIn,
           onRefused: (reason) => {
             refusal.reason = reason
           },
@@ -265,11 +284,21 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
       warn(`raven player made an unusable id for ${origin}`)
       return { kind: TRUST_OUTCOME_KINDS.unsaved }
     }
-    if (!(await isRaven({ serverId, origin }))) {
-      await forget(serverId)
-      return { kind: TRUST_OUTCOME_KINDS.unreachable, origin }
+    const probe = await probed({ serverId, origin })
+    switch (probe.kind) {
+      case PROBE_KINDS.raven:
+        return keep({ serverId, origin, signIn: probe.signIn })
+      case PROBE_KINDS.badSignIn:
+        await forget(serverId)
+        return { kind: TRUST_OUTCOME_KINDS.badSignIn }
+      case PROBE_KINDS.unreachable:
+        await forget(serverId)
+        return { kind: TRUST_OUTCOME_KINDS.unreachable, origin }
+      default: {
+        const unreachable: never = probe
+        return unreachable
+      }
     }
-    return keep({ serverId, origin })
   }
 
   return {
@@ -334,13 +363,9 @@ export const withTrustLog = ({
 }): ServerTrust => ({
   trust: async (input) => {
     const outcome = await trust.trust(input)
-    try {
-      warn(
-        `trust for ${loggable(input.origin)} from ${FROM_LABELS[input.from]}: ${outcomeLabel(outcome)}`,
-      )
-    } catch {
-      // A throwing logger must not turn an answer into a rejection.
-    }
+    quietly(warn)(
+      `trust for ${loggable(input.origin)} from ${FROM_LABELS[input.from]}: ${outcomeLabel(outcome)}`,
+    )
     return outcome
   },
   remove: (serverId) => trust.remove(serverId),

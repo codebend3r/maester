@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { EMPTY_CONFIG, type DesktopConfig, type ServerEntry } from '@/main/desktopConfig'
+import { PROBE_KINDS, type ProbeResult } from '@/main/servers/serverCalls'
 import { createJsonStore, type StateFs } from '@/main/stateStore'
 import { NAME_MAX, SERVERS_CAP, renameServer } from '@/main/servers/serverList'
 import {
@@ -26,6 +27,7 @@ const entryFor = ({ n }: { n: number }): ServerEntry => ({
   origin: `https://s${n}.example`,
   name: `Server ${n}`,
   addedAt: n,
+  signIn: null,
 })
 
 const configWith = ({ servers }: { servers: ServerEntry[] }): DesktopConfig => ({
@@ -69,7 +71,40 @@ const handConfirm = () => {
   return { confirm, asked, answer }
 }
 
-const PROBE_ANSWERS = { raven: 'raven', notRaven: 'notRaven', throws: 'throws' } as const
+const PROBE_ANSWERS = {
+  raven: 'raven',
+  ravenReady: 'ravenReady',
+  badSignIn: 'badSignIn',
+  notRaven: 'notRaven',
+  throws: 'throws',
+} as const
+
+const SIGN_IN = {
+  supabaseUrl: 'https://project.supabase.co',
+  publishableKey: 'sb_publishable_example',
+  webUrl: 'https://raven.example',
+} as const
+
+const RAVEN: ProbeResult = { kind: PROBE_KINDS.raven, signIn: null }
+const UNREACHABLE: ProbeResult = { kind: PROBE_KINDS.unreachable }
+
+const probeResultFor = (answer: ProbeAnswer): ProbeResult => {
+  switch (answer) {
+    case PROBE_ANSWERS.raven:
+      return RAVEN
+    case PROBE_ANSWERS.ravenReady:
+      return { kind: PROBE_KINDS.raven, signIn: SIGN_IN }
+    case PROBE_ANSWERS.badSignIn:
+      return { kind: PROBE_KINDS.badSignIn }
+    case PROBE_ANSWERS.notRaven:
+    case PROBE_ANSWERS.throws:
+      return UNREACHABLE
+    default: {
+      const unreachable: never = answer
+      return unreachable
+    }
+  }
+}
 
 type ProbeAnswer = (typeof PROBE_ANSWERS)[keyof typeof PROBE_ANSWERS]
 
@@ -116,7 +151,7 @@ const setup = ({
       probes.push(input)
       log.push('probe')
       if (probeAnswer === PROBE_ANSWERS.throws) throw new Error('socket hang up')
-      return probeAnswer === PROBE_ANSWERS.raven
+      return probeResultFor(probeAnswer)
     },
     forget: async (serverId) => {
       forgotten.push(serverId)
@@ -335,7 +370,13 @@ describe('createServerTrust', () => {
   it('probes with the new id and the origin after a yes, then stores the server by its host', async () => {
     const world = setup()
     const outcome = await answered({ world, isYes: true })
-    const server = { id: idFor({ n: 1 }), origin: ORIGIN, name: 'raven.example', addedAt: NOW }
+    const server = {
+      id: idFor({ n: 1 }),
+      origin: ORIGIN,
+      name: 'raven.example',
+      addedAt: NOW,
+      signIn: null,
+    }
     expect(world.probes).toEqual([{ serverId: idFor({ n: 1 }), origin: ORIGIN }])
     expect(outcome).toEqual({ kind: 'trusted', server, isNew: true })
     expect(world.config.read().servers).toEqual([server])
@@ -350,8 +391,56 @@ describe('createServerTrust', () => {
     const written: unknown = JSON.parse(world.disk.files.get(FILE) ?? 'null')
     expect(written).toEqual({
       ...EMPTY_CONFIG,
-      servers: [{ id: idFor({ n: 1 }), origin: ORIGIN, name: 'raven.example', addedAt: NOW }],
+      servers: [
+        { id: idFor({ n: 1 }), origin: ORIGIN, name: 'raven.example', addedAt: NOW, signIn: null },
+      ],
     })
+  })
+
+  it('pins the sign-in a ready probe found with the new server, and writes it to disk', async () => {
+    const world = setup({ probeAnswer: PROBE_ANSWERS.ravenReady })
+    const outcome = await answered({ world, isYes: true })
+    const server = {
+      id: idFor({ n: 1 }),
+      origin: ORIGIN,
+      name: 'raven.example',
+      addedAt: NOW,
+      signIn: SIGN_IN,
+    }
+    expect(outcome).toEqual({ kind: TRUST_OUTCOME_KINDS.trusted, server, isNew: true })
+    await world.config.flush()
+    const written: unknown = JSON.parse(world.disk.files.get(FILE) ?? 'null')
+    expect(written).toEqual({ ...EMPTY_CONFIG, servers: [server] })
+  })
+
+  it('stores a server whose accounts are off or older than accounts with no pin', async () => {
+    const world = setup({ probeAnswer: PROBE_ANSWERS.raven })
+    await answered({ world, isYes: true })
+    expect(world.config.read().servers.map((server) => server.signIn)).toEqual([null])
+  })
+
+  it('refuses a server whose sign-in settings it cannot use, forgetting the fresh session and storing nothing', async () => {
+    const world = setup({ probeAnswer: PROBE_ANSWERS.badSignIn })
+    const before = world.config.read()
+    const outcome = await answered({ world, isYes: true })
+    expect(outcome).toEqual({ kind: TRUST_OUTCOME_KINDS.badSignIn })
+    expect(world.prompt.asked).toEqual([ORIGIN])
+    expect(world.forgotten).toEqual([idFor({ n: 1 })])
+    expect(world.config.read()).toBe(before)
+    expect(world.log).toEqual(['probe', 'forget'])
+  })
+
+  it('tells a person that sign-in settings are the problem', () => {
+    expect(TRUST_MESSAGES.badSignIn).toBe(
+      "That server's sign-in settings are not ones raven player can use.",
+    )
+  })
+
+  it('asks again from a link after a server had sign-in settings it could not use', async () => {
+    const world = setup({ probeAnswer: PROBE_ANSWERS.badSignIn })
+    await answered({ world, isYes: true })
+    await answered({ world, isYes: false })
+    expect(world.prompt.asked).toEqual([ORIGIN, ORIGIN])
   })
 
   it('names a punycode server by its punycode host, never its unicode letters', async () => {
@@ -440,7 +529,7 @@ describe('createServerTrust', () => {
     const trust = createServerTrust({
       config: world.config,
       confirm: async () => true,
-      probe: () => new Promise<boolean>(() => undefined),
+      probe: () => new Promise<ProbeResult>(() => undefined),
       forget: async (serverId) => {
         forgotten.push(serverId)
       },
@@ -469,7 +558,7 @@ describe('createServerTrust', () => {
     const trust = createServerTrust({
       config: world.config,
       confirm: async () => true,
-      probe: async () => false,
+      probe: async () => UNREACHABLE,
       forget: () => new Promise<void>(() => undefined),
       onRemoved: () => undefined,
       newId: () => idFor({ n: 7 }),
@@ -491,7 +580,7 @@ describe('createServerTrust', () => {
       confirm: async () => 'yes',
       probe: async (input) => {
         world.probes.push(input)
-        return true
+        return RAVEN
       },
       forget: async () => undefined,
       onRemoved: () => undefined,
@@ -513,7 +602,7 @@ describe('createServerTrust', () => {
       confirm: async () => true,
       probe: () =>
         new Promise((resolve) => {
-          release.push(() => resolve(true))
+          release.push(() => resolve(RAVEN))
         }),
       forget: async () => undefined,
       onRemoved: () => undefined,
@@ -588,7 +677,7 @@ describe('createServerTrust', () => {
     const world = setup()
     const pending = world.trust.trust({ origin: ORIGIN, from: 'app' })
     await settle()
-    const first = { id: idFor({ n: 50 }), origin: ORIGIN, name: 'Vhagar', addedAt: 5 }
+    const first = { id: idFor({ n: 50 }), origin: ORIGIN, name: 'Vhagar', addedAt: 5, signIn: null }
     world.config.update((config) => ({ ...config, servers: [first] }))
     world.prompt.answer(true)
     expect(await pending).toEqual({ kind: 'trusted', server: first, isNew: false })
@@ -601,7 +690,7 @@ describe('createServerTrust', () => {
     await answered({ world, isYes: false })
     const pending = world.trust.trust({ origin: ORIGIN, from: 'app' })
     await settle()
-    const first = { id: idFor({ n: 50 }), origin: ORIGIN, name: 'Vhagar', addedAt: 5 }
+    const first = { id: idFor({ n: 50 }), origin: ORIGIN, name: 'Vhagar', addedAt: 5, signIn: null }
     world.config.update((config) => ({ ...config, servers: [first] }))
     world.prompt.answer(true)
     expect(await pending).toEqual({ kind: 'trusted', server: first, isNew: false })
@@ -633,7 +722,7 @@ describe('createServerTrust', () => {
         },
       },
       confirm: async () => true,
-      probe: async () => true,
+      probe: async () => RAVEN,
       forget: async (serverId) => {
         world.forgotten.push(serverId)
       },
@@ -666,7 +755,7 @@ describe('createServerTrust', () => {
       },
       probe: async (input) => {
         world.probes.push(input)
-        return true
+        return RAVEN
       },
       forget: async () => undefined,
       onRemoved: () => undefined,
@@ -699,7 +788,13 @@ describe('createServerTrust', () => {
     expect(world.prompt.asked).toEqual([ORIGIN, ORIGIN])
     expect(outcome).toEqual({
       kind: 'trusted',
-      server: { id: idFor({ n: 2 }), origin: ORIGIN, name: 'raven.example', addedAt: NOW },
+      server: {
+        id: idFor({ n: 2 }),
+        origin: ORIGIN,
+        name: 'raven.example',
+        addedAt: NOW,
+        signIn: null,
+      },
       isNew: true,
     })
   })
@@ -747,7 +842,7 @@ describe('remove', () => {
         },
       },
       confirm: async () => false,
-      probe: async () => false,
+      probe: async () => UNREACHABLE,
       forget: async (serverId) => {
         forgotten.push(serverId)
       },
@@ -787,7 +882,7 @@ describe('remove', () => {
     const trust = createServerTrust({
       config: world.config,
       confirm: async () => false,
-      probe: async () => false,
+      probe: async () => UNREACHABLE,
       forget: async () => undefined,
       onRemoved: () => {
         throw new Error('engine gone')
