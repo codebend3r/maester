@@ -38,6 +38,7 @@ const outcomeOf = (reply: DesktopReply | null): Outcome => {
     case DESKTOP_REPLIES.updates:
     case DESKTOP_REPLIES.downloads:
     case DESKTOP_REPLIES.space:
+    case DESKTOP_REPLIES.account:
       return { kind: OUTCOME_KINDS.stay, message: UNOPENED }
     default: {
       const unreachable: never = reply

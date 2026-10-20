@@ -157,6 +157,7 @@ export const useChangeDownloads = (): ((request: DownloadsChange) => Promise<boo
       case DESKTOP_REPLIES.updates:
       case DESKTOP_REPLIES.downloadAsk:
       case DESKTOP_REPLIES.space:
+      case DESKTOP_REPLIES.account:
         showNotice(UNREACHED)
         return false
       default: {

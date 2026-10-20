@@ -307,6 +307,265 @@ describe('redact', () => {
     })
   })
 
+  describe('sign-in secrets', () => {
+    const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1MSJ9.c2lnbmF0dXJl-_x'
+    const TICKET = `account.${'Ab1_-'.repeat(8)}Ab1`
+    const RELAY_SECRET = `${'Zz9_-'.repeat(8)}Zz9`
+    const EMAIL = 'cj.rivas+raven@example.com'
+    const FIELDS: string[] = [
+      'authorization',
+      'access_token',
+      'refresh_token',
+      'provider_token',
+      'token_hash',
+      'token',
+      'apikey',
+    ]
+
+    // Each secret as plain text, JSON, JSON inside a JSON string, util.inspect and a URL.
+    const forms = ({ name, secret }: { name: string; secret: string }): string[] => [
+      `${name}=${secret}`,
+      `${name}: ${secret}`,
+      JSON.stringify({ [name]: secret, x: 1 }),
+      JSON.stringify({ body: JSON.stringify({ [name]: secret, x: 1 }) }),
+      inspect({ [name]: secret, x: 1 }),
+      `https://raven.example/auth/v1/verify?x=1&${name}=${secret}&y=2`,
+    ]
+
+    it.each(FIELDS)('blanks the value of %s in every form', (name) => {
+      forms({ name, secret: 'SECRETVAL123' }).forEach((input) => {
+        const out = redact(input)
+        expect(out).not.toContain('SECRETVAL123')
+        expect(out).toContain('[redacted]')
+        expect(redact(out)).toBe(out)
+      })
+    })
+
+    it('keeps what surrounds a blanked field', () => {
+      expect(redact('/verify?x=1&token_hash=SECRETVAL&y=2')).toBe(
+        '/verify?x=1&token_hash=[redacted]&y=2',
+      )
+      expect(redact('{"access_token":"SECRETVAL","expires_in":3600}')).toBe(
+        '{"access_token":"[redacted]","expires_in":3600}',
+      )
+      expect(redact("{ refresh_token: 'SECRETVAL', user: 1 }")).toBe(
+        "{ refresh_token: '[redacted]', user: 1 }",
+      )
+      expect(redact('{\\"apikey\\":\\"SECRETVAL\\",\\"x\\":1}')).toBe(
+        '{\\"apikey\\":\\"[redacted]\\",\\"x\\":1}',
+      )
+      expect(redact('grant_type=password&refresh_token=SECRETVAL')).toBe(
+        'grant_type=password&refresh_token=[redacted]',
+      )
+    })
+
+    it('blanks an authorization header and any bearer value', () => {
+      expect(redact('Authorization: Bearer SECRETVAL')).toBe('Authorization: [redacted]')
+      expect(redact('{"Authorization":"Bearer SECRETVAL"}')).toBe('{"Authorization":"[redacted]"}')
+      expect(redact('{"authorization":"Basic SECRETVAL"}')).toBe('{"authorization":"[redacted]"}')
+      expect(redact(inspect({ headers: { authorization: 'Bearer SECRETVAL' } }))).toBe(
+        "{ headers: { authorization: '[redacted]' } }",
+      )
+      expect(redact('sent bearer SECRETVAL to the server')).toBe(
+        'sent bearer [redacted] to the server',
+      )
+      expect(redact('[http] Bearer SECRETVAL.x-y_z, retry')).toBe('[http] Bearer [redacted], retry')
+      expect(redact('{\\"h\\":\\"Bearer SECRETVAL\\"}')).toBe('{\\"h\\":\\"Bearer [redacted]\\"}')
+      expect(redact('http-header-fields=Authorization: Bearer SECRETVAL,Accept: */*')).toBe(
+        'http-header-fields=Authorization: [redacted],Accept: */*',
+      )
+    })
+
+    it('blanks a JWT wherever it sits', () => {
+      expect(redact(`session ${JWT} ended`)).toBe('session [redacted] ended')
+      expect(redact(`{"jwt":"${JWT}"}`)).toBe('{"jwt":"[redacted]"}')
+      expect(redact(`{\\"jwt\\":\\"${JWT}\\"}`)).toBe('{\\"jwt\\":\\"[redacted]\\"}')
+      expect(redact(inspect({ jwt: JWT }))).toBe("{ jwt: '[redacted]' }")
+      expect(redact(`https://raven.example/cb#jwt=${JWT}&x=1`)).toBe(
+        'https://raven.example/cb#jwt=[redacted]&x=1',
+      )
+      expect(redact('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1MSJ9.')).toBe(
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1MSJ9.',
+      )
+      expect(redact('eyJhbGciOiJIUzI1NiJ9 and eyJ.x')).toBe('eyJhbGciOiJIUzI1NiJ9 and eyJ.x')
+    })
+
+    it('blanks the t parameter and any account ticket', () => {
+      expect(redact(`https://raven.example/api/media/7/file?t=${TICKET}`)).toBe(
+        'https://raven.example/api/media/7/file?t=[redacted]',
+      )
+      expect(redact('/api/media/7/stream?a=1&t=whatever&b=2')).toBe(
+        '/api/media/7/stream?a=1&t=[redacted]&b=2',
+      )
+      expect(redact(`Opening ${TICKET} for media 7`)).toBe('Opening [redacted] for media 7')
+      expect(redact(`{"ticket":"${TICKET}"}`)).toBe('{"ticket":"[redacted]"}')
+      expect(redact(`{\\"ticket\\":\\"${TICKET}\\"}`)).toBe('{\\"ticket\\":\\"[redacted]\\"}')
+      expect(redact(inspect({ ticket: TICKET }))).toBe("{ ticket: '[redacted]' }")
+      expect(redact(JSON.stringify({ url: `http://h/file?t=${TICKET}`, ok: true }))).toBe(
+        '{"url":"http://h/file?t=[redacted]","ok":true}',
+      )
+      expect(redact('/library?sort=t&q=a&start=3')).toBe('/library?sort=t&q=a&start=3')
+      expect(redact('the main account.json file and my-account.refreshSettings.x')).toBe(
+        'the main account.json file and my-account.refreshSettings.x',
+      )
+    })
+
+    it('blanks URL encoded secrets', () => {
+      const encoded = (text: string): string => encodeURIComponent(text)
+      expect(redact(`%3Ft%3D${TICKET}`)).toBe('%3Ft%3D[redacted]')
+      expect(redact(`u=${encoded(`http://h/api/media/7/file?t=${TICKET}&x=1`)}`)).toBe(
+        'u=http%3A%2F%2Fh%2Fapi%2Fmedia%2F7%2Ffile%3Ft%3D[redacted]%26x%3D1',
+      )
+      expect(redact(`a%3D${TICKET}`)).toBe('a%3D[redacted]')
+      expect(redact(`a%3D${JWT}`)).toBe('a%3D[redacted]')
+      expect(redact(`a%3d${JWT}`)).toBe('a%3d[redacted]')
+      expect(redact(`token%3D${JWT}`)).toBe('token%3D[redacted]')
+      expect(redact(`x%26access_token%3DSECRETVAL%26y%3D1`)).toBe('x%26access_token%3D[redacted]')
+      expect(redact(`Authorization%3A%20Bearer%20${JWT}`)).toBe('Authorization%3A%20[redacted]')
+      expect(redact(`h%3A%20Bearer%20${JWT}`)).toBe('h%3A%20Bearer%20[redacted]')
+      expect(redact(`Bearer%20SECRETVAL`)).toBe('Bearer%20[redacted]')
+      expect(redact(`maester-auth.0%3Dbase64-SECRETVAL`)).toBe('maester-auth.0%3D[redacted]')
+      expect(redact(`http%3A%2F%2F127.0.0.1%3A5%2F${RELAY_SECRET}%2Ffile`)).toBe(
+        'http%3A%2F%2F127.0.0.1%3A5%2F[redacted]%2Ffile',
+      )
+      expect(redact(`http%3a%2f%2f127.0.0.1%3a5%2f${RELAY_SECRET}%2ffile`)).toBe(
+        'http%3a%2f%2f127.0.0.1%3a5%2f[redacted]%2ffile',
+      )
+      expect(redact(`password%3Dhunter2`)).toBe('password%3D[redacted]')
+      expect(redact(`url=${encoded(`http://127.0.0.1:5/${RELAY_SECRET}/file`)}`)).not.toContain(
+        RELAY_SECRET,
+      )
+      const out = redact(`Authorization%3A%20Bearer%20${JWT} ${encoded(`/x?t=${TICKET}`)}`)
+      expect(redact(out)).toBe(out)
+    })
+
+    it('blanks the Supabase session cookies and their chunks', () => {
+      const names = [
+        'maester-auth',
+        'maester-auth.0',
+        'maester-auth.12',
+        'sb-abcdefgh-auth-token',
+        'sb-abcdefgh-auth-token.1',
+      ]
+      names.forEach((name) => {
+        expect(redact(`${name}=base64-SECRETVAL; Path=/`)).toBe(`${name}=[redacted]; Path=/`)
+        expect(redact(`h=${name}%3Dbase64-SECRETVAL`)).toBe(`h=${name}%3D[redacted]`)
+        expect(redact(inspect({ name, value: 'SECRETVAL' }))).toBe(
+          `{ name: '${name}', value: '[redacted]' }`,
+        )
+        expect(redact(JSON.stringify({ value: 'SECRETVAL', name }))).toBe(
+          `{"value":"[redacted]","name":"${name}"}`,
+        )
+        expect(redact(JSON.stringify({ c: JSON.stringify({ name, value: 'S1' }) }))).toBe(
+          `{"c":"{\\"name\\":\\"${name}\\",\\"value\\":\\"[redacted]\\"}"}`,
+        )
+        expect(redact(`Cookie: ${name}=SECRETVAL`)).toBe('Cookie: [redacted]')
+      })
+      expect(redact('Cookie: sb-abc-auth-token.0=x')).toBe('Cookie: [redacted]')
+      expect(redact('sb-auth=1 maester=2 author=3')).toBe('sb-auth=1 maester=2 author=3')
+    })
+
+    it("blanks a relay URL's secret and keeps the rest", () => {
+      expect(redact(`Opening http://127.0.0.1:54321/${RELAY_SECRET}/file`)).toBe(
+        'Opening http://127.0.0.1:54321/[redacted]/file',
+      )
+      expect(redact(`GET http://127.0.0.1:80/${RELAY_SECRET}/subtitles/external-2 failed`)).toBe(
+        'GET http://127.0.0.1:80/[redacted]/subtitles/external-2 failed',
+      )
+      expect(redact(JSON.stringify({ url: `http://127.0.0.1:1/${RELAY_SECRET}/file` }))).toBe(
+        '{"url":"http://127.0.0.1:1/[redacted]/file"}',
+      )
+      expect(redact(`{\\"u\\":\\"http://127.0.0.1:1/${RELAY_SECRET}/file\\"}`)).toBe(
+        '{\\"u\\":\\"http://127.0.0.1:1/[redacted]/file\\"}',
+      )
+      const inspected = redact(inspect({ url: `http://127.0.0.1:9/${RELAY_SECRET}` }))
+      expect(inspected).not.toContain(RELAY_SECRET)
+      expect(inspected).toContain("'http://127.0.0.1:9/[redacted]'")
+    })
+
+    it('leaves other loopback and server URLs alone', () => {
+      const urls = [
+        'http://127.0.0.1:54321/api/media/7/file',
+        'http://127.0.0.1:54321/abc/file',
+        `http://127.0.0.1:54321/${RELAY_SECRET}Z/file`,
+        `http://127.0.0.1:54321/${RELAY_SECRET.slice(1)}/file`,
+        `https://raven.example/${RELAY_SECRET}/file`,
+      ]
+      urls.forEach((url) => expect(redact(url)).toBe(url))
+    })
+
+    it('blanks an email address in every form', () => {
+      expect(redact(`signed in as ${EMAIL}.`)).toBe('signed in as <email>.')
+      expect(redact(`{"email":"${EMAIL}","x":1}`)).toBe('{"email":"<email>","x":1}')
+      expect(redact(`{\\"email\\":\\"${EMAIL}\\"}`)).toBe('{\\"email\\":\\"<email>\\"}')
+      expect(redact(inspect({ email: EMAIL }))).toBe("{ email: '<email>' }")
+      expect(redact(`/auth/v1/recover?email=${EMAIL}&x=1`)).toBe(
+        '/auth/v1/recover?email=<email>&x=1',
+      )
+      expect(redact('/auth/v1/recover?email=cj%40example.com&x=1')).toBe(
+        '/auth/v1/recover?email=<email>&x=1',
+      )
+      expect(redact('a@b.co, c.d@e-f.g.org; <h@i.io>')).toBe('<email>, <email>; <<email>>')
+    })
+
+    it('leaves what is not an email alone', () => {
+      const samples = [
+        "import { x } from '@raven/core'",
+        'resolved @raven/core@1.2.3 and react@19.2.0 and @types/node@22.0.0',
+        'bun add @luwin/web @shared/server',
+        'Loaded /Users/cj/node_modules/@raven/ui/dist/index.js',
+        'asset icon@2x.png and icon@3x.webp',
+        '@ alone, a@b, @home, user@localhost, 1 @ 2',
+        'timestamps 10:00@host and a @ b.c',
+        'git ref main@{upstream}',
+      ]
+      samples.forEach((line) => {
+        const expected = line.replace('/Users/cj/node_modules/@raven/ui/dist/index.js', '<path>')
+        expect(redact(line)).toBe(expected)
+      })
+    })
+
+    it('leaves ordinary words and fields alone', () => {
+      const samples = [
+        'tokens=5 token_count=3 tokenizer: fine',
+        'authority=raven.example author=cj',
+        'the api key is missing',
+        'Unexpected token } in JSON',
+        'bearers of news',
+        'e2e: signed in at http://127.0.0.1:5173/library?page=2',
+      ]
+      samples.forEach((line) => expect(redact(line)).toBe(line))
+    })
+
+    it('changes nothing when run twice', () => {
+      const inputs = [
+        `Authorization: Bearer SECRETVAL ${JWT} Bearer X`,
+        `token=A&access_token=B refresh_token: C {"apikey":"D"} { token_hash: 'E' } ${EMAIL}`,
+        `http://h/file?t=${TICKET} ${TICKET} http://127.0.0.1:1/${RELAY_SECRET}/file`,
+        `%3Ft%3D${TICKET} a%3D${JWT} token%3D${JWT} Authorization%3A%20Bearer%20${JWT} http%3A%2F%2F127.0.0.1%3A5%2F${RELAY_SECRET}%2Ffile`,
+        'maester-auth.0=base64-X; sb-abc-auth-token=Y Cookie: maester-auth=Z',
+        inspect({ name: 'maester-auth.1', value: 'SECRETVAL', email: EMAIL, token: JWT }),
+        JSON.stringify({ body: JSON.stringify({ token: 'T', email: EMAIL, t: 'x' }) }),
+        ...FIELDS.flatMap((name) => forms({ name, secret: JWT })),
+      ]
+      inputs.forEach((input) => {
+        const once = redact(input)
+        expect(redact(once)).toBe(once)
+      })
+    })
+
+    it('logs none of them', () => {
+      const line = logLine({
+        at: 0,
+        level: 'warn',
+        message: `Bearer ${JWT} ${EMAIL} ?t=${TICKET} http://127.0.0.1:1/${RELAY_SECRET}/file`,
+      })
+      expect(line).toBe(
+        `${STAMP}warn Bearer [redacted] <email> ?t=[redacted] http://127.0.0.1:1/[redacted]/file\n`,
+      )
+    })
+  })
+
   it('blanks the paths mpv names, quoted or bare', () => {
     expect(
       redact("[file] Cannot open file '/Volumes/Media/Secret Film.mkv': No such file or directory"),
@@ -484,11 +743,78 @@ describe('logLine', () => {
     ['a run of protocol prefixed paths', 'file:/Volumes/'.repeat(21_500)],
     ['a run of volumes', '/Volumes/'.repeat(33_400)],
     ['a run of file URLs', 'file://'.repeat(43_000)],
+    ['a run of maester cookie names', 'maester-auth'.repeat(25_000)],
+    ['a run of Supabase cookie names', 'sb-a-auth-token'.repeat(20_000)],
+    ['a run of cookie names with values', 'raven_unlock value '.repeat(16_000)],
+    ['a run of encoded separators', 'token%20'.repeat(37_500)],
+    ['a run of encoded JWT starts', '%3Deyj'.repeat(50_000)],
+    ['a run of encoded t parameters', '%3Ft%3D'.repeat(43_000)],
+    ['a run of encoded relay hosts', '127.0.0.1%3A1%2F'.repeat(19_000)],
+    ['a run of bearer words', 'Bearer '.repeat(43_000)],
+    ['a run of JWT starts', 'eyJ'.repeat(100_000)],
+    ['a run of JWT segments', 'eyJ.'.repeat(75_000)],
+    ['a run of JWT starts with dots', 'eyJa.b'.repeat(50_000)],
+    ['a run of token keys', 'token='.repeat(50_000)],
+    ['a run of token keys with quotes', 'token="'.repeat(40_000)],
+    ['a run of token keys with escaped quotes', 'token=\\"'.repeat(35_000)],
+    ['a run of token key words', 'access_token '.repeat(23_000)],
+    ['a run of authorization keys', 'authorization: '.repeat(20_000)],
+    ['a run of ticket prefixes', 'account.'.repeat(37_500)],
+    ['a run of t parameters', '?t='.repeat(100_000)],
+    ['a run of session cookie names', 'maester-auth.0 '.repeat(20_000)],
+    ['a run of Supabase cookie prefixes', 'sb-'.repeat(100_000)],
+    ['a run of Supabase cookie words', 'sb-a '.repeat(60_000)],
+    ['a run of hyphenated Supabase words', 'sb-a-'.repeat(60_000)],
+    ['a run of relay hosts', '127.0.0.1:1/'.repeat(25_000)],
+    ['a run of email locals', 'a.'.repeat(150_000)],
+    ['a run of at signs', 'a@'.repeat(150_000)],
+    ['a run of email domains', 'a@a.'.repeat(75_000)],
+    ['a run of email hyphens', 'a@a-'.repeat(75_000)],
+    ['a run of email labels', 'a@b'.concat('.1'.repeat(150_000))],
   ])('logs 300 KB of %s in under 200 ms', (_name, message) => {
     const { log } = setup()
     const startedAt = performance.now()
     log.warn(message)
     expect(performance.now() - startedAt).toBeLessThan(200)
+  })
+
+  // The sign-in patterns are linear on their own, with no help from the cap above.
+  it.each([
+    ['JWT starts', 'eyJ'.repeat(100_000)],
+    ['JWT segments', 'eyJ.'.repeat(75_000)],
+    ['bearer words', 'Bearer '.repeat(43_000)],
+    ['token keys', 'token='.repeat(50_000)],
+    ['token key words', 'access_token '.repeat(23_000)],
+    ['ticket prefixes', 'account.'.repeat(37_500)],
+    ['t parameters', '?t='.repeat(100_000)],
+    ['Supabase cookie prefixes', 'sb-'.repeat(100_000)],
+    ['hyphenated Supabase words', 'sb-a-'.repeat(60_000)],
+    ['relay hosts', '127.0.0.1:1/'.repeat(25_000)],
+    ['email locals', 'a.'.repeat(150_000)],
+    ['at signs', 'a@'.repeat(150_000)],
+    ['email domains', 'a@a.'.repeat(75_000)],
+    ['email hyphens', 'a@a-'.repeat(75_000)],
+    ['email labels', `a@b${'.1'.repeat(150_000)}`],
+    ['maester cookie names', 'maester-auth'.repeat(25_000)],
+    ['Supabase cookie names', 'sb-a-auth-token'.repeat(20_000)],
+    ['cookie names with values', 'raven_unlock value '.repeat(16_000)],
+    ['encoded separators', 'token%20'.repeat(37_500)],
+    ['encoded JWT starts', '%3Deyj'.repeat(50_000)],
+    ['encoded JWT segments', '%3Deyj.'.repeat(43_000)],
+    ['encoded t parameters', '%3Ft%3D'.repeat(43_000)],
+    ['encoded relay hosts', '127.0.0.1%3A1%2F'.repeat(19_000)],
+  ])('redacts 300 KB of %s in linear time', (_name, text) => {
+    // An eighth of the input of the same shape: linear work takes about 8 times as long on the
+    // whole and quadratic work 64 times, so 24 times tells them apart whatever the machine's speed.
+    const eighth = text.slice(0, text.length / 8)
+    const timeOf = (input: string): number =>
+      Array.from({ length: 5 }, () => {
+        const startedAt = performance.now()
+        redact(input)
+        return performance.now() - startedAt
+      }).reduce((fastest, each) => Math.min(fastest, each))
+    // Clocks are coarse and a short run can be near zero, so the shorter time has a floor.
+    expect(timeOf(text)).toBeLessThanOrEqual(24 * Math.max(timeOf(eighth), 5))
   })
 
   it('caps a message before redacting it, never between the halves of a surrogate pair', () => {

@@ -1,4 +1,5 @@
 import { isBoolean, isString, listOf, object } from '@raven/core'
+import { parseJson } from '@/main/parseJson'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 
 export const RELEASES_URL = 'https://api.github.com/repos/codebend3r/maester/releases?per_page=100'
@@ -179,15 +180,6 @@ export type UpdateFetch = (input: {
   text: () => Promise<string>
 }>
 
-const parseJson = (text: string): { ok: true; value: unknown } | { ok: false } => {
-  try {
-    const value: unknown = JSON.parse(text)
-    return { ok: true, value }
-  } catch {
-    return { ok: false }
-  }
-}
-
 type PageRead =
   | { ok: true; releases: unknown[]; next: string | null; chars: number }
   | { ok: false; problem: string }
@@ -229,11 +221,9 @@ const readPage = async ({
   if (text === null) return { ok: false, problem: UPDATE_PROBLEMS.unreachable }
   if (text.length > charsLeft) return { ok: false, problem: UPDATE_PROBLEMS.unreadable }
   const parsed = parseJson(text)
-  if (!parsed.ok || !isList(parsed.value)) {
-    return { ok: false, problem: UPDATE_PROBLEMS.unreadable }
-  }
+  if (!isList(parsed)) return { ok: false, problem: UPDATE_PROBLEMS.unreadable }
   const next = nextPageUrl({ link: linkOf(response.headers), start })
-  return { ok: true, releases: parsed.value, next, chars: text.length }
+  return { ok: true, releases: parsed, next, chars: text.length }
 }
 
 /**
