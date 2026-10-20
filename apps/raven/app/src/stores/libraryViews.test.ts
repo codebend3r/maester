@@ -53,7 +53,7 @@ describe('useLibraryViews', () => {
           [`${SERVER}/1`]: { sort: MEDIA_SORTS.added, pinned: false },
           [`${SERVER}/2`]: { sort: 'loudest' },
           [`${SERVER}/3`]: { groupBy: MEDIA_GROUPINGS.codec },
-          [`${SERVER}/4`]: 'grid',
+          [`${SERVER}/4`]: LIBRARY_VIEWS.grid,
         },
       },
       version: 0,
