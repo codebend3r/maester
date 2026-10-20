@@ -12,8 +12,10 @@ import {
 } from '@raven/core'
 import {
   Button,
+  createProgressSaver,
   type NativePlayer,
   type PlayerServices,
+  type ProgressSaver,
   UnlockDialog,
   type UnlockSecret,
 } from '@raven/ui'
@@ -256,6 +258,7 @@ const Ready = ({
   at,
   next,
   lastSaved,
+  saver,
   length,
   hasRecordedPlay,
   onEngineError,
@@ -268,6 +271,7 @@ const Ready = ({
   at: number
   next: number[]
   lastSaved: { current: number }
+  saver: ProgressSaver
   length: { current: number | null }
   hasRecordedPlay: { current: boolean }
   onEngineError: NonNullable<PlayerServices['onEngineError']>
@@ -314,6 +318,7 @@ const Ready = ({
             ? null
             : { mediaId: nextId, label: nextLabel, rest: next.slice(1) },
         lastSaved,
+        saver,
         length,
         hasRecordedPlay,
         escape,
@@ -330,6 +335,7 @@ const Ready = ({
       nextId,
       nextLabel,
       lastSaved,
+      saver,
       length,
       hasRecordedPlay,
       escape,
@@ -412,6 +418,9 @@ const NativeTitle = ({
     gcTime: 0,
   })
   const lastSaved = useRef(0)
+  const [saver] = useState(() =>
+    createProgressSaver({ send: (report) => api.saveProgress({ id: mediaId, ...report }) }),
+  )
   // The page's, so a services rebuild or a relock remount keeps what the engine learned.
   const length = useRef<number | null>(null)
   const hasRecordedPlay = useRef(false)
@@ -514,6 +523,7 @@ const NativeTitle = ({
         at={resumeFrom ?? at}
         next={next}
         lastSaved={lastSaved}
+        saver={saver}
         length={length}
         hasRecordedPlay={hasRecordedPlay}
         onEngineError={onEngineError}
