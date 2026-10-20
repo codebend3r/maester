@@ -42,6 +42,8 @@ import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
+import { ViewingAccounts } from '@/media/viewingAccounts'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
 import { type OnDisk, scoreCandidates } from '@/metadata/matchConfidence'
 import { MatchFactsCache } from '@/metadata/matchFactsCache'
@@ -118,6 +120,7 @@ export class MatchController {
     @Inject(LockService) private readonly lock: LockService,
     @Inject(MatchFiles) private readonly files: MatchFiles,
     @Inject(MatchFactsCache) private readonly facts: MatchFactsCache,
+    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
 
   private requireTmdb(): void {
@@ -228,7 +231,8 @@ export class MatchController {
     if (subject == null) return NOTHING_ON_DISK
     const viewer = this.lock.viewer({ request })
     // An extra is never matched (`off`), so a trailer's numbers say nothing of the show.
-    const files = this.subjectFiles({ type, subject }).filter(
+    const account = this.accounts.keyOf({ request })
+    const files = this.subjectFiles({ type, subject, account }).filter(
       (file) => file.match !== MATCH_STATES.off && viewer.seesLibrary(file.libraryId),
     )
     const [first] = files
@@ -274,13 +278,15 @@ export class MatchController {
   private subjectFiles({
     type,
     subject,
+    account,
   }: {
     type: MatchItemType
     subject: MatchSubject
+    account: AccountKey
   }): SubjectFile[] {
     switch (subject.kind) {
       case MATCH_SUBJECT_KINDS.media: {
-        const file = this.media.get(subject.id)
+        const file = this.media.get({ id: subject.id, account })
         if (file == null) return []
         const showFolder = type === ITEM_TYPES.show ? showFolderOf(file) : null
         if (showFolder == null) return [file]
@@ -291,7 +297,7 @@ export class MatchController {
       case MATCH_SUBJECT_KINDS.item:
         return type === ITEM_TYPES.show
           ? this.files.under(subject.id).map(asShowFile)
-          : this.media.forItem(subject.id)
+          : this.media.forItem({ itemId: subject.id, account })
       default: {
         const unreachable: never = subject
         return unreachable
@@ -335,8 +341,13 @@ export class MatchController {
   @PrivateBy('media')
   @AdminOnly()
   @Put('media/:id/match')
-  async setMatch(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Promise<MediaItem> {
-    const record = this.media.get(id)
+  async setMatch(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+  ): Promise<MediaItem> {
+    const account = this.accounts.keyOf({ request })
+    const record = this.media.get({ id, account })
     if (!record) throw new NotFoundException(`No media ${id}`)
     if (!isMatchChoice(body)) throw new BadRequestException('tmdbId must be a TMDB id or null')
     const kind = this.libraries.get(record.libraryId)?.settings.kind
@@ -349,7 +360,7 @@ export class MatchController {
     }
     if (tmdbId != null) this.requireTmdb()
     await this.service.fixMatch({ mediaId: id, tmdbId }).catch(tmdbFailure)
-    const updated = this.media.get(id)
+    const updated = this.media.get({ id, account })
     if (!updated) throw new NotFoundException(`No media ${id}`)
     return updated
   }

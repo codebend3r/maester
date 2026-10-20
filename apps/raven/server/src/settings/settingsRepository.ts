@@ -7,9 +7,11 @@ import {
   type PlaybackSettings,
   isDisplaySettings,
   type Guard,
+  isAccountId,
   isPlaybackSettings,
   isRecord,
   isString,
+  object,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
@@ -19,7 +21,11 @@ export const SETTINGS_KEYS = {
   display: 'display',
   admin: 'admin',
   accounts: 'accounts',
+  viewing: 'viewing',
 } as const
+
+/** The owner who took over the viewing recorded before accounts, and when. */
+const isViewingRecord = object({ ownerId: isAccountId, adoptedAt: isString })
 
 /** Server-wide settings, one JSON value per key, each read with its defaults filled in. */
 @Injectable()
@@ -119,5 +125,16 @@ export class SettingsRepository {
   /** Forgets the record, once the operator has opted out of accounts. */
   forgetAccountsEnforced(): void {
     this.db.prepare('DELETE FROM settings WHERE key = ?').run(SETTINGS_KEYS.accounts)
+  }
+
+  /** The owner who adopted the viewing from before accounts, or null if none has. */
+  viewingOwner(): string | null {
+    const stored = this.read({ key: SETTINGS_KEYS.viewing })
+    return isViewingRecord(stored) ? stored.ownerId : null
+  }
+
+  /** Records the owner who adopted the viewing from before accounts. */
+  markViewingOwner({ ownerId, at }: { ownerId: string; at: Date }): void {
+    this.write({ key: SETTINGS_KEYS.viewing, value: { ownerId, adoptedAt: at.toISOString() } })
   }
 }

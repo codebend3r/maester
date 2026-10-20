@@ -3,6 +3,7 @@ import { isWatchedChange, MAX_WATCH_TARGETS } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
 import { LockService } from '@/lock/lockService'
+import { ViewingAccounts } from '@/media/viewingAccounts'
 import { WatchedCards } from '@/media/watchedCards'
 import { WatchedRepository } from '@/media/watchedRepository'
 import { parseBody } from '@/parseBody'
@@ -19,6 +20,7 @@ export class WatchedController {
     @Inject(LockService) private readonly lock: LockService,
     @Inject(WatchedCards) private readonly cards: WatchedCards,
     @Inject(WatchedRepository) private readonly watched: WatchedRepository,
+    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
 
   /** Marks every target watched or unwatched; see `WatchedRepository.set` for what that does. */
@@ -38,6 +40,7 @@ export class WatchedController {
       }),
       watched: change.watched,
       at: new Date(),
+      account: this.accounts.keyOf({ request }),
     })
   }
 }

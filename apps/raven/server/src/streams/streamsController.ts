@@ -7,13 +7,16 @@ import {
   NotFoundException,
   Param,
   Post,
+  Req,
 } from '@nestjs/common'
 import type { LiveStream } from '@raven/core'
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
+import type { FastifyRequest } from 'fastify'
 import { AdminOnly } from '@/admin/adminGuard'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { Public } from '@/lock/lockGuard'
 import { MediaRepository } from '@/media/mediaRepository'
+import { ViewingAccounts } from '@/media/viewingAccounts'
 import { describeClient } from '@/streams/clientInfo'
 import { StreamSessions } from '@/streams/streamSessions'
 
@@ -25,14 +28,16 @@ export class StreamsController {
     @Inject(StreamSessions) private readonly sessions: StreamSessions,
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
+    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
 
-  /** Live as of this request, so never cached. */
+  /** Live as of this request, so never cached; each video as the owner asking sees it. */
   @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
   @Get()
-  list(): LiveStream[] {
+  list(@Req() request: FastifyRequest): LiveStream[] {
+    const account = this.accounts.keyOf({ request })
     return this.sessions.list().flatMap((session): LiveStream[] => {
-      const media = this.media.get(session.mediaId)
+      const media = this.media.get({ id: session.mediaId, account })
       if (media == null) return []
       return [
         {

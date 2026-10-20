@@ -53,6 +53,7 @@ import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
 import { MovieSplits } from '@/media/movieSplits'
 import { SagaBackdrops } from '@/media/sagaBackdrops'
+import { ViewingAccounts } from '@/media/viewingAccounts'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { parseBody } from '@/parseBody'
@@ -110,6 +111,7 @@ export class LibrariesController {
     @Inject(LockService) private readonly lock: LockService,
     @Inject(Management) private readonly management: Management,
     @Inject(RatingsRefresh) private readonly ratings: RatingsRefresh,
+    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
 
   /** A library can only be locked behind a PIN that can open it again. */
@@ -326,6 +328,7 @@ export class LibrariesController {
   @Get(':id/history')
   history(
     @Param('id', ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
     @Query('limit') limit?: string,
     @Query('watched') watched?: string,
   ): HistoryEntry[] {
@@ -334,45 +337,75 @@ export class LibrariesController {
       libraryId: id,
       limit: historyLimit(limit),
       watchedOnly: watched === QUERY_FLAGS.true,
+      account: this.accounts.keyOf({ request }),
     })
   }
 
   /** A TV shows library as its shows, with the files no show was found for after. */
   @Get(':id/shows')
-  listShows(@Param('id', ParseIntPipe) id: number, @Query() query: unknown): ShowListing {
+  listShows(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: unknown,
+    @Req() request: FastifyRequest,
+  ): ShowListing {
     this.find(id)
     const params = listParams(query)
+    const account = this.accounts.keyOf({ request })
     return {
-      shows: this.media.listShows({ libraryId: id, ...params }),
-      unmatched: this.media.listUnmatched({ libraryId: id, search: params.search }),
+      shows: this.media.listShows({ libraryId: id, ...params, account }),
+      unmatched: this.media.listUnmatched({ libraryId: id, search: params.search, account }),
     }
   }
 
   @Get(':id/media')
-  listMedia(@Param('id', ParseIntPipe) id: number, @Query() query: unknown): MediaItem[] {
+  listMedia(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: unknown,
+    @Req() request: FastifyRequest,
+  ): MediaItem[] {
     this.find(id)
-    return this.media.list({ libraryId: id, ...listParams(query) })
+    return this.media.list({
+      libraryId: id,
+      ...listParams(query),
+      account: this.accounts.keyOf({ request }),
+    })
   }
 
   /** Its videos with a saved spot, the most recently watched first, each with its card's poster. */
   @Get(':id/in-progress')
-  listInProgress(@Param('id', ParseIntPipe) id: number): PosterEntry[] {
+  listInProgress(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): PosterEntry[] {
     this.find(id)
-    return this.media.withPosters(this.media.listInProgress({ libraryId: id }))
+    return this.media.withPosters(
+      this.media.listInProgress({ libraryId: id, account: this.accounts.keyOf({ request }) }),
+    )
   }
 
   /** Its favourites, most recently marked first, each with its card's poster. */
   @Get(':id/favourites')
-  listFavourites(@Param('id', ParseIntPipe) id: number): PosterEntry[] {
+  listFavourites(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): PosterEntry[] {
     this.find(id)
-    return this.media.withPosters(this.media.listFavourites({ libraryId: id }))
+    return this.media.withPosters(
+      this.media.listFavourites({ libraryId: id, account: this.accounts.keyOf({ request }) }),
+    )
   }
 
   /** Its sagas of two movies or more; none in a library that is not matched to movies. */
-  @Get(':id/sagas')
-  listSagas(@Param('id', ParseIntPipe) id: number): Saga[] {
+  private sagasOf({ id, request }: { id: number; request: FastifyRequest }): Saga[] {
     const record = this.find(id)
-    return matchTypeFor(record.settings.kind) === ITEM_TYPES.movie ? this.media.listSagas(id) : []
+    return matchTypeFor(record.settings.kind) === ITEM_TYPES.movie
+      ? this.media.listSagas({ libraryId: id, account: this.accounts.keyOf({ request }) })
+      : []
+  }
+
+  @Get(':id/sagas')
+  listSagas(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): Saga[] {
+    return this.sagasOf({ id, request })
   }
 
   /**
@@ -385,8 +418,9 @@ export class LibrariesController {
     @Param('id', ParseIntPipe) id: number,
     @Param('sagaId') sagaId: string,
     @Body() body: unknown,
+    @Req() request: FastifyRequest,
   ): SagaBackdrop {
-    const saga = this.listSagas(id).find((each) => each.tmdbId === sagaId)
+    const saga = this.sagasOf({ id, request }).find((each) => each.tmdbId === sagaId)
     if (!saga) throw new NotFoundException(`No saga ${sagaId} in library ${id}`)
     const backdrop = parseBody({
       guard: isSagaBackdrop,
@@ -403,14 +437,17 @@ export class LibrariesController {
 
   /** Its files no movie or show was found for, or still waiting for matching, by title, each with the AI lookup's suggestion. */
   @Get(':id/unmatched')
-  listUnmatched(@Param('id', ParseIntPipe) id: number): UnmatchedFile[] {
+  listUnmatched(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): UnmatchedFile[] {
     const record = this.find(id)
     const type = matchTypeFor(record.settings.kind)
     if (type == null) return []
     return this.metadata.withSuggestions({
       libraryId: id,
       type,
-      files: this.media.listUnmatched({ libraryId: id }),
+      files: this.media.listUnmatched({ libraryId: id, account: this.accounts.keyOf({ request }) }),
     })
   }
 
@@ -425,32 +462,45 @@ export class LibrariesController {
 
   /** Its movies with more than one file, split apart or not; none in a library not matched to movies. */
   @Get(':id/duplicates')
-  listDuplicates(@Param('id', ParseIntPipe) id: number): Duplicates {
+  listDuplicates(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): Duplicates {
     const record = this.find(id)
-    return matchTypeFor(record.settings.kind) === ITEM_TYPES.movie ? this.splits.list(id) : []
+    return matchTypeFor(record.settings.kind) === ITEM_TYPES.movie
+      ? this.splits.list({ libraryId: id, account: this.accounts.keyOf({ request }) })
+      : []
   }
 
   /** Splits a card, named by any file on it: every file apart, or by cut. */
   @AdminOnly()
   @Post(':id/duplicates/split')
   @HttpCode(200)
-  split(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Duplicates {
+  split(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+  ): Duplicates {
     this.findMovies(id)
-    const request = parseBody({
+    const asked = parseBody({
       guard: isSplitRequest,
       body,
       message: 'Send { mediaId, how }, how being "apart" or "smart".',
     })
-    return this.splits.split({ libraryId: id, ...request })
+    return this.splits.split({ libraryId: id, ...asked, account: this.accounts.keyOf({ request }) })
   }
 
   /** Puts a split movie's files back on one card. */
   @AdminOnly()
   @Post(':id/duplicates/join')
   @HttpCode(200)
-  join(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Duplicates {
+  join(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+  ): Duplicates {
     this.findMovies(id)
     const { itemId } = parseBody({ guard: isJoinRequest, body, message: 'Send { itemId }.' })
-    return this.splits.join({ libraryId: id, itemId })
+    return this.splits.join({ libraryId: id, itemId, account: this.accounts.keyOf({ request }) })
   }
 }
