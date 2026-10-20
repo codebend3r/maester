@@ -14,15 +14,20 @@
     "db:status": "supabase status --workdir ..",
     "test:db": "supabase test db --workdir ..",
     "lint:db": "supabase db lint --workdir .. --local --schema public,private --fail-on warning",
-    "deploy": "bun run --sequential deploy:check deploy:db deploy:config",
+    "lint:ts": "oxlint",
+    "check:functions": "deno check --config functions/signup-alert/deno.json functions/signup-alert",
+    "test:functions": "deno test --config functions/signup-alert/deno.json functions/signup-alert",
+    "deploy": "bun run --sequential deploy:check deploy:db deploy:config deploy:functions",
     "deploy:check": "bash scripts/production.sh diff",
     "deploy:db": "supabase db push --workdir ..",
     "deploy:config": "bash scripts/production.sh push",
+    "deploy:functions": "supabase functions deploy signup-alert --use-api --workdir ..",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },
   "devDependencies": {
     "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
     "supabase": "2.121.0"
   },
   "nx": {
@@ -41,6 +46,9 @@
       "db:status",
       "test:db",
       "lint:db",
+      "lint:ts",
+      "check:functions",
+      "test:functions",
       "deploy",
       "format",
       "format:check"

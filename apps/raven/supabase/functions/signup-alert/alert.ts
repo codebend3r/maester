@@ -1,0 +1,84 @@
+import { createHash, timingSafeEqual } from 'node:crypto'
+
+export const SIGNUP_ALERT_HEADER = 'x-signup-alert-secret'
+
+export const ALERT_ENV = {
+  secret: 'SIGNUP_ALERT_SECRET',
+  recipient: 'SIGNUP_ALERT_TO',
+  smtpHost: 'SMTP_HOST',
+  smtpUser: 'SMTP_USER',
+  smtpPass: 'SMTP_PASS',
+  webUrl: 'RAVEN_WEB_URL',
+} as const
+
+export const ENROLMENT_STATUSES = { approved: 'approved', pending: 'pending' } as const
+type EnrolmentStatus = (typeof ENROLMENT_STATUSES)[keyof typeof ENROLMENT_STATUSES]
+
+type SignupAlert = { email: string; status: EnrolmentStatus }
+type AlertMessage = { subject: string; text: string }
+
+const isEnrolmentStatus = (value: unknown): value is EnrolmentStatus =>
+  Object.values(ENROLMENT_STATUSES).some((status) => status === value)
+
+const isSignupAlert = (value: unknown): value is SignupAlert =>
+  typeof value === 'object' &&
+  value !== null &&
+  'email' in value &&
+  typeof value.email === 'string' &&
+  value.email.length > 0 &&
+  'status' in value &&
+  isEnrolmentStatus(value.status)
+
+// Hashing first gives timingSafeEqual the equal lengths it requires.
+const digest = (value: string) => createHash('sha256').update(value).digest()
+
+const isSameSecret = ({ given, expected }: { given: string; expected: string }) =>
+  timingSafeEqual(digest(given), digest(expected))
+
+const composeAlert = ({ alert, webUrl }: { alert: SignupAlert; webUrl: string }): AlertMessage => {
+  const settings = `${webUrl}/settings`
+  switch (alert.status) {
+    case ENROLMENT_STATUSES.approved:
+      return {
+        subject: `raven: ${alert.email} signed up and was approved`,
+        text: `${alert.email} confirmed their email and was approved automatically.\n\nTo remove their access, open Users in raven's settings: ${settings}\n`,
+      }
+    case ENROLMENT_STATUSES.pending:
+      return {
+        subject: `raven: ${alert.email} is waiting for approval`,
+        text: `${alert.email} confirmed their email and is waiting for you.\n\nTo approve or remove them, open Users in raven's settings: ${settings}\n`,
+      }
+    default: {
+      const unhandled: never = alert.status
+      throw new Error(`Unhandled enrolment status ${String(unhandled)}`)
+    }
+  }
+}
+
+const readBody = async ({ request }: { request: Request }): Promise<unknown> => {
+  try {
+    return await request.json()
+  } catch {
+    return null
+  }
+}
+
+export const handleSignupAlert = async ({
+  request,
+  secret,
+  webUrl,
+  send,
+}: {
+  request: Request
+  secret: string
+  webUrl: string
+  send: (message: AlertMessage) => Promise<void>
+}) => {
+  if (request.method !== 'POST') return new Response(null, { status: 405 })
+  const given = request.headers.get(SIGNUP_ALERT_HEADER) ?? ''
+  if (!isSameSecret({ given, expected: secret })) return new Response(null, { status: 401 })
+  const body = await readBody({ request })
+  if (!isSignupAlert(body)) return new Response(null, { status: 400 })
+  await send(composeAlert({ alert: body, webUrl }))
+  return new Response(null, { status: 204 })
+}

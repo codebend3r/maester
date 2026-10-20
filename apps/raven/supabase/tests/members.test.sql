@@ -1,6 +1,9 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(36);
+select plan(45);
+
+-- Most cases run after the auto-approval window; the window has its own cases below.
+update private.enrolment set approve_until = '-infinity';
 
 insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
   ('10000000-0000-4000-8000-000000000001', 'test-owner@maester.test', now(), '{}'),
@@ -16,6 +19,35 @@ update auth.users set email = 'changed@maester.test' where id = '10000000-0000-4
 select is((select email from public.members where id = '10000000-0000-4000-8000-000000000003'), 'changed@maester.test', 'Email changes synchronize');
 select is((select status from public.members where id = '10000000-0000-4000-8000-000000000003'), 'revoked', 'Email change never restores access');
 
+update private.enrolment set approve_until = 'infinity';
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('10000000-0000-4000-8000-000000000004', 'test-early@maester.test', now(), '{}'),
+  ('10000000-0000-4000-8000-000000000005', 'test-early-unverified@maester.test', null, '{}');
+select is((select status from public.members where id = '10000000-0000-4000-8000-000000000004'), 'approved', 'Sign-ups before the cutoff are approved');
+update auth.users set email_confirmed_at = now() where id = '10000000-0000-4000-8000-000000000005';
+select is((select status from public.members where id = '10000000-0000-4000-8000-000000000005'), 'approved', 'Confirmation before the cutoff approves');
+update auth.users set email = 'changed-again@maester.test' where id = '10000000-0000-4000-8000-000000000003';
+select is((select status from public.members where id = '10000000-0000-4000-8000-000000000003'), 'revoked', 'The approval window never restores access');
+update private.enrolment set approve_until = '-infinity';
+
+select is((select count(*)::integer from net.http_request_queue), 0, 'Unconfigured alerts send nothing');
+select vault.create_secret('http://alerts.test/signup-alert', 'signup_alert_url');
+select vault.create_secret('test-alert-secret', 'signup_alert_secret');
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('10000000-0000-4000-8000-000000000006', 'test-alerted@maester.test', now(), '{}');
+select is(
+  (select convert_from(body, 'UTF8')::jsonb from net.http_request_queue where url = 'http://alerts.test/signup-alert'),
+  '{"email": "test-alerted@maester.test", "status": "pending"}'::jsonb,
+  'A sign-up alerts the owner with its status'
+);
+select is(
+  (select headers ->> 'x-signup-alert-secret' from net.http_request_queue where url = 'http://alerts.test/signup-alert'),
+  'test-alert-secret',
+  'The alert carries the shared secret'
+);
+update auth.users set email = 'test-alerted-again@maester.test' where id = '10000000-0000-4000-8000-000000000006';
+select is((select count(*)::integer from net.http_request_queue), 1, 'An email change sends no alert');
+
 select ok(not has_table_privilege('anon', 'public.members', 'SELECT'), 'Anonymous cannot read members');
 select ok(not has_table_privilege('authenticated', 'public.members', 'INSERT'), 'Clients cannot insert members');
 select ok(not has_table_privilege('authenticated', 'public.members', 'UPDATE'), 'Clients cannot update members');
@@ -25,6 +57,8 @@ select ok(not has_function_privilege('anon', 'public.current_membership()', 'EXE
 select ok(not has_function_privilege('anon', 'public.list_members(integer,integer)', 'EXECUTE'), 'Anonymous cannot list members');
 select ok(not has_function_privilege('anon', 'public.set_member_status(uuid,text)', 'EXECUTE'), 'Anonymous cannot approve');
 select ok(not has_function_privilege('authenticated', 'private.enrol_confirmed_user()', 'EXECUTE'), 'Clients cannot run enrolment');
+select ok(not has_function_privilege('authenticated', 'private.alert_signup()', 'EXECUTE'), 'Clients cannot send alerts');
+select ok(not has_table_privilege('authenticated', 'private.enrolment', 'UPDATE'), 'Clients cannot move the approval cutoff');
 
 -- Bootstrap uses database-operator privileges, never a public first-signup rule.
 delete from private.owner;

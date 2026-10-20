@@ -28,7 +28,8 @@ All seeded accounts are verified. Use a fresh signup to test confirmation delive
 
 ## Authorization contract
 
-- Confirmed users receive a `public.members` row with `pending` status. Confirmation and email changes never approve or restore access.
+- Confirmed users receive a `public.members` row: `approved` while the confirmation lands before `private.enrolment`'s `approve_until`, `pending` after it. Email changes never approve or restore access, inside the window or out.
+- Every new membership row queues a sign-up alert (see "Sign-up alerts") with the address and its status. Email changes send none.
 - Authenticated users can read their own membership, but cannot write memberships or read the private owner table.
 - `current_membership()` returns zero or one row: `id`, `email`, `status`, `is_owner`. It uses the current caller, not a supplied account id.
 - `list_members(page_size, page_offset)` and `set_member_status(member_id, member_status)` require the approved configured owner. Lists are capped at 100 rows per call. Status writes accept only `approved` or `revoked`; the owner cannot change their own access through this RPC.
@@ -85,8 +86,36 @@ Setting the three Supabase variables on raven turns enforcement on for everyone 
 
 A server that has run `ready` stays closed if its Supabase settings go missing: it answers `503` everywhere but `/api/health`, `/api/auth/config` and `/api/media-origins/ping`. Rolling back is `RAVEN_ACCOUNTS=off` with the Supabase variables removed, which reopens anonymous access and brings the admin password and the browser PIN back. It is an explicit security decision, not an automatic fallback, and raven logs a warning on every start while it is set.
 
+## Sign-up alerts and the approval window, operator only
+
+Until `approve_until` (Dec 1 2026 at 00:00 New York time, set by the migration) a confirmed sign-up is approved at once; after it, it waits for the owner on raven's Users settings. Move the cutoff as the database operator in the SQL editor:
+
+```sql
+update private.enrolment set approve_until = '2027-01-01 00:00 America/New_York';
+```
+
+Every sign-up, approved or pending, emails the owner through the `signup-alert` Edge Function. The `alert_signup` trigger posts the new address and status to it with `pg_net`, sending a shared secret the function checks. Without the two Vault secrets below, sign-ups still enrol and the database logs a warning instead. Edge Functions refuse outbound SMTP on ports 25 and 587, so the function connects on 465 (implicit TLS); Gmail's `smtp.gmail.com` accepts it with an app password.
+
+1. Generate the shared secret with `openssl rand -hex 32`. Keep it out of every committed file.
+2. Set the function's secrets, then deploy it (`deploy` runs `deploy:functions` last):
+
+   ```sh
+   supabase secrets set --workdir .. SIGNUP_ALERT_SECRET=... SIGNUP_ALERT_TO=owner@example.com \
+     SMTP_HOST=smtp.gmail.com SMTP_USER=sender@gmail.com SMTP_PASS=... RAVEN_WEB_URL=https://raven.example
+   bunx nx run @raven/supabase:deploy
+   ```
+
+3. Store the function's address and the same secret in Vault, in the SQL editor:
+
+   ```sql
+   select vault.create_secret('https://YOUR_PROJECT_REF.supabase.co/functions/v1/signup-alert', 'signup_alert_url');
+   select vault.create_secret('THE_SHARED_SECRET', 'signup_alert_secret');
+   ```
+
+4. Sign up a test address and check that the email arrives. `net._http_response` holds each call's status for a few hours; a `401` means the two secrets differ.
+
 ## CI and rollout
 
-The `Supabase` PR job starts the Docker stack, runs the pgTAP authorization tests and database lint, then stops it even on failure. General `verify`, `affected` and git hooks do not start Docker or deploy anything.
+The `Supabase` PR job sets up Deno, type-checks and tests the Edge Functions (`check:functions`, `test:functions`), starts the Docker stack, runs the pgTAP authorization tests and database lint, then stops it even on failure. General `verify`, `affected` and git hooks do not start Docker or deploy anything.
 
 Stacked on this project: raven's server (`raven-auth-server`), web (`raven-auth-ui`) and player (`raven-auth-desktop`), then enforcement (`raven-auth-enforcement`). Per-account progress and favourites are the follow-up (`raven-account-data`).

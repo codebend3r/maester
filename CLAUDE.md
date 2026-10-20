@@ -13,7 +13,7 @@
 - Writing: no em dashes or en dashes anywhere, including comments and UI copy.
 - `e2e`, `test:native`, `make`, `audit:bundle` and `smoke:packaged` need macOS on Apple Silicon, so `verify` and `affected` leave them out and the PR checks' desktop jobs, behind the required `🖥️ Desktop` check, run them. Locally they run only on such a Mac, and `smoke:packaged` uses your own `~/Library/Application Support/raven` and `~/Library/Logs/raven`. A packaged app reads no test hook, so the smoke also makes the real launch check against GitHub and writes `updates.checkedAt` into that folder's `desktop-config.json`, moving an older file to version 4.
 
-- `@raven/supabase`'s `test:db` and `lint:db` need Docker and a running local stack. `verify` and `affected` leave those targets out; the PR checks' `🗄️ Supabase` job starts the stack and runs them.
+- `@raven/supabase`'s `test:db` and `lint:db` need Docker and a running local stack, and its `check:functions` and `test:functions` need Deno, which runs its Edge Functions. `verify` and `affected` leave those targets out; the PR checks' `🗄️ Supabase` job sets up Deno, starts the stack and runs them.
 
 ## TypeScript
 
