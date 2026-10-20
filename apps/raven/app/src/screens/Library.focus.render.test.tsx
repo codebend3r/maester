@@ -3,7 +3,9 @@ import {
   APP_CLIENT_CALLS,
   type Library as LibraryRecord,
   MEDIA_SORTS,
+  JUMP_SCALE_LABELS,
   SORT_FIELD_LABELS,
+  isRecord,
   sortFieldsFor,
 } from '@raven/core'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
@@ -14,7 +16,7 @@ import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { FILMS, NAS, SERIES, libraryApi, libraryPath } from '@/test/libraryServer'
+import { FILMS, GROUPED_FILMS, NAS, SERIES, libraryApi, libraryPath } from '@/test/libraryServer'
 import { renderScreen } from '@/test/renderScreen'
 
 const mockParams = jest.fn(() => ({ id: String(FILMS.id) }))
@@ -43,6 +45,11 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => mockParams(),
+}))
+// The fork's requestTVFocus is native; what matters is which card asks for the focus, and when.
+const mockRequestTVFocus = jest.fn<(instance: unknown) => void>()
+jest.mock('@/layouts/tvFocus', () => ({
+  requestTVFocus: (instance: unknown) => mockRequestTVFocus(instance),
 }))
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
@@ -83,6 +90,12 @@ const layOut = async () => {
     }, Promise.resolve())
 }
 
+/** The cards that asked for the remote's focus after a jump, by title, in order. */
+const askedFor = (): unknown[] =>
+  mockRequestTVFocus.mock.calls.map(([instance]) =>
+    isRecord(instance) && isRecord(instance.props) ? instance.props.accessibilityLabel : instance,
+  )
+
 const renderLibrary = async ({ id }: { id: number }) => {
   mockParams.mockReturnValue({ id: String(id) })
   const rendered = await renderScreen({ ui: <Library /> })
@@ -95,6 +108,7 @@ describe('Library on a TV', () => {
     jest.restoreAllMocks()
     mockServer.requests = []
     mockServer.libraries = []
+    mockRequestTVFocus.mockClear()
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
     useLibraryViews.setState({ choices: {} })
   })
@@ -127,7 +141,8 @@ describe('Library on a TV', () => {
     const row = within(screen.getByLabelText('Jump to a letter'))
     expect(row.getByRole('button', { name: 'C' }).props.accessibilityState?.disabled).toBe(true)
     await fireEvent.press(row.getByRole('button', { name: 'B' }))
-    expect(preferred(SHOW_TITLES)).toEqual(['The Beacon'])
+    expect(askedFor()).toEqual(['The Beacon'])
+    expect(preferred(SHOW_TITLES)).toEqual([])
   })
 
   it('draws no card before the list has its height, so the first card takes focus as it mounts', async () => {
@@ -140,17 +155,72 @@ describe('Library on a TV', () => {
     expect(preferred(FILM_TITLES)).toEqual(['Ashfall Gate'])
   })
 
-  it('takes the focus back to a card jumped to twice, mounting it afresh', async () => {
+  it('asks for the focus on every jump, the same card twice included', async () => {
     await renderLibrary({ id: SERIES.id })
     await screen.findByRole('button', { name: 'Saltmarsh' })
     const row = within(screen.getByLabelText('Jump to a letter'))
 
     await fireEvent.press(row.getByRole('button', { name: 'B' }))
-    const once = screen.getByRole('button', { name: 'The Beacon' })
     await fireEvent.press(row.getByRole('button', { name: 'B' }))
-    const twice = screen.getByRole('button', { name: 'The Beacon' })
-    expect(twice).not.toBe(once)
-    expect(preferred(SHOW_TITLES)).toEqual(['The Beacon'])
+    await fireEvent.press(row.getByRole('button', { name: 'S' }))
+    expect(askedFor()).toEqual(['The Beacon', 'The Beacon', 'Saltmarsh'])
+  })
+
+  it('asks once per jump, not again when the card jumped to mounts afresh', async () => {
+    mockServer.libraries = [GROUPED_FILMS]
+    await renderLibrary({ id: FILMS.id })
+    const bucket = await screen.findByRole('button', { name: 'Matched, 3 videos' })
+    const row = within(screen.getByLabelText('Jump to a letter'))
+
+    await fireEvent.press(row.getByRole('button', { name: 'B' }))
+    expect(await screen.findByRole('button', { name: 'Busboys' })).toBeTruthy()
+    expect(askedFor()).toEqual(['Busboys'])
+
+    await fireEvent.press(bucket)
+    expect(screen.queryByRole('button', { name: 'Busboys' })).toBeNull()
+    await fireEvent.press(bucket)
+    expect(screen.getByRole('button', { name: 'Busboys' })).toBeTruthy()
+    expect(askedFor()).toEqual(['Busboys'])
+  })
+
+  it('leaves the focus on the toolbar when the sort changes after a jump', async () => {
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+    const row = within(screen.getByLabelText('Jump to a letter'))
+    await fireEvent.press(row.getByRole('button', { name: 'B' }))
+    expect(askedFor()).toEqual(['Busboys'])
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Sort: Title' }))
+    await fireEvent.press(
+      within(screen.getByLabelText('Sort')).getByRole('button', { name: SORT_FIELD_LABELS.added }),
+    )
+    expect(await screen.findByRole('button', { name: 'Sort: Date added' })).toBeTruthy()
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByRole('button')
+          .map((card) => card.props.accessibilityLabel)
+          .filter((label) => FILM_TITLES.includes(label)),
+      ).toEqual(['Busboys', 'Night Train', 'Ashfall Gate']),
+    )
+    expect(preferred(FILM_TITLES)).toEqual([])
+    expect(askedFor()).toEqual(['Busboys'])
+
+    // The newest first now: the strip runs by month, and its one month holds Busboys first.
+    await fireEvent.press(
+      within(screen.getByLabelText(JUMP_SCALE_LABELS.added)).getByRole('button', {
+        name: 'October 2026',
+      }),
+    )
+    expect(askedFor()).toEqual(['Busboys', 'Busboys'])
+  })
+
+  it('takes the opening focus off the first card once anything in the grid has the focus', async () => {
+    await renderLibrary({ id: FILMS.id })
+    const first = await screen.findByRole('button', { name: 'Ashfall Gate' })
+    expect(preferred(FILM_TITLES)).toEqual(['Ashfall Gate'])
+    await fireEvent(first, 'focus')
+    expect(preferred(FILM_TITLES)).toEqual([])
   })
 
   it('picks a sort from a focusable list rather than a sheet, offering only what the type allows', async () => {

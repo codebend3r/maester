@@ -1,10 +1,10 @@
-import { type ComponentRef, useEffect, useRef, useState } from 'react'
+import { type ComponentRef, useRef, useState } from 'react'
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { ShelfCard } from '@/queries/cards'
 import { CardPicture } from '@/layouts/Card'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
-import { requestTVFocus } from '@/layouts/tvFocus'
+import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
@@ -20,29 +20,32 @@ const EASE_OUT = Easing.bezier(0.2, 0.8, 0.2, 1)
 export const focusCaptionHeightOf = (fontScale: number): number =>
   SIZES.space3 + linesHeightOf({ sizes: [SIZES.textLg, SIZES.text], fontScale })
 
+/** What a card does on focus by default: nothing more than its own growth. */
+const NOTHING = (): void => undefined
+
 /**
  * A card the remote moves to, on a shelf or in a grid: it grows and takes the ring while
  * focused, smoothly unless the system asks for less motion, when it changes at once.
- * `isPreferred` asks the remote's focus for it, as the screen opens; `isJumpedTo` takes the
- * focus once it is on screen, as a card a jump mounts afresh must.
+ * `isPreferred` asks the remote's focus for it as the screen opens; `jump` takes the focus
+ * once per jump that lands on it. `onFocused` hears each time it gets the focus.
  */
 export const FocusCard = ({
   card,
   width,
   isPreferred,
-  isJumpedTo = false,
+  jump = null,
+  onFocused = NOTHING,
   onPress,
 }: {
   card: ShelfCard
   width: number
   isPreferred: boolean
-  isJumpedTo?: boolean
+  jump?: JumpFocus | null
+  onFocused?: () => void
   onPress: () => void
 }) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
-  useEffect(() => {
-    if (isJumpedTo) requestTVFocus(pressable.current)
-  }, [isJumpedTo])
+  useJumpFocus({ jump, view: pressable })
   const isReduced = useReduceMotion((state) => state.isReduced)
   const [isFocused, setFocused] = useState(false)
   const [scale] = useState(() => new Animated.Value(1))
@@ -73,6 +76,7 @@ export const FocusCard = ({
       onFocus={() => {
         setFocused(true)
         grow(FOCUS_SCALE)
+        onFocused()
       }}
       onPress={onPress}
     >

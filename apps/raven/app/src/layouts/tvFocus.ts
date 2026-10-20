@@ -1,6 +1,9 @@
 import { isRecord } from '@raven/core'
 
-/** A host view the tvOS fork has given its `requestTVFocus`, which React Native's types leave out. */
+/**
+ * A host view the tvOS fork has given its `requestTVFocus`, which React Native's types leave
+ * out.
+ */
 const canTakeTVFocus = (value: unknown): value is { requestTVFocus: () => void } =>
   isRecord(value) && typeof value.requestTVFocus === 'function'
 

@@ -1,5 +1,5 @@
 import { JUMP_SCALE_LABELS, type JumpScale, LIBRARY_VIEWS } from '@raven/core'
-import { type ComponentRef, useEffect, useRef, useState } from 'react'
+import { type ComponentRef, useRef, useState } from 'react'
 import {
   FlatList,
   Pressable,
@@ -22,7 +22,7 @@ import {
   isRowView,
 } from '@/layouts/gridKit'
 import { GRID_ROWS, type GridRow, columnsFor } from '@/layouts/gridRows'
-import { requestTVFocus } from '@/layouts/tvFocus'
+import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useGrid } from '@/layouts/useGrid'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
@@ -49,25 +49,26 @@ const RowCard = ({
   card,
   hasPicture,
   isPreferred,
-  isJumpedTo,
+  jump,
+  onFocused,
   onPress,
 }: {
   card: ShelfCard
   hasPicture: boolean
   isPreferred: boolean
-  isJumpedTo: boolean
+  jump: JumpFocus | null
+  onFocused: () => void
   onPress: () => void
 }) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
-  useEffect(() => {
-    if (isJumpedTo) requestTVFocus(pressable.current)
-  }, [isJumpedTo])
+  useJumpFocus({ jump, view: pressable })
   return (
     <Pressable
       ref={pressable}
       accessibilityLabel={card.title}
       accessibilityRole="button"
       hasTVPreferredFocus={isPreferred}
+      onFocus={onFocused}
       onPress={onPress}
       style={({ focused }) => [styles.rowCard, focused && styles.focused]}
     >
@@ -140,7 +141,7 @@ const firstKeyOf = (rows: readonly GridRow[]): string | null => {
 /**
  * A library on a TV: its name, what it holds, the pickers and the jump row held at the top,
  * and below them the cards in rows the remote moves through, never the touch layout made
- * larger. Focus starts on the first card, and a jump moves it to the card jumped to.
+ * larger. Focus starts on the first card, and each jump moves it to the card jumped to.
  */
 const Grid = ({ title, line, notice, toolbar, sections, view, jump, onOpen }: GridProps) => {
   const screen = useWindowDimensions()
@@ -173,14 +174,24 @@ const Grid = ({ title, line, notice, toolbar, sections, view, jump, onOpen }: Gr
     )
   }
   const { list, rows, toggle, jumpTo } = useGrid({ sections, columnsOf, heightOf, top: 0 })
-  // Each jump counts, so a jump to the card already jumped to mounts it afresh and it takes
-  // the focus again: a preferred focus that does not change asks for nothing.
-  const [jumped, setJumped] = useState<{ card: string; count: number } | null>(null)
   const [listHeight, setListHeight] = useState(0)
-  const preferred = jumped?.card ?? firstKeyOf(rows)
-  const isJumpedTo = (card: ShelfCard): boolean => jumped !== null && card.key === jumped.card
-  const keyOf = (card: ShelfCard): string =>
-    jumped !== null && isJumpedTo(card) ? `${card.key}#${jumped.count}` : card.key
+  // Each jump counts, the same card twice included. The count last handled is kept apart from
+  // rendering, so the card jumped to asks for the focus once for its jump and never again as it
+  // mounts afresh: scrolled back to, its bucket reopened, the grid sorted again.
+  const [jumped, setJumped] = useState<{ card: string; count: number } | null>(null)
+  const handledJump = useRef(0)
+  const claimJump = (count: number): boolean => {
+    if (count <= handledJump.current) return false
+    handledJump.current = count
+    return true
+  }
+  const jumpOf = (card: ShelfCard): JumpFocus | null =>
+    jumped !== null && card.key === jumped.card ? { count: jumped.count, claim: claimJump } : null
+  // The first card, or bucket, takes the focus as the grid opens, and only then: once anything
+  // in the grid has had it, a new first card (after a sort) must not pull it from the viewer.
+  const [isOpening, setOpening] = useState(true)
+  const settle = () => setOpening(false)
+  const preferred = isOpening ? firstKeyOf(rows) : null
 
   const renderRow = ({ item: row }: { item: GridRow }) => {
     switch (row.kind) {
@@ -192,6 +203,7 @@ const Grid = ({ title, line, notice, toolbar, sections, view, jump, onOpen }: Gr
               accessibilityRole="button"
               accessibilityState={{ expanded: row.isOpen }}
               hasTVPreferredFocus={row.key === preferred}
+              onFocus={settle}
               onPress={() => toggle(row.key)}
               style={({ focused }) => [styles.bucket, focused && styles.focused]}
             >
@@ -208,21 +220,23 @@ const Grid = ({ title, line, notice, toolbar, sections, view, jump, onOpen }: Gr
           <View style={[styles.cards, isRows && styles.rowCards, { height: heightOf(row) }]}>
             {row.cards.map((card) =>
               isRows ? (
-                <View key={keyOf(card)} style={{ width: widthOf(row.shape) }}>
+                <View key={card.key} style={{ width: widthOf(row.shape) }}>
                   <RowCard
                     card={card}
                     hasPicture={view === LIBRARY_VIEWS.tiles}
-                    isJumpedTo={isJumpedTo(card)}
                     isPreferred={card.key === preferred}
+                    jump={jumpOf(card)}
+                    onFocused={settle}
                     onPress={() => onOpen(card)}
                   />
                 </View>
               ) : (
                 <FocusCard
-                  key={keyOf(card)}
+                  key={card.key}
                   card={card}
-                  isJumpedTo={isJumpedTo(card)}
                   isPreferred={card.key === preferred}
+                  jump={jumpOf(card)}
+                  onFocused={settle}
                   onPress={() => onOpen(card)}
                   width={widthOf(row.shape)}
                 />
@@ -250,7 +264,10 @@ const Grid = ({ title, line, notice, toolbar, sections, view, jump, onOpen }: Gr
             jump={jump}
             onJump={(keys) => {
               const card = jumpTo(keys)
-              if (card !== null) setJumped({ card, count: (jumped?.count ?? 0) + 1 })
+              if (card === null) return
+              settle()
+              // From the latest count, so two presses before a render make two jumps.
+              setJumped((was) => ({ card, count: (was?.count ?? 0) + 1 }))
             }}
           />
         )}
@@ -269,7 +286,7 @@ const Grid = ({ title, line, notice, toolbar, sections, view, jump, onOpen }: Gr
             ref={list}
             contentContainerStyle={styles.content}
             data={rows}
-            extraData={jumped}
+            extraData={{ jumped, preferred }}
             keyExtractor={(row) => row.key}
             renderItem={renderRow}
             style={{ height: listHeight }}
