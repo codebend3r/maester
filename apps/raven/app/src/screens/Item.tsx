@@ -32,7 +32,7 @@ import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useServerCookies } from '@/queries/useServerCookies'
 import { ItemLayout, ItemNotice } from '@/layouts'
-import { ITEM_ACTIONS, type ItemAction } from '@/layouts/itemKit'
+import { type CheckState, ITEM_ACTIONS, type ItemAction } from '@/layouts/itemKit'
 import { APP_ROUTE_PARAMS, ROUTE_TARGETS, type RouteTarget, hrefOf } from '@/routes'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
 
@@ -52,10 +52,10 @@ const WATCHED_CHECKS = {
   [WATCHED_STATES.unwatched]: false,
   [WATCHED_STATES.partly]: 'mixed',
   [WATCHED_STATES.watched]: true,
-} as const satisfies Record<WatchedState, boolean | 'mixed'>
+} as const satisfies Record<WatchedState, CheckState>
 
-/** What a page's item is shown with: its server, its pictures' headers, and where it leads. */
-type ItemContext = Pictures & {
+/** What a page's item is shown with: its pictures' headers, and where it leads. */
+type ItemContext = Pick<Pictures, 'headersFor'> & {
   onOpen: (target: RouteTarget) => void
   onBack: () => void
 }
@@ -146,8 +146,9 @@ const PlayableItem = ({
     versions,
     primary,
     show: show.data ?? null,
+    isShowPending: details.show !== null && show.isPending,
     tracks: tracks.data,
-    api: context.api,
+    api: session.api,
     headersFor: context.headersFor,
   })
   const actions = [
@@ -211,7 +212,7 @@ const ShowItem = ({
       actions={actions}
       onBack={context.onBack}
       onOpen={context.onOpen}
-      page={showPage({ details, api: context.api, headersFor: context.headersFor })}
+      page={showPage({ details, api: session.api, headersFor: context.headersFor })}
     />
   )
 }
@@ -254,7 +255,7 @@ const SeasonItem = ({
       page={seasonPage({
         season: details,
         show: show.data ?? null,
-        api: context.api,
+        api: session.api,
         headersFor: context.headersFor,
       })}
     />
@@ -363,7 +364,6 @@ const ServerItem = ({
         <ItemOf
           key={page.data.id}
           context={{
-            api: session.api,
             headersFor: cookieHeadersFor({ server: session.server, cookies }),
             onOpen: (target) => router.push(hrefOf(target)),
             onBack,

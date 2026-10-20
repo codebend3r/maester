@@ -27,13 +27,20 @@ import {
   type ItemLayoutProps,
   type ItemNoticeProps,
   dotted,
+  episodeLabelOf,
   playLabelOf,
 } from '@/layouts/itemKit'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
-/** The web's 48rem: from there on the screen is a tablet's, and the pictures grow. */
+/**
+ * The web's 48rem: a screen whose shorter side reaches it is a tablet's, and the pictures grow.
+ * The shorter side, so a phone held sideways, wider than that, keeps a phone's pictures.
+ */
 const TABLET_WIDTH = 48 * 16
+
+const isTablet = ({ width, height }: { width: number; height: number }): boolean =>
+  Math.min(width, height) >= TABLET_WIDTH
 
 /** How wide the heading's picture stands: a poster, or an episode's wider still. */
 const HERO_WIDTHS = {
@@ -125,7 +132,7 @@ const ProgressLine = ({ progress }: { progress: NonNullable<ItemHero['progress']
 
 const Hero = ({ hero, actions }: { hero: ItemHero; actions: ItemAction[] | null }) => {
   const { width, height } = useWindowDimensions()
-  const widths = width >= TABLET_WIDTH ? HERO_WIDTHS.tablet : HERO_WIDTHS.phone
+  const widths = isTablet({ width, height }) ? HERO_WIDTHS.tablet : HERO_WIDTHS.phone
   // Held sideways the screen is short, so the title sits by the poster's top, not its foot.
   const isWide = width > height
   const facts = dotted([...hero.facts, ...(hero.rating === null ? [] : [hero.rating])])
@@ -202,7 +209,7 @@ const Versions = ({ versions, onOpen }: { versions: VersionRow[]; onOpen: Opens 
 type Opens = (target: RouteTarget) => void
 
 const Seasons = ({ seasons, onOpen }: { seasons: ShelfCard[]; onOpen: Opens }) => {
-  const { width } = useWindowDimensions()
+  const screen = useWindowDimensions()
   const gutters = useGutters()
   return (
     <View style={styles.section}>
@@ -222,7 +229,7 @@ const Seasons = ({ seasons, onOpen }: { seasons: ShelfCard[]; onOpen: Opens }) =
             key={season.key}
             card={season}
             onPress={() => onOpen(season.target)}
-            width={width >= TABLET_WIDTH ? SEASON_WIDTHS.tablet : SEASON_WIDTHS.phone}
+            width={isTablet(screen) ? SEASON_WIDTHS.tablet : SEASON_WIDTHS.phone}
           />
         ))}
       </ScrollView>
@@ -236,7 +243,7 @@ const Episodes = ({ episodes, onOpen }: { episodes: EpisodeRow[]; onOpen: Opens 
     {episodes.map((episode) => (
       <Pressable
         key={episode.key}
-        accessibilityLabel={episode.title}
+        accessibilityLabel={episodeLabelOf(episode)}
         accessibilityRole="button"
         onPress={() => onOpen(episode.target)}
         style={({ pressed }) => [styles.episode, pressed && styles.pressed]}

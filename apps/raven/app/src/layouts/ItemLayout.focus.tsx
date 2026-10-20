@@ -226,8 +226,11 @@ const Versions = ({
 const Person = ({ person, onSettle }: Settles & { person: PersonCard }) => {
   const [isFocused, setFocused] = useState(false)
   return (
+    // Deliberately inert until the app has a person page: it takes the focus only so the
+    // remote can move along the row and scroll it.
     <Pressable
       accessibilityLabel={`${person.name}, ${person.role}`}
+      accessibilityRole="text"
       focusable
       onBlur={() => setFocused(false)}
       onFocus={() => {
@@ -283,40 +286,45 @@ const ItemLayout = ({ page, actions, onOpen }: ItemLayoutProps) => {
             onSettle={settle}
           />
         </View>
-        {page.seasons.length > 0 && (
-          <CardRow
-            cards={page.seasons}
-            onOpen={onOpen}
-            onSettle={settle}
-            title={ITEM_HEADINGS.seasons}
-          />
-        )}
-        {page.episodes.length > 0 && (
-          <CardRow
-            cards={page.episodes}
-            onOpen={onOpen}
-            onSettle={settle}
-            title={ITEM_HEADINGS.episodes}
-          />
-        )}
-        {page.versions.length > 0 && (
-          <Versions onOpen={onOpen} onSettle={settle} versions={page.versions} />
-        )}
-        {page.cast.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.padded}>
-              <Heading title={page.castTitle} />
-            </View>
-            <ScrollView
-              contentContainerStyle={styles.row}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-            >
-              {page.cast.map((person) => (
-                <Person key={person.key} onSettle={settle} person={person} />
-              ))}
-            </ScrollView>
-          </View>
+        {/* The rows wait for the actions, so nothing below can take the opening focus from Play. */}
+        {actions !== null && (
+          <>
+            {page.seasons.length > 0 && (
+              <CardRow
+                cards={page.seasons}
+                onOpen={onOpen}
+                onSettle={settle}
+                title={ITEM_HEADINGS.seasons}
+              />
+            )}
+            {page.episodes.length > 0 && (
+              <CardRow
+                cards={page.episodes}
+                onOpen={onOpen}
+                onSettle={settle}
+                title={ITEM_HEADINGS.episodes}
+              />
+            )}
+            {page.versions.length > 0 && (
+              <Versions onOpen={onOpen} onSettle={settle} versions={page.versions} />
+            )}
+            {page.cast.length > 0 && (
+              <View style={styles.section}>
+                <View style={styles.padded}>
+                  <Heading title={page.castTitle} />
+                </View>
+                <ScrollView
+                  contentContainerStyle={styles.row}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                >
+                  {page.cast.map((person) => (
+                    <Person key={person.key} onSettle={settle} person={person} />
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </View>

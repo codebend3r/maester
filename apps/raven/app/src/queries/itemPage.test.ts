@@ -27,6 +27,7 @@ const movie = ({ versions = [BUSBOYS_FILE] }: { versions?: typeof BUSBOYS.versio
     versions,
     primary: versions[0] ?? BUSBOYS_FILE,
     show: null,
+    isShowPending: false,
     tracks: undefined,
     ...pictures,
   })
@@ -89,17 +90,24 @@ describe('playablePage', () => {
   it("heads an episode with its show and number, its still, and the show's backdrop once read", () => {
     const [primary] = GOOD_NEWS_ABOUT_HELL.versions
     if (primary === undefined) throw new Error('the episode has a file')
-    const episode = (show: typeof SEVERANCE | null) =>
+    const episode = ({
+      show = null,
+      isShowPending = false,
+    }: {
+      show?: typeof SEVERANCE | null
+      isShowPending?: boolean
+    }) =>
       playablePage({
         kind: ITEM_TYPES.episode,
         details: GOOD_NEWS_ABOUT_HELL,
         versions: [primary],
         primary,
         show,
+        isShowPending,
         tracks: undefined,
         ...pictures,
       })
-    const { hero, castTitle } = episode(null)
+    const { hero, castTitle } = episode({ isShowPending: true })
     expect(hero.eyebrow).toBe('Severance · Season 1 · Episode 1')
     expect(hero.poster).toEqual({
       shape: CARD_SHAPES.wide,
@@ -107,7 +115,25 @@ describe('playablePage', () => {
     })
     expect(hero.backdrop).toBeNull()
     expect(castTitle).toBe('Guest stars & crew')
-    expect(episode(SEVERANCE).hero.backdrop).toEqual(at('/api/items/4/images/backdrop?v=b4'))
+    expect(episode({ show: SEVERANCE }).hero.backdrop).toEqual(
+      at('/api/items/4/images/backdrop?v=b4'),
+    )
+  })
+
+  it("puts an episode's still behind it once its show is known to have no backdrop, or cannot be read", () => {
+    const [primary] = GOOD_NEWS_ABOUT_HELL.versions
+    if (primary === undefined) throw new Error('the episode has a file')
+    const page = playablePage({
+      kind: ITEM_TYPES.episode,
+      details: GOOD_NEWS_ABOUT_HELL,
+      versions: [primary],
+      primary,
+      show: null,
+      isShowPending: false,
+      tracks: undefined,
+      ...pictures,
+    })
+    expect(page.hero.backdrop).toEqual(at('/api/items/6/images/still?v=s6'))
   })
 })
 

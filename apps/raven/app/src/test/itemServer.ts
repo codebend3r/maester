@@ -228,14 +228,17 @@ const bodyOf = (body: string | undefined): unknown => (body === undefined ? null
 /**
  * Busboys, Severance, its first season and that season's first episode, behind the app's
  * allowlist so an unlisted call fails the test. Every write is heard, and answered once
- * `writes` lets it through, so a test can look at the screen while the server is still busy.
+ * `writes` lets it through, and every read once `reads` lets its path through, so a test can
+ * look at the screen while the server is still busy.
  */
 export const itemApi = ({
   hear = () => undefined,
   writes = async () => undefined,
+  reads = async () => undefined,
 }: {
   hear?: (request: HeardRequest) => void
   writes?: () => Promise<void>
+  reads?: (path: string) => Promise<void>
 } = {}): ApiClient =>
   createApiClient({
     baseUrl: NAS.origin,
@@ -246,8 +249,8 @@ export const itemApi = ({
         const sent = bodyOf(init.body)
         hear({ method, path, body: sent })
         const isRead = method === APP_CALL_METHODS.get
-        if (!isRead) await writes()
-        const body = isRead ? READS[path] : WRITES[path]?.(sent)
+        await (isRead ? reads(path) : writes())
+        const body = isRead ? READS[path] : (WRITES[path]?.(sent) ?? undefined)
         const status = body === undefined ? 404 : 200
         return {
           ok: status === 200,

@@ -160,9 +160,10 @@ describe('Item on a phone or tablet', () => {
     expect(await screen.findByRole('header', { name: 'Season 1' })).toBeTruthy()
     expect(screen.getByText('Severance')).toBeTruthy()
     expect(screen.getByRole('header', { name: 'Episodes' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'E2 · Half Loop' })).toBeTruthy()
+    // Each row is read out with its line, and whether it is watched.
+    expect(screen.getByRole('button', { name: /^E2 · Half Loop, .+ · 55m$/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Play S01E01' })).toBeTruthy()
-    await fireEvent.press(screen.getByRole('button', { name: 'E1 · Good News About Hell' }))
+    await fireEvent.press(screen.getByRole('button', { name: /^E1 · Good News About Hell, / }))
     expect(mockPush).toHaveBeenCalledWith({
       pathname: APP_ROUTES.item,
       params: { id: String(GOOD_NEWS_ABOUT_HELL.id), library: String(SERIES.id) },

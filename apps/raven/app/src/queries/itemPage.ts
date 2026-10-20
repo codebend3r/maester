@@ -134,30 +134,44 @@ const pageOf = ({
   cast: castOf({ details, ...rest }),
 })
 
-/**
- * A movie's or an episode's page, for the files of the one library and card it shows:
- * `versions`, and `primary`, the one Play starts. An episode is headed by its still under its
- * show's backdrop, which waits for `show` to be read, and its show and number; a movie by its
- * poster, backdrop and director. Either says how much of `primary` is left.
- */
-export const playablePage = ({
-  kind,
+/** A movie's heading: its poster and backdrop, director, rating and facts. */
+const movieHero = ({
   details,
-  versions,
+  shown,
+  primary,
+  ...pictures
+}: Pictures & { details: ItemDetails; shown: ItemDetails; primary: MediaItem }): ItemHero => ({
+  eyebrow: null,
+  title: details.title,
+  byline: directedBy(details),
+  rating: details.contentRating,
+  facts: movieFacts({ details: shown, primary }),
+  progress: timeLeft(primary),
+  poster: posterOf({ details, ...pictures }),
+  backdrop: backdropOf({ details, ...pictures }),
+  tagline: details.tagline,
+  summary: details.summary,
+})
+
+/**
+ * An episode's heading: its still, else a frame of its file, under its show's backdrop, and
+ * its show and number. The still stands in for a show with no backdrop, or one that could not
+ * be read, but not while the show is still being read.
+ */
+const episodeHero = ({
+  details,
+  shown,
   primary,
   show,
-  tracks,
+  isShowPending,
   ...pictures
 }: Pictures & {
-  kind: typeof ITEM_TYPES.movie | typeof ITEM_TYPES.episode
   details: ItemDetails
-  versions: MediaItem[]
+  shown: ItemDetails
   primary: MediaItem
   show: ItemDetails | null
-  tracks: MediaTracks | undefined
-}): ItemPage => {
-  const isEpisode = kind === ITEM_TYPES.episode
-  const shown = { ...details, versions }
+  isShowPending: boolean
+}): ItemHero => {
   const still = pictureAt({
     uri:
       pictures.api.itemImageUrl({
@@ -167,27 +181,49 @@ export const playablePage = ({
       }) ?? pictures.api.thumbnailUrl(primary),
     headersFor: pictures.headersFor,
   })
-  const hero: ItemHero = {
-    eyebrow: isEpisode ? episodeByline(details) || null : null,
+  return {
+    eyebrow: episodeByline(details) || null,
     title: details.title,
-    byline: isEpisode ? null : directedBy(details),
-    rating: isEpisode ? null : details.contentRating,
-    facts: isEpisode
-      ? episodeFacts({ details: shown, primary })
-      : movieFacts({ details: shown, primary }),
+    byline: null,
+    rating: null,
+    facts: episodeFacts({ details: shown, primary }),
     progress: timeLeft(primary),
-    poster: isEpisode
-      ? { shape: CARD_SHAPES.wide, picture: still }
-      : posterOf({ details, ...pictures }),
-    // The still stands in only for a show with no backdrop, not while the show is read.
-    backdrop: isEpisode
-      ? show === null
-        ? null
-        : (backdropOf({ details: show, ...pictures }) ?? still)
-      : backdropOf({ details, ...pictures }),
-    tagline: isEpisode ? null : details.tagline,
+    poster: { shape: CARD_SHAPES.wide, picture: still },
+    backdrop: isShowPending ? null : (backdropOf({ details: show, ...pictures }) ?? still),
+    tagline: null,
     summary: details.summary,
   }
+}
+
+/**
+ * A movie's or an episode's page, for the files of the one library and card it shows:
+ * `versions`, and `primary`, the one Play starts. Either says how much of `primary` is left.
+ */
+export const playablePage = ({
+  kind,
+  details,
+  versions,
+  primary,
+  show,
+  isShowPending,
+  tracks,
+  ...pictures
+}: Pictures & {
+  kind: typeof ITEM_TYPES.movie | typeof ITEM_TYPES.episode
+  details: ItemDetails
+  versions: MediaItem[]
+  primary: MediaItem
+  /** An episode's show, once read; null while it is read, when it cannot be, and for a movie. */
+  show: ItemDetails | null
+  /** Whether an episode's show is still being read. */
+  isShowPending: boolean
+  tracks: MediaTracks | undefined
+}): ItemPage => {
+  const isEpisode = kind === ITEM_TYPES.episode
+  const shown = { ...details, versions }
+  const hero = isEpisode
+    ? episodeHero({ details, shown, primary, show, isShowPending, ...pictures })
+    : movieHero({ details, shown, primary, ...pictures })
   return pageOf({
     hero,
     details,

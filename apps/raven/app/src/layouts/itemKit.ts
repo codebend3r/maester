@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react'
+import type { AccessibilityState } from 'react-native'
 
-import type { ItemPage } from '@/queries/itemPage'
+import type { EpisodeRow, ItemPage } from '@/queries/itemPage'
 import type { RouteTarget } from '@/routes'
+
+/** How far a mark is on, as React Native says it to a screen reader: on, off, or `mixed`. */
+export type CheckState = NonNullable<AccessibilityState['checked']>
 
 /** What an action on an item's page is: Play, or a mark the viewer turns on and off. */
 export const ITEM_ACTIONS = { play: 'play', toggle: 'toggle' } as const
@@ -13,7 +17,7 @@ export type ItemAction =
       key: string
       label: string
       /** Whether the mark is on; `mixed` for a show or season only partly watched. */
-      isOn: boolean | 'mixed'
+      isOn: CheckState
       onPress: () => void
     }
 
@@ -44,8 +48,15 @@ export const ITEM_HEADINGS = {
 /** What a version's Play is called aloud: "Play Busboys (2026).mkv". */
 export const playLabelOf = (fileName: string): string => `Play ${fileName}`
 
-/** What marks an episode watched on its row. */
+/** What marks an episode watched on its row, and what it is called aloud. */
 export const WATCHED_MARK = '✓ Watched'
+const WATCHED_WORD = 'Watched'
+
+/** An episode row as it is read out: "E2 · Half Loop, 18 Feb 2022 · 55m, Watched". */
+export const episodeLabelOf = (episode: EpisodeRow): string =>
+  [episode.title, episode.line, episode.isWatched ? WATCHED_WORD : null]
+    .filter((part): part is string => part !== null)
+    .join(', ')
 
 /** What sits before a mark's label while it is on. */
 export const ON_MARK = '✓ '
