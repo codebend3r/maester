@@ -130,7 +130,7 @@ describe('AppShell', () => {
     )
   })
 
-  it('leads with the logo, Home and Favourites, then the pinned libraries, with Libraries, Streams and Settings last', async () => {
+  it('leads with the logo, Home and Favourites, then the pinned libraries, with Libraries, Streams, Bug reports and Settings last', async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
     renderShell({ route: '/' })
     await within(nav()).findByRole('link', { name: 'Movies' })
@@ -138,14 +138,25 @@ describe('AppShell', () => {
       within(nav())
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['raven', 'Home', 'Favourites', 'Movies', 'Libraries', 'Streams', 'Settings'])
+    ).toEqual([
+      'raven',
+      'Home',
+      'Favourites',
+      'Movies',
+      'Libraries',
+      'Streams',
+      'Bug reports',
+      'Settings',
+    ])
   })
 
-  it('leaves Streams out of the menus and the tab bar while the admin lock is on', async () => {
+  it('leaves Streams and Bug reports out of the menus and the tab bar while the admin lock is on', async () => {
     spies.list.mockImplementation(async () => [])
     renderShell({ route: '/', adminLock: { state: ADMIN_LOCK_STATES.on, available: true } })
     expect(await within(nav()).findByRole('link', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Streams' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Bug reports' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Reports' })).toBeNull()
   })
 
   it('opens a page a link leads to at its top', async () => {
@@ -408,7 +419,7 @@ describe('AppShell', () => {
     expect(useSideMenu.getState().collapsed).toBe(false)
   })
 
-  it('gives a phone Home, Libraries, Favourites, Streams and Settings in a tab bar', () => {
+  it('gives a phone Home, Libraries, Favourites, Streams, Reports and Settings in a tab bar', () => {
     spies.list.mockImplementation(async () => [])
     renderShell({ route: '/favourites' })
     const links = within(tabs()).getAllByRole('link')
@@ -417,9 +428,17 @@ describe('AppShell', () => {
       ['Libraries', '/libraries'],
       ['Favourites', '/favourites'],
       ['Streams', '/streams'],
+      ['Reports', '/reports'],
       ['Settings', '/settings'],
     ])
-    expect(links.map(iconOf)).toEqual(['home', 'libraries', 'heart', 'playback', 'settings'])
+    expect(links.map(iconOf)).toEqual([
+      'home',
+      'libraries',
+      'heart',
+      'playback',
+      'alert',
+      'settings',
+    ])
     expect(within(tabs()).getByRole('link', { name: 'Favourites' })).toHaveAttribute(
       'aria-current',
       'page',

@@ -10,6 +10,14 @@ import {
   AUTH_PARAMS,
   AUTH_PATHS,
   AUTH_SCHEME,
+  BUG_REPORT_PARAMS,
+  BUG_REPORT_PATHS,
+  type BugReport,
+  type BugReportStatus,
+  type BugReportStatusChange,
+  type PlaybackDiagnostics,
+  isBugReport,
+  isBugReportList,
   MEDIA_TICKET_PARAM,
   isAccount,
   isAccountList,
@@ -987,6 +995,34 @@ export const createApiClient = ({
     stopStream: async (id: string): Promise<void> => {
       await send({ path: `/api/streams/${encodeURIComponent(id)}/stop`, method: 'POST' })
     },
+
+    /** Sends what the player gathered about a video that would not play, for the admin to read later. */
+    reportPlaybackError: (diagnostics: PlaybackDiagnostics): Promise<BugReport> =>
+      expect({
+        request: send({ path: BUG_REPORT_PATHS.reports, method: 'POST', body: diagnostics }),
+        guard: isBugReport,
+      }),
+
+    /** Every bug report, newest first. Admin only. */
+    listBugReports: (): Promise<BugReport[]> =>
+      expect({ request: send({ path: BUG_REPORT_PATHS.reports }), guard: isBugReportList }),
+
+    /** Moves a report on, as the admin works through it. Admin only. */
+    setBugReportStatus: ({
+      id,
+      status,
+    }: {
+      id: number
+      status: BugReportStatus
+    }): Promise<BugReport> =>
+      expect({
+        request: send({
+          path: BUG_REPORT_PATHS.status.replace(`:${BUG_REPORT_PARAMS.id}`, String(id)),
+          method: 'PUT',
+          body: { status } satisfies BugReportStatusChange,
+        }),
+        guard: isBugReport,
+      }),
 
     getMediaTicket: (id: number): Promise<MediaTicket> =>
       expect({ request: send({ path: `/api/media/${id}/ticket` }), guard: isMediaTicket }),

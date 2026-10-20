@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test'
 import {
   ACCOUNT_TICKET_SECONDS,
+  BUG_REPORT_STATUSES,
+  isBugReport,
+  isBugReportList,
+  isBugReportStatus,
+  isBugReportStatusChange,
+  isPlaybackDiagnostics,
   DEFAULT_SAGA_BACKDROP,
   MEDIA_PROBE_BYTES,
   MEDIA_TICKET_REFRESH_SECONDS,
@@ -59,14 +65,17 @@ import {
   isSagaBackdrop,
   isSlideshowMotion,
   isShowListing,
+  MEDIA_ORIGIN_KINDS,
 } from '@/contract'
 import { MAX_WATCH_TARGETS } from '@/watched'
 import {
+  bugReport,
   episodeSummary,
   itemDetails,
   itemSummary,
   library,
   mediaItem,
+  playbackDiagnostics,
   review,
   seasonSummary,
   showEntry,
@@ -772,5 +781,56 @@ describe('the media plane guards', () => {
 
   it('keeps an account ticket to five minutes', () => {
     expect(ACCOUNT_TICKET_SECONDS).toBe(300)
+  })
+})
+
+describe('the bug report guards', () => {
+  it('takes diagnostics with every fact, and the null ones a browser does not give', () => {
+    expect(isPlaybackDiagnostics(playbackDiagnostics())).toBe(true)
+    expect(isPlaybackDiagnostics(playbackDiagnostics({ media: null, playback: null }))).toBe(true)
+    expect(
+      isPlaybackDiagnostics(
+        playbackDiagnostics({
+          origin: {
+            kind: MEDIA_ORIGIN_KINDS.lan,
+            url: 'https://raven.home.example.com',
+            pickedAt: 'now',
+          },
+        }),
+      ),
+    ).toBe(true)
+  })
+
+  it('refuses diagnostics missing a part, or with an unknown way of playing', () => {
+    const { device: _device, ...noDevice } = playbackDiagnostics()
+    expect(isPlaybackDiagnostics(noDevice)).toBe(false)
+    expect(
+      isPlaybackDiagnostics({
+        ...playbackDiagnostics(),
+        playback: {
+          modes: ['teleport'],
+          attempts: [],
+          isForced: false,
+          steppedDown: null,
+          settings: null,
+        },
+      }),
+    ).toBe(false)
+    expect(isPlaybackDiagnostics({ ...playbackDiagnostics(), problems: 'it broke' })).toBe(false)
+  })
+
+  it('takes only the four statuses', () => {
+    expect(isBugReportStatus.values).toEqual(Object.values(BUG_REPORT_STATUSES))
+    expect(isBugReportStatusChange({ status: BUG_REPORT_STATUSES.wontFix })).toBe(true)
+    expect(isBugReportStatusChange({ status: 'closed' })).toBe(false)
+    expect(isBugReportStatusChange({})).toBe(false)
+  })
+
+  it('lists a report whatever its diagnostics hold, as long as they are an object', () => {
+    expect(isBugReportList([bugReport(), bugReport({ id: 2, diagnostics: { old: true } })])).toBe(
+      true,
+    )
+    expect(isBugReport({ ...bugReport(), diagnostics: 'text' })).toBe(false)
+    expect(isBugReport({ ...bugReport(), reporter: { accountId: 'local' } })).toBe(false)
   })
 })

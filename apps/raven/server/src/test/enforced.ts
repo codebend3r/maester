@@ -4,6 +4,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
   AUTH_HEADERS,
   AUTH_PATHS,
+  BUG_REPORT_PATHS,
   type ApiClient,
   ITEM_TYPES,
   LIBRARY_KINDS,
@@ -116,6 +117,9 @@ export const ROUTES = {
   person: { method: GET, path: '/api/people/:id', account: approved },
   personPhoto: { method: GET, path: '/api/people/:id/photo', account: approved },
   reviewAvatar: { method: GET, path: '/api/reviews/:id/avatar', account: approved },
+  reportError: { method: POST, path: BUG_REPORT_PATHS.reports, account: approved },
+  bugReports: { method: GET, path: BUG_REPORT_PATHS.reports, account: owner },
+  bugReportStatus: { method: PUT, path: BUG_REPORT_PATHS.status, account: owner },
   displaySettings: { method: GET, path: '/api/settings/display', account: approved },
   saveDisplaySettings: { method: PUT, path: '/api/settings/display', account: owner },
   playbackSettings: { method: GET, path: '/api/settings/playback', account: approved },

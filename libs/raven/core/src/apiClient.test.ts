@@ -10,6 +10,7 @@ import {
   parseServerEvent,
 } from '@/apiClient'
 import {
+  BUG_REPORT_STATUSES,
   DEFAULT_SAGA_BACKDROP,
   AUTH_CONFIG_STATES,
   AUTH_HEADERS,
@@ -28,7 +29,15 @@ import {
   type MetadataHealth,
   type PersonDetails,
 } from '@/contract'
-import { itemDetails, itemSummary, library, mediaItem, showEntry } from '@/test/fixtures'
+import {
+  bugReport,
+  itemDetails,
+  itemSummary,
+  library,
+  mediaItem,
+  playbackDiagnostics,
+  showEntry,
+} from '@/test/fixtures'
 
 type Call = { url: string; init?: FetchInit }
 
@@ -786,5 +795,36 @@ describe('the metadata calls', () => {
       ].join(', '),
     )
     expect(client.posterSrcSet({ id: 2, version: null })).toBeNull()
+  })
+})
+
+describe('the bug report calls', () => {
+  it('posts the diagnostics as they are, and reads back the report it made', async () => {
+    const diagnostics = playbackDiagnostics()
+    const report = bugReport({ diagnostics })
+    const { client, calls } = clientReturning(respond({ status: 201, body: report }))
+    expect(await client.reportPlaybackError(diagnostics)).toEqual(report)
+    expect(calls[0]?.url ?? null).toBe('http://nas:8484/api/reports')
+    expect(calls[0]?.init?.method ?? null).toBe('POST')
+    expect(calls[0]?.init?.body ?? null).toBe(JSON.stringify(diagnostics))
+  })
+
+  it('lists the reports, refusing a list it does not understand', async () => {
+    const listed = clientReturning(respond({ body: [bugReport()] }))
+    expect(await listed.client.listBugReports()).toEqual([bugReport()])
+    expect(listed.calls[0]?.url ?? null).toBe('http://nas:8484/api/reports')
+    const bad = clientReturning(respond({ body: [{ id: 1 }] }))
+    await expect(bad.client.listBugReports()).rejects.toMatchObject({ status: 502 })
+  })
+
+  it('puts a new status on the report its id names', async () => {
+    const fixed = bugReport({ id: 4, status: BUG_REPORT_STATUSES.fixed })
+    const { client, calls } = clientReturning(respond({ body: fixed }))
+    expect(await client.setBugReportStatus({ id: 4, status: BUG_REPORT_STATUSES.fixed })).toEqual(
+      fixed,
+    )
+    expect(calls[0]?.url ?? null).toBe('http://nas:8484/api/reports/4/status')
+    expect(calls[0]?.init?.method ?? null).toBe('PUT')
+    expect(calls[0]?.init?.body ?? null).toBe(JSON.stringify({ status: BUG_REPORT_STATUSES.fixed }))
   })
 })

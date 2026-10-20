@@ -1,4 +1,9 @@
-import type { PlayerAction, PlayerErrorReason, ProgressReport } from '@raven/core'
+import type {
+  PlaybackDiagnostics,
+  PlayerAction,
+  PlayerErrorReason,
+  ProgressReport,
+} from '@raven/core'
 import type { IconName } from '@/components/Icon/Icon'
 
 export type ProgressSink = {
@@ -41,6 +46,12 @@ export type TrackChoice = { audio: number | null; subtitle: string | null }
 /** Another player that can take this title over, starting at a position in seconds. */
 export type Handoff = { label: string; run: (at: number) => void }
 
+/** Where Unplayable's Report this error goes, and the app version the report names. */
+export type ErrorReporter = {
+  appVersion: string | null
+  send: (diagnostics: PlaybackDiagnostics) => Promise<unknown>
+}
+
 export type PlayerServices = {
   title: PlayerTitle
   progress: ProgressSink
@@ -63,6 +74,8 @@ export type PlayerServices = {
   unplayableNote?: string
   /** Plays this title in another player: Unplayable's first action, and a row in the Playback menu. */
   handoff?: Handoff
+  /** Without it Unplayable offers no Report this error. */
+  report?: ErrorReporter
   /** The native engine's error, before Unplayable shows it, for a host that can recover (a relocked library). */
   onEngineError?: (error: { reason: PlayerErrorReason; message: string }) => void
 }

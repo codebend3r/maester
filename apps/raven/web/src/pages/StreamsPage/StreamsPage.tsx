@@ -19,12 +19,12 @@ import {
 } from '@raven/core'
 import { Button } from '@raven/ui'
 import { useId, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
+import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
 import { PictureChip, ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
-import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
+import { useManagement } from '@/lib/management'
 import { api } from '@/lib/api'
 import { liveStreamsQuery, mediaStreamsQuery, tracksQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
@@ -316,25 +316,12 @@ export const StreamsPage = () => {
 
   if (!canManage) {
     return (
-      <section className={styles.empty}>
-        <BackButton fallback={HOME} className={styles.back} />
-        <div className={styles.emptyBody}>
-          {mode === MANAGEMENT_MODES.adminLock ? (
-            <>
-              <h1 className={styles.emptyTitle}>Streams are for the admin</h1>
-              <p>
-                Turn the admin lock off in <Link to="/settings">Settings</Link> to see who is
-                streaming and to stop a stream.
-              </p>
-            </>
-          ) : (
-            <>
-              <h1 className={styles.emptyTitle}>Streams are for the owner</h1>
-              <p>Only the owner can see who is streaming and stop a stream.</p>
-            </>
-          )}
-        </div>
-      </section>
+      <ManagersOnly
+        mode={mode}
+        name="Streams"
+        forAdmin="see who is streaming and to stop a stream"
+        forOwner="see who is streaming and stop a stream"
+      />
     )
   }
 

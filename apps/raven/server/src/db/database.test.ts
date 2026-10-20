@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ITEM_TYPES } from '@raven/core'
+import { BUG_REPORT_STATUSES, ITEM_TYPES } from '@raven/core'
 import Sqlite from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
@@ -400,7 +400,7 @@ describe('migrations', () => {
 
   it('gives every viewing row to the local account, leaving out rows whose video or title is gone', () => {
     const before = new Sqlite(join(state.dir, 'raven.db'))
-    const shipped = MIGRATIONS.length - 1
+    const shipped = 30
     MIGRATIONS.slice(0, shipped).forEach((sql) => before.exec(sql))
     before.pragma(`user_version = ${shipped}`)
     before
@@ -468,6 +468,25 @@ describe('migrations', () => {
     db.prepare('DELETE FROM items WHERE id = 1').run()
     expect(db.prepare('SELECT COUNT(*) AS rows FROM item_favourites').get()).toEqual({ rows: 0 })
     expect(db.pragma('foreign_key_check')).toEqual([])
+    database.onModuleDestroy()
+  })
+
+  it('adds bug reports, none yet, each kept as valid JSON', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 31).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 31')
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    const count = () => database.db.prepare('SELECT COUNT(*) AS reports FROM bug_reports').get()
+    expect(count()).toEqual({ reports: 0 })
+    const insert = database.db.prepare(
+      `INSERT INTO bug_reports (account_id, media_id, title, summary, status, diagnostics, created_at, updated_at)
+       VALUES (?, NULL, 'Heat', 'It stopped.', ?, ?, '2026-10-20', '2026-10-20')`,
+    )
+    insert.run(VIEWING_ACCOUNTS.local, BUG_REPORT_STATUSES.new, '{"problems":[]}')
+    expect(count()).toEqual({ reports: 1 })
+    expect(() => insert.run(VIEWING_ACCOUNTS.local, BUG_REPORT_STATUSES.new, 'not json')).toThrow()
     database.onModuleDestroy()
   })
 })

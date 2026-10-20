@@ -30,6 +30,7 @@ import { ravenPlayer } from '@/lib/ravenPlayer'
 import { useRouteId } from '@/lib/routeQuery'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import { useTicketFollowsSession } from '@/lib/useTicketFollowsSession'
+import { ravenVersion } from '@/lib/version'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
 
 /** How long a copied file link plays, as long as the ticket it carries: an account ticket can end sooner, with its token. */
@@ -157,6 +158,10 @@ export const WatchPlayer = ({
     favourite: {
       isFavourite: media.favourite,
       toggle: () => favourite.mutate(!media.favourite),
+    },
+    report: {
+      appVersion: ravenVersion,
+      send: (diagnostics) => api.reportPlaybackError(diagnostics),
     },
     ...(opensInRavenPlayer && {
       handoff: {

@@ -1,6 +1,8 @@
 import {
   type ApiClient,
   type MediaItem,
+  type PlaybackAttempt,
+  type PlaybackDiagnostics,
   type PlaybackMode,
   DEFAULT_PLAYBACK_SETTINGS,
   PLAYBACK_MODES,
@@ -32,6 +34,12 @@ const sameLadder = ({ a, b }: { a: Ladder; b: Ladder }): boolean =>
 /** A way of playing the connection could not carry, and what it did carry. */
 export type StepDown = { from: PlaybackMode; delivery: Delivery }
 
+/** Why the way being played failed, and what the picture was doing then, for a report. */
+export type PlaybackFailure = Omit<PlaybackAttempt, 'mode'>
+
+/** How the ladder went, as a report carries it. */
+export type LadderFacts = NonNullable<PlaybackDiagnostics['playback']>
+
 export const PLAYBACK_STATUSES = {
   waiting: 'waiting',
   unplayable: 'unplayable',
@@ -45,6 +53,7 @@ export type PlaybackStatus =
       status: typeof PLAYBACK_STATUSES.unplayable
       problems: string[]
       tryAnyway: (() => void) | null
+      facts: LadderFacts
     }
   /**
    * `fail` steps down to the next way, or gives up once none is left. `slow`
@@ -54,7 +63,7 @@ export type PlaybackStatus =
   | {
       status: typeof PLAYBACK_STATUSES.playing
       rendition: Rendition
-      fail: (message: string) => void
+      fail: (failure: PlaybackFailure) => void
       slow: ((delivery: Delivery) => void) | null
       /** Why this is a transcode, when the connection is the reason. */
       steppedDown: StepDown | null
@@ -101,6 +110,7 @@ export const usePlaybackLadder = ({
   const [failure, setFailure] = useState<string | null>(null)
   const [steppedDown, setSteppedDown] = useState<StepDown | null>(null)
   const [picked, setPicked] = useState<PlayPick | null>(null)
+  const [attempts, setAttempts] = useState<PlaybackAttempt[]>([])
 
   // The server's settings say whether to force the original file and what it
   // converts; a plan made without them starts a stream it may refuse.
@@ -126,6 +136,17 @@ export const usePlaybackLadder = ({
       status: PLAYBACK_STATUSES.unplayable,
       problems: failure != null ? [failure, ...plan.problems] : plan.problems,
       tryAnyway: failure == null && !forced ? () => setForced(true) : null,
+      facts: {
+        modes: [...ladder.modes],
+        attempts,
+        isForced: forced,
+        steppedDown: steppedDown && {
+          from: steppedDown.from,
+          delivered: steppedDown.delivery.delivered,
+          needed: steppedDown.delivery.needed,
+        },
+        settings: settings.data?.settings ?? null,
+      },
     }
   }
   const isConverting = mode === PLAYBACK_MODES.transcode
@@ -136,9 +157,10 @@ export const usePlaybackLadder = ({
   return {
     status: PLAYBACK_STATUSES.playing,
     rendition,
-    fail: (message) => {
+    fail: (failed) => {
+      setAttempts((tried) => [...tried, { mode, ...failed }])
       if (step + 1 < ladder.modes.length) setFallback({ ladder, step: step + 1 })
-      else setFailure(message)
+      else setFailure(failed.message)
     },
     slow: lighter > step ? (delivery) => setSteppedDown({ from: mode, delivery }) : null,
     steppedDown: isConverting ? steppedDown : null,

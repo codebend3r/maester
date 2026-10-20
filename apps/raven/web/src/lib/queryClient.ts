@@ -115,6 +115,8 @@ export const queryKeys = {
   adminLock: ['admin'],
   /** What the server is streaming to whom right now, for the admin. */
   liveStreams: ['streams'],
+  /** What viewers reported from the player, for the admin. */
+  bugReports: ['reports'],
   displaySettings: ['settings', 'display'],
   nextEpisode: (showId: number) => ['items', showId, 'next'],
   person: (id: number | null) => ['people', id],
