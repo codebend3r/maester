@@ -1,9 +1,24 @@
+import { execFile } from 'node:child_process'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { playLinkFor } from '@raven/core'
+import { AUTH_PARAMS, AUTH_PATHS, MEMBER_STATUSES, playLinkFor } from '@raven/core'
 import { expect, test } from '@playwright/test'
 import { type Clips, makeClips } from '@/e2e/clips'
-import { FIXTURE_ADMIN_KINDS, routesOf, startFixtureServer } from '@/e2e/fixtureServer'
+import {
+  ACCOUNT_TICKET_PREFIX,
+  FIXTURE_ACCOUNT,
+  FIXTURE_ACCOUNT_KINDS,
+  FIXTURE_PUBLISHABLE_KEY,
+} from '@/e2e/fixtureAuth'
+import {
+  FIXTURE_ADMIN_KINDS,
+  FIXTURE_MEDIA,
+  MEDIA_PATHS,
+  routesOf,
+  startFixtureServer,
+  UNLOCK_COOKIE,
+} from '@/e2e/fixtureServer'
 import { API_PATHS } from '@/main/servers/allowlist'
+import { RELAY_HOST, RELAY_SECRET_BYTES } from '@/main/servers/mediaRelay'
 import {
   browserOpens,
   closeApp,
@@ -20,6 +35,7 @@ import {
   trustPrompts,
   withApp,
 } from '@/e2e/harness'
+import { tapPlayerPort, trafficOf } from '@/e2e/playerPort'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import {
   DESKTOP_REPLIES,
@@ -34,6 +50,35 @@ const CONTENT_SECURITY_POLICY =
   "default-src 'self'; img-src 'self' data:; media-src 'self' raven-file:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 
 const NAVIGATION_KEY = 'ravenE2eNavigation'
+
+const PAGE_FETCHES = { reached: 'reached', blocked: 'blocked' } as const
+
+const PIN = '3001'
+// The unlock cookie's value the redirecting server sets, to look for where it goes.
+const REDIRECT_UNLOCK = 'a.b'
+// The real server's: five minutes, and Supabase's hour.
+const TICKET_MS = 300_000
+const JWT_SECONDS = 3600
+
+// `lsof -Fn` prints each socket's name on a line that starts with this field letter.
+const LSOF_NAME_FIELD = 'n'
+
+/** The loopback ports a process listens on, as `lsof` lists them; none when it lists nothing. */
+const loopbackPorts = ({ pid }: { pid: number }) =>
+  new Promise<number[]>((resolve) => {
+    execFile(
+      'lsof',
+      ['-a', '-p', `${pid}`, '-iTCP', '-sTCP:LISTEN', '-n', '-P', `-F${LSOF_NAME_FIELD}`],
+      (_error, stdout) =>
+        resolve(
+          stdout.split('\n').flatMap((line) => {
+            const [host = '', port = ''] = line.slice(LSOF_NAME_FIELD.length).split(':')
+            const isLoopback = line.startsWith(LSOF_NAME_FIELD) && host === RELAY_HOST
+            return isLoopback && /^\d+$/u.test(port) ? [Number(port)] : []
+          }),
+        ),
+    )
+  })
 
 /**
  * A listener on 127.0.0.1 that logs `METHOD path` and the `Cookie` header (or '') for every
@@ -165,7 +210,8 @@ test.describe('the security baseline', () => {
           expect(await trustPrompts({ app })).toEqual([
             `Add the raven server at ${redirecting.origin}?`,
           ])
-          expect(redirecting.requests).toEqual(['GET /api/lock'])
+          // The probe's first read is the public auth config, and it goes no further.
+          expect(redirecting.requests).toEqual([`${SERVER_METHODS.get} ${AUTH_PATHS.config}`])
           expect(elsewhere.requests).toEqual([])
           expect(
             await requestFromPage({ page, request: { type: DESKTOP_REQUESTS.listServers } }),
@@ -201,10 +247,16 @@ test.describe('the security baseline', () => {
     })
     const redirecting = await startListener({
       answer: ({ request, response }) => {
+        // A server older than accounts, so the probe goes on to the lock.
+        if (request.url === AUTH_PATHS.config) {
+          response.writeHead(404, { [HTTP_HEADERS.contentType]: 'application/json' })
+          response.end('{"message":"Not found"}')
+          return
+        }
         if (request.url === API_PATHS.lock) {
           response.writeHead(200, {
             [HTTP_HEADERS.contentType]: 'application/json',
-            [HTTP_HEADERS.setCookie]: 'raven_unlock=a.b; Path=/api; HttpOnly; SameSite=Strict',
+            [HTTP_HEADERS.setCookie]: `${UNLOCK_COOKIE}=${REDIRECT_UNLOCK}; Path=/api; HttpOnly; SameSite=Strict`,
           })
           response.end('{"available":true,"unlocked":true}')
           return
@@ -227,8 +279,17 @@ test.describe('the security baseline', () => {
           await expect(
             page.getByText(`raven player could not reach ${redirecting.host}.`),
           ).toBeVisible()
-          expect(redirecting.requests).toEqual(['GET /api/lock', 'GET /api/media/1'])
-          expect(redirecting.cookies).toEqual(['', 'raven_unlock=a.b'])
+          // The trust probe reads the auth config and the lock; the title's page reads the
+          // config once more for the account, which it keeps from then on.
+          const config = `${SERVER_METHODS.get} ${AUTH_PATHS.config}`
+          expect(redirecting.requests).toEqual([
+            config,
+            `${SERVER_METHODS.get} ${API_PATHS.lock}`,
+            config,
+            `${SERVER_METHODS.get} ${MEDIA_PATHS.item(FIXTURE_MEDIA.first)}`,
+          ])
+          const unlock = `${UNLOCK_COOKIE}=${REDIRECT_UNLOCK}`
+          expect(redirecting.cookies).toEqual(['', '', unlock, unlock])
           expect(elsewhere.requests).toEqual([])
           expect(elsewhere.cookies).toEqual([])
           expect(await browserOpens({ app })).toEqual([])
@@ -243,7 +304,7 @@ test.describe('the security baseline', () => {
     const { app, page } = running()
     const fixture = await startFixtureServer({
       clips: { first: clips.first, second: clips.second, tracks: clips.first },
-      mode: { pin: '3001', isLocked: false, admin: { kind: FIXTURE_ADMIN_KINDS.off } },
+      mode: { pin: PIN, isLocked: false, admin: { kind: FIXTURE_ADMIN_KINDS.off } },
     })
     try {
       await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
@@ -418,5 +479,151 @@ test.describe('the security baseline', () => {
       unknown,
     )
     expect(status).toBe(404)
+  })
+})
+
+test.describe('a raven server whose accounts are on', () => {
+  test("keeps the sign-in's tokens, its account calls and the relay out of the page's reach", async () => {
+    const userData = await freshUserData()
+    const clips = await makeClips()
+    const fixture = await startFixtureServer({
+      clips: { first: clips.first, second: clips.second, tracks: clips.first },
+      mode: {
+        pin: PIN,
+        isLocked: false,
+        admin: { kind: FIXTURE_ADMIN_KINDS.off },
+        accounts: {
+          kind: FIXTURE_ACCOUNT_KINDS.ready,
+          status: MEMBER_STATUSES.approved,
+          ticketMs: TICKET_MS,
+          jwtSeconds: JWT_SECONDS,
+        },
+      },
+    })
+    try {
+      await withApp({
+        userData,
+        run: async ({ app, page }) => {
+          await expect(page.getByRole('heading', { name: 'raven player' })).toBeVisible()
+          await tapPlayerPort({ page })
+          await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
+          const added = await requestFromPage({
+            page,
+            request: { type: DESKTOP_REQUESTS.addServer, origin: fixture.origin },
+          })
+          const [serverId = ''] =
+            added !== null && added.type === DESKTOP_REPLIES.servers
+              ? added.servers.map((server) => server.serverId)
+              : []
+          expect(serverId).not.toBe('')
+          const signedIn = await requestFromPage({
+            page,
+            request: {
+              type: DESKTOP_REQUESTS.signIn,
+              serverId,
+              email: FIXTURE_ACCOUNT.email,
+              password: FIXTURE_ACCOUNT.password,
+            },
+          })
+          expect(signedIn?.type ?? null).toBe(DESKTOP_REPLIES.account)
+          const read = await requestFromPage({
+            page,
+            request: { type: DESKTOP_REQUESTS.readAccount, serverId },
+          })
+
+          // main makes these three itself, with the Bearer; the page may ask for none of them.
+          const asked = fixture.requests.length
+          const forgeries = [
+            { method: SERVER_METHODS.get, path: AUTH_PATHS.config, body: null },
+            { method: SERVER_METHODS.get, path: AUTH_PATHS.me, body: null },
+            {
+              method: SERVER_METHODS.post,
+              path: AUTH_PATHS.ticket.replace(`:${AUTH_PARAMS.id}`, String(FIXTURE_MEDIA.first)),
+              body: null,
+            },
+          ]
+          const refused = await Promise.all(
+            forgeries.map((forgery) =>
+              requestFromPage({
+                page,
+                request: { type: DESKTOP_REQUESTS.serverCall, serverId, ...forgery },
+              }),
+            ),
+          )
+          expect(refused).toEqual(
+            forgeries.map(() => ({
+              type: DESKTOP_REPLIES.serverUnreachable,
+              message: 'raven player does not make that call.',
+            })),
+          )
+          expect(routesOf(fixture.requests.slice(asked))).toEqual([])
+
+          // The relay listens from the first title it plays: the one loopback port that is new.
+          const pid = app.process().pid ?? 0
+          const before = await loopbackPorts({ pid })
+          await openUrl({
+            app,
+            url: playLinkFor({
+              origin: fixture.origin,
+              mediaId: FIXTURE_MEDIA.first,
+              at: 0,
+              next: [],
+            }),
+          })
+          await expect(
+            page.getByRole('heading', { name: 'Fixture One', exact: true }),
+          ).toBeVisible()
+          await expect
+            .poll(async () =>
+              (await loopbackPorts({ pid })).filter((port) => !before.includes(port)),
+            )
+            .toHaveLength(1)
+          const relayPort =
+            (await loopbackPorts({ pid })).find((port) => !before.includes(port)) ?? 0
+          const relay = `http://${RELAY_HOST}:${relayPort}`
+          const fetched = await page.evaluate(
+            async ({ url, outcomes }) => {
+              try {
+                // Opaque answers count: only the content security policy can refuse this.
+                await fetch(url, { mode: 'no-cors' })
+                return outcomes.reached
+              } catch {
+                return outcomes.blocked
+              }
+            },
+            { url: `${relay}/`, outcomes: PAGE_FETCHES },
+          )
+          expect(fetched).toBe(PAGE_FETCHES.blocked)
+          // The relay itself answers a path it was not given with a 404, and sends nothing on.
+          const heard = fixture.requests.length
+          const stale = Buffer.alloc(RELAY_SECRET_BYTES).toString('base64url')
+          expect((await fetch(`${relay}/${stale}/file`)).status).toBe(404)
+          expect(fixture.requests.length).toBe(heard)
+
+          const tokens = fixture.issuedTokens()
+          expect(tokens.length).toBeGreaterThan(2)
+          const seen = [
+            JSON.stringify([added, signedIn, read]),
+            JSON.stringify(await trafficOf({ page })),
+            await page.content(),
+          ]
+          const unseen = [
+            ...tokens,
+            FIXTURE_ACCOUNT.password,
+            FIXTURE_PUBLISHABLE_KEY,
+            'eyJ',
+            ACCOUNT_TICKET_PREFIX,
+            `:${relayPort}`,
+          ]
+          expect(
+            seen.flatMap((text) => unseen.filter((secret) => text.includes(secret))),
+            'the page holds a token, a ticket, the key or the relay',
+          ).toEqual([])
+        },
+      })
+    } finally {
+      await fixture.close()
+      await Promise.all([removeDir(userData), removeDir(clips.folder)])
+    }
   })
 })
