@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
+import { AUTH_ROUTES } from '@raven/core'
 import {
   AUTH_QUERY,
-  AUTH_ROUTES,
   checkEmailPath,
   confirmUrl,
   safeReturnPath,

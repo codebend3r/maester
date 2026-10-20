@@ -1,11 +1,12 @@
 import { useMutation } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { AUTH_ROUTES } from '@raven/core'
 import { PasswordFields } from '@/components/AuthScreen/AuthFields'
 import { AuthForm, Fields, Lead, SubmitButton } from '@/components/AuthScreen/AuthCard'
 import { AUDIENCES, AuthScreen } from '@/components/AuthScreen/AuthScreen'
 import { weakPasswordMessage } from '@/lib/authErrors'
-import { AUTH_ROUTES, HOME_PATH } from '@/lib/authRoutes'
+import { HOME_PATH } from '@/lib/authRoutes'
 import { callAuth } from '@/lib/session'
 import { useAuthSession } from '@/stores/authSession'
 

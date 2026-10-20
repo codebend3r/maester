@@ -3,6 +3,7 @@ import {
   AUTH_CONFIG_STATES,
   AUTH_COOKIE,
   AUTH_REFUSALS,
+  AUTH_ROUTES,
   MEMBER_STATUSES,
   isAccount,
   isAuthConfig,
@@ -54,5 +55,17 @@ describe('account contract boundaries', () => {
     )
     expect(isAuthRefusal({ reason: 'invented-reason', message: 'No access.' })).toBe(false)
     expect(isAuthRefusal({ reason: AUTH_REFUSALS.signedOut })).toBe(false)
+  })
+
+  it('names the web pages every client opens for an account', () => {
+    expect(AUTH_ROUTES).toEqual({
+      signIn: '/sign-in',
+      signUp: '/sign-up',
+      checkEmail: '/check-email',
+      confirm: '/auth/confirm',
+      forgot: '/forgot-password',
+      reset: '/reset-password',
+      pending: '/pending',
+    })
   })
 })

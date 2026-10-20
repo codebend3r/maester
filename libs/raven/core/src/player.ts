@@ -68,6 +68,7 @@ export const PLAYER_ERROR_REASONS = {
   network: 'network',
   locked: 'locked',
   engine: 'engine',
+  account: 'account',
 } as const
 
 export const isPlayerErrorReason = oneOf(Object.values(PLAYER_ERROR_REASONS))

@@ -36,6 +36,8 @@ export const AUTH_HEADERS = {
 export const AUTH_SCHEME = 'Bearer'
 export const AUTH_API_PREFIX = '/api/'
 export const AUTH_METHODS = { get: 'GET', head: 'HEAD', post: 'POST' } as const
+/** The query key a media ticket travels in, on the file and sidecar URLs. */
+export const MEDIA_TICKET_PARAM = 't'
 export const AUTH_PARAMS = { id: 'id', pageSize: 'pageSize', pageOffset: 'pageOffset' } as const
 export const AUTH_PATHS = {
   config: '/api/auth/config',
@@ -43,6 +45,15 @@ export const AUTH_PATHS = {
   members: '/api/auth/members',
   memberStatus: '/api/auth/members/:id/status',
   ticket: '/api/auth/media/:id/ticket',
+} as const
+export const AUTH_ROUTES = {
+  signIn: '/sign-in',
+  signUp: '/sign-up',
+  checkEmail: '/check-email',
+  confirm: '/auth/confirm',
+  forgot: '/forgot-password',
+  reset: '/reset-password',
+  pending: '/pending',
 } as const
 
 export const isAccountId = (value: unknown): value is string =>

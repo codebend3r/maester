@@ -4,12 +4,18 @@ import { AuthApiError, type Session } from '@supabase/supabase-js'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { type AuthConfig, AUTH_CONFIG_STATES, ApiError, MEMBER_STATUSES } from '@raven/core'
+import {
+  type AuthConfig,
+  AUTH_CONFIG_STATES,
+  ApiError,
+  MEMBER_STATUSES,
+  AUTH_ROUTES,
+} from '@raven/core'
 import { AppRoutes } from '@/AppRoutes'
 import { api } from '@/lib/api'
 import { type AuthClient } from '@/lib/authClient'
 import { AUTH_ERRORS } from '@/lib/authErrors'
-import { AUTH_QUERY, AUTH_ROUTES } from '@/lib/authRoutes'
+import { AUTH_QUERY } from '@/lib/authRoutes'
 import { queryKeys } from '@/lib/queryClient'
 import { CONFIRM_TYPES, ConfirmPage } from '@/pages/ConfirmPage/ConfirmPage'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'

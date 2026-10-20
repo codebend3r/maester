@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
+import { AUTH_ROUTES } from '@raven/core'
 import { AuthCard, Lead, Status } from '@/components/AuthScreen/AuthCard'
 import { AUDIENCES, AuthScreen } from '@/components/AuthScreen/AuthScreen'
-import { AUTH_QUERY, AUTH_ROUTES, HOME_PATH } from '@/lib/authRoutes'
+import { AUTH_QUERY, HOME_PATH } from '@/lib/authRoutes'
 import { useAuthSession } from '@/stores/authSession'
 import styles from '@/pages/ConfirmPage/ConfirmPage.module.scss'
 
