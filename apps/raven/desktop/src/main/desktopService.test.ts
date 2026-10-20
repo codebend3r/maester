@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'bun:test'
 import { dirname, basename } from 'node:path'
-import { DESKTOP_REPLIES, isOpaqueId, MAX_QUEUE } from '@/shared/protocol'
+import {
+  ACCOUNT_STATES,
+  DESKTOP_REPLIES,
+  isOpaqueId,
+  MAX_QUEUE,
+  MAX_SECRET,
+  DESKTOP_REQUESTS,
+  ENVELOPE_KINDS,
+  ACCOUNT_PAGES,
+} from '@/shared/protocol'
+import type { AccountService } from '@/main/accounts/accountService'
 import { createGrants, type Grants } from '@/main/grants'
 import { createStateStore, type StateFs, type Timers } from '@/main/stateStore'
 import { EMPTY_STATE } from '@/main/playerState'
@@ -10,7 +20,7 @@ import { EMPTY_CONFIG, type ConfigStore, type DesktopConfig } from '@/main/deskt
 import { CALL_MESSAGES, type ServerCallResult } from '@/main/servers/serverCalls'
 import { removeServer } from '@/main/servers/serverList'
 import { TRUST_MESSAGES, TRUST_OUTCOME_KINDS, type TrustOutcome } from '@/main/servers/serverTrust'
-import type { DesktopReply } from '@/shared/protocol'
+import type { AccountView, DesktopReply } from '@/shared/protocol'
 import { createUpdateService, UPDATE_COPY } from '@/main/updateService'
 import { UPDATE_PROBLEMS, type UpdateCheck } from '@/main/updates'
 import type { OutputSettings } from '@raven/core'
@@ -146,6 +156,7 @@ const fakeDownloads = ({
     views: () => [],
     onSuspend: () => undefined,
     onResume: () => undefined,
+    accessEnded: () => undefined,
     dispose: () => undefined,
     pause: async (input) => {
       note('pause', input)
@@ -190,11 +201,68 @@ const fakeDownloads = ({
   return { downloads, reached, resumeAt }
 }
 
+const ACCOUNT_VIEW: AccountView = {
+  serverId: SERVER,
+  state: ACCOUNT_STATES.approved,
+  email: 'ada@example.com',
+  isRemembered: true,
+  signInHost: 'project.supabase.co',
+}
+
+/** An account service that records what reached it and answers with `ACCOUNT_VIEW`. */
+const fakeAccounts = ({
+  signInMessage,
+  pageMessage,
+}: {
+  signInMessage: string | null
+  pageMessage: string | null
+}) => {
+  const reached: { name: string; input: unknown }[] = []
+  const note = ({ name, input }: { name: string; input: unknown }) => {
+    reached.push({ name, input })
+  }
+  const accounts: AccountService = {
+    read: async (serverId) => {
+      note({ name: 'read', input: serverId })
+      return ACCOUNT_VIEW
+    },
+    refresh: async (serverId) => {
+      note({ name: 'refresh', input: serverId })
+      return ACCOUNT_VIEW
+    },
+    signIn: async (input) => {
+      note({ name: 'signIn', input: input })
+      return signInMessage === null
+        ? { ok: true, account: ACCOUNT_VIEW }
+        : { ok: false, message: signInMessage }
+    },
+    signOut: async (serverId) => {
+      note({ name: 'signOut', input: serverId })
+      return { ...ACCOUNT_VIEW, state: ACCOUNT_STATES.signedOut, email: null }
+    },
+    openPage: async (input) => {
+      note({ name: 'openPage', input: input })
+      return pageMessage === null ? { ok: true } : { ok: false, message: pageMessage }
+    },
+    removed: async (serverId) => {
+      note({ name: 'removed', input: serverId })
+    },
+    changed: async (serverId) => {
+      note({ name: 'changed', input: serverId })
+    },
+    refused: async (input) => {
+      note({ name: 'refused', input: input })
+    },
+  }
+  return { accounts, reached }
+}
+
 const SERVER_ENTRY = {
   id: SERVER,
   origin: 'https://raven.example',
   name: 'raven.example',
   addedAt: 1,
+  signIn: null,
 } as const
 
 /** A config held in memory, starting with one server. */
@@ -226,7 +294,13 @@ const setup = ({
   updateAnswers = [],
   serverPosition = 0,
   watched = [],
+  signInMessage = null,
+  pageMessage = null,
 }: {
+  /** What the fake account service refuses a sign in with, or null to let it in. */
+  signInMessage?: string | null
+  /** What the fake account service refuses an account page with, or null to open it. */
+  pageMessage?: string | null
   /** The download videos the fake download service says are marked watched. */
   watched?: string[]
   updateAnswers?: UpdateCheck[]
@@ -350,9 +424,11 @@ const setup = ({
     serverPosition,
     watched,
   })
+  const { accounts, reached: accountsReached } = fakeAccounts({ signInMessage, pageMessage })
   const service = createDesktopService({
     updates,
     downloads,
+    accounts,
     config,
     serverCalls: {
       callFromPage: async (input) => {
@@ -446,6 +522,7 @@ const setup = ({
     config,
     server,
     reached,
+    accountsReached,
     resumeAt,
     releases,
     table,
@@ -1396,7 +1473,13 @@ describe('server titles', () => {
         ...current,
         servers: [
           ...current.servers,
-          { id: OTHER_SERVER, origin: 'http://nas.local:8080', name: 'NAS', addedAt: 2 },
+          {
+            id: OTHER_SERVER,
+            origin: 'http://nas.local:8080',
+            name: 'NAS',
+            addedAt: 2,
+            signIn: null,
+          },
         ],
       }))
       expect(await ask({ service, request: { type: 'listServers' } })).toEqual({
@@ -1422,6 +1505,7 @@ describe('server titles', () => {
         origin: 'https://nas.example',
         name: 'nas.example',
         addedAt: 2,
+        signIn: null,
       }
       const { service, server } = setup({
         files: {},
@@ -1456,6 +1540,7 @@ describe('server titles', () => {
         { kind: 'unreachable', origin: 'https://nas.example' },
         TRUST_MESSAGES.unreachable('https://nas.example'),
       ],
+      [{ kind: TRUST_OUTCOME_KINDS.badSignIn }, TRUST_MESSAGES.badSignIn],
       [{ kind: 'invalid' }, MESSAGES.badServer],
       [{ kind: 'unsaved' }, TRUST_MESSAGES.unsaved],
     ] satisfies [TrustOutcome, string][])(
@@ -1502,7 +1587,13 @@ describe('server titles', () => {
         ...current,
         servers: [
           ...current.servers,
-          { id: OTHER_SERVER, origin: 'https://nas.example', name: 'nas.example', addedAt: 2 },
+          {
+            id: OTHER_SERVER,
+            origin: 'https://nas.example',
+            name: 'nas.example',
+            addedAt: 2,
+            signIn: null,
+          },
         ],
       }))
       await noteDune({ service })
@@ -1860,5 +1951,170 @@ describe('downloads', () => {
       await ask({ service, request: { type: 'openDownload', downloadId: '../downloads' } }),
     ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
     expect(reached).toEqual([])
+  })
+})
+
+describe('accounts', () => {
+  type Service = ReturnType<typeof setup>['service']
+  const ask = ({ service, request }: { service: Service; request: unknown }) =>
+    service.handle({ kind: ENVELOPE_KINDS.page, request })
+  const unknownServer = {
+    type: DESKTOP_REPLIES.refused,
+    message: CALL_MESSAGES.unknownServer,
+  } as const
+  const accountReply = (account: AccountView) =>
+    ({ type: DESKTOP_REPLIES.account, account }) as const
+  const bad = { type: DESKTOP_REPLIES.refused, message: MESSAGES.unknownRequest } as const
+
+  it('answers readAccount and refreshAccount with the account service view', async () => {
+    const { service, accountsReached } = setup({ files: {} })
+    expect(
+      await ask({ service, request: { type: DESKTOP_REQUESTS.readAccount, serverId: SERVER } }),
+    ).toEqual(accountReply(ACCOUNT_VIEW))
+    expect(
+      await ask({ service, request: { type: DESKTOP_REQUESTS.refreshAccount, serverId: SERVER } }),
+    ).toEqual(accountReply(ACCOUNT_VIEW))
+    expect(accountsReached).toEqual([
+      { name: 'read', input: SERVER },
+      { name: 'refresh', input: SERVER },
+    ])
+  })
+
+  it('signs in with the email and password the page sent, and answers the new view', async () => {
+    const { service, accountsReached } = setup({ files: {} })
+    expect(
+      await ask({
+        service,
+        request: {
+          type: DESKTOP_REQUESTS.signIn,
+          serverId: SERVER,
+          email: 'ada@example.com',
+          password: 'pw',
+        },
+      }),
+    ).toEqual(accountReply(ACCOUNT_VIEW))
+    expect(accountsReached).toEqual([
+      {
+        name: 'signIn',
+        input: { serverId: SERVER, email: 'ada@example.com', password: 'pw' },
+      },
+    ])
+  })
+
+  it('refuses a sign in with the service message, and echoes neither the email nor the password', async () => {
+    const { service } = setup({ files: {}, signInMessage: 'That email or password is not right.' })
+    const reply = await ask({
+      service,
+      request: {
+        type: DESKTOP_REQUESTS.signIn,
+        serverId: SERVER,
+        email: 'ada@example.com',
+        password: 'pw-secret',
+      },
+    })
+    expect(reply).toEqual({
+      type: DESKTOP_REPLIES.refused,
+      message: 'That email or password is not right.',
+    })
+    expect(JSON.stringify(reply)).not.toContain('pw-secret')
+    expect(JSON.stringify(reply)).not.toContain('ada@example.com')
+  })
+
+  it('refuses a password past MAX_SECRET, and a server id that is not opaque, without a call', async () => {
+    const { service, accountsReached } = setup({ files: {} })
+    expect(
+      await ask({
+        service,
+        request: {
+          type: DESKTOP_REQUESTS.signIn,
+          serverId: SERVER,
+          email: 'ada@example.com',
+          password: 'p'.repeat(MAX_SECRET + 1),
+        },
+      }),
+    ).toEqual(bad)
+    expect(
+      await ask({
+        service,
+        request: {
+          type: DESKTOP_REQUESTS.signIn,
+          serverId: 'https://evil.example',
+          email: 'a@b.c',
+          password: 'p',
+        },
+      }),
+    ).toEqual(bad)
+    expect(accountsReached).toEqual([])
+  })
+
+  it('signs out and answers the signed out view', async () => {
+    const { service, accountsReached } = setup({ files: {} })
+    expect(
+      await ask({ service, request: { type: DESKTOP_REQUESTS.signOut, serverId: SERVER } }),
+    ).toEqual(accountReply({ ...ACCOUNT_VIEW, state: ACCOUNT_STATES.signedOut, email: null }))
+    expect(accountsReached).toEqual([{ name: 'signOut', input: SERVER }])
+  })
+
+  it.each([
+    ['signUp', ACCOUNT_PAGES.signUp],
+    ['forgot', ACCOUNT_PAGES.forgot],
+  ])('opens the %s page by name, never by address', async (page) => {
+    const { service, accountsReached } = setup({ files: {} })
+    expect(
+      await ask({
+        service,
+        request: { type: DESKTOP_REQUESTS.openAccountPage, serverId: SERVER, page },
+      }),
+    ).toEqual({ type: DESKTOP_REPLIES.done })
+    expect(accountsReached).toEqual([{ name: 'openPage', input: { serverId: SERVER, page } }])
+  })
+
+  it('refuses an account page the service could not open, with its message', async () => {
+    const { service } = setup({
+      files: {},
+      pageMessage: 'raven player could not open your browser.',
+    })
+    expect(
+      await ask({
+        service,
+        request: {
+          type: DESKTOP_REQUESTS.openAccountPage,
+          serverId: SERVER,
+          page: ACCOUNT_PAGES.signUp,
+        },
+      }),
+    ).toEqual({
+      type: DESKTOP_REPLIES.refused,
+      message: 'raven player could not open your browser.',
+    })
+  })
+
+  it('refuses a page that is an address', async () => {
+    const { service, accountsReached } = setup({ files: {} })
+    expect(
+      await ask({
+        service,
+        request: {
+          type: DESKTOP_REQUESTS.openAccountPage,
+          serverId: SERVER,
+          page: 'https://evil.example',
+        },
+      }),
+    ).toEqual(bad)
+    expect(accountsReached).toEqual([])
+  })
+
+  it.each([
+    [{ type: DESKTOP_REQUESTS.readAccount }],
+    [{ type: DESKTOP_REQUESTS.refreshAccount }],
+    [{ type: DESKTOP_REQUESTS.signIn, email: 'a@b.c', password: 'p' }],
+    [{ type: DESKTOP_REQUESTS.signOut }],
+    [{ type: DESKTOP_REQUESTS.openAccountPage, page: ACCOUNT_PAGES.signUp }],
+  ])('refuses a server it does not keep for %j, and asks the service nothing', async (partial) => {
+    const { service, accountsReached } = setup({ files: {} })
+    expect(await ask({ service, request: { ...partial, serverId: OTHER_SERVER } })).toEqual(
+      unknownServer,
+    )
+    expect(accountsReached).toEqual([])
   })
 })

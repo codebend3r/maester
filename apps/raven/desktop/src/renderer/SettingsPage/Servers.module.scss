@@ -57,6 +57,22 @@
   }
 }
 
+// A ready server's account takes a row of its own under the name and address.
+.withAccount {
+  grid-template-areas:
+    'name actions'
+    'origin actions'
+    'account account';
+
+  @media (max-width: 30rem) {
+    grid-template-areas:
+      'name'
+      'origin'
+      'actions'
+      'account';
+  }
+}
+
 .name {
   grid-area: name;
   font-weight: 600;
@@ -81,6 +97,63 @@
   @media (max-width: 30rem) {
     justify-content: start;
   }
+}
+
+.account {
+  grid-area: account;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'status action'
+    'body body'
+    'notice notice'
+    'refusal refusal';
+  gap: 0 var(--space-3);
+  align-items: center;
+  min-width: 0;
+  padding-block-start: var(--space-1);
+
+  @media (max-width: 30rem) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'status'
+      'action'
+      'body'
+      'notice'
+      'refusal';
+    gap: var(--space-1);
+  }
+}
+
+.status {
+  grid-area: status;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.accountAction {
+  grid-area: action;
+  justify-self: end;
+
+  @media (max-width: 30rem) {
+    justify-self: start;
+  }
+}
+
+.signIn {
+  grid-area: body;
+  padding-block-start: var(--space-1);
+}
+
+.accountNotice {
+  grid-area: notice;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.accountRefusal {
+  grid-area: refusal;
 }
 
 // The rename form, or the question before a removal, takes the whole row while it is open.

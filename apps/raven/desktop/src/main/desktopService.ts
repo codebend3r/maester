@@ -1,5 +1,6 @@
 import { basename, dirname } from 'node:path'
 import { type OutputSettings, titleFromFileName } from '@raven/core'
+import type { AccountService } from '@/main/accounts/accountService'
 import { type ConfigStore, type DesktopConfig, pickOutput } from '@/main/desktopConfig'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import { grantNext } from '@/main/folder'
@@ -43,6 +44,7 @@ import {
   type InvokeEnvelope,
   isInvokeEnvelope,
   MAX_QUEUE,
+  type AccountView,
   type RecentView,
   DESKTOP_REPLIES,
 } from '@/shared/protocol'
@@ -88,6 +90,7 @@ export type DesktopServiceDeps = {
   openExternal: (url: string) => Promise<void>
   updates: UpdateService
   downloads: DownloadService
+  accounts: AccountService
 }
 
 export type DesktopService = {
@@ -101,6 +104,11 @@ export type DesktopService = {
 const DONE = { type: DESKTOP_REPLIES.done } as const satisfies DesktopReply
 
 const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
+
+const accountReply = (account: AccountView): DesktopReply => ({
+  type: DESKTOP_REPLIES.account,
+  account,
+})
 
 const messageFor = (reason: GrantRefusal): string => {
   switch (reason) {
@@ -144,6 +152,8 @@ const replyForAdd = ({
       return refused(TRUST_MESSAGES.busy)
     case TRUST_OUTCOME_KINDS.unreachable:
       return refused(TRUST_MESSAGES.unreachable(outcome.origin))
+    case TRUST_OUTCOME_KINDS.badSignIn:
+      return refused(TRUST_MESSAGES.badSignIn)
     case TRUST_OUTCOME_KINDS.invalid:
       return refused(MESSAGES.badServer)
     case TRUST_OUTCOME_KINDS.unsaved:
@@ -513,6 +523,49 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     return DONE
   }
 
+  /** An account request about a server main no longer keeps is refused before it reaches the service. */
+  const withKnownServer = async ({
+    serverId,
+    run,
+  }: {
+    serverId: string
+    run: () => Promise<DesktopReply>
+  }): Promise<DesktopReply> => {
+    if (serverById({ config: config.read(), serverId }) === null) {
+      return refused(CALL_MESSAGES.unknownServer)
+    }
+    return run()
+  }
+
+  const signIn = (
+    request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.signIn }>,
+  ): Promise<DesktopReply> =>
+    withKnownServer({
+      serverId: request.serverId,
+      run: async () => {
+        const result = await deps.accounts.signIn({
+          serverId: request.serverId,
+          email: request.email,
+          password: request.password,
+        })
+        return result.ok ? accountReply(result.account) : refused(result.message)
+      },
+    })
+
+  const openAccountPage = (
+    request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.openAccountPage }>,
+  ): Promise<DesktopReply> =>
+    withKnownServer({
+      serverId: request.serverId,
+      run: async () => {
+        const result = await deps.accounts.openPage({
+          serverId: request.serverId,
+          page: request.page,
+        })
+        return result.ok ? DONE : refused(result.message)
+      },
+    })
+
   const checkForUpdates = async (): Promise<DesktopReply> => {
     await deps.updates.checkNow()
     return { type: DESKTOP_REPLIES.updates, status: deps.updates.status() }
@@ -613,6 +666,25 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       case DESKTOP_REQUESTS.playbackLeft:
         deps.downloads.playbackLeft({ fileId: request.fileId })
         return DONE
+      case DESKTOP_REQUESTS.readAccount:
+        return withKnownServer({
+          serverId: request.serverId,
+          run: async () => accountReply(await deps.accounts.read(request.serverId)),
+        })
+      case DESKTOP_REQUESTS.refreshAccount:
+        return withKnownServer({
+          serverId: request.serverId,
+          run: async () => accountReply(await deps.accounts.refresh(request.serverId)),
+        })
+      case DESKTOP_REQUESTS.signIn:
+        return signIn(request)
+      case DESKTOP_REQUESTS.signOut:
+        return withKnownServer({
+          serverId: request.serverId,
+          run: async () => accountReply(await deps.accounts.signOut(request.serverId)),
+        })
+      case DESKTOP_REQUESTS.openAccountPage:
+        return openAccountPage(request)
       default: {
         const unreachable: never = request
         return unreachable

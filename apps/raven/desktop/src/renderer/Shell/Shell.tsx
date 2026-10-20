@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { applyDownloadsEvent } from '@/renderer/desktop/downloadsApi'
+import { accountKey } from '@/renderer/desktop/accountApi'
 import { DownloadDialog } from '@/renderer/Shell/DownloadDialog'
 import { OpenLinkDialog } from '@/renderer/Shell/OpenLinkDialog'
 import { applyReply, play, playServer } from '@/renderer/Shell/openReply'
@@ -94,6 +95,8 @@ export const Shell = () => {
         return showDownloadAsk(event.ask)
       case DESKTOP_EVENTS.downloads:
         return void applyDownloadsEvent({ queryClient, event })
+      case DESKTOP_EVENTS.account:
+        return void queryClient.setQueryData(accountKey(event.account.serverId), event.account)
       default: {
         const unreachable: never = event
         return unreachable

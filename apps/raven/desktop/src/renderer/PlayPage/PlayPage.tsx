@@ -52,18 +52,21 @@ const NOT_OPENABLE = 'raven player cannot open that video.'
 export const Refused = ({
   title = "This video can't be opened",
   message,
+  isHeadingFocused = true,
   children,
 }: {
   title?: string
   message: string
+  /** False when a field among the children takes the cursor itself, as a sign in form's does. */
+  isHeadingFocused?: boolean
   children?: ReactNode
 }) => {
   const navigate = useNavigate()
   const heading = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
-    if (heading.current !== null) heading.current.focus()
-  }, [])
+    if (isHeadingFocused && heading.current !== null) heading.current.focus()
+  }, [isHeadingFocused])
 
   return (
     <main className={styles.refused} aria-labelledby="refused-title">

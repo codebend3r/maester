@@ -46,6 +46,9 @@ export const SERVER_COPY = {
     `raven player's video engine did not start, so this title opened from ${name} in your browser.`,
   engineStopped:
     "raven player's video engine stopped. Open this title in your browser to keep watching.",
+  accountNeededTitle: 'Account needed',
+  signInNeeded: (name: string) => `Sign in to ${name} to play this title.`,
+  approvedOnly: (name: string) => `${name} plays titles for approved accounts only.`,
   unplayable: (name: string) => `raven player could not play this title from ${name}.`,
 } as const
 

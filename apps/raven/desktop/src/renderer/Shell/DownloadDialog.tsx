@@ -4,11 +4,16 @@ import {
   type FormEvent,
   type KeyboardEvent,
   useEffect,
+  useEffectEvent,
   useId,
   useMemo,
   useRef,
   useState,
 } from 'react'
+import { ACCOUNT_COPY } from '@/renderer/Account/accountCopy'
+import { AccountRefused } from '@/renderer/Account/AccountRefused'
+import { SignInForm } from '@/renderer/Account/SignInForm'
+import { useAccount } from '@/renderer/desktop/accountApi'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import { useDesktop } from '@/renderer/stores/desktop'
 import { UNREACHED } from '@/renderer/desktop/downloadsApi'
@@ -18,10 +23,12 @@ import { useOpenReply } from '@/renderer/Shell/openReply'
 import { SERVER_COPY } from '@/renderer/ServerPage/serverServices'
 import { useNotice } from '@/renderer/stores/notice'
 import {
+  ACCOUNT_STATES,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   DOWNLOAD_ASK_KINDS,
   DOWNLOAD_KINDS,
+  type AccountView,
   type DesktopReply,
   type DesktopRequest,
   type DownloadAsk,
@@ -218,6 +225,138 @@ const LockedDialog = ({
   )
 }
 
+/** What the dialog says of an account that does not let the download through, and is no form to fill. */
+const AccountNote = ({ account, serverName }: { account: AccountView; serverName: string }) => {
+  switch (account.state) {
+    case ACCOUNT_STATES.signedOut:
+      return null
+    case ACCOUNT_STATES.pending:
+    case ACCOUNT_STATES.revoked:
+      return (
+        <AccountRefused serverId={account.serverId} state={account.state} email={account.email} />
+      )
+    case ACCOUNT_STATES.approved:
+    case ACCOUNT_STATES.off:
+      return <p>{`Asking ${serverName} again.`}</p>
+    case ACCOUNT_STATES.unavailable:
+      return <p>{ACCOUNT_COPY.unavailable(serverName)}</p>
+    case ACCOUNT_STATES.failed:
+      return <p>{ACCOUNT_COPY.failed(serverName)}</p>
+    default: {
+      const unreachable: never = account.state
+      return unreachable
+    }
+  }
+}
+
+/**
+ * A download link from a server whose accounts are ready, while the account is not let in: the
+ * person signs in, or checks again, and main reads the link again once the account is approved.
+ */
+const AccountDialog = ({
+  ask,
+  account: asked,
+  onClose,
+}: {
+  ask: DownloadAsk
+  account: AccountView
+  onClose: () => void
+}) => {
+  const { client } = useDesktop()
+  const openReply = useOpenReply()
+  const showNotice = useNotice((state) => state.show)
+  const dialog = useRef<HTMLDialogElement>(null)
+  const isRetrying = useRef(false)
+  const titleId = useId()
+  const [openedAt] = useState(() => Date.now())
+  const read = useAccount(ask.serverId)
+  // Main's answer with the ask stands until the account is read again while the dialog is open: an
+  // older read kept from Settings could let a download through that main has not.
+  const account = read.data !== undefined && read.dataUpdatedAt >= openedAt ? read.data : asked
+  const isLetIn = account.state === ACCOUNT_STATES.approved || account.state === ACCOUNT_STATES.off
+
+  useEffect(() => {
+    if (dialog.current !== null && !dialog.current.open) dialog.current.showModal()
+  }, [])
+
+  const close = () => {
+    if (dialog.current !== null) dialog.current.close()
+  }
+
+  // Cancel and Escape end here; a retry has already answered for the ask.
+  const closed = () => {
+    if (!isRetrying.current) {
+      void askMain({
+        client,
+        request: { type: DESKTOP_REQUESTS.declineDownload, askId: ask.askId },
+      })
+    }
+    onClose()
+  }
+
+  const keepKeys = (event: KeyboardEvent) => {
+    event.stopPropagation()
+    if (event.key !== KEYS.escape) return
+    event.preventDefault()
+    close()
+  }
+
+  const retry = async () => {
+    if (isRetrying.current) return
+    isRetrying.current = true
+    const reply = await askMain({
+      client,
+      request: { type: DESKTOP_REQUESTS.retryDownloadAsk, askId: ask.askId },
+    })
+    // A new ask opens a dialog of its own; anything else leaves nothing to show here.
+    if (reply === null || reply.type !== DESKTOP_REPLIES.downloadAsk) close()
+    if (reply === null) return showNotice(UNREACHED)
+    openReply(reply)
+  }
+
+  const retryOnce = useEffectEvent(() => void retry())
+
+  useEffect(() => {
+    if (isLetIn) retryOnce()
+  }, [isLetIn])
+
+  const isSignedOut = account.state === ACCOUNT_STATES.signedOut
+
+  return (
+    <dialog
+      ref={dialog}
+      className={styles.dialog}
+      aria-labelledby={titleId}
+      onClose={closed}
+      onKeyDown={keepKeys}
+    >
+      <section className={styles.content}>
+        <h2 id={titleId} className={styles.title}>
+          {TITLE}
+        </h2>
+        {isSignedOut ? (
+          <>
+            <p>{`Sign in to ${ask.serverName} to download from it.`}</p>
+            <SignInForm
+              serverId={ask.serverId}
+              signInHost={account.signInHost}
+              isRemembered={account.isRemembered}
+              onCancel={close}
+            />
+          </>
+        ) : (
+          <>
+            <AccountNote account={account} serverName={ask.serverName} />
+            <div className={styles.actions}>
+              <Button onClick={close}>Cancel</Button>
+            </div>
+          </>
+        )}
+      </section>
+    </dialog>
+  )
+}
+
 export const DownloadDialog = ({ ask, onClose }: { ask: DownloadAsk; onClose: () => void }) => {
   const { status } = ask
   switch (status.kind) {
@@ -227,6 +366,8 @@ export const DownloadDialog = ({ ask, onClose }: { ask: DownloadAsk; onClose: ()
       return <LockedDialog ask={ask} secret={UNLOCK_SECRETS.pin} onClose={onClose} />
     case DOWNLOAD_ASK_KINDS.hidden:
       return <LockedDialog ask={ask} secret={UNLOCK_SECRETS.adminPassword} onClose={onClose} />
+    case DOWNLOAD_ASK_KINDS.account:
+      return <AccountDialog ask={ask} account={status.account} onClose={onClose} />
     default: {
       const unreachable: never = status
       return unreachable

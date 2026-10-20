@@ -1,5 +1,8 @@
 import { fakeClient } from '@/renderer/test/render'
 import {
+  ACCOUNT_STATES,
+  type AccountView,
+  DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   type DesktopReply,
   type DesktopRequest,
@@ -10,6 +13,17 @@ import {
 export const S = '33333333-3333-4333-8333-333333333333'
 
 export const VHAGAR: ServerView = { serverId: S, origin: 'https://raven.example', name: 'Vhagar' }
+
+const DONE_REPLY: DesktopReply = { type: DESKTOP_REPLIES.done }
+
+/** A server whose accounts are off, which every server page test starts from. */
+export const OFF_ACCOUNT: AccountView = {
+  serverId: S,
+  state: ACCOUNT_STATES.off,
+  email: null,
+  isRemembered: true,
+  signInHost: null,
+}
 
 /** A server's answer: a status and a JSON body, as main relays it. */
 export const reply = ({
@@ -42,16 +56,20 @@ export const heldReply = () => {
 /**
  * A client that knows Vhagar and answers each server call from `calls`: a list is
  * answered in order, its last answer repeating; a call the table lacks answers 404.
- * `replies` answers other requests by type; anything else is done.
+ * `replies` answers other requests by type; anything else is done. `account` is what
+ * `readAccount` answers (done when none), read at each request so a test can change it
+ * mid-play.
  */
 export const serverClient = ({
   calls,
   servers = [VHAGAR],
   replies = {},
+  account = null,
 }: {
   calls: Partial<Record<CallKey, CallAnswer | CallAnswer[]>>
   servers?: ServerView[]
   replies?: Partial<Record<DesktopRequest['type'], DesktopReply>>
+  account?: { current: AccountView } | null
 }) => {
   const answered = new Map<string, number>()
   const answer = (
@@ -74,8 +92,13 @@ export const serverClient = ({
           return { type: 'recents', recents: [] }
         case DESKTOP_REQUESTS.serverCall:
           return answer(request)
+        case DESKTOP_REQUESTS.readAccount:
+          if (replies[request.type] !== undefined) return replies[request.type] ?? DONE_REPLY
+          return account === null
+            ? DONE_REPLY
+            : { type: DESKTOP_REPLIES.account, account: account.current }
         default:
-          return replies[request.type] ?? { type: 'done' }
+          return replies[request.type] ?? { type: DESKTOP_REPLIES.done }
       }
     },
   })

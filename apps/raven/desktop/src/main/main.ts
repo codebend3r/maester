@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import {
   appendFile,
@@ -13,6 +13,7 @@ import {
   statfs,
   writeFile,
 } from 'node:fs/promises'
+import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { Readable } from 'node:stream'
@@ -28,17 +29,24 @@ import {
   ipcMain,
   Menu,
   MessageChannelMain,
+  type MessageBoxOptions,
   type MessagePortMain,
   net,
   type OpenDialogOptions,
   powerMonitor,
   powerSaveBlocker,
   protocol,
+  safeStorage,
   screen,
   session,
   shell,
 } from 'electron'
 import { PLATFORMS } from '@/build/forgeOptions'
+import type { AuthFetch } from '@/main/accounts/accountSessions'
+import { createAccountStack } from '@/main/accounts/accountStack'
+import { accountsReadyWith } from '@/main/accounts/accountsReady'
+import { ACCOUNTS_DIR, createSessionStore, isForcedMemoryFrom } from '@/main/accounts/sessionStore'
+import { warmAuthConfigs } from '@/main/accounts/warmAuthConfigs'
 import { createAppHandler } from '@/main/appProtocol'
 import {
   BUDGET_WINDOW_MS,
@@ -98,7 +106,8 @@ import { createQuitMark } from '@/main/quitMark'
 import { createRequestHandler } from '@/main/requestHandler'
 import { isAppUrl, isPermissionAllowed, isTrustedSender, windowOpenFor } from '@/main/security'
 import { createLinkOpener } from '@/main/servers/linkOpener'
-import { createServerCalls, probeServer } from '@/main/servers/serverCalls'
+import { listenOnLoopback, type MediaRelay, type UpstreamFetch } from '@/main/servers/mediaRelay'
+import { probeServer } from '@/main/servers/serverCalls'
 import { serverById } from '@/main/servers/serverList'
 import {
   clearOrphanPartitions,
@@ -107,7 +116,7 @@ import {
 } from '@/main/servers/serverSessions'
 import { createServerSources } from '@/main/servers/serverSources'
 import { createServerTrust, withTrustLog } from '@/main/servers/serverTrust'
-import { confirmWith } from '@/main/servers/trustPrompt'
+import { confirmSignInChangeWith, confirmWith } from '@/main/servers/trustPrompt'
 import {
   CLOSE_TIMEOUTS,
   closeTimeoutFor,
@@ -169,6 +178,21 @@ const fetchBare = ({
 }) => net.fetch(url, { ...init, credentials: 'omit', redirect: 'error', cache: 'no-store' })
 
 const fetchReleases: UpdateFetch = fetchBare
+
+/** Auth's own calls: no cookie rides along and a redirect fails, as for every fetch main makes unasked. */
+const fetchAuth: AuthFetch = ({ url, init }) =>
+  net.fetch(url, { ...init, credentials: 'omit', redirect: 'error', cache: 'no-store' })
+
+/** The relay's requests to a server: the ticket rides on the URL, never a cookie, and a redirect fails. */
+const fetchRelayed: UpstreamFetch = ({ url, method, headers, signal }) =>
+  net.fetch(url, {
+    method,
+    headers,
+    signal,
+    credentials: 'omit',
+    redirect: 'error',
+    cache: 'no-store',
+  })
 
 /**
  * A media origin's probe, which `mediaAccess` times over the whole body. The timeout's signal
@@ -465,6 +489,26 @@ const startApp = (): void => {
     orphans.removing.catch((error: unknown) => {
       warn(`raven player could not clear its old server sessions: ${errorText(error)}`)
     })
+    // A test hook too: an unpackaged run reads `RAVEN_DESKTOP_SAFE_STORAGE` (`off`).
+    const sessionStore = createSessionStore({
+      dir: join(userData, ACCOUNTS_DIR),
+      safeStorage,
+      isForcedMemory: isForcedMemoryFrom({ isPackaged: app.isPackaged, env: process.env }),
+      fs: {
+        readFile: (path) => readFile(path),
+        writeFile: ({ path, data, mode }) => writeFile(path, data, { mode }),
+        rename: ({ from, to }) => rename(from, to),
+        remove: (path) => rm(path, { force: true }),
+        mkdir: ({ path, mode }) => mkdir(path, { recursive: true, mode }).then(() => undefined),
+        readdir: (path) => readdir(path),
+      },
+      warn,
+    })
+    sessionStore
+      .clearOrphans({ keep: config.read().servers.map(({ id }) => id) })
+      .catch((error: unknown) => {
+        warn(`raven player could not clear its old sign-ins: ${errorText(error)}`)
+      })
     const grants = createGrants({ fs: { realpath, stat }, newId: randomUUID })
     const serverOf = (serverId: string) => serverById({ config: config.read(), serverId })
     const sessions = createServerSessions({
@@ -472,11 +516,42 @@ const startApp = (): void => {
       timers,
       warn,
     })
-    const serverCalls = createServerCalls({ serverOf, fetchFor: sessions.fetchFor, warn })
+    // The sheet is raised from main, on the window when there is one.
+    const showSheet = (prompt: MessageBoxOptions) => {
+      const window = liveWindow()
+      return window === null ? dialog.showMessageBox(prompt) : dialog.showMessageBox(window, prompt)
+    }
+    const { authConfigs, serverCalls, accounts, accessEnds, accountTickets, relay } =
+      createAccountStack({
+        config,
+        serverOf,
+        fetchFor: sessions.fetchFor,
+        sessionStore,
+        confirmSignInChange: confirmSignInChangeWith({ show: showSheet }),
+        fetchAuth,
+        listen: listenOnLoopback({ createServer: (handler) => createServer(handler), warn }),
+        fetchUpstream: fetchRelayed,
+        newSecret: (bytes) => randomBytes(bytes).toString('base64url'),
+        openExternal: (url) => shell.openExternal(url),
+        emit: (account) => send({ type: DESKTOP_EVENTS.account, account }),
+        info: (message) => log.info(message),
+        timers,
+        warn,
+      })
+    // Not awaited: the window opens without it. A ready server gets no Bearer until its auth
+    // config has been read once, so read each stored server's now rather than at its first refusal.
+    // It warns per server and never rejects; the catch only keeps the promise from floating.
+    warmAuthConfigs({ servers: config.read().servers, authConfigs, warn }).catch(() => {
+      warn("raven player could not read its servers' sign-in settings")
+    })
     const sources = createServerSources({
       serverOf,
       cookiesFor: sessions.cookiesFor,
       calls: serverCalls,
+      authConfigs,
+      tickets: accountTickets,
+      relay,
+      accountChanged: accounts.changed,
       warn,
     })
     const downloadsFile = join(userData, DOWNLOADS_FILE)
@@ -492,7 +567,7 @@ const startApp = (): void => {
         send({ type: DESKTOP_EVENTS.notice, message: STORE_NOTICES.downloads })
       },
     })
-    // The cookie path rides the server's own session; an origin gets a ticket and no cookie.
+    // The cookie path rides the server's own session; an origin or an account gets a ticket and no cookie.
     const fetchDownload = ({
       serverId,
       access,
@@ -511,6 +586,7 @@ const startApp = (): void => {
               cache: 'no-store',
             })
         case ACCESS_KINDS.origin:
+        case ACCESS_KINDS.account:
           return ({ url, headers, signal }) => fetchBare({ url, init: { headers, signal } })
         default: {
           const unreachable: never = access
@@ -521,6 +597,8 @@ const startApp = (): void => {
     // Grants hold real paths, so the downloads are named from the real folder too: a profile
     // reached through a link (a temporary folder on macOS) would otherwise match none of them.
     const downloadsUserData = await realpath(userData).catch(() => userData)
+    // Read as playback reads it, so a title and its download reach the server the same way.
+    const accountsReady = accountsReadyWith({ authConfigs, serverOf, warn })
     const downloads = createDownloadService({
       store: downloadsStore,
       config,
@@ -541,16 +619,19 @@ const startApp = (): void => {
         probe: fetchProbe,
         probeClock: () => performance.now(),
         now: Date.now,
+        timers,
+        isReady: accountsReady,
+        tickets: accountTickets,
         warn,
       }),
       fetchFor: fetchDownload,
       fs: {
         mkdir: (path) => mkdir(path, { recursive: true }).then(() => undefined),
-        rename: (from, to) => rename(from, to),
+        rename: ({ from, to }) => rename(from, to),
         rm: (path) => rm(path, { recursive: true, force: true }),
         readdir: (path) => readdir(path),
         openPart,
-        writeFile: (path, text) => writeFile(path, text, 'utf8'),
+        writeFile: ({ path, text }) => writeFile(path, text, 'utf8'),
         size: (path) =>
           stat(path).then(
             ({ size }) => size,
@@ -565,6 +646,9 @@ const startApp = (): void => {
       wasSetAside: loadedDownloads.wasSetAside,
       // A test hook shortens the five minutes; a packaged app never reads it.
       syncRetryMs: syncRetryFrom({ isPackaged: app.isPackaged, env: process.env }) ?? SYNC_RETRY_MS,
+      isReady: accountsReady,
+      readAccount: accounts.read,
+      accountChanged: accounts.changed,
       grants,
       state: store,
       stat: (path) => stat(path),
@@ -574,19 +658,14 @@ const startApp = (): void => {
     // keeps them for the next launch. A run already renaming its finished video still marks
     // it ready, which the gate's second flush writes.
     app.once('before-quit', () => downloads.dispose())
+    // A sign out, a removed server or a moved sign-in host: its account downloads stop too.
+    accessEnds.listen(({ serverId }) => downloads.accessEnded({ serverId }))
 
     const trust = withTrustLog({
       trust: createServerTrust({
         config,
         // Read off `dialog` at each call, never kept, so the e2e can stand in for the sheet.
-        confirm: confirmWith({
-          show: (prompt) => {
-            const window = liveWindow()
-            return window === null
-              ? dialog.showMessageBox(prompt)
-              : dialog.showMessageBox(window, prompt)
-          },
-        }),
+        confirm: confirmWith({ show: showSheet }),
         // The new server's session is made here, after the person said yes.
         probe: ({ serverId, origin }) =>
           probeServer({ fetch: sessions.fetchFor(serverId), origin }),
@@ -597,6 +676,13 @@ const startApp = (): void => {
           downloads.removeServer({ serverId }).catch((error: unknown) => {
             warn(`raven player could not remove a removed server's downloads: ${errorText(error)}`)
           })
+          // Its access ends first, then the sign-in and the file it was kept in.
+          accounts
+            .removed(serverId)
+            .then(() => sessionStore.forget(serverId))
+            .catch((error: unknown) => {
+              warn(`raven player could not remove a removed server's sign-in: ${errorText(error)}`)
+            })
           const engine = currentEngine()
           if (engine === null) return
           engine.service.resetIfServer(serverId).catch((error: unknown) => {
@@ -699,6 +785,7 @@ const startApp = (): void => {
       openExternal: (url) => shell.openExternal(url),
       updates,
       downloads,
+      accounts,
     })
 
     // mpv stops before the stores flush and before Electron tears the window down.
@@ -836,7 +923,16 @@ const startApp = (): void => {
       windowMs: budgetWindow ?? BUDGET_WINDOW_MS,
       sampleMs: budgetWindow ?? PLAYING_SAMPLE_MS,
     })
-    players.current = attachPlayer({ window, grants, config, sources, marks, budgets, downloads })
+    players.current = attachPlayer({
+      window,
+      grants,
+      config,
+      sources,
+      relay,
+      marks,
+      budgets,
+      downloads,
+    })
     // A quit holds the window open while it flushes, so no budget timer may fire meanwhile.
     app.once('before-quit', () => budgets.dispose())
     window.on('closed', () => {
@@ -1019,6 +1115,7 @@ const attachPlayer = ({
   grants,
   config,
   sources,
+  relay,
   marks,
   budgets,
   downloads,
@@ -1027,6 +1124,7 @@ const attachPlayer = ({
   grants: Grants
   config: ConfigStore
   sources: ReturnType<typeof createServerSources>
+  relay: Pick<MediaRelay, 'closeAll'>
   marks: ReturnType<typeof createMarks>
   budgets: ReturnType<typeof createBudgets>
   downloads: Pick<DownloadService, 'sidecarsOf' | 'notePlaying'>
@@ -1076,6 +1174,8 @@ const attachPlayer = ({
       latest = { ...latest, isShowing }
       budgets.report(latest)
       if (!isShowing) downloads.notePlaying({ fileId: null })
+      // The title is gone from the screen, so its relay secret is retired with it.
+      if (!isShowing) relay.closeAll()
       if (window.isDestroyed()) return
       window.setBackgroundColor(isShowing ? CLEAR : NIGHT)
       // Home always shows the traffic lights, whatever the watch route last asked for.
@@ -1106,6 +1206,7 @@ const attachPlayer = ({
         mpv,
         resolveSource,
         explain: sources.explain,
+        refusedAccount: sources.refusedAccount,
         canChooseAo: mode === ENGINE_MODES.window,
         timers,
         onActivity: activity.report,
