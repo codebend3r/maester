@@ -233,6 +233,12 @@ export const liveStreamsQuery = queryOptions({
   refetchInterval: LIVE_STREAMS_POLL_MS,
 })
 
+/** Every bug report, newest first. Admin only, so a page asks only while the viewer may manage. */
+export const bugReportsQuery = queryOptions({
+  queryKey: queryKeys.bugReports,
+  queryFn: () => api.listBugReports(),
+})
+
 export const metadataHealthQuery = queryOptions({
   queryKey: queryKeys.metadataHealth,
   queryFn: () => api.getMetadataHealth(),

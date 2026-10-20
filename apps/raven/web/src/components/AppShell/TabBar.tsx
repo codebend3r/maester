@@ -27,7 +27,8 @@ const Tab = ({
 
 /**
  * A phone's way round, in place of the side menu: Home, Libraries,
- * Favourites and Settings along the foot of the screen. The pinned
+ * Favourites and Settings along the foot of the screen, with Streams and
+ * Reports between them for whoever may manage. The pinned
  * libraries are reached from Libraries, so any library's pages mark it.
  */
 export const TabBar = () => (
@@ -42,6 +43,7 @@ export const TabBar = () => (
     <Tab to="/favourites" patterns={['/favourites']} icon="heart" label="Favourites" />
     <AdminOnly>
       <Tab to="/streams" patterns={['/streams']} icon="playback" label="Streams" />
+      <Tab to="/reports" patterns={['/reports']} icon="alert" label="Reports" />
     </AdminOnly>
     <Tab to="/settings" patterns={['/settings']} icon="settings" label="Settings" />
   </nav>

@@ -251,24 +251,3 @@
     padding-top: var(--space-1);
   }
 }
-
-.empty {
-  display: grid;
-  grid-template-columns: minmax(0, var(--measure));
-  grid-template-areas:
-    'back'
-    'body';
-  gap: var(--space-6);
-  color: var(--color-lichen);
-}
-
-.emptyBody {
-  grid-area: body;
-  display: grid;
-  gap: var(--space-4);
-  justify-items: start;
-}
-
-.emptyTitle {
-  color: var(--color-bark);
-}

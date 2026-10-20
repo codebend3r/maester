@@ -6,6 +6,7 @@ export type { UnlockSecret } from '@/components/UnlockDialog/UnlockDialog'
 export { Player } from '@/components/Player/Player'
 export { useHostPlayer } from '@/stores/playerServices'
 export type {
+  ErrorReporter,
   Handoff,
   HostActions,
   PlayerFavourite,
@@ -39,3 +40,4 @@ export { playerQueryKeys } from '@/lib/playerQueryKeys'
 export { createProgressSaver } from '@/lib/progressSaver'
 export type { ProgressSaver } from '@/lib/progressSaver'
 export { Controls } from '@/components/Player/Controls'
+export { Toaster } from '@/components/Toaster/Toaster'

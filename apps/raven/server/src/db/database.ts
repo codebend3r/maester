@@ -525,6 +525,25 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE plays ADD COLUMN account_id TEXT NOT NULL DEFAULT '${VIEWING_ACCOUNTS.local}';
   CREATE INDEX plays_account ON plays (account_id, media_id, played_at);
   `,
+  // What a viewer's player sends with Report this error, for the admin to
+  // work through. A report outlives its video, so media_id is no foreign
+  // key; diagnostics is the JSON the player gathered. Reports are found by
+  // account and time to hold back one account sending too many.
+  `
+  CREATE TABLE bug_reports (
+    id INTEGER PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    reporter_email TEXT,
+    media_id INTEGER,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    status TEXT NOT NULL,
+    diagnostics TEXT NOT NULL CHECK (json_valid(diagnostics)),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX bug_reports_account ON bug_reports (account_id, created_at);
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

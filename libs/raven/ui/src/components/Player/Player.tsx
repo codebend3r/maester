@@ -102,7 +102,7 @@ const FilePlayer = ({
       onBack={onBack}
       rendition={DIRECT_RENDITION}
       selection={fileSelection}
-      onFailure={setFailure}
+      onFailure={({ message }) => setFailure(message)}
     />
   )
 }
@@ -126,7 +126,18 @@ const ServerPlayer = ({
       return <Waiting />
     case PLAYBACK_STATUSES.unplayable:
       return (
-        <Unplayable onBack={onBack} problems={playback.problems} onTryAnyway={playback.tryAnyway} />
+        <Unplayable
+          onBack={onBack}
+          problems={playback.problems}
+          onTryAnyway={playback.tryAnyway}
+          context={{
+            media: source.media,
+            tracks: selection.tracks,
+            audio: selection.audio,
+            subtitle: selection.subtitle,
+            ladder: playback.facts,
+          }}
+        />
       )
     case PLAYBACK_STATUSES.playing:
       if (selection.isWaitingForTracks) return <Waiting />

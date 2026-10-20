@@ -177,6 +177,13 @@ export const AppShell = () => {
                 label="Streams"
                 isIconsOnly={isIconsOnly}
               />
+              <NavItem
+                to="/reports"
+                patterns={['/reports']}
+                icon={<Icon name="alert" />}
+                label="Bug reports"
+                isIconsOnly={isIconsOnly}
+              />
             </AdminOnly>
             <NavItem
               to="/settings"

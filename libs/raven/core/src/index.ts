@@ -1,4 +1,5 @@
 export * from '@/apiClient'
+export * from '@/bugReports'
 export * from '@/candidateTiers'
 export * from '@/contract'
 export * from '@/entryKeys'

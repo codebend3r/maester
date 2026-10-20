@@ -3,7 +3,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PLAYBACK_MODES } from '@raven/core'
 import { act, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { PLAYBACK_STATUSES, usePlaybackLadder } from '@/components/Player/usePlaybackLadder'
+import {
+  PLAYBACK_STATUSES,
+  type PlaybackFailure,
+  usePlaybackLadder,
+} from '@/components/Player/usePlaybackLadder'
 import { initialVideoState, videoReducer } from '@/components/Player/useVideoState'
 import { api } from '@/test/api'
 import { PICK_KINDS } from '@/components/Player/playChoices'
@@ -25,6 +29,14 @@ describe('videoReducer', () => {
       buffered: [[0, 60]],
     })
   })
+})
+
+/** A way that failed before the picture had a time or a frame. */
+const failure = (message: string): PlaybackFailure => ({
+  message,
+  position: null,
+  frame: null,
+  frames: null,
 })
 
 const withSettings = ({ children }: { children: ReactNode }) => {
@@ -51,11 +63,11 @@ describe('usePlaybackLadder', () => {
     expect(first.status).toBe(PLAYBACK_STATUSES.playing)
     if (first.status !== PLAYBACK_STATUSES.playing) return
     const firstMode = first.rendition.mode
-    act(() => first.fail('first broke'))
+    act(() => first.fail(failure('first broke')))
     const second = result.current
     if (second.status === PLAYBACK_STATUSES.playing) {
       expect(second.rendition.mode).not.toBe(firstMode)
-      act(() => second.fail('second broke'))
+      act(() => second.fail(failure('second broke')))
     }
     const last = result.current
     expect(last.status).toBe(PLAYBACK_STATUSES.unplayable)
@@ -128,7 +140,7 @@ describe('usePlaybackLadder', () => {
     expect(picked.steppedDown).toBeNull()
 
     // A failure steps down from the pick.
-    act(() => picked.fail('broke'))
+    act(() => picked.fail(failure('broke')))
     const failed = result.current
     if (failed.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
     expect(failed.rendition.mode).toBe(PLAYBACK_MODES.transcode)

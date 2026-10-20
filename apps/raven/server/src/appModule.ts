@@ -69,6 +69,8 @@ import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbC
 import { Filmographies } from '@/people/filmographies'
 import { PeopleRepository } from '@/people/peopleRepository'
 import { PlaybackController } from '@/playback/playbackController'
+import { BugReportsController } from '@/reports/bugReportsController'
+import { BugReportsRepository } from '@/reports/bugReportsRepository'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { StreamsController } from '@/streams/streamsController'
 import { StreamSessions } from '@/streams/streamSessions'
@@ -100,6 +102,7 @@ export const CONTROLLERS = [
   LockController,
   AdminController,
   StreamsController,
+  BugReportsController,
   AuthController,
 ] as const
 
@@ -210,6 +213,7 @@ export class AppModule {
         LockService,
         MediaTickets,
         StreamSessions,
+        BugReportsRepository,
         // First the account gate: with accounts ready, every route but the open ones needs an account.
         { provide: APP_GUARD, useClass: AccountGuard },
         // Every route passes the lock first; those marked PrivateBy, or on a controller that is, are held.

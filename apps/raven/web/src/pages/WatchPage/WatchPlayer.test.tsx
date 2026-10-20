@@ -7,7 +7,7 @@ import {
   playLinkFor,
   type SubtitleTrack,
 } from '@raven/core'
-import { useMediaOrigin, usePlayerPrefs } from '@raven/ui'
+import { Toaster, useMediaOrigin, usePlayerPrefs } from '@raven/ui'
 import { QueryClient } from '@tanstack/react-query'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -19,9 +19,10 @@ import { queryKeys } from '@/lib/queryClient'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { fakeAccount } from '@/test/authClient'
 import { setBrowserSupport } from '@/test/canPlay'
-import { mediaItem } from '@/test/fixtures'
+import { bugReport, mediaItem } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
+import { ravenVersion } from '@/lib/version'
 
 const subtitleTrack = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({
   id: 'embedded-0',
@@ -165,6 +166,35 @@ describe('Player file link on the media plane', () => {
     )
     expect(
       await screen.findByText('Link copied. Paste it into VLC or IINA to play it there.'),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('WatchPlayer Report this error', () => {
+  beforeEach(() => setBrowserSupport(() => false))
+
+  it('sends the report to the server with this build of raven, and says so in a toast', async () => {
+    const report = spyOn(api, 'reportPlaybackError').mockImplementation(async (diagnostics) =>
+      bugReport({ diagnostics }),
+    )
+    spies.push(report)
+    renderWithProviders({
+      ui: (
+        <>
+          <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" />
+          <Toaster />
+        </>
+      ),
+    })
+    await userEvent.click(await screen.findByRole('button', { name: 'Report this error' }))
+    expect(report).toHaveBeenCalledTimes(1)
+    expect(report.mock.calls[0]?.[0] ?? null).toMatchObject({
+      title: mediaItem().title,
+      media: { id: mediaItem().id, fileName: mediaItem().fileName },
+      app: { version: ravenVersion },
+    })
+    expect(
+      await screen.findByText('Error reported. The admin has been sent the details.'),
     ).toBeInTheDocument()
   })
 })
@@ -379,6 +409,7 @@ describe('WatchPlayer Open in raven player', () => {
       'Open in raven player',
       'Try playing anyway',
       'Copy file link',
+      'Report this error',
     ])
     // The built library hashes its class names, so the tone is matched by its stem.
     expect(screen.getByRole('button', { name: 'Open in raven player' }).className).toMatch(

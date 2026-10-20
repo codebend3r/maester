@@ -2,6 +2,7 @@ import { PLAYBACK_MODES, STREAM_TIME_SHIFT } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import type { EngineHandle, EngineStats, HtmlSource } from '@/components/Player/engine'
 import type { Rendition } from '@/components/Player/rendition'
+import type { PlaybackFailure } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
 import { SubtitleOverlay } from '@/components/Player/SubtitleOverlay'
@@ -26,7 +27,7 @@ export const useHtmlEngine = ({
   source: HtmlSource
   rendition: Rendition
   selection: TrackSelection
-  onFailure: (message: string) => void
+  onFailure: (failure: PlaybackFailure) => void
   onSlow?: (delivery: Delivery) => void
   toggleFullscreen: () => void
 }) => {
@@ -44,6 +45,43 @@ export const useHtmlEngine = ({
     startAt: title.resumeAt,
     knownDuration: title.duration,
   })
+  const savedPosition = playback.position
+  const position = {
+    get current() {
+      const element = videoRef.current
+      return element && element.readyState >= HTMLMediaElement.HAVE_METADATA
+        ? Math.max(0, element.currentTime - shift)
+        : savedPosition.current
+    },
+  }
+  const readStats = (): EngineStats => {
+    const element = videoRef.current
+    if (!element) return { engine: ENGINE_NAME, viewport: null, frame: null, frames: null }
+    // Missing outside a real browser.
+    const frameQuality = element.getVideoPlaybackQuality?.() ?? null
+    return {
+      engine: ENGINE_NAME,
+      viewport:
+        element.clientWidth > 0
+          ? {
+              width: element.clientWidth,
+              height: element.clientHeight,
+              scale: window.devicePixelRatio,
+            }
+          : null,
+      frame:
+        element.videoWidth > 0 ? { width: element.videoWidth, height: element.videoHeight } : null,
+      frames: frameQuality
+        ? { dropped: frameQuality.droppedVideoFrames, total: frameQuality.totalVideoFrames }
+        : null,
+    }
+  }
+  // A way that fails says where the picture was and what it decoded, for a report.
+  const fail = (message: string) => {
+    const { frame, frames } = readStats()
+    const at = position.current
+    onFailure({ message, position: Number.isFinite(at) ? at : null, frame, frames })
+  }
   useMediaSource({
     videoRef,
     source,
@@ -52,7 +90,7 @@ export const useHtmlEngine = ({
     position: playback.position,
     playing: playback.playing,
     onRefused: playback.refused,
-    onFailure,
+    onFailure: fail,
     onSlow,
   })
   useVideoEvents({
@@ -72,15 +110,6 @@ export const useHtmlEngine = ({
     time: playback.state.time,
     duration: playback.duration,
   })
-  const savedPosition = playback.position
-  const position = {
-    get current() {
-      const element = videoRef.current
-      return element && element.readyState >= HTMLMediaElement.HAVE_METADATA
-        ? Math.max(0, element.currentTime - shift)
-        : savedPosition.current
-    },
-  }
   const actions: EngineHandle['actions'] = {
     play: () => {
       videoRef.current?.play()?.catch(() => undefined)
@@ -104,28 +133,6 @@ export const useHtmlEngine = ({
     setAudio: selection.pickAudio,
     setSubtitle: selection.pickSubtitle,
     setSubtitleScale: setCaptionScale,
-  }
-  const readStats = (): EngineStats => {
-    const element = videoRef.current
-    if (!element) return { engine: ENGINE_NAME, viewport: null, frame: null, frames: null }
-    // Missing outside a real browser.
-    const frameQuality = element.getVideoPlaybackQuality?.() ?? null
-    return {
-      engine: ENGINE_NAME,
-      viewport:
-        element.clientWidth > 0
-          ? {
-              width: element.clientWidth,
-              height: element.clientHeight,
-              scale: window.devicePixelRatio,
-            }
-          : null,
-      frame:
-        element.videoWidth > 0 ? { width: element.videoWidth, height: element.videoHeight } : null,
-      frames: frameQuality
-        ? { dropped: frameQuality.droppedVideoFrames, total: frameQuality.totalVideoFrames }
-        : null,
-    }
   }
   const engine: EngineHandle = {
     state: playback.state,

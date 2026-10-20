@@ -328,6 +328,13 @@
   @include glass-button;
 }
 
+// Under the ways forward, apart from them: it sends the error, and leaves.
+.report {
+  @include glass-button;
+
+  justify-self: start;
+}
+
 .panelTitle {
   font-family: var(--font-display);
   font-size: var(--font-size-xl);

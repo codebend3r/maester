@@ -1,8 +1,10 @@
 import { Route, Routes } from 'react-router-dom'
 import { AUTH_ROUTES } from '@raven/core'
+import { Toaster } from '@raven/ui'
 import { AppShell } from '@/components/AppShell/AppShell'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { PinPrompt } from '@/components/PinPrompt/PinPrompt'
+import { BugReportsPage } from '@/pages/BugReportsPage/BugReportsPage'
 import { DesignPage } from '@/pages/DesignPage/DesignPage'
 import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
 import { HistoryPage } from '@/pages/HistoryPage/HistoryPage'
@@ -46,6 +48,7 @@ export const AppRoutes = () => (
           <Route path="people/:id" element={<PersonPage />} />
           <Route path="favourites" element={<FavouritesPage />} />
           <Route path="streams" element={<StreamsPage />} />
+          <Route path="reports" element={<BugReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="design" element={<DesignPage />} />
           <Route path="*" element={<NotFoundPage />} />
@@ -65,5 +68,7 @@ export const AppRoutes = () => (
     </Routes>
     {/* Over any page, the player too: whatever sits in a locked library asks for the PIN. */}
     <PinPrompt />
+    {/* Toasts outlast the page that raised them, as Report this error's does the player. */}
+    <Toaster />
   </>
 )

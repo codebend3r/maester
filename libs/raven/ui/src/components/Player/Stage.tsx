@@ -20,7 +20,7 @@ import type { Handoff, PlayerFavourite } from '@/components/Player/PlayerService
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
 import type { PlayChoices } from '@/components/Player/playChoices'
 import type { Rendition } from '@/components/Player/rendition'
-import type { StepDown } from '@/components/Player/usePlaybackLadder'
+import type { PlaybackFailure, StepDown } from '@/components/Player/usePlaybackLadder'
 import type { Delivery } from '@/lib/streamSource'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import { Button, ButtonLink } from '@/components/Button/Button'
@@ -72,7 +72,7 @@ export type StageProps = {
   onBack: () => void
   rendition: Rendition
   selection: TrackSelection
-  onFailure: (message: string) => void
+  onFailure: (failure: PlaybackFailure) => void
   /** The connection cannot carry the converted stream as fast as it plays. */
   onSlow?: (delivery: Delivery) => void
   steppedDown?: StepDown | null
