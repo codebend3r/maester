@@ -3,10 +3,8 @@ import {
   type Home,
   type HomeShelf,
   ITEM_IMAGE_KINDS,
-  ITEM_TYPES,
   type Library,
   type PosterEntry,
-  matchTypeFor,
   tileWords,
   withLibraries,
 } from '@raven/core'
@@ -15,9 +13,8 @@ import {
   CARD_SHAPES,
   type Pictures,
   type ShelfCard,
-  frameCard,
   imageOf,
-  movieCard,
+  libraryVideoCard,
   showCard,
   videoCard,
 } from '@/queries/cards'
@@ -57,12 +54,10 @@ const libraryCards = ({
   switch (shelf.type) {
     case HOME_SHELF_TYPES.shows:
       return shelf.shows.map((entry) => showCard({ entry, ...pictures }))
-    case HOME_SHELF_TYPES.media: {
-      const isMovies = matchTypeFor(library.settings.kind) === ITEM_TYPES.movie
+    case HOME_SHELF_TYPES.media:
       return shelf.media.map((media) =>
-        isMovies ? movieCard({ media, ...pictures }) : frameCard({ media, ...pictures }),
+        libraryVideoCard({ kind: library.settings.kind, media, ...pictures }),
       )
-    }
     default: {
       const unknown: never = shelf
       return unknown

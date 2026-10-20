@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import {
   Image,
   Pressable,
@@ -16,31 +17,23 @@ import { CardPicture } from '@/layouts/Card'
 import { TouchBack } from '@/layouts/TouchBack'
 import { TouchCard } from '@/layouts/TouchCard'
 import { toneStyles } from '@/layouts/formStyles'
-import { BUTTON_TONES } from '@/layouts/formKit'
 import {
-  ITEM_ACTIONS,
   ITEM_HEADINGS,
-  ON_MARK,
   WATCHED_MARK,
   type ItemAction,
   type ItemKit,
   type ItemLayoutProps,
   type ItemNoticeProps,
+  actionLookOf,
   dotted,
   episodeLabelOf,
+  heroFactsOf,
+  heroPictureOf,
   playLabelOf,
 } from '@/layouts/itemKit'
+import { isTablet } from '@/layouts/screenSizes'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { COLOURS, SIZES } from '@/theme/appTheme'
-
-/**
- * The web's 48rem: a screen whose shorter side reaches it is a tablet's, and the pictures grow.
- * The shorter side, so a phone held sideways, wider than that, keeps a phone's pictures.
- */
-const TABLET_WIDTH = 48 * 16
-
-const isTablet = ({ width, height }: { width: number; height: number }): boolean =>
-  Math.min(width, height) >= TABLET_WIDTH
 
 /** How wide the heading's picture stands: a poster, or an episode's wider still. */
 const HERO_WIDTHS = {
@@ -77,47 +70,22 @@ const Heading = ({ title }: { title: string }) => (
 
 /** Play, filled as the one action the page is for, or a mark, ticked while it is on. */
 const ActionButton = ({ action }: { action: ItemAction }) => {
-  switch (action.kind) {
-    case ITEM_ACTIONS.play:
-      return (
-        <Pressable
-          accessibilityLabel={action.label}
-          accessibilityRole="button"
-          onPress={action.onPress}
-          style={({ pressed }) => [
-            styles.action,
-            toneStyles[BUTTON_TONES.primary].button,
-            pressed && styles.pressed,
-          ]}
-        >
-          <Text style={[styles.actionLabel, toneStyles[BUTTON_TONES.primary].label]}>
-            {action.label}
-          </Text>
-        </Pressable>
-      )
-    case ITEM_ACTIONS.toggle:
-      return (
-        <Pressable
-          accessibilityLabel={action.label}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: action.isOn }}
-          onPress={action.onPress}
-          style={({ pressed }) => [
-            styles.action,
-            toneStyles[BUTTON_TONES.quiet].button,
-            pressed && styles.pressed,
-          ]}
-        >
-          <Text style={[styles.actionLabel, toneStyles[BUTTON_TONES.quiet].label]}>
-            {action.isOn === true ? `${ON_MARK}${action.label}` : action.label}
-          </Text>
-        </Pressable>
-      )
-    default: {
-      const unknown: never = action
-      return unknown
-    }
-  }
+  const look = actionLookOf(action)
+  return (
+    <Pressable
+      accessibilityLabel={action.label}
+      accessibilityRole={look.role}
+      accessibilityState={look.state}
+      onPress={action.onPress}
+      style={({ pressed }) => [
+        styles.action,
+        toneStyles[look.tone].button,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.actionLabel, toneStyles[look.tone].label]}>{look.text}</Text>
+    </Pressable>
+  )
 }
 
 /** Where playback stopped, or how much is watched, as a line with its words. */
@@ -130,24 +98,16 @@ const ProgressLine = ({ progress }: { progress: NonNullable<ItemHero['progress']
   </View>
 )
 
-const Hero = ({ hero, actions }: { hero: ItemHero; actions: ItemAction[] | null }) => {
+const Hero = ({ hero, actions }: { hero: ItemHero; actions: ItemAction[] }) => {
   const { width, height } = useWindowDimensions()
   const widths = isTablet({ width, height }) ? HERO_WIDTHS.tablet : HERO_WIDTHS.phone
   // Held sideways the screen is short, so the title sits by the poster's top, not its foot.
   const isWide = width > height
-  const facts = dotted([...hero.facts, ...(hero.rating === null ? [] : [hero.rating])])
+  const facts = heroFactsOf(hero)
   return (
     <View style={styles.hero}>
       <View style={[styles.headRow, isWide && styles.headRowWide]}>
-        <CardPicture
-          card={{
-            title: hero.title,
-            shape: hero.poster.shape,
-            picture: hero.poster.picture,
-            progress: 0,
-          }}
-          width={widths[hero.poster.shape]}
-        />
+        <CardPicture card={heroPictureOf(hero)} width={widths[hero.poster.shape]} />
         <View style={styles.words}>
           {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
           <Text accessibilityRole="header" style={styles.title}>
@@ -158,13 +118,11 @@ const Hero = ({ hero, actions }: { hero: ItemHero; actions: ItemAction[] | null 
           {hero.progress !== null && <ProgressLine progress={hero.progress} />}
         </View>
       </View>
-      {actions !== null && (
-        <View style={styles.actions}>
-          {actions.map((action) => (
-            <ActionButton key={action.key} action={action} />
-          ))}
-        </View>
-      )}
+      <View style={styles.actions}>
+        {actions.map((action) => (
+          <ActionButton key={action.key} action={action} />
+        ))}
+      </View>
       {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
       {hero.summary !== null && <Text style={styles.summary}>{hero.summary}</Text>}
     </View>
@@ -208,32 +166,39 @@ const Versions = ({ versions, onOpen }: { versions: VersionRow[]; onOpen: Opens 
 
 type Opens = (target: RouteTarget) => void
 
-const Seasons = ({ seasons, onOpen }: { seasons: ShelfCard[]; onOpen: Opens }) => {
-  const screen = useWindowDimensions()
+/** A titled row that scrolls sideways, running to the screen's edges past the gutters. */
+const Rail = ({ title, children }: { title: string; children: ReactNode }) => {
   const gutters = useGutters()
+  const padded = { paddingLeft: gutters.left, paddingRight: gutters.right }
   return (
     <View style={styles.section}>
-      <View style={{ paddingLeft: gutters.left, paddingRight: gutters.right }}>
-        <Heading title={ITEM_HEADINGS.seasons} />
+      <View style={padded}>
+        <Heading title={title} />
       </View>
       <ScrollView
-        contentContainerStyle={[
-          styles.cards,
-          { paddingLeft: gutters.left, paddingRight: gutters.right },
-        ]}
+        contentContainerStyle={[styles.cards, padded]}
         horizontal
         showsHorizontalScrollIndicator={false}
       >
-        {seasons.map((season) => (
-          <TouchCard
-            key={season.key}
-            card={season}
-            onPress={() => onOpen(season.target)}
-            width={isTablet(screen) ? SEASON_WIDTHS.tablet : SEASON_WIDTHS.phone}
-          />
-        ))}
+        {children}
       </ScrollView>
     </View>
+  )
+}
+
+const Seasons = ({ seasons, onOpen }: { seasons: ShelfCard[]; onOpen: Opens }) => {
+  const screen = useWindowDimensions()
+  return (
+    <Rail title={ITEM_HEADINGS.seasons}>
+      {seasons.map((season) => (
+        <TouchCard
+          key={season.key}
+          card={season}
+          onPress={() => onOpen(season.target)}
+          width={isTablet(screen) ? SEASON_WIDTHS.tablet : SEASON_WIDTHS.phone}
+        />
+      ))}
+    </Rail>
   )
 }
 
@@ -282,28 +247,13 @@ const Person = ({ person }: { person: PersonCard }) => (
   </View>
 )
 
-const Cast = ({ title, cast }: { title: string; cast: PersonCard[] }) => {
-  const gutters = useGutters()
-  return (
-    <View style={styles.section}>
-      <View style={{ paddingLeft: gutters.left, paddingRight: gutters.right }}>
-        <Heading title={title} />
-      </View>
-      <ScrollView
-        contentContainerStyle={[
-          styles.cards,
-          { paddingLeft: gutters.left, paddingRight: gutters.right },
-        ]}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
-        {cast.map((person) => (
-          <Person key={person.key} person={person} />
-        ))}
-      </ScrollView>
-    </View>
-  )
-}
+const Cast = ({ title, cast }: { title: string; cast: PersonCard[] }) => (
+  <Rail title={title}>
+    {cast.map((person) => (
+      <Person key={person.key} person={person} />
+    ))}
+  </Rail>
+)
 
 /** The backdrop across the top, under the way back; without one, room for the way back. */
 const Top = ({ backdrop, onBack }: Pick<ItemPage['hero'], 'backdrop'> & { onBack: () => void }) => {
@@ -332,7 +282,8 @@ const Top = ({ backdrop, onBack }: Pick<ItemPage['hero'], 'backdrop'> & { onBack
 /**
  * An item on a phone or tablet: the backdrop, then the poster beside the names and facts, the
  * actions, the summary and the file, then a movie's versions, a show's seasons or a season's
- * episodes, and the cast. It scrolls as one page, clear of the side insets held sideways.
+ * episodes, and the cast. It scrolls as one page, clear of the side insets held sideways. The
+ * marks are drawn at once and Play once it is known, as on the web.
  */
 const ItemLayout = ({ page, actions, onOpen, onBack }: ItemLayoutProps) => {
   const insets = useSafeAreaInsets()

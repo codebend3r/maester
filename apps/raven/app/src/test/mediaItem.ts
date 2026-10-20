@@ -1,4 +1,24 @@
-import { MATCH_STATES, type MediaItem, THUMBNAIL_STATES } from '@raven/core'
+import {
+  ITEM_TYPES,
+  type ItemSummary,
+  MATCH_STATES,
+  type MediaItem,
+  THUMBNAIL_STATES,
+} from '@raven/core'
+
+/** A title's summary, a 2026 movie unless a test says otherwise, with versioned pictures. */
+export const summaryFor = (overrides: Partial<ItemSummary> & Pick<ItemSummary, 'id' | 'title'>) =>
+  ({
+    type: ITEM_TYPES.movie,
+    year: 2026,
+    show: null,
+    season: null,
+    episode: null,
+    posterVersion: `p${overrides.id}`,
+    backdropVersion: `b${overrides.id}`,
+    ratings: [],
+    ...overrides,
+  }) satisfies ItemSummary
 
 /** A whole server title, as `GET /api/media/:id` answers it, with what a test cares about changed. */
 export const mediaItemFor = (overrides: Partial<MediaItem> = {}): MediaItem => ({

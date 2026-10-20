@@ -161,7 +161,8 @@ const SearchResults = ({ query, libraries }: { query: string; libraries: Library
         </p>
       )}
       {results.isPending && <SkeletonShelves label="Searching every library" count={1} />}
-      {results.isSuccess && shelves.length === 0 && (
+      {/* The last search's answer stands in while this one is read: it says nothing of this one. */}
+      {results.isSuccess && !results.isPlaceholderData && shelves.length === 0 && (
         <p className={styles.message}>{`Nothing in any library matches "${query}".`}</p>
       )}
       {shelves.map(({ shelf, library }) => (

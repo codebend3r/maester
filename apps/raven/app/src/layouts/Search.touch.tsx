@@ -23,11 +23,13 @@ import { COLOURS, SIZES } from '@/theme/appTheme'
  * A search box under the thumb: the keyboard's Search key searches at once, and while it
  * holds text a button beside it empties it, which asks for nothing.
  */
-const SearchField = ({ search, label }: SearchFieldProps) => (
+const SearchField = ({ search, label, isPreferred = false }: SearchFieldProps) => (
   <View style={[formStyles.input, styles.box]}>
     <TextInput
       accessibilityLabel={label}
       autoCapitalize="none"
+      // oxlint-disable-next-line jsx-a11y/no-autofocus -- a search screen opens to be typed in, as iOS's own do
+      autoFocus={isPreferred}
       autoCorrect={false}
       onChangeText={search.setText}
       onSubmitEditing={() => search.searchNow()}
@@ -54,7 +56,8 @@ const SearchField = ({ search, label }: SearchFieldProps) => (
 /**
  * The search screen on a phone or tablet: the way back, the title and the field held at the
  * top, and the results scrolled below them, clear of the side insets of a phone held sideways.
- * A drag puts the keyboard away, and a card under it still takes the first tap.
+ * It opens with the keyboard up on the field; a drag puts it away, and a card under it still
+ * takes the first tap.
  */
 const SearchLayout = ({ title, label, search, notice, onBack, children }: SearchLayoutProps) => {
   const insets = useSafeAreaInsets()
@@ -72,7 +75,7 @@ const SearchLayout = ({ title, label, search, notice, onBack, children }: Search
             {title}
           </Text>
           <View style={isWide ? styles.wideField : styles.field}>
-            <SearchField label={label} search={search} />
+            <SearchField isPreferred label={label} search={search} />
           </View>
         </View>
       </View>

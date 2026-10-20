@@ -5,8 +5,9 @@ import { act, fireEvent, screen } from '@testing-library/react-native'
 import { Search } from '@/screens/Search'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
-import type { HeardRequest } from '@/test/itemServer'
-import { DUNE_QUERY, NAS, isSearch, searchApi, searchPathFor } from '@/test/searchServer'
+import type { HeardRequest } from '@/test/fixtureFetch'
+import { NAS } from '@/test/homeServer'
+import { DUNE_QUERY, isSearch, searchApi, searchPathFor } from '@/test/searchServer'
 import { renderScreen } from '@/test/renderScreen'
 
 /** What the server heard, per test. */

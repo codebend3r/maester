@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import type { GridSection } from '@/queries/libraryGrid'
 import { ROUTE_TARGETS } from '@/routes'
-import { GRID_ROWS, columnsFor, gridRowsOf, jumpTargetOf, offsetOfRow } from '@/layouts/gridRows'
+import { GRID_ROWS, gridColumnsOf, gridRowsOf, jumpTargetOf, offsetOfRow } from '@/layouts/gridRows'
 
 const card = (key: string): ShelfCard => ({
   key,
@@ -38,16 +38,31 @@ const keysOf = (rows: ReturnType<typeof gridRowsOf>) =>
       : row.cards.map(({ key }) => key).join(' '),
   )
 
-describe('columnsFor', () => {
+describe('gridColumnsOf', () => {
+  const columnsOf = ({ room, least, gap }: { room: number; least: number; gap: number }) =>
+    gridColumnsOf({ room, gap, leastOf: () => least }).columnsOf(CARD_SHAPES.poster)
+
   it('fits as many columns as the least width allows, with the gaps between them', () => {
-    expect(columnsFor({ width: 358, least: 128, gap: 16 })).toBe(2)
-    expect(columnsFor({ width: 400, least: 128, gap: 16 })).toBe(2)
-    expect(columnsFor({ width: 416, least: 128, gap: 16 })).toBe(3)
-    expect(columnsFor({ width: 1760, least: 232, gap: 32 })).toBe(6)
+    expect(columnsOf({ room: 358, least: 128, gap: 16 })).toBe(2)
+    expect(columnsOf({ room: 400, least: 128, gap: 16 })).toBe(2)
+    expect(columnsOf({ room: 416, least: 128, gap: 16 })).toBe(3)
+    expect(columnsOf({ room: 1760, least: 232, gap: 32 })).toBe(6)
   })
 
   it('always fits one', () => {
-    expect(columnsFor({ width: 100, least: 240, gap: 16 })).toBe(1)
+    expect(columnsOf({ room: 100, least: 240, gap: 16 })).toBe(1)
+  })
+
+  it('lays each shape out by its own least width, every card its share of the room', () => {
+    const { columnsOf: columns, widthOf } = gridColumnsOf({
+      room: 400,
+      gap: 16,
+      leastOf: (shape) => (shape === CARD_SHAPES.poster ? 128 : 240),
+    })
+    expect(columns(CARD_SHAPES.poster)).toBe(2)
+    expect(widthOf(CARD_SHAPES.poster)).toBe(192)
+    expect(columns(CARD_SHAPES.wide)).toBe(1)
+    expect(widthOf(CARD_SHAPES.wide)).toBe(400)
   })
 })
 

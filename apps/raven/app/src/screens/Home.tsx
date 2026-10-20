@@ -6,7 +6,7 @@ import { homeShelvesOf } from '@/queries/homeShelves'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useServerCookies } from '@/queries/useServerCookies'
 import { Shelf, Shelves } from '@/layouts'
-import { APP_ROUTES, hrefOf } from '@/routes'
+import { APP_ROUTES, ROUTE_TARGETS, hrefOf } from '@/routes'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
 
 const COPY = {
@@ -45,7 +45,7 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
   const open = ({ target }: ShelfCard) => router.push(hrefOf(target))
 
   const openLibrary = (libraryId: number) =>
-    router.push({ pathname: APP_ROUTES.library, params: { id: String(libraryId) } })
+    router.push(hrefOf({ kind: ROUTE_TARGETS.library, libraryId, query: '' }))
 
   return (
     <Shelves

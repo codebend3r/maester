@@ -19,4 +19,15 @@ describe('hrefOf', () => {
       params: { mediaId: '20' },
     })
   })
+
+  it('opens a library, on a search only when it is handed one', () => {
+    expect(hrefOf({ kind: ROUTE_TARGETS.library, libraryId: 2, query: '' })).toEqual({
+      pathname: APP_ROUTES.library,
+      params: { id: '2' },
+    })
+    expect(hrefOf({ kind: ROUTE_TARGETS.library, libraryId: 2, query: 'dune' })).toEqual({
+      pathname: APP_ROUTES.library,
+      params: { id: '2', q: 'dune' },
+    })
+  })
 })

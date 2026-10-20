@@ -16,15 +16,8 @@ import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import {
-  FILMS,
-  FILM_SEARCHES,
-  GROUPED_FILMS,
-  NAS,
-  SERIES,
-  libraryApi,
-  libraryPath,
-} from '@/test/libraryServer'
+import { FILMS, NAS, SERIES } from '@/test/homeServer'
+import { FILM_SEARCHES, GROUPED_FILMS, libraryApi, libraryPath } from '@/test/libraryServer'
 import { renderScreen } from '@/test/renderScreen'
 
 const mockParams = jest.fn(() => ({ id: String(FILMS.id) }))
@@ -251,6 +244,22 @@ describe('Library on a TV', () => {
     expect(preferred(FILM_TITLES)).toEqual(['Ashfall Gate'])
     await fireEvent(first, 'focus')
     expect(preferred(FILM_TITLES)).toEqual([])
+  })
+
+  it('lets the opening focus go once the header has had it, before any card did', async () => {
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+    // A control's focus bubbles up to the header that holds it, as the Sort chip's does.
+    const header = screen.getByRole('header', { name: 'Films' }).parent
+    if (header === null) throw new Error('No header')
+    await fireEvent(header, 'focus')
+    expect(preferred(FILM_TITLES)).toEqual([])
+
+    const field = screen.getByLabelText('Search Films')
+    await fireEvent.changeText(field, FILM_SEARCHES.busboys)
+    await fireEvent(field, 'submitEditing')
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Night Train' })).toBeNull())
+    expect(screen.getByRole('button', { name: 'Busboys' }).props.hasTVPreferredFocus).not.toBe(true)
   })
 
   it('picks a sort from a focusable list rather than a sheet, offering only what the type allows', async () => {

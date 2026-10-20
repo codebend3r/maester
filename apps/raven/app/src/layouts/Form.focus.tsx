@@ -9,7 +9,8 @@ import {
   keyboardFor,
 } from '@/layouts/formKit'
 import { formStyles, toneStyles } from '@/layouts/formStyles'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { tvFieldStyles } from '@/layouts/tvControls'
+import { SIZES } from '@/theme/appTheme'
 
 const Form = ({ title, children }: FormProps) => (
   <View style={[formStyles.ground, styles.ground]}>
@@ -80,25 +81,6 @@ const FormButton = ({ label, onPress, tone, isDisabled = false }: FormButtonProp
     <Text style={[formStyles.buttonText, styles.buttonText, toneStyles[tone].label]}>{label}</Text>
   </Pressable>
 )
-
-/** The round end of tvOS's focused field plate: half the field's height. */
-const PLATE_END = SIZES.controlLarge / 2
-
-/**
- * A TV text field's frame and the input inside it. tvOS draws a focused text field as its own
- * raised plate with round ends. The input runs past the frame by those ends, which the frame
- * clips, so what shows has the frame's corners, the radius every other control has.
- */
-export const tvFieldStyles = StyleSheet.create({
-  frame: { minHeight: SIZES.controlLarge, overflow: 'hidden', paddingHorizontal: 0 },
-  input: {
-    color: COLOURS.text,
-    fontSize: SIZES.textLg,
-    minHeight: SIZES.controlLarge,
-    marginHorizontal: -PLATE_END,
-    paddingHorizontal: PLATE_END + SIZES.space2,
-  },
-})
 
 /** The TV form: read from the sofa, so larger, and driven by the remote's focus. */
 export const focusForm: FormKit = { Form, Field, FormButton }

@@ -4,12 +4,11 @@ import { ITEM_TYPES, movieFacts } from '@raven/core'
 import { CARD_SHAPES } from '@/queries/cards'
 import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { ROUTE_TARGETS } from '@/routes'
+import { NAS, SERIES } from '@/test/homeServer'
 import {
   BUSBOYS,
   BUSBOYS_FILE,
   GOOD_NEWS_ABOUT_HELL,
-  NAS,
-  SERIES,
   SEVERANCE,
   SEVERANCE_ONE,
   itemApi,

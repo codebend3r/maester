@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 
-import { tvFieldStyles } from '@/layouts/Form.focus'
 import { formStyles } from '@/layouts/formStyles'
 import {
   CLEAR_SEARCH,
@@ -9,10 +8,8 @@ import {
   type SearchKit,
   type SearchLayoutProps,
 } from '@/layouts/searchKit'
+import { NOTHING_ON_FOCUS, PlateButton, tvFieldStyles } from '@/layouts/tvControls'
 import { COLOURS, SIZES } from '@/theme/appTheme'
-
-/** What a field does on focus by default: nothing more than its own ring. */
-const NOTHING = (): void => undefined
 
 /**
  * A search box the remote selects, which opens the platform's own keyboard. It reports each
@@ -24,7 +21,7 @@ const SearchField = ({
   search,
   label,
   isPreferred = false,
-  onFocused = NOTHING,
+  onFocused = NOTHING_ON_FOCUS,
 }: SearchFieldProps) => {
   const [isFocused, setFocused] = useState(false)
   return (
@@ -58,14 +55,12 @@ const SearchField = ({
         />
       </View>
       {search.text !== '' && (
-        <Pressable
-          accessibilityLabel={CLEAR_SEARCH.label}
-          accessibilityRole="button"
+        <PlateButton
+          label={CLEAR_SEARCH.label}
           onPress={() => search.searchFor('')}
-          style={({ focused }) => [styles.clear, focused && formStyles.focused]}
-        >
-          <Text style={styles.clearText}>{CLEAR_SEARCH.text}</Text>
-        </Pressable>
+          accessibilityRole="button"
+          text={CLEAR_SEARCH.text}
+        />
       )}
     </View>
   )
@@ -108,15 +103,4 @@ const styles = StyleSheet.create({
   notice: { color: COLOURS.muted, fontSize: SIZES.textLg },
   box: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space2 },
   frame: { width: SIZES.measure },
-  clear: {
-    minWidth: SIZES.controlLarge,
-    minHeight: SIZES.controlLarge,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.tvFocusRing,
-    borderColor: COLOURS.quiet,
-    backgroundColor: COLOURS.quiet,
-  },
-  clearText: { color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: '600' },
 })

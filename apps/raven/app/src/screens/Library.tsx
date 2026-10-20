@@ -133,7 +133,8 @@ const useListing = ({
     }
     return files.data === undefined ? null : { shows: [], files: files.data }
   })()
-  return { listed, error: query.error }
+  // While a new search is read, the last one's answer stands in for it.
+  return { listed, error: query.error, isStandIn: query.isPlaceholderData }
 }
 
 /**
@@ -153,7 +154,7 @@ const LibraryGrid = ({
   const view = useLibraryView({ serverId: server.id, library })
   const search = useSearch({ initial: asked })
   const { settings } = view
-  const { listed, error } = useListing({
+  const { listed, error, isStandIn } = useListing({
     queries,
     library,
     settings,
@@ -172,8 +173,9 @@ const LibraryGrid = ({
           headersFor: cookieHeadersFor({ server, cookies }),
           now: new Date(),
         })
+  // Nothing matches only once the server says so, not while the last search stands in.
   const empty =
-    listed === null
+    listed === null || isStandIn
       ? null
       : emptyListingMessage({
           isEmpty: listed.shows.length === 0 && listed.files.length === 0,

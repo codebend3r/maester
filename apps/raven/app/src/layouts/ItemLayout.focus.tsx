@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import {
   Image,
   Pressable,
@@ -13,18 +13,18 @@ import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import type { ItemHero, ItemPage, PersonCard, VersionRow } from '@/queries/itemPage'
 import type { RouteTarget } from '@/routes'
 import { CardPicture } from '@/layouts/Card'
-import { FocusCard } from '@/layouts/FocusCard'
-import { BUTTON_TONES } from '@/layouts/formKit'
+import { FOCUS_CARD_WIDTHS, FocusCard } from '@/layouts/FocusCard'
 import { toneStyles } from '@/layouts/formStyles'
 import {
-  ITEM_ACTIONS,
   ITEM_HEADINGS,
-  ON_MARK,
   type ItemAction,
   type ItemKit,
   type ItemLayoutProps,
   type ItemNoticeProps,
+  actionLookOf,
   dotted,
+  heroFactsOf,
+  heroPictureOf,
   playLabelOf,
 } from '@/layouts/itemKit'
 import { LINE_RATIO } from '@/layouts/textHeights'
@@ -34,9 +34,6 @@ const GUTTER = SIZES.space8
 
 /** The heading's picture in points on a 1920 by 1080 point screen: a poster, or a still. */
 const HERO_WIDTHS = { [CARD_SHAPES.poster]: 280, [CARD_SHAPES.wide]: 480 } as const
-
-/** Card widths in points, as Home's shelves draw them. */
-const CARD_WIDTHS = { [CARD_SHAPES.poster]: 232, [CARD_SHAPES.wide]: 400 } as const
 
 /** How wide the words beside the picture run: about seventy characters at the TV's size. */
 const WORDS_WIDTH = 1040
@@ -70,24 +67,22 @@ const ActionButton = ({
   isPreferred,
   onSettle,
 }: Settles & { action: ItemAction; isPreferred: boolean }) => {
-  const tone = action.kind === ITEM_ACTIONS.play ? BUTTON_TONES.primary : BUTTON_TONES.quiet
-  const label =
-    action.kind === ITEM_ACTIONS.toggle && action.isOn === true
-      ? `${ON_MARK}${action.label}`
-      : action.label
+  const look = actionLookOf(action)
   return (
     <Pressable
       accessibilityLabel={action.label}
-      accessibilityRole={action.kind === ITEM_ACTIONS.play ? 'button' : 'checkbox'}
-      accessibilityState={
-        action.kind === ITEM_ACTIONS.toggle ? { checked: action.isOn } : undefined
-      }
+      accessibilityRole={look.role}
+      accessibilityState={look.state}
       hasTVPreferredFocus={isPreferred}
       onFocus={onSettle}
       onPress={action.onPress}
-      style={({ focused }) => [styles.action, toneStyles[tone].button, focused && styles.focused]}
+      style={({ focused }) => [
+        styles.action,
+        toneStyles[look.tone].button,
+        focused && styles.focused,
+      ]}
     >
-      <Text style={[styles.actionLabel, toneStyles[tone].label]}>{label}</Text>
+      <Text style={[styles.actionLabel, toneStyles[look.tone].label]}>{look.text}</Text>
     </Pressable>
   )
 }
@@ -113,22 +108,15 @@ const Hero = ({
   onSettle,
 }: Settles & {
   hero: ItemHero
+  /** The actions, or null while what Play starts is still being read. */
   actions: ItemAction[] | null
   file: ItemPage['file']
   isOpening: boolean
 }) => {
-  const facts = dotted([...hero.facts, ...(hero.rating === null ? [] : [hero.rating])])
+  const facts = heroFactsOf(hero)
   return (
     <View style={styles.hero}>
-      <CardPicture
-        card={{
-          title: hero.title,
-          shape: hero.poster.shape,
-          picture: hero.poster.picture,
-          progress: 0,
-        }}
-        width={HERO_WIDTHS[hero.poster.shape]}
-      />
+      <CardPicture card={heroPictureOf(hero)} width={HERO_WIDTHS[hero.poster.shape]} />
       <View style={styles.words}>
         {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
         <Text accessibilityRole="header" style={styles.title}>
@@ -165,13 +153,8 @@ const Hero = ({
   )
 }
 
-/** A row of cards the remote moves along, under its heading. */
-const CardRow = ({
-  title,
-  cards,
-  onOpen,
-  onSettle,
-}: Settles & { title: string; cards: ShelfCard[]; onOpen: Opens }) => (
+/** A titled row the remote moves along, scrolled as the focus moves. */
+const Rail = ({ title, children }: { title: string; children: ReactNode }) => (
   <View style={styles.section}>
     <View style={styles.padded}>
       <Heading title={title} />
@@ -181,18 +164,30 @@ const CardRow = ({
       horizontal
       showsHorizontalScrollIndicator={false}
     >
-      {cards.map((card) => (
-        <FocusCard
-          key={card.key}
-          card={card}
-          isPreferred={false}
-          onFocused={onSettle}
-          onPress={() => onOpen(card.target)}
-          width={CARD_WIDTHS[card.shape]}
-        />
-      ))}
+      {children}
     </ScrollView>
   </View>
+)
+
+/** A row of cards the remote moves along, under its heading. */
+const CardRow = ({
+  title,
+  cards,
+  onOpen,
+  onSettle,
+}: Settles & { title: string; cards: ShelfCard[]; onOpen: Opens }) => (
+  <Rail title={title}>
+    {cards.map((card) => (
+      <FocusCard
+        key={card.key}
+        card={card}
+        isPreferred={false}
+        onFocused={onSettle}
+        onPress={() => onOpen(card.target)}
+        width={FOCUS_CARD_WIDTHS[card.shape]}
+      />
+    ))}
+  </Rail>
 )
 
 const Versions = ({
@@ -261,7 +256,7 @@ const Person = ({ person, onSettle }: Settles & { person: PersonCard }) => {
  * opens on, its first action holding the focus until the viewer moves it, then rows to move
  * along for the seasons or episodes, the versions and the cast.
  */
-const ItemLayout = ({ page, actions, onOpen }: ItemLayoutProps) => {
+const ItemLayout = ({ page, actions, isPlayPending, onOpen }: ItemLayoutProps) => {
   const screen = useWindowDimensions()
   // Preferred focus is for the opening only: once anything here has had the focus, a button
   // that changes or mounts again leaves the viewer where they are.
@@ -279,7 +274,7 @@ const ItemLayout = ({ page, actions, onOpen }: ItemLayoutProps) => {
       <ScrollView contentContainerStyle={styles.page} style={styles.scroll}>
         <View style={styles.padded}>
           <Hero
-            actions={actions}
+            actions={isPlayPending ? null : actions}
             file={page.file}
             hero={page.hero}
             isOpening={isOpening}
@@ -287,7 +282,7 @@ const ItemLayout = ({ page, actions, onOpen }: ItemLayoutProps) => {
           />
         </View>
         {/* The rows wait for the actions, so nothing below can take the opening focus from Play. */}
-        {actions !== null && (
+        {!isPlayPending && (
           <>
             {page.seasons.length > 0 && (
               <CardRow
@@ -309,20 +304,11 @@ const ItemLayout = ({ page, actions, onOpen }: ItemLayoutProps) => {
               <Versions onOpen={onOpen} onSettle={settle} versions={page.versions} />
             )}
             {page.cast.length > 0 && (
-              <View style={styles.section}>
-                <View style={styles.padded}>
-                  <Heading title={page.castTitle} />
-                </View>
-                <ScrollView
-                  contentContainerStyle={styles.row}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                >
-                  {page.cast.map((person) => (
-                    <Person key={person.key} onSettle={settle} person={person} />
-                  ))}
-                </ScrollView>
-              </View>
+              <Rail title={page.castTitle}>
+                {page.cast.map((person) => (
+                  <Person key={person.key} onSettle={settle} person={person} />
+                ))}
+              </Rail>
             )}
           </>
         )}

@@ -8,6 +8,7 @@ import {
   chosenLabelOf,
   pickerLabelOf,
 } from '@/layouts/gridKit'
+import { PlateButton, plateStyles } from '@/layouts/tvControls'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
 /** Marks the option chosen now. */
@@ -31,10 +32,10 @@ const Picker = <K extends string>(props: PickerProps<K>) => {
         accessibilityLabel={pickerLabelOf(props)}
         accessibilityRole="button"
         onPress={() => setOpen(true)}
-        style={({ focused }) => [styles.chip, focused && styles.focused]}
+        style={({ focused }) => [plateStyles.plate, styles.chip, focused && plateStyles.focused]}
       >
         <Text style={styles.label}>{label}</Text>
-        <Text style={styles.value}>{chosenLabelOf(props)}</Text>
+        <Text style={plateStyles.label}>{chosenLabelOf(props)}</Text>
       </Pressable>
       <Modal transparent visible={isOpen} onRequestClose={() => setOpen(false)}>
         <View style={styles.backdrop}>
@@ -54,7 +55,7 @@ const Picker = <K extends string>(props: PickerProps<K>) => {
                   onPress={() => choose(option.key)}
                   style={({ focused }) => [styles.option, focused && styles.focused]}
                 >
-                  <Text style={[styles.value, option.key === value && styles.chosen]}>
+                  <Text style={[plateStyles.label, option.key === value && styles.chosen]}>
                     {option.key === value ? `${CHOSEN} ${option.label}` : option.label}
                   </Text>
                 </Pressable>
@@ -68,34 +69,21 @@ const Picker = <K extends string>(props: PickerProps<K>) => {
 }
 
 const ToolButton = ({ label, accessibilityLabel, onPress }: ToolButtonProps) => (
-  <Pressable
-    accessibilityLabel={accessibilityLabel}
-    accessibilityRole="button"
+  <PlateButton
+    label={accessibilityLabel}
     onPress={onPress}
-    style={({ focused }) => [styles.chip, focused && styles.focused]}
-  >
-    <Text style={styles.value}>{label}</Text>
-  </Pressable>
+    accessibilityRole="button"
+    text={label}
+  />
 )
 
 /** The toolbar on a TV: chips the remote reaches, each opening a list it moves through. */
 export const focusPicker: PickerKit = { Picker, ToolButton }
 
 const styles = StyleSheet.create({
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SIZES.space2,
-    minHeight: SIZES.controlLarge,
-    paddingHorizontal: SIZES.space3,
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.tvFocusRing,
-    borderColor: COLOURS.quiet,
-    backgroundColor: COLOURS.quiet,
-  },
+  chip: { flexDirection: 'row', gap: SIZES.space2 },
   focused: { borderColor: COLOURS.text },
   label: { color: COLOURS.muted, fontSize: SIZES.text },
-  value: { color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: '600' },
   chosen: { fontWeight: 'bold' },
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   // The web's `--color-scrim` is a translucent black React Native's tokens cannot carry.

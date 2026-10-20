@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { CARD_SHAPES } from '@/queries/cards'
 import { TouchCard } from '@/layouts/TouchCard'
+import { BREAKPOINTS } from '@/layouts/screenSizes'
 import {
   NOTHING_HERE,
   SEARCH_EVERY_LIBRARY,
@@ -14,9 +15,6 @@ import {
 } from '@/layouts/shelfKit'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
-/** The web's 48rem: from there on the screen is a tablet's, and the cards grow. */
-const TABLET_WIDTH = 48 * 16
-
 /** Card widths in points: about two and a half posters across a phone, more on a tablet. */
 const CARD_WIDTHS = {
   phone: { [CARD_SHAPES.poster]: 128, [CARD_SHAPES.wide]: 248 },
@@ -25,7 +23,7 @@ const CARD_WIDTHS = {
 
 const useCardWidths = () => {
   const { width } = useWindowDimensions()
-  return width >= TABLET_WIDTH ? CARD_WIDTHS.tablet : CARD_WIDTHS.phone
+  return width >= BREAKPOINTS.tablet ? CARD_WIDTHS.tablet : CARD_WIDTHS.phone
 }
 
 const Shelves = ({ title, notice, onSearch, children }: ShelvesProps) => {

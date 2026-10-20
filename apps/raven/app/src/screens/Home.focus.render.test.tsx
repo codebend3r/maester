@@ -8,6 +8,7 @@ import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { NAS, SPARSE, homeApi } from '@/test/homeServer'
+import { heldAnswer } from '@/test/heldAnswer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { renderScreen } from '@/test/renderScreen'
 
@@ -99,10 +100,8 @@ describe('Home on a TV', () => {
   })
 
   it('offers the search in the top row once the shelves are drawn, never before them or first', async () => {
-    let release = () => {}
-    mockHome.answer = new Promise<void>((resolve) => {
-      release = resolve
-    })
+    const { answer, release } = heldAnswer()
+    mockHome.answer = answer
     await renderHome()
     expect(await screen.findByText('Gathering your libraries')).toBeTruthy()
     // Drawn alone, it would be all tvOS had to give the opening focus to.

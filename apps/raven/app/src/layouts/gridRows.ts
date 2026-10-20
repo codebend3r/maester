@@ -9,17 +9,26 @@ export type GridRow =
   | { kind: typeof GRID_ROWS.cards; key: string; shape: CardShape; cards: ShelfCard[] }
 
 /**
- * As many columns of at least `least` as fit in `width` with `gap` between them, and never none.
+ * How a grid `room` points wide lays out each shape of card: in as many columns of at least
+ * `leastOf` it as fit with `gap` between them, and never none, each card as wide as its share.
  */
-export const columnsFor = ({
-  width,
-  least,
+export const gridColumnsOf = ({
+  room,
   gap,
+  leastOf,
 }: {
-  width: number
-  least: number
+  room: number
   gap: number
-}): number => Math.max(1, Math.floor((width + gap) / (least + gap)))
+  leastOf: (shape: CardShape) => number
+}) => {
+  const columnsOf = (shape: CardShape): number =>
+    Math.max(1, Math.floor((room + gap) / (leastOf(shape) + gap)))
+  const widthOf = (shape: CardShape): number => {
+    const columns = columnsOf(shape)
+    return (room - (columns - 1) * gap) / columns
+  }
+  return { columnsOf, widthOf }
+}
 
 /** Whether a section folds: a bucket does, and the untitled run of a plain grid never. */
 export const isBucket = (section: GridSection): boolean => section.title !== null

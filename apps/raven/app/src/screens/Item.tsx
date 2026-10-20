@@ -109,6 +109,25 @@ const playNextLabel = (code: string | null): string =>
   code === null ? COPY.play : `${COPY.play} ${code}`
 
 /**
+ * A show's or a season's marks: Favourite where the server says it can be one, then Watched
+ * over every episode under it.
+ */
+const marksOf = ({
+  details,
+  favourite,
+  watched,
+}: {
+  details: ItemDetails
+  favourite: ReturnType<typeof useServerItemFavourite>
+  watched: ReturnType<typeof useServerWatchedToggle>
+}): ItemAction[] => [
+  ...(details.favourite === null
+    ? []
+    : [favouriteOf({ isOn: details.favourite, onToggle: favourite.mutate })]),
+  watchedOf(watched),
+]
+
+/**
  * A movie or an episode once the library's files it shows are known: Play, or Resume where it
  * stopped, then Favourite where its library allows one, then Watched, each mark shown before
  * the server answers.
@@ -164,14 +183,19 @@ const PlayableItem = ({
     }),
   ]
   return (
-    <ItemLayout actions={actions} onBack={context.onBack} onOpen={context.onOpen} page={page} />
+    <ItemLayout
+      actions={actions}
+      isPlayPending={false}
+      onBack={context.onBack}
+      onOpen={context.onOpen}
+      page={page}
+    />
   )
 }
 
 /**
- * A show: Play for the episode the server says comes next, Favourite and Watched over every
- * episode, then its seasons. The actions wait for the next episode, so Play is there from the
- * first, to take the remote's focus.
+ * A show: Play for the episode the server says comes next, once it says, Favourite and Watched
+ * over every episode, then its seasons.
  */
 const ShowItem = ({
   details,
@@ -190,26 +214,22 @@ const ShowItem = ({
     targets: [{ kind: WATCH_TARGET_KINDS.item, id: details.id, libraryId: null }],
   })
   const nextFile = next.data ?? null
-  const actions = next.isPending
-    ? null
-    : [
-        ...(nextFile === null
-          ? []
-          : [
-              playOf({
-                media: nextFile,
-                label: playNextLabel(nextFile.item === null ? null : episodeCode(nextFile.item)),
-                context,
-              }),
-            ]),
-        ...(details.favourite === null
-          ? []
-          : [favouriteOf({ isOn: details.favourite, onToggle: favourite.mutate })]),
-        watchedOf(toggle),
-      ]
+  const actions = [
+    ...(nextFile === null
+      ? []
+      : [
+          playOf({
+            media: nextFile,
+            label: playNextLabel(nextFile.item === null ? null : episodeCode(nextFile.item)),
+            context,
+          }),
+        ]),
+    ...marksOf({ details, favourite, watched: toggle }),
+  ]
   return (
     <ItemLayout
       actions={actions}
+      isPlayPending={next.isPending}
       onBack={context.onBack}
       onOpen={context.onOpen}
       page={showPage({ details, api: session.api, headersFor: context.headersFor })}
@@ -242,14 +262,12 @@ const SeasonItem = ({
     ...(next === undefined || nextFile === null
       ? []
       : [playOf({ media: nextFile, label: playNextLabel(episodeCode(next)), context })]),
-    ...(details.favourite === null
-      ? []
-      : [favouriteOf({ isOn: details.favourite, onToggle: favourite.mutate })]),
-    watchedOf(toggle),
+    ...marksOf({ details, favourite, watched: toggle }),
   ]
   return (
     <ItemLayout
       actions={actions}
+      isPlayPending={false}
       onBack={context.onBack}
       onOpen={context.onOpen}
       page={seasonPage({

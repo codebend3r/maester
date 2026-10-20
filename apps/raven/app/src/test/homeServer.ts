@@ -12,7 +12,6 @@ import {
   SCAN_STATES,
   type Home,
   ITEM_TYPES,
-  type ItemSummary,
   LIBRARY_KINDS,
   type Library,
   type LibraryKind,
@@ -20,7 +19,8 @@ import {
 } from '@raven/core'
 
 import type { AppServer } from '@/servers/serverList'
-import { mediaItemFor } from '@/test/mediaItem'
+import { NOT_FOUND, STATUSES, responseOf } from '@/test/fixtureFetch'
+import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 export const NAS: AppServer = {
   id: '0f8fad5b-d9cb-469f-a165-70867728950e',
@@ -64,19 +64,6 @@ const libraryFor = ({ id, name, kind }: { id: number; name: string; kind: Librar
     backdrop: null,
     ratingsRefresh: { state: RATINGS_REFRESH_STATES.idle, finishedAt: null },
   }) satisfies Library
-
-const summaryFor = (overrides: Partial<ItemSummary> & Pick<ItemSummary, 'id' | 'title'>) =>
-  ({
-    type: ITEM_TYPES.movie,
-    year: 2026,
-    show: null,
-    season: null,
-    episode: null,
-    posterVersion: `p${overrides.id}`,
-    backdropVersion: `b${overrides.id}`,
-    ratings: [],
-    ...overrides,
-  }) satisfies ItemSummary
 
 export const FILMS = libraryFor({ id: 1, name: 'Films', kind: LIBRARY_KINDS.movies })
 export const SERIES = libraryFor({ id: 2, name: 'Series', kind: LIBRARY_KINDS.shows })
@@ -170,22 +157,12 @@ export const homeApi = (server: AppServer = NAS): ApiClient =>
     baseUrl: server.origin,
     fetch: async (url, init) => {
       const isUnlock = url === `${server.origin}${APP_CLIENT_CALLS.unlock.path}`
-      const isRightPin = isUnlock && (init?.body ?? null) === JSON.stringify({ pin: '1234' })
-      const body = isUnlock
-        ? isRightPin
-          ? { available: true, unlocked: true }
-          : { message: 'That PIN is not right.' }
-        : ANSWERS[url]
-      const status = ((): number => {
-        if (body === undefined) return 404
-        return isUnlock && !isRightPin ? 403 : 200
-      })()
-      return {
-        ok: status === 200,
-        status,
-        statusText: status === 200 ? 'OK' : 'Refused',
-        json: async () => body ?? { message: 'Not found' },
-        text: async () => JSON.stringify(body ?? { message: 'Not found' }),
+      if (isUnlock) {
+        return (init?.body ?? null) === JSON.stringify({ pin: '1234' })
+          ? responseOf({ status: STATUSES.ok, body: { available: true, unlocked: true } })
+          : responseOf({ status: STATUSES.forbidden, body: { message: 'That PIN is not right.' } })
       }
+      const body = ANSWERS[url]
+      return responseOf(body === undefined ? NOT_FOUND : { status: STATUSES.ok, body })
     },
   })

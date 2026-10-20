@@ -1,7 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { CARD_SHAPES } from '@/queries/cards'
-import { FocusCard } from '@/layouts/FocusCard'
+import { FOCUS_CARD_WIDTHS, FocusCard } from '@/layouts/FocusCard'
 import {
   NOTHING_HERE,
   SEARCH_EVERY_LIBRARY,
@@ -11,10 +10,8 @@ import {
   type ShelvesProps,
   seeAllLabelOf,
 } from '@/layouts/shelfKit'
+import { PlateButton } from '@/layouts/tvControls'
 import { COLOURS, SIZES } from '@/theme/appTheme'
-
-/** Card widths in points on a 1920 by 1080 point screen, read from across the room. */
-const CARD_WIDTHS = { [CARD_SHAPES.poster]: 232, [CARD_SHAPES.wide]: 400 } as const
 
 /**
  * Home's shelves under its title and, beside it, the way into the search. That is drawn only
@@ -28,14 +25,12 @@ const Shelves = ({ title, notice, isLoading, onSearch, children }: ShelvesProps)
         {title}
       </Text>
       {!isLoading && (
-        <Pressable
-          accessibilityLabel={SEARCH_EVERY_LIBRARY.label}
-          accessibilityRole="link"
+        <PlateButton
+          label={SEARCH_EVERY_LIBRARY.label}
           onPress={onSearch}
-          style={({ focused }) => [styles.search, focused && styles.focusedSearch]}
-        >
-          <Text style={styles.searchLabel}>{SEARCH_EVERY_LIBRARY.text}</Text>
-        </Pressable>
+          accessibilityRole="link"
+          text={SEARCH_EVERY_LIBRARY.text}
+        />
       )}
     </View>
     {notice !== null && <Text style={styles.notice}>{notice}</Text>}
@@ -90,7 +85,7 @@ const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) =>
             card={card}
             isPreferred={isFirst && index === 0}
             onPress={() => onOpen(card)}
-            width={CARD_WIDTHS[card.shape]}
+            width={FOCUS_CARD_WIDTHS[card.shape]}
           />
         ))}
       </ScrollView>
@@ -115,17 +110,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.space8,
   },
   pageTitle: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
-  search: {
-    minHeight: SIZES.controlLarge,
-    justifyContent: 'center',
-    paddingHorizontal: SIZES.space3,
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.tvFocusRing,
-    borderColor: COLOURS.quiet,
-    backgroundColor: COLOURS.quiet,
-  },
-  focusedSearch: { borderColor: COLOURS.text },
-  searchLabel: { color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: '600' },
   notice: { color: COLOURS.muted, fontSize: SIZES.textLg, paddingHorizontal: SIZES.space8 },
   shelf: { gap: SIZES.space1 },
   titleRow: {

@@ -1,12 +1,10 @@
 import {
-  ITEM_TYPES,
   LIBRARY_VIEWS,
   type LibrarySettings,
   type MediaItem,
   type ShowEntry,
   groupMedia,
   listsShows,
-  matchTypeFor,
   plural,
   unmatchedShowsOf,
 } from '@raven/core'
@@ -17,8 +15,9 @@ import {
   type Pictures,
   type ShelfCard,
   frameCard,
-  movieCard,
+  libraryVideoCard,
   showCard,
+  videoShapeFor,
 } from '@/queries/cards'
 
 /**
@@ -47,22 +46,18 @@ const SECTION_KEYS = { all: 'all', shows: 'shows' } as const
 
 type Cards = Pictures & { settings: LibrarySettings; now: Date }
 
-/**
- * A Movies library's videos as posters, any other's as frame grabs, each saying what it is sorted
- * by.
- */
-const fileCards = ({ settings, now, files, ...pictures }: Cards & { files: MediaItem[] }) => {
-  const isMovies = matchTypeFor(settings.kind) === ITEM_TYPES.movie
-  const order = { sort: settings.sort, now }
-  return {
-    shape: isMovies ? CARD_SHAPES.poster : CARD_SHAPES.wide,
-    cards: files.map((media) =>
-      isMovies
-        ? movieCard({ media, order, ...pictures })
-        : frameCard({ media, order, ...pictures }),
-    ),
-  }
-}
+/** A library's videos as its type draws them, each saying what it is sorted by. */
+const fileCards = ({ settings, now, files, ...pictures }: Cards & { files: MediaItem[] }) => ({
+  shape: videoShapeFor(settings.kind),
+  cards: files.map((media) =>
+    libraryVideoCard({
+      kind: settings.kind,
+      media,
+      order: { sort: settings.sort, now },
+      ...pictures,
+    }),
+  ),
+})
 
 const videos = (n: number): string => plural({ n, one: 'video', many: 'videos' })
 

@@ -6,7 +6,10 @@ export type SearchFieldProps = {
   search: Search
   /** What it searches, shown while it is empty and said aloud: "Search Films". */
   label: string
-  /** Asks the remote's focus for the field as it mounts, on a TV. */
+  /**
+   * Whether the screen opens on the field: it takes the remote's focus as it mounts on a TV,
+   * and brings the keyboard up under the thumb.
+   */
   isPreferred?: boolean
   /** Hears each time the field gets the focus. */
   onFocused?: () => void

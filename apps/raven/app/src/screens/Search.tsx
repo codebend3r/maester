@@ -7,7 +7,7 @@ import { libraryShelvesOf } from '@/queries/homeShelves'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useServerCookies } from '@/queries/useServerCookies'
 import { SearchLayout, Shelf } from '@/layouts'
-import { APP_ROUTE_PARAMS, APP_ROUTES, hrefOf } from '@/routes'
+import { ROUTE_TARGETS, hrefOf } from '@/routes'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
 
 const COPY = {
@@ -43,7 +43,9 @@ const ServerSearch = ({ session: { server, api, queries } }: { session: AppQueri
     const failure = results.error ?? libraries.error
     if (failure !== null) return failure.message
     if (shelves.length > 0) return null
-    const isRead = results.isSuccess && libraries.isSuccess && cookies !== null
+    // The last search's answer stands in while this one is read: it says nothing of this one.
+    const isRead =
+      results.isSuccess && !results.isPlaceholderData && libraries.isSuccess && cookies !== null
     return isRead ? nothingMatches(query) : COPY.searching
   })()
 
@@ -51,10 +53,7 @@ const ServerSearch = ({ session: { server, api, queries } }: { session: AppQueri
 
   // The library opens on the search, so it lists every match, not only the shelf's.
   const openLibrary = (libraryId: number) =>
-    router.push({
-      pathname: APP_ROUTES.library,
-      params: { [APP_ROUTE_PARAMS.id]: String(libraryId), [APP_ROUTE_PARAMS.query]: query },
-    })
+    router.push(hrefOf({ kind: ROUTE_TARGETS.library, libraryId, query }))
 
   return (
     <SearchLayout

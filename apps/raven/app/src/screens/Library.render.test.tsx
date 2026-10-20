@@ -16,26 +16,28 @@ import { Library } from '@/screens/Library'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
-import {
-  FILMS,
-  FILM_SEARCHES,
-  GROUPED_FILMS,
-  NAS,
-  SERIES,
-  libraryApi,
-  libraryPath,
-} from '@/test/libraryServer'
-import { renderScreen } from '@/test/renderScreen'
+import { FILMS, NAS, SERIES } from '@/test/homeServer'
+import { FILM_SEARCHES, GROUPED_FILMS, libraryApi, libraryPath } from '@/test/libraryServer'
+import { heldAnswer } from '@/test/heldAnswer'
+import { keyboardTapsAbove, renderScreen } from '@/test/renderScreen'
 import { linesHeightOf } from '@/layouts/textHeights'
 import { SIZES } from '@/theme/appTheme'
 
 const mockPush = jest.fn()
 const mockFontScale = jest.fn(() => 1)
 const mockParams = jest.fn((): Record<string, string> => ({ id: String(FILMS.id) }))
-/** What the server heard, and the libraries it answers with in place of its own, per test. */
-const mockServer: { requests: string[]; libraries: LibraryRecord[] } = {
+/**
+ * What the server heard, the libraries it answers with in place of its own, and what its
+ * answers wait on, per test.
+ */
+const mockServer: {
+  requests: string[]
+  libraries: LibraryRecord[]
+  reads: (path: string) => Promise<void>
+} = {
   requests: [],
   libraries: [],
+  reads: async () => undefined,
 }
 const mockApi = jest.fn((_server: AppServer) =>
   libraryApi({
@@ -43,6 +45,7 @@ const mockApi = jest.fn((_server: AppServer) =>
       mockServer.requests = [...mockServer.requests, path]
     },
     libraries: () => mockServer.libraries,
+    reads: (path) => mockServer.reads(path),
   }),
 )
 
@@ -135,6 +138,7 @@ describe('Library on a phone or tablet', () => {
     jest.clearAllMocks()
     mockServer.requests = []
     mockServer.libraries = []
+    mockServer.reads = async () => undefined
     mockFontScale.mockReturnValue(1)
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
     useLibraryViews.setState({ choices: {} })
@@ -279,6 +283,22 @@ describe('Library on a phone or tablet', () => {
     )
   })
 
+  it("stands a bucket's heading taller for the viewer's larger text, so its title is not cut", async () => {
+    mockServer.libraries = [GROUPED_FILMS]
+    const headingHeight = async () =>
+      StyleSheet.flatten(
+        (await screen.findByRole('button', { name: 'Matched, 3 videos' })).props.style,
+      )?.height
+    await renderLibrary({ id: FILMS.id })
+    expect(await headingHeight()).toBe(SIZES.fieldHeight + SIZES.space2)
+
+    mockFontScale.mockReturnValue(3)
+    await renderLibrary({ id: FILMS.id })
+    expect(await headingHeight()).toBeCloseTo(
+      linesHeightOf({ sizes: [SIZES.textLg], fontScale: 3 }) + SIZES.space2,
+    )
+  })
+
   it('filters the grid by its search box once typing pauses, never for each key', async () => {
     jest.useFakeTimers()
     await renderLibrary({ id: FILMS.id })
@@ -326,17 +346,40 @@ describe('Library on a phone or tablet', () => {
     expect(await screen.findByText(`Nothing here matches "${FILM_SEARCHES.nothing}".`)).toBeTruthy()
   })
 
+  it('says nothing matches only once the server says so, not while the last search stands in', async () => {
+    jest.useFakeTimers()
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+    await typeSearch(FILM_SEARCHES.nothing)
+    await pause(SEARCH_DELAY_MS)
+    expect(await screen.findByText(`Nothing here matches "${FILM_SEARCHES.nothing}".`)).toBeTruthy()
+
+    const answer = heldAnswer()
+    const searched = libraryPath({
+      call: listMedia,
+      library: FILMS,
+      sort: MEDIA_SORTS.title,
+      search: FILM_SEARCHES.busboys,
+    })
+    mockServer.reads = (path) => (path === searched ? answer.answer : Promise.resolve())
+    const field = screen.getByLabelText(SEARCH_FILMS)
+    await fireEvent.changeText(field, FILM_SEARCHES.busboys)
+    await fireEvent(field, 'submitEditing')
+    await waitFor(() => expect(mockServer.requests).toContain(searched))
+    expect(screen.queryByText(/^Nothing here matches/)).toBeNull()
+
+    answer.release()
+    expect(await screen.findByRole('button', { name: 'Busboys' })).toBeTruthy()
+  })
   it('lets the cards take the first tap while the keyboard is up', async () => {
     await renderLibrary({ id: FILMS.id })
     const card = await screen.findByRole('button', { name: 'Night Train' })
-    // A scroll view keeps a tap for its children only when it is told to; else the first tap
-    // only puts the keyboard away.
-    const scrollsOf = (node: typeof card | null): unknown[] => {
-      if (node === null) return []
-      const here = node.type === 'RCTScrollView'
-      return [...(here ? [node.props.keyboardShouldPersistTaps] : []), ...scrollsOf(node.parent)]
-    }
-    expect(scrollsOf(card.parent)).toEqual(['handled'])
+    expect(keyboardTapsAbove(card)).toEqual(['handled'])
+  })
+
+  it('leaves the keyboard down as it opens: its box is there to be chosen', async () => {
+    await renderLibrary({ id: FILMS.id })
+    expect((await screen.findByLabelText(SEARCH_FILMS)).props.autoFocus).toBe(false)
   })
 
   it('opens on the search it was handed, as a search through every library hands it over', async () => {

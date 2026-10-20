@@ -32,8 +32,8 @@ export const APP_SCREENS = {
   unlock: 'unlock',
 } as const
 
-/** Where a card or a button takes the viewer: an item's page, or the player. */
-export const ROUTE_TARGETS = { item: 'item', play: 'play' } as const
+/** Where a card or a link takes the viewer: an item's page, the player, or a library. */
+export const ROUTE_TARGETS = { item: 'item', play: 'play', library: 'library' } as const
 
 export type RouteTarget =
   | {
@@ -45,6 +45,12 @@ export type RouteTarget =
       fileId: number | null
     }
   | { kind: typeof ROUTE_TARGETS.play; mediaId: number }
+  | {
+      kind: typeof ROUTE_TARGETS.library
+      libraryId: number
+      /** The search the library opens on, as the web's `?q=`; empty for none. */
+      query: string
+    }
 
 /** An item's page, with neither a library nor a file named. */
 export const itemTarget = (itemId: number): RouteTarget => ({
@@ -55,8 +61,8 @@ export const itemTarget = (itemId: number): RouteTarget => ({
 })
 
 /** A param's value, left out when there is none. */
-const paramOf = ({ name, value }: { name: string; value: number | null }) =>
-  value === null ? {} : { [name]: String(value) }
+const paramOf = ({ name, value }: { name: string; value: number | string | null }) =>
+  value === null || value === '' ? {} : { [name]: String(value) }
 
 /** A route and its params, as the router takes them. */
 type Href = {
@@ -80,6 +86,14 @@ export const hrefOf = (target: RouteTarget): Href => {
       return {
         pathname: APP_ROUTES.play,
         params: { [APP_ROUTE_PARAMS.mediaId]: String(target.mediaId) },
+      }
+    case ROUTE_TARGETS.library:
+      return {
+        pathname: APP_ROUTES.library,
+        params: {
+          [APP_ROUTE_PARAMS.id]: String(target.libraryId),
+          ...paramOf({ name: APP_ROUTE_PARAMS.query, value: target.query }),
+        },
       }
     default: {
       const unknown: never = target

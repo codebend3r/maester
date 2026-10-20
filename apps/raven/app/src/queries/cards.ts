@@ -2,13 +2,16 @@ import {
   type ApiClient,
   CARD_DESTINATIONS,
   ITEM_IMAGE_KINDS,
+  ITEM_TYPES,
   type ItemSummary,
+  type LibraryKind,
   type MediaItem,
   type MediaSort,
   type ShowEntry,
   cardDestination,
   cardTitle,
   formatRuntime,
+  matchTypeFor,
   mediaEntryKey,
   mediaLabel,
   progressOf,
@@ -131,7 +134,7 @@ const sortedLine = ({ media, order }: { media: MediaItem; order: Order }): strin
  * A movie as its poster, else its frame grab, as the web's poster card draws it, under its
  * year or the value its grid is sorted by.
  */
-export const movieCard = ({
+const movieCard = ({
   media,
   api,
   headersFor,
@@ -169,6 +172,19 @@ export const frameCard = ({
     hasPages: false,
     headersFor,
   })
+
+const isMovieKind = (kind: LibraryKind): boolean => matchTypeFor(kind) === ITEM_TYPES.movie
+
+/** How a library's videos are drawn: a Movies library's as posters, any other's as frames. */
+export const videoShapeFor = (kind: LibraryKind): CardShape =>
+  isMovieKind(kind) ? CARD_SHAPES.poster : CARD_SHAPES.wide
+
+/** A video as its library's type draws it: `movieCard` in a Movies library, else `frameCard`. */
+export const libraryVideoCard = ({
+  kind,
+  ...card
+}: Pictures & { kind: LibraryKind; media: MediaItem; order?: Order }): ShelfCard =>
+  isMovieKind(kind) ? movieCard(card) : frameCard(card)
 
 /** A show as its poster, under the years it ran or the value its grid is sorted by. */
 export const showCard = ({

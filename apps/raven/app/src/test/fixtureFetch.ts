@@ -1,0 +1,30 @@
+import type { FetchResponse } from '@raven/core'
+
+/** The statuses the test servers answer with. */
+export const STATUSES = {
+  ok: 200,
+  noContent: 204,
+  forbidden: 403,
+  notFound: 404,
+  failed: 500,
+} as const
+
+/** How a test server answers: a status, and the body it sends with it. */
+export type Answer = { status: number; body: unknown }
+
+/** The answer to a path the test server does not know. */
+export const NOT_FOUND: Answer = { status: STATUSES.notFound, body: { message: 'Not found' } }
+
+/** A request a test server heard: its method, its path and query, and what it was sent. */
+export type HeardRequest = { method: string; path: string; body: unknown }
+
+const isSuccess = (status: number): boolean => status >= 200 && status < 300
+
+/** `answer` as `fetch` hands it back: `ok` for any 2xx, as the platform's is. */
+export const responseOf = ({ status, body }: Answer): FetchResponse => ({
+  ok: isSuccess(status),
+  status,
+  statusText: isSuccess(status) ? 'OK' : 'Refused',
+  json: async () => body,
+  text: async () => JSON.stringify(body),
+})

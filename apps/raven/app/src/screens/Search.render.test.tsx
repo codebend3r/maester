@@ -6,28 +6,32 @@ import { APP_ROUTE_PARAMS, APP_ROUTES, ROUTE_TARGETS, hrefOf } from '@/routes'
 import { Search } from '@/screens/Search'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
-import type { HeardRequest } from '@/test/itemServer'
+import type { HeardRequest } from '@/test/fixtureFetch'
+import { FILMS, NAS } from '@/test/homeServer'
 import {
   DUNE,
   DUNE_QUERY,
   FAILING_SEARCH,
-  FILMS,
-  NAS,
   isSearch,
   searchApi,
   searchPathFor,
 } from '@/test/searchServer'
-import { renderScreen } from '@/test/renderScreen'
+import { heldAnswer } from '@/test/heldAnswer'
+import { keyboardTapsAbove, renderScreen } from '@/test/renderScreen'
 
 const mockPush = jest.fn()
 const mockBack = jest.fn()
-/** What the server heard, per test. */
-const mockServer: { heard: HeardRequest[] } = { heard: [] }
+/** What the server heard, and what its answers wait on, per test. */
+const mockServer: { heard: HeardRequest[]; reads: (path: string) => Promise<void> } = {
+  heard: [],
+  reads: async () => undefined,
+}
 const mockApi = jest.fn((_server: AppServer) =>
   searchApi({
     hear: (request) => {
       mockServer.heard = [...mockServer.heard, request]
     },
+    reads: (path) => mockServer.reads(path),
   }),
 )
 
@@ -69,6 +73,7 @@ describe('Search on a phone or tablet', () => {
     jest.useFakeTimers()
     jest.clearAllMocks()
     mockServer.heard = []
+    mockServer.reads = async () => undefined
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
 
@@ -133,6 +138,25 @@ describe('Search on a phone or tablet', () => {
     expect(await screen.findByText('Nothing in any library matches "zzz".')).toBeTruthy()
   })
 
+  it('says nothing matches only once the server says so, not while the last search stands in', async () => {
+    await renderScreen({ ui: <Search /> })
+    await type('zzz')
+    await pause(SEARCH_DELAY_MS)
+    expect(await screen.findByText('Nothing in any library matches "zzz".')).toBeTruthy()
+
+    const answer = heldAnswer()
+    mockServer.reads = (path) =>
+      path === searchPathFor(DUNE_QUERY) ? answer.answer : Promise.resolve()
+    const field = screen.getByLabelText(FIELD)
+    await fireEvent.changeText(field, DUNE_QUERY)
+    await fireEvent(field, 'submitEditing')
+    expect(searches()).toContain(searchPathFor(DUNE_QUERY))
+    expect(screen.queryByText(/^Nothing in any library matches/)).toBeNull()
+    expect(screen.getByText('Searching every library')).toBeTruthy()
+
+    answer.release()
+    expect(await screen.findByRole('header', { name: 'Films' })).toBeTruthy()
+  })
   it('says what went wrong when the search fails', async () => {
     await renderScreen({ ui: <Search /> })
     await type(FAILING_SEARCH.query)
@@ -168,14 +192,13 @@ describe('Search on a phone or tablet', () => {
     await type(DUNE_QUERY)
     await pause(SEARCH_DELAY_MS)
     const card = await screen.findByRole('button', { name: 'Dune' })
-    // A scroll view keeps a tap for its children only when it is told to; else the first tap
-    // only puts the keyboard away.
-    const scrollsOf = (node: typeof card | null): unknown[] => {
-      if (node === null) return []
-      const here = node.props.horizontal === true || node.props.keyboardDismissMode !== undefined
-      return [...(here ? [node.props.keyboardShouldPersistTaps] : []), ...scrollsOf(node.parent)]
-    }
-    expect(scrollsOf(card.parent)).toEqual(['handled', 'handled'])
+    // The shelf's row, then the results under the field.
+    expect(keyboardTapsAbove(card)).toEqual(['handled', 'handled'])
+  })
+
+  it('opens with the keyboard up on its field', async () => {
+    await renderScreen({ ui: <Search /> })
+    expect(screen.getByLabelText(FIELD).props.autoFocus).toBe(true)
   })
 
   it('goes back the way it came', async () => {

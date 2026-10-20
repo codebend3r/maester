@@ -14,23 +14,26 @@ const letters = () => {
   return scale
 }
 
+/** A mark's label at the default text size: 12.8 points (0.8rem), set 1.25 lines tall. */
+const LABEL = 16
+
 describe('fitJumpMarks', () => {
   it("gives each mark the alphabet's share of the room, at most the web's 40rem over 27", () => {
-    const fitted = fitJumpMarks({ scale: letters(), room: 748 })
+    const fitted = fitJumpMarks({ scale: letters(), room: 748, labelHeight: LABEL })
     expect(fitted.marks).toHaveLength(LETTERS.length)
     expect(fitted.height).toBe(JUMP_MARK_HEIGHTS.most)
     expect(JUMP_MARK_HEIGHTS.most).toBeCloseTo((40 * 16) / 27)
   })
 
   it('shrinks the marks to fit a shorter room, down to the least a finger can press', () => {
-    const fitted = fitJumpMarks({ scale: letters(), room: 600 })
+    const fitted = fitJumpMarks({ scale: letters(), room: 600, labelHeight: LABEL })
     expect(fitted.marks).toHaveLength(LETTERS.length)
     expect(fitted.height).toBeCloseTo(600 / 27)
     expect(fitted.height).toBeGreaterThanOrEqual(JUMP_MARK_HEIGHTS.least)
   })
 
   it('keeps each mark to the cards under it, and none for a mark no card is under', () => {
-    const { marks } = fitJumpMarks({ scale: letters(), room: 748 })
+    const { marks } = fitJumpMarks({ scale: letters(), room: 748, labelHeight: LABEL })
     const byLabel = (label: string) => marks.find((mark) => mark.label === label)
     expect([...(byLabel('B')?.keys ?? [])]).toEqual(['media:31'])
     expect(byLabel('C')?.keys).toBeNull()
@@ -38,7 +41,7 @@ describe('fitJumpMarks', () => {
 
   it("gathers neighbouring marks into one where a phone held sideways can't fit them all", () => {
     const room = 360
-    const fitted = fitJumpMarks({ scale: letters(), room })
+    const fitted = fitJumpMarks({ scale: letters(), room, labelHeight: LABEL })
     expect(fitted.height).toBeGreaterThanOrEqual(JUMP_MARK_HEIGHTS.least)
     expect(fitted.marks.length * fitted.height).toBeLessThanOrEqual(room)
     expect(fitted.marks).toHaveLength(14)
@@ -54,8 +57,15 @@ describe('fitJumpMarks', () => {
 
   it('gives a short strip the least height rather than collapse it when it fits', () => {
     const scale = { ...letters(), marks: letters().marks.slice(0, 5) }
-    const fitted = fitJumpMarks({ scale, room: 360 })
+    const fitted = fitJumpMarks({ scale, room: 360, labelHeight: LABEL })
     expect(fitted.marks).toHaveLength(5)
     expect(fitted.height).toBe(JUMP_MARK_HEIGHTS.least)
+  })
+
+  it("stands each mark as tall as its label at the viewer's larger text, gathering them sooner", () => {
+    const fitted = fitJumpMarks({ scale: letters(), room: 748, labelHeight: 30 })
+    expect(fitted.height).toBe(30)
+    expect(fitted.marks).toHaveLength(14)
+    expect(fitted.marks.length * fitted.height).toBeLessThanOrEqual(748)
   })
 })

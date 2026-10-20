@@ -7,10 +7,10 @@ name: A search from Home finds a title and opens it, and a library searches its 
     timeout: 30000
 # Home's header opens the search through every library.
 - tapOn: Search every library
+# The search opens with the keyboard up on its field, so typing goes straight into it.
 - extendedWaitUntil:
-    visible: Search every library
+    visible: Back
     timeout: 10000
-- tapOn: Search every library
 - inputText: lantern
 # The search runs once typing pauses, under the library holding the match. The server leaves
 # locked libraries out of it, the films' among them.

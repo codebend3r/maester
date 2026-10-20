@@ -8,6 +8,7 @@ import { CardPicture, pictureHeightOf } from '@/layouts/Card'
 import { TouchBack } from '@/layouts/TouchBack'
 import { TouchCard, touchCaptionHeightOf } from '@/layouts/TouchCard'
 import { fitJumpMarks } from '@/layouts/jumpMarks'
+import { BREAKPOINTS } from '@/layouts/screenSizes'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
   CHEVRONS,
@@ -16,7 +17,7 @@ import {
   headingLabelOf,
   isRowView,
 } from '@/layouts/gridKit'
-import { GRID_ROWS, type GridRow, columnsFor } from '@/layouts/gridRows'
+import { GRID_ROWS, type GridRow, gridColumnsOf } from '@/layouts/gridRows'
 import { useGrid } from '@/layouts/useGrid'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
@@ -29,8 +30,8 @@ const ROW_GAP = SIZES.space4
  */
 const leastWidthOf = ({ shape, screen }: { shape: CardShape; screen: number }): number => {
   if (shape === CARD_SHAPES.wide) return 240
-  if (screen <= 48 * 16) return 128
-  return screen <= 64 * 16 ? 150 : 168
+  if (screen <= BREAKPOINTS.tablet) return 128
+  return screen <= BREAKPOINTS.wide ? 150 : 168
 }
 
 /** A row of the list and tiles views is at least this wide, so a tablet holds two. */
@@ -39,7 +40,9 @@ const LEAST_ROW_WIDTH = 320
 /** A tile's picture, by its card's shape. */
 const TILE_WIDTHS = { [CARD_SHAPES.poster]: 48, [CARD_SHAPES.wide]: 96 } as const
 
-const HEADER_HEIGHT = SIZES.fieldHeight + SIZES.space2
+/** How tall a bucket's heading row stands: a finger's reach, or its title at the viewer's size. */
+const headerHeightOf = (fontScale: number): number =>
+  Math.max(SIZES.fieldHeight, linesHeightOf({ sizes: [SIZES.textLg], fontScale })) + SIZES.space2
 
 /** How wide the jump strip stands at the right edge, and so the room the cards leave it. */
 const STRIP_WIDTH = SIZES.space5
@@ -90,8 +93,9 @@ const JumpStrip = ({
   fontScale: number
   onJump: (keys: ReadonlySet<string>) => void
 }) => {
-  const unit = jump.unit === null ? 0 : linesHeightOf({ sizes: [SIZES.textXs], fontScale })
-  const { height, marks } = fitJumpMarks({ scale: jump, room: room - unit })
+  const labelHeight = linesHeightOf({ sizes: [SIZES.textXs], fontScale })
+  const unit = jump.unit === null ? 0 : labelHeight
+  const { height, marks } = fitJumpMarks({ scale: jump, room: room - unit, labelHeight })
   return (
     <View accessibilityLabel={JUMP_SCALE_LABELS[jump.field]} style={styles.strip}>
       {jump.unit !== null && <Text style={styles.unit}>{jump.unit}</Text>}
@@ -142,20 +146,14 @@ const Grid = ({
   // of a phone held sideways.
   const left = GUTTER + insets.left
   const right = GUTTER + (jump === null ? 0 : STRIP_WIDTH) + insets.right
-  const room = screen.width - left - right
   const isRows = isRowView(view)
-  const columnsOf = (shape: CardShape) =>
-    columnsFor({
-      width: room,
-      least: isRows ? LEAST_ROW_WIDTH : leastWidthOf({ shape, screen: screen.width }),
-      gap: GAP,
-    })
-  const widthOf = (shape: CardShape) => {
-    const columns = columnsOf(shape)
-    return (room - (columns - 1) * GAP) / columns
-  }
+  const { columnsOf, widthOf } = gridColumnsOf({
+    room: screen.width - left - right,
+    gap: GAP,
+    leastOf: (shape) => (isRows ? LEAST_ROW_WIDTH : leastWidthOf({ shape, screen: screen.width })),
+  })
   const heightOf = (row: GridRow): number => {
-    if (row.kind === GRID_ROWS.header) return HEADER_HEIGHT
+    if (row.kind === GRID_ROWS.header) return headerHeightOf(screen.fontScale)
     if (isRows) {
       const picture = pictureHeightOf({ shape: row.shape, width: TILE_WIDTHS[row.shape] })
       const words = linesHeightOf({
@@ -292,7 +290,13 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.6 },
   bucket: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space1 },
   chevron: { color: COLOURS.muted, fontSize: SIZES.text, width: SIZES.space3 },
-  bucketTitle: { flexShrink: 1, color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
+  bucketTitle: {
+    flexShrink: 1,
+    color: COLOURS.text,
+    fontSize: SIZES.textLg,
+    lineHeight: SIZES.textLg * LINE_RATIO,
+    fontWeight: 'bold',
+  },
   count: { color: COLOURS.muted, fontSize: SIZES.textSm },
   cards: { flexDirection: 'row', gap: GAP },
   rowCard: {
@@ -311,12 +315,17 @@ const styles = StyleSheet.create({
   rowLine: { color: COLOURS.muted, fontSize: SIZES.textXs, lineHeight: SIZES.textXs * LINE_RATIO },
   stripSlot: { position: 'absolute', width: STRIP_WIDTH, justifyContent: 'center' },
   strip: { alignItems: 'center' },
-  unit: { color: COLOURS.muted, fontSize: SIZES.textXs },
+  unit: { color: COLOURS.muted, fontSize: SIZES.textXs, lineHeight: SIZES.textXs * LINE_RATIO },
   mark: {
     minWidth: STRIP_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  markLabel: { color: COLOURS.muted, fontSize: SIZES.textXs, fontWeight: '600' },
+  markLabel: {
+    color: COLOURS.muted,
+    fontSize: SIZES.textXs,
+    lineHeight: SIZES.textXs * LINE_RATIO,
+    fontWeight: '600',
+  },
   markEmpty: { color: COLOURS.line },
 })

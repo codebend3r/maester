@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { APP_CLIENT_CALLS } from '@raven/core'
 import { fireEvent, screen } from '@testing-library/react-native'
 
@@ -7,15 +7,22 @@ import { Item } from '@/screens/Item'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { BUSBOYS, NAS, SEVERANCE, SEVERANCE_ONE, itemApi, pathFor } from '@/test/itemServer'
-import { renderScreen } from '@/test/renderScreen'
+import { NAS } from '@/test/homeServer'
+import { BUSBOYS, SEVERANCE, SEVERANCE_ONE, itemApi, pathFor } from '@/test/itemServer'
+import { heldAnswer } from '@/test/heldAnswer'
+import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 
 const mockPush = jest.fn()
 const mockParams = jest.fn((): Record<string, string> => ({ id: String(BUSBOYS.id) }))
-/** The answers the server's writes and reads wait on, per test. */
-const mockServer: { writes: () => Promise<void>; reads: (path: string) => Promise<void> } = {
+/** The answers the server's writes and reads wait on, and what lets a held one through, per test. */
+const mockServer: {
+  writes: () => Promise<void>
+  reads: (path: string) => Promise<void>
+  release: () => void
+} = {
   writes: async () => undefined,
   reads: async () => undefined,
+  release: () => undefined,
 }
 const mockApi = jest.fn((_server: AppServer) =>
   itemApi({ writes: () => mockServer.writes(), reads: (path) => mockServer.reads(path) }),
@@ -50,9 +57,13 @@ const preferred = (): string[] =>
     .filter((node) => node.props.hasTVPreferredFocus === true)
     .map((node) => node.props.accessibilityLabel)
 
+/** The client this test's screen reads through. */
+const shown = { client: createScreenClient() }
+
 const renderItem = async (id: number) => {
   mockParams.mockReturnValue({ id: String(id) })
-  return renderScreen({ ui: <Item /> })
+  shown.client = createScreenClient()
+  return renderScreen({ ui: <Item />, client: shown.client })
 }
 
 describe('Item on a TV', () => {
@@ -60,8 +71,15 @@ describe('Item on a TV', () => {
     jest.clearAllMocks()
     mockServer.writes = async () => undefined
     mockServer.reads = async () => undefined
+    mockServer.release = () => undefined
     useReduceMotion.setState({ isReduced: true })
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
+  })
+
+  // A write a test held is let through once it is done, and what follows it lands in time.
+  afterEach(async () => {
+    mockServer.release()
+    await untilIdle(shown.client)
   })
 
   it('opens with the focus on Resume, and only on Resume', async () => {
@@ -73,7 +91,9 @@ describe('Item on a TV', () => {
 
   it('asks for the focus once: not again once the viewer has moved it, nor as Play changes', async () => {
     // The mark is held unanswered, so the page shows it as made rather than read again.
-    mockServer.writes = () => new Promise<void>(() => undefined)
+    const write = heldAnswer()
+    mockServer.writes = () => write.answer
+    mockServer.release = write.release
     await renderItem(BUSBOYS.id)
     const watched = await screen.findByRole('checkbox', { name: 'Mark watched' })
 
@@ -101,18 +121,15 @@ describe('Item on a TV', () => {
   })
 
   it("waits for a show's next episode before drawing anything the remote could take first", async () => {
-    let release = () => {}
-    const next = new Promise<void>((resolve) => {
-      release = resolve
-    })
+    const next = heldAnswer()
     const nextPath = pathFor({ path: APP_CLIENT_CALLS.nextEpisode.path, id: SEVERANCE.id })
-    mockServer.reads = (path) => (path === nextPath ? next : Promise.resolve())
+    mockServer.reads = (path) => (path === nextPath ? next.answer : Promise.resolve())
     await renderItem(SEVERANCE.id)
     await screen.findByRole('header', { name: 'Severance' })
 
     // Nothing focusable is drawn yet, so tvOS has nothing else to give the focus to.
     const seasonEarly = screen.queryByRole('button', { name: 'Season 1' })
-    release()
+    next.release()
     expect(seasonEarly).toBeNull()
 
     await screen.findByRole('button', { name: 'Play S01E01' })

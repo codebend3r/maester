@@ -15,23 +15,15 @@ import {
 } from '@raven/core'
 
 import { allowlistedFetch } from '@/servers/allowlist'
+import {
+  type Answer,
+  type HeardRequest,
+  NOT_FOUND,
+  STATUSES,
+  responseOf,
+} from '@/test/fixtureFetch'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
-import { mediaItemFor } from '@/test/mediaItem'
-
-export { NAS, SERIES }
-
-const summaryFor = (overrides: Partial<ItemSummary> & Pick<ItemSummary, 'id' | 'title'>) =>
-  ({
-    type: ITEM_TYPES.movie,
-    year: 2026,
-    show: null,
-    season: null,
-    episode: null,
-    posterVersion: `p${overrides.id}`,
-    backdropVersion: `b${overrides.id}`,
-    ratings: [],
-    ...overrides,
-  }) satisfies ItemSummary
+import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 const detailsFor = (summary: ItemSummary, overrides: Partial<ItemDetails> = {}): ItemDetails => ({
   ...summary,
@@ -208,24 +200,17 @@ const READS: Record<string, unknown> = {
 /** Whether a favourite change asks for a favourite. */
 const isMarked = (body: unknown): boolean => isRecord(body) && body.favourite === true
 
-/** How the server answers: a status, and the body it sends with it. */
-type Answer = { status: number; body: unknown }
-
-const OK = 200
-
 /** The answer of a write that sends nothing back, as `PUT /api/watched` does. */
-const NO_CONTENT: Answer = { status: 204, body: null }
-
-const NOT_FOUND: Answer = { status: 404, body: { message: 'Not found' } }
+const NO_CONTENT: Answer = { status: STATUSES.noContent, body: null }
 
 const WRITES: Record<string, (body: unknown) => Answer> = {
   [setWatched.path]: () => NO_CONTENT,
   [pathFor({ path: setFavourite.path, id: BUSBOYS_FILE.id })]: (body) => ({
-    status: OK,
+    status: STATUSES.ok,
     body: { ...BUSBOYS_FILE, favourite: isMarked(body) },
   }),
   [pathFor({ path: setItemFavourite.path, id: SEVERANCE.id })]: (body) => ({
-    status: OK,
+    status: STATUSES.ok,
     body: { ...SEVERANCE, favourite: isMarked(body) },
   }),
 }
@@ -242,11 +227,8 @@ const answerFor = ({
 }): Answer => {
   if (method !== APP_CALL_METHODS.get) return WRITES[path]?.(body) ?? NOT_FOUND
   const read = READS[path]
-  return read === undefined ? NOT_FOUND : { status: OK, body: read }
+  return read === undefined ? NOT_FOUND : { status: STATUSES.ok, body: read }
 }
-
-/** A request the server heard: its method, its path and query, and what it was sent. */
-export type HeardRequest = { method: string; path: string; body: unknown }
 
 const bodyOf = (body: string | undefined): unknown => (body === undefined ? null : JSON.parse(body))
 
@@ -274,14 +256,7 @@ export const itemApi = ({
         const sent = bodyOf(init.body)
         hear({ method, path, body: sent })
         await (method === APP_CALL_METHODS.get ? reads(path) : writes())
-        const { status, body } = answerFor({ method, path, body: sent })
-        return {
-          ok: status !== NOT_FOUND.status,
-          status,
-          statusText: status === NOT_FOUND.status ? 'Not found' : 'OK',
-          json: async () => body,
-          text: async () => JSON.stringify(body),
-        }
+        return responseOf(answerFor({ method, path, body: sent }))
       },
     }),
   })

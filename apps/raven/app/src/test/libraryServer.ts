@@ -3,7 +3,6 @@ import {
   type ApiClient,
   type AppClientCall,
   ITEM_TYPES,
-  type ItemSummary,
   LIBRARY_VIEWS,
   type Library,
   MATCH_STATES,
@@ -17,23 +16,9 @@ import {
 } from '@raven/core'
 
 import { allowlistedFetch } from '@/servers/allowlist'
+import { NOT_FOUND, STATUSES, responseOf } from '@/test/fixtureFetch'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
-import { mediaItemFor } from '@/test/mediaItem'
-
-export { FILMS, NAS, SERIES }
-
-const summaryFor = (overrides: Partial<ItemSummary> & Pick<ItemSummary, 'id' | 'title'>) =>
-  ({
-    type: ITEM_TYPES.movie,
-    year: 2026,
-    show: null,
-    season: null,
-    episode: null,
-    posterVersion: `p${overrides.id}`,
-    backdropVersion: `b${overrides.id}`,
-    ratings: [],
-    ...overrides,
-  }) satisfies ItemSummary
+import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 const movieFor = ({
   id,
@@ -163,11 +148,14 @@ export const GROUPED_FILMS: Library = {
 export const libraryApi = ({
   record = () => undefined,
   libraries = () => [],
+  reads = async () => undefined,
 }: {
   /** Hears the path and query of every request. */
   record?: (path: string) => void
   /** Answers that stand in for these libraries' own. */
   libraries?: () => Library[]
+  /** What each answer waits on, by its path and query, so a test can look while it waits. */
+  reads?: (path: string) => Promise<void>
 } = {}): ApiClient =>
   createApiClient({
     baseUrl: NAS.origin,
@@ -175,18 +163,12 @@ export const libraryApi = ({
       fetch: async (url) => {
         const path = url.slice(NAS.origin.length)
         record(path)
+        await reads(path)
         const override = libraries().find(
           (library) => path === libraryPath({ call: getLibrary, library }),
         )
         const body = override ?? ANSWERS[path]
-        const status = body === undefined ? 404 : 200
-        return {
-          ok: status === 200,
-          status,
-          statusText: status === 200 ? 'OK' : 'Not found',
-          json: async () => body ?? { message: 'Not found' },
-          text: async () => JSON.stringify(body ?? { message: 'Not found' }),
-        }
+        return responseOf(body === undefined ? NOT_FOUND : { status: STATUSES.ok, body })
       },
     }),
   })

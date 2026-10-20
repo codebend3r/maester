@@ -11,15 +11,8 @@ import {
 
 import { CARD_SHAPES } from '@/queries/cards'
 import { librarySectionsOf } from '@/queries/libraryGrid'
-import {
-  ASHFALL_GATE,
-  BUSBOYS,
-  FILMS,
-  NAS,
-  NIGHT_TRAIN,
-  SERIES,
-  libraryApi,
-} from '@/test/libraryServer'
+import { FILMS, NAS, SERIES } from '@/test/homeServer'
+import { ASHFALL_GATE, BUSBOYS, NIGHT_TRAIN, libraryApi } from '@/test/libraryServer'
 import { mediaItemFor } from '@/test/mediaItem'
 import { ROUTE_TARGETS } from '@/routes'
 

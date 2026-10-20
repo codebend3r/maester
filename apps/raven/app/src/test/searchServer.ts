@@ -5,31 +5,21 @@ import {
   HOME_SHELF_TYPES,
   type HomeSearch,
   ITEM_TYPES,
-  type ItemSummary,
   MATCH_STATES,
   createApiClient,
   toQueryString,
 } from '@raven/core'
 
 import { allowlistedFetch } from '@/servers/allowlist'
+import {
+  type Answer,
+  type HeardRequest,
+  NOT_FOUND,
+  STATUSES,
+  responseOf,
+} from '@/test/fixtureFetch'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
-import type { HeardRequest } from '@/test/itemServer'
-import { mediaItemFor } from '@/test/mediaItem'
-
-export { FILMS, NAS }
-
-const summaryFor = (overrides: Partial<ItemSummary> & Pick<ItemSummary, 'id' | 'title'>) =>
-  ({
-    type: ITEM_TYPES.movie,
-    year: 2026,
-    show: null,
-    season: null,
-    episode: null,
-    posterVersion: `p${overrides.id}`,
-    backdropVersion: `b${overrides.id}`,
-    ratings: [],
-    ...overrides,
-  }) satisfies ItemSummary
+import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 export const DUNE = mediaItemFor({
   id: 50,
@@ -81,40 +71,35 @@ export const searchPathFor = (query: string): string =>
 /** Whether `path` is a search through every library. */
 export const isSearch = (path: string): boolean => path.startsWith(`${searchHome.path}?`)
 
-type Answer = { status: number; body: unknown }
-
 const answerFor = (path: string): Answer => {
-  if (path === listLibraries.path) return { status: 200, body: [FILMS, SERIES] }
-  if (path === searchPathFor(DUNE_QUERY)) return { status: 200, body: DUNE_RESULTS }
+  if (path === listLibraries.path) return { status: STATUSES.ok, body: [FILMS, SERIES] }
+  if (path === searchPathFor(DUNE_QUERY)) return { status: STATUSES.ok, body: DUNE_RESULTS }
   if (path === searchPathFor(FAILING_SEARCH.query)) {
-    return { status: 500, body: { message: FAILING_SEARCH.message } }
+    return { status: STATUSES.failed, body: { message: FAILING_SEARCH.message } }
   }
-  return isSearch(path)
-    ? { status: 200, body: [] }
-    : { status: 404, body: { message: 'Not found' } }
+  return isSearch(path) ? { status: STATUSES.ok, body: [] } : NOT_FOUND
 }
 
 /**
  * Films and Series, and a search through them that finds Dune in both, behind the app's
- * allowlist so an unlisted call fails the test. Every request is heard.
+ * allowlist so an unlisted call fails the test. Every request is heard, and answered once
+ * `reads` lets its path through, so a test can look while the server is still busy.
  */
 export const searchApi = ({
   hear = () => undefined,
-}: { hear?: (request: HeardRequest) => void } = {}): ApiClient =>
+  reads = async () => undefined,
+}: {
+  hear?: (request: HeardRequest) => void
+  reads?: (path: string) => Promise<void>
+} = {}): ApiClient =>
   createApiClient({
     baseUrl: NAS.origin,
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
         const path = url.slice(NAS.origin.length)
         hear({ method: init.method ?? APP_CALL_METHODS.get, path, body: null })
-        const { status, body } = answerFor(path)
-        return {
-          ok: status === 200,
-          status,
-          statusText: status === 200 ? 'OK' : 'Refused',
-          json: async () => body,
-          text: async () => JSON.stringify(body),
-        }
+        await reads(path)
+        return responseOf(answerFor(path))
       },
     }),
   })

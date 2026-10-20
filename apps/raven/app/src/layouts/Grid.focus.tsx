@@ -1,5 +1,5 @@
 import { JUMP_SCALE_LABELS, type JumpScale, LIBRARY_VIEWS } from '@raven/core'
-import { type ComponentRef, useRef, useState } from 'react'
+import { type ComponentRef, useMemo, useRef, useState } from 'react'
 import {
   FlatList,
   Pressable,
@@ -10,9 +10,9 @@ import {
   useWindowDimensions,
 } from 'react-native'
 
-import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
+import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
-import { FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
+import { FOCUS_CARD_WIDTHS, FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
   CHEVRONS,
@@ -21,16 +21,13 @@ import {
   headingLabelOf,
   isRowView,
 } from '@/layouts/gridKit'
-import { GRID_ROWS, type GridRow, columnsFor } from '@/layouts/gridRows'
+import { GRID_ROWS, type GridRow, gridColumnsOf } from '@/layouts/gridRows'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useGrid } from '@/layouts/useGrid'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
 const GUTTER = SIZES.space8
 const GAP = SIZES.space5
-
-/** The narrowest card a row holds, read from across the room, as Home's shelves draw them. */
-const LEAST_WIDTHS = { [CARD_SHAPES.poster]: 232, [CARD_SHAPES.wide]: 400 } as const
 
 /** A row of the list and tiles views is at least this wide, so a TV holds three. */
 const LEAST_ROW_WIDTH = 480
@@ -40,7 +37,12 @@ const TILE_WIDTHS = { [CARD_SHAPES.poster]: 72, [CARD_SHAPES.wide]: 144 } as con
 /** Room above and below each row for a card grown by focus, as Home's rows leave it. */
 const GROWTH_ROOM = SIZES.space4
 
-const HEADER_HEIGHT = SIZES.controlLarge + SIZES.space3
+/** How tall a bucket's heading row stands: the remote's control, or its title at the viewer's size. */
+const headerHeightOf = (fontScale: number): number =>
+  Math.max(
+    SIZES.controlLarge,
+    linesHeightOf({ sizes: [SIZES.textXl], fontScale }) + 2 * SIZES.tvFocusRing,
+  ) + SIZES.space3
 
 /**
  * A card of the list or tiles view, the remote's to move to: a row of words, ringed while focused.
@@ -156,20 +158,18 @@ const Grid = ({
   onOpen,
 }: GridProps) => {
   const screen = useWindowDimensions()
-  const room = screen.width - 2 * GUTTER
   const isRows = isRowView(view)
-  const columnsOf = (shape: CardShape) =>
-    columnsFor({ width: room, least: isRows ? LEAST_ROW_WIDTH : LEAST_WIDTHS[shape], gap: GAP })
-  const widthOf = (shape: CardShape) => {
-    const columns = columnsOf(shape)
-    return (room - (columns - 1) * GAP) / columns
-  }
+  const { columnsOf, widthOf } = gridColumnsOf({
+    room: screen.width - 2 * GUTTER,
+    gap: GAP,
+    leastOf: (shape) => (isRows ? LEAST_ROW_WIDTH : FOCUS_CARD_WIDTHS[shape]),
+  })
   const wordsHeight = linesHeightOf({
     sizes: [SIZES.textLg, SIZES.text],
     fontScale: screen.fontScale,
   })
   const heightOf = (row: GridRow): number => {
-    if (row.kind === GRID_ROWS.header) return HEADER_HEIGHT
+    if (row.kind === GRID_ROWS.header) return headerHeightOf(screen.fontScale)
     if (isRows) {
       const picture = pictureHeightOf({ shape: row.shape, width: TILE_WIDTHS[row.shape] })
       return (
@@ -199,10 +199,13 @@ const Grid = ({
   const jumpOf = (card: ShelfCard): JumpFocus | null =>
     jumped !== null && card.key === jumped.card ? { count: jumped.count, claim: claimJump } : null
   // The first card, or bucket, takes the focus as the grid opens, and only then: once anything
-  // in the grid has had it, a new first card (after a sort) must not pull it from the viewer.
+  // on the screen has had it, a card drawn later (after a sort, or once a search finds some)
+  // must not pull it from the viewer. The header hears its controls' focus as it bubbles up.
   const [isOpening, setOpening] = useState(true)
   const settle = () => setOpening(false)
   const preferred = isOpening ? firstKeyOf(rows) : null
+  // What the rows draw from beyond `rows` itself, the one value while neither changes.
+  const drawn = useMemo(() => ({ jumped, preferred }), [jumped, preferred])
 
   const renderRow = ({ item: row }: { item: GridRow }) => {
     switch (row.kind) {
@@ -264,7 +267,7 @@ const Grid = ({
 
   return (
     <View style={styles.ground}>
-      <View style={styles.header}>
+      <View onFocus={settle} style={styles.header}>
         <Text accessibilityRole="header" style={styles.title}>
           {title}
         </Text>
@@ -300,7 +303,7 @@ const Grid = ({
             ref={list}
             contentContainerStyle={styles.content}
             data={rows}
-            extraData={{ jumped, preferred }}
+            extraData={drawn}
             keyExtractor={(row) => row.key}
             renderItem={renderRow}
             style={{ height: listHeight }}
@@ -325,7 +328,7 @@ const styles = StyleSheet.create({
   },
   title: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
   line: { color: COLOURS.muted, fontSize: SIZES.textLg },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space3 },
+  toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SIZES.space3 },
   notice: { color: COLOURS.muted, fontSize: SIZES.textLg },
   // A horizontal ScrollView grows by default, which would leave the cards below no room.
   jumpScroll: { flexGrow: 0 },
@@ -333,7 +336,7 @@ const styles = StyleSheet.create({
   unit: { color: COLOURS.muted, fontSize: SIZES.text, paddingRight: SIZES.space1 },
   mark: {
     minWidth: SIZES.controlLarge,
-    height: SIZES.controlLarge,
+    minHeight: SIZES.controlLarge,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: SIZES.radius,
@@ -358,7 +361,12 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   chevron: { color: COLOURS.muted, fontSize: SIZES.textLg },
-  bucketTitle: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
+  bucketTitle: {
+    color: COLOURS.text,
+    fontSize: SIZES.textXl,
+    lineHeight: SIZES.textXl * LINE_RATIO,
+    fontWeight: 'bold',
+  },
   count: { color: COLOURS.muted, fontSize: SIZES.textLg },
   cards: { flexDirection: 'row', gap: GAP, paddingVertical: GROWTH_ROOM },
   rowCards: { paddingVertical: SIZES.space1 },

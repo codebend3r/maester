@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { APP_CALL_METHODS, APP_CLIENT_CALLS, WATCH_TARGET_KINDS } from '@raven/core'
 import { fireEvent, screen } from '@testing-library/react-native'
 
@@ -6,26 +6,31 @@ import { APP_ROUTES } from '@/routes'
 import { Item } from '@/screens/Item'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
+import type { HeardRequest } from '@/test/fixtureFetch'
+import { NAS, SERIES } from '@/test/homeServer'
 import {
   BUSBOYS,
   BUSBOYS_FILE,
   GOOD_NEWS_ABOUT_HELL,
-  type HeardRequest,
-  NAS,
-  SERIES,
   SEVERANCE,
   SEVERANCE_ONE,
   itemApi,
   pathFor,
 } from '@/test/itemServer'
-import { renderScreen } from '@/test/renderScreen'
+import { heldAnswer } from '@/test/heldAnswer'
+import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 
 const mockPush = jest.fn()
 const mockParams = jest.fn((): Record<string, string> => ({ id: String(BUSBOYS.id) }))
-/** What the server heard, and the answer its writes wait on, per test. */
-const mockServer: { heard: HeardRequest[]; writes: () => Promise<void> } = {
+/** What the server heard, and the answers its writes and reads wait on, per test. */
+const mockServer: {
+  heard: HeardRequest[]
+  writes: () => Promise<void>
+  reads: (path: string) => Promise<void>
+} = {
   heard: [],
   writes: async () => undefined,
+  reads: async () => undefined,
 }
 const mockApi = jest.fn((_server: AppServer) =>
   itemApi({
@@ -33,6 +38,7 @@ const mockApi = jest.fn((_server: AppServer) =>
       mockServer.heard = [...mockServer.heard, request]
     },
     writes: () => mockServer.writes(),
+    reads: (path) => mockServer.reads(path),
   }),
 )
 
@@ -53,18 +59,13 @@ jest.mock('@/servers/serverClient', () => ({
 
 const { setWatched, setItemFavourite } = APP_CLIENT_CALLS
 
+/** The client this test's screen reads through. */
+const shown = { client: createScreenClient() }
+
 const renderItem = async (params: Record<string, string>) => {
   mockParams.mockReturnValue(params)
-  return renderScreen({ ui: <Item /> })
-}
-
-/** A server's answer held back until `release` is called. */
-const heldAnswer = () => {
-  let release = () => {}
-  const answer = new Promise<void>((resolve) => {
-    release = resolve
-  })
-  return { answer, release }
+  shown.client = createScreenClient()
+  return renderScreen({ ui: <Item />, client: shown.client })
 }
 
 /** The writes the server heard, without its reads. */
@@ -76,8 +77,12 @@ describe('Item on a phone or tablet', () => {
     jest.clearAllMocks()
     mockServer.heard = []
     mockServer.writes = async () => undefined
+    mockServer.reads = async () => undefined
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
+
+  // What the page still reads, such as a season's show, lands before the test ends.
+  afterEach(() => untilIdle(shown.client))
 
   it('shows a half-watched movie with Resume and the time left', async () => {
     await renderItem({ id: String(BUSBOYS.id) })
@@ -132,6 +137,20 @@ describe('Item on a phone or tablet', () => {
     expect(await screen.findByRole('button', { name: 'Play S01E01' })).toBeTruthy()
     await fireEvent.press(screen.getByRole('button', { name: 'Season 2' }))
     expect(mockPush).toHaveBeenCalledWith({ pathname: APP_ROUTES.item, params: { id: '7' } })
+  })
+
+  it("offers a show's marks while its next episode is read, and Play once it is, as the web does", async () => {
+    const next = heldAnswer()
+    const nextPath = pathFor({ path: APP_CLIENT_CALLS.nextEpisode.path, id: SEVERANCE.id })
+    mockServer.reads = (path) => (path === nextPath ? next.answer : Promise.resolve())
+    await renderItem({ id: String(SEVERANCE.id) })
+
+    expect(await screen.findByRole('checkbox', { name: 'Favourite', checked: false })).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: 'Mark watched' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Play S01E01' })).toBeNull()
+
+    next.release()
+    expect(await screen.findByRole('button', { name: 'Play S01E01' })).toBeTruthy()
   })
 
   it('marks a show a favourite, showing it before the server answers', async () => {
