@@ -12,7 +12,11 @@ services:
         versions:
           - {resolution: "1080", codec: h264, size_gb: 12.0, bitrate_mbps: 10.2, file: "/Movies/Dune (2021)/Dune (2021) WEBDL-1080p.mkv"}
           - {resolution: "4k", codec: hevc, size_gb: 21.5, bitrate_mbps: 18.4, file: "/Movies/Dune (2021)/Dune (2021) 2160p HEVC.mkv"}
+  raven:
+    titles:
+      - {title: "Dune", year: 2021, quality: "1080p"}
+      - {title: "Dune", year: 2021, quality: "4K", hdr: true}
 turns:
-  - user: "is Dune (2021) on the server?"
+  - user: "which versions of Dune (2021) are on the server? send me the Plex link"
     expect_tools: [check_availability]
     reply_matches: "app\\.plex\\.tv/desktop/#!/server/"
