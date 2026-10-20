@@ -210,6 +210,25 @@ describe('mediaAccessFor', () => {
     expect(probes.probed.every((url) => url.startsWith(`${PUBLIC.url}/`))).toBe(true)
   })
 
+  it('refuses, never rejects, when the jar cannot be read', async () => {
+    const server = mediaServer({ tickets: [STATUSES.unavailable] })
+    const media = mediaAccessFor({
+      api: server.api,
+      server: NAS,
+      now: () => READ_AT,
+      probe: probesOf({ elapsedMs: QUICK_LAN }).probe,
+      readCookies: async () => {
+        throw new Error('The keychain is locked')
+      },
+      watchNetwork: fakeNetwork().watchNetwork,
+    })
+    expect(await media.source(direct)).toEqual({
+      ok: false,
+      reason: ACCESS_REFUSALS.unreachable,
+      message: MEDIA_ACCESS_MESSAGES.unreachable(NAS.name),
+    })
+  })
+
   it('refuses a video in a locked library', async () => {
     const { media } = setUp({ server: mediaServer({ tickets: [STATUSES.locked] }) })
     expect(await media.source(direct)).toEqual({

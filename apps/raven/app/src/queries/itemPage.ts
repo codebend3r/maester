@@ -240,7 +240,7 @@ export const playablePage = ({
             facts: [...versionFacts(version), version.edition].filter(
               (fact): fact is string => fact !== null && fact !== '',
             ),
-            target: { kind: ROUTE_TARGETS.play, mediaId: version.id },
+            target: { kind: ROUTE_TARGETS.play, mediaId: version.id, at: 0 },
           })),
     castTitle: isEpisode ? CAST_TITLES.guests : CAST_TITLES.everyone,
     ...pictures,

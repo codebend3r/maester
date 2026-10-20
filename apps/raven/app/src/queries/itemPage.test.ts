@@ -80,8 +80,8 @@ describe('playablePage', () => {
     const uhd = mediaItemFor({ ...BUSBOYS_FILE, id: 22, width: 3840, height: 2160, size: 4e10 })
     const rows = movie({ versions: [BUSBOYS_FILE, uhd] }).versions
     expect(rows.map(({ fileName, target }) => [fileName, target])).toEqual([
-      ['Busboys (2026).mkv', { kind: ROUTE_TARGETS.play, mediaId: 20 }],
-      ['Busboys (2026).mkv', { kind: ROUTE_TARGETS.play, mediaId: 22 }],
+      ['Busboys (2026).mkv', { kind: ROUTE_TARGETS.play, mediaId: 20, at: 0 }],
+      ['Busboys (2026).mkv', { kind: ROUTE_TARGETS.play, mediaId: 22, at: 0 }],
     ])
     expect(rows[1]!.facts).toEqual(['4K', 'HEVC', '40.0 GB'])
   })

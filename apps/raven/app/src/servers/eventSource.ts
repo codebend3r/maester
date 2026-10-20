@@ -35,6 +35,9 @@ export const APP_STATES = {
   background: 'background',
 } as const
 
+/** What React Native's `AppState` says when the app's state changes. */
+export const APP_STATE_EVENTS = { change: 'change' } as const
+
 /**
  * Whether the app counts as in the foreground in `state`. Only the background closes the
  * stream: `inactive` is Control Center, a call or the app switcher passing over the app,

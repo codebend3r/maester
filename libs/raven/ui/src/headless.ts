@@ -1,6 +1,10 @@
 export { VIDEO_EVENTS, initialVideoState, videoReducer } from '@/components/Player/videoState'
 export type { Ranges, VideoEvent, VideoState } from '@/components/Player/videoState'
 export { fromPlayerEvent, rangesFrom } from '@/components/Player/fromPlayerEvent'
+export { SAVE_EVERY_S } from '@/components/Player/watchProgress'
+export { useProgressReport } from '@/components/Player/useProgressReport'
+export type { WatchHide } from '@/components/Player/useProgressReport'
+export { preferredAudio, preferredSubtitle } from '@/components/Player/selection'
 export { ENGINE_KINDS, sendQuietly, sourceKey } from '@/components/Player/engine'
 export type {
   Engine,
@@ -24,6 +28,7 @@ export { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@/stores/playerPrefs'
 export { configureStorage } from '@/stores/configureStorage'
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'
+export { useTrackCues } from '@/lib/useTrackCues'
 export { playerQueryKeys } from '@/lib/playerQueryKeys'
 export { useSearch } from '@/lib/useSearch'
 export type { Search } from '@/lib/useSearch'

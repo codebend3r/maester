@@ -1,23 +1,8 @@
-import { useQueries } from '@tanstack/react-query'
-import {
-  PLAYER_SOURCE_KINDS,
-  SUBTITLE_SOURCES,
-  type SubtitleCue,
-  type SubtitleTrack,
-  mergeCues,
-  subtitleWindows,
-} from '@raven/core'
+import { PLAYER_SOURCE_KINDS, type SubtitleCue, type SubtitleTrack } from '@raven/core'
 import type { HtmlSource } from '@/components/Player/engine'
-import { playerQueriesFor } from '@/lib/playerQueries'
+import { type SubtitleStatus, useTrackCues } from '@/lib/useTrackCues'
 
-export type SubtitleStatus = 'off' | 'loading' | 'ready' | 'error'
-
-/**
- * The cues around `time` for one track. An embedded track is fetched a
- * window at a time, the one playing plus the next as it draws near; a
- * sidecar file comes whole. Windows already fetched stay in the query
- * cache, so seeking back is instant.
- */
+/** The cues around `time` for one track of what the browser plays; a local file has none here. */
 export const useSubtitleCues = ({
   source,
   track,
@@ -28,40 +13,13 @@ export const useSubtitleCues = ({
   track: SubtitleTrack | null
   time: number
   duration: number | null
-}): { cues: SubtitleCue[]; status: SubtitleStatus } => {
-  const windows =
-    track == null || source.kind === PLAYER_SOURCE_KINDS.file
-      ? []
-      : track.source === SUBTITLE_SOURCES.external
-        ? [0]
-        : subtitleWindows({ time, duration })
-  return useQueries({
-    queries:
-      track == null || source.kind === PLAYER_SOURCE_KINDS.file
-        ? []
-        : windows.map((window) =>
-            playerQueriesFor(source.api).subtitles({
-              id: source.media.id,
-              trackId: track.id,
-              window,
-            }),
-          ),
-    combine: (results) => {
-      const [playing] = results
-      const status: SubtitleStatus =
-        playing == null
-          ? 'off'
-          : playing.isError
-            ? 'error'
-            : playing.isPending
-              ? 'loading'
-              : 'ready'
-      const cues = results.reduce<SubtitleCue[]>(
-        (merged, result) =>
-          result.data ? mergeCues({ existing: merged, incoming: result.data }) : merged,
-        [],
-      )
-      return { cues, status }
-    },
+}): { cues: SubtitleCue[]; status: SubtitleStatus } =>
+  useTrackCues({
+    video:
+      source.kind === PLAYER_SOURCE_KINDS.server
+        ? { api: source.api, mediaId: source.media.id }
+        : null,
+    track,
+    time,
+    duration,
   })
-}

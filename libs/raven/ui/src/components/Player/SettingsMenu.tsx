@@ -7,7 +7,7 @@ import { playingAudio } from '@/components/Player/selection'
 import type { ChoiceGroup as Group, PlayChoices } from '@/components/Player/playChoices'
 import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/SettingsMenu.module.scss'
-import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
+import type { SubtitleStatus } from '@/lib/useTrackCues'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 
 const SUBTITLE_STATUS: Record<SubtitleStatus, string | null> = {

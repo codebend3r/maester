@@ -1,4 +1,4 @@
-import { type FetchResponse, LOCKED_STATUS } from '@raven/core'
+import { type FetchResponse, LOCKED_STATUS, isString } from '@raven/core'
 
 /** The statuses the test servers answer with. */
 export const STATUSES = {
@@ -28,5 +28,6 @@ export const responseOf = ({ status, body }: Answer): FetchResponse => ({
   status,
   statusText: isSuccess(status) ? 'OK' : 'Refused',
   json: async () => body,
-  text: async () => JSON.stringify(body),
+  // A text body, as WebVTT is, goes as it is; anything else as JSON.
+  text: async () => (isString(body) ? body : JSON.stringify(body)),
 })

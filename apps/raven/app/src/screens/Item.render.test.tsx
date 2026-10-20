@@ -105,7 +105,10 @@ describe('Item on a phone or tablet', () => {
     await fireEvent.press(await screen.findByRole('button', { name: 'Resume from 50:00' }))
     expect(mockPush).toHaveBeenCalledWith({
       pathname: APP_ROUTES.play,
-      params: { [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_FILE.id) },
+      params: {
+        [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_FILE.id),
+        [APP_ROUTE_PARAMS.at]: String(BUSBOYS_FILE.position),
+      },
     })
   })
 

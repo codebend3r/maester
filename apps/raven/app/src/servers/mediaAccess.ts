@@ -79,10 +79,18 @@ type TicketRead =
   | { kind: typeof TICKET_READS.off }
   | { kind: typeof TICKET_READS.refused; refusal: AccessRefusal }
 
+const accessRefusal = ({
+  reason,
+  server,
+}: {
+  reason: AccessRefusalReason
+  server: AppServer
+}): AccessRefusal => ({ ok: false, reason, message: MEDIA_ACCESS_MESSAGES[reason](server.name) })
+
 const refusalOf = ({ error, server }: { error: unknown; server: AppServer }): TicketRead => {
   const refused = (reason: AccessRefusalReason): TicketRead => ({
     kind: TICKET_READS.refused,
-    refusal: { ok: false, reason, message: MEDIA_ACCESS_MESSAGES[reason](server.name) },
+    refusal: accessRefusal({ reason, server }),
   })
   // Anything but the server's own answer, a failed network above all, is an outage.
   if (!(error instanceof ApiError)) return refused(ACCESS_REFUSALS.unreachable)
@@ -214,26 +222,33 @@ export const mediaAccessFor = ({
     return { ok: true, source: { uri, headers } }
   }
 
-  return {
-    source: async (request) => {
-      const [origin, read] = await Promise.all([pickOf(), ticketFor(request.media.id)])
-      switch (read.kind) {
-        case TICKET_READS.refused:
-          return read.refusal
-        case TICKET_READS.off:
-          return cookieSource(request)
-        case TICKET_READS.issued: {
-          if (origin === null) return cookieSource(request)
-          const uri = uriFor({ request, access: { origin, ticket: read.ticket } })
-          checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
-          return { ok: true, source: { uri, headers: {} } }
-        }
-        default: {
-          const unreachable: never = read
-          return unreachable
-        }
+  const sourceFor = async (request: SourceRequest): Promise<SourceOutcome> => {
+    const [origin, read] = await Promise.all([pickOf(), ticketFor(request.media.id)])
+    switch (read.kind) {
+      case TICKET_READS.refused:
+        return read.refusal
+      case TICKET_READS.off:
+        return cookieSource(request)
+      case TICKET_READS.issued: {
+        if (origin === null) return cookieSource(request)
+        const uri = uriFor({ request, access: { origin, ticket: read.ticket } })
+        checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
+        return { ok: true, source: { uri, headers: {} } }
       }
-    },
+      default: {
+        const unreachable: never = read
+        return unreachable
+      }
+    }
+  }
+
+  return {
+    // A jar that cannot be read, or an address the allowlist refuses, is an outcome like any
+    // other refusal, so the player always hears back.
+    source: (request) =>
+      sourceFor(request).catch(() =>
+        accessRefusal({ reason: ACCESS_REFUSALS.unreachable, server }),
+      ),
     close: stopWatching,
   }
 }

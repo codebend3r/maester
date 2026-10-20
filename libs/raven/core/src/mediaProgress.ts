@@ -17,3 +17,17 @@ export const timeLeftOf = (media: MediaItem): string | null => {
   const minutes = Math.max(1, Math.round((media.duration - media.position) / 60))
   return `${minutes} min left`
 }
+
+/** How near a known end a stopped video starts over rather than resumes, in seconds. */
+const RESUME_MARGIN_S = 10
+
+/**
+ * Where a video starts: at `at` when a caller names a spot past 0, else where it last stopped,
+ * and from the top when that is 0 or within the last 10 seconds of a known end.
+ */
+export const resumeAtFor = ({ at, media }: { at: number; media: MediaItem }): number => {
+  const from = at > 0 ? at : media.position
+  if (from <= 0) return 0
+  if (media.duration !== null && from >= media.duration - RESUME_MARGIN_S) return 0
+  return from
+}

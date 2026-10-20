@@ -1,3 +1,3 @@
-import { Play } from '@/screens/Play'
+import { Player } from '@/screens/Player'
 
-export default Play
+export default Player

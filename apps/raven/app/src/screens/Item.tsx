@@ -72,7 +72,8 @@ const playOf = ({
   kind: ITEM_ACTIONS.play,
   key: ACTION_KEYS.play,
   label,
-  onPress: () => context.onOpen({ kind: ROUTE_TARGETS.play, mediaId: media.id }),
+  onPress: () =>
+    context.onOpen({ kind: ROUTE_TARGETS.play, mediaId: media.id, at: media.position }),
 })
 
 const favouriteOf = ({

@@ -1,8 +1,14 @@
-import { type RefObject, useEffect, useEffectEvent, useRef } from 'react'
+import type { RefObject } from 'react'
 import { useHostServices } from '@/stores/playerServices'
+import { type WatchHide, useProgressReport } from '@/components/Player/useProgressReport'
 import type { VideoState } from '@/components/Player/videoState'
 
-const SAVE_EVERY_S = 10
+const PAGE_EVENTS = { hide: 'pagehide' } as const
+
+const watchPageHide: WatchHide = (save) => {
+  window.addEventListener(PAGE_EVENTS.hide, save)
+  return () => window.removeEventListener(PAGE_EVENTS.hide, save)
+}
 
 /** Progress follows engine state, not a particular engine's DOM events. */
 export const useWatchProgress = ({
@@ -18,49 +24,13 @@ export const useWatchProgress = ({
   audio: number | null
 }): void => {
   const { progress, title } = useHostServices()
-  const lastSaved = useRef(title.resumeAt)
-  const started = useRef(false)
-  const previous = useRef(state)
-  const reportedDuration = useRef<number | null>(null)
-
-  const save = useEffectEvent((at: number) => {
-    if (!started.current || !Number.isFinite(at)) return
-    lastSaved.current = at
-    progress.save({ position: at, audio })
+  useProgressReport({
+    state,
+    position,
+    duration,
+    audio,
+    resumeAt: title.resumeAt,
+    progress,
+    watchHide: watchPageHide,
   })
-
-  useEffect(() => {
-    if (!started.current && !state.paused && !state.waiting) {
-      started.current = true
-      progress.started()
-    }
-    if (state.ended && !previous.current.ended) save(duration ?? position.current)
-    else if (
-      (state.paused && !previous.current.paused) ||
-      Math.abs(state.time - lastSaved.current) >= SAVE_EVERY_S
-    )
-      save(position.current)
-    previous.current = state
-  }, [state, duration, position, progress])
-
-  useEffect(() => {
-    if (duration == null || !Number.isFinite(duration) || duration <= 0) return
-    if (reportedDuration.current === duration) return
-    reportedDuration.current = duration
-    if (!progress.duration) return
-    progress.duration(duration)
-  }, [duration, progress])
-
-  const leave = useEffectEvent(() => {
-    save(position.current)
-    progress.left(position.current)
-  })
-  const hide = useEffectEvent(() => save(position.current))
-  useEffect(() => {
-    window.addEventListener('pagehide', hide)
-    return () => {
-      window.removeEventListener('pagehide', hide)
-      leave()
-    }
-  }, [])
 }

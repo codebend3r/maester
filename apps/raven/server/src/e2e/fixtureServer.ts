@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { rmSync } from 'node:fs'
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import { constants, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { LIBRARY_KINDS } from '@raven/core'
@@ -9,14 +9,16 @@ import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 import { ADMIN_PASSWORD, NOT_WATCHING, adminCookie, testConfig } from '@/test/app'
-import { encodeRichClip } from '@/test/clips'
+import { encodeClip, encodeRichClip } from '@/test/clips'
 import { fakeTmdb } from '@/test/fakeTmdb'
 import { apiFor } from '@/test/server'
 
 /**
  * A real raven server for the device app's Maestro flows (`apps/raven/app/e2e`): one locked
- * film library holding a movie and one open series library holding an episode, behind a PIN
- * and the admin password, with media tickets on. Both are matched against a fake TMDB, so no
+ * film library holding a movie and one open series library holding two episodes, behind a PIN
+ * and the admin password, with media tickets on. The movie and the first episode are MKVs, which
+ * an Apple device plays through the server's HLS remux; the second episode is an MP4 with an
+ * English sidecar, which it plays as it is. Both are matched against a fake TMDB, so no
  * request leaves the Mac. It listens on a fixed port on the loopback, which the iOS and tvOS
  * simulators share with the Mac, and lives until it is stopped.
  */
@@ -29,6 +31,8 @@ const FIXTURE = {
     library: 'Series',
     folder: join('Lantern Bay', 'Season 1'),
     file: 'Lantern Bay - S01E01 - Low Tide.mkv',
+    direct: 'Lantern Bay - S01E02 - High Water.mp4',
+    sidecar: 'Lantern Bay - S01E02 - High Water.en.srt',
   },
 } as const
 
@@ -39,12 +43,20 @@ const tmdb = fakeTmdb({
       id: 9002,
       title: 'Lantern Bay',
       first: '2024-01-05',
-      seasons: { 1: [{ number: 1, title: 'Low Tide', aired: '2024-01-05' }] },
+      seasons: {
+        1: [
+          { number: 1, title: 'Low Tide', aired: '2024-01-05' },
+          { number: 2, title: 'High Water', aired: '2024-01-12' },
+        ],
+      },
     },
   ],
 })
 
 const CUES = ['1', '00:00:02,000 --> 00:00:05,000', 'The tide is turning.', ''].join('\n')
+
+/** The sidecar's one cue lasts nearly all of the clip, so a player paused anywhere shows it. */
+const SIDECAR_CUES = ['1', '00:00:01,000 --> 00:00:58,000', 'The water is rising.', ''].join('\n')
 
 const STOP_SIGNALS = ['SIGINT', 'SIGTERM'] as const
 
@@ -73,7 +85,9 @@ const serve = async (): Promise<string> => {
       cues: CUES,
     }),
     encodeRichClip({ path: join(shows, FIXTURE.show.folder, FIXTURE.show.file), cues: CUES }),
+    encodeClip({ path: join(shows, FIXTURE.show.folder, FIXTURE.show.direct), seconds: 60 }),
   ])
+  await writeFile(join(shows, FIXTURE.show.folder, FIXTURE.show.sidecar), SIDECAR_CUES)
 
   const app = await createApp({
     config: {
