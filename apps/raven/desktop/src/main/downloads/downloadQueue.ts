@@ -1,6 +1,11 @@
-import { isMediaTracks, oneOf, type SubtitleTrack } from '@raven/core'
+import { AUTH_REFUSALS, oneOf } from '@raven/core'
+import { unlessStopped } from '@/main/bounded'
 import type { ServerEntry } from '@/main/desktopConfig'
-import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
+import {
+  accountRefusedMessage,
+  DOWNLOAD_MESSAGES,
+  type AccountRefusal,
+} from '@/main/downloads/downloadMessages'
 import {
   advance,
   bytesOf,
@@ -23,11 +28,9 @@ import {
   type DownloadEntry,
   type FailReason,
   type PauseReason,
-  type Sidecar,
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import {
-  DOWNLOAD_STALL_MS,
   FETCH_REASONS,
   fetchToFile,
   type FetchOutcome,
@@ -38,7 +41,6 @@ import {
   ACCESS_KINDS,
   ACCESS_REFUSALS,
   fileUrlFor,
-  sidecarUrlFor,
   type Access,
   type MediaAccess,
 } from '@/main/downloads/mediaAccess'
@@ -49,17 +51,15 @@ import {
   partPathFor,
   readSpace,
   serverDirFor,
-  sidecarPathFor,
-  subtitlesDirFor,
   videoPathFor,
   type SpaceFs,
 } from '@/main/downloads/space'
+import { createSidecarDownload } from '@/main/downloads/sidecarDownload'
 import { removeFolder, sweepDownloads } from '@/main/downloads/sweep'
 import { errorText } from '@/main/log/errorText'
-import { CALL_NAMES } from '@/main/servers/allowlist'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
-import { sidecarTracksOf } from '@/main/servers/sidecarTracks'
 import { TIMER_MAX_MS, type Timers } from '@/main/stateStore'
+import { HTTP_STATUSES } from '@/shared/httpStatuses'
 import { DOWNLOAD_STATUS_KINDS, isOpaqueId, SERVER_GONE } from '@/shared/protocol'
 
 export const DOWNLOAD_CONCURRENCY = 2
@@ -73,19 +73,14 @@ export const OUTAGE_RETRY_MS = 300_000
 /** How long a wake from sleep is given for the network to come back before files start again. */
 export const RESUME_SETTLE_MS = 5000
 
-/** The most of a subtitle kept; a larger one is skipped rather than read whole into memory. */
-export const SIDECAR_MAX_BYTES = 16 * 1024 ** 2
-
-const NOT_FOUND_STATUS = 404
-
 /** The parts of `node:fs/promises` the queue uses; main passes a recursive `mkdir` and a forced, recursive `rm`. */
 export type QueueFs = {
   mkdir: (path: string) => Promise<void>
-  rename: (from: string, to: string) => Promise<void>
+  rename: (input: { from: string; to: string }) => Promise<void>
   rm: (path: string) => Promise<void>
   readdir: (path: string) => Promise<string[]>
   openPart: (path: string) => Promise<PartFile>
-  writeFile: (path: string, text: string) => Promise<void>
+  writeFile: (input: { path: string; text: string }) => Promise<void>
   /** A file's size, 0 when there is no such file. */
   size: (path: string) => Promise<number>
 }
@@ -111,6 +106,8 @@ export type DownloadQueueDeps = {
   onRemoved: (entries: readonly DownloadEntry[]) => void
   /** A wake from sleep has settled: the network has had its moment. */
   onAwake: () => void
+  /** The server refused the account a file was fetched with: main reads it again, so the page hears. */
+  accountChanged: (serverId: string) => Promise<void>
 }
 
 export type DownloadQueue = {
@@ -136,6 +133,8 @@ export type DownloadQueue = {
   removeAll: () => Promise<void>
   /** At launch: `sweepDownloads`, holding any kick until it is done. Never rejects. */
   sweep: (input: { wasSetAside: boolean }) => Promise<void>
+  /** The server's sign-in ended in main: its files fetched with an account ticket fail. */
+  accessEnded: (input: { serverId: string }) => void
   /** Aborts every fetch; the entries stay as they are for the next launch. */
   dispose: () => void
 }
@@ -147,6 +146,7 @@ const STOP_REASONS = {
   remove: 'remove',
   suspend: 'suspend',
   dispose: 'dispose',
+  account: 'account',
 } as const
 
 const isStopReason = oneOf(Object.values(STOP_REASONS))
@@ -163,52 +163,26 @@ const stopReasonOf = (signal: AbortSignal): StopReason | null => {
   return isStopReason(reason.message) ? reason.message : null
 }
 
-/** A body's text, read only up to `max` bytes: past them, the rest is never read. */
-const TEXT_READS = { text: 'text', tooBig: 'tooBig' } as const
+const isAccountRun = ({ held }: Pick<Run, 'held'>): boolean =>
+  (held.access?.kind ?? null) === ACCESS_KINDS.account
 
-const textUpTo = async ({
-  body,
-  max,
-  signal,
-}: {
-  body: ReadableStream<Uint8Array> | null
-  max: number
-  signal: AbortSignal
-}): Promise<
-  { kind: typeof TEXT_READS.text; text: string } | { kind: typeof TEXT_READS.tooBig }
-> => {
-  const decoder = new TextDecoder()
-  const read: { bytes: number; text: string; isOver: boolean } = {
-    bytes: 0,
-    text: '',
-    isOver: false,
-  }
-  const sink = new WritableStream<Uint8Array>({
-    write: (chunk) => {
-      read.bytes += chunk.length
-      if (read.bytes > max) {
-        read.isOver = true
-        throw new RangeError('The subtitle is larger than raven player keeps')
-      }
-      read.text += decoder.decode(chunk, { stream: true })
-    },
-  })
-  try {
-    await (body ?? new ReadableStream<Uint8Array>({ start: (c) => c.close() })).pipeTo(sink, {
-      signal,
-    })
-  } catch (error) {
-    if (read.isOver) return { kind: TEXT_READS.tooBig }
-    throw error
-  }
-  return { kind: TEXT_READS.text, text: read.text + decoder.decode() }
-}
+const isUnderWay = ({ status }: DownloadEntry): boolean =>
+  status.kind === DOWNLOAD_STATUS_KINDS.queued || status.kind === DOWNLOAD_STATUS_KINDS.downloading
 
 const isRelocked = ({ status }: DownloadEntry): boolean =>
   status.kind === DOWNLOAD_STATUS_KINDS.paused && status.reason === PAUSE_REASONS.relocked
 
 /** A file being fetched: `stop` aborts it, and `done` settles once it has let go of its files. */
-type Run = { serverId: string; stop: AbortController; done: Promise<void>; disk: RunDisk }
+type Run = {
+  serverId: string
+  stop: AbortController
+  done: Promise<void>
+  disk: RunDisk
+  held: RunAccess
+}
+
+/** The access a run fetches with, once it has read one. */
+type RunAccess = { access: Access | null }
 
 /**
  * What a run's part holds, counted as it is written, and whether its space check has passed:
@@ -217,36 +191,34 @@ type Run = { serverId: string; stop: AbortController; done: Promise<void>; disk:
 type RunDisk = { size: number; bytes: number; hasRoom: boolean }
 
 /** What one file's run needs at every step. */
-type Job = { entry: DownloadEntry; server: ServerEntry; signal: AbortSignal; disk: RunDisk }
+type Job = {
+  entry: DownloadEntry
+  server: ServerEntry
+  signal: AbortSignal
+  disk: RunDisk
+  held: RunAccess
+}
 
 const lackedBy = ({ disk }: Run): number => (disk.hasRoom ? Math.max(disk.size - disk.bytes, 0) : 0)
 
 type Failure = Extract<FetchOutcome, { ok: false }>
 
-const parseJson = (text: string): unknown => {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
-}
-
-/** Settles with null as soon as `signal` aborts, so a stopped run never waits on a slow server. */
-const unlessStopped = <T>({
-  task,
-  signal,
+/**
+ * An account response the server cut once the fetch had written past `from`, as it ends one whose
+ * account lost access: a new ticket resumes it at once. One cut with nothing new is an outage.
+ */
+const isResumableCut = ({
+  access,
+  outcome,
+  from,
 }: {
-  task: Promise<T>
-  signal: AbortSignal
-}): Promise<T | null> => {
-  if (signal.aborted) return Promise.resolve(null)
-  const stopped = Promise.withResolvers<null>()
-  const onAbort = (): void => stopped.resolve(null)
-  signal.addEventListener('abort', onAbort, { once: true })
-  return Promise.race([task, stopped.promise]).finally(() =>
-    signal.removeEventListener('abort', onAbort),
-  )
-}
+  access: Access
+  outcome: Failure
+  from: number
+}): boolean =>
+  access.kind === ACCESS_KINDS.account &&
+  outcome.reason === FETCH_REASONS.cut &&
+  outcome.bytes > from
 
 /**
  * Fetches the queued files two at a time into `downloads/<serverId>/<mediaId>`, in the
@@ -260,6 +232,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   let isDisposed = false
   /** The launch sweep while it runs: a kick meanwhile waits, so the sweep never takes a new file's folder. */
   const launch: { sweeping: Promise<void> | null } = { sweeping: null }
+  /** How many times each server's sign-in has ended, so a ticket read across an end is not used. */
+  let accessEnds: ReadonlyMap<string, number> = new Map()
   /** The one timer that tries the files waiting on an outage again. */
   const outage: { retry: unknown } = { retry: undefined }
   /** The files the outage retry requeued, until they fail, finish or the viewer acts on them. */
@@ -382,15 +356,80 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     )
   }
 
+  /** Fails each of `downloadIds` with `message`, its bytes kept, and stops the ones that run. */
+  const failRuns = ({
+    downloadIds,
+    message,
+  }: {
+    downloadIds: readonly string[]
+    message: string
+  }): void => {
+    const isPicked: RunPick = ({ downloadId }) => downloadIds.includes(downloadId)
+    saveBytes(isPicked)
+    store.update((state) =>
+      downloadIds.reduce(
+        (next, downloadId) => fail(next, { downloadId, reason: FAIL_REASONS.other, message }),
+        state,
+      ),
+    )
+    stopRuns({ reason: STOP_REASONS.account, isStopped: isPicked }).catch(() => undefined)
+  }
+
+  /**
+   * The server refused the account: this file fails with why, and so do the files of its group
+   * still under way, which would meet the same refusal. Main reads the account again, so the page
+   * hears it; the files told of are this one alone.
+   */
+  const failAccount = ({ job, message }: { job: Job; message: string }): void => {
+    const { entry, server } = job
+    const group = store
+      .read()
+      .entries.filter(
+        (other) =>
+          other.downloadId !== entry.downloadId &&
+          isUnderWay(other) &&
+          sameGroup({ a: entry, b: other }),
+      )
+      .map(({ downloadId }) => downloadId)
+    group.forEach((downloadId) => retried.delete(downloadId))
+    failRuns({ downloadIds: [entry.downloadId, ...group], message })
+    told(entry.downloadId)
+    deps.warn(`${loggable(server.name)} refused the account for ${loggable(entry.label)}`)
+    deps.accountChanged(server.id).catch(() => {
+      deps.warn(`raven player could not read ${loggable(server.name)}'s account again`)
+    })
+  }
+
+  const failAccountFor = ({ job, reason }: { job: Job; reason: AccountRefusal }): void =>
+    failAccount({
+      job,
+      message: accountRefusedMessage({ reason, serverName: job.server.name }),
+    })
+
+  const endsOf = (serverId: string): number => accessEnds.get(serverId) ?? 0
+
   /** A new access, or null once the file has been failed or paused for why there is none. */
   const accessOf = async (job: Job): Promise<Access | null> => {
-    const { entry, signal } = job
+    const { entry, server, signal } = job
+    const ends = endsOf(server.id)
     const outcome = await unlessStopped({
-      task: deps.access.accessFor({ serverId: entry.serverId, mediaId: entry.mediaId }),
+      task: deps.access.accessFor({ serverId: entry.serverId, mediaId: entry.mediaId, signal }),
       signal,
     })
     if (outcome === null || signal.aborted) return null
-    if (outcome.ok) return outcome.access
+    if (outcome.ok) {
+      // The sign-in this ticket was read for has ended since: the file waits for the next one.
+      if (outcome.access.kind === ACCESS_KINDS.account && endsOf(server.id) !== ends) {
+        failRuns({
+          downloadIds: [entry.downloadId],
+          message: DOWNLOAD_MESSAGES.signInAgain(server.name),
+        })
+        told(entry.downloadId)
+        return null
+      }
+      job.held.access = outcome.access
+      return outcome.access
+    }
     switch (outcome.reason) {
       case ACCESS_REFUSALS.locked:
         relock(job)
@@ -403,6 +442,9 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
         return null
       case ACCESS_REFUSALS.gone:
         failEntry({ entry, reason: FAIL_REASONS.gone })
+        return null
+      case ACCESS_REFUSALS.account:
+        failAccount({ job, message: outcome.message })
         return null
       default: {
         const unreachable: never = outcome.reason
@@ -433,14 +475,16 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     job: Job
     access: Access
     signal: AbortSignal
-  }): Promise<FetchOutcome> => {
+  }): Promise<{ outcome: FetchOutcome; from: number }> => {
     const { entry, server, disk } = job
+    /** What the part held when the fetch last asked: its `Range`, so a cut can tell it made progress. */
+    const asked = { bytes: disk.bytes }
     // `bytes` is advisory, for the views, so it may be stored mid-stream: every resume reads
     // `part.size()` for its `Range` and corrects it.
     const onDisk = (bytes: number): void =>
       store.update((state) => advance(state, { downloadId: entry.downloadId, bytes }))
     const part = await fs.openPart(partPathFor(partsOf(entry)))
-    return fetchToFile({
+    const outcome = await fetchToFile({
       fetch: deps.fetchFor({ serverId: entry.serverId, access }),
       url: fileUrlFor({ access, origin: server.origin, mediaId: entry.mediaId }),
       // The run counts every byte as it lands; a resumed row shows the bytes already on disk at
@@ -450,6 +494,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
         size: async () => {
           const bytes = await part.size()
           disk.bytes = bytes
+          asked.bytes = bytes
           onDisk(bytes)
           return bytes
         },
@@ -468,11 +513,32 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       now: deps.now,
       onProgress: onDisk,
     })
+    return { outcome, from: asked.bytes }
   }
 
   /** Fails or pauses the file for why its fetch stopped short. */
-  const settleFailure = ({ job, outcome }: { job: Job; outcome: Failure }): void => {
+  const settleFailure = ({
+    job,
+    access,
+    outcome,
+  }: {
+    job: Job
+    access: Access
+    outcome: Failure
+  }): void => {
     const { entry, server } = job
+    // An account ticket refused again, or refused outright, is the account's refusal: the reason
+    // its body gives, or the one its status stands for.
+    if (access.kind === ACCESS_KINDS.account) {
+      if (outcome.reason === FETCH_REASONS.unauthorized) {
+        failAccountFor({ job, reason: outcome.refusal ?? AUTH_REFUSALS.signedOut })
+        return
+      }
+      if (outcome.reason === FETCH_REASONS.status && outcome.status === HTTP_STATUSES.forbidden) {
+        failAccountFor({ job, reason: outcome.refusal ?? AUTH_REFUSALS.revoked })
+        return
+      }
+    }
     switch (outcome.reason) {
       case FETCH_REASONS.locked:
         relock(job)
@@ -484,6 +550,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
         failEntry({ entry, reason: FAIL_REASONS.changed })
         return
       case FETCH_REASONS.unreachable:
+      case FETCH_REASONS.cut:
       case FETCH_REASONS.stalled:
       case FETCH_REASONS.aborted:
         // The origin picked may be the one that went away; the next file probes again.
@@ -501,7 +568,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
           failUnreachable(job)
           return
         }
-        if (status === NOT_FOUND_STATUS) {
+        if (status === HTTP_STATUSES.notFound) {
           failEntry({ entry, reason: FAIL_REASONS.gone })
           return
         }
@@ -521,8 +588,9 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
 
   /**
    * Fetches the video into its `.part` and answers the access it ended with, or null once the
-   * file has been failed, paused or stopped. A ticket about to lapse is renewed, and a 401 or
-   * 423 reads a new access once per ticket before it counts.
+   * file has been failed, paused or stopped. A ticket about to lapse is renewed, a 401 or 423
+   * reads a new access once per renewal before it counts, and an account response cut after
+   * progress reads one more at once.
    */
   const fetchVideo = async ({
     job,
@@ -537,7 +605,9 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     const refresh = new AbortController()
     const signal = AbortSignal.any([stop, refresh.signal])
     const renewal = renewalFor({ access, refresh })
-    const outcome = await fetchOnce({ job, access, signal }).finally(() => timers.clear(renewal))
+    const { outcome, from } = await fetchOnce({ job, access, signal }).finally(() =>
+      timers.clear(renewal),
+    )
     if (stop.aborted) return null
     if (outcome.ok) return access
     // The part is closed now, so the bytes it holds can be kept.
@@ -545,106 +615,38 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     const isRenewal = stopReasonOf(signal) === STOP_REASONS.refresh
     const isRefused =
       outcome.reason === FETCH_REASONS.unauthorized || outcome.reason === FETCH_REASONS.locked
-    if (!isRenewal && !(isRefused && !hasRetried)) {
-      settleFailure({ job, outcome })
+    const isRetry = isRefused && !hasRetried
+    if (!isRenewal && !isRetry && !isResumableCut({ access, outcome, from })) {
+      settleFailure({ job, access, outcome })
       return null
     }
     const next = await accessOf(job)
     if (next === null) return null
-    // A renewed ticket gets its own re-read, so a long file can meet a server restart in each ticket's life.
-    return fetchVideo({ job, access: next, hasRetried: !isRenewal })
+    // A renewed ticket gets its own re-read, so a long file can meet a server restart in each
+    // ticket's life. A cut keeps the one it had, so cuts between 401s never hide a refusal.
+    return fetchVideo({ job, access: next, hasRetried: !isRenewal && (hasRetried || isRetry) })
   }
 
-  const tracksOf = async ({ entry, signal }: Job): Promise<SubtitleTrack[]> => {
-    const reply = await unlessStopped({
-      task: deps.calls
-        .call({
-          serverId: entry.serverId,
-          call: { name: CALL_NAMES.getTracks, mediaId: entry.mediaId },
-        })
-        .catch(() => null),
-      signal,
-    })
-    const body = reply !== null && reply.ok && reply.status === 200 ? parseJson(reply.body) : null
-    if (isMediaTracks(body)) return sidecarTracksOf(body)
-    if (!signal.aborted) {
-      deps.warn(`raven player kept no subtitles for ${loggable(entry.label)}: no track list`)
-    }
-    return []
-  }
-
-  /** Fetches one subtitle whole and writes it; a failure is logged by title and track and skipped. */
-  const fetchSidecar = async ({
-    job,
-    access,
-    track,
-  }: {
-    job: Job
-    access: Access
-    track: SubtitleTrack
-  }): Promise<Sidecar | null> => {
-    const { entry, server, signal: stop } = job
-    const skipped = (why = ''): null => {
-      if (!stop.aborted) {
-        deps.warn(`raven player skipped subtitle ${track.id} of ${loggable(entry.label)}${why}`)
-      }
-      return null
-    }
-    const late = new AbortController()
-    const timer = timers.set({ run: () => late.abort(), ms: DOWNLOAD_STALL_MS })
-    const signal = AbortSignal.any([stop, late.signal])
-    try {
-      const response = await deps.fetchFor({ serverId: entry.serverId, access })({
-        url: sidecarUrlFor({
-          access,
-          origin: server.origin,
-          mediaId: entry.mediaId,
-          trackId: track.id,
-        }),
-        headers: {},
-        signal,
-      })
-      if (response.status !== 200) {
-        if (response.body !== null) await response.body.cancel().catch(() => undefined)
-        return skipped()
-      }
-      const read = await textUpTo({ body: response.body, max: SIDECAR_MAX_BYTES, signal })
-      if (read.kind === TEXT_READS.tooBig) return skipped(': it is larger than 16 MiB')
-      await fs.writeFile(sidecarPathFor({ ...partsOf(entry), trackId: track.id }), read.text)
-      return { trackId: track.id, title: track.title ?? '', language: track.language ?? '' }
-    } catch {
-      return skipped()
-    } finally {
-      timers.clear(timer)
-    }
-  }
-
-  const sidecarsFor = async ({ job, access }: { job: Job; access: Access }): Promise<Sidecar[]> => {
-    const tracks = await tracksOf(job)
-    if (tracks.length === 0 || job.signal.aborted) return []
-    const isMade = await fs.mkdir(subtitlesDirFor(partsOf(job.entry))).then(
-      () => true,
-      () => false,
-    )
-    if (!isMade) {
-      deps.warn(
-        `raven player kept no subtitles for ${loggable(job.entry.label)}: no folder for them`,
-      )
-      return []
-    }
-    const written = await Promise.all(tracks.map((track) => fetchSidecar({ job, access, track })))
-    return written.flatMap((sidecar) => (sidecar === null ? [] : [sidecar]))
-  }
+  const sidecarsFor = createSidecarDownload({
+    calls: deps.calls,
+    fetchFor: (input) => deps.fetchFor(input),
+    fs,
+    userData,
+    timers,
+    warn: (message) => deps.warn(message),
+  })
 
   /** One file, from the space check to `ready`. */
   const work = async ({
     downloadId,
     signal,
     disk,
+    held,
   }: {
     downloadId: string
     signal: AbortSignal
     disk: RunDisk
+    held: RunAccess
   }): Promise<void> => {
     const entry = entryById(store.read(), { downloadId })
     if (entry === null) return
@@ -653,7 +655,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       failEntry({ entry, reason: FAIL_REASONS.other, message: SERVER_GONE })
       return
     }
-    const job: Job = { entry, server, signal, disk }
+    const job: Job = { entry, server, signal, disk, held }
     // A crash between the rename and the next save leaves the video whole and the file not ready.
     const whole = await fs.size(videoPathFor(partsOf(entry)))
     if (signal.aborted) return
@@ -685,11 +687,18 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       return
     await fs.mkdir(entryDirFor(partsOf(entry)))
     if (signal.aborted) return
+    // The server checks an account ticket when each request starts and keeps it five minutes, so
+    // the subtitles go first, on the run's fresh ticket, before a long video outlives it.
+    const early = access.kind === ACCESS_KINDS.account ? await sidecarsFor({ job, access }) : null
+    if (signal.aborted) return
     const fetched = await fetchVideo({ job, access, hasRetried: false })
     if (fetched === null) return
-    const sidecars = await sidecarsFor({ job, access: fetched })
+    const sidecars = early ?? (await sidecarsFor({ job, access: fetched }))
     if (signal.aborted) return
-    await fs.rename(partPathFor(partsOf(entry)), videoPathFor(partsOf(entry)))
+    await fs.rename({
+      from: partPathFor(partsOf(entry)),
+      to: videoPathFor(partsOf(entry)),
+    })
     // The video is in place, so the file is ready whatever was asked of it meanwhile.
     store.update((state) => finish(setSidecars(state, { downloadId, sidecars }), { downloadId }))
     announceReady(downloadId)
@@ -706,8 +715,9 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     const stop = new AbortController()
     const settled = Promise.withResolvers<void>()
     const disk: RunDisk = { size: entry.size, bytes: bytesOf(entry), hasRoom: false }
-    running.set(downloadId, { serverId: entry.serverId, stop, done: settled.promise, disk })
-    work({ downloadId, signal: stop.signal, disk })
+    const held: RunAccess = { access: null }
+    running.set(downloadId, { serverId: entry.serverId, stop, done: settled.promise, disk, held })
+    work({ downloadId, signal: stop.signal, disk, held })
       .catch((error: unknown) => {
         if (stop.signal.aborted) return
         failEntry({ entry, reason: FAIL_REASONS.other, message: errorText(error) })
@@ -906,6 +916,24 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     await removing({ path: downloadsDirFor({ userData }), what: 'its downloads' })
   }
 
+  const accessEnded: DownloadQueue['accessEnded'] = ({ serverId }) => {
+    if (isDisposed) return
+    accessEnds = new Map([...accessEnds, [serverId, endsOf(serverId) + 1]])
+    const server = deps.serverOf(serverId)
+    // A removed server's files are already gone with it.
+    if (server === null) return
+    const ended = [...running]
+      .filter(([downloadId, run]) => {
+        const entry = entryById(store.read(), { downloadId })
+        return run.serverId === serverId && isAccountRun(run) && entry !== null && isUnderWay(entry)
+      })
+      .map(([downloadId]) => downloadId)
+    if (ended.length === 0) return
+    failRuns({ downloadIds: ended, message: DOWNLOAD_MESSAGES.signInAgain(server.name) })
+    ended.forEach(told)
+    deps.warn(`raven player stopped downloading from ${loggable(server.name)}: its sign-in ended`)
+  }
+
   const dispose: DownloadQueue['dispose'] = () => {
     saveBytes(() => true)
     isDisposed = true
@@ -928,6 +956,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     remove: removeOne,
     removeServer: removeServerAll,
     removeAll: removeEverything,
+    accessEnded,
     sweep: ({ wasSetAside }) => {
       const sweeping = sweepDownloads({
         store,

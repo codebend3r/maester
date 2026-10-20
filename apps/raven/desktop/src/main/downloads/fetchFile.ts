@@ -1,6 +1,9 @@
-import { LOCKED_STATUS } from '@raven/core'
+import { AUTH_REFUSALS, LOCKED_STATUS } from '@raven/core'
+import type { AccountRefusal } from '@/main/downloads/downloadMessages'
+import { ACCOUNT_REFUSAL_STATUSES, readShort, refusalAt } from '@/main/servers/authRefusals'
 import type { Timers } from '@/main/stateStore'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HTTP_STATUSES } from '@/shared/httpStatuses'
 
 export const PROGRESS_STEP_BYTES = 8 * 1024 ** 2
 export const PROGRESS_STEP_MS = 1000
@@ -26,6 +29,8 @@ export type PartFile = {
 export const FETCH_REASONS = {
   aborted: 'aborted',
   unreachable: 'unreachable',
+  /** The response began and ended short: its body broke, or ended before the bytes it promised. */
+  cut: 'cut',
   stalled: 'stalled',
   changed: 'changed',
   locked: 'locked',
@@ -34,12 +39,14 @@ export const FETCH_REASONS = {
   status: 'status',
 } as const
 
+/** `refusal` is why a `401` or `403` body says it refused the account, or null. */
 export type FetchOutcome =
   | { ok: true; bytes: number }
   | {
       ok: false
       reason: (typeof FETCH_REASONS)[keyof typeof FETCH_REASONS]
       status: number | null
+      refusal: AccountRefusal | null
       bytes: number
     }
 
@@ -81,12 +88,14 @@ type Plan = (typeof PLANS)[keyof typeof PLANS]
 const failure = ({
   reason,
   status = null,
+  refusal = null,
   bytes,
 }: {
   reason: FailureReason
   status?: number | null
+  refusal?: AccountRefusal | null
   bytes: number
-}): FetchOutcome => ({ ok: false, reason, status, bytes })
+}): FetchOutcome => ({ ok: false, reason, status, refusal, bytes })
 
 const isAbortError = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
@@ -94,17 +103,35 @@ const isAbortError = (error: unknown): boolean =>
 const isNoSpace = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOSPC'
 
+const CONTENT_RANGE = /^bytes (\d+)-(\d+)\/(?:\d+|\*)$/u
+
 /** The first byte of a `Content-Range` such as `bytes 1024-2047/4096`; `null` when absent or malformed. */
 export const contentRangeStart = (header: string | null): number | null => {
-  const match = /^bytes (\d+)-\d+\/(?:\d+|\*)$/u.exec(header ?? '')
-  const start = match?.[1]
-  return start === undefined ? null : Number(start)
+  const start = CONTENT_RANGE.exec(header ?? '')?.[1] ?? null
+  return start === null ? null : Number(start)
+}
+
+/**
+ * The size the part reaches once the body sends all the response promised: the bytes on disk and
+ * its `Content-Length`, else past the last byte of its `Content-Range`; `null` when it promised neither.
+ */
+const promisedSize = ({
+  from,
+  headers,
+}: {
+  from: number
+  headers: Answer['headers']
+}): number | null => {
+  const length = /^\d+$/u.exec(headers.get(HTTP_HEADERS.contentLength) ?? '')?.[0] ?? null
+  if (length !== null) return from + Number(length)
+  const last = CONTENT_RANGE.exec(headers.get(HTTP_HEADERS.contentRange) ?? '')?.[2] ?? null
+  return last === null ? null : Number(last) + 1
 }
 
 const refusalFor = (status: number): { reason: FailureReason; status: number } | null => {
   if (status >= 200 && status < 300) return null
   switch (status) {
-    case 401:
+    case HTTP_STATUSES.unauthorized:
       return { reason: FETCH_REASONS.unauthorized, status }
     case LOCKED_STATUS:
       return { reason: FETCH_REASONS.locked, status }
@@ -124,18 +151,43 @@ const planFor = ({
   from: number
   rangeStart: number | null
 }): Plan => {
-  if (status !== 200 && status !== 206) return PLANS.unexpected
-  if (from === 0) return status === 200 ? PLANS.append : PLANS.changed
-  return status === 206 && rangeStart === from ? PLANS.append : PLANS.restart
+  if (status !== HTTP_STATUSES.ok && status !== HTTP_STATUSES.partialContent)
+    return PLANS.unexpected
+  if (from === 0) return status === HTTP_STATUSES.ok ? PLANS.append : PLANS.changed
+  return status === HTTP_STATUSES.partialContent && rangeStart === from
+    ? PLANS.append
+    : PLANS.restart
 }
 
 const discard = async (body: Answer['body']): Promise<void> => {
   await body?.cancel().catch(() => undefined)
 }
 
+/** The account refusal a `401` or `403` body names; any other refused body is only let go of. */
+const refusalIn = async ({
+  status,
+  body,
+}: {
+  status: number
+  body: Answer['body']
+}): Promise<AccountRefusal | null> => {
+  if (status !== HTTP_STATUSES.unauthorized && status !== HTTP_STATUSES.forbidden) {
+    await discard(body)
+    return null
+  }
+  const reason = refusalAt({
+    status,
+    body: await readShort(body),
+    statuses: ACCOUNT_REFUSAL_STATUSES,
+  })
+  // Accounts that are down are the server's outage, not a refusal of this account.
+  return reason === AUTH_REFUSALS.unavailable ? null : reason
+}
+
 const streamToPart = async ({
   body,
   from,
+  promised,
   part,
   expectedSize,
   signal,
@@ -146,6 +198,7 @@ const streamToPart = async ({
 }: Omit<FetchInput, 'fetch' | 'url'> & {
   body: Answer['body']
   from: number
+  promised: number | null
   stallMs: number
 }): Promise<FetchOutcome> => {
   const progress = { bytes: from, reportedBytes: from, reportedAt: now() }
@@ -216,10 +269,13 @@ const streamToPart = async ({
       ? FETCH_REASONS.aborted
       : stall.isStalled
         ? FETCH_REASONS.stalled
-        : FETCH_REASONS.unreachable
+        : FETCH_REASONS.cut
     return failure({ reason, bytes: progress.bytes })
   }
   if (progress.bytes !== expectedSize) {
+    // A body that ends before the bytes it promised was cut, not a shorter file: what came is kept.
+    if (promised !== null && progress.bytes < promised)
+      return failure({ reason: FETCH_REASONS.cut, bytes: progress.bytes })
     await part.truncate()
     return failure({ reason: FETCH_REASONS.changed, bytes: 0 })
   }
@@ -274,13 +330,13 @@ const download = async ({
   const { response } = answer
   const refusal = refusalFor(response.status)
   if (refusal !== null) {
-    await discard(response.body)
+    const reason = await refusalIn({ status: response.status, body: response.body })
     if (refusal.status === UNSATISFIABLE_RANGE_STATUS) {
       // The server's file is now shorter than the bytes on disk; keeping them would earn the same 416 on every retry.
       await part.truncate()
       return failure({ ...refusal, bytes: 0 })
     }
-    return failure({ ...refusal, bytes: from })
+    return failure({ ...refusal, refusal: reason, bytes: from })
   }
   const plan = planFor({
     status: response.status,
@@ -293,6 +349,7 @@ const download = async ({
         ...input,
         body: response.body,
         from,
+        promised: promisedSize({ from, headers: response.headers }),
         stallMs: stallMs ?? DOWNLOAD_STALL_MS,
       })
     case PLANS.restart:

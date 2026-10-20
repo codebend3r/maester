@@ -1,9 +1,11 @@
 import {
+  AUTH_REFUSALS,
   isMediaId,
   isMediaOrigins,
   isMediaTicket,
   LOCKED_STATUS,
   MEDIA_PROBE_BYTES,
+  MEDIA_TICKET_PARAM,
   MEDIA_TICKET_REFRESH_SECONDS,
   MEDIA_TICKET_SECONDS,
   pickOrigin,
@@ -11,11 +13,21 @@ import {
   type MediaOrigin,
   type OriginProbe,
 } from '@raven/core'
+import { SIGNAL_EVENTS } from '@/main/bounded'
 import type { ServerEntry } from '@/main/desktopConfig'
-import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
+import { accountRefusedMessage, DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
-import { CALL_NAMES } from '@/main/servers/allowlist'
+import { quietly } from '@/main/log/quietly'
+import { parseJson } from '@/main/parseJson'
+import {
+  type AccountTickets,
+  TICKET_OUTCOMES,
+  type TicketOutcome,
+} from '@/main/servers/accountTickets'
+import { API_PATHS, CALL_NAMES, MEDIA_FILE_PATH, subtitlePathOf } from '@/main/servers/allowlist'
 import { CALL_MESSAGES, loggable, type ServerCalls } from '@/main/servers/serverCalls'
+import { TIMER_MAX_MS, type Timers } from '@/main/stateStore'
+import { HTTP_STATUSES } from '@/shared/httpStatuses'
 import { isSidecarTrackId, SERVER_GONE } from '@/shared/protocol'
 
 export const PROBE_TIMEOUT_MS = 2000
@@ -26,7 +38,12 @@ export const PROBE_TIMEOUT_MS = 2000
  */
 export const TICKET_RENEW_MS = (MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECONDS) * 1000
 
-const NOT_FOUND_STATUS = 404
+/**
+ * The most account tickets a server's downloads mint in any `windowMs`, a ticket's life on the
+ * server. The server keeps 32 live per account, so a fast queue of short files leaves the rest to
+ * playback, on every device, rather than spending them all.
+ */
+export const DOWNLOAD_MINTS = { budget: 16, windowMs: 300_000 } as const
 
 /**
  * Main builds this on `net.fetch`. It owns the timeout, which covers reading the body too: a probe
@@ -37,18 +54,23 @@ export type ProbeFetch = (input: {
   timeoutMs: number
 }) => Promise<{ ok: boolean; body: ReadableStream<Uint8Array> | null }>
 
-export const ACCESS_KINDS = { origin: 'origin', cookie: 'cookie' } as const
+export const ACCESS_KINDS = { origin: 'origin', cookie: 'cookie', account: 'account' } as const
 
-/** `renewAt` is when the queue reads a new ticket, in epoch ms by raven player's clock. */
+/**
+ * `renewAt` is when the queue reads a new ticket, in epoch ms by raven player's clock. An account
+ * ticket has none: the server checks it only when a request starts, so a long file streams on.
+ */
 export type Access =
   | { kind: typeof ACCESS_KINDS.origin; url: string; ticket: string; renewAt: number }
   | { kind: typeof ACCESS_KINDS.cookie }
+  | { kind: typeof ACCESS_KINDS.account; url: string; ticket: string }
 
 export const ACCESS_REFUSALS = {
   locked: 'locked',
   unreachable: 'unreachable',
   unreadable: 'unreadable',
   gone: 'gone',
+  account: 'account',
 } as const
 
 export type AccessOutcome =
@@ -56,7 +78,12 @@ export type AccessOutcome =
   | { ok: false; reason: (typeof ACCESS_REFUSALS)[keyof typeof ACCESS_REFUSALS]; message: string }
 
 export type MediaAccess = {
-  accessFor: (input: { serverId: string; mediaId: number }) => Promise<AccessOutcome>
+  /** `signal` is the run's: a run stopped while it waits on the mint budget mints nothing. */
+  accessFor: (input: {
+    serverId: string
+    mediaId: number
+    signal: AbortSignal
+  }) => Promise<AccessOutcome>
   forget: (serverId: string) => void
 }
 
@@ -120,9 +147,10 @@ const mediaUrlFor = ({
   if (!isMediaId(mediaId)) throw new RangeError('A download needs a media id')
   switch (access.kind) {
     case ACCESS_KINDS.origin:
-      return `${access.url}/api/media/${mediaId}/${path}?${toQueryString({ t: access.ticket })}`
+    case ACCESS_KINDS.account:
+      return `${access.url}${API_PATHS.media}/${mediaId}/${path}?${toQueryString({ [MEDIA_TICKET_PARAM]: access.ticket })}`
     case ACCESS_KINDS.cookie:
-      return `${origin}/api/media/${mediaId}/${path}`
+      return `${origin}${API_PATHS.media}/${mediaId}/${path}`
     default: {
       const unreachable: never = access
       return unreachable
@@ -138,7 +166,7 @@ export const fileUrlFor = ({
   access: Access
   origin: string
   mediaId: number
-}): string => mediaUrlFor({ access, origin, mediaId, path: 'file' })
+}): string => mediaUrlFor({ access, origin, mediaId, path: MEDIA_FILE_PATH })
 
 export const sidecarUrlFor = ({
   access,
@@ -152,15 +180,7 @@ export const sidecarUrlFor = ({
   trackId: string
 }): string => {
   if (!isSidecarTrackId(trackId)) throw new RangeError('A subtitle needs an external track id')
-  return mediaUrlFor({ access, origin, mediaId, path: `subtitles/${trackId}` })
-}
-
-const readJson = (text: string): unknown => {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
+  return mediaUrlFor({ access, origin, mediaId, path: subtitlePathOf(trackId) })
 }
 
 /**
@@ -179,9 +199,54 @@ const trustedOrigin = (origin: MediaOrigin): MediaOrigin | null => {
   }
 }
 
+/** What a mint that gave no ticket comes to, in the refusals the queue already knows. */
+const mintRefusalOf = ({
+  outcome,
+  server,
+}: {
+  outcome: Exclude<TicketOutcome, { kind: typeof TICKET_OUTCOMES.ticket }>
+  server: ServerEntry
+}): AccessOutcome => {
+  switch (outcome.kind) {
+    case TICKET_OUTCOMES.refused:
+      // Accounts that are down, or a server at its ticket cap, is an outage the retry outlasts.
+      if (outcome.reason === AUTH_REFUSALS.unavailable) {
+        return {
+          ok: false,
+          reason: ACCESS_REFUSALS.unreachable,
+          message: CALL_MESSAGES.unreachable(server.name),
+        }
+      }
+      return {
+        ok: false,
+        reason: ACCESS_REFUSALS.account,
+        message: accountRefusedMessage({ reason: outcome.reason, serverName: server.name }),
+      }
+    case TICKET_OUTCOMES.locked:
+      return {
+        ok: false,
+        reason: ACCESS_REFUSALS.locked,
+        message: DOWNLOAD_MESSAGES.relocked(server.name),
+      }
+    case TICKET_OUTCOMES.gone:
+      return { ok: false, reason: ACCESS_REFUSALS.gone, message: EXPAND_MESSAGES.gone(server.name) }
+    case TICKET_OUTCOMES.unreachable:
+      return {
+        ok: false,
+        reason: ACCESS_REFUSALS.unreachable,
+        message: CALL_MESSAGES.unreachable(server.name),
+      }
+    default: {
+      const unreachable: never = outcome
+      return unreachable
+    }
+  }
+}
+
 /**
  * `probeClock` times the probes in monotonic milliseconds, so a wall clock that jumps never skews
- * one; `now` is the wall clock a ticket's renewal is set by.
+ * one; `now` is the wall clock a ticket's renewal is set by. A server whose accounts are ready
+ * (`isReady`, read as playback reads it) is reached with an account ticket minted for each run.
  */
 export const createMediaAccess = ({
   calls,
@@ -189,6 +254,9 @@ export const createMediaAccess = ({
   probe,
   probeClock,
   now,
+  timers,
+  isReady,
+  tickets,
   warn,
 }: {
   calls: Pick<ServerCalls, 'call'>
@@ -196,26 +264,24 @@ export const createMediaAccess = ({
   probe: ProbeFetch
   probeClock: () => number
   now: () => number
+  timers: Timers
+  isReady: (server: ServerEntry) => Promise<boolean>
+  tickets: Pick<AccountTickets, 'ticketFor'>
   warn: (message: string) => void
 }): MediaAccess => {
   /** The pick is held as a promise so two files asking at once share one read and one probe. */
   let picks: ReadonlyMap<string, Promise<MediaOrigin | null>> = new Map()
 
   /** A log line never fails an access: the pick it belongs to is held for good. */
-  const safeWarn = (message: string): void => {
-    try {
-      warn(message)
-    } catch {
-      // Nothing is left to tell.
-    }
-  }
+  const safeWarn = quietly(warn)
 
   /** Never rejects: a pick is held for good, so a rejected one would fail every later call. */
   const pickFor = async (server: ServerEntry): Promise<MediaOrigin | null> => {
     const reply = await calls
       .call({ serverId: server.id, call: { name: CALL_NAMES.getMediaOrigins } })
       .catch(() => null)
-    const body = reply?.ok && reply.status === 200 ? readJson(reply.body) : null
+    const body =
+      reply !== null && reply.ok && reply.status === HTTP_STATUSES.ok ? parseJson(reply.body) : null
     if (!isMediaOrigins(body)) {
       safeWarn(`${loggable(server.name)} did not list media origins raven player can read`)
       return null
@@ -273,7 +339,7 @@ export const createMediaAccess = ({
         message: DOWNLOAD_MESSAGES.relocked(server.name),
       }
     }
-    if (reply.status === NOT_FOUND_STATUS) {
+    if (reply.status === HTTP_STATUSES.notFound) {
       return { ok: false, reason: ACCESS_REFUSALS.gone, message: EXPAND_MESSAGES.gone(server.name) }
     }
     // A proxy in front of a restarting server answers 502 to 504: an outage, not a refusal.
@@ -284,7 +350,7 @@ export const createMediaAccess = ({
         message: CALL_MESSAGES.unreachable(server.name),
       }
     }
-    const body = reply.status === 200 ? readJson(reply.body) : null
+    const body = reply.status === HTTP_STATUSES.ok ? parseJson(reply.body) : null
     if (!isMediaTicket(body)) {
       return {
         ok: false,
@@ -303,11 +369,94 @@ export const createMediaAccess = ({
     }
   }
 
+  /** When each server's downloads minted, by raven player's clock, inside the last window. */
+  let minted: ReadonlyMap<string, readonly number[]> = new Map()
+
+  /** True once `ms` has passed, false as soon as `signal` aborts. */
+  const waitFor = ({ ms, signal }: { ms: number; signal: AbortSignal }): Promise<boolean> =>
+    new Promise((resolve) => {
+      const timer: { handle: unknown } = { handle: undefined }
+      const onAbort = (): void => {
+        timers.clear(timer.handle)
+        resolve(false)
+      }
+      timer.handle = timers.set({
+        run: () => {
+          signal.removeEventListener(SIGNAL_EVENTS.abort, onAbort)
+          resolve(true)
+        },
+        ms: Math.min(ms, TIMER_MAX_MS),
+      })
+      signal.addEventListener(SIGNAL_EVENTS.abort, onAbort, { once: true })
+    })
+
+  /**
+   * Takes one of the server's mints, waiting while the window's are spent until the oldest ages
+   * out. False when the run stopped first, and nothing was taken.
+   */
+  const takeMint = async ({
+    serverId,
+    signal,
+  }: {
+    serverId: string
+    signal: AbortSignal
+  }): Promise<boolean> => {
+    if (signal.aborted) return false
+    const time = now()
+    const recent = (minted.get(serverId) ?? []).filter(
+      (at) => at > time - DOWNLOAD_MINTS.windowMs && at <= time,
+    )
+    if (recent.length < DOWNLOAD_MINTS.budget) {
+      minted = new Map([...minted, [serverId, [...recent, time]]])
+      return true
+    }
+    // A clock set back never waits longer than one window.
+    const ms = Math.min(
+      Math.max(Math.min(...recent) + DOWNLOAD_MINTS.windowMs - time, 1),
+      DOWNLOAD_MINTS.windowMs,
+    )
+    return (await waitFor({ ms, signal })) && takeMint({ serverId, signal })
+  }
+
+  /** The picked origin, or the server's own when none answers, with a ticket minted fresh. */
+  const accountAccess = async ({
+    server,
+    mediaId,
+    signal,
+  }: {
+    server: ServerEntry
+    mediaId: number
+    signal: AbortSignal
+  }): Promise<AccessOutcome> => {
+    // The queue has already let go of a stopped run, so what this answers is never read.
+    if (!(await takeMint({ serverId: server.id, signal }))) {
+      return {
+        ok: false,
+        reason: ACCESS_REFUSALS.unreachable,
+        message: CALL_MESSAGES.unreachable(server.name),
+      }
+    }
+    const [origin, outcome] = await Promise.all([
+      pickOf(server),
+      tickets.ticketFor({ serverId: server.id, mediaId, isFresh: true }),
+    ])
+    if (outcome.kind !== TICKET_OUTCOMES.ticket) return mintRefusalOf({ outcome, server })
+    return {
+      ok: true,
+      access: {
+        kind: ACCESS_KINDS.account,
+        url: origin?.url ?? server.origin,
+        ticket: outcome.ticket,
+      },
+    }
+  }
+
   return {
-    accessFor: async ({ serverId, mediaId }) => {
+    accessFor: async ({ serverId, mediaId, signal }) => {
       const server = serverOf(serverId)
       if (server === null)
         return { ok: false, reason: ACCESS_REFUSALS.unreachable, message: SERVER_GONE }
+      if (await isReady(server)) return accountAccess({ server, mediaId, signal })
       const origin = await pickOf(server)
       if (origin === null) return { ok: true, access: { kind: ACCESS_KINDS.cookie } }
       return ticketAccess({ server, origin, mediaId })

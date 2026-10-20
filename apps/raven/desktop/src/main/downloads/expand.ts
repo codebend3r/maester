@@ -1,5 +1,6 @@
 import {
   ADMIN_LOCK_STATES,
+  AUTH_REFUSALS,
   DOWNLOAD_TARGET_KINDS,
   episodeCode,
   isAdminLock,
@@ -17,8 +18,11 @@ import {
   type ItemSummary,
   type MediaItem,
 } from '@raven/core'
+import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
+import { ACCOUNT_REFUSAL_STATUSES, refusalAt } from '@/main/servers/authRefusals'
 import { CALL_MESSAGES, type ServerCalls } from '@/main/servers/serverCalls'
+import { HTTP_STATUSES } from '@/shared/httpStatuses'
 import { DOWNLOAD_KINDS, type DownloadGroup, type DownloadKind } from '@/shared/protocol'
 
 export const DOWNLOAD_MAX_FILES = 500
@@ -37,6 +41,7 @@ export const EXPAND_REASONS = {
   unreachable: 'unreachable',
   tooMany: 'tooMany',
   unreadable: 'unreadable',
+  account: 'account',
 } as const
 
 export type Expansion =
@@ -51,6 +56,7 @@ export const EXPAND_MESSAGES = {
   tooMany: 'That is more than raven player downloads at once.',
   gone: (name: string) => `That title is not on ${name} any more.`,
   unreadable: (name: string) => `${name} answered with something raven player could not read.`,
+  account: (name: string) => `${name} did not let your account download that.`,
 } as const
 
 const LOCKED_MESSAGE = (name: string): string => `${name} keeps that behind its PIN.`
@@ -67,7 +73,13 @@ type Draft = {
   entries: Entry[]
 }
 type Calls = Pick<ServerCalls, 'call'>
-type Server = { calls: Calls; serverId: string; serverName: string }
+type Server = {
+  calls: Calls
+  serverId: string
+  serverName: string
+  /** Whether the server's accounts are ready: its admin lock then hides nothing the password could lift. */
+  hasAccounts: boolean
+}
 
 export const episodeLabel = ({
   season,
@@ -115,25 +127,22 @@ const oncePerFile = (entries: readonly Entry[]): Entry[] => [
 
 const isSuccess = (status: number): boolean => status >= 200 && status < 300
 
-const parse = (body: string): unknown => {
-  try {
-    const value: unknown = JSON.parse(body)
-    return value
-  } catch {
-    return undefined
-  }
-}
-
 const fail = ({ reason, message }: Pick<Failure, 'reason' | 'message'>): Read<never> => ({
   ok: false,
   failure: { ok: false, reason, message },
 })
 
+/** Whether a 401 or 403 is the account refused, rather than the server's accounts being down. */
+const isAccountRefused = (result: { status: number; body: string }): boolean => {
+  const reason = refusalAt({ ...result, statuses: ACCOUNT_REFUSAL_STATUSES })
+  return reason !== null && reason !== AUTH_REFUSALS.unavailable
+}
+
 /** Whether a 404 is the admin lock hiding the title, which the admin password lifts. */
 const isHiddenByAdminLock = async ({ calls, serverId }: Pick<Server, 'calls' | 'serverId'>) => {
   const result = await calls.call({ serverId, call: { name: CALL_NAMES.getAdminLock } })
   if (!result.ok || !isSuccess(result.status)) return false
-  const lock = parse(result.body)
+  const lock = parseJson(result.body)
   return isAdminLock(lock) && lock.state === ADMIN_LOCK_STATES.on && lock.available
 }
 
@@ -141,6 +150,7 @@ const read = async <T>({
   calls,
   serverId,
   serverName,
+  hasAccounts,
   call,
   guard,
 }: Server & { call: AllowedCall; guard: Guard<T> }): Promise<Read<T>> => {
@@ -149,8 +159,11 @@ const read = async <T>({
   if (result.status === LOCKED_STATUS) {
     return fail({ reason: EXPAND_REASONS.locked, message: LOCKED_MESSAGE(serverName) })
   }
-  if (result.status === 404) {
-    return (await isHiddenByAdminLock({ calls, serverId }))
+  if (isAccountRefused(result)) {
+    return fail({ reason: EXPAND_REASONS.account, message: EXPAND_MESSAGES.account(serverName) })
+  }
+  if (result.status === HTTP_STATUSES.notFound) {
+    return !hasAccounts && (await isHiddenByAdminLock({ calls, serverId }))
       ? fail({ reason: EXPAND_REASONS.hidden, message: HIDDEN_MESSAGE(serverName) })
       : fail({ reason: EXPAND_REASONS.gone, message: EXPAND_MESSAGES.gone(serverName) })
   }
@@ -160,7 +173,7 @@ const read = async <T>({
       message: CALL_MESSAGES.unreachable(serverName),
     })
   }
-  const value = parse(result.body)
+  const value = parseJson(result.body)
   return guard(value)
     ? { ok: true, value }
     : fail({ reason: EXPAND_REASONS.unreadable, message: EXPAND_MESSAGES.unreadable(serverName) })
@@ -369,13 +382,14 @@ export const expandTarget = async ({
   calls,
   serverId,
   serverName,
+  hasAccounts,
   target,
   skip,
 }: Server & {
   target: DownloadTarget
   skip: (mediaId: number) => boolean
 }): Promise<Expansion> => {
-  const server = { calls, serverId, serverName }
+  const server = { calls, serverId, serverName, hasAccounts }
   const draft = await draftOf({ server, target })
   if (!draft.ok) return draft.failure
   const { kind, title, groupTitle, groupKey } = draft.value

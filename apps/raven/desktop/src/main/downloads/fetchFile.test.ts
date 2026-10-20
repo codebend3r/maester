@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test'
+import { AUTH_REFUSALS } from '@raven/core'
 import {
   contentRangeStart,
   DOWNLOAD_STALL_MS,
+  FETCH_REASONS,
   fetchToFile,
   PROGRESS_STEP_BYTES,
   PROGRESS_STEP_MS,
@@ -9,7 +11,9 @@ import {
   type PartFile,
   type StreamFetch,
 } from '@/main/downloads/fetchFile'
+import { brokenBody } from '@/main/test/downloadFakes'
 import { fakeTimers } from '@/main/test/playerFakes'
+import { HTTP_HEADERS } from '@/shared/httpHeaders'
 
 type Reply = {
   status: number
@@ -18,6 +22,8 @@ type Reply = {
 }
 
 const bytesOf = (length: number, fill = 1): Uint8Array => new Uint8Array(length).fill(fill)
+
+const textOf = (text: string): Uint8Array => new TextEncoder().encode(text)
 
 /** A body that delivers `chunks` and ends. */
 const bodyOf = (chunks: Uint8Array[]): ReadableStream<Uint8Array> =>
@@ -236,7 +242,7 @@ describe('a whole file', () => {
     const { fetch } = fakeFetch({ replies: [reply({ status: 200, body: null })] })
     const { part, flags } = fakePart()
     const outcome = await run({ fetch, part, expectedSize: 4 })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, bytes: 0 })
+    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, refusal: null, bytes: 0 })
     expect(flags.closes).toBe(1)
   })
 })
@@ -320,7 +326,7 @@ describe('a resume', () => {
     })
     const { part, flags } = fakePart({ disk: [bytesOf(4096)] })
     const outcome = await run({ fetch, part, expectedSize: 8192 })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, bytes: 0 })
+    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, refusal: null, bytes: 0 })
     expect(calls).toHaveLength(2)
     expect(flags.closes).toBe(1)
   })
@@ -337,7 +343,7 @@ describe('a resume', () => {
     })
     const { part, chunks, flags } = fakePart()
     const outcome = await run({ fetch, part, expectedSize: 10 })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, bytes: 0 })
+    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, refusal: null, bytes: 0 })
     expect(sizeOf(chunks)).toBe(0)
     expect(flags.closes).toBe(1)
   })
@@ -378,7 +384,7 @@ describe('a part that is already whole', () => {
     const { fetch, calls } = fakeFetch({ replies: [] })
     const { part, flags } = fakePart()
     const outcome = await run({ fetch, part, expectedSize: -1 })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, bytes: 0 })
+    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, refusal: null, bytes: 0 })
     expect(calls).toHaveLength(0)
     expect(flags.truncates).toBe(2)
     expect(flags.closes).toBe(1)
@@ -390,7 +396,7 @@ describe('the size', () => {
     const { fetch } = fakeFetch({ replies: [reply({ status: 200, body: bodyOf([bytesOf(7)]) })] })
     const { part, chunks, flags } = fakePart()
     const outcome = await run({ fetch, part, expectedSize: 10 })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, bytes: 0 })
+    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, refusal: null, bytes: 0 })
     expect(sizeOf(chunks)).toBe(0)
     expect(flags.truncates).toBe(1)
     expect(flags.closes).toBe(1)
@@ -402,7 +408,7 @@ describe('the size', () => {
     })
     const { part, chunks, flags } = fakePart()
     const outcome = await run({ fetch, part, expectedSize: 10 })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, bytes: 0 })
+    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, refusal: null, bytes: 0 })
     expect(sizeOf(chunks)).toBe(0)
     expect(flags.truncates).toBe(1)
     expect(flags.closes).toBe(1)
@@ -420,7 +426,13 @@ describe('a stall', () => {
     await settle()
     expect([...clock.pending.values()].map((timer) => timer.ms)).toEqual([DOWNLOAD_STALL_MS])
     clock.fire()
-    expect(await pending).toEqual({ ok: false, reason: 'stalled', status: null, bytes: 5 })
+    expect(await pending).toEqual({
+      ok: false,
+      reason: 'stalled',
+      status: null,
+      refusal: null,
+      bytes: 5,
+    })
     expect(sizeOf(chunks)).toBe(5)
     expect(flags.closes).toBe(1)
     expect(clock.pending.size).toBe(0)
@@ -434,7 +446,13 @@ describe('a stall', () => {
     await settle()
     expect([...clock.pending.values()].map((timer) => timer.ms)).toEqual([1234])
     clock.fire()
-    expect(await pending).toEqual({ ok: false, reason: 'stalled', status: null, bytes: 0 })
+    expect(await pending).toEqual({
+      ok: false,
+      reason: 'stalled',
+      status: null,
+      refusal: null,
+      bytes: 0,
+    })
   })
 
   it('clears its timer when the file completes', async () => {
@@ -460,7 +478,7 @@ describe('a full disk', () => {
     })
     const { part, flags } = fakePart({ disk: [bytesOf(2)], failAppend: full })
     const outcome = await run({ fetch, part, expectedSize: 12 })
-    expect(outcome).toEqual({ ok: false, reason: 'space', status: null, bytes: 2 })
+    expect(outcome).toEqual({ ok: false, reason: 'space', status: null, refusal: null, bytes: 2 })
     expect(flags.truncates).toBe(0)
     expect(flags.closes).toBe(1)
   })
@@ -484,19 +502,25 @@ describe('a refusal', () => {
 
   it('maps 401 to unauthorized', async () => {
     const { outcome, flags } = await refused({ status: 401 })
-    expect(outcome).toEqual({ ok: false, reason: 'unauthorized', status: 401, bytes: 0 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: 'unauthorized',
+      status: 401,
+      refusal: null,
+      bytes: 0,
+    })
     expect(flags.closes).toBe(1)
   })
 
   it('maps 423 to locked', async () => {
     const { outcome, flags } = await refused({ status: 423 })
-    expect(outcome).toEqual({ ok: false, reason: 'locked', status: 423, bytes: 0 })
+    expect(outcome).toEqual({ ok: false, reason: 'locked', status: 423, refusal: null, bytes: 0 })
     expect(flags.closes).toBe(1)
   })
 
   it('maps 416 to changed, and truncates the part it can no longer use', async () => {
     const { outcome, flags, chunks } = await refused({ status: 416, disk: [bytesOf(4)] })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: 416, bytes: 0 })
+    expect(outcome).toEqual({ ok: false, reason: 'changed', status: 416, refusal: null, bytes: 0 })
     expect(flags.truncates).toBe(1)
     expect(sizeOf(chunks)).toBe(0)
     expect(flags.closes).toBe(1)
@@ -504,19 +528,53 @@ describe('a refusal', () => {
 
   it('maps any other non-2xx to status with its code', async () => {
     const { outcome, flags } = await refused({ status: 500 })
-    expect(outcome).toEqual({ ok: false, reason: 'status', status: 500, bytes: 0 })
+    expect(outcome).toEqual({ ok: false, reason: 'status', status: 500, refusal: null, bytes: 0 })
     expect(flags.closes).toBe(1)
     expect((await refused({ status: 404 })).outcome).toEqual({
       ok: false,
       reason: 'status',
       status: 404,
+      refusal: null,
       bytes: 0,
     })
   })
 
+  it.each([
+    [403, AUTH_REFUSALS.pending],
+    [403, AUTH_REFUSALS.revoked],
+    [401, AUTH_REFUSALS.signedOut],
+  ] as const)('carries the account refusal a %p body names: %s', async (status, reason) => {
+    const { fetch } = fakeFetch({
+      replies: [
+        reply({ status, body: bodyOf([textOf(JSON.stringify({ reason, message: 'No.' }))]) }),
+      ],
+    })
+    const outcome = await run({ fetch, part: fakePart({}).part, expectedSize: 10 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: status === 401 ? FETCH_REASONS.unauthorized : FETCH_REASONS.status,
+      status,
+      refusal: reason,
+      bytes: 0,
+    })
+  })
+
+  it('carries no refusal for a body that names accounts being down', async () => {
+    const body = JSON.stringify({ reason: AUTH_REFUSALS.unavailable, message: 'Down.' })
+    const { fetch } = fakeFetch({ replies: [reply({ status: 403, body: bodyOf([textOf(body)]) })] })
+    const outcome = await run({ fetch, part: fakePart({}).part, expectedSize: 10 })
+    expect(outcome).toEqual({ ok: false, reason: 'status', status: 403, refusal: null, bytes: 0 })
+  })
+
   it('keeps the bytes on disk', async () => {
     const { outcome, chunks } = await refused({ status: 401, disk: [bytesOf(6)] })
-    expect(outcome).toEqual({ ok: false, reason: 'unauthorized', status: 401, bytes: 6 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: 'unauthorized',
+      status: 401,
+      refusal: null,
+      bytes: 6,
+    })
     expect(sizeOf(chunks)).toBe(6)
   })
 })
@@ -526,23 +584,128 @@ describe('the network', () => {
     const { fetch } = fakeFetch({ replies: [], error: new TypeError('fetch failed') })
     const { part, flags } = fakePart({ disk: [bytesOf(3)] })
     const outcome = await run({ fetch, part, expectedSize: 10 })
-    expect(outcome).toEqual({ ok: false, reason: 'unreachable', status: null, bytes: 3 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: 'unreachable',
+      status: null,
+      refusal: null,
+      bytes: 3,
+    })
+    expect(flags.closes).toBe(1)
+  })
+})
+
+describe('a cut', () => {
+  it('is a cut, with the bytes so far kept, when the body breaks mid-way', async () => {
+    const { fetch } = fakeFetch({
+      replies: [reply({ status: 200, body: brokenBody([bytesOf(4)]) })],
+    })
+    const { part, chunks, flags } = fakePart()
+    const outcome = await run({ fetch, part, expectedSize: 10 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.cut,
+      status: null,
+      refusal: null,
+      bytes: 4,
+    })
+    expect(sizeOf(chunks)).toBe(4)
+    expect(flags.truncates).toBe(0)
     expect(flags.closes).toBe(1)
   })
 
-  it('is unreachable when the body errors mid-way', async () => {
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(bytesOf(4))
-        controller.error(new TypeError('terminated'))
-      },
+  it('is a cut, never a whole file, when the body ends short of its content-length', async () => {
+    const { fetch } = fakeFetch({
+      replies: [
+        reply({
+          status: 200,
+          headers: { [HTTP_HEADERS.contentLength]: '10' },
+          body: bodyOf([bytesOf(6)]),
+        }),
+      ],
     })
-    const { fetch } = fakeFetch({ replies: [reply({ status: 200, body })] })
-    const { part, flags } = fakePart()
+    const { part, chunks, flags } = fakePart()
+    const reported: number[] = []
+    const outcome = await run({
+      fetch,
+      part,
+      expectedSize: 10,
+      onProgress: (bytes) => reported.push(bytes),
+    })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.cut,
+      status: null,
+      refusal: null,
+      bytes: 6,
+    })
+    expect(sizeOf(chunks)).toBe(6)
+    expect(flags.truncates).toBe(0)
+    expect(reported).toEqual([])
+  })
+
+  it('is a cut when a resumed body ends short of its content-range', async () => {
+    const { fetch } = fakeFetch({
+      replies: [
+        reply({
+          status: 206,
+          headers: { [HTTP_HEADERS.contentRange]: 'bytes 4-9/10' },
+          body: bodyOf([bytesOf(2)]),
+        }),
+      ],
+    })
+    const { part, chunks, flags } = fakePart({ disk: [bytesOf(4)] })
     const outcome = await run({ fetch, part, expectedSize: 10 })
-    expect(outcome.ok).toBe(false)
-    expect(outcome).toMatchObject({ reason: 'unreachable', status: null })
-    expect(flags.closes).toBe(1)
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.cut,
+      status: null,
+      refusal: null,
+      bytes: 6,
+    })
+    expect(sizeOf(chunks)).toBe(6)
+    expect(flags.truncates).toBe(0)
+  })
+
+  it('is changed, never whole, when the body sends all it promised and that falls short of the file', async () => {
+    const { fetch } = fakeFetch({
+      replies: [
+        reply({
+          status: 200,
+          headers: { [HTTP_HEADERS.contentLength]: '6' },
+          body: bodyOf([bytesOf(6)]),
+        }),
+      ],
+    })
+    const { part, chunks, flags } = fakePart()
+    const outcome = await run({ fetch, part, expectedSize: 10 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.changed,
+      status: null,
+      refusal: null,
+      bytes: 0,
+    })
+    expect(sizeOf(chunks)).toBe(0)
+    expect(flags.truncates).toBe(1)
+  })
+
+  it('is whole only once the part holds the whole file', async () => {
+    const { fetch } = fakeFetch({
+      replies: [
+        reply({
+          status: 206,
+          headers: {
+            [HTTP_HEADERS.contentRange]: 'bytes 4-9/10',
+            [HTTP_HEADERS.contentLength]: '6',
+          },
+          body: bodyOf([bytesOf(6)]),
+        }),
+      ],
+    })
+    const { part, chunks } = fakePart({ disk: [bytesOf(4)] })
+    expect(await run({ fetch, part, expectedSize: 10 })).toEqual({ ok: true, bytes: 10 })
+    expect(sizeOf(chunks)).toBe(10)
   })
 })
 
@@ -556,7 +719,7 @@ describe('an abort', () => {
     })
     const { part, flags } = fakePart({ disk: [bytesOf(3)] })
     const outcome = await run({ fetch, part, expectedSize: 10, signal: controller.signal })
-    expect(outcome).toEqual({ ok: false, reason: 'aborted', status: null, bytes: 3 })
+    expect(outcome).toEqual({ ok: false, reason: 'aborted', status: null, refusal: null, bytes: 3 })
     expect(flags.closes).toBe(1)
   })
 
@@ -567,7 +730,13 @@ describe('an abort', () => {
     })
     const { part } = fakePart()
     const outcome = await run({ fetch, part, expectedSize: 10 })
-    expect(outcome).toEqual({ ok: false, reason: 'unreachable', status: null, bytes: 0 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: 'unreachable',
+      status: null,
+      refusal: null,
+      bytes: 0,
+    })
   })
 
   it('is aborted mid-body with the bytes so far kept', async () => {
@@ -586,7 +755,13 @@ describe('an abort', () => {
     })
     await settle()
     controller.abort()
-    expect(await pending).toEqual({ ok: false, reason: 'aborted', status: null, bytes: 5 })
+    expect(await pending).toEqual({
+      ok: false,
+      reason: 'aborted',
+      status: null,
+      refusal: null,
+      bytes: 5,
+    })
     expect(sizeOf(chunks)).toBe(5)
     expect(flags.truncates).toBe(0)
     expect(flags.closes).toBe(1)
@@ -609,7 +784,13 @@ describe('a server that never answers', () => {
     await settle()
     expect([...pending.values()].map(({ ms }) => ms)).toEqual([DOWNLOAD_STALL_MS])
     fire()
-    expect(await outcome).toEqual({ ok: false, reason: 'stalled', status: null, bytes: 0 })
+    expect(await outcome).toEqual({
+      ok: false,
+      reason: 'stalled',
+      status: null,
+      refusal: null,
+      bytes: 0,
+    })
     expect(seen.signal?.aborted).toBe(true)
   })
 

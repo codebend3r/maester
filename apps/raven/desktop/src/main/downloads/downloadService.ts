@@ -1,5 +1,5 @@
 import type { ConfigStore } from '@/main/desktopConfig'
-import { createDownloadAsks, type DownloadAsks } from '@/main/downloads/asks'
+import { createDownloadAsks, type DownloadAsks, type DownloadAsksDeps } from '@/main/downloads/asks'
 import { createAutoDelete, isDueForDeletion } from '@/main/downloads/autoDelete'
 import { DOWNLOAD_MESSAGES, failedMessage, pausedMessage } from '@/main/downloads/downloadMessages'
 import {
@@ -67,7 +67,9 @@ export type DownloadServiceDeps = {
   wasSetAside: boolean
   /** How often the sync tries its servers again; the spec's five minutes unless main's test hook shortens it. */
   syncRetryMs: number
-} & Pick<DownloadPlaybackDeps, 'grants' | 'state' | 'stat'>
+} & Pick<DownloadPlaybackDeps, 'grants' | 'state' | 'stat'> &
+  Pick<DownloadAsksDeps, 'isReady' | 'readAccount'> &
+  Pick<DownloadQueueDeps, 'accountChanged'>
 
 type ById = { downloadId: string }
 
@@ -112,6 +114,8 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     onSuspend: () => void
     /** Main's `powerMonitor` `resume`: files start again once the network has had a moment. */
     onResume: () => void
+    /** A server's sign-in ended in main: its downloads fetched with an account ticket fail. */
+    accessEnded: (input: { serverId: string }) => void
     /** Stops the events and every fetch; after it the page hears nothing more. */
     dispose: () => void
   }
@@ -297,6 +301,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     // After the settle, so a deletion that came due in the sleep finds the network back and
     // the server hears what was watched first.
     onAwake: () => deleteClock.rearm(),
+    accountChanged: deps.accountChanged,
     onFailed: (entry) => {
       const { status } = entry
       if (status.kind !== DOWNLOAD_STATUS_KINDS.failed) return
@@ -321,6 +326,8 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     warn: deps.warn,
     change,
     list,
+    isReady: deps.isReady,
+    readAccount: deps.readAccount,
   })
 
   // Only the page asking for the list sends what is pending; the list that events and replies carry does not.
@@ -505,6 +512,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     isWatched: playback.isWatched,
     onSuspend: queue.onSuspend,
     onResume: queue.onResume,
+    accessEnded: queue.accessEnded,
     dispose,
   }
 }
