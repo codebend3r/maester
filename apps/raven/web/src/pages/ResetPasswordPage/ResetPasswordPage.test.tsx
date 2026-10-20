@@ -144,6 +144,28 @@ describe('ResetPasswordPage', () => {
       expect(useAuthSession.getState().isRecovery).toBe(true)
     })
 
+    it('drops a weak password refusal once the password changes, since it described the old one', async () => {
+      const user = userEvent.setup()
+      renderReset({
+        calls: {
+          updateUser: async () =>
+            refused({
+              code: AUTH_ERRORS.weakPassword,
+              message: 'Password should be at least 12 characters.',
+            }),
+        },
+      })
+      await screen.findByLabelText('New password')
+      await fillIn({ user })
+      await user.click(submit())
+      await screen.findByRole('alert')
+
+      await user.type(password(), '-staple')
+
+      expect(screen.queryByText('Password should be at least 12 characters.')).toBeNull()
+      expect(password()).toHaveAttribute('aria-invalid', 'false')
+    })
+
     it.each([
       ['an unknown error code', async () => refused({ code: 'something_new', message: 'Words' })],
       [
