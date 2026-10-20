@@ -5,7 +5,8 @@ export const TICKET_SUPPORT = { on: 'on', off: 'off', unknown: 'unknown' } as co
 
 type TicketSupport = (typeof TICKET_SUPPORT)[keyof typeof TICKET_SUPPORT]
 
-const SERVICE_UNAVAILABLE = 503
+/** What the ticket route answers on a server without `RAVEN_MEDIA_SECRET`. */
+export const TICKETS_OFF_STATUS = 503
 
 const firstMediaIdOf = (home: Home): number | null => {
   const shelved = home.shelves.flatMap((shelf) =>
@@ -30,7 +31,7 @@ export const ticketSupportOf = async ({
     await api.getMediaTicket(id)
     return TICKET_SUPPORT.on
   } catch (error) {
-    const isOff = error instanceof ApiError && error.status === SERVICE_UNAVAILABLE
+    const isOff = error instanceof ApiError && error.status === TICKETS_OFF_STATUS
     return isOff ? TICKET_SUPPORT.off : TICKET_SUPPORT.unknown
   }
 }

@@ -1,4 +1,4 @@
-import type { FetchResponse } from '@raven/core'
+import { type FetchResponse, LOCKED_STATUS } from '@raven/core'
 
 /** The statuses the test servers answer with. */
 export const STATUSES = {
@@ -6,7 +6,9 @@ export const STATUSES = {
   noContent: 204,
   forbidden: 403,
   notFound: 404,
+  locked: LOCKED_STATUS,
   failed: 500,
+  unavailable: 503,
 } as const
 
 /** How a test server answers: a status, and the body it sends with it. */
