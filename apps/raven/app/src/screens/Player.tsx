@@ -3,8 +3,10 @@ import {
   ITEM_IMAGE_KINDS,
   type MediaItem,
   type MediaTracks,
+  type PlaybackMode,
   type PlaybackPolicy,
   ROUTE_STATES,
+  type SubtitleTrack,
   activeCues,
   mediaLabel,
   resumeAtFor,
@@ -63,13 +65,32 @@ const COPY = {
 const PROGRESS_EVERY_MS = 250
 
 /**
- * The text track the player shows. Where raven draws the cues, the player's own rendition is
- * never picked, so it never draws a second; elsewhere the picked track's rendition is, by its
- * place, or with none picked the player's own choice (a forced track, the system's settings).
+ * Who draws the picked subtitle. Where the chrome draws the cues, raven reads them from
+ * `cueTrack`, and the player's own rendition is never picked, so it never draws a second.
+ * Elsewhere the player draws the stream's rendition at the track's place (`textTrack`), or with
+ * none picked, what it chooses itself (a forced track, the system's settings).
  */
-const textTrackFor = ({ place }: { place: number | null }): VideoSurface['selectedTextTrack'] => {
-  if (shouldDrawCaptions) return { type: SelectedTrackType.DISABLED }
-  return place === null ? undefined : { type: SelectedTrackType.INDEX, value: place }
+const captionsFor = ({
+  mode,
+  tracks,
+  subtitle,
+}: {
+  mode: PlaybackMode | null
+  tracks: MediaTracks | null
+  subtitle: string | null
+}): { cueTrack: SubtitleTrack | null; textTrack: VideoSurface['selectedTextTrack'] } => {
+  if (shouldDrawCaptions) {
+    return {
+      cueTrack: tracks?.subtitles.find((track) => track.supported && track.id === subtitle) ?? null,
+      textTrack: { type: SelectedTrackType.DISABLED },
+    }
+  }
+  const place =
+    tracks === null || mode === null ? null : subtitlePlaceFor({ mode, tracks, subtitle })
+  return {
+    cueTrack: null,
+    textTrack: place === null ? undefined : { type: SelectedTrackType.INDEX, value: place },
+  }
 }
 
 /** Keeps the screen on while it is drawn. */
@@ -110,7 +131,7 @@ const Playing = ({
     preferredSubtitle({ tracks, subtitles: subtitlePrefs }),
   )
   const plan = useMemo(
-    () => planFor({ platform: DEVICE_PLATFORM, media, tracks, policy }),
+    () => planFor({ platform: DEVICE_PLATFORM, media, tracks, policy, shouldDrawCaptions }),
     [media, tracks, policy],
   )
   const { state, dispatch } = usePlaybackSession({
@@ -149,15 +170,10 @@ const Playing = ({
     tracks === null || mode === null
       ? null
       : audioPlaceFor({ mode, tracks, audio: ladder?.audio ?? null })
-  // raven reads the cues only where it draws them; elsewhere the platform draws the rendition.
-  const subtitleTrack = shouldDrawCaptions
-    ? (tracks?.subtitles.find((track) => track.supported && track.id === subtitle) ?? null)
-    : null
-  const subtitlePlace =
-    tracks === null || mode === null ? null : subtitlePlaceFor({ mode, tracks, subtitle })
+  const captions = captionsFor({ mode, tracks, subtitle })
   const { cues } = useTrackCues({
     video: { api: session.api, mediaId: media.id },
-    track: subtitleTrack,
+    track: captions.cueTrack,
     time: video.time,
     duration,
   })
@@ -250,7 +266,7 @@ const Playing = ({
           progressUpdateInterval: PROGRESS_EVERY_MS,
           selectedAudioTrack:
             audioPlace === null ? undefined : { type: SelectedTrackType.INDEX, value: audioPlace },
-          selectedTextTrack: textTrackFor({ place: subtitlePlace }),
+          selectedTextTrack: captions.textTrack,
           source,
         }
   const artwork =

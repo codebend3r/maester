@@ -462,10 +462,12 @@ jobs:
           cat "$RUNNER_TEMP/fixture.log"
           exit 1
 
-      # A fresh Apple TV 4K on the runner's newest tvOS runtime, booted, with the build on it.
+      # A fresh Apple TV 4K on the tvOS runtime of the selected Xcode's SDK, booted, with the
+      # build on it. A runner with no such runtime fails here rather than testing on another.
       - name: 📺 Boot the Apple TV simulator
         run: |
-          runtime="$(xcrun simctl list -j runtimes tvOS | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')"
+          sdk="$(xcrun --sdk appletvsimulator --show-sdk-version)"
+          runtime="$(xcrun simctl list -j runtimes tvOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
           device="$(xcrun simctl create raven-tv com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K "$runtime")"
           xcrun simctl boot "$device"
           xcrun simctl bootstatus "$device" -b
@@ -563,11 +565,13 @@ jobs:
       - name: 🗄️ Start the fixture server
         run: bunx nx run @raven/server:serve:fixture > "$RUNNER_TEMP/fixture.log" 2>&1 &
 
-      # A fresh iPhone 16 on the runner's newest iOS runtime. `simctl boot` returns at once
-      # and CoreSimulator boots it in the background; the wait step below blocks on it.
+      # A fresh iPhone 16 on the iOS runtime of the selected Xcode's SDK. `simctl boot`
+      # returns at once and CoreSimulator boots it in the background; a runner with no such
+      # runtime fails here rather than testing on another.
       - name: 📱 Boot the iPhone simulator
         run: |
-          runtime="$(xcrun simctl list -j runtimes iOS | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')"
+          sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          runtime="$(xcrun simctl list -j runtimes iOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
           device="$(xcrun simctl create raven-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
           xcrun simctl boot "$device"
           echo "SIMULATOR=$device" >> "$GITHUB_ENV"

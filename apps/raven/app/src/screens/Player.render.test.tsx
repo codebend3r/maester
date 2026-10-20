@@ -9,9 +9,7 @@ import {
 } from '@raven/core'
 import { SAVE_EVERY_S, usePlayerPrefs, useUnlockPrompt } from '@raven/ui/headless'
 import { act, cleanup, fireEvent, screen } from '@testing-library/react-native'
-import type * as ReactModule from 'react'
-import type * as VideoModule from 'react-native-video'
-import type { ReactVideoProps, VideoRef } from 'react-native-video'
+import type { ReactVideoProps } from 'react-native-video'
 
 import { useUnlockRoute } from '@/queries/useUnlockRoute'
 import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
@@ -22,6 +20,8 @@ import { type HeardRequest, STATUSES, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import { BUSBOYS_MP4, CUE_TEXT, playerApi } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
+import type * as VideoMock from '@/test/videoMock'
+import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@/test/videoMock'
 
 const mockPush = jest.fn()
 const mockPathname = jest.fn((): string => APP_ROUTES.play)
@@ -33,11 +33,6 @@ const mockParams = jest.fn((): Record<string, string> => ({
 const mockServer: { heard: HeardRequest[]; ticketStatus: number } = {
   heard: [],
   ticketStatus: STATUSES.ok,
-}
-/** The props the player was last drawn with, which the test fires the player's events through. */
-const mockVideo: { props: ReactVideoProps | null; seek: jest.Mock } = {
-  props: null,
-  seek: jest.fn(),
 }
 
 jest.mock('expo-router', () => ({
@@ -67,36 +62,9 @@ jest.mock('@/servers/serverClient', () => ({
 jest.mock('@react-native-community/netinfo', () =>
   jest.requireActual('@react-native-community/netinfo/jest/netinfo-mock'),
 )
-jest.mock('react-native-video', () => {
-  const { useEffect, useImperativeHandle } = jest.requireActual<typeof ReactModule>('react')
-  const Video = ({ ref, ...props }: ReactVideoProps & { ref?: ReactModule.Ref<VideoRef> }) => {
-    useEffect(() => {
-      mockVideo.props = props
-    })
-    useImperativeHandle(ref, () => ({
-      seek: (time: number) => mockVideo.seek(time),
-      resume: () => undefined,
-      pause: () => undefined,
-      presentFullscreenPlayer: () => undefined,
-      dismissFullscreenPlayer: () => undefined,
-      restoreUserInterfaceForPictureInPictureStopCompleted: () => undefined,
-      save: () => undefined,
-      setVolume: () => undefined,
-      getCurrentPosition: async () => 0,
-      setFullScreen: () => undefined,
-      setSource: () => undefined,
-      enterPictureInPicture: () => undefined,
-      exitPictureInPicture: () => undefined,
-    }))
-    return null
-  }
-  // The library's own constants, with its player swapped for one the test drives.
-  return {
-    ...jest.requireActual<typeof VideoModule>('react-native-video'),
-    __esModule: true,
-    default: Video,
-  }
-})
+jest.mock('react-native-video', () =>
+  jest.requireActual<typeof VideoMock>('@/test/videoMock').videoModuleMock(),
+)
 
 /** The player as the app hosts it, beside what opens the PIN screen on a 423. */
 const WithUnlock = () => {
@@ -116,7 +84,7 @@ const renderPlayer = async (params: Record<string, string>) => {
 
 /** The props the player was last drawn with. */
 const videoProps = (): ReactVideoProps => {
-  const { props } = mockVideo
+  const { props } = drawnVideo
   if (props === null) throw new Error('The player was never drawn')
   return props
 }
@@ -144,33 +112,16 @@ const playsRecorded = (): number =>
     ({ method, path }) => method === APP_CALL_METHODS.post && path === playsPath,
   ).length
 
-/** Fires what the player says as it opens its source and starts. */
-const start = async (props: ReactVideoProps) => {
-  await act(async () => {
-    props.onLoad!({
-      currentTime: 0,
-      duration: BUSBOYS_MP4.duration ?? 0,
-      naturalSize: { width: 1920, height: 1080, orientation: 'landscape' },
-      audioTracks: [],
-      textTracks: [],
-      videoTracks: [],
-    })
-    props.onPlaybackStateChanged!({ isPlaying: true, isSeeking: false })
-    props.onBuffer!({ isBuffering: false })
-  })
-}
-
-const moveTo = async ({ props, seconds }: { props: ReactVideoProps; seconds: number }) =>
-  act(async () => {
-    props.onProgress!({ currentTime: seconds, playableDuration: seconds, seekableDuration: 6000 })
-  })
+/** Fires what the player says as it opens Busboys and starts. */
+const start = async (props: ReactVideoProps) =>
+  startVideo({ props, duration: BUSBOYS_MP4.duration ?? 0 })
 
 describe('Player on a phone or tablet', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockServer.heard = []
     mockServer.ticketStatus = STATUSES.ok
-    mockVideo.props = null
+    resetDrawnVideo()
     useUnlockPrompt.setState({ open: false })
     usePlayerPrefs.setState({ subtitles: { on: false, language: null } })
     // A server of its own for each test, so no test plays on a ticket or a probe another held.
@@ -208,11 +159,11 @@ describe('Player on a phone or tablet', () => {
     const props = await loadedVideo()
     await start(props)
     const from = BUSBOYS_MP4.position
-    await moveTo({ props, seconds: from + 4 })
-    await moveTo({ props, seconds: from + SAVE_EVERY_S })
-    await moveTo({ props, seconds: from + SAVE_EVERY_S + 4 })
-    await moveTo({ props, seconds: from + SAVE_EVERY_S * 2 })
-    await moveTo({ props, seconds: from + SAVE_EVERY_S * 2 + 3 })
+    await moveVideoTo({ props, seconds: from + 4 })
+    await moveVideoTo({ props, seconds: from + SAVE_EVERY_S })
+    await moveVideoTo({ props, seconds: from + SAVE_EVERY_S + 4 })
+    await moveVideoTo({ props, seconds: from + SAVE_EVERY_S * 2 })
+    await moveVideoTo({ props, seconds: from + SAVE_EVERY_S * 2 + 3 })
     await fireEvent.press(screen.getByRole('button', { name: 'Pause' }))
     expect(videoProps().paused).toBe(true)
     await act(async () => {
@@ -233,7 +184,7 @@ describe('Player on a phone or tablet', () => {
     const length = BUSBOYS_MP4.duration ?? 0
     const ninety = length * 0.9
     await [ninety - 600, ninety - 300, ninety, ninety + 300].reduce(
-      (before, seconds) => before.then(() => moveTo({ props, seconds })),
+      (before, seconds) => before.then(() => moveVideoTo({ props, seconds })),
       Promise.resolve(),
     )
     expect(playsRecorded()).toBe(1)
@@ -254,7 +205,7 @@ describe('Player on a phone or tablet', () => {
     })
     const props = await loadedVideo()
     await start(props)
-    await moveTo({ props, seconds: 3125 })
+    await moveVideoTo({ props, seconds: 3125 })
     await act(async () => {
       props.onError!({ error: { code: -11828, localizedDescription: 'Cannot Open' } })
     })
@@ -270,11 +221,11 @@ describe('Player on a phone or tablet', () => {
     await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
     const props = await loadedVideo()
     await start(props)
-    await moveTo({ props, seconds: 100 })
+    await moveVideoTo({ props, seconds: 100 })
     await fireEvent.press(screen.getByRole('button', { name: 'Forward 10 seconds' }))
-    expect(mockVideo.seek).toHaveBeenLastCalledWith(110)
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(110)
     await fireEvent.press(screen.getByRole('button', { name: 'Back 10 seconds' }))
-    expect(mockVideo.seek).toHaveBeenLastCalledWith(100)
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(100)
   })
 
   it("draws the picked track's cues from the server's WebVTT while they last", async () => {
@@ -283,9 +234,9 @@ describe('Player on a phone or tablet', () => {
     const props = await loadedVideo()
     await start(props)
     expect(screen.getByRole('button', { name: 'Subtitles: English' })).toBeTruthy()
-    await moveTo({ props, seconds: 15 })
+    await moveVideoTo({ props, seconds: 15 })
     expect(await screen.findByText(CUE_TEXT)).toBeTruthy()
-    await moveTo({ props, seconds: 25 })
+    await moveVideoTo({ props, seconds: 25 })
     expect(screen.queryByText(CUE_TEXT)).toBeNull()
   })
 
@@ -293,7 +244,7 @@ describe('Player on a phone or tablet', () => {
     const { unmount } = await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
     const props = await loadedVideo()
     await start(props)
-    await moveTo({ props, seconds: 42 })
+    await moveVideoTo({ props, seconds: 42 })
     await fireEvent.press(screen.getByRole('button', { name: 'Back' }))
     expect(mockBack).toHaveBeenCalled()
     unmount()

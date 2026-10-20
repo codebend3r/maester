@@ -1,11 +1,16 @@
 import { create } from 'zustand'
 
+/**
+ * The card another screen was opened from, by its place on this one. It lasts through the
+ * screen being covered once, so the card can take the focus back as the screen returns.
+ */
+type Opener = { card: string; wasCovered: boolean }
+
 /** What one screen keeps of the remote's focus, on a TV. */
 type ScreenFocus = {
   /** Whether anything on the screen has had the focus, which spends its opening focus. */
   hasSettled: boolean
-  /** The card another screen was opened from, by its place on this one, until this is back. */
-  opener: string | null
+  opener: Opener | null
 }
 
 type ScreenFocusState = { screens: Readonly<Record<string, ScreenFocus>> }
@@ -20,6 +25,9 @@ const FRESH: ScreenFocus = { hasSettled: false, opener: null }
 
 const screenOf = ({ state, screen }: { state: ScreenFocusState; screen: string }): ScreenFocus =>
   state.screens[screen] ?? FRESH
+
+const openerOf = ({ screen }: { screen: string }): Opener | null =>
+  screenOf({ state: useScreenFocus.getState(), screen }).opener
 
 const change = ({ screen, to }: { screen: string; to: Partial<ScreenFocus> }): void =>
   useScreenFocus.setState((state) => ({
@@ -38,20 +46,24 @@ export const settleScreen = ({ screen }: { screen: string }): void => {
 
 /** The card at `card` opens another screen; it takes the focus back when this one returns. */
 export const rememberOpener = ({ screen, card }: { screen: string; card: string }): void =>
-  change({ screen, to: { hasSettled: true, opener: card } })
+  change({ screen, to: { hasSettled: true, opener: { card, wasCovered: false } } })
 
 /** Hands the opener back once, and only to the card it names: true for that card, then never. */
 export const takeOpener = ({ screen, card }: { screen: string; card: string }): boolean => {
-  if (screenOf({ state: useScreenFocus.getState(), screen }).opener !== card) return false
+  if (openerOf({ screen })?.card !== card) return false
   change({ screen, to: { opener: null } })
   return true
 }
 
-/** Lets go of an opener no card took as the screen returned, so no later return asks for it. */
-export const dropOpener = ({ screen }: { screen: string }): void => {
-  if (screenOf({ state: useScreenFocus.getState(), screen }).opener !== null) {
-    change({ screen, to: { opener: null } })
-  }
+/**
+ * Another screen covers this one. The opener just remembered lasts through it; one that has
+ * lasted through a cover already, which no card took as the screen came back, goes, so a
+ * return from a screen no card opened asks for nothing.
+ */
+export const coverScreen = ({ screen }: { screen: string }): void => {
+  const opener = openerOf({ screen })
+  if (opener === null) return
+  change({ screen, to: { opener: opener.wasCovered ? null : { ...opener, wasCovered: true } } })
 }
 
 /** Forgets a screen that has gone, so one opened in its place starts afresh. */

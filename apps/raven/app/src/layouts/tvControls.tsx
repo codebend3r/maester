@@ -46,24 +46,28 @@ export const plateStyles = StyleSheet.create({
 
 /**
  * A plain button on a plate, the remote's to press: `text` is what it shows, `label` is said,
- * and `onFocused` hears each time it gets the focus.
+ * `isPreferred` asks the remote's focus for it as it appears, and `onFocused` hears each time
+ * it gets the focus.
  */
 export const PlateButton = ({
   text,
   label,
   accessibilityRole,
+  isPreferred = false,
   onFocused = NOTHING_ON_FOCUS,
   onPress,
 }: {
   text: string
   label: string
   accessibilityRole: AccessibilityRole
+  isPreferred?: boolean
   onFocused?: () => void
   onPress: () => void
 }) => (
   <Pressable
     accessibilityLabel={label}
     accessibilityRole={accessibilityRole}
+    hasTVPreferredFocus={isPreferred}
     onFocus={onFocused}
     onPress={onPress}
     style={({ focused }) => [plateStyles.plate, focused && plateStyles.focused]}

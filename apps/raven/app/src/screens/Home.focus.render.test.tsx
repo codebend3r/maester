@@ -1,30 +1,38 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { isRecord } from '@raven/core'
-import { fireEvent, screen } from '@testing-library/react-native'
-import { BackHandler, StyleSheet, TVEventControl } from 'react-native'
+import { type Home as HomeAnswer, isRecord } from '@raven/core'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 
 import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Home } from '@/screens/Home'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { useScreenFocus } from '@/stores/screenFocus'
-import { NAS, SPARSE, homeApi } from '@/test/homeServer'
+import { FILMS, HOME, NAS, SPARSE, homeApi } from '@/test/homeServer'
 import { heldAnswer } from '@/test/heldAnswer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import type * as NavigationFocus from '@/test/navigationFocus'
-import { leaveTestScreen, resetTestScreen, returnToTestScreen } from '@/test/navigationFocus'
-import { renderScreen } from '@/test/renderScreen'
+import {
+  askedFor,
+  focusRequested,
+  leaveTestScreen,
+  resetTestScreen,
+  returnToTestScreen,
+} from '@/test/navigationFocus'
+import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 
-/** What Home's read waits on before it is answered, per test. */
-const mockHome: { answer: Promise<void> } = { answer: Promise.resolve() }
+/** What Home's read waits on before it is answered, and what it answers when not the server's. */
+const mockHome: { answer: Promise<void>; home: HomeAnswer | null } = {
+  answer: Promise.resolve(),
+  home: null,
+}
 const mockApi = jest.fn((server: AppServer) => {
   const api = homeApi(server)
   return {
     ...api,
     getHome: async () => {
       await mockHome.answer
-      return api.getHome()
+      return mockHome.home ?? api.getHome()
     },
   }
 })
@@ -43,11 +51,10 @@ jest.mock('expo-router', () => ({
   ...jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').navigationFocusMocks,
   useRouter: () => ({ push: mockPush }),
 }))
-// The fork's requestTVFocus is native; what matters is which card asks for the focus, and when.
-const mockRequestTVFocus = jest.fn<(instance: unknown) => void>()
-jest.mock('@/layouts/tvFocus', () => ({
-  requestTVFocus: (instance: unknown) => mockRequestTVFocus(instance),
-}))
+jest.mock(
+  '@/layouts/tvFocus',
+  () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
+)
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
@@ -59,13 +66,42 @@ jest.mock('@/servers/serverClient', () => ({
   },
 }))
 
-const renderHome = async () => renderScreen({ ui: <Home /> })
+const shown = { client: createScreenClient() }
 
-/** The cards that asked for the remote's focus, by title, in order. */
-const askedFor = (): unknown[] =>
-  mockRequestTVFocus.mock.calls.map(([instance]) =>
-    isRecord(instance) && isRecord(instance.props) ? instance.props.accessibilityLabel : instance,
+const renderHome = async () => {
+  shown.client = createScreenClient()
+  return renderScreen({ ui: <Home />, client: shown.client })
+}
+
+const BUSBOYS = 'Busboys'
+const NIGHT_TRAIN = 'Night Train'
+
+/** Home with nothing being watched and no Films shelf: every card the shelves held goes. */
+const WITHOUT_FILMS: HomeAnswer = {
+  inProgress: [],
+  shelves: HOME.shelves.filter((shelf) => shelf.libraryId !== FILMS.id),
+}
+
+/**
+ * The server answers Home anew and the shelves are read again, as an event or a refetch does,
+ * until the card titled `card` is drawn (`isDrawn`) or gone.
+ */
+const answerHome = async ({
+  home,
+  card,
+  isDrawn,
+}: {
+  home: HomeAnswer
+  card: string
+  isDrawn: boolean
+}) => {
+  mockHome.home = home
+  await act(async () => shown.client.invalidateQueries())
+  await untilIdle(shown.client)
+  await waitFor(() =>
+    expect(screen.queryAllByRole('button', { name: card }).length > 0).toBe(isDrawn),
   )
+}
 
 /** Whatever on screen asks for the remote's focus, by its label. */
 const preferred = (): unknown[] =>
@@ -77,8 +113,8 @@ describe('Home on a TV', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     resetTestScreen()
-    useScreenFocus.setState({ screens: {} })
     mockHome.answer = Promise.resolve()
+    mockHome.home = null
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
 
@@ -167,9 +203,9 @@ describe('Home on a TV', () => {
     await fireEvent(screen.getByRole('link', { name: 'Search every library' }), 'focus')
     expect(preferred()).toEqual([])
 
-    // A new answer draws the shelves again; the first card mounts as it did, unpreferred.
-    await leaveTestScreen()
-    await returnToTestScreen()
+    // The shelves are drawn again: every card goes, then mounts afresh, the first unpreferred.
+    await answerHome({ home: WITHOUT_FILMS, card: BUSBOYS, isDrawn: false })
+    await answerHome({ home: HOME, card: BUSBOYS, isDrawn: true })
     expect(preferred()).toEqual([])
     expect(askedFor()).toEqual([])
   })
@@ -197,8 +233,8 @@ describe('Home on a TV', () => {
     await fireEvent.press(inFilms!)
     await leaveTestScreen()
     await returnToTestScreen()
-    expect(mockRequestTVFocus).toHaveBeenCalledTimes(1)
-    const [[instance]] = mockRequestTVFocus.mock.calls
+    const [instance, ...more] = focusRequested()
+    expect(more).toEqual([])
     // The view the card hands over is drawn as the element on screen with its own handlers.
     const [inContinue, inFilmsNow] = screen.getAllByRole('button')
     const focusOf = (view: unknown) =>
@@ -223,15 +259,34 @@ describe('Home on a TV', () => {
     expect(askedFor()).toEqual(['Night Train'])
   })
 
-  it('leaves Menu to the navigator, which on Home hands it to tvOS', async () => {
-    const listen = jest.spyOn(BackHandler, 'addEventListener')
-    const menuKey = jest.spyOn(TVEventControl, 'enableTVMenuKey')
+  it('takes the focus back to a card drawn afresh while another screen covered Home', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
-    await fireEvent.press(screen.getAllByRole('button')[2]!)
+    await fireEvent.press(screen.getByRole('button', { name: NIGHT_TRAIN }))
+    await leaveTestScreen()
+
+    // Covered, the shelves are read again: the card goes, then comes back as a new view.
+    await answerHome({ home: WITHOUT_FILMS, card: NIGHT_TRAIN, isDrawn: false })
+    await answerHome({ home: HOME, card: NIGHT_TRAIN, isDrawn: true })
+
+    await returnToTestScreen()
+    expect(askedFor()).toEqual([NIGHT_TRAIN])
+  })
+
+  it('lets go of an opener no card took, once another screen covers Home again', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    await fireEvent.press(screen.getByRole('button', { name: NIGHT_TRAIN }))
+    await leaveTestScreen()
+    await answerHome({ home: WITHOUT_FILMS, card: NIGHT_TRAIN, isDrawn: false })
+    await returnToTestScreen()
+    expect(askedFor()).toEqual([])
+
+    // The card is drawn again, then the search, which is not a card, opens and goes back.
+    await answerHome({ home: HOME, card: NIGHT_TRAIN, isDrawn: true })
+    await fireEvent.press(screen.getByRole('link', { name: 'Search every library' }))
     await leaveTestScreen()
     await returnToTestScreen()
-    expect(listen).not.toHaveBeenCalled()
-    expect(menuKey).not.toHaveBeenCalled()
+    expect(askedFor()).toEqual([])
   })
 })

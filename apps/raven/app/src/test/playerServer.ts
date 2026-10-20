@@ -91,16 +91,36 @@ const VTT = ['WEBVTT', '', '00:00:10.000 --> 00:00:20.000', CUE_TEXT, ''].join('
 /** A route's path for the MP4. */
 const busboysPath = (path: string): string => pathFor({ path, id: BUSBOYS_MP4.id })
 
-const { getItem, getMedia, getTracks, getPlaybackSettings, getMediaOrigins, listLibraries } =
-  APP_CLIENT_CALLS
+/** Each file the server holds, with its tracks. */
+const FILES = [
+  { media: BUSBOYS_MP4, tracks: TRACKS },
+  { media: BUSBOYS_UNSUBTITLED, tracks: UNSUBTITLED_TRACKS },
+] as const
 
-const unsubtitledPath = (path: string): string => pathFor({ path, id: BUSBOYS_UNSUBTITLED.id })
+const {
+  getItem,
+  getMedia,
+  getMediaTicket,
+  getTracks,
+  getPlaybackSettings,
+  getMediaOrigins,
+  listLibraries,
+  recordPlay,
+  saveProgress,
+  subtitles,
+} = APP_CLIENT_CALLS
+
+/** A route's path for each file. */
+const filePaths = ({ path }: { path: string }): string[] =>
+  FILES.map(({ media }) => pathFor({ path, id: media.id }))
 
 const READS: Record<string, unknown> = {
-  [busboysPath(getMedia.path)]: BUSBOYS_MP4,
-  [busboysPath(getTracks.path)]: TRACKS,
-  [unsubtitledPath(getMedia.path)]: BUSBOYS_UNSUBTITLED,
-  [unsubtitledPath(getTracks.path)]: UNSUBTITLED_TRACKS,
+  ...Object.fromEntries(
+    FILES.flatMap(({ media, tracks }) => [
+      [pathFor({ path: getMedia.path, id: media.id }), media],
+      [pathFor({ path: getTracks.path, id: media.id }), tracks],
+    ]),
+  ),
   [pathFor({ path: getItem.path, id: BUSBOYS.id })]: BUSBOYS,
   [getPlaybackSettings.path]: {
     settings: DEFAULT_PLAYBACK_SETTINGS,
@@ -108,15 +128,15 @@ const READS: Record<string, unknown> = {
   },
   [getMediaOrigins.path]: { origins: [] },
   [listLibraries.path]: [WATCHED_AT_90],
-  [busboysPath(APP_CLIENT_CALLS.subtitles.path).replace(TRACK_PARAM, SUBTITLE_ID)]: VTT,
+  [busboysPath(subtitles.path).replace(TRACK_PARAM, SUBTITLE_ID)]: VTT,
 }
 
 const WRITES: ReadonlySet<string> = new Set([
-  busboysPath(APP_CLIENT_CALLS.saveProgress.path),
-  busboysPath(APP_CLIENT_CALLS.recordPlay.path),
-  unsubtitledPath(APP_CLIENT_CALLS.saveProgress.path),
-  unsubtitledPath(APP_CLIENT_CALLS.recordPlay.path),
+  ...filePaths({ path: saveProgress.path }),
+  ...filePaths({ path: recordPlay.path }),
 ])
+
+const TICKETS: ReadonlySet<string> = new Set(filePaths({ path: getMediaTicket.path }))
 
 const bodyOf = (body: string | undefined): unknown => (body === undefined ? null : JSON.parse(body))
 
@@ -140,10 +160,7 @@ export const playerApi = ({
     if (method !== APP_CALL_METHODS.get) {
       return WRITES.has(path) ? { status: STATUSES.noContent, body: null } : NOT_FOUND
     }
-    if (
-      path === busboysPath(APP_CLIENT_CALLS.getMediaTicket.path) ||
-      path === unsubtitledPath(APP_CLIENT_CALLS.getMediaTicket.path)
-    ) {
+    if (TICKETS.has(path)) {
       return ticketStatus === STATUSES.ok
         ? { status: ticketStatus, body: { ticket: 'tkt.player', expiresAt: 0 } }
         : { status: ticketStatus, body: { message: 'This library is locked.' } }

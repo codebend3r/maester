@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import Video, { type VideoMetadata } from 'react-native-video'
 
 import { type PlayerChromeKit, type PlayerChromeProps } from '@/layouts/playerKit'
-import { plateStyles } from '@/layouts/tvControls'
+import { PlateButton } from '@/layouts/tvControls'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
 const GUTTER = SIZES.space8
@@ -64,16 +64,14 @@ const PlayerChrome = ({ title, summary, artwork, surface, notice, onBack }: Play
         </Text>
       )}
       <View style={styles.actions}>
-        <Pressable
-          accessibilityLabel={BACK}
+        <PlateButton
           accessibilityRole="button"
-          hasTVPreferredFocus={isOpening}
-          onFocus={() => setOpening(false)}
+          isPreferred={isOpening}
+          label={BACK}
+          onFocused={() => setOpening(false)}
           onPress={onBack}
-          style={({ focused }) => [plateStyles.plate, focused && plateStyles.focused]}
-        >
-          <Text style={plateStyles.label}>{BACK}</Text>
-        </Pressable>
+          text={BACK}
+        />
       </View>
     </View>
   )

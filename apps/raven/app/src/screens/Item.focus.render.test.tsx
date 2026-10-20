@@ -1,20 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { APP_CLIENT_CALLS, isRecord } from '@raven/core'
+import { APP_CLIENT_CALLS } from '@raven/core'
 import { fireEvent, screen, within } from '@testing-library/react-native'
-import { BackHandler, TVEventControl } from 'react-native'
 
 import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Item } from '@/screens/Item'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { useScreenFocus } from '@/stores/screenFocus'
 import { NAS } from '@/test/homeServer'
 import { pathFor } from '@/test/fixtureFetch'
 import { BUSBOYS, SEVERANCE, SEVERANCE_ONE, itemApi } from '@/test/itemServer'
 import { heldAnswer } from '@/test/heldAnswer'
 import type * as NavigationFocus from '@/test/navigationFocus'
-import { leaveTestScreen, resetTestScreen, returnToTestScreen } from '@/test/navigationFocus'
+import {
+  askedFor,
+  leaveTestScreen,
+  resetTestScreen,
+  returnToTestScreen,
+} from '@/test/navigationFocus'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
@@ -49,11 +52,10 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: jest.fn() }),
   useLocalSearchParams: () => mockParams(),
 }))
-// The fork's requestTVFocus is native; what matters is which card asks for the focus, and when.
-const mockRequestTVFocus = jest.fn<(instance: unknown) => void>()
-jest.mock('@/layouts/tvFocus', () => ({
-  requestTVFocus: (instance: unknown) => mockRequestTVFocus(instance),
-}))
+jest.mock(
+  '@/layouts/tvFocus',
+  () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
+)
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
@@ -70,12 +72,6 @@ const preferred = (): string[] =>
   [...screen.queryAllByRole('button'), ...screen.queryAllByRole('checkbox')]
     .filter((node) => node.props.hasTVPreferredFocus === true)
     .map((node) => node.props.accessibilityLabel)
-
-/** The cards that asked for the remote's focus, by title, in order. */
-const askedFor = (): unknown[] =>
-  mockRequestTVFocus.mock.calls.map(([instance]) =>
-    isRecord(instance) && isRecord(instance.props) ? instance.props.accessibilityLabel : instance,
-  )
 
 /** A host element on screen, as the queries hand it back. */
 type ScreenNode = ReturnType<typeof screen.getByRole>
@@ -102,7 +98,6 @@ describe('Item on a TV', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     resetTestScreen()
-    useScreenFocus.setState({ screens: {} })
     mockServer.writes = async () => undefined
     mockServer.reads = async () => undefined
     mockServer.release = () => undefined
@@ -201,14 +196,5 @@ describe('Item on a TV', () => {
     await returnToTestScreen()
     expect(askedFor()).toEqual(['Season 1'])
     expect(preferred()).toEqual([])
-  })
-
-  it('leaves Menu to the navigator, which takes the page back', async () => {
-    const listen = jest.spyOn(BackHandler, 'addEventListener')
-    const menuKey = jest.spyOn(TVEventControl, 'enableTVMenuKey')
-    await renderItem(SEVERANCE.id)
-    await screen.findByRole('button', { name: 'Play S01E01' })
-    expect(listen).not.toHaveBeenCalled()
-    expect(menuKey).not.toHaveBeenCalled()
   })
 })

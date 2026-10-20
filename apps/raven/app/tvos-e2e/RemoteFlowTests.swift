@@ -13,6 +13,7 @@ final class RemoteFlowTests: XCTestCase {
   }
 
   private enum Copy {
+    static let play = "Play"
     static let continueWatching = "Continue watching"
     static let resume = "Resume from"
     static let markWatched = "Mark watched"
@@ -37,7 +38,7 @@ final class RemoteFlowTests: XCTestCase {
     XCTAssertFalse(app.staticTexts[Copy.continueWatching].exists, "Nothing is being watched yet")
 
     press(.select)
-    XCTAssertTrue(waitForFocus(timeout: 30) { $0 == "Play" }, "The film's page opens on Play")
+    XCTAssertTrue(waitForFocus(timeout: 30) { $0 == Copy.play }, "The film's page opens on Play")
 
     // The film is an MKV, which plays through the server's HLS remux under the system's
     // transport. Twenty seconds in, more than one ten-second save has landed.
@@ -117,7 +118,7 @@ final class RemoteFlowTests: XCTestCase {
     XCTAssertTrue(waitForFocus(timeout: 15) { $0 == Copy.watched })
     press(.select)
     XCTAssertTrue(waitForFocus(timeout: 15) { $0 == Copy.markWatched })
-    XCTAssertTrue(app.buttons["Play"].waitForExistence(timeout: 15))
+    XCTAssertTrue(app.buttons[Copy.play].waitForExistence(timeout: 15))
   }
 
   // MARK: - The remote and the focus

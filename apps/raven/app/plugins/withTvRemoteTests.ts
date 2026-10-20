@@ -69,6 +69,7 @@ type XcodeProjectApi = {
   addToPbxGroup: (group: string, parent: string) => void
   addBuildPhase: (files: string[], type: string, comment: string, target: string) => unknown
   getFirstProject: () => { firstProject: { mainGroup: string } }
+  pbxNativeTargetSection: () => Record<string, unknown>
 }
 
 const XCODE_METHODS = [
@@ -81,6 +82,7 @@ const XCODE_METHODS = [
   'addToPbxGroup',
   'addBuildPhase',
   'getFirstProject',
+  'pbxNativeTargetSection',
 ] as const satisfies readonly (keyof XcodeProjectApi)[]
 
 const isXcodeProjectApi = (value: unknown): value is XcodeProjectApi =>
@@ -90,6 +92,18 @@ const isXcodeProjectApi = (value: unknown): value is XcodeProjectApi =>
 
 /** Quoted as a pbxproj value that holds a space, a slash or a hyphen must be. */
 const quoted = (value: string): string => `"${value}"`
+
+/**
+ * Whether the project has the test target already: the mod has run on this project before. A
+ * prebuild, with `--clean` or without, hands it a fresh project file, so only a second run on
+ * the same one finds it.
+ */
+const hasRemoteTests = (project: XcodeProjectApi): boolean =>
+  Object.values(project.pbxNativeTargetSection()).some((target) => {
+    const name: unknown =
+      typeof target === 'object' && target !== null && Reflect.get(target, 'name')
+    return name === REMOTE_TESTS.target || name === quoted(REMOTE_TESTS.target)
+  })
 
 /**
  * The test bundle's settings: a tvOS UI test bundle that drives the installed app by its bundle
@@ -140,7 +154,8 @@ const schemeOf = ({
  * Adds the Apple TV's remote-driven end to end test to the generated Xcode project, since
  * `ios/` is made afresh by each prebuild: the Swift in `tvos-e2e/` is copied into
  * `ios/RavenRemoteTests/`, a UI test target compiles it, and a shared scheme of the same name
- * runs it. The `xcode` package's project is changed in place, as every Xcode mod does.
+ * runs it. A project that has the target already only gets the Swift copied afresh. The `xcode`
+ * package's project is changed in place, as every Xcode mod does.
  */
 export const withTvRemoteTests: ConfigPlugin = (config) =>
   withXcodeProject(config, (mod) => {
@@ -154,6 +169,7 @@ export const withTvRemoteTests: ConfigPlugin = (config) =>
     const files = readdirSync(sources).filter((file) => file.endsWith(SWIFT))
     mkdirSync(copied, { recursive: true })
     files.forEach((file) => copyFileSync(join(sources, file), join(copied, file)))
+    if (hasRemoteTests(project)) return mod
 
     const uuid = project.generateUuid()
     const configurations = project.addXCConfigurationList(

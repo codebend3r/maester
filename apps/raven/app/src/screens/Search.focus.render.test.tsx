@@ -1,15 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { SEARCH_DELAY_MS, isRecord } from '@raven/core'
+import { SEARCH_DELAY_MS } from '@raven/core'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 
 import { Search } from '@/screens/Search'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
-import { useScreenFocus } from '@/stores/screenFocus'
 import type { HeardRequest } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import type * as NavigationFocus from '@/test/navigationFocus'
-import { leaveTestScreen, resetTestScreen, returnToTestScreen } from '@/test/navigationFocus'
+import {
+  askedFor,
+  leaveTestScreen,
+  resetTestScreen,
+  returnToTestScreen,
+} from '@/test/navigationFocus'
 import { DUNE_QUERY, isSearch, searchApi, searchPathFor } from '@/test/searchServer'
 import { renderScreen } from '@/test/renderScreen'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
@@ -36,11 +40,10 @@ jest.mock('expo-router', () => ({
   ...jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').navigationFocusMocks,
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
 }))
-// The fork's requestTVFocus is native; what matters is which card asks for the focus, and when.
-const mockRequestTVFocus = jest.fn<(instance: unknown) => void>()
-jest.mock('@/layouts/tvFocus', () => ({
-  requestTVFocus: (instance: unknown) => mockRequestTVFocus(instance),
-}))
+jest.mock(
+  '@/layouts/tvFocus',
+  () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
+)
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
@@ -66,12 +69,6 @@ const preferred = (): unknown[] =>
     .filter((node) => node.props.hasTVPreferredFocus === true)
     .map((node) => node.props.accessibilityLabel)
 
-/** The cards that asked for the remote's focus, by title, in order. */
-const askedFor = (): unknown[] =>
-  mockRequestTVFocus.mock.calls.map(([instance]) =>
-    isRecord(instance) && isRecord(instance.props) ? instance.props.accessibilityLabel : instance,
-  )
-
 const pause = async (ms: number) => {
   await act(async () => {
     jest.advanceTimersByTime(ms)
@@ -83,7 +80,6 @@ describe('Search on a TV', () => {
     jest.useFakeTimers()
     jest.clearAllMocks()
     resetTestScreen()
-    useScreenFocus.setState({ screens: {} })
     mockServer.heard = []
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })

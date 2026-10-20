@@ -10,10 +10,8 @@ import {
   mediaLabel,
 } from '@raven/core'
 import { usePlayerPrefs } from '@raven/ui/headless'
-import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react-native'
-import type * as ReactModule from 'react'
-import type * as VideoModule from 'react-native-video'
-import { type ReactVideoProps, SelectedTrackType, type VideoRef } from 'react-native-video'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { type ReactVideoProps, SelectedTrackType } from 'react-native-video'
 
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { Player } from '@/screens/Player'
@@ -24,6 +22,8 @@ import { NAS } from '@/test/homeServer'
 import { BUSBOYS } from '@/test/itemServer'
 import { BUSBOYS_MP4, BUSBOYS_UNSUBTITLED, CUE_TEXT, playerApi } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
+import type * as VideoMock from '@/test/videoMock'
+import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@/test/videoMock'
 
 const mockBack = jest.fn()
 const mockParams = jest.fn((): Record<string, string> => ({
@@ -31,8 +31,6 @@ const mockParams = jest.fn((): Record<string, string> => ({
 }))
 /** What the server heard, per test. */
 const mockServer: { heard: HeardRequest[] } = { heard: [] }
-/** The props the player was last drawn with, which the test fires the player's events through. */
-const mockVideo: { props: ReactVideoProps | null } = { props: null }
 
 // The layouts pick their variant once, as they load, so the TV is set before anything does.
 jest.mock('react-native/Libraries/Utilities/Platform', () => {
@@ -66,36 +64,9 @@ jest.mock('@/servers/serverClient', () => ({
 jest.mock('@react-native-community/netinfo', () =>
   jest.requireActual('@react-native-community/netinfo/jest/netinfo-mock'),
 )
-jest.mock('react-native-video', () => {
-  const { useEffect, useImperativeHandle } = jest.requireActual<typeof ReactModule>('react')
-  const Video = ({ ref, ...props }: ReactVideoProps & { ref?: ReactModule.Ref<VideoRef> }) => {
-    useEffect(() => {
-      mockVideo.props = props
-    })
-    useImperativeHandle(ref, () => ({
-      seek: () => undefined,
-      resume: () => undefined,
-      pause: () => undefined,
-      presentFullscreenPlayer: () => undefined,
-      dismissFullscreenPlayer: () => undefined,
-      restoreUserInterfaceForPictureInPictureStopCompleted: () => undefined,
-      save: () => undefined,
-      setVolume: () => undefined,
-      getCurrentPosition: async () => 0,
-      setFullScreen: () => undefined,
-      setSource: () => undefined,
-      enterPictureInPicture: () => undefined,
-      exitPictureInPicture: () => undefined,
-    }))
-    return null
-  }
-  // The library's own constants, with its player swapped for one the test drives.
-  return {
-    ...jest.requireActual<typeof VideoModule>('react-native-video'),
-    __esModule: true,
-    default: Video,
-  }
-})
+jest.mock('react-native-video', () =>
+  jest.requireActual<typeof VideoMock>('@/test/videoMock').videoModuleMock(),
+)
 
 const shown = { client: createScreenClient() }
 
@@ -113,7 +84,7 @@ const renderPlayer = async (params: Record<string, string>) => {
 /** The player's props once it has a source to play. */
 const loadedVideo = async (): Promise<ReactVideoProps> =>
   waitFor(() => {
-    const { props } = mockVideo
+    const { props } = drawnVideo
     if (props === null || props.source === undefined) throw new Error('No source yet')
     return props
   })
@@ -138,31 +109,15 @@ const subtitleReads = (): HeardRequest[] =>
     return call !== null && APP_CLIENT_CALLS[call] === APP_CLIENT_CALLS.subtitles
   })
 
-const start = async (props: ReactVideoProps) => {
-  await act(async () => {
-    props.onLoad!({
-      currentTime: 0,
-      duration: BUSBOYS_MP4.duration ?? 0,
-      naturalSize: { width: 1920, height: 1080, orientation: 'landscape' },
-      audioTracks: [],
-      textTracks: [],
-      videoTracks: [],
-    })
-    props.onPlaybackStateChanged!({ isPlaying: true, isSeeking: false })
-    props.onBuffer!({ isBuffering: false })
-  })
-}
-
-const moveTo = async ({ props, seconds }: { props: ReactVideoProps; seconds: number }) =>
-  act(async () => {
-    props.onProgress!({ currentTime: seconds, playableDuration: seconds, seekableDuration: 6000 })
-  })
+/** Fires what the player says as it opens Busboys and starts. */
+const start = async (props: ReactVideoProps) =>
+  startVideo({ props, duration: BUSBOYS_MP4.duration ?? 0 })
 
 describe('Player on a TV', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockServer.heard = []
-    mockVideo.props = null
+    resetDrawnVideo()
     usePlayerPrefs.setState({ subtitles: { on: false, language: null } })
     const server = { ...NAS, id: `1c3f7e20-4d5e-41d1-80b4-${String(++servers).padStart(12, '0')}` }
     useActiveServer.setState({ servers: [server], activeId: server.id })
@@ -207,7 +162,7 @@ describe('Player on a TV', () => {
     // The preferred track is the first rendition, picked for the system to draw.
     expect(props.selectedTextTrack).toEqual({ type: SelectedTrackType.INDEX, value: 0 })
     await start(props)
-    await moveTo({ props, seconds: 15 })
+    await moveVideoTo({ props, seconds: 15 })
     expect(screen.queryByText(CUE_TEXT)).toBeNull()
     expect(subtitleReads()).toEqual([])
   })
@@ -235,7 +190,7 @@ describe('Player on a TV', () => {
     })
     const props = await loadedVideo()
     await start(props)
-    await moveTo({ props, seconds: 42 })
+    await moveVideoTo({ props, seconds: 42 })
     unmount()
     await waitFor(() => expect(savedSpots().at(-1)).toEqual({ position: 42, audio: AUDIO_PLAYED }))
   })

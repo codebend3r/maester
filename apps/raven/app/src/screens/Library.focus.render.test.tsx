@@ -6,7 +6,6 @@ import {
   JUMP_SCALE_LABELS,
   LIBRARY_VIEWS,
   SORT_FIELD_LABELS,
-  isRecord,
   sortFieldsFor,
 } from '@raven/core'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
@@ -18,11 +17,15 @@ import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { useScreenFocus } from '@/stores/screenFocus'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import { FILM_SEARCHES, GROUPED_FILMS, libraryApi, libraryPath } from '@/test/libraryServer'
 import type * as NavigationFocus from '@/test/navigationFocus'
-import { leaveTestScreen, resetTestScreen, returnToTestScreen } from '@/test/navigationFocus'
+import {
+  askedFor,
+  leaveTestScreen,
+  resetTestScreen,
+  returnToTestScreen,
+} from '@/test/navigationFocus'
 import { renderScreen } from '@/test/renderScreen'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
@@ -54,11 +57,10 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => mockParams(),
 }))
-// The fork's requestTVFocus is native; what matters is which card asks for the focus, and when.
-const mockRequestTVFocus = jest.fn<(instance: unknown) => void>()
-jest.mock('@/layouts/tvFocus', () => ({
-  requestTVFocus: (instance: unknown) => mockRequestTVFocus(instance),
-}))
+jest.mock(
+  '@/layouts/tvFocus',
+  () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
+)
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
@@ -98,12 +100,6 @@ const layOut = async () => {
     }, Promise.resolve())
 }
 
-/** The cards that asked for the remote's focus after a jump, by title, in order. */
-const askedFor = (): unknown[] =>
-  mockRequestTVFocus.mock.calls.map(([instance]) =>
-    isRecord(instance) && isRecord(instance.props) ? instance.props.accessibilityLabel : instance,
-  )
-
 const renderLibrary = async ({ id }: { id: number }) => {
   mockParams.mockReturnValue({ [APP_ROUTE_PARAMS.id]: String(id) })
   const rendered = await renderScreen({ ui: <Library /> })
@@ -116,9 +112,7 @@ describe('Library on a TV', () => {
     jest.restoreAllMocks()
     mockServer.requests = []
     mockServer.libraries = []
-    mockRequestTVFocus.mockClear()
     resetTestScreen()
-    useScreenFocus.setState({ screens: {} })
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
     useLibraryViews.setState({ choices: {} })
   })

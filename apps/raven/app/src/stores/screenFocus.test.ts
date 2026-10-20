@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test'
 
 import {
-  dropOpener,
+  coverScreen,
   isOpeningIn,
   leaveScreen,
   rememberOpener,
@@ -38,11 +38,26 @@ describe('screen focus', () => {
     expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(false)
   })
 
-  it('lets an opener no card took go, so a later return asks for nothing', () => {
+  it('keeps the opener through the cover the card opened, for the card to take on return', () => {
     rememberOpener({ screen: HOME, card: NIGHT_TRAIN })
-    dropOpener({ screen: HOME })
+    coverScreen({ screen: HOME })
+    expect(takeOpener({ screen: HOME, card: NIGHT_TRAIN })).toBe(true)
+  })
+
+  it('lets an opener no card took go as the screen is covered again', () => {
+    rememberOpener({ screen: HOME, card: NIGHT_TRAIN })
+    coverScreen({ screen: HOME })
+    coverScreen({ screen: HOME })
     expect(takeOpener({ screen: HOME, card: NIGHT_TRAIN })).toBe(false)
     expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(false)
+  })
+
+  it('keeps a new opener through its own cover, whatever the last one left', () => {
+    rememberOpener({ screen: HOME, card: NIGHT_TRAIN })
+    coverScreen({ screen: HOME })
+    rememberOpener({ screen: HOME, card: BUSBOYS })
+    coverScreen({ screen: HOME })
+    expect(takeOpener({ screen: HOME, card: BUSBOYS })).toBe(true)
   })
 
   it('forgets a screen that has gone, so one opened in its place starts afresh', () => {
@@ -50,7 +65,7 @@ describe('screen focus', () => {
     rememberOpener({ screen: ITEM, card: BUSBOYS })
     leaveScreen({ screen: HOME })
     expect(useScreenFocus.getState().screens).toEqual({
-      [ITEM]: { hasSettled: true, opener: BUSBOYS },
+      [ITEM]: { hasSettled: true, opener: { card: BUSBOYS, wasCovered: false } },
     })
     expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(true)
   })
