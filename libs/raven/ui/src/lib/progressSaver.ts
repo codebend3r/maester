@@ -13,11 +13,11 @@ export type ProgressSaver = {
 }
 
 /**
- * Sends a title's saved positions one at a time, newest first, so an older
- * spot never lands after a newer one. A save that fails, as when the
- * connection drops along with the video, is tried again on `SAVE_RETRY_MS`
- * unless a newer position replaced it by then; `settled` lets a host read
- * the server's lists again only once the last position is in.
+ * Sends a title's saved positions one at a time, only the newest of those
+ * waiting, so an older spot never lands after a newer one. A save that
+ * fails, as when the connection drops along with the video, is tried again
+ * on `SAVE_RETRY_MS` unless a newer position replaced it by then; `settled`
+ * lets a host read the server's lists again only once the last position is in.
  */
 export const createProgressSaver = ({
   send,

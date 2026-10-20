@@ -71,10 +71,9 @@ const SignUpForm = () => {
           label="Password"
           password={password}
           confirmation={confirmation}
-          // The refusal is about the password sent, so it goes once the field holds another.
           refusal={
-            signUp.isError && signUp.variables.password === password
-              ? failureCopy(signUp.error)
+            signUp.isError
+              ? { password: signUp.variables.password, message: failureCopy(signUp.error) }
               : null
           }
           isMismatched={isMismatched}

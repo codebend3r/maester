@@ -46,10 +46,12 @@ const ResetPasswordForm = () => {
           label="New password"
           password={password}
           confirmation={confirmation}
-          // The refusal is about the password sent, so it goes once the field holds another.
           refusal={
-            update.isError && update.variables === password
-              ? (weakPasswordMessage(update.error) ?? FAILED_COPY)
+            update.isError
+              ? {
+                  password: update.variables,
+                  message: weakPasswordMessage(update.error) ?? FAILED_COPY,
+                }
               : null
           }
           isMismatched={isMismatched}
