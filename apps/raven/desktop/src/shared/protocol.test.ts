@@ -272,6 +272,7 @@ describe('isDesktopRequest', () => {
         watched: null,
       },
     ],
+    [{ type: DESKTOP_REQUESTS.leaveServerTitle, serverId: id, mediaId: 7 }],
     [{ type: DESKTOP_REQUESTS.readUpdates }],
     [{ type: DESKTOP_REQUESTS.setUpdateCheck, isEnabled: false }],
     [{ type: DESKTOP_REQUESTS.checkForUpdates }],
@@ -607,6 +608,7 @@ describe('isDesktopEvent', () => {
     [{ type: DESKTOP_EVENTS.updateAvailable, version: '0.6.0' }],
     [{ type: DESKTOP_EVENTS.downloadAsk, ask: ASK }],
     [{ type: DESKTOP_EVENTS.downloads, downloads: [VIEW], autoDeleteDefault: false }],
+    [{ type: DESKTOP_EVENTS.accountSwitched, serverId: id }],
   ])('accepts %j', (value) => {
     expect(isDesktopEvent(value)).toBe(true)
   })
@@ -625,6 +627,11 @@ describe('isDesktopEvent', () => {
     [
       'space, which only the page asks for',
       { type: DESKTOP_REPLIES.space, space: { free: 1, total: 2, used: 0 } },
+    ],
+    ['a switch of account that names no server', { type: DESKTOP_EVENTS.accountSwitched }],
+    [
+      'a switch of account whose server is not an opaque id',
+      { type: DESKTOP_EVENTS.accountSwitched, serverId: '../x' },
     ],
     [
       'a list of downloads without its default',

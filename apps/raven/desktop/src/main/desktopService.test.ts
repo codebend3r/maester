@@ -157,6 +157,7 @@ const fakeDownloads = ({
     onSuspend: () => undefined,
     onResume: () => undefined,
     accessEnded: () => undefined,
+    accountSwitched: () => undefined,
     dispose: () => undefined,
     pause: async (input) => {
       note('pause', input)
@@ -400,7 +401,8 @@ const setup = ({
   const opened: { link: string; from: 'link' | 'app' }[] = []
   const batches: (readonly string[])[] = []
   const browsed: string[] = []
-  const server = { calls, trusted, removed, opened, batches, browsed }
+  const left: { serverId: string; mediaId: number }[] = []
+  const server = { calls, trusted, removed, opened, batches, browsed, left }
   const updateQueue = [...updateAnswers]
   const releasePages: string[] = []
   const releases = { checks: 0, opened: releasePages }
@@ -434,6 +436,11 @@ const setup = ({
       callFromPage: async (input) => {
         server.calls.push(input)
         return callResult
+      },
+    },
+    titleSittings: {
+      left: (title) => {
+        server.left.push(title)
       },
     },
     trust: {
@@ -1413,6 +1420,17 @@ describe('server titles', () => {
     servers: [{ serverId: SERVER, origin: 'https://raven.example', name: 'raven.example' }],
   } as const satisfies DesktopReply
 
+  it('tells the sittings the page left a title', async () => {
+    const { service, server } = setup({ files: {} })
+    expect(
+      await ask({
+        service,
+        request: { type: DESKTOP_REQUESTS.leaveServerTitle, serverId: SERVER, mediaId: 7 },
+      }),
+    ).toEqual({ type: DESKTOP_REPLIES.done })
+    expect(server.left).toEqual([{ serverId: SERVER, mediaId: 7 }])
+  })
+
   describe('serverCall', () => {
     const call = {
       type: 'serverCall',
@@ -1605,6 +1623,43 @@ describe('server titles', () => {
       })
       expect(server.removed).toEqual([SERVER])
       expect((await recents({ service })).map((recent) => recent.from)).toEqual(['nas.example'])
+    })
+
+    it("drops that server's recents when its account changes, and keeps other servers' and local files'", async () => {
+      const { service, config } = setup({ files: { '/m/a.mkv': {} } })
+      config.update((current) => ({
+        ...current,
+        servers: [
+          ...current.servers,
+          {
+            id: OTHER_SERVER,
+            origin: 'https://nas.example',
+            name: 'nas.example',
+            addedAt: 2,
+            signIn: null,
+          },
+        ],
+      }))
+      const { fileId } = idOf(await service.openPaths(['/m/a.mkv']))
+      await ask({ service, request: { type: DESKTOP_REQUESTS.describeFile, fileId, queue: [] } })
+      await noteDune({ service })
+      await noteDune({ service, serverId: OTHER_SERVER })
+      const before = await recents({ service })
+      expect(before).toHaveLength(3)
+      service.accountSwitched({ serverId: SERVER })
+      const after = await recents({ service })
+      expect(after.map((recent) => recent.from)).toEqual(['nas.example', 'm'])
+      service.accountSwitched({ serverId: SERVER })
+      expect(await recents({ service })).toEqual(after)
+      const dropped = before.find(
+        (recent) => !after.some((kept) => kept.recentId === recent.recentId),
+      )
+      expect(
+        await ask({
+          service,
+          request: { type: DESKTOP_REQUESTS.openRecent, recentId: dropped?.recentId ?? '' },
+        }),
+      ).toEqual(expect.objectContaining({ type: DESKTOP_REPLIES.refused }))
     })
 
     it('answers removing an unknown server with the list', async () => {

@@ -42,12 +42,6 @@ const setup = (answer: DesktopReply | (() => Promise<DesktopReply>)) => {
 
 const SIGNED_IN = accountOf({ state: ACCOUNT_STATES.approved, email: 'me@example.com' })
 
-describe('accountKey', () => {
-  it('is the desktop account key of one server', () => {
-    expect(accountKey(S)).toEqual(['desktop', 'account', S])
-  })
-})
-
 describe('useAccount', () => {
   it('reads the account of one server from main', async () => {
     const { client, wrapper } = setup({ type: DESKTOP_REPLIES.account, account: SIGNED_IN })

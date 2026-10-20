@@ -1,9 +1,11 @@
 import { describe, expect, it, jest, mock, spyOn } from 'bun:test'
+import { type QueryClient, QueryObserver } from '@tanstack/react-query'
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NavigationType } from 'react-router-dom'
 import { DOWNLOADS_KEY } from '@/renderer/desktop/downloadsApi'
 import { accountKey } from '@/renderer/desktop/accountApi'
+import { SERVER_QUERIES, serverKey } from '@/renderer/desktop/serverApi'
 import { accountOf } from '@/renderer/test/accountFakes'
 import { useDragging } from '@/renderer/stores/dragging'
 import { useNotice } from '@/renderer/stores/notice'
@@ -204,6 +206,71 @@ describe('Shell', () => {
     expect(
       client.request.mock.calls.some(([request]) => request.type === DESKTOP_REQUESTS.readAccount),
     ).toBe(false)
+  })
+
+  describe("a server's cached queries", () => {
+    const other = '66666666-6666-4666-8666-666666666666'
+    const mediaOf = (serverId: string) => [...serverKey(serverId), SERVER_QUERIES.media, 7]
+    /** A title on screen: an active query of the server that counts its fetches. */
+    const watching = (queryClient: QueryClient) => {
+      const fetches = { count: 0 }
+      const options = {
+        queryKey: mediaOf(ID_C),
+        queryFn: async () => {
+          fetches.count += 1
+          return { position: fetches.count * 100 }
+        },
+        staleTime: Infinity,
+      }
+      const observer = new QueryObserver(queryClient, options)
+      const stop = observer.subscribe(() => undefined)
+      return { fetches, observer, options, stop }
+    }
+    const listings = (client: ReturnType<typeof fakeClient>) =>
+      client.request.mock.calls.filter(([request]) => request.type === DESKTOP_REQUESTS.listRecents)
+        .length
+
+    it('marks them stale on a switch of account, refetching nothing and keeping a title on screen', async () => {
+      const client = fakeClient()
+      const { queryClient } = renderDesktop({ client, routes: STUB_ROUTES })
+      await settled()
+      const title = watching(queryClient)
+      await waitFor(() => expect(title.observer.getCurrentResult().data).toEqual({ position: 100 }))
+      queryClient.setQueryData(mediaOf(other), { position: 300 })
+      const listed = listings(client)
+      await client.emit({ type: DESKTOP_EVENTS.accountSwitched, serverId: ID_C })
+      expect(queryClient.getQueryState(mediaOf(ID_C))?.isInvalidated ?? null).toBe(true)
+      expect(title.fetches.count).toBe(1)
+      expect(title.observer.getCurrentResult().data).toEqual({ position: 100 })
+      expect(queryClient.getQueryState(mediaOf(other))?.isInvalidated ?? null).toBe(false)
+      await waitFor(() => expect(listings(client)).toBe(listed + 1))
+      title.stop()
+    })
+
+    it('reads the server again as the new account once the gate lets it in', async () => {
+      const client = fakeClient()
+      const { queryClient } = renderDesktop({ client, routes: STUB_ROUTES })
+      await settled()
+      const title = watching(queryClient)
+      await waitFor(() => expect(title.fetches.count).toBe(1))
+      await client.emit({ type: DESKTOP_EVENTS.accountSwitched, serverId: ID_C })
+      title.observer.setOptions({ ...title.options, enabled: false })
+      title.observer.setOptions({ ...title.options, enabled: true })
+      await waitFor(() => expect(title.observer.getCurrentResult().data).toEqual({ position: 200 }))
+      title.stop()
+    })
+
+    it('leaves them alone on an account event that is not a switch', async () => {
+      const client = fakeClient()
+      const { queryClient } = renderDesktop({ client, routes: STUB_ROUTES })
+      await settled()
+      queryClient.setQueryData(mediaOf(ID_C), { position: 600 })
+      await client.emit({ type: DESKTOP_EVENTS.account, account: accountOf({ serverId: ID_C }) })
+      expect(queryClient.getQueryState(mediaOf(ID_C))?.isInvalidated ?? null).toBe(false)
+      expect(queryClient.getQueryData<{ position: number }>(mediaOf(ID_C)) ?? null).toEqual({
+        position: 600,
+      })
+    })
   })
 
   it("lists Home's recents again when a downloads event drops a download, not for progress", async () => {

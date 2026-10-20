@@ -1,11 +1,23 @@
-import { describe, expect, it, mock } from 'bun:test'
+import { describe, expect, it, mock, spyOn } from 'bun:test'
 import { createMenuHub } from '@/renderer/desktop/menuHub'
 import { serverApiFor } from '@/renderer/desktop/serverApi'
 import { resumeAtFor, serverServicesFor } from '@/renderer/ServerPage/serverServices'
-import { reply, S, sentOfType, serverClient, VHAGAR } from '@/renderer/test/serverFakes'
+import {
+  type CallKey,
+  reply,
+  S,
+  sentOfType,
+  serverClient,
+  VHAGAR,
+} from '@/renderer/test/serverFakes'
+import { DESKTOP_REPLIES, SERVER_METHODS } from '@/shared/protocol'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
 const EPISODE = mediaItemFor({ duration: 1200 })
+
+const PLAY_CALL: CallKey = `${SERVER_METHODS.post} /api/media/7/plays`
+const SAVE_CALL: CallKey = `${SERVER_METHODS.put} /api/media/7/progress`
+const SAVED = reply({ status: 204, body: '' })
 
 type Built = Parameters<typeof serverServicesFor>[0]
 
@@ -14,18 +26,15 @@ const servicesWith = ({
   escape = { run: () => undefined, feedback: null },
   length = { current: EPISODE.duration },
   hasRecordedPlay = { current: false },
+  calls = { [PLAY_CALL]: SAVED, [SAVE_CALL]: SAVED },
 }: {
   next?: Built['next']
   escape?: Built['escape']
   length?: Built['length']
   hasRecordedPlay?: Built['hasRecordedPlay']
+  calls?: Parameters<typeof serverClient>[0]['calls']
 } = {}) => {
-  const client = serverClient({
-    calls: {
-      'POST /api/media/7/plays': reply({ status: 204, body: '' }),
-      'PUT /api/media/7/progress': reply({ status: 204, body: '' }),
-    },
-  })
+  const client = serverClient({ calls })
   const lastSaved = { current: 0 }
   const services = serverServicesFor({
     media: EPISODE,
@@ -104,6 +113,23 @@ describe('serverServicesFor', () => {
       body: '{"position":40}',
     })
     expect(lastSaved.current).toBe(40)
+  })
+
+  it('keeps playing with only a warning when main refuses its reports for another account', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const refused = {
+      type: DESKTOP_REPLIES.serverUnreachable,
+      message: 'raven player is signed in to Vhagar as someone else now.',
+    }
+    const { lastSaved, services } = servicesWith({
+      calls: { [PLAY_CALL]: refused, [SAVE_CALL]: refused },
+    })
+    services.progress.started()
+    services.progress.save(40)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(lastSaved.current).toBe(40)
+    expect(warn).toHaveBeenCalledTimes(2)
+    warn.mockRestore()
   })
 
   it('notes the share watched in the recents when the title is left', () => {

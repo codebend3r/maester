@@ -38,7 +38,7 @@ export const DEFAULT_PLAYBACK_STATE: PlaybackSettingsState = {
  * leaves any to be fetched. `account` renders as that account signed in on a
  * server with accounts on, its `/api/me` already read.
  * `libraries` is the list the side menu reads, for a test that has it read.
- * Returns what Testing Library's `render` does, and the query client.
+ * Returns what Testing Library's `render` does, and the query client (a fresh one unless `client` names it).
  */
 export const renderWithProviders = ({
   ui,
@@ -50,6 +50,7 @@ export const renderWithProviders = ({
   authConfig = { state: AUTH_CONFIG_STATES.off },
   account = null,
   libraries = null,
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
 }: {
   ui: ReactNode
   route?: string
@@ -61,8 +62,9 @@ export const renderWithProviders = ({
   authConfig?: AuthConfig | null
   account?: Account | null
   libraries?: Library[] | null
+  /** The cache to render over, for a test that needs the one the session store resets. */
+  client?: QueryClient
 }) => {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   if (playback) client.setQueryData(queryKeys.playbackSettings, playback)
   if (display) client.setQueryData(queryKeys.displaySettings, display)
   if (adminLock) client.setQueryData(queryKeys.adminLock, adminLock)

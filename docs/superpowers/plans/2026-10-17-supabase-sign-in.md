@@ -98,6 +98,6 @@ Task plan: `2026-10-18-raven-auth-enforcement.md`, PR #255 against `raven-auth-d
 | `raven-auth-ui` | Login, signup, confirmation, recovery, pending and Settings > Users. Task plan: [`2026-10-18-raven-auth-ui.md`](2026-10-18-raven-auth-ui.md) | Test the complete owner approval flow in staging |
 | `raven-auth-desktop` | Main-owned session, login, pending, secure storage and playback tickets. Task plan: [`2026-10-18-raven-auth-desktop.md`](2026-10-18-raven-auth-desktop.md) | Release before enforcement |
 | `raven-auth-enforcement` | Account gate across every protected API/media path, owner-only management, remove admin-password authorization, bind PIN state to accounts | Configure production and verify anonymous access is denied |
-| `raven-account-data` | Per-account progress, plays, watched and favourites with owner adoption | Follow-up; viewing data is shared until this ships |
+| `raven-account-data` | Per-account progress, plays, watched and favourites with owner adoption. Task plan: [`2026-10-18-raven-account-data.md`](2026-10-18-raven-account-data.md) (built, #256) | Back up the data folder, then sign in as the owner once before inviting anyone |
 
 Rebase and retarget each child after its parent merges. Preserve the security boundary: only the enforcement PR changes existing library access, but every newly introduced account, management and account-ticket route is protected from its first merge.

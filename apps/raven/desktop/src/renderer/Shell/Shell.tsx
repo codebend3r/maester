@@ -3,9 +3,10 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { applyDownloadsEvent } from '@/renderer/desktop/downloadsApi'
 import { accountKey } from '@/renderer/desktop/accountApi'
+import { serverKey } from '@/renderer/desktop/serverApi'
 import { DownloadDialog } from '@/renderer/Shell/DownloadDialog'
 import { OpenLinkDialog } from '@/renderer/Shell/OpenLinkDialog'
-import { applyReply, play, playServer } from '@/renderer/Shell/openReply'
+import { applyReply, play, playServer, RECENTS_KEY } from '@/renderer/Shell/openReply'
 import { UpdateNotice } from '@/renderer/Shell/UpdateNotice'
 import { UPDATES_KEY } from '@/renderer/Shell/updateState'
 import { useFileDrop } from '@/renderer/Shell/useFileDrop'
@@ -97,6 +98,14 @@ export const Shell = () => {
         return void applyDownloadsEvent({ queryClient, event })
       case DESKTOP_EVENTS.account:
         return void queryClient.setQueryData(accountKey(event.account.serverId), event.account)
+      case DESKTOP_EVENTS.accountSwitched:
+        // What the page cached of the server was the last account's. A title on screen keeps
+        // playing; the next read of the server, as the gate lets the new account in, fetches again.
+        void queryClient.invalidateQueries({
+          queryKey: serverKey(event.serverId),
+          refetchType: 'none',
+        })
+        return void queryClient.invalidateQueries({ queryKey: RECENTS_KEY })
       default: {
         const unreachable: never = event
         return unreachable

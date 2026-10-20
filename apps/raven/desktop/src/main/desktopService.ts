@@ -32,6 +32,7 @@ import {
   type ServerTrust,
   type TrustOutcome,
 } from '@/main/servers/serverTrust'
+import type { TitleSittings } from '@/main/servers/titleSittings'
 import type { StateStore, Timers } from '@/main/stateStore'
 import { UPDATE_COPY, type UpdateService } from '@/main/updateService'
 import { serverOriginOf, watchUrlFor } from '@/shared/playLink'
@@ -85,6 +86,7 @@ export type DesktopServiceDeps = {
   setWindowButtons: (isVisible: boolean) => void
   config: ConfigStore
   serverCalls: Pick<ServerCalls, 'callFromPage'>
+  titleSittings: Pick<TitleSittings, 'left'>
   trust: ServerTrust
   links: LinkOpener
   openExternal: (url: string) => Promise<void>
@@ -99,6 +101,11 @@ export type DesktopService = {
   openDialog: () => Promise<DesktopReply>
   /** A batch of links main was handed (`open-url`); the opener acts on the first. */
   openLinks: (links: readonly string[]) => Promise<DesktopReply>
+  /**
+   * The account signed in to a server changed: Home's recents of that server go, since their
+   * titles and shares watched were the last account's.
+   */
+  accountSwitched: (input: { serverId: string }) => void
 }
 
 const DONE = { type: DESKTOP_REPLIES.done } as const satisfies DesktopReply
@@ -478,17 +485,19 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     return serversOf(config.read())
   }
 
+  const dropServerRecents = ({ serverId }: { serverId: string }): void => {
+    store.update((state) => removeServerRecents({ state, serverId }))
+    forgetRecentIds({
+      keys: [...entryById.values()]
+        .filter((entry) => entry.kind === RECENT_KINDS.server && entry.serverId === serverId)
+        .map(recentKey),
+    })
+  }
+
   const removeOne = async ({ serverId }: { serverId: string }): Promise<DesktopReply> => {
     await deps.trust.remove(serverId)
     // A removal that could not be saved keeps the server, so it keeps its recents too.
-    if (serverById({ config: config.read(), serverId }) === null) {
-      store.update((state) => removeServerRecents({ state, serverId }))
-      forgetRecentIds({
-        keys: [...entryById.values()]
-          .filter((entry) => entry.kind === RECENT_KINDS.server && entry.serverId === serverId)
-          .map(recentKey),
-      })
-    }
+    if (serverById({ config: config.read(), serverId }) === null) dropServerRecents({ serverId })
     return serversOf(config.read())
   }
 
@@ -620,6 +629,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return openInBrowser({ serverId: request.serverId, mediaId: request.mediaId })
       case DESKTOP_REQUESTS.noteServerTitle:
         return noteServerTitle(request)
+      case DESKTOP_REQUESTS.leaveServerTitle:
+        deps.titleSittings.left({ serverId: request.serverId, mediaId: request.mediaId })
+        return DONE
       case DESKTOP_REQUESTS.readUpdates:
         return { type: DESKTOP_REPLIES.updates, status: deps.updates.status() }
       case DESKTOP_REQUESTS.setUpdateCheck:
@@ -722,5 +734,5 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     }
   }
 
-  return { handle, openPaths, openDialog, openLinks }
+  return { handle, openPaths, openDialog, openLinks, accountSwitched: dropServerRecents }
 }
