@@ -9,6 +9,7 @@ import {
   isPlayerReply,
   isPlayerRequest,
   isPlayerSource,
+  PLAYER_ERROR_REASONS,
 } from '@/player'
 
 const tracks = { audio: [], subtitles: [], defaultAudio: null, frameRate: null }
@@ -102,7 +103,18 @@ describe('isPlayerEvent', () => {
 
 describe('isPlayerErrorReason', () => {
   it('lists every reason', () => {
-    expect(isPlayerErrorReason.values).toEqual(['open', 'decode', 'network', 'locked', 'engine'])
+    expect(isPlayerErrorReason.values).toEqual([
+      PLAYER_ERROR_REASONS.open,
+      PLAYER_ERROR_REASONS.decode,
+      PLAYER_ERROR_REASONS.network,
+      PLAYER_ERROR_REASONS.locked,
+      PLAYER_ERROR_REASONS.engine,
+      PLAYER_ERROR_REASONS.account,
+    ])
+  })
+
+  it('accepts an account refusal', () => {
+    expect(isPlayerErrorReason(PLAYER_ERROR_REASONS.account)).toBe(true)
   })
 })
 

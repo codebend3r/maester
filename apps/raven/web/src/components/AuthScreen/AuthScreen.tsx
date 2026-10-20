@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
+import { AUTH_ROUTES } from '@raven/core'
 import { AuthCard, Brand, Lead, Status } from '@/components/AuthScreen/AuthCard'
 import { PosterWall } from '@/components/AuthScreen/PosterWall'
 import { type AccessKind, ACCESS_KINDS, useAccessState } from '@/lib/accessState'
-import { AUTH_ROUTES, HOME_PATH, signInPath } from '@/lib/authRoutes'
+import { HOME_PATH, signInPath } from '@/lib/authRoutes'
 import styles from '@/components/AuthScreen/AuthScreen.module.scss'
 
 /** Who an auth page is for. Anyone else is sent where they belong. */

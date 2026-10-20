@@ -9,10 +9,10 @@ import {
   AUTH_CONFIG_STATES,
   AUTH_REFUSALS,
   MEMBER_STATUSES,
+  AUTH_ROUTES,
 } from '@raven/core'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { api } from '@/lib/api'
-import { AUTH_ROUTES } from '@/lib/authRoutes'
 import { queryClient, queryKeys } from '@/lib/queryClient'
 import { signOut } from '@/lib/session'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'

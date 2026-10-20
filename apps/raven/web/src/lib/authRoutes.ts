@@ -1,12 +1,4 @@
-export const AUTH_ROUTES = {
-  signIn: '/sign-in',
-  signUp: '/sign-up',
-  checkEmail: '/check-email',
-  confirm: '/auth/confirm',
-  forgot: '/forgot-password',
-  reset: '/reset-password',
-  pending: '/pending',
-} as const
+import { AUTH_ROUTES } from '@raven/core'
 
 export const AUTH_QUERY = {
   returnTo: 'return_to',

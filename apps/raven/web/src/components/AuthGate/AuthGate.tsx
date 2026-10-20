@@ -1,8 +1,9 @@
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { Button } from '@raven/ui'
+import { AUTH_ROUTES } from '@raven/core'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
-import { AUTH_ROUTES, signInPath } from '@/lib/authRoutes'
+import { signInPath } from '@/lib/authRoutes'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/components/AuthGate/AuthGate.module.scss'
 

@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { AUTH_ROUTES } from '@raven/core'
 import { EmailField, PasswordFields } from '@/components/AuthScreen/AuthFields'
 import { AuthForm, Fields, Lead, Note, SubmitButton } from '@/components/AuthScreen/AuthCard'
 import { AUDIENCES, AuthScreen } from '@/components/AuthScreen/AuthScreen'
@@ -11,7 +12,7 @@ import {
   isRateLimited,
   weakPasswordMessage,
 } from '@/lib/authErrors'
-import { AUTH_ROUTES, checkEmailPath } from '@/lib/authRoutes'
+import { checkEmailPath } from '@/lib/authRoutes'
 import { callAuth } from '@/lib/session'
 import { useConfirmUrl } from '@/lib/useConfirmUrl'
 import { useAuthSession } from '@/stores/authSession'

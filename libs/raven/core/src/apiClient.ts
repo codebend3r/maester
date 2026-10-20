@@ -10,6 +10,7 @@ import {
   AUTH_PARAMS,
   AUTH_PATHS,
   AUTH_SCHEME,
+  MEDIA_TICKET_PARAM,
   isAccount,
   isAccountList,
   isAuthConfig,
@@ -237,7 +238,9 @@ export const createApiClient = ({
     query: Record<string, string>
     access: MediaAccess | null
   }): string => {
-    const queryString = toQueryString(access === null ? query : { ...query, t: access.ticket })
+    const queryString = toQueryString(
+      access === null ? query : { ...query, [MEDIA_TICKET_PARAM]: access.ticket },
+    )
     return `${access === null ? root : access.origin.url}${path}${queryString === '' ? '' : `?${queryString}`}`
   }
 

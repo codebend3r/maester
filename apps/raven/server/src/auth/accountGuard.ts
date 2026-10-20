@@ -13,6 +13,7 @@ import {
   AUTH_REFUSALS,
   isRecord,
   isString,
+  MEDIA_TICKET_PARAM,
 } from '@raven/core'
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
@@ -33,7 +34,6 @@ export const RequireAccount = (
   requirement: (typeof ACCOUNT_REQUIREMENTS)[keyof typeof ACCOUNT_REQUIREMENTS],
 ) => SetMetadata(ACCOUNT_ACCESS, requirement)
 const decorators = new Reflector()
-const MEDIA_QUERY = { ticket: 't' } as const
 const isMediaIdParam = (value: unknown): value is string =>
   isString(value) && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value))
 
@@ -53,7 +53,7 @@ export class AccountGuard implements CanActivate {
     )
     const request = context.switchToHttp().getRequest<FastifyRequest>()
     const query = isRecord(request.query) ? request.query : {}
-    const ticket = query[MEDIA_QUERY.ticket]
+    const ticket = query[MEDIA_TICKET_PARAM]
     const isAccountTicket =
       isMediaPlaneRoute(targets) && isString(ticket) && ticket.startsWith(ACCOUNT_TICKET_PREFIX)
     if (!isAccountRoute && !isAccountTicket) return true

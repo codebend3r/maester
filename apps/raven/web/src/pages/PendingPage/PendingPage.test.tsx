@@ -7,11 +7,12 @@ import {
   AUTH_CONFIG_STATES,
   AUTH_REFUSALS,
   MEMBER_STATUSES,
+  AUTH_ROUTES,
 } from '@raven/core'
 import { AppRoutes } from '@/AppRoutes'
 import { api } from '@/lib/api'
 import { type AuthClient } from '@/lib/authClient'
-import { AUTH_ROUTES, HOME_PATH, signInPath } from '@/lib/authRoutes'
+import { HOME_PATH, signInPath } from '@/lib/authRoutes'
 import { queryKeys } from '@/lib/queryClient'
 import { PendingPage } from '@/pages/PendingPage/PendingPage'
 import { useAuthSession } from '@/stores/authSession'
