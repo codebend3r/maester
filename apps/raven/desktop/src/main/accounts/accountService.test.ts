@@ -4,10 +4,10 @@ import {
   ACCOUNT_MESSAGES,
   signInUnavailable,
   authorizeWith,
-  createAccessEnds,
   createAccountService,
 } from '@/main/accounts/accountService'
 import { SIGN_IN_OUTCOMES, TOKEN_READS, type TokenRead } from '@/main/accounts/accountSessions'
+import { createServerSignal } from '@/main/accounts/serverSignal'
 import { AUTH_STATES, type AuthState } from '@/main/accounts/authConfigs'
 import type { SignInConfig } from '@/main/accounts/authEndpoints'
 import { EMPTY_CONFIG, type ConfigStore, type DesktopConfig } from '@/main/desktopConfig'
@@ -65,7 +65,16 @@ const accountBody = ({
   }),
 })
 
+const ACCOUNT_A = '30000000-0000-4000-8000-00000000000a'
+const ACCOUNT_B = '30000000-0000-4000-8000-00000000000b'
+
 type Setup = {
+  /** The account a sign in signs in as. */
+  signInAs?: string
+  /** The account signed in before the test starts; null when no one is. */
+  accountId?: string | null
+  /** Whether reading the config again drops the session, as a yes to a moved sign-in host does. */
+  isSessionDroppedOnReread?: boolean
   states?: AuthState[]
   rereads?: AuthState[]
   token?: string | null
@@ -78,6 +87,9 @@ type Setup = {
 }
 
 const setup = ({
+  signInAs = ACCOUNT_A,
+  accountId = ACCOUNT_A,
+  isSessionDroppedOnReread = false,
   states = [READY],
   rereads = [],
   token = TOKEN,
@@ -118,12 +130,20 @@ const setup = ({
   const ended: string[] = []
   const signedInWith: SignInConfig[] = []
   const rereadQueue = [...rereads]
-  const current: { state: AuthState; token: string | null; me: ServerCallResult } = {
+  const current: {
+    state: AuthState
+    token: string | null
+    me: ServerCallResult
+    accountId: string | null
+  } = {
     state: states[0] ?? READY,
     token,
     me,
+    accountId,
   }
-  const accessEnds = createAccessEnds()
+  /** Each server whose signed in account changed, with the account signed in by then. */
+  const switched: { serverId: string; accountId: string | null }[] = []
+  const accessEnds = createServerSignal()
   accessEnds.listen(({ serverId }) => {
     ended.push(serverId)
   })
@@ -139,7 +159,10 @@ const setup = ({
         events.push(EVENTS.stateOf)
         return current.state
       },
-      reread: () => readAgain(EVENTS.reread),
+      reread: () => {
+        if (isSessionDroppedOnReread) current.accountId = null
+        return readAgain(EVENTS.reread)
+      },
       recheck: () => readAgain(EVENTS.recheck),
     },
     sessions: {
@@ -152,18 +175,24 @@ const setup = ({
           password: PASSWORD,
           config: undefined,
         })
-        if (outcome === SIGN_IN_OUTCOMES.signedIn) current.token = TOKEN
+        if (outcome === SIGN_IN_OUTCOMES.signedIn) {
+          current.token = TOKEN
+          current.accountId = signInAs
+        }
         return { kind: outcome }
       },
       accessToken: async () => tokenReadOf({ token: current.token, isAuthDown }),
       signOut: async () => {
         events.push(EVENTS.signOut)
         current.token = null
+        current.accountId = null
       },
       forget: async () => {
         events.push(EVENTS.forget)
         current.token = null
+        current.accountId = null
       },
+      accountIdOf: () => current.accountId,
     },
     calls: {
       call: async ({ call }) => {
@@ -183,9 +212,13 @@ const setup = ({
     },
     info: (message) => infos.push(message),
     warn: (message) => warnings.push(message),
+    switched: ({ serverId }) => {
+      switched.push({ serverId, accountId: current.accountId })
+    },
   })
   return {
     service,
+    switched,
     events,
     emitted,
     infos,
@@ -481,36 +514,50 @@ describe('createAccountService signOut', () => {
   })
 })
 
+describe('createAccountService when the account signed in changes', () => {
+  it('tells main once a sign out has ended the session', async () => {
+    const world = setup()
+    await world.service.signOut(SERVER_ID)
+    expect(world.switched).toEqual([{ serverId: SERVER_ID, accountId: null }])
+  })
+
+  it('tells main when the server rejected the session and signed it out', async () => {
+    const world = setup({ me: { ok: true, status: 401, body: '' } })
+    await world.service.refused({ serverId: SERVER_ID, isSessionRejected: true })
+    expect(world.switched).toEqual([{ serverId: SERVER_ID, accountId: null }])
+  })
+
+  it('tells main of a sign in as another account, or after no one was signed in', async () => {
+    const other = setup({ signInAs: ACCOUNT_B })
+    await other.service.signIn({ serverId: SERVER_ID, email: EMAIL, password: PASSWORD })
+    expect(other.switched).toEqual([{ serverId: SERVER_ID, accountId: ACCOUNT_B }])
+    const first = setup({ accountId: null, token: null })
+    await first.service.signIn({ serverId: SERVER_ID, email: EMAIL, password: PASSWORD })
+    expect(first.switched).toEqual([{ serverId: SERVER_ID, accountId: ACCOUNT_A }])
+  })
+
+  it('tells main of the same account signing in again once a moved sign-in host dropped its session', async () => {
+    const world = setup({ isSessionDroppedOnReread: true })
+    await world.service.signIn({ serverId: SERVER_ID, email: EMAIL, password: PASSWORD })
+    expect(world.switched).toEqual([{ serverId: SERVER_ID, accountId: ACCOUNT_A }])
+  })
+
+  it('tells nobody of a sign in as the account already signed in, nor of one that failed', async () => {
+    const same = setup()
+    await same.service.signIn({ serverId: SERVER_ID, email: EMAIL, password: PASSWORD })
+    expect(same.switched).toEqual([])
+    const failed = setup({ accountId: null, outcome: SIGN_IN_OUTCOMES.wrongPassword })
+    await failed.service.signIn({ serverId: SERVER_ID, email: EMAIL, password: PASSWORD })
+    expect(failed.switched).toEqual([])
+  })
+})
+
 describe('createAccountService removed', () => {
   it('forgets the sign-in and tells the listeners', async () => {
     const world = setup()
     await world.service.removed(SERVER_ID)
     expect(world.events).toContain(EVENTS.forget)
     expect(world.ended).toEqual([SERVER_ID])
-  })
-})
-
-describe('createAccessEnds', () => {
-  it('tells every listener, and stops telling one that was removed', () => {
-    const ends = createAccessEnds()
-    const heard: string[] = []
-    const stop = ends.listen(({ serverId }) => heard.push(`a ${serverId}`))
-    ends.listen(({ serverId }) => heard.push(`b ${serverId}`))
-    ends.notify({ serverId: 'one' })
-    stop()
-    ends.notify({ serverId: 'two' })
-    expect(heard).toEqual(['a one', 'b one', 'b two'])
-  })
-
-  it('reaches the rest when a listener throws', () => {
-    const ends = createAccessEnds()
-    const heard: string[] = []
-    ends.listen(() => {
-      throw new Error('relay gone')
-    })
-    ends.listen(({ serverId }) => heard.push(serverId))
-    ends.notify({ serverId: 'one' })
-    expect(heard).toEqual(['one'])
   })
 })
 

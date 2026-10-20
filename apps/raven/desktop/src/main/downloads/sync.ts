@@ -26,6 +26,8 @@ export type SyncDeps = {
   warn: (message: string) => void
   /** How often the server is tried again; `SYNC_RETRY_MS` unless main's test hook shortens it. */
   retryMs: number
+  /** The account signed in to a server, as its stored session names it; null when none is. */
+  accountIdOf: (input: { serverId: string }) => string | null
 }
 
 export type Sync = {
@@ -51,13 +53,15 @@ const isLogged = (status: number): boolean => status === 403 || status === 404
 
 /**
  * How a call went: the server took it, refused it for good or for now (a 403 or a 404),
- * answered something else, or could not be reached.
+ * answered something else, or could not be reached; or it never went, since what it carries
+ * belongs to an account not signed in to the server now.
  */
 const DELIVERIES = {
   taken: 'taken',
   denied: 'denied',
   refused: 'refused',
   unreachable: 'unreachable',
+  waiting: 'waiting',
 } as const
 
 type Delivery = (typeof DELIVERIES)[keyof typeof DELIVERIES]
@@ -67,7 +71,7 @@ const OWING_KINDS = { entry: 'entry', owed: 'owed' } as const
 
 type Owing =
   | { kind: typeof OWING_KINDS.entry; downloadId: string }
-  | { kind: typeof OWING_KINDS.owed; serverId: string; mediaId: number }
+  | { kind: typeof OWING_KINDS.owed; serverId: string; mediaId: number; accountId: string | null }
 
 /** What an owing has pending now, with what its calls need. A removed download has no title. */
 type Due = {
@@ -80,13 +84,13 @@ type Due = {
 
 const entryOwing = (downloadId: string): Owing => ({ kind: OWING_KINDS.entry, downloadId })
 
-/** One string per owing, so the maps can key by it: a download id, or its server and media. */
+/** One string per owing, so the maps can key by it: a download id, or its server, media and account. */
 const keyOf = (owing: Owing): string => {
   switch (owing.kind) {
     case OWING_KINDS.entry:
       return owing.downloadId
     case OWING_KINDS.owed:
-      return JSON.stringify([owing.serverId, owing.mediaId])
+      return JSON.stringify([owing.serverId, owing.mediaId, owing.accountId])
     default: {
       const unreachable: never = owing
       return unreachable
@@ -134,7 +138,14 @@ const queuesByServer = (dues: readonly Due[]): Due[][] => [
     .values(),
 ]
 
-export const createSync = ({ store, calls, timers, warn, retryMs }: SyncDeps): Sync => {
+export const createSync = ({
+  store,
+  calls,
+  timers,
+  warn,
+  retryMs,
+  accountIdOf,
+}: SyncDeps): Sync => {
   const debouncing = new Map<string, unknown>()
   /** Each send while it is out, by `keyOf`; it settles false when its server could not be reached. */
   const inFlight = new Map<string, Promise<boolean>>()
@@ -152,9 +163,24 @@ export const createSync = ({ store, calls, timers, warn, retryMs }: SyncDeps): S
 
   const dueOf = (owing: Owing): Due | null => dueIn(store.read(), owing)
 
+  /**
+   * Whether what is pending may go to its server now: what was noted for no account goes to
+   * whoever is signed in, and an account's only while that account is.
+   */
+  const isSendable = ({ serverId, pending }: { serverId: string; pending: Pending }): boolean =>
+    pending.accountId === null || pending.accountId === accountIdOf({ serverId })
+
   /** Sends one call; `taken` when the server took it, so what it carried can be cleared. */
   const deliver = async ({ due, call }: { due: Due; call: AllowedCall }): Promise<Delivery> => {
-    const result = await calls.call({ serverId: due.serverId, call })
+    // Read again before each call: the account may have signed out while the last was out.
+    if (!isSendable(due)) return DELIVERIES.waiting
+    const result = await calls.call({
+      serverId: due.serverId,
+      call,
+      accountId: due.pending.accountId,
+    })
+    // Its account signed out, or another signed in, while the call waited on its token.
+    if (!result.ok && !isSendable(due)) return DELIVERIES.waiting
     if (!result.ok) {
       unreachable.add(due.serverId)
       return DELIVERIES.unreachable
@@ -190,8 +216,9 @@ export const createSync = ({ store, calls, timers, warn, retryMs }: SyncDeps): S
   }
 
   /**
-   * Clears what the server took. A download removed while its call was out has moved its
-   * pending to `owed`, so it is cleared there, and never sent twice.
+   * Clears what the server took. A download removed while its call was out, or whose account
+   * signed out meanwhile, has moved its pending to `owed`, so it is cleared there, never sent
+   * twice, and what the download now holds for another account is left alone.
    */
   const clearSent = ({
     due,
@@ -206,11 +233,13 @@ export const createSync = ({ store, calls, timers, warn, retryMs }: SyncDeps): S
   }): void => {
     const sent = { sentPlay, sentPosition, sentFurthest }
     const { owing, serverId, mediaId } = due
-    store.update((state) =>
-      owing.kind === OWING_KINDS.entry && entryById(state, owing) !== null
-        ? clearPending(state, { downloadId: owing.downloadId, ...sent })
-        : clearOwed(state, { serverId, mediaId, ...sent }),
-    )
+    const { accountId } = due.pending
+    store.update((state) => {
+      const entry = owing.kind === OWING_KINDS.entry ? entryById(state, owing) : null
+      return entry !== null && entry.pending.accountId === accountId
+        ? clearPending(state, { downloadId: entry.downloadId, ...sent })
+        : clearOwed(state, { serverId, mediaId, accountId, ...sent })
+    })
   }
 
   const warnFailed =
@@ -231,8 +260,7 @@ export const createSync = ({ store, calls, timers, warn, retryMs }: SyncDeps): S
    * The furthest position, when it is past the last: the server keeps how far a play got as the
    * most it hears, so it hears this before a scrub back. `taken` when the round may go on.
    */
-  const sendFurthest = async (owing: Owing): Promise<Delivery> => {
-    const due = dueOf(owing)
+  const sendFurthest = async (due: Due | null): Promise<Delivery> => {
     if (due === null) return DELIVERIES.refused
     const { furthest, position } = due.pending
     if (furthest === null || (position !== null && furthest <= position)) return DELIVERIES.taken
@@ -253,6 +281,12 @@ export const createSync = ({ store, calls, timers, warn, retryMs }: SyncDeps): S
   const send = async (owing: Owing): Promise<boolean> => {
     const first = dueOf(owing)
     if (first === null || !hasPending(first)) return true
+    const { accountId } = first.pending
+    /** What the download holds now, unless it now belongs to another account: the next round's. */
+    const dueAsFirst = (): Due | null => {
+      const due = dueOf(owing)
+      return due !== null && due.pending.accountId === accountId ? due : null
+    }
     if (first.pending.play) {
       const played = await deliver({
         due: first,
@@ -263,10 +297,10 @@ export const createSync = ({ store, calls, timers, warn, retryMs }: SyncDeps): S
       if (played !== DELIVERIES.taken) return notTaken({ due: first, delivery: played })
       clearSent({ due: first, sentPlay: true, sentPosition: null, sentFurthest: null })
     }
-    const reached = await sendFurthest(owing)
+    const reached = await sendFurthest(dueAsFirst())
     if (reached !== DELIVERIES.taken) return reached !== DELIVERIES.unreachable
     // Read again: the position may have moved while the play or the furthest was out.
-    const due = dueOf(owing)
+    const due = dueAsFirst()
     const position = due?.pending.position ?? null
     if (due === null || position === null) return true
     const saved = await deliver({
@@ -279,9 +313,13 @@ export const createSync = ({ store, calls, timers, warn, retryMs }: SyncDeps): S
     return true
   }
 
+  const isSendableNow = (item: { serverId: string; pending: Pending }): boolean =>
+    hasPending(item) && isSendable(item)
+
+  /** Whether anything could go now; what waits on an account goes when that account signs in. */
   const isAnythingPending = (): boolean => {
     const { entries, owed } = store.read()
-    return entries.some(hasPending) || owed.some(hasPending)
+    return entries.some(isSendableNow) || owed.some(isSendableNow)
   }
 
   const armRetry = (): void => {
@@ -327,7 +365,7 @@ export const createSync = ({ store, calls, timers, warn, retryMs }: SyncDeps): S
     if (handle !== undefined) timers.clear(handle)
     debouncing.delete(key)
     const due = dueOf(owing)
-    if (due === null || !hasPending(due)) return Promise.resolve(true)
+    if (due === null || !isSendableNow(due)) return Promise.resolve(true)
     const sent = (async (): Promise<boolean> => {
       const isReached = await send(owing).catch((error: unknown) => {
         warnFailed({ label: due.label })(error)
@@ -371,7 +409,7 @@ export const createSync = ({ store, calls, timers, warn, retryMs }: SyncDeps): S
     pruneLogged()
     const dues = owings.flatMap((owing) => {
       const due = dueOf(owing)
-      return due !== null && (inFlight.has(keyOf(owing)) || hasPending(due)) ? [due] : []
+      return due !== null && (inFlight.has(keyOf(owing)) || isSendableNow(due)) ? [due] : []
     })
     // A download removed while its calls are out is still awaited.
     const leaving = owings.filter((owing) => dueOf(owing) === null && inFlight.has(keyOf(owing)))
@@ -384,10 +422,11 @@ export const createSync = ({ store, calls, timers, warn, retryMs }: SyncDeps): S
     const { entries, owed } = store.read()
     return runEach([
       ...entries.map(({ downloadId }) => entryOwing(downloadId)),
-      ...owed.map(({ serverId, mediaId }): Owing => ({
+      ...owed.map(({ serverId, mediaId, pending }): Owing => ({
         kind: OWING_KINDS.owed,
         serverId,
         mediaId,
+        accountId: pending.accountId,
       })),
     ])
   }

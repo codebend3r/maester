@@ -60,6 +60,11 @@ export type AuthConfigs = {
    * `RECHECK_AFTER_MS`, and never asks again about a move the person turned down.
    */
   recheck: (serverId: string) => Promise<AuthState>
+  /**
+   * Whether a server has accounts, synchronously: as last read when that was ready, off or
+   * legacy, else as its pin says, so a server out of reach keeps the accounts it was seen with.
+   */
+  hasAccounts: (serverId: string) => boolean
 }
 
 export type AuthConfigsDeps = {
@@ -254,5 +259,26 @@ export const createAuthConfigs = (deps: AuthConfigsDeps): AuthConfigs => {
     return known !== undefined && known.kind === AUTH_STATES.ready ? known.signIn : null
   }
 
-  return { stateOf, reread, recheck, readyOf }
+  const hasAccounts: AuthConfigs['hasAccounts'] = (serverId) => {
+    const known = kept.get(serverId)
+    const isPinned = (entryOf(serverId)?.signIn ?? null) !== null
+    if (known === undefined) return isPinned
+    switch (known.kind) {
+      case AUTH_STATES.ready:
+        return true
+      case AUTH_STATES.off:
+      case AUTH_STATES.legacy:
+        return false
+      case AUTH_STATES.down:
+      case AUTH_STATES.unavailable:
+      case AUTH_STATES.unreachable:
+        return isPinned
+      default: {
+        const unreachable: never = known
+        return unreachable
+      }
+    }
+  }
+
+  return { stateOf, reread, recheck, readyOf, hasAccounts }
 }

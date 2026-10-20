@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test'
 import {
   DOWNLOADS_FILE,
   EMPTY_DOWNLOADS,
-  NO_PENDING,
   advance,
   bytesOf,
   clearOwed,
@@ -37,32 +36,7 @@ import {
   type DownloadsState,
   type Pending,
 } from '@/main/downloads/downloadState'
-
-const SERVER_A = '11111111-1111-4111-8111-111111111111'
-const SERVER_B = '22222222-2222-4222-8222-222222222222'
-const id = (n: number): string => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
-
-const entry = (overrides: Partial<DownloadEntry> = {}): DownloadEntry => ({
-  downloadId: id(1),
-  serverId: SERVER_A,
-  mediaId: 1,
-  label: 'The Two Towers',
-  group: { kind: 'movie', key: 'movie:1', title: 'The Two Towers', order: 0 },
-  container: 'mkv',
-  size: 1000,
-  duration: 200,
-  watchedPercent: 90,
-  sidecars: [],
-  status: { kind: 'queued' },
-  autoDelete: false,
-  watchedAt: null,
-  serverPosition: 0,
-  pending: NO_PENDING,
-  createdAt: 100,
-  ...overrides,
-})
-
-const stateOf = (...entries: DownloadEntry[]): DownloadsState => ({ ...EMPTY_DOWNLOADS, entries })
+import { entry, id, SERVER_A, SERVER_B, stateOf } from '@/main/test/downloadEntries'
 
 const ID = id(1)
 
@@ -76,14 +50,14 @@ describe('the guards', () => {
     const full = entry({
       sidecars: [{ trackId: 'external-3', title: 'English', language: 'en' }],
       status: { kind: 'paused', bytes: 10, reason: 'viewer' },
-      pending: { play: true, position: 12, furthest: 30, at: 5 },
+      pending: { play: true, position: 12, furthest: 30, at: 5, accountId: null },
     })
     expect(isDownloadEntry(full)).toBe(true)
     expect(isDownloadsState(stateOf(full))).toBe(true)
   })
 
   it('accepts what removed downloads still owe their servers, and refuses an owed item of no server', () => {
-    const pending = { play: true, position: 12, furthest: 30, at: 5 }
+    const pending = { play: true, position: 12, furthest: 30, at: 5, accountId: null }
     expect(
       isDownloadsState({ ...EMPTY_DOWNLOADS, owed: [{ serverId: SERVER_A, mediaId: 1, pending }] }),
     ).toBe(true)
@@ -95,7 +69,7 @@ describe('the guards', () => {
 
   it('refuses a status kind it does not know', () => {
     expect(isDownloadEntry({ ...entry(), status: { kind: 'stalled', bytes: 1 } })).toBe(false)
-    expect(isDownloadsState({ ...EMPTY_DOWNLOADS, version: 2 })).toBe(false)
+    expect(isDownloadsState({ ...EMPTY_DOWNLOADS, version: 3 })).toBe(false)
   })
 
   it('keeps why a download stopped as a reason, never as the words the page shows', () => {
@@ -406,7 +380,7 @@ describe('remove and removeServer', () => {
 })
 
 describe('what a removed download owes its server', () => {
-  const PLAYED: Pending = { play: true, position: 180, furthest: 190, at: 50 }
+  const PLAYED: Pending = { play: true, position: 180, furthest: 190, at: 50, accountId: null }
   const owing = stateOf(
     entry({ downloadId: id(1), mediaId: 1, pending: PLAYED }),
     entry({ downloadId: id(2), mediaId: 2, serverId: SERVER_B, pending: PLAYED }),
@@ -450,7 +424,7 @@ describe('what a removed download owes its server', () => {
         entry({
           downloadId: id(4),
           mediaId: 1,
-          pending: { play: false, position: 20, furthest: 40, at: 90 },
+          pending: { play: false, position: 20, furthest: 40, at: 90, accountId: null },
         }),
       ],
     })
@@ -458,7 +432,7 @@ describe('what a removed download owes its server', () => {
       {
         serverId: SERVER_A,
         mediaId: 1,
-        pending: { play: true, position: 20, furthest: 190, at: 90 },
+        pending: { play: true, position: 20, furthest: 190, at: 90, accountId: null },
       },
     ])
   })
@@ -469,7 +443,7 @@ describe('what a removed download owes its server', () => {
         entry({
           downloadId: id(1),
           mediaId: 1,
-          pending: { play: false, position: 180, furthest: null, at: 50 },
+          pending: { play: false, position: 180, furthest: null, at: 50, accountId: null },
         }),
       ),
       { downloadId: id(1) },
@@ -479,7 +453,7 @@ describe('what a removed download owes its server', () => {
         entry({
           downloadId: id(4),
           mediaId: 1,
-          pending: { play: false, position: null, furthest: 40, at: 90 },
+          pending: { play: false, position: null, furthest: 40, at: 90, accountId: null },
         }),
       ],
     })
@@ -487,7 +461,7 @@ describe('what a removed download owes its server', () => {
       {
         serverId: SERVER_A,
         mediaId: 1,
-        pending: { play: false, position: 180, furthest: 180, at: 90 },
+        pending: { play: false, position: 180, furthest: 180, at: 90, accountId: null },
       },
     ])
   })
@@ -499,7 +473,7 @@ describe('what a removed download owes its server', () => {
         entry({
           downloadId: id(4),
           mediaId: 1,
-          pending: { play: false, position: 185, furthest: null, at: 90 },
+          pending: { play: false, position: 185, furthest: null, at: 90, accountId: null },
         }),
       ],
     })
@@ -507,20 +481,22 @@ describe('what a removed download owes its server', () => {
       {
         serverId: SERVER_A,
         mediaId: 1,
-        pending: { play: true, position: 185, furthest: 190, at: 90 },
+        pending: { play: true, position: 185, furthest: 190, at: 90, accountId: null },
       },
     ])
   })
 
   it('owedOf finds an owed item by server and media, or null', () => {
     const owed = remove(owing, { downloadId: id(1) })
-    expect(owedOf(owed, { serverId: SERVER_A, mediaId: 1 })?.pending).toEqual(PLAYED)
-    expect(owedOf(owed, { serverId: SERVER_B, mediaId: 1 })).toBeNull()
+    expect(
+      owedOf(owed, { serverId: SERVER_A, mediaId: 1, accountId: null })?.pending ?? null,
+    ).toEqual(PLAYED)
+    expect(owedOf(owed, { serverId: SERVER_B, mediaId: 1, accountId: null })).toBeNull()
   })
 
   it('clearOwed clears what was sent, and drops the item once nothing is left', () => {
     const owed = remove(owing, { downloadId: id(1) })
-    const key = { serverId: SERVER_A, mediaId: 1 }
+    const key = { serverId: SERVER_A, mediaId: 1, accountId: null }
     const played = clearOwed(owed, {
       ...key,
       sentPlay: true,
@@ -542,18 +518,20 @@ describe('what a removed download owes its server', () => {
 
   it('clearOwed keeps a position other than the one sent, and changes nothing for an item not owed', () => {
     const owed = remove(owing, { downloadId: id(1) })
-    const key = { serverId: SERVER_A, mediaId: 1 }
+    const key = { serverId: SERVER_A, mediaId: 1, accountId: null }
     const next = clearOwed(owed, { ...key, sentPlay: true, sentPosition: 100, sentFurthest: 190 })
     expect(owedOf(next, key)?.pending).toEqual({
       play: false,
       position: 180,
       furthest: null,
       at: 50,
+      accountId: null,
     })
     expect(
       clearOwed(owed, {
         serverId: SERVER_B,
         mediaId: 1,
+        accountId: null,
         sentPlay: true,
         sentPosition: 180,
         sentFurthest: 190,
@@ -563,10 +541,10 @@ describe('what a removed download owes its server', () => {
 
   it('dropOwed drops one item, and changes nothing for an item not owed', () => {
     const owed = removeAll(owing)
-    expect(dropOwed(owed, { serverId: SERVER_A, mediaId: 1 }).owed).toEqual([
+    expect(dropOwed(owed, { serverId: SERVER_A, mediaId: 1, accountId: null }).owed).toEqual([
       { serverId: SERVER_B, mediaId: 2, pending: PLAYED },
     ])
-    expect(dropOwed(owed, { serverId: SERVER_A, mediaId: 2 })).toBe(owed)
+    expect(dropOwed(owed, { serverId: SERVER_A, mediaId: 2, accountId: null })).toBe(owed)
   })
 })
 
@@ -663,8 +641,15 @@ describe('pending', () => {
       play: true,
       position: 42,
       at: 9,
+      accountId: null,
     })
-    expect(next.entries[0]?.pending).toEqual({ play: true, position: 42, furthest: 42, at: 9 })
+    expect(next.entries[0]?.pending ?? null).toEqual({
+      play: true,
+      position: 42,
+      furthest: 42,
+      at: 9,
+      accountId: null,
+    })
   })
 
   it('notePending keeps the furthest position through a scrub back, and raises it past', () => {
@@ -673,11 +658,36 @@ describe('pending', () => {
       play: true,
       position: 190,
       at: 1,
+      accountId: null,
     })
-    const back = notePending(watched, { downloadId: ID, play: false, position: 140, at: 2 })
-    expect(back.entries[0]?.pending).toEqual({ play: true, position: 140, furthest: 190, at: 2 })
-    const past = notePending(back, { downloadId: ID, play: false, position: 195, at: 3 })
-    expect(past.entries[0]?.pending).toEqual({ play: true, position: 195, furthest: 195, at: 3 })
+    const back = notePending(watched, {
+      downloadId: ID,
+      play: false,
+      position: 140,
+      at: 2,
+      accountId: null,
+    })
+    expect(back.entries[0]?.pending ?? null).toEqual({
+      play: true,
+      position: 140,
+      furthest: 190,
+      at: 2,
+      accountId: null,
+    })
+    const past = notePending(back, {
+      downloadId: ID,
+      play: false,
+      position: 195,
+      at: 3,
+      accountId: null,
+    })
+    expect(past.entries[0]?.pending ?? null).toEqual({
+      play: true,
+      position: 195,
+      furthest: 195,
+      at: 3,
+      accountId: null,
+    })
   })
 
   it('notePending keeps a play the server has not heard when a position report follows', () => {
@@ -686,46 +696,85 @@ describe('pending', () => {
       play: true,
       position: 10,
       at: 1,
+      accountId: null,
     })
-    const next = notePending(played, { downloadId: ID, play: false, position: 20, at: 2 })
-    expect(next.entries[0]?.pending).toEqual({ play: true, position: 20, furthest: 20, at: 2 })
+    const next = notePending(played, {
+      downloadId: ID,
+      play: false,
+      position: 20,
+      at: 2,
+      accountId: null,
+    })
+    expect(next.entries[0]?.pending ?? null).toEqual({
+      play: true,
+      position: 20,
+      furthest: 20,
+      at: 2,
+      accountId: null,
+    })
   })
 
   it('clearPending clears the play, the position and the furthest it sent', () => {
-    const state = stateOf(entry({ pending: { play: true, position: 42, furthest: 42, at: 9 } }))
+    const state = stateOf(
+      entry({ pending: { play: true, position: 42, furthest: 42, at: 9, accountId: null } }),
+    )
     const next = clearPending(state, {
       downloadId: ID,
       sentPlay: true,
       sentPosition: 42,
       sentFurthest: 42,
     })
-    expect(next.entries[0]?.pending).toEqual({ play: false, position: null, furthest: null, at: 9 })
+    expect(next.entries[0]?.pending ?? null).toEqual({
+      play: false,
+      position: null,
+      furthest: null,
+      at: 9,
+      accountId: null,
+    })
   })
 
   it('clearPending keeps a play it did not send', () => {
-    const state = stateOf(entry({ pending: { play: true, position: 42, furthest: 42, at: 9 } }))
+    const state = stateOf(
+      entry({ pending: { play: true, position: 42, furthest: 42, at: 9, accountId: null } }),
+    )
     const next = clearPending(state, {
       downloadId: ID,
       sentPlay: false,
       sentPosition: 42,
       sentFurthest: 42,
     })
-    expect(next.entries[0]?.pending).toEqual({ play: true, position: null, furthest: null, at: 9 })
+    expect(next.entries[0]?.pending ?? null).toEqual({
+      play: true,
+      position: null,
+      furthest: null,
+      at: 9,
+      accountId: null,
+    })
   })
 
   it('clearPending keeps a newer position', () => {
-    const state = stateOf(entry({ pending: { play: true, position: 60, furthest: 60, at: 12 } }))
+    const state = stateOf(
+      entry({ pending: { play: true, position: 60, furthest: 60, at: 12, accountId: null } }),
+    )
     const next = clearPending(state, {
       downloadId: ID,
       sentPlay: true,
       sentPosition: 42,
       sentFurthest: 42,
     })
-    expect(next.entries[0]?.pending).toEqual({ play: false, position: 60, furthest: 60, at: 12 })
+    expect(next.entries[0]?.pending ?? null).toEqual({
+      play: false,
+      position: 60,
+      furthest: 60,
+      at: 12,
+      accountId: null,
+    })
   })
 
   it('clearPending keeps a furthest raised past the one it sent', () => {
-    const state = stateOf(entry({ pending: { play: false, position: 70, furthest: 99, at: 12 } }))
+    const state = stateOf(
+      entry({ pending: { play: false, position: 70, furthest: 99, at: 12, accountId: null } }),
+    )
     const next = clearPending(state, {
       downloadId: ID,
       sentPlay: false,
@@ -897,7 +946,14 @@ describe('an unknown download id', () => {
     ],
     [
       'notePending',
-      () => notePending(state, { downloadId: unknown, play: true, position: 1, at: 1 }),
+      () =>
+        notePending(state, {
+          downloadId: unknown,
+          play: true,
+          position: 1,
+          at: 1,
+          accountId: null,
+        }),
     ],
     ['forgetServerPosition', () => forgetServerPosition(state, { downloadId: unknown })],
     [

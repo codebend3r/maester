@@ -1,17 +1,18 @@
 import {
   type AccountServiceDeps,
   authorizeWith,
-  createAccessEnds,
   createAccountService,
 } from '@/main/accounts/accountService'
 import { type AuthFetch, createAccountSessions } from '@/main/accounts/accountSessions'
 import { type AuthConfigsDeps, createAuthConfigs } from '@/main/accounts/authConfigs'
+import { createServerSignal } from '@/main/accounts/serverSignal'
 import type { SessionStore } from '@/main/accounts/sessionStore'
 import type { ConfigStore, ServerEntry } from '@/main/desktopConfig'
 import { errorText } from '@/main/log/errorText'
 import { createAccountTickets } from '@/main/servers/accountTickets'
 import { createMediaRelay } from '@/main/servers/mediaRelay'
 import { createServerCalls, NO_BEARER, type ServerFetch } from '@/main/servers/serverCalls'
+import { createTitleSittings } from '@/main/servers/titleSittings'
 import type { Timers } from '@/main/stateStore'
 
 type RelayDeps = Parameters<typeof createMediaRelay>[0]
@@ -33,7 +34,10 @@ export type AccountStackDeps = {
 /**
  * Main's account layer, wired: each server's public auth config, the sign-ins kept for it, the
  * server calls that carry their Bearer, the account tickets and the media relay. A sign out, a
- * removed server or a moved sign-in host ends the access held on its behalf (`accessEnds`).
+ * session Auth refused, a removed server or a moved sign-in host ends the access held on its
+ * behalf (`accessEnds`), and a change of the account signed in reaches what keeps data per
+ * account (`accountSwitches`). A server title's reports go out as the account that opened it
+ * (`titleSittings`).
  * Electron's parts come in as parameters, so `main.ts` alone imports it.
  */
 export const createAccountStack = (deps: AccountStackDeps) => {
@@ -41,7 +45,8 @@ export const createAccountStack = (deps: AccountStackDeps) => {
   // Without the Bearer layer below, which asks `authConfigs` for a server's state: its own
   // read of the public auth config must not ask itself.
   const authCalls = createServerCalls({ serverOf, fetchFor, ...NO_BEARER, warn })
-  const accessEnds = createAccessEnds()
+  const accessEnds = createServerSignal()
+  const accountSwitches = createServerSignal()
   const authConfigs = createAuthConfigs({
     calls: authCalls,
     config,
@@ -50,6 +55,7 @@ export const createAccountStack = (deps: AccountStackDeps) => {
     forget: async (serverId) => {
       await accountSessions.forget(serverId)
       accessEnds.notify({ serverId })
+      accountSwitches.notify({ serverId })
     },
     now: Date.now,
     warn,
@@ -60,12 +66,18 @@ export const createAccountStack = (deps: AccountStackDeps) => {
     fetch: deps.fetchAuth,
     now: Date.now,
     timers,
-    onEnded: (serverId) => accessEnds.notify({ serverId }),
+    // Auth refused the session, so nobody is signed in any more: the account changed with it.
+    onEnded: (serverId) => {
+      accessEnds.notify({ serverId })
+      accountSwitches.notify({ serverId })
+    },
     warn,
   })
+  const titleSittings = createTitleSittings({ accountIdOf: accountSessions.accountIdOf })
   const serverCalls = createServerCalls({
     serverOf,
     fetchFor,
+    reportAs: titleSittings.reportAs,
     authorize: authorizeWith({ authConfigs, sessions: accountSessions }),
     hasAccounts: ({ serverId }) => authConfigs.readyOf(serverId) !== null,
     refresh: ({ serverId }) => accountSessions.refresh(serverId),
@@ -87,6 +99,7 @@ export const createAccountStack = (deps: AccountStackDeps) => {
     emit: deps.emit,
     info: deps.info,
     warn,
+    switched: accountSwitches.notify,
   })
   const accountTickets = createAccountTickets({
     calls: serverCalls,
@@ -106,5 +119,15 @@ export const createAccountStack = (deps: AccountStackDeps) => {
     relay.closeServer(serverId)
     accountTickets.forget(serverId)
   })
-  return { authConfigs, serverCalls, accounts, accessEnds, accountTickets, relay }
+  return {
+    authConfigs,
+    accountSessions,
+    serverCalls,
+    accounts,
+    accessEnds,
+    accountSwitches,
+    accountTickets,
+    relay,
+    titleSittings,
+  }
 }

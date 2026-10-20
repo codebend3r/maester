@@ -599,3 +599,34 @@ describe('createAuthConfigs staleness', () => {
     expect(AUTH_CONFIG_STALE_MS).toBe(600_000)
   })
 })
+
+describe('createAuthConfigs hasAccounts', () => {
+  it('is true for a server read ready, and for one pinned with accounts that has not been read', async () => {
+    const ready = setup({ answers: [body(readyBody(PIN))] })
+    expect(ready.configs.hasAccounts(SERVER_ID)).toBe(false)
+    await ready.configs.stateOf(SERVER_ID)
+    expect(ready.configs.hasAccounts(SERVER_ID)).toBe(true)
+    const pinned = setup({ signIn: PIN })
+    expect(pinned.configs.hasAccounts(SERVER_ID)).toBe(true)
+    expect(pinned.log).toEqual([])
+  })
+
+  it('is false for a server read off or legacy, though a pin is left from when it had accounts', async () => {
+    const off = setup({ signIn: PIN, answers: [body({ state: AUTH_CONFIG_STATES.off })] })
+    await off.configs.stateOf(SERVER_ID)
+    expect(off.configs.hasAccounts(SERVER_ID)).toBe(false)
+    const legacy = setup({ signIn: PIN, answers: [{ ok: true, status: 404, body: '' }] })
+    await legacy.configs.stateOf(SERVER_ID)
+    expect(legacy.configs.hasAccounts(SERVER_ID)).toBe(false)
+  })
+
+  it('goes by the pin for a server whose accounts are down or that it cannot reach', async () => {
+    const down = setup({ signIn: PIN, answers: [body({ state: AUTH_CONFIG_STATES.unavailable })] })
+    await down.configs.stateOf(SERVER_ID)
+    expect(down.configs.hasAccounts(SERVER_ID)).toBe(true)
+    const unreached = setup({ answers: [{ ok: false, message: 'offline' }] })
+    await unreached.configs.stateOf(SERVER_ID)
+    expect(unreached.configs.hasAccounts(SERVER_ID)).toBe(false)
+    expect(unreached.configs.hasAccounts(OTHER_ID)).toBe(false)
+  })
+})

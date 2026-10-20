@@ -20,6 +20,8 @@ import { createNodeTimers } from '@/main/timers'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 
 const SERVER = '0f4e2a4c-1b8c-4f9e-9e21-6f1f0f1d2c3a'
+const USER_ID = '30000000-0000-4000-8000-000000000001'
+const OTHER_USER_ID = '30000000-0000-4000-8000-000000000002'
 const OTHER = '11111111-2222-4333-8444-555555555555'
 const EMAIL = 'friend@maester.test'
 const PASSWORD = 'correct horse battery staple'
@@ -59,7 +61,9 @@ const stubAuth = ({ expiresIn = 3600 }: { expiresIn?: number } = {}) => {
     refreshReply: Reply | null
     logoutStatus: number
     isDown: boolean
+    userId: string
   } = {
+    userId: USER_ID,
     expiresIn,
     issued: 0,
     live: new Set<string>(),
@@ -81,7 +85,7 @@ const stubAuth = ({ expiresIn = 3600 }: { expiresIn?: number } = {}) => {
       expires_at: Math.floor(Date.now() / 1000) + state.expiresIn,
       refresh_token: refresh,
       user: {
-        id: '30000000-0000-4000-8000-000000000001',
+        id: state.userId,
         aud: 'authenticated',
         email: EMAIL,
         app_metadata: {},
@@ -564,6 +568,54 @@ describe('signOut and forget', () => {
     expect(auth.state.requests).toHaveLength(before)
     expect(storage.itemsOf(SERVER).size).toBe(0)
     expect(await sessions.accessToken({ serverId: SERVER })).toEqual(NO_TOKEN)
+  })
+})
+
+describe('accountIdOf', () => {
+  it('names the account signed in, and the account of each new sign in', async () => {
+    const auth = stubAuth()
+    const sessions = sessionsWith({ auth })
+    expect(sessions.accountIdOf({ serverId: SERVER })).toBeNull()
+    await sessions.signIn({ serverId: SERVER, email: EMAIL, password: PASSWORD, config: CONFIG })
+    expect(sessions.accountIdOf({ serverId: SERVER })).toBe(USER_ID)
+    expect(sessions.accountIdOf({ serverId: OTHER })).toBeNull()
+    auth.state.userId = OTHER_USER_ID
+    await sessions.signIn({ serverId: SERVER, email: EMAIL, password: PASSWORD, config: CONFIG })
+    expect(sessions.accountIdOf({ serverId: SERVER })).toBe(OTHER_USER_ID)
+  })
+
+  it('reads a relaunch its stored sessions without a request', async () => {
+    const auth = stubAuth()
+    const storage = memoryStorage()
+    await sessionsWith({ auth, storage }).signIn({
+      serverId: SERVER,
+      email: EMAIL,
+      password: PASSWORD,
+      config: CONFIG,
+    })
+    const before = auth.state.requests.length
+    const relaunched = sessionsWith({ auth, storage })
+    await relaunched.restore({ serverIds: [SERVER, OTHER] })
+    expect(relaunched.accountIdOf({ serverId: SERVER })).toBe(USER_ID)
+    expect(relaunched.accountIdOf({ serverId: OTHER })).toBeNull()
+    expect(auth.state.requests).toHaveLength(before)
+  })
+
+  it('names no account once signed out, forgotten or refused a refresh', async () => {
+    const auth = stubAuth()
+    const sessions = sessionsWith({ auth })
+    const signIn = () =>
+      sessions.signIn({ serverId: SERVER, email: EMAIL, password: PASSWORD, config: CONFIG })
+    await signIn()
+    await sessions.signOut(SERVER)
+    expect(sessions.accountIdOf({ serverId: SERVER })).toBeNull()
+    await signIn()
+    await sessions.forget(SERVER)
+    expect(sessions.accountIdOf({ serverId: SERVER })).toBeNull()
+    await signIn()
+    auth.state.live.clear()
+    await sessions.refresh(SERVER)
+    expect(sessions.accountIdOf({ serverId: SERVER })).toBeNull()
   })
 })
 

@@ -1,6 +1,7 @@
 import {
   EMPTY_DOWNLOADS,
-  isDownloadsState,
+  isStoredDownloads,
+  upgradeDownloads,
   type DownloadsState,
 } from '@/main/downloads/downloadState'
 import { JSON_READ_KINDS, readJsonFile, type JsonStore, type StateFs } from '@/main/stateStore'
@@ -21,10 +22,10 @@ export const loadDownloads = async ({
   file: string
   now: () => number
 }): Promise<LoadedDownloads> => {
-  const read = await readJsonFile({ fs, file, now, guard: isDownloadsState })
+  const read = await readJsonFile({ fs, file, now, guard: isStoredDownloads })
   switch (read.kind) {
     case JSON_READ_KINDS.read:
-      return { state: read.value, wasSetAside: false }
+      return { state: upgradeDownloads(read.value), wasSetAside: false }
     case JSON_READ_KINDS.missing:
       return { state: EMPTY_DOWNLOADS, wasSetAside: false }
     case JSON_READ_KINDS.setAside:

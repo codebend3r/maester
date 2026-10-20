@@ -120,7 +120,7 @@ describe('sweepDownloads', () => {
   })
 
   it('finishes the removal of a server no longer kept: its downloads owe it nothing and its owed goes', async () => {
-    const pending = { play: true, position: 750, furthest: 750, at: 5 }
+    const pending = { play: true, position: 750, furthest: 750, at: 5, accountId: null }
     const kept: Owed = { serverId: SERVER_ID, mediaId: 4, pending }
     const world = setup({
       entries: [entryFor(1, { pending }), entryFor(9, { serverId: GONE_SERVER_ID, pending })],
