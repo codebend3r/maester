@@ -7,7 +7,9 @@ import { AppShell } from '@/components/AppShell/AppShell'
 import { api } from '@/lib/api'
 import { ravenVersion } from '@/lib/version'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
+import { useAuthSession } from '@/stores/authSession'
 import { useSideMenu } from '@/stores/sideMenu'
+import { fakeAccount } from '@/test/authClient'
 import { FakeEventSource } from '@/test/eventSource'
 import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
@@ -65,6 +67,7 @@ describe('AppShell', () => {
   afterEach(() => {
     cleanup()
     spies.list.mockReset()
+    useAuthSession.setState({ session: null })
   })
 
   afterAll(() => {
@@ -442,5 +445,32 @@ describe('AppShell', () => {
     const theme = within(screen.getByRole('main')).getByRole('button', { name: 'Theme' })
     await userEvent.click(theme)
     expect(screen.getByRole('menu', { name: 'Theme' })).toBeInTheDocument()
+  })
+
+  it('has no account button while accounts are off', () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell('/libraries')
+    expect(screen.queryByRole('button', { name: 'Account' })).toBeNull()
+  })
+
+  it('puts the account button, with Sign out, after the theme button for whoever is signed in', async () => {
+    spies.list.mockImplementation(async () => [])
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="libraries" element={<p>libraries</p>} />
+          </Route>
+        </Routes>
+      ),
+      route: '/libraries',
+      account: fakeAccount(),
+    })
+    const corner = within(screen.getByRole('main'))
+    const [theme, account] = corner.getAllByRole('button')
+    expect(theme).toHaveAccessibleName('Theme')
+    expect(account).toHaveAccessibleName('Account')
+    await userEvent.click(corner.getByRole('button', { name: 'Account' }))
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
   })
 })

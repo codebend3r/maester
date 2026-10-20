@@ -60,6 +60,7 @@ export type IconName =
   | 'sidebar'
   | 'lock'
   | 'unlock'
+  | 'signOut'
 
 /**
  * An icon's drawing, up to three paths: the outline, the soft tint under its
@@ -184,6 +185,10 @@ const DRAWINGS: Record<IconName, Drawing> = {
   },
   lock: { stroke: `${LOCK_BODY}M8 10.5V8a4 4 0 0 1 8 0v2.5M12 14.5v2`, fill: LOCK_BODY },
   unlock: { stroke: `${LOCK_BODY}M8 10.5V8a4 4 0 0 1 7.6-1.8M12 14.5v2`, fill: LOCK_BODY },
+  signOut: {
+    stroke: 'M10 4.5H7A2.5 2.5 0 0 0 4.5 7v10A2.5 2.5 0 0 0 7 19.5h3M15 8l4 4-4 4M19 12H9.5',
+    fill: 'M10 4.5H7A2.5 2.5 0 0 0 4.5 7v10A2.5 2.5 0 0 0 7 19.5h3z',
+  },
   image: {
     stroke: `${PANEL}M3.5 16l4.6-4.6a1.5 1.5 0 0 1 2.1 0L15 16.2M13.5 14.7l1.6-1.6a1.5 1.5 0 0 1 2.1 0l3.3 3.3`,
     fill: PANEL,
@@ -352,6 +357,7 @@ const NUDGES: Partial<Record<IconName, string>> = {
   next: styles.nudgeOn,
   forward: styles.nudgeOn,
   convert: styles.nudgeOn,
+  signOut: styles.nudgeOn,
   up: styles.nudgeUp,
   download: styles.nudgeDown,
 }

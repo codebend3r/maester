@@ -1,6 +1,7 @@
-import { KEYS, THEMES, type ThemeId } from '@raven/core'
+import { THEMES, type ThemeId } from '@raven/core'
 import { Icon } from '@raven/ui'
-import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
+import { useId } from 'react'
+import { useMenu } from '@/lib/useMenu'
 import { useTheme } from '@/stores/theme'
 import styles from '@/components/ThemePicker/ThemePicker.module.scss'
 
@@ -26,47 +27,8 @@ const Preview = ({ theme }: { theme: ThemeId }) => (
  */
 export const ThemePicker = ({ className }: { className?: string }) => {
   const id = useId()
-  const [isOpen, setOpen] = useState(false)
-  const root = useRef<HTMLDivElement>(null)
-  const trigger = useRef<HTMLButtonElement>(null)
-  const list = useRef<HTMLUListElement>(null)
+  const { isOpen, toggle, close, root, trigger, list, onKeyDown } = useMenu()
   const { theme, pick } = useTheme()
-
-  const close = ({ refocus }: { refocus: boolean }) => {
-    setOpen(false)
-    if (refocus) trigger.current?.focus()
-  }
-
-  // Focus lands on the theme worn, so the arrows start from it.
-  useEffect(() => {
-    if (isOpen) list.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus()
-  }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return undefined
-    const onPointerDown = (event: PointerEvent) => {
-      if (!(event.target instanceof Node) || !root.current?.contains(event.target)) setOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [isOpen])
-
-  const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
-    const items = Array.from(list.current?.querySelectorAll('button') ?? [])
-    const index = items.findIndex((item) => item === document.activeElement)
-    if (event.key === KEYS.escape) {
-      event.preventDefault()
-      close({ refocus: true })
-    } else if (event.key === KEYS.arrowDown) {
-      event.preventDefault()
-      items[(index + 1) % items.length]?.focus()
-    } else if (event.key === KEYS.arrowUp) {
-      event.preventDefault()
-      items[index <= 0 ? items.length - 1 : index - 1]?.focus()
-    } else if (event.key === KEYS.tab) {
-      setOpen(false)
-    }
-  }
 
   return (
     <div ref={root} className={[styles.picker, className].filter(Boolean).join(' ')}>
@@ -79,7 +41,7 @@ export const ThemePicker = ({ className }: { className?: string }) => {
         aria-expanded={isOpen}
         aria-controls={id}
         title="Theme"
-        onClick={() => setOpen((now) => !now)}
+        onClick={toggle}
       >
         <span className={styles.swatch} />
       </button>
