@@ -616,6 +616,7 @@ test.describe.serial('downloading through the server', () => {
           origin: fixture.origin,
           name: hostOf({ fixture }),
           addedAt: at - 60 * MINUTE_MS,
+          signIn: null,
         },
       ],
     }

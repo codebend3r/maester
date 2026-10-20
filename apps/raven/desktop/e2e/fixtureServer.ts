@@ -3,18 +3,18 @@ import { readFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { basename, extname } from 'node:path'
 import {
+  type Account,
   ADMIN_LOCK_STATES,
   DEFAULT_SAGA_BACKDROP,
   type EpisodeSummary,
   isItemDetails,
   isLibrary,
   isMediaTracks,
-  isRecord,
   isSagaList,
-  isString,
   type ItemDetails,
   type Library,
   MEDIA_PROBE_BYTES,
+  MEDIA_TICKET_PARAM,
   MEDIA_TICKET_SECONDS,
   type MediaItem,
   type MediaTracks,
@@ -22,6 +22,24 @@ import {
   type SeasonSummary,
   SUBTITLE_SOURCES,
 } from '@raven/core'
+import {
+  ACCOUNT_TICKET_PREFIX,
+  AUTH_V1_PREFIX,
+  bearerOf,
+  createFixtureAuth,
+  FIXTURE_ACCOUNT_KINDS,
+  type FixtureAccounts,
+  TICKET_CHECKS,
+} from '@/e2e/fixtureAuth'
+import {
+  fieldOf,
+  partsOf,
+  sendEmpty,
+  sendJson,
+  sendMissing,
+  tokenOf,
+  URL_BASE,
+} from '@/e2e/fixtureHttp'
 import { details, library, summary } from '@/main/test/serverFakes'
 import { API_PATHS } from '@/main/servers/allowlist'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
@@ -44,6 +62,7 @@ const API_ROUTES = {
 
 /** The path of one of a title's routes, as a request to the server carries it. */
 export const MEDIA_PATHS = {
+  item: (mediaId: number) => `/api/media/${mediaId}`,
   file: (mediaId: number) => `/api/media/${mediaId}/file`,
   sidecar: (mediaId: number) => `/api/media/${mediaId}/subtitles/external-0`,
   ticket: (mediaId: number) => `/api/media/${mediaId}/ticket`,
@@ -86,7 +105,13 @@ export type FixtureAdmin =
   | { kind: typeof FIXTURE_ADMIN_KINDS.password; password: string }
   | { kind: typeof FIXTURE_ADMIN_KINDS.noPassword }
 
-export type FixtureMode = { pin: string; isLocked: boolean; admin: FixtureAdmin }
+/** `accounts` left out is a server with accounts off. */
+export type FixtureMode = {
+  pin: string
+  isLocked: boolean
+  admin: FixtureAdmin
+  accounts?: FixtureAccounts
+}
 
 export type FixtureRequest = {
   method: string
@@ -94,12 +119,26 @@ export type FixtureRequest = {
   path: string
   /** Whether the query carried a media ticket in `t`. */
   hasTicket: boolean
+  /** Whether that ticket was an account ticket. */
+  hasAccountTicket: boolean
+  /** Whether the request carried a Bearer token; the token never reaches the log. */
+  hasBearer: boolean
   hasUnlock: boolean
   hasAdmin: boolean
   hasOtherCookie: boolean
   range: string | null
   body: string | null
 }
+
+/** What the relay sends a server: an account ticket and nothing else, no Bearer and no cookie. */
+export const isRelayed = ({
+  hasAccountTicket,
+  hasBearer,
+  hasUnlock,
+  hasAdmin,
+  hasOtherCookie,
+}: FixtureRequest): boolean =>
+  hasAccountTicket && !hasBearer && !hasUnlock && !hasAdmin && !hasOtherCookie
 
 /** `METHOD path` for each request, never the bodies, which hold PINs and passwords. */
 export const routesOf = (requests: readonly FixtureRequest[]): string[] =>
@@ -119,8 +158,12 @@ export type FixtureServer = {
   elsewhere: { origin: string; requests: FixtureRequest[] }
   /** Every cookie value it has handed out, unlock and admin, kept past a relock. */
   issued: () => readonly string[]
+  /** Every access token, refresh token and account ticket it has handed out, in order. */
+  issuedTokens: () => readonly string[]
   /** Forgets every unlock, as a server restart does. */
   relock: () => void
+  /** Changes the status of the `ready` account from now on; the fixture throws when accounts are not `ready`. */
+  setStatus: (status: Account['status']) => void
   /**
    * Slows every file answer that reaches byte `byte` to a trickle from there, as a slow
    * link does; an answer that starts past it goes out at full speed. `null` sends the
@@ -182,7 +225,7 @@ const FIXTURE_SIDECAR =
 
 const FIXTURE_PAGE = '<!doctype html><html><head><title>Sign in</title></head><body></body></html>'
 
-const UNLOCK_COOKIE = 'raven_unlock'
+export const UNLOCK_COOKIE = 'raven_unlock'
 const ADMIN_COOKIE = 'raven_admin'
 const COOKIE_ATTRIBUTES = 'Path=/api; HttpOnly; SameSite=Strict'
 const ADMIN_MAX_AGE_S = 34_560_000
@@ -196,10 +239,7 @@ const TRICKLE_MS = 100
 
 const LOCKED_MESSAGE = 'This library is locked.'
 const PROBE_MAX_BYTES = 1_048_576
-const TICKET_PARAM = 't'
 const PROBE_BYTES_PARAM = 'bytes'
-// Only parses a request's own path and query; nothing is ever fetched from it.
-const URL_BASE = 'http://fixture.invalid'
 
 const MEDIA_ROUTE = /^\/api\/media\/(\d+)(\/.*)?$/u
 const MP4_EXTENSION = '.mp4'
@@ -234,20 +274,20 @@ type Serve = (input: {
 
 const NO_TRIES: Tries = { failed: 0, waitUntil: 0 }
 
-/** A request's path and query, split as the server reads them; one it cannot read names nothing. */
-const partsOf = (url: string): { pathname: string; query: URLSearchParams } => {
-  if (!URL.canParse(url, URL_BASE)) return { pathname: '', query: new URLSearchParams() }
+/** A request's path for the log, its ticket left out, and whether it carried one and of which kind. */
+const withoutTicket = (
+  url: string,
+): { path: string; hasTicket: boolean; hasAccountTicket: boolean } => {
+  if (!URL.canParse(url, URL_BASE)) return { path: url, hasTicket: false, hasAccountTicket: false }
   const parsed = new URL(url, URL_BASE)
-  return { pathname: parsed.pathname, query: parsed.searchParams }
-}
-
-/** A request's path for the log, its ticket left out, and whether it carried one. */
-const withoutTicket = (url: string): { path: string; hasTicket: boolean } => {
-  if (!URL.canParse(url, URL_BASE)) return { path: url, hasTicket: false }
-  const parsed = new URL(url, URL_BASE)
-  if (!parsed.searchParams.has(TICKET_PARAM)) return { path: url, hasTicket: false }
-  parsed.searchParams.delete(TICKET_PARAM)
-  return { path: `${parsed.pathname}${parsed.search}`, hasTicket: true }
+  const ticket = parsed.searchParams.get(MEDIA_TICKET_PARAM)
+  if (ticket === null) return { path: url, hasTicket: false, hasAccountTicket: false }
+  parsed.searchParams.delete(MEDIA_TICKET_PARAM)
+  return {
+    path: `${parsed.pathname}${parsed.search}`,
+    hasTicket: true,
+    hasAccountTicket: ticket.startsWith(ACCOUNT_TICKET_PREFIX),
+  }
 }
 
 /** The container the server names a clip by, from its extension: `mkv`, `mp4`. */
@@ -341,8 +381,6 @@ const afterWrong = ({ tries, now }: { tries: Tries; now: number }): Tries =>
     ? { failed: tries.failed + 1, waitUntil: tries.waitUntil }
     : { failed: 0, waitUntil: now + WRONG_WAIT_MS }
 
-const tokenOf = () => `${Date.now()}.${randomBytes(18).toString('base64url')}`
-
 /** The cookies a request carries, by name; values stay here and never reach a log. */
 const cookiesOf = (request: IncomingMessage): ReadonlyMap<string, string> =>
   new Map(
@@ -368,46 +406,6 @@ const readBody = (request: IncomingMessage): Promise<string | null> =>
     })
     request.on('error', reject)
   })
-
-const parseJson = (text: string | null): unknown => {
-  if (text === null) return null
-  try {
-    const value: unknown = JSON.parse(text)
-    return value
-  } catch {
-    return null
-  }
-}
-
-const fieldOf = ({ body, name }: { body: string | null; name: string }): string | null => {
-  const value = parseJson(body)
-  if (!isRecord(value)) return null
-  const field = value[name]
-  return isString(field) ? field : null
-}
-
-const sendJson = ({
-  response,
-  status,
-  body,
-  cookie = null,
-}: {
-  response: ServerResponse
-  status: number
-  body: unknown
-  cookie?: string | null
-}) => {
-  response.writeHead(status, {
-    [HTTP_HEADERS.contentType]: 'application/json; charset=utf-8',
-    ...(cookie === null ? {} : { [HTTP_HEADERS.setCookie]: cookie }),
-  })
-  response.end(JSON.stringify(body))
-}
-
-const sendEmpty = ({ response, status }: { response: ServerResponse; status: number }) => {
-  response.writeHead(status)
-  response.end()
-}
 
 /** A `Range` header read as raven's `parseRange` reads it. */
 const rangeOf = ({
@@ -585,13 +583,14 @@ export const startFixtureServer = async ({
     return {
       method: request.method ?? '',
       ...withoutTicket(request.url ?? ''),
+      hasBearer: bearerOf(request) !== null,
       hasUnlock: cookies.has(UNLOCK_COOKIE),
       hasAdmin: cookies.has(ADMIN_COOKIE),
       hasOtherCookie: Array.from(cookies.keys()).some(
         (name) => name !== UNLOCK_COOKIE && name !== ADMIN_COOKIE,
       ),
       range: request.headers.range ?? null,
-      body,
+      body: partsOf(request.url ?? '').pathname.startsWith(AUTH_V1_PREFIX) ? null : body,
     }
   }
 
@@ -700,6 +699,14 @@ export const startFixtureServer = async ({
     return true
   }
 
+  const auth = createFixtureAuth({
+    accounts: mode.accounts ?? { kind: FIXTURE_ACCOUNT_KINDS.off },
+    origin: () => origin,
+    now,
+    hasTitle: (mediaId) => titles.has(mediaId),
+    isHeldBack,
+  })
+
   const sendPing = ({ response, query }: { response: ServerResponse; query: URLSearchParams }) => {
     const length = probeLengthOf(query)
     response.writeHead(200, {
@@ -715,9 +722,6 @@ export const startFixtureServer = async ({
     response.end(FIXTURE_SIDECAR)
   }
 
-  const sendMissing = (response: ServerResponse) =>
-    sendJson({ response, status: 404, body: { message: 'Not found' } })
-
   const answerMedia = ({
     request,
     response,
@@ -732,8 +736,14 @@ export const startFixtureServer = async ({
     const title = titles.get(mediaId)
     const missing = `No media ${mediaId}`
     if (title === undefined) return sendJson({ response, status: 404, body: { message: missing } })
-    if (isHeldBack({ request, response, missing })) return
     const route = `${request.method ?? ''} ${rest}`
+    const isTicketRoute = route === MEDIA_ROUTES.file || route === MEDIA_ROUTES.sidecar
+    const ticket = isTicketRoute
+      ? auth.checkTicket({ request, response, mediaId })
+      : TICKET_CHECKS.none
+    if (ticket === TICKET_CHECKS.refused) return
+    // An account ticket passes the PIN lock, as the server's media plane lets it.
+    if (ticket === TICKET_CHECKS.none && isHeldBack({ request, response, missing })) return
     switch (route) {
       case MEDIA_ROUTES.item:
         return sendJson({ response, status: 200, body: mediaItems.get(mediaId) })
@@ -846,7 +856,7 @@ export const startFixtureServer = async ({
     const mediaId = Number(route?.[1] ?? 0)
     const title = titles.get(mediaId)
     if (route === null || title === undefined) return sendMissing(response)
-    if (query.get(TICKET_PARAM) !== ticketFor(mediaId)) {
+    if (query.get(MEDIA_TICKET_PARAM) !== ticketFor(mediaId)) {
       return sendJson({ response, status: 401, body: { message: 'That ticket is not valid.' } })
     }
     if (route[2] !== MEDIA_PLANE_FILE) return sendSidecar(response)
@@ -944,9 +954,10 @@ export const startFixtureServer = async ({
       return sendJson({ response, status: 200, body: adminLockOf(cookies) })
     }
     if (route === API_ROUTES.adminUnlock) return answerAdminUnlock({ response, body })
+    if (auth.answerAccounts({ request, response, body })) return
     const libraryRoute = libraryRouteOf({ request, response })
     if (libraryRoute !== null) return libraryRoute()
-    const media = MEDIA_ROUTE.exec(path)
+    const media = MEDIA_ROUTE.exec(partsOf(path).pathname)
     if (media === null) return sendMissing(response)
     return answerMedia({ request, response, mediaId: Number(media[1]), rest: media[2] ?? '' })
   }
@@ -1034,9 +1045,11 @@ export const startFixtureServer = async ({
     requests: home.requests,
     elsewhere,
     issued: () => issued,
+    issuedTokens: auth.issuedTokens,
     relock: () => {
       unlocks = new Set()
     },
+    setStatus: auth.setStatus,
     throttle: ({ byte }) => {
       throttleAt = byte
       if (byte !== null) return

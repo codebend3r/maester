@@ -1,17 +1,27 @@
-import { type PlayRequest, playLinkFor } from '@raven/core'
+import {
+  AUTH_PATHS,
+  DOWNLOAD_TARGET_KINDS,
+  downloadLinkFor,
+  MEMBER_STATUSES,
+  type PlayRequest,
+  playLinkFor,
+} from '@raven/core'
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test'
 import { makeClips, makeTrackClip } from '@/e2e/clips'
+import { FIXTURE_ACCOUNT, FIXTURE_ACCOUNT_KINDS, type FixtureAccounts } from '@/e2e/fixtureAuth'
 import {
   FIXTURE_ADMIN_KINDS,
   FIXTURE_MEDIA,
   type FixtureAdmin,
   type FixtureRequest,
   type FixtureServer,
+  MEDIA_PATHS,
   routesOf,
   startFixtureServer,
 } from '@/e2e/fixtureServer'
 import { ENGINE_MODES } from '@/main/player/engine'
-import type { ServerMethod } from '@/main/servers/allowlist'
+import { API_PATHS, type ServerMethod } from '@/main/servers/allowlist'
+import { CALL_MESSAGES } from '@/main/servers/serverCalls'
 import { SERVER_METHODS } from '@/shared/protocol'
 import {
   browserOpens,
@@ -31,7 +41,7 @@ import {
   trustPrompts,
   withApp,
 } from '@/e2e/harness'
-import { DESKTOP_REPLIES, DESKTOP_REQUESTS } from '@/shared/protocol'
+import { ACCOUNT_STATES, DESKTOP_REPLIES, DESKTOP_REQUESTS } from '@/shared/protocol'
 
 const PIN = '3001'
 const ADMIN_PASSWORD = 'raven fixture admin'
@@ -47,6 +57,11 @@ const CLIP_SECONDS = 30
 const SAVE_SLACK_S = 2
 // The fixture's wrong-try wait, passed on its clock instead of waited out.
 const WRONG_WAIT_MS = 60_000
+// The real server's ticket life and Supabase's JWT hour.
+const TICKET_MS = 300_000
+const JWT_SECONDS = 3600
+// A download is a local copy of a small clip.
+const DOWNLOAD_WAIT_MS = 15_000
 
 type FixtureClips = { first: string; second: string; tracks: string }
 
@@ -65,12 +80,24 @@ test.afterAll(async () => {
 })
 
 /** A locked fixture, PIN `3001`, whose clock a test can move past the wrong-try wait. */
-const startLockedFixture = async ({ admin, skew }: { admin: FixtureAdmin; skew: { ms: number } }) =>
+const startLockedFixture = async ({
+  admin,
+  accounts,
+  skew,
+}: {
+  admin: FixtureAdmin
+  accounts?: FixtureAccounts
+  skew: { ms: number }
+}) =>
   startFixtureServer({
     clips: fixtureClips,
-    mode: { pin: PIN, isLocked: true, admin },
+    mode: { pin: PIN, isLocked: true, admin, accounts },
     now: () => Date.now() + skew.ms,
   })
+
+/** A request on the cookie path: both cookies, and no Bearer or account ticket. */
+const isCookiePath = ({ hasUnlock, hasAdmin, hasBearer, hasAccountTicket }: FixtureRequest) =>
+  hasUnlock && hasAdmin && !hasBearer && !hasAccountTicket
 
 const linkTo = ({ fixture, ...rest }: { fixture: FixtureServer } & Omit<PlayRequest, 'origin'>) =>
   playLinkFor({ origin: fixture.origin, ...rest })
@@ -328,8 +355,10 @@ test.describe.serial('playing a title from a locked raven server', () => {
         await openUrl({ app, url: linkTo({ fixture, mediaId: 1, at: 0, next: [] }) })
         await expect(unlockDialog({ page, title: 'Locked library' })).toBeVisible()
         expect(await trustPrompts({ app })).toEqual([promptFor({ fixture })])
-        // The probe after the yes is the first thing the server hears.
-        expect(routesOf(loggedSince({ fixture, from })).at(0) ?? null).toBe('GET /api/lock')
+        // The probe after the yes is the first thing the server hears: its accounts are off.
+        expect(routesOf(loggedSince({ fixture, from })).at(0) ?? null).toBe(
+          `${SERVER_METHODS.get} ${AUTH_PATHS.config}`,
+        )
         // Stored under its origin's host until someone renames it.
         const listed = await requestFromPage({
           page,
@@ -560,7 +589,102 @@ test.describe.serial('playing a title from a locked raven server', () => {
   })
 })
 
-test.describe('playing a title while the admin lock hides it', () => {
+/** Servers with accounts off and servers older than accounts: both keep the admin password (D1). */
+const PASSWORD_KINDS = [FIXTURE_ACCOUNT_KINDS.off, FIXTURE_ACCOUNT_KINDS.legacy] as const
+
+/** What the trust probe asks first: the auth config, then the lock of a server too old for it. */
+const PROBES = {
+  [FIXTURE_ACCOUNT_KINDS.off]: [`${SERVER_METHODS.get} ${AUTH_PATHS.config}`],
+  [FIXTURE_ACCOUNT_KINDS.legacy]: [
+    `${SERVER_METHODS.get} ${AUTH_PATHS.config}`,
+    `${SERVER_METHODS.get} ${API_PATHS.lock}`,
+  ],
+} as const satisfies Record<(typeof PASSWORD_KINDS)[number], readonly string[]>
+
+PASSWORD_KINDS.forEach((kind) => {
+  test.describe(`a server whose accounts are ${kind}, while the admin lock hides its title`, () => {
+    let userData = ''
+    let fixture: FixtureServer | null = null
+
+    test.beforeAll(async () => {
+      userData = await freshUserData()
+      fixture = await startLockedFixture({
+        admin: { kind: FIXTURE_ADMIN_KINDS.password, password: ADMIN_PASSWORD },
+        accounts: { kind },
+        skew: { ms: 0 },
+      })
+    })
+
+    test.afterAll(async () => {
+      const closing = fixture === null ? Promise.resolve() : fixture.close()
+      await closing.finally(() => removeDir(userData))
+    })
+
+    test('asks for the admin password first, plays with both cookies and downloads with them', async () => {
+      if (fixture === null) throw new Error('The fixture server is not running.')
+      const running = fixture
+      const output = await withApp({
+        userData,
+        run: async ({ app, page, output: printed }) => {
+          await expect(homeHeading(page)).toBeVisible()
+          await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
+          await openUrl({ app, url: linkTo({ fixture: running, mediaId: 1, at: 0, next: [] }) })
+          await expect(unlockDialog({ page, title: 'Admin lock' })).toBeVisible()
+          expect(routesOf(running.requests).slice(0, PROBES[kind].length)).toEqual(PROBES[kind])
+          await enterSecret({
+            page,
+            title: 'Admin lock',
+            label: 'Admin password',
+            secret: ADMIN_PASSWORD,
+          })
+          await unlockWithPin({ page })
+          await expectPlayingNatively({ page, title: 'Fixture One' })
+          const files = requestsTo({
+            requests: running.requests,
+            method: SERVER_METHODS.get,
+            path: MEDIA_PATHS.file(FIXTURE_MEDIA.first),
+          })
+          expect(files.length).toBeGreaterThan(0)
+          expect(files.every(isCookiePath)).toBe(true)
+
+          await page.keyboard.press('Escape')
+          await expect(homeHeading(page)).toBeVisible()
+          const from = running.requests.length
+          await openUrl({
+            app,
+            url: downloadLinkFor({
+              origin: running.origin,
+              target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: FIXTURE_MEDIA.first },
+            }),
+          })
+          const ask = page.getByRole('dialog', { name: 'Download to raven player' })
+          await expect(ask).toContainText('Download Fixture One')
+          await ask.getByRole('button', { name: 'Download', exact: true }).click()
+          await page.getByRole('button', { name: /^Downloads/u }).click()
+          await expect(page.getByRole('button', { name: 'Play Fixture One' })).toBeVisible({
+            timeout: DOWNLOAD_WAIT_MS,
+          })
+          const fetched = requestsTo({
+            requests: loggedSince({ fixture: running, from }),
+            method: SERVER_METHODS.get,
+            path: MEDIA_PATHS.file(FIXTURE_MEDIA.first),
+          })
+          expect(fetched.length).toBeGreaterThan(0)
+          expect(fetched.every(isCookiePath)).toBe(true)
+          return printed
+        },
+      })
+      expect(running.requests.some(({ hasBearer }) => hasBearer)).toBe(false)
+      expectNothingSecretPrinted({
+        output,
+        issued: running.issued(),
+        typed: [PIN, ADMIN_PASSWORD],
+      })
+    })
+  })
+})
+
+test.describe('a server whose accounts are ready, while the admin lock hides its title', () => {
   let userData = ''
   let fixture: FixtureServer | null = null
 
@@ -568,6 +692,12 @@ test.describe('playing a title while the admin lock hides it', () => {
     userData = await freshUserData()
     fixture = await startLockedFixture({
       admin: { kind: FIXTURE_ADMIN_KINDS.password, password: ADMIN_PASSWORD },
+      accounts: {
+        kind: FIXTURE_ACCOUNT_KINDS.ready,
+        status: MEMBER_STATUSES.approved,
+        ticketMs: TICKET_MS,
+        jwtSeconds: JWT_SECONDS,
+      },
       skew: { ms: 0 },
     })
   })
@@ -577,39 +707,80 @@ test.describe('playing a title while the admin lock hides it', () => {
     await closing.finally(() => removeDir(userData))
   })
 
-  test('asks for the admin password first while the admin lock hides the title', async () => {
+  test('never offers the admin password: the title is gone, and nothing asks /api/admin', async () => {
     if (fixture === null) throw new Error('The fixture server is not running.')
     const running = fixture
-    const output = await withApp({
+    const host = hostOf({ fixture: running })
+    await withApp({
       userData,
-      run: async ({ app, page, output: printed }) => {
+      run: async ({ app, page }) => {
         await expect(homeHeading(page)).toBeVisible()
         await stubTrustPrompt({ app, answer: TRUST_ANSWERS.add })
-        await openUrl({ app, url: linkTo({ fixture: running, mediaId: 1, at: 0, next: [] }) })
-        await expect(unlockDialog({ page, title: 'Admin lock' })).toBeVisible()
-        await enterSecret({
+        const added = await requestFromPage({
           page,
-          title: 'Admin lock',
-          label: 'Admin password',
-          secret: ADMIN_PASSWORD,
+          request: { type: DESKTOP_REQUESTS.addServer, origin: running.origin },
         })
-        await unlockWithPin({ page })
-        await expectPlayingNatively({ page, title: 'Fixture One' })
-        const files = requestsTo({
-          requests: running.requests,
+        const [serverId = ''] =
+          added !== null && added.type === DESKTOP_REPLIES.servers
+            ? added.servers.map((server) => server.serverId)
+            : []
+        const signedIn = await requestFromPage({
+          page,
+          request: {
+            type: DESKTOP_REQUESTS.signIn,
+            serverId,
+            email: FIXTURE_ACCOUNT.email,
+            password: FIXTURE_ACCOUNT.password,
+          },
+        })
+        expect(
+          signedIn !== null && signedIn.type === DESKTOP_REPLIES.account
+            ? signedIn.account.state
+            : null,
+        ).toBe(ACCOUNT_STATES.approved)
+
+        // The page asking for either admin call is refused in main, before anything is sent.
+        const adminCalls = [
+          { method: SERVER_METHODS.get, path: API_PATHS.admin, body: null },
+          {
+            method: SERVER_METHODS.post,
+            path: API_PATHS.adminUnlock,
+            body: JSON.stringify({ password: ADMIN_PASSWORD }),
+          },
+        ]
+        const refused = await Promise.all(
+          adminCalls.map((call) =>
+            requestFromPage({
+              page,
+              request: { type: DESKTOP_REQUESTS.serverCall, serverId, ...call },
+            }),
+          ),
+        )
+        expect(refused).toEqual(
+          adminCalls.map(() => ({
+            type: DESKTOP_REPLIES.serverUnreachable,
+            message: CALL_MESSAGES.adminWithAccounts(host),
+          })),
+        )
+
+        const from = running.requests.length
+        await openUrl({ app, url: linkTo({ fixture: running, mediaId: 1, at: 0, next: [] }) })
+        await expect(page.getByText(`This title is not on ${host} any more.`)).toBeVisible()
+        await expect(unlockDialog({ page, title: 'Admin lock' })).toHaveCount(0)
+        const read = requestsTo({
+          requests: loggedSince({ fixture: running, from }),
           method: SERVER_METHODS.get,
-          path: '/api/media/1/file',
+          path: MEDIA_PATHS.item(FIXTURE_MEDIA.first),
         })
-        expect(files.length).toBeGreaterThan(0)
-        expect(files.every(({ hasUnlock, hasAdmin }) => hasUnlock && hasAdmin)).toBe(true)
-        return printed
+        expect(read.length).toBeGreaterThan(0)
+        expect(read.every(({ hasBearer, hasAdmin }) => hasBearer && !hasAdmin)).toBe(true)
       },
     })
-    expectNothingSecretPrinted({
-      output,
-      issued: running.issued(),
-      typed: [PIN, ADMIN_PASSWORD],
-    })
+    expect(
+      running.requests.filter(({ path }) =>
+        new URL(path, running.origin).pathname.startsWith(API_PATHS.admin),
+      ),
+    ).toEqual([])
   })
 })
 
@@ -647,7 +818,7 @@ test.describe('a server title without the video engine', () => {
         await expect(page.getByRole('heading', { name: 'Opened in your browser' })).toBeVisible()
         await expect.poll(() => browserOpens({ app })).toEqual([`${running.origin}/watch/1`])
         // Only the trust probe: the page has no engine to read the title for.
-        expect(routesOf(running.requests)).toEqual(['GET /api/lock'])
+        expect(routesOf(running.requests)).toEqual([`${SERVER_METHODS.get} ${AUTH_PATHS.config}`])
       },
     })
   })

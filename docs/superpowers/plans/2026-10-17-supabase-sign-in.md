@@ -63,12 +63,25 @@ Task plan: `2026-10-18-raven-auth-ui.md`, stacked on `supabase-spec-status` (#24
 - [x] Walk the flow on the local stack: sign up, confirm in a second browser, Pending, owner approval, Check again, Remove access, forgot and reset.
 - [ ] Not verifiable locally: Netlify forwarding and SSE, real SMTP, the cloud redirect allowlist and a second real device. The staging check below covers them.
 
+## PR 4: raven-auth-desktop
+
+Task plan: `2026-10-18-raven-auth-desktop.md`, PR #254 against `main` (#247 merged).
+
+- [x] Pin each server's sign-in endpoints from its public auth config in `desktop-config.json` (version 4), and ask in main's own prompt before a changed pin is used.
+- [x] Hold the session in main, one `@supabase/auth-js` client per server, encrypted with `safeStorage` or in memory alone, and add Bearer to every call to a server whose accounts are `ready`. The renderer never sees a token.
+- [x] Sign-in, pending and removed screens in Settings and on the server page; Create account and Forgot password open the server's web app.
+- [x] Play server titles through a loopback relay that adds account tickets and renews them, so seeks, reconnects and subtitles past five minutes keep working. Download with account tickets under a per-server mint budget.
+- [x] Redact tokens, tickets, emails and relay secrets from the log. Make no admin-password call to a `ready` server.
+- [x] Fixture server with accounts, e2e and native tests: many ticket lives and a session refresh, an audio switch after expiry, a sidecar fetched once, removal mid-play, a relaunch that keeps or loses the sign-in.
+- [x] Off and pre-accounts servers behave as before (D1).
+- [ ] Not verifiable in this PR: a packaged, ad hoc signed build's keychain behaviour after an update, the cloud project's real JWT lifetime, and a production server with enforcement on (that is `raven-auth-enforcement`).
+
 ## Later PR stack
 
 | Branch | Scope | Cutover dependency |
 |---|---|---|
 | `raven-auth-ui` | Login, signup, confirmation, recovery, pending and Settings > Users. Task plan: [`2026-10-18-raven-auth-ui.md`](2026-10-18-raven-auth-ui.md) | Test the complete owner approval flow in staging |
-| `raven-auth-desktop` | Main-owned session, login, pending, secure storage and playback tickets | Release before enforcement |
+| `raven-auth-desktop` | Main-owned session, login, pending, secure storage and playback tickets. Task plan: [`2026-10-18-raven-auth-desktop.md`](2026-10-18-raven-auth-desktop.md) | Release before enforcement |
 | `raven-auth-enforcement` | Account gate across every protected API/media path, owner-only management, remove admin-password authorization, bind PIN state to accounts | Configure production and verify anonymous access is denied |
 | `raven-account-data` | Per-account progress, plays, watched and favourites with owner adoption | Follow-up; viewing data is shared until this ships |
 
