@@ -336,7 +336,7 @@ describe('setEnabled', () => {
     expect(service.setEnabled(false).isEnabled).toBe(false)
     expect(service.status().isEnabled).toBe(false)
     expect(await saved()).toMatchObject({
-      version: 3,
+      version: 4,
       updates: { isEnabled: false, checkedAt: NOW - HOUR },
     })
     expect(service.setEnabled(true).isEnabled).toBe(true)

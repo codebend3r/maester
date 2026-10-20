@@ -13,6 +13,7 @@ import {
   type Infer,
   type OutputSettings,
 } from '@raven/core'
+import { isSignInConfig, usableSignIn } from '@/main/accounts/authEndpoints'
 import { isOpaqueId } from '@/shared/protocol'
 import { isServerOrigin } from '@/shared/playLink'
 import { NAME_MAX, cleanName, nameFor, tidyText } from '@/main/servers/serverNames'
@@ -21,11 +22,20 @@ import { loadJson, type JsonStore, type StateFs } from '@/main/stateStore'
 export const CONFIG_FILE = 'desktop-config.json'
 export const SERVERS_CAP = 20
 
+/** A server as versions 1 to 3 stored it, before it could pin a sign-in. */
+const isUnpinnedServerEntry = object({
+  id: isOpaqueId,
+  origin: isServerOrigin,
+  name: isString,
+  addedAt: isNumber,
+})
+
 export const isServerEntry = object({
   id: isOpaqueId,
   origin: isServerOrigin,
   name: isString,
   addedAt: isNumber,
+  signIn: nullable(isSignInConfig),
 })
 
 export type ServerEntry = Infer<typeof isServerEntry>
@@ -38,7 +48,7 @@ export type UpdateSettings = Infer<typeof isUpdateSettings>
 export const DEFAULT_UPDATE_SETTINGS: UpdateSettings = { isEnabled: true, checkedAt: null }
 
 export const isDesktopConfig = object({
-  version: oneOf([3]),
+  version: oneOf([4]),
   output: isOutputSettings,
   servers: listOf(isServerEntry),
   updates: isUpdateSettings,
@@ -47,19 +57,29 @@ export const isDesktopConfig = object({
 export type DesktopConfig = Infer<typeof isDesktopConfig>
 
 /**
- * What a file on disk may hold: this version, the one before the release check, or the
- * one before servers existed.
+ * What a file on disk may hold: this version, the one before sign-ins were pinned, the one
+ * before the release check, or the one before servers existed.
  */
 export const isStoredConfig = union(
   object({ version: oneOf([1]), output: isOutputSettings }),
-  object({ version: oneOf([2]), output: isOutputSettings, servers: listOf(isServerEntry) }),
+  object({
+    version: oneOf([2]),
+    output: isOutputSettings,
+    servers: listOf(isUnpinnedServerEntry),
+  }),
+  object({
+    version: oneOf([3]),
+    output: isOutputSettings,
+    servers: listOf(isUnpinnedServerEntry),
+    updates: isUpdateSettings,
+  }),
   isDesktopConfig,
 )
 
 export type ConfigStore = JsonStore<DesktopConfig>
 
 export const EMPTY_CONFIG: DesktopConfig = {
-  version: 3,
+  version: 4,
   output: DEFAULT_OUTPUT_SETTINGS,
   servers: [],
   updates: { ...DEFAULT_UPDATE_SETTINGS },
@@ -96,7 +116,7 @@ export const pickOutput = (output: OutputSettings): OutputSettings => ({
 })
 
 /**
- * Rebuilds each entry from its four fields, so nothing else a file carried is kept. Its
+ * Rebuilds each entry from its five fields, so nothing else a file carried is kept. Its
  * name is tidied as a typed one would be, and is the host when nothing is left of it.
  */
 const pickServer = (server: ServerEntry): ServerEntry => ({
@@ -106,6 +126,9 @@ const pickServer = (server: ServerEntry): ServerEntry => ({
     cleanName(tidyText({ text: server.name, max: NAME_MAX })) ??
     nameFor(server.origin).slice(0, NAME_MAX),
   addedAt: server.addedAt,
+  // Checked again as a server's own config is, so a file edited by hand can never point sign-in
+  // somewhere raven player would not have pinned; endpoints that fail are dropped and pinned afresh.
+  signIn: server.signIn === null ? null : usableSignIn(server.signIn),
 })
 
 /** The first servers up to the cap, skipping any whose id or origin an earlier one already has. */
@@ -116,25 +139,35 @@ const uniqueServers = (servers: readonly ServerEntry[]): ServerEntry[] =>
     return [...kept, pickServer(server)]
   }, [])
 
+const unpinned = (servers: readonly Infer<typeof isUnpinnedServerEntry>[]): ServerEntry[] =>
+  uniqueServers(servers.map((server) => ({ ...server, signIn: null })))
+
 export const upgradeConfig = (stored: Infer<typeof isStoredConfig>): DesktopConfig => {
   switch (stored.version) {
     case 1:
       return {
-        version: 3,
+        version: 4,
         output: pickOutput(stored.output),
         servers: [],
         updates: { ...DEFAULT_UPDATE_SETTINGS },
       }
     case 2:
       return {
-        version: 3,
+        version: 4,
         output: pickOutput(stored.output),
-        servers: uniqueServers(stored.servers),
+        servers: unpinned(stored.servers),
         updates: { ...DEFAULT_UPDATE_SETTINGS },
       }
     case 3:
       return {
-        version: 3,
+        version: 4,
+        output: pickOutput(stored.output),
+        servers: unpinned(stored.servers),
+        updates: { isEnabled: stored.updates.isEnabled, checkedAt: stored.updates.checkedAt },
+      }
+    case 4:
+      return {
+        version: 4,
         output: pickOutput(stored.output),
         servers: uniqueServers(stored.servers),
         updates: { isEnabled: stored.updates.isEnabled, checkedAt: stored.updates.checkedAt },
