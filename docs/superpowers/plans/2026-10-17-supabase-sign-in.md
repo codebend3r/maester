@@ -76,6 +76,21 @@ Task plan: `2026-10-18-raven-auth-desktop.md`, PR #254 against `main` (#247 merg
 - [x] Off and pre-accounts servers behave as before (D1).
 - [ ] Not verifiable in this PR: a packaged, ad hoc signed build's keychain behaviour after an update, the cloud project's real JWT lifetime, and a production server with enforcement on (that is `raven-auth-enforcement`).
 
+## PR 5: raven-auth-enforcement
+
+Task plan: `2026-10-18-raven-auth-enforcement.md`, PR #255 against `raven-auth-desktop` (the spec's step 6).
+
+- [x] An effective auth state: `ready`, `off` and `unavailable`. The first `ready` start records `accounts.enforcedAt`, and a server that once enforced never falls back to open by itself; only `RAVEN_ACCOUNTS=off` reopens it, with a warning on every start.
+- [x] A default-deny `AccountGuard`: every route needs an approved account unless marked `@OpenToAnyone()` (`/api/health`, `/api/auth/config` and the media-origins ping), with the 79-route inventory pinned by a test and swept anonymously, as each kind of caller and as the owner.
+- [x] Management is the owner's (26 routes); `/api/admin*` answers 404 and `ADMIN_PASSWORD` authorizes nothing under `ready`; `off` keeps the admin lock as it was.
+- [x] The PIN's unlock names the account that entered it. Only the owner unlocks; members never see locked libraries.
+- [x] Account tickets on every media path, redeemed and rechecked per request; a legacy HMAC ticket opens nothing under `ready`; a library locked after a mint refuses the ticket at once.
+- [x] SSE and open `file` and `stream` responses are rechecked every 60 s; an outage keeps an authorized stream until its last-known token expires, removal and integrity failures end it at once.
+- [x] Membership lookups shared in flight and cached for 5 s, evicted when raven changes the status.
+- [x] The web follows the owner (no admin lock UI under `ready`, owner-only management screens) and the gated server (tickets renewed at 120 s, the event stream reopened with the fresh token); a download the server cuts mid-body resumes (desktop, #254).
+- [x] Server tests for anonymous, unverified, pending, approved, revoked and owner callers across JSON, writes, artwork, SSE, files, ranges, subtitles and tickets, JWT expiry, wrong issuer, audience and algorithm, an unavailable membership service and cache headers.
+- [ ] Not verifiable locally: Netlify forwarding of `Cookie`, `Authorization` and SSE without public caching, real SMTP, the cloud redirect allowlist, a production server with enforcement on, and a second real device. The operator steps in the task plan cover them.
+
 ## Later PR stack
 
 | Branch | Scope | Cutover dependency |

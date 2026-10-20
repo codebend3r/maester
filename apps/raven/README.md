@@ -9,31 +9,50 @@ A light, self-hosted video library and player. Point it at folders of videos; it
 
 raven is the `apps/raven/` folder of an Nx workspace; the [root README](../../README.md) covers the workspace.
 
-## Supabase account preparation
+## Accounts
 
-The account foundation is additive, not the login cutover. **Existing library, media and admin-password access remains unchanged**, even when Supabase is configured. The web app has its sign-in screens and the owner's approval screen (below), and raven player signs in to servers that have accounts on (see [Accounts in raven player](#accounts-in-raven-player)); only after that release will the server enforce account access everywhere.
+Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `RAVEN_WEB_URL` in `apps/raven/.env` and raven runs with accounts `ready`. Both URLs are origins, with HTTPS required except on loopback. No service-role key is used or accepted. Compose already passes the product env file to the server. For a local stack, use `http://127.0.0.1:54321`, the local publishable key and `http://localhost:5173`. See the [database runbook](supabase/README.md) for setup, owner bootstrap and the cutover steps.
 
-Set all three in `apps/raven/.env`: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `RAVEN_WEB_URL`. Both URLs are origins, with HTTPS required except on loopback. No service-role key is used or accepted. Compose already passes the product env file to the server. For a local stack, use `http://127.0.0.1:54321`, the local publishable key and `http://localhost:5173`. See the [database runbook](supabase/README.md) for setup and owner bootstrap.
+With none of the three set, raven runs `off`: open to anyone who reaches it, with the [admin lock](#admin-lock) and the per-browser PIN, exactly as before accounts. With only some set, or set badly, it runs `unavailable`.
+
+| State | When | What the server does |
+|---|---|---|
+| `off` | No Supabase settings, and no record that this server ever enforced accounts (or `RAVEN_ACCOUNTS=off`) | Open, with the admin lock and the browser's PIN as before. The account routes answer `503` |
+| `unavailable` | Partial or invalid Supabase settings; or a server that once ran `ready` has lost them | Answers `503` everywhere except `/api/health`, `/api/auth/config` and `/api/media-origins/ping`. It never falls back to open by itself |
+| `ready` | All three set and valid | Every route needs an approved account except the three above and `GET /api/me`, which answers any account its own status |
+
+The first `ready` start writes `accounts.enforcedAt` into the database. From then on a start whose Supabase settings are gone is `unavailable`, not `off`, so a lost env file locks the library instead of opening it. Only `RAVEN_ACCOUNTS=off` (with the three settings unset) forgets the record and reopens raven to anonymous viewers; it is an explicit security decision, logs a warning on every start while it is set, and is a conflict (`unavailable`) if the three settings are still there.
+
+### What `ready` enforces
+
+- **Default deny.** Every route is held to an approved account unless its handler is marked `@OpenToAnyone()`. Anonymous callers get `401 signed_out`, an unverified, pending or removed account `403` (`pending` or `revoked`), a member on a management route `403 not_owner`, and a Supabase or key-set outage `503 unavailable`. Nothing fails open. Every protected response carries `Vary: authorization, cookie` and is never `public`; refusals are `no-store`. The route inventory is pinned by a test, so a new route is approved-only until someone says otherwise.
+- **Who manages.** Management is the owner's: adding, editing, deleting, scanning, refreshing and matching libraries, metadata and images, the folder browser, Playback and Display settings, Streams, deleting a video, file paths, and the Users screen (26 routes). Approved members browse, play, favourite and mark watched. `ADMIN_PASSWORD` authorizes nothing, and `/api/admin*` answers `404`.
+- **Bearer and cookie.** Bearer wins. Only `GET` and `HEAD` may use the `maester-auth` cookie, so a cookie alone never writes.
+- **The PIN.** Only the owner unlocks locked libraries. A member never sees one: it is not listed and its routes answer `404`, and a member's unlock is `403 not_owner`. The `raven_unlock` cookie names the account that entered the PIN, so another account on the same browser inherits nothing.
+- **Playback tickets.** The web and raven player play with opaque account tickets (`POST /api/auth/media/:id/ticket`, or `GET /api/media/:id/ticket` with Bearer). A ticket is bound to one account and one title and lasts at most five minutes and never past the issuing JWT. Every `file`, `stream`, `subtitles` and range request redeems it afresh and checks current approval, so a removed account's ticket gets `403`. A library locked after a member's ticket was minted refuses it at once. An owner's ticket carries the PIN unlock the owner had when it was minted and is honoured only while the caller can still manage. A ticket URL is a capability for one title for up to five minutes: it keeps working if the owner signs out, until the account is removed or it expires. Under `ready` a legacy `RAVEN_MEDIA_SECRET` ticket (`?t=`) opens nothing, the owner included.
+- **Open streams.** Server-sent events and open `file` and `stream` responses are rechecked every 60 seconds and ended when the account loses access or when the newest token the server has seen for it expires. A client that keeps calling the API keeps its stream; a quiet one loses it at that token's expiry and resumes by range with a new ticket. If Supabase is briefly unreachable at a recheck, a stream that was already authorized stays open until the last known token expires, while a removal ends it at once and so does an integrity failure (an account mismatch, or more than one or malformed membership rows).
+- **Membership lookups.** Concurrent requests for one token share one `current_membership` lookup, and an answer is reused for 5 seconds. A status change made through the Users screen drops that account's cached answer, so removal through raven bites on the next request; a change made straight in the database takes up to 5 seconds. A page of 300 posters makes one lookup per token every 5 seconds, not 300.
+- **Still shared.** Progress, plays, watched marks and favourites are the server's, not an account's, until the follow-up (`raven-account-data`) separates them.
+
+### Account routes
 
 | Endpoint | Access |
 |---|---|
 | `GET /api/auth/config` | Public, safe connection settings only; `off`, `unavailable` or `ready` |
-| `GET /api/me` | Valid account session; pending/removed users can see their own status |
-| `GET /api/auth/members?pageSize=100&pageOffset=0` | Approved owner only |
-| `POST /api/auth/members/:id/status` | Approved owner with Bearer; body `{"status":"approved"}` or `{"status":"revoked"}` |
-| `POST /api/auth/media/:id/ticket` | Approved account with Bearer, plus the existing library/PIN visibility rules |
+| `GET /api/me` | Any account session; pending and removed accounts see their own status |
+| `GET /api/auth/members?pageSize=100&pageOffset=0` | Owner only |
+| `POST /api/auth/members/:id/status` | Owner with Bearer; body `{"status":"approved"}` or `{"status":"revoked"}` |
+| `POST /api/auth/media/:id/ticket` | Approved account with Bearer, plus the library and PIN visibility rules |
 
-New account endpoints are protected from their first deployment, independent of the old admin-password cookie. Supabase's current membership is checked on every account request and ticket redemption, without a membership cache or trusting JWT role/status claims. A stale owner request is checked again by the database RPC before a write. Missing identity returns `401`, pending/removed/non-owner access `403`, infrastructure failure `503`. Missing or partial configuration leaves protected account endpoints unavailable, not open.
+Missing identity returns `401`, pending, removed or non-owner access `403`, infrastructure failure `503`. JWTs are verified against the project's JWKS (ES256 only; the wrong issuer, audience or algorithm is `401`), and membership is read from the database, never from a JWT claim. Account JWTs, refresh tokens and tickets never belong in logs.
 
-Browser sessions use a fixed host-only `maester-auth` cookie, including chunked/base64url values. Cookies authorize only GET/HEAD; every write requires Bearer. The API client can take a synchronous `accessToken` callback, but never sends it to explicit media/subtitle URLs. Account JWTs and refresh credentials never belong in query strings or logs.
+Browser sessions use a fixed host-only `maester-auth` cookie, including chunked and base64url values. The API client can take a synchronous `accessToken` callback, but never sends it to explicit media or subtitle URLs. Account tickets are random, kept only in server memory, capped globally and per account, and gone after a restart.
 
-New account playback tickets are random opaque capabilities, kept only in server memory, capped globally and per account. They last at most five minutes and never beyond the issuing access JWT's expiry; server restart invalidates them. They carry no JWT in the URL and recheck current approval on every range, stream or subtitle request. Invalid or removed-account tickets never fall back to legacy anonymous playback. Existing legacy tickets and routes remain unchanged until cutover.
-
-raven player renews the account session and mints a fresh ticket before each ticket expires, and again after a refused one, so seeks and subtitle requests past the five minutes keep working; its end-to-end tests cover many ticket lives and a session refresh. Do not assume these five-minute tickets behave like legacy six-hour tickets in any other client. Existing continuous streams and buffered bytes are not forcibly recalled by this preparation PR.
+raven player renews the account session and mints a fresh ticket before each ticket expires, and again after a refused one, so seeks and subtitle requests past the five minutes keep working; its end-to-end tests cover many ticket lives and a session refresh. A download the server cuts at its account's token expiry resumes by range with a new ticket. Do not assume these five-minute tickets behave like the legacy six-hour ones in any other client. Older raven player builds, which know nothing of accounts, lose access to a `ready` server.
 
 ### Accounts in the web app
 
-The web app asks `GET /api/auth/config` once and acts on the answer. With `off`, raven is exactly as before: no gate and no link to any account screen. With `unavailable`, the account screens show a notice and the rest of raven stays as it is. Only with `ready` does the web app gate itself: a signed out visitor goes to sign in and comes back to the page they asked for (the return path is a same-origin path, never a URL), and an account that is pending or removed is held on the pending screen with no library data or shell. The server does not yet gate the existing routes, so this is the web app's own door, not enforcement; that is a later PR.
+The web app asks `GET /api/auth/config` once and acts on the answer. With `off`, raven is exactly as before: no gate and no link to any account screen. With `unavailable`, the account screens show a notice and every other page shows **raven is temporarily unavailable** with **Try again**, since the server answers nothing else. Only with `ready` does the web app gate itself: a signed out visitor goes to sign in and comes back to the page they asked for (the return path is a same-origin path, never a URL), and an account that is pending or removed is held on the pending screen with no library data or shell. On a `ready` server the server enforces the same rule on every route, so the web app's door is for the visitor's benefit and the server is the lock. An owner sees the management screens; a member sees none of them, and the web app makes no `/api/admin` request.
 
 | Route | What |
 |---|---|
@@ -88,7 +107,7 @@ Then, on Vhagar, `sudo docker load -i /volume1/docker/raven/raven-image.tar.gz` 
 
 The compose file's `tailscale` service puts raven on the internet at `https://raven.<tailnet>.ts.net` with [Tailscale Funnel](https://tailscale.com/kb/1223/funnel). It runs in a container of its own and proxies to raven over the compose network, so a new raven image never restarts it. It sits in the `funnel` profile, and `update.sh` starts it only once `funnel/serve.json` is there, so until then raven stays on the LAN.
 
-Anyone with the address can browse and play every library that is not locked. Set `ADMIN_PASSWORD` first: the [admin lock](#admin-lock) is what keeps them from changing anything, and without the password it also stays on for you. Make `LIBRARY_PIN` long, too: five wrong tries a minute still lets a stranger make 7,200 a day, enough to run through a four-digit PIN in under two days.
+On a server without accounts, anyone with the address can browse and play every library that is not locked. With [accounts](#accounts) `ready`, nobody can without an approved account, which is the safer way to go public. Without them, set `ADMIN_PASSWORD` first: the [admin lock](#admin-lock) is what keeps them from changing anything, and without the password it also stays on for you. Make `LIBRARY_PIN` long, too: five wrong tries a minute still lets a stranger make 7,200 a day, enough to run through a four-digit PIN in under two days.
 
 1. In the Tailscale admin console, generate a one-off auth key (**Settings → Keys**, not reusable). The tailnet's policy must give the node the `funnel` attribute, as it already does for the tailnet's other Funnels.
 2. Put it in Vhagar's `.env` as `TS_AUTHKEY`, beside `ADMIN_PASSWORD`.
@@ -115,9 +134,9 @@ The web app can also be served from Netlify, with `/api` proxied to the Funnel a
 
 Netlify carries the control plane: the JSON, the pictures, the cookies and the live events, all through `/api`. The video, the original file and the subtitles are the media plane, and they go straight from the browser to Vhagar over the best origin it can reach, so playback does not count against the site's bandwidth. The same `/api` proxy stays as the fallback.
 
-- **Three variables on Vhagar** turn it on, all in the [Configuration](#configuration) table: `RAVEN_MEDIA_ORIGINS` lists the origins, best first, as `kind:url` (`lan`, `tailnet` or `public`); `RAVEN_WEB_ORIGINS` names the web app origins allowed to call the media routes, your Netlify site and, with one `*` in its first hostname label, its deploy previews; `RAVEN_MEDIA_SECRET` signs the tickets. With `RAVEN_MEDIA_ORIGINS` unset, nothing changes.
+- **Three variables on Vhagar** turn it on, all in the [Configuration](#configuration) table: `RAVEN_MEDIA_ORIGINS` lists the origins, best first, as `kind:url` (`lan`, `tailnet` or `public`); `RAVEN_WEB_ORIGINS` names the web app origins allowed to call the media routes, your Netlify site and, with one `*` in its first hostname label, its deploy previews; `RAVEN_MEDIA_SECRET` signs the tickets of a server without accounts. With accounts `ready` the tickets are [account tickets](#what-ready-enforces) and the secret is not needed. With `RAVEN_MEDIA_ORIGINS` unset, nothing changes.
 - **The probe.** When the app opens, and again when the network comes back or the tab returns after a long absence, the browser fetches 256 KB from each origin and picks the one that answers best, preferring `lan` over `tailnet` over `public` when they are close. It keeps the pick in `sessionStorage` for 10 minutes, and probes again if a stream cannot reach it.
-- **The ticket.** The page asks raven through Netlify for a ticket, which stands in for the PIN cookie on the media origin, whose cookies Netlify's page cannot send. A ticket is good for 6 hours and for one video, sets no cookie and opens nothing else. The link that "Copy file link" copies carries it too, so it plays in VLC or IINA for those 6 hours.
+- **The ticket.** The page asks raven through Netlify for a ticket, which stands in for the PIN cookie on the media origin, whose cookies Netlify's page cannot send. A ticket is good for 6 hours and for one video, sets no cookie and opens nothing else. With accounts `ready` it is an account ticket instead: five minutes at most, renewed by the page every two minutes and whenever the session's token is refreshed, and checked against the account on every request. The link that "Copy file link" copies carries it too, so it plays in VLC or IINA for those 6 hours, or with accounts `ready` for up to the account ticket's five minutes, less when the token it was minted with runs out first.
 - **The fallback.** When no origin answers, or none is set, the player uses `/api` through Netlify as before. Thumbnails and JSON always do.
 
 What Vhagar needs for each kind:
@@ -276,6 +295,8 @@ A watched video's card carries a check in the corner of its picture (and beside 
 Every card has a menu, from the button in its corner or a right click; on a screen with a pointer, the button shows when the card is pointed at or focused. **Favourite** marks the video and lists it under **Favourites** in the side menu, most recently marked first, across every library but the locked ones. A show's or season's page has a heart beside Play that does the same for the show or season, which **Favourites** lists before the videos, with pills to narrow the page to Shows, Seasons, Movies, Episodes or Other videos. A locked library's videos, shows and seasons have no heart and no Favourite in their menu, whether or not the PIN is entered; one marked before its library was locked keeps its heart, to unmark it. The player has the same heart at the top, beside the video's title, so a video can be marked while it plays: pressing it marks or unmarks the video without stopping it, and the heart fills once it is a favourite. **Mark as watched** (or **Mark as unwatched**, once it is) comes next and, like Favourite, is there with the admin lock on; see [Marking watched](#marking-watched). The rest of the menu needs the [admin lock](#admin-lock) off. In a matched library it has **Fix match** and **Refresh details** (see [Metadata](#metadata)), and on a matched movie or episode **Edit images**, which opens the movie's (or the episode's show's) pictures in a dialog over the page, the same as **Edit images** on its page. It ends with where the file lives, and choosing it copies the path. **Delete** asks first, then removes the file from disk and the video from the index, along with its thumbnail, progress and favourite. There is no undo.
 
 ## Admin lock
+
+This is how a server without accounts (`off`, see [Accounts](#accounts)) keeps management to its admin. With accounts `ready` there is no admin lock: the [owner](#what-ready-enforces) manages, every other account only browses and plays, `ADMIN_PASSWORD` authorizes nothing and the PIN opens locked libraries for the owner alone.
 
 The admin lock keeps what only an admin should do out of every other browser's reach. It is on in every browser until the admin password is entered there, and while it is on:
 
@@ -512,14 +533,16 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 | `AI_MATCH_EFFORT`             | `low`                          | How hard it thinks: `low`, `medium`, `high`, `xhigh` or `max` |
 | `AI_DAILY_LIMIT`              | `200`                          | AI lookups a day                             |
 | `LIBRARY_PIN`                 | unset                          | The PIN that opens locked libraries          |
-| `ADMIN_PASSWORD`              | unset                          | Turns the [admin lock](#admin-lock) off; 10 characters or more, mixing cases, a digit and a symbol. Unset or weaker, the lock stays on |
-| `RAVEN_MEDIA_ORIGINS`         | unset                          | Where the browser may fetch media from, best first: `kind:url` entries, comma separated, `kind` being `lan`, `tailnet` or `public`. https only, with no path; `http` is for `localhost`. Needs `RAVEN_MEDIA_SECRET` |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `RAVEN_WEB_URL` | unset | All three valid turn [accounts](#accounts) on (`ready`). Origins; HTTPS except on loopback; the key is a publishable one, never a service-role key. None set is `off`; some set is `unavailable` |
+| `RAVEN_ACCOUNTS`              | unset                          | Exactly `off`, with the three above unset, reopens a server that once enforced accounts to anonymous viewers. A security rollback; it logs a warning on every start |
+| `ADMIN_PASSWORD`              | unset                          | Turns the [admin lock](#admin-lock) off on a server without accounts; 10 characters or more, mixing cases, a digit and a symbol. Unset or weaker, the lock stays on. With accounts `ready` it does nothing |
+| `RAVEN_MEDIA_ORIGINS`         | unset                          | Where the browser may fetch media from, best first: `kind:url` entries, comma separated, `kind` being `lan`, `tailnet` or `public`. https only, with no path; `http` is for `localhost`. On a server without accounts it needs `RAVEN_MEDIA_SECRET` |
 | `RAVEN_WEB_ORIGINS`           | unset                          | Web app origins allowed to call the media routes cross-origin. One `*` is allowed, in the first hostname label only, anywhere in it, standing for one or more characters other than a dot (`https://deploy-preview-*--raven-player.netlify.app`); `http` is for `localhost` |
-| `RAVEN_MEDIA_SECRET`          | unset                          | Signs media tickets: 32 random bytes or more, base64. Rotating it ends every ticket |
+| `RAVEN_MEDIA_SECRET`          | unset                          | Signs the media tickets of a server without accounts: 32 random bytes or more, base64. Rotating it ends every ticket. With accounts `ready` it signs nothing, opens nothing and is not warned about |
 
 ## Not there yet
 
-- No accounts. Everyone who reaches raven, on the LAN or through [Funnel](#public-through-tailscale-funnel), shares one set of progress, history and favourites; the [admin lock](#admin-lock) and the PIN are what keep the rest to you.
+- No per-account data. Everyone with an account shares one set of progress, plays, watched marks and favourites, and on a server without accounts everyone who reaches raven does; a later change separates them per account.
 - Picture subtitles (PGS, VobSub) would need burning in or OCR.
 - On VAAPI, HDR is converted to BT.709 on the GPU rather than tone mapped. That suits HLG; HDR10 (PQ) comes out flat.
 - No QSV; Intel GPUs go through VAAPI.

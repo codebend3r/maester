@@ -1,6 +1,6 @@
 # Supabase sign-in: raven first
 
-Date: 2026-10-17. Status: step 1 shipped (#237), step 2 shipped (#239), steps 3 and 4 (the web, #247) shipped, step 5 (raven player, #254) in review; later steps open, tracked in `docs/superpowers/plans/2026-10-17-supabase-sign-in.md`.
+Date: 2026-10-17. Status: step 1 shipped (#237), step 2 shipped (#239), steps 3 and 4 (the web, #247) shipped, step 5 (raven player, #254) in review, step 6 (enforcement, #255) built and in review, its plan at `docs/superpowers/plans/2026-10-18-raven-auth-enforcement.md`; later steps open, tracked in `docs/superpowers/plans/2026-10-17-supabase-sign-in.md`.
 
 ## Goal
 
