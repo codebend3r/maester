@@ -1,7 +1,14 @@
 import type { MediaTracks, SubtitleTrack } from '@raven/core'
 import type { QueueFs } from '@/main/downloads/downloadQueue'
 import type { PartFile, StreamFetch } from '@/main/downloads/fetchFile'
-import type { Access, AccessOutcome, MediaAccess } from '@/main/downloads/mediaAccess'
+import {
+  type Access,
+  ACCESS_KINDS,
+  type AccessOutcome,
+  type createMediaAccess,
+  type MediaAccess,
+} from '@/main/downloads/mediaAccess'
+import { HTTP_HEADERS } from '@/shared/httpHeaders'
 
 export const ORIGIN = 'http://192.168.1.5:3000'
 export const MINUTE = 60_000
@@ -77,7 +84,7 @@ export const fakeDisk = (seed: Record<string, number> = {}) => {
       if (unmakeable.has(path)) throw fsError({ code: 'EACCES', syscall: 'mkdir' })
       dirs.add(path)
     },
-    rename: async (from, to) => {
+    rename: async ({ from, to }) => {
       const chunks = files.get(from)
       if (chunks === undefined) throw fsError({ code: 'ENOENT', syscall: 'rename' })
       files.delete(from)
@@ -107,7 +114,7 @@ export const fakeDisk = (seed: Record<string, number> = {}) => {
       if (!files.has(path)) files.set(path, [])
       return partAt(path)
     },
-    writeFile: async (path, text) => {
+    writeFile: async ({ path, text }) => {
       needsFolder(path)
       texts.set(path, text)
     },
@@ -148,25 +155,65 @@ export const whole = (chunks: Uint8Array[]): ReadableStream<Uint8Array> =>
     },
   })
 
+/** A body that sends `chunks` and then breaks, the way a response the server ends mid-file does. */
+export const brokenBody = (chunks: Uint8Array[]): ReadableStream<Uint8Array> => {
+  const sent = { count: 0 }
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      const next = chunks[sent.count]
+      if (next === undefined) {
+        controller.error(new TypeError('terminated'))
+        return
+      }
+      sent.count += 1
+      controller.enqueue(next)
+    },
+  })
+}
+
 const rangeStartOf = (headers: Record<string, string>): number =>
   Number(/^bytes=(\d+)-$/u.exec(headers.Range ?? '')?.[1] ?? 0)
 
 /**
- * A file of `size` bytes served from the request's `Range`, 206 for a range and 200 for
- * the whole: `sent` of the bytes asked for arrive, then the body ends when `isEnding`, or
- * waits.
+ * A file of `size` bytes served from the request's `Range`, 206 for a range and 200 for the
+ * whole, with the length of the rest promised: `sent` of the bytes asked for go into the body
+ * `bodyOf` makes.
  */
+const answerFrom = ({
+  request,
+  size,
+  sent,
+  bodyOf,
+}: {
+  request: FetchRequest
+  size: number
+  sent: number
+  bodyOf: (chunks: Uint8Array[]) => ReadableStream<Uint8Array>
+}): Answer => {
+  const from = rangeStartOf(request.headers)
+  const length = Math.min(sent, size - from)
+  const body = bodyOf(length > 0 ? [new Uint8Array(length)] : [])
+  const promised = { [HTTP_HEADERS.contentLength]: String(size - from) }
+  return from === 0
+    ? { status: 200, headers: promised, body }
+    : {
+        status: 206,
+        headers: { ...promised, [HTTP_HEADERS.contentRange]: `bytes ${from}-${size - 1}/${size}` },
+        body,
+      }
+}
+
+/** `sent` of the bytes asked for arrive, then the body ends when `isEnding`, or waits. */
 export const serving =
   ({ size, sent = size, isEnding = true }: { size: number; sent?: number; isEnding?: boolean }) =>
-  (request: FetchRequest): Answer => {
-    const from = rangeStartOf(request.headers)
-    const length = Math.min(sent, size - from)
-    const chunks = length > 0 ? [new Uint8Array(length)] : []
-    const body = isEnding ? whole(chunks) : held(chunks)
-    return from === 0
-      ? { status: 200, body }
-      : { status: 206, headers: { 'content-range': `bytes ${from}-${size - 1}/${size}` }, body }
-  }
+  (request: FetchRequest): Answer =>
+    answerFrom({ request, size, sent, bodyOf: isEnding ? whole : held })
+
+/** `sent` of the bytes asked for arrive, then the server ends the response mid-file. */
+export const cutting =
+  ({ size, sent }: { size: number; sent: number }) =>
+  (request: FetchRequest): Answer =>
+    answerFrom({ request, size, sent, bodyOf: brokenBody })
 
 /** Answers each call with the next of `answers`, the last one for every call after. */
 export const inTurn = <T>(answers: readonly T[]): (() => T) => {
@@ -222,15 +269,29 @@ export const ticketFor = ({
 
 export const COOKIE_ACCESS: AccessOutcome = { ok: true, access: { kind: 'cookie' } }
 
+/** An account ticket on the media origin, as a server whose accounts are ready answers. */
+export const accountTicket = (ticket = 'account.one'): AccessOutcome => ({
+  ok: true,
+  access: { kind: ACCESS_KINDS.account, url: ORIGIN, ticket },
+})
+
+/** `createMediaAccess`'s accounts for a server whose accounts are off: it never mints. */
+export const NO_ACCOUNTS = {
+  isReady: async () => false,
+  tickets: {
+    ticketFor: async () => {
+      throw new Error('a server without accounts mints no account ticket')
+    },
+  },
+} as const satisfies Pick<Parameters<typeof createMediaAccess>[0], 'isReady' | 'tickets'>
+
 /** Media access answered by `answer`; every read and every forget is recorded. */
-export const fakeAccess = (
-  answer: (input: { serverId: string; mediaId: number }) => Promise<AccessOutcome>,
-) => {
+export const fakeAccess = (answer: MediaAccess['accessFor']) => {
   const asked: { serverId: string; mediaId: number }[] = []
   const forgotten: string[] = []
   const access: MediaAccess = {
     accessFor: async (input) => {
-      asked.push(input)
+      asked.push({ serverId: input.serverId, mediaId: input.mediaId })
       return answer(input)
     },
     forget: (serverId) => {

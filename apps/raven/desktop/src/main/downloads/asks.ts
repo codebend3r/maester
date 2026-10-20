@@ -23,12 +23,14 @@ import { downloadsDirFor, fits, readSpace, type SpaceFs } from '@/main/downloads
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { serverById } from '@/main/servers/serverList'
 import {
+  ACCOUNT_STATES,
   DESKTOP_EVENTS,
   DESKTOP_REPLIES,
   DOWNLOAD_ASK_KINDS,
   DOWNLOAD_STATUS_KINDS,
   isContainerName,
   SERVER_GONE,
+  type AccountView,
   type DesktopEvent,
   type DesktopReply,
   type DownloadAskStatus,
@@ -51,6 +53,10 @@ export type DownloadAsksDeps = {
   change: (apply: (state: DownloadsState) => DownloadsState) => void
   /** The downloads as the page reads them, which a confirmation answers. */
   list: () => DesktopReply
+  /** Whether the server's accounts are ready, read as playback reads it. Never rejects. */
+  isReady: (server: { id: string; name: string }) => Promise<boolean>
+  /** The server's account as the page may see it. */
+  readAccount: (serverId: string) => Promise<AccountView>
 }
 
 export type DownloadAsks = {
@@ -68,6 +74,13 @@ type HeldAsk = { serverId: string; target: DownloadTarget; expansion: Expansion;
 type Server = { serverId: string; serverName: string }
 
 const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
+
+/** The account states that keep a server's titles back until the person signs in or is let in. */
+const HELD_BACK: ReadonlySet<AccountView['state']> = new Set([
+  ACCOUNT_STATES.signedOut,
+  ACCOUNT_STATES.pending,
+  ACCOUNT_STATES.revoked,
+])
 
 /**
  * Each file becomes `<mediaId>/video.<container>` on disk, so both must be safe to name a file
@@ -179,12 +192,67 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
       case EXPAND_REASONS.unreachable:
       case EXPAND_REASONS.tooMany:
       case EXPAND_REASONS.unreadable:
+      // An account held back is asked for before this; one main reads as let in is refused with why.
+      case EXPAND_REASONS.account:
         return { ok: false, message: expansion.message }
       default: {
         const unreachable: never = expansion.reason
         return unreachable
       }
     }
+  }
+
+  /**
+   * The account that keeps the server's titles back, or null. One that cannot be read is no reason
+   * to hold the ask: the server refuses what the account may not have, and that is asked for then.
+   */
+  const heldBackAccount = async (serverId: string): Promise<AccountView | null> => {
+    const account = await deps.readAccount(serverId).catch(() => null)
+    return account !== null && HELD_BACK.has(account.state) ? account : null
+  }
+
+  const askReply = ({
+    askId,
+    server,
+    status,
+  }: {
+    askId: string
+    server: Server
+    status: DownloadAskStatus
+  }): DesktopReply => ({
+    type: DESKTOP_REPLIES.downloadAsk,
+    ask: {
+      askId,
+      serverId: server.serverId,
+      serverName: server.serverName,
+      autoDelete: store.read().autoDeleteDefault,
+      status,
+    },
+  })
+
+  /** Holds the ask until the account is let in; a confirmation meanwhile is refused with why. */
+  const holdForAccount = ({
+    askId,
+    server,
+    target,
+    account,
+  }: {
+    askId: string
+    server: Server
+    target: DownloadTarget
+    account: AccountView
+  }): DesktopReply => {
+    const expansion: Expansion = {
+      ok: false,
+      reason: EXPAND_REASONS.account,
+      message: EXPAND_MESSAGES.account(server.serverName),
+    }
+    asks.set(askId, { serverId: server.serverId, target, expansion, at: now() })
+    return askReply({
+      askId,
+      server,
+      status: { kind: DOWNLOAD_ASK_KINDS.account, account },
+    })
   }
 
   /** Expands `target` and holds it under `askId`; a refusal holds nothing, so a retry of it is gone. */
@@ -198,29 +266,32 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     target: DownloadTarget
   }): Promise<DesktopReply> => {
     const { serverId, serverName } = server
+    // As the web does, raven player asks for an approved account first, whether or not the server
+    // enforces it yet.
+    const isReady = await deps.isReady({ id: serverId, name: serverName })
+    const account = isReady ? await heldBackAccount(serverId) : null
+    if (account !== null) return holdForAccount({ askId, server, target, account })
     const expansion = await expandTarget({
       calls: deps.calls,
       serverId,
       serverName,
+      hasAccounts: isReady,
       target,
       skip: (mediaId) => entryByMedia(store.read(), { serverId, mediaId }) !== null,
     })
+    if (!expansion.ok && expansion.reason === EXPAND_REASONS.account) {
+      const refusedAccount = await heldBackAccount(serverId)
+      if (refusedAccount !== null) {
+        return holdForAccount({ askId, server, target, account: refusedAccount })
+      }
+    }
     const outcome = await statusOf({ expansion, serverName })
     if (!outcome.ok) {
       asks.delete(askId)
       return refused(outcome.message)
     }
     asks.set(askId, { serverId, target, expansion, at: now() })
-    return {
-      type: DESKTOP_REPLIES.downloadAsk,
-      ask: {
-        askId,
-        serverId,
-        serverName,
-        autoDelete: store.read().autoDeleteDefault,
-        status: outcome.status,
-      },
-    }
+    return askReply({ askId, server, status: outcome.status })
   }
 
   const ask: DownloadAsks['ask'] = async ({ serverId, target }) => {
@@ -247,7 +318,7 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     const held = asks.get(askId)
     if (held === undefined) return refused(DOWNLOAD_MESSAGES.askGone)
     const { expansion } = held
-    // A locked ask waits for its retry; the page offers no Download until then.
+    // A locked ask, or one waiting on its account, waits for its retry; the page offers no Download until then.
     if (!expansion.ok) return refused(expansion.message)
     const server = serverOf(held.serverId)
     asks.delete(askId)

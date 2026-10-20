@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'bun:test'
-import { LOCKED_STATUS, type MediaItem, type Saga } from '@raven/core'
+import {
+  ADMIN_LOCK_STATES,
+  AUTH_REFUSALS,
+  DOWNLOAD_TARGET_KINDS,
+  ITEM_TYPES,
+  LOCKED_STATUS,
+  type MediaItem,
+  type Saga,
+} from '@raven/core'
 import {
   DOWNLOAD_MAX_FILES,
   EXPAND_MESSAGES,
   episodeLabel,
   expandTarget,
   type Expansion,
+  EXPAND_REASONS,
 } from '@/main/downloads/expand'
 import {
   details,
@@ -19,6 +28,7 @@ import {
   summary,
   type Reply,
 } from '@/main/test/serverFakes'
+import { CALL_NAMES } from '@/main/servers/allowlist'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
@@ -38,22 +48,26 @@ const failed = (expansion: Expansion) => {
 }
 
 const library1 = {
-  [keyOf({ name: 'getLibrary', libraryId: 1 })]: ok(library({ id: 1, watchedPercent: 90 })),
+  [keyOf({ name: CALL_NAMES.getLibrary, libraryId: 1 })]: ok(
+    library({ id: 1, watchedPercent: 90 }),
+  ),
 }
 
-const itemCall = (itemId: number): string => keyOf({ name: 'getItem', itemId })
-const mediaCall = (mediaId: number): string => keyOf({ name: 'getMedia', mediaId })
-const sagasCall = keyOf({ name: 'getSagas', libraryId: 1 })
-const adminCall = keyOf({ name: 'getAdminLock' })
+const itemCall = (itemId: number): string => keyOf({ name: CALL_NAMES.getItem, itemId })
+const mediaCall = (mediaId: number): string => keyOf({ name: CALL_NAMES.getMedia, mediaId })
+const sagasCall = keyOf({ name: CALL_NAMES.getSagas, libraryId: 1 })
+const adminCall = keyOf({ name: CALL_NAMES.getAdminLock })
 
 const run = ({
   replies,
   target,
   skip = () => false,
+  hasAccounts = false,
 }: {
   replies: Record<string, Reply>
   target: Parameters<typeof expandTarget>[0]['target']
   skip?: (mediaId: number) => boolean
+  hasAccounts?: boolean
 }) => {
   const { calls, log } = fakeCalls({ ...library1, ...replies })
   return {
@@ -64,6 +78,7 @@ const run = ({
       serverName: SERVER_NAME,
       target,
       skip,
+      hasAccounts,
     }),
   }
 }
@@ -79,6 +94,7 @@ describe('constants', () => {
     expect(EXPAND_MESSAGES.unreadable('Vhagar')).toBe(
       'Vhagar answered with something raven player could not read.',
     )
+    expect(EXPAND_MESSAGES.account('Vhagar')).toBe('Vhagar did not let your account download that.')
   })
 })
 
@@ -119,7 +135,7 @@ describe('expandTarget', () => {
         watchedPercent: 90,
       },
     ])
-    expect(log).toEqual([mediaCall(9), keyOf({ name: 'getLibrary', libraryId: 1 })])
+    expect(log).toEqual([mediaCall(9), keyOf({ name: CALL_NAMES.getLibrary, libraryId: 1 })])
   })
 
   it('makes an episode file an episode of its show', async () => {
@@ -517,7 +533,9 @@ describe('expandTarget', () => {
   it('reads a library once for two episodes of it, and each library on its own', async () => {
     const { expansion, log } = run({
       replies: {
-        [keyOf({ name: 'getLibrary', libraryId: 2 })]: ok(library({ id: 2, watchedPercent: 80 })),
+        [keyOf({ name: CALL_NAMES.getLibrary, libraryId: 2 })]: ok(
+          library({ id: 2, watchedPercent: 80 }),
+        ),
         [itemCall(5)]: ok(
           details({
             id: 5,
@@ -543,8 +561,12 @@ describe('expandTarget', () => {
     })
     const result = succeeded(await expansion)
     expect(result.files.map(({ watchedPercent }) => watchedPercent)).toEqual([90, 90, 80])
-    expect(log.filter((key) => key === keyOf({ name: 'getLibrary', libraryId: 1 }))).toHaveLength(1)
-    expect(log.filter((key) => key === keyOf({ name: 'getLibrary', libraryId: 2 }))).toHaveLength(1)
+    expect(
+      log.filter((key) => key === keyOf({ name: CALL_NAMES.getLibrary, libraryId: 1 })),
+    ).toHaveLength(1)
+    expect(
+      log.filter((key) => key === keyOf({ name: CALL_NAMES.getLibrary, libraryId: 2 })),
+    ).toHaveLength(1)
   })
 
   it('answers locked for a 423', async () => {
@@ -581,6 +603,38 @@ describe('expandTarget', () => {
     expect(failed(await expansion).reason).toBe('hidden')
   })
 
+  it('answers gone for a 404 on a server with accounts, without asking for its admin lock', async () => {
+    const { expansion, log } = run({
+      replies: { [adminCall]: ok({ state: ADMIN_LOCK_STATES.on, available: true }) },
+      target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 5 },
+      hasAccounts: true,
+    })
+    const result = failed(await expansion)
+    expect(result.reason).toBe(EXPAND_REASONS.gone)
+    expect(result.message).toBe(EXPAND_MESSAGES.gone(SERVER_NAME))
+    expect(log).not.toContain(adminCall)
+  })
+
+  it('answers gone for a title deep in a show on a server with accounts', async () => {
+    const { expansion, log } = run({
+      replies: {
+        [itemCall(4)]: ok(
+          details({
+            id: 4,
+            type: ITEM_TYPES.show,
+            title: 'Severance',
+            children: [season({ id: 5, number: 1 })],
+          }),
+        ),
+        [adminCall]: ok({ state: ADMIN_LOCK_STATES.on, available: true }),
+      },
+      target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 4 },
+      hasAccounts: true,
+    })
+    expect(failed(await expansion).reason).toBe(EXPAND_REASONS.gone)
+    expect(log).not.toContain(adminCall)
+  })
+
   it('answers gone for a 404 while the admin lock is off, cannot be lifted or does not answer', async () => {
     const off = run({
       replies: { [adminCall]: ok({ state: 'off' }) },
@@ -614,6 +668,38 @@ describe('expandTarget', () => {
     expect(result.message).toBe('raven player could not reach Vhagar.')
   })
 
+  it.each([
+    [401, AUTH_REFUSALS.signedOut],
+    [403, AUTH_REFUSALS.pending],
+    [403, AUTH_REFUSALS.revoked],
+    [403, AUTH_REFUSALS.notOwner],
+  ])('answers account for a %i refusing the account as %s', async (status, reason) => {
+    const { expansion } = run({
+      replies: { [itemCall(5)]: { status, body: { reason, message: 'Sign in.' } } },
+      target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 5 },
+    })
+    expect(failed(await expansion)).toEqual({
+      ok: false,
+      reason: EXPAND_REASONS.account,
+      message: EXPAND_MESSAGES.account(SERVER_NAME),
+    })
+  })
+
+  it('answers unreachable for a 401 or 403 that names no account refusal', async () => {
+    const bare = run({
+      replies: { [itemCall(5)]: { status: 401, body: '' } },
+      target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 5 },
+    })
+    expect(failed(await bare.expansion).reason).toBe(EXPAND_REASONS.unreachable)
+    const down = run({
+      replies: {
+        [itemCall(5)]: { status: 403, body: { reason: AUTH_REFUSALS.unavailable, message: 'x' } },
+      },
+      target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 5 },
+    })
+    expect(failed(await down.expansion).reason).toBe(EXPAND_REASONS.unreachable)
+  })
+
   it('answers unreachable for a server error', async () => {
     const { expansion } = run({
       replies: { [itemCall(5)]: { status: 500, body: '' } },
@@ -643,13 +729,14 @@ describe('expandTarget', () => {
   it('answers unreadable when the library cannot be read', async () => {
     const { calls } = fakeCalls({
       [mediaCall(9)]: ok(mediaItemFor({ id: 9 })),
-      [keyOf({ name: 'getLibrary', libraryId: 1 })]: ok({ id: 1 }),
+      [keyOf({ name: CALL_NAMES.getLibrary, libraryId: 1 })]: ok({ id: 1 }),
     })
     const result = failed(
       await expandTarget({
         calls,
         serverId: SERVER_ID,
         serverName: SERVER_NAME,
+        hasAccounts: false,
         target: { kind: 'media', mediaId: 9 },
         skip: () => false,
       }),

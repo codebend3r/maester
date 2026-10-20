@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { MEDIA_PROBE_BYTES, type MediaTracks } from '@raven/core'
+import { AUTH_REFUSALS, MEDIA_PROBE_BYTES, type MediaTracks } from '@raven/core'
+import { CALL_NAMES } from '@/main/servers/allowlist'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
@@ -8,32 +9,43 @@ import {
   OUTAGE_RETRY_MS,
   RENEWAL_MIN_MS,
   RESUME_SETTLE_MS,
-  SIDECAR_MAX_BYTES,
 } from '@/main/downloads/downloadQueue'
+import { SIDECAR_MAX_BYTES } from '@/main/downloads/sidecarDownload'
 import {
   EMPTY_DOWNLOADS,
   entryById,
   NO_PENDING,
   type DownloadEntry,
   type DownloadsState,
+  FAIL_REASONS,
+  PAUSE_REASONS,
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import { DOWNLOAD_STALL_MS } from '@/main/downloads/fetchFile'
 import {
   createMediaAccess,
+  DOWNLOAD_MINTS,
   type AccessOutcome,
+  type MediaAccess,
   type ProbeFetch,
+  ACCESS_REFUSALS,
+  ACCESS_KINDS,
 } from '@/main/downloads/mediaAccess'
 import { SPACE_RESERVE_BYTES } from '@/main/downloads/space'
+import { ACCOUNT_TICKET_RENEW_MS, TICKET_OUTCOMES } from '@/main/servers/accountTickets'
 import {
+  accountTicket,
   COOKIE_ACCESS,
+  cutting,
   fakeAccess,
   fakeDisk,
   fakeNetwork,
   fsError,
+  held,
   inTurn,
   MINUTE,
+  NO_ACCOUNTS,
   ORIGIN,
   serving,
   subtitleTrack,
@@ -46,6 +58,8 @@ import {
 } from '@/main/test/downloadFakes'
 import { fakeTimers } from '@/main/test/playerFakes'
 import { fakeCalls, keyOf, ok, type Reply } from '@/main/test/serverFakes'
+import { HTTP_STATUSES } from '@/shared/httpStatuses'
+import { DOWNLOAD_STATUS_KINDS } from '@/shared/protocol'
 
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
 const OTHER_SERVER_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
@@ -58,8 +72,8 @@ const BLOCK = 4096
 const HOUR = 60 * MINUTE
 
 const SERVERS: ServerEntry[] = [
-  { id: SERVER_ID, origin: 'https://vhagar.example', name: 'Vhagar', addedAt: 1 },
-  { id: OTHER_SERVER_ID, origin: 'https://syrax.example', name: 'Syrax', addedAt: 2 },
+  { id: SERVER_ID, origin: 'https://vhagar.example', name: 'Vhagar', addedAt: 1, signIn: null },
+  { id: OTHER_SERVER_ID, origin: 'https://syrax.example', name: 'Syrax', addedAt: 2, signIn: null },
 ]
 
 /** Every origin answers its ping with the whole body at once. */
@@ -88,7 +102,7 @@ const entryFor = (n: number, overrides: Partial<DownloadEntry> = {}): DownloadEn
   duration: 3000,
   watchedPercent: 90,
   sidecars: [],
-  status: { kind: 'queued' },
+  status: { kind: DOWNLOAD_STATUS_KINDS.queued },
   autoDelete: false,
   watchedAt: null,
   serverPosition: 0,
@@ -111,7 +125,12 @@ const memoryStore = (initial: DownloadsState): DownloadsStore => {
 
 const FAR_TICKET = ticketFor({ ticket: 'one', renewAt: NOW + 6 * HOUR })
 
-const failedUnreachable = { kind: 'failed', bytes: 0, reason: 'unreachable', message: '' } as const
+const failedUnreachable = {
+  kind: DOWNLOAD_STATUS_KINDS.failed,
+  bytes: 0,
+  reason: FAIL_REASONS.unreachable,
+  message: '',
+} as const
 
 const LOCKED: AccessOutcome = {
   ok: false,
@@ -129,7 +148,7 @@ const setup = ({
 }: {
   entries?: DownloadEntry[]
   free?: number
-  access?: (input: { serverId: string; mediaId: number }) => Promise<AccessOutcome>
+  access?: MediaAccess['accessFor']
   disk?: Record<string, number>
   tracks?: MediaTracks
   servers?: ServerEntry[]
@@ -140,7 +159,7 @@ const setup = ({
   const network = fakeNetwork()
   const media = fakeAccess(access)
   const table: Record<string, Reply> = Object.fromEntries(
-    entries.map(({ mediaId }) => [keyOf({ name: 'getTracks', mediaId }), ok(tracks)]),
+    entries.map(({ mediaId }) => [keyOf({ name: CALL_NAMES.getTracks, mediaId }), ok(tracks)]),
   )
   const { calls } = fakeCalls(table)
   const finished: DownloadEntry[] = []
@@ -148,6 +167,7 @@ const setup = ({
   const dropped: (readonly DownloadEntry[])[] = []
   const warnings: string[] = []
   const wakes = { settled: 0 }
+  const toldAccounts: string[] = []
   const queue = createDownloadQueue({
     store,
     serverOf: (serverId) => servers.find((server) => server.id === serverId) ?? null,
@@ -170,6 +190,9 @@ const setup = ({
     onAwake: () => {
       wakes.settled += 1
     },
+    accountChanged: async (serverId) => {
+      toldAccounts.push(serverId)
+    },
   })
   const statusOf = (n: number) => entryById(store.read(), { downloadId: idOf(n) })?.status ?? null
   /** Runs the timers set for `ms`, and only those. */
@@ -190,6 +213,7 @@ const setup = ({
     dropped,
     warnings,
     wakes,
+    toldAccounts,
     pending,
     statusOf,
     fireAfter,
@@ -215,9 +239,9 @@ describe('kick', () => {
     world.queue.kick()
     await ticks(10)
     expect(world.network.fileRequests().map(({ url }) => url)).toEqual([fileUrl(1), fileUrl(2)])
-    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 0 })
-    expect(world.statusOf(2)).toEqual({ kind: 'downloading', bytes: 0 })
-    expect(world.statusOf(3)).toEqual({ kind: 'queued' })
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 })
+    expect(world.statusOf(2)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 })
+    expect(world.statusOf(3)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.queued })
   })
 
   it('fetches from the media origin with the ticket, through the origin fetch', async () => {
@@ -249,7 +273,14 @@ describe('kick', () => {
     const world = setup({
       entries: [
         entryFor(1, { status: { kind: 'paused', bytes: 0, reason: 'viewer' } }),
-        entryFor(2, { status: { kind: 'failed', bytes: 0, reason: 'other', message: 'x' } }),
+        entryFor(2, {
+          status: {
+            kind: DOWNLOAD_STATUS_KINDS.failed,
+            bytes: 0,
+            reason: FAIL_REASONS.other,
+            message: 'x',
+          },
+        }),
         entryFor(3, { status: { kind: 'ready' } }),
       ],
     })
@@ -281,8 +312,13 @@ describe('space', () => {
       ],
     })
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'failed')
-    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, reason: 'noSpace', message: '' })
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
+    expect(world.statusOf(1)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.failed,
+      bytes: 0,
+      reason: FAIL_REASONS.noSpace,
+      message: '',
+    })
     expect(world.statusOf(2)).toEqual({ kind: 'paused', bytes: 0, reason: 'noSpace' })
     await until(() => world.network.fileRequests().length === 2)
     expect(world.network.fileRequests().map(({ url }) => url)).toEqual([fileUrl(5), fileUrl(6)])
@@ -296,7 +332,12 @@ describe('space', () => {
       entries: [
         entryFor(1, {
           size: 12_288,
-          status: { kind: 'failed', bytes: 8192, reason: 'noSpace', message: '' },
+          status: {
+            kind: DOWNLOAD_STATUS_KINDS.failed,
+            bytes: 8192,
+            reason: FAIL_REASONS.noSpace,
+            message: '',
+          },
         }),
       ],
       disk: { [partOf(1)]: 8192 },
@@ -305,7 +346,7 @@ describe('space', () => {
     world.queue.retry({ downloadId: idOf(1) })
     await until(() => world.network.fileRequests().length === 1)
     expect(world.network.fileRequests()[0]?.headers).toEqual({ Range: 'bytes=8192-' })
-    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 8192 })
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 8192 })
   })
 
   it('stops a file of the group that was still reading its ticket, which stays paused', async () => {
@@ -316,7 +357,7 @@ describe('space', () => {
       access: ({ mediaId }) => (mediaId === 2 ? ticket.promise : Promise.resolve(FAR_TICKET)),
     })
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'failed')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
     expect(world.statusOf(2)).toEqual({ kind: 'paused', bytes: 0, reason: 'noSpace' })
     ticket.resolve(FAR_TICKET)
     await ticks(10)
@@ -333,17 +374,25 @@ describe('space', () => {
       ],
     })
     world.queue.kick()
-    await until(() => world.statusOf(2)?.kind === 'failed')
+    await until(() => (world.statusOf(2)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
     await ticks(10)
     expect(world.network.fileRequests().map(({ url }) => url)).toEqual([fileUrl(1)])
-    expect(world.statusOf(2)).toEqual({ kind: 'failed', bytes: 0, reason: 'noSpace', message: '' })
+    expect(world.statusOf(2)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.failed,
+      bytes: 0,
+      reason: FAIL_REASONS.noSpace,
+      message: '',
+    })
   })
 
   it('counts only what the running file still lacks, so a file whose part is nearly whole leaves room', async () => {
     const world = setup({
       free: SPACE_RESERVE_BYTES + 10,
       entries: [
-        entryFor(1, { group: MOVIE, status: { kind: 'downloading', bytes: 6 } }),
+        entryFor(1, {
+          group: MOVIE,
+          status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 6 },
+        }),
         entryFor(2, { group: { ...MOVIE, key: 'movie:91', title: 'Arrival (2016)' } }),
       ],
       disk: { [partOf(1)]: 6 },
@@ -351,7 +400,7 @@ describe('space', () => {
     world.network.answers.file = serving({ size: 8, sent: 0, isEnding: false })
     world.queue.kick()
     await until(() => world.network.fileRequests().length === 2)
-    expect(world.statusOf(2)).toEqual({ kind: 'downloading', bytes: 0 })
+    expect(world.statusOf(2)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 })
   })
 
   it('still fails a file with no part that needs more than that', async () => {
@@ -360,7 +409,7 @@ describe('space', () => {
       entries: [entryFor(1, { size: 12_288 })],
     })
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'failed')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
     expect(world.network.fileRequests()).toEqual([])
   })
 
@@ -369,8 +418,13 @@ describe('space', () => {
     world.network.answers.file = serving({ size: 8 })
     world.drive.appendError.value = fsError({ code: 'ENOSPC', syscall: 'write' })
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'failed')
-    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, reason: 'noSpace', message: '' })
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
+    expect(world.statusOf(1)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.failed,
+      bytes: 0,
+      reason: FAIL_REASONS.noSpace,
+      message: '',
+    })
     expect(world.drive.files.has(partOf(1))).toBe(true)
   })
 })
@@ -400,7 +454,7 @@ describe('a relock', () => {
     })
     world.network.answers.file = () => refused(423)
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'paused')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.paused)
     expect(world.statusOf(1)).toEqual({ kind: 'paused', bytes: 0, reason: 'relocked' })
     expect(world.network.fileRequests().map(({ url }) => url)).toEqual([
       fileUrl(1),
@@ -423,8 +477,8 @@ describe('resuming after a relock', () => {
     })
     world.queue.resume({ downloadId: idOf(2) })
     expect([1, 2, 3, 5].map(world.statusOf)).toEqual([
-      { kind: 'queued' },
-      { kind: 'queued' },
+      { kind: DOWNLOAD_STATUS_KINDS.queued },
+      { kind: DOWNLOAD_STATUS_KINDS.queued },
       { kind: 'paused', bytes: 0, reason: 'viewer' },
       relocked,
     ])
@@ -440,7 +494,7 @@ describe('resuming after a relock', () => {
     })
     world.queue.resume({ downloadId: idOf(1) })
     expect([1, 2].map(world.statusOf)).toEqual([
-      { kind: 'queued' },
+      { kind: DOWNLOAD_STATUS_KINDS.queued },
       { kind: 'paused', bytes: 0, reason: 'viewer' },
     ])
   })
@@ -479,9 +533,9 @@ describe('an outage', () => {
     expect(world.drive.files.has(partOf(1))).toBe(true)
     world.queue.resumeAll()
     expect([1, 2, 3].map(world.statusOf)).toEqual([
-      expect.objectContaining({ kind: 'failed' }),
-      { kind: 'queued' },
-      { kind: 'queued' },
+      expect.objectContaining({ kind: DOWNLOAD_STATUS_KINDS.failed }),
+      { kind: DOWNLOAD_STATUS_KINDS.queued },
+      { kind: DOWNLOAD_STATUS_KINDS.queued },
     ])
   })
 
@@ -498,7 +552,7 @@ describe('an outage', () => {
     world.queue.kick()
     await until(() => world.drive.sizeOf(partOf(1)) === 2)
     second.resolve(FAR_TICKET)
-    await until(() => world.statusOf(1)?.kind === 'paused')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.paused)
     expect(world.statusOf(1)).toEqual({ kind: 'paused', bytes: 2, reason: 'unreachable' })
   })
 
@@ -518,10 +572,12 @@ describe('an outage', () => {
 
   it('pauses the rest of the server when its ticket read answers 502', async () => {
     const { calls } = fakeCalls({
-      [keyOf({ name: 'getMediaOrigins' })]: ok({ origins: [{ kind: 'lan', url: ORIGIN }] }),
+      [keyOf({ name: CALL_NAMES.getMediaOrigins })]: ok({
+        origins: [{ kind: 'lan', url: ORIGIN }],
+      }),
       ...Object.fromEntries(
         [1, 2, 3].map((mediaId) => [
-          keyOf({ name: 'getMediaTicket', mediaId }),
+          keyOf({ name: CALL_NAMES.getMediaTicket, mediaId }),
           { status: 502, body: '' },
         ]),
       ),
@@ -532,6 +588,8 @@ describe('an outage', () => {
       probe: wholePing,
       probeClock: () => 0,
       now: () => NOW,
+      timers: fakeTimers().timers,
+      ...NO_ACCOUNTS,
       warn: () => undefined,
     })
     const world = setup({
@@ -554,7 +612,7 @@ describe('an outage', () => {
     world.network.answers.file = (request) =>
       request.serverId === SERVER_ID ? refused(503) : serving({ size: 8 })(request)
     world.queue.kick()
-    await until(() => world.statusOf(5)?.kind === 'ready')
+    await until(() => (world.statusOf(5)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
     expect(world.statusOf(1)).toEqual(failedUnreachable)
     expect(world.statusOf(2)).toEqual(waiting)
     expect(world.statusOf(3)).toEqual(waiting)
@@ -571,21 +629,28 @@ describe('pause, resume and retry', () => {
     })
     world.network.answers.file = serving({ size: 8, sent: 0, isEnding: false })
     world.queue.resume({ downloadId: idOf(1) })
-    expect(world.statusOf(1)).toEqual({ kind: 'queued' })
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.queued })
     await until(() => world.network.fileRequests().length === 1)
     expect(world.network.fileRequests()[0]?.headers).toEqual({ Range: 'bytes=4-' })
-    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 4 })
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 4 })
   })
 
   it('retries a failed file', async () => {
     const world = setup({
       entries: [
-        entryFor(1, { status: { kind: 'failed', bytes: 0, reason: 'other', message: 'x' } }),
+        entryFor(1, {
+          status: {
+            kind: DOWNLOAD_STATUS_KINDS.failed,
+            bytes: 0,
+            reason: FAIL_REASONS.other,
+            message: 'x',
+          },
+        }),
       ],
     })
     world.queue.retry({ downloadId: idOf(1) })
     await until(() => world.network.fileRequests().length === 1)
-    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 0 })
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 })
   })
 
   it('keeps the bytes a paused file had written, as many as its part holds', async () => {
@@ -593,7 +658,7 @@ describe('pause, resume and retry', () => {
     world.network.answers.file = serving({ size: 8, sent: 5, isEnding: false })
     world.queue.kick()
     await until(() => world.drive.sizeOf(partOf(1)) === 5)
-    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 0 })
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 })
     await world.queue.pause({ downloadId: idOf(1) })
     expect(world.statusOf(1)).toEqual({ kind: 'paused', bytes: 5, reason: 'viewer' })
   })
@@ -626,20 +691,34 @@ describe('pause, resume and retry', () => {
     const world = setup({
       entries: [
         entryFor(1, { status: { kind: 'paused', bytes: 0, reason: 'viewer' } }),
-        entryFor(2, { status: { kind: 'failed', bytes: 0, reason: 'other', message: 'x' } }),
+        entryFor(2, {
+          status: {
+            kind: DOWNLOAD_STATUS_KINDS.failed,
+            bytes: 0,
+            reason: FAIL_REASONS.other,
+            message: 'x',
+          },
+        }),
       ],
     })
     world.queue.resumeAll()
-    expect(world.statusOf(1)).toEqual({ kind: 'queued' })
-    expect(world.statusOf(2)).toEqual({ kind: 'failed', bytes: 0, reason: 'other', message: 'x' })
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.queued })
+    expect(world.statusOf(2)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.failed,
+      bytes: 0,
+      reason: FAIL_REASONS.other,
+      message: 'x',
+    })
   })
 })
 
 describe('the ticket', () => {
   it("renews the server's ticket 5 h 50 m after reading it, and fetches on from the bytes on disk", async () => {
-    const ticketKey = keyOf({ name: 'getMediaTicket', mediaId: 1 })
+    const ticketKey = keyOf({ name: CALL_NAMES.getMediaTicket, mediaId: 1 })
     const table: Record<string, Reply> = {
-      [keyOf({ name: 'getMediaOrigins' })]: ok({ origins: [{ kind: 'lan', url: ORIGIN }] }),
+      [keyOf({ name: CALL_NAMES.getMediaOrigins })]: ok({
+        origins: [{ kind: 'lan', url: ORIGIN }],
+      }),
       // As the server writes it: epoch milliseconds, six hours on.
       [ticketKey]: ok({ ticket: 'one', expiresAt: NOW + 6 * HOUR }),
     }
@@ -649,6 +728,8 @@ describe('the ticket', () => {
       probe: wholePing,
       probeClock: () => 0,
       now: () => NOW,
+      timers: fakeTimers().timers,
+      ...NO_ACCOUNTS,
       warn: () => undefined,
     })
     const world = setup({ entries: [entryFor(1)], access: media.accessFor })
@@ -663,7 +744,7 @@ describe('the ticket', () => {
     const [first, second] = world.network.fileRequests()
     expect(first?.signal.aborted).toBe(true)
     expect(second).toMatchObject({ url: fileUrl(1, 'two'), headers: { Range: 'bytes=4-' } })
-    expect(world.statusOf(1)?.kind).toBe('downloading')
+    expect(world.statusOf(1)?.kind ?? null).toBe(DOWNLOAD_STATUS_KINDS.downloading)
     expect(world.failed).toEqual([])
   })
 
@@ -707,7 +788,7 @@ describe('the ticket', () => {
       return turns.count === 1 ? refused(401) : file(request)
     }
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'ready')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
     expect(world.network.fileRequests().map(({ url }) => url)).toEqual([
       fileUrl(1),
       fileUrl(1, 'two'),
@@ -736,7 +817,7 @@ describe('the ticket', () => {
     world.queue.kick()
     await until(() => world.drive.sizeOf(partOf(1)) === 4)
     world.fireAfter(5 * MINUTE)
-    await until(() => world.statusOf(1)?.kind === 'ready')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
     expect(world.network.fileRequests().map(({ url }) => url)).toEqual([
       fileUrl(1, 'one'),
       fileUrl(1, 'two'),
@@ -756,9 +837,9 @@ describe('the ticket', () => {
     })
     world.network.answers.file = () => refused(401)
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'failed')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
     expect(world.statusOf(1)).toEqual({
-      kind: 'failed',
+      kind: DOWNLOAD_STATUS_KINDS.failed,
       bytes: 0,
       reason: 'unauthorized',
       message: '',
@@ -768,14 +849,504 @@ describe('the ticket', () => {
   })
 })
 
+describe('an account ticket', () => {
+  const accountFileUrl = ({ n, ticket = 'account.one' }: { n: number; ticket?: string }): string =>
+    `${ORIGIN}/api/media/${n}/file?t=${ticket}`
+
+  it('fetches the subtitles and the file with one account ticket, through the bare fetch', async () => {
+    const world = setup({
+      entries: [entryFor(1)],
+      access: async () => accountTicket(),
+      tracks: tracksWith([subtitleTrack({ id: 'external-0' })]),
+    })
+    world.network.answers.file = serving({ size: 8 })
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
+    expect(
+      world.network.requests.map(({ kind, url, headers }) => ({ kind, url, headers })),
+    ).toEqual([
+      {
+        kind: ACCESS_KINDS.account,
+        url: `${ORIGIN}/api/media/1/subtitles/external-0?t=account.one`,
+        headers: {},
+      },
+      { kind: ACCESS_KINDS.account, url: accountFileUrl({ n: 1 }), headers: {} },
+    ])
+    expect(world.media.asked).toHaveLength(1)
+  })
+
+  it('is never aborted to renew it, however long the file runs', async () => {
+    const world = setup({ entries: [entryFor(1)], access: async () => accountTicket() })
+    world.network.answers.file = serving({ size: 8, sent: 4, isEnding: false })
+    world.queue.kick()
+    await until(() => world.drive.sizeOf(partOf(1)) === 4)
+    expect([...world.pending.values()].every(({ ms }) => ms <= DOWNLOAD_STALL_MS)).toBe(true)
+    world.fireAfter(ACCOUNT_TICKET_RENEW_MS)
+    world.fireAfter(5 * MINUTE)
+    await ticks(10)
+    expect(world.network.fileRequests()).toHaveLength(1)
+    expect(world.network.fileRequests()[0]?.signal.aborted ?? null).toBe(false)
+    expect(world.media.asked).toHaveLength(1)
+  })
+
+  it('reads one more ticket on a 401 and goes on from the bytes on disk', async () => {
+    const world = setup({
+      entries: [entryFor(1, { status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 4 } })],
+      disk: { [partOf(1)]: 4 },
+      access: inTurn([
+        Promise.resolve(accountTicket('account.one')),
+        Promise.resolve(accountTicket('account.two')),
+      ]),
+    })
+    const next = inTurn([() => refused(401), serving({ size: 8 })])
+    world.network.answers.file = (request) => next()(request)
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
+    expect(world.network.fileRequests().map(({ url, headers }) => ({ url, headers }))).toEqual([
+      { url: accountFileUrl({ n: 1 }), headers: { Range: 'bytes=4-' } },
+      { url: accountFileUrl({ n: 1, ticket: 'account.two' }), headers: { Range: 'bytes=4-' } },
+    ])
+    expect(world.toldAccounts).toEqual([])
+  })
+
+  it('fails with the account copy and tells the account on a second 401', async () => {
+    const world = setup({ entries: [entryFor(1)], access: async () => accountTicket() })
+    world.network.answers.file = () => refused(401)
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
+    expect(world.statusOf(1)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.failed,
+      bytes: 0,
+      reason: FAIL_REASONS.other,
+      message: DOWNLOAD_MESSAGES.signInAgain('Vhagar'),
+    })
+    expect(world.media.asked).toHaveLength(2)
+    expect(world.toldAccounts).toEqual([SERVER_ID])
+  })
+
+  it('fails the file and the rest of its group on a 403, tells the account once and goes on', async () => {
+    const world = setup({
+      entries: [entryFor(1), entryFor(2), entryFor(3), entryFor(4, { group: MOVIE })],
+      access: async () => accountTicket(),
+    })
+    world.network.answers.file = (request) =>
+      request.url.includes('/media/1/') ? refused(403) : { status: 200, body: held() }
+    world.queue.kick()
+    await until(() => (world.statusOf(4)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.downloading)
+    const removed = {
+      kind: DOWNLOAD_STATUS_KINDS.failed,
+      bytes: 0,
+      reason: FAIL_REASONS.other,
+      message: DOWNLOAD_MESSAGES.removed('Vhagar'),
+    } as const
+    expect([world.statusOf(1), world.statusOf(2), world.statusOf(3)]).toEqual([
+      removed,
+      removed,
+      removed,
+    ])
+    expect(world.network.fileRequests()[1]?.signal.aborted ?? null).toBe(true)
+    expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
+    expect(world.toldAccounts).toEqual([SERVER_ID])
+    expect(world.warnings.join('\n')).not.toContain('account.one')
+  })
+
+  it('says the account is waiting when a 403 names it pending, not that it was removed', async () => {
+    const world = setup({ entries: [entryFor(1)], access: async () => accountTicket() })
+    const pending = JSON.stringify({ reason: AUTH_REFUSALS.pending, message: 'Waiting.' })
+    world.network.answers.file = () => ({
+      status: 403,
+      body: whole([new TextEncoder().encode(pending)]),
+    })
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
+    expect(world.statusOf(1)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.failed,
+      bytes: 0,
+      reason: FAIL_REASONS.other,
+      message: DOWNLOAD_MESSAGES.waiting('Vhagar'),
+    })
+  })
+
+  it('fails the group with the account copy when its ticket is refused, and tells the account', async () => {
+    const world = setup({
+      entries: [entryFor(1), entryFor(2), entryFor(3)],
+      access: async () => ({
+        ok: false,
+        reason: ACCESS_REFUSALS.account,
+        message: DOWNLOAD_MESSAGES.waiting('Vhagar'),
+      }),
+    })
+    world.queue.kick()
+    await until(() => (world.statusOf(3)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
+    await ticks(10)
+    expect(world.statusOf(1)).toMatchObject({ message: DOWNLOAD_MESSAGES.waiting('Vhagar') })
+    expect(world.statusOf(2)).toMatchObject({ message: DOWNLOAD_MESSAGES.waiting('Vhagar') })
+    expect(world.statusOf(3)).toMatchObject({ message: DOWNLOAD_MESSAGES.waiting('Vhagar') })
+    expect(world.network.requests).toEqual([])
+    expect(world.failed).toHaveLength(1)
+    expect(world.toldAccounts).toEqual([SERVER_ID])
+  })
+
+  it('mints no more tickets in any five minutes than the budget, and fails no file, over a long queue', async () => {
+    const clock = { now: NOW }
+    const mintedAt: number[] = []
+    const mintTimers = fakeTimers()
+    const count = 40
+    const media = createMediaAccess({
+      calls: fakeCalls({}).calls,
+      serverOf: (serverId) => SERVERS.find((server) => server.id === serverId) ?? null,
+      probe: wholePing,
+      probeClock: () => 0,
+      now: () => clock.now,
+      timers: mintTimers.timers,
+      isReady: async () => true,
+      tickets: {
+        ticketFor: async ({ mediaId }) => {
+          mintedAt.push(clock.now)
+          return { kind: TICKET_OUTCOMES.ticket, ticket: `account.${mediaId}` }
+        },
+      },
+      warn: () => undefined,
+    })
+    const world = setup({
+      entries: Array.from({ length: count }, (_, index) => entryFor(index + 1)),
+      access: media.accessFor,
+    })
+    world.network.answers.file = serving({ size: 8 })
+    world.queue.kick()
+    /** Lets the queue run until it finishes or waits on the budget, then moves the clock on to the wait's end. */
+    const drive = async (rounds: number): Promise<void> => {
+      await until(
+        () =>
+          (world.statusOf(count)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready ||
+          mintTimers.pending.size > 0,
+        2000,
+      )
+      if ((world.statusOf(count)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready || rounds === 0)
+        return
+      await ticks(5)
+      const soonest = Math.min(...[...mintTimers.pending.values()].map(({ ms }) => ms))
+      clock.now += soonest
+      const due = [...mintTimers.pending].filter(([, timer]) => timer.ms === soonest)
+      due.forEach(([handle]) => mintTimers.pending.delete(handle))
+      due.forEach(([, timer]) => timer.run())
+      return drive(rounds - 1)
+    }
+    await drive(20)
+    expect(mintedAt).toHaveLength(count)
+    const busiest = Math.max(
+      ...mintedAt.map(
+        (from) => mintedAt.filter((at) => at >= from && at < from + DOWNLOAD_MINTS.windowMs).length,
+      ),
+    )
+    expect(busiest).toBe(DOWNLOAD_MINTS.budget)
+    expect(DOWNLOAD_MINTS).toEqual({ budget: 16, windowMs: 300_000 })
+    expect(world.failed).toEqual([])
+    expect(
+      world.store.read().entries.every(({ status }) => status.kind === DOWNLOAD_STATUS_KINDS.ready),
+    ).toBe(true)
+  })
+
+  it('fetches the subtitles first, on the fresh ticket, so a video longer than its ticket keeps them', async () => {
+    const clock = { now: NOW }
+    const ticketMs = 5 * MINUTE
+    const world = setup({
+      entries: [entryFor(1)],
+      access: async () => accountTicket(),
+      tracks: tracksWith([subtitleTrack({ id: 'external-0' })]),
+    })
+    // As the server checks it: a ticket read at the start of the run is refused five minutes on.
+    world.network.answers.sidecar = () =>
+      clock.now - NOW < ticketMs
+        ? { status: 200, body: whole([new TextEncoder().encode('WEBVTT')]) }
+        : refused(401)
+    const file = serving({ size: 8 })
+    world.network.answers.file = (request) => {
+      const answer = file(request)
+      clock.now += 6 * MINUTE
+      return answer
+    }
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
+    expect(world.network.requests.map(({ url }) => url)).toEqual([
+      `${ORIGIN}/api/media/1/subtitles/external-0?t=account.one`,
+      `${ORIGIN}/api/media/1/file?t=account.one`,
+    ])
+    expect(world.drive.texts.get(`${dirOf(1)}/subtitles/external-0.vtt`)).toBe('WEBVTT')
+    expect(entryById(world.store.read(), { downloadId: idOf(1) })?.sidecars ?? null).toEqual([
+      { trackId: 'external-0', title: 'English', language: 'en' },
+    ])
+    expect(world.media.asked).toHaveLength(1)
+  })
+
+  it('keeps fetching the subtitles after the video on the origin and cookie paths', async () => {
+    const world = setup({
+      entries: [entryFor(1)],
+      tracks: tracksWith([subtitleTrack({ id: 'external-0' })]),
+    })
+    world.network.answers.file = serving({ size: 8 })
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
+    expect(world.network.requests.map(({ url }) => url)).toEqual([
+      fileUrl(1),
+      `${ORIGIN}/api/media/1/subtitles/external-0?t=one`,
+    ])
+  })
+})
+
+describe('a response the server cuts mid-file', () => {
+  /** An account ticket per read, numbered per title: `account.<mediaId>.<read>`. */
+  const minting = (): MediaAccess['accessFor'] => {
+    const reads = new Map<number, number>()
+    return async ({ mediaId }) => {
+      const read = (reads.get(mediaId) ?? 0) + 1
+      reads.set(mediaId, read)
+      return accountTicket(`account.${mediaId}.${read}`)
+    }
+  }
+  const mintedUrl = ({ n, read }: { n: number; read: number }): string =>
+    `${ORIGIN}/api/media/${n}/file?t=account.${n}.${read}`
+  const requestsOf = ({ world, n }: { world: ReturnType<typeof setup>; n: number }) =>
+    world.network
+      .fileRequests()
+      .filter(({ url }) => url.includes(`/media/${n}/`))
+      .map(({ url, headers }) => ({ url, headers }))
+  const isOutageArmed = (world: ReturnType<typeof setup>): boolean =>
+    [...world.pending.values()].some(({ ms }) => ms === OUTAGE_RETRY_MS)
+  const asksFor = ({ world, n }: { world: ReturnType<typeof setup>; n: number }): number =>
+    world.media.asked.filter(({ mediaId }) => mediaId === n).length
+
+  it('resumes an account file from the bytes on disk on one new ticket, failing and pausing nothing', async () => {
+    const world = setup({ entries: [entryFor(1), entryFor(2)], access: minting() })
+    const first = inTurn([cutting({ size: 8, sent: 4 }), serving({ size: 8 })])
+    world.network.answers.file = (request) =>
+      request.url.includes('/media/1/')
+        ? first()(request)
+        : serving({ size: 8, sent: 2, isEnding: false })(request)
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
+    expect(requestsOf({ world, n: 1 })).toEqual([
+      { url: mintedUrl({ n: 1, read: 1 }), headers: {} },
+      { url: mintedUrl({ n: 1, read: 2 }), headers: { Range: 'bytes=4-' } },
+    ])
+    expect(world.drive.sizeOf(videoOf(1))).toBe(8)
+    expect(world.statusOf(2)?.kind ?? null).toBe(DOWNLOAD_STATUS_KINDS.downloading)
+    expect(requestsOf({ world, n: 2 })).toHaveLength(1)
+    expect(world.failed).toEqual([])
+    expect(world.media.forgotten).toEqual([])
+    expect(isOutageArmed(world)).toBe(false)
+    expect(world.toldAccounts).toEqual([])
+  })
+
+  it('resumes an account file whose body ends cleanly short of what it promised, never keeping it as whole', async () => {
+    const world = setup({ entries: [entryFor(1)], access: minting() })
+    const next = inTurn([serving({ size: 8, sent: 4 }), serving({ size: 8 })])
+    world.network.answers.file = (request) => next()(request)
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
+    expect(requestsOf({ world, n: 1 })).toEqual([
+      { url: mintedUrl({ n: 1, read: 1 }), headers: {} },
+      { url: mintedUrl({ n: 1, read: 2 }), headers: { Range: 'bytes=4-' } },
+    ])
+    expect(world.drive.sizeOf(videoOf(1))).toBe(8)
+    expect(world.failed).toEqual([])
+  })
+
+  it('falls back to the outage when the resumed response is cut again with no new bytes', async () => {
+    const world = setup({ entries: [entryFor(1), entryFor(2)], access: minting() })
+    const first = inTurn([cutting({ size: 8, sent: 4 }), cutting({ size: 8, sent: 0 })])
+    world.network.answers.file = (request) =>
+      request.url.includes('/media/1/')
+        ? first()(request)
+        : serving({ size: 8, sent: 2, isEnding: false })(request)
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
+    expect(world.statusOf(1)).toEqual({ ...failedUnreachable, bytes: 4 })
+    expect(world.statusOf(2)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.paused,
+      bytes: 2,
+      reason: PAUSE_REASONS.unreachable,
+    })
+    expect(requestsOf({ world, n: 1 })).toHaveLength(2)
+    expect(asksFor({ world, n: 1 })).toBe(2)
+    expect(world.drive.sizeOf(partOf(1))).toBe(4)
+    expect(world.media.forgotten).toEqual([SERVER_ID])
+    expect(isOutageArmed(world)).toBe(true)
+    expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
+    expect(world.toldAccounts).toEqual([])
+  })
+
+  it('falls back to the outage when an account response is cut before any byte', async () => {
+    const world = setup({ entries: [entryFor(1)], access: minting() })
+    world.network.answers.file = cutting({ size: 8, sent: 0 })
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
+    expect(world.statusOf(1)).toEqual(failedUnreachable)
+    expect(asksFor({ world, n: 1 })).toBe(1)
+    expect(isOutageArmed(world)).toBe(true)
+  })
+
+  it('still fails with the account copy when the resumed ticket is refused with a 403', async () => {
+    const world = setup({ entries: [entryFor(1)], access: minting() })
+    const next = inTurn([cutting({ size: 8, sent: 4 }), () => refused(HTTP_STATUSES.forbidden)])
+    world.network.answers.file = (request) => next()(request)
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
+    expect(world.statusOf(1)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.failed,
+      bytes: 4,
+      reason: FAIL_REASONS.other,
+      message: DOWNLOAD_MESSAGES.removed('Vhagar'),
+    })
+    expect(world.toldAccounts).toEqual([SERVER_ID])
+    expect(isOutageArmed(world)).toBe(false)
+  })
+
+  it('gives the resumed ticket its own re-read on a 401', async () => {
+    const world = setup({ entries: [entryFor(1)], access: minting() })
+    const next = inTurn([
+      cutting({ size: 8, sent: 4 }),
+      () => refused(HTTP_STATUSES.unauthorized),
+      serving({ size: 8 }),
+    ])
+    world.network.answers.file = (request) => next()(request)
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
+    expect(requestsOf({ world, n: 1 }).map(({ url }) => url)).toEqual([
+      mintedUrl({ n: 1, read: 1 }),
+      mintedUrl({ n: 1, read: 2 }),
+      mintedUrl({ n: 1, read: 3 }),
+    ])
+  })
+
+  it('keeps the 401 retry it already spent through a cut, so the next 401 fails the file', async () => {
+    const world = setup({ entries: [entryFor(1)], access: minting() })
+    const next = inTurn([
+      () => refused(HTTP_STATUSES.unauthorized),
+      cutting({ size: 8, sent: 4 }),
+      () => refused(HTTP_STATUSES.unauthorized),
+      serving({ size: 8 }),
+    ])
+    world.network.answers.file = (request) => next()(request)
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
+    expect(world.statusOf(1)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.failed,
+      bytes: 4,
+      reason: FAIL_REASONS.other,
+      message: DOWNLOAD_MESSAGES.signInAgain('Vhagar'),
+    })
+    expect(requestsOf({ world, n: 1 })).toHaveLength(3)
+    expect(asksFor({ world, n: 1 })).toBe(3)
+    expect(world.toldAccounts).toEqual([SERVER_ID])
+  })
+
+  const fallsBackOnPath = async ({ access }: { access: AccessOutcome }) => {
+    const world = setup({ entries: [entryFor(1), entryFor(2)], access: async () => access })
+    world.network.answers.file = (request) =>
+      request.url.includes('/media/1/')
+        ? cutting({ size: 8, sent: 4 })(request)
+        : serving({ size: 8, sent: 2, isEnding: false })(request)
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
+    expect(world.statusOf(1)).toEqual({ ...failedUnreachable, bytes: 4 })
+    expect(world.statusOf(2)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.paused,
+      bytes: 2,
+      reason: PAUSE_REASONS.unreachable,
+    })
+    expect(asksFor({ world, n: 1 })).toBe(1)
+    expect(world.media.forgotten).toEqual([SERVER_ID])
+    expect(isOutageArmed(world)).toBe(true)
+  }
+
+  it('leaves an origin file cut mid-way on the outage path, as before', async () => {
+    await fallsBackOnPath({ access: FAR_TICKET })
+  })
+
+  it('leaves a cookie file cut mid-way on the outage path, as before', async () => {
+    await fallsBackOnPath({ access: COOKIE_ACCESS })
+  })
+
+  it('never keeps an origin file whose body ends cleanly short as whole', async () => {
+    const world = setup({ entries: [entryFor(1)] })
+    world.network.answers.file = serving({ size: 8, sent: 4 })
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
+    expect(world.statusOf(1)).toEqual({ ...failedUnreachable, bytes: 4 })
+    expect(world.drive.sizeOf(partOf(1))).toBe(4)
+    expect(world.drive.files.has(videoOf(1))).toBe(false)
+    expect(world.finished).toEqual([])
+  })
+})
+
+describe('an account whose access ended', () => {
+  const byServer = async ({ serverId }: { serverId: string }) =>
+    serverId === SERVER_ID ? accountTicket() : FAR_TICKET
+
+  it("fails the server's running account files, keeping their bytes, and leaves other servers", async () => {
+    const world = setup({
+      entries: [entryFor(1), entryFor(2, { serverId: OTHER_SERVER_ID })],
+      access: byServer,
+    })
+    world.network.answers.file = serving({ size: 8, sent: 4, isEnding: false })
+    world.queue.kick()
+    await until(
+      () =>
+        world.drive.sizeOf(partOf(1)) === 4 && world.drive.sizeOf(partOf(2, OTHER_SERVER_ID)) === 4,
+    )
+    world.queue.accessEnded({ serverId: SERVER_ID })
+    await ticks(10)
+    expect(world.statusOf(1)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.failed,
+      bytes: 4,
+      reason: FAIL_REASONS.other,
+      message: DOWNLOAD_MESSAGES.signInAgain('Vhagar'),
+    })
+    const requestOf = (serverId: string) =>
+      world.network.fileRequests().find((request) => request.serverId === serverId)
+    const [mine, theirs] = [requestOf(SERVER_ID), requestOf(OTHER_SERVER_ID)]
+    expect(mine?.signal.aborted ?? null).toBe(true)
+    expect(theirs?.signal.aborted ?? null).toBe(false)
+    expect(world.statusOf(2)?.kind ?? null).toBe(DOWNLOAD_STATUS_KINDS.downloading)
+    expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
+    expect(world.toldAccounts).toEqual([])
+  })
+
+  it('leaves a file on the origin or cookie path downloading', async () => {
+    const world = setup({ entries: [entryFor(1)] })
+    world.network.answers.file = serving({ size: 8, sent: 4, isEnding: false })
+    world.queue.kick()
+    await until(() => world.drive.sizeOf(partOf(1)) === 4)
+    world.queue.accessEnded({ serverId: SERVER_ID })
+    await ticks(10)
+    expect(world.statusOf(1)?.kind ?? null).toBe(DOWNLOAD_STATUS_KINDS.downloading)
+    expect(world.network.fileRequests()[0]?.signal.aborted ?? null).toBe(false)
+  })
+
+  it('does not fetch with a ticket minted while the access ended', async () => {
+    const minted = Promise.withResolvers<AccessOutcome>()
+    const world = setup({ entries: [entryFor(1)], access: () => minted.promise })
+    world.queue.kick()
+    await until(() => world.media.asked.length === 1)
+    world.queue.accessEnded({ serverId: SERVER_ID })
+    minted.resolve(accountTicket())
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
+    expect(world.statusOf(1)).toMatchObject({
+      message: DOWNLOAD_MESSAGES.signInAgain('Vhagar'),
+    })
+    expect(world.network.requests).toEqual([])
+  })
+})
+
 describe('a file whose video is already whole', () => {
   it('finishes without a fetch when a crash came between the rename and the save', async () => {
     const world = setup({
-      entries: [entryFor(1, { status: { kind: 'downloading', bytes: 4 } })],
+      entries: [entryFor(1, { status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 4 } })],
       disk: { [videoOf(1)]: 8 },
     })
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'ready')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
     expect(world.network.requests).toEqual([])
     expect(world.media.asked).toEqual([])
     expect(world.finished.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
@@ -800,7 +1371,7 @@ describe('a finished file', () => {
     })
     world.network.answers.file = serving({ size: 8 })
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'ready')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
     expect(world.drive.files.has(partOf(1))).toBe(false)
     expect(world.drive.sizeOf(videoOf(1))).toBe(8)
     expect(world.drive.texts.get(`${dirOf(1)}/subtitles/external-0.vtt`)).toBe('WEBVTT')
@@ -820,8 +1391,8 @@ describe('a finished file', () => {
     world.network.answers.file = serving({ size: 8 })
     world.network.answers.sidecar = () => refused(404)
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'ready')
-    expect(entryById(world.store.read(), { downloadId: idOf(1) })?.sidecars).toEqual([])
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
+    expect(entryById(world.store.read(), { downloadId: idOf(1) })?.sidecars ?? null).toEqual([])
     const log = world.warnings.join('\n')
     expect(log).toContain('Episode 1')
     expect(log).toContain('external-0')
@@ -840,10 +1411,10 @@ describe('a finished file', () => {
       body: whole([new Uint8Array(SIDECAR_MAX_BYTES), new Uint8Array(1)]),
     })
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'ready')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
     expect(SIDECAR_MAX_BYTES).toBe(16 * 1024 ** 2)
     expect(world.drive.texts.size).toBe(0)
-    expect(entryById(world.store.read(), { downloadId: idOf(1) })?.sidecars).toEqual([])
+    expect(entryById(world.store.read(), { downloadId: idOf(1) })?.sidecars ?? null).toEqual([])
     const log = world.warnings.join('\n')
     expect(log).toContain('Episode 1')
     expect(log).toContain('external-0')
@@ -859,10 +1430,10 @@ describe('a finished file', () => {
     world.drive.unmakeable.add(`${dirOf(1)}/subtitles`)
     world.network.answers.file = serving({ size: 8 })
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'ready')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
     expect(world.drive.sizeOf(videoOf(1))).toBe(8)
     expect(world.network.sidecarRequests()).toEqual([])
-    expect(entryById(world.store.read(), { downloadId: idOf(1) })?.sidecars).toEqual([])
+    expect(entryById(world.store.read(), { downloadId: idOf(1) })?.sidecars ?? null).toEqual([])
     expect(world.finished).toHaveLength(1)
     expect(world.warnings).toHaveLength(1)
     expect(world.warnings[0]).toContain('Episode 1')
@@ -871,10 +1442,10 @@ describe('a finished file', () => {
 
   it('finishes with no subtitles when the track list cannot be read', async () => {
     const world = setup({ entries: [entryFor(1)] })
-    world.table[keyOf({ name: 'getTracks', mediaId: 1 })] = { unreachable: 'gone' }
+    world.table[keyOf({ name: CALL_NAMES.getTracks, mediaId: 1 })] = { unreachable: 'gone' }
     world.network.answers.file = serving({ size: 8 })
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'ready')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
     expect(world.network.sidecarRequests()).toEqual([])
     expect(world.finished).toHaveLength(1)
   })
@@ -901,8 +1472,8 @@ describe('a failed file', () => {
     world.network.answers.file = (request) =>
       request.url.includes('/media/1/') ? answer() : serving({ size: 8 })(request)
     world.queue.kick()
-    await until(() => world.statusOf(3)?.kind === 'ready')
-    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, ...why })
+    await until(() => (world.statusOf(3)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 0, ...why })
     expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
   })
 
@@ -912,7 +1483,7 @@ describe('a failed file', () => {
       throw new Error('net::ERR_CONNECTION_REFUSED')
     }
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'failed')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
     expect(world.statusOf(1)).toEqual(failedUnreachable)
     expect(world.media.forgotten).toEqual([SERVER_ID])
   })
@@ -927,8 +1498,13 @@ describe('a failed file', () => {
     })
     world.network.answers.file = serving({ size: 8 })
     world.queue.kick()
-    await until(() => world.statusOf(2)?.kind === 'ready')
-    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, reason: 'gone', message: '' })
+    await until(() => (world.statusOf(2)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
+    expect(world.statusOf(1)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.failed,
+      bytes: 0,
+      reason: FAIL_REASONS.gone,
+      message: '',
+    })
     expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
   })
 
@@ -938,9 +1514,9 @@ describe('a failed file', () => {
       access: async () => ({ ok: false, reason: 'unreadable', message: 'Vhagar mumbled.' }),
     })
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'failed')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
     expect(world.statusOf(1)).toEqual({
-      kind: 'failed',
+      kind: DOWNLOAD_STATUS_KINDS.failed,
       bytes: 0,
       reason: 'other',
       message: 'Vhagar mumbled.',
@@ -952,9 +1528,9 @@ describe('a failed file', () => {
     world.network.answers.file = serving({ size: 8 })
     world.drive.appendError.value = fsError({ code: 'EIO', syscall: 'write' })
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'failed')
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
     expect(world.statusOf(1)).toEqual({
-      kind: 'failed',
+      kind: DOWNLOAD_STATUS_KINDS.failed,
       bytes: 0,
       reason: 'other',
       message: 'write EIO',
@@ -972,7 +1548,7 @@ describe('remove', () => {
     world.queue.kick()
     await until(() => world.network.fileRequests().length === 2)
     await world.queue.remove({ downloadId: idOf(1) })
-    expect(world.network.fileRequests()[0]?.signal.aborted).toBe(true)
+    expect(world.network.fileRequests()[0]?.signal.aborted ?? null).toBe(true)
     expect(world.drive.removed).toEqual([dirOf(1)])
     expect(world.drive.files.has(partOf(1))).toBe(false)
     expect(world.store.read().entries.map(({ downloadId }) => downloadId)).toEqual([idOf(2)])
@@ -1030,14 +1606,19 @@ describe('remove', () => {
 describe('a relaunch', () => {
   it('resumes a file left downloading from the bytes on disk', async () => {
     const world = setup({
-      entries: [entryFor(1, { size: 8192, status: { kind: 'downloading', bytes: 4096 } })],
+      entries: [
+        entryFor(1, {
+          size: 8192,
+          status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 4096 },
+        }),
+      ],
       disk: { [partOf(1)]: 4096 },
     })
     world.network.answers.file = serving({ size: 8192, sent: 0, isEnding: false })
     world.queue.kick()
     await until(() => world.network.fileRequests().length === 1)
     expect(world.network.fileRequests()[0]?.headers).toEqual({ Range: 'bytes=4096-' })
-    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 4096 })
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 4096 })
   })
 
   it('holds a kick made while the sweep runs until it is done', async () => {
@@ -1048,7 +1629,7 @@ describe('a relaunch', () => {
     world.queue.kick()
     await ticks(10)
     expect(world.network.fileRequests()).toEqual([])
-    expect(world.statusOf(1)).toEqual({ kind: 'queued' })
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.queued })
     listing.resolve()
     await sweeping
     await until(() => world.network.fileRequests().length === 1)
@@ -1071,15 +1652,15 @@ describe('the outage retry', () => {
       access: async () => (reachable.value ? FAR_TICKET : unreachable),
     })
     world.queue.kick()
-    await until(() => world.statusOf(2)?.kind === 'paused')
+    await until(() => (world.statusOf(2)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.paused)
     expect(OUTAGE_RETRY_MS).toBe(300_000)
     expect(retries(world.pending)).toHaveLength(1)
     reachable.value = true
     world.fireAfter(OUTAGE_RETRY_MS)
     await until(() => world.network.fileRequests().length === 2)
     expect([1, 2].map(world.statusOf)).toEqual([
-      { kind: 'downloading', bytes: 0 },
-      { kind: 'downloading', bytes: 0 },
+      { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 },
+      { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 },
     ])
     expect(retries(world.pending)).toEqual([])
   })
@@ -1090,11 +1671,15 @@ describe('the outage retry', () => {
       access: async () => unreachable,
     })
     world.queue.kick()
-    await until(() => world.statusOf(3)?.kind === 'paused')
+    await until(() => (world.statusOf(3)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.paused)
     await ticks(10)
     expect(retries(world.pending)).toHaveLength(1)
     world.fireAfter(OUTAGE_RETRY_MS)
-    await until(() => world.media.asked.length === 4 && world.statusOf(1)?.kind === 'failed')
+    await until(
+      () =>
+        world.media.asked.length === 4 &&
+        (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed,
+    )
     await ticks(10)
     expect(retries(world.pending)).toHaveLength(1)
   })
@@ -1102,10 +1687,18 @@ describe('the outage retry', () => {
   it('tells of the outage once, not again each time a retry finds it still there', async () => {
     const world = setup({ entries: [entryFor(1), entryFor(2)], access: async () => unreachable })
     world.queue.kick()
-    await until(() => world.statusOf(1)?.kind === 'failed' && world.statusOf(2)?.kind === 'paused')
+    await until(
+      () =>
+        (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed &&
+        (world.statusOf(2)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.paused,
+    )
     expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
     world.fireAfter(OUTAGE_RETRY_MS)
-    await until(() => world.media.asked.length === 4 && world.statusOf(1)?.kind === 'failed')
+    await until(
+      () =>
+        world.media.asked.length === 4 &&
+        (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed,
+    )
     await ticks(10)
     expect(world.failed).toHaveLength(1)
     world.queue.retry({ downloadId: idOf(1) })
@@ -1117,29 +1710,48 @@ describe('the outage retry', () => {
     const world = setup({
       entries: [
         entryFor(1, { status: { kind: 'paused', bytes: 0, reason: 'unreachable' } }),
-        entryFor(2, { status: { kind: 'failed', bytes: 0, reason: 'unreachable', message: '' } }),
+        entryFor(2, {
+          status: {
+            kind: DOWNLOAD_STATUS_KINDS.failed,
+            bytes: 0,
+            reason: FAIL_REASONS.unreachable,
+            message: '',
+          },
+        }),
         entryFor(3, { status: { kind: 'paused', bytes: 0, reason: 'viewer' } }),
-        entryFor(4, { status: { kind: 'failed', bytes: 0, reason: 'changed', message: '' } }),
+        entryFor(4, {
+          status: {
+            kind: DOWNLOAD_STATUS_KINDS.failed,
+            bytes: 0,
+            reason: FAIL_REASONS.changed,
+            message: '',
+          },
+        }),
       ],
     })
     world.queue.retryOutages()
     await until(() => world.network.fileRequests().length === 2)
     expect(world.network.fileRequests().map(({ url }) => url)).toEqual([fileUrl(1), fileUrl(2)])
     expect(world.statusOf(3)).toEqual({ kind: 'paused', bytes: 0, reason: 'viewer' })
-    expect(world.statusOf(4)).toEqual({ kind: 'failed', bytes: 0, reason: 'changed', message: '' })
+    expect(world.statusOf(4)).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.failed,
+      bytes: 0,
+      reason: FAIL_REASONS.changed,
+      message: '',
+    })
   })
 
   it('drops the retry once nothing waits on an outage, and at dispose', async () => {
     const world = setup({ entries: [entryFor(1), entryFor(2)], access: async () => unreachable })
     world.queue.kick()
-    await until(() => world.statusOf(2)?.kind === 'paused')
+    await until(() => (world.statusOf(2)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.paused)
     await world.queue.remove({ downloadId: idOf(1) })
     expect(retries(world.pending)).toHaveLength(1)
     await world.queue.remove({ downloadId: idOf(2) })
     expect(retries(world.pending)).toEqual([])
     const again = setup({ entries: [entryFor(1)], access: async () => unreachable })
     again.queue.kick()
-    await until(() => again.statusOf(1)?.kind === 'failed')
+    await until(() => (again.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.failed)
     again.queue.dispose()
     expect(retries(again.pending)).toEqual([])
   })
@@ -1147,7 +1759,7 @@ describe('the outage retry', () => {
   it('holds what waits on an outage for the viewer on Pause all, so no retry starts it', async () => {
     const world = setup({ entries: [entryFor(1), entryFor(2)], access: async () => unreachable })
     world.queue.kick()
-    await until(() => world.statusOf(2)?.kind === 'paused')
+    await until(() => (world.statusOf(2)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.paused)
     await world.queue.pauseAll()
     expect([1, 2].map(world.statusOf)).toEqual([
       { kind: 'paused', bytes: 0, reason: 'viewer' },
@@ -1169,9 +1781,9 @@ describe('a sleep', () => {
     await ticks(10)
     expect(world.network.fileRequests()).toHaveLength(2)
     expect([1, 2, 3].map(world.statusOf)).toEqual([
-      { kind: 'downloading', bytes: 0 },
-      { kind: 'downloading', bytes: 0 },
-      { kind: 'queued' },
+      { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 },
+      { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 },
+      { kind: DOWNLOAD_STATUS_KINDS.queued },
     ])
     expect(world.failed).toEqual([])
   })
@@ -1182,7 +1794,7 @@ describe('a sleep', () => {
     world.queue.kick()
     await until(() => world.drive.sizeOf(partOf(1)) === 6)
     world.queue.onSuspend()
-    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 6 })
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 6 })
   })
 
   it('starts them again from the bytes on disk once the wake has settled', async () => {
@@ -1220,7 +1832,7 @@ describe('a sleep', () => {
     world.queue.onResume()
     world.fireAfter(RESUME_SETTLE_MS)
     await until(() => world.network.fileRequests().length === 1)
-    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 0 })
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 })
   })
 })
 
@@ -1236,9 +1848,9 @@ describe('dispose', () => {
     await ticks(10)
     expect(world.network.fileRequests()).toHaveLength(2)
     expect([1, 2, 3].map(world.statusOf)).toEqual([
-      { kind: 'downloading', bytes: 0 },
-      { kind: 'downloading', bytes: 0 },
-      { kind: 'queued' },
+      { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 },
+      { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 },
+      { kind: DOWNLOAD_STATUS_KINDS.queued },
     ])
     expect(world.failed).toEqual([])
   })
@@ -1249,6 +1861,6 @@ describe('dispose', () => {
     world.queue.kick()
     await until(() => world.drive.sizeOf(partOf(1)) === 7)
     world.queue.dispose()
-    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 7 })
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 7 })
   })
 })

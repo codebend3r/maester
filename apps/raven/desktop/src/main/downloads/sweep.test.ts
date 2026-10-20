@@ -18,8 +18,8 @@ const USER_DATA = '/data'
 const DOWNLOADS = '/data/downloads'
 
 const SERVERS: ServerEntry[] = [
-  { id: SERVER_ID, origin: 'https://vhagar.example', name: 'Vhagar', addedAt: 1 },
-  { id: OTHER_SERVER_ID, origin: 'https://syrax.example', name: 'Syrax', addedAt: 2 },
+  { id: SERVER_ID, origin: 'https://vhagar.example', name: 'Vhagar', addedAt: 1, signIn: null },
+  { id: OTHER_SERVER_ID, origin: 'https://syrax.example', name: 'Syrax', addedAt: 2, signIn: null },
 ]
 
 const idOf = (n: number): string => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`

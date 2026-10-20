@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'bun:test'
-import { LOCKED_STATUS, type DownloadTarget, type MediaItem, type Saga } from '@raven/core'
+import {
+  ADMIN_LOCK_STATES,
+  AUTH_REFUSALS,
+  DOWNLOAD_TARGET_KINDS,
+  LOCKED_STATUS,
+  type DownloadTarget,
+  type MediaItem,
+  type Saga,
+} from '@raven/core'
 import { EMPTY_CONFIG, type ConfigStore, type DesktopConfig } from '@/main/desktopConfig'
 import { ASK_TTL_MS } from '@/main/downloads/asks'
 import { AUTO_DELETE_DELAY_MS } from '@/main/downloads/autoDelete'
@@ -21,8 +29,9 @@ import { RESUME_SETTLE_MS } from '@/main/downloads/downloadQueue'
 import { DOWNLOADS_DEBOUNCE_MS } from '@/main/downloads/downloadStore'
 import { SYNC_DEBOUNCE_MS, SYNC_RETRY_MS } from '@/main/downloads/sync'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
-import type { AccessOutcome } from '@/main/downloads/mediaAccess'
+import { ACCESS_REFUSALS, type AccessOutcome } from '@/main/downloads/mediaAccess'
 import { SPACE_RESERVE_BYTES } from '@/main/downloads/space'
+import { CALL_NAMES } from '@/main/servers/allowlist'
 import { createGrants } from '@/main/grants'
 import {
   addRecent,
@@ -33,6 +42,7 @@ import {
 } from '@/main/playerState'
 import { createJsonStore, type StateFs } from '@/main/stateStore'
 import {
+  accountTicket,
   fakeAccess,
   fakeDisk,
   fakeNetwork,
@@ -52,7 +62,17 @@ import {
   show,
   type Reply,
 } from '@/main/test/serverFakes'
-import { SERVER_GONE, type DesktopEvent, type DesktopReply } from '@/shared/protocol'
+import {
+  ACCOUNT_STATES,
+  DESKTOP_EVENTS,
+  DESKTOP_REPLIES,
+  SERVER_GONE,
+  type AccountView,
+  type DesktopEvent,
+  type DesktopReply,
+  DOWNLOAD_ASK_KINDS,
+  DOWNLOAD_STATUS_KINDS,
+} from '@/shared/protocol'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
@@ -62,7 +82,13 @@ const NOW = 1_700_000_000_000
 const GIB = 1024 ** 3
 const BLOCK = 4096
 
-const SERVER = { id: SERVER_ID, origin: 'https://vhagar.example', name: 'Vhagar', addedAt: 1 }
+const SERVER = {
+  id: SERVER_ID,
+  origin: 'https://vhagar.example',
+  name: 'Vhagar',
+  addedAt: 1,
+  signIn: null,
+}
 
 const DOWNLOADS = `${USER_DATA}/downloads`
 
@@ -118,10 +144,10 @@ const MTIME = 1_600_000_000_000
 
 type Video = { size: number; mtimeMs: number }
 
-const libraryCall = keyOf({ name: 'getLibrary', libraryId: 1 })
-const mediaCall = (mediaId: number): string => keyOf({ name: 'getMedia', mediaId })
-const itemCall = (itemId: number): string => keyOf({ name: 'getItem', itemId })
-const sagasCall = keyOf({ name: 'getSagas', libraryId: 1 })
+const libraryCall = keyOf({ name: CALL_NAMES.getLibrary, libraryId: 1 })
+const mediaCall = (mediaId: number): string => keyOf({ name: CALL_NAMES.getMedia, mediaId })
+const itemCall = (itemId: number): string => keyOf({ name: CALL_NAMES.getItem, itemId })
+const sagasCall = keyOf({ name: CALL_NAMES.getSagas, libraryId: 1 })
 
 const MOVIE = mediaItemFor({ id: 9, title: 'Fellowship', year: 2001, size: 41 * GIB })
 
@@ -179,6 +205,10 @@ const setup = ({
   startAt = NOW,
   isPageReady = true,
   syncRetryMs = SYNC_RETRY_MS,
+  isReady = false,
+  readAccount = async () => {
+    throw new Error('a server without accounts has no account to read')
+  },
 }: {
   replies?: Record<string, Reply>
   free?: number
@@ -195,6 +225,10 @@ const setup = ({
   isPageReady?: boolean
   /** The sync's retry, as main passes it; the spec's five minutes unless a test shortens it. */
   syncRetryMs?: number
+  /** Whether the server's accounts are ready. */
+  isReady?: boolean
+  /** The account main reads for the server. */
+  readAccount?: (serverId: string) => Promise<AccountView>
 } = {}) => {
   const table: Record<string, Reply> = {
     [libraryCall]: ok(library({ id: 1, watchedPercent: 90 })),
@@ -257,6 +291,8 @@ const setup = ({
     },
   })
   const statted: string[] = []
+  const accountReads: string[] = []
+  const toldAccounts: string[] = []
   const service = createDownloadService({
     store,
     config,
@@ -280,6 +316,14 @@ const setup = ({
     ready: Promise.resolve(),
     wasSetAside: false,
     syncRetryMs,
+    isReady: async () => isReady,
+    readAccount: (serverId) => {
+      accountReads.push(serverId)
+      return readAccount(serverId)
+    },
+    accountChanged: async (serverId) => {
+      toldAccounts.push(serverId)
+    },
     grants,
     state,
     stat: async (path) => {
@@ -309,6 +353,8 @@ const setup = ({
     drive,
     network,
     media,
+    accountReads,
+    toldAccounts,
   }
 }
 
@@ -420,7 +466,7 @@ describe('ask', () => {
       initial: {
         ...EMPTY_DOWNLOADS,
         entries: [
-          entryFor({ mediaId: 11, size: 4 * GIB, status: { kind: 'queued' } }),
+          entryFor({ mediaId: 11, size: 4 * GIB, status: { kind: DOWNLOAD_STATUS_KINDS.queued } }),
           entryFor({
             downloadId: '00000000-0000-4000-8000-0000000000a1',
             mediaId: 12,
@@ -473,7 +519,7 @@ describe('ask', () => {
       kind: 'locked',
     })
     const hidden = setup({
-      replies: { [keyOf({ name: 'getAdminLock' })]: ok({ state: 'on', available: true }) },
+      replies: { [keyOf({ name: CALL_NAMES.getAdminLock })]: ok({ state: 'on', available: true }) },
     })
     expect((await askFor({ world: hidden, target: { kind: 'item', itemId: 5 } })).status).toEqual({
       kind: 'hidden',
@@ -579,6 +625,193 @@ describe('retryAsk', () => {
   })
 })
 
+describe('an account ask', () => {
+  const accountOf = (state: AccountView['state']): AccountView => ({
+    serverId: SERVER_ID,
+    state,
+    email: state === ACCOUNT_STATES.signedOut ? null : 'me@example.com',
+    isRemembered: true,
+    signInHost: 'project.supabase.co',
+  })
+
+  it('asks a signed out person to sign in, reading no title from the server', async () => {
+    const world = setup({
+      replies: { [mediaCall(9)]: ok(MOVIE) },
+      isReady: true,
+      readAccount: async () => accountOf(ACCOUNT_STATES.signedOut),
+    })
+    expect(
+      await world.service.ask({
+        serverId: SERVER_ID,
+        target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
+      }),
+    ).toEqual({
+      type: DESKTOP_REPLIES.downloadAsk,
+      ask: {
+        askId: '00000000-0000-4000-8000-000000000001',
+        serverId: SERVER_ID,
+        serverName: 'Vhagar',
+        autoDelete: false,
+        status: { kind: DOWNLOAD_ASK_KINDS.account, account: accountOf(ACCOUNT_STATES.signedOut) },
+      },
+    })
+    expect(world.log).toEqual([])
+    expect(world.accountReads).toEqual([SERVER_ID])
+  })
+
+  it.each([ACCOUNT_STATES.pending, ACCOUNT_STATES.revoked] as const)(
+    'shows a %s account the same way',
+    async (state) => {
+      const world = setup({ isReady: true, readAccount: async () => accountOf(state) })
+      const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
+      expect(ask.status).toEqual({ kind: DOWNLOAD_ASK_KINDS.account, account: accountOf(state) })
+    },
+  )
+
+  it('expands once the person signs in, under the same ask id', async () => {
+    const account = { view: accountOf(ACCOUNT_STATES.signedOut) }
+    const world = setup({
+      replies: { [mediaCall(9)]: ok(MOVIE) },
+      isReady: true,
+      readAccount: async () => account.view,
+    })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
+    account.view = accountOf(ACCOUNT_STATES.approved)
+    expect(await world.service.retryAsk({ askId: ask.askId })).toMatchObject({
+      type: DESKTOP_REPLIES.downloadAsk,
+      ask: {
+        askId: ask.askId,
+        status: { kind: DOWNLOAD_ASK_KINDS.ready, files: 1, bytes: 41 * GIB },
+      },
+    })
+  })
+
+  it('refuses to queue an ask still waiting on its account', async () => {
+    const world = setup({
+      isReady: true,
+      readAccount: async () => accountOf(ACCOUNT_STATES.signedOut),
+    })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
+    expect(await world.service.confirm({ askId: ask.askId, autoDelete: false })).toEqual({
+      type: DESKTOP_REPLIES.refused,
+      message: EXPAND_MESSAGES.account('Vhagar'),
+    })
+    expect(world.store.read().entries).toEqual([])
+  })
+
+  it('answers gone, never hidden, for a hidden title on a server with accounts', async () => {
+    const adminCall = keyOf({ name: CALL_NAMES.getAdminLock })
+    const world = setup({
+      isReady: true,
+      readAccount: async () => accountOf(ACCOUNT_STATES.approved),
+      replies: { [adminCall]: ok({ state: ADMIN_LOCK_STATES.on, available: true }) },
+    })
+    expect(
+      await world.service.ask({
+        serverId: SERVER_ID,
+        target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 5 },
+      }),
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.gone('Vhagar') })
+    expect(world.log).not.toContain(adminCall)
+  })
+
+  it('expands a server whose accounts are not ready as it always has, reading no account', async () => {
+    const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
+    expect(ask.status).toMatchObject({ kind: DOWNLOAD_ASK_KINDS.ready, files: 1 })
+    expect(world.accountReads).toEqual([])
+  })
+
+  it('asks for the account when the server refuses one main read as approved', async () => {
+    const reads = { count: 0 }
+    const world = setup({
+      replies: {
+        [mediaCall(9)]: { status: 403, body: { reason: AUTH_REFUSALS.revoked, message: 'No.' } },
+      },
+      isReady: true,
+      readAccount: async () => {
+        reads.count += 1
+        return accountOf(reads.count === 1 ? ACCOUNT_STATES.approved : ACCOUNT_STATES.revoked)
+      },
+    })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
+    expect(ask.status).toEqual({
+      kind: DOWNLOAD_ASK_KINDS.account,
+      account: accountOf(ACCOUNT_STATES.revoked),
+    })
+  })
+
+  it('refuses with why when the server refuses an account main still reads as approved', async () => {
+    const world = setup({
+      replies: {
+        [mediaCall(9)]: { status: 401, body: { reason: AUTH_REFUSALS.signedOut, message: 'No.' } },
+      },
+      isReady: true,
+      readAccount: async () => accountOf(ACCOUNT_STATES.approved),
+    })
+    expect(
+      await world.service.ask({
+        serverId: SERVER_ID,
+        target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
+      }),
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.account('Vhagar') })
+  })
+
+  it('expands when the account cannot be read, and leaves the refusal to the server', async () => {
+    const world = setup({
+      replies: { [mediaCall(9)]: ok(MOVIE) },
+      isReady: true,
+      readAccount: async () => {
+        throw new Error('down')
+      },
+    })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
+    expect(ask.status).toMatchObject({ kind: DOWNLOAD_ASK_KINDS.ready, files: 1 })
+  })
+})
+
+describe('downloads with an account ticket', () => {
+  const ID = '0f8fad5b-d9cb-469f-a165-70867728950e'
+  const queued = (): DownloadsState => ({
+    ...EMPTY_DOWNLOADS,
+    entries: [entryFor({ size: 8, status: { kind: DOWNLOAD_STATUS_KINDS.queued } })],
+  })
+
+  it('tells main to read the account again when a download is refused for it', async () => {
+    const world = setup({
+      initial: queued(),
+      access: async () => ({
+        ok: false,
+        reason: ACCESS_REFUSALS.account,
+        message: DOWNLOAD_MESSAGES.removed('Vhagar'),
+      }),
+    })
+    await until(() => world.toldAccounts.length === 1)
+    expect(world.toldAccounts).toEqual([SERVER_ID])
+    expect(world.sent).toContainEqual({
+      type: DESKTOP_EVENTS.notice,
+      message: DOWNLOAD_MESSAGES.failed({
+        label: 'S01E01 Good News',
+        why: DOWNLOAD_MESSAGES.removed('Vhagar'),
+      }),
+    })
+  })
+
+  it("fails a server's running account downloads when its sign-in ends", async () => {
+    const world = setup({ initial: queued(), access: async () => accountTicket() })
+    world.network.answers.file = serving({ size: 8, sent: 4, isEnding: false })
+    await until(() => world.network.fileRequests().length === 1)
+    world.service.accessEnded({ serverId: SERVER_ID })
+    await until(
+      () =>
+        (world.store.read().entries.find((entry) => entry.downloadId === ID)?.status.kind ??
+          null) === DOWNLOAD_STATUS_KINDS.failed,
+    )
+    expect(world.network.fileRequests()[0]?.signal.aborted ?? null).toBe(true)
+    expect(world.toldAccounts).toEqual([])
+  })
+})
+
 describe('confirm', () => {
   it('queues the files, skipping one already present, says so and answers the list', async () => {
     const present = entryFor({ mediaId: 11 })
@@ -602,7 +835,7 @@ describe('confirm', () => {
         duration: 3000,
         watchedPercent: 90,
         sidecars: [],
-        status: { kind: 'queued' },
+        status: { kind: DOWNLOAD_STATUS_KINDS.queued },
         autoDelete: true,
         watchedAt: null,
         serverPosition: 4200,
@@ -812,7 +1045,7 @@ describe('readSpace', () => {
           entryFor({
             downloadId: '00000000-0000-4000-8000-0000000000a2',
             mediaId: 13,
-            status: { kind: 'queued' },
+            status: { kind: DOWNLOAD_STATUS_KINDS.queued },
           }),
         ],
       },
@@ -868,7 +1101,7 @@ describe('the queue', () => {
   const UNKNOWN_ID = '00000000-0000-4000-8000-0000000000ff'
   const PART = `${DOWNLOADS}/${SERVER_ID}/11/video.mkv.part`
   const queuedFile = (overrides: Partial<DownloadEntry> = {}): DownloadEntry =>
-    entryFor({ size: 8, status: { kind: 'queued' }, ...overrides })
+    entryFor({ size: 8, status: { kind: DOWNLOAD_STATUS_KINDS.queued }, ...overrides })
   const holding = (...entries: DownloadEntry[]): DownloadsState => ({
     ...EMPTY_DOWNLOADS,
     entries,
@@ -910,7 +1143,7 @@ describe('the queue', () => {
     await until(() => world.network.fileRequests().length === 1)
     const reply = downloadsOf(await world.service.pause({ downloadId: ID }))
     expect(reply.downloads[0]?.status).toEqual({ kind: 'paused', bytes: 0, message: null })
-    expect(world.network.fileRequests()[0]?.signal.aborted).toBe(true)
+    expect(world.network.fileRequests()[0]?.signal.aborted ?? null).toBe(true)
   })
 
   it('resumes and retries through the queue', async () => {
@@ -926,7 +1159,7 @@ describe('the queue', () => {
       access: async () => FAR_TICKET,
     })
     expect(downloadsOf(world.service.resume({ downloadId: ID })).downloads).toContainEqual(
-      expect.objectContaining({ downloadId: ID, status: { kind: 'queued' } }),
+      expect.objectContaining({ downloadId: ID, status: { kind: DOWNLOAD_STATUS_KINDS.queued } }),
     )
     world.service.retry({ downloadId: OTHER_ID })
     await until(() => world.network.fileRequests().length === 2)
@@ -1115,7 +1348,7 @@ describe('the queue', () => {
     const world = setup({ initial: holding(queuedFile()), access: async () => FAR_TICKET })
     await until(() => world.network.fileRequests().length === 1)
     world.service.onSuspend()
-    expect(world.network.fileRequests()[0]?.signal.aborted).toBe(true)
+    expect(world.network.fileRequests()[0]?.signal.aborted ?? null).toBe(true)
     await ticks(10)
     expect(statusOf(world)).toEqual({ kind: 'downloading', bytes: 0 })
     world.service.onResume()
@@ -1131,7 +1364,7 @@ describe('the queue', () => {
     const world = setup({ initial: holding(queuedFile()), access: async () => FAR_TICKET })
     await until(() => world.network.fileRequests().length === 1)
     world.service.dispose()
-    expect(world.network.fileRequests()[0]?.signal.aborted).toBe(true)
+    expect(world.network.fileRequests()[0]?.signal.aborted ?? null).toBe(true)
     await ticks(10)
     world.fire()
     expect(world.sent).toEqual([])
@@ -1282,7 +1515,7 @@ describe('playing a download', () => {
 
   it("reads a finished file's facts, so its share shows once a position is saved", async () => {
     const world = setup({
-      initial: holding(entryFor({ size: 8, status: { kind: 'queued' } })),
+      initial: holding(entryFor({ size: 8, status: { kind: DOWNLOAD_STATUS_KINDS.queued } })),
       access: async () => FAR_TICKET,
       player: savePosition({
         state: EMPTY_STATE,
@@ -1306,8 +1539,8 @@ describe('reaching the server', () => {
   const FILE: Video = { size: 2 * GIB, mtimeMs: MTIME }
   const PLAYED = { play: true, position: 750, furthest: 750, at: NOW }
   const progress = (mediaId: number, position: number): string =>
-    keyOf({ name: 'saveProgress', mediaId, position })
-  const playOf = (mediaId: number): string => keyOf({ name: 'recordPlay', mediaId })
+    keyOf({ name: CALL_NAMES.saveProgress, mediaId, position })
+  const playOf = (mediaId: number): string => keyOf({ name: CALL_NAMES.recordPlay, mediaId })
   const NO_CONTENT: Reply = { status: 204, body: '' }
   const holding = (...entries: DownloadEntry[]): DownloadsState => ({
     ...EMPTY_DOWNLOADS,
@@ -1529,8 +1762,8 @@ describe('deleting once watched', () => {
   const VIDEO = `${DOWNLOADS}/${SERVER_ID}/11/video.mkv`
   const FILE: Video = { size: 2 * GIB, mtimeMs: MTIME }
   const NO_CONTENT: Reply = { status: 204, body: '' }
-  const PLAY = keyOf({ name: 'recordPlay', mediaId: 11 })
-  const PROGRESS = keyOf({ name: 'saveProgress', mediaId: 11, position: 0 })
+  const PLAY = keyOf({ name: CALL_NAMES.recordPlay, mediaId: 11 })
+  const PROGRESS = keyOf({ name: CALL_NAMES.saveProgress, mediaId: 11, position: 0 })
   const DELETED = { type: 'notice', message: 'Deleted S01E01 Good News after watching' } as const
   const holding = (...entries: DownloadEntry[]): DownloadsState => ({
     ...EMPTY_DOWNLOADS,

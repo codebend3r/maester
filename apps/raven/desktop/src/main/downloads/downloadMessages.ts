@@ -1,3 +1,4 @@
+import { AUTH_REFUSALS, type AuthRefusal } from '@raven/core'
 import {
   FAIL_REASONS,
   PAUSE_REASONS,
@@ -43,12 +44,41 @@ export const DOWNLOAD_MESSAGES = {
   answered: ({ serverName, status }: { serverName: string; status: number }): string =>
     `${serverName} answered ${status}`,
   relocked: (name: string): string => `${name} locked this library again`,
+  signInAgain: (name: string): string => `Sign in to ${name} again`,
+  waiting: (name: string): string => `Your account on ${name} is waiting for approval`,
+  removed: (name: string): string => `Your access to ${name} was removed`,
   unreachable: (name: string): string => `${name} could not be reached`,
   downloaded: (label: string): string => `Downloaded ${label}`,
   failed: ({ label, why }: { label: string; why: string }): string =>
     `Could not download ${label}: ${why}`,
   deletedAfterWatching: (label: string): string => `Deleted ${label} after watching`,
 } as const
+
+/** A refusal of the account itself; `unavailable` is the server's outage, not the account's. */
+export type AccountRefusal = Exclude<AuthRefusal['reason'], typeof AUTH_REFUSALS.unavailable>
+
+/** What a download refused for its account says, by why the server refused it. */
+export const accountRefusedMessage = ({
+  reason,
+  serverName,
+}: {
+  reason: AccountRefusal
+  serverName: string
+}): string => {
+  switch (reason) {
+    case AUTH_REFUSALS.signedOut:
+      return DOWNLOAD_MESSAGES.signInAgain(serverName)
+    case AUTH_REFUSALS.pending:
+      return DOWNLOAD_MESSAGES.waiting(serverName)
+    case AUTH_REFUSALS.revoked:
+    case AUTH_REFUSALS.notOwner:
+      return DOWNLOAD_MESSAGES.removed(serverName)
+    default: {
+      const unreachable: never = reason
+      return unreachable
+    }
+  }
+}
 
 /** Words that name the server; with no name, the server is no longer in raven player. */
 const naming = ({
