@@ -8,14 +8,14 @@ import {
   SetMetadata,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { LOCKED_STATUS, isString } from '@raven/core'
+import { LOCKED_STATUS, MEDIA_TICKET_PARAM, isString } from '@raven/core'
 import { HTTP_METHODS } from '@shared/server'
-import { AdminService } from '@/admin/adminService'
-import { AuthSessions } from '@/auth/authSessions'
+import type { FastifyRequest } from 'fastify'
+import { Management } from '@/auth/management'
 import { LockService, PRIVACIES, type Privacy } from '@/lock/lockService'
 import { isMediaPlaneRoute } from '@/media/mediaPlaneMark'
 import { MediaTickets } from '@/media/mediaTickets'
-import { requestParts } from '@/requestParts'
+import { ROUTE_PARAMS, requestParts } from '@/requestParts'
 import type { MarkTargets, RouteMark } from '@/routeMarks'
 
 const PRIVACY = Symbol('PRIVACY')
@@ -47,7 +47,7 @@ export const PrivateBy = (privacy: Privacy) => SetMetadata(PRIVACY, privacy)
 /**
  * Marks a route, or a controller, that takes a parameter yet holds nothing
  * back by it: what it names is not in a library, or it hides what this
- * browser may not see itself. A route's own mark wins over its controller's.
+ * caller may not see itself. A route's own mark wins over its controller's.
  */
 export const Public = () => SetMetadata(PRIVACY, LOCK_MARKS.public)
 
@@ -89,44 +89,45 @@ export const lockMarkProblems = (routes: readonly RouteMark[]): string[] =>
 
 /**
  * Answers 423 Locked for a route marked `PrivateBy`, on itself or its
- * controller, whose id sits in a locked library this browser has not
- * unlocked. While the admin lock holds it answers 404 instead, as if there
- * were no such library, so nothing asks for the PIN. A media plane route
- * held by `PrivateBy('media')` also opens to a media ticket for its id in
- * `?t=`, for the origins a browser sends no cookie to. `assertRoutesMarked`
- * keeps every route with a parameter marked, so the routes that pass
- * unchecked take no id.
+ * controller, whose id sits in a locked library this caller has not
+ * unlocked. For a caller who cannot manage raven, a member or a browser the
+ * admin lock holds, it answers 404 instead, as if there were no such
+ * library, so nothing asks for the PIN. An account ticket is held to the
+ * same rules on every request, as the account it stands for, so a library
+ * locked after the mint shuts it at once. Without accounts, a media plane
+ * route held by `PrivateBy('media')` also opens to a media ticket for its
+ * id in `?t=`, for the origins a browser sends no cookie to; with them, that
+ * legacy ticket opens nothing. `assertRoutesMarked` keeps every route with
+ * a parameter marked, so the routes that pass unchecked take no id.
  */
 @Injectable()
 export class LockGuard implements CanActivate {
   constructor(
     @Inject(LockService) private readonly lock: Pick<LockService, 'viewer'>,
-    @Inject(AdminService) private readonly admin: Pick<AdminService, 'isLocked'>,
+    @Inject(Management) private readonly management: Pick<Management, 'canManage' | 'isLegacy'>,
     @Inject(MediaTickets) private readonly tickets: Pick<MediaTickets, 'verify'>,
-    @Inject(AuthSessions) private readonly sessions: Pick<AuthSessions, 'isTicket'>,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const mark = lockMarkOf([context.getHandler(), context.getClass()])
+    const targets = [context.getHandler(), context.getClass()]
+    const mark = lockMarkOf(targets)
     if (!isPrivacy(mark)) return true
+    const request = context.switchToHttp().getRequest<FastifyRequest>()
+    const { params, query } = requestParts(context)
+    const id = Number(params[ROUTE_PARAMS.id])
+    const ticket = query[MEDIA_TICKET_PARAM]
     if (
-      isMediaPlaneRoute([context.getHandler(), context.getClass()]) &&
-      this.sessions.isTicket({ request: context.switchToHttp().getRequest<object>() })
-    )
-      return true
-    const { params, query, cookie } = requestParts(context)
-    const id = Number(params.id)
-    const ticket = query.t
-    if (
+      this.management.isLegacy() &&
       mark === PRIVACIES.media &&
-      isMediaPlaneRoute([context.getHandler(), context.getClass()]) &&
+      isMediaPlaneRoute(targets) &&
       isString(ticket) &&
       this.tickets.verify({ ticket, id })
     ) {
       return true
     }
-    if (this.lock.viewer({ cookie }).sees({ privacy: mark, id })) return true
-    if (this.admin.isLocked({ cookie })) throw new NotFoundException(`${NOT_FOUND[mark]} ${id}`)
+    if (this.lock.viewer({ request }).sees({ privacy: mark, id })) return true
+    if (!this.management.canManage({ request }))
+      throw new NotFoundException(`${NOT_FOUND[mark]} ${id}`)
     throw new HttpException('This library is locked.', LOCKED_STATUS)
   }
 }

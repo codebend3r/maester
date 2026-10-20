@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpException,
   Inject,
+  NotFoundException,
   Post,
   Res,
 } from '@nestjs/common'
@@ -15,6 +16,7 @@ import { type AdminLock, isAdminUnlockRequest } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
 import { type AdminChange, AdminService } from '@/admin/adminService'
+import { Management } from '@/auth/management'
 import { RAVEN_HEADERS } from '@/http'
 import { parseBody } from '@/parseBody'
 
@@ -24,9 +26,19 @@ const applied = ({ change, reply }: { change: AdminChange; reply: FastifyReply }
   return change.lock
 }
 
+const SIGNS_IN_WITH_ACCOUNTS = 'This server signs in with accounts; the owner manages it.'
+
 @Controller('api/admin')
 export class AdminController {
-  constructor(@Inject(AdminService) private readonly admin: AdminService) {}
+  constructor(
+    @Inject(AdminService) private readonly admin: AdminService,
+    @Inject(Management) private readonly management: Pick<Management, 'isLegacy'>,
+  ) {}
+
+  /** Once accounts are ready the owner manages raven, and the password and its cookie are inert. */
+  private requireLegacy(): void {
+    if (!this.management.isLegacy()) throw new NotFoundException(SIGNS_IN_WITH_ACCOUNTS)
+  }
 
   /** The lock in this browser; a session still open gets its cookie renewed, so it never runs out while in use. */
   @Get()
@@ -34,6 +46,7 @@ export class AdminController {
     @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): AdminLock {
+    this.requireLegacy()
     const renewed = this.admin.renewed({ cookie })
     return renewed ? applied({ change: renewed, reply }) : this.admin.state({ cookie })
   }
@@ -43,6 +56,7 @@ export class AdminController {
   @Post('unlock')
   @HttpCode(200)
   unlock(@Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply): AdminLock {
+    this.requireLegacy()
     const { password } = parseBody({
       guard: isAdminUnlockRequest,
       body,
@@ -62,6 +76,7 @@ export class AdminController {
     @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): AdminLock {
+    this.requireLegacy()
     const change = this.admin.lock({ cookie })
     return change ? applied({ change, reply }) : this.admin.state({ cookie })
   }
@@ -74,6 +89,7 @@ export class AdminController {
     @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): AdminLock {
+    this.requireLegacy()
     const change = this.admin.keepUnlocked({ cookie })
     if (!change) {
       throw new ConflictException(

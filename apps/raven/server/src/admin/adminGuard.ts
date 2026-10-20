@@ -7,9 +7,11 @@ import {
   SetMetadata,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
+import { AUTH_REFUSALS } from '@raven/core'
 import { HTTP_METHODS } from '@shared/server'
-import { AdminService } from '@/admin/adminService'
-import { requestParts } from '@/requestParts'
+import type { FastifyRequest } from 'fastify'
+import { authFailure } from '@/auth/authFailure'
+import { Management } from '@/auth/management'
 import type { MarkTargets, RouteMark } from '@/routeMarks'
 
 const AUDIENCE = Symbol('AUDIENCE')
@@ -59,14 +61,24 @@ export const audienceMarkProblems = (routes: readonly RouteMark[]): string[] =>
     return []
   })
 
-/** Answers 403 Forbidden for a route marked `AdminOnly` while the admin lock holds for this browser. */
+/**
+ * Holds back a route marked `AdminOnly` from whoever cannot manage raven.
+ * With accounts off that is a browser the admin lock holds, answered 403
+ * Forbidden; once they are ready it is any account but the owner, answered
+ * 403 `not_owner`. While they are unavailable the account gate has already
+ * answered 503.
+ */
 @Injectable()
 export class AdminGuard implements CanActivate {
-  constructor(@Inject(AdminService) private readonly admin: AdminService) {}
+  constructor(
+    @Inject(Management) private readonly management: Pick<Management, 'canManage' | 'isLegacy'>,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
     if (audienceOf([context.getHandler(), context.getClass()]) !== AUDIENCES.admin) return true
-    if (!this.admin.isLocked({ cookie: requestParts(context).cookie })) return true
+    const request = context.switchToHttp().getRequest<FastifyRequest>()
+    if (this.management.canManage({ request })) return true
+    if (!this.management.isLegacy()) throw authFailure(AUTH_REFUSALS.notOwner)
     throw new ForbiddenException('The admin lock is on. Turn it off in Settings to do this.')
   }
 }

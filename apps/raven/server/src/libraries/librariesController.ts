@@ -4,7 +4,6 @@ import {
   Controller,
   Delete,
   Get,
-  Headers,
   HttpCode,
   Inject,
   NotFoundException,
@@ -13,6 +12,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
@@ -41,9 +41,9 @@ import {
   METADATA_SERVICE_STATES,
   SAGA_BACKDROP_TYPES,
 } from '@raven/core'
+import type { FastifyRequest } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
-import { AdminService } from '@/admin/adminService'
-import { RAVEN_HEADERS } from '@/http'
+import { Management } from '@/auth/management'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
 import { RatingsRefresh } from '@/libraries/ratingsRefresh'
 import { PrivateBy, Public } from '@/lock/lockGuard'
@@ -58,6 +58,7 @@ import { MetadataService } from '@/metadata/metadataService'
 import { parseBody } from '@/parseBody'
 import { LibraryWatcher } from '@/scanner/libraryWatcher'
 import { ScannerService } from '@/scanner/scannerService'
+import { ROUTE_PARAMS } from '@/requestParts'
 
 const parseInput = (body: unknown): LibraryInput => {
   const result = validateLibraryInput(body)
@@ -72,9 +73,12 @@ const listParams = (query: unknown): MediaListParams =>
 /** A locked library's scan failure, in place of the message, which names its folders. */
 export const LOCKED_SCAN_ERROR = 'The last scan ran into trouble. Enter the PIN to see what.'
 
-/** A scan's failure for a viewer the admin lock keeps from the folders it names. */
+/** A scan's failure for a viewer the admin lock holds, so who may not see the folders it names. */
 export const HIDDEN_SCAN_ERROR =
   'The last scan ran into trouble. Turn the admin lock off in Settings to see what.'
+
+/** A scan's failure for a member once accounts are on: only the owner sees the folders it names. */
+export const OWNER_SCAN_ERROR = 'The last scan ran into trouble. Only the owner can see what.'
 
 /** What a query flag such as `?watched=true` says when it is on. */
 const QUERY_FLAGS = { true: 'true' } as const
@@ -104,7 +108,7 @@ export class LibrariesController {
     @Inject(MetadataService) private readonly metadata: MetadataService,
     @Inject(LibraryWatcher) private readonly watcher: LibraryWatcher,
     @Inject(LockService) private readonly lock: LockService,
-    @Inject(AdminService) private readonly admin: AdminService,
+    @Inject(Management) private readonly management: Management,
     @Inject(RatingsRefresh) private readonly ratings: RatingsRefresh,
   ) {}
 
@@ -120,10 +124,10 @@ export class LibrariesController {
   /**
    * A library as a client sees it: its scan's live status, where its
    * Refresh stands, and its newest video's picture. Without `canSee` a
-   * library still locked to the browser keeps its folders, its picture and
+   * library still locked to the caller keeps its folders, its picture and
    * what its last scan said about them (which names the folders) to itself,
    * and shows only its name, type, counts and Refresh. Without `isAdmin`,
-   * which is the admin lock off in this browser, no library shows its
+   * which is whoever may manage raven, no library shows its
    * folders or the scan failure that names them. Every route says which:
    * the public ones ask the lock, while the guarded ones, and creating a
    * library, pass true, as whoever reaches them sees it all.
@@ -142,7 +146,8 @@ export class LibrariesController {
     if (canSee && isAdmin) {
       return { ...record, scan, ratingsRefresh, backdrop: this.media.backdropOf(record.id) }
     }
-    const hiddenError = canSee ? HIDDEN_SCAN_ERROR : LOCKED_SCAN_ERROR
+    const unmanagedError = this.management.isLegacy() ? HIDDEN_SCAN_ERROR : OWNER_SCAN_ERROR
+    const hiddenError = canSee ? unmanagedError : LOCKED_SCAN_ERROR
     return {
       ...record,
       paths: [],
@@ -159,11 +164,11 @@ export class LibrariesController {
     return record
   }
 
-  /** Every library, but a locked one while the admin lock holds. */
+  /** Every library, but a locked one the viewer may not see: all of them unless the caller can manage. */
   @Public()
   @Get()
-  list(@Headers(RAVEN_HEADERS.cookie) cookie: string | undefined): Library[] {
-    const viewer = this.lock.viewer({ cookie })
+  list(@Req() request: FastifyRequest): Library[] {
+    const viewer = this.lock.viewer({ request })
     return this.libraries
       .list()
       .filter((record) => viewer.listsLibrary(record.id))
@@ -171,28 +176,25 @@ export class LibrariesController {
         this.withStatus({
           record,
           canSee: viewer.seesLibrary(record.id),
-          isAdmin: !this.admin.isLocked({ cookie }),
+          isAdmin: this.management.canManage({ request }),
         }),
       )
   }
 
   /**
    * Every library shows in the side menu, locked or not, so its own settings
-   * do too; while the admin lock holds, a locked one is not there at all.
+   * do too; to a caller who cannot manage, a locked one is not there at all.
    */
   @Public()
   @Get(':id')
-  get(
-    @Param('id', ParseIntPipe) id: number,
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
-  ): Library {
+  get(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number, @Req() request: FastifyRequest): Library {
     const record = this.find(id)
-    const viewer = this.lock.viewer({ cookie })
+    const viewer = this.lock.viewer({ request })
     if (!viewer.listsLibrary(id)) throw new NotFoundException(`No library ${id}`)
     return this.withStatus({
       record,
       canSee: viewer.seesLibrary(id),
-      isAdmin: !this.admin.isLocked({ cookie }),
+      isAdmin: this.management.canManage({ request }),
     })
   }
 
@@ -244,7 +246,7 @@ export class LibrariesController {
   setView(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: unknown,
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Req() request: FastifyRequest,
   ): Library {
     const { name, paths } = this.find(id)
     const settings = parseBody({
@@ -254,7 +256,11 @@ export class LibrariesController {
     })
     const record = this.libraries.update({ id, input: { name, paths, settings } })
     if (!record) throw new NotFoundException(`No library ${id}`)
-    return this.withStatus({ record, canSee: true, isAdmin: !this.admin.isLocked({ cookie }) })
+    return this.withStatus({
+      record,
+      canSee: true,
+      isAdmin: this.management.canManage({ request }),
+    })
   }
 
   @AdminOnly()

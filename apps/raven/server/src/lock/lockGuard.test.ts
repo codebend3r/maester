@@ -1,8 +1,9 @@
 import { Controller, Delete, Get, HttpException, NotFoundException, Put } from '@nestjs/common'
 import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host'
-import { LOCKED_STATUS } from '@raven/core'
+import { LOCKED_STATUS, MEDIA_TICKET_PARAM } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import { CONTROLLERS } from '@/appModule'
+import { ACCOUNT_REQUIREMENTS } from '@/auth/accountGuard'
 import { LockGuard, PrivateBy, Public, lockMarkProblems } from '@/lock/lockGuard'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import { assertRoutesMarked, routeMarks } from '@/routeMarks'
@@ -85,12 +86,20 @@ class ShutController {
 describe('the lock marks on routes', () => {
   it('reads each route with its own mark, or else its controller’s', () => {
     expect(routeMarks([ThingsController])).toEqual([
-      { method: 'GET', path: '/api/things/:id', lock: 'media', audience: null, mediaPlane: false },
+      {
+        method: 'GET',
+        path: '/api/things/:id',
+        lock: 'media',
+        audience: null,
+        account: ACCOUNT_REQUIREMENTS.approved,
+        mediaPlane: false,
+      },
       {
         method: 'GET',
         path: '/api/things/:id/bytes',
         lock: 'media',
         audience: null,
+        account: ACCOUNT_REQUIREMENTS.approved,
         mediaPlane: true,
       },
       {
@@ -98,6 +107,7 @@ describe('the lock marks on routes', () => {
         path: '/api/things/:id/open',
         lock: 'public',
         audience: null,
+        account: ACCOUNT_REQUIREMENTS.approved,
         mediaPlane: false,
       },
     ])
@@ -136,7 +146,10 @@ describe('the lock marks on routes', () => {
 describe('the lock guard and a media ticket', () => {
   const VALID = 'good-ticket'
 
-  const guard = ({ isAdminLocked = false }: { isAdminLocked?: boolean } = {}) =>
+  const guard = ({
+    isAdminLocked = false,
+    isLegacy = true,
+  }: { isAdminLocked?: boolean; isLegacy?: boolean } = {}) =>
     new LockGuard(
       {
         viewer: () => ({
@@ -146,9 +159,8 @@ describe('the lock guard and a media ticket', () => {
           sees: () => false,
         }),
       },
-      { isLocked: () => isAdminLocked },
+      { canManage: () => !isAdminLocked, isLegacy: () => isLegacy },
       { verify: ({ ticket, id }) => ticket === VALID && id === 7 },
-      { isTicket: () => false },
     )
 
   const contextOf = ({
@@ -167,7 +179,11 @@ describe('the lock guard and a media ticket', () => {
   it('lets a good ticket through on a media plane route', () => {
     expect(
       guard().canActivate(
-        contextOf({ controller: ShutController, handler: bytes, query: { t: VALID } }),
+        contextOf({
+          controller: ShutController,
+          handler: bytes,
+          query: { [MEDIA_TICKET_PARAM]: VALID },
+        }),
       ),
     ).toBe(true)
   })
@@ -175,14 +191,22 @@ describe('the lock guard and a media ticket', () => {
   it('refuses the same ticket on a route that is not marked media plane', () => {
     const refused = (): boolean =>
       guard().canActivate(
-        contextOf({ controller: ShutController, handler: plain, query: { t: VALID } }),
+        contextOf({
+          controller: ShutController,
+          handler: plain,
+          query: { [MEDIA_TICKET_PARAM]: VALID },
+        }),
       )
     expect(refused).toThrow(HttpException)
     expect(refused).toThrow(expect.objectContaining({ status: LOCKED_STATUS }))
   })
 
   it('refuses a ticket for another video, a missing one, and one that is not a string', () => {
-    const refusals = [{ t: 'other-ticket' }, {}, { t: [VALID] }].map(
+    const refusals = [
+      { [MEDIA_TICKET_PARAM]: 'other-ticket' },
+      {},
+      { [MEDIA_TICKET_PARAM]: [VALID] },
+    ].map(
       (query) => () =>
         guard().canActivate(contextOf({ controller: ShutController, handler: bytes, query })),
     )
@@ -191,10 +215,26 @@ describe('the lock guard and a media ticket', () => {
     })
   })
 
+  it('takes no legacy ticket once accounts are on, not even for the owner', () => {
+    const refused = (): boolean =>
+      guard({ isLegacy: false }).canActivate(
+        contextOf({
+          controller: ShutController,
+          handler: bytes,
+          query: { [MEDIA_TICKET_PARAM]: VALID },
+        }),
+      )
+    expect(refused).toThrow(expect.objectContaining({ status: LOCKED_STATUS }))
+  })
+
   it('answers 404 to a refused ticket while the admin lock holds', () => {
     const refused = (): boolean =>
       guard({ isAdminLocked: true }).canActivate(
-        contextOf({ controller: ShutController, handler: bytes, query: { t: 'nope' } }),
+        contextOf({
+          controller: ShutController,
+          handler: bytes,
+          query: { [MEDIA_TICKET_PARAM]: 'nope' },
+        }),
       )
     expect(refused).toThrow(NotFoundException)
   })

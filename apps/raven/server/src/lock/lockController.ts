@@ -3,17 +3,16 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   HttpCode,
   HttpException,
   Inject,
   Post,
+  Req,
   Res,
 } from '@nestjs/common'
 import { type LockState, isUnlockRequest } from '@raven/core'
-import type { FastifyReply } from 'fastify'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
-import { RAVEN_HEADERS } from '@/http'
 import { LockService } from '@/lock/lockService'
 import { parseBody } from '@/parseBody'
 
@@ -22,17 +21,21 @@ export class LockController {
   constructor(@Inject(LockService) private readonly lock: LockService) {}
 
   @Get()
-  state(@Headers(RAVEN_HEADERS.cookie) cookie: string | undefined): LockState {
-    return this.lock.state({ cookie })
+  state(@Req() request: FastifyRequest): LockState {
+    return this.lock.state({ request })
   }
 
-  /** `{ pin }`: opens every locked library for this browser. */
+  /** `{ pin }`: opens every locked library for this browser, to the owner once accounts are ready. */
   @ForViewers()
   @Post('unlock')
   @HttpCode(200)
-  unlock(@Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply): LockState {
+  unlock(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): LockState {
     const { pin } = parseBody({ guard: isUnlockRequest, body, message: 'pin must be text' })
-    const unlocking = this.lock.unlock(pin)
+    const unlocking = this.lock.unlock({ pin, request })
     if (!unlocking.ok) throw new HttpException(unlocking.message, unlocking.status)
     reply.header(HEADERS.setCookie, unlocking.cookie)
     return { available: true, unlocked: true }
@@ -42,8 +45,11 @@ export class LockController {
   @ForViewers()
   @Post('lock')
   @HttpCode(200)
-  relock(@Res({ passthrough: true }) reply: FastifyReply): LockState {
+  relock(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): LockState {
     reply.header(HEADERS.setCookie, this.lock.lockCookie())
-    return { available: this.lock.available, unlocked: false }
+    return { ...this.lock.state({ request }), unlocked: false }
   }
 }
