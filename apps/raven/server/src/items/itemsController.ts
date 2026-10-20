@@ -46,6 +46,7 @@ import { LockService } from '@/lock/lockService'
 import { FAVOURITE_OUTCOMES } from '@/media/favouriteOutcomes'
 import { MediaRepository } from '@/media/mediaRepository'
 import { TitleFavourites } from '@/media/titleFavourites'
+import { ViewingAccounts } from '@/media/viewingAccounts'
 import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
 import { ItemImagesRepository, STORED_IMAGE_SOURCES } from '@/metadata/itemImagesRepository'
 import { ItemOverrides } from '@/metadata/itemOverrides'
@@ -72,6 +73,7 @@ export class ItemsController {
     @Inject(LockService) private readonly lock: LockService,
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(TitleFavourites) private readonly titleFavourites: TitleFavourites,
+    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
 
   private requireItem(id: number): void {
@@ -83,6 +85,7 @@ export class ItemsController {
     const details = this.metadata.details(id)
     if (!details) throw new NotFoundException(`No item ${id}`)
     const viewer = this.lock.viewer({ request })
+    const account = this.accounts.keyOf({ request })
     return {
       ...details,
       aiMatch: this.service.aiMatchFor({
@@ -91,9 +94,17 @@ export class ItemsController {
         tmdbId: details.tmdbId,
         sees: (libraryId) => viewer.seesLibrary(libraryId),
       }),
-      favourite: this.titleFavourites.favouriteOf(id),
-      versions: this.media.forItem(id).filter((item) => viewer.seesLibrary(item.libraryId)),
-      children: itemChildren({ parentId: id, viewer, metadata: this.metadata, media: this.media }),
+      favourite: this.titleFavourites.favouriteOf({ itemId: id, account }),
+      versions: this.media
+        .forItem({ itemId: id, account })
+        .filter((item) => viewer.seesLibrary(item.libraryId)),
+      children: itemChildren({
+        parentId: id,
+        viewer,
+        metadata: this.metadata,
+        media: this.media,
+        account,
+      }),
     }
   }
 
@@ -136,7 +147,11 @@ export class ItemsController {
     @Req() request: FastifyRequest,
   ): ItemDetails {
     if (!isFavouriteChange(body)) throw new BadRequestException('favourite must be true or false')
-    const outcome = this.titleFavourites.set({ itemId: id, favourite: body.favourite })
+    const outcome = this.titleFavourites.set({
+      itemId: id,
+      favourite: body.favourite,
+      account: this.accounts.keyOf({ request }),
+    })
     switch (outcome) {
       case FAVOURITE_OUTCOMES.done:
         return this.details({ id, request })
@@ -171,7 +186,11 @@ export class ItemsController {
     this.requireItem(id)
     const viewer = this.lock.viewer({ request })
     const libraryIds = this.libraries.ids().filter((libraryId) => viewer.seesLibrary(libraryId))
-    return this.media.nextEpisode({ showId: id, libraryIds })
+    return this.media.nextEpisode({
+      showId: id,
+      libraryIds,
+      account: this.accounts.keyOf({ request }),
+    })
   }
 
   /**
@@ -187,7 +206,11 @@ export class ItemsController {
     this.requireItem(id)
     const viewer = this.lock.viewer({ request })
     const libraryIds = this.libraries.ids().filter((libraryId) => viewer.seesLibrary(libraryId))
-    return this.media.shuffledEpisodes({ itemId: id, libraryIds })
+    return this.media.shuffledEpisodes({
+      itemId: id,
+      libraryIds,
+      account: this.accounts.keyOf({ request }),
+    })
   }
 
   /** Fetches the item from TMDB again now. One TMDB no longer has is gone after, so 404. */

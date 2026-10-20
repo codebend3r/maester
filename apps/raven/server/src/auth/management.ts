@@ -11,7 +11,8 @@ import { AdminService } from '@/admin/adminService'
 import { AuthSessions, accountOf } from '@/auth/authSessions'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
 
-const isApprovedOwner = (account: Account): boolean =>
+/** Whether the account is the owner, approved: who manages raven once accounts are ready. */
+export const isApprovedOwner = (account: Account): boolean =>
   account.status === MEMBER_STATUSES.approved && account.isOwner
 
 /**

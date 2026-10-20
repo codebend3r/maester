@@ -1,3 +1,4 @@
+import { copyFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
@@ -27,7 +28,7 @@ import {
   bearerHeaders,
 } from '@/test/auth'
 import { encodeClip } from '@/test/clips'
-import { fakeTmdb } from '@/test/fakeTmdb'
+import { type FakeShow, fakeTmdb } from '@/test/fakeTmdb'
 import { injectFetch } from '@/test/server'
 
 const { get: GET, post: POST, put: PUT, delete: DELETE } = ROUTE_METHODS
@@ -157,6 +158,7 @@ export const CALLER_KINDS = {
   pending: 'pending',
   revoked: 'revoked',
   member: 'member',
+  guest: 'guest',
   owner: 'owner',
 } as const
 
@@ -170,6 +172,7 @@ const CALLER_IDS = {
   [CALLER_KINDS.pending]: AUTH_TEST_IDS.pending,
   [CALLER_KINDS.revoked]: AUTH_TEST_IDS.revoked,
   [CALLER_KINDS.member]: AUTH_TEST_IDS.friend,
+  [CALLER_KINDS.guest]: AUTH_TEST_IDS.guest,
   [CALLER_KINDS.owner]: AUTH_TEST_IDS.owner,
 } as const
 
@@ -225,6 +228,21 @@ export const outcomeOf = ({
 
 const MATRIX = { id: 603, title: 'The Matrix', released: '1999-03-31' } as const
 
+const ANDOR: FakeShow = {
+  id: 83867,
+  title: 'Andor',
+  first: '2022-09-21',
+  seasons: {
+    1: [
+      { number: 1, title: 'Kassa', aired: '2022-09-21' },
+      { number: 2, title: 'That Would Be Me', aired: '2022-09-21' },
+    ],
+  },
+}
+
+/** What the fake TMDB knows: The Matrix, and the first two episodes of Andor. */
+export const ENFORCED_TITLES = { movies: [MATRIX], shows: [ANDOR] }
+
 /**
  * A server with accounts `ready`, on which the owner has made and scanned
  * one movies library holding The Matrix, matched against a fake TMDB. The
@@ -237,6 +255,7 @@ export const createEnforcedApp = async ({
   mediaSecret = null,
   mediaOrigins = [],
   accessRecheckMs,
+  movieSeconds = 1,
 }: {
   root: string
   fixture: AuthFixture
@@ -247,6 +266,8 @@ export const createEnforcedApp = async ({
   mediaOrigins?: readonly MediaOrigin[]
   /** How often open SSE and media responses are checked again; a minute when left out. */
   accessRecheckMs?: number
+  /** How long The Matrix runs, for a test that saves a spot further in than a second. */
+  movieSeconds?: number
 }): Promise<{
   app: NestFastifyApplication
   mediaDir: string
@@ -254,7 +275,7 @@ export const createEnforcedApp = async ({
   ids: { library: number; video: number; item: number | null }
 }> => {
   const mediaDir = join(root, 'media')
-  await encodeClip({ path: join(mediaDir, 'The Matrix (1999).mp4'), seconds: 1 })
+  await encodeClip({ path: join(mediaDir, 'The Matrix (1999).mp4'), seconds: movieSeconds })
   const base = testConfig({ dataDir: join(root, 'data'), mediaDir })
   const app = await createApp({
     config: {
@@ -266,7 +287,7 @@ export const createEnforcedApp = async ({
     },
     authKeys: fixture.keys,
     authFetch: fixture.fetcher,
-    metadataFetch: fakeTmdb({ movies: [MATRIX] }).fetch,
+    metadataFetch: fakeTmdb(ENFORCED_TITLES).fetch,
     quiet: true,
     watch: NOT_WATCHING,
     accessRecheckMs,
@@ -292,4 +313,89 @@ export const createEnforcedApp = async ({
     app.get(MetadataRepository).find({ type: ITEM_TYPES.movie, tmdbId: String(MATRIX.id) })?.id ??
     null
   return { app, mediaDir, ownerApi, ids: { library: library.id, video: video.id, item } }
+}
+
+/** Where `addShow` finds Andor's season, and its two episodes in order. */
+export type ShowIds = { library: number; show: number; season: number; episodes: [number, number] }
+
+/**
+ * Adds a shows library holding the first two episodes of Andor, matched
+ * against the fake TMDB, to a server `createEnforcedApp` made. It is a
+ * separate step because the other suites count the one library that
+ * function leaves.
+ */
+export const addShow = async ({
+  root,
+  enforced,
+}: {
+  root: string
+  enforced: Pick<Awaited<ReturnType<typeof createEnforcedApp>>, 'app' | 'ownerApi'>
+}): Promise<ShowIds> => {
+  const { app, ownerApi } = enforced
+  const showsDir = join(root, 'shows')
+  const season = join(showsDir, 'Andor (2022)', 'Season 01')
+  const first = join(season, 'Andor - S01E01 - Kassa.mp4')
+  await encodeClip({ path: first, seconds: 1 })
+  await copyFile(first, join(season, 'Andor - S01E02 - That Would Be Me.mp4'))
+  const library = await ownerApi.createLibrary({
+    name: 'Shows',
+    paths: [showsDir],
+    settings: { kind: LIBRARY_KINDS.shows },
+  })
+  await app.get(ScannerService).whenIdle(library.id)
+  await app.get(MetadataService).whenIdle()
+  await app.get(ThumbnailService).whenIdle()
+  const { shows } = await ownerApi.listShows({ libraryId: library.id })
+  const [entry] = shows
+  if (entry === undefined) throw new Error('The enforced shows library matched no show')
+  const [firstSeason] = (await ownerApi.getItem(entry.show.id)).children
+  const [one, two] = (await ownerApi.listMedia({ libraryId: library.id }))
+    .toSorted((a, b) => a.fileName.localeCompare(b.fileName))
+    .map(({ id }) => id)
+  if (firstSeason === undefined || one === undefined || two === undefined) {
+    throw new Error('The enforced shows library did not match Andor and its two episodes')
+  }
+  return { library: library.id, show: entry.show.id, season: firstSeason.id, episodes: [one, two] }
+}
+
+/** The movies library's two extras: a file no movie matches, and a second file of The Matrix. */
+export type LeftoverIds = { unmatched: number; duplicate: number }
+
+const LEFTOVER_FILES = {
+  unmatched: 'Zzxq Qwvb Unmatchable.mp4',
+  duplicate: 'The Matrix (1999) Final Cut.mp4',
+} as const
+
+/**
+ * Adds to the movies library `createEnforcedApp` made a file the fake TMDB
+ * cannot match and a second file of The Matrix, so Not matched and Duplicates
+ * have something to list. A separate step for the same reason as `addShow`.
+ */
+export const addLeftovers = async ({
+  enforced,
+}: {
+  enforced: Pick<
+    Awaited<ReturnType<typeof createEnforcedApp>>,
+    'app' | 'mediaDir' | 'ownerApi' | 'ids'
+  >
+}): Promise<LeftoverIds> => {
+  const { app, mediaDir, ownerApi, ids } = enforced
+  const matrix = join(mediaDir, 'The Matrix (1999).mp4')
+  await Promise.all(
+    Object.values(LEFTOVER_FILES).map((name) => copyFile(matrix, join(mediaDir, name))),
+  )
+  await ownerApi.scanLibrary(ids.library)
+  await app.get(ScannerService).whenIdle(ids.library)
+  await app.get(MetadataService).whenIdle()
+  await app.get(ThumbnailService).whenIdle()
+  const unmatched = (await ownerApi.listUnmatched(ids.library)).find(
+    ({ fileName }) => fileName === LEFTOVER_FILES.unmatched,
+  )
+  const duplicate = (await ownerApi.listDuplicates(ids.library))
+    .flatMap(({ cards }) => cards.flatMap(({ files }) => files))
+    .find(({ media }) => media.fileName === LEFTOVER_FILES.duplicate)
+  if (unmatched === undefined || duplicate === undefined) {
+    throw new Error('The enforced movies library did not list its extra files')
+  }
+  return { unmatched: unmatched.id, duplicate: duplicate.media.id }
 }

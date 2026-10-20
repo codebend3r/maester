@@ -44,6 +44,8 @@ import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MediaRepository } from '@/media/mediaRepository'
 import { RANGE_OUTCOMES, RANGE_UNITS, parseRange } from '@/media/range'
+import { ViewingAccounts } from '@/media/viewingAccounts'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { parseBody } from '@/parseBody'
 import { ScannerService } from '@/scanner/scannerService'
@@ -89,10 +91,11 @@ export class MediaController {
     @Inject(ScannerService) private readonly scanner: ScannerService,
     @Inject(StreamSessions) private readonly streams: StreamSessions,
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
+    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
 
-  private find(id: number): MediaItem {
-    const item = this.media.get(id)
+  private find({ id, account }: { id: number; account: AccountKey }): MediaItem {
+    const item = this.media.get({ id, account })
     if (!item) throw new NotFoundException(`No media ${id}`)
     return item
   }
@@ -104,8 +107,8 @@ export class MediaController {
   }
 
   @Get(':id')
-  get(@Param('id', ParseIntPipe) id: number): MediaItem {
-    return this.find(id)
+  get(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): MediaItem {
+    return this.find({ id, account: this.accounts.keyOf({ request }) })
   }
 
   /** Where the file lives, for the card's menu: the one call that hands a client a path. */
@@ -129,7 +132,7 @@ export class MediaController {
       message: 'position must be a number of seconds',
     })
     this.streams.report({ mediaId: id, client: clientOf(request), position })
-    if (!this.viewing.report({ id, position })) {
+    if (!this.viewing.report({ id, position, account: this.accounts.keyOf({ request }) })) {
       throw new NotFoundException(`No media ${id}`)
     }
   }
@@ -138,22 +141,29 @@ export class MediaController {
   @ForViewers()
   @Post(':id/plays')
   @HttpCode(204)
-  recordPlay(@Param('id', ParseIntPipe) id: number): void {
-    if (!this.viewing.recordPlay({ id })) throw new NotFoundException(`No media ${id}`)
+  recordPlay(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): void {
+    if (!this.viewing.recordPlay({ id, account: this.accounts.keyOf({ request }) })) {
+      throw new NotFoundException(`No media ${id}`)
+    }
   }
 
   @ForViewers()
   @Put(':id/favourite')
-  setFavourite(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): MediaItem {
+  setFavourite(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+  ): MediaItem {
     const { favourite } = parseBody({
       guard: isFavouriteChange,
       body,
       message: 'favourite must be true or false',
     })
-    const outcome = this.viewing.setFavourite({ id, favourite })
+    const account = this.accounts.keyOf({ request })
+    const outcome = this.viewing.setFavourite({ id, favourite, account })
     switch (outcome) {
       case FAVOURITE_OUTCOMES.done:
-        return this.find(id)
+        return this.find({ id, account })
       case FAVOURITE_OUTCOMES.missing:
         throw new NotFoundException(`No media ${id}`)
       case FAVOURITE_OUTCOMES.locked:

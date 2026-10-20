@@ -29,6 +29,7 @@ export const AUTH_TEST_IDS = {
   pending: '20000000-0000-4000-8000-000000000003',
   revoked: '20000000-0000-4000-8000-000000000004',
   missing: '20000000-0000-4000-8000-000000000005',
+  guest: '20000000-0000-4000-8000-000000000006',
 } as const
 export const AUTH_TEST_ALGORITHM = 'ES256'
 export const AUTH_TEST_KID = 'raven-auth-test'
@@ -88,6 +89,12 @@ export const authFixture = async () => {
     [AUTH_TEST_IDS.friend]: {
       id: AUTH_TEST_IDS.friend,
       email: 'friend@maester.test',
+      status: MEMBER_STATUSES.approved,
+      isOwner: false,
+    },
+    [AUTH_TEST_IDS.guest]: {
+      id: AUTH_TEST_IDS.guest,
+      email: 'guest@maester.test',
       status: MEMBER_STATUSES.approved,
       isOwner: false,
     },

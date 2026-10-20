@@ -43,6 +43,8 @@ import { MediaTickets } from '@/media/mediaTickets'
 import { SagaBackdrops } from '@/media/sagaBackdrops'
 import { MovieSplits } from '@/media/movieSplits'
 import { TitleFavourites } from '@/media/titleFavourites'
+import { ViewingAccounts } from '@/media/viewingAccounts'
+import { ViewingAdoption } from '@/media/viewingAdoption'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { WatchedCards } from '@/media/watchedCards'
 import { WatchedController } from '@/media/watchedController'
@@ -174,6 +176,8 @@ export class AppModule {
         SagaBackdrops,
         MediaRepository,
         MovieSplits,
+        ViewingAdoption,
+        ViewingAccounts,
         ViewingRepository,
         TitleFavourites,
         WatchedCards,

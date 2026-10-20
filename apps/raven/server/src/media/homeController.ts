@@ -4,6 +4,7 @@ import {
   type Home,
   type HomeSearch,
   type HomeShelf,
+  MEDIA_SORTS,
   type MediaSort,
   isString,
   listsShows,
@@ -12,6 +13,8 @@ import type { FastifyRequest } from 'fastify'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { LockService, type Viewer } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
+import { ViewingAccounts } from '@/media/viewingAccounts'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 
 /** How many of a pinned library's newest arrivals its shelf on the home page holds. */
 const SHELF_SIZE = 8
@@ -26,6 +29,7 @@ export class HomeController {
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(LockService) private readonly lock: LockService,
+    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
 
   /** A library's row: its shows for a TV shows library, its videos for any other. */
@@ -34,13 +38,15 @@ export class HomeController {
     search,
     sort,
     limit,
+    account,
   }: {
     library: LibraryRecord
     search: string
     sort: MediaSort
     limit: number
+    account: AccountKey
   }): HomeShelf {
-    const listing = { libraryId: id, search, sort, limit }
+    const listing = { libraryId: id, search, sort, limit, account }
     return listsShows(settings.kind)
       ? { libraryId: id, type: 'shows', shows: this.media.listShows(listing) }
       : { libraryId: id, type: 'media', media: this.media.list(listing) }
@@ -58,12 +64,17 @@ export class HomeController {
   @Get()
   home(@Req() request: FastifyRequest): Home {
     const viewer = this.lock.viewer({ request })
+    const account = this.accounts.keyOf({ request })
     const shelves = this.seenBy(viewer)
       .filter((library) => library.settings.pinned)
-      .map((library) => this.shelf({ library, search: '', sort: 'added', limit: SHELF_SIZE }))
+      .map((library) =>
+        this.shelf({ library, search: '', sort: MEDIA_SORTS.added, limit: SHELF_SIZE, account }),
+      )
     return {
       inProgress: this.media.withPosters(
-        this.media.listInProgress().filter((media) => viewer.seesLibrary(media.libraryId)),
+        this.media
+          .listInProgress({ account })
+          .filter((media) => viewer.seesLibrary(media.libraryId)),
       ),
       shelves,
     }
@@ -75,13 +86,16 @@ export class HomeController {
    * libraries stay out, whether or not the PIN is entered.
    */
   @Get('search')
-  search(@Query('q') q: unknown): HomeSearch {
+  search(@Query('q') q: unknown, @Req() request: FastifyRequest): HomeSearch {
     const search = isString(q) ? q.trim() : ''
     if (!search) return []
+    const account = this.accounts.keyOf({ request })
     return this.libraries
       .list()
       .filter((library) => !library.settings.locked)
-      .map((library) => this.shelf({ library, search, sort: 'title', limit: SEARCH_SHELF_SIZE }))
+      .map((library) =>
+        this.shelf({ library, search, sort: MEDIA_SORTS.title, limit: SEARCH_SHELF_SIZE, account }),
+      )
       .filter(
         (shelf) => (shelf.type === HOME_SHELF_TYPES.shows ? shelf.shows : shelf.media).length > 0,
       )
