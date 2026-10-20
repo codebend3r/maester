@@ -4,9 +4,13 @@ import {
   PLAYER_EVENTS,
   type PlayerCommand,
   type PlayerEvent,
+  PLAYER_SOURCE_KINDS,
+  PLAYER_ERROR_REASONS,
 } from '@raven/core'
 import {
   MPV_COMMANDS,
+  MPV_END_FILE_REASONS,
+  MPV_EVENTS,
   type MpvEvent,
   type MpvProperty,
   type MpvPropertyValue,
@@ -15,6 +19,7 @@ import {
   propertyGuards,
 } from '@raven/mpv'
 import {
+  type AccountRefusalReader,
   BUFFERED_MS,
   createPlayerService,
   type FailureExplainer,
@@ -33,6 +38,7 @@ import {
   type ServerTarget,
   SIDECAR_BUDGET_MS,
   TIME_MS,
+  PLAYER_PHASES,
 } from '@/main/player/playerService'
 import { engineOptionsFor, HARDENED_OPTIONS } from '@/main/player/engine'
 import type { Timers } from '@/main/stateStore'
@@ -72,6 +78,7 @@ const LOAD = {
 const SERVER_ID = '00000000-0000-4000-8000-000000000001'
 const OTHER_SERVER_ID = '00000000-0000-4000-8000-000000000002'
 const GONE_SERVER_ID = '00000000-0000-4000-8000-000000000003'
+const RELAYED_SERVER_ID = '00000000-0000-4000-8000-000000000004'
 const SERVER_URL = 'https://raven.example/api/media/7/file'
 const SIDECAR_URLS = [
   'https://raven.example/api/media/7/subtitles/external-0',
@@ -88,6 +95,7 @@ const SERVER_TARGET: ServerTarget = {
     { url: SIDECAR_URLS[0], title: 'Spanish', language: 'es' },
     { url: SIDECAR_URLS[1], title: '', language: '' },
   ],
+  relay: null,
 }
 
 const OTHER_TARGET: ServerTarget = {
@@ -97,6 +105,20 @@ const OTHER_TARGET: ServerTarget = {
   url: 'https://other.example/api/media/9/file',
   headerFields: '',
   sidecars: [],
+  relay: null,
+}
+
+const RELAY_SECRET = 'Zm9vYmFyYmF6cXV4cXV1eGNvcmdlZ3JhdWx0Z2FycGx5'
+const RELAY_BASE = `http://127.0.0.1:41234/${RELAY_SECRET}`
+
+const RELAYED_TARGET: ServerTarget = {
+  kind: PLAYER_SOURCE_KINDS.server,
+  serverId: RELAYED_SERVER_ID,
+  mediaId: 5,
+  url: `${RELAY_BASE}/file`,
+  headerFields: '',
+  sidecars: [{ url: `${RELAY_BASE}/subtitles/external-0`, title: '', language: '' }],
+  relay: { loadId: '1', base: RELAY_BASE },
 }
 
 const SERVER_LOAD = {
@@ -112,10 +134,19 @@ const OTHER_LOAD = {
   source: { kind: 'server', serverId: OTHER_SERVER_ID, mediaId: 9 },
 } as const satisfies PlayerCommand
 
+const RELAYED_LOAD = {
+  ...SERVER_LOAD,
+  source: { kind: PLAYER_SOURCE_KINDS.server, serverId: RELAYED_SERVER_ID, mediaId: 5 },
+} as const satisfies PlayerCommand
+
 /** A sidecar as mpv lists it once `sub-add` has added it: the file's third subtitle. */
 const LATE_SIDECAR = mpvTrack({ id: 3, type: 'sub', lang: 'spa', codec: 'webvtt', external: true })
 
 const GONE_MESSAGE = 'That server is no longer in raven player.'
+const REMOVED = {
+  reason: PLAYER_ERROR_REASONS.account,
+  message: 'Your access to Vhagar was removed.',
+} as const
 const LOCKED = { reason: 'locked', message: 'Vhagar locked this library again.' } as const
 
 /** Server sources that know two servers; `hold` keeps the next resolve until `release`. */
@@ -134,6 +165,7 @@ const fakeServers = () => {
     }
     if (source.serverId === SERVER_ID) return { ok: true, target: SERVER_TARGET }
     if (source.serverId === OTHER_SERVER_ID) return { ok: true, target: OTHER_TARGET }
+    if (source.serverId === RELAYED_SERVER_ID) return { ok: true, target: RELAYED_TARGET }
     return { ok: false, message: GONE_MESSAGE }
   }
   return {
@@ -390,7 +422,8 @@ const fileOf = (fileId: string) =>
 const setup = ({
   timers,
   sidecarsOf = () => [],
-}: { timers?: Timers; sidecarsOf?: SidecarsOf } = {}) => {
+  refusedAccount = () => null,
+}: { timers?: Timers; sidecarsOf?: SidecarsOf; refusedAccount?: AccountRefusalReader } = {}) => {
   const mpv = createFakeMpv()
   const clock = createFakeTimers()
   const servers = fakeServers()
@@ -403,6 +436,7 @@ const setup = ({
     mpv: mpv.control,
     resolveSource: resolveSourceWith({ grants: { fileOf }, servers: servers.servers, sidecarsOf }),
     explain: explainer.explain,
+    refusedAccount,
     canChooseAo: false,
     timers: timers ?? clock.timers,
     onActivity: (next) => {
@@ -470,6 +504,7 @@ describe('hardening', () => {
         sidecarsOf: () => [],
       }),
       explain: fakeExplain().explain,
+      refusedAccount: () => null,
       canChooseAo: false,
       timers: createFakeTimers().timers,
       onActivity: () => {},
@@ -491,6 +526,7 @@ describe('hardening', () => {
         sidecarsOf: () => [],
       }),
       explain: fakeExplain().explain,
+      refusedAccount: () => null,
       canChooseAo: false,
       timers: createFakeTimers().timers,
       onActivity: () => {},
@@ -702,7 +738,7 @@ describe('createPlayerService', () => {
       const { service, events, activity } = setup()
       await service.handle(LOAD)
       activity.splice(0)
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       expect(events).toEqual([])
       expect(activity).toEqual([])
       service.receive({ type: 'file-loaded' })
@@ -713,7 +749,11 @@ describe('createPlayerService', () => {
     test('an error while loading is an open error; while loaded a decode error', async () => {
       const opening = setup()
       await opening.service.handle(LOAD)
-      opening.service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      opening.service.receive({
+        type: MPV_EVENTS.endFile,
+        reason: MPV_END_FILE_REASONS.error,
+        error: -13,
+      })
       expect(opening.events).toEqual([
         { type: 'error', reason: 'open', message: PLAYER_MESSAGES.cannotOpen },
       ])
@@ -721,7 +761,11 @@ describe('createPlayerService', () => {
       const playing = setup()
       await playing.loaded()
       playing.clear()
-      playing.service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      playing.service.receive({
+        type: MPV_EVENTS.endFile,
+        reason: MPV_END_FILE_REASONS.error,
+        error: -13,
+      })
       expect(playing.events).toEqual([
         { type: 'error', reason: 'decode', message: PLAYER_MESSAGES.stopped },
       ])
@@ -733,14 +777,18 @@ describe('createPlayerService', () => {
       await near.loaded()
       near.time(118)
       near.clear()
-      near.service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      near.service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       expect(near.events).toEqual([{ type: 'ended' }])
 
       const short = setup()
       await short.loaded()
       short.time(60)
       short.clear()
-      short.service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      short.service.receive({
+        type: MPV_EVENTS.endFile,
+        reason: MPV_END_FILE_REASONS.eof,
+        error: 0,
+      })
       expect(short.events).toEqual([
         { type: 'error', reason: 'decode', message: PLAYER_MESSAGES.stopped },
       ])
@@ -750,7 +798,11 @@ describe('createPlayerService', () => {
       await unknown.loaded()
       unknown.time(60)
       unknown.clear()
-      unknown.service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      unknown.service.receive({
+        type: MPV_EVENTS.endFile,
+        reason: MPV_END_FILE_REASONS.eof,
+        error: 0,
+      })
       expect(unknown.events).toEqual([{ type: 'ended' }])
     })
 
@@ -765,7 +817,7 @@ describe('createPlayerService', () => {
         message: PLAYER_MESSAGES.failed,
       })
       clear()
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       expect(events).toEqual([
         { type: 'error', reason: 'decode', message: PLAYER_MESSAGES.stopped },
       ])
@@ -779,7 +831,7 @@ describe('createPlayerService', () => {
       service.receive({ type: 'file-loaded' })
       await settle()
       clear()
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       expect(events).toEqual([
         { type: 'error', reason: 'decode', message: PLAYER_MESSAGES.stopped },
       ])
@@ -791,7 +843,7 @@ describe('createPlayerService', () => {
       time(30)
       await service.handle({ type: 'seek', time: 500 })
       clear()
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       expect(events).toEqual([{ type: 'ended' }])
     })
 
@@ -799,7 +851,7 @@ describe('createPlayerService', () => {
       const { service, events, loaded, clear } = setup()
       await loaded({ ...LOAD, start: 118 })
       clear()
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       expect(events).toEqual([{ type: 'ended' }])
     })
 
@@ -810,7 +862,7 @@ describe('createPlayerService', () => {
       service.receive({ type: 'file-loaded' })
       await settle()
       clear()
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       expect(events).toEqual([{ type: 'ended' }])
     })
 
@@ -818,7 +870,11 @@ describe('createPlayerService', () => {
       const playing = setup()
       await playing.loaded()
       playing.clear()
-      playing.service.receive({ type: 'end-file', reason: 'quit', error: 0 })
+      playing.service.receive({
+        type: MPV_EVENTS.endFile,
+        reason: MPV_END_FILE_REASONS.quit,
+        error: 0,
+      })
       expect(playing.events).toEqual([])
       expect(playing.activity).toEqual([{ isPlaying: false, isShowing: true }])
       playing.time(5)
@@ -827,18 +883,74 @@ describe('createPlayerService', () => {
       const opening = setup()
       await opening.service.handle(LOAD)
       opening.clear()
-      opening.service.receive({ type: 'end-file', reason: 'quit', error: 0 })
+      opening.service.receive({
+        type: MPV_EVENTS.endFile,
+        reason: MPV_END_FILE_REASONS.quit,
+        error: 0,
+      })
       expect(opening.events).toEqual([])
       expect(opening.activity).toEqual([{ isPlaying: false, isShowing: true }])
+    })
+
+    test('an eof while a relayed title opens ends it as the account refusal the relay saw', async () => {
+      const { service, events, explainer, activity } = setup({ refusedAccount: () => REMOVED })
+      explainer.use(EXPLAIN_MODES.answer)
+      expect(await service.handle(RELAYED_LOAD)).toEqual({ ok: true })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
+      await settle()
+      expect(explainer.asked).toEqual([{ target: RELAYED_TARGET, phase: PLAYER_PHASES.loading }])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toHaveLength(1)
+      expect(activity.at(-1)).toEqual({ isPlaying: false, isShowing: true })
+    })
+
+    test.each([
+      { label: 'an eof near the end', reason: MPV_END_FILE_REASONS.eof, error: 0, at: 118 },
+      { label: 'an eof short of the end', reason: MPV_END_FILE_REASONS.eof, error: 0, at: 60 },
+      { label: 'an error', reason: MPV_END_FILE_REASONS.error, error: -10, at: 60 },
+    ])(
+      '$label after a relayed title the relay saw refused asks explain for it as loaded and sends one error, not ended',
+      async ({ reason, error, at }) => {
+        const { service, events, explainer, loaded, time, clear, activity } = setup({
+          refusedAccount: () => REMOVED,
+        })
+        await loaded(RELAYED_LOAD)
+        time(at)
+        clear()
+        service.receive({ type: MPV_EVENTS.endFile, reason, error })
+        await settle()
+        expect(explainer.asked).toEqual([{ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded }])
+        expect(events.map(({ type }) => type)).toEqual([PLAYER_EVENTS.error])
+        expect(activity.at(-1)).toEqual({ isPlaying: false, isShowing: true })
+      },
+    )
+
+    test('a relayed title that runs out with no refusal sends ended and asks explain nothing', async () => {
+      const { service, events, explainer, loaded, time, clear } = setup()
+      await loaded(RELAYED_LOAD)
+      time(118)
+      clear()
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
+      await settle()
+      expect(explainer.asked).toEqual([])
+      expect(events).toEqual([{ type: PLAYER_EVENTS.ended }])
+    })
+
+    test('an eof while a title opens with no refusal is still not an ending', async () => {
+      const { service, events, explainer } = setup()
+      expect(await service.handle(RELAYED_LOAD)).toEqual({ ok: true })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
+      await settle()
+      expect(explainer.asked).toEqual([])
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
     })
 
     test('a file that cannot open answers nothing more after its error', async () => {
       const { service, events, counts, mpv } = setup()
       await service.handle(LOAD)
-      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.error, error: -13 })
       service.receive({ type: 'playback-restart' })
       service.receive({ type: 'property', name: 'time-pos', data: 3 })
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       expect(events.length).toBe(1)
       expect(counts.firstFrames).toBe(0)
       mpv.log.splice(0)
@@ -871,6 +983,38 @@ describe('createPlayerService', () => {
         "mpv error file: Cannot open file '<file>': Permission denied",
         'mpv warn demux: <file>: bad index',
       ])
+    })
+
+    test("a warning names a relayed title's base or secret only as <relay>", async () => {
+      const { service, warnings, loaded } = setup()
+      await loaded(RELAYED_LOAD)
+      warnings.splice(0)
+      service.receive({
+        type: 'log',
+        level: 'error',
+        prefix: 'ffmpeg',
+        text: `http: HTTP error 403 Forbidden for ${RELAY_BASE}/file`,
+      })
+      service.receive({
+        type: 'log',
+        level: 'warn',
+        prefix: 'stream',
+        text: `GET /${RELAY_SECRET}/subtitles/external-0 failed`,
+      })
+      expect(warnings).toEqual([
+        'mpv error ffmpeg: http: HTTP error 403 Forbidden for <relay>/file',
+        'mpv warn stream: GET /<relay>/subtitles/external-0 failed',
+      ])
+      expect(warnings.join('')).not.toContain(RELAY_SECRET)
+    })
+
+    test('a relayed title opens the relay URL with no header fields', async () => {
+      const { service, mpv } = setup()
+      mpv.log.splice(0)
+      expect(await service.handle(RELAYED_LOAD)).toEqual({ ok: true })
+      expect(mpv.log.at(-1)).toBe(
+        `loadfile ${RELAY_BASE}/file replace -1 start=30,stream-lavf-o=%37%max_redirects=0,reconnect_delay_max=3,network-timeout=15`,
+      )
     })
 
     test('a warning names a sidecar only as <file>, by its path or its name', async () => {
@@ -1082,7 +1226,7 @@ describe('createPlayerService', () => {
       service.receive({ type: 'property', name: 'track-list', data: [] })
       service.receive({ type: 'property', name: 'container-fps', data: null })
       expect(events).toEqual([])
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       expect(events).toEqual([
         { type: 'error', reason: 'decode', message: PLAYER_MESSAGES.stopped },
       ])
@@ -1392,6 +1536,7 @@ describe('createPlayerService', () => {
           sidecarsOf: () => [],
         }),
         explain: fakeExplain().explain,
+        refusedAccount: () => null,
         canChooseAo: false,
         timers: createFakeTimers().timers,
         onActivity: () => {
@@ -1555,8 +1700,8 @@ describe('createPlayerService', () => {
       activity.splice(0)
       service.receive({ type: 'file-loaded' })
       service.receive({ type: 'property', name: 'time-pos', data: 4 })
-      service.receive({ type: 'end-file', reason: 'error', error: -13 })
-      service.receive({ type: 'end-file', reason: 'redirect', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.error, error: -13 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.redirect, error: 0 })
       await settle()
       expect(events).toEqual([])
       expect(activity).toEqual([])
@@ -1577,7 +1722,7 @@ describe('createPlayerService', () => {
       const { service, mpv, events, loaded, clear } = setup()
       await loaded()
       clear()
-      service.receive({ type: 'end-file', reason: 'redirect', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.redirect, error: 0 })
       expect(events).toEqual([
         { type: 'error', reason: 'open', message: PLAYER_MESSAGES.cannotOpen },
       ])
@@ -1593,7 +1738,7 @@ describe('createPlayerService', () => {
       const loading = service.handle(LOAD)
       await settle()
       activity.splice(0)
-      service.receive({ type: 'end-file', reason: 'redirect', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.redirect, error: 0 })
       mpv.release()
       expect(await loading).toEqual({ ok: true })
       expect(types()).toEqual([])
@@ -1608,7 +1753,7 @@ describe('createPlayerService', () => {
       await service.handle(LOAD)
       mpv.log.splice(0)
       activity.splice(0)
-      service.receive({ type: 'end-file', reason: 'redirect', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.redirect, error: 0 })
       expect(events).toEqual([
         { type: 'error', reason: 'open', message: PLAYER_MESSAGES.cannotOpen },
       ])
@@ -1624,7 +1769,7 @@ describe('createPlayerService', () => {
       const { service, mpv, warnings } = setup()
       await service.handle(LOAD)
       mpv.failOn('stop')
-      service.receive({ type: 'end-file', reason: 'redirect', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.redirect, error: 0 })
       await settle()
       expect(warnings.at(-1)).toBe('mpv stop failed: mpv request failed (-12)')
     })
@@ -1652,7 +1797,7 @@ describe('createPlayerService', () => {
       await settle()
       service.receive({ type: 'playback-restart' })
       expect(counts.firstFrames).toBe(1)
-      service.receive({ type: 'end-file', reason: 'stop', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.stop, error: 0 })
       service.receive({ type: 'file-loaded' })
       await settle()
       service.receive({ type: 'playback-restart' })
@@ -1666,8 +1811,8 @@ describe('createPlayerService', () => {
       clear()
       time(50)
       service.receive({ type: 'property', name: 'pause', data: true })
-      service.receive({ type: 'end-file', reason: 'stop', error: 0 })
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.stop, error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       service.receive({ type: 'file-loaded' })
       service.receive({ type: 'playback-restart' })
       await settle()
@@ -1685,7 +1830,7 @@ describe('createPlayerService', () => {
       await service.handle(LOAD)
       clear()
       time(51)
-      service.receive({ type: 'end-file', reason: 'stop', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.stop, error: 0 })
       expect(events).toEqual([])
       mpv.values.set('duration', 300)
       service.receive({ type: 'file-loaded' })
@@ -1693,7 +1838,7 @@ describe('createPlayerService', () => {
       expect(events.length).toBe(5)
       time(298)
       clear()
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       expect(events).toEqual([{ type: 'ended' }])
     })
 
@@ -1702,14 +1847,14 @@ describe('createPlayerService', () => {
       await service.handle(LOAD)
       await loaded()
       clear()
-      service.receive({ type: 'end-file', reason: 'stop', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.stop, error: 0 })
       time(3)
       service.receive({ type: 'file-loaded' })
       await settle()
       expect(types()).toEqual(['time', 'paused', 'duration', 'rate', 'waiting', 'tracks'])
       time(119)
       clear()
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       expect(events).toEqual([{ type: 'ended' }])
     })
 
@@ -1833,7 +1978,7 @@ describe('createPlayerService', () => {
       expect(activity.at(-1)).toEqual({ isPlaying: false, isShowing: true })
       expect(warnings.some((warning) => warning.includes(`${SERVER_STALL_MS} ms`))).toBe(true)
       // The stop's own ending and anything after it belong to no load.
-      service.receive({ type: 'end-file', reason: 'error', error: -10 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.error, error: -10 })
       waiting({ service, data: false })
       await settle()
       expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toHaveLength(1)
@@ -1922,6 +2067,55 @@ describe('createPlayerService', () => {
       ])
     })
 
+    test('a relayed title whose account was refused says so when it stalls, never lost', async () => {
+      const clock = createTimedTimers()
+      const asked: ServerTarget[] = []
+      const { service, events, loaded, clear } = setup({
+        timers: clock.timers,
+        refusedAccount: (target) => {
+          asked.push(target)
+          return REMOVED
+        },
+      })
+      await loaded(RELAYED_LOAD)
+      clear()
+      waiting({ service, data: true })
+      clock.advance(SERVER_STALL_MS)
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([
+        { type: PLAYER_EVENTS.error, ...REMOVED },
+      ])
+      expect(asked).toEqual([RELAYED_TARGET])
+    })
+
+    test('a relayed title refused while it opens says so after the budget too', async () => {
+      const clock = createTimedTimers()
+      const { service, events } = setup({ timers: clock.timers, refusedAccount: () => REMOVED })
+      expect(await service.handle(RELAYED_LOAD)).toEqual({ ok: true })
+      clock.advance(SERVER_STALL_MS)
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([
+        { type: PLAYER_EVENTS.error, ...REMOVED },
+      ])
+    })
+
+    test('a reader that throws leaves the stall a lost connection', async () => {
+      const clock = createTimedTimers()
+      const { service, events } = setup({
+        timers: clock.timers,
+        refusedAccount: () => {
+          throw new Error('boom')
+        },
+      })
+      expect(await service.handle(RELAYED_LOAD)).toEqual({ ok: true })
+      clock.advance(SERVER_STALL_MS)
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([
+        {
+          type: PLAYER_EVENTS.error,
+          reason: PLAYER_ERROR_REASONS.network,
+          message: PLAYER_MESSAGES.lost,
+        },
+      ])
+    })
+
     test('a server title that never loads is a lost connection after the budget', async () => {
       const clock = createTimedTimers()
       const { service, mpv, events, activity } = setup({ timers: clock.timers })
@@ -1936,7 +2130,7 @@ describe('createPlayerService', () => {
       expect(activity.at(-1)).toEqual({ isPlaying: false, isShowing: true })
       // A file-loaded or an error ending after the stop belongs to no load.
       service.receive({ type: 'file-loaded' })
-      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.error, error: -13 })
       await settle()
       expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toHaveLength(1)
       expect(events.filter(({ type }) => type === PLAYER_EVENTS.paused)).toEqual([])
@@ -2142,7 +2336,7 @@ describe('createPlayerService', () => {
       const { service, mpv, loaded, time } = setup()
       await loaded(SERVER_LOAD)
       time(40)
-      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.error, error: -13 })
       await loaded()
       await loaded(OTHER_LOAD)
       await service.applyOutput({ output: PASSTHROUGH, devices: [] })
@@ -2333,7 +2527,7 @@ describe('createPlayerService', () => {
       const { service, explainer, events, loaded, clear } = setup()
       await loaded(SERVER_LOAD)
       clear()
-      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.error, error: -13 })
       await settle()
       expect(explainer.asked).toEqual([{ target: SERVER_TARGET, phase: 'loaded' }])
       expect(events).toEqual([{ type: 'error', ...LOCKED }])
@@ -2342,7 +2536,7 @@ describe('createPlayerService', () => {
     test('an error end-file while loading is explained as an open failure', async () => {
       const { service, explainer, events } = setup()
       await service.handle(SERVER_LOAD)
-      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.error, error: -13 })
       await settle()
       expect(explainer.asked).toEqual([{ target: SERVER_TARGET, phase: 'loading' }])
       expect(events).toEqual([{ type: 'error', ...LOCKED }])
@@ -2353,7 +2547,7 @@ describe('createPlayerService', () => {
       await loaded(SERVER_LOAD)
       time(40)
       clear()
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       await settle()
       expect(explainer.asked).toEqual([{ target: SERVER_TARGET, phase: 'loaded' }])
       expect(events).toEqual([{ type: 'error', ...LOCKED }])
@@ -2364,7 +2558,7 @@ describe('createPlayerService', () => {
       await loaded(SERVER_LOAD)
       time(119)
       clear()
-      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
       await settle()
       expect(explainer.asked).toEqual([])
       expect(events).toEqual([{ type: 'ended' }])
@@ -2374,7 +2568,7 @@ describe('createPlayerService', () => {
       const { service, explainer, events, loaded, clear } = setup()
       await loaded()
       clear()
-      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.error, error: -13 })
       await settle()
       expect(explainer.asked).toEqual([])
       expect(events).toEqual([
@@ -2387,7 +2581,7 @@ describe('createPlayerService', () => {
       await loaded(SERVER_LOAD)
       clear()
       explainer.use(EXPLAIN_MODES.hold)
-      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.error, error: -13 })
       await settle()
       expect(await service.handle(LOAD)).toEqual({ ok: true })
       explainer.release()
@@ -2400,7 +2594,7 @@ describe('createPlayerService', () => {
       await loaded(SERVER_LOAD)
       clear()
       explainer.use(EXPLAIN_MODES.reject)
-      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      service.receive({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.error, error: -13 })
       await settle()
       expect(events).toEqual([{ type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost }])
     })

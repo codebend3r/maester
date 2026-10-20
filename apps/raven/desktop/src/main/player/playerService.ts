@@ -137,6 +137,11 @@ export type ServerTarget = {
   /** `Cookie: ...` from the server's own session, or '' when it holds none. */
   headerFields: string
   sidecars: readonly { url: string; title: string; language: string }[]
+  /**
+   * The loopback relay load this title plays through, for a server whose accounts are ready;
+   * null for one mpv reaches itself. Its base names the load's secret, which warnings blank.
+   */
+  relay: { loadId: string; base: string } | null
 }
 export type LocalSidecar = { path: string; title: string; language: string }
 type FileTarget = {
@@ -146,6 +151,13 @@ type FileTarget = {
 }
 type LoadTarget = FileTarget | ServerTarget
 export type ResolvedSource = { ok: true; target: LoadTarget } | { ok: false; message: string }
+/**
+ * The account failure the relay saw for a server title, read synchronously, or null: a title
+ * refused mid-play says access was removed, never that the connection was lost.
+ */
+export type AccountRefusalReader = (
+  target: ServerTarget,
+) => { reason: PlayerErrorReason; message: string } | null
 export type FailureExplainer = (input: {
   target: ServerTarget
   phase: ShowingPhase
@@ -173,6 +185,8 @@ const BUFFERED_STEP_S = 0.5
 
 /** What a warning says in place of the open file's path or name. */
 const OPEN_FILE = '<file>'
+/** What a warning says in place of a relayed title's base or the secret inside it. */
+const RELAYED = '<relay>'
 
 export const resolveSourceWith =
   ({
@@ -365,6 +379,7 @@ export const createPlayerService = ({
   mpv: unguarded,
   resolveSource,
   explain,
+  refusedAccount,
   canChooseAo,
   timers,
   serverStallMs = SERVER_STALL_MS,
@@ -375,6 +390,7 @@ export const createPlayerService = ({
   mpv: MpvControl
   resolveSource: ReturnType<typeof resolveSourceWith>
   explain: FailureExplainer
+  refusedAccount: AccountRefusalReader
   canChooseAo: boolean
   timers: Timers
   /** `SERVER_STALL_MS` unless a test needs it short. */
@@ -388,8 +404,17 @@ export const createPlayerService = ({
   let opened: LoadTarget | null = null
   // mpv's warnings name the file it plays and its sidecars, which the log must not hold
   // (Ruling 12). Whole paths go first so a name inside one is not replaced on its own.
+  // A relayed title's base holds its load's secret, which the log must not hold either.
   const withoutOpenFile = (message: string): string => {
-    if (opened === null || opened.kind !== PLAYER_SOURCE_KINDS.file) return message
+    if (opened === null) return message
+    if (opened.kind === PLAYER_SOURCE_KINDS.server) {
+      if (opened.relay === null) return message
+      const { base } = opened.relay
+      const secret = base.slice(base.lastIndexOf('/') + 1)
+      return [base, secret]
+        .filter((name) => name !== '')
+        .reduce((text, name) => text.replaceAll(name, RELAYED), message)
+    }
     const paths = [opened.path, ...opened.sidecars.map(({ path }) => path)]
     const named = [...paths, ...paths.map((path) => basename(path))].filter((name) => name !== '')
     return named.reduce((text, name) => text.replaceAll(name, OPEN_FILE), message)
@@ -559,10 +584,23 @@ export const createPlayerService = ({
     serverOpened() !== null &&
     (phase === PLAYER_PHASES.loading || (phase === PLAYER_PHASES.loaded && isWaiting))
 
+  /** The account failure the relay saw for the open server title, or null. */
+  const accountRefusal = (): ReturnType<AccountRefusalReader> => {
+    const target = serverOpened()
+    if (target === null) return null
+    try {
+      return refusedAccount(target)
+    } catch (error) {
+      warn(`player could not read an account refusal: ${messageOf(error)}`)
+      return null
+    }
+  }
+
   /**
    * The server has kept a title opening, or loaded and waiting with its clock still, for
-   * `serverStallMs`: the load ends as a lost connection, as a file that stops does. The
-   * load itself was answered once mpv took its loadfile, so the page hears it here.
+   * `serverStallMs`: the load ends as a lost connection, as a file that stops does, unless the
+   * relay saw its account refused. The load itself was answered once mpv took its loadfile, so
+   * the page hears it here.
    */
   const onServerStalled = (token: number) => {
     stallTimer = null
@@ -570,11 +608,11 @@ export const createPlayerService = ({
     stalledTickets = new Set([...stalledTickets, openedTicket])
     settleTo(PLAYER_PHASES.idle)
     warn(`a server title waited ${serverStallMs} ms on its server, so it stops`)
-    emit({
-      type: PLAYER_EVENTS.error,
+    const failure = accountRefusal() ?? {
       reason: PLAYER_ERROR_REASONS.network,
       message: PLAYER_MESSAGES.lost,
-    })
+    }
+    emit({ type: PLAYER_EVENTS.error, ...failure })
     onActivity({ isPlaying: false, isShowing: true })
     mpv.command({ args: [MPV_COMMANDS.stop] }).catch((error: unknown) => {
       warn(`mpv stop failed: ${messageOf(error)}`)
@@ -891,9 +929,14 @@ export const createPlayerService = ({
     )
       return
     if (phase === PLAYER_PHASES.loading) {
-      if (reason === MPV_END_FILE_REASONS.eof) return
+      // mpv ends a stream the server refused as if it ran out; only the relay can tell.
+      const refused = reason === MPV_END_FILE_REASONS.eof ? accountRefusal() : null
+      if (reason === MPV_END_FILE_REASONS.eof && refused === null) return
       settleTo(PLAYER_PHASES.idle)
-      if (reason === MPV_END_FILE_REASONS.error) {
+      if (refused !== null) {
+        warn('mpv ended a server title its account was refused while it opened')
+        emitFailure({ failure: refused, during: PLAYER_PHASES.loading })
+      } else if (reason === MPV_END_FILE_REASONS.error) {
         warn(`mpv could not open the file (${error})`)
         emitFailure({
           failure: { reason: PLAYER_ERROR_REASONS.open, message: PLAYER_MESSAGES.cannotOpen },
@@ -908,8 +951,13 @@ export const createPlayerService = ({
       reason === MPV_END_FILE_REASONS.eof &&
       duration !== null &&
       duration - (lastTime ?? 0) > EOF_SHORT_S
+    // A seek near the end that the server refused runs out like the end itself.
+    const refused = reason === MPV_END_FILE_REASONS.eof ? accountRefusal() : null
     settleTo(PLAYER_PHASES.idle)
-    if (reason === MPV_END_FILE_REASONS.error || isShort) {
+    if (refused !== null) {
+      warn('mpv ended a server title its account was refused while it played')
+      emitFailure({ failure: refused, during: PLAYER_PHASES.loaded })
+    } else if (reason === MPV_END_FILE_REASONS.error || isShort) {
       warn(`mpv stopped playing the file (${reason} ${error})`)
       emitFailure({
         failure: { reason: PLAYER_ERROR_REASONS.decode, message: PLAYER_MESSAGES.stopped },
