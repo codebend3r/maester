@@ -14,14 +14,21 @@ import { COLOURS, SIZES } from '@/theme/appTheme'
 /** Marks the option chosen now. */
 const CHOSEN = '\u2713'
 
+/** What a picker does as its list opens or closes unless told more: nothing. */
+const NOTHING_ON_OPEN = (): void => undefined
+
 /**
  * A picker the remote drives: a chip that opens a list over the screen, focus on the
  * option chosen now. tvOS has no action sheet (React Native's is built out of it), so this
  * is the TV's on both systems. Menu or Back closes it without choosing.
  */
 const Picker = <K extends string>(props: PickerProps<K>) => {
-  const { label, options, value, onChoose } = props
-  const [isOpen, setOpen] = useState(false)
+  const { label, options, value, onChoose, onOpenChange = NOTHING_ON_OPEN } = props
+  const [isOpen, setIsOpen] = useState(false)
+  const setOpen = (isOpening: boolean) => {
+    setIsOpen(isOpening)
+    onOpenChange(isOpening)
+  }
   const choose = (key: K) => {
     setOpen(false)
     onChoose(key)

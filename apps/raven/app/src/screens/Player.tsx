@@ -37,6 +37,7 @@ import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
 import { planFor } from '@/platform/playbackPlan'
 import { mediaSourcesFor } from '@/player/mediaSources'
 import { progressSinkFor, watchAppHide } from '@/player/progressSink'
+import { isAudioDropped } from '@/player/droppedAudio'
 import {
   SUBTITLE_CHOICES,
   audioOptionsOf,
@@ -251,7 +252,12 @@ const Playing = ({
             dispatchVideo({ type: VIDEO_EVENTS.ended })
           },
           onError: () => dispatch({ type: SESSION_EVENTS.failed, attempt, at: position.current }),
-          onLoad: ({ duration: length }) => {
+          onLoad: ({ duration: length, audioTracks }) => {
+            const asked = { platform: DEVICE_PLATFORM, mode, place: audioPlace }
+            if (isAudioDropped({ ...asked, reported: audioTracks })) {
+              dispatch({ type: SESSION_EVENTS.failed, attempt, at: position.current })
+              return
+            }
             if (length > 0) setDuration(length)
             dispatchVideo({ type: VIDEO_EVENTS.duration, duration: length > 0 ? length : null })
             dispatch({ type: SESSION_EVENTS.loaded, attempt })

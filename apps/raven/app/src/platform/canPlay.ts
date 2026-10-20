@@ -1,4 +1,5 @@
 import {
+  AUDIO_CODECS,
   CONTAINERS,
   type CanPlay,
   HLS_COPY_AUDIO,
@@ -37,11 +38,39 @@ const APPLE = {
   audioCodecs: HLS_COPY_AUDIO,
 } as const satisfies PlayTable
 
-/** Android TV answers as Apple does until ExoPlayer has a table of its own. */
+/**
+ * ExoPlayer on Android TV, which reads MKV and WebM as well as MP4 and MOV and decodes H.264,
+ * HEVC, AV1 and VP9; it starts generous and narrows from what fails in use. H.264 is 8-bit only,
+ * as on Apple: few TVs have a High 10 decoder, and a remux copies the same video. DTS and TrueHD
+ * are a maybe, played or passed through by some devices and not others: they count as a yes, as
+ * a browser's "maybe" does, so the original file is tried and a refusal steps down to the remux,
+ * whose audio the server makes E-AC-3.
+ */
+const EXOPLAYER = {
+  containers: [CONTAINERS.mkv, CONTAINERS.mp4, CONTAINERS.mov, CONTAINERS.webm],
+  videoCodecs: {
+    [VIDEO_CODECS.h264]: [8],
+    [VIDEO_CODECS.hevc]: [8, 10],
+    [VIDEO_CODECS.av1]: [8, 10],
+    [VIDEO_CODECS.vp9]: [8, 10],
+  },
+  audioCodecs: [
+    AUDIO_CODECS.aac,
+    AUDIO_CODECS.ac3,
+    AUDIO_CODECS.eac3,
+    AUDIO_CODECS.opus,
+    AUDIO_CODECS.vorbis,
+    AUDIO_CODECS.flac,
+    AUDIO_CODECS.mp3,
+    AUDIO_CODECS.dts,
+    AUDIO_CODECS.truehd,
+  ],
+} as const satisfies PlayTable
+
 const PLAY_TABLES: Record<AppPlatform, PlayTable> = {
   [APP_PLATFORMS.ios]: APPLE,
   [APP_PLATFORMS.tvos]: APPLE,
-  [APP_PLATFORMS.androidTv]: APPLE,
+  [APP_PLATFORMS.androidTv]: EXOPLAYER,
 }
 
 const CODECS_PARAM = /codecs="([^"]*)"/
@@ -84,9 +113,10 @@ type PlatformSupport = Pick<Parameters<typeof planPlayback>[0], 'canPlay' | 'can
  * What `planPlayback` asks this platform. React Native has no `canPlayType`, so the answers
  * come from a table. The app converts through the server's HLS route, never Media Source
  * Extensions: fragmented MP4 (`streamMimeType`'s `video/mp4`) with the video copied or made
- * H.264, and the audio copied or made E-AC-3, both of which the table plays. A stream plays,
- * then, where its video plays in MP4, which is what `canPlay` answers for that string: the
- * stereo AAC `streamMimeType` names is in `HLS_COPY_AUDIO`, so the audio never refuses one.
+ * H.264, and the audio copied or made E-AC-3, which both tables play but for ALAC on Android
+ * TV. A stream plays, then, where its video plays in MP4, which is what `canPlay` answers for
+ * that string: both tables play MP4 and the stereo AAC `streamMimeType` names, so the audio
+ * never refuses one.
  */
 export const canPlayFor = (platform: AppPlatform): PlatformSupport => {
   const canPlay = canPlayFrom(PLAY_TABLES[platform])
