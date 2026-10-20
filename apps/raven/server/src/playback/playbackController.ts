@@ -15,6 +15,8 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
+  AUTH_CONFIG_STATES,
+  type AuthConfig,
   type MediaStreams,
   type MediaTicket,
   type MediaTracks,
@@ -28,9 +30,12 @@ import {
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS, wholeNumber, CACHE_POLICIES } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
+import { AccessRechecks } from '@/auth/accessRechecks'
+import { AccountTickets } from '@/auth/accountTickets'
+import { AUTH_STATE } from '@/auth/effectiveAuth'
 import { streamArgs } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
-import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import { FFMPEG_SIGNALS, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { parseStreams } from '@/ffmpeg/streams'
 import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { PrivateBy } from '@/lock/lockGuard'
@@ -41,7 +46,8 @@ import { MediaTickets } from '@/media/mediaTickets'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
 import { StreamSessions } from '@/streams/streamSessions'
-import { trackStream } from '@/streams/trackStream'
+import { RESPONSE_EVENTS, trackStream } from '@/streams/trackStream'
+import { ROUTE_PARAMS } from '@/requestParts'
 
 /** The size a viewer asked a transcode for, or null for the server's settings. */
 const streamSizeOf = ({
@@ -86,6 +92,9 @@ export class PlaybackController {
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
     @Inject(MediaTickets) private readonly tickets: MediaTickets,
     @Inject(StreamSessions) private readonly streams: StreamSessions,
+    @Inject(AUTH_STATE) private readonly auth: AuthConfig,
+    @Inject(AccountTickets) private readonly accountTickets: AccountTickets,
+    @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
   ) {}
 
   private fileOf(id: number): MediaFile {
@@ -97,11 +106,18 @@ export class PlaybackController {
   /**
    * Stands in for the cookie on this video's media requests to another
    * origin. Not a media plane route: a ticket must never fetch another.
+   * With accounts it is the account ticket the POST route mints, for a
+   * Bearer caller only; without them, one signed with the media secret.
    */
   @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
   @Get(':id/ticket')
-  ticket(@Param('id', ParseIntPipe) id: number): MediaTicket {
+  ticket(
+    @Req() request: FastifyRequest,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+  ): MediaTicket {
     this.fileOf(id)
+    if (this.auth.state !== AUTH_CONFIG_STATES.off)
+      return this.accountTickets.issue({ id, request })
     if (!this.tickets.isOn) {
       throw new ServiceUnavailableException('Set RAVEN_MEDIA_SECRET to hand out media tickets.')
     }
@@ -207,8 +223,15 @@ export class PlaybackController {
     )
     // The response closes when it finishes or when the client goes away;
     // killing an ffmpeg that already exited does nothing.
-    reply.raw.on('close', () => child.kill('SIGKILL'))
-    trackStream({ sessions: this.streams, mediaId: id, mode, request, reply })
+    reply.raw.on(RESPONSE_EVENTS.close, () => child.kill(FFMPEG_SIGNALS.kill))
+    trackStream({
+      sessions: this.streams,
+      rechecks: this.rechecks,
+      mediaId: id,
+      mode,
+      request,
+      reply,
+    })
     await reply
       .header(HEADERS.contentType, RAVEN_CONTENT_TYPES.mp4)
       .header(HEADERS.cacheControl, CACHE_POLICIES.noStore)

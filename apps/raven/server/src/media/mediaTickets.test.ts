@@ -5,7 +5,7 @@ import { MediaTickets } from '@/media/mediaTickets'
 
 const config = (secret: Buffer | null): ServerConfig => ({
   ...readServerConfig({}),
-  mediaPlane: { origins: [], webOrigins: [], secret, problems: [] },
+  mediaPlane: { origins: [], webOrigins: [], secret, problems: [], secretProblems: [] },
 })
 
 const flip = (text: string): string => `${text.startsWith('A') ? 'B' : 'A'}${text.slice(1)}`

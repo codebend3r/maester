@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest, mock } from 'bun:test'
-import { MEDIA_TICKET_REFRESH_SECONDS, MEDIA_TICKET_SECONDS, type MediaOrigin } from '@raven/core'
+import type { MediaOrigin } from '@raven/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
@@ -10,7 +10,8 @@ import { api } from '@/test/api'
 
 const lan: MediaOrigin = { kind: 'lan', url: 'https://lan.example' }
 const publicOrigin: MediaOrigin = { kind: 'public', url: 'https://public.example' }
-const REFRESH_MS = (MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECONDS) * 1000
+/** Every two minutes, as the README says the page renews an account ticket. */
+const REFRESH_MS = 2 * 60_000
 
 const apiWithTickets = (getMediaTicket: typeof api.getMediaTicket) => ({ ...api, getMediaTicket })
 
@@ -75,7 +76,7 @@ describe('useMediaPlane', () => {
     expect(result.current.access).toBeNull()
   })
 
-  it('refreshes the ticket from receipt, ten minutes before it would expire, whatever expiresAt says', async () => {
+  it("refreshes the ticket from receipt, inside an account ticket's life, whatever expiresAt says", async () => {
     jest.useFakeTimers()
     let issued = 0
     const getMediaTicket = mock(async () => ({ ticket: `t${++issued}`, expiresAt: 1 }))
@@ -103,19 +104,19 @@ describe('useMediaPlane', () => {
         () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1, reprobe: () => {} }),
         { wrapper: harness({ client }) },
       )
-    const hour = 3_600_000
+    const elapsedBeforeUnmount = 60_000
+    const unmountedFor = 20_000
     const first = mount()
     pickOrigin(lan)
     await advance(0)
     expect(getMediaTicket).toHaveBeenCalledTimes(1)
-    await advance(3 * hour)
+    await advance(elapsedBeforeUnmount)
     first.unmount()
-    await advance(2 * 60_000)
+    await advance(unmountedFor)
     mount()
     await advance(0)
     expect(getMediaTicket).toHaveBeenCalledTimes(1)
-    // 5 h 50 min after the first receipt is 2 h 48 min after the remount.
-    await advance(REFRESH_MS - 3 * hour - 2 * 60_000 - 1000)
+    await advance(REFRESH_MS - elapsedBeforeUnmount - unmountedFor - 1000)
     expect(getMediaTicket).toHaveBeenCalledTimes(1)
     await advance(2000)
     expect(getMediaTicket).toHaveBeenCalledTimes(2)

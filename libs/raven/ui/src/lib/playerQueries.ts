@@ -1,8 +1,20 @@
 import { type QueryStatus, queryOptions } from '@tanstack/react-query'
-import { type ApiClient, MEDIA_TICKET_REFRESH_SECONDS, MEDIA_TICKET_SECONDS } from '@raven/core'
+import {
+  ACCOUNT_TICKET_SECONDS,
+  type ApiClient,
+  MEDIA_TICKET_REFRESH_SECONDS,
+  MEDIA_TICKET_SECONDS,
+} from '@raven/core'
 import { playerQueryKeys as queryKeys } from '@/lib/playerQueryKeys'
 
-const TICKET_REFRESH_MS = (MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECONDS) * 1000
+/** Two fifths of an account ticket's life, two of its five minutes, so a renewal lands well inside it. */
+const ACCOUNT_TICKET_RENEW_MS = (ACCOUNT_TICKET_SECONDS * 1000 * 2) / 5
+
+// Legacy tickets last far longer and are renewed as often as account tickets, at no cost.
+const TICKET_REFRESH_MS = Math.min(
+  (MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECONDS) * 1000,
+  ACCOUNT_TICKET_RENEW_MS,
+)
 
 const REFUSED_RETRY_MS = 60_000
 

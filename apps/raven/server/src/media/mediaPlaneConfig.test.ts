@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { MEDIA_ORIGIN_KINDS } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import {
   isAllowedWebOrigin,
@@ -213,28 +214,31 @@ describe('readMediaPlaneConfig', () => {
       webOrigins: [],
       secret: null,
       problems: [],
+      secretProblems: [],
     })
   })
 
-  it('adds a problem and keeps no origins when origins are set without a usable secret', () => {
+  it('adds a problem but keeps the origins, for accounts to offer, when origins are set without a usable secret', () => {
     const config = readMediaPlaneConfig({
       RAVEN_MEDIA_ORIGINS: 'lan:https://a.example,vpn:https://b.example',
       RAVEN_WEB_ORIGINS: 'https://raven-player.netlify.app',
       RAVEN_MEDIA_SECRET: 'short',
     })
-    expect(config.origins).toEqual([])
+    expect(config.origins).toEqual([{ kind: MEDIA_ORIGIN_KINDS.lan, url: 'https://a.example' }])
     expect(config.secret).toBeNull()
     expect(config.webOrigins).toEqual(['https://raven-player.netlify.app'])
-    expect(config.problems).toHaveLength(2)
-    expect(config.problems.some((problem) => problem.includes('vpn:https://b.example'))).toBe(true)
-    expect(config.problems.some((problem) => problem.includes('RAVEN_MEDIA_SECRET'))).toBe(true)
+    expect(config.problems).toHaveLength(1)
+    expect(config.problems[0]).toContain('vpn:https://b.example')
+    expect(config.secretProblems).toHaveLength(1)
+    expect(config.secretProblems[0]).toContain(MEDIA_PLANE_ENV.secret)
   })
 
   it('names the missing secret when origins are set without one', () => {
     const config = readMediaPlaneConfig({ RAVEN_MEDIA_ORIGINS: 'lan:https://a.example' })
-    expect(config.origins).toEqual([])
-    expect(config.problems).toHaveLength(1)
-    expect(config.problems[0]).toContain('RAVEN_MEDIA_SECRET')
+    expect(config.origins).toEqual([{ kind: MEDIA_ORIGIN_KINDS.lan, url: 'https://a.example' }])
+    expect(config.problems).toEqual([])
+    expect(config.secretProblems).toHaveLength(1)
+    expect(config.secretProblems[0]).toContain(MEDIA_PLANE_ENV.secret)
   })
 
   it('keeps origins and secret together when both are usable', () => {
@@ -247,11 +251,12 @@ describe('readMediaPlaneConfig', () => {
     expect(config.webOrigins).toEqual(['https://*.netlify.app'])
     expect(config.secret?.length).toBe(32)
     expect(config.problems).toEqual([])
+    expect(config.secretProblems).toEqual([])
   })
 
   it('names a secret that is set but unusable even without origins', () => {
     const config = readMediaPlaneConfig({ RAVEN_MEDIA_SECRET: 'short' })
     expect(config.secret).toBeNull()
-    expect(config.problems).toHaveLength(1)
+    expect(config.secretProblems).toHaveLength(1)
   })
 })
