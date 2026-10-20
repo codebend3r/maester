@@ -8,8 +8,8 @@ import {
   subtitleLabel,
 } from '@raven/core'
 
-/** The subtitle picker's first choice, which no track id takes. */
-export const SUBTITLES_OFF = 'off'
+/** The subtitle picker's own choices beside the tracks: off, which no track id takes. */
+export const SUBTITLE_CHOICES = { off: 'off' } as const
 
 /** A choice in a track picker: its key and how it reads. */
 export type TrackOption = { key: string; label: string }
@@ -27,7 +27,7 @@ const showable = (tracks: MediaTracks): SubtitleTrack[] =>
 
 /** Subtitles off, then each track a player can show, keyed by its id. */
 export const subtitleOptionsOf = (tracks: MediaTracks): TrackOption[] => [
-  { key: SUBTITLES_OFF, label: 'Off' },
+  { key: SUBTITLE_CHOICES.off, label: 'Off' },
   ...showable(tracks).map((track) => ({ key: track.id, label: labelText(subtitleLabel(track)) })),
 ]
 

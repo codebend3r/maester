@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { type MediaTracks, PLAYBACK_MODES, SUBTITLE_SOURCES, type SubtitleTrack } from '@raven/core'
 
 import {
-  SUBTITLES_OFF,
+  SUBTITLE_CHOICES,
   audioOptionsOf,
   audioPlaceFor,
   subtitleOptionsOf,
@@ -51,7 +51,7 @@ describe('the track pickers', () => {
 
   it('offers subtitles off, then every track a player can show', () => {
     expect(subtitleOptionsOf(TRACKS).map(({ key }) => key)).toEqual([
-      SUBTITLES_OFF,
+      SUBTITLE_CHOICES.off,
       ENGLISH.id,
       FRENCH.id,
       SIDECAR.id,

@@ -1,5 +1,6 @@
 import {
   ACCESS_REFUSALS,
+  type ApiClient,
   type MediaItem,
   type MediaTracks,
   type PlaybackPolicy,
@@ -37,7 +38,7 @@ import { PlayerChrome } from '@/layouts'
 import { DEVICE_SUPPORT } from '@/platform/devicePlatform'
 import { mediaSourcesFor } from '@/player/mediaSources'
 import {
-  SUBTITLES_OFF,
+  SUBTITLE_CHOICES,
   audioOptionsOf,
   audioPlaceFor,
   subtitleOptionsOf,
@@ -76,26 +77,26 @@ const watchAppHide: WatchHide = (save) => {
  * and a failed one costs only that spot.
  */
 const progressSinkFor = ({
-  session,
-  media,
+  api,
+  mediaId,
+  libraryId,
   queryClient,
 }: {
-  session: AppQueries
-  media: MediaItem
+  api: ApiClient
+  mediaId: number
+  libraryId: number
   queryClient: QueryClient
 }) => {
   let lastSave: Promise<unknown> = Promise.resolve()
   return {
     started: () => {
-      session.api.recordPlay(media.id).catch(() => undefined)
+      api.recordPlay(mediaId).catch(() => undefined)
     },
     save: (report: ProgressReport) => {
-      lastSave = session.api.saveProgress({ id: media.id, ...report }).catch(() => undefined)
+      lastSave = api.saveProgress({ id: mediaId, ...report }).catch(() => undefined)
     },
     left: () => {
-      lastSave
-        .then(() => afterWatching({ queryClient, libraryId: media.libraryId }))
-        .catch(() => undefined)
+      lastSave.then(() => afterWatching({ queryClient, libraryId })).catch(() => undefined)
     },
   }
 }
@@ -152,9 +153,11 @@ const Playing = ({
   const [duration, setDuration] = useState(media.duration)
   const [isPaused, setPaused] = useState(false)
   const player = useRef<VideoRef>(null)
+  // A refetched video is a new object; the sink, and the save it waits on, stay the same.
+  const { id: mediaId, libraryId } = media
   const progress = useMemo(
-    () => progressSinkFor({ session, media, queryClient }),
-    [session, media, queryClient],
+    () => progressSinkFor({ api: session.api, mediaId, libraryId, queryClient }),
+    [session.api, mediaId, libraryId, queryClient],
   )
   const mode = modeOf(state)
   const ladder = state.phase === SESSION_PHASES.failed ? null : state
@@ -239,7 +242,7 @@ const Playing = ({
   }
 
   const pickSubtitle = (key: string) => {
-    const id = key === SUBTITLES_OFF ? null : key
+    const id = key === SUBTITLE_CHOICES.off ? null : key
     const track = tracks?.subtitles.find((each) => each.id === id) ?? null
     setSubtitles({ on: id !== null, language: track?.language ?? subtitlePrefs.language })
     setSubtitle(id)
@@ -328,7 +331,7 @@ const Playing = ({
             ? null
             : {
                 options: subtitleOptions,
-                value: subtitle ?? SUBTITLES_OFF,
+                value: subtitle ?? SUBTITLE_CHOICES.off,
                 onChoose: pickSubtitle,
               }
         }

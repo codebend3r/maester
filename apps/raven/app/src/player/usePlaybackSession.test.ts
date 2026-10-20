@@ -6,6 +6,7 @@ import {
   SESSION_EVENTS,
   SESSION_PHASES,
   type SessionState,
+  hasWayBelow,
   initialSession,
   modeOf,
   sessionReducer,
@@ -92,6 +93,26 @@ describe('the playback ladder', () => {
     ).toBe(playing)
   })
 
+  it('gives the last way all the time it takes, as a transcode on a NAS may need, but not one with a way below', () => {
+    const transcoding = sourced(opened({ modes: [remux, transcode] }))
+    const lastWay = failed({ state: transcoding, at: RESUME_AT })
+    const loadingLast = sourced(lastWay)
+    expect(modeOf(loadingLast)).toBe(transcode)
+    expect(hasWayBelow(loadingLast)).toBe(false)
+    expect(
+      sessionReducer(loadingLast, {
+        type: SESSION_EVENTS.timedOut,
+        attempt: attemptOf(loadingLast),
+      }),
+    ).toBe(loadingLast)
+    expect(hasWayBelow(transcoding)).toBe(true)
+    const next = sessionReducer(transcoding, {
+      type: SESSION_EVENTS.timedOut,
+      attempt: attemptOf(transcoding),
+    })
+    expect(modeOf(next)).toBe(transcode)
+  })
+
   it('ignores what an earlier load says once the ladder has moved on', () => {
     const playing = loaded(sourced(opened()))
     expect(sessionReducer(playing, { type: SESSION_EVENTS.failed, attempt: 9, at: 10 })).toBe(
@@ -99,11 +120,11 @@ describe('the playback ladder', () => {
     )
   })
 
-  it("gives the plan's problems once every way has failed, or says so plainly", () => {
+  it("says every way has failed, then gives the plan's problems", () => {
     const lastWay = sourced(opened({ modes: [transcode], problems: [MKV_PROBLEM] }))
     expect(failed({ state: lastWay, at: 12 })).toEqual({
       phase: SESSION_PHASES.failed,
-      problems: [MKV_PROBLEM],
+      problems: [SESSION_COPY.exhausted, MKV_PROBLEM],
     })
     expect(failed({ state: sourced(opened({ modes: [direct] })), at: 12 })).toEqual({
       phase: SESSION_PHASES.failed,

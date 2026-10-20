@@ -60,7 +60,7 @@ type SessionEvent =
   | { type: typeof SESSION_EVENTS.audioPicked; audio: number | null; at: number }
   | { type: typeof SESSION_EVENTS.retried }
 
-/** The plan's own reasons when it has any, else what the player can say for itself. */
+/** Nothing to play: the plan's own reasons when it has any, else what the player can say. */
 const failedWith = ({
   problems,
   fallback,
@@ -115,19 +115,28 @@ const sourcing = ({
 })
 
 /**
- * The next way down from where `ladder` stands, from `at`. The problems the plan gave stand in
- * for the player's own once there is none.
+ * The next way down from where `ladder` stands, from `at`. Once there is none, the player says
+ * every way failed, then gives the plan's reasons for the ways it never offered, as the web does.
  */
 const stepDown = ({ ladder, at }: { ladder: Ladder; at: number }): SessionState => {
   const step = ladder.step + 1
   if (step >= ladder.modes.length)
-    return failedWith({ problems: ladder.problems, fallback: SESSION_COPY.exhausted })
+    return { phase: SESSION_PHASES.failed, problems: [SESSION_COPY.exhausted, ...ladder.problems] }
   return sourcing({ ladder, step, at })
 }
 
 /**
+ * Whether a way is left below the one tried now. Only then does a slow load step down: the last
+ * way gets all the time it takes, as a transcode on a NAS may need longer than
+ * `LOAD_TIMEOUT_MS` for its first segment, and the server waits for it up to its own limit.
+ */
+export const hasWayBelow = (state: SessionState): boolean =>
+  state.phase !== SESSION_PHASES.failed && state.step < state.modes.length - 1
+
+/**
  * The ladder, as the web's: the plan's first way, then the next whenever one fails to start or
- * to decode, or has not loaded within `LOAD_TIMEOUT_MS`, each from the spot it got to. A remux
+ * to decode, or, while a way is left below, has not loaded within `LOAD_TIMEOUT_MS`, each from
+ * the spot it got to. A remux
  * the server refuses (its 409, keyframes too far apart to cut) fails like any other, so the
  * transcode below it is next.
  */
@@ -147,7 +156,12 @@ export const sessionReducer = (state: SessionState, event: SessionEvent): Sessio
       if (event.attempt !== state.attempt || state.phase === SESSION_PHASES.refused) return state
       return stepDown({ ladder: state, at: event.at })
     case SESSION_EVENTS.timedOut:
-      if (state.phase !== SESSION_PHASES.loading || event.attempt !== state.attempt) return state
+      if (
+        state.phase !== SESSION_PHASES.loading ||
+        event.attempt !== state.attempt ||
+        !hasWayBelow(state)
+      )
+        return state
       return stepDown({ ladder: state, at: state.at })
     case SESSION_EVENTS.audioPicked: {
       const picked = { ...state, audio: event.audio }
@@ -191,6 +205,7 @@ export const usePlaybackSession = ({
   )
   const phase = state.phase
   const attempt = phase === SESSION_PHASES.failed ? null : state.attempt
+  const isTimed = hasWayBelow(state)
 
   const ask = useEffectEvent((asked: number) => {
     const status = { isCurrent: true }
@@ -217,13 +232,13 @@ export const usePlaybackSession = ({
   }, [phase, attempt])
 
   useEffect(() => {
-    if (phase !== SESSION_PHASES.loading || attempt === null) return undefined
+    if (phase !== SESSION_PHASES.loading || attempt === null || !isTimed) return undefined
     const timer = setTimeout(
       () => dispatch({ type: SESSION_EVENTS.timedOut, attempt }),
       LOAD_TIMEOUT_MS,
     )
     return () => clearTimeout(timer)
-  }, [phase, attempt])
+  }, [phase, attempt, isTimed])
 
   useEffect(() => {
     if (phase !== SESSION_PHASES.refused) return undefined

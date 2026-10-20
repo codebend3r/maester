@@ -219,10 +219,11 @@ describe('Player on a phone or tablet', () => {
     ])
   })
 
-  it("records the play once on its way past the library's watched percentage", async () => {
+  it('records the play once, as it starts, and none more on the way past the watched percentage', async () => {
     await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
     const props = await loadedVideo()
     await start(props)
+    expect(playsRecorded()).toBe(1)
     const length = BUSBOYS_MP4.duration ?? 0
     const ninety = length * 0.9
     await [ninety - 600, ninety - 300, ninety, ninety + 300].reduce(
