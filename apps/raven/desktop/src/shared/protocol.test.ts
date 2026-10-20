@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  ACCOUNT_PAGES,
+  ACCOUNT_STATES,
   APP_HOST,
   APP_ORIGIN,
   APP_SCHEME,
   DESKTOP_EVENTS,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
+  DOWNLOAD_ASK_KINDS,
   ENVELOPE_KINDS,
   FILE_SCHEME,
   IPC_CHANNELS,
   MAX_QUEUE,
+  MAX_SECRET,
   MENU_PLAYER_ACTIONS,
   NAVIGATION_TARGETS,
   PLAYER_CONNECTION_STATUSES,
@@ -19,6 +23,8 @@ import {
   isDesktopEvent,
   isDesktopReply,
   isDesktopRequest,
+  isAccountPage,
+  isAccountView,
   isContainerName,
   isDownloadAsk,
   isDownloadAskStatus,
@@ -761,6 +767,17 @@ describe('the download ask and views', () => {
     expect(isDownloadAskStatus({ ...READY, files: '3' })).toBe(false)
   })
 
+  it("accepts an account ask with the account's view", () => {
+    expect(isDownloadAskStatus({ kind: DOWNLOAD_ASK_KINDS.account, account: ACCOUNT })).toBe(true)
+    expect(isDownloadAskStatus({ kind: DOWNLOAD_ASK_KINDS.account })).toBe(false)
+    expect(
+      isDownloadAskStatus({
+        kind: DOWNLOAD_ASK_KINDS.account,
+        account: { ...ACCOUNT, state: 'odd' },
+      }),
+    ).toBe(false)
+  })
+
   it('accepts an ask by ids and refuses one whose ids are a path or an origin', () => {
     expect(isDownloadAsk(ASK)).toBe(true)
     expect(isDownloadAsk({ ...ASK, askId: '../downloads.json' })).toBe(false)
@@ -782,5 +799,128 @@ describe('the download ask and views', () => {
   it('accepts the space line and refuses one with a string', () => {
     expect(isSpaceView({ free: 1, total: 2, used: 0 })).toBe(true)
     expect(isSpaceView({ free: '1', total: 2, used: 0 })).toBe(false)
+  })
+})
+
+const ACCOUNT = {
+  serverId: id,
+  state: ACCOUNT_STATES.approved,
+  email: 'ada@example.com',
+  isRemembered: true,
+  signInHost: 'abc.supabase.co',
+} as const
+
+describe('the account protocol', () => {
+  it('names the seven account states and the two pages', () => {
+    expect(ACCOUNT_STATES).toEqual({
+      off: 'off',
+      unavailable: 'unavailable',
+      signedOut: 'signedOut',
+      pending: 'pending',
+      revoked: 'revoked',
+      approved: 'approved',
+      failed: 'failed',
+    })
+    expect(ACCOUNT_PAGES).toEqual({ signUp: 'signUp', forgot: 'forgot' })
+    expect(MAX_SECRET).toBe(256)
+  })
+
+  it.each(Object.values(ACCOUNT_STATES))('accepts a view in state %s', (state) => {
+    expect(isAccountView({ ...ACCOUNT, state })).toBe(true)
+  })
+
+  it('accepts a view with no email and no sign-in host', () => {
+    expect(isAccountView({ ...ACCOUNT, email: null, signInHost: null })).toBe(true)
+  })
+
+  it.each([
+    ['a state it does not know', { ...ACCOUNT, state: 'ready' }],
+    ['a server id that is not opaque', { ...ACCOUNT, serverId: 'one' }],
+    ['no isRemembered', { ...ACCOUNT, isRemembered: undefined }],
+    ['an email that is a number', { ...ACCOUNT, email: 7 }],
+  ])('rejects a view with %s', (_name, value) => {
+    expect(isAccountView(value)).toBe(false)
+  })
+
+  it('accepts the two pages and nothing else', () => {
+    expect(isAccountPage(ACCOUNT_PAGES.signUp)).toBe(true)
+    expect(isAccountPage(ACCOUNT_PAGES.forgot)).toBe(true)
+    expect(isAccountPage('https://evil.example')).toBe(false)
+  })
+
+  it.each([
+    [{ type: DESKTOP_REQUESTS.readAccount, serverId: id }],
+    [{ type: DESKTOP_REQUESTS.refreshAccount, serverId: id }],
+    [
+      {
+        type: DESKTOP_REQUESTS.signIn,
+        serverId: id,
+        email: 'ada@example.com',
+        password: 'hunter2',
+      },
+    ],
+    [
+      {
+        type: DESKTOP_REQUESTS.signIn,
+        serverId: id,
+        email: 'ada@example.com',
+        password: 'p'.repeat(MAX_SECRET),
+      },
+    ],
+    [{ type: DESKTOP_REQUESTS.signOut, serverId: id }],
+    [{ type: DESKTOP_REQUESTS.openAccountPage, serverId: id, page: ACCOUNT_PAGES.signUp }],
+    [{ type: DESKTOP_REQUESTS.openAccountPage, serverId: id, page: ACCOUNT_PAGES.forgot }],
+  ])('accepts the request %j', (value) => {
+    expect(isDesktopRequest(value)).toBe(true)
+  })
+
+  it.each([
+    ['readAccount without a server', { type: DESKTOP_REQUESTS.readAccount }],
+    [
+      'readAccount for a server id that is not opaque',
+      { type: DESKTOP_REQUESTS.readAccount, serverId: 'one' },
+    ],
+    ['refreshAccount without a server', { type: DESKTOP_REQUESTS.refreshAccount }],
+    [
+      'a password past MAX_SECRET',
+      {
+        type: DESKTOP_REQUESTS.signIn,
+        serverId: id,
+        email: 'ada@example.com',
+        password: 'p'.repeat(MAX_SECRET + 1),
+      },
+    ],
+    [
+      'an email past MAX_SECRET',
+      {
+        type: DESKTOP_REQUESTS.signIn,
+        serverId: id,
+        email: 'e'.repeat(MAX_SECRET + 1),
+        password: 'hunter2',
+      },
+    ],
+    [
+      'a password that is a number',
+      { type: DESKTOP_REQUESTS.signIn, serverId: id, email: 'a@b.c', password: 7 },
+    ],
+    ['a sign in without a password', { type: DESKTOP_REQUESTS.signIn, serverId: id, email: 'a@b' }],
+    ['signOut without a server', { type: DESKTOP_REQUESTS.signOut }],
+    [
+      'a page that is a URL',
+      { type: DESKTOP_REQUESTS.openAccountPage, serverId: id, page: 'https://evil.example' },
+    ],
+    [
+      'a page that is a path',
+      { type: DESKTOP_REQUESTS.openAccountPage, serverId: id, page: '/sign-up' },
+    ],
+  ])('rejects %s', (_name, value) => {
+    expect(isDesktopRequest(value)).toBe(false)
+  })
+
+  it('accepts the account reply and event, and rejects them without a view', () => {
+    expect(isDesktopReply({ type: DESKTOP_REPLIES.account, account: ACCOUNT })).toBe(true)
+    expect(isDesktopReply({ type: DESKTOP_REPLIES.account })).toBe(false)
+    expect(isDesktopEvent({ type: DESKTOP_EVENTS.account, account: ACCOUNT })).toBe(true)
+    expect(isDesktopEvent({ type: DESKTOP_EVENTS.account })).toBe(false)
   })
 })

@@ -92,6 +92,7 @@ export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
     case DESKTOP_REPLIES.updates:
     case DESKTOP_REPLIES.downloads:
     case DESKTOP_REPLIES.space:
+    case DESKTOP_REPLIES.account:
       return null
     default: {
       const unreachable: never = reply

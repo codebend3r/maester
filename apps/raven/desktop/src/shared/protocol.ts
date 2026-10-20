@@ -55,7 +55,13 @@ export const isServerTarget = object({
 
 export type ServerTarget = Infer<typeof isServerTarget>
 
-export const HTTP_METHODS = { get: 'GET', head: 'HEAD', put: 'PUT', post: 'POST' } as const
+export const HTTP_METHODS = {
+  get: 'GET',
+  head: 'HEAD',
+  put: 'PUT',
+  post: 'POST',
+  delete: 'DELETE',
+} as const
 
 /** The methods a server call may use; the app's own protocols also answer HEAD. */
 export const SERVER_METHODS = {
@@ -128,9 +134,44 @@ export const isDownloadStatus = union(
 
 export type DownloadStatus = Infer<typeof isDownloadStatus>
 
-export const DOWNLOAD_ASK_KINDS = { ready: 'ready', locked: 'locked', hidden: 'hidden' } as const
+/** Whether the sign-in to a server's accounts is open, waiting on its owner, closed or out of reach. */
+export const ACCOUNT_STATES = {
+  off: 'off',
+  unavailable: 'unavailable',
+  signedOut: 'signedOut',
+  pending: 'pending',
+  revoked: 'revoked',
+  approved: 'approved',
+  failed: 'failed',
+} as const
 
-/** What the download dialog shows: the files to fetch, or the lock to lift before main can list them. */
+const isAccountState = oneOf(Object.values(ACCOUNT_STATES))
+
+/**
+ * A server's account as the page sees it: never a token, a Supabase address or a key. The email is
+ * the signed in person's own, and `signInHost` is the host the sign-in goes to, for the page to name.
+ */
+export const isAccountView = object({
+  serverId: isOpaqueId,
+  state: isAccountState,
+  email: nullable(isString),
+  isRemembered: isBoolean,
+  signInHost: nullable(isString),
+})
+
+export type AccountView = Infer<typeof isAccountView>
+
+export const DOWNLOAD_ASK_KINDS = {
+  ready: 'ready',
+  locked: 'locked',
+  hidden: 'hidden',
+  account: 'account',
+} as const
+
+/**
+ * What the download dialog shows: the files to fetch, the lock to lift before main can list them,
+ * or the account to sign in with, or to have approved, on a server whose accounts are ready.
+ */
 export const isDownloadAskStatus = union(
   object({
     kind: oneOf([DOWNLOAD_ASK_KINDS.ready]),
@@ -143,6 +184,7 @@ export const isDownloadAskStatus = union(
   }),
   object({ kind: oneOf([DOWNLOAD_ASK_KINDS.locked]) }),
   object({ kind: oneOf([DOWNLOAD_ASK_KINDS.hidden]) }),
+  object({ kind: oneOf([DOWNLOAD_ASK_KINDS.account]), account: isAccountView }),
 )
 
 export type DownloadAskStatus = Infer<typeof isDownloadAskStatus>
@@ -178,6 +220,19 @@ export type DownloadView = Infer<typeof isDownloadView>
 export const isSpaceView = object({ free: isNumber, total: isNumber, used: isNumber })
 
 export type SpaceView = Infer<typeof isSpaceView>
+
+/** The longest PIN, password or email main takes from the page. */
+export const MAX_SECRET = 256
+
+/** The server pages Create account and Forgot password open; main builds the address itself. */
+export const ACCOUNT_PAGES = { signUp: 'signUp', forgot: 'forgot' } as const
+
+export const isAccountPage = oneOf(Object.values(ACCOUNT_PAGES))
+
+export type AccountPage = Infer<typeof isAccountPage>
+
+const isSecretText = (value: unknown): value is string =>
+  isString(value) && value.length <= MAX_SECRET
 
 /** An audio track's index as a pick names it: a whole number, 0 or more. */
 export const isTrackIndex = (value: unknown): value is number =>
@@ -278,6 +333,11 @@ export const DESKTOP_REQUESTS = {
   setDownloadDefaults: 'setDownloadDefaults',
   showDownloadsFolder: 'showDownloadsFolder',
   playbackLeft: 'playbackLeft',
+  readAccount: 'readAccount',
+  refreshAccount: 'refreshAccount',
+  signIn: 'signIn',
+  signOut: 'signOut',
+  openAccountPage: 'openAccountPage',
 } as const
 
 /** What the page asks main for. No variant carries a file path; a server call names its server by id. */
@@ -363,6 +423,21 @@ export const isDesktopRequest = union(
   object({ type: oneOf([DESKTOP_REQUESTS.showDownloadsFolder]) }),
   // The play page left this file, so a deletion waiting for the player to leave it can run.
   object({ type: oneOf([DESKTOP_REQUESTS.playbackLeft]), fileId: isOpaqueId }),
+  object({ type: oneOf([DESKTOP_REQUESTS.readAccount]), serverId: isOpaqueId }),
+  object({ type: oneOf([DESKTOP_REQUESTS.refreshAccount]), serverId: isOpaqueId }),
+  // The one request that carries a password: main hands it to the sign-in host and keeps no copy.
+  object({
+    type: oneOf([DESKTOP_REQUESTS.signIn]),
+    serverId: isOpaqueId,
+    email: isSecretText,
+    password: isSecretText,
+  }),
+  object({ type: oneOf([DESKTOP_REQUESTS.signOut]), serverId: isOpaqueId }),
+  object({
+    type: oneOf([DESKTOP_REQUESTS.openAccountPage]),
+    serverId: isOpaqueId,
+    page: isAccountPage,
+  }),
 )
 
 export type DesktopRequest = Infer<typeof isDesktopRequest>
@@ -382,6 +457,7 @@ export const DESKTOP_REPLIES = {
   downloadAsk: 'downloadAsk',
   downloads: 'downloads',
   space: 'space',
+  account: 'account',
 } as const
 
 export const isDesktopReply = union(
@@ -408,6 +484,7 @@ export const isDesktopReply = union(
     autoDeleteDefault: isBoolean,
   }),
   object({ type: oneOf([DESKTOP_REPLIES.space]), space: isSpaceView }),
+  object({ type: oneOf([DESKTOP_REPLIES.account]), account: isAccountView }),
 )
 
 export type DesktopReply = Infer<typeof isDesktopReply>
@@ -422,6 +499,7 @@ export const DESKTOP_EVENTS = {
   updateAvailable: 'updateAvailable',
   downloadAsk: 'downloadAsk',
   downloads: 'downloads',
+  account: 'account',
 } as const
 
 export const NAVIGATION_TARGETS = { settings: 'settings' } as const
@@ -441,6 +519,8 @@ export const isDesktopEvent = union(
     downloads: listOf(isDownloadView),
     autoDeleteDefault: isBoolean,
   }),
+  // Main's view of a server's account changed on its own: a refresh failed, or a call was refused.
+  object({ type: oneOf([DESKTOP_EVENTS.account]), account: isAccountView }),
 )
 
 export type DesktopEvent = Infer<typeof isDesktopEvent>

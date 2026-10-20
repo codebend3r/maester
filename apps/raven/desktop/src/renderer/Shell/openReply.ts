@@ -76,6 +76,7 @@ export const applyReply = ({
     case DESKTOP_REPLIES.updates:
     case DESKTOP_REPLIES.downloads:
     case DESKTOP_REPLIES.space:
+    case DESKTOP_REPLIES.account:
       return
     default: {
       const unreachable: never = reply

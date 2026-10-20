@@ -1,3 +1,4 @@
+import { parseJson } from '@/main/parseJson'
 import { EMPTY_STATE, isPlayerState, type PlayerState } from '@/main/playerState'
 
 export type StateFs = {
@@ -37,14 +38,6 @@ export const ERROR_CODES = { enoent: 'ENOENT' } as const
 
 export const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === ERROR_CODES.enoent
-
-const parseJson = (text: string): unknown => {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return undefined
-  }
-}
 
 /** Never throws: whatever cannot be read as a `T` is kept aside and the app starts with `empty`. */
 /** What a JSON file held: nothing, a value its guard accepts, or something else, now set aside. */
