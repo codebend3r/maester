@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { type AdminLock, KINDS, isLibraryKind } from '@raven/core'
+import { ADMIN_LOCK_STATES, type Account, type AdminLock, KINDS, isLibraryKind } from '@raven/core'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
@@ -7,13 +7,23 @@ import { AppShell } from '@/components/AppShell/AppShell'
 import { api } from '@/lib/api'
 import { ravenVersion } from '@/lib/version'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
+import { useAuthSession } from '@/stores/authSession'
 import { useSideMenu } from '@/stores/sideMenu'
+import { fakeAccount } from '@/test/authClient'
 import { FakeEventSource } from '@/test/eventSource'
 import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { MEDIUM_SCREEN } from '@/components/AppShell/useIsMediumScreen'
 
-const renderShell = (route: string, adminLock?: AdminLock) =>
+const renderShell = ({
+  route,
+  adminLock,
+  account,
+}: {
+  route: string
+  adminLock?: AdminLock
+  account?: Account
+}) =>
   renderWithProviders({
     ui: (
       <Routes>
@@ -35,6 +45,7 @@ const renderShell = (route: string, adminLock?: AdminLock) =>
     ),
     route,
     adminLock,
+    account,
   })
 
 const nav = () => screen.getByRole('navigation', { name: 'Main' })
@@ -65,6 +76,7 @@ describe('AppShell', () => {
   afterEach(() => {
     cleanup()
     spies.list.mockReset()
+    useAuthSession.setState({ session: null })
   })
 
   afterAll(() => {
@@ -73,7 +85,7 @@ describe('AppShell', () => {
 
   it('links home from the logo, named by its word alone', () => {
     spies.list.mockImplementation(async () => [])
-    renderShell('/favourites')
+    renderShell({ route: '/favourites' })
     const home = screen.getByRole('link', { name: 'raven' })
     expect(home).toHaveAttribute('href', '/')
     expect(home.querySelector('img')).toHaveAttribute('src', '/brand/raven-mark-on-dark.svg')
@@ -81,7 +93,7 @@ describe('AppShell', () => {
 
   it('leads with the logo, then Home, a house, marked on the page it opens on', () => {
     spies.list.mockImplementation(async () => [])
-    renderShell('/')
+    renderShell({ route: '/' })
     const [brand, first] = within(nav()).getAllByRole('link')
     expect(brand).toBe(logo())
     expect(first).toHaveAccessibleName('Home')
@@ -95,7 +107,7 @@ describe('AppShell', () => {
 
   it('marks Libraries, not Home, on the list of libraries', () => {
     spies.list.mockImplementation(async () => [])
-    renderShell('/libraries')
+    renderShell({ route: '/libraries' })
     expect(within(nav()).getByRole('link', { name: 'Libraries' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -105,7 +117,7 @@ describe('AppShell', () => {
 
   it('links to the libraries and the favourites, marking the current page', () => {
     spies.list.mockImplementation(async () => [])
-    renderShell('/favourites')
+    renderShell({ route: '/favourites' })
     expect(within(nav()).getByRole('link', { name: 'Libraries' })).toHaveAttribute(
       'href',
       '/libraries',
@@ -120,7 +132,7 @@ describe('AppShell', () => {
 
   it('leads with the logo, Home and Favourites, then the pinned libraries, with Libraries, Streams and Settings last', async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
-    renderShell('/')
+    renderShell({ route: '/' })
     await within(nav()).findByRole('link', { name: 'Movies' })
     expect(
       within(nav())
@@ -131,7 +143,7 @@ describe('AppShell', () => {
 
   it('leaves Streams out of the menus and the tab bar while the admin lock is on', async () => {
     spies.list.mockImplementation(async () => [])
-    renderShell('/', { state: 'on', available: true })
+    renderShell({ route: '/', adminLock: { state: ADMIN_LOCK_STATES.on, available: true } })
     expect(await within(nav()).findByRole('link', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Streams' })).toBeNull()
   })
@@ -139,7 +151,7 @@ describe('AppShell', () => {
   it('opens a page a link leads to at its top', async () => {
     spies.list.mockImplementation(async () => [])
     const scroll = spyOn(window, 'scrollTo').mockImplementation(() => undefined)
-    renderShell('/')
+    renderShell({ route: '/' })
     expect(scroll).not.toHaveBeenCalled()
     await userEvent.click(within(nav()).getByRole('link', { name: 'Favourites' }))
     expect(scroll).toHaveBeenCalledWith({ top: 0 })
@@ -152,7 +164,7 @@ describe('AppShell', () => {
       library({ id: 2, name: 'Clips', settings: { ...library().settings, pinned: false } }),
       library({ id: 3, name: 'Movies' }),
     ])
-    renderShell('/')
+    renderShell({ route: '/' })
     const pinned = await within(nav()).findByRole('list', { name: 'Pinned' })
     const links = within(pinned).getAllByRole('link')
     expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
@@ -163,7 +175,7 @@ describe('AppShell', () => {
 
   it("marks a pinned library's own link, not Libraries, while it is open", async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
-    renderShell('/libraries/3')
+    renderShell({ route: '/libraries/3' })
     const movies = await within(nav()).findByRole('link', { name: 'Movies' })
     expect(movies).toHaveAttribute('aria-current', 'page')
     expect(within(nav()).getByRole('link', { name: 'Libraries' })).not.toHaveAttribute(
@@ -176,7 +188,7 @@ describe('AppShell', () => {
       library({ id: 3, name: 'Movies' }),
       library({ id: 4, name: 'Clips', settings: { ...library().settings, pinned: false } }),
     ])
-    renderShell('/libraries/4')
+    renderShell({ route: '/libraries/4' })
     await within(nav()).findByRole('link', { name: 'Movies' })
     expect(within(nav()).getByRole('link', { name: 'Libraries' })).toHaveAttribute(
       'aria-current',
@@ -190,7 +202,7 @@ describe('AppShell', () => {
         library({ id: index + 1, name: kind, settings: { ...library().settings, kind } }),
       ),
     )
-    renderShell('/')
+    renderShell({ route: '/' })
     const pinned = await within(nav()).findByRole('list', { name: 'Pinned' })
     expect(within(pinned).getAllByRole('link').map(iconOf)).toEqual([
       'film',
@@ -215,7 +227,7 @@ describe('AppShell', () => {
       }),
       library({ id: 2, name: 'Music', settings: { ...library().settings, icon: 'disc' } }),
     ])
-    renderShell('/')
+    renderShell({ route: '/' })
     const pinned = await within(nav()).findByRole('list', { name: 'Pinned' })
     expect(within(pinned).getAllByRole('link').map(iconOf)).toEqual(['octagon', 'disc'])
   })
@@ -230,7 +242,7 @@ describe('AppShell', () => {
         }),
       ),
     )
-    renderShell('/')
+    renderShell({ route: '/' })
     const pinned = await within(nav()).findByRole('list', { name: 'Pinned' })
     expect(within(pinned).getAllByRole('link').map(iconsOf)).toEqual(
       isLibraryKind.values.map((kind) => [KINDS[kind].icon, 'lock']),
@@ -247,7 +259,7 @@ describe('AppShell', () => {
       library({ id: 1, name: 'Tutorials', settings: { ...library().settings, locked: true } }),
       library({ id: 2, name: 'Clips' }),
     ])
-    renderShell('/')
+    renderShell({ route: '/' })
     await within(nav()).findByRole('link', { name: 'Tutorials (locked)' })
     await userEvent.click(toggle())
     expect(within(nav()).getByRole('link', { name: 'Tutorials (locked)' })).toHaveAttribute(
@@ -260,7 +272,7 @@ describe('AppShell', () => {
 
   it('collapses to its icons with the toggle, keeping every link named', async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
-    renderShell('/')
+    renderShell({ route: '/' })
     await within(nav()).findByRole('link', { name: 'Movies' })
     expect(toggle()).toHaveAttribute('aria-expanded', 'true')
 
@@ -278,7 +290,7 @@ describe('AppShell', () => {
 
   it("shows raven's version beside the toggle while the menu is open", async () => {
     spies.list.mockImplementation(async () => [])
-    renderShell('/')
+    renderShell({ route: '/' })
     expect(within(nav()).getByText(`v${ravenVersion}`)).toBeInTheDocument()
 
     await userEvent.click(toggle())
@@ -287,7 +299,7 @@ describe('AppShell', () => {
 
   it("frosts over once a card's picture is behind the page, and clears after", () => {
     spies.list.mockImplementation(async () => [])
-    const { container } = renderShell('/')
+    const { container } = renderShell({ route: '/' })
     expect(nav()).not.toHaveClass('frosted')
 
     // Asked for but still loading, nothing is behind the page yet.
@@ -303,7 +315,7 @@ describe('AppShell', () => {
 
   it('collapses and expands with B, but not while typing or with a modifier held', async () => {
     spies.list.mockImplementation(async () => [])
-    renderShell('/search')
+    renderShell({ route: '/search' })
     await userEvent.keyboard('b')
     expect(toggle()).toHaveAttribute('aria-expanded', 'false')
     await userEvent.keyboard('B')
@@ -317,27 +329,27 @@ describe('AppShell', () => {
 
   it('tells of the B key on a first visit until the tip is put away', async () => {
     spies.list.mockImplementation(async () => [])
-    const first = renderShell('/')
+    const first = renderShell({ route: '/' })
     const tip = screen.getByRole('complementary', { name: 'Tip' })
     expect(tip).toHaveTextContent('Press B to collapse or expand the side menu.')
     await userEvent.click(within(tip).getByRole('button', { name: 'Got it' }))
     expect(screen.queryByRole('complementary', { name: 'Tip' })).toBeNull()
 
     first.unmount()
-    renderShell('/')
+    renderShell({ route: '/' })
     expect(screen.queryByRole('complementary', { name: 'Tip' })).toBeNull()
   })
 
   it('puts the tip away once the shortcut has been used', async () => {
     spies.list.mockImplementation(async () => [])
-    renderShell('/')
+    renderShell({ route: '/' })
     await userEvent.keyboard('b')
     expect(screen.queryByRole('complementary', { name: 'Tip' })).toBeNull()
   })
 
   it('reads the libraries again when the server says one changed or comes back, and hangs up on leaving', async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
-    const shell = renderShell('/')
+    const shell = renderShell({ route: '/' })
     await within(nav()).findByRole('link', { name: 'Movies' })
     expect(spies.list).toHaveBeenCalledTimes(1)
     const [stream] = FakeEventSource.opened
@@ -357,7 +369,7 @@ describe('AppShell', () => {
 
   it('heads the pinned libraries while open, leaving a rule in their place once collapsed', async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
-    renderShell('/')
+    renderShell({ route: '/' })
     await within(nav()).findByRole('link', { name: 'Movies' })
     expect(within(nav()).getByText('Pinned')).toBeInTheDocument()
     expect(within(logo()).getByText('raven')).not.toHaveClass('visually-hidden')
@@ -370,7 +382,7 @@ describe('AppShell', () => {
 
   it('has no Pinned heading with nothing pinned', () => {
     spies.list.mockImplementation(async () => [])
-    renderShell('/')
+    renderShell({ route: '/' })
     expect(within(nav()).queryByText('Pinned')).toBeNull()
   })
 
@@ -379,7 +391,7 @@ describe('AppShell', () => {
     spies.list.mockImplementation(async () => [
       library({ id: 1, name: 'Tutorials', settings: { ...library().settings, locked: true } }),
     ])
-    renderShell('/')
+    renderShell({ route: '/' })
     await within(nav()).findByRole('link', { name: 'Tutorials (locked)' })
     expect(within(nav()).getByRole('link', { name: 'Home' })).toHaveAttribute('title', 'Home')
     expect(within(nav()).getByRole('link', { name: 'Tutorials (locked)' })).toHaveAttribute(
@@ -398,7 +410,7 @@ describe('AppShell', () => {
 
   it('gives a phone Home, Libraries, Favourites, Streams and Settings in a tab bar', () => {
     spies.list.mockImplementation(async () => [])
-    renderShell('/favourites')
+    renderShell({ route: '/favourites' })
     const links = within(tabs()).getAllByRole('link')
     expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
       ['Home', '/'],
@@ -417,7 +429,7 @@ describe('AppShell', () => {
 
   it('marks Libraries in the tab bar on any library, a pinned one too', async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
-    renderShell('/libraries/3')
+    renderShell({ route: '/libraries/3' })
     await within(nav()).findByRole('link', { name: 'Movies' })
     expect(within(tabs()).getByRole('link', { name: 'Libraries' })).toHaveAttribute(
       'aria-current',
@@ -430,7 +442,7 @@ describe('AppShell', () => {
 
   it('puts the search through every library over every page', () => {
     spies.list.mockImplementation(async () => [])
-    renderShell('/libraries')
+    renderShell({ route: '/libraries' })
     expect(
       within(screen.getByRole('main')).getByRole('searchbox', { name: 'Search every library' }),
     ).toHaveAttribute('placeholder', 'Search every library')
@@ -438,9 +450,26 @@ describe('AppShell', () => {
 
   it('puts the theme button in the corner of every page', async () => {
     spies.list.mockImplementation(async () => [])
-    renderShell('/libraries')
+    renderShell({ route: '/libraries' })
     const theme = within(screen.getByRole('main')).getByRole('button', { name: 'Theme' })
     await userEvent.click(theme)
     expect(screen.getByRole('menu', { name: 'Theme' })).toBeInTheDocument()
+  })
+
+  it('has no account button while accounts are off', () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell({ route: '/libraries' })
+    expect(screen.queryByRole('button', { name: 'Account' })).toBeNull()
+  })
+
+  it('puts the account button, with Sign out, after the theme button for whoever is signed in', async () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell({ route: '/libraries', account: fakeAccount() })
+    const main = within(screen.getByRole('main'))
+    const [theme, account] = main.getAllByRole('button')
+    expect(theme).toHaveAccessibleName('Theme')
+    expect(account).toHaveAccessibleName('Account')
+    await userEvent.click(main.getByRole('button', { name: 'Account' }))
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
   })
 })

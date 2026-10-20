@@ -1,10 +1,10 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { ApiError, AUTH_REFUSALS } from '@raven/core'
 import { Button } from '@raven/ui'
 import { Address, AuthCard, Lead } from '@/components/AuthScreen/AuthCard'
 import { AUDIENCES, AuthScreen } from '@/components/AuthScreen/AuthScreen'
 import { ACCESS_KINDS, useAccessState, useAccount } from '@/lib/accessState'
-import { signOut } from '@/lib/session'
+import { useSignOut } from '@/lib/useSignOut'
 import styles from '@/pages/PendingPage/PendingPage.module.scss'
 
 const COPY = {
@@ -38,11 +38,10 @@ const isAnswer = (error: Error | null): boolean =>
  * for the account on mounting would ask again each time it came back.
  */
 export const PendingPage = () => {
-  const queryClient = useQueryClient()
   const access = useAccessState()
   const account = useAccount()
   const check = useMutation({ mutationFn: () => account.refetch() })
-  const end = useMutation({ mutationFn: () => signOut({ queryClient }) })
+  const end = useSignOut()
   const answer = check.data
   const isFailed = !!answer && answer.isError && !isAnswer(answer.error)
   const isBusy = check.isPending || end.isPending

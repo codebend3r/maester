@@ -302,12 +302,12 @@
   padding: var(--page-top) var(--gutter) calc(var(--section-gap) + var(--tab-bar-room));
 }
 
-// The search at the start, as wide as reads well, the theme button at the end.
+// The search at the start, as wide as reads well, the corner's buttons at the end.
 .bar {
   grid-area: bar;
   display: grid;
   grid-template-columns: minmax(0, 26.25rem) auto;
-  grid-template-areas: 'search theme';
+  grid-template-areas: 'search corner';
   justify-content: space-between;
   align-items: center;
   gap: var(--space-4);
@@ -325,11 +325,16 @@
   align-content: start;
 }
 
-// Over an item page's backdrop, still under a dialog's top layer. Its menu
-// rises over the page and the selection bar while it is open.
+// The theme button, then the account button. Over an item page's backdrop,
+// still under a dialog's top layer. A menu open from either rises over the
+// page and the selection bar.
 .corner {
-  grid-area: theme;
+  grid-area: corner;
   z-index: 2;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-1);
 
   &:has([aria-expanded='true']) {
     z-index: 4;

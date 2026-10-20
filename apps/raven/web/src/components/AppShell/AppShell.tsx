@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { type ReactNode, useId } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { Button, Icon, useKeyShortcut } from '@raven/ui'
+import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
 import { isAnyOf, libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
 import { TabBar } from '@/components/AppShell/TabBar'
 import { useIsMediumScreen } from '@/components/AppShell/useIsMediumScreen'
@@ -83,11 +84,11 @@ const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
  * down to its icons whatever the toggle says, so there the toggle and B
  * step aside. A phone has no side menu but a tab bar along the foot of the
  * screen. Over every page, a bar holds the search through every library
- * and, in its corner, the theme button. While a card's
- * picture is behind the page, the menu frosts over it. While the frame is
- * open, what the pages show follows the server's changes, and the admin
- * lock coming on or going off. The player leaves the frame behind for the
- * whole screen.
+ * and, in its corner, the theme button and, for whoever is signed in, the
+ * account button with Sign out. While a card's picture is behind the page,
+ * the menu frosts over it. While the frame is open, what the pages show
+ * follows the server's changes, and the admin lock coming on or going off.
+ * The player leaves the frame behind for the whole screen.
  */
 export const AppShell = () => {
   const navId = useId()
@@ -209,7 +210,10 @@ export const AppShell = () => {
       <main className={styles.main}>
         <div className={styles.bar}>
           <SiteSearch className={styles.search} />
-          <ThemePicker className={styles.corner} />
+          <div className={styles.corner}>
+            <ThemePicker />
+            <AccountMenu />
+          </div>
         </div>
         <div className={styles.page}>
           <TopCardNote pageKey={key}>
