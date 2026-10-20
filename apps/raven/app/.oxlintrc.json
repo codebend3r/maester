@@ -6,6 +6,11 @@
     "browser": false
   },
   "ignorePatterns": ["ios", "android", "build", ".expo"],
+  "rules": {
+    // React Native has no DOM: `autoFocus` on a TV focus guide hands the remote coming into it
+    // to a control inside, which is how a TV is driven, not a page stealing the keyboard.
+    "jsx-a11y/no-autofocus": ["error", { "ignoreNonDOM": true }]
+  },
   "overrides": [
     {
       // expo-router reads each route from its file's default export, and Expo,

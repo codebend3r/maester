@@ -4,6 +4,7 @@ import {
   type Library as LibraryRecord,
   MEDIA_SORTS,
   JUMP_SCALE_LABELS,
+  LIBRARY_VIEWS,
   SORT_FIELD_LABELS,
   isRecord,
   sortFieldsFor,
@@ -17,8 +18,11 @@ import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
 import { useReduceMotion } from '@/stores/reduceMotion'
+import { useScreenFocus } from '@/stores/screenFocus'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import { FILM_SEARCHES, GROUPED_FILMS, libraryApi, libraryPath } from '@/test/libraryServer'
+import type * as NavigationFocus from '@/test/navigationFocus'
+import { leaveTestScreen, resetTestScreen, returnToTestScreen } from '@/test/navigationFocus'
 import { renderScreen } from '@/test/renderScreen'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
@@ -46,6 +50,7 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   return platform
 })
 jest.mock('expo-router', () => ({
+  ...jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').navigationFocusMocks,
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => mockParams(),
 }))
@@ -112,6 +117,8 @@ describe('Library on a TV', () => {
     mockServer.requests = []
     mockServer.libraries = []
     mockRequestTVFocus.mockClear()
+    resetTestScreen()
+    useScreenFocus.setState({ screens: {} })
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
     useLibraryViews.setState({ choices: {} })
   })
@@ -296,5 +303,29 @@ describe('Library on a TV', () => {
       ).toBe(true),
     )
     expect(screen.queryByLabelText('Sort')).toBeNull()
+  })
+
+  it('takes the focus back to the card a page was opened from, and to no other', async () => {
+    await renderLibrary({ id: FILMS.id })
+    const card = await screen.findByRole('button', { name: 'Night Train' })
+    await fireEvent(card, 'focus')
+    await fireEvent.press(card)
+    await leaveTestScreen()
+    expect(askedFor()).toEqual([])
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Night Train'])
+    expect(preferred(FILM_TITLES)).toEqual([])
+  })
+
+  it('takes it back to a card of the list view too', async () => {
+    useLibraryViews
+      .getState()
+      .choose({ serverId: NAS.id, libraryId: FILMS.id, change: { view: LIBRARY_VIEWS.list } })
+    await renderLibrary({ id: FILMS.id })
+    const card = await screen.findByRole('button', { name: 'Busboys' })
+    await fireEvent.press(card)
+    await leaveTestScreen()
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Busboys'])
   })
 })

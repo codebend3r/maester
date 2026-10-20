@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { isRecord } from '@raven/core'
 import { fireEvent, screen } from '@testing-library/react-native'
-import { StyleSheet } from 'react-native'
+import { BackHandler, StyleSheet, TVEventControl } from 'react-native'
 
 import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Home } from '@/screens/Home'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
+import { useScreenFocus } from '@/stores/screenFocus'
 import { NAS, SPARSE, homeApi } from '@/test/homeServer'
 import { heldAnswer } from '@/test/heldAnswer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
+import type * as NavigationFocus from '@/test/navigationFocus'
+import { leaveTestScreen, resetTestScreen, returnToTestScreen } from '@/test/navigationFocus'
 import { renderScreen } from '@/test/renderScreen'
 
 /** What Home's read waits on before it is answered, per test. */
@@ -35,7 +39,15 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
 })
 const mockPush = jest.fn()
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }))
+jest.mock('expo-router', () => ({
+  ...jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').navigationFocusMocks,
+  useRouter: () => ({ push: mockPush }),
+}))
+// The fork's requestTVFocus is native; what matters is which card asks for the focus, and when.
+const mockRequestTVFocus = jest.fn<(instance: unknown) => void>()
+jest.mock('@/layouts/tvFocus', () => ({
+  requestTVFocus: (instance: unknown) => mockRequestTVFocus(instance),
+}))
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
@@ -49,8 +61,23 @@ jest.mock('@/servers/serverClient', () => ({
 
 const renderHome = async () => renderScreen({ ui: <Home /> })
 
+/** The cards that asked for the remote's focus, by title, in order. */
+const askedFor = (): unknown[] =>
+  mockRequestTVFocus.mock.calls.map(([instance]) =>
+    isRecord(instance) && isRecord(instance.props) ? instance.props.accessibilityLabel : instance,
+  )
+
+/** Whatever on screen asks for the remote's focus, by its label. */
+const preferred = (): unknown[] =>
+  [...screen.getAllByRole('button'), ...screen.getAllByRole('link')]
+    .filter((node) => node.props.hasTVPreferredFocus === true)
+    .map((node) => node.props.accessibilityLabel)
+
 describe('Home on a TV', () => {
   beforeEach(() => {
+    jest.clearAllMocks()
+    resetTestScreen()
+    useScreenFocus.setState({ screens: {} })
     mockHome.answer = Promise.resolve()
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
@@ -130,5 +157,81 @@ describe('Home on a TV', () => {
     expect(first.props.accessibilityLabel).toBe('Busboys')
     expect(first.props.hasTVPreferredFocus).toBe(true)
     expect(rest.some((card) => card.props.hasTVPreferredFocus === true)).toBe(false)
+  })
+
+  it('lets the opening focus go once anything on Home has had it, so nothing drawn later takes it', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    expect(preferred()).toEqual(['Busboys'])
+
+    await fireEvent(screen.getByRole('link', { name: 'Search every library' }), 'focus')
+    expect(preferred()).toEqual([])
+
+    // A new answer draws the shelves again; the first card mounts as it did, unpreferred.
+    await leaveTestScreen()
+    await returnToTestScreen()
+    expect(preferred()).toEqual([])
+    expect(askedFor()).toEqual([])
+  })
+
+  it('takes the focus back to the card a screen was opened from, on the shelf it sits on', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    const cards = screen.getAllByRole('button')
+    await fireEvent(cards[2]!, 'focus')
+    await fireEvent.press(cards[2]!)
+    expect(mockPush).toHaveBeenCalledTimes(1)
+
+    await leaveTestScreen()
+    expect(askedFor()).toEqual([])
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Night Train'])
+    expect(preferred()).toEqual([])
+  })
+
+  it('takes it back to the copy on its own shelf when a title sits on two', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    // Busboys is under Continue watching and under Films; the one in Films opens.
+    const [, inFilms] = screen.getAllByRole('button')
+    await fireEvent.press(inFilms!)
+    await leaveTestScreen()
+    await returnToTestScreen()
+    expect(mockRequestTVFocus).toHaveBeenCalledTimes(1)
+    const [[instance]] = mockRequestTVFocus.mock.calls
+    // The view the card hands over is drawn as the element on screen with its own handlers.
+    const [inContinue, inFilmsNow] = screen.getAllByRole('button')
+    const focusOf = (view: unknown) =>
+      isRecord(view) && isRecord(view.props) ? view.props.onFocus : null
+    expect(focusOf(instance) === inFilmsNow!.props.onFocus).toBe(true)
+    expect(focusOf(instance) === inContinue!.props.onFocus).toBe(false)
+  })
+
+  it('takes it back once, never on a later return from a screen no card opened', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    await fireEvent.press(screen.getAllByRole('button')[2]!)
+    await leaveTestScreen()
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Night Train'])
+
+    // The viewer moves on, then opens the search, which is not a card, and comes back.
+    await fireEvent(screen.getAllByRole('button')[3]!, 'focus')
+    await fireEvent.press(screen.getByRole('link', { name: 'Search every library' }))
+    await leaveTestScreen()
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Night Train'])
+  })
+
+  it('leaves Menu to the navigator, which on Home hands it to tvOS', async () => {
+    const listen = jest.spyOn(BackHandler, 'addEventListener')
+    const menuKey = jest.spyOn(TVEventControl, 'enableTVMenuKey')
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    await fireEvent.press(screen.getAllByRole('button')[2]!)
+    await leaveTestScreen()
+    await returnToTestScreen()
+    expect(listen).not.toHaveBeenCalled()
+    expect(menuKey).not.toHaveBeenCalled()
   })
 })

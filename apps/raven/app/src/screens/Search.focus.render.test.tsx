@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { SEARCH_DELAY_MS } from '@raven/core'
+import { SEARCH_DELAY_MS, isRecord } from '@raven/core'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 
 import { Search } from '@/screens/Search'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
+import { useScreenFocus } from '@/stores/screenFocus'
 import type { HeardRequest } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
+import type * as NavigationFocus from '@/test/navigationFocus'
+import { leaveTestScreen, resetTestScreen, returnToTestScreen } from '@/test/navigationFocus'
 import { DUNE_QUERY, isSearch, searchApi, searchPathFor } from '@/test/searchServer'
 import { renderScreen } from '@/test/renderScreen'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
@@ -29,7 +32,15 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   Object.defineProperty(platform.default, 'isTV', { get: () => true })
   return platform
 })
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), back: jest.fn() }) }))
+jest.mock('expo-router', () => ({
+  ...jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').navigationFocusMocks,
+  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+}))
+// The fork's requestTVFocus is native; what matters is which card asks for the focus, and when.
+const mockRequestTVFocus = jest.fn<(instance: unknown) => void>()
+jest.mock('@/layouts/tvFocus', () => ({
+  requestTVFocus: (instance: unknown) => mockRequestTVFocus(instance),
+}))
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
@@ -55,6 +66,12 @@ const preferred = (): unknown[] =>
     .filter((node) => node.props.hasTVPreferredFocus === true)
     .map((node) => node.props.accessibilityLabel)
 
+/** The cards that asked for the remote's focus, by title, in order. */
+const askedFor = (): unknown[] =>
+  mockRequestTVFocus.mock.calls.map(([instance]) =>
+    isRecord(instance) && isRecord(instance.props) ? instance.props.accessibilityLabel : instance,
+  )
+
 const pause = async (ms: number) => {
   await act(async () => {
     jest.advanceTimersByTime(ms)
@@ -65,6 +82,8 @@ describe('Search on a TV', () => {
   beforeEach(() => {
     jest.useFakeTimers()
     jest.clearAllMocks()
+    resetTestScreen()
+    useScreenFocus.setState({ screens: {} })
     mockServer.heard = []
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
@@ -114,5 +133,20 @@ describe('Search on a TV', () => {
     expect(screen.getByLabelText(FIELD).props.value).toBe('')
     await pause(SEARCH_DELAY_MS * 5)
     expect(searches()).toEqual([])
+  })
+
+  it('takes the focus back to the result a page was opened from', async () => {
+    await renderScreen({ ui: <Search /> })
+    const field = screen.getByLabelText(FIELD)
+    await fireEvent(field, 'focus')
+    await fireEvent.changeText(field, DUNE_QUERY)
+    await fireEvent(field, 'submitEditing')
+    const show = await screen.findByRole('button', { name: 'Dune: Prophecy' })
+    await fireEvent(show, 'focus')
+    await fireEvent.press(show)
+    await leaveTestScreen()
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Dune: Prophecy'])
+    expect(preferred()).toEqual([])
   })
 })

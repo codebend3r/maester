@@ -7,11 +7,14 @@ import packageJson from '#package'
 // the app come in by their relative path and extension.
 import { isDevelopmentVariant } from './src/config/appVariant.ts'
 import { BUILD_ENV, buildNumberOf } from './src/config/buildNumber.ts'
+import { isTvPrebuild } from './src/config/tvPrebuild.ts'
+import { withTvRemoteTests } from './plugins/withTvRemoteTests.ts'
 
 const APP_ID = 'io.github.codebend3r.raven.app'
 
 const buildNumber = buildNumberOf({ runNumber: process.env[BUILD_ENV.runNumber] })
 const isDevelopment = isDevelopmentVariant({ variant: process.env[BUILD_ENV.appVariant] })
+const isTv = isTvPrebuild({ value: process.env[BUILD_ENV.tv] })
 
 const LOCAL_NETWORK_USE = 'raven reaches your raven server on your local network.'
 
@@ -62,5 +65,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ['react-native-video', { enableBackgroundAudio: true }],
     ],
   }
-  return isDevelopment ? withCleartextTraffic(app) : app
+  // The Apple TV's remote-driven end to end test joins only the TV's native project.
+  const withTests = isTv ? withTvRemoteTests(app) : app
+  return isDevelopment ? withCleartextTraffic(withTests) : withTests
 }

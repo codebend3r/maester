@@ -1,0 +1,57 @@
+import { beforeEach, describe, expect, it } from 'bun:test'
+
+import {
+  dropOpener,
+  isOpeningIn,
+  leaveScreen,
+  rememberOpener,
+  settleScreen,
+  takeOpener,
+  useScreenFocus,
+} from '@/stores/screenFocus'
+
+const HOME = 'home-route'
+const ITEM = 'item-route'
+const NIGHT_TRAIN = 'library:1/media:3'
+const BUSBOYS = 'library:1/media:2'
+
+describe('screen focus', () => {
+  beforeEach(() => useScreenFocus.setState({ screens: {} }))
+
+  it('keeps a screen opening until something on it has the focus', () => {
+    expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(true)
+    settleScreen({ screen: HOME })
+    expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(false)
+    expect(isOpeningIn({ state: useScreenFocus.getState(), screen: ITEM })).toBe(true)
+  })
+
+  it('hands the opener back once, and only to the card it names', () => {
+    rememberOpener({ screen: HOME, card: NIGHT_TRAIN })
+    expect(takeOpener({ screen: HOME, card: BUSBOYS })).toBe(false)
+    expect(takeOpener({ screen: ITEM, card: NIGHT_TRAIN })).toBe(false)
+    expect(takeOpener({ screen: HOME, card: NIGHT_TRAIN })).toBe(true)
+    expect(takeOpener({ screen: HOME, card: NIGHT_TRAIN })).toBe(false)
+  })
+
+  it('counts opening a card as having had the focus', () => {
+    rememberOpener({ screen: HOME, card: NIGHT_TRAIN })
+    expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(false)
+  })
+
+  it('lets an opener no card took go, so a later return asks for nothing', () => {
+    rememberOpener({ screen: HOME, card: NIGHT_TRAIN })
+    dropOpener({ screen: HOME })
+    expect(takeOpener({ screen: HOME, card: NIGHT_TRAIN })).toBe(false)
+    expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(false)
+  })
+
+  it('forgets a screen that has gone, so one opened in its place starts afresh', () => {
+    rememberOpener({ screen: HOME, card: NIGHT_TRAIN })
+    rememberOpener({ screen: ITEM, card: BUSBOYS })
+    leaveScreen({ screen: HOME })
+    expect(useScreenFocus.getState().screens).toEqual({
+      [ITEM]: { hasSettled: true, opener: BUSBOYS },
+    })
+    expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(true)
+  })
+})

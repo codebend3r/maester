@@ -11,5 +11,11 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["app.config.ts", "metro.config.ts", "babel.config.ts", "src/**/*.test.ts"]
+  "include": [
+    "app.config.ts",
+    "metro.config.ts",
+    "babel.config.ts",
+    "plugins/**/*.ts",
+    "src/**/*.test.ts"
+  ]
 }

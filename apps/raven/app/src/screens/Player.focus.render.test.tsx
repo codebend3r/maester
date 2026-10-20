@@ -149,6 +149,7 @@ const start = async (props: ReactVideoProps) => {
       videoTracks: [],
     })
     props.onPlaybackStateChanged!({ isPlaying: true, isSeeking: false })
+    props.onBuffer!({ isBuffering: false })
   })
 }
 
