@@ -1,6 +1,7 @@
 import { HEALTH_STATUSES } from '@raven/core'
 import { Controller, Get, Inject } from '@nestjs/common'
 import type { ServerHealth } from '@raven/core'
+import { OpenToAnyone } from '@/auth/accountGuard'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { MetadataService } from '@/metadata/metadataService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -13,6 +14,7 @@ export class HealthController {
     @Inject(MetadataService) private readonly metadata: MetadataService,
   ) {}
 
+  @OpenToAnyone()
   @Get()
   async get(): Promise<ServerHealth> {
     const [ffmpeg, tonemap, encoder] = await Promise.all([

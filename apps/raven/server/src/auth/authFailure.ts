@@ -16,3 +16,28 @@ export const authFailure = (reason: AuthRefusal['reason']): HttpException => {
   const { status, message } = FAILURES[reason]
   return new HttpException({ reason, message } satisfies AuthRefusal, status)
 }
+
+/** The ways a membership answer can be one raven must not trust. */
+export const INTEGRITY_FAILURES = {
+  accountMismatch: 'account mismatch',
+  ambiguousMembership: 'ambiguous membership',
+  malformedMembership: 'malformed membership',
+} as const
+
+export type IntegrityFailureKind = (typeof INTEGRITY_FAILURES)[keyof typeof INTEGRITY_FAILURES]
+
+/**
+ * A membership answer that cannot be trusted: for another account, for
+ * several, or not shaped like a membership. Clients are told only that
+ * accounts are unavailable, as for an outage, but it is an integrity
+ * failure, not an outage: an open response never outlasts one.
+ */
+export class IntegrityFailure extends HttpException {
+  readonly failure: IntegrityFailureKind
+
+  constructor({ failure }: { failure: IntegrityFailureKind }) {
+    const { status, message } = FAILURES[AUTH_REFUSALS.unavailable]
+    super({ reason: AUTH_REFUSALS.unavailable, message } satisfies AuthRefusal, status)
+    this.failure = failure
+  }
+}

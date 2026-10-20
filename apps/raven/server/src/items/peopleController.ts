@@ -1,7 +1,7 @@
 import {
   Controller,
   Get,
-  Headers,
+  Req,
   Inject,
   NotFoundException,
   Param,
@@ -10,8 +10,7 @@ import {
   Res,
 } from '@nestjs/common'
 import type { PersonDetails } from '@raven/core'
-import type { FastifyReply } from 'fastify'
-import { RAVEN_HEADERS } from '@/http'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import { sendImage } from '@/items/sendImage'
 import { Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
@@ -20,7 +19,7 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 import { Filmographies } from '@/people/filmographies'
 import { PeopleRepository } from '@/people/peopleRepository'
 
-/** People are in no library; a person's credits hide the movies and shows this browser may not see. */
+/** People are in no library; a person's credits hide the movies and shows this caller may not see. */
 @Controller('api/people')
 @Public()
 export class PeopleController {
@@ -39,13 +38,13 @@ export class PeopleController {
   @Get(':id')
   async get(
     @Param('id', ParseIntPipe) id: number,
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Req() request: FastifyRequest,
   ): Promise<PersonDetails> {
     const person = this.metadata.person(id)
     if (!person) throw new NotFoundException(`No person ${id}`)
-    const viewer = this.lock.viewer({ cookie })
+    const viewer = this.lock.viewer({ request })
     const credits = person.credits.filter((credit) => viewer.seesItem(credit.item.id))
-    // A person whose titles are all hidden from this browser is never looked
+    // A person whose titles are all hidden from this caller is never looked
     // up; the rest share two lookups at a time, with 20 waiting.
     const asked = credits.length > 0 ? await this.filmographies.ensure({ personId: id }) : null
     // Read again, for the name and photo a fetch just brought.

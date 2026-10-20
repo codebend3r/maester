@@ -5,6 +5,7 @@ import {
   Get,
   Header,
   HttpCode,
+  HttpException,
   Inject,
   NotFoundException,
   Param,
@@ -16,6 +17,7 @@ import {
 import {
   AUTH_PARAMS,
   AUTH_PATHS,
+  MEMBER_STATUSES,
   type Account,
   type AuthConfig,
   type MediaTicket,
@@ -26,11 +28,12 @@ import {
 import { CACHE_POLICIES, HEADERS, wholeNumber } from '@shared/server'
 import type { FastifyRequest } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
-import { ACCOUNT_REQUIREMENTS, RequireAccount } from '@/auth/accountGuard'
+import { ACCOUNT_REQUIREMENTS, OpenToAnyone, RequireAccount } from '@/auth/accountGuard'
 import { AccountTickets } from '@/auth/accountTickets'
 import { AuthBackend } from '@/auth/authBackend'
 import { AuthSessions } from '@/auth/authSessions'
-import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { MembershipLookups } from '@/auth/membershipLookups'
+import { AUTH_STATE } from '@/auth/effectiveAuth'
 import { PrivateBy, Public } from '@/lock/lockGuard'
 import { PRIVACIES } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
@@ -42,17 +45,19 @@ const pageNumber = (value: unknown): number | null => (isString(value) ? wholeNu
 @Public()
 export class AuthController {
   constructor(
-    @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
+    @Inject(AUTH_STATE) private readonly auth: AuthConfig,
     @Inject(AuthSessions) private readonly sessions: AuthSessions,
     @Inject(AuthBackend) private readonly backend: AuthBackend,
+    @Inject(MembershipLookups) private readonly lookups: MembershipLookups,
     @Inject(AccountTickets) private readonly tickets: AccountTickets,
     @Inject(MediaIndex) private readonly media: MediaIndex,
   ) {}
 
+  @OpenToAnyone()
   @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
   @Get(AUTH_PATHS.config)
   authConfig(): AuthConfig {
-    return this.config.auth
+    return this.auth
   }
 
   @RequireAccount(ACCOUNT_REQUIREMENTS.session)
@@ -101,11 +106,28 @@ export class AuthController {
       body,
       message: 'Expected approved or revoked status.',
     })
-    return this.backend.setStatus({
-      token: this.sessions.sessionOf({ request }).token,
-      id: id.toLowerCase(),
-      change,
-    })
+    const accountId = id.toLowerCase()
+    // Runs however the change ends: a response lost after the change was made
+    // must not leave the old answer cached, so only a plain refusal keeps the
+    // account's token held.
+    const settle = ({ isRefused }: { isRefused: boolean }): void => {
+      this.lookups.forget({ accountId })
+      if (change.status !== MEMBER_STATUSES.approved && !isRefused) {
+        this.sessions.release({ accountId })
+      }
+    }
+    try {
+      const account = await this.backend.setStatus({
+        token: this.sessions.sessionOf({ request }).token,
+        id: accountId,
+        change,
+      })
+      settle({ isRefused: false })
+      return account
+    } catch (error) {
+      settle({ isRefused: error instanceof HttpException && error.getStatus() < 500 })
+      throw error
+    }
   }
 
   @ForViewers()
@@ -118,6 +140,6 @@ export class AuthController {
     @Param(AUTH_PARAMS.id, ParseIntPipe) id: number,
   ): MediaTicket {
     if (this.media.fileOf(id) === null) throw new NotFoundException('No media')
-    return this.tickets.issue({ id, session: this.sessions.sessionOf({ request }) })
+    return this.tickets.issue({ id, request })
   }
 }

@@ -1,7 +1,7 @@
-import { Body, Controller, Headers, HttpCode, Inject, Put } from '@nestjs/common'
+import { Body, Controller, Req, HttpCode, Inject, Put } from '@nestjs/common'
 import { isWatchedChange, MAX_WATCH_TARGETS } from '@raven/core'
+import type { FastifyRequest } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
-import { RAVEN_HEADERS } from '@/http'
 import { LockService } from '@/lock/lockService'
 import { WatchedCards } from '@/media/watchedCards'
 import { WatchedRepository } from '@/media/watchedRepository'
@@ -10,7 +10,7 @@ import { parseBody } from '@/parseBody'
 /**
  * Marking cuts across libraries, so it hangs off its own root, like
  * favourites. It takes no `:id`, so the lock has nothing to hold it by:
- * targets in libraries this browser may not see are skipped, and the answer
+ * targets in libraries this caller may not see are skipped, and the answer
  * is the same either way.
  */
 @Controller('api/watched')
@@ -25,7 +25,7 @@ export class WatchedController {
   @ForViewers()
   @Put()
   @HttpCode(204)
-  set(@Body() body: unknown, @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined): void {
+  set(@Body() body: unknown, @Req() request: FastifyRequest): void {
     const change = parseBody({
       guard: isWatchedChange,
       body,
@@ -34,7 +34,7 @@ export class WatchedController {
     this.watched.set({
       cards: this.cards.resolve({
         targets: change.targets,
-        viewer: this.lock.viewer({ cookie }),
+        viewer: this.lock.viewer({ request }),
       }),
       watched: change.watched,
       at: new Date(),

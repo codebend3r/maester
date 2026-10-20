@@ -16,9 +16,11 @@ import {
   exportJWK,
   generateKeyPair,
   SignJWT,
+  UnsecuredJWT,
   type JWTPayload,
 } from 'jose'
 import { vi } from 'vitest'
+import { AUTH_ENCODINGS } from '@/auth/accessToken'
 import { AUTH_JWT_ROLE, type AuthFetch } from '@/auth/tokenVerifier'
 
 export const AUTH_TEST_IDS = {
@@ -43,14 +45,33 @@ export const AUTH_TEST_FAILURES = {
   malformed: 'malformed',
   denied: 'denied',
   wrongAccount: 'wrong-account',
+  ambiguous: 'ambiguous',
 } as const
-const RPC_PATHS = {
+export const RPC_PATHS = {
   keys: '/auth/v1/.well-known/jwks.json',
   current: '/rest/v1/rpc/current_membership',
   list: '/rest/v1/rpc/list_members',
   status: '/rest/v1/rpc/set_member_status',
 } as const
 const SQL_ERRORS = { forbidden: '42501', missing: 'P0002' } as const
+/** Tokens signed some way raven must never accept: with a shared secret, or not at all. */
+export const FORGED_ALGORITHMS = { symmetric: 'HS256', none: 'none' } as const
+const AUTH_TEST_ISSUER = `${AUTH_TEST_CONFIG.supabaseUrl}/auth/v1`
+/** Where a well-signed token may claim to come from, or be for, that is not this server's Supabase. */
+export const MISADDRESSED_CLAIMS = {
+  issuer: 'https://elsewhere.example.test/auth/v1',
+  audience: 'anon',
+} as const
+const FORGING_SECRET = new TextEncoder().encode('a-test-secret-long-enough-for-the-HMAC')
+
+/** The Authorization header that carries `token`, as raven player and the API client send it. */
+export const bearerHeaders = ({ token }: { token: string }) => ({
+  [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${token}`,
+})
+
+/** The `maester-auth` cookie the web's Supabase client keeps for `token`, in its base64 form. */
+export const authCookie = ({ token }: { token: string }) =>
+  `${AUTH_COOKIE}=base64-${Buffer.from(JSON.stringify({ access_token: token })).toString(AUTH_ENCODINGS.base64url)}`
 
 export const authFixture = async () => {
   const pair = await generateKeyPair(AUTH_TEST_ALGORITHM)
@@ -108,6 +129,9 @@ export const authFixture = async () => {
         if (owner === undefined) throw new Error('Missing owner fixture')
         return Response.json([row(owner)])
       }
+      if (state.failure === AUTH_TEST_FAILURES.ambiguous && account !== undefined) {
+        return Response.json([row(account), row(account)])
+      }
       return Response.json(account === undefined ? [] : [row(account)])
     }
     if (account === undefined || !account.isOwner || account.status !== MEMBER_STATUSES.approved) {
@@ -145,7 +169,7 @@ export const authFixture = async () => {
     id = AUTH_TEST_IDS.friend,
     claims = {},
     expiresIn = 3600,
-    issuer = `${AUTH_TEST_CONFIG.supabaseUrl}/auth/v1`,
+    issuer = AUTH_TEST_ISSUER,
     audience = AUTH_JWT_ROLE,
   }: {
     id?: string
@@ -162,6 +186,24 @@ export const authFixture = async () => {
       .setAudience(audience)
       .setExpirationTime(Math.floor(Date.now() / 1000) + expiresIn)
       .sign(pair.privateKey)
+  /** A token with every claim the friend's real one has, signed as `algorithm` says instead. */
+  const forge = async ({
+    algorithm,
+  }: {
+    algorithm: (typeof FORGED_ALGORITHMS)[keyof typeof FORGED_ALGORITHMS]
+  }): Promise<string> => {
+    const now = Math.floor(Date.now() / 1000)
+    const claims: JWTPayload = {
+      role: AUTH_JWT_ROLE,
+      sub: AUTH_TEST_IDS.friend,
+      iat: now,
+      iss: AUTH_TEST_ISSUER,
+      aud: AUTH_JWT_ROLE,
+      exp: now + 3600,
+    }
+    if (algorithm === FORGED_ALGORITHMS.none) return new UnsecuredJWT(claims).encode()
+    return new SignJWT(claims).setProtectedHeader({ alg: algorithm }).sign(FORGING_SECRET)
+  }
 
-  return { accounts, state, fetcher, mint, pair, keys: createLocalJWKSet(jwks) }
+  return { accounts, state, fetcher, mint, forge, pair, keys: createLocalJWKSet(jwks) }
 }

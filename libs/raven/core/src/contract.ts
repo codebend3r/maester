@@ -1669,6 +1669,9 @@ export type MediaTicket = Infer<typeof isMediaTicket>
 /** How long a media ticket is valid. */
 export const MEDIA_TICKET_SECONDS = 21_600
 
+/** How long an account ticket is valid, at most: it never outlives the token it was minted with. */
+export const ACCOUNT_TICKET_SECONDS = 300
+
 /**
  * A video the server is sending to one browser or device right now, as the
  * admin's Streams page lists it. `browser` and `device` are read from the

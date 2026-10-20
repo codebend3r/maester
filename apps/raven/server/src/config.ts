@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import type { Anthropic } from '@anthropic-ai/sdk'
 import { type AuthConfig, type HwAccel, isHwAccel, oneOf } from '@raven/core'
-import { readAuthConfig } from '@/auth/authConfig'
+import { ACCOUNTS_OPT_OUT, AUTH_ENV, readAuthConfig } from '@/auth/authConfig'
 import { readMediaPlaneConfig, type MediaPlaneConfig } from '@/media/mediaPlaneConfig'
 import { flag, type ListenConfig, readListenConfig, wholeNumber } from '@shared/server'
 
@@ -69,7 +69,10 @@ export type ServerConfig = ListenConfig & {
   adminPassword: string | null
   /** Where the browser fetches media straight from the server, and who may ask: all off until configured. */
   mediaPlane: MediaPlaneConfig
+  /** What the Supabase environment says. The state the server runs in also depends on its enforcement record, see `AUTH_STATE`. */
   auth: AuthConfig
+  /** `RAVEN_ACCOUNTS=off` exactly: the operator's explicit rollback from enforced accounts. */
+  isAccountsOptedOut: boolean
 }
 
 /** The DI token the config is provided under. */
@@ -115,4 +118,5 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   adminPassword: env.ADMIN_PASSWORD?.trim() || null,
   mediaPlane: readMediaPlaneConfig(env),
   auth: readAuthConfig(env),
+  isAccountsOptedOut: env[AUTH_ENV.accounts] === ACCOUNTS_OPT_OUT,
 })
