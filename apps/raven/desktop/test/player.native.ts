@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert'
+import { randomBytes } from 'node:crypto'
 import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { createRequire } from 'node:module'
 import { basename, dirname, join, resolve } from 'node:path'
 import { after, before, describe, test } from 'node:test'
@@ -8,33 +9,61 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { setFlagsFromString } from 'node:v8'
 import { runInNewContext } from 'node:vm'
 import {
+  ADMIN_LOCK_STATES,
+  AUTH_HEADERS,
+  AUTH_PARAMS,
+  AUTH_PATHS,
   isNumber,
   isRecord,
+  MEMBER_STATUSES,
   object,
   type OutputSettings,
+  PLAYER_COMMANDS,
+  PLAYER_ERROR_REASONS,
   PLAYER_EVENTS,
+  PLAYER_REFUSAL_REASONS,
+  PLAYER_SOURCE_KINDS,
   type PlayerCommand,
   type PlayerEvent,
 } from '@raven/core'
 import {
   MPV_END_FILE_REASONS,
   MPV_EVENTS,
+  MPV_PROPERTIES,
   MPV_TRACK_TYPES,
   type MpvEvent,
   openMpv,
 } from '@raven/mpv'
 import { CLIP_SECONDS, type Clips, makeClips, makeTrackClip } from '@/e2e/clips'
 import {
+  AUTH_V1,
+  FIXTURE_ACCOUNT,
+  FIXTURE_ACCOUNT_KINDS,
+  FIXTURE_PUBLISHABLE_KEY,
+  GRANT_PARAM,
+  GRANTS,
+} from '@/e2e/fixtureAuth'
+import {
+  FIXTURE_ADMIN_KINDS,
   FIXTURE_MEDIA,
+  type FixtureAdmin,
   type FixtureMode,
   type FixtureRequest,
   type FixtureServer,
+  isRelayed,
   startFixtureServer,
 } from '@/e2e/fixtureServer'
 import { SERVER_METHODS } from '@/shared/protocol'
+import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { createAccountSessions, SIGN_IN_OUTCOMES } from '@/main/accounts/accountSessions'
+import { authorizeWith } from '@/main/accounts/accountService'
+import { AUTH_STATES, type AuthState } from '@/main/accounts/authConfigs'
+import type { SignInConfig } from '@/main/accounts/authEndpoints'
+import type { SessionStorage } from '@/main/accounts/sessionStore'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { addonPathFor } from '@/main/player/engine'
 import {
+  type AccountRefusalReader,
   createPlayerService,
   type FailureExplainer,
   PLAYER_MESSAGES,
@@ -46,13 +75,21 @@ import {
   type ServerTarget,
 } from '@/main/player/playerService'
 import { tracksFromMpv } from '@/main/player/tracksFromMpv'
-import { createServerCalls, fetchThrough } from '@/main/servers/serverCalls'
+import { createAccountTickets } from '@/main/servers/accountTickets'
+import { API_PATHS } from '@/main/servers/allowlist'
+import {
+  createMediaRelay,
+  listenOnLoopback,
+  RELAY_HOST,
+  RELAY_SECRET_BYTES,
+} from '@/main/servers/mediaRelay'
+import { createServerCalls, fetchThrough, NO_BEARER } from '@/main/servers/serverCalls'
 import {
   createServerSources,
   SOURCE_MESSAGES,
   TRACKS_TIMEOUT_MS,
 } from '@/main/servers/serverSources'
-import { NO_SERVERS, noExplanation } from '@/main/test/playerFakes'
+import { ACCOUNTS_OFF, NO_SERVERS, noExplanation, noRefusedAccount } from '@/main/test/playerFakes'
 import { createNodeTimers } from '@/main/timers'
 
 /** The id the server gives a title's first sidecar (Ruling 18). */
@@ -227,8 +264,14 @@ type Servers = Parameters<typeof resolveSourceWith>[0]['servers']
 const openHarness = async ({
   servers = NO_SERVERS,
   explain = noExplanation,
+  refusedAccount = noRefusedAccount,
   serverStallMs,
-}: { servers?: Servers; explain?: FailureExplainer; serverStallMs?: number } = {}) => {
+}: {
+  servers?: Servers
+  explain?: FailureExplainer
+  refusedAccount?: AccountRefusalReader
+  serverStallMs?: number
+} = {}) => {
   const events: PlayerEvent[] = []
   // What mpv itself said, in stream order, without the property changes.
   const raw: MpvEvent[] = []
@@ -247,6 +290,7 @@ const openHarness = async ({
     mpv,
     resolveSource: resolveSourceWith({ grants: { fileOf }, servers, sidecarsOf }),
     explain,
+    refusedAccount,
     canChooseAo: false,
     timers: createNodeTimers(),
     ...(serverStallMs === undefined ? {} : { serverStallMs }),
@@ -932,9 +976,9 @@ const serveBytes = ({
   const range = /^bytes=(\d+)-(\d*)$/u.exec(request.headers.range ?? '')
   if (range === null) {
     response.writeHead(200, {
-      'content-type': 'video/x-matroska',
-      'accept-ranges': 'bytes',
-      'content-length': bytes.length,
+      [HTTP_HEADERS.contentType]: 'video/x-matroska',
+      [HTTP_HEADERS.acceptRanges]: 'bytes',
+      [HTTP_HEADERS.contentLength]: bytes.length,
     })
     response.end(bytes)
     return
@@ -948,10 +992,10 @@ const serveBytes = ({
     return
   }
   response.writeHead(206, {
-    'content-type': 'video/x-matroska',
-    'accept-ranges': 'bytes',
-    'content-range': `bytes ${start}-${end}/${bytes.length}`,
-    'content-length': end - start + 1,
+    [HTTP_HEADERS.contentType]: 'video/x-matroska',
+    [HTTP_HEADERS.acceptRanges]: 'bytes',
+    [HTTP_HEADERS.contentRange]: `bytes ${start}-${end}/${bytes.length}`,
+    [HTTP_HEADERS.contentLength]: end - start + 1,
   })
   response.end(bytes.subarray(start, end + 1))
 }
@@ -1033,6 +1077,7 @@ const targetFor = ({
         },
       ]
     : [],
+  relay: null,
 })
 
 const serversOf = (targets: readonly ServerTarget[]): Servers => ({
@@ -1280,6 +1325,12 @@ const startFixture = async ({ mode }: { mode: FixtureMode }) => {
 
 type Jar = readonly { name: string; value: string }[]
 
+/** The account parts of server sources: what a server's accounts are, its tickets and its relay. */
+type AccountDeps = Pick<
+  Parameters<typeof createServerSources>[0],
+  'authConfigs' | 'tickets' | 'relay' | 'accountChanged'
+>
+
 /** The `name=value` of each `Set-Cookie`, as a session would keep them. */
 const cookiesFrom = (response: Response): Jar =>
   response.headers.getSetCookie().flatMap((line) => {
@@ -1314,9 +1365,17 @@ const unlockPin = ({ fixture }: { fixture: FixtureServer }) =>
  * The server sources main builds, over the fixture: `jar` stands in for the server's
  * session, which sends its cookies with main's own calls and hands them to `cookiesFor`.
  */
-const sourcesFor = ({ fixture, jar }: { fixture: FixtureServer; jar: Jar }) => {
+const sourcesFor = ({
+  fixture,
+  jar,
+  accounts = ACCOUNTS_OFF,
+}: {
+  fixture: FixtureServer
+  jar: Jar
+  accounts?: AccountDeps
+}) => {
   const warnings: string[] = []
-  const entry: ServerEntry = { ...FIXTURE_SERVER, origin: fixture.origin, addedAt: 0 }
+  const entry: ServerEntry = { ...FIXTURE_SERVER, origin: fixture.origin, addedAt: 0, signIn: null }
   const serverOf = (serverId: string) => (serverId === entry.id ? entry : null)
   const warn = (message: string) => {
     warnings.push(message)
@@ -1330,10 +1389,17 @@ const sourcesFor = ({ fixture, jar }: { fixture: FixtureServer; jar: Jar }) => {
         if (sent !== '') headers.set('cookie', sent)
         return fetch(url, { ...init, headers })
       }),
+    ...NO_BEARER,
     warn,
   })
   return {
-    sources: createServerSources({ serverOf, cookiesFor: async () => jar, calls, warn }),
+    sources: createServerSources({
+      serverOf,
+      cookiesFor: async () => jar,
+      calls,
+      ...accounts,
+      warn,
+    }),
     warnings,
   }
 }
@@ -1344,11 +1410,13 @@ type Asked = Parameters<FailureExplainer>[0]
 const withFixtureTitles = async ({
   fixture,
   jar,
+  accounts,
   serverStallMs,
   run,
 }: {
   fixture: FixtureServer
   jar: Jar
+  accounts?: AccountDeps
   serverStallMs?: number
   run: (input: {
     harness: Harness
@@ -1357,7 +1425,7 @@ const withFixtureTitles = async ({
   }) => Promise<void>
 }) => {
   const asked: Asked[] = []
-  const { sources, warnings: sourceWarnings } = sourcesFor({ fixture, jar })
+  const { sources, warnings: sourceWarnings } = sourcesFor({ fixture, jar, accounts })
   const harness = await openHarness({
     servers: sources,
     explain: async (input) => {
@@ -1995,6 +2063,530 @@ describe('a slow raven fixture server', () => {
   })
 })
 
+const ACCOUNT_SERVER = {
+  id: '00000000-0000-4000-8000-0000000000d4',
+  name: 'Accounts',
+} as const
+/** The real server's ticket life. */
+const ACCOUNT_TICKET_MS = 300_000
+/** Shorter than Supabase's hour, so the film of seeks below outlives the first JWT. */
+const ACCOUNT_JWT_SECONDS = 1800
+/** Past a ticket's life, and past the four minutes raven player reuses one for. */
+const TICKET_STEP_MS = 310_000
+/**
+ * Where the seeks land, latest first, so each lands where mpv has read nothing yet. Six steps
+ * past a ticket's life are half an hour on the clock, past the JWT's end.
+ */
+const SEEK_TARGETS = [27, 23, 19, 15, 11, 7] as const
+/** What the fixture sends at full speed before it trickles: several seconds of the track clip. */
+const BUFFER_SHARE = 0.3
+/** `eyJ`, the base64url of `{"`, opens every JWT. */
+const JWT_HEAD = 'eyJ'
+/** Long enough for a request mpv still had to make to reach the relay. */
+const QUIET_MS = 1500
+const REFRESH_PATH = `${AUTH_V1.token}?${GRANT_PARAM}=${GRANTS.refresh}`
+const ACCOUNT_TICKET_PATH = AUTH_PATHS.ticket.replace(
+  `:${AUTH_PARAMS.id}`,
+  String(FIXTURE_MEDIA.first),
+)
+
+/** The clock the fixture and raven player's account parts share, which a test moves on. */
+type Clock = { skewMs: number }
+
+const startAccountFixture = async ({
+  clock,
+  admin = { kind: FIXTURE_ADMIN_KINDS.off },
+}: {
+  clock: Clock
+  admin?: FixtureAdmin
+}) => {
+  const { first, second } = await fixtureClips()
+  return startFixtureServer({
+    clips: { first, second, tracks: clip.path },
+    mode: {
+      pin: FIXTURE_PIN,
+      isLocked: true,
+      admin,
+      accounts: {
+        kind: FIXTURE_ACCOUNT_KINDS.ready,
+        status: MEMBER_STATUSES.approved,
+        ticketMs: ACCOUNT_TICKET_MS,
+        jwtSeconds: ACCOUNT_JWT_SECONDS,
+      },
+    },
+    now: () => Date.now() + clock.skewMs,
+  })
+}
+
+/**
+ * The account parts main builds for a server whose accounts are ready, over the fixture: auth-js
+ * signed in at the fixture's stub Auth, the Bearer on main's calls, the tickets and the loopback
+ * relay, all on `clock`. `jar` stands in for the server's session, which holds the PIN's cookie.
+ */
+const accountPartsFor = async ({
+  fixture,
+  jar,
+  clock,
+}: {
+  fixture: FixtureServer
+  jar: Jar
+  clock: Clock
+}) => {
+  const warnings: string[] = []
+  const warn = (message: string) => {
+    warnings.push(message)
+  }
+  const now = () => Date.now() + clock.skewMs
+  const signIn: SignInConfig = {
+    supabaseUrl: fixture.origin,
+    publishableKey: FIXTURE_PUBLISHABLE_KEY,
+    webUrl: fixture.origin,
+  }
+  const entry: ServerEntry = { ...ACCOUNT_SERVER, origin: fixture.origin, addedAt: 0, signIn }
+  const serverOf = (serverId: string) => (serverId === entry.id ? entry : null)
+  const authConfigs = {
+    stateOf: async (): Promise<AuthState> => ({ kind: AUTH_STATES.ready, signIn }),
+    readyOf: () => signIn,
+  }
+  // auth-js's storage, in memory, as `RAVEN_DESKTOP_SAFE_STORAGE=off` keeps it.
+  const kept: { items: ReadonlyMap<string, string> } = { items: new Map() }
+  const storage: SessionStorage = {
+    getItem: async (key) => kept.items.get(key) ?? null,
+    setItem: async (key, value) => {
+      kept.items = new Map([...kept.items, [key, value]])
+    },
+    removeItem: async (key) => {
+      kept.items = new Map([...kept.items].filter(([name]) => name !== key))
+    },
+  }
+  const sessions = createAccountSessions({
+    storageFor: () => storage,
+    configOf: authConfigs.readyOf,
+    fetch: ({ url, init }) => fetch(url, init),
+    now,
+    timers: createNodeTimers(),
+    onEnded: () => undefined,
+    warn,
+  })
+  const sent = jar.map(({ name, value }) => `${name}=${value}`).join('; ')
+  const calls = createServerCalls({
+    serverOf,
+    fetchFor: () =>
+      fetchThrough((url, init) => {
+        const headers = new Headers(init.headers)
+        if (sent !== '') headers.set(AUTH_HEADERS.cookie, sent)
+        return fetch(url, { ...init, headers })
+      }),
+    authorize: authorizeWith({ authConfigs, sessions }),
+    refresh: ({ serverId }) => sessions.refresh(serverId),
+    onRefusal: () => undefined,
+    hasAccounts: () => true,
+    warn,
+  })
+  const tickets = createAccountTickets({ calls, sessions, now })
+  // Every request the relay heard, as mpv sent it, and the listener, to close after.
+  const heard: string[] = []
+  const listeners: Server[] = []
+  // The servers whose account the relay or the sources asked main to read again.
+  const changed: string[] = []
+  const relay = createMediaRelay({
+    listen: listenOnLoopback({
+      createServer: (handler) => {
+        const listener = createServer((request, response) => {
+          heard.push(`${request.method ?? ''} ${request.url ?? ''}`)
+          handler(request, response)
+        })
+        listeners.push(listener)
+        return listener
+      },
+      warn,
+    }),
+    fetchUpstream: ({ url, method, headers, signal }) =>
+      fetch(url, { method, headers, signal, redirect: 'error', cache: 'no-store' }),
+    tickets,
+    newSecret: (bytes) => randomBytes(bytes).toString('base64url'),
+    accountChanged: async ({ serverId }) => {
+      changed.push(serverId)
+    },
+    warn,
+  })
+  const sources = createServerSources({
+    serverOf,
+    cookiesFor: async () => jar,
+    calls,
+    authConfigs,
+    tickets,
+    relay,
+    accountChanged: async (serverId) => {
+      changed.push(serverId)
+    },
+    warn,
+  })
+  const outcome = await sessions.signIn({
+    serverId: entry.id,
+    email: FIXTURE_ACCOUNT.email,
+    password: FIXTURE_ACCOUNT.password,
+    config: signIn,
+  })
+  assert.equal(outcome.kind, SIGN_IN_OUTCOMES.signedIn, 'the fixture did not sign the account in')
+  const close = async () => {
+    relay.closeAll()
+    await Promise.all(
+      listeners.map(
+        (listener) =>
+          new Promise<void>((resolveClose) => {
+            listener.closeAllConnections()
+            listener.close(() => resolveClose())
+          }),
+      ),
+    )
+  }
+  return { sources, relay, heard, changed, warnings, close }
+}
+
+type AccountParts = Awaited<ReturnType<typeof accountPartsFor>>
+
+/**
+ * Runs `run` on a harness whose server titles resolve, explain and read their refusals through
+ * the account parts, and answers the targets each load resolved to, the relay's URLs included.
+ */
+const withAccountTitles = async ({
+  fixture,
+  jar,
+  clock,
+  run,
+}: {
+  fixture: FixtureServer
+  jar: Jar
+  clock: Clock
+  run: (input: {
+    harness: Harness
+    parts: AccountParts
+    targets: readonly ServerTarget[]
+  }) => Promise<void>
+}) => {
+  const parts = await accountPartsFor({ fixture, jar, clock })
+  const targets: ServerTarget[] = []
+  const harness = await openHarness({
+    servers: {
+      resolve: async (source) => {
+        const resolved = await parts.sources.resolve(source)
+        if (resolved.ok && resolved.target.kind === PLAYER_SOURCE_KINDS.server) {
+          targets.push(resolved.target)
+        }
+        return resolved
+      },
+    },
+    explain: parts.sources.explain,
+    refusedAccount: parts.sources.refusedAccount,
+  })
+  try {
+    await run({ harness, parts, targets })
+  } finally {
+    await harness.destroy()
+    await parts.close()
+  }
+}
+
+const accountLoad = ({ mediaId }: { mediaId: number }): PlayerCommand => ({
+  type: PLAYER_COMMANDS.load,
+  source: { kind: PLAYER_SOURCE_KINDS.server, serverId: ACCOUNT_SERVER.id, mediaId },
+  start: 0,
+  audio: null,
+  subtitle: null,
+})
+
+const playingAccountTitle = ({ harness }: { harness: Harness }) =>
+  harness.eventAfter({
+    label: 'the account title playing',
+    matches: where({ type: PLAYER_EVENTS.paused, holds: (event) => !event.paused }),
+    action: () => harness.sendOk(accountLoad({ mediaId: FIXTURE_MEDIA.first })),
+  })
+
+/** The secret of a relayed load, the path segment its file URL opens with. */
+const secretOf = (target: ServerTarget | undefined) =>
+  new URL(target?.url ?? `http://${RELAY_HOST}/`).pathname.split('/')[1] ?? ''
+
+/** Holds the track clip at a share of its bytes, so mpv reads only what a seek asks for past it. */
+const throttleClip = async ({ fixture }: { fixture: FixtureServer }) => {
+  const { size } = await stat(clip.path)
+  fixture.throttle({ byte: Math.floor(size * THROTTLE_SHARE) })
+}
+
+const timeOf = async ({ harness }: { harness: Harness }) =>
+  (await harness.mpv.read({ name: MPV_PROPERTIES.timePos })) ?? Number.NaN
+
+describe('account titles through the relay against headless libmpv', () => {
+  test('seeks past many ticket lives and a JWT refresh, plays on, and reads the sidecar once', async () => {
+    const clock: Clock = { skewMs: 0 }
+    const fixture = await startAccountFixture({ clock })
+    try {
+      const jar = await unlockPin({ fixture })
+      await withAccountTitles({
+        fixture,
+        jar,
+        clock,
+        run: async ({ harness, parts, targets }) => {
+          await throttleClip({ fixture })
+          const from = fixture.requests.length
+          await playingAccountTitle({ harness })
+          await harness.sendOk({ type: PLAYER_COMMANDS.pause })
+          await SEEK_TARGETS.reduce(async (previous, target) => {
+            await previous
+            clock.skewMs += TICKET_STEP_MS
+            const mark = fixture.requests.length
+            await harness.sendOk({ type: PLAYER_COMMANDS.seek, time: target })
+            await harness.waitFor({
+              label: `the clock at ${target}`,
+              check: async () => near({ value: await timeOf({ harness }), target, within: 1 }),
+            })
+            await harness.waitFor({
+              label: `a request for the stretch at ${target}`,
+              check: async () =>
+                requestsTo({
+                  log: fixture.requests,
+                  path: fileOfMedia(FIXTURE_MEDIA.first),
+                  from: mark,
+                }).length > 0,
+            })
+          }, Promise.resolve())
+          fixture.throttle({ byte: null })
+          const last = SEEK_TARGETS.at(-1) ?? 0
+          await harness.eventAfter({
+            label: 'the clock moving on after the last seek',
+            matches: where({ type: PLAYER_EVENTS.time, holds: (event) => event.time >= last + 1 }),
+            action: () => harness.sendOk({ type: PLAYER_COMMANDS.play }),
+          })
+
+          const played = fixture.requests.slice(from)
+          const files = requestsTo({ log: played, path: fileOfMedia(FIXTURE_MEDIA.first) })
+          assert.ok(files.length > SEEK_TARGETS.length, 'mpv made a request for fewer seeks')
+          assert.ok(files.every(isRelayed), 'a file request went without its ticket alone')
+          const mints = played.filter(
+            ({ method, path }) => method === SERVER_METHODS.post && path === ACCOUNT_TICKET_PATH,
+          )
+          assert.ok(
+            mints.length > SEEK_TARGETS.length,
+            `only ${mints.length} tickets for the seeks`,
+          )
+          assert.ok(
+            mints.every(({ hasBearer }) => hasBearer),
+            'a ticket was asked for without the Bearer',
+          )
+          assert.ok(
+            played.some(
+              ({ method, path }) => method === SERVER_METHODS.post && path === REFRESH_PATH,
+            ),
+            'the JWT was never refreshed',
+          )
+          const sidecars = requestsTo({ log: played, path: SIDECAR_PATH })
+          assert.equal(sidecars.length, 1, 'mpv read the sidecar more than once')
+          assert.ok(sidecars.every(isRelayed), 'the sidecar went without its ticket alone')
+          assert.deepEqual(harness.errorsOf(), [])
+          assert.deepEqual(parts.changed, [])
+          const secret = secretOf(targets.at(0))
+          assert.equal(
+            secret.length,
+            Buffer.alloc(RELAY_SECRET_BYTES).toString('base64url').length,
+            'the title did not go through the relay',
+          )
+          const tokens = fixture.issuedTokens()
+          assert.ok(tokens.length > SEEK_TARGETS.length, 'the fixture issued too few tokens')
+          const unsaid = [secret, RELAY_HOST, JWT_HEAD, ...tokens]
+          assert.deepEqual(
+            [...harness.warnings, ...parts.warnings].filter((warning) =>
+              unsaid.some((secretText) => warning.includes(secretText)),
+            ).length,
+            0,
+            'a warning holds the relay, a token or a ticket',
+          )
+        },
+      })
+    } finally {
+      fixture.throttle({ byte: null })
+      await fixture.close()
+    }
+  })
+
+  test("an audio switch past a ticket's life refreshes through the relay and plays on", async () => {
+    const clock: Clock = { skewMs: 0 }
+    const fixture = await startAccountFixture({ clock })
+    try {
+      const jar = await unlockPin({ fixture })
+      await withAccountTitles({
+        fixture,
+        jar,
+        clock,
+        run: async ({ harness }) => {
+          await playingAccountTitle({ harness })
+          await harness.nextEvent({
+            label: 'the clock past a second',
+            matches: where({ type: PLAYER_EVENTS.time, holds: (event) => event.time >= 1 }),
+          })
+          const list = await harness.mpv.read({ name: MPV_PROPERTIES.trackList })
+          const second = list.filter((track) => track.type === MPV_TRACK_TYPES.audio)[1]
+          assert.ok(second, 'the clip lacks its second audio track')
+          clock.skewMs += TICKET_STEP_MS
+          const mark = fixture.requests.length
+          const at = await timeOf({ harness })
+          await harness.sendOk({ type: PLAYER_COMMANDS.audio, index: 1 })
+          assert.equal(await harness.mpv.read({ name: MPV_PROPERTIES.aid }), second.id)
+          await harness.waitFor({
+            label: "the refresh seek's request",
+            check: async () =>
+              requestsTo({
+                log: fixture.requests,
+                path: fileOfMedia(FIXTURE_MEDIA.first),
+                from: mark,
+              }).length > 0,
+          })
+          await harness.nextEvent({
+            label: 'the clock moving on after the switch',
+            matches: where({ type: PLAYER_EVENTS.time, holds: (event) => event.time >= at + 1 }),
+          })
+          const switched = fixture.requests.slice(mark)
+          assert.ok(
+            requestsTo({ log: switched, path: fileOfMedia(FIXTURE_MEDIA.first) }).every(isRelayed),
+            'the refresh seek went without its ticket alone',
+          )
+          assert.ok(
+            switched.some(
+              ({ method, path }) => method === SERVER_METHODS.post && path === ACCOUNT_TICKET_PATH,
+            ),
+            'the refresh seek reused a ticket past its life',
+          )
+          assert.deepEqual(harness.errorsOf(), [])
+        },
+      })
+    } finally {
+      await fixture.close()
+    }
+  })
+
+  test('removing the account mid-play is an account error, and mpv opens nothing more', async () => {
+    const clock: Clock = { skewMs: 0 }
+    const fixture = await startAccountFixture({ clock })
+    try {
+      const jar = await unlockPin({ fixture })
+      await withAccountTitles({
+        fixture,
+        jar,
+        clock,
+        run: async ({ harness, parts }) => {
+          await throttleClip({ fixture })
+          await playingAccountTitle({ harness })
+          fixture.setStatus(MEMBER_STATUSES.revoked)
+          const failure = await harness.eventAfter({
+            label: 'the removed account stopping the title',
+            matches: where({ type: PLAYER_EVENTS.error }),
+            // A seek past what mpv holds is the next request the server hears. Near the end,
+            // where mpv runs a refused seek out as if the title had ended.
+            action: () => harness.sendOk({ type: PLAYER_COMMANDS.seek, time: SEEK_TARGETS[0] }),
+          })
+          assert.deepEqual(failure, {
+            type: PLAYER_EVENTS.error,
+            reason: PLAYER_ERROR_REASONS.account,
+            message: SOURCE_MESSAGES.removed(ACCOUNT_SERVER.name),
+          })
+          assert.ok(
+            parts.changed.includes(ACCOUNT_SERVER.id),
+            'main was not told to read the account',
+          )
+          await sleep(SETTLE_MS)
+          const asked = fixture.requests.length
+          const relayed = parts.heard.length
+          await sleep(QUIET_MS)
+          assert.equal(fixture.requests.length, asked, 'the server heard more after the error')
+          assert.equal(parts.heard.length, relayed, 'mpv asked the relay for more after the error')
+        },
+      })
+    } finally {
+      fixture.throttle({ byte: null })
+      await fixture.close()
+    }
+  })
+
+  test('removed mid-play, the title plays on from what mpv holds, then ends as the account error', async () => {
+    const clock: Clock = { skewMs: 0 }
+    const fixture = await startAccountFixture({ clock })
+    try {
+      const jar = await unlockPin({ fixture })
+      await withAccountTitles({
+        fixture,
+        jar,
+        clock,
+        run: async ({ harness }) => {
+          const { size } = await stat(clip.path)
+          fixture.throttle({ byte: Math.floor(size * BUFFER_SHARE) })
+          await playingAccountTitle({ harness })
+          await harness.nextEvent({
+            label: 'the clock past a second',
+            matches: where({ type: PLAYER_EVENTS.time, holds: (event) => event.time >= 1 }),
+          })
+          fixture.setStatus(MEMBER_STATUSES.revoked)
+          const ending = harness.nextEvent({
+            label: 'the account error once the buffer ran out',
+            matches: where({ type: PLAYER_EVENTS.error }),
+            timeoutMs: DRAIN_WAIT_MS,
+          })
+          // A dropped link: mpv reconnects through the relay, and the server refuses that request.
+          fixture.disconnect()
+          const at = await timeOf({ harness })
+          await harness.waitFor({
+            label: 'the buffer playing on after the removal',
+            check: async () => (await timeOf({ harness })) >= at + 1,
+          })
+          assert.deepEqual(harness.errorsOf(), [], 'the title stopped before its buffer ran out')
+          assert.deepEqual(await ending, {
+            type: PLAYER_EVENTS.error,
+            reason: PLAYER_ERROR_REASONS.account,
+            message: SOURCE_MESSAGES.removed(ACCOUNT_SERVER.name),
+          })
+        },
+      })
+    } finally {
+      fixture.throttle({ byte: null })
+      await fixture.close()
+    }
+  })
+
+  test('the relay hears nothing once the load ends, and its secret opens nothing after', async () => {
+    const clock: Clock = { skewMs: 0 }
+    const fixture = await startAccountFixture({ clock })
+    try {
+      const jar = await unlockPin({ fixture })
+      await withAccountTitles({
+        fixture,
+        jar,
+        clock,
+        run: async ({ harness, parts, targets }) => {
+          await playingAccountTitle({ harness })
+          await harness.sendOk({ type: PLAYER_COMMANDS.stop })
+          await harness.waitFor({
+            label: 'mpv idle after the stop',
+            check: async () =>
+              (await harness.mpv.read({ name: MPV_PROPERTIES.trackList })).length === 0,
+          })
+          await sleep(SETTLE_MS)
+          const relayed = parts.heard.length
+          await sleep(QUIET_MS)
+          assert.equal(parts.heard.length, relayed, 'mpv asked the relay for more after the stop')
+
+          // As main retires it when the player stops showing: then the URL mpv had is a 404.
+          parts.relay.closeAll()
+          const asked = fixture.requests.length
+          const target = targets.at(0)
+          assert.ok(target, 'the title never resolved')
+          assert.equal((await fetch(target.url)).status, 404)
+          assert.equal(fixture.requests.length, asked, 'a retired secret reached the server')
+        },
+      })
+    } finally {
+      await fixture.close()
+    }
+  })
+})
+
 describe('a raven fixture server under the admin lock', () => {
   const holder: { fixture: FixtureServer | null } = { fixture: null }
   before(async () => {
@@ -2042,6 +2634,116 @@ describe('a raven fixture server under the admin lock', () => {
         assert.deepEqual(harness.errorsOf(), [])
       },
     })
+  })
+
+  test('a server older than accounts hides the title until the admin password, whose unlock lifts it', async () => {
+    const fixture = await startFixture({
+      mode: {
+        pin: FIXTURE_PIN,
+        isLocked: true,
+        admin: { kind: FIXTURE_ADMIN_KINDS.password, password: FIXTURE_PASSWORD },
+        accounts: { kind: FIXTURE_ACCOUNT_KINDS.legacy },
+      },
+    })
+    const legacy: AccountDeps = {
+      ...ACCOUNTS_OFF,
+      authConfigs: { stateOf: async (): Promise<AuthState> => ({ kind: AUTH_STATES.legacy }) },
+    }
+    try {
+      assert.equal((await fetch(`${fixture.origin}${AUTH_PATHS.config}`)).status, 404)
+      const pin = await unlockPin({ fixture })
+      await withFixtureTitles({
+        fixture,
+        jar: pin,
+        accounts: legacy,
+        run: async ({ harness }) => {
+          const failure = await harness.eventAfter({
+            label: 'the hidden title refused',
+            matches: where({ type: PLAYER_EVENTS.error }),
+            action: () => harness.sendOk(titleLoad({ mediaId: FIXTURE_MEDIA.first })),
+          })
+          assert.deepEqual(failure, {
+            type: PLAYER_EVENTS.error,
+            reason: PLAYER_ERROR_REASONS.open,
+            message: SOURCE_MESSAGES.gone(FIXTURE_SERVER.name),
+          })
+        },
+      })
+      // What the page reads on that 404 before it asks for the admin password.
+      const lock = await fetch(`${fixture.origin}${API_PATHS.admin}`, {
+        headers: {
+          [AUTH_HEADERS.cookie]: pin.map(({ name, value }) => `${name}=${value}`).join('; '),
+        },
+      })
+      assert.deepEqual(await lock.json(), { state: ADMIN_LOCK_STATES.on, available: true })
+      const admin = await unlockWith({
+        fixture,
+        path: API_PATHS.adminUnlock,
+        body: { password: FIXTURE_PASSWORD },
+      })
+      await withFixtureTitles({
+        fixture,
+        jar: [...admin, ...pin],
+        accounts: legacy,
+        run: async ({ harness }) => {
+          const mark = fixture.requests.length
+          await playingTitle({ harness, mediaId: FIXTURE_MEDIA.first })
+          const files = requestsTo({
+            log: fixture.requests,
+            path: fileOfMedia(FIXTURE_MEDIA.first),
+            from: mark,
+          })
+          assert.ok(files.length > 0, 'mpv never asked for the file')
+          assert.ok(
+            files.every(
+              ({ hasUnlock, hasAdmin, hasBearer, hasAccountTicket }) =>
+                hasUnlock && hasAdmin && !hasBearer && !hasAccountTicket,
+            ),
+            'a file request left the cookie path',
+          )
+          assert.deepEqual(harness.errorsOf(), [])
+        },
+      })
+    } finally {
+      await fixture.close()
+    }
+  })
+
+  test('a server whose accounts are ready never asks the admin lock: the hidden title is gone', async () => {
+    const clock: Clock = { skewMs: 0 }
+    const fixture = await startAccountFixture({
+      clock,
+      admin: { kind: FIXTURE_ADMIN_KINDS.password, password: FIXTURE_PASSWORD },
+    })
+    try {
+      const jar = await unlockPin({ fixture })
+      await withAccountTitles({
+        fixture,
+        jar,
+        clock,
+        run: async ({ harness, parts }) => {
+          const outcome = await harness.send(accountLoad({ mediaId: FIXTURE_MEDIA.first }))
+          assert.deepEqual(outcome, {
+            ok: false,
+            reason: PLAYER_REFUSAL_REASONS.refused,
+            message: SOURCE_MESSAGES.gone(ACCOUNT_SERVER.name),
+          })
+          assert.deepEqual(
+            fixture.requests.filter(({ path }) => path.startsWith(API_PATHS.admin)),
+            [],
+            'the admin lock was asked about',
+          )
+          assert.deepEqual(parts.heard, [], 'the relay opened for a hidden title')
+          assert.deepEqual(
+            harness.raw.filter((event) => event.type === MPV_EVENTS.fileLoaded),
+            [],
+            'mpv opened the hidden title',
+          )
+        },
+      })
+    } finally {
+      await fixture.close()
+    }
   })
 })
 
