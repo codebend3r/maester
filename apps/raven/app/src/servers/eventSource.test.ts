@@ -7,26 +7,21 @@ import {
   type NativeEventSource,
   RECONNECT_MS,
   type Schedule,
+  type SourceRequest,
   eventSourceFor,
   isForegroundState,
 } from '@/servers/eventSource'
 
 const EVENTS_URL = 'http://nas:8080/api/events'
 
-type Heard = { type: string; listener: (event: { type: string; data?: string | null }) => void }
+type Heard = { type: string; listener: Parameters<NativeEventSource['addEventListener']>[1] }
 
-type Made = { url: string; headers: Record<string, string>; heard: Heard[]; isClosed: boolean }
+type Made = SourceRequest & { heard: Heard[]; isClosed: boolean }
 
 /** Event sources that record how each was made and what listens, and can be made to speak. */
 const fakeSources = () => {
   const made: Made[] = []
-  const createSource = ({
-    url,
-    headers,
-  }: {
-    url: string
-    headers: Record<string, string>
-  }): NativeEventSource => {
+  const createSource = ({ url, headers }: SourceRequest): NativeEventSource => {
     const heard: Heard[] = []
     const source: Made = { url, headers, heard, isClosed: false }
     made.push(source)

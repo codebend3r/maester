@@ -3,6 +3,7 @@ import { AUTH_HEADERS, SERVER_COOKIES, isRecord, isString } from '@raven/core'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
+import type { Picture } from '@/queries/cards'
 import { clearOnServerSwitch } from '@/queries/serverCache'
 import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Home } from '@/screens/Home'
@@ -144,8 +145,6 @@ describe('Home on a phone or tablet', () => {
     )
   })
 })
-
-type Picture = { uri: string; headers: Record<string, string> }
 
 const isPicture = (value: unknown): value is Picture =>
   isRecord(value) && isString(value.uri) && isRecord(value.headers)

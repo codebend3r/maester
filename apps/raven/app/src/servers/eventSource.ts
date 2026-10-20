@@ -16,6 +16,9 @@ export type NativeEventSource = {
   close: () => void
 }
 
+/** Where an event source connects, and the headers it sends. */
+export type SourceRequest = { url: string; headers: Record<string, string> }
+
 /** Runs `run` after `ms`; returns the way to cancel it. */
 export type Schedule = (wait: { run: () => void; ms: number }) => () => void
 
@@ -84,7 +87,7 @@ export const eventSourceFor =
     app,
   }: {
     headersFor: (url: string) => Promise<Record<string, string>>
-    createSource: (source: { url: string; headers: Record<string, string> }) => NativeEventSource
+    createSource: (source: SourceRequest) => NativeEventSource
     schedule: Schedule
     app: AppActivity
   }) =>

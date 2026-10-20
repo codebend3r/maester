@@ -11,7 +11,6 @@ import {
 
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import type { ItemHero, ItemPage, PersonCard, VersionRow } from '@/queries/itemPage'
-import type { RouteTarget } from '@/routes'
 import { CardPicture } from '@/layouts/Card'
 import { FOCUS_CARD_WIDTHS, FocusCard } from '@/layouts/FocusCard'
 import { toneStyles } from '@/layouts/formStyles'
@@ -47,7 +46,7 @@ const PERSON_WIDTH = 176
 const BACKDROP_RATIO = 9 / 16
 const BACKDROP_OPACITY = 0.3
 
-type Opens = (target: RouteTarget) => void
+type Opens = ItemLayoutProps['onOpen']
 
 /** What every focusable part of the page tells it on focus, so the opening focus is let go. */
 type Settles = { onSettle: () => void }

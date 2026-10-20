@@ -12,7 +12,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import type { EpisodeRow, ItemHero, ItemPage, PersonCard, VersionRow } from '@/queries/itemPage'
-import type { RouteTarget } from '@/routes'
 import { CardPicture } from '@/layouts/Card'
 import { TouchBack } from '@/layouts/TouchBack'
 import { TouchCard } from '@/layouts/TouchCard'
@@ -164,7 +163,7 @@ const Versions = ({ versions, onOpen }: { versions: VersionRow[]; onOpen: Opens 
   </View>
 )
 
-type Opens = (target: RouteTarget) => void
+type Opens = ItemLayoutProps['onOpen']
 
 /** A titled row that scrolls sideways, running to the screen's edges past the gutters. */
 const Rail = ({ title, children }: { title: string; children: ReactNode }) => {
