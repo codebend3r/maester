@@ -13,14 +13,14 @@ const Loading = () => (
   </main>
 )
 
-const Failed = () => {
+const Retry = ({ title, message }: { title: string; message: string }) => {
   const queryClient = useQueryClient()
   const isRetrying = useIsFetching({ queryKey: queryKeys.auth }) > 0
   return (
     <main className={styles.screen}>
       <section className={styles.panel}>
-        <h1 className={styles.title}>Account access is temporarily unavailable</h1>
-        <p className={styles.copy}>raven could not check your account. Your session is kept.</p>
+        <h1 className={styles.title}>{title}</h1>
+        <p className={styles.copy}>{message}</p>
         <Button
           tone="primary"
           disabled={isRetrying}
@@ -35,22 +35,33 @@ const Failed = () => {
 
 /**
  * The route element in front of every page that needs a signed-in, approved
- * account. With accounts off, or not reachable yet, it lets everything
- * through as raven always has. A failure to reach the server shows a screen
- * to try again from, and never signs anyone out.
+ * account. With accounts off it lets everything through as raven always
+ * has. Accounts that cannot be reached, like a failure to reach the server,
+ * show a screen to try again from, and never sign anyone out.
  */
 export const AuthGate = () => {
   const access = useAccessState()
   const { pathname, search } = useLocation()
   switch (access.kind) {
     case ACCESS_KINDS.disabled:
-    case ACCESS_KINDS.unavailable:
     case ACCESS_KINDS.approved:
       return <Outlet />
     case ACCESS_KINDS.loading:
       return <Loading />
     case ACCESS_KINDS.failed:
-      return <Failed />
+      return (
+        <Retry
+          title="Account access is temporarily unavailable"
+          message="raven could not check your account. Your session is kept."
+        />
+      )
+    case ACCESS_KINDS.unavailable:
+      return (
+        <Retry
+          title="raven is temporarily unavailable"
+          message="raven could not reach its accounts. Try again in a moment."
+        />
+      )
     case ACCESS_KINDS.signedOut:
       return <Navigate replace to={signInPath({ returnTo: `${pathname}${search}` })} />
     case ACCESS_KINDS.pending:

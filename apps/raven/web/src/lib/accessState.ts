@@ -125,3 +125,9 @@ export const useAccessState = (): AccessState => {
   const account = useAccount()
   return accessStateOf({ config, session: { status, session }, account })
 }
+
+/** Whether the server answers the viewer's calls: accounts are off, or the account is approved. */
+export const useIsServed = (): boolean => {
+  const { kind } = useAccessState()
+  return kind === ACCESS_KINDS.disabled || kind === ACCESS_KINDS.approved
+}

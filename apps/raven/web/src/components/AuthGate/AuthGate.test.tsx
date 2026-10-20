@@ -86,10 +86,25 @@ describe('AuthGate', () => {
     expect(getMe).not.toHaveBeenCalled()
   })
 
-  it('shows the page while accounts cannot be reached yet', () => {
+  it('shows a panel, not the page, while accounts cannot be reached', async () => {
+    const user = userEvent.setup()
+    getAuthConfig.mockResolvedValue(readyConfig)
+    getMe.mockResolvedValue(fakeAccount())
     renderGate({ authConfig: { state: AUTH_CONFIG_STATES.unavailable }, isSignedIn: false })
-    expect(screen.getByText('Library')).toBeInTheDocument()
+
+    expect(
+      screen.getByRole('heading', { name: 'raven is temporarily unavailable' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('raven could not reach its accounts. Try again in a moment.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Library')).toBeNull()
     expect(getMe).not.toHaveBeenCalled()
+
+    useAuthSession.setState({ session: SIGNED_IN })
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('Library')).toBeInTheDocument()
+    expect(getAuthConfig).toHaveBeenCalledTimes(1)
   })
 
   it('sends a signed out visitor to sign in, remembering where they were', async () => {

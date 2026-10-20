@@ -16,8 +16,8 @@ import { Button, CONTROLS_LINGER_SECONDS, type IconName, usePlayerPrefs } from '
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
-import { useCanManage } from '@/lib/adminLock'
 import { api } from '@/lib/api'
+import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
 import { edit, useOptimisticMutation } from '@/lib/optimistic'
 import { adminLockQuery, displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
 import { mutationKeys, queryKeys } from '@/lib/queryClient'
@@ -177,7 +177,7 @@ const SettingsSection = <T,>({
   children: (data: T) => ReactNode
 }) => {
   const headingId = useId()
-  const canManage = useCanManage()
+  const { mode, canManage } = useManagement()
   return (
     <section className={styles.section} aria-labelledby={headingId}>
       <header className={styles.sectionHead}>
@@ -189,7 +189,11 @@ const SettingsSection = <T,>({
           {!canManage && (
             <>
               {' '}
-              <span>Turn the admin lock off below to change these.</span>
+              <span>
+                {mode === MANAGEMENT_MODES.adminLock
+                  ? 'Turn the admin lock off below to change these.'
+                  : 'Only the owner can change these.'}
+              </span>
             </>
           )}
         </p>
@@ -483,8 +487,8 @@ const AdminLockSection = () => {
  * this browser. Each change
  * shows at once and saves on its own behind it, put back if the save
  * fails; Reset to defaults puts the server's settings back at once, after a
- * second click to be sure. With the admin lock on, the settings can be read
- * but not changed.
+ * second click to be sure. Where the admin lock is on, or the viewer is not
+ * the owner, the settings can be read but not changed.
  */
 export const SettingsPage = () => {
   const titleId = useId()
@@ -492,6 +496,7 @@ export const SettingsPage = () => {
   const [isConfirming, setConfirming] = useState(false)
   // Accounts show only to an approved viewer; the other states have a screen of their own.
   const access = useAccessState()
+  const { mode } = useManagement()
   const playback = useQuery(playbackSettingsQuery)
   const display = useQuery(displaySettingsQuery)
   const save = useOptimisticMutation({
@@ -697,7 +702,7 @@ export const SettingsPage = () => {
         </>
       )}
       <AdvancedSection />
-      <AdminLockSection />
+      {mode === MANAGEMENT_MODES.adminLock && <AdminLockSection />}
     </section>
   )
 }

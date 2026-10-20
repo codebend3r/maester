@@ -4,6 +4,7 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { api } from '@/lib/api'
 import { StreamsPage } from '@/pages/StreamsPage/StreamsPage'
+import { fakeAccount } from '@/test/authClient'
 import { itemSummary, liveStream, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
@@ -88,6 +89,23 @@ describe('StreamsPage', () => {
     renderWithProviders({ ui: <StreamsPage />, adminLock: { state: 'on', available: true } })
     expect(screen.getByRole('heading', { name: 'Streams are for the admin' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(spies.list).not.toHaveBeenCalled()
+  })
+
+  it('lists the streams for the owner of a server with accounts', async () => {
+    spies.list.mockImplementation(async () => [liveStream({ device: 'Mac' })])
+    renderWithProviders({
+      ui: <StreamsPage />,
+      account: fakeAccount({ isOwner: true }),
+      adminLock: null,
+    })
+    expect(await screen.findByText('Mac')).toBeInTheDocument()
+  })
+
+  it('says streams are for the owner to a member, and asks for nothing', () => {
+    renderWithProviders({ ui: <StreamsPage />, account: fakeAccount(), adminLock: null })
+    expect(screen.getByRole('heading', { name: 'Streams are for the owner' })).toBeInTheDocument()
+    expect(screen.queryByText(/admin lock/i)).toBeNull()
     expect(spies.list).not.toHaveBeenCalled()
   })
 

@@ -90,3 +90,10 @@ export const useAuthSession = create<AuthSessionState>()((set, get) => ({
     )
   },
 }))
+
+/** Calls `listener` with the session's access token each time it changes, null on sign out; returns the unsubscribe. */
+export const onAccessTokenChange = (listener: (token: string | null) => void): (() => void) =>
+  useAuthSession.subscribe((state, previous) => {
+    const token = state.session?.accessToken ?? null
+    if (token !== (previous.session?.accessToken ?? null)) listener(token)
+  })

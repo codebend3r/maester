@@ -1,4 +1,7 @@
 import {
+  ACCOUNT_TICKET_SECONDS,
+  AUTH_CONFIG_STATES,
+  MEDIA_TICKET_SECONDS,
   type MediaItem,
   ROUTE_STATES,
   mediaLabel,
@@ -21,11 +24,18 @@ import { api } from '@/lib/api'
 import { afterWatching } from '@/lib/invalidate'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from 'react-router-dom'
-import { mediaQuery } from '@/lib/queries'
+import { authConfigQuery, mediaQuery } from '@/lib/queries'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { useRouteId } from '@/lib/routeQuery'
 import { useMediaMutations } from '@/lib/useMediaMutations'
+import { useTicketFollowsSession } from '@/lib/useTicketFollowsSession'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
+
+/** How long a copied file link plays, as long as the ticket it carries: an account ticket can end sooner, with its token. */
+const LINK_LIFE = {
+  account: `up to ${ACCOUNT_TICKET_SECONDS / 60} minutes`,
+  legacy: `${MEDIA_TICKET_SECONDS / 3600} hours`,
+} as const
 
 /**
  * The card that was clicked hands its item over in router state, so the
@@ -98,10 +108,13 @@ export const WatchPlayer = ({
   const [next, ...after] = upNext
   const resumable = media.position > 0 && media.position < (media.duration ?? Infinity) - 10
   const mediaPlane = useMediaPlane({ api, mediaId: media.id, reprobe: useReprobe() })
+  useTicketFollowsSession({ mediaId: media.id })
+  const hasAccounts = (useQuery(authConfigQuery).data?.state ?? null) === AUTH_CONFIG_STATES.ready
   const copyLink = () => {
     const href = api.fileUrl({ id: media.id, access: mediaPlane.access })
     const link = href.startsWith('/') ? new URL(href, window.location.origin).href : href
-    const lasts = mediaPlane.access ? '; it works for 6 hours' : ''
+    const life = hasAccounts ? LINK_LIFE.account : LINK_LIFE.legacy
+    const lasts = mediaPlane.access ? `; it works for ${life}` : ''
     navigator.clipboard.writeText(link).then(
       () => setCopied(`Link copied. Paste it into VLC or IINA to play it there${lasts}.`),
       () => setCopied(`Copy this link: ${link}`),

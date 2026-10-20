@@ -34,7 +34,7 @@ import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionS
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
-import { useCanManage } from '@/lib/adminLock'
+import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
 import {
   duplicatesQuery,
   historyQuery,
@@ -326,16 +326,20 @@ const suggestionsIn =
   (file: MediaItem): AiSuggestion | null =>
     files.find((each) => each.id === file.id)?.aiSuggestion ?? null
 
-/** What the Not matched tab says to do about its files: Fix match, once the admin lock is off. */
+/** What the Not matched tab says to do about its files: Fix match, once the viewer may manage. */
 const notMatchedHint = ({
   matchType,
-  canManage,
+  management,
 }: {
   matchType: ReturnType<typeof matchTypeFor>
-  canManage: boolean
+  management: ReturnType<typeof useManagement>
 }): string => {
   const title = matchType ?? 'title'
-  if (!canManage) return `Turn the admin lock off in Settings to point these at the right ${title}.`
+  if (!management.canManage) {
+    return management.mode === MANAGEMENT_MODES.adminLock
+      ? `Turn the admin lock off in Settings to point these at the right ${title}.`
+      : `Only the owner can point these at the right ${title}.`
+  }
   if (matchType === ITEM_TYPES.show) {
     return 'Choose Fix match beside a show to point its folder at the right show.'
   }
@@ -353,7 +357,7 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
   const matchType = matchTypeFor(library.settings.kind)
   const metadata = useQuery(metadataHealthQuery)
   const canMatch = metadata.data?.tmdb === METADATA_SERVICE_STATES.ok
-  const canManage = useCanManage()
+  const management = useManagement()
   const query = useQuery({
     ...unmatchedQuery(library.id),
     refetchInterval: (current) =>
@@ -369,7 +373,7 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
     >
       {(files) => (
         <>
-          <p className={styles.message}>{notMatchedHint({ matchType, canManage })}</p>
+          <p className={styles.message}>{notMatchedHint({ matchType, management })}</p>
           {matchType === ITEM_TYPES.show ? (
             <UnmatchedShows
               files={files}
