@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { ACCESS_REFUSALS, PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
+import { ACCESS_REFUSALS, type AccessRefusal, PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
 
 import {
   SESSION_COPY,
@@ -9,7 +9,9 @@ import {
   hasWayBelow,
   initialSession,
   modeOf,
+  noticeOf,
   sessionReducer,
+  sourcedOf,
 } from '@/player/usePlaybackSession'
 import type { SourceOutcome } from '@/servers/mediaAccess'
 
@@ -23,7 +25,7 @@ const SOURCED: SourceOutcome = {
   source: { uri: 'http://nas:8080/api/media/20/file', headers: {} },
 }
 
-const LOCKED: SourceOutcome = {
+const LOCKED: AccessRefusal = {
   ok: false,
   reason: ACCESS_REFUSALS.locked,
   message: "This video's library on nas:8080 is locked.",
@@ -169,5 +171,23 @@ describe('the playback ladder', () => {
     expect(
       sessionReducer(playing, { type: SESSION_EVENTS.audioPicked, audio: 1, at: 640 }),
     ).toMatchObject({ phase: SESSION_PHASES.playing, audio: 1, attempt: 0 })
+  })
+
+  it('says what stands in for the video until frames flow, and hands the source over meanwhile', () => {
+    const asking = opened()
+    expect([noticeOf(asking), sourcedOf(asking)]).toEqual([SESSION_COPY.starting, null])
+    const loading = sourced(asking)
+    expect([noticeOf(loading), sourcedOf(loading)]).toEqual([SESSION_COPY.starting, SOURCED])
+    const playing = loaded(loading)
+    expect([noticeOf(playing), sourcedOf(playing)]).toEqual([null, SOURCED])
+    const refused = sessionReducer(asking, {
+      type: SESSION_EVENTS.sourced,
+      attempt: attemptOf(asking),
+      outcome: LOCKED,
+    })
+    expect([noticeOf(refused), sourcedOf(refused)]).toEqual([LOCKED.message, null])
+    expect(noticeOf(opened({ modes: [], problems: [MKV_PROBLEM, SESSION_COPY.noWay] }))).toBe(
+      `${MKV_PROBLEM}\n${SESSION_COPY.noWay}`,
+    )
   })
 })

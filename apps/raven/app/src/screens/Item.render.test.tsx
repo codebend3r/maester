@@ -6,7 +6,7 @@ import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Item } from '@/screens/Item'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
-import type { HeardRequest } from '@/test/fixtureFetch'
+import { type HeardRequest, pathFor } from '@/test/fixtureFetch'
 import { NAS, SERIES } from '@/test/homeServer'
 import {
   BUSBOYS,
@@ -15,7 +15,6 @@ import {
   SEVERANCE,
   SEVERANCE_ONE,
   itemApi,
-  pathFor,
 } from '@/test/itemServer'
 import { heldAnswer } from '@/test/heldAnswer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'

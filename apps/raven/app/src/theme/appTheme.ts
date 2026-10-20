@@ -37,7 +37,6 @@ export const COLOURS = {
   notice: colour('--color-amber'),
   error: colour('--color-leaf-bright'),
   track: colour('--color-moss'),
-  // What sits on a picture keeps one look in every theme.
   onPicture: fixedColour('--color-on-picture'),
 } as const
 

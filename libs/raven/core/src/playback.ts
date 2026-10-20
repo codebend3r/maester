@@ -49,6 +49,12 @@ const CODEC_LABELS: Record<string, string> = {
   vorbis: 'Vorbis',
 }
 
+/** ffprobe's names for the containers the clients' play tables name. */
+export const CONTAINERS = { mp4: 'mp4', mov: 'mov' } as const
+
+/** ffprobe's `codec_name` for the video codecs the server and the clients' play tables treat apart. */
+export const VIDEO_CODECS = { h264: 'h264', hevc: 'hevc' } as const
+
 export const codecLabel = (codec: string | null): string =>
   codec == null ? 'Unknown' : (CODEC_LABELS[codec] ?? codec.toUpperCase())
 

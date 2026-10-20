@@ -516,8 +516,12 @@ jobs:
           unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
 
-      # Signs in with the PIN and the admin password, then finds the locked movie on Home.
+      # Every flow in `apps/raven/app/e2e`, each signing in with the PIN and the admin password
+      # first. A fresh runner can start Maestro's XCTest driver slower than it waits by default,
+      # so it waits five minutes (in milliseconds).
       - name: 🎬 App end to end
+        env:
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
         run: bun run app:e2e
 
       # Maestro's screenshots and logs and the fixture server's log, only when a step failed.

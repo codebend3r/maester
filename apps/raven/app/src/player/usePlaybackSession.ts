@@ -5,9 +5,10 @@ import type { MediaSources, SourceOutcome } from '@/servers/mediaAccess'
 import { useCookieVersion } from '@/stores/cookieVersion'
 
 /** How long a source may take to load before the ladder steps down from it. */
-const LOAD_TIMEOUT_MS = 15_000
+export const LOAD_TIMEOUT_MS = 15_000
 
 export const SESSION_COPY = {
+  starting: 'Starting',
   exhausted: "This video didn't start in any of the ways the server offers.",
   noWay: "The server offers no way to play this video here, and won't convert it.",
 } as const
@@ -136,9 +137,8 @@ export const hasWayBelow = (state: SessionState): boolean =>
 /**
  * The ladder, as the web's: the plan's first way, then the next whenever one fails to start or
  * to decode, or, while a way is left below, has not loaded within `LOAD_TIMEOUT_MS`, each from
- * the spot it got to. A remux
- * the server refuses (its 409, keyframes too far apart to cut) fails like any other, so the
- * transcode below it is next.
+ * the spot it got to. A remux the server refuses (its 409, keyframes too far apart to cut)
+ * fails like any other, so the transcode below it is next.
  */
 export const sessionReducer = (state: SessionState, event: SessionEvent): SessionState => {
   if (state.phase === SESSION_PHASES.failed) return state
@@ -173,6 +173,34 @@ export const sessionReducer = (state: SessionState, event: SessionEvent): Sessio
       return sourcing({ ladder: state, step: state.step, at: state.at })
     default: {
       const unknown: never = event
+      return unknown
+    }
+  }
+}
+
+/** The source the player loads, from when the session hands it over until it gives way. */
+export const sourcedOf = (state: SessionState): Sourced | null =>
+  state.phase === SESSION_PHASES.loading || state.phase === SESSION_PHASES.playing
+    ? state.sourced
+    : null
+
+/**
+ * The line shown in place of the video: why nothing plays, the refusal, or that it is starting;
+ * null once frames flow.
+ */
+export const noticeOf = (state: SessionState): string | null => {
+  switch (state.phase) {
+    case SESSION_PHASES.failed:
+      return state.problems.join('\n')
+    case SESSION_PHASES.refused:
+      return state.refusal.message
+    case SESSION_PHASES.sourcing:
+    case SESSION_PHASES.loading:
+      return SESSION_COPY.starting
+    case SESSION_PHASES.playing:
+      return null
+    default: {
+      const unknown: never = state
       return unknown
     }
   }

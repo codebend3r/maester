@@ -22,8 +22,7 @@ mock.module('@react-native-community/netinfo', () => ({
 const { watchNetwork } = await import('@/servers/networkChanges')
 
 /** NetInfo's names for two kinds of network. */
-const WIFI = 'wifi'
-const CELLULAR = 'cellular'
+const NETWORK_TYPES = { wifi: 'wifi', cellular: 'cellular' } as const
 
 const stateOf = ({
   type,
@@ -50,14 +49,14 @@ describe('watchNetwork', () => {
         moves += 1
       },
     })
-    report(stateOf({ type: WIFI, ipAddress: '192.168.1.40' }))
-    report(stateOf({ type: WIFI, ipAddress: '192.168.1.40' }))
+    report(stateOf({ type: NETWORK_TYPES.wifi, ipAddress: '192.168.1.40' }))
+    report(stateOf({ type: NETWORK_TYPES.wifi, ipAddress: '192.168.1.40' }))
     expect(moves).toBe(0)
-    report(stateOf({ type: WIFI, ipAddress: '10.0.0.7' }))
+    report(stateOf({ type: NETWORK_TYPES.wifi, ipAddress: '10.0.0.7' }))
     expect(moves).toBe(1)
-    report(stateOf({ type: CELLULAR }))
+    report(stateOf({ type: NETWORK_TYPES.cellular }))
     expect(moves).toBe(2)
-    report(stateOf({ type: CELLULAR, isConnected: false }))
+    report(stateOf({ type: NETWORK_TYPES.cellular, isConnected: false }))
     expect(moves).toBe(3)
     stop()
     expect(listeners).toEqual([])

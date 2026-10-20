@@ -12,7 +12,7 @@ import {
 export const SUBTITLE_CHOICES = { off: 'off' } as const
 
 /** A choice in a track picker: its key and how it reads. */
-export type TrackOption = { key: string; label: string }
+type TrackOption = { key: string; label: string }
 
 const labelText = ({ name, details }: TrackLabel): string =>
   details === '' ? name : `${name} · ${details}`

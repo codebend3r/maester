@@ -1,4 +1,10 @@
-import { type ApiClient, MEDIA_PROBE_BYTES, type MediaOrigin, type OriginProbe } from '@raven/core'
+import {
+  type ApiClient,
+  MEDIA_PROBE_BYTES,
+  MEDIA_PROBE_TIMEOUT_MS,
+  type MediaOrigin,
+  type OriginProbe,
+} from '@raven/core'
 
 export type ProbeFetch = (
   url: string,
@@ -11,8 +17,6 @@ type ProbeInput = {
   now: () => number
   timeoutMs?: number
 }
-
-const DEFAULT_TIMEOUT_MS = 2000
 
 const countBytes = async ({
   reader,
@@ -63,7 +67,7 @@ const measure = async ({
 /** Times a small download from `origin`; null when it cannot be had in `timeoutMs`. */
 export const probeOrigin = async ({
   origin,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
+  timeoutMs = MEDIA_PROBE_TIMEOUT_MS,
   ...input
 }: ProbeInput & { origin: MediaOrigin }): Promise<OriginProbe | null> => {
   const controller = new AbortController()

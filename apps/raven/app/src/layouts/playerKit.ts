@@ -1,16 +1,12 @@
 import type { ReactNode } from 'react'
 
-import type { TrackOption } from '@/player/playerTracks'
+import type { PickerProps } from '@/layouts/gridKit'
 
 /** How far a skip button moves, in seconds, as the web's Back 10 and Forward 10 do. */
 export const SKIP_SECONDS = 10
 
-/** A track picker: what it offers, which is picked, and what to do with a pick. */
-export type TrackPicker = {
-  options: readonly TrackOption[]
-  value: string
-  onChoose: (key: string) => void
-}
+/** A track picker: what it offers, which is picked, and what to do with a pick; the chrome names it. */
+type TrackPicker = Omit<PickerProps<string>, 'label'>
 
 /** The transport, once there is a video to drive. */
 export type Transport = {

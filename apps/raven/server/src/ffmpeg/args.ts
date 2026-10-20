@@ -1,4 +1,4 @@
-import { ENCODER_KINDS, PLAYBACK_MODES, type StreamMode } from '@raven/core'
+import { ENCODER_KINDS, PLAYBACK_MODES, type StreamMode, VIDEO_CODECS } from '@raven/core'
 import { SOFTWARE, type VideoEncoder } from '@/ffmpeg/encoder'
 
 export const QUIET = ['-hide_banner', '-loglevel', 'error', '-nostdin']
@@ -94,9 +94,6 @@ export const transcodeBitrate = ({
   quality: TranscodeQuality
   bitrate: number | null
 }): number => bitrate ?? QUALITY[quality].bitrate
-
-/** ffprobe's `codec_name` for the codecs the args treat apart. */
-export const VIDEO_CODECS = { h264: 'h264', hevc: 'hevc' } as const
 
 /** Codecs every Intel GPU recent enough for VAAPI decodes; anything else decodes on the CPU. */
 const GPU_DECODES: ReadonlySet<string> = new Set([VIDEO_CODECS.h264, VIDEO_CODECS.hevc])

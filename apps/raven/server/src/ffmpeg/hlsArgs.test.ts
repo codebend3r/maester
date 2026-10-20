@@ -1,6 +1,11 @@
-import { HLS_COPY_AUDIO_CODECS, PLAYBACK_MODES, QUALITIES, type StreamMode } from '@raven/core'
+import {
+  HLS_COPY_AUDIO_CODECS,
+  PLAYBACK_MODES,
+  QUALITIES,
+  type StreamMode,
+  VIDEO_CODECS,
+} from '@raven/core'
 import { describe, expect, it } from 'vitest'
-import { VIDEO_CODECS } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { DEMUX_TIME_BASES, type HlsDialect, SEGMENT_CLOCKS } from '@/ffmpeg/ffmpegVersion'
 import { type HlsSource, hlsArgs, hlsAudioArgs, hlsAudioCodec } from '@/ffmpeg/hlsArgs'

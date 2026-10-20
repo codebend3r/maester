@@ -64,6 +64,12 @@
 20. **Android TV builds and tests on Linux.** GitHub's macOS arm64 runners cannot run the Android emulator, so `android-tv` jobs run on `ubuntu-24.04` with KVM. The Apple builds and the tvOS e2e run on `macos-26`. Both join the `🖥️ Desktop` gate's `needs`.
 21. **The real-device pass is the user's.** Task 32 writes the M1 to M15 checklist into the app's README with an empty result column; nobody in CI can fill it.
 22. **Apple TV direct-plays only files with no text subtitles.** The system panel lists only HLS renditions, so on `tvos` a direct-playable file with a sidecar or embedded text track starts at `remux`, where its subtitles are renditions.
+23. **H.264 plays as it is on Apple devices only at 8 bits.** AVPlayer has no High 10 decoder, and an HLS remux copies the same video, so Apple's table lists `h264` at 8 bits and `hevc` at 8 and 10, and a 10-bit H.264 file plans straight to `transcode` (Task 23). It costs a server transcode for the rare Hi10P file.
+24. **A ticket is renewed by the client's own clock.** The app renews a video's ticket core's `MEDIA_TICKET_RENEW_MS` after it read it (`ticketRenewAt`), never from `expiresAt`, as the web and the desktop do, so a device clock off the server's changes nothing (Task 24's "before `expiresAt`" gives way).
+25. **raven draws the touch player's subtitles, in every mode.** Headless `useTrackCues` reads the picked track's cues from the server's WebVTT route, core's `activeCues` and `cueRuns` draw them over the video, and the player's own text tracks stay off: on the iOS simulator AVPlayerLayer drew neither a sidecar `textTracks` entry nor an HLS rendition, and `react-native-video` 6.19.3 reports a cue's text but never its end. Picture in Picture and AirPlay show no subtitles; the real-device pass (Ruling 21) checks the native tracks again. Apple TV's system transport (Task 26) keeps Ruling 22's renditions.
+26. **`recordPlay` once, as playback starts.** The web and the desktop record the play when frames first flow, and the server counts it watched from the saved spots at the library's percentage, so Task 25's "once past the library's watched percentage" gives way and the app never compares the percentage itself.
+27. **A remux failure with no HTTP status steps down to the transcode, as a 409 does.** AVPlayer reports no status for a refused playlist, so the ladder cannot tell the server's 409 from any other remux failure, and the transcode is the next way either way. It costs a transcode where a second try might have worked.
+28. **The device app serves accounts-`off` and pre-accounts servers until PR 10.** As the desktop's D1 keeps those paths, PRs 4 to 9 sign in with the PIN and the admin password only. Account sign-in is PR 10 (`device-accounts`): it first tells a viewer at the address step, in honest words, that a `ready` server signs in with accounts the app cannot use yet, then signs in, sends the Bearer, and gives HLS under `ready` a server-side capability bound to the HLS session (AVPlayer sends only one fixed set of headers per asset, and a native relay on phones and TVs is heavy).
 
 ## Review Focus
 
@@ -86,6 +92,7 @@
 | 7 | `device-play-tv` | PR 6 | 26, 27 | 7. Player on Apple TV |
 | 8 | `device-android-tv` | PR 7 | 28, 29 | 8. Android TV |
 | 9 | `device-polish` | PR 8 | 30 to 32 | 9. Settings, themes, polish |
+| 10 | `device-accounts` | PR 9 | 33 to 36 | Accounts on the app (Ruling 28) |
 
 The plan and the spec's status change go in PR 1's first commit. Each PR: thermo review, one fix commit, `bun run verify`, `git push -u origin <branch>`, `gh pr create --base <base>`.
 
@@ -516,3 +523,38 @@ Each task: move the file with `git mv` (so `--follow` keeps history), rewrite it
 
 - **Files:** `apps/raven/README.md` (an "raven app (iPhone, iPad, Apple TV, Android TV)" section: install with a Personal Team, sideload the APK, weekly reinstall, watchman), `apps/raven/app/README.md` (dev loop, the M1 to M15 checklist with an empty result column, Ruling 21), root `CLAUDE.md` (the app's Mac-only targets beside the desktop's), the spec's status ("implemented through PR 9").
 - [ ] **Step 1:** `bun run verify`; PASS. Commit: `MAE: document raven's device app`. Thermo review, fix commit, push, open PR 9 against `device-android-tv`.
+
+---
+
+## PR 10: accounts on the device app
+
+Ruling 28. A server whose `GET /api/auth/config` answers `ready` is signed in to with an account, as the desktop does (`apps/raven/CLAUDE.md`, "Desktop"); one that answers `off`, `unavailable` or 404 keeps the cookie, PIN and admin password paths of PRs 4 to 9.
+
+### Task 33: an account's HLS session outlives its ticket
+
+- **Files:** `apps/raven/server/src/hls/hlsController.ts`, `src/hls/hlsSessions.ts`, `src/auth/accessRechecks.ts`, tests (`appHls.test.ts`, the enforcement inventory in `src/test/enforced.ts`, the isolation suite where it reads HLS).
+- Under `ready`, a `master.m3u8` opened with an account ticket binds its new session to that ticket's account and media. Every URI the session's playlists name carries the session's own capability (random, per session, never the account ticket, never logged) in place of `t`, and its routes take that capability only for that session and media. While the session lives `AccessRechecks` checks the account every `DEFAULT_ACCESS_RECHECK_MS`, as for `file` and `stream`: a removal or a failed integrity check ends the session at once (its next request 404s, so the player opens the master again with a new ticket); an `unavailable` recheck keeps it until the last-known token expires. Under `off` nothing changes.
+- [ ] **Step 1:** Tests: the capability opens its own session's video playlist, init, segments and subtitles, and nothing of another session or media; an account ticket on a segment route is refused once the session has a capability; removing the account ends its sessions within one recheck; a legacy HMAC ticket opens no HLS route under `ready`; the capability is in no log line. FAIL, implement, PASS.
+- [ ] **Step 2:** Commit: `MAE: let an account's HLS session outlive its ticket`.
+
+### Task 34: the auth config probe and its pin
+
+- **Files:** `apps/raven/app/src/servers/authConfigs.ts`, `src/servers/serverList.ts` (an `account` part per server: Supabase address, publishable key and web origin), `src/screens/SignIn.tsx`, tests; core `APP_CLIENT_CALLS` gains `getAuthConfig`, `getMe` and `getAccountTicket`, which `appClients.test.ts` checks against the server's marks.
+- Sign-in reads `getAuthConfig` before anything else. `ready` pins the config with the server, validated at the trust boundary with core's guards; a later config naming other endpoints asks before any password goes there, and only a yes pins it again. `off`, `unavailable` and 404 go on to the PIN as today. On a `ready` server the app never calls `getAdminLock` or `unlockAdmin`. Until Task 35's account step exists, the address step says plainly that the server signs in with accounts, which the app cannot do yet (the words of `MEDIA_ACCESS_MESSAGES.account`), and adds nothing.
+- [ ] **Step 1:** Tests: a `ready` config pins its three endpoints and shows the accounts line; a changed one asks and keeps the old pin on a no; `off` and 404 reach the PIN step; `getAdminLock` throws before the request on a `ready` server. FAIL, implement, PASS.
+- [ ] **Step 2:** Commit: `MAE: pin a raven server's account sign-in in the app`.
+
+### Task 35: email and password, kept in the keychain
+
+- **Files:** `apps/raven/app/src/accounts/{accountSessions.ts,sessionStore.ts}`, `src/screens/SignIn.tsx` (an account step), `src/servers/serverFetch.ts`, `src/servers/serverHeaders.ts`, `src/servers/serverClient.ts`, tests; add `@supabase/auth-js` (exact, the desktop's version).
+- The account step takes the place of Task 34's accounts line. One `@supabase/auth-js` client per `ready` server, its session one JSON value in `expo-secure-store` under `raven.account.<serverId>`, guarded when read; a store that throws signs the viewer out for the run, as the jar degrades. `Authorization: Bearer` goes on every allowlisted call to that server, the event stream and the pictures (`cookieHeadersFor` grows into the headers for the server's own `/api/`), refreshing once on a `signed_out` refusal. Create account and Forgot password open the server's web origin in the browser. No JWT, refresh token or ticket is logged or kept anywhere else.
+- [ ] **Step 1:** Tests: a sign-in keeps the session and the next call carries the Bearer; a refusal refreshes once, then signs out; a picture's and the stream's headers carry it only for the server's own `/api/`; removing the server forgets its session. FAIL, implement, PASS. `test:screens`: the account step signs in and reaches Home.
+- [ ] **Step 2:** Commit: `MAE: sign in to a raven account from the app`.
+
+### Task 36: playing under an account
+
+- **Files:** `apps/raven/app/src/servers/mediaAccess.ts` (an account ticket from `getAccountTicket` in place of `getMediaTicket` on a `ready` server, the media origin from `pickOrigin` or the server's own address), `src/player/usePlaybackSession.ts`, tests; `e2e/` (a `ready` fixture, if `serve:fixture` can run one without the cloud, else the account flows stay in the bun and jest tests and the README says so).
+- Direct play takes a fresh account ticket for every source and every step down; HLS plays on Task 33's capability, so a film longer than an account ticket's five minutes plays to its end. A refused account ticket (`403`, or a second `401`) is core's `account` refusal, with the desktop's words ("Sign in to X again", "Your access to X was removed").
+- [ ] **Step 1:** Tests: a `ready` server's direct source carries an account ticket and no cookie; a remux's master is opened with one and its playlists name only the capability; a 401 on the ticket mints once more, a second or a 403 refuses with the account copy. FAIL, implement, PASS.
+- [ ] **Step 2:** Manual on the iPhone simulator against a `ready` server: sign in, play direct and remux, resume. Commit: `MAE: play raven titles under an account in the app`. Thermo review, fix commit, push, open PR 10 against `device-polish`.
+

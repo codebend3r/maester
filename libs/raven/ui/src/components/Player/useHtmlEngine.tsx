@@ -1,4 +1,4 @@
-import { PLAYBACK_MODES, STREAM_TIME_SHIFT } from '@raven/core'
+import { PLAYBACK_MODES, PLAYER_SOURCE_KINDS, STREAM_TIME_SHIFT } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import type { EngineHandle, EngineStats, HtmlSource } from '@/components/Player/engine'
 import type { Rendition } from '@/components/Player/rendition'
@@ -8,11 +8,11 @@ import { useHostServices } from '@/stores/playerServices'
 import { SubtitleOverlay } from '@/components/Player/SubtitleOverlay'
 import { useMediaSource } from '@/components/Player/useMediaSource'
 import type { Delivery } from '@/lib/streamSource'
-import { useSubtitleCues } from '@/components/Player/useSubtitleCues'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
 import { useVideoState } from '@/components/Player/useVideoState'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { useTrackCues } from '@/lib/useTrackCues'
 
 const ENGINE_NAME = 'HTML video'
 
@@ -104,8 +104,11 @@ export const useHtmlEngine = ({
     },
   })
   useEffect(() => videoRef.current?.focus(), [])
-  const subtitles = useSubtitleCues({
-    source,
+  const subtitles = useTrackCues({
+    video:
+      source.kind === PLAYER_SOURCE_KINDS.server
+        ? { api: source.api, mediaId: source.media.id }
+        : null,
     track: selection.subtitle,
     time: playback.state.time,
     duration: playback.duration,

@@ -36,21 +36,15 @@ export const useTrackCues = ({
   time: number
   duration: number | null
 }): { cues: SubtitleCue[]; status: SubtitleStatus } => {
-  const windows = (() => {
+  const queries = (() => {
     if (track == null || video == null) return []
-    return track.source === SUBTITLE_SOURCES.external ? [0] : subtitleWindows({ time, duration })
+    const windows =
+      track.source === SUBTITLE_SOURCES.external ? [0] : subtitleWindows({ time, duration })
+    const { subtitles } = playerQueriesFor(video.api)
+    return windows.map((window) => subtitles({ id: video.mediaId, trackId: track.id, window }))
   })()
   return useQueries({
-    queries:
-      track == null || video == null
-        ? []
-        : windows.map((window) =>
-            playerQueriesFor(video.api).subtitles({
-              id: video.mediaId,
-              trackId: track.id,
-              window,
-            }),
-          ),
+    queries,
     combine: (results) => {
       const [playing] = results
       const status = (() => {

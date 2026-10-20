@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'bun:test'
-import { MEDIA_PROBE_BYTES } from '@raven/core'
+import { MEDIA_PROBE_BYTES, MEDIA_PROBE_TIMEOUT_MS } from '@raven/core'
 
 import { probeFetchOf } from '@/servers/mediaProbe'
 import { FETCH_CREDENTIALS } from '@/servers/serverFetch'
-import { LAN } from '@/test/mediaServer'
+import { LAN, mediaServer } from '@/test/mediaServer'
 
-const PING = `${LAN.url}/api/media-origins/ping?bytes=${MEDIA_PROBE_BYTES}`
+const PING = mediaServer({}).api.pingUrl({ origin: LAN })
+
+/** A route the app never calls: a library's scan, which is the owner's. */
+const SCAN = `${LAN.url}/api/libraries/1/scan`
 
 type Sent = { url: string; credentials: string; isAborted: () => boolean }
 
@@ -42,7 +45,7 @@ describe('probeFetchOf', () => {
   it('times the whole ping and counts its bytes, with no cookie', async () => {
     const ping = pingFetch({})
     const probe = probeFetchOf({ fetch: ping.fetch, clock: clockOf([100, 135]) })
-    expect(await probe({ url: PING, timeoutMs: 2000 })).toEqual({
+    expect(await probe({ url: PING, timeoutMs: MEDIA_PROBE_TIMEOUT_MS })).toEqual({
       ok: true,
       bytes: MEDIA_PROBE_BYTES,
       elapsedMs: 35,
@@ -55,7 +58,7 @@ describe('probeFetchOf', () => {
   it('reads no body from a ping that refused', async () => {
     const ping = pingFetch({ ok: false })
     const probe = probeFetchOf({ fetch: ping.fetch, clock: clockOf([0]) })
-    expect(await probe({ url: PING, timeoutMs: 2000 })).toEqual({
+    expect(await probe({ url: PING, timeoutMs: MEDIA_PROBE_TIMEOUT_MS })).toEqual({
       ok: false,
       bytes: 0,
       elapsedMs: 0,
@@ -79,9 +82,9 @@ describe('probeFetchOf', () => {
   it("never pings an address outside the app's calls", async () => {
     const ping = pingFetch({})
     const probe = probeFetchOf({ fetch: ping.fetch, clock: clockOf([0]) })
-    await expect(
-      probe({ url: `${LAN.url}/api/libraries/1/scan`, timeoutMs: 2000 }),
-    ).rejects.toThrow(`raven's app does not call GET ${LAN.url}/api/libraries/1/scan`)
+    await expect(probe({ url: SCAN, timeoutMs: MEDIA_PROBE_TIMEOUT_MS })).rejects.toThrow(
+      `raven's app does not call GET ${SCAN}`,
+    )
     expect(ping.sent).toEqual([])
   })
 })

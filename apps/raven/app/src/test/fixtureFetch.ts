@@ -20,6 +20,13 @@ export const NOT_FOUND: Answer = { status: STATUSES.notFound, body: { message: '
 /** A request a test server heard: its method, its path and query, and what it was sent. */
 export type HeardRequest = { method: string; path: string; body: unknown }
 
+/** The `:id` placeholder in the allowlist's paths. */
+const ID_PARAM = ':id'
+
+/** A route's path for one id: `/api/items/40`. */
+export const pathFor = ({ path, id }: { path: string; id: number }): string =>
+  path.replace(ID_PARAM, String(id))
+
 const isSuccess = (status: number): boolean => status >= 200 && status < 300
 
 /** `answer` as `fetch` hands it back: `ok` for any 2xx, as the platform's is. */

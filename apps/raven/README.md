@@ -208,7 +208,7 @@ Playback resumes where you stopped; reaching the library's **Watched at** (95% b
 
 ### HLS for native players
 
-Players without Media Source Extensions, AVPlayer on Apple TV and iPhone and ExoPlayer on Android TV, get the same remux or transcode as HLS. The routes are on the media plane, so a media ticket (`?t=`) opens them, and every URI a playlist names carries the request's ticket:
+Players without Media Source Extensions, AVPlayer on Apple TV and iPhone and ExoPlayer on Android TV, get the same remux or transcode as HLS. The routes are on the media plane, so a media ticket (`?t=`) opens them, as it opens `file` and `stream`: an account ticket under accounts `ready`, the HMAC ticket only when accounts are `off`. Every URI a playlist names carries the request's ticket:
 
 | Route | What it answers |
 | --- | --- |

@@ -7,6 +7,7 @@ import {
   type ApiClient,
   LOCKED_STATUS,
   MEDIA_PROBE_BYTES,
+  MEDIA_PROBE_TIMEOUT_MS,
   type MediaAccess,
   type MediaItem,
   type MediaOrigin,
@@ -24,8 +25,6 @@ import type { ServerCookies } from '@/servers/cookieJar'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
 import type { AppServer } from '@/servers/serverList'
 import { TICKETS_OFF_STATUS } from '@/servers/tickets'
-
-const PROBE_TIMEOUT_MS = 2000
 
 /**
  * One origin's ping, read to its end within `timeoutMs`: whether it answered 2xx, how many bytes
@@ -97,7 +96,7 @@ const refusalOf = ({ error, server }: { error: unknown; server: AppServer }): Ti
   if (error.status === TICKETS_OFF_STATUS) return { kind: TICKET_READS.off }
   if (error.status === LOCKED_STATUS) return refused(ACCESS_REFUSALS.locked)
   if (error.status === NOT_FOUND_STATUS) return refused(ACCESS_REFUSALS.gone)
-  // A proxy in front of a restarting server answers 502 to 504.
+  // A proxy in front of a restarting server answers 502 or 504.
   if (error.status >= SERVER_ERROR_STATUS) return refused(ACCESS_REFUSALS.unreachable)
   return refused(ACCESS_REFUSALS.unreadable)
 }
@@ -105,11 +104,13 @@ const refusalOf = ({ error, server }: { error: unknown; server: AppServer }): Ti
 /**
  * Where one server's videos play from, for the native players. The origins `getMediaOrigins`
  * lists are probed on first use and again on each change of network, and the fastest by core's
- * `pickOrigin` plays by ticket. A ticket is read per video and renewed `MEDIA_TICKET_RENEW_MS`
- * after it was read, by `now`. A server that lists no origin, has none answering, or hands out
- * no ticket (the 503 of one without `RAVEN_MEDIA_SECRET`) plays from its own address with its
- * cookies as headers, which `cookieHeadersFor` gives only to its own API. Nothing here logs:
- * a ticket is only ever in the source's address.
+ * `pickOrigin` plays by ticket. A probe that picks none is not kept: the next source probes
+ * again, so an origin that comes back is used without waiting for the network to change. A
+ * ticket is read per video and renewed `MEDIA_TICKET_RENEW_MS` after it was read, by `now`. A
+ * server that lists no origin, has none answering, or hands out no ticket (the 503 of one
+ * without `RAVEN_MEDIA_SECRET`) plays from its own address with its cookies as headers, which
+ * `cookieHeadersFor` gives only to its own API. Nothing here logs: a ticket is only ever in the
+ * source's address.
  */
 export const mediaAccessFor = ({
   api,
@@ -133,7 +134,10 @@ export const mediaAccessFor = ({
 
   const measure = async (origin: MediaOrigin): Promise<OriginProbe | null> => {
     try {
-      const answer = await probe({ url: api.pingUrl({ origin }), timeoutMs: PROBE_TIMEOUT_MS })
+      const answer = await probe({
+        url: api.pingUrl({ origin }),
+        timeoutMs: MEDIA_PROBE_TIMEOUT_MS,
+      })
       if (!answer.ok || answer.bytes < MEDIA_PROBE_BYTES) return null
       // A ping that lands within the clock's tick has no measurable time; a millisecond keeps the rate finite.
       const elapsedMs = Math.max(answer.elapsedMs, 1)
@@ -158,14 +162,23 @@ export const mediaAccessFor = ({
     return pickOrigin(probes.filter((each) => each !== null))
   }
 
+  /** A fresh pick to hold, let go of once it turns out to be none, so the next source asks again. */
+  const freshPick = (): Promise<MediaOrigin | null> => {
+    const next: Promise<MediaOrigin | null> = pickFor().then((origin) => {
+      if (origin === null && pick === next) pick = null
+      return origin
+    })
+    return next
+  }
+
   const pickOf = (): Promise<MediaOrigin | null> => {
-    pick ??= pickFor()
+    pick ??= freshPick()
     return pick
   }
 
   const stopWatching = watchNetwork({
     onChange: () => {
-      if (pick !== null) pick = pickFor()
+      if (pick !== null) pick = freshPick()
     },
   })
 
@@ -176,8 +189,11 @@ export const mediaAccessFor = ({
       .getMediaTicket(mediaId)
       .then(
         ({ ticket }): TicketRead => {
-          const fresh = { ticket, renewAt: ticketRenewAt({ readAt: now() }) }
-          held = new Map([...held, [mediaId, fresh]])
+          const readAt = now()
+          const fresh = { ticket, renewAt: ticketRenewAt({ readAt }) }
+          // A ticket past its renewal is never used again, so it goes as another comes.
+          const live = [...held].filter(([, kept]) => readAt < kept.renewAt)
+          held = new Map([...live, [mediaId, fresh]])
           return { kind: TICKET_READS.issued, ...fresh }
         },
         (error: unknown) => refusalOf({ error, server }),

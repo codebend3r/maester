@@ -1,6 +1,8 @@
 import {
+  CONTAINERS,
   type CanPlay,
   HLS_COPY_AUDIO,
+  VIDEO_CODECS,
   audioCodecString,
   containerMimeType,
   isString,
@@ -12,7 +14,8 @@ import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 
 /**
  * What a platform's player takes as it is, in the names a `MediaItem` carries (ffprobe's).
- * Each video codec lists the bit depths it decodes, as `videoCodecString` tells them apart.
+ * Each video codec lists the bit depths it decodes, as `videoCodecString` tells them apart:
+ * it writes one string for 8 bits and one for anything deeper, so 10 stands for 12 too.
  */
 type PlayTable = {
   containers: readonly string[]
@@ -29,8 +32,8 @@ type PlayTable = {
  * a browser's "maybe" does, and a refusal steps down to the remux, which re-tags it `hvc1`.
  */
 const APPLE = {
-  containers: ['mp4', 'mov'],
-  videoCodecs: { h264: [8], hevc: [8, 10] },
+  containers: [CONTAINERS.mp4, CONTAINERS.mov],
+  videoCodecs: { [VIDEO_CODECS.h264]: [8], [VIDEO_CODECS.hevc]: [8, 10] },
   audioCodecs: HLS_COPY_AUDIO,
 } as const satisfies PlayTable
 
@@ -82,7 +85,8 @@ type PlatformSupport = Pick<Parameters<typeof planPlayback>[0], 'canPlay' | 'can
  * come from a table. The app converts through the server's HLS route, never Media Source
  * Extensions: fragmented MP4 (`streamMimeType`'s `video/mp4`) with the video copied or made
  * H.264, and the audio copied or made E-AC-3, both of which the table plays. A stream plays,
- * then, where its video plays in MP4, which is what `canPlay` answers for that string.
+ * then, where its video plays in MP4, which is what `canPlay` answers for that string: the
+ * stereo AAC `streamMimeType` names is in `HLS_COPY_AUDIO`, so the audio never refuses one.
  */
 export const canPlayFor = (platform: AppPlatform): PlatformSupport => {
   const canPlay = canPlayFrom(PLAY_TABLES[platform])

@@ -4,6 +4,7 @@ import {
   isMediaOrigins,
   isSidecarTrackId,
   MEDIA_PROBE_BYTES,
+  MEDIA_PROBE_TIMEOUT_MS,
   MEDIA_TICKET_PARAM,
   type MediaOrigin,
   type OriginProbe,
@@ -25,8 +26,6 @@ import { API_PATHS, CALL_NAMES, MEDIA_FILE_PATH, subtitlePathOf } from '@/main/s
 import { CALL_MESSAGES, loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { TIMER_MAX_MS, type Timers } from '@/main/stateStore'
 import { HTTP_STATUSES } from '@/shared/httpStatuses'
-
-export const PROBE_TIMEOUT_MS = 2000
 
 /**
  * The most account tickets a server's downloads mint in any `windowMs`, a ticket's life on the
@@ -87,7 +86,7 @@ const measureOrigin = async ({
 }): Promise<OriginProbe | null> => {
   const url = `${origin.url}/api/media-origins/ping?${toQueryString({ bytes: String(MEDIA_PROBE_BYTES) })}`
   const startedAt = clock()
-  const response = await probe({ url, timeoutMs: PROBE_TIMEOUT_MS })
+  const response = await probe({ url, timeoutMs: MEDIA_PROBE_TIMEOUT_MS })
   if (response.body === null) return null
   const reader = response.body.getReader()
   const countFrom = async (received: number): Promise<number> => {

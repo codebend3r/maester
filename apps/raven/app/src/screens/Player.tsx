@@ -1,10 +1,8 @@
 import {
   ACCESS_REFUSALS,
-  type ApiClient,
   type MediaItem,
   type MediaTracks,
   type PlaybackPolicy,
-  type ProgressReport,
   ROUTE_STATES,
   activeCues,
   mediaLabel,
@@ -15,8 +13,6 @@ import {
 } from '@raven/core'
 import {
   VIDEO_EVENTS,
-  type WatchHide,
-  afterWatching,
   initialVideoState,
   preferredAudio,
   preferredSubtitle,
@@ -27,16 +23,17 @@ import {
   useUnlockPrompt,
   videoReducer,
 } from '@raven/ui/headless'
-import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useKeepAwake } from 'expo-keep-awake'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { AppState, StyleSheet } from 'react-native'
+import { StyleSheet } from 'react-native'
 import Video, { SelectedTrackType, type VideoRef } from 'react-native-video'
 
 import { PlayerChrome } from '@/layouts'
 import { DEVICE_SUPPORT } from '@/platform/devicePlatform'
 import { mediaSourcesFor } from '@/player/mediaSources'
+import { progressSinkFor, watchAppHide } from '@/player/progressSink'
 import {
   SUBTITLE_CHOICES,
   audioOptionsOf,
@@ -47,59 +44,20 @@ import {
   SESSION_EVENTS,
   SESSION_PHASES,
   modeOf,
+  noticeOf,
+  sourcedOf,
   usePlaybackSession,
 } from '@/player/usePlaybackSession'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { APP_ROUTE_PARAMS, secondsOf } from '@/routes'
-import { APP_STATE_EVENTS, isForegroundState } from '@/servers/eventSource'
 
 const COPY = {
   opening: 'Opening the video',
   missing: 'This video is not on the server.',
-  starting: 'Starting',
 } as const
 
 /** How often the player says where it is, in milliseconds: often enough for a smooth clock. */
 const PROGRESS_EVERY_MS = 250
-
-/** Saves the spot when the app goes to the background, as a page hidden does on the web. */
-const watchAppHide: WatchHide = (save) => {
-  const subscription = AppState.addEventListener(APP_STATE_EVENTS.change, (state) => {
-    if (!isForegroundState(state)) save()
-  })
-  return () => subscription.remove()
-}
-
-/**
- * Where the viewer's progress goes, as the web's watch page sends it: the play once frames
- * flow, each spot saved, and, once the player goes, the item's page, Home and Continue
- * watching read again after the last save has landed. Every call is the allowlisted client's,
- * and a failed one costs only that spot.
- */
-const progressSinkFor = ({
-  api,
-  mediaId,
-  libraryId,
-  queryClient,
-}: {
-  api: ApiClient
-  mediaId: number
-  libraryId: number
-  queryClient: QueryClient
-}) => {
-  let lastSave: Promise<unknown> = Promise.resolve()
-  return {
-    started: () => {
-      api.recordPlay(mediaId).catch(() => undefined)
-    },
-    save: (report: ProgressReport) => {
-      lastSave = api.saveProgress({ id: mediaId, ...report }).catch(() => undefined)
-    },
-    left: () => {
-      lastSave.then(() => afterWatching({ queryClient, libraryId })).catch(() => undefined)
-    },
-  }
-}
 
 /** Keeps the screen on while it is drawn. */
 const StayAwake = () => {
@@ -171,10 +129,7 @@ const Playing = ({
     progress,
     watchHide: watchAppHide,
   })
-  const sourced =
-    state.phase === SESSION_PHASES.loading || state.phase === SESSION_PHASES.playing
-      ? state.sourced
-      : null
+  const sourced = sourcedOf(state)
   const audioPlace =
     tracks === null || mode === null
       ? null
@@ -248,24 +203,6 @@ const Playing = ({
     setSubtitle(id)
   }
 
-  const notice = (() => {
-    switch (state.phase) {
-      case SESSION_PHASES.failed:
-        return state.problems.join('\n')
-      case SESSION_PHASES.refused:
-        return state.refusal.message
-      case SESSION_PHASES.sourcing:
-      case SESSION_PHASES.loading:
-        return COPY.starting
-      case SESSION_PHASES.playing:
-        return null
-      default: {
-        const unknown: never = state
-        return unknown
-      }
-    }
-  })()
-
   const subtitleOptions = tracks === null ? [] : subtitleOptionsOf(tracks)
   const surface = source !== null && attempt !== null && (
     <Video
@@ -323,7 +260,7 @@ const Playing = ({
                 onChoose: pickAudio,
               }
         }
-        notice={notice}
+        notice={noticeOf(state)}
         onBack={onBack}
         onPictureInPicture={source === null ? null : enterPictureInPicture}
         subtitles={

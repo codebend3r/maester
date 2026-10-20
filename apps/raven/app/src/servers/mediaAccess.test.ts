@@ -1,6 +1,7 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import {
   ACCESS_REFUSALS,
+  APP_CLIENT_CALLS,
   AUTH_HEADERS,
   HLS_PARAMS,
   HLS_PATHS,
@@ -8,6 +9,7 @@ import {
   MEDIA_TICKET_PARAM,
   MEDIA_TICKET_RENEW_MS,
   PLAYBACK_MODES,
+  SERVER_COOKIES,
   type StreamQuality,
   toQueryString,
 } from '@raven/core'
@@ -19,7 +21,7 @@ import {
   type SourceOutcome,
   type SourceRequest,
 } from '@/servers/mediaAccess'
-import { STATUSES } from '@/test/fixtureFetch'
+import { STATUSES, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import {
   LAN,
@@ -33,6 +35,7 @@ import {
 
 const BUSBOYS = { id: 20 }
 const READ_AT = 1_000_000
+/** A size the transcode is asked for, typed so a name `STREAM_QUALITIES` lacks fails the check. */
 const LOW_720: StreamQuality = 'low720'
 
 const QUICK_LAN = { [LAN.url]: 20, [PUBLIC.url]: 200 }
@@ -68,9 +71,9 @@ const sourceOf = (outcome: SourceOutcome) => {
 const ticketed = ({ origin, path, ticket }: { origin: string; path: string; ticket: string }) =>
   `${origin}${path}?${toQueryString({ [MEDIA_TICKET_PARAM]: ticket })}`
 
-const filePath = `/api/media/${BUSBOYS.id}/file`
-const masterPath = HLS_PATHS.master.replace(`:${HLS_PARAMS.id}`, String(BUSBOYS.id))
-const ticketPath = `/api/media/${BUSBOYS.id}/ticket`
+const filePath = pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS.id })
+const masterPath = pathFor({ path: HLS_PATHS.master, id: BUSBOYS.id })
+const ticketPath = pathFor({ path: APP_CLIENT_CALLS.getMediaTicket.path, id: BUSBOYS.id })
 
 const direct: SourceRequest = {
   media: BUSBOYS,
@@ -88,7 +91,9 @@ const transcode: SourceRequest = {
 
 const CONSOLE_METHODS = ['log', 'info', 'warn', 'error', 'debug'] as const
 
-const cookieHeader = { [AUTH_HEADERS.cookie]: 'raven_unlock=u.1' }
+const cookieHeader = {
+  [AUTH_HEADERS.cookie]: `${SERVER_COOKIES.unlock}=${NAS_COOKIES[SERVER_COOKIES.unlock]}`,
+}
 
 describe('mediaAccessFor', () => {
   it('plays from the LAN origin that answers fastest, by ticket and with no cookie', async () => {
@@ -151,6 +156,17 @@ describe('mediaAccessFor', () => {
     expect(sourceOf(await media.source(direct)).uri).toBe(
       ticketed({ origin: PUBLIC.url, path: filePath, ticket: TICKETS[0] }),
     )
+    expect(probes.probed).toHaveLength(4)
+  })
+
+  it('probes again on the next source after a probe no origin answered, as one may come back', async () => {
+    const { media, probes } = setUp({ elapsedMs: {} })
+    expect(sourceOf(await media.source(direct)).uri.startsWith(`${NAS.origin}/`)).toBe(true)
+    expect(probes.probed).toHaveLength(2)
+    probes.retime(QUICK_LAN)
+    expect(sourceOf(await media.source(direct)).uri.startsWith(`${LAN.url}/`)).toBe(true)
+    expect(probes.probed).toHaveLength(4)
+    await media.source(direct)
     expect(probes.probed).toHaveLength(4)
   })
 

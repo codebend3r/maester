@@ -15,9 +15,9 @@ import {
   QUALITIES,
   STREAM_TIME_SHIFT,
   type StreamMode,
+  VIDEO_CODECS,
 } from '@raven/core'
 import { type MockInstance, afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { VIDEO_CODECS } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { type FfmpegStream, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, mediaClockOf } from '@/ffmpeg/probe'

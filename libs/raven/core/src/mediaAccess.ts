@@ -10,6 +10,9 @@ export const MEDIA_TICKET_RENEW_MS = (MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRES
 export const ticketRenewAt = ({ readAt }: { readAt: number }): number =>
   readAt + MEDIA_TICKET_RENEW_MS
 
+/** How long a client waits on one origin's ping before it counts the origin as not answering. */
+export const MEDIA_PROBE_TIMEOUT_MS = 2000
+
 /** Why a client cannot reach a video's media. */
 export const ACCESS_REFUSALS = {
   locked: 'locked',

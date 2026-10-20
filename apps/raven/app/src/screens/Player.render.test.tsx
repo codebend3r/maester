@@ -18,7 +18,7 @@ import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Player } from '@/screens/Player'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
-import { type HeardRequest, STATUSES } from '@/test/fixtureFetch'
+import { type HeardRequest, STATUSES, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import { BUSBOYS_MP4, CUE_TEXT, playerApi } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
@@ -127,8 +127,8 @@ const loadedVideo = async (): Promise<ReactVideoProps> => {
   return videoProps()
 }
 
-const progressPath = APP_CLIENT_CALLS.saveProgress.path.replace(':id', String(BUSBOYS_MP4.id))
-const playsPath = APP_CLIENT_CALLS.recordPlay.path.replace(':id', String(BUSBOYS_MP4.id))
+const progressPath = pathFor({ path: APP_CLIENT_CALLS.saveProgress.path, id: BUSBOYS_MP4.id })
+const playsPath = pathFor({ path: APP_CLIENT_CALLS.recordPlay.path, id: BUSBOYS_MP4.id })
 
 /** Each spot the server was told to save, in order. */
 const savedSpots = (): unknown[] =>
@@ -188,7 +188,9 @@ describe('Player on a phone or tablet', () => {
       [APP_ROUTE_PARAMS.at]: String(BUSBOYS_MP4.position),
     })
     const props = await loadedVideo()
-    expect(props.source!.uri).toBe(`${NAS.origin}/api/media/${BUSBOYS_MP4.id}/file`)
+    expect(props.source!.uri).toBe(
+      `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })}`,
+    )
     expect(props.source!.startPosition).toBe(BUSBOYS_MP4.position * 1000)
     expect(screen.getByText(mediaLabel(BUSBOYS_MP4))).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy()
@@ -252,7 +254,7 @@ describe('Player on a phone or tablet', () => {
     await act(async () => {
       props.onError!({ error: { code: -11828, localizedDescription: 'Cannot Open' } })
     })
-    const master = HLS_PATHS.master.replace(`:${HLS_PARAMS.id}`, String(BUSBOYS_MP4.id))
+    const master = pathFor({ path: HLS_PATHS.master, id: BUSBOYS_MP4.id })
     await screen.findByRole('button', { name: 'Pause' })
     expect(videoProps().source!.uri).toBe(
       `${NAS.origin}${master}?${HLS_PARAMS.mode}=${PLAYBACK_MODES.remux}`,

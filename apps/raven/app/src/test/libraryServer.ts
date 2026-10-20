@@ -16,7 +16,7 @@ import {
 } from '@raven/core'
 
 import { allowlistedFetch } from '@/servers/allowlist'
-import { NOT_FOUND, STATUSES, responseOf } from '@/test/fixtureFetch'
+import { NOT_FOUND, STATUSES, pathFor, responseOf } from '@/test/fixtureFetch'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
@@ -80,9 +80,6 @@ const SHOWS: ShowListing = {
   unmatched: [],
 }
 
-/** The `:id` in the allowlist's library paths. */
-const ID_PARAM = ':id'
-
 /** A library route's path for `library`, with the listing's query when it has a sort. */
 export const libraryPath = ({
   call,
@@ -96,7 +93,7 @@ export const libraryPath = ({
   /** What the library's search box asks for. */
   search?: string
 }): string => {
-  const path = call.path.replace(ID_PARAM, String(library.id))
+  const path = pathFor({ path: call.path, id: library.id })
   return sort === undefined ? path : `${path}?${mediaListQuery.encode({ sort, search })}`
 }
 

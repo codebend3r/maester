@@ -19,7 +19,6 @@ import {
   type PlayerChromeKit,
   type PlayerChromeProps,
   SKIP_SECONDS,
-  type TrackPicker,
   type Transport,
 } from '@/layouts/playerKit'
 import { TouchBack } from '@/layouts/TouchBack'
@@ -138,10 +137,6 @@ const RoundButton = ({
   >
     <Text style={[styles.glyph, isLarge && styles.glyphLarge]}>{glyph}</Text>
   </Pressable>
-)
-
-const TrackChip = ({ label, picker }: { label: string; picker: TrackPicker }) => (
-  <Picker label={label} onChoose={picker.onChoose} options={picker.options} value={picker.value} />
 )
 
 /** Play and pause between the skips, then the time over the line to drag along. */
@@ -269,8 +264,8 @@ const PlayerChrome = ({
               </Text>
             </View>
             <View style={styles.tools}>
-              {audio !== null && <TrackChip label={PLAYER_COPY.audio} picker={audio} />}
-              {subtitles !== null && <TrackChip label={PLAYER_COPY.subtitles} picker={subtitles} />}
+              {audio !== null && <Picker label={PLAYER_COPY.audio} {...audio} />}
+              {subtitles !== null && <Picker label={PLAYER_COPY.subtitles} {...subtitles} />}
               {onPictureInPicture !== null && (
                 <ToolButton
                   accessibilityLabel={PLAYER_COPY.pictureInPicture}

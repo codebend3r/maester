@@ -20,6 +20,7 @@ import {
   type HeardRequest,
   NOT_FOUND,
   STATUSES,
+  pathFor,
   responseOf,
 } from '@/test/fixtureFetch'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
@@ -203,12 +204,6 @@ const {
   setFavourite,
   setItemFavourite,
 } = APP_CLIENT_CALLS
-
-const ID_PARAM = ':id'
-
-/** A route's path for one id: `/api/items/40`. */
-export const pathFor = ({ path, id }: { path: string; id: number }): string =>
-  path.replace(ID_PARAM, String(id))
 
 const READS: Record<string, unknown> = {
   [listLibraries.path]: [FILMS, SERIES],

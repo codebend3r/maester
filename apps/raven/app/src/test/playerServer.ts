@@ -2,11 +2,14 @@ import {
   APP_CALL_METHODS,
   APP_CLIENT_CALLS,
   type ApiClient,
+  CONTAINERS,
   DEFAULT_PLAYBACK_SETTINGS,
   ENCODER_KINDS,
+  HLS_COPY_AUDIO_CODECS,
   MATCH_STATES,
   type MediaTracks,
   SUBTITLE_SOURCES,
+  VIDEO_CODECS,
   createApiClient,
 } from '@raven/core'
 
@@ -16,6 +19,7 @@ import {
   type HeardRequest,
   NOT_FOUND,
   STATUSES,
+  pathFor,
   responseOf,
 } from '@/test/fixtureFetch'
 import { FILMS, NAS } from '@/test/homeServer'
@@ -30,10 +34,10 @@ export const BUSBOYS_MP4 = mediaItemFor({
   libraryId: FILMS.id,
   title: 'Busboys',
   fileName: 'Busboys (2026).mp4',
-  container: 'mp4',
-  videoCodec: 'h264',
+  container: CONTAINERS.mp4,
+  videoCodec: VIDEO_CODECS.h264,
   videoBitDepth: 8,
-  audioCodec: 'aac',
+  audioCodec: HLS_COPY_AUDIO_CODECS.aac,
   audioChannels: 2,
   duration: 6000,
   position: 3000,
@@ -45,7 +49,16 @@ export const BUSBOYS_MP4 = mediaItemFor({
 const SUBTITLE_ID = 'embedded-0'
 
 const TRACKS: MediaTracks = {
-  audio: [{ index: 0, codec: 'aac', channels: 2, language: 'en', title: null, default: true }],
+  audio: [
+    {
+      index: 0,
+      codec: HLS_COPY_AUDIO_CODECS.aac,
+      channels: 2,
+      language: 'en',
+      title: null,
+      default: true,
+    },
+  ],
   subtitles: [
     {
       id: SUBTITLE_ID,
@@ -63,35 +76,33 @@ const TRACKS: MediaTracks = {
   frameRate: 24,
 }
 
-const ID_PARAM = ':id'
 const TRACK_PARAM = ':trackId'
 
 /** The embedded track's one cue, from ten seconds in to twenty. */
 export const CUE_TEXT = 'The tide is turning.'
 const VTT = ['WEBVTT', '', '00:00:10.000 --> 00:00:20.000', CUE_TEXT, ''].join('\n')
 
-const pathFor = (path: string): string => path.replace(ID_PARAM, String(BUSBOYS_MP4.id))
+/** A route's path for the MP4. */
+const busboysPath = (path: string): string => pathFor({ path, id: BUSBOYS_MP4.id })
 
 const { getMedia, getTracks, getPlaybackSettings, getMediaOrigins, listLibraries } =
   APP_CLIENT_CALLS
 
 const READS: Record<string, unknown> = {
-  [pathFor(getMedia.path)]: BUSBOYS_MP4,
-  [pathFor(getTracks.path)]: TRACKS,
+  [busboysPath(getMedia.path)]: BUSBOYS_MP4,
+  [busboysPath(getTracks.path)]: TRACKS,
   [getPlaybackSettings.path]: {
     settings: DEFAULT_PLAYBACK_SETTINGS,
     effective: { encoder: ENCODER_KINDS.software, tonemapAvailable: false },
   },
   [getMediaOrigins.path]: { origins: [] },
   [listLibraries.path]: [WATCHED_AT_90],
-  [APP_CLIENT_CALLS.subtitles.path
-    .replace(ID_PARAM, String(BUSBOYS_MP4.id))
-    .replace(TRACK_PARAM, SUBTITLE_ID)]: VTT,
+  [busboysPath(APP_CLIENT_CALLS.subtitles.path).replace(TRACK_PARAM, SUBTITLE_ID)]: VTT,
 }
 
 const WRITES: ReadonlySet<string> = new Set([
-  pathFor(APP_CLIENT_CALLS.saveProgress.path),
-  pathFor(APP_CLIENT_CALLS.recordPlay.path),
+  busboysPath(APP_CLIENT_CALLS.saveProgress.path),
+  busboysPath(APP_CLIENT_CALLS.recordPlay.path),
 ])
 
 const bodyOf = (body: string | undefined): unknown => (body === undefined ? null : JSON.parse(body))
@@ -115,7 +126,7 @@ export const playerApi = ({
     if (method !== APP_CALL_METHODS.get) {
       return WRITES.has(path) ? { status: STATUSES.noContent, body: null } : NOT_FOUND
     }
-    if (path === pathFor(APP_CLIENT_CALLS.getMediaTicket.path)) {
+    if (path === busboysPath(APP_CLIENT_CALLS.getMediaTicket.path)) {
       return ticketStatus === STATUSES.ok
         ? { status: ticketStatus, body: { ticket: 'tkt.player', expiresAt: 0 } }
         : { status: ticketStatus, body: { message: 'This library is locked.' } }
