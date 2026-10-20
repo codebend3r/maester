@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { APP_CALL_METHODS, APP_CLIENT_CALLS, WATCH_TARGET_KINDS } from '@raven/core'
 import { fireEvent, screen } from '@testing-library/react-native'
 
-import { APP_ROUTES } from '@/routes'
+import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Item } from '@/screens/Item'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
@@ -21,7 +21,9 @@ import { heldAnswer } from '@/test/heldAnswer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 
 const mockPush = jest.fn()
-const mockParams = jest.fn((): Record<string, string> => ({ id: String(BUSBOYS.id) }))
+const mockParams = jest.fn((): Record<string, string> => ({
+  [APP_ROUTE_PARAMS.id]: String(BUSBOYS.id),
+}))
 /** What the server heard, and the answers its writes and reads wait on, per test. */
 const mockServer: {
   heard: HeardRequest[]
@@ -103,7 +105,7 @@ describe('Item on a phone or tablet', () => {
     await fireEvent.press(await screen.findByRole('button', { name: 'Resume from 50:00' }))
     expect(mockPush).toHaveBeenCalledWith({
       pathname: APP_ROUTES.play,
-      params: { mediaId: String(BUSBOYS_FILE.id) },
+      params: { [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_FILE.id) },
     })
   })
 
@@ -136,7 +138,10 @@ describe('Item on a phone or tablet', () => {
     expect(screen.getByRole('header', { name: 'Seasons' })).toBeTruthy()
     expect(await screen.findByRole('button', { name: 'Play S01E01' })).toBeTruthy()
     await fireEvent.press(screen.getByRole('button', { name: 'Season 2' }))
-    expect(mockPush).toHaveBeenCalledWith({ pathname: APP_ROUTES.item, params: { id: '7' } })
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: APP_ROUTES.item,
+      params: { [APP_ROUTE_PARAMS.id]: '7' },
+    })
   })
 
   it("offers a show's marks while its next episode is read, and Play once it is, as the web does", async () => {
@@ -185,7 +190,10 @@ describe('Item on a phone or tablet', () => {
     await fireEvent.press(screen.getByRole('button', { name: /^E1 · Good News About Hell, / }))
     expect(mockPush).toHaveBeenCalledWith({
       pathname: APP_ROUTES.item,
-      params: { id: String(GOOD_NEWS_ABOUT_HELL.id), library: String(SERIES.id) },
+      params: {
+        [APP_ROUTE_PARAMS.id]: String(GOOD_NEWS_ABOUT_HELL.id),
+        [APP_ROUTE_PARAMS.library]: String(SERIES.id),
+      },
     })
   })
 

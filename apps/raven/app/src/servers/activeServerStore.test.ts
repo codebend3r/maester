@@ -21,7 +21,7 @@ describe('createActiveServerStore', () => {
     useServers.getState().activate(NAS.id)
     await Promise.resolve()
     expect(SERVER_LIST_KEY).toBe('raven.servers')
-    expect(JSON.parse(items.get('raven.servers') ?? '')).toMatchObject({
+    expect(JSON.parse(items.get(SERVER_LIST_KEY) ?? '')).toMatchObject({
       state: { servers: [NAS], activeId: NAS.id },
     })
   })
@@ -44,14 +44,14 @@ describe('createActiveServerStore', () => {
       state: { servers: [NAS, { ...NAS, origin: 'x' }], activeId: 'gone' },
       version: 0,
     }
-    const { store } = memoryStore([['raven.servers', JSON.stringify(stored)]])
+    const { store } = memoryStore([[SERVER_LIST_KEY, JSON.stringify(stored)]])
     const useServers = createActiveServerStore({ store, jar: noJar })
     await useServers.persist.rehydrate()
     expect(useServers.getState()).toMatchObject({ servers: [NAS], activeId: null })
   })
 
   it('starts empty from a value that is not JSON', async () => {
-    const { store } = memoryStore([['raven.servers', 'not json']])
+    const { store } = memoryStore([[SERVER_LIST_KEY, 'not json']])
     const useServers = createActiveServerStore({ store, jar: noJar })
     await useServers.persist.rehydrate()
     expect(useServers.getState()).toMatchObject({ servers: [], activeId: null })

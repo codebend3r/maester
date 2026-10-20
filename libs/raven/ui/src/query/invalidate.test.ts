@@ -73,7 +73,7 @@ const readAgain = async (
 ): Promise<string[]> => {
   const client = holding(HELD_KEYS)
   await change(client)
-  return hashed(HELD_KEYS.filter((key) => !!client.getQueryState(key)?.isInvalidated))
+  return hashed(HELD_KEYS.filter((key) => client.getQueryState(key)?.isInvalidated ?? false))
 }
 
 const hashed = (keys: readonly QueryKey[]): string[] => keys.map((key) => hashKey(key)).toSorted()
@@ -186,6 +186,6 @@ describe('afterItemEdited', () => {
     const updated = itemDetails({ id: 40, title: 'Busboys Redux' })
     await afterItemEdited({ queryClient: client, updated, part: EDITED_PARTS.images })
     expect(client.getQueryData<typeof updated>(queryKeys.item(40))).toEqual(updated)
-    expect(client.getQueryState(queryKeys.item(40))?.isInvalidated).toBe(false)
+    expect(client.getQueryState(queryKeys.item(40))!.isInvalidated).toBe(false)
   })
 })

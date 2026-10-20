@@ -113,6 +113,9 @@ const backdropOf = ({
 }: Pictures & { details: ItemDetails | null }): Picture | null =>
   pictureAt({ uri: imageOf({ api, item: details, kind: ITEM_IMAGE_KINDS.backdrop }), headersFor })
 
+/** A line of facts, or null when it has none to say. */
+const lineOrNull = (line: string): string | null => (line === '' ? null : line)
+
 /** How much of a video started is left, with its line; nothing for one not started. */
 const timeLeft = (media: MediaItem): Progress | null => {
   const label = timeLeftOf(media)
@@ -182,7 +185,7 @@ const episodeHero = ({
     headersFor: pictures.headersFor,
   })
   return {
-    eyebrow: episodeByline(details) || null,
+    eyebrow: lineOrNull(episodeByline(details)),
     title: details.title,
     byline: null,
     rating: null,
@@ -309,7 +312,7 @@ export const seasonPage = ({
       title: [episode.episode === null ? null : `E${episode.episode}`, episode.title]
         .filter((part): part is string => part !== null)
         .join(' · '),
-      line: episodeRowFacts(episode).join(' · ') || null,
+      line: lineOrNull(episodeRowFacts(episode).join(' · ')),
       shape: CARD_SHAPES.wide,
       picture: pictureAt({
         uri: episodeStillUrl({ ...pictures, episode }),

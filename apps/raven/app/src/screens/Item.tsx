@@ -80,7 +80,7 @@ const favouriteOf = ({
   onToggle,
 }: {
   isOn: boolean
-  onToggle: (marked: boolean) => void
+  onToggle: (isMarked: boolean) => void
 }): ItemAction => ({
   kind: ITEM_ACTIONS.toggle,
   key: ACTION_KEYS.favourite,

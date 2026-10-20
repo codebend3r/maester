@@ -28,7 +28,7 @@ describe('useItemFavourite', () => {
     act(() => result.current.mutate(true))
 
     await waitFor(() =>
-      expect(client.getQueryData<ItemDetails>(queryKeys.item(SHOW.id))?.favourite).toBe(true),
+      expect(client.getQueryData<ItemDetails>(queryKeys.item(SHOW.id))!.favourite).toBe(true),
     )
     expect(spy).toHaveBeenCalledWith({ id: SHOW.id, favourite: true })
     answer.resolve({ ...SHOW, favourite: true })

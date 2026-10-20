@@ -127,7 +127,7 @@ describe('seasons and episodes', () => {
   })
 
   it('plays next the first episode not watched that has a file', () => {
-    expect(nextEpisodeIn(episodesOf(season))?.id).toBe(9)
+    expect(nextEpisodeIn(episodesOf(season))!.id).toBe(9)
     expect(nextEpisodeIn([episodeSummary({ watched: true })])).toBeUndefined()
   })
 

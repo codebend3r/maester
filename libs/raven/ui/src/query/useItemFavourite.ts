@@ -10,8 +10,8 @@ export const useServerItemFavourite = ({ api, item }: { api: ApiClient; item: It
   const queryClient = useQueryClient()
   return useOptimisticMutation({
     mutationKey: mutationKeys.itemFavourite,
-    mutationFn: (marked: boolean) => api.setItemFavourite({ id: item.id, favourite: marked }),
-    edits: (marked) => itemFavouriteEdits({ item, favourite: marked }),
+    mutationFn: (isMarked: boolean) => api.setItemFavourite({ id: item.id, favourite: isMarked }),
+    edits: (isMarked) => itemFavouriteEdits({ item, favourite: isMarked }),
     settle: () => afterFavourites(queryClient),
   })
 }

@@ -25,7 +25,13 @@ import {
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
-const detailsFor = (summary: ItemSummary, overrides: Partial<ItemDetails> = {}): ItemDetails => ({
+const detailsFor = ({
+  summary,
+  overrides,
+}: {
+  summary: ItemSummary
+  overrides: Partial<ItemDetails>
+}): ItemDetails => ({
   ...summary,
   tmdbId: String(summary.id),
   imdbId: null,
@@ -62,23 +68,32 @@ export const BUSBOYS_FILE = mediaItemFor({
   item: BUSBOYS_SUMMARY,
 })
 
-export const BUSBOYS = detailsFor(BUSBOYS_SUMMARY, {
-  tagline: 'Every table has a story.',
-  summary: 'Two busboys at a downtown steakhouse plan one last perfect shift.',
-  contentRating: 'R',
-  genres: ['Comedy', 'Drama'],
-  credits: [
-    { personId: 1, name: 'Mark Kimball', job: CREDIT_JOBS.cast, role: 'Rudy', photoVersion: 'k1' },
-    { personId: 2, name: 'Ana Ortiz', job: CREDIT_JOBS.cast, role: 'Lena', photoVersion: null },
-    {
-      personId: 1,
-      name: 'Mark Kimball',
-      job: CREDIT_JOBS.director,
-      role: 'Director',
-      photoVersion: 'k1',
-    },
-  ],
-  versions: [BUSBOYS_FILE],
+export const BUSBOYS = detailsFor({
+  summary: BUSBOYS_SUMMARY,
+  overrides: {
+    tagline: 'Every table has a story.',
+    summary: 'Two busboys at a downtown steakhouse plan one last perfect shift.',
+    contentRating: 'R',
+    genres: ['Comedy', 'Drama'],
+    credits: [
+      {
+        personId: 1,
+        name: 'Mark Kimball',
+        job: CREDIT_JOBS.cast,
+        role: 'Rudy',
+        photoVersion: 'k1',
+      },
+      { personId: 2, name: 'Ana Ortiz', job: CREDIT_JOBS.cast, role: 'Lena', photoVersion: null },
+      {
+        personId: 1,
+        name: 'Mark Kimball',
+        job: CREDIT_JOBS.director,
+        role: 'Director',
+        photoVersion: 'k1',
+      },
+    ],
+    versions: [BUSBOYS_FILE],
+  },
 })
 
 const SEVERANCE_SUMMARY = summaryFor({
@@ -151,21 +166,30 @@ const SEASON_TWO = seasonFor({ id: 7, season: 2 })
 const GOOD_NEWS = episodeFor({ id: 6, episode: 1, title: 'Good News About Hell', fileId: 12 })
 const HALF_LOOP = episodeFor({ id: 8, episode: 2, title: 'Half Loop', fileId: 13 })
 
-export const SEVERANCE = detailsFor(SEVERANCE_SUMMARY, {
-  summary: 'Mark leads a team of office workers whose memories have been split.',
-  studio: 'Apple TV+',
-  favourite: false,
-  children: [SEASON_ONE, SEASON_TWO],
+export const SEVERANCE = detailsFor({
+  summary: SEVERANCE_SUMMARY,
+  overrides: {
+    summary: 'Mark leads a team of office workers whose memories have been split.',
+    studio: 'Apple TV+',
+    favourite: false,
+    children: [SEASON_ONE, SEASON_TWO],
+  },
 })
 
-export const SEVERANCE_ONE = detailsFor(SEASON_ONE, { children: [GOOD_NEWS, HALF_LOOP] })
+export const SEVERANCE_ONE = detailsFor({
+  summary: SEASON_ONE,
+  overrides: { children: [GOOD_NEWS, HALF_LOOP] },
+})
 
-export const GOOD_NEWS_ABOUT_HELL = detailsFor(GOOD_NEWS, {
-  summary: 'Mark is promoted.',
-  released: GOOD_NEWS.released,
-  runtime: GOOD_NEWS.runtime,
-  backdropVersion: GOOD_NEWS.stillVersion,
-  versions: GOOD_NEWS.primary === null ? [] : [GOOD_NEWS.primary],
+export const GOOD_NEWS_ABOUT_HELL = detailsFor({
+  summary: GOOD_NEWS,
+  overrides: {
+    summary: 'Mark is promoted.',
+    released: GOOD_NEWS.released,
+    runtime: GOOD_NEWS.runtime,
+    backdropVersion: GOOD_NEWS.stillVersion,
+    versions: GOOD_NEWS.primary === null ? [] : [GOOD_NEWS.primary],
+  },
 })
 
 const TRACKS: MediaTracks = { audio: [], subtitles: [], defaultAudio: null, frameRate: null }

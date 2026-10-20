@@ -54,7 +54,7 @@ export const Unlock = () => {
         isSecret
         label={COPY.pin}
         onChangeText={setPin}
-        onSubmit={() => void submit()}
+        onSubmit={() => submit()}
         value={pin}
       />
       {error !== null && (
@@ -65,7 +65,7 @@ export const Unlock = () => {
       <FormButton
         isDisabled={isBusy}
         label={COPY.unlock}
-        onPress={() => void submit()}
+        onPress={() => submit()}
         tone={BUTTON_TONES.primary}
       />
       <FormButton

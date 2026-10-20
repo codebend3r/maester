@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { ITEM_TYPES, movieFacts } from '@raven/core'
+import { AUTH_HEADERS, ITEM_TYPES, movieFacts } from '@raven/core'
 
 import { CARD_SHAPES } from '@/queries/cards'
 import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
@@ -15,7 +15,7 @@ import {
 } from '@/test/itemServer'
 import { mediaItemFor } from '@/test/mediaItem'
 
-const COOKIE = { Cookie: 'raven_unlock=u.1' }
+const COOKIE = { [AUTH_HEADERS.cookie]: 'raven_unlock=u.1' }
 const pictures = { api: itemApi(), headersFor: () => COOKIE }
 const at = (path: string) => ({ uri: `${NAS.origin}${path}`, headers: COOKIE })
 
@@ -83,7 +83,7 @@ describe('playablePage', () => {
       ['Busboys (2026).mkv', { kind: ROUTE_TARGETS.play, mediaId: 20 }],
       ['Busboys (2026).mkv', { kind: ROUTE_TARGETS.play, mediaId: 22 }],
     ])
-    expect(rows[1]?.facts).toEqual(['4K', 'HEVC', '40.0 GB'])
+    expect(rows[1]!.facts).toEqual(['4K', 'HEVC', '40.0 GB'])
   })
 
   it("heads an episode with its show and number, its still, and the show's backdrop once read", () => {
@@ -178,7 +178,7 @@ describe('seasonPage', () => {
         { kind: ROUTE_TARGETS.item, itemId: 8, libraryId: SERIES.id, fileId: null },
       ],
     ])
-    expect(page.episodes[0]?.picture).toEqual(at('/api/items/6/images/still?v=s6'))
+    expect(page.episodes[0]!.picture).toEqual(at('/api/items/6/images/still?v=s6'))
   })
 
   it('waits for the show for its backdrop', () => {

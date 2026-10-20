@@ -36,7 +36,7 @@ describe('fitJumpMarks', () => {
     const { marks } = fitJumpMarks({ scale: letters(), room: 748, labelHeight: LABEL })
     const byLabel = (label: string) => marks.find((mark) => mark.label === label)
     expect([...(byLabel('B')?.keys ?? [])]).toEqual(['media:31'])
-    expect(byLabel('C')?.keys).toBeNull()
+    expect(byLabel('C')!.keys).toBeNull()
   })
 
   it("gathers neighbouring marks into one where a phone held sideways can't fit them all", () => {

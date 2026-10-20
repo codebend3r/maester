@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
-import { APP_ROUTES } from '@/routes'
+import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Home } from '@/screens/Home'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
@@ -96,7 +96,10 @@ describe('Home on a TV', () => {
   it("lets the remote open a library from its shelf's title", async () => {
     await renderHome()
     await fireEvent.press(await screen.findByRole('link', { name: 'See all in Series' }))
-    expect(mockPush).toHaveBeenCalledWith({ pathname: APP_ROUTES.library, params: { id: '2' } })
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: APP_ROUTES.library,
+      params: { [APP_ROUTE_PARAMS.id]: '2' },
+    })
   })
 
   it('offers the search in the top row once the shelves are drawn, never before them or first', async () => {
@@ -111,7 +114,7 @@ describe('Home on a TV', () => {
     await screen.findByRole('header', { name: 'Films' })
     const search = screen.getByRole('link', { name: 'Search every library' })
     expect(search.props.hasTVPreferredFocus).not.toBe(true)
-    expect(screen.getAllByRole('button')[0]?.props.hasTVPreferredFocus).toBe(true)
+    expect(screen.getAllByRole('button')[0]!.props.hasTVPreferredFocus).toBe(true)
 
     await fireEvent.press(search)
     expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.search)

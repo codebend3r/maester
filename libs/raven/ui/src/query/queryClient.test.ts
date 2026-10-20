@@ -26,7 +26,7 @@ describe('createQueryClient', () => {
 
 describe('the retry policy', () => {
   it('gives up at once on a 404 and tries anything else once more', () => {
-    const retry = createQueryClient().getDefaultOptions().queries?.retry
+    const retry = createQueryClient().getDefaultOptions().queries?.retry ?? null
     const retries = (error: Error) =>
       typeof retry === 'function' ? [0, 1].map((failures) => retry(failures, error)) : []
     expect(retries(new ApiError({ status: 404, message: 'Gone' }))).toEqual([false, false])

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  AUTH_HEADERS,
   ITEM_TYPES,
   LIBRARY_KINDS,
   LIBRARY_VIEWS,
@@ -16,7 +17,7 @@ import { ASHFALL_GATE, BUSBOYS, NIGHT_TRAIN, libraryApi } from '@/test/librarySe
 import { mediaItemFor } from '@/test/mediaItem'
 import { ROUTE_TARGETS } from '@/routes'
 
-const COOKIE = { Cookie: 'raven_unlock=u.1' }
+const COOKIE = { [AUTH_HEADERS.cookie]: 'raven_unlock=u.1' }
 const NOW = new Date('2026-10-20T00:00:00.000Z')
 const pictures = { api: libraryApi(), headersFor: () => COOKIE, now: NOW }
 
@@ -43,14 +44,14 @@ describe('librarySectionsOf', () => {
     })
     expect(sections).toHaveLength(1)
     const [all] = sections
-    expect(all?.title).toBeNull()
-    expect(all?.shape).toBe(CARD_SHAPES.poster)
-    expect(all?.cards.map(({ title, line }) => [title, line])).toEqual([
+    expect(all!.title).toBeNull()
+    expect(all!.shape).toBe(CARD_SHAPES.poster)
+    expect(all!.cards.map(({ title, line }) => [title, line])).toEqual([
       ['Ashfall Gate', '2021'],
       ['Busboys', '2026'],
       ['Night Train', '2025'],
     ])
-    expect(all?.cards[1]).toMatchObject({
+    expect(all!.cards[1]).toMatchObject({
       key: 'media:31',
       target: { kind: ROUTE_TARGETS.item, itemId: 51, libraryId: FILMS.id, fileId: null },
       picture: { uri: `${NAS.origin}/api/items/51/images/poster?v=p51`, headers: COOKIE },
@@ -63,7 +64,7 @@ describe('librarySectionsOf', () => {
       listing: { shows: [], files: [BUSBOYS] },
       ...pictures,
     })
-    expect(all?.cards[0]?.line).toBe('Added 4 days ago')
+    expect(all!.cards[0]!.line).toBe('Added 4 days ago')
   })
 
   it('buckets the grouped view as the web groups it, each bucket with its count', () => {
@@ -77,7 +78,7 @@ describe('librarySectionsOf', () => {
       ['group:matched', 'Matched', '2 videos'],
       ['group:unmatched', 'Not matched', '1 video'],
     ])
-    expect(sections[1]?.cards.map(({ title }) => title)).toEqual(['Night Train'])
+    expect(sections[1]!.cards.map(({ title }) => title)).toEqual(['Night Train'])
   })
 
   it('lays a library that is never matched out as frame grabs with their lengths', () => {
@@ -87,8 +88,8 @@ describe('librarySectionsOf', () => {
       listing: { shows: [], files: [clip] },
       ...pictures,
     })
-    expect(all?.shape).toBe(CARD_SHAPES.wide)
-    expect(all?.cards[0]).toMatchObject({
+    expect(all!.shape).toBe(CARD_SHAPES.wide)
+    expect(all!.cards[0]).toMatchObject({
       title: 'Pier at dusk',
       line: '2m',
       picture: { uri: `${NAS.origin}/api/media/80/thumbnail?v=1`, headers: COOKIE },
@@ -115,7 +116,7 @@ describe('librarySectionsOf', () => {
       ...pictures,
     })
     expect(sections.map(({ key, title }) => [key, title])).toEqual([['shows', null]])
-    expect(sections[0]?.cards[0]).toMatchObject({
+    expect(sections[0]!.cards[0]).toMatchObject({
       key: 'show:60',
       title: 'Ashfall',
       line: '2020 to 2022',
@@ -133,6 +134,6 @@ describe('librarySectionsOf', () => {
     expect(sections.map(({ key, title, count }) => [key, title, count])).toEqual([
       ['folder:Harbour Lights', 'Harbour Lights', 'Not matched, 2 episodes'],
     ])
-    expect(sections[0]?.shape).toBe(CARD_SHAPES.wide)
+    expect(sections[0]!.shape).toBe(CARD_SHAPES.wide)
   })
 })

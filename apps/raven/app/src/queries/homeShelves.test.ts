@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { HOME_SHELF_TYPES, ITEM_TYPES, LIBRARY_KINDS, THUMBNAIL_STATES } from '@raven/core'
+import {
+  AUTH_HEADERS,
+  HOME_SHELF_TYPES,
+  ITEM_TYPES,
+  LIBRARY_KINDS,
+  THUMBNAIL_STATES,
+} from '@raven/core'
 
 import { CARD_SHAPES } from '@/queries/cards'
 import { CONTINUE_WATCHING, homeShelvesOf, libraryShelvesOf } from '@/queries/homeShelves'
@@ -7,7 +13,7 @@ import { FILMS, HOME, NAS, SERIES, homeApi } from '@/test/homeServer'
 import { mediaItemFor } from '@/test/mediaItem'
 import { ROUTE_TARGETS } from '@/routes'
 
-const COOKIE = { Cookie: 'raven_unlock=u.1' }
+const COOKIE = { [AUTH_HEADERS.cookie]: 'raven_unlock=u.1' }
 const headersFor = () => COOKIE
 
 describe('homeShelvesOf', () => {

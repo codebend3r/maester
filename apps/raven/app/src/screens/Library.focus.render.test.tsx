@@ -11,6 +11,7 @@ import {
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 
+import { APP_ROUTE_PARAMS } from '@/routes'
 import { Library } from '@/screens/Library'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
@@ -20,7 +21,7 @@ import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import { FILM_SEARCHES, GROUPED_FILMS, libraryApi, libraryPath } from '@/test/libraryServer'
 import { renderScreen } from '@/test/renderScreen'
 
-const mockParams = jest.fn(() => ({ id: String(FILMS.id) }))
+const mockParams = jest.fn(() => ({ [APP_ROUTE_PARAMS.id]: String(FILMS.id) }))
 /** What the server heard, and the libraries it answers with in place of its own, per test. */
 const mockServer: { requests: string[]; libraries: LibraryRecord[] } = {
   requests: [],
@@ -79,7 +80,7 @@ const preferred = (titles: readonly string[]): string[] =>
 /** The TV's list waits for the height left under the header, which jest never lays out. */
 const layOut = async () => {
   await screen.findByRole('header', {
-    name: mockParams().id === String(FILMS.id) ? 'Films' : 'Series',
+    name: mockParams()[APP_ROUTE_PARAMS.id] === String(FILMS.id) ? 'Films' : 'Series',
   })
   const layout = { nativeEvent: { layout: { x: 0, y: 0, width: 1920, height: 800 } } }
   // One at a time: each event is an act() of its own, and they may not overlap.
@@ -98,7 +99,7 @@ const askedFor = (): unknown[] =>
   )
 
 const renderLibrary = async ({ id }: { id: number }) => {
-  mockParams.mockReturnValue({ id: String(id) })
+  mockParams.mockReturnValue({ [APP_ROUTE_PARAMS.id]: String(id) })
   const rendered = await renderScreen({ ui: <Library /> })
   await layOut()
   return rendered
@@ -149,7 +150,7 @@ describe('Library on a TV', () => {
     const scaleOf = () => {
       const [face] = card.children
       if (typeof face !== 'object' || face === null) throw new Error('No card face')
-      return StyleSheet.flatten(face.props.style)?.transform
+      return StyleSheet.flatten(face.props.style)?.transform ?? null
     }
     expect(scaleOf()).toEqual([{ scale: 1 }])
     await fireEvent(card, 'focus')
@@ -162,14 +163,14 @@ describe('Library on a TV', () => {
     expect(preferred(SHOW_TITLES)).toEqual(['Ashfall'])
 
     const row = within(screen.getByLabelText('Jump to a letter'))
-    expect(row.getByRole('button', { name: 'C' }).props.accessibilityState?.disabled).toBe(true)
+    expect(row.getByRole('button', { name: 'C' }).props.accessibilityState!.disabled).toBe(true)
     await fireEvent.press(row.getByRole('button', { name: 'B' }))
     expect(askedFor()).toEqual(['The Beacon'])
     expect(preferred(SHOW_TITLES)).toEqual([])
   })
 
   it('draws no card before the list has its height, so the first card takes focus as it mounts', async () => {
-    mockParams.mockReturnValue({ id: String(FILMS.id) })
+    mockParams.mockReturnValue({ [APP_ROUTE_PARAMS.id]: String(FILMS.id) })
     await renderScreen({ ui: <Library /> })
     await screen.findByRole('header', { name: 'Films' })
     expect(screen.queryByRole('button', { name: 'Ashfall Gate' })).toBeNull()

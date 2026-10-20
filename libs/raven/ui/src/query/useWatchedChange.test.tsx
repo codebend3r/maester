@@ -33,9 +33,9 @@ describe('useWatchedChange', () => {
     const { result, client } = setUp()
     act(() => result.current.mutate(change({ id: 40, watched: true })))
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(1))
-    expect(client.getQueryState(queryKeys.item(40))?.isInvalidated).toBe(false)
+    expect(client.getQueryState(queryKeys.item(40))!.isInvalidated).toBe(false)
     answer.resolve()
-    await waitFor(() => expect(client.getQueryState(queryKeys.item(40))?.isInvalidated).toBe(true))
+    await waitFor(() => expect(client.getQueryState(queryKeys.item(40))!.isInvalidated).toBe(true))
   })
 
   it('keeps marks in the order they were made', async () => {
@@ -66,7 +66,7 @@ describe('useWatchedChange', () => {
     expect(result.current.state).toBe(state)
     act(() => result.current.onToggle())
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(1))
-    return spy.mock.calls[0]?.[0]
+    return spy.mock.calls[0]![0]
   }
 
   it('has a toggle mark everything watched unless it all is already', async () => {

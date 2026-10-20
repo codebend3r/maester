@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { APP_CLIENT_CALLS } from '@raven/core'
 import { fireEvent, screen } from '@testing-library/react-native'
 
-import { APP_ROUTES } from '@/routes'
+import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Item } from '@/screens/Item'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
@@ -13,7 +13,9 @@ import { heldAnswer } from '@/test/heldAnswer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 
 const mockPush = jest.fn()
-const mockParams = jest.fn((): Record<string, string> => ({ id: String(BUSBOYS.id) }))
+const mockParams = jest.fn((): Record<string, string> => ({
+  [APP_ROUTE_PARAMS.id]: String(BUSBOYS.id),
+}))
 /** The answers the server's writes and reads wait on, and what lets a held one through, per test. */
 const mockServer: {
   writes: () => Promise<void>
@@ -61,7 +63,7 @@ const preferred = (): string[] =>
 const shown = { client: createScreenClient() }
 
 const renderItem = async (id: number) => {
-  mockParams.mockReturnValue({ id: String(id) })
+  mockParams.mockReturnValue({ [APP_ROUTE_PARAMS.id]: String(id) })
   shown.client = createScreenClient()
   return renderScreen({ ui: <Item />, client: shown.client })
 }
@@ -116,7 +118,7 @@ describe('Item on a TV', () => {
     await fireEvent.press(season)
     expect(mockPush).toHaveBeenCalledWith({
       pathname: APP_ROUTES.item,
-      params: { id: String(SEVERANCE_ONE.id) },
+      params: { [APP_ROUTE_PARAMS.id]: String(SEVERANCE_ONE.id) },
     })
   })
 

@@ -85,7 +85,7 @@ const setUp = ({ tokens }: { tokens?: ReturnType<typeof fakeTokens> } = {}) => {
   const client = new QueryClient()
   HELD.forEach((key) => client.setQueryData(key, []))
   const hook = renderQueryHook({ client, hook: () => useServerEvents() })
-  const stale = () => HELD.filter((key) => !!client.getQueryState(key)?.isInvalidated)
+  const stale = () => HELD.filter((key) => client.getQueryState(key)?.isInvalidated ?? false)
   return { api, hook, opened, stale }
 }
 
@@ -97,7 +97,7 @@ describe('useServerEvents', () => {
 
   it('reads again what a library event names, and nothing else', async () => {
     const { opened, stale } = setUp()
-    opened[0]?.emit({
+    opened[0]!.emit({
       type: SERVER_STREAM_EVENTS.message,
       data: JSON.stringify({ type: SERVER_EVENT_TYPES.library, libraryId: 2 }),
     })
@@ -114,12 +114,12 @@ describe('useServerEvents', () => {
 
   it('ignores a message that is not a server event', () => {
     const { opened, stale } = setUp()
-    opened[0]?.emit({ type: SERVER_STREAM_EVENTS.message, data: 'not json' })
-    opened[0]?.emit({
+    opened[0]!.emit({ type: SERVER_STREAM_EVENTS.message, data: 'not json' })
+    opened[0]!.emit({
       type: SERVER_STREAM_EVENTS.message,
       data: { type: SERVER_EVENT_TYPES.library },
     })
-    opened[0]?.emit({
+    opened[0]!.emit({
       type: SERVER_STREAM_EVENTS.message,
       data: JSON.stringify({ type: 'rescan', libraryId: 2 }),
     })
@@ -128,11 +128,11 @@ describe('useServerEvents', () => {
 
   it('reads everything again once a dropped stream is back, not on its first open', async () => {
     const { opened, stale } = setUp()
-    opened[0]?.emit({ type: SERVER_STREAM_EVENTS.open })
+    opened[0]!.emit({ type: SERVER_STREAM_EVENTS.open })
     expect(stale()).toEqual([])
-    opened[0]?.emit({ type: SERVER_STREAM_EVENTS.error })
+    opened[0]!.emit({ type: SERVER_STREAM_EVENTS.error })
     expect(stale()).toEqual([])
-    opened[0]?.emit({ type: SERVER_STREAM_EVENTS.open })
+    opened[0]!.emit({ type: SERVER_STREAM_EVENTS.open })
     await waitFor(() =>
       expect(stale()).toEqual([
         queryKeys.libraries,
@@ -147,7 +147,7 @@ describe('useServerEvents', () => {
 
   it('hangs up when it unmounts', () => {
     const { hook, opened } = setUp()
-    expect(opened[0]?.state.closed).toBe(false)
+    expect(opened[0]!.state.closed).toBe(false)
     hook.unmount()
     expect(opened.map(({ state }) => state.closed)).toEqual([true])
   })

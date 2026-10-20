@@ -22,8 +22,8 @@ export const useServerMediaMutations = ({ api, media }: { api: ApiClient; media:
 
   const favourite = useOptimisticMutation({
     mutationKey: mutationKeys.favourite,
-    mutationFn: (marked: boolean) => api.setFavourite({ id: media.id, favourite: marked }),
-    edits: (marked) => favouriteEdits({ media, favourite: marked }),
+    mutationFn: (isMarked: boolean) => api.setFavourite({ id: media.id, favourite: isMarked }),
+    edits: (isMarked) => favouriteEdits({ media, favourite: isMarked }),
     settle: () => afterFavourites(queryClient),
   })
 
@@ -42,8 +42,9 @@ export const useServerMediaMutations = ({ api, media }: { api: ApiClient; media:
     mutationFn: () => api.deleteMedia(media.id),
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: queryKeys.mediaItem(media.id) })
-      queryClient.setQueriesData<MediaItem[]>(lists, (items) =>
-        items?.filter((item) => item.id !== media.id),
+      queryClient.setQueriesData<MediaItem[]>(
+        lists,
+        (items) => items?.filter((item) => item.id !== media.id) ?? undefined,
       )
       queryClient.setQueryData<PosterEntry[]>(
         queryKeys.favourites,

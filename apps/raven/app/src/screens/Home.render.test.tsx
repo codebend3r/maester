@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { AUTH_HEADERS, isRecord, isString } from '@raven/core'
+import { AUTH_HEADERS, SERVER_COOKIES, isRecord, isString } from '@raven/core'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
 import { clearOnServerSwitch } from '@/queries/serverCache'
-import { APP_ROUTES } from '@/routes'
+import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Home } from '@/screens/Home'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
@@ -62,13 +62,19 @@ describe('Home on a phone or tablet', () => {
   it('opens the item a card is for', async () => {
     await renderHome()
     await fireEvent.press(await screen.findByRole('button', { name: 'Severance' }))
-    expect(mockPush).toHaveBeenCalledWith({ pathname: APP_ROUTES.item, params: { id: '4' } })
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: APP_ROUTES.item,
+      params: { [APP_ROUTE_PARAMS.id]: '4' },
+    })
   })
 
   it("opens a library from its shelf's title, as the web's shelf heading links to it", async () => {
     await renderHome()
     await fireEvent.press(await screen.findByRole('link', { name: 'See all in Films' }))
-    expect(mockPush).toHaveBeenCalledWith({ pathname: APP_ROUTES.library, params: { id: '1' } })
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: APP_ROUTES.library,
+      params: { [APP_ROUTE_PARAMS.id]: '1' },
+    })
     expect(screen.queryByRole('link', { name: 'See all in Continue watching' })).toBeNull()
   })
 
@@ -130,7 +136,7 @@ describe('Home on a phone or tablet', () => {
     await fireEvent(refused, NATIVE_EVENTS.error)
     expect(pictures()).toHaveLength(3)
 
-    mockCookies.mockReturnValue({ raven_unlock: 'u.2' })
+    mockCookies.mockReturnValue({ [SERVER_COOKIES.unlock]: 'u.2' })
     await act(async () => bumpCookieVersion())
     await waitFor(() => expect(pictures()).toHaveLength(4))
     expect(pictures().map(({ headers }) => headers)).toEqual(

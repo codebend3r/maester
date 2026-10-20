@@ -25,7 +25,9 @@ import { SIZES } from '@/theme/appTheme'
 
 const mockPush = jest.fn()
 const mockFontScale = jest.fn(() => 1)
-const mockParams = jest.fn((): Record<string, string> => ({ id: String(FILMS.id) }))
+const mockParams = jest.fn((): Record<string, string> => ({
+  [APP_ROUTE_PARAMS.id]: String(FILMS.id),
+}))
 /**
  * What the server heard, the libraries it answers with in place of its own, and what its
  * answers wait on, per test.
@@ -74,8 +76,7 @@ const { listMedia, listShows } = APP_CLIENT_CALLS
 const rowHeightOf = (card: ReturnType<typeof screen.getByRole>): unknown => {
   const heightOf = (node: typeof card | null): unknown => {
     if (node === null) return undefined
-    const height: unknown = StyleSheet.flatten(node.props.style)?.height
-    return height ?? heightOf(node.parent)
+    return StyleSheet.flatten(node.props.style)?.height ?? heightOf(node.parent)
   }
   return heightOf(card.parent)
 }
@@ -166,7 +167,7 @@ describe('Library on a phone or tablet', () => {
     await fireEvent.press(await screen.findByRole('button', { name: 'Busboys' }))
     expect(mockPush).toHaveBeenCalledWith({
       pathname: APP_ROUTES.item,
-      params: { id: '51', library: String(FILMS.id) },
+      params: { [APP_ROUTE_PARAMS.id]: '51', [APP_ROUTE_PARAMS.library]: String(FILMS.id) },
     })
   })
 
@@ -206,12 +207,12 @@ describe('Library on a phone or tablet', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: 'Sort: Title' }))
     const [sheet] = asked
-    expect(sheet?.options).toEqual([
+    expect(sheet!.options).toEqual([
       ...sortFieldsFor(SERIES.settings.kind).map((field) => SORT_FIELD_LABELS[field]),
       'Cancel',
     ])
-    expect(sheet?.options).not.toContain(SORT_FIELD_LABELS.size)
-    expect(sheet?.options).not.toContain(SORT_FIELD_LABELS.resolution)
+    expect(sheet!.options).not.toContain(SORT_FIELD_LABELS.size)
+    expect(sheet!.options).not.toContain(SORT_FIELD_LABELS.resolution)
   })
 
   it("lists a show library by title when this device's choice is one its type cannot use", async () => {
@@ -235,7 +236,7 @@ describe('Library on a phone or tablet', () => {
     const strip = screen.getByLabelText('Jump to a letter')
     expect(strip).toBeTruthy()
     const open = (name: string) =>
-      screen.getByRole('button', { name }).props.accessibilityState?.disabled !== true
+      !(screen.getByRole('button', { name }).props.accessibilityState?.disabled ?? false)
     expect(['A', 'B', 'S'].map(open)).toEqual([true, true, true])
     expect(['Numbers and symbols', 'C', 'T', 'Z'].map(open)).toEqual([false, false, false, false])
   })
@@ -261,14 +262,14 @@ describe('Library on a phone or tablet', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Group by: Matched or not' }))
     await fireEvent.press(screen.getByRole('button', { name: 'View: Grouped' }))
     expect(asked.map(({ title }) => title)).toEqual(['Group by', 'View'])
-    expect(asked[0]?.options).toEqual([
+    expect(asked[0]!.options).toEqual([
       'Matched or not',
       'Resolution',
       'Video codec',
       'Month added',
       'Cancel',
     ])
-    expect(asked[1]?.options).toEqual(['Grid', 'List', 'Tiles', 'Grouped', 'Cancel'])
+    expect(asked[1]!.options).toEqual(['Grid', 'List', 'Tiles', 'Grouped', 'Cancel'])
   })
 
   it("stands the rows taller for the viewer's larger text, so captions are not cut", async () => {
@@ -288,7 +289,7 @@ describe('Library on a phone or tablet', () => {
     const headingHeight = async () =>
       StyleSheet.flatten(
         (await screen.findByRole('button', { name: 'Matched, 3 videos' })).props.style,
-      )?.height
+      )?.height ?? null
     await renderLibrary({ id: FILMS.id })
     expect(await headingHeight()).toBe(SIZES.fieldHeight + SIZES.space2)
 
@@ -400,6 +401,10 @@ describe('Library on a phone or tablet', () => {
   it('asks for nothing when the address names no library', async () => {
     await renderLibrary({ id: '1e3' })
     expect(await screen.findByText('This library is not on the server.')).toBeTruthy()
-    expect(mockServer.requests.some((path) => path.startsWith('/api/libraries/'))).toBe(false)
+    expect(
+      mockServer.requests.some((path) =>
+        path.startsWith(`${APP_CLIENT_CALLS.listLibraries.path}/`),
+      ),
+    ).toBe(false)
   })
 })

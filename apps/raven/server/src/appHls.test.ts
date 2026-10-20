@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
+  HLS_COPY_AUDIO_CODECS,
   HLS_PARAMS,
   HLS_PATHS,
   MEDIA_TICKET_PARAM,
@@ -192,7 +193,7 @@ describe('the HLS route', () => {
       encodeClip({
         path: join(media, FILES.late),
         seconds: LATE_SECONDS,
-        audio: 'ac3',
+        audio: HLS_COPY_AUDIO_CODECS.ac3,
         startAt: LATE_START,
       }),
       writeFile(join(media, 'Late (2026).en.srt'), LATE_SIDECAR),

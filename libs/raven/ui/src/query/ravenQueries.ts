@@ -230,7 +230,8 @@ export const ravenQueriesFor = (api: ApiClient) => {
       staleTime: 60_000,
       refetchInterval: (query) => {
         const lock = query.state.data
-        return lock?.state === ADMIN_LOCK_STATES.turningOn ? lock.remainingMs + PAST_DUE_MS : false
+        if (lock === undefined || lock.state !== ADMIN_LOCK_STATES.turningOn) return false
+        return lock.remainingMs + PAST_DUE_MS
       },
     }),
 
