@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import type { GridSection } from '@/queries/libraryGrid'
+import { ROUTE_TARGETS } from '@/routes'
 import { GRID_ROWS, columnsFor, gridRowsOf, jumpTargetOf, offsetOfRow } from '@/layouts/gridRows'
 
 const card = (key: string): ShelfCard => ({
@@ -11,7 +12,7 @@ const card = (key: string): ShelfCard => ({
   shape: CARD_SHAPES.poster,
   picture: null,
   progress: 0,
-  itemId: null,
+  target: { kind: ROUTE_TARGETS.play, mediaId: 1 },
 })
 
 const section = ({

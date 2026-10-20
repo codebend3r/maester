@@ -162,12 +162,44 @@ export const readWatchState = ({
   id: number | null
 }): WatchState | null => (isWatchState(state) && state.media.id === id ? state : null)
 
+/** Where a card goes: an item's page, or straight to the player. */
+export const CARD_DESTINATIONS = { page: 'page', player: 'player' } as const
+
+export type CardDestination =
+  | {
+      kind: typeof CARD_DESTINATIONS.page
+      item: ItemSummary
+      path: AppPath
+      libraryId: number
+      /** The file Play starts, named for a card a movie was split onto; null otherwise. */
+      file: number | null
+    }
+  | { kind: typeof CARD_DESTINATIONS.player; media: MediaItem }
+
 /**
  * Where a card goes: a matched item's page as the card's library shows it,
- * where the library has pages, or straight to the player, with the video
- * handed over, for anything else. A card a movie was split onto names its
- * file, so the page plays that one.
+ * where the library has pages, or straight to the player for anything else.
+ * A card a movie was split onto names its file, so the page plays that one.
  */
+export const cardDestination = ({
+  media,
+  hasPages,
+}: {
+  media: MediaItem
+  hasPages: boolean
+}): CardDestination => {
+  const path = hasPages && media.item ? itemPath(media.item) : null
+  if (path == null || !media.item) return { kind: CARD_DESTINATIONS.player, media }
+  return {
+    kind: CARD_DESTINATIONS.page,
+    item: media.item,
+    path,
+    libraryId: media.libraryId,
+    file: media.variant == null ? null : media.id,
+  }
+}
+
+/** A card's destination as a link: the page's address in its library, or the player's with the video handed over. */
 export const cardLink = ({
   media,
   hasPages,
@@ -175,13 +207,21 @@ export const cardLink = ({
   media: MediaItem
   hasPages: boolean
 }): { to: AppPath; state?: WatchState } => {
-  const page = hasPages && media.item ? itemPath(media.item) : null
-  if (page == null) return watchLink({ media })
-  return {
-    to: inLibrary({
-      page,
-      libraryId: media.libraryId,
-      file: media.variant == null ? null : media.id,
-    }),
+  const destination = cardDestination({ media, hasPages })
+  switch (destination.kind) {
+    case CARD_DESTINATIONS.page:
+      return {
+        to: inLibrary({
+          page: destination.path,
+          libraryId: destination.libraryId,
+          file: destination.file,
+        }),
+      }
+    case CARD_DESTINATIONS.player:
+      return watchLink({ media: destination.media })
+    default: {
+      const unknown: never = destination
+      return unknown
+    }
   }
 }

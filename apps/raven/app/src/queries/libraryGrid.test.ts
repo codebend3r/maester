@@ -21,6 +21,7 @@ import {
   libraryApi,
 } from '@/test/libraryServer'
 import { mediaItemFor } from '@/test/mediaItem'
+import { ROUTE_TARGETS } from '@/routes'
 
 const COOKIE = { Cookie: 'raven_unlock=u.1' }
 const NOW = new Date('2026-10-20T00:00:00.000Z')
@@ -58,7 +59,7 @@ describe('librarySectionsOf', () => {
     ])
     expect(all?.cards[1]).toMatchObject({
       key: 'media:31',
-      itemId: 51,
+      target: { kind: ROUTE_TARGETS.item, itemId: 51, libraryId: FILMS.id, fileId: null },
       picture: { uri: `${NAS.origin}/api/items/51/images/poster?v=p51`, headers: COOKIE },
     })
   })
@@ -125,7 +126,7 @@ describe('librarySectionsOf', () => {
       key: 'show:60',
       title: 'Ashfall',
       line: '2020 to 2022',
-      itemId: 60,
+      target: { kind: ROUTE_TARGETS.item, itemId: 60, libraryId: null, fileId: null },
     })
   })
 

@@ -1,10 +1,12 @@
 import {
   type ApiClient,
+  CARD_DESTINATIONS,
   ITEM_IMAGE_KINDS,
   type ItemSummary,
   type MediaItem,
   type MediaSort,
   type ShowEntry,
+  cardDestination,
   cardTitle,
   formatRuntime,
   mediaEntryKey,
@@ -16,13 +18,15 @@ import {
   sortFact,
 } from '@raven/core'
 
+import { ROUTE_TARGETS, type RouteTarget, itemTarget } from '@/routes'
+
 /** How a card is drawn: a poster stood upright, or a wide frame. */
 export const CARD_SHAPES = { poster: 'poster', wide: 'wide' } as const
 
 export type CardShape = (typeof CARD_SHAPES)[keyof typeof CARD_SHAPES]
 
 /** A picture as React Native's `Image` takes it, with the server's cookies where it needs them. */
-type Picture = { uri: string; headers: Record<string, string> }
+export type Picture = { uri: string; headers: Record<string, string> }
 
 /** One card, on a shelf or in a grid, as both layouts draw it. */
 export type ShelfCard = {
@@ -33,13 +37,13 @@ export type ShelfCard = {
   picture: Picture | null
   /** How far in playback stopped, from 0 to 1. */
   progress: number
-  /** The item the card opens; null for a file matched to none. */
-  itemId: number | null
+  /** Where pressing it goes: its item's page, or the player for a file with no page. */
+  target: RouteTarget
 }
 
 /** Where a card's picture comes from and what goes with the request for it. */
 export type Pictures = {
-  api: Pick<ApiClient, 'itemImageUrl' | 'thumbnailUrl'>
+  api: Pick<ApiClient, 'itemImageUrl' | 'thumbnailUrl' | 'photoUrl'>
   headersFor: (uri: string) => Record<string, string>
 }
 
@@ -49,7 +53,10 @@ export type Pictures = {
  */
 type Order = { sort: MediaSort; now: Date } | null
 
-const pictureAt = ({ uri, headersFor }: Pick<Pictures, 'headersFor'> & { uri: string | null }) =>
+export const pictureAt = ({
+  uri,
+  headersFor,
+}: Pick<Pictures, 'headersFor'> & { uri: string | null }) =>
   uri === null ? null : { uri, headers: headersFor(uri) }
 
 export const imageOf = ({
@@ -65,13 +72,40 @@ export const imageOf = ({
   return api.itemImageUrl({ id: item.id, kind, version })
 }
 
-/** A card for one video: what it shows is the caller's, the rest comes from the video. */
+/**
+ * Where a video's card goes, as the web's card links decide: its item's page in the card's
+ * library where `hasPages`, naming the file of a card a movie was split onto, else the player.
+ */
+const videoTarget = ({ media, hasPages }: { media: MediaItem; hasPages: boolean }): RouteTarget => {
+  const destination = cardDestination({ media, hasPages })
+  switch (destination.kind) {
+    case CARD_DESTINATIONS.page:
+      return {
+        kind: ROUTE_TARGETS.item,
+        itemId: destination.item.id,
+        libraryId: destination.libraryId,
+        fileId: destination.file,
+      }
+    case CARD_DESTINATIONS.player:
+      return { kind: ROUTE_TARGETS.play, mediaId: destination.media.id }
+    default: {
+      const unknown: never = destination
+      return unknown
+    }
+  }
+}
+
+/**
+ * A card for one video: what it shows is the caller's, the rest comes from the video. A card
+ * `hasPages` opens its item's page; any other plays the video, as the web's frame cards do.
+ */
 export const videoCard = ({
   media,
   title,
   line,
   shape,
   uri,
+  hasPages,
   headersFor,
 }: Pick<Pictures, 'headersFor'> & {
   media: MediaItem
@@ -79,6 +113,7 @@ export const videoCard = ({
   line: string | null
   shape: CardShape
   uri: string | null
+  hasPages: boolean
 }): ShelfCard => ({
   key: mediaEntryKey(media),
   title,
@@ -86,7 +121,7 @@ export const videoCard = ({
   shape,
   picture: pictureAt({ uri, headersFor }),
   progress: progressOf(media),
-  itemId: media.item?.id ?? null,
+  target: videoTarget({ media, hasPages }),
 })
 
 const sortedLine = ({ media, order }: { media: MediaItem; order: Order }): string | null =>
@@ -110,11 +145,15 @@ export const movieCard = ({
     shape: CARD_SHAPES.poster,
     uri:
       imageOf({ api, item: media.item, kind: ITEM_IMAGE_KINDS.poster }) ?? api.thumbnailUrl(media),
+    hasPages: true,
     headersFor,
   })
 }
 
-/** Any other video as its frame grab and its length, as the web's media card draws it. */
+/**
+ * Any other video as its frame grab and its length, as the web's media card draws it; it plays
+ * at once, as the web's frame cards in a library with no pages do.
+ */
 export const frameCard = ({
   media,
   api,
@@ -127,6 +166,7 @@ export const frameCard = ({
     line: sortedLine({ media, order }) ?? formatRuntime(media.duration),
     shape: CARD_SHAPES.wide,
     uri: api.thumbnailUrl(media),
+    hasPages: false,
     headersFor,
   })
 
@@ -148,5 +188,5 @@ export const showCard = ({
     headersFor,
   }),
   progress: 0,
-  itemId: entry.show.id,
+  target: itemTarget(entry.show.id),
 })

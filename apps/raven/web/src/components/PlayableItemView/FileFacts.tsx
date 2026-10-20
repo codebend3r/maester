@@ -1,27 +1,6 @@
-import {
-  type MediaItem,
-  type MediaTracks,
-  fileFacts,
-  formatBitrate,
-  formatBytes,
-} from '@raven/core'
+import { type MediaItem, type MediaTracks, allFileFacts } from '@raven/core'
 import { useId } from 'react'
 import styles from '@/components/PlayableItemView/FileFacts.module.scss'
-
-/** The file's facts as label and value: its tracks, then its container, bitrate and size. */
-const allFileFacts = ({
-  media,
-  tracks,
-}: {
-  media: MediaItem
-  tracks: MediaTracks | undefined
-}): Array<{ label: string; value: string }> =>
-  [
-    ...fileFacts({ media, tracks }),
-    { label: 'Container', value: media.container.toUpperCase() },
-    { label: 'Bitrate', value: formatBitrate(media.bitrate) ?? '' },
-    { label: 'Size', value: formatBytes(media.size) },
-  ].filter((fact) => fact.value !== '')
 
 /**
  * The file Play starts, as a list of facts on hairline rows: its video,

@@ -38,7 +38,14 @@ const continueCard = ({ entry, api, headersFor }: Pictures & { entry: PosterEntr
     imageOf({ api, item: media.item, kind: ITEM_IMAGE_KINDS.backdrop }) ??
     api.thumbnailUrl(media) ??
     imageOf({ api, item: poster, kind: ITEM_IMAGE_KINDS.backdrop })
-  return videoCard({ media, ...tileWords(media), shape: CARD_SHAPES.wide, uri, headersFor })
+  return videoCard({
+    media,
+    ...tileWords(media),
+    shape: CARD_SHAPES.wide,
+    uri,
+    hasPages: true,
+    headersFor,
+  })
 }
 
 const libraryCards = ({

@@ -2,16 +2,19 @@ import { useQuery } from '@tanstack/react-query'
 import {
   DOWNLOAD_TARGET_KINDS,
   type EpisodeSummary,
-  ITEM_TYPES,
   type ItemDetails,
   ROUTE_STATES,
   episodeCode,
   episodeEntryKey,
-  formatAirDate,
-  plural,
+  episodeRowFacts,
+  episodeStillUrl,
+  episodesOf,
+  episodesWatched,
+  nextEpisodeIn,
   routeState,
-  runtimeFact,
+  seasonFacts,
   watchLink,
+  watchedCountLabel,
   watchedStateOf,
 } from '@raven/core'
 import { useId } from 'react'
@@ -58,17 +61,8 @@ const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
     targets: [{ kind: 'item', id: episode.id, libraryId: null }],
   })
   const file = episode.primary ?? undefined
-  // The still, from TMDB or beside the file; else a frame of the file itself.
-  const picture =
-    episode.stillVersion == null
-      ? file
-        ? api.thumbnailUrl(file)
-        : null
-      : api.itemImageUrl({ id: episode.id, kind: 'still', version: episode.stillVersion })
-  const facts = [
-    formatAirDate(episode.released),
-    runtimeFact({ file, runtime: episode.runtime }),
-  ].filter((fact): fact is string => fact != null)
+  const picture = episodeStillUrl({ api, episode })
+  const facts = episodeRowFacts(episode)
 
   return (
     <li className={styles.episode} data-entry={episodeEntryKey(episode)} {...select.rootProps}>
@@ -128,13 +122,9 @@ const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
 
 const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }) => {
   const ids = { title: useId(), episodes: useId() }
-  const episodes = season.children.flatMap((child) =>
-    child.type === ITEM_TYPES.episode ? [child] : [],
-  )
-  const count = episodes.length
-  const watchedCount = episodes.filter((episode) => episode.watched).length
-  // The first episode on disk not yet watched that has a file to play.
-  const next = episodes.find((episode) => !episode.watched && episode.primary != null)
+  const episodes = episodesOf(season)
+  const { watched: watchedCount, total: count } = episodesWatched(episodes)
+  const next = nextEpisodeIn(episodes)
   const nextFile = next?.primary ?? null
   const nextCode = next ? episodeCode(next) : null
   const hasFiles = episodes.some((episode) => episode.primary != null)
@@ -142,7 +132,7 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
     state: watchedStateOf({ watched: watchedCount, total: count }),
     targets: [{ kind: 'item', id: season.id, libraryId: null }],
   })
-  const watchedWords = `${watchedCount} of ${count} watched`
+  const watchedWords = watchedCountLabel({ watched: watchedCount, total: count })
   const favourite = useItemFavourite({ item: season })
   return (
     <SelectionScope
@@ -161,10 +151,7 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
           title={season.title}
           byline={null}
           contentRating={show.contentRating}
-          facts={[
-            season.year == null ? null : String(season.year),
-            plural({ n: count, one: 'episode', many: 'episodes' }),
-          ].filter((fact): fact is string => fact != null)}
+          facts={seasonFacts(season)}
           ratings={[]}
           progress={count > 0 ? { fraction: watchedCount / count, label: watchedWords } : undefined}
           picture={{

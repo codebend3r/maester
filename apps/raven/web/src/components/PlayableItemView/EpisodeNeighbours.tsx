@@ -1,22 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   type EpisodeSummary,
-  ITEM_TYPES,
   type ItemDetails,
   episodeCode,
+  episodeStillUrl,
+  episodesOf,
   inLibrary,
+  seasonsOf,
 } from '@raven/core'
 import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { itemQuery } from '@/lib/queries'
 import styles from '@/components/PlayableItemView/EpisodeNeighbours.module.scss'
-
-/** The still an episode's row shows: TMDB's or the one beside the file, else a frame of the file. */
-const stillOf = (episode: EpisodeSummary): string | null => {
-  if (episode.stillVersion != null)
-    return api.itemImageUrl({ id: episode.id, kind: 'still', version: episode.stillVersion })
-  return episode.primary ? api.thumbnailUrl(episode.primary) : null
-}
 
 /**
  * The episodes either side of `episode` in its season on disk, read from
@@ -27,13 +22,11 @@ const useNeighbours = (
   episode: ItemDetails,
 ): Array<{ direction: 'Previous' | 'Next'; episode: EpisodeSummary }> => {
   const show = useQuery(itemQuery(episode.show?.id ?? null))
-  const season = show.data?.children.find(
-    (child) => child.type === ITEM_TYPES.season && child.season === episode.season,
+  const season = (show.data ? seasonsOf(show.data) : []).find(
+    (child) => child.season === episode.season,
   )
   const seasonQuery = useQuery(itemQuery(season?.id ?? null))
-  const episodes = (seasonQuery.data?.children ?? []).flatMap((child) =>
-    child.type === ITEM_TYPES.episode ? [child] : [],
-  )
+  const episodes = seasonQuery.data ? episodesOf(seasonQuery.data) : []
   const at = episodes.findIndex((each) => each.id === episode.id)
   if (at < 0) return []
   const before = episodes[at - 1]
@@ -66,7 +59,7 @@ export const EpisodeNeighbours = ({
     >
       <ul className={styles.list}>
         {neighbours.map(({ direction, episode: neighbour }) => {
-          const still = stillOf(neighbour)
+          const still = episodeStillUrl({ api, episode: neighbour })
           return (
             <li key={neighbour.id}>
               <Link

@@ -30,7 +30,7 @@ import { type Listing, librarySectionsOf } from '@/queries/libraryGrid'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useServerCookies } from '@/queries/useServerCookies'
 import { Grid, Picker, ToolButton } from '@/layouts'
-import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
+import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
 import { useLibraryView } from '@/screens/useLibraryView'
 import type { LibraryChoice } from '@/stores/libraryViews'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
@@ -177,10 +177,7 @@ const LibraryGrid = ({
           source: settings.ratingsSource,
         })
 
-  const open = ({ itemId }: ShelfCard) => {
-    if (itemId === null) return
-    router.push({ pathname: APP_ROUTES.item, params: { id: String(itemId) } })
-  }
+  const open = ({ target }: ShelfCard) => router.push(hrefOf(target))
 
   return (
     <Grid

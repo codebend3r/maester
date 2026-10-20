@@ -1,0 +1,465 @@
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+
+import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
+import type { EpisodeRow, ItemHero, ItemPage, PersonCard, VersionRow } from '@/queries/itemPage'
+import type { RouteTarget } from '@/routes'
+import { CardPicture } from '@/layouts/Card'
+import { TouchBack } from '@/layouts/TouchBack'
+import { TouchCard } from '@/layouts/TouchCard'
+import { toneStyles } from '@/layouts/formStyles'
+import { BUTTON_TONES } from '@/layouts/formKit'
+import {
+  ITEM_ACTIONS,
+  ITEM_HEADINGS,
+  ON_MARK,
+  WATCHED_MARK,
+  type ItemAction,
+  type ItemKit,
+  type ItemLayoutProps,
+  type ItemNoticeProps,
+  dotted,
+  playLabelOf,
+} from '@/layouts/itemKit'
+import { LINE_RATIO } from '@/layouts/textHeights'
+import { COLOURS, SIZES } from '@/theme/appTheme'
+
+/** The web's 48rem: from there on the screen is a tablet's, and the pictures grow. */
+const TABLET_WIDTH = 48 * 16
+
+/** How wide the heading's picture stands: a poster, or an episode's wider still. */
+const HERO_WIDTHS = {
+  phone: { [CARD_SHAPES.poster]: 112, [CARD_SHAPES.wide]: 176 },
+  tablet: { [CARD_SHAPES.poster]: 168, [CARD_SHAPES.wide]: 288 },
+} as const
+
+const SEASON_WIDTHS = { phone: 128, tablet: 168 } as const
+
+const STILL_WIDTH = 128
+
+const PHOTO_SIZE = 72
+
+/** A person's column: their photo, with room either side for a name under it. */
+const PERSON_WIDTH = 96
+
+/**
+ * The backdrop is 16:9, and never more than a third of the screen's height, so a phone held
+ * sideways or a tablet still opens on the title.
+ */
+const BACKDROP_RATIO = 9 / 16
+const BACKDROP_SHARE = 1 / 3
+
+const useGutters = () => {
+  const insets = useSafeAreaInsets()
+  return { left: SIZES.space3 + insets.left, right: SIZES.space3 + insets.right }
+}
+
+const Heading = ({ title }: { title: string }) => (
+  <Text accessibilityRole="header" style={styles.heading}>
+    {title}
+  </Text>
+)
+
+/** Play, filled as the one action the page is for, or a mark, ticked while it is on. */
+const ActionButton = ({ action }: { action: ItemAction }) => {
+  switch (action.kind) {
+    case ITEM_ACTIONS.play:
+      return (
+        <Pressable
+          accessibilityLabel={action.label}
+          accessibilityRole="button"
+          onPress={action.onPress}
+          style={({ pressed }) => [
+            styles.action,
+            toneStyles[BUTTON_TONES.primary].button,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={[styles.actionLabel, toneStyles[BUTTON_TONES.primary].label]}>
+            {action.label}
+          </Text>
+        </Pressable>
+      )
+    case ITEM_ACTIONS.toggle:
+      return (
+        <Pressable
+          accessibilityLabel={action.label}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: action.isOn }}
+          onPress={action.onPress}
+          style={({ pressed }) => [
+            styles.action,
+            toneStyles[BUTTON_TONES.quiet].button,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={[styles.actionLabel, toneStyles[BUTTON_TONES.quiet].label]}>
+            {action.isOn === true ? `${ON_MARK}${action.label}` : action.label}
+          </Text>
+        </Pressable>
+      )
+    default: {
+      const unknown: never = action
+      return unknown
+    }
+  }
+}
+
+/** Where playback stopped, or how much is watched, as a line with its words. */
+const ProgressLine = ({ progress }: { progress: NonNullable<ItemHero['progress']> }) => (
+  <View style={styles.progress}>
+    <View style={styles.track}>
+      <View style={[styles.fill, { width: `${progress.fraction * 100}%` }]} />
+    </View>
+    <Text style={styles.small}>{progress.label}</Text>
+  </View>
+)
+
+const Hero = ({ hero, actions }: { hero: ItemHero; actions: ItemAction[] | null }) => {
+  const { width, height } = useWindowDimensions()
+  const widths = width >= TABLET_WIDTH ? HERO_WIDTHS.tablet : HERO_WIDTHS.phone
+  // Held sideways the screen is short, so the title sits by the poster's top, not its foot.
+  const isWide = width > height
+  const facts = dotted([...hero.facts, ...(hero.rating === null ? [] : [hero.rating])])
+  return (
+    <View style={styles.hero}>
+      <View style={[styles.headRow, isWide && styles.headRowWide]}>
+        <CardPicture
+          card={{
+            title: hero.title,
+            shape: hero.poster.shape,
+            picture: hero.poster.picture,
+            progress: 0,
+          }}
+          width={widths[hero.poster.shape]}
+        />
+        <View style={styles.words}>
+          {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
+          <Text accessibilityRole="header" style={styles.title}>
+            {hero.title}
+          </Text>
+          {hero.byline !== null && <Text style={styles.byline}>{hero.byline}</Text>}
+          {facts !== '' && <Text style={styles.small}>{facts}</Text>}
+          {hero.progress !== null && <ProgressLine progress={hero.progress} />}
+        </View>
+      </View>
+      {actions !== null && (
+        <View style={styles.actions}>
+          {actions.map((action) => (
+            <ActionButton key={action.key} action={action} />
+          ))}
+        </View>
+      )}
+      {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
+      {hero.summary !== null && <Text style={styles.summary}>{hero.summary}</Text>}
+    </View>
+  )
+}
+
+const FileFacts = ({ facts }: { facts: ItemPage['file'] }) => (
+  <View style={styles.facts}>
+    <Heading title={ITEM_HEADINGS.file} />
+    {facts.map((fact) => (
+      <View key={fact.label} style={styles.fact}>
+        <Text style={styles.factLabel}>{fact.label}</Text>
+        <Text style={styles.factValue}>{fact.value}</Text>
+      </View>
+    ))}
+  </View>
+)
+
+const Versions = ({ versions, onOpen }: { versions: VersionRow[]; onOpen: Opens }) => (
+  <View style={styles.section}>
+    <Heading title={ITEM_HEADINGS.versions} />
+    {versions.map((version) => (
+      <Pressable
+        key={version.key}
+        accessibilityLabel={playLabelOf(version.fileName)}
+        accessibilityRole="button"
+        onPress={() => onOpen(version.target)}
+        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      >
+        <View style={styles.words}>
+          <Text style={styles.rowTitle}>{dotted(version.facts)}</Text>
+          <Text numberOfLines={1} style={styles.small}>
+            {version.fileName}
+          </Text>
+        </View>
+        <Text style={styles.play}>{'▶'}</Text>
+      </Pressable>
+    ))}
+  </View>
+)
+
+type Opens = (target: RouteTarget) => void
+
+const Seasons = ({ seasons, onOpen }: { seasons: ShelfCard[]; onOpen: Opens }) => {
+  const { width } = useWindowDimensions()
+  const gutters = useGutters()
+  return (
+    <View style={styles.section}>
+      <View style={{ paddingLeft: gutters.left, paddingRight: gutters.right }}>
+        <Heading title={ITEM_HEADINGS.seasons} />
+      </View>
+      <ScrollView
+        contentContainerStyle={[
+          styles.cards,
+          { paddingLeft: gutters.left, paddingRight: gutters.right },
+        ]}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {seasons.map((season) => (
+          <TouchCard
+            key={season.key}
+            card={season}
+            onPress={() => onOpen(season.target)}
+            width={width >= TABLET_WIDTH ? SEASON_WIDTHS.tablet : SEASON_WIDTHS.phone}
+          />
+        ))}
+      </ScrollView>
+    </View>
+  )
+}
+
+const Episodes = ({ episodes, onOpen }: { episodes: EpisodeRow[]; onOpen: Opens }) => (
+  <View style={styles.section}>
+    <Heading title={ITEM_HEADINGS.episodes} />
+    {episodes.map((episode) => (
+      <Pressable
+        key={episode.key}
+        accessibilityLabel={episode.title}
+        accessibilityRole="button"
+        onPress={() => onOpen(episode.target)}
+        style={({ pressed }) => [styles.episode, pressed && styles.pressed]}
+      >
+        <CardPicture card={episode} width={STILL_WIDTH} />
+        <View style={styles.words}>
+          <Text style={styles.rowTitle}>{episode.title}</Text>
+          {episode.line !== null && <Text style={styles.small}>{episode.line}</Text>}
+          {episode.summary !== null && (
+            <Text numberOfLines={3} style={styles.small}>
+              {episode.summary}
+            </Text>
+          )}
+          {episode.isWatched && <Text style={styles.small}>{WATCHED_MARK}</Text>}
+        </View>
+      </Pressable>
+    ))}
+  </View>
+)
+
+const Person = ({ person }: { person: PersonCard }) => (
+  <View style={styles.person}>
+    <View style={styles.photo}>
+      {person.picture !== null ? (
+        <Image resizeMode="cover" source={person.picture} style={StyleSheet.absoluteFill} />
+      ) : (
+        <Text style={styles.initials}>{person.initials}</Text>
+      )}
+    </View>
+    <Text numberOfLines={2} style={styles.personName}>
+      {person.name}
+    </Text>
+    <Text numberOfLines={2} style={styles.personRole}>
+      {person.role}
+    </Text>
+  </View>
+)
+
+const Cast = ({ title, cast }: { title: string; cast: PersonCard[] }) => {
+  const gutters = useGutters()
+  return (
+    <View style={styles.section}>
+      <View style={{ paddingLeft: gutters.left, paddingRight: gutters.right }}>
+        <Heading title={title} />
+      </View>
+      <ScrollView
+        contentContainerStyle={[
+          styles.cards,
+          { paddingLeft: gutters.left, paddingRight: gutters.right },
+        ]}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {cast.map((person) => (
+          <Person key={person.key} person={person} />
+        ))}
+      </ScrollView>
+    </View>
+  )
+}
+
+/** The backdrop across the top, under the way back; without one, room for the way back. */
+const Top = ({ backdrop, onBack }: Pick<ItemPage['hero'], 'backdrop'> & { onBack: () => void }) => {
+  const screen = useWindowDimensions()
+  const insets = useSafeAreaInsets()
+  const gutters = useGutters()
+  const height = Math.min(screen.width * BACKDROP_RATIO, screen.height * BACKDROP_SHARE)
+  const room = { paddingTop: insets.top + SIZES.space1, paddingLeft: gutters.left }
+  if (backdrop === null) {
+    return (
+      <View style={room}>
+        <TouchBack onPress={onBack} />
+      </View>
+    )
+  }
+  return (
+    <View style={{ height }}>
+      <Image resizeMode="cover" source={backdrop} style={StyleSheet.absoluteFill} />
+      <View style={[styles.top, room]}>
+        <TouchBack isRaised onPress={onBack} />
+      </View>
+    </View>
+  )
+}
+
+/**
+ * An item on a phone or tablet: the backdrop, then the poster beside the names and facts, the
+ * actions, the summary and the file, then a movie's versions, a show's seasons or a season's
+ * episodes, and the cast. It scrolls as one page, clear of the side insets held sideways.
+ */
+const ItemLayout = ({ page, actions, onOpen, onBack }: ItemLayoutProps) => {
+  const insets = useSafeAreaInsets()
+  const gutters = useGutters()
+  const padded = { paddingLeft: gutters.left, paddingRight: gutters.right }
+  return (
+    <ScrollView
+      contentContainerStyle={[styles.page, { paddingBottom: insets.bottom + SIZES.space5 }]}
+      style={styles.ground}
+    >
+      <Top backdrop={page.hero.backdrop} onBack={onBack} />
+      <View style={padded}>
+        <Hero actions={actions} hero={page.hero} />
+      </View>
+      {page.file.length > 0 && (
+        <View style={padded}>
+          <FileFacts facts={page.file} />
+        </View>
+      )}
+      {page.versions.length > 0 && (
+        <View style={padded}>
+          <Versions onOpen={onOpen} versions={page.versions} />
+        </View>
+      )}
+      {page.seasons.length > 0 && <Seasons onOpen={onOpen} seasons={page.seasons} />}
+      {page.episodes.length > 0 && (
+        <View style={padded}>
+          <Episodes episodes={page.episodes} onOpen={onOpen} />
+        </View>
+      )}
+      {page.cast.length > 0 && <Cast cast={page.cast} title={page.castTitle} />}
+    </ScrollView>
+  )
+}
+
+const ItemNotice = ({ notice, onBack }: ItemNoticeProps) => {
+  const insets = useSafeAreaInsets()
+  const gutters = useGutters()
+  return (
+    <View
+      style={[
+        styles.ground,
+        styles.notice,
+        { paddingTop: insets.top, paddingLeft: gutters.left, paddingRight: gutters.right },
+      ]}
+    >
+      <TouchBack onPress={onBack} />
+      <Text style={styles.summary}>{notice}</Text>
+    </View>
+  )
+}
+
+/** An item's page on a phone or tablet. */
+export const touchItem: ItemKit = { ItemLayout, ItemNotice }
+
+const styles = StyleSheet.create({
+  ground: { flex: 1, backgroundColor: COLOURS.ground },
+  page: { gap: SIZES.space4 },
+  notice: { gap: SIZES.space3 },
+  top: { position: 'absolute', top: 0, left: 0 },
+  hero: { gap: SIZES.space3 },
+  headRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SIZES.space3 },
+  headRowWide: { alignItems: 'flex-start' },
+  heading: { color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
+  words: { flex: 1, gap: SIZES.space0 },
+  eyebrow: { color: COLOURS.muted, fontSize: SIZES.textSm, fontWeight: '600' },
+  title: {
+    color: COLOURS.text,
+    fontSize: SIZES.textXl,
+    lineHeight: SIZES.textXl * LINE_RATIO,
+    fontWeight: 'bold',
+  },
+  byline: { color: COLOURS.text, fontSize: SIZES.textSm },
+  small: { color: COLOURS.muted, fontSize: SIZES.textSm, lineHeight: SIZES.textSm * LINE_RATIO },
+  progress: { gap: SIZES.space0, paddingTop: SIZES.space0, maxWidth: SIZES.measure },
+  track: { height: SIZES.space0, borderRadius: SIZES.space0, backgroundColor: COLOURS.track },
+  fill: { height: '100%', borderRadius: SIZES.space0, backgroundColor: COLOURS.accent },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space1 },
+  action: {
+    minHeight: SIZES.fieldHeight,
+    justifyContent: 'center',
+    paddingHorizontal: SIZES.space3,
+    borderRadius: SIZES.radius,
+    borderWidth: SIZES.focusRing,
+  },
+  actionLabel: { fontSize: SIZES.text, fontWeight: 'bold' },
+  pressed: { opacity: 0.6 },
+  tagline: { color: COLOURS.text, fontSize: SIZES.text, fontStyle: 'italic' },
+  summary: {
+    color: COLOURS.text,
+    fontSize: SIZES.text,
+    lineHeight: SIZES.text * LINE_RATIO,
+    maxWidth: SIZES.measure,
+  },
+  section: { gap: SIZES.space2 },
+  facts: { gap: SIZES.space2, maxWidth: SIZES.measure },
+  fact: {
+    flexDirection: 'row',
+    gap: SIZES.space3,
+    paddingVertical: SIZES.space1,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLOURS.line,
+  },
+  factLabel: { width: '30%', color: COLOURS.muted, fontSize: SIZES.textSm },
+  factValue: { flex: 1, color: COLOURS.text, fontSize: SIZES.textSm },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.space2,
+    minHeight: SIZES.fieldHeight,
+    paddingVertical: SIZES.space1,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLOURS.line,
+  },
+  rowTitle: { color: COLOURS.text, fontSize: SIZES.text, fontWeight: '600' },
+  play: { color: COLOURS.text, fontSize: SIZES.textLg, paddingHorizontal: SIZES.space1 },
+  cards: { gap: SIZES.space3 },
+  episode: { flexDirection: 'row', alignItems: 'flex-start', gap: SIZES.space2 },
+  person: { width: PERSON_WIDTH, alignItems: 'center', gap: SIZES.space0 },
+  photo: {
+    width: PHOTO_SIZE,
+    height: PHOTO_SIZE,
+    borderRadius: PHOTO_SIZE / 2,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLOURS.raised,
+  },
+  initials: { color: COLOURS.muted, fontSize: SIZES.textLg, fontWeight: 'bold' },
+  personName: {
+    color: COLOURS.text,
+    fontSize: SIZES.textXs,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  personRole: { color: COLOURS.muted, fontSize: SIZES.textXs, textAlign: 'center' },
+})

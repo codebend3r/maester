@@ -64,6 +64,7 @@ export const AppRoot = () => {
           <Stack.Screen name={APP_SCREENS.home} />
           <Stack.Screen name={APP_SCREENS.item} />
           <Stack.Screen name={APP_SCREENS.library} />
+          <Stack.Screen name={APP_SCREENS.play} />
           <Stack.Screen name={APP_SCREENS.unlock} />
         </Stack.Protected>
       </Stack>

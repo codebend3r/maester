@@ -117,10 +117,13 @@ describe('Library on a phone or tablet', () => {
     expect(screen.getByRole('button', { name: `View: ${LIBRARY_VIEW_LABELS.grid}` })).toBeTruthy()
   })
 
-  it('opens a card on its item', async () => {
+  it("opens a card on its item's page, as this library shows it", async () => {
     await renderLibrary({ id: FILMS.id })
     await fireEvent.press(await screen.findByRole('button', { name: 'Busboys' }))
-    expect(mockPush).toHaveBeenCalledWith({ pathname: APP_ROUTES.item, params: { id: '51' } })
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: APP_ROUTES.item,
+      params: { id: '51', library: String(FILMS.id) },
+    })
   })
 
   it('refetches with a sort the type allows, chosen from the sheet, and keeps it on this device', async () => {

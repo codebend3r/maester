@@ -1,13 +1,25 @@
 import { describe, expect, it } from 'bun:test'
+import { createApiClient } from '@/apiClient'
+import { ITEM_TYPES, THUMBNAIL_STATES } from '@/contract'
 import {
+  allFileFacts,
   episodeByline,
   episodeFacts,
+  episodeRowFacts,
+  episodeStillUrl,
+  episodesOf,
+  episodesWatched,
   formatAirDate,
   movieFacts,
+  nextEpisodeIn,
   runtimeFact,
+  seasonFacts,
+  seasonsOf,
+  seasonsWatched,
   versionFacts,
+  watchedCountLabel,
 } from '@/itemFacts'
-import { itemDetails, mediaItem } from '@/test/fixtures'
+import { episodeSummary, itemDetails, mediaItem, seasonSummary } from '@/test/fixtures'
 
 describe('runtimeFact', () => {
   it("prefers the file's own length to TMDB's runtime", () => {
@@ -71,5 +83,116 @@ describe('versionFacts', () => {
     expect(
       versionFacts(mediaItem({ width: null, height: null, videoCodec: null, size: 1_500_000_000 })),
     ).toEqual(['1.5 GB'])
+  })
+})
+
+describe('allFileFacts', () => {
+  it("lists the file's tracks, then its container, bitrate and size", () => {
+    expect(allFileFacts({ media: mediaItem({ size: 2_500_000_000 }), tracks: undefined })).toEqual([
+      { label: 'Video', value: '1080p (H.264)' },
+      { label: 'Audio', value: 'AAC Stereo' },
+      { label: 'Container', value: 'MP4' },
+      { label: 'Bitrate', value: '5.0 Mb/s' },
+      { label: 'Size', value: '2.5 GB' },
+    ])
+  })
+
+  it('leaves out a bitrate the file has not been probed for', () => {
+    const labels = allFileFacts({ media: mediaItem({ bitrate: null }), tracks: undefined }).map(
+      (fact) => fact.label,
+    )
+    expect(labels).not.toContain('Bitrate')
+  })
+})
+
+describe('seasons and episodes', () => {
+  const show = itemDetails({
+    type: ITEM_TYPES.show,
+    children: [seasonSummary({ id: 5 }), seasonSummary({ id: 7, season: 2, title: 'Season 2' })],
+  })
+  const season = itemDetails({
+    type: ITEM_TYPES.season,
+    year: 2022,
+    children: [
+      episodeSummary({ id: 6, episode: 1, watched: true }),
+      episodeSummary({ id: 8, episode: 2, primary: null }),
+      episodeSummary({ id: 9, episode: 3 }),
+    ],
+  })
+
+  it("reads a show's seasons and a season's episodes off their children", () => {
+    expect(seasonsOf(show).map((child) => child.id)).toEqual([5, 7])
+    expect(episodesOf(show)).toEqual([])
+    expect(episodesOf(season).map((child) => child.id)).toEqual([6, 8, 9])
+  })
+
+  it('plays next the first episode not watched that has a file', () => {
+    expect(nextEpisodeIn(episodesOf(season))?.id).toBe(9)
+    expect(nextEpisodeIn([episodeSummary({ watched: true })])).toBeUndefined()
+  })
+
+  it("gives a season's year and how many of its episodes are on disk", () => {
+    expect(seasonFacts(season)).toEqual(['2022', '3 episodes'])
+    expect(seasonFacts(itemDetails({ type: ITEM_TYPES.season, year: null, children: [] }))).toEqual(
+      ['0 episodes'],
+    )
+  })
+
+  it('says how many are watched, and adds up a show across its seasons', () => {
+    expect(watchedCountLabel({ watched: 1, total: 3 })).toBe('1 of 3 watched')
+    expect(episodesWatched(episodesOf(season))).toEqual({ watched: 1, total: 3 })
+    expect(
+      seasonsWatched([
+        seasonSummary({ episodeCount: 9, watchedCount: 9 }),
+        seasonSummary({ episodeCount: 8, watchedCount: 2 }),
+      ]),
+    ).toEqual({ watched: 11, total: 17 })
+  })
+
+  it("gives an episode row's air date and length, the file's own over TMDB's", () => {
+    expect(
+      episodeRowFacts(
+        episodeSummary({
+          released: '2022-02-18',
+          runtime: 54,
+          primary: mediaItem({ duration: 3300 }),
+        }),
+      ),
+    ).toEqual([formatAirDate('2022-02-18')!, '55m'])
+    expect(episodeRowFacts(episodeSummary({ released: null, runtime: 54, primary: null }))).toEqual(
+      ['54m'],
+    )
+  })
+})
+
+describe('episodeStillUrl', () => {
+  const api = createApiClient({
+    fetch: async () => {
+      throw new Error('no request is made for a picture address')
+    },
+  })
+
+  it("uses the episode's still, else a frame of its file, else nothing", () => {
+    expect(episodeStillUrl({ api, episode: episodeSummary({ id: 6, stillVersion: 's1' }) })).toBe(
+      '/api/items/6/images/still?v=s1',
+    )
+    expect(
+      episodeStillUrl({
+        api,
+        episode: episodeSummary({ stillVersion: null, primary: mediaItem({ id: 12 }) }),
+      }),
+    ).toBe('/api/media/12/thumbnail?v=1')
+    expect(
+      episodeStillUrl({
+        api,
+        episode: episodeSummary({
+          stillVersion: null,
+          primary: mediaItem({ thumbnail: THUMBNAIL_STATES.pending }),
+        }),
+      }),
+    ).toBeNull()
+    expect(
+      episodeStillUrl({ api, episode: episodeSummary({ stillVersion: null, primary: null }) }),
+    ).toBeNull()
   })
 })

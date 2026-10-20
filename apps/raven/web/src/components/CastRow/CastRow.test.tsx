@@ -1,21 +1,9 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { CastRow, castMembers } from '@/components/CastRow/CastRow'
+import { CastRow } from '@/components/CastRow/CastRow'
 import { itemDetails } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
-
-describe('castMembers', () => {
-  it('lists someone who acts and directs once, with both roles', () => {
-    expect(castMembers(itemDetails().credits).map((member) => [member.name, member.roles])).toEqual(
-      [
-        ['Mark Kimball', ['Rudy', 'Director']],
-        ['Ana Ortiz', ['Lena']],
-        ['Jo Park', ['Screenplay']],
-      ],
-    )
-  })
-})
 
 describe('CastRow', () => {
   it('shows photos where TMDB has them and initials where it does not', () => {

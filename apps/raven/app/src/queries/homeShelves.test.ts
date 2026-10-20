@@ -5,6 +5,7 @@ import { CARD_SHAPES } from '@/queries/cards'
 import { CONTINUE_WATCHING, homeShelvesOf } from '@/queries/homeShelves'
 import { FILMS, HOME, NAS, SERIES, homeApi } from '@/test/homeServer'
 import { mediaItemFor } from '@/test/mediaItem'
+import { ROUTE_TARGETS } from '@/routes'
 
 const COOKIE = { Cookie: 'raven_unlock=u.1' }
 const headersFor = () => COOKIE
@@ -49,7 +50,7 @@ describe('homeShelvesOf', () => {
       shape: CARD_SHAPES.wide,
       picture: { uri: `${NAS.origin}/api/pictures/items/40/backdrop/b40`, headers: COOKIE },
       progress: 0.25,
-      itemId: 40,
+      target: { kind: ROUTE_TARGETS.item, itemId: 40, libraryId: FILMS.id, fileId: null },
     })
   })
 
@@ -67,7 +68,7 @@ describe('homeShelvesOf', () => {
       shape: CARD_SHAPES.poster,
       picture: { uri: `${NAS.origin}/api/pictures/items/41/poster/p41`, headers: COOKIE },
       progress: 0,
-      itemId: 41,
+      target: { kind: ROUTE_TARGETS.item, itemId: 41, libraryId: FILMS.id, fileId: null },
     })
     expect(series?.cards[0] ?? null).toEqual({
       key: 'show:4',
@@ -76,7 +77,7 @@ describe('homeShelvesOf', () => {
       shape: CARD_SHAPES.poster,
       picture: { uri: `${NAS.origin}/api/pictures/items/4/poster/p4`, headers: COOKIE },
       progress: 0,
-      itemId: 4,
+      target: { kind: ROUTE_TARGETS.item, itemId: 4, libraryId: null, fileId: null },
     })
   })
 
@@ -106,20 +107,25 @@ describe('homeShelvesOf', () => {
       headersFor,
     })
     expect(
-      (shelf?.cards ?? []).map(({ shape, picture, line, itemId }) => ({
+      (shelf?.cards ?? []).map(({ shape, picture, line, target }) => ({
         shape,
         picture,
         line,
-        itemId,
+        target,
       })),
     ).toEqual([
       {
         shape: CARD_SHAPES.wide,
         picture: { uri: `${NAS.origin}/api/media/30/thumbnail?v=3`, headers: COOKIE },
         line: '2m',
-        itemId: null,
+        target: { kind: ROUTE_TARGETS.play, mediaId: 30 },
       },
-      { shape: CARD_SHAPES.wide, picture: null, line: null, itemId: null },
+      {
+        shape: CARD_SHAPES.wide,
+        picture: null,
+        line: null,
+        target: { kind: ROUTE_TARGETS.play, mediaId: 31 },
+      },
     ])
   })
 
@@ -152,7 +158,7 @@ describe('homeShelvesOf', () => {
       title: 'Severance',
       line: 'S01E02 · Half Loop',
       picture: { uri: `${NAS.origin}/api/media/50/thumbnail?v=2` },
-      itemId: 60,
+      target: { kind: ROUTE_TARGETS.item, itemId: 60, libraryId: 1, fileId: null },
     })
   })
 

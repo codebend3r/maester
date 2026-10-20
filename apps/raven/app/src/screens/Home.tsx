@@ -6,7 +6,7 @@ import { homeShelvesOf } from '@/queries/homeShelves'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useServerCookies } from '@/queries/useServerCookies'
 import { Shelf, Shelves } from '@/layouts'
-import { APP_ROUTES } from '@/routes'
+import { APP_ROUTES, hrefOf } from '@/routes'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
 
 const COPY = {
@@ -41,10 +41,7 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
   // Focus starts on a card, so on the first shelf that has one.
   const focusShelf = shelves.findIndex(({ cards }) => cards.length > 0)
 
-  const open = ({ itemId }: ShelfCard) => {
-    if (itemId === null) return
-    router.push({ pathname: APP_ROUTES.item, params: { id: String(itemId) } })
-  }
+  const open = ({ target }: ShelfCard) => router.push(hrefOf(target))
 
   const openLibrary = (libraryId: number) =>
     router.push({ pathname: APP_ROUTES.library, params: { id: String(libraryId) } })

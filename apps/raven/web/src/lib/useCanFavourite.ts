@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { canFavouriteIn } from '@raven/core'
 import { librariesQuery } from '@/lib/queries'
 
 /**
@@ -9,6 +10,5 @@ import { librariesQuery } from '@/lib/queries'
 export const useCanFavourite = (libraryId: number): boolean =>
   useQuery({
     ...librariesQuery,
-    select: (libraries) =>
-      !libraries.some((library) => library.id === libraryId && library.settings.locked),
+    select: (libraries) => canFavouriteIn({ libraries, libraryId }),
   }).data ?? true

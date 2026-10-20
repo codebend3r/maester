@@ -2,6 +2,8 @@ import { Platform } from 'react-native'
 
 import { focusForm } from '@/layouts/Form.focus'
 import { focusGrid } from '@/layouts/Grid.focus'
+import { focusItem } from '@/layouts/ItemLayout.focus'
+import { touchItem } from '@/layouts/ItemLayout.touch'
 import { touchGrid } from '@/layouts/Grid.touch'
 import { focusPicker } from '@/layouts/Picker.focus'
 import { touchPicker } from '@/layouts/Picker.touch'
@@ -26,3 +28,9 @@ export const { Grid } = Platform.isTV ? focusGrid : touchGrid
  * and iPads.
  */
 export const { Picker, ToolButton } = Platform.isTV ? focusPicker : touchPicker
+
+/**
+ * An item's page: a heading over the backdrop the remote opens on, with rows to move along,
+ * on a TV; one page scrolled under the thumb everywhere else.
+ */
+export const { ItemLayout, ItemNotice } = Platform.isTV ? focusItem : touchItem

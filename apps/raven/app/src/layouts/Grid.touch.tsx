@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
+import { TouchBack } from '@/layouts/TouchBack'
 import { TouchCard, touchCaptionHeightOf } from '@/layouts/TouchCard'
 import { fitJumpMarks } from '@/layouts/jumpMarks'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
@@ -42,9 +43,6 @@ const HEADER_HEIGHT = SIZES.fieldHeight + SIZES.space2
 
 /** How wide the jump strip stands at the right edge, and so the room the cards leave it. */
 const STRIP_WIDTH = SIZES.space5
-
-/** The way back, and what it is called aloud without its arrow. */
-const BACK = { text: '\u2039 Back', label: 'Back' } as const
 
 /** A card of the list or tiles view: a row of words, with its picture in the tiles view. */
 const RowCard = ({
@@ -242,15 +240,7 @@ const Grid = ({
             onLayout={({ nativeEvent }) => setTop(nativeEvent.layout.height)}
             style={styles.header}
           >
-            <Pressable
-              accessibilityLabel={BACK.label}
-              accessibilityRole="button"
-              hitSlop={SIZES.space2}
-              onPress={onBack}
-              style={({ pressed }) => [styles.back, pressed && styles.pressed]}
-            >
-              <Text style={styles.backLabel}>{BACK.text}</Text>
-            </Pressable>
+            <TouchBack onPress={onBack} />
             <Text accessibilityRole="header" style={styles.title}>
               {title}
             </Text>
@@ -289,8 +279,6 @@ export const touchGrid: GridKit = { Grid }
 const styles = StyleSheet.create({
   ground: { flex: 1, backgroundColor: COLOURS.ground },
   header: { gap: SIZES.space2, paddingBottom: SIZES.space4 },
-  back: { alignSelf: 'flex-start', minHeight: SIZES.fieldHeight, justifyContent: 'center' },
-  backLabel: { color: COLOURS.muted, fontSize: SIZES.text },
   title: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
   line: { color: COLOURS.muted, fontSize: SIZES.textSm },
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space1 },

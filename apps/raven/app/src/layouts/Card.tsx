@@ -21,7 +21,7 @@ export const CardPicture = ({
   width,
   ring = 0,
 }: {
-  card: ShelfCard
+  card: Pick<ShelfCard, 'title' | 'shape' | 'picture' | 'progress'>
   width: number
   ring?: number
 }) => {
