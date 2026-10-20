@@ -10,23 +10,27 @@ import {
 
 import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 
-/** What a platform's player takes as it is, in the names a `MediaItem` carries (ffprobe's). */
+/**
+ * What a platform's player takes as it is, in the names a `MediaItem` carries (ffprobe's).
+ * Each video codec lists the bit depths it decodes, as `videoCodecString` tells them apart.
+ */
 type PlayTable = {
   containers: readonly string[]
-  videoCodecs: readonly string[]
+  videoCodecs: Readonly<Record<string, readonly number[]>>
   audioCodecs: readonly string[]
 }
 
 /**
- * AVPlayer on iPhone, iPad and Apple TV: MP4 and MOV holding H.264 or HEVC at any bit
- * depth, with the audio the HLS route copies, which is the audio AVPlayer decodes. HEVC in
- * MP4 is a maybe, since AVPlayer refuses it under the `hev1` tag and the index does not keep
- * the tag: it counts as a yes, as a browser's "maybe" does, and a refusal steps down to the
- * remux, which re-tags it `hvc1`.
+ * AVPlayer on iPhone, iPad and Apple TV: MP4 and MOV holding 8-bit H.264 or HEVC at any
+ * depth, with the audio the HLS route copies, which is the audio AVPlayer decodes. It has no
+ * High 10 decoder, and a remux copies the same video, so `canStream` refuses 10-bit H.264 as
+ * well and the plan goes straight to the transcode. HEVC in MP4 is a maybe, since AVPlayer
+ * refuses it under the `hev1` tag and the index does not keep the tag: it counts as a yes, as
+ * a browser's "maybe" does, and a refusal steps down to the remux, which re-tags it `hvc1`.
  */
 const APPLE = {
   containers: ['mp4', 'mov'],
-  videoCodecs: ['h264', 'hevc'],
+  videoCodecs: { h264: [8], hevc: [8, 10] },
   audioCodecs: HLS_COPY_AUDIO,
 } as const satisfies PlayTable
 
@@ -36,9 +40,6 @@ const PLAY_TABLES: Record<AppPlatform, PlayTable> = {
   [APP_PLATFORMS.tvos]: APPLE,
   [APP_PLATFORMS.androidTv]: APPLE,
 }
-
-/** `videoCodecString` writes one string for 8-bit video and another for anything deeper. */
-const BIT_DEPTHS = [8, 10] as const
 
 const CODECS_PARAM = /codecs="([^"]*)"/
 
@@ -62,8 +63,8 @@ const canPlayFrom = (table: PlayTable): CanPlay => {
   )
   const codecs = new Set(
     [
-      ...table.videoCodecs.flatMap((codec) =>
-        BIT_DEPTHS.map((bitDepth) => videoCodecString({ codec, bitDepth })),
+      ...Object.entries(table.videoCodecs).flatMap(([codec, bitDepths]) =>
+        bitDepths.map((bitDepth) => videoCodecString({ codec, bitDepth })),
       ),
       ...table.audioCodecs.map((codec) => audioCodecString(codec)),
     ].filter(isString),

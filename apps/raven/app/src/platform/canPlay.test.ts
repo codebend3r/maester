@@ -86,6 +86,30 @@ describe('canPlayFor on iPhone and iPad', () => {
     expect(planOnIos({ media }).modes).toEqual([PLAYBACK_MODES.transcode])
   })
 
+  it('sends a 10-bit H.264 MKV through the transcode, since AVPlayer has no High 10 decoder', () => {
+    const media = mediaItemFor({
+      container: 'mkv',
+      videoCodec: 'h264',
+      videoBitDepth: 10,
+      audioCodec: 'aac',
+    })
+    expect(planOnIos({ media }).modes).toEqual([PLAYBACK_MODES.transcode])
+  })
+
+  it('plays H.264 in MP4 as it is only at 8 bits', () => {
+    const planAt = (videoBitDepth: number) =>
+      planOnIos({
+        media: mediaItemFor({
+          container: 'mp4',
+          videoCodec: 'h264',
+          videoBitDepth,
+          audioCodec: 'aac',
+        }),
+      }).modes
+    expect(planAt(8)[0] ?? null).toBe(PLAYBACK_MODES.direct)
+    expect(planAt(10)).toEqual([PLAYBACK_MODES.transcode])
+  })
+
   it('leaves an MKV no way to play when the server converts nothing', () => {
     const media = mediaItemFor({
       container: 'mkv',
