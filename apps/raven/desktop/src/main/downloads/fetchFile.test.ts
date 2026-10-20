@@ -242,7 +242,13 @@ describe('a whole file', () => {
     const { fetch } = fakeFetch({ replies: [reply({ status: 200, body: null })] })
     const { part, flags } = fakePart()
     const outcome = await run({ fetch, part, expectedSize: 4 })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, refusal: null, bytes: 0 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.changed,
+      status: null,
+      refusal: null,
+      bytes: 0,
+    })
     expect(flags.closes).toBe(1)
   })
 })
@@ -326,7 +332,13 @@ describe('a resume', () => {
     })
     const { part, flags } = fakePart({ disk: [bytesOf(4096)] })
     const outcome = await run({ fetch, part, expectedSize: 8192 })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, refusal: null, bytes: 0 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.changed,
+      status: null,
+      refusal: null,
+      bytes: 0,
+    })
     expect(calls).toHaveLength(2)
     expect(flags.closes).toBe(1)
   })
@@ -343,7 +355,13 @@ describe('a resume', () => {
     })
     const { part, chunks, flags } = fakePart()
     const outcome = await run({ fetch, part, expectedSize: 10 })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, refusal: null, bytes: 0 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.changed,
+      status: null,
+      refusal: null,
+      bytes: 0,
+    })
     expect(sizeOf(chunks)).toBe(0)
     expect(flags.closes).toBe(1)
   })
@@ -384,7 +402,13 @@ describe('a part that is already whole', () => {
     const { fetch, calls } = fakeFetch({ replies: [] })
     const { part, flags } = fakePart()
     const outcome = await run({ fetch, part, expectedSize: -1 })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, refusal: null, bytes: 0 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.changed,
+      status: null,
+      refusal: null,
+      bytes: 0,
+    })
     expect(calls).toHaveLength(0)
     expect(flags.truncates).toBe(2)
     expect(flags.closes).toBe(1)
@@ -396,7 +420,13 @@ describe('the size', () => {
     const { fetch } = fakeFetch({ replies: [reply({ status: 200, body: bodyOf([bytesOf(7)]) })] })
     const { part, chunks, flags } = fakePart()
     const outcome = await run({ fetch, part, expectedSize: 10 })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, refusal: null, bytes: 0 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.changed,
+      status: null,
+      refusal: null,
+      bytes: 0,
+    })
     expect(sizeOf(chunks)).toBe(0)
     expect(flags.truncates).toBe(1)
     expect(flags.closes).toBe(1)
@@ -408,7 +438,13 @@ describe('the size', () => {
     })
     const { part, chunks, flags } = fakePart()
     const outcome = await run({ fetch, part, expectedSize: 10 })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, refusal: null, bytes: 0 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.changed,
+      status: null,
+      refusal: null,
+      bytes: 0,
+    })
     expect(sizeOf(chunks)).toBe(0)
     expect(flags.truncates).toBe(1)
     expect(flags.closes).toBe(1)
@@ -428,7 +464,7 @@ describe('a stall', () => {
     clock.fire()
     expect(await pending).toEqual({
       ok: false,
-      reason: 'stalled',
+      reason: FETCH_REASONS.stalled,
       status: null,
       refusal: null,
       bytes: 5,
@@ -448,7 +484,7 @@ describe('a stall', () => {
     clock.fire()
     expect(await pending).toEqual({
       ok: false,
-      reason: 'stalled',
+      reason: FETCH_REASONS.stalled,
       status: null,
       refusal: null,
       bytes: 0,
@@ -478,7 +514,13 @@ describe('a full disk', () => {
     })
     const { part, flags } = fakePart({ disk: [bytesOf(2)], failAppend: full })
     const outcome = await run({ fetch, part, expectedSize: 12 })
-    expect(outcome).toEqual({ ok: false, reason: 'space', status: null, refusal: null, bytes: 2 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.space,
+      status: null,
+      refusal: null,
+      bytes: 2,
+    })
     expect(flags.truncates).toBe(0)
     expect(flags.closes).toBe(1)
   })
@@ -504,7 +546,7 @@ describe('a refusal', () => {
     const { outcome, flags } = await refused({ status: 401 })
     expect(outcome).toEqual({
       ok: false,
-      reason: 'unauthorized',
+      reason: FETCH_REASONS.unauthorized,
       status: 401,
       refusal: null,
       bytes: 0,
@@ -514,13 +556,25 @@ describe('a refusal', () => {
 
   it('maps 423 to locked', async () => {
     const { outcome, flags } = await refused({ status: 423 })
-    expect(outcome).toEqual({ ok: false, reason: 'locked', status: 423, refusal: null, bytes: 0 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.locked,
+      status: 423,
+      refusal: null,
+      bytes: 0,
+    })
     expect(flags.closes).toBe(1)
   })
 
   it('maps 416 to changed, and truncates the part it can no longer use', async () => {
     const { outcome, flags, chunks } = await refused({ status: 416, disk: [bytesOf(4)] })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: 416, refusal: null, bytes: 0 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.changed,
+      status: 416,
+      refusal: null,
+      bytes: 0,
+    })
     expect(flags.truncates).toBe(1)
     expect(sizeOf(chunks)).toBe(0)
     expect(flags.closes).toBe(1)
@@ -528,11 +582,17 @@ describe('a refusal', () => {
 
   it('maps any other non-2xx to status with its code', async () => {
     const { outcome, flags } = await refused({ status: 500 })
-    expect(outcome).toEqual({ ok: false, reason: 'status', status: 500, refusal: null, bytes: 0 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.status,
+      status: 500,
+      refusal: null,
+      bytes: 0,
+    })
     expect(flags.closes).toBe(1)
     expect((await refused({ status: 404 })).outcome).toEqual({
       ok: false,
-      reason: 'status',
+      reason: FETCH_REASONS.status,
       status: 404,
       refusal: null,
       bytes: 0,
@@ -563,14 +623,20 @@ describe('a refusal', () => {
     const body = JSON.stringify({ reason: AUTH_REFUSALS.unavailable, message: 'Down.' })
     const { fetch } = fakeFetch({ replies: [reply({ status: 403, body: bodyOf([textOf(body)]) })] })
     const outcome = await run({ fetch, part: fakePart({}).part, expectedSize: 10 })
-    expect(outcome).toEqual({ ok: false, reason: 'status', status: 403, refusal: null, bytes: 0 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.status,
+      status: 403,
+      refusal: null,
+      bytes: 0,
+    })
   })
 
   it('keeps the bytes on disk', async () => {
     const { outcome, chunks } = await refused({ status: 401, disk: [bytesOf(6)] })
     expect(outcome).toEqual({
       ok: false,
-      reason: 'unauthorized',
+      reason: FETCH_REASONS.unauthorized,
       status: 401,
       refusal: null,
       bytes: 6,
@@ -586,7 +652,7 @@ describe('the network', () => {
     const outcome = await run({ fetch, part, expectedSize: 10 })
     expect(outcome).toEqual({
       ok: false,
-      reason: 'unreachable',
+      reason: FETCH_REASONS.unreachable,
       status: null,
       refusal: null,
       bytes: 3,
@@ -719,7 +785,13 @@ describe('an abort', () => {
     })
     const { part, flags } = fakePart({ disk: [bytesOf(3)] })
     const outcome = await run({ fetch, part, expectedSize: 10, signal: controller.signal })
-    expect(outcome).toEqual({ ok: false, reason: 'aborted', status: null, refusal: null, bytes: 3 })
+    expect(outcome).toEqual({
+      ok: false,
+      reason: FETCH_REASONS.aborted,
+      status: null,
+      refusal: null,
+      bytes: 3,
+    })
     expect(flags.closes).toBe(1)
   })
 
@@ -732,7 +804,7 @@ describe('an abort', () => {
     const outcome = await run({ fetch, part, expectedSize: 10 })
     expect(outcome).toEqual({
       ok: false,
-      reason: 'unreachable',
+      reason: FETCH_REASONS.unreachable,
       status: null,
       refusal: null,
       bytes: 0,
@@ -757,7 +829,7 @@ describe('an abort', () => {
     controller.abort()
     expect(await pending).toEqual({
       ok: false,
-      reason: 'aborted',
+      reason: FETCH_REASONS.aborted,
       status: null,
       refusal: null,
       bytes: 5,
@@ -786,7 +858,7 @@ describe('a server that never answers', () => {
     fire()
     expect(await outcome).toEqual({
       ok: false,
-      reason: 'stalled',
+      reason: FETCH_REASONS.stalled,
       status: null,
       refusal: null,
       bytes: 0,

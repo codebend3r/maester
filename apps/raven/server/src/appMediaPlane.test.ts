@@ -49,6 +49,7 @@ const mediaPlane = ({ secret }: { secret: Buffer | null }): ServerConfig['mediaP
   ],
   secret,
   problems: [],
+  secretProblems: [],
 })
 
 type Started = { app: NestFastifyApplication; admin: string; video: number }

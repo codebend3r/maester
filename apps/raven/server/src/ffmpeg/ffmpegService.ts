@@ -54,6 +54,9 @@ const failureText = (error: unknown): string => {
   return error instanceof Error ? error.message : String(error)
 }
 
+/** The signals raven sends an ffmpeg it started. */
+export const FFMPEG_SIGNALS = { kill: 'SIGKILL' } as const satisfies Record<string, NodeJS.Signals>
+
 /** A running ffmpeg whose output is read as it is written. */
 export type FfmpegStream = ChildProcessByStdio<null, Readable, Readable>
 
@@ -125,7 +128,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   onModuleDestroy(): void {
-    this.streams.forEach((child) => child.kill('SIGKILL'))
+    this.streams.forEach((child) => child.kill(FFMPEG_SIGNALS.kill))
   }
 
   /**

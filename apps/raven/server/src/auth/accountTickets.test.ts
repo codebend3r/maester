@@ -3,38 +3,51 @@ import { describe, expect, it } from 'vitest'
 import { AccountTickets } from '@/auth/accountTickets'
 import { AuthBackend } from '@/auth/authBackend'
 import { AuthSessions } from '@/auth/authSessions'
+import { MEMBERSHIP_TTL_MS, MembershipLookups } from '@/auth/membershipLookups'
 import { createTokenVerifier } from '@/auth/tokenVerifier'
-import { readServerConfig } from '@/config'
-import { AUTH_TEST_CONFIG, AUTH_TEST_IDS, authFixture } from '@/test/auth'
+import { AUTH_TEST_CONFIG, AUTH_TEST_IDS, authFixture, bearerHeaders } from '@/test/auth'
 
-const setup = async () => {
+type Session = Awaited<ReturnType<AuthSessions['authenticate']>>
+
+const setup = async ({ unlockedUntil = null }: { unlockedUntil?: number | null } = {}) => {
   const fixture = await authFixture()
-  const backend = new AuthBackend(
-    { ...readServerConfig({}), auth: AUTH_TEST_CONFIG },
-    fixture.fetcher,
-  )
+  const backend = new AuthBackend(AUTH_TEST_CONFIG, fixture.fetcher)
   const sessions = new AuthSessions(
     createTokenVerifier({
       config: AUTH_TEST_CONFIG,
       keys: fixture.keys,
       authFetch: fixture.fetcher,
     }),
-    backend,
+    new MembershipLookups(backend, MEMBERSHIP_TTL_MS),
   )
   const session = await sessions.authenticate({ token: await fixture.mint() })
-  return { sessions, session, tickets: new AccountTickets(sessions) }
+  const lock = { unlockedUntil: () => unlockedUntil }
+  /** A request the account gate bound to `bound`, sent by Bearer unless it says otherwise. */
+  const requestFor = ({ bound, isBearer = true }: { bound: Session; isBearer?: boolean }) => {
+    const request = { headers: bearerHeaders({ token: bound.token }) }
+    sessions.bindSession({ request, session: bound, isBearer })
+    return request
+  }
+  return {
+    sessions,
+    session,
+    request: requestFor({ bound: session }),
+    requestFor,
+    lock,
+    tickets: new AccountTickets(sessions, lock),
+  }
 }
 
 describe('bounded account ticket storage', () => {
   it('caps issuance per account without evicting live tickets, then reclaims expired entries', async () => {
-    const { tickets, session } = await setup()
+    const { tickets, session, request } = await setup()
     const now = Date.now()
-    const issued = Array.from({ length: 32 }, () => tickets.issue({ id: 7, session, now }))
-    expect(() => tickets.issue({ id: 7, session, now })).toThrow()
+    const issued = Array.from({ length: 32 }, () => tickets.issue({ id: 7, request, now }))
+    expect(() => tickets.issue({ id: 7, request, now })).toThrow()
     await expect(tickets.redeem({ id: 7, ticket: issued[0]!.ticket, now })).resolves.toMatchObject({
-      id: session.account.id,
+      session: { account: { id: session.account.id } },
     })
-    const renewed = tickets.issue({ id: 7, session, now: now + 300_000 })
+    const renewed = tickets.issue({ id: 7, request, now: now + 300_000 })
     expect(renewed.ticket).not.toBe(issued[0]!.ticket)
     await expect(
       tickets.redeem({ id: 7, ticket: issued[0]!.ticket, now: now + 300_000 }),
@@ -42,34 +55,60 @@ describe('bounded account ticket storage', () => {
   })
 
   it('invalidates tickets on server restart and never reuses a capability', async () => {
-    const { tickets, sessions, session } = await setup()
-    const first = tickets.issue({ id: 7, session })
-    const second = tickets.issue({ id: 7, session })
+    const { tickets, sessions, request, lock } = await setup()
+    const first = tickets.issue({ id: 7, request })
+    const second = tickets.issue({ id: 7, request })
     expect(first.ticket).not.toBe(second.ticket)
     await expect(
-      new AccountTickets(sessions).redeem({ ticket: first.ticket, id: 7 }),
+      new AccountTickets(sessions, lock).redeem({ ticket: first.ticket, id: 7 }),
     ).rejects.toMatchObject({ response: { reason: AUTH_REFUSALS.signedOut } })
   })
 
   it('refuses expired sessions, invalid media ids and unapproved issuance', async () => {
-    const { tickets, session } = await setup()
-    expect(() => tickets.issue({ id: 0, session })).toThrow('Invalid media id')
-    expect(() => tickets.issue({ id: 1.5, session })).toThrow('Invalid media id')
+    const { tickets, session, request, requestFor } = await setup()
+    expect(() => tickets.issue({ id: 0, request })).toThrow('Invalid media id')
+    expect(() => tickets.issue({ id: 1.5, request })).toThrow('Invalid media id')
     expect(() =>
-      tickets.issue({ id: 7, session: { ...session, expiresAt: Date.now() - 1 } }),
+      tickets.issue({
+        id: 7,
+        request: requestFor({ bound: { ...session, expiresAt: Date.now() - 1 } }),
+      }),
     ).toThrow()
     expect(() =>
       tickets.issue({
         id: 7,
-        session: {
-          ...session,
-          account: {
-            ...session.account,
-            id: AUTH_TEST_IDS.pending,
-            status: MEMBER_STATUSES.pending,
+        request: requestFor({
+          bound: {
+            ...session,
+            account: {
+              ...session.account,
+              id: AUTH_TEST_IDS.pending,
+              status: MEMBER_STATUSES.pending,
+            },
           },
-        },
+        }),
       }),
     ).toThrow()
+  })
+
+  it('mints only for a session sent by Bearer, never the cookie alone or no session', async () => {
+    const { tickets, session, requestFor } = await setup()
+    const refusals = [requestFor({ bound: session, isBearer: false }), { headers: {} }].map(
+      (request) => () => tickets.issue({ id: 7, request }),
+    )
+    refusals.forEach((refused) => {
+      expect(refused).toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({ reason: AUTH_REFUSALS.signedOut }),
+        }),
+      )
+    })
+  })
+
+  it('hands back the PIN unlock the ticket was minted under', async () => {
+    const unlockedUntil = Date.now() + 60_000
+    const { tickets, request } = await setup({ unlockedUntil })
+    const { ticket } = tickets.issue({ id: 7, request })
+    await expect(tickets.redeem({ id: 7, ticket })).resolves.toMatchObject({ unlockedUntil })
   })
 })

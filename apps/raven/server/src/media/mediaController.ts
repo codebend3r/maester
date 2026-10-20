@@ -33,6 +33,7 @@ import {
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
+import { AccessRechecks } from '@/auth/accessRechecks'
 import { ERROR_CODES, errorMessage } from '@/errorMessage'
 import { RAVEN_CACHE_POLICIES, RAVEN_HEADERS } from '@/http'
 import { sendImage } from '@/items/sendImage'
@@ -87,6 +88,7 @@ export class MediaController {
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(ScannerService) private readonly scanner: ScannerService,
     @Inject(StreamSessions) private readonly streams: StreamSessions,
+    @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
   ) {}
 
   private find(id: number): MediaItem {
@@ -218,6 +220,7 @@ export class MediaController {
 
     trackStream({
       sessions: this.streams,
+      rechecks: this.rechecks,
       mediaId: id,
       mode: PLAYBACK_MODES.direct,
       request,

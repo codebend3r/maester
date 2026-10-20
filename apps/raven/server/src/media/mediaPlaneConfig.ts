@@ -23,14 +23,19 @@ const HOSTS = { localhost: 'localhost' } as const
 const MIN_SECRET_BYTES = 32
 
 export type MediaPlaneConfig = {
-  /** Where the browser may fetch media from, best first; empty without a usable secret. */
+  /** Where the browser may fetch media from, best first; offered only once a ticket can prove who asks. */
   origins: MediaOrigin[]
   /** Origins allowed to call the media routes cross-origin; a pattern may hold a `*`. */
   webOrigins: string[]
   /** The key tickets are signed with; null when unset or unusable. Never logged or sent to a client. */
   secret: Buffer | null
-  /** One sentence per entry or value that was dropped, for the boot log. */
+  /** One sentence per origin entry that was dropped, for the boot log. */
   problems: string[]
+  /**
+   * What is wrong with the media secret, for the boot log while accounts
+   * are off; with them, account tickets need no secret.
+   */
+  secretProblems: string[]
 }
 
 const splitList = (value: string | undefined): string[] =>
@@ -201,15 +206,11 @@ export const readMediaPlaneConfig = (env: NodeJS.ProcessEnv): MediaPlaneConfig =
   const secret = readMediaSecret(env[MEDIA_PLANE_ENV.secret])
   const hasSecretValue = (env[MEDIA_PLANE_ENV.secret]?.trim() ?? '') !== ''
   const needsSecret = origins.origins.length > 0 || hasSecretValue
-  const isUsable = secret.secret !== null
   return {
-    origins: isUsable ? origins.origins : [],
+    origins: origins.origins,
     webOrigins: webOrigins.origins,
     secret: secret.secret,
-    problems: [
-      ...origins.problems,
-      ...webOrigins.problems,
-      ...(needsSecret ? secret.problems : []),
-    ],
+    problems: [...origins.problems, ...webOrigins.problems],
+    secretProblems: needsSecret ? secret.problems : [],
   }
 }
