@@ -1,6 +1,7 @@
 import { keepPreviousData, queryOptions, skipToken } from '@tanstack/react-query'
 import {
   ADMIN_LOCK_STATES,
+  FILMOGRAPHY_STATES,
   type ApiClient,
   type MatchItemType,
   type MatchSubject,
@@ -186,7 +187,9 @@ export const ravenQueriesFor = (api: ApiClient) => {
         queryKey: queryKeys.person(id),
         queryFn: id == null ? skipToken : () => api.getPerson(id),
         refetchInterval: (query) =>
-          query.state.data?.filmography.state === 'pending' ? FILMOGRAPHY_POLL_MS : false,
+          (query.state.data?.filmography.state ?? null) === FILMOGRAPHY_STATES.pending
+            ? FILMOGRAPHY_POLL_MS
+            : false,
       }),
 
     /** A search for Fix match, scored against `subject` and best first; an empty title asks for nothing. */

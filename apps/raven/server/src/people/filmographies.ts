@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
-import type { PersonFilmography } from '@raven/core'
+import { FILMOGRAPHY_STATES, type PersonFilmography } from '@raven/core'
 import { errorMessage } from '@/errorMessage'
 import { type LocalCredit, MetadataRepository } from '@/metadata/metadataRepository'
 import { TmdbClient } from '@/metadata/tmdbClient'
@@ -86,7 +86,7 @@ export class Filmographies {
     const rows = this.people.filmographyRows(personId)
     const itemIds = rows.flatMap((row) => row.itemId ?? [])
     return {
-      state: 'ready',
+      state: FILMOGRAPHY_STATES.ready,
       fetchedAt,
       entries: toEntries({
         rows,
