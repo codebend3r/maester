@@ -1,6 +1,6 @@
 # Supabase sign-in: raven first
 
-Date: 2026-10-17. Status: step 1 shipped (#237), step 2 shipped (#239), steps 3 and 4 (the web, #247) shipped, step 5 (raven player, #254) in review, step 6 (enforcement, #255) built and in review, its plan at `docs/superpowers/plans/2026-10-18-raven-auth-enforcement.md`; later steps open, tracked in `docs/superpowers/plans/2026-10-17-supabase-sign-in.md`.
+Date: 2026-10-17. Status: step 1 shipped (#237), step 2 shipped (#239), steps 3 and 4 (the web, #247) shipped, step 5 (raven player, #254) in review, step 6 (enforcement, #255) built and in review, its plan at `docs/superpowers/plans/2026-10-18-raven-auth-enforcement.md`, step 7 (per-account viewing data, #256) built and in review, its plan at `docs/superpowers/plans/2026-10-18-raven-account-data.md`; later steps open, tracked in `docs/superpowers/plans/2026-10-17-supabase-sign-in.md`.
 
 ## Goal
 
@@ -21,10 +21,10 @@ The implementation plan is `docs/superpowers/plans/2026-10-17-supabase-sign-in.m
 | Web | Login, signup, check-email, confirm, forgot, reset, pending and Users screens inside raven | Cross-app redirects and shared-domain SSO |
 | Desktop | Minimum compatible login, pending state, secure session storage and authenticated playback before enforcement | Google callback flow and broader account-management UI |
 | rookery and luwin | Leave their current authentication working | Migrate after raven is protected |
-| Viewing data | Existing shared progress, plays, watched and favourites remain shared initially | Separate per-account data in the next phase |
+| Viewing data | Progress, plays, watched and favourites are per account; everything recorded before accounts moves to the owner on their first visit (step 7, `raven-account-data`) | Library view settings stay shared until per-account library preferences (step 9) |
 | Hosting | Keep raven's current hosting; no new shared parent domain required | Shared-domain hosting only if later SSO needs it |
 
-The first milestone is an access gate, not separate viewing profiles. Its shared viewing state must be documented before inviting users. Do not claim account isolation until the later data migration ships.
+The first milestone is an access gate, not separate viewing profiles. Its shared viewing state must be documented before inviting users. Do not claim account isolation until the later data migration ships. That migration is now built in step 7 (`raven-account-data`, #256): viewing data is per account once it is deployed.
 
 ## First milestone: acceptance criteria
 
@@ -141,7 +141,7 @@ Each implementation PR leaves main working. Steps 1 to 5 prepare the cutover; st
 | 4 | Settings > Users, owner-only approval/removal, Account section and end-to-end authorization tests | Owner can manage accounts entirely inside raven |
 | 5 | Minimum desktop login, secure main-process session and authenticated playback | Release compatible desktop before the server cutover |
 | 6 | Enforce approved-account access across every protected route; switch management to owner-only; remove admin-password authorization and bind PIN state to accounts | Configure production, deploy the gate and verify it before inviting users |
-| 7 | Separate progress, plays, watched and favourites per account; migrate existing rows to the owner | Next feature after the access-gate milestone; initial viewing data is shared |
+| 7 | Separate progress, plays, watched and favourites per account; migrate existing rows to the owner | Built (#256), in review: per-account viewing data with owner adoption; before it ships, viewing data is shared |
 | 8 | Migrate rookery and luwin; extract shared auth modules when there are real consumers | Not a raven prerequisite |
 | 9 | Cross-app SSO, Google sign-in, optional per-account library preferences and expanded desktop account UI | Independently scoped follow-ups |
 

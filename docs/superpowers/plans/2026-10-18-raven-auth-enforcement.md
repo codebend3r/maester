@@ -288,7 +288,7 @@ Task 2 puts this exact table into a test, so a new route that is missing from it
 7. Stage the whole flow: a staging raven `ready` behind a Netlify deploy preview. Verify Netlify forwards `Cookie`, `Authorization` and SSE unbuffered, and caches no `/api` response.
 8. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `RAVEN_WEB_URL` in Vhagar's `.env`. Review `RAVEN_MEDIA_ORIGINS` and `RAVEN_WEB_ORIGINS`. `ADMIN_PASSWORD` becomes inert; keep it only for the rollback. Deploy (`deploy-raven-vhagar`).
 9. From outside the tailnet, run the after-enforcement checks: anonymous API, media and artwork requests fail, health answers, the owner approves a second account, it plays but cannot manage, and removal blocks its original JWT and ticket.
-10. Before inviting anyone, tell them that progress, plays, watched and favourites are still shared (step 7 separates them).
+10. Per-account viewing data is the `raven-account-data` change ([`2026-10-18-raven-account-data.md`](2026-10-18-raven-account-data.md)): before inviting anyone, deploy it, with a backup of the data folder first, and sign in once as the owner so the history from before accounts is adopted. Without it, progress, plays, watched marks and favourites are shared by every approved account.
 11. A rollback is `RAVEN_ACCOUNTS=off` with the Supabase env removed. It reopens anonymous access, so it is an explicit security decision.
 
 ## Risks

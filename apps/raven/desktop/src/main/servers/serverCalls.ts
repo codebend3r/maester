@@ -9,6 +9,7 @@ import {
   type AuthRefusal,
 } from '@raven/core'
 import { signInConfigOf, type SignInConfig } from '@/main/accounts/authEndpoints'
+import { accountIdOfToken } from '@/main/accounts/tokenAccount'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { quietly } from '@/main/log/quietly'
 import { parseJson } from '@/main/parseJson'
@@ -22,6 +23,7 @@ import {
   type ServerMethod,
 } from '@/main/servers/allowlist'
 import { refusalAt } from '@/main/servers/authRefusals'
+import { AS_ANYONE, REPORT_KINDS, type TitleSittings } from '@/main/servers/titleSittings'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { HTTP_STATUSES } from '@/shared/httpStatuses'
 import { SERVER_GONE, SERVER_METHODS } from '@/shared/protocol'
@@ -42,6 +44,7 @@ export const CALL_MESSAGES = {
   unreachable: (name: string) => `raven player could not reach ${name}.`,
   tooBig: (name: string) => `${name} sent more than raven player reads.`,
   busy: (name: string) => `raven player is still waiting on ${name}.`,
+  otherAccount: (name: string) => `raven player is signed in to ${name} as someone else now.`,
 } as const
 
 export type ServerFetch = (input: {
@@ -57,7 +60,15 @@ export type ServerCallResult =
   | { ok: false; message: string }
 
 export type ServerCalls = {
-  call: (input: { serverId: string; call: AllowedCall }) => Promise<ServerCallResult>
+  /**
+   * `accountId`, when given, is the only account the call may go out as: one whose token names
+   * another account, or no token, sends nothing.
+   */
+  call: (input: {
+    serverId: string
+    call: AllowedCall
+    accountId?: string | null
+  }) => Promise<ServerCallResult>
   callFromPage: (input: {
     serverId: string
     method: string
@@ -196,6 +207,10 @@ const rematch = (call: AllowedCall): AllowedCall | null => {
 const isAdminPasswordCall = (call: AllowedCall): boolean =>
   call.name === CALL_NAMES.getAdminLock || call.name === CALL_NAMES.unlockAdmin
 
+/** The title a call reports watching, or null for a call that reports nothing. */
+const reportedTitleOf = (call: AllowedCall): number | null =>
+  call.name === CALL_NAMES.saveProgress || call.name === CALL_NAMES.recordPlay ? call.mediaId : null
+
 /**
  * Runs allowlisted calls against the stored servers. Every URL is the stored origin
  * plus the path `requestFor` builds, so nothing the page sends can name another host.
@@ -207,10 +222,16 @@ export const createServerCalls = ({
   refresh,
   onRefusal,
   hasAccounts,
+  reportAs = () => AS_ANYONE,
   warn,
 }: {
   serverOf: (serverId: string) => ServerEntry | null
   fetchFor: (serverId: string) => ServerFetch
+  /**
+   * Who the page's reports of a title go out as; main's own calls and the auth config reads
+   * report nothing, so they leave it out.
+   */
+  reportAs?: TitleSittings['reportAs']
   warn: (message: string) => void
 } & Bearer): ServerCalls => {
   /** A log line never fails a call: the call has already been answered or refused. */
@@ -326,11 +347,22 @@ export const createServerCalls = ({
   const send = async ({
     server,
     call,
+    accountId,
   }: {
     server: ServerEntry
     call: AllowedCall
+    accountId: string | null
   }): Promise<ServerCallResult> => {
+    // Checked against each token as it is read, so a sign in as another account in between never
+    // carries one account's call under another's token.
+    const isAs = (token: string | null): boolean =>
+      accountId === null || (token !== null && accountIdOfToken(token) === accountId)
+    const otherAccount: ServerCallResult = {
+      ok: false,
+      message: CALL_MESSAGES.otherAccount(server.name),
+    }
     const token = await tokenFor(server)
+    if (!isAs(token)) return otherAccount
     const first = await attempt({ server, call, token })
     if (!first.ok) return first
     const isRefreshable =
@@ -346,6 +378,7 @@ export const createServerCalls = ({
       announce({ server, result: first, isSessionRejected: false })
       return first
     }
+    if (!isAs(fresh)) return otherAccount
     const second = await attempt({ server, call, token: fresh })
     if (second.ok) announce({ server, result: second, isSessionRejected: true })
     return second
@@ -373,7 +406,7 @@ export const createServerCalls = ({
    * through `callFromPage`, never here; the call is still matched again, so a value
    * that slipped past the types (a string `mediaId`) never reaches a path.
    */
-  const call: ServerCalls['call'] = async ({ serverId, call: given }) => {
+  const call: ServerCalls['call'] = async ({ serverId, call: given, accountId = null }) => {
     const allowed = rematch(given)
     if (allowed === null) {
       safeWarn('refused a call main built off the allowlist')
@@ -391,7 +424,7 @@ export const createServerCalls = ({
     if (isBusy({ server, call: allowed })) {
       return { ok: false, message: CALL_MESSAGES.busy(server.name) }
     }
-    const task = send({ server, call: allowed })
+    const task = send({ server, call: allowed, accountId })
     return isWrite(allowed) ? tracked({ task }) : task
   }
 
@@ -401,7 +434,27 @@ export const createServerCalls = ({
       safeWarn(`refused a page call off the allowlist: ${loggable(method)} ${loggable(path)}`)
       return { ok: false, message: CALL_MESSAGES.offList }
     }
-    return call({ serverId, call: allowed })
+    const mediaId = reportedTitleOf(allowed)
+    const as = mediaId === null ? AS_ANYONE : reportAs({ serverId, mediaId })
+    switch (as.kind) {
+      case REPORT_KINDS.anyone:
+        return call({ serverId, call: allowed })
+      // The token's own account is checked, so a sign in by another sends this title nothing.
+      case REPORT_KINDS.account:
+        return call({ serverId, call: allowed, accountId: as.accountId })
+      case REPORT_KINDS.nobody: {
+        const server = serverOf(serverId)
+        return {
+          ok: false,
+          message:
+            server === null ? CALL_MESSAGES.unknownServer : CALL_MESSAGES.otherAccount(server.name),
+        }
+      }
+      default: {
+        const unreachable: never = as
+        return unreachable
+      }
+    }
   }
 
   return {

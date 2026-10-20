@@ -25,7 +25,7 @@ import { AccountRefused } from '@/renderer/Account/AccountRefused'
 import { SignInForm } from '@/renderer/Account/SignInForm'
 import { accountKey } from '@/renderer/desktop/accountApi'
 import { CONNECTION_STATUSES } from '@/renderer/desktop/playerConnection'
-import { serverApiFor, useServers } from '@/renderer/desktop/serverApi'
+import { SERVER_QUERIES, serverApiFor, serverKey, useServers } from '@/renderer/desktop/serverApi'
 import { NativePlaying } from '@/renderer/PlayPage/NativePlaying'
 import { Refused, useIsOutputFixed, Waiting } from '@/renderer/PlayPage/PlayPage'
 import { requestQuietly } from '@/renderer/PlayPage/playerServices'
@@ -295,7 +295,7 @@ const Ready = ({
   )
   const [nextId] = next
   const nextMedia = useQuery({
-    queryKey: ['desktop', 'server', serverId, 'next', nextId],
+    queryKey: [...serverKey(serverId), SERVER_QUERIES.next, nextId],
     queryFn: nextId === undefined ? skipToken : () => api.getMedia(nextId),
     retry: false,
   })
@@ -382,10 +382,10 @@ const NativeTitle = ({
   const { serverId } = server
   const api = useMemo(() => serverApiFor({ client, serverId }), [client, serverId])
   const mediaKey = useMemo(
-    () => ['desktop', 'server', serverId, 'media', mediaId],
+    () => [...serverKey(serverId), SERVER_QUERIES.media, mediaId],
     [serverId, mediaId],
   )
-  const adminKey = useMemo(() => ['desktop', 'server', serverId, 'adminLock'], [serverId])
+  const adminKey = useMemo(() => [...serverKey(serverId), SERVER_QUERIES.adminLock], [serverId])
   const { account, gate } = useAccountGate(serverId)
   const isLetIn = gate.kind === GATE_KINDS.letIn
   const media = useQuery({
@@ -393,8 +393,11 @@ const NativeTitle = ({
     queryFn: () => api.getMedia(mediaId),
     enabled: isLetIn,
     retry: false,
-    // Reading the title again while it plays would move its resume point under the player.
+    // Reading the title again while it plays would move its resume point under the player, and a
+    // read after an account switch would reload it as the new account.
     staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     gcTime: 0,
   })
   const isHidden = media.error instanceof ApiError && media.error.status === 404
@@ -472,6 +475,17 @@ const NativeTitle = ({
       },
     })
   }, [client, serverId, media.data])
+
+  // Main keeps the account that opened the title through every reload of its player, until the
+  // page leaves it or stops letting the account in.
+  useEffect(() => {
+    if (!isLetIn) return
+    return () =>
+      requestQuietly({
+        client,
+        request: { type: DESKTOP_REQUESTS.leaveServerTitle, serverId, mediaId },
+      })
+  }, [client, serverId, mediaId, isLetIn])
 
   const rereadRefusals = accountRefusals.filter(
     (refusedAt) => account.dataUpdatedAt >= refusedAt,

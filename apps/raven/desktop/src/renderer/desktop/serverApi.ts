@@ -72,6 +72,12 @@ export const serverApiFor = ({
 
 export const SERVERS_KEY = ['desktop', 'servers'] as const
 
+/** What the page caches of one server, every query of it under this prefix; Shell marks it stale on that server's `accountSwitched`. */
+export const serverKey = (serverId: string) => ['desktop', 'server', serverId] as const
+
+/** What follows `serverKey` in each query of a server. */
+export const SERVER_QUERIES = { next: 'next', media: 'media', adminLock: 'adminLock' } as const
+
 /** The servers raven player keeps, as Settings shows them. */
 export const useServers = (): UseQueryResult<ServerView[]> => {
   const { client } = useDesktop()

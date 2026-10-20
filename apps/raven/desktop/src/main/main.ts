@@ -116,6 +116,7 @@ import {
 } from '@/main/servers/serverSessions'
 import { createServerSources } from '@/main/servers/serverSources'
 import { createServerTrust, withTrustLog } from '@/main/servers/serverTrust'
+import type { TitleSittings } from '@/main/servers/titleSittings'
 import { confirmSignInChangeWith, confirmWith } from '@/main/servers/trustPrompt'
 import {
   CLOSE_TIMEOUTS,
@@ -521,23 +522,32 @@ const startApp = (): void => {
       const window = liveWindow()
       return window === null ? dialog.showMessageBox(prompt) : dialog.showMessageBox(window, prompt)
     }
-    const { authConfigs, serverCalls, accounts, accessEnds, accountTickets, relay } =
-      createAccountStack({
-        config,
-        serverOf,
-        fetchFor: sessions.fetchFor,
-        sessionStore,
-        confirmSignInChange: confirmSignInChangeWith({ show: showSheet }),
-        fetchAuth,
-        listen: listenOnLoopback({ createServer: (handler) => createServer(handler), warn }),
-        fetchUpstream: fetchRelayed,
-        newSecret: (bytes) => randomBytes(bytes).toString('base64url'),
-        openExternal: (url) => shell.openExternal(url),
-        emit: (account) => send({ type: DESKTOP_EVENTS.account, account }),
-        info: (message) => log.info(message),
-        timers,
-        warn,
-      })
+    const {
+      authConfigs,
+      accountSessions,
+      serverCalls,
+      accounts,
+      accessEnds,
+      accountSwitches,
+      accountTickets,
+      relay,
+      titleSittings,
+    } = createAccountStack({
+      config,
+      serverOf,
+      fetchFor: sessions.fetchFor,
+      sessionStore,
+      confirmSignInChange: confirmSignInChangeWith({ show: showSheet }),
+      fetchAuth,
+      listen: listenOnLoopback({ createServer: (handler) => createServer(handler), warn }),
+      fetchUpstream: fetchRelayed,
+      newSecret: (bytes) => randomBytes(bytes).toString('base64url'),
+      openExternal: (url) => shell.openExternal(url),
+      emit: (account) => send({ type: DESKTOP_EVENTS.account, account }),
+      info: (message) => log.info(message),
+      timers,
+      warn,
+    })
     // Not awaited: the window opens without it. A ready server gets no Bearer until its auth
     // config has been read once, so read each stored server's now rather than at its first refusal.
     // It warns per server and never rejects; the catch only keeps the promise from floating.
@@ -554,6 +564,15 @@ const startApp = (): void => {
       accountChanged: accounts.changed,
       warn,
     })
+    // Read once the app is ready, since a read that finds safeStorage unavailable removes the
+    // sign-in it kept, and before the downloads' first kick and the window, so a play noted at
+    // launch knows its account.
+    const restored = app
+      .whenReady()
+      .then(() => accountSessions.restore({ serverIds: config.read().servers.map(({ id }) => id) }))
+      .catch((error: unknown) => {
+        warn(`raven player could not read its kept sign-ins: ${errorText(error)}`)
+      })
     const downloadsFile = join(userData, DOWNLOADS_FILE)
     const loadedDownloads = await loadDownloads({ fs: stateFs, file: downloadsFile, now: Date.now })
     const downloadsStore = createJsonStore({
@@ -642,7 +661,7 @@ const startApp = (): void => {
           ),
       },
       showItemInFolder: (path) => shell.showItemInFolder(path),
-      ready: app.whenReady(),
+      ready: restored,
       wasSetAside: loadedDownloads.wasSetAside,
       // A test hook shortens the five minutes; a packaged app never reads it.
       syncRetryMs: syncRetryFrom({ isPackaged: app.isPackaged, env: process.env }) ?? SYNC_RETRY_MS,
@@ -652,6 +671,8 @@ const startApp = (): void => {
       grants,
       state: store,
       stat: (path) => stat(path),
+      hasAccounts: ({ serverId }) => authConfigs.hasAccounts(serverId),
+      accountIdOf: accountSessions.accountIdOf,
     })
     // Before the quit gate's own `before-quit`: each running file's bytes on disk are saved
     // while it is still downloading, then every fetch is aborted, so the gate's first flush
@@ -660,6 +681,8 @@ const startApp = (): void => {
     app.once('before-quit', () => downloads.dispose())
     // A sign out, a removed server or a moved sign-in host: its account downloads stop too.
     accessEnds.listen(({ serverId }) => downloads.accessEnded({ serverId }))
+    // Another account signed in, or none: what the last one watched stays with it.
+    accountSwitches.listen(({ serverId }) => downloads.accountSwitched({ serverId }))
 
     const trust = withTrustLog({
       trust: createServerTrust({
@@ -743,6 +766,8 @@ const startApp = (): void => {
       // The page sends `ready` once per mount; a reload sends it again, which the batches ignore
       // and which hands the new page a fresh player port (Ruling 12).
       onReady: () => {
+        // A new page shows no title, even when the last one crashed before it could say it left.
+        titleSittings.leftAll()
         fileBatch.ready()
         linkBatch.ready()
         checkAtLaunch()
@@ -780,6 +805,7 @@ const startApp = (): void => {
       },
       config,
       serverCalls,
+      titleSittings,
       trust,
       links: createLinkOpener({ trust, downloads, warn }),
       openExternal: (url) => shell.openExternal(url),
@@ -787,6 +813,12 @@ const startApp = (): void => {
       downloads,
       accounts,
     })
+    // Home's recents of that server were the last account's.
+    accountSwitches.listen(({ serverId }) => service.accountSwitched({ serverId }))
+    // Last, so the page reads again only once main has dropped what was the last account's.
+    accountSwitches.listen(({ serverId }) =>
+      send({ type: DESKTOP_EVENTS.accountSwitched, serverId }),
+    )
 
     // mpv stops before the stores flush and before Electron tears the window down.
     const shutdown = createShutdown({
@@ -836,7 +868,8 @@ const startApp = (): void => {
     app.on('before-quit', quitGate)
     app.on('will-quit', quitGate)
 
-    await app.whenReady()
+    // The app is ready once the kept sign-ins are read, which `restored` waits on first.
+    await restored
     // `powerMonitor` answers only once the app is ready. A sleep stops the downloads where
     // they are, and the wake starts them again.
     powerMonitor.on('suspend', () => downloads.onSuspend())
@@ -932,6 +965,7 @@ const startApp = (): void => {
       marks,
       budgets,
       downloads,
+      titleSittings,
     })
     // A quit holds the window open while it flushes, so no budget timer may fire meanwhile.
     app.once('before-quit', () => budgets.dispose())
@@ -1119,11 +1153,13 @@ const attachPlayer = ({
   marks,
   budgets,
   downloads,
+  titleSittings,
 }: {
   window: BrowserWindow
   grants: Grants
   config: ConfigStore
   sources: ReturnType<typeof createServerSources>
+  titleSittings: Pick<TitleSittings, 'opened'>
   relay: Pick<MediaRelay, 'closeAll'>
   marks: ReturnType<typeof createMarks>
   budgets: ReturnType<typeof createBudgets>
@@ -1134,6 +1170,8 @@ const attachPlayer = ({
   const sink: { service: PlayerService | null } = { service: null }
   const servers = {
     resolve: async (source: Parameters<typeof sources.resolve>[0]) => {
+      // Before it plays: what the page reports of it from here on is this account's.
+      titleSittings.opened({ serverId: source.serverId, mediaId: source.mediaId })
       const resolved = await sources.resolve(source)
       const server = serverById({ config: config.read(), serverId: source.serverId })
       if (resolved.ok && server !== null) {

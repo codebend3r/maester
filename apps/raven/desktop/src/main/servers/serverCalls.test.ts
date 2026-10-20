@@ -2,8 +2,10 @@ import { describe, expect, it } from 'bun:test'
 import { AUTH_CONFIG_STATES, AUTH_HEADERS, AUTH_REFUSALS, AUTH_SCHEME } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { PLAYER_MESSAGES } from '@/main/player/playerService'
-import { API_PATHS, CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
+import { API_PATHS, CALL_NAMES, requestFor, type AllowedCall } from '@/main/servers/allowlist'
 import { SOURCE_MESSAGES } from '@/main/servers/serverSources'
+import { createTitleSittings, type TitleSittings } from '@/main/servers/titleSittings'
+import { tokenFor } from '@/main/test/accountTokens'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { SERVER_GONE, SERVER_METHODS } from '@/shared/protocol'
 import {
@@ -20,6 +22,7 @@ import {
   probeServer,
   replyCapFor,
   type Bearer,
+  type ServerCallResult,
   type ServerFetch,
 } from '@/main/servers/serverCalls'
 
@@ -108,11 +111,13 @@ const setup = ({
   servers = [SERVER, OTHER],
   isWarnBroken = false,
   bearer = NO_BEARER,
+  reportAs,
 }: {
   answer?: (sent: Sent) => Answer
   servers?: readonly ServerEntry[]
   isWarnBroken?: boolean
   bearer?: Bearer
+  reportAs?: TitleSittings['reportAs']
 } = {}) => {
   const fake = fakeFetch({ answer })
   const warnings: string[] = []
@@ -124,6 +129,7 @@ const setup = ({
       return fake.fetch
     },
     ...bearer,
+    reportAs,
     warn: (message) => {
       warnings.push(message)
       if (isWarnBroken) throw new Error('the log is gone')
@@ -163,6 +169,9 @@ describe('the call values', () => {
     )
     expect(CALL_MESSAGES.busy('raven.example')).toBe(
       'raven player is still waiting on raven.example.',
+    )
+    expect(CALL_MESSAGES.otherAccount('raven.example')).toBe(
+      'raven player is signed in to raven.example as someone else now.',
     )
   })
 })
@@ -650,6 +659,8 @@ describe('createServerCalls.call', () => {
 })
 
 describe('createServerCalls with accounts', () => {
+  const ACCOUNT_A = '30000000-0000-4000-8000-00000000000a'
+  const ACCOUNT_B = '30000000-0000-4000-8000-00000000000b'
   const TOKEN = 'access-token-one'
   const FRESH = 'access-token-two'
   const SIGNED_OUT = JSON.stringify({ reason: AUTH_REFUSALS.signedOut, message: 'Sign in.' })
@@ -736,6 +747,41 @@ describe('createServerCalls with accounts', () => {
     const answers = await Promise.all(waiting)
     expect(answers.every((answer) => answer.ok)).toBe(true)
     expect(sent).toHaveLength(MAX_IN_FLIGHT + 1)
+  })
+
+  it('sends a call made for an account only under a token issued to that account', async () => {
+    const asA = tokenFor({ accountId: ACCOUNT_A })
+    const asB = tokenFor({ accountId: ACCOUNT_B })
+    const { bearer } = bearerOf({ tokens: [asA, asB, null] })
+    const { calls, sent } = setup({ bearer })
+    const PLAY = { name: CALL_NAMES.recordPlay, mediaId: 7 } as const
+    const forA = { serverId: SERVER.id, call: PLAY, accountId: ACCOUNT_A }
+    expect((await calls.call(forA)).ok).toBe(true)
+    const refused: ServerCallResult = {
+      ok: false,
+      message: CALL_MESSAGES.otherAccount(SERVER.name),
+    }
+    expect(await calls.call(forA)).toEqual(refused)
+    expect(await calls.call(forA)).toEqual(refused)
+    expect(sent.map(authorizationOf)).toEqual([`${AUTH_SCHEME} ${asA}`])
+  })
+
+  it('does not repeat a call made for an account under a refreshed token of another', async () => {
+    const { bearer } = bearerOf({
+      tokens: [tokenFor({ accountId: ACCOUNT_A })],
+      refreshes: [tokenFor({ accountId: ACCOUNT_B })],
+    })
+    const { calls, sent } = setup({
+      bearer,
+      answer: () => reply({ status: 401, text: SIGNED_OUT }),
+    })
+    const result = await calls.call({
+      serverId: SERVER.id,
+      call: { name: CALL_NAMES.recordPlay, mediaId: 7 },
+      accountId: ACCOUNT_A,
+    })
+    expect(result).toEqual({ ok: false, message: CALL_MESSAGES.otherAccount(SERVER.name) })
+    expect(sent).toHaveLength(1)
   })
 
   it('does not ask for a token for a server it does not hold', async () => {
@@ -956,6 +1002,86 @@ describe('createServerCalls with accounts', () => {
       body: null,
     })
     expect(sent.map(authorizationOf)).toEqual([`${AUTH_SCHEME} ${TOKEN}`])
+  })
+
+  describe('a server title left open while another account signs in', () => {
+    const TITLE = { serverId: SERVER.id, mediaId: 7 }
+    const SAVE = requestFor({ name: CALL_NAMES.saveProgress, mediaId: 7, position: 40 })
+    const PLAY = requestFor({ name: CALL_NAMES.recordPlay, mediaId: 7 })
+    const READ = requestFor({ name: CALL_NAMES.getMedia, mediaId: 7 })
+    const fromPage = (request: typeof SAVE) => ({ serverId: SERVER.id, ...request })
+
+    const signedInAs = (accountId: string | null) => {
+      const signedIn = { accountId }
+      const sittings = createTitleSittings({ accountIdOf: () => signedIn.accountId })
+      return { signedIn, sittings }
+    }
+
+    it("sends the page's reports of a title only as the account that opened it", async () => {
+      const asA = tokenFor({ accountId: ACCOUNT_A })
+      const asB = tokenFor({ accountId: ACCOUNT_B })
+      const { bearer } = bearerOf({ tokens: [asA, asB, asB, asB, asB] })
+      const { signedIn, sittings } = signedInAs(ACCOUNT_A)
+      const { calls, sent } = setup({ bearer, reportAs: sittings.reportAs })
+      sittings.opened(TITLE)
+      expect((await calls.callFromPage(fromPage(SAVE))).ok).toBe(true)
+
+      signedIn.accountId = ACCOUNT_B
+      const refused: ServerCallResult = {
+        ok: false,
+        message: CALL_MESSAGES.otherAccount(SERVER.name),
+      }
+      expect(await calls.callFromPage(fromPage(SAVE))).toEqual(refused)
+      expect(await calls.callFromPage(fromPage(PLAY))).toEqual(refused)
+      expect((await calls.callFromPage(fromPage(READ))).ok).toBe(true)
+      expect(sent.map(({ url, headers }) => [url, headers[AUTH_HEADERS.authorization]])).toEqual([
+        [`${SERVER.origin}${SAVE.path}`, `${AUTH_SCHEME} ${asA}`],
+        [`${SERVER.origin}${READ.path}`, `${AUTH_SCHEME} ${asB}`],
+      ])
+
+      sittings.left(TITLE)
+      sittings.opened(TITLE)
+      expect((await calls.callFromPage(fromPage(SAVE))).ok).toBe(true)
+      expect(sent.map(authorizationOf).at(-1)).toBe(`${AUTH_SCHEME} ${asB}`)
+    })
+
+    it("keeps a title the page reloads as the account that opened it, so A's reports never reach B", async () => {
+      const asA = tokenFor({ accountId: ACCOUNT_A })
+      const asB = tokenFor({ accountId: ACCOUNT_B })
+      const { bearer } = bearerOf({ tokens: [asB, asB, asB, asA] })
+      const { signedIn, sittings } = signedInAs(ACCOUNT_A)
+      const { calls, sent } = setup({ bearer, reportAs: sittings.reportAs })
+      sittings.opened(TITLE)
+      signedIn.accountId = ACCOUNT_B
+      sittings.opened(TITLE)
+      const refused: ServerCallResult = {
+        ok: false,
+        message: CALL_MESSAGES.otherAccount(SERVER.name),
+      }
+      expect(await calls.callFromPage(fromPage(SAVE))).toEqual(refused)
+      expect(await calls.callFromPage(fromPage(PLAY))).toEqual(refused)
+      sittings.opened(TITLE)
+      expect(await calls.callFromPage(fromPage(SAVE))).toEqual(refused)
+      expect(sent).toEqual([])
+
+      signedIn.accountId = ACCOUNT_A
+      expect((await calls.callFromPage(fromPage(SAVE))).ok).toBe(true)
+      expect(sent.map(authorizationOf)).toEqual([`${AUTH_SCHEME} ${asA}`])
+    })
+
+    it('sends nothing of a title opened signed out once an account signs in', async () => {
+      const { bearer, authorized } = bearerOf({ tokens: [tokenFor({ accountId: ACCOUNT_A })] })
+      const { signedIn, sittings } = signedInAs(null)
+      const { calls, sent } = setup({ bearer, reportAs: sittings.reportAs })
+      sittings.opened(TITLE)
+      signedIn.accountId = ACCOUNT_A
+      expect(await calls.callFromPage(fromPage(SAVE))).toEqual({
+        ok: false,
+        message: CALL_MESSAGES.otherAccount(SERVER.name),
+      })
+      expect(authorized).toEqual([])
+      expect(sent).toEqual([])
+    })
   })
 })
 

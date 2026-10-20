@@ -312,6 +312,7 @@ export const DESKTOP_REQUESTS = {
   openLink: 'openLink',
   openInBrowser: 'openInBrowser',
   noteServerTitle: 'noteServerTitle',
+  leaveServerTitle: 'leaveServerTitle',
   readUpdates: 'readUpdates',
   setUpdateCheck: 'setUpdateCheck',
   checkForUpdates: 'checkForUpdates',
@@ -391,6 +392,11 @@ export const isDesktopRequest = union(
     mediaId: isMediaId,
     label: isString,
     watched: nullable(isNumber),
+  }),
+  object({
+    type: oneOf([DESKTOP_REQUESTS.leaveServerTitle]),
+    serverId: isOpaqueId,
+    mediaId: isMediaId,
   }),
   object({ type: oneOf([DESKTOP_REQUESTS.readUpdates]) }),
   object({ type: oneOf([DESKTOP_REQUESTS.setUpdateCheck]), isEnabled: isBoolean }),
@@ -500,6 +506,7 @@ export const DESKTOP_EVENTS = {
   downloadAsk: 'downloadAsk',
   downloads: 'downloads',
   account: 'account',
+  accountSwitched: 'accountSwitched',
 } as const
 
 export const NAVIGATION_TARGETS = { settings: 'settings' } as const
@@ -521,6 +528,8 @@ export const isDesktopEvent = union(
   }),
   // Main's view of a server's account changed on its own: a refresh failed, or a call was refused.
   object({ type: oneOf([DESKTOP_EVENTS.account]), account: isAccountView }),
+  // Another account, or none, is signed in to the server now. It names the server, never an account.
+  object({ type: oneOf([DESKTOP_EVENTS.accountSwitched]), serverId: isOpaqueId }),
 )
 
 export type DesktopEvent = Infer<typeof isDesktopEvent>
