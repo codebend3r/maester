@@ -21,7 +21,8 @@ export type AdminChange = { cookie: string; lock: AdminLock }
  */
 type Session = { since: number; locksAt: number | null }
 
-const COOKIE = 'raven_admin'
+/** The cookie that holds the admin lock off in a browser of a server without accounts. */
+export const ADMIN_COOKIE = 'raven_admin'
 /**
  * How long the browser keeps the cookie: 400 days, the most Chrome allows.
  * Each read of the lock renews it, so a browser that comes back keeps it.
@@ -137,7 +138,7 @@ export class AdminService implements OnModuleInit {
   /** Scoped to the API, out of reach of scripts, never sent from another site, and kept when the browser closes. */
   private cookieOf({ since, locksAt }: Session): string {
     const value = `${since}.${locksAt ?? ''}`
-    return `${COOKIE}=${value}.${this.sign(value)}; Path=/api; HttpOnly; SameSite=Strict; Max-Age=${COOKIE_MAX_AGE_S}`
+    return `${ADMIN_COOKIE}=${value}.${this.sign(value)}; Path=/api; HttpOnly; SameSite=Strict; Max-Age=${COOKIE_MAX_AGE_S}`
   }
 
   private sign(value: string): string {
@@ -147,7 +148,7 @@ export class AdminService implements OnModuleInit {
   /** This browser's session while the lock is off for it, else null. */
   private session(cookie: string | undefined): Session | null {
     const [since = '', locksAt = '', signature = ''] =
-      readCookie({ header: cookie, name: COOKIE })?.split('.') ?? []
+      readCookie({ header: cookie, name: ADMIN_COOKIE })?.split('.') ?? []
     if (!sameSecret({ given: signature, expected: this.sign(`${since}.${locksAt}`) })) return null
     const session = { since: Number(since), locksAt: locksAt === '' ? null : Number(locksAt) }
     return session.locksAt == null || session.locksAt > Date.now() ? session : null
