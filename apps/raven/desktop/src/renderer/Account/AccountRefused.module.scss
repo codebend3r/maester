@@ -1,0 +1,29 @@
+.refused {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+}
+
+.reason {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  justify-content: start;
+}
+
+.status {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}

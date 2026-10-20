@@ -2,12 +2,19 @@ import { useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { KEYS } from '@raven/core'
 import { Button } from '@raven/ui'
+import { ACCOUNT_COPY } from '@/renderer/Account/accountCopy'
+import { AccountRefused } from '@/renderer/Account/AccountRefused'
+import { Refusal } from '@/renderer/Account/Refusal'
+import { SignInForm } from '@/renderer/Account/SignInForm'
+import { ACCOUNT_ANSWERS, useAccount, useAccountActions } from '@/renderer/desktop/accountApi'
 import { useDownloads } from '@/renderer/desktop/downloadsApi'
 import { SERVERS_KEY, useServers } from '@/renderer/desktop/serverApi'
 import styles from '@/renderer/SettingsPage/Servers.module.scss'
 import { RECENTS_KEY } from '@/renderer/Shell/openReply'
 import { useDesktop } from '@/renderer/stores/desktop'
 import {
+  ACCOUNT_STATES,
+  type AccountView,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   type DesktopRequest,
@@ -63,6 +70,134 @@ const removalQuestion = ({ name, downloads }: { name: string; downloads: number 
   return `${signsOut} and deletes its ${downloads} ${downloads === 1 ? 'download' : 'downloads'}.`
 }
 
+/**
+ * A ready server's account in its row: who is signed in and Sign out, or Sign in, which opens the
+ * form in the row; a pending or removed account says so. A server with accounts off shows nothing.
+ */
+const AccountLine = ({ server, account }: { server: ServerView; account: AccountView }) => {
+  const { signOut, refresh } = useAccountActions()
+  const [isSigningIn, setIsSigningIn] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [refusal, setRefusal] = useState<string | null>(null)
+  const action = useRef<HTMLButtonElement>(null)
+  const isPreviouslySigningIn = useRef(false)
+
+  // The form closing, signed in or not, hands focus back to the row's one account button.
+  useEffect(() => {
+    const isPrevious = isPreviouslySigningIn.current
+    isPreviouslySigningIn.current = isSigningIn
+    if (isPrevious && !isSigningIn) focus(action.current)
+  }, [isSigningIn])
+
+  const leave = async () => {
+    setNotice('')
+    setRefusal(null)
+    const answer = await signOut(server.serverId)
+    if (answer.kind === ACCOUNT_ANSWERS.refused) return setRefusal(answer.message)
+    setNotice(`Signed out of ${server.name}.`)
+    focus(action.current)
+  }
+
+  const checkAgain = async () => {
+    setRefusal(null)
+    const answer = await refresh(server.serverId)
+    if (answer.kind === ACCOUNT_ANSWERS.refused) setRefusal(answer.message)
+  }
+
+  const outage = (status: string) => (
+    <>
+      <p className={styles.status}>{status}</p>
+      <Button className={styles.accountAction} onClick={() => void checkAgain()}>
+        Check again
+      </Button>
+    </>
+  )
+
+  const content = () => {
+    switch (account.state) {
+      case ACCOUNT_STATES.off:
+        return null
+      case ACCOUNT_STATES.unavailable:
+        return outage(ACCOUNT_COPY.unavailable(server.name))
+      case ACCOUNT_STATES.failed:
+        return outage(ACCOUNT_COPY.failed(server.name))
+      case ACCOUNT_STATES.signedOut:
+        if (isSigningIn) {
+          return (
+            <div className={styles.signIn}>
+              <SignInForm
+                serverId={server.serverId}
+                signInHost={account.signInHost}
+                isRemembered={account.isRemembered}
+                onSignedIn={() => {
+                  setNotice(`Signed in to ${server.name}.`)
+                  setIsSigningIn(false)
+                }}
+                onCancel={() => setIsSigningIn(false)}
+              />
+            </div>
+          )
+        }
+        return (
+          <>
+            <p className={styles.status}>Not signed in.</p>
+            <Button
+              ref={action}
+              className={styles.accountAction}
+              aria-label={`Sign in to ${server.name}`}
+              onClick={() => setIsSigningIn(true)}
+            >
+              Sign in
+            </Button>
+          </>
+        )
+      case ACCOUNT_STATES.approved:
+        return (
+          <>
+            <p className={styles.status}>Signed in as {account.email ?? 'you'}.</p>
+            <Button
+              ref={action}
+              className={styles.accountAction}
+              aria-label={`Sign out of ${server.name}`}
+              onClick={() => void leave()}
+            >
+              Sign out
+            </Button>
+          </>
+        )
+      case ACCOUNT_STATES.pending:
+      case ACCOUNT_STATES.revoked:
+        return (
+          <div className={styles.signIn}>
+            <AccountRefused
+              serverId={server.serverId}
+              state={account.state}
+              email={account.email}
+            />
+          </div>
+        )
+      default: {
+        const unreachable: never = account.state
+        return unreachable
+      }
+    }
+  }
+
+  return (
+    <div className={styles.account}>
+      {content()}
+      {/* Always mounted: a live region is announced when its text changes, not when it appears. */}
+      <output className={styles.accountNotice}>{notice}</output>
+      {refusal !== null && <Refusal className={styles.accountRefusal}>{refusal}</Refusal>}
+    </div>
+  )
+}
+
+const classOf = ({ mode, hasAccount }: { mode: RowMode; hasAccount: boolean }): string => {
+  if (mode !== ROW_MODES.view) return styles.open
+  return hasAccount ? `${styles.server} ${styles.withAccount}` : styles.server
+}
+
 const ServerRow = ({
   server,
   downloads,
@@ -94,6 +229,8 @@ const ServerRow = ({
   const keepButton = useRef<HTMLButtonElement>(null)
   const previousMode = useRef<RowMode>(mode)
   const questionId = useId()
+  const account = useAccount(server.serverId).data ?? null
+  const hasAccount = account !== null && account.state !== ACCOUNT_STATES.off
 
   // Focus follows the swap: into the form or the question, then back to the button that opened it,
   // unless the person has moved on to another row.
@@ -200,6 +337,7 @@ const ServerRow = ({
                 Remove
               </Button>
             </div>
+            {hasAccount && <AccountLine server={server} account={account} />}
           </>
         )
       default: {
@@ -210,7 +348,7 @@ const ServerRow = ({
   }
 
   return (
-    <li ref={row} className={mode === ROW_MODES.view ? styles.server : styles.open}>
+    <li ref={row} className={classOf({ mode, hasAccount })}>
       {content()}
     </li>
   )
@@ -270,6 +408,7 @@ export const Servers = ({ className }: { className?: string }) => {
       case DESKTOP_REPLIES.downloadAsk:
       case DESKTOP_REPLIES.downloads:
       case DESKTOP_REPLIES.space:
+      case DESKTOP_REPLIES.account:
         return refuse(UNCHANGED)
       default: {
         const unreachable: never = reply

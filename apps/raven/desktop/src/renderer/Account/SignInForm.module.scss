@@ -1,0 +1,40 @@
+.form {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  min-width: 0;
+  max-width: var(--measure);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+  justify-self: stretch;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+
+  input {
+    width: 100%;
+    min-width: 0;
+    font-size: var(--font-size-md);
+
+    &:focus-visible {
+      outline: var(--focus-ring);
+      outline-offset: 2px;
+    }
+  }
+}
+
+.actions,
+.links {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  justify-content: start;
+}
+
+.note {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}

@@ -4,7 +4,7 @@ import type { NativePlayer } from '@raven/ui'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { connectionsOf, fakeClient, renderDesktop, STUB_ROUTES } from '@/renderer/test/render'
-import { reply, S, serverClient } from '@/renderer/test/serverFakes'
+import { OFF_ACCOUNT, reply, S, serverClient } from '@/renderer/test/serverFakes'
 import {
   DESKTOP_REQUESTS,
   type DesktopReply,
@@ -205,6 +205,7 @@ describe('OpenLinkDialog over a playing video', () => {
   it('keeps its keys from a server title, and Escape closes only the dialog', async () => {
     const client = serverClient({
       calls: { 'GET /api/media/7': reply({ body: mediaItemFor({}) }) },
+      account: { current: OFF_ACCOUNT },
     })
     const fake = fakePlayer()
     const { router } = renderDesktop({

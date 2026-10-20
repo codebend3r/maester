@@ -20,12 +20,17 @@ import {
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { ACCOUNT_COPY } from '@/renderer/Account/accountCopy'
+import { AccountRefused } from '@/renderer/Account/AccountRefused'
+import { SignInForm } from '@/renderer/Account/SignInForm'
+import { accountKey } from '@/renderer/desktop/accountApi'
 import { CONNECTION_STATUSES } from '@/renderer/desktop/playerConnection'
 import { serverApiFor, useServers } from '@/renderer/desktop/serverApi'
 import { NativePlaying } from '@/renderer/PlayPage/NativePlaying'
 import { Refused, useIsOutputFixed, Waiting } from '@/renderer/PlayPage/PlayPage'
 import { requestQuietly } from '@/renderer/PlayPage/playerServices'
 import { useChosenEngine } from '@/renderer/PlayPage/useChosenEngine'
+import { type AccountGate, GATE_KINDS, useAccountGate } from '@/renderer/ServerPage/accountGate'
 import styles from '@/renderer/ServerPage/ServerPage.module.scss'
 import {
   browserRefusalOf,
@@ -39,6 +44,7 @@ import {
 } from '@/renderer/ServerPage/serverServices'
 import { useDesktop } from '@/renderer/stores/desktop'
 import {
+  ACCOUNT_STATES,
   DESKTOP_REQUESTS,
   isOpaqueId,
   MENU_PLAYER_ACTIONS,
@@ -145,6 +151,74 @@ const CannotRead = ({
       <BrowserRefusal refusal={browser.refusal} />
     </Refused>
   )
+}
+
+/** The account keeps the title back: it is still read, the person signs in, waits for approval or sees why. */
+const AccountWall = ({
+  server,
+  mediaId,
+  gate,
+  onRetry,
+}: {
+  server: ServerView
+  mediaId: number
+  gate: Exclude<AccountGate, { kind: typeof GATE_KINDS.letIn }>
+  onRetry: () => void
+}) => {
+  switch (gate.kind) {
+    case GATE_KINDS.reading:
+      return <Waiting />
+    case GATE_KINDS.unread:
+      return (
+        <CannotRead server={server} mediaId={mediaId} message={gate.message} onRetry={onRetry} />
+      )
+    case GATE_KINDS.walled:
+      break
+    default: {
+      const unreachable: never = gate
+      return unreachable
+    }
+  }
+  const { account, state } = gate
+  switch (state) {
+    case ACCOUNT_STATES.signedOut:
+      return (
+        <Refused
+          title={SERVER_COPY.accountNeededTitle}
+          message={SERVER_COPY.signInNeeded(server.name)}
+          isHeadingFocused={false}
+        >
+          <SignInForm
+            serverId={server.serverId}
+            signInHost={account.signInHost}
+            isRemembered={account.isRemembered}
+          />
+        </Refused>
+      )
+    case ACCOUNT_STATES.pending:
+    case ACCOUNT_STATES.revoked:
+      return (
+        <Refused
+          title={SERVER_COPY.accountNeededTitle}
+          message={SERVER_COPY.approvedOnly(server.name)}
+        >
+          <AccountRefused serverId={server.serverId} state={state} email={account.email} />
+        </Refused>
+      )
+    case ACCOUNT_STATES.failed:
+      return (
+        <CannotRead
+          server={server}
+          mediaId={mediaId}
+          message={ACCOUNT_COPY.failed(server.name)}
+          onRetry={onRetry}
+        />
+      )
+    default: {
+      const unreachable: never = state
+      return unreachable
+    }
+  }
 }
 
 /** A locked title: the server's secret is asked for over a quiet page, and Cancel goes Home. */
@@ -290,9 +364,10 @@ const Ready = ({
 }
 
 /**
- * Reads the title from its server, asking for the admin password or the PIN when the server
- * hides or locks it, then plays it. A library locking mid-play asks again and resumes at
- * the last position the server saved.
+ * Reads the title from its server once the account lets it through (or the server has no
+ * accounts), asking for the admin password or the PIN when the server hides or locks it, then
+ * plays it. A library locking mid-play asks again, and an account refused mid-play asks to
+ * sign in or shows the refusal; either resumes at the last position the server saved.
  */
 const NativeTitle = ({
   server,
@@ -311,20 +386,25 @@ const NativeTitle = ({
     [serverId, mediaId],
   )
   const adminKey = useMemo(() => ['desktop', 'server', serverId, 'adminLock'], [serverId])
+  const { account, gate } = useAccountGate(serverId)
+  const isLetIn = gate.kind === GATE_KINDS.letIn
   const media = useQuery({
     queryKey: mediaKey,
     queryFn: () => api.getMedia(mediaId),
+    enabled: isLetIn,
     retry: false,
     // Reading the title again while it plays would move its resume point under the player.
     staleTime: Infinity,
     gcTime: 0,
   })
   const isHidden = media.error instanceof ApiError && media.error.status === 404
+  // Enforcement replaces the admin password with the account, so main refuses the call there.
+  const isAdminUsed = !isLetIn || gate.state !== ACCOUNT_STATES.approved
   // Only a missing title asks: while the admin lock is on, a locked library's titles are hidden.
   const adminLock = useQuery({
     queryKey: adminKey,
     queryFn: () => api.getAdminLock(),
-    enabled: isHidden,
+    enabled: isHidden && isAdminUsed,
     retry: false,
     gcTime: 0,
   })
@@ -334,6 +414,10 @@ const NativeTitle = ({
   const hasRecordedPlay = useRef(false)
   const [resumeFrom, setResumeFrom] = useState<number | null>(null)
   const hasNoted = useRef(false)
+  // When each account refusal stopped the player.
+  const [accountRefusals, setAccountRefusals] = useState<number[]>([])
+  // The saved position at the last refusal that earned a reload: one reload per stretch without progress.
+  const refusedAtSaved = useRef<number | null>(null)
 
   // The admin lock is read again only when a title is missing again.
   const reread = () =>
@@ -344,12 +428,29 @@ const NativeTitle = ({
 
   const onEngineError = useCallback<NonNullable<PlayerServices['onEngineError']>>(
     ({ reason }) => {
+      if (reason === PLAYER_ERROR_REASONS.account) {
+        setResumeFrom(lastSaved.current)
+        void queryClient.invalidateQueries({ queryKey: accountKey(serverId) })
+        // A refusal again with nothing played since keeps its player, showing the refusal, so a
+        // server that keeps refusing an approved account is not asked in a loop.
+        if (refusedAtSaved.current === lastSaved.current) return
+        refusedAtSaved.current = lastSaved.current
+        setAccountRefusals((all) => [...all, Date.now()])
+        return
+      }
       if (reason !== PLAYER_ERROR_REASONS.locked) return
       setResumeFrom(lastSaved.current)
       void queryClient.invalidateQueries({ queryKey: mediaKey })
     },
-    [queryClient, mediaKey],
+    [queryClient, mediaKey, serverId],
   )
+
+  // Each refusal is a new object, so every one reads the account again.
+  const refusal = media.error instanceof ApiError ? media.error.refusal : null
+  useEffect(() => {
+    if (refusal === null) return
+    void queryClient.invalidateQueries({ queryKey: accountKey(serverId) })
+  }, [queryClient, serverId, refusal])
 
   // A relock before the first save resumes where this title started, not at 0.
   useEffect(() => {
@@ -372,11 +473,26 @@ const NativeTitle = ({
     })
   }, [client, serverId, media.data])
 
+  const rereadRefusals = accountRefusals.filter(
+    (refusedAt) => account.dataUpdatedAt >= refusedAt,
+  ).length
+  // A failed read of an account already known leaves the page as it was.
+  if (gate.kind !== GATE_KINDS.letIn) {
+    return (
+      <AccountWall
+        server={server}
+        mediaId={mediaId}
+        gate={gate}
+        onRetry={() => void account.refetch()}
+      />
+    )
+  }
   if (media.isSuccess) {
     return (
       <Ready
-        // Each read of the title remounts the player, so an unlock mid-play starts a new load.
-        key={media.dataUpdatedAt}
+        // Each read of the title remounts the player, so an unlock mid-play starts a new load, and so
+        // does an account read after a refusal that still lets the title through.
+        key={`${media.dataUpdatedAt}:${rereadRefusals}`}
         media={media.data}
         server={server}
         api={api}
@@ -393,6 +509,8 @@ const NativeTitle = ({
   }
   // A read after an unlock keeps the last refusal until it answers, which must not ask again.
   if (!media.isError || media.isFetching) return <Waiting />
+  // The account is read again for a refusal; its answer may replace this page.
+  if (refusal !== null && account.isFetching) return <Waiting />
   const { error } = media
   if (isLockedError(error)) {
     return (
@@ -407,6 +525,7 @@ const NativeTitle = ({
     )
   }
   if (isHidden) {
+    if (!isAdminUsed) return <Refused message={SERVER_COPY.gone(server.name)} />
     if (adminLock.isError) {
       return (
         <CannotRead

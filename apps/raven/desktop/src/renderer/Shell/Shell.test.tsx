@@ -3,12 +3,14 @@ import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NavigationType } from 'react-router-dom'
 import { DOWNLOADS_KEY } from '@/renderer/desktop/downloadsApi'
+import { accountKey } from '@/renderer/desktop/accountApi'
+import { accountOf } from '@/renderer/test/accountFakes'
 import { useDragging } from '@/renderer/stores/dragging'
 import { useNotice } from '@/renderer/stores/notice'
 import { useUpdateNotice } from '@/renderer/stores/updateNotice'
 import { DL_5, viewOf } from '@/renderer/test/downloadFakes'
 import { fakeClient, renderDesktop, STUB_ROUTES } from '@/renderer/test/render'
-import { DESKTOP_REQUESTS } from '@/shared/protocol'
+import { ACCOUNT_STATES, DESKTOP_EVENTS, DESKTOP_REQUESTS } from '@/shared/protocol'
 
 const ID_A = '11111111-1111-4111-8111-111111111111'
 const ID_B = '22222222-2222-4222-8222-222222222222'
@@ -185,6 +187,23 @@ describe('Shell', () => {
       downloads: [],
       autoDeleteDefault: true,
     })
+  })
+
+  it("seeds a server's account query from an account event, and no other, without asking main", async () => {
+    const client = fakeClient()
+    const { queryClient } = renderDesktop({ client, routes: STUB_ROUTES })
+    await settled()
+    const other = '66666666-6666-4666-8666-666666666666'
+    const before = accountOf({ serverId: other })
+    queryClient.setQueryData(accountKey(ID_C), accountOf({ serverId: ID_C }))
+    queryClient.setQueryData(accountKey(other), before)
+    const next = accountOf({ serverId: ID_C, state: ACCOUNT_STATES.revoked })
+    await client.emit({ type: DESKTOP_EVENTS.account, account: next })
+    expect(queryClient.getQueryState(accountKey(ID_C))?.data ?? null).toEqual(next)
+    expect(queryClient.getQueryState(accountKey(other))?.data ?? null).toBe(before)
+    expect(
+      client.request.mock.calls.some(([request]) => request.type === DESKTOP_REQUESTS.readAccount),
+    ).toBe(false)
   })
 
   it("lists Home's recents again when a downloads event drops a download, not for progress", async () => {

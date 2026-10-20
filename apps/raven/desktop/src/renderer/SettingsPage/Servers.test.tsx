@@ -2,10 +2,13 @@ import { describe, expect, it } from 'bun:test'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RECENTS_KEY } from '@/renderer/Shell/openReply'
+import { accountOf } from '@/renderer/test/accountFakes'
 import { DL_1, DL_2, DL_3, viewOf } from '@/renderer/test/downloadFakes'
 import { fakeClient, renderDesktop } from '@/renderer/test/render'
 import { S, VHAGAR } from '@/renderer/test/serverFakes'
 import {
+  ACCOUNT_STATES,
+  type AccountView,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   type DesktopReply,
@@ -28,6 +31,9 @@ type Answers = {
   addServer?: DesktopReply
   renameServer?: DesktopReply
   removeServer?: DesktopReply
+  signIn?: DesktopReply
+  refreshAccount?: DesktopReply
+  openAccountPage?: DesktopReply
 }
 
 /** Main as Settings sees it: it keeps the servers, and answers each change with the list or `answers`. */
@@ -35,12 +41,29 @@ const mainWith = ({
   servers = [VHAGAR, MELEYS],
   answers = {},
   downloads = [],
+  accounts = [],
 }: {
   servers?: ServerView[]
   answers?: Answers
   downloads?: DownloadView[]
+  /** What main answers readAccount with, by server; a server not listed answers `done`, as an old main would. */
+  accounts?: AccountView[]
 } = {}) => {
-  const stored = { servers }
+  const stored = { servers, accounts }
+  const accountReply = (serverId: string): DesktopReply => {
+    const account = stored.accounts.find((candidate) => candidate.serverId === serverId)
+    return account === undefined
+      ? { type: DESKTOP_REPLIES.done }
+      : { type: DESKTOP_REPLIES.account, account }
+  }
+  const keep = (reply: DesktopReply): DesktopReply => {
+    if (reply.type !== DESKTOP_REPLIES.account) return reply
+    stored.accounts = [
+      ...stored.accounts.filter((candidate) => candidate.serverId !== reply.account.serverId),
+      reply.account,
+    ]
+    return reply
+  }
   const listed = (): DesktopReply => ({ type: 'servers', servers: stored.servers })
   const client = fakeClient({
     request: async (asked: DesktopRequest) => {
@@ -65,8 +88,30 @@ const mainWith = ({
           if (answers.removeServer !== undefined) return answers.removeServer
           stored.servers = stored.servers.filter((server) => server.serverId !== asked.serverId)
           return listed()
+        case DESKTOP_REQUESTS.readAccount:
+          return accountReply(asked.serverId)
+        case DESKTOP_REQUESTS.refreshAccount:
+          return keep(answers.refreshAccount ?? accountReply(asked.serverId))
+        case DESKTOP_REQUESTS.signIn:
+          return keep(
+            answers.signIn ?? {
+              type: DESKTOP_REPLIES.account,
+              account: accountOf({
+                serverId: asked.serverId,
+                state: ACCOUNT_STATES.approved,
+                email: asked.email,
+              }),
+            },
+          )
+        case DESKTOP_REQUESTS.signOut:
+          return keep({
+            type: DESKTOP_REPLIES.account,
+            account: accountOf({ serverId: asked.serverId }),
+          })
+        case DESKTOP_REQUESTS.openAccountPage:
+          return answers.openAccountPage ?? { type: DESKTOP_REPLIES.done }
         default:
-          return { type: 'done' }
+          return { type: DESKTOP_REPLIES.done }
       }
     },
   })
@@ -415,7 +460,9 @@ describe('Servers', () => {
   })
 
   it('says nothing when the person declines the prompt, and keeps what they typed', async () => {
-    const { section, client } = await renderServers({ answers: { addServer: { type: 'done' } } })
+    const { section, client } = await renderServers({
+      answers: { addServer: { type: DESKTOP_REPLIES.done } },
+    })
     const field = within(section).getByRole('textbox', { name: 'Server address' })
     await userEvent.type(field, 'https://raven.example')
     await userEvent.click(within(section).getByRole('button', { name: 'Add server' }))
@@ -459,7 +506,7 @@ describe('Servers', () => {
         if (asked.type === DESKTOP_REQUESTS.listServers)
           return { type: 'servers', servers: [VHAGAR] }
         if (asked.type === DESKTOP_REQUESTS.addServer) return held.promise
-        return { type: 'done' }
+        return { type: DESKTOP_REPLIES.done }
       },
     })
     renderDesktop({ client, route: '/settings' })
@@ -474,7 +521,7 @@ describe('Servers', () => {
     await userEvent.click(button)
     expect(button).toHaveFocus()
     expect(sentOf({ client, type: 'addServer' })).toHaveLength(1)
-    await act(async () => held.resolve({ type: 'done' }))
+    await act(async () => held.resolve({ type: DESKTOP_REPLIES.done }))
     await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'false'))
   })
 
@@ -505,7 +552,7 @@ describe('Servers', () => {
         if (asked.type === DESKTOP_REQUESTS.listServers)
           return { type: 'servers', servers: [VHAGAR] }
         if (asked.type === DESKTOP_REQUESTS.removeServer) throw new Error('port closed')
-        return { type: 'done' }
+        return { type: DESKTOP_REPLIES.done }
       },
     })
     renderDesktop({ client, route: '/settings' })
@@ -545,12 +592,176 @@ describe('Servers', () => {
       request: async (asked) =>
         asked.type === DESKTOP_REQUESTS.listServers
           ? { type: 'refused', message: 'raven player could not read its servers.' }
-          : { type: 'done' },
+          : { type: DESKTOP_REPLIES.done },
     })
     renderDesktop({ client, route: '/settings' })
     const section = await screen.findByRole('region', { name: 'Servers' })
     expect(
       await within(section).findByText('raven player could not read its servers.'),
     ).toBeInTheDocument()
+  })
+})
+
+const ME = 'me@example.com'
+
+const approved = (overrides: Partial<AccountView> = {}) =>
+  accountOf({ state: ACCOUNT_STATES.approved, email: ME, ...overrides })
+
+describe('Servers accounts', () => {
+  it('shows who is signed in and a Sign out for a ready server', async () => {
+    const { section } = await renderServers({ servers: [VHAGAR], accounts: [approved()] })
+    const row = await rowOf({ section, name: 'Vhagar' })
+    expect(await within(row).findByText(`Signed in as ${ME}.`)).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: 'Sign out of Vhagar' })).toBeInTheDocument()
+    expect(within(row).queryByRole('button', { name: 'Sign in to Vhagar' })).toBeNull()
+  })
+
+  it('offers Sign in for a signed out server, and opens the form in its row', async () => {
+    const { section } = await renderServers({ servers: [VHAGAR], accounts: [accountOf()] })
+    const row = await rowOf({ section, name: 'Vhagar' })
+    expect(await within(row).findByText('Not signed in.')).toBeInTheDocument()
+    await userEvent.click(within(row).getByRole('button', { name: 'Sign in to Vhagar' }))
+    expect(within(row).getByLabelText('Email')).toHaveFocus()
+    expect(within(row).getByLabelText('Password')).toBeInTheDocument()
+    expect(within(row).getByText('Signs in with project.supabase.co.')).toBeInTheDocument()
+  })
+
+  it('signs in from the row and then shows the email with Sign out', async () => {
+    const { section, client } = await renderServers({
+      servers: [VHAGAR],
+      accounts: [accountOf()],
+    })
+    const row = await rowOf({ section, name: 'Vhagar' })
+    await userEvent.click(await within(row).findByRole('button', { name: 'Sign in to Vhagar' }))
+    await userEvent.type(within(row).getByLabelText('Email'), ME)
+    await userEvent.type(within(row).getByLabelText('Password'), 'hunter2')
+    await userEvent.click(within(row).getByRole('button', { name: 'Sign in' }))
+    expect(await within(row).findByText(`Signed in as ${ME}.`)).toBeInTheDocument()
+    expect(within(row).queryByLabelText('Password')).toBeNull()
+    expect(sentOf({ client, type: DESKTOP_REQUESTS.signIn })).toEqual([
+      { type: DESKTOP_REQUESTS.signIn, serverId: S, email: ME, password: 'hunter2' },
+    ])
+    expect(within(row).getByRole('button', { name: 'Sign out of Vhagar' })).toHaveFocus()
+  })
+
+  it('says why a sign in was refused and keeps the form open', async () => {
+    const { section } = await renderServers({
+      servers: [VHAGAR],
+      accounts: [accountOf()],
+      answers: {
+        signIn: { type: DESKTOP_REPLIES.refused, message: 'Email or password is wrong.' },
+      },
+    })
+    const row = await rowOf({ section, name: 'Vhagar' })
+    await userEvent.click(await within(row).findByRole('button', { name: 'Sign in to Vhagar' }))
+    await userEvent.type(within(row).getByLabelText('Email'), ME)
+    await userEvent.type(within(row).getByLabelText('Password'), 'nope')
+    await userEvent.click(within(row).getByRole('button', { name: 'Sign in' }))
+    expect(await within(row).findByRole('alert')).toHaveTextContent('Email or password is wrong.')
+    expect(within(row).getByLabelText('Password')).toHaveValue('')
+  })
+
+  it('closes the form on Cancel and puts focus back on Sign in', async () => {
+    const { section } = await renderServers({ servers: [VHAGAR], accounts: [accountOf()] })
+    const row = await rowOf({ section, name: 'Vhagar' })
+    await userEvent.click(await within(row).findByRole('button', { name: 'Sign in to Vhagar' }))
+    await userEvent.click(within(row).getByRole('button', { name: 'Cancel' }))
+    expect(within(row).queryByLabelText('Password')).toBeNull()
+    expect(within(row).getByRole('button', { name: 'Sign in to Vhagar' })).toHaveFocus()
+  })
+
+  it('signs out from the row and goes back to Sign in', async () => {
+    const { section, client } = await renderServers({
+      servers: [VHAGAR],
+      accounts: [approved()],
+    })
+    const row = await rowOf({ section, name: 'Vhagar' })
+    await userEvent.click(await within(row).findByRole('button', { name: 'Sign out of Vhagar' }))
+    expect(await within(row).findByText('Not signed in.')).toBeInTheDocument()
+    expect(sentOf({ client, type: DESKTOP_REQUESTS.signOut })).toEqual([
+      { type: DESKTOP_REQUESTS.signOut, serverId: S },
+    ])
+    expect(within(row).getByRole('button', { name: 'Sign in to Vhagar' })).toHaveFocus()
+  })
+
+  it('shows a pending account as waiting for approval, and re-renders once it is approved', async () => {
+    const { section } = await renderServers({
+      servers: [VHAGAR],
+      accounts: [approved({ state: ACCOUNT_STATES.pending })],
+      answers: { refreshAccount: { type: DESKTOP_REPLIES.account, account: approved() } },
+    })
+    const row = await rowOf({ section, name: 'Vhagar' })
+    expect(await within(row).findByText('Waiting for approval')).toBeInTheDocument()
+    await userEvent.click(within(row).getByRole('button', { name: 'Check again' }))
+    expect(await within(row).findByText(`Signed in as ${ME}.`)).toBeInTheDocument()
+    expect(within(row).queryByText('Waiting for approval')).toBeNull()
+  })
+
+  it('shows a removed account as removed', async () => {
+    const { section } = await renderServers({
+      servers: [VHAGAR],
+      accounts: [approved({ state: ACCOUNT_STATES.revoked })],
+    })
+    const row = await rowOf({ section, name: 'Vhagar' })
+    expect(await within(row).findByText('Your access was removed')).toBeInTheDocument()
+  })
+
+  it('says accounts are unavailable on a server that cannot take them right now, and checks again', async () => {
+    const { section, client } = await renderServers({
+      servers: [VHAGAR],
+      accounts: [accountOf({ state: ACCOUNT_STATES.unavailable, signInHost: null })],
+      answers: { refreshAccount: { type: DESKTOP_REPLIES.account, account: approved() } },
+    })
+    const row = await rowOf({ section, name: 'Vhagar' })
+    expect(
+      await within(row).findByText('Accounts are unavailable on Vhagar right now.'),
+    ).toBeInTheDocument()
+    expect(within(row).queryByRole('button', { name: /^Sign in/ })).toBeNull()
+    await userEvent.click(within(row).getByRole('button', { name: 'Check again' }))
+    expect(await within(row).findByText(`Signed in as ${ME}.`)).toBeInTheDocument()
+    expect(sentOf({ client, type: DESKTOP_REQUESTS.refreshAccount })).toHaveLength(1)
+  })
+
+  it('offers Check again when main could not tell the account', async () => {
+    const { section, client } = await renderServers({
+      servers: [VHAGAR],
+      accounts: [accountOf({ state: ACCOUNT_STATES.failed })],
+      answers: { refreshAccount: { type: DESKTOP_REPLIES.account, account: approved() } },
+    })
+    const row = await rowOf({ section, name: 'Vhagar' })
+    expect(
+      await within(row).findByText('raven player could not check your account on Vhagar.'),
+    ).toBeInTheDocument()
+    await userEvent.click(within(row).getByRole('button', { name: 'Check again' }))
+    expect(await within(row).findByText(`Signed in as ${ME}.`)).toBeInTheDocument()
+    expect(sentOf({ client, type: DESKTOP_REQUESTS.refreshAccount })).toHaveLength(1)
+  })
+
+  it('shows nothing new for a server with accounts off, or one too old to have them', async () => {
+    const { section } = await renderServers({
+      servers: [VHAGAR],
+      accounts: [accountOf({ state: ACCOUNT_STATES.off, signInHost: null })],
+    })
+    const row = await rowOf({ section, name: 'Vhagar' })
+    await waitFor(() => expect(within(row).queryByText('Not signed in.')).toBeNull())
+    expect(within(row).queryByRole('button', { name: /^Sign (in|out)/ })).toBeNull()
+    expect(within(row).getAllByRole('button')).toHaveLength(2)
+  })
+
+  it('shows nothing new for a server main has no account for (an older server)', async () => {
+    const { section } = await renderServers({ servers: [VHAGAR] })
+    const row = await rowOf({ section, name: 'Vhagar' })
+    expect(within(row).getAllByRole('button')).toHaveLength(2)
+    expect(within(row).queryByText('Not signed in.')).toBeNull()
+  })
+
+  it('keeps one server signed in while another is not', async () => {
+    const { section } = await renderServers({
+      accounts: [approved(), accountOf({ serverId: T })],
+    })
+    const vhagar = await rowOf({ section, name: 'Vhagar' })
+    const meleys = await rowOf({ section, name: 'Meleys' })
+    expect(await within(vhagar).findByText(`Signed in as ${ME}.`)).toBeInTheDocument()
+    expect(await within(meleys).findByText('Not signed in.')).toBeInTheDocument()
   })
 })

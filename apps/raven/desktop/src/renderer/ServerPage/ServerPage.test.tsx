@@ -1,22 +1,42 @@
 import { describe, expect, it, mock } from 'bun:test'
-import { PLAYER_COMMANDS, type PlayerCommand, type PlayerEvent } from '@raven/core'
+import {
+  ADMIN_LOCK_STATES,
+  AUTH_REFUSALS,
+  PLAYER_COMMANDS,
+  PLAYER_ERROR_REASONS,
+  PLAYER_EVENTS,
+  PLAYER_SOURCE_KINDS,
+  type PlayerCommand,
+  type PlayerEvent,
+} from '@raven/core'
 import type { NativePlayer } from '@raven/ui'
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NavigationType } from 'react-router-dom'
 import { SERVER_COPY } from '@/renderer/ServerPage/serverServices'
+import { accountOf } from '@/renderer/test/accountFakes'
+import { ACCOUNT_COPY } from '@/renderer/Account/accountCopy'
+import { accountKey } from '@/renderer/desktop/accountApi'
 import { connectionsOf, renderDesktop } from '@/renderer/test/render'
 import { PlayerRefusal } from '@/renderer/desktop/playerConnection'
 import {
   callNamesOf,
   heldReply,
+  OFF_ACCOUNT,
   reply,
   S,
   sentOfType,
   serverCallsOf,
   serverClient,
 } from '@/renderer/test/serverFakes'
-import { DESKTOP_REQUESTS, type DesktopReply, ENGINE_STOPPED } from '@/shared/protocol'
+import {
+  ACCOUNT_STATES,
+  type AccountView,
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  type DesktopReply,
+  ENGINE_STOPPED,
+} from '@/shared/protocol'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
 const OTHER = '44444444-4444-4444-8444-444444444444'
@@ -50,7 +70,9 @@ const fakePlayer = () => {
 
 type FakePlayer = ReturnType<typeof fakePlayer>
 
-const loadsOf = (fake: FakePlayer): Extract<PlayerCommand, { type: 'load' }>[] =>
+const loadsOf = (
+  fake: FakePlayer,
+): Extract<PlayerCommand, { type: typeof PLAYER_COMMANDS.load }>[] =>
   fake.send.mock.calls
     .map(([command]) => command)
     .flatMap((command) => (command.type === PLAYER_COMMANDS.load ? [command] : []))
@@ -69,22 +91,24 @@ const loaded = ({ fake, count = 1 }: { fake: FakePlayer; count?: number }) =>
 const MAIN_SERVER_GONE = 'That server is no longer in raven player.'
 
 const NO_BROWSER: DesktopReply = {
-  type: 'refused',
+  type: DESKTOP_REPLIES.refused,
   message: 'raven player could not open your browser.',
 }
 
 const playTitle = ({
   calls,
   replies,
+  account = { current: OFF_ACCOUNT },
   state = { at: 0, next: [] },
   route = `/server/${S}/7`,
 }: {
   calls: Parameters<typeof serverClient>[0]['calls']
   replies?: Parameters<typeof serverClient>[0]['replies']
+  account?: { current: AccountView }
   state?: unknown
   route?: string
 }) => {
-  const client = serverClient({ calls, replies })
+  const client = serverClient({ calls, replies, account })
   const fake = fakePlayer()
   const rendered = renderDesktop({
     client,
@@ -108,15 +132,21 @@ describe('ServerPage', () => {
     })
     await waitFor(() => expect(loadsOf(fake)).toHaveLength(1))
     expect(loadsOf(fake)[0]).toEqual({
-      type: 'load',
-      source: { kind: 'server', serverId: S, mediaId: 7 },
+      type: PLAYER_COMMANDS.load,
+      source: { kind: PLAYER_SOURCE_KINDS.server, serverId: S, mediaId: 7 },
       start: 30,
       audio: null,
       subtitle: null,
     })
     expect(await screen.findByRole('heading', { name: 'Episode 1' })).toBeInTheDocument()
-    expect(sentOfType({ client, type: 'noteServerTitle' })).toEqual([
-      { type: 'noteServerTitle', serverId: S, mediaId: 7, label: 'Episode 1', watched: 0 },
+    expect(sentOfType({ client, type: DESKTOP_REQUESTS.noteServerTitle })).toEqual([
+      {
+        type: DESKTOP_REQUESTS.noteServerTitle,
+        serverId: S,
+        mediaId: 7,
+        label: 'Episode 1',
+        watched: 0,
+      },
     ])
   })
 
@@ -133,7 +163,7 @@ describe('ServerPage', () => {
     await enter({ label: 'PIN', value: '1234' })
     await waitFor(() => expect(loadsOf(fake)).toHaveLength(1))
     expect(serverCallsOf(client)).toContainEqual({
-      type: 'serverCall',
+      type: DESKTOP_REQUESTS.serverCall,
       serverId: S,
       method: 'POST',
       path: '/api/lock/unlock',
@@ -229,7 +259,7 @@ describe('ServerPage', () => {
     const { client } = playTitle({
       calls: {
         'GET /api/media/7': {
-          type: 'serverUnreachable',
+          type: DESKTOP_REPLIES.serverUnreachable,
           message: 'raven player could not reach raven.example.',
         },
       },
@@ -242,15 +272,15 @@ describe('ServerPage', () => {
       expect(callNamesOf(client)).toEqual(['GET /api/media/7', 'GET /api/media/7']),
     )
     await userEvent.click(await screen.findByRole('button', { name: 'Open in browser' }))
-    expect(sentOfType({ client, type: 'openInBrowser' })).toEqual([
-      { type: 'openInBrowser', serverId: S, mediaId: 7 },
+    expect(sentOfType({ client, type: DESKTOP_REQUESTS.openInBrowser })).toEqual([
+      { type: DESKTOP_REQUESTS.openInBrowser, serverId: S, mediaId: 7 },
     ])
   })
 
   it("says main's reason when it will not open the browser", async () => {
     playTitle({
       calls: {
-        'GET /api/media/7': { type: 'serverUnreachable', message: 'No answer.' },
+        'GET /api/media/7': { type: DESKTOP_REPLIES.serverUnreachable, message: 'No answer.' },
       },
       replies: { openInBrowser: NO_BROWSER },
     })
@@ -261,7 +291,7 @@ describe('ServerPage', () => {
   it('offers no browser for a server raven player no longer has', async () => {
     playTitle({
       calls: {
-        'GET /api/media/7': { type: 'refused', message: MAIN_SERVER_GONE },
+        'GET /api/media/7': { type: DESKTOP_REPLIES.refused, message: MAIN_SERVER_GONE },
       },
     })
     expect(await screen.findByText(SERVER_COPY.unknownServer)).toBeInTheDocument()
@@ -286,7 +316,11 @@ describe('ServerPage', () => {
       replies: { openInBrowser: NO_BROWSER },
     })
     await loaded({ fake })
-    fake.emit({ type: 'error', reason: 'open', message: 'The file is damaged.' })
+    fake.emit({
+      type: PLAYER_EVENTS.error,
+      reason: PLAYER_ERROR_REASONS.open,
+      message: 'The file is damaged.',
+    })
     await userEvent.click(await screen.findByRole('button', { name: 'Open in browser' }))
     expect(await screen.findByText(NO_BROWSER.message)).toBeInTheDocument()
   })
@@ -294,7 +328,11 @@ describe('ServerPage', () => {
   it('offers no browser under Unplayable once the server is gone mid-play', async () => {
     const { fake } = playTitle({ calls: { 'GET /api/media/7': reply({ body: EPISODE }) } })
     await loaded({ fake })
-    fake.emit({ type: 'error', reason: 'open', message: MAIN_SERVER_GONE })
+    fake.emit({
+      type: PLAYER_EVENTS.error,
+      reason: PLAYER_ERROR_REASONS.open,
+      message: MAIN_SERVER_GONE,
+    })
     expect(await screen.findByText(SERVER_COPY.unknownServer)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Open in browser' })).toBeNull()
   })
@@ -320,8 +358,8 @@ describe('ServerPage', () => {
       player: connectionsOf({ status: 'unavailable', message: 'No engine.' }),
     })
     expect(await screen.findByText(SERVER_COPY.inBrowser('Vhagar'))).toBeInTheDocument()
-    expect(sentOfType({ client, type: 'openInBrowser' })).toEqual([
-      { type: 'openInBrowser', serverId: S, mediaId: 7 },
+    expect(sentOfType({ client, type: DESKTOP_REQUESTS.openInBrowser })).toEqual([
+      { type: DESKTOP_REQUESTS.openInBrowser, serverId: S, mediaId: 7 },
     ])
     expect(serverCallsOf(client)).toEqual([])
   })
@@ -329,12 +367,16 @@ describe('ServerPage', () => {
   it('offers the browser when the video engine stops mid-play', async () => {
     const { client, fake } = playTitle({ calls: { 'GET /api/media/7': reply({ body: EPISODE }) } })
     await loaded({ fake })
-    fake.emit({ type: 'error', reason: 'engine', message: ENGINE_STOPPED })
+    fake.emit({
+      type: PLAYER_EVENTS.error,
+      reason: PLAYER_ERROR_REASONS.engine,
+      message: ENGINE_STOPPED,
+    })
     expect(await screen.findByText(SERVER_COPY.engineStopped)).toBeInTheDocument()
-    expect(sentOfType({ client, type: 'openInBrowser' })).toEqual([])
+    expect(sentOfType({ client, type: DESKTOP_REQUESTS.openInBrowser })).toEqual([])
     await userEvent.click(screen.getByRole('button', { name: 'Open in browser' }))
-    expect(sentOfType({ client, type: 'openInBrowser' })).toEqual([
-      { type: 'openInBrowser', serverId: S, mediaId: 7 },
+    expect(sentOfType({ client, type: DESKTOP_REQUESTS.openInBrowser })).toEqual([
+      { type: DESKTOP_REQUESTS.openInBrowser, serverId: S, mediaId: 7 },
     ])
   })
 
@@ -392,23 +434,23 @@ describe('ServerPage', () => {
       },
     })
     await loaded({ fake })
-    fake.emit({ type: 'paused', paused: false })
-    fake.emit({ type: 'time', time: 40 })
+    fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+    fake.emit({ type: PLAYER_EVENTS.time, time: 40 })
     await waitFor(() =>
       expect(serverCallsOf(client)).toContainEqual({
-        type: 'serverCall',
+        type: DESKTOP_REQUESTS.serverCall,
         serverId: S,
         method: 'PUT',
         path: '/api/media/7/progress',
         body: '{"position":40}',
       }),
     )
-    fake.emit({ type: 'error', reason: 'locked', message: 'x' })
+    fake.emit({ type: PLAYER_EVENTS.error, reason: PLAYER_ERROR_REASONS.locked, message: 'x' })
     expect(await screen.findByRole('dialog', { name: 'Locked library' })).toBeInTheDocument()
     await enter({ label: 'PIN', value: '1234' })
     await waitFor(() => expect(loadsOf(fake)).toHaveLength(2))
     expect(loadsOf(fake)[1]).toMatchObject({
-      source: { kind: 'server', serverId: S, mediaId: 7 },
+      source: { kind: PLAYER_SOURCE_KINDS.server, serverId: S, mediaId: 7 },
       start: 40,
     })
   })
@@ -422,7 +464,7 @@ describe('ServerPage', () => {
       state: { at: 300, next: [] },
     })
     await loaded({ fake })
-    fake.emit({ type: 'error', reason: 'locked', message: 'x' })
+    fake.emit({ type: PLAYER_EVENTS.error, reason: PLAYER_ERROR_REASONS.locked, message: 'x' })
     await enter({ label: 'PIN', value: '1234' })
     await waitFor(() => expect(loadsOf(fake)).toHaveLength(2))
     expect(loadsOf(fake).map(({ start }) => start)).toEqual([300, 300])
@@ -438,13 +480,13 @@ describe('ServerPage', () => {
       },
     })
     await loaded({ fake })
-    fake.emit({ type: 'paused', paused: false })
+    fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
     await waitFor(() => expect(callNamesOf(client)).toContain('POST /api/media/7/plays'))
-    fake.emit({ type: 'error', reason: 'locked', message: 'x' })
+    fake.emit({ type: PLAYER_EVENTS.error, reason: PLAYER_ERROR_REASONS.locked, message: 'x' })
     await enter({ label: 'PIN', value: '1234' })
     await loaded({ fake, count: 2 })
-    fake.emit({ type: 'paused', paused: false })
-    fake.emit({ type: 'time', time: 50 })
+    fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+    fake.emit({ type: PLAYER_EVENTS.time, time: 50 })
     await waitFor(() => expect(callNamesOf(client)).toContain('PUT /api/media/7/progress'))
     expect(callNamesOf(client).filter((name) => name === 'POST /api/media/7/plays')).toHaveLength(1)
   })
@@ -461,16 +503,16 @@ describe('ServerPage', () => {
       state: { at: 0, next: [8] },
     })
     await loaded({ fake })
-    fake.emit({ type: 'duration', duration: 100 })
-    fake.emit({ type: 'paused', paused: false })
-    fake.emit({ type: 'time', time: 40 })
+    fake.emit({ type: PLAYER_EVENTS.duration, duration: 100 })
+    fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+    fake.emit({ type: PLAYER_EVENTS.time, time: 40 })
     await act(async () =>
       next.resolve(reply({ body: mediaItemFor({ id: 8, title: 'Episode 2' }) })),
     )
     await screen.findByRole('link', { name: 'Up next: Episode 2' })
     await act(async () => router.navigate('/'))
-    const notes = sentOfType({ client, type: 'noteServerTitle' })
-    expect(notes.at(-1)).toMatchObject({ type: 'noteServerTitle', watched: 0.4 })
+    const notes = sentOfType({ client, type: DESKTOP_REQUESTS.noteServerTitle })
+    expect(notes.at(-1)).toMatchObject({ type: DESKTOP_REQUESTS.noteServerTitle, watched: 0.4 })
   })
 
   it('asks again when the title stays locked after an unlock mid-play', async () => {
@@ -481,7 +523,7 @@ describe('ServerPage', () => {
       },
     })
     await loaded({ fake })
-    fake.emit({ type: 'error', reason: 'locked', message: 'x' })
+    fake.emit({ type: PLAYER_EVENTS.error, reason: PLAYER_ERROR_REASONS.locked, message: 'x' })
     await enter({ label: 'PIN', value: '1234' })
     await waitFor(() =>
       expect(callNamesOf(client).filter((name) => name === 'GET /api/media/7')).toHaveLength(3),
@@ -530,5 +572,390 @@ describe('ServerPage', () => {
     renderDesktop({ client, route: `/server/${OTHER}/7` })
     expect(await screen.findByText(SERVER_COPY.unknownServer)).toBeInTheDocument()
     expect(serverCallsOf(client)).toEqual([])
+  })
+})
+
+const APPROVED = accountOf({ state: ACCOUNT_STATES.approved, email: 'me@example.com' })
+const ACCOUNT_DONE = (account: AccountView): DesktopReply => ({
+  type: DESKTOP_REPLIES.account,
+  account,
+})
+const REFUSED_SIGNED_OUT = reply({
+  status: 401,
+  body: { reason: AUTH_REFUSALS.signedOut, message: 'Sign in to Vhagar.' },
+})
+
+describe('ServerPage accounts', () => {
+  it('asks for sign in in place of the player, then plays once approved', async () => {
+    const account = { current: accountOf() }
+    const { client, fake } = playTitle({
+      calls: { 'GET /api/media/7': reply({ body: EPISODE }) },
+      account,
+      replies: { signIn: ACCOUNT_DONE(APPROVED) },
+    })
+    expect(
+      await screen.findByRole('heading', { name: SERVER_COPY.accountNeededTitle }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(SERVER_COPY.signInNeeded('Vhagar'))).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull()
+    expect(screen.getByLabelText('Email')).toHaveFocus()
+    expect(callNamesOf(client)).toEqual([])
+    expect(loadsOf(fake)).toHaveLength(0)
+    await userEvent.type(screen.getByLabelText('Email'), 'me@example.com')
+    await userEvent.type(screen.getByLabelText('Password'), 'hunter2')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(loadsOf(fake)).toHaveLength(1))
+    expect(callNamesOf(client)).toEqual(['GET /api/media/7'])
+    expect(sentOfType({ client, type: DESKTOP_REQUESTS.signIn })).toEqual([
+      { type: DESKTOP_REQUESTS.signIn, serverId: S, email: 'me@example.com', password: 'hunter2' },
+    ])
+  })
+
+  it.each([
+    { state: ACCOUNT_STATES.pending, title: 'Waiting for approval' },
+    { state: ACCOUNT_STATES.revoked, title: 'Your access was removed' },
+  ])(
+    'says an account that is $state is not let in, and reads no title',
+    async ({ state, title }) => {
+      const { client, fake } = playTitle({
+        calls: { 'GET /api/media/7': reply({ body: EPISODE }) },
+        account: { current: accountOf({ state, email: 'me@example.com' }) },
+      })
+      expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument()
+      expect(screen.getByText(SERVER_COPY.approvedOnly('Vhagar'))).toBeInTheDocument()
+      expect(callNamesOf(client)).toEqual([])
+      expect(loadsOf(fake)).toHaveLength(0)
+    },
+  )
+
+  it('plays once Check again finds the account approved', async () => {
+    const { fake } = playTitle({
+      calls: { 'GET /api/media/7': reply({ body: EPISODE }) },
+      account: { current: accountOf({ state: ACCOUNT_STATES.pending }) },
+      replies: { refreshAccount: ACCOUNT_DONE(APPROVED) },
+    })
+    await userEvent.click(await screen.findByRole('button', { name: 'Check again' }))
+    await waitFor(() => expect(loadsOf(fake)).toHaveLength(1))
+  })
+
+  it.each([ACCOUNT_STATES.off, ACCOUNT_STATES.unavailable, ACCOUNT_STATES.approved])(
+    'plays when the account is %s',
+    async (state) => {
+      const { fake } = playTitle({
+        calls: { 'GET /api/media/7': reply({ body: EPISODE }) },
+        account: { current: accountOf({ state }) },
+      })
+      await waitFor(() => expect(loadsOf(fake)).toHaveLength(1))
+    },
+  )
+
+  it('says a hidden title is gone for an approved account, never asking for the admin password', async () => {
+    const { client, fake } = playTitle({
+      calls: {
+        'GET /api/media/7': MISSING,
+        'GET /api/admin': reply({ body: { state: ADMIN_LOCK_STATES.on, available: true } }),
+      },
+      account: { current: accountOf({ state: ACCOUNT_STATES.approved }) },
+    })
+    expect(await screen.findByText(SERVER_COPY.gone('Vhagar'))).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Admin lock' })).toBeNull()
+    expect(callNamesOf(client)).toEqual(['GET /api/media/7'])
+    expect(loadsOf(fake)).toHaveLength(0)
+  })
+
+  it('still asks for the PIN of an approved account on a locked title', async () => {
+    const { client } = playTitle({
+      calls: { 'GET /api/media/7': LOCKED },
+      account: { current: accountOf({ state: ACCOUNT_STATES.approved }) },
+    })
+    expect(await screen.findByRole('dialog', { name: 'Locked library' })).toBeInTheDocument()
+    expect(callNamesOf(client)).toEqual(['GET /api/media/7'])
+  })
+
+  it('still asks for the admin password when the accounts are unavailable, as the server has none to use', async () => {
+    const { client } = playTitle({
+      calls: {
+        'GET /api/media/7': [MISSING, reply({ body: EPISODE })],
+        'GET /api/admin': reply({ body: { state: ADMIN_LOCK_STATES.on, available: true } }),
+        'POST /api/admin/unlock': reply({ body: { state: ADMIN_LOCK_STATES.off } }),
+      },
+      account: { current: accountOf({ state: ACCOUNT_STATES.unavailable }) },
+    })
+    expect(await screen.findByRole('dialog', { name: 'Admin lock' })).toBeInTheDocument()
+    await enter({ label: 'Admin password', value: 'hunter2' })
+    await waitFor(() => expect(callNamesOf(client)).toContain('POST /api/admin/unlock'))
+  })
+
+  it('says the account could not be checked and reads it again on Try again', async () => {
+    const account = { current: accountOf({ state: ACCOUNT_STATES.failed }) }
+    const { client, fake } = playTitle({
+      calls: { 'GET /api/media/7': reply({ body: EPISODE }) },
+      account,
+    })
+    expect(await screen.findByText(ACCOUNT_COPY.failed('Vhagar'))).toBeInTheDocument()
+    expect(callNamesOf(client)).toEqual([])
+    account.current = APPROVED
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(loadsOf(fake)).toHaveLength(1))
+    expect(sentOfType({ client, type: DESKTOP_REQUESTS.readAccount })).toHaveLength(2)
+  })
+
+  it("says main's reason when the account cannot be read", async () => {
+    const { client } = playTitle({
+      calls: { 'GET /api/media/7': reply({ body: EPISODE }) },
+      replies: { readAccount: { type: DESKTOP_REPLIES.refused, message: 'No sign in today.' } },
+    })
+    expect(await screen.findByText('No sign in today.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    expect(callNamesOf(client)).toEqual([])
+  })
+
+  it('shows the refusal and resumes at the last saved position after an approval', async () => {
+    const account = { current: APPROVED }
+    const { client, fake } = playTitle({
+      calls: {
+        'GET /api/media/7': reply({ body: EPISODE }),
+        'POST /api/media/7/plays': reply({ status: 204, body: '' }),
+        'PUT /api/media/7/progress': reply({ status: 204, body: '' }),
+      },
+      account,
+      replies: { refreshAccount: ACCOUNT_DONE(APPROVED) },
+    })
+    await loaded({ fake })
+    fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+    fake.emit({ type: PLAYER_EVENTS.time, time: 40 })
+    await waitFor(() => expect(callNamesOf(client)).toContain('PUT /api/media/7/progress'))
+    account.current = accountOf({ state: ACCOUNT_STATES.revoked, email: 'me@example.com' })
+    fake.emit({
+      type: PLAYER_EVENTS.error,
+      reason: PLAYER_ERROR_REASONS.account,
+      message: 'Your access to Vhagar was removed.',
+    })
+    expect(
+      await screen.findByRole('heading', { name: 'Your access was removed' }),
+    ).toBeInTheDocument()
+    expect(loadsOf(fake)).toHaveLength(1)
+    await userEvent.click(screen.getByRole('button', { name: 'Check again' }))
+    await waitFor(() => expect(loadsOf(fake)).toHaveLength(2))
+    expect(loadsOf(fake)[1]).toMatchObject({
+      source: { kind: PLAYER_SOURCE_KINDS.server, serverId: S, mediaId: 7 },
+      start: 40,
+    })
+    expect(callNamesOf(client).filter((name) => name === 'GET /api/media/7')).toHaveLength(1)
+  })
+
+  it('asks to sign in again when the account is gone mid-play', async () => {
+    const account = { current: APPROVED }
+    const { fake } = playTitle({
+      calls: { 'GET /api/media/7': reply({ body: EPISODE }) },
+      account,
+    })
+    await loaded({ fake })
+    account.current = accountOf()
+    fake.emit({
+      type: PLAYER_EVENTS.error,
+      reason: PLAYER_ERROR_REASONS.account,
+      message: 'Sign in to Vhagar again.',
+    })
+    expect(await screen.findByLabelText('Email')).toBeInTheDocument()
+  })
+
+  it('reads the account again when the title read is refused for it', async () => {
+    const account = { current: APPROVED }
+    const { client, fake } = playTitle({
+      calls: { 'GET /api/media/7': [REFUSED_SIGNED_OUT, reply({ body: EPISODE })] },
+      account,
+      replies: { signIn: ACCOUNT_DONE(APPROVED) },
+    })
+    await waitFor(() =>
+      expect(sentOfType({ client, type: DESKTOP_REQUESTS.readAccount })).toHaveLength(1),
+    )
+    account.current = accountOf()
+    await waitFor(() =>
+      expect(sentOfType({ client, type: DESKTOP_REQUESTS.readAccount })).toHaveLength(2),
+    )
+    expect(await screen.findByLabelText('Email')).toBeInTheDocument()
+    expect(loadsOf(fake)).toHaveLength(0)
+    await userEvent.type(screen.getByLabelText('Email'), 'me@example.com')
+    await userEvent.type(screen.getByLabelText('Password'), 'hunter2')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(loadsOf(fake)).toHaveLength(1))
+  })
+
+  it('says the refusal when the account is still approved', async () => {
+    const { fake } = playTitle({
+      calls: { 'GET /api/media/7': REFUSED_SIGNED_OUT },
+      account: { current: APPROVED },
+    })
+    expect(await screen.findByText('Sign in to Vhagar.')).toBeInTheDocument()
+    expect(loadsOf(fake)).toHaveLength(0)
+  })
+
+  it('keeps a title read that is refused for another reason as it was', async () => {
+    const { client } = playTitle({
+      calls: { 'GET /api/media/7': reply({ status: 500, body: { message: 'Boom.' } }) },
+    })
+    expect(await screen.findByText('Boom.')).toBeInTheDocument()
+    expect(sentOfType({ client, type: DESKTOP_REQUESTS.readAccount })).toHaveLength(1)
+  })
+
+  it('keeps playing when a later read of the account fails', async () => {
+    const replies: NonNullable<Parameters<typeof serverClient>[0]['replies']> = {}
+    const { fake, queryClient } = playTitle({
+      calls: { 'GET /api/media/7': reply({ body: EPISODE }) },
+      account: { current: APPROVED },
+      replies,
+    })
+    await loaded({ fake })
+    replies.readAccount = { type: DESKTOP_REPLIES.refused, message: 'No sign in today.' }
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: accountKey(S) })
+    })
+    await waitFor(() =>
+      expect(queryClient.getQueryState(accountKey(S))?.status ?? null).toBe('error'),
+    )
+    expect(screen.queryByText('No sign in today.')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Episode 1' })).toBeInTheDocument()
+    expect(loadsOf(fake)).toHaveLength(1)
+  })
+
+  it('keeps playing when a later read of the account says it could not be checked', async () => {
+    const account = { current: APPROVED }
+    const { fake, queryClient } = playTitle({
+      calls: { 'GET /api/media/7': reply({ body: EPISODE }) },
+      account,
+    })
+    await loaded({ fake })
+    account.current = accountOf({ state: ACCOUNT_STATES.failed, email: 'me@example.com' })
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: accountKey(S) })
+    })
+    await waitFor(() =>
+      expect(queryClient.getQueryData<AccountView>(accountKey(S))?.state ?? null).toBe(
+        ACCOUNT_STATES.failed,
+      ),
+    )
+    expect(screen.queryByText(ACCOUNT_COPY.failed('Vhagar'))).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Episode 1' })).toBeInTheDocument()
+    expect(
+      fake.send.mock.calls.filter(([command]) => command.type === PLAYER_COMMANDS.stop),
+    ).toHaveLength(0)
+    expect(loadsOf(fake)).toHaveLength(1)
+  })
+
+  it('does not bring the player back when the account cannot be checked after a sign out', async () => {
+    const account = { current: APPROVED }
+    const { fake, queryClient } = playTitle({
+      calls: { 'GET /api/media/7': reply({ body: EPISODE }) },
+      account,
+    })
+    await loaded({ fake })
+    account.current = accountOf()
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: accountKey(S) })
+    })
+    expect(await screen.findByLabelText('Email')).toBeInTheDocument()
+    account.current = accountOf({ state: ACCOUNT_STATES.failed })
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: accountKey(S) })
+    })
+    expect(await screen.findByText(ACCOUNT_COPY.failed('Vhagar'))).toBeInTheDocument()
+    expect(loadsOf(fake)).toHaveLength(1)
+  })
+
+  it('loads again at the last saved position when the account is still approved after its refusal', async () => {
+    const { client, fake } = playTitle({
+      calls: {
+        'GET /api/media/7': reply({ body: EPISODE }),
+        'POST /api/media/7/plays': reply({ status: 204, body: '' }),
+        'PUT /api/media/7/progress': reply({ status: 204, body: '' }),
+      },
+      account: { current: APPROVED },
+    })
+    await loaded({ fake })
+    fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+    fake.emit({ type: PLAYER_EVENTS.time, time: 40 })
+    await waitFor(() => expect(callNamesOf(client)).toContain('PUT /api/media/7/progress'))
+    fake.emit({
+      type: PLAYER_EVENTS.error,
+      reason: PLAYER_ERROR_REASONS.account,
+      message: 'Sign in to Vhagar again.',
+    })
+    await waitFor(() => expect(loadsOf(fake)).toHaveLength(2))
+    expect(loadsOf(fake)[1]).toMatchObject({ start: 40 })
+    expect(sentOfType({ client, type: DESKTOP_REQUESTS.readAccount })).toHaveLength(2)
+    expect(callNamesOf(client).filter((name) => name === 'GET /api/media/7')).toHaveLength(1)
+  })
+
+  it('loads once, not twice, when the account asked to sign in before it was approved again', async () => {
+    const account = { current: APPROVED }
+    const { fake } = playTitle({
+      calls: { 'GET /api/media/7': reply({ body: EPISODE }) },
+      account,
+      replies: { signIn: ACCOUNT_DONE(APPROVED) },
+    })
+    await loaded({ fake })
+    account.current = accountOf()
+    fake.emit({
+      type: PLAYER_EVENTS.error,
+      reason: PLAYER_ERROR_REASONS.account,
+      message: 'Sign in to Vhagar again.',
+    })
+    await userEvent.type(await screen.findByLabelText('Email'), 'me@example.com')
+    await userEvent.type(screen.getByLabelText('Password'), 'hunter2')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(loadsOf(fake)).toHaveLength(2))
+    await act(async () => {})
+    expect(loadsOf(fake)).toHaveLength(2)
+  })
+
+  describe('refusals of an approved account', () => {
+    const playApproved = () => {
+      const rendered = playTitle({
+        calls: {
+          'GET /api/media/7': reply({ body: EPISODE }),
+          'POST /api/media/7/plays': reply({ status: 204, body: '' }),
+          'PUT /api/media/7/progress': reply({ status: 204, body: '' }),
+        },
+        account: { current: APPROVED },
+      })
+      const refuse = () =>
+        rendered.fake.emit({
+          type: PLAYER_EVENTS.error,
+          reason: PLAYER_ERROR_REASONS.account,
+          message: 'Sign in to Vhagar again.',
+        })
+      const reads = () =>
+        sentOfType({ client: rendered.client, type: DESKTOP_REQUESTS.readAccount }).length
+      return { ...rendered, refuse, reads }
+    }
+
+    it('reloads once for refusals with no playback between them, then keeps the errored player', async () => {
+      const { fake, refuse, reads } = playApproved()
+      await loaded({ fake })
+      refuse()
+      await waitFor(() => expect(loadsOf(fake)).toHaveLength(2))
+      await loaded({ fake, count: 2 })
+      refuse()
+      await waitFor(() => expect(reads()).toBe(3))
+      await act(async () => {})
+      expect(loadsOf(fake)).toHaveLength(2)
+      expect(screen.getByRole('heading', { name: 'Episode 1' })).toBeInTheDocument()
+    })
+
+    it('reloads again at the new position once playback has moved between refusals', async () => {
+      const { client, fake, refuse } = playApproved()
+      await loaded({ fake })
+      refuse()
+      await waitFor(() => expect(loadsOf(fake)).toHaveLength(2))
+      await loaded({ fake, count: 2 })
+      fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+      fake.emit({ type: PLAYER_EVENTS.time, time: 60 })
+      await waitFor(() => expect(callNamesOf(client)).toContain('PUT /api/media/7/progress'))
+      refuse()
+      await waitFor(() => expect(loadsOf(fake)).toHaveLength(3))
+      expect(loadsOf(fake)[2]).toMatchObject({ start: 60 })
+    })
   })
 })
