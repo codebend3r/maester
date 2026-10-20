@@ -65,9 +65,9 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
 }
 
 /**
- * `/`: what is being watched, then each pinned library's newest, as shelves of cards. A
- * card opens its item, and a library shelf's title the library. Each server gets a Home of its own, so nothing one showed, its
- * scroll or its focus, carries over to the next.
+ * `/`: what is being watched, then each pinned library's newest, as shelves of cards. A card
+ * opens its item, and a library shelf's See all the library. Each server gets a Home of its
+ * own, so nothing one showed, its scroll or its focus, carries over to the next.
  */
 export const Home = () => {
   const session = useAppQueries()

@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { type ComponentRef, useEffect, useRef, useState } from 'react'
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { ShelfCard } from '@/queries/cards'
 import { CardPicture } from '@/layouts/Card'
+import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
+import { requestTVFocus } from '@/layouts/tvFocus'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
@@ -14,25 +16,33 @@ const GROW_MS = 150
 // The web's `--ease-out`, `cubic-bezier(0.2, 0.8, 0.2, 1)`, which the native tokens cannot carry.
 const EASE_OUT = Easing.bezier(0.2, 0.8, 0.2, 1)
 
-/** How tall a focus card's caption stands: its title, then its line. */
-export const FOCUS_CAPTION_HEIGHT = SIZES.space3 + SIZES.textLg * 1.25 + SIZES.text * 1.25
+/** How tall a focus card's caption stands, from its picture's foot: its title, then its line. */
+export const focusCaptionHeightOf = (fontScale: number): number =>
+  SIZES.space3 + linesHeightOf({ sizes: [SIZES.textLg, SIZES.text], fontScale })
 
 /**
  * A card the remote moves to, on a shelf or in a grid: it grows and takes the ring while
  * focused, smoothly unless the system asks for less motion, when it changes at once.
- * `isPreferred` asks the remote's focus for it, as the screen opens or after a jump.
+ * `isPreferred` asks the remote's focus for it, as the screen opens; `isJumpedTo` takes the
+ * focus once it is on screen, as a card a jump mounts afresh must.
  */
 export const FocusCard = ({
   card,
   width,
   isPreferred,
+  isJumpedTo = false,
   onPress,
 }: {
   card: ShelfCard
   width: number
   isPreferred: boolean
+  isJumpedTo?: boolean
   onPress: () => void
 }) => {
+  const pressable = useRef<ComponentRef<typeof Pressable>>(null)
+  useEffect(() => {
+    if (isJumpedTo) requestTVFocus(pressable.current)
+  }, [isJumpedTo])
   const isReduced = useReduceMotion((state) => state.isReduced)
   const [isFocused, setFocused] = useState(false)
   const [scale] = useState(() => new Animated.Value(1))
@@ -52,6 +62,7 @@ export const FocusCard = ({
 
   return (
     <Pressable
+      ref={pressable}
       accessibilityLabel={card.title}
       accessibilityRole="button"
       hasTVPreferredFocus={isPreferred}
@@ -87,9 +98,9 @@ const styles = StyleSheet.create({
   title: {
     color: COLOURS.muted,
     fontSize: SIZES.textLg,
-    lineHeight: SIZES.textLg * 1.25,
+    lineHeight: SIZES.textLg * LINE_RATIO,
     fontWeight: '600',
   },
   focusedTitle: { color: COLOURS.text },
-  line: { color: COLOURS.muted, fontSize: SIZES.text, lineHeight: SIZES.text * 1.25 },
+  line: { color: COLOURS.muted, fontSize: SIZES.text, lineHeight: SIZES.text * LINE_RATIO },
 })

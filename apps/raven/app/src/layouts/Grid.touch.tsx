@@ -5,7 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
-import { TOUCH_CAPTION_HEIGHT, TouchCard } from '@/layouts/TouchCard'
+import { TouchCard, touchCaptionHeightOf } from '@/layouts/TouchCard'
+import { fitJumpMarks } from '@/layouts/jumpMarks'
+import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
   CHEVRONS,
   type GridKit,
@@ -21,7 +23,9 @@ const GUTTER = SIZES.space3
 const GAP = SIZES.space3
 const ROW_GAP = SIZES.space4
 
-/** The narrowest card a row holds, as the web's grid has it: posters narrower on a narrower screen. */
+/**
+ * The narrowest card a row holds, as the web's grid has it: posters narrower on a narrower screen.
+ */
 const leastWidthOf = ({ shape, screen }: { shape: CardShape; screen: number }): number => {
   if (shape === CARD_SHAPES.wide) return 240
   if (screen <= 48 * 16) return 128
@@ -35,13 +39,9 @@ const LEAST_ROW_WIDTH = 320
 const TILE_WIDTHS = { [CARD_SHAPES.poster]: 48, [CARD_SHAPES.wide]: 96 } as const
 
 const HEADER_HEIGHT = SIZES.fieldHeight + SIZES.space2
-const WORDS_HEIGHT = SIZES.text * 1.25 + SIZES.textXs * 1.25
 
 /** How wide the jump strip stands at the right edge, and so the room the cards leave it. */
 const STRIP_WIDTH = SIZES.space5
-
-/** How many points each of a strip's marks stands, the alphabet's 27 fitting a small phone. */
-const MARK_HEIGHT = 18
 
 /** The way back, and what it is called aloud without its arrow. */
 const BACK = { text: '\u2039 Back', label: 'Back' } as const
@@ -76,37 +76,46 @@ const RowCard = ({
   </Pressable>
 )
 
-/** A strip down the right edge, as the web's, of the steps the order runs through. */
+/**
+ * A strip down the right edge, as the web's, of the steps the order runs through, fitted to
+ * the `room` it has: each step as tall as fits, or neighbouring steps gathered into one where
+ * they cannot all be pressed, as on a phone held sideways.
+ */
 const JumpStrip = ({
   jump,
+  room,
+  fontScale,
   onJump,
 }: {
   jump: JumpScale
+  room: number
+  fontScale: number
   onJump: (keys: ReadonlySet<string>) => void
-}) => (
-  <View accessibilityLabel={JUMP_SCALE_LABELS[jump.field]} style={styles.strip}>
-    {jump.unit !== null && <Text style={styles.unit}>{jump.unit}</Text>}
-    {jump.marks.map((mark) => {
-      const keys = jump.entries.get(mark.key)
-      return (
+}) => {
+  const unit = jump.unit === null ? 0 : linesHeightOf({ sizes: [SIZES.textXs], fontScale })
+  const { height, marks } = fitJumpMarks({ scale: jump, room: room - unit })
+  return (
+    <View accessibilityLabel={JUMP_SCALE_LABELS[jump.field]} style={styles.strip}>
+      {jump.unit !== null && <Text style={styles.unit}>{jump.unit}</Text>}
+      {marks.map((mark) => (
         <Pressable
           key={mark.key}
           accessibilityLabel={mark.name}
           accessibilityRole="button"
-          accessibilityState={{ disabled: keys === undefined }}
-          disabled={keys === undefined}
+          accessibilityState={{ disabled: mark.keys === null }}
+          disabled={mark.keys === null}
           hitSlop={{ left: SIZES.space2 }}
-          onPress={() => keys !== undefined && onJump(keys)}
-          style={styles.mark}
+          onPress={() => mark.keys !== null && onJump(mark.keys)}
+          style={[styles.mark, { height }]}
         >
-          <Text style={[styles.markLabel, keys === undefined && styles.markEmpty]}>
+          <Text style={[styles.markLabel, mark.keys === null && styles.markEmpty]}>
             {mark.label}
           </Text>
         </Pressable>
-      )
-    })}
-  </View>
-)
+      ))}
+    </View>
+  )
+}
 
 /**
  * A library under the thumb: the way back, its name and what it holds, the pickers, then its
@@ -127,7 +136,14 @@ const Grid = ({
   const screen = useWindowDimensions()
   const insets = useSafeAreaInsets()
   const [top, setTop] = useState(0)
-  const room = screen.width - 2 * GUTTER - (jump === null ? 0 : STRIP_WIDTH)
+  // The strip's slot runs between the top and bottom insets; until it is laid out, that is
+  // the window's height between them.
+  const [stripRoom, setStripRoom] = useState<number | null>(null)
+  // The side insets keep the cards and the strip clear of the Dynamic Island and the corners
+  // of a phone held sideways.
+  const left = GUTTER + insets.left
+  const right = GUTTER + (jump === null ? 0 : STRIP_WIDTH) + insets.right
+  const room = screen.width - left - right
   const isRows = isRowView(view)
   const columnsOf = (shape: CardShape) =>
     columnsFor({
@@ -143,11 +159,15 @@ const Grid = ({
     if (row.kind === GRID_ROWS.header) return HEADER_HEIGHT
     if (isRows) {
       const picture = pictureHeightOf({ shape: row.shape, width: TILE_WIDTHS[row.shape] })
-      return Math.max(view === LIBRARY_VIEWS.tiles ? picture : 0, WORDS_HEIGHT) + SIZES.space2 * 2
+      const words = linesHeightOf({
+        sizes: [SIZES.text, SIZES.textXs],
+        fontScale: screen.fontScale,
+      })
+      return Math.max(view === LIBRARY_VIEWS.tiles ? picture : 0, words) + SIZES.space2 * 2
     }
     return (
       pictureHeightOf({ shape: row.shape, width: widthOf(row.shape) }) +
-      TOUCH_CAPTION_HEIGHT +
+      touchCaptionHeightOf(screen.fontScale) +
       ROW_GAP
     )
   }
@@ -209,14 +229,12 @@ const Grid = ({
     <View style={styles.ground}>
       <FlatList
         ref={list}
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingTop: insets.top + SIZES.space2,
-            paddingBottom: insets.bottom + SIZES.space5,
-            paddingRight: GUTTER + (jump === null ? 0 : STRIP_WIDTH),
-          },
-        ]}
+        contentContainerStyle={{
+          paddingTop: insets.top + SIZES.space2,
+          paddingBottom: insets.bottom + SIZES.space5,
+          paddingLeft: left,
+          paddingRight: right,
+        }}
         data={rows}
         keyExtractor={(row) => row.key}
         ListHeaderComponent={
@@ -246,10 +264,19 @@ const Grid = ({
       />
       {jump !== null && (
         <View
+          onLayout={({ nativeEvent }) => setStripRoom(nativeEvent.layout.height)}
           pointerEvents="box-none"
-          style={[styles.stripSlot, { top: insets.top, bottom: insets.bottom }]}
+          style={[
+            styles.stripSlot,
+            { top: insets.top, bottom: insets.bottom, right: insets.right },
+          ]}
         >
-          <JumpStrip jump={jump} onJump={jumpTo} />
+          <JumpStrip
+            fontScale={screen.fontScale}
+            jump={jump}
+            onJump={jumpTo}
+            room={stripRoom ?? screen.height - insets.top - insets.bottom}
+          />
         </View>
       )}
     </View>
@@ -261,7 +288,6 @@ export const touchGrid: GridKit = { Grid }
 
 const styles = StyleSheet.create({
   ground: { flex: 1, backgroundColor: COLOURS.ground },
-  content: { paddingLeft: GUTTER },
   header: { gap: SIZES.space2, paddingBottom: SIZES.space4 },
   back: { alignSelf: 'flex-start', minHeight: SIZES.fieldHeight, justifyContent: 'center' },
   backLabel: { color: COLOURS.muted, fontSize: SIZES.text },
@@ -285,15 +311,14 @@ const styles = StyleSheet.create({
   rowTitle: {
     color: COLOURS.text,
     fontSize: SIZES.text,
-    lineHeight: SIZES.text * 1.25,
+    lineHeight: SIZES.text * LINE_RATIO,
     fontWeight: '600',
   },
-  rowLine: { color: COLOURS.muted, fontSize: SIZES.textXs, lineHeight: SIZES.textXs * 1.25 },
-  stripSlot: { position: 'absolute', right: 0, width: STRIP_WIDTH, justifyContent: 'center' },
+  rowLine: { color: COLOURS.muted, fontSize: SIZES.textXs, lineHeight: SIZES.textXs * LINE_RATIO },
+  stripSlot: { position: 'absolute', width: STRIP_WIDTH, justifyContent: 'center' },
   strip: { alignItems: 'center' },
   unit: { color: COLOURS.muted, fontSize: SIZES.textXs },
   mark: {
-    height: MARK_HEIGHT,
     minWidth: STRIP_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',

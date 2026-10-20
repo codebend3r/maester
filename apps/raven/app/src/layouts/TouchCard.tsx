@@ -2,10 +2,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { ShelfCard } from '@/queries/cards'
 import { CardPicture } from '@/layouts/Card'
+import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
-/** How tall a touch card's caption stands: its title, then its line. */
-export const TOUCH_CAPTION_HEIGHT = SIZES.space1 + SIZES.textSm * 1.25 + SIZES.textXs * 1.25
+/** How tall a touch card's caption stands, from its picture's foot: its title, then its line. */
+export const touchCaptionHeightOf = (fontScale: number): number =>
+  SIZES.space1 + linesHeightOf({ sizes: [SIZES.textSm, SIZES.textXs], fontScale })
 
 /** A card under the thumb, on a shelf or in a grid: its picture, its title and its line. */
 export const TouchCard = ({
@@ -43,8 +45,8 @@ const styles = StyleSheet.create({
   title: {
     color: COLOURS.text,
     fontSize: SIZES.textSm,
-    lineHeight: SIZES.textSm * 1.25,
+    lineHeight: SIZES.textSm * LINE_RATIO,
     fontWeight: '600',
   },
-  line: { color: COLOURS.muted, fontSize: SIZES.textXs, lineHeight: SIZES.textXs * 1.25 },
+  line: { color: COLOURS.muted, fontSize: SIZES.textXs, lineHeight: SIZES.textXs * LINE_RATIO },
 })

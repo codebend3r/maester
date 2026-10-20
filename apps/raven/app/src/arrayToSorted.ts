@@ -1,8 +1,11 @@
 /** The name of the language's `Array.prototype.toSorted`. */
 export const TO_SORTED = 'toSorted'
 
-/** `toSorted` as ES2023 has it: the array's items in a new array, sorted, the array untouched. */
-function sortedCopy<T>(this: readonly T[], compare?: (a: T, b: T) => number): T[] {
+/**
+ * `toSorted` as ES2023 has it: the array's items in a new array, sorted stably, holes read as
+ * `undefined` and put last, the array untouched. Named as the language names it.
+ */
+function toSorted<T>(this: readonly T[], compare?: (a: T, b: T) => number): T[] {
   return [...this].sort(compare)
 }
 
@@ -16,7 +19,7 @@ function sortedCopy<T>(this: readonly T[], compare?: (a: T, b: T) => number): T[
 export const installToSorted = ({ prototype }: { prototype: object }): void => {
   if (TO_SORTED in prototype) return
   Object.defineProperty(prototype, TO_SORTED, {
-    value: sortedCopy,
+    value: toSorted,
     writable: true,
     configurable: true,
   })

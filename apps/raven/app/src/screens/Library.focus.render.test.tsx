@@ -68,9 +68,26 @@ const preferred = (titles: readonly string[]): string[] =>
     )
     .map((card) => card.props.accessibilityLabel)
 
+/** The TV's list waits for the height left under the header, which jest never lays out. */
+const layOut = async () => {
+  await screen.findByRole('header', {
+    name: mockParams().id === String(FILMS.id) ? 'Films' : 'Series',
+  })
+  const layout = { nativeEvent: { layout: { x: 0, y: 0, width: 1920, height: 800 } } }
+  // One at a time: each event is an act() of its own, and they may not overlap.
+  await screen.container
+    .queryAll((node) => typeof node.props.onLayout === 'function')
+    .reduce<Promise<void>>(async (before, node) => {
+      await before
+      await fireEvent(node, 'layout', layout)
+    }, Promise.resolve())
+}
+
 const renderLibrary = async ({ id }: { id: number }) => {
   mockParams.mockReturnValue({ id: String(id) })
-  return renderScreen({ ui: <Library /> })
+  const rendered = await renderScreen({ ui: <Library /> })
+  await layOut()
+  return rendered
 }
 
 describe('Library on a TV', () => {
@@ -110,6 +127,29 @@ describe('Library on a TV', () => {
     const row = within(screen.getByLabelText('Jump to a letter'))
     expect(row.getByRole('button', { name: 'C' }).props.accessibilityState?.disabled).toBe(true)
     await fireEvent.press(row.getByRole('button', { name: 'B' }))
+    expect(preferred(SHOW_TITLES)).toEqual(['The Beacon'])
+  })
+
+  it('draws no card before the list has its height, so the first card takes focus as it mounts', async () => {
+    mockParams.mockReturnValue({ id: String(FILMS.id) })
+    await renderScreen({ ui: <Library /> })
+    await screen.findByRole('header', { name: 'Films' })
+    expect(screen.queryByRole('button', { name: 'Ashfall Gate' })).toBeNull()
+    await layOut()
+    expect(await screen.findByRole('button', { name: 'Ashfall Gate' })).toBeTruthy()
+    expect(preferred(FILM_TITLES)).toEqual(['Ashfall Gate'])
+  })
+
+  it('takes the focus back to a card jumped to twice, mounting it afresh', async () => {
+    await renderLibrary({ id: SERIES.id })
+    await screen.findByRole('button', { name: 'Saltmarsh' })
+    const row = within(screen.getByLabelText('Jump to a letter'))
+
+    await fireEvent.press(row.getByRole('button', { name: 'B' }))
+    const once = screen.getByRole('button', { name: 'The Beacon' })
+    await fireEvent.press(row.getByRole('button', { name: 'B' }))
+    const twice = screen.getByRole('button', { name: 'The Beacon' })
+    expect(twice).not.toBe(once)
     expect(preferred(SHOW_TITLES)).toEqual(['The Beacon'])
   })
 

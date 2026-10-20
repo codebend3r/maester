@@ -8,7 +8,7 @@ import {
   sortFieldsFor,
 } from '@raven/core'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
-import { ActionSheetIOS } from 'react-native'
+import { ActionSheetIOS, StyleSheet } from 'react-native'
 
 import { APP_ROUTES } from '@/routes'
 import { Library } from '@/screens/Library'
@@ -17,8 +17,11 @@ import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
 import { FILMS, GROUPED_FILMS, NAS, SERIES, libraryApi, libraryPath } from '@/test/libraryServer'
 import { renderScreen } from '@/test/renderScreen'
+import { linesHeightOf } from '@/layouts/textHeights'
+import { SIZES } from '@/theme/appTheme'
 
 const mockPush = jest.fn()
+const mockFontScale = jest.fn(() => 1)
 const mockParams = jest.fn(() => ({ id: String(FILMS.id) }))
 /** What the server heard, and the libraries it answers with in place of its own, per test. */
 const mockServer: { requests: string[]; libraries: LibraryRecord[] } = {
@@ -38,6 +41,10 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: jest.fn() }),
   useLocalSearchParams: () => mockParams(),
 }))
+jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
+  __esModule: true,
+  default: () => ({ width: 390, height: 844, scale: 3, fontScale: mockFontScale() }),
+}))
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
@@ -50,6 +57,16 @@ jest.mock('@/servers/serverClient', () => ({
 }))
 
 const { listMedia, listShows } = APP_CLIENT_CALLS
+
+/** How tall the row holding `card` stands: the nearest of its parents with a set height. */
+const rowHeightOf = (card: ReturnType<typeof screen.getByRole>): unknown => {
+  const heightOf = (node: typeof card | null): unknown => {
+    if (node === null) return undefined
+    const height: unknown = StyleSheet.flatten(node.props.style)?.height
+    return height ?? heightOf(node.parent)
+  }
+  return heightOf(card.parent)
+}
 
 /** The sheets the screen asked for, and the option each was answered with by `answer`. */
 const sheets = ({ answer }: { answer: string | null }) => {
@@ -82,6 +99,7 @@ describe('Library on a phone or tablet', () => {
     jest.clearAllMocks()
     mockServer.requests = []
     mockServer.libraries = []
+    mockFontScale.mockReturnValue(1)
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
     useLibraryViews.setState({ choices: {} })
   })
@@ -204,6 +222,18 @@ describe('Library on a phone or tablet', () => {
       'Cancel',
     ])
     expect(asked[1]?.options).toEqual(['Grid', 'List', 'Tiles', 'Grouped', 'Cancel'])
+  })
+
+  it("stands the rows taller for the viewer's larger text, so captions are not cut", async () => {
+    await renderLibrary({ id: FILMS.id })
+    const normal = rowHeightOf(await screen.findByRole('button', { name: 'Busboys' }))
+
+    mockFontScale.mockReturnValue(2)
+    await renderLibrary({ id: FILMS.id })
+    const larger = rowHeightOf(await screen.findByRole('button', { name: 'Busboys' }))
+    expect(typeof normal === 'number' && typeof larger === 'number' && larger - normal).toBeCloseTo(
+      linesHeightOf({ sizes: [SIZES.textSm, SIZES.textXs], fontScale: 1 }),
+    )
   })
 
   it('says a library that is not there is not there', async () => {

@@ -1,5 +1,5 @@
 import { JUMP_SCALE_LABELS, type JumpScale, LIBRARY_VIEWS } from '@raven/core'
-import { useState } from 'react'
+import { type ComponentRef, useEffect, useRef, useState } from 'react'
 import {
   FlatList,
   Pressable,
@@ -12,7 +12,8 @@ import {
 
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
-import { FOCUS_CAPTION_HEIGHT, FocusCard } from '@/layouts/FocusCard'
+import { FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
+import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
   CHEVRONS,
   type GridKit,
@@ -21,6 +22,7 @@ import {
   isRowView,
 } from '@/layouts/gridKit'
 import { GRID_ROWS, type GridRow, columnsFor } from '@/layouts/gridRows'
+import { requestTVFocus } from '@/layouts/tvFocus'
 import { useGrid } from '@/layouts/useGrid'
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
@@ -39,40 +41,50 @@ const TILE_WIDTHS = { [CARD_SHAPES.poster]: 72, [CARD_SHAPES.wide]: 144 } as con
 const GROWTH_ROOM = SIZES.space4
 
 const HEADER_HEIGHT = SIZES.controlLarge + SIZES.space3
-const WORDS_HEIGHT = SIZES.textLg * 1.25 + SIZES.text * 1.25
 
-/** A card of the list or tiles view, the remote's to move to: a row of words, ringed while focused. */
+/**
+ * A card of the list or tiles view, the remote's to move to: a row of words, ringed while focused.
+ */
 const RowCard = ({
   card,
   hasPicture,
   isPreferred,
+  isJumpedTo,
   onPress,
 }: {
   card: ShelfCard
   hasPicture: boolean
   isPreferred: boolean
+  isJumpedTo: boolean
   onPress: () => void
-}) => (
-  <Pressable
-    accessibilityLabel={card.title}
-    accessibilityRole="button"
-    hasTVPreferredFocus={isPreferred}
-    onPress={onPress}
-    style={({ focused }) => [styles.rowCard, focused && styles.focused]}
-  >
-    {hasPicture && <CardPicture card={card} width={TILE_WIDTHS[card.shape]} />}
-    <View style={styles.words}>
-      <Text numberOfLines={1} style={styles.rowTitle}>
-        {card.title}
-      </Text>
-      {card.line !== null && (
-        <Text numberOfLines={1} style={styles.rowLine}>
-          {card.line}
+}) => {
+  const pressable = useRef<ComponentRef<typeof Pressable>>(null)
+  useEffect(() => {
+    if (isJumpedTo) requestTVFocus(pressable.current)
+  }, [isJumpedTo])
+  return (
+    <Pressable
+      ref={pressable}
+      accessibilityLabel={card.title}
+      accessibilityRole="button"
+      hasTVPreferredFocus={isPreferred}
+      onPress={onPress}
+      style={({ focused }) => [styles.rowCard, focused && styles.focused]}
+    >
+      {hasPicture && <CardPicture card={card} width={TILE_WIDTHS[card.shape]} />}
+      <View style={styles.words}>
+        <Text numberOfLines={1} style={styles.rowTitle}>
+          {card.title}
         </Text>
-      )}
-    </View>
-  </Pressable>
-)
+        {card.line !== null && (
+          <Text numberOfLines={1} style={styles.rowLine}>
+            {card.line}
+          </Text>
+        )}
+      </View>
+    </Pressable>
+  )
+}
 
 /**
  * The web's jump strip as a row the remote moves along, over the cards: each step takes the
@@ -115,7 +127,10 @@ const JumpRow = ({
   </ScrollView>
 )
 
-/** The key of what takes the focus as the grid opens: its first row's first card, or its first bucket. */
+/**
+ * The key of what takes the focus as the grid opens: its first row's first card, or its first
+ * bucket.
+ */
 const firstKeyOf = (rows: readonly GridRow[]): string | null => {
   const [first] = rows
   if (first === undefined) return null
@@ -137,26 +152,35 @@ const Grid = ({ title, line, notice, toolbar, sections, view, jump, onOpen }: Gr
     const columns = columnsOf(shape)
     return (room - (columns - 1) * GAP) / columns
   }
+  const wordsHeight = linesHeightOf({
+    sizes: [SIZES.textLg, SIZES.text],
+    fontScale: screen.fontScale,
+  })
   const heightOf = (row: GridRow): number => {
     if (row.kind === GRID_ROWS.header) return HEADER_HEIGHT
     if (isRows) {
       const picture = pictureHeightOf({ shape: row.shape, width: TILE_WIDTHS[row.shape] })
       return (
-        Math.max(view === LIBRARY_VIEWS.tiles ? picture : 0, WORDS_HEIGHT) +
+        Math.max(view === LIBRARY_VIEWS.tiles ? picture : 0, wordsHeight) +
         SIZES.space3 * 2 +
         SIZES.space2
       )
     }
     return (
       pictureHeightOf({ shape: row.shape, width: widthOf(row.shape) }) +
-      FOCUS_CAPTION_HEIGHT +
+      focusCaptionHeightOf(screen.fontScale) +
       2 * GROWTH_ROOM
     )
   }
   const { list, rows, toggle, jumpTo } = useGrid({ sections, columnsOf, heightOf, top: 0 })
-  const [jumped, setJumped] = useState<string | null>(null)
+  // Each jump counts, so a jump to the card already jumped to mounts it afresh and it takes
+  // the focus again: a preferred focus that does not change asks for nothing.
+  const [jumped, setJumped] = useState<{ card: string; count: number } | null>(null)
   const [listHeight, setListHeight] = useState(0)
-  const preferred = jumped ?? firstKeyOf(rows)
+  const preferred = jumped?.card ?? firstKeyOf(rows)
+  const isJumpedTo = (card: ShelfCard): boolean => jumped !== null && card.key === jumped.card
+  const keyOf = (card: ShelfCard): string =>
+    jumped !== null && isJumpedTo(card) ? `${card.key}#${jumped.count}` : card.key
 
   const renderRow = ({ item: row }: { item: GridRow }) => {
     switch (row.kind) {
@@ -184,18 +208,20 @@ const Grid = ({ title, line, notice, toolbar, sections, view, jump, onOpen }: Gr
           <View style={[styles.cards, isRows && styles.rowCards, { height: heightOf(row) }]}>
             {row.cards.map((card) =>
               isRows ? (
-                <View key={card.key} style={{ width: widthOf(row.shape) }}>
+                <View key={keyOf(card)} style={{ width: widthOf(row.shape) }}>
                   <RowCard
                     card={card}
                     hasPicture={view === LIBRARY_VIEWS.tiles}
+                    isJumpedTo={isJumpedTo(card)}
                     isPreferred={card.key === preferred}
                     onPress={() => onOpen(card)}
                   />
                 </View>
               ) : (
                 <FocusCard
-                  key={card.key}
+                  key={keyOf(card)}
                   card={card}
+                  isJumpedTo={isJumpedTo(card)}
                   isPreferred={card.key === preferred}
                   onPress={() => onOpen(card)}
                   width={widthOf(row.shape)}
@@ -220,7 +246,13 @@ const Grid = ({ title, line, notice, toolbar, sections, view, jump, onOpen }: Gr
         {line !== null && <Text style={styles.line}>{line}</Text>}
         <View style={styles.toolbar}>{toolbar}</View>
         {jump !== null && (
-          <JumpRow jump={jump} onJump={(keys) => setJumped(jumpTo(keys) ?? jumped)} />
+          <JumpRow
+            jump={jump}
+            onJump={(keys) => {
+              const card = jumpTo(keys)
+              if (card !== null) setJumped({ card, count: (jumped?.count ?? 0) + 1 })
+            }}
+          />
         )}
         {notice !== null && <Text style={styles.notice}>{notice}</Text>}
       </View>
@@ -230,15 +262,19 @@ const Grid = ({ title, line, notice, toolbar, sections, view, jump, onOpen }: Gr
         onLayout={({ nativeEvent }) => setListHeight(nativeEvent.layout.height)}
         style={styles.listSlot}
       >
-        <FlatList
-          ref={list}
-          contentContainerStyle={styles.content}
-          data={rows}
-          extraData={preferred}
-          keyExtractor={(row) => row.key}
-          renderItem={renderRow}
-          style={{ height: listHeight }}
-        />
+        {/* Drawn only once it has its height, so the first card mounts asking for the focus,
+            which it then takes; a card that mounted without it would not. */}
+        {listHeight > 0 && (
+          <FlatList
+            ref={list}
+            contentContainerStyle={styles.content}
+            data={rows}
+            extraData={jumped}
+            keyExtractor={(row) => row.key}
+            renderItem={renderRow}
+            style={{ height: listHeight }}
+          />
+        )}
       </View>
     </View>
   )
@@ -308,8 +344,8 @@ const styles = StyleSheet.create({
   rowTitle: {
     color: COLOURS.text,
     fontSize: SIZES.textLg,
-    lineHeight: SIZES.textLg * 1.25,
+    lineHeight: SIZES.textLg * LINE_RATIO,
     fontWeight: '600',
   },
-  rowLine: { color: COLOURS.muted, fontSize: SIZES.text, lineHeight: SIZES.text * 1.25 },
+  rowLine: { color: COLOURS.muted, fontSize: SIZES.text, lineHeight: SIZES.text * LINE_RATIO },
 })

@@ -21,7 +21,10 @@ import {
   showCard,
 } from '@/queries/cards'
 
-/** What a library lists, whatever its type: a TV library's shows and the files no show was found for, or its files. */
+/**
+ * What a library lists, whatever its type: a TV library's shows and the files no show was found
+ * for, or its files.
+ */
 export type Listing = { shows: ShowEntry[]; files: MediaItem[] }
 
 /**
@@ -36,12 +39,18 @@ export type GridSection = {
   cards: ShelfCard[]
 }
 
-/** The keys of the sections a listing always has the one of: a plain grid's, or a TV library's shows. */
+/**
+ * The keys of the sections a listing always has the one of: a plain grid's, or a TV library's
+ * shows.
+ */
 const SECTION_KEYS = { all: 'all', shows: 'shows' } as const
 
 type Cards = Pictures & { settings: LibrarySettings; now: Date }
 
-/** A Movies library's videos as posters, any other's as frame grabs, each saying what it is sorted by. */
+/**
+ * A Movies library's videos as posters, any other's as frame grabs, each saying what it is sorted
+ * by.
+ */
 const fileCards = ({ settings, now, files, ...pictures }: Cards & { files: MediaItem[] }) => {
   const isMovies = matchTypeFor(settings.kind) === ITEM_TYPES.movie
   const order = { sort: settings.sort, now }
@@ -57,7 +66,9 @@ const fileCards = ({ settings, now, files, ...pictures }: Cards & { files: Media
 
 const videos = (n: number): string => plural({ n, one: 'video', many: 'videos' })
 
-/** A library of files: one run, or the grouped view's buckets, as the web's `MediaGroups` cuts them. */
+/**
+ * A library of files: one run, or the grouped view's buckets, as the web's `MediaGroups` cuts them.
+ */
 const fileSections = ({ files, ...cards }: Cards & { files: MediaItem[] }): GridSection[] => {
   if (cards.settings.view !== LIBRARY_VIEWS.grouped) {
     return [{ key: SECTION_KEYS.all, title: null, count: null, ...fileCards({ files, ...cards }) }]

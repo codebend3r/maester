@@ -34,3 +34,35 @@ describe('installToSorted', () => {
     expect(target.toSorted).toBe(own)
   })
 })
+
+describe('the installed toSorted', () => {
+  const target = {}
+  installToSorted({ prototype: target })
+  const toSorted: unknown = Reflect.get(target, TO_SORTED)
+
+  it('is named as the language names it', () => {
+    expect(typeof toSorted === 'function' && toSorted.name).toBe(TO_SORTED)
+  })
+
+  it('keeps equal items in the order they came', () => {
+    if (typeof toSorted !== 'function') throw new Error('No toSorted')
+    const pairs = [
+      { rank: 2, name: 'first two' },
+      { rank: 1, name: 'one' },
+      { rank: 2, name: 'second two' },
+    ]
+    const sorted: unknown = Reflect.apply(toSorted, pairs, [
+      (a: { rank: number }, b: { rank: number }) => a.rank - b.rank,
+    ])
+    expect(sorted).toEqual([pairs[1], pairs[0], pairs[2]])
+  })
+
+  it('reads a hole as undefined and sorts it last, as the language does', () => {
+    if (typeof toSorted !== 'function') throw new Error('No toSorted')
+    // oxlint-disable-next-line no-sparse-arrays -- the hole is what is under test
+    const sparse = [3, , 1]
+    const sorted: unknown = Reflect.apply(toSorted, sparse, [])
+    expect(sorted).toEqual([1, 3, undefined])
+    expect(Array.isArray(sorted) && 1 in sorted && 2 in sorted).toBe(true)
+  })
+})

@@ -8,7 +8,9 @@ export type GridRow =
   | { kind: typeof GRID_ROWS.header; key: string; section: GridSection; isOpen: boolean }
   | { kind: typeof GRID_ROWS.cards; key: string; shape: CardShape; cards: ShelfCard[] }
 
-/** As many columns of at least `least` as fit in `width` with `gap` between them, and never none. */
+/**
+ * As many columns of at least `least` as fit in `width` with `gap` between them, and never none.
+ */
 export const columnsFor = ({
   width,
   least,
@@ -30,7 +32,9 @@ const cardRows = ({ section, columns }: { section: GridSection; columns: number 
     cards: section.cards.slice(at * columns, (at + 1) * columns),
   }))
 
-/** The rows of a grid: each bucket's heading, then its cards when it is open, `columnsOf` to a row. */
+/**
+ * The rows of a grid: each bucket's heading, then its cards when it is open, `columnsOf` to a row.
+ */
 export const gridRowsOf = ({
   sections,
   open,

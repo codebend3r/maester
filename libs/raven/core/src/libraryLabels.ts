@@ -56,7 +56,10 @@ export const JUMP_SCALE_LABELS: Record<JumpScale['field'], string> = {
   rating: 'Jump to a score',
 }
 
-/** What a library's page says in place of a listing with nothing in it, or null while there is something. */
+/**
+ * What a library's page says in place of a listing with nothing in it, or null while there is
+ * something.
+ */
 export const emptyListingMessage = ({
   isEmpty,
   query,

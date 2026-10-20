@@ -47,10 +47,9 @@ const Shelves = ({ title, notice, children }: ShelvesProps) => {
 }
 
 /**
- * A shelf under the thumb: its title, then a row that scrolls sideways and comes to rest on a
- * card's edge, each card as wide as its own shape asks.
+ * A shelf's title, and beside a library's the way into the library, as the web's shelf
+ * heading links to it.
  */
-/** A shelf's title, and beside a library's the way into the library, as the web's shelf heading links to it. */
 const ShelfTitle = ({ shelf, onOpenLibrary }: Pick<ShelfProps, 'shelf' | 'onOpenLibrary'>) => {
   const { libraryId } = shelf
   return (
@@ -73,6 +72,10 @@ const ShelfTitle = ({ shelf, onOpenLibrary }: Pick<ShelfProps, 'shelf' | 'onOpen
   )
 }
 
+/**
+ * A shelf under the thumb: its title, then a row that scrolls sideways and comes to rest on a
+ * card's edge, each card as wide as its own shape asks.
+ */
 const Shelf = ({ shelf, onOpen, onOpenLibrary }: ShelfProps) => {
   const widths = useCardWidths()
   const snaps = shelf.cards.reduce<number[]>(
