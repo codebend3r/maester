@@ -288,7 +288,7 @@ class Guardrails:
 @dataclass(frozen=True)
 class Settings:
     anthropic_api_key: str = setting("", "ANTHROPIC_API_KEY", _raw, required=True)
-    model: str = setting("claude-opus-5-5", "LUWIN_MODEL")
+    model: str = setting("claude-sonnet-5-5", "LUWIN_MODEL")
     effort: str = setting("medium", "LUWIN_EFFORT")  # low | medium | high | xhigh | max
 
     seerr_url: str = setting("", "SEERR_URL", _url, required=True)

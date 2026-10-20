@@ -75,7 +75,7 @@ The board follows the issues. `uv run python scripts/sync_board.py`, run from th
 | Part      | Choice                                                                                          |
 | --------- | ----------------------------------------------------------------------------------------------- |
 | Language  | Python 3.12, `uv`, `ruff`, `pytest`, run through the workspace's Nx and Bun                     |
-| LLM       | Anthropic Python SDK, Messages API tool-use loop, `claude-opus-5-5` by default, prompt caching  |
+| LLM       | Anthropic Python SDK, Messages API tool-use loop, `claude-sonnet-5-5` default, prompt caching   |
 | Chat      | luwin's own app (`@luwin/web`): React 19, Vite 8, TanStack Query, zustand, SCSS modules        |
 | Web       | FastAPI: luwin's `/api` (chat streamed as server-sent events), the Seerr webhook, `/health`     |
 | Sign-in   | rookery's `maester_session` cookie, checked with rookery's internal session lookup              |
