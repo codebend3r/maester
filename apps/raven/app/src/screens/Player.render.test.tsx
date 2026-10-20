@@ -131,6 +131,9 @@ const progressPath = pathFor({ path: APP_CLIENT_CALLS.saveProgress.path, id: BUS
 const playsPath = pathFor({ path: APP_CLIENT_CALLS.recordPlay.path, id: BUSBOYS_MP4.id })
 
 /** Each spot the server was told to save, in order. */
+/** The audio track every save names: the file's only one. */
+const AUDIO_PLAYED = 0
+
 const savedSpots = (): unknown[] =>
   mockServer.heard
     .filter(({ method, path }) => method === APP_CALL_METHODS.put && path === progressPath)
@@ -215,9 +218,9 @@ describe('Player on a phone or tablet', () => {
       videoProps().onPlaybackStateChanged!({ isPlaying: false, isSeeking: false })
     })
     expect(savedSpots()).toEqual([
-      { position: from + SAVE_EVERY_S },
-      { position: from + SAVE_EVERY_S * 2 },
-      { position: from + SAVE_EVERY_S * 2 + 3 },
+      { position: from + SAVE_EVERY_S, audio: AUDIO_PLAYED },
+      { position: from + SAVE_EVERY_S * 2, audio: AUDIO_PLAYED },
+      { position: from + SAVE_EVERY_S * 2 + 3, audio: AUDIO_PLAYED },
     ])
   })
 
@@ -233,7 +236,7 @@ describe('Player on a phone or tablet', () => {
       Promise.resolve(),
     )
     expect(playsRecorded()).toBe(1)
-    expect(savedSpots()).toContainEqual({ position: ninety })
+    expect(savedSpots()).toContainEqual({ position: ninety, audio: AUDIO_PLAYED })
   })
 
   it('opens the PIN screen when the video sits in a locked library', async () => {
@@ -293,6 +296,6 @@ describe('Player on a phone or tablet', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Back' }))
     expect(mockBack).toHaveBeenCalled()
     unmount()
-    expect(savedSpots().at(-1)).toEqual({ position: 42 })
+    expect(savedSpots().at(-1)).toEqual({ position: 42, audio: AUDIO_PLAYED })
   })
 })
