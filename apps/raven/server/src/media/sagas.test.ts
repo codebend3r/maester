@@ -5,7 +5,7 @@ import { MediaIndex } from '@/media/mediaIndex'
 import { MovieSplits } from '@/media/movieSplits'
 import { BLANK_ITEM, type FetchedSaga } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
-import { repositories } from '@/test/repositories'
+import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
 const PROBE = {
   duration: 60,
@@ -65,12 +65,13 @@ describe("a library's sagas", () => {
       libraryId: state.libraryId,
       mediaId: id(name),
       how: 'apart',
+      account: TEST_ACCOUNTS.a,
     })
   }
 
   const sagas = () =>
     media()
-      .listSagas(state.libraryId)
+      .listSagas({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })
       .map((saga) => ({ name: saga.name, files: saga.media.map((item) => item.fileName) }))
 
   beforeEach(async () => {
@@ -93,7 +94,7 @@ describe("a library's sagas", () => {
     })
     splitApart('Fellowship 2160p.mkv')
 
-    expect(media().list({ libraryId: state.libraryId })).toHaveLength(2)
+    expect(media().list({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })).toHaveLength(2)
     expect(sagas()).toEqual([])
   })
 
@@ -116,7 +117,7 @@ describe("a library's sagas", () => {
     addMovie({ title: 'The Two Towers', year: 2002, files: ['Two Towers.mkv'] })
     const backdrops = () =>
       media()
-        .listSagas(state.libraryId)
+        .listSagas({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })
         .map((saga) => saga.backdrop)
     const { sagaBackdrops } = repositories(database.get())
     expect(backdrops()).toEqual([DEFAULT_SAGA_BACKDROP])
@@ -145,7 +146,7 @@ describe("a library's sagas", () => {
       .run(state.libraryId, RINGS.tmdbId, JSON.stringify({ type: 'spin' }))
     expect(
       media()
-        .listSagas(state.libraryId)
+        .listSagas({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })
         .map((saga) => saga.backdrop),
     ).toEqual([DEFAULT_SAGA_BACKDROP])
   })

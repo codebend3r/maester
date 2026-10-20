@@ -2,9 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { FAVOURITE_OUTCOMES } from '@/media/favouriteOutcomes'
 import { MediaIndex } from '@/media/mediaIndex'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 import { ViewingRepository } from '@/media/viewingRepository'
+import { PLAY_KINDS } from '@/media/watchedRepository'
 import { testDatabase } from '@/test/database'
-import { repositories } from '@/test/repositories'
+import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
 const MINUTE = {
   duration: 60,
@@ -17,6 +19,8 @@ const MINUTE = {
   audioChannels: 2,
   bitrate: 5_000_000,
 }
+
+type PlayKind = (typeof PLAY_KINDS)[keyof typeof PLAY_KINDS]
 
 describe('play history', () => {
   const database = testDatabase('raven-history-')
@@ -44,19 +48,40 @@ describe('play history', () => {
   }
   const watchedIds = (libraryId: number): number[] =>
     viewing()
-      .history({ libraryId, limit: 100, watchedOnly: true })
+      .history({ libraryId, limit: 100, watchedOnly: true, account: TEST_ACCOUNTS.a })
       .map((entry) => entry.media.id)
   /** A time on 10 October 2026, this many minutes after 7pm UTC. */
   const at = (minutes: number): Date => new Date(Date.UTC(2026, 9, 10, 19, minutes))
   const history = ({ libraryId, limit = 100 }: { libraryId: number; limit?: number }) =>
     viewing()
-      .history({ libraryId, limit })
+      .history({ libraryId, limit, account: TEST_ACCOUNTS.a })
       .map((entry) => ({
         id: entry.media.id,
         lastPlayedAt: entry.lastPlayedAt,
         plays: entry.plays,
       }))
-  const positionOf = (id: number): number => media().get(id)?.position ?? -1
+  /** A play of `kind` written straight to the table, as account A's. */
+  const addPlay = ({
+    id,
+    at: playedAt,
+    furthest,
+    kind,
+  }: {
+    id: number
+    at: Date
+    furthest: number
+    kind: PlayKind
+  }): void => {
+    database
+      .get()
+      .db.prepare(
+        `INSERT INTO plays (account_id, media_id, played_at, furthest, kind)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(TEST_ACCOUNTS.a, id, playedAt.toISOString(), furthest, kind)
+  }
+  const positionOf = (id: number): number =>
+    media().get({ id, account: TEST_ACCOUNTS.a })?.position ?? -1
 
   beforeAll(database.open)
   afterAll(database.close)
@@ -64,10 +89,10 @@ describe('play history', () => {
   it('counts a video started again within half an hour as the same play', () => {
     const libraryId = createLibrary('sitting')
     const id = add({ libraryId, name: 'film' })
-    viewing().recordPlay({ id, at: at(0) })
-    viewing().recordPlay({ id, at: at(25) })
+    viewing().recordPlay({ id, at: at(0), account: TEST_ACCOUNTS.a })
+    viewing().recordPlay({ id, at: at(25), account: TEST_ACCOUNTS.a })
     expect(history({ libraryId })).toEqual([{ id, lastPlayedAt: at(25).toISOString(), plays: 1 }])
-    viewing().recordPlay({ id, at: at(56) })
+    viewing().recordPlay({ id, at: at(56), account: TEST_ACCOUNTS.a })
     expect(history({ libraryId })).toEqual([{ id, lastPlayedAt: at(56).toISOString(), plays: 2 }])
   })
 
@@ -76,9 +101,9 @@ describe('play history', () => {
     const first = add({ libraryId, name: 'first' })
     const second = add({ libraryId, name: 'second' })
     add({ libraryId, name: 'never' })
-    viewing().recordPlay({ id: first, at: at(0) })
-    viewing().recordPlay({ id: second, at: at(10) })
-    viewing().recordPlay({ id: first, at: at(100) })
+    viewing().recordPlay({ id: first, at: at(0), account: TEST_ACCOUNTS.a })
+    viewing().recordPlay({ id: second, at: at(10), account: TEST_ACCOUNTS.a })
+    viewing().recordPlay({ id: first, at: at(100), account: TEST_ACCOUNTS.a })
     expect(history({ libraryId })).toEqual([
       { id: first, lastPlayedAt: at(100).toISOString(), plays: 2 },
       { id: second, lastPlayedAt: at(10).toISOString(), plays: 1 },
@@ -90,9 +115,13 @@ describe('play history', () => {
     const otherId = createLibrary('theirs')
     const older = add({ libraryId, name: 'older' })
     const newer = add({ libraryId, name: 'newer' })
-    viewing().recordPlay({ id: older, at: at(0) })
-    viewing().recordPlay({ id: newer, at: at(5) })
-    viewing().recordPlay({ id: add({ libraryId: otherId, name: 'elsewhere' }), at: at(9) })
+    viewing().recordPlay({ id: older, at: at(0), account: TEST_ACCOUNTS.a })
+    viewing().recordPlay({ id: newer, at: at(5), account: TEST_ACCOUNTS.a })
+    viewing().recordPlay({
+      id: add({ libraryId: otherId, name: 'elsewhere' }),
+      at: at(9),
+      account: TEST_ACCOUNTS.a,
+    })
     expect(history({ libraryId }).map((entry) => entry.id)).toEqual([newer, older])
     expect(history({ libraryId, limit: 1 }).map((entry) => entry.id)).toEqual([newer])
   })
@@ -100,20 +129,20 @@ describe('play history', () => {
   it("counts a video as watched once a play gets past its library's percentage", () => {
     const libraryId = createLibrary('threshold')
     const id = addMinute({ libraryId, name: 'minute' })
-    const entry = () => viewing().history({ libraryId, limit: 100 })[0]
-    viewing().recordPlay({ id, at: at(0) })
-    viewing().report({ id, position: 50, at: at(1) })
+    const entry = () => viewing().history({ libraryId, limit: 100, account: TEST_ACCOUNTS.a })[0]
+    viewing().recordPlay({ id, at: at(0), account: TEST_ACCOUNTS.a })
+    viewing().report({ id, position: 50, at: at(1), account: TEST_ACCOUNTS.a })
     expect(entry()).toMatchObject({ furthest: 50, watched: false })
-    viewing().report({ id, position: 20, at: at(2) })
+    viewing().report({ id, position: 20, at: at(2), account: TEST_ACCOUNTS.a })
     expect(entry()).toMatchObject({ furthest: 50, watched: false })
-    viewing().report({ id, position: 57, at: at(3) })
+    viewing().report({ id, position: 57, at: at(3), account: TEST_ACCOUNTS.a })
     expect(entry()).toMatchObject({ furthest: 57, watched: true, plays: 1 })
   })
 
   it('moves the bar when the library changes its percentage', () => {
     const libraryId = createLibrary('lenient')
     const id = addMinute({ libraryId, name: 'minute' })
-    viewing().report({ id, position: 30, at: at(0) })
+    viewing().report({ id, position: 30, at: at(0), account: TEST_ACCOUNTS.a })
     expect(watchedIds(libraryId)).toEqual([])
     libraries().update({
       id: libraryId,
@@ -126,8 +155,8 @@ describe('play history', () => {
     const libraryId = createLibrary('filtered')
     const finished = addMinute({ libraryId, name: 'finished' })
     const started = addMinute({ libraryId, name: 'started' })
-    viewing().report({ id: finished, position: 60, at: at(0) })
-    viewing().report({ id: started, position: 10, at: at(5) })
+    viewing().report({ id: finished, position: 60, at: at(0), account: TEST_ACCOUNTS.a })
+    viewing().report({ id: started, position: 10, at: at(5), account: TEST_ACCOUNTS.a })
     expect(history({ libraryId }).map((entry) => entry.id)).toEqual([started, finished])
     expect(watchedIds(libraryId)).toEqual([finished])
   })
@@ -135,14 +164,16 @@ describe('play history', () => {
   it('never counts a video it cannot measure as watched', () => {
     const libraryId = createLibrary('unprobed')
     const id = add({ libraryId, name: 'unknown length' })
-    viewing().report({ id, position: 5000, at: at(0) })
-    expect(viewing().history({ libraryId, limit: 100 })[0]).toMatchObject({ watched: false })
+    viewing().report({ id, position: 5000, at: at(0), account: TEST_ACCOUNTS.a })
+    expect(viewing().history({ libraryId, limit: 100, account: TEST_ACCOUNTS.a })[0]).toMatchObject(
+      { watched: false },
+    )
   })
 
   it('forgets the plays of a video that leaves the library', () => {
     const libraryId = createLibrary('gone')
     const id = add({ libraryId, name: 'deleted' })
-    viewing().recordPlay({ id, at: at(0) })
+    viewing().recordPlay({ id, at: at(0), account: TEST_ACCOUNTS.a })
     index().remove([id])
     expect(history({ libraryId })).toEqual([])
   })
@@ -150,11 +181,11 @@ describe('play history', () => {
   it('saves the spot to resume from with the play, and starting a play keeps it', () => {
     const libraryId = createLibrary('resume')
     const id = addMinute({ libraryId, name: 'film' })
-    expect(viewing().report({ id, position: 30, at: at(0) })).toBe(true)
+    expect(viewing().report({ id, position: 30, at: at(0), account: TEST_ACCOUNTS.a })).toBe(true)
     expect(positionOf(id)).toBe(30)
-    viewing().recordPlay({ id, at: at(90) })
+    viewing().recordPlay({ id, at: at(90), account: TEST_ACCOUNTS.a })
     expect(positionOf(id)).toBe(30)
-    viewing().report({ id, position: 2, at: at(91) })
+    viewing().report({ id, position: 2, at: at(91), account: TEST_ACCOUNTS.a })
     expect(positionOf(id)).toBe(0)
   })
 
@@ -165,17 +196,19 @@ describe('play history', () => {
       input: { name: 'forgetful', paths: ['/forgetful'], settings: { saveProgress: false } },
     })
     const id = addMinute({ libraryId, name: 'film' })
-    viewing().report({ id, position: 30, at: at(0) })
+    viewing().report({ id, position: 30, at: at(0), account: TEST_ACCOUNTS.a })
     expect(positionOf(id)).toBe(0)
-    expect(viewing().history({ libraryId, limit: 100 })[0]).toMatchObject({ furthest: 30 })
+    expect(viewing().history({ libraryId, limit: 100, account: TEST_ACCOUNTS.a })[0]).toMatchObject(
+      { furthest: 30 },
+    )
   })
 
   it('clears the spot at the library’s watched percentage, and not before', () => {
     const libraryId = createLibrary('threshold-spot')
     const id = addMinute({ libraryId, name: 'minute' })
-    viewing().report({ id, position: 56, at: at(0) })
+    viewing().report({ id, position: 56, at: at(0), account: TEST_ACCOUNTS.a })
     expect(positionOf(id)).toBe(56)
-    viewing().report({ id, position: 57, at: at(1) })
+    viewing().report({ id, position: 57, at: at(1), account: TEST_ACCOUNTS.a })
     expect(positionOf(id)).toBe(0)
     expect(watchedIds(libraryId)).toEqual([id])
   })
@@ -187,9 +220,9 @@ describe('play history', () => {
       input: { name: 'halfway', paths: ['/halfway'], settings: { watchedPercent: 50 } },
     })
     const early = addMinute({ libraryId: halfway, name: 'early' })
-    viewing().report({ id: early, position: 29, at: at(0) })
+    viewing().report({ id: early, position: 29, at: at(0), account: TEST_ACCOUNTS.a })
     expect(positionOf(early)).toBe(29)
-    viewing().report({ id: early, position: 30, at: at(1) })
+    viewing().report({ id: early, position: 30, at: at(1), account: TEST_ACCOUNTS.a })
     expect(positionOf(early)).toBe(0)
     const strict = createLibrary('strict')
     libraries().update({
@@ -197,19 +230,19 @@ describe('play history', () => {
       input: { name: 'strict', paths: ['/strict'], settings: { watchedPercent: 100 } },
     })
     const late = addMinute({ libraryId: strict, name: 'late' })
-    viewing().report({ id: late, position: 59, at: at(0) })
+    viewing().report({ id: late, position: 59, at: at(0), account: TEST_ACCOUNTS.a })
     expect(positionOf(late)).toBe(59)
   })
 
   it('keeps the spots of a library that saves no progress, even past the threshold', () => {
     const libraryId = createLibrary('keeps-spots')
     const id = addMinute({ libraryId, name: 'film' })
-    viewing().report({ id, position: 30, at: at(0) })
+    viewing().report({ id, position: 30, at: at(0), account: TEST_ACCOUNTS.a })
     libraries().update({
       id: libraryId,
       input: { name: 'keeps-spots', paths: ['/keeps-spots'], settings: { saveProgress: false } },
     })
-    viewing().report({ id, position: 60, at: at(1) })
+    viewing().report({ id, position: 60, at: at(1), account: TEST_ACCOUNTS.a })
     libraries().update({
       id: libraryId,
       input: { name: 'keeps-spots', paths: ['/keeps-spots'], settings: { saveProgress: true } },
@@ -221,46 +254,45 @@ describe('play history', () => {
     const libraryId = createLibrary('sittings')
     const id = addMinute({ libraryId, name: 'film' })
     const db = database.get().db
-    db.prepare(
-      "INSERT INTO plays (media_id, played_at, furthest, kind) VALUES (?, ?, 60, 'marked')",
-    ).run(id, at(0).toISOString())
-    viewing().recordPlay({ id, at: at(5) })
-    expect(db.prepare("SELECT COUNT(*) AS n FROM plays WHERE kind = 'marked'").get()).toEqual({
-      n: 1,
-    })
+    addPlay({ id, at: at(0), furthest: 60, kind: PLAY_KINDS.marked })
+    viewing().recordPlay({ id, at: at(5), account: TEST_ACCOUNTS.a })
+    expect(
+      db.prepare('SELECT COUNT(*) AS n FROM plays WHERE kind = ?').get(PLAY_KINDS.marked),
+    ).toEqual({ n: 1 })
     expect(
       db.prepare('SELECT kind, furthest FROM plays WHERE media_id = ? ORDER BY id').all(id),
     ).toEqual([
-      { kind: 'marked', furthest: 60 },
-      { kind: 'played', furthest: 0 },
+      { kind: PLAY_KINDS.marked, furthest: 60 },
+      { kind: PLAY_KINDS.played, furthest: 0 },
     ])
-    db.prepare("UPDATE plays SET kind = 'cleared' WHERE kind = 'played' AND media_id = ?").run(id)
-    viewing().report({ id, position: 10, at: at(10) })
+    db.prepare('UPDATE plays SET kind = ? WHERE kind = ? AND media_id = ?').run(
+      PLAY_KINDS.cleared,
+      PLAY_KINDS.played,
+      id,
+    )
+    viewing().report({ id, position: 10, at: at(10), account: TEST_ACCOUNTS.a })
     expect(
       db.prepare('SELECT kind, furthest FROM plays WHERE media_id = ? ORDER BY id').all(id),
     ).toEqual([
-      { kind: 'marked', furthest: 60 },
-      { kind: 'cleared', furthest: 0 },
-      { kind: 'played', furthest: 10 },
+      { kind: PLAY_KINDS.marked, furthest: 60 },
+      { kind: PLAY_KINDS.cleared, furthest: 0 },
+      { kind: PLAY_KINDS.played, furthest: 10 },
     ])
   })
 
   it('counts real plays in the history, takes furthest from the plays that count, and reports a mark', () => {
     const libraryId = createLibrary('kinds')
     const id = addMinute({ libraryId, name: 'film' })
-    const insert = database
-      .get()
-      .db.prepare('INSERT INTO plays (media_id, played_at, furthest, kind) VALUES (?, ?, ?, ?)')
-    insert.run(id, at(0).toISOString(), 60, 'cleared')
-    insert.run(id, at(60).toISOString(), 10, 'played')
-    expect(viewing().history({ libraryId, limit: 10 })[0]).toMatchObject({
+    addPlay({ id, at: at(0), furthest: 60, kind: PLAY_KINDS.cleared })
+    addPlay({ id, at: at(60), furthest: 10, kind: PLAY_KINDS.played })
+    expect(viewing().history({ libraryId, limit: 10, account: TEST_ACCOUNTS.a })[0]).toMatchObject({
       plays: 2,
       furthest: 10,
       watched: false,
       marked: false,
     })
-    insert.run(id, at(120).toISOString(), 60, 'marked')
-    expect(viewing().history({ libraryId, limit: 10 })[0]).toMatchObject({
+    addPlay({ id, at: at(120), furthest: 60, kind: PLAY_KINDS.marked })
+    expect(viewing().history({ libraryId, limit: 10, account: TEST_ACCOUNTS.a })[0]).toMatchObject({
       plays: 2,
       furthest: 10,
       lastPlayedAt: at(120).toISOString(),
@@ -274,11 +306,8 @@ describe('play history', () => {
     const libraryId = createLibrary('marks-only')
     const marked = addMinute({ libraryId, name: 'marked' })
     const cleared = addMinute({ libraryId, name: 'cleared' })
-    const insert = database
-      .get()
-      .db.prepare('INSERT INTO plays (media_id, played_at, furthest, kind) VALUES (?, ?, ?, ?)')
-    insert.run(marked, at(0).toISOString(), 60, 'marked')
-    insert.run(cleared, at(5).toISOString(), 60, 'cleared')
+    addPlay({ id: marked, at: at(0), furthest: 60, kind: PLAY_KINDS.marked })
+    addPlay({ id: cleared, at: at(5), furthest: 60, kind: PLAY_KINDS.cleared })
     expect(history({ libraryId })).toEqual([
       { id: cleared, lastPlayedAt: at(5).toISOString(), plays: 1 },
       { id: marked, lastPlayedAt: at(0).toISOString(), plays: 0 },
@@ -286,10 +315,65 @@ describe('play history', () => {
     expect(watchedIds(libraryId)).toEqual([marked])
   })
 
+  it('keeps one account’s spot, plays, watched videos and favourites from another', () => {
+    const libraryId = createLibrary('accounts')
+    const started = addMinute({ libraryId, name: 'started' })
+    const finished = addMinute({ libraryId, name: 'finished' })
+    viewing().report({ id: started, position: 30, at: at(0), account: TEST_ACCOUNTS.a })
+    viewing().report({ id: finished, position: 60, at: at(1), account: TEST_ACCOUNTS.a })
+    viewing().setFavourite({ id: started, favourite: true, account: TEST_ACCOUNTS.a })
+    const seenBy = (account: AccountKey) =>
+      media()
+        .getMany({ ids: [started, finished], account })
+        .map(({ position, favourite, watched }) => ({ position, favourite, watched }))
+    const historyOf = (account: AccountKey) =>
+      viewing()
+        .history({ libraryId, limit: 100, account })
+        .map((entry) => entry.media.id)
+    const inProgressOf = (account: AccountKey) =>
+      media()
+        .listInProgress({ libraryId, account })
+        .map((item) => item.id)
+
+    expect(seenBy(TEST_ACCOUNTS.a)).toEqual([
+      { position: 30, favourite: true, watched: false },
+      { position: 0, favourite: false, watched: true },
+    ])
+    expect(historyOf(TEST_ACCOUNTS.a)).toEqual([finished, started])
+    expect(inProgressOf(TEST_ACCOUNTS.a)).toEqual([started])
+    expect(seenBy(TEST_ACCOUNTS.b)).toEqual([
+      { position: 0, favourite: false, watched: false },
+      { position: 0, favourite: false, watched: false },
+    ])
+    expect(historyOf(TEST_ACCOUNTS.b)).toEqual([])
+    expect(inProgressOf(TEST_ACCOUNTS.b)).toEqual([])
+    expect(media().listFavourites({ libraryId, account: TEST_ACCOUNTS.b })).toEqual([])
+
+    viewing().report({ id: started, position: 45, at: at(2), account: TEST_ACCOUNTS.b })
+    viewing().setFavourite({ id: started, favourite: false, account: TEST_ACCOUNTS.b })
+    expect(seenBy(TEST_ACCOUNTS.a)[0]).toEqual({ position: 30, favourite: true, watched: false })
+    expect(seenBy(TEST_ACCOUNTS.b)[0]).toEqual({ position: 45, favourite: false, watched: false })
+  })
+
+  it('never continues another account’s sitting', () => {
+    const libraryId = createLibrary('two sittings')
+    const id = addMinute({ libraryId, name: 'film' })
+    viewing().report({ id, position: 50, at: at(0), account: TEST_ACCOUNTS.a })
+    viewing().report({ id, position: 10, at: at(5), account: TEST_ACCOUNTS.b })
+    const entryOf = (account: AccountKey) => viewing().history({ libraryId, limit: 10, account })[0]
+    expect(entryOf(TEST_ACCOUNTS.a)).toMatchObject({ plays: 1, furthest: 50 })
+    expect(entryOf(TEST_ACCOUNTS.b)).toMatchObject({ plays: 1, furthest: 10 })
+    viewing().recordPlay({ id, at: at(10), account: TEST_ACCOUNTS.b })
+    expect(entryOf(TEST_ACCOUNTS.a)).toMatchObject({
+      plays: 1,
+      lastPlayedAt: at(0).toISOString(),
+    })
+  })
+
   it('says when there is no such video, and writes nothing', () => {
-    expect(viewing().report({ id: 999_999, position: 30 })).toBe(false)
-    expect(viewing().recordPlay({ id: 999_999 })).toBe(false)
-    expect(viewing().setFavourite({ id: 999_999, favourite: true })).toBe(
+    expect(viewing().report({ id: 999_999, position: 30, account: TEST_ACCOUNTS.a })).toBe(false)
+    expect(viewing().recordPlay({ id: 999_999, account: TEST_ACCOUNTS.a })).toBe(false)
+    expect(viewing().setFavourite({ id: 999_999, favourite: true, account: TEST_ACCOUNTS.a })).toBe(
       FAVOURITE_OUTCOMES.missing,
     )
   })
@@ -297,10 +381,14 @@ describe('play history', () => {
   it('marks and unmarks a favourite', () => {
     const libraryId = createLibrary('loved')
     const id = add({ libraryId, name: 'film' })
-    expect(viewing().setFavourite({ id, favourite: true })).toBe(FAVOURITE_OUTCOMES.done)
-    expect(media().get(id)?.favourite).toBe(true)
-    expect(viewing().setFavourite({ id, favourite: false })).toBe(FAVOURITE_OUTCOMES.done)
-    expect(media().get(id)?.favourite).toBe(false)
+    expect(viewing().setFavourite({ id, favourite: true, account: TEST_ACCOUNTS.a })).toBe(
+      FAVOURITE_OUTCOMES.done,
+    )
+    expect(media().get({ id, account: TEST_ACCOUNTS.a })?.favourite ?? null).toBe(true)
+    expect(viewing().setFavourite({ id, favourite: false, account: TEST_ACCOUNTS.a })).toBe(
+      FAVOURITE_OUTCOMES.done,
+    )
+    expect(media().get({ id, account: TEST_ACCOUNTS.a })?.favourite ?? null).toBe(false)
   })
 
   it('never marks a locked library’s video, but unmarks one', () => {
@@ -310,8 +398,12 @@ describe('play history', () => {
       settings: { locked: true },
     }).id
     const id = add({ libraryId, name: 'secret' })
-    expect(viewing().setFavourite({ id, favourite: true })).toBe(FAVOURITE_OUTCOMES.locked)
-    expect(media().get(id)?.favourite).toBe(false)
-    expect(viewing().setFavourite({ id, favourite: false })).toBe(FAVOURITE_OUTCOMES.done)
+    expect(viewing().setFavourite({ id, favourite: true, account: TEST_ACCOUNTS.a })).toBe(
+      FAVOURITE_OUTCOMES.locked,
+    )
+    expect(media().get({ id, account: TEST_ACCOUNTS.a })?.favourite ?? null).toBe(false)
+    expect(viewing().setFavourite({ id, favourite: false, account: TEST_ACCOUNTS.a })).toBe(
+      FAVOURITE_OUTCOMES.done,
+    )
   })
 })

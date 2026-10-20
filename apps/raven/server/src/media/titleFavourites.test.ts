@@ -6,7 +6,7 @@ import { TitleFavourites } from '@/media/titleFavourites'
 import { localEpisode, localSeason } from '@/metadata/localItems'
 import type { FetchedItem } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
-import { repositories } from '@/test/repositories'
+import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
 const showNamed = ({ tmdbId, title }: { tmdbId: string; title: string }): FetchedItem => ({
   ...localSeason({ showTmdbId: tmdbId, number: 1 }),
@@ -71,51 +71,73 @@ describe('favourite shows and seasons', () => {
   afterAll(() => database.close())
 
   it('marks and unmarks a show or season, newest first', () => {
-    expect(favourites().favouriteOf(state.open)).toBe(false)
-    expect(favourites().set({ itemId: state.open, favourite: true })).toBe(FAVOURITE_OUTCOMES.done)
-    expect(favourites().set({ itemId: state.season, favourite: true })).toBe(
-      FAVOURITE_OUTCOMES.done,
-    )
-    expect(favourites().favouriteOf(state.open)).toBe(true)
+    expect(favourites().favouriteOf({ itemId: state.open, account: TEST_ACCOUNTS.a })).toBe(false)
+    expect(
+      favourites().set({ itemId: state.open, favourite: true, account: TEST_ACCOUNTS.a }),
+    ).toBe(FAVOURITE_OUTCOMES.done)
+    expect(
+      favourites().set({ itemId: state.season, favourite: true, account: TEST_ACCOUNTS.a }),
+    ).toBe(FAVOURITE_OUTCOMES.done)
+    expect(favourites().favouriteOf({ itemId: state.open, account: TEST_ACCOUNTS.a })).toBe(true)
     expect(
       favourites()
-        .list()
+        .list({ account: TEST_ACCOUNTS.a })
         .map((item) => item.id),
     ).toEqual([state.season, state.open])
-    expect(favourites().set({ itemId: state.season, favourite: false })).toBe(
-      FAVOURITE_OUTCOMES.done,
-    )
+    expect(
+      favourites().set({ itemId: state.season, favourite: false, account: TEST_ACCOUNTS.a }),
+    ).toBe(FAVOURITE_OUTCOMES.done)
     expect(
       favourites()
-        .list()
+        .list({ account: TEST_ACCOUNTS.a })
         .map((item) => item.id),
     ).toEqual([state.open])
   })
 
   it('leaves an episode to its files, and says so of an id that names nothing', () => {
-    expect(favourites().favouriteOf(state.episode)).toBeNull()
-    expect(favourites().set({ itemId: state.episode, favourite: true })).toBe(
+    expect(favourites().favouriteOf({ itemId: state.episode, account: TEST_ACCOUNTS.a })).toBeNull()
+    expect(
+      favourites().set({ itemId: state.episode, favourite: true, account: TEST_ACCOUNTS.a }),
+    ).toBe(FAVOURITE_OUTCOMES.missing)
+    expect(favourites().set({ itemId: 999_999, favourite: true, account: TEST_ACCOUNTS.a })).toBe(
       FAVOURITE_OUTCOMES.missing,
     )
-    expect(favourites().set({ itemId: 999_999, favourite: true })).toBe(FAVOURITE_OUTCOMES.missing)
   })
 
   it('never marks or lists a show only a locked library holds, but unmarks one', () => {
-    expect(favourites().favouriteOf(state.hidden)).toBeNull()
-    expect(favourites().set({ itemId: state.hidden, favourite: true })).toBe(
-      FAVOURITE_OUTCOMES.locked,
-    )
+    expect(favourites().favouriteOf({ itemId: state.hidden, account: TEST_ACCOUNTS.a })).toBeNull()
+    expect(
+      favourites().set({ itemId: state.hidden, favourite: true, account: TEST_ACCOUNTS.a }),
+    ).toBe(FAVOURITE_OUTCOMES.locked)
     database
       .get()
-      .db.prepare('INSERT INTO item_favourites (item_id, added_at) VALUES (?, ?)')
-      .run(state.hidden, new Date().toISOString())
+      .db.prepare('INSERT INTO item_favourites (account_id, item_id, added_at) VALUES (?, ?, ?)')
+      .run(TEST_ACCOUNTS.a, state.hidden, new Date().toISOString())
     expect(
       favourites()
-        .list()
+        .list({ account: TEST_ACCOUNTS.a })
         .map((item) => item.id),
     ).not.toContain(state.hidden)
-    expect(favourites().set({ itemId: state.hidden, favourite: false })).toBe(
-      FAVOURITE_OUTCOMES.done,
-    )
+    expect(
+      favourites().set({ itemId: state.hidden, favourite: false, account: TEST_ACCOUNTS.a }),
+    ).toBe(FAVOURITE_OUTCOMES.done)
+  })
+
+  it('keeps one account’s favourite shows and seasons from another', () => {
+    favourites().set({ itemId: state.season, favourite: true, account: TEST_ACCOUNTS.a })
+    expect(favourites().favouriteOf({ itemId: state.season, account: TEST_ACCOUNTS.b })).toBe(false)
+    expect(favourites().list({ account: TEST_ACCOUNTS.b })).toEqual([])
+    favourites().set({ itemId: state.open, favourite: true, account: TEST_ACCOUNTS.b })
+    favourites().set({ itemId: state.season, favourite: false, account: TEST_ACCOUNTS.b })
+    expect(
+      favourites()
+        .list({ account: TEST_ACCOUNTS.a })
+        .map((item) => item.id),
+    ).toEqual([state.season, state.open])
+    expect(
+      favourites()
+        .list({ account: TEST_ACCOUNTS.b })
+        .map((item) => item.id),
+    ).toEqual([state.open])
   })
 })

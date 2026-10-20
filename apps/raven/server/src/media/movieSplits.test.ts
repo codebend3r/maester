@@ -1,3 +1,4 @@
+import { MEDIA_SORTS, SPLIT_HOWS } from '@raven/core'
 import { ConflictException, NotFoundException } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
@@ -5,7 +6,7 @@ import { MediaIndex } from '@/media/mediaIndex'
 import { MovieSplits } from '@/media/movieSplits'
 import { BLANK_ITEM, type FetchedItem } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
-import { repositories } from '@/test/repositories'
+import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
 const PROBE = {
   duration: 60,
@@ -63,7 +64,7 @@ describe('splitting a movie library’s duplicates', () => {
   /** The library's cards as the listing gives them: each card's file, how many share it, and its variant. */
   const cards = () =>
     media()
-      .list({ libraryId: state.libraryId, sort: 'title' })
+      .list({ libraryId: state.libraryId, sort: MEDIA_SORTS.title, account: TEST_ACCOUNTS.a })
       .map((item) => [item.fileName, item.versions, item.variant])
 
   beforeEach(async () => {
@@ -88,7 +89,7 @@ describe('splitting a movie library’s duplicates', () => {
     })
     addMovie({ title: 'Collateral', files: ['Collateral (2004).mkv'] })
 
-    const movies = splits().list(state.libraryId)
+    const movies = splits().list({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })
 
     expect(movies).toHaveLength(1)
     expect(movies[0]?.cards).toHaveLength(1)
@@ -115,7 +116,10 @@ describe('splitting a movie library’s duplicates', () => {
       withPosters: vi.spyOn(repository, 'withPosters'),
     }
 
-    const movies = new MovieSplits(database.get(), repository).list(state.libraryId)
+    const movies = new MovieSplits(database.get(), repository).list({
+      libraryId: state.libraryId,
+      account: TEST_ACCOUNTS.a,
+    })
 
     expect(movies.map((duplicate) => duplicate.cards[0]?.files.length)).toEqual([2, 2])
     expect(reads.getMany).toHaveBeenCalledTimes(1)
@@ -132,6 +136,7 @@ describe('splitting a movie library’s duplicates', () => {
       libraryId: state.libraryId,
       mediaId: id('300 (2007) WEBDL-2160p.mkv'),
       how: 'apart',
+      account: TEST_ACCOUNTS.a,
     })
 
     expect(cards()).toEqual([
@@ -159,6 +164,7 @@ describe('splitting a movie library’s duplicates', () => {
       libraryId: state.libraryId,
       mediaId: id('Alexander (2004) Remux-2160p.mkv'),
       how: 'smart',
+      account: TEST_ACCOUNTS.a,
     })
 
     expect(cards()).toEqual([
@@ -184,6 +190,7 @@ describe('splitting a movie library’s duplicates', () => {
       libraryId: state.libraryId,
       mediaId: id('Avatar Extended (2009) 2160p HEVC.mkv'),
       how: 'smart',
+      account: TEST_ACCOUNTS.a,
     })
 
     expect(cards().map(([, , variant]) => variant)).toEqual(['Extended', 'Theatrical Cut'])
@@ -203,6 +210,7 @@ describe('splitting a movie library’s duplicates', () => {
         libraryId: state.libraryId,
         mediaId: id('Watchmen The Ultimate Cut (2009) 2160p HEVC.mkv'),
         how: 'smart',
+        account: TEST_ACCOUNTS.a,
       }),
     ).toThrow(ConflictException)
     expect(cards()).toEqual([['Watchmen The Ultimate Cut (2009) 2160p HEVC.mkv', 2, null]])
@@ -214,7 +222,8 @@ describe('splitting a movie library’s duplicates', () => {
       files: ["Watchmen Director's Cut (2009).mkv", 'Watchmen (Directors Edition) (2009).mkv'],
     })
 
-    const [card] = splits().list(state.libraryId)[0]?.cards ?? []
+    const [card] =
+      splits().list({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })[0]?.cards ?? []
     expect(card?.files.map((file) => file.cut)).toEqual([
       { label: "Director's Cut", key: 'directors' },
       { label: 'Directors Edition', key: 'directors' },
@@ -224,6 +233,7 @@ describe('splitting a movie library’s duplicates', () => {
         libraryId: state.libraryId,
         mediaId: id("Watchmen Director's Cut (2009).mkv"),
         how: 'smart',
+        account: TEST_ACCOUNTS.a,
       }),
     ).toThrow(ConflictException)
   })
@@ -242,6 +252,7 @@ describe('splitting a movie library’s duplicates', () => {
       libraryId: state.libraryId,
       mediaId: id('Watchmen (2009).mkv'),
       how: 'smart',
+      account: TEST_ACCOUNTS.a,
     })
 
     expect(cards()).toEqual([
@@ -258,10 +269,16 @@ describe('splitting a movie library’s duplicates', () => {
         libraryId: state.libraryId,
         mediaId: id('Collateral (2004).mkv'),
         how: 'apart',
+        account: TEST_ACCOUNTS.a,
       }),
     ).toThrow(ConflictException)
     expect(() =>
-      splits().split({ libraryId: state.libraryId, mediaId: 999, how: 'apart' }),
+      splits().split({
+        libraryId: state.libraryId,
+        mediaId: 999,
+        how: SPLIT_HOWS.apart,
+        account: TEST_ACCOUNTS.a,
+      }),
     ).toThrow(NotFoundException)
   })
 
@@ -274,13 +291,16 @@ describe('splitting a movie library’s duplicates', () => {
       libraryId: state.libraryId,
       mediaId: id('300 (2007) 2160p HEVC.mkv'),
       how: 'apart',
+      account: TEST_ACCOUNTS.a,
     })
 
-    const after = splits().join({ libraryId: state.libraryId, itemId })
+    const after = splits().join({ libraryId: state.libraryId, itemId, account: TEST_ACCOUNTS.a })
 
     expect(cards()).toEqual([['300 (2007) 2160p HEVC.mkv', 2, null]])
     expect(after[0]?.cards.map((card) => card.files.length)).toEqual([2])
-    expect(() => splits().join({ libraryId: state.libraryId, itemId })).toThrow(NotFoundException)
+    expect(() =>
+      splits().join({ libraryId: state.libraryId, itemId, account: TEST_ACCOUNTS.a }),
+    ).toThrow(NotFoundException)
   })
 
   it('leaves a file’s split behind when it is matched to another movie, and keeps it for the same one', () => {
@@ -292,6 +312,7 @@ describe('splitting a movie library’s duplicates', () => {
       libraryId: state.libraryId,
       mediaId: id('Alexander (2004) Remux-2160p.mkv'),
       how: 'apart',
+      account: TEST_ACCOUNTS.a,
     })
     const { metadata } = repositories(database.get())
     const collateral = metadata.save({ item: movie({ tmdbId: 'Collateral', title: 'Collateral' }) })

@@ -29,6 +29,7 @@ import {
 } from '@/media/mediaSql'
 import { SagaBackdrops } from '@/media/sagaBackdrops'
 import { shuffle } from '@/media/shuffle'
+import type { AccountKey, ByAccount } from '@/media/viewingAccountKeys'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
@@ -97,8 +98,8 @@ const SELECT_COLUMNS = `
 const FROM_MEDIA = `
     FROM media m
     JOIN libraries l ON l.id = m.library_id
-    LEFT JOIN playback_progress p ON p.media_id = m.id
-    LEFT JOIN favourites f ON f.media_id = m.id
+    LEFT JOIN playback_progress p ON p.account_id = @account AND p.media_id = m.id
+    LEFT JOIN favourites f ON f.account_id = @account AND f.media_id = m.id
     LEFT JOIN ${FIRST_ITEM}
     LEFT JOIN shown_items i ON i.id = mi.item_id
     LEFT JOIN items t ON t.id = mi.item_id`
@@ -239,9 +240,11 @@ const ORDER_BY: Record<MediaSort, string> = {
 
 /**
  * The videos as a client sees them: listings, a show's next episode, an
- * item's files, favourites. Every answer is a `MediaItem`, which has no
- * path, so nothing read here can hand a client one. What the server needs
- * of a file itself, its path above all, is `MediaIndex`'s.
+ * item's files, favourites. Each read is one account's, whose spots,
+ * favourites and plays it binds as `@account`. Every answer is a
+ * `MediaItem`, which has no path, so nothing read here can hand a client
+ * one. What the server needs of a file itself, its path above all, is
+ * `MediaIndex`'s.
  */
 @Injectable()
 export class MediaRepository {
@@ -267,23 +270,26 @@ export class MediaRepository {
     }))
   }
 
-  /** The videos with these ids, in the order asked; one that is gone is left out. */
-  getMany(ids: readonly number[]): MediaItem[] {
+  /**
+   * The videos with these ids, in the order asked, as `account` sees them;
+   * one that is gone is left out.
+   */
+  getMany({ ids, account }: { ids: readonly number[]; account: AccountKey }): MediaItem[] {
     if (ids.length === 0) return []
     const found = new Map(
       this.items(
         this.db
-          .prepare<[string], MediaRow>(
+          .prepare<[ByAccount, string], MediaRow>(
             `${SELECT_MEDIA} WHERE m.id IN (SELECT value FROM json_each(?))`,
           )
-          .all(JSON.stringify(ids)),
+          .all({ account }, JSON.stringify(ids)),
       ).map((item) => [item.id, item]),
     )
     return ids.flatMap((id) => found.get(id) ?? [])
   }
 
-  get(id: number): MediaItem | null {
-    return this.getMany([id])[0] ?? null
+  get({ id, account }: { id: number; account: AccountKey }): MediaItem | null {
+    return this.getMany({ ids: [id], account })[0] ?? null
   }
 
   /**
@@ -299,16 +305,18 @@ export class MediaRepository {
     sort = 'title',
     seed = 0,
     limit,
+    account,
   }: {
     libraryId: number
     search?: string
     sort?: MediaSort
     seed?: number
     limit?: number
+    account: AccountKey
   }): MediaItem[] {
     const pattern = likePattern(search.trim())
     const rows = this.db
-      .prepare<[number, string, string, string, number], MediaRow>(
+      .prepare<[ByAccount, number, string, string, string, number], MediaRow>(
         `WITH listed AS (
            ${SELECT_COLUMNS},
                   ROW_NUMBER() OVER (
@@ -324,7 +332,7 @@ export class MediaRepository {
           ORDER BY ${ORDER_BY[sort]}
           LIMIT ?`,
       )
-      .all(libraryId, pattern, pattern, pattern, sqlLimit({ sort, limit }))
+      .all({ account }, libraryId, pattern, pattern, pattern, sqlLimit({ sort, limit }))
     const items = this.items(rows)
     return sort === MEDIA_SORTS.random ? shuffle({ items, seed }).slice(0, limit) : items
   }
@@ -339,12 +347,14 @@ export class MediaRepository {
   private nextUnwatched({
     showIds,
     libraryIds,
+    account,
   }: {
     showIds: readonly number[]
     libraryIds: readonly number[]
+    account: AccountKey
   }): Map<number, number> {
     const rows = this.db
-      .prepare<[string, string], { show_id: number; media_id: number }>(
+      .prepare<[ByAccount, string, string], { show_id: number; media_id: number }>(
         `WITH files AS (
            SELECT s.parent_id AS show_id, m.id AS media_id, e.id AS episode_id,
                   s.number AS season_number, e.number AS episode_number,
@@ -369,7 +379,7 @@ export class MediaRepository {
             WHERE episode_watched = 0)
          SELECT show_id, media_id FROM ranked WHERE rank = 1`,
       )
-      .all(JSON.stringify(showIds), JSON.stringify(libraryIds))
+      .all({ account }, JSON.stringify(showIds), JSON.stringify(libraryIds))
     return new Map(rows.map((row) => [row.show_id, row.media_id]))
   }
 
@@ -385,16 +395,18 @@ export class MediaRepository {
     sort = 'title',
     seed = 0,
     limit,
+    account,
   }: {
     libraryId: number
     search?: string
     sort?: MediaSort
     seed?: number
     limit?: number
+    account: AccountKey
   }): ShowEntry[] {
     const pattern = likePattern(search.trim())
     const rows = this.db
-      .prepare<[number, string, string, number], ShowRow>(
+      .prepare<[ByAccount, number, string, string, number], ShowRow>(
         `WITH files AS (${EPISODE_FILES})
          SELECT sh.id, sh.ended, COUNT(DISTINCT f.episode_id) AS episodes,
                 COUNT(DISTINCT CASE WHEN f.watched = 1 THEN f.episode_id END) AS watched_episodes,
@@ -409,11 +421,13 @@ export class MediaRepository {
           ORDER BY ${SHOW_ORDER_BY[sort]}
           LIMIT ?`,
       )
-      .all(libraryId, pattern, pattern, sqlLimit({ sort, limit }))
+      .all({ account }, libraryId, pattern, pattern, sqlLimit({ sort, limit }))
     const showIds = rows.map((row) => row.id)
     const summaries = this.metadata.summaries(showIds)
-    const next = this.nextUnwatched({ showIds, libraryIds: [libraryId] })
-    const episodes = new Map(this.getMany([...next.values()]).map((item) => [item.id, item]))
+    const next = this.nextUnwatched({ showIds, libraryIds: [libraryId], account })
+    const episodes = new Map(
+      this.getMany({ ids: [...next.values()], account }).map((item) => [item.id, item]),
+    )
     const entries = rows.flatMap((row): ShowEntry[] => {
       const show = summaries.get(row.id)
       if (!show) return []
@@ -440,12 +454,14 @@ export class MediaRepository {
   nextEpisode({
     showId,
     libraryIds,
+    account,
   }: {
     showId: number
     libraryIds: readonly number[]
+    account: AccountKey
   }): MediaItem | null {
-    const next = this.nextUnwatched({ showIds: [showId], libraryIds }).get(showId)
-    return next == null ? null : this.get(next)
+    const next = this.nextUnwatched({ showIds: [showId], libraryIds, account }).get(showId)
+    return next == null ? null : this.get({ id: next, account })
   }
 
   /**
@@ -459,10 +475,12 @@ export class MediaRepository {
     itemId,
     libraryIds,
     roll = Math.random,
+    account,
   }: {
     itemId: number
     libraryIds: readonly number[]
     roll?: () => number
+    account: AccountKey
   }): MediaItem[] {
     const rows = this.db
       .prepare<[number, number, string], { media_id: number }>(
@@ -482,57 +500,78 @@ export class MediaRepository {
       )
       .all(itemId, itemId, JSON.stringify(libraryIds))
     const dealt = shuffled({ items: rows.map((row) => row.media_id), roll })
-    return this.getMany(dealt.slice(0, SHUFFLE_LENGTH))
+    return this.getMany({ ids: dealt.slice(0, SHUFFLE_LENGTH), account })
   }
 
   /**
-   * The episodes among `ids` that are watched, each once for every library
-   * where one of its files is: a page counts only the libraries it may show.
+   * The episodes among `ids` that `account` watched, each once for every
+   * library where one of its files is: a page counts only the libraries it
+   * may show.
    */
-  watchedEpisodes(ids: readonly number[]): { episodeId: number; libraryId: number }[] {
+  watchedEpisodes({
+    ids,
+    account,
+  }: {
+    ids: readonly number[]
+    account: AccountKey
+  }): { episodeId: number; libraryId: number }[] {
     if (ids.length === 0) return []
     return this.db
-      .prepare<[string], { episode_id: number; library_id: number }>(
+      .prepare<[ByAccount, string], { episode_id: number; library_id: number }>(
         `SELECT DISTINCT mi.item_id AS episode_id, m.library_id
            FROM media_items mi
            JOIN media m ON m.id = mi.media_id
            JOIN libraries l ON l.id = m.library_id
           WHERE mi.item_id IN (SELECT value FROM json_each(?)) AND ${fileWatched('m')}`,
       )
-      .all(JSON.stringify(ids))
+      .all({ account }, JSON.stringify(ids))
       .map((row) => ({ episodeId: row.episode_id, libraryId: row.library_id }))
   }
 
   /** A library's files no show or movie was found for, pending ones included, by title. */
-  listUnmatched({ libraryId, search = '' }: { libraryId: number; search?: string }): MediaItem[] {
+  listUnmatched({
+    libraryId,
+    search = '',
+    account,
+  }: {
+    libraryId: number
+    search?: string
+    account: AccountKey
+  }): MediaItem[] {
     return this.items(
       this.db
-        .prepare<[number, string], MediaRow>(
+        .prepare<[ByAccount, number, string], MediaRow>(
           `${SELECT_MEDIA}
             WHERE m.library_id = ? AND m.match IN ('pending', 'unmatched')
               AND m.title LIKE ? ESCAPE '\\'
             ORDER BY m.title COLLATE NOCASE, m.id`,
         )
-        .all(libraryId, likePattern(search.trim())),
+        .all({ account }, libraryId, likePattern(search.trim())),
     )
   }
 
   /** Every file that is an item, in any library, best first. */
-  forItem(itemId: number): MediaItem[] {
-    return this.forItems([itemId]).get(itemId) ?? []
+  forItem({ itemId, account }: { itemId: number; account: AccountKey }): MediaItem[] {
+    return this.forItems({ itemIds: [itemId], account }).get(itemId) ?? []
   }
 
   /** Every file that is each of the items, in any library, best first, in one read. */
-  forItems(itemIds: readonly number[]): Map<number, MediaItem[]> {
+  forItems({
+    itemIds,
+    account,
+  }: {
+    itemIds: readonly number[]
+    account: AccountKey
+  }): Map<number, MediaItem[]> {
     if (itemIds.length === 0) return new Map()
     const rows = this.db
-      .prepare<[string], MediaRow & { linked_item: number }>(
+      .prepare<[ByAccount, string], MediaRow & { linked_item: number }>(
         `${SELECT_COLUMNS}, x.item_id AS linked_item${FROM_MEDIA}
            JOIN media_items x ON x.media_id = m.id
           WHERE x.item_id IN (SELECT value FROM json_each(?))
           ORDER BY ${BEST_FIRST}`,
       )
-      .all(JSON.stringify(itemIds))
+      .all({ account }, JSON.stringify(itemIds))
     const items = this.items(rows)
     return rows.reduce((byItem, row, index) => {
       const item = items[index]
@@ -542,19 +581,26 @@ export class MediaRepository {
   }
 
   /**
-   * Every video with a saved spot, across every library that saves progress
-   * or in `libraryId` alone, the most recently watched first. A finished or
-   * barely started video has no spot, so it is not in progress.
+   * Every video `account` has a saved spot in, across every library that
+   * saves progress or in `libraryId` alone, the most recently watched first.
+   * A finished or barely started video has no spot, so it is not in
+   * progress.
    */
-  listInProgress({ libraryId = null }: { libraryId?: number | null } = {}): MediaItem[] {
+  listInProgress({
+    libraryId = null,
+    account,
+  }: {
+    libraryId?: number | null
+    account: AccountKey
+  }): MediaItem[] {
     return this.items(
       this.db
-        .prepare<{ libraryId: number | null }, MediaRow>(
+        .prepare<{ libraryId: number | null; account: AccountKey }, MediaRow>(
           `${SELECT_MEDIA} WHERE p.media_id IS NOT NULL AND l.save_progress = 1
               AND (@libraryId IS NULL OR m.library_id = @libraryId)
             ORDER BY p.updated_at DESC, m.id DESC`,
         )
-        .all({ libraryId }),
+        .all({ libraryId, account }),
     )
   }
 
@@ -598,19 +644,25 @@ export class MediaRepository {
   }
 
   /**
-   * Every favourite across every library, or in `libraryId` alone, most
-   * recently marked first. A locked library's are left out, whether or not
-   * the PIN is entered.
+   * Every favourite of `account` across every library, or in `libraryId`
+   * alone, most recently marked first. A locked library's are left out,
+   * whether or not the PIN is entered.
    */
-  listFavourites({ libraryId = null }: { libraryId?: number | null } = {}): MediaItem[] {
+  listFavourites({
+    libraryId = null,
+    account,
+  }: {
+    libraryId?: number | null
+    account: AccountKey
+  }): MediaItem[] {
     return this.items(
       this.db
-        .prepare<{ libraryId: number | null }, MediaRow>(
+        .prepare<{ libraryId: number | null; account: AccountKey }, MediaRow>(
           `${SELECT_MEDIA} WHERE f.media_id IS NOT NULL AND l.locked = 0
               AND (@libraryId IS NULL OR m.library_id = @libraryId)
             ORDER BY f.added_at DESC, m.id DESC`,
         )
-        .all({ libraryId }),
+        .all({ libraryId, account }),
     )
   }
 
@@ -621,10 +673,10 @@ export class MediaRepository {
    * several cards is still one movie, so a single movie of a collection is
    * no saga yet, however many cards it has.
    */
-  listSagas(libraryId: number): Saga[] {
+  listSagas({ libraryId, account }: { libraryId: number; account: AccountKey }): Saga[] {
     const movies = this.items(
       this.db
-        .prepare<[number], MediaRow>(
+        .prepare<[ByAccount, number], MediaRow>(
           `WITH ranked AS (
              ${SELECT_COLUMNS},
                     ROW_NUMBER() OVER (PARTITION BY i.id ORDER BY ${BEST_FIRST}) AS version_rank
@@ -632,7 +684,7 @@ export class MediaRepository {
               WHERE m.library_id = ? AND i.type = 'movie' AND t.saga_tmdb_id IS NOT NULL)
            SELECT * FROM ranked WHERE version_rank = 1 ORDER BY ${ORDER_BY['year-old']}`,
         )
-        .all(libraryId),
+        .all({ account }, libraryId),
     )
     const sagas = this.metadata.sagasOf(movies.flatMap((media) => media.item?.id ?? []))
     const backdrops = this.sagaBackdrops.ofLibrary(libraryId)

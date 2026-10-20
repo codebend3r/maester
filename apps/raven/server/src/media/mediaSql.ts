@@ -21,24 +21,25 @@ export const FIRST_ITEM = `media_items mi
      AND mi.item_id = (SELECT MIN(z.item_id) FROM media_items z WHERE z.media_id = m.id)`
 
 /**
- * Whether the file `file` is watched: it has a `marked` play, or a `played`
- * one that got to its library's watched percentage. A file whose length is
- * still unknown is watched only by a mark. An `EXISTS` over the file's
- * plays, by `plays_media`, so it never aggregates the whole table. Assumes
+ * Whether the file `file` is watched by the account bound as `@account`:
+ * it has a `marked` play, or a `played` one that got to its library's
+ * watched percentage. A file whose length is still unknown is watched only
+ * by a mark. An `EXISTS` over the account's plays of the file, by
+ * `plays_account`, so it never aggregates the whole table. Assumes
  * `libraries l` is its library.
  */
 export const fileWatched = (file: string): string =>
   `EXISTS (SELECT 1 FROM plays pl
-            WHERE pl.media_id = ${file}.id
+            WHERE pl.account_id = @account AND pl.media_id = ${file}.id
               AND (pl.kind = 'marked'
                    OR (pl.kind = 'played' AND ${file}.duration > 0
                        AND pl.furthest >= ${file}.duration * l.watched_percent / 100.0)))`
 
 /**
- * Whether the card of the file `file` is watched, `item` being its first
- * item: any file in its library with the same item and `split`, or the file
- * alone when nothing is matched to it. The CROSS JOIN starts the walk from
- * the item's files, as the version count does.
+ * Whether the card of the file `file` is watched by `@account`, `item`
+ * being its first item: any file in its library with the same item and
+ * `split`, or the file alone when nothing is matched to it. The CROSS JOIN
+ * starts the walk from the item's files, as the version count does.
  */
 export const cardWatched = ({ file, item }: { file: string; item: string }): string =>
   `CASE WHEN ${item}.id IS NULL THEN ${fileWatched(file)}

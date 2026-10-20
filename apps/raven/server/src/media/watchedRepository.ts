@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { DatabaseService } from '@/db/database'
 import { fileWatched } from '@/media/mediaSql'
+import type { AccountKey, ByAccount } from '@/media/viewingAccountKeys'
 import type { WatchCard } from '@/media/watchedCards'
 
 /** What a play is, as the `plays.kind` column holds it: a real one, a Mark as watched, or a real one Mark as unwatched set aside. */
@@ -26,42 +27,59 @@ export class WatchedRepository {
    * spot of every file of the card, even in a library that saves no
    * progress: marking is explicit, unlike a report. Unwatched deletes the
    * card's marks, sets its real plays aside as `cleared`, which stay in the
-   * history and never count, and deletes its spots.
+   * history and never count, and deletes its spots. Only `account`'s plays
+   * and spots are read or touched.
    */
-  set({ cards, watched, at }: { cards: readonly WatchCard[]; watched: boolean; at: Date }): void {
-    const isWatched = this.db.prepare<[string], { watched: number }>(
+  set({
+    cards,
+    watched,
+    at,
+    account,
+  }: {
+    cards: readonly WatchCard[]
+    watched: boolean
+    at: Date
+    account: AccountKey
+  }): void {
+    const isWatched = this.db.prepare<[ByAccount, string], { watched: number }>(
       `SELECT 1 AS watched
          FROM media m
          JOIN libraries l ON l.id = m.library_id
         WHERE m.id IN (SELECT value FROM json_each(?)) AND ${fileWatched('m')}
         LIMIT 1`,
     )
-    const mark = this.db.prepare(
-      `INSERT INTO plays (media_id, played_at, furthest, kind) VALUES (?, ?, ?, ?)`,
+    const mark = this.db.prepare<[ByAccount, number, string, number, string]>(
+      `INSERT INTO plays (account_id, media_id, played_at, furthest, kind)
+       VALUES (@account, ?, ?, ?, ?)`,
     )
-    const dropMarks = this.db.prepare(
-      `DELETE FROM plays WHERE kind = ? AND media_id IN (SELECT value FROM json_each(?))`,
+    const dropMarks = this.db.prepare<[ByAccount, string, string]>(
+      `DELETE FROM plays
+        WHERE account_id = @account AND kind = ?
+          AND media_id IN (SELECT value FROM json_each(?))`,
     )
-    const setAside = this.db.prepare(
+    const setAside = this.db.prepare<[ByAccount, string, string, string]>(
       `UPDATE plays SET kind = ?
-        WHERE kind = ? AND media_id IN (SELECT value FROM json_each(?))`,
+        WHERE account_id = @account AND kind = ?
+          AND media_id IN (SELECT value FROM json_each(?))`,
     )
-    const clearSpots = this.db.prepare(
-      'DELETE FROM playback_progress WHERE media_id IN (SELECT value FROM json_each(?))',
+    const clearSpots = this.db.prepare<[ByAccount, string]>(
+      `DELETE FROM playback_progress
+        WHERE account_id = @account AND media_id IN (SELECT value FROM json_each(?))`,
     )
+    const bound = { account }
     this.db.transaction(() => {
       cards.forEach((card) => {
         const best = card.files[0]
         if (!best) return
         const ids = JSON.stringify(card.files.map((file) => file.id))
-        if (!!isWatched.get(ids) === watched) return
+        if (!!isWatched.get(bound, ids) === watched) return
         if (watched) {
-          mark.run(best.id, at.toISOString(), best.duration ?? 0, PLAY_KINDS.marked)
+          mark.run(bound, best.id, at.toISOString(), best.duration ?? 0, PLAY_KINDS.marked)
         } else {
-          dropMarks.run(PLAY_KINDS.marked, ids)
-          setAside.run(PLAY_KINDS.cleared, PLAY_KINDS.played, ids)
+          dropMarks.run(bound, PLAY_KINDS.marked, ids)
+          setAside.run(bound, PLAY_KINDS.cleared, PLAY_KINDS.played, ids)
         }
-        clearSpots.run(ids)
+        clearSpots.run(bound, ids)
       })
     })()
   }

@@ -1,10 +1,11 @@
+import { MEDIA_SORTS } from '@raven/core'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { ItemOverrides } from '@/metadata/itemOverrides'
 import { BLANK_ITEM, type FetchedItem } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
-import { repositories } from '@/test/repositories'
+import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
 const movie = ({ tmdbId, title }: { tmdbId: string; title: string }): FetchedItem => ({
   ...BLANK_ITEM,
@@ -39,7 +40,7 @@ describe('an edit over TMDB’s words', () => {
   const details = (itemId: number) => repositories(database.get()).metadata.details(itemId)
   const listed = () =>
     repositories(database.get())
-      .media.list({ libraryId: state.libraryId, sort: 'title' })
+      .media.list({ libraryId: state.libraryId, sort: MEDIA_SORTS.title, account: TEST_ACCOUNTS.a })
       .map((media) => media.item?.title)
 
   beforeEach(async () => {

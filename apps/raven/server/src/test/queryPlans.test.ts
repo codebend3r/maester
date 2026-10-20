@@ -5,12 +5,11 @@ import { PRODUCTION_STATISTICS } from '@/test/queryPlans'
 /**
  * Tables the copy has no statistics for, as `ANALYZE` gives an empty table
  * none: `ai_decisions` was empty on the real server, and `saga_backdrops`,
- * `item_favourites`, `person_credits` and `score_requests` came after the copy was taken.
+ * `person_credits` and `score_requests` came after the copy was taken.
  */
 const NOT_IN_THE_COPY: ReadonlySet<string> = new Set([
   'ai_decisions',
   'saga_backdrops',
-  'item_favourites',
   'person_credits',
   'score_requests',
 ])
@@ -29,10 +28,18 @@ describe("the real server's statistics the plan tests copy", () => {
     const schema = database
       .get()
       .db.prepare<[], { tbl: string; idx: string | null }>(
-        `SELECT t.name AS tbl, i.name AS idx
-           FROM sqlite_master t
-           LEFT JOIN sqlite_master i ON i.type = 'index' AND i.tbl_name = t.name
-          WHERE t.type = 'table' AND t.name NOT LIKE 'sqlite\\_%' ESCAPE '\\'`,
+        `WITH tables AS (
+           SELECT name, wr FROM pragma_table_list
+            WHERE schema = 'main' AND type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'),
+         indexes AS (
+           SELECT t.name AS tbl, i.name AS idx
+             FROM tables t
+             JOIN sqlite_master i ON i.type = 'index' AND i.tbl_name = t.name
+           UNION ALL
+           SELECT name, name FROM tables WHERE wr = 1)
+         SELECT tbl, idx FROM indexes
+         UNION ALL
+         SELECT name, NULL FROM tables WHERE name NOT IN (SELECT tbl FROM indexes)`,
       )
       .all()
       .filter(({ tbl }) => !NOT_IN_THE_COPY.has(tbl))
