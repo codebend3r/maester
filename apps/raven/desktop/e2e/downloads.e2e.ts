@@ -621,7 +621,7 @@ test.describe.serial('downloading through the server', () => {
       ],
     }
     const seeded: DownloadsState = {
-      version: 1,
+      version: 2,
       entries: [
         {
           downloadId: randomUUID(),
@@ -638,7 +638,7 @@ test.describe.serial('downloading through the server', () => {
           autoDelete: true,
           watchedAt: at - 11 * MINUTE_MS,
           serverPosition: 0,
-          pending: { play: false, position: null, furthest: null, at: 0 },
+          pending: { play: false, position: null, furthest: null, at: 0, accountId: null },
           createdAt: at - 60 * MINUTE_MS,
         },
       ],

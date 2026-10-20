@@ -11,6 +11,7 @@ import {
   bytesOf,
   entryById,
   PAUSE_REASONS,
+  oweOtherAccounts,
   setAutoDelete,
   setAutoDeleteDefault,
   sortDownloads,
@@ -67,7 +68,7 @@ export type DownloadServiceDeps = {
   wasSetAside: boolean
   /** How often the sync tries its servers again; the spec's five minutes unless main's test hook shortens it. */
   syncRetryMs: number
-} & Pick<DownloadPlaybackDeps, 'grants' | 'state' | 'stat'> &
+} & Pick<DownloadPlaybackDeps, 'grants' | 'state' | 'stat' | 'hasAccounts' | 'accountIdOf'> &
   Pick<DownloadAsksDeps, 'isReady' | 'readAccount'> &
   Pick<DownloadQueueDeps, 'accountChanged'>
 
@@ -116,6 +117,11 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     onResume: () => void
     /** A server's sign-in ended in main: its downloads fetched with an account ticket fail. */
     accessEnded: (input: { serverId: string }) => void
+    /**
+     * The account signed in to a server changed: what its downloads hold for any other account
+     * waits in `owed` for that account, and what the one signed in now is owed goes out.
+     */
+    accountSwitched: (input: { serverId: string }) => void
     /** Stops the events and every fetch; after it the page hears nothing more. */
     dispose: () => void
   }
@@ -243,6 +249,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     timers: deps.timers,
     warn: deps.warn,
     retryMs: deps.syncRetryMs,
+    accountIdOf: deps.accountIdOf,
   })
 
   const runSync = (work: Promise<void>): void => {
@@ -274,6 +281,8 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
       deleteClock.schedule(input)
     },
     onLeft: () => deleteClock.playbackLeft(),
+    hasAccounts: deps.hasAccounts,
+    accountIdOf: deps.accountIdOf,
   })
 
   const queue = createDownloadQueue({
@@ -439,6 +448,12 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     return { type: DESKTOP_REPLIES.done }
   }
 
+  const accountSwitched: DownloadService['accountSwitched'] = ({ serverId }) => {
+    const accountId = deps.accountIdOf({ serverId })
+    change((state) => oweOtherAccounts(state, { serverId, accountId }))
+    runSync(sync.runAll())
+  }
+
   const dispose = (): void => {
     isDisposed = true
     if (announcing.timer !== undefined) deps.timers.clear(announcing.timer)
@@ -513,6 +528,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     onSuspend: queue.onSuspend,
     onResume: queue.onResume,
     accessEnded: queue.accessEnded,
+    accountSwitched,
     dispose,
   }
 }

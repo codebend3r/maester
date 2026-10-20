@@ -807,14 +807,23 @@ describe('logLine', () => {
     // An eighth of the input of the same shape: linear work takes about 8 times as long on the
     // whole and quadratic work 64 times, so 24 times tells them apart whatever the machine's speed.
     const eighth = text.slice(0, text.length / 8)
-    const timeOf = (input: string): number =>
-      Array.from({ length: 5 }, () => {
-        const startedAt = performance.now()
-        redact(input)
-        return performance.now() - startedAt
-      }).reduce((fastest, each) => Math.min(fastest, each))
-    // Clocks are coarse and a short run can be near zero, so the shorter time has a floor.
-    expect(timeOf(text)).toBeLessThanOrEqual(24 * Math.max(timeOf(eighth), 5))
+    // Milliseconds of this process's CPU, not of the clock, so other work on the machine, as
+    // when every project's tests run at once, never counts against either side.
+    const timeOf = (inputs: readonly string[]): number => {
+      const before = process.cpuUsage()
+      inputs.forEach((input) => redact(input))
+      const { user, system } = process.cpuUsage(before)
+      return (user + system) / 1000
+    }
+    // The eighth is timed eight times over, back to back with the whole, so both sides of a pair
+    // take about as long, and the median pair ignores the odd one a pause fell into. A short run
+    // can still be near zero, so the eighth's time has a floor.
+    const eighths = Array.from({ length: 8 }, () => eighth)
+    const ratios = Array.from({ length: 7 }, () => {
+      const perEighth = Math.max(timeOf(eighths) / 8, 5)
+      return timeOf([text]) / perEighth
+    }).toSorted((a, b) => a - b)
+    expect(ratios.at(3) ?? Infinity).toBeLessThanOrEqual(24)
   })
 
   it('caps a message before redacting it, never between the halves of a surrogate pair', () => {

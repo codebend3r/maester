@@ -1,4 +1,4 @@
-import { AUTH_HEADERS } from '@raven/core'
+import { AUTH_HEADERS, isString, object } from '@raven/core'
 import {
   type AuthError,
   AuthClient,
@@ -10,6 +10,7 @@ import {
 import { isSameSignIn, type SignInConfig } from '@/main/accounts/authEndpoints'
 import type { SessionStorage } from '@/main/accounts/sessionStore'
 import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
+import { parseJson } from '@/main/parseJson'
 import type { Timers } from '@/main/stateStore'
 import { HTTP_STATUSES } from '@/shared/httpStatuses'
 
@@ -67,6 +68,13 @@ export type AccountSessions = {
   refresh: (serverId: string) => Promise<string | null>
   signOut: (serverId: string) => Promise<void>
   forget: (serverId: string) => Promise<void>
+  /**
+   * The id of the account signed in to a server, as the session kept for it names it, read with
+   * no request; null when none is. It stays in main: the page never learns it.
+   */
+  accountIdOf: (input: { serverId: string }) => string | null
+  /** Reads each server's kept session once at launch, so `accountIdOf` knows it from the start. */
+  restore: (input: { serverIds: readonly string[] }) => Promise<void>
 }
 
 export const AUTH_ERROR_CODES = {
@@ -103,6 +111,14 @@ const STORAGE_KEYS = [
   `${SESSION_STORAGE_KEY}-user`,
   `${SESSION_STORAGE_KEY}-code-verifier`,
 ] as const
+
+/** The part of the session auth-js keeps that names the account. */
+const isStoredSession = object({ user: object({ id: isString }) })
+
+const accountIdIn = (value: string | null): string | null => {
+  const session = value === null ? null : parseJson(value)
+  return isStoredSession(session) ? session.user.id : null
+}
 
 type FetchInput = Parameters<typeof fetch>[0]
 
@@ -180,6 +196,35 @@ export const createAccountSessions = ({
   warn: (message: string) => void
 }): AccountSessions => {
   let clients: ReadonlyMap<string, Held> = new Map()
+  let accountIds: ReadonlyMap<string, string> = new Map()
+
+  const noteSession = ({ serverId, value }: { serverId: string; value: string | null }): void => {
+    const accountId = accountIdIn(value)
+    accountIds =
+      accountId === null
+        ? new Map([...accountIds].filter(([id]) => id !== serverId))
+        : new Map([...accountIds, [serverId, accountId]])
+  }
+
+  // Every read and write of the session passes here, so the account it names is always known.
+  const storageOf = (serverId: string): SessionStorage => {
+    const storage = storageFor(serverId)
+    return {
+      getItem: async (key) => {
+        const value = await storage.getItem(key)
+        if (key === SESSION_STORAGE_KEY) noteSession({ serverId, value })
+        return value
+      },
+      setItem: async (key, value) => {
+        await storage.setItem(key, value)
+        if (key === SESSION_STORAGE_KEY) noteSession({ serverId, value })
+      },
+      removeItem: async (key) => {
+        await storage.removeItem(key)
+        if (key === SESSION_STORAGE_KEY) noteSession({ serverId, value: null })
+      },
+    }
+  }
 
   const ended = (serverId: string): void => {
     try {
@@ -206,7 +251,7 @@ export const createAccountSessions = ({
     if (known !== undefined && isSameSignIn({ a: known.config, b: config })) return known.client
     // The endpoints moved: the old client's late writes would land under the same key.
     drop(serverId)
-    const { storage, close } = closable(storageFor(serverId))
+    const { storage, close } = closable(storageOf(serverId))
     const client = new AuthClient({
       url: `${config.supabaseUrl}${AUTH_PATH}`,
       headers: { [AUTH_HEADERS.apiKey]: config.publishableKey },
@@ -227,7 +272,7 @@ export const createAccountSessions = ({
   }
 
   const clearStorage = async (serverId: string): Promise<void> => {
-    const storage = storageFor(serverId)
+    const storage = storageOf(serverId)
     await Promise.all(STORAGE_KEYS.map((key) => storage.removeItem(key)))
   }
 
@@ -370,5 +415,17 @@ export const createAccountSessions = ({
     await clearStorage(serverId)
   }
 
-  return { signIn, accessToken, refresh, signOut, forget }
+  const restore: AccountSessions['restore'] = async ({ serverIds }) => {
+    await Promise.all(serverIds.map((serverId) => storageOf(serverId).getItem(SESSION_STORAGE_KEY)))
+  }
+
+  return {
+    signIn,
+    accessToken,
+    refresh,
+    signOut,
+    forget,
+    accountIdOf: ({ serverId }) => accountIds.get(serverId) ?? null,
+    restore,
+  }
 }

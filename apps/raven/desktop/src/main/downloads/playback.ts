@@ -5,6 +5,7 @@ import {
   forgetServerPosition,
   notePending,
   noteWatched,
+  oweOtherAccounts,
   sameGroup,
   sortDownloads,
   type DownloadEntry,
@@ -54,6 +55,10 @@ export type DownloadPlaybackDeps = {
   onNoted: (input: { downloadId: string }) => void
   /** The player left the download it was on, for another file or for nothing of this computer's. */
   onLeft: () => void
+  /** Whether a server has accounts, so what is watched of its downloads belongs to one. */
+  hasAccounts: (input: { serverId: string }) => boolean
+  /** The account signed in to a server, as its stored session names it; null when none is. */
+  accountIdOf: (input: { serverId: string }) => string | null
 }
 
 export type DownloadPlayback = {
@@ -160,6 +165,11 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   /** Videos opened and not played yet: the first position noted for one is its play. */
   const freshFiles = new Set<string>()
   /**
+   * The account signed in when each video was opened, which every position of that sitting
+   * belongs to: a sign in by another account partway through never takes the rest of it.
+   */
+  const sittings = new Map<string, string | null>()
+  /**
    * What the page opened and what the engine loaded, kept apart so neither clears the other:
    * the engine stopping while the page still plays a file, or the page leaving a file the
    * engine still has, leaves the download playing.
@@ -182,6 +192,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
       // path, where the same title downloaded again lives.
       downloadIdByFile.delete(fileId)
       freshFiles.delete(fileId)
+      sittings.delete(fileId)
     }
     const file = grants.fileOf(fileId)
     const entry = file === null ? null : entryAt(file.path)
@@ -219,6 +230,14 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     return file ?? firstGranted(rest)
   }
 
+  const signedInTo = ({ serverId }: DownloadEntry): string | null =>
+    deps.hasAccounts({ serverId }) ? deps.accountIdOf({ serverId }) : null
+
+  const sit = ({ fileId, entry }: { fileId: string; entry: DownloadEntry }): void => {
+    freshFiles.add(fileId)
+    sittings.set(fileId, signedInTo(entry))
+  }
+
   const open: DownloadPlayback['open'] = async ({ downloadId }) => {
     const entry = entryById(store.read(), { downloadId })
     if (entry === null || entry.status.kind !== DOWNLOAD_STATUS_KINDS.ready)
@@ -229,7 +248,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
       deps.warn(`raven player could not open the file of ${loggable(entry.label)}`)
       return refused(DOWNLOAD_MESSAGES.fileGone)
     }
-    freshFiles.add(fileId)
+    sit({ fileId, entry })
     const queued = await Promise.all(
       later.map(async (other) => {
         const queuedId = await grantVideo(other)
@@ -295,7 +314,8 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
 
   const noteOpened: DownloadPlayback['noteOpened'] = ({ fileId }) => {
     play({ side: PLAY_SIDES.page, fileId })
-    if (playing.page.downloadId !== null) freshFiles.add(fileId)
+    const entry = entryOfFile(fileId)
+    if (playing.page.downloadId !== null && entry !== null) sit({ fileId, entry })
   }
 
   const notePosition: DownloadPlayback['notePosition'] = ({ fileId, position, duration }) => {
@@ -308,17 +328,27 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     const isPlay = freshFiles.has(fileId)
     freshFiles.delete(fileId)
     const at = deps.now()
-    deps.change((state) =>
-      noteWatched(
-        notePending(forgetServerPosition(state, { downloadId }), {
-          downloadId,
-          play: isPlay,
-          position,
-          at,
-        }),
-        { downloadId, position, duration, at },
-      ),
-    )
+    const { serverId } = entry
+    const hasAccounts = deps.hasAccounts({ serverId })
+    const signedIn = hasAccounts ? deps.accountIdOf({ serverId }) : null
+    const recorded = sittings.get(fileId)
+    const sitting = recorded === undefined ? signedIn : recorded
+    sittings.set(fileId, sitting)
+    const accountId = hasAccounts ? sitting : null
+    // Signed out of a server with accounts, the play is this Mac's alone: no account to send it under.
+    const isOwedToServer = !hasAccounts || accountId !== null
+    deps.change((state) => {
+      const local = forgetServerPosition(state, { downloadId })
+      const pending = isOwedToServer
+        ? notePending(local, { downloadId, play: isPlay, position, at, accountId })
+        : local
+      // A sitting that outlived its account's sign in waits in `owed` until that account is back.
+      const noted =
+        accountId === signedIn
+          ? pending
+          : oweOtherAccounts(pending, { serverId, accountId: signedIn })
+      return noteWatched(noted, { downloadId, position, duration, at })
+    })
     deps.onNoted({ downloadId })
   }
 
@@ -379,6 +409,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     files.forEach(([fileId]) => {
       downloadIdByFile.delete(fileId)
       freshFiles.delete(fileId)
+      sittings.delete(fileId)
     })
   }
 

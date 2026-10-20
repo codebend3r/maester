@@ -7,6 +7,7 @@ import {
 } from '@/main/accounts/accountSessions'
 import { AUTH_STATES, type AuthConfigs, type AuthState } from '@/main/accounts/authConfigs'
 import { signInHostOf } from '@/main/accounts/authEndpoints'
+import type { ServerSignal } from '@/main/accounts/serverSignal'
 import type { ConfigStore } from '@/main/desktopConfig'
 import { quietly } from '@/main/log/quietly'
 import { parseJson } from '@/main/parseJson'
@@ -36,39 +37,6 @@ export const ACCOUNT_MESSAGES = {
 export const signInUnavailable = ({ name }: { name: string }): string =>
   `${name} could not sign you in right now. Try again.`
 
-type AccessEndListener = (input: { serverId: string }) => void
-
-/**
- * Whoever holds access on a person's behalf (the media relay, the downloads) listens here, and
- * main tells it when a sign-in ends: a sign out, a removed server, a sign-in host that moved.
- */
-export type AccessEnds = {
-  /** Returns the function that stops listening. */
-  listen: (listener: AccessEndListener) => () => void
-  notify: AccessEndListener
-}
-
-export const createAccessEnds = (): AccessEnds => {
-  let listeners: readonly AccessEndListener[] = []
-  return {
-    listen: (listener) => {
-      listeners = [...listeners, listener]
-      return () => {
-        listeners = listeners.filter((known) => known !== listener)
-      }
-    },
-    notify: (input) => {
-      listeners.forEach((listener) => {
-        try {
-          listener(input)
-        } catch {
-          // One listener's failure must not keep the rest from ending their access.
-        }
-      })
-    },
-  }
-}
-
 type SignInResult = { ok: true; account: AccountView } | { ok: false; message: string }
 
 type OpenPageResult = { ok: true } | { ok: false; message: string }
@@ -90,17 +58,23 @@ export type AccountService = {
 
 export type AccountServiceDeps = {
   authConfigs: Pick<AuthConfigs, 'stateOf' | 'reread' | 'recheck'>
-  sessions: Pick<AccountSessions, 'signIn' | 'accessToken' | 'signOut' | 'forget'>
+  sessions: Pick<AccountSessions, 'signIn' | 'accessToken' | 'signOut' | 'forget' | 'accountIdOf'>
   /** Calls that carry the Bearer: `/api/me` is read through them. */
   calls: Pick<ServerCalls, 'call'>
   config: ConfigStore
   isRemembered: () => boolean
   openExternal: (url: string) => Promise<void>
-  accessEnds: AccessEnds
+  /** Told when a sign-in ends: whoever holds access on its behalf (the relay, the downloads) listens. */
+  accessEnds: Pick<ServerSignal, 'notify'>
   /** Sends the page the new view of an account. */
   emit: (account: AccountView) => void
   info: (message: string) => void
   warn: (message: string) => void
+  /**
+   * The account signed in to a server changed: a sign out, a session the server rejected, or a
+   * sign in as an account other than the one signed in. Called once the session has changed.
+   */
+  switched: ServerSignal['notify']
 }
 
 const stateOfAccount = (account: Account): AccountView['state'] => {
@@ -296,6 +270,8 @@ export const createAccountService = (deps: AccountServiceDeps): AccountService =
   const signIn: AccountService['signIn'] = async ({ serverId, email, password }) => {
     // Never a password to anything the server's own config has not just vouched for.
     const state = await deps.authConfigs.reread(serverId)
+    // Read after the config: a yes to a moved sign-in host has just dropped the session it kept.
+    const before = deps.sessions.accountIdOf({ serverId })
     if (state.kind === AUTH_STATES.unreachable) {
       return { ok: false, message: signInUnavailable({ name: nameOf(serverId) }) }
     }
@@ -314,12 +290,14 @@ export const createAccountService = (deps: AccountServiceDeps): AccountService =
       }
     }
     info(`signed in to ${nameOf(serverId)}`)
+    if (deps.sessions.accountIdOf({ serverId }) !== before) deps.switched({ serverId })
     return { ok: true, account: await show({ serverId, known: state }) }
   }
 
   const end = async (serverId: string): Promise<void> => {
     await deps.sessions.signOut(serverId)
     deps.accessEnds.notify({ serverId })
+    deps.switched({ serverId })
     info(`signed out of ${nameOf(serverId)}`)
   }
 

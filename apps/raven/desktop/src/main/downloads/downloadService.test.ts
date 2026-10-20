@@ -32,6 +32,8 @@ import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import { ACCESS_REFUSALS, type AccessOutcome } from '@/main/downloads/mediaAccess'
 import { SPACE_RESERVE_BYTES } from '@/main/downloads/space'
 import { CALL_NAMES } from '@/main/servers/allowlist'
+import { CALL_MESSAGES } from '@/main/servers/serverCalls'
+import { tokenFor } from '@/main/test/accountTokens'
 import { createGrants } from '@/main/grants'
 import {
   addRecent,
@@ -209,6 +211,8 @@ const setup = ({
   readAccount = async () => {
     throw new Error('a server without accounts has no account to read')
   },
+  hasAccounts = false,
+  accountId = null,
 }: {
   replies?: Record<string, Reply>
   free?: number
@@ -229,7 +233,14 @@ const setup = ({
   isReady?: boolean
   /** The account main reads for the server. */
   readAccount?: (serverId: string) => Promise<AccountView>
+  /** Whether the server has accounts, so a play belongs to the account signed in. */
+  hasAccounts?: boolean
+  /** The account signed in to the server, as its stored session names it. */
+  accountId?: string | null
 } = {}) => {
+  const signedIn = { accountId }
+  /** Each call the server heard, with the Bearer token it carried. */
+  const heard: { call: string; token: string | null }[] = []
   const table: Record<string, Reply> = {
     [libraryCall]: ok(library({ id: 1, watchedPercent: 90 })),
     ...replies,
@@ -240,6 +251,11 @@ const setup = ({
   const calls: typeof answering = {
     call: async (input) => {
       await silence.until
+      const token = signedIn.accountId === null ? null : tokenFor({ accountId: signedIn.accountId })
+      // As main's calls do: a call made for an account goes only under that account's token.
+      const isAs = (input.accountId ?? null) === null || input.accountId === signedIn.accountId
+      if (!isAs) return { ok: false, message: CALL_MESSAGES.otherAccount(SERVER.name) }
+      heard.push({ call: keyOf(input.call), token })
       return answering.call(input)
     },
   }
@@ -330,10 +346,14 @@ const setup = ({
       statted.push(path)
       return videoAt(path)
     },
+    hasAccounts: () => hasAccounts,
+    accountIdOf: () => signedIn.accountId,
   })
   if (isPageReady) service.pageReady()
   return {
     service,
+    signedIn,
+    heard,
     store,
     grants,
     state,
@@ -1433,7 +1453,13 @@ describe('playing a download', () => {
       savePosition({ state, file: factsOf(VIDEO), position: 750, duration: 3000, at: NOW }),
     )
     world.service.notePosition({ fileId, position: 750, duration: 3000 })
-    expect(entryOf(world)?.pending).toEqual({ play: true, position: 750, furthest: 750, at: NOW })
+    expect(entryOf(world)?.pending ?? null).toEqual({
+      play: true,
+      position: 750,
+      furthest: 750,
+      at: NOW,
+      accountId: null,
+    })
     expect(world.service.views()[0]?.watched).toBe(0.25)
     world.fire()
     expect(lastList(world)[0]?.watched).toBe(0.25)
@@ -1537,7 +1563,7 @@ describe('reaching the server', () => {
   const VIDEO = `${DOWNLOADS}/${SERVER_ID}/11/video.mkv`
   const OTHER_VIDEO = `${DOWNLOADS}/${SERVER_ID}/12/video.mkv`
   const FILE: Video = { size: 2 * GIB, mtimeMs: MTIME }
-  const PLAYED = { play: true, position: 750, furthest: 750, at: NOW }
+  const PLAYED = { play: true, position: 750, furthest: 750, at: NOW, accountId: null }
   const progress = (mediaId: number, position: number): string =>
     keyOf({ name: CALL_NAMES.saveProgress, mediaId, position })
   const playOf = (mediaId: number): string => keyOf({ name: CALL_NAMES.recordPlay, mediaId })
@@ -1577,6 +1603,101 @@ describe('reaching the server', () => {
     expect(world.log).toEqual([playOf(11), progress(11, 750)])
     await until(() => entries(world)[0]?.pending.position === null)
     expect(entries(world)[0]?.pending.play).toBe(false)
+  })
+
+  it("keeps an account's offline play with it through a sign out and another account's sign in", async () => {
+    const ACCOUNT_A = '30000000-0000-4000-8000-00000000000a'
+    const ACCOUNT_B = '30000000-0000-4000-8000-00000000000b'
+    const OFFLINE: Reply = { unreachable: 'offline' }
+    const world = setup({
+      initial: holding(entryFor({})),
+      videos: { [VIDEO]: FILE },
+      replies: { [playOf(11)]: OFFLINE, [progress(11, 750)]: OFFLINE },
+      hasAccounts: true,
+      accountId: ACCOUNT_A,
+    })
+    await ticks(10)
+    const granted = await world.grants.grant(VIDEO)
+    if (!granted.ok) throw new Error('expected a grant')
+    world.service.noteOpened({ fileId: granted.file.fileId })
+    world.service.notePosition({ fileId: granted.file.fileId, position: 750, duration: 3000 })
+    expect(entries(world)[0]?.pending ?? null).toEqual({ ...PLAYED, accountId: ACCOUNT_A })
+    world.table[playOf(11)] = NO_CONTENT
+    world.table[progress(11, 750)] = NO_CONTENT
+    const offline = world.heard.length
+
+    world.signedIn.accountId = null
+    // A session Auth refused and the sign out that follows it each tell of the same change.
+    world.service.accountSwitched({ serverId: SERVER_ID })
+    world.service.accountSwitched({ serverId: SERVER_ID })
+    expect(entries(world)[0]?.pending ?? null).toEqual(NO_PENDING)
+    expect(world.store.read().owed).toEqual([
+      { serverId: SERVER_ID, mediaId: 11, pending: { ...PLAYED, accountId: ACCOUNT_A } },
+    ])
+    world.signedIn.accountId = ACCOUNT_B
+    world.service.accountSwitched({ serverId: SERVER_ID })
+    await ticks(10)
+    fireAfter(world, SYNC_DEBOUNCE_MS)
+    await ticks(10)
+    expect(world.heard.slice(offline)).toEqual([])
+
+    world.signedIn.accountId = ACCOUNT_A
+    world.service.accountSwitched({ serverId: SERVER_ID })
+    await until(() => world.store.read().owed.length === 0)
+    world.service.accountSwitched({ serverId: SERVER_ID })
+    await ticks(10)
+    const tokenOfA = tokenFor({ accountId: ACCOUNT_A })
+    expect(world.heard.slice(offline)).toEqual([
+      { call: playOf(11), token: tokenOfA },
+      { call: progress(11, 750), token: tokenOfA },
+    ])
+  })
+
+  it("keeps a title left open across a switch with the account that opened it, never the next one's", async () => {
+    const ACCOUNT_A = '30000000-0000-4000-8000-00000000000a'
+    const ACCOUNT_B = '30000000-0000-4000-8000-00000000000b'
+    const OFFLINE: Reply = { unreachable: 'offline' }
+    const world = setup({
+      initial: holding(entryFor({})),
+      videos: { [VIDEO]: FILE },
+      replies: { [playOf(11)]: OFFLINE, [progress(11, 1000)]: OFFLINE },
+      hasAccounts: true,
+      accountId: ACCOUNT_A,
+    })
+    await ticks(10)
+    const granted = await world.grants.grant(VIDEO)
+    if (!granted.ok) throw new Error('expected a grant')
+    world.service.noteOpened({ fileId: granted.file.fileId })
+    world.service.notePosition({ fileId: granted.file.fileId, position: 750, duration: 3000 })
+    world.table[playOf(11)] = NO_CONTENT
+    world.table[progress(11, 1000)] = NO_CONTENT
+    const offline = world.heard.length
+
+    world.signedIn.accountId = ACCOUNT_B
+    world.service.accountSwitched({ serverId: SERVER_ID })
+    world.service.notePosition({ fileId: granted.file.fileId, position: 900, duration: 3000 })
+    world.service.notePosition({ fileId: granted.file.fileId, position: 1000, duration: 3000 })
+    expect(entries(world)[0]?.pending ?? null).toEqual(NO_PENDING)
+    expect(world.store.read().owed).toEqual([
+      {
+        serverId: SERVER_ID,
+        mediaId: 11,
+        pending: { ...PLAYED, position: 1000, furthest: 1000, accountId: ACCOUNT_A },
+      },
+    ])
+    await ticks(10)
+    fireAfter(world, SYNC_DEBOUNCE_MS)
+    await ticks(10)
+    expect(world.heard.slice(offline)).toEqual([])
+
+    world.signedIn.accountId = ACCOUNT_A
+    world.service.accountSwitched({ serverId: SERVER_ID })
+    await until(() => world.store.read().owed.length === 0)
+    const tokenOfA = tokenFor({ accountId: ACCOUNT_A })
+    expect(world.heard.slice(offline)).toEqual([
+      { call: playOf(11), token: tokenOfA },
+      { call: progress(11, 1000), token: tokenOfA },
+    ])
   })
 
   it('sends at launch what the last run left pending', async () => {
@@ -1970,7 +2091,13 @@ describe('deleting once watched', () => {
   })
 
   it('owes the server what it deleted while the server was unreachable, and sends it once back', async () => {
-    const owed = { play: true, position: 2800, furthest: 2800, at: NOW - 11 * MINUTE }
+    const owed = {
+      play: true,
+      position: 2800,
+      furthest: 2800,
+      at: NOW - 11 * MINUTE,
+      accountId: null,
+    }
     const world = setup({
       initial: holding(entryFor({ autoDelete: true, watchedAt: NOW - 11 * MINUTE, pending: owed })),
       videos: { [VIDEO]: FILE },
@@ -1992,7 +2119,13 @@ describe('deleting once watched', () => {
     const waiting = async () => {
       const world = settingUp({
         watchedAt: NOW - 11 * MINUTE,
-        pending: { play: false, position: 2800, furthest: 2800, at: NOW - 11 * MINUTE },
+        pending: {
+          play: false,
+          position: 2800,
+          furthest: 2800,
+          at: NOW - 11 * MINUTE,
+          accountId: null,
+        },
       })
       const answer = Promise.withResolvers<void>()
       world.silence.until = answer.promise

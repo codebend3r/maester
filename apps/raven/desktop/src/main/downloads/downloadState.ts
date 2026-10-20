@@ -28,17 +28,24 @@ const isSidecar = object({ trackId: isSidecarTrackId, title: isString, language:
 export const isFileSize = (value: unknown): value is number =>
   isNumber(value) && Number.isSafeInteger(value) && value > 0
 
-/**
- * What the server has not heard yet: a play to record, the last position to report, and the
- * furthest position since the last send. The server keeps how far a play got as the most it
- * hears, so a scrub back after the end must not be all it hears.
- */
-const isPending = object({
+const PENDING_FIELDS = {
   play: isBoolean,
   position: nullable(isNumber),
   furthest: nullable(isNumber),
   at: isNumber,
-})
+}
+
+/** What version 1 kept pending, before a play belonged to an account. */
+const isPendingV1 = object(PENDING_FIELDS)
+
+/**
+ * What the server has not heard yet: a play to record, the last position to report, and the
+ * furthest position since the last send. The server keeps how far a play got as the most it
+ * hears, so a scrub back after the end must not be all it hears. `accountId` is the account
+ * signed in to the server when it was noted, sent only under that account; null for a server
+ * without accounts, or for what was noted before accounts, which goes to whoever is signed in.
+ */
+const isPending = object({ ...PENDING_FIELDS, accountId: nullable(isString) })
 
 /** Why a download waits paused: the viewer paused it, or the queue did for the disk, a relock or an outage. */
 export const PAUSE_REASONS = {
@@ -79,7 +86,7 @@ const isEntryStatus = union(
   object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.ready]) }),
 )
 
-export const isDownloadEntry = object({
+const ENTRY_FIELDS = {
   downloadId: isOpaqueId,
   serverId: isOpaqueId,
   mediaId: isMediaId,
@@ -98,22 +105,37 @@ export const isDownloadEntry = object({
    * opens there; 0 once a position is noted here, after which the local resume spot decides.
    */
   serverPosition: isNumber,
-  pending: isPending,
   createdAt: isNumber,
-})
+}
+
+export const isDownloadEntry = object({ ...ENTRY_FIELDS, pending: isPending })
 
 /**
  * What a removed download still owed its server, kept until the server hears it: removing a
- * download offline, as its auto-delete does, must not lose what was watched. One item per title.
+ * download offline, as its auto-delete does, must not lose what was watched. What an account
+ * watched waits here too once another signs in. One item per title and account.
  */
-const isOwed = object({ serverId: isOpaqueId, mediaId: isMediaId, pending: isPending })
+const OWED_FIELDS = { serverId: isOpaqueId, mediaId: isMediaId }
+
+const isOwed = object({ ...OWED_FIELDS, pending: isPending })
 
 export const isDownloadsState = object({
-  version: oneOf([1]),
+  version: oneOf([2]),
   entries: listOf(isDownloadEntry),
   autoDeleteDefault: isBoolean,
   owed: listOf(isOwed),
 })
+
+/** What `downloads.json` may hold: this version, or the one before plays belonged to an account. */
+export const isStoredDownloads = union(
+  object({
+    version: oneOf([1]),
+    entries: listOf(object({ ...ENTRY_FIELDS, pending: isPendingV1 })),
+    autoDeleteDefault: isBoolean,
+    owed: listOf(object({ ...OWED_FIELDS, pending: isPendingV1 })),
+  }),
+  isDownloadsState,
+)
 
 export type PauseReason = Infer<typeof isPauseReason>
 export type FailReason = Infer<typeof isFailReason>
@@ -125,13 +147,49 @@ export type Owed = Infer<typeof isOwed>
 export type DownloadsState = Infer<typeof isDownloadsState>
 
 export const EMPTY_DOWNLOADS: DownloadsState = {
-  version: 1,
+  version: 2,
   entries: [],
   autoDeleteDefault: false,
   owed: [],
 }
 
-export const NO_PENDING: Pending = { play: false, position: null, furthest: null, at: 0 }
+export const NO_PENDING: Pending = {
+  play: false,
+  position: null,
+  furthest: null,
+  at: 0,
+  accountId: null,
+}
+
+/** Version 1 noted no account, so what it kept pending goes to whoever is signed in, as it did. */
+const sharedPending = ({ play, position, furthest, at }: Infer<typeof isPendingV1>): Pending => ({
+  play,
+  position,
+  furthest,
+  at,
+  accountId: null,
+})
+
+export const upgradeDownloads = (stored: Infer<typeof isStoredDownloads>): DownloadsState => {
+  switch (stored.version) {
+    case 1:
+      return {
+        version: 2,
+        entries: stored.entries.map((entry) => ({
+          ...entry,
+          pending: sharedPending(entry.pending),
+        })),
+        autoDeleteDefault: stored.autoDeleteDefault,
+        owed: stored.owed.map((item) => ({ ...item, pending: sharedPending(item.pending) })),
+      }
+    case 2:
+      return stored
+    default: {
+      const unreachable: never = stored
+      return unreachable
+    }
+  }
+}
 
 export const entryById = (
   state: DownloadsState,
@@ -361,15 +419,16 @@ const clearedOf = (pending: Pending, { sentPlay, sentPosition, sentFurthest }: S
   return { ...pending, play, position, furthest }
 }
 
-type Title = { serverId: string; mediaId: number }
+/** One owed item: a title of a server, under the account its play and positions belong to. */
+type OwedKey = { serverId: string; mediaId: number; accountId: string | null }
 
-const isTitle =
-  ({ serverId, mediaId }: Title) =>
-  (item: Title): boolean =>
-    item.serverId === serverId && item.mediaId === mediaId
+const isOwedAs =
+  ({ serverId, mediaId, accountId }: OwedKey) =>
+  (item: Owed): boolean =>
+    item.serverId === serverId && item.mediaId === mediaId && item.pending.accountId === accountId
 
-export const owedOf = (state: DownloadsState, title: Title): Owed | null =>
-  state.owed.find(isTitle(title)) ?? null
+export const owedOf = (state: DownloadsState, key: OwedKey): Owed | null =>
+  state.owed.find(isOwedAs(key)) ?? null
 
 /** The higher of two positions, either of which may be none. */
 const furthestOf = (a: number | null, b: number | null): number | null =>
@@ -389,17 +448,46 @@ const mergePending = ({ a, b }: { a: Pending; b: Pending }): Pending => {
     position,
     furthest: position === null || furthest === null ? furthest : Math.max(furthest, position),
     at: newer.at,
+    accountId: newer.accountId,
   }
 }
 
-/** `owed` with what these removed entries still owed their servers folded in. */
+/**
+ * `owed` with what these entries still owe their servers folded in, one item per title and
+ * account: what one account watched never folds into another's.
+ */
 const owe = (state: DownloadsState, { entries }: { entries: readonly DownloadEntry[] }): Owed[] =>
   entries.filter(hasPending).reduce<Owed[]>((owed, { serverId, mediaId, pending }) => {
-    const known = owed.find(isTitle({ serverId, mediaId }))
+    const known = owed.find(isOwedAs({ serverId, mediaId, accountId: pending.accountId }))
     if (known === undefined) return [...owed, { serverId, mediaId, pending }]
     const merged = { ...known, pending: mergePending({ a: known.pending, b: pending }) }
     return owed.map((item) => (item === known ? merged : item))
   }, state.owed)
+
+/**
+ * The account signed in to a server changed: what its downloads hold pending for any other
+ * account moves to `owed` under that account, where it waits until that account signs in to the
+ * server again. What was noted for no account stays, for whoever is signed in.
+ */
+export const oweOtherAccounts = (
+  state: DownloadsState,
+  { serverId, accountId }: { serverId: string; accountId: string | null },
+): DownloadsState => {
+  const isOwing = (entry: DownloadEntry): boolean =>
+    entry.serverId === serverId &&
+    hasPending(entry) &&
+    entry.pending.accountId !== null &&
+    entry.pending.accountId !== accountId
+  const owing = state.entries.filter(isOwing)
+  if (owing.length === 0) return state
+  return {
+    ...state,
+    entries: state.entries.map((entry) =>
+      isOwing(entry) ? { ...entry, pending: NO_PENDING } : entry,
+    ),
+    owed: owe(state, { entries: owing }),
+  }
+}
 
 /** Drops one entry; what the server has not heard of it moves to `owed` in the same change. */
 export const remove = (
@@ -439,9 +527,9 @@ export const removeServer = (
 /** What the server took is no longer owed; an item it took all of goes. */
 export const clearOwed = (
   state: DownloadsState,
-  { serverId, mediaId, sentPlay, sentPosition, sentFurthest }: Title & Sent,
+  { serverId, mediaId, accountId, sentPlay, sentPosition, sentFurthest }: OwedKey & Sent,
 ): DownloadsState => {
-  const current = owedOf(state, { serverId, mediaId })
+  const current = owedOf(state, { serverId, mediaId, accountId })
   if (current === null) return state
   const pending = clearedOf(current.pending, { sentPlay, sentPosition, sentFurthest })
   if (pending === current.pending) return state
@@ -452,8 +540,8 @@ export const clearOwed = (
 }
 
 /** The server will never take this owed item (a 403 or a 404), so it goes. */
-export const dropOwed = (state: DownloadsState, title: Title): DownloadsState => {
-  const current = owedOf(state, title)
+export const dropOwed = (state: DownloadsState, key: OwedKey): DownloadsState => {
+  const current = owedOf(state, key)
   return current === null
     ? state
     : { ...state, owed: state.owed.filter((item) => item !== current) }
@@ -528,7 +616,8 @@ export const forgetServerPosition = (
 
 /**
  * `play` is sticky: a position report must not erase a play the server has not heard. `furthest`
- * only rises until a send clears it.
+ * only rises until a send clears it. What the entry held for another account moves to `owed`
+ * first, so one account's report never folds into another's.
  */
 export const notePending = (
   state: DownloadsState,
@@ -537,20 +626,31 @@ export const notePending = (
     play,
     position,
     at,
-  }: { downloadId: string; play: boolean; position: number; at: number },
-): DownloadsState =>
-  changeEntry(state, {
-    downloadId,
-    change: (entry) => ({
-      ...entry,
-      pending: {
-        play: entry.pending.play || play,
-        position,
-        furthest: Math.max(entry.pending.furthest ?? position, position),
-        at,
-      },
-    }),
-  })
+    accountId,
+  }: { downloadId: string; play: boolean; position: number; at: number; accountId: string | null },
+): DownloadsState => {
+  const current = entryById(state, { downloadId })
+  if (current === null) return state
+  const isOtherAccount = hasPending(current) && current.pending.accountId !== accountId
+  const owed = isOtherAccount ? owe(state, { entries: [current] }) : state.owed
+  const before = isOtherAccount ? NO_PENDING : current.pending
+  return changeEntry(
+    { ...state, owed },
+    {
+      downloadId,
+      change: (entry) => ({
+        ...entry,
+        pending: {
+          play: before.play || play,
+          position,
+          furthest: Math.max(before.furthest ?? position, position),
+          at,
+          accountId,
+        },
+      }),
+    },
+  )
+}
 
 /**
  * Clears what a sync sent. A position saved during the call differs from `sentPosition` and
