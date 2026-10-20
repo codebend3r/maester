@@ -65,7 +65,7 @@ describe('screen focus', () => {
     rememberOpener({ screen: ITEM, card: BUSBOYS })
     leaveScreen({ screen: HOME })
     expect(useScreenFocus.getState().screens).toEqual({
-      [ITEM]: { hasSettled: true, opener: { card: BUSBOYS, wasCovered: false } },
+      [ITEM]: { hasSettled: true, opener: { card: BUSBOYS, hasBeenCovered: false } },
     })
     expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(true)
   })

@@ -4,7 +4,7 @@ import { create } from 'zustand'
  * The card another screen was opened from, by its place on this one. It lasts through the
  * screen being covered once, so the card can take the focus back as the screen returns.
  */
-type Opener = { card: string; wasCovered: boolean }
+type Opener = { card: string; hasBeenCovered: boolean }
 
 /** What one screen keeps of the remote's focus, on a TV. */
 type ScreenFocus = {
@@ -46,7 +46,7 @@ export const settleScreen = ({ screen }: { screen: string }): void => {
 
 /** The card at `card` opens another screen; it takes the focus back when this one returns. */
 export const rememberOpener = ({ screen, card }: { screen: string; card: string }): void =>
-  change({ screen, to: { hasSettled: true, opener: { card, wasCovered: false } } })
+  change({ screen, to: { hasSettled: true, opener: { card, hasBeenCovered: false } } })
 
 /** Hands the opener back once, and only to the card it names: true for that card, then never. */
 export const takeOpener = ({ screen, card }: { screen: string; card: string }): boolean => {
@@ -63,7 +63,10 @@ export const takeOpener = ({ screen, card }: { screen: string; card: string }): 
 export const coverScreen = ({ screen }: { screen: string }): void => {
   const opener = openerOf({ screen })
   if (opener === null) return
-  change({ screen, to: { opener: opener.wasCovered ? null : { ...opener, wasCovered: true } } })
+  change({
+    screen,
+    to: { opener: opener.hasBeenCovered ? null : { ...opener, hasBeenCovered: true } },
+  })
 }
 
 /** Forgets a screen that has gone, so one opened in its place starts afresh. */

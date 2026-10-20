@@ -19,10 +19,10 @@ import {
  */
 const useScreenTurn = ({ toFront, onTurn }: { toFront: boolean; onTurn: () => void }): void => {
   const isFocused = useIsFocused()
-  const wasFocused = useRef(isFocused)
+  const isFocusedBefore = useRef(isFocused)
   useEffect(() => {
-    if (isFocused === toFront && wasFocused.current !== toFront) onTurn()
-    wasFocused.current = isFocused
+    if (isFocused === toFront && isFocusedBefore.current !== toFront) onTurn()
+    isFocusedBefore.current = isFocused
   }, [isFocused, toFront, onTurn])
 }
 
