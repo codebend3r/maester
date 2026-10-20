@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SearchField } from '@/components/SearchField/SearchField'
-import { useSearch } from '@/lib/useSearch'
+import { useSearch } from '@raven/ui/headless'
 
 /** A search box with its query shown beside it, as a page would act on it. */
 const Box = () => {

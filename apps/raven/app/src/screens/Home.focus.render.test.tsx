@@ -11,7 +11,18 @@ import { NAS, SPARSE, homeApi } from '@/test/homeServer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { renderScreen } from '@/test/renderScreen'
 
-const mockApi = jest.fn(homeApi)
+/** What Home's read waits on before it is answered, per test. */
+const mockHome: { answer: Promise<void> } = { answer: Promise.resolve() }
+const mockApi = jest.fn((server: AppServer) => {
+  const api = homeApi(server)
+  return {
+    ...api,
+    getHome: async () => {
+      await mockHome.answer
+      return api.getHome()
+    },
+  }
+})
 
 // The layouts pick their variant once, as they load, so the TV is set before anything does.
 jest.mock('react-native/Libraries/Utilities/Platform', () => {
@@ -39,6 +50,7 @@ const renderHome = async () => renderScreen({ ui: <Home /> })
 
 describe('Home on a TV', () => {
   beforeEach(() => {
+    mockHome.answer = Promise.resolve()
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
 
@@ -84,6 +96,26 @@ describe('Home on a TV', () => {
     await renderHome()
     await fireEvent.press(await screen.findByRole('link', { name: 'See all in Series' }))
     expect(mockPush).toHaveBeenCalledWith({ pathname: APP_ROUTES.library, params: { id: '2' } })
+  })
+
+  it('offers the search in the top row once the shelves are drawn, never before them or first', async () => {
+    let release = () => {}
+    mockHome.answer = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await renderHome()
+    expect(await screen.findByText('Gathering your libraries')).toBeTruthy()
+    // Drawn alone, it would be all tvOS had to give the opening focus to.
+    expect(screen.queryByRole('link', { name: 'Search every library' })).toBeNull()
+
+    release()
+    await screen.findByRole('header', { name: 'Films' })
+    const search = screen.getByRole('link', { name: 'Search every library' })
+    expect(search.props.hasTVPreferredFocus).not.toBe(true)
+    expect(screen.getAllByRole('button')[0]?.props.hasTVPreferredFocus).toBe(true)
+
+    await fireEvent.press(search)
+    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.search)
   })
 
   it('puts focus on the first card of the first shelf that has one', async () => {

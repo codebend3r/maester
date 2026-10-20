@@ -11,6 +11,7 @@ import {
   emptyListingMessage,
   groupingsFor,
   isScanning,
+  isString,
   jumpScale,
   listsShows,
   plural,
@@ -22,6 +23,7 @@ import {
   startingSort,
   viewsFor,
 } from '@raven/core'
+import { useSearch } from '@raven/ui/headless'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
@@ -29,7 +31,7 @@ import type { ShelfCard } from '@/queries/cards'
 import { type Listing, librarySectionsOf } from '@/queries/libraryGrid'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useServerCookies } from '@/queries/useServerCookies'
-import { Grid, Picker, ToolButton } from '@/layouts'
+import { Grid, Picker, SearchField, ToolButton } from '@/layouts'
 import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
 import { useLibraryView } from '@/screens/useLibraryView'
 import type { LibraryChoice } from '@/stores/libraryViews'
@@ -44,6 +46,7 @@ const COPY = {
   order: 'Order',
   view: 'View',
   groupBy: 'Group by',
+  search: 'Search',
 } as const
 
 /**
@@ -100,20 +103,25 @@ const LibraryToolbar = ({
   )
 }
 
-/** What the library holds: its shows and the files no show was found for, or its files. */
+/**
+ * What the library holds: its shows and the files no show was found for, or its files, of
+ * those the search finds. The server searches, as it does for the web.
+ */
 const useListing = ({
   queries,
   library,
   settings,
+  search,
   seed,
 }: {
   queries: AppQueries['queries']
   library: LibraryRecord
   settings: LibrarySettings
+  search: string
   seed: number
 }) => {
   const isShowList = listsShows(settings.kind)
-  const listing = { libraryId: library.id, search: '', sort: settings.sort, seed }
+  const listing = { libraryId: library.id, search, sort: settings.sort, seed }
   const shows = useQuery({ ...queries.showListQuery(listing), enabled: isShowList })
   const files = useQuery({ ...queries.mediaListQuery(listing), enabled: !isShowList })
   const query = isShowList ? shows : files
@@ -128,18 +136,30 @@ const useListing = ({
   return { listed, error: query.error }
 }
 
-/** A library once it is known: its cards, laid out as this device last left it. */
+/**
+ * A library once it is known: its cards, laid out as this device last left it, of those its
+ * search finds. The search starts on the one it was opened with.
+ */
 const LibraryGrid = ({
   session: { server, api, queries },
   library,
+  asked,
 }: {
   session: AppQueries
   library: LibraryRecord
+  asked: string
 }) => {
   const router = useRouter()
   const view = useLibraryView({ serverId: server.id, library })
+  const search = useSearch({ initial: asked })
   const { settings } = view
-  const { listed, error } = useListing({ queries, library, settings, seed: view.seed })
+  const { listed, error } = useListing({
+    queries,
+    library,
+    settings,
+    search: search.query,
+    seed: view.seed,
+  })
   const cookies = useServerCookies(server)
 
   const sections =
@@ -157,7 +177,7 @@ const LibraryGrid = ({
       ? null
       : emptyListingMessage({
           isEmpty: listed.shows.length === 0 && listed.files.length === 0,
-          query: '',
+          query: search.query,
           isScanning: isScanning(library.scan),
         })
   const notice = ((): string | null => {
@@ -186,6 +206,7 @@ const LibraryGrid = ({
       notice={notice}
       onBack={() => router.back()}
       onOpen={open}
+      search={<SearchField label={`${COPY.search} ${library.name}`} search={search} />}
       sections={sections}
       title={library.name}
       toolbar={<LibraryToolbar onChange={view.change} settings={settings} />}
@@ -204,6 +225,7 @@ const LibraryNotice = ({ notice }: { notice: string }) => {
       notice={notice}
       onBack={() => router.back()}
       onOpen={() => undefined}
+      search={null}
       sections={[]}
       title={COPY.library}
       toolbar={null}
@@ -212,7 +234,15 @@ const LibraryNotice = ({ notice }: { notice: string }) => {
   )
 }
 
-const ServerLibrary = ({ session, id }: { session: AppQueries; id: number | null }) => {
+const ServerLibrary = ({
+  session,
+  id,
+  asked,
+}: {
+  session: AppQueries
+  id: number | null
+  asked: string
+}) => {
   const queryClient = useQueryClient()
   const { queries } = session
   // The libraries Home read already hold this one, so the page opens on that while it is read.
@@ -232,7 +262,7 @@ const ServerLibrary = ({ session, id }: { session: AppQueries; id: number | null
     case ROUTE_STATES.loading:
       return <LibraryNotice notice={COPY.opening} />
     case ROUTE_STATES.ready:
-      return <LibraryGrid key={page.data.id} library={page.data} session={session} />
+      return <LibraryGrid key={page.data.id} asked={asked} library={page.data} session={session} />
     default: {
       const unknown: never = page
       return unknown
@@ -241,11 +271,23 @@ const ServerLibrary = ({ session, id }: { session: AppQueries; id: number | null
 }
 
 /**
- * `/library/[id]`: a library's videos or shows, sorted, laid out and grouped as this device
- * last left it, in the ways its type allows, with the web's jump strip. A card opens its item.
+ * `/library/[id]`: a library's videos or shows, searched, sorted, laid out and grouped as this
+ * device last left it, in the ways its type allows, with the web's jump strip. A card opens
+ * its item. `?q=` opens it on a search, as a search through every library hands one over.
  */
 export const Library = () => {
-  const id = routeIdOf(useLocalSearchParams()[APP_ROUTE_PARAMS.id])
+  const params = useLocalSearchParams()
+  const id = routeIdOf(params[APP_ROUTE_PARAMS.id])
+  const query = params[APP_ROUTE_PARAMS.query]
   const session = useAppQueries()
-  return session !== null && <ServerLibrary key={session.server.id} id={id} session={session} />
+  return (
+    session !== null && (
+      <ServerLibrary
+        key={session.server.id}
+        asked={isString(query) ? query : ''}
+        id={id}
+        session={session}
+      />
+    )
+  )
 }

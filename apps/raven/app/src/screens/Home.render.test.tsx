@@ -72,6 +72,12 @@ describe('Home on a phone or tablet', () => {
     expect(screen.queryByRole('link', { name: 'See all in Continue watching' })).toBeNull()
   })
 
+  it('opens the search through every library from its header', async () => {
+    await renderHome()
+    await fireEvent.press(await screen.findByRole('link', { name: 'Search every library' }))
+    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.search)
+  })
+
   it('draws each card as wide as its shape asks: a wide frame, then posters', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })

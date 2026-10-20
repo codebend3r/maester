@@ -139,11 +139,22 @@ const firstKeyOf = (rows: readonly GridRow[]): string | null => {
 }
 
 /**
- * A library on a TV: its name, what it holds, the pickers and the jump row held at the top,
- * and below them the cards in rows the remote moves through, never the touch layout made
- * larger. Focus starts on the first card, and each jump moves it to the card jumped to.
+ * A library on a TV: its name, what it holds, its search box beside the pickers and the jump
+ * row held at the top, and below them the cards in rows the remote moves through, never the
+ * touch layout made larger. Focus starts on the first card, and each jump moves it to the card
+ * jumped to.
  */
-const Grid = ({ title, line, notice, toolbar, sections, view, jump, onOpen }: GridProps) => {
+const Grid = ({
+  title,
+  line,
+  notice,
+  search,
+  toolbar,
+  sections,
+  view,
+  jump,
+  onOpen,
+}: GridProps) => {
   const screen = useWindowDimensions()
   const room = screen.width - 2 * GUTTER
   const isRows = isRowView(view)
@@ -258,7 +269,10 @@ const Grid = ({ title, line, notice, toolbar, sections, view, jump, onOpen }: Gr
           {title}
         </Text>
         {line !== null && <Text style={styles.line}>{line}</Text>}
-        <View style={styles.toolbar}>{toolbar}</View>
+        <View style={styles.toolbar}>
+          {search}
+          {toolbar}
+        </View>
         {jump !== null && (
           <JumpRow
             jump={jump}
@@ -311,7 +325,7 @@ const styles = StyleSheet.create({
   },
   title: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
   line: { color: COLOURS.muted, fontSize: SIZES.textLg },
-  toolbar: { flexDirection: 'row', gap: SIZES.space3 },
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space3 },
   notice: { color: COLOURS.muted, fontSize: SIZES.textLg },
   // A horizontal ScrollView grows by default, which would leave the cards below no room.
   jumpScroll: { flexGrow: 0 },

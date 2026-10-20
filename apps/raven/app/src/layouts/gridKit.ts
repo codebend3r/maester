@@ -10,6 +10,8 @@ export type GridProps = {
   line: string | null
   /** A line in place of the cards: while they load, when they fail, or when there are none. */
   notice: string | null
+  /** The library's search box, over the pickers. */
+  search: ReactNode
   /** The pickers over the cards. */
   toolbar: ReactNode
   sections: GridSection[]

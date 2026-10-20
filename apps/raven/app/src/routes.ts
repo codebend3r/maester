@@ -5,19 +5,21 @@ export const APP_ROUTES = {
   item: '/item/[id]',
   library: '/library/[id]',
   play: '/play/[mediaId]',
+  search: '/search',
   unlock: '/unlock',
 } as const
 
 /**
  * The params the routes carry, as `useLocalSearchParams` reads them: the ids their file names
- * hold, and an item page's library and file, which ride in its query as the web's `?library=`
- * and `?file=` do.
+ * hold, an item page's library and file, which ride in its query as the web's `?library=`
+ * and `?file=` do, and the search a library opens on, as the web's `?q=`.
  */
 export const APP_ROUTE_PARAMS = {
   id: 'id',
   library: 'library',
   file: 'file',
   mediaId: 'mediaId',
+  query: 'q',
 } as const
 
 /** Each route's name as its navigator knows it: its file under `app/`, without the extension. */
@@ -26,6 +28,7 @@ export const APP_SCREENS = {
   item: 'item/[id]',
   library: 'library/[id]',
   play: 'play/[mediaId]',
+  search: 'search',
   unlock: 'unlock',
 } as const
 

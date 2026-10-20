@@ -208,16 +208,41 @@ const READS: Record<string, unknown> = {
 /** Whether a favourite change asks for a favourite. */
 const isMarked = (body: unknown): boolean => isRecord(body) && body.favourite === true
 
-const WRITES: Record<string, (body: unknown) => unknown> = {
-  [setWatched.path]: () => null,
+/** How the server answers: a status, and the body it sends with it. */
+type Answer = { status: number; body: unknown }
+
+const OK = 200
+
+/** The answer of a write that sends nothing back, as `PUT /api/watched` does. */
+const NO_CONTENT: Answer = { status: 204, body: null }
+
+const NOT_FOUND: Answer = { status: 404, body: { message: 'Not found' } }
+
+const WRITES: Record<string, (body: unknown) => Answer> = {
+  [setWatched.path]: () => NO_CONTENT,
   [pathFor({ path: setFavourite.path, id: BUSBOYS_FILE.id })]: (body) => ({
-    ...BUSBOYS_FILE,
-    favourite: isMarked(body),
+    status: OK,
+    body: { ...BUSBOYS_FILE, favourite: isMarked(body) },
   }),
   [pathFor({ path: setItemFavourite.path, id: SEVERANCE.id })]: (body) => ({
-    ...SEVERANCE,
-    favourite: isMarked(body),
+    status: OK,
+    body: { ...SEVERANCE, favourite: isMarked(body) },
   }),
+}
+
+/** What the server answers `method` at `path` with, sent `body`. */
+const answerFor = ({
+  method,
+  path,
+  body,
+}: {
+  method: string
+  path: string
+  body: unknown
+}): Answer => {
+  if (method !== APP_CALL_METHODS.get) return WRITES[path]?.(body) ?? NOT_FOUND
+  const read = READS[path]
+  return read === undefined ? NOT_FOUND : { status: OK, body: read }
 }
 
 /** A request the server heard: its method, its path and query, and what it was sent. */
@@ -248,16 +273,14 @@ export const itemApi = ({
         const method = init.method ?? APP_CALL_METHODS.get
         const sent = bodyOf(init.body)
         hear({ method, path, body: sent })
-        const isRead = method === APP_CALL_METHODS.get
-        await (isRead ? reads(path) : writes())
-        const body = isRead ? READS[path] : (WRITES[path]?.(sent) ?? undefined)
-        const status = body === undefined ? 404 : 200
+        await (method === APP_CALL_METHODS.get ? reads(path) : writes())
+        const { status, body } = answerFor({ method, path, body: sent })
         return {
-          ok: status === 200,
+          ok: status !== NOT_FOUND.status,
           status,
-          statusText: status === 200 ? 'OK' : 'Not found',
-          json: async () => body ?? { message: 'Not found' },
-          text: async () => JSON.stringify(body ?? { message: 'Not found' }),
+          statusText: status === NOT_FOUND.status ? 'Not found' : 'OK',
+          json: async () => body,
+          text: async () => JSON.stringify(body),
         }
       },
     }),

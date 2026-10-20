@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { HOME_SHELF_TYPES, ITEM_TYPES, LIBRARY_KINDS, THUMBNAIL_STATES } from '@raven/core'
 
 import { CARD_SHAPES } from '@/queries/cards'
-import { CONTINUE_WATCHING, homeShelvesOf } from '@/queries/homeShelves'
+import { CONTINUE_WATCHING, homeShelvesOf, libraryShelvesOf } from '@/queries/homeShelves'
 import { FILMS, HOME, NAS, SERIES, homeApi } from '@/test/homeServer'
 import { mediaItemFor } from '@/test/mediaItem'
 import { ROUTE_TARGETS } from '@/routes'
@@ -170,5 +170,24 @@ describe('homeShelvesOf', () => {
       headersFor,
     })
     expect(shelves.map(({ title }) => title)).toEqual(['Series'])
+  })
+})
+
+describe('libraryShelvesOf', () => {
+  it('lays out what a search found as library shelves, leaving out a library not listed', () => {
+    const shelves = libraryShelvesOf({
+      shelves: [...HOME.shelves, { libraryId: 9, type: HOME_SHELF_TYPES.media, media: [] }],
+      libraries: [FILMS, SERIES],
+      api: homeApi(),
+      headersFor,
+    })
+    expect(shelves.map(({ key, title, libraryId }) => ({ key, title, libraryId }))).toEqual([
+      { key: `library:${FILMS.id}`, title: 'Films', libraryId: FILMS.id },
+      { key: `library:${SERIES.id}`, title: 'Series', libraryId: SERIES.id },
+    ])
+    expect(shelves.map(({ cards }) => cards.map(({ title }) => title))).toEqual([
+      ['Busboys', 'Night Train'],
+      ['Severance'],
+    ])
   })
 })

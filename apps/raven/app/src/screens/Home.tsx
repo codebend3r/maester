@@ -32,10 +32,11 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
         })
   const failure = home.error ?? libraries.error
   const isBare = home.isSuccess && libraries.isSuccess && cookies !== null && shelves.length === 0
+  const isLoading = failure === null && !isBare && shelves.length === 0
   const notice = ((): string | null => {
     if (failure !== null) return failure.message
     if (isBare) return COPY.bare
-    return shelves.length === 0 ? COPY.loading : null
+    return isLoading ? COPY.loading : null
   })()
 
   // Focus starts on a card, so on the first shelf that has one.
@@ -47,7 +48,12 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
     router.push({ pathname: APP_ROUTES.library, params: { id: String(libraryId) } })
 
   return (
-    <Shelves notice={notice} title={COPY.title}>
+    <Shelves
+      isLoading={isLoading}
+      notice={notice}
+      onSearch={() => router.push(APP_ROUTES.search)}
+      title={COPY.title}
+    >
       {shelves.map((shelf, index) => (
         <Shelf
           key={shelf.key}
@@ -63,8 +69,9 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
 
 /**
  * `/`: what is being watched, then each pinned library's newest, as shelves of cards. A card
- * opens its item, and a library shelf's See all the library. Each server gets a Home of its
- * own, so nothing one showed, its scroll or its focus, carries over to the next.
+ * opens its item, a library shelf's See all the library, and Search the search through every
+ * library. Each server gets a Home of its own, so nothing one showed, its scroll or its focus,
+ * carries over to the next.
  */
 export const Home = () => {
   const session = useAppQueries()

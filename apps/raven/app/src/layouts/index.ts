@@ -6,6 +6,8 @@ import { focusItem } from '@/layouts/ItemLayout.focus'
 import { touchItem } from '@/layouts/ItemLayout.touch'
 import { touchGrid } from '@/layouts/Grid.touch'
 import { focusPicker } from '@/layouts/Picker.focus'
+import { focusSearch } from '@/layouts/Search.focus'
+import { touchSearch } from '@/layouts/Search.touch'
 import { touchPicker } from '@/layouts/Picker.touch'
 import { focusShelf } from '@/layouts/Shelf.focus'
 import { touchShelf } from '@/layouts/Shelf.touch'
@@ -34,3 +36,9 @@ export const { Picker, ToolButton } = Platform.isTV ? focusPicker : touchPicker
  * on a TV; one page scrolled under the thumb everywhere else.
  */
 export const { ItemLayout, ItemNotice } = Platform.isTV ? focusItem : touchItem
+
+/**
+ * A search box and the search screen: the platform's own keyboard, opened from a field the
+ * remote selects, on a TV; a field over results under the thumb everywhere else.
+ */
+export const { SearchField, SearchLayout } = Platform.isTV ? focusSearch : touchSearch

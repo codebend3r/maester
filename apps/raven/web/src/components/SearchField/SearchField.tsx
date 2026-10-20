@@ -1,6 +1,6 @@
 import { KEYS } from '@raven/core'
 import type { ComponentProps } from 'react'
-import type { Search } from '@/lib/useSearch'
+import type { Search } from '@raven/ui/headless'
 import styles from '@/components/SearchField/SearchField.module.scss'
 
 /**

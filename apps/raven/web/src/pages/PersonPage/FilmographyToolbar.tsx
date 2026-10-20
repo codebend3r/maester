@@ -3,7 +3,7 @@ import { Icon } from '@raven/ui'
 import { useId } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { SearchField } from '@/components/SearchField/SearchField'
-import type { Search } from '@/lib/useSearch'
+import type { Search } from '@raven/ui/headless'
 import styles from '@/pages/PersonPage/FilmographyToolbar.module.scss'
 
 const TAB_LABELS: Record<FilmographyTab, string> = {

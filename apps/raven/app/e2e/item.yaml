@@ -43,7 +43,8 @@ name: A title opens from Home, marks watched and back, and a show leads to its e
 - extendedWaitUntil:
     visible: Episodes
     timeout: 30000
-- tapOn: E1 · Low Tide
+# A row is read out with its line and watched state after its name.
+- tapOn: E1 · Low Tide.*
 - extendedWaitUntil:
     visible: Lantern Bay · Season 1 · Episode 1
     timeout: 30000

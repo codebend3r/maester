@@ -5,6 +5,7 @@ import { CARD_SHAPES } from '@/queries/cards'
 import { TouchCard } from '@/layouts/TouchCard'
 import {
   NOTHING_HERE,
+  SEARCH_EVERY_LIBRARY,
   SEE_ALL,
   type ShelfKit,
   type ShelfProps,
@@ -27,19 +28,36 @@ const useCardWidths = () => {
   return width >= TABLET_WIDTH ? CARD_WIDTHS.tablet : CARD_WIDTHS.phone
 }
 
-const Shelves = ({ title, notice, children }: ShelvesProps) => {
+const Shelves = ({ title, notice, onSearch, children }: ShelvesProps) => {
   const insets = useSafeAreaInsets()
   return (
     <ScrollView
       contentContainerStyle={[
         styles.shelves,
-        { paddingTop: insets.top + SIZES.space3, paddingBottom: insets.bottom + SIZES.space5 },
+        {
+          paddingTop: insets.top + SIZES.space3,
+          paddingBottom: insets.bottom + SIZES.space5,
+          // Clear of the Dynamic Island and the corners of a phone held sideways.
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
       ]}
       style={styles.ground}
     >
-      <Text accessibilityRole="header" style={styles.pageTitle}>
-        {title}
-      </Text>
+      <View style={styles.pageRow}>
+        <Text accessibilityRole="header" style={styles.pageTitle}>
+          {title}
+        </Text>
+        <Pressable
+          accessibilityLabel={SEARCH_EVERY_LIBRARY.label}
+          accessibilityRole="link"
+          hitSlop={SIZES.space2}
+          onPress={onSearch}
+          style={({ pressed }) => [styles.search, pressed && styles.pressed]}
+        >
+          <Text style={styles.searchLabel}>{SEARCH_EVERY_LIBRARY.text}</Text>
+        </Pressable>
+      </View>
       {notice !== null && <Text style={styles.notice}>{notice}</Text>}
       {children}
     </ScrollView>
@@ -92,6 +110,9 @@ const Shelf = ({ shelf, onOpen, onOpenLibrary }: ShelfProps) => {
           contentContainerStyle={styles.row}
           decelerationRate="fast"
           horizontal
+          // Under a search box the keyboard may be up: a card's first tap opens it, not only
+          // puts the keyboard away.
+          keyboardShouldPersistTaps="handled"
           showsHorizontalScrollIndicator={false}
           snapToOffsets={snaps}
         >
@@ -115,12 +136,22 @@ export const touchShelf: ShelfKit = { Shelves, Shelf }
 const styles = StyleSheet.create({
   ground: { flex: 1, backgroundColor: COLOURS.ground },
   shelves: { gap: SIZES.space4 },
-  pageTitle: {
-    color: COLOURS.text,
-    fontSize: SIZES.textXl,
-    fontWeight: 'bold',
+  pageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SIZES.space2,
     paddingHorizontal: SIZES.space3,
   },
+  pageTitle: { flexShrink: 1, color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
+  search: {
+    minHeight: SIZES.fieldHeight,
+    justifyContent: 'center',
+    paddingHorizontal: SIZES.space3,
+    borderRadius: SIZES.radius,
+    backgroundColor: COLOURS.quiet,
+  },
+  searchLabel: { color: COLOURS.text, fontSize: SIZES.text, fontWeight: '600' },
   notice: { color: COLOURS.muted, fontSize: SIZES.text, paddingHorizontal: SIZES.space3 },
   shelf: { gap: SIZES.space2 },
   titleRow: {

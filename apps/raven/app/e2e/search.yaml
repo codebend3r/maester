@@ -1,0 +1,50 @@
+appId: io.github.codebend3r.raven.app
+name: A search from Home finds a title and opens it, and a library searches its own
+---
+- runFlow: signIn.yaml
+- extendedWaitUntil:
+    visible: Lantern Bay
+    timeout: 30000
+# Home's header opens the search through every library.
+- tapOn: Search every library
+- extendedWaitUntil:
+    visible: Search every library
+    timeout: 10000
+- tapOn: Search every library
+- inputText: lantern
+# The search runs once typing pauses, under the library holding the match. The server leaves
+# locked libraries out of it, the films' among them.
+- extendedWaitUntil:
+    visible: See all in Series
+    timeout: 30000
+- tapOn: Lantern Bay
+- extendedWaitUntil:
+    visible: Seasons
+    timeout: 30000
+- tapOn: Back
+# A search that finds nothing says so.
+- tapOn: Clear search
+- tapOn: Search every library
+- inputText: nowhere
+- extendedWaitUntil:
+    visible: Nothing in any library matches "nowhere".
+    timeout: 30000
+- tapOn: Back
+# A library's own box searches it, a locked one once unlocked included.
+- extendedWaitUntil:
+    visible: See all in Films
+    timeout: 30000
+- tapOn: See all in Films
+- extendedWaitUntil:
+    visible: Search Films
+    timeout: 30000
+- tapOn: Search Films
+- inputText: nowhere
+- extendedWaitUntil:
+    visible: Nothing here matches "nowhere".
+    timeout: 30000
+# Cleared, the library lists everything again, in the grouped view the fixture keeps.
+- tapOn: Clear search
+- extendedWaitUntil:
+    visible: Matched, 1 video
+    timeout: 30000

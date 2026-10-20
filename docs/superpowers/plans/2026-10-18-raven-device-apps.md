@@ -434,7 +434,7 @@ Each task: move the file with `git mv` (so `--follow` keeps history), rewrite it
 ### Task 22: Search
 
 - **Files:** `src/screens/Search.tsx`, `app/search.tsx`, tests.
-- Debounced: searches when typing pauses for 400 ms (the web's value; read it from web's `useSearch` and lift the constant to core) or on submit, never per keystroke. On TV the platform keyboard.
+- Debounced: searches when typing pauses for 200 ms (the web's `SEARCH_DELAY_MS`; read it from web's `useSearch` and lift the constant to core) or on submit, never per keystroke. On TV the platform keyboard.
 - [ ] **Step 1:** `test:screens` with fake timers: typing "dune" fires one search after the pause; submitting fires at once; clearing shows nothing.
 - [ ] **Step 2:** FAIL, implement, PASS. Commit: `MAE: search raven from the app`. Thermo review, fix commit, push, open PR 5 against `device-app`.
 

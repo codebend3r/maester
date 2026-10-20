@@ -8,6 +8,7 @@ import {
   type PosterEntry,
   matchTypeFor,
   tileWords,
+  withLibraries,
 } from '@raven/core'
 
 import {
@@ -70,15 +71,30 @@ const libraryCards = ({
 }
 
 /**
+ * A shelf for each library's row, under the library's name, in the server's order: Home's
+ * newest arrivals, or what a search found. A row for a library not in the list is left out.
+ */
+export const libraryShelvesOf = ({
+  shelves,
+  libraries,
+  ...pictures
+}: Pictures & { shelves: readonly HomeShelf[]; libraries: readonly Library[] }): ShelfView[] =>
+  withLibraries({ shelves, libraries }).map(({ shelf, library }) => ({
+    key: `library:${library.id}`,
+    title: library.name,
+    libraryId: library.id,
+    cards: libraryCards({ shelf, library, ...pictures }),
+  }))
+
+/**
  * Home's shelves as the web lays them out: what is being watched, then each pinned
- * library's newest, under the library's name, in the server's order. A shelf for a library
- * not in the list is left out, as is an empty Continue watching.
+ * library's newest (`libraryShelvesOf`). An empty Continue watching is left out.
  */
 export const homeShelvesOf = ({
   home,
   libraries,
   ...pictures
-}: Pictures & { home: Home; libraries: Library[] }): ShelfView[] => {
+}: Pictures & { home: Home; libraries: readonly Library[] }): ShelfView[] => {
   const continuing: ShelfView[] =
     home.inProgress.length === 0
       ? []
@@ -90,17 +106,5 @@ export const homeShelvesOf = ({
             cards: home.inProgress.map((entry) => continueCard({ entry, ...pictures })),
           },
         ]
-  const shelves = home.shelves.flatMap((shelf) => {
-    const library = libraries.find(({ id }) => id === shelf.libraryId)
-    if (library === undefined) return []
-    return [
-      {
-        key: `library:${library.id}`,
-        title: library.name,
-        libraryId: library.id,
-        cards: libraryCards({ shelf, library, ...pictures }),
-      },
-    ]
-  })
-  return [...continuing, ...shelves]
+  return [...continuing, ...libraryShelvesOf({ shelves: home.shelves, libraries, ...pictures })]
 }

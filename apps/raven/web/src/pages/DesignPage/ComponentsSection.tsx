@@ -19,7 +19,7 @@ import { Loading } from '@/components/Skeleton/Skeleton'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { WatchedMark } from '@/components/WatchedMark/WatchedMark'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
-import { useSearch } from '@/lib/useSearch'
+import { useSearch } from '@raven/ui/headless'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import { IconSet } from '@/pages/DesignPage/IconSet'
 import {

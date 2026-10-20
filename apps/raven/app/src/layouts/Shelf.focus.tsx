@@ -4,6 +4,7 @@ import { CARD_SHAPES } from '@/queries/cards'
 import { FocusCard } from '@/layouts/FocusCard'
 import {
   NOTHING_HERE,
+  SEARCH_EVERY_LIBRARY,
   SEE_ALL,
   type ShelfKit,
   type ShelfProps,
@@ -15,11 +16,28 @@ import { COLOURS, SIZES } from '@/theme/appTheme'
 /** Card widths in points on a 1920 by 1080 point screen, read from across the room. */
 const CARD_WIDTHS = { [CARD_SHAPES.poster]: 232, [CARD_SHAPES.wide]: 400 } as const
 
-const Shelves = ({ title, notice, children }: ShelvesProps) => (
+/**
+ * Home's shelves under its title and, beside it, the way into the search. That is drawn only
+ * once the shelves are read, with them: drawn alone, it would be all tvOS had to give the
+ * opening focus to, which belongs to the first card.
+ */
+const Shelves = ({ title, notice, isLoading, onSearch, children }: ShelvesProps) => (
   <ScrollView contentContainerStyle={styles.shelves} style={styles.ground}>
-    <Text accessibilityRole="header" style={styles.pageTitle}>
-      {title}
-    </Text>
+    <View style={styles.pageRow}>
+      <Text accessibilityRole="header" style={styles.pageTitle}>
+        {title}
+      </Text>
+      {!isLoading && (
+        <Pressable
+          accessibilityLabel={SEARCH_EVERY_LIBRARY.label}
+          accessibilityRole="link"
+          onPress={onSearch}
+          style={({ focused }) => [styles.search, focused && styles.focusedSearch]}
+        >
+          <Text style={styles.searchLabel}>{SEARCH_EVERY_LIBRARY.text}</Text>
+        </Pressable>
+      )}
+    </View>
     {notice !== null && <Text style={styles.notice}>{notice}</Text>}
     {children}
   </ScrollView>
@@ -90,12 +108,24 @@ export const focusShelf: ShelfKit = { Shelves, Shelf }
 const styles = StyleSheet.create({
   ground: { flex: 1, backgroundColor: COLOURS.ground },
   shelves: { gap: SIZES.space4, paddingVertical: SIZES.space6 },
-  pageTitle: {
-    color: COLOURS.text,
-    fontSize: SIZES.textXl,
-    fontWeight: 'bold',
+  pageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.space5,
     paddingHorizontal: SIZES.space8,
   },
+  pageTitle: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
+  search: {
+    minHeight: SIZES.controlLarge,
+    justifyContent: 'center',
+    paddingHorizontal: SIZES.space3,
+    borderRadius: SIZES.radius,
+    borderWidth: SIZES.tvFocusRing,
+    borderColor: COLOURS.quiet,
+    backgroundColor: COLOURS.quiet,
+  },
+  focusedSearch: { borderColor: COLOURS.text },
+  searchLabel: { color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: '600' },
   notice: { color: COLOURS.muted, fontSize: SIZES.textLg, paddingHorizontal: SIZES.space8 },
   shelf: { gap: SIZES.space1 },
   titleRow: {

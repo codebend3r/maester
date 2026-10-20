@@ -22,7 +22,7 @@ import { Button, Icon } from '@raven/ui'
 import type { IconName } from '@raven/ui'
 import { SearchField } from '@/components/SearchField/SearchField'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
-import type { Search } from '@/lib/useSearch'
+import type { Search } from '@raven/ui/headless'
 import styles from '@/components/LibraryToolbar/LibraryToolbar.module.scss'
 
 /**

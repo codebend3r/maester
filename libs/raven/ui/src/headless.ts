@@ -25,6 +25,8 @@ export { configureStorage } from '@/stores/configureStorage'
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'
 export { playerQueryKeys } from '@/lib/playerQueryKeys'
+export { useSearch } from '@/lib/useSearch'
+export type { Search } from '@/lib/useSearch'
 export { createQueryClient, mutationKeys, queryKeys } from '@/query/queryClient'
 export {
   EDITED_PARTS,

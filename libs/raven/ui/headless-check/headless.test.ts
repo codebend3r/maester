@@ -61,6 +61,7 @@ describe('the headless entry', () => {
     expect(entry.useServerItemFavourite).toBeFunction()
     expect(entry.serverEventsFor).toBeFunction()
     expect(entry.usePlaybackPolicy).toBeFunction()
+    expect(entry.useSearch).toBeFunction()
     expect(entry.createSelectionStore().getState().selecting).toBeFalse()
     expect(entry.usePageBackdrop.getState().current).toBeNull()
   })

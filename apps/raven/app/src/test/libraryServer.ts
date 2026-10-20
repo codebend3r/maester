@@ -103,18 +103,24 @@ export const libraryPath = ({
   call,
   library,
   sort,
+  search,
 }: {
   call: AppClientCall
   library: Library
   sort?: MediaSort
+  /** What the library's search box asks for. */
+  search?: string
 }): string => {
   const path = call.path.replace(ID_PARAM, String(library.id))
-  return sort === undefined ? path : `${path}?${mediaListQuery.encode({ sort })}`
+  return sort === undefined ? path : `${path}?${mediaListQuery.encode({ sort, search })}`
 }
+
+/** What a viewer types in Films' search box to find Busboys, and to find nothing. */
+export const FILM_SEARCHES = { busboys: 'bus', nothing: 'zzz' } as const
 
 const { getLibrary, listLibraries, listMedia, listShows } = APP_CLIENT_CALLS
 
-/** Films sorted by title, then newest first; Series by title. */
+/** Films sorted by title, then newest first, and searched; Series by title. */
 const ANSWERS: Record<string, unknown> = {
   [listLibraries.path]: [FILMS, SERIES],
   [libraryPath({ call: getLibrary, library: FILMS })]: FILMS,
@@ -129,6 +135,18 @@ const ANSWERS: Record<string, unknown> = {
     NIGHT_TRAIN,
     ASHFALL_GATE,
   ],
+  [libraryPath({
+    call: listMedia,
+    library: FILMS,
+    sort: MEDIA_SORTS.title,
+    search: FILM_SEARCHES.busboys,
+  })]: [BUSBOYS],
+  [libraryPath({
+    call: listMedia,
+    library: FILMS,
+    sort: MEDIA_SORTS.title,
+    search: FILM_SEARCHES.nothing,
+  })]: [],
   [libraryPath({ call: listShows, library: SERIES, sort: MEDIA_SORTS.title })]: SHOWS,
 }
 

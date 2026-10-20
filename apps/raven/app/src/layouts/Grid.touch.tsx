@@ -116,14 +116,15 @@ const JumpStrip = ({
 }
 
 /**
- * A library under the thumb: the way back, its name and what it holds, the pickers, then its
- * cards in as many columns as the screen's width fits, the buckets folded until pressed, and
- * the jump strip along the right edge.
+ * A library under the thumb: the way back, its name and what it holds, its search box and the
+ * pickers, then its cards in as many columns as the screen's width fits, the buckets folded
+ * until pressed, and the jump strip along the right edge.
  */
 const Grid = ({
   title,
   line,
   notice,
+  search,
   toolbar,
   sections,
   view,
@@ -235,6 +236,10 @@ const Grid = ({
         }}
         data={rows}
         keyExtractor={(row) => row.key}
+        // The search box sits in the header: a drag puts its keyboard away, and with the
+        // keyboard up a card or the clear button still takes the first tap.
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View
             onLayout={({ nativeEvent }) => setTop(nativeEvent.layout.height)}
@@ -245,6 +250,7 @@ const Grid = ({
               {title}
             </Text>
             {line !== null && <Text style={styles.line}>{line}</Text>}
+            {search}
             <View style={styles.toolbar}>{toolbar}</View>
             {notice !== null && <Text style={styles.notice}>{notice}</Text>}
           </View>

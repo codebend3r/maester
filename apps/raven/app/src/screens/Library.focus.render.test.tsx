@@ -16,7 +16,15 @@ import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { FILMS, GROUPED_FILMS, NAS, SERIES, libraryApi, libraryPath } from '@/test/libraryServer'
+import {
+  FILMS,
+  FILM_SEARCHES,
+  GROUPED_FILMS,
+  NAS,
+  SERIES,
+  libraryApi,
+  libraryPath,
+} from '@/test/libraryServer'
 import { renderScreen } from '@/test/renderScreen'
 
 const mockParams = jest.fn(() => ({ id: String(FILMS.id) }))
@@ -117,6 +125,28 @@ describe('Library on a TV', () => {
     await renderLibrary({ id: FILMS.id })
     await screen.findByRole('button', { name: 'Night Train' })
     expect(preferred(FILM_TITLES)).toEqual(['Ashfall Gate'])
+  })
+
+  it('has a search box the remote reaches, which never takes the opening focus', async () => {
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+    const field = screen.getByLabelText('Search Films')
+    expect(field.props.hasTVPreferredFocus).not.toBe(true)
+    expect(preferred(FILM_TITLES)).toEqual(['Ashfall Gate'])
+
+    await fireEvent(screen.getByRole('button', { name: 'Ashfall Gate' }), 'focus')
+    await fireEvent.changeText(field, FILM_SEARCHES.busboys)
+    await fireEvent(field, 'submitEditing')
+    expect(mockServer.requests).toContain(
+      libraryPath({
+        call: APP_CLIENT_CALLS.listMedia,
+        library: FILMS,
+        sort: MEDIA_SORTS.title,
+        search: FILM_SEARCHES.busboys,
+      }),
+    )
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Night Train' })).toBeNull())
+    expect(preferred(FILM_TITLES)).toEqual([])
   })
 
   it('grows the focused card and rings it, as Home does', async () => {

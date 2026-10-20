@@ -1,28 +1,37 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import {
   APP_CLIENT_CALLS,
   type Library as LibraryRecord,
   LIBRARY_VIEW_LABELS,
   MEDIA_SORTS,
+  SEARCH_DELAY_MS,
   SORT_FIELD_LABELS,
   sortFieldsFor,
 } from '@raven/core'
-import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 
-import { APP_ROUTES } from '@/routes'
+import { APP_ROUTE_PARAMS, APP_ROUTES } from '@/routes'
 import { Library } from '@/screens/Library'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
-import { FILMS, GROUPED_FILMS, NAS, SERIES, libraryApi, libraryPath } from '@/test/libraryServer'
+import {
+  FILMS,
+  FILM_SEARCHES,
+  GROUPED_FILMS,
+  NAS,
+  SERIES,
+  libraryApi,
+  libraryPath,
+} from '@/test/libraryServer'
 import { renderScreen } from '@/test/renderScreen'
 import { linesHeightOf } from '@/layouts/textHeights'
 import { SIZES } from '@/theme/appTheme'
 
 const mockPush = jest.fn()
 const mockFontScale = jest.fn(() => 1)
-const mockParams = jest.fn(() => ({ id: String(FILMS.id) }))
+const mockParams = jest.fn((): Record<string, string> => ({ id: String(FILMS.id) }))
 /** What the server heard, and the libraries it answers with in place of its own, per test. */
 const mockServer: { requests: string[]; libraries: LibraryRecord[] } = {
   requests: [],
@@ -88,9 +97,36 @@ const cardTitles = (titles: readonly string[]): string[] =>
 
 const FILM_TITLES = ['Ashfall Gate', 'Busboys', 'Night Train'] as const
 
-const renderLibrary = async ({ id }: { id: number | string }) => {
-  mockParams.mockReturnValue({ id: String(id) })
+const renderLibrary = async ({ id, query }: { id: number | string; query?: string }) => {
+  mockParams.mockReturnValue({
+    [APP_ROUTE_PARAMS.id]: String(id),
+    ...(query === undefined ? {} : { [APP_ROUTE_PARAMS.query]: query }),
+  })
   return renderScreen({ ui: <Library /> })
+}
+
+const SEARCH_FILMS = 'Search Films'
+
+/** The searches of Films' listing the server heard. */
+const filmSearches = (): string[] =>
+  mockServer.requests.filter(
+    (path) =>
+      path.startsWith(libraryPath({ call: listMedia, library: FILMS })) && path.includes('q='),
+  )
+
+/** Types `text` into Films' search box one key at a time, as a keyboard reports it. */
+const typeSearch = async (text: string) => {
+  const field = screen.getByLabelText(SEARCH_FILMS)
+  await [...text].reduce(async (typed, _, index) => {
+    await typed
+    await fireEvent.changeText(field, text.slice(0, index + 1))
+  }, Promise.resolve())
+}
+
+const pause = async (ms: number) => {
+  await act(async () => {
+    jest.advanceTimersByTime(ms)
+  })
 }
 
 describe('Library on a phone or tablet', () => {
@@ -102,6 +138,10 @@ describe('Library on a phone or tablet', () => {
     mockFontScale.mockReturnValue(1)
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
     useLibraryViews.setState({ choices: {} })
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
   })
 
   it("lists a movies library's posters in the library's own sort", async () => {
@@ -236,6 +276,76 @@ describe('Library on a phone or tablet', () => {
     const larger = rowHeightOf(await screen.findByRole('button', { name: 'Busboys' }))
     expect(typeof normal === 'number' && typeof larger === 'number' && larger - normal).toBeCloseTo(
       linesHeightOf({ sizes: [SIZES.textSm, SIZES.textXs], fontScale: 1 }),
+    )
+  })
+
+  it('filters the grid by its search box once typing pauses, never for each key', async () => {
+    jest.useFakeTimers()
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+    await typeSearch(FILM_SEARCHES.busboys)
+    await pause(SEARCH_DELAY_MS - 1)
+    expect(filmSearches()).toEqual([])
+    expect(cardTitles(FILM_TITLES)).toEqual(['Ashfall Gate', 'Busboys', 'Night Train'])
+
+    await pause(1)
+    expect(filmSearches()).toEqual([
+      libraryPath({
+        call: listMedia,
+        library: FILMS,
+        sort: MEDIA_SORTS.title,
+        search: FILM_SEARCHES.busboys,
+      }),
+    ])
+    await waitFor(() => expect(cardTitles(FILM_TITLES)).toEqual(['Busboys']))
+  })
+
+  it('searches at once when the keyboard sends it, and lists everything again once cleared', async () => {
+    jest.useFakeTimers()
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+    await typeSearch(FILM_SEARCHES.busboys)
+    await fireEvent(screen.getByLabelText(SEARCH_FILMS), 'submitEditing')
+    expect(filmSearches()).toHaveLength(1)
+    await waitFor(() => expect(cardTitles(FILM_TITLES)).toEqual(['Busboys']))
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Clear search' }))
+    await waitFor(() =>
+      expect(cardTitles(FILM_TITLES)).toEqual(['Ashfall Gate', 'Busboys', 'Night Train']),
+    )
+    await pause(SEARCH_DELAY_MS * 5)
+    expect(filmSearches()).toHaveLength(1)
+  })
+
+  it('says when nothing in the library matches the search', async () => {
+    jest.useFakeTimers()
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+    await typeSearch(FILM_SEARCHES.nothing)
+    await pause(SEARCH_DELAY_MS)
+    expect(await screen.findByText(`Nothing here matches "${FILM_SEARCHES.nothing}".`)).toBeTruthy()
+  })
+
+  it('lets the cards take the first tap while the keyboard is up', async () => {
+    await renderLibrary({ id: FILMS.id })
+    const card = await screen.findByRole('button', { name: 'Night Train' })
+    // A scroll view keeps a tap for its children only when it is told to; else the first tap
+    // only puts the keyboard away.
+    const scrollsOf = (node: typeof card | null): unknown[] => {
+      if (node === null) return []
+      const here = node.type === 'RCTScrollView'
+      return [...(here ? [node.props.keyboardShouldPersistTaps] : []), ...scrollsOf(node.parent)]
+    }
+    expect(scrollsOf(card.parent)).toEqual(['handled'])
+  })
+
+  it('opens on the search it was handed, as a search through every library hands it over', async () => {
+    await renderLibrary({ id: FILMS.id, query: FILM_SEARCHES.busboys })
+    expect(await screen.findByRole('button', { name: 'Busboys' })).toBeTruthy()
+    expect(screen.getByLabelText(SEARCH_FILMS).props.value).toBe(FILM_SEARCHES.busboys)
+    expect(cardTitles(FILM_TITLES)).toEqual(['Busboys'])
+    expect(mockServer.requests).not.toContain(
+      libraryPath({ call: listMedia, library: FILMS, sort: MEDIA_SORTS.title }),
     )
   })
 

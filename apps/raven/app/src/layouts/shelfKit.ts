@@ -7,6 +7,10 @@ export type ShelvesProps = {
   title: string
   /** A line in place of the shelves: while they load, when they fail, or when there are none. */
   notice: string | null
+  /** Whether the shelves are still being read. */
+  isLoading: boolean
+  /** Opens the search through every library. */
+  onSearch: () => void
   children: ReactNode
 }
 
@@ -31,3 +35,6 @@ export const NOTHING_HERE = 'Nothing here yet.'
 export const SEE_ALL = 'See all'
 
 export const seeAllLabelOf = (title: string): string => `${SEE_ALL} in ${title}`
+
+/** The way into the search through every library, and what it is called aloud. */
+export const SEARCH_EVERY_LIBRARY = { text: 'Search', label: 'Search every library' } as const
