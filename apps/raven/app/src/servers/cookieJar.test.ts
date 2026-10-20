@@ -177,7 +177,10 @@ describe('createCookieJar', () => {
     const jar = createCookieJar({
       store,
       onChange: (serverId) => {
-        void jar.read(serverId).then((cookies) => changed.push({ serverId, cookies }))
+        jar.read(serverId).then(
+          (cookies) => changed.push({ serverId, cookies }),
+          () => undefined,
+        )
       },
     })
     await jar.read(SERVER_ID)

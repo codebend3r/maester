@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common'
 import { ENCODER_KINDS, HW_ACCELS } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { errorMessage } from '@/errorMessage'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { encoderTestArgs } from '@/ffmpeg/args'
 import { SOFTWARE, type VideoEncoder, encoderCandidates } from '@/ffmpeg/encoder'
@@ -182,8 +183,8 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
    * use, and says when ffprobe and ffmpeg are different builds.
    */
   onApplicationBootstrap(): void {
-    void this.videoEncoder()
-    void this.warnOfMismatchedTools()
+    this.videoEncoder().catch((error: unknown) => this.logger.warn(errorMessage(error)))
+    this.warnOfMismatchedTools().catch((error: unknown) => this.logger.warn(errorMessage(error)))
   }
 
   /**

@@ -154,7 +154,7 @@ export const eventSourceFor =
       if (stream.isClosed || !stream.isForeground || isWaiting) return
       stream.isOpening = true
       const { generation } = stream
-      void headersFor(url)
+      headersFor(url)
         .then((headers) => {
           if (generation !== stream.generation) return
           const source = createSource({ url, headers })

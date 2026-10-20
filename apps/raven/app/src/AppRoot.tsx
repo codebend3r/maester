@@ -47,7 +47,8 @@ export const AppRoot = () => {
   const session = useAppQueries()
 
   useEffect(() => {
-    void loadStores().then(() => setLoaded(true))
+    const show = () => setLoaded(true)
+    loadStores().then(show, show)
   }, [])
   useEffect(() => clearOnServerSwitch({ client: queryClient, store: useActiveServer }), [])
   useEffect(() => followReduceMotion(), [])

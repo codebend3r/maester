@@ -15,9 +15,13 @@ export const useServerCookies = (server: AppServer): ServerCookies | null => {
   useEffect(() => {
     const status = { isCurrent: true }
     const readJar = () => {
-      void cookieJar.read(server.id).then((cookies) => {
-        if (status.isCurrent) setRead({ serverId: server.id, cookies })
-      })
+      // The jar reads as empty when its store fails, so a rejection only keeps the last ones.
+      cookieJar.read(server.id).then(
+        (cookies) => {
+          if (status.isCurrent) setRead({ serverId: server.id, cookies })
+        },
+        () => undefined,
+      )
     }
     readJar()
     const stopListening = useCookieVersion.subscribe(readJar)
