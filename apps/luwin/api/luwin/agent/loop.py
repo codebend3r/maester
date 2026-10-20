@@ -38,6 +38,8 @@ IDLE_RESET = timedelta(hours=6)
 REFUSAL_REPLY = "I can't help with that one."
 LIMIT_REPLY = "You've hit the {what} limit for now; {hint}."
 TRUNCATED_REPLY = "That reply got too long and was cut off; ask me again more narrowly."
+# Sent once when the model ends a turn with no text, so the user still gets an answer.
+CONTINUE_PROMPT = "Please continue."
 # What leads a held call in the caller's conversation when it finally runs.
 HELD_LEAD = "(What I asked for while the server was down for maintenance, run now that it's back.)"
 
@@ -232,6 +234,7 @@ class Agent:
 
         tools = self.runner.registry.definitions(tier)
         json_retries = 0
+        is_nudged = False
 
         for _ in range(MAX_TOOL_ITERATIONS + 1):
             try:
@@ -248,6 +251,21 @@ class Agent:
             reply.output_tokens += response.usage.output_tokens
             reply.cache_read_tokens += getattr(response.usage, "cache_read_input_tokens", 0) or 0
 
+            tool_uses = [b for b in response.content if b.type == "tool_use"]
+            if (
+                response.stop_reason == "end_turn"
+                and not tool_uses
+                and not self._text_of(response.content)
+            ):
+                # Right after tool results the model can end its turn with nothing
+                # to say. The API rejects an empty assistant message on replay, so
+                # it is never kept; the model is asked once to carry on instead.
+                if is_nudged:
+                    break
+                is_nudged = True
+                messages.append({"role": "user", "content": CONTINUE_PROMPT})
+                continue
+
             content = [b.to_dict() for b in response.content]
             assistant_message = {"role": "assistant", "content": content}
             messages.append(assistant_message)
@@ -255,7 +273,6 @@ class Agent:
 
             if response.stop_reason == "pause_turn":
                 continue
-            tool_uses = [b for b in response.content if b.type == "tool_use"]
             if response.stop_reason == "refusal":
                 reply.text = REFUSAL_REPLY
                 break

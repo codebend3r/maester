@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from luwin.agent.limits import RateLimiter
-from luwin.agent.loop import MAX_TOOL_ITERATIONS, Agent, AgentReply
+from luwin.agent.loop import CONTINUE_PROMPT, MAX_TOOL_ITERATIONS, Agent, AgentReply
 from luwin.agent.runner import ToolRunner
 from luwin.agent.tools import Tier, ToolRegistry
 from luwin.config import Settings
@@ -77,6 +77,33 @@ async def test_tool_call_round_trip(world):
     assert second[-1]["role"] == "user" and second[-1]["content"][0]["type"] == "tool_result"
     assert "1984" in second[-1]["content"][0]["content"]
     assert store.audit_recent(1)[0].tool == "search_media"
+
+
+async def test_an_empty_end_of_turn_is_dropped_and_the_model_asked_once_to_continue(world):
+    make, store = world
+    agent, model = make(
+        tool_message([("search_media", {"query": "dune"})]),
+        tool_message([], stop_reason="end_turn"),
+        text_message("There are two: 2021 and 1984. Which one?"),
+    )
+    reply = await agent.respond("u1", Tier.FRIEND, "get dune")
+    assert reply.text.startswith("There are two") and reply.iterations == 3
+    third = model.messages.calls[2]["messages"]
+    assert third[-2]["content"][0]["type"] == "tool_result"
+    assert third[-1] == {"role": "user", "content": CONTINUE_PROMPT}
+    history = store.recent_messages("u1", max_tokens=1000)
+    assert [m["role"] for m in history] == ["user", "assistant", "user", "assistant"]
+    assert all(m["content"] for m in history)
+
+
+async def test_a_second_empty_end_of_turn_stops_without_keeping_it(world):
+    make, store = world
+    empty = tool_message([], stop_reason="end_turn")
+    agent, model = make(tool_message([("search_media", {"query": "dune"})]), empty, empty)
+    reply = await agent.respond("u1", Tier.FRIEND, "get dune")
+    assert reply.text == "" and len(model.messages.calls) == 3
+    history = store.recent_messages("u1", max_tokens=1000)
+    assert [m["role"] for m in history] == ["user", "assistant", "user"]
 
 
 async def test_history_is_replayed_but_idle_history_is_not(world):
