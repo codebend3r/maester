@@ -58,7 +58,7 @@ import {
   type PlaybackSettingsState,
   type PosterEntry,
   type PosterWidth,
-  type ProgressChange,
+  type ProgressReport,
   type Saga,
   type SagaBackdrop,
   type ServerEvent,
@@ -498,11 +498,16 @@ export const createApiClient = ({
     getMediaLocation: (id: number): Promise<MediaLocation> =>
       expect({ request: send({ path: `/api/media/${id}/location` }), guard: isMediaLocation }),
 
-    saveProgress: async ({ id, position }: { id: number; position: number }): Promise<void> => {
+    /** Where playback got to, and the audio track playing, for the admin's Streams page. */
+    saveProgress: async ({
+      id,
+      position,
+      audio,
+    }: { id: number } & ProgressReport): Promise<void> => {
       await send({
         path: `/api/media/${id}/progress`,
         method: 'PUT',
-        body: { position } satisfies ProgressChange,
+        body: { position, audio } satisfies ProgressReport,
       })
     },
 

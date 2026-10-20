@@ -127,6 +127,9 @@ export const mediaQuery = (id: number | null) =>
 /** A file's tracks only change when the file does, and the scan stores them. */
 export const tracksQuery = playerQueriesFor(api).tracks
 
+/** The server probes a file for each answer, so a stream's card asks once, when it opens. */
+export const mediaStreamsQuery = playerQueriesFor(api).streams
+
 /** Where a file lives is read fresh each time its menu shows it. */
 export const mediaLocationQuery = (id: number) =>
   queryOptions({

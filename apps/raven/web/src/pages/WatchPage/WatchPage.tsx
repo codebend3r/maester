@@ -138,8 +138,8 @@ export const WatchPlayer = ({
       started: () => {
         api.recordPlay(media.id).catch(() => undefined)
       },
-      save: (position) => {
-        api.saveProgress({ id: media.id, position }).catch(() => undefined)
+      save: ({ position, audio }) => {
+        api.saveProgress({ id: media.id, position, audio }).catch(() => undefined)
       },
       left: () => {
         afterWatching({ queryClient, libraryId: media.libraryId }).catch(() => undefined)

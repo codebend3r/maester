@@ -367,7 +367,7 @@ describe('ServerPage', () => {
         serverId: S,
         method: 'PUT',
         path: '/api/media/7/progress',
-        body: '{"position":40}',
+        body: '{"position":40,"audio":null}',
       }),
     )
     fake.emit({ type: PLAYER_EVENTS.error, reason: PLAYER_ERROR_REASONS.locked, message: 'x' })

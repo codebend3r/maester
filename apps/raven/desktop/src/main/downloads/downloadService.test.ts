@@ -1565,7 +1565,7 @@ describe('reaching the server', () => {
   const FILE: Video = { size: 2 * GIB, mtimeMs: MTIME }
   const PLAYED = { play: true, position: 750, furthest: 750, at: NOW, accountId: null }
   const progress = (mediaId: number, position: number): string =>
-    keyOf({ name: CALL_NAMES.saveProgress, mediaId, position })
+    keyOf({ name: CALL_NAMES.saveProgress, mediaId, position, audio: null })
   const playOf = (mediaId: number): string => keyOf({ name: CALL_NAMES.recordPlay, mediaId })
   const NO_CONTENT: Reply = { status: 204, body: '' }
   const holding = (...entries: DownloadEntry[]): DownloadsState => ({
@@ -1884,7 +1884,7 @@ describe('deleting once watched', () => {
   const FILE: Video = { size: 2 * GIB, mtimeMs: MTIME }
   const NO_CONTENT: Reply = { status: 204, body: '' }
   const PLAY = keyOf({ name: CALL_NAMES.recordPlay, mediaId: 11 })
-  const PROGRESS = keyOf({ name: CALL_NAMES.saveProgress, mediaId: 11, position: 0 })
+  const PROGRESS = keyOf({ name: CALL_NAMES.saveProgress, mediaId: 11, position: 0, audio: null })
   const DELETED = { type: 'notice', message: 'Deleted S01E01 Good News after watching' } as const
   const holding = (...entries: DownloadEntry[]): DownloadsState => ({
     ...EMPTY_DOWNLOADS,

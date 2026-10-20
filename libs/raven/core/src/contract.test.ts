@@ -23,6 +23,7 @@ import {
   isPosterWidth,
   posterWidthFrom,
   isProgressChange,
+  isProgressReport,
   isServerHealth,
   isShowMatchChoice,
   isStreamMode,
@@ -641,6 +642,14 @@ describe('the request bodies', () => {
     expect(isProgressChange({ position: 61.5 })).toBe(true)
     expect(isProgressChange({ position: -1 })).toBe(false)
     expect(isProgressChange({ position: '61' })).toBe(false)
+  })
+
+  it('takes a report with a whole audio track index, or null when the player cannot tell', () => {
+    expect(isProgressReport({ position: 3, audio: 0 })).toBe(true)
+    expect(isProgressReport({ position: 3, audio: null })).toBe(true)
+    expect(isProgressReport({ position: 3 })).toBe(false)
+    expect(isProgressReport({ position: 3, audio: -1 })).toBe(false)
+    expect(isProgressReport({ position: 3, audio: 1.5 })).toBe(false)
   })
 
   it('takes a favourite flag and a PIN', () => {

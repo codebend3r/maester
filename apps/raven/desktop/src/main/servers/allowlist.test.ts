@@ -38,8 +38,8 @@ const ACCEPTED: readonly Accepted[] = [
     method: HTTP_METHODS.put,
     path: '/api/media/7/progress',
     body: '{"position":40}',
-    call: { name: CALL_NAMES.saveProgress, mediaId: 7, position: 40 },
-    sentBody: '{"position":40}',
+    call: { name: CALL_NAMES.saveProgress, mediaId: 7, position: 40, audio: null },
+    sentBody: '{"position":40,"audio":null}',
   },
   {
     method: HTTP_METHODS.post,
@@ -181,14 +181,14 @@ describe('matchCall accepts exactly the sixteen calls', () => {
         path: '/api/media/1/progress',
         body: '{"position":0}',
       }),
-    ).toEqual({ name: CALL_NAMES.saveProgress, mediaId: 1, position: 0 })
+    ).toEqual({ name: CALL_NAMES.saveProgress, mediaId: 1, position: 0, audio: null })
     expect(
       matchCall({
         method: HTTP_METHODS.put,
         path: '/api/media/1/progress',
         body: '{"position":12.5}',
       }),
-    ).toEqual({ name: CALL_NAMES.saveProgress, mediaId: 1, position: 12.5 })
+    ).toEqual({ name: CALL_NAMES.saveProgress, mediaId: 1, position: 12.5, audio: null })
   })
 
   it('accepts a body of exactly MAX_BODY characters', () => {
@@ -198,7 +198,20 @@ describe('matchCall accepts exactly the sixteen calls', () => {
       name: CALL_NAMES.saveProgress,
       mediaId: 1,
       position: 40,
+      audio: null,
     })
+  })
+
+  it('carries the audio track a page names, and drops one that is no track index', () => {
+    const match = (body: string) =>
+      matchCall({ method: HTTP_METHODS.put, path: '/api/media/1/progress', body })
+    expect(match('{"position":12.5,"audio":2}')).toEqual({
+      name: CALL_NAMES.saveProgress,
+      mediaId: 1,
+      position: 12.5,
+      audio: 2,
+    })
+    expect(match('{"position":12.5,"audio":"2"}')).toMatchObject({ audio: null })
   })
 
   it('accepts a PIN and a password of exactly MAX_SECRET characters', () => {
@@ -225,14 +238,14 @@ describe('requestFor', () => {
     expect(requestFor(call)).toEqual({ method, path, body: sentBody })
   })
 
-  it('sends only the known field of a body, never what the page sent', () => {
+  it('sends only the known fields of a body, never what the page sent', () => {
     const call = matchCall({
       method: HTTP_METHODS.put,
       path: '/api/media/7/progress',
       body: '{"position":40,"extra":"x"}',
     })
     expect(call).not.toBeNull()
-    expect(requestFor(call!).body).toBe('{"position":40}')
+    expect(requestFor(call!).body).toBe('{"position":40,"audio":null}')
   })
 
   it('drops extra fields from an unlock body too', () => {

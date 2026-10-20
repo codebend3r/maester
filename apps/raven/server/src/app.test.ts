@@ -170,7 +170,7 @@ describe('the media server', () => {
     it("lists a library's own videos in progress and favourites, and no sagas or misses in Other", async () => {
       const [movie] = await listMedia(library.id)
       const id = movie?.id ?? -1
-      await api().saveProgress({ id, position: 3 })
+      await api().saveProgress({ id, position: 3, audio: null })
       await api().setFavourite({ id, favourite: true })
       try {
         const inProgress = await api().listInProgress(library.id)
@@ -180,7 +180,7 @@ describe('the media server', () => {
         const favourites = await api().listLibraryFavourites(library.id)
         expect(favourites.map(({ media }) => media.id)).toEqual([id])
       } finally {
-        await api().saveProgress({ id, position: 0 })
+        await api().saveProgress({ id, position: 0, audio: null })
         await api().setFavourite({ id, favourite: false })
       }
       expect(await api().listInProgress(library.id)).toEqual([])
@@ -320,7 +320,7 @@ describe('the media server', () => {
     it('remembers where playback stopped', async () => {
       const [movie] = await listMedia(library.id)
       const id = movie?.id ?? -1
-      await api().saveProgress({ id, position: 3.5 })
+      await api().saveProgress({ id, position: 3.5, audio: null })
       expect((await api().getMedia(id)).position).toBe(3.5)
 
       // Not a body the client can send, so sent by hand.
@@ -330,7 +330,9 @@ describe('the media server', () => {
         payload: { position: 'soon' },
       })
       expect(bad.statusCode).toBe(400)
-      await expect(api().saveProgress({ id: 999_999, position: 1 })).rejects.toMatchObject({
+      await expect(
+        api().saveProgress({ id: 999_999, position: 1, audio: null }),
+      ).rejects.toMatchObject({
         status: 404,
       })
     })
@@ -445,12 +447,12 @@ describe('the media server', () => {
       it('with progress saving off, hides saved spots, saves nothing, and keeps them for later', async () => {
         const [movie] = await listMedia(library.id)
         const id = movie?.id ?? -1
-        await api().saveProgress({ id, position: 2 })
+        await api().saveProgress({ id, position: 2, audio: null })
 
         await putLibrary({ saveProgress: false })
         expect(await positionOf(id)).toBe(0)
         expect((await listMedia(library.id)).every((item) => item.position === 0)).toBe(true)
-        await api().saveProgress({ id, position: 4 })
+        await api().saveProgress({ id, position: 4, audio: null })
 
         await putLibrary({ saveProgress: true })
         expect(await positionOf(id)).toBe(2)
@@ -564,7 +566,7 @@ describe('the media server', () => {
       it("shows what is in progress, then a pinned library's newest arrivals", async () => {
         const [movie] = await listMedia(library.id)
         const id = movie?.id ?? -1
-        await api().saveProgress({ id, position: 3 })
+        await api().saveProgress({ id, position: 3, audio: null })
         try {
           const home = await api().getHome()
           // A file matched to nothing has no poster to stand for it.
@@ -578,7 +580,7 @@ describe('the media server', () => {
           })
         } finally {
           // Barely started again: the spot is cleared.
-          await api().saveProgress({ id, position: 0 })
+          await api().saveProgress({ id, position: 0, audio: null })
         }
         expect((await api().getHome()).inProgress).toEqual([])
       })
@@ -637,7 +639,7 @@ describe('the media server', () => {
         expect(await entryFor({ id })).toMatchObject({ plays: 1, furthest: 0, watched: false })
         expect(await entryFor({ id, watchedOnly: true })).toBeUndefined()
 
-        await api().saveProgress({ id, position: episode?.duration ?? 0 })
+        await api().saveProgress({ id, position: episode?.duration ?? 0, audio: null })
         expect(await entryFor({ id, watchedOnly: true })).toMatchObject({
           plays: 1,
           watched: true,

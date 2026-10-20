@@ -5,10 +5,11 @@ import {
   PLAYBACK_MODES,
   type PlaybackMode,
   type StreamMode,
-  type VideoRange,
+  VIDEO_RANGE_LABELS,
   type VideoStream,
   audioLabel,
   codecLabel,
+  codecWithProfile,
   formatBitrate,
   formatBytes,
   formatChannels,
@@ -39,29 +40,8 @@ const METHODS: Record<PlaybackMode, string> = {
   transcode: 'Transcode',
 }
 
-const RANGES: Record<VideoRange, string> = {
-  sdr: 'SDR',
-  hdr10: 'HDR10',
-  hlg: 'HLG',
-  dolbyVision: 'Dolby Vision',
-}
-
 const dimensions = ({ width, height }: { width: number; height: number }): string =>
   `${width}×${height}`
-
-/** "H.264 High", "AAC LC"; the profile alone when it names the codec already: "DTS-HD MA". */
-const codecWithProfile = ({
-  codec,
-  profile,
-}: {
-  codec: string | null
-  profile: string | null
-}): string | null => {
-  if (codec == null) return null
-  const label = codecLabel(codec)
-  if (profile == null) return label
-  return profile.toLowerCase().includes(label.toLowerCase()) ? profile : `${label} ${profile}`
-}
 
 /** The probe's name for the range once it is in, the index's HDR flag until then. */
 const rangeLabel = ({
@@ -71,7 +51,7 @@ const rangeLabel = ({
   media: MediaItem
   video: VideoStream | null
 }): string | null => {
-  if (video) return RANGES[video.range]
+  if (video) return VIDEO_RANGE_LABELS[video.range]
   if (media.videoCodec == null) return null
   return media.hdr ? 'HDR' : 'SDR'
 }

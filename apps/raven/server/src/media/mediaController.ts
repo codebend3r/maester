@@ -26,6 +26,7 @@ import {
   containerMimeType,
   isFavouriteChange,
   isProgressChange,
+  isProgressReport,
   isRecord,
   isString,
   PLAYBACK_MODES,
@@ -34,6 +35,7 @@ import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { AccessRechecks } from '@/auth/accessRechecks'
+import { AuthSessions } from '@/auth/authSessions'
 import { ERROR_CODES, errorMessage } from '@/errorMessage'
 import { RAVEN_CACHE_POLICIES, RAVEN_HEADERS } from '@/http'
 import { sendImage } from '@/items/sendImage'
@@ -92,6 +94,7 @@ export class MediaController {
     @Inject(StreamSessions) private readonly streams: StreamSessions,
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
+    @Inject(AuthSessions) private readonly callers: AuthSessions,
   ) {}
 
   private find({ id, account }: { id: number; account: AccountKey }): MediaItem {
@@ -131,7 +134,14 @@ export class MediaController {
       body,
       message: 'position must be a number of seconds',
     })
-    this.streams.report({ mediaId: id, client: clientOf(request), position })
+    // An older player names no audio track; null keeps the one the stream knew.
+    const audio = isProgressReport(body) ? body.audio : null
+    this.streams.report({
+      mediaId: id,
+      client: clientOf({ request, auth: this.callers }),
+      position,
+      audio,
+    })
     if (!this.viewing.report({ id, position, account: this.accounts.keyOf({ request }) })) {
       throw new NotFoundException(`No media ${id}`)
     }
@@ -231,8 +241,11 @@ export class MediaController {
     trackStream({
       sessions: this.streams,
       rechecks: this.rechecks,
+      auth: this.callers,
       mediaId: id,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       request,
       reply,
     })

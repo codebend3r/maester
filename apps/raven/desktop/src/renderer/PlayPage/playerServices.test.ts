@@ -93,7 +93,7 @@ describe('servicesFor', () => {
     const { services, client } = setup()
     services.progress.started()
     services.progress.duration!(30)
-    services.progress.save(12)
+    services.progress.save({ position: 12, audio: null })
     services.progress.left(20)
     expect(client.request).toHaveBeenNthCalledWith(1, {
       type: 'savePosition',
@@ -125,7 +125,7 @@ describe('servicesFor', () => {
 
   it('saves a null length before the engine reports one', () => {
     const { services, client } = setup()
-    services.progress.save(12)
+    services.progress.save({ position: 12, audio: null })
     expect(client.request).toHaveBeenCalledWith({
       type: 'savePosition',
       fileId: A,
@@ -188,7 +188,7 @@ describe('servicesFor, the desktop seams', () => {
     const warn = spyOn(console, 'warn').mockImplementation(() => {})
     services.chrome!.shown(false)
     services.trackPicks!.save({ audio: 0, subtitle: null })
-    services.progress.save(3)
+    services.progress.save({ position: 3, audio: null })
     await settled()
     expect(warn).toHaveBeenCalledTimes(3)
     warn.mockRestore()

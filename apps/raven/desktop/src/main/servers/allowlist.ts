@@ -4,6 +4,7 @@ import {
   isAdminUnlockRequest,
   isMediaId,
   isProgressChange,
+  isProgressReport,
   isUnlockRequest,
 } from '@raven/core'
 import { parseJson } from '@/main/parseJson'
@@ -35,7 +36,12 @@ export const CALL_NAMES = {
 export type AllowedCall =
   | { name: typeof CALL_NAMES.getMedia; mediaId: number }
   | { name: typeof CALL_NAMES.getTracks; mediaId: number }
-  | { name: typeof CALL_NAMES.saveProgress; mediaId: number; position: number }
+  | {
+      name: typeof CALL_NAMES.saveProgress
+      mediaId: number
+      position: number
+      audio: number | null
+    }
   | { name: typeof CALL_NAMES.recordPlay; mediaId: number }
   | { name: typeof CALL_NAMES.getLock }
   | { name: typeof CALL_NAMES.unlock; pin: string }
@@ -130,10 +136,12 @@ const ROUTES: readonly Route[] = [
     kind: ROUTE_KINDS.numbered,
     method: SERVER_METHODS.put,
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/progress$/u,
-    read: ({ id, body }) =>
-      body.kind === BODY_KINDS.json && isProgressChange(body.value)
-        ? { name: CALL_NAMES.saveProgress, mediaId: id, position: body.value.position }
-        : null,
+    read: ({ id, body }) => {
+      if (body.kind !== BODY_KINDS.json || !isProgressChange(body.value)) return null
+      // An older page names no audio track; null tells the server it cannot tell.
+      const audio = isProgressReport(body.value) ? body.value.audio : null
+      return { name: CALL_NAMES.saveProgress, mediaId: id, position: body.value.position, audio }
+    },
   },
   {
     kind: ROUTE_KINDS.numbered,
@@ -286,7 +294,7 @@ export const requestFor = (
       return {
         method: SERVER_METHODS.put,
         path: `/api/media/${call.mediaId}/progress`,
-        body: JSON.stringify({ position: call.position }),
+        body: JSON.stringify({ position: call.position, audio: call.audio }),
       }
     case CALL_NAMES.recordPlay:
       return { method: SERVER_METHODS.post, path: `/api/media/${call.mediaId}/plays`, body: null }

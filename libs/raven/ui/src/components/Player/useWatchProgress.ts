@@ -9,10 +9,13 @@ export const useWatchProgress = ({
   state,
   position,
   duration,
+  audio,
 }: {
   state: VideoState
   position: RefObject<number>
   duration: number | null
+  /** The audio track playing, which each save names for the admin's Streams page. */
+  audio: number | null
 }): void => {
   const { progress, title } = useHostServices()
   const lastSaved = useRef(title.resumeAt)
@@ -23,7 +26,7 @@ export const useWatchProgress = ({
   const save = useEffectEvent((at: number) => {
     if (!started.current || !Number.isFinite(at)) return
     lastSaved.current = at
-    progress.save(at)
+    progress.save({ position: at, audio })
   })
 
   useEffect(() => {

@@ -64,16 +64,18 @@ describe('who is streaming', () => {
     await rm(state.root, { recursive: true, force: true })
   })
 
-  it('lists a direct play with its browser, device, address and progress', async () => {
-    expect(await admin().listLiveStreams()).toEqual([])
-    expect((await play()).statusCode).toBe(206)
-    const progress = await app().inject({
+  const report = (payload: object) =>
+    app().inject({
       method: 'PUT',
       url: `/api/media/${videoId()}/progress`,
-      payload: { position: 3.5 },
+      payload,
       headers: asViewer,
     })
-    expect(progress.statusCode).toBe(204)
+
+  it('lists a direct play with its browser, device, address, progress and audio track', async () => {
+    expect(await admin().listLiveStreams()).toEqual([])
+    expect((await play()).statusCode).toBe(206)
+    expect((await report({ position: 3.5, audio: 0 })).statusCode).toBe(204)
 
     expect(await admin().listLiveStreams()).toEqual([
       expect.objectContaining({
@@ -84,7 +86,24 @@ describe('who is streaming', () => {
         device: 'Mac',
         address: ADDRESS,
         position: 3.5,
+        viewer: null,
+        audio: 0,
+        quality: null,
       }),
+    ])
+  })
+
+  it('keeps the audio track through an older player’s report, which names none', async () => {
+    expect((await report({ position: 4 })).statusCode).toBe(204)
+    expect(await admin().listLiveStreams()).toEqual([
+      expect.objectContaining({ position: 4, audio: 0 }),
+    ])
+  })
+
+  it('keeps the position of a report whose audio is no track index, and ignores the audio', async () => {
+    expect((await report({ position: 4.5, audio: -1 })).statusCode).toBe(204)
+    expect(await admin().listLiveStreams()).toEqual([
+      expect.objectContaining({ position: 4.5, audio: 0 }),
     ])
   })
 

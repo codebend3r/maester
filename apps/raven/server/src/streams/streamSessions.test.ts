@@ -7,8 +7,8 @@ import {
   StreamSessions,
 } from '@/streams/streamSessions'
 
-const ANNA: StreamClient = { address: '10.0.0.5', userAgent: 'Anna Browser' }
-const BEN: StreamClient = { address: '10.0.0.6', userAgent: 'Ben Browser' }
+const ANNA: StreamClient = { address: '10.0.0.5', userAgent: 'Anna Browser', viewer: null }
+const BEN: StreamClient = { address: '10.0.0.6', userAgent: 'Ben Browser', viewer: null }
 
 /** A response that has sent `sent` bytes, and counts how often it was cut off. */
 const connection = () => {
@@ -31,6 +31,8 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: first.open,
       now: 0,
@@ -38,6 +40,8 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: second.open,
       now: 1000,
@@ -45,6 +49,8 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: BEN,
       connection: other.open,
       now: 1000,
@@ -52,6 +58,8 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 2,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: other.open,
       now: 1000,
@@ -71,6 +79,8 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: connection().open,
       now: 0,
@@ -78,6 +88,8 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.transcode,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: connection().open,
       now: 1,
@@ -90,13 +102,15 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: connection().open,
       now: 0,
     })
-    sessions.report({ mediaId: 1, client: ANNA, position: 42, now: 5000 })
-    sessions.report({ mediaId: 1, client: BEN, position: 99, now: 5000 })
-    sessions.report({ mediaId: 7, client: ANNA, position: 99, now: 5000 })
+    sessions.report({ mediaId: 1, client: ANNA, position: 42, audio: null, now: 5000 })
+    sessions.report({ mediaId: 1, client: BEN, position: 99, audio: null, now: 5000 })
+    sessions.report({ mediaId: 7, client: ANNA, position: 99, audio: null, now: 5000 })
 
     expect(sessions.list({ now: 6000 })).toEqual([
       expect.objectContaining({ client: ANNA, position: 42, lastSeenAt: 5000 }),
@@ -109,6 +123,8 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: quiet.open,
       now: 0,
@@ -116,11 +132,13 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 2,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: BEN,
       connection: connection().open,
       now: 0,
     })
-    sessions.report({ mediaId: 2, client: BEN, position: 10, now: IDLE_MS - 1 })
+    sessions.report({ mediaId: 2, client: BEN, position: 10, audio: null, now: IDLE_MS - 1 })
 
     expect(sessions.list({ now: IDLE_MS }).map(({ mediaId }) => mediaId)).toEqual([2])
   })
@@ -131,6 +149,8 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.transcode,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: sending.open,
       now: 0,
@@ -152,6 +172,8 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: first.open,
       now: 0,
@@ -159,6 +181,8 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: second.open,
       now: 0,
@@ -166,6 +190,8 @@ describe('StreamSessions', () => {
     const release = sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: released.open,
       now: 0,
@@ -177,7 +203,7 @@ describe('StreamSessions', () => {
     expect([first.state.closed, second.state.closed, released.state.closed]).toEqual([1, 1, 0])
     expect(sessions.list({ now: 1 })).toEqual([])
     // A progress report from the player still playing what it buffered does not bring it back.
-    sessions.report({ mediaId: 1, client: ANNA, position: 3, now: 2 })
+    sessions.report({ mediaId: 1, client: ANNA, position: 3, audio: null, now: 2 })
     expect(sessions.list({ now: 2 })).toEqual([])
     expect(sessions.stop(stream?.id ?? '')).toBe(false)
   })
@@ -187,6 +213,8 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: connection().open,
       now: 0,
@@ -196,6 +224,8 @@ describe('StreamSessions', () => {
     sessions.open({
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
       client: ANNA,
       connection: connection().open,
       now: 10,
@@ -204,6 +234,149 @@ describe('StreamSessions', () => {
     const [after] = sessions.list({ now: 11 })
     expect(after?.id).not.toBe(before?.id)
     expect(after?.startedAt).toBe(10)
+  })
+
+  it('makes one stream per account on a shared browser', () => {
+    const sessions = new StreamSessions()
+    const cara: StreamClient = { ...ANNA, viewer: { id: 'cara-id', email: 'cara@example.com' } }
+    const dev: StreamClient = { ...ANNA, viewer: { id: 'dev-id', email: 'dev@example.com' } }
+    ;[cara, dev].forEach((client) =>
+      sessions.open({
+        mediaId: 1,
+        mode: PLAYBACK_MODES.direct,
+        quality: null,
+        audio: null,
+        client,
+        connection: connection().open,
+        now: 0,
+      }),
+    )
+    sessions.report({ mediaId: 1, client: dev, position: 30, audio: null, now: 5 })
+
+    expect(
+      sessions.list({ now: 10 }).map(({ client, position }) => [client.viewer?.email, position]),
+    ).toEqual([
+      ['cara@example.com', null],
+      ['dev@example.com', 30],
+    ])
+  })
+
+  it('keeps the audio a converted stream asked for until the player reports another', () => {
+    const sessions = new StreamSessions()
+    sessions.open({
+      mediaId: 1,
+      mode: PLAYBACK_MODES.remux,
+      quality: null,
+      audio: 2,
+      client: ANNA,
+      connection: connection().open,
+      now: 0,
+    })
+    sessions.report({ mediaId: 1, client: ANNA, position: 5, audio: null, now: 1 })
+    expect(sessions.list({ now: 2 })[0]?.audio).toBe(2)
+
+    sessions.report({ mediaId: 1, client: ANNA, position: 6, audio: 1, now: 3 })
+    // A range request of direct play names no track, so it keeps the one reported.
+    sessions.open({
+      mediaId: 1,
+      mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
+      client: ANNA,
+      connection: connection().open,
+      now: 4,
+    })
+    expect(sessions.list({ now: 5 })[0]).toMatchObject({ audio: 1, mode: PLAYBACK_MODES.direct })
+  })
+
+  it('keeps the size a transcode asked for, and drops it for another mode', () => {
+    const sessions = new StreamSessions()
+    sessions.open({
+      mediaId: 1,
+      mode: PLAYBACK_MODES.transcode,
+      quality: 'high720',
+      audio: 0,
+      client: ANNA,
+      connection: connection().open,
+      now: 0,
+    })
+    expect(sessions.list({ now: 1 })[0]?.quality).toBe('high720')
+    sessions.open({
+      mediaId: 1,
+      mode: PLAYBACK_MODES.remux,
+      quality: null,
+      audio: 0,
+      client: ANNA,
+      connection: connection().open,
+      now: 2,
+    })
+    expect(sessions.list({ now: 3 })[0]?.quality).toBeNull()
+  })
+
+  it('reads the send rate off the bytes sent within the window, closed responses included', () => {
+    const sessions = new StreamSessions()
+    const open = connection()
+    const short = connection()
+    sessions.open({
+      mediaId: 1,
+      mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
+      client: ANNA,
+      connection: open.open,
+      now: 0,
+    })
+    const release = sessions.open({
+      mediaId: 1,
+      mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
+      client: ANNA,
+      connection: short.open,
+      now: 0,
+    })
+
+    open.state.sent = 1_000_000
+    short.state.sent = 250_000
+    release()
+    // 1.25 MB in 2 s is 5 Mb/s.
+    expect(sessions.list({ now: 2000 })[0]?.sendRate).toBe(5_000_000)
+
+    // The look at the start falls out of the window, and from 2 s to 11 s nothing moved.
+    expect(sessions.list({ now: 11_000 })[0]?.sendRate).toBe(0)
+  })
+
+  it('never takes back bytes a response sent when its count reads lower at close', () => {
+    const sessions = new StreamSessions()
+    const sending = connection()
+    const release = sessions.open({
+      mediaId: 1,
+      mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
+      client: ANNA,
+      connection: sending.open,
+      now: 0,
+    })
+    sending.state.sent = 500_000
+    expect(sessions.list({ now: 1000 })[0]?.sendRate).toBe(4_000_000)
+    sending.state.sent = 0
+    release()
+    expect(sessions.list({ now: 2000 })[0]?.sendRate).toBe(2_000_000)
+  })
+
+  it('has no send rate before a second look', () => {
+    const sessions = new StreamSessions()
+    sessions.open({
+      mediaId: 1,
+      mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
+      client: ANNA,
+      connection: connection().open,
+      now: 0,
+    })
+    expect(sessions.list({ now: 0 })[0]?.sendRate).toBeNull()
   })
 
   it('has nothing to stop for an id that is not live', () => {

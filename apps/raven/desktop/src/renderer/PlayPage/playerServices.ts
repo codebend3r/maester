@@ -114,7 +114,8 @@ export const servicesFor = ({
       started: () => {
         hasStarted = true
       },
-      save: savePosition,
+      // A local file goes to no server's Streams page, so the audio track stays here.
+      save: ({ position }) => savePosition(position),
       // The player reports a leave even before playback began, and main counts a download's
       // first position after an open as a play, so a file left while it loads says nothing.
       left: (position) => {

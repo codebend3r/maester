@@ -266,7 +266,12 @@ export const createSync = ({
     if (furthest === null || (position !== null && furthest <= position)) return DELIVERIES.taken
     const delivery = await deliver({
       due,
-      call: { name: CALL_NAMES.saveProgress, mediaId: due.mediaId, position: furthest },
+      call: {
+        name: CALL_NAMES.saveProgress,
+        mediaId: due.mediaId,
+        position: furthest,
+        audio: null,
+      },
     })
     if (delivery !== DELIVERIES.taken)
       return notTaken({ due, delivery }) ? DELIVERIES.refused : DELIVERIES.unreachable
@@ -305,7 +310,7 @@ export const createSync = ({
     if (due === null || position === null) return true
     const saved = await deliver({
       due,
-      call: { name: CALL_NAMES.saveProgress, mediaId: due.mediaId, position },
+      call: { name: CALL_NAMES.saveProgress, mediaId: due.mediaId, position, audio: null },
     })
     if (saved !== DELIVERIES.taken) return notTaken({ due, delivery: saved })
     // A furthest no further than this position is covered by it.

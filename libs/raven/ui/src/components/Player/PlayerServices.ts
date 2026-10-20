@@ -1,9 +1,10 @@
-import type { PlayerAction, PlayerErrorReason } from '@raven/core'
+import type { PlayerAction, PlayerErrorReason, ProgressReport } from '@raven/core'
 import type { IconName } from '@/components/Icon/Icon'
 
 export type ProgressSink = {
   started: () => void
-  save: (position: number) => void
+  /** Where playback is, and the audio track playing, for the server's Streams page. */
+  save: (report: ProgressReport) => void
   left: (position: number) => void
   /** The engine learned how long the video is. */
   duration?: (seconds: number) => void

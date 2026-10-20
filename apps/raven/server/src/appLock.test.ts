@@ -269,7 +269,7 @@ describe('a library locked behind the PIN', () => {
 
   it('keeps a locked library off the home page until it is unlocked', async () => {
     const { cookie } = await unlock('3001')
-    await api(cookie).saveProgress({ id: state.privateVideo, position: 1 })
+    await api(cookie).saveProgress({ id: state.privateVideo, position: 1, audio: null })
     const home = async (holding?: string) => {
       const answer = await api(holding).getHome()
       return {

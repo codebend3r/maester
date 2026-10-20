@@ -207,5 +207,9 @@ export const liveStream = (overrides: Partial<LiveStream> = {}): LiveStream => (
   startedAt: '2026-10-18T18:00:00.000Z',
   lastSeenAt: '2026-10-18T18:10:00.000Z',
   position: 754,
+  viewer: null,
+  audio: null,
+  sendRate: null,
+  quality: null,
   ...overrides,
 })
