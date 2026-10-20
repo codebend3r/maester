@@ -1,5 +1,6 @@
 import type { PlayRequest } from '@raven/core'
 import type { DownloadService } from '@/main/downloads/downloadService'
+import { quietly } from '@/main/log/quietly'
 import { loggable } from '@/main/servers/serverCalls'
 import {
   TRUST_MESSAGES,
@@ -33,6 +34,8 @@ const replyForUntrusted = (
       return { type: DESKTOP_REPLIES.refused, message: TRUST_MESSAGES.busy }
     case TRUST_OUTCOME_KINDS.unreachable:
       return { type: DESKTOP_REPLIES.refused, message: TRUST_MESSAGES.unreachable(outcome.origin) }
+    case TRUST_OUTCOME_KINDS.badSignIn:
+      return { type: DESKTOP_REPLIES.refused, message: TRUST_MESSAGES.badSignIn }
     case TRUST_OUTCOME_KINDS.invalid:
       return { type: DESKTOP_REPLIES.refused, message: TRUST_MESSAGES.invalid }
     case TRUST_OUTCOME_KINDS.unsaved:
@@ -81,13 +84,7 @@ export const createLinkOpener = ({
   downloads: Pick<DownloadService, 'ask'>
   warn: (message: string) => void
 }): LinkOpener => {
-  const safeWarn = (message: string): void => {
-    try {
-      warn(message)
-    } catch {
-      // A throwing logger must not turn an answer into a rejection.
-    }
-  }
+  const safeWarn = quietly(warn)
 
   const askTrust = ({
     origin,

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import { TRUST_MESSAGES, trustDetailFor } from '@/main/servers/serverTrust'
-import { confirmWith, trustPromptFor } from '@/main/servers/trustPrompt'
+import {
+  confirmSignInChangeWith,
+  confirmWith,
+  signInChangePromptFor,
+  trustPromptFor,
+} from '@/main/servers/trustPrompt'
 
 const ORIGIN = 'https://raven.example.ts.net'
 const LOOKALIKE = 'https://xn--rven-6na.example'
@@ -47,5 +52,55 @@ describe('confirmWith', () => {
     expect(await answering({ response: 1 }).confirm(ORIGIN)).toBe(false)
     expect(await answering({ response: -1 }).confirm(ORIGIN)).toBe(false)
     expect(await answering({ response: 2 }).confirm(ORIGIN)).toBe(false)
+  })
+})
+
+describe('signInChangePromptFor', () => {
+  const NAME = 'Vhagar'
+  const HOST = 'project.supabase.co'
+
+  it('asks whether to use the new sign-in host, with Cancel as the default and the escape', () => {
+    expect(signInChangePromptFor({ serverName: NAME, host: HOST })).toEqual({
+      type: 'question',
+      message: 'Vhagar now signs in through project.supabase.co. Use it?',
+      detail: TRUST_MESSAGES.signInChangedDetail,
+      buttons: ['Use It', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+    })
+  })
+
+  it('spells out a punycode host in its own letters, keeping the message ASCII', () => {
+    const prompt = signInChangePromptFor({ serverName: NAME, host: 'xn--aypal-uye.example' })
+    expect(prompt.message).toBe('Vhagar now signs in through xn--aypal-uye.example. Use it?')
+    expect(prompt.detail).toBe(
+      `${TRUST_MESSAGES.signInChangedDetail} ${TRUST_MESSAGES.lookalike('\u0440aypal.example')}`,
+    )
+  })
+})
+
+describe('confirmSignInChangeWith', () => {
+  const answering = ({ response }: { response: number }) => {
+    const shown: unknown[] = []
+    const confirm = confirmSignInChangeWith({
+      show: async (prompt) => {
+        shown.push(prompt)
+        return { response }
+      },
+    })
+    return { confirm, shown }
+  }
+
+  it('is a yes only for Use It', async () => {
+    const { confirm, shown } = answering({ response: 0 })
+    expect(await confirm({ serverName: 'Vhagar', host: 'a.example' })).toBe(true)
+    expect(shown).toEqual([signInChangePromptFor({ serverName: 'Vhagar', host: 'a.example' })])
+  })
+
+  it('is a no for Cancel, the escape key and anything else', async () => {
+    const input = { serverName: 'Vhagar', host: 'a.example' }
+    expect(await answering({ response: 1 }).confirm(input)).toBe(false)
+    expect(await answering({ response: -1 }).confirm(input)).toBe(false)
+    expect(await answering({ response: 2 }).confirm(input)).toBe(false)
   })
 })

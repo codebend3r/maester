@@ -1,23 +1,40 @@
 import {
+  AUTH_REFUSALS,
   isMediaId,
   isMediaTracks,
   LOCKED_STATUS,
   PLAYER_ERROR_REASONS,
   PLAYER_SOURCE_KINDS,
+  type AuthRefusal,
+  type PlayerErrorReason,
   type PlayerSource,
+  type SubtitleTrack,
 } from '@raven/core'
+import { accountsReadyWith } from '@/main/accounts/accountsReady'
+import type { AuthConfigs } from '@/main/accounts/authConfigs'
+import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
 import type { ServerEntry } from '@/main/desktopConfig'
+import { parseJson } from '@/main/parseJson'
 import {
+  type AccountRefusalReader,
   type FailureExplainer,
   PLAYER_MESSAGES,
   PLAYER_PHASES,
   type ResolvedSource,
   type ServerTarget,
 } from '@/main/player/playerService'
-import { CALL_NAMES } from '@/main/servers/allowlist'
+import {
+  type AccountTickets,
+  TICKET_OUTCOMES,
+  type TicketOutcome,
+} from '@/main/servers/accountTickets'
+import { API_PATHS, CALL_NAMES, MEDIA_FILE_PATH, subtitlePathOf } from '@/main/servers/allowlist'
+import { ACCOUNT_REFUSAL_STATUSES, refusalAt } from '@/main/servers/authRefusals'
 import { cookieHeader } from '@/main/servers/cookieHeader'
+import type { MediaRelay } from '@/main/servers/mediaRelay'
 import { loggable, type ServerCallResult, type ServerCalls } from '@/main/servers/serverCalls'
 import { sidecarTracksOf } from '@/main/servers/sidecarTracks'
+import { HTTP_STATUSES } from '@/shared/httpStatuses'
 import { messageOf } from '@/shared/messageOf'
 import { isOpaqueId, SERVER_GONE } from '@/shared/protocol'
 
@@ -29,6 +46,10 @@ export const SOURCE_MESSAGES = {
   relocked: (name: string) => `${name} locked this library again.`,
   gone: (name: string) => `This title is not on ${name} any more.`,
   cannotOpen: (name: string) => `raven player could not open this title from ${name}.`,
+  signIn: (name: string) => `Sign in to ${name} to play this.`,
+  signInAgain: (name: string) => `Sign in to ${name} again.`,
+  pending: (name: string) => `Your account on ${name} is waiting for approval.`,
+  removed: (name: string) => `Your access to ${name} was removed.`,
 } as const
 
 export const EXPLAIN_TIMEOUT_MS = 5000
@@ -38,59 +59,93 @@ export const EXPLAIN_TIMEOUT_MS = 5000
  */
 export const TRACKS_TIMEOUT_MS = 3000
 
-const NOT_FOUND_STATUS = 404
+type Sidecars = ServerTarget['sidecars']
+type Failure = { reason: PlayerErrorReason; message: string }
 
 type ServerSource = Extract<PlayerSource, { kind: typeof PLAYER_SOURCE_KINDS.server }>
 
-const parseJson = (text: string): { ok: true; value: unknown } | { ok: false } => {
-  try {
-    const value: unknown = JSON.parse(text)
-    return { ok: true, value }
-  } catch {
-    return { ok: false }
-  }
-}
-
-const BOUNDED_OUTCOMES = { answered: 'answered', late: 'late', failed: 'failed' } as const
-
-type Bounded =
-  | { outcome: typeof BOUNDED_OUTCOMES.answered; result: ServerCallResult }
-  | { outcome: typeof BOUNDED_OUTCOMES.late }
-  | { outcome: typeof BOUNDED_OUTCOMES.failed; message: string }
-
-/** The call's answer, or why there is none: it rejected, or did not answer within `ms`. */
-const within = async ({
-  task,
-  ms,
+/** What the player says when the server refused the account mid-play; null when it is no account matter. */
+const accountFailureOf = ({
+  reason,
+  name,
 }: {
-  task: Promise<ServerCallResult>
-  ms: number
-}): Promise<Bounded> => {
-  const timer: { handle: ReturnType<typeof setTimeout> | null } = { handle: null }
-  const timeout = new Promise<Bounded>((resolve) => {
-    timer.handle = setTimeout(() => resolve({ outcome: BOUNDED_OUTCOMES.late }), ms)
-  })
-  const answer = task.then(
-    (result): Bounded => ({ outcome: BOUNDED_OUTCOMES.answered, result }),
-    (error: unknown): Bounded => ({ outcome: BOUNDED_OUTCOMES.failed, message: messageOf(error) }),
-  )
-  try {
-    return await Promise.race([answer, timeout])
-  } finally {
-    if (timer.handle !== null) clearTimeout(timer.handle)
+  reason: AuthRefusal['reason']
+  name: string
+}): Failure | null => {
+  switch (reason) {
+    case AUTH_REFUSALS.signedOut:
+      return { reason: PLAYER_ERROR_REASONS.account, message: SOURCE_MESSAGES.signInAgain(name) }
+    // An account sent back to waiting while it played has lost the access it had.
+    case AUTH_REFUSALS.pending:
+    case AUTH_REFUSALS.revoked:
+    case AUTH_REFUSALS.notOwner:
+      return { reason: PLAYER_ERROR_REASONS.account, message: SOURCE_MESSAGES.removed(name) }
+    case AUTH_REFUSALS.unavailable:
+      return null
+    default: {
+      const unreachable: never = reason
+      return unreachable
+    }
   }
 }
+
+/** Why a title cannot start, when its first ticket could not be minted. */
+const refusedMessageOf = ({
+  outcome,
+  name,
+}: {
+  outcome: Exclude<TicketOutcome, { kind: typeof TICKET_OUTCOMES.ticket }>
+  name: string
+}): string => {
+  switch (outcome.kind) {
+    case TICKET_OUTCOMES.refused:
+      switch (outcome.reason) {
+        case AUTH_REFUSALS.signedOut:
+          return SOURCE_MESSAGES.signIn(name)
+        case AUTH_REFUSALS.pending:
+          return SOURCE_MESSAGES.pending(name)
+        case AUTH_REFUSALS.revoked:
+        case AUTH_REFUSALS.notOwner:
+          return SOURCE_MESSAGES.removed(name)
+        case AUTH_REFUSALS.unavailable:
+          return SOURCE_MESSAGES.lost(name)
+        default: {
+          const unreachable: never = outcome.reason
+          return unreachable
+        }
+      }
+    case TICKET_OUTCOMES.locked:
+      return SOURCE_MESSAGES.relocked(name)
+    case TICKET_OUTCOMES.gone:
+      return SOURCE_MESSAGES.gone(name)
+    case TICKET_OUTCOMES.unreachable:
+      return SOURCE_MESSAGES.lost(name)
+    default: {
+      const unreachable: never = outcome
+      return unreachable
+    }
+  }
+}
+
+/** The account refusal a `401` or `403` from the server carries, or null for any other answer. */
+const accountRefusalIn = (result: ServerCallResult): AuthRefusal['reason'] | null =>
+  result.ok ? refusalAt({ ...result, statuses: ACCOUNT_REFUSAL_STATUSES }) : null
 
 /**
  * Server titles for the player: main builds the file URL from the stored origin, the
  * `Cookie` header from that server's own session and the sidecars from the server's own
- * track list, so nothing the page sends names a host, a path or a cookie. Main asks the
- * server why when mpv fails to open or stops one of its titles.
+ * track list, so nothing the page sends names a host, a path or a cookie. A server whose accounts
+ * are ready plays through the loopback relay instead, with no cookie and no ticket in anything mpv
+ * holds. Main asks the relay, then the server, why when mpv fails to open or stops one of its titles.
  */
 export const createServerSources = ({
   serverOf,
   cookiesFor,
   calls,
+  authConfigs,
+  tickets,
+  relay,
+  accountChanged,
   warn,
 }: {
   serverOf: (serverId: string) => ServerEntry | null
@@ -99,15 +154,30 @@ export const createServerSources = ({
     url: string
   }) => Promise<readonly { name: string; value: string }[]>
   calls: Pick<ServerCalls, 'call'>
+  authConfigs: Pick<AuthConfigs, 'stateOf'>
+  tickets: Pick<AccountTickets, 'ticketFor'>
+  relay: Pick<MediaRelay, 'open' | 'refusalOf' | 'close'>
+  /** Reads the server's account again, so the page hears that it changed. */
+  accountChanged: (serverId: string) => Promise<void>
   warn: (message: string) => void
-}): { resolve: (source: ServerSource) => Promise<ResolvedSource>; explain: FailureExplainer } => {
-  const sidecarsOf = async ({
+}): {
+  resolve: (source: ServerSource) => Promise<ResolvedSource>
+  explain: FailureExplainer
+  refusedAccount: AccountRefusalReader
+} => {
+  const noteAccount = (serverId: string): void => {
+    accountChanged(serverId).catch(() => {
+      warn('raven player could not read an account again after a refusal')
+    })
+  }
+
+  const trackListOf = async ({
     server,
     mediaId,
   }: {
     server: ServerEntry
     mediaId: number
-  }): Promise<ServerTarget['sidecars']> => {
+  }): Promise<readonly SubtitleTrack[]> => {
     const name = loggable(server.name)
     try {
       const bounded = await within({
@@ -119,7 +189,7 @@ export const createServerSources = ({
         return []
       }
       if (bounded.outcome === BOUNDED_OUTCOMES.failed) {
-        warn(`no sidecars from ${name}: its tracks failed: ${loggable(bounded.message)}`)
+        warn(`no sidecars from ${name}: its tracks failed: ${loggable(messageOf(bounded.error))}`)
         return []
       }
       const { result } = bounded
@@ -127,23 +197,66 @@ export const createServerSources = ({
         warn(`no sidecars from ${name}: ${loggable(result.message)}`)
         return []
       }
-      if (result.status !== 200) {
+      if (result.status !== HTTP_STATUSES.ok) {
         warn(`no sidecars from ${name}: its tracks answered ${result.status}`)
         return []
       }
       const parsed = parseJson(result.body)
-      if (!parsed.ok || !isMediaTracks(parsed.value)) {
+      if (!isMediaTracks(parsed)) {
         warn(`no sidecars from ${name}: its tracks were not a track list`)
         return []
       }
-      return sidecarTracksOf(parsed.value).map((track) => ({
-        url: `${server.origin}/api/media/${mediaId}/subtitles/${encodeURIComponent(track.id)}`,
-        title: track.title ?? '',
-        language: track.language ?? '',
-      }))
+      return sidecarTracksOf(parsed)
     } catch (error) {
       warn(`no sidecars from ${name}: ${loggable(messageOf(error))}`)
       return []
+    }
+  }
+
+  const isReady = accountsReadyWith({ authConfigs, serverOf, warn })
+
+  const resolveRelayed = async ({
+    server,
+    mediaId,
+    trackList,
+  }: {
+    server: ServerEntry
+    mediaId: number
+    trackList: Promise<readonly SubtitleTrack[]>
+  }): Promise<ResolvedSource> => {
+    // The first ticket before anything opens: a title the account may not play is refused here.
+    const [tracks, first] = await Promise.all([
+      trackList,
+      tickets.ticketFor({ serverId: server.id, mediaId, isFresh: false }),
+    ])
+    if (first.kind !== TICKET_OUTCOMES.ticket) {
+      if (first.kind === TICKET_OUTCOMES.refused) noteAccount(server.id)
+      return { ok: false, message: refusedMessageOf({ outcome: first, name: server.name }) }
+    }
+    const opened = await relay
+      .open({ server, mediaId, sidecarTrackIds: tracks.map((track) => track.id) })
+      .catch(() => null)
+    if (opened === null) {
+      warn(`raven player could not relay a title from ${loggable(server.name)}`)
+      return { ok: false, message: SOURCE_MESSAGES.cannotOpen(server.name) }
+    }
+    const sidecars: Sidecars = tracks.flatMap((track, index) => {
+      const url = opened.sidecarUrls[index]
+      return url === undefined
+        ? []
+        : [{ url, title: track.title ?? '', language: track.language ?? '' }]
+    })
+    return {
+      ok: true,
+      target: {
+        kind: PLAYER_SOURCE_KINDS.server,
+        serverId: server.id,
+        mediaId,
+        url: opened.fileUrl,
+        headerFields: '',
+        sidecars,
+        relay: { loadId: opened.loadId, base: opened.base },
+      },
     }
   }
 
@@ -153,11 +266,12 @@ export const createServerSources = ({
     }
     const server = serverOf(serverId)
     if (server === null) return { ok: false, message: SOURCE_MESSAGES.unknownServer }
-    const url = `${server.origin}/api/media/${mediaId}/file`
-    const [sidecars, cookies] = await Promise.all([
-      sidecarsOf({ server, mediaId }),
-      cookiesFor({ serverId, url }),
-    ])
+    // Read while the accounts state is asked for: either way the title wants its sidecars.
+    const trackList = trackListOf({ server, mediaId })
+    if (await isReady(server)) return resolveRelayed({ server, mediaId, trackList })
+    const media = `${server.origin}${API_PATHS.media}/${mediaId}`
+    const url = `${media}/${MEDIA_FILE_PATH}`
+    const [tracks, cookies] = await Promise.all([trackList, cookiesFor({ serverId, url })])
     return {
       ok: true,
       target: {
@@ -166,9 +280,31 @@ export const createServerSources = ({
         mediaId,
         url,
         headerFields: cookieHeader(cookies) ?? '',
-        sidecars,
+        sidecars: tracks.map((track) => ({
+          url: `${media}/${subtitlePathOf(encodeURIComponent(track.id))}`,
+          title: track.title ?? '',
+          language: track.language ?? '',
+        })),
+        relay: null,
       },
     }
+  }
+
+  /**
+   * What the player says for a relayed title whose account the relay saw refused, or null. The
+   * relay has already told the account; the player's stall and its ending both ask this.
+   */
+  const refusedAccount: AccountRefusalReader = (target) => {
+    if (target.relay === null) return null
+    const server = serverOf(target.serverId)
+    const reason = relay.refusalOf(target.relay.loadId)
+    if (server === null || reason === null) return null
+    return accountFailureOf({ reason, name: server.name })
+  }
+
+  /** A failed title is over, so its relay secret is retired. */
+  const endRelayedLoad = (target: ServerTarget): void => {
+    if (target.relay !== null) relay.close(target.relay.loadId)
   }
 
   const explain: FailureExplainer = async ({ target, phase }) => {
@@ -176,6 +312,10 @@ export const createServerSources = ({
     if (server === null) {
       return { reason: PLAYER_ERROR_REASONS.network, message: SOURCE_MESSAGES.lost('the server') }
     }
+    // mpv ends a refused stream as if it ran out, so the relay is the one that knows.
+    const relayed = refusedAccount(target)
+    endRelayedLoad(target)
+    if (relayed !== null) return relayed
     const bounded = await within({
       task: calls.call({
         serverId: server.id,
@@ -187,10 +327,17 @@ export const createServerSources = ({
       return { reason: PLAYER_ERROR_REASONS.network, message: SOURCE_MESSAGES.lost(server.name) }
     }
     const { result } = bounded
+    const refused = accountRefusalIn(result)
+    const fromServer =
+      refused === null ? null : accountFailureOf({ reason: refused, name: server.name })
+    if (fromServer !== null) {
+      noteAccount(server.id)
+      return fromServer
+    }
     if (result.status === LOCKED_STATUS) {
       return { reason: PLAYER_ERROR_REASONS.locked, message: SOURCE_MESSAGES.relocked(server.name) }
     }
-    if (result.status === NOT_FOUND_STATUS) {
+    if (result.status === HTTP_STATUSES.notFound) {
       return { reason: PLAYER_ERROR_REASONS.open, message: SOURCE_MESSAGES.gone(server.name) }
     }
     return phase === PLAYER_PHASES.loading
@@ -198,5 +345,5 @@ export const createServerSources = ({
       : { reason: PLAYER_ERROR_REASONS.decode, message: PLAYER_MESSAGES.stopped }
   }
 
-  return { resolve, explain }
+  return { resolve, explain, refusedAccount }
 }

@@ -3,11 +3,13 @@ import type { PlayRequest } from '@raven/core'
 import { EMPTY_CONFIG, type ConfigStore, type ServerEntry } from '@/main/desktopConfig'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import { LINK_MESSAGES, createLinkOpener, replyForTrust } from '@/main/servers/linkOpener'
+import { PROBE_KINDS } from '@/main/servers/serverCalls'
 import {
   TRUST_MESSAGES,
   createServerTrust,
   type ServerTrust,
   type TrustOutcome,
+  TRUST_OUTCOME_KINDS,
 } from '@/main/servers/serverTrust'
 import { isDesktopReply, type DesktopReply } from '@/shared/protocol'
 import { fakeTimers } from '@/main/test/playerFakes'
@@ -19,6 +21,7 @@ const SERVER: ServerEntry = {
   origin: ORIGIN,
   name: 'raven.example',
   addedAt: 1,
+  signIn: null,
 }
 
 const REQUEST: PlayRequest = { origin: ORIGIN, mediaId: 7, at: 30, next: [8] }
@@ -101,6 +104,7 @@ describe('replyForTrust', () => {
     [{ kind: 'full' } as const, TRUST_MESSAGES.full],
     [{ kind: 'busy' } as const, TRUST_MESSAGES.busy],
     [{ kind: 'unreachable', origin: ORIGIN } as const, TRUST_MESSAGES.unreachable(ORIGIN)],
+    [{ kind: TRUST_OUTCOME_KINDS.badSignIn } as const, TRUST_MESSAGES.badSignIn],
     [{ kind: 'invalid' } as const, TRUST_MESSAGES.invalid],
     [{ kind: 'unsaved' } as const, TRUST_MESSAGES.unsaved],
   ])('refuses %j with its message', (outcome, message) => {
@@ -167,6 +171,7 @@ describe('createLinkOpener', () => {
   it.each([
     [{ kind: 'busy' } as const, TRUST_MESSAGES.busy],
     [{ kind: 'unreachable', origin: ORIGIN } as const, TRUST_MESSAGES.unreachable(ORIGIN)],
+    [{ kind: TRUST_OUTCOME_KINDS.badSignIn } as const, TRUST_MESSAGES.badSignIn],
   ])('refuses a download link when trust is %j, and asks nothing', async (outcome, message) => {
     const world = setup({ outcome })
     const link = 'raven://download?server=https%3A%2F%2Fraven.example&item=10'
@@ -222,6 +227,7 @@ describe('createLinkOpener', () => {
     [{ kind: 'full' } as const, TRUST_MESSAGES.full],
     [{ kind: 'busy' } as const, TRUST_MESSAGES.busy],
     [{ kind: 'unreachable', origin: ORIGIN } as const, TRUST_MESSAGES.unreachable(ORIGIN)],
+    [{ kind: TRUST_OUTCOME_KINDS.badSignIn } as const, TRUST_MESSAGES.badSignIn],
   ])('refuses a link when trust is %j', async (outcome, message) => {
     const world = setup({ outcome })
     expect(await world.opener.open({ link: LINK, from: 'link' })).toEqual({
@@ -318,7 +324,7 @@ describe('createLinkOpener over the real trust', () => {
       },
       probe: async ({ origin }) => {
         probes.push(origin)
-        return true
+        return { kind: PROBE_KINDS.raven, signIn: null }
       },
       forget: async () => undefined,
       onRemoved: () => undefined,

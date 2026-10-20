@@ -1,5 +1,17 @@
-import { isLockState } from '@raven/core'
+import {
+  AUTH_CONFIG_STATES,
+  AUTH_HEADERS,
+  AUTH_REFUSALS,
+  AUTH_SCHEME,
+  isAuthConfig,
+  isLockState,
+  type AuthConfig,
+  type AuthRefusal,
+} from '@raven/core'
+import { signInConfigOf, type SignInConfig } from '@/main/accounts/authEndpoints'
 import type { ServerEntry } from '@/main/desktopConfig'
+import { quietly } from '@/main/log/quietly'
+import { parseJson } from '@/main/parseJson'
 import {
   CALL_NAMES,
   isPageCall,
@@ -9,7 +21,9 @@ import {
   type AllowedCall,
   type ServerMethod,
 } from '@/main/servers/allowlist'
+import { refusalAt } from '@/main/servers/authRefusals'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HTTP_STATUSES } from '@/shared/httpStatuses'
 import { SERVER_GONE, SERVER_METHODS } from '@/shared/protocol'
 
 export const CALL_TIMEOUT_MS = 10_000
@@ -23,6 +37,8 @@ export const WRITE_RESERVE = 2
 export const CALL_MESSAGES = {
   unknownServer: SERVER_GONE,
   offList: 'raven player does not make that call.',
+  adminWithAccounts: (name: string) =>
+    `${name} uses accounts, so raven player does not use its admin password.`,
   unreachable: (name: string) => `raven player could not reach ${name}.`,
   tooBig: (name: string) => `${name} sent more than raven player reads.`,
   busy: (name: string) => `raven player is still waiting on ${name}.`,
@@ -106,13 +122,17 @@ export const fetchThrough =
     }
   }
 
-const headersFor = ({ body }: { body: string | null }): Record<string, string> =>
-  body === null
-    ? { [HTTP_HEADERS.accept]: 'application/json' }
-    : {
-        [HTTP_HEADERS.accept]: 'application/json',
-        [HTTP_HEADERS.contentType]: 'application/json',
-      }
+const headersFor = ({
+  body,
+  token = null,
+}: {
+  body: string | null
+  token?: string | null
+}): Record<string, string> => ({
+  [HTTP_HEADERS.accept]: 'application/json',
+  ...(body === null ? {} : { [HTTP_HEADERS.contentType]: 'application/json' }),
+  ...(token === null ? {} : { [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${token}` }),
+})
 
 /** How many characters of a call's reply main reads. */
 export const replyCapFor = (call: AllowedCall): number =>
@@ -132,14 +152,37 @@ export const loggable = (text: string): string =>
     .slice(0, LOG_TEXT_MAX)
     .replace(UNPRINTABLE, (char) => `\\u{${(char.codePointAt(0) ?? 0).toString(16)}}`)
 
-const parseJson = (text: string): { ok: true; value: unknown } | { ok: false } => {
-  try {
-    const value: unknown = JSON.parse(text)
-    return { ok: true, value }
-  } catch {
-    return { ok: false }
-  }
+/** The account layer's part of every call. A server whose accounts are not ready answers `null`. */
+export type Bearer = {
+  /** The access token to send to the server, or null for a call that carries none. */
+  authorize: (input: { serverId: string }) => Promise<string | null>
+  /** Refreshes the sign-in after a `signed_out` refusal; the new access token, or null. */
+  refresh: (input: { serverId: string }) => Promise<string | null>
+  /**
+   * A `401` or `503` that carries an auth refusal came back for good. `isSessionRejected` is true
+   * when the token main had just refreshed was refused again.
+   */
+  onRefusal: (input: { serverId: string; isSessionRejected: boolean }) => void
+  /**
+   * Whether the server is kept as one whose accounts are ready, read from what main already holds
+   * and never from the network. Enforcement replaces the admin password with the account there.
+   */
+  hasAccounts: (input: { serverId: string }) => boolean
 }
+
+/** For calls that never carry an account: main's own reads of a server's public auth config. */
+export const NO_BEARER = {
+  authorize: () => Promise.resolve(null),
+  refresh: () => Promise.resolve(null),
+  onRefusal: () => undefined,
+  hasAccounts: () => false,
+} as const satisfies Bearer
+
+const BEARER_REFUSAL_STATUSES = [HTTP_STATUSES.unauthorized, HTTP_STATUSES.unavailable] as const
+
+/** The refusal a `401` or `503` carries, so a wrong PIN's 401 or a proxy's 503 is none. */
+const refusalReasonOf = (result: { status: number; body: string }): AuthRefusal['reason'] | null =>
+  refusalAt({ ...result, statuses: BEARER_REFUSAL_STATUSES })
 
 /** The call as `matchCall` reads its own request back, or null when it does not survive that. */
 const rematch = (call: AllowedCall): AllowedCall | null => {
@@ -150,6 +193,9 @@ const rematch = (call: AllowedCall): AllowedCall | null => {
   }
 }
 
+const isAdminPasswordCall = (call: AllowedCall): boolean =>
+  call.name === CALL_NAMES.getAdminLock || call.name === CALL_NAMES.unlockAdmin
+
 /**
  * Runs allowlisted calls against the stored servers. Every URL is the stored origin
  * plus the path `requestFor` builds, so nothing the page sends can name another host.
@@ -157,20 +203,18 @@ const rematch = (call: AllowedCall): AllowedCall | null => {
 export const createServerCalls = ({
   serverOf,
   fetchFor,
+  authorize,
+  refresh,
+  onRefusal,
+  hasAccounts,
   warn,
 }: {
   serverOf: (serverId: string) => ServerEntry | null
   fetchFor: (serverId: string) => ServerFetch
   warn: (message: string) => void
-}): ServerCalls => {
+} & Bearer): ServerCalls => {
   /** A log line never fails a call: the call has already been answered or refused. */
-  const safeWarn = (message: string): void => {
-    try {
-      warn(message)
-    } catch {
-      // Nothing is left to tell.
-    }
-  }
+  const safeWarn = quietly(warn)
 
   let inFlight: ReadonlyMap<string, number> = new Map()
   let writes: ReadonlySet<Promise<void>> = new Set()
@@ -181,12 +225,42 @@ export const createServerCalls = ({
     inFlight = new Map([...inFlight, [serverId, countOf(serverId) + by]])
   }
 
-  const send = async ({
+  const slotsFor = (call: AllowedCall): number =>
+    requestFor(call).method === SERVER_METHODS.get ? MAX_IN_FLIGHT : MAX_IN_FLIGHT + WRITE_RESERVE
+
+  const isBusy = ({ server, call }: { server: ServerEntry; call: AllowedCall }): boolean =>
+    countOf(server.id) >= slotsFor(call)
+
+  /**
+   * One request to the server, in one of its slots. The slot is held for the request alone, not
+   * for the Bearer's reads before it, so a slow Auth never fills the slots a ticket mint needs.
+   */
+  const attempt = async ({
     server,
     call,
+    token,
   }: {
     server: ServerEntry
     call: AllowedCall
+    token: string | null
+  }): Promise<ServerCallResult> => {
+    if (isBusy({ server, call })) return { ok: false, message: CALL_MESSAGES.busy(server.name) }
+    adjust({ serverId: server.id, by: 1 })
+    try {
+      return await request({ server, call, token })
+    } finally {
+      adjust({ serverId: server.id, by: -1 })
+    }
+  }
+
+  const request = async ({
+    server,
+    call,
+    token,
+  }: {
+    server: ServerEntry
+    call: AllowedCall
+    token: string | null
   }): Promise<ServerCallResult> => {
     const { method, path, body } = requestFor(call)
     const maxChars = replyCapFor(call)
@@ -194,7 +268,7 @@ export const createServerCalls = ({
       const reply = await fetchFor(server.id)({
         url: `${server.origin}${path}`,
         method,
-        headers: headersFor({ body }),
+        headers: headersFor({ body, token }),
         body,
         timeoutMs: CALL_TIMEOUT_MS,
       })
@@ -208,6 +282,73 @@ export const createServerCalls = ({
       safeWarn(`${method} ${path} to ${loggable(server.name)} failed: ${loggable(reasonOf(error))}`)
       return { ok: false, message: CALL_MESSAGES.unreachable(server.name) }
     }
+  }
+
+  const tokenFor = async (server: ServerEntry): Promise<string | null> => {
+    try {
+      return await authorize({ serverId: server.id })
+    } catch {
+      safeWarn(`raven player could not read its sign-in for ${loggable(server.name)}`)
+      return null
+    }
+  }
+
+  const refreshedFor = async (server: ServerEntry): Promise<string | null> => {
+    try {
+      return await refresh({ serverId: server.id })
+    } catch {
+      safeWarn(`raven player could not refresh its sign-in for ${loggable(server.name)}`)
+      return null
+    }
+  }
+
+  const announce = ({
+    server,
+    result,
+    isSessionRejected,
+  }: {
+    server: ServerEntry
+    result: Extract<ServerCallResult, { ok: true }>
+    isSessionRejected: boolean
+  }): void => {
+    const reason = refusalReasonOf(result)
+    if (reason === null) return
+    try {
+      onRefusal({
+        serverId: server.id,
+        isSessionRejected: isSessionRejected && reason === AUTH_REFUSALS.signedOut,
+      })
+    } catch {
+      safeWarn(`raven player could not note a refusal from ${loggable(server.name)}`)
+    }
+  }
+
+  const send = async ({
+    server,
+    call,
+  }: {
+    server: ServerEntry
+    call: AllowedCall
+  }): Promise<ServerCallResult> => {
+    const token = await tokenFor(server)
+    const first = await attempt({ server, call, token })
+    if (!first.ok) return first
+    const isRefreshable =
+      token !== null &&
+      first.status === HTTP_STATUSES.unauthorized &&
+      refusalReasonOf(first) === AUTH_REFUSALS.signedOut
+    if (!isRefreshable) {
+      announce({ server, result: first, isSessionRejected: false })
+      return first
+    }
+    const fresh = await refreshedFor(server)
+    if (fresh === null) {
+      announce({ server, result: first, isSessionRejected: false })
+      return first
+    }
+    const second = await attempt({ server, call, token: fresh })
+    if (second.ok) announce({ server, result: second, isSessionRejected: true })
+    return second
   }
 
   const tracked = async ({
@@ -240,20 +381,18 @@ export const createServerCalls = ({
     }
     const server = serverOf(serverId)
     if (server === null) return { ok: false, message: CALL_MESSAGES.unknownServer }
-    const slots =
-      requestFor(allowed).method === SERVER_METHODS.get
-        ? MAX_IN_FLIGHT
-        : MAX_IN_FLIGHT + WRITE_RESERVE
-    if (countOf(serverId) >= slots) {
+    if (isAdminPasswordCall(allowed) && hasAccounts({ serverId })) {
+      safeWarn(
+        `refused ${allowed.name} to ${loggable(server.name)}: its accounts replace the admin password`,
+      )
+      return { ok: false, message: CALL_MESSAGES.adminWithAccounts(server.name) }
+    }
+    // A server already full answers at once, before the Bearer waits on Auth for nothing.
+    if (isBusy({ server, call: allowed })) {
       return { ok: false, message: CALL_MESSAGES.busy(server.name) }
     }
-    adjust({ serverId, by: 1 })
-    try {
-      const task = send({ server, call: allowed })
-      return await (isWrite(allowed) ? tracked({ task }) : task)
-    } finally {
-      adjust({ serverId, by: -1 })
-    }
+    const task = send({ server, call: allowed })
+    return isWrite(allowed) ? tracked({ task }) : task
   }
 
   const callFromPage: ServerCalls['callFromPage'] = async ({ serverId, method, path, body }) => {
@@ -275,15 +414,32 @@ export const createServerCalls = ({
   }
 }
 
-/** Whether `origin` answers as a raven server: a 200 from `GET /api/lock` holding a lock state. */
-export const probeServer = async ({
+export const PROBE_KINDS = {
+  raven: 'raven',
+  badSignIn: 'badSignIn',
+  unreachable: 'unreachable',
+} as const
+
+/**
+ * What a probe made of an origin. A raven server brings the sign-in endpoints to pin when its
+ * accounts are ready, and none when they are off, unavailable or the server predates them.
+ */
+export type ProbeResult =
+  | { kind: typeof PROBE_KINDS.raven; signIn: SignInConfig | null }
+  | { kind: typeof PROBE_KINDS.badSignIn }
+  | { kind: typeof PROBE_KINDS.unreachable }
+
+/** A call's status and, when the reply is no bigger than the cap, its text; null when it failed. */
+const probeCall = async ({
   fetch,
   origin,
+  call,
 }: {
   fetch: ServerFetch
   origin: string
-}): Promise<boolean> => {
-  const { method, path, body } = requestFor({ name: CALL_NAMES.getLock })
+  call: AllowedCall
+}): Promise<{ status: number; text: string | null } | null> => {
+  const { method, path, body } = requestFor(call)
   try {
     const reply = await fetch({
       url: `${origin}${path}`,
@@ -292,12 +448,46 @@ export const probeServer = async ({
       body,
       timeoutMs: CALL_TIMEOUT_MS,
     })
-    if (reply.status !== 200) return false
+    if (reply.status !== HTTP_STATUSES.ok) return { status: reply.status, text: null }
     const text = await reply.text({ maxChars: MAX_REPLY_CHARS })
-    if (text.length > MAX_REPLY_CHARS) return false
-    const parsed = parseJson(text)
-    return parsed.ok && isLockState(parsed.value)
+    return { status: reply.status, text: text.length > MAX_REPLY_CHARS ? null : text }
   } catch {
-    return false
+    return null
   }
+}
+
+const isLockAnswer = (answer: Awaited<ReturnType<typeof probeCall>>): boolean => {
+  if (answer === null || answer.status !== HTTP_STATUSES.ok || answer.text === null) return false
+  return isLockState(parseJson(answer.text))
+}
+
+const UNREACHABLE: ProbeResult = { kind: PROBE_KINDS.unreachable }
+
+const resultOf = (config: AuthConfig): ProbeResult => {
+  if (config.state !== AUTH_CONFIG_STATES.ready) return { kind: PROBE_KINDS.raven, signIn: null }
+  const signIn = signInConfigOf(config)
+  return signIn === null ? { kind: PROBE_KINDS.badSignIn } : { kind: PROBE_KINDS.raven, signIn }
+}
+
+/**
+ * Whether `origin` answers as a raven server, from its public `GET /api/auth/config`. A valid
+ * config is a raven server; a 404 is one older than accounts, which `GET /api/lock` tells from
+ * any other site; anything else is unreachable.
+ */
+export const probeServer = async ({
+  fetch,
+  origin,
+}: {
+  fetch: ServerFetch
+  origin: string
+}): Promise<ProbeResult> => {
+  const answer = await probeCall({ fetch, origin, call: { name: CALL_NAMES.getAuthConfig } })
+  if (answer === null) return UNREACHABLE
+  if (answer.status === HTTP_STATUSES.notFound) {
+    const lock = await probeCall({ fetch, origin, call: { name: CALL_NAMES.getLock } })
+    return isLockAnswer(lock) ? { kind: PROBE_KINDS.raven, signIn: null } : UNREACHABLE
+  }
+  if (answer.status !== HTTP_STATUSES.ok || answer.text === null) return UNREACHABLE
+  const parsed = parseJson(answer.text)
+  return isAuthConfig(parsed) ? resultOf(parsed) : UNREACHABLE
 }

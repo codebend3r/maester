@@ -27,6 +27,7 @@ const entryFor = ({ n }: { n: number }): ServerEntry => ({
   origin: originFor({ n }),
   name: `Server ${n}`,
   addedAt: n,
+  signIn: null,
 })
 
 const configOf = ({ count }: { count: number }): DesktopConfig => ({
@@ -130,8 +131,25 @@ describe('addServer', () => {
       origin: 'http://127.0.0.1:8080',
       name: '127.0.0.1:8080',
       addedAt: 1700000000000,
+      signIn: null,
     }
     expect(outcome).toEqual({ ok: true, server, config: { ...EMPTY_CONFIG, servers: [server] } })
+  })
+
+  it('pins the sign-in it is given with the new server', () => {
+    const signIn = {
+      supabaseUrl: 'https://project.supabase.co',
+      publishableKey: 'sb_publishable_example',
+      webUrl: originFor({ n: 1 }),
+    }
+    const outcome = addServer({
+      config: EMPTY_CONFIG,
+      id: idFor({ n: 1 }),
+      origin: originFor({ n: 1 }),
+      at: 1,
+      signIn,
+    })
+    expect(outcome.ok && outcome.server.signIn).toEqual(signIn)
   })
 
   it('twice with the same origin keeps one entry and returns the first id', () => {

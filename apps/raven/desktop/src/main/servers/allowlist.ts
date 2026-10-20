@@ -1,9 +1,16 @@
-import { isAdminUnlockRequest, isMediaId, isProgressChange, isUnlockRequest } from '@raven/core'
-import { SERVER_METHODS } from '@/shared/protocol'
+import {
+  AUTH_PARAMS,
+  AUTH_PATHS,
+  isAdminUnlockRequest,
+  isMediaId,
+  isProgressChange,
+  isUnlockRequest,
+} from '@raven/core'
+import { parseJson } from '@/main/parseJson'
+import { MAX_SECRET, SERVER_METHODS } from '@/shared/protocol'
 
 export type ServerMethod = (typeof SERVER_METHODS)[keyof typeof SERVER_METHODS]
 export const MAX_BODY = 4096
-export const MAX_SECRET = 256
 
 /** The calls main makes for the page, by name. */
 export const CALL_NAMES = {
@@ -20,6 +27,9 @@ export const CALL_NAMES = {
   getSagas: 'getSagas',
   getMediaOrigins: 'getMediaOrigins',
   getMediaTicket: 'getMediaTicket',
+  getAuthConfig: 'getAuthConfig',
+  getMe: 'getMe',
+  getAccountTicket: 'getAccountTicket',
 } as const
 
 export type AllowedCall =
@@ -36,6 +46,9 @@ export type AllowedCall =
   | { name: typeof CALL_NAMES.getSagas; libraryId: number }
   | { name: typeof CALL_NAMES.getMediaOrigins }
   | { name: typeof CALL_NAMES.getMediaTicket; mediaId: number }
+  | { name: typeof CALL_NAMES.getAuthConfig }
+  | { name: typeof CALL_NAMES.getMe }
+  | { name: typeof CALL_NAMES.getAccountTicket; mediaId: number }
 
 /** The fixed paths among the calls; the numbered calls' paths carry an id. */
 export const API_PATHS = {
@@ -44,7 +57,14 @@ export const API_PATHS = {
   admin: '/api/admin',
   adminUnlock: '/api/admin/unlock',
   mediaOrigins: '/api/media-origins',
+  media: '/api/media',
 } as const
+
+/** A title's bytes under `${API_PATHS.media}/<id>/`, read with a ticket or a cookie. */
+export const MEDIA_FILE_PATH = 'file'
+const MEDIA_SUBTITLES_PATH = 'subtitles'
+
+export const subtitlePathOf = (trackId: string): string => `${MEDIA_SUBTITLES_PATH}/${trackId}`
 
 const BODY_KINDS = { none: 'none', json: 'json', bad: 'bad' } as const
 
@@ -74,15 +94,16 @@ const NONE = { kind: BODY_KINDS.none } as const satisfies Body
 const readBody = (body: string | null): Body => {
   if (body === null) return NONE
   if (body.length > MAX_BODY) return { kind: BODY_KINDS.bad }
-  try {
-    const value: unknown = JSON.parse(body)
-    return { kind: BODY_KINDS.json, value }
-  } catch {
-    return { kind: BODY_KINDS.bad }
-  }
+  const value = parseJson(body)
+  return value === undefined ? { kind: BODY_KINDS.bad } : { kind: BODY_KINDS.json, value }
 }
 
 const isSecret = (value: string): boolean => value.length <= MAX_SECRET
+
+const ID_PARAM = `:${AUTH_PARAMS.id}`
+
+/** An account route's path with its `:id` filled in. */
+const withId = ({ path, id }: { path: string; id: string }): string => path.replace(ID_PARAM, id)
 
 /** Only for the calls that take no body: anything sent along refuses the call. */
 const bare =
@@ -143,6 +164,24 @@ const ROUTES: readonly Route[] = [
     method: SERVER_METHODS.get,
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/ticket$/u,
     read: ({ id, body }) => bare({ name: CALL_NAMES.getMediaTicket, mediaId: id })({ body }),
+  },
+  {
+    kind: ROUTE_KINDS.numbered,
+    method: SERVER_METHODS.post,
+    pattern: new RegExp(`^${withId({ path: AUTH_PATHS.ticket, id: '([1-9]\\d{0,15})' })}$`, 'u'),
+    read: ({ id, body }) => bare({ name: CALL_NAMES.getAccountTicket, mediaId: id })({ body }),
+  },
+  {
+    kind: ROUTE_KINDS.fixed,
+    method: SERVER_METHODS.get,
+    path: AUTH_PATHS.config,
+    read: bare({ name: CALL_NAMES.getAuthConfig }),
+  },
+  {
+    kind: ROUTE_KINDS.fixed,
+    method: SERVER_METHODS.get,
+    path: AUTH_PATHS.me,
+    read: bare({ name: CALL_NAMES.getMe }),
   },
   {
     kind: ROUTE_KINDS.fixed,
@@ -215,7 +254,7 @@ const matchRoute = ({
   }
 }
 
-/** One of the thirteen allowlisted calls, read from what was sent, or null for anything else. */
+/** One of the sixteen allowlisted calls, read from what was sent, or null for anything else. */
 export const matchCall = ({
   method,
   path,
@@ -281,6 +320,16 @@ export const requestFor = (
       return { method: SERVER_METHODS.get, path: API_PATHS.mediaOrigins, body: null }
     case CALL_NAMES.getMediaTicket:
       return { method: SERVER_METHODS.get, path: `/api/media/${call.mediaId}/ticket`, body: null }
+    case CALL_NAMES.getAuthConfig:
+      return { method: SERVER_METHODS.get, path: AUTH_PATHS.config, body: null }
+    case CALL_NAMES.getMe:
+      return { method: SERVER_METHODS.get, path: AUTH_PATHS.me, body: null }
+    case CALL_NAMES.getAccountTicket:
+      return {
+        method: SERVER_METHODS.post,
+        path: withId({ path: AUTH_PATHS.ticket, id: String(call.mediaId) }),
+        body: null,
+      }
     default: {
       const unreachable: never = call
       return unreachable
@@ -305,6 +354,9 @@ export const isWrite = (call: AllowedCall): boolean => {
     case CALL_NAMES.getSagas:
     case CALL_NAMES.getMediaOrigins:
     case CALL_NAMES.getMediaTicket:
+    case CALL_NAMES.getAuthConfig:
+    case CALL_NAMES.getMe:
+    case CALL_NAMES.getAccountTicket:
       return false
     default: {
       const unreachable: never = call
@@ -314,13 +366,17 @@ export const isWrite = (call: AllowedCall): boolean => {
 }
 
 /**
- * Whether the page may make a call. A media ticket and the origin list are main's alone:
- * main builds every media URL itself, so the page never holds a ticket or learns an origin.
+ * Whether the page may make a call. Tickets, the origin list and the account calls are main's
+ * alone: main builds every media URL and holds every session itself, so the page never holds a
+ * ticket or a token or learns an origin.
  */
 export const isPageCall = (call: AllowedCall): boolean => {
   switch (call.name) {
     case CALL_NAMES.getMediaOrigins:
     case CALL_NAMES.getMediaTicket:
+    case CALL_NAMES.getAuthConfig:
+    case CALL_NAMES.getMe:
+    case CALL_NAMES.getAccountTicket:
       return false
     case CALL_NAMES.getMedia:
     case CALL_NAMES.getTracks:
