@@ -1691,6 +1691,18 @@ export const isLiveStream = object({
   startedAt: isString,
   lastSeenAt: isString,
   position: nullable(isNumber),
+  /** The signed-in account's email; null on a server without accounts. */
+  viewer: nullable(isString),
+  /**
+   * The audio track playing, by its place among the file's: the one a
+   * converted stream asked for, then the one the player reports. Null until
+   * either says.
+   */
+  audio: nullable(isNumber),
+  /** Bits per second the server sent over the last few seconds; null until it has looked twice. */
+  sendRate: nullable(isNumber),
+  /** The size the viewer asked a transcode for; null for the server's own settings and for the other modes. */
+  quality: nullable(isStreamQuality),
 })
 
 export type LiveStream = Infer<typeof isLiveStream>
@@ -1717,6 +1729,22 @@ export const isProgressChange = object({
 })
 
 export type ProgressChange = Infer<typeof isProgressChange>
+
+/** An audio track's place among the file's, as ffmpeg's `0:a:N` counts them. */
+const isTrackIndex = (value: unknown): value is number =>
+  isNumber(value) && Number.isInteger(value) && value >= 0
+
+/**
+ * The same route from a player that names what it plays: the position, and
+ * the audio track playing, or null when it cannot tell. A body without
+ * `audio` is an older player's `ProgressChange`.
+ */
+export const isProgressReport = object({
+  ...isProgressChange.shape,
+  audio: nullable(isTrackIndex),
+})
+
+export type ProgressReport = Infer<typeof isProgressReport>
 
 /** `PUT /api/media/:id/favourite`. */
 export const isFavouriteChange = object({

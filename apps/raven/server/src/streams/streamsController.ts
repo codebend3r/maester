@@ -50,6 +50,10 @@ export class StreamsController {
           startedAt: new Date(session.startedAt).toISOString(),
           lastSeenAt: new Date(session.lastSeenAt).toISOString(),
           position: session.position,
+          viewer: session.client.viewer?.email ?? null,
+          audio: session.audio,
+          sendRate: session.sendRate,
+          quality: session.quality,
         },
       ]
     })

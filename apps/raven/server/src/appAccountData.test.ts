@@ -15,19 +15,21 @@ import {
   WATCH_TARGET_KINDS,
   createApiClient,
   isMediaItem,
+  isMediaTicket,
 } from '@raven/core'
 import { CACHE_POLICIES, ENCODINGS, HEADERS } from '@shared/server'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import type { ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
+import { RAVEN_HEADERS } from '@/http'
 import { VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
 import type { AdoptedCounts } from '@/media/viewingAdoption'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 import { NOT_WATCHING, ROUTE_METHODS, adminCookie, testConfig } from '@/test/app'
-import { AUTH_TEST_CONFIG, AUTH_TEST_IDS, authFixture } from '@/test/auth'
+import { AUTH_TEST_CONFIG, AUTH_TEST_IDS, authFixture, bearerHeaders } from '@/test/auth'
 import { encodeClip } from '@/test/clips'
 import { fakeTmdb } from '@/test/fakeTmdb'
 import {
@@ -45,6 +47,7 @@ import {
   headersFor,
   outcomeOf,
   pathOf,
+  withTicket,
 } from '@/test/enforced'
 import { viewingCountsOf } from '@/test/repositories'
 import { apiFor, injectFetch } from '@/test/server'
@@ -171,11 +174,11 @@ const recordMemberViewing = async ({ api }: { api: Client }) => {
   const [first] = tv.episodes
   await Promise.all(
     [extra.unmatched, extra.duplicate].map(async (id) => {
-      await api.saveProgress({ id, position: SPOT })
+      await api.saveProgress({ id, position: SPOT, audio: null })
       await api.setFavourite({ id, favourite: true })
     }),
   )
-  await api.saveProgress({ id: video, position: SPOT })
+  await api.saveProgress({ id: video, position: SPOT, audio: null })
   await api.recordPlay(video)
   await api.setFavourite({ id: video, favourite: true })
   await api.setItemFavourite({ id: tv.show, favourite: true })
@@ -446,6 +449,49 @@ type Past = {
   tv: ShowIds
 }
 
+describe("the owner's Streams page", () => {
+  it('names the account watching, and the audio track its player reports', async () => {
+    const token = await fixture.mint({ id: AUTH_TEST_IDS.friend })
+    const browser = { [RAVEN_HEADERS.userAgent]: 'Friend Browser' }
+    const minted: unknown = (
+      await enforced.app.inject({
+        method: ROUTES.accountTicket.method,
+        url: pathOf({ route: ROUTES.accountTicket, params: { id: enforced.ids.video } }),
+        headers: bearerHeaders({ token }),
+      })
+    ).json()
+    if (!isMediaTicket(minted)) throw new Error('No ticket was minted')
+    const played = await enforced.app.inject({
+      url: withTicket({
+        route: ROUTES.file,
+        params: { id: enforced.ids.video },
+        ticket: minted.ticket,
+      }),
+      headers: { ...browser, [HEADERS.range]: 'bytes=0-99' },
+    })
+    expect(played.statusCode).toBe(206)
+    const reported = await enforced.app.inject({
+      method: ROUTES.progress.method,
+      url: pathOf({ route: ROUTES.progress, params: { id: enforced.ids.video } }),
+      headers: { ...browser, ...bearerHeaders({ token }) },
+      payload: { position: SPOT, audio: 0 },
+    })
+    expect(reported.statusCode).toBe(204)
+
+    const owner = await clientFor({ id: AUTH_TEST_IDS.owner })
+    const streams = await owner.listLiveStreams()
+    expect(streams).toEqual([
+      expect.objectContaining({
+        viewer: 'friend@maester.test',
+        position: SPOT,
+        audio: 0,
+        quality: null,
+      }),
+    ])
+    await Promise.all(streams.map(({ id }) => owner.stopStream(id)))
+  })
+})
+
 describe('the viewing from before accounts', () => {
   const state: { clips: string; dirs: string[]; servers: Set<NestFastifyApplication> } = {
     clips: '',
@@ -555,7 +601,7 @@ describe('the viewing from before accounts', () => {
       later: idOf(PAST_FILES.later),
     }
     const viewer = apiFor({ app })
-    await viewer.saveProgress({ id: ids.movie, position: SPOT })
+    await viewer.saveProgress({ id: ids.movie, position: SPOT, audio: null })
     await viewer.recordPlay(ids.movie)
     await viewer.setFavourite({ id: ids.movie, favourite: true })
     await viewer.setItemFavourite({ id: shows.show, favourite: true })
@@ -635,7 +681,7 @@ describe('the viewing from before accounts', () => {
     const rolledBack = await startOn({ dir: past.dir, mode: SERVER_MODES.optedOut })
     const anonymous = apiFor({ app: rolledBack })
     expect((await anonymous.getMedia(past.ids.movie)).position).toBe(SPOT)
-    await anonymous.saveProgress({ id: past.ids.other, position: SPOT })
+    await anonymous.saveProgress({ id: past.ids.other, position: SPOT, audio: null })
     expect(spotOwners({ app: rolledBack, mediaId: past.ids.other })).toEqual([AUTH_TEST_IDS.owner])
     expect(pastRows({ app: rolledBack })).toEqual(NO_PAST)
     await stop({ app: rolledBack })

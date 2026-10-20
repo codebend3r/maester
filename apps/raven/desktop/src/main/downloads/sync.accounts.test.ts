@@ -21,6 +21,7 @@ describe('what an account watched', () => {
     name: CALL_NAMES.saveProgress,
     mediaId,
     position,
+    audio: null,
   })
 
   it('sends nothing of an account while it is signed out or another is signed in, then all of it once', async () => {

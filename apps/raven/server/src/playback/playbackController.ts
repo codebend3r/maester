@@ -32,6 +32,7 @@ import { CONTENT_TYPES, HEADERS, wholeNumber, CACHE_POLICIES } from '@shared/ser
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AccessRechecks } from '@/auth/accessRechecks'
 import { AccountTickets } from '@/auth/accountTickets'
+import { AuthSessions } from '@/auth/authSessions'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
 import { streamArgs } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
@@ -50,13 +51,13 @@ import { RESPONSE_EVENTS, trackStream } from '@/streams/trackStream'
 import { ROUTE_PARAMS } from '@/requestParts'
 
 /** The size a viewer asked a transcode for, or null for the server's settings. */
-const streamSizeOf = ({
+const streamQualityOf = ({
   quality,
   mode,
 }: {
   quality: string | undefined
   mode: string | undefined
-}): (typeof STREAM_QUALITIES)[StreamQuality] | null => {
+}): StreamQuality | null => {
   if (quality == null) return null
   if (!isStreamQuality(quality)) {
     throw new BadRequestException('quality must be one of the listed sizes')
@@ -64,7 +65,7 @@ const streamSizeOf = ({
   if (mode !== PLAYBACK_MODES.transcode) {
     throw new BadRequestException('quality applies to a transcode only')
   }
-  return STREAM_QUALITIES[quality]
+  return quality
 }
 
 /** The server's setting is the ceiling a viewer's pick can not lift. */
@@ -72,7 +73,7 @@ const capHeight = ({
   size,
   maxHeight,
 }: {
-  size: ReturnType<typeof streamSizeOf>
+  size: (typeof STREAM_QUALITIES)[StreamQuality] | null
   maxHeight: number
 }): number => Math.min(size?.height ?? maxHeight, maxHeight)
 
@@ -95,6 +96,7 @@ export class PlaybackController {
     @Inject(AUTH_STATE) private readonly auth: AuthConfig,
     @Inject(AccountTickets) private readonly accountTickets: AccountTickets,
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
+    @Inject(AuthSessions) private readonly callers: AuthSessions,
   ) {}
 
   private fileOf(id: number): MediaFile {
@@ -182,7 +184,8 @@ export class PlaybackController {
     if (playback.transcoding === TRANSCODINGS.remuxOnly && mode === PLAYBACK_MODES.transcode) {
       throw new ForbiddenException('Transcoding is off in Settings; only remuxing is on.')
     }
-    const size = streamSizeOf({ quality, mode })
+    const picked = streamQualityOf({ quality, mode })
+    const size = picked == null ? null : STREAM_QUALITIES[picked]
     const from = start == null ? 0 : Number(start)
     if (!Number.isFinite(from) || from < 0) {
       throw new BadRequestException('start must be a number of seconds')
@@ -227,8 +230,11 @@ export class PlaybackController {
     trackStream({
       sessions: this.streams,
       rechecks: this.rechecks,
+      auth: this.callers,
       mediaId: id,
       mode,
+      quality: picked,
+      audio: chosen,
       request,
       reply,
     })

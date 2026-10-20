@@ -8,6 +8,8 @@ import {
   type StreamMode,
   type StreamQuality,
   TRANSCODINGS,
+  VIDEO_RANGES,
+  type VideoRange,
   isStreamQuality,
 } from '@/contract'
 
@@ -49,6 +51,28 @@ const CODEC_LABELS: Record<string, string> = {
 
 export const codecLabel = (codec: string | null): string =>
   codec == null ? 'Unknown' : (CODEC_LABELS[codec] ?? codec.toUpperCase())
+
+/** "H.264 High", "AAC LC"; the profile alone when it names the codec already: "DTS-HD MA". */
+export const codecWithProfile = ({
+  codec,
+  profile,
+}: {
+  codec: string | null
+  profile: string | null
+}): string | null => {
+  if (codec == null) return null
+  const label = codecLabel(codec)
+  if (profile == null) return label
+  return profile.toLowerCase().includes(label.toLowerCase()) ? profile : `${label} ${profile}`
+}
+
+/** How each range of light reads to a person. */
+export const VIDEO_RANGE_LABELS = {
+  [VIDEO_RANGES.sdr]: 'SDR',
+  [VIDEO_RANGES.hdr10]: 'HDR10',
+  [VIDEO_RANGES.hlg]: 'HLG',
+  [VIDEO_RANGES.dolbyVision]: 'Dolby Vision',
+} as const satisfies Record<VideoRange, string>
 
 /**
  * The MIME type a container is served and checked as. MOV and M4V are the

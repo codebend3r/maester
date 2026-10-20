@@ -102,15 +102,15 @@ describe('serverServicesFor', () => {
     ])
   })
 
-  it('saves the position on the server and remembers it for the page', () => {
+  it('saves the position and audio track on the server and remembers the position for the page', () => {
     const { client, lastSaved, services } = servicesWith()
-    services.progress.save(40)
+    services.progress.save({ position: 40, audio: 1 })
     expect(client.request).toHaveBeenCalledWith({
       type: 'serverCall',
       serverId: S,
       method: 'PUT',
       path: '/api/media/7/progress',
-      body: '{"position":40}',
+      body: '{"position":40,"audio":1}',
     })
     expect(lastSaved.current).toBe(40)
   })
@@ -125,7 +125,7 @@ describe('serverServicesFor', () => {
       calls: { [PLAY_CALL]: refused, [SAVE_CALL]: refused },
     })
     services.progress.started()
-    services.progress.save(40)
+    services.progress.save({ position: 40, audio: null })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(lastSaved.current).toBe(40)
     expect(warn).toHaveBeenCalledTimes(2)

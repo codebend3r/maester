@@ -138,10 +138,10 @@ export const serverServicesFor = ({
         hasRecordedPlay.current = true
         callQuietly({ call: api.recordPlay(media.id), what: 'record the play' })
       },
-      save: (position) => {
+      save: ({ position, audio }) => {
         lastSaved.current = position
         callQuietly({
-          call: api.saveProgress({ id: media.id, position }),
+          call: api.saveProgress({ id: media.id, position, audio }),
           what: 'save the position',
         })
       },

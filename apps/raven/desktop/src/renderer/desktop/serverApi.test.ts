@@ -34,13 +34,13 @@ describe('serverApiFor', () => {
     const client = serverClient({
       calls: { 'PUT /api/media/7/progress': reply({ status: 204, body: '' }) },
     })
-    await serverApiFor({ client, serverId: S }).saveProgress({ id: 7, position: 40 })
+    await serverApiFor({ client, serverId: S }).saveProgress({ id: 7, position: 40, audio: null })
     expect(client.request).toHaveBeenCalledWith({
       type: 'serverCall',
       serverId: S,
       method: 'PUT',
       path: '/api/media/7/progress',
-      body: '{"position":40}',
+      body: '{"position":40,"audio":null}',
     })
   })
 

@@ -139,7 +139,12 @@ export const PlayerChrome = ({
   const menuButton = useRef<HTMLButtonElement>(null)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)
-  useWatchProgress({ state, position: engine.position, duration })
+  useWatchProgress({
+    state,
+    position: engine.position,
+    duration,
+    audio: selection.audio ?? selection.tracks?.defaultAudio ?? null,
+  })
   const upNext = useUpNext({ ended: state.ended, time: state.time, duration })
   const nextLink = upNext.next
   const setAutoplay = usePlayerPrefs((prefs) => prefs.setAutoplay)

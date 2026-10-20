@@ -229,10 +229,10 @@ describe('createApiClient', () => {
 
   it('sends JSON bodies', async () => {
     const { client, calls } = clientReturning(respond({ status: 204 }))
-    await client.saveProgress({ id: 7, position: 93.5 })
+    await client.saveProgress({ id: 7, position: 93.5, audio: 1 })
     expect(calls[0]?.init).toMatchObject({
       method: 'PUT',
-      body: '{"position":93.5}',
+      body: '{"position":93.5,"audio":1}',
       headers: { 'content-type': 'application/json' },
     })
   })

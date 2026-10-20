@@ -207,7 +207,7 @@ describe('marking videos watched', () => {
 
   it('clears the resume spot of what it marks, and the file is no longer in progress', async () => {
     const heat = id('Heat (1995).mp4')
-    await api().saveProgress({ id: heat, position: 1 })
+    await api().saveProgress({ id: heat, position: 1, audio: null })
     expect((await api().getMedia(heat)).position).toBe(1)
     await setWatched({
       watched: true,

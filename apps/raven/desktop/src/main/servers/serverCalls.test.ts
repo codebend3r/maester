@@ -401,7 +401,7 @@ describe('createServerCalls.call', () => {
     const { calls, sent } = setup({ answer: () => reply({ status: 204, text: '' }) })
     const result = await calls.call({
       serverId: SERVER.id,
-      call: { name: CALL_NAMES.saveProgress, mediaId: 7, position: 40 },
+      call: { name: CALL_NAMES.saveProgress, mediaId: 7, position: 40, audio: null },
     })
     expect(result).toEqual({ ok: true, status: 204, body: '' })
     expect(sent).toEqual([
@@ -409,7 +409,7 @@ describe('createServerCalls.call', () => {
         url: 'https://raven.example/api/media/7/progress',
         method: SERVER_METHODS.put,
         headers: { accept: 'application/json', 'content-type': 'application/json' },
-        body: '{"position":40}',
+        body: '{"position":40,"audio":null}',
         timeoutMs: CALL_TIMEOUT_MS,
       },
     ])
@@ -577,7 +577,7 @@ describe('createServerCalls.call', () => {
     )
     const save = calls.call({
       serverId: SERVER.id,
-      call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5 },
+      call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5, audio: null },
     })
     const unlock = calls.call({
       serverId: SERVER.id,
@@ -612,7 +612,7 @@ describe('createServerCalls.call', () => {
     })
     const save = calls.call({
       serverId: SERVER.id,
-      call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5 },
+      call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5, audio: null },
     })
     await flush()
     expect(sent).toHaveLength(MAX_IN_FLIGHT + 1)
@@ -717,7 +717,7 @@ describe('createServerCalls with accounts', () => {
     await calls.call({ serverId: SERVER.id, call: GET_LOCK })
     await calls.call({
       serverId: SERVER.id,
-      call: { name: CALL_NAMES.saveProgress, mediaId: 7, position: 3 },
+      call: { name: CALL_NAMES.saveProgress, mediaId: 7, position: 3, audio: null },
     })
     expect(sent.map(authorizationOf)).toEqual([
       `${AUTH_SCHEME} ${TOKEN}`,
@@ -838,9 +838,12 @@ describe('createServerCalls with accounts', () => {
     })
     await calls.call({
       serverId: SERVER.id,
-      call: { name: CALL_NAMES.saveProgress, mediaId: 7, position: 3 },
+      call: { name: CALL_NAMES.saveProgress, mediaId: 7, position: 3, audio: null },
     })
-    expect(sent.map((request) => request.body)).toEqual(['{"position":3}', '{"position":3}'])
+    expect(sent.map((request) => request.body)).toEqual([
+      '{"position":3,"audio":null}',
+      '{"position":3,"audio":null}',
+    ])
   })
 
   it('gives up on a second 401 without refreshing again, and says the session was rejected', async () => {
@@ -1006,7 +1009,12 @@ describe('createServerCalls with accounts', () => {
 
   describe('a server title left open while another account signs in', () => {
     const TITLE = { serverId: SERVER.id, mediaId: 7 }
-    const SAVE = requestFor({ name: CALL_NAMES.saveProgress, mediaId: 7, position: 40 })
+    const SAVE = requestFor({
+      name: CALL_NAMES.saveProgress,
+      mediaId: 7,
+      position: 40,
+      audio: null,
+    })
     const PLAY = requestFor({ name: CALL_NAMES.recordPlay, mediaId: 7 })
     const READ = requestFor({ name: CALL_NAMES.getMedia, mediaId: 7 })
     const fromPage = (request: typeof SAVE) => ({ serverId: SERVER.id, ...request })
@@ -1202,8 +1210,12 @@ describe('createServerCalls.call refuses a call that slipped past the types', ()
   })
 
   it('refuses a position that is not a spot in the file', async () => {
-    await refused({ forged: { name: CALL_NAMES.saveProgress, mediaId: 1, position: Number.NaN } })
-    await refused({ forged: { name: CALL_NAMES.saveProgress, mediaId: 1, position: -1 } })
+    await refused({
+      forged: { name: CALL_NAMES.saveProgress, mediaId: 1, position: Number.NaN, audio: null },
+    })
+    await refused({
+      forged: { name: CALL_NAMES.saveProgress, mediaId: 1, position: -1, audio: null },
+    })
   })
 
   it('refuses a secret past MAX_SECRET', async () => {
@@ -1258,7 +1270,7 @@ describe('createServerCalls log lines', () => {
     })
     const save = down.calls.call({
       serverId: SERVER.id,
-      call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5 },
+      call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5, audio: null },
     })
     await down.calls.settleWrites()
     expect(await save).toEqual({ ok: false, message: CALL_MESSAGES.unreachable('raven.example') })
@@ -1417,7 +1429,7 @@ describe('pending writes', () => {
     expect(calls.hasPendingWrites()).toBe(false)
     const save = calls.call({
       serverId: SERVER.id,
-      call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5 },
+      call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5, audio: null },
     })
     expect(calls.hasPendingWrites()).toBe(true)
     const progress = { isSettled: false }
@@ -1466,7 +1478,7 @@ describe('pending writes', () => {
     })
     const first = calls.call({
       serverId: SERVER.id,
-      call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5 },
+      call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5, audio: null },
     })
     const settled = calls.settleWrites()
     const second = calls.call({
@@ -1486,7 +1498,7 @@ describe('pending writes', () => {
     const { calls } = setup({ answer: () => ({ kind: ANSWER_KINDS.reject }) })
     const save = calls.call({
       serverId: SERVER.id,
-      call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5 },
+      call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5, audio: null },
     })
     await calls.settleWrites()
     expect(calls.hasPendingWrites()).toBe(false)

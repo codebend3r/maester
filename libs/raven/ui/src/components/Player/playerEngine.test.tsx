@@ -79,7 +79,7 @@ describe('useWatchProgress state transitions', () => {
     usePlayerServices.setState({ services })
     const initial = initialVideoState(20)
     const { rerender, unmount } = renderHook(
-      ({ state }) => useWatchProgress({ state, position, duration: 120 }),
+      ({ state }) => useWatchProgress({ state, position, duration: 120, audio: 1 }),
       { initialProps: { state: initial } },
     )
     rerender({ state: { ...initial, paused: false, waiting: true } })
@@ -91,21 +91,21 @@ describe('useWatchProgress state transitions', () => {
     expect(services.progress.save).not.toHaveBeenCalled()
     position.current = 31
     rerender({ state: { ...initial, paused: false, time: 31 } })
-    expect(services.progress.save).toHaveBeenLastCalledWith(31)
+    expect(services.progress.save).toHaveBeenLastCalledWith({ position: 31, audio: 1 })
     position.current = 25
     rerender({ state: { ...initial, time: 25 } })
-    expect(services.progress.save).toHaveBeenLastCalledWith(25)
+    expect(services.progress.save).toHaveBeenLastCalledWith({ position: 25, audio: 1 })
     position.current = 120
     rerender({ state: { ...initial, time: 120, ended: true } })
-    expect(services.progress.save).toHaveBeenLastCalledWith(120)
+    expect(services.progress.save).toHaveBeenLastCalledWith({ position: 120, audio: 1 })
     expect(services.progress.save).toHaveBeenCalledTimes(3)
     rerender({ state: { ...initial, time: 120, ended: true, rate: 2 } })
     expect(services.progress.save).toHaveBeenCalledTimes(3)
     act(() => window.dispatchEvent(new Event('pagehide')))
-    expect(services.progress.save).toHaveBeenLastCalledWith(120)
+    expect(services.progress.save).toHaveBeenLastCalledWith({ position: 120, audio: 1 })
     position.current = 118
     unmount()
-    expect(services.progress.save).toHaveBeenLastCalledWith(118)
+    expect(services.progress.save).toHaveBeenLastCalledWith({ position: 118, audio: 1 })
     expect(services.progress.left).toHaveBeenCalledWith(118)
     expect(services.progress.started).toHaveBeenCalledTimes(1)
   })
@@ -115,7 +115,7 @@ describe('useWatchProgress state transitions', () => {
     usePlayerServices.setState({ services })
     const position = { current: 0 }
     const { unmount } = renderHook(() =>
-      useWatchProgress({ state: initialVideoState(20), position, duration: null }),
+      useWatchProgress({ state: initialVideoState(20), position, duration: null, audio: null }),
     )
     act(() => window.dispatchEvent(new Event('pagehide')))
     unmount()
@@ -138,7 +138,7 @@ describe('useWatchProgress duration sink', () => {
     const initialProps: { length: number | null } = { length: null }
     const { rerender } = renderHook(
       ({ length }: { length: number | null }) =>
-        useWatchProgress({ state, position, duration: length }),
+        useWatchProgress({ state, position, duration: length, audio: null }),
       { initialProps },
     )
     expect(duration).not.toHaveBeenCalled()
@@ -158,6 +158,7 @@ describe('useWatchProgress duration sink', () => {
           state: initialVideoState(0),
           position: { current: 0 },
           duration: 120,
+          audio: null,
         }),
       ),
     ).not.toThrow()
