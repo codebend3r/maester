@@ -13,17 +13,17 @@ import {
 } from '@/stores/screenFocus'
 
 /**
- * Calls `onTurn` each time the screen turns to the front (`toFront`), once another on top of it
+ * Calls `onTurn` each time the screen turns to the front (`isToFront`), once another on top of it
  * has gone, or away from it, as another covers it: never as it mounts, and never while it stays
  * where it is.
  */
-const useScreenTurn = ({ toFront, onTurn }: { toFront: boolean; onTurn: () => void }): void => {
+const useScreenTurn = ({ isToFront, onTurn }: { isToFront: boolean; onTurn: () => void }): void => {
   const isFocused = useIsFocused()
   const isFocusedBefore = useRef(isFocused)
   useEffect(() => {
-    if (isFocused === toFront && isFocusedBefore.current !== toFront) onTurn()
+    if (isFocused === isToFront && isFocusedBefore.current !== isToFront) onTurn()
     isFocusedBefore.current = isFocused
-  }, [isFocused, toFront, onTurn])
+  }, [isFocused, isToFront, onTurn])
 }
 
 /** Whether the screen still gives its opening focus, and the way to say something has had it. */
@@ -46,7 +46,7 @@ export const useOpeningFocus = (): OpeningFocus => {
  */
 export const useScreenFocusScope = (): OpeningFocus => {
   const screen = useRoute().key
-  useScreenTurn({ toFront: false, onTurn: () => coverScreen({ screen }) })
+  useScreenTurn({ isToFront: false, onTurn: () => coverScreen({ screen }) })
   // A layout that takes another's place on the same route (Home's, on a server switch) first
   // draws with the entry it leaves, and again with a fresh one once this forgets it.
   useEffect(() => () => leaveScreen({ screen }), [screen])
@@ -68,7 +68,7 @@ export const useOpenerFocus = ({
 }): { remember: () => void } => {
   const screen = useRoute().key
   useScreenTurn({
-    toFront: true,
+    isToFront: true,
     onTurn: () => {
       if (takeOpener({ screen, card: place })) requestTVFocus(view.current)
     },
