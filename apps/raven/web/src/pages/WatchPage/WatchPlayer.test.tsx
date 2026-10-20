@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import {
+  ACCOUNT_TICKET_SECONDS,
   type MediaItem,
   type MediaTracks,
   PLAY_LINK_MAX_NEXT,
@@ -14,6 +15,7 @@ import { WatchProbe } from '@/test/watchProbe'
 import { WatchPlayer as Player, WatchPage } from '@/pages/WatchPage/WatchPage'
 import { api } from '@/lib/api'
 import { ravenPlayer } from '@/lib/ravenPlayer'
+import { fakeAccount } from '@/test/authClient'
 import { setBrowserSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
 import { held } from '@/test/held'
@@ -118,6 +120,33 @@ describe('Player file link on the media plane', () => {
     expect(
       await screen.findByText(
         'Link copied. Paste it into VLC or IINA to play it there; it works for 6 hours.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("says a link copied with accounts on works for up to an account ticket's five minutes", async () => {
+    useMediaOrigin.setState({ pick: { origin: lan, at: Date.now() } })
+    spies.push(spyOn(api, 'getMediaOrigins').mockImplementation(async () => ({ origins: [lan] })))
+    spies.push(
+      spyOn(api, 'getMediaTicket').mockImplementation(async () => ({
+        ticket: 'account.abc',
+        expiresAt: Date.now() + ACCOUNT_TICKET_SECONDS * 1000,
+      })),
+    )
+    spies.push(spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {}))
+    renderWithProviders({
+      ui: <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" />,
+      account: fakeAccount(),
+    })
+    await waitFor(async () => {
+      await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
+      expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(
+        'https://raven.home.example/api/media/7/file?t=account.abc',
+      )
+    })
+    expect(
+      await screen.findByText(
+        'Link copied. Paste it into VLC or IINA to play it there; it works for up to 5 minutes.',
       ),
     ).toBeInTheDocument()
   })

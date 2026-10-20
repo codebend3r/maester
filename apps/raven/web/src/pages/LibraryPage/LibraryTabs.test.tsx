@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
+  type Account,
   type AdminLock,
   DEFAULT_SAGA_BACKDROP,
   type LibraryKind,
@@ -17,6 +18,7 @@ import {
   metadataHealth,
   unmatchedFile,
 } from '@/test/fixtures'
+import { fakeAccount } from '@/test/authClient'
 import { renderLibraryPage } from '@/test/libraryPage'
 import { pollFast } from '@/test/polls'
 
@@ -62,17 +64,19 @@ describe('LibraryPage tabs', () => {
     behind,
     settings = {},
     adminLock,
+    account,
   }: {
     kind?: LibraryKind
     route?: string
     behind?: string[]
     settings?: Partial<LibrarySettings>
     adminLock?: AdminLock
+    account?: Account
   } = {}) => {
     spies.get.mockImplementation(async () =>
       library({ id: 2, name: 'Films', settings: { ...library().settings, kind, ...settings } }),
     )
-    renderLibraryPage({ route, behind, adminLock })
+    renderLibraryPage({ route, behind, adminLock, account })
   }
 
   it('offers the tabs its type has, with All open first', async () => {
@@ -322,6 +326,15 @@ describe('LibraryPage tabs', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Cesar 911/ })).toBeInTheDocument()
     expect(screen.queryAllByRole('button', { name: /^(Accept|Fix match) / })).toEqual([])
+  })
+
+  it('tells a member that only the owner can point the files at the right title', async () => {
+    spies.unmatched.mockImplementation(async () => [unmatchedFile({ id: 3 })])
+    open({ kind: 'shows', route: '/libraries/2/not-matched', account: fakeAccount() })
+    expect(
+      await screen.findByText('Only the owner can point these at the right show.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/admin lock/i)).toBeNull()
   })
 
   it("offers the AI lookup's suggestion for a movie above the files", async () => {

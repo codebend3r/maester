@@ -15,7 +15,7 @@ import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { RatingsStatus } from '@/components/RatingsStatus/RatingsStatus'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
-import { useCanManage } from '@/lib/adminLock'
+import { MANAGEMENT_MODES, useCanManage, useManagement } from '@/lib/management'
 import { api } from '@/lib/api'
 import { librarySettingsEdits } from '@/lib/edits'
 import { foldersByParent } from '@/lib/folders'
@@ -153,7 +153,7 @@ const RowsSkeleton = () => (
  */
 export const LibrariesPage = () => {
   const [adding, setAdding] = useState(false)
-  const canManage = useCanManage()
+  const { mode, canManage } = useManagement()
   const libraries = useQuery({
     ...librariesQuery,
     // Poll while something scans (1.5 s) or a Refresh runs (5 s), so the counts
@@ -199,7 +199,11 @@ export const LibrariesPage = () => {
               Add library
             </Button>
           ) : (
-            <p>Turn the admin lock off in Settings to add one.</p>
+            <p>
+              {mode === MANAGEMENT_MODES.adminLock
+                ? 'Turn the admin lock off in Settings to add one.'
+                : 'Only the owner can add a library.'}
+            </p>
           )}
           {dialog}
         </div>

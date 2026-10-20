@@ -1,5 +1,5 @@
 import type { RatingsRefresh } from '@raven/core'
-import { useCanManage } from '@/lib/adminLock'
+import { useCanManage } from '@/lib/management'
 import styles from '@/components/RatingsStatus/RatingsStatus.module.scss'
 
 const count = new Intl.NumberFormat()

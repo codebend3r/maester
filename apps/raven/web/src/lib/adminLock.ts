@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ADMIN_LOCK_STATES, type AdminLock } from '@raven/core'
 import { useEffect, useRef } from 'react'
+import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { adminLockQuery } from '@/lib/queries'
 
 /** Whether the admin lock holds: on, or not yet known, as the server then treats this browser too. */
@@ -8,10 +9,14 @@ export const isAdminLocked = (lock: AdminLock | undefined): boolean =>
   (lock?.state ?? ADMIN_LOCK_STATES.on) === ADMIN_LOCK_STATES.on
 
 /**
- * Whether this browser may manage raven: call the routes the server marks
- * `AdminOnly`, which it answers only while the admin lock is off here.
+ * The admin lock, read only while accounts are off: with accounts on the
+ * password is inert and the server answers 404 to the routes that read it.
  */
-export const useCanManage = (): boolean => !isAdminLocked(useQuery(adminLockQuery).data)
+export const useAdminLock = (): AdminLock | undefined => {
+  const isAdminLockMode = useAccessState().kind === ACCESS_KINDS.disabled
+  const lock = useQuery({ ...adminLockQuery, enabled: isAdminLockMode })
+  return isAdminLockMode ? lock.data : undefined
+}
 
 /**
  * Reads every page again when the admin lock comes on or goes off in this
@@ -21,7 +26,7 @@ export const useCanManage = (): boolean => !isAdminLocked(useQuery(adminLockQuer
  */
 export const useFollowAdminLock = (): void => {
   const queryClient = useQueryClient()
-  const lock = useQuery(adminLockQuery).data
+  const lock = useAdminLock()
   const isLocked = lock == null ? null : isAdminLocked(lock)
   const seen = useRef(isLocked)
   useEffect(() => {

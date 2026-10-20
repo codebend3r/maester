@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
-import { useCanManage } from '@/lib/adminLock'
+import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
 import { api } from '@/lib/api'
 import { liveStreamsQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
@@ -123,12 +123,12 @@ const RowsSkeleton = () => (
 /**
  * `/streams`: what the server is sending right now, one card per viewer and
  * video, newest last, with the device and browser it is going to and how
- * far along it is, and Stop on each. It is for the admin, so it asks only
- * while the admin lock is off, and says so while it is on. The list is read
- * every couple of seconds.
+ * far along it is, and Stop on each. It is for the admin, or the owner once
+ * accounts are on, so it asks only while the viewer may manage, and says so
+ * otherwise. The list is read every couple of seconds.
  */
 export const StreamsPage = () => {
-  const canManage = useCanManage()
+  const { mode, canManage } = useManagement()
   const streams = useQuery({ ...liveStreamsQuery, enabled: canManage })
 
   if (!canManage) {
@@ -136,11 +136,20 @@ export const StreamsPage = () => {
       <section className={styles.empty}>
         <BackButton fallback={HOME} className={styles.back} />
         <div className={styles.emptyBody}>
-          <h1 className={styles.emptyTitle}>Streams are for the admin</h1>
-          <p>
-            Turn the admin lock off in <Link to="/settings">Settings</Link> to see who is streaming
-            and to stop a stream.
-          </p>
+          {mode === MANAGEMENT_MODES.adminLock ? (
+            <>
+              <h1 className={styles.emptyTitle}>Streams are for the admin</h1>
+              <p>
+                Turn the admin lock off in <Link to="/settings">Settings</Link> to see who is
+                streaming and to stop a stream.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className={styles.emptyTitle}>Streams are for the owner</h1>
+              <p>Only the owner can see who is streaming and stop a stream.</p>
+            </>
+          )}
         </div>
       </section>
     )

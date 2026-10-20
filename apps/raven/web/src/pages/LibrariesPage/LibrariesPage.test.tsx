@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { useQuery } from '@tanstack/react-query'
+import { fakeAccount } from '@/test/authClient'
 import { library, mediaItem, metadataHealth } from '@/test/fixtures'
 import { mediaListQuery } from '@/lib/queries'
 import { held } from '@/test/held'
@@ -494,6 +495,26 @@ describe('LibrariesPage', () => {
       await screen.findByText('Turn the admin lock off in Settings to add one.'),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add library' })).toBeNull()
+  })
+
+  it('offers Add library to the owner of a server with accounts, with no word of an admin lock', async () => {
+    spies.list.mockImplementation(async () => [])
+    renderWithProviders({
+      ui: <LibrariesPage />,
+      account: fakeAccount({ isOwner: true }),
+      adminLock: null,
+    })
+    await waitFor(() => expect(spies.list).toHaveBeenCalled())
+    expect(await screen.findByRole('button', { name: 'Add library' })).toBeInTheDocument()
+    expect(screen.queryByText(/admin lock/i)).toBeNull()
+  })
+
+  it('tells a member that only the owner can add a library, and leaves the buttons out', async () => {
+    spies.list.mockImplementation(async () => [])
+    renderWithProviders({ ui: <LibrariesPage />, account: fakeAccount(), adminLock: null })
+    expect(await screen.findByText('Only the owner can add a library.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add library' })).toBeNull()
+    expect(screen.queryByText(/admin lock/i)).toBeNull()
   })
 
   it('keeps the way back to Home on the page that has no libraries', async () => {

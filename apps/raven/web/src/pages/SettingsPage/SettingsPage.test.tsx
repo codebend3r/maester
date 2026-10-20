@@ -409,27 +409,58 @@ describe('accounts on SettingsPage', () => {
       ui: <SettingsPage />,
       authConfig: { state: AUTH_CONFIG_STATES.unavailable },
     })
-    expect(headings()).toEqual(['Playback', 'Display', 'Advanced', 'Admin'])
+    expect(headings()).toEqual(['Playback', 'Display', 'Advanced'])
     expect(spies.me).not.toHaveBeenCalled()
   })
 
   it('shows neither to an account that is not approved', async () => {
     renderSignedIn(fakeAccount({ status: MEMBER_STATUSES.pending, isOwner: true }))
     await waitFor(() => expect(spies.me).toHaveBeenCalled())
-    expect(headings()).toEqual(['Playback', 'Display', 'Advanced', 'Admin'])
+    expect(headings()).toEqual(['Playback', 'Display', 'Advanced'])
     expect(spies.members).not.toHaveBeenCalled()
   })
 
   it('shows Account but not Users to a member', async () => {
     renderSignedIn(fakeAccount())
     await screen.findByRole('heading', { name: 'Account' })
-    expect(headings()).toEqual(['Playback', 'Display', 'Account', 'Advanced', 'Admin'])
+    expect(headings()).toEqual(['Playback', 'Display', 'Account', 'Advanced'])
     expect(spies.members).not.toHaveBeenCalled()
   })
 
   it('shows Account and Users, after Display, to the owner', async () => {
     renderSignedIn(fakeAccount({ isOwner: true }))
     await screen.findByRole('heading', { name: 'Users' })
-    expect(headings()).toEqual(['Playback', 'Display', 'Account', 'Users', 'Advanced', 'Admin'])
+    expect(headings()).toEqual(['Playback', 'Display', 'Account', 'Users', 'Advanced'])
+  })
+
+  describe('who may change the server settings', () => {
+    const adminLock = spyOn(api, 'getAdminLock')
+    const setPlayback = spyOn(api, 'setPlaybackSettings')
+
+    afterEach(() => {
+      adminLock.mockReset()
+      setPlayback.mockReset()
+    })
+
+    it('lets the owner change them, with no admin lock section and no request for the lock', async () => {
+      renderSignedIn(fakeAccount({ isOwner: true }))
+      await screen.findByRole('heading', { name: 'Users' })
+      const remuxOnly = await screen.findByRole('radio', { name: /Remux only/ })
+      expect(remuxOnly).toBeEnabled()
+      expect(screen.queryByText(/admin lock/i)).toBeNull()
+      expect(screen.queryByRole('checkbox', { name: /^Admin lock/ })).toBeNull()
+      expect(adminLock).not.toHaveBeenCalled()
+    })
+
+    it('holds them for a member, who is told only the owner can change them', async () => {
+      renderSignedIn(fakeAccount())
+      await screen.findByRole('heading', { name: 'Account' })
+      const remuxOnly = await screen.findByRole('radio', { name: /Remux only/ })
+      expect(remuxOnly).toBeDisabled()
+      expect(screen.getAllByText('Only the owner can change these.')).toHaveLength(2)
+      expect(screen.queryByText(/admin lock/i)).toBeNull()
+      expect(adminLock).not.toHaveBeenCalled()
+      expect(setPlayback).not.toHaveBeenCalled()
+    })
   })
 })

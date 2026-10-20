@@ -1,10 +1,12 @@
-import { describe, expect, it, spyOn } from 'bun:test'
+import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook } from '@testing-library/react'
-import type { AdminLock } from '@raven/core'
+import { ADMIN_LOCK_STATES, AUTH_CONFIG_STATES, type AdminLock, type AuthConfig } from '@raven/core'
 import type { ReactNode } from 'react'
-import { isAdminLocked, useFollowAdminLock } from '@/lib/adminLock'
+import { isAdminLocked, useAdminLock, useFollowAdminLock } from '@/lib/adminLock'
+import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
+import { readyConfig } from '@/test/authClient'
 
 describe('isAdminLocked', () => {
   it('holds while the lock is on, or not known yet', () => {
@@ -27,6 +29,7 @@ describe('useFollowAdminLock', () => {
         client.setQueryData(queryKeys.adminLock, lock)
         await new Promise((resolve) => setTimeout(resolve, 0))
       })
+    client.setQueryData(queryKeys.authConfig, { state: AUTH_CONFIG_STATES.off })
     client.setQueryData(queryKeys.adminLock, { state: 'on', available: true })
     const invalidated = spyOn(client, 'invalidateQueries').mockImplementation(async () => undefined)
     const wrapper = ({ children }: { children: ReactNode }) => (
@@ -41,5 +44,33 @@ describe('useFollowAdminLock', () => {
     expect(invalidated).toHaveBeenCalledTimes(1)
     await set({ state: 'on', available: true })
     expect(invalidated).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('useAdminLock', () => {
+  const read = spyOn(api, 'getAdminLock')
+
+  const render = (config: AuthConfig) => {
+    const client = new QueryClient()
+    client.setQueryData(queryKeys.authConfig, config)
+    client.setQueryData(queryKeys.adminLock, { state: ADMIN_LOCK_STATES.off })
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    )
+    return renderHook(() => useAdminLock(), { wrapper })
+  }
+
+  afterEach(() => read.mockReset())
+
+  it('reads the lock while accounts are off', () => {
+    read.mockResolvedValue({ state: ADMIN_LOCK_STATES.off })
+    expect(render({ state: AUTH_CONFIG_STATES.off }).result.current).toEqual({
+      state: ADMIN_LOCK_STATES.off,
+    })
+  })
+
+  it('knows no lock once accounts are on, and asks for none', () => {
+    expect(render(readyConfig).result.current).toBeUndefined()
+    expect(read).not.toHaveBeenCalled()
   })
 })
