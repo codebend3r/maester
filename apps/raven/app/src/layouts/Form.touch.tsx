@@ -15,7 +15,7 @@ import {
   type FormProps,
   keyboardFor,
 } from '@/layouts/formKit'
-import { formStyles, toneStyles } from '@/layouts/formStyles'
+import { toneStyles, touchFormStyles as formStyles } from '@/layouts/formStyles'
 import { SIZES } from '@/theme/appTheme'
 
 const Form = ({ title, children }: FormProps) => (
@@ -74,7 +74,7 @@ const FormButton = ({ label, onPress, tone, isDisabled = false }: FormButtonProp
 )
 
 /** The phone and tablet form: one column under the thumb, lifted clear of the keyboard. */
-export const touchForm: FormKit = { Form, Field, FormButton }
+export const touchForm: FormKit = { Form, Field, FormButton, formStyles }
 
 const styles = StyleSheet.create({
   content: {

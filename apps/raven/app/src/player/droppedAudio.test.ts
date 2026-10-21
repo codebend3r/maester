@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { PLAYBACK_MODES } from '@raven/core'
 
 import { APP_PLATFORMS } from '@/platform/platform'
-import { isAudioDropped } from '@/player/droppedAudio'
+import { hasAskedPick, isAudioDropped } from '@/player/droppedAudio'
 
 /** A TrueHD track ExoPlayer listed but could neither decode nor pass through. */
 const DROPPED = [{ index: 0, selected: false }]
@@ -57,5 +57,35 @@ describe('isAudioDropped', () => {
   it("leaves Apple's players alone, whose table names only audio they decode", () => {
     expect(isAudioDropped({ ...ON_TV, platform: APP_PLATFORMS.tvos })).toBe(false)
     expect(isAudioDropped({ ...ON_TV, platform: APP_PLATFORMS.ios })).toBe(false)
+  })
+})
+
+describe('hasAskedPick', () => {
+  it('hears the asked track picked at its place', () => {
+    expect(
+      hasAskedPick({
+        place: 1,
+        reported: [
+          { index: 0, selected: false },
+          { index: 1, selected: true },
+        ],
+      }),
+    ).toBe(true)
+  })
+
+  it("hears another pick as not yet the asked one, ExoPlayer's first before it applies the ask", () => {
+    expect(
+      hasAskedPick({
+        place: 1,
+        reported: [
+          { index: 0, selected: true },
+          { index: 1, selected: false },
+        ],
+      }),
+    ).toBe(false)
+  })
+
+  it('takes any pick where the player was left to choose', () => {
+    expect(hasAskedPick({ place: null, reported: DROPPED })).toBe(true)
   })
 })

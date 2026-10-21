@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 
 import { useScreenFocusScope } from '@/layouts/focus'
-import { formStyles } from '@/layouts/formStyles'
+import { tvFormStyles as formStyles } from '@/layouts/formStyles'
 import {
   CLEAR_SEARCH,
   type SearchFieldProps,

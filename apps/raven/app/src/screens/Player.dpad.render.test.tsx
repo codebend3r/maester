@@ -21,6 +21,7 @@ import { Player } from '@/screens/Player'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
+import { AUDIO_SETTLE_SECONDS } from '@/player/droppedAudio'
 import { SESSION_COPY } from '@/player/usePlaybackSession'
 import { type HeardRequest, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
@@ -313,6 +314,34 @@ describe('Player on Android TV', () => {
     expect(sourceUri(videoProps())).toBe(
       `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_DUAL.id })}`,
     )
+  })
+
+  it('waits for the settled track when the first progress comes before it, as ExoPlayer sends them', async () => {
+    usePlayerPrefs.setState({ audioLanguage: DUAL_COMMENTARY.language })
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_DUAL.id) })
+    await loadWith({ audioTracks: audioPicked({ count: 2, picked: 0 }) })
+    // The progress handler starts before the load is reported, so a tick comes first.
+    await moveVideoTo({ props: videoProps(), seconds: 1 })
+    await act(async () => {
+      videoProps().onAudioTracks!({
+        audioTracks: audioPicked({ count: 2, picked: DUAL_COMMENTARY.index }),
+      })
+    })
+    await moveVideoTo({ props: videoProps(), seconds: 1.5 })
+    expect(sourceUri(videoProps())).toBe(
+      `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_DUAL.id })}`,
+    )
+  })
+
+  it('steps down once the asked track has had its time to settle and never did', async () => {
+    usePlayerPrefs.setState({ audioLanguage: DUAL_COMMENTARY.language })
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_DUAL.id) })
+    await loadWith({ audioTracks: audioPicked({ count: 2, picked: 0 }) })
+    await moveVideoTo({ props: videoProps(), seconds: 1 })
+    const file = `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_DUAL.id })}`
+    expect(sourceUri(videoProps())).toBe(file)
+    await moveVideoTo({ props: videoProps(), seconds: 1 + AUDIO_SETTLE_SECONDS })
+    await waitFor(() => expect(sourceUri(videoProps())).not.toBe(file))
   })
 
   it('keeps playing the original file the server forces, sound or none', async () => {

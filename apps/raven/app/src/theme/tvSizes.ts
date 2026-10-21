@@ -1,6 +1,6 @@
 import { Dimensions, Platform } from 'react-native'
 
-import { SIZES } from '@/theme/appTheme'
+import { SIZES, type Sizes } from '@/theme/appTheme'
 import { tvScaleOf } from '@/theme/tvScale'
 
 /**
@@ -33,4 +33,4 @@ export const TV_SIZES = {
   controlLarge: tvSize(SIZES.controlLarge),
   focusRing: tvSize(SIZES.focusRing),
   tvFocusRing: tvSize(SIZES.tvFocusRing),
-} as const satisfies Record<keyof typeof SIZES, number>
+} as const satisfies Sizes

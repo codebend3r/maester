@@ -37,7 +37,7 @@ import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
 import { planFor } from '@/platform/playbackPlan'
 import { mediaSourcesFor } from '@/player/mediaSources'
 import { progressSinkFor, watchAppHide } from '@/player/progressSink'
-import { isAudioDropped } from '@/player/droppedAudio'
+import { AUDIO_SETTLE_SECONDS, hasAskedPick, isAudioDropped } from '@/player/droppedAudio'
 import {
   SUBTITLE_CHOICES,
   audioOptionsOf,
@@ -95,10 +95,15 @@ const captionsFor = ({
   }
 }
 
-/** The audio tracks the player last reported for one attempt, and whether they were judged. */
+/**
+ * The audio tracks the player last reported for one attempt: whether its pick is the asked one
+ * yet, the clock at the first tick that found it unsettled, and whether they were judged.
+ */
 type HeardAudio = {
   attempt: number
   reported: Parameters<typeof isAudioDropped>[0]['reported']
+  isSettled: boolean
+  unsettledSince: number | null
   isJudged: boolean
 }
 
@@ -220,19 +225,53 @@ const Playing = ({
     dispatchVideo({ type: VIDEO_EVENTS.sought, time: target })
   }
 
-  // ExoPlayer applies the asked audio track after `onLoad` has reported its own first pick, and
-  // says so in `onAudioTracks`; the tracks are judged once, as the first frames flow, from the
-  // last word it gave for this attempt.
+  // ExoPlayer reports the load with its own first pick and starts its progress before that, then
+  // applies the asked audio track and says so in `onAudioTracks`. A load whose pick is already
+  // the asked one is judged at the next tick; another waits for `onAudioTracks`, or for
+  // `AUDIO_SETTLE_SECONDS` of play, and is judged once, from the player's last word.
   const heardAudio = useRef<HeardAudio | null>(null)
-  const hearAudio = ({ attempt: heardFor, reported }: Omit<HeardAudio, 'isJudged'>) => {
+  const heardFor = (heardAttempt: number): HeardAudio | null => {
     const last = heardAudio.current
-    const isJudged = last !== null && last.attempt === heardFor && last.isJudged
-    heardAudio.current = { attempt: heardFor, reported, isJudged }
+    return last !== null && last.attempt === heardAttempt ? last : null
   }
-  const judgeAudio = ({ attempt: judgedFor }: { attempt: number }) => {
-    const heard = heardAudio.current
-    if (heard === null || heard.attempt !== judgedFor || heard.isJudged) return
-    if (state.phase !== SESSION_PHASES.playing) return
+  const hearLoad = ({
+    attempt: heardAttempt,
+    reported,
+  }: Pick<HeardAudio, 'attempt' | 'reported'>) => {
+    const isSettled = hasAskedPick({ place: audioPlace, reported })
+    const isJudged = heardFor(heardAttempt)?.isJudged ?? false
+    heardAudio.current = {
+      attempt: heardAttempt,
+      reported,
+      isSettled,
+      unsettledSince: null,
+      isJudged,
+    }
+  }
+  const hearTracks = ({
+    attempt: heardAttempt,
+    reported,
+  }: Pick<HeardAudio, 'attempt' | 'reported'>) => {
+    const last = heardFor(heardAttempt)
+    heardAudio.current =
+      last === null
+        ? {
+            attempt: heardAttempt,
+            reported,
+            isSettled: false,
+            unsettledSince: null,
+            isJudged: false,
+          }
+        : { ...last, reported, isSettled: true }
+  }
+  const judgeAudio = ({ attempt: judgedFor, clock }: { attempt: number; clock: number }) => {
+    const heard = heardFor(judgedFor)
+    if (heard === null || heard.isJudged || state.phase !== SESSION_PHASES.playing) return
+    if (!heard.isSettled) {
+      const since = heard.unsettledSince ?? clock
+      heardAudio.current = { ...heard, unsettledSince: since }
+      if (clock - since < AUDIO_SETTLE_SECONDS) return
+    }
     heardAudio.current = { ...heard, isJudged: true }
     const asked = { platform: DEVICE_PLATFORM, mode, place: audioPlace }
     if (hasWayBelow(state) && isAudioDropped({ ...asked, reported: heard.reported })) {
@@ -281,9 +320,9 @@ const Playing = ({
             dispatchVideo({ type: VIDEO_EVENTS.ended })
           },
           onError: () => dispatch({ type: SESSION_EVENTS.failed, attempt, at: position.current }),
-          onAudioTracks: ({ audioTracks }) => hearAudio({ attempt, reported: audioTracks }),
+          onAudioTracks: ({ audioTracks }) => hearTracks({ attempt, reported: audioTracks }),
           onLoad: ({ duration: length, audioTracks }) => {
-            hearAudio({ attempt, reported: audioTracks })
+            hearLoad({ attempt, reported: audioTracks })
             if (length > 0) setDuration(length)
             dispatchVideo({ type: VIDEO_EVENTS.duration, duration: length > 0 ? length : null })
             dispatch({ type: SESSION_EVENTS.loaded, attempt })
@@ -293,7 +332,7 @@ const Playing = ({
           onProgress: ({ currentTime }) => {
             position.current = currentTime
             dispatchVideo({ type: VIDEO_EVENTS.moved, time: currentTime, buffered: [] })
-            judgeAudio({ attempt })
+            judgeAudio({ attempt, clock: currentTime })
           },
           paused: isPaused,
           progressUpdateInterval: PROGRESS_EVERY_MS,

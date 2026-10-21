@@ -64,3 +64,6 @@ export const SIZES = {
   // The web's ring is read from a desk; from the sofa it is drawn twice as thick.
   tvFocusRing: size('--border-thick') * 2,
 } as const
+
+/** A set of the shared scale's lengths: `SIZES`, or the TV layouts' sized to the screen. */
+export type Sizes = Record<keyof typeof SIZES, number>
