@@ -52,6 +52,7 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
       isLoading={isLoading}
       notice={notice}
       onSearch={() => router.push(APP_ROUTES.search)}
+      onSettings={() => router.push(APP_ROUTES.settings)}
       title={COPY.title}
     >
       {shelves.map((shelf, index) => (

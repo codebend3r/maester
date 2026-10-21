@@ -1,3 +1,4 @@
+import { type ComponentRef, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import type { ShelfCard } from '@/queries/cards'
@@ -5,27 +6,55 @@ import type { ShelfView } from '@/queries/homeShelves'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
-import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
+import { useOpenerFocus, useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import {
   NOTHING_HERE,
   SEARCH_EVERY_LIBRARY,
   SEE_ALL,
+  SETTINGS_ENTRY,
   type ShelfKit,
   type ShelfProps,
   type ShelvesProps,
   seeAllLabelOf,
 } from '@/layouts/shelfKit'
-import { PlateButton } from '@/layouts/tvControls'
+import { PlateButton, plateStyles } from '@/layouts/tvControls'
 import { COLOURS } from '@/theme/appTheme'
 import { TV_SIZES } from '@/theme/tvSizes'
 
+/** Where the Settings entry sits on Home, a place no shelf's card shares. */
+const SETTINGS_PLACE = 'settings'
+
 /**
- * Home's shelves under its title and, beside it, the way into the search. That is drawn only
- * once the shelves are read, with them: drawn alone, it would be all tvOS had to give the
- * opening focus to, which belongs to the first card. Anything here taking the focus spends the
- * opening focus, so a shelf drawn later never pulls the focus back.
+ * The way into Settings, which takes the remote's focus back when Settings goes, as a card does
+ * for the screen it opened: Android TV restores nothing on its own.
  */
-const Shelves = ({ title, notice, isLoading, onSearch, children }: ShelvesProps) => {
+const SettingsEntry = ({ onPress, onFocused }: { onPress: () => void; onFocused: () => void }) => {
+  const view = useRef<ComponentRef<typeof Pressable>>(null)
+  const { remember } = useOpenerFocus({ place: SETTINGS_PLACE, view })
+  return (
+    <Pressable
+      ref={view}
+      accessibilityLabel={SETTINGS_ENTRY.label}
+      accessibilityRole="link"
+      onFocus={onFocused}
+      onPress={() => {
+        remember()
+        onPress()
+      }}
+      style={({ focused }) => [plateStyles.plate, focused && plateStyles.focused]}
+    >
+      <Text style={plateStyles.label}>{SETTINGS_ENTRY.label}</Text>
+    </Pressable>
+  )
+}
+
+/**
+ * Home's shelves under its title and, beside it, the ways into the search and Settings. Those
+ * are drawn only once the shelves are read, with them: drawn alone, they would be all tvOS had
+ * to give the opening focus to, which belongs to the first card. Anything here taking the focus
+ * spends the opening focus, so a shelf drawn later never pulls the focus back.
+ */
+const Shelves = ({ title, notice, isLoading, onSearch, onSettings, children }: ShelvesProps) => {
   const { settle } = useScreenFocusScope()
   return (
     <ScrollView contentContainerStyle={styles.shelves} style={styles.ground}>
@@ -34,13 +63,16 @@ const Shelves = ({ title, notice, isLoading, onSearch, children }: ShelvesProps)
           {title}
         </Text>
         {!isLoading && (
-          <PlateButton
-            label={SEARCH_EVERY_LIBRARY.label}
-            onFocused={settle}
-            onPress={onSearch}
-            accessibilityRole="link"
-            text={SEARCH_EVERY_LIBRARY.text}
-          />
+          <>
+            <PlateButton
+              label={SEARCH_EVERY_LIBRARY.label}
+              onFocused={settle}
+              onPress={onSearch}
+              accessibilityRole="link"
+              text={SEARCH_EVERY_LIBRARY.text}
+            />
+            <SettingsEntry onFocused={settle} onPress={onSettings} />
+          </>
         )}
       </View>
       {notice !== null && <Text style={styles.notice}>{notice}</Text>}

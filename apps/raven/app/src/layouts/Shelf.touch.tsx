@@ -8,6 +8,7 @@ import {
   NOTHING_HERE,
   SEARCH_EVERY_LIBRARY,
   SEE_ALL,
+  SETTINGS_ENTRY,
   type ShelfKit,
   type ShelfProps,
   type ShelvesProps,
@@ -26,7 +27,7 @@ const useCardWidths = () => {
   return width >= BREAKPOINTS.tablet ? CARD_WIDTHS.tablet : CARD_WIDTHS.phone
 }
 
-const Shelves = ({ title, notice, onSearch, children }: ShelvesProps) => {
+const Shelves = ({ title, notice, onSearch, onSettings, children }: ShelvesProps) => {
   const insets = useSafeAreaInsets()
   return (
     <ScrollView
@@ -46,15 +47,26 @@ const Shelves = ({ title, notice, onSearch, children }: ShelvesProps) => {
         <Text accessibilityRole="header" style={styles.pageTitle}>
           {title}
         </Text>
-        <Pressable
-          accessibilityLabel={SEARCH_EVERY_LIBRARY.label}
-          accessibilityRole="link"
-          hitSlop={SIZES.space2}
-          onPress={onSearch}
-          style={({ pressed }) => [styles.search, pressed && styles.pressed]}
-        >
-          <Text style={styles.searchLabel}>{SEARCH_EVERY_LIBRARY.text}</Text>
-        </Pressable>
+        <View style={styles.tools}>
+          <Pressable
+            accessibilityLabel={SEARCH_EVERY_LIBRARY.label}
+            accessibilityRole="link"
+            hitSlop={SIZES.space2}
+            onPress={onSearch}
+            style={({ pressed }) => [styles.search, pressed && styles.pressed]}
+          >
+            <Text style={styles.searchLabel}>{SEARCH_EVERY_LIBRARY.text}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityLabel={SETTINGS_ENTRY.label}
+            accessibilityRole="link"
+            hitSlop={SIZES.space2}
+            onPress={onSettings}
+            style={({ pressed }) => [styles.search, styles.gear, pressed && styles.pressed]}
+          >
+            <Text style={styles.gearLabel}>{SETTINGS_ENTRY.gear}</Text>
+          </Pressable>
+        </View>
       </View>
       {notice !== null && <Text style={styles.notice}>{notice}</Text>}
       {children}
@@ -150,6 +162,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLOURS.quiet,
   },
   searchLabel: { color: COLOURS.text, fontSize: SIZES.text, fontWeight: '600' },
+  tools: { flexDirection: 'row', gap: SIZES.space2 },
+  gear: { minWidth: SIZES.fieldHeight, alignItems: 'center' },
+  gearLabel: { color: COLOURS.text, fontSize: SIZES.textLg },
   notice: { color: COLOURS.muted, fontSize: SIZES.text, paddingHorizontal: SIZES.space3 },
   shelf: { gap: SIZES.space2 },
   titleRow: {

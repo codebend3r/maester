@@ -9,6 +9,7 @@ import {
   type AppServer,
   addServer,
   removeServer,
+  renameServer,
   storedServersOf,
 } from '@/servers/serverList'
 
@@ -16,8 +17,14 @@ type ActiveServerState = {
   servers: AppServer[]
   activeId: string | null
   add: (server: AppServer) => AddOutcome
-  /** Drops the server and its cookies; with it goes the active one when it was that. */
+  /**
+   * Drops the server and its cookies. When it was the active one, the first server left
+   * becomes active, or none when it was the last, and the active id's change empties the
+   * query cache (`clearOnServerSwitch`). Another server's answers are never in the cache.
+   */
   remove: (id: string) => Promise<void>
+  /** Gives a listed server the name typed; false, and nothing changed, when it will not do. */
+  rename: (input: { id: string; name: string }) => boolean
   /** Makes a listed server the one the app talks to; an id not on the list changes nothing. */
   activate: (id: string) => void
 }
@@ -48,11 +55,16 @@ export const createActiveServerStore = ({
           return outcome
         },
         remove: async (id) => {
-          set(({ servers, activeId }) => ({
-            servers: removeServer({ servers, id }),
-            activeId: activeId === id ? null : activeId,
-          }))
+          set(({ servers, activeId }) => {
+            const left = removeServer({ servers, id })
+            return { servers: left, activeId: activeId === id ? (left[0]?.id ?? null) : activeId }
+          })
           await jar.forget(id)
+        },
+        rename: ({ id, name }) => {
+          const renamed = renameServer({ servers: get().servers, id, name })
+          if (renamed !== null) set({ servers: renamed })
+          return renamed !== null
         },
         activate: (id) => {
           if (get().servers.some((server) => server.id === id)) set({ activeId: id })

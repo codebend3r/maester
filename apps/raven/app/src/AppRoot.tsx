@@ -10,6 +10,7 @@ import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useUnlockRoute } from '@/queries/useUnlockRoute'
 import { APP_ROUTES, APP_SCREENS } from '@/routes'
 import { useActiveServer } from '@/stores/activeServer'
+import { configureAppPrefs } from '@/stores/appPrefs'
 import { configureLibraryViews } from '@/stores/libraryViews'
 import { followReduceMotion } from '@/stores/reduceMotion'
 import { returnScreen } from '@/stores/screenFocus'
@@ -24,6 +25,7 @@ const loadStores = async (): Promise<void> => {
   await Promise.allSettled([
     configureStorage({ storage: AsyncStorage }),
     configureLibraryViews({ storage: AsyncStorage }),
+    configureAppPrefs({ storage: AsyncStorage }),
     useActiveServer.persist.rehydrate(),
   ])
 }
@@ -75,6 +77,7 @@ export const AppRoot = () => {
           <Stack.Screen name={APP_SCREENS.library} />
           <Stack.Screen name={APP_SCREENS.play} />
           <Stack.Screen name={APP_SCREENS.search} />
+          <Stack.Screen name={APP_SCREENS.settings} />
           <Stack.Screen name={APP_SCREENS.unlock} />
         </Stack.Protected>
       </Stack>

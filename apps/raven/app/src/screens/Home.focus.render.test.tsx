@@ -183,6 +183,28 @@ describe('Home on a TV', () => {
     expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.search)
   })
 
+  it('offers Settings beside the search with the shelves, and takes the focus back to it on return', async () => {
+    const { answer, release } = heldAnswer()
+    mockHome.answer = answer
+    await renderHome()
+    expect(await screen.findByText('Gathering your libraries')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull()
+
+    release()
+    await screen.findByRole('header', { name: 'Films' })
+    const settings = screen.getByRole('link', { name: 'Settings' })
+    expect(preferred()).toEqual(['Busboys'])
+
+    await fireEvent(settings, NATIVE_EVENTS.focus)
+    await fireEvent.press(settings)
+    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.settings)
+    await leaveTestScreen()
+    expect(askedFor()).toEqual([])
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Settings'])
+    expect(preferred()).toEqual([])
+  })
+
   it('puts focus on the first card of the first shelf that has one', async () => {
     useActiveServer.setState({ servers: [SPARSE], activeId: SPARSE.id })
     await renderHome()

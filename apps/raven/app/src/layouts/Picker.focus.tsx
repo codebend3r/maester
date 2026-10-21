@@ -18,60 +18,100 @@ const CHOSEN = '\u2713'
 /** What a picker does as its list opens or closes unless told more: nothing. */
 const NOTHING_ON_OPEN = (): void => undefined
 
+type PickerListProps<K extends string> = Pick<
+  PickerProps<K>,
+  'label' | 'options' | 'value' | 'onChoose'
+> & { isOpen: boolean; onClose: () => void }
+
 /**
- * A picker the remote drives: a chip that opens a list over the screen, focus on the
- * option chosen now. tvOS has no action sheet (React Native's is built out of it), so this
- * is the TV's on both systems. Menu or Back closes it without choosing.
+ * The list a TV picker opens over the screen, focus on the option chosen now. tvOS has no action
+ * sheet (React Native's is built out of it), so this is the TV's on both systems. Menu or Back
+ * closes it without choosing.
  */
-const Picker = <K extends string>(props: PickerProps<K>) => {
-  const { label, options, value, onChoose, onOpenChange = NOTHING_ON_OPEN } = props
+export const PickerList = <K extends string>({
+  label,
+  options,
+  value,
+  onChoose,
+  isOpen,
+  onClose,
+}: PickerListProps<K>) => (
+  <Modal transparent visible={isOpen} onRequestClose={onClose}>
+    <View style={styles.backdrop}>
+      <View style={styles.shade} />
+      <View accessibilityLabel={label} style={styles.panel}>
+        <Text accessibilityRole="header" style={styles.title}>
+          {label}
+        </Text>
+        <ScrollView contentContainerStyle={styles.options}>
+          {options.map((option) => (
+            <Pressable
+              key={option.key}
+              accessibilityLabel={option.label}
+              accessibilityRole="button"
+              accessibilityState={{ selected: option.key === value }}
+              hasTVPreferredFocus={option.key === value}
+              onPress={() => onChoose(option.key)}
+              style={({ focused }) => [styles.option, focused && styles.focused]}
+            >
+              <Text style={[plateStyles.label, option.key === value && styles.chosen]}>
+                {option.key === value ? `${CHOSEN} ${option.label}` : option.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+    </View>
+  </Modal>
+)
+
+/**
+ * What opens a TV picker's list, and the props that draw it: choosing closes the list, and
+ * `onOpenChange` hears each open and close.
+ */
+export const usePickerList = <K extends string>({
+  label,
+  options,
+  value,
+  onChoose,
+  onOpenChange = NOTHING_ON_OPEN,
+}: PickerProps<K>): { open: () => void; list: PickerListProps<K> } => {
   const [isOpen, setIsOpen] = useState(false)
   const setOpen = (isOpening: boolean) => {
     setIsOpen(isOpening)
     onOpenChange(isOpening)
   }
-  const choose = (key: K) => {
-    setOpen(false)
-    onChoose(key)
+  return {
+    open: () => setOpen(true),
+    list: {
+      label,
+      options,
+      value,
+      isOpen,
+      onClose: () => setOpen(false),
+      onChoose: (key) => {
+        setOpen(false)
+        onChoose(key)
+      },
+    },
   }
+}
+
+/** A picker the remote drives: a chip that opens its list over the screen. */
+const Picker = <K extends string>(props: PickerProps<K>) => {
+  const { open, list } = usePickerList(props)
   return (
     <>
       <Pressable
         accessibilityLabel={pickerLabelOf(props)}
         accessibilityRole="button"
-        onPress={() => setOpen(true)}
+        onPress={open}
         style={({ focused }) => [plateStyles.plate, styles.chip, focused && plateStyles.focused]}
       >
-        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.label}>{props.label}</Text>
         <Text style={plateStyles.label}>{chosenLabelOf(props)}</Text>
       </Pressable>
-      <Modal transparent visible={isOpen} onRequestClose={() => setOpen(false)}>
-        <View style={styles.backdrop}>
-          <View style={styles.shade} />
-          <View accessibilityLabel={label} style={styles.panel}>
-            <Text accessibilityRole="header" style={styles.title}>
-              {label}
-            </Text>
-            <ScrollView contentContainerStyle={styles.options}>
-              {options.map((option) => (
-                <Pressable
-                  key={option.key}
-                  accessibilityLabel={option.label}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: option.key === value }}
-                  hasTVPreferredFocus={option.key === value}
-                  onPress={() => choose(option.key)}
-                  style={({ focused }) => [styles.option, focused && styles.focused]}
-                >
-                  <Text style={[plateStyles.label, option.key === value && styles.chosen]}>
-                    {option.key === value ? `${CHOSEN} ${option.label}` : option.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <PickerList {...list} />
     </>
   )
 }
