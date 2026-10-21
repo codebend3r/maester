@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import {
   APP_CLIENT_CALLS,
   type Library as LibraryRecord,
+  LIBRARY_VIEWS,
   LIBRARY_VIEW_LABELS,
   MEDIA_SORTS,
   SEARCH_DELAY_MS,
@@ -271,6 +272,18 @@ describe('Library on a phone or tablet', () => {
       'Cancel',
     ])
     expect(asked[1]!.options).toEqual(['Grid', 'List', 'Tiles', 'Grouped', 'Cancel'])
+  })
+
+  it('shows a library the web left on covers as its grid, and offers no covers here', async () => {
+    const asked = sheets({ answer: null })
+    mockServer.libraries = [
+      { ...FILMS, settings: { ...FILMS.settings, view: LIBRARY_VIEWS.covers } },
+    ]
+    await renderLibrary({ id: FILMS.id })
+
+    expect(await screen.findByRole('button', { name: 'View: Grid' })).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'View: Grid' }))
+    expect(asked[0]!.options).toEqual(['Grid', 'List', 'Tiles', 'Grouped', 'Cancel'])
   })
 
   it("stands the rows taller for the viewer's larger text, so captions are not cut", async () => {

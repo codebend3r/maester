@@ -1,7 +1,26 @@
-import { type Library, type LibrarySettings, MEDIA_SORTS, coherentSettings } from '@raven/core'
+import {
+  LIBRARY_VIEWS,
+  type Library,
+  type LibrarySettings,
+  type LibraryView,
+  MEDIA_SORTS,
+  coherentSettings,
+  viewsFor,
+} from '@raven/core'
 import { useState } from 'react'
 
 import { type LibraryChoice, libraryChoiceOf, useLibraryViews } from '@/stores/libraryViews'
+
+/**
+ * The web's bare covers have no layout here yet, so a library left on them shows the grid
+ * and the view picker does not offer them.
+ */
+const shownView = (view: LibraryView): LibraryView =>
+  view === LIBRARY_VIEWS.covers ? LIBRARY_VIEWS.grid : view
+
+/** The views the app offers for a type of library: the web's, but the covers. */
+export const appViewsFor = (kind: Parameters<typeof viewsFor>[0]): LibraryView[] =>
+  viewsFor(kind).filter((view) => view !== LIBRARY_VIEWS.covers)
 
 /** A fresh deal for a random sort; the order holds while the library is open. */
 const dealSeed = (): number => Math.floor(Math.random() * 2 ** 31)
@@ -27,7 +46,8 @@ export const useLibraryView = ({
   )
   const choose = useLibraryViews((state) => state.choose)
   const [seed] = useState(dealSeed)
-  const settings = coherentSettings({ ...library.settings, ...choice })
+  const coherent = coherentSettings({ ...library.settings, ...choice })
+  const settings = { ...coherent, view: shownView(coherent.view) }
   return {
     settings,
     seed: settings.sort === MEDIA_SORTS.random ? seed : 0,

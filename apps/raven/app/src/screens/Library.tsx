@@ -21,7 +21,6 @@ import {
   sortFieldsFor,
   sortParts,
   startingSort,
-  viewsFor,
 } from '@raven/core'
 import { useSearch } from '@raven/ui/headless'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -33,7 +32,7 @@ import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useServerCookies } from '@/queries/useServerCookies'
 import { Grid, Picker, SearchField, ToolButton } from '@/layouts'
 import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
-import { useLibraryView } from '@/screens/useLibraryView'
+import { appViewsFor, useLibraryView } from '@/screens/useLibraryView'
 import type { LibraryChoice } from '@/stores/libraryViews'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
 
@@ -82,7 +81,7 @@ const LibraryToolbar = ({
       <Picker
         label={COPY.view}
         onChoose={(view) => onChange({ view })}
-        options={viewsFor(settings.kind).map((view) => ({
+        options={appViewsFor(settings.kind).map((view) => ({
           key: view,
           label: LIBRARY_VIEW_LABELS[view],
         }))}
