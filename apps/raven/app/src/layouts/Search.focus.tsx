@@ -47,7 +47,7 @@ const SearchField = ({
             setFocused(true)
             onFocused()
           }}
-          onSubmitEditing={() => search.searchNow()}
+          onSubmitEditing={({ nativeEvent }) => search.searchFor(nativeEvent.text)}
           placeholder={label}
           placeholderTextColor={COLOURS.muted}
           returnKeyType="search"

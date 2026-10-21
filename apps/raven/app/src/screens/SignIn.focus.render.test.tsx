@@ -61,4 +61,15 @@ describe('SignIn on a TV', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
     expect(mockGetLock).toHaveBeenCalledTimes(1)
   })
+
+  it('signs in to what the keyboard sends, though its last keys have not reached the field', async () => {
+    await render(<SignIn />)
+    const field = screen.getByLabelText('Server address')
+    await fireEvent.changeText(field, 'http:/')
+    await fireEvent(field, NATIVE_EVENTS.submitEditing, {
+      nativeEvent: { text: 'http://127.0.0.1:8490' },
+    })
+    expect(mockGetLock).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/Enter the server's address on its own/)).toBeNull()
+  })
 })

@@ -7,7 +7,8 @@ export type FieldProps = {
   label: string
   value: string
   onChangeText: (text: string) => void
-  onSubmit: () => void
+  /** Gets the text the keyboard sent, which a fast typist's last keys may not have reached `value` with yet. */
+  onSubmit: (input: { text: string }) => void
   placeholder?: string
   isSecret?: boolean
   isNumeric?: boolean

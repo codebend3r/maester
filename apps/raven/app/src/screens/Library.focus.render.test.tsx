@@ -132,7 +132,9 @@ describe('Library on a TV', () => {
 
     await fireEvent(screen.getByRole('button', { name: 'Ashfall Gate' }), NATIVE_EVENTS.focus)
     await fireEvent.changeText(field, FILM_SEARCHES.busboys)
-    await fireEvent(field, NATIVE_EVENTS.submitEditing)
+    await fireEvent(field, NATIVE_EVENTS.submitEditing, {
+      nativeEvent: { text: FILM_SEARCHES.busboys },
+    })
     expect(mockServer.requests).toContain(
       libraryPath({
         call: APP_CLIENT_CALLS.listMedia,
@@ -260,7 +262,9 @@ describe('Library on a TV', () => {
 
     const field = screen.getByLabelText('Search Films')
     await fireEvent.changeText(field, FILM_SEARCHES.busboys)
-    await fireEvent(field, NATIVE_EVENTS.submitEditing)
+    await fireEvent(field, NATIVE_EVENTS.submitEditing, {
+      nativeEvent: { text: FILM_SEARCHES.busboys },
+    })
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Night Train' })).toBeNull())
     expect(screen.getByRole('button', { name: 'Busboys' }).props.hasTVPreferredFocus).not.toBe(true)
   })

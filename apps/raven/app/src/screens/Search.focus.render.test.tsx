@@ -100,7 +100,7 @@ describe('Search on a TV', () => {
     expect(preferred()).toEqual([])
 
     await fireEvent.changeText(field, DUNE_QUERY)
-    await fireEvent(field, NATIVE_EVENTS.submitEditing)
+    await fireEvent(field, NATIVE_EVENTS.submitEditing, { nativeEvent: { text: DUNE_QUERY } })
     expect(searches()).toEqual([searchPathFor(DUNE_QUERY)])
     expect(await screen.findByRole('button', { name: 'Dune' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Dune: Prophecy' })).toBeTruthy()
@@ -136,7 +136,7 @@ describe('Search on a TV', () => {
     const field = screen.getByLabelText(FIELD)
     await fireEvent(field, 'focus')
     await fireEvent.changeText(field, DUNE_QUERY)
-    await fireEvent(field, 'submitEditing')
+    await fireEvent(field, 'submitEditing', { nativeEvent: { text: DUNE_QUERY } })
     const show = await screen.findByRole('button', { name: 'Dune: Prophecy' })
     await fireEvent(show, 'focus')
     await fireEvent.press(show)

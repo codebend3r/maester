@@ -144,8 +144,12 @@ describe('SignIn', () => {
     await render(<SignIn />)
     const field = screen.getByLabelText('Server address')
     await fireEvent.changeText(field, 'http://nas:8080')
-    await fireEvent(field, NATIVE_EVENTS.submitEditing)
-    await fireEvent(field, NATIVE_EVENTS.submitEditing)
+    await fireEvent(field, NATIVE_EVENTS.submitEditing, {
+      nativeEvent: { text: 'http://nas:8080' },
+    })
+    await fireEvent(field, NATIVE_EVENTS.submitEditing, {
+      nativeEvent: { text: 'http://nas:8080' },
+    })
     expect(getLock).toHaveBeenCalledTimes(1)
   })
 
