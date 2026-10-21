@@ -24,6 +24,7 @@ import { BUSBOYS_MP4, BUSBOYS_UNSUBTITLED, CUE_TEXT, playerApi } from '@/test/pl
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 import type * as VideoMock from '@/test/videoMock'
 import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@/test/videoMock'
+import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 const mockBack = jest.fn()
 const mockParams = jest.fn((): Record<string, string> => ({
@@ -178,7 +179,7 @@ describe('Player on a TV', () => {
     expect(await screen.findByText('This video is not on the server.')).toBeTruthy()
     const back = screen.getByRole('button', { name: 'Back' })
     expect(back.props.hasTVPreferredFocus).toBe(true)
-    await fireEvent(back, 'focus')
+    await fireEvent(back, NATIVE_EVENTS.focus)
     expect(screen.getByRole('button', { name: 'Back' }).props.hasTVPreferredFocus).toBe(false)
     await fireEvent.press(screen.getByRole('button', { name: 'Back' }))
     expect(mockBack).toHaveBeenCalled()

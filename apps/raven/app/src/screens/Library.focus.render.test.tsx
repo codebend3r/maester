@@ -306,7 +306,7 @@ describe('Library on a TV', () => {
   it('takes the focus back to the card a page was opened from, and to no other', async () => {
     await renderLibrary({ id: FILMS.id })
     const card = await screen.findByRole('button', { name: 'Night Train' })
-    await fireEvent(card, 'focus')
+    await fireEvent(card, NATIVE_EVENTS.focus)
     await fireEvent.press(card)
     await leaveTestScreen()
     expect(askedFor()).toEqual([])

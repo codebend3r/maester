@@ -200,7 +200,7 @@ describe('Home on a TV', () => {
     await screen.findByRole('header', { name: 'Films' })
     expect(preferred()).toEqual(['Busboys'])
 
-    await fireEvent(screen.getByRole('link', { name: 'Search every library' }), 'focus')
+    await fireEvent(screen.getByRole('link', { name: 'Search every library' }), NATIVE_EVENTS.focus)
     expect(preferred()).toEqual([])
 
     // The shelves are drawn again: every card goes, then mounts afresh, the first unpreferred.
@@ -214,7 +214,7 @@ describe('Home on a TV', () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
     const cards = screen.getAllByRole('button')
-    await fireEvent(cards[2]!, 'focus')
+    await fireEvent(cards[2]!, NATIVE_EVENTS.focus)
     await fireEvent.press(cards[2]!)
     expect(mockPush).toHaveBeenCalledTimes(1)
 
@@ -252,7 +252,7 @@ describe('Home on a TV', () => {
     expect(askedFor()).toEqual(['Night Train'])
 
     // The viewer moves on, then opens the search, which is not a card, and comes back.
-    await fireEvent(screen.getAllByRole('button')[3]!, 'focus')
+    await fireEvent(screen.getAllByRole('button')[3]!, NATIVE_EVENTS.focus)
     await fireEvent.press(screen.getByRole('link', { name: 'Search every library' }))
     await leaveTestScreen()
     await returnToTestScreen()

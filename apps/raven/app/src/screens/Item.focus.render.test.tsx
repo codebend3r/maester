@@ -189,7 +189,7 @@ describe('Item on a TV', () => {
   it('takes the focus back to the season a page was opened from', async () => {
     await renderItem(SEVERANCE.id)
     const season = await screen.findByRole('button', { name: 'Season 1' })
-    await fireEvent(season, 'focus')
+    await fireEvent(season, NATIVE_EVENTS.focus)
     await fireEvent.press(season)
     await leaveTestScreen()
     expect(askedFor()).toEqual([])
