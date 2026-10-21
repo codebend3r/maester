@@ -277,6 +277,7 @@ export const fieldSorts = (name: SortFieldName): MediaSort[] => {
 
 export const LIBRARY_VIEWS = {
   grid: 'grid',
+  covers: 'covers',
   list: 'list',
   tiles: 'tiles',
   grouped: 'grouped',

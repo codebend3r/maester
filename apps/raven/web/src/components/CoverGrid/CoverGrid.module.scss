@@ -1,0 +1,120 @@
+// Covers packed tight, as many to a row as fit at 8.5rem or more.
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
+  gap: var(--space-1);
+
+  // A library can hold thousands of covers, so the browser lays out and
+  // draws only those near the screen. One it skips stands in at the height
+  // it had when last drawn, else at about a frame grab's 1440 wide.
+  // Skipping clips what a cover draws to its box, so it may draw a little
+  // past it as it grows and casts its shadow.
+  > li {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto 8.5rem;
+    overflow-clip-margin: var(--space-5);
+  }
+
+  // The clip would also cut off a focus ring and a cover growing to the
+  // pointer, so a cover pointed at or holding the focus is drawn whole.
+  > li:hover,
+  > li:focus-within {
+    content-visibility: visible;
+  }
+}
+
+// Posters are narrower than frame grabs, so more fit a row, and narrower
+// still on a narrower screen.
+.posters {
+  grid-template-columns: repeat(auto-fill, minmax(min(8.5rem, 100%), 1fr));
+
+  > li {
+    contain-intrinsic-block-size: auto 13rem;
+  }
+}
+
+@media (max-width: 48rem) {
+  .posters {
+    grid-template-columns: repeat(auto-fill, minmax(min(6.5rem, 100%), 1fr));
+  }
+}
+
+// Raised while pointed at or focused, so a grown cover lies over its
+// neighbours.
+.cover {
+  position: relative;
+  display: grid;
+  grid-template-areas: 'cover';
+
+  &:hover,
+  &:focus-within {
+    z-index: 1;
+  }
+
+  > * {
+    grid-area: cover;
+  }
+}
+
+// The picture, cropped to the cover's shape: a poster's, or a frame grab's.
+.picture {
+  --poster-letter: var(--font-size-title);
+
+  display: grid;
+  grid-template-areas: 'picture';
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-canopy);
+  text-decoration: none;
+
+  .posters & {
+    aspect-ratio: 2 / 3;
+  }
+
+  > * {
+    grid-area: picture;
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.cover:hover .picture,
+.picture:focus-visible {
+  box-shadow: var(--shadow-poster);
+}
+
+.cover:hover .picture img,
+.picture:focus-visible img {
+  filter: brightness(1.08);
+}
+
+// In the cover's top corner, over the picture.
+.select {
+  position: absolute;
+  inset: var(--space-1) auto auto var(--space-1);
+  z-index: 2;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .picture {
+    transition:
+      scale 200ms var(--ease-out),
+      box-shadow 200ms var(--ease-out);
+  }
+
+  .picture img {
+    transition: filter 150ms var(--ease-out);
+  }
+
+  .cover:not([data-selecting]):hover .picture,
+  .picture:focus-visible {
+    scale: 1.04;
+  }
+}

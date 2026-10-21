@@ -26,6 +26,7 @@ import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { useTableSort } from '@/lib/useTableSort'
 import { useSelectable } from '@/lib/useSelectable'
+import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import styles from '@/components/MediaList/MediaList.module.scss'
 
 const day = new Intl.DateTimeFormat(undefined, {
@@ -70,15 +71,7 @@ const MediaRow = ({
             {movies ? (
               <PosterImage media={media} sizes={POSTER_SIZES.list} />
             ) : (
-              thumbnail && (
-                <img
-                  className={styles.thumbnail}
-                  src={thumbnail}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-              )
+              thumbnail && <ViewportImage className={styles.thumbnail} src={thumbnail} alt="" />
             )}
           </CardLink>
           <CardLink

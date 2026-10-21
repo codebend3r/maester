@@ -1,5 +1,4 @@
 import {
-  type ItemSummary,
   type MediaSort,
   type RatingSource,
   type ShowEntry,
@@ -12,10 +11,10 @@ import {
   watchedStateOf,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
-import { useState } from 'react'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { PosterOverlay } from '@/components/PosterOverlay/PosterOverlay'
+import { ItemPoster } from '@/components/PosterImage/PosterImage'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { WatchedCount, WatchedCountWords } from '@/components/WatchedCount/WatchedCount'
@@ -23,6 +22,7 @@ import { api } from '@/lib/api'
 import { POSTER_SIZES, type PosterSizes, posterSources } from '@/lib/posters'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'
+import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import styles from '@/components/ShowCard/ShowCard.module.scss'
 
 /**
@@ -57,25 +57,6 @@ const useShowCard = ({
     ].filter((fact): fact is string => fact != null),
     playLabel: code ? `Play ${show.title} ${code}` : `Play ${show.title}`,
   }
-}
-
-/** A show's poster, or its initial when it has none or the poster fails to load. */
-const ShowPoster = ({ show, sizes }: { show: ItemSummary; sizes: PosterSizes }) => {
-  const poster = posterSources({ item: show, sizes })
-  const [failed, setFailed] = useState(false)
-  if (!poster || failed) {
-    return <span className={styles.placeholder}>{show.title.slice(0, 1)}</span>
-  }
-  return (
-    <img
-      className={styles.image}
-      {...poster}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      onError={() => setFailed(true)}
-    />
-  )
 }
 
 /** The facts under a show's title, a dot apart, with its score and the words of its count. */
@@ -143,7 +124,7 @@ export const ShowCard = ({
           aria-hidden="true"
         >
           <span className={styles.frame}>
-            <ShowPoster show={show} sizes={sizes} />
+            <ItemPoster item={show} sizes={sizes} />
             <span className={styles.marks}>
               <WatchedCount decorative watched={entry.watchedEpisodes} total={entry.episodes} />
             </span>
@@ -215,7 +196,7 @@ const WideShowCard = ({
         aria-hidden="true"
       >
         <span className={styles.wideFrame}>
-          <ShowPoster show={show} sizes={POSTER_SIZES.showCard} />
+          <ItemPoster item={show} sizes={POSTER_SIZES.showCard} />
           {!isWatched && (
             <span className={styles.wideMarks}>
               <WatchedCount decorative watched={entry.watchedEpisodes} total={entry.episodes} />
@@ -258,14 +239,12 @@ const WideShowCard = ({
         )}
       </div>
       {wash && (
-        <img
+        <ViewportImage
           className={styles.wash}
           src={wash.src}
           srcSet={wash.srcSet}
           sizes={wash.sizes}
           alt=""
-          loading="lazy"
-          decoding="async"
         />
       )}
     </li>
