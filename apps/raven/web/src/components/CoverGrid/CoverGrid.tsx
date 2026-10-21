@@ -1,5 +1,4 @@
 import {
-  type AppPath,
   type MediaItem,
   type ShowEntry,
   cardLink,
@@ -7,11 +6,10 @@ import {
   mediaEntryKey,
   showEntryKey,
 } from '@raven/core'
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
-import { PosterImage } from '@/components/PosterImage/PosterImage'
+import { ItemPoster, PosterImage } from '@/components/PosterImage/PosterImage'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
-import { ShowPoster } from '@/components/ShowCard/ShowCard'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { POSTER_SIZES } from '@/lib/posters'
 import { useSelectable } from '@/lib/useSelectable'
@@ -29,7 +27,7 @@ const Cover = ({
 }: {
   entry: string
   title: string
-  link: { to: AppPath; state?: unknown }
+  link: Pick<ComponentProps<typeof CardLink>, 'to' | 'state'>
   children: ReactNode
 }) => {
   const select = useSelectable({ key: entry, title })
@@ -84,22 +82,19 @@ export const ShowCovers = ({ shows }: { shows: ShowEntry[] }) => (
         title={show.title}
         link={{ to: `/shows/${show.id}` }}
       >
-        <ShowPoster show={show} sizes={POSTER_SIZES.cover} />
+        <ItemPoster item={show} sizes={POSTER_SIZES.cover} />
       </Cover>
     ))}
   </CoverList>
 )
 
+/** How many blank covers stand in: a screen's worth at 1440 wide. */
+const SKELETON_COUNT = 24
+
 /** The covers while they are on their way: blank pictures in their places. */
-export const CoverGridSkeleton = ({
-  posters,
-  count = 24,
-}: {
-  posters: boolean
-  count?: number
-}) => (
+export const CoverGridSkeleton = ({ posters }: { posters: boolean }) => (
   <CoverList posters={posters}>
-    {Array.from({ length: count }, (_, index) => (
+    {Array.from({ length: SKELETON_COUNT }, (_, index) => (
       <li key={index} className={styles.cover}>
         <Bone shape={posters ? 'poster' : 'frame'} />
       </li>

@@ -12,17 +12,16 @@ import {
   sortTitle,
   watchedStateOf,
 } from '@raven/core'
-import { useState } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { Icon } from '@raven/ui'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
+import { ItemPoster } from '@/components/PosterImage/PosterImage'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
-import { POSTER_SIZES, posterSources } from '@/lib/posters'
+import { POSTER_SIZES } from '@/lib/posters'
 import { useTableSort } from '@/lib/useTableSort'
 import { useSelectable } from '@/lib/useSelectable'
-import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import styles from '@/components/ShowCard/ShowViews.module.scss'
 
 const episodesLabel = (entry: ShowEntry): string =>
@@ -49,33 +48,16 @@ const NextPlay = ({ entry }: { entry: ShowEntry }) => {
  * A show's small poster, or its initial; a second way to the page, so out
  * of the tab order. A list's row shows it smaller than a tile.
  */
-const SmallPoster = ({ entry, inRow = false }: { entry: ShowEntry; inRow?: boolean }) => {
-  const { show } = entry
-  const poster = posterSources({
-    item: show,
-    sizes: inRow ? POSTER_SIZES.list : POSTER_SIZES.showTile,
-  })
-  const [failed, setFailed] = useState(false)
-  return (
-    <CardLink
-      to={`/shows/${show.id}`}
-      className={inRow ? `${styles.frame} ${styles.rowFrame}` : styles.frame}
-      tabIndex={-1}
-      aria-hidden="true"
-    >
-      {poster && !failed ? (
-        <ViewportImage
-          className={styles.image}
-          {...poster}
-          alt=""
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <span className={styles.placeholder}>{show.title.slice(0, 1)}</span>
-      )}
-    </CardLink>
-  )
-}
+const SmallPoster = ({ entry, inRow = false }: { entry: ShowEntry; inRow?: boolean }) => (
+  <CardLink
+    to={`/shows/${entry.show.id}`}
+    className={inRow ? `${styles.frame} ${styles.rowFrame}` : styles.frame}
+    tabIndex={-1}
+    aria-hidden="true"
+  >
+    <ItemPoster item={entry.show} sizes={inRow ? POSTER_SIZES.list : POSTER_SIZES.showTile} />
+  </CardLink>
+)
 
 const RATING_COLUMNS: readonly { source: RatingSource; label: string }[] = [
   { source: 'rottenTomatoes', label: 'RT' },
