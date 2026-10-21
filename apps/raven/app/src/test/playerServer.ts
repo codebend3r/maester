@@ -4,10 +4,12 @@ import {
   type ApiClient,
   CONTAINERS,
   DEFAULT_PLAYBACK_SETTINGS,
+  DIRECT_PLAYS,
   ENCODER_KINDS,
   HLS_COPY_AUDIO_CODECS,
   MATCH_STATES,
   type MediaTracks,
+  type PlaybackSettings,
   SUBTITLE_SOURCES,
   VIDEO_CODECS,
   createApiClient,
@@ -82,6 +84,24 @@ const TRACKS: MediaTracks = {
 
 const UNSUBTITLED_TRACKS: MediaTracks = { ...TRACKS, subtitles: [] }
 
+/** The film as an MP4 with no subtitles and two audio tracks. */
+export const BUSBOYS_DUAL = { ...BUSBOYS_MP4, id: 22, fileName: 'Busboys (2026) Dual.mp4' }
+
+/** The dual MP4's second audio track, a Japanese commentary. */
+export const DUAL_COMMENTARY = {
+  index: 1,
+  codec: HLS_COPY_AUDIO_CODECS.aac,
+  channels: 2,
+  language: 'ja',
+  title: 'Commentary',
+  default: false,
+} as const satisfies MediaTracks['audio'][number]
+
+const DUAL_TRACKS: MediaTracks = {
+  ...UNSUBTITLED_TRACKS,
+  audio: [...UNSUBTITLED_TRACKS.audio, DUAL_COMMENTARY],
+}
+
 const TRACK_PARAM = ':trackId'
 
 /** The embedded track's one cue, from ten seconds in to twenty. */
@@ -95,6 +115,7 @@ const busboysPath = (path: string): string => pathFor({ path, id: BUSBOYS_MP4.id
 const FILES = [
   { media: BUSBOYS_MP4, tracks: TRACKS },
   { media: BUSBOYS_UNSUBTITLED, tracks: UNSUBTITLED_TRACKS },
+  { media: BUSBOYS_DUAL, tracks: DUAL_TRACKS },
 ] as const
 
 const {
@@ -122,10 +143,6 @@ const READS: Record<string, unknown> = {
     ]),
   ),
   [pathFor({ path: getItem.path, id: BUSBOYS.id })]: BUSBOYS,
-  [getPlaybackSettings.path]: {
-    settings: DEFAULT_PLAYBACK_SETTINGS,
-    effective: { encoder: ENCODER_KINDS.software, tonemapAvailable: false },
-  },
   [getMediaOrigins.path]: { origins: [] },
   [listLibraries.path]: [WATCHED_AT_90],
   [busboysPath(subtitles.path).replace(TRACK_PARAM, SUBTITLE_ID)]: VTT,
@@ -144,21 +161,33 @@ const bodyOf = (body: string | undefined): unknown => (body === undefined ? null
 const pathOnly = (path: string): string => path.split('?')[0] ?? path
 
 /**
- * Busboys, as an MP4 with a text track and as one without, and its page, on a server that lists
- * no media origin, behind the app's allowlist so an unlisted call fails the test. Its ticket route
- * answers `ticketStatus`: 200 hands out a ticket, 423 says the library is locked. Progress and
+ * Busboys, as an MP4 with a text track, one without and one with two audio tracks, and its page,
+ * on a server that lists no media origin, behind the app's allowlist so an unlisted call fails
+ * the test. Its ticket route answers `ticketStatus`: 200 hands out a ticket, 423 says the library
+ * is locked. Its playback settings send the original file as `directPlay` says. Progress and
  * plays are taken with no answer, and every request is heard.
  */
 export const playerApi = ({
   hear,
   ticketStatus = STATUSES.ok,
+  directPlay = DIRECT_PLAYS.auto,
 }: {
   hear: (request: HeardRequest) => void
   ticketStatus?: number
+  directPlay?: PlaybackSettings['directPlay']
 }): ApiClient => {
   const answerFor = ({ method, path }: { method: string; path: string }): Answer => {
     if (method !== APP_CALL_METHODS.get) {
       return WRITES.has(path) ? { status: STATUSES.noContent, body: null } : NOT_FOUND
+    }
+    if (path === getPlaybackSettings.path) {
+      return {
+        status: STATUSES.ok,
+        body: {
+          settings: { ...DEFAULT_PLAYBACK_SETTINGS, directPlay },
+          effective: { encoder: ENCODER_KINDS.software, tonemapAvailable: false },
+        },
+      }
     }
     if (TICKETS.has(path)) {
       return ticketStatus === STATUSES.ok

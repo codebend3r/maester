@@ -9,8 +9,8 @@ import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
  * maybe in Android TV's table (DTS, TrueHD) refuses, and the player then steps down to the
  * remux, whose audio the server makes E-AC-3. `place` is the asked track's place among the
  * player's, which keep the file's order, or null where the player was left to choose, when any
- * track will do; `reported` is the player's tracks as it loaded, each saying whether it was
- * picked. Apple's players are never asked: their table names only audio
+ * track will do; `reported` is the player's last word on its tracks once the asked one has
+ * settled (`onAudioTracks`, not `onLoad`, which comes first), each saying whether it was picked. Apple's players are never asked: their table names only audio
  * they decode. Nor is a stream, which carries only the track the session asked the server for.
  */
 export const isAudioDropped = ({

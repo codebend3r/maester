@@ -48,6 +48,7 @@ import {
 import {
   SESSION_EVENTS,
   SESSION_PHASES,
+  hasWayBelow,
   modeOf,
   noticeOf,
   sourcedOf,
@@ -92,6 +93,13 @@ const captionsFor = ({
     cueTrack: null,
     textTrack: place === null ? undefined : { type: SelectedTrackType.INDEX, value: place },
   }
+}
+
+/** The audio tracks the player last reported for one attempt, and whether they were judged. */
+type HeardAudio = {
+  attempt: number
+  reported: Parameters<typeof isAudioDropped>[0]['reported']
+  isJudged: boolean
 }
 
 /** Keeps the screen on while it is drawn. */
@@ -202,13 +210,34 @@ const Playing = ({
     }
   }, [refusal])
 
+  // A seek before the video has loaded is lost by the player, so it is not taken at all.
   const seek = (to: number) => {
     const current = player.current
-    if (current === null) return
+    if (current === null || state.phase !== SESSION_PHASES.playing) return
     const target = Math.min(Math.max(0, to), duration ?? to)
     current.seek(target)
     position.current = target
     dispatchVideo({ type: VIDEO_EVENTS.sought, time: target })
+  }
+
+  // ExoPlayer applies the asked audio track after `onLoad` has reported its own first pick, and
+  // says so in `onAudioTracks`; the tracks are judged once, as the first frames flow, from the
+  // last word it gave for this attempt.
+  const heardAudio = useRef<HeardAudio | null>(null)
+  const hearAudio = ({ attempt: heardFor, reported }: Omit<HeardAudio, 'isJudged'>) => {
+    const last = heardAudio.current
+    const isJudged = last !== null && last.attempt === heardFor && last.isJudged
+    heardAudio.current = { attempt: heardFor, reported, isJudged }
+  }
+  const judgeAudio = ({ attempt: judgedFor }: { attempt: number }) => {
+    const heard = heardAudio.current
+    if (heard === null || heard.attempt !== judgedFor || heard.isJudged) return
+    if (state.phase !== SESSION_PHASES.playing) return
+    heardAudio.current = { ...heard, isJudged: true }
+    const asked = { platform: DEVICE_PLATFORM, mode, place: audioPlace }
+    if (hasWayBelow(state) && isAudioDropped({ ...asked, reported: heard.reported })) {
+      dispatch({ type: SESSION_EVENTS.failed, attempt: judgedFor, at: position.current })
+    }
   }
 
   const togglePlay = () => {
@@ -252,12 +281,9 @@ const Playing = ({
             dispatchVideo({ type: VIDEO_EVENTS.ended })
           },
           onError: () => dispatch({ type: SESSION_EVENTS.failed, attempt, at: position.current }),
+          onAudioTracks: ({ audioTracks }) => hearAudio({ attempt, reported: audioTracks }),
           onLoad: ({ duration: length, audioTracks }) => {
-            const asked = { platform: DEVICE_PLATFORM, mode, place: audioPlace }
-            if (isAudioDropped({ ...asked, reported: audioTracks })) {
-              dispatch({ type: SESSION_EVENTS.failed, attempt, at: position.current })
-              return
-            }
+            hearAudio({ attempt, reported: audioTracks })
             if (length > 0) setDuration(length)
             dispatchVideo({ type: VIDEO_EVENTS.duration, duration: length > 0 ? length : null })
             dispatch({ type: SESSION_EVENTS.loaded, attempt })
@@ -267,6 +293,7 @@ const Playing = ({
           onProgress: ({ currentTime }) => {
             position.current = currentTime
             dispatchVideo({ type: VIDEO_EVENTS.moved, time: currentTime, buffered: [] })
+            judgeAudio({ attempt })
           },
           paused: isPaused,
           progressUpdateInterval: PROGRESS_EVERY_MS,

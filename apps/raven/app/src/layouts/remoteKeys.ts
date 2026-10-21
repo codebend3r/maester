@@ -20,16 +20,13 @@ export type RemoteKey = (typeof REMOTE_KEYS)[keyof typeof REMOTE_KEYS]
 
 const isRemoteKey = oneOf(Object.values(REMOTE_KEYS))
 
-/** A key held down, as the fork names it, and the key it is. */
+/** A key held down, as the fork's Android helper names it (only the d-pad and select), and the key it is. */
 export const LONG_PRESSES = {
   longLeft: REMOTE_KEYS.left,
   longRight: REMOTE_KEYS.right,
   longUp: REMOTE_KEYS.up,
   longDown: REMOTE_KEYS.down,
   longSelect: REMOTE_KEYS.select,
-  longPlayPause: REMOTE_KEYS.playPause,
-  longRewind: REMOTE_KEYS.rewind,
-  longFastForward: REMOTE_KEYS.fastForward,
 } as const
 
 const isLongPress = (name: string): name is keyof typeof LONG_PRESSES => name in LONG_PRESSES

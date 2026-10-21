@@ -158,13 +158,20 @@ const Controls = ({
   onScrubbing,
   onPicking,
   onBottomHeight,
+  isVisible,
 }: Pick<PlayerChromeProps, 'title' | 'transport' | 'audio' | 'subtitles' | 'onBack'> & {
+  /** Whether the controls are showing, not fading out: each time they come back the line asks for the focus. */
+  isVisible: boolean
   onScrubbing: (isScrubbing: boolean) => void
   onPicking: (isPicking: boolean) => void
   onBottomHeight: (height: number) => void
 }) => {
   const scrubber: Focusable = useRef(null)
-  useFocusOnMount(scrubber)
+  // Brought back while they fade out, the controls are still drawn, and the hidden state's
+  // catcher, which had the focus, goes: the line asks again.
+  useEffect(() => {
+    if (isVisible) requestTVFocus(scrubber.current)
+  }, [isVisible])
   return (
     <View style={styles.frame}>
       <Text numberOfLines={2} style={styles.title}>
@@ -304,6 +311,7 @@ const DpadPlayer = ({
             onBack={onBack}
             onBottomHeight={setBottomHeight}
             onPicking={setPicking}
+            isVisible={isVisible}
             onScrubbing={setScrubbing}
             subtitles={subtitles}
             title={title}
