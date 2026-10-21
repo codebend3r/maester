@@ -22,6 +22,9 @@ export const RUN_SIGNALS = {
   resume: 'SIGCONT',
 } as const
 
+/** The run's child process and stdout line events it follows. */
+const RUN_EVENTS = { close: 'close', error: 'error', line: 'line' } as const
+
 /** A run killed for a later request; whoever waited on it asks again. */
 export class RunReplaced extends Error {
   constructor() {
@@ -89,16 +92,18 @@ export class SegmentRun {
     this.onSegment = onSegment
     this.onEnd = onEnd
     this.closed = new Promise<void>((resolve) => {
-      child.once('close', () => resolve())
-      child.once('error', () => {
+      child.once(RUN_EVENTS.close, () => resolve())
+      child.once(RUN_EVENTS.error, () => {
         if (child.pid === undefined) resolve()
       })
     })
-    createInterface({ input: child.stdout }).on('line', (line) => this.finished(line.trim()))
-    child.once('close', () => this.ended())
+    createInterface({ input: child.stdout }).on(RUN_EVENTS.line, (line) =>
+      this.finished(line.trim()),
+    )
+    child.once(RUN_EVENTS.close, () => this.ended())
     // Once spawned, an 'error' (a signal that could not be sent) leaves it running; only
     // 'close' ends it. One that never spawned has no pid and gets no 'close'.
-    child.once('error', () => {
+    child.once(RUN_EVENTS.error, () => {
       if (child.pid === undefined) this.ended()
     })
   }
