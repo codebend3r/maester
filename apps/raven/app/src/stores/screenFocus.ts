@@ -50,7 +50,7 @@ export const rememberOpener = ({ screen, card }: { screen: string; card: string 
 
 /** Hands the opener back once, and only to the card it names: true for that card, then never. */
 export const takeOpener = ({ screen, card }: { screen: string; card: string }): boolean => {
-  if (openerOf({ screen })?.card !== card) return false
+  if ((openerOf({ screen })?.card ?? null) !== card) return false
   change({ screen, to: { opener: null } })
   return true
 }
