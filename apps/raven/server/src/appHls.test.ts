@@ -16,7 +16,7 @@ import {
   parseWebVtt,
   toQueryString,
 } from '@raven/core'
-import { CONTENT_TYPES, HEADERS } from '@shared/server'
+import { CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
@@ -31,9 +31,11 @@ import {
   cookieSet,
   cookies,
   decodedBody,
+  routePath,
   testConfig,
 } from '@/test/app'
 import { encodeClip, encodeRichClip } from '@/test/clips'
+import { ROUTES } from '@/test/enforced'
 import { apiFor } from '@/test/server'
 
 const run = promisify(execFile)
@@ -124,7 +126,7 @@ describe('the HLS route', () => {
 
   const get = ({ url, cookie }: { url: string; cookie?: string }) =>
     app().inject({
-      method: 'GET',
+      method: HTTP_METHODS.get,
       url,
       headers: {
         [HEADERS.acceptEncoding]: BROWSER_ENCODINGS,
@@ -236,8 +238,8 @@ describe('the HLS route', () => {
       broadcast: idOf('broadcast'),
     }
     const unlock = await state.app.inject({
-      method: 'POST',
-      url: '/api/lock/unlock',
+      method: ROUTES.unlock.method,
+      url: ROUTES.unlock.path,
       payload: { pin: PIN },
     })
     state.unlocked = cookies(state.admin, cookieSet(unlock))
@@ -263,10 +265,15 @@ describe('the HLS route', () => {
     expect(Number(attributeOf({ playlist, name: 'BANDWIDTH' }))).toBeGreaterThan(0)
     expect(playlist).not.toContain('#EXT-X-INDEPENDENT-SEGMENTS')
     const uris = urisIn(playlist)
+    // Every URI is an absolute path under the folder the master sits in.
+    const folder = routePath({
+      route: HLS_PATHS.master,
+      values: { [HLS_PARAMS.id]: state.ids.rich },
+    }).replace(/[^/]+$/, '')
     // The embedded SRT's rendition, then the variant.
     expect(uris).toHaveLength(2)
     uris.forEach((uri) => {
-      expect(uri.startsWith(`/api/media/${state.ids.rich}/hls/`)).toBe(true)
+      expect(uri.startsWith(folder)).toBe(true)
       expect(uri).toContain(`${MEDIA_TICKET_PARAM}=${encodeURIComponent(ticket)}`)
     })
 
@@ -472,7 +479,10 @@ describe('the HLS route', () => {
         }),
     )
     try {
-      const url = `/api/media/${state.ids.warm}/tracks`
+      const url = routePath({
+        route: ROUTES.tracks.path,
+        values: { [HLS_PARAMS.id]: state.ids.warm },
+      })
       const [first, second] = [
         await get({ url, cookie: state.unlocked }),
         await get({ url, cookie: state.unlocked }),
@@ -535,20 +545,42 @@ describe('the HLS route', () => {
     const segment = uris[1] ?? ''
     const session = /\/hls\/([^/]+)\//.exec(segment)?.[1] ?? ''
     const ticket = `?${MEDIA_TICKET_PARAM}=${encodeURIComponent(ticketFor(state.ids.rich))}`
-    const base = `/api/media/${state.ids.rich}/hls`
     const otherTicket = `?${MEDIA_TICKET_PARAM}=${encodeURIComponent(ticketFor(state.ids.late))}`
+    const unknown = 'A'.repeat(22)
+    /** A route of the rich clip's session `at`, filled in with `values`, with its ticket. */
+    const rich = ({
+      route,
+      at,
+      values = {},
+    }: {
+      route: string
+      at: string
+      values?: Record<string, string | number>
+    }) =>
+      `${routePath({ route, values: { [HLS_PARAMS.id]: state.ids.rich, [HLS_PARAMS.session]: at, ...values } })}${ticket}`
     const asked = await Promise.all(
       [
-        `${base}/not-a-session/video.m3u8${ticket}`,
-        `${base}/${'A'.repeat(22)}/video.m3u8${ticket}`,
-        `${base}/${'A'.repeat(22)}/segment/0${ticket}`,
-        `${base}/${session}/segment/99${ticket}`,
-        `${base}/${session}/segment/one${ticket}`,
-        `${base}/${session}/segment/-1${ticket}`,
-        `${base}/${session}/subtitles/embedded-9${ticket}`,
-        `${base}/${session}/subtitles/embedded-0/99${ticket}`,
+        rich({ route: HLS_PATHS.video, at: 'not-a-session' }),
+        rich({ route: HLS_PATHS.video, at: unknown }),
+        rich({ route: HLS_PATHS.segment, at: unknown, values: { [HLS_PARAMS.n]: 0 } }),
+        rich({ route: HLS_PATHS.segment, at: session, values: { [HLS_PARAMS.n]: 99 } }),
+        rich({ route: HLS_PATHS.segment, at: session, values: { [HLS_PARAMS.n]: 'one' } }),
+        rich({ route: HLS_PATHS.segment, at: session, values: { [HLS_PARAMS.n]: -1 } }),
+        rich({
+          route: HLS_PATHS.subtitles,
+          at: session,
+          values: { [HLS_PARAMS.trackId]: 'embedded-9' },
+        }),
+        rich({
+          route: HLS_PATHS.subtitleSegment,
+          at: session,
+          values: { [HLS_PARAMS.trackId]: 'embedded-0', [HLS_PARAMS.n]: 99 },
+        }),
         // A session of one video is not another's.
-        `/api/media/${state.ids.late}/hls/${session}/video.m3u8${otherTicket}`,
+        `${routePath({
+          route: HLS_PATHS.video,
+          values: { [HLS_PARAMS.id]: state.ids.late, [HLS_PARAMS.session]: session },
+        })}${otherTicket}`,
       ].map((url) => get({ url })),
     )
     expect(asked.map(({ statusCode }) => statusCode)).toEqual(asked.map(() => 404))

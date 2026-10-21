@@ -3,7 +3,13 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
-import { MEDIA_PROBE_BYTES, type MediaOrigin, isMediaTicket } from '@raven/core'
+import {
+  HLS_PARAMS,
+  HLS_PATHS,
+  MEDIA_PROBE_BYTES,
+  type MediaOrigin,
+  isMediaTicket,
+} from '@raven/core'
 import { CONTENT_TYPES, ENCODINGS, HEADERS, HTTP_METHODS, CACHE_POLICIES } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
@@ -12,7 +18,7 @@ import { MediaIndex } from '@/media/mediaIndex'
 import { CORS_FLAGS, CORS_HEADERS } from '@/media/mediaPlaneCors'
 import { MediaTickets } from '@/media/mediaTickets'
 import { ScannerService } from '@/scanner/scannerService'
-import { NOT_WATCHING, adminCookie, cookieSet, cookies, testConfig } from '@/test/app'
+import { NOT_WATCHING, adminCookie, cookieSet, cookies, routePath, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 
@@ -322,12 +328,24 @@ describe('the media plane routes', () => {
         '/api/media-origins/ping?bytes=10',
         `/api/media/${video}/file`,
         `/api/media/${video}/subtitles/external-0`,
-        `/api/media/${video}/hls/master.m3u8`,
-        `/api/media/${video}/hls/${session}/video.m3u8`,
-        `/api/media/${video}/hls/${session}/init`,
-        `/api/media/${video}/hls/${session}/segment/0`,
-        `/api/media/${video}/hls/${session}/subtitles/external-0`,
-        `/api/media/${video}/hls/${session}/subtitles/external-0/0`,
+        ...[
+          HLS_PATHS.master,
+          HLS_PATHS.video,
+          HLS_PATHS.init,
+          HLS_PATHS.segment,
+          HLS_PATHS.subtitles,
+          HLS_PATHS.subtitleSegment,
+        ].map((route) =>
+          routePath({
+            route,
+            values: {
+              [HLS_PARAMS.id]: video,
+              [HLS_PARAMS.session]: session,
+              [HLS_PARAMS.trackId]: 'external-0',
+              [HLS_PARAMS.n]: 0,
+            },
+          }),
+        ),
       ]
       const open = await Promise.all(paths.map(ask))
       expect(open.map(({ statusCode }) => statusCode)).toEqual(paths.map(() => 204))
