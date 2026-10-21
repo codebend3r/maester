@@ -5,6 +5,7 @@ import { AppState } from 'react-native'
 import EventSource from 'react-native-sse'
 
 import { allowlistedFetch } from '@/servers/allowlist'
+import { hasAccounts } from '@/servers/authConfigs'
 import { createCookieJar } from '@/servers/cookieJar'
 import {
   APP_STATES,
@@ -16,6 +17,7 @@ import type { SecretStore } from '@/servers/secretStore'
 import { serverFetchFor } from '@/servers/serverFetch'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
 import type { AppServer } from '@/servers/serverList'
+import { useAccountAnswers } from '@/stores/accountAnswers'
 import { bumpCookieVersion } from '@/stores/cookieVersion'
 
 /** The keychain on Apple, which tvOS keeps as well, and the keystore on Android. */
@@ -26,11 +28,21 @@ export const cookieJar = createCookieJar({ store: secretStore, onChange: bumpCoo
 
 export const newServerId = (): string => randomUUID()
 
-/** The client for one server, in its own session: its cookies and no other, and only the app's calls. */
+/**
+ * The client for one server, in its own session: its cookies and no other, only the app's
+ * calls, and none of the admin lock's while the server signs in with accounts.
+ */
 export const apiFor = (server: AppServer): ApiClient =>
   createApiClient({
     baseUrl: server.origin,
-    fetch: allowlistedFetch({ fetch: serverFetchFor({ server, jar: cookieJar, fetch }) }),
+    fetch: allowlistedFetch({
+      fetch: serverFetchFor({ server, jar: cookieJar, fetch }),
+      hasAccounts: () =>
+        hasAccounts({
+          account: server.account,
+          answer: useAccountAnswers.getState().answers[server.id] ?? null,
+        }),
+    }),
   })
 
 /** What a request made outside `fetch` (a picture, the event stream) sends to `url` on `server`. */

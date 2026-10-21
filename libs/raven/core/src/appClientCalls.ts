@@ -1,4 +1,4 @@
-import { HLS_PATHS, PICTURE_PATHS } from '@/contract'
+import { AUTH_PATHS, HLS_PATHS, PICTURE_PATHS } from '@/contract'
 
 /** The methods raven's device app sends. */
 export const APP_CALL_METHODS = { get: 'GET', put: 'PUT', post: 'POST' } as const
@@ -11,9 +11,10 @@ export type AppClientCall = { method: AppCallMethod; path: string }
 const { get, put, post } = APP_CALL_METHODS
 
 /**
- * Every route raven's device app may ask a server for, through PR 9's screens: the
- * `@Public()` and viewer reads, the writes the spec allows (progress, plays, watched, the
- * favourites, the PIN) and the admin lock's unlock, the media ticket and the media plane.
+ * Every route raven's device app may ask a server for: the `@Public()` and viewer reads, the
+ * writes the spec allows (progress, plays, watched, the favourites, the PIN) and the admin
+ * lock's unlock, the media ticket and the media plane, and for a server with accounts (Ruling
+ * 28) its sign-in settings, the account signed in and a title's account ticket.
  * A call the `ApiClient` makes is named after its method; the rest are the URLs the native
  * players, pictures and the event stream fetch. Nothing here is `@AdminOnly()` or kept for the
  * owner by the account gate: the server's `appClients.test.ts` checks every entry against its
@@ -24,6 +25,10 @@ export const APP_CLIENT_CALLS = {
   unlock: { method: post, path: '/api/lock/unlock' },
   getAdminLock: { method: get, path: '/api/admin' },
   unlockAdmin: { method: post, path: '/api/admin/unlock' },
+
+  getAuthConfig: { method: get, path: AUTH_PATHS.config },
+  getMe: { method: get, path: AUTH_PATHS.me },
+  getAccountTicket: { method: post, path: AUTH_PATHS.ticket },
 
   getHome: { method: get, path: '/api/home' },
   searchHome: { method: get, path: '/api/home/search' },

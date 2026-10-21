@@ -201,6 +201,7 @@ export const playerApi = ({
   return createApiClient({
     baseUrl: NAS.origin,
     fetch: allowlistedFetch({
+      hasAccounts: () => false,
       fetch: async (url, init = {}) => {
         const path = url.slice(NAS.origin.length)
         const method = init.method ?? APP_CALL_METHODS.get

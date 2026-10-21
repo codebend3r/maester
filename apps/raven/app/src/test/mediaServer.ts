@@ -69,6 +69,7 @@ export const mediaServer = ({
   const api = createApiClient({
     baseUrl: NAS.origin,
     fetch: allowlistedFetch({
+      hasAccounts: () => false,
       fetch: async (url) => {
         heard.push(url.slice(NAS.origin.length))
         return responseOf(answer(url))

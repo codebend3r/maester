@@ -305,7 +305,7 @@ describe('account-bound playback tickets', () => {
     createApiClient({ fetch: injectFetch({ app }), accessToken: () => friendToken })
 
   it('issues an opaque ticket with no configured media secret and plays range requests', async () => {
-    const result = await client().getAccountMediaTicket({ id: video })
+    const result = await client().getAccountTicket({ id: video })
     expect(result.ticket.startsWith(ACCOUNT_TICKET_PREFIX)).toBe(true)
     expect(result.ticket).not.toContain(friendToken)
     const response = await app.inject({
@@ -318,7 +318,7 @@ describe('account-bound playback tickets', () => {
   })
 
   it('checks current approval on every redemption, without legacy-ticket fallback', async () => {
-    const result = await client().getAccountMediaTicket({ id: video })
+    const result = await client().getAccountTicket({ id: video })
     const friend = fixture.accounts[AUTH_TEST_IDS.friend]
     if (friend === undefined) throw new Error('Missing friend')
     fixture.accounts[AUTH_TEST_IDS.friend] = { ...friend, status: MEMBER_STATUSES.revoked }
@@ -341,7 +341,7 @@ describe('account-bound playback tickets', () => {
   })
 
   it('refuses an account ticket for another media id', async () => {
-    const result = await client().getAccountMediaTicket({ id: video })
+    const result = await client().getAccountTicket({ id: video })
     expect(
       (
         await app.inject({
@@ -352,7 +352,7 @@ describe('account-bound playback tickets', () => {
   })
 
   it('validates media route parameters before redeeming a capability', async () => {
-    const result = await client().getAccountMediaTicket({ id: video })
+    const result = await client().getAccountTicket({ id: video })
     await Promise.all(
       ['NaN', '-1', '1.5', '9007199254740992'].map(async (id) => {
         expect(

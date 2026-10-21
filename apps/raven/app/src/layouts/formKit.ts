@@ -31,17 +31,35 @@ export type FormButtonProps = {
   onPress: () => void
   tone: ButtonTone
   isDisabled?: boolean
+  /** The button a step with no field opens on: on a TV the remote's, once, as it is drawn. */
+  isPreferred?: boolean
+}
+
+/**
+ * A question a step must have answered before it goes on: `question` is what is asked,
+ * `detail` why it matters, `yesLabel` the answer that goes ahead and `noLabel` the one that
+ * changes nothing, which is the default. `onAnswer` hears the answer once.
+ */
+export type ConfirmProps = {
+  title: string
+  question: string
+  detail: string
+  yesLabel: string
+  noLabel: string
+  onAnswer: (input: { isYes: boolean }) => void
 }
 
 /**
  * A form's pieces, which each platform lays out and drives its own way, and the hook for its
  * styles at the platform's scale in the theme worn now, whose lines (`note`, `notice`,
- * `error`) the screens draw.
+ * `error`) the screens draw. `Confirm` asks a yes or no: the system's alert under the thumb,
+ * a step of the form on a TV.
  */
 export type FormKit = {
   Form: (props: FormProps) => ReactNode
   Field: (props: FieldProps) => ReactNode
   FormButton: (props: FormButtonProps) => ReactNode
+  Confirm: (props: ConfirmProps) => ReactNode
   useFormStyles: () => FormStyles
 }
 

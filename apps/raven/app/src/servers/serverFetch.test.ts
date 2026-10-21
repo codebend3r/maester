@@ -16,6 +16,7 @@ const SERVER: AppServer = {
   name: 'nas:8080',
   origin: 'http://nas:8080',
   addedAt: 1,
+  account: null,
 }
 
 type Sent = { url: string; init: Parameters<NativeFetch>[1] }

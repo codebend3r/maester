@@ -1,20 +1,27 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import {
   ADMIN_LOCK_STATES,
+  AUTH_CONFIG_STATES,
   type AdminLock,
   ApiError,
+  type AuthConfig,
   DEFAULT_THEME,
   type Home,
   type LockState,
   type MediaTicket,
   SERVERS_CAP,
 } from '@raven/core'
-import { fireEvent, render, screen } from '@testing-library/react-native'
-import { StyleSheet } from 'react-native'
+import { act, fireEvent, render, screen } from '@testing-library/react-native'
+import { Alert, type AlertButton, StyleSheet } from 'react-native'
 
 import { APP_ROUTES } from '@/routes'
-import { SignIn, TICKETS_OFF } from '@/screens/SignIn'
+import { SIGN_IN_COPY, SignIn, TICKETS_OFF } from '@/screens/SignIn'
+import { ACCOUNT_ANSWERS } from '@/servers/authConfigs'
+import { MEDIA_ACCESS_MESSAGES } from '@/servers/mediaAccess'
+import type { AppServer } from '@/servers/serverList'
+import { useAccountAnswers } from '@/stores/accountAnswers'
 import { useActiveServer } from '@/stores/activeServer'
+import { MOVED_PIN, PIN, readyConfigOf } from '@/test/accountPins'
 import { appThemeOf } from '@/theme/appTheme'
 import { mediaItemFor } from '@/test/mediaItem'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
@@ -29,7 +36,9 @@ const getHome = jest.fn<() => Promise<Home>>()
 const getMediaTicket = jest.fn<(id: number) => Promise<MediaTicket>>()
 const getAdminLock = jest.fn<() => Promise<AdminLock>>()
 const unlockAdmin = jest.fn<(password: string) => Promise<AdminLock>>()
+const getAuthConfig = jest.fn<() => Promise<AuthConfig>>()
 const mockApiFor = jest.fn((_server: unknown) => ({
+  getAuthConfig,
   getLock,
   unlock,
   getAdminLock,
@@ -69,6 +78,8 @@ describe('SignIn', () => {
     getHome.mockResolvedValue(HOME)
     getMediaTicket.mockResolvedValue({ ticket: 't', expiresAt: 1 })
     getAdminLock.mockResolvedValue({ state: ADMIN_LOCK_STATES.off })
+    getAuthConfig.mockResolvedValue({ state: AUTH_CONFIG_STATES.off })
+    useAccountAnswers.setState({ answers: {} })
     mockNewServerId.mockImplementation(() => MOCK_SERVER_ID)
     mockCanGoBack.mockReturnValue(false)
   })
@@ -202,6 +213,7 @@ describe('SignIn', () => {
       name: `nas${n}`,
       origin: `http://nas${n}:8080`,
       addedAt: n,
+      account: null,
     }))
     useActiveServer.setState({ servers: full, activeId: null })
     await render(<SignIn />)
@@ -297,6 +309,7 @@ describe('SignIn', () => {
       name: 'nas',
       origin: 'http://nas:8080',
       addedAt: 1,
+      account: null,
     }
     useActiveServer.setState({ servers: [known], activeId: null })
     getLock.mockResolvedValue({ available: true, unlocked: true })
@@ -306,5 +319,138 @@ describe('SignIn', () => {
     expect(mockApiFor).toHaveBeenCalledWith(known)
     expect(useActiveServer.getState()).toMatchObject({ servers: [known], activeId: known.id })
     expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
+  })
+
+  describe('a server that signs in with accounts', () => {
+    const KNOWN: AppServer = {
+      id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+      name: 'nas',
+      origin: 'http://nas:8080',
+      addedAt: 1,
+      account: null,
+    }
+
+    /** The buttons of the alert last shown, by their words. */
+    const alertButton = (text: string): AlertButton | undefined => {
+      const buttons = jest.mocked(Alert.alert).mock.lastCall?.[2] ?? []
+      return buttons.find((button) => button.text === text)
+    }
+
+    const press = async (text: string) => {
+      const button = alertButton(text)
+      expect(button).toBeDefined()
+      await act(() => button?.onPress?.())
+    }
+
+    beforeEach(() => {
+      jest.spyOn(Alert, 'alert').mockImplementation(() => undefined)
+    })
+
+    it('reads the auth config before anything else', async () => {
+      getLock.mockResolvedValue({ available: false, unlocked: false })
+      await render(<SignIn />)
+      await enterAddress('http://nas:8080')
+      expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
+      const [config] = getAuthConfig.mock.invocationCallOrder
+      const [lock] = getLock.mock.invocationCallOrder
+      expect(config).toBeLessThan(lock ?? 0)
+    })
+
+    it('says plainly that the app cannot sign in to it yet, and adds nothing', async () => {
+      getAuthConfig.mockResolvedValue(readyConfigOf(PIN))
+      await render(<SignIn />)
+      await enterAddress('http://nas:8080')
+      expect(await screen.findByText(MEDIA_ACCESS_MESSAGES.account('nas:8080'))).toBeTruthy()
+      expect(screen.getByLabelText('Server address')).toBeTruthy()
+      expect(useActiveServer.getState()).toMatchObject({ servers: [], activeId: null })
+      expect(useAccountAnswers.getState().answers).toEqual({
+        [MOCK_SERVER_ID]: ACCOUNT_ANSWERS.ready,
+      })
+      expect(getLock).not.toHaveBeenCalled()
+      expect(getAdminLock).not.toHaveBeenCalled()
+      expect(unlockAdmin).not.toHaveBeenCalled()
+      expect(mockDismissTo).not.toHaveBeenCalled()
+    })
+
+    it("pins a listed server's three endpoints the first time it is ready", async () => {
+      useActiveServer.setState({ servers: [KNOWN], activeId: KNOWN.id })
+      getAuthConfig.mockResolvedValue(readyConfigOf(PIN))
+      await render(<SignIn />)
+      await enterAddress('http://nas:8080')
+      expect(await screen.findByText(MEDIA_ACCESS_MESSAGES.account('nas'))).toBeTruthy()
+      expect(useActiveServer.getState().servers).toEqual([{ ...KNOWN, account: PIN }])
+      expect(Alert.alert).not.toHaveBeenCalled()
+    })
+
+    it('asks before following a pinned server to other endpoints, and keeps the old pin on Cancel', async () => {
+      useActiveServer.setState({ servers: [{ ...KNOWN, account: PIN }], activeId: KNOWN.id })
+      getAuthConfig.mockResolvedValue(readyConfigOf(MOVED_PIN))
+      await render(<SignIn />)
+      await enterAddress('http://nas:8080')
+
+      expect(Alert.alert).toHaveBeenCalledWith(
+        SIGN_IN_COPY.moved({ name: 'nas', host: 'moved.supabase.co' }),
+        SIGN_IN_COPY.movedDetail,
+        expect.any(Array),
+        expect.any(Object),
+      )
+      await press(SIGN_IN_COPY.cancel)
+
+      expect(
+        await screen.findByText(SIGN_IN_COPY.kept({ name: 'nas', host: 'project.supabase.co' })),
+      ).toBeTruthy()
+      expect(useActiveServer.getState().servers).toEqual([{ ...KNOWN, account: PIN }])
+      expect(getLock).not.toHaveBeenCalled()
+    })
+
+    it('pins the new endpoints only on a yes', async () => {
+      useActiveServer.setState({ servers: [{ ...KNOWN, account: PIN }], activeId: KNOWN.id })
+      getAuthConfig.mockResolvedValue(readyConfigOf(MOVED_PIN))
+      await render(<SignIn />)
+      await enterAddress('http://nas:8080')
+      expect(useActiveServer.getState().servers).toEqual([{ ...KNOWN, account: PIN }])
+
+      await press(SIGN_IN_COPY.follow)
+
+      expect(await screen.findByText(MEDIA_ACCESS_MESSAGES.account('nas'))).toBeTruthy()
+      expect(useActiveServer.getState().servers).toEqual([{ ...KNOWN, account: MOVED_PIN }])
+    })
+
+    it("says so when the server's sign-in names endpoints the app cannot use", async () => {
+      getAuthConfig.mockResolvedValue(
+        readyConfigOf({ ...PIN, supabaseUrl: 'http://project.supabase.co' }),
+      )
+      await render(<SignIn />)
+      await enterAddress('http://nas:8080')
+      expect(await screen.findByText(SIGN_IN_COPY.badSignIn)).toBeTruthy()
+      expect(getLock).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['off', async () => ({ state: AUTH_CONFIG_STATES.off })],
+      ['unavailable', async () => ({ state: AUTH_CONFIG_STATES.unavailable })],
+      [
+        'not there, on a server older than accounts',
+        async () => {
+          throw new ApiError({ status: 404, message: 'Not Found' })
+        },
+      ],
+    ] as const)('goes on to the PIN when its accounts are %s', async (_name, answer) => {
+      getAuthConfig.mockImplementation(answer)
+      getLock.mockResolvedValue({ available: true, unlocked: false })
+      await render(<SignIn />)
+      await enterAddress('http://nas:8080')
+      expect(await screen.findByLabelText('PIN')).toBeTruthy()
+    })
+
+    it('asks for the admin password of a pinned server whose accounts are now off', async () => {
+      useActiveServer.setState({ servers: [{ ...KNOWN, account: PIN }], activeId: KNOWN.id })
+      getAuthConfig.mockResolvedValue({ state: AUTH_CONFIG_STATES.off })
+      getAdminLock.mockResolvedValue({ state: ADMIN_LOCK_STATES.on, available: true })
+      await unlockWithPin()
+      expect(await screen.findByLabelText('Admin password')).toBeTruthy()
+      expect(useAccountAnswers.getState().answers).toEqual({ [KNOWN.id]: ACCOUNT_ANSWERS.off })
+      expect(useActiveServer.getState().servers).toEqual([{ ...KNOWN, account: PIN }])
+    })
   })
 })

@@ -1,21 +1,30 @@
-import { ADMIN_LOCK_STATES, type ApiClient, serverNameFor, serverOriginOf } from '@raven/core'
+import {
+  ADMIN_LOCK_STATES,
+  type ApiClient,
+  type SignInConfig,
+  serverNameFor,
+  serverOriginOf,
+} from '@raven/core'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Text } from 'react-native'
 
-import { BUTTON_TONES, Field, Form, FormButton, useFormStyles } from '@/layouts'
+import { BUTTON_TONES, Confirm, Field, Form, FormButton, useFormStyles } from '@/layouts'
 import { APP_ROUTES } from '@/routes'
 import { useSubmit } from '@/screens/useSubmit'
+import { AUTH_READS, answerOf, readAuthConfig } from '@/servers/authConfigs'
+import { MEDIA_ACCESS_MESSAGES } from '@/servers/mediaAccess'
 import { apiFor, cookieJar, newServerId } from '@/servers/serverClient'
 import { ADD_OUTCOMES, type AppServer } from '@/servers/serverList'
 import { TICKET_SUPPORT, ticketSupportOf } from '@/servers/tickets'
+import { useAccountAnswers } from '@/stores/accountAnswers'
 import { useActiveServer } from '@/stores/activeServer'
 
 /** The spec's words for a server without `RAVEN_MEDIA_SECRET`, which the app then plays from with its cookie. */
 export const TICKETS_OFF =
   "This server can't hand out media tickets. Set RAVEN_MEDIA_SECRET on it to play in the app"
 
-const COPY = {
+export const SIGN_IN_COPY = {
   title: 'Sign in to raven',
   address: 'Server address',
   example: 'http://192.168.1.20:8484',
@@ -33,26 +42,52 @@ const COPY = {
   notNow: 'Not now',
   otherAddress: 'Use another address',
   cancel: 'Cancel',
+  badSignIn: "That server's sign-in settings are not ones raven can use.",
+  moved: ({ name, host }: { name: string; host: string }) =>
+    `${name} now signs in through ${host}. Use it?`,
+  movedDetail: 'Your password goes to that address when you sign in. Use it only if you trust it.',
+  follow: 'Use it',
+  kept: ({ name, host }: { name: string; host: string }) =>
+    `${name} keeps signing in through ${host} on this device.`,
 } as const
 
-const STEPS = { address: 'address', pin: 'pin', admin: 'admin', ticketsOff: 'ticketsOff' } as const
+const STEPS = {
+  address: 'address',
+  pin: 'pin',
+  admin: 'admin',
+  ticketsOff: 'ticketsOff',
+  moved: 'moved',
+} as const
 
 /** A step that asks for a secret the server unlocks with. */
 type SecretStep = { kind: typeof STEPS.pin | typeof STEPS.admin; server: AppServer }
 
-type Step = { kind: typeof STEPS.address } | SecretStep | { kind: typeof STEPS.ticketsOff }
+/** The question for a pinned server whose sign-in now names other endpoints, at `host`. */
+type MovedStep = {
+  kind: typeof STEPS.moved
+  server: AppServer
+  account: SignInConfig
+  host: string
+  pinnedHost: string
+}
+
+type Step =
+  | { kind: typeof STEPS.address }
+  | SecretStep
+  | { kind: typeof STEPS.ticketsOff }
+  | MovedStep
 
 /** What the PIN step and the admin step each ask for, and the call that sends it. */
 const SECRET_STEPS = {
   [STEPS.pin]: {
-    prompt: COPY.pinPrompt,
-    label: COPY.pin,
+    prompt: SIGN_IN_COPY.pinPrompt,
+    label: SIGN_IN_COPY.pin,
     isNumeric: true,
     unlock: ({ api, secret }: { api: ApiClient; secret: string }) => api.unlock(secret),
   },
   [STEPS.admin]: {
-    prompt: COPY.adminPrompt,
-    label: COPY.adminPassword,
+    prompt: SIGN_IN_COPY.adminPrompt,
+    label: SIGN_IN_COPY.adminPassword,
     isNumeric: false,
     unlock: ({ api, secret }: { api: ApiClient; secret: string }) => api.unlockAdmin(secret),
   },
@@ -65,9 +100,12 @@ const isAdminLockHeld = async (api: ApiClient): Promise<boolean> => {
 }
 
 /**
- * The first launch: the server's address, then its PIN when it has locked libraries, then
- * the admin password when the admin lock would still hide them, as the desktop asks. The
- * server joins the list and becomes the active one only once it has answered as raven.
+ * The first launch: the server's address, then, once its auth config says it has no accounts,
+ * its PIN when it has locked libraries, then the admin password when the admin lock would
+ * still hide them, as the desktop asks. The server joins the list and becomes the active one
+ * only once it has answered as raven. A server with accounts has its sign-in pinned (asking
+ * first when a listed one's names other endpoints) and is told apart in plain words, since the
+ * app cannot sign in to an account yet; it adds nothing, and no PIN or password is asked for.
  */
 export const SignIn = () => {
   const router = useRouter()
@@ -75,7 +113,8 @@ export const SignIn = () => {
   const [step, setStep] = useState<Step>({ kind: STEPS.address })
   const [address, setAddress] = useState('')
   const [secret, setSecret] = useState('')
-  const { isBusy, error, setError, run } = useSubmit({ unreachable: COPY.unreachable })
+  const [notice, setNotice] = useState<string | null>(null)
+  const { isBusy, error, setError, run } = useSubmit({ unreachable: SIGN_IN_COPY.unreachable })
 
   // From Settings, Home is under it in the stack: go back down to it rather than stack another.
   const goHome = () => router.dismissTo(APP_ROUTES.home)
@@ -90,7 +129,7 @@ export const SignIn = () => {
     const isKnown = servers.some((known) => known.id === server.id)
     const added = isKnown ? ADD_OUTCOMES.added : add(server).kind
     if (added !== ADD_OUTCOMES.added) {
-      setError(added === ADD_OUTCOMES.full ? COPY.full : COPY.notAdded)
+      setError(added === ADD_OUTCOMES.full ? SIGN_IN_COPY.full : SIGN_IN_COPY.notAdded)
       return
     }
     activate(server.id)
@@ -102,10 +141,27 @@ export const SignIn = () => {
     goHome()
   }
 
+  const openLock = async ({ server, api }: { server: AppServer; api: ApiClient }) => {
+    const lock = await api.getLock()
+    if (lock.available && !lock.unlocked) {
+      askFor({ kind: STEPS.pin, server })
+      return
+    }
+    await finish(server)
+  }
+
+  /** Keeps a listed server's sign-in pinned at `account`; a server not listed is never added. */
+  const keepAccount = ({ server, account }: { server: AppServer; account: SignInConfig }) => {
+    const { servers, pin } = useActiveServer.getState()
+    if (servers.some((known) => known.id === server.id)) pin({ id: server.id, account })
+    setNotice(MEDIA_ACCESS_MESSAGES.account(server.name))
+  }
+
   const submitAddress = ({ text }: { text: string }) => {
+    setNotice(null)
     const origin = serverOriginOf(text)
     if (origin === null) {
-      setError(COPY.badAddress)
+      setError(SIGN_IN_COPY.badAddress)
       return
     }
     run(async () => {
@@ -115,14 +171,48 @@ export const SignIn = () => {
         name: serverNameFor(origin),
         origin,
         addedAt: Date.now(),
+        account: null,
       }
-      const lock = await apiFor(server).getLock()
-      if (lock.available && !lock.unlocked) {
-        askFor({ kind: STEPS.pin, server })
-        return
+      const api = apiFor(server)
+      const read = await readAuthConfig({ api, server })
+      useAccountAnswers.getState().hear({ serverId: server.id, answer: answerOf(read) })
+      switch (read.kind) {
+        case AUTH_READS.accountless:
+          await openLock({ server, api })
+          return
+        case AUTH_READS.pinned:
+          keepAccount({ server, account: read.account })
+          return
+        case AUTH_READS.moved: {
+          const { account, host, pinnedHost } = read
+          askFor({ kind: STEPS.moved, server, account, host, pinnedHost })
+          return
+        }
+        case AUTH_READS.unusable:
+          setError(SIGN_IN_COPY.badSignIn)
+          return
+        default: {
+          const unreachable: never = read
+          return unreachable
+        }
       }
-      await finish(server)
     })
+  }
+
+  /** Only a yes pins the endpoints the server names now; a no keeps the old pin. */
+  const answerMoved = ({
+    step: { server, account, pinnedHost },
+    isYes,
+  }: {
+    step: MovedStep
+    isYes: boolean
+  }) => {
+    askFor({ kind: STEPS.address })
+    if (!isYes) {
+      setNotice(SIGN_IN_COPY.kept({ name: server.name, host: pinnedHost }))
+      return
+    }
+    keepAccount({ server, account })
   }
 
   const submitSecret = ({ step: { kind, server }, text }: { step: SecretStep; text: string }) =>
@@ -153,25 +243,30 @@ export const SignIn = () => {
   switch (step.kind) {
     case STEPS.address:
       return (
-        <Form title={COPY.title}>
+        <Form title={SIGN_IN_COPY.title}>
           <Field
             isFirst
-            label={COPY.address}
+            label={SIGN_IN_COPY.address}
             onChangeText={setAddress}
             onSubmit={submitAddress}
-            placeholder={COPY.example}
+            placeholder={SIGN_IN_COPY.example}
             value={address}
           />
+          {notice !== null && (
+            <Text accessibilityLiveRegion="polite" style={formStyles.notice}>
+              {notice}
+            </Text>
+          )}
           {errorLine}
           <FormButton
             isDisabled={isBusy}
-            label={COPY.continue}
+            label={SIGN_IN_COPY.continue}
             onPress={() => submitAddress({ text: address })}
             tone={BUTTON_TONES.primary}
           />
           {router.canGoBack() && (
             <FormButton
-              label={COPY.cancel}
+              label={SIGN_IN_COPY.cancel}
               onPress={() => router.back()}
               tone={BUTTON_TONES.ghost}
             />
@@ -196,32 +291,43 @@ export const SignIn = () => {
           {errorLine}
           <FormButton
             isDisabled={isBusy}
-            label={COPY.unlock}
+            label={SIGN_IN_COPY.unlock}
             onPress={() => submitSecret({ step, text: secret })}
             tone={BUTTON_TONES.primary}
           />
           <FormButton
             isDisabled={isBusy}
-            label={COPY.notNow}
+            label={SIGN_IN_COPY.notNow}
             onPress={() => run(() => finish(step.server))}
             tone={BUTTON_TONES.quiet}
           />
           <FormButton
             isDisabled={isBusy}
-            label={COPY.otherAddress}
+            label={SIGN_IN_COPY.otherAddress}
             onPress={() => startOver(step.server)}
             tone={BUTTON_TONES.ghost}
           />
         </Form>
       )
     }
+    case STEPS.moved:
+      return (
+        <Confirm
+          detail={SIGN_IN_COPY.movedDetail}
+          noLabel={SIGN_IN_COPY.cancel}
+          onAnswer={({ isYes }) => answerMoved({ step, isYes })}
+          question={SIGN_IN_COPY.moved({ name: step.server.name, host: step.host })}
+          title={step.server.name}
+          yesLabel={SIGN_IN_COPY.follow}
+        />
+      )
     case STEPS.ticketsOff:
       return (
-        <Form title={COPY.title}>
+        <Form title={SIGN_IN_COPY.title}>
           <Text accessibilityLiveRegion="polite" style={formStyles.notice}>
             {TICKETS_OFF}
           </Text>
-          <FormButton label={COPY.continue} onPress={goHome} tone={BUTTON_TONES.primary} />
+          <FormButton label={SIGN_IN_COPY.continue} onPress={goHome} tone={BUTTON_TONES.primary} />
         </Form>
       )
     default: {

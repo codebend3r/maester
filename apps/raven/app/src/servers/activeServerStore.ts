@@ -1,4 +1,4 @@
-import { renamedServers } from '@raven/core'
+import { type SignInConfig, renamedServers } from '@raven/core'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
@@ -9,6 +9,7 @@ import {
   type AddOutcome,
   type AppServer,
   addServer,
+  pinServer,
   removeServer,
   storedServersOf,
 } from '@/servers/serverList'
@@ -25,6 +26,12 @@ type ActiveServerState = {
   remove: (id: string) => Promise<void>
   /** Gives a listed server the name typed; false, and nothing changed, when it will not do. */
   rename: (input: { id: string; name: string }) => boolean
+  /**
+   * Pins a listed server's sign-in in place of any it had, kept with the server and so
+   * forgotten with it; false, and nothing changed, for a server not listed or endpoints the
+   * app could not sign in through.
+   */
+  pin: (input: { id: string; account: SignInConfig }) => boolean
   /** Makes a listed server the one the app talks to; an id not on the list changes nothing. */
   activate: (id: string) => void
 }
@@ -65,6 +72,11 @@ export const createActiveServerStore = ({
           const renamed = renamedServers({ servers: get().servers, id, name })
           if (renamed !== null) set({ servers: renamed })
           return renamed !== null
+        },
+        pin: ({ id, account }) => {
+          const pinned = pinServer({ servers: get().servers, id, account })
+          if (pinned !== null) set({ servers: pinned })
+          return pinned !== null
         },
         activate: (id) => {
           if (get().servers.some((server) => server.id === id)) set({ activeId: id })

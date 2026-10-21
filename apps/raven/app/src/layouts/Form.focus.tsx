@@ -1,6 +1,10 @@
+import { type ComponentRef, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
+import { useFocusOnMount } from '@/layouts/focus'
 import {
+  BUTTON_TONES,
+  type ConfirmProps,
   type FieldProps,
   type FormButtonProps,
   type FormKit,
@@ -60,14 +64,33 @@ const Field = ({
   )
 }
 
-const FormButton = ({ label, onPress, tone, isDisabled = false }: FormButtonProps) => {
+/**
+ * A button on a plate. `isPreferred` gives it the remote as it is drawn, once: asked for
+ * again once mounted, since Android TV takes no preferred focus a view asks for before it is
+ * in the window, and let go once it has had the focus, so the remote stays where the viewer
+ * moves it.
+ */
+const FormButton = ({
+  label,
+  onPress,
+  tone,
+  isDisabled = false,
+  isPreferred = false,
+}: FormButtonProps) => {
   const formStyles = useTvFormStyles()
   const toneStyles = useToneStyles()
+  const button = useRef<ComponentRef<typeof Pressable>>(null)
+  const [hasHadFocus, setHadFocus] = useState(false)
+  useFocusOnMount({ view: button, isAsked: isPreferred })
   return (
     <Pressable
+      ref={button}
+      accessibilityLabel={label}
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled }}
       disabled={isDisabled}
+      hasTVPreferredFocus={isPreferred && !hasHadFocus}
+      onFocus={() => setHadFocus(true)}
       onPress={onPress}
       style={({ focused }) => [
         formStyles.button,
@@ -84,8 +107,42 @@ const FormButton = ({ label, onPress, tone, isDisabled = false }: FormButtonProp
   )
 }
 
+/**
+ * A question asked as a step of the form, since a TV's alert is the system's and the remote
+ * would open on whichever button it likes: the remote opens on the answer that changes
+ * nothing.
+ */
+const Confirm = ({ title, question, detail, yesLabel, noLabel, onAnswer }: ConfirmProps) => {
+  const formStyles = useTvFormStyles()
+  return (
+    <Form title={title}>
+      <Text accessibilityLiveRegion="polite" style={formStyles.notice}>
+        {question}
+      </Text>
+      <Text style={formStyles.note}>{detail}</Text>
+      <FormButton
+        label={yesLabel}
+        onPress={() => onAnswer({ isYes: true })}
+        tone={BUTTON_TONES.primary}
+      />
+      <FormButton
+        isPreferred
+        label={noLabel}
+        onPress={() => onAnswer({ isYes: false })}
+        tone={BUTTON_TONES.ghost}
+      />
+    </Form>
+  )
+}
+
 /** The TV form: read from the sofa, so larger, and driven by the remote's focus. */
-export const focusForm: FormKit = { Form, Field, FormButton, useFormStyles: useTvFormStyles }
+export const focusForm: FormKit = {
+  Form,
+  Field,
+  FormButton,
+  Confirm,
+  useFormStyles: useTvFormStyles,
+}
 
 const styles = StyleSheet.create({
   ground: { justifyContent: 'center', padding: TV_SIZES.space5 },

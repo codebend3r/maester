@@ -23,8 +23,13 @@ import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 
 export { BUTTON_TONES } from '@/layouts/formKit'
 
-/** The form a screen asks for: driven by focus on a TV, by touch everywhere else. */
-export const { Form, Field, FormButton, useFormStyles } = Platform.isTV ? focusForm : touchForm
+/**
+ * The form a screen asks for: driven by focus on a TV, by touch everywhere else, with its
+ * yes or no as a step of the form on a TV and the system's alert under the thumb.
+ */
+export const { Form, Field, FormButton, Confirm, useFormStyles } = Platform.isTV
+  ? focusForm
+  : touchForm
 
 /** Home's shelves: rows the remote moves along on a TV, rows under the thumb everywhere else. */
 export const { Shelves, Shelf } = Platform.isTV ? focusShelf : touchShelf

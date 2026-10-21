@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react'
 import {
+  Alert,
   KeyboardAvoidingView,
   Pressable,
   ScrollView,
@@ -9,6 +11,7 @@ import {
 } from 'react-native'
 
 import {
+  type ConfirmProps,
   type FieldProps,
   type FormButtonProps,
   type FormKit,
@@ -91,11 +94,41 @@ const FormButton = ({ label, onPress, tone, isDisabled = false }: FormButtonProp
   )
 }
 
+/**
+ * The question in the system's alert, asked once as the step is drawn, over the form with the
+ * question on it. The answer that changes nothing is the alert's cancel, which a dismissal
+ * outside it gives too.
+ */
+const Confirm = ({ title, question, detail, yesLabel, noLabel, onAnswer }: ConfirmProps) => {
+  const formStyles = useTouchFormStyles()
+  const hasAsked = useRef(false)
+  useEffect(() => {
+    if (hasAsked.current) return
+    hasAsked.current = true
+    const answer = (isYes: boolean) => () => onAnswer({ isYes })
+    Alert.alert(
+      question,
+      detail,
+      [
+        { text: noLabel, style: 'cancel', onPress: answer(false) },
+        { text: yesLabel, onPress: answer(true) },
+      ],
+      { cancelable: true, onDismiss: answer(false) },
+    )
+  }, [question, detail, yesLabel, noLabel, onAnswer])
+  return (
+    <Form title={title}>
+      <Text style={formStyles.notice}>{question}</Text>
+    </Form>
+  )
+}
+
 /** The phone and tablet form: one column under the thumb, lifted clear of the keyboard. */
 export const touchForm: FormKit = {
   Form,
   Field,
   FormButton,
+  Confirm,
   useFormStyles: useTouchFormStyles,
 }
 

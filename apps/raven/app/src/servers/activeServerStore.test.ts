@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 
 import { ADD_OUTCOMES, type AppServer } from '@/servers/serverList'
 import { SERVER_LIST_KEY, createActiveServerStore } from '@/servers/activeServerStore'
+import { PIN } from '@/test/accountPins'
 import { failingStore, memoryStore } from '@/test/memoryStore'
 
 const NAS: AppServer = {
@@ -9,6 +10,7 @@ const NAS: AppServer = {
   name: 'nas:8080',
   origin: 'http://nas:8080',
   addedAt: 1,
+  account: null,
 }
 
 const noJar = { forget: async () => {} }
@@ -18,6 +20,7 @@ const DEN: AppServer = {
   name: 'den:8080',
   origin: 'http://den:8080',
   addedAt: 2,
+  account: null,
 }
 
 /** A jar that records the servers whose cookies it forgot. */
@@ -134,5 +137,29 @@ describe('createActiveServerStore', () => {
     expect(JSON.parse(items.get(SERVER_LIST_KEY) ?? '')).toMatchObject({
       state: { servers: [{ ...NAS, name: 'Attic' }] },
     })
+  })
+
+  it("keeps a server's pinned sign-in with it, and reads it back in a new launch", async () => {
+    const { store } = memoryStore()
+    const first = createActiveServerStore({ store, jar: noJar })
+    first.getState().add(NAS)
+    expect(first.getState().pin({ id: NAS.id, account: PIN })).toBe(true)
+    expect(first.getState().pin({ id: DEN.id, account: PIN })).toBe(false)
+    await Promise.resolve()
+
+    const next = createActiveServerStore({ store, jar: noJar })
+    await next.persist.rehydrate()
+    expect(next.getState().servers).toEqual([{ ...NAS, account: PIN }])
+  })
+
+  it('forgets the pin with the server, so adding it again starts with none', async () => {
+    const { store, items } = memoryStore()
+    const useServers = createActiveServerStore({ store, jar: noJar })
+    useServers.getState().add(NAS)
+    useServers.getState().pin({ id: NAS.id, account: PIN })
+    await useServers.getState().remove(NAS.id)
+    expect(items.get(SERVER_LIST_KEY) ?? '').not.toContain(PIN.supabaseUrl)
+    useServers.getState().add(NAS)
+    expect(useServers.getState().servers).toEqual([NAS])
   })
 })

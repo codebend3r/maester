@@ -64,7 +64,7 @@ It sets `NSAllowsLocalNetworking` on Apple and `usesCleartextTraffic` on Android
 
 Media plays with tickets, so set `RAVEN_MEDIA_SECRET` on the server. Without it, sign-in says so, and the player falls back to sending the cookie.
 
-The app signs in only to a server with accounts `off`, or one older than the accounts. A server with accounts `ready` needs an account the app cannot sign in with yet; account sign-in comes in PR 10 (the plan's Ruling 28).
+The app signs in only to a server with accounts `off`, or one older than the accounts. A server with accounts `ready` needs an account the app cannot sign in with yet: sign-in reads the server's auth config first and says so on the address step. A listed server keeps the sign-in it was first seen with pinned, and the app asks before it follows the server to another. Account sign-in comes later in PR 10 (the plan's Ruling 28).
 
 To install a build on your own iPhone, iPad, Apple TV or Android TV, follow the [raven README](../README.md#raven-app-iphone-ipad-apple-tv-android-tv).
 

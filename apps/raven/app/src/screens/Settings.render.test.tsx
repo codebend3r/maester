@@ -68,6 +68,7 @@ const serversOf = (count: number): AppServer[] =>
     name: `nas${n}`,
     origin: `http://nas${n}:8080`,
     addedAt: n,
+    account: null,
   }))
 
 /** The first light theme, which the default is not. */
