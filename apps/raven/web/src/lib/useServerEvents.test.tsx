@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, jest } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { EVENT_SOURCE_EVENTS } from '@/lib/eventSourceEvents'
-import { EVENTS_RETRY_MS, useServerEvents } from '@/lib/useServerEvents'
+import { EVENTS_RETRY_MS, SERVER_STREAM_EVENTS } from '@raven/ui/headless'
+import { useServerEvents } from '@/lib/useServerEvents'
 import { useAuthSession } from '@/stores/authSession'
 import { SIGNED_IN } from '@/test/authClient'
 import { FakeEventSource } from '@/test/eventSource'
@@ -64,7 +64,7 @@ describe('useServerEvents', () => {
     expect(invalidate).not.toHaveBeenCalled()
 
     act(() => {
-      stream(1).dispatchEvent(new Event(EVENT_SOURCE_EVENTS.open))
+      stream(1).dispatchEvent(new Event(SERVER_STREAM_EVENTS.open))
     })
     expect(invalidate).toHaveBeenCalled()
   })
@@ -107,7 +107,7 @@ describe('useServerEvents', () => {
     expect(invalidate).not.toHaveBeenCalled()
 
     act(() => {
-      stream(1).dispatchEvent(new Event(EVENT_SOURCE_EVENTS.open))
+      stream(1).dispatchEvent(new Event(SERVER_STREAM_EVENTS.open))
     })
     expect(invalidate).toHaveBeenCalled()
   })

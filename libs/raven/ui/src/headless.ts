@@ -55,6 +55,16 @@ export {
 } from '@/query/edits'
 export { HISTORY_SHOWS, ravenQueriesFor } from '@/query/ravenQueries'
 export type { HistoryShow, RavenQueries } from '@/query/ravenQueries'
+export { mediaMutationsFor } from '@/query/useMediaMutations'
+export { usePlaybackPolicy } from '@/query/usePlaybackPolicy'
+export {
+  EVENTS_RETRY_MS,
+  SERVER_STREAM_EVENTS,
+  SERVER_STREAM_STATES,
+  serverEventsFor,
+} from '@/query/useServerEvents'
+export type { ServerEventSource } from '@/query/useServerEvents'
+export { watchedChangeFor } from '@/query/useWatchedChange'
 export { usePageBackdrop } from '@/stores/pageBackdrop'
 export { createSelectionStore } from '@/stores/selection'
 export type { SelectionStore } from '@/stores/selection'
