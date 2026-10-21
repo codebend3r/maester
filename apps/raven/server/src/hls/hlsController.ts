@@ -40,6 +40,7 @@ import { subtitleSegmentVtt, subtitleSpanOf, subtitleWindowsOf } from '@/hls/sub
 import { variantOf, videoStringOf } from '@/hls/variant'
 import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { PrivateBy } from '@/lock/lockGuard'
+import { PRIVACIES } from '@/lock/lockService'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import {
@@ -70,7 +71,7 @@ const routeOf = (path: HlsPath): string => path.slice(`/${MEDIA_ROUTES}/`.length
  * the video opens it, and every URI a playlist names carries that ticket.
  */
 @Controller(MEDIA_ROUTES)
-@PrivateBy('media')
+@PrivateBy(PRIVACIES.media)
 export class HlsController {
   constructor(
     @Inject(SettingsRepository) private readonly settings: SettingsRepository,
@@ -115,7 +116,7 @@ export class HlsController {
     const probe = parseProbe(output)
     const clock = mediaClockOf(output)
     const end = clock.end ?? (file.duration == null ? null : clock.start + file.duration)
-    if (probe?.width == null || probe.height == null || end == null) {
+    if (probe === null || probe.width == null || probe.height == null || end == null) {
       throw new UnprocessableEntityException('This file has no picture of a known length to cut')
     }
     const videoString = videoStringOf({
@@ -351,7 +352,9 @@ export class HlsController {
   }): Promise<SubtitleTrack> {
     const { tracks } = await this.tracks.tracksFor(file)
     const track = tracks.subtitles.find((candidate) => candidate.id === trackId)
-    if (!track?.supported) throw new NotFoundException(`No text subtitle track ${trackId}`)
+    if (track === undefined || !track.supported) {
+      throw new NotFoundException(`No text subtitle track ${trackId}`)
+    }
     return track
   }
 

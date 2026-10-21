@@ -226,7 +226,7 @@ describe('the HLS route', () => {
     const idOf = (clip: Clip): number => {
       const id = index
         .idsForLibrary(library.id)
-        .find((candidate) => index.fileOf(candidate)?.fileName === FILES[clip])
+        .find((candidate) => (index.fileOf(candidate)?.fileName ?? null) === FILES[clip])
       if (id == null) throw new Error(`${FILES[clip]} was not scanned`)
       return id
     }
@@ -246,7 +246,7 @@ describe('the HLS route', () => {
   })
 
   afterAll(async () => {
-    await state.app?.close()
+    if (state.app) await state.app.close()
     await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
@@ -325,28 +325,24 @@ describe('the HLS route', () => {
 
   it('serves an init and segments that ffprobe reads, never compressed', async () => {
     const { uris } = await videoPlaylist({ clip: 'rich', mode: PLAYBACK_MODES.remux })
-    const [init, first, second] = await Promise.all(
-      uris.slice(0, 3).map((uri) => get({ url: uri })),
-    )
+    const responses = await Promise.all(uris.slice(0, 3).map((uri) => get({ url: uri })))
+    expect(responses).toHaveLength(3)
+    const [init, ...segments] = responses
+    if (!init) throw new Error('The playlist lists no init')
 
-    expect(init?.statusCode).toBe(200)
-    expect(init?.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.mp4)
-    expect(init?.rawPayload.subarray(4, 8).toString()).toBe('ftyp')
-    ;[first, second].forEach((segment) => {
-      expect(segment?.statusCode).toBe(200)
-      expect(segment?.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.segment)
-      expect(segment?.rawPayload.subarray(4, 8).toString()).toBe('moof')
+    expect(init.statusCode).toBe(200)
+    expect(init.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.mp4)
+    expect(init.rawPayload.subarray(4, 8).toString()).toBe('ftyp')
+    segments.forEach((segment) => {
+      expect(segment.statusCode).toBe(200)
+      expect(segment.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.segment)
+      expect(segment.rawPayload.subarray(4, 8).toString()).toBe('moof')
     })
-    ;[init, first, second].forEach((response) =>
-      expect(response?.headers[HEADERS.contentEncoding]).toBeUndefined(),
+    responses.forEach((response) =>
+      expect(response.headers[HEADERS.contentEncoding]).toBeUndefined(),
     )
     const path = join(state.root, 'segments.mp4')
-    await writeFile(
-      path,
-      Buffer.concat(
-        [init?.rawPayload, first?.rawPayload, second?.rawPayload].flatMap((b) => b ?? []),
-      ),
-    )
+    await writeFile(path, Buffer.concat(responses.map(({ rawPayload }) => rawPayload)))
     const [codec, firstPts] = await Promise.all([
       ffprobe({ path, args: ['-select_streams', 'v:0', '-show_entries', 'stream=codec_name'] }),
       ffprobe({
@@ -444,14 +440,11 @@ describe('the HLS route', () => {
     /** Segment `n` of a new transcode session, asked for first, as ffprobe reads it after its init. */
     const segmentOf = async (n: number) => {
       const { uris } = await videoPlaylist({ clip: 'late', mode: PLAYBACK_MODES.transcode })
-      const [init, segment] = await Promise.all(
+      const responses = await Promise.all(
         [uris[0] ?? '', uris[n + 1] ?? ''].map((uri) => get({ url: uri })),
       )
       const path = join(state.root, `late-transcode-${n}.mp4`)
-      await writeFile(
-        path,
-        Buffer.concat([init?.rawPayload, segment?.rawPayload].flatMap((b) => b ?? [])),
-      )
+      await writeFile(path, Buffer.concat(responses.map(({ rawPayload }) => rawPayload)))
       const pts = (
         await ffprobe({
           path,
@@ -601,13 +594,12 @@ describe('the HLS route', () => {
     )
     expect(subtitles.playlist).toContain(`#EXT-X-TARGETDURATION:6`)
 
-    const [first, second] = await Promise.all(
-      subtitles.uris.slice(0, 2).map((uri) => get({ url: uri })),
-    )
-    const texts = [first, second].map((response) => {
-      expect(response?.statusCode).toBe(200)
-      expect(response?.headers[HEADERS.contentType]).toBe(CONTENT_TYPES.vtt)
-      return response ? decodedBody(response).toString() : ''
+    const responses = await Promise.all(subtitles.uris.slice(0, 2).map((uri) => get({ url: uri })))
+    expect(responses).toHaveLength(2)
+    const texts = responses.map((response) => {
+      expect(response.statusCode).toBe(200)
+      expect(response.headers[HEADERS.contentType]).toBe(CONTENT_TYPES.vtt)
+      return decodedBody(response).toString()
     })
     texts.forEach((text) =>
       expect(text).toContain(
@@ -623,12 +615,16 @@ describe('the HLS route', () => {
       }),
     )
     expect(start).toBeCloseTo(LATE_START, 1)
-    const [early, later] = texts.map(parseWebVtt)
-    expect(early?.map(({ text }) => text)).toEqual(['Early'])
-    expect(early?.[0]?.start).toBeCloseTo(1 + start, 3)
-    expect(early?.[0]?.end).toBeCloseTo(2 + start, 3)
-    expect(later?.map(({ text }) => text)).toEqual(['Later'])
-    expect(later?.[0]?.start).toBeCloseTo(7 + start, 3)
+    expect(texts.map(parseWebVtt)).toEqual([
+      [
+        expect.objectContaining({
+          text: 'Early',
+          start: expect.closeTo(1 + start, 3),
+          end: expect.closeTo(2 + start, 3),
+        }),
+      ],
+      [expect.objectContaining({ text: 'Later', start: expect.closeTo(7 + start, 3) })],
+    ])
   })
 
   it("cuts an embedded track's window into the segment's six seconds", async () => {
@@ -650,7 +646,11 @@ describe('the HLS route', () => {
         '%+#1',
       ],
     })
-    expect(cues.map(({ text }) => text)).toEqual(['Second line'])
-    expect(cues[0]?.start).toBeCloseTo(12.5 + Number(firstFrame), 3)
+    expect(cues).toEqual([
+      expect.objectContaining({
+        text: 'Second line',
+        start: expect.closeTo(12.5 + Number(firstFrame), 3),
+      }),
+    ])
   })
 })

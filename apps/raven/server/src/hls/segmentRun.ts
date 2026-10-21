@@ -23,7 +23,7 @@ export const RUN_SIGNALS = {
 } as const
 
 /** The run's child process and stdout line events it follows. */
-const RUN_EVENTS = { close: 'close', error: 'error', line: 'line' } as const
+export const RUN_EVENTS = { close: 'close', error: 'error', line: 'line' } as const
 
 /** A run killed for a later request; whoever waited on it asks again. */
 export class RunReplaced extends Error {

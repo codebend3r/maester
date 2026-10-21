@@ -29,6 +29,9 @@ export const numeric = (value: unknown): number | null => {
   return isNumber(parsed) && parsed > 0 ? parsed : null
 }
 
+/** The `disposition` flags raven reads off a stream. */
+const DISPOSITIONS = { default: 'default', attachedPicture: 'attached_pic' } as const
+
 const disposition = ({ stream, flag }: { stream: Stream; flag: string }): boolean =>
   isRecord(stream.disposition) && stream.disposition[flag] === 1
 
@@ -91,7 +94,8 @@ export const rateOf = (value: unknown): number | null => {
 const videoStreamOf = (streams: readonly Stream[]): Stream | undefined =>
   streams.find(
     (stream) =>
-      stream.codec_type === CODEC_TYPES.video && !disposition({ stream, flag: 'attached_pic' }),
+      stream.codec_type === CODEC_TYPES.video &&
+      !disposition({ stream, flag: DISPOSITIONS.attachedPicture }),
   )
 
 /** Where a file's media lies on its own clock, which the HLS plans are cut on. */
@@ -129,8 +133,8 @@ export const mediaClockOf = (output: unknown): MediaClock => {
   return {
     start,
     end,
-    videoStart: secondsOf(video?.start_time) ?? start,
-    frameRate: rateOf(video?.r_frame_rate) ?? rateOf(video?.avg_frame_rate),
+    videoStart: secondsOf(video?.start_time ?? null) ?? start,
+    frameRate: rateOf(video?.r_frame_rate ?? null) ?? rateOf(video?.avg_frame_rate ?? null),
   }
 }
 
@@ -147,7 +151,8 @@ export const parseProbe = (output: unknown): ProbeResult | null => {
   const video = videoStreamOf(streams)
   const audioTracks = streams.filter((stream) => stream.codec_type === CODEC_TYPES.audio)
   const audio =
-    audioTracks.find((stream) => disposition({ stream, flag: 'default' })) ?? audioTracks[0]
+    audioTracks.find((stream) => disposition({ stream, flag: DISPOSITIONS.default })) ??
+    audioTracks[0]
 
   if (!video && !audio) return null
 

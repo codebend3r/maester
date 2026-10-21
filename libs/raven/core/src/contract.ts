@@ -1151,7 +1151,7 @@ export const DIRECT_PLAYS = { auto: 'auto', force: 'force' } as const
 
 export const TRANSCODINGS = { on: 'on', remuxOnly: 'remuxOnly', off: 'off' } as const
 
-const QUALITIES = { low: 'low', medium: 'medium', high: 'high' } as const
+export const QUALITIES = { low: 'low', medium: 'medium', high: 'high' } as const
 
 export const HW_ACCELS = {
   auto: 'auto',

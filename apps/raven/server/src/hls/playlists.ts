@@ -11,7 +11,10 @@ type SubtitleRendition = { track: SubtitleTrack; uri: string }
 
 const SUBTITLE_GROUP = 'subs'
 
-const yesNo = (value: boolean): 'YES' | 'NO' => (value ? 'YES' : 'NO')
+/** RFC 8216's enumerated values for an attribute that is on or off. */
+const HLS_SWITCH = { yes: 'YES', no: 'NO' } as const
+
+const yesNo = (isYes: boolean) => (isYes ? HLS_SWITCH.yes : HLS_SWITCH.no)
 
 /** A quoted attribute value has no escape in RFC 8216, so a quote or a line break cannot appear in one. */
 const quoted = (value: string): string => `"${value.replace(/["\r\n]/g, '')}"`
@@ -58,7 +61,7 @@ const mediaLine = ({ track, uri, name }: SubtitleRendition & { name: string }): 
     `GROUP-ID=${quoted(SUBTITLE_GROUP)}`,
     `NAME=${quoted(name)}`,
     ...(track.language == null ? [] : [`LANGUAGE=${quoted(track.language)}`]),
-    'DEFAULT=NO',
+    `DEFAULT=${HLS_SWITCH.no}`,
     `AUTOSELECT=${yesNo(track.forced)}`,
     `FORCED=${yesNo(track.forced)}`,
     `URI=${quoted(uri)}`,

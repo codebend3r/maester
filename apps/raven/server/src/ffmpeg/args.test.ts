@@ -1,3 +1,4 @@
+import { QUALITIES } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import type { VideoEncoder } from '@/ffmpeg/encoder'
 import {
@@ -199,8 +200,8 @@ describe('streamArgs', () => {
 
 describe('transcodeBitrate', () => {
   it("is the viewer's ceiling, else the quality setting's target", () => {
-    expect(transcodeBitrate({ quality: 'high', bitrate: 3_000_000 })).toBe(3_000_000)
-    expect(transcodeBitrate({ quality: 'high', bitrate: null })).toBe(16_000_000)
+    expect(transcodeBitrate({ quality: QUALITIES.high, bitrate: 3_000_000 })).toBe(3_000_000)
+    expect(transcodeBitrate({ quality: QUALITIES.high, bitrate: null })).toBe(16_000_000)
   })
 })
 

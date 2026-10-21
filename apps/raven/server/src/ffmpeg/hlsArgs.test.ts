@@ -1,5 +1,6 @@
-import { PLAYBACK_MODES, type StreamMode } from '@raven/core'
+import { HLS_COPY_AUDIO_CODECS, PLAYBACK_MODES, QUALITIES, type StreamMode } from '@raven/core'
 import { describe, expect, it } from 'vitest'
+import { VIDEO_CODECS } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { DEMUX_TIME_BASES, type HlsDialect, SEGMENT_CLOCKS } from '@/ffmpeg/ffmpegVersion'
 import { type HlsSource, hlsArgs, hlsAudioArgs, hlsAudioCodec } from '@/ffmpeg/hlsArgs'
@@ -13,7 +14,7 @@ describe('hlsArgs', () => {
   }
   const aac = {
     index: 1,
-    codec: 'aac',
+    codec: HLS_COPY_AUDIO_CODECS.aac,
     channels: 2,
     language: null,
     title: null,
@@ -23,10 +24,10 @@ describe('hlsArgs', () => {
     input: '/m/clip.mkv',
     plan,
     audio: aac,
-    videoCodec: 'hevc',
+    videoCodec: VIDEO_CODECS.hevc,
     encoder: SOFTWARE,
     maxHeight: 1080,
-    quality: 'medium',
+    quality: QUALITIES.medium,
     bitrate: null,
     tonemap: false,
     startTime: 0,
@@ -235,7 +236,7 @@ describe('hlsArgs', () => {
 describe('hlsAudioArgs', () => {
   const track = {
     index: 0,
-    codec: 'aac',
+    codec: HLS_COPY_AUDIO_CODECS.aac,
     channels: 2,
     language: null,
     title: null,
@@ -244,7 +245,10 @@ describe('hlsAudioArgs', () => {
 
   it('copies what HLS players decode', () => {
     expect(hlsAudioArgs(track)).toEqual(['-c:a', 'copy'])
-    expect(hlsAudioArgs({ ...track, codec: 'eac3', channels: 8 })).toEqual(['-c:a', 'copy'])
+    expect(hlsAudioArgs({ ...track, codec: HLS_COPY_AUDIO_CODECS.eac3, channels: 8 })).toEqual([
+      '-c:a',
+      'copy',
+    ])
   })
 
   it('turns anything else into E-AC-3, keeping up to six channels', () => {

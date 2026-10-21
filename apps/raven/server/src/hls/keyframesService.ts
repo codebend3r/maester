@@ -54,7 +54,8 @@ export class KeyframesService {
   }: ProbeTarget & { mtimeMs: number | null }): Promise<number[]> {
     const keyframes = await this.ffmpeg.probeKeyframes(path)
     // Nothing awaits between this check and the save.
-    if (this.index.fileOf(id)?.mtimeMs === mtimeMs) this.index.saveKeyframes({ id, keyframes })
+    const current = this.index.fileOf(id)
+    if (current !== null && current.mtimeMs === mtimeMs) this.index.saveKeyframes({ id, keyframes })
     return keyframes
   }
 }

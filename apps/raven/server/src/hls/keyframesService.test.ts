@@ -1,6 +1,6 @@
 import { chmod, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { DEFAULT_PLAYBACK_SETTINGS } from '@raven/core'
+import { DEFAULT_PLAYBACK_SETTINGS, LIBRARY_KINDS } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
@@ -42,7 +42,7 @@ describe('KeyframesService', () => {
   const add = (name: string): number =>
     index().insert({
       libraryId: state.libraryId,
-      kind: 'other',
+      kind: LIBRARY_KINDS.other,
       file: { path: join(database.dir(), name), root: database.dir(), size: 1, mtimeMs: 1 },
     })
   const serviceWith = (ffprobePath: string) => {

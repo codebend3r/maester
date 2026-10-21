@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { readServerConfig } from '@/config'
 import { DEFAULT_PLAYBACK_SETTINGS, type HwAccel } from '@raven/core'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
-import { RUN_SIGNALS } from '@/hls/segmentRun'
+import { RUN_EVENTS, RUN_SIGNALS } from '@/hls/segmentRun'
 
 describe('FfmpegService', () => {
   const state = { dir: '' }
@@ -71,8 +71,8 @@ describe('FfmpegService', () => {
         { playback: () => DEFAULT_PLAYBACK_SETTINGS },
       ).warnOfMismatchedTools()
       expect(warn).toHaveBeenCalledTimes(1)
-      expect(String(warn.mock.calls[0]?.[0])).toContain(
-        'ffmpeg is 5.1.9-0+deb12u1 and ffprobe is 9.0.2',
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('ffmpeg is 5.1.9-0+deb12u1 and ffprobe is 9.0.2'),
       )
     } finally {
       warn.mockRestore()
@@ -91,7 +91,7 @@ describe('FfmpegService', () => {
     const ffmpeg = service('slow')
     const child = ffmpeg.segment([])
     const closed = new Promise<NodeJS.Signals | null>((resolve) => {
-      child.on('close', (_code, signal) => resolve(signal))
+      child.on(RUN_EVENTS.close, (_code, signal) => resolve(signal))
     })
 
     ffmpeg.onModuleDestroy()

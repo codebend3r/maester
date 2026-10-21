@@ -57,7 +57,7 @@ const codecOf = (stream: Stream): string | null =>
   isString(stream.codec_name) ? stream.codec_name : null
 
 const frameRateOf = (stream: Stream | undefined): number | null =>
-  rateOf(stream?.avg_frame_rate) ?? rateOf(stream?.r_frame_rate)
+  rateOf(stream?.avg_frame_rate ?? null) ?? rateOf(stream?.r_frame_rate ?? null)
 
 /**
  * Reads the audio and subtitle tracks from `ffprobe -show_streams -of json`

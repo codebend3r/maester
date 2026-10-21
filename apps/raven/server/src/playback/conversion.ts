@@ -85,7 +85,7 @@ export const audioTrackOf = ({
 /** The file's size in bytes, or a 404 once it is no longer on disk. */
 export const sizeOnDisk = async (file: MediaFile): Promise<number> => {
   const info = await stat(file.path).catch(() => null)
-  if (!info?.isFile()) throw new NotFoundException('The file is no longer on disk')
+  if (info === null || !info.isFile()) throw new NotFoundException('The file is no longer on disk')
   return info.size
 }
 

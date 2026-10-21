@@ -7,6 +7,8 @@
  */
 const truncateToMilliseconds = (seconds: number): number => Math.floor(seconds * 1000 + 1e-6) / 1000
 
+const PACKET_REPORT = { noTime: 'N/A', keyframe: 'K' } as const
+
 /**
  * The video keyframe times, in seconds and ascending, from ffprobe's
  * `-show_entries packet=pts_time,flags -of csv=p=0` report: one
@@ -17,7 +19,12 @@ export const parseKeyframes = (output: string): number[] =>
   output
     .split('\n')
     .map((line) => line.trim().split(','))
-    .filter(([time, flags]) => time !== '' && time !== 'N/A' && flags?.includes('K') === true)
+    .filter(
+      ([time, flags]) =>
+        time !== '' &&
+        time !== PACKET_REPORT.noTime &&
+        (flags ?? '').includes(PACKET_REPORT.keyframe),
+    )
     .map(([time]) => Number(time))
     .filter(Number.isFinite)
     .map(truncateToMilliseconds)

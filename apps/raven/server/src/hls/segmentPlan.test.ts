@@ -17,14 +17,14 @@ describe('remuxPlan', () => {
   it('starts segment 0 at the first keyframe', () => {
     const plan = remuxPlan({ keyframes: [0.041, 6.5, 12.9], duration: 15 })
 
-    expect(plan?.boundaries).toEqual([0.041, 6.5, 12.9])
+    expect(plan).toMatchObject({ boundaries: [0.041, 6.5, 12.9] })
     expect(plan && segmentDurations(plan)).toEqual([6.459, 6.4, 2.1])
   })
 
   it('takes a keyframe exactly six seconds on', () => {
     const plan = remuxPlan({ keyframes: [0, 3, 6, 12], duration: 14 })
 
-    expect(plan?.boundaries).toEqual([0, 6, 12])
+    expect(plan).toMatchObject({ boundaries: [0, 6, 12] })
   })
 
   it('keeps millisecond sums exact', () => {
@@ -42,7 +42,7 @@ describe('remuxPlan', () => {
   })
 
   it('accepts a gap of exactly twenty seconds', () => {
-    expect(remuxPlan({ keyframes: [0, 20], duration: 40 })?.boundaries).toEqual([0, 20])
+    expect(remuxPlan({ keyframes: [0, 20], duration: 40 })).toMatchObject({ boundaries: [0, 20] })
   })
 
   it('answers null with no keyframes', () => {

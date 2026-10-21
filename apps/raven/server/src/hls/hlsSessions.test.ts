@@ -12,10 +12,12 @@ import {
   HLS_KEPT_SEGMENTS,
   MEDIA_TICKET_SECONDS,
   PLAYBACK_MODES,
+  QUALITIES,
   STREAM_TIME_SHIFT,
   type StreamMode,
 } from '@raven/core'
 import { type MockInstance, afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { VIDEO_CODECS } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { type FfmpegStream, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, mediaClockOf } from '@/ffmpeg/probe'
@@ -29,7 +31,7 @@ import {
 } from '@/hls/hlsSessions'
 import { segmentFileName } from '@/hls/segmentFiles'
 import { type SegmentPlan, remuxPlan, transcodePlan } from '@/hls/segmentPlan'
-import { HLS_SEGMENT_WAIT_MS, RUN_SIGNALS } from '@/hls/segmentRun'
+import { HLS_SEGMENT_WAIT_MS, RUN_EVENTS, RUN_SIGNALS } from '@/hls/segmentRun'
 import { eventually, testConfig } from '@/test/app'
 import { encodeClip, encodeRichClip } from '@/test/clips'
 import { mdatOf, videoTfdt } from '@/test/mp4'
@@ -65,6 +67,13 @@ class WatchedFfmpeg extends FfmpegService {
     const child = super.segment(paced)
     this.runs.push({ args, child, kill: vi.spyOn(child, 'kill') })
     return child
+  }
+
+  /** The run started `n`th, which the test needs to have started. */
+  runAt(n: number): WatchedFfmpeg['runs'][number] {
+    const started = this.runs[n]
+    if (!started) throw new Error(`Run ${n} never started`)
+    return started
   }
 
   alive(): FfmpegStream[] {
@@ -243,10 +252,10 @@ describe('HlsSessions', () => {
         startTime,
         frameRate,
         audio,
-        videoCodec: 'h264',
+        videoCodec: VIDEO_CODECS.h264,
         encoder: SOFTWARE,
         maxHeight: 1080,
-        quality: 'medium',
+        quality: QUALITIES.medium,
         bitrate: null,
         tonemap: false,
       },
@@ -273,7 +282,8 @@ describe('HlsSessions', () => {
       .trim()
       .split('\n')
       .map((line) => line.split(',').map(Number))
-    return { count: packets.length, firstPts: packets[0]?.[0], firstDts: packets[0]?.[1] }
+    const [firstPts, firstDts] = packets[0] ?? []
+    return { count: packets.length, firstPts, firstDts }
   }
 
   const boundary = (n: number): number => state.plan.boundaries[n] ?? NaN
@@ -387,10 +397,10 @@ describe('HlsSessions', () => {
       )
 
       // The sound's start can move by an encoder's priming; the picture's cannot.
-      expect(source.clock?.videoStart).toBeGreaterThan((source.clock?.start ?? 0) + 0.1)
+      expect(source.clock?.videoStart ?? NaN).toBeGreaterThan((source.clock?.start ?? 0) + 0.1)
       expect(source.plan.boundaries.length).toBeGreaterThan(10)
       source.plan.boundaries.forEach((start, n) => {
-        expect(fromZero.get(n)?.firstPts).toBeCloseTo(start + STREAM_TIME_SHIFT, 2)
+        expect(fromZero.get(n)?.firstPts ?? NaN).toBeCloseTo(start + STREAM_TIME_SHIFT, 2)
       })
       expect([...fromThree.entries()]).toEqual([...fromZero.entries()].filter(([n]) => n >= 3))
       expect([...fromSeven.entries()]).toEqual([...fromZero.entries()].filter(([n]) => n >= 7))
@@ -418,10 +428,10 @@ describe('HlsSessions', () => {
       )
 
       // Segment 2 starts 2 s past a keyframe, where a seek alone landed at the next one.
-      expect(source.seekKeyframes?.length).toBe(4)
+      expect(source.seekKeyframes).toHaveLength(4)
       expect(source.plan.boundaries.length).toBeGreaterThan(5)
       source.plan.boundaries.forEach((start, n) => {
-        expect(fromZero.get(n)?.firstPts).toBeCloseTo(start + STREAM_TIME_SHIFT, 2)
+        expect(fromZero.get(n)?.firstPts ?? NaN).toBeCloseTo(start + STREAM_TIME_SHIFT, 2)
       })
       expect([...fromTwo.entries()]).toEqual([...fromZero.entries()].filter(([n]) => n >= 2))
       ;[...fromZero.values()].slice(0, -1).forEach(({ count }) => expect(count).toBe(150))
@@ -641,16 +651,16 @@ describe('HlsSessions', () => {
     await sessions.segment({ session: session.id, n: 0 })
     const init = await sessions.init({ session: session.id })
     const folder = join(dataDir, 'hls', session.id)
-    const [first] = ffmpeg.runs
+    const first = ffmpeg.runAt(0)
 
     expect(existsSync(folder)).toBe(true)
     advance(HLS_IDLE_MS - 1)
-    expect(first?.kill).not.toHaveBeenCalled()
+    expect(first.kill).not.toHaveBeenCalled()
     advance(1)
 
     // The rest takes its turn after whatever the session was doing.
     await eventually({ read: async () => existsSync(folder), check: (exists) => !exists })
-    expect(first?.kill).toHaveBeenCalledWith(RUN_SIGNALS.kill)
+    expect(first.kill).toHaveBeenCalledWith(RUN_SIGNALS.kill)
     expect(ffmpeg.alive()).toHaveLength(0)
     // The init outlives the rest, so it needs no run.
     expect(
@@ -697,7 +707,7 @@ describe('HlsSessions', () => {
 
     expect(sessions.get({ mediaId: 1, session: next?.id ?? '' })).toBeNull()
     expect(sessions.get({ mediaId: 1, session: oldest?.id ?? '' })).not.toBeNull()
-    expect(sessions.get({ mediaId: 1, session: ninth.id })?.id).toBe(ninth.id)
+    expect(sessions.get({ mediaId: 1, session: ninth.id })).toMatchObject({ id: ninth.id })
   })
 
   it('pauses a run ten segments past the furthest asked, and resumes it when asked further', async () => {
@@ -706,10 +716,10 @@ describe('HlsSessions', () => {
     const { ffmpeg, sessions } = open({ pace: PACE })
     const session = mintIn({ sessions, plan: state.keyframePlan })
     await sessions.segment({ session: session.id, n: 0 })
-    const [first] = ffmpeg.runs
-    const signals = () => first?.kill.mock.calls.flat() ?? []
+    const first = ffmpeg.runAt(0)
+    const signals = () => first.kill.mock.calls.flat()
     const stateOf = async (): Promise<string> =>
-      (await run('ps', ['-o', 'stat=', '-p', String(first?.child.pid)])).stdout.trim()
+      (await run('ps', ['-o', 'stat=', '-p', String(first.child.pid)])).stdout.trim()
 
     await eventually({ read: async () => signals(), check: (sent) => sent.length === 1 })
     expect(signals()).toEqual([RUN_SIGNALS.stop])
@@ -821,11 +831,11 @@ describe('HlsSessions', () => {
     const header = await init
     const fortieth = await sessions.segment({ session: session.id, n: 40 })
 
-    const [atZero, atForty] = ffmpeg.runs
     expect(ffmpeg.runs).toHaveLength(2)
-    expect(atZero?.kill).toHaveBeenCalledWith(RUN_SIGNALS.kill)
-    expect(argAfter({ args: atForty?.args ?? [], flag: '-segment_start_number' })).toBe('40')
-    expect(ffmpeg.alive().every((child) => child === atForty?.child)).toBe(true)
+    const atForty = ffmpeg.runAt(1)
+    expect(ffmpeg.runAt(0).kill).toHaveBeenCalledWith(RUN_SIGNALS.kill)
+    expect(argAfter({ args: atForty.args, flag: '-segment_start_number' })).toBe('40')
+    expect(ffmpeg.alive().every((child) => child === atForty.child)).toBe(true)
     expect((await videoOf({ init: header, media: fortieth })).firstPts).toBeCloseTo(
       (state.longPlan.boundaries[40] ?? NaN) + STREAM_TIME_SHIFT,
       3,
@@ -851,7 +861,7 @@ describe('HlsSessions', () => {
     const session = mintIn({ sessions })
     await sessions.segment({ session: session.id, n: 0 })
 
-    ffmpeg.runs[0]?.child.emit('error', new Error('A signal could not be sent'))
+    ffmpeg.runAt(0).child.emit(RUN_EVENTS.error, new Error('A signal could not be sent'))
     await sessions.segment({ session: session.id, n: 1 })
 
     expect(ffmpeg.runs).toHaveLength(1)
@@ -891,7 +901,7 @@ describe('HlsSessions', () => {
     expect(sessions.get({ mediaId: 1, session: first.id })).toBeNull()
     expect(sessions.get({ mediaId: 1, session: second.id })).toBeNull()
     expect(sessions.get({ mediaId: 2, session: kept.id })).not.toBeNull()
-    expect(ffmpeg.runs[0]?.kill).toHaveBeenCalledWith(RUN_SIGNALS.kill)
+    expect(ffmpeg.runAt(0).kill).toHaveBeenCalledWith(RUN_SIGNALS.kill)
     await eventually({ read: async () => existsSync(folder), check: (exists) => !exists })
 
     const stale = join(dataDir, 'hls', 'stale')

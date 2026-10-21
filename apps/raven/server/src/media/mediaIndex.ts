@@ -316,8 +316,9 @@ export class MediaIndex {
     const row = this.db
       .prepare<[number], { keyframes: string | null }>('SELECT keyframes FROM media WHERE id = ?')
       .get(id)
-    if (row?.keyframes == null) return null
-    return parseJsonAs({ json: row.keyframes, guard: isKeyframes })
+    const keyframes = row?.keyframes ?? null
+    if (keyframes === null) return null
+    return parseJsonAs({ json: keyframes, guard: isKeyframes })
   }
 
   saveKeyframes({ id, keyframes }: { id: number; keyframes: number[] }): void {

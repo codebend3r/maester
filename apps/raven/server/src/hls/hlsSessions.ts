@@ -103,6 +103,8 @@ type Step<T> =
 
 const ready = <T>(value: T): Step<T> => ({ kind: STEPS.ready, value })
 
+const SIGNAL_EVENTS = { abort: 'abort' } as const
+
 /**
  * Waits for `until`, or rejects with the signal's reason once the request's
  * client has gone, so a request nobody reads any more starts no run when
@@ -122,8 +124,8 @@ const untilOrGone = ({
       gone()
       return
     }
-    signal.addEventListener('abort', gone, { once: true })
-    until.finally(() => signal.removeEventListener('abort', gone)).then(resolve, reject)
+    signal.addEventListener(SIGNAL_EVENTS.abort, gone, { once: true })
+    until.finally(() => signal.removeEventListener(SIGNAL_EVENTS.abort, gone)).then(resolve, reject)
   })
 }
 
@@ -327,7 +329,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     const step = await this.inTurn({
       entry,
       work: async () => {
-        signal?.throwIfAborted()
+        if (signal) signal.throwIfAborted()
         return this.locate({ entry, n })
       },
     })
@@ -381,7 +383,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     const step = await this.inTurn({
       entry,
       work: async () => {
-        signal?.throwIfAborted()
+        if (signal) signal.throwIfAborted()
         return this.initStep({ entry, canStart })
       },
     })
