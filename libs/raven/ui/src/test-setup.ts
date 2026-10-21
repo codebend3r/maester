@@ -2,10 +2,12 @@ import { afterEach } from 'bun:test'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { useMediaOrigin } from '@/stores/mediaOrigin'
-import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { configurePlayerPrefs, usePlayerPrefs } from '@/stores/playerPrefs'
 import { usePlayerServices } from '@/stores/playerServices'
 import { useToasts } from '@/stores/toasts'
 import { resetBrowserSupport } from '@/test/canPlay'
+
+await configurePlayerPrefs({ storage: window.localStorage })
 
 const initialPrefs = usePlayerPrefs.getInitialState()
 const initialMediaOrigin = useMediaOrigin.getInitialState()

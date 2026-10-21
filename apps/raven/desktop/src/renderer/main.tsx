@@ -6,6 +6,7 @@ import '@fontsource/young-serif'
 import '@fontsource-variable/instrument-sans/wdth.css'
 // Shared primitives load before the desktop overrides.
 import '@raven/ui/styles.css'
+import { configurePlayerPrefs } from '@raven/ui'
 import '@/renderer/styles/desktop.scss'
 import { clientFor } from '@/renderer/desktop/client'
 import { createMenuHub } from '@/renderer/desktop/menuHub'
@@ -14,6 +15,8 @@ import { desktopRoutes } from '@/renderer/routes'
 import { useDesktopBridge } from '@/renderer/stores/desktop'
 import { APP_ORIGIN } from '@/shared/protocol'
 
+// Before the first render, since the player reads its prefs as it mounts.
+await configurePlayerPrefs({ storage: window.localStorage })
 const client = clientFor('ravenDesktop' in window ? window.ravenDesktop : undefined)
 // Listening before the first render, so the hand-over that answers the Shell's `ready` is heard.
 const player = listenForPlayer({ target: window, origin: APP_ORIGIN })
