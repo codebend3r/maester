@@ -1,4 +1,4 @@
-import type { MediaItem } from '@raven/core'
+import type { ItemDetails, ItemSummary, Library, MediaItem } from '@raven/core'
 
 export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   id: 7,
@@ -31,5 +31,88 @@ export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   variant: null,
   card: null,
   watched: false,
+  ...overrides,
+})
+
+export const library = (overrides: Partial<Library> = {}): Library => ({
+  id: 2,
+  name: 'Movies',
+  paths: ['/media/Movies'],
+  layouts: [{ path: '/media/Movies', layout: 'flat', groups: 0 }],
+  itemCount: 12,
+  unmatchedCount: 0,
+  createdAt: '2026-09-27T00:00:00.000Z',
+  scan: {
+    state: 'idle',
+    found: 12,
+    processed: 12,
+    startedAt: null,
+    finishedAt: null,
+    quickScannedAt: null,
+    error: null,
+  },
+  settings: {
+    saveProgress: true,
+    pinned: true,
+    sort: 'title',
+    view: 'grid',
+    groupBy: 'resolution',
+    watchedPercent: 95,
+    kind: 'other',
+    ratingsSource: 'tmdb',
+    autoRefresh: true,
+    locked: false,
+    folderLayout: 'auto',
+    icon: null,
+  },
+  backdrop: null,
+  ratingsRefresh: { state: 'idle', finishedAt: null },
+  ...overrides,
+})
+
+export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary => ({
+  id: 40,
+  type: 'movie',
+  title: 'Busboys',
+  year: 2026,
+  show: null,
+  season: null,
+  episode: null,
+  posterVersion: 'p1',
+  backdropVersion: null,
+  ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 1200 }],
+  ...overrides,
+})
+
+/** A matched movie in a Movies library: the file's parsed name, and the movie it is. */
+export const matchedMovie = (overrides: Partial<MediaItem> = {}): MediaItem =>
+  mediaItem({ title: 'Busboys', year: 2026, match: 'matched', item: itemSummary(), ...overrides })
+
+export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails => ({
+  ...itemSummary(),
+  tmdbId: '1001',
+  imdbId: 'tt1001',
+  originalTitle: 'Busboys',
+  tagline: 'Every table has a story.',
+  summary: 'Two busboys at a downtown steakhouse plan one last perfect shift.',
+  contentRating: 'R',
+  released: '2026-03-14',
+  ended: null,
+  runtime: 97,
+  studio: 'Night Shift Pictures',
+  genres: ['Comedy', 'Drama', 'Crime', 'Romance'],
+  backdropVersion: 'b1',
+  logoVersion: null,
+  favourite: null,
+  aiMatch: null,
+  reviews: [],
+  credits: [
+    { personId: 1, name: 'Mark Kimball', job: 'cast', role: 'Rudy', photoVersion: 'k1' },
+    { personId: 2, name: 'Ana Ortiz', job: 'cast', role: 'Lena', photoVersion: null },
+    { personId: 1, name: 'Mark Kimball', job: 'director', role: 'Director', photoVersion: 'k1' },
+    { personId: 3, name: 'Jo Park', job: 'writer', role: 'Screenplay', photoVersion: null },
+  ],
+  versions: [matchedMovie()],
+  children: [],
   ...overrides,
 })

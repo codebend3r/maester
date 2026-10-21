@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { METADATA_SERVICE_STATES, type MediaItem, type MetadataHealth } from '@raven/core'
 import { useEffect, useRef } from 'react'
-import { afterAiLookups } from '@/lib/invalidate'
+import { afterAiLookups } from '@raven/ui/headless'
 import { metadataHealthQuery } from '@/lib/queries'
 import { POLL_MS, anyPending } from '@/pages/LibraryPage/useMatchingPassDone'
 

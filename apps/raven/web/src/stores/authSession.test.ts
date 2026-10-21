@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import { AUTH_EVENTS } from '@/lib/authClient'
-import { queryClient, queryKeys } from '@/lib/queryClient'
+import { createSelectionStore, queryKeys, useUnlockPrompt } from '@raven/ui/headless'
+import { queryClient } from '@/lib/queryClient'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { createSelectionStore, useUnlockPrompt } from '@raven/ui/headless'
 import { useSelectionScopes } from '@/stores/selectionScope'
 import { fakeAuthClient, fakeSession, readyConfig as config } from '@/test/authClient'
 

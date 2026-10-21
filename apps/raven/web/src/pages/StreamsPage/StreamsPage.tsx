@@ -27,7 +27,7 @@ import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useManagement } from '@/lib/management'
 import { api } from '@/lib/api'
 import { liveStreamsQuery, mediaStreamsQuery, tracksQuery } from '@/lib/queries'
-import { queryKeys } from '@/lib/queryClient'
+import { queryKeys } from '@raven/ui/headless'
 import styles from '@/pages/StreamsPage/StreamsPage.module.scss'
 
 const MODE_LABELS = {

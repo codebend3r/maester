@@ -3,32 +3,20 @@ import {
   type Duplicates,
   HOME_SHELF_TYPES,
   type HistoryEntry,
+  type Home,
   type HomeSearch,
   type HomeShelf,
   type ItemDetails,
   type ItemSummary,
+  type Library,
   type LibrarySettings,
   type MediaItem,
   type PosterEntry,
   type Saga,
   type ShowListing,
 } from '@raven/core'
-import { type Edit, edit, editAll } from '@/lib/optimistic'
-import {
-  favouriteTitlesQuery,
-  favouritesQuery,
-  homeQuery,
-  inProgressQuery,
-  itemQuery,
-  duplicatesQuery,
-  librariesQuery,
-  libraryFavouritesQuery,
-  libraryQuery,
-  mediaQuery,
-  sagasQuery,
-  unmatchedQuery,
-} from '@/lib/queries'
-import { queryKeys } from '@/lib/queryClient'
+import { type Edit, editAll, editKey } from '@/query/optimistic'
+import { queryKeys } from '@/query/queryClient'
 
 /**
  * What each change looks like in the cache before the server answers, named
@@ -70,13 +58,13 @@ export const itemFavouriteEdits = ({
   item: ItemDetails
   favourite: boolean
 }): Edit[] => [
-  edit({
-    queryKey: itemQuery(item.id).queryKey,
+  editKey<ItemDetails>({
+    queryKey: queryKeys.item(item.id),
     update: (details) => (details.favourite === favourite ? details : { ...details, favourite }),
   }),
-  edit({
-    queryKey: favouriteTitlesQuery.queryKey,
-    update: (titles: ItemSummary[]) => {
+  editKey<ItemSummary[]>({
+    queryKey: queryKeys.favouriteTitles,
+    update: (titles) => {
       if (favourite) return titles
       const kept = titles.filter((title) => title.id !== item.id)
       return kept.length === titles.length ? titles : kept
@@ -121,7 +109,7 @@ export const favouriteEdits = ({
   }
   const { libraryId } = media
   return [
-    edit({ queryKey: mediaQuery(media.id).queryKey, update: mark }),
+    editKey<MediaItem>({ queryKey: queryKeys.mediaItem(media.id), update: mark }),
     editAll<MediaItem[]>({
       filters: { queryKey: queryKeys.mediaLists(libraryId) },
       update: markAll,
@@ -133,12 +121,15 @@ export const favouriteEdits = ({
         return unmatched === listing.unmatched ? listing : { ...listing, unmatched }
       },
     }),
-    edit({ queryKey: unmatchedQuery(libraryId).queryKey, update: markAll }),
-    edit({ queryKey: inProgressQuery(libraryId).queryKey, update: markEntries }),
-    edit({ queryKey: favouritesQuery.queryKey, update: favourites }),
-    edit({ queryKey: libraryFavouritesQuery(libraryId).queryKey, update: favourites }),
-    edit({
-      queryKey: homeQuery.queryKey,
+    editKey<MediaItem[]>({ queryKey: queryKeys.unmatched(libraryId), update: markAll }),
+    editKey<PosterEntry[]>({ queryKey: queryKeys.inProgress(libraryId), update: markEntries }),
+    editKey<PosterEntry[]>({ queryKey: queryKeys.favourites, update: favourites }),
+    editKey<PosterEntry[]>({
+      queryKey: queryKeys.libraryFavourites(libraryId),
+      update: favourites,
+    }),
+    editKey<Home>({
+      queryKey: queryKeys.home,
       update: (home) => {
         const inProgress = markEntries(home.inProgress)
         const shelves = markShelves(home.shelves)
@@ -150,8 +141,8 @@ export const favouriteEdits = ({
     editAll<HomeSearch>({ filters: { queryKey: queryKeys.homeSearches }, update: markShelves }),
     ...(media.item
       ? [
-          edit({
-            queryKey: itemQuery(media.item.id).queryKey,
+          editKey<ItemDetails>({
+            queryKey: queryKeys.item(media.item.id),
             update: (details) => {
               const versions = markAll(details.versions)
               return versions === details.versions ? details : { ...details, versions }
@@ -258,12 +249,15 @@ export const watchedEdits = ({
         return unmatched === listing.unmatched ? listing : { ...listing, unmatched }
       },
     }),
-    edit({ queryKey: unmatchedQuery(libraryId).queryKey, update: markAll }),
-    edit({ queryKey: inProgressQuery(libraryId).queryKey, update: dropEntries }),
-    edit({ queryKey: favouritesQuery.queryKey, update: markEntries }),
-    edit({ queryKey: libraryFavouritesQuery(libraryId).queryKey, update: markEntries }),
-    edit({
-      queryKey: homeQuery.queryKey,
+    editKey<MediaItem[]>({ queryKey: queryKeys.unmatched(libraryId), update: markAll }),
+    editKey<PosterEntry[]>({ queryKey: queryKeys.inProgress(libraryId), update: dropEntries }),
+    editKey<PosterEntry[]>({ queryKey: queryKeys.favourites, update: markEntries }),
+    editKey<PosterEntry[]>({
+      queryKey: queryKeys.libraryFavourites(libraryId),
+      update: markEntries,
+    }),
+    editKey<Home>({
+      queryKey: queryKeys.home,
       update: (home) => {
         const inProgress = dropEntries(home.inProgress)
         const shelves = markShelves(home.shelves)
@@ -273,8 +267,8 @@ export const watchedEdits = ({
       },
     }),
     editAll<HomeSearch>({ filters: { queryKey: queryKeys.homeSearches }, update: markShelves }),
-    edit({ queryKey: sagasQuery(libraryId).queryKey, update: markSagas }),
-    edit({ queryKey: duplicatesQuery(libraryId).queryKey, update: markDuplicates }),
+    editKey<Saga[]>({ queryKey: queryKeys.sagas(libraryId), update: markSagas }),
+    editKey<Duplicates>({ queryKey: queryKeys.duplicates(libraryId), update: markDuplicates }),
     // The library's history, and the one across every library.
     editAll<HistoryEntry[]>({
       filters: { queryKey: queryKeys.historyLists(libraryId) },
@@ -286,8 +280,8 @@ export const watchedEdits = ({
     }),
     ...(media.item
       ? [
-          edit({
-            queryKey: itemQuery(media.item.id).queryKey,
+          editKey<ItemDetails>({
+            queryKey: queryKeys.item(media.item.id),
             update: (details) => {
               const versions = markAll(details.versions)
               return versions === details.versions ? details : { ...details, versions }
@@ -306,12 +300,12 @@ export const librarySettingsEdits = ({
   libraryId: number
   change: Partial<LibrarySettings>
 }): Edit[] => [
-  edit({
-    queryKey: libraryQuery(libraryId).queryKey,
+  editKey<Library>({
+    queryKey: queryKeys.library(libraryId),
     update: (library) => ({ ...library, settings: { ...library.settings, ...change } }),
   }),
-  edit({
-    queryKey: librariesQuery.queryKey,
+  editKey<Library[]>({
+    queryKey: queryKeys.libraries,
     update: (libraries) =>
       mapWhere({
         items: libraries,

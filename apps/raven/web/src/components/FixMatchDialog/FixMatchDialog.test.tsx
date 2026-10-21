@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
@@ -53,6 +53,9 @@ describe('Fix match', () => {
     spies.search.mockReset()
     spies.setMatch.mockReset()
   })
+
+  // The libraries answer holds for the whole file; a later file reads its own.
+  afterAll(() => Object.values(spies).forEach((spy) => spy.mockRestore()))
 
   const unmatched = mediaItem({ title: 'Busboys', year: 2026, match: 'unmatched' })
 

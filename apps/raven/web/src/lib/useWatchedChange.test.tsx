@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { queryKeys } from '@raven/ui/headless'
 import { useWatchedChange } from '@/lib/useWatchedChange'
 import { held } from '@/test/held'
 

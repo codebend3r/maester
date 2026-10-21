@@ -1,6 +1,6 @@
 import type { InvalidateQueryFilters, QueryClient } from '@tanstack/react-query'
 import type { ItemDetails } from '@raven/core'
-import { queryKeys } from '@/lib/queryClient'
+import { queryKeys } from '@/query/queryClient'
 
 /**
  * What to read again after each kind of change, named for the change, so a

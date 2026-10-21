@@ -4,7 +4,7 @@ import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { api } from '@/lib/api'
-import { afterSplit } from '@/lib/invalidate'
+import { afterSplit } from '@raven/ui/headless'
 import styles from '@/components/MovieFiles/MovieFiles.module.scss'
 
 /** The movie's other cards in the library, each with its files, best first. */

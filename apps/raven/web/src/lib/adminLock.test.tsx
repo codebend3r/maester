@@ -5,7 +5,7 @@ import { ADMIN_LOCK_STATES, AUTH_CONFIG_STATES, type AdminLock, type AuthConfig 
 import type { ReactNode } from 'react'
 import { isAdminLocked, useAdminLock, useFollowAdminLock } from '@/lib/adminLock'
 import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { queryKeys } from '@raven/ui/headless'
 import { readyConfig } from '@/test/authClient'
 
 describe('isAdminLocked', () => {

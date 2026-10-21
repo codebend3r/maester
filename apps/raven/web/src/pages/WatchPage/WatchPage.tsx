@@ -18,10 +18,9 @@ import {
   useLeaveFullscreen,
   useMediaPlane,
 } from '@raven/ui'
-import { useHostPlayer, usePlayerPrefs } from '@raven/ui/headless'
+import { afterWatching, useHostPlayer, usePlayerPrefs } from '@raven/ui/headless'
 import { useReprobe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { api } from '@/lib/api'
-import { afterWatching } from '@/lib/invalidate'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from 'react-router-dom'
 import { authConfigQuery, mediaQuery } from '@/lib/queries'

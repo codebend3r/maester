@@ -19,9 +19,8 @@ import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button } from '@raven/ui'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { api } from '@/lib/api'
-import { afterSplit } from '@/lib/invalidate'
+import { afterSplit, queryKeys } from '@raven/ui/headless'
 import { POSTER_SIZES } from '@/lib/posters'
-import { queryKeys } from '@/lib/queryClient'
 import styles from '@/components/Duplicates/Duplicates.module.scss'
 
 /** The card's poster, opening its page. */

@@ -16,7 +16,7 @@ import { api } from '@/lib/api'
 import { type AuthClient } from '@/lib/authClient'
 import { AUTH_ERRORS } from '@/lib/authErrors'
 import { AUTH_QUERY } from '@/lib/authRoutes'
-import { queryKeys } from '@/lib/queryClient'
+import { queryKeys } from '@raven/ui/headless'
 import { CONFIRM_TYPES, ConfirmPage } from '@/pages/ConfirmPage/ConfirmPage'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import {

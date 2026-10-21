@@ -4,7 +4,7 @@ import { Button } from '@raven/ui'
 import { AUTH_ROUTES } from '@raven/core'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { signInPath } from '@/lib/authRoutes'
-import { queryKeys } from '@/lib/queryClient'
+import { queryKeys } from '@raven/ui/headless'
 import styles from '@/components/AuthGate/AuthGate.module.scss'
 
 const Loading = () => (

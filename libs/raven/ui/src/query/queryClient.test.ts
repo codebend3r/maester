@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test'
-import { playerQueriesFor, playerQueryKeys, useUnlockPrompt } from '@raven/ui/headless'
-import { api } from '@/lib/api'
 import { ApiError } from '@raven/core'
-import { createQueryClient, queryKeys } from '@/lib/queryClient'
+import { createQueryClient, queryKeys } from '@/query/queryClient'
+import { playerQueriesFor } from '@/lib/playerQueries'
+import { playerQueryKeys } from '@/lib/playerQueryKeys'
+import { useUnlockPrompt } from '@/stores/unlockPrompt'
+import { recordingApi } from '@/test/recordingApi'
 
 const failWith = (status: number) => async (): Promise<never> => {
   throw new ApiError({ status, message: 'No' })
@@ -22,9 +24,20 @@ describe('createQueryClient', () => {
   })
 })
 
+describe('the retry policy', () => {
+  it('gives up at once on a 404 and tries anything else once more', () => {
+    const retry = createQueryClient().getDefaultOptions().queries?.retry
+    const retries = (error: Error) =>
+      typeof retry === 'function' ? [0, 1].map((failures) => retry(failures, error)) : []
+    expect(retries(new ApiError({ status: 404, message: 'Gone' }))).toEqual([false, false])
+    expect(retries(new ApiError({ status: 500, message: 'Broke' }))).toEqual([true, false])
+  })
+})
+
 describe('shared player query keys', () => {
   it('keeps player caches reachable by the web invalidation keys', async () => {
     const client = createQueryClient()
+    const { api } = recordingApi({ body: null })
     const queries = playerQueriesFor(api)
     const input = { id: 7, trackId: 'embedded-0', window: 0 }
     expect(queryKeys.mediaTracks).toBe(playerQueryKeys.mediaTracks)

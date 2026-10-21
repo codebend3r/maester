@@ -13,15 +13,20 @@ import {
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, type IconName } from '@raven/ui'
-import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@raven/ui/headless'
+import {
+  CONTROLS_LINGER_SECONDS,
+  edit,
+  mutationKeys,
+  queryKeys,
+  useOptimisticMutation,
+  usePlayerPrefs,
+} from '@raven/ui/headless'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { api } from '@/lib/api'
 import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
-import { edit, useOptimisticMutation } from '@/lib/optimistic'
 import { adminLockQuery, displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
-import { mutationKeys, queryKeys } from '@/lib/queryClient'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { UsersSection } from '@/pages/SettingsPage/UsersSection'

@@ -11,10 +11,12 @@ import {
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '@/lib/api'
-import { librarySettingsEdits } from '@/lib/edits'
-import { afterLibraryView } from '@/lib/invalidate'
-import { useOptimisticMutation } from '@/lib/optimistic'
-import { mutationKeys } from '@/lib/queryClient'
+import {
+  afterLibraryView,
+  librarySettingsEdits,
+  mutationKeys,
+  useOptimisticMutation,
+} from '@raven/ui/headless'
 import { useAddressSearch } from '@/lib/useSearch'
 
 /** A fresh deal for a random sort; the order holds while the page is open. */

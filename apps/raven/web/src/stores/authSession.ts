@@ -7,7 +7,8 @@ import {
   createAuthClient,
 } from '@/lib/authClient'
 import { clearAccountState } from '@/lib/clearAccountState'
-import { queryClient, queryKeys } from '@/lib/queryClient'
+import { queryKeys } from '@raven/ui/headless'
+import { queryClient } from '@/lib/queryClient'
 
 export const AUTH_SESSION_STATUSES = { booting: 'booting', ready: 'ready' } as const
 export type AuthSessionStatus = (typeof AUTH_SESSION_STATUSES)[keyof typeof AUTH_SESSION_STATUSES]

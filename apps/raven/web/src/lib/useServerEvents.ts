@@ -3,7 +3,7 @@ import { SERVER_EVENT_TYPES, type ServerEvent, parseServerEvent } from '@raven/c
 import { useEffect } from 'react'
 import { api } from '@/lib/api'
 import { EVENT_SOURCE_EVENTS } from '@/lib/eventSourceEvents'
-import { afterLibraryEvent, afterReconnect } from '@/lib/invalidate'
+import { afterLibraryEvent, afterReconnect } from '@raven/ui/headless'
 import { onAccessTokenChange } from '@/stores/authSession'
 
 /** Reads again what an event says changed. */

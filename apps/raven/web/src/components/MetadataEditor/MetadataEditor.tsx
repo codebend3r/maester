@@ -11,7 +11,7 @@ import { type FormEvent, useId, useState } from 'react'
 import { Button, Icon } from '@raven/ui'
 import { MovieFiles } from '@/components/MovieFiles/MovieFiles'
 import { api } from '@/lib/api'
-import { EDITED_PARTS, afterItemEdited } from '@/lib/invalidate'
+import { EDITED_PARTS, afterItemEdited } from '@raven/ui/headless'
 import { itemMetadataQuery } from '@/lib/queries'
 import styles from '@/components/MetadataEditor/MetadataEditor.module.scss'
 
