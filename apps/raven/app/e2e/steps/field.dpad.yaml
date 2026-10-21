@@ -1,19 +1,12 @@
 appId: io.github.codebend3r.raven.app
 name: Type into the field named FIELD with the remote, check it shows SHOWN, then send it
 ---
-# Each step opens with nothing focused on Android TV, so Down brings the remote's focus to the
-# step's field, its first control.
-- repeat:
-    while:
-      notVisible:
-        text: ${FIELD}
-        focused: true
-    times: 3
-    commands:
-      - pressKey: Remote Dpad Down
-- assertVisible:
-    text: ${FIELD}
-    focused: true
+# Each step opens with the remote on its field, untouched.
+- extendedWaitUntil:
+    visible:
+      text: ${FIELD}
+      focused: true
+    timeout: 10000
 # Select opens the platform's keyboard on the field.
 - pressKey: Remote Dpad Center
 # What is typed is checked before it is sent, clearing the field to type it again when a key

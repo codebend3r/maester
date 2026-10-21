@@ -26,6 +26,25 @@ const useScreenTurn = ({ isToFront, onTurn }: { isToFront: boolean; onTurn: () =
   }, [isFocused, isToFront, onTurn])
 }
 
+/**
+ * Asks the remote's focus for the view `view` holds once, as it is drawn, when `isAsked` was
+ * true then. A view that mounts asking through `hasTVPreferredFocus` asks before it is in the
+ * window, and the fork retries that only once, which on Android TV is still too early: the
+ * screen opened with nothing focused.
+ */
+export const useFocusOnMount = ({
+  view,
+  isAsked = true,
+}: {
+  view: RefObject<unknown>
+  isAsked?: boolean
+}): void => {
+  const isAskedOnMount = useRef(isAsked)
+  useEffect(() => {
+    if (isAskedOnMount.current) requestTVFocus(view.current)
+  }, [view])
+}
+
 /** Whether the screen still gives its opening focus, and the way to say something has had it. */
 type OpeningFocus = { isOpening: boolean; settle: () => void }
 

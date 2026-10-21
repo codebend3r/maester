@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { type ComponentRef, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 
+import { useFocusOnMount } from '@/layouts/focus'
 import {
   type FieldProps,
   type FormButtonProps,
@@ -27,6 +28,9 @@ const Form = ({ title, children }: FormProps) => (
 // the text back as it is typed; the field only needs to show where focus is. Leaving the
 // keyboard with Menu cancels the edit: the native field goes back to what it held, but no
 // change is reported, so the field takes the text it ends editing with as the truth.
+// The step's first field takes the remote as it is drawn, so a step never opens with nothing
+// focused. Android's text input has no preferred focus, and its own `focus()` opens the
+// keyboard, so the frame asks: it cannot hold the focus, which goes on to the field inside.
 const Field = ({
   label,
   value,
@@ -38,10 +42,16 @@ const Field = ({
   isFirst = false,
 }: FieldProps) => {
   const [isFocused, setFocused] = useState(false)
+  const frame = useRef<ComponentRef<typeof View>>(null)
+  useFocusOnMount({ view: frame, isAsked: isFirst })
   return (
     <View style={styles.field}>
       <Text style={[formStyles.label, styles.label]}>{label}</Text>
-      <View style={[formStyles.input, tvFieldStyles.frame, isFocused && formStyles.focused]}>
+      <View
+        ref={frame}
+        collapsable={false}
+        style={[formStyles.input, tvFieldStyles.frame, isFocused && formStyles.focused]}
+      >
         <TextInput
           accessibilityLabel={label}
           autoCapitalize="none"

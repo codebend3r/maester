@@ -680,6 +680,15 @@ jobs:
       # The flows reach the fixture server over plain http on the loopback, which only the
       # development variant's cleartext traffic allows.
       APP_VARIANT: development
+      # The emulator both runner steps start, its build pinned to the one the flows were
+      # written on (36.5.11), so the AVD cache's key can name everything its snapshot was
+      # made with.
+      EMULATOR_BUILD: '15261927'
+      EMULATOR_CORES: '4'
+      EMULATOR_RAM: 4096M
+      EMULATOR_OPTIONS: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+      # Android TV, API 36 (the app's target SDK), x86_64 for KVM, at 960 by 540 dp.
+      AVD_IMAGE: system-images;android-36;android-tv;x86_64
     steps:
       # The PR's head commit, so the artifact name below matches the commit that was built.
       - name: 📥 Checkout exact PR head
@@ -742,8 +751,20 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # The AVD cache's key names everything its snapshot is made from: the system image's
+      # revision (the runner always installs the newest, which this reads from the same
+      # repository), the emulator build, the cores, the RAM and a hash of the options. A
+      # snapshot from anything else would not load and the emulator would cold boot every run.
+      # Bump the `v1` to throw the cache away by hand.
+      - name: 🔑 AVD cache key
+        id: avd-key
+        run: |
+          revision="$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null | awk -F'|' -v image="$AVD_IMAGE" '{ gsub(/ /, "", $1); gsub(/ /, "", $2) } $1 == image { print $2; exit }')"
+          test -n "$revision"
+          options="$(echo "$EMULATOR_OPTIONS" | sha256sum | cut -c1-12)"
+          echo "key=avd-v1-android-tv-36-x86_64-tv_1080p-image$revision-emulator$EMULATOR_BUILD-$EMULATOR_CORES-cores-$EMULATOR_RAM-$options" >> "$GITHUB_OUTPUT"
+
       # The Android TV AVD with a booted snapshot, so a later run boots from it in seconds.
-      # The key names everything the AVD is made from; change it with any of them.
       - name: 🗃️ Android TV AVD cache
         id: avd-cache
         uses: actions/cache@v6
@@ -751,7 +772,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-android-tv-36-x86_64-tv_1080p-${{ runner.os }}
+          key: ${{ steps.avd-key.outputs.key }}
 
       # Only on a cache miss: makes the AVD, boots it once and saves the snapshot.
       - name: 📺 Make the Android TV AVD
@@ -763,10 +784,11 @@ jobs:
           target: android-tv
           arch: x86_64
           profile: tv_1080p
-          cores: 4
-          ram-size: 4096M
+          emulator-build: ${{ env.EMULATOR_BUILD }}
+          cores: ${{ env.EMULATOR_CORES }}
+          ram-size: ${{ env.EMULATOR_RAM }}
           force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: ${{ env.EMULATOR_OPTIONS }}
           disable-animations: false
           script: echo "Saved the Android TV AVD's snapshot"
 
@@ -813,10 +835,11 @@ jobs:
           target: android-tv
           arch: x86_64
           profile: tv_1080p
-          cores: 4
-          ram-size: 4096M
+          emulator-build: ${{ env.EMULATOR_BUILD }}
+          cores: ${{ env.EMULATOR_CORES }}
+          ram-size: ${{ env.EMULATOR_RAM }}
           force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-snapshot-save ${{ env.EMULATOR_OPTIONS }}
           disable-animations: true
           disable-spellchecker: true
           script: |

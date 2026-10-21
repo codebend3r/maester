@@ -70,8 +70,9 @@ A file the device plays as it is (on Apple, an MP4 or MOV of H.264 or HEVC with 
 On Android TV the same server is signed in to with the remote: `e2e/play.dpad.yaml` signs in by moving to each field, opening the platform's keyboard with select, typing and checking what the field shows (a secret as one dot a character) before sending it, finds the film focused on Home, opens it, plays it, pauses with the remote's play and pause key, skips ten seconds ahead with right, leaves with Back to a page offering to resume from that spot, finds the film under Continue watching with the focus back on the card it opened, and marks it watched and back, so the fixture is left as it was found. `e2e/home.yaml` runs there too. Build the development variant for Android TV, install it on the running emulator and run them; `e2e:android-tv` first points the emulator's `127.0.0.1:8490` at the computer's with `adb reverse`, so the app signs in to the address the iPhone uses:
 
 ```sh
+export ANDROID_HOME=~/Library/Android/sdk
 APP_VARIANT=development bunx nx run @raven/app:build:android-tv
-adb install apps/raven/app/android/app/build/outputs/apk/release/app-release.apk
+$ANDROID_HOME/platform-tools/adb install apps/raven/app/android/app/build/outputs/apk/release/app-release.apk
 bun run app:e2e:android-tv
 ```
 

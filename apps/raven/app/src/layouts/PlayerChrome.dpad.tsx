@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import Video from 'react-native-video'
 
+import { useFocusOnMount } from '@/layouts/focus'
 import { FocusBand } from '@/layouts/FocusBand'
 import { focusPicker } from '@/layouts/Picker.focus'
 import { CaptionText } from '@/layouts/PlayerCaption'
@@ -49,13 +50,6 @@ const THUMB = TV_SIZES.space4
 const THUMB_FOCUSED = TV_SIZES.space6
 
 type Focusable = RefObject<ComponentRef<typeof Pressable> | null>
-
-/** Asks the remote's focus for the view once, as it is drawn: each time the controls appear. */
-const useFocusOnMount = (view: Focusable) => {
-  useEffect(() => {
-    requestTVFocus(view.current)
-  }, [view])
-}
 
 /**
  * Hears the remote through the fork's `useTVEventHandler`, which subscribes again whenever its
@@ -218,7 +212,7 @@ const Controls = ({
 /** While the controls are hidden, the one thing on screen to hold the remote's focus. */
 const ControlsCatcher = ({ onPress }: { onPress: () => void }) => {
   const catcher: Focusable = useRef(null)
-  useFocusOnMount(catcher)
+  useFocusOnMount({ view: catcher })
   return (
     <Pressable
       ref={catcher}

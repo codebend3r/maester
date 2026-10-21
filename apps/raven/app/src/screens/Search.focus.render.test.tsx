@@ -91,6 +91,7 @@ describe('Search on a TV', () => {
   it('opens with the remote on the field, and only the field', async () => {
     await renderScreen({ ui: <Search /> })
     expect(preferred()).toEqual([FIELD])
+    expect(askedFor()).toEqual([FIELD])
   })
 
   it('lets go of the opening focus once the field has had it, and gives the results none', async () => {
@@ -142,7 +143,8 @@ describe('Search on a TV', () => {
     await fireEvent.press(show)
     await leaveTestScreen()
     await returnToTestScreen()
-    expect(askedFor()).toEqual(['Dune: Prophecy'])
+    // The field asked as the screen opened; the return asks only for the result.
+    expect(askedFor()).toEqual([FIELD, 'Dune: Prophecy'])
     expect(preferred()).toEqual([])
   })
 })

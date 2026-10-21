@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { type ComponentRef, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 
-import { useScreenFocusScope } from '@/layouts/focus'
+import { useFocusOnMount, useScreenFocusScope } from '@/layouts/focus'
 import { tvFormStyles as formStyles } from '@/layouts/formStyles'
 import {
   CLEAR_SEARCH,
@@ -26,9 +26,14 @@ const SearchField = ({
   onFocused = NOTHING_ON_FOCUS,
 }: SearchFieldProps) => {
   const [isFocused, setFocused] = useState(false)
+  const frame = useRef<ComponentRef<typeof View>>(null)
+  useFocusOnMount({ view: frame, isAsked: isPreferred })
   return (
     <View style={styles.box}>
+      {/* Asks for the remote on the field inside, as sign-in's frame does. */}
       <View
+        ref={frame}
+        collapsable={false}
         style={[
           formStyles.input,
           tvFieldStyles.frame,
