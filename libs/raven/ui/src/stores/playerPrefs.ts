@@ -1,5 +1,8 @@
 import { create } from 'zustand'
-import { createJSONStorage, persist } from 'zustand/middleware'
+import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
+
+/** The key the prefs are stored under. */
+export const PLAYER_PREFS_KEY = 'raven-player'
 
 /** How many seconds the player's controls linger once nothing stirs: the slider's ends and where it starts. */
 export const CONTROLS_LINGER_SECONDS = { min: 3, max: 10, initial: 5 } as const
@@ -33,6 +36,17 @@ type PlayerPrefs = {
 }
 
 /**
+ * zustand's persist falls back to `window.localStorage` when it has no storage,
+ * which this module must not touch, and it only gains `persist.setOptions`
+ * when it starts with one. This holds the place until `configurePlayerPrefs`.
+ */
+const UNCONFIGURED: StateStorage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined,
+}
+
+/**
  * Volume, subtitles, audio language, how long the controls linger and
  * autoplay carry over from one video to the next, and across visits.
  */
@@ -56,8 +70,9 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
       setAutoplay: (isOn) => set({ autoplay: isOn }),
     }),
     {
-      name: 'raven-player',
-      storage: createJSONStorage(() => window.localStorage),
+      name: PLAYER_PREFS_KEY,
+      storage: createJSONStorage(() => UNCONFIGURED),
+      skipHydration: true,
       partialize: ({
         volume,
         muted,
@@ -80,3 +95,17 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
     },
   ),
 )
+
+/**
+ * Gives the prefs the host's storage and loads what it holds. A host calls it
+ * once, before anything renders: `window.localStorage` on the web and the
+ * desktop, AsyncStorage in the app.
+ */
+export const configurePlayerPrefs = async ({
+  storage,
+}: {
+  storage: StateStorage
+}): Promise<void> => {
+  usePlayerPrefs.persist.setOptions({ storage: createJSONStorage(() => storage) })
+  await usePlayerPrefs.persist.rehydrate()
+}

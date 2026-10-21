@@ -26,7 +26,7 @@ import { initialVideoState, videoReducer } from '@/components/Player/videoState'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
 import { api } from '@/test/api'
 import { renderWithProviders } from '@/test/render'
-import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { PLAYER_PREFS_KEY, usePlayerPrefs } from '@/stores/playerPrefs'
 import { usePlayerServices } from '@/stores/playerServices'
 
 const servicesFor = (): PlayerServices => ({
@@ -745,6 +745,6 @@ describe('player preferences', () => {
     expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(false)
     act(() => usePlayerPrefs.getState().setOpensInRavenPlayer(true))
     expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(true)
-    expect(window.localStorage.getItem('raven-player')).toContain('"opensInRavenPlayer":true')
+    expect(window.localStorage.getItem(PLAYER_PREFS_KEY)).toContain('"opensInRavenPlayer":true')
   })
 })
