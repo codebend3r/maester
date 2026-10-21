@@ -2,7 +2,7 @@ import { lastPerServer } from '@/queries/perServer'
 import { mediaAccessFor } from '@/servers/mediaAccess'
 import { probeFetchOf } from '@/servers/mediaProbe'
 import { watchNetwork } from '@/servers/networkChanges'
-import { apiFor, cookieJar } from '@/servers/serverClient'
+import { apiFor, credentialsFor } from '@/servers/serverClient'
 import { useAppPrefs } from '@/stores/appPrefs'
 
 /**
@@ -17,7 +17,7 @@ export const mediaSourcesFor = lastPerServer({
       server,
       now: Date.now,
       probe: probeFetchOf({ fetch, clock: Date.now }),
-      readCookies: () => cookieJar.read(server.id),
+      readCredentials: () => credentialsFor(server),
       watchNetwork,
       awayMaxHeight: () => useAppPrefs.getState().awayMaxHeight,
     }),

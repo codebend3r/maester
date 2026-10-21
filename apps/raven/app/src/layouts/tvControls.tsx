@@ -47,9 +47,10 @@ const useFieldStyles = themedStyles((colours) =>
  * A text field the remote selects, which opens the platform's own keyboard. The keyboard reports
  * the text back as it is typed; leaving it with Menu cancels the edit, and the native field goes
  * back to what it held, but no change is reported, so the field takes the text it ends editing
- * with as the truth. `isPreferred` gives it the remote as it is drawn, so a screen never opens
- * with nothing focused: Android's text input has no preferred focus, and its own `focus()`
- * opens the keyboard, so the frame asks, and the focus goes on to the input inside it.
+ * with as the truth. `isPreferred` gives it the remote as it is drawn, once, until it has had
+ * the focus, so a screen never opens with nothing focused and never pulls the remote back.
+ * Android's text input has no preferred focus, and its own `focus()` opens the keyboard, so the
+ * frame asks, and the focus goes on to the input inside it.
  */
 export const TvTextField = ({
   label,
@@ -73,6 +74,7 @@ export const TvTextField = ({
   'placeholder' | 'placeholderTextColor' | 'keyboardType' | 'returnKeyType' | 'secureTextEntry'
 >) => {
   const [isFocused, setFocused] = useState(false)
+  const [hasHadFocus, setHadFocus] = useState(false)
   const frame = useRef<ComponentRef<typeof View>>(null)
   const tvFormStyles = useTvFormStyles()
   const tvFieldStyles = useFieldStyles()
@@ -95,12 +97,13 @@ export const TvTextField = ({
         accessibilityLabel={label}
         autoCapitalize="none"
         autoCorrect={false}
-        hasTVPreferredFocus={isPreferred}
+        hasTVPreferredFocus={isPreferred && !hasHadFocus}
         onBlur={() => setFocused(false)}
         onChangeText={onChangeText}
         onEndEditing={({ nativeEvent }) => onChangeText(nativeEvent.text)}
         onFocus={() => {
           setFocused(true)
+          setHadFocus(true)
           onFocused()
         }}
         onSubmitEditing={({ nativeEvent }) => onSubmit(nativeEvent.text)}

@@ -6,6 +6,7 @@ import {
   AUTH_READS,
   answerOf,
   hasAccounts,
+  isLetIn,
   readAuthConfig,
 } from '@/servers/authConfigs'
 import { MOVED_PIN, PIN, readyConfigOf } from '@/test/accountPins'
@@ -128,5 +129,18 @@ describe('hasAccounts', () => {
     expect(hasAccounts({ account: null, answer: null })).toBe(false)
     expect(hasAccounts({ account: PIN, answer: ACCOUNT_ANSWERS.unavailable })).toBe(true)
     expect(hasAccounts({ account: null, answer: ACCOUNT_ANSWERS.unavailable })).toBe(false)
+  })
+})
+
+describe('isLetIn', () => {
+  it('lets the viewer in to a server with accounts only while its account is signed in', () => {
+    expect(isLetIn({ account: PIN, answer: ACCOUNT_ANSWERS.ready, isSignedIn: true })).toBe(true)
+    expect(isLetIn({ account: PIN, answer: ACCOUNT_ANSWERS.ready, isSignedIn: false })).toBe(false)
+    expect(isLetIn({ account: PIN, answer: null, isSignedIn: false })).toBe(false)
+  })
+
+  it('always lets the viewer in to a server without them', () => {
+    expect(isLetIn({ account: null, answer: null, isSignedIn: false })).toBe(true)
+    expect(isLetIn({ account: PIN, answer: ACCOUNT_ANSWERS.off, isSignedIn: false })).toBe(true)
   })
 })

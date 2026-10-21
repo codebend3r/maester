@@ -17,7 +17,8 @@ import {
 // store, whose keys take only letters, digits, `.`, `-` and `_`.
 const SERVER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
-const isServerId = (value: unknown): value is string => isString(value) && SERVER_ID.test(value)
+export const isServerId = (value: unknown): value is string =>
+  isString(value) && SERVER_ID.test(value)
 
 /** A server as it was kept before accounts: a name and an origin with a session of its own. */
 const isServerEntry = object({

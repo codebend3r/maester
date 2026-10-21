@@ -1,15 +1,20 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { MAX_HEIGHTS, THEMES, themeOf } from '@raven/core'
-import { fireEvent, screen, within } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 
 import { Settings } from '@/screens/Settings'
+import { SIGN_IN_COPY, SignIn } from '@/screens/SignIn'
 import type { AppServer } from '@/servers/serverList'
+import { useAccountAnswers } from '@/stores/accountAnswers'
+import { noteSession, useAccountState } from '@/stores/accountState'
 import { useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
+import { PIN } from '@/test/accountPins'
+import { heldAnswer } from '@/test/heldAnswer'
 import { NAS, OTHER, homeApi } from '@/test/homeServer'
 import type * as NavigationFocus from '@/test/navigationFocus'
-import { resetTestScreen } from '@/test/navigationFocus'
+import { askedFor, resetTestScreen } from '@/test/navigationFocus'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { renderScreen } from '@/test/renderScreen'
 import { appThemeOf } from '@/theme/appTheme'
@@ -25,10 +30,19 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
 const mockPush = jest.fn()
 const mockBack = jest.fn()
 const mockApi = jest.fn(homeApi)
+/** Ends the sign-in as the sessions do: the app hears the server is signed out. */
+const mockSignOut = jest.fn(async ({ server }: { server: AppServer }) => {
+  noteSession({ serverId: server.id, isSignedIn: false })
+})
 
 jest.mock('expo-router', () => ({
   ...jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').navigationFocusMocks,
-  useRouter: () => ({ push: mockPush, back: mockBack }),
+  useRouter: () => ({
+    push: mockPush,
+    back: mockBack,
+    dismissTo: jest.fn(),
+    canGoBack: () => false,
+  }),
 }))
 jest.mock(
   '@/layouts/tvFocus',
@@ -38,6 +52,11 @@ jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => ({}), forget: async () => {} },
+  credentialsFor: async () => ({ cookies: {}, token: null }),
+  accountSessions: {
+    forget: async () => {},
+    signOut: (input: { server: AppServer }) => mockSignOut(input),
+  },
   secretStore: {
     getItemAsync: async () => null,
     setItemAsync: async () => {},
@@ -181,5 +200,72 @@ describe('Settings on a TV', () => {
     expect(mockBack).not.toHaveBeenCalled()
     expect(useActiveServer.getState().servers[1]).toEqual(OTHER)
     expect(preferred()).toEqual(['Rename other:8484'])
+  })
+  describe('signing out', () => {
+    const ACCOUNT_NAS: AppServer = { ...NAS, account: PIN }
+    const ACCOUNT_OTHER: AppServer = { ...OTHER, account: PIN }
+
+    /** Settings while the server in use is signed in, then sign-in, as the routes' guard does. */
+    const Guarded = () => {
+      const isSignedIn = useAccountState((state) => state.signedIn[NAS.id] === true)
+      return isSignedIn ? <Settings /> : <SignIn />
+    }
+
+    beforeEach(() => {
+      useActiveServer.setState({ servers: [ACCOUNT_NAS, ACCOUNT_OTHER], activeId: NAS.id })
+      useAccountAnswers.setState({ answers: {} })
+      useAccountState.setState({ signedIn: { [NAS.id]: true, [OTHER.id]: true }, version: 2 })
+    })
+
+    it("lands the remote on the account step's Email, once, after signing out of the server in use", async () => {
+      await renderScreen({ ui: <Guarded /> })
+      await fireEvent(screen.getByRole('button', { name: 'Rename nas:8080' }), NATIVE_EVENTS.focus)
+      await fireEvent(
+        screen.getByRole('button', { name: 'Sign out of nas:8080' }),
+        NATIVE_EVENTS.focus,
+      )
+      await fireEvent.press(screen.getByRole('button', { name: 'Sign out of nas:8080' }))
+
+      expect(await screen.findByText(SIGN_IN_COPY.accountPrompt)).toBeTruthy()
+      expect(mockSignOut).toHaveBeenCalledWith({ server: ACCOUNT_NAS })
+      expect(askedFor()).toEqual([SIGN_IN_COPY.email])
+      const email = screen.getByLabelText(SIGN_IN_COPY.email)
+      expect(email.props.hasTVPreferredFocus).toBe(true)
+
+      await fireEvent(email, NATIVE_EVENTS.focus)
+      await fireEvent(screen.getByLabelText(SIGN_IN_COPY.password), NATIVE_EVENTS.focus)
+      expect(screen.getByLabelText(SIGN_IN_COPY.email).props.hasTVPreferredFocus).toBe(false)
+      expect(askedFor()).toEqual([SIGN_IN_COPY.email])
+      expect(useActiveServer.getState().servers).toEqual([ACCOUNT_NAS, ACCOUNT_OTHER])
+    })
+
+    it("hands the remote to the row's first button once its Sign out goes, for a server not in use", async () => {
+      await renderScreen({ ui: <Guarded /> })
+      const signOut = screen.getByRole('button', { name: 'Sign out of other:8484' })
+      await fireEvent(signOut, NATIVE_EVENTS.focus)
+      await fireEvent.press(signOut)
+
+      await waitFor(() =>
+        expect(screen.queryByRole('button', { name: 'Sign out of other:8484' })).toBeNull(),
+      )
+      expect(askedFor()).toEqual(['Use other:8484'])
+      expect(screen.getByRole('header', { name: 'Settings' })).toBeTruthy()
+    })
+
+    it('asks for nothing once the remote has moved on along the row before the sign out ends', async () => {
+      const held = heldAnswer()
+      mockSignOut.mockImplementationOnce(async ({ server }) => {
+        await held.answer
+        noteSession({ serverId: server.id, isSignedIn: false })
+      })
+      await renderScreen({ ui: <Guarded /> })
+      await fireEvent.press(screen.getByRole('button', { name: 'Sign out of other:8484' }))
+      await fireEvent(screen.getByRole('button', { name: 'Use other:8484' }), NATIVE_EVENTS.focus)
+      await act(async () => held.release())
+      await waitFor(() =>
+        expect(screen.queryByRole('button', { name: 'Sign out of other:8484' })).toBeNull(),
+      )
+      expect(askedFor()).toEqual([])
+    })
   })
 })

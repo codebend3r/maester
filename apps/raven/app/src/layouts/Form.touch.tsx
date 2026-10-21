@@ -11,11 +11,14 @@ import {
 } from 'react-native'
 
 import {
+  BUTTON_TONES,
   type ConfirmProps,
   type FieldProps,
   type FormButtonProps,
   type FormKit,
   type FormProps,
+  type FormSheetProps,
+  type WebPagesProps,
   keyboardFor,
 } from '@/layouts/formKit'
 import { useToneStyles, useTouchFormStyles } from '@/layouts/formStyles'
@@ -49,6 +52,7 @@ const Field = ({
   placeholder,
   isSecret = false,
   isNumeric = false,
+  isEmail = false,
 }: FieldProps) => {
   const formStyles = useTouchFormStyles()
   const muted = useTheme((theme) => theme.palette.muted)
@@ -59,7 +63,7 @@ const Field = ({
         accessibilityLabel={label}
         autoCapitalize="none"
         autoCorrect={false}
-        keyboardType={keyboardFor({ isNumeric, isSecret })}
+        keyboardType={keyboardFor({ isNumeric, isSecret, isEmail })}
         onChangeText={onChangeText}
         onSubmitEditing={({ nativeEvent }) => onSubmit({ text: nativeEvent.text })}
         placeholder={placeholder}
@@ -123,12 +127,23 @@ const Confirm = ({ title, question, detail, yesLabel, noLabel, onAnswer }: Confi
   )
 }
 
+/** Under the thumb a step is the screen itself; its own button goes back. */
+const FormSheet = ({ children }: FormSheetProps) => children
+
+/** Each page a button that opens the browser on it. */
+const WebPages = ({ pages }: WebPagesProps) =>
+  pages.map(({ label, onOpen }) => (
+    <FormButton key={label} label={label} onPress={onOpen} tone={BUTTON_TONES.ghost} />
+  ))
+
 /** The phone and tablet form: one column under the thumb, lifted clear of the keyboard. */
 export const touchForm: FormKit = {
   Form,
   Field,
   FormButton,
   Confirm,
+  FormSheet,
+  WebPages,
   useFormStyles: useTouchFormStyles,
 }
 

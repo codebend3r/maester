@@ -134,3 +134,17 @@ export const hasAccounts = ({
     }
   }
 }
+
+/**
+ * Whether a server lets the viewer past sign-in: one without accounts always, one with them only
+ * while its account is signed in, so a session that ends sends the viewer back to sign in.
+ */
+export const isLetIn = ({
+  account,
+  answer,
+  isSignedIn,
+}: {
+  account: SignInConfig | null
+  answer: AccountAnswer | null
+  isSignedIn: boolean
+}): boolean => isSignedIn || !hasAccounts({ account, answer })

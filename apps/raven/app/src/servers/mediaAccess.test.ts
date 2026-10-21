@@ -3,6 +3,7 @@ import {
   ACCESS_REFUSALS,
   APP_CLIENT_CALLS,
   AUTH_HEADERS,
+  AUTH_SCHEME,
   HLS_PARAMS,
   HLS_PATHS,
   MEDIA_ORIGIN_KINDS,
@@ -47,10 +48,12 @@ const setUp = ({
   server = mediaServer({}),
   elapsedMs = QUICK_LAN,
   cookies = NAS_COOKIES,
+  token = null,
 }: {
   server?: ReturnType<typeof mediaServer>
   elapsedMs?: Readonly<Record<string, number>>
   cookies?: ServerCookies
+  token?: string | null
 } = {}) => {
   const clock = { now: READ_AT }
   const away: { maxHeight: MaxHeight } = { maxHeight: MAX_HEIGHTS.fullHd }
@@ -61,7 +64,7 @@ const setUp = ({
     server: NAS,
     now: () => clock.now,
     probe: probes.probe,
-    readCookies: async () => cookies,
+    readCredentials: async () => ({ cookies, token }),
     watchNetwork: network.watchNetwork,
     awayMaxHeight: () => away.maxHeight,
   })
@@ -249,6 +252,17 @@ describe('mediaAccessFor', () => {
     expect(sourceOf(await refused.media.source(direct)).headers).toEqual(cookieHeader)
   })
 
+  it("sends the account's Bearer beside the cookie from the server's own address, and never by ticket", async () => {
+    const token = 'eyJhbGciOiJFUzI1NiJ9.eyJuIjoiMSJ9.c2ln'
+    const own = setUp({ server: mediaServer({ origins: [] }), token })
+    expect(sourceOf(await own.media.source(direct)).headers).toEqual({
+      ...cookieHeader,
+      [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${token}`,
+    })
+    const byTicket = setUp({ token })
+    expect(sourceOf(await byTicket.media.source(direct)).headers).toEqual({})
+  })
+
   it('sends no cookie header when the jar holds none', async () => {
     const { media } = setUp({ server: mediaServer({ origins: [] }), cookies: {} })
     expect(sourceOf(await media.source(direct))).toEqual({
@@ -271,7 +285,7 @@ describe('mediaAccessFor', () => {
       server: NAS,
       now: () => READ_AT,
       probe: probesOf({ elapsedMs: QUICK_LAN }).probe,
-      readCookies: async () => {
+      readCredentials: async () => {
         throw new Error('The keychain is locked')
       },
       watchNetwork: fakeNetwork().watchNetwork,

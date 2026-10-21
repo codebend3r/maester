@@ -46,6 +46,12 @@ export const APP_STATE_EVENTS = { change: 'change' } as const
 export const isForegroundState = (state: string): boolean => state !== APP_STATES.background
 
 /**
+ * Whether the app is active in `state`, as auth-js's React Native guidance reads it: anything
+ * else, `inactive` included, stops the sessions' renewal until the app is active again.
+ */
+export const isActiveState = (state: string): boolean => state === APP_STATES.active
+
+/**
  * How long a dropped stream waits before it opens again: doubling from a second, to half a
  * minute, and back to a second only once a connection has held for `held`, so a proxy that
  * accepts and then resets each one is not asked again every second.

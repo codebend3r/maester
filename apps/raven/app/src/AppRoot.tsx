@@ -7,10 +7,14 @@ import { hideAsync, preventAutoHideAsync } from 'expo-splash-screen'
 import { useEffect, useState } from 'react'
 import { Appearance, StatusBar } from 'react-native'
 
-import { clearOnServerSwitch } from '@/queries/serverCache'
+import { clearOnServerSwitch, clearOnSignOut } from '@/queries/serverCache'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useUnlockRoute } from '@/queries/useUnlockRoute'
 import { APP_ROUTES, APP_SCREENS } from '@/routes'
+import { isLetIn } from '@/servers/authConfigs'
+import { accountSessions, keepSessionsFresh } from '@/servers/serverClient'
+import { useAccountAnswers } from '@/stores/accountAnswers'
+import { useAccountState } from '@/stores/accountState'
 import { useActiveServer } from '@/stores/activeServer'
 import { configureAppPrefs } from '@/stores/appPrefs'
 import { configureLibraryViews } from '@/stores/libraryViews'
@@ -28,6 +32,13 @@ const SPLASH_IGNORED = (): void => undefined
 // The splash stays up until the stores are read, so the theme picked is the first thing drawn.
 preventAutoHideAsync().catch(SPLASH_IGNORED)
 
+/** The servers, then whether each one pinned with accounts has a session kept for it. */
+const loadServers = async (): Promise<void> => {
+  await useActiveServer.persist.rehydrate()
+  const pinned = useActiveServer.getState().servers.filter(({ account }) => account !== null)
+  await accountSessions.restore({ serverIds: pinned.map(({ id }) => id) })
+}
+
 const loadStores = async (): Promise<void> => {
   // A store whose storage cannot be read starts from its defaults rather than holding
   // the app on a blank screen; the next write puts the file right.
@@ -35,8 +46,20 @@ const loadStores = async (): Promise<void> => {
     configureStorage({ storage: AsyncStorage }),
     configureLibraryViews({ storage: AsyncStorage }),
     configureAppPrefs({ storage: AsyncStorage }),
-    useActiveServer.persist.rehydrate(),
+    loadServers(),
   ])
+}
+
+/** Whether the active server lets the viewer past sign-in, as `isLetIn` says. */
+const useLetsIn = (session: AppQueries | null): boolean => {
+  const server = session?.server ?? null
+  const answer = useAccountAnswers((state) =>
+    server === null ? null : (state.answers[server.id] ?? null),
+  )
+  const isSignedIn = useAccountState((state) =>
+    server === null ? false : state.signedIn[server.id] === true,
+  )
+  return server !== null && isLetIn({ account: server.account, answer, isSignedIn })
 }
 
 /** Keeps the cache in step with the active server's event stream, while it is the active one. */
@@ -58,7 +81,8 @@ const UnlockRoute = () => {
 
 /**
  * Loads what the app keeps on the device before any route renders, then the routes. Every
- * route but sign-in needs a server, so without one they send the viewer to sign in. Until the
+ * route but sign-in needs a server, and one with accounts a signed in account, so without them
+ * they send the viewer to sign in. Until the
  * prefs are read the splash stays up and the app paints nothing, so the first frame of a theme
  * is the one picked, never the default's on its way to it; the splash goes once that frame is
  * drawn, and after that a theme picked in Settings repaints everything at once.
@@ -66,6 +90,7 @@ const UnlockRoute = () => {
 export const AppRoot = () => {
   const [isLoaded, setLoaded] = useState(false)
   const session = useAppQueries()
+  const isAdmitted = useLetsIn(session)
   const ground = useTheme((theme) => theme.palette.ground)
   const tone = useTheme((theme) => theme.tone)
 
@@ -74,6 +99,16 @@ export const AppRoot = () => {
     loadStores().then(show, show)
   }, [])
   useEffect(() => clearOnServerSwitch({ client: queryClient, store: useActiveServer }), [])
+  useEffect(
+    () =>
+      clearOnSignOut({
+        client: queryClient,
+        accounts: useAccountState,
+        activeId: () => useActiveServer.getState().activeId,
+      }),
+    [],
+  )
+  useEffect(() => keepSessionsFresh(), [])
   useEffect(() => followReduceMotion(), [])
   useEffect(() => (isLoaded ? followTheme({ apply: wearSystemLook }) : undefined), [isLoaded])
   useEffect(() => {
@@ -84,7 +119,7 @@ export const AppRoot = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <StatusBar barStyle={tone === THEME_TONES.light ? 'dark-content' : 'light-content'} />
-      {session !== null && <ServerEvents key={session.server.id} session={session} />}
+      {session !== null && isAdmitted && <ServerEvents key={session.server.id} session={session} />}
       <UnlockRoute />
       {/* A screen's opening focus comes back once the transition that reveals it has ended:
           on Android TV the transition takes the focus from anything asked for before then. */}
@@ -96,7 +131,7 @@ export const AppRoot = () => {
         }}
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: ground } }}
       >
-        <Stack.Protected guard={session !== null} redirectTo={APP_ROUTES.signIn}>
+        <Stack.Protected guard={isAdmitted} redirectTo={APP_ROUTES.signIn}>
           <Stack.Screen name={APP_SCREENS.home} />
           <Stack.Screen name={APP_SCREENS.item} />
           <Stack.Screen name={APP_SCREENS.library} />

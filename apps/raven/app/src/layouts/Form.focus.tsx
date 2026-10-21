@@ -1,5 +1,5 @@
 import { type ComponentRef, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { useFocusOnMount } from '@/layouts/focus'
 import {
@@ -9,6 +9,8 @@ import {
   type FormButtonProps,
   type FormKit,
   type FormProps,
+  type FormSheetProps,
+  type WebPagesProps,
   keyboardFor,
 } from '@/layouts/formKit'
 import { useToneStyles, useTvFormStyles } from '@/layouts/formStyles'
@@ -43,6 +45,7 @@ const Field = ({
   placeholder,
   isSecret = false,
   isNumeric = false,
+  isEmail = false,
   isFirst = false,
 }: FieldProps) => {
   const formStyles = useTvFormStyles()
@@ -51,7 +54,7 @@ const Field = ({
       <Text style={[formStyles.label, styles.label]}>{label}</Text>
       <TvTextField
         isPreferred={isFirst}
-        keyboardType={keyboardFor({ isNumeric, isSecret })}
+        keyboardType={keyboardFor({ isNumeric, isSecret, isEmail })}
         label={label}
         onChangeText={onChangeText}
         onSubmit={(text) => onSubmit({ text })}
@@ -135,12 +138,30 @@ const Confirm = ({ title, question, detail, yesLabel, noLabel, onAnswer }: Confi
   )
 }
 
+/**
+ * A step over the screen, in a `Modal` whose `onRequestClose` hears Menu or Back, so the remote's
+ * own way back closes the step where the native stack would otherwise leave the screen.
+ */
+const FormSheet = ({ onClose, children }: FormSheetProps) => (
+  <Modal visible onRequestClose={onClose}>
+    {children}
+  </Modal>
+)
+
+/** A TV opens no browser (Apple TV has none), so it says where the pages are instead. */
+const WebPages = ({ note }: WebPagesProps) => {
+  const formStyles = useTvFormStyles()
+  return <Text style={formStyles.note}>{note}</Text>
+}
+
 /** The TV form: read from the sofa, so larger, and driven by the remote's focus. */
 export const focusForm: FormKit = {
   Form,
   Field,
   FormButton,
   Confirm,
+  FormSheet,
+  WebPages,
   useFormStyles: useTvFormStyles,
 }
 

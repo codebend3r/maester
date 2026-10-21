@@ -4,6 +4,7 @@ import { type FetchResponse, LOCKED_STATUS, isString } from '@raven/core'
 export const STATUSES = {
   ok: 200,
   noContent: 204,
+  unauthorized: 401,
   forbidden: 403,
   notFound: 404,
   locked: LOCKED_STATUS,

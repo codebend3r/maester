@@ -25,8 +25,7 @@ import {
 } from '@raven/core'
 
 import { checkAppCall } from '@/servers/allowlist'
-import type { ServerCookies } from '@/servers/cookieJar'
-import { cookieHeadersFor } from '@/servers/serverHeaders'
+import { type ServerCredentials, serverHeadersFor } from '@/servers/serverHeaders'
 import type { AppServer } from '@/servers/serverList'
 import { TICKETS_OFF_STATUS } from '@/servers/tickets'
 
@@ -78,7 +77,7 @@ export const MEDIA_ACCESS_MESSAGES = {
   gone: (name: string): string => `${name} no longer has this video.`,
   unreachable: (name: string): string => `${name} can't be reached.`,
   unreadable: (name: string): string => `${name} sent something raven can't read.`,
-  account: (name: string): string => `${name} signs in with accounts, which the app can't do yet.`,
+  account: (name: string): string => `Sign in to ${name} again.`,
 } as const satisfies Record<AccessRefusalReason, (name: string) => string>
 
 const NOT_FOUND_STATUS = 404
@@ -123,8 +122,8 @@ const refusalOf = ({ error, server }: { error: unknown; server: AppServer }): Ti
  * again, so an origin that comes back is used without waiting for the network to change. A
  * ticket is read per video and renewed `MEDIA_TICKET_RENEW_MS` after it was read, by `now`. A
  * server that lists no origin, has none answering, or hands out no ticket (the 503 of one
- * without `RAVEN_MEDIA_SECRET`) plays from its own address with its cookies as headers, which
- * `cookieHeadersFor` gives only to its own API. A transcode from the `public` origin, away
+ * without `RAVEN_MEDIA_SECRET`) plays from its own address with its credentials as headers,
+ * which `serverHeadersFor` gives only to its own API. A transcode from the `public` origin, away
  * from home, asks for the size `awayMaxHeight` reads at the moment, Settings' cap. Nothing here
  * logs: a ticket is only ever in the source's address.
  */
@@ -133,7 +132,7 @@ export const mediaAccessFor = ({
   server,
   now,
   probe,
-  readCookies,
+  readCredentials,
   watchNetwork,
   awayMaxHeight,
 }: {
@@ -141,7 +140,7 @@ export const mediaAccessFor = ({
   server: AppServer
   now: () => number
   probe: ProbeFetch
-  readCookies: () => Promise<ServerCookies>
+  readCredentials: () => Promise<ServerCredentials>
   watchNetwork: WatchNetwork
   awayMaxHeight: () => MaxHeight
 }): MediaSources => {
@@ -265,7 +264,7 @@ export const mediaAccessFor = ({
 
   const cookieSource = async (request: SourceRequest): Promise<SourceOutcome> => {
     const uri = uriFor({ request, access: null })
-    const headers = cookieHeadersFor({ server, cookies: await readCookies() })(uri)
+    const headers = serverHeadersFor({ server, credentials: await readCredentials() })(uri)
     return { ok: true, source: { uri, headers } }
   }
 

@@ -1,3 +1,4 @@
+import { type ComponentRef, useEffect, useRef } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { FocusBand } from '@/layouts/FocusBand'
@@ -14,6 +15,7 @@ import type {
   SettingsSheetProps,
   SettingsToggleProps,
 } from '@/layouts/settingsKit'
+import { requestTVFocus } from '@/layouts/tvFocus'
 import { PlateButton, usePlateStyles } from '@/layouts/tvControls'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
@@ -56,11 +58,22 @@ const SettingsSection = ({ title, note, children }: SettingsSectionProps) => {
 /**
  * A server the remote reaches: its name, address and mark, then its buttons. The whole row is a
  * band as wide as the page, so Down or Up into it lands on its first button or the one last left
- * there, though the buttons sit at the row's far end.
+ * there, though the buttons sit at the row's far end. A button pressed that goes from the row
+ * (Sign out, once the account has) hands the remote to the row's first button, since the
+ * platform would move it elsewhere on the page, or, on Android TV, perhaps to nothing.
  */
 const ServerRow = ({ name, line, badge, actions, openingAction }: ServerRowProps) => {
   const { isOpening, settle } = useOpeningFocus()
   const styles = useStyles()
+  const first = useRef<ComponentRef<typeof Pressable>>(null)
+  // The button last pressed, until the remote moves to another of the row's.
+  const pressed = useRef<string | null>(null)
+  useEffect(() => {
+    const key = pressed.current
+    if (key === null || actions.some((action) => action.key === key)) return
+    pressed.current = null
+    requestTVFocus(first.current)
+  }, [actions])
   return (
     <FocusBand>
       <View style={styles.row}>
@@ -76,14 +89,21 @@ const ServerRow = ({ name, line, badge, actions, openingAction }: ServerRowProps
           </Text>
         </View>
         <View style={styles.actions}>
-          {actions.map((action) => (
+          {actions.map((action, index) => (
             <PlateButton
               key={action.key}
+              ref={index === 0 ? first : undefined}
               accessibilityRole="button"
               isPreferred={isOpening && action.key === openingAction}
               label={action.label}
-              onFocused={settle}
-              onPress={action.onPress}
+              onFocused={() => {
+                pressed.current = null
+                settle()
+              }}
+              onPress={() => {
+                pressed.current = action.key
+                action.onPress()
+              }}
               text={action.text}
             />
           ))}

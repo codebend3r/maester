@@ -1,11 +1,21 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { AUTH_CONFIG_STATES, type AuthConfig, type LockState } from '@raven/core'
+import {
+  AUTH_CONFIG_STATES,
+  type AuthConfig,
+  type Home,
+  type LockState,
+  SIGN_IN_OUTCOMES,
+  type SignInOutcomeKind,
+} from '@raven/core'
 import { fireEvent, render, screen } from '@testing-library/react-native'
 import { Alert } from 'react-native'
 
+import type { AccountSessions } from '@/accounts/accountSessions'
+import { APP_ROUTES } from '@/routes'
 import { SIGN_IN_COPY, SignIn } from '@/screens/SignIn'
-import { MEDIA_ACCESS_MESSAGES } from '@/servers/mediaAccess'
 import type { AppServer } from '@/servers/serverList'
+import { useAccountAnswers } from '@/stores/accountAnswers'
+import { useAccountState } from '@/stores/accountState'
 import { useActiveServer } from '@/stores/activeServer'
 import { MOVED_PIN, PIN, readyConfigOf } from '@/test/accountPins'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
@@ -14,6 +24,12 @@ import { askedFor, resetTestScreen } from '@/test/navigationFocus'
 
 const mockGetLock = jest.fn<() => Promise<LockState>>()
 const mockGetAuthConfig = jest.fn<() => Promise<AuthConfig>>()
+const mockGetHome = jest.fn<() => Promise<Home>>()
+const mockDismissTo = jest.fn<(href: string) => void>()
+type SignInInput = Parameters<AccountSessions['signIn']>[0]
+const mockSignIn = jest.fn(async (_input: SignInInput): Promise<SignInOutcomeKind> => {
+  return SIGN_IN_OUTCOMES.signedIn
+})
 
 // The layouts pick their variant once, as they load, so the TV is set before anything does.
 jest.mock('react-native/Libraries/Utilities/Platform', () => {
@@ -24,16 +40,20 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   return platform
 })
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ dismissTo: jest.fn(), back: jest.fn(), canGoBack: () => false }),
+  useRouter: () => ({ dismissTo: mockDismissTo, back: jest.fn(), canGoBack: () => false }),
 }))
 jest.mock(
   '@/layouts/tvFocus',
   () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
 )
 jest.mock('@/servers/serverClient', () => ({
-  apiFor: () => ({ getLock: mockGetLock, getAuthConfig: mockGetAuthConfig }),
+  apiFor: () => ({ getLock: mockGetLock, getAuthConfig: mockGetAuthConfig, getHome: mockGetHome }),
   newServerId: () => '0f8fad5b-d9cb-469f-a165-70867728950e',
   cookieJar: { forget: async () => {} },
+  accountSessions: {
+    signIn: (input: SignInInput) => mockSignIn(input),
+    forget: async () => {},
+  },
   secretStore: {
     getItemAsync: async () => null,
     setItemAsync: async () => {},
@@ -46,8 +66,12 @@ describe('SignIn on a TV', () => {
     jest.clearAllMocks()
     resetTestScreen()
     useActiveServer.setState({ servers: [], activeId: null })
+    useAccountAnswers.setState({ answers: {} })
+    useAccountState.setState({ signedIn: {}, version: 0 })
     mockGetLock.mockResolvedValue({ available: false, unlocked: false })
     mockGetAuthConfig.mockResolvedValue({ state: AUTH_CONFIG_STATES.off })
+    mockGetHome.mockResolvedValue({ inProgress: [], shelves: [] })
+    mockSignIn.mockResolvedValue(SIGN_IN_OUTCOMES.signedIn)
   })
 
   // Asked for as it mounts, the preferred focus comes before the field is in the window, which
@@ -113,7 +137,8 @@ describe('SignIn on a TV', () => {
     }
 
     const reachQuestion = async () => {
-      useActiveServer.setState({ servers: [KNOWN], activeId: KNOWN.id })
+      // Listed but not the one in use, so sign-in opens at the address.
+      useActiveServer.setState({ servers: [KNOWN], activeId: null })
       mockGetAuthConfig.mockResolvedValue(readyConfigOf(MOVED_PIN))
       await render(<SignIn />)
       await fireEvent(screen.getByLabelText('Server address'), NATIVE_EVENTS.submitEditing, {
@@ -145,8 +170,59 @@ describe('SignIn on a TV', () => {
     it('pins the new endpoints on Use it', async () => {
       await reachQuestion()
       await fireEvent.press(screen.getByRole('button', { name: SIGN_IN_COPY.follow }))
-      expect(await screen.findByText(MEDIA_ACCESS_MESSAGES.account('nas'))).toBeTruthy()
+      expect(await screen.findByText(SIGN_IN_COPY.accountPrompt)).toBeTruthy()
       expect(useActiveServer.getState().servers).toEqual([{ ...KNOWN, account: MOVED_PIN }])
+      expect(mockGetLock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('the account step', () => {
+    const ADDRESS = 'http://127.0.0.1:8490'
+    const EMAIL = 'friend@maester.test'
+    const PASSWORD = 'correct horse battery staple'
+
+    const reachAccount = async () => {
+      mockGetAuthConfig.mockResolvedValue(readyConfigOf(PIN))
+      await render(<SignIn />)
+      await fireEvent(screen.getByLabelText('Server address'), NATIVE_EVENTS.submitEditing, {
+        nativeEvent: { text: ADDRESS },
+      })
+      expect(await screen.findByText(SIGN_IN_COPY.accountPrompt)).toBeTruthy()
+    }
+
+    it('opens with the remote on the email field, once it is drawn', async () => {
+      await reachAccount()
+      expect(askedFor()).toEqual(['Server address', SIGN_IN_COPY.email])
+    })
+
+    it('says where to create an account or reset a password, since a TV has no browser', async () => {
+      await reachAccount()
+      expect(screen.getByText(SIGN_IN_COPY.webPages(PIN.webUrl))).toBeTruthy()
+      expect(screen.queryByRole('button', { name: SIGN_IN_COPY.createAccount })).toBeNull()
+      expect(screen.queryByRole('button', { name: SIGN_IN_COPY.forgotPassword })).toBeNull()
+    })
+
+    it('goes back to the address step on Menu or Back', async () => {
+      await reachAccount()
+      await fireEvent(screen.getByLabelText(SIGN_IN_COPY.email), NATIVE_EVENTS.requestClose)
+      expect(screen.getByLabelText('Server address')).toBeTruthy()
+      expect(screen.queryByLabelText(SIGN_IN_COPY.email)).toBeNull()
+      expect(askedFor()).toEqual(['Server address', SIGN_IN_COPY.email, 'Server address'])
+    })
+
+    it('signs in with what the keyboard sends and reaches Home', async () => {
+      await reachAccount()
+      await fireEvent(screen.getByLabelText(SIGN_IN_COPY.email), NATIVE_EVENTS.endEditing, {
+        nativeEvent: { text: EMAIL },
+      })
+      await fireEvent(screen.getByLabelText(SIGN_IN_COPY.password), NATIVE_EVENTS.submitEditing, {
+        nativeEvent: { text: PASSWORD },
+      })
+      expect(mockSignIn).toHaveBeenCalledWith(
+        expect.objectContaining({ account: PIN, email: EMAIL, password: PASSWORD }),
+      )
+      expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
+      expect(useActiveServer.getState().servers).toMatchObject([{ origin: ADDRESS, account: PIN }])
       expect(mockGetLock).not.toHaveBeenCalled()
     })
   })

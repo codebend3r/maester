@@ -29,6 +29,7 @@ jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => mockCookies(), forget: async () => {} },
+  credentialsFor: async () => ({ cookies: mockCookies(), token: null }),
   secretStore: {
     getItemAsync: async () => null,
     setItemAsync: async () => {},
@@ -147,7 +148,7 @@ describe('Home on a phone or tablet', () => {
     await act(async () => bumpCookieVersion())
     await waitFor(() => expect(pictures()).toHaveLength(4))
     expect(pictures().map(({ headers }) => headers)).toEqual(
-      Array.from({ length: 4 }, () => ({ [AUTH_HEADERS.cookie]: 'raven_unlock=u.2' })),
+      Array.from({ length: 4 }, () => ({ [AUTH_HEADERS.cookie]: `${SERVER_COOKIES.unlock}=u.2` })),
     )
   })
 })
