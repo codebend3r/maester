@@ -17,9 +17,10 @@ import {
   type ShelvesProps,
   seeAllLabelOf,
 } from '@/layouts/shelfKit'
-import { PlateButton, plateStyles } from '@/layouts/tvControls'
-import { COLOURS } from '@/theme/appTheme'
+import { Logo } from '@/layouts/Logo'
+import { PlateButton, usePlateStyles } from '@/layouts/tvControls'
 import { TV_SIZES } from '@/theme/tvSizes'
+import { themedStyles } from '@/theme/useTheme'
 
 /** Where the Settings entry sits on Home, a place no shelf's card shares. */
 const SETTINGS_PLACE = 'settings'
@@ -31,6 +32,7 @@ const SETTINGS_PLACE = 'settings'
 const SettingsEntry = ({ onPress, onFocused }: { onPress: () => void; onFocused: () => void }) => {
   const view = useRef<ComponentRef<typeof Pressable>>(null)
   const { remember } = useOpenerFocus({ place: SETTINGS_PLACE, view })
+  const plateStyles = usePlateStyles()
   return (
     <Pressable
       ref={view}
@@ -56,9 +58,11 @@ const SettingsEntry = ({ onPress, onFocused }: { onPress: () => void; onFocused:
  */
 const Shelves = ({ title, notice, isLoading, onSearch, onSettings, children }: ShelvesProps) => {
   const { settle } = useScreenFocusScope()
+  const styles = useStyles()
   return (
     <ScrollView contentContainerStyle={styles.shelves} style={styles.ground}>
       <View style={styles.pageRow}>
+        <Logo width={TV_SIZES.textXl} />
         <Text accessibilityRole="header" style={styles.pageTitle}>
           {title}
         </Text>
@@ -91,6 +95,7 @@ const ShelfTitle = ({
   onFocused,
 }: Pick<ShelfProps, 'shelf' | 'onOpenLibrary'> & { onFocused: () => void }) => {
   const { libraryId } = shelf
+  const styles = useStyles()
   return (
     <View style={styles.titleRow}>
       <Text accessibilityRole="header" style={styles.shelfTitle}>
@@ -126,6 +131,7 @@ const placeOf = ({ shelf, card }: { shelf: ShelfView; card: ShelfCard }): string
  */
 const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) => {
   const { isOpening, settle } = useOpeningFocus()
+  const styles = useStyles()
   return (
     <View style={styles.shelf}>
       <ShelfTitle onFocused={settle} onOpenLibrary={onOpenLibrary} shelf={shelf} />
@@ -163,38 +169,40 @@ const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) =>
  */
 export const focusShelf: ShelfKit = { Shelves, Shelf }
 
-const styles = StyleSheet.create({
-  ground: { flex: 1, backgroundColor: COLOURS.ground },
-  shelves: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
-  pageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: TV_SIZES.space5,
-    paddingHorizontal: TV_SIZES.space8,
-  },
-  pageTitle: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  notice: { color: COLOURS.muted, fontSize: TV_SIZES.textLg, paddingHorizontal: TV_SIZES.space8 },
-  shelf: { gap: TV_SIZES.space1 },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: TV_SIZES.space3,
-    paddingHorizontal: TV_SIZES.space8,
-  },
-  shelfTitle: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  seeAll: {
-    paddingHorizontal: TV_SIZES.space2,
-    paddingVertical: TV_SIZES.space0,
-    borderRadius: TV_SIZES.radius,
-    borderWidth: TV_SIZES.tvFocusRing,
-    borderColor: 'transparent',
-  },
-  focusedLink: { borderColor: COLOURS.text, backgroundColor: COLOURS.quiet },
-  seeAllLabel: { color: COLOURS.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
-  focusedLabel: { color: COLOURS.text },
-  row: {
-    gap: TV_SIZES.space5,
-    paddingHorizontal: TV_SIZES.space8,
-    paddingVertical: TV_SIZES.space4,
-  },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    ground: { flex: 1, backgroundColor: colours.ground },
+    shelves: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
+    pageRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: TV_SIZES.space5,
+      paddingHorizontal: TV_SIZES.space8,
+    },
+    pageTitle: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    notice: { color: colours.muted, fontSize: TV_SIZES.textLg, paddingHorizontal: TV_SIZES.space8 },
+    shelf: { gap: TV_SIZES.space1 },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: TV_SIZES.space3,
+      paddingHorizontal: TV_SIZES.space8,
+    },
+    shelfTitle: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    seeAll: {
+      paddingHorizontal: TV_SIZES.space2,
+      paddingVertical: TV_SIZES.space0,
+      borderRadius: TV_SIZES.radius,
+      borderWidth: TV_SIZES.tvFocusRing,
+      borderColor: 'transparent',
+    },
+    focusedLink: { borderColor: colours.text, backgroundColor: colours.quiet },
+    seeAllLabel: { color: colours.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+    focusedLabel: { color: colours.text },
+    row: {
+      gap: TV_SIZES.space5,
+      paddingHorizontal: TV_SIZES.space8,
+      paddingVertical: TV_SIZES.space4,
+    },
+  }),
+)

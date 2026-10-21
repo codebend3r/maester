@@ -34,14 +34,15 @@ export type FormButtonProps = {
 }
 
 /**
- * A form's pieces, which each platform lays out and drives its own way, and its styles at the
- * platform's scale, whose lines (`note`, `notice`, `error`) the screens draw.
+ * A form's pieces, which each platform lays out and drives its own way, and the hook for its
+ * styles at the platform's scale in the theme worn now, whose lines (`note`, `notice`,
+ * `error`) the screens draw.
  */
 export type FormKit = {
   Form: (props: FormProps) => ReactNode
   Field: (props: FieldProps) => ReactNode
   FormButton: (props: FormButtonProps) => ReactNode
-  formStyles: FormStyles
+  useFormStyles: () => FormStyles
 }
 
 /** The keyboard a field opens: digits for a PIN, plain for a password, a web address's otherwise. */

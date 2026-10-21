@@ -3,6 +3,7 @@ import {
   ADMIN_LOCK_STATES,
   type AdminLock,
   ApiError,
+  DEFAULT_THEME,
   type Home,
   type LockState,
   type MediaTicket,
@@ -14,7 +15,7 @@ import { StyleSheet } from 'react-native'
 import { APP_ROUTES } from '@/routes'
 import { SignIn, TICKETS_OFF } from '@/screens/SignIn'
 import { useActiveServer } from '@/stores/activeServer'
-import { COLOURS } from '@/theme/appTheme'
+import { appThemeOf } from '@/theme/appTheme'
 import { mediaItemFor } from '@/test/mediaItem'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
@@ -179,8 +180,9 @@ describe('SignIn', () => {
     await screen.findByLabelText('PIN')
     const fillOf = (name: string): unknown =>
       StyleSheet.flatten(screen.getByRole('button', { name }).props.style)?.backgroundColor ?? null
-    expect(fillOf('Unlock')).toBe(COLOURS.accent)
-    expect(fillOf('Not now')).toBe(COLOURS.quiet)
+    const { palette } = appThemeOf(DEFAULT_THEME)
+    expect(fillOf('Unlock')).toBe(palette.accent)
+    expect(fillOf('Not now')).toBe(palette.quiet)
     expect(fillOf('Use another address')).toBe('transparent')
   })
 

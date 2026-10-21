@@ -2,13 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import {
   APP_CALL_METHODS,
   APP_CLIENT_CALLS,
+  DEFAULT_THEME,
   HLS_PARAMS,
   HLS_PATHS,
   PLAYBACK_MODES,
+  THEMES,
+  THEME_TONES,
   mediaLabel,
 } from '@raven/core'
 import { SAVE_EVERY_S, usePlayerPrefs, useUnlockPrompt } from '@raven/ui/headless'
-import { act, cleanup, fireEvent, screen } from '@testing-library/react-native'
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react-native'
+import { ActionSheetIOS, StyleSheet } from 'react-native'
 import type { ReactVideoProps } from 'react-native-video'
 
 import { useUnlockRoute } from '@/queries/useUnlockRoute'
@@ -16,10 +20,12 @@ import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Player } from '@/screens/Player'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
+import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { type HeardRequest, STATUSES, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import { BUSBOYS_MP4, CUE_TEXT, playerApi } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
+import { appThemeOf } from '@/theme/appTheme'
 import type * as VideoMock from '@/test/videoMock'
 import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@/test/videoMock'
 
@@ -112,6 +118,12 @@ const playsRecorded = (): number =>
     ({ method, path }) => method === APP_CALL_METHODS.post && path === playsPath,
   ).length
 
+/** A light theme, whose page colours would vanish over a bright picture. */
+const PATINA = THEMES.find((theme) => theme.name === 'Patina')?.id ?? DEFAULT_THEME
+
+/** What a drawn element is painted with. */
+const styleOf = (node: ReturnType<typeof screen.getByRole>) => StyleSheet.flatten(node.props.style)
+
 /** Fires what the player says as it opens Busboys and starts. */
 const start = async (props: ReactVideoProps) =>
   startVideo({ props, duration: BUSBOYS_MP4.duration ?? 0 })
@@ -123,6 +135,7 @@ describe('Player on a phone or tablet', () => {
     mockServer.ticketStatus = STATUSES.ok
     resetDrawnVideo()
     useUnlockPrompt.setState({ open: false })
+    useAppPrefs.setState(DEFAULT_APP_PREFS)
     usePlayerPrefs.setState({ subtitles: { on: false, language: null } })
     // A server of its own for each test, so no test plays on a ticket or a probe another held.
     const server = { ...NAS, id: `0f8fad5b-d9cb-469f-a165-${String(++servers).padStart(12, '0')}` }
@@ -135,6 +148,7 @@ describe('Player on a phone or tablet', () => {
     await untilIdle(shown.client)
     await cleanup()
     shown.client.clear()
+    jest.restoreAllMocks()
   })
 
   it('starts Resume at the spot it names, playing the file as it is', async () => {
@@ -238,6 +252,37 @@ describe('Player on a phone or tablet', () => {
     expect(await screen.findByText(CUE_TEXT)).toBeTruthy()
     await moveVideoTo({ props, seconds: 25 })
     expect(screen.queryByText(CUE_TEXT)).toBeNull()
+  })
+
+  it("keeps its chips, Play and Back the player's dark glass under Patina, and the sheet dark", async () => {
+    usePlayerPrefs.setState({ subtitles: { on: true, language: null } })
+    useAppPrefs.setState({ theme: PATINA })
+    const { palette, overPicture } = appThemeOf(PATINA)
+    const sheets: (string | undefined)[] = []
+    jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((options) => {
+      sheets.push(options.userInterfaceStyle)
+    })
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
+    await loadedVideo()
+
+    const chip = screen.getByRole('button', { name: 'Subtitles: English' })
+    expect(styleOf(chip)?.backgroundColor ?? null).toBe(overPicture.quiet)
+    expect(styleOf(within(chip).getByText('English'))?.color ?? null).toBe(overPicture.text)
+    expect(styleOf(within(chip).getByText('Subtitles'))?.color ?? null).toBe(overPicture.muted)
+    expect(overPicture.quiet).not.toBe(palette.quiet)
+    expect(overPicture.text).not.toBe(palette.text)
+    expect(
+      styleOf(screen.getByRole('button', { name: 'Picture in Picture' }))?.backgroundColor ?? null,
+    ).toBe(overPicture.quiet)
+    expect(styleOf(screen.getByRole('button', { name: 'Pause' }))?.backgroundColor ?? null).toBe(
+      overPicture.quiet,
+    )
+    expect(styleOf(screen.getByRole('button', { name: 'Back' }))?.backgroundColor ?? null).toBe(
+      overPicture.quiet,
+    )
+
+    await fireEvent.press(chip)
+    expect(sheets).toEqual([THEME_TONES.dark])
   })
 
   it('saves the spot and goes back when Back is pressed', async () => {

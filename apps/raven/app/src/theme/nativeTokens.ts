@@ -5,6 +5,16 @@ const REM = /^(-?\d*\.?\d+)rem$/
 const PIXELS = /^(-?\d*\.?\d+)px$/
 const NUMBER = /^-?\d*\.?\d+$/
 const HEX_COLOUR = /^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i
+const TRANSLUCENT_RGB = /^rgb\((\d{1,3}) (\d{1,3}) (\d{1,3}) \/ (\d*\.?\d+)%\)$/
+
+/** A colour as React Native takes it: hex as written, CSS's `rgb(r g b / a%)` as `rgba()`. */
+const colourOf = (value: string): string | null => {
+  if (HEX_COLOUR.test(value)) return value
+  const [, red, green, blue, alpha] = TRANSLUCENT_RGB.exec(value) ?? []
+  if (red === undefined || green === undefined || blue === undefined || alpha === undefined)
+    return null
+  return `rgba(${red}, ${green}, ${blue}, ${Number(alpha) / 100})`
+}
 
 /** A length in points or a plain number; null for anything else. */
 const numberOf = (value: string): number | null => {
@@ -19,14 +29,15 @@ type NativeTokens = { colours: Record<string, string>; numbers: Record<string, n
 
 /**
  * The web's custom properties that React Native can use, by name: hex colours
- * as written, and lengths and plain numbers as numbers. What it has no way to
- * say (`clamp()`, `var()`, `color-mix()`, `rgb()` with a percent alpha, a
- * shadow, a font stack, an em) is dropped rather than guessed at.
+ * as written, a translucent `rgb()` as `rgba()`, and lengths and plain numbers
+ * as numbers. What it has no way to say (`clamp()`, `var()`, `color-mix()`, a
+ * gradient, a shadow, a font stack, an em) is dropped rather than guessed at.
  */
 export const nativeTokens = (tokens: Readonly<Record<string, string>>): NativeTokens =>
   Object.entries(tokens).reduce<NativeTokens>(
     ({ colours, numbers }, [name, value]) => {
-      if (HEX_COLOUR.test(value)) return { colours: { ...colours, [name]: value }, numbers }
+      const colour = colourOf(value)
+      if (colour !== null) return { colours: { ...colours, [name]: colour }, numbers }
       const number = numberOf(value)
       if (number === null) return { colours, numbers }
       return { colours, numbers: { ...numbers, [name]: number } }

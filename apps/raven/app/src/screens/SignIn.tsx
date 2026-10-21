@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Text } from 'react-native'
 
-import { BUTTON_TONES, Field, Form, FormButton, formStyles } from '@/layouts'
+import { BUTTON_TONES, Field, Form, FormButton, useFormStyles } from '@/layouts'
 import { APP_ROUTES } from '@/routes'
 import { useSubmit } from '@/screens/useSubmit'
 import { apiFor, cookieJar, newServerId } from '@/servers/serverClient'
@@ -71,6 +71,7 @@ const isAdminLockHeld = async (api: ApiClient): Promise<boolean> => {
  */
 export const SignIn = () => {
   const router = useRouter()
+  const formStyles = useFormStyles()
   const [step, setStep] = useState<Step>({ kind: STEPS.address })
   const [address, setAddress] = useState('')
   const [secret, setSecret] = useState('')

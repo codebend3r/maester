@@ -14,7 +14,9 @@ import {
   type ShelvesProps,
   seeAllLabelOf,
 } from '@/layouts/shelfKit'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { Logo } from '@/layouts/Logo'
+import { SIZES } from '@/theme/appTheme'
+import { themedStyles } from '@/theme/useTheme'
 
 /** Card widths in points: about two and a half posters across a phone, more on a tablet. */
 const CARD_WIDTHS = {
@@ -29,6 +31,7 @@ const useCardWidths = () => {
 
 const Shelves = ({ title, notice, onSearch, onSettings, children }: ShelvesProps) => {
   const insets = useSafeAreaInsets()
+  const styles = useStyles()
   return (
     <ScrollView
       contentContainerStyle={[
@@ -44,9 +47,12 @@ const Shelves = ({ title, notice, onSearch, onSettings, children }: ShelvesProps
       style={styles.ground}
     >
       <View style={styles.pageRow}>
-        <Text accessibilityRole="header" style={styles.pageTitle}>
-          {title}
-        </Text>
+        <View style={styles.brand}>
+          <Logo width={SIZES.textXl} />
+          <Text accessibilityRole="header" style={styles.pageTitle}>
+            {title}
+          </Text>
+        </View>
         <View style={styles.tools}>
           <Pressable
             accessibilityLabel={SEARCH_EVERY_LIBRARY.label}
@@ -80,6 +86,7 @@ const Shelves = ({ title, notice, onSearch, onSettings, children }: ShelvesProps
  */
 const ShelfTitle = ({ shelf, onOpenLibrary }: Pick<ShelfProps, 'shelf' | 'onOpenLibrary'>) => {
   const { libraryId } = shelf
+  const styles = useStyles()
   return (
     <View style={styles.titleRow}>
       <Text accessibilityRole="header" numberOfLines={1} style={styles.shelfTitle}>
@@ -106,6 +113,7 @@ const ShelfTitle = ({ shelf, onOpenLibrary }: Pick<ShelfProps, 'shelf' | 'onOpen
  */
 const Shelf = ({ shelf, onOpen, onOpenLibrary }: ShelfProps) => {
   const widths = useCardWidths()
+  const styles = useStyles()
   const snaps = shelf.cards.reduce<number[]>(
     (offsets, card) => offsets.concat((offsets.at(-1) ?? 0) + widths[card.shape] + SIZES.space3),
     [0],
@@ -143,39 +151,42 @@ const Shelf = ({ shelf, onOpen, onOpenLibrary }: ShelfProps) => {
 /** Home on a phone or tablet: the shelves stacked down the page, each scrolled sideways. */
 export const touchShelf: ShelfKit = { Shelves, Shelf }
 
-const styles = StyleSheet.create({
-  ground: { flex: 1, backgroundColor: COLOURS.ground },
-  shelves: { gap: SIZES.space4 },
-  pageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: SIZES.space2,
-    paddingHorizontal: SIZES.space3,
-  },
-  pageTitle: { flexShrink: 1, color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
-  search: {
-    minHeight: SIZES.fieldHeight,
-    justifyContent: 'center',
-    paddingHorizontal: SIZES.space3,
-    borderRadius: SIZES.radius,
-    backgroundColor: COLOURS.quiet,
-  },
-  searchLabel: { color: COLOURS.text, fontSize: SIZES.text, fontWeight: '600' },
-  tools: { flexDirection: 'row', gap: SIZES.space2 },
-  gear: { minWidth: SIZES.fieldHeight, alignItems: 'center' },
-  gearLabel: { color: COLOURS.text, fontSize: SIZES.textLg },
-  notice: { color: COLOURS.muted, fontSize: SIZES.text, paddingHorizontal: SIZES.space3 },
-  shelf: { gap: SIZES.space2 },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: SIZES.space2,
-    paddingHorizontal: SIZES.space3,
-  },
-  shelfTitle: { flexShrink: 1, color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
-  seeAll: { color: COLOURS.muted, fontSize: SIZES.textSm, fontWeight: '600' },
-  pressed: { opacity: 0.6 },
-  row: { gap: SIZES.space3, paddingHorizontal: SIZES.space3 },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    ground: { flex: 1, backgroundColor: colours.ground },
+    shelves: { gap: SIZES.space4 },
+    pageRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: SIZES.space2,
+      paddingHorizontal: SIZES.space3,
+    },
+    brand: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: SIZES.space2 },
+    pageTitle: { flexShrink: 1, color: colours.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
+    search: {
+      minHeight: SIZES.fieldHeight,
+      justifyContent: 'center',
+      paddingHorizontal: SIZES.space3,
+      borderRadius: SIZES.radius,
+      backgroundColor: colours.quiet,
+    },
+    searchLabel: { color: colours.text, fontSize: SIZES.text, fontWeight: '600' },
+    tools: { flexDirection: 'row', gap: SIZES.space2 },
+    gear: { minWidth: SIZES.fieldHeight, alignItems: 'center' },
+    gearLabel: { color: colours.text, fontSize: SIZES.textLg },
+    notice: { color: colours.muted, fontSize: SIZES.text, paddingHorizontal: SIZES.space3 },
+    shelf: { gap: SIZES.space2 },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      gap: SIZES.space2,
+      paddingHorizontal: SIZES.space3,
+    },
+    shelfTitle: { flexShrink: 1, color: colours.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
+    seeAll: { color: colours.muted, fontSize: SIZES.textSm, fontWeight: '600' },
+    pressed: { opacity: 0.6 },
+    row: { gap: SIZES.space3, paddingHorizontal: SIZES.space3 },
+  }),
+)
