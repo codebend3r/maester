@@ -1,3 +1,4 @@
+import { renamedServers } from '@raven/core'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
@@ -9,7 +10,6 @@ import {
   type AppServer,
   addServer,
   removeServer,
-  renameServer,
   storedServersOf,
 } from '@/servers/serverList'
 
@@ -62,7 +62,7 @@ export const createActiveServerStore = ({
           await jar.forget(id)
         },
         rename: ({ id, name }) => {
-          const renamed = renameServer({ servers: get().servers, id, name })
+          const renamed = renamedServers({ servers: get().servers, id, name })
           if (renamed !== null) set({ servers: renamed })
           return renamed !== null
         },

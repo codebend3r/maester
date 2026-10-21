@@ -23,17 +23,11 @@ type PlayTable = {
   videoCodecs: Readonly<Record<string, readonly number[]>>
   audioCodecs: readonly string[]
   /**
-   * What the table lists that some files or devices still refuse: these codecs, in these
-   * containers. A maybe counts as a yes for a viewer who prefers direct play, as a browser's
+   * The codecs listed above that some files or devices still refuse, in every container the
+   * table plays. A maybe counts as a yes for a viewer who prefers direct play, as a browser's
    * "maybe" does, and as a no otherwise.
    */
-  maybes: readonly Maybe[]
-}
-
-type Maybe = {
-  containers: readonly string[]
-  videoCodecs: readonly string[]
-  audioCodecs: readonly string[]
+  maybes: readonly string[]
 }
 
 /**
@@ -48,13 +42,7 @@ const APPLE = {
   containers: [CONTAINERS.mp4, CONTAINERS.mov],
   videoCodecs: { [VIDEO_CODECS.h264]: [8], [VIDEO_CODECS.hevc]: [8, 10] },
   audioCodecs: HLS_COPY_AUDIO,
-  maybes: [
-    {
-      containers: [CONTAINERS.mp4, CONTAINERS.mov],
-      videoCodecs: [VIDEO_CODECS.hevc],
-      audioCodecs: [],
-    },
-  ],
+  maybes: [VIDEO_CODECS.hevc],
 } as const satisfies PlayTable
 
 /**
@@ -83,13 +71,7 @@ const EXOPLAYER = {
     AUDIO_CODECS.dts,
     AUDIO_CODECS.truehd,
   ],
-  maybes: [
-    {
-      containers: [CONTAINERS.mkv, CONTAINERS.mp4, CONTAINERS.mov, CONTAINERS.webm],
-      videoCodecs: [],
-      audioCodecs: [AUDIO_CODECS.dts, AUDIO_CODECS.truehd],
-    },
-  ],
+  maybes: [AUDIO_CODECS.dts, AUDIO_CODECS.truehd],
 } as const satisfies PlayTable
 
 const PLAY_TABLES: Record<AppPlatform, PlayTable> = {
@@ -113,35 +95,18 @@ const mimePartsOf = (mimeType: string): { type: string; codecs: string[] } => {
   }
 }
 
-/** The strings core writes for codecs named in ffprobe's words, at every depth the table lists. */
-const codecStringsOf = ({
-  table,
-  videoCodecs,
-  audioCodecs,
-}: {
-  table: PlayTable
-  videoCodecs: readonly string[]
-  audioCodecs: readonly string[]
-}): string[] =>
-  [
-    ...videoCodecs.flatMap((codec) =>
-      (table.videoCodecs[codec] ?? []).map((bitDepth) => videoCodecString({ codec, bitDepth })),
-    ),
-    ...audioCodecs.map((codec) => audioCodecString(codec)),
-  ].filter(isString)
-
-const mimeTypesOf = (containers: readonly string[]): Set<string> =>
-  new Set(containers.map((container) => containerMimeType(container)).filter(isString))
-
 /** Yes when the container and every codec named are in the table, in core's strings. */
 const canPlayFrom = (table: PlayTable): CanPlay => {
-  const types = mimeTypesOf(table.containers)
+  const types = new Set(
+    table.containers.map((container) => containerMimeType(container)).filter(isString),
+  )
   const codecs = new Set(
-    codecStringsOf({
-      table,
-      videoCodecs: Object.keys(table.videoCodecs),
-      audioCodecs: table.audioCodecs,
-    }),
+    [
+      ...Object.entries(table.videoCodecs).flatMap(([codec, bitDepths]) =>
+        bitDepths.map((bitDepth) => videoCodecString({ codec, bitDepth })),
+      ),
+      ...table.audioCodecs.map((codec) => audioCodecString(codec)),
+    ].filter(isString),
   )
   return (mimeType) => {
     const asked = mimePartsOf(mimeType)
@@ -149,18 +114,16 @@ const canPlayFrom = (table: PlayTable): CanPlay => {
   }
 }
 
-/** Yes when the type names a codec the table counts as a maybe in that container. */
-const isMaybeFrom = (table: PlayTable): CanPlay => {
-  const maybes = table.maybes.map((maybe) => ({
-    types: mimeTypesOf(maybe.containers),
-    codecs: new Set(codecStringsOf({ table, ...maybe })),
-  }))
-  return (mimeType) => {
-    const asked = mimePartsOf(mimeType)
-    return maybes.some(
-      ({ types, codecs }) =>
-        types.has(asked.type) && asked.codecs.some((codec) => codecs.has(codec)),
-    )
+/** What the platform plays for sure: the table without its maybes. */
+const surelyOf = (table: PlayTable): PlayTable => {
+  const isSure = (codec: string) => !table.maybes.includes(codec)
+  return {
+    ...table,
+    videoCodecs: Object.fromEntries(
+      Object.entries(table.videoCodecs).filter(([codec]) => isSure(codec)),
+    ),
+    audioCodecs: table.audioCodecs.filter(isSure),
+    maybes: [],
   }
 }
 
@@ -182,10 +145,5 @@ type PlatformSupport = Pick<Parameters<typeof planPlayback>[0], 'canPlay' | 'can
 export const canPlayFor = (platform: AppPlatform): PlatformSupport => {
   const table = PLAY_TABLES[platform]
   const canPlay = canPlayFrom(table)
-  const isMaybe = isMaybeFrom(table)
-  return {
-    canPlay,
-    canStream: canPlay,
-    canPlaySurely: (mimeType) => canPlay(mimeType) && !isMaybe(mimeType),
-  }
+  return { canPlay, canStream: canPlay, canPlaySurely: canPlayFrom(surelyOf(table)) }
 }

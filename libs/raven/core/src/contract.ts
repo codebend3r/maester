@@ -1173,6 +1173,9 @@ export const TRANSCODINGS = { on: 'on', remuxOnly: 'remuxOnly', off: 'off' } as 
 
 export const QUALITIES = { low: 'low', medium: 'medium', high: 'high' } as const
 
+/** The frames a transcode may be scaled down to, in lines: 4K, 1080p and 720p. */
+export const MAX_HEIGHTS = { uhd: 2160, fullHd: 1080, hd: 720 } as const
+
 export const HW_ACCELS = {
   auto: 'auto',
   videotoolbox: 'videotoolbox',
@@ -1184,12 +1187,17 @@ export const HW_ACCELS = {
 export const PLAYBACK_CHOICES = {
   directPlay: Object.values(DIRECT_PLAYS),
   transcoding: Object.values(TRANSCODINGS),
-  maxHeight: [2160, 1080, 720],
+  maxHeight: Object.values(MAX_HEIGHTS),
   quality: Object.values(QUALITIES),
   hwAccel: Object.values(HW_ACCELS),
 } as const
 
 export const isHwAccel = oneOf(PLAYBACK_CHOICES.hwAccel)
+
+export const isMaxHeight = oneOf(PLAYBACK_CHOICES.maxHeight)
+
+/** The frame a transcode is scaled down to: one of `MAX_HEIGHTS`. */
+export type MaxHeight = Infer<typeof isMaxHeight>
 
 /** What encodes a transcode: `auto` takes the GPU the machine has, `none` keeps to the CPU. */
 export type HwAccel = Infer<typeof isHwAccel>
@@ -1209,7 +1217,7 @@ export const isPlaybackSettings = object({
    */
   transcoding: oneOf(PLAYBACK_CHOICES.transcoding),
   /** The frame a transcode is scaled down to. */
-  maxHeight: oneOf(PLAYBACK_CHOICES.maxHeight),
+  maxHeight: isMaxHeight,
   /** How hard a transcode is squeezed: `low` for a slow network, `high` for a big screen. */
   quality: oneOf(PLAYBACK_CHOICES.quality),
   /** What encodes a transcode: `auto` takes the GPU the machine has, `none` keeps to the CPU. */

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { THEMES, themeOf } from '@raven/core'
+import { MAX_HEIGHTS, THEMES, themeOf } from '@raven/core'
 import { fireEvent, screen, within } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 
 import { Settings } from '@/screens/Settings'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
-import { AWAY_MAX_HEIGHTS, DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
+import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { NAS, OTHER, homeApi } from '@/test/homeServer'
 import type * as NavigationFocus from '@/test/navigationFocus'
 import { resetTestScreen } from '@/test/navigationFocus'
@@ -138,7 +138,7 @@ describe('Settings on a TV', () => {
     await fireEvent.press(
       within(screen.getByLabelText('Away from home')).getByRole('button', { name: '4K' }),
     )
-    expect(useAppPrefs.getState().awayMaxHeight).toBe(AWAY_MAX_HEIGHTS.uhd)
+    expect(useAppPrefs.getState().awayMaxHeight).toBe(MAX_HEIGHTS.uhd)
   })
 
   it('renames a server through the TV keyboard, starting on its field', async () => {

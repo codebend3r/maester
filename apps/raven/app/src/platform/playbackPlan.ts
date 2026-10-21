@@ -1,4 +1,5 @@
 import {
+  type CanPlay,
   type MediaItem,
   type MediaTracks,
   PLAYBACK_MODES,
@@ -47,22 +48,17 @@ export const planFor = ({
   shouldDrawCaptions: boolean
 }): PlaybackPlan => {
   const { canPlay, canPlaySurely, canStream } = canPlayFor(platform)
-  const isNarrowed = !prefs.isTranscodeAllowed && policy.transcoding === TRANSCODINGS.on
-  const planned = {
-    media,
-    canStream,
-    defaultAudio: true,
-    policy: isNarrowed ? { ...policy, transcoding: TRANSCODINGS.remuxOnly } : policy,
-  }
-  const generous = planPlayback({ ...planned, canPlay })
-  const sure = prefs.shouldPreferDirectPlay
-    ? generous
-    : planPlayback({ ...planned, canPlay: canPlaySurely })
-  const narrowed = sure.modes.length === 0 ? generous : sure
+  const isTranscodeTaken = !prefs.isTranscodeAllowed && policy.transcoding === TRANSCODINGS.on
+  const policyHere = isTranscodeTaken ? { ...policy, transcoding: TRANSCODINGS.remuxOnly } : policy
+  const planWith = (answer: CanPlay): PlaybackPlan =>
+    planPlayback({ media, canPlay: answer, canStream, defaultAudio: true, policy: policyHere })
+  const generous = planWith(canPlay)
+  const sure = prefs.shouldPreferDirectPlay ? generous : planWith(canPlaySurely)
+  const chosen = sure.modes.length > 0 ? sure : generous
   const plan =
-    isNarrowed && narrowed.modes.length === 0
-      ? { ...narrowed, problems: [...narrowed.problems, TRANSCODING_OFF_HERE] }
-      : narrowed
+    isTranscodeTaken && chosen.modes.length === 0
+      ? { ...chosen, problems: [...chosen.problems, TRANSCODING_OFF_HERE] }
+      : chosen
   const hasTextSubtitles = tracks?.subtitles.some((track) => track.supported) ?? false
   if (shouldDrawCaptions || !hasTextSubtitles) return plan
   const converted = plan.modes.filter((mode) => mode !== PLAYBACK_MODES.direct)

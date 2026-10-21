@@ -31,7 +31,7 @@ import { PlateButton } from '@/layouts/tvControls'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { TV_SIZES } from '@/theme/tvSizes'
-import { themedStyles } from '@/theme/useTheme'
+import { pictureStyles } from '@/theme/useTheme'
 
 const { Picker } = focusPicker
 
@@ -352,25 +352,25 @@ const PlayerChrome = (props: PlayerChromeProps) => {
 /** The player on Android TV: raven's controls, which the d-pad drives, with raven's subtitles. */
 export const dpadPlayerChrome: PlayerChromeKit = { PlayerChrome, shouldDrawCaptions: true }
 
-const useStyles = themedStyles((colours) =>
+const useStyles = pictureStyles((colours) =>
   StyleSheet.create({
-    root: { flex: 1, backgroundColor: colours.stage },
+    root: { flex: 1, backgroundColor: colours.ground },
     scrim: {
       ...StyleSheet.absoluteFill,
-      backgroundColor: colours.stage,
+      backgroundColor: colours.ground,
       opacity: SCRIM_OPACITY,
     },
     frame: { flex: 1, justifyContent: 'space-between', padding: GUTTER },
-    title: { color: colours.onPicture, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
     bottom: { gap: TV_SIZES.space3 },
     timeline: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
-    time: { color: colours.onPicture, fontSize: TV_SIZES.text, fontVariant: ['tabular-nums'] },
+    time: { color: colours.text, fontSize: TV_SIZES.text, fontVariant: ['tabular-nums'] },
     scrubberSlot: { flex: 1 },
     scrubber: { height: TV_SIZES.controlLarge, justifyContent: 'center' },
     line: {
       height: TV_SIZES.space1,
       borderRadius: TV_SIZES.space1,
-      backgroundColor: colours.pictureTrack,
+      backgroundColor: colours.track,
       overflow: 'hidden',
     },
     lineFocused: { height: TV_SIZES.space2 },
@@ -380,7 +380,7 @@ const useStyles = themedStyles((colours) =>
       width: THUMB,
       height: THUMB,
       borderRadius: THUMB,
-      backgroundColor: colours.onPicture,
+      backgroundColor: colours.text,
     },
     thumbFocused: {
       width: THUMB_FOCUSED,
@@ -399,7 +399,7 @@ const useStyles = themedStyles((colours) =>
     noticeSlot: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
     notice: {
       maxWidth: TV_SIZES.measure,
-      color: colours.onPicture,
+      color: colours.text,
       fontSize: TV_SIZES.textLg,
       textAlign: 'center',
     },

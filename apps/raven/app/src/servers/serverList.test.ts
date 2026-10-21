@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'bun:test'
 
-import { NAME_MAX, SERVERS_CAP } from '@raven/core'
+import { SERVERS_CAP } from '@raven/core'
 
 import {
   ADD_OUTCOMES,
   type AppServer,
   addServer,
   removeServer,
-  renameServer,
   storedServersOf,
 } from '@/servers/serverList'
 
@@ -73,22 +72,6 @@ describe('removeServer', () => {
   it('drops the server with that id and keeps the rest', () => {
     const other = { ...NAS, id: NEW_ID, origin: 'http://other:8080' }
     expect(removeServer({ servers: [NAS, other], id: NAS.id })).toEqual([other])
-  })
-})
-
-describe('renameServer', () => {
-  it("gives the server the name typed, tidied as the desktop's are", () => {
-    const [first, second] = serversOf(2)
-    if (first === undefined || second === undefined) throw new Error('No servers')
-    expect(
-      renameServer({ servers: [first, second], id: second.id, name: '  Living   room ' }),
-    ).toEqual([first, { ...second, name: 'Living room' }])
-  })
-
-  it('refuses a blank name, one too long, and a server not on the list', () => {
-    expect(renameServer({ servers: [NAS], id: NAS.id, name: '   ' })).toBeNull()
-    expect(renameServer({ servers: [NAS], id: NAS.id, name: 'a'.repeat(NAME_MAX + 1) })).toBeNull()
-    expect(renameServer({ servers: [NAS], id: NEW_ID, name: 'Den' })).toBeNull()
   })
 })
 

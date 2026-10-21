@@ -5,7 +5,7 @@ import { DEFAULT_THEME, THEMES, THEME_TONES, parseThemes, parseTokens } from '@r
 
 import { appThemeOf } from '@/theme/appTheme'
 import { nativeTokens } from '@/theme/nativeTokens'
-import { FIXED_TOKENS, OVER_PICTURE_TOKENS, PALETTE_TOKENS } from '@/theme/tokenNames'
+import { OVER_PICTURE_TOKENS, PALETTE_TOKENS } from '@/theme/tokenNames'
 
 // The stylesheets themselves, not the built `@raven/ui/designTokens` the app reads, so a
 // stale build or a parse that drifted from them fails here.
@@ -44,14 +44,6 @@ describe('appThemeOf', () => {
     expect(appThemeOf(DEFAULT_THEME).palette).toMatchObject(
       paletteFrom({ tokens: PALETTE_TOKENS, declared: root }),
     )
-  })
-
-  it('paints what sits on a picture as globals.scss does, whatever the theme', () => {
-    THEMES.forEach(({ id }) => {
-      expect(appThemeOf(id).palette).toMatchObject(
-        paletteFrom({ tokens: FIXED_TOKENS, declared: root }),
-      )
-    })
   })
 
   it("draws over the video in globals.scss's on-picture colours, the web player's, whatever the theme", () => {

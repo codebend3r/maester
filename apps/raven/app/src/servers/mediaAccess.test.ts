@@ -8,6 +8,8 @@ import {
   MEDIA_ORIGIN_KINDS,
   MEDIA_TICKET_PARAM,
   MEDIA_TICKET_RENEW_MS,
+  MAX_HEIGHTS,
+  type MaxHeight,
   PLAYBACK_MODES,
   SERVER_COOKIES,
   type StreamQuality,
@@ -15,7 +17,6 @@ import {
 } from '@raven/core'
 
 import type { ServerCookies } from '@/servers/cookieJar'
-import { AWAY_MAX_HEIGHTS } from '@/stores/appPrefs'
 import {
   MEDIA_ACCESS_MESSAGES,
   mediaAccessFor,
@@ -52,6 +53,7 @@ const setUp = ({
   cookies?: ServerCookies
 } = {}) => {
   const clock = { now: READ_AT }
+  const away: { maxHeight: MaxHeight } = { maxHeight: MAX_HEIGHTS.fullHd }
   const probes = probesOf({ elapsedMs })
   const network = fakeNetwork()
   const media = mediaAccessFor({
@@ -61,8 +63,9 @@ const setUp = ({
     probe: probes.probe,
     readCookies: async () => cookies,
     watchNetwork: network.watchNetwork,
+    awayMaxHeight: () => away.maxHeight,
   })
-  return { media, clock, probes, network, heard: server.heard }
+  return { media, clock, away, probes, network, heard: server.heard }
 }
 
 const sourceOf = (outcome: SourceOutcome) => {
@@ -77,26 +80,9 @@ const filePath = pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS.id })
 const masterPath = pathFor({ path: HLS_PATHS.master, id: BUSBOYS.id })
 const ticketPath = pathFor({ path: APP_CLIENT_CALLS.getMediaTicket.path, id: BUSBOYS.id })
 
-const AWAY_1080 = AWAY_MAX_HEIGHTS.fullHd
-
-const direct: SourceRequest = {
-  media: BUSBOYS,
-  mode: PLAYBACK_MODES.direct,
-  audio: null,
-  awayMaxHeight: AWAY_1080,
-}
-const remux: SourceRequest = {
-  media: BUSBOYS,
-  mode: PLAYBACK_MODES.remux,
-  audio: 1,
-  awayMaxHeight: AWAY_1080,
-}
-const transcode: SourceRequest = {
-  media: BUSBOYS,
-  mode: PLAYBACK_MODES.transcode,
-  audio: 0,
-  awayMaxHeight: AWAY_1080,
-}
+const direct: SourceRequest = { media: BUSBOYS, mode: PLAYBACK_MODES.direct, audio: null }
+const remux: SourceRequest = { media: BUSBOYS, mode: PLAYBACK_MODES.remux, audio: 1 }
+const transcode: SourceRequest = { media: BUSBOYS, mode: PLAYBACK_MODES.transcode, audio: 0 }
 
 /** Only the public origin answers: the device is away from home. */
 const AWAY = { [PUBLIC.url]: 40 }
@@ -145,7 +131,7 @@ describe('mediaAccessFor', () => {
   })
 
   it('caps a transcode from the public origin at the height chosen for away from home', async () => {
-    const { media } = setUp({ elapsedMs: AWAY })
+    const { media, away } = setUp({ elapsedMs: AWAY })
     const query = toQueryString({
       [HLS_PARAMS.mode]: PLAYBACK_MODES.transcode,
       [HLS_PARAMS.audio]: '0',
@@ -156,14 +142,14 @@ describe('mediaAccessFor', () => {
       uri: `${PUBLIC.url}${masterPath}?${query}`,
       headers: {},
     })
-    const at720 = { ...transcode, awayMaxHeight: AWAY_MAX_HEIGHTS.hd }
-    expect(qualityOf(await media.source(at720))).toBe(LOW_720)
+    away.maxHeight = MAX_HEIGHTS.hd
+    expect(qualityOf(await media.source(transcode))).toBe(LOW_720)
   })
 
   it('asks no cap at 4K, which the server ladder has no size for', async () => {
-    const { media } = setUp({ elapsedMs: AWAY })
-    const at4k = { ...transcode, awayMaxHeight: AWAY_MAX_HEIGHTS.uhd }
-    expect(qualityOf(await media.source(at4k))).toBeNull()
+    const { media, away } = setUp({ elapsedMs: AWAY })
+    away.maxHeight = MAX_HEIGHTS.uhd
+    expect(qualityOf(await media.source(transcode))).toBeNull()
   })
 
   it('asks no cap from a LAN origin, at home', async () => {
@@ -289,6 +275,7 @@ describe('mediaAccessFor', () => {
         throw new Error('The keychain is locked')
       },
       watchNetwork: fakeNetwork().watchNetwork,
+      awayMaxHeight: () => MAX_HEIGHTS.fullHd,
     })
     expect(await media.source(direct)).toEqual({
       ok: false,

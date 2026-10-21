@@ -28,7 +28,7 @@ import {
 import { TouchBack } from '@/layouts/TouchBack'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { SIZES } from '@/theme/appTheme'
-import { themedStyles } from '@/theme/useTheme'
+import { pictureStyles } from '@/theme/useTheme'
 
 const { Picker, ToolButton } = touchPicker
 
@@ -288,12 +288,12 @@ const PlayerChrome = ({
 /** The player under the thumb, on iPhones and iPads. */
 export const touchPlayerChrome: PlayerChromeKit = { PlayerChrome, shouldDrawCaptions: true }
 
-const useStyles = themedStyles((colours) =>
+const useStyles = pictureStyles((colours) =>
   StyleSheet.create({
-    root: { flex: 1, backgroundColor: colours.stage },
+    root: { flex: 1, backgroundColor: colours.ground },
     scrim: {
       ...StyleSheet.absoluteFill,
-      backgroundColor: colours.stage,
+      backgroundColor: colours.ground,
       opacity: SCRIM_OPACITY,
     },
     frame: { flex: 1, justifyContent: 'space-between' },
@@ -305,7 +305,7 @@ const useStyles = themedStyles((colours) =>
       justifyContent: 'flex-end',
       gap: SIZES.space2,
     },
-    title: { flex: 1, color: colours.onPicture, fontSize: SIZES.text, fontWeight: '600' },
+    title: { flex: 1, color: colours.text, fontSize: SIZES.text, fontWeight: '600' },
     middle: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -313,13 +313,13 @@ const useStyles = themedStyles((colours) =>
       gap: SIZES.space6,
     },
     bottom: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space2 },
-    time: { color: colours.onPicture, fontSize: SIZES.textSm, fontVariant: ['tabular-nums'] },
+    time: { color: colours.text, fontSize: SIZES.textSm, fontVariant: ['tabular-nums'] },
     scrubberSlot: { flex: 1 },
     scrubber: { height: SCRUBBER_HEIGHT, justifyContent: 'center' },
     line: {
       height: SIZES.space1,
       borderRadius: SIZES.space1,
-      backgroundColor: colours.pictureTrack,
+      backgroundColor: colours.track,
       overflow: 'hidden',
     },
     played: { height: '100%', backgroundColor: colours.played },
@@ -329,7 +329,7 @@ const useStyles = themedStyles((colours) =>
       height: SIZES.space4,
       marginLeft: -SIZES.space4 / 2,
       borderRadius: SIZES.space4,
-      backgroundColor: colours.onPicture,
+      backgroundColor: colours.text,
     },
     round: {
       minWidth: SIZES.controlLarge,
@@ -338,12 +338,12 @@ const useStyles = themedStyles((colours) =>
       justifyContent: 'center',
       borderRadius: SIZES.controlLarge,
       paddingHorizontal: SIZES.space2,
-      backgroundColor: colours.pictureGlass,
+      backgroundColor: colours.raised,
     },
     // The same dark glass as the skips, larger: the web's play is on-picture too, in every theme.
     roundLarge: { minWidth: SIZES.controlLarge * 1.5, minHeight: SIZES.controlLarge * 1.5 },
     pressed: { opacity: 0.6 },
-    glyph: { color: colours.onPicture, fontSize: SIZES.text, fontWeight: '600' },
+    glyph: { color: colours.text, fontSize: SIZES.text, fontWeight: '600' },
     glyphLarge: { fontSize: SIZES.textXl },
     captionSlot: {
       ...StyleSheet.absoluteFill,
@@ -355,7 +355,7 @@ const useStyles = themedStyles((colours) =>
     noticeSlot: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
     notice: {
       maxWidth: SIZES.measure,
-      color: colours.onPicture,
+      color: colours.text,
       fontSize: SIZES.text,
       textAlign: 'center',
     },

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { APP_CLIENT_CALLS, SERVERS_CAP, THEMES, themeOf } from '@raven/core'
+import { APP_CLIENT_CALLS, MAX_HEIGHTS, SERVERS_CAP, THEMES, themeOf } from '@raven/core'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { ActionSheetIOS, Alert, type AlertButton, StyleSheet } from 'react-native'
 
@@ -10,7 +10,7 @@ import { Home } from '@/screens/Home'
 import { Settings } from '@/screens/Settings'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
-import { AWAY_MAX_HEIGHTS, DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
+import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { NAS, OTHER, homeApi } from '@/test/homeServer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { createScreenClient, renderScreen } from '@/test/renderScreen'
@@ -259,7 +259,7 @@ describe('Settings on a phone or tablet', () => {
     await renderScreen({ ui: <Settings /> })
     await fireEvent.press(screen.getByRole('button', { name: 'Away from home: 1080p' }))
     expect(asked.map(({ options }) => options)).toEqual([['4K', '1080p', '720p', 'Cancel']])
-    expect(useAppPrefs.getState().awayMaxHeight).toBe(AWAY_MAX_HEIGHTS.hd)
+    expect(useAppPrefs.getState().awayMaxHeight).toBe(MAX_HEIGHTS.hd)
   })
 
   it('goes back from its Back', async () => {

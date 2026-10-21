@@ -1,14 +1,8 @@
 import { beforeEach, describe, expect, it } from 'bun:test'
-import { DEFAULT_THEME, THEMES } from '@raven/core'
+import { DEFAULT_THEME, MAX_HEIGHTS, THEMES } from '@raven/core'
 import type { StateStorage } from 'zustand/middleware'
 
-import {
-  APP_PREFS_KEY,
-  AWAY_MAX_HEIGHTS,
-  DEFAULT_APP_PREFS,
-  configureAppPrefs,
-  useAppPrefs,
-} from '@/stores/appPrefs'
+import { APP_PREFS_KEY, DEFAULT_APP_PREFS, configureAppPrefs, useAppPrefs } from '@/stores/appPrefs'
 
 const memoryStorage = (entries: [string, string][] = []) => {
   const items = new Map(entries)
@@ -41,7 +35,7 @@ describe('useAppPrefs', () => {
       theme: DEFAULT_THEME,
       shouldPreferDirectPlay: true,
       isTranscodeAllowed: true,
-      awayMaxHeight: AWAY_MAX_HEIGHTS.fullHd,
+      awayMaxHeight: MAX_HEIGHTS.fullHd,
     })
   })
 
@@ -50,7 +44,7 @@ describe('useAppPrefs', () => {
     await configureAppPrefs({ storage })
     const { change } = useAppPrefs.getState()
     change({ theme: CONTRAST })
-    change({ isTranscodeAllowed: false, awayMaxHeight: AWAY_MAX_HEIGHTS.hd })
+    change({ isTranscodeAllowed: false, awayMaxHeight: MAX_HEIGHTS.hd })
     change({ shouldPreferDirectPlay: false })
 
     // What the next launch reads is what this one wrote, before anything there changes it.
@@ -61,7 +55,7 @@ describe('useAppPrefs', () => {
       theme: CONTRAST,
       shouldPreferDirectPlay: false,
       isTranscodeAllowed: false,
-      awayMaxHeight: AWAY_MAX_HEIGHTS.hd,
+      awayMaxHeight: MAX_HEIGHTS.hd,
     })
   })
 

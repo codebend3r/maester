@@ -2,7 +2,7 @@ import { type CueRun, cueRuns } from '@raven/core'
 import { StyleSheet, Text } from 'react-native'
 
 import { SIZES } from '@/theme/appTheme'
-import { themedStyles } from '@/theme/useTheme'
+import { pictureStyles } from '@/theme/useTheme'
 
 /** A cue's styled runs, each keyed by where it starts in the cue's text. */
 const keyedRuns = (text: string): (CueRun & { key: string })[] =>
@@ -47,7 +47,7 @@ export const CaptionText = ({
   )
 }
 
-const useStyles = themedStyles((colours) =>
+const useStyles = pictureStyles((colours) =>
   StyleSheet.create({
     caption: {
       maxWidth: SIZES.measure,
@@ -55,8 +55,8 @@ const useStyles = themedStyles((colours) =>
       paddingVertical: SIZES.space1,
       borderRadius: SIZES.radius,
       overflow: 'hidden',
-      backgroundColor: colours.pictureGlass,
-      color: colours.onPicture,
+      backgroundColor: colours.raised,
+      color: colours.text,
       textAlign: 'center',
     },
     italic: { fontStyle: 'italic' },

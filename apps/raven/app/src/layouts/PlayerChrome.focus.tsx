@@ -4,7 +4,7 @@ import Video, { type VideoMetadata } from 'react-native-video'
 
 import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
 import { type PlayerChromeKit, type PlayerChromeProps } from '@/layouts/playerKit'
-import { themedStyles } from '@/theme/useTheme'
+import { pictureStyles } from '@/theme/useTheme'
 
 /** What the system's info panel shows: the title, the synopsis and the poster, where known. */
 const infoOf = ({
@@ -50,8 +50,8 @@ const PlayerChrome = ({ title, summary, artwork, surface, notice, onBack }: Play
 /** The player on Apple TV: the system's transport, which the remote drives and draws over. */
 export const focusPlayerChrome: PlayerChromeKit = { PlayerChrome, shouldDrawCaptions: false }
 
-const useStyles = themedStyles((colours) =>
+const useStyles = pictureStyles((colours) =>
   StyleSheet.create({
-    ground: { flex: 1, backgroundColor: colours.stage },
+    ground: { flex: 1, backgroundColor: colours.ground },
   }),
 )
