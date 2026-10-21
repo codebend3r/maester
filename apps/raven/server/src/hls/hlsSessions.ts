@@ -54,6 +54,15 @@ type SegmentsPastKeepingProps = {
 }
 
 /**
+ * How long a capability opens its session after the master minted it,
+ * however often it is used: a long film with its pauses fits twice over,
+ * and a capability that leaks is good for half a day, never days. Past it
+ * the session's routes answer 404, so the player opens the master again
+ * with a new ticket.
+ */
+export const HLS_CAPABILITY_MS = 12 * 60 * 60 * 1000
+
+/**
  * The segments a session lets go of once `furthest` is asked for: all but
  * the last `HLS_KEPT_SEGMENTS` at or behind it.
  */
@@ -106,6 +115,8 @@ export type HlsGrant = Pick<HlsAccess, 'account' | 'unlockedUntil'>
 type Entry = {
   session: HlsSession
   grant: HlsGrant | null
+  /** When its capability stops opening it, set once at the mint; null for a session with none. */
+  capabilityUntil: number | null
   /** Stops watching the account's access, once the session ends some other way. */
   unwatch: () => void
   keyframesFor: (() => readonly number[] | null) | null
@@ -269,9 +280,10 @@ type HlsSessionsPruneProps = { entry: Entry; n: number }
  *
  * A session an account's ticket opened has a capability of its own, which
  * its routes take in place of the ticket, so it outlives the ticket's five
- * minutes. It dies with the session: forgotten, dropped, evicted, or ended
- * when the account loses access. Sessions live in memory alone, so a
- * restart ends every one.
+ * minutes, though never past `HLS_CAPABILITY_MS` from the mint. It dies
+ * with the session: forgotten, dropped, evicted, ended when the account
+ * loses access, or asked for past that deadline. Sessions live in memory
+ * alone, so a restart ends every one.
  */
 @Injectable()
 export class HlsSessions implements OnModuleInit, OnModuleDestroy {
@@ -318,6 +330,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
       session,
       grant:
         access === null ? null : { account: access.account, unlockedUntil: access.unlockedUntil },
+      capabilityUntil: access === null ? null : this.clock.now() + HLS_CAPABILITY_MS,
       unwatch: () => undefined,
       keyframesFor,
       hasWarnedOfSeek: false,
@@ -343,7 +356,8 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
 
   /**
    * The session, when it is kept, plays this media, and `key` is its
-   * capability or it has none: once it has one, nothing else opens it.
+   * capability or it has none: once it has one, nothing else opens it, and
+   * a request past the capability's deadline ends it.
    */
   get({ mediaId, session, key }: HlsSessionsGetProps): HlsSession | null {
     const entry = this.openedBy({ mediaId, session, key })
@@ -398,7 +412,12 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     const entry = this.entries.get(session)
     if (!entry || entry.session.mediaId !== mediaId) return null
     const { capability } = entry.session
-    if (capability !== null && !isCapabilityOf({ given: key, expected: capability })) return null
+    if (capability === null) return entry
+    if (!isCapabilityOf({ given: key, expected: capability })) return null
+    if (this.clock.now() >= (entry.capabilityUntil ?? 0)) {
+      this.end(entry)
+      return null
+    }
     return entry
   }
 

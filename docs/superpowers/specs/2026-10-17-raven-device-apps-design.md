@@ -163,7 +163,7 @@ GET /api/media/:id/hls/:session/init.mp4?t=...
 - **Subtitles** are a subtitle rendition per track in the master playlist, each a WebVTT playlist cut into the same six-second windows from the existing VTT route, so the existing route does the work and nothing new parses subtitles.
 - **Settings** apply as to the stream route: transcoding off refuses both modes with 403, remux only refuses transcode.
 - **Load**: one ffmpeg per session, one session per device. The segment folder is bounded: at most the last thirty segments of a session are kept.
-- **Accounts** (the plan's Ruling 28): with accounts `ready`, a master opened with an account ticket gives its session a random capability of its own, and every URI its playlists name carries that in `?t=` in place of the ticket, so a film outlives the ticket's five minutes. Only the capability opens that session's routes; `AccessRechecks` checks the account every minute, and a removal ends the session, whose next request answers 404 so the player opens the master again with a new ticket.
+- **Accounts** (the plan's Ruling 28): with accounts `ready`, a master opened with an account ticket gives its session a random capability of its own, and every URI its playlists name carries that in `?t=` in place of the ticket, so a film outlives the ticket's five minutes. Only the capability opens that session's routes, for at most 12 hours from the master; `AccessRechecks` checks the account every minute, and a removal ends the session, whose next request answers 404 so the player opens the master again with a new ticket.
 
 Nothing changes for the stream route or the browser.
 

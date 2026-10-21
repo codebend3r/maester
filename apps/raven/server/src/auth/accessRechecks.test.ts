@@ -1,3 +1,4 @@
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Logger } from '@nestjs/common'
@@ -280,16 +281,28 @@ describe('an HLS session opened with an account ticket', () => {
   }
   /** No session rests or is forgotten here: only its account's rechecks end it. */
   const STILL: HlsClock = { now: () => Date.now(), after: () => () => undefined }
+  /** Each test's sessions and data folder, let go once it is done. */
+  const made: { sessions: HlsSessions[]; dirs: string[] } = { sessions: [], dirs: [] }
+
+  afterEach(async () => {
+    await Promise.all(made.sessions.map((sessions) => sessions.onModuleDestroy()))
+    await Promise.all(made.dirs.map((dir) => rm(dir, { recursive: true, force: true })))
+    made.sessions = []
+    made.dirs = []
+  })
 
   /** A session minted as the master does for the friend's ticket, and whether its capability still opens it. */
   const minted = async () => {
     const env = await setup()
-    const config = testConfig({ dataDir: join(tmpdir(), 'raven-rechecks-hls'), mediaDir: tmpdir() })
+    const dataDir = await mkdtemp(join(tmpdir(), 'raven-rechecks-hls-'))
+    const config = testConfig({ dataDir, mediaDir: tmpdir() })
     const hls = new HlsSessions(
       config,
       new FfmpegService(config, { playback: () => DEFAULT_PLAYBACK_SETTINGS }),
       STILL,
     )
+    made.sessions = [...made.sessions, hls]
+    made.dirs = [...made.dirs, dataDir]
     const request = {}
     const session = await env.signIn()
     env.sessions.bindTicket({ request, session, unlockedUntil: null })

@@ -3,8 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Logger } from '@nestjs/common'
 import {
+  AUTH_HEADERS,
+  AUTH_REFUSALS,
   HLS_PARAMS,
   HLS_PATHS,
+  LIBRARY_KINDS,
+  LOCKED_STATUS,
   MEDIA_TICKET_PARAM,
   MEMBER_STATUSES,
   PLAYBACK_MODES,
@@ -13,9 +17,11 @@ import {
   toQueryString,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { MEMBERSHIP_TTL_MS } from '@/auth/membershipLookups'
 import { HLS_CAPABILITY_PREFIX } from '@/hls/hlsCapability'
-import { eventually, routePath } from '@/test/app'
-import { AUTH_TEST_FAILURES, AUTH_TEST_IDS, authFixture } from '@/test/auth'
+import { HLS_CAPABILITY_MS } from '@/hls/hlsSessions'
+import { cookieSet, eventually, routePath } from '@/test/app'
+import { AUTH_TEST_FAILURES, AUTH_TEST_IDS, authFixture, bearerHeaders } from '@/test/auth'
 import {
   CALLER_KINDS,
   type CallerKind,
@@ -25,11 +31,18 @@ import {
   createEnforcedApp,
   headersFor,
   hlsSessionIn,
+  outcomeOf,
   pathOf,
+  withTicket,
 } from '@/test/enforced'
 
 describe("an account's HLS session", () => {
   const RECHECK_MS = 100
+  const PIN = '7007'
+  /** Two days: a token that outlives every jump of the clock here, so no recheck ends a session for it. */
+  const LONG_TOKEN_SECONDS = 2 * 24 * 60 * 60
+  /** `?t=` given twice, which Fastify reads as an array. */
+  const REPEATED = `${MEDIA_TICKET_PARAM}=a&${MEDIA_TICKET_PARAM}=b`
   /** Several rechecks long, and the bound a test holds the server to. */
   const ENDED_WITHIN_MS = 1_000
   const SUBRIP = ['1', '00:00:00,200 --> 00:00:00,900', 'Wake up, Neo.', ''].join('\n')
@@ -48,7 +61,12 @@ describe("an account's HLS session", () => {
   beforeAll(async () => {
     root = await mkdtemp(join(tmpdir(), 'raven-enforcement-hls-'))
     fixture = await authFixture()
-    plane = await createEnforcedApp({ root, fixture, accessRecheckMs: RECHECK_MS })
+    plane = await createEnforcedApp({
+      root,
+      fixture,
+      libraryPin: PIN,
+      accessRecheckMs: RECHECK_MS,
+    })
     other = (await addLeftovers({ enforced: plane })).duplicate
     await Promise.all(
       ['The Matrix (1999).en.srt', 'The Matrix (1999) Final Cut.en.srt'].map((name) =>
@@ -72,11 +90,23 @@ describe("an account's HLS session", () => {
   const get = ({ url, headers = {} }: { url: string; headers?: Record<string, string> }) =>
     plane.app.inject({ url, headers })
 
-  const ticketFor = async ({ caller, id }: { caller: CallerKind; id: number }) => {
+  const bearerOf = (caller: CallerKind) =>
+    headersFor({ fixture, caller, via: TOKEN_CARRIERS.bearer })
+
+  /** An account ticket for `id`, minted by `caller` with Bearer, or with `headers` when given. */
+  const ticketFor = async ({
+    caller,
+    id,
+    headers,
+  }: {
+    caller: CallerKind
+    id: number
+    headers?: Record<string, string>
+  }) => {
     const response = await plane.app.inject({
       method: ROUTES.accountTicket.method,
       url: pathOf({ route: ROUTES.accountTicket, params: { id } }),
-      headers: await headersFor({ fixture, caller, via: TOKEN_CARRIERS.bearer }),
+      headers: headers ?? (await bearerOf(caller)),
     })
     const body: unknown = response.json()
     if (!isMediaTicket(body)) throw new Error('No ticket was minted')
@@ -106,8 +136,17 @@ describe("an account's HLS session", () => {
   }
 
   /** Opens a remux of `id` with an account ticket alone, as a native player does. */
-  const open = async ({ caller, id }: { caller: CallerKind; id: number }): Promise<Opened> => {
-    const ticket = await ticketFor({ caller, id })
+  const open = async ({
+    caller,
+    id,
+    headers,
+  }: {
+    caller: CallerKind
+    id: number
+    /** What the ticket is minted with, when not the caller's Bearer alone. */
+    headers?: Record<string, string>
+  }): Promise<Opened> => {
+    const ticket = await ticketFor({ caller, id, headers })
     const query = toQueryString({
       [HLS_PARAMS.mode]: PLAYBACK_MODES.remux,
       [MEDIA_TICKET_PARAM]: ticket,
@@ -174,6 +213,54 @@ describe("an account's HLS session", () => {
   }): Promise<number[]> =>
     Promise.all(urls.map(async (url) => (await get({ url, headers })).statusCode))
 
+  /** The owner's Bearer with the unlock cookie the PIN earns, and when that unlock lapses. */
+  const unlockAsOwner = async ({ headers }: { headers: Record<string, string> }) => {
+    const unlocking = await plane.app.inject({
+      method: ROUTES.unlock.method,
+      url: ROUTES.unlock.path,
+      headers,
+      payload: { pin: PIN },
+    })
+    expect(unlocking.statusCode).toBe(200)
+    const cookie = cookieSet(unlocking)
+    const [, value = ''] = cookie.split('=')
+    const [expires = ''] = value.split('.')
+    return { headers: { ...headers, [AUTH_HEADERS.cookie]: cookie }, lapsesAt: Number(expires) }
+  }
+
+  /** Locks or opens the library as the owner, past the PIN, as a locked library's settings are changed. */
+  const setLocked = async ({ isLocked }: { isLocked: boolean }) => {
+    const { headers } = await unlockAsOwner({ headers: await bearerOf(CALLER_KINDS.owner) })
+    const response = await plane.app.inject({
+      method: ROUTES.updateLibrary.method,
+      url: pathOf({ route: ROUTES.updateLibrary, params: { id: plane.ids.library } }),
+      headers,
+      payload: {
+        name: 'Enforced',
+        paths: [plane.mediaDir],
+        settings: { kind: LIBRARY_KINDS.movies, locked: isLocked },
+      },
+    })
+    expect(response.statusCode).toBe(200)
+  }
+
+  /** The status and refusal of each response, for the routes that answer an auth refusal. */
+  const refusalsOf = async ({
+    urls,
+    headers,
+  }: {
+    urls: string[]
+    headers?: Record<string, string>
+  }) =>
+    Promise.all(
+      urls.map(async (url) => {
+        const { status, reason } = outcomeOf({ response: await get({ url, headers }) })
+        return { status, reason }
+      }),
+    )
+
+  const SIGNED_OUT = { status: 401, reason: AUTH_REFUSALS.signedOut } as const
+
   const setStatus = ({
     id,
     status,
@@ -217,23 +304,26 @@ describe("an account's HLS session", () => {
     ).toEqual([200, 200, 200, 200, 200])
   })
 
-  it('refuses an account ticket or a Bearer on its routes once it has a capability', async () => {
+  it('refuses an account ticket, a Bearer or the cookie on its routes once it has a capability', async () => {
     const opened = await open({ caller: CALLER_KINDS.member, id: plane.ids.video })
     const ticket = await ticketFor({ caller: CALLER_KINDS.member, id: plane.ids.video })
-    const withTicket = await statusesOf({
+    const bare = sessionRoutes({ id: opened.id, session: opened.session, key: null })
+    const byTicket = await statusesOf({
       urls: sessionRoutes({ id: opened.id, session: opened.session, key: ticket }),
     })
-    const withBearer = await statusesOf({
-      urls: sessionRoutes({ id: opened.id, session: opened.session, key: null }),
+    const byBearer = await statusesOf({ urls: bare, headers: await bearerOf(CALLER_KINDS.member) })
+    const byCookie = await statusesOf({
+      urls: bare,
       headers: await headersFor({
         fixture,
         caller: CALLER_KINDS.member,
-        via: TOKEN_CARRIERS.bearer,
+        via: TOKEN_CARRIERS.cookie,
       }),
     })
-    expect({ withTicket, withBearer }).toEqual({
-      withTicket: [404, 404, 404, 404, 404],
-      withBearer: [404, 404, 404, 404, 404],
+    expect({ byTicket, byBearer, byCookie }).toEqual({
+      byTicket: [404, 404, 404, 404, 404],
+      byBearer: [404, 404, 404, 404, 404],
+      byCookie: [404, 404, 404, 404, 404],
     })
   })
 
@@ -311,6 +401,134 @@ describe("an account's HLS session", () => {
       expect(lines()).not.toContain(opened.ticket)
     } finally {
       ;[...logged, ...printed].forEach((spy) => spy.mockRestore())
+    }
+  })
+
+  it("opens nothing off its session's routes, and binds nothing on the open ping", async () => {
+    const opened = await open({ caller: CALLER_KINDS.member, id: plane.ids.video })
+    const params = { id: opened.id, trackId: sidecars.get(opened.id) ?? '' }
+    const master = `${pathOf({ route: ROUTES.hlsMaster, params })}?${toQueryString({
+      [HLS_PARAMS.mode]: PLAYBACK_MODES.remux,
+      [MEDIA_TICKET_PARAM]: opened.capability,
+    })}`
+    const elsewhere = [ROUTES.file, ROUTES.stream, ROUTES.tracks, ROUTES.subtitles].map((route) =>
+      withTicket({ route, params, ticket: opened.capability }),
+    )
+    const urls = [master, ...elsewhere]
+    expect(await refusalsOf({ urls })).toEqual(urls.map(() => SIGNED_OUT))
+    expect(
+      await statusesOf({ urls: [withTicket({ route: ROUTES.ping, ticket: opened.capability })] }),
+    ).toEqual([200])
+  })
+
+  it('refuses a repeated ticket on every HLS route as a ticket that opens nothing', async () => {
+    const member = await bearerOf(CALLER_KINDS.member)
+    const master = `${pathOf({ route: ROUTES.hlsMaster, params: { id: plane.ids.video } })}?${toQueryString(
+      { [HLS_PARAMS.mode]: PLAYBACK_MODES.remux },
+    )}`
+    const opening = await get({ url: master, headers: member })
+    expect(opening.statusCode).toBe(200)
+    const urls = [
+      master,
+      ...sessionRoutes({ id: plane.ids.video, session: hlsSessionIn(opening.body), key: null }),
+    ]
+    const capability = await open({ caller: CALLER_KINDS.member, id: plane.ids.video })
+    const ofCapability = sessionRoutes({
+      id: capability.id,
+      session: capability.session,
+      key: null,
+    })
+    const repeated = (url: string): string => `${url}${url.includes('?') ? '&' : '?'}${REPEATED}`
+
+    expect(await statusesOf({ urls, headers: member })).toEqual(urls.map(() => 200))
+    expect({
+      withBearer: await refusalsOf({ urls: urls.map(repeated), headers: member }),
+      alone: await refusalsOf({ urls: urls.map(repeated) }),
+      onCapability: await refusalsOf({ urls: ofCapability.map(repeated), headers: member }),
+    }).toEqual({
+      withBearer: urls.map(() => SIGNED_OUT),
+      alone: urls.map(() => SIGNED_OUT),
+      onCapability: ofCapability.map(() => SIGNED_OUT),
+    })
+  })
+
+  it("shuts a member's session at once when its library is locked after it opened", async () => {
+    const opened = await open({ caller: CALLER_KINDS.member, id: plane.ids.video })
+    const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
+    expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
+    await setLocked({ isLocked: true })
+    try {
+      expect(await statusesOf({ urls })).toEqual([404, 404, 404, 404, 404])
+    } finally {
+      await setLocked({ isLocked: false })
+    }
+    expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
+  })
+
+  it('ends the session within a recheck of a failed integrity check', async () => {
+    const opened = await open({ caller: CALLER_KINDS.member, id: plane.ids.video })
+    const [video = ''] = sessionRoutes({
+      id: opened.id,
+      session: opened.session,
+      key: opened.capability,
+    })
+    fixture.state.failure = AUTH_TEST_FAILURES.wrongAccount
+    try {
+      // The member's last answer is reused for its TTL before a recheck asks again.
+      await eventually({
+        read: async () => (await get({ url: video })).statusCode,
+        check: (status) => status === 404,
+        ms: MEMBERSHIP_TTL_MS + ENDED_WITHIN_MS,
+      })
+    } finally {
+      fixture.state.failure = AUTH_TEST_FAILURES.none
+    }
+    expect((await get({ url: video })).statusCode).toBe(404)
+  })
+
+  // The clock jumps ahead from here on, and a membership answer cached ahead of real time is
+  // reused until real time catches up, so these come last.
+  it("carries the owner's PIN unlock into the session, and answers 423 once it lapses", async () => {
+    await setLocked({ isLocked: true })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const start = Date.now()
+      const owner = bearerHeaders({
+        token: await fixture.mint({ id: AUTH_TEST_IDS.owner, expiresIn: LONG_TOKEN_SECONDS }),
+      })
+      const { headers, lapsesAt } = await unlockAsOwner({ headers: owner })
+      // Opened a minute after the unlock, so the capability's deadline falls after the unlock lapses.
+      vi.setSystemTime(start + 60_000)
+      const opened = await open({ caller: CALLER_KINDS.owner, id: plane.ids.video, headers })
+      const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
+      expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
+      vi.setSystemTime(lapsesAt)
+      expect(await statusesOf({ urls })).toEqual(urls.map(() => LOCKED_STATUS))
+    } finally {
+      vi.useRealTimers()
+      await setLocked({ isLocked: false })
+    }
+  })
+
+  it('ends the session at its capability deadline, however busy it kept', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const start = Date.now()
+      const member = bearerHeaders({
+        token: await fixture.mint({ id: AUTH_TEST_IDS.friend, expiresIn: LONG_TOKEN_SECONDS }),
+      })
+      const opened = await open({
+        caller: CALLER_KINDS.member,
+        id: plane.ids.video,
+        headers: member,
+      })
+      const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
+      vi.setSystemTime(start + HLS_CAPABILITY_MS - 1)
+      expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
+      vi.setSystemTime(start + HLS_CAPABILITY_MS)
+      expect(await statusesOf({ urls })).toEqual([404, 404, 404, 404, 404])
+    } finally {
+      vi.useRealTimers()
     }
   })
 })
