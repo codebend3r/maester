@@ -27,6 +27,7 @@ import { type MediaClock, mediaClockOf } from '@/ffmpeg/probe'
 import { HLS_CAPABILITY_PREFIX, isHlsCapability } from '@/hls/hlsCapability'
 import type { HlsClock } from '@/hls/hlsClock'
 import {
+  HLS_CAPABILITY_MS,
   HLS_INIT_GRACE_MS,
   HLS_SESSION_CAP,
   type HlsAccess,
@@ -977,6 +978,33 @@ describe('HlsSessions', () => {
 
       expect(sessions.get({ mediaId: 1, session: session.id, key: capability })).toBeNull()
       expect(sessions.grantOf({ mediaId: 1, session: session.id, capability })).toBeNull()
+    })
+
+    it('ends the session at its capability deadline, however often the capability was used', () => {
+      const { sessions, advance } = open()
+      const { ended, access } = accessOf()
+      const session = mintIn({ sessions, access })
+      const plain = mintIn({ sessions })
+      const capability = session.capability ?? ''
+      /** An hour: well inside the forget, so only the deadline can end the session. */
+      const HOUR_MS = 60 * 60 * 1000
+      const isOpen = () => ({
+        capability: sessions.get({ mediaId: 1, session: session.id, key: capability }) !== null,
+        plain: sessions.get({ mediaId: 1, session: plain.id }) !== null,
+      })
+      const hourly = Array.from({ length: HLS_CAPABILITY_MS / HOUR_MS - 1 }, () => {
+        advance(HOUR_MS)
+        return isOpen()
+      })
+      advance(HOUR_MS - 1)
+      const justBefore = isOpen()
+      advance(1)
+
+      expect(hourly).toEqual(hourly.map(() => ({ capability: true, plain: true })))
+      expect(justBefore).toEqual({ capability: true, plain: true })
+      expect(isOpen()).toEqual({ capability: false, plain: true })
+      expect(sessions.grantOf({ mediaId: 1, session: session.id, capability })).toBeNull()
+      expect(ended.observed).toBe(false)
     })
 
     it('stops watching its access once the session goes another way', () => {

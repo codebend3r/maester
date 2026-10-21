@@ -146,13 +146,13 @@ export type Route = (typeof ROUTES)[keyof typeof ROUTES]
  * The routes an HLS session's capability opens, under accounts `ready`, in
  * place of an account ticket: every one that names the session.
  */
-export const HLS_CAPABILITY_ROUTES: readonly Route[] = [
+export const HLS_CAPABILITY_ROUTES = [
   ROUTES.hlsVideo,
   ROUTES.hlsInit,
   ROUTES.hlsSegment,
   ROUTES.hlsSubtitles,
   ROUTES.hlsSubtitleSegment,
-]
+] as const satisfies readonly Route[]
 
 /** `path` with each `:name` filled from `params`, else with `1`. */
 export const pathOf = ({

@@ -12,6 +12,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common'
 import {
+  AUTH_REFUSALS,
   HLS_PARAMS,
   HLS_PATHS,
   MEDIA_TICKET_PARAM,
@@ -19,10 +20,12 @@ import {
   type StreamMode,
   type SubtitleTrack,
   isHlsSessionId,
+  isString,
 } from '@raven/core'
 import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, wholeNumber } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AccessRechecks } from '@/auth/accessRechecks'
+import { authFailure } from '@/auth/authFailure'
 import { AuthSessions, CALLERS } from '@/auth/authSessions'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
@@ -63,6 +66,16 @@ const MEDIA_ROUTES = 'api/media'
 
 /** An HLS path as this controller's route: what follows its `api/media` prefix. */
 const routeOf = (path: HlsPath): string => path.slice(`/${MEDIA_ROUTES}/`.length)
+
+/** `?t=` as one value may arrive: absent, or a string. Repeated, it is an array. */
+const isTicketQuery = (value: unknown): value is string | undefined =>
+  value === undefined || isString(value)
+
+/** `?t=` at the boundary: a repeated one is refused as a ticket that opens nothing is. */
+const ticketIn = (value: unknown): string | undefined => {
+  if (!isTicketQuery(value)) throw authFailure(AUTH_REFUSALS.signedOut)
+  return value
+}
 
 /** What every URI a session's playlist names carries: its capability, else the request's ticket. */
 const keyFor = ({
@@ -111,10 +124,11 @@ export class HlsController {
     @Query(HLS_PARAMS.mode) mode: string | undefined,
     @Query(HLS_PARAMS.audio) audio: string | undefined,
     @Query(HLS_PARAMS.quality) quality: string | undefined,
-    @Query(MEDIA_TICKET_PARAM) ticket: string | undefined,
+    @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
+    const ticket = ticketIn(query)
     const streamMode = streamModeOf(mode)
     const playback = this.settings.playback()
     refuseWhatSettingsTurnOff({ playback, mode: streamMode })
@@ -203,9 +217,10 @@ export class HlsController {
   async video(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
     @Param(HLS_PARAMS.session) session: string,
-    @Query(MEDIA_TICKET_PARAM) ticket: string | undefined,
+    @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
+    const ticket = ticketIn(query)
     const opened = this.sessionOf({ id, session, key: ticket })
     const uris = sessionUris({ session: opened, key: keyFor({ session: opened, ticket }) })
     await this.sendPlaylist({
@@ -220,11 +235,11 @@ export class HlsController {
   async init(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
     @Param(HLS_PARAMS.session) session: string,
-    @Query(MEDIA_TICKET_PARAM) key: unknown,
+    @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session, key })
+    const opened = this.sessionOf({ id, session, key: ticketIn(query) })
     await this.sendMedia({
       request,
       reply,
@@ -241,11 +256,11 @@ export class HlsController {
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
     @Param(HLS_PARAMS.session) session: string,
     @Param(HLS_PARAMS.n) n: string,
-    @Query(MEDIA_TICKET_PARAM) key: unknown,
+    @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session, key })
+    const opened = this.sessionOf({ id, session, key: ticketIn(query) })
     const number = wholeNumber(n)
     if (number == null) throw new NotFoundException(`No segment ${n} in this stream`)
     await this.sendMedia({
@@ -265,9 +280,10 @@ export class HlsController {
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
     @Param(HLS_PARAMS.session) session: string,
     @Param(HLS_PARAMS.trackId) trackId: string,
-    @Query(MEDIA_TICKET_PARAM) ticket: string | undefined,
+    @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
+    const ticket = ticketIn(query)
     const opened = this.sessionOf({ id, session, key: ticket })
     await this.textTrackOf({ file: this.fileOf(id), trackId })
     const uris = sessionUris({ session: opened, key: keyFor({ session: opened, ticket }) })
@@ -294,10 +310,10 @@ export class HlsController {
     @Param(HLS_PARAMS.session) session: string,
     @Param(HLS_PARAMS.trackId) trackId: string,
     @Param(HLS_PARAMS.n) n: string,
-    @Query(MEDIA_TICKET_PARAM) key: unknown,
+    @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session, key })
+    const opened = this.sessionOf({ id, session, key: ticketIn(query) })
     const file = this.fileOf(id)
     const track = await this.textTrackOf({ file, trackId })
     const number = wholeNumber(n)
@@ -366,7 +382,7 @@ export class HlsController {
   }: {
     id: number
     session: string
-    key: unknown
+    key: string | undefined
   }): HlsSession {
     const opened = isHlsSessionId(session) ? this.sessions.get({ mediaId: id, session, key }) : null
     if (!opened) throw noSuchSession()
