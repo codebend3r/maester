@@ -1,0 +1,106 @@
+appId: io.github.codebend3r.raven.app
+name: The remote plays a film from Home, skips ahead, and Back leaves it under Continue watching
+tags:
+  - dpad
+---
+- runFlow: signIn.yaml
+# Home opens with the remote on the film, the first card, and nothing is being watched yet.
+- extendedWaitUntil:
+    visible:
+      text: Kestrel Point
+      focused: true
+    timeout: 30000
+- assertNotVisible: Continue watching
+# Select opens the film's page with the remote on Play.
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: Play
+      focused: true
+    timeout: 30000
+- assertVisible: Mark watched
+# The film is an MKV, which plays through the server's HLS remux under raven's own controls.
+# They fade once it has played untouched for a few seconds, which says frames are flowing.
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible: Show the controls
+    timeout: 60000
+# The remote's play and pause key pauses wherever the focus is, and the controls come back
+# and stay while it is paused, with the remote on the line.
+- pressKey: Remote Media Play Pause
+- extendedWaitUntil:
+    visible: Play
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      text: Position, .*
+      focused: true
+    timeout: 10000
+# Paused, right on the line skips ten seconds ahead of the spot it reads out.
+- copyTextFrom:
+    text: Position, .*
+    focused: true
+- evalScript: ${output.ahead = (function (said) { var spot = said.match(/(\d+):(\d\d) of/); var seconds = Number(spot[1]) * 60 + Number(spot[2]) + 10; return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0') })(maestro.copiedText)}
+- pressKey: Remote Dpad Right
+- extendedWaitUntil:
+    visible:
+      text: Position, ${output.ahead} of .*
+      focused: true
+    timeout: 10000
+# Back leaves the player for the page, which offers to resume from the spot it skipped to.
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Resume from ${output.ahead}
+      focused: true
+    timeout: 30000
+# Back again returns to Home, where the film now sits under Continue watching, and the remote
+# is back on the card the page was opened from, on the films' own shelf below.
+- pressKey: Back
+- extendedWaitUntil:
+    visible: Continue watching
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: Kestrel Point
+      focused: true
+      below: Films
+    timeout: 10000
+# The spot is cleared by a mark, and taking the mark off again leaves the film as the fixture
+# had it, never started, so Home has nothing under Continue watching again.
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: Resume from .*
+      focused: true
+    timeout: 30000
+- repeat:
+    while:
+      notVisible:
+        text: Mark watched
+        focused: true
+    times: 4
+    commands:
+      - pressKey: Remote Dpad Right
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: Watched
+      focused: true
+    timeout: 10000
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: Mark watched
+      focused: true
+    timeout: 10000
+- assertVisible: Play
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Kestrel Point
+      focused: true
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: Continue watching
+    timeout: 30000

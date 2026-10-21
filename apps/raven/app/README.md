@@ -24,8 +24,9 @@ Run every script through Nx from the repo root, as `bunx nx run @raven/app:<scri
 | `typecheck`, `lint:ts`, `format`, `format:check` | As every project                                                                           |
 | `test`                                           | bun test, for everything that renders nothing                                              |
 | `test:screens`                                   | jest-expo, for the tests that render (`*.render.test.tsx`)                                 |
-| `e2e`                                            | Maestro flows in `e2e/`, against `@raven/server`'s `serve:fixture`                         |
+| `e2e`                                            | Maestro flows in `e2e/` on the iPhone, against `@raven/server`'s `serve:fixture`           |
 | `e2e:tvos`                                       | The Apple TV's XCUITest in `tvos-e2e/`, driven by the Siri Remote, against the same server |
+| `e2e:android-tv`                                 | The Maestro flows the remote drives, on the Android TV emulator, against the same server   |
 
 `ios/`, `android/` and `build/` are generated and gitignored. `prebuild:ios` and `prebuild:tvos` write the same `ios/` folder. Each `build:*` runs its own `prebuild:*` first (bun runs a `pre` script before the script it names), so a build always starts from a fresh native project for its platform.
 
@@ -65,6 +66,14 @@ A file the device plays as it is (on Apple, an MP4 or MOV of H.264 or HEVC with 
 ## End to end
 
 `e2e/signIn.yaml` signs in to the fixture server with its PIN and admin password, `e2e/home.yaml` then finds the locked film on Home, which only both unlocks show, `e2e/library.yaml` opens each library from Home and sorts it, `e2e/item.yaml` opens the film's page, marks it watched and back, and follows the series to its season and episode, `e2e/play.yaml` plays the film from its page under raven's controls (an MKV, so through the server's HLS remux), pauses it and goes back, and `e2e/search.yaml` searches every library from Home, opens the series it finds (the server's search leaves locked libraries out), says when nothing matches, and searches the film library from its own box. Start the server with `bunx nx run @raven/server:serve:fixture`, install a development-variant build on a booted iPhone simulator and run `bun run app:e2e` from the repo root; the [raven README](../README.md#test-it-end-to-end) has the steps. The address, PIN and admin password are in `signIn.yaml`'s `env`, matching what the server prints.
+
+On Android TV the same server is signed in to with the remote: `e2e/play.dpad.yaml` signs in by moving to each field, opening the platform's keyboard with select, typing and checking what the field shows (a secret as one dot a character) before sending it, finds the film focused on Home, opens it, plays it, pauses with the remote's play and pause key, skips ten seconds ahead with right, leaves with Back to a page offering to resume from that spot, finds the film under Continue watching with the focus back on the card it opened, and marks it watched and back, so the fixture is left as it was found. `e2e/home.yaml` runs there too. Build the development variant for Android TV, install it on the running emulator and run them; `e2e:android-tv` first points the emulator's `127.0.0.1:8490` at the computer's with `adb reverse`, so the app signs in to the address the iPhone uses:
+
+```sh
+APP_VARIANT=development bunx nx run @raven/app:build:android-tv
+adb install apps/raven/app/android/app/build/outputs/apk/release/app-release.apk
+bun run app:e2e:android-tv
+```
 
 Maestro cannot drive an Apple TV, so the TV's flow is an XCUITest, `tvos-e2e/RemoteFlowTests.swift`, which presses the Siri Remote's buttons (`XCUIRemote`) and types on the platform's keyboard: it signs in, plays the film from Home, presses Menu twice and finds the film under Continue watching with the focus back on the card it opened, then presses Menu on Home and checks raven went to the background. It ends by marking the film watched and back, so the fixture is left as it was found. `prebuild:tvos` copies it into `ios/` as the `RavenRemoteTests` target and scheme (`plugins/withTvRemoteTests.ts`), so build the development variant for Apple TV, install it on the simulator and run it:
 
