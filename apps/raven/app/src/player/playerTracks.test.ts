@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { type MediaTracks, PLAYBACK_MODES, SUBTITLE_SOURCES, type SubtitleTrack } from '@raven/core'
+import {
+  AUDIO_CODECS,
+  type MediaTracks,
+  PLAYBACK_MODES,
+  SUBTITLE_SOURCES,
+  type SubtitleTrack,
+} from '@raven/core'
 
 import {
   SUBTITLE_CHOICES,
@@ -34,8 +40,15 @@ const UNTAGGED = subtitle({
 
 const TRACKS: MediaTracks = {
   audio: [
-    { index: 0, codec: 'ac3', channels: 6, language: 'en', title: null, default: true },
-    { index: 1, codec: 'aac', channels: 2, language: 'ja', title: 'Commentary', default: false },
+    { index: 0, codec: AUDIO_CODECS.ac3, channels: 6, language: 'en', title: null, default: true },
+    {
+      index: 1,
+      codec: AUDIO_CODECS.aac,
+      channels: 2,
+      language: 'ja',
+      title: 'Commentary',
+      default: false,
+    },
   ],
   subtitles: [ENGLISH, PICTURES, FRENCH, SIDECAR, UNTAGGED],
   defaultAudio: 0,
