@@ -20,6 +20,7 @@ import { useReduceMotion } from '@/stores/reduceMotion'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import { FILM_SEARCHES, GROUPED_FILMS, libraryApi, libraryPath } from '@/test/libraryServer'
 import { renderScreen } from '@/test/renderScreen'
+import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 const mockParams = jest.fn(() => ({ [APP_ROUTE_PARAMS.id]: String(FILMS.id) }))
 /** What the server heard, and the libraries it answers with in place of its own, per test. */
@@ -88,7 +89,7 @@ const layOut = async () => {
     .queryAll((node) => typeof node.props.onLayout === 'function')
     .reduce<Promise<void>>(async (before, node) => {
       await before
-      await fireEvent(node, 'layout', layout)
+      await fireEvent(node, NATIVE_EVENTS.layout, layout)
     }, Promise.resolve())
 }
 
@@ -128,9 +129,9 @@ describe('Library on a TV', () => {
     expect(field.props.hasTVPreferredFocus).not.toBe(true)
     expect(preferred(FILM_TITLES)).toEqual(['Ashfall Gate'])
 
-    await fireEvent(screen.getByRole('button', { name: 'Ashfall Gate' }), 'focus')
+    await fireEvent(screen.getByRole('button', { name: 'Ashfall Gate' }), NATIVE_EVENTS.focus)
     await fireEvent.changeText(field, FILM_SEARCHES.busboys)
-    await fireEvent(field, 'submitEditing')
+    await fireEvent(field, NATIVE_EVENTS.submitEditing)
     expect(mockServer.requests).toContain(
       libraryPath({
         call: APP_CLIENT_CALLS.listMedia,
@@ -153,7 +154,7 @@ describe('Library on a TV', () => {
       return StyleSheet.flatten(face.props.style)?.transform ?? null
     }
     expect(scaleOf()).toEqual([{ scale: 1 }])
-    await fireEvent(card, 'focus')
+    await fireEvent(card, NATIVE_EVENTS.focus)
     expect(scaleOf()).toEqual([{ scale: 1.08 }])
   })
 
@@ -243,7 +244,7 @@ describe('Library on a TV', () => {
     await renderLibrary({ id: FILMS.id })
     const first = await screen.findByRole('button', { name: 'Ashfall Gate' })
     expect(preferred(FILM_TITLES)).toEqual(['Ashfall Gate'])
-    await fireEvent(first, 'focus')
+    await fireEvent(first, NATIVE_EVENTS.focus)
     expect(preferred(FILM_TITLES)).toEqual([])
   })
 
@@ -253,12 +254,12 @@ describe('Library on a TV', () => {
     // A control's focus bubbles up to the header that holds it, as the Sort chip's does.
     const header = screen.getByRole('header', { name: 'Films' }).parent
     if (header === null) throw new Error('No header')
-    await fireEvent(header, 'focus')
+    await fireEvent(header, NATIVE_EVENTS.focus)
     expect(preferred(FILM_TITLES)).toEqual([])
 
     const field = screen.getByLabelText('Search Films')
     await fireEvent.changeText(field, FILM_SEARCHES.busboys)
-    await fireEvent(field, 'submitEditing')
+    await fireEvent(field, NATIVE_EVENTS.submitEditing)
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Night Train' })).toBeNull())
     expect(screen.getByRole('button', { name: 'Busboys' }).props.hasTVPreferredFocus).not.toBe(true)
   })

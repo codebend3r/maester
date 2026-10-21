@@ -9,6 +9,7 @@ import type { HeardRequest } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import { DUNE_QUERY, isSearch, searchApi, searchPathFor } from '@/test/searchServer'
 import { renderScreen } from '@/test/renderScreen'
+import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 /** What the server heard, per test. */
 const mockServer: { heard: HeardRequest[] } = { heard: [] }
@@ -80,11 +81,11 @@ describe('Search on a TV', () => {
   it('lets go of the opening focus once the field has had it, and gives the results none', async () => {
     await renderScreen({ ui: <Search /> })
     const field = screen.getByLabelText(FIELD)
-    await fireEvent(field, 'focus')
+    await fireEvent(field, NATIVE_EVENTS.focus)
     expect(preferred()).toEqual([])
 
     await fireEvent.changeText(field, DUNE_QUERY)
-    await fireEvent(field, 'submitEditing')
+    await fireEvent(field, NATIVE_EVENTS.submitEditing)
     expect(searches()).toEqual([searchPathFor(DUNE_QUERY)])
     expect(await screen.findByRole('button', { name: 'Dune' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Dune: Prophecy' })).toBeTruthy()
@@ -109,7 +110,7 @@ describe('Search on a TV', () => {
     await fireEvent.changeText(field, 'du')
     // tvOS reports each key as it is typed, then puts the field back on Menu, saying so only
     // as the edit ends.
-    await fireEvent(field, 'endEditing', { nativeEvent: { text: '' } })
+    await fireEvent(field, NATIVE_EVENTS.endEditing, { nativeEvent: { text: '' } })
     expect(screen.getByLabelText(FIELD).props.value).toBe('')
     await pause(SEARCH_DELAY_MS * 5)
     expect(searches()).toEqual([])

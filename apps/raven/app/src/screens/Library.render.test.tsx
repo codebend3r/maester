@@ -22,6 +22,7 @@ import { heldAnswer } from '@/test/heldAnswer'
 import { keyboardTapsAbove, renderScreen } from '@/test/renderScreen'
 import { linesHeightOf } from '@/layouts/textHeights'
 import { SIZES } from '@/theme/appTheme'
+import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 const mockPush = jest.fn()
 const mockFontScale = jest.fn(() => 1)
@@ -326,7 +327,7 @@ describe('Library on a phone or tablet', () => {
     await renderLibrary({ id: FILMS.id })
     await screen.findByRole('button', { name: 'Night Train' })
     await typeSearch(FILM_SEARCHES.busboys)
-    await fireEvent(screen.getByLabelText(SEARCH_FILMS), 'submitEditing')
+    await fireEvent(screen.getByLabelText(SEARCH_FILMS), NATIVE_EVENTS.submitEditing)
     expect(filmSearches()).toHaveLength(1)
     await waitFor(() => expect(cardTitles(FILM_TITLES)).toEqual(['Busboys']))
 
@@ -365,7 +366,7 @@ describe('Library on a phone or tablet', () => {
     mockServer.reads = (path) => (path === searched ? answer.answer : Promise.resolve())
     const field = screen.getByLabelText(SEARCH_FILMS)
     await fireEvent.changeText(field, FILM_SEARCHES.busboys)
-    await fireEvent(field, 'submitEditing')
+    await fireEvent(field, NATIVE_EVENTS.submitEditing)
     await waitFor(() => expect(mockServer.requests).toContain(searched))
     expect(screen.queryByText(/^Nothing here matches/)).toBeNull()
 

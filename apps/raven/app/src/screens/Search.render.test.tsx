@@ -18,6 +18,7 @@ import {
 } from '@/test/searchServer'
 import { heldAnswer } from '@/test/heldAnswer'
 import { keyboardTapsAbove, renderScreen } from '@/test/renderScreen'
+import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 const mockPush = jest.fn()
 const mockBack = jest.fn()
@@ -100,7 +101,7 @@ describe('Search on a phone or tablet', () => {
   it('asks at once when the keyboard sends the search', async () => {
     await renderScreen({ ui: <Search /> })
     await type(DUNE_QUERY)
-    await fireEvent(screen.getByLabelText(FIELD), 'submitEditing')
+    await fireEvent(screen.getByLabelText(FIELD), NATIVE_EVENTS.submitEditing)
     expect(searches()).toEqual([searchPathFor(DUNE_QUERY)])
     expect(await screen.findByRole('button', { name: 'Dune' })).toBeTruthy()
 
@@ -149,7 +150,7 @@ describe('Search on a phone or tablet', () => {
       path === searchPathFor(DUNE_QUERY) ? answer.answer : Promise.resolve()
     const field = screen.getByLabelText(FIELD)
     await fireEvent.changeText(field, DUNE_QUERY)
-    await fireEvent(field, 'submitEditing')
+    await fireEvent(field, NATIVE_EVENTS.submitEditing)
     expect(searches()).toContain(searchPathFor(DUNE_QUERY))
     expect(screen.queryByText(/^Nothing in any library matches/)).toBeNull()
     expect(screen.getByText('Searching every library')).toBeTruthy()

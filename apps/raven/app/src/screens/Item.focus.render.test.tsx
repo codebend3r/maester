@@ -11,6 +11,7 @@ import { NAS } from '@/test/homeServer'
 import { BUSBOYS, SEVERANCE, SEVERANCE_ONE, itemApi, pathFor } from '@/test/itemServer'
 import { heldAnswer } from '@/test/heldAnswer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
+import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 const mockPush = jest.fn()
 const mockParams = jest.fn((): Record<string, string> => ({
@@ -99,7 +100,7 @@ describe('Item on a TV', () => {
     await renderItem(BUSBOYS.id)
     const watched = await screen.findByRole('checkbox', { name: 'Mark watched' })
 
-    await fireEvent(watched, 'focus')
+    await fireEvent(watched, NATIVE_EVENTS.focus)
     expect(preferred()).toEqual([])
 
     await fireEvent.press(watched)
@@ -114,7 +115,7 @@ describe('Item on a TV', () => {
     expect(preferred()).toEqual(['Play S01E01'])
 
     const season = screen.getByRole('button', { name: 'Season 1' })
-    await fireEvent(season, 'focus')
+    await fireEvent(season, NATIVE_EVENTS.focus)
     await fireEvent.press(season)
     expect(mockPush).toHaveBeenCalledWith({
       pathname: APP_ROUTES.item,
