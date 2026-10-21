@@ -97,11 +97,12 @@ update private.enrolment set approve_until = '2027-01-01 00:00 America/New_York'
 Every sign-up, approved or pending, emails the owner through the `signup-alert` Edge Function. The `alert_signup` trigger posts the new address and status to it with `pg_net`, sending a shared secret the function checks. Without the two Vault secrets below, sign-ups still enrol and the database logs a warning instead. Edge Functions refuse outbound SMTP on ports 25 and 587, so the function connects on 465 (implicit TLS); Gmail's `smtp.gmail.com` accepts it with an app password.
 
 1. Generate the shared secret with `openssl rand -hex 32`. Keep it out of every committed file.
-2. Set the function's secrets, then deploy it (`deploy` runs `deploy:functions` last):
+2. Set the function's secrets with the pinned CLI, then deploy it from the repo root (`deploy` runs `deploy:functions` last). The secrets go straight to the CLI, not through Nx, which would print them in its task output:
 
    ```sh
-   supabase secrets set --workdir .. SIGNUP_ALERT_SECRET=... SIGNUP_ALERT_TO=owner@example.com \
-     SMTP_HOST=smtp.gmail.com SMTP_USER=sender@gmail.com SMTP_PASS=... RAVEN_WEB_URL=https://raven.example
+   (cd apps/raven/supabase && bunx supabase secrets set --workdir .. SIGNUP_ALERT_SECRET=... \
+     SIGNUP_ALERT_TO=owner@example.com SMTP_HOST=smtp.gmail.com SMTP_USER=sender@gmail.com \
+     SMTP_PASS=... RAVEN_WEB_URL=https://raven.example)
    bunx nx run @raven/supabase:deploy
    ```
 

@@ -22,5 +22,6 @@ from auth.users where email like '%@maester.test';
 
 update public.members set status = 'approved'
 where id in ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002');
+update public.members set status = 'pending' where id = '00000000-0000-4000-8000-000000000003';
 update public.members set status = 'revoked' where id = '00000000-0000-4000-8000-000000000004';
 insert into private.owner (account_id) values ('00000000-0000-4000-8000-000000000001');

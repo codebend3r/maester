@@ -1,11 +1,11 @@
 import { deepEqual, equal } from 'node:assert/strict'
-import { ENROLMENT_STATUSES, handleSignupAlert, SIGNUP_ALERT_HEADER } from '@/alert'
+import { ENROLMENT_STATUSES, handleSignupAlert, HTTP_METHODS, SIGNUP_ALERT_HEADER } from '@/alert'
 
 const SECRET = 'test-secret'
-const WEB_URL = 'https://raven.test'
+const SETTINGS_URL = 'https://raven.test/settings'
 
 const alertRequest = ({
-  method = 'POST',
+  method = HTTP_METHODS.post,
   secret = SECRET,
   body = JSON.stringify({ email: 'friend@maester.test', status: ENROLMENT_STATUSES.approved }),
 }: {
@@ -24,7 +24,7 @@ const run = async (request: Request) => {
   const response = await handleSignupAlert({
     request,
     secret: SECRET,
-    webUrl: WEB_URL,
+    settingsUrl: SETTINGS_URL,
     send: async (message) => {
       sent.push(message)
     },
@@ -56,7 +56,10 @@ Deno.test('refuses a request without the shared secret', async () => {
 })
 
 Deno.test('refuses anything but a POST', async () => {
-  deepEqual(await run(alertRequest({ method: 'GET', body: null })), { status: 405, sent: [] })
+  deepEqual(await run(alertRequest({ method: HTTP_METHODS.get, body: null })), {
+    status: 405,
+    sent: [],
+  })
 })
 
 Deno.test('refuses a body that is not a sign-up', async () => {

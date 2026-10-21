@@ -2,14 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 
 export const SIGNUP_ALERT_HEADER = 'x-signup-alert-secret'
 
-export const ALERT_ENV = {
-  secret: 'SIGNUP_ALERT_SECRET',
-  recipient: 'SIGNUP_ALERT_TO',
-  smtpHost: 'SMTP_HOST',
-  smtpUser: 'SMTP_USER',
-  smtpPass: 'SMTP_PASS',
-  webUrl: 'RAVEN_WEB_URL',
-} as const
+export const HTTP_METHODS = { get: 'GET', post: 'POST' } as const
 
 export const ENROLMENT_STATUSES = { approved: 'approved', pending: 'pending' } as const
 type EnrolmentStatus = (typeof ENROLMENT_STATUSES)[keyof typeof ENROLMENT_STATUSES]
@@ -35,18 +28,23 @@ const digest = (value: string) => createHash('sha256').update(value).digest()
 const isSameSecret = ({ given, expected }: { given: string; expected: string }) =>
   timingSafeEqual(digest(given), digest(expected))
 
-const composeAlert = ({ alert, webUrl }: { alert: SignupAlert; webUrl: string }): AlertMessage => {
-  const settings = `${webUrl}/settings`
+const composeAlert = ({
+  alert,
+  settingsUrl,
+}: {
+  alert: SignupAlert
+  settingsUrl: string
+}): AlertMessage => {
   switch (alert.status) {
     case ENROLMENT_STATUSES.approved:
       return {
         subject: `raven: ${alert.email} signed up and was approved`,
-        text: `${alert.email} confirmed their email and was approved automatically.\n\nTo remove their access, open Users in raven's settings: ${settings}\n`,
+        text: `${alert.email} confirmed their email and was approved automatically.\n\nTo remove their access, open Users in raven's settings: ${settingsUrl}\n`,
       }
     case ENROLMENT_STATUSES.pending:
       return {
         subject: `raven: ${alert.email} is waiting for approval`,
-        text: `${alert.email} confirmed their email and is waiting for you.\n\nTo approve or remove them, open Users in raven's settings: ${settings}\n`,
+        text: `${alert.email} confirmed their email and is waiting for you.\n\nTo approve or remove them, open Users in raven's settings: ${settingsUrl}\n`,
       }
     default: {
       const unhandled: never = alert.status
@@ -66,19 +64,19 @@ const readBody = async ({ request }: { request: Request }): Promise<unknown> => 
 export const handleSignupAlert = async ({
   request,
   secret,
-  webUrl,
+  settingsUrl,
   send,
 }: {
   request: Request
   secret: string
-  webUrl: string
+  settingsUrl: string
   send: (message: AlertMessage) => Promise<void>
 }) => {
-  if (request.method !== 'POST') return new Response(null, { status: 405 })
+  if (request.method !== HTTP_METHODS.post) return new Response(null, { status: 405 })
   const given = request.headers.get(SIGNUP_ALERT_HEADER) ?? ''
   if (!isSameSecret({ given, expected: secret })) return new Response(null, { status: 401 })
   const body = await readBody({ request })
   if (!isSignupAlert(body)) return new Response(null, { status: 400 })
-  await send(composeAlert({ alert: body, webUrl }))
+  await send(composeAlert({ alert: body, settingsUrl }))
   return new Response(null, { status: 204 })
 }
