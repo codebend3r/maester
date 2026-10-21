@@ -26,6 +26,7 @@ import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { useSelectable } from '@/lib/useSelectable'
+import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import styles from '@/components/MediaTiles/MediaTiles.module.scss'
 
 /**
@@ -86,13 +87,7 @@ const MediaTile = ({
         {posters ? (
           <PosterFrame media={media} sizes={POSTER_SIZES.movieTile} withWatched={withWatched} />
         ) : thumbnail ? (
-          <img
-            className={styles.thumbnail}
-            src={thumbnail}
-            alt=""
-            loading="lazy"
-            decoding="async"
-          />
+          <ViewportImage className={styles.thumbnail} src={thumbnail} alt="" />
         ) : (
           <span className={styles.placeholder}>{media.title.slice(0, 1)}</span>
         )}

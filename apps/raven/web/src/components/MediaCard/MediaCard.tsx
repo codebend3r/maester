@@ -24,6 +24,7 @@ import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
 import { useSelectable } from '@/lib/useSelectable'
+import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import styles from '@/components/MediaCard/MediaCard.module.scss'
 
 /** A label on glass over the frame grab, with the words a screen reader hears for it. */
@@ -88,13 +89,7 @@ export const MediaCard = ({
         >
           <span className={styles.frame}>
             {thumbnail ? (
-              <img
-                className={styles.thumbnail}
-                src={thumbnail}
-                alt=""
-                loading="lazy"
-                decoding="async"
-              />
+              <ViewportImage className={styles.thumbnail} src={thumbnail} alt="" />
             ) : (
               <span className={styles.placeholder} aria-hidden="true">
                 {label.slice(0, 1)}

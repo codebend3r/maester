@@ -2,6 +2,7 @@ import { type ItemSummary, type MediaItem, cardTitle } from '@raven/core'
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import { type PosterSizes, posterSources } from '@/lib/posters'
+import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import styles from '@/components/PosterImage/PosterImage.module.scss'
 
 /**
@@ -36,15 +37,13 @@ export const PosterImage = ({
   }
   const isPoster = poster != null && poster.src === source
   return (
-    <img
+    <ViewportImage
       key={source}
       className={styles.image}
       src={source}
       srcSet={isPoster ? poster.srcSet : undefined}
       sizes={isPoster ? poster.sizes : undefined}
       alt=""
-      loading="lazy"
-      decoding="async"
       onError={() => setFailed((current) => [...current, source])}
     />
   )

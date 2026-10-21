@@ -23,6 +23,7 @@ import { api } from '@/lib/api'
 import { POSTER_SIZES, type PosterSizes, posterSources } from '@/lib/posters'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'
+import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import styles from '@/components/ShowCard/ShowCard.module.scss'
 
 /**
@@ -67,14 +68,7 @@ const ShowPoster = ({ show, sizes }: { show: ItemSummary; sizes: PosterSizes }) 
     return <span className={styles.placeholder}>{show.title.slice(0, 1)}</span>
   }
   return (
-    <img
-      className={styles.image}
-      {...poster}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      onError={() => setFailed(true)}
-    />
+    <ViewportImage className={styles.image} {...poster} alt="" onError={() => setFailed(true)} />
   )
 }
 
@@ -258,14 +252,12 @@ const WideShowCard = ({
         )}
       </div>
       {wash && (
-        <img
+        <ViewportImage
           className={styles.wash}
           src={wash.src}
           srcSet={wash.srcSet}
           sizes={wash.sizes}
           alt=""
-          loading="lazy"
-          decoding="async"
         />
       )}
     </li>

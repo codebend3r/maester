@@ -22,6 +22,7 @@ import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { useTableSort } from '@/lib/useTableSort'
 import { useSelectable } from '@/lib/useSelectable'
+import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import styles from '@/components/ShowCard/ShowViews.module.scss'
 
 const episodesLabel = (entry: ShowEntry): string =>
@@ -63,12 +64,10 @@ const SmallPoster = ({ entry, inRow = false }: { entry: ShowEntry; inRow?: boole
       aria-hidden="true"
     >
       {poster && !failed ? (
-        <img
+        <ViewportImage
           className={styles.image}
           {...poster}
           alt=""
-          loading="lazy"
-          decoding="async"
           onError={() => setFailed(true)}
         />
       ) : (
