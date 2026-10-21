@@ -19,6 +19,10 @@ final class RemoteFlowTests: XCTestCase {
     static let markWatched = "Mark watched"
     static let watched = "Watched"
     static let keyboardGo = "go"
+    static let continueButton = "Continue"
+    static let unreachable =
+      "Couldn't reach a raven server there. Check the address and that raven is running."
+    static let bullet: Character = "•"
   }
 
   private let app = XCUIApplication(bundleIdentifier: "io.github.codebend3r.raven.app")
@@ -82,20 +86,41 @@ final class RemoteFlowTests: XCTestCase {
 
   /// The address, then the PIN, then the admin password, each on the platform's keyboard.
   private func signIn() {
-    guard app.textFields.firstMatch.waitForExistence(timeout: 60) else { return }
+    let field = app.textFields.firstMatch
+    guard field.waitForExistence(timeout: 60) else { return }
     press(.select)
     sleep(2)
-    app.typeText("\(Fixture.address)\n")
+    XCTAssertTrue(type(Fixture.address, into: field) { $0 == Fixture.address }, "The address")
+    // Go waits for the check: sent in one burst with the text, it beat the last keys in CI.
+    app.typeText("\n")
+    XCTAssertTrue(reachPinStep(), "The server answers the address")
     enterSecret(Fixture.pin, isNumberPad: true)
     enterSecret(Fixture.adminPassword, isNumberPad: false)
   }
 
+  /// Waits for the PIN step. A request that fails though the field holds the right address
+  /// (a cold fixture, or a submit that read the text early) is sent again with Continue.
+  private func reachPinStep(tries: Int = 3) -> Bool {
+    (0...tries).contains { attempt in
+      if app.secureTextFields.firstMatch.waitForExistence(timeout: 10) { return true }
+      guard attempt < tries, app.staticTexts[Copy.unreachable].exists else { return false }
+      XCTAssertEqual(valueOf(app.textFields.firstMatch), Fixture.address)
+      XCTAssertTrue(waitForFocus(pressing: .down, tries: 3) { $0 == Copy.continueButton })
+      press(.select)
+      return false
+    }
+  }
+
   private func enterSecret(_ secret: String, isNumberPad: Bool) {
-    XCTAssertTrue(app.secureTextFields.firstMatch.waitForExistence(timeout: 30))
-    XCTAssertTrue(waitForFocus(timeout: 10) { _ in self.app.secureTextFields.firstMatch.hasFocus })
+    let field = app.secureTextFields.firstMatch
+    XCTAssertTrue(field.waitForExistence(timeout: 30))
+    XCTAssertTrue(waitForFocus(timeout: 10) { _ in field.hasFocus })
     press(.select)
     sleep(2)
-    app.typeText(secret)
+    let isWhole = type(secret, into: field) { shown in
+      shown.count == secret.count && shown.allSatisfy { $0 == Copy.bullet }
+    }
+    XCTAssertTrue(isWhole, "Every character of the secret")
     if isNumberPad {
       // The number pad's go sits under the digits.
       press(.down)
@@ -119,6 +144,48 @@ final class RemoteFlowTests: XCTestCase {
     press(.select)
     XCTAssertTrue(waitForFocus(timeout: 15) { $0 == Copy.markWatched })
     XCTAssertTrue(app.buttons[Copy.play].waitForExistence(timeout: 15))
+  }
+
+  // MARK: - The keyboard
+
+  /// Types `text` on the open keyboard until `field` shows what `isRight` expects, clearing it
+  /// between tries, so a key the keyboard dropped is caught before the value is sent.
+  private func type(
+    _ text: String,
+    into field: XCUIElement,
+    tries: Int = 3,
+    _ isRight: @escaping (String) -> Bool
+  ) -> Bool {
+    (1...tries).contains { attempt in
+      if attempt > 1 { clear(field, typed: text) }
+      app.typeText(text)
+      return waitForValue(of: field, timeout: 3, isRight)
+    }
+  }
+
+  /// Deletes back over what the field holds, or what was typed, whichever is longer.
+  private func clear(_ field: XCUIElement, typed text: String) {
+    let count = max(valueOf(field).count, text.count)
+    app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count))
+  }
+
+  private func valueOf(_ field: XCUIElement) -> String {
+    field.value as? String ?? ""
+  }
+
+  /// Waits until the field's value passes `check`.
+  private func waitForValue(
+    of field: XCUIElement,
+    timeout: TimeInterval,
+    _ check: @escaping (String) -> Bool
+  ) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+      if check(valueOf(field)) { return true }
+      usleep(500_000)
+    }
+    print("The field held \(valueOf(field))")
+    return false
   }
 
   // MARK: - The remote and the focus
