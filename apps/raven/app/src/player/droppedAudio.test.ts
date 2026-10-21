@@ -2,7 +2,14 @@ import { describe, expect, it } from 'bun:test'
 import { PLAYBACK_MODES } from '@raven/core'
 
 import { APP_PLATFORMS } from '@/platform/platform'
-import { hasAskedPick, isAudioDropped } from '@/player/droppedAudio'
+import {
+  AUDIO_HEARINGS,
+  AUDIO_SETTLE_SECONDS,
+  type AudioHearing,
+  type HeardAudio,
+  hearAudio,
+  isAudioDropped,
+} from '@/player/droppedAudio'
 
 /** A TrueHD track ExoPlayer listed but could neither decode nor pass through. */
 const DROPPED = [{ index: 0, selected: false }]
@@ -60,32 +67,89 @@ describe('isAudioDropped', () => {
   })
 })
 
-describe('hasAskedPick', () => {
-  it('hears the asked track picked at its place', () => {
-    expect(
-      hasAskedPick({
-        place: 1,
-        reported: [
-          { index: 0, selected: false },
-          { index: 1, selected: true },
-        ],
-      }),
-    ).toBe(true)
-  })
+/** The film's two tracks, as ExoPlayer lists them with the one at `picked` playing. */
+const pickedAt = (picked: number) => [
+  { index: 0, selected: picked === 0 },
+  { index: 1, selected: picked === 1 },
+]
 
-  it("hears another pick as not yet the asked one, ExoPlayer's first before it applies the ask", () => {
-    expect(
-      hasAskedPick({
-        place: 1,
-        reported: [
-          { index: 0, selected: true },
-          { index: 1, selected: false },
-        ],
-      }),
-    ).toBe(false)
+const ATTEMPT = 1
+
+/** Hears each in turn from nothing, and gives what was heard last and every report judged. */
+const hearAll = (hearings: readonly AudioHearing[]) =>
+  hearings.reduce<{ heard: HeardAudio | null; judged: unknown[] }>(
+    ({ heard, judged }, hearing) => {
+      const next = hearAudio({ heard, hearing })
+      return {
+        heard: next.heard,
+        judged: next.toJudge === null ? judged : [...judged, next.toJudge],
+      }
+    },
+    { heard: null, judged: [] },
+  )
+
+const loaded = (place: number | null, picked: number): AudioHearing => ({
+  type: AUDIO_HEARINGS.loaded,
+  attempt: ATTEMPT,
+  reported: pickedAt(picked),
+  place,
+})
+
+const moved = (clock: number): AudioHearing => ({
+  type: AUDIO_HEARINGS.moved,
+  attempt: ATTEMPT,
+  clock,
+})
+
+describe('hearAudio', () => {
+  it('judges at the first tick after a load whose pick is already the asked one', () => {
+    expect(hearAll([loaded(1, 1), moved(0)]).judged).toEqual([pickedAt(1)])
   })
 
   it('takes any pick where the player was left to choose', () => {
-    expect(hasAskedPick({ place: null, reported: DROPPED })).toBe(true)
+    expect(hearAll([loaded(null, 0), moved(0)]).judged).toEqual([pickedAt(0)])
+  })
+
+  it('never judges a tick before the load, which ExoPlayer sends first', () => {
+    expect(hearAll([moved(0), moved(1), moved(3)]).judged).toEqual([])
+  })
+
+  it("waits for the settled tracks when the load names ExoPlayer's own first pick", () => {
+    const tracks: AudioHearing = {
+      type: AUDIO_HEARINGS.tracks,
+      attempt: ATTEMPT,
+      reported: pickedAt(1),
+    }
+    expect(hearAll([loaded(1, 0), moved(0), moved(1)]).judged).toEqual([])
+    expect(hearAll([loaded(1, 0), moved(0), tracks, moved(0.25)]).judged).toEqual([pickedAt(1)])
+  })
+
+  it('judges an unsettled pick as it stands once it has played for the settle time', () => {
+    expect(hearAll([loaded(1, 0), moved(10), moved(11)]).judged).toEqual([])
+    expect(
+      hearAll([loaded(1, 0), moved(10), moved(11), moved(10 + AUDIO_SETTLE_SECONDS)]).judged,
+    ).toEqual([pickedAt(0)])
+  })
+
+  it('counts only the time played, never the jump of a seek, toward the settle time', () => {
+    const sought = (clock: number): AudioHearing => ({
+      type: AUDIO_HEARINGS.sought,
+      attempt: ATTEMPT,
+      clock,
+    })
+    // Half a second in, the viewer skips ten seconds on and plays on half a second more.
+    expect(hearAll([loaded(1, 0), moved(0), moved(0.5), sought(10.5), moved(11)]).judged).toEqual(
+      [],
+    )
+    // And ten seconds back: the clock going back takes nothing off what was played.
+    const back = [loaded(1, 0), moved(20), moved(21), sought(11), moved(11.5), moved(12)]
+    expect(hearAll(back).judged).toEqual([pickedAt(0)])
+  })
+
+  it('judges each attempt once, and leaves an earlier attempt alone', () => {
+    const { heard, judged } = hearAll([loaded(1, 1), moved(0), moved(1), moved(5)])
+    expect(judged).toHaveLength(1)
+    const stale = hearAudio({ heard, hearing: { ...moved(6), attempt: ATTEMPT - 1 } })
+    expect(stale).toEqual({ heard, toJudge: null })
   })
 })

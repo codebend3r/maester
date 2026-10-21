@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
-import type { PlayerChromeProps } from '@/layouts/playerKit'
+import { PLAYER_COPY, type PlayerChromeProps } from '@/layouts/playerKit'
 import { PlateButton } from '@/layouts/tvControls'
 import { COLOURS } from '@/theme/appTheme'
 import { TV_SIZES } from '@/theme/tvSizes'
 
 const GUTTER = TV_SIZES.space8
-
-const BACK = 'Back'
 
 /**
  * A TV player while there is nothing to play (opening, refused, or no way left): the title and
@@ -37,10 +35,10 @@ export const PlayerNotice = ({
         <PlateButton
           accessibilityRole="button"
           isPreferred={isOpening}
-          label={BACK}
+          label={PLAYER_COPY.leave}
           onFocused={() => setOpening(false)}
           onPress={onBack}
-          text={BACK}
+          text={PLAYER_COPY.leave}
         />
       </View>
     </View>

@@ -1,77 +1,49 @@
-import { type ComponentRef, useRef, useState } from 'react'
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { useFocusOnMount, useScreenFocusScope } from '@/layouts/focus'
-import { tvFormStyles as formStyles } from '@/layouts/formStyles'
+import { useScreenFocusScope } from '@/layouts/focus'
 import {
   CLEAR_SEARCH,
   type SearchFieldProps,
   type SearchKit,
   type SearchLayoutProps,
 } from '@/layouts/searchKit'
-import { NOTHING_ON_FOCUS, PlateButton, tvFieldStyles } from '@/layouts/tvControls'
+import { NOTHING_ON_FOCUS, PlateButton, TvTextField } from '@/layouts/tvControls'
 import { COLOURS } from '@/theme/appTheme'
 import { TV_SIZES } from '@/theme/tvSizes'
 
 /**
- * A search box the remote selects, which opens the platform's own keyboard. It reports each
- * key as it is typed, and the box searches once typing pauses or the keyboard sends it.
- * Leaving the keyboard with Menu cancels the edit: the native field goes back to what it held
- * but reports no change, so the box takes the text it ends editing with, as sign-in's does.
+ * A search box the remote selects, which opens the platform's own keyboard. It searches once
+ * typing pauses or the keyboard sends it, and a clear button beside it empties it.
  */
 const SearchField = ({
   search,
   label,
   isPreferred = false,
   onFocused = NOTHING_ON_FOCUS,
-}: SearchFieldProps) => {
-  const [isFocused, setFocused] = useState(false)
-  const frame = useRef<ComponentRef<typeof View>>(null)
-  useFocusOnMount({ view: frame, isAsked: isPreferred })
-  return (
-    <View style={styles.box}>
-      {/* Asks for the remote on the field inside, as sign-in's frame does. */}
-      <View
-        ref={frame}
-        collapsable={false}
-        style={[
-          formStyles.input,
-          tvFieldStyles.frame,
-          styles.frame,
-          isFocused && formStyles.focused,
-        ]}
-      >
-        <TextInput
-          accessibilityLabel={label}
-          autoCapitalize="none"
-          autoCorrect={false}
-          hasTVPreferredFocus={isPreferred}
-          onBlur={() => setFocused(false)}
-          onChangeText={search.setText}
-          onEndEditing={({ nativeEvent }) => search.setText(nativeEvent.text)}
-          onFocus={() => {
-            setFocused(true)
-            onFocused()
-          }}
-          onSubmitEditing={({ nativeEvent }) => search.searchFor(nativeEvent.text)}
-          placeholder={label}
-          placeholderTextColor={COLOURS.muted}
-          returnKeyType="search"
-          style={tvFieldStyles.input}
-          value={search.text}
-        />
-      </View>
-      {search.text !== '' && (
-        <PlateButton
-          label={CLEAR_SEARCH.label}
-          onPress={() => search.searchFor('')}
-          accessibilityRole="button"
-          text={CLEAR_SEARCH.text}
-        />
-      )}
-    </View>
-  )
-}
+}: SearchFieldProps) => (
+  <View style={styles.box}>
+    <TvTextField
+      frameStyle={styles.frame}
+      isPreferred={isPreferred}
+      label={label}
+      onChangeText={search.setText}
+      onFocused={onFocused}
+      onSubmit={search.searchFor}
+      placeholder={label}
+      placeholderTextColor={COLOURS.muted}
+      returnKeyType="search"
+      value={search.text}
+    />
+    {search.text !== '' && (
+      <PlateButton
+        label={CLEAR_SEARCH.label}
+        onPress={() => search.searchFor('')}
+        accessibilityRole="button"
+        text={CLEAR_SEARCH.text}
+      />
+    )}
+  </View>
+)
 
 /**
  * The search screen on a TV: the title and the field at the top, and the results below as

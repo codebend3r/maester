@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it } from 'bun:test'
 
 import {
   coverScreen,
+  drawCard,
   isOpeningIn,
   leaveScreen,
   rememberOpener,
+  returnScreen,
   settleScreen,
   takeOpener,
   useScreenFocus,
@@ -65,8 +67,36 @@ describe('screen focus', () => {
     rememberOpener({ screen: ITEM, card: BUSBOYS })
     leaveScreen({ screen: HOME })
     expect(useScreenFocus.getState().screens).toEqual({
-      [ITEM]: { hasSettled: true, opener: { card: BUSBOYS, hasBeenCovered: false } },
+      [ITEM]: { hasSettled: true, opener: { card: BUSBOYS, isDrawn: true, hasBeenCovered: false } },
     })
     expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(true)
+  })
+
+  it('opens a screen again on a return whose opener has gone, its shelf with it', () => {
+    rememberOpener({ screen: HOME, card: NIGHT_TRAIN })
+    coverScreen({ screen: HOME })
+    drawCard({ screen: HOME, card: NIGHT_TRAIN, isDrawn: false })
+    returnScreen({ screen: HOME })
+    expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(true)
+    expect(takeOpener({ screen: HOME, card: NIGHT_TRAIN })).toBe(false)
+  })
+
+  it('leaves the opener to its card when the card was drawn afresh while covered', () => {
+    rememberOpener({ screen: HOME, card: NIGHT_TRAIN })
+    coverScreen({ screen: HOME })
+    drawCard({ screen: HOME, card: NIGHT_TRAIN, isDrawn: false })
+    drawCard({ screen: HOME, card: NIGHT_TRAIN, isDrawn: true })
+    returnScreen({ screen: HOME })
+    expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(false)
+    expect(takeOpener({ screen: HOME, card: NIGHT_TRAIN })).toBe(true)
+  })
+
+  it("hears only the opener's own card come and go", () => {
+    rememberOpener({ screen: HOME, card: NIGHT_TRAIN })
+    drawCard({ screen: HOME, card: BUSBOYS, isDrawn: false })
+    drawCard({ screen: ITEM, card: NIGHT_TRAIN, isDrawn: false })
+    returnScreen({ screen: HOME })
+    expect(takeOpener({ screen: HOME, card: NIGHT_TRAIN })).toBe(true)
+    expect(useScreenFocus.getState().screens[ITEM]).toBeUndefined()
   })
 })

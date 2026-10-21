@@ -3,7 +3,7 @@ import { isRecord } from '@raven/core'
 import { act } from '@testing-library/react-native'
 import { create } from 'zustand'
 
-import { useScreenFocus } from '@/stores/screenFocus'
+import { returnScreen, useScreenFocus } from '@/stores/screenFocus'
 
 /** Whether the screen a render test draws is the one in front, as the navigator would say. */
 const useTestScreen = create<{ isFocused: boolean }>()(() => ({ isFocused: true }))
@@ -46,9 +46,14 @@ export const askedFor = (): unknown[] => focusRequested().map(labelOf)
 export const leaveTestScreen = async (): Promise<void> =>
   act(() => useTestScreen.setState({ isFocused: false }))
 
-/** The screen on top goes back, as Menu or Back takes it, and the test's is in front again. */
-export const returnToTestScreen = async (): Promise<void> =>
-  act(() => useTestScreen.setState({ isFocused: true }))
+/**
+ * The screen on top goes back, as Menu or Back takes it, and the test's is in front again, then
+ * the transition that reveals it ends, which the navigator tells the screen focus store.
+ */
+export const returnToTestScreen = async (): Promise<void> => {
+  await act(() => useTestScreen.setState({ isFocused: true }))
+  await act(() => returnScreen({ screen: TEST_ROUTE.key }))
+}
 
 /** The test's screen in front with nothing remembered of its focus, as each test starts. */
 export const resetTestScreen = (): void => {

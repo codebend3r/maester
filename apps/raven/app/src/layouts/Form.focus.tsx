@@ -1,7 +1,5 @@
-import { type ComponentRef, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { useFocusOnMount } from '@/layouts/focus'
 import {
   type FieldProps,
   type FormButtonProps,
@@ -10,7 +8,7 @@ import {
   keyboardFor,
 } from '@/layouts/formKit'
 import { toneStyles, tvFormStyles as formStyles } from '@/layouts/formStyles'
-import { tvFieldStyles } from '@/layouts/tvControls'
+import { TvTextField } from '@/layouts/tvControls'
 import { TV_SIZES } from '@/theme/tvSizes'
 
 const Form = ({ title, children }: FormProps) => (
@@ -24,13 +22,7 @@ const Form = ({ title, children }: FormProps) => (
   </View>
 )
 
-// Selecting a field with the remote opens the platform's own keyboard, which reports
-// the text back as it is typed; the field only needs to show where focus is. Leaving the
-// keyboard with Menu cancels the edit: the native field goes back to what it held, but no
-// change is reported, so the field takes the text it ends editing with as the truth.
-// The step's first field takes the remote as it is drawn, so a step never opens with nothing
-// focused. Android's text input has no preferred focus, and its own `focus()` opens the
-// keyboard, so the frame asks: it cannot hold the focus, which goes on to the field inside.
+/** A labelled field; the step's first takes the remote as it is drawn. */
 const Field = ({
   label,
   value,
@@ -40,39 +32,22 @@ const Field = ({
   isSecret = false,
   isNumeric = false,
   isFirst = false,
-}: FieldProps) => {
-  const [isFocused, setFocused] = useState(false)
-  const frame = useRef<ComponentRef<typeof View>>(null)
-  useFocusOnMount({ view: frame, isAsked: isFirst })
-  return (
-    <View style={styles.field}>
-      <Text style={[formStyles.label, styles.label]}>{label}</Text>
-      <View
-        ref={frame}
-        collapsable={false}
-        style={[formStyles.input, tvFieldStyles.frame, isFocused && formStyles.focused]}
-      >
-        <TextInput
-          accessibilityLabel={label}
-          autoCapitalize="none"
-          autoCorrect={false}
-          hasTVPreferredFocus={isFirst}
-          keyboardType={keyboardFor({ isNumeric, isSecret })}
-          onBlur={() => setFocused(false)}
-          onChangeText={onChangeText}
-          onEndEditing={({ nativeEvent }) => onChangeText(nativeEvent.text)}
-          onFocus={() => setFocused(true)}
-          onSubmitEditing={({ nativeEvent }) => onSubmit({ text: nativeEvent.text })}
-          placeholder={placeholder}
-          returnKeyType="go"
-          secureTextEntry={isSecret}
-          style={tvFieldStyles.input}
-          value={value}
-        />
-      </View>
-    </View>
-  )
-}
+}: FieldProps) => (
+  <View style={styles.field}>
+    <Text style={[formStyles.label, styles.label]}>{label}</Text>
+    <TvTextField
+      isPreferred={isFirst}
+      keyboardType={keyboardFor({ isNumeric, isSecret })}
+      label={label}
+      onChangeText={onChangeText}
+      onSubmit={(text) => onSubmit({ text })}
+      placeholder={placeholder}
+      returnKeyType="go"
+      secureTextEntry={isSecret}
+      value={value}
+    />
+  </View>
+)
 
 const FormButton = ({ label, onPress, tone, isDisabled = false }: FormButtonProps) => (
   <Pressable

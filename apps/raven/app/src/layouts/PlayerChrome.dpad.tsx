@@ -37,8 +37,6 @@ const { Picker } = focusPicker
 
 const GUTTER = TV_SIZES.space8
 
-const BACK = 'Back'
-
 /** How long the controls take to fade, where motion is allowed. */
 const FADE_MS = 200
 
@@ -201,7 +199,12 @@ const Controls = ({
             {subtitles !== null && (
               <Picker label={PLAYER_COPY.subtitles} onOpenChange={onPicking} {...subtitles} />
             )}
-            <PlateButton accessibilityRole="button" label={BACK} onPress={onBack} text={BACK} />
+            <PlateButton
+              accessibilityRole="button"
+              label={PLAYER_COPY.leave}
+              onPress={onBack}
+              text={PLAYER_COPY.leave}
+            />
           </View>
         </FocusBand>
       </View>

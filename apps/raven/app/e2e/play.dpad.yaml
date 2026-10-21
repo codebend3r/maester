@@ -17,14 +17,13 @@ tags:
       visible: Continue watching
     commands:
       - runFlow: steps/clearSpot.dpad.yaml
-      # The card the page was opened from went with its shelf, and Android TV puts the focus
-      # nowhere, so the app opens again, on the film.
-      - launchApp
+      # The card the page was opened from went with its shelf, so Home gives its opening
+      # focus again, to the film on its own shelf.
       - extendedWaitUntil:
           visible:
             text: Kestrel Point
             focused: true
-          timeout: 30000
+          timeout: 10000
 - assertNotVisible: Continue watching
 # Select opens the film's page with the remote on Play.
 - pressKey: Remote Dpad Center

@@ -61,6 +61,7 @@ export type PlayerChromeKit = {
 
 export const PLAYER_COPY = {
   play: 'Play',
+  leave: 'Back',
   pause: 'Pause',
   back: (seconds: number) => `Back ${seconds} seconds`,
   forward: (seconds: number) => `Forward ${seconds} seconds`,

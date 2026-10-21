@@ -4,6 +4,7 @@ import { type RefObject, useEffect, useRef } from 'react'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import {
   coverScreen,
+  drawCard,
   isOpeningIn,
   leaveScreen,
   rememberOpener,
@@ -76,7 +77,8 @@ export const useScreenFocusScope = (): OpeningFocus => {
  * A card's part in taking the focus back to the card another screen was opened from. The card
  * calls `remember` as it opens one; when this screen returns, the card remembered asks for the
  * remote's focus once, whether its view lived on under the screen on top or mounted afresh
- * there. `place` is the card's place on its screen, unique there.
+ * there; it says as it is drawn and as it goes, so a return whose card has gone gives the
+ * screen's opening focus instead. `place` is the card's place on its screen, unique there.
  */
 export const useOpenerFocus = ({
   place,
@@ -86,6 +88,10 @@ export const useOpenerFocus = ({
   view: RefObject<unknown>
 }): { remember: () => void } => {
   const screen = useRoute().key
+  useEffect(() => {
+    drawCard({ screen, card: place, isDrawn: true })
+    return () => drawCard({ screen, card: place, isDrawn: false })
+  }, [screen, place])
   useScreenTurn({
     isToFront: true,
     onTurn: () => {
