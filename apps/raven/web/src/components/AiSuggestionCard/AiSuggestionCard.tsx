@@ -4,7 +4,7 @@ import { type Ref, useId } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, Icon } from '@raven/ui'
 import { api } from '@/lib/api'
-import { afterMatch } from '@/lib/invalidate'
+import { afterMatch } from '@raven/ui/headless'
 import styles from '@/components/AiSuggestionCard/AiSuggestionCard.module.scss'
 
 /** A suggestion's title as a person reads it, with its year when TMDB gives one. */

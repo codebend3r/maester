@@ -6,10 +6,8 @@ import { Button, ButtonLink } from '@raven/ui'
 import { useRatingsRefreshDone } from '@/components/LibraryActions/useRatingsRefreshDone'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { api } from '@/lib/api'
-import { afterRematch, afterRescan } from '@/lib/invalidate'
+import { afterRematch, afterRescan, queryKeys, useUnlockPrompt } from '@raven/ui/headless'
 import { metadataHealthQuery } from '@/lib/queries'
-import { queryKeys } from '@/lib/queryClient'
-import { useUnlockPrompt } from '@raven/ui/headless'
 
 /**
  * Refresh, Rescan and Match again for a library. The caller holds them, as

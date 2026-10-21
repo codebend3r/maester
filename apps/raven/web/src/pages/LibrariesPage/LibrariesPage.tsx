@@ -17,14 +17,16 @@ import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { MANAGEMENT_MODES, useCanManage, useManagement } from '@/lib/management'
 import { api } from '@/lib/api'
-import { librarySettingsEdits } from '@/lib/edits'
+import {
+  afterPins,
+  librarySettingsEdits,
+  mutationKeys,
+  useOptimisticMutation,
+} from '@raven/ui/headless'
 import { foldersByParent } from '@/lib/folders'
-import { afterPins } from '@/lib/invalidate'
 import { libraryPollDelay } from '@/lib/libraryPolling'
 import { LIBRARY_LOCK_STATES, lockState } from '@/lib/libraryLock'
-import { useOptimisticMutation } from '@/lib/optimistic'
 import { librariesQuery, lockQuery } from '@/lib/queries'
-import { mutationKeys } from '@/lib/queryClient'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
 const count = new Intl.NumberFormat()

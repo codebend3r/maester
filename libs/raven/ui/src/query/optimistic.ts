@@ -58,6 +58,19 @@ export const edit = <T>({
 }): Edit => editAll<T>({ filters: { queryKey, exact: true }, update })
 
 /**
+ * An edit to the one query a bare key from `queryKeys` names. The key carries
+ * no type, so `T` says what the query holds; left out, it is `never` and no
+ * `update` fits.
+ */
+export const editKey = <T = never>({
+  queryKey,
+  update,
+}: {
+  queryKey: QueryKey
+  update: (data: NoInfer<T>) => NoInfer<T>
+}): Edit => editAll<T>({ filters: { queryKey, exact: true }, update })
+
+/**
  * Shows a change before the server answers: every query it changes has any
  * fetch in flight called off, so an older answer cannot land over it, then
  * takes the change. What each held before comes back.

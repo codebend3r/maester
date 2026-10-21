@@ -10,7 +10,7 @@ import {
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@raven/ui'
 import { api } from '@/lib/api'
-import { afterSagaBackdrop } from '@/lib/invalidate'
+import { afterSagaBackdrop } from '@raven/ui/headless'
 import styles from '@/pages/SagaPage/SagaBackdropDialog.module.scss'
 
 /** A way for the slideshow to go, or `off` for the cover held still. */

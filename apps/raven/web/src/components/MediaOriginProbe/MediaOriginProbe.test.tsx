@@ -6,7 +6,7 @@ import { render, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MediaOriginProbe, useReprobe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { queryKeys } from '@raven/ui/headless'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { SIGNED_IN, fakeAccount, readyConfig } from '@/test/authClient'
 

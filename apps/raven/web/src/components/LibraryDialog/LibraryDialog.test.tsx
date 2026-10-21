@@ -1,7 +1,9 @@
-import { describe, expect, it, mock } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { type MetadataHealth, createApiClient, isLibraryIconName } from '@raven/core'
+import { type MetadataHealth, isLibraryIconName } from '@raven/core'
+import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
+import { api } from '@/lib/api'
 import { library, metadataHealth } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
@@ -9,22 +11,14 @@ const created: unknown[] = []
 /** Whether the server has a PIN, as the next dialog will find. */
 const lockAvailable = { now: true }
 const updated: unknown[] = []
-const offline = createApiClient({
-  fetch: async () => {
-    throw new Error('No network in tests')
-  },
-})
 
 /** What the next dialog finds of metadata: TMDB off and the AI key set, unless a test says otherwise. */
 const NO_TMDB = metadataHealth({ tmdb: 'off', ai: 'ok', aiRemaining: 200 })
 const served: { health: MetadataHealth } = { health: NO_TMDB }
 
-// Spread over a real client: Bun's module mocks are shared by every test
-// file, and the others still need the URL helpers.
-mock.module('@/lib/api', () => ({
-  api: {
-    ...offline,
-    browse: async (path?: string) =>
+describe('LibraryDialog', () => {
+  const spies = [
+    spyOn(api, 'browse').mockImplementation(async (path) =>
       path
         ? { path, parent: '/media', directories: [] }
         : {
@@ -32,22 +26,24 @@ mock.module('@/lib/api', () => ({
             parent: null,
             directories: [{ name: 'Movies', path: '/media/Movies' }],
           },
-    createLibrary: async (input: unknown) => {
+    ),
+    spyOn(api, 'createLibrary').mockImplementation(async (input) => {
       created.push(input)
-      return { id: 1 }
-    },
-    updateLibrary: async ({ id, input }: { id: number; input: unknown }) => {
+      return library({ id: 1 })
+    }),
+    spyOn(api, 'updateLibrary').mockImplementation(async ({ id, input }) => {
       updated.push(input)
-      return { id }
-    },
-    getLock: async () => ({ available: lockAvailable.now, unlocked: false }),
-    getMetadataHealth: async () => served.health,
-  },
-}))
+      return library({ id })
+    }),
+    spyOn(api, 'getLock').mockImplementation(async () => ({
+      available: lockAvailable.now,
+      unlocked: false,
+    })),
+    spyOn(api, 'getMetadataHealth').mockImplementation(async () => served.health),
+  ]
 
-const { LibraryDialog } = await import('@/components/LibraryDialog/LibraryDialog')
+  afterAll(() => spies.forEach((spy) => spy.mockRestore()))
 
-describe('LibraryDialog', () => {
   it('offers Ratings shown for a Movies library, and not for Other', async () => {
     renderWithProviders({
       ui: (

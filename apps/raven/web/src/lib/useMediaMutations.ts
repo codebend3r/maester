@@ -1,10 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { MediaItem, PosterEntry } from '@raven/core'
 import { api } from '@/lib/api'
-import { favouriteEdits, watchedEdits, withoutEntry } from '@/lib/edits'
-import { afterFavourites, afterWatched } from '@/lib/invalidate'
-import { useOptimisticMutation } from '@/lib/optimistic'
-import { mutationKeys, queryKeys } from '@/lib/queryClient'
+import {
+  afterFavourites,
+  afterWatched,
+  favouriteEdits,
+  mutationKeys,
+  queryKeys,
+  useOptimisticMutation,
+  watchedEdits,
+  withoutEntry,
+} from '@raven/ui/headless'
 
 /**
  * Marking a favourite or a watched mark, deleting a video and fetching its

@@ -24,6 +24,37 @@ export { CONTROLS_LINGER_SECONDS, configurePlayerPrefs, usePlayerPrefs } from '@
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'
 export { playerQueryKeys } from '@/lib/playerQueryKeys'
+export { createQueryClient, mutationKeys, queryKeys } from '@/query/queryClient'
+export {
+  EDITED_PARTS,
+  afterAiLookups,
+  afterFavourites,
+  afterItemEdited,
+  afterLibraryEvent,
+  afterLibrarySaved,
+  afterLibraryView,
+  afterMatch,
+  afterMatchingPass,
+  afterPins,
+  afterReconnect,
+  afterRematch,
+  afterRescan,
+  afterSagaBackdrop,
+  afterSplit,
+  afterWatched,
+  afterWatching,
+} from '@/query/invalidate'
+export { edit, editAll, useOptimisticMutation } from '@/query/optimistic'
+export type { Edit } from '@/query/optimistic'
+export {
+  favouriteEdits,
+  itemFavouriteEdits,
+  librarySettingsEdits,
+  watchedEdits,
+  withoutEntry,
+} from '@/query/edits'
+export { HISTORY_SHOWS, ravenQueriesFor } from '@/query/ravenQueries'
+export type { HistoryShow, RavenQueries } from '@/query/ravenQueries'
 export { usePageBackdrop } from '@/stores/pageBackdrop'
 export { createSelectionStore } from '@/stores/selection'
 export type { SelectionStore } from '@/stores/selection'

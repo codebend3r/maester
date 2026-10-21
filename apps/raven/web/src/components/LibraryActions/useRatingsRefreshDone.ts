@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import type { Library } from '@raven/core'
 import { useEffect, useRef } from 'react'
-import { afterLibraryEvent } from '@/lib/invalidate'
+import { afterLibraryEvent } from '@raven/ui/headless'
 
 /**
  * A Refresh changes scores and the rating sorts without any server event, so

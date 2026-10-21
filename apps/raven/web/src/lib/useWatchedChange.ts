@@ -1,9 +1,7 @@
 import { WATCHED_STATES, type WatchedChange, type WatchedState } from '@raven/core'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { afterWatched } from '@/lib/invalidate'
-import { useOptimisticMutation } from '@/lib/optimistic'
-import { mutationKeys } from '@/lib/queryClient'
+import { afterWatched, mutationKeys, useOptimisticMutation } from '@raven/ui/headless'
 
 /**
  * Marks whatever `targets` name watched or unwatched when the cache cannot

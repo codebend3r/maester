@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { MATCH_STATES, type MediaItem } from '@raven/core'
 import { useEffect, useRef } from 'react'
-import { afterMatchingPass } from '@/lib/invalidate'
+import { afterMatchingPass } from '@raven/ui/headless'
 
 /** How often a listing reads again while something in it is still on its way. */
 export const POLL_MS = 3000

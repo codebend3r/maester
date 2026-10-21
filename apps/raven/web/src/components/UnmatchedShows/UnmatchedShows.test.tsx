@@ -1,35 +1,13 @@
-import { describe, expect, it, mock } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createApiClient } from '@raven/core'
+import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
+import { api } from '@/lib/api'
 import { aiSuggestion, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
-const offline = createApiClient({
-  fetch: async () => {
-    throw new Error('No network in tests')
-  },
-})
 const searched: Array<{ subject?: unknown }> = []
 const matched: Array<{ mediaId: number; tmdbId: string | null }> = []
-
-// Spread over a real client: Bun's module mocks are shared by every test
-// file, and the others still need the URL helpers.
-mock.module('@/lib/api', () => ({
-  api: {
-    ...offline,
-    searchMatches: async (request: { subject?: unknown }) => {
-      searched.push(request)
-      return []
-    },
-    setMatch: async (request: { mediaId: number; tmdbId: string | null }) => {
-      matched.push(request)
-      return mediaItem()
-    },
-  },
-}))
-
-const { UnmatchedShows } = await import('@/components/UnmatchedShows/UnmatchedShows')
 
 const files = [
   mediaItem({ id: 1, title: 'Ep 1', folder: 'Archie/Season 1', fileName: 'Archie - S01E01.mkv' }),
@@ -54,6 +32,19 @@ const renderShows = () =>
   })
 
 describe('UnmatchedShows', () => {
+  const spies = [
+    spyOn(api, 'searchMatches').mockImplementation(async (request) => {
+      searched.push(request)
+      return []
+    }),
+    spyOn(api, 'setMatch').mockImplementation(async (request) => {
+      matched.push(request)
+      return mediaItem()
+    }),
+  ]
+
+  afterAll(() => spies.forEach((spy) => spy.mockRestore()))
+
   it('lists one collapsed entry per show folder, with its episode count', () => {
     renderShows()
     expect(screen.getAllByRole('listitem')).toHaveLength(2)

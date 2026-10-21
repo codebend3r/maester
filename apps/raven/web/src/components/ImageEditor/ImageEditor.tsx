@@ -18,7 +18,7 @@ import { Button, Icon } from '@raven/ui'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { Tabs } from '@/components/Tabs/Tabs'
 import { api } from '@/lib/api'
-import { EDITED_PARTS, afterItemEdited } from '@/lib/invalidate'
+import { EDITED_PARTS, afterItemEdited } from '@raven/ui/headless'
 import { itemImagesQuery } from '@/lib/queries'
 import styles from '@/components/ImageEditor/ImageEditor.module.scss'
 
