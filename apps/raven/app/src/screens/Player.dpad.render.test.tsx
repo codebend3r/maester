@@ -2,14 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import {
   APP_CALL_METHODS,
   APP_CLIENT_CALLS,
+  DEFAULT_THEME,
   DIRECT_PLAYS,
   HLS_PARAMS,
   HLS_PATHS,
   PLAYBACK_MODES,
+  THEMES,
   type PlaybackSettings,
+  formatDuration,
 } from '@raven/core'
 import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@raven/ui/headless'
-import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 import type { ReactVideoProps } from 'react-native-video'
 import { SelectedTrackType } from 'react-native-video'
 
@@ -20,6 +24,7 @@ import { APP_ROUTE_PARAMS } from '@/routes'
 import { Player } from '@/screens/Player'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
+import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { AUDIO_SETTLE_SECONDS } from '@/player/droppedAudio'
 import { SESSION_COPY } from '@/player/usePlaybackSession'
@@ -34,6 +39,7 @@ import {
   playerApi,
 } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
+import { appThemeOf } from '@/theme/appTheme'
 import type * as NavigationFocus from '@/test/navigationFocus'
 import { askedFor, resetTestScreen } from '@/test/navigationFocus'
 import type * as RemoteModule from '@/test/tvRemote'
@@ -162,6 +168,12 @@ const playing = async ({ id }: { id: number }): Promise<ReactVideoProps> => {
 
 const scrubber = () => screen.getByRole('adjustable', { name: 'Position' })
 
+/** A light theme, whose page colours would vanish over a bright picture. */
+const PATINA = THEMES.find((theme) => theme.name === 'Patina')?.id ?? DEFAULT_THEME
+
+/** What a drawn element is painted with. */
+const styleOf = (node: ReturnType<typeof screen.getByRole>) => StyleSheet.flatten(node.props.style)
+
 /** The fixture's one audio track, which every save names as the one playing. */
 const AUDIO_PLAYED = 0
 
@@ -182,6 +194,7 @@ describe('Player on Android TV', () => {
     mockServer.directPlay = DIRECT_PLAYS.auto
     resetTestScreen()
     useReduceMotion.setState({ isReduced: true })
+    useAppPrefs.setState(DEFAULT_APP_PREFS)
     resetDrawnVideo()
     usePlayerPrefs.setState({
       subtitles: { on: false, language: null },
@@ -282,6 +295,39 @@ describe('Player on Android TV', () => {
     expect(await screen.findByText(CUE_TEXT)).toBeTruthy()
     await moveVideoTo({ props, seconds: 25 })
     expect(screen.queryByText(CUE_TEXT)).toBeNull()
+  })
+
+  it("keeps its chips, Play, Back and the lists they open the player's dark glass under Patina", async () => {
+    usePlayerPrefs.setState({ subtitles: { on: true, language: null } })
+    useAppPrefs.setState({ theme: PATINA })
+    const { palette, overPicture } = appThemeOf(PATINA)
+    await playing({ id: BUSBOYS_MP4.id })
+
+    const chip = screen.getByRole('button', { name: 'Subtitles: English' })
+    expect(styleOf(chip)?.backgroundColor ?? null).toBe(overPicture.quiet)
+    expect(styleOf(within(chip).getByText('English'))?.color ?? null).toBe(overPicture.text)
+    expect(styleOf(within(chip).getByText('Subtitles'))?.color ?? null).toBe(overPicture.muted)
+    expect(overPicture.quiet).not.toBe(palette.quiet)
+    expect(overPicture.text).not.toBe(palette.text)
+    ;['Pause', PLAYER_COPY.leave].forEach((name) => {
+      const plate = screen.getByRole('button', { name })
+      expect(styleOf(plate)?.backgroundColor ?? null).toBe(overPicture.quiet)
+      expect(styleOf(within(plate).getByText(name))?.color ?? null).toBe(overPicture.text)
+    })
+    expect(styleOf(screen.getByText(formatDuration(BUSBOYS_MP4.duration)))?.color ?? null).toBe(
+      overPicture.text,
+    )
+
+    await fireEvent(chip, NATIVE_EVENTS.focus)
+    expect(
+      styleOf(screen.getByRole('button', { name: 'Subtitles: English' }))?.borderColor ?? null,
+    ).toBe(overPicture.text)
+    await fireEvent.press(screen.getByRole('button', { name: 'Subtitles: English' }))
+    const list = screen.getByLabelText(PLAYER_COPY.subtitles)
+    expect(styleOf(list)?.backgroundColor ?? null).toBe(overPicture.raised)
+    expect(
+      styleOf(within(list).getByRole('header', { name: PLAYER_COPY.subtitles }))?.color ?? null,
+    ).toBe(overPicture.text)
   })
 
   it('steps down to the remux when ExoPlayer plays the file without any of its sound', async () => {

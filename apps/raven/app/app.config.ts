@@ -1,3 +1,5 @@
+import { DEFAULT_THEME } from '@raven/core'
+import { themeTokens } from '@raven/ui/designTokens'
 import type { ConfigContext, ExpoConfig } from 'expo/config'
 import { type ConfigPlugin, withAndroidManifest } from 'expo/config-plugins'
 
@@ -8,6 +10,7 @@ import packageJson from '#package'
 import { isDevelopmentVariant } from './src/config/appVariant.ts'
 import { BUILD_ENV, buildNumberOf } from './src/config/buildNumber.ts'
 import { isTvPrebuild } from './src/config/tvPrebuild.ts'
+import { PALETTE_TOKENS } from './src/theme/tokenNames.ts'
 import { withTvRemoteTests } from './plugins/withTvRemoteTests.ts'
 
 const APP_ID = 'io.github.codebend3r.raven.app'
@@ -17,6 +20,17 @@ const isDevelopment = isDevelopmentVariant({ variant: process.env[BUILD_ENV.appV
 const isTv = isTvPrebuild({ value: process.env[BUILD_ENV.tv] })
 
 const LOCAL_NETWORK_USE = 'raven reaches your raven server on your local network.'
+
+/**
+ * The default theme's ground, from themes.scss through the built tokens the app reads, for what
+ * the system draws before raven's first frame: the splash, and the window behind the app. The
+ * system cannot know the theme picked, so it is the default's dark, never a white flash.
+ */
+const launchGround = (): string => {
+  const ground = themeTokens[DEFAULT_THEME]?.[PALETTE_TOKENS.ground]
+  if (ground === undefined) throw new Error(`themes.scss gives ${DEFAULT_THEME} no ground`)
+  return ground
+}
 
 // Expo's config has no field for it, so the development variant sets it on the manifest.
 const withCleartextTraffic: ConfigPlugin = (config) =>
@@ -31,6 +45,7 @@ const withCleartextTraffic: ConfigPlugin = (config) =>
   })
 
 export default ({ config }: ConfigContext): ExpoConfig => {
+  const ground = launchGround()
   const app: ExpoConfig = {
     ...config,
     name: 'raven',
@@ -55,6 +70,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       package: APP_ID,
       versionCode: buildNumber,
+      // The window's own colour, under the app. iOS reads its counterpart only through
+      // expo-system-ui; there the splash covers the window until raven draws.
+      backgroundColor: ground,
     },
     plugins: [
       'expo-router',
@@ -63,6 +81,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       // Picture in Picture needs the audio background mode. The player still pauses when the
       // app leaves the screen without it (`playInBackground` off): this is video.
       ['react-native-video', { enableBackgroundAudio: true }],
+      // Held up by `AppRoot` until the stores are read, so the theme picked is the first frame.
+      ['expo-splash-screen', { backgroundColor: ground }],
     ],
   }
   // The Apple TV's remote-driven end to end test joins only the TV's native project.

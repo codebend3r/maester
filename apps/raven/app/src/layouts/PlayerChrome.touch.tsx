@@ -27,7 +27,8 @@ import {
 } from '@/layouts/playerKit'
 import { TouchBack } from '@/layouts/TouchBack'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { SIZES } from '@/theme/appTheme'
+import { themedStyles } from '@/theme/useTheme'
 
 const { Picker, ToolButton } = touchPicker
 
@@ -59,6 +60,7 @@ const Scrubber = ({
 }: Pick<Transport, 'position' | 'onSeek'> & { duration: number }) => {
   const [width, setWidth] = useState(0)
   const [dragged, setDragged] = useState<number | null>(null)
+  const styles = useStyles()
   const timeAt = (event: GestureResponderEvent): number =>
     width <= 0
       ? position
@@ -98,22 +100,30 @@ const RoundButton = ({
   label: string
   isLarge?: boolean
   onPress: () => void
-}) => (
-  <Pressable
-    accessibilityLabel={label}
-    accessibilityRole="button"
-    hitSlop={SIZES.space2}
-    onPress={onPress}
-    style={({ pressed }) => [styles.round, isLarge && styles.roundLarge, pressed && styles.pressed]}
-  >
-    <Text style={[styles.glyph, isLarge && styles.glyphLarge]}>{glyph}</Text>
-  </Pressable>
-)
+}) => {
+  const styles = useStyles()
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      hitSlop={SIZES.space2}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.round,
+        isLarge && styles.roundLarge,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.glyph, isLarge && styles.glyphLarge]}>{glyph}</Text>
+    </Pressable>
+  )
+}
 
 /** Play and pause between the skips, then the time over the line to drag along. */
 const TransportControls = ({ transport }: { transport: Transport }) => {
   const { isPaused, position, duration, onTogglePlay, onSeek } = transport
   const length = duration ?? 0
+  const styles = useStyles()
   return (
     <>
       <View pointerEvents="box-none" style={styles.middle}>
@@ -170,6 +180,7 @@ const PlayerChrome = ({
   const [isShown, setShown] = useState(true)
   const [stirredAt, setStirredAt] = useState(() => Date.now())
   const [opacity] = useState(() => new Animated.Value(1))
+  const styles = useStyles()
   const isPlaying = transport !== null && !transport.isPaused
   // Only a video that plays hides its controls: paused, opening or ended, they stay up.
   const isVisible = isShown || !isPlaying
@@ -201,7 +212,7 @@ const PlayerChrome = ({
   }
   return (
     <View style={styles.root}>
-      <StatusBar hidden={!isVisible} />
+      <StatusBar barStyle="light-content" hidden={!isVisible} />
       {surface !== null && (
         <Video
           {...surface}
@@ -248,11 +259,14 @@ const PlayerChrome = ({
               </Text>
             </View>
             <View style={styles.tools}>
-              {audio !== null && <Picker label={PLAYER_COPY.audio} {...audio} />}
-              {subtitles !== null && <Picker label={PLAYER_COPY.subtitles} {...subtitles} />}
+              {audio !== null && <Picker isOverPicture label={PLAYER_COPY.audio} {...audio} />}
+              {subtitles !== null && (
+                <Picker isOverPicture label={PLAYER_COPY.subtitles} {...subtitles} />
+              )}
               {onPictureInPicture !== null && (
                 <ToolButton
                   accessibilityLabel={PLAYER_COPY.pictureInPicture}
+                  isOverPicture
                   label={PLAYER_COPY.pictureInPicture}
                   onPress={onPictureInPicture}
                 />
@@ -274,77 +288,76 @@ const PlayerChrome = ({
 /** The player under the thumb, on iPhones and iPads. */
 export const touchPlayerChrome: PlayerChromeKit = { PlayerChrome, shouldDrawCaptions: true }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLOURS.ground },
-  scrim: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: COLOURS.ground,
-    opacity: SCRIM_OPACITY,
-  },
-  frame: { flex: 1, justifyContent: 'space-between' },
-  top: { gap: SIZES.space2 },
-  heading: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space3 },
-  tools: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    gap: SIZES.space2,
-  },
-  title: { flex: 1, color: COLOURS.onPicture, fontSize: SIZES.text, fontWeight: '600' },
-  middle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SIZES.space6,
-  },
-  bottom: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space2 },
-  time: { color: COLOURS.onPicture, fontSize: SIZES.textSm, fontVariant: ['tabular-nums'] },
-  scrubberSlot: { flex: 1 },
-  scrubber: { height: SCRUBBER_HEIGHT, justifyContent: 'center' },
-  line: {
-    height: SIZES.space1,
-    borderRadius: SIZES.space1,
-    backgroundColor: COLOURS.track,
-    overflow: 'hidden',
-  },
-  played: { height: '100%', backgroundColor: COLOURS.accent },
-  thumb: {
-    position: 'absolute',
-    width: SIZES.space4,
-    height: SIZES.space4,
-    marginLeft: -SIZES.space4 / 2,
-    borderRadius: SIZES.space4,
-    backgroundColor: COLOURS.onPicture,
-  },
-  round: {
-    minWidth: SIZES.controlLarge,
-    minHeight: SIZES.controlLarge,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: SIZES.controlLarge,
-    paddingHorizontal: SIZES.space2,
-    backgroundColor: COLOURS.deep,
-  },
-  roundLarge: {
-    minWidth: SIZES.controlLarge * 1.5,
-    minHeight: SIZES.controlLarge * 1.5,
-    backgroundColor: COLOURS.accent,
-  },
-  pressed: { opacity: 0.6 },
-  glyph: { color: COLOURS.onPicture, fontSize: SIZES.text, fontWeight: '600' },
-  glyphLarge: { color: COLOURS.onAccent, fontSize: SIZES.textXl },
-  captionSlot: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    // Clear of the time and the scrubber along the bottom.
-    marginBottom: SIZES.controlLarge + SIZES.space4,
-  },
-  noticeSlot: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  notice: {
-    maxWidth: SIZES.measure,
-    color: COLOURS.onPicture,
-    fontSize: SIZES.text,
-    textAlign: 'center',
-  },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colours.stage },
+    scrim: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: colours.stage,
+      opacity: SCRIM_OPACITY,
+    },
+    frame: { flex: 1, justifyContent: 'space-between' },
+    top: { gap: SIZES.space2 },
+    heading: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space3 },
+    tools: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-end',
+      gap: SIZES.space2,
+    },
+    title: { flex: 1, color: colours.onPicture, fontSize: SIZES.text, fontWeight: '600' },
+    middle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SIZES.space6,
+    },
+    bottom: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space2 },
+    time: { color: colours.onPicture, fontSize: SIZES.textSm, fontVariant: ['tabular-nums'] },
+    scrubberSlot: { flex: 1 },
+    scrubber: { height: SCRUBBER_HEIGHT, justifyContent: 'center' },
+    line: {
+      height: SIZES.space1,
+      borderRadius: SIZES.space1,
+      backgroundColor: colours.pictureTrack,
+      overflow: 'hidden',
+    },
+    played: { height: '100%', backgroundColor: colours.played },
+    thumb: {
+      position: 'absolute',
+      width: SIZES.space4,
+      height: SIZES.space4,
+      marginLeft: -SIZES.space4 / 2,
+      borderRadius: SIZES.space4,
+      backgroundColor: colours.onPicture,
+    },
+    round: {
+      minWidth: SIZES.controlLarge,
+      minHeight: SIZES.controlLarge,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: SIZES.controlLarge,
+      paddingHorizontal: SIZES.space2,
+      backgroundColor: colours.pictureGlass,
+    },
+    // The same dark glass as the skips, larger: the web's play is on-picture too, in every theme.
+    roundLarge: { minWidth: SIZES.controlLarge * 1.5, minHeight: SIZES.controlLarge * 1.5 },
+    pressed: { opacity: 0.6 },
+    glyph: { color: colours.onPicture, fontSize: SIZES.text, fontWeight: '600' },
+    glyphLarge: { fontSize: SIZES.textXl },
+    captionSlot: {
+      ...StyleSheet.absoluteFill,
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      // Clear of the time and the scrubber along the bottom.
+      marginBottom: SIZES.controlLarge + SIZES.space4,
+    },
+    noticeSlot: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+    notice: {
+      maxWidth: SIZES.measure,
+      color: colours.onPicture,
+      fontSize: SIZES.text,
+      textAlign: 'center',
+    },
+  }),
+)

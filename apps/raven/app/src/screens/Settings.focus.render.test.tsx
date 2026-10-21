@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { THEMES, themeOf } from '@raven/core'
 import { fireEvent, screen, within } from '@testing-library/react-native'
-import { ActionSheetIOS } from 'react-native'
+import { ActionSheetIOS, StyleSheet } from 'react-native'
 
 import { Settings } from '@/screens/Settings'
 import type { AppServer } from '@/servers/serverList'
@@ -12,6 +12,7 @@ import type * as NavigationFocus from '@/test/navigationFocus'
 import { resetTestScreen } from '@/test/navigationFocus'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { renderScreen } from '@/test/renderScreen'
+import { appThemeOf } from '@/theme/appTheme'
 
 // The layouts pick their variant once, as they load, so the TV is set before anything does.
 jest.mock('react-native/Libraries/Utilities/Platform', () => {
@@ -95,6 +96,29 @@ describe('Settings on a TV', () => {
     await fireEvent.press(list.getByRole('button', { name: light.name }))
     expect(sheet).not.toHaveBeenCalled()
     expect(useAppPrefs.getState().theme).toBe(light.id)
+  })
+
+  it('wears a theme the moment it is picked: the page, its plates and the focus ring', async () => {
+    const light = THEMES.find((theme) => theme.tone !== themeOf(DEFAULT_APP_PREFS.theme).tone)
+    if (light === undefined) throw new Error('No light theme')
+    const { palette } = appThemeOf(light.id)
+    const styleOf = (node: ReturnType<typeof screen.getByRole>) =>
+      StyleSheet.flatten(node.props.style)
+    await renderScreen({ ui: <Settings /> })
+    await fireEvent.press(screen.getByRole('button', { name: `Theme: ${DEFAULT_THEME_NAME}` }))
+    await fireEvent.press(
+      within(screen.getByLabelText('Theme')).getByRole('button', { name: light.name }),
+    )
+
+    expect(styleOf(screen.getByRole('header', { name: 'Servers' }))?.color ?? null).toBe(
+      palette.text,
+    )
+    const theme = screen.getByRole('button', { name: `Theme: ${light.name}` })
+    expect(styleOf(theme)?.backgroundColor ?? null).toBe(palette.quiet)
+    await fireEvent(theme, NATIVE_EVENTS.focus)
+    expect(
+      styleOf(screen.getByRole('button', { name: `Theme: ${light.name}` }))?.borderColor ?? null,
+    ).toBe(palette.text)
   })
 
   it('turns a setting on and off with a press, saying which it is', async () => {

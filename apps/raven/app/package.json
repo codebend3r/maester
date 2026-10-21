@@ -58,6 +58,7 @@
     "expo-linking": "58.0.13",
     "expo-router": "58.0.23",
     "expo-secure-store": "58.0.2",
+    "expo-splash-screen": "58.0.10",
     "react": "19.3.0",
     "react-native": "npm:react-native-tvos@0.88.0-0",
     "react-native-safe-area-context": "5.10.1",
@@ -217,6 +218,9 @@
         "cache": true
       },
       "prebuild:ios": {
+        "dependsOn": [
+          "^build"
+        ],
         "inputs": [
           "default",
           "^production",
@@ -236,6 +240,9 @@
         "cache": true
       },
       "prebuild:tvos": {
+        "dependsOn": [
+          "^build"
+        ],
         "inputs": [
           "default",
           "^production",
@@ -255,6 +262,9 @@
         "cache": true
       },
       "prebuild:android-tv": {
+        "dependsOn": [
+          "^build"
+        ],
         "inputs": [
           "default",
           "^production",

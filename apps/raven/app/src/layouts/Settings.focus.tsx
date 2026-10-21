@@ -14,9 +14,9 @@ import type {
   SettingsSheetProps,
   SettingsToggleProps,
 } from '@/layouts/settingsKit'
-import { PlateButton, plateStyles } from '@/layouts/tvControls'
-import { COLOURS } from '@/theme/appTheme'
+import { PlateButton, usePlateStyles } from '@/layouts/tvControls'
 import { TV_SIZES } from '@/theme/tvSizes'
+import { themedStyles } from '@/theme/useTheme'
 
 /** What a TV toggle says it is set to. */
 const TOGGLE_STATES = { on: 'On', off: 'Off' } as const
@@ -29,6 +29,7 @@ const TOGGLE_STATES = { on: 'On', off: 'Off' } as const
  */
 const SettingsPage = ({ title, children }: SettingsPageProps) => {
   useScreenFocusScope()
+  const styles = useStyles()
   return (
     <ScrollView contentContainerStyle={styles.page} style={styles.ground}>
       <Text accessibilityRole="header" style={styles.title}>
@@ -39,15 +40,18 @@ const SettingsPage = ({ title, children }: SettingsPageProps) => {
   )
 }
 
-const SettingsSection = ({ title, note, children }: SettingsSectionProps) => (
-  <View style={styles.section}>
-    <Text accessibilityRole="header" style={styles.heading}>
-      {title}
-    </Text>
-    {children}
-    {note !== null && <Text style={styles.note}>{note}</Text>}
-  </View>
-)
+const SettingsSection = ({ title, note, children }: SettingsSectionProps) => {
+  const styles = useStyles()
+  return (
+    <View style={styles.section}>
+      <Text accessibilityRole="header" style={styles.heading}>
+        {title}
+      </Text>
+      {children}
+      {note !== null && <Text style={styles.note}>{note}</Text>}
+    </View>
+  )
+}
 
 /**
  * A server the remote reaches: its name, address and mark, then its buttons. The whole row is a
@@ -56,6 +60,7 @@ const SettingsSection = ({ title, note, children }: SettingsSectionProps) => (
  */
 const ServerRow = ({ name, line, badge, actions, openingAction }: ServerRowProps) => {
   const { isOpening, settle } = useOpeningFocus()
+  const styles = useStyles()
   return (
     <FocusBand>
       <View style={styles.row}>
@@ -94,6 +99,8 @@ const ServerRow = ({ name, line, badge, actions, openingAction }: ServerRowProps
  */
 const SettingsToggle = ({ label, hint, isOn, onToggle }: SettingsToggleProps) => {
   const { settle } = useOpeningFocus()
+  const styles = useStyles()
+  const plateStyles = usePlateStyles()
   return (
     <Pressable
       accessibilityLabel={label}
@@ -118,6 +125,8 @@ const SettingsToggle = ({ label, hint, isOn, onToggle }: SettingsToggleProps) =>
  */
 const SettingsButton = ({ text, isDisabled, onPress }: SettingsButtonProps) => {
   const { settle } = useOpeningFocus()
+  const styles = useStyles()
+  const plateStyles = usePlateStyles()
   return (
     <FocusBand>
       <Pressable
@@ -147,6 +156,8 @@ const SettingsButton = ({ text, isDisabled, onPress }: SettingsButtonProps) => {
 const SettingsChoice = <K extends string>(props: SettingsChoiceProps<K>) => {
   const { settle } = useOpeningFocus()
   const { open, list } = usePickerList(props)
+  const styles = useStyles()
+  const plateStyles = usePlateStyles()
   return (
     <>
       <Pressable
@@ -185,46 +196,48 @@ export const focusSettings: SettingsKit = {
   SettingsSheet,
 }
 
-const styles = StyleSheet.create({
-  ground: { flex: 1, backgroundColor: COLOURS.ground },
-  page: {
-    gap: TV_SIZES.space5,
-    paddingVertical: TV_SIZES.space6,
-    paddingHorizontal: TV_SIZES.space8,
-  },
-  title: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  section: { gap: TV_SIZES.space3 },
-  heading: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  note: { color: COLOURS.muted, fontSize: TV_SIZES.text },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: TV_SIZES.space4,
-    padding: TV_SIZES.space3,
-    borderRadius: TV_SIZES.radius,
-    backgroundColor: COLOURS.raised,
-  },
-  words: { flexShrink: 1, flexGrow: 1, gap: TV_SIZES.space0 },
-  choiceLabel: { flexShrink: 1, flexGrow: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space2 },
-  name: { flexShrink: 1, color: COLOURS.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
-  badge: {
-    paddingHorizontal: TV_SIZES.space2,
-    borderRadius: TV_SIZES.radius,
-    overflow: 'hidden',
-    color: COLOURS.onAccent,
-    backgroundColor: COLOURS.accent,
-    fontSize: TV_SIZES.text,
-    fontWeight: 'bold',
-  },
-  line: { color: COLOURS.muted, fontSize: TV_SIZES.text },
-  actions: { flexDirection: 'row', gap: TV_SIZES.space2 },
-  setting: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: TV_SIZES.space4,
-    paddingVertical: TV_SIZES.space2,
-  },
-  button: { alignSelf: 'flex-start' },
-  off: { opacity: 0.5 },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    ground: { flex: 1, backgroundColor: colours.ground },
+    page: {
+      gap: TV_SIZES.space5,
+      paddingVertical: TV_SIZES.space6,
+      paddingHorizontal: TV_SIZES.space8,
+    },
+    title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    section: { gap: TV_SIZES.space3 },
+    heading: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    note: { color: colours.muted, fontSize: TV_SIZES.text },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: TV_SIZES.space4,
+      padding: TV_SIZES.space3,
+      borderRadius: TV_SIZES.radius,
+      backgroundColor: colours.raised,
+    },
+    words: { flexShrink: 1, flexGrow: 1, gap: TV_SIZES.space0 },
+    choiceLabel: { flexShrink: 1, flexGrow: 1 },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space2 },
+    name: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+    badge: {
+      paddingHorizontal: TV_SIZES.space2,
+      borderRadius: TV_SIZES.radius,
+      overflow: 'hidden',
+      color: colours.onAccent,
+      backgroundColor: colours.accent,
+      fontSize: TV_SIZES.text,
+      fontWeight: 'bold',
+    },
+    line: { color: colours.muted, fontSize: TV_SIZES.text },
+    actions: { flexDirection: 'row', gap: TV_SIZES.space2 },
+    setting: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: TV_SIZES.space4,
+      paddingVertical: TV_SIZES.space2,
+    },
+    button: { alignSelf: 'flex-start' },
+    off: { opacity: 0.5 },
+  }),
+)

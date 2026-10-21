@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { APP_CLIENT_CALLS, SERVERS_CAP, THEMES, themeOf } from '@raven/core'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
-import { ActionSheetIOS, Alert, type AlertButton } from 'react-native'
+import { ActionSheetIOS, Alert, type AlertButton, StyleSheet } from 'react-native'
 
+import { LOGO_MARKS } from '@/layouts/Logo'
 import { clearOnServerSwitch } from '@/queries/serverCache'
 import { APP_ROUTES } from '@/routes'
 import { Home } from '@/screens/Home'
@@ -13,6 +14,7 @@ import { AWAY_MAX_HEIGHTS, DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPr
 import { NAS, OTHER, homeApi } from '@/test/homeServer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { createScreenClient, renderScreen } from '@/test/renderScreen'
+import { appThemeOf } from '@/theme/appTheme'
 
 const mockPush = jest.fn()
 const mockBack = jest.fn()
@@ -200,6 +202,35 @@ describe('Settings on a phone or tablet', () => {
     ])
     expect(useAppPrefs.getState().theme).toBe(LIGHT_THEME.id)
     expect(screen.getByRole('button', { name: `Theme: ${LIGHT_THEME.name}` })).toBeTruthy()
+  })
+
+  it('wears a theme the moment it is picked: Home and Settings repaint, the logo with them', async () => {
+    if (LIGHT_THEME === undefined) throw new Error('No light theme')
+    const before = appThemeOf(DEFAULT_APP_PREFS.theme)
+    const after = appThemeOf(LIGHT_THEME.id)
+    const colourOf = (name: string): unknown =>
+      StyleSheet.flatten(screen.getByRole('header', { name }).props.style)?.color ?? null
+    answerSheet(LIGHT_THEME.name)
+    await renderScreen({
+      ui: (
+        <>
+          <Home />
+          <Settings />
+        </>
+      ),
+    })
+    await screen.findByRole('header', { name: 'Films' })
+    expect(colourOf('Home')).toBe(before.palette.text)
+    expect(colourOf('Servers')).toBe(before.palette.text)
+    expect(screen.getByRole('image', { name: 'raven' }).props.source).toBe(LOGO_MARKS[before.tone])
+
+    await fireEvent.press(screen.getByRole('button', { name: `Theme: ${themeOf(before.id).name}` }))
+    expect(colourOf('Home')).toBe(after.palette.text)
+    expect(colourOf('Films')).toBe(after.palette.text)
+    expect(colourOf('Servers')).toBe(after.palette.text)
+    expect(after.palette.text).not.toBe(before.palette.text)
+    expect(screen.getByRole('image', { name: 'raven' }).props.source).toBe(LOGO_MARKS[after.tone])
+    expect(LOGO_MARKS[after.tone]).not.toBe(LOGO_MARKS[before.tone])
   })
 
   it('turns direct play preference and transcoding off and on', async () => {

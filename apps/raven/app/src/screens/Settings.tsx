@@ -15,7 +15,7 @@ import {
   SettingsSection,
   SettingsSheet,
   SettingsToggle,
-  formStyles,
+  useFormStyles,
 } from '@/layouts'
 import type { SettingsAction } from '@/layouts/settingsKit'
 import { APP_ROUTES } from '@/routes'
@@ -89,6 +89,7 @@ const confirmRemove = ({ server, remove }: { server: AppServer; remove: () => vo
 /** A server's new name, typed in the platform's form: the field opens with the name it has. */
 const Rename = ({ server, onDone }: { server: AppServer; onDone: () => void }) => {
   const rename = useActiveServer((state) => state.rename)
+  const formStyles = useFormStyles()
   const [name, setName] = useState(server.name)
   const [isRefused, setRefused] = useState(false)
   const save = ({ text }: { text: string }) => {
