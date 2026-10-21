@@ -61,7 +61,7 @@ const useShowCard = ({
 }
 
 /** A show's poster, or its initial when it has none or the poster fails to load. */
-const ShowPoster = ({ show, sizes }: { show: ItemSummary; sizes: PosterSizes }) => {
+export const ShowPoster = ({ show, sizes }: { show: ItemSummary; sizes: PosterSizes }) => {
   const poster = posterSources({ item: show, sizes })
   const [failed, setFailed] = useState(false)
   if (!poster || failed) {

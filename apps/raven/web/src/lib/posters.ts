@@ -22,6 +22,13 @@ export const POSTER_SIZES = {
    */
   grid: 'auto, (max-width: 48rem) 12.5rem, (max-width: 64rem) 14.625rem, 16.25rem',
   /**
+   * `CoverGrid`'s posters, columns of 136 px at least with 8 px between, 104
+   * px under 48rem. Two columns that just miss fitting a third are the
+   * widest it lays out, half a column and a gap wider than the least: 160 px
+   * under 48rem and 208 px past it.
+   */
+  cover: 'auto, (max-width: 48rem) 10rem, 13rem',
+  /**
    * Home's rows: two, four, then eight across the page, which stops growing
    * at 120rem.
    */
@@ -50,6 +57,7 @@ export type PosterSizes = (typeof POSTER_SIZES)[keyof typeof POSTER_SIZES]
  */
 const NARROWEST: Record<PosterSizes, number> = {
   [POSTER_SIZES.grid]: 128,
+  [POSTER_SIZES.cover]: 104,
   [POSTER_SIZES.row]: 70,
   [POSTER_SIZES.deck]: 118,
   [POSTER_SIZES.season]: 144,

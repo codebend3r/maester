@@ -11,7 +11,8 @@ import type {
 } from '@raven/core'
 import { api } from '@/lib/api'
 import { useUnlockPrompt } from '@raven/ui/headless'
-import { library, mediaItem, metadataHealth, showEntry } from '@/test/fixtures'
+import { POSTER_SIZES } from '@/lib/posters'
+import { library, matchedMovie, mediaItem, metadataHealth, showEntry } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderLibraryPage } from '@/test/libraryPage'
 import { pollFast } from '@/test/polls'
@@ -192,6 +193,21 @@ describe('LibraryPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Tiles' }))
     expect(screen.getByRole('button', { name: 'Tiles' })).toHaveAttribute('aria-pressed', 'true')
     expect(state.sent.at(-1)).toEqual({ view: 'tiles' })
+  })
+
+  it('lays the videos out as bare covers, each opening where its card would', async () => {
+    serve({ settings: { view: 'covers' } })
+    const cover = await screen.findByRole('link', { name: 'Wide' })
+    expect(cover).toHaveAttribute('href', '/watch/1')
+    expect(cover).toHaveTextContent('')
+    expect(screen.getByRole('button', { name: 'Covers' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it("lays a Movies library's covers out as posters that open each movie's page", async () => {
+    serve({ settings: { kind: 'movies', view: 'covers' }, items: [matchedMovie()] })
+    const cover = await screen.findByRole('link', { name: 'Busboys' })
+    expect(cover.getAttribute('href')).toStartWith('/movies/40')
+    expect(cover.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.cover)
   })
 
   it('groups by resolution, and offers the other groupings only in that view', async () => {
@@ -573,6 +589,14 @@ describe('LibraryPage for TV shows', () => {
       'href',
       '/watch/12',
     )
+  })
+
+  it('lays the shows out as bare covers when asked', async () => {
+    serve({ view: 'covers' })
+    await userEvent.click(await screen.findByText('Matched'))
+    const cover = await screen.findByRole('link', { name: 'Severance' })
+    expect(cover).toHaveAttribute('href', '/shows/4')
+    expect(screen.queryByText('9 episodes')).toBeNull()
   })
 
   it('lays the shows out as tiles when asked', async () => {

@@ -34,6 +34,7 @@ export type IconName =
   | 'keyboard'
   | 'pin'
   | 'grid'
+  | 'covers'
   | 'list'
   | 'tiles'
   | 'grouped'
@@ -199,6 +200,12 @@ const DRAWINGS: Record<IconName, Drawing> = {
   grid: {
     stroke: `${roundRect({ x: 4, y: 4, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 13.5, y: 4, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 4, y: 13.5, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 13.5, y: 13.5, w: 6.5, h: 6.5, r: 1.5 })}`,
     fill: `${roundRect({ x: 4, y: 4, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 13.5, y: 13.5, w: 6.5, h: 6.5, r: 1.5 })}`,
+  },
+  covers: {
+    stroke: [3.5, 9.75, 16]
+      .flatMap((x) => [4, 13].map((y) => roundRect({ x, y, w: 4.5, h: 7, r: 1 })))
+      .join(''),
+    fill: `${roundRect({ x: 3.5, y: 4, w: 4.5, h: 7, r: 1 })}${roundRect({ x: 16, y: 13, w: 4.5, h: 7, r: 1 })}`,
   },
   list: {
     stroke: 'M9.5 6.5h10M9.5 12h10M9.5 17.5h10',

@@ -170,7 +170,7 @@ describe('the rules for each type of library', () => {
   })
 
   it('has no grouped view for a TV library, and no match grouping for an Other one', () => {
-    expect(viewsFor('shows')).toEqual(['grid', 'list', 'tiles'])
+    expect(viewsFor('shows')).toEqual(['grid', 'covers', 'list', 'tiles'])
     expect(viewsFor('other')).toContain('grouped')
     expect(groupingsFor('other')).toEqual(['resolution', 'codec', 'month'])
     expect(groupingsFor('movies')).toContain('match')

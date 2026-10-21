@@ -79,6 +79,7 @@ const DirectionButton = ({
 
 const VIEWS: Record<LibraryView, { label: string; icon: IconName }> = {
   grid: { label: 'Grid', icon: 'grid' },
+  covers: { label: 'Covers', icon: 'covers' },
   list: { label: 'List', icon: 'list' },
   tiles: { label: 'Tiles', icon: 'tiles' },
   grouped: { label: 'Grouped', icon: 'grouped' },

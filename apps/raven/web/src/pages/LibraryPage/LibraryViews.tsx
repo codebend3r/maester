@@ -10,6 +10,7 @@ import {
   unmatchedShowsOf,
 } from '@raven/core'
 import { Bucket } from '@/components/Bucket/Bucket'
+import { CoverGridSkeleton, MediaCovers, ShowCovers } from '@/components/CoverGrid/CoverGrid'
 import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { MediaGroups } from '@/components/MediaGroups/MediaGroups'
 import { MediaList } from '@/components/MediaList/MediaList'
@@ -23,6 +24,7 @@ import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 /** A TV library's shows laid out the way its view setting says; the grouped view is the grid, as the page itself splits matched from not. */
 const ShowsView = ({ settings, shows }: { settings: LibrarySettings; shows: ShowEntry[] }) => {
   if (settings.view === LIBRARY_VIEWS.list) return <ShowList shows={shows} />
+  if (settings.view === LIBRARY_VIEWS.covers) return <ShowCovers shows={shows} />
   if (settings.view === LIBRARY_VIEWS.tiles) return <ShowTiles shows={shows} sort={settings.sort} />
   return <ShowGrid shows={shows} ratingsSource={settings.ratingsSource} sort={settings.sort} />
 }
@@ -42,6 +44,7 @@ const MediaView = ({ settings, items }: { settings: LibrarySettings; items: Medi
   const movies = isMovieLibrary(settings)
   if (settings.view === LIBRARY_VIEWS.list)
     return <MediaList items={items} movies={movies} matchType={matchType} />
+  if (settings.view === LIBRARY_VIEWS.covers) return <MediaCovers items={items} posters={movies} />
   if (settings.view === LIBRARY_VIEWS.tiles)
     return <MediaTiles items={items} posters={movies} matchType={matchType} sort={settings.sort} />
   if (settings.view === LIBRARY_VIEWS.grouped)
@@ -103,8 +106,10 @@ export const LibraryListing = ({
   )
 }
 
-/** Stand-ins shaped as the listing will be: rows, a TV library's wide show cards, or cards. */
+/** Stand-ins shaped as the listing will be: covers, rows, a TV library's wide show cards, or cards. */
 const ListingBones = ({ settings }: { settings: LibrarySettings }) => {
+  if (settings.view === LIBRARY_VIEWS.covers)
+    return <CoverGridSkeleton posters={listsShows(settings.kind) || isMovieLibrary(settings)} />
   if (settings.view === LIBRARY_VIEWS.list || settings.view === LIBRARY_VIEWS.tiles)
     return <MediaTilesSkeleton />
   if (listsShows(settings.kind)) return <ShowGridSkeleton />
@@ -113,7 +118,7 @@ const ListingBones = ({ settings }: { settings: LibrarySettings }) => {
 
 /**
  * The listing while it is on its way, laid out as its view lays it out:
- * rows for a list or tiles, wide cards for a TV library's shows, else
+ * bare covers, rows for a list or tiles, wide cards for a TV library's shows, else
  * cards, posters for a Movies library's films.
  */
 export const LibraryListingSkeleton = ({ settings }: { settings: LibrarySettings }) => (
