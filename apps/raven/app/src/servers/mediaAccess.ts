@@ -6,6 +6,7 @@ import {
   ApiError,
   type ApiClient,
   LOCKED_STATUS,
+  MEDIA_ORIGIN_KINDS,
   MEDIA_PROBE_BYTES,
   MEDIA_PROBE_TIMEOUT_MS,
   type MediaAccess,
@@ -14,7 +15,9 @@ import {
   type OriginProbe,
   PLAYBACK_MODES,
   type PlaybackMode,
+  STREAM_QUALITIES,
   type StreamQuality,
+  isStreamQuality,
   pickOrigin,
   serverOriginOf,
   ticketRenewAt,
@@ -25,6 +28,7 @@ import type { ServerCookies } from '@/servers/cookieJar'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
 import type { AppServer } from '@/servers/serverList'
 import { TICKETS_OFF_STATUS } from '@/servers/tickets'
+import type { AwayMaxHeight } from '@/stores/appPrefs'
 
 /**
  * One origin's ping, read to its end within `timeoutMs`: whether it answered 2xx, how many bytes
@@ -44,13 +48,40 @@ type PlayerSource = { uri: string; headers: Record<string, string> }
 
 export type SourceOutcome = { ok: true; source: PlayerSource } | AccessRefusal
 
-/** A video to play and how: direct is the file itself, remux and transcode the HLS master playlist. */
+/**
+ * A video to play and how: direct is the file itself, remux and transcode the HLS master
+ * playlist. `awayMaxHeight` caps a transcode played from the server's public origin.
+ */
 export type SourceRequest = {
   media: Pick<MediaItem, 'id'>
   mode: PlaybackMode
   audio: number | null
-  quality: StreamQuality | null
+  awayMaxHeight: AwayMaxHeight
 }
+
+/**
+ * The size a transcode away from home asks for. The server takes no height, only one of
+ * `STREAM_QUALITIES`, and sizes only a transcode (a remux copies the video). The cap is there to
+ * save data, so it is the size at that height with the fewest bits, never more than the server's
+ * own quality setting would spend. A cap no size is as tall as (4K: the sizes stop at 1080p) asks
+ * for none, and the server's own settings stand.
+ */
+const awayQualityOf = (maxHeight: AwayMaxHeight): StreamQuality | null =>
+  isStreamQuality.values
+    .filter((key) => STREAM_QUALITIES[key].height === maxHeight)
+    .toSorted((a, b) => STREAM_QUALITIES[a].bitrate - STREAM_QUALITIES[b].bitrate)[0] ?? null
+
+/** The size `request` asks the server for from `origin`: capped away from home, else none. */
+const qualityFor = ({
+  request: { mode, awayMaxHeight },
+  origin,
+}: {
+  request: SourceRequest
+  origin: MediaOrigin | null
+}): StreamQuality | null =>
+  mode === PLAYBACK_MODES.transcode && origin !== null && origin.kind === MEDIA_ORIGIN_KINDS.public
+    ? awayQualityOf(awayMaxHeight)
+    : null
 
 export type MediaSources = {
   source: (request: SourceRequest) => Promise<SourceOutcome>
@@ -213,18 +244,21 @@ export const mediaAccessFor = ({
   }
 
   const uriFor = ({
-    request: { media, mode, audio, quality },
+    request,
     access,
   }: {
     request: SourceRequest
     access: MediaAccess | null
   }): string => {
+    const { media, mode, audio } = request
     switch (mode) {
       case PLAYBACK_MODES.direct:
         return api.fileUrl({ id: media.id, access })
       case PLAYBACK_MODES.remux:
-      case PLAYBACK_MODES.transcode:
+      case PLAYBACK_MODES.transcode: {
+        const quality = qualityFor({ request, origin: access?.origin ?? null })
         return api.hlsUrl({ id: media.id, mode, audio, quality, access })
+      }
       default: {
         const unreachable: never = mode
         return unreachable

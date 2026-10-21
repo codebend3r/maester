@@ -18,7 +18,9 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   Object.defineProperty(platform.default, 'isTV', { get: () => true })
   return platform
 })
-jest.mock('expo-router', () => ({ useRouter: () => ({ replace: jest.fn() }) }))
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ dismissTo: jest.fn(), back: jest.fn(), canGoBack: () => false }),
+}))
 jest.mock(
   '@/layouts/tvFocus',
   () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,

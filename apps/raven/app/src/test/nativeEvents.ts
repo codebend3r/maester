@@ -6,4 +6,6 @@ export const NATIVE_EVENTS = {
   error: 'error',
   endEditing: 'endEditing',
   submitEditing: 'submitEditing',
+  valueChange: 'valueChange',
+  requestClose: 'requestClose',
 } as const

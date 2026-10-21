@@ -15,6 +15,7 @@ import {
 } from '@raven/core'
 
 import type { ServerCookies } from '@/servers/cookieJar'
+import { AWAY_MAX_HEIGHTS } from '@/stores/appPrefs'
 import {
   MEDIA_ACCESS_MESSAGES,
   mediaAccessFor,
@@ -35,7 +36,8 @@ import {
 
 const BUSBOYS = { id: 20 }
 const READ_AT = 1_000_000
-/** A size the transcode is asked for, typed so a name `STREAM_QUALITIES` lacks fails the check. */
+/** The sizes a cap asks a transcode for, typed so a name `STREAM_QUALITIES` lacks fails the check. */
+const LOW_1080: StreamQuality = 'low1080'
 const LOW_720: StreamQuality = 'low720'
 
 const QUICK_LAN = { [LAN.url]: 20, [PUBLIC.url]: 200 }
@@ -75,18 +77,35 @@ const filePath = pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS.id })
 const masterPath = pathFor({ path: HLS_PATHS.master, id: BUSBOYS.id })
 const ticketPath = pathFor({ path: APP_CLIENT_CALLS.getMediaTicket.path, id: BUSBOYS.id })
 
+const AWAY_1080 = AWAY_MAX_HEIGHTS.fullHd
+
 const direct: SourceRequest = {
   media: BUSBOYS,
   mode: PLAYBACK_MODES.direct,
   audio: null,
-  quality: null,
+  awayMaxHeight: AWAY_1080,
 }
-const remux: SourceRequest = { media: BUSBOYS, mode: PLAYBACK_MODES.remux, audio: 1, quality: null }
+const remux: SourceRequest = {
+  media: BUSBOYS,
+  mode: PLAYBACK_MODES.remux,
+  audio: 1,
+  awayMaxHeight: AWAY_1080,
+}
 const transcode: SourceRequest = {
   media: BUSBOYS,
   mode: PLAYBACK_MODES.transcode,
   audio: 0,
-  quality: LOW_720,
+  awayMaxHeight: AWAY_1080,
+}
+
+/** Only the public origin answers: the device is away from home. */
+const AWAY = { [PUBLIC.url]: 40 }
+
+/** The quality the HLS master playlist of `source` asks for, or null for none. */
+const qualityOf = (outcome: SourceOutcome): string | null => {
+  const query = sourceOf(outcome).uri.split('?')[1] ?? ''
+  const pair = query.split('&').find((part) => part.startsWith(`${HLS_PARAMS.quality}=`))
+  return pair === undefined ? null : pair.slice(HLS_PARAMS.quality.length + 1)
 }
 
 const CONSOLE_METHODS = ['log', 'info', 'warn', 'error', 'debug'] as const
@@ -112,18 +131,51 @@ describe('mediaAccessFor', () => {
     expect(sourceOf(await away.media.source(direct)).uri.startsWith(`${PUBLIC.url}/`)).toBe(true)
   })
 
-  it('builds the HLS master playlist with its mode, audio and quality, by ticket', async () => {
+  it('builds the HLS master playlist with its mode and audio, by ticket', async () => {
     const { media } = setUp()
     const query = toQueryString({
       [HLS_PARAMS.mode]: PLAYBACK_MODES.transcode,
       [HLS_PARAMS.audio]: '0',
-      [HLS_PARAMS.quality]: LOW_720,
       [MEDIA_TICKET_PARAM]: TICKETS[0],
     })
     expect(sourceOf(await media.source(transcode))).toEqual({
       uri: `${LAN.url}${masterPath}?${query}`,
       headers: {},
     })
+  })
+
+  it('caps a transcode from the public origin at the height chosen for away from home', async () => {
+    const { media } = setUp({ elapsedMs: AWAY })
+    const query = toQueryString({
+      [HLS_PARAMS.mode]: PLAYBACK_MODES.transcode,
+      [HLS_PARAMS.audio]: '0',
+      [HLS_PARAMS.quality]: LOW_1080,
+      [MEDIA_TICKET_PARAM]: TICKETS[0],
+    })
+    expect(sourceOf(await media.source(transcode))).toEqual({
+      uri: `${PUBLIC.url}${masterPath}?${query}`,
+      headers: {},
+    })
+    const at720 = { ...transcode, awayMaxHeight: AWAY_MAX_HEIGHTS.hd }
+    expect(qualityOf(await media.source(at720))).toBe(LOW_720)
+  })
+
+  it('asks no cap at 4K, which the server ladder has no size for', async () => {
+    const { media } = setUp({ elapsedMs: AWAY })
+    const at4k = { ...transcode, awayMaxHeight: AWAY_MAX_HEIGHTS.uhd }
+    expect(qualityOf(await media.source(at4k))).toBeNull()
+  })
+
+  it('asks no cap from a LAN origin, at home', async () => {
+    const { media } = setUp()
+    const outcome = await media.source(transcode)
+    expect(sourceOf(outcome).uri.startsWith(`${LAN.url}/`)).toBe(true)
+    expect(qualityOf(outcome)).toBeNull()
+  })
+
+  it('asks no cap of a remux, which copies the video and which the server sizes not', async () => {
+    const { media } = setUp({ elapsedMs: AWAY })
+    expect(qualityOf(await media.source(remux))).toBeNull()
   })
 
   it('keeps a ticket until its renewal comes, then renews it before building the source', async () => {

@@ -85,6 +85,12 @@ describe('Home on a phone or tablet', () => {
     expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.search)
   })
 
+  it('opens Settings from the gear in its header', async () => {
+    await renderHome()
+    await fireEvent.press(await screen.findByRole('link', { name: 'Settings' }))
+    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.settings)
+  })
+
   it('draws each card as wide as its shape asks: a wide frame, then posters', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })

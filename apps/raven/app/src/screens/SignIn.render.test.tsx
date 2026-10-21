@@ -21,7 +21,7 @@ import { NATIVE_EVENTS } from '@/test/nativeEvents'
 const MOCK_SERVER_ID = '0f8fad5b-d9cb-469f-a165-70867728950e'
 const HOME: Home = { inProgress: [{ media: mediaItemFor({ id: 7 }), poster: null }], shelves: [] }
 
-const mockReplace = jest.fn<(href: string) => void>()
+const mockDismissTo = jest.fn<(href: string) => void>()
 const getLock = jest.fn<() => Promise<LockState>>()
 const unlock = jest.fn<(pin: string) => Promise<LockState>>()
 const getHome = jest.fn<() => Promise<Home>>()
@@ -39,7 +39,12 @@ const mockApiFor = jest.fn((_server: unknown) => ({
 const mockNewServerId = jest.fn(() => MOCK_SERVER_ID)
 const mockForget = jest.fn(async (_serverId: string) => {})
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ replace: mockReplace }) }))
+const mockBack = jest.fn()
+const mockCanGoBack = jest.fn(() => false)
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ dismissTo: mockDismissTo, back: mockBack, canGoBack: mockCanGoBack }),
+}))
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: unknown) => mockApiFor(server),
   newServerId: () => mockNewServerId(),
@@ -64,6 +69,20 @@ describe('SignIn', () => {
     getMediaTicket.mockResolvedValue({ ticket: 't', expiresAt: 1 })
     getAdminLock.mockResolvedValue({ state: ADMIN_LOCK_STATES.off })
     mockNewServerId.mockImplementation(() => MOCK_SERVER_ID)
+    mockCanGoBack.mockReturnValue(false)
+  })
+
+  it('offers no way back on the first launch, where there is nothing to go back to', async () => {
+    await render(<SignIn />)
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull()
+  })
+
+  it('goes back to Settings on Cancel when a server is added from there', async () => {
+    mockCanGoBack.mockReturnValue(true)
+    await render(<SignIn />)
+    await fireEvent.press(screen.getByRole('button', { name: 'Cancel' }))
+    expect(mockBack).toHaveBeenCalled()
+    expect(mockDismissTo).not.toHaveBeenCalled()
   })
 
   const unlockWithPin = async () => {
@@ -81,11 +100,11 @@ describe('SignIn', () => {
     await unlockWithPin()
 
     await fireEvent.changeText(await screen.findByLabelText('Admin password'), 'Pass#word2026')
-    expect(mockReplace).not.toHaveBeenCalled()
+    expect(mockDismissTo).not.toHaveBeenCalled()
     await fireEvent.press(screen.getByRole('button', { name: 'Unlock' }))
 
     expect(unlockAdmin).toHaveBeenCalledWith('Pass#word2026')
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 
   it('goes on without the admin password on Not now', async () => {
@@ -94,7 +113,7 @@ describe('SignIn', () => {
     await screen.findByLabelText('Admin password')
     await fireEvent.press(screen.getByRole('button', { name: 'Not now' }))
     expect(unlockAdmin).not.toHaveBeenCalled()
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 
   it("shows the server's words for a wrong admin password", async () => {
@@ -106,7 +125,7 @@ describe('SignIn', () => {
     await fireEvent.changeText(await screen.findByLabelText('Admin password'), 'wrong')
     await fireEvent.press(screen.getByRole('button', { name: 'Unlock' }))
     expect(await screen.findByText('That password is not right.')).toBeTruthy()
-    expect(mockReplace).not.toHaveBeenCalled()
+    expect(mockDismissTo).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -115,7 +134,7 @@ describe('SignIn', () => {
   ])('asks for no admin password when the admin lock is %s', async (_name, lock: AdminLock) => {
     getAdminLock.mockResolvedValue(lock)
     await unlockWithPin()
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
     expect(screen.queryByLabelText('Admin password')).toBeNull()
   })
 
@@ -126,7 +145,7 @@ describe('SignIn', () => {
     await screen.findByLabelText('PIN')
     await fireEvent.press(screen.getByRole('button', { name: 'Not now' }))
     expect(getAdminLock).not.toHaveBeenCalled()
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 
   it("forgets a new server's cookies when the viewer starts over", async () => {
@@ -171,7 +190,7 @@ describe('SignIn', () => {
     await render(<SignIn />)
     await enterAddress('http://nas:8080')
     expect(await screen.findByText(/couldn't be added/)).toBeTruthy()
-    expect(mockReplace).not.toHaveBeenCalled()
+    expect(mockDismissTo).not.toHaveBeenCalled()
   })
 
   it('says so when the device keeps as many servers as it can, and stays', async () => {
@@ -187,7 +206,7 @@ describe('SignIn', () => {
     await enterAddress('http://nas:8080')
     expect(await screen.findByText(/as many servers as it can/)).toBeTruthy()
     expect(useActiveServer.getState().servers).toHaveLength(SERVERS_CAP)
-    expect(mockReplace).not.toHaveBeenCalled()
+    expect(mockDismissTo).not.toHaveBeenCalled()
   })
 
   it('shows an error rather than failing when no id can be made', async () => {
@@ -210,7 +229,7 @@ describe('SignIn', () => {
 
     expect(unlock).toHaveBeenCalledWith('1234')
     expect(getMediaTicket).toHaveBeenCalledWith(7)
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
     expect(useActiveServer.getState()).toMatchObject({
       servers: [{ id: MOCK_SERVER_ID, name: 'nas:8080', origin: 'http://nas:8080' }],
       activeId: MOCK_SERVER_ID,
@@ -222,7 +241,7 @@ describe('SignIn', () => {
     await render(<SignIn />)
     await enterAddress('http://nas:8080')
     expect(unlock).not.toHaveBeenCalled()
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 
   it("shows the spec's words when the server hands out no tickets, then goes Home", async () => {
@@ -235,11 +254,11 @@ describe('SignIn', () => {
     expect(TICKETS_OFF).toBe(
       "This server can't hand out media tickets. Set RAVEN_MEDIA_SECRET on it to play in the app",
     )
-    expect(mockReplace).not.toHaveBeenCalled()
+    expect(mockDismissTo).not.toHaveBeenCalled()
     expect(useActiveServer.getState().activeId).toBe(MOCK_SERVER_ID)
 
     await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 
   it('refuses an address that is not a bare origin, without calling it', async () => {
@@ -267,7 +286,7 @@ describe('SignIn', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Unlock' }))
 
     expect(await screen.findByText('That PIN is not right.')).toBeTruthy()
-    expect(mockReplace).not.toHaveBeenCalled()
+    expect(mockDismissTo).not.toHaveBeenCalled()
   })
 
   it('signs in again to a server already on the list, under its own id', async () => {
@@ -284,6 +303,6 @@ describe('SignIn', () => {
     await enterAddress('http://nas:8080')
     expect(mockApiFor).toHaveBeenCalledWith(known)
     expect(useActiveServer.getState()).toMatchObject({ servers: [known], activeId: known.id })
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 })

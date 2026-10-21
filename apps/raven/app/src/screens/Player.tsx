@@ -63,6 +63,7 @@ import {
 import { imageOf } from '@/queries/cards'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { APP_ROUTE_PARAMS, secondsOf } from '@/routes'
+import { useAppPrefs } from '@/stores/appPrefs'
 
 const COPY = {
   opening: 'Opening the video',
@@ -138,9 +139,20 @@ const Playing = ({
   const [subtitle, setSubtitle] = useState(() =>
     preferredSubtitle({ tracks, subtitles: subtitlePrefs }),
   )
+  const shouldPreferDirectPlay = useAppPrefs((prefs) => prefs.shouldPreferDirectPlay)
+  const isTranscodeAllowed = useAppPrefs((prefs) => prefs.isTranscodeAllowed)
+  const awayMaxHeight = useAppPrefs((prefs) => prefs.awayMaxHeight)
   const plan = useMemo(
-    () => planFor({ platform: DEVICE_PLATFORM, media, tracks, policy, shouldDrawCaptions }),
-    [media, tracks, policy],
+    () =>
+      planFor({
+        platform: DEVICE_PLATFORM,
+        media,
+        tracks,
+        policy,
+        prefs: { shouldPreferDirectPlay, isTranscodeAllowed },
+        shouldDrawCaptions,
+      }),
+    [media, tracks, policy, shouldPreferDirectPlay, isTranscodeAllowed],
   )
   const { state, dispatch } = usePlaybackSession({
     media,
@@ -149,6 +161,7 @@ const Playing = ({
     audio: preferredAudio({ tracks, language: audioLanguage }),
     problems: plan.problems,
     sources: mediaSourcesFor(session.server),
+    awayMaxHeight,
   })
   const [video, dispatchVideo] = useReducer(videoReducer, resumeAt, initialVideoState)
   const position = useRef(resumeAt)

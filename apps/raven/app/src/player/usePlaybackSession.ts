@@ -2,6 +2,7 @@ import { type AccessRefusal, type MediaItem, PLAYBACK_MODES, type PlaybackMode }
 import { useEffect, useEffectEvent, useReducer } from 'react'
 
 import type { MediaSources, SourceOutcome } from '@/servers/mediaAccess'
+import type { AwayMaxHeight } from '@/stores/appPrefs'
 import { useCookieVersion } from '@/stores/cookieVersion'
 
 /** How long a source may take to load before the ladder steps down from it. */
@@ -218,6 +219,7 @@ export const usePlaybackSession = ({
   audio,
   problems,
   sources,
+  awayMaxHeight,
 }: {
   media: Pick<MediaItem, 'id'>
   modes: readonly PlaybackMode[]
@@ -225,6 +227,8 @@ export const usePlaybackSession = ({
   audio: number | null
   problems: readonly string[]
   sources: MediaSources
+  /** The cap on a transcode from the server's public origin, read as each source is asked for. */
+  awayMaxHeight: AwayMaxHeight
 }): { state: SessionState; dispatch: (event: SessionEvent) => void } => {
   const [state, dispatch] = useReducer(
     sessionReducer,
@@ -240,7 +244,7 @@ export const usePlaybackSession = ({
     const mode = modeOf(state)
     if (state.phase !== SESSION_PHASES.sourcing || mode === null) return () => undefined
     const { at: from } = state
-    sources.source({ media, mode, audio: state.audio, quality: null }).then(
+    sources.source({ media, mode, audio: state.audio, awayMaxHeight }).then(
       (outcome) => {
         if (status.isCurrent) dispatch({ type: SESSION_EVENTS.sourced, attempt: asked, outcome })
       },

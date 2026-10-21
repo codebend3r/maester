@@ -1,6 +1,7 @@
 import {
   type Infer,
   SERVERS_CAP,
+  cleanName,
   isNumber,
   isRecord,
   isServerOrigin,
@@ -64,6 +65,25 @@ export const removeServer = ({
   servers: readonly AppServer[]
   id: string
 }): AppServer[] => servers.filter((server) => server.id !== id)
+
+/**
+ * The list with the server given the name typed, tidied as the desktop tidies one; null when
+ * the name will not do (blank, past core's `NAME_MAX`, or holding a hidden character) or no
+ * server on the list has the id.
+ */
+export const renameServer = ({
+  servers,
+  id,
+  name,
+}: {
+  servers: readonly AppServer[]
+  id: string
+  name: string
+}): AppServer[] | null => {
+  const cleaned = cleanName(name)
+  if (cleaned === null || !servers.some((server) => server.id === id)) return null
+  return servers.map((server) => (server.id === id ? { ...server, name: cleaned } : server))
+}
 
 type StoredServers = { servers: AppServer[]; activeId: string | null }
 

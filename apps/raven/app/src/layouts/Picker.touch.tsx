@@ -1,4 +1,4 @@
-import { type ComponentRef, useRef } from 'react'
+import { type ComponentRef, type RefObject, useRef } from 'react'
 import { ActionSheetIOS, Pressable, StyleSheet, Text, View, findNodeHandle } from 'react-native'
 
 import {
@@ -12,37 +12,48 @@ import {
 import { COLOURS, SIZES } from '@/theme/appTheme'
 
 /**
+ * Opens the system's action sheet for a picker, on an iPad as a popover pointing at `anchor`'s
+ * view when it has one.
+ */
+export const openPickerSheet = <K extends string>({
+  label,
+  options,
+  onChoose,
+  anchor,
+}: Pick<PickerProps<K>, 'label' | 'options' | 'onChoose'> & {
+  anchor: RefObject<ComponentRef<typeof View> | null>
+}) => {
+  const node = anchor.current === null ? null : findNodeHandle(anchor.current)
+  ActionSheetIOS.showActionSheetWithOptions(
+    {
+      title: label,
+      options: [...options.map((option) => option.label), CANCEL],
+      cancelButtonIndex: options.length,
+      ...(node === null ? {} : { anchor: node }),
+      userInterfaceStyle: 'dark',
+    },
+    (index) => {
+      const chosen = options[index]
+      if (chosen !== undefined) onChoose(chosen.key)
+    },
+  )
+}
+
+/**
  * A picker under the thumb: a chip that opens the system's action sheet, on an iPad as a
  * popover pointing at the chip. Only iPhones and iPads use the touch layout.
  */
 const Picker = <K extends string>(props: PickerProps<K>) => {
-  const { label, options, onChoose } = props
   const chip = useRef<ComponentRef<typeof View>>(null)
-  const open = () => {
-    const anchor = chip.current === null ? null : findNodeHandle(chip.current)
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: label,
-        options: [...options.map((option) => option.label), CANCEL],
-        cancelButtonIndex: options.length,
-        ...(anchor === null ? {} : { anchor }),
-        userInterfaceStyle: 'dark',
-      },
-      (index) => {
-        const chosen = options[index]
-        if (chosen !== undefined) onChoose(chosen.key)
-      },
-    )
-  }
   return (
     <Pressable
       ref={chip}
       accessibilityLabel={pickerLabelOf(props)}
       accessibilityRole="button"
-      onPress={open}
+      onPress={() => openPickerSheet({ ...props, anchor: chip })}
       style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
     >
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{props.label}</Text>
       <Text style={styles.value}>{chosenLabelOf(props)}</Text>
     </Pressable>
   )
