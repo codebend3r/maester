@@ -27,6 +27,7 @@ import {
 import { FILMS, NAS } from '@/test/homeServer'
 import { BUSBOYS } from '@/test/itemServer'
 import { mediaItemFor, summaryFor } from '@/test/mediaItem'
+import { SUBTITLE_CODECS } from '@/test/subtitleCodecs'
 
 /** The film library, which counts a video watched at 90%. */
 const WATCHED_AT_90 = { ...FILMS, settings: { ...FILMS.settings, watchedPercent: 90 } }
@@ -69,7 +70,7 @@ const TRACKS: MediaTracks = {
     {
       id: SUBTITLE_ID,
       source: SUBTITLE_SOURCES.embedded,
-      codec: 'mov_text',
+      codec: SUBTITLE_CODECS.movText,
       language: 'en',
       title: null,
       default: false,

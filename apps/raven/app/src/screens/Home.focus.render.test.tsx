@@ -296,7 +296,7 @@ describe('Home on a TV', () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
     // Busboys under Continue watching opens; while its page covers Home, the spot is cleared.
-    await fireEvent(screen.getAllByRole('button')[2]!, 'focus')
+    await fireEvent(screen.getAllByRole('button')[2]!, NATIVE_EVENTS.focus)
     await fireEvent.press(screen.getAllByRole('button')[0]!)
     await leaveTestScreen()
     mockHome.home = { ...HOME, inProgress: [] }

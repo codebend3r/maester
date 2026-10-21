@@ -40,6 +40,7 @@ import type * as RemoteModule from '@/test/tvRemote'
 import { pressRemote } from '@/test/tvRemote'
 import type * as VideoMockModule from '@/test/videoMock'
 import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@/test/videoMock'
+import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 const mockBack = jest.fn()
 const mockParams = jest.fn((): Record<string, string> => ({
@@ -209,14 +210,14 @@ describe('Player on Android TV', () => {
   it("gives the scrubber the remote's focus as the controls first appear, once", async () => {
     await playing({ id: BUSBOYS_UNSUBTITLED.id })
     expect(scrubber().props.hasTVPreferredFocus).toBe(true)
-    await fireEvent(scrubber(), 'focus')
+    await fireEvent(scrubber(), NATIVE_EVENTS.focus)
     expect(scrubber().props.hasTVPreferredFocus).toBe(false)
   })
 
   it('seeks ten seconds either way as the d-pad presses left and right on the scrubber', async () => {
     const props = await playing({ id: BUSBOYS_UNSUBTITLED.id })
     await moveVideoTo({ props, seconds: 100 })
-    await fireEvent(scrubber(), 'focus')
+    await fireEvent(scrubber(), NATIVE_EVENTS.focus)
     await pressRemote({ key: REMOTE_KEYS.right })
     expect(drawnVideo.seek).toHaveBeenLastCalledWith(110)
     await pressRemote({ key: REMOTE_KEYS.left })
@@ -227,8 +228,8 @@ describe('Player on Android TV', () => {
 
   it('moves along the buttons, not the video, once the focus has left the scrubber', async () => {
     await playing({ id: BUSBOYS_UNSUBTITLED.id })
-    await fireEvent(scrubber(), 'focus')
-    await fireEvent(scrubber(), 'blur')
+    await fireEvent(scrubber(), NATIVE_EVENTS.focus)
+    await fireEvent(scrubber(), NATIVE_EVENTS.blur)
     await pressRemote({ key: REMOTE_KEYS.right })
     expect(drawnVideo.seek).not.toHaveBeenCalled()
   })
@@ -358,7 +359,7 @@ describe('Player on Android TV', () => {
   it('lets a seek go that comes before the video has loaded', async () => {
     await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_UNSUBTITLED.id) })
     await loadedVideo()
-    await fireEvent(scrubber(), 'focus')
+    await fireEvent(scrubber(), NATIVE_EVENTS.focus)
     await pressRemote({ key: REMOTE_KEYS.right })
     expect(drawnVideo.seek).not.toHaveBeenCalled()
     expect(scrubber().props.accessibilityValue.now).toBe(BUSBOYS_UNSUBTITLED.position)

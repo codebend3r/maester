@@ -13,6 +13,7 @@ import {
   VIDEO_CODECS,
 } from '@raven/core'
 import { mediaItemFor } from '@/test/mediaItem'
+import { SUBTITLE_CODECS } from '@/test/subtitleCodecs'
 
 import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 import { planFor } from '@/platform/playbackPlan'
@@ -32,9 +33,6 @@ const MKV = mediaItemFor({
   videoBitDepth: 10,
   audioCodec: HLS_COPY_AUDIO_CODECS.eac3,
 })
-
-/** ffprobe's names for the subtitle formats these files carry. */
-const SUBTITLE_CODECS = { srt: 'srt', movText: 'mov_text', pgs: 'hdmv_pgs_subtitle' } as const
 
 const subtitleTrack = (overrides: Partial<SubtitleTrack> & Pick<SubtitleTrack, 'id'>) =>
   ({
