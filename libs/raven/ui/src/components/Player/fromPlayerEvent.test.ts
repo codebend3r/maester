@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import type { MediaTracks, PlayerEvent } from '@raven/core'
 import { fromPlayerEvent, rangesFrom } from '@/components/Player/fromPlayerEvent'
-import type { VideoEvent } from '@/components/Player/useVideoState'
+import type { VideoEvent } from '@/components/Player/videoState'
 
 const buffered: [number, number][] = [[0, 10]]
 

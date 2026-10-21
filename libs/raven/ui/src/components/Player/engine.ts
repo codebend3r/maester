@@ -9,7 +9,7 @@ import {
 } from '@raven/core'
 import type { ReactNode, RefObject } from 'react'
 import type { MediaPlane } from '@/components/Player/useMediaPlane'
-import type { VideoState } from '@/components/Player/useVideoState'
+import type { VideoState } from '@/components/Player/videoState'
 
 export type EngineActions = {
   play: () => void

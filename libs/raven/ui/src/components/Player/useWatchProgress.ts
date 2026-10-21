@@ -1,6 +1,6 @@
 import { type RefObject, useEffect, useEffectEvent, useRef } from 'react'
 import { useHostServices } from '@/stores/playerServices'
-import type { VideoState } from '@/components/Player/useVideoState'
+import type { VideoState } from '@/components/Player/videoState'
 
 const SAVE_EVERY_S = 10
 

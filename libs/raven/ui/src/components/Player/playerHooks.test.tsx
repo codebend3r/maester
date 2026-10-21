@@ -8,7 +8,7 @@ import {
   type PlaybackFailure,
   usePlaybackLadder,
 } from '@/components/Player/usePlaybackLadder'
-import { initialVideoState, videoReducer } from '@/components/Player/useVideoState'
+import { initialVideoState, videoReducer } from '@/components/Player/videoState'
 import { api } from '@/test/api'
 import { PICK_KINDS } from '@/components/Player/playChoices'
 import { playerQueryKeys as queryKeys } from '@/lib/playerQueryKeys'

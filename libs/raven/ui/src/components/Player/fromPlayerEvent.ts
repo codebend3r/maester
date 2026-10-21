@@ -1,5 +1,5 @@
 import { PLAYER_EVENTS, type PlayerEvent } from '@raven/core'
-import { type Ranges, VIDEO_EVENTS, type VideoEvent } from '@/components/Player/useVideoState'
+import { type Ranges, VIDEO_EVENTS, type VideoEvent } from '@/components/Player/videoState'
 
 export const rangesFrom = (ranges: readonly { start: number; end: number }[]): Ranges =>
   ranges.map(({ start, end }): [number, number] => [start, end])

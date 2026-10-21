@@ -24,7 +24,7 @@ export type {
   HtmlSource,
   NativePlayer,
 } from '@/components/Player/engine'
-export type { VideoState, VideoEvent } from '@/components/Player/useVideoState'
+export type { VideoState, VideoEvent } from '@/components/Player/videoState'
 export { ICON_NAMES, Icon } from '@/components/Icon/Icon'
 export type { IconName, IconSize } from '@/components/Icon/Icon'
 export { useLeaveFullscreen } from '@/components/Player/useStageChrome'
