@@ -1,6 +1,7 @@
 import {
   APP_CALL_METHODS,
   APP_CLIENT_CALLS,
+  AUTH_REFUSALS,
   type ApiClient,
   CONTAINERS,
   DEFAULT_PLAYBACK_SETTINGS,
@@ -120,6 +121,7 @@ const FILES = [
 ] as const
 
 const {
+  getAccountTicket,
   getItem,
   getMedia,
   getMediaTicket,
@@ -156,6 +158,17 @@ const WRITES: ReadonlySet<string> = new Set([
 
 const TICKETS: ReadonlySet<string> = new Set(filePaths({ path: getMediaTicket.path }))
 
+const MINTS: ReadonlySet<string> = new Set(filePaths({ path: getAccountTicket.path }))
+
+/** The account tickets the server mints, the first `account.player.1`, counting up. */
+export const accountTicketOf = (count: number): string => `account.player.${count}`
+
+/** The reason the server gives for each status it refuses an account's mint with. */
+const MINT_REFUSALS: Readonly<Record<number, string>> = {
+  [STATUSES.unauthorized]: AUTH_REFUSALS.signedOut,
+  [STATUSES.forbidden]: AUTH_REFUSALS.revoked,
+}
+
 const bodyOf = (body: string | undefined): unknown => (body === undefined ? null : JSON.parse(body))
 
 /** The path a request names, without its query. */
@@ -166,18 +179,33 @@ const pathOnly = (path: string): string => path.split('?')[0] ?? path
  * on a server that lists no media origin, behind the app's allowlist so an unlisted call fails
  * the test. Its ticket route answers `ticketStatus`: 200 hands out a ticket, 423 says the library
  * is locked. Its playback settings send the original file as `directPlay` says. Progress and
- * plays are taken with no answer, and every request is heard.
+ * plays are taken with no answer, and every request is heard. With accounts, each account
+ * ticket minted answers the next of `mints` (the last standing for every mint after it): 200
+ * mints the next `accountTicketOf`, 401 and 403 refuse as the server refuses an account.
  */
 export const playerApi = ({
   hear,
   ticketStatus = STATUSES.ok,
   directPlay = DIRECT_PLAYS.auto,
+  mints = [STATUSES.ok],
 }: {
   hear: (request: HeardRequest) => void
   ticketStatus?: number
   directPlay?: PlaybackSettings['directPlay']
+  mints?: readonly number[]
 }): ApiClient => {
+  const minted = { asked: 0, issued: 0 }
+  const mintAnswer = (): Answer => {
+    const status = mints[Math.min(minted.asked, mints.length - 1)] ?? STATUSES.ok
+    minted.asked += 1
+    if (status !== STATUSES.ok) {
+      return { status, body: { reason: MINT_REFUSALS[status] ?? null, message: 'No.' } }
+    }
+    minted.issued += 1
+    return { status, body: { ticket: accountTicketOf(minted.issued), expiresAt: 0 } }
+  }
   const answerFor = ({ method, path }: { method: string; path: string }): Answer => {
+    if (MINTS.has(path) && method === getAccountTicket.method) return mintAnswer()
     if (method !== APP_CALL_METHODS.get) {
       return WRITES.has(path) ? { status: STATUSES.noContent, body: null } : NOT_FOUND
     }

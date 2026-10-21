@@ -11,7 +11,6 @@ import {
 } from '@/accounts/accountSessions'
 import { createSessionStore } from '@/accounts/sessionStore'
 import { allowlistedFetch } from '@/servers/allowlist'
-import { hasAccounts } from '@/servers/authConfigs'
 import { createCookieJar } from '@/servers/cookieJar'
 import {
   APP_STATES,
@@ -25,7 +24,7 @@ import type { SecretStore } from '@/servers/secretStore'
 import { FETCH_CREDENTIALS, type ServerBearer, serverFetchFor } from '@/servers/serverFetch'
 import { type ServerCredentials, serverHeadersFor } from '@/servers/serverHeaders'
 import type { AppServer } from '@/servers/serverList'
-import { useAccountAnswers } from '@/stores/accountAnswers'
+import { hasAccountsNow } from '@/stores/accountAnswers'
 import { noteSession } from '@/stores/accountState'
 import { bumpCookieVersion } from '@/stores/cookieVersion'
 
@@ -62,13 +61,6 @@ const appActivityFor = (isForegroundIn: (state: string) => boolean): AppActivity
 /** Renews every account session ahead of its expiry while the app is active; returns a stop. */
 export const keepSessionsFresh = (): (() => void) =>
   refreshWhileActive({ sessions: accountSessions, app: appActivityFor(isActiveState) })
-
-/** Whether the server signs in with accounts, at this call: what it last said, else its pin. */
-const hasAccountsNow = (server: AppServer): boolean =>
-  hasAccounts({
-    account: server.account,
-    answer: useAccountAnswers.getState().answers[server.id] ?? null,
-  })
 
 const bearerFor = (server: AppServer): ServerBearer =>
   accountBearer({ sessions: accountSessions, server, hasAccounts: () => hasAccountsNow(server) })

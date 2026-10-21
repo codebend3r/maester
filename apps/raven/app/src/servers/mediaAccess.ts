@@ -1,6 +1,8 @@
 import {
   ACCESS_REFUSALS,
+  ACCOUNT_ACCESS_MESSAGES,
   APP_CALL_METHODS,
+  AUTH_REFUSALS,
   type AccessRefusal,
   type AccessRefusalReason,
   ApiError,
@@ -9,6 +11,7 @@ import {
   MEDIA_ORIGIN_KINDS,
   MEDIA_PROBE_BYTES,
   MEDIA_PROBE_TIMEOUT_MS,
+  MEDIA_TICKET_PARAM,
   type MaxHeight,
   type MediaAccess,
   type MediaItem,
@@ -18,10 +21,12 @@ import {
   type PlaybackMode,
   STREAM_QUALITIES,
   type StreamQuality,
+  accountAccessMessageOf,
   isStreamQuality,
   pickOrigin,
   serverOriginOf,
   ticketRenewAt,
+  toQueryString,
 } from '@raven/core'
 
 import { checkAppCall } from '@/servers/allowlist'
@@ -77,9 +82,11 @@ export const MEDIA_ACCESS_MESSAGES = {
   gone: (name: string): string => `${name} no longer has this video.`,
   unreachable: (name: string): string => `${name} can't be reached.`,
   unreadable: (name: string): string => `${name} sent something raven can't read.`,
-  account: (name: string): string => `Sign in to ${name} again.`,
+  account: ACCOUNT_ACCESS_MESSAGES.signInAgain,
 } as const satisfies Record<AccessRefusalReason, (name: string) => string>
 
+const UNAUTHORIZED_STATUS = 401
+const FORBIDDEN_STATUS = 403
 const NOT_FOUND_STATUS = 404
 const SERVER_ERROR_STATUS = 500
 
@@ -116,6 +123,35 @@ const refusalOf = ({ error, server }: { error: unknown; server: AppServer }): Ti
 }
 
 /**
+ * Why the server would not mint an account ticket. A `401` here is the second: the server's
+ * fetch has already refreshed the token once and sent the mint again (`serverFetchFor`). A
+ * `401` or `403` is the account's refusal, in raven player's words; accounts being down is an
+ * outage.
+ */
+const mintRefusalOf = ({ error, server }: { error: unknown; server: AppServer }): AccessRefusal => {
+  if (!(error instanceof ApiError)) {
+    return accessRefusal({ reason: ACCESS_REFUSALS.unreachable, server })
+  }
+  if (error.status === UNAUTHORIZED_STATUS || error.status === FORBIDDEN_STATUS) {
+    const reason =
+      error.refusal?.reason ??
+      (error.status === UNAUTHORIZED_STATUS ? AUTH_REFUSALS.signedOut : AUTH_REFUSALS.revoked)
+    const message = accountAccessMessageOf({ reason, name: server.name })
+    return message === null
+      ? accessRefusal({ reason: ACCESS_REFUSALS.unreachable, server })
+      : { ok: false, reason: ACCESS_REFUSALS.account, message }
+  }
+  const read = refusalOf({ error, server })
+  return read.kind === TICKET_READS.refused
+    ? read.refusal
+    : accessRefusal({ reason: ACCESS_REFUSALS.unreachable, server })
+}
+
+/** `uri` carrying `ticket`, as core's media URLs carry one: the last of its query. */
+const withTicket = ({ uri, ticket }: { uri: string; ticket: string }): string =>
+  `${uri}${uri.includes('?') ? '&' : '?'}${toQueryString({ [MEDIA_TICKET_PARAM]: ticket })}`
+
+/**
  * Where one server's videos play from, for the native players. The origins `getMediaOrigins`
  * lists are probed on first use and again on each change of network, and the fastest by core's
  * `pickOrigin` plays by ticket. A probe that picks none is not kept: the next source probes
@@ -124,8 +160,11 @@ const refusalOf = ({ error, server }: { error: unknown; server: AppServer }): Ti
  * server that lists no origin, has none answering, or hands out no ticket (the 503 of one
  * without `RAVEN_MEDIA_SECRET`) plays from its own address with its credentials as headers,
  * which `serverHeadersFor` gives only to its own API. A transcode from the `public` origin, away
- * from home, asks for the size `awayMaxHeight` reads at the moment, Settings' cap. Nothing here
- * logs: a ticket is only ever in the source's address.
+ * from home, asks for the size `awayMaxHeight` reads at the moment, Settings' cap. A server with
+ * accounts (`hasAccounts`, read at each source) is reached by an account ticket minted afresh
+ * for every source, so each step down and each reopen gets one, from the picked origin or else
+ * the server's own address, and never with the cookie or the Bearer: the native player sends no
+ * header. Nothing here logs: a ticket is only ever in the source's address.
  */
 export const mediaAccessFor = ({
   api,
@@ -135,6 +174,7 @@ export const mediaAccessFor = ({
   readCredentials,
   watchNetwork,
   awayMaxHeight,
+  hasAccounts,
 }: {
   api: ApiClient
   server: AppServer
@@ -143,6 +183,7 @@ export const mediaAccessFor = ({
   readCredentials: () => Promise<ServerCredentials>
   watchNetwork: WatchNetwork
   awayMaxHeight: () => MaxHeight
+  hasAccounts: () => boolean
 }): MediaSources => {
   /** Held as a promise, so sources asked for at once share one read and one probe. */
   let pick: Promise<MediaOrigin | null> | null = null
@@ -268,7 +309,25 @@ export const mediaAccessFor = ({
     return { ok: true, source: { uri, headers } }
   }
 
+  const mintFor = (mediaId: number): Promise<{ ticket: string } | AccessRefusal> =>
+    api.getAccountTicket({ id: mediaId }).then(
+      ({ ticket }) => ({ ticket }),
+      (error: unknown) => mintRefusalOf({ error, server }),
+    )
+
+  const accountSource = async (request: SourceRequest): Promise<SourceOutcome> => {
+    const [origin, minted] = await Promise.all([pickOf(), mintFor(request.media.id)])
+    if ('ok' in minted) return minted
+    const uri =
+      origin === null
+        ? withTicket({ uri: uriFor({ request, access: null }), ticket: minted.ticket })
+        : uriFor({ request, access: { origin, ticket: minted.ticket } })
+    checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
+    return { ok: true, source: { uri, headers: {} } }
+  }
+
   const sourceFor = async (request: SourceRequest): Promise<SourceOutcome> => {
+    if (hasAccounts()) return accountSource(request)
     const [origin, read] = await Promise.all([pickOf(), ticketFor(request.media.id)])
     switch (read.kind) {
       case TICKET_READS.refused:

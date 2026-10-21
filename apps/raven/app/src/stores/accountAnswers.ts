@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
-import type { AccountAnswer } from '@/servers/authConfigs'
+import { type AccountAnswer, hasAccounts } from '@/servers/authConfigs'
+import type { AppServer } from '@/servers/serverList'
 
 type AccountAnswersState = {
   /** What each server said of its accounts when sign-in last asked, this run, by server id. */
@@ -17,3 +18,10 @@ export const useAccountAnswers = create<AccountAnswersState>()((set) => ({
   hear: ({ serverId, answer }) =>
     set(({ answers }) => ({ answers: { ...answers, [serverId]: answer } })),
 }))
+
+/** Whether `server` signs in with accounts, at this call: what it last said, else its pin. */
+export const hasAccountsNow = (server: Pick<AppServer, 'id' | 'account'>): boolean =>
+  hasAccounts({
+    account: server.account,
+    answer: useAccountAnswers.getState().answers[server.id] ?? null,
+  })

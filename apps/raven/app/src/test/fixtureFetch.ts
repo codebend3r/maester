@@ -7,6 +7,7 @@ export const STATUSES = {
   unauthorized: 401,
   forbidden: 403,
   notFound: 404,
+  conflict: 409,
   locked: LOCKED_STATUS,
   failed: 500,
   unavailable: 503,
