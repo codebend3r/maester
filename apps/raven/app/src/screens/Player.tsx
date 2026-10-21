@@ -141,7 +141,6 @@ const Playing = ({
   )
   const shouldPreferDirectPlay = useAppPrefs((prefs) => prefs.shouldPreferDirectPlay)
   const isTranscodeAllowed = useAppPrefs((prefs) => prefs.isTranscodeAllowed)
-  const awayMaxHeight = useAppPrefs((prefs) => prefs.awayMaxHeight)
   const plan = useMemo(
     () =>
       planFor({
@@ -161,7 +160,6 @@ const Playing = ({
     audio: preferredAudio({ tracks, language: audioLanguage }),
     problems: plan.problems,
     sources: mediaSourcesFor(session.server),
-    awayMaxHeight,
   })
   const [video, dispatchVideo] = useReducer(videoReducer, resumeAt, initialVideoState)
   const position = useRef(resumeAt)

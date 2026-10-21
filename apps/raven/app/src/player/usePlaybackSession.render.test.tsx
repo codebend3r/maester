@@ -11,7 +11,6 @@ import {
   usePlaybackSession,
 } from '@/player/usePlaybackSession'
 import type { MediaSources, SourceRequest } from '@/servers/mediaAccess'
-import { AWAY_MAX_HEIGHTS } from '@/stores/appPrefs'
 
 const { direct, remux, transcode } = PLAYBACK_MODES
 
@@ -36,7 +35,6 @@ const renderSession = (modes: readonly PlaybackMode[]) =>
       audio: null,
       problems: [],
       sources: SOURCES,
-      awayMaxHeight: AWAY_MAX_HEIGHTS.fullHd,
     }),
   )
 

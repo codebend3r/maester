@@ -1,4 +1,11 @@
-import { NAME_MAX, SERVERS_CAP, THEMES } from '@raven/core'
+import {
+  MAX_HEIGHTS,
+  type MaxHeight,
+  NAME_MAX,
+  SERVERS_CAP,
+  THEMES,
+  isMaxHeight,
+} from '@raven/core'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Alert, Text } from 'react-native'
@@ -21,12 +28,7 @@ import type { SettingsAction } from '@/layouts/settingsKit'
 import { APP_ROUTES } from '@/routes'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
-import {
-  AWAY_MAX_HEIGHTS,
-  type AwayMaxHeight,
-  isAwayMaxHeight,
-  useAppPrefs,
-} from '@/stores/appPrefs'
+import { useAppPrefs } from '@/stores/appPrefs'
 
 const COPY = {
   title: 'Settings',
@@ -63,16 +65,16 @@ const ACTION_WORDS = {
 } as const satisfies Record<keyof typeof SERVER_ACTIONS, unknown>
 
 /** What the away cap is called, as the web's server settings name the same heights. */
-const AWAY_LABELS: Record<AwayMaxHeight, string> = {
-  [AWAY_MAX_HEIGHTS.uhd]: '4K',
-  [AWAY_MAX_HEIGHTS.fullHd]: '1080p',
-  [AWAY_MAX_HEIGHTS.hd]: '720p',
+const AWAY_LABELS: Record<MaxHeight, string> = {
+  [MAX_HEIGHTS.uhd]: '4K',
+  [MAX_HEIGHTS.fullHd]: '1080p',
+  [MAX_HEIGHTS.hd]: '720p',
 }
 
 /** A height as the picker keys it, which takes only strings. */
-const awayKeyOf = (height: AwayMaxHeight) => `${height}` as const
+const awayKeyOf = (height: MaxHeight) => `${height}` as const
 
-const AWAY_OPTIONS = Object.values(AWAY_MAX_HEIGHTS).map((height) => ({
+const AWAY_OPTIONS = Object.values(MAX_HEIGHTS).map((height) => ({
   key: awayKeyOf(height),
   label: AWAY_LABELS[height],
 }))
@@ -174,9 +176,18 @@ export const Settings = () => {
     ]
   }
 
-  const openingActionOf = ({ server, index }: { server: AppServer; index: number }) => {
+  /** The button a TV opens on: the first row's first, or the Rename the viewer came back from. */
+  const openingActionOf = ({
+    server,
+    index,
+    actions,
+  }: {
+    server: AppServer
+    index: number
+    actions: readonly SettingsAction[]
+  }) => {
     if (renamedId !== null) return server.id === renamedId ? SERVER_ACTIONS.rename : null
-    return index === 0 ? (actionsFor(server)[0]?.key ?? null) : null
+    return index === 0 ? (actions[0]?.key ?? null) : null
   }
 
   const isFull = servers.length >= SERVERS_CAP
@@ -184,16 +195,19 @@ export const Settings = () => {
   return (
     <SettingsPage onBack={() => router.back()} title={COPY.title}>
       <SettingsSection note={isFull ? COPY.full : null} title={COPY.servers}>
-        {servers.map((server, index) => (
-          <ServerRow
-            key={server.id}
-            actions={actionsFor(server)}
-            badge={server.id === activeId ? COPY.inUse : null}
-            line={server.origin}
-            name={server.name}
-            openingAction={openingActionOf({ server, index })}
-          />
-        ))}
+        {servers.map((server, index) => {
+          const actions = actionsFor(server)
+          return (
+            <ServerRow
+              key={server.id}
+              actions={actions}
+              badge={server.id === activeId ? COPY.inUse : null}
+              line={server.origin}
+              name={server.name}
+              openingAction={openingActionOf({ server, index, actions })}
+            />
+          )
+        })}
         <SettingsButton
           isDisabled={isFull}
           onPress={() => router.push(APP_ROUTES.signIn)}
@@ -225,7 +239,7 @@ export const Settings = () => {
           label={COPY.away}
           onChoose={(key) => {
             const height = Number(key)
-            if (isAwayMaxHeight(height)) change({ awayMaxHeight: height })
+            if (isMaxHeight(height)) change({ awayMaxHeight: height })
           }}
           options={AWAY_OPTIONS}
           value={awayKeyOf(awayMaxHeight)}

@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native'
 import { PLAYER_COPY, type PlayerChromeProps } from '@/layouts/playerKit'
 import { PlateButton } from '@/layouts/tvControls'
 import { TV_SIZES } from '@/theme/tvSizes'
-import { themedStyles } from '@/theme/useTheme'
+import { pictureStyles } from '@/theme/useTheme'
 
 const GUTTER = TV_SIZES.space8
 
@@ -20,7 +20,7 @@ export const PlayerNotice = ({
   onBack,
 }: Pick<PlayerChromeProps, 'title' | 'notice' | 'onBack'>) => {
   const [isOpening, setOpening] = useState(true)
-  const styles = useStyles({ isOverPicture: true })
+  const styles = useStyles()
   return (
     <View style={styles.page}>
       {title !== '' && (
@@ -48,7 +48,7 @@ export const PlayerNotice = ({
   )
 }
 
-const useStyles = themedStyles((colours) =>
+const useStyles = pictureStyles((colours) =>
   StyleSheet.create({
     page: {
       flex: 1,

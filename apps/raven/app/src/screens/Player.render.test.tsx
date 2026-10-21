@@ -280,6 +280,7 @@ describe('Player on a phone or tablet', () => {
     expect(styleOf(screen.getByRole('button', { name: 'Back' }))?.backgroundColor ?? null).toBe(
       overPicture.quiet,
     )
+    expect(styleOf(screen.getByText(mediaLabel(BUSBOYS_MP4)))?.color ?? null).toBe(overPicture.text)
 
     await fireEvent.press(chip)
     expect(sheets).toEqual([THEME_TONES.dark])

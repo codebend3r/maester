@@ -138,6 +138,13 @@
       "dev:tvos"
     ],
     "targets": {
+      "test": {
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/apps/raven/web/public/brand/raven-mark-on-*.png"
+        ]
+      },
       "start": {
         "continuous": true,
         "cache": false,

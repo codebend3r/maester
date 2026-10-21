@@ -1,4 +1,4 @@
-import { type ComponentRef, useRef, useState } from 'react'
+import { type ComponentRef, type Ref, useRef, useState } from 'react'
 import {
   type AccessibilityRole,
   Pressable,
@@ -137,9 +137,11 @@ export const usePlateStyles = themedStyles((colours) =>
 /**
  * A plain button on a plate, the remote's to press: `text` is what it shows, `label` is said,
  * `isPreferred` asks the remote's focus for it as it appears, `onFocused` hears each time it
- * gets the focus, and `isOverPicture` gives it the player's dark glass in every theme.
+ * gets the focus, and `isOverPicture` gives it the player's dark glass in every theme. `ref`
+ * holds its view, for a button that takes the focus back itself (`useOpenerFocus`).
  */
 export const PlateButton = ({
+  ref,
   text,
   label,
   accessibilityRole,
@@ -148,6 +150,7 @@ export const PlateButton = ({
   onFocused = NOTHING_ON_FOCUS,
   onPress,
 }: {
+  ref?: Ref<ComponentRef<typeof Pressable>>
   text: string
   label: string
   accessibilityRole: AccessibilityRole
@@ -159,6 +162,7 @@ export const PlateButton = ({
   const plateStyles = usePlateStyles({ isOverPicture })
   return (
     <Pressable
+      ref={ref}
       accessibilityLabel={label}
       accessibilityRole={accessibilityRole}
       hasTVPreferredFocus={isPreferred}

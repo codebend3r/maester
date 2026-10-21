@@ -1,19 +1,18 @@
-import { DEFAULT_THEME, type ThemeId, isBoolean, isRecord, isThemeId, oneOf } from '@raven/core'
+import {
+  DEFAULT_THEME,
+  MAX_HEIGHTS,
+  type MaxHeight,
+  type ThemeId,
+  isBoolean,
+  isMaxHeight,
+  isRecord,
+  isThemeId,
+} from '@raven/core'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
 
 /** The key the preferences are stored under. */
 export const APP_PREFS_KEY = 'raven-app-prefs'
-
-/**
- * The tallest picture the app asks a transcode for away from home, in lines: the web's 4K,
- * 1080p and 720p, as the server's own cap offers them.
- */
-export const AWAY_MAX_HEIGHTS = { uhd: 2160, fullHd: 1080, hd: 720 } as const
-
-export type AwayMaxHeight = (typeof AWAY_MAX_HEIGHTS)[keyof typeof AWAY_MAX_HEIGHTS]
-
-export const isAwayMaxHeight = oneOf(Object.values(AWAY_MAX_HEIGHTS))
 
 /** What this device keeps of the viewer's choices, beside the player's own preferences. */
 export type AppPrefsValues = {
@@ -22,8 +21,11 @@ export type AppPrefsValues = {
   shouldPreferDirectPlay: boolean
   /** Whether the server may re-encode a file for this device; off, it only remuxes. */
   isTranscodeAllowed: boolean
-  /** The cap on a transcode played from the server's public origin. */
-  awayMaxHeight: AwayMaxHeight
+  /**
+   * The tallest picture a transcode played from the server's public origin is asked for: one of
+   * the heights the server's own cap offers (core's `MAX_HEIGHTS`).
+   */
+  awayMaxHeight: MaxHeight
 }
 
 type AppPrefs = AppPrefsValues & {
@@ -40,7 +42,7 @@ export const DEFAULT_APP_PREFS: AppPrefsValues = {
   theme: DEFAULT_THEME,
   shouldPreferDirectPlay: true,
   isTranscodeAllowed: true,
-  awayMaxHeight: AWAY_MAX_HEIGHTS.fullHd,
+  awayMaxHeight: MAX_HEIGHTS.fullHd,
 }
 
 /** What was read back, each preference kept only where it is one, the default otherwise. */
@@ -54,7 +56,7 @@ const prefsOf = (saved: unknown): AppPrefsValues => {
     isTranscodeAllowed: isBoolean(kept.isTranscodeAllowed)
       ? kept.isTranscodeAllowed
       : DEFAULT_APP_PREFS.isTranscodeAllowed,
-    awayMaxHeight: isAwayMaxHeight(kept.awayMaxHeight)
+    awayMaxHeight: isMaxHeight(kept.awayMaxHeight)
       ? kept.awayMaxHeight
       : DEFAULT_APP_PREFS.awayMaxHeight,
   }

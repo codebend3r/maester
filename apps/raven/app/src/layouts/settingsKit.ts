@@ -43,7 +43,10 @@ export type SettingsToggleProps = {
 export type SettingsButtonProps = { text: string; isDisabled: boolean; onPress: () => void }
 
 /** A setting picked from a list: its row shows the label and what is chosen now. */
-export type SettingsChoiceProps<K extends string> = Omit<PickerProps<K>, 'onOpenChange'>
+export type SettingsChoiceProps<K extends string> = Pick<
+  PickerProps<K>,
+  'label' | 'options' | 'value' | 'onChoose'
+>
 
 export type SettingsSheetProps = {
   /** Called when the viewer backs out of the sheet: Menu or Back on a TV. */

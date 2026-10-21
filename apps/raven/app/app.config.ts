@@ -27,8 +27,8 @@ const LOCAL_NETWORK_USE = 'raven reaches your raven server on your local network
  * system cannot know the theme picked, so it is the default's dark, never a white flash.
  */
 const launchGround = (): string => {
-  const ground = themeTokens[DEFAULT_THEME]?.[PALETTE_TOKENS.ground]
-  if (ground === undefined) throw new Error(`themes.scss gives ${DEFAULT_THEME} no ground`)
+  const ground = themeTokens[DEFAULT_THEME]?.[PALETTE_TOKENS.ground] ?? null
+  if (ground === null) throw new Error(`themes.scss gives ${DEFAULT_THEME} no ground`)
   return ground
 }
 

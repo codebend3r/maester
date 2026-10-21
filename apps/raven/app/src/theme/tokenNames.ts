@@ -18,17 +18,6 @@ export const PALETTE_TOKENS = {
 } as const
 
 /**
- * The colours every theme shares, from globals.scss: the player's one dark look over the
- * picture, as the web's, and whatever else sits on a picture.
- */
-export const FIXED_TOKENS = {
-  stage: '--color-stage',
-  onPicture: '--color-on-picture',
-  pictureGlass: '--color-picture-glass',
-  pictureTrack: '--color-bark-faint',
-} as const
-
-/**
  * What the page's colours become over the video: the web player's own set (`Player.module.scss`,
  * its controls and its settings menu), from globals.scss and the same in every theme. A chip, a
  * plate, a list or a page drawn over the picture is dark glass with on-picture text whatever the

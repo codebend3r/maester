@@ -8,7 +8,8 @@ const BACK = { text: '‹ Back', label: 'Back' } as const
 
 /**
  * The way back on a touch screen, at the top of a page, as tall as a finger needs. `isRaised`
- * gives it the picture's dark glass, the same in every theme, for where it sits over a picture.
+ * raises it on the picture's dark glass, drawn from the `overPicture` palette, the same in
+ * every theme, for where it sits over a picture.
  */
 export const TouchBack = ({
   onPress,
@@ -17,7 +18,7 @@ export const TouchBack = ({
   onPress: () => void
   isRaised?: boolean
 }) => {
-  const styles = useStyles()
+  const styles = useStyles({ isOverPicture: isRaised })
   return (
     <Pressable
       accessibilityLabel={BACK.label}
@@ -37,10 +38,10 @@ const useStyles = themedStyles((colours) =>
     raised: {
       paddingHorizontal: SIZES.space2,
       borderRadius: SIZES.radius,
-      backgroundColor: colours.pictureGlass,
+      backgroundColor: colours.raised,
     },
     label: { color: colours.muted, fontSize: SIZES.text },
-    raisedLabel: { color: colours.onPicture },
+    raisedLabel: { color: colours.text },
     pressed: { opacity: 0.6 },
   }),
 )

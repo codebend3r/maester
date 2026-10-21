@@ -18,7 +18,7 @@ import {
   seeAllLabelOf,
 } from '@/layouts/shelfKit'
 import { Logo } from '@/layouts/Logo'
-import { PlateButton, usePlateStyles } from '@/layouts/tvControls'
+import { PlateButton } from '@/layouts/tvControls'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
@@ -32,21 +32,18 @@ const SETTINGS_PLACE = 'settings'
 const SettingsEntry = ({ onPress, onFocused }: { onPress: () => void; onFocused: () => void }) => {
   const view = useRef<ComponentRef<typeof Pressable>>(null)
   const { remember } = useOpenerFocus({ place: SETTINGS_PLACE, view })
-  const plateStyles = usePlateStyles()
   return (
-    <Pressable
+    <PlateButton
       ref={view}
-      accessibilityLabel={SETTINGS_ENTRY.label}
       accessibilityRole="link"
-      onFocus={onFocused}
+      label={SETTINGS_ENTRY.label}
+      onFocused={onFocused}
       onPress={() => {
         remember()
         onPress()
       }}
-      style={({ focused }) => [plateStyles.plate, focused && plateStyles.focused]}
-    >
-      <Text style={plateStyles.label}>{SETTINGS_ENTRY.label}</Text>
-    </Pressable>
+      text={SETTINGS_ENTRY.label}
+    />
   )
 }
 

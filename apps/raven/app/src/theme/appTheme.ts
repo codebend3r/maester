@@ -2,9 +2,9 @@ import { DEFAULT_THEME, THEMES, type ThemeId, type ThemeTone, themeOf } from '@r
 import { designTokens, themeTokens } from '@raven/ui/designTokens'
 
 import { nativeTokens } from '@/theme/nativeTokens'
-import { FIXED_TOKENS, OVER_PICTURE_TOKENS, PALETTE_TOKENS } from '@/theme/tokenNames'
+import { OVER_PICTURE_TOKENS, PALETTE_TOKENS } from '@/theme/tokenNames'
 
-const { numbers, colours: fixedColours } = nativeTokens(
+const { numbers, colours: rootColours } = nativeTokens(
   Object.fromEntries(designTokens.map(({ name, value }) => [name, value])),
 )
 
@@ -20,9 +20,10 @@ const tokenOf = <T>({ tokens, name }: { tokens: Readonly<Record<string, T>>; nam
 
 const size = (name: string): number => tokenOf({ tokens: numbers, name })
 
-const fixed = (name: string): string => tokenOf({ tokens: fixedColours, name })
+/** A colour globals.scss gives every theme alike. */
+const fixed = (name: string): string => tokenOf({ tokens: rootColours, name })
 
-export type Palette = Record<keyof typeof PALETTE_TOKENS | keyof typeof FIXED_TOKENS, string>
+export type Palette = Record<keyof typeof PALETTE_TOKENS, string>
 
 /**
  * A theme as the app wears it: its colours, the ones it wears over the video, and whether its
@@ -48,10 +49,6 @@ const paletteOf = (id: ThemeId): Palette => {
     error: colour(PALETTE_TOKENS.error),
     track: colour(PALETTE_TOKENS.track),
     played: colour(PALETTE_TOKENS.played),
-    stage: fixed(FIXED_TOKENS.stage),
-    onPicture: fixed(FIXED_TOKENS.onPicture),
-    pictureGlass: fixed(FIXED_TOKENS.pictureGlass),
-    pictureTrack: fixed(FIXED_TOKENS.pictureTrack),
   }
 }
 

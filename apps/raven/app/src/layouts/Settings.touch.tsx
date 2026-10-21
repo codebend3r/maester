@@ -148,7 +148,10 @@ const SettingsChoice = <K extends string>(props: SettingsChoiceProps<K>) => {
   )
 }
 
-/** A step drawn in the page's place: the page's own Back and the step's Cancel leave it. */
+/**
+ * A step drawn in the page's place, which its own Cancel leaves; the stack's swipe back leaves
+ * Settings with it.
+ */
 const SettingsSheet = ({ children }: SettingsSheetProps) => children
 
 /** Settings on a phone or tablet: one page under the thumb, the system's switches and sheets. */

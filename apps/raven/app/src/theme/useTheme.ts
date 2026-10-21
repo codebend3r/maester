@@ -34,6 +34,19 @@ export const themedStyles = <T>(build: (palette: Palette) => T): ((ground?: Grou
   return useThemedStyles
 }
 
+const OVER_PICTURE: Ground = { isOverPicture: true }
+
+/**
+ * `themedStyles` for what is only ever drawn over the video (the player's chrome, its captions,
+ * the TV's notice in its place): the hook hands back the set built from the `overPicture`
+ * palette, so its ground, text, glass and track are the web player's in every theme.
+ */
+export const pictureStyles = <T>(build: (palette: Palette) => T): (() => T) => {
+  const useThemedStyles = themedStyles(build)
+  const usePictureStyles = (): T => useThemedStyles(OVER_PICTURE)
+  return usePictureStyles
+}
+
 /** The theme worn now, for code that runs outside a render, as a press does. */
 export const themeNow = (): AppTheme => appThemeOf(useAppPrefs.getState().theme)
 
