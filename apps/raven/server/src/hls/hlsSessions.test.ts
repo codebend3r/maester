@@ -6,25 +6,30 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import {
+  type Account,
   type AudioTrack,
   DEFAULT_PLAYBACK_SETTINGS,
   HLS_IDLE_MS,
   HLS_KEPT_SEGMENTS,
   MEDIA_TICKET_SECONDS,
+  MEMBER_STATUSES,
   PLAYBACK_MODES,
   QUALITIES,
   STREAM_TIME_SHIFT,
   type StreamMode,
   VIDEO_CODECS,
 } from '@raven/core'
+import { Subject } from 'rxjs'
 import { type MockInstance, afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { type FfmpegStream, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, mediaClockOf } from '@/ffmpeg/probe'
+import { HLS_CAPABILITY_PREFIX, isHlsCapability } from '@/hls/hlsCapability'
 import type { HlsClock } from '@/hls/hlsClock'
 import {
   HLS_INIT_GRACE_MS,
   HLS_SESSION_CAP,
+  type HlsAccess,
   type HlsSession,
   HlsSessions,
   segmentsPastKeeping,
@@ -33,6 +38,7 @@ import { segmentFileName } from '@/hls/segmentFiles'
 import { type SegmentPlan, remuxPlan, transcodePlan } from '@/hls/segmentPlan'
 import { HLS_SEGMENT_WAIT_MS, RUN_EVENTS, RUN_SIGNALS } from '@/hls/segmentRun'
 import { eventually, testConfig } from '@/test/app'
+import { AUTH_TEST_IDS } from '@/test/auth'
 import { encodeClip, encodeRichClip } from '@/test/clips'
 import { mdatOf, videoTfdt } from '@/test/mp4'
 
@@ -236,6 +242,7 @@ describe('HlsSessions', () => {
     startTime?: number
     frameRate?: number | null
     keyframesFor?: (() => readonly number[] | null) | null
+    access?: HlsAccess | null
   }
 
   const mintIn = ({
@@ -248,6 +255,7 @@ describe('HlsSessions', () => {
     startTime = 0,
     frameRate = 24,
     keyframesFor = null,
+    access = null,
   }: MintInProps): HlsSession =>
     sessions.mint({
       mediaId,
@@ -267,6 +275,7 @@ describe('HlsSessions', () => {
         tonemap: false,
       },
       keyframesFor,
+      access,
     })
 
   type VideoOfProps = { init: Uint8Array; media: Uint8Array }
@@ -918,6 +927,92 @@ describe('HlsSessions', () => {
     await writeFile(join(stale, segmentFileName(0)), 'left by a run before a restart')
     sessions.onModuleInit()
     expect(existsSync(stale)).toBe(false)
+  })
+
+  describe("an account's session", () => {
+    const FRIEND: Account = {
+      id: AUTH_TEST_IDS.friend,
+      email: 'friend@maester.test',
+      status: MEMBER_STATUSES.approved,
+      isOwner: false,
+    }
+
+    /** Access for the friend that ends when `ended` emits. */
+    const accessOf = ({ ended = new Subject<void>() }: { ended?: Subject<void> } = {}) => ({
+      ended,
+      access: { account: FRIEND, unlockedUntil: null, ended },
+    })
+
+    it('gives each a capability of its own, which opens that session of that media alone', () => {
+      const { sessions } = open()
+      const first = mintIn({ sessions, access: accessOf().access })
+      const second = mintIn({ sessions, access: accessOf().access })
+      const plain = mintIn({ sessions })
+      const firstKey = first.capability ?? ''
+      const secondKey = second.capability ?? ''
+
+      expect(isHlsCapability(firstKey)).toBe(true)
+      expect(firstKey.startsWith(HLS_CAPABILITY_PREFIX)).toBe(true)
+      expect(firstKey).not.toBe(secondKey)
+      expect(plain.capability).toBeNull()
+      expect(sessions.grantOf({ mediaId: 1, session: first.id, capability: firstKey })).toEqual({
+        account: FRIEND,
+        unlockedUntil: null,
+      })
+      expect([
+        sessions.grantOf({ mediaId: 1, session: first.id, capability: secondKey }),
+        sessions.grantOf({ mediaId: 2, session: first.id, capability: firstKey }),
+        sessions.grantOf({ mediaId: 1, session: second.id, capability: firstKey }),
+        sessions.grantOf({ mediaId: 1, session: plain.id, capability: firstKey }),
+      ]).toEqual([null, null, null, null])
+      expect(sessions.get({ mediaId: 1, session: first.id, key: firstKey })).toMatchObject({
+        id: first.id,
+      })
+      expect(
+        [undefined, secondKey, firstKey.toUpperCase(), [firstKey]].map((key) =>
+          sessions.get({ mediaId: 1, session: first.id, key }),
+        ),
+      ).toEqual([null, null, null, null])
+      expect(sessions.get({ mediaId: 1, session: plain.id, key: firstKey })).not.toBeNull()
+    })
+
+    it('ends the session when its access ends, and forgets the capability with it', () => {
+      const { sessions } = open()
+      const { ended, access } = accessOf()
+      const session = mintIn({ sessions, access })
+      const capability = session.capability ?? ''
+
+      ended.next()
+
+      expect(sessions.get({ mediaId: 1, session: session.id, key: capability })).toBeNull()
+      expect(sessions.grantOf({ mediaId: 1, session: session.id, capability })).toBeNull()
+    })
+
+    it('stops watching its access once the session goes another way', () => {
+      const { sessions, advance } = open()
+      const dropped = accessOf()
+      const forgotten = accessOf()
+      const evicted = accessOf()
+      const kept = accessOf()
+      mintIn({ sessions, access: forgotten.access })
+      advance(MEDIA_TICKET_SECONDS * 1000)
+      mintIn({ sessions, access: evicted.access })
+      advance(1)
+      mintIn({ sessions, mediaId: 2, access: dropped.access })
+      advance(1)
+      Array.from({ length: HLS_SESSION_CAP - 2 }, () => mintIn({ sessions }))
+      sessions.drop({ mediaId: 2 })
+      mintIn({ sessions })
+      // The ninth: the cap drops the longest idle, the first left.
+      mintIn({ sessions, access: kept.access })
+
+      expect([dropped, forgotten, evicted, kept].map(({ ended }) => ended.observed)).toEqual([
+        false,
+        false,
+        false,
+        true,
+      ])
+    })
   })
 
   it('refuses an unknown session and a segment the plan does not have', async () => {

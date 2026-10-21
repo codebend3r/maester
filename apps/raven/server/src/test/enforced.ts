@@ -6,6 +6,7 @@ import {
   AUTH_PATHS,
   BUG_REPORT_PATHS,
   type ApiClient,
+  HLS_PARAMS,
   HLS_PATHS,
   ITEM_TYPES,
   LIBRARY_KINDS,
@@ -150,6 +151,18 @@ export const ROUTES = {
 
 export type Route = (typeof ROUTES)[keyof typeof ROUTES]
 
+/**
+ * The routes an HLS session's capability opens, under accounts `ready`, in
+ * place of an account ticket: every one that names the session.
+ */
+export const HLS_CAPABILITY_ROUTES: readonly Route[] = [
+  ROUTES.hlsVideo,
+  ROUTES.hlsInit,
+  ROUTES.hlsSegment,
+  ROUTES.hlsSubtitles,
+  ROUTES.hlsSubtitleSegment,
+]
+
 type PathOfProps = {
   route: Route
   params?: Record<string, number | string>
@@ -171,6 +184,15 @@ type WithTicketProps = {
 /** `route`'s path with a media ticket in `?t=`, as the media plane is asked for it. */
 export const withTicket = ({ route, params, ticket }: WithTicketProps): string =>
   `${pathOf({ route, params })}?${MEDIA_TICKET_PARAM}=${ticket}`
+
+/** The session the first video playlist URI in `text` names, or '' when it names none. */
+export const hlsSessionIn = (text: string): string => {
+  const pattern = HLS_PATHS.video
+    .replace('.', '\\.')
+    .replace(`:${HLS_PARAMS.id}`, '\\d+')
+    .replace(`:${HLS_PARAMS.session}`, '([A-Za-z0-9_-]+)')
+  return new RegExp(pattern).exec(text)?.[1] ?? ''
+}
 
 /** Who a request comes from, by the account its token names, or none. */
 export const CALLER_KINDS = {

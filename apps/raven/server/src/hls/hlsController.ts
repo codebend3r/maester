@@ -23,11 +23,12 @@ import {
 import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, wholeNumber } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AccessRechecks } from '@/auth/accessRechecks'
-import { AuthSessions } from '@/auth/authSessions'
+import { AuthSessions, CALLERS } from '@/auth/authSessions'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
+import { OpenedByCapability } from '@/hls/hlsCapability'
 import { type HlsPath, sessionUris } from '@/hls/hlsUris'
-import { type HlsSession, HlsSessions } from '@/hls/hlsSessions'
+import { type HlsAccess, type HlsSession, HlsSessions, noSuchSession } from '@/hls/hlsSessions'
 import { KeyframesService } from '@/hls/keyframesService'
 import {
   masterPlaylist,
@@ -63,6 +64,15 @@ const MEDIA_ROUTES = 'api/media'
 /** An HLS path as this controller's route: what follows its `api/media` prefix. */
 const routeOf = (path: HlsPath): string => path.slice(`/${MEDIA_ROUTES}/`.length)
 
+type HlsControllerKeyForProps = {
+  session: Pick<HlsSession, 'capability'>
+  ticket: string | undefined
+}
+
+/** What every URI a session's playlist names carries: its capability, else the request's ticket. */
+const keyFor = ({ session, ticket }: HlsControllerKeyForProps): string | null =>
+  session.capability ?? ticket ?? null
+
 type HlsControllerPlanOfProps = {
   mode: StreamMode
   file: MediaFile
@@ -70,7 +80,11 @@ type HlsControllerPlanOfProps = {
   end: number
 }
 
-type HlsControllerSessionOfProps = { id: number; session: string }
+type HlsControllerSessionOfProps = {
+  id: number
+  session: string
+  key: unknown
+}
 
 type HlsControllerTextTrackOfProps = {
   file: MediaFile
@@ -95,7 +109,9 @@ type HlsControllerSendMediaProps = {
  * Extensions: the native players on phones and TVs. The master playlist
  * opens a session, and the session's playlists, init and segments are
  * asked for by its id. Each route is on the media plane, so a ticket for
- * the video opens it, and every URI a playlist names carries that ticket.
+ * the video opens it. Every URI a playlist names carries the legacy ticket
+ * the master was opened with, or, when an account ticket opened it, the
+ * session's own capability, which then alone opens the session's routes.
  */
 @Controller(MEDIA_ROUTES)
 @PrivateBy(PRIVACIES.media)
@@ -127,6 +143,7 @@ export class HlsController {
     @Query(HLS_PARAMS.audio) audio: string | undefined,
     @Query(HLS_PARAMS.quality) quality: string | undefined,
     @Query(MEDIA_TICKET_PARAM) ticket: string | undefined,
+    @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const streamMode = streamModeOf(mode)
@@ -186,9 +203,10 @@ export class HlsController {
         tonemap,
       },
       keyframesFor,
+      access: this.accessOf({ request }),
     })
 
-    const uris = sessionUris({ session, ticket: ticket ?? null })
+    const uris = sessionUris({ session, key: keyFor({ session, ticket }) })
     const playlist = masterPlaylist({
       mode: streamMode,
       variantUri: uris.video,
@@ -211,6 +229,7 @@ export class HlsController {
 
   /** Every segment of the session's plan, behind its init. */
   @MediaPlane()
+  @OpenedByCapability()
   @Get(routeOf(HLS_PATHS.video))
   async video(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
@@ -218,8 +237,8 @@ export class HlsController {
     @Query(MEDIA_TICKET_PARAM) ticket: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session })
-    const uris = sessionUris({ session: opened, ticket: ticket ?? null })
+    const opened = this.sessionOf({ id, session, key: ticket })
+    const uris = sessionUris({ session: opened, key: keyFor({ session: opened, ticket }) })
     await this.sendPlaylist({
       reply,
       playlist: mediaPlaylist({ plan: opened.plan, initUri: uris.init, segmentUri: uris.segment }),
@@ -227,14 +246,16 @@ export class HlsController {
   }
 
   @MediaPlane()
+  @OpenedByCapability()
   @Get(routeOf(HLS_PATHS.init))
   async init(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
     @Param(HLS_PARAMS.session) session: string,
+    @Query(MEDIA_TICKET_PARAM) key: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session })
+    const opened = this.sessionOf({ id, session, key })
     await this.sendMedia({
       request,
       reply,
@@ -245,15 +266,17 @@ export class HlsController {
   }
 
   @MediaPlane()
+  @OpenedByCapability()
   @Get(routeOf(HLS_PATHS.segment))
   async segment(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
     @Param(HLS_PARAMS.session) session: string,
     @Param(HLS_PARAMS.n) n: string,
+    @Query(MEDIA_TICKET_PARAM) key: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session })
+    const opened = this.sessionOf({ id, session, key })
     const number = wholeNumber(n)
     if (number == null) throw new NotFoundException(`No segment ${n} in this stream`)
     await this.sendMedia({
@@ -267,6 +290,7 @@ export class HlsController {
 
   /** A text subtitle track as six-second WebVTT segments, timed as the video playlist is. */
   @MediaPlane()
+  @OpenedByCapability()
   @Get(routeOf(HLS_PATHS.subtitles))
   async subtitlePlaylist(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
@@ -275,9 +299,9 @@ export class HlsController {
     @Query(MEDIA_TICKET_PARAM) ticket: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session })
+    const opened = this.sessionOf({ id, session, key: ticket })
     await this.textTrackOf({ file: this.fileOf(id), trackId })
-    const uris = sessionUris({ session: opened, ticket: ticket ?? null })
+    const uris = sessionUris({ session: opened, key: keyFor({ session: opened, ticket }) })
     await this.sendPlaylist({
       reply,
       playlist: subtitlePlaylist({
@@ -294,15 +318,17 @@ export class HlsController {
    * onto the file's own clock, which the video keeps.
    */
   @MediaPlane()
+  @OpenedByCapability()
   @Get(routeOf(HLS_PATHS.subtitleSegment))
   async subtitleSegment(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
     @Param(HLS_PARAMS.session) session: string,
     @Param(HLS_PARAMS.trackId) trackId: string,
     @Param(HLS_PARAMS.n) n: string,
+    @Query(MEDIA_TICKET_PARAM) key: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session })
+    const opened = this.sessionOf({ id, session, key })
     const file = this.fileOf(id)
     const track = await this.textTrackOf({ file, trackId })
     const number = wholeNumber(n)
@@ -353,10 +379,26 @@ export class HlsController {
     return file
   }
 
-  private sessionOf({ id, session }: HlsControllerSessionOfProps): HlsSession {
-    const opened = isHlsSessionId(session) ? this.sessions.get({ mediaId: id, session }) : null
-    if (!opened) throw new NotFoundException('No such stream session; open the stream again')
+  /** The session `key` opens: any key for one without a capability, only its capability for one with. */
+  private sessionOf({ id, session, key }: HlsControllerSessionOfProps): HlsSession {
+    const opened = isHlsSessionId(session) ? this.sessions.get({ mediaId: id, session, key }) : null
+    if (!opened) throw noSuchSession()
     return opened
+  }
+
+  /**
+   * What a session opened by `request` stands for: the account and unlock
+   * of the account ticket that opened it, rechecked as an open response's
+   * is, or null for any other caller, whose session needs no capability.
+   */
+  private accessOf({ request }: { request: FastifyRequest }): HlsAccess | null {
+    const caller = this.callers.callerOf({ request })
+    if (caller.kind !== CALLERS.ticket) return null
+    return {
+      account: caller.session.account,
+      unlockedUntil: caller.unlockedUntil,
+      ended: this.rechecks.ended({ request }),
+    }
   }
 
   /** A track a rendition can show: a picture track has none. */
@@ -373,7 +415,7 @@ export class HlsController {
   }
 
   private async sendPlaylist({ reply, playlist }: HlsControllerSendPlaylistProps): Promise<void> {
-    // Each URI in it carries a ticket, and the session behind it ends.
+    // Each URI in it carries a ticket or a capability, and the session behind it ends.
     await reply
       .header(HEADERS.contentType, CONTENT_TYPES.m3u8)
       .header(HEADERS.cacheControl, CACHE_POLICIES.noStore)

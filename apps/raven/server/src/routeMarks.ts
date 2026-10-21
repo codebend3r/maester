@@ -4,13 +4,14 @@ import { Reflector } from '@nestjs/core'
 import { isNumber, isRecord, isString } from '@raven/core'
 import { type Audience, audienceMarkProblems, audienceOf } from '@/admin/adminGuard'
 import { type AccountRequirement, accountRuleOf } from '@/auth/accountGuard'
+import { isCapabilityRoute } from '@/hls/hlsCapability'
 import { type LockMark, lockMarkOf, lockMarkProblems } from '@/lock/lockGuard'
 import { isMediaPlaneRoute } from '@/media/mediaPlaneMark'
 
 /** Where a route's mark is read: its handler, then its controller, the first mark found winning. */
 export type MarkTargets = Parameters<Reflector['getAllAndOverride']>[1]
 
-/** A route as its decorators declare it, with what it says to the PIN lock, to the admin lock and to the account gate, and whether it is on the media plane. */
+/** A route as its decorators declare it, with what it says to the PIN lock, to the admin lock and to the account gate, whether it is on the media plane, and whether an HLS session's capability opens it. */
 export type RouteMark = {
   method: string
   path: string
@@ -18,6 +19,7 @@ export type RouteMark = {
   audience: Audience | null
   account: AccountRequirement
   mediaPlane: boolean
+  isOpenedByCapability: boolean
 }
 
 const decorators = new Reflector()
@@ -53,6 +55,7 @@ export const routeMarks = (controllers: readonly Type[]): RouteMark[] =>
           audience: audienceOf(targets),
           account: accountRuleOf(targets).requirement,
           mediaPlane: isMediaPlaneRoute(targets),
+          isOpenedByCapability: isCapabilityRoute(targets),
         },
       ]
     })

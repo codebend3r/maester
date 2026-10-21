@@ -1,5 +1,15 @@
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Logger } from '@nestjs/common'
-import { AUTH_REFUSALS, MEMBER_STATUSES, type Account } from '@raven/core'
+import {
+  AUTH_REFUSALS,
+  DEFAULT_PLAYBACK_SETTINGS,
+  MEMBER_STATUSES,
+  PLAYBACK_MODES,
+  QUALITIES,
+  VIDEO_CODECS,
+  type Account,
+} from '@raven/core'
 import { decodeJwt } from 'jose'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccessRechecks } from '@/auth/accessRechecks'
@@ -7,6 +17,12 @@ import { AuthBackend } from '@/auth/authBackend'
 import { AuthSessions, REMEMBERED_ACCOUNTS } from '@/auth/authSessions'
 import { MEMBERSHIP_TTL_MS, MembershipLookups } from '@/auth/membershipLookups'
 import type { createTokenVerifier } from '@/auth/tokenVerifier'
+import { SOFTWARE } from '@/ffmpeg/encoder'
+import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import type { HlsSource } from '@/ffmpeg/hlsArgs'
+import type { HlsClock } from '@/hls/hlsClock'
+import { HlsSessions } from '@/hls/hlsSessions'
+import { testConfig } from '@/test/app'
 import { AUTH_TEST_CONFIG, AUTH_TEST_FAILURES, AUTH_TEST_IDS, authFixture } from '@/test/auth'
 
 const RECHECK_MS = 60_000
@@ -244,5 +260,78 @@ describe('the freshest token per account', () => {
     if (friend === undefined) throw new Error('Missing friend fixture')
     sessions.remember({ account: friend, token: 'stale', expiresAt: START.getTime() })
     expect(sessions.freshestFor({ accountId: friend.id })).toBeNull()
+  })
+})
+
+describe('an HLS session opened with an account ticket', () => {
+  const SOURCE: HlsSource = {
+    input: join(tmpdir(), 'raven-rechecks-clip.mkv'),
+    mode: PLAYBACK_MODES.remux,
+    plan: { boundaries: [0], duration: 6 },
+    startTime: 0,
+    frameRate: 24,
+    audio: null,
+    videoCodec: VIDEO_CODECS.h264,
+    encoder: SOFTWARE,
+    maxHeight: 1080,
+    quality: QUALITIES.medium,
+    bitrate: null,
+    tonemap: false,
+  }
+  /** No session rests or is forgotten here: only its account's rechecks end it. */
+  const STILL: HlsClock = { now: () => Date.now(), after: () => () => undefined }
+
+  /** A session minted as the master does for the friend's ticket, and whether its capability still opens it. */
+  const minted = async () => {
+    const env = await setup()
+    const config = testConfig({ dataDir: join(tmpdir(), 'raven-rechecks-hls'), mediaDir: tmpdir() })
+    const hls = new HlsSessions(
+      config,
+      new FfmpegService(config, { playback: () => DEFAULT_PLAYBACK_SETTINGS }),
+      STILL,
+    )
+    const request = {}
+    const session = await env.signIn()
+    env.sessions.bindTicket({ request, session, unlockedUntil: null })
+    const opened = hls.mint({
+      mediaId: 1,
+      asked: null,
+      source: SOURCE,
+      keyframesFor: null,
+      access: {
+        account: session.account,
+        unlockedUntil: null,
+        ended: env.rechecks.ended({ request }),
+      },
+    })
+    const isOpen = (): boolean =>
+      hls.grantOf({ mediaId: 1, session: opened.id, capability: opened.capability ?? '' }) !== null
+    return { ...env, isOpen }
+  }
+
+  it('ends the session at the next recheck once the account is removed', async () => {
+    const { isOpen, setStatus } = await minted()
+    await vi.advanceTimersByTimeAsync(RECHECK_MS / 2)
+    setStatus({ status: MEMBER_STATUSES.revoked })
+    await vi.advanceTimersByTimeAsync(RECHECK_MS / 2 - 1)
+    expect(isOpen()).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(isOpen()).toBe(false)
+  })
+
+  it('ends the session at the next recheck when the lookup answers for another account', async () => {
+    const { fixture, isOpen } = await minted()
+    fixture.state.failure = AUTH_TEST_FAILURES.wrongAccount
+    await vi.advanceTimersByTimeAsync(RECHECK_MS)
+    expect(isOpen()).toBe(false)
+  })
+
+  it('keeps the session through an outage until the last-known token expires', async () => {
+    const { fixture, isOpen } = await minted()
+    fixture.state.failure = AUTH_TEST_FAILURES.network
+    await vi.advanceTimersByTimeAsync(TOKEN_MS - 1)
+    expect(isOpen()).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(isOpen()).toBe(false)
   })
 })
