@@ -354,11 +354,11 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
       await this.prune({ entry, n })
       return ready(path)
     }
-    if (run && run.writesSoon(n)) return waitThenRetry(run.waitFor(n))
+    if (run && run.isWrittenSoon(n)) return waitThenRetry(run.waitFor(n))
     // A run is not killed before it has written what it was started for, or
     // stalled on it, so two requests far apart cannot keep replacing each
     // other's runs.
-    if (run && !run.mayBeReplaced) {
+    if (run && !run.canBeReplaced) {
       return waitThenRetry(
         run.waitForStart().catch((error: unknown) => {
           if (error instanceof NotFoundException) throw error

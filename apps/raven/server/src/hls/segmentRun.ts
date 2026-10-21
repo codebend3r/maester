@@ -114,12 +114,12 @@ export class SegmentRun {
   }
 
   /** Whether a far request may kill it: once it has started, or stalled before it could. */
-  get mayBeReplaced(): boolean {
+  get canBeReplaced(): boolean {
     return this.hasStarted || this.hasStalled
   }
 
   /** Whether `n` is the segment it writes next or one just after, worth waiting for. */
-  writesSoon(n: number): boolean {
+  isWrittenSoon(n: number): boolean {
     return n >= this.next && n <= this.next + HLS_WAIT_AHEAD
   }
 
