@@ -513,13 +513,54 @@ bunx nx run @raven/desktop:e2e            # Playwright against electron .
 2. A pull request that touches the release's files (the workflow, the shared native build action, `forge.config.ts`, `src/build/` or `release/`) runs `desktop-release.yml` as a dry run, which builds the assets as a workflow artifact and never publishes. So does a run from the Actions tab.
 3. Dispatching that dry run on `main` before tagging builds what the tag will, at the old version (the tag builds the Release commit, which carries the new one, and checks the tag against it), so a broken release shows before the tag exists. It does not make the tag's build faster. Both workflows restore the libmpv source build (`@raven/mpv:fetch:libmpv`, an Nx cached target) only from Nx Cloud, and the repository has no `NX_CLOUD_ACCESS_TOKEN` secret yet. The `.nx/cache` fallback saves nothing: Nx 23 keeps its local cache in `~/.nx/<workspace id>/cache`, and even moved to `.nx/cache` with `NX_CACHE_DIRECTORY` it is found only through a database named for the machine, so the next runner misses it. So every `🎞️ Desktop native` job and every release build compiles libmpv from source, 11 to 14 minutes on recent runs, well inside the release job's 150 minutes. Once the secret is set, Nx Cloud serves the build to a later run with the same inputs (the source lock, the patches, the build scripts, node-addon-api's version and the Xcode version).
 
-## The device app
+## raven app (iPhone, iPad, Apple TV, Android TV)
 
-`@raven/app` is raven on iPhone, iPad, Apple TV and Android TV. Its [README](app/README.md) covers building it and signing in to a server.
+raven app is raven on iPhone, iPad, Apple TV and Android TV: browse the libraries, search, resume, play, and mark watched and favourite. Managing a library stays in the web app. It is `@raven/app`, an Expo app on `react-native-tvos`; its [README](app/README.md) covers how it plays, its Settings, the dev loop and the device checklist. There is no store build: an Apple device installs it from Xcode with a free Personal Team, and an Android TV sideloads the APK.
+
+### What you need
+
+- A Mac with Xcode in `/Applications/Xcode.app`, CocoaPods and watchman: `brew install cocoapods watchman`. Prebuild runs `pod install`, and watchman keeps Metro, the bundler a debug build loads from, serving your latest change; `start` stops at once without it.
+- Node 22.18 or newer, and an Apple ID for the Personal Team.
+- For Android TV: Android Studio, its SDK as `ANDROID_HOME` and its bundled JDK as `JAVA_HOME`, as the [app README](app/README.md#what-you-need) sets them. `adb` is in the SDK's `platform-tools`.
+
+### Which server address
+
+The app asks for the server's address first, then its PIN when it has locked libraries, then the admin password while the [admin lock](#admin-lock) would still hide them. A build from the steps below reaches a server over https only, such as its Funnel address, `https://raven.<tailnet>.ts.net` (see [Public through Tailscale Funnel](#public-through-tailscale-funnel)). To sign in over plain http on your LAN, such as `http://<nas>:8484`, build the development variant: put `APP_VARIANT=development` before the prebuild or build command.
+
+Set `RAVEN_MEDIA_SECRET` on the server, so video plays with media tickets and from the best of its `RAVEN_MEDIA_ORIGINS`; without it sign-in says so, and video plays from the server's own address with the cookie.
+
+The app signs in only to a server with accounts `off`, or one older than the accounts, with the PIN and the admin password. A server with accounts `ready` needs an account the app cannot sign in with yet; account sign-in comes in PR 10.
+
+### Install it on iPhone, iPad and Apple TV
+
+1. Generate the native project, from the repo root: `bunx nx run @raven/app:prebuild:ios` for an iPhone or iPad, or `bunx nx run @raven/app:prebuild:tvos` for an Apple TV. Both write `apps/raven/app/ios`, so generate it again when you switch.
+2. Open `apps/raven/app/ios/raven.xcworkspace` in Xcode. In Xcode's Settings, Accounts, add your Apple ID; it becomes your Personal Team. In the `raven` target's Signing & Capabilities, keep Automatically manage signing on and pick that team. A prebuild writes the project afresh, so pick the team again after each one. If Xcode says the bundle identifier `io.github.codebend3r.raven.app` is not available, another team has it: give it one of your own there.
+3. In Product, Scheme, Edit Scheme, set Run's Build Configuration to Release, so the app carries its own bundle and needs no Metro.
+4. Connect the device. An iPhone or iPad by cable; turn on Developer Mode in its Settings, Privacy & Security when it asks. An Apple TV pairs over the network: on the TV open Settings, Remotes and Devices, Remote App and Devices, then pick it in Xcode's Window, Devices and Simulators and type the code it shows.
+5. Pick the device as the destination and choose Product, Run. The first launch may refuse an untrusted developer: trust your Apple ID in the device's Settings, General, under device management.
+
+If the build stops at bundling because it cannot find `node`, write `export NODE_BINARY=<the path that command -v node prints>` into `apps/raven/app/ios/.xcode.env.local`.
+
+A Personal Team's profile lasts 7 days, and then the app no longer opens. Reinstall it each week: connect the device and choose Product, Run again. Installing over it keeps its servers, sign-ins and settings. A free team keeps at most three of its apps on a device at once.
+
+### Install it on Android TV
+
+1. Build the APK from the repo root, with `ANDROID_HOME` and `JAVA_HOME` set: `bunx nx run @raven/app:build:android-tv`. It generates `apps/raven/app/android` first and writes `android/app/build/outputs/apk/release/app-release.apk` under the app. It is signed with the generated project's debug key, so it needs no account.
+2. On the TV, turn on Developer options (press the build number in Settings' About seven times), then network debugging in them.
+3. Connect and install, from the repo root:
+
+   ```bash
+   $ANDROID_HOME/platform-tools/adb connect <tv>:5555
+   $ANDROID_HOME/platform-tools/adb install -r apps/raven/app/android/app/build/outputs/apk/release/app-release.apk
+   ```
+
+   The TV asks to allow the connection the first time. A TV that offers Wireless debugging instead pairs first with `adb pair` and the address and code it shows. `-r` replaces an installed raven and keeps its servers and settings.
+
+A sideloaded APK has no expiry: reinstall only to update it.
 
 ### Test it end to end
 
-The Maestro flows in `apps/raven/app/e2e` sign in to a real raven server and check Home. That server comes from the repo with a fixture library:
+The Maestro flows in `apps/raven/app/e2e` sign in to a real raven server, then browse, search and play it. That server comes from the repo with a fixture library:
 
 ```bash
 bunx nx run @raven/server:serve:fixture
@@ -549,6 +590,8 @@ apps/raven/
   desktop/       @raven/desktop: Raven, the Electron app: main process (the web host that
                  serves @raven/web, grants, the player service over libmpv, downloads, logs,
                  updates), preload, packaging (src/build), e2e. Its pages are web's src/desktop.
+  app/           @raven/app: raven app, the Expo app on react-native-tvos for iPhone, iPad, Apple TV
+                 and Android TV: routes, screens, layouts per platform, the player, e2e flows
   Dockerfile, docker-compose.yml, docker-compose.vhagar.yml, vhagar-update.sh, .env.example
 libs/raven/
   ui/            @raven/ui: shared React player, HTML engine, buttons, icons and styles.
@@ -559,7 +602,7 @@ libs/raven/
                  it unchanged.
 ```
 
-A native iOS or Android app would be another `apps/raven/` entry that imports `@raven/core` and answers the direct-play check from its own player (AVPlayer takes MKV-free HEVC and Dolby audio; ExoPlayer takes almost everything).
+raven app imports `@raven/core` and `@raven/ui/headless` and answers the direct-play check from its own tables, one for AVPlayer on Apple devices and one for ExoPlayer on Android TV, since React Native has no `canPlayType`.
 
 ## Configuration
 
@@ -609,3 +652,5 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 - Raven keeps its downloads in its own data folder, with no way to pick another.
 - Raven runs only on Apple Silicon Macs: no Intel Macs, Windows or Linux yet.
 - Raven is signed ad hoc, not with a Developer ID or notarized, so it needs Open Anyway once and cannot update itself.
+- raven app has no TestFlight, App Store or Play Store build: Apple devices install it from Xcode and reinstall it weekly, and Android TV sideloads the APK.
+- raven app signs in only to servers with accounts `off`; account sign-in comes in PR 10. Its other known gaps are in its [README](app/README.md#known-gaps).
