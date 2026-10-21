@@ -62,6 +62,7 @@ describe('who each route is for', () => {
         audience: 'admin',
         account: ACCOUNT_REQUIREMENTS.owner,
         mediaPlane: false,
+        isOpenedByCapability: false,
       },
       {
         method: 'PUT',
@@ -70,6 +71,7 @@ describe('who each route is for', () => {
         audience: 'viewers',
         account: ACCOUNT_REQUIREMENTS.approved,
         mediaPlane: false,
+        isOpenedByCapability: false,
       },
       {
         method: 'DELETE',
@@ -78,6 +80,7 @@ describe('who each route is for', () => {
         audience: 'admin',
         account: ACCOUNT_REQUIREMENTS.owner,
         mediaPlane: false,
+        isOpenedByCapability: false,
       },
     ])
   })

@@ -42,7 +42,7 @@ const sessionOf = (account: Account): Caller => ({
 
 const ticketOf = (account: Account): Caller => ({
   kind: CALLERS.ticket,
-  session: { account, token: 'jwt', expiresAt: 1 },
+  session: { account },
   unlockedUntil: null,
 })
 

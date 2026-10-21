@@ -40,7 +40,10 @@ export const AUTH_HEADERS = {
 export const AUTH_SCHEME = 'Bearer'
 export const AUTH_API_PREFIX = '/api/'
 export const AUTH_METHODS = { get: 'GET', head: 'HEAD', post: 'POST' } as const
-/** The query key a media ticket travels in, on the file and sidecar URLs. */
+/**
+ * The query key a media ticket travels in, on the file and sidecar URLs,
+ * and an HLS session's capability on the URIs its playlists name.
+ */
 export const MEDIA_TICKET_PARAM = 't'
 export const AUTH_PARAMS = { id: 'id', pageSize: 'pageSize', pageOffset: 'pageOffset' } as const
 export const AUTH_PATHS = {

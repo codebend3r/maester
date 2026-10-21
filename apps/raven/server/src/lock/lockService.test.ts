@@ -38,7 +38,7 @@ const ticketCaller = ({
   unlockedUntil?: number
 }): Caller => ({
   kind: CALLERS.ticket,
-  session: { account, token: 'jwt', expiresAt: Date.now() + 60_000 },
+  session: { account },
   unlockedUntil,
 })
 

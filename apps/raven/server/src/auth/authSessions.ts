@@ -8,6 +8,8 @@ export const AUTH_VERIFY = Symbol('AUTH_VERIFY')
 export const CALLERS = { legacy: 'legacy', session: 'session', ticket: 'ticket' } as const
 
 type Session = Awaited<ReturnType<AuthSessions['authenticate']>>
+/** What a ticket's caller keeps of the session it stands for: only the account, never its token. */
+type TicketSession = Pick<Session, 'account'>
 /**
  * Who a request comes from: the legacy browser of a server without
  * accounts, a session from Bearer or the cookie, or an account ticket with
@@ -17,7 +19,7 @@ type Session = Awaited<ReturnType<AuthSessions['authenticate']>>
 export type Caller =
   | { kind: typeof CALLERS.legacy }
   | { kind: typeof CALLERS.session; session: Session; isBearer: boolean }
-  | { kind: typeof CALLERS.ticket; session: Session; unlockedUntil: number | null }
+  | { kind: typeof CALLERS.ticket; session: TicketSession; unlockedUntil: number | null }
 
 const LEGACY: Caller = { kind: CALLERS.legacy }
 
@@ -108,17 +110,25 @@ export class AuthSessions {
     this.callers.set(request, { kind: CALLERS.session, session, isBearer })
   }
 
-  /** Binds the caller a redeemed ticket stands for: the session it was minted from, rechecked, and its unlock. */
+  /**
+   * Binds the caller a redeemed ticket, or an HLS session's capability,
+   * stands for: the account of the session it was minted from, rechecked,
+   * and its unlock.
+   */
   bindTicket({
     request,
     session,
     unlockedUntil,
   }: {
     request: object
-    session: Session
+    session: TicketSession
     unlockedUntil: number | null
   }): void {
-    this.callers.set(request, { kind: CALLERS.ticket, session, unlockedUntil })
+    this.callers.set(request, {
+      kind: CALLERS.ticket,
+      session: { account: session.account },
+      unlockedUntil,
+    })
   }
 
   /** The caller the account gate bound to `request`; the legacy browser when it bound none. */

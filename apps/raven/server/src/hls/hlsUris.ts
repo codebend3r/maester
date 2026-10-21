@@ -4,32 +4,33 @@ import type { HlsSession } from '@/hls/hlsSessions'
 export type HlsPath = (typeof HLS_PATHS)[keyof typeof HLS_PATHS]
 
 /**
- * An HLS path with its placeholders filled in, absolute, and carrying the
- * request's ticket when it had one: a relative URI would not inherit it.
+ * An HLS path with its placeholders filled in, absolute, and carrying
+ * `key` in `?t=` when there is one, a ticket or the session's capability:
+ * a relative URI would not inherit it.
  */
 const hlsUri = ({
   path,
   values,
-  ticket,
+  key,
 }: {
   path: HlsPath
   values: Readonly<Record<string, string>>
-  ticket: string | null
+  key: string | null
 }): string => {
   const filled = path.replace(/:(\w+)/g, (placeholder, name: string) => {
     const value = values[name]
     return value == null ? placeholder : encodeURIComponent(value)
   })
-  return ticket == null ? filled : `${filled}?${toQueryString({ [MEDIA_TICKET_PARAM]: ticket })}`
+  return key == null ? filled : `${filled}?${toQueryString({ [MEDIA_TICKET_PARAM]: key })}`
 }
 
 /** Every URI one session's playlists name. */
 export const sessionUris = ({
   session,
-  ticket,
+  key,
 }: {
   session: Pick<HlsSession, 'id' | 'mediaId'>
-  ticket: string | null
+  key: string | null
 }) => {
   const of = ({
     path,
@@ -45,7 +46,7 @@ export const sessionUris = ({
         [HLS_PARAMS.session]: session.id,
         ...values,
       },
-      ticket,
+      key,
     })
   return {
     video: of({ path: HLS_PATHS.video }),

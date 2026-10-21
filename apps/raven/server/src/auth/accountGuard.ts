@@ -12,6 +12,8 @@ import {
   AUTH_REFUSALS,
   type Account,
   type AuthConfig,
+  HLS_PARAMS,
+  isHlsSessionId,
   isString,
   MEDIA_TICKET_PARAM,
 } from '@raven/core'
@@ -23,6 +25,8 @@ import { ACCOUNT_TICKET_PREFIX, AccountTickets } from '@/auth/accountTickets'
 import { authFailure } from '@/auth/authFailure'
 import { AuthSessions, requireApproved } from '@/auth/authSessions'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
+import { isCapabilityRoute, isHlsCapability } from '@/hls/hlsCapability'
+import { HlsSessions, noSuchSession } from '@/hls/hlsSessions'
 import { isMediaPlaneRoute } from '@/media/mediaPlaneMark'
 import { ROUTE_PARAMS, requestParts } from '@/requestParts'
 import type { MarkTargets } from '@/routeMarks'
@@ -103,6 +107,19 @@ const accountTicketOf = ({
   return isString(ticket) && ticket.startsWith(ACCOUNT_TICKET_PREFIX) ? ticket : null
 }
 
+/** An HLS session's capability in `?t=` on a route that names the session, or null. */
+const capabilityOf = ({
+  query,
+  targets,
+}: {
+  query: Record<string, unknown>
+  targets: MarkTargets
+}): string | null => {
+  if (!isCapabilityRoute(targets)) return null
+  const capability = query[MEDIA_TICKET_PARAM]
+  return isHlsCapability(capability) ? capability : null
+}
+
 const admit = ({
   requirement,
   account,
@@ -133,7 +150,8 @@ const admit = ({
  * refused as unavailable and the rest pass for the legacy browser, as before
  * accounts. `unavailable` refuses everything but the open routes. `ready`
  * resolves the caller from Bearer, from the session cookie on a GET or
- * HEAD, or from an account ticket on the media plane, and holds it to the
+ * HEAD, from an account ticket on the media plane, or from an HLS
+ * session's capability on that session's routes, and holds it to the
  * route's requirement.
  */
 @Injectable()
@@ -142,6 +160,7 @@ export class AccountGuard implements CanActivate {
     @Inject(AuthSessions) private readonly sessions: AuthSessions,
     @Inject(AccountTickets) private readonly tickets: AccountTickets,
     @Inject(AUTH_STATE) private readonly auth: AuthConfig,
+    @Inject(HlsSessions) private readonly hls: Pick<HlsSessions, 'grantOf'>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -166,8 +185,41 @@ export class AccountGuard implements CanActivate {
       return true
     }
     if (this.auth.state !== AUTH_CONFIG_STATES.ready) throw authFailure(AUTH_REFUSALS.unavailable)
+    const capability = capabilityOf({ query, targets })
+    if (capability !== null) {
+      this.admitCapability({ request, capability, params, requirement })
+      return true
+    }
     await this.admitSession({ request, requirement })
     return true
+  }
+
+  /**
+   * Binds the account an HLS session was opened for, when `capability` is
+   * that session's and the route names it and its media. Any other is told
+   * the session is gone, as a session that ended is, so the player opens
+   * the master again with a new ticket.
+   */
+  private admitCapability({
+    request,
+    capability,
+    params,
+    requirement,
+  }: {
+    request: FastifyRequest
+    capability: string
+    params: Record<string, unknown>
+    requirement: GatedRequirement
+  }): void {
+    const id = params[ROUTE_PARAMS.id]
+    const session = params[HLS_PARAMS.session]
+    const grant =
+      isMediaIdParam(id) && isHlsSessionId(session)
+        ? this.hls.grantOf({ mediaId: Number(id), session, capability })
+        : null
+    if (grant === null) throw noSuchSession()
+    admit({ requirement, account: grant.account })
+    this.sessions.bindTicket({ request, session: grant, unlockedUntil: grant.unlockedUntil })
   }
 
   /** Redeems an account ticket for the media id it names, and binds the account it stands for. */
