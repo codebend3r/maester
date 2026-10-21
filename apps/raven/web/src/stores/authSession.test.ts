@@ -2,9 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import { AUTH_EVENTS } from '@/lib/authClient'
 import { queryClient, queryKeys } from '@/lib/queryClient'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { createSelectionStore } from '@/stores/selection'
+import { createSelectionStore, useUnlockPrompt } from '@raven/ui/headless'
 import { useSelectionScopes } from '@/stores/selectionScope'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { fakeAuthClient, fakeSession, readyConfig as config } from '@/test/authClient'
 
 const settled = () => Promise.resolve().then(() => undefined)

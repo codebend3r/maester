@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { usePlayerPrefs } from '@raven/ui/headless'
+import { usePageBackdrop, usePlayerPrefs } from '@raven/ui/headless'
 import {
   type AdminLock,
   DEFAULT_SAGA_BACKDROP,
@@ -14,7 +14,6 @@ import { api } from '@/lib/api'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { POSTER_SIZES } from '@/lib/posters'
 import { SagaPage } from '@/pages/SagaPage/SagaPage'
-import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { itemSummary, library, matchedMovie } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { WatchProbe } from '@/test/watchProbe'

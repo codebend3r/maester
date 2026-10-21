@@ -3,7 +3,7 @@ import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { POSTER_SIZES } from '@/lib/posters'
 import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
-import { usePageBackdrop } from '@/stores/pageBackdrop'
+import { usePageBackdrop } from '@raven/ui/headless'
 import { atPixelRatio, restorePixelRatio } from '@/test/pixelRatio'
 import { renderWithProviders } from '@/test/render'
 

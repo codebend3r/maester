@@ -1,4 +1,4 @@
-import { usePageBackdrop } from '@/stores/pageBackdrop'
+import { usePageBackdrop } from '@raven/ui/headless'
 import styles from '@/components/PageBackdrop/PageBackdrop.module.scss'
 
 /**

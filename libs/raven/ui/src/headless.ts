@@ -24,3 +24,7 @@ export { CONTROLS_LINGER_SECONDS, configurePlayerPrefs, usePlayerPrefs } from '@
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'
 export { playerQueryKeys } from '@/lib/playerQueryKeys'
+export { usePageBackdrop } from '@/stores/pageBackdrop'
+export { createSelectionStore } from '@/stores/selection'
+export type { SelectionStore } from '@/stores/selection'
+export { useUnlockPrompt } from '@/stores/unlockPrompt'

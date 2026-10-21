@@ -51,6 +51,8 @@ describe('the headless entry', () => {
     const entry = await import('@raven/ui/headless')
     expect(entry.videoReducer).toBeFunction()
     expect(entry.initialVideoState(12).time).toBe(12)
+    expect(entry.createSelectionStore().getState().selecting).toBeFalse()
+    expect(entry.usePageBackdrop.getState().current).toBeNull()
   })
 
   test('reaches for no DOM package or stylesheet', () => {

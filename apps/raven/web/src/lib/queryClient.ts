@@ -1,4 +1,4 @@
-import { playerQueryKeys } from '@raven/ui/headless'
+import { playerQueryKeys, useUnlockPrompt } from '@raven/ui/headless'
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 import {
   type MatchItemType,
@@ -7,7 +7,6 @@ import {
   ApiError,
   isLockedError,
 } from '@raven/core'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
 
 /** Anything refused for sitting in a locked library asks for the PIN, wherever it was asked for. */
 const askForPin = (error: Error): void => {

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { ApiError } from '@raven/core'
 import { PinPrompt } from '@/components/PinPrompt/PinPrompt'
 import { api } from '@/lib/api'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
+import { useUnlockPrompt } from '@raven/ui/headless'
 import { renderWithProviders } from '@/test/render'
 
 describe('PinPrompt', () => {
