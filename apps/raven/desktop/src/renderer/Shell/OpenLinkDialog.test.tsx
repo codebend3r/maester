@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from 'bun:test'
 import { PLAYER_COMMANDS, type PlayerCommand } from '@raven/core'
-import type { NativePlayer } from '@raven/ui'
+import type { NativePlayer } from '@raven/ui/headless'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { connectionsOf, fakeClient, renderDesktop, STUB_ROUTES } from '@/renderer/test/render'

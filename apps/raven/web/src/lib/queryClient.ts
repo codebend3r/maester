@@ -1,4 +1,4 @@
-import { playerQueryKeys } from '@raven/ui'
+import { playerQueryKeys } from '@raven/ui/headless'
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 import {
   type MatchItemType,

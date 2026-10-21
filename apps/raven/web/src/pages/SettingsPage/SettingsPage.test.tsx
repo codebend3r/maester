@@ -10,7 +10,7 @@ import {
   type Account,
   type PlaybackSettingsState,
 } from '@raven/core'
-import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@raven/ui'
+import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@raven/ui/headless'
 import { api } from '@/lib/api'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
 import { held } from '@/test/held'

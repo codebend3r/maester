@@ -15,11 +15,10 @@ import {
   ButtonLink,
   Player,
   createProgressSaver,
-  useHostPlayer,
   useLeaveFullscreen,
   useMediaPlane,
-  usePlayerPrefs,
 } from '@raven/ui'
+import { useHostPlayer, usePlayerPrefs } from '@raven/ui/headless'
 import { useReprobe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { api } from '@/lib/api'
 import { afterWatching } from '@/lib/invalidate'

@@ -1,7 +1,7 @@
 import { afterEach } from 'bun:test'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { configurePlayerPrefs } from '@raven/ui'
+import { configurePlayerPrefs } from '@raven/ui/headless'
 import { useDesktopBridge } from '@/renderer/stores/desktop'
 import { useDownloadAsk } from '@/renderer/stores/downloadAsk'
 import { useDragging } from '@/renderer/stores/dragging'

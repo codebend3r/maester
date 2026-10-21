@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DOWNLOAD_TARGET_KINDS } from '@raven/core'
-import { usePlayerPrefs } from '@raven/ui'
+import { usePlayerPrefs } from '@raven/ui/headless'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 

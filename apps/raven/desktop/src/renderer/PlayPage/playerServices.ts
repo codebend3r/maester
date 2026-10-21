@@ -1,4 +1,4 @@
-import type { PlayerServices } from '@raven/ui'
+import type { PlayerServices } from '@raven/ui/headless'
 import { PLAYER_ACTIONS, type PlayerAction, listOf, object } from '@raven/core'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import type { MenuHub } from '@/renderer/desktop/menuHub'

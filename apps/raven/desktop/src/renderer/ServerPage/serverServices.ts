@@ -8,7 +8,8 @@ import {
   mediaLabel,
   object,
 } from '@raven/core'
-import type { PlayerServices, ProgressSaver } from '@raven/ui'
+import type { ProgressSaver } from '@raven/ui'
+import type { PlayerServices } from '@raven/ui/headless'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import type { MenuHub } from '@/renderer/desktop/menuHub'
 import { playerActionFor, requestQuietly } from '@/renderer/PlayPage/playerServices'

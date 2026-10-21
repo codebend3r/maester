@@ -13,12 +13,11 @@ import {
 import {
   Button,
   createProgressSaver,
-  type NativePlayer,
-  type PlayerServices,
   type ProgressSaver,
   UnlockDialog,
   type UnlockSecret,
 } from '@raven/ui'
+import type { NativePlayer, PlayerServices } from '@raven/ui/headless'
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'

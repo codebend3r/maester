@@ -7,7 +7,8 @@ import {
   playLinkFor,
   type SubtitleTrack,
 } from '@raven/core'
-import { Toaster, useMediaOrigin, usePlayerPrefs } from '@raven/ui'
+import { Toaster, useMediaOrigin } from '@raven/ui'
+import { usePlayerPrefs } from '@raven/ui/headless'
 import { QueryClient } from '@tanstack/react-query'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

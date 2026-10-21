@@ -6,7 +6,7 @@ import {
   PLAYER_REFUSAL_REASONS,
   type PlayerEvent,
 } from '@raven/core'
-import type { NativePlayer } from '@raven/ui'
+import type { NativePlayer } from '@raven/ui/headless'
 import { useSyncExternalStore } from 'react'
 import { useDesktop } from '@/renderer/stores/desktop'
 import { isPlayerPortMessage, PLAYER_CONNECTION_STATUSES } from '@/shared/protocol'

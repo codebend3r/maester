@@ -6,6 +6,8 @@ preload = [
   "../../../tooling/web/scss-modules.ts",
   "./src/test-setup.ts",
 ]
+# headless-check has its own bunfig: this one preloads the DOM it must run without.
+pathIgnorePatterns = ["headless-check/**"]
 coverageSkipTestFiles = true
 coveragePathIgnorePatterns = [
   "src/test/**",

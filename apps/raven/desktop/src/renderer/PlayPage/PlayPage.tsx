@@ -10,14 +10,8 @@ import {
 } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { type OutputSettings, PLAYER_SOURCE_KINDS } from '@raven/core'
-import {
-  Button,
-  ENGINE_KINDS,
-  Player,
-  type PlayerServices,
-  useHostPlayer,
-  useKeyShortcut,
-} from '@raven/ui'
+import { Button, Player, useKeyShortcut } from '@raven/ui'
+import { ENGINE_KINDS, type PlayerServices, useHostPlayer } from '@raven/ui/headless'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import { CONNECTION_STATUSES } from '@/renderer/desktop/playerConnection'
 import { NativePlaying } from '@/renderer/PlayPage/NativePlaying'

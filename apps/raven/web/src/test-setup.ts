@@ -1,7 +1,7 @@
 import { afterEach } from 'bun:test'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { configurePlayerPrefs, usePlayerPrefs } from '@raven/ui'
+import { configurePlayerPrefs, usePlayerPrefs } from '@raven/ui/headless'
 import { queryClient } from '@/lib/queryClient'
 import { useAuthSession } from '@/stores/authSession'
 import { useCardLinks } from '@/stores/cardLinks'

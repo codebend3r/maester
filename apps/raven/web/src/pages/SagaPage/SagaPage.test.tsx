@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { usePlayerPrefs } from '@raven/ui'
+import { usePlayerPrefs } from '@raven/ui/headless'
 import {
   type AdminLock,
   DEFAULT_SAGA_BACKDROP,

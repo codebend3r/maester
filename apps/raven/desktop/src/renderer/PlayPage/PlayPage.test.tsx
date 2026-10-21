@@ -17,7 +17,7 @@ import {
   type PlayerEvent,
   type PlayerRefusalReason,
 } from '@raven/core'
-import type { NativePlayer } from '@raven/ui'
+import type { NativePlayer } from '@raven/ui/headless'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NavigationType } from 'react-router-dom'
