@@ -1,7 +1,8 @@
 import { type MediaItem, planPlayback } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { browserCanPlay, browserCanStream } from '@raven/ui/canPlay'
-import { usePlaybackPolicy } from '@/lib/usePlaybackPolicy'
+import { usePlaybackPolicy } from '@raven/ui/headless'
+import { playbackSettingsQuery } from '@/lib/queries'
 import styles from '@/components/PlaybackNote/PlaybackNote.module.scss'
 
 /**
@@ -10,7 +11,7 @@ import styles from '@/components/PlaybackNote/PlaybackNote.module.scss'
  * on the server, as most 4K files are, or before those settings are known.
  */
 export const PlaybackNote = ({ media }: { media: MediaItem }) => {
-  const policy = usePlaybackPolicy()
+  const policy = usePlaybackPolicy({ queries: { playbackSettingsQuery } })
   if (!policy) return null
   const plan = planPlayback({
     media,
