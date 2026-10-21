@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { useSelectionScopes } from '@/stores/selectionScope'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
+import { useUnlockPrompt } from '@raven/ui/headless'
 
 /**
  * Everything one account left in this tab that the next one must not see.

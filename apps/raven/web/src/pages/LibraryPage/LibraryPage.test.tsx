@@ -10,7 +10,7 @@ import type {
   MediaSort,
 } from '@raven/core'
 import { api } from '@/lib/api'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
+import { useUnlockPrompt } from '@raven/ui/headless'
 import { library, mediaItem, metadataHealth, showEntry } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderLibraryPage } from '@/test/libraryPage'

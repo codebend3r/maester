@@ -1,6 +1,6 @@
 import { type PointerEvent, useEffect, useLayoutEffect, useRef } from 'react'
 import { useHoverBackdrops } from '@/stores/hoverBackdrops'
-import { usePageBackdrop } from '@/stores/pageBackdrop'
+import { usePageBackdrop } from '@raven/ui/headless'
 
 /** The `PointerEvent.pointerType` of a mouse, the one pointer that rests on a card. */
 const POINTER_TYPES = { mouse: 'mouse' } as const

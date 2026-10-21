@@ -9,7 +9,7 @@ import { api } from '@/lib/api'
 import { afterRematch, afterRescan } from '@/lib/invalidate'
 import { metadataHealthQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
+import { useUnlockPrompt } from '@raven/ui/headless'
 
 /**
  * Refresh, Rescan and Match again for a library. The caller holds them, as

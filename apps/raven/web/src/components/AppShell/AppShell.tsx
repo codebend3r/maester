@@ -17,7 +17,7 @@ import { librariesQuery } from '@/lib/queries'
 import { TopCardNote, useScrollReset } from '@/lib/useScrollReset'
 import { useServerEvents } from '@/lib/useServerEvents'
 import { ravenVersion } from '@/lib/version'
-import { usePageBackdrop } from '@/stores/pageBackdrop'
+import { usePageBackdrop } from '@raven/ui/headless'
 import { useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
 

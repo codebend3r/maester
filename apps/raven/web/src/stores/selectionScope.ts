@@ -1,7 +1,7 @@
 import type { WatchTarget } from '@raven/core'
 import type { RefObject } from 'react'
 import { create } from 'zustand'
-import type { SelectionStore } from '@/stores/selection'
+import type { SelectionStore } from '@raven/ui/headless'
 
 /** What a section or page tells its scope about its cards. */
 export type SelectionSource = {

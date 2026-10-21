@@ -1,5 +1,5 @@
 import { Button, Icon } from '@raven/ui'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
+import { useUnlockPrompt } from '@raven/ui/headless'
 import styles from '@/components/LockedLibrary/LockedLibrary.module.scss'
 
 /** Stands where a locked library's videos would be, until the PIN is entered. */

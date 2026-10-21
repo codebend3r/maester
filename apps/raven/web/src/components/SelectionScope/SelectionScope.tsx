@@ -1,7 +1,7 @@
 import type { WatchTarget } from '@raven/core'
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from 'zustand'
-import { type SelectionStore, createSelectionStore } from '@/stores/selection'
+import { type SelectionStore, createSelectionStore } from '@raven/ui/headless'
 import {
   type SelectionScopeValue,
   type SelectionSource,
