@@ -1,11 +1,11 @@
 import { PLAYER_COMMANDS, PLAYER_EVENTS, type PlayerSource } from '@raven/core'
+import { Player } from '@raven/ui'
 import {
   ENGINE_KINDS,
   type NativePlayer,
-  Player,
   type PlayerServices,
   useHostPlayer,
-} from '@raven/ui'
+} from '@raven/ui/headless'
 import { useEffect, useMemo, useRef } from 'react'
 import { isEngineGone, isEngineStop, PlayerRefusal } from '@/renderer/desktop/playerConnection'
 

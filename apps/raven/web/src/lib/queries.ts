@@ -6,7 +6,7 @@ import {
   type MediaSort,
 } from '@raven/core'
 import { api } from '@/lib/api'
-import { playerQueriesFor } from '@raven/ui'
+import { playerQueriesFor } from '@raven/ui/headless'
 import { queryKeys } from '@/lib/queryClient'
 
 /**

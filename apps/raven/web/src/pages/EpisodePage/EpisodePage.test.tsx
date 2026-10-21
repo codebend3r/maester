@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { usePlayerPrefs } from '@raven/ui'
+import { usePlayerPrefs } from '@raven/ui/headless'
 import type { ItemDetails } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'

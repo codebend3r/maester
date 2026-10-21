@@ -6,7 +6,7 @@ import '@fontsource/young-serif'
 import '@fontsource-variable/instrument-sans/wdth.css'
 // Shared primitives load before the desktop overrides.
 import '@raven/ui/styles.css'
-import { configurePlayerPrefs } from '@raven/ui'
+import { configurePlayerPrefs } from '@raven/ui/headless'
 import '@/renderer/styles/desktop.scss'
 import { clientFor } from '@/renderer/desktop/client'
 import { createMenuHub } from '@/renderer/desktop/menuHub'

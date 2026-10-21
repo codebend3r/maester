@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { playerQueriesFor, playerQueryKeys } from '@raven/ui'
+import { playerQueriesFor, playerQueryKeys } from '@raven/ui/headless'
 import { api } from '@/lib/api'
 import { ApiError } from '@raven/core'
 import { createQueryClient, queryKeys } from '@/lib/queryClient'

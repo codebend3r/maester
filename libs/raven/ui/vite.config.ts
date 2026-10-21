@@ -21,6 +21,7 @@ export default defineConfig({
       entry: {
         styles: fileURLToPath(new URL('./src/styles.ts', import.meta.url)),
         index: fileURLToPath(new URL('./src/index.ts', import.meta.url)),
+        headless: fileURLToPath(new URL('./src/headless.ts', import.meta.url)),
         canPlay: fileURLToPath(new URL('./src/lib/canPlay.ts', import.meta.url)),
         designTokens: fileURLToPath(new URL('./src/styles/designTokens.ts', import.meta.url)),
       },

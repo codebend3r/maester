@@ -1,6 +1,6 @@
 import { expect, mock } from 'bun:test'
 import { PLAYER_COMMANDS, type PlayerCommand, type PlayerEvent } from '@raven/core'
-import type { NativePlayer } from '@raven/ui'
+import type { NativePlayer } from '@raven/ui/headless'
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AccountView } from '@/shared/protocol'

@@ -1,5 +1,6 @@
 import { type DownloadTarget, downloadLinkFor } from '@raven/core'
-import { Button, usePlayerPrefs } from '@raven/ui'
+import { Button } from '@raven/ui'
+import { usePlayerPrefs } from '@raven/ui/headless'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 
 /**

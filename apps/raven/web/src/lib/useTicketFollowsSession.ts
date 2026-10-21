@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { playerQueryKeys } from '@raven/ui'
+import { playerQueryKeys } from '@raven/ui/headless'
 import { useEffect } from 'react'
 import { onAccessTokenChange } from '@/stores/authSession'
 

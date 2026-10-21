@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { type NativePlayer, type PlayerServices, Player, useHostPlayer } from '@raven/ui'
+import { Player } from '@raven/ui'
+import { type NativePlayer, type PlayerServices, useHostPlayer } from '@raven/ui/headless'
 import { act, screen } from '@testing-library/react'
 // The one renderer test that imports main's modules: it runs both ends of the real bridge.
 import { connectPort, type PortLike } from '@/main/player/playerPort'

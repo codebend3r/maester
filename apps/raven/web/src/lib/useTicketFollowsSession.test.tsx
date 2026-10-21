@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from 'bun:test'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { playerQueryKeys } from '@raven/ui'
+import { playerQueryKeys } from '@raven/ui/headless'
 import type { ReactNode } from 'react'
 import { useTicketFollowsSession } from '@/lib/useTicketFollowsSession'
 import { useAuthSession } from '@/stores/authSession'
