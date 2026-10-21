@@ -17,10 +17,17 @@ const keyedRuns = (text: string): (CueRun & { key: string })[] =>
 
 /**
  * The subtitle cues showing now, as raven draws them over the video wherever it draws them
- * itself: WebVTT's italic, bold and underline runs on a dark plate. The chrome places it.
+ * itself: WebVTT's italic, bold and underline runs on a dark plate. The chrome places it, and a
+ * TV's sizes the text to its screen (`fontSize`).
  */
-export const CaptionText = ({ caption }: { caption: string }) => (
-  <Text style={styles.caption}>
+export const CaptionText = ({
+  caption,
+  fontSize = SIZES.textLg,
+}: {
+  caption: string
+  fontSize?: number
+}) => (
+  <Text style={[styles.caption, { fontSize }]}>
     {keyedRuns(caption).map((run) => (
       <Text
         key={run.key}
@@ -45,7 +52,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: COLOURS.deep,
     color: COLOURS.onPicture,
-    fontSize: SIZES.textLg,
     textAlign: 'center',
   },
   italic: { fontStyle: 'italic' },

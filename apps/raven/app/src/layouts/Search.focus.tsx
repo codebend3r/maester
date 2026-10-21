@@ -10,7 +10,8 @@ import {
   type SearchLayoutProps,
 } from '@/layouts/searchKit'
 import { NOTHING_ON_FOCUS, PlateButton, tvFieldStyles } from '@/layouts/tvControls'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { COLOURS } from '@/theme/appTheme'
+import { TV_SIZES } from '@/theme/tvSizes'
 
 /**
  * A search box the remote selects, which opens the platform's own keyboard. It reports each
@@ -93,10 +94,10 @@ export const focusSearch: SearchKit = { SearchField, SearchLayout }
 
 const styles = StyleSheet.create({
   ground: { flex: 1, backgroundColor: COLOURS.ground },
-  page: { gap: SIZES.space4, paddingVertical: SIZES.space6 },
-  header: { gap: SIZES.space3, paddingHorizontal: SIZES.space8 },
-  title: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
-  notice: { color: COLOURS.muted, fontSize: SIZES.textLg },
-  box: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space2 },
-  frame: { width: SIZES.measure },
+  page: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
+  header: { gap: TV_SIZES.space3, paddingHorizontal: TV_SIZES.space8 },
+  title: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+  notice: { color: COLOURS.muted, fontSize: TV_SIZES.textLg },
+  box: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space2 },
+  frame: { width: TV_SIZES.measure },
 })

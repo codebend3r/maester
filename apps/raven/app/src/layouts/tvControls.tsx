@@ -1,12 +1,13 @@
 import { type AccessibilityRole, Pressable, StyleSheet, Text } from 'react-native'
 
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { COLOURS } from '@/theme/appTheme'
+import { TV_SIZES } from '@/theme/tvSizes'
 
 /** What a TV control does on focus unless told more: nothing beyond its own ring or growth. */
 export const NOTHING_ON_FOCUS = (): void => undefined
 
 /** The round end of tvOS's focused field plate: half the field's height. */
-const PLATE_END = SIZES.controlLarge / 2
+const PLATE_END = TV_SIZES.controlLarge / 2
 
 /**
  * A TV text field's frame and the input inside it. tvOS draws a focused text field as its own
@@ -14,13 +15,13 @@ const PLATE_END = SIZES.controlLarge / 2
  * clips, so what shows has the frame's corners, the radius every other control has.
  */
 export const tvFieldStyles = StyleSheet.create({
-  frame: { minHeight: SIZES.controlLarge, overflow: 'hidden', paddingHorizontal: 0 },
+  frame: { minHeight: TV_SIZES.controlLarge, overflow: 'hidden', paddingHorizontal: 0 },
   input: {
     color: COLOURS.text,
-    fontSize: SIZES.textLg,
-    minHeight: SIZES.controlLarge,
+    fontSize: TV_SIZES.textLg,
+    minHeight: TV_SIZES.controlLarge,
     marginHorizontal: -PLATE_END,
-    paddingHorizontal: PLATE_END + SIZES.space2,
+    paddingHorizontal: PLATE_END + TV_SIZES.space2,
   },
 })
 
@@ -30,18 +31,18 @@ export const tvFieldStyles = StyleSheet.create({
  */
 export const plateStyles = StyleSheet.create({
   plate: {
-    minWidth: SIZES.controlLarge,
-    minHeight: SIZES.controlLarge,
+    minWidth: TV_SIZES.controlLarge,
+    minHeight: TV_SIZES.controlLarge,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: SIZES.space3,
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.tvFocusRing,
+    paddingHorizontal: TV_SIZES.space3,
+    borderRadius: TV_SIZES.radius,
+    borderWidth: TV_SIZES.tvFocusRing,
     borderColor: COLOURS.quiet,
     backgroundColor: COLOURS.quiet,
   },
   focused: { borderColor: COLOURS.text },
-  label: { color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: '600' },
+  label: { color: COLOURS.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
 })
 
 /**

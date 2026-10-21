@@ -4,7 +4,7 @@ import type { ShelfCard } from '@/queries/cards'
 import type { ShelfView } from '@/queries/homeShelves'
 
 import { FocusBand } from '@/layouts/FocusBand'
-import { FOCUS_CARD_WIDTHS, FocusCard } from '@/layouts/FocusCard'
+import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import {
   NOTHING_HERE,
@@ -16,7 +16,8 @@ import {
   seeAllLabelOf,
 } from '@/layouts/shelfKit'
 import { PlateButton } from '@/layouts/tvControls'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { COLOURS } from '@/theme/appTheme'
+import { TV_SIZES } from '@/theme/tvSizes'
 
 /**
  * Home's shelves under its title and, beside it, the way into the search. That is drawn only
@@ -113,7 +114,7 @@ const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) =>
                 onFocused={settle}
                 onPress={() => onOpen(card)}
                 place={placeOf({ shelf, card })}
-                width={FOCUS_CARD_WIDTHS[card.shape]}
+                width={focusCardWidthOf(card.shape)}
               />
             ))}
           </ScrollView>
@@ -132,32 +133,36 @@ export const focusShelf: ShelfKit = { Shelves, Shelf }
 
 const styles = StyleSheet.create({
   ground: { flex: 1, backgroundColor: COLOURS.ground },
-  shelves: { gap: SIZES.space4, paddingVertical: SIZES.space6 },
+  shelves: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
   pageRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SIZES.space5,
-    paddingHorizontal: SIZES.space8,
+    gap: TV_SIZES.space5,
+    paddingHorizontal: TV_SIZES.space8,
   },
-  pageTitle: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
-  notice: { color: COLOURS.muted, fontSize: SIZES.textLg, paddingHorizontal: SIZES.space8 },
-  shelf: { gap: SIZES.space1 },
+  pageTitle: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+  notice: { color: COLOURS.muted, fontSize: TV_SIZES.textLg, paddingHorizontal: TV_SIZES.space8 },
+  shelf: { gap: TV_SIZES.space1 },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SIZES.space3,
-    paddingHorizontal: SIZES.space8,
+    gap: TV_SIZES.space3,
+    paddingHorizontal: TV_SIZES.space8,
   },
-  shelfTitle: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
+  shelfTitle: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
   seeAll: {
-    paddingHorizontal: SIZES.space2,
-    paddingVertical: SIZES.space0,
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.tvFocusRing,
+    paddingHorizontal: TV_SIZES.space2,
+    paddingVertical: TV_SIZES.space0,
+    borderRadius: TV_SIZES.radius,
+    borderWidth: TV_SIZES.tvFocusRing,
     borderColor: 'transparent',
   },
   focusedLink: { borderColor: COLOURS.text, backgroundColor: COLOURS.quiet },
-  seeAllLabel: { color: COLOURS.muted, fontSize: SIZES.textLg, fontWeight: '600' },
+  seeAllLabel: { color: COLOURS.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
   focusedLabel: { color: COLOURS.text },
-  row: { gap: SIZES.space5, paddingHorizontal: SIZES.space8, paddingVertical: SIZES.space4 },
+  row: {
+    gap: TV_SIZES.space5,
+    paddingHorizontal: TV_SIZES.space8,
+    paddingVertical: TV_SIZES.space4,
+  },
 })

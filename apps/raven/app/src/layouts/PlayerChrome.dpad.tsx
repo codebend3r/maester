@@ -29,11 +29,12 @@ import { pressedKeyOf, remoteAnswerOf } from '@/layouts/remoteKeys'
 import { PlateButton } from '@/layouts/tvControls'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { COLOURS } from '@/theme/appTheme'
+import { TV_SIZES } from '@/theme/tvSizes'
 
 const { Picker } = focusPicker
 
-const GUTTER = SIZES.space8
+const GUTTER = TV_SIZES.space8
 
 const BACK = 'Back'
 
@@ -44,8 +45,8 @@ const FADE_MS = 200
 const SCRIM_OPACITY = 0.45
 
 /** The thumb on the line, and how much it grows while the remote is on it. */
-const THUMB = SIZES.space4
-const THUMB_FOCUSED = SIZES.space6
+const THUMB = TV_SIZES.space4
+const THUMB_FOCUSED = TV_SIZES.space6
 
 type Focusable = RefObject<ComponentRef<typeof Pressable> | null>
 
@@ -324,10 +325,10 @@ const DpadPlayer = ({
           pointerEvents="none"
           style={[
             styles.captionSlot,
-            { paddingBottom: isVisible ? GUTTER + bottomHeight + SIZES.space4 : GUTTER },
+            { paddingBottom: isVisible ? GUTTER + bottomHeight + TV_SIZES.space4 : GUTTER },
           ]}
         >
-          <CaptionText caption={caption} />
+          <CaptionText caption={caption} fontSize={TV_SIZES.textLg} />
         </View>
       )}
     </View>
@@ -351,19 +352,19 @@ const styles = StyleSheet.create({
     opacity: SCRIM_OPACITY,
   },
   frame: { flex: 1, justifyContent: 'space-between', padding: GUTTER },
-  title: { color: COLOURS.onPicture, fontSize: SIZES.textXl, fontWeight: 'bold' },
-  bottom: { gap: SIZES.space3 },
-  timeline: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space3 },
-  time: { color: COLOURS.onPicture, fontSize: SIZES.text, fontVariant: ['tabular-nums'] },
+  title: { color: COLOURS.onPicture, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+  bottom: { gap: TV_SIZES.space3 },
+  timeline: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
+  time: { color: COLOURS.onPicture, fontSize: TV_SIZES.text, fontVariant: ['tabular-nums'] },
   scrubberSlot: { flex: 1 },
-  scrubber: { height: SIZES.controlLarge, justifyContent: 'center' },
+  scrubber: { height: TV_SIZES.controlLarge, justifyContent: 'center' },
   line: {
-    height: SIZES.space1,
-    borderRadius: SIZES.space1,
+    height: TV_SIZES.space1,
+    borderRadius: TV_SIZES.space1,
     backgroundColor: COLOURS.track,
     overflow: 'hidden',
   },
-  lineFocused: { height: SIZES.space2 },
+  lineFocused: { height: TV_SIZES.space2 },
   played: { height: '100%', backgroundColor: COLOURS.accent },
   thumb: {
     position: 'absolute',
@@ -376,10 +377,10 @@ const styles = StyleSheet.create({
     width: THUMB_FOCUSED,
     height: THUMB_FOCUSED,
     borderRadius: THUMB_FOCUSED,
-    borderWidth: SIZES.tvFocusRing,
+    borderWidth: TV_SIZES.tvFocusRing,
     borderColor: COLOURS.accent,
   },
-  buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space3 },
+  buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: TV_SIZES.space3 },
   captionSlot: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
@@ -388,9 +389,9 @@ const styles = StyleSheet.create({
   },
   noticeSlot: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   notice: {
-    maxWidth: SIZES.measure,
+    maxWidth: TV_SIZES.measure,
     color: COLOURS.onPicture,
-    fontSize: SIZES.textLg,
+    fontSize: TV_SIZES.textLg,
     textAlign: 'center',
   },
 })

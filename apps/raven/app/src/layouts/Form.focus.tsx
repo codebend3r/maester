@@ -10,7 +10,7 @@ import {
 } from '@/layouts/formKit'
 import { formStyles, toneStyles } from '@/layouts/formStyles'
 import { tvFieldStyles } from '@/layouts/tvControls'
-import { SIZES } from '@/theme/appTheme'
+import { TV_SIZES } from '@/theme/tvSizes'
 
 const Form = ({ title, children }: FormProps) => (
   <View style={[formStyles.ground, styles.ground]}>
@@ -86,10 +86,10 @@ const FormButton = ({ label, onPress, tone, isDisabled = false }: FormButtonProp
 export const focusForm: FormKit = { Form, Field, FormButton }
 
 const styles = StyleSheet.create({
-  ground: { justifyContent: 'center', padding: SIZES.space5 },
-  content: { gap: SIZES.space5, width: '100%', maxWidth: SIZES.measure, alignSelf: 'center' },
-  label: { fontSize: SIZES.textLg },
-  field: { gap: SIZES.space3 },
-  button: { minHeight: SIZES.controlLarge, borderWidth: SIZES.tvFocusRing },
-  buttonText: { fontSize: SIZES.textLg },
+  ground: { justifyContent: 'center', padding: TV_SIZES.space5 },
+  content: { gap: TV_SIZES.space5, width: '100%', maxWidth: TV_SIZES.measure, alignSelf: 'center' },
+  label: { fontSize: TV_SIZES.textLg },
+  field: { gap: TV_SIZES.space3 },
+  button: { minHeight: TV_SIZES.controlLarge, borderWidth: TV_SIZES.tvFocusRing },
+  buttonText: { fontSize: TV_SIZES.textLg },
 })

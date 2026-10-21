@@ -3,9 +3,10 @@ import { StyleSheet, Text, View } from 'react-native'
 
 import type { PlayerChromeProps } from '@/layouts/playerKit'
 import { PlateButton } from '@/layouts/tvControls'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { COLOURS } from '@/theme/appTheme'
+import { TV_SIZES } from '@/theme/tvSizes'
 
-const GUTTER = SIZES.space8
+const GUTTER = TV_SIZES.space8
 
 const BACK = 'Back'
 
@@ -50,15 +51,15 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
     justifyContent: 'center',
-    gap: SIZES.space4,
+    gap: TV_SIZES.space4,
     paddingHorizontal: GUTTER,
     backgroundColor: COLOURS.ground,
   },
-  title: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
+  title: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
   notice: {
-    maxWidth: SIZES.measure,
+    maxWidth: TV_SIZES.measure,
     color: COLOURS.text,
-    fontSize: SIZES.textLg,
+    fontSize: TV_SIZES.textLg,
   },
   actions: { flexDirection: 'row' },
 })

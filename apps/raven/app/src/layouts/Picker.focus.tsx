@@ -9,7 +9,8 @@ import {
   pickerLabelOf,
 } from '@/layouts/gridKit'
 import { PlateButton, plateStyles } from '@/layouts/tvControls'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { COLOURS } from '@/theme/appTheme'
+import { TV_SIZES } from '@/theme/tvSizes'
 
 /** Marks the option chosen now. */
 const CHOSEN = '\u2713'
@@ -88,29 +89,29 @@ const ToolButton = ({ label, accessibilityLabel, onPress }: ToolButtonProps) => 
 export const focusPicker: PickerKit = { Picker, ToolButton }
 
 const styles = StyleSheet.create({
-  chip: { flexDirection: 'row', gap: SIZES.space2 },
+  chip: { flexDirection: 'row', gap: TV_SIZES.space2 },
   focused: { borderColor: COLOURS.text },
-  label: { color: COLOURS.muted, fontSize: SIZES.text },
+  label: { color: COLOURS.muted, fontSize: TV_SIZES.text },
   chosen: { fontWeight: 'bold' },
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   // The web's `--color-scrim` is a translucent black React Native's tokens cannot carry.
   shade: { ...StyleSheet.absoluteFill, backgroundColor: COLOURS.deep, opacity: 0.85 },
   panel: {
-    minWidth: SIZES.measure / 2,
+    minWidth: TV_SIZES.measure / 2,
     maxHeight: '80%',
-    gap: SIZES.space3,
-    padding: SIZES.space5,
-    borderRadius: SIZES.radius,
+    gap: TV_SIZES.space3,
+    padding: TV_SIZES.space5,
+    borderRadius: TV_SIZES.radius,
     backgroundColor: COLOURS.raised,
   },
-  title: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
-  options: { gap: SIZES.space1 },
+  title: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+  options: { gap: TV_SIZES.space1 },
   option: {
-    minHeight: SIZES.controlLarge,
+    minHeight: TV_SIZES.controlLarge,
     justifyContent: 'center',
-    paddingHorizontal: SIZES.space3,
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.tvFocusRing,
+    paddingHorizontal: TV_SIZES.space3,
+    borderRadius: TV_SIZES.radius,
+    borderWidth: TV_SIZES.tvFocusRing,
     borderColor: 'transparent',
   },
 })
