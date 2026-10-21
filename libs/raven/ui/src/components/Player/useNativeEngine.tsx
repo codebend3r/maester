@@ -5,7 +5,7 @@ import { fromPlayerEvent, rangesFrom } from '@/components/Player/fromPlayerEvent
 import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
 import { useNativeTrackSelection } from '@/components/Player/useNativeTrackSelection'
-import { type Ranges, initialVideoState, videoReducer } from '@/components/Player/useVideoState'
+import { type Ranges, initialVideoState, videoReducer } from '@/components/Player/videoState'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 const ENGINE_NAME = 'mpv'
