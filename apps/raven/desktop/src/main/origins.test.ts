@@ -84,7 +84,7 @@ describe('serverOriginFrom', () => {
     ).toEqual({ origin: BUILT, warnings: [] })
   })
 
-  it('falls back to the local server when the build named none', () => {
+  it('falls back to the default server when the build named none', () => {
     expect(pick({ isPackaged: true, built: '', env: {} })).toEqual({
       origin: DEFAULT_SERVER_ORIGIN,
       warnings: [],
