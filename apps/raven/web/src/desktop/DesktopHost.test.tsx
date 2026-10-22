@@ -31,6 +31,7 @@ import {
   viewOf,
 } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
+import { playPathOf } from '@/desktop/paths'
 
 const askOf = (status: DownloadAsk['status']): DownloadAsk => ({
   askId: ASK_ID,
@@ -83,7 +84,7 @@ describe('DesktopHost', () => {
     await client.emit({ type: DESKTOP_EVENTS.navigate, to: PAGE_PATHS.settings })
     expect(where()).toBe(PAGE_PATHS.settings)
     await client.emit({ type: DESKTOP_EVENTS.play, target: { fileId: FILE_ID, queue: [] } })
-    expect(where()).toBe(`/play/${FILE_ID}`)
+    expect(where()).toBe(playPathOf(FILE_ID))
   })
 
   it("shows main's notices and a newer release as toasts", async () => {
@@ -172,7 +173,7 @@ describe('DesktopHost', () => {
     await act(async () => {
       fireEvent.drop(window, { dataTransfer: files })
     })
-    expect(where()).toBe(`/play/${FILE_ID}`)
+    expect(where()).toBe(playPathOf(FILE_ID))
     expect(client.dropFiles).toHaveBeenCalledTimes(1)
   })
 })

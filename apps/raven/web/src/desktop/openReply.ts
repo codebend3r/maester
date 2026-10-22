@@ -3,6 +3,7 @@ import { useToasts } from '@raven/ui'
 import { type NavigateFunction, useLocation, useNavigate } from 'react-router-dom'
 import { isPlaying, playPathOf } from '@/desktop/paths'
 import { useDownloadAsk } from '@/stores/downloadAsk'
+import { handled } from '@/desktop/handled'
 
 /**
  * What to do with main's answer to opening something: play a file (replacing a video already
@@ -21,12 +22,16 @@ const applyReply = ({
 }): void => {
   switch (reply.type) {
     case DESKTOP_REPLIES.play:
-      return void navigate(playPathOf(reply.target.fileId), {
-        state: { queue: reply.target.queue },
-        replace: isPlaying(pathname),
-      })
+      return handled(
+        Promise.resolve(
+          navigate(playPathOf(reply.target.fileId), {
+            state: { queue: reply.target.queue },
+            replace: isPlaying(pathname),
+          }),
+        ),
+      )
     case DESKTOP_REPLIES.navigate:
-      return void navigate(reply.to)
+      return handled(Promise.resolve(navigate(reply.to)))
     case DESKTOP_REPLIES.downloadAsk:
       return useDownloadAsk.getState().show(reply.ask)
     case DESKTOP_REPLIES.refused:

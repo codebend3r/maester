@@ -498,7 +498,7 @@ describe('createMediaAccess', () => {
         previous.then(() => access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE })),
       Promise.resolve(),
     )
-    void access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE })
+    access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE }).catch(() => undefined)
     await ticks(5)
     expect(mints).toHaveLength(DOWNLOAD_MINTS.budget)
     expect(pending.size).toBe(1)

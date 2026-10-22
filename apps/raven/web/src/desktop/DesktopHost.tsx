@@ -13,6 +13,7 @@ import { useFollowServerReach, useReturnWhenReached } from '@/desktop/serverReac
 import { useFileDrop } from '@/desktop/useFileDrop'
 import { useDesktop } from '@/stores/desktop'
 import { useDownloadAsk } from '@/stores/downloadAsk'
+import { handled } from '@/desktop/handled'
 
 /** The toast for a newer release; Settings' Updates section opens its page. */
 const updateWords = (version: string): string =>
@@ -45,7 +46,7 @@ export const DesktopHost = () => {
       case DESKTOP_EVENTS.downloadAsk:
         return openReply(event)
       case DESKTOP_EVENTS.navigate:
-        return void navigate(event.to)
+        return handled(Promise.resolve(navigate(event.to)))
       case DESKTOP_EVENTS.player:
         return menu.emit(event.action)
       case DESKTOP_EVENTS.notice:

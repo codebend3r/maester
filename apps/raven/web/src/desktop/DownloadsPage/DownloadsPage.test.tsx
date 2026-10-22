@@ -25,6 +25,7 @@ import {
   viewOf,
 } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
+import { DESKTOP_PATHS, playPathOf } from '@/desktop/paths'
 
 const EPISODE_2 = viewOf({
   downloadId: DL_2,
@@ -44,11 +45,11 @@ const DUNE = viewOf({
 const renderPage = (client: FakeClient) => {
   asDesktop(client)
   renderWithProviders({
-    route: '/downloads',
+    route: DESKTOP_PATHS.downloads,
     ui: (
       <>
         <Routes>
-          <Route path="/downloads" element={<DownloadsPage />} />
+          <Route path={DESKTOP_PATHS.downloads} element={<DownloadsPage />} />
           <Route path="*" element={<Where />} />
         </Routes>
         <Toaster />
@@ -154,7 +155,7 @@ describe('DownloadsPage', () => {
     })
     renderPage(client)
     await userEvent.click(await screen.findByRole('button', { name: 'Play Dune (2021)' }))
-    await waitFor(() => expect(where()).toBe(`/play/${FILE_ID}`))
+    await waitFor(() => expect(where()).toBe(playPathOf(FILE_ID)))
   })
 
   it('asks before deleting, frees the room it says, and can be talked out of it', async () => {
