@@ -501,11 +501,26 @@ describe('the web host: /api', () => {
       response.write('abcd', () => response.destroy())
     })
     const { port } = await host({ serverOrigin: server.origin })
-    const cut = await ask({ port, path: '/api/media/3/file' }).then(
-      () => null,
-      (error: unknown) => error,
-    )
-    expect(cut).toBeInstanceOf(Error)
+    // Bun's client reports a cut answer as an error or as an early end, by timing; either
+    // way the answer is not complete.
+    const isComplete = await new Promise<boolean>((resolve) => {
+      const outgoing = request(
+        {
+          host: '127.0.0.1',
+          port,
+          path: '/api/media/3/file',
+          headers: { [HTTP_HEADERS.host]: WEB_HOST },
+        },
+        (response) => {
+          response.on('error', () => resolve(false))
+          response.once('close', () => resolve(response.complete))
+          response.resume()
+        },
+      )
+      outgoing.on('error', () => resolve(false))
+      outgoing.end()
+    })
+    expect(isComplete).toBe(false)
   })
 
   it('lets go of the server when the page breaks off an upload', async () => {
