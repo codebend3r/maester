@@ -2,6 +2,7 @@ import {
   APP_CALL_METHODS,
   APP_CLIENT_CALLS,
   type AppClientCall,
+  type AppClientCallName,
   type FetchLike,
   appClientCallOf,
 } from '@raven/core'
@@ -19,12 +20,20 @@ const ADMIN_LOCK_CALLS: ReadonlySet<AppClientCall> = new Set([
 const withoutQuery = (url: string): string => url.replace(/[?#].*$/su, '')
 
 /**
- * Throws unless `method` and `url` are one of core's `APP_CLIENT_CALLS`, so no screen can
- * reach an `@AdminOnly()` route or a write the app has no business with. What it throws
- * names the method and the address without its query, which may hold a ticket.
+ * The name of the call `method` and `url` are among core's `APP_CLIENT_CALLS`; it throws for
+ * any other, so no screen can reach an `@AdminOnly()` route or a write the app has no business
+ * with. What it throws names the method and the address without its query, which may hold a
+ * ticket.
  */
-export const checkAppCall = ({ method, url }: { method: string; url: string }): void => {
-  if (appClientCallOf({ method, url }) !== null) return
+export const checkAppCall = ({
+  method,
+  url,
+}: {
+  method: string
+  url: string
+}): AppClientCallName => {
+  const name = appClientCallOf({ method, url })
+  if (name !== null) return name
   throw new Error(`raven's app does not call ${method} ${withoutQuery(url)}`)
 }
 
@@ -37,10 +46,8 @@ export const allowlistedFetch =
   ({ fetch, hasAccounts }: { fetch: FetchLike; hasAccounts: () => boolean }): FetchLike =>
   async (url, init = {}) => {
     const method = init.method ?? APP_CALL_METHODS.get
-    checkAppCall({ method, url })
-    const name = appClientCallOf({ method, url })
-    const isAdminLockCall = name !== null && ADMIN_LOCK_CALLS.has(APP_CLIENT_CALLS[name])
-    if (isAdminLockCall && hasAccounts()) {
+    const name = checkAppCall({ method, url })
+    if (ADMIN_LOCK_CALLS.has(APP_CLIENT_CALLS[name]) && hasAccounts()) {
       throw new Error(
         `raven's app does not call ${method} ${withoutQuery(url)} on a server with accounts`,
       )

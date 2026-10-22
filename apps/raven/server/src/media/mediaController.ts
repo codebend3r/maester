@@ -34,6 +34,7 @@ import {
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
+import { merge } from 'rxjs'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { AccessRechecks } from '@/auth/accessRechecks'
 import { OpenedByPass, PASS_KINDS } from '@/auth/accountPasses'
@@ -231,7 +232,8 @@ export class MediaController {
    * range request, so the server does nothing but read. Files the client
    * cannot decode as they are go through `PlaybackController`'s stream. An
    * account ticket that opens the file earns a pass, so the native player's
-   * later ranges, which carry that same ticket, outlive its five minutes.
+   * later ranges, which carry that same ticket, outlive its five minutes; a
+   * range still streaming as that pass ends is cut, as a recheck cuts it.
    */
   @MediaPlane()
   @OpenedByPass(PASS_KINDS.ticket)
@@ -245,11 +247,11 @@ export class MediaController {
     const file = this.fileOf(id)
     const info = await stat(file.path).catch(() => null)
     if (!info?.isFile()) throw new NotFoundException('The file is no longer on disk')
-    this.passes.hold({ request, ticket, mediaId: id })
+    const passEnded = this.passes.hold({ request, ticket, mediaId: id })
 
     trackStream({
       sessions: this.streams,
-      rechecks: this.rechecks,
+      ended: merge(this.rechecks.ended({ request }), passEnded),
       auth: this.callers,
       mediaId: id,
       mode: PLAYBACK_MODES.direct,

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { AUTH_REFUSALS, MEMBER_STATUSES, type Account } from '@raven/core'
+import type { PassGrant } from '@/auth/accountPasses'
 import { INTEGRITY_FAILURES, IntegrityFailure, authFailure } from '@/auth/authFailure'
 import { MembershipLookups } from '@/auth/membershipLookups'
 import type { createTokenVerifier } from '@/auth/tokenVerifier'
@@ -111,23 +112,14 @@ export class AuthSessions {
   }
 
   /**
-   * Binds the caller a redeemed ticket, or an HLS session's capability,
-   * stands for: the account of the session it was minted from, rechecked,
-   * and its unlock.
+   * Binds the caller a redeemed ticket, or an account pass, stands for: the
+   * account of the session it was minted from, rechecked, and its unlock.
    */
-  bindTicket({
-    request,
-    session,
-    unlockedUntil,
-  }: {
-    request: object
-    session: TicketSession
-    unlockedUntil: number | null
-  }): void {
+  bindTicket({ request, grant }: { request: object; grant: PassGrant }): void {
     this.callers.set(request, {
       kind: CALLERS.ticket,
-      session: { account: session.account },
-      unlockedUntil,
+      session: { account: grant.account },
+      unlockedUntil: grant.unlockedUntil,
     })
   }
 

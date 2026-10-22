@@ -279,7 +279,7 @@ export class AccountGuard implements CanActivate {
     requirement: GatedRequirement
   }): void {
     admit({ requirement, account: grant.account })
-    this.sessions.bindTicket({ request, session: grant, unlockedUntil: grant.unlockedUntil })
+    this.sessions.bindTicket({ request, grant })
   }
 
   /** Authenticates Bearer, or the session cookie on a GET or HEAD, and binds its session. */

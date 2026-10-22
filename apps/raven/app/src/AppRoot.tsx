@@ -82,10 +82,10 @@ const UnlockRoute = () => {
 /**
  * Loads what the app keeps on the device before any route renders, then the routes. Every
  * route but sign-in needs a server, and one with accounts a signed in account, so without them
- * they send the viewer to sign in. Until the
- * prefs are read the splash stays up and the app paints nothing, so the first frame of a theme
- * is the one picked, never the default's on its way to it; the splash goes once that frame is
- * drawn, and after that a theme picked in Settings repaints everything at once.
+ * they send the viewer to sign in. Until the prefs are read the splash stays up and the app
+ * paints nothing, so the first frame of a theme is the one picked, never the default's on its
+ * way to it; the splash goes once that frame is drawn, and after that a theme picked in
+ * Settings repaints everything at once.
  */
 export const AppRoot = () => {
   const [isLoaded, setLoaded] = useState(false)

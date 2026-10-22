@@ -1,13 +1,12 @@
 import { createHash } from 'node:crypto'
 import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common'
 import { isString } from '@raven/core'
-import { AccessRechecks } from '@/auth/accessRechecks'
+import { AsyncSubject, NEVER, type Observable } from 'rxjs'
 import { AUTH_ENCODINGS } from '@/auth/accessToken'
-import { type AccountPass, type PassGrant, openPass, ticketAccessOf } from '@/auth/accountPasses'
+import { type AccountPass, type PassGrant, openPass } from '@/auth/accountPasses'
 import { ACCOUNT_TICKET_PREFIX } from '@/auth/accountTickets'
-import { AuthSessions } from '@/auth/authSessions'
+import { TicketAccesses } from '@/auth/ticketAccesses'
 import { CLOCK, type Clock } from '@/clock'
-import { LockService } from '@/lock/lockService'
 
 /** How many passes the server holds in all; one more lets go of the least recently used. */
 export const FILE_PASS_CAP = 256
@@ -25,6 +24,8 @@ type Held = {
   /** Null only while the pass opens, which may end it at once. */
   pass: AccountPass | null
   lastUsedAt: number
+  /** Emits once the pass has ended, however it ended, so the responses it opened are cut. */
+  ended: AsyncSubject<void>
 }
 
 /** Ends a held pass; the pass then has it forgotten. */
@@ -59,35 +60,40 @@ export class FilePasses implements OnModuleDestroy {
 
   constructor(
     @Inject(CLOCK) private readonly clock: Clock,
-    @Inject(AuthSessions) private readonly callers: Pick<AuthSessions, 'callerOf'>,
-    @Inject(AccessRechecks) private readonly rechecks: Pick<AccessRechecks, 'ended'>,
-    @Inject(LockService) private readonly lock: Pick<LockService, 'relocks' | 'unlockNeedOf'>,
+    @Inject(TicketAccesses) private readonly accesses: Pick<TicketAccesses, 'accessOf'>,
   ) {}
 
   /**
    * Holds a pass for `ticket` on media `mediaId`, once the account gate let
-   * the request through on that account ticket or its pass. Another
-   * caller, a legacy ticket or none hold nothing. A ticket already held
-   * keeps the deadline of its first open.
+   * the request through on that account ticket or its pass, and answers
+   * what emits as that pass ends, so the response it opened is cut then.
+   * Another caller, a legacy ticket or none hold nothing, and nothing ends
+   * their response here. A ticket already held keeps the deadline of its
+   * first open.
    */
-  hold({ request, ticket, mediaId }: { request: object; ticket: unknown; mediaId: number }): void {
-    if (!isString(ticket) || !ticket.startsWith(ACCOUNT_TICKET_PREFIX)) return
+  hold({
+    request,
+    ticket,
+    mediaId,
+  }: {
+    request: object
+    ticket: unknown
+    mediaId: number
+  }): Observable<void> {
+    if (!isString(ticket) || !ticket.startsWith(ACCOUNT_TICKET_PREFIX)) return NEVER
     const digest = digestOf(ticket)
-    if (this.grantOf({ ticket, mediaId }) !== null) return
-    const access = ticketAccessOf({
-      request,
-      mediaId,
-      callers: this.callers,
-      rechecks: this.rechecks,
-      lock: this.lock,
-    })
-    if (access === null) return
+    const kept = this.held.get(digest)
+    if (kept !== undefined && this.grantOf({ ticket, mediaId }) !== null)
+      return kept.ended.asObservable()
+    const access = this.accesses.accessOf({ request, mediaId })
+    if (access === null) return NEVER
     this.makeRoom({ accountId: access.account.id })
     const record: Held = {
       accountId: access.account.id,
       mediaId,
       pass: null,
       lastUsedAt: this.clock.now(),
+      ended: new AsyncSubject<void>(),
     }
     this.held.set(digest, record)
     record.pass = openPass({
@@ -97,6 +103,7 @@ export class FilePasses implements OnModuleDestroy {
       clock: this.clock,
       onEnd: () => this.forget({ digest, record }),
     })
+    return record.ended.asObservable()
   }
 
   /** What `ticket`'s pass lets a request for media `mediaId`'s file through as, or null when it holds none. */
@@ -118,6 +125,8 @@ export class FilePasses implements OnModuleDestroy {
 
   private forget({ digest, record }: { digest: string; record: Held }): void {
     if (this.held.get(digest) === record) this.held.delete(digest)
+    record.ended.next()
+    record.ended.complete()
   }
 
   /** Ends the least recently used pass of the account at its share, else of all at the cap. */

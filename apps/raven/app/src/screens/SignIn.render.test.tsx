@@ -402,7 +402,7 @@ describe('SignIn', () => {
       expect(unlockAdmin).not.toHaveBeenCalled()
     })
 
-    it('signs in at the endpoints the server names again, then adds it with its pin and goes Home', async () => {
+    it('signs in at the endpoints the server names again, then adds it with its pin and goes Home, asking for no legacy ticket', async () => {
       await reachAccount()
       await signInAs({ email: ` ${EMAIL} `, password: PASSWORD })
 
@@ -428,6 +428,8 @@ describe('SignIn', () => {
       expect(getLock).not.toHaveBeenCalled()
       expect(getAdminLock).not.toHaveBeenCalled()
       expect(unlockAdmin).not.toHaveBeenCalled()
+      // Account tickets play its titles, so whether it hands out legacy ones is never asked.
+      expect(getMediaTicket).not.toHaveBeenCalled()
     })
 
     it("says the sign-in's words for a wrong password, adds nothing and clears the password", async () => {

@@ -151,6 +151,12 @@ const mintRefusalOf = ({ error, server }: { error: unknown; server: AppServer })
 const withTicket = ({ uri, ticket }: { uri: string; ticket: string }): string =>
   `${uri}${uri.includes('?') ? '&' : '?'}${toQueryString({ [MEDIA_TICKET_PARAM]: ticket })}`
 
+/** A source played by the ticket in its address alone: the native player sends no header. */
+const playable = (uri: string): SourceOutcome => {
+  checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
+  return { ok: true, source: { uri, headers: {} } }
+}
+
 /**
  * Where one server's videos play from, for the native players. The origins `getMediaOrigins`
  * lists are probed on first use and again on each change of network, and the fastest by core's
@@ -309,21 +315,20 @@ export const mediaAccessFor = ({
     return { ok: true, source: { uri, headers } }
   }
 
-  const mintFor = (mediaId: number): Promise<{ ticket: string } | AccessRefusal> =>
+  const mintFor = (mediaId: number): Promise<{ ok: true; ticket: string } | AccessRefusal> =>
     api.getAccountTicket({ id: mediaId }).then(
-      ({ ticket }) => ({ ticket }),
+      ({ ticket }) => ({ ok: true, ticket }),
       (error: unknown) => mintRefusalOf({ error, server }),
     )
 
   const accountSource = async (request: SourceRequest): Promise<SourceOutcome> => {
     const [origin, minted] = await Promise.all([pickOf(), mintFor(request.media.id)])
-    if ('ok' in minted) return minted
-    const uri =
+    if (!minted.ok) return minted
+    return playable(
       origin === null
         ? withTicket({ uri: uriFor({ request, access: null }), ticket: minted.ticket })
-        : uriFor({ request, access: { origin, ticket: minted.ticket } })
-    checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
-    return { ok: true, source: { uri, headers: {} } }
+        : uriFor({ request, access: { origin, ticket: minted.ticket } }),
+    )
   }
 
   const sourceFor = async (request: SourceRequest): Promise<SourceOutcome> => {
@@ -334,12 +339,9 @@ export const mediaAccessFor = ({
         return read.refusal
       case TICKET_READS.off:
         return cookieSource(request)
-      case TICKET_READS.issued: {
+      case TICKET_READS.issued:
         if (origin === null) return cookieSource(request)
-        const uri = uriFor({ request, access: { origin, ticket: read.ticket } })
-        checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
-        return { ok: true, source: { uri, headers: {} } }
-      }
+        return playable(uriFor({ request, access: { origin, ticket: read.ticket } }))
       default: {
         const unreachable: never = read
         return unreachable

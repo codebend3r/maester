@@ -3,11 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Logger } from '@nestjs/common'
 import {
-  AUTH_HEADERS,
   AUTH_REFUSALS,
   HLS_PARAMS,
   HLS_PATHS,
-  LIBRARY_KINDS,
   LOCKED_STATUS,
   MEDIA_ORIGIN_KINDS,
   MEDIA_TICKET_PARAM,
@@ -15,34 +13,34 @@ import {
   PLAYBACK_MODES,
   SUBTITLE_SOURCES,
   createApiClient,
-  isMediaTicket,
   toQueryString,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ACCOUNT_PASS_MS } from '@/auth/accountPasses'
 import { MEMBERSHIP_TTL_MS } from '@/auth/membershipLookups'
 import { HLS_CAPABILITY_PREFIX } from '@/hls/hlsCapability'
-import { cookieSet, eventually, routePath } from '@/test/app'
+import { eventually, routePath } from '@/test/app'
 import { AUTH_TEST_FAILURES, AUTH_TEST_IDS, authFixture, bearerHeaders } from '@/test/auth'
 import {
   CALLER_KINDS,
   type CallerKind,
+  LONG_TOKEN_SECONDS,
   ROUTES,
   TOKEN_CARRIERS,
   addLeftovers,
   createEnforcedApp,
   headersFor,
   hlsSessionIn,
+  mintedTicket,
   outcomeOf,
   pathOf,
+  pinMoves,
   withTicket,
 } from '@/test/enforced'
 
 describe("an account's HLS session", () => {
   const RECHECK_MS = 100
   const PIN = '7007'
-  /** Two days: a token that outlives every jump of the clock here, so no recheck ends a session for it. */
-  const LONG_TOKEN_SECONDS = 2 * 24 * 60 * 60
   /** `?t=` given twice, which Fastify reads as an array. */
   const REPEATED = `${MEDIA_TICKET_PARAM}=a&${MEDIA_TICKET_PARAM}=b`
   /** Several rechecks long, and the bound a test holds the server to. */
@@ -59,6 +57,7 @@ describe("an account's HLS session", () => {
   /** Each video's sidecar track, by media id. */
   const sidecars = new Map<number, string>()
   let other: number
+  let pin: ReturnType<typeof pinMoves>
 
   beforeAll(async () => {
     root = await mkdtemp(join(tmpdir(), 'raven-enforcement-hls-'))
@@ -69,6 +68,7 @@ describe("an account's HLS session", () => {
       libraryPin: PIN,
       accessRecheckMs: RECHECK_MS,
     })
+    pin = pinMoves({ enforced: plane, fixture, pin: PIN })
     other = (await addLeftovers({ enforced: plane })).duplicate
     await Promise.all(
       ['The Matrix (1999).en.srt', 'The Matrix (1999) Final Cut.en.srt'].map((name) =>
@@ -112,12 +112,8 @@ describe("an account's HLS session", () => {
     caller: CallerKind
     id: number
     headers?: Record<string, string>
-  }) => {
-    const response = await mintFor({ id, headers: headers ?? (await bearerOf(caller)) })
-    const body: unknown = response.json()
-    if (!isMediaTicket(body)) throw new Error('No ticket was minted')
-    return body.ticket
-  }
+  }): Promise<string> =>
+    mintedTicket({ app: plane.app, id, headers: headers ?? (await bearerOf(caller)) })
 
   /** The URIs a playlist names on lines of their own: a master's variant, a media playlist's segments. */
   const linesIn = (playlist: string): string[] =>
@@ -219,47 +215,6 @@ describe("an account's HLS session", () => {
   }): Promise<number[]> =>
     Promise.all(urls.map(async (url) => (await get({ url, headers })).statusCode))
 
-  /** The owner's Bearer with the unlock cookie the PIN earns, and when that unlock lapses. */
-  const unlockAsOwner = async ({ headers }: { headers: Record<string, string> }) => {
-    const unlocking = await plane.app.inject({
-      method: ROUTES.unlock.method,
-      url: ROUTES.unlock.path,
-      headers,
-      payload: { pin: PIN },
-    })
-    expect(unlocking.statusCode).toBe(200)
-    const cookie = cookieSet(unlocking)
-    const [, value = ''] = cookie.split('=')
-    const [expires = ''] = value.split('.')
-    return { headers: { ...headers, [AUTH_HEADERS.cookie]: cookie }, lapsesAt: Number(expires) }
-  }
-
-  /** Locks the PIN again with `headers`, as the owner's Lock button does. */
-  const relock = async ({ headers }: { headers: Record<string, string> }) => {
-    const response = await plane.app.inject({
-      method: ROUTES.relock.method,
-      url: ROUTES.relock.path,
-      headers,
-    })
-    expect(response.statusCode).toBe(200)
-  }
-
-  /** Locks or opens the library as the owner, past the PIN, as a locked library's settings are changed. */
-  const setLocked = async ({ isLocked }: { isLocked: boolean }) => {
-    const { headers } = await unlockAsOwner({ headers: await bearerOf(CALLER_KINDS.owner) })
-    const response = await plane.app.inject({
-      method: ROUTES.updateLibrary.method,
-      url: pathOf({ route: ROUTES.updateLibrary, params: { id: plane.ids.library } }),
-      headers,
-      payload: {
-        name: 'Enforced',
-        paths: [plane.mediaDir],
-        settings: { kind: LIBRARY_KINDS.movies, locked: isLocked },
-      },
-    })
-    expect(response.statusCode).toBe(200)
-  }
-
   /** The status and refusal of each response, for the routes that answer an auth refusal. */
   const refusalsOf = async ({
     urls,
@@ -288,14 +243,14 @@ describe("an account's HLS session", () => {
   // These move the clock ahead and back first, so a membership answer cached while it was ahead
   // must never hide what the tests after them check.
   it("carries the owner's PIN unlock into the session, and ends it once the unlock lapses", async () => {
-    await setLocked({ isLocked: true })
+    await pin.setLocked({ isLocked: true })
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       const start = Date.now()
       const owner = bearerHeaders({
         token: await fixture.mint({ id: AUTH_TEST_IDS.owner, expiresIn: LONG_TOKEN_SECONDS }),
       })
-      const { headers, lapsesAt } = await unlockAsOwner({ headers: owner })
+      const { headers, lapsesAt } = await pin.unlock({ headers: owner })
       // Opened a minute after the unlock, so the capability's deadline falls after the unlock lapses.
       vi.setSystemTime(start + 60_000)
       const opened = await open({ caller: CALLER_KINDS.owner, id: plane.ids.video, headers })
@@ -308,7 +263,7 @@ describe("an account's HLS session", () => {
       expect((await mintFor({ id: opened.id, headers: owner })).statusCode).toBe(LOCKED_STATUS)
     } finally {
       vi.useRealTimers()
-      await setLocked({ isLocked: false })
+      await pin.setLocked({ isLocked: false })
     }
   })
 
@@ -335,32 +290,32 @@ describe("an account's HLS session", () => {
   })
 
   it('ends a session on a locked library as the owner locks again, and its reopen meets the lock', async () => {
-    await setLocked({ isLocked: true })
+    await pin.setLocked({ isLocked: true })
     try {
       const owner = await bearerOf(CALLER_KINDS.owner)
-      const { headers } = await unlockAsOwner({ headers: owner })
+      const { headers } = await pin.unlock({ headers: owner })
       const opened = await open({ caller: CALLER_KINDS.owner, id: plane.ids.video, headers })
       const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
       expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
-      await relock({ headers })
+      await pin.relock({ headers })
       expect(await statusesOf({ urls })).toEqual([404, 404, 404, 404, 404])
       expect((await mintFor({ id: opened.id, headers: owner })).statusCode).toBe(LOCKED_STATUS)
     } finally {
-      await setLocked({ isLocked: false })
+      await pin.setLocked({ isLocked: false })
     }
   })
 
   it('keeps a session on an unlocked library through a relock, without the unlock', async () => {
-    const { headers } = await unlockAsOwner({ headers: await bearerOf(CALLER_KINDS.owner) })
+    const { headers } = await pin.unlock({ headers: await bearerOf(CALLER_KINDS.owner) })
     const opened = await open({ caller: CALLER_KINDS.owner, id: plane.ids.video, headers })
     const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
-    await relock({ headers })
+    await pin.relock({ headers })
     expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
-    await setLocked({ isLocked: true })
+    await pin.setLocked({ isLocked: true })
     try {
       expect(await statusesOf({ urls })).toEqual(urls.map(() => LOCKED_STATUS))
     } finally {
-      await setLocked({ isLocked: false })
+      await pin.setLocked({ isLocked: false })
     }
   })
 
@@ -576,11 +531,11 @@ describe("an account's HLS session", () => {
     const opened = await open({ caller: CALLER_KINDS.member, id: plane.ids.video })
     const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
     expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
-    await setLocked({ isLocked: true })
+    await pin.setLocked({ isLocked: true })
     try {
       expect(await statusesOf({ urls })).toEqual([404, 404, 404, 404, 404])
     } finally {
-      await setLocked({ isLocked: false })
+      await pin.setLocked({ isLocked: false })
     }
     expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
   })

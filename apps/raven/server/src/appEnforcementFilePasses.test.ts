@@ -10,7 +10,6 @@ import {
   MEMBER_STATUSES,
   PLAYBACK_MODES,
   SUBTITLE_SOURCES,
-  isMediaTicket,
   toQueryString,
 } from '@raven/core'
 import { HEADERS } from '@shared/server'
@@ -22,11 +21,13 @@ import { AUTH_TEST_FAILURES, AUTH_TEST_IDS, authFixture, bearerHeaders } from '@
 import {
   CALLER_KINDS,
   type CallerKind,
+  LONG_TOKEN_SECONDS,
   ROUTES,
   TOKEN_CARRIERS,
   addLeftovers,
   createEnforcedApp,
   headersFor,
+  mintedTicket,
   outcomeOf,
   pathOf,
   withTicket,
@@ -37,8 +38,6 @@ describe("an account ticket's pass on the file it opened", () => {
   const TICKET_MS = ACCOUNT_TICKET_SECONDS * 1000
   /** Past the ticket's five minutes, well inside any token minted here. */
   const PAST_TICKET_MS = TICKET_MS + 1_000
-  /** Two days: a token that outlives the pass, so no recheck ends it for want of one. */
-  const LONG_TOKEN_SECONDS = 2 * 24 * 60 * 60
   /** Several rechecks long, and the bound a test holds the server to. */
   const ENDED_WITHIN_MS = 1_000
   const FIRST_BYTES = { [HEADERS.range]: 'bytes=0-99' }
@@ -82,16 +81,12 @@ describe("an account ticket's pass on the file it opened", () => {
     caller?: CallerKind
     id?: number
     headers?: Record<string, string>
-  } = {}): Promise<string> => {
-    const response = await plane.app.inject({
-      method: ROUTES.accountTicket.method,
-      url: pathOf({ route: ROUTES.accountTicket, params: { id } }),
+  } = {}): Promise<string> =>
+    mintedTicket({
+      app: plane.app,
+      id,
       headers: headers ?? (await headersFor({ fixture, caller, via: TOKEN_CARRIERS.bearer })),
     })
-    const body: unknown = response.json()
-    if (!isMediaTicket(body)) throw new Error('No ticket was minted')
-    return body.ticket
-  }
 
   /** Asks for `id`'s file with `ticket` alone, as a native player's range request does. */
   const play = ({

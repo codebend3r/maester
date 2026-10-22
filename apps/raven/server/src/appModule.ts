@@ -9,6 +9,7 @@ import { AuthBackend } from '@/auth/authBackend'
 import { AuthController } from '@/auth/authController'
 import { AUTH_STATE, resolveAuthState } from '@/auth/effectiveAuth'
 import { AUTH_VERIFY, AuthSessions } from '@/auth/authSessions'
+import { TicketAccesses } from '@/auth/ticketAccesses'
 import { Management } from '@/auth/management'
 import { MEMBERSHIP_TTL, MEMBERSHIP_TTL_MS, MembershipLookups } from '@/auth/membershipLookups'
 import { AUTH_FETCH, createTokenVerifier, type AuthFetch } from '@/auth/tokenVerifier'
@@ -220,6 +221,7 @@ export class AppModule {
         { provide: CLOCK, useValue: SYSTEM_CLOCK },
         HlsSessions,
         FilePasses,
+        TicketAccesses,
         SubtitlesService,
         MediaArtifacts,
         ScannerService,

@@ -192,8 +192,9 @@ export const sessionReducer = (state: SessionState, event: SessionEvent): Sessio
       return stepDown({ ladder: state, at: event.at })
     case SESSION_EVENTS.dropped:
       if (event.attempt !== state.attempt || state.phase === SESSION_PHASES.refused) return state
-      if (state.phase !== SESSION_PHASES.playing || !hasPlayedOn({ ladder: state, at: event.at }))
+      if (state.phase !== SESSION_PHASES.playing || !hasPlayedOn({ ladder: state, at: event.at })) {
         return stepDown({ ladder: state, at: event.at })
+      }
       return sourcing({
         ladder: { ...state, reopenedAt: event.at },
         step: state.step,
@@ -254,8 +255,8 @@ export const noticeOf = (state: SessionState): string | null => {
  * Plays `media` down its plan's ladder: asks `sources` for each way's source in turn, steps
  * down when the player says one failed or it has not loaded in time, opens a direct play again
  * from its `clock` once it has waited for data (`isWaiting`) `STALL_REOPEN_MS` with the clock
- * standing still, and asks again
- * after a refusal once the server's cookies change, as an unlock changes them.
+ * standing still, and asks again after a refusal once the server's cookies change, as an
+ * unlock changes them.
  */
 export const usePlaybackSession = ({
   media,

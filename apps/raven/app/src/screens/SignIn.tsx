@@ -31,7 +31,7 @@ import { AUTH_READS, type AuthRead, answerOf, isLetIn, readAuthConfig } from '@/
 import { accountSessions, apiFor, cookieJar, newServerId } from '@/servers/serverClient'
 import { ADD_OUTCOMES, type AppServer } from '@/servers/serverList'
 import { TICKET_SUPPORT, ticketSupportOf } from '@/servers/tickets'
-import { useAccountAnswers } from '@/stores/accountAnswers'
+import { hasAccountsNow, useAccountAnswers } from '@/stores/accountAnswers'
 import { useAccountState } from '@/stores/accountState'
 import { useActiveServer } from '@/stores/activeServer'
 
@@ -97,8 +97,11 @@ type MovedStep = {
   pinnedHost: string
 }
 
-/** The email and password for a server with accounts, pinned at `account`, which `server` carries. */
-type AccountStep = { kind: typeof STEPS.account; server: AppServer; account: SignInConfig }
+/** A server whose sign-in is pinned: one that signs in with accounts. */
+type PinnedServer = AppServer & { account: SignInConfig }
+
+/** The email and password for a server with accounts, at the endpoints its pin names. */
+type AccountStep = { kind: typeof STEPS.account; server: PinnedServer }
 
 type Step =
   | { kind: typeof STEPS.address }
@@ -128,7 +131,7 @@ const openingStep = (): Step => {
   if (isLetIn({ account: active.account, answer, isSignedIn: isSignedIn(active) })) {
     return ADDRESS_STEP
   }
-  return { kind: STEPS.account, server: active, account: active.account }
+  return { kind: STEPS.account, server: { ...active, account: active.account } }
 }
 
 /** What the PIN step and the admin step each ask for, and the call that sends it. */
@@ -181,7 +184,11 @@ export const SignIn = () => {
     setStep(next)
   }
 
-  /** Adds the server when it is new and makes it the active one; false when it could not be added. */
+  /**
+   * Adds the server when it is new and makes it the active one; false when it could not be
+   * added. Only a server without accounts is asked whether it hands out media tickets: one
+   * with them plays by account tickets alone.
+   */
   const finish = async (server: AppServer): Promise<boolean> => {
     const { add, activate } = useActiveServer.getState()
     const added = isListed(server) ? ADD_OUTCOMES.added : add(server).kind
@@ -190,7 +197,9 @@ export const SignIn = () => {
       return false
     }
     activate(server.id)
-    const support = await ticketSupportOf({ api: apiFor(server) })
+    const support = hasAccountsNow(server)
+      ? TICKET_SUPPORT.on
+      : await ticketSupportOf({ api: apiFor(server) })
     if (support === TICKET_SUPPORT.off) {
       askFor({ kind: STEPS.ticketsOff })
       return true
@@ -219,7 +228,7 @@ export const SignIn = () => {
       await finish(pinned)
       return
     }
-    askFor({ kind: STEPS.account, server: pinned, account })
+    askFor({ kind: STEPS.account, server: pinned })
   }
 
   /** Goes on as the server's auth config says: the PIN, the account, or a question first. */
@@ -442,7 +451,8 @@ export const SignIn = () => {
         />
       )
     case STEPS.account: {
-      const host = signInHostOf(step.account)
+      const { account } = step.server
+      const host = signInHostOf(account)
       return (
         <FormSheet onClose={() => startOver(step.server)}>
           <Form key={step.kind} title={step.server.name}>
@@ -470,15 +480,15 @@ export const SignIn = () => {
               tone={BUTTON_TONES.primary}
             />
             <WebPages
-              note={SIGN_IN_COPY.webPages(step.account.webUrl)}
+              note={SIGN_IN_COPY.webPages(account.webUrl)}
               pages={[
                 {
                   label: SIGN_IN_COPY.createAccount,
-                  onOpen: () => openPage({ account: step.account, page: ACCOUNT_PAGES.signUp }),
+                  onOpen: () => openPage({ account, page: ACCOUNT_PAGES.signUp }),
                 },
                 {
                   label: SIGN_IN_COPY.forgotPassword,
-                  onOpen: () => openPage({ account: step.account, page: ACCOUNT_PAGES.forgot }),
+                  onOpen: () => openPage({ account, page: ACCOUNT_PAGES.forgot }),
                 },
               ]}
             />

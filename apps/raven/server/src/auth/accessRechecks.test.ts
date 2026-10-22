@@ -18,6 +18,7 @@ import { AccessRechecks } from '@/auth/accessRechecks'
 import { AuthBackend } from '@/auth/authBackend'
 import { AuthSessions, REMEMBERED_ACCOUNTS } from '@/auth/authSessions'
 import { MEMBERSHIP_TTL_MS, MembershipLookups } from '@/auth/membershipLookups'
+import { TicketAccesses } from '@/auth/ticketAccesses'
 import type { createTokenVerifier } from '@/auth/tokenVerifier'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
@@ -112,7 +113,10 @@ describe('rechecks of an open response', () => {
   it('ends a ticket caller at the next recheck once the account is removed', async () => {
     const { sessions, rechecks, signIn, setStatus } = await setup()
     const request = {}
-    sessions.bindTicket({ request, session: await signIn(), unlockedUntil: null })
+    sessions.bindTicket({
+      request,
+      grant: { account: (await signIn()).account, unlockedUntil: null },
+    })
     const seen = { isEnded: false }
     rechecks.ended({ request }).subscribe(() => {
       seen.isEnded = true
@@ -302,7 +306,7 @@ describe('an HLS session opened with an account ticket', () => {
     made.dirs = [...made.dirs, dataDir]
     const request = {}
     const session = await env.signIn()
-    env.sessions.bindTicket({ request, session, unlockedUntil: null })
+    env.sessions.bindTicket({ request, grant: { account: session.account, unlockedUntil: null } })
     const opened = hls.mint({
       mediaId: 1,
       asked: null,
@@ -356,12 +360,18 @@ describe("a direct file's pass, held by the account ticket that opened it", () =
   const held = async () => {
     const env = await setup()
     // Only the account's rechecks end it here: its deadline never comes.
-    const passes = new FilePasses(STILL_CLOCK, env.sessions, env.rechecks, {
-      relocks: NEVER,
-      unlockNeedOf: () => () => false,
-    })
+    const passes = new FilePasses(
+      STILL_CLOCK,
+      new TicketAccesses(env.sessions, env.rechecks, {
+        relocks: NEVER,
+        unlockNeedOf: () => () => false,
+      }),
+    )
     const request = {}
-    env.sessions.bindTicket({ request, session: await env.signIn(), unlockedUntil: null })
+    env.sessions.bindTicket({
+      request,
+      grant: { account: (await env.signIn()).account, unlockedUntil: null },
+    })
     passes.hold({ request, ticket: TICKET, mediaId: MEDIA })
     const isOpen = (): boolean => passes.grantOf({ ticket: TICKET, mediaId: MEDIA }) !== null
     return { ...env, isOpen }

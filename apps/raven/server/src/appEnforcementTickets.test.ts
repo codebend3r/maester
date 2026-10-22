@@ -3,9 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   ACCOUNT_TICKET_SECONDS,
-  AUTH_HEADERS,
   AUTH_REFUSALS,
-  LIBRARY_KINDS,
   MEDIA_ORIGIN_KINDS,
   MEMBER_STATUSES,
   type MediaOrigin,
@@ -17,17 +15,20 @@ import {
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ACCOUNT_TICKET_PREFIX } from '@/auth/accountTickets'
-import { ROUTE_METHODS, type RouteMethod, cookieSet } from '@/test/app'
+import { ROUTE_METHODS, type RouteMethod } from '@/test/app'
 import { AUTH_TEST_IDS, authFixture, bearerHeaders } from '@/test/auth'
 import {
   CALLER_KINDS,
+  LONG_TOKEN_SECONDS,
   ROUTES,
   type Route,
   TOKEN_CARRIERS,
   createEnforcedApp,
   headersFor,
+  mintedTicket,
   outcomeOf,
   pathOf,
+  pinMoves,
   withTicket,
 } from '@/test/enforced'
 
@@ -40,13 +41,12 @@ describe('account tickets on the media paths', () => {
   const PAST_THE_END = { [HEADERS.range]: 'bytes=999999999-' }
   const SUBRIP = ['1', '00:00:00,200 --> 00:00:00,900', 'Wake up, Neo.', ''].join('\n')
   const TICKET_MS = ACCOUNT_TICKET_SECONDS * 1000
-  /** Two days: a token that outlives the unlock, so no recheck ends a pass for want of one. */
-  const LONG_TOKEN_SECONDS = 2 * 24 * 60 * 60
 
   let tickets: Awaited<ReturnType<typeof authFixture>>
   let plane: Awaited<ReturnType<typeof createEnforcedApp>>
   let planeRoot: string
   let sidecar: string
+  let pin: ReturnType<typeof pinMoves>
 
   beforeAll(async () => {
     planeRoot = await mkdtemp(join(tmpdir(), 'raven-enforcement-tickets-'))
@@ -57,6 +57,7 @@ describe('account tickets on the media paths', () => {
       libraryPin: PIN,
       mediaOrigins: ORIGINS,
     })
+    pin = pinMoves({ enforced: plane, fixture: tickets, pin: PIN })
     await writeFile(join(plane.mediaDir, 'The Matrix (1999).en.srt'), SUBRIP)
     const { subtitles } = await plane.ownerApi.getTracks(plane.ids.video)
     sidecar = subtitles.find(({ source }) => source === SUBTITLE_SOURCES.external)?.id ?? ''
@@ -85,17 +86,13 @@ describe('account tickets on the media paths', () => {
       headers,
     })
 
-  const ticketOf = async ({
+  const ticketOf = ({
     route,
     headers,
   }: {
     route: typeof ROUTES.mediaTicket | typeof ROUTES.accountTicket
     headers: Record<string, string>
-  }): Promise<string> => {
-    const body: unknown = (await mint({ route, headers })).json()
-    if (!isMediaTicket(body)) throw new Error('No ticket was minted')
-    return body.ticket
-  }
+  }): Promise<string> => mintedTicket({ app: plane.app, route, id: plane.ids.video, headers })
 
   const redeem = ({
     ticket,
@@ -111,48 +108,9 @@ describe('account tickets on the media paths', () => {
     headers?: Record<string, string>
   }) => plane.app.inject({ method, url: withTicket({ route, params, ticket }), headers })
 
-  const unlockAsOwner = async ({ headers }: { headers: Record<string, string> }) => {
-    const unlocking = await plane.app.inject({
-      method: ROUTES.unlock.method,
-      url: ROUTES.unlock.path,
-      headers,
-      payload: { pin: PIN },
-    })
-    expect(unlocking.statusCode).toBe(200)
-    return { ...headers, [AUTH_HEADERS.cookie]: cookieSet(unlocking) }
-  }
-
-  /** When the unlock the PIN earned `headers`' cookie lapses: the expiry it is signed with. */
-  const lapseOf = ({ headers }: { headers: Record<string, string> }): number => {
-    const [, value = ''] = (headers[AUTH_HEADERS.cookie] ?? '').split('=')
-    const [expires = ''] = value.split('.')
-    return Number(expires)
-  }
-
-  /** Locks the PIN again with `headers`, as the owner's Lock button does. */
-  const relock = async ({ headers }: { headers: Record<string, string> }) => {
-    const response = await plane.app.inject({
-      method: ROUTES.relock.method,
-      url: ROUTES.relock.path,
-      headers,
-    })
-    expect(response.statusCode).toBe(200)
-  }
-
-  /** Locks or opens the library as the owner, past the PIN, as a locked library's settings are changed. */
-  const setLocked = async ({ isLocked }: { isLocked: boolean }) => {
-    const response = await plane.app.inject({
-      method: ROUTES.updateLibrary.method,
-      url: pathOf({ route: ROUTES.updateLibrary, params: { id: plane.ids.library } }),
-      headers: await unlockAsOwner({ headers: await owner() }),
-      payload: {
-        name: 'Enforced',
-        paths: [plane.mediaDir],
-        settings: { kind: LIBRARY_KINDS.movies, locked: isLocked },
-      },
-    })
-    expect(response.statusCode).toBe(200)
-  }
+  /** The owner's Bearer with the unlock cookie the PIN earns it. */
+  const unlockAsOwner = async ({ headers }: { headers: Record<string, string> }) =>
+    (await pin.unlock({ headers })).headers
 
   it('mints with Bearer alone, on the GET as on the POST, a ticket of five minutes at most', async () => {
     const cookieOnly = await headersFor({
@@ -227,18 +185,18 @@ describe('account tickets on the media paths', () => {
   it('shuts a ticket at once when its library is locked after the mint', async () => {
     const ticket = await ticketOf({ route: ROUTES.accountTicket, headers: await member() })
     expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(206)
-    await setLocked({ isLocked: true })
+    await pin.setLocked({ isLocked: true })
     try {
       expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(404)
     } finally {
-      await setLocked({ isLocked: false })
+      await pin.setLocked({ isLocked: false })
     }
   })
 
   it("carries the owner's PIN into a ticket minted with it, and into no other", async () => {
     const headers = await owner()
     const before = await ticketOf({ route: ROUTES.accountTicket, headers })
-    await setLocked({ isLocked: true })
+    await pin.setLocked({ isLocked: true })
     try {
       expect((await redeem({ ticket: before, headers: FIRST_BYTES })).statusCode).toBe(
         LOCKED_STATUS,
@@ -249,18 +207,18 @@ describe('account tickets on the media paths', () => {
       })
       expect((await redeem({ ticket: unlocked, headers: FIRST_BYTES })).statusCode).toBe(206)
     } finally {
-      await setLocked({ isLocked: false })
+      await pin.setLocked({ isLocked: false })
     }
   })
 
   it("ends a ticket's pass on a locked library as the owner locks again, and takes back every live ticket's unlock", async () => {
-    await setLocked({ isLocked: true })
+    await pin.setLocked({ isLocked: true })
     try {
       const unlocked = await unlockAsOwner({ headers: await owner() })
       const played = await ticketOf({ route: ROUTES.accountTicket, headers: unlocked })
       const unplayed = await ticketOf({ route: ROUTES.accountTicket, headers: unlocked })
       expect((await redeem({ ticket: played, headers: FIRST_BYTES })).statusCode).toBe(206)
-      await relock({ headers: unlocked })
+      await pin.relock({ headers: unlocked })
       expect(
         await Promise.all(
           [played, unplayed].map(
@@ -281,7 +239,7 @@ describe('account tickets on the media paths', () => {
         vi.useRealTimers()
       }
     } finally {
-      await setLocked({ isLocked: false })
+      await pin.setLocked({ isLocked: false })
     }
   })
 
@@ -289,16 +247,16 @@ describe('account tickets on the media paths', () => {
     const unlocked = await unlockAsOwner({ headers: await owner() })
     const ticket = await ticketOf({ route: ROUTES.accountTicket, headers: unlocked })
     expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(206)
-    await relock({ headers: unlocked })
+    await pin.relock({ headers: unlocked })
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       vi.setSystemTime(Date.now() + TICKET_MS + 1_000)
       expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(206)
-      await setLocked({ isLocked: true })
+      await pin.setLocked({ isLocked: true })
       try {
         expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(LOCKED_STATUS)
       } finally {
-        await setLocked({ isLocked: false })
+        await pin.setLocked({ isLocked: false })
       }
     } finally {
       vi.useRealTimers()
@@ -306,19 +264,18 @@ describe('account tickets on the media paths', () => {
   })
 
   it("ends a ticket's pass on a locked library as the owner's unlock lapses", async () => {
-    await setLocked({ isLocked: true })
+    await pin.setLocked({ isLocked: true })
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       const start = Date.now()
       const longOwner = bearerHeaders({
         token: await tickets.mint({ id: AUTH_TEST_IDS.owner, expiresIn: LONG_TOKEN_SECONDS }),
       })
-      const unlocked = await unlockAsOwner({ headers: longOwner })
+      const { headers: unlocked, lapsesAt } = await pin.unlock({ headers: longOwner })
       // Opened a minute after the unlock, so the pass's deadline falls after the unlock lapses.
       vi.setSystemTime(start + 60_000)
       const ticket = await ticketOf({ route: ROUTES.accountTicket, headers: unlocked })
       expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(206)
-      const lapsesAt = lapseOf({ headers: unlocked })
       vi.setSystemTime(lapsesAt - 1)
       expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(206)
       vi.setSystemTime(lapsesAt)
@@ -327,7 +284,7 @@ describe('account tickets on the media paths', () => {
       )
     } finally {
       vi.useRealTimers()
-      await setLocked({ isLocked: false })
+      await pin.setLocked({ isLocked: false })
     }
   })
 

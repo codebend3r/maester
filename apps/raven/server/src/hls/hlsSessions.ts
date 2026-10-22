@@ -216,7 +216,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     asked,
     source,
     keyframesFor,
-    access = null,
+    access,
   }: {
     mediaId: number
     asked: StreamQuality | null
@@ -227,7 +227,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
      */
     keyframesFor: (() => readonly number[] | null) | null
     /** The account an account ticket opened it for; null for any other caller. */
-    access?: PassAccess | null
+    access: PassAccess | null
   }): HlsSession {
     const kept = [...this.entries.values()]
     if (kept.length >= HLS_SESSION_CAP) {
