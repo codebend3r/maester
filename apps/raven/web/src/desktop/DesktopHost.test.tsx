@@ -36,7 +36,7 @@ const askOf = (status: DownloadAsk['status']): DownloadAsk => ({
   askId: ASK_ID,
   serverId: SERVER_ID,
   serverName: 'raven',
-  autoDelete: false,
+  shouldAutoDelete: false,
   status,
 })
 
@@ -47,7 +47,7 @@ const READY_ASK = askOf({
   files: 1,
   bytes: 4_000_000_000,
   free: 400_000_000_000,
-  fits: true,
+  canFit: true,
 })
 
 const renderHost = ({
@@ -185,7 +185,7 @@ describe('DesktopHost and the downloads cache', () => {
     await client.emit({
       type: DESKTOP_EVENTS.downloads,
       downloads: [view],
-      autoDeleteDefault: true,
+      shouldAutoDeleteByDefault: true,
     })
     expect(queries.getQueryData<DownloadsData>(DESKTOP_QUERY_KEYS.downloads)).toEqual({
       downloads: [view],

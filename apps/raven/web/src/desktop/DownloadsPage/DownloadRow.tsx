@@ -177,7 +177,7 @@ export const DownloadRow = ({
         return change({ type: DESKTOP_REQUESTS.pauseDownload, downloadId })
       case ROW_ACTIONS.resume:
         // A library locked again needs its PIN before main can fetch from it.
-        if (view.needsUnlock) return setIsUnlocking(true)
+        if (view.isLocked) return setIsUnlocking(true)
         return change({ type: DESKTOP_REQUESTS.resumeDownload, downloadId })
       case ROW_ACTIONS.retry:
         return change({ type: DESKTOP_REQUESTS.retryDownload, downloadId })
@@ -255,15 +255,15 @@ export const DownloadRow = ({
               <input
                 type="checkbox"
                 role="switch"
-                checked={view.autoDelete}
-                aria-checked={view.autoDelete}
+                checked={view.shouldAutoDelete}
+                aria-checked={view.shouldAutoDelete}
                 aria-describedby={ids.label}
                 onChange={(event) =>
                   handled(
                     change({
                       type: DESKTOP_REQUESTS.setDownloadAutoDelete,
                       downloadId,
-                      autoDelete: event.target.checked,
+                      shouldAutoDelete: event.target.checked,
                     }),
                   )
                 }

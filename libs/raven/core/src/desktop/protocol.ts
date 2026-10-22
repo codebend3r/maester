@@ -170,7 +170,7 @@ export const isDownloadAskStatus = union(
     files: isNumber,
     bytes: isNumber,
     free: isNumber,
-    fits: isBoolean,
+    canFit: isBoolean,
   }),
   object({ kind: oneOf([DOWNLOAD_ASK_KINDS.locked]) }),
   object({ kind: oneOf([DOWNLOAD_ASK_KINDS.account]) }),
@@ -183,7 +183,7 @@ export const isDownloadAsk = object({
   askId: isOpaqueId,
   serverId: isOpaqueId,
   serverName: isString,
-  autoDelete: isBoolean,
+  shouldAutoDelete: isBoolean,
   status: isDownloadAskStatus,
 })
 
@@ -198,10 +198,10 @@ export const isDownloadView = object({
   serverName: isString,
   size: isNumber,
   status: isDownloadStatus,
-  autoDelete: isBoolean,
+  shouldAutoDelete: isBoolean,
   watched: nullable(isNumber),
   deletesAt: nullable(isNumber),
-  needsUnlock: isBoolean,
+  isLocked: isBoolean,
 })
 
 export type DownloadView = Infer<typeof isDownloadView>
@@ -379,7 +379,7 @@ export const isDesktopRequest = union(
   object({
     type: oneOf([DESKTOP_REQUESTS.confirmDownload]),
     askId: isOpaqueId,
-    autoDelete: isBoolean,
+    shouldAutoDelete: isBoolean,
   }),
   object({ type: oneOf([DESKTOP_REQUESTS.declineDownload]), askId: isOpaqueId }),
   object({ type: oneOf([DESKTOP_REQUESTS.retryDownloadAsk]), askId: isOpaqueId }),
@@ -392,13 +392,13 @@ export const isDesktopRequest = union(
   object({
     type: oneOf([DESKTOP_REQUESTS.setDownloadAutoDelete]),
     downloadId: isOpaqueId,
-    autoDelete: isBoolean,
+    shouldAutoDelete: isBoolean,
   }),
   object({ type: oneOf([DESKTOP_REQUESTS.pauseAllDownloads]) }),
   object({ type: oneOf([DESKTOP_REQUESTS.resumeAllDownloads]) }),
   object({ type: oneOf([DESKTOP_REQUESTS.deleteAllDownloads]) }),
   object({ type: oneOf([DESKTOP_REQUESTS.readSpace]) }),
-  object({ type: oneOf([DESKTOP_REQUESTS.setDownloadDefaults]), autoDelete: isBoolean }),
+  object({ type: oneOf([DESKTOP_REQUESTS.setDownloadDefaults]), shouldAutoDelete: isBoolean }),
   object({ type: oneOf([DESKTOP_REQUESTS.showDownloadsFolder]) }),
   // The play page left this file, so a deletion waiting for the player to leave it can run.
   object({ type: oneOf([DESKTOP_REQUESTS.playbackLeft]), fileId: isOpaqueId }),
@@ -479,7 +479,7 @@ export const isDesktopReply = union(
   object({
     type: oneOf([DESKTOP_REPLIES.downloads]),
     downloads: listOf(isDownloadView),
-    autoDeleteDefault: isBoolean,
+    shouldAutoDeleteByDefault: isBoolean,
   }),
   object({ type: oneOf([DESKTOP_REPLIES.space]), space: isSpaceView }),
 )
@@ -513,7 +513,7 @@ export const isDesktopEvent = union(
   object({
     type: oneOf([DESKTOP_EVENTS.downloads]),
     downloads: listOf(isDownloadView),
-    autoDeleteDefault: isBoolean,
+    shouldAutoDeleteByDefault: isBoolean,
   }),
 )
 

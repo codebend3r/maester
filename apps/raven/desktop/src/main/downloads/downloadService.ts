@@ -202,10 +202,10 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         serverName,
         size: entry.size,
         status: viewStatusOf({ status: entry.status, serverName }),
-        autoDelete: entry.autoDelete,
+        shouldAutoDelete: entry.autoDelete,
         watched: playback.watchedOf(entry),
         deletesAt: deleteClock.deletesAt({ downloadId: entry.downloadId }),
-        needsUnlock:
+        isLocked:
           entry.status.kind === DOWNLOAD_STATUS_KINDS.paused &&
           entry.status.reason === PAUSE_REASONS.relocked,
       }
@@ -214,7 +214,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   const list = (): DownloadsList => ({
     type: DESKTOP_EVENTS.downloads,
     downloads: views(),
-    autoDeleteDefault: store.read().autoDeleteDefault,
+    shouldAutoDeleteByDefault: store.read().autoDeleteDefault,
   })
 
   // The list is read when the timer fires, so every change folded into it is in it.

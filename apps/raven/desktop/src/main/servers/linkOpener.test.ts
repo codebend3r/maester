@@ -15,7 +15,7 @@ const ASK_REPLY: DesktopReply = {
     askId: '00000000-0000-4000-8000-0000000000aa',
     serverId: SERVER_ID,
     serverName: 'raven',
-    autoDelete: false,
+    shouldAutoDelete: false,
     status: { kind: 'locked' },
   },
 }

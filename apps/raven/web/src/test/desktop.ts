@@ -42,10 +42,10 @@ export const viewOf = (overrides: Partial<DownloadView> = {}): DownloadView => (
   serverName: 'raven',
   size: 2 * GB,
   status: { kind: DOWNLOAD_STATUS_KINDS.queued },
-  autoDelete: false,
+  shouldAutoDelete: false,
   watched: null,
   deletesAt: null,
-  needsUnlock: false,
+  isLocked: false,
   ...overrides,
 })
 
@@ -177,7 +177,7 @@ export const downloadsMain = ({
   const listed = (): DesktopReply => ({
     type: DESKTOP_REPLIES.downloads,
     downloads: state.downloads,
-    autoDeleteDefault: state.shouldAutoDelete,
+    shouldAutoDeleteByDefault: state.shouldAutoDelete,
   })
   const update = ({
     downloadId,
@@ -216,13 +216,13 @@ export const downloadsMain = ({
           change: (view) => ({
             ...view,
             status: { kind: DOWNLOAD_STATUS_KINDS.queued },
-            needsUnlock: false,
+            isLocked: false,
           }),
         })
       case DESKTOP_REQUESTS.setDownloadAutoDelete:
         return update({
           downloadId: request.downloadId,
-          change: (view) => ({ ...view, autoDelete: request.autoDelete }),
+          change: (view) => ({ ...view, shouldAutoDelete: request.shouldAutoDelete }),
         })
       case DESKTOP_REQUESTS.deleteDownload:
         state.downloads = state.downloads.filter((view) => view.downloadId !== request.downloadId)
@@ -231,7 +231,7 @@ export const downloadsMain = ({
         state.downloads = []
         return listed()
       case DESKTOP_REQUESTS.setDownloadDefaults:
-        state.shouldAutoDelete = request.autoDelete
+        state.shouldAutoDelete = request.shouldAutoDelete
         return listed()
       default:
         return DONE

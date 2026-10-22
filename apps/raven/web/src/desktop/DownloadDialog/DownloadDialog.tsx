@@ -55,9 +55,9 @@ const ReadyDialog = ({
   const { dialog, close, keepKeys } = useModal()
   const isConfirmed = useRef(false)
   const ids = { title: useId(), question: useId() }
-  const [shouldAutoDelete, setShouldAutoDelete] = useState(ask.autoDelete)
+  const [shouldAutoDelete, setShouldAutoDelete] = useState(ask.shouldAutoDelete)
   const isEmpty = status.files === 0
-  const canDownload = status.fits && !isEmpty
+  const canDownload = status.canFit && !isEmpty
 
   // Cancel, Escape and Download all end here; only Download has already answered.
   const closed = () => {
@@ -74,14 +74,14 @@ const ReadyDialog = ({
       await client.request({
         type: DESKTOP_REQUESTS.confirmDownload,
         askId: ask.askId,
-        autoDelete: shouldAutoDelete,
+        shouldAutoDelete: shouldAutoDelete,
       }),
     )
   }
 
   const noun = nounFor({ kind: status.downloadKind, files: status.files })
   const question = `Download ${status.title} (${status.files} ${noun}, ${formatBytes(status.bytes)})?`
-  const room = status.fits
+  const room = status.canFit
     ? `${formatBytes(status.free)} free on this Mac.`
     : `Needs ${formatBytes(status.bytes)}; ${formatBytes(status.free)} free.`
 

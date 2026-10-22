@@ -31,7 +31,7 @@ const askOf = (status: DownloadAsk['status']): DownloadAsk => ({
   askId: ASK_ID,
   serverId: SERVER_ID,
   serverName: 'raven',
-  autoDelete: false,
+  shouldAutoDelete: false,
   status,
 })
 
@@ -47,7 +47,7 @@ const readyOf = (
     files: 9,
     bytes: 18 * GB,
     free: 400 * GB,
-    fits: true,
+    canFit: true,
     ...overrides,
   })
 
@@ -84,7 +84,7 @@ describe('DownloadDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Download' }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.confirmDownload })).toEqual([
-      { type: DESKTOP_REQUESTS.confirmDownload, askId: ASK_ID, autoDelete: true },
+      { type: DESKTOP_REQUESTS.confirmDownload, askId: ASK_ID, shouldAutoDelete: true },
     ])
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.declineDownload })).toEqual([])
   })
@@ -103,7 +103,7 @@ describe('DownloadDialog', () => {
   })
 
   it('offers no download that does not fit, or one already made, and declines on the way out', async () => {
-    const { client } = renderDialog({ ask: readyOf({ fits: false, free: 2 * GB }) })
+    const { client } = renderDialog({ ask: readyOf({ canFit: false, free: 2 * GB }) })
     expect(screen.getByText('Needs 18.0 GB; 2.0 GB free.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Download' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
