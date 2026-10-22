@@ -16,6 +16,7 @@ import {
   contentSecurityPolicy,
   createWebHostHandler,
   inlineScriptHashes,
+  isCutShort,
   listenWebHost,
   LOOPBACK_ADDRESSES,
   webHostFailureText,
@@ -751,5 +752,53 @@ describe('listenWebHost', () => {
       free.once('error', reject)
       free.listen(port, '127.0.0.1', resolve)
     })
+  })
+})
+
+describe('isCutShort', () => {
+  const answer = ({
+    complete = true,
+    statusCode = 200,
+    length,
+  }: {
+    complete?: boolean
+    statusCode?: number
+    length?: string
+  }) => ({
+    complete,
+    statusCode,
+    headers: length === undefined ? {} : { [HTTP_HEADERS.contentLength]: length },
+  })
+
+  it('cuts an answer the client did not see through', () => {
+    expect(
+      isCutShort({ upstream: answer({ complete: false }), method: HTTP_METHODS.get, bytes: 0 }),
+    ).toBe(true)
+  })
+
+  it('cuts an answer that ended before the length it declared', () => {
+    expect(
+      isCutShort({ upstream: answer({ length: '100' }), method: HTTP_METHODS.get, bytes: 4 }),
+    ).toBe(true)
+  })
+
+  it('passes an answer that sent all it declared, or declared nothing', () => {
+    expect(
+      isCutShort({ upstream: answer({ length: '4' }), method: HTTP_METHODS.get, bytes: 4 }),
+    ).toBe(false)
+    expect(isCutShort({ upstream: answer({}), method: HTTP_METHODS.get, bytes: 4 })).toBe(false)
+  })
+
+  it('passes the answers that never carry a body', () => {
+    expect(
+      isCutShort({ upstream: answer({ length: '100' }), method: HTTP_METHODS.head, bytes: 0 }),
+    ).toBe(false)
+    expect(
+      isCutShort({
+        upstream: answer({ statusCode: 304, length: '100' }),
+        method: HTTP_METHODS.get,
+        bytes: 0,
+      }),
+    ).toBe(false)
   })
 })
