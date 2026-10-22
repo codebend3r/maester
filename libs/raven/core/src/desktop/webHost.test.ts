@@ -41,6 +41,6 @@ describe('the web host', () => {
       serverOrigin: 'RAVEN_DESKTOP_SERVER_ORIGIN',
       linkOrigins: 'RAVEN_DESKTOP_LINK_ORIGINS',
     })
-    expect(DEFAULT_SERVER_ORIGIN).toBe('http://localhost:8484')
+    expect(DEFAULT_SERVER_ORIGIN).toBe('https://raven.tail5586d4.ts.net')
   })
 })

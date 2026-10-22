@@ -43,5 +43,9 @@ export const DESKTOP_ENV = {
   linkOrigins: 'RAVEN_DESKTOP_LINK_ORIGINS',
 } as const
 
-/** The server a build without `RAVEN_DESKTOP_SERVER_ORIGIN` uses: a local `nx run @raven/server:dev`. */
-export const DEFAULT_SERVER_ORIGIN = 'http://localhost:8484'
+/**
+ * The server a build without `RAVEN_DESKTOP_SERVER_ORIGIN` uses: Vhagar's Tailscale Funnel, where
+ * Netlify's `RAVEN_API_ORIGIN` sends the web app's `/api`, so raven player signs in to the same
+ * accounts and keeps the same library, progress and favourites as the web.
+ */
+export const DEFAULT_SERVER_ORIGIN = 'https://raven.tail5586d4.ts.net'

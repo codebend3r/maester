@@ -473,10 +473,10 @@ From the repo root, on an Apple Silicon Mac, with the CI-built libmpv and addon 
 
 The app builds `@raven/web` first and serves that build, so there is one UI. The server it talks to is fixed at build time:
 
-- `RAVEN_DESKTOP_SERVER_ORIGIN` is the raven server's address, the Funnel origin (`https://raven.<tailnet>.ts.net`), the same value as Netlify's `RAVEN_API_ORIGIN`. It is not in the repo. Unset, the app points at `http://localhost:8484`, a local `bunx nx run @raven/server:dev`, so set it for any build you give to someone.
+- `RAVEN_DESKTOP_SERVER_ORIGIN` is the raven server's address. Unset, the app points at Vhagar's Funnel origin, `https://raven.tail5586d4.ts.net`, the same value as Netlify's `RAVEN_API_ORIGIN`, so a viewer who signs in sees the same library and picks up where the web left off. Set it to `http://localhost:8484` to build against a local `bunx nx run @raven/server:dev`.
 - `RAVEN_DESKTOP_LINK_ORIGINS` is an optional comma separated list of other origins whose `raven://` links name the same server, such as a LAN address.
 
-An unpackaged `dev` run reads both from the environment too, so a different server needs no rebuild. A release build must have them set for the desktop release workflow, or the dmg points at localhost.
+An unpackaged `dev` run reads both from the environment too, so a different server needs no rebuild.
 
 ```bash
 RAVEN_DESKTOP_SERVER_ORIGIN=https://raven.<tailnet>.ts.net bunx nx run @raven/desktop:dev   # builds, then runs electron . (unpackaged)
