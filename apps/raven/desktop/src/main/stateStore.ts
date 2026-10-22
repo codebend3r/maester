@@ -39,7 +39,12 @@ export type JsonStoreOptions<T> = {
 }
 
 /** The `code` of the Node system errors raven player tells apart. */
-export const ERROR_CODES = { enoent: 'ENOENT' } as const
+export const ERROR_CODES = {
+  enoent: 'ENOENT',
+  addressInUse: 'EADDRINUSE',
+  addressNotAvailable: 'EADDRNOTAVAIL',
+  familyNotSupported: 'EAFNOSUPPORT',
+} as const
 
 export const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === ERROR_CODES.enoent

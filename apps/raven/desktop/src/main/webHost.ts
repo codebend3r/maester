@@ -22,7 +22,7 @@ import {
 import { WEB_DIST } from '@/build/forgeOptions'
 import { errorText } from '@/main/log/errorText'
 import { quietly } from '@/main/log/quietly'
-import type { Timers } from '@/main/stateStore'
+import { ERROR_CODES, type Timers } from '@/main/stateStore'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { HTTP_STATUSES } from '@/shared/httpStatuses'
 import { URL_PROTOCOLS } from '@/shared/playLink'
@@ -421,17 +421,18 @@ const closeServer = (server: Server) =>
     server.close(() => resolvePromise())
   })
 
-const ADDRESS_IN_USE = 'EADDRINUSE'
-
 /** What `listen` fails with for an address this Mac does not have, such as `::1` with IPv6 off. */
-const MISSING_ADDRESS_CODES: ReadonlySet<unknown> = new Set(['EADDRNOTAVAIL', 'EAFNOSUPPORT'])
+const MISSING_ADDRESS_CODES: ReadonlySet<unknown> = new Set([
+  ERROR_CODES.addressNotAvailable,
+  ERROR_CODES.familyNotSupported,
+])
 
 const isMissingAddress = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && MISSING_ADDRESS_CODES.has(error.code)
 
 /** What the person is told when the web host cannot listen, and raven player quits. */
 export const webHostFailureText = (error: unknown): string =>
-  error instanceof Error && 'code' in error && error.code === ADDRESS_IN_USE
+  error instanceof Error && 'code' in error && error.code === ERROR_CODES.addressInUse
     ? `Another app is using port ${WEB_HOST_PORT} on this Mac. Quit it, then open raven player again.`
     : `raven player could not start serving its page: ${errorText(error)}`
 
