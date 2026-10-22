@@ -1,4 +1,4 @@
-import { AUTH_HEADERS, AUTH_SCHEME, SERVER_METHODS } from '@raven/core'
+import { AUTH_HEADERS, AUTH_REFUSALS, AUTH_SCHEME, SERVER_METHODS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { SERVER_GONE, type ServerEntry } from '@/main/desktopConfig'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
@@ -738,15 +738,16 @@ describe('createServerCalls with the page signed in', () => {
   })
 
   it('passes a 401 on as it came, since the page renews its own session', async () => {
+    const signedOut = JSON.stringify({ reason: AUTH_REFUSALS.signedOut })
     const { authorize } = tokensOf({ tokens: [TOKEN, TOKEN] })
     const { calls, sent } = setup({
       authorize,
-      answer: () => reply({ status: 401, text: '{"reason":"signed_out"}' }),
+      answer: () => reply({ status: 401, text: signedOut }),
     })
     expect(await calls.call({ serverId: SERVER.id, call: ORIGINS })).toEqual({
       ok: true,
       status: 401,
-      body: '{"reason":"signed_out"}',
+      body: signedOut,
     })
     expect(sent).toHaveLength(1)
   })

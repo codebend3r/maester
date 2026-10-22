@@ -623,7 +623,7 @@ describe('the web host: /api', () => {
 describe('webHostFailureText', () => {
   it('names the port when another app holds it', () => {
     const taken = Object.assign(new Error('listen EADDRINUSE'), {
-      code: 'EADDRINUSE',
+      code: ERROR_CODES.addressInUse,
       syscall: 'listen',
     })
     expect(webHostFailureText(taken)).toBe(
@@ -684,7 +684,9 @@ describe('listenWebHost', () => {
     const listenForReal = server.listen.bind(server)
     const failOnIpv6 = (port: number, address: string, onListening: () => void) => {
       if (address !== '::1') return listenForReal(port, address, onListening)
-      const missing = Object.assign(new Error('listen EADDRNOTAVAIL'), { code: 'EADDRNOTAVAIL' })
+      const missing = Object.assign(new Error('listen EADDRNOTAVAIL'), {
+        code: ERROR_CODES.addressNotAvailable,
+      })
       queueMicrotask(() => server.emit('error', missing))
       return server
     }
@@ -742,7 +744,7 @@ describe('listenWebHost', () => {
       .then(() => null)
       .catch((error: unknown) => error)
     expect(failure).toBeInstanceOf(Error)
-    expect(failure).toHaveProperty('code', 'EADDRINUSE')
+    expect(failure).toHaveProperty('code', ERROR_CODES.addressInUse)
     const free = createServer()
     servers.push(free)
     await new Promise<void>((resolve, reject) => {
