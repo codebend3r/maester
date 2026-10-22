@@ -9,6 +9,7 @@ import {
 } from 'node:http'
 import { request as requestHttps } from 'node:https'
 import { basename, join, resolve, sep } from 'node:path'
+import { pipeline } from 'node:stream'
 import {
   extensionOf,
   FILE_SCHEME,
@@ -70,8 +71,6 @@ const CONTENT_TYPES = new Map(
 const HTTP_EVENTS = {
   close: 'close',
   connect: 'connect',
-  data: 'data',
-  end: 'end',
   error: 'error',
   response: 'response',
   socket: 'socket',
@@ -198,28 +197,6 @@ const connectionNamed = (headers: IncomingHttpHeaders): ReadonlySet<string> =>
       .map((name) => name.trim().toLowerCase())
       .filter((name) => name !== ''),
   )
-
-/** Statuses whose answers never carry a body, whatever their `content-length` says. */
-const BODILESS_STATUSES: ReadonlySet<number> = new Set([
-  HTTP_STATUSES.noContent,
-  HTTP_STATUSES.notModified,
-])
-
-/** Whether the server's answer ended before the body it declared, so it must not reach the page as whole. */
-export const isCutShort = ({
-  upstream,
-  method,
-  bytes,
-}: {
-  upstream: Pick<IncomingMessage, 'complete' | 'statusCode' | 'headers'>
-  method: string | undefined
-  bytes: number
-}): boolean => {
-  if (!upstream.complete) return true
-  if (method === HTTP_METHODS.head || BODILESS_STATUSES.has(upstream.statusCode ?? 0)) return false
-  const declared = Number(upstream.headers[HTTP_HEADERS.contentLength] ?? Number.NaN)
-  return Number.isInteger(declared) && bytes < declared
-}
 
 const passed = (headers: IncomingHttpHeaders): OutgoingHttpHeaders => {
   const named = connectionNamed(headers)
@@ -374,25 +351,8 @@ export const createWebHostHandler = ({
       response.writeHead(upstream.statusCode ?? HTTP_STATUSES.badGateway, passed(upstream.headers))
       // Sent at once, so an event stream opens before its first event.
       response.flushHeaders()
-      // A break on either side ends both; there is no one left to tell. Bun's client can end an
-      // answer the server broke off as if it were whole, so the bytes are counted too, and a
-      // short one is cut for the page rather than ended cleanly.
-      const received = { bytes: 0 }
-      upstream.on(HTTP_EVENTS.data, (chunk: Buffer) => {
-        received.bytes += chunk.length
-      })
-      upstream.pipe(response, { end: false })
-      upstream.once(HTTP_EVENTS.end, () => {
-        if (isCutShort({ upstream, method: request.method, bytes: received.bytes })) {
-          response.destroy()
-          return
-        }
-        response.end()
-      })
-      upstream.once(HTTP_EVENTS.error, () => response.destroy())
-      upstream.once(HTTP_EVENTS.close, () => {
-        if (!response.writableEnded) response.destroy()
-      })
+      // A break on either side ends both; there is no one left to tell.
+      pipeline(upstream, response, () => {})
     })
     outgoing.on(HTTP_EVENTS.error, (error) => {
       if (page.hasLeft) return

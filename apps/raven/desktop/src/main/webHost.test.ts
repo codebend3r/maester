@@ -8,6 +8,7 @@ import {
   type Server,
   type ServerResponse,
 } from 'node:http'
+import { createServer as createNetServer } from 'node:net'
 import { join } from 'node:path'
 import { text } from 'node:stream/consumers'
 import { HTTP_METHODS, WEB_HOST, AUTH_PATHS, WEB_HOST_ERRORS } from '@raven/core'
@@ -16,7 +17,6 @@ import {
   contentSecurityPolicy,
   createWebHostHandler,
   inlineScriptHashes,
-  isCutShort,
   listenWebHost,
   LOOPBACK_ADDRESSES,
   webHostFailureText,
@@ -497,14 +497,22 @@ describe('the web host: /api', () => {
   })
 
   it('cuts the page off when the server breaks off mid-answer', async () => {
-    const server = await upstream(({ response }) => {
-      response.writeHead(200, { [HTTP_HEADERS.contentLength]: '100' })
-      response.write('abcd', () => response.destroy())
+    // Raw bytes, since Bun's own server on Linux drops a destroyed answer before its headers.
+    const cutting = createNetServer((socket) => {
+      socket.once('data', () => {
+        socket.end(`HTTP/1.1 200 OK\r\n${HTTP_HEADERS.contentLength}: 100\r\n\r\nabcd`)
+        socket.destroySoon()
+      })
     })
-    const { port } = await host({ serverOrigin: server.origin })
-    // Bun's client reports a cut answer as an error or as an early end, by timing; either
-    // way the answer is not complete.
-    const isComplete = await new Promise<boolean>((resolve) => {
+    const serverPort = await new Promise<number>((resolve) => {
+      cutting.listen(0, '127.0.0.1', () => {
+        const address = cutting.address()
+        if (address === null || typeof address === 'string') throw new Error('not listening')
+        resolve(address.port)
+      })
+    })
+    const { port } = await host({ serverOrigin: `http://127.0.0.1:${serverPort}` })
+    const reply = await new Promise<{ status: number; isComplete: boolean }>((resolve) => {
       const outgoing = request(
         {
           host: '127.0.0.1',
@@ -513,15 +521,17 @@ describe('the web host: /api', () => {
           headers: { [HTTP_HEADERS.host]: WEB_HOST },
         },
         (response) => {
-          response.on('error', () => resolve(false))
-          response.once('close', () => resolve(response.complete))
+          const status = response.statusCode ?? 0
+          response.on('error', () => resolve({ status, isComplete: false }))
+          response.once('close', () => resolve({ status, isComplete: response.complete }))
           response.resume()
         },
       )
-      outgoing.on('error', () => resolve(false))
+      outgoing.on('error', () => resolve({ status: 0, isComplete: false }))
       outgoing.end()
     })
-    expect(isComplete).toBe(false)
+    cutting.close()
+    expect(reply).toEqual({ status: 200, isComplete: false })
   })
 
   it('lets go of the server when the page breaks off an upload', async () => {
@@ -752,53 +762,5 @@ describe('listenWebHost', () => {
       free.once('error', reject)
       free.listen(port, '127.0.0.1', resolve)
     })
-  })
-})
-
-describe('isCutShort', () => {
-  const answer = ({
-    complete = true,
-    statusCode = 200,
-    length,
-  }: {
-    complete?: boolean
-    statusCode?: number
-    length?: string
-  }) => ({
-    complete,
-    statusCode,
-    headers: length === undefined ? {} : { [HTTP_HEADERS.contentLength]: length },
-  })
-
-  it('cuts an answer the client did not see through', () => {
-    expect(
-      isCutShort({ upstream: answer({ complete: false }), method: HTTP_METHODS.get, bytes: 0 }),
-    ).toBe(true)
-  })
-
-  it('cuts an answer that ended before the length it declared', () => {
-    expect(
-      isCutShort({ upstream: answer({ length: '100' }), method: HTTP_METHODS.get, bytes: 4 }),
-    ).toBe(true)
-  })
-
-  it('passes an answer that sent all it declared, or declared nothing', () => {
-    expect(
-      isCutShort({ upstream: answer({ length: '4' }), method: HTTP_METHODS.get, bytes: 4 }),
-    ).toBe(false)
-    expect(isCutShort({ upstream: answer({}), method: HTTP_METHODS.get, bytes: 4 })).toBe(false)
-  })
-
-  it('passes the answers that never carry a body', () => {
-    expect(
-      isCutShort({ upstream: answer({ length: '100' }), method: HTTP_METHODS.head, bytes: 0 }),
-    ).toBe(false)
-    expect(
-      isCutShort({
-        upstream: answer({ statusCode: 304, length: '100' }),
-        method: HTTP_METHODS.get,
-        bytes: 0,
-      }),
-    ).toBe(false)
   })
 })

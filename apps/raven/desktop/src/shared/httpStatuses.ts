@@ -1,9 +1,7 @@
 /** The HTTP statuses main reads off a server's answers, gives mpv or answers the page with. */
 export const HTTP_STATUSES = {
   ok: 200,
-  noContent: 204,
   partialContent: 206,
-  notModified: 304,
   badRequest: 400,
   unauthorized: 401,
   forbidden: 403,
