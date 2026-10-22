@@ -1,8 +1,13 @@
 import { Route, Routes } from 'react-router-dom'
-import { AUTH_ROUTES } from '@raven/core'
+import { AUTH_ROUTES, PAGE_PATHS } from '@raven/core'
 import { Toaster } from '@raven/ui'
 import { AppShell } from '@/components/AppShell/AppShell'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
+import { DesktopHost } from '@/desktop/DesktopHost'
+import { DownloadsPage } from '@/desktop/DownloadsPage/DownloadsPage'
+import { LocalPage } from '@/desktop/LocalPage/LocalPage'
+import { DESKTOP_PATHS } from '@/desktop/paths'
+import { PlayRoute } from '@/desktop/PlayPage/PlayPage'
 import { PinPrompt } from '@/components/PinPrompt/PinPrompt'
 import { BugReportsPage } from '@/pages/BugReportsPage/BugReportsPage'
 import { DesignPage } from '@/pages/DesignPage/DesignPage'
@@ -29,46 +34,63 @@ import { ResetPasswordPage } from '@/pages/ResetPasswordPage/ResetPasswordPage'
 import { SignInPage } from '@/pages/SignInPage/SignInPage'
 import { SignUpPage } from '@/pages/SignUpPage/SignUpPage'
 import { WatchPage } from '@/pages/WatchPage/WatchPage'
+import { useIsDesktop } from '@/stores/desktop'
 
-export const AppRoutes = () => (
-  <>
-    <Routes>
-      <Route element={<AuthGate />}>
-        <Route element={<AppShell />}>
-          <Route index element={<HomePage />} />
-          <Route path="libraries" element={<LibrariesPage />} />
-          <Route path="libraries/:id" element={<LibraryPage />} />
-          <Route path="libraries/:id/history" element={<HistoryPage />} />
-          <Route path="libraries/:id/:section" element={<LibraryPage />} />
-          <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
-          <Route path="movies/:id" element={<MoviePage />} />
-          <Route path="shows/:id" element={<ShowPage />} />
-          <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
-          <Route path="episodes/:id" element={<EpisodePage />} />
-          <Route path="people/:id" element={<PersonPage />} />
-          <Route path="favourites" element={<FavouritesPage />} />
-          <Route path="streams" element={<StreamsPage />} />
-          <Route path="reports" element={<BugReportsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="design" element={<DesignPage />} />
-          <Route path="*" element={<NotFoundPage />} />
+/**
+ * Every page, behind the sign-in gate but the account pages and Get. Inside
+ * raven player the frame adds Downloads and On this Mac, and the app's own
+ * part of the page runs over every route.
+ */
+export const AppRoutes = () => {
+  const isDesktop = useIsDesktop()
+  return (
+    <>
+      <Routes>
+        <Route element={<AuthGate />}>
+          <Route element={<AppShell />}>
+            <Route index element={<HomePage />} />
+            <Route path="libraries" element={<LibrariesPage />} />
+            <Route path="libraries/:id" element={<LibraryPage />} />
+            <Route path="libraries/:id/history" element={<HistoryPage />} />
+            <Route path="libraries/:id/:section" element={<LibraryPage />} />
+            <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
+            <Route path="movies/:id" element={<MoviePage />} />
+            <Route path="shows/:id" element={<ShowPage />} />
+            <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
+            <Route path="episodes/:id" element={<EpisodePage />} />
+            <Route path="people/:id" element={<PersonPage />} />
+            <Route path="favourites" element={<FavouritesPage />} />
+            <Route path="streams" element={<StreamsPage />} />
+            <Route path="reports" element={<BugReportsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="design" element={<DesignPage />} />
+            {isDesktop && (
+              <>
+                <Route path={DESKTOP_PATHS.downloads} element={<DownloadsPage />} />
+                <Route path={DESKTOP_PATHS.local} element={<LocalPage />} />
+              </>
+            )}
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+          {/* The player takes the whole screen, outside the browsing frame, as a file raven player plays does. */}
+          <Route path={`${PAGE_PATHS.watch}/:id`} element={<WatchPage />} />
+          {isDesktop && <Route path={DESKTOP_PATHS.play} element={<PlayRoute />} />}
         </Route>
-        {/* The player takes the whole screen, outside the browsing frame. */}
-        <Route path="watch/:id" element={<WatchPage />} />
-      </Route>
-      {/* So do the account pages, which sit outside the gate they serve, and the page to get raven from. */}
-      <Route path={AUTH_ROUTES.signIn} element={<SignInPage />} />
-      <Route path={AUTH_ROUTES.signUp} element={<SignUpPage />} />
-      <Route path={AUTH_ROUTES.checkEmail} element={<CheckEmailPage />} />
-      <Route path={AUTH_ROUTES.confirm} element={<ConfirmPage />} />
-      <Route path={AUTH_ROUTES.forgot} element={<ForgotPasswordPage />} />
-      <Route path={AUTH_ROUTES.reset} element={<ResetPasswordPage />} />
-      <Route path={AUTH_ROUTES.pending} element={<PendingPage />} />
-      <Route path="get" element={<GetPage />} />
-    </Routes>
-    {/* Over any page, the player too: whatever sits in a locked library asks for the PIN. */}
-    <PinPrompt />
-    {/* Toasts outlast the page that raised them, as Report this error's does the player. */}
-    <Toaster />
-  </>
-)
+        {/* So do the account pages, which sit outside the gate they serve, and the page to get raven from. */}
+        <Route path={AUTH_ROUTES.signIn} element={<SignInPage />} />
+        <Route path={AUTH_ROUTES.signUp} element={<SignUpPage />} />
+        <Route path={AUTH_ROUTES.checkEmail} element={<CheckEmailPage />} />
+        <Route path={AUTH_ROUTES.confirm} element={<ConfirmPage />} />
+        <Route path={AUTH_ROUTES.forgot} element={<ForgotPasswordPage />} />
+        <Route path={AUTH_ROUTES.reset} element={<ResetPasswordPage />} />
+        <Route path={AUTH_ROUTES.pending} element={<PendingPage />} />
+        <Route path="get" element={<GetPage />} />
+      </Routes>
+      {/* Over any page, the player too: whatever sits in a locked library asks for the PIN. */}
+      <PinPrompt />
+      {/* Toasts outlast the page that raised them, as Report this error's does the player. */}
+      <Toaster />
+      {isDesktop && <DesktopHost />}
+    </>
+  )
+}

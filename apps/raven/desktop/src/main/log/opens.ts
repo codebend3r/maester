@@ -1,6 +1,10 @@
 import { extname, join } from 'node:path'
-import { PLAYER_SOURCE_KINDS } from '@raven/core'
-import { DESKTOP_REQUESTS, ENVELOPE_KINDS, isInvokeEnvelope } from '@/shared/protocol'
+import {
+  DESKTOP_REQUESTS,
+  ENVELOPE_KINDS,
+  isInvokeEnvelope,
+  PLAYER_SOURCE_KINDS,
+} from '@raven/core'
 
 export type OpenedTitle =
   | { kind: typeof PLAYER_SOURCE_KINDS.file; path: string }

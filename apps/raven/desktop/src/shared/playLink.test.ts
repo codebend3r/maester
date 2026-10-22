@@ -7,7 +7,6 @@ import {
   readDownloadLink,
   readPlayLink,
   serverOriginOf,
-  watchUrlFor,
 } from '@/shared/playLink'
 
 describe('serverOriginOf', () => {
@@ -371,13 +370,5 @@ describe('readDownloadLink', () => {
 
   it('keeps readPlayLink from reading a download link', () => {
     expect(readPlayLink(`${base}&media=7`)).toBeNull()
-  })
-})
-
-describe('watchUrlFor', () => {
-  it('joins the origin and the title', () => {
-    expect(watchUrlFor({ origin: 'http://[::1]:3000', mediaId: 4 })).toBe(
-      'http://[::1]:3000/watch/4',
-    )
   })
 })

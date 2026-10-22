@@ -1,7 +1,9 @@
 import {
   DEFAULT_OUTPUT_SETTINGS,
+  type Infer,
   isBoolean,
   isNumber,
+  isOpaqueId,
   isOutputSettings,
   isPassthroughFormat,
   isString,
@@ -9,36 +11,31 @@ import {
   nullable,
   object,
   oneOf,
-  union,
-  type Infer,
   type OutputSettings,
+  union,
 } from '@raven/core'
-import { isSignInConfig, usableSignIn } from '@/main/accounts/authEndpoints'
-import { isOpaqueId } from '@/shared/protocol'
 import { isServerOrigin } from '@/shared/playLink'
-import { NAME_MAX, cleanName, nameFor, tidyText } from '@/main/servers/serverNames'
 import { loadJson, type JsonStore, type StateFs } from '@/main/stateStore'
 
 export const CONFIG_FILE = 'desktop-config.json'
-export const SERVERS_CAP = 20
 
-/** A server as versions 1 to 3 stored it, before it could pin a sign-in. */
-const isUnpinnedServerEntry = object({
-  id: isOpaqueId,
-  origin: isServerOrigin,
-  name: isString,
-  addedAt: isNumber,
-})
+/** What raven player calls its server in what it says: it plays from that one alone. */
+export const SERVER_NAME = 'raven'
 
-export const isServerEntry = object({
-  id: isOpaqueId,
-  origin: isServerOrigin,
-  name: isString,
-  addedAt: isNumber,
-  signIn: nullable(isSignInConfig),
-})
+/** Said of a server an older raven player kept besides, which raven player no longer reaches. */
+export const SERVER_GONE = 'raven player no longer plays from that server.'
 
-export type ServerEntry = Infer<typeof isServerEntry>
+/**
+ * The server raven player plays from, by the opaque id its downloads are filed under, and the
+ * origin that id was given for. Versions 2 to 4 kept a list of these, each with more fields
+ * (a name, when it was added, version 4's pinned sign-in), which are no longer read.
+ */
+const isServerRecord = object({ id: isOpaqueId, origin: isServerOrigin })
+
+type ServerRecord = Infer<typeof isServerRecord>
+
+/** The server as the rest of main reads it: its record, and the name raven player says. */
+export type ServerEntry = ServerRecord & { name: string }
 
 /** Whether the release check runs at launch, and when it last answered. */
 const isUpdateSettings = object({ isEnabled: isBoolean, checkedAt: nullable(isNumber) })
@@ -48,42 +45,67 @@ export type UpdateSettings = Infer<typeof isUpdateSettings>
 export const DEFAULT_UPDATE_SETTINGS: UpdateSettings = { isEnabled: true, checkedAt: null }
 
 export const isDesktopConfig = object({
-  version: oneOf([4]),
+  version: oneOf([5]),
   output: isOutputSettings,
-  servers: listOf(isServerEntry),
+  server: isServerRecord,
   updates: isUpdateSettings,
+  /**
+   * The last account the page signed in to the server with, kept past a sign out and a relaunch,
+   * so what is watched before the page signs in again waits for that account. Null until one has.
+   */
+  lastAccountId: nullable(isString),
 })
 
 export type DesktopConfig = Infer<typeof isDesktopConfig>
 
 /**
- * What a file on disk may hold: this version, the one before sign-ins were pinned, the one
- * before the release check, or the one before servers existed.
+ * What a file on disk may hold: this version, the one before raven player kept a single
+ * server, the one before sign-ins were pinned, the one before the release check, or the one
+ * before servers existed.
  */
 export const isStoredConfig = union(
   object({ version: oneOf([1]), output: isOutputSettings }),
+  object({ version: oneOf([2]), output: isOutputSettings, servers: listOf(isServerRecord) }),
   object({
-    version: oneOf([2]),
+    version: oneOf([3, 4]),
     output: isOutputSettings,
-    servers: listOf(isUnpinnedServerEntry),
-  }),
-  object({
-    version: oneOf([3]),
-    output: isOutputSettings,
-    servers: listOf(isUnpinnedServerEntry),
+    servers: listOf(isServerRecord),
     updates: isUpdateSettings,
   }),
   isDesktopConfig,
 )
 
+type StoredConfig = Infer<typeof isStoredConfig>
+
 export type ConfigStore = JsonStore<DesktopConfig>
 
-export const EMPTY_CONFIG: DesktopConfig = {
-  version: 4,
-  output: DEFAULT_OUTPUT_SETTINGS,
-  servers: [],
-  updates: { ...DEFAULT_UPDATE_SETTINGS },
-}
+/** A missing file reads as the first version, which takes the server with a new id. */
+const NO_CONFIG: StoredConfig = { version: 1, output: DEFAULT_OUTPUT_SETTINGS }
+
+/**
+ * The server a build plays from (`RAVEN_DESKTOP_SERVER_ORIGIN`) and the other origins its links
+ * may name for it (`RAVEN_DESKTOP_LINK_ORIGINS`).
+ */
+export type FixedServer = { origin: string; aliases: readonly string[] }
+
+/** Whether `origin` names the fixed server: its own origin, or one of its aliases. */
+export const namesServer = ({ server, origin }: { server: FixedServer; origin: string }): boolean =>
+  origin === server.origin || server.aliases.includes(origin)
+
+/** The server as main reads it, with the name raven player says. */
+export const serverOf = (config: DesktopConfig): ServerEntry => ({
+  ...config.server,
+  name: SERVER_NAME,
+})
+
+/** The server when `serverId` is its id; null for any other, such as a server an older version kept. */
+export const serverById = ({
+  config,
+  serverId,
+}: {
+  config: DesktopConfig
+  serverId: string
+}): ServerEntry | null => (config.server.id === serverId ? serverOf(config) : null)
 
 export const setOutput = ({
   config,
@@ -94,6 +116,18 @@ export const setOutput = ({
 }): DesktopConfig => ({
   ...config,
   output,
+})
+
+/** The account the page signed in with now, kept as the last one. */
+export const setLastAccount = ({
+  config,
+  accountId,
+}: {
+  config: DesktopConfig
+  accountId: string
+}): DesktopConfig => ({
+  ...config,
+  lastAccountId: accountId,
 })
 
 export const setUpdates = ({
@@ -116,61 +150,101 @@ export const pickOutput = (output: OutputSettings): OutputSettings => ({
 })
 
 /**
- * Rebuilds each entry from its five fields, so nothing else a file carried is kept. Its
- * name is tidied as a typed one would be, and is the host when nothing is left of it.
+ * The config; the ids of the servers an older version kept that were the fixed server too (its
+ * origin and an alias added as two), whose downloads move to the server's id; and whether it is
+ * not what the file holds, so main writes it at once and the server keeps its id next launch.
  */
-const pickServer = (server: ServerEntry): ServerEntry => ({
-  id: server.id,
-  origin: server.origin,
-  name:
-    cleanName(tidyText({ text: server.name, max: NAME_MAX })) ??
-    nameFor(server.origin).slice(0, NAME_MAX),
-  addedAt: server.addedAt,
-  // Checked again as a server's own config is, so a file edited by hand can never point sign-in
-  // somewhere raven player would not have pinned; endpoints that fail are dropped and pinned afresh.
-  signIn: server.signIn === null ? null : usableSignIn(server.signIn),
-})
+export type UpgradedConfig = { config: DesktopConfig; adopted: string[]; isChanged: boolean }
 
-/** The first servers up to the cap, skipping any whose id or origin an earlier one already has. */
-const uniqueServers = (servers: readonly ServerEntry[]): ServerEntry[] =>
-  servers.reduce<ServerEntry[]>((kept, server) => {
-    const isSeen = kept.some((known) => known.id === server.id || known.origin === server.origin)
-    if (isSeen || kept.length >= SERVERS_CAP) return kept
-    return [...kept, pickServer(server)]
-  }, [])
+/**
+ * The id the fixed server goes by: the first kept server that names it, so its downloads keep
+ * their files, owed plays and sync; else a new one. The other servers that name it are adopted.
+ */
+const fromList = ({
+  servers,
+  server,
+  newId,
+}: {
+  servers: readonly ServerRecord[]
+  server: FixedServer
+  newId: () => string
+}): { id: string; adopted: string[] } => {
+  const ids = [
+    ...new Set(servers.filter(({ origin }) => namesServer({ server, origin })).map(({ id }) => id)),
+  ]
+  const [first, ...adopted] = ids
+  return { id: first ?? newId(), adopted }
+}
 
-const unpinned = (servers: readonly Infer<typeof isUnpinnedServerEntry>[]): ServerEntry[] =>
-  uniqueServers(servers.map((server) => ({ ...server, signIn: null })))
-
-export const upgradeConfig = (stored: Infer<typeof isStoredConfig>): DesktopConfig => {
+/** The stored update settings rebuilt from their two fields; the defaults before version 3 had any. */
+const updatesOf = (stored: StoredConfig): UpdateSettings => {
   switch (stored.version) {
     case 1:
-      return {
-        version: 4,
-        output: pickOutput(stored.output),
-        servers: [],
-        updates: { ...DEFAULT_UPDATE_SETTINGS },
-      }
     case 2:
-      return {
-        version: 4,
-        output: pickOutput(stored.output),
-        servers: unpinned(stored.servers),
-        updates: { ...DEFAULT_UPDATE_SETTINGS },
-      }
+      return { ...DEFAULT_UPDATE_SETTINGS }
     case 3:
-      return {
-        version: 4,
-        output: pickOutput(stored.output),
-        servers: unpinned(stored.servers),
-        updates: { isEnabled: stored.updates.isEnabled, checkedAt: stored.updates.checkedAt },
-      }
     case 4:
+    case 5:
+      return { isEnabled: stored.updates.isEnabled, checkedAt: stored.updates.checkedAt }
+    default: {
+      const unreachable: never = stored
+      return unreachable
+    }
+  }
+}
+
+const configFor = ({
+  stored,
+  id,
+  origin,
+  lastAccountId = null,
+}: {
+  stored: StoredConfig
+  id: string
+  origin: string
+  lastAccountId?: string | null
+}): DesktopConfig => ({
+  version: 5,
+  output: pickOutput(stored.output),
+  server: { id, origin },
+  updates: updatesOf(stored),
+  lastAccountId,
+})
+
+/**
+ * Any version, as version 5 for the fixed server. A version 5 server keeps its id and its last
+ * account whatever origin the build names now, so its downloads stay filed where they are and
+ * nothing has to move: only the origin is written anew.
+ */
+export const upgradeConfig = ({
+  stored,
+  server,
+  newId,
+}: {
+  stored: StoredConfig
+  server: FixedServer
+  newId: () => string
+}): UpgradedConfig => {
+  const { origin } = server
+  switch (stored.version) {
+    case 1:
+      return { config: configFor({ stored, id: newId(), origin }), adopted: [], isChanged: true }
+    case 2:
+    case 3:
+    case 4: {
+      const { id, adopted } = fromList({ servers: stored.servers, server, newId })
+      return { config: configFor({ stored, id, origin }), adopted, isChanged: true }
+    }
+    case 5:
       return {
-        version: 4,
-        output: pickOutput(stored.output),
-        servers: uniqueServers(stored.servers),
-        updates: { isEnabled: stored.updates.isEnabled, checkedAt: stored.updates.checkedAt },
+        config: configFor({
+          stored,
+          id: stored.server.id,
+          origin,
+          lastAccountId: stored.lastAccountId,
+        }),
+        adopted: [],
+        isChanged: stored.server.origin !== origin,
       }
     default: {
       const unreachable: never = stored
@@ -183,9 +257,17 @@ export const loadConfig = async ({
   fs,
   file,
   now,
+  server,
+  newId,
 }: {
   fs: StateFs
   file: string
   now: () => number
-}): Promise<DesktopConfig> =>
-  upgradeConfig(await loadJson({ fs, file, now, guard: isStoredConfig, empty: EMPTY_CONFIG }))
+  server: FixedServer
+  newId: () => string
+}): Promise<UpgradedConfig> =>
+  upgradeConfig({
+    stored: await loadJson({ fs, file, now, guard: isStoredConfig, empty: NO_CONFIG }),
+    server,
+    newId,
+  })

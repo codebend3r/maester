@@ -1,0 +1,122 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.header {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.hint {
+  color: var(--color-lichen);
+}
+
+// The place to drop a video, lit while files are dragged over the window.
+.drop {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  border: var(--border-thick) dashed var(--color-line-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .drop {
+    transition:
+      border-color 120ms var(--ease-out),
+      background-color 120ms var(--ease-out);
+  }
+}
+
+.dragging {
+  border-color: var(--color-leaf-bright);
+  background: var(--color-moss);
+}
+
+.dropTitle {
+  font-size: var(--font-size-lg);
+}
+
+.recents {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.recentsHead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'title clear';
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.recentsTitle {
+  grid-area: title;
+}
+
+.clear {
+  grid-area: clear;
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.recent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.play {
+  display: grid;
+  gap: var(--space-0);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
+  color: var(--color-bark);
+  text-align: start;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-line-strong);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .play {
+    transition: border-color 120ms var(--ease-out);
+  }
+}
+
+.name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.from {
+  overflow: hidden;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watched {
+  width: 100%;
+}

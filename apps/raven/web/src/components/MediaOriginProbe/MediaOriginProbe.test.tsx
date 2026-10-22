@@ -9,6 +9,7 @@ import { api } from '@/lib/api'
 import { queryKeys } from '@raven/ui/headless'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { SIGNED_IN, fakeAccount, readyConfig } from '@/test/authClient'
+import { asDesktop } from '@/test/desktop'
 
 afterEach(() => useMediaOrigin.setState({ pick: null, isProbing: false }))
 
@@ -39,6 +40,21 @@ describe('MediaOriginProbe', () => {
       </QueryClientProvider>,
     )
     expect(origins).toHaveBeenCalledTimes(1)
+    origins.mockRestore()
+  })
+
+  it('asks for nothing inside raven player, whose mpv finds its own way to the server', () => {
+    const origins = spyOn(api, 'getMediaOrigins').mockImplementation(() => new Promise(() => {}))
+    asDesktop()
+    const { getByText } = render(
+      <QueryClientProvider client={accountsOff()}>
+        <MediaOriginProbe>
+          <p>The app</p>
+        </MediaOriginProbe>
+      </QueryClientProvider>,
+    )
+    expect(getByText('The app')).toBeInTheDocument()
+    expect(origins).not.toHaveBeenCalled()
     origins.mockRestore()
   })
 

@@ -165,7 +165,7 @@ describe('adHocApps', () => {
 })
 
 describe('isPackagedPath', () => {
-  it.each(['', '/package.json', '/dist', '/dist/main/main.js', '/dist/renderer/index.html'])(
+  it.each(['', '/package.json', '/dist', '/dist/main/main.js', '/dist/preload/preload.cjs'])(
     'packages %p',
     (file) => {
       expect(isPackagedPath(file)).toBe(true)

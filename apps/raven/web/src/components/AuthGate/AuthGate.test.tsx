@@ -1,3 +1,4 @@
+import { DESKTOP_PATHS } from '@/desktop/paths'
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
@@ -17,8 +18,10 @@ import { queryKeys } from '@raven/ui/headless'
 import { queryClient } from '@/lib/queryClient'
 import { signOut } from '@/lib/session'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
+import { useServerReach } from '@/stores/serverReach'
 import { SIGNED_IN, fakeAccount, fakeAuthClient, fakeSession, readyConfig } from '@/test/authClient'
 import { Where } from '@/test/authPage'
+import { FILE_ID } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
 
 const renderGate = ({
@@ -67,6 +70,34 @@ describe('AuthGate', () => {
     renderGate()
     expect(screen.getByRole('status')).toHaveTextContent('Checking your account')
     expect(screen.queryByText('Library')).toBeNull()
+  })
+
+  it('keeps a local file or download playing while the account is read', () => {
+    getMe.mockImplementation(() => new Promise(() => undefined))
+    renderGate({ route: `/play/${FILE_ID}` })
+    expect(screen.getByText('Library')).toBeInTheDocument()
+    expect(screen.queryByText('Checking your account')).toBeNull()
+  })
+
+  it('keeps a local file or download playing when the account cannot be read', async () => {
+    getMe.mockRejectedValue(
+      refused({
+        status: 503,
+        reason: { reason: AUTH_REFUSALS.unavailable, message: 'Accounts are unavailable.' },
+      }),
+    )
+    renderGate({ route: `/play/${FILE_ID}` })
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    expect(screen.getByText('Library')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+  })
+
+  it('keeps a local file or download playing while accounts cannot be reached', () => {
+    renderGate({
+      authConfig: { state: AUTH_CONFIG_STATES.unavailable },
+      route: `/play/${FILE_ID}`,
+    })
+    expect(screen.getByText('Library')).toBeInTheDocument()
   })
 
   it('shows the loading screen while the stored session is read', () => {
@@ -225,5 +256,33 @@ describe('AuthGate', () => {
     await user.click(await screen.findByRole('button', { name: 'Leave' }))
 
     expect(await screen.findByTestId('where')).toHaveTextContent(AUTH_ROUTES.signIn)
+  })
+})
+
+describe('AuthGate inside raven player with its server out of reach', () => {
+  const renderOffline = (route: string) => {
+    useServerReach.setState({ isOffline: true })
+    return renderWithProviders({
+      route,
+      ui: (
+        <Routes>
+          <Route element={<AuthGate />}>
+            <Route path="downloads" element={<p>Downloads page</p>} />
+            <Route path="*" element={<p>Library</p>} />
+          </Route>
+        </Routes>
+      ),
+    })
+  }
+
+  it('opens a page that needs no server, as it is', () => {
+    renderOffline(DESKTOP_PATHS.downloads)
+    expect(screen.getByText('Downloads page')).toBeInTheDocument()
+  })
+
+  it('sends any other page to Downloads', () => {
+    renderOffline('/libraries/3')
+    expect(screen.getByText('Downloads page')).toBeInTheDocument()
+    expect(screen.queryByText('Library')).toBeNull()
   })
 })

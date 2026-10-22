@@ -1,9 +1,8 @@
+import { HTTP_METHODS, SERVER_METHODS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
-import { HTTP_METHODS, MAX_SECRET, SERVER_METHODS } from '@/shared/protocol'
 import {
   CALL_NAMES,
   MAX_BODY,
-  isPageCall,
   isWrite,
   matchCall,
   requestFor,
@@ -50,34 +49,6 @@ const ACCEPTED: readonly Accepted[] = [
   },
   {
     method: HTTP_METHODS.get,
-    path: '/api/lock',
-    body: null,
-    call: { name: CALL_NAMES.getLock },
-    sentBody: null,
-  },
-  {
-    method: HTTP_METHODS.post,
-    path: '/api/lock/unlock',
-    body: '{"pin":"1234"}',
-    call: { name: CALL_NAMES.unlock, pin: '1234' },
-    sentBody: '{"pin":"1234"}',
-  },
-  {
-    method: HTTP_METHODS.get,
-    path: '/api/admin',
-    body: null,
-    call: { name: CALL_NAMES.getAdminLock },
-    sentBody: null,
-  },
-  {
-    method: HTTP_METHODS.post,
-    path: '/api/admin/unlock',
-    body: '{"password":"hunter2"}',
-    call: { name: CALL_NAMES.unlockAdmin, password: 'hunter2' },
-    sentBody: '{"password":"hunter2"}',
-  },
-  {
-    method: HTTP_METHODS.get,
     path: '/api/items/10',
     body: null,
     call: { name: CALL_NAMES.getItem, itemId: 10 },
@@ -105,27 +76,6 @@ const ACCEPTED: readonly Accepted[] = [
     sentBody: null,
   },
   {
-    method: HTTP_METHODS.get,
-    path: '/api/media/7/ticket',
-    body: null,
-    call: { name: CALL_NAMES.getMediaTicket, mediaId: 7 },
-    sentBody: null,
-  },
-  {
-    method: HTTP_METHODS.get,
-    path: '/api/auth/config',
-    body: null,
-    call: { name: CALL_NAMES.getAuthConfig },
-    sentBody: null,
-  },
-  {
-    method: HTTP_METHODS.get,
-    path: '/api/me',
-    body: null,
-    call: { name: CALL_NAMES.getMe },
-    sentBody: null,
-  },
-  {
     method: HTTP_METHODS.post,
     path: '/api/auth/media/7/ticket',
     body: null,
@@ -149,18 +99,17 @@ const refuse = ({
 }
 
 describe('the allowlist values', () => {
-  it('names three methods and the two limits', () => {
+  it('names three methods and the body limit', () => {
     expect(Object.values(SERVER_METHODS)).toEqual([
       SERVER_METHODS.get,
       SERVER_METHODS.put,
       SERVER_METHODS.post,
     ])
     expect(MAX_BODY).toBe(4096)
-    expect(MAX_SECRET).toBe(256)
   })
 })
 
-describe('matchCall accepts exactly the sixteen calls', () => {
+describe('matchCall accepts exactly the nine calls', () => {
   it.each(CASES)('accepts %s', (_name, { method, path, body, call }) => {
     expect(matchCall({ method, path, body })).toEqual(call)
   })
@@ -213,24 +162,6 @@ describe('matchCall accepts exactly the sixteen calls', () => {
     })
     expect(match('{"position":12.5,"audio":"2"}')).toMatchObject({ audio: null })
   })
-
-  it('accepts a PIN and a password of exactly MAX_SECRET characters', () => {
-    const secret = 'a'.repeat(MAX_SECRET)
-    expect(
-      matchCall({
-        method: HTTP_METHODS.post,
-        path: '/api/lock/unlock',
-        body: JSON.stringify({ pin: secret }),
-      }),
-    ).toEqual({ name: CALL_NAMES.unlock, pin: secret })
-    expect(
-      matchCall({
-        method: HTTP_METHODS.post,
-        path: '/api/admin/unlock',
-        body: JSON.stringify({ password: secret }),
-      }),
-    ).toEqual({ name: CALL_NAMES.unlockAdmin, password: secret })
-  })
 })
 
 describe('requestFor', () => {
@@ -247,49 +178,13 @@ describe('requestFor', () => {
     expect(call).not.toBeNull()
     expect(requestFor(call!).body).toBe('{"position":40,"audio":null}')
   })
-
-  it('drops extra fields from an unlock body too', () => {
-    const unlock = matchCall({
-      method: HTTP_METHODS.post,
-      path: '/api/lock/unlock',
-      body: '{"pin":"1","admin":true}',
-    })
-    expect(requestFor(unlock!).body).toBe('{"pin":"1"}')
-    const admin = matchCall({
-      method: HTTP_METHODS.post,
-      path: '/api/admin/unlock',
-      body: '{"password":"p","pin":"1"}',
-    })
-    expect(requestFor(admin!).body).toBe('{"password":"p"}')
-  })
-
-  it('escapes control characters in a secret when it serializes it', () => {
-    const call = matchCall({
-      method: HTTP_METHODS.post,
-      path: '/api/lock/unlock',
-      body: '{"pin":"1\\r\\n2"}',
-    })
-    expect(requestFor(call!).body).toBe('{"pin":"1\\r\\n2"}')
-  })
 })
 
 describe('isWrite', () => {
-  it('is true for saveProgress and recordPlay only, so the five new reads are not writes', () => {
+  it('is true for saveProgress and recordPlay only', () => {
     expect(ACCEPTED.filter(({ call }) => isWrite(call)).map(({ call }) => call.name)).toEqual([
       CALL_NAMES.saveProgress,
       CALL_NAMES.recordPlay,
-    ])
-  })
-})
-
-describe('isPageCall', () => {
-  it('keeps the origin list, tickets and the account calls to main, and lets the page make the rest', () => {
-    expect(ACCEPTED.filter(({ call }) => !isPageCall(call)).map(({ call }) => call.name)).toEqual([
-      CALL_NAMES.getMediaOrigins,
-      CALL_NAMES.getMediaTicket,
-      CALL_NAMES.getAuthConfig,
-      CALL_NAMES.getMe,
-      CALL_NAMES.getAccountTicket,
     ])
   })
 })
@@ -313,6 +208,14 @@ describe('matchCall refuses calls off the list', () => {
     refuse({ method: HTTP_METHODS.post, path: '/api/admin/lock' }))
   it('refuses POST /api/admin/keep-unlocked', () =>
     refuse({ method: HTTP_METHODS.post, path: '/api/admin/keep-unlocked' }))
+  it('refuses the calls the page makes for itself now: the locks, the admin password and the account', () => {
+    refuse({ method: HTTP_METHODS.get, path: '/api/lock' })
+    refuse({ method: HTTP_METHODS.post, path: '/api/lock/unlock', body: '{"pin":"1"}' })
+    refuse({ method: HTTP_METHODS.get, path: '/api/admin' })
+    refuse({ method: HTTP_METHODS.post, path: '/api/admin/unlock', body: '{"password":"p"}' })
+    refuse({ method: HTTP_METHODS.get, path: '/api/auth/config' })
+    refuse({ method: HTTP_METHODS.get, path: '/api/me' })
+  })
   it('refuses PUT /api/media/1/favourite', () =>
     refuse({
       method: HTTP_METHODS.put,
@@ -336,25 +239,23 @@ describe('matchCall refuses the new reads when they are not exact', () => {
     refuse({ method: HTTP_METHODS.get, path: '/api/items/010' })
     refuse({ method: HTTP_METHODS.get, path: '/api/libraries/03/sagas' })
     refuse({ method: HTTP_METHODS.get, path: '/api/libraries/3/sagas/' })
-    refuse({ method: HTTP_METHODS.get, path: '/api/media/7/ticket?x=1' })
+    refuse({ method: HTTP_METHODS.get, path: '/api/media/7/ticket' })
     refuse({ method: HTTP_METHODS.get, path: '/api/media-origins/ping' })
     refuse({ method: HTTP_METHODS.get, path: '/api/media-origins?x=1' })
   })
 
-  it('refuses a write method on any of the five', () => {
+  it('refuses a write method on any of the four', () => {
     refuse({ method: HTTP_METHODS.post, path: '/api/items/10' })
     refuse({ method: HTTP_METHODS.put, path: '/api/libraries/3' })
     refuse({ method: HTTP_METHODS.post, path: '/api/libraries/3/sagas' })
     refuse({ method: HTTP_METHODS.post, path: '/api/media-origins' })
-    refuse({ method: HTTP_METHODS.post, path: '/api/media/7/ticket' })
   })
 
-  it('refuses a body on any of the five', () => {
+  it('refuses a body on any of the four', () => {
     refuse({ method: HTTP_METHODS.get, path: '/api/items/10', body: '{}' })
     refuse({ method: HTTP_METHODS.get, path: '/api/libraries/3', body: '{}' })
     refuse({ method: HTTP_METHODS.get, path: '/api/libraries/3/sagas', body: '{}' })
     refuse({ method: HTTP_METHODS.get, path: '/api/media-origins', body: '{}' })
-    refuse({ method: HTTP_METHODS.get, path: '/api/media/7/ticket', body: '{}' })
   })
 
   it('refuses an id past the safe integers', () => {
@@ -363,20 +264,13 @@ describe('matchCall refuses the new reads when they are not exact', () => {
   })
 })
 
-describe('matchCall refuses the account calls when they are not exact', () => {
-  it('refuses a body on any of the three', () => {
-    refuse({ method: HTTP_METHODS.get, path: '/api/auth/config', body: '{}' })
-    refuse({ method: HTTP_METHODS.get, path: '/api/me', body: '{}' })
+describe('matchCall refuses the account ticket when it is not exact', () => {
+  it('refuses a body', () => {
     refuse({ method: HTTP_METHODS.post, path: '/api/auth/media/7/ticket', body: '{}' })
     refuse({ method: HTTP_METHODS.post, path: '/api/auth/media/7/ticket', body: '' })
   })
 
   it('refuses a query, a trailing or extra slash and a hash', () => {
-    refuse({ method: HTTP_METHODS.get, path: '/api/auth/config?x=1' })
-    refuse({ method: HTTP_METHODS.get, path: '/api/auth/config/' })
-    refuse({ method: HTTP_METHODS.get, path: '/api/me?x=1' })
-    refuse({ method: HTTP_METHODS.get, path: '/api/me/' })
-    refuse({ method: HTTP_METHODS.get, path: '/api//me' })
     refuse({ method: HTTP_METHODS.post, path: '/api/auth/media/7/ticket?x=1' })
     refuse({ method: HTTP_METHODS.post, path: '/api/auth/media/7/ticket/' })
     refuse({ method: HTTP_METHODS.post, path: '/api/auth/media//7/ticket' })
@@ -393,9 +287,7 @@ describe('matchCall refuses the account calls when they are not exact', () => {
     refuse({ method: HTTP_METHODS.post, path: '/api/auth/media/9007199254740992/ticket' })
   })
 
-  it('refuses the wrong method on each', () => {
-    refuse({ method: HTTP_METHODS.post, path: '/api/auth/config' })
-    refuse({ method: HTTP_METHODS.post, path: '/api/me' })
+  it('refuses the wrong method', () => {
     refuse({ method: HTTP_METHODS.get, path: '/api/auth/media/7/ticket' })
     refuse({ method: HTTP_METHODS.put, path: '/api/auth/media/7/ticket' })
   })
@@ -486,7 +378,7 @@ describe('matchCall refuses the wrong method', () => {
   it('refuses GET where PUT is allowed', () =>
     refuse({ method: HTTP_METHODS.get, path: '/api/media/1/progress' }))
   it('refuses PUT where POST is allowed', () =>
-    refuse({ method: HTTP_METHODS.put, path: '/api/lock/unlock', body: '{"pin":"1"}' }))
+    refuse({ method: HTTP_METHODS.put, path: '/api/media/1/plays' }))
   it('refuses HEAD, OPTIONS and PATCH', () => {
     refuse({ method: HTTP_METHODS.head, path: '/api/lock' })
     refuse({ method: 'OPTIONS', path: '/api/lock' })
@@ -532,31 +424,4 @@ describe('matchCall refuses bodies that do not fit the call', () => {
       path: '/api/media/1/progress',
       body: '{"__proto__":{"position":1}}',
     }))
-  it('refuses POST /api/lock/unlock with a 300-character PIN', () =>
-    refuse({
-      method: HTTP_METHODS.post,
-      path: '/api/lock/unlock',
-      body: JSON.stringify({ pin: 'a'.repeat(300) }),
-    }))
-  it('refuses a PIN one past MAX_SECRET and a password one past it', () => {
-    refuse({
-      method: HTTP_METHODS.post,
-      path: '/api/lock/unlock',
-      body: JSON.stringify({ pin: 'a'.repeat(MAX_SECRET + 1) }),
-    })
-    refuse({
-      method: HTTP_METHODS.post,
-      path: '/api/admin/unlock',
-      body: JSON.stringify({ password: 'a'.repeat(MAX_SECRET + 1) }),
-    })
-  })
-  it('refuses a PIN that is not a string', () => {
-    refuse({ method: HTTP_METHODS.post, path: '/api/lock/unlock', body: '{"pin":1234}' })
-    refuse({ method: HTTP_METHODS.post, path: '/api/lock/unlock', body: '{}' })
-    refuse({ method: HTTP_METHODS.post, path: '/api/lock/unlock' })
-  })
-  it('refuses a password in the PIN call and a PIN in the password call', () => {
-    refuse({ method: HTTP_METHODS.post, path: '/api/lock/unlock', body: '{"password":"p"}' })
-    refuse({ method: HTTP_METHODS.post, path: '/api/admin/unlock', body: '{"pin":"1"}' })
-  })
 })

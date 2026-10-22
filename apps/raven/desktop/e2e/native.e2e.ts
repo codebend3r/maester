@@ -10,7 +10,9 @@ import {
 import { type Clips, makeClips, makeTrackClip } from '@/e2e/clips'
 import {
   closeApp,
+  expectOffline,
   freshUserData,
+  heading,
   launchApp,
   markWithin,
   openFile,
@@ -19,6 +21,15 @@ import {
   withApp,
 } from '@/e2e/harness'
 import { postOnPort, tapPlayerPort, trafficOf } from '@/e2e/playerPort'
+import {
+  clockOf,
+  distanceFrom,
+  expectButton,
+  expectClockAdvancing,
+  expectNative,
+  expectPlayingNatively,
+  wake,
+} from '@/e2e/playerView'
 
 // Twice the 20 ms main thread budget (spec section 8), as P4 does for launch.
 const LOOP_LAG_LIMIT_MS = 40
@@ -31,53 +42,11 @@ const QUIT_LIMIT_MS = 1000
 const QUIT_HANG_MS = 3000
 const QUIT_MARK_WAIT_MS = 1000
 const NEXT_WAIT_MS = 15_000
-// The window's colour on Home and under a video, as Electron reports them: main sets the
-// clear one as `#00000000`, and `getBackgroundColor` leaves the alpha off.
+// The window's colour behind the page and under a video, as Electron reports them: main sets
+// the clear one as `#00000000`, and `getBackgroundColor` leaves the alpha off.
 const NIGHT = '#15201E'
 const CLEAR = '#000000'
 const ERROR_CODES = { eperm: 'EPERM' } as const
-
-const heading = ({ page, name }: { page: Page; name: string }) =>
-  page.getByRole('heading', { name, exact: true })
-
-const homeHeading = (page: Page) => page.getByRole('heading', { name: 'raven player' })
-
-/** A pointer move wakes the controls, which hold their clock while hidden (Ruling 7). */
-const wake = async (page: Page) => {
-  await page.mouse.move(120, 120)
-  await page.mouse.move(160, 140)
-}
-
-/** The scrubber's position in whole seconds, read with the controls awake. */
-const clockOf = async (page: Page): Promise<number | null> => {
-  await wake(page)
-  const now = await page.getByRole('slider', { name: 'Seek' }).getAttribute('aria-valuenow')
-  return now === null ? null : Number(now)
-}
-
-/** The clock moves more than a second past where it is now: a stuck clock fails here. */
-const expectClockAdvancing = async (page: Page) => {
-  const start = (await clockOf(page)) ?? Number.POSITIVE_INFINITY
-  await expect
-    .poll(async () => ((await clockOf(page)) ?? Number.NEGATIVE_INFINITY) - start)
-    .toBeGreaterThan(1)
-}
-
-const distanceFrom = async ({ page, seconds }: { page: Page; seconds: number }) => {
-  const now = await clockOf(page)
-  return now === null ? Number.POSITIVE_INFINITY : Math.abs(now - seconds)
-}
-
-/** mpv plays it: the page has no `<video>`, and the stage says its picture is native. */
-const expectNative = async (page: Page) => {
-  await expect(page.locator('video')).toHaveCount(0)
-  await expect(page.locator('html')).toHaveAttribute('data-surface', 'native')
-}
-
-const expectButton = async ({ page, name }: { page: Page; name: string }) => {
-  await wake(page)
-  await expect(page.getByRole('button', { name })).toBeVisible()
-}
 
 /** Plays `path` through mpv and waits until its clock is moving. */
 const playNatively = async ({
@@ -92,10 +61,13 @@ const playNatively = async ({
   title: string
 }) => {
   await openFile({ app, path })
-  await expect(heading({ page, name: title })).toBeVisible()
-  await expectNative(page)
-  await expectButton({ page, name: 'Pause (k)' })
-  await expectClockAdvancing(page)
+  await expectPlayingNatively({ page, title })
+}
+
+/** The player has gone and the page it left is back: no `/play` route and no picture under it. */
+const expectLeftPlayer = async (page: Page) => {
+  await expectOffline({ page })
+  await expect(page.locator('html')).not.toHaveAttribute('data-surface', 'native')
 }
 
 /** The reply to each request of `type` the page sent, in order; null for one not answered yet. */
@@ -148,7 +120,7 @@ const isAlive = (pid: number): boolean => {
   }
 }
 
-/** The window's background as Electron reports it: night on Home, clear under a video. */
+/** The window's background as Electron reports it: night behind a page, clear under a video. */
 const backgroundOf = (app: ElectronApplication): Promise<string | null> =>
   app.evaluate(
     ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getBackgroundColor() ?? null,
@@ -328,15 +300,14 @@ test.describe.serial('playing a local file through mpv', () => {
     })
   })
 
-  test('goes back home with Escape and with Back, stopping mpv each time', async () => {
+  test('goes back to the page it left with Escape and with Back, stopping mpv each time', async () => {
     await withApp({
       userData,
       run: async ({ app, page }) => {
         await tapPlayerPort({ page })
         await playNatively({ app, page, path: clips.second, title: 'Clip 02 Été' })
         await page.keyboard.press('Escape')
-        await expect(homeHeading(page)).toBeVisible()
-        await expect(page.locator('html')).not.toHaveAttribute('data-surface', 'native')
+        await expectLeftPlayer(page)
         await expect
           .poll(() => lastReplyOf({ page, type: PLAYER_COMMANDS.stop }))
           .toMatchObject({ ok: true })
@@ -346,8 +317,7 @@ test.describe.serial('playing a local file through mpv', () => {
         await playNatively({ app, page, path: clips.second, title: 'Clip 02 Été' })
         await wake(page)
         await page.getByRole('button', { name: 'Back', exact: true }).click()
-        await expect(homeHeading(page)).toBeVisible()
-        await expect(page.locator('html')).not.toHaveAttribute('data-surface', 'native')
+        await expectLeftPlayer(page)
         await expect
           .poll(async () => {
             const added = (await repliesTo({ page, type: PLAYER_COMMANDS.stop })).slice(stops)
@@ -367,15 +337,11 @@ test.describe.serial('playing a local file through mpv', () => {
         await playNatively({ app, page, path: clips.second, title: 'Clip 02 Été' })
 
         // A second `ready`: main closes the old port, which stops mpv, and hands over a new
-        // one. Each page load starts on Home, so the video opens again from there.
+        // one. The page reloads on the same file, which it opens again on the new port.
         await page.reload()
         await expect.poll(async () => (await trafficOf({ page })).ports).toBe(1)
-        // Main put the window back for Home before it handed the new page its port.
-        expect(await backgroundOf(app)).toBe(NIGHT)
-        await expect(homeHeading(page)).toBeVisible()
-        await expect(page.locator('html')).not.toHaveAttribute('data-surface', 'native')
-
-        await playNatively({ app, page, path: clips.second, title: 'Clip 02 Été' })
+        await expectPlayingNatively({ page, title: 'Clip 02 Été' })
+        expect(await backgroundOf(app)).toBe(CLEAR)
         await expect
           .poll(() => lastReplyOf({ page, type: PLAYER_COMMANDS.load }))
           .toMatchObject({ ok: true })
@@ -394,7 +360,7 @@ test.describe.serial('playing a local file through mpv', () => {
         await playNatively({ app, page, path: clips.first, title: 'Clip 01' })
         expect(await backgroundOf(app)).toBe(CLEAR)
         await page.keyboard.press('Escape')
-        await expect(homeHeading(page)).toBeVisible()
+        await expectLeftPlayer(page)
         await tapPlayerPort({ page })
 
         const ungranted = '00000000-0000-4000-8000-000000000000'
@@ -430,7 +396,7 @@ test.describe.serial('playing a local file through mpv', () => {
 
         const { replies, events, strays } = await trafficOf({ page })
         const unknown = 'raven player does not understand that command.'
-        const notOpen = 'That video is no longer open. Open it again from Home.'
+        const notOpen = 'That video is no longer open. Open it again from On this Mac or Downloads.'
         expect(replies).toEqual([
           { id: 9001, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: unknown },
           { id: 9002, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: unknown },
@@ -446,8 +412,7 @@ test.describe.serial('playing a local file through mpv', () => {
         // A load main accepts makes the window clear for the picture before it answers, so
         // an opaque window once every reply is in means none of them reached mpv.
         expect(await backgroundOf(app)).toBe(NIGHT)
-        await expect(homeHeading(page)).toBeVisible()
-        await expect(page.locator('html')).not.toHaveAttribute('data-surface', 'native')
+        await expectLeftPlayer(page)
       },
     })
   })

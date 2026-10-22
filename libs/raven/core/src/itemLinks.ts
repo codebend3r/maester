@@ -6,6 +6,12 @@ import { type Infer, isBoolean, object } from '@/schema'
 /** An address in the app, from its root. */
 export type AppPath = `/${string}`
 
+/** The app's pages that raven names from outside a page's own links: the desktop menu and links. */
+export const PAGE_PATHS = { settings: '/settings', watch: '/watch' } as const
+
+/** The page that plays a video. */
+export const watchPageOf = (mediaId: number): AppPath => `${PAGE_PATHS.watch}/${mediaId}`
+
 /** A season's page, by its show and number. */
 const seasonPath = ({ showId, season }: { showId: number; season: number }): AppPath =>
   `/shows/${showId}/seasons/${season}`
@@ -127,7 +133,7 @@ export const watchLink = ({
   upNext?: WatchState['upNext']
   isShuffled?: boolean
 }): { to: AppPath; state: WatchState } => ({
-  to: `/watch/${media.id}`,
+  to: watchPageOf(media.id),
   state: { media, upNext, isShuffled },
 })
 

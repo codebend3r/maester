@@ -1,7 +1,6 @@
-import { HTTP_METHODS } from '@/shared/protocol'
+import { extensionOf, HTTP_METHODS } from '@raven/core'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { extensionOf } from '@raven/core'
-import { ALLOWED_METHODS } from '@/main/appProtocol'
+import { ALLOWED_METHODS } from '@/main/webHost'
 import type { Grants } from '@/main/grants'
 
 const BYTE_RANGE_KINDS = {

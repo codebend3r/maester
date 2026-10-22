@@ -9,6 +9,8 @@ import {
   queueLink,
   readWatchState,
   watchLink,
+  PAGE_PATHS,
+  watchPageOf,
 } from '@/itemLinks'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 
@@ -33,6 +35,13 @@ describe('episodeBackPath', () => {
     expect(episodeBackPath({ item: itemSummary({ show: null }), libraryId: 3 })).toBe(
       '/libraries/3',
     )
+  })
+})
+
+describe('watchPageOf', () => {
+  it("names a video's page under the watch path", () => {
+    expect(PAGE_PATHS).toEqual({ settings: '/settings', watch: '/watch' })
+    expect(watchPageOf(9)).toBe('/watch/9')
   })
 })
 

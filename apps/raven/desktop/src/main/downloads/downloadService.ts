@@ -1,5 +1,14 @@
-import type { ConfigStore } from '@/main/desktopConfig'
-import { createDownloadAsks, type DownloadAsks, type DownloadAsksDeps } from '@/main/downloads/asks'
+import {
+  DESKTOP_EVENTS,
+  DESKTOP_REPLIES,
+  type DesktopEvent,
+  type DesktopReply,
+  DOWNLOAD_STATUS_KINDS,
+  type DownloadStatus,
+  type DownloadView,
+} from '@raven/core'
+import { type ConfigStore, serverById, serverOf, setLastAccount } from '@/main/desktopConfig'
+import { createDownloadAsks, type DownloadAsks } from '@/main/downloads/asks'
 import { createAutoDelete, isDueForDeletion } from '@/main/downloads/autoDelete'
 import { DOWNLOAD_MESSAGES, failedMessage, pausedMessage } from '@/main/downloads/downloadMessages'
 import {
@@ -29,17 +38,7 @@ import { downloadsDirFor, readSpace, type SpaceFs } from '@/main/downloads/space
 import { createSync, settleWithin } from '@/main/downloads/sync'
 import { errorText } from '@/main/log/errorText'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
-import { serverById } from '@/main/servers/serverList'
 import type { Timers } from '@/main/stateStore'
-import {
-  DESKTOP_EVENTS,
-  DESKTOP_REPLIES,
-  DOWNLOAD_STATUS_KINDS,
-  type DesktopEvent,
-  type DesktopReply,
-  type DownloadStatus,
-  type DownloadView,
-} from '@/shared/protocol'
 
 /** The `downloads` event goes out at most once in this long, so progress cannot flood the page. */
 export const DOWNLOADS_EVENT_MS = 250
@@ -59,7 +58,7 @@ export type DownloadServiceDeps = {
   send: (event: DesktopEvent) => void
   warn: (message: string) => void
   access: MediaAccess
-  fetchFor: DownloadQueueDeps['fetchFor']
+  fetch: DownloadQueueDeps['fetch']
   fs: QueueFs
   showItemInFolder: (path: string) => void
   /** Settles once the network can be used (main's `app.whenReady()`); the launch's first kick waits on it. */
@@ -68,9 +67,7 @@ export type DownloadServiceDeps = {
   wasSetAside: boolean
   /** How often the sync tries its servers again; the spec's five minutes unless main's test hook shortens it. */
   syncRetryMs: number
-} & Pick<DownloadPlaybackDeps, 'grants' | 'state' | 'stat' | 'hasAccounts' | 'accountIdOf'> &
-  Pick<DownloadAsksDeps, 'isReady' | 'readAccount'> &
-  Pick<DownloadQueueDeps, 'accountChanged'>
+} & Pick<DownloadPlaybackDeps, 'grants' | 'state' | 'stat' | 'accountIdOf'>
 
 type ById = { downloadId: string }
 
@@ -78,6 +75,7 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
   Pick<
     DownloadPlayback,
     | 'open'
+    | 'openTitle'
     | 'nextOf'
     | 'sidecarsOf'
     | 'fromLabelOf'
@@ -108,8 +106,6 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
      * so what they tell at launch reaches a page that listens.
      */
     pageReady: () => void
-    /** Called when a server is removed from raven player (Ruling 17). */
-    removeServer: (input: { serverId: string }) => Promise<void>
     showFolder: () => Promise<DesktopReply>
     /** Main's `powerMonitor` `suspend`: every fetch stops and its file waits for the wake. */
     onSuspend: () => void
@@ -119,7 +115,8 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     accessEnded: (input: { serverId: string }) => void
     /**
      * The account signed in to a server changed: what its downloads hold for any other account
-     * waits in `owed` for that account, and what the one signed in now is owed goes out.
+     * waits in `owed` for that account, and what the one signed in now is owed goes out. An
+     * account signed in is kept in the config as the last one, which a play while none is waits for.
      */
     accountSwitched: (input: { serverId: string }) => void
     /** Stops the events and every fetch; after it the page hears nothing more. */
@@ -281,17 +278,18 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
       deleteClock.schedule(input)
     },
     onLeft: () => deleteClock.playbackLeft(),
-    hasAccounts: deps.hasAccounts,
     accountIdOf: deps.accountIdOf,
+    lastAccountIdOf: ({ serverId }) =>
+      serverById({ config: config.read(), serverId }) === null ? null : config.read().lastAccountId,
   })
 
   const queue = createDownloadQueue({
     // The queue's changes go through `change` too, so its progress reaches the page.
     store: { ...store, update: change },
     serverOf: (serverId) => serverById({ config: config.read(), serverId }),
-    servers: () => config.read().servers,
+    servers: () => [serverOf(config.read())],
     access: deps.access,
-    fetchFor: deps.fetchFor,
+    fetch: deps.fetch,
     calls: deps.calls,
     fs: deps.fs,
     space: deps.space,
@@ -310,7 +308,6 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     // After the settle, so a deletion that came due in the sleep finds the network back and
     // the server hears what was watched first.
     onAwake: () => deleteClock.rearm(),
-    accountChanged: deps.accountChanged,
     onFailed: (entry) => {
       const { status } = entry
       if (status.kind !== DOWNLOAD_STATUS_KINDS.failed) return
@@ -335,8 +332,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     warn: deps.warn,
     change,
     list,
-    isReady: deps.isReady,
-    readAccount: deps.readAccount,
+    isSignedIn: ({ serverId }) => deps.accountIdOf({ serverId }) !== null,
   })
 
   // Only the page asking for the list sends what is pending; the list that events and replies carry does not.
@@ -448,8 +444,22 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     return { type: DESKTOP_REPLIES.done }
   }
 
+  const keepLastAccount = ({
+    serverId,
+    accountId,
+  }: {
+    serverId: string
+    accountId: string | null
+  }): void => {
+    const current = config.read()
+    if (accountId === null || current.lastAccountId === accountId) return
+    if (serverById({ config: current, serverId }) === null) return
+    config.update((latest) => setLastAccount({ config: latest, accountId }))
+  }
+
   const accountSwitched: DownloadService['accountSwitched'] = ({ serverId }) => {
     const accountId = deps.accountIdOf({ serverId })
+    keepLastAccount({ serverId, accountId })
     change((state) => oweOtherAccounts(state, { serverId, accountId }))
     runSync(sync.runAll())
   }
@@ -511,9 +521,9 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
       playback.noteNewPage()
       firstPage.ready()
     },
-    removeServer: queue.removeServer,
     showFolder,
     open: playback.open,
+    openTitle: playback.openTitle,
     nextOf: playback.nextOf,
     sidecarsOf: playback.sidecarsOf,
     fromLabelOf: playback.fromLabelOf,

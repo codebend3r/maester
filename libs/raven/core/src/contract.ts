@@ -29,6 +29,9 @@ export const AUTH_CONFIG_STATES = {
   ready: 'ready',
 } as const
 export const AUTH_COOKIE = 'maester-auth'
+/** The cookie the library PIN's unlock sets, under `UNLOCK_COOKIE_PATH`, naming the account that entered it. */
+export const UNLOCK_COOKIE = 'raven_unlock'
+export const UNLOCK_COOKIE_PATH = '/api'
 export const AUTH_HEADERS = {
   authorization: 'authorization',
   cookie: 'cookie',

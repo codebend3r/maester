@@ -1,18 +1,19 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { isRecord, isString } from '@raven/core'
 import { expect, type Page, test } from '@playwright/test'
+import { DESKTOP_REPLIES, DESKTOP_REQUESTS, isRecord, isString } from '@raven/core'
 import {
   browserOpens,
+  expectOffline,
   freshUserData,
   removeDir,
   requestFromPage,
+  sideLink,
   stubBrowser,
   withApp,
 } from '@/e2e/harness'
 import { type ReleasesFixture, startReleasesFixture } from '@/e2e/releasesFixture'
-import { DESKTOP_REPLIES, DESKTOP_REQUESTS } from '@/shared/protocol'
 
 const CONFIG_FILE = 'desktop-config.json'
 const NOTICE_WAIT_MS = 10_000
@@ -44,7 +45,17 @@ const release = ({
   assets: dmg === null ? [] : [{ name: dmg }],
 })
 
-const updateNotice = (page: Page) => page.getByRole('complementary', { name: 'Update' })
+/** The toast main's notice of a newer release raises, over whatever page is open. */
+const updateNotice = (page: Page) => page.getByText(/^raven player [\d.]+ is out\. Settings has/u)
+
+/** Settings' Updates section, from the side menu of the frame a launch with no server opens. */
+const openUpdates = async (page: Page) => {
+  await expectOffline({ page })
+  await sideLink({ page, name: 'Settings' }).click()
+  const updates = page.getByRole('region', { name: 'Updates' })
+  await expect(updates).toBeVisible()
+  return updates
+}
 
 /** What main says about the release check, once it has an answer from the fixture. */
 const checkedStatus = async (page: Page) => {
@@ -98,11 +109,6 @@ const withFixture = async ({
   }
 }
 
-type Box = { x: number; y: number; width: number; height: number }
-
-const isOverlapping = ({ a, b }: { a: Box; b: Box }): boolean =>
-  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
-
 test.describe('the release check', () => {
   test('tells you about a newer release and opens its page', async () => {
     await withFixture({
@@ -115,36 +121,14 @@ test.describe('the release check', () => {
             await stubBrowser({ app })
             const notice = updateNotice(page)
             await expect(notice).toBeVisible({ timeout: NOTICE_WAIT_MS })
-            await expect(notice).toContainText('raven player 99.0.0 is out.')
+            await expect(notice).toHaveText("raven player 99.0.0 is out. Settings has what's new.")
 
-            // The notice takes its own row, so the end of Settings scrolls clear of it.
-            await page.getByRole('button', { name: 'Settings' }).click()
-            await expect(notice).toBeVisible()
-            const clear = page.getByRole('button', { name: 'Clear recents' })
-            // Again until it holds: the sections above grow as their reads answer.
-            await expect(async () => {
-              await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
-              await expect(clear).toBeInViewport({ timeout: 500 })
-            }).toPass()
-            const settings = page.getByRole('main', { name: 'Settings' })
-            const [clearBox, settingsBox, noticeBox] = await Promise.all([
-              clear.boundingBox(),
-              settings.boundingBox(),
-              notice.boundingBox(),
-            ])
-            if (clearBox === null || settingsBox === null || noticeBox === null) {
-              throw new Error('nothing to measure')
-            }
-            expect(isOverlapping({ a: clearBox, b: noticeBox })).toBe(false)
-            // Below the whole page, not only beside its last button.
-            expect(settingsBox.y + settingsBox.height).toBeLessThanOrEqual(noticeBox.y)
-
-            await notice.getByRole('button', { name: "See what's new" }).click()
+            const updates = await openUpdates(page)
+            await expect(updates.getByText('raven player 99.0.0 is out.')).toBeVisible()
+            await updates.getByRole('button', { name: "See what's new" }).click()
             await expect
               .poll(() => browserOpens({ app }))
               .toEqual(['https://github.com/codebend3r/maester/releases/tag/v99.0.0'])
-            await expect(notice).toBeHidden()
-            await expect(page.getByRole('heading', { name: 'Settings' })).toBeFocused()
           },
         })
       },
@@ -169,7 +153,7 @@ test.describe('the release check', () => {
           userData,
           env: { RAVEN_DESKTOP_RELEASES_URL: fixture.url },
           run: async ({ page }) => {
-            await expect(page.getByRole('heading', { name: 'raven player' })).toBeVisible()
+            await expectOffline({ page })
             // Main announces before it answers a later read, so a finished check has said all it will.
             await expect
               .poll(() => checkedStatus(page), { timeout: NOTICE_WAIT_MS })
@@ -219,8 +203,7 @@ test.describe('the release check', () => {
               .poll(() => checkedStatus(page), { timeout: NOTICE_WAIT_MS })
               .toEqual({ latest: null, problem: 'GitHub listed no raven player release.' })
             await expect(updateNotice(page)).toHaveCount(0)
-            await page.getByRole('button', { name: 'Settings' }).click()
-            const updates = page.getByRole('region', { name: 'Updates' })
+            const updates = await openUpdates(page)
             await updates.getByRole('button', { name: 'Check now' }).click()
             await expect(updates.getByRole('status')).toHaveText(
               'raven player could not check for updates. GitHub listed no raven player release.',
@@ -243,8 +226,7 @@ test.describe('the release check', () => {
           env,
           run: async ({ page }) => {
             await expect.poll(() => fixture.requests(), { timeout: NOTICE_WAIT_MS }).toBe(1)
-            await page.getByRole('button', { name: 'Settings' }).click()
-            const updates = page.getByRole('region', { name: 'Updates' })
+            const updates = await openUpdates(page)
             const box = updates.getByRole('checkbox', { name: 'Check for updates once a day' })
             await expect(box).toBeChecked()
             await box.uncheck()
@@ -260,14 +242,12 @@ test.describe('the release check', () => {
           userData,
           env,
           run: async ({ page }) => {
-            await expect(page.getByRole('heading', { name: 'raven player' })).toBeVisible()
+            await expectOffline({ page })
             await delay(QUIET_MS)
             expect(fixture.requests()).toBe(1)
-            await page.getByRole('button', { name: 'Settings' }).click()
+            const updates = await openUpdates(page)
             await expect(
-              page
-                .getByRole('region', { name: 'Updates' })
-                .getByRole('checkbox', { name: 'Check for updates once a day' }),
+              updates.getByRole('checkbox', { name: 'Check for updates once a day' }),
             ).not.toBeChecked()
           },
         })

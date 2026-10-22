@@ -6,8 +6,8 @@ export const CLEAR = '#00000000'
 /**
  * Splits the service's activity: whether it plays goes to the sleep guard every time,
  * whether a video shows goes to the window only when it changes. Nothing shows at first.
- * `hide` forces the window back for Home: a new or crashed page shows no video, even when
- * the service, already idle or dead, has nothing to report.
+ * `hide` forces the window back for a page with no video: a new or crashed page shows none,
+ * even when the service, already idle or dead, has nothing to report.
  */
 export const createActivity = ({
   onPlaying,

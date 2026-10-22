@@ -1,6 +1,5 @@
 import { join } from 'node:path'
-import { isMediaId } from '@raven/core'
-import { isContainerName, isOpaqueId, isSidecarTrackId } from '@/shared/protocol'
+import { isContainerName, isMediaId, isOpaqueId, isSidecarTrackId } from '@raven/core'
 
 /** What a download leaves free on the disk, so the system and raven player keep room to work. */
 export const SPACE_RESERVE_BYTES = 2 * 1024 ** 3

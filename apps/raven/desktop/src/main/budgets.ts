@@ -2,7 +2,7 @@ import { SYNC_RETRY_MS } from '@/main/downloads/sync'
 import type { PlayerActivity } from '@/main/player/playerService'
 import type { Timers } from '@/main/stateStore'
 
-/** How long Home or a pause lasts before its mark (Ruling 13). */
+/** How long a page with no video, or a pause, lasts before its mark (Ruling 13). */
 export const BUDGET_WINDOW_MS = 60_000
 /** How often memory is marked while a video plays. */
 export const PLAYING_SAMPLE_MS = 10_000
@@ -42,9 +42,9 @@ export const stateOf = (activity: PlayerActivity): BudgetState => {
 }
 
 /**
- * Marks memory on Home and while playing, and CPU while paused, restarting its timer only
- * when the state changes. Reports after `dispose` are ignored: the player can still report
- * while its window closes.
+ * Marks memory on a page with no video and while playing, and CPU while paused, restarting its
+ * timer only when the state changes. Reports after `dispose` are ignored: the player can still
+ * report while its window closes.
  */
 export const createBudgets = ({
   metrics,

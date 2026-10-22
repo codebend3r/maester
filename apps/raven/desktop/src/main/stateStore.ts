@@ -1,5 +1,10 @@
 import { parseJson } from '@/main/parseJson'
-import { EMPTY_STATE, isPlayerState, type PlayerState } from '@/main/playerState'
+import {
+  EMPTY_STATE,
+  isStoredPlayerState,
+  type PlayerState,
+  upgradeState,
+} from '@/main/playerState'
 
 export type StateFs = {
   readFile: (path: string) => Promise<string>
@@ -80,7 +85,7 @@ export const loadJson = async <T>({ empty, ...input }: JsonFile<T> & { empty: T 
   return read.kind === JSON_READ_KINDS.read ? read.value : empty
 }
 
-export const loadState = ({
+export const loadState = async ({
   fs,
   file,
   now,
@@ -88,7 +93,8 @@ export const loadState = ({
   fs: StateFs
   file: string
   now: () => number
-}): Promise<PlayerState> => loadJson({ fs, file, now, guard: isPlayerState, empty: EMPTY_STATE })
+}): Promise<PlayerState> =>
+  upgradeState(await loadJson({ fs, file, now, guard: isStoredPlayerState, empty: EMPTY_STATE }))
 
 export const createJsonStore = <T>({
   fs,

@@ -17,6 +17,7 @@
     "dead-css": "nx run maester:dead-css",
     "desktop:audit:bundle": "nx run @raven/desktop:audit:bundle",
     "desktop:build": "nx run @raven/desktop:build",
+    "desktop:dev": "nx run @raven/desktop:dev",
     "desktop:e2e": "nx run @raven/desktop:e2e",
     "desktop:make": "nx run @raven/desktop:make",
     "desktop:smoke:packaged": "nx run @raven/desktop:smoke:packaged",

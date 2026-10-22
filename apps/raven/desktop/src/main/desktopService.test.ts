@@ -1,29 +1,27 @@
+import {
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  type DesktopReply,
+  ENVELOPE_KINDS,
+  isOpaqueId,
+  type OutputSettings,
+  type PageSession,
+  PLAYER_SOURCE_KINDS,
+  DOWNLOAD_TARGET_KINDS,
+} from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { dirname, basename } from 'node:path'
-import {
-  ACCOUNT_STATES,
-  DESKTOP_REPLIES,
-  isOpaqueId,
-  MAX_QUEUE,
-  MAX_SECRET,
-  DESKTOP_REQUESTS,
-  ENVELOPE_KINDS,
-  ACCOUNT_PAGES,
-} from '@/shared/protocol'
-import type { AccountService } from '@/main/accounts/accountService'
 import { createGrants, type Grants } from '@/main/grants'
 import { createStateStore, type StateFs, type Timers } from '@/main/stateStore'
 import { EMPTY_STATE } from '@/main/playerState'
 import { createDesktopService, MESSAGES } from '@/main/desktopService'
 import type { DownloadService } from '@/main/downloads/downloadService'
-import { EMPTY_CONFIG, type ConfigStore, type DesktopConfig } from '@/main/desktopConfig'
-import { CALL_MESSAGES, type ServerCallResult } from '@/main/servers/serverCalls'
-import { removeServer } from '@/main/servers/serverList'
-import { TRUST_MESSAGES, TRUST_OUTCOME_KINDS, type TrustOutcome } from '@/main/servers/serverTrust'
-import type { AccountView, DesktopReply } from '@/shared/protocol'
+import type { ConfigStore, DesktopConfig } from '@/main/desktopConfig'
+import type { ServerTitles } from '@/main/servers/serverTitles'
+import { configFor } from '@/main/test/configFakes'
 import { createUpdateService, UPDATE_COPY } from '@/main/updateService'
 import { UPDATE_PROBLEMS, type UpdateCheck } from '@/main/updates'
-import type { OutputSettings } from '@raven/core'
+import { MAX_QUEUE } from '@/shared/hostNames'
 
 type Entry = { real: string; isFile: boolean; size: number; mtimeMs: number }
 
@@ -49,7 +47,6 @@ const OUTPUT_ANSWER = {
 }
 
 const SERVER = '0f8fad5b-d9cb-469f-a165-70867728950e'
-const OTHER_SERVER = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
 
 const ASK_ID = '00000000-0000-4000-8000-0000000000aa'
 
@@ -103,6 +100,10 @@ const fakeDownloads = ({
     open: async (input) => {
       note('open', input)
       return PLAY_REPLY
+    },
+    openTitle: async (input) => {
+      note('openTitle', input)
+      return null
     },
     sidecarsOf: () => [],
     fromLabelOf: ({ path }) =>
@@ -191,9 +192,6 @@ const fakeDownloads = ({
       note('removeAll')
       return DOWNLOADS_REPLY
     },
-    removeServer: async (input) => {
-      note('removeServer', input)
-    },
     showFolder: async () => {
       note('showFolder')
       return { type: 'done' }
@@ -202,73 +200,23 @@ const fakeDownloads = ({
   return { downloads, reached, resumeAt }
 }
 
-const ACCOUNT_VIEW: AccountView = {
-  serverId: SERVER,
-  state: ACCOUNT_STATES.approved,
-  email: 'ada@example.com',
-  isRemembered: true,
-  signInHost: 'project.supabase.co',
-}
+const TITLE_REPLY = {
+  type: DESKTOP_REPLIES.title,
+  source: { kind: PLAYER_SOURCE_KINDS.server, serverId: SERVER, mediaId: 7 },
+  resumeAt: 30,
+  next: [8],
+} as const satisfies DesktopReply
 
-/** An account service that records what reached it and answers with `ACCOUNT_VIEW`. */
-const fakeAccounts = ({
-  signInMessage,
-  pageMessage,
-}: {
-  signInMessage: string | null
-  pageMessage: string | null
-}) => {
-  const reached: { name: string; input: unknown }[] = []
-  const note = ({ name, input }: { name: string; input: unknown }) => {
-    reached.push({ name, input })
-  }
-  const accounts: AccountService = {
-    read: async (serverId) => {
-      note({ name: 'read', input: serverId })
-      return ACCOUNT_VIEW
-    },
-    refresh: async (serverId) => {
-      note({ name: 'refresh', input: serverId })
-      return ACCOUNT_VIEW
-    },
-    signIn: async (input) => {
-      note({ name: 'signIn', input: input })
-      return signInMessage === null
-        ? { ok: true, account: ACCOUNT_VIEW }
-        : { ok: false, message: signInMessage }
-    },
-    signOut: async (serverId) => {
-      note({ name: 'signOut', input: serverId })
-      return { ...ACCOUNT_VIEW, state: ACCOUNT_STATES.signedOut, email: null }
-    },
-    openPage: async (input) => {
-      note({ name: 'openPage', input: input })
-      return pageMessage === null ? { ok: true } : { ok: false, message: pageMessage }
-    },
-    removed: async (serverId) => {
-      note({ name: 'removed', input: serverId })
-    },
-    changed: async (serverId) => {
-      note({ name: 'changed', input: serverId })
-    },
-    refused: async (input) => {
-      note({ name: 'refused', input: input })
-    },
-  }
-  return { accounts, reached }
-}
+const NAVIGATE_REPLY = {
+  type: DESKTOP_REPLIES.navigate,
+  to: '/watch/7',
+} as const satisfies DesktopReply
 
-const SERVER_ENTRY = {
-  id: SERVER,
-  origin: 'https://raven.example',
-  name: 'raven.example',
-  addedAt: 1,
-  signIn: null,
-} as const
-
-/** A config held in memory, starting with one server. */
+/** A config held in memory, with its one server. */
 const memoryConfig = (): ConfigStore & { set: (config: DesktopConfig) => void } => {
-  const state: { value: DesktopConfig } = { value: { ...EMPTY_CONFIG, servers: [SERVER_ENTRY] } }
+  const state: { value: DesktopConfig } = {
+    value: configFor({ id: SERVER, origin: 'https://raven.example' }),
+  }
   return {
     read: () => state.value,
     update: (change) => {
@@ -289,19 +237,13 @@ const setup = ({
   stat,
   failOutputWrite = false,
   failOutputRead = false,
-  trustOutcome = { kind: 'declined' },
-  callResult = { ok: true, status: 200, body: '{}' },
-  failBrowser = false,
   updateAnswers = [],
   serverPosition = 0,
   watched = [],
-  signInMessage = null,
-  pageMessage = null,
+  isSessionTaken = true,
 }: {
-  /** What the fake account service refuses a sign in with, or null to let it in. */
-  signInMessage?: string | null
-  /** What the fake account service refuses an account page with, or null to open it. */
-  pageMessage?: string | null
+  /** Whether the page's account takes the session it is sent. */
+  isSessionTaken?: boolean
   /** The download videos the fake download service says are marked watched. */
   watched?: string[]
   updateAnswers?: UpdateCheck[]
@@ -309,9 +251,6 @@ const setup = ({
   serverPosition?: number
   failOutputWrite?: boolean
   failOutputRead?: boolean
-  trustOutcome?: TrustOutcome
-  callResult?: ServerCallResult
-  failBrowser?: boolean
   files: Record<string, Partial<Entry>>
   dialog?: string[] | Error
   addRecentDocument?: (path: string) => void
@@ -395,14 +334,11 @@ const setup = ({
   // A second sequence for recents ids, offset so it cannot collide with the grants' ids.
   const recentId = sequentialId()
   const config = memoryConfig()
-  const calls: { serverId: string; method: string; path: string; body: string | null }[] = []
-  const trusted: { origin: string; from: 'link' | 'app' }[] = []
-  const removed: string[] = []
-  const opened: { link: string; from: 'link' | 'app' }[] = []
+  const opened: { link: string }[] = []
   const batches: (readonly string[])[] = []
-  const browsed: string[] = []
-  const left: { serverId: string; mediaId: number }[] = []
-  const server = { calls, trusted, removed, opened, batches, browsed, left }
+  const sessions: (PageSession | null)[] = []
+  const played: Parameters<ServerTitles['play']>[0][] = []
+  const server = { opened, batches, sessions, played }
   const updateQueue = [...updateAnswers]
   const releasePages: string[] = []
   const releases = { checks: 0, opened: releasePages }
@@ -426,54 +362,31 @@ const setup = ({
     serverPosition,
     watched,
   })
-  const { accounts, reached: accountsReached } = fakeAccounts({ signInMessage, pageMessage })
   const service = createDesktopService({
     updates,
     downloads,
-    accounts,
     config,
-    serverCalls: {
-      callFromPage: async (input) => {
-        server.calls.push(input)
-        return callResult
+    account: {
+      set: (session) => {
+        server.sessions.push(session)
+        return isSessionTaken
       },
     },
-    titleSittings: {
-      left: (title) => {
-        server.left.push(title)
-      },
-    },
-    trust: {
-      trust: async (input) => {
-        server.trusted.push(input)
-        if (trustOutcome.kind === TRUST_OUTCOME_KINDS.trusted) {
-          config.update((current) => ({
-            ...current,
-            servers: [...current.servers, trustOutcome.server],
-          }))
-        }
-        return trustOutcome
-      },
-      remove: async (serverId) => {
-        server.removed.push(serverId)
-        const isKnown = config.read().servers.some((entry) => entry.id === serverId)
-        config.update((current) => removeServer({ config: current, serverId }))
-        return isKnown
+    titles: {
+      play: async (input) => {
+        server.played.push(input)
+        return TITLE_REPLY
       },
     },
     links: {
       open: async (input) => {
         server.opened.push(input)
-        return { type: 'done' }
+        return NAVIGATE_REPLY
       },
       openBatch: async (links) => {
         server.batches.push(links)
-        return { type: 'playServer', target: { serverId: SERVER, mediaId: 7, at: 0, next: [] } }
+        return NAVIGATE_REPLY
       },
-    },
-    openExternal: async (url) => {
-      server.browsed.push(url)
-      if (failBrowser) throw new Error('no browser')
     },
     grants,
     store,
@@ -529,7 +442,6 @@ const setup = ({
     config,
     server,
     reached,
-    accountsReached,
     resumeAt,
     releases,
     table,
@@ -794,6 +706,12 @@ describe('describeFile', () => {
         type: 'refused',
         message: MESSAGES.notOpen,
       },
+    )
+  })
+
+  it("names the pages a video is opened again from, which the app's page has", () => {
+    expect(MESSAGES.notOpen).toBe(
+      'That video is no longer open. Open it again from On this Mac or Downloads.',
     )
   })
 
@@ -1399,404 +1317,75 @@ describe('recents', () => {
   })
 })
 
-describe('server titles', () => {
+describe('the server', () => {
   type Service = ReturnType<typeof setup>['service']
   const ask = ({ service, request }: { service: Service; request: unknown }) =>
-    service.handle({ kind: 'page', request })
-  const recents = async ({ service }: { service: Service }) => {
-    const reply = await ask({ service, request: { type: 'listRecents' } })
-    if (reply.type !== DESKTOP_REPLIES.recents)
-      throw new Error(`expected recents, got ${reply.type}`)
-    return reply.recents
-  }
-  const noteDune = ({ service, serverId = SERVER }: { service: Service; serverId?: string }) =>
-    ask({
-      service,
-      request: { type: 'noteServerTitle', serverId, mediaId: 7, label: 'Dune', watched: 0.5 },
-    })
-  const unknownServer = { type: 'refused', message: CALL_MESSAGES.unknownServer } as const
-  const listed = {
-    type: 'servers',
-    servers: [{ serverId: SERVER, origin: 'https://raven.example', name: 'raven.example' }],
-  } as const satisfies DesktopReply
+    service.handle({ kind: ENVELOPE_KINDS.page, request })
+  const SESSION = { accessToken: 'header.payload.signature', userId: 'ada' }
 
-  it('tells the sittings the page left a title', async () => {
+  it("hands the page's session to the account, and its sign out as null", async () => {
+    const { service, server } = setup({ files: {} })
+    expect(
+      await ask({ service, request: { type: DESKTOP_REQUESTS.accountToken, session: SESSION } }),
+    ).toEqual({ type: DESKTOP_REPLIES.done })
+    expect(
+      await ask({ service, request: { type: DESKTOP_REQUESTS.accountToken, session: null } }),
+    ).toEqual({ type: DESKTOP_REPLIES.done })
+    expect(server.sessions).toEqual([SESSION, null])
+  })
+
+  it('refuses a session the account will not take', async () => {
+    const { service } = setup({ files: {}, isSessionTaken: false })
+    expect(
+      await ask({ service, request: { type: DESKTOP_REQUESTS.accountToken, session: SESSION } }),
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: MESSAGES.badSession })
+  })
+
+  it('refuses a session with no account, without handing it on', async () => {
     const { service, server } = setup({ files: {} })
     expect(
       await ask({
         service,
-        request: { type: DESKTOP_REQUESTS.leaveServerTitle, serverId: SERVER, mediaId: 7 },
+        request: { type: DESKTOP_REQUESTS.accountToken, session: { accessToken: 'x' } },
       }),
-    ).toEqual({ type: DESKTOP_REPLIES.done })
-    expect(server.left).toEqual([{ serverId: SERVER, mediaId: 7 }])
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: MESSAGES.unknownRequest })
+    expect(server.sessions).toEqual([])
   })
 
-  describe('serverCall', () => {
-    const call = {
-      type: 'serverCall',
-      serverId: SERVER,
-      method: 'GET',
-      path: '/api/media/7',
-      body: null,
-    } as const
-
-    it('runs the call through the page allowlist and answers with what the server said', async () => {
-      const { service, server } = setup({
-        files: {},
-        callResult: { ok: true, status: 423, body: '{"message":"locked"}' },
-      })
-      expect(await ask({ service, request: call })).toEqual({
-        type: 'serverReply',
-        status: 423,
-        body: '{"message":"locked"}',
-      })
-      expect(server.calls).toEqual([
-        { serverId: SERVER, method: 'GET', path: '/api/media/7', body: null },
-      ])
-    })
-
-    it('answers a call that did not reach the server as unreachable', async () => {
-      const { service } = setup({
-        files: {},
-        callResult: { ok: false, message: 'raven player could not reach raven.example.' },
-      })
-      expect(await ask({ service, request: call })).toEqual({
-        type: 'serverUnreachable',
-        message: 'raven player could not reach raven.example.',
-      })
-    })
-
-    it('keeps only the fields it knows', async () => {
-      const { service, server } = setup({ files: {} })
-      await ask({ service, request: { ...call, origin: 'https://evil.example', headers: {} } })
-      expect(server.calls).toEqual([
-        { serverId: SERVER, method: 'GET', path: '/api/media/7', body: null },
-      ])
-    })
-
-    it('refuses a method off the list without calling', async () => {
-      const { service, server } = setup({ files: {} })
-      expect(await ask({ service, request: { ...call, method: 'DELETE' } })).toEqual({
-        type: 'refused',
-        message: MESSAGES.unknownRequest,
-      })
-      expect(server.calls).toEqual([])
-    })
-  })
-
-  describe('servers', () => {
-    it('lists the servers in stored order as ids, origins and names', async () => {
-      const { service, config } = setup({ files: {} })
-      config.update((current) => ({
-        ...current,
-        servers: [
-          ...current.servers,
-          {
-            id: OTHER_SERVER,
-            origin: 'http://nas.local:8080',
-            name: 'NAS',
-            addedAt: 2,
-            signIn: null,
-          },
-        ],
-      }))
-      expect(await ask({ service, request: { type: 'listServers' } })).toEqual({
-        type: 'servers',
-        servers: [
-          { serverId: SERVER, origin: 'https://raven.example', name: 'raven.example' },
-          { serverId: OTHER_SERVER, origin: 'http://nas.local:8080', name: 'NAS' },
-        ],
-      })
-    })
-
-    it('refuses an address with a path before asking trust anything', async () => {
-      const { service, server } = setup({ files: {} })
-      expect(
-        await ask({ service, request: { type: 'addServer', origin: 'https://raven.example/x' } }),
-      ).toEqual({ type: 'refused', message: MESSAGES.badServer })
-      expect(server.trusted).toEqual([])
-    })
-
-    it('asks trust about the canonical origin, from the app, and lists the servers once trusted', async () => {
-      const added = {
-        id: OTHER_SERVER,
-        origin: 'https://nas.example',
-        name: 'nas.example',
-        addedAt: 2,
-        signIn: null,
-      }
-      const { service, server } = setup({
-        files: {},
-        trustOutcome: { kind: 'trusted', server: added, isNew: true },
-      })
-      const reply = await ask({
-        service,
-        request: { type: 'addServer', origin: 'https://NAS.example:443/' },
-      })
-      expect(server.trusted).toEqual([{ origin: 'https://nas.example', from: 'app' }])
-      expect(reply).toEqual({
-        type: 'servers',
-        servers: [
-          ...listed.servers,
-          { serverId: OTHER_SERVER, origin: 'https://nas.example', name: 'nas.example' },
-        ],
-      })
-    })
-
-    it("asks trust about 'https://raven.example/' as its origin", async () => {
-      const { service, server } = setup({ files: {} })
-      expect(
-        await ask({ service, request: { type: 'addServer', origin: 'https://raven.example/' } }),
-      ).toEqual({ type: 'done' })
-      expect(server.trusted).toEqual([{ origin: 'https://raven.example', from: 'app' }])
-    })
-
-    it.each([
-      [{ kind: 'full' }, TRUST_MESSAGES.full],
-      [{ kind: 'busy' }, TRUST_MESSAGES.busy],
-      [
-        { kind: 'unreachable', origin: 'https://nas.example' },
-        TRUST_MESSAGES.unreachable('https://nas.example'),
-      ],
-      [{ kind: TRUST_OUTCOME_KINDS.badSignIn }, TRUST_MESSAGES.badSignIn],
-      [{ kind: 'invalid' }, MESSAGES.badServer],
-      [{ kind: 'unsaved' }, TRUST_MESSAGES.unsaved],
-    ] satisfies [TrustOutcome, string][])(
-      'refuses %j with its message',
-      async (trustOutcome, message) => {
-        const { service } = setup({ files: {}, trustOutcome })
-        expect(
-          await ask({ service, request: { type: 'addServer', origin: 'https://nas.example' } }),
-        ).toEqual({ type: 'refused', message })
-      },
+  it('asks the downloads about a target on the one server', async () => {
+    const { service, reached } = setup({ files: {} })
+    const target = { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 4 } as const
+    expect(await ask({ service, request: { type: DESKTOP_REQUESTS.askDownload, target } })).toEqual(
+      { type: DESKTOP_REPLIES.done },
     )
-
-    it('renames a server, tidying the name, and refuses an empty name or an unknown id', async () => {
-      const { service } = setup({ files: {} })
-      expect(
-        await ask({ service, request: { type: 'renameServer', serverId: SERVER, name: '' } }),
-      ).toEqual({ type: 'refused', message: MESSAGES.badName })
-      expect(
-        await ask({
-          service,
-          request: { type: 'renameServer', serverId: SERVER, name: 'x'.repeat(81) },
-        }),
-      ).toEqual({ type: 'refused', message: MESSAGES.badName })
-      expect(
-        await ask({
-          service,
-          request: { type: 'renameServer', serverId: OTHER_SERVER, name: 'NAS' },
-        }),
-      ).toEqual(unknownServer)
-      expect(
-        await ask({
-          service,
-          request: { type: 'renameServer', serverId: SERVER, name: '  Home   NAS ' },
-        }),
-      ).toEqual({
-        type: 'servers',
-        servers: [{ serverId: SERVER, origin: 'https://raven.example', name: 'Home NAS' }],
-      })
-    })
-
-    it("removes a server through trust and drops that server's recents", async () => {
-      const { service, server, config } = setup({ files: {} })
-      config.update((current) => ({
-        ...current,
-        servers: [
-          ...current.servers,
-          {
-            id: OTHER_SERVER,
-            origin: 'https://nas.example',
-            name: 'nas.example',
-            addedAt: 2,
-            signIn: null,
-          },
-        ],
-      }))
-      await noteDune({ service })
-      await noteDune({ service, serverId: OTHER_SERVER })
-      expect(await recents({ service })).toHaveLength(2)
-      expect(await ask({ service, request: { type: 'removeServer', serverId: SERVER } })).toEqual({
-        type: 'servers',
-        servers: [{ serverId: OTHER_SERVER, origin: 'https://nas.example', name: 'nas.example' }],
-      })
-      expect(server.removed).toEqual([SERVER])
-      expect((await recents({ service })).map((recent) => recent.from)).toEqual(['nas.example'])
-    })
-
-    it("drops that server's recents when its account changes, and keeps other servers' and local files'", async () => {
-      const { service, config } = setup({ files: { '/m/a.mkv': {} } })
-      config.update((current) => ({
-        ...current,
-        servers: [
-          ...current.servers,
-          {
-            id: OTHER_SERVER,
-            origin: 'https://nas.example',
-            name: 'nas.example',
-            addedAt: 2,
-            signIn: null,
-          },
-        ],
-      }))
-      const { fileId } = idOf(await service.openPaths(['/m/a.mkv']))
-      await ask({ service, request: { type: DESKTOP_REQUESTS.describeFile, fileId, queue: [] } })
-      await noteDune({ service })
-      await noteDune({ service, serverId: OTHER_SERVER })
-      const before = await recents({ service })
-      expect(before).toHaveLength(3)
-      service.accountSwitched({ serverId: SERVER })
-      const after = await recents({ service })
-      expect(after.map((recent) => recent.from)).toEqual(['nas.example', 'm'])
-      service.accountSwitched({ serverId: SERVER })
-      expect(await recents({ service })).toEqual(after)
-      const dropped = before.find(
-        (recent) => !after.some((kept) => kept.recentId === recent.recentId),
-      )
-      expect(
-        await ask({
-          service,
-          request: { type: DESKTOP_REQUESTS.openRecent, recentId: dropped?.recentId ?? '' },
-        }),
-      ).toEqual(expect.objectContaining({ type: DESKTOP_REPLIES.refused }))
-    })
-
-    it('answers removing an unknown server with the list', async () => {
-      const { service } = setup({ files: {} })
-      expect(
-        await ask({ service, request: { type: 'removeServer', serverId: OTHER_SERVER } }),
-      ).toEqual(listed)
-    })
+    expect(reached).toEqual([{ name: 'ask', input: { serverId: SERVER, target } }])
   })
 
-  describe('links', () => {
-    it('opens a link the app was handed as from the app', async () => {
-      const { service, server } = setup({ files: {} })
-      const link = 'https://raven.example/watch/7'
-      expect(await ask({ service, request: { type: 'openLink', link } })).toEqual({ type: 'done' })
-      expect(server.opened).toEqual([{ link, from: 'app' }])
-    })
-
-    it('forwards a batch from main to the opener', async () => {
-      const { service, server } = setup({ files: {} })
-      const links = ['raven://play?server=https://raven.example&media=7', 'raven://x']
-      expect(await service.openLinks(links)).toEqual({
-        type: 'playServer',
-        target: { serverId: SERVER, mediaId: 7, at: 0, next: [] },
-      })
-      expect(server.batches).toEqual([links])
-    })
+  it('plays a title through the server titles, and answers what the player needs', async () => {
+    const { service, server } = setup({ files: {} })
+    expect(
+      await ask({
+        service,
+        request: { type: DESKTOP_REQUESTS.playTitle, mediaId: 7, at: 30, next: [8] },
+      }),
+    ).toEqual(TITLE_REPLY)
+    expect(server.played).toEqual([{ mediaId: 7, at: 30, next: [8] }])
   })
 
-  describe('openInBrowser', () => {
-    it("opens the title's watch page on its server", async () => {
-      const { service, server } = setup({ files: {} })
-      expect(
-        await ask({ service, request: { type: 'openInBrowser', serverId: SERVER, mediaId: 7 } }),
-      ).toEqual({ type: 'done' })
-      expect(server.browsed).toEqual(['https://raven.example/watch/7'])
-    })
-
-    it('refuses a server it does not know and opens nothing', async () => {
-      const { service, server } = setup({ files: {} })
-      expect(
-        await ask({
-          service,
-          request: { type: 'openInBrowser', serverId: OTHER_SERVER, mediaId: 7 },
-        }),
-      ).toEqual(unknownServer)
-      expect(server.browsed).toEqual([])
-    })
-
-    it('says so when the browser could not be opened', async () => {
-      const { service } = setup({ files: {}, failBrowser: true })
-      expect(
-        await ask({ service, request: { type: 'openInBrowser', serverId: SERVER, mediaId: 7 } }),
-      ).toEqual({ type: 'refused', message: MESSAGES.noBrowser })
-    })
+  it('opens a link the page was handed', async () => {
+    const { service, server } = setup({ files: {} })
+    const link = 'https://raven.example/watch/7'
+    expect(await ask({ service, request: { type: DESKTOP_REQUESTS.openLink, link } })).toEqual(
+      NAVIGATE_REPLY,
+    )
+    expect(server.opened).toEqual([{ link }])
   })
 
-  describe('server recents', () => {
-    it('lists a noted title by its label, its server name and its share, with an opaque id', async () => {
-      const { service } = setup({ files: {} })
-      expect(await noteDune({ service })).toEqual({ type: 'done' })
-      const [recent, ...rest] = await recents({ service })
-      expect(rest).toEqual([])
-      expect(recent).toEqual({
-        recentId: expect.any(String),
-        label: 'Dune',
-        from: 'raven.example',
-        watched: 0.5,
-      })
-      expect(isOpaqueId(recent!.recentId)).toBe(true)
-      expect(recent!.recentId).not.toContain('/')
-    })
-
-    it('clamps the share to 0..1 and keeps a null', async () => {
-      const { service } = setup({ files: {} })
-      const note = (watched: unknown) =>
-        ask({
-          service,
-          request: {
-            type: 'noteServerTitle',
-            serverId: SERVER,
-            mediaId: 7,
-            label: 'Dune',
-            watched,
-          },
-        })
-      await note(3)
-      expect((await recents({ service }))[0]!.watched).toBe(1)
-      await note(-2)
-      expect((await recents({ service }))[0]!.watched).toBe(0)
-      await note(null)
-      expect((await recents({ service }))[0]!.watched).toBeNull()
-      expect(await note(Number.NaN)).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
-    })
-
-    it('refuses noting a title on a server it does not know', async () => {
-      const { service } = setup({ files: {} })
-      expect(await noteDune({ service, serverId: OTHER_SERVER })).toEqual(unknownServer)
-      expect(await recents({ service })).toEqual([])
-    })
-
-    it('opens a server recent at the start with nothing queued, as the server keeps the resume point', async () => {
-      const { service } = setup({ files: {} })
-      await noteDune({ service })
-      const [recent] = await recents({ service })
-      expect(
-        await ask({ service, request: { type: 'openRecent', recentId: recent!.recentId } }),
-      ).toEqual({ type: 'playServer', target: { serverId: SERVER, mediaId: 7, at: 0, next: [] } })
-    })
-
-    it('refuses a stale recent once its server has left the config, and leaves it off the list', async () => {
-      const { service, config } = setup({ files: {} })
-      await noteDune({ service })
-      const [recent] = await recents({ service })
-      config.set(EMPTY_CONFIG)
-      expect(
-        await ask({ service, request: { type: 'openRecent', recentId: recent!.recentId } }),
-      ).toEqual(unknownServer)
-      expect(await recents({ service })).toEqual([])
-    })
-
-    it('removes one server recent and clears both kinds', async () => {
-      const { service } = setup({ files: show })
-      const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
-      await ask({ service, request: { type: 'describeFile', fileId, queue: [] } })
-      await noteDune({ service })
-      const [dune, episode] = await recents({ service })
-      expect([dune!.label, episode!.label]).toEqual(['Dune', 'Episode 1'])
-      await ask({ service, request: { type: 'removeRecent', recentId: dune!.recentId } })
-      expect((await recents({ service })).map((recent) => recent.label)).toEqual(['Episode 1'])
-      await noteDune({ service })
-      await ask({ service, request: { type: 'clearRecents' } })
-      expect(await recents({ service })).toEqual([])
-      expect(
-        await ask({ service, request: { type: 'openRecent', recentId: dune!.recentId } }),
-      ).toEqual({ type: 'refused', message: MESSAGES.unknownRecent })
-    })
+  it('forwards a batch from main to the opener', async () => {
+    const { service, server } = setup({ files: {} })
+    const links = ['raven://play?server=https://raven.example&media=7', 'raven://x']
+    expect(await service.openLinks(links)).toEqual(NAVIGATE_REPLY)
+    expect(server.batches).toEqual([links])
   })
 })
 
@@ -2006,170 +1595,5 @@ describe('downloads', () => {
       await ask({ service, request: { type: 'openDownload', downloadId: '../downloads' } }),
     ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
     expect(reached).toEqual([])
-  })
-})
-
-describe('accounts', () => {
-  type Service = ReturnType<typeof setup>['service']
-  const ask = ({ service, request }: { service: Service; request: unknown }) =>
-    service.handle({ kind: ENVELOPE_KINDS.page, request })
-  const unknownServer = {
-    type: DESKTOP_REPLIES.refused,
-    message: CALL_MESSAGES.unknownServer,
-  } as const
-  const accountReply = (account: AccountView) =>
-    ({ type: DESKTOP_REPLIES.account, account }) as const
-  const bad = { type: DESKTOP_REPLIES.refused, message: MESSAGES.unknownRequest } as const
-
-  it('answers readAccount and refreshAccount with the account service view', async () => {
-    const { service, accountsReached } = setup({ files: {} })
-    expect(
-      await ask({ service, request: { type: DESKTOP_REQUESTS.readAccount, serverId: SERVER } }),
-    ).toEqual(accountReply(ACCOUNT_VIEW))
-    expect(
-      await ask({ service, request: { type: DESKTOP_REQUESTS.refreshAccount, serverId: SERVER } }),
-    ).toEqual(accountReply(ACCOUNT_VIEW))
-    expect(accountsReached).toEqual([
-      { name: 'read', input: SERVER },
-      { name: 'refresh', input: SERVER },
-    ])
-  })
-
-  it('signs in with the email and password the page sent, and answers the new view', async () => {
-    const { service, accountsReached } = setup({ files: {} })
-    expect(
-      await ask({
-        service,
-        request: {
-          type: DESKTOP_REQUESTS.signIn,
-          serverId: SERVER,
-          email: 'ada@example.com',
-          password: 'pw',
-        },
-      }),
-    ).toEqual(accountReply(ACCOUNT_VIEW))
-    expect(accountsReached).toEqual([
-      {
-        name: 'signIn',
-        input: { serverId: SERVER, email: 'ada@example.com', password: 'pw' },
-      },
-    ])
-  })
-
-  it('refuses a sign in with the service message, and echoes neither the email nor the password', async () => {
-    const { service } = setup({ files: {}, signInMessage: 'That email or password is not right.' })
-    const reply = await ask({
-      service,
-      request: {
-        type: DESKTOP_REQUESTS.signIn,
-        serverId: SERVER,
-        email: 'ada@example.com',
-        password: 'pw-secret',
-      },
-    })
-    expect(reply).toEqual({
-      type: DESKTOP_REPLIES.refused,
-      message: 'That email or password is not right.',
-    })
-    expect(JSON.stringify(reply)).not.toContain('pw-secret')
-    expect(JSON.stringify(reply)).not.toContain('ada@example.com')
-  })
-
-  it('refuses a password past MAX_SECRET, and a server id that is not opaque, without a call', async () => {
-    const { service, accountsReached } = setup({ files: {} })
-    expect(
-      await ask({
-        service,
-        request: {
-          type: DESKTOP_REQUESTS.signIn,
-          serverId: SERVER,
-          email: 'ada@example.com',
-          password: 'p'.repeat(MAX_SECRET + 1),
-        },
-      }),
-    ).toEqual(bad)
-    expect(
-      await ask({
-        service,
-        request: {
-          type: DESKTOP_REQUESTS.signIn,
-          serverId: 'https://evil.example',
-          email: 'a@b.c',
-          password: 'p',
-        },
-      }),
-    ).toEqual(bad)
-    expect(accountsReached).toEqual([])
-  })
-
-  it('signs out and answers the signed out view', async () => {
-    const { service, accountsReached } = setup({ files: {} })
-    expect(
-      await ask({ service, request: { type: DESKTOP_REQUESTS.signOut, serverId: SERVER } }),
-    ).toEqual(accountReply({ ...ACCOUNT_VIEW, state: ACCOUNT_STATES.signedOut, email: null }))
-    expect(accountsReached).toEqual([{ name: 'signOut', input: SERVER }])
-  })
-
-  it.each([
-    ['signUp', ACCOUNT_PAGES.signUp],
-    ['forgot', ACCOUNT_PAGES.forgot],
-  ])('opens the %s page by name, never by address', async (page) => {
-    const { service, accountsReached } = setup({ files: {} })
-    expect(
-      await ask({
-        service,
-        request: { type: DESKTOP_REQUESTS.openAccountPage, serverId: SERVER, page },
-      }),
-    ).toEqual({ type: DESKTOP_REPLIES.done })
-    expect(accountsReached).toEqual([{ name: 'openPage', input: { serverId: SERVER, page } }])
-  })
-
-  it('refuses an account page the service could not open, with its message', async () => {
-    const { service } = setup({
-      files: {},
-      pageMessage: 'raven player could not open your browser.',
-    })
-    expect(
-      await ask({
-        service,
-        request: {
-          type: DESKTOP_REQUESTS.openAccountPage,
-          serverId: SERVER,
-          page: ACCOUNT_PAGES.signUp,
-        },
-      }),
-    ).toEqual({
-      type: DESKTOP_REPLIES.refused,
-      message: 'raven player could not open your browser.',
-    })
-  })
-
-  it('refuses a page that is an address', async () => {
-    const { service, accountsReached } = setup({ files: {} })
-    expect(
-      await ask({
-        service,
-        request: {
-          type: DESKTOP_REQUESTS.openAccountPage,
-          serverId: SERVER,
-          page: 'https://evil.example',
-        },
-      }),
-    ).toEqual(bad)
-    expect(accountsReached).toEqual([])
-  })
-
-  it.each([
-    [{ type: DESKTOP_REQUESTS.readAccount }],
-    [{ type: DESKTOP_REQUESTS.refreshAccount }],
-    [{ type: DESKTOP_REQUESTS.signIn, email: 'a@b.c', password: 'p' }],
-    [{ type: DESKTOP_REQUESTS.signOut }],
-    [{ type: DESKTOP_REQUESTS.openAccountPage, page: ACCOUNT_PAGES.signUp }],
-  ])('refuses a server it does not keep for %j, and asks the service nothing', async (partial) => {
-    const { service, accountsReached } = setup({ files: {} })
-    expect(await ask({ service, request: { ...partial, serverId: OTHER_SERVER } })).toEqual(
-      unknownServer,
-    )
-    expect(accountsReached).toEqual([])
   })
 })

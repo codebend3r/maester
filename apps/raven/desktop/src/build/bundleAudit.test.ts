@@ -7,6 +7,7 @@ import {
   fileProblems,
   MACH_O_READS,
   MPV_IN_APP,
+  WEB_IN_APP,
   parseArchs,
   parseIsExecutable,
   parseLinks,
@@ -242,7 +243,8 @@ describe('fileProblems', () => {
 
 describe('bundleProblems', () => {
   const everyEngineFile = (relative: string) =>
-    MPV_MACH_O.some((name) => relative === join(MPV_IN_APP, name))
+    MPV_MACH_O.some((name) => relative === join(MPV_IN_APP, name)) ||
+    relative === join(WEB_IN_APP, 'index.html')
 
   it('passes a whole bundle', () => {
     expect(
@@ -268,6 +270,19 @@ describe('bundleProblems', () => {
       `${libmpv} is missing from the app`,
       'Info.plist says 0.5.3, package.json says 0.5.4',
     ])
+  })
+
+  it('names a missing web app', () => {
+    const page = join(WEB_IN_APP, 'index.html')
+    expect(page).toBe(join('Contents', 'Resources', 'dist', 'index.html'))
+    expect(
+      bundleProblems({
+        files: [],
+        exists: (relative) => everyEngineFile(relative) && relative !== page,
+        plistVersion: '0.5.4',
+        packageVersion: '0.5.4',
+      }),
+    ).toEqual([`${page} is missing from the app`])
   })
 
   it('includes every file problem', () => {

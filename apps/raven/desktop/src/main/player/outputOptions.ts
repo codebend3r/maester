@@ -1,7 +1,12 @@
-import { AUDIO_DEVICES, AUDIO_PROFILES, type OutputSettings } from '@raven/core'
+import {
+  AUDIO_DEVICES,
+  AUDIO_PROFILES,
+  type AudioDevice,
+  carriedFormats,
+  carriesPassthrough,
+  type OutputSettings,
+} from '@raven/core'
 import { MPV_PROPERTIES, type MpvPropertyValue } from '@raven/mpv'
-import { carriedFormats, carriesPassthrough } from '@/shared/carriedOutput'
-import type { AudioDevice } from '@/shared/protocol'
 
 /** The mpv options raven player sets that `@raven/mpv` does not read back as properties. */
 export const MPV_OPTIONS = {

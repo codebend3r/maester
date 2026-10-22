@@ -1,10 +1,32 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { DOWNLOAD_TARGET_KINDS } from '@raven/core'
+import {
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  DOWNLOAD_ASK_KINDS,
+  DOWNLOAD_TARGET_KINDS,
+  type DesktopReply,
+  type DownloadAsk,
+} from '@raven/core'
+import { Toaster } from '@raven/ui'
 import { usePlayerPrefs } from '@raven/ui/headless'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { ravenPlayer } from '@/lib/ravenPlayer'
+import { useDownloadAsk } from '@/stores/downloadAsk'
+import { held } from '@/test/held'
+import { ASK_ID, asDesktop, fakeClient, SERVER_ID } from '@/test/desktop'
+import { renderWithProviders } from '@/test/render'
+
+const TARGET = { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 7 } as const
+
+const askOf = (): DownloadAsk => ({
+  askId: ASK_ID,
+  serverId: SERVER_ID,
+  serverName: 'raven',
+  autoDelete: false,
+  status: { kind: DOWNLOAD_ASK_KINDS.locked },
+})
 
 describe('DownloadButton', () => {
   const open = spyOn(ravenPlayer, 'open').mockImplementation(() => {})
@@ -40,5 +62,53 @@ describe('DownloadButton', () => {
     expect(open).toHaveBeenCalledWith(
       `raven://download?server=${encodeURIComponent(window.location.origin)}&saga=2%3A119`,
     )
+  })
+
+  it('is always there inside raven player, and asks the app to download the title', async () => {
+    const ask = askOf()
+    const client = fakeClient({
+      request: async () => ({ type: DESKTOP_REPLIES.downloadAsk, ask }),
+    })
+    asDesktop(client)
+    renderWithProviders({ ui: <DownloadButton target={TARGET} /> })
+    await userEvent.click(screen.getByRole('button', { name: 'Download' }))
+    expect(client.request).toHaveBeenCalledWith({
+      type: DESKTOP_REQUESTS.askDownload,
+      target: TARGET,
+    })
+    expect(useDownloadAsk.getState().shown?.ask).toEqual(ask)
+    expect(open).not.toHaveBeenCalled()
+  })
+
+  it('asks once while raven player reads the title, however often it is pressed', async () => {
+    const reply = held<DesktopReply>()
+    const client = fakeClient({ request: () => reply.promise })
+    asDesktop(client)
+    renderWithProviders({ ui: <DownloadButton target={TARGET} /> })
+    const button = screen.getByRole('button', { name: 'Download' })
+    await userEvent.click(button)
+    await userEvent.click(button)
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+    expect(client.request).toHaveBeenCalledTimes(1)
+    await act(async () => reply.answer({ type: DESKTOP_REPLIES.done }))
+    expect(button).toHaveAttribute('aria-disabled', 'false')
+  })
+
+  it("says raven player's refusal", async () => {
+    asDesktop(
+      fakeClient({
+        request: async () => ({ type: DESKTOP_REPLIES.refused, message: 'Sign in first.' }),
+      }),
+    )
+    renderWithProviders({
+      ui: (
+        <>
+          <DownloadButton target={TARGET} />
+          <Toaster />
+        </>
+      ),
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Download' }))
+    expect(await screen.findByText('Sign in first.')).toBeInTheDocument()
   })
 })

@@ -11,7 +11,7 @@
 - A `package.json` script runs one command. Steps become scripts of their own, chained with `bun run --sequential build:clean build:compile` (or `--parallel`), never with `&&`, `||` or `;`. The pre-push hook and the `one-command-per-script` target (in `verify`, `affected` and the PR checks) reject a chained script.
 - Every import of a project's own modules goes through its `@/` alias and names no extension: `@/lib/api`, never `./api`, `../lib/api` or `@/lib/api.js`. oxlint's `no-restricted-imports` fails on anything else. Non-TypeScript assets keep their extension (`@/components/Player/Player.module.scss`). Node needs relative `.js` paths at runtime, so the server and core builds run `tsc-alias` after `tsc` to rewrite the alias in `dist` only.
 - Writing: no em dashes or en dashes anywhere, including comments and UI copy.
-- `e2e`, `test:native`, `make`, `audit:bundle` and `smoke:packaged` need macOS on Apple Silicon, so `verify` and `affected` leave them out and the PR checks' desktop jobs, behind the required `🖥️ Desktop` check, run them. Locally they run only on such a Mac, and `smoke:packaged` uses your own `~/Library/Application Support/raven` and `~/Library/Logs/raven`. A packaged app reads no test hook, so the smoke also makes the real launch check against GitHub and writes `updates.checkedAt` into that folder's `desktop-config.json`, moving an older file to version 4.
+- `e2e`, `test:native`, `make`, `audit:bundle` and `smoke:packaged` need macOS on Apple Silicon, so `verify` and `affected` leave them out and the PR checks' desktop jobs, behind the required `🖥️ Desktop` check, run them. Locally they run only on such a Mac, and `smoke:packaged` uses your own `~/Library/Application Support/raven` and `~/Library/Logs/raven`. A packaged app reads no test hook, so the smoke also makes the real launch check against GitHub and writes `updates.checkedAt` into that folder's `desktop-config.json`, moving an older file to version 5.
 
 - `@raven/supabase`'s `test:db` and `lint:db` need Docker and a running local stack, and its `check:functions` and `test:functions` need Deno, which runs its Edge Functions. `verify` and `affected` leave those targets out; the PR checks' `🗄️ Supabase` job sets up Deno, starts the stack and runs them.
 
@@ -66,15 +66,15 @@ These apply to every TypeScript project: everything but `@luwin/api` and the Pyt
 
 ## React
 
-These apply to every React project: `@raven/web`, `@rookery/web`, `@luwin/web`, `@raven/ui` and the desktop renderer in `@raven/desktop`.
+These apply to every React project: `@raven/web`, `@rookery/web`, `@luwin/web` and `@raven/ui`. raven player's UI is `@raven/web`'s `src/desktop`.
 
-- Global state lives in zustand, never in a React context. State that more than one component reads or writes is a store in the project's `src/stores/` (the desktop's is `src/renderer/stores/`, beside its only React code), made with `create` (`apps/raven/web/src/stores/theme.ts`, `libs/raven/ui/src/stores/playerPrefs.ts`). A component reads it through a selector, `useTheme((state) => state.theme)`, so it re-renders only when its slice changes. Never write a `createContext` and a `*Provider` to pass state, a setter or a callback down the tree: the component that needs the value imports the store.
+- Global state lives in zustand, never in a React context. State that more than one component reads or writes is a store in the project's `src/stores/`, made with `create` (`apps/raven/web/src/stores/theme.ts`, `libs/raven/ui/src/stores/playerPrefs.ts`). A component reads it through a selector, `useTheme((state) => state.theme)`, so it re-renders only when its slice changes. Never write a `createContext` and a `*Provider` to pass state, a setter or a callback down the tree: the component that needs the value imports the store.
 - State one component owns stays in `useState` or `useReducer`, and server data stays in TanStack Query. A store holds client state the tree shares, not a copy of an API response.
 - The one exception is a provider a library requires: TanStack Query's `QueryClientProvider`, React Router's `RouterProvider`.
 
 ## CSS
 
-These apply to the web apps, `@raven/web`, `@rookery/web` and `@luwin/web`, to `@raven/ui`, whose styles both raven clients import, and to the desktop renderer in `@raven/desktop`. Each app has its own tokens, so "the app's `globals.scss`" means `libs/raven/ui/src/styles/globals.scss` for raven, `apps/rookery/web/src/styles/globals.scss` for rookery and `apps/luwin/web/src/styles/globals.scss` for luwin.
+These apply to the web apps, `@raven/web`, `@rookery/web` and `@luwin/web`, and to `@raven/ui`, whose styles both raven clients import. Each app has its own tokens, so "the app's `globals.scss`" means `libs/raven/ui/src/styles/globals.scss` for raven, `apps/rookery/web/src/styles/globals.scss` for rookery and `apps/luwin/web/src/styles/globals.scss` for luwin.
 
 - No dead selectors. Every class in a `*.module.scss` is referenced from the component that imports it, and every rule in `globals.scss` and `elements.scss` matches an element some component renders. Delete a selector when its last use goes; a stale class in a module is dead code. The `dead-css` target (in `verify`, `affected` and the PR checks) fails on a module class no TSX reads.
 - Component styles are SCSS modules (`*.module.scss`), imported through the `@/` alias, never a relative path. The `react-ts-css` editor extension flags aliased imports as unresolved; that is a tooling bug to fix in tooling, not a reason to relativize the import.
@@ -102,21 +102,21 @@ Shared tool config lives at the root, so every project lints and compiles by the
 - oxfmt has no `extends`, so each project keeps its own `.oxfmtrc.json`; keep their options identical.
 - `nx.json` lists `tsconfig.base.json` and `tooling/` as shared inputs, so a change there reruns every project's tasks.
 
-| Project           | Path                  | What                                                                                                      |
-| ----------------- | --------------------- | --------------------------------------------------------------------------------------------------------- |
-| `@luwin/api`      | `apps/luwin/api`      | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite                                   |
-| `@raven/supabase` | `apps/raven/supabase` | Supabase Auth configuration, membership approval, migrations, local seed and database tests               |
-| `@raven/server`   | `apps/raven/server`   | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest                                     |
-| `@raven/web`      | `apps/raven/web`      | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom                             |
-| `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check                                  |
-| `@raven/ui`       | `libs/raven/ui`       | Shared React player, engine/services contracts, primitives and styles                                     |
-| `@raven/mpv`      | `libs/raven/mpv`      | N-API addon over our pinned libmpv build: macOS video surface, typed async wrapper                        |
-| `@raven/desktop`  | `apps/raven/desktop`  | raven player: Electron 44 and Forge, renderer on `@raven/ui`, libmpv through `@raven/mpv`, Playwright e2e |
-| `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest                                |
-| `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom                                  |
-| `@luwin/web`      | `apps/luwin/web`      | luwin's chat page, and the sandbox for testing its answers: React 19, Vite 8, TanStack Query, zustand     |
-| `@shared/server`  | `libs/shared/server`  | The servers' shared scaffolding: web app serving, SQLite migrations, env                                  |
-| `scripts`         | `scripts`             | Repo tooling; its Python is linted with luwin's pinned ruff and config                                    |
+| Project           | Path                  | What                                                                                                   |
+| ----------------- | --------------------- | ------------------------------------------------------------------------------------------------------ |
+| `@luwin/api`      | `apps/luwin/api`      | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite                                |
+| `@raven/supabase` | `apps/raven/supabase` | Supabase Auth configuration, membership approval, migrations, local seed and database tests            |
+| `@raven/server`   | `apps/raven/server`   | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest                                  |
+| `@raven/web`      | `apps/raven/web`      | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom                          |
+| `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check                               |
+| `@raven/ui`       | `libs/raven/ui`       | Shared React player, engine/services contracts, primitives and styles                                  |
+| `@raven/mpv`      | `libs/raven/mpv`      | N-API addon over our pinned libmpv build: macOS video surface, typed async wrapper                     |
+| `@raven/desktop`  | `apps/raven/desktop`  | raven player: Electron 44 and Forge, serving `@raven/web`, libmpv through `@raven/mpv`, Playwright e2e |
+| `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest                             |
+| `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom                               |
+| `@luwin/web`      | `apps/luwin/web`      | luwin's chat page, and the sandbox for testing its answers: React 19, Vite 8, TanStack Query, zustand  |
+| `@shared/server`  | `libs/shared/server`  | The servers' shared scaffolding: web app serving, SQLite migrations, env                               |
+| `scripts`         | `scripts`             | Repo tooling; its Python is linted with luwin's pinned ruff and config                                 |
 
 Python projects declare `package.json` scripts that call uv (`uv run pytest -q`, `uv run ruff check .`); Nx runs them in the project's folder. There is no Python Nx plugin and no uv workspace.
 

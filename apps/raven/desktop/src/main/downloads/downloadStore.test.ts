@@ -1,8 +1,8 @@
+import { DOWNLOAD_KINDS, DOWNLOAD_STATUS_KINDS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { EMPTY_DOWNLOADS, NO_PENDING, queue } from '@/main/downloads/downloadState'
 import { DOWNLOADS_DEBOUNCE_MS, loadDownloads } from '@/main/downloads/downloadStore'
 import type { StateFs } from '@/main/stateStore'
-import { DOWNLOAD_KINDS, DOWNLOAD_STATUS_KINDS } from '@/shared/protocol'
 
 const FILE = '/data/downloads.json'
 const NOW = 1700000000000

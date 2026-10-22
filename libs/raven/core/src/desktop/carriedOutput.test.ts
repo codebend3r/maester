@@ -1,0 +1,35 @@
+import { expect, test } from 'bun:test'
+import { carriedFormats, carriesPassthrough } from '@/desktop/carriedOutput'
+import { AUDIO_PROFILES, DEFAULT_OUTPUT_SETTINGS, type OutputSettings } from '@/player'
+
+const passthroughOf = (formats: OutputSettings['passthrough']): OutputSettings => ({
+  ...DEFAULT_OUTPUT_SETTINGS,
+  profile: AUDIO_PROFILES.passthrough,
+  passthrough: formats,
+})
+
+test('carriedFormats keeps only AC3 and DTS, once each, in a fixed order', () => {
+  expect(carriedFormats(passthroughOf(['truehd', 'dts', 'eac3', 'ac3', 'dts']))).toEqual([
+    'ac3',
+    'dts',
+  ])
+})
+
+test('passthrough carries when at least one carried format is chosen', () => {
+  expect(carriesPassthrough(passthroughOf(['ac3']))).toBe(true)
+  expect(carriesPassthrough(passthroughOf(['truehd', 'dts']))).toBe(true)
+})
+
+test('passthrough with no carried format plays as PCM', () => {
+  expect(carriesPassthrough(passthroughOf([]))).toBe(false)
+  expect(carriesPassthrough(passthroughOf(['truehd', 'eac3', 'dts-hd']))).toBe(false)
+})
+
+test('the other profiles never carry', () => {
+  expect(carriesPassthrough({ ...DEFAULT_OUTPUT_SETTINGS, profile: AUDIO_PROFILES.pcm })).toBe(
+    false,
+  )
+  expect(
+    carriesPassthrough({ ...DEFAULT_OUTPUT_SETTINGS, profile: AUDIO_PROFILES.headphones }),
+  ).toBe(false)
+})

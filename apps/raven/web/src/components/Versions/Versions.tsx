@@ -1,4 +1,4 @@
-import { type Library, type MediaItem, versionFacts } from '@raven/core'
+import { type Library, type MediaItem, versionFacts, watchPageOf } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@raven/ui'
@@ -42,7 +42,7 @@ export const Versions = ({
               </span>
               <span className={styles.file}>{version.fileName}</span>
               <Link
-                to={`/watch/${version.id}`}
+                to={watchPageOf(version.id)}
                 state={{ media: version }}
                 className={styles.play}
                 aria-label={`Play ${version.fileName}`}

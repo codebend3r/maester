@@ -1,11 +1,11 @@
-import type { MenuItemConstructorOptions } from 'electron'
 import {
   DESKTOP_EVENTS,
   type DesktopEvent,
   MENU_PLAYER_ACTIONS,
   type MenuPlayerAction,
-  NAVIGATION_TARGETS,
-} from '@/shared/protocol'
+  PAGE_PATHS,
+} from '@raven/core'
+import type { MenuItemConstructorOptions } from 'electron'
 
 export type MenuActions = {
   openDialog: () => void
@@ -62,8 +62,7 @@ export const menuTemplate = ({
         {
           label: 'Settings…',
           accelerator: 'CommandOrControl+,',
-          click: () =>
-            actions.send({ type: DESKTOP_EVENTS.navigate, to: NAVIGATION_TARGETS.settings }),
+          click: () => actions.send({ type: DESKTOP_EVENTS.navigate, to: PAGE_PATHS.settings }),
         },
         { label: 'Check for Updates…', id: 'check-for-updates', click: actions.checkForUpdates },
         SEPARATOR,

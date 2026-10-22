@@ -1,3 +1,4 @@
+import { type DesktopReply, isOpaqueId, DOWNLOAD_STATUS_KINDS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
@@ -19,7 +20,7 @@ import {
 } from '@/main/playerState'
 import type { JsonStore } from '@/main/stateStore'
 import { ticks, until } from '@/main/test/downloadFakes'
-import { isOpaqueId, MAX_QUEUE, type DesktopReply } from '@/shared/protocol'
+import { MAX_QUEUE } from '@/shared/hostNames'
 
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
 const OTHER_SERVER_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
@@ -131,19 +132,19 @@ const setup = ({
   entries = [],
   videos = {},
   player = EMPTY_STATE,
-  hasAccounts = false,
-  accountId = null,
+  accountId = ACCOUNT_A,
+  lastAccountId = null,
 }: {
   entries?: DownloadEntry[]
   /** Finished videos by path. */
   videos?: Record<string, Video>
   player?: PlayerState
-  /** Whether the downloads' server has accounts. */
-  hasAccounts?: boolean
-  /** The account signed in to the server, as its stored session names it. */
+  /** The account signed in to the server, as the page's session names it. */
   accountId?: string | null
+  /** The last account signed in to the server, as the config keeps it. */
+  lastAccountId?: string | null
 } = {}) => {
-  const signedIn = { accountId }
+  const signedIn = { accountId, lastAccountId }
   const store = memoryStore<DownloadsState>({ ...EMPTY_DOWNLOADS, entries })
   const state = memoryStore(player)
   const shelf = new Map(Object.entries(videos))
@@ -194,8 +195,8 @@ const setup = ({
     onLeft: () => {
       left.count += 1
     },
-    hasAccounts: () => hasAccounts,
     accountIdOf: () => signedIn.accountId,
+    lastAccountIdOf: () => signedIn.lastAccountId,
   })
   return {
     playback,
@@ -265,7 +266,7 @@ describe('open', () => {
     })
     const ready = [episodeOf(3), episodeOf(1), episodeOf(2), episodeOf(5), movie]
     const world = setup({
-      entries: [...ready, episodeOf(4, { status: { kind: 'queued' } })],
+      entries: [...ready, episodeOf(4, { status: { kind: DOWNLOAD_STATUS_KINDS.queued } })],
       videos: shelved(...ready),
     })
     const target = targetOf(await world.playback.open({ downloadId: episodeOf(2).downloadId }))
@@ -314,11 +315,45 @@ describe('open', () => {
   })
 })
 
+describe('openTitle', () => {
+  it("grants a server title's ready download, the page on it and its next position a play", async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE } })
+    const fileId = await world.playback.openTitle({ serverId: SERVER_ID, mediaId: 11 })
+    if (fileId === null) throw new Error('expected the download')
+    expect(world.grants.fileOf(fileId)?.path ?? null).toBe(VIDEO)
+    expect(world.playback.isPlaying(ID)).toBe(true)
+    world.playback.notePosition({ fileId, position: 100, duration: 3000 })
+    expect(world.store.read().entries[0]?.pending ?? null).toEqual({
+      play: true,
+      position: 100,
+      furthest: 100,
+      at: NOW,
+      accountId: ACCOUNT_A,
+    })
+  })
+
+  it('opens nothing for a title with no download, or one not ready, or on another server', async () => {
+    const world = setup({
+      entries: [entryFor({}), episodeOf(2, { status: { kind: DOWNLOAD_STATUS_KINDS.queued } })],
+      videos: { [VIDEO]: FILE },
+    })
+    expect(await world.playback.openTitle({ serverId: SERVER_ID, mediaId: 99 })).toBeNull()
+    expect(await world.playback.openTitle({ serverId: SERVER_ID, mediaId: 12 })).toBeNull()
+    expect(await world.playback.openTitle({ serverId: OTHER_SERVER_ID, mediaId: 11 })).toBeNull()
+  })
+
+  it('opens nothing, with a warning, for a download whose file has gone', async () => {
+    const world = setup({ entries: [entryFor({})] })
+    expect(await world.playback.openTitle({ serverId: SERVER_ID, mediaId: 11 })).toBeNull()
+    expect(world.warnings).toEqual(['raven player could not open the file of S01E01 Good News'])
+  })
+})
+
 describe('nextOf', () => {
   it("offers the group's next ready download after one granted outside the Downloads page", async () => {
     const ready = [episodeOf(1), episodeOf(3), episodeOf(4)]
     const world = setup({
-      entries: [...ready, episodeOf(2, { status: { kind: 'queued' } })],
+      entries: [...ready, episodeOf(2, { status: { kind: DOWNLOAD_STATUS_KINDS.queued } })],
       videos: shelved(...ready),
     })
     const next = await world.playback.nextOf({ fileId: await granted(world, videoOf(11)) })
@@ -427,7 +462,7 @@ describe('notePosition', () => {
       position: 100,
       furthest: 100,
       at: NOW + 1,
-      accountId: null,
+      accountId: ACCOUNT_A,
     })
     // What a sync sent is cleared, so a second play would show.
     world.store.update((state) =>
@@ -445,7 +480,7 @@ describe('notePosition', () => {
       position: 200,
       furthest: 200,
       at: NOW + 2,
-      accountId: null,
+      accountId: ACCOUNT_A,
     })
     expect(await opened(world)).toBe(fileId)
     world.playback.notePosition({ fileId, position: 300, duration: 3000 })
@@ -454,15 +489,14 @@ describe('notePosition', () => {
       position: 300,
       furthest: 300,
       at: NOW + 2,
-      accountId: null,
+      accountId: ACCOUNT_A,
     })
   })
 
-  it('tags a play of a download from a server with accounts with the account signed in', async () => {
+  it('tags a play of a download with the account signed in', async () => {
     const world = setup({
       entries: [entryFor({})],
       videos: { [VIDEO]: FILE },
-      hasAccounts: true,
       accountId: ACCOUNT_A,
     })
     const fileId = await opened(world)
@@ -480,7 +514,7 @@ describe('notePosition', () => {
     const world = setup({
       entries: [entryFor({ serverPosition: 4200 })],
       videos: { [VIDEO]: FILE },
-      hasAccounts: true,
+      accountId: null,
     })
     const fileId = await opened(world)
     world.playback.notePosition({ fileId, position: 2990, duration: 3000 })
@@ -501,11 +535,51 @@ describe('notePosition', () => {
     })
   })
 
+  it('owes a play while signed out to the last account signed in, held until it signs in again', async () => {
+    const world = setup({
+      entries: [entryFor({})],
+      videos: { [VIDEO]: FILE },
+      accountId: null,
+      lastAccountId: ACCOUNT_A,
+    })
+    const fileId = await opened(world)
+    world.playback.notePosition({ fileId, position: 100, duration: 3000 })
+    expect(entryOf(world)?.pending ?? null).toEqual(NO_PENDING)
+    expect(world.store.read().owed).toEqual([
+      {
+        serverId: SERVER_ID,
+        mediaId: 11,
+        pending: { play: true, position: 100, furthest: 100, at: NOW, accountId: ACCOUNT_A },
+      },
+    ])
+    world.signedIn.accountId = ACCOUNT_A
+    world.playback.notePosition({ fileId, position: 200, duration: 3000 })
+    expect(entryOf(world)?.pending ?? null).toEqual({
+      play: false,
+      position: 200,
+      furthest: 200,
+      at: NOW,
+      accountId: ACCOUNT_A,
+    })
+  })
+
+  it('records nothing for the server from a play before any account has signed in', async () => {
+    const world = setup({
+      entries: [entryFor({})],
+      videos: { [VIDEO]: FILE },
+      accountId: null,
+      lastAccountId: null,
+    })
+    const fileId = await opened(world)
+    world.playback.notePosition({ fileId, position: 100, duration: 3000 })
+    expect(entryOf(world)?.pending ?? null).toEqual(NO_PENDING)
+    expect(world.store.read().owed).toEqual([])
+  })
+
   it('owes the account that opened a title what it reports after another signs in', async () => {
     const world = setup({
       entries: [entryFor({})],
       videos: { [VIDEO]: FILE },
-      hasAccounts: true,
       accountId: ACCOUNT_A,
     })
     const fileId = await opened(world)
@@ -529,23 +603,6 @@ describe('notePosition', () => {
       furthest: 300,
       at: NOW + 1,
       accountId: ACCOUNT_B,
-    })
-  })
-
-  it('tags no account for a server without accounts, as it always noted', async () => {
-    const world = setup({
-      entries: [entryFor({})],
-      videos: { [VIDEO]: FILE },
-      accountId: ACCOUNT_A,
-    })
-    const fileId = await opened(world)
-    world.playback.notePosition({ fileId, position: 100, duration: 3000 })
-    expect(entryOf(world)?.pending ?? null).toEqual({
-      play: true,
-      position: 100,
-      furthest: 100,
-      at: NOW,
-      accountId: null,
     })
   })
 
@@ -595,7 +652,7 @@ describe('notePosition', () => {
       position: 100,
       furthest: 100,
       at: NOW,
-      accountId: null,
+      accountId: ACCOUNT_A,
     })
     world.playback.noteOpened({ fileId })
     world.playback.notePosition({ fileId, position: 150, duration: 3000 })
@@ -604,7 +661,7 @@ describe('notePosition', () => {
       position: 150,
       furthest: 150,
       at: NOW,
-      accountId: null,
+      accountId: ACCOUNT_A,
     })
   })
 
@@ -635,7 +692,7 @@ describe('notePosition', () => {
       position: 100,
       furthest: 100,
       at: NOW,
-      accountId: null,
+      accountId: ACCOUNT_A,
     })
     expect(world.playback.sidecarsOf(fileId)).toHaveLength(1)
   })
@@ -657,7 +714,7 @@ describe('notePosition', () => {
       position: 100,
       furthest: 100,
       at: NOW,
-      accountId: null,
+      accountId: ACCOUNT_A,
     })
   })
 })

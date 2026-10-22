@@ -1,7 +1,19 @@
 import { basename, dirname } from 'node:path'
-import { type OutputSettings, titleFromFileName } from '@raven/core'
-import type { AccountService } from '@/main/accounts/accountService'
-import { type ConfigStore, type DesktopConfig, pickOutput } from '@/main/desktopConfig'
+import {
+  type AudioDevice,
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  type DesktopReply,
+  type DesktopRequest,
+  ENVELOPE_KINDS,
+  type InvokeEnvelope,
+  isInvokeEnvelope,
+  type OutputSettings,
+  type RecentView,
+  titleFromFileName,
+} from '@raven/core'
+import type { PageAccount } from '@/main/accounts/pageAccount'
+import { type ConfigStore, pickOutput, serverOf } from '@/main/desktopConfig'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import { grantNext } from '@/main/folder'
 import { GRANT_REFUSALS, type GrantedFile, type GrantRefusal, type Grants } from '@/main/grants'
@@ -9,13 +21,10 @@ import {
   addRecent,
   clearRecents,
   type FileFacts,
-  noteServerRecent,
   type PlayerState,
-  RECENT_KINDS,
   type RecentEntry,
   recentKey,
   removeRecentByKey,
-  removeServerRecents,
   resumeFor,
   savePosition,
   setTrackPick,
@@ -23,47 +32,23 @@ import {
   watchedShare,
 } from '@/main/playerState'
 import type { LinkOpener } from '@/main/servers/linkOpener'
-import { CALL_MESSAGES, type ServerCalls } from '@/main/servers/serverCalls'
-import { cleanName, renameServer, serverById } from '@/main/servers/serverList'
-import {
-  TRUST_MESSAGES,
-  TRUST_OUTCOME_KINDS,
-  TRUST_SOURCES,
-  type ServerTrust,
-  type TrustOutcome,
-} from '@/main/servers/serverTrust'
-import type { TitleSittings } from '@/main/servers/titleSittings'
+import type { ServerTitles } from '@/main/servers/serverTitles'
 import type { StateStore, Timers } from '@/main/stateStore'
 import { UPDATE_COPY, type UpdateService } from '@/main/updateService'
-import { serverOriginOf, watchUrlFor } from '@/shared/playLink'
-import {
-  type AudioDevice,
-  type DesktopReply,
-  DESKTOP_REQUESTS,
-  type DesktopRequest,
-  ENVELOPE_KINDS,
-  type InvokeEnvelope,
-  isInvokeEnvelope,
-  MAX_QUEUE,
-  type AccountView,
-  type RecentView,
-  DESKTOP_REPLIES,
-} from '@/shared/protocol'
+import { MAX_QUEUE } from '@/shared/hostNames'
 
 export const MESSAGES = {
   notVideo: 'raven player opens video files only.',
   missing: 'That file could not be found.',
   nothingDropped: 'Drop a video file to play it.',
-  notOpen: 'That video is no longer open. Open it again from Home.',
+  notOpen: 'That video is no longer open. Open it again from On this Mac or Downloads.',
   unknownRecent: 'That video is no longer in your recents.',
   unknownRequest: 'raven player does not understand that request.',
   failed: 'raven player could not do that. Try again.',
-  badServer: TRUST_MESSAGES.invalid,
-  badName: 'A server name needs 1 to 80 characters.',
-  noBrowser: 'raven player could not open your browser.',
+  badSession: 'raven player could not read that sign in.',
 } as const
 
-/** How long Home waits on one file's check: a sleeping network share can block for minutes. */
+/** How long the recents wait on one file's check: a sleeping share can block for minutes. */
 const RECENT_CHECK_MS = 500
 
 export type DesktopServiceDeps = {
@@ -85,14 +70,12 @@ export type DesktopServiceDeps = {
   }
   setWindowButtons: (isVisible: boolean) => void
   config: ConfigStore
-  serverCalls: Pick<ServerCalls, 'callFromPage'>
-  titleSittings: Pick<TitleSittings, 'left'>
-  trust: ServerTrust
   links: LinkOpener
-  openExternal: (url: string) => Promise<void>
   updates: UpdateService
   downloads: DownloadService
-  accounts: AccountService
+  /** The page's sign in, which main uses for every call to the server. */
+  account: Pick<PageAccount, 'set'>
+  titles: ServerTitles
 }
 
 export type DesktopService = {
@@ -101,21 +84,11 @@ export type DesktopService = {
   openDialog: () => Promise<DesktopReply>
   /** A batch of links main was handed (`open-url`); the opener acts on the first. */
   openLinks: (links: readonly string[]) => Promise<DesktopReply>
-  /**
-   * The account signed in to a server changed: Home's recents of that server go, since their
-   * titles and shares watched were the last account's.
-   */
-  accountSwitched: (input: { serverId: string }) => void
 }
 
 const DONE = { type: DESKTOP_REPLIES.done } as const satisfies DesktopReply
 
 const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
-
-const accountReply = (account: AccountView): DesktopReply => ({
-  type: DESKTOP_REPLIES.account,
-  account,
-})
 
 const messageFor = (reason: GrantRefusal): string => {
   switch (reason) {
@@ -126,47 +99,6 @@ const messageFor = (reason: GrantRefusal): string => {
       return MESSAGES.notVideo
     default: {
       const unreachable: never = reason
-      return unreachable
-    }
-  }
-}
-
-const serversOf = (config: DesktopConfig): DesktopReply => ({
-  type: DESKTOP_REPLIES.servers,
-  servers: config.servers.map((server) => ({
-    serverId: server.id,
-    origin: server.origin,
-    name: server.name,
-  })),
-})
-
-/** What Settings' Add answers once trust has decided. */
-const replyForAdd = ({
-  outcome,
-  config,
-}: {
-  outcome: TrustOutcome
-  config: DesktopConfig
-}): DesktopReply => {
-  switch (outcome.kind) {
-    case TRUST_OUTCOME_KINDS.trusted:
-      return serversOf(config)
-    case TRUST_OUTCOME_KINDS.declined:
-      return DONE
-    case TRUST_OUTCOME_KINDS.full:
-      return refused(TRUST_MESSAGES.full)
-    case TRUST_OUTCOME_KINDS.busy:
-      return refused(TRUST_MESSAGES.busy)
-    case TRUST_OUTCOME_KINDS.unreachable:
-      return refused(TRUST_MESSAGES.unreachable(outcome.origin))
-    case TRUST_OUTCOME_KINDS.badSignIn:
-      return refused(TRUST_MESSAGES.badSignIn)
-    case TRUST_OUTCOME_KINDS.invalid:
-      return refused(MESSAGES.badServer)
-    case TRUST_OUTCOME_KINDS.unsaved:
-      return refused(TRUST_MESSAGES.unsaved)
-    default: {
-      const unreachable: never = outcome
       return unreachable
     }
   }
@@ -258,11 +190,11 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     const file = grants.fileOf(request.fileId)
     if (file === null) return refused(MESSAGES.notOpen)
     // A grant outlives its download, so a play queue can reach a deleted one: it is missing,
-    // and must not rejoin Home's recents before its load fails.
+    // and must not rejoin On this Mac's recents before its load fails.
     if (deps.downloads.isStaleDownload({ path: file.path })) return refused(MESSAGES.missing)
     store.update((state) => addRecent({ state, path: file.path, at: now() }))
     // A download's file is video.<container> in a folder named by its media id, and stays listed
-    // after a delete, so File > Open Recent leaves it to Home's recents.
+    // after a delete, so File > Open Recent leaves it to On this Mac's recents.
     if (deps.downloads.labelOf({ path: file.path }) === null) deps.addRecentDocument(file.path)
     // The page describes a file each time it opens one, so this is where a play begins.
     deps.downloads.noteOpened({ fileId: file.fileId })
@@ -347,7 +279,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     return Promise.race([factsOf(path), timeout.promise]).finally(() => deps.timers.clear(timer))
   }
 
-  // Home's bar must agree with where playback starts, so a file replaced on disk shows none.
+  // A recent's bar must agree with where playback starts, so a file replaced on disk shows none.
   // Only a file with a saved position needs the check; the rest are not started either way.
   const shareOf = async ({ state, path }: { state: PlayerState; path: string }) => {
     if (!state.resume.some((entry) => entry.path === path)) return null
@@ -362,41 +294,20 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   }: {
     state: PlayerState
     entry: RecentEntry
-  }): Promise<RecentView | null> => {
-    switch (entry.kind) {
-      case RECENT_KINDS.file:
-        return {
-          recentId: recentIdFor({ entry }),
-          label: titleOf({ path: entry.path, name: basename(entry.path) }),
-          from: fromOf(entry.path),
-          watched: deps.downloads.isWatched({ path: entry.path })
-            ? 1
-            : await shareOf({ state, path: entry.path }),
-        }
-      case RECENT_KINDS.server: {
-        // A title whose server has gone cannot be played, so Home does not offer it.
-        const server = serverById({ config: config.read(), serverId: entry.serverId })
-        if (server === null) return null
-        return {
-          recentId: recentIdFor({ entry }),
-          label: entry.label,
-          from: server.name,
-          watched: entry.watched,
-        }
-      }
-      default: {
-        const unreachable: never = entry
-        return unreachable
-      }
-    }
-  }
+  }): Promise<RecentView> => ({
+    recentId: recentIdFor({ entry }),
+    label: titleOf({ path: entry.path, name: basename(entry.path) }),
+    from: fromOf(entry.path),
+    watched: deps.downloads.isWatched({ path: entry.path })
+      ? 1
+      : await shareOf({ state, path: entry.path }),
+  })
 
   const listRecents = async (): Promise<DesktopReply> => {
     const state = store.read()
-    const views = await Promise.all(state.recents.map((entry) => viewOf({ state, entry })))
     return {
       type: DESKTOP_REPLIES.recents,
-      recents: views.filter((view): view is RecentView => view !== null),
+      recents: await Promise.all(state.recents.map((entry) => viewOf({ state, entry }))),
     }
   }
 
@@ -408,36 +319,12 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     })
   }
 
-  const playServer = ({
-    serverId,
-    mediaId,
-  }: {
-    serverId: string
-    mediaId: number
-  }): DesktopReply => {
-    if (serverById({ config: config.read(), serverId }) === null) {
-      return refused(CALL_MESSAGES.unknownServer)
-    }
-    // The server keeps where to resume, so a recent starts at 0 and the page asks it.
-    return { type: DESKTOP_REPLIES.playServer, target: { serverId, mediaId, at: 0, next: [] } }
-  }
-
   const openRecent = async ({ recentId }: { recentId: string }): Promise<DesktopReply> => {
     const entry = entryById.get(recentId)
     if (entry === undefined) return refused(MESSAGES.unknownRecent)
-    switch (entry.kind) {
-      case RECENT_KINDS.file: {
-        const result = await grants.grant(entry.path)
-        if (!result.ok) return refused(messageFor(result.reason))
-        return { type: DESKTOP_REPLIES.play, target: { fileId: result.file.fileId, queue: [] } }
-      }
-      case RECENT_KINDS.server:
-        return playServer({ serverId: entry.serverId, mediaId: entry.mediaId })
-      default: {
-        const unreachable: never = entry
-        return unreachable
-      }
-    }
+    const result = await grants.grant(entry.path)
+    if (!result.ok) return refused(messageFor(result.reason))
+    return { type: DESKTOP_REPLIES.play, target: { fileId: result.file.fileId, queue: [] } }
   }
 
   const dropRecent = ({ recentId }: { recentId: string }): DesktopReply => {
@@ -455,125 +342,6 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     deps.clearRecentDocuments()
     return DONE
   }
-
-  const serverCall = async (
-    request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.serverCall }>,
-  ): Promise<DesktopReply> => {
-    const result = await deps.serverCalls.callFromPage({
-      serverId: request.serverId,
-      method: request.method,
-      path: request.path,
-      body: request.body,
-    })
-    if (!result.ok) return { type: DESKTOP_REPLIES.serverUnreachable, message: result.message }
-    return { type: DESKTOP_REPLIES.serverReply, status: result.status, body: result.body }
-  }
-
-  const addServer = async ({ origin: address }: { origin: string }): Promise<DesktopReply> => {
-    const origin = serverOriginOf(address)
-    if (origin === null) return refused(MESSAGES.badServer)
-    const outcome = await deps.trust.trust({ origin, from: TRUST_SOURCES.app })
-    return replyForAdd({ outcome, config: config.read() })
-  }
-
-  const renameOne = ({ serverId, name }: { serverId: string; name: string }): DesktopReply => {
-    if (cleanName(name) === null) return refused(MESSAGES.badName)
-    if (serverById({ config: config.read(), serverId }) === null) {
-      return refused(CALL_MESSAGES.unknownServer)
-    }
-    config.update((current) => renameServer({ config: current, serverId, name }) ?? current)
-    return serversOf(config.read())
-  }
-
-  const dropServerRecents = ({ serverId }: { serverId: string }): void => {
-    store.update((state) => removeServerRecents({ state, serverId }))
-    forgetRecentIds({
-      keys: [...entryById.values()]
-        .filter((entry) => entry.kind === RECENT_KINDS.server && entry.serverId === serverId)
-        .map(recentKey),
-    })
-  }
-
-  const removeOne = async ({ serverId }: { serverId: string }): Promise<DesktopReply> => {
-    await deps.trust.remove(serverId)
-    // A removal that could not be saved keeps the server, so it keeps its recents too.
-    if (serverById({ config: config.read(), serverId }) === null) dropServerRecents({ serverId })
-    return serversOf(config.read())
-  }
-
-  const openInBrowser = async ({
-    serverId,
-    mediaId,
-  }: {
-    serverId: string
-    mediaId: number
-  }): Promise<DesktopReply> => {
-    const server = serverById({ config: config.read(), serverId })
-    if (server === null) return refused(CALL_MESSAGES.unknownServer)
-    try {
-      await deps.openExternal(watchUrlFor({ origin: server.origin, mediaId }))
-    } catch (error) {
-      deps.onError(error)
-      return refused(MESSAGES.noBrowser)
-    }
-    return DONE
-  }
-
-  const noteServerTitle = (
-    request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.noteServerTitle }>,
-  ): DesktopReply => {
-    const { serverId, mediaId, label, watched } = request
-    if (serverById({ config: config.read(), serverId }) === null) {
-      return refused(CALL_MESSAGES.unknownServer)
-    }
-    store.update((state) =>
-      noteServerRecent({ state, serverId, mediaId, label, watched, at: now() }),
-    )
-    return DONE
-  }
-
-  /** An account request about a server main no longer keeps is refused before it reaches the service. */
-  const withKnownServer = async ({
-    serverId,
-    run,
-  }: {
-    serverId: string
-    run: () => Promise<DesktopReply>
-  }): Promise<DesktopReply> => {
-    if (serverById({ config: config.read(), serverId }) === null) {
-      return refused(CALL_MESSAGES.unknownServer)
-    }
-    return run()
-  }
-
-  const signIn = (
-    request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.signIn }>,
-  ): Promise<DesktopReply> =>
-    withKnownServer({
-      serverId: request.serverId,
-      run: async () => {
-        const result = await deps.accounts.signIn({
-          serverId: request.serverId,
-          email: request.email,
-          password: request.password,
-        })
-        return result.ok ? accountReply(result.account) : refused(result.message)
-      },
-    })
-
-  const openAccountPage = (
-    request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.openAccountPage }>,
-  ): Promise<DesktopReply> =>
-    withKnownServer({
-      serverId: request.serverId,
-      run: async () => {
-        const result = await deps.accounts.openPage({
-          serverId: request.serverId,
-          page: request.page,
-        })
-        return result.ok ? DONE : refused(result.message)
-      },
-    })
 
   const checkForUpdates = async (): Promise<DesktopReply> => {
     await deps.updates.checkNow()
@@ -613,25 +381,8 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       case DESKTOP_REQUESTS.writeOutput:
         await deps.output.write(pickOutput(request.output))
         return DONE
-      case DESKTOP_REQUESTS.serverCall:
-        return serverCall(request)
-      case DESKTOP_REQUESTS.listServers:
-        return serversOf(config.read())
-      case DESKTOP_REQUESTS.addServer:
-        return addServer({ origin: request.origin })
-      case DESKTOP_REQUESTS.renameServer:
-        return renameOne({ serverId: request.serverId, name: request.name })
-      case DESKTOP_REQUESTS.removeServer:
-        return removeOne({ serverId: request.serverId })
       case DESKTOP_REQUESTS.openLink:
-        return deps.links.open({ link: request.link, from: TRUST_SOURCES.app })
-      case DESKTOP_REQUESTS.openInBrowser:
-        return openInBrowser({ serverId: request.serverId, mediaId: request.mediaId })
-      case DESKTOP_REQUESTS.noteServerTitle:
-        return noteServerTitle(request)
-      case DESKTOP_REQUESTS.leaveServerTitle:
-        deps.titleSittings.left({ serverId: request.serverId, mediaId: request.mediaId })
-        return DONE
+        return deps.links.open({ link: request.link })
       case DESKTOP_REQUESTS.readUpdates:
         return { type: DESKTOP_REPLIES.updates, status: deps.updates.status() }
       case DESKTOP_REQUESTS.setUpdateCheck:
@@ -678,25 +429,12 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       case DESKTOP_REQUESTS.playbackLeft:
         deps.downloads.playbackLeft({ fileId: request.fileId })
         return DONE
-      case DESKTOP_REQUESTS.readAccount:
-        return withKnownServer({
-          serverId: request.serverId,
-          run: async () => accountReply(await deps.accounts.read(request.serverId)),
-        })
-      case DESKTOP_REQUESTS.refreshAccount:
-        return withKnownServer({
-          serverId: request.serverId,
-          run: async () => accountReply(await deps.accounts.refresh(request.serverId)),
-        })
-      case DESKTOP_REQUESTS.signIn:
-        return signIn(request)
-      case DESKTOP_REQUESTS.signOut:
-        return withKnownServer({
-          serverId: request.serverId,
-          run: async () => accountReply(await deps.accounts.signOut(request.serverId)),
-        })
-      case DESKTOP_REQUESTS.openAccountPage:
-        return openAccountPage(request)
+      case DESKTOP_REQUESTS.accountToken:
+        return deps.account.set(request.session) ? DONE : refused(MESSAGES.badSession)
+      case DESKTOP_REQUESTS.askDownload:
+        return deps.downloads.ask({ serverId: serverOf(config.read()).id, target: request.target })
+      case DESKTOP_REQUESTS.playTitle:
+        return deps.titles.play({ mediaId: request.mediaId, at: request.at, next: request.next })
       default: {
         const unreachable: never = request
         return unreachable
@@ -734,5 +472,5 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     }
   }
 
-  return { handle, openPaths, openDialog, openLinks, accountSwitched: dropServerRecents }
+  return { handle, openPaths, openDialog, openLinks }
 }

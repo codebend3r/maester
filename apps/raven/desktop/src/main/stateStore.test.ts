@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { EMPTY_STATE, addRecent, type PlayerState } from '@/main/playerState'
-import { EMPTY_CONFIG, isDesktopConfig } from '@/main/desktopConfig'
+import { isDesktopConfig } from '@/main/desktopConfig'
+import { SERVER, configFor } from '@/main/test/configFakes'
 import {
   createJsonStore,
   createStateStore,
@@ -13,6 +14,7 @@ import {
   type Timers,
 } from '@/main/stateStore'
 
+const EMPTY_CONFIG = configFor(SERVER)
 const FILE = '/data/player-state.json'
 const TMP = `${FILE}.tmp`
 

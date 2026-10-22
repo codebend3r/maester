@@ -1,0 +1,233 @@
+.page {
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+// The title with the buttons for every download at its end, and the disk under both.
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title tools'
+    'disk disk';
+  gap: var(--space-3) var(--space-4);
+  align-items: center;
+}
+
+.title {
+  grid-area: title;
+}
+
+.tools {
+  grid-area: tools;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: end;
+  gap: var(--space-1);
+}
+
+// Short of room for the title and all three buttons in a row, the buttons go under it.
+@container (max-width: 64rem) {
+  .header {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'title'
+      'tools'
+      'disk';
+  }
+
+  .tools {
+    justify-content: start;
+  }
+}
+
+@container (max-width: 30rem) {
+  .tools {
+    grid-auto-flow: row;
+    justify-items: start;
+  }
+}
+
+.disk {
+  grid-area: disk;
+  display: grid;
+  gap: var(--space-1);
+  max-width: var(--measure);
+}
+
+.line {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.meter {
+  width: 100%;
+}
+
+.empty {
+  max-width: var(--measure);
+  color: var(--color-lichen);
+}
+
+.groups {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.group {
+  display: grid;
+  min-width: 0;
+}
+
+.groupBody {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.groupTitle {
+  font-size: var(--font-size-lg);
+}
+
+.rows {
+  display: grid;
+  gap: var(--space-2);
+}
+
+// A card is a container, so its parts lay out by its own width, whatever the side menu takes.
+.card {
+  container-type: inline-size;
+  display: grid;
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
+}
+
+// The download: its name and size, then where it stands beside what can be done with it.
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'label size'
+    'status actions';
+  gap: var(--space-1) var(--space-4);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+}
+
+.label {
+  grid-area: label;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.size {
+  grid-area: size;
+  justify-self: end;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  grid-area: status;
+  display: grid;
+  gap: var(--space-0);
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.gauge {
+  width: 100%;
+}
+
+.actions {
+  grid-area: actions;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  grid-template-areas: 'act auto remove';
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+  justify-content: end;
+}
+
+.act {
+  grid-area: act;
+}
+
+.remove {
+  grid-area: remove;
+}
+
+.auto {
+  grid-area: auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  font-size: var(--font-size-sm);
+}
+
+// The question before a delete takes the whole card while it is open.
+.asking {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'question confirm';
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+}
+
+.question {
+  grid-area: question;
+  overflow-wrap: anywhere;
+}
+
+.confirm {
+  grid-area: confirm;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  justify-content: start;
+}
+
+// A narrower card stacks where it stands under its name, and its actions under that.
+@container (max-width: 40rem) {
+  .row {
+    grid-template-areas:
+      'label size'
+      'status status'
+      'actions actions';
+  }
+
+  .actions {
+    justify-content: start;
+  }
+}
+
+// A phone's card: the switch over the two buttons, and the question over its answers.
+@container (max-width: 30rem) {
+  .row {
+    padding: var(--space-3);
+  }
+
+  .actions {
+    grid-template-columns: auto auto;
+    grid-template-areas:
+      'auto auto'
+      'act remove';
+    justify-content: space-between;
+  }
+
+  .asking {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'question'
+      'confirm';
+    padding: var(--space-3);
+  }
+}

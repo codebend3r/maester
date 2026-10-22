@@ -24,7 +24,6 @@ import {
   queue,
   remove,
   removeAll,
-  removeServer,
   resume,
   sameGroup,
   setAutoDelete,
@@ -346,7 +345,7 @@ describe('fail and finish', () => {
   })
 })
 
-describe('remove and removeServer', () => {
+describe('remove and removeAll', () => {
   const state = stateOf(
     entry({ downloadId: id(1), mediaId: 1 }),
     entry({ downloadId: id(2), mediaId: 2, serverId: SERVER_B }),
@@ -356,16 +355,6 @@ describe('remove and removeServer', () => {
     expect(remove(state, { downloadId: id(1) }).entries.map((each) => each.downloadId)).toEqual([
       id(2),
     ])
-  })
-
-  it('removeServer drops that server entries', () => {
-    expect(
-      removeServer(state, { serverId: SERVER_B }).entries.map((each) => each.downloadId),
-    ).toEqual([id(1)])
-  })
-
-  it('removeServer for a server with none returns the same state', () => {
-    expect(removeServer(state, { serverId: id(9) })).toBe(state)
   })
 
   it('removeAll drops every entry and keeps the default', () => {
@@ -402,19 +391,6 @@ describe('what a removed download owes its server', () => {
       { serverId: SERVER_A, mediaId: 1, pending: PLAYED },
       { serverId: SERVER_B, mediaId: 2, pending: PLAYED },
     ])
-  })
-
-  it("removeServer owes nothing for that server's entries, and drops what it was owed", () => {
-    const owed = remove(owing, { downloadId: id(1) })
-    const next = removeServer(removeServer(owed, { serverId: SERVER_A }), { serverId: SERVER_B })
-    expect(next.entries).toEqual([])
-    expect(next.owed).toEqual([])
-    expect(removeServer(owed, { serverId: SERVER_A }).owed).toEqual([])
-  })
-
-  it('removeServer of a server owed something but holding no entry drops it', () => {
-    const owed = remove(stateOf(entry({ pending: PLAYED })), { downloadId: ID })
-    expect(removeServer(owed, { serverId: SERVER_A }).owed).toEqual([])
   })
 
   it('folds a title already owed into one item: the play kept, the newer position, the furthest', () => {

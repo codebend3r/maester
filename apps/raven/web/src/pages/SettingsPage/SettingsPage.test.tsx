@@ -15,6 +15,8 @@ import { api } from '@/lib/api'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
 import { held } from '@/test/held'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
+import { useServerReach } from '@/stores/serverReach'
+import { asDesktop, downloadsMain } from '@/test/desktop'
 import { fakeAccount, readyConfig } from '@/test/authClient'
 import { renderWithProviders } from '@/test/render'
 
@@ -459,5 +461,36 @@ describe('accounts on SettingsPage', () => {
       expect(adminLock).not.toHaveBeenCalled()
       expect(setPlayback).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('SettingsPage inside raven player', () => {
+  const spies = { get: spyOn(api, 'getPlaybackSettings') }
+
+  beforeEach(() => spies.get.mockImplementation(async () => STATE))
+  afterEach(() => {
+    cleanup()
+    Object.values(spies).forEach((spy) => spy.mockReset())
+  })
+
+  it("adds the app's own sections, and leaves out this browser's raven player toggle", async () => {
+    asDesktop(downloadsMain())
+    renderWithProviders({ ui: <SettingsPage />, playback: null })
+    await screen.findByRole('radio', { name: /Remux only/ })
+    expect(screen.queryByRole('checkbox', { name: /^Open videos in raven player/ })).toBeNull()
+    expect(screen.getByRole('region', { name: 'Downloads' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'This computer' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Updates' })).toBeInTheDocument()
+  })
+
+  it("keeps only the app's sections and this browser's while its server is out of reach", () => {
+    asDesktop(downloadsMain())
+    useServerReach.setState({ isOffline: true })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null, authConfig: null })
+    expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
+    ).toEqual(['Downloads', 'This computer', 'Updates', 'Advanced'])
+    expect(spies.get).not.toHaveBeenCalled()
   })
 })

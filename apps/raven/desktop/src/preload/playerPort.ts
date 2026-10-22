@@ -3,7 +3,7 @@ import {
   PLAYER_CONNECTION_STATUSES,
   type PlayerConnectionStatus,
   WINDOW_MESSAGE_TYPES,
-} from '@/shared/protocol'
+} from '@raven/core'
 
 const rebuild = (connection: PlayerConnectionStatus): PlayerConnectionStatus => {
   switch (connection.status) {

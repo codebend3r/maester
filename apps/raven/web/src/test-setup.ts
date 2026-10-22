@@ -7,12 +7,17 @@ import {
   usePlayerPrefs,
   useUnlockPrompt,
 } from '@raven/ui/headless'
+import { useToasts } from '@raven/ui'
 import { queryClient } from '@/lib/queryClient'
 import { useAuthSession } from '@/stores/authSession'
 import { useCardLinks } from '@/stores/cardLinks'
+import { useDesktopBridge } from '@/stores/desktop'
+import { useDownloadAsk } from '@/stores/downloadAsk'
+import { useDragging } from '@/stores/dragging'
 import { useHoverBackdrops } from '@/stores/hoverBackdrops'
 import { useOriginProbe } from '@/stores/originProbe'
 import { useSelectionScopes } from '@/stores/selectionScope'
+import { useServerReach } from '@/stores/serverReach'
 import { useSideMenu } from '@/stores/sideMenu'
 import { useTheme } from '@/stores/theme'
 import { resetBrowserSupport } from '@/test/canPlay'
@@ -32,6 +37,11 @@ const initialCardLinks = useCardLinks.getInitialState()
 const initialHoverBackdrops = useHoverBackdrops.getInitialState()
 const initialOriginProbe = useOriginProbe.getInitialState()
 const initialSelectionScopes = useSelectionScopes.getInitialState()
+const initialDesktopBridge = useDesktopBridge.getInitialState()
+const initialDownloadAsk = useDownloadAsk.getInitialState()
+const initialDragging = useDragging.getInitialState()
+const initialServerReach = useServerReach.getInitialState()
+const initialToasts = useToasts.getInitialState()
 
 // Bun test does not unmount between tests the way vitest globals do. The
 // stores reset after the unmount, or a store still subscribed to redraws
@@ -51,6 +61,12 @@ afterEach(() => {
   useHoverBackdrops.setState(initialHoverBackdrops, true)
   useOriginProbe.setState(initialOriginProbe, true)
   useSelectionScopes.setState(initialSelectionScopes, true)
+  useDesktopBridge.setState(initialDesktopBridge, true)
+  useDownloadAsk.setState(initialDownloadAsk, true)
+  useDragging.setState(initialDragging, true)
+  useServerReach.setState(initialServerReach, true)
+  useToasts.setState(initialToasts, true)
+  delete document.documentElement.dataset.desktop
   resetBrowserSupport()
   FakeEventSource.opened = []
   resetPolls()

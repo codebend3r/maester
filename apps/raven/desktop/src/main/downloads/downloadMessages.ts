@@ -1,4 +1,5 @@
-import { AUTH_REFUSALS, type AuthRefusal } from '@raven/core'
+import { AUTH_REFUSALS, type AuthRefusal, DOWNLOAD_KINDS, type DownloadKind } from '@raven/core'
+import { SERVER_GONE } from '@/main/desktopConfig'
 import {
   FAIL_REASONS,
   PAUSE_REASONS,
@@ -6,7 +7,6 @@ import {
   type PauseReason,
 } from '@/main/downloads/downloadState'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
-import { DOWNLOAD_KINDS, SERVER_GONE, type DownloadKind } from '@/shared/protocol'
 
 /** What the files of an ask of each kind are called, many at a time. */
 const FILE_NOUNS = {

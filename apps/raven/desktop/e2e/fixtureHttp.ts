@@ -32,6 +32,32 @@ export const fieldOf = ({ body, name }: { body: string | null; name: string }): 
   return isString(field) ? field : null
 }
 
+/** The CORS headers the stand-in Auth answers the page's cross-origin calls with, as Supabase does. */
+const CORS_HEADERS = {
+  allowOrigin: 'access-control-allow-origin',
+  allowMethods: 'access-control-allow-methods',
+  allowHeaders: 'access-control-allow-headers',
+} as const
+
+/** The preflight a browser sends before a cross-origin call with headers of its own. */
+export const PREFLIGHT_METHOD = 'OPTIONS'
+
+/** Lets `origin` call what `response` answers, with the headers supabase-js sends. */
+export const allowCrossOrigin = ({
+  response,
+  origin,
+}: {
+  response: ServerResponse
+  origin: string
+}): void => {
+  response.setHeader(CORS_HEADERS.allowOrigin, origin)
+  response.setHeader(CORS_HEADERS.allowMethods, 'GET, POST, PUT, DELETE, OPTIONS')
+  response.setHeader(
+    CORS_HEADERS.allowHeaders,
+    'apikey, authorization, content-type, x-client-info, x-supabase-api-version',
+  )
+}
+
 export const sendJson = ({
   response,
   status,

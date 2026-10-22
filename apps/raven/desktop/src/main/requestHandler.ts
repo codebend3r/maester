@@ -1,6 +1,6 @@
+import { DESKTOP_REPLIES, type DesktopReply, PAGE_ORIGIN } from '@raven/core'
 import { MESSAGES } from '@/main/desktopService'
 import { errorText, isFsError } from '@/main/log/errorText'
-import { APP_ORIGIN, DESKTOP_REPLIES, type DesktopReply } from '@/shared/protocol'
 
 const REFUSED = {
   type: DESKTOP_REPLIES.refused,
@@ -12,7 +12,7 @@ const describeError = (error: unknown): string =>
   error instanceof Error && !isFsError(error) ? (error.stack ?? error.message) : errorText(error)
 
 /**
- * The request channel's door: only the app's own frame is answered, every refusal
+ * The request channel's door: only the page's own frame is answered, every refusal
  * is logged, and a failing service is answered with a refusal instead of a rejection.
  */
 export const createRequestHandler = ({
@@ -27,7 +27,7 @@ export const createRequestHandler = ({
   return async ({ frameUrl, payload }) => {
     if (!isTrustedSender(frameUrl)) {
       warn(
-        `raven player refused a request from ${frameUrl ?? 'an unknown frame'}, not ${APP_ORIGIN}.`,
+        `raven player refused a request from ${frameUrl ?? 'an unknown frame'}, not ${PAGE_ORIGIN}.`,
       )
       return REFUSED
     }

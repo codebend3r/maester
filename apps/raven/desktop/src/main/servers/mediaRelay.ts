@@ -2,11 +2,13 @@ import type { AddressInfo } from 'node:net'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
   AUTH_REFUSALS,
+  type AuthRefusal,
+  HTTP_METHODS,
   isMediaId,
+  isSidecarTrackId,
   LOCKED_STATUS,
   MEDIA_TICKET_PARAM,
   toQueryString,
-  type AuthRefusal,
 } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { quietly } from '@/main/log/quietly'
@@ -20,7 +22,6 @@ import { accountRefusalOf, readShort } from '@/main/servers/authRefusals'
 import { loggable } from '@/main/servers/serverCalls'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { HTTP_STATUSES } from '@/shared/httpStatuses'
-import { HTTP_METHODS, isSidecarTrackId } from '@/shared/protocol'
 
 /** The relay listens here alone, so nothing off this Mac can reach it. */
 export const RELAY_HOST = '127.0.0.1'
@@ -230,7 +231,6 @@ export const createMediaRelay = ({
   fetchUpstream,
   tickets,
   newSecret,
-  accountChanged,
   warn,
 }: {
   listen: RelayListen
@@ -238,14 +238,10 @@ export const createMediaRelay = ({
   tickets: Pick<AccountTickets, 'ticketFor'>
   /** `RELAY_SECRET_BYTES` random bytes in base64url. */
   newSecret: (bytes: number) => string
-  /** Reads the server's account again, so the page hears that it was refused. */
-  accountChanged: (input: { serverId: string }) => Promise<void>
   warn: (message: string) => void
 }): MediaRelay => {
   let current: Load | null = null
   let refusal: { loadId: string; reason: AuthRefusal['reason'] } | null = null
-  // The reasons the current load has already told the account about, so mpv's retries tell it once.
-  let told: ReadonlySet<AuthRefusal['reason']> = new Set()
   let requests: readonly Request[] = []
   let listening: Promise<{ port: number }> | null = null
   let opened = 0
@@ -261,21 +257,11 @@ export const createMediaRelay = ({
     ending.forEach((request) => request.controller.abort())
   }
 
-  const tell = (load: Load): void => {
-    const failed = (): void =>
-      safeWarn(`raven player could not read ${loggable(load.name)}'s account again`)
-    try {
-      accountChanged({ serverId: load.serverId }).catch(failed)
-    } catch {
-      failed()
-    }
-  }
-
   const isCurrent = (load: Load): boolean => (current?.loadId ?? null) === load.loadId
 
   /**
-   * The account hears of every refusal, but only the file's own is why the title ends: mpv plays
-   * on past a sidecar it could not read, so a refused sidecar must not turn the end into an error.
+   * Every refusal is logged, but only the file's own is why the title ends: mpv plays on past a
+   * sidecar it could not read, so a refused sidecar must not turn the end into an error.
    */
   const record = ({
     load,
@@ -290,9 +276,6 @@ export const createMediaRelay = ({
     if (!isCurrent(load)) return
     if (path === MEDIA_FILE_PATH) refusal = { loadId: load.loadId, reason }
     safeWarn(`${loggable(load.name)} refused a relayed request: ${reason}`)
-    if (told.has(reason)) return
-    told = new Set([...told, reason])
-    tell(load)
   }
 
   const ticketed = async ({
@@ -368,10 +351,9 @@ export const createMediaRelay = ({
       return
     }
     // The file served again after a refusal (the owner let the account back in): it plays on,
-    // so its end is a plain one, and a later refusal is told to the account afresh.
+    // so its end is a plain one.
     if (path === MEDIA_FILE_PATH && isSuccess(upstream.status) && isCurrent(load)) {
       refusal = null
-      told = new Set()
     }
     response.writeHead(upstream.status, passedHeaders(upstream))
     if (method === RELAY_METHODS.head || upstream.body === null) {
@@ -464,7 +446,6 @@ export const createMediaRelay = ({
         routes,
       }
       refusal = null
-      told = new Set()
       const base = `http://${RELAY_HOST}:${port}/${secret}`
       return {
         loadId,

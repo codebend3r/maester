@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
+import { SERVER_METHODS } from '@raven/core'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { SERVER_METHODS } from '@/shared/protocol'
 
 const RELEASES_PATH = '/releases'
 

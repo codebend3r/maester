@@ -13,10 +13,25 @@ import {
   type AuthRefusal,
   MEDIA_TICKET_PARAM,
   MEMBER_STATUSES,
+  PAGE_ORIGIN,
+  SERVER_METHODS,
 } from '@raven/core'
-import { fieldOf, partsOf, sendEmpty, sendJson, sendMissing, tokenOf } from '@/e2e/fixtureHttp'
-import { AUTH_ERROR_CODES } from '@/main/accounts/accountSessions'
-import { SERVER_METHODS } from '@/shared/protocol'
+import {
+  allowCrossOrigin,
+  fieldOf,
+  partsOf,
+  PREFLIGHT_METHOD,
+  sendEmpty,
+  sendJson,
+  sendMissing,
+  tokenOf,
+} from '@/e2e/fixtureHttp'
+
+/** The `error_code` Supabase Auth answers a refused sign in or refresh with. */
+const AUTH_ERROR_CODES = {
+  invalidCredentials: 'invalid_credentials',
+  refreshTokenNotFound: 'refresh_token_not_found',
+} as const
 
 export const FIXTURE_ACCOUNT_KINDS = { off: 'off', legacy: 'legacy', ready: 'ready' } as const
 
@@ -358,6 +373,12 @@ export const createFixtureAuth = ({
       const mintId = method === SERVER_METHODS.post ? ticketRouteOf(pathname) : null
       if (mintId === null) return false
       answerTicketMint({ request, response, mediaId: mintId })
+      return true
+    }
+    // raven player's page signs in here from its own origin, as it does at Supabase.
+    if (pathname.startsWith(AUTH_V1_PREFIX)) allowCrossOrigin({ response, origin: PAGE_ORIGIN })
+    if (method === PREFLIGHT_METHOD && pathname.startsWith(AUTH_V1_PREFIX)) {
+      sendEmpty({ response, status: 204 })
       return true
     }
     if (method === SERVER_METHODS.post && pathname === AUTH_V1.token) {

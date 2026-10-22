@@ -1,7 +1,9 @@
 import { isAbsolute, relative, sep } from 'node:path'
+import { DESKTOP_REPLIES, type DesktopReply, DOWNLOAD_STATUS_KINDS, isOpaqueId } from '@raven/core'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   entryById,
+  entryByMedia,
   forgetServerPosition,
   notePending,
   noteWatched,
@@ -27,13 +29,7 @@ import {
 } from '@/main/playerState'
 import { loggable } from '@/main/servers/serverCalls'
 import type { StateStore } from '@/main/stateStore'
-import {
-  DESKTOP_REPLIES,
-  type DesktopReply,
-  DOWNLOAD_STATUS_KINDS,
-  isOpaqueId,
-  MAX_QUEUE,
-} from '@/shared/protocol'
+import { MAX_QUEUE } from '@/shared/hostNames'
 
 export type DownloadPlaybackDeps = {
   /** Read here; every change goes through `change`, so the page hears it. */
@@ -46,7 +42,7 @@ export type DownloadPlaybackDeps = {
   stat: (path: string) => Promise<{ size: number; mtimeMs: number }>
   now: () => number
   warn: (message: string) => void
-  /** The server's name now, or '' once raven player no longer keeps it. */
+  /** The server's name, or '' for a server raven player no longer plays from. */
   serverNameOf: (serverId: string) => string
   change: (apply: (state: DownloadsState) => DownloadsState) => void
   /** Tells the page the list changed when only a share watched did. */
@@ -55,18 +51,30 @@ export type DownloadPlaybackDeps = {
   onNoted: (input: { downloadId: string }) => void
   /** The player left the download it was on, for another file or for nothing of this computer's. */
   onLeft: () => void
-  /** Whether a server has accounts, so what is watched of its downloads belongs to one. */
-  hasAccounts: (input: { serverId: string }) => boolean
-  /** The account signed in to a server, as its stored session names it; null when none is. */
+  /**
+   * The account signed in to a server, as the page's session names it; null when none is, and
+   * for a server raven player no longer reaches, whose downloads owe it nothing.
+   */
   accountIdOf: (input: { serverId: string }) => string | null
+  /**
+   * The last account the page signed in to a server with, kept past a sign out and a relaunch;
+   * null until one has, and for a server raven player no longer reaches.
+   */
+  lastAccountIdOf: (input: { serverId: string }) => string | null
 }
 
 export type DownloadPlayback = {
   /** Plays a ready download as a local file, with its group's later ready files queued. */
   open: (input: { downloadId: string }) => Promise<DesktopReply>
   /**
+   * The granted video of a server title's ready download, which playing the title prefers: the
+   * page is on it, and the next position noted for it is a play. Null when there is none, or its
+   * file has gone.
+   */
+  openTitle: (input: { serverId: string; mediaId: number }) => Promise<string | null>
+  /**
    * The next ready download of a granted download's group, granted, for a play whose queue has
-   * run out (opened from Home's recents, or past `MAX_QUEUE`); null after the last, and for any
+   * run out (opened from On this Mac's recents, or past `MAX_QUEUE`); null after the last, and for any
    * other file.
    */
   nextOf: (input: { fileId: string }) => Promise<Readonly<GrantedFile> | null>
@@ -74,7 +82,7 @@ export type DownloadPlayback = {
   sidecarsOf: (fileId: string) => readonly LocalSidecar[]
   /**
    * "Downloaded from <server>" for a path in the downloads folder, or "Downloaded" once raven
-   * player no longer keeps the server; else null.
+   * player no longer plays from the server; else null.
    */
   fromLabelOf: (input: { path: string }) => string | null
   /** The title of the download whose video is at `path`, else null. */
@@ -98,7 +106,7 @@ export type DownloadPlayback = {
   notePosition: (input: { fileId: string; position: number; duration: number | null }) => void
   /**
    * What the engine loaded: a granted file, or nothing of this computer's (a server title, the
-   * player hiding for Home).
+   * player hiding for a page with no video).
    */
   notePlaying: (input: { fileId: string | null }) => void
   /** The play page left this file; a page already on the next file stays on it. */
@@ -116,12 +124,12 @@ export type DownloadPlayback = {
    */
   isMidTitle: (downloadId: string) => boolean
   /**
-   * A download's share watched, as Home's recents show one: 1 once it is marked watched, else
-   * the share its resume spot gives, null until its file was read. It takes the entry, so the
-   * views read every row's share without searching the list for each.
+   * A download's share watched, as On this Mac's recents show one: 1 once it is marked watched,
+   * else the share its resume spot gives, null until its file was read. It takes the entry, so
+   * the views read every row's share without searching the list for each.
    */
   watchedOf: (entry: DownloadEntry) => number | null
-  /** Whether the video at `path` is a download marked watched, which Home's recent shows whole. */
+  /** Whether the video at `path` is a download marked watched, which the recents show whole. */
   isWatched: (input: { path: string }) => boolean
   /** Reads these ready downloads' files for their share watched, then tells the page. */
   readFiles: (entries: readonly DownloadEntry[]) => void
@@ -230,12 +238,17 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     return file ?? firstGranted(rest)
   }
 
-  const signedInTo = ({ serverId }: DownloadEntry): string | null =>
-    deps.hasAccounts({ serverId }) ? deps.accountIdOf({ serverId }) : null
+  /**
+   * The account a sitting belongs to: the one signed in, or while none is, the last that was,
+   * so a play before the page sends its session waits for that account rather than going to
+   * whoever signs in next. Null only before any account has signed in.
+   */
+  const sittingAccountOf = ({ serverId }: { serverId: string }): string | null =>
+    deps.accountIdOf({ serverId }) ?? deps.lastAccountIdOf({ serverId })
 
   const sit = ({ fileId, entry }: { fileId: string; entry: DownloadEntry }): void => {
     freshFiles.add(fileId)
-    sittings.set(fileId, signedInTo(entry))
+    sittings.set(fileId, sittingAccountOf({ serverId: entry.serverId }))
   }
 
   const open: DownloadPlayback['open'] = async ({ downloadId }) => {
@@ -267,6 +280,18 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
         queue: queued.flatMap((queuedId) => (queuedId === null ? [] : [queuedId])),
       },
     }
+  }
+
+  const openTitle: DownloadPlayback['openTitle'] = async ({ serverId, mediaId }) => {
+    const entry = entryByMedia(store.read(), { serverId, mediaId })
+    if (entry === null || entry.status.kind !== DOWNLOAD_STATUS_KINDS.ready) return null
+    const fileId = await grantVideo(entry)
+    if (fileId === null) {
+      deps.warn(`raven player could not open the file of ${loggable(entry.label)}`)
+      return null
+    }
+    noteOpened({ fileId })
+    return fileId
   }
 
   const nextOf: DownloadPlayback['nextOf'] = async ({ fileId }) => {
@@ -329,19 +354,17 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     freshFiles.delete(fileId)
     const at = deps.now()
     const { serverId } = entry
-    const hasAccounts = deps.hasAccounts({ serverId })
-    const signedIn = hasAccounts ? deps.accountIdOf({ serverId }) : null
+    const signedIn = deps.accountIdOf({ serverId })
     const recorded = sittings.get(fileId)
-    const sitting = recorded === undefined ? signedIn : recorded
-    sittings.set(fileId, sitting)
-    const accountId = hasAccounts ? sitting : null
-    // Signed out of a server with accounts, the play is this Mac's alone: no account to send it under.
-    const isOwedToServer = !hasAccounts || accountId !== null
+    const accountId = recorded === undefined ? sittingAccountOf({ serverId }) : recorded
+    sittings.set(fileId, accountId)
     deps.change((state) => {
       const local = forgetServerPosition(state, { downloadId })
-      const pending = isOwedToServer
-        ? notePending(local, { downloadId, play: isPlay, position, at, accountId })
-        : local
+      // Signed out, the play is this Mac's alone: there is no account to send it under.
+      const pending =
+        accountId === null
+          ? local
+          : notePending(local, { downloadId, play: isPlay, position, at, accountId })
       // A sitting that outlived its account's sign in waits in `owed` until that account is back.
       const noted =
         accountId === signedIn
@@ -415,6 +438,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
 
   return {
     open,
+    openTitle,
     nextOf,
     sidecarsOf,
     fromLabelOf,

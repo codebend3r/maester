@@ -1,6 +1,6 @@
+import { PLAYER_CONNECTION_STATUSES, WINDOW_MESSAGE_TYPES } from '@raven/core'
 import { describe, expect, test } from 'bun:test'
 import { forwardPlayerPort } from '@/preload/playerPort'
-import { PLAYER_CONNECTION_STATUSES, WINDOW_MESSAGE_TYPES } from '@/shared/protocol'
 
 const { port1, port2 } = new MessageChannel()
 

@@ -9,10 +9,10 @@ import {
   LOCKED_STATUS,
   isLibrary,
   isLockState,
+  UNLOCK_COOKIE,
 } from '@raven/core'
 import { HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { UNLOCK_COOKIE } from '@/lock/lockService'
 import { MediaTickets } from '@/media/mediaTickets'
 import { cookieSet } from '@/test/app'
 import { AUTH_TEST_IDS, authFixture } from '@/test/auth'

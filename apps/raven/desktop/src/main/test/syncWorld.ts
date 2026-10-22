@@ -69,7 +69,7 @@ export const setupSync = ({
   entries?: DownloadEntry[]
   owed?: Owed[]
   retryMs?: number
-  /** The account signed in to the server, as its stored session names it. */
+  /** The account signed in to the server, as the page's session names it. */
   accountId?: string | null
 } = {}) => {
   const signedIn = { accountId }

@@ -7,8 +7,8 @@ import {
   isPlayerRequest,
   isRecord,
   type PlayerEvent,
+  WINDOW_MESSAGE_TYPES,
 } from '@raven/core'
-import { WINDOW_MESSAGE_TYPES } from '@/shared/protocol'
 
 const TAP_KEY = 'ravenE2ePlayerTap'
 const PORT_KEY = 'ravenE2ePlayerPort'

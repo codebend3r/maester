@@ -1,6 +1,9 @@
 import { basename } from 'node:path'
 import {
+  type AudioDevice,
+  ENGINE_STOPPED,
   isNumber,
+  isTrackIndex,
   type OutputSettings,
   PLAYER_COMMANDS,
   PLAYER_ERROR_REASONS,
@@ -36,7 +39,6 @@ import {
 } from '@/main/player/outputOptions'
 import { aidFor, sidFor, tracksFromMpv } from '@/main/player/tracksFromMpv'
 import type { Timers } from '@/main/stateStore'
-import { type AudioDevice, ENGINE_STOPPED, isTrackIndex, SERVER_GONE } from '@/shared/protocol'
 import { messageOf } from '@/shared/messageOf'
 
 export type MpvControl = Pick<Mpv, 'command' | 'set' | 'read' | 'observe'>
@@ -46,13 +48,12 @@ export type PlayerOutcome =
 export type PlayerActivity = { isPlaying: boolean; isShowing: boolean }
 
 export const PLAYER_MESSAGES = {
-  notOpen: 'That video is no longer open. Open it again from Home.',
+  notOpen: 'That video is no longer open. Open it again from On this Mac or Downloads.',
   cannotOpen: 'raven player could not open this video.',
   stopped: 'raven player could not keep playing this video.',
   engineStopped: ENGINE_STOPPED,
   noTrack: 'That track is not in this video.',
   failed: 'raven player could not do that.',
-  serverGone: SERVER_GONE,
   /** A server title's failure when the server could not say why; the source names the server when it can. */
   lost: 'raven player lost its connection to the server. Where you stopped last is saved there.',
 } as const
@@ -134,14 +135,9 @@ export type ServerTarget = {
   serverId: string
   mediaId: number
   url: string
-  /** `Cookie: ...` from the server's own session, or '' when it holds none. */
-  headerFields: string
   sidecars: readonly { url: string; title: string; language: string }[]
-  /**
-   * The loopback relay load this title plays through, for a server whose accounts are ready;
-   * null for one mpv reaches itself. Its base names the load's secret, which warnings blank.
-   */
-  relay: { loadId: string; base: string } | null
+  /** The loopback relay load this title plays through. Its base names the load's secret, which warnings blank. */
+  relay: { loadId: string; base: string }
 }
 export type LocalSidecar = { path: string; title: string; language: string }
 type FileTarget = {
@@ -233,8 +229,6 @@ export type PlayerService = {
   /** True once mpv shut down or overflowed: nothing it is asked will play again. */
   isDead: () => boolean
   reset: () => Promise<void>
-  /** Stops a title from `serverId`, playing or still resolving, as that server goes away. */
-  resetIfServer: (serverId: string) => Promise<void>
   /**
    * Forgets the title and every timer without telling mpv or the page, as its mpv is
    * destroyed, so no budget outlives the engine.
@@ -263,8 +257,8 @@ const ENGINE_GONE: PlayerOutcome = {
 const quoted = (value: string): string => `%${new TextEncoder().encode(value).length}%${value}`
 
 /**
- * The `loadfile` options for a target: where it starts, and for a server title its
- * cookie, the redirect and reconnect limits and the network timeout, which mpv applies
+ * The `loadfile` options for a target: where it starts, and for a server title the
+ * redirect and reconnect limits and the network timeout, which mpv applies
  * to this file alone (sidecars added while it plays included) and drops when it ends.
  */
 const loadfileOptionsFor = ({ target, start }: { target: LoadTarget; start: number }): string => {
@@ -274,9 +268,6 @@ const loadfileOptionsFor = ({ target, start }: { target: LoadTarget; start: numb
     case PLAYER_SOURCE_KINDS.server:
       return [
         `start=${start}`,
-        ...(target.headerFields === ''
-          ? []
-          : [`http-header-fields=${quoted(target.headerFields)}`]),
         `stream-lavf-o=${quoted(SERVER_LOAD_OPTIONS.lavf)}`,
         `network-timeout=${SERVER_LOAD_OPTIONS.networkTimeout}`,
       ].join(',')
@@ -408,7 +399,6 @@ export const createPlayerService = ({
   const withoutOpenFile = (message: string): string => {
     if (opened === null) return message
     if (opened.kind === PLAYER_SOURCE_KINDS.server) {
-      if (opened.relay === null) return message
       const { base } = opened.relay
       const secret = base.slice(base.lastIndexOf('/') + 1)
       return [base, secret]
@@ -462,14 +452,10 @@ export const createPlayerService = ({
   // redirect that comes before it belongs to the file this load replaces, and one after
   // a refused loadfile belongs to no load at all.
   let answeredGeneration = -1
-  // Bumped by every load and stop, and by a server going away, so a load still resolving
-  // its source notices it was overtaken before it touches anything.
+  // Bumped by every load and stop, so a load still resolving its source notices it was
+  // overtaken before it touches anything.
   let loadTicket = 0
-  // The load still resolving a server's source, so that server going away can cancel it.
-  let resolving: { ticket: number; serverId: string } | null = null
   let openedTicket = 0
-  // Loads whose server went away while they resolved or waited on mpv: they answer that.
-  let removedTickets: ReadonlySet<number> = new Set()
   // Loads the stall budget ended while they waited on mpv: they answer a lost connection.
   let stalledTickets: ReadonlySet<number> = new Set()
   // Bumped as each subtitle pick starts, before mpv hears it, so a late sidecar's
@@ -1111,24 +1097,17 @@ export const createPlayerService = ({
   const load = async (command: Extract<PlayerCommand, { type: typeof PLAYER_COMMANDS.load }>) => {
     loadTicket += 1
     const ticket = loadTicket
-    resolving =
-      command.source.kind === PLAYER_SOURCE_KINDS.server
-        ? { ticket, serverId: command.source.serverId }
-        : null
-    // What a load overtaken while it waits answers: its server going away or its stall
-    // budget running out is a refusal the page can show, since nothing will play; an
-    // engine stop is a failure, and a newer load or a stop is no failure of this one.
+    // What a load overtaken while it waits answers: its stall budget running out is a
+    // refusal the page can show, since nothing will play; an engine stop is a failure, and
+    // a newer load or a stop is no failure of this one.
     const bail = () => {
       if (isDead()) return ENGINE_GONE
-      if (removedTickets.has(ticket)) return refuse(PLAYER_MESSAGES.serverGone)
       if (stalledTickets.has(ticket)) return refuse(PLAYER_MESSAGES.lost)
       return OK
     }
-    const resolved = await resolveSource(command.source).finally(() => {
-      if (resolving !== null && resolving.ticket === ticket) resolving = null
-    })
-    // A newer load, a stop or the server going away while the source resolved: this load
-    // touches nothing, as one overtaken while it waits on mpv sends no loadfile.
+    const resolved = await resolveSource(command.source)
+    // A newer load or a stop while the source resolved: this load touches nothing, as one
+    // overtaken while it waits on mpv sends no loadfile.
     if (ticket !== loadTicket || isDead()) return bail()
     if (!resolved.ok) return refuse(resolved.message)
     opened = resolved.target
@@ -1225,7 +1204,6 @@ export const createPlayerService = ({
 
   const stop = async () => {
     loadTicket += 1
-    resolving = null
     settleTo(PLAYER_PHASES.idle)
     onActivity({ isPlaying: false, isShowing: false })
     await mpv.command({ args: [MPV_COMMANDS.stop] })
@@ -1328,33 +1306,7 @@ export const createPlayerService = ({
     dispose: () => {
       if (phase === PLAYER_PHASES.dead) return
       loadTicket += 1
-      resolving = null
       settleTo(PLAYER_PHASES.dead)
-    },
-    resetIfServer: async (serverId) => {
-      if (resolving !== null && resolving.serverId === serverId) {
-        removedTickets = new Set([...removedTickets, resolving.ticket])
-        loadTicket += 1
-        resolving = null
-      }
-      if ((serverOpened()?.serverId ?? null) !== serverId) return
-      if (phase !== PLAYER_PHASES.loading && phase !== PLAYER_PHASES.loaded) return
-      // A load still waiting is answered as refused; a title already playing has no answer
-      // left to carry that, so the page hears it as an error.
-      const isPlaying = phase === PLAYER_PHASES.loaded
-      removedTickets = new Set([...removedTickets, openedTicket])
-      // The stop takes its ticket before its first await; a load started while mpv
-      // stops takes another, and its page must not hear of the gone server.
-      const stopping = reset()
-      const ticket = loadTicket
-      await stopping
-      if (isPlaying && ticket === loadTicket) {
-        emit({
-          type: PLAYER_EVENTS.error,
-          reason: PLAYER_ERROR_REASONS.open,
-          message: PLAYER_MESSAGES.serverGone,
-        })
-      }
     },
     applyOutput: async ({ output, devices }) => {
       if (phase === PLAYER_PHASES.dead) return

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'bun:test'
-import { PLAY_LINK_MAX_NEXT, downloadLinkFor, isMediaId, playLinkFor } from '@/playLink'
+import {
+  DOWNLOAD_TARGET_KINDS,
+  PLAY_LINK_MAX_NEXT,
+  downloadLinkFor,
+  isDownloadTarget,
+  isMediaId,
+  playLinkFor,
+} from '@/playLink'
 
 describe('isMediaId', () => {
   it.each([1, 7, 9007199254740991])('accepts %p', (value) => {
@@ -123,5 +130,31 @@ describe('downloadLinkFor', () => {
         target: { kind: 'saga', libraryId: 1, tmdbId: '1234567890123456' },
       }),
     ).toContain('&saga=1%3A1234567890123456')
+  })
+})
+
+describe('isDownloadTarget', () => {
+  it.each([
+    [{ kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 7 }],
+    [{ kind: DOWNLOAD_TARGET_KINDS.item, itemId: 4 }],
+    [{ kind: DOWNLOAD_TARGET_KINDS.saga, libraryId: 1, tmdbId: '119' }],
+  ])('accepts %j', (target) => {
+    expect(isDownloadTarget(target)).toBe(true)
+  })
+
+  it.each([
+    ['a media id of zero', { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 0 }],
+    ['an item named by a string', { kind: DOWNLOAD_TARGET_KINDS.item, itemId: '4' }],
+    [
+      'a saga whose collection is a number',
+      { kind: DOWNLOAD_TARGET_KINDS.saga, libraryId: 1, tmdbId: 119 },
+    ],
+    [
+      'a saga whose collection is a path',
+      { kind: DOWNLOAD_TARGET_KINDS.saga, libraryId: 1, tmdbId: '../119' },
+    ],
+    ['a kind it does not know', { kind: 'library', libraryId: 1 }],
+  ])('rejects %s', (_name, target) => {
+    expect(isDownloadTarget(target)).toBe(false)
   })
 })

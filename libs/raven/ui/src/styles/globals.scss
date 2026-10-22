@@ -178,6 +178,9 @@
   --tracking-label: 0.06em;
   --tracking-eyebrow: 0.12em;
 
+  // A control that cannot be used, or is held while its action runs.
+  --opacity-held: 0.55;
+
   // A card lifting under the pointer.
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   // A toggle or a heart springing past its mark and back.
@@ -223,6 +226,12 @@ body {
   @media (prefers-reduced-motion: no-preference) {
     transition: background-color 400ms ease;
   }
+}
+
+// raven player's window has no title bar of its own (macOS `hiddenInset`): the page
+// runs under it, and this clears the traffic lights.
+:root[data-desktop] {
+  --titlebar-inset: 1.75rem;
 }
 
 // A desktop host draws the video under the page, so the page lets it through.

@@ -1,19 +1,22 @@
-import { mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { setTimeout as delay } from 'node:timers/promises'
-import { _electron, type ElectronApplication, type Page } from '@playwright/test'
-import { withoutTestHooks } from '@/build/smokeVerdict'
-import { LOG_FILE } from '@/main/log/log'
-import { ENGINE_MODES } from '@/main/player/engine'
-import { ERROR_CODES } from '@/main/stateStore'
+import { _electron, type ElectronApplication, expect, type Page } from '@playwright/test'
 import {
+  DESKTOP_ENV,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   type DesktopReply,
   isDesktopReply,
-} from '@/shared/protocol'
+} from '@raven/core'
+import { FIXTURE_ACCOUNT } from '@/e2e/fixtureAuth'
+import { withoutTestHooks } from '@/build/smokeVerdict'
+import { LOG_FILE } from '@/main/log/log'
+import { ENGINE_MODES } from '@/main/player/engine'
+import { ERROR_CODES } from '@/main/stateStore'
+import { AUTH_ORIGIN_HOOK } from '@/main/origins'
 
 // `cwd` with `args: ['.']` runs the built app the way `electron .` does: package.json's `main`.
 const PROJECT_DIR = join(import.meta.dirname, '..')
@@ -22,6 +25,19 @@ const QUIT_MS = 10_000
 // Every budget mark main prints on stdout (Ruling 14): `raven-<name> <n>` on a line of its own.
 const MARK_LINE = /^raven-([a-z][a-z0-9-]*) (\d+(?:\.\d+)?)$/
 const QUIT_OUTCOMES = { closed: 'closed', timeout: 'timeout' } as const
+
+/**
+ * The server a launch without a fixture points at: the discard port, where nothing listens, so
+ * the page finds no server and opens the offline frame. Never the build's default, which on a
+ * developer's Mac may be a real raven.
+ */
+const NO_SERVER = 'http://127.0.0.1:9'
+
+/** What points main's `/api` at a fixture, and lets the page sign in at its stand-in Auth. */
+export const serverEnv = ({ origin }: { origin: string }): Record<string, string> => ({
+  [DESKTOP_ENV.serverOrigin]: origin,
+  [AUTH_ORIGIN_HOOK]: origin,
+})
 
 /** The marks main has printed so far, in order, and whether its stdout has closed. */
 type Marks = {
@@ -32,7 +48,7 @@ type Marks = {
 }
 
 /** Every line main printed so far, on stdout and on stderr, in the order each arrived. */
-export type Output = { lines: () => readonly string[] }
+type Output = { lines: () => readonly string[] }
 
 export type Launched = {
   app: ElectronApplication
@@ -40,9 +56,6 @@ export type Launched = {
   marks: Marks
   output: Output
 }
-
-/** A budget mark's line, which carries only a name and a number. */
-export const isMarkLine = (line: string): boolean => MARK_LINE.test(line)
 
 export const freshUserData = (): Promise<string> => mkdtemp(join(tmpdir(), 'raven-e2e-user-'))
 
@@ -54,19 +67,6 @@ export const removeDir = async (path: string): Promise<void> => {
 
 const isMissing = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === ERROR_CODES.enoent
-
-/**
- * The server session folders Electron keeps under `userData`. Only a missing `Partitions`
- * folder means none: a missing `userData` is a test that looked too late, and throws.
- */
-export const serverPartitions = async ({ userData }: { userData: string }): Promise<string[]> => {
-  await stat(userData)
-  const names = await readdir(join(userData, 'Partitions')).catch((error: unknown) => {
-    if (isMissing(error)) return []
-    throw error
-  })
-  return names.filter((name) => name.startsWith('server%3A'))
-}
 
 /** main's log under the test hook's userData (Ruling 11). */
 export const logPathFor = ({ userData }: { userData: string }): string =>
@@ -209,6 +209,7 @@ export const launchApp = async ({
       ...withoutTestHooks({ env: process.env }),
       RAVEN_DESKTOP_USER_DATA: userData,
       RAVEN_DESKTOP_MPV: mpv,
+      [DESKTOP_ENV.serverOrigin]: NO_SERVER,
       ...env,
     },
   })
@@ -260,60 +261,6 @@ export const openUrl = async ({ app, url }: { app: ElectronApplication; url: str
   await app.evaluate(({ app: electronApp }, link) => {
     electronApp.emit('open-url', { preventDefault: () => undefined }, link)
   }, url)
-}
-
-const TRUST_PROMPTS_KEY = 'ravenE2eTrustPrompts'
-
-/** How a test answers main's trust sheet. */
-export const TRUST_ANSWERS = { add: 'add', cancel: 'cancel' } as const
-
-type TrustAnswer = (typeof TRUST_ANSWERS)[keyof typeof TRUST_ANSWERS]
-
-/**
- * Answers main's trust sheet without showing it, and records what it asked. main reads
- * `dialog.showMessageBox` at each call, so the stand-in takes its place.
- */
-export const stubTrustPrompt = async ({
-  app,
-  answer,
-}: {
-  app: ElectronApplication
-  answer: TrustAnswer
-}): Promise<void> => {
-  await app.evaluate(
-    ({ dialog }, { key, response }) => {
-      Reflect.set(globalThis, key, [])
-      const ask = async (...args: unknown[]) => {
-        const options: unknown = args.at(-1)
-        const message =
-          typeof options === 'object' &&
-          options !== null &&
-          'message' in options &&
-          typeof options.message === 'string'
-            ? options.message
-            : ''
-        const asked: unknown = Reflect.get(globalThis, key)
-        const earlier = Array.isArray(asked)
-          ? asked.filter((item): item is string => typeof item === 'string')
-          : []
-        Reflect.set(globalThis, key, [...earlier, message])
-        return { response, checkboxChecked: false }
-      }
-      Reflect.set(dialog, 'showMessageBox', ask)
-    },
-    { key: TRUST_PROMPTS_KEY, response: answer === TRUST_ANSWERS.add ? 0 : 1 },
-  )
-}
-
-/** What main's trust sheet asked since `stubTrustPrompt`, in order. */
-export const trustPrompts = async ({ app }: { app: ElectronApplication }): Promise<string[]> => {
-  const asked = await app.evaluate((_modules, key) => {
-    const value: unknown = Reflect.get(globalThis, key)
-    return value
-  }, TRUST_PROMPTS_KEY)
-  return Array.isArray(asked)
-    ? asked.filter((item): item is string => typeof item === 'string')
-    : []
 }
 
 const BROWSER_OPENS_KEY = 'ravenE2eBrowserOpens'
@@ -371,7 +318,7 @@ export const requestFromPage = async ({
   return isDesktopReply(reply) ? reply : null
 }
 
-/** The share of `label` main has stored as watched, in whole percent, as Home labels it. */
+/** The share of `label` main has stored as watched, in whole percent, as On this Mac labels it. */
 export const watchedPercent = async ({
   page,
   label,
@@ -384,4 +331,45 @@ export const watchedPercent = async ({
   const recent = reply.recents.find((entry) => entry.label === label)
   if (recent === undefined || recent.watched === null) return null
   return Math.round(recent.watched * 100)
+}
+
+/** A page's main heading, by its exact name. */
+export const heading = ({ page, name }: { page: Page; name: string }) =>
+  page.getByRole('heading', { name, exact: true, level: 1 })
+
+/** A link in the side menu, by its exact name. */
+export const sideLink = ({ page, name }: { page: Page; name: string }) =>
+  page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true })
+
+/**
+ * The side menu's first-visit tip rises over its lower links on a window as short as CI's, so a
+ * test puts it away before it clicks them, as a person would. Once put away it stays away, so a
+ * later launch on the same profile has none.
+ */
+const dismissMenuTip = async ({ page }: { page: Page }): Promise<void> => {
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+  const tip = page.getByRole('complementary', { name: 'Tip' })
+  if ((await tip.count()) === 0) return
+  await tip.getByRole('button', { name: 'Got it' }).click()
+  await expect(tip).toHaveCount(0)
+}
+
+/**
+ * The frame raven player opens with no server to reach: Downloads, with only the pages that need
+ * none in the side menu.
+ */
+export const expectOffline = async ({ page }: { page: Page }): Promise<void> => {
+  await expect(heading({ page, name: 'Downloads' })).toBeVisible()
+  await expect(sideLink({ page, name: 'Home' })).toHaveCount(0)
+  await dismissMenuTip({ page })
+}
+
+/** Signs the fixture's account in through the web's own sign-in page and waits for Home. */
+export const signIn = async ({ page }: { page: Page }): Promise<void> => {
+  await expect(heading({ page, name: 'Welcome back' })).toBeVisible()
+  await page.getByRole('textbox', { name: 'Email' }).fill(FIXTURE_ACCOUNT.email)
+  await page.getByRole('textbox', { name: 'Password' }).fill(FIXTURE_ACCOUNT.password)
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(heading({ page, name: 'Home' })).toBeVisible()
+  await dismissMenuTip({ page })
 }

@@ -48,7 +48,7 @@ Missing identity returns `401`, pending, removed or non-owner access `403`, infr
 
 Browser sessions use a fixed host-only `maester-auth` cookie, including chunked and base64url values. The API client can take a synchronous `accessToken` callback, but never sends it to explicit media or subtitle URLs. Account tickets are random, kept only in server memory, capped globally and per account, and gone after a restart.
 
-raven player renews the account session and mints a fresh ticket before each ticket expires, and again after a refused one, so seeks and subtitle requests past the five minutes keep working; its end-to-end tests cover many ticket lives and a session refresh. A download the server cuts at its account's token expiry resumes by range with a new ticket. Do not assume these five-minute tickets behave like the legacy six-hour ones in any other client. Older raven player builds, which know nothing of accounts, lose access to a `ready` server.
+raven player mints a fresh ticket before each ticket expires, and again after a refused one, with the session the page has renewed, so seeks and subtitle requests past the five minutes keep working; its end-to-end tests cover many ticket lives and a session refresh. A download the server cuts at its account's token expiry resumes by range with a new ticket. Do not assume these five-minute tickets behave like the legacy six-hour ones in any other client. Older raven player builds, which know nothing of accounts, lose access to a `ready` server.
 
 ### Accounts in the web app
 
@@ -389,7 +389,7 @@ The server and core tests need `ffmpeg` and `ffprobe` on the PATH: the end-to-en
 
 ## raven player (macOS)
 
-raven player is raven's player as a Mac app, for Apple Silicon. It plays videos from your own disk under the same controls as the web, through libmpv rather than the browser, so MKV, HEVC, Dolby audio, DTS and TrueHD all play as they are, with no remux or transcode. It also plays a raven server's titles handed to it from raven web, and keeps copies of them on the Mac to play with no server at all. It does not browse a library yet; the web does that.
+raven player is raven as a Mac app, for Apple Silicon. It is the raven web app in its own window, with the same pages, look, sign-in and library as the browser, plus what a browser cannot do. Every video plays through libmpv rather than the browser, so MKV, HEVC, Dolby audio, DTS and TrueHD all play as they are, with no remux or transcode. It keeps copies of your titles on the Mac to play with no server at all, and plays videos from your own disk under the same controls.
 
 ### Install it
 
@@ -401,44 +401,49 @@ Each release (`vX.Y.Z`) on the repo's [Releases page](https://github.com/codeben
 
 If you would rather use Terminal for step 3, `xattr -dr com.apple.quarantine "/Applications/raven player.app"` removes the download's quarantine, and the app then opens without asking.
 
-The app keeps its settings, servers, recents, resume points and downloads in `~/Library/Application Support/raven`.
+The app keeps its settings, recents, resume points and downloads in `~/Library/Application Support/raven`.
 
-### Open a video
+### Using it
 
-- **Open** (Command O), or the button on Home, picks a video. **Drop** one or more videos on the window: the first plays and the rest follow it, in the order dropped.
+- **It is raven.** Browse, search, sign in and play as you do on the web. The app loads raven web from a page of its own on this Mac, `http://localhost:47484`, and passes `/api` on to one raven server, the one the app was built for. There is no server to add, and no Servers screen. Another app holding port 47484 stops raven player starting, and it says so.
+- **Sign in** with the web app's own sign-in, which asks Supabase directly. The page hands its session to the app, which keeps it in memory only, so playback and downloads act as your account. After a relaunch the page signs in again by itself while its session lasts.
+- **Locked libraries** ask for the PIN in the page, as in the browser. The app uses that same unlock for playback and downloads, so one entry covers them.
+- **Every title plays in mpv.** Play on a movie or an episode opens the native player, and prefers a finished download over the server. The player shows why a title will not play (signed out, waiting for approval, a locked library, gone from the server, server out of reach) instead of a blank window.
+- **Without the server** the app shows Downloads, On this Mac, anything already playing and Settings, and goes back to the page you were on when the server answers again.
+
+### On this Mac
+
+**On this Mac**, from the side menu, plays a video from your own disk:
+
+- **Open** (Command O), or the button there, picks a video. **Drop** one or more videos on the window: the first plays and the rest follow it, in the order dropped.
 - **From Finder:** Open With, raven player, or drop a video on the Dock icon. raven player registers for movie types at `Alternate` rank, so installing it changes nothing Finder does until you say so: hold Option in Finder's Open With menu for Always Open With, or use Get Info, Open with, raven player, Change All.
-- **Open Recent** in the File menu, and the recents on Home (the last 50, each with how far you got). A local file resumes where it stopped.
+- **Open Recent** in the File menu, and the recents on the page (the last 50, each with how far you got; Clear recents empties the list). A local file resumes where it stopped.
 - **Next in folder:** when a local video ends, the next one in its folder (by natural order, so `Episode 2` before `Episode 10`) plays, and Next shows it as soon as playback starts.
 
-### Servers and handoff
+### Links
 
-- **Add a server** in Settings, by its address (`https://raven.<tailnet>.ts.net`), or by following a link to it. Either way raven player asks first, in a dialog of its own, "Add the raven server at ...?", and fetches nothing before you agree. It keeps at most 20; removing one signs raven player out of it. When the server has accounts on, raven player also reads its sign-in settings and remembers them (see Accounts in raven player).
-- **A session per server:** each server's cookies stay in that server's own session, so one server's unlock never reaches another, and the page never holds them.
-- **Locked libraries** ask for the PIN, after the admin password when that server's admin lock is on (a server with accounts on never asks for the admin password: its accounts replace it). The unlock lasts while raven player runs, so a relaunch asks for the PIN again.
-- **From raven web:** turn on **Open videos in raven player** in raven web's Settings, in each browser on a Mac where raven player is installed. The web then offers "Open in raven player" for videos that browser cannot play, and in the player's settings, and "Download to raven player" on a title's page (see Downloads); the browser asks before handing the link over. Progress and history go back to the server as they do from the web. Without a working video engine, raven player opens a server title in your browser instead.
-- **raven web on Netlify** hands over the address it was opened at, the Netlify site. Add the server's own address (its Funnel address) to raven player rather than the Netlify site's, so video comes straight from the server and not through Netlify's proxy.
+- **Open Link** (File menu, Command L) takes a `raven://play` link or a raven watch page's address. Following a `raven://play` or `raven://download` link from a browser does the same.
+- The app opens links for its own server only: the origin it was built for, and any alias origins it was built with (a LAN address beside the Funnel name, say). A link to any other server is refused, and nothing is fetched.
+- With **Open videos in raven player** on in raven web's Settings, in each browser on a Mac where raven player is installed, the browser offers "Open in raven player" for videos it cannot play, and "Download to raven player" on a title's page. The browser asks before handing the link over. Inside the app, Download is always there and needs no link.
 
 ### Accounts in raven player
 
-- **Which servers.** A server whose `GET /api/auth/config` answers `ready` needs an approved account to play or download, in raven player as in raven web, whether or not that server enforces accounts yet. A server that answers `off` or `unavailable`, or that is older than the accounts and answers 404, works as it always has: no sign-in, the PIN and the admin password as before. Updating raven player changes nothing for those servers.
-- **Sign in** from Settings, Servers, or from a server title's page, with your email and password. Create account and Forgot password open that server's web app in your browser, where the sign-up and the email link belong. A new or removed account sees **Waiting for approval** or **Your access was removed**, with **Check again** and **Sign out**. The password goes from raven player straight to the sign-in service the server names; the page never holds it or any token.
-- **The sign-in service is pinned.** When you add a server, raven player records the Supabase address, key and web address its settings name. If a later read names others, raven player asks in a dialog of its own, "<server> now signs in through <host>. Use it?", and sends no password there unless you say yes.
-- **Where the session lives.** Each server's sign-in is kept encrypted with macOS's keychain item that raven player already uses for its cookies, so you stay signed in across launches. When encryption is not available the sign-in lives in memory only, you sign in again at each launch, and the sign-in form says it is not remembered. Sign out, or removing the server, deletes it.
-- **Playback.** A server title with accounts on plays through a small relay inside raven player that listens on this Mac's loopback address only. mpv asks the relay for each range, subtitle file and seek, and the relay adds a short-lived media ticket for that one title, renewing it every four minutes, so a film plays and seeks past the server's five-minute ticket with no new sign-in. If your access is removed, the next request fails and the player says "Your access to <server> was removed."
-- **Your plays follow your account.** An offline play of a download, and the resume spot it leaves, is tagged with the account signed in when the title was opened and is sent only under that account's token, so another account signing in on the same Mac never sends it and never sees it. Signing out keeps it for when that account signs in again. A title left playing while another account signs in stays the first account's to the end: a download's later positions, and the save when it closes, wait for that account, and a server title's are not sent at all, since raven player keeps no queue for a server title and the server keeps the first account's last spot from before the switch. The title keeps playing where it is, even when the window comes back to the front or the network comes back; leave it and open it again to watch it as the new account. A play made while signed out of a server with accounts is not queued for the server (this Mac still remembers where you were). Signing in as a different account, or signing out, clears that server's recents from Home and marks its cached pages stale without reloading the title you are watching. Older downloads with plays waiting from before accounts are sent to whoever is signed in, as before.
-- **Downloads** from a server with accounts on use a ticket per fetch run, subtitles first. A server's downloads mint at most 16 tickets in five minutes, so a long queue waits its turn rather than failing. A sign-in that ends or is removed stops the running files and keeps their bytes; sign in again and Retry.
+- **Your account follows you.** A download's plays and resume spot are tagged with the account signed in when the title was opened, or the last account to sign in while none is, and are sent only under that account's token, so another account signing in on the same Mac never sends them. A title left playing while another account signs in stays the first account's to the end.
+- **Playback.** A server title plays through a small relay inside raven player that listens on this Mac's loopback address only. mpv asks the relay for each range, subtitle file and seek, and the relay adds a short-lived media ticket for that one title, renewing it every four minutes, so a film plays and seeks past the server's five-minute ticket with no new sign-in. If your access is removed, the next request fails and the player says "Your access to raven was removed."
+- **Downloads** use a ticket per fetch run, subtitles first. The server's downloads mint at most 16 tickets in five minutes, so a long queue waits its turn rather than failing. A sign-in that ends or is removed stops the running files and keeps their bytes; sign in again and Retry.
 - **Logs** hold none of it: no password, email, token, ticket or relay secret.
 
 ### Downloads
 
-- **Download to raven player:** with **Open videos in raven player** on, raven web's movie, episode, season, show and saga pages offer it beside Play. raven player asks first (after "Add the raven server at ...?" for a server it does not know): what you are downloading, how many files and how big, and how much the disk has free. A locked library asks for the PIN first, as a server title does. raven player leaves at least 2 GB of the disk free, and says so instead of offering Download when the files will not fit. Nothing is queued before you choose **Download**, and a file already on the Downloads page is skipped.
-- **What is kept:** the server's original file, the same bytes raven player streams, and its subtitle files. They live in `~/Library/Application Support/raven/downloads`, a folder per server and per title, and the list of them in `downloads.json` beside it. Settings, Downloads, **Show in Finder** opens the folder; you cannot pick another one yet.
-- **The Downloads page**, from the button in Home's header (its badge counts what is queued or downloading), lists every file, newest first, with a show's or saga's files together in play order, and the disk's free space. Each row offers **Play** once the file is whole, **Pause** or **Resume**, **Retry** after a failure, a **Delete once watched** switch and **Delete**; the header has **Pause all** and **Resume all**. Two files download at a time. A download picks up where it stopped after a quit, a sleep or a dropped connection: when the server cannot be reached, its files wait, and raven player tries again every five minutes, at launch and after a sleep.
-- **Playing a download** works as for a file of your own: the native engine, resume, track picks, and Next for the rest of its show or saga. The player and Home's recents say "Downloaded from <server>". A title you streamed partway opens where the server had it when you downloaded it.
+- **Download:** inside the app every movie, episode, season, show and saga page offers it beside Play. raven player asks first: what you are downloading, how many files and how big, and how much the disk has free. A locked library asks for the PIN first, as a title does. raven player leaves at least 2 GB of the disk free, and says so instead of offering Download when the files will not fit. Nothing is queued before you choose **Download**, and a file already on the Downloads page is skipped.
+- **What is kept:** the server's original file, the same bytes raven player streams, and its subtitle files. They live in `~/Library/Application Support/raven/downloads`, a folder per title, and the list of them in `downloads.json` beside it. Settings, Downloads, **Show in Finder** opens the folder; you cannot pick another one yet.
+- **The Downloads page**, from the side menu (its badge counts what is queued or downloading), lists every file, newest first, with a show's or saga's files together in play order, and the disk's free space. Each row offers **Play** once the file is whole, **Pause** or **Resume**, **Retry** after a failure, a **Delete once watched** switch and **Delete**; the header has **Pause all** and **Resume all**. Two files download at a time. A download picks up where it stopped after a quit, a sleep or a dropped connection: when the server cannot be reached, its files wait, and raven player tries again every five minutes, at launch and after a sleep.
+- **Playing a download** works as for a file of your own: the native engine, resume, track picks, and Next for the rest of its show or saga. The player and the recents say "Downloaded from raven". A title you streamed partway opens where the server had it when you downloaded it.
 - **Delete once watched** deletes a download ten minutes after it counts as watched (the library's **Watched at**), and the row counts down: "Deletes in 7 minutes". Quit before then and the clock carries on at the next launch, or deletes at once when the ten minutes have passed. It never deletes a title while it plays, or while you are in the middle of it. Turned on for a title already watched, it starts the ten minutes then. The ask's checkbox starts from your last choice, which Settings, Downloads also sets.
-- **What reaches the server:** that you played a download and where you stopped, as plays and progress reports, as streaming sends them, so Continue watching, History and the watched marks come out right. raven player sends them a couple of seconds after each save while the server answers, at launch, whenever Home, Downloads or Settings opens, and every five minutes while anything waits. Before it deletes a download it gives the server two seconds to hear what was watched, and what the server has not heard yet is kept until it does, unless you remove the server or it no longer has the title. History dates the play when the server hears of it, not when you watched.
-- **Where the bytes come from:** when the server lists media origins (`RAVEN_MEDIA_ORIGINS`), raven player fetches 256 KB from each and picks the one that answers best, preferring `lan` over `tailnet` over `public` when they are close, as the browser does; it then fetches with a media ticket for that one file and no cookie. When it lists none, or none answers, raven player reads the file from the server's own address with that server's session and its cookie, as it streams a server title. A server with accounts on is the exception: raven player fetches with an account ticket (from the picked origin, or the server's own address) and no cookie. The page never sees a media origin, a ticket or a cookie.
-- **Deleting:** **Delete** on a row, **Delete all downloads** in Settings, and removing a server, whose question says how many downloads go with it, delete the files from the disk.
+- **What reaches the server:** that you played a download and where you stopped, as plays and progress reports, as streaming sends them, so Continue watching, History and the watched marks come out right. raven player sends them a couple of seconds after each save while the server answers, at launch, whenever the app reads the list of downloads (Downloads, Settings and the badge) or an account signs in, and every five minutes while anything waits. Before it deletes a download it gives the server two seconds to hear what was watched, and what the server has not heard yet is kept until it does, unless the server no longer has the title. History dates the play when the server hears of it, not when you watched.
+- **Where the bytes come from:** when the server lists media origins (`RAVEN_MEDIA_ORIGINS`), raven player fetches 256 KB from each and picks the one that answers best, preferring `lan` over `tailnet` over `public` when they are close, as the browser does; it then fetches with a media ticket for that one file. When it lists none, or none answers, raven player fetches from the server's own address with an account ticket. The page never sees a media origin or a ticket.
+- **Deleting:** **Delete** on a row and **Delete all downloads** in Settings delete the files from the disk.
+- **Upgrading** from a raven player that kept a list of servers keeps the downloads of any whose address matches this build's server or an alias; downloads from other servers are not played from any more.
 
 ### This computer
 
@@ -452,7 +457,7 @@ The output device is the system's unless you pick one.
 
 ### Diagnostics
 
-- **Logs** are in `~/Library/Logs/raven` (Help, Show Logs): `raven.log`, rotated through `raven.log.1` to `raven.log.4` at 1 MB each. They record launches, what kind of thing was opened (`open file .mkv`, `open server title 7 on Vhagar`), refusals, mpv's warnings and errors, and the budget marks (`raven-launch-ms`, `raven-memory-idle-mb`, `raven-quit-ms` and the rest). Every line is redacted before it is written: no cookie values, PINs, passwords, request bodies, file paths, file names, tokens, tickets, relay secrets or email addresses. The log does name your servers and their addresses (`open server title 7 on Vhagar`, a server's origin in a trust warning, a server's file URL in an mpv warning) and the titles of your downloads, so read it before you attach it to a public issue.
+- **Logs** are in `~/Library/Logs/raven` (Help, Show Logs): `raven.log`, rotated through `raven.log.1` to `raven.log.4` at 1 MB each. They record launches, what kind of thing was opened (`open file .mkv`, `open server title 7 on raven`), refusals, mpv's warnings and errors, and the budget marks (`raven-launch-ms`, `raven-memory-idle-mb`, `raven-quit-ms` and the rest). Every line is redacted before it is written: no cookie values, PINs, passwords, request bodies, file paths, file names, tokens, tickets, relay secrets or email addresses. The log can name your server (`open server title 7 on raven`) and the titles of your downloads, so read it before you attach it to a public issue.
 - **Crash reports** stay on the Mac, in `~/Library/Application Support/raven/Crashpad` (Help, Show Crash Reports). Nothing uploads them.
 - **Copy Diagnostics** (Help) puts six lines on the clipboard for a bug report: raven player's version and whether it is packaged, the macOS version, the Electron, Chromium and Node versions, the mpv and FFmpeg versions (or why the video engine is unavailable), hardware decoding, and the display's refresh rate and EDR headroom. It holds no paths, file names, server addresses or cookies.
 
@@ -460,14 +465,21 @@ Nothing leaves the Mac unless you send it.
 
 ### Updates
 
-Once a day at launch, raven player asks GitHub for the repo's releases and looks for a newer full release (`vX.Y.Z`, not a draft or a prerelease) with its dmg attached. GitHub lists the releases by tag name, so a run of `vX.Y.Z.N` builds can push the app's release off the first page; raven player reads up to five pages of 100. It says this is the newest release only when it found that release in what it read; when GitHub listed none with the app, it says so instead. It sends nothing else, and installs nothing. A newer release shows a quiet notice on Home and Settings, "raven player X.Y.Z is out.", with **See what's new** (the release page) and **Dismiss**. Check for Updates in the raven player menu and **Check now** in Settings, Updates, check at any time; turn off **Check for updates once a day** there to stop the daily check. While raven player is signed ad hoc it cannot update itself: download the new release and install it over the old one.
+Once a day at launch, raven player asks GitHub for the repo's releases and looks for a newer full release (`vX.Y.Z`, not a draft or a prerelease) with its dmg attached. GitHub lists the releases by tag name, so a run of `vX.Y.Z.N` builds can push the app's release off the first page; raven player reads up to five pages of 100. It says this is the newest release only when it found that release in what it read; when GitHub listed none with the app, it says so instead. It sends nothing else, and installs nothing. A newer release shows a toast, "raven player X.Y.Z is out. Settings has what's new.", and Settings, Updates offers **See what's new** (the release page). Check for Updates in the raven player menu and **Check now** in Settings, Updates, check at any time; turn off **Check for updates once a day** there to stop the daily check. While raven player is signed ad hoc it cannot update itself: download the new release and install it over the old one.
 
 ### Build it
 
-From the repo root, on an Apple Silicon Mac, with the CI-built libmpv and addon in `libs/raven/mpv/resources/darwin-arm64` (see the [library README](../../libs/raven/mpv/README.md); they are built in CI, not on a laptop):
+From the repo root, on an Apple Silicon Mac, with the CI-built libmpv and addon in `libs/raven/mpv/resources/darwin-arm64` (see the [library README](../../libs/raven/mpv/README.md); they are built in CI, not on a laptop).
+
+The app builds `@raven/web` first and serves that build, so there is one UI. The server it talks to is fixed at build time:
+
+- `RAVEN_DESKTOP_SERVER_ORIGIN` is the raven server's address, the Funnel origin (`https://raven.<tailnet>.ts.net`), the same value as Netlify's `RAVEN_API_ORIGIN`. It is not in the repo. Unset, the app points at `http://localhost:8484`, a local `bunx nx run @raven/server:dev`, so set it for any build you give to someone.
+- `RAVEN_DESKTOP_LINK_ORIGINS` is an optional comma separated list of other origins whose `raven://` links name the same server, such as a LAN address.
+
+An unpackaged `dev` run reads both from the environment too, so a different server needs no rebuild. A release build must have them set for the desktop release workflow, or the dmg points at localhost.
 
 ```bash
-bunx nx run @raven/desktop:dev            # builds, then runs electron . (unpackaged)
+RAVEN_DESKTOP_SERVER_ORIGIN=https://raven.<tailnet>.ts.net bunx nx run @raven/desktop:dev   # builds, then runs electron . (unpackaged)
 bunx nx run @raven/desktop:make           # the signed-ad-hoc app, its dmg and zip, under apps/raven/desktop/out
 bunx nx run @raven/desktop:audit:bundle   # every Mach-O arm64, signed, linked only inside the app
 bunx nx run @raven/desktop:smoke:packaged # launches the packaged app, waits for its marks, quits it
@@ -491,9 +503,9 @@ apps/raven/
                  metadata: the TMDB client, matching, the image cache and the item routes
   web/           @raven/web: React 19 + Vite: libraries, the grid, list, tiles and groups, history,
                  movie pages and Fix match, the browser player host, the /design page
-  desktop/       @raven/desktop: raven player, the Electron app: main process (grants, servers,
-                 the player service over libmpv, downloads, logs, updates), preload, renderer,
-                 packaging (src/build), e2e
+  desktop/       @raven/desktop: raven player, the Electron app: main process (the web host that
+                 serves @raven/web, grants, the player service over libmpv, downloads, logs,
+                 updates), preload, packaging (src/build), e2e. Its pages are web's src/desktop.
   Dockerfile, docker-compose.yml, docker-compose.vhagar.yml, vhagar-update.sh, .env.example
 libs/raven/
   ui/            @raven/ui: shared React player, HTML engine, buttons, icons and styles.
@@ -549,7 +561,7 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 - Picture subtitles (PGS, VobSub) would need burning in or OCR.
 - On VAAPI, HDR is converted to BT.709 on the GPU rather than tone mapped. That suits HLG; HDR10 (PQ) comes out flat.
 - No QSV; Intel GPUs go through VAAPI.
-- raven player has no library mode, local or remote: browsing, scanning and matching stay with the server and the web, and a download starts from a title's page in raven web.
-- raven player keeps its downloads in its own data folder, with no way to pick another, and lists a show's or saga's files one per row rather than grouped.
+- raven player plays from one server, the one it was built for: there is no way to add another, and no embedded server or local library.
+- raven player keeps its downloads in its own data folder, with no way to pick another.
 - raven player runs only on Apple Silicon Macs: no Intel Macs, Windows or Linux yet.
 - raven player is signed ad hoc, not with a Developer ID or notarized, so it needs Open Anyway once and cannot update itself.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { EMPTY_CONFIG, type DesktopConfig, type UpdateSettings } from '@/main/desktopConfig'
+import type { DesktopConfig, UpdateSettings } from '@/main/desktopConfig'
+import { SERVER, configFor } from '@/main/test/configFakes'
 import { createJsonStore, type StateFs } from '@/main/stateStore'
 import { fakeTimers } from '@/main/test/playerFakes'
 import {
@@ -19,6 +20,7 @@ import {
   type UpdateFetch,
 } from '@/main/updates'
 
+const EMPTY_CONFIG = configFor(SERVER)
 const FILE = '/data/desktop-config.json'
 const NOW = 1_700_000_000_000
 const HOUR = 3_600_000
@@ -336,7 +338,7 @@ describe('setEnabled', () => {
     expect(service.setEnabled(false).isEnabled).toBe(false)
     expect(service.status().isEnabled).toBe(false)
     expect(await saved()).toMatchObject({
-      version: 4,
+      version: 5,
       updates: { isEnabled: false, checkedAt: NOW - HOUR },
     })
     expect(service.setEnabled(true).isEnabled).toBe(true)

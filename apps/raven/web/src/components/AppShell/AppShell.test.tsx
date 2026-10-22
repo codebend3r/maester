@@ -1,5 +1,14 @@
+import { DESKTOP_PATHS } from '@/desktop/paths'
 import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { ADMIN_LOCK_STATES, type Account, type AdminLock, KINDS, isLibraryKind } from '@raven/core'
+import {
+  ADMIN_LOCK_STATES,
+  type Account,
+  type AdminLock,
+  KINDS,
+  isLibraryKind,
+  DOWNLOAD_STATUS_KINDS,
+  PAGE_PATHS,
+} from '@raven/core'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
@@ -8,9 +17,12 @@ import { api } from '@/lib/api'
 import { ravenVersion } from '@/lib/version'
 import { usePageBackdrop } from '@raven/ui/headless'
 import { useAuthSession } from '@/stores/authSession'
+import { useDesktopBridge } from '@/stores/desktop'
+import { useServerReach } from '@/stores/serverReach'
 import { useSideMenu } from '@/stores/sideMenu'
 import { fakeAccount } from '@/test/authClient'
 import { FakeEventSource } from '@/test/eventSource'
+import { asDesktop, DL_2, downloadsMain, viewOf } from '@/test/desktop'
 import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { MEDIUM_SCREEN } from '@/components/AppShell/useIsMediumScreen'
@@ -490,5 +502,80 @@ describe('AppShell', () => {
     expect(account).toHaveAccessibleName('Account')
     await userEvent.click(main.getByRole('button', { name: 'Account' }))
     expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
+  })
+
+  it('adds On this Mac and Downloads over Settings inside raven player, the downloads under way counted', async () => {
+    spies.list.mockImplementation(async () => [])
+    asDesktop(downloadsMain({ downloads: [viewOf(), viewOf({ downloadId: DL_2 })] }))
+    renderShell({ route: '/' })
+    const downloads = await within(nav()).findByRole('link', { name: 'Downloads (2 in progress)' })
+    expect(downloads).toHaveAttribute('href', DESKTOP_PATHS.downloads)
+    expect(within(downloads).getByText('2')).toHaveAttribute('aria-hidden', 'true')
+    expect(
+      within(nav())
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual([
+      '/',
+      '/',
+      '/favourites',
+      '/libraries',
+      '/streams',
+      '/reports',
+      DESKTOP_PATHS.local,
+      DESKTOP_PATHS.downloads,
+      PAGE_PATHS.settings,
+    ])
+    expect(
+      within(tabs())
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual([
+      'Home',
+      'Libraries',
+      'Favourites',
+      'Streams',
+      'Reports',
+      'This Mac',
+      'Downloads',
+      'Settings',
+    ])
+    expect(document.querySelector('[aria-hidden="true"].titlebar')).not.toBeNull()
+  })
+
+  it('has no badge, and no title bar strip, with nothing under way or in a browser', async () => {
+    spies.list.mockImplementation(async () => [])
+    asDesktop(
+      downloadsMain({ downloads: [viewOf({ status: { kind: DOWNLOAD_STATUS_KINDS.ready } })] }),
+    )
+    renderShell({ route: '/' })
+    expect(await within(nav()).findByRole('link', { name: 'Downloads' })).toBeInTheDocument()
+    cleanup()
+    useDesktopBridge.setState({ desktop: null })
+    renderShell({ route: '/' })
+    expect(within(nav()).queryByRole('link', { name: 'Downloads' })).toBeNull()
+    expect(document.querySelector('.titlebar')).toBeNull()
+  })
+
+  it('keeps only what needs no server while raven player cannot reach it', () => {
+    asDesktop(downloadsMain())
+    useServerReach.setState({ isOffline: true })
+    renderShell({ route: '/libraries' })
+    expect(
+      within(nav())
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['raven', 'On this Mac', 'Downloads', 'Settings'])
+    expect(
+      within(tabs())
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['This Mac', 'Downloads', 'Settings'])
+    expect(screen.queryByRole('searchbox')).toBeNull()
+    expect(
+      within(screen.getByRole('main')).getByRole('button', { name: 'Theme' }),
+    ).toBeInTheDocument()
+    expect(spies.list).not.toHaveBeenCalled()
+    expect(FakeEventSource.opened).toEqual([])
   })
 })

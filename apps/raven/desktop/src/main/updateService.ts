@@ -1,3 +1,4 @@
+import { UPDATE_WORDS, type UpdateStatus } from '@raven/core'
 import { type ConfigStore, setUpdates } from '@/main/desktopConfig'
 import { errorText } from '@/main/log/errorText'
 import {
@@ -8,16 +9,13 @@ import {
   type UpdateCheck,
   type UpdateFinding,
 } from '@/main/updates'
-import type { UpdateStatus } from '@/shared/protocol'
 
 const RELEASES_HOOK = 'RAVEN_DESKTOP_RELEASES_URL'
 
 export const UPDATE_COPY = {
-  newer: (version: string) => `raven player ${version} is out.`,
+  ...UPDATE_WORDS,
   newerDetail:
     'Download it from its release page. While raven player is signed ad hoc it cannot update itself.',
-  current: (version: string) => `raven player ${version} is the newest release.`,
-  failed: 'raven player could not check for updates.',
   noRelease: 'raven player has not found a newer release.',
   unopened: 'raven player could not open the release page.',
 } as const
