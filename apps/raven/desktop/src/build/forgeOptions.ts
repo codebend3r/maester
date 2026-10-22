@@ -13,6 +13,12 @@ export const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, 
  */
 export const WEB_DIST = join('..', 'web', 'dist')
 
+/**
+ * The raven logo as the app icon, from this project's folder and without an extension: the
+ * packager adds `.icns`, and an unpackaged launch puts the `.png` in the Dock.
+ */
+export const APP_ICON = join('resources', 'icon')
+
 /** The packager's paths for what goes in the asar. */
 const PACKAGED_PATHS = { project: '', manifest: '/package.json', dist: '/dist' } as const
 
