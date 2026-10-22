@@ -24,7 +24,7 @@ const askOf = (): DownloadAsk => ({
   askId: ASK_ID,
   serverId: SERVER_ID,
   serverName: 'raven',
-  autoDelete: false,
+  shouldAutoDelete: false,
   status: { kind: DOWNLOAD_ASK_KINDS.locked },
 })
 

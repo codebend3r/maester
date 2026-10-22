@@ -115,7 +115,7 @@ describe('DownloadsPage', () => {
     await userEvent.click(within(rowOf('S01E01 Good News')).getByRole('switch'))
     await waitFor(() =>
       expect(sentOfType({ client, type: DESKTOP_REQUESTS.setDownloadAutoDelete })).toEqual([
-        { type: DESKTOP_REQUESTS.setDownloadAutoDelete, downloadId: DL_1, autoDelete: true },
+        { type: DESKTOP_REQUESTS.setDownloadAutoDelete, downloadId: DL_1, shouldAutoDelete: true },
       ]),
     )
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.retryDownload })).toHaveLength(1)
@@ -189,7 +189,7 @@ describe('DownloadsPage', () => {
       downloads: [
         viewOf({
           status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, message: 'Locked' },
-          needsUnlock: true,
+          isLocked: true,
         }),
       ],
     })

@@ -31,7 +31,7 @@ export const useDownloads = (): UseQueryResult<DownloadsData> => {
     queryFn: async () => {
       const reply = await client.request({ type: DESKTOP_REQUESTS.listDownloads })
       if (reply.type === DESKTOP_REPLIES.downloads) {
-        return { downloads: reply.downloads, shouldAutoDelete: reply.autoDeleteDefault }
+        return { downloads: reply.downloads, shouldAutoDelete: reply.shouldAutoDeleteByDefault }
       }
       throw new Error(refusalText({ reply, fallback: NO_DOWNLOADS }))
     },
@@ -41,13 +41,13 @@ export const useDownloads = (): UseQueryResult<DownloadsData> => {
 
 type ListChange = {
   queryClient: QueryClient
-  event: { downloads: DownloadView[]; autoDeleteDefault: boolean }
+  event: { downloads: DownloadView[]; shouldAutoDeleteByDefault: boolean }
 }
 
 const setDownloads = ({ queryClient, event }: ListChange) =>
   queryClient.setQueryData<DownloadsData>(DESKTOP_QUERY_KEYS.downloads, {
     downloads: event.downloads,
-    shouldAutoDelete: event.autoDeleteDefault,
+    shouldAutoDelete: event.shouldAutoDeleteByDefault,
   })
 
 type ListMove = { before: DownloadView[]; after: DownloadView[] }

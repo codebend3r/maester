@@ -23,7 +23,7 @@ const invalidatedBy = async ({
   const invalidate = spyOn(queryClient, 'invalidateQueries')
   await applyDownloadsEvent({
     queryClient,
-    event: { downloads: after, autoDeleteDefault: false },
+    event: { downloads: after, shouldAutoDeleteByDefault: false },
   })
   expect(queryClient.getQueryData<DownloadsData>(DESKTOP_QUERY_KEYS.downloads)).toEqual({
     downloads: after,

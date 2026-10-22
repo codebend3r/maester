@@ -57,10 +57,16 @@ const READY = {
   files: 3,
   bytes: 44_236_810_240,
   free: 442_381_631_488,
-  fits: true,
+  canFit: true,
 } as const
 
-const ASK = { askId: id, serverId: other, serverName: 'Vhagar', autoDelete: false, status: READY }
+const ASK = {
+  askId: id,
+  serverId: other,
+  serverName: 'Vhagar',
+  shouldAutoDelete: false,
+  status: READY,
+}
 
 const VIEW = {
   downloadId: id,
@@ -75,10 +81,10 @@ const VIEW = {
   serverName: 'Vhagar',
   size: 15_891_378_995,
   status: { kind: 'downloading', bytes: 12_992_272_384 },
-  autoDelete: true,
+  shouldAutoDelete: true,
   watched: null,
   deletesAt: null,
-  needsUnlock: false,
+  isLocked: false,
 } as const
 
 const SESSION = { accessToken: 'eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJhZGEifQ.c2ln', userId: id }
@@ -227,7 +233,7 @@ describe('isDesktopRequest', () => {
     [{ type: DESKTOP_REQUESTS.setUpdateCheck, isEnabled: false }],
     [{ type: DESKTOP_REQUESTS.checkForUpdates }],
     [{ type: DESKTOP_REQUESTS.openRelease }],
-    [{ type: DESKTOP_REQUESTS.confirmDownload, askId: id, autoDelete: true }],
+    [{ type: DESKTOP_REQUESTS.confirmDownload, askId: id, shouldAutoDelete: true }],
     [{ type: DESKTOP_REQUESTS.declineDownload, askId: id }],
     [{ type: DESKTOP_REQUESTS.retryDownloadAsk, askId: id }],
     [{ type: DESKTOP_REQUESTS.listDownloads }],
@@ -236,12 +242,12 @@ describe('isDesktopRequest', () => {
     [{ type: DESKTOP_REQUESTS.resumeDownload, downloadId: id }],
     [{ type: DESKTOP_REQUESTS.retryDownload, downloadId: id }],
     [{ type: DESKTOP_REQUESTS.deleteDownload, downloadId: id }],
-    [{ type: DESKTOP_REQUESTS.setDownloadAutoDelete, downloadId: id, autoDelete: false }],
+    [{ type: DESKTOP_REQUESTS.setDownloadAutoDelete, downloadId: id, shouldAutoDelete: false }],
     [{ type: DESKTOP_REQUESTS.pauseAllDownloads }],
     [{ type: DESKTOP_REQUESTS.resumeAllDownloads }],
     [{ type: DESKTOP_REQUESTS.deleteAllDownloads }],
     [{ type: DESKTOP_REQUESTS.readSpace }],
-    [{ type: DESKTOP_REQUESTS.setDownloadDefaults, autoDelete: true }],
+    [{ type: DESKTOP_REQUESTS.setDownloadDefaults, shouldAutoDelete: true }],
     [{ type: DESKTOP_REQUESTS.showDownloadsFolder }],
     [{ type: DESKTOP_REQUESTS.playbackLeft, fileId: id }],
     [{ type: DESKTOP_REQUESTS.accountToken, session: SESSION }],
@@ -367,7 +373,11 @@ describe('isDesktopRequest', () => {
     ['a confirmation without its choice', { type: DESKTOP_REQUESTS.confirmDownload, askId: id }],
     [
       'a confirmation naming its ask by a path',
-      { type: DESKTOP_REQUESTS.confirmDownload, askId: '/Users/me/film.mkv', autoDelete: false },
+      {
+        type: DESKTOP_REQUESTS.confirmDownload,
+        askId: '/Users/me/film.mkv',
+        shouldAutoDelete: false,
+      },
     ],
     ['a retry naming its ask by a number', { type: DESKTOP_REQUESTS.retryDownloadAsk, askId: 7 }],
     [
@@ -380,7 +390,7 @@ describe('isDesktopRequest', () => {
     ['a delete with no download', { type: DESKTOP_REQUESTS.deleteDownload }],
     [
       'an auto-delete switch set by a string',
-      { type: DESKTOP_REQUESTS.setDownloadAutoDelete, downloadId: id, autoDelete: 'yes' },
+      { type: DESKTOP_REQUESTS.setDownloadAutoDelete, downloadId: id, shouldAutoDelete: 'yes' },
     ],
     ['a default with no value', { type: DESKTOP_REQUESTS.setDownloadDefaults }],
     ['an unknown type', { type: 'readFile', path: '/etc/hosts' }],
@@ -461,11 +471,11 @@ describe('isDesktopReply', () => {
     [
       {
         type: DESKTOP_REPLIES.downloadAsk,
-        ask: { ...ASK, autoDelete: true, status: { kind: 'account' } },
+        ask: { ...ASK, shouldAutoDelete: true, status: { kind: 'account' } },
       },
     ],
-    [{ type: DESKTOP_REPLIES.downloads, downloads: [VIEW], autoDeleteDefault: false }],
-    [{ type: DESKTOP_REPLIES.downloads, downloads: [], autoDeleteDefault: true }],
+    [{ type: DESKTOP_REPLIES.downloads, downloads: [VIEW], shouldAutoDeleteByDefault: false }],
+    [{ type: DESKTOP_REPLIES.downloads, downloads: [], shouldAutoDeleteByDefault: true }],
     [
       {
         type: DESKTOP_REPLIES.space,
@@ -487,7 +497,10 @@ describe('isDesktopReply', () => {
     ],
     [
       'an ask whose ready status lacks whether it fits',
-      { type: DESKTOP_REPLIES.downloadAsk, ask: { ...ASK, status: { ...READY, fits: undefined } } },
+      {
+        type: DESKTOP_REPLIES.downloadAsk,
+        ask: { ...ASK, status: { ...READY, canFit: undefined } },
+      },
     ],
     [
       'an ask of an unknown status',
@@ -495,14 +508,14 @@ describe('isDesktopReply', () => {
     ],
     [
       'an ask without its default',
-      { type: DESKTOP_REPLIES.downloadAsk, ask: { ...ASK, autoDelete: undefined } },
+      { type: DESKTOP_REPLIES.downloadAsk, ask: { ...ASK, shouldAutoDelete: undefined } },
     ],
     [
       'a download named by its path',
       {
         type: DESKTOP_REPLIES.downloads,
         downloads: [{ ...VIEW, downloadId: '/Users/me/Library/raven/downloads/a/7/video.mkv' }],
-        autoDeleteDefault: false,
+        shouldAutoDeleteByDefault: false,
       },
     ],
     ['a list without its default', { type: DESKTOP_REPLIES.downloads, downloads: [] }],
@@ -672,7 +685,7 @@ describe('isDesktopEvent', () => {
     [{ type: DESKTOP_EVENTS.openLink }],
     [{ type: DESKTOP_EVENTS.updateAvailable, version: '0.6.0' }],
     [{ type: DESKTOP_EVENTS.downloadAsk, ask: ASK }],
-    [{ type: DESKTOP_EVENTS.downloads, downloads: [VIEW], autoDeleteDefault: false }],
+    [{ type: DESKTOP_EVENTS.downloads, downloads: [VIEW], shouldAutoDeleteByDefault: false }],
   ])('accepts %j', (value) => {
     expect(isDesktopEvent(value)).toBe(true)
   })
@@ -847,7 +860,7 @@ describe('the download ask and views', () => {
   it('accepts a view with or without its watched share and deletion time', () => {
     expect(isDownloadView(VIEW)).toBe(true)
     expect(isDownloadView({ ...VIEW, watched: 0.4, deletesAt: 1_700_000_600_000 })).toBe(true)
-    expect(isDownloadView({ ...VIEW, needsUnlock: 'no' })).toBe(false)
+    expect(isDownloadView({ ...VIEW, isLocked: 'no' })).toBe(false)
     expect(isDownloadView({ ...VIEW, status: { kind: 'stalled' } })).toBe(false)
   })
 

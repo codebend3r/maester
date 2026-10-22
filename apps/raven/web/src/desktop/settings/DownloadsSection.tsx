@@ -74,7 +74,7 @@ export const DownloadsSection = () => {
               handled(
                 change({
                   type: DESKTOP_REQUESTS.setDownloadDefaults,
-                  autoDelete: event.target.checked,
+                  shouldAutoDelete: event.target.checked,
                 }),
               )
             }

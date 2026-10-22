@@ -97,7 +97,7 @@ describe('DesktopSettings: Downloads', () => {
     await userEvent.click(await screen.findByRole('checkbox', { name: /Delete once watched/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Show in Finder' }))
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.setDownloadDefaults })).toEqual([
-      { type: DESKTOP_REQUESTS.setDownloadDefaults, autoDelete: true },
+      { type: DESKTOP_REQUESTS.setDownloadDefaults, shouldAutoDelete: true },
     ])
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.showDownloadsFolder })).toHaveLength(1)
     expect(

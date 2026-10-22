@@ -53,7 +53,7 @@ const ASK_ID = '00000000-0000-4000-8000-0000000000aa'
 const DOWNLOADS_REPLY = {
   type: 'downloads',
   downloads: [],
-  autoDeleteDefault: false,
+  shouldAutoDeleteByDefault: false,
 } as const satisfies DesktopReply
 
 const SPACE_REPLY = {
@@ -152,7 +152,7 @@ const fakeDownloads = ({
     },
     setDefaults: (input) => {
       note('setDefaults', input)
-      return { ...DOWNLOADS_REPLY, autoDeleteDefault: input.autoDelete }
+      return { ...DOWNLOADS_REPLY, shouldAutoDeleteByDefault: input.autoDelete }
     },
     views: () => [],
     onSuspend: () => undefined,
@@ -1477,7 +1477,10 @@ describe('downloads', () => {
   it('hands a confirmation to the download service and answers its list', async () => {
     const { service, reached } = setup({ files: {} })
     expect(
-      await ask({ service, request: { type: 'confirmDownload', askId: ASK_ID, autoDelete: true } }),
+      await ask({
+        service,
+        request: { type: 'confirmDownload', askId: ASK_ID, shouldAutoDelete: true },
+      }),
     ).toEqual(DOWNLOADS_REPLY)
     expect(reached).toEqual([{ name: 'confirm', input: { askId: ASK_ID, autoDelete: true } }])
   })
@@ -1499,7 +1502,7 @@ describe('downloads', () => {
     ],
     [{ type: 'readSpace' }, { name: 'readSpace', input: null }],
     [
-      { type: 'setDownloadDefaults', autoDelete: true },
+      { type: 'setDownloadDefaults', shouldAutoDelete: true },
       { name: 'setDefaults', input: { autoDelete: true } },
     ],
   ])('hands %j to the download service', async (request, call) => {
@@ -1513,7 +1516,7 @@ describe('downloads', () => {
     expect(
       await ask({
         service,
-        request: { type: 'confirmDownload', askId: '../downloads.json', autoDelete: false },
+        request: { type: 'confirmDownload', askId: '../downloads.json', shouldAutoDelete: false },
       }),
     ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
     expect(reached).toEqual([])
@@ -1537,7 +1540,7 @@ describe('downloads', () => {
       { name: 'remove', input: { downloadId: ASK_ID } },
     ],
     [
-      { type: 'setDownloadAutoDelete', downloadId: ASK_ID, autoDelete: true },
+      { type: 'setDownloadAutoDelete', downloadId: ASK_ID, shouldAutoDelete: true },
       { name: 'setAutoDelete', input: { downloadId: ASK_ID, autoDelete: true } },
     ],
     [{ type: 'pauseAllDownloads' }, { name: 'pauseAll', input: null }],

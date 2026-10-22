@@ -9,7 +9,7 @@ const askOf = (askId: string): DownloadAsk => ({
   askId,
   serverId: SERVER_ID,
   serverName: 'raven',
-  autoDelete: false,
+  shouldAutoDelete: false,
   status: { kind: DOWNLOAD_ASK_KINDS.locked },
 })
 

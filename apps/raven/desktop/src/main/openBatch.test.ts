@@ -164,7 +164,7 @@ describe('eventForOpen', () => {
       askId: FILM,
       serverId: NEXT,
       serverName: 'Vhagar',
-      autoDelete: false,
+      shouldAutoDelete: false,
       status: { kind: 'locked' },
     } as const
     expect(eventForOpen({ type: 'downloadAsk', ask })).toEqual({ type: 'downloadAsk', ask })
@@ -172,7 +172,9 @@ describe('eventForOpen', () => {
 
   it('sends nothing for a reply that opens nothing', () => {
     expect(eventForOpen({ type: 'done' })).toBeNull()
-    expect(eventForOpen({ type: 'downloads', downloads: [], autoDeleteDefault: false })).toBeNull()
+    expect(
+      eventForOpen({ type: 'downloads', downloads: [], shouldAutoDeleteByDefault: false }),
+    ).toBeNull()
     expect(eventForOpen({ type: 'space', space: { free: 1, total: 2, used: 0 } })).toBeNull()
     expect(
       eventForOpen({

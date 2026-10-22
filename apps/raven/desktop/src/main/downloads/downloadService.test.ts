@@ -442,7 +442,7 @@ describe('ask', () => {
         askId: '00000000-0000-4000-8000-000000000001',
         serverId: SERVER_ID,
         serverName: SERVER_NAME,
-        autoDelete: false,
+        shouldAutoDelete: false,
         status: {
           kind: 'ready',
           title: 'Fellowship (2001)',
@@ -450,7 +450,7 @@ describe('ask', () => {
           files: 1,
           bytes: 41 * GIB,
           free: 412 * GIB,
-          fits: true,
+          canFit: true,
         },
       },
     })
@@ -463,7 +463,7 @@ describe('ask', () => {
       free: 41 * GIB + SPACE_RESERVE_BYTES - BLOCK,
     })
     const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
-    expect(ask.status).toMatchObject({ kind: 'ready', fits: false })
+    expect(ask.status).toMatchObject({ kind: 'ready', canFit: false })
   })
 
   it('fits less while other files are queued or downloading, and shows only its own bytes', async () => {
@@ -472,7 +472,7 @@ describe('ask', () => {
     expect(
       (await askFor({ world: alone, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } }))
         .status,
-    ).toMatchObject({ kind: 'ready', bytes: 41 * GIB, fits: true })
+    ).toMatchObject({ kind: 'ready', bytes: 41 * GIB, canFit: true })
     const busy = setup({
       replies: { [mediaCall(9)]: ok(MOVIE) },
       free: room,
@@ -498,7 +498,7 @@ describe('ask', () => {
     expect(
       (await askFor({ world: busy, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } }))
         .status,
-    ).toMatchObject({ kind: 'ready', bytes: 41 * GIB, fits: false })
+    ).toMatchObject({ kind: 'ready', bytes: 41 * GIB, canFit: false })
   })
 
   it('counts and sizes only the files not yet downloaded', async () => {
@@ -653,7 +653,7 @@ describe('an account ask', () => {
         askId: '00000000-0000-4000-8000-000000000001',
         serverId: SERVER_ID,
         serverName: SERVER_NAME,
-        autoDelete: false,
+        shouldAutoDelete: false,
         status: { kind: DOWNLOAD_ASK_KINDS.account },
       },
     })
@@ -784,9 +784,9 @@ describe('confirm', () => {
     ])
     world.fire()
     expect(downloadEvents(world.sent)).toEqual([
-      { type: 'downloads', downloads: reply.downloads, autoDeleteDefault: true },
+      { type: 'downloads', downloads: reply.downloads, shouldAutoDeleteByDefault: true },
     ])
-    expect(reply.autoDeleteDefault).toBe(true)
+    expect(reply.shouldAutoDeleteByDefault).toBe(true)
     expect(reply.downloads.map(({ label }) => label)).toEqual([
       'S01E01 Good News',
       'S01E02 Half Loop',
@@ -797,13 +797,18 @@ describe('confirm', () => {
   it("keeps the dialog's choice as the default the next ask starts from", async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE), [itemCall(5)]: ok(SEASON) } })
     const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
-    expect(ask.autoDelete).toBe(false)
+    expect(ask.shouldAutoDelete).toBe(false)
     await world.service.confirm({ askId: ask.askId, autoDelete: true })
-    expect(world.service.list()).toMatchObject({ type: 'downloads', autoDeleteDefault: true })
-    expect((await askFor({ world, target: { kind: 'item', itemId: 5 } })).autoDelete).toBe(true)
+    expect(world.service.list()).toMatchObject({
+      type: 'downloads',
+      shouldAutoDeleteByDefault: true,
+    })
+    expect((await askFor({ world, target: { kind: 'item', itemId: 5 } })).shouldAutoDelete).toBe(
+      true,
+    )
     world.fire()
     expect(downloadEvents(world.sent)).toEqual([
-      expect.objectContaining({ type: 'downloads', autoDeleteDefault: true }),
+      expect.objectContaining({ type: 'downloads', shouldAutoDeleteByDefault: true }),
     ])
   })
 
@@ -923,16 +928,16 @@ describe('setDefaults', () => {
     expect(world.service.setDefaults({ autoDelete: true })).toEqual({
       type: 'downloads',
       downloads: [],
-      autoDeleteDefault: true,
+      shouldAutoDeleteByDefault: true,
     })
     expect(world.store.read().autoDeleteDefault).toBe(true)
     expect(
       (await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } }))
-        .autoDelete,
+        .shouldAutoDelete,
     ).toBe(true)
     world.fire()
     expect(downloadEvents(world.sent)).toEqual([
-      { type: 'downloads', downloads: [], autoDeleteDefault: true },
+      { type: 'downloads', downloads: [], shouldAutoDeleteByDefault: true },
     ])
   })
 })
@@ -963,15 +968,15 @@ describe('list and views', () => {
           serverName: SERVER_NAME,
           size: 2 * GIB,
           status: { kind: 'downloading', bytes: GIB },
-          autoDelete: true,
+          shouldAutoDelete: true,
           watched: null,
           deletesAt: null,
-          needsUnlock: false,
+          isLocked: false,
         },
         // Marked watched, so watched whole, though no file was read for its share.
         expect.objectContaining({ downloadId: older.downloadId, watched: 1 }),
       ],
-      autoDeleteDefault: true,
+      shouldAutoDeleteByDefault: true,
     })
     expect(world.service.views()).toEqual(downloadsOf(world.service.list()).downloads)
   })
@@ -1028,7 +1033,7 @@ describe('the downloads event', () => {
     const events = downloadEvents(world.sent)
     expect(events).toHaveLength(1)
     expect(events[0]).toMatchObject({
-      autoDeleteDefault: true,
+      shouldAutoDeleteByDefault: true,
       downloads: [{ label: 'Fellowship (2001)' }],
     })
   })
@@ -1147,7 +1152,7 @@ describe('the queue', () => {
   it('sets one download to delete once watched', () => {
     const world = setup({ initial: holding(entryFor({})) })
     const reply = downloadsOf(world.service.setAutoDelete({ downloadId: ID, autoDelete: true }))
-    expect(reply.downloads[0]?.autoDelete).toBe(true)
+    expect(reply.downloads[0]?.shouldAutoDelete).toBe(true)
     expect(world.store.read().entries[0]?.autoDelete).toBe(true)
   })
 
@@ -1182,7 +1187,7 @@ describe('the queue', () => {
     expect(await world.service.removeAll()).toEqual({
       type: 'downloads',
       downloads: [],
-      autoDeleteDefault: true,
+      shouldAutoDeleteByDefault: true,
     })
     expect(world.drive.removed).toContain(DOWNLOADS)
   })
@@ -1235,7 +1240,7 @@ describe('the queue', () => {
         }),
       ),
     })
-    expect(world.service.views().map(({ needsUnlock }) => needsUnlock)).toEqual([true, false])
+    expect(world.service.views().map(({ isLocked }) => isLocked)).toEqual([true, false])
     const [relocked] = world.service.views()
     expect(relocked?.status).toEqual({
       kind: 'paused',

@@ -149,7 +149,7 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
       files: expansion.files.length,
       bytes,
       free,
-      fits: fits({ bytes: bytes + owed, free }),
+      canFit: fits({ bytes: bytes + owed, free }),
     }
   }
 
@@ -202,7 +202,7 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
       askId,
       serverId: server.serverId,
       serverName: server.serverName,
-      autoDelete: store.read().autoDeleteDefault,
+      shouldAutoDelete: store.read().autoDeleteDefault,
       status,
     },
   })

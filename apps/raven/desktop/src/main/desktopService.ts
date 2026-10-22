@@ -392,7 +392,10 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       case DESKTOP_REQUESTS.openRelease:
         return openRelease()
       case DESKTOP_REQUESTS.confirmDownload:
-        return deps.downloads.confirm({ askId: request.askId, autoDelete: request.autoDelete })
+        return deps.downloads.confirm({
+          askId: request.askId,
+          autoDelete: request.shouldAutoDelete,
+        })
       case DESKTOP_REQUESTS.declineDownload:
         return deps.downloads.decline({ askId: request.askId })
       case DESKTOP_REQUESTS.retryDownloadAsk:
@@ -402,7 +405,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       case DESKTOP_REQUESTS.readSpace:
         return deps.downloads.readSpace()
       case DESKTOP_REQUESTS.setDownloadDefaults:
-        return deps.downloads.setDefaults({ autoDelete: request.autoDelete })
+        return deps.downloads.setDefaults({ autoDelete: request.shouldAutoDelete })
       case DESKTOP_REQUESTS.pauseDownload:
         return deps.downloads.pause({ downloadId: request.downloadId })
       case DESKTOP_REQUESTS.resumeDownload:
@@ -414,7 +417,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       case DESKTOP_REQUESTS.setDownloadAutoDelete:
         return deps.downloads.setAutoDelete({
           downloadId: request.downloadId,
-          autoDelete: request.autoDelete,
+          autoDelete: request.shouldAutoDelete,
         })
       case DESKTOP_REQUESTS.pauseAllDownloads:
         return deps.downloads.pauseAll()
