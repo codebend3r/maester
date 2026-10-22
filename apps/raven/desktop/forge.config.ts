@@ -8,6 +8,7 @@ import { VIDEO_EXTENSIONS } from '@raven/core'
 import { MakerDmg } from './src/build/dmgMaker'
 import {
   adHocApps,
+  APP_ICON,
   documentTypes,
   FUSES,
   isPackagedPath,
@@ -28,6 +29,7 @@ const config: ForgeConfig = {
     executableName: APP_NAME,
     appBundleId: 'io.github.codebend3r.raven',
     appCategoryType: 'public.app-category.video',
+    icon: APP_ICON,
     asar: { unpack: '**/*.node' },
     // Bun's node_modules is symlinks into a shared store; main and preload are bundled, so
     // the asar holds dist and package.json alone.

@@ -48,7 +48,7 @@ import {
   session,
   shell,
 } from 'electron'
-import { PLATFORMS } from '@/build/forgeOptions'
+import { APP_ICON, PLATFORMS } from '@/build/forgeOptions'
 import { createPageAccount } from '@/main/accounts/pageAccount'
 import { createServerSignal } from '@/main/accounts/serverSignal'
 import {
@@ -823,6 +823,8 @@ const startApp = (): void => {
     app.on('will-quit', quitGate)
 
     await app.whenReady()
+    // Packaged, the bundle's icon.icns is the Dock's; unpackaged, Electron's own would be.
+    if (!app.isPackaged) app.dock?.setIcon(join(app.getAppPath(), `${APP_ICON}.png`))
     // `powerMonitor` answers only once the app is ready. A sleep stops the downloads where
     // they are, and the wake starts them again.
     powerMonitor.on('suspend', () => downloads.onSuspend())

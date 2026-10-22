@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'bun:test'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { VIDEO_EXTENSIONS } from '@raven/core'
 import {
   adHocApps,
+  APP_ICON,
   DOCUMENT_UTIS,
   type DocumentUti,
   documentTypes,
@@ -161,6 +164,14 @@ describe('adHocApps', () => {
     expect(
       adHocApps({ platform: 'linux', signing: {}, outputPaths, appName: 'raven player' }),
     ).toEqual([])
+  })
+})
+
+describe('APP_ICON', () => {
+  const project = join(import.meta.dir, '..', '..')
+
+  it.each(['icns', 'png'])('is a .%s the app ships with', (extension) => {
+    expect(existsSync(join(project, `${APP_ICON}.${extension}`))).toBe(true)
   })
 })
 
