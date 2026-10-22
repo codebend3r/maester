@@ -30,7 +30,6 @@ import {
   PER_FILE_OPTIONS,
   PLAYER_MESSAGES,
   type PlayerActivity,
-  type PlayerOutcome,
   type PlayerService,
   type ResolvedSource,
   resolveSourceWith,
@@ -90,12 +89,11 @@ const SERVER_TARGET: ServerTarget = {
   serverId: SERVER_ID,
   mediaId: 7,
   url: SERVER_URL,
-  headerFields: 'Cookie: raven_unlock=a.b',
   sidecars: [
     { url: SIDECAR_URLS[0], title: 'Spanish', language: 'es' },
     { url: SIDECAR_URLS[1], title: '', language: '' },
   ],
-  relay: null,
+  relay: { loadId: '7', base: 'http://127.0.0.1:41234/c2VydmVyLXRhcmdldC1zZWNyZXQ' },
 }
 
 const OTHER_TARGET: ServerTarget = {
@@ -103,9 +101,8 @@ const OTHER_TARGET: ServerTarget = {
   serverId: OTHER_SERVER_ID,
   mediaId: 9,
   url: 'https://other.example/api/media/9/file',
-  headerFields: '',
   sidecars: [],
-  relay: null,
+  relay: { loadId: '9', base: 'http://127.0.0.1:41234/b3RoZXItdGFyZ2V0LXNlY3JldA' },
 }
 
 const RELAY_SECRET = 'Zm9vYmFyYmF6cXV4cXV1eGNvcmdlZ3JhdWx0Z2FycGx5'
@@ -116,7 +113,6 @@ const RELAYED_TARGET: ServerTarget = {
   serverId: RELAYED_SERVER_ID,
   mediaId: 5,
   url: `${RELAY_BASE}/file`,
-  headerFields: '',
   sidecars: [{ url: `${RELAY_BASE}/subtitles/external-0`, title: '', language: '' }],
   relay: { loadId: '1', base: RELAY_BASE },
 }
@@ -2306,12 +2302,12 @@ describe('createPlayerService', () => {
   })
 
   describe('server titles', () => {
-    test('a server load carries its cookie, the redirect and reconnect limits and the network timeout on its own loadfile', async () => {
+    test('a server load carries the redirect and reconnect limits and the network timeout on its own loadfile', async () => {
       const { service, mpv } = setup()
       expect(await service.handle(SERVER_LOAD)).toEqual({ ok: true })
       expect(mpv.log).toEqual([
         'set pause false',
-        'loadfile https://raven.example/api/media/7/file replace -1 start=30,http-header-fields=%24%Cookie: raven_unlock=a.b,stream-lavf-o=%37%max_redirects=0,reconnect_delay_max=3,network-timeout=15',
+        'loadfile https://raven.example/api/media/7/file replace -1 start=30,stream-lavf-o=%37%max_redirects=0,reconnect_delay_max=3,network-timeout=15',
       ])
     })
 
@@ -2321,15 +2317,6 @@ describe('createPlayerService', () => {
       clear()
       expect(await service.handle(LOAD)).toEqual({ ok: true })
       expect(mpv.log).toEqual(['set pause false', 'loadfile /m/Film.mkv replace -1 start=0'])
-    })
-
-    test('a server with no cookies sends no header, and still no redirect', async () => {
-      const { service, mpv } = setup()
-      expect(await service.handle(OTHER_LOAD)).toEqual({ ok: true })
-      expect(mpv.log).toEqual([
-        'set pause false',
-        'loadfile https://other.example/api/media/9/file replace -1 start=30,stream-lavf-o=%37%max_redirects=0,reconnect_delay_max=3,network-timeout=15',
-      ])
     })
 
     test('nothing ever sets a per-file option globally', async () => {
@@ -2342,7 +2329,6 @@ describe('createPlayerService', () => {
       await service.applyOutput({ output: PASSTHROUGH, devices: [] })
       await service.applyDisplay({ refreshRate: 60, edrHeadroom: 2 })
       await service.handle({ type: 'stop' })
-      await service.resetIfServer(SERVER_ID)
       const options = [
         ...HARDENED_OPTIONS,
         ...engineOptionsFor({ surface: { kind: 'headless' } }),
@@ -2599,93 +2585,6 @@ describe('createPlayerService', () => {
       expect(events).toEqual([{ type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost }])
     })
 
-    test('resetIfServer stops only a title from that server', async () => {
-      const { service, mpv, activity, loaded, clear } = setup()
-      await loaded(SERVER_LOAD)
-      clear()
-      await service.resetIfServer(OTHER_SERVER_ID)
-      expect(mpv.log).toEqual([])
-      await service.resetIfServer(SERVER_ID)
-      expect(mpv.log).toEqual(['stop'])
-      expect(activity).toEqual([{ isPlaying: false, isShowing: false }])
-    })
-
-    test('resetIfServer tells the page why its playing title stopped', async () => {
-      const { service, events, loaded, clear } = setup()
-      await loaded(SERVER_LOAD)
-      clear()
-      await service.resetIfServer(SERVER_ID)
-      expect(events).toEqual([
-        { type: 'error', reason: 'open', message: PLAYER_MESSAGES.serverGone },
-      ])
-    })
-
-    test('resetIfServer tells a load that began while it stopped nothing of the gone server', async () => {
-      const { service, mpv, events, loaded, clear } = setup()
-      await loaded(SERVER_LOAD)
-      clear()
-      mpv.hold('stop')
-      const resetting = service.resetIfServer(SERVER_ID)
-      await settle()
-      const loading = service.handle(LOAD)
-      await settle()
-      mpv.release()
-      await resetting
-      expect(await loading).toEqual({ ok: true })
-      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
-    })
-
-    test('resetIfServer leaves a file alone', async () => {
-      const { service, mpv, loaded, clear } = setup()
-      await loaded(SERVER_LOAD)
-      await loaded()
-      clear()
-      await service.resetIfServer(SERVER_ID)
-      expect(mpv.log).toEqual([])
-    })
-
-    test('resetIfServer refuses a load from that server still resolving, which sends nothing', async () => {
-      const { service, mpv, servers } = setup()
-      servers.hold()
-      const loading = service.handle(SERVER_LOAD)
-      await settle()
-      await service.resetIfServer(SERVER_ID)
-      servers.release()
-      expect(await loading).toEqual({
-        ok: false,
-        reason: 'refused',
-        message: PLAYER_MESSAGES.serverGone,
-      })
-      expect(mpv.log).toEqual([])
-    })
-
-    test('resetIfServer refuses a load from that server still waiting on mpv, and stops it', async () => {
-      const { service, mpv } = setup()
-      mpv.hold('set pause')
-      const loading = service.handle(SERVER_LOAD)
-      await settle()
-      const resetting = service.resetIfServer(SERVER_ID)
-      mpv.release()
-      await resetting
-      expect(await loading).toEqual({
-        ok: false,
-        reason: 'refused',
-        message: PLAYER_MESSAGES.serverGone,
-      })
-      expect(mpv.log).toEqual(['set pause false', 'stop'])
-    })
-
-    test('resetIfServer for another server leaves a resolving load to play', async () => {
-      const { service, mpv, servers } = setup()
-      servers.hold()
-      const loading = service.handle(SERVER_LOAD)
-      await settle()
-      await service.resetIfServer(OTHER_SERVER_ID)
-      servers.release()
-      expect(await loading).toEqual({ ok: true })
-      expect(mpv.log.at(-1)).toStartWith('loadfile https://raven.example/api/media/7/file')
-    })
-
     test('slow sidecars hold the first snapshot back no longer than the budget', async () => {
       const { service, mpv, clock, types, warnings } = setup()
       mpv.hold('sub-add')
@@ -2789,29 +2688,6 @@ describe('createPlayerService', () => {
       service.receive({ type: 'file-loaded' })
       await settle()
       expect(mpv.log.filter((entry) => entry.startsWith('set sid'))).toEqual(['set sid 3'])
-    })
-
-    test('every load of a removed server answers that it is gone, the playing one and one resolving', async () => {
-      const { service, mpv, servers, loaded } = setup()
-      mpv.hold('set pause')
-      const loading = service.handle(SERVER_LOAD)
-      await settle()
-      servers.hold()
-      const resolving = service.handle({ ...SERVER_LOAD, start: 5 })
-      await settle()
-      const resetting = service.resetIfServer(SERVER_ID)
-      mpv.release()
-      await resetting
-      servers.release()
-      const gone: PlayerOutcome = {
-        ok: false,
-        reason: 'refused',
-        message: PLAYER_MESSAGES.serverGone,
-      }
-      expect(await loading).toEqual(gone)
-      expect(await resolving).toEqual(gone)
-      expect(mpv.log.some((entry) => entry.startsWith('loadfile'))).toBe(false)
-      await loaded()
     })
 
     test('sidecars that finish in time leave no budget timer behind', async () => {

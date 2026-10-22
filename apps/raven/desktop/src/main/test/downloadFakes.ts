@@ -1,13 +1,7 @@
 import type { MediaTracks, SubtitleTrack } from '@raven/core'
 import type { QueueFs } from '@/main/downloads/downloadQueue'
 import type { PartFile, StreamFetch } from '@/main/downloads/fetchFile'
-import {
-  type Access,
-  ACCESS_KINDS,
-  type AccessOutcome,
-  type createMediaAccess,
-  type MediaAccess,
-} from '@/main/downloads/mediaAccess'
+import { type AccessOutcome, type MediaAccess } from '@/main/downloads/mediaAccess'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 
 export const ORIGIN = 'http://192.168.1.5:3000'
@@ -131,8 +125,6 @@ export type Answer = {
 }
 
 export type FetchRequest = {
-  kind: Access['kind']
-  serverId: string
   url: string
   headers: Record<string, string>
   signal: AbortSignal
@@ -228,9 +220,14 @@ export const inTurn = <T>(answers: readonly T[]): (() => T) => {
 
 const isSidecar = (url: string): boolean => url.includes('/subtitles/')
 
+/** The title a fetch asked for, read off its URL's `/api/media/<id>/`. */
+export const mediaOfRequest = ({ url }: Pick<FetchRequest, 'url'>): number | null => {
+  const digits = /\/api\/media\/(\d+)\//u.exec(url)?.[1] ?? null
+  return digits === null ? null : Number(digits)
+}
+
 /**
- * Fetches recorded with the kind of access each went through. A file waits by default;
- * a subtitle answers `WEBVTT`. `answers` is read at each call, so a test can change it.
+ * Fetches recorded as they went out. A file waits by default; a subtitle answers `WEBVTT`. `answers` is read at each call, so a test can change it.
  */
 export const fakeNetwork = () => {
   const requests: FetchRequest[] = []
@@ -241,49 +238,27 @@ export const fakeNetwork = () => {
     file: () => ({ status: 200, body: held() }),
     sidecar: () => ({ status: 200, body: whole([new TextEncoder().encode('WEBVTT')]) }),
   }
-  const fetchFor =
-    ({ serverId, access }: { serverId: string; access: Access }): StreamFetch =>
-    async ({ url, headers, signal }) => {
-      const request = { kind: access.kind, serverId, url, headers, signal }
-      requests.push(request)
-      const answer = isSidecar(url) ? answers.sidecar(request) : answers.file(request)
-      const named = new Map(Object.entries(answer.headers ?? {}))
-      return {
-        status: answer.status,
-        headers: { get: (name) => named.get(name) ?? null },
-        body: answer.body,
-      }
+  const fetch: StreamFetch = async ({ url, headers, signal }) => {
+    const request = { url, headers, signal }
+    requests.push(request)
+    const answer = isSidecar(url) ? answers.sidecar(request) : answers.file(request)
+    const named = new Map(Object.entries(answer.headers ?? {}))
+    return {
+      status: answer.status,
+      headers: { get: (name) => named.get(name) ?? null },
+      body: answer.body,
     }
+  }
   const fileRequests = (): FetchRequest[] => requests.filter(({ url }) => !isSidecar(url))
   const sidecarRequests = (): FetchRequest[] => requests.filter(({ url }) => isSidecar(url))
-  return { fetchFor, requests, answers, fileRequests, sidecarRequests }
+  return { fetch, requests, answers, fileRequests, sidecarRequests }
 }
 
-export const ticketFor = ({
-  ticket,
-  renewAt,
-}: {
-  ticket: string
-  renewAt: number
-}): AccessOutcome => ({ ok: true, access: { kind: 'origin', url: ORIGIN, ticket, renewAt } })
-
-export const COOKIE_ACCESS: AccessOutcome = { ok: true, access: { kind: 'cookie' } }
-
-/** An account ticket on the media origin, as a server whose accounts are ready answers. */
+/** An account ticket on the media origin. */
 export const accountTicket = (ticket = 'account.one'): AccessOutcome => ({
   ok: true,
-  access: { kind: ACCESS_KINDS.account, url: ORIGIN, ticket },
+  access: { url: ORIGIN, ticket },
 })
-
-/** `createMediaAccess`'s accounts for a server whose accounts are off: it never mints. */
-export const NO_ACCOUNTS = {
-  isReady: async () => false,
-  tickets: {
-    ticketFor: async () => {
-      throw new Error('a server without accounts mints no account ticket')
-    },
-  },
-} as const satisfies Pick<Parameters<typeof createMediaAccess>[0], 'isReady' | 'tickets'>
 
 /** Media access answered by `answer`; every read and every forget is recorded. */
 export const fakeAccess = (answer: MediaAccess['accessFor']) => {

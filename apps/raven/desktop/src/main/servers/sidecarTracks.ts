@@ -1,5 +1,9 @@
-import { SUBTITLE_SOURCES, type MediaTracks, type SubtitleTrack } from '@raven/core'
-import { isSidecarTrackId } from '@/shared/protocol'
+import {
+  isSidecarTrackId,
+  type MediaTracks,
+  SUBTITLE_SOURCES,
+  type SubtitleTrack,
+} from '@raven/core'
 
 /**
  * The server's own subtitle files beside the video: embedded tracks come from the file.

@@ -367,7 +367,7 @@ $field: "input:not([type='checkbox'], [type='radio'], [type='range'], [type='col
 
   &:where(:disabled) {
     cursor: not-allowed;
-    opacity: 0.55;
+    opacity: var(--opacity-held);
   }
 }
 

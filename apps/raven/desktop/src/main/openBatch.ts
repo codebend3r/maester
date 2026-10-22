@@ -1,12 +1,7 @@
 import { isAbsolute } from 'node:path'
+import { DESKTOP_EVENTS, DESKTOP_REPLIES, type DesktopEvent, type DesktopReply } from '@raven/core'
 import type { Timers } from '@/main/stateStore'
-import {
-  DESKTOP_EVENTS,
-  DESKTOP_REPLIES,
-  type DesktopEvent,
-  type DesktopReply,
-  MAX_QUEUE,
-} from '@/shared/protocol'
+import { MAX_QUEUE } from '@/shared/hostNames'
 
 // The first item plays and the rest queue, so a batch past this has nowhere to go.
 const BATCH_CAP = MAX_QUEUE + 1
@@ -76,8 +71,8 @@ export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
   switch (reply.type) {
     case DESKTOP_REPLIES.play:
       return { type: DESKTOP_EVENTS.play, target: reply.target }
-    case DESKTOP_REPLIES.playServer:
-      return { type: DESKTOP_EVENTS.playServer, target: reply.target }
+    case DESKTOP_REPLIES.navigate:
+      return { type: DESKTOP_EVENTS.navigate, to: reply.to }
     case DESKTOP_REPLIES.downloadAsk:
       return { type: DESKTOP_EVENTS.downloadAsk, ask: reply.ask }
     case DESKTOP_REPLIES.refused:
@@ -86,13 +81,11 @@ export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
     case DESKTOP_REPLIES.recents:
     case DESKTOP_REPLIES.output:
     case DESKTOP_REPLIES.done:
-    case DESKTOP_REPLIES.servers:
-    case DESKTOP_REPLIES.serverReply:
-    case DESKTOP_REPLIES.serverUnreachable:
+    case DESKTOP_REPLIES.title:
+    case DESKTOP_REPLIES.titleRefused:
     case DESKTOP_REPLIES.updates:
     case DESKTOP_REPLIES.downloads:
     case DESKTOP_REPLIES.space:
-    case DESKTOP_REPLIES.account:
       return null
     default: {
       const unreachable: never = reply

@@ -1,5 +1,5 @@
 import { toQueryString } from '@/query'
-import { isNumber } from '@/schema'
+import { type Infer, isNumber, isString, object, oneOf, union } from '@/schema'
 
 export const PLAY_LINK_MAX_NEXT = 100
 
@@ -30,16 +30,23 @@ export const playLinkFor = ({ origin, mediaId, at, next }: PlayRequest): string 
 
 export const DOWNLOAD_TARGET_KINDS = { media: 'media', item: 'item', saga: 'saga' } as const
 
+const isCollectionId = (value: unknown): value is string =>
+  isString(value) && /^[1-9]\d{0,15}$/u.test(value)
+
 /** What a download link asks the desktop to keep: one file, one title, or one collection of a library. */
-export type DownloadTarget =
-  | { kind: typeof DOWNLOAD_TARGET_KINDS.media; mediaId: number }
-  | { kind: typeof DOWNLOAD_TARGET_KINDS.item; itemId: number }
-  | { kind: typeof DOWNLOAD_TARGET_KINDS.saga; libraryId: number; tmdbId: string }
+export const isDownloadTarget = union(
+  object({ kind: oneOf([DOWNLOAD_TARGET_KINDS.media]), mediaId: isMediaId }),
+  object({ kind: oneOf([DOWNLOAD_TARGET_KINDS.item]), itemId: isMediaId }),
+  object({
+    kind: oneOf([DOWNLOAD_TARGET_KINDS.saga]),
+    libraryId: isMediaId,
+    tmdbId: isCollectionId,
+  }),
+)
+
+export type DownloadTarget = Infer<typeof isDownloadTarget>
 
 export type DownloadRequest = { origin: string; target: DownloadTarget }
-
-const isCollectionId = (value: unknown): value is string =>
-  typeof value === 'string' && /^[1-9]\d{0,15}$/u.test(value)
 
 /** The link for a download; throws for an id that is not one. */
 export const downloadLinkFor = ({ origin, target }: DownloadRequest): string => {

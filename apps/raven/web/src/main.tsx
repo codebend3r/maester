@@ -9,6 +9,7 @@ import '@raven/ui/styles.css'
 import { configurePlayerPrefs } from '@raven/ui/headless'
 import { AppRoutes } from '@/AppRoutes'
 import { CardLinks } from '@/components/CardLink/CardLink'
+import { startDesktop } from '@/desktop/startDesktop'
 import { MediaOriginProbe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { queryClient } from '@/lib/queryClient'
 import { PrefetchPlaybackSettings } from '@/lib/prefetchPlaybackSettings'
@@ -16,6 +17,7 @@ import { StartAuthSession } from '@/lib/startAuthSession'
 import { followTheme } from '@/stores/theme'
 
 followTheme()
+startDesktop({ bridge: window.ravenDesktop, root: document.documentElement, target: window })
 await configurePlayerPrefs({ storage: window.localStorage })
 const rootElement = document.getElementById('root')
 

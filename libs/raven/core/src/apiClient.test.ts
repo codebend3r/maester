@@ -9,6 +9,7 @@ import {
   isLockedError,
   parseServerEvent,
 } from '@/apiClient'
+import { WEB_HOST_ERRORS } from '@/desktop/webHost'
 import {
   BUG_REPORT_STATUSES,
   DEFAULT_SAGA_BACKDROP,
@@ -457,6 +458,26 @@ describe('createApiClient', () => {
     const failure = await client.getMedia(7).catch((error: unknown) => error)
     expect(isLockedError(failure)).toBe(true)
     expect(isLockedError(new ApiError({ status: 403, message: 'No' }))).toBe(false)
+  })
+
+  it("tells raven player's unreachable server apart from the server's own 502", async () => {
+    const unreachable = clientReturning(
+      respond({ status: 502, body: { error: WEB_HOST_ERRORS.serverUnreachable } }),
+    )
+    const cut = await unreachable.client.getAuthConfig().catch((error: unknown) => error)
+    expect(cut).toBeInstanceOf(ApiError)
+    expect(cut).toMatchObject({ status: 502, isServerUnreachable: true })
+    const broken = clientReturning(respond({ status: 502, body: { message: 'Bad gateway' } }))
+    const failure = await broken.client.getAuthConfig().catch((error: unknown) => error)
+    expect(failure).toMatchObject({ status: 502, isServerUnreachable: false })
+    const funnel = clientReturning({
+      ...respond({ status: 504 }),
+      json: async () => {
+        throw new SyntaxError('Unexpected token <')
+      },
+    })
+    const away = await funnel.client.getAuthConfig().catch((error: unknown) => error)
+    expect(away).toMatchObject({ status: 504, isServerUnreachable: true })
   })
 
   it('deletes a video', async () => {

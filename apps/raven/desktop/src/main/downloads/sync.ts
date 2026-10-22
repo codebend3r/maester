@@ -26,7 +26,7 @@ export type SyncDeps = {
   warn: (message: string) => void
   /** How often the server is tried again; `SYNC_RETRY_MS` unless main's test hook shortens it. */
   retryMs: number
-  /** The account signed in to a server, as its stored session names it; null when none is. */
+  /** The account signed in to a server, as the page's session names it; null when none is. */
   accountIdOf: (input: { serverId: string }) => string | null
 }
 

@@ -1,46 +1,28 @@
-import {
-  AUTH_CONFIG_STATES,
-  AUTH_HEADERS,
-  AUTH_REFUSALS,
-  AUTH_SCHEME,
-  isAuthConfig,
-  isLockState,
-  type AuthConfig,
-  type AuthRefusal,
-} from '@raven/core'
-import { signInConfigOf, type SignInConfig } from '@/main/accounts/authEndpoints'
+import { AUTH_HEADERS, AUTH_SCHEME, SERVER_METHODS } from '@raven/core'
 import { accountIdOfToken } from '@/main/accounts/tokenAccount'
-import type { ServerEntry } from '@/main/desktopConfig'
+import { SERVER_GONE, type ServerEntry } from '@/main/desktopConfig'
 import { quietly } from '@/main/log/quietly'
-import { parseJson } from '@/main/parseJson'
 import {
   CALL_NAMES,
-  isPageCall,
   isWrite,
   matchCall,
   requestFor,
   type AllowedCall,
   type ServerMethod,
 } from '@/main/servers/allowlist'
-import { refusalAt } from '@/main/servers/authRefusals'
-import { AS_ANYONE, REPORT_KINDS, type TitleSittings } from '@/main/servers/titleSittings'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { HTTP_STATUSES } from '@/shared/httpStatuses'
-import { SERVER_GONE, SERVER_METHODS } from '@/shared/protocol'
 
 export const CALL_TIMEOUT_MS = 10_000
 export const MAX_REPLY_CHARS = 1_048_576
 /** `getSagas` answers every saga of a library with a whole `MediaItem` per movie, so it reads past the usual cap. */
 export const MAX_SAGAS_REPLY_CHARS = 8 * 1_048_576
 export const MAX_IN_FLIGHT = 6
-/** Slots past `MAX_IN_FLIGHT` that only a `PUT` or `POST` may take, so reads never starve a save or an unlock. */
+/** Slots past `MAX_IN_FLIGHT` that only a `PUT` or `POST` may take, so reads never starve a save or a ticket. */
 export const WRITE_RESERVE = 2
 
 export const CALL_MESSAGES = {
   unknownServer: SERVER_GONE,
   offList: 'raven player does not make that call.',
-  adminWithAccounts: (name: string) =>
-    `${name} uses accounts, so raven player does not use its admin password.`,
   unreachable: (name: string) => `raven player could not reach ${name}.`,
   tooBig: (name: string) => `${name} sent more than raven player reads.`,
   busy: (name: string) => `raven player is still waiting on ${name}.`,
@@ -68,12 +50,6 @@ export type ServerCalls = {
     serverId: string
     call: AllowedCall
     accountId?: string | null
-  }) => Promise<ServerCallResult>
-  callFromPage: (input: {
-    serverId: string
-    method: string
-    path: string
-    body: string | null
   }) => Promise<ServerCallResult>
   hasPendingWrites: () => boolean
   settleWrites: () => Promise<void>
@@ -103,9 +79,9 @@ const readCapped = async ({
 }
 
 /**
- * A `ServerFetch` over a session's `fetch`: the session's cookies go along, a redirect
- * fails the call rather than carrying them to wherever it points, and a call that
- * never answers is cut off.
+ * A `ServerFetch` over `net.fetch`: no cookie from any jar goes along, only the headers the call
+ * names, a redirect fails the call rather than carrying them to wherever it points, and a call
+ * that never answers is cut off.
  */
 export const fetchThrough =
   (fetch: (url: string, init: RequestInit) => Promise<Response>): ServerFetch =>
@@ -116,7 +92,7 @@ export const fetchThrough =
       ...(body === null ? {} : { body }),
       redirect: 'error',
       signal: AbortSignal.timeout(timeoutMs),
-      credentials: 'include',
+      credentials: 'omit',
     })
     const stream = response.body
     return {
@@ -135,14 +111,17 @@ export const fetchThrough =
 
 const headersFor = ({
   body,
-  token = null,
+  token,
+  unlock,
 }: {
   body: string | null
-  token?: string | null
+  token: string | null
+  unlock: string | null
 }): Record<string, string> => ({
   [HTTP_HEADERS.accept]: 'application/json',
   ...(body === null ? {} : { [HTTP_HEADERS.contentType]: 'application/json' }),
   ...(token === null ? {} : { [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${token}` }),
+  ...(unlock === null ? {} : { [AUTH_HEADERS.cookie]: unlock }),
 })
 
 /** How many characters of a call's reply main reads. */
@@ -163,38 +142,6 @@ export const loggable = (text: string): string =>
     .slice(0, LOG_TEXT_MAX)
     .replace(UNPRINTABLE, (char) => `\\u{${(char.codePointAt(0) ?? 0).toString(16)}}`)
 
-/** The account layer's part of every call. A server whose accounts are not ready answers `null`. */
-export type Bearer = {
-  /** The access token to send to the server, or null for a call that carries none. */
-  authorize: (input: { serverId: string }) => Promise<string | null>
-  /** Refreshes the sign-in after a `signed_out` refusal; the new access token, or null. */
-  refresh: (input: { serverId: string }) => Promise<string | null>
-  /**
-   * A `401` or `503` that carries an auth refusal came back for good. `isSessionRejected` is true
-   * when the token main had just refreshed was refused again.
-   */
-  onRefusal: (input: { serverId: string; isSessionRejected: boolean }) => void
-  /**
-   * Whether the server is kept as one whose accounts are ready, read from what main already holds
-   * and never from the network. Enforcement replaces the admin password with the account there.
-   */
-  hasAccounts: (input: { serverId: string }) => boolean
-}
-
-/** For calls that never carry an account: main's own reads of a server's public auth config. */
-export const NO_BEARER = {
-  authorize: () => Promise.resolve(null),
-  refresh: () => Promise.resolve(null),
-  onRefusal: () => undefined,
-  hasAccounts: () => false,
-} as const satisfies Bearer
-
-const BEARER_REFUSAL_STATUSES = [HTTP_STATUSES.unauthorized, HTTP_STATUSES.unavailable] as const
-
-/** The refusal a `401` or `503` carries, so a wrong PIN's 401 or a proxy's 503 is none. */
-const refusalReasonOf = (result: { status: number; body: string }): AuthRefusal['reason'] | null =>
-  refusalAt({ ...result, statuses: BEARER_REFUSAL_STATUSES })
-
 /** The call as `matchCall` reads its own request back, or null when it does not survive that. */
 const rematch = (call: AllowedCall): AllowedCall | null => {
   try {
@@ -204,36 +151,26 @@ const rematch = (call: AllowedCall): AllowedCall | null => {
   }
 }
 
-const isAdminPasswordCall = (call: AllowedCall): boolean =>
-  call.name === CALL_NAMES.getAdminLock || call.name === CALL_NAMES.unlockAdmin
-
-/** The title a call reports watching, or null for a call that reports nothing. */
-const reportedTitleOf = (call: AllowedCall): number | null =>
-  call.name === CALL_NAMES.saveProgress || call.name === CALL_NAMES.recordPlay ? call.mediaId : null
-
 /**
- * Runs allowlisted calls against the stored servers. Every URL is the stored origin
- * plus the path `requestFor` builds, so nothing the page sends can name another host.
+ * Runs allowlisted calls against the server. Every URL is its stored origin plus the path
+ * `requestFor` builds, and each carries the page's access token as its Bearer when there is one,
+ * and the page's library PIN unlock as its cookie when the page holds one.
  */
 export const createServerCalls = ({
   serverOf,
-  fetchFor,
+  fetch,
   authorize,
-  refresh,
-  onRefusal,
-  hasAccounts,
-  reportAs = () => AS_ANYONE,
+  unlockOf,
   warn,
 }: {
   serverOf: (serverId: string) => ServerEntry | null
-  fetchFor: (serverId: string) => ServerFetch
-  /**
-   * Who the page's reports of a title go out as; main's own calls and the auth config reads
-   * report nothing, so they leave it out.
-   */
-  reportAs?: TitleSittings['reportAs']
+  fetch: ServerFetch
+  /** The access token to send to the server: the page's, or null while it is signed out. */
+  authorize: (input: { serverId: string }) => string | null
+  /** The `Cookie` header with the page's unlock for the server, or null when it holds none. */
+  unlockOf: (input: { serverId: string }) => Promise<string | null>
   warn: (message: string) => void
-} & Bearer): ServerCalls => {
+}): ServerCalls => {
   /** A log line never fails a call: the call has already been answered or refused. */
   const safeWarn = quietly(warn)
 
@@ -252,10 +189,7 @@ export const createServerCalls = ({
   const isBusy = ({ server, call }: { server: ServerEntry; call: AllowedCall }): boolean =>
     countOf(server.id) >= slotsFor(call)
 
-  /**
-   * One request to the server, in one of its slots. The slot is held for the request alone, not
-   * for the Bearer's reads before it, so a slow Auth never fills the slots a ticket mint needs.
-   */
+  /** One request to the server, in one of its slots. */
   const attempt = async ({
     server,
     call,
@@ -286,10 +220,11 @@ export const createServerCalls = ({
     const { method, path, body } = requestFor(call)
     const maxChars = replyCapFor(call)
     try {
-      const reply = await fetchFor(server.id)({
+      const unlock = await unlockOf({ serverId: server.id })
+      const reply = await fetch({
         url: `${server.origin}${path}`,
         method,
-        headers: headersFor({ body, token }),
+        headers: headersFor({ body, token, unlock }),
         body,
         timeoutMs: CALL_TIMEOUT_MS,
       })
@@ -305,46 +240,11 @@ export const createServerCalls = ({
     }
   }
 
-  const tokenFor = async (server: ServerEntry): Promise<string | null> => {
-    try {
-      return await authorize({ serverId: server.id })
-    } catch {
-      safeWarn(`raven player could not read its sign-in for ${loggable(server.name)}`)
-      return null
-    }
-  }
-
-  const refreshedFor = async (server: ServerEntry): Promise<string | null> => {
-    try {
-      return await refresh({ serverId: server.id })
-    } catch {
-      safeWarn(`raven player could not refresh its sign-in for ${loggable(server.name)}`)
-      return null
-    }
-  }
-
-  const announce = ({
-    server,
-    result,
-    isSessionRejected,
-  }: {
-    server: ServerEntry
-    result: Extract<ServerCallResult, { ok: true }>
-    isSessionRejected: boolean
-  }): void => {
-    const reason = refusalReasonOf(result)
-    if (reason === null) return
-    try {
-      onRefusal({
-        serverId: server.id,
-        isSessionRejected: isSessionRejected && reason === AUTH_REFUSALS.signedOut,
-      })
-    } catch {
-      safeWarn(`raven player could not note a refusal from ${loggable(server.name)}`)
-    }
-  }
-
-  const send = async ({
+  /**
+   * Checked against the token's own account, so a call that belongs to one account never goes
+   * out under another's token, or under none.
+   */
+  const send = ({
     server,
     call,
     accountId,
@@ -353,35 +253,12 @@ export const createServerCalls = ({
     call: AllowedCall
     accountId: string | null
   }): Promise<ServerCallResult> => {
-    // Checked against each token as it is read, so a sign in as another account in between never
-    // carries one account's call under another's token.
-    const isAs = (token: string | null): boolean =>
-      accountId === null || (token !== null && accountIdOfToken(token) === accountId)
-    const otherAccount: ServerCallResult = {
-      ok: false,
-      message: CALL_MESSAGES.otherAccount(server.name),
+    const token = authorize({ serverId: server.id })
+    const isAs = accountId === null || (token !== null && accountIdOfToken(token) === accountId)
+    if (!isAs) {
+      return Promise.resolve({ ok: false, message: CALL_MESSAGES.otherAccount(server.name) })
     }
-    const token = await tokenFor(server)
-    if (!isAs(token)) return otherAccount
-    const first = await attempt({ server, call, token })
-    if (!first.ok) return first
-    const isRefreshable =
-      token !== null &&
-      first.status === HTTP_STATUSES.unauthorized &&
-      refusalReasonOf(first) === AUTH_REFUSALS.signedOut
-    if (!isRefreshable) {
-      announce({ server, result: first, isSessionRejected: false })
-      return first
-    }
-    const fresh = await refreshedFor(server)
-    if (fresh === null) {
-      announce({ server, result: first, isSessionRejected: false })
-      return first
-    }
-    if (!isAs(fresh)) return otherAccount
-    const second = await attempt({ server, call, token: fresh })
-    if (second.ok) announce({ server, result: second, isSessionRejected: true })
-    return second
+    return attempt({ server, call, token })
   }
 
   const tracked = async ({
@@ -402,9 +279,8 @@ export const createServerCalls = ({
   }
 
   /**
-   * Main's own calls, from fields it narrowed itself. Anything the page sends goes
-   * through `callFromPage`, never here; the call is still matched again, so a value
-   * that slipped past the types (a string `mediaId`) never reaches a path.
+   * Main's own calls, from fields it narrowed itself. The call is still matched again, so a
+   * value that slipped past the types (a string `mediaId`) never reaches a path.
    */
   const call: ServerCalls['call'] = async ({ serverId, call: given, accountId = null }) => {
     const allowed = rematch(given)
@@ -414,133 +290,15 @@ export const createServerCalls = ({
     }
     const server = serverOf(serverId)
     if (server === null) return { ok: false, message: CALL_MESSAGES.unknownServer }
-    if (isAdminPasswordCall(allowed) && hasAccounts({ serverId })) {
-      safeWarn(
-        `refused ${allowed.name} to ${loggable(server.name)}: its accounts replace the admin password`,
-      )
-      return { ok: false, message: CALL_MESSAGES.adminWithAccounts(server.name) }
-    }
-    // A server already full answers at once, before the Bearer waits on Auth for nothing.
-    if (isBusy({ server, call: allowed })) {
-      return { ok: false, message: CALL_MESSAGES.busy(server.name) }
-    }
     const task = send({ server, call: allowed, accountId })
     return isWrite(allowed) ? tracked({ task }) : task
   }
 
-  const callFromPage: ServerCalls['callFromPage'] = async ({ serverId, method, path, body }) => {
-    const allowed = matchCall({ method, path, body })
-    if (allowed === null || !isPageCall(allowed)) {
-      safeWarn(`refused a page call off the allowlist: ${loggable(method)} ${loggable(path)}`)
-      return { ok: false, message: CALL_MESSAGES.offList }
-    }
-    const mediaId = reportedTitleOf(allowed)
-    const as = mediaId === null ? AS_ANYONE : reportAs({ serverId, mediaId })
-    switch (as.kind) {
-      case REPORT_KINDS.anyone:
-        return call({ serverId, call: allowed })
-      // The token's own account is checked, so a sign in by another sends this title nothing.
-      case REPORT_KINDS.account:
-        return call({ serverId, call: allowed, accountId: as.accountId })
-      case REPORT_KINDS.nobody: {
-        const server = serverOf(serverId)
-        return {
-          ok: false,
-          message:
-            server === null ? CALL_MESSAGES.unknownServer : CALL_MESSAGES.otherAccount(server.name),
-        }
-      }
-      default: {
-        const unreachable: never = as
-        return unreachable
-      }
-    }
-  }
-
   return {
     call,
-    callFromPage,
     hasPendingWrites: () => writes.size > 0,
     settleWrites: async () => {
       await Promise.all(writes)
     },
   }
-}
-
-export const PROBE_KINDS = {
-  raven: 'raven',
-  badSignIn: 'badSignIn',
-  unreachable: 'unreachable',
-} as const
-
-/**
- * What a probe made of an origin. A raven server brings the sign-in endpoints to pin when its
- * accounts are ready, and none when they are off, unavailable or the server predates them.
- */
-export type ProbeResult =
-  | { kind: typeof PROBE_KINDS.raven; signIn: SignInConfig | null }
-  | { kind: typeof PROBE_KINDS.badSignIn }
-  | { kind: typeof PROBE_KINDS.unreachable }
-
-/** A call's status and, when the reply is no bigger than the cap, its text; null when it failed. */
-const probeCall = async ({
-  fetch,
-  origin,
-  call,
-}: {
-  fetch: ServerFetch
-  origin: string
-  call: AllowedCall
-}): Promise<{ status: number; text: string | null } | null> => {
-  const { method, path, body } = requestFor(call)
-  try {
-    const reply = await fetch({
-      url: `${origin}${path}`,
-      method,
-      headers: headersFor({ body }),
-      body,
-      timeoutMs: CALL_TIMEOUT_MS,
-    })
-    if (reply.status !== HTTP_STATUSES.ok) return { status: reply.status, text: null }
-    const text = await reply.text({ maxChars: MAX_REPLY_CHARS })
-    return { status: reply.status, text: text.length > MAX_REPLY_CHARS ? null : text }
-  } catch {
-    return null
-  }
-}
-
-const isLockAnswer = (answer: Awaited<ReturnType<typeof probeCall>>): boolean => {
-  if (answer === null || answer.status !== HTTP_STATUSES.ok || answer.text === null) return false
-  return isLockState(parseJson(answer.text))
-}
-
-const UNREACHABLE: ProbeResult = { kind: PROBE_KINDS.unreachable }
-
-const resultOf = (config: AuthConfig): ProbeResult => {
-  if (config.state !== AUTH_CONFIG_STATES.ready) return { kind: PROBE_KINDS.raven, signIn: null }
-  const signIn = signInConfigOf(config)
-  return signIn === null ? { kind: PROBE_KINDS.badSignIn } : { kind: PROBE_KINDS.raven, signIn }
-}
-
-/**
- * Whether `origin` answers as a raven server, from its public `GET /api/auth/config`. A valid
- * config is a raven server; a 404 is one older than accounts, which `GET /api/lock` tells from
- * any other site; anything else is unreachable.
- */
-export const probeServer = async ({
-  fetch,
-  origin,
-}: {
-  fetch: ServerFetch
-  origin: string
-}): Promise<ProbeResult> => {
-  const answer = await probeCall({ fetch, origin, call: { name: CALL_NAMES.getAuthConfig } })
-  if (answer === null) return UNREACHABLE
-  if (answer.status === HTTP_STATUSES.notFound) {
-    const lock = await probeCall({ fetch, origin, call: { name: CALL_NAMES.getLock } })
-    return isLockAnswer(lock) ? { kind: PROBE_KINDS.raven, signIn: null } : UNREACHABLE
-  }
-  if (answer.status !== HTTP_STATUSES.ok || answer.text === null) return UNREACHABLE
-  const parsed = parseJson(answer.text)
-  return isAuthConfig(parsed) ? resultOf(parsed) : UNREACHABLE
 }

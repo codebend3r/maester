@@ -27,9 +27,12 @@ import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { api } from '@/lib/api'
 import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
 import { adminLockQuery, displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
+import { DesktopSettings } from '@/desktop/settings/DesktopSettings'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { UsersSection } from '@/pages/SettingsPage/UsersSection'
+import { useIsDesktop } from '@/stores/desktop'
+import { useServerReach } from '@/stores/serverReach'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 
 /** Every value a setting takes, with its words; a value added in `@raven/core` cannot go unlabelled. */
@@ -488,16 +491,36 @@ const AdminLockSection = () => {
 }
 
 /**
- * `/settings`: how the server plays video, and how pages look, for every
- * viewer, then the advanced settings and the admin lock at the foot, for
- * this browser. Each change
+ * Settings while raven player cannot reach its server: only what the app
+ * and this browser keep for themselves.
+ */
+const OfflineSettings = () => {
+  const titleId = useId()
+  return (
+    <section className={styles.page} aria-labelledby={titleId}>
+      <header className={styles.header}>
+        <h1 id={titleId} className={styles.title}>
+          Settings
+        </h1>
+      </header>
+      <DesktopSettings />
+      <AdvancedSection />
+    </section>
+  )
+}
+
+/**
+ * How the server plays video, and how pages look, for every viewer, then
+ * the account, raven player's own settings inside the app, and the advanced
+ * settings and the admin lock at the foot, for this browser. Each change
  * shows at once and saves on its own behind it, put back if the save
  * fails; Reset to defaults puts the server's settings back at once, after a
  * second click to be sure. Where the admin lock is on, or the viewer is not
  * the owner, the settings can be read but not changed.
  */
-export const SettingsPage = () => {
+const ServerSettings = () => {
   const titleId = useId()
+  const isDesktop = useIsDesktop()
   const queryClient = useQueryClient()
   const [isConfirming, setConfirming] = useState(false)
   // Accounts show only to an approved viewer; the other states have a screen of their own.
@@ -611,7 +634,7 @@ export const SettingsPage = () => {
         query={playback}
         shape={<SettingsSkeleton count={Object.keys(DEFAULT_PLAYBACK_SETTINGS).length} />}
         saveError={save.failure}
-        browser={<BrowserPlayback />}
+        browser={!isDesktop && <BrowserPlayback />}
       >
         {({ settings: current, effective }) => (
           <>
@@ -707,8 +730,16 @@ export const SettingsPage = () => {
           )}
         </>
       )}
+      {isDesktop && <DesktopSettings />}
       <AdvancedSection />
       {mode === MANAGEMENT_MODES.adminLock && <AdminLockSection />}
     </section>
   )
 }
+
+/**
+ * `/settings`: the server's settings and this browser's, or inside raven
+ * player while its server is out of reach, only the app's own.
+ */
+export const SettingsPage = () =>
+  useServerReach((state) => state.isOffline) ? <OfflineSettings /> : <ServerSettings />

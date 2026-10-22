@@ -4,8 +4,8 @@
   "ignorePatterns": ["dist", "out", "staging", "test-results"],
   "overrides": [
     {
-      // Vite, Playwright and Forge read their config through a default export.
-      "files": ["vite.config.ts", "playwright.config.ts", "forge.config.ts"],
+      // Playwright and Forge read their config through a default export.
+      "files": ["playwright.config.ts", "forge.config.ts"],
       "rules": {
         "import/no-default-export": "off"
       }
@@ -19,13 +19,7 @@
       }
     },
     {
-      "files": [
-        "src/**/*.test.ts",
-        "src/**/*.test.tsx",
-        "src/renderer/test/**",
-        "src/shared/test/**",
-        "test/**"
-      ],
+      "files": ["src/**/*.test.ts", "src/shared/test/**", "test/**"],
       "rules": {
         "typescript/no-non-null-assertion": "off",
         "unicorn/consistent-function-scoping": "off"

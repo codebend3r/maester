@@ -1,9 +1,4 @@
 import { AUTH_REFUSALS, isMediaTicket, LOCKED_STATUS, type AuthRefusal } from '@raven/core'
-import {
-  type AccountSessions,
-  TICKET_MIN_VALIDITY_MS,
-  TOKEN_READS,
-} from '@/main/accounts/accountSessions'
 import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES } from '@/main/servers/allowlist'
 import { accountRefusalOf } from '@/main/servers/authRefusals'
@@ -79,11 +74,12 @@ const keyOf = ({ serverId, mediaId }: { serverId: string; mediaId: number }): st
  */
 export const createAccountTickets = ({
   calls,
-  sessions,
+  isSignedIn,
   now,
 }: {
   calls: Pick<ServerCalls, 'call'>
-  sessions: Pick<AccountSessions, 'accessToken'>
+  /** Whether the page is signed in to the server, so a mint has a token to go out with. */
+  isSignedIn: (input: { serverId: string }) => boolean
   now: () => number
 }): AccountTickets => {
   let held: ReadonlyMap<string, Held> = new Map()
@@ -96,22 +92,13 @@ export const createAccountTickets = ({
     serverId: string
     mediaId: number
   }): Promise<TicketOutcome> => {
-    const token = await sessions.accessToken({ serverId, minValidityMs: TICKET_MIN_VALIDITY_MS })
-    switch (token.kind) {
-      case TOKEN_READS.none:
-        return { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.signedOut }
-      // Auth could not renew a token that ran out: an outage to wait out, not a sign out.
-      case TOKEN_READS.unreachable:
-        return UNREACHABLE
-      case TOKEN_READS.token:
-        return outcomeOf(
-          await calls.call({ serverId, call: { name: CALL_NAMES.getAccountTicket, mediaId } }),
-        )
-      default: {
-        const unreachable: never = token
-        return unreachable
-      }
+    // Signed out, the server would refuse the mint as signed out too, so main does not ask it.
+    if (!isSignedIn({ serverId })) {
+      return { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.signedOut }
     }
+    return outcomeOf(
+      await calls.call({ serverId, call: { name: CALL_NAMES.getAccountTicket, mediaId } }),
+    )
   }
 
   const start = ({ serverId, mediaId }: { serverId: string; mediaId: number }) => {

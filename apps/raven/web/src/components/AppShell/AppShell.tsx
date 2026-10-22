@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { type ReactNode, useId } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { Button, Icon, useKeyShortcut } from '@raven/ui'
+import { Button, Icon, type IconName, useKeyShortcut } from '@raven/ui'
 import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
 import { isAnyOf, libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
 import { TabBar } from '@/components/AppShell/TabBar'
@@ -17,7 +17,11 @@ import { librariesQuery } from '@/lib/queries'
 import { TopCardNote, useScrollReset } from '@/lib/useScrollReset'
 import { useServerEvents } from '@/lib/useServerEvents'
 import { ravenVersion } from '@/lib/version'
+import { useInProgressCount } from '@/desktop/downloadsApi'
+import { DESKTOP_PATHS } from '@/desktop/paths'
 import { usePageBackdrop } from '@raven/ui/headless'
+import { useIsDesktop } from '@/stores/desktop'
+import { useServerReach } from '@/stores/serverReach'
 import { useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
 
@@ -60,6 +64,53 @@ const NavItem = ({
   )
 }
 
+/** An icon with a count over its corner, for the eye only: the row's name says the count. */
+const CountedIcon = ({ icon, count }: { icon: IconName; count: number }) => (
+  <span className={styles.counted}>
+    <Icon name={icon} />
+    {count > 0 && (
+      <span className={styles.badge} aria-hidden="true">
+        {count}
+      </span>
+    )}
+  </span>
+)
+
+/** raven player's own rows: the files on this Mac, and the downloads with how many are under way. */
+const DesktopNavItems = ({ isIconsOnly }: { isIconsOnly: boolean }) => {
+  const inProgress = useInProgressCount()
+  return (
+    <>
+      <NavItem
+        to={DESKTOP_PATHS.local}
+        patterns={[DESKTOP_PATHS.local]}
+        icon={<Icon name="file-play" />}
+        label="On this Mac"
+        isIconsOnly={isIconsOnly}
+      />
+      <NavItem
+        to={DESKTOP_PATHS.downloads}
+        patterns={[DESKTOP_PATHS.downloads]}
+        icon={<CountedIcon icon="download" count={inProgress} />}
+        label="Downloads"
+        isIconsOnly={isIconsOnly}
+        note={inProgress > 0 ? `${inProgress} in progress` : undefined}
+      />
+    </>
+  )
+}
+
+/**
+ * What keeps the pages in step with the server while the frame is open: its
+ * changes, and the admin lock coming on or going off. Left out while raven
+ * player cannot reach its server.
+ */
+const FollowServer = () => {
+  useServerEvents()
+  useFollowAdminLock()
+  return null
+}
+
 /** What B does on a medium screen, where the menu keeps to its icons. */
 const ignore = () => undefined
 
@@ -88,7 +139,10 @@ const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
  * account button with Sign out. While a card's picture is behind the page,
  * the menu frosts over it. While the frame is open, what the pages show
  * follows the server's changes, and the admin lock coming on or going off.
- * The player leaves the frame behind for the whole screen.
+ * The player leaves the frame behind for the whole screen. Inside raven
+ * player the menu adds On this Mac and Downloads over Settings, and the
+ * window is dragged by a strip along its top; while the app cannot reach
+ * its server, the frame keeps only those three and what needs no server.
  */
 export const AppShell = () => {
   const navId = useId()
@@ -97,19 +151,25 @@ export const AppShell = () => {
   const isMediumScreen = useIsMediumScreen()
   const isIconsOnly = collapsed || isMediumScreen
   const isFrosted = usePageBackdrop((state) => state.shown != null)
-  const libraries = useQuery(librariesQuery)
-  const pinned = (libraries.data ?? []).filter((library) => library.settings.pinned)
+  const isDesktop = useIsDesktop()
+  const isOffline = useServerReach((state) => state.isOffline)
+  const libraries = useQuery({ ...librariesQuery, enabled: !isOffline })
+  // Kept from before the server went out of reach, they would open pages that need it.
+  const pinned = isOffline
+    ? []
+    : (libraries.data ?? []).filter((library) => library.settings.pinned)
   const isPinnedOpen = pinned.some((library) =>
     isAnyOf({ patterns: libraryPages(library.id), pathname }),
   )
 
   useKeyShortcut({ key: 'b', onPress: isMediumScreen ? ignore : toggle })
-  useServerEvents()
-  useFollowAdminLock()
   useScrollReset()
 
   return (
     <div className={collapsed ? `${styles.shell} ${styles.collapsed}` : styles.shell}>
+      {!isOffline && <FollowServer />}
+      {/* The window has no title bar of its own: this strip is what it is dragged by. */}
+      {isDesktop && <div className={styles.titlebar} aria-hidden="true" />}
       <PageBackdrop />
       <nav
         id={navId}
@@ -120,20 +180,24 @@ export const AppShell = () => {
           <Logo isMarkOnly={isIconsOnly} />
         </Link>
         <div className={styles.links}>
-          <NavItem
-            to="/"
-            patterns={['/']}
-            icon={<Icon name="home" />}
-            label="Home"
-            isIconsOnly={isIconsOnly}
-          />
-          <NavItem
-            to="/favourites"
-            patterns={['/favourites']}
-            icon={<Icon name="heart" />}
-            label="Favourites"
-            isIconsOnly={isIconsOnly}
-          />
+          {!isOffline && (
+            <>
+              <NavItem
+                to="/"
+                patterns={['/']}
+                icon={<Icon name="home" />}
+                label="Home"
+                isIconsOnly={isIconsOnly}
+              />
+              <NavItem
+                to="/favourites"
+                patterns={['/favourites']}
+                icon={<Icon name="heart" />}
+                label="Favourites"
+                isIconsOnly={isIconsOnly}
+              />
+            </>
+          )}
           {pinned.length > 0 && (
             <>
               {isIconsOnly ? (
@@ -162,29 +226,34 @@ export const AppShell = () => {
         </div>
         <div className={styles.dock}>
           <div className={styles.manage}>
-            <NavItem
-              to="/libraries"
-              patterns={isPinnedOpen ? ['/libraries'] : ['/libraries', ...libraryPages(':id')]}
-              icon={<Icon name="libraries" />}
-              label="Libraries"
-              isIconsOnly={isIconsOnly}
-            />
-            <AdminOnly>
-              <NavItem
-                to="/streams"
-                patterns={['/streams']}
-                icon={<Icon name="playback" />}
-                label="Streams"
-                isIconsOnly={isIconsOnly}
-              />
-              <NavItem
-                to="/reports"
-                patterns={['/reports']}
-                icon={<Icon name="alert" />}
-                label="Bug reports"
-                isIconsOnly={isIconsOnly}
-              />
-            </AdminOnly>
+            {!isOffline && (
+              <>
+                <NavItem
+                  to="/libraries"
+                  patterns={isPinnedOpen ? ['/libraries'] : ['/libraries', ...libraryPages(':id')]}
+                  icon={<Icon name="libraries" />}
+                  label="Libraries"
+                  isIconsOnly={isIconsOnly}
+                />
+                <AdminOnly>
+                  <NavItem
+                    to="/streams"
+                    patterns={['/streams']}
+                    icon={<Icon name="playback" />}
+                    label="Streams"
+                    isIconsOnly={isIconsOnly}
+                  />
+                  <NavItem
+                    to="/reports"
+                    patterns={['/reports']}
+                    icon={<Icon name="alert" />}
+                    label="Bug reports"
+                    isIconsOnly={isIconsOnly}
+                  />
+                </AdminOnly>
+              </>
+            )}
+            {isDesktop && <DesktopNavItems isIconsOnly={isIconsOnly} />}
             <NavItem
               to="/settings"
               patterns={['/settings']}
@@ -216,10 +285,10 @@ export const AppShell = () => {
       </nav>
       <main className={styles.main}>
         <div className={styles.bar}>
-          <SiteSearch className={styles.search} />
+          {!isOffline && <SiteSearch className={styles.search} />}
           <div className={styles.corner}>
             <ThemePicker />
-            <AccountMenu />
+            {!isOffline && <AccountMenu />}
           </div>
         </div>
         <div className={styles.page}>

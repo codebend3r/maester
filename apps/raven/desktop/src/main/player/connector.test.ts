@@ -1,9 +1,9 @@
+import type { PlayerConnectionStatus } from '@raven/core'
 import { describe, expect, mock, test } from 'bun:test'
 import { createConnector, OPEN_MS } from '@/main/player/connector'
 import { ENGINE_MESSAGES, type OpenedEngine } from '@/main/player/engine'
 import type { PlayerService } from '@/main/player/playerService'
 import { fakePort, fakeService, fakeTimers } from '@/main/test/playerFakes'
-import type { PlayerConnectionStatus } from '@/shared/protocol'
 
 type Engine = { service: PlayerService }
 /** Stands in for Electron's `MessagePortMain`: the connector passes it on without knowing its type. */

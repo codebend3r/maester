@@ -1,63 +1,62 @@
 import { randomUUID } from 'node:crypto'
 import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { expect, type Page, test } from '@playwright/test'
 import {
+  DEFAULT_OUTPUT_SETTINGS,
+  DOWNLOAD_KINDS,
+  DOWNLOAD_STATUS_KINDS,
   DOWNLOAD_TARGET_KINDS,
-  type DownloadTarget,
   downloadLinkFor,
   formatBytes,
+  SERVER_METHODS,
 } from '@raven/core'
-import { type ElectronApplication, expect, type Page, test } from '@playwright/test'
 import { makeClips, makeTrackClip } from '@/e2e/clips'
+import { ACCOUNT_TICKET_PREFIX, FIXTURE_ACCOUNT } from '@/e2e/fixtureAuth'
+import { FIXTURE_MEDIA, FIXTURE_MOVIE_NAMES, FIXTURE_TITLES } from '@/e2e/fixtureLibrary'
 import {
   containerOf,
-  FIXTURE_ITEMS,
-  FIXTURE_MEDIA,
-  MEDIA_PATHS,
-  type FixtureMode,
   type FixtureRequest,
   type FixtureServer,
+  isTicketOnly,
+  MEDIA_PATHS,
   routesOf,
-  startFixtureServer,
-  ticketFor,
+  startWebFixture,
 } from '@/e2e/fixtureServer'
 import {
+  expectOffline,
   freshUserData,
+  heading,
   openUrl,
   readLog,
   removeDir,
-  requestFromPage,
-  stubTrustPrompt,
+  serverEnv,
+  sideLink,
+  signIn,
   withApp,
 } from '@/e2e/harness'
-import { CONFIG_FILE, type DesktopConfig, EMPTY_CONFIG } from '@/main/desktopConfig'
+import { expectButton, expectClockAdvancing, expectPlayingNatively } from '@/e2e/playerView'
+import {
+  CONFIG_FILE,
+  DEFAULT_UPDATE_SETTINGS,
+  type DesktopConfig,
+  isDesktopConfig,
+} from '@/main/desktopConfig'
 import {
   DOWNLOADS_FILE,
   type DownloadsState,
   isDownloadsState,
 } from '@/main/downloads/downloadState'
 import { entryDirFor, partPathFor, videoPathFor } from '@/main/downloads/space'
-import {
-  DESKTOP_REPLIES,
-  DESKTOP_REQUESTS,
-  DOWNLOAD_KINDS,
-  DOWNLOAD_STATUS_KINDS,
-  SERVER_METHODS,
-} from '@/shared/protocol'
 
-const PIN = '3001'
-const LOCKED: FixtureMode = { pin: PIN, isLocked: true, admin: { kind: 'off' } }
 // Past the file's first chunk, so a pause finds bytes on disk to resume from.
 const THROTTLE_BYTE = 262_144
 // The test hook's sync retry, in place of the spec's five minutes.
 const SYNC_RETRY_HOOK_MS = '2000'
 // A download is a local copy of a small clip, though the origin's probe may wait its 2 s.
 const READY_WAIT_MS = 15_000
-// A failed try to report: the launch's own, or the 2 s retry's when the launch's came before
-// main's output was read.
-const FAILED_TRY_WAIT_MS = 20_000
-// The late report waits for a retry or two once the server is back.
-const LATE_REPORT_WAIT_MS = 20_000
+// The page asks again every 5 s while its server is down, then signs main in, which sends.
+const LATE_REPORT_WAIT_MS = 30_000
 // The notice stays 6 s, and a launch deletion tells of itself once the page says ready.
 const NOTICE_WAIT_MS = 10_000
 const MINUTE_MS = 60_000
@@ -70,7 +69,7 @@ const SAVED = {
   method: SERVER_METHODS.put,
   path: MEDIA_PATHS.progress(FIXTURE_MEDIA.first),
 } as const
-// Two launches, a hang and a late report.
+// A launch with the server down, then the wait for it to come back and hear the play.
 const OFFLINE_TEST_MS = 120_000
 
 type FixtureClips = { first: string; second: string; tracks: string }
@@ -80,14 +79,22 @@ let fixtureClips: FixtureClips = { first: '', second: '', tracks: '' }
 let clipSizes: ReadonlyMap<number, number> = new Map()
 let clipFolders: string[] = []
 
+const sizeOfFile = async (path: string) => (await stat(path)).size
+
 test.beforeAll(async () => {
   const [clips, track] = await Promise.all([makeClips(), makeTrackClip()])
   fixtureClips = { first: clips.first, second: clips.second, tracks: track.path }
   clipFolders = [clips.folder, track.folder]
-  const [firstSize, secondSize] = await Promise.all([stat(track.path), stat(clips.second)])
+  const [tracksSize, firstSize, secondSize] = await Promise.all([
+    sizeOfFile(track.path),
+    sizeOfFile(clips.first),
+    sizeOfFile(clips.second),
+  ])
   clipSizes = new Map([
-    [FIXTURE_MEDIA.first, firstSize.size],
-    [FIXTURE_MEDIA.second, secondSize.size],
+    [FIXTURE_MEDIA.first, tracksSize],
+    [FIXTURE_MEDIA.second, secondSize],
+    [FIXTURE_MEDIA.firstEpisode, firstSize],
+    [FIXTURE_MEDIA.secondEpisode, secondSize],
   ])
 })
 
@@ -102,14 +109,8 @@ const sizeOf = (mediaId: number): number => {
   return size
 }
 
-const startLockedFixture = ({ hasMediaPlane }: { hasMediaPlane: boolean }) =>
-  startFixtureServer({ clips: fixtureClips, mode: LOCKED, hasMediaPlane })
-
-const linkTo = ({ fixture, target }: { fixture: FixtureServer; target: DownloadTarget }) =>
-  downloadLinkFor({ origin: fixture.origin, target })
-
-/** The server's name until it is renamed: its origin's host, with the port. */
-const hostOf = ({ fixture }: { fixture: FixtureServer }) => new URL(fixture.origin).host
+/** A server with accounts, whose media origin serves a title's file for its account ticket. */
+const startAccountsFixture = () => startWebFixture({ clips: fixtureClips, hasMediaPlane: true })
 
 const requestsTo = ({
   requests,
@@ -129,10 +130,6 @@ const fileFetches = ({
   requests: readonly FixtureRequest[]
   mediaId: number
 }) => requestsTo({ requests, method: SERVER_METHODS.get, path: MEDIA_PATHS.file(mediaId) })
-
-/** A request a media origin takes: a ticket and no cookie of any kind. */
-const isTicketOnly = ({ hasTicket, hasUnlock, hasAdmin, hasOtherCookie }: FixtureRequest) =>
-  hasTicket && !hasUnlock && !hasAdmin && !hasOtherCookie
 
 /** A body read as JSON, or null; never an error, which would print the body. */
 const parseJson = (text: string | null): unknown => {
@@ -172,91 +169,44 @@ const storedDownloads = async ({ userData }: { userData: string }): Promise<Down
   return value
 }
 
-const homeHeading = (page: Page) => page.getByRole('heading', { name: 'raven player' })
-
-const heading = ({ page, name }: { page: Page; name: string }) =>
-  page.getByRole('heading', { name, exact: true })
-
-/** A pointer move wakes the controls, which hold their clock while hidden. */
-const wake = async (page: Page) => {
-  await page.mouse.move(120, 120)
-  await page.mouse.move(160, 140)
-}
-
-const expectButton = async ({ page, name }: { page: Page; name: string }) => {
-  await wake(page)
-  await expect(page.getByRole('button', { name })).toBeVisible()
-}
-
-/** The scrubber's position in whole seconds, read with the controls awake. */
-const clockOf = async (page: Page): Promise<number> => {
-  await wake(page)
-  const now = await page.getByRole('slider', { name: 'Seek' }).getAttribute('aria-valuenow')
-  return now === null ? Number.NaN : Number(now)
-}
-
-const expectClockMoving = async (page: Page) => {
-  const start = await clockOf(page)
-  await expect.poll(async () => (await clockOf(page)) - start).toBeGreaterThan(1)
-}
-
-/** mpv plays the title: the page has no `<video>`, its clock moves, and main says it is native. */
-const expectPlayingNatively = async ({ page, title }: { page: Page; title: string }) => {
-  await expect(heading({ page, name: title })).toBeVisible()
-  await expect(page.locator('video')).toHaveCount(0)
-  await expect(page.locator('html')).toHaveAttribute('data-surface', 'native')
-  await expectButton({ page, name: 'Pause (k)' })
-  await expectClockMoving(page)
-}
-
-const lockedDialog = (page: Page) => page.getByRole('dialog', { name: 'Locked library' })
-
 const askDialog = (page: Page) => page.getByRole('dialog', { name: 'Download to raven player' })
 
-/**
- * Opens a download link and answers its dialog: the PIN first when this launch has not given
- * it yet, then Download once the question names what `question` says.
- */
-const download = async ({
-  app,
-  page,
-  fixture,
-  target,
-  question,
-}: {
-  app: ElectronApplication
-  page: Page
-  fixture: FixtureServer
-  target: DownloadTarget
-  question: string
-}) => {
-  await openUrl({ app, url: linkTo({ fixture, target }) })
-  await expect(lockedDialog(page).or(askDialog(page))).toBeVisible()
-  if (await lockedDialog(page).isVisible()) {
-    const unlock = lockedDialog(page)
-    await unlock.getByLabel('PIN', { exact: true }).fill(PIN)
-    await unlock.getByRole('button', { name: 'Unlock' }).click()
-  }
+/** Answers the download dialog once its question names what `question` says. */
+const confirmDownload = async ({ page, question }: { page: Page; question: string }) => {
   const ask = askDialog(page)
   await expect(ask).toContainText(question)
   await ask.getByRole('button', { name: 'Download', exact: true }).click()
   await expect(ask).toHaveCount(0)
 }
 
-/** Home's Downloads button, whose name carries the count its badge shows. */
-const downloadsButton = ({ page, count }: { page: Page; count: number }) =>
-  page.getByRole('button', {
-    name: count === 0 ? 'Downloads' : `Downloads, ${count} in progress`,
-    exact: true,
-  })
+/** Download on the title page that is open, then the dialog's Download. */
+const downloadFromPage = async ({ page, question }: { page: Page; question: string }) => {
+  await page.getByRole('button', { name: 'Download', exact: true }).click()
+  await confirmDownload({ page, question })
+}
+
+/** The side menu's Downloads, whose name carries the count its badge shows. */
+const downloadsLink = ({ page, count }: { page: Page; count: number }) =>
+  sideLink({ page, name: count === 0 ? 'Downloads' : `Downloads (${count} in progress)` })
 
 const openDownloads = async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: /^Downloads/u }).click()
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: /^Downloads/u })
+    .click()
   await expect(heading({ page, name: 'Downloads' })).toBeVisible()
 }
 
+/** A title's page, from its card on Home. */
+const openTitle = async ({ page, title }: { page: Page; title: string }) => {
+  await sideLink({ page, name: 'Home' }).click()
+  await page.getByRole('link', { name: title, exact: true }).click()
+  await expect(heading({ page, name: title })).toBeVisible()
+}
+
+/** A download's own row: the innermost item naming it, inside its title's group. */
 const rowOf = ({ page, label }: { page: Page; label: string }) =>
-  page.getByRole('listitem').filter({ hasText: label })
+  page.getByRole('listitem').filter({ hasText: label, hasNot: page.getByRole('listitem') })
 
 /** The row reads ready: it offers Play, and names the whole file's size. */
 const expectReady = async ({ page, label, size }: { page: Page; label: string; size: number }) => {
@@ -267,14 +217,14 @@ const expectReady = async ({ page, label, size }: { page: Page; label: string; s
   await expect(row.getByText(formatBytes(size), { exact: true })).toBeVisible()
 }
 
-const serverIdOf = async ({ page }: { page: Page }): Promise<string> => {
-  const reply = await requestFromPage({ page, request: { type: DESKTOP_REQUESTS.listServers } })
-  const [server] = reply !== null && reply.type === DESKTOP_REPLIES.servers ? reply.servers : []
-  if (server === undefined) throw new Error('raven player keeps no server.')
-  return server.serverId
+/** The id raven player files its server's downloads under, as its config holds it. */
+const serverIdOf = async ({ userData }: { userData: string }): Promise<string> => {
+  const config = parseJson(await readFile(join(userData, CONFIG_FILE), 'utf8'))
+  if (!isDesktopConfig(config)) throw new Error('raven player saved no config.')
+  return config.server.id
 }
 
-test.describe.serial('downloading through a media origin', () => {
+test.describe.serial('downloading from the web pages, and playing offline', () => {
   let userData = ''
   let started: FixtureServer | null = null
 
@@ -285,7 +235,7 @@ test.describe.serial('downloading through a media origin', () => {
 
   test.beforeAll(async () => {
     userData = await freshUserData()
-    started = await startLockedFixture({ hasMediaPlane: true })
+    started = await startAccountsFixture()
   })
 
   test.afterAll(async () => {
@@ -293,24 +243,22 @@ test.describe.serial('downloading through a media origin', () => {
     await closing.finally(() => removeDir(userData))
   })
 
-  test('asks before a download link, then fetches the file from the origin with a ticket alone', async () => {
+  test('downloads a movie from its page, fetching it from the media origin on an account ticket', async () => {
     const fixture = server()
     const size = sizeOf(FIXTURE_MEDIA.first)
     const { serverId, output: printed } = await withApp({
       userData,
-      run: async ({ app, page, output }) => {
-        await expect(homeHeading(page)).toBeVisible()
-        await stubTrustPrompt({ app, answer: 'add' })
-        await download({
-          app,
+      env: serverEnv({ origin: fixture.origin }),
+      run: async ({ page, output }) => {
+        await signIn({ page })
+        await openTitle({ page, title: FIXTURE_TITLES.first })
+        await downloadFromPage({
           page,
-          fixture,
-          target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: FIXTURE_MEDIA.first },
-          question: `Download Fixture One (1 movie, ${formatBytes(size)}) from ${hostOf({ fixture })}?`,
+          question: `Download ${FIXTURE_MOVIE_NAMES.first} (1 movie, ${formatBytes(size)})?`,
         })
         await openDownloads({ page })
-        await expectReady({ page, label: 'Fixture One', size })
-        return { serverId: await serverIdOf({ page }), output }
+        await expectReady({ page, label: FIXTURE_MOVIE_NAMES.first, size })
+        return { serverId: await serverIdOf({ userData }), output }
       },
     })
 
@@ -327,20 +275,24 @@ test.describe.serial('downloading through a media origin', () => {
     })
     expect(sidecars.length).toBeGreaterThan(0)
     expect(sidecars.every(isTicketOnly)).toBe(true)
-    // The ticket came from the server itself, behind the PIN; the file never did.
-    const tickets = requestsTo({
+    // The ticket came from the server itself, for the page's account; the file never did.
+    const mints = requestsTo({
       requests: fixture.requests,
-      method: SERVER_METHODS.get,
-      path: MEDIA_PATHS.ticket(FIXTURE_MEDIA.first),
+      method: SERVER_METHODS.post,
+      path: MEDIA_PATHS.accountTicket(FIXTURE_MEDIA.first),
     })
-    expect(tickets.length).toBeGreaterThan(0)
-    expect(tickets.every(({ hasUnlock }) => hasUnlock)).toBe(true)
+    expect(mints.length).toBeGreaterThan(0)
+    expect(mints.every(({ hasBearer }) => hasBearer)).toBe(true)
     expect(fileFetches({ requests: fixture.requests, mediaId: FIXTURE_MEDIA.first })).toEqual([])
-    // The ticket rides in the file's address alone: main never prints, logs or keeps it.
-    const ticket = ticketFor(FIXTURE_MEDIA.first)
-    expect(printed.lines().filter((line) => line.includes(ticket))).toEqual([])
-    expect((await readLog({ userData })).filter((line) => line.includes(ticket))).toEqual([])
-    expect(await readFile(join(userData, DOWNLOADS_FILE), 'utf8')).not.toContain(ticket)
+    // A ticket rides in the file's address alone: main never prints, logs or keeps one.
+    const tickets = fixture
+      .issuedTokens()
+      .filter((token) => token.startsWith(ACCOUNT_TICKET_PREFIX))
+    expect(tickets.length).toBeGreaterThan(0)
+    const isNamed = (text: string) => tickets.some((ticket) => text.includes(ticket))
+    expect(printed.lines().filter(isNamed)).toEqual([])
+    expect((await readLog({ userData })).filter(isNamed)).toEqual([])
+    expect(isNamed(await readFile(join(userData, DOWNLOADS_FILE), 'utf8'))).toBe(false)
 
     const stored = await storedDownloads({ userData })
     expect(
@@ -353,7 +305,7 @@ test.describe.serial('downloading through a media origin', () => {
     ).toEqual([
       {
         mediaId: FIXTURE_MEDIA.first,
-        label: 'Fixture One',
+        label: FIXTURE_MOVIE_NAMES.first,
         status: { kind: DOWNLOAD_STATUS_KINDS.ready },
         size,
       },
@@ -367,27 +319,64 @@ test.describe.serial('downloading through a media origin', () => {
     expect(await sizeOnDisk(video)).toBe(size)
   })
 
-  test('pauses a download partway and resumes it from the bytes on disk with a Range', async () => {
+  test('downloads a season from its page, and the side menu counts what is left', async () => {
     const fixture = server()
-    const label = 'Fixture Two'
+    const bytes = sizeOf(FIXTURE_MEDIA.firstEpisode) + sizeOf(FIXTURE_MEDIA.secondEpisode)
+    // Each file is held until the test lets it go, so the count steps down one at a time.
+    const releaseFirst = fixture.stall({ path: /^\/api\/media\/5\/file/u })
+    const releaseSecond = fixture.stall({ path: /^\/api\/media\/6\/file/u })
+    try {
+      await withApp({
+        userData,
+        env: serverEnv({ origin: fixture.origin }),
+        run: async ({ page }) => {
+          await expect(heading({ page, name: 'Home' })).toBeVisible()
+          await openTitle({ page, title: FIXTURE_TITLES.show })
+          await page
+            .getByRole('link', { name: new RegExp(`^${FIXTURE_TITLES.season}`, 'u') })
+            .click()
+          await expect(heading({ page, name: FIXTURE_TITLES.season })).toBeVisible()
+          await downloadFromPage({ page, question: `(2 episodes, ${formatBytes(bytes)})` })
+          await expect(downloadsLink({ page, count: 2 })).toBeVisible()
+          releaseFirst()
+          await expect(downloadsLink({ page, count: 1 })).toBeVisible({ timeout: READY_WAIT_MS })
+          releaseSecond()
+          await expect(downloadsLink({ page, count: 0 })).toBeVisible({ timeout: READY_WAIT_MS })
+          await openDownloads({ page })
+          await expect(page.getByRole('button', { name: /^Play /u })).toHaveCount(3)
+        },
+      })
+    } finally {
+      releaseFirst()
+      releaseSecond()
+    }
+  })
+
+  test('takes a raven://download link from outside, and resumes a paused download with a Range', async () => {
+    const fixture = server()
+    const label = FIXTURE_MOVIE_NAMES.second
     const size = sizeOf(FIXTURE_MEDIA.second)
     await withApp({
       userData,
+      env: serverEnv({ origin: fixture.origin }),
       run: async ({ app, page }) => {
-        await expect(homeHeading(page)).toBeVisible()
-        await stubTrustPrompt({ app, answer: 'add' })
+        await expect(heading({ page, name: 'Home' })).toBeVisible()
         const part = partPathFor({
           userData,
-          serverId: await serverIdOf({ page }),
+          serverId: await serverIdOf({ userData }),
           mediaId: FIXTURE_MEDIA.second,
           container: containerOf(fixtureClips.second),
         })
         fixture.throttle({ byte: THROTTLE_BYTE })
-        await download({
+        await openUrl({
           app,
+          url: downloadLinkFor({
+            origin: fixture.origin,
+            target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: FIXTURE_MEDIA.second },
+          }),
+        })
+        await confirmDownload({
           page,
-          fixture,
-          target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: FIXTURE_MEDIA.second },
           question: `Download ${label} (1 movie, ${formatBytes(size)})`,
         })
         await openDownloads({ page })
@@ -417,15 +406,17 @@ test.describe.serial('downloading through a media origin', () => {
   })
 
   test('deletes a download, its row and its folder', async () => {
-    const label = 'Fixture Two'
+    const fixture = server()
+    const label = FIXTURE_MOVIE_NAMES.second
     const size = sizeOf(FIXTURE_MEDIA.second)
     await withApp({
       userData,
+      env: serverEnv({ origin: fixture.origin }),
       run: async ({ page }) => {
-        await expect(homeHeading(page)).toBeVisible()
+        await expect(heading({ page, name: 'Home' })).toBeVisible()
         const folder = entryDirFor({
           userData,
-          serverId: await serverIdOf({ page }),
+          serverId: await serverIdOf({ userData }),
           mediaId: FIXTURE_MEDIA.second,
         })
         expect(await isPresent(folder)).toBe(true)
@@ -436,241 +427,139 @@ test.describe.serial('downloading through a media origin', () => {
         await row.getByRole('button', { name: 'Delete', exact: true }).click()
         await expect(rowOf({ page, label })).toHaveCount(0)
         await expect.poll(() => isPresent(folder)).toBe(false)
-        await expect(rowOf({ page, label: 'Fixture One' })).toHaveCount(1)
+        await expect(rowOf({ page, label: FIXTURE_MOVIE_NAMES.first })).toHaveCount(1)
       },
     })
   })
 
-  test('plays a download while its server hangs and once it is gone, and tells it later', async () => {
+  test('plays a download after a relaunch with the server down, and sends its position once the server is back', async () => {
     test.setTimeout(OFFLINE_TEST_MS)
-    const gone = server()
-    const port = Number(new URL(gone.origin).port)
+    const fixture = server()
+    const label = FIXTURE_MOVIE_NAMES.first
+    await fixture.close()
+    const heardBefore = fixture.requests.length
     await withApp({
       userData,
+      env: {
+        ...serverEnv({ origin: fixture.origin }),
+        RAVEN_DESKTOP_SYNC_RETRY_MS: SYNC_RETRY_HOOK_MS,
+      },
       run: async ({ page }) => {
-        await expect(homeHeading(page)).toBeVisible()
-        await openDownloads({ page })
-        // Every request waits from here on: playing must ask nothing of the server.
-        gone.hang()
-        await rowOf({ page, label: 'Fixture One' })
-          .getByRole('button', { name: 'Play Fixture One' })
+        await expectOffline({ page })
+        await rowOf({ page, label })
+          .getByRole('button', { name: `Play ${label}` })
           .click()
-        await expectPlayingNatively({ page, title: 'Fixture One' })
-        // A save the server cannot hear, so the play and the position wait for it.
+        await expectPlayingNatively({ page, title: label })
+        // Paused, so the position main keeps for the server stays put. With no server the page
+        // has not signed main in, so the play is kept for the account last signed in.
         await page.keyboard.press('k')
         await expectButton({ page, name: 'Play (k)' })
-
-        // The server's address now refuses every connection, and the file still plays.
-        await gone.close()
-        await page.keyboard.press('k')
-        await expectButton({ page, name: 'Pause (k)' })
-        await expectClockMoving(page)
-      },
-    })
-
-    await withApp({
-      userData,
-      env: { RAVEN_DESKTOP_SYNC_RETRY_MS: SYNC_RETRY_HOOK_MS },
-      run: async ({ page, output }) => {
-        await expect(homeHeading(page)).toBeVisible()
-        // A try finds the server still gone, so only a later retry can reach it.
+        const owedOf = async () =>
+          (await storedDownloads({ userData })).owed.find(
+            ({ mediaId }) => mediaId === FIXTURE_MEDIA.first,
+          )?.pending ?? null
         await expect
-          .poll(
-            () =>
-              output
-                .lines()
-                .some(
-                  (line) =>
-                    line.includes(`${PLAYED.method} ${PLAYED.path}`) && line.includes('failed'),
-                ),
-            { timeout: FAILED_TRY_WAIT_MS },
-          )
-          .toBe(true)
-        // A restarted server forgets every unlock, and nothing in this launch gives the PIN
-        // again, so the server back at the stored address holds no lock.
-        const back = await startFixtureServer({
-          clips: fixtureClips,
-          mode: { ...LOCKED, isLocked: false },
-          hasMediaPlane: true,
-          port,
-        })
-        started = back
+          .poll(async () => {
+            const owed = await owedOf()
+            return owed === null ? null : { play: owed.play, accountId: owed.accountId }
+          })
+          .toEqual({ play: true, accountId: FIXTURE_ACCOUNT.id })
+
+        // The server comes back as it was: the page finds it, signs main in again, and main sends.
+        await fixture.reopen()
         const heard = (route: { method: string; path: string }) =>
-          requestsTo({ requests: back.requests, ...route })
+          requestsTo({ requests: fixture.requests.slice(heardBefore), ...route })
         await expect
           .poll(() => heard(PLAYED).length > 0 && heard(SAVED).length > 0, {
             timeout: LATE_REPORT_WAIT_MS,
           })
           .toBe(true)
-        const routes = routesOf(back.requests)
+        const routes = routesOf(fixture.requests.slice(heardBefore))
         // The play goes first, so the server hears it before a position that may mark it watched.
         expect(routes.indexOf(`${PLAYED.method} ${PLAYED.path}`)).toBeLessThan(
           routes.indexOf(`${SAVED.method} ${SAVED.path}`),
         )
         const [saved] = heard(SAVED)
+        expect(saved?.hasBearer ?? false).toBe(true)
         expect(saved === undefined ? null : positionOf(saved)).toBeGreaterThan(0)
+        // The player stayed put through the server's return: still paused, it plays on from there.
+        await expectButton({ page, name: 'Play (k)' })
+        await page.keyboard.press('k')
+        await expectClockAdvancing(page)
       },
     })
   })
 })
 
-test.describe.serial('downloading through the server', () => {
-  let userData = ''
-  let started: FixtureServer | null = null
-
-  const server = (): FixtureServer => {
-    if (started === null) throw new Error('The fixture server is not running.')
-    return started
+test('deletes at launch a download watched eleven minutes ago, and says so', async () => {
+  const userData = await freshUserData()
+  const fixture = await startAccountsFixture()
+  const serverId = randomUUID()
+  const at = Date.now()
+  const container = containerOf(fixtureClips.tracks)
+  const config: DesktopConfig = {
+    version: 5,
+    output: DEFAULT_OUTPUT_SETTINGS,
+    server: { id: serverId, origin: fixture.origin },
+    updates: { ...DEFAULT_UPDATE_SETTINGS },
+    lastAccountId: null,
   }
-
-  test.beforeAll(async () => {
-    userData = await freshUserData()
-    started = await startLockedFixture({ hasMediaPlane: false })
-  })
-
-  test.afterAll(async () => {
-    const closing = started === null ? Promise.resolve() : started.close()
-    await closing.finally(() => removeDir(userData))
-  })
-
-  test('fetches the file from the server with its cookie when it lists no media origin', async () => {
-    const fixture = server()
-    const size = sizeOf(FIXTURE_MEDIA.first)
+  const seeded: DownloadsState = {
+    version: 2,
+    entries: [
+      {
+        downloadId: randomUUID(),
+        serverId,
+        mediaId: FIXTURE_MEDIA.first,
+        label: FIXTURE_TITLES.first,
+        group: {
+          kind: DOWNLOAD_KINDS.movie,
+          key: 'movie:1',
+          title: FIXTURE_TITLES.first,
+          order: 0,
+        },
+        container,
+        size: sizeOf(FIXTURE_MEDIA.first),
+        duration: 30,
+        watchedPercent: 90,
+        sidecars: [],
+        status: { kind: DOWNLOAD_STATUS_KINDS.ready },
+        autoDelete: true,
+        watchedAt: at - 11 * MINUTE_MS,
+        serverPosition: 0,
+        pending: { play: false, position: null, furthest: null, at: 0, accountId: null },
+        createdAt: at - 60 * MINUTE_MS,
+      },
+    ],
+    autoDeleteDefault: false,
+    owed: [],
+  }
+  if (!isDownloadsState(seeded)) throw new Error('The seeded downloads are not what main reads.')
+  const folder = entryDirFor({ userData, serverId, mediaId: FIXTURE_MEDIA.first })
+  try {
+    await mkdir(folder, { recursive: true })
+    await copyFile(
+      fixtureClips.tracks,
+      videoPathFor({ userData, serverId, mediaId: FIXTURE_MEDIA.first, container }),
+    )
+    await Promise.all([
+      writeFile(join(userData, CONFIG_FILE), JSON.stringify(config)),
+      writeFile(join(userData, DOWNLOADS_FILE), JSON.stringify(seeded)),
+    ])
     await withApp({
       userData,
-      run: async ({ app, page }) => {
-        await expect(homeHeading(page)).toBeVisible()
-        await stubTrustPrompt({ app, answer: 'add' })
-        await download({
-          app,
-          page,
-          fixture,
-          target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: FIXTURE_MEDIA.first },
-          question: `Download Fixture One (1 movie, ${formatBytes(size)})`,
+      env: serverEnv({ origin: fixture.origin }),
+      run: async ({ page }) => {
+        await expect(page.getByText(`Deleted ${FIXTURE_TITLES.first} after watching`)).toBeVisible({
+          timeout: NOTICE_WAIT_MS,
         })
-        await openDownloads({ page })
-        await expectReady({ page, label: 'Fixture One', size })
+        await expect.poll(() => isPresent(folder)).toBe(false)
       },
     })
-
-    const files = fileFetches({ requests: fixture.requests, mediaId: FIXTURE_MEDIA.first })
-    expect(files.length).toBeGreaterThan(0)
-    expect(files.every(({ hasUnlock, hasTicket }) => hasUnlock && !hasTicket)).toBe(true)
-    expect(
-      requestsTo({
-        requests: fixture.requests,
-        method: SERVER_METHODS.get,
-        path: MEDIA_PATHS.ticket(FIXTURE_MEDIA.first),
-      }),
-    ).toEqual([])
-    expect(routesOf(fixture.elsewhere.requests)).toEqual([])
-  })
-
-  test('downloads a whole season, and Home counts what is left', async () => {
-    const ownUserData = await freshUserData()
-    const fixture = server()
-    const bytes = sizeOf(FIXTURE_MEDIA.first) + sizeOf(FIXTURE_MEDIA.second)
-    // Each file is held until the test lets it go, so the count steps down one at a time.
-    const releaseFirst = fixture.stall({ path: /^\/api\/media\/1\/file/u })
-    const releaseSecond = fixture.stall({ path: /^\/api\/media\/2\/file/u })
-    try {
-      await withApp({
-        userData: ownUserData,
-        run: async ({ app, page }) => {
-          await expect(homeHeading(page)).toBeVisible()
-          await stubTrustPrompt({ app, answer: 'add' })
-          await download({
-            app,
-            page,
-            fixture,
-            target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: FIXTURE_ITEMS.season },
-            question: `(2 episodes, ${formatBytes(bytes)})`,
-          })
-          await expect(downloadsButton({ page, count: 2 })).toBeVisible()
-          releaseFirst()
-          await expect(downloadsButton({ page, count: 1 })).toBeVisible({ timeout: READY_WAIT_MS })
-          releaseSecond()
-          await expect(downloadsButton({ page, count: 0 })).toBeVisible({ timeout: READY_WAIT_MS })
-          await openDownloads({ page })
-          await expect(page.getByRole('button', { name: /^Play /u })).toHaveCount(2)
-        },
-      })
-    } finally {
-      releaseFirst()
-      releaseSecond()
-      await removeDir(ownUserData)
-    }
-  })
-
-  test('deletes at launch a download watched eleven minutes ago, and says so', async () => {
-    const ownUserData = await freshUserData()
-    const fixture = server()
-    const serverId = randomUUID()
-    const at = Date.now()
-    const container = containerOf(fixtureClips.tracks)
-    const config: DesktopConfig = {
-      ...EMPTY_CONFIG,
-      servers: [
-        {
-          id: serverId,
-          origin: fixture.origin,
-          name: hostOf({ fixture }),
-          addedAt: at - 60 * MINUTE_MS,
-          signIn: null,
-        },
-      ],
-    }
-    const seeded: DownloadsState = {
-      version: 2,
-      entries: [
-        {
-          downloadId: randomUUID(),
-          serverId,
-          mediaId: FIXTURE_MEDIA.first,
-          label: 'Fixture One',
-          group: { kind: DOWNLOAD_KINDS.movie, key: 'movie:1', title: 'Fixture One', order: 0 },
-          container,
-          size: sizeOf(FIXTURE_MEDIA.first),
-          duration: 30,
-          watchedPercent: 90,
-          sidecars: [],
-          status: { kind: DOWNLOAD_STATUS_KINDS.ready },
-          autoDelete: true,
-          watchedAt: at - 11 * MINUTE_MS,
-          serverPosition: 0,
-          pending: { play: false, position: null, furthest: null, at: 0, accountId: null },
-          createdAt: at - 60 * MINUTE_MS,
-        },
-      ],
-      autoDeleteDefault: false,
-      owed: [],
-    }
-    if (!isDownloadsState(seeded)) throw new Error('The seeded downloads are not what main reads.')
-    const folder = entryDirFor({ userData: ownUserData, serverId, mediaId: FIXTURE_MEDIA.first })
-    try {
-      await mkdir(folder, { recursive: true })
-      await copyFile(
-        fixtureClips.tracks,
-        videoPathFor({ userData: ownUserData, serverId, mediaId: FIXTURE_MEDIA.first, container }),
-      )
-      await Promise.all([
-        writeFile(join(ownUserData, CONFIG_FILE), JSON.stringify(config)),
-        writeFile(join(ownUserData, DOWNLOADS_FILE), JSON.stringify(seeded)),
-      ])
-      await withApp({
-        userData: ownUserData,
-        run: async ({ page }) => {
-          await expect(page.getByText('Deleted Fixture One after watching')).toBeVisible({
-            timeout: NOTICE_WAIT_MS,
-          })
-          await expect.poll(() => isPresent(folder)).toBe(false)
-        },
-      })
-      const stored = await storedDownloads({ userData: ownUserData })
-      expect(stored.entries).toEqual([])
-      expect(stored.owed).toEqual([])
-    } finally {
-      await removeDir(ownUserData)
-    }
-  })
+    const stored = await storedDownloads({ userData })
+    expect(stored.entries).toEqual([])
+    expect(stored.owed).toEqual([])
+  } finally {
+    await fixture.close().finally(() => removeDir(userData))
+  }
 })

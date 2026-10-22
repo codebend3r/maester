@@ -1,8 +1,8 @@
+import { PLAYER_CONNECTION_STATUSES, type PlayerConnectionStatus } from '@raven/core'
 import { ENGINE_MESSAGES, ENGINE_STATUSES, type OpenedEngine } from '@/main/player/engine'
 import { connectPort, type PortLike } from '@/main/player/playerPort'
 import type { PlayerService } from '@/main/player/playerService'
 import type { Timers } from '@/main/stateStore'
-import { PLAYER_CONNECTION_STATUSES, type PlayerConnectionStatus } from '@/shared/protocol'
 import { messageOf } from '@/shared/messageOf'
 
 /**

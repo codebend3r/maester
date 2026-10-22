@@ -1,7 +1,8 @@
+import { DESKTOP_EVENTS, DESKTOP_REPLIES, PLAYER_SOURCE_KINDS, TITLE_REFUSALS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { createOpenBatch, eventForOpen, launchPaths, pathsFromArgv } from '@/main/openBatch'
 import type { Timers } from '@/main/stateStore'
-import { MAX_QUEUE } from '@/shared/protocol'
+import { MAX_QUEUE } from '@/shared/hostNames'
 
 const FILM = '00000000-0000-4000-8000-000000000001'
 const NEXT = '00000000-0000-4000-8000-000000000002'
@@ -151,9 +152,11 @@ describe('eventForOpen', () => {
     ).toEqual({ type: 'notice', message: 'raven player opens video files only.' })
   })
 
-  it('turns a server title into a playServer event', () => {
-    const target = { serverId: NEXT, mediaId: 7, at: 30, next: [8] }
-    expect(eventForOpen({ type: 'playServer', target })).toEqual({ type: 'playServer', target })
+  it("turns a link's watch page into the event that shows it", () => {
+    expect(eventForOpen({ type: DESKTOP_REPLIES.navigate, to: '/watch/7?at=30&next=8' })).toEqual({
+      type: DESKTOP_EVENTS.navigate,
+      to: '/watch/7?at=30&next=8',
+    })
   })
 
   it('turns a download ask into the event that shows it', () => {
@@ -171,9 +174,21 @@ describe('eventForOpen', () => {
     expect(eventForOpen({ type: 'done' })).toBeNull()
     expect(eventForOpen({ type: 'downloads', downloads: [], autoDeleteDefault: false })).toBeNull()
     expect(eventForOpen({ type: 'space', space: { free: 1, total: 2, used: 0 } })).toBeNull()
-    expect(eventForOpen({ type: 'servers', servers: [] })).toBeNull()
-    expect(eventForOpen({ type: 'serverReply', status: 200, body: '{}' })).toBeNull()
-    expect(eventForOpen({ type: 'serverUnreachable', message: 'gone' })).toBeNull()
+    expect(
+      eventForOpen({
+        type: DESKTOP_REPLIES.title,
+        source: { kind: PLAYER_SOURCE_KINDS.server, serverId: NEXT, mediaId: 7 },
+        resumeAt: 0,
+        next: [],
+      }),
+    ).toBeNull()
+    expect(
+      eventForOpen({
+        type: DESKTOP_REPLIES.titleRefused,
+        reason: TITLE_REFUSALS.locked,
+        message: 'raven locked it.',
+      }),
+    ).toBeNull()
     expect(
       eventForOpen({
         type: 'output',

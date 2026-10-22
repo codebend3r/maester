@@ -1,41 +1,26 @@
-import {
-  type Infer,
-  isMediaId,
-  isNumber,
-  isString,
-  listOf,
-  nullable,
-  object,
-  oneOf,
-  union,
-} from '@raven/core'
-import { isOpaqueId } from '@/shared/protocol'
-import { tidyText } from '@/main/servers/serverNames'
+import { type Infer, isNumber, isString, listOf, nullable, object, oneOf, union } from '@raven/core'
 
 export const RECENTS_CAP = 50
 export const RESUME_CAP = 1000
 export const TRACKS_CAP = 1000
 export const END_MARGIN_S = 10
 
-export const RECENT_KINDS = { file: 'file', server: 'server' } as const
+export const RECENT_KINDS = { file: 'file' } as const
 
-const isFileRecent = object({
+/** The kinds of recent an older raven player kept besides: server titles, before the web app. */
+export const FORMER_RECENT_KINDS = { server: 'server' } as const
+
+const isRecentEntry = object({
   kind: oneOf([RECENT_KINDS.file]),
   path: isString,
   openedAt: isNumber,
 })
 
-/** A server title, by ids. `watched` is only for Home's bar: the server keeps where to resume. */
-const isServerRecent = object({
-  kind: oneOf([RECENT_KINDS.server]),
-  serverId: isOpaqueId,
-  mediaId: isMediaId,
-  label: isString,
-  watched: nullable(isNumber),
-  openedAt: isNumber,
-})
-
-const isRecentEntry = union(isFileRecent, isServerRecent)
+/**
+ * A server title in an older raven player's recents. It is read only to be dropped: the web app's
+ * own lists show what was watched on the server now.
+ */
+const isFormerRecent = object({ kind: oneOf([FORMER_RECENT_KINDS.server]) })
 
 const isResumeEntry = object({
   path: isString,
@@ -61,12 +46,19 @@ const isWindowBounds = object({
   displayId: isNumber,
 })
 
-export const isPlayerState = object({
+const STATE_FIELDS = {
   version: oneOf([1]),
-  recents: listOf(isRecentEntry),
   resume: listOf(isResumeEntry),
   tracks: listOf(isTrackPick),
   window: nullable(isWindowBounds),
+}
+
+const isPlayerState = object({ ...STATE_FIELDS, recents: listOf(isRecentEntry) })
+
+/** What `player-state.json` may hold: this, or an older raven player's, whose recents held server titles too. */
+export const isStoredPlayerState = object({
+  ...STATE_FIELDS,
+  recents: listOf(union(isRecentEntry, isFormerRecent)),
 })
 
 export type RecentEntry = Infer<typeof isRecentEntry>
@@ -94,19 +86,14 @@ const upsertFirst = <T extends { path: string }>({
   cap: number
 }): T[] => [entry, ...list.filter((existing) => existing.path !== entry.path)].slice(0, cap)
 
-/** One key per recent, whichever kind: a file by its path, a server title by its server and media ids. */
-export const recentKey = (entry: RecentEntry): string => {
-  switch (entry.kind) {
-    case RECENT_KINDS.file:
-      return `file:${entry.path}`
-    case RECENT_KINDS.server:
-      return `server:${entry.serverId}:${entry.mediaId}`
-    default: {
-      const unreachable: never = entry
-      return unreachable
-    }
-  }
-}
+/** The state as this raven player keeps it: an older one's server titles leave the recents. */
+export const upgradeState = (stored: Infer<typeof isStoredPlayerState>): PlayerState => ({
+  ...stored,
+  recents: stored.recents.filter(isRecentEntry),
+})
+
+/** One key per recent: a file by its path. */
+export const recentKey = (entry: RecentEntry): string => `${entry.kind}:${entry.path}`
 
 /** Puts `entry` first, dropping any older entry with its key, and keeps the newest `RECENTS_CAP`. */
 const withRecent = ({ state, entry }: { state: PlayerState; entry: RecentEntry }): PlayerState => {
@@ -130,39 +117,6 @@ export const addRecent = ({
   at: number
 }): PlayerState => withRecent({ state, entry: { kind: RECENT_KINDS.file, path, openedAt: at } })
 
-/** A label the page sent is kept to a sensible length, so it cannot swell the state file. */
-export const RECENT_LABEL_MAX = 200
-
-const clampShare = (watched: number | null): number | null =>
-  watched === null ? null : Math.min(1, Math.max(0, watched))
-
-export const noteServerRecent = ({
-  state,
-  serverId,
-  mediaId,
-  label,
-  watched,
-  at,
-}: {
-  state: PlayerState
-  serverId: string
-  mediaId: number
-  label: string
-  watched: number | null
-  at: number
-}): PlayerState =>
-  withRecent({
-    state,
-    entry: {
-      kind: RECENT_KINDS.server,
-      serverId,
-      mediaId,
-      label: tidyText({ text: label, max: RECENT_LABEL_MAX }),
-      watched: clampShare(watched),
-      openedAt: at,
-    },
-  })
-
 export const removeRecentByKey = ({
   state,
   key,
@@ -176,19 +130,6 @@ export const removeRecentByKey = ({
 
 export const removeRecent = ({ state, path }: { state: PlayerState; path: string }): PlayerState =>
   removeRecentByKey({ state, key: recentKey({ kind: RECENT_KINDS.file, path, openedAt: 0 }) })
-
-export const removeServerRecents = ({
-  state,
-  serverId,
-}: {
-  state: PlayerState
-  serverId: string
-}): PlayerState => ({
-  ...state,
-  recents: state.recents.filter(
-    (entry) => entry.kind !== RECENT_KINDS.server || entry.serverId !== serverId,
-  ),
-})
 
 export const clearRecents = (state: PlayerState): PlayerState => ({ ...state, recents: [] })
 

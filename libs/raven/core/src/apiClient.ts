@@ -119,6 +119,7 @@ import {
   isServerHealth,
   isShowListing,
 } from '@/contract'
+import { isUnreachableAnswer } from '@/desktop/webHost'
 import { type MediaListOptions, mediaListQuery } from '@/mediaListQuery'
 import { toQueryString } from '@/query'
 import type { SagaPicture } from '@/sagas'
@@ -152,20 +153,25 @@ export type FetchLike = (url: string, init?: FetchInit) => Promise<FetchResponse
 export class ApiError extends Error {
   readonly status: number
   readonly refusal: AuthRefusal | null
+  /** Whether the answer came from in front of a server out of reach (see `isUnreachableAnswer`). */
+  readonly isServerUnreachable: boolean
 
   constructor({
     status,
     message,
     refusal = null,
+    isServerUnreachable = false,
   }: {
     status: number
     message: string
     refusal?: AuthRefusal | null
+    isServerUnreachable?: boolean
   }) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.refusal = refusal
+    this.isServerUnreachable = isServerUnreachable
   }
 }
 
@@ -287,6 +293,7 @@ export const createApiClient = ({
           fallback: response.statusText || 'Request failed',
         }),
         refusal: isAuthRefusal(responseBody) ? responseBody : null,
+        isServerUnreachable: isUnreachableAnswer({ status: response.status, body: responseBody }),
       })
     }
     return response

@@ -1,6 +1,16 @@
 import { expect, type Page, test } from '@playwright/test'
+import { PAGE_ORIGIN } from '@raven/core'
 import { type Clips, makeClips } from '@/e2e/clips'
-import { freshUserData, openFile, removeDir, watchedPercent, withApp } from '@/e2e/harness'
+import {
+  expectOffline,
+  freshUserData,
+  heading,
+  openFile,
+  removeDir,
+  sideLink,
+  watchedPercent,
+  withApp,
+} from '@/e2e/harness'
 
 type VideoFacts = { readyState: number; paused: boolean; currentTime: number }
 
@@ -33,7 +43,14 @@ const distanceFrom = async ({ page, seconds }: { page: Page; seconds: number }) 
   return facts === null ? Number.POSITIVE_INFINITY : Math.abs(facts.currentTime - seconds)
 }
 
-const homeHeading = (page: Page) => page.getByRole('heading', { name: 'raven player' })
+const localHeading = (page: Page) => heading({ page, name: 'On this Mac' })
+
+/** On this Mac, from the side menu of the frame a launch with no server opens. */
+const openLocal = async (page: Page) => {
+  await expectOffline({ page })
+  await sideLink({ page, name: 'On this Mac' }).click()
+  await expect(localHeading(page)).toBeVisible()
+}
 
 const DRAG_EVENTS = { enter: 'dragenter', drop: 'drop' } as const
 
@@ -61,10 +78,10 @@ const forgedDrag = ({
 const dropOverlay = (page: Page) => page.getByText('Drop to play')
 
 /**
- * Drags a File the page made over Home until its "Drop to play" shows, which proves the
+ * Drags a File the page made over On this Mac until its "Drop to play" shows, which proves the
  * drop listener is attached, then drops it: main refuses it with a notice.
  */
-const dropForgedFileOnHome = async ({ page, name }: { page: Page; name: string }) => {
+const dropForgedFileOnLocal = async ({ page, name }: { page: Page; name: string }) => {
   await expect(async () => {
     await forgedDrag({ page, type: DRAG_EVENTS.enter, name })
     await expect(dropOverlay(page)).toBeVisible({ timeout: 500 })
@@ -117,7 +134,7 @@ test.describe.serial('playing a local file through the web engine fallback', () 
       mpv: MPV,
       run: async ({ app, page }) => {
         await openFile({ app, path: clips.first })
-        await expect(page.getByRole('heading', { name: 'Clip 01', exact: true })).toBeVisible()
+        await expect(heading({ page, name: 'Clip 01' })).toBeVisible()
         await expect.poll(async () => isPlaying(await videoFacts(page))).toBe(true)
         await expectClockAdvancing(page)
 
@@ -162,22 +179,24 @@ test.describe.serial('playing a local file through the web engine fallback', () 
     })
   })
 
-  test('lists recents after a relaunch and removes one', async () => {
+  test('lists recents on On this Mac after a relaunch, plays one and removes it', async () => {
     await withApp({
       userData,
       mpv: MPV,
       run: async ({ page }) => {
-        const recent = page.getByRole('button', { name: 'Clip 01' })
+        await openLocal(page)
+        const recents = page.getByRole('region', { name: 'Recent' })
+        const recent = recents.getByRole('button', { name: /^Clip 01/u })
         await expect(recent).toBeVisible()
-        await expect(page.getByRole('progressbar', { name: '50% watched' })).toBeVisible()
+        await expect(recents.getByRole('progressbar', { name: '50% watched' })).toBeVisible()
 
         await recent.click()
-        await expect(page.getByRole('heading', { name: 'Clip 01', exact: true })).toBeVisible()
+        await expect(heading({ page, name: 'Clip 01' })).toBeVisible()
         await page.keyboard.press('Escape')
-        await expect(homeHeading(page)).toBeVisible()
+        await expect(localHeading(page)).toBeVisible()
 
-        await page.getByRole('button', { name: 'Remove from recents' }).click()
-        await expect(page.getByText('Nothing opened yet.')).toBeVisible()
+        await recents.getByRole('button', { name: 'Remove Clip 01 from recents' }).click()
+        await expect(recents.getByText('Nothing opened yet.')).toBeVisible()
       },
     })
   })
@@ -187,13 +206,13 @@ test.describe.serial('playing a local file through the web engine fallback', () 
       userData,
       mpv: MPV,
       run: async ({ page }) => {
-        await expect(homeHeading(page)).toBeVisible()
+        await openLocal(page)
         // Named for a real video, so a path taken from the name would play it.
-        await dropForgedFileOnHome({ page, name: clips.first })
+        await dropForgedFileOnLocal({ page, name: clips.first })
 
-        await expect(page.getByRole('status')).toHaveText('Drop a video file to play it.')
-        expect(page.url()).toBe('app://raven/')
-        await expect(homeHeading(page)).toBeVisible()
+        await expect(page.getByText('Drop a video file to play it.')).toBeVisible()
+        expect(page.url()).toBe(`${PAGE_ORIGIN}/local`)
+        await expect(localHeading(page)).toBeVisible()
       },
     })
   })

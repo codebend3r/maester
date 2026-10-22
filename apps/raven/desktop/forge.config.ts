@@ -12,6 +12,7 @@ import {
   FUSES,
   isPackagedPath,
   signingFrom,
+  WEB_DIST,
 } from './src/build/forgeOptions'
 import { type RunCommand, signAdHoc } from './src/build/machO'
 import { MPV_STAGING } from './src/build/stageMpv'
@@ -34,8 +35,9 @@ const config: ForgeConfig = {
     ignore: (file) => !isPackagedPath(file),
     protocols: [{ name: 'raven link', schemes: ['raven'] }],
     extendInfo: documentTypes(VIDEO_EXTENSIONS),
-    // stage:mpv fills staging/mpv/darwin-arm64, so it lands at Contents/Resources/mpv/darwin-arm64.
-    extraResource: [MPV_STAGING],
+    // stage:mpv fills staging/mpv/darwin-arm64, so it lands at Contents/Resources/mpv/darwin-arm64;
+    // the web app's build (a dependency of this project's build) lands at Contents/Resources/dist.
+    extraResource: [MPV_STAGING, WEB_DIST],
     ...signing,
   },
   makers: [new MakerDmg({}, ['darwin']), new MakerZIP({}, ['darwin'])],

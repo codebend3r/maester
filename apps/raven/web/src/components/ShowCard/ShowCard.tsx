@@ -9,6 +9,7 @@ import {
   showSortFact,
   showYears,
   watchedStateOf,
+  watchPageOf,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
@@ -137,7 +138,7 @@ export const ShowCard = ({
             play={
               card.select.selecting
                 ? null
-                : { to: `/watch/${next.id}`, state: { media: next }, label: card.playLabel }
+                : { to: watchPageOf(next.id), state: { media: next }, label: card.playLabel }
             }
           />
         )}
@@ -222,7 +223,7 @@ const WideShowCard = ({
         />
         {next && !card.select.selecting && (
           <CardLink
-            to={`/watch/${next.id}`}
+            to={watchPageOf(next.id)}
             state={{ media: next }}
             className={styles.next}
             aria-label={card.playLabel}

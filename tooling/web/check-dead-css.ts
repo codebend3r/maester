@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { compile } from 'sass'
 import ts from 'typescript'
@@ -18,13 +17,6 @@ const root = process.cwd()
 
 const describe = ({ file, line }: Pick<Problem, 'file' | 'line'>): string =>
   line === undefined ? relative(root, file) : `${relative(root, file)}:${line}`
-
-// The desktop's tsconfig.json only references its three bundles; the
-// renderer's is the one that includes the components.
-const configFor = (project: string): string => {
-  const renderer = resolve(project, 'tsconfig.renderer.json')
-  return existsSync(renderer) ? renderer : resolve(project, 'tsconfig.json')
-}
 
 const loadProgram = (configPath: string): ts.Program => {
   const parsed = ts.getParsedCommandLineOfConfigFile(
@@ -149,7 +141,7 @@ const usesIn = ({
 }
 
 const checkProject = (project: string) => {
-  const configPath = configFor(project)
+  const configPath = resolve(project, 'tsconfig.json')
   const program = loadProgram(configPath)
   const checker = program.getTypeChecker()
   const options = program.getCompilerOptions()

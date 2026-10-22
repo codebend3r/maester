@@ -7,6 +7,12 @@ import { join } from 'node:path'
 
 export const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, NodeJS.Platform>
 
+/**
+ * The web app's build, from this project's folder. Forge copies it into the app's resources
+ * under its own name, and unpackaged the web host serves it from here.
+ */
+export const WEB_DIST = join('..', 'web', 'dist')
+
 /** The packager's paths for what goes in the asar. */
 const PACKAGED_PATHS = { project: '', manifest: '/package.json', dist: '/dist' } as const
 

@@ -1,6 +1,12 @@
 import { createHmac, randomBytes } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
-import { AUTH_HEADERS, AUTH_REFUSALS, type LockState } from '@raven/core'
+import {
+  AUTH_HEADERS,
+  AUTH_REFUSALS,
+  type LockState,
+  UNLOCK_COOKIE,
+  UNLOCK_COOKIE_PATH,
+} from '@raven/core'
 import { readCookie, sameSecret } from '@shared/server'
 import type { FastifyRequest } from 'fastify'
 import { authFailure } from '@/auth/authFailure'
@@ -36,7 +42,6 @@ export type Unlocking =
   | { ok: true; cookie: string }
   | { ok: false; status: 401 | 429 | 503; message: string }
 
-export const UNLOCK_COOKIE = 'raven_unlock'
 /** What the unlock cookie names for a caller no account is behind: the browser of a server without accounts. */
 const NO_ACCOUNT = ''
 const COOKIE_PARTS = 3
@@ -145,7 +150,7 @@ export class LockService {
 
   /** Scoped to the API, out of reach of scripts, and never sent from another site. */
   private attributes(): string {
-    return 'Path=/api; HttpOnly; SameSite=Strict'
+    return `Path=${UNLOCK_COOKIE_PATH}; HttpOnly; SameSite=Strict`
   }
 
   private sign(payload: string): string {

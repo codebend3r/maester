@@ -4,6 +4,7 @@ import {
   MEDIA_TICKET_SECONDS,
   type MediaItem,
   ROUTE_STATES,
+  type RouteQuery,
   mediaLabel,
   playLinkFor,
   readWatchState,
@@ -13,13 +14,21 @@ import {
 import { useState } from 'react'
 import {
   ButtonLink,
+  type MediaPlane,
   Player,
   createProgressSaver,
   useLeaveFullscreen,
   useMediaPlane,
 } from '@raven/ui'
-import { afterWatching, useHostPlayer, usePlayerPrefs } from '@raven/ui/headless'
+import {
+  afterWatching,
+  type PlayerServices,
+  useHostPlayer,
+  usePlayerPrefs,
+} from '@raven/ui/headless'
 import { useReprobe } from '@/components/MediaOriginProbe/MediaOriginProbe'
+import { DesktopWatch } from '@/desktop/DesktopWatch/DesktopWatch'
+import { PlayerMessage } from '@/desktop/player/PlayerMessage'
 import { api } from '@/lib/api'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from 'react-router-dom'
@@ -29,6 +38,7 @@ import { useRouteId } from '@/lib/routeQuery'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import { useTicketFollowsSession } from '@/lib/useTicketFollowsSession'
 import { ravenVersion } from '@/lib/version'
+import { useIsDesktop } from '@/stores/desktop'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
 
 /** How long a copied file link plays, as long as the ticket it carries: an account ticket can end sooner, with its token. */
@@ -36,6 +46,43 @@ const LINK_LIFE = {
   account: `up to ${ACCOUNT_TICKET_SECONDS / 60} minutes`,
   legacy: `${MEDIA_TICKET_SECONDS / 3600} hours`,
 } as const
+
+/** Where a video that cannot play goes back to. */
+const LIBRARIES_PATH = '/libraries'
+
+/** The player's place while there is no video: waiting for one (a null message), or saying why. */
+const WatchMessage = ({ message }: { message: string | null }) => (
+  <main className={styles.page}>
+    {message === null ? (
+      <p aria-live="polite">Loading</p>
+    ) : (
+      <>
+        <p role="alert">{message}</p>
+        <ButtonLink to={LIBRARIES_PATH} tone="pill" icon="back" className={styles.back}>
+          Back to libraries
+        </ButtonLink>
+      </>
+    )}
+  </main>
+)
+
+/** What the player's place says while the video is not there: nothing yet, or why not. */
+const messageOf = (
+  page: Exclude<RouteQuery<MediaItem>, { state: typeof ROUTE_STATES.ready }>,
+): string | null => {
+  switch (page.state) {
+    case ROUTE_STATES.loading:
+      return null
+    case ROUTE_STATES.missing:
+      return 'This video is no longer in any library.'
+    case ROUTE_STATES.error:
+      return page.message
+    default: {
+      const unreachable: never = page
+      return unreachable
+    }
+  }
+}
 
 /**
  * The card that was clicked hands its item over in router state, so the
@@ -45,7 +92,8 @@ const LINK_LIFE = {
  */
 export const WatchPage = () => {
   const id = useRouteId()
-  const { state } = useLocation()
+  const { state, search } = useLocation()
+  const isDesktop = useIsDesktop()
   const handed = readWatchState({ state, id })
   const page = routeState({
     id,
@@ -56,7 +104,8 @@ export const WatchPage = () => {
   if (page.state === ROUTE_STATES.ready) {
     return (
       <WatchPlayer
-        key={page.data.id}
+        // A play link raven player opens for the title on screen names where to start: a new player.
+        key={isDesktop ? `${page.data.id}${search}` : page.data.id}
         media={page.data}
         upNext={handed?.upNext ?? []}
         isShuffled={handed?.isShuffled ?? false}
@@ -64,24 +113,9 @@ export const WatchPage = () => {
       />
     )
   }
-  return (
-    <main className={styles.page}>
-      {page.state === ROUTE_STATES.loading ? (
-        <p aria-live="polite">Loading</p>
-      ) : (
-        <>
-          <p role="alert">
-            {page.state === ROUTE_STATES.missing
-              ? 'This video is no longer in any library.'
-              : page.message}
-          </p>
-          <ButtonLink to="/libraries" tone="pill" icon="back" className={styles.back}>
-            Back to libraries
-          </ButtonLink>
-        </>
-      )}
-    </main>
-  )
+  // Outside the side menu, raven player's window has no other way back while this waits.
+  if (isDesktop) return <PlayerMessage message={messageOf(page)} fallback={LIBRARIES_PATH} />
+  return <WatchMessage message={messageOf(page)} />
 }
 
 /**
@@ -123,7 +157,8 @@ export const WatchPlayer = ({
       () => setCopied(`Copy this link: ${link}`),
     )
   }
-  const isHosting = useHostPlayer({
+  const isDesktop = useIsDesktop()
+  const services: PlayerServices = {
     title: {
       label: mediaLabel(media),
       duration: media.duration,
@@ -161,21 +196,41 @@ export const WatchPlayer = ({
       appVersion: ravenVersion,
       send: (diagnostics) => api.reportPlaybackError(diagnostics),
     },
-    ...(opensInRavenPlayer && {
-      handoff: {
-        label: 'Open in raven player',
-        run: (at) =>
-          ravenPlayer.open(
-            playLinkFor({
-              origin: window.location.origin,
-              mediaId: media.id,
-              at,
-              next: upNext.map(({ id }) => id),
-            }),
-          ),
-      },
-    }),
-  })
+    // Inside raven player the title already plays there.
+    ...(opensInRavenPlayer &&
+      !isDesktop && {
+        handoff: {
+          label: 'Open in raven player',
+          run: (at) =>
+            ravenPlayer.open(
+              playLinkFor({
+                origin: window.location.origin,
+                mediaId: media.id,
+                at,
+                next: upNext.map(({ id }) => id),
+              }),
+            ),
+        },
+      }),
+  }
+  return isDesktop ? (
+    <DesktopWatch services={services} media={media} upNext={upNext} />
+  ) : (
+    <BrowserWatch services={services} media={media} mediaPlane={mediaPlane} />
+  )
+}
+
+/** The browser's own video, hosted for as long as it plays. */
+const BrowserWatch = ({
+  services,
+  media,
+  mediaPlane,
+}: {
+  services: PlayerServices
+  media: MediaItem
+  mediaPlane: MediaPlane
+}) => {
+  const isHosting = useHostPlayer(services)
   return (
     isHosting && (
       <Player engine={{ kind: 'html', source: { kind: 'server', media, api, mediaPlane } }} />

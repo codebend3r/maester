@@ -1,3 +1,0 @@
-{
-  "extends": ["../../../tooling/gale/recommended-scss.json", "../../../tooling/gale/rules.json"]
-}

@@ -1,35 +1,26 @@
 import {
   AUTH_PARAMS,
   AUTH_PATHS,
-  isAdminUnlockRequest,
   isMediaId,
   isProgressChange,
   isProgressReport,
-  isUnlockRequest,
+  SERVER_METHODS,
 } from '@raven/core'
 import { parseJson } from '@/main/parseJson'
-import { MAX_SECRET, SERVER_METHODS } from '@/shared/protocol'
 
 export type ServerMethod = (typeof SERVER_METHODS)[keyof typeof SERVER_METHODS]
 export const MAX_BODY = 4096
 
-/** The calls main makes for the page, by name. */
+/** The calls main makes to the server, by name. */
 export const CALL_NAMES = {
   getMedia: 'getMedia',
   getTracks: 'getTracks',
   saveProgress: 'saveProgress',
   recordPlay: 'recordPlay',
-  getLock: 'getLock',
-  unlock: 'unlock',
-  getAdminLock: 'getAdminLock',
-  unlockAdmin: 'unlockAdmin',
   getItem: 'getItem',
   getLibrary: 'getLibrary',
   getSagas: 'getSagas',
   getMediaOrigins: 'getMediaOrigins',
-  getMediaTicket: 'getMediaTicket',
-  getAuthConfig: 'getAuthConfig',
-  getMe: 'getMe',
   getAccountTicket: 'getAccountTicket',
 } as const
 
@@ -43,25 +34,14 @@ export type AllowedCall =
       audio: number | null
     }
   | { name: typeof CALL_NAMES.recordPlay; mediaId: number }
-  | { name: typeof CALL_NAMES.getLock }
-  | { name: typeof CALL_NAMES.unlock; pin: string }
-  | { name: typeof CALL_NAMES.getAdminLock }
-  | { name: typeof CALL_NAMES.unlockAdmin; password: string }
   | { name: typeof CALL_NAMES.getItem; itemId: number }
   | { name: typeof CALL_NAMES.getLibrary; libraryId: number }
   | { name: typeof CALL_NAMES.getSagas; libraryId: number }
   | { name: typeof CALL_NAMES.getMediaOrigins }
-  | { name: typeof CALL_NAMES.getMediaTicket; mediaId: number }
-  | { name: typeof CALL_NAMES.getAuthConfig }
-  | { name: typeof CALL_NAMES.getMe }
   | { name: typeof CALL_NAMES.getAccountTicket; mediaId: number }
 
 /** The fixed paths among the calls; the numbered calls' paths carry an id. */
 export const API_PATHS = {
-  lock: '/api/lock',
-  unlock: '/api/lock/unlock',
-  admin: '/api/admin',
-  adminUnlock: '/api/admin/unlock',
   mediaOrigins: '/api/media-origins',
   media: '/api/media',
 } as const
@@ -103,8 +83,6 @@ const readBody = (body: string | null): Body => {
   const value = parseJson(body)
   return value === undefined ? { kind: BODY_KINDS.bad } : { kind: BODY_KINDS.json, value }
 }
-
-const isSecret = (value: string): boolean => value.length <= MAX_SECRET
 
 const ID_PARAM = `:${AUTH_PARAMS.id}`
 
@@ -169,12 +147,6 @@ const ROUTES: readonly Route[] = [
   },
   {
     kind: ROUTE_KINDS.numbered,
-    method: SERVER_METHODS.get,
-    pattern: /^\/api\/media\/([1-9]\d{0,15})\/ticket$/u,
-    read: ({ id, body }) => bare({ name: CALL_NAMES.getMediaTicket, mediaId: id })({ body }),
-  },
-  {
-    kind: ROUTE_KINDS.numbered,
     method: SERVER_METHODS.post,
     pattern: new RegExp(`^${withId({ path: AUTH_PATHS.ticket, id: '([1-9]\\d{0,15})' })}$`, 'u'),
     read: ({ id, body }) => bare({ name: CALL_NAMES.getAccountTicket, mediaId: id })({ body }),
@@ -182,52 +154,8 @@ const ROUTES: readonly Route[] = [
   {
     kind: ROUTE_KINDS.fixed,
     method: SERVER_METHODS.get,
-    path: AUTH_PATHS.config,
-    read: bare({ name: CALL_NAMES.getAuthConfig }),
-  },
-  {
-    kind: ROUTE_KINDS.fixed,
-    method: SERVER_METHODS.get,
-    path: AUTH_PATHS.me,
-    read: bare({ name: CALL_NAMES.getMe }),
-  },
-  {
-    kind: ROUTE_KINDS.fixed,
-    method: SERVER_METHODS.get,
     path: API_PATHS.mediaOrigins,
     read: bare({ name: CALL_NAMES.getMediaOrigins }),
-  },
-  {
-    kind: ROUTE_KINDS.fixed,
-    method: SERVER_METHODS.get,
-    path: API_PATHS.lock,
-    read: bare({ name: CALL_NAMES.getLock }),
-  },
-  {
-    kind: ROUTE_KINDS.fixed,
-    method: SERVER_METHODS.post,
-    path: API_PATHS.unlock,
-    read: ({ body }) =>
-      body.kind === BODY_KINDS.json && isUnlockRequest(body.value) && isSecret(body.value.pin)
-        ? { name: CALL_NAMES.unlock, pin: body.value.pin }
-        : null,
-  },
-  {
-    kind: ROUTE_KINDS.fixed,
-    method: SERVER_METHODS.get,
-    path: API_PATHS.admin,
-    read: bare({ name: CALL_NAMES.getAdminLock }),
-  },
-  {
-    kind: ROUTE_KINDS.fixed,
-    method: SERVER_METHODS.post,
-    path: API_PATHS.adminUnlock,
-    read: ({ body }) =>
-      body.kind === BODY_KINDS.json &&
-      isAdminUnlockRequest(body.value) &&
-      isSecret(body.value.password)
-        ? { name: CALL_NAMES.unlockAdmin, password: body.value.password }
-        : null,
   },
 ]
 
@@ -262,7 +190,10 @@ const matchRoute = ({
   }
 }
 
-/** One of the sixteen allowlisted calls, read from what was sent, or null for anything else. */
+/**
+ * One of the allowlisted calls, read from its request, or null for anything else. Main reads back
+ * each request it built, so a value that slipped past the types never reaches a path.
+ */
 export const matchCall = ({
   method,
   path,
@@ -298,22 +229,6 @@ export const requestFor = (
       }
     case CALL_NAMES.recordPlay:
       return { method: SERVER_METHODS.post, path: `/api/media/${call.mediaId}/plays`, body: null }
-    case CALL_NAMES.getLock:
-      return { method: SERVER_METHODS.get, path: API_PATHS.lock, body: null }
-    case CALL_NAMES.unlock:
-      return {
-        method: SERVER_METHODS.post,
-        path: API_PATHS.unlock,
-        body: JSON.stringify({ pin: call.pin }),
-      }
-    case CALL_NAMES.getAdminLock:
-      return { method: SERVER_METHODS.get, path: API_PATHS.admin, body: null }
-    case CALL_NAMES.unlockAdmin:
-      return {
-        method: SERVER_METHODS.post,
-        path: API_PATHS.adminUnlock,
-        body: JSON.stringify({ password: call.password }),
-      }
     case CALL_NAMES.getItem:
       return { method: SERVER_METHODS.get, path: `/api/items/${call.itemId}`, body: null }
     case CALL_NAMES.getLibrary:
@@ -326,12 +241,6 @@ export const requestFor = (
       }
     case CALL_NAMES.getMediaOrigins:
       return { method: SERVER_METHODS.get, path: API_PATHS.mediaOrigins, body: null }
-    case CALL_NAMES.getMediaTicket:
-      return { method: SERVER_METHODS.get, path: `/api/media/${call.mediaId}/ticket`, body: null }
-    case CALL_NAMES.getAuthConfig:
-      return { method: SERVER_METHODS.get, path: AUTH_PATHS.config, body: null }
-    case CALL_NAMES.getMe:
-      return { method: SERVER_METHODS.get, path: AUTH_PATHS.me, body: null }
     case CALL_NAMES.getAccountTicket:
       return {
         method: SERVER_METHODS.post,
@@ -353,51 +262,12 @@ export const isWrite = (call: AllowedCall): boolean => {
       return true
     case CALL_NAMES.getMedia:
     case CALL_NAMES.getTracks:
-    case CALL_NAMES.getLock:
-    case CALL_NAMES.unlock:
-    case CALL_NAMES.getAdminLock:
-    case CALL_NAMES.unlockAdmin:
     case CALL_NAMES.getItem:
     case CALL_NAMES.getLibrary:
     case CALL_NAMES.getSagas:
     case CALL_NAMES.getMediaOrigins:
-    case CALL_NAMES.getMediaTicket:
-    case CALL_NAMES.getAuthConfig:
-    case CALL_NAMES.getMe:
     case CALL_NAMES.getAccountTicket:
       return false
-    default: {
-      const unreachable: never = call
-      return unreachable
-    }
-  }
-}
-
-/**
- * Whether the page may make a call. Tickets, the origin list and the account calls are main's
- * alone: main builds every media URL and holds every session itself, so the page never holds a
- * ticket or a token or learns an origin.
- */
-export const isPageCall = (call: AllowedCall): boolean => {
-  switch (call.name) {
-    case CALL_NAMES.getMediaOrigins:
-    case CALL_NAMES.getMediaTicket:
-    case CALL_NAMES.getAuthConfig:
-    case CALL_NAMES.getMe:
-    case CALL_NAMES.getAccountTicket:
-      return false
-    case CALL_NAMES.getMedia:
-    case CALL_NAMES.getTracks:
-    case CALL_NAMES.saveProgress:
-    case CALL_NAMES.recordPlay:
-    case CALL_NAMES.getLock:
-    case CALL_NAMES.unlock:
-    case CALL_NAMES.getAdminLock:
-    case CALL_NAMES.unlockAdmin:
-    case CALL_NAMES.getItem:
-    case CALL_NAMES.getLibrary:
-    case CALL_NAMES.getSagas:
-      return true
     default: {
       const unreachable: never = call
       return unreachable

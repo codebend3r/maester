@@ -2,16 +2,21 @@ import { useMediaOriginProbe } from '@raven/ui'
 import { type ReactNode, useLayoutEffect } from 'react'
 import { useIsServed } from '@/lib/accessState'
 import { api } from '@/lib/api'
+import { useIsDesktop } from '@/stores/desktop'
 import { useOriginProbe } from '@/stores/originProbe'
 
 /**
  * Probes the server's media origins as the app opens and as the network
  * changes, and puts `reprobe` in `useOriginProbe` for whatever plays media
  * beneath it, which draws once it is there. With accounts on it probes once
- * an account is approved, as the server answers no one else.
+ * an account is approved, as the server answers no one else. Inside raven
+ * player it never probes: mpv plays through the app, which picks its own way
+ * to the server.
  */
 export const MediaOriginProbe = ({ children }: { children: ReactNode }) => {
-  const isEnabled = useIsServed()
+  const isServed = useIsServed()
+  const isDesktop = useIsDesktop()
+  const isEnabled = isServed && !isDesktop
   const { reprobe } = useMediaOriginProbe({ api, isEnabled })
   useLayoutEffect(() => {
     useOriginProbe.setState({ reprobe })

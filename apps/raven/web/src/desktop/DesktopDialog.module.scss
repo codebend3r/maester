@@ -1,0 +1,73 @@
+// raven player's own dialogs, drawn as the shared UnlockDialog is: the frame,
+// corners and shadow are elements.scss's, the padding the form's, so the
+// footer's hairline runs edge to edge.
+.dialog {
+  width: min(28rem, calc(100vw - 2 * var(--space-3)));
+  max-width: none;
+  padding: 0;
+}
+
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  padding-top: var(--space-5);
+
+  > * {
+    padding-inline: var(--space-5);
+  }
+
+  @media (max-width: 30rem) {
+    padding-top: var(--space-4);
+
+    > * {
+      padding-inline: var(--space-4);
+    }
+  }
+}
+
+.title {
+  font-size: var(--font-size-xl);
+}
+
+.hint {
+  color: var(--color-birch);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.error {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  font-size: var(--font-size-sm);
+
+  svg {
+    color: var(--color-leaf-bright);
+  }
+}
+
+// Under a hairline, the dialog's action at the end.
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: end;
+  gap: var(--space-1);
+  padding-block: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}

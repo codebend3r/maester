@@ -1,8 +1,13 @@
+import {
+  ENVELOPE_KINDS,
+  type InvokeEnvelope,
+  PAGE_ORIGIN,
+  type RavenDesktopBridge,
+} from '@raven/core'
 import { contextBridge, type IpcRendererEvent, ipcRenderer, webUtils } from 'electron'
 import { dropPaths } from '@/preload/dropPaths'
 import { forwardPlayerPort } from '@/preload/playerPort'
-import type { RavenDesktopBridge } from '@/shared/bridge'
-import { APP_ORIGIN, ENVELOPE_KINDS, IPC_CHANNELS, type InvokeEnvelope } from '@/shared/protocol'
+import { IPC_CHANNELS } from '@/shared/hostNames'
 
 // The page's request goes on unchecked: main narrows the whole envelope at its boundary.
 type Envelope =
@@ -31,14 +36,18 @@ const bridge = {
   },
 } satisfies RavenDesktopBridge
 
-contextBridge.exposeInMainWorld('ravenDesktop', bridge)
+// Only the web host's page gets the bridge. Main refuses any other frame too, and the window
+// never navigates away, so this is a second lock rather than the only one.
+if (window.location.origin === PAGE_ORIGIN) {
+  contextBridge.exposeInMainWorld('ravenDesktop', bridge)
 
-// The player's port cannot cross `contextBridge`, so it reaches the page as a window message
-// on the app's origin, which the page checks before taking the port.
-ipcRenderer.on(IPC_CHANNELS.player, (event, payload: unknown) =>
-  forwardPlayerPort({
-    payload,
-    ports: event.ports,
-    post: ({ message, transfer }) => window.postMessage(message, APP_ORIGIN, transfer),
-  }),
-)
+  // The player's port cannot cross `contextBridge`, so it reaches the page as a window message
+  // on the page's origin, which the page checks before taking the port.
+  ipcRenderer.on(IPC_CHANNELS.player, (event, payload: unknown) =>
+    forwardPlayerPort({
+      payload,
+      ports: event.ports,
+      post: ({ message, transfer }) => window.postMessage(message, PAGE_ORIGIN, transfer),
+    }),
+  )
+}

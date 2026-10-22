@@ -159,7 +159,7 @@ const smoke = async ({ project }: { project: string }): Promise<number> => {
       .filter((line) => MARKS.some((needle) => line.includes(needle)))
       .forEach((line) => process.stdout.write(`${line}\n`))
     process.stdout.write(
-      `raven player ${version} launched, opened its video engine and quit on SIGTERM.\n`,
+      `raven player ${version} launched, served its page, opened its video engine and quit on SIGTERM.\n`,
     )
     return 0
   } finally {

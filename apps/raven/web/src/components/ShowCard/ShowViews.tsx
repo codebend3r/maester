@@ -11,6 +11,7 @@ import {
   showYears,
   sortTitle,
   watchedStateOf,
+  watchPageOf,
 } from '@raven/core'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { Icon } from '@raven/ui'
@@ -34,7 +35,7 @@ const NextPlay = ({ entry }: { entry: ShowEntry }) => {
   const code = next.item ? episodeCode(next.item) : null
   return (
     <CardLink
-      to={`/watch/${next.id}`}
+      to={watchPageOf(next.id)}
       state={{ media: next }}
       className={styles.play}
       aria-label={code ? `Play ${show.title} ${code}` : `Play ${show.title}`}

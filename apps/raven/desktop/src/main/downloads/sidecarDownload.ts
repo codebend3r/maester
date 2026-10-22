@@ -66,14 +66,14 @@ type SidecarJob = { entry: DownloadEntry; server: ServerEntry; signal: AbortSign
  */
 export const createSidecarDownload = ({
   calls,
-  fetchFor,
+  fetch,
   fs,
   userData,
   timers,
   warn,
 }: {
   calls: Pick<ServerCalls, 'call'>
-  fetchFor: (input: { serverId: string; access: Access }) => StreamFetch
+  fetch: StreamFetch
   fs: Pick<QueueFs, 'mkdir' | 'writeFile'>
   userData: string
   timers: Timers
@@ -114,7 +114,7 @@ export const createSidecarDownload = ({
     access: Access
     track: SubtitleTrack
   }): Promise<Sidecar | null> => {
-    const { entry, server, signal: stop } = job
+    const { entry, signal: stop } = job
     const skipped = (why = ''): null => {
       if (!stop.aborted) {
         warn(`raven player skipped subtitle ${track.id} of ${loggable(entry.label)}${why}`)
@@ -125,13 +125,8 @@ export const createSidecarDownload = ({
     const timer = timers.set({ run: () => late.abort(), ms: DOWNLOAD_STALL_MS })
     const signal = AbortSignal.any([stop, late.signal])
     try {
-      const response = await fetchFor({ serverId: entry.serverId, access })({
-        url: sidecarUrlFor({
-          access,
-          origin: server.origin,
-          mediaId: entry.mediaId,
-          trackId: track.id,
-        }),
+      const response = await fetch({
+        url: sidecarUrlFor({ access, mediaId: entry.mediaId, trackId: track.id }),
         headers: {},
         signal,
       })

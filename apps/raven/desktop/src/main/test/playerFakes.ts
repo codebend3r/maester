@@ -1,5 +1,4 @@
 import type { PlayerCommand, PlayerEvent } from '@raven/core'
-import { AUTH_STATES } from '@/main/accounts/authConfigs'
 import type { PortLike } from '@/main/player/playerPort'
 import type {
   AccountRefusalReader,
@@ -8,8 +7,6 @@ import type {
   PlayerService,
   ResolvedSource,
 } from '@/main/player/playerService'
-import { TICKET_OUTCOMES } from '@/main/servers/accountTickets'
-import type { MediaRelay } from '@/main/servers/mediaRelay'
 import type { Timers } from '@/main/stateStore'
 
 const OK: PlayerOutcome = { ok: true }
@@ -20,23 +17,6 @@ const NO_SERVERS_MESSAGE = 'This player knows no servers.'
 export const NO_SERVERS = {
   resolve: async (): Promise<ResolvedSource> => ({ ok: false, message: NO_SERVERS_MESSAGE }),
 }
-
-const NOT_RELAYED_MESSAGE = 'This player relays no titles.'
-
-/**
- * The account parts of server sources for servers whose accounts are off: every title takes the
- * cookie path, no ticket is minted and nothing goes through the relay.
- */
-export const ACCOUNTS_OFF = {
-  authConfigs: { stateOf: async () => ({ kind: AUTH_STATES.off }) },
-  tickets: { ticketFor: async () => ({ kind: TICKET_OUTCOMES.unreachable }) },
-  relay: {
-    open: () => Promise.reject(new Error(NOT_RELAYED_MESSAGE)),
-    refusalOf: () => null,
-    close: () => undefined,
-  } satisfies Pick<MediaRelay, 'open' | 'refusalOf' | 'close'>,
-  accountChanged: async () => undefined,
-} as const
 
 /** A player whose server titles were never refused an account. */
 export const noRefusedAccount: AccountRefusalReader = () => null
@@ -134,7 +114,6 @@ export const fakeService = ({
       log.push('reset')
       flags.resets += 1
     },
-    resetIfServer: async () => {},
     dispose: () => {},
     applyOutput: async () => {},
     applyDisplay: async () => {},

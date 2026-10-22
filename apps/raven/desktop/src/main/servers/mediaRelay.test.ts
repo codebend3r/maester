@@ -1,7 +1,6 @@
+import { AUTH_REFUSALS, HTTP_METHODS, MEDIA_TICKET_PARAM } from '@raven/core'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { AUTH_REFUSALS, MEDIA_TICKET_PARAM } from '@raven/core'
 import { createServer, type Server } from 'node:http'
-import { TOKEN_READS } from '@/main/accounts/accountSessions'
 import { SIGNAL_EVENTS } from '@/main/bounded'
 import type { ServerEntry } from '@/main/desktopConfig'
 import {
@@ -18,14 +17,11 @@ import {
   type UpstreamFetch,
 } from '@/main/servers/mediaRelay'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { HTTP_METHODS } from '@/shared/protocol'
 
 const SERVER: ServerEntry = {
   id: '00000000-0000-4000-8000-000000000001',
   origin: 'https://raven.example',
   name: 'Vhagar',
-  addedAt: 1,
-  signIn: null,
 }
 const OTHER: ServerEntry = { ...SERVER, id: '00000000-0000-4000-8000-000000000002' }
 
@@ -80,7 +76,6 @@ const setup = ({
   const warnings: string[] = []
   const secrets: number[] = []
   const listens = { count: 0 }
-  const changed: string[] = []
   const fetchUpstream: UpstreamFetch = async (input) => {
     heard.push(input)
     const { status, headers = {}, body = null } = answer({ heard: input, count: heard.length })
@@ -110,9 +105,6 @@ const setup = ({
         )
       },
     },
-    accountChanged: async ({ serverId }) => {
-      changed.push(serverId)
-    },
     newSecret: (bytes) => {
       secrets.push(bytes)
       return `${'s'.repeat(42)}${secrets.length}`
@@ -121,7 +113,7 @@ const setup = ({
       warnings.push(message)
     },
   })
-  return { relay, heard, asked, warnings, secrets, listens, changed }
+  return { relay, heard, asked, warnings, secrets, listens }
 }
 
 const OPEN = { server: SERVER, mediaId: 7, sidecarTrackIds: ['external-0', 'external-3'] }
@@ -163,7 +155,6 @@ describe('open', () => {
       fetchUpstream: () => Promise.reject(new Error('unused')),
       tickets: { ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.unreachable }) },
       newSecret: () => 'x'.repeat(43),
-      accountChanged: async () => undefined,
       warn: () => undefined,
     })
     await expect(relay.open(OPEN)).rejects.toThrow('no socket')
@@ -176,7 +167,6 @@ describe('open', () => {
       fetchUpstream: () => Promise.reject(new Error('unused')),
       tickets: { ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.unreachable }) },
       newSecret: () => 'short/../',
-      accountChanged: async () => undefined,
       warn: () => undefined,
     })
     await expect(relay.open(OPEN)).rejects.toThrow()
@@ -440,7 +430,6 @@ describe('a relayed request', () => {
           }),
       },
       newSecret: () => 'r'.repeat(43),
-      accountChanged: async () => undefined,
       warn: () => undefined,
     })
     const old = await relay.open(OPEN)
@@ -469,27 +458,8 @@ describe('a relayed request', () => {
     expect(refused.relay.refusalOf(removed.loadId)).toBe(AUTH_REFUSALS.revoked)
   })
 
-  test("a refusal tells the account once per load and reason, a sidecar's included", async () => {
-    const { relay, changed } = setup({
-      answer: ({ count }) =>
-        count <= 2
-          ? { status: 403, body: refusalBody(AUTH_REFUSALS.revoked) }
-          : { status: 403, body: refusalBody(AUTH_REFUSALS.pending) },
-    })
-    const { fileUrl, sidecarUrls } = await relay.open(OPEN)
-    const [sidecar = ''] = sidecarUrls
-    await fetch(sidecar)
-    await rangeOf(fileUrl)
-    expect(changed).toEqual([SERVER.id])
-    await rangeOf(fileUrl)
-    expect(changed).toEqual([SERVER.id, SERVER.id])
-    const next = await relay.open(OPEN)
-    await rangeOf(next.fileUrl)
-    expect(changed).toEqual([SERVER.id, SERVER.id, SERVER.id])
-  })
-
-  test('a refused sidecar tells the account but is not why the file ends', async () => {
-    const { relay, changed } = setup({
+  test('a refused sidecar is not why the file ends', async () => {
+    const { relay } = setup({
       answer: ({ heard }) =>
         heard.url.includes('/subtitles/')
           ? { status: 403, body: refusalBody(AUTH_REFUSALS.revoked) }
@@ -498,14 +468,13 @@ describe('a relayed request', () => {
     const { fileUrl, sidecarUrls, loadId } = await relay.open(OPEN)
     const [sidecar = ''] = sidecarUrls
     expect((await fetch(sidecar)).status).toBe(403)
-    expect(changed).toEqual([SERVER.id])
     expect(relay.refusalOf(loadId)).toBeNull()
     expect((await rangeOf(fileUrl)).status).toBe(206)
     expect(relay.refusalOf(loadId)).toBeNull()
   })
 
-  test('the file served again after a refusal clears it, and a later refusal is told afresh', async () => {
-    const { relay, changed } = setup({
+  test('the file served again after a refusal clears it, and a later refusal is kept afresh', async () => {
+    const { relay } = setup({
       answer: ({ count }) =>
         count === 2
           ? { status: 206, body: 'abcd' }
@@ -518,23 +487,21 @@ describe('a relayed request', () => {
     expect(relay.refusalOf(loadId)).toBeNull()
     expect((await rangeOf(fileUrl)).status).toBe(403)
     expect(relay.refusalOf(loadId)).toBe(AUTH_REFUSALS.revoked)
-    expect(changed).toEqual([SERVER.id, SERVER.id])
   })
 
-  test('a refused mint tells the account, and an access ended in main does not', async () => {
-    const { relay, changed } = setup({
+  test("a refused mint is the load's refusal, as is an access ended in main", async () => {
+    const { relay } = setup({
       outcomes: [{ kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.signedOut }],
     })
-    const { fileUrl } = await relay.open(OPEN)
+    const { fileUrl, loadId } = await relay.open(OPEN)
     await rangeOf(fileUrl)
-    expect(changed).toEqual([SERVER.id])
+    expect(relay.refusalOf(loadId)).toBe(AUTH_REFUSALS.signedOut)
     const ended = await relay.open(OPEN)
     relay.closeServer(SERVER.id)
     expect(relay.refusalOf(ended.loadId)).toBe(AUTH_REFUSALS.signedOut)
-    expect(changed).toEqual([SERVER.id])
   })
 
-  test('an account read that fails is warned without a secret', async () => {
+  test('a refusal is warned without a secret', async () => {
     const warnings: string[] = []
     const relay = createMediaRelay({
       listen: listenOnLoopback({
@@ -553,7 +520,6 @@ describe('a relayed request', () => {
         ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.ticket, ticket: 'account.t1' }),
       },
       newSecret: () => 'w'.repeat(43),
-      accountChanged: () => Promise.reject(new Error('https://raven.example token')),
       warn: (message) => {
         warnings.push(message)
       },
@@ -561,10 +527,7 @@ describe('a relayed request', () => {
     const { fileUrl } = await relay.open(OPEN)
     await rangeOf(fileUrl)
     await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(warnings).toEqual([
-      'Vhagar refused a relayed request: revoked',
-      "raven player could not read Vhagar's account again",
-    ])
+    expect(warnings).toEqual(['Vhagar refused a relayed request: revoked'])
   })
 
   test('seeks past many ticket lifetimes keep playing, one mint per window', async () => {
@@ -599,11 +562,10 @@ describe('a relayed request', () => {
             return { ok: true, status: 200, body: JSON.stringify({ ticket, expiresAt: 0 }) }
           },
         },
-        sessions: { accessToken: async () => ({ kind: TOKEN_READS.token, token: 'jwt' }) },
+        isSignedIn: () => true,
         now: () => clock.now,
       }),
       newSecret: () => 'v'.repeat(43),
-      accountChanged: async () => undefined,
       warn: () => undefined,
     })
     const { fileUrl, loadId } = await relay.open(OPEN)
@@ -636,7 +598,6 @@ describe('a relayed request', () => {
         ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.ticket, ticket: 'account.t1' }),
       },
       newSecret: () => 'q'.repeat(43),
-      accountChanged: async () => undefined,
       warn: (message) => {
         warnings.push(message)
       },

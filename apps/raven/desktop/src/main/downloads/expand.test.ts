@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test'
 import {
-  ADMIN_LOCK_STATES,
   AUTH_REFUSALS,
   DOWNLOAD_TARGET_KINDS,
   ITEM_TYPES,
@@ -56,18 +55,15 @@ const library1 = {
 const itemCall = (itemId: number): string => keyOf({ name: CALL_NAMES.getItem, itemId })
 const mediaCall = (mediaId: number): string => keyOf({ name: CALL_NAMES.getMedia, mediaId })
 const sagasCall = keyOf({ name: CALL_NAMES.getSagas, libraryId: 1 })
-const adminCall = keyOf({ name: CALL_NAMES.getAdminLock })
 
 const run = ({
   replies,
   target,
   skip = () => false,
-  hasAccounts = false,
 }: {
   replies: Record<string, Reply>
   target: Parameters<typeof expandTarget>[0]['target']
   skip?: (mediaId: number) => boolean
-  hasAccounts?: boolean
 }) => {
   const { calls, log } = fakeCalls({ ...library1, ...replies })
   return {
@@ -78,7 +74,6 @@ const run = ({
       serverName: SERVER_NAME,
       target,
       skip,
-      hasAccounts,
     }),
   }
 }
@@ -595,28 +590,19 @@ describe('expandTarget', () => {
     expect(failed(await expansion).reason).toBe('locked')
   })
 
-  it('answers hidden for a 404 while the admin lock is on and can be turned off', async () => {
-    const { expansion } = run({
-      replies: { [adminCall]: ok({ state: 'on', available: true }) },
-      target: { kind: 'item', itemId: 5 },
-    })
-    expect(failed(await expansion).reason).toBe('hidden')
-  })
-
-  it('answers gone for a 404 on a server with accounts, without asking for its admin lock', async () => {
+  it('answers gone for a 404, asking nothing more', async () => {
     const { expansion, log } = run({
-      replies: { [adminCall]: ok({ state: ADMIN_LOCK_STATES.on, available: true }) },
+      replies: {},
       target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 5 },
-      hasAccounts: true,
     })
     const result = failed(await expansion)
     expect(result.reason).toBe(EXPAND_REASONS.gone)
     expect(result.message).toBe(EXPAND_MESSAGES.gone(SERVER_NAME))
-    expect(log).not.toContain(adminCall)
+    expect(log).toEqual([itemCall(5)])
   })
 
-  it('answers gone for a title deep in a show on a server with accounts', async () => {
-    const { expansion, log } = run({
+  it('answers gone for a title deep in a show', async () => {
+    const { expansion } = run({
       replies: {
         [itemCall(4)]: ok(
           details({
@@ -626,36 +612,10 @@ describe('expandTarget', () => {
             children: [season({ id: 5, number: 1 })],
           }),
         ),
-        [adminCall]: ok({ state: ADMIN_LOCK_STATES.on, available: true }),
       },
       target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 4 },
-      hasAccounts: true,
     })
     expect(failed(await expansion).reason).toBe(EXPAND_REASONS.gone)
-    expect(log).not.toContain(adminCall)
-  })
-
-  it('answers gone for a 404 while the admin lock is off, cannot be lifted or does not answer', async () => {
-    const off = run({
-      replies: { [adminCall]: ok({ state: 'off' }) },
-      target: { kind: 'item', itemId: 5 },
-    })
-    expect(failed(await off.expansion).reason).toBe('gone')
-    const unavailable = run({
-      replies: { [adminCall]: ok({ state: 'on', available: false }) },
-      target: { kind: 'item', itemId: 5 },
-    })
-    expect(failed(await unavailable.expansion).reason).toBe('gone')
-    const silent = run({
-      replies: { [adminCall]: { unreachable: 'down' } },
-      target: { kind: 'item', itemId: 5 },
-    })
-    expect(failed(await silent.expansion).reason).toBe('gone')
-    const garbled = run({
-      replies: { [adminCall]: ok('not json') },
-      target: { kind: 'item', itemId: 5 },
-    })
-    expect(failed(await garbled.expansion).reason).toBe('gone')
   })
 
   it('carries the message of an unreachable call', async () => {
@@ -736,7 +696,6 @@ describe('expandTarget', () => {
         calls,
         serverId: SERVER_ID,
         serverName: SERVER_NAME,
-        hasAccounts: false,
         target: { kind: 'media', mediaId: 9 },
         skip: () => false,
       }),

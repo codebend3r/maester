@@ -1,5 +1,12 @@
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test'
-import { freshUserData, type MpvMode, readLog, removeDir, withApp } from '@/e2e/harness'
+import {
+  expectOffline,
+  freshUserData,
+  type MpvMode,
+  readLog,
+  removeDir,
+  withApp,
+} from '@/e2e/harness'
 import { ENGINE_MODES } from '@/main/player/engine'
 
 const COPIED_KEY = 'ravenE2eCopied'
@@ -46,8 +53,6 @@ const copyDiagnostics = async ({ app }: { app: ElectronApplication }): Promise<v
   })
 }
 
-const homeHeading = (page: Page) => page.getByRole('heading', { name: 'raven player' })
-
 /** Copies the diagnostics into the stand-in clipboard and answers what was copied. */
 const copiedDiagnostics = async ({
   mpv,
@@ -62,7 +67,7 @@ const copiedDiagnostics = async ({
       userData,
       mpv,
       run: async ({ app, page }) => {
-        await expect(homeHeading(page)).toBeVisible()
+        await expectOffline({ page })
         await ready({ userData, page })
         await stubClipboard({ app })
         await copyDiagnostics({ app })

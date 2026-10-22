@@ -1,8 +1,13 @@
 import {
+  DOWNLOAD_STATUS_KINDS,
   type Infer,
   isBoolean,
+  isContainerName,
+  isDownloadGroup,
   isMediaId,
   isNumber,
+  isOpaqueId,
+  isSidecarTrackId,
   isString,
   isWatchedPercent,
   listOf,
@@ -11,13 +16,6 @@ import {
   oneOf,
   union,
 } from '@raven/core'
-import {
-  DOWNLOAD_STATUS_KINDS,
-  isContainerName,
-  isDownloadGroup,
-  isOpaqueId,
-  isSidecarTrackId,
-} from '@/shared/protocol'
 
 export const DOWNLOADS_FILE = 'downloads.json'
 
@@ -42,8 +40,8 @@ const isPendingV1 = object(PENDING_FIELDS)
  * What the server has not heard yet: a play to record, the last position to report, and the
  * furthest position since the last send. The server keeps how far a play got as the most it
  * hears, so a scrub back after the end must not be all it hears. `accountId` is the account
- * signed in to the server when it was noted, sent only under that account; null for a server
- * without accounts, or for what was noted before accounts, which goes to whoever is signed in.
+ * signed in to the server when it was noted, sent only under that account; null for what was
+ * noted before plays belonged to an account, which goes to whoever is signed in.
  */
 const isPending = object({ ...PENDING_FIELDS, accountId: nullable(isString) })
 
@@ -509,19 +507,59 @@ export const removeAll = (state: DownloadsState): DownloadsState =>
     ? state
     : { ...state, entries: [], owed: owe(state, { entries: state.entries }) }
 
+const isSameList = <T>({ left, right }: { left: readonly T[]; right: readonly T[] }): boolean =>
+  left.length === right.length && left.every((item, index) => item === right[index])
+
 /**
- * Drops a server's entries and what it was owed: raven player no longer keeps the server, so
- * nothing could reach it.
+ * Files every download under the one server raven player plays from. The downloads in `moved`,
+ * an adopted server's whose folders now sit under the server's id, become the server's, and what
+ * an adopted server was owed, or its downloads that did not move still owe, is the server's too.
+ * A download of any other server is no longer reached: a ready one stays to play, owing that
+ * server nothing, and the rest go, as does what that server was owed. Nothing to change, as at
+ * every launch after the first, hands back the same state.
  */
-export const removeServer = (
-  state: DownloadsState,
-  { serverId }: { serverId: string },
-): DownloadsState => {
-  const kept = state.entries.filter((entry) => entry.serverId !== serverId)
-  const owed = state.owed.filter((item) => item.serverId !== serverId)
-  return kept.length === state.entries.length && owed.length === state.owed.length
+export const keepOneServer = ({
+  state,
+  serverId,
+  adopted,
+  moved,
+}: {
+  state: DownloadsState
+  serverId: string
+  adopted: readonly string[]
+  moved: ReadonlySet<string>
+}): DownloadsState => {
+  const entries = state.entries.flatMap((entry): DownloadEntry[] => {
+    if (entry.serverId === serverId) return [entry]
+    if (moved.has(entry.downloadId)) return [{ ...entry, serverId }]
+    if (entry.status.kind !== DOWNLOAD_STATUS_KINDS.ready) return []
+    return [hasPending(entry) ? { ...entry, pending: NO_PENDING } : entry]
+  })
+  // An adopted server's download that stayed where it was (a twin of a title the server has, or a
+  // folder that could not move) still owes what was watched of it, now to the server.
+  const unmoved = state.entries
+    .filter(
+      (entry) =>
+        entry.serverId !== serverId &&
+        adopted.includes(entry.serverId) &&
+        !moved.has(entry.downloadId),
+    )
+    .map((entry) => ({ ...entry, serverId }))
+  const carried = state.owed.reduce<Owed[]>((kept, item) => {
+    if (item.serverId !== serverId && !adopted.includes(item.serverId)) return kept
+    const filed = item.serverId === serverId ? item : { ...item, serverId }
+    const known = kept.find(
+      isOwedAs({ serverId, mediaId: filed.mediaId, accountId: filed.pending.accountId }),
+    )
+    if (known === undefined) return [...kept, filed]
+    const merged = { ...known, pending: mergePending({ a: known.pending, b: filed.pending }) }
+    return kept.map((each) => (each === known ? merged : each))
+  }, [])
+  const owed = owe({ ...state, owed: carried }, { entries: unmoved })
+  return isSameList({ left: entries, right: state.entries }) &&
+    isSameList({ left: owed, right: state.owed })
     ? state
-    : { ...state, entries: kept, owed }
+    : { ...state, entries, owed }
 }
 
 /** What the server took is no longer owed; an item it took all of goes. */

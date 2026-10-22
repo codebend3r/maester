@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'bun:test'
+import { isOpaqueId } from '@raven/core'
 import { grantNext } from '@/main/folder'
 import { createGrants, type GrantFs } from '@/main/grants'
 
@@ -185,5 +187,11 @@ describe('grantNext with real grants', () => {
     expect(next!.path).toBe('/m/Show/E3.mkv')
     expect(grants.fileOf('id-1')!.path).toBe('/m/Show/E3.mkv')
     expect(grants.fileOf('id-2')).toBeNull()
+  })
+})
+
+describe('the ids main makes', () => {
+  it('pass the guard the page and the file scheme check every id with', () => {
+    expect(isOpaqueId(randomUUID())).toBe(true)
   })
 })

@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { AUTH_REFUSALS } from '@raven/core'
 import {
-  TICKET_MIN_VALIDITY_MS,
-  TOKEN_READS,
-  type TokenRead,
-} from '@/main/accounts/accountSessions'
-import {
   createAccountTickets,
   TICKET_OUTCOMES,
   ACCOUNT_TICKET_RENEW_MS,
@@ -24,14 +19,14 @@ const minted = ({ count }: { count: number }): ServerCallResult => ({
 
 const setup = ({
   answer = minted,
-  token = { kind: TOKEN_READS.token, token: 'jwt' },
+  isSignedIn = true,
 }: {
   answer?: (input: { count: number }) => ServerCallResult | Promise<ServerCallResult>
-  token?: TokenRead
+  isSignedIn?: boolean
 } = {}) => {
   const clock = { now: 1_000_000 }
   const made: { serverId: string; call: AllowedCall }[] = []
-  const asked: { serverId: string; minValidityMs?: number }[] = []
+  const asked: string[] = []
   const tickets = createAccountTickets({
     calls: {
       call: async ({ serverId, call }) => {
@@ -39,11 +34,9 @@ const setup = ({
         return answer({ count: made.length })
       },
     },
-    sessions: {
-      accessToken: async (input) => {
-        asked.push(input)
-        return token
-      },
+    isSignedIn: ({ serverId }) => {
+      asked.push(serverId)
+      return isSignedIn
     },
     now: () => clock.now,
   })
@@ -59,17 +52,16 @@ const refusal = ({ status, reason }: { status: number; reason: string }): Server
 })
 
 describe('ticketFor', () => {
-  test('mints with getAccountTicket after a token that outlives the ticket', async () => {
+  test('mints with getAccountTicket while the page is signed in', async () => {
     const { tickets, made, asked } = setup()
     expect(await tickets.ticketFor(TITLE)).toEqual({
       kind: TICKET_OUTCOMES.ticket,
       ticket: 'account.t1',
     })
-    expect(asked).toEqual([{ serverId: SERVER_ID, minValidityMs: TICKET_MIN_VALIDITY_MS }])
+    expect(asked).toEqual([SERVER_ID])
     expect(made).toEqual([
       { serverId: SERVER_ID, call: { name: CALL_NAMES.getAccountTicket, mediaId: 7 } },
     ])
-    expect(TICKET_MIN_VALIDITY_MS).toBe(360_000)
   })
 
   test('reuses the ticket inside the window, by raven player clock', async () => {
@@ -164,18 +156,12 @@ describe('ticketFor', () => {
     expect(made.length).toBe(1)
   })
 
-  test('no session is refused as signed out without a call', async () => {
-    const { tickets, made } = setup({ token: { kind: TOKEN_READS.none } })
+  test('a page signed out is refused as signed out without a call', async () => {
+    const { tickets, made } = setup({ isSignedIn: false })
     expect(await tickets.ticketFor(TITLE)).toEqual({
       kind: TICKET_OUTCOMES.refused,
       reason: AUTH_REFUSALS.signedOut,
     })
-    expect(made).toEqual([])
-  })
-
-  test('an Auth out of reach is unreachable, not signed out, without a call', async () => {
-    const { tickets, made } = setup({ token: { kind: TOKEN_READS.unreachable } })
-    expect(await tickets.ticketFor(TITLE)).toEqual({ kind: TICKET_OUTCOMES.unreachable })
     expect(made).toEqual([])
   })
 
@@ -226,19 +212,13 @@ describe('ticketFor', () => {
     expect(made.length).toBe(2)
   })
 
-  test('a call or a token read that throws is unreachable', async () => {
+  test('a call that throws is unreachable', async () => {
     const throwing = setup({
       answer: () => {
         throw new Error('boom')
       },
     })
     expect(await throwing.tickets.ticketFor(TITLE)).toEqual({ kind: TICKET_OUTCOMES.unreachable })
-    const tickets = createAccountTickets({
-      calls: { call: () => Promise.resolve(minted({ count: 1 })) },
-      sessions: { accessToken: () => Promise.reject(new Error('keychain')) },
-      now: () => 0,
-    })
-    expect(await tickets.ticketFor(TITLE)).toEqual({ kind: TICKET_OUTCOMES.unreachable })
   })
 })
 

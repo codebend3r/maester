@@ -13,7 +13,7 @@ import {
 } from '@raven/core'
 import { render } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, parsePath } from 'react-router-dom'
 import { CardLinks } from '@/components/CardLink/CardLink'
 import { MediaOriginProbe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { queryKeys } from '@raven/ui/headless'
@@ -43,6 +43,7 @@ export const DEFAULT_PLAYBACK_STATE: PlaybackSettingsState = {
 export const renderWithProviders = ({
   ui,
   route = '/',
+  state,
   behind = [],
   playback = DEFAULT_PLAYBACK_STATE,
   display = DEFAULT_DISPLAY_SETTINGS,
@@ -54,6 +55,8 @@ export const renderWithProviders = ({
 }: {
   ui: ReactNode
   route?: string
+  /** The `location.state` `route` opens with, as a link inside the app would leave it. */
+  state?: unknown
   /** Pages already in history before `route`, oldest first, as if the app had been browsed there. */
   behind?: string[]
   playback?: PlaybackSettingsState | null
@@ -82,7 +85,10 @@ export const renderWithProviders = ({
   if (libraries) client.setQueryData(queryKeys.libraries, libraries)
   const rendered = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[...behind, route]} initialIndex={behind.length}>
+      <MemoryRouter
+        initialEntries={[...behind, state === undefined ? route : { ...parsePath(route), state }]}
+        initialIndex={behind.length}
+      >
         <PrefetchPlaybackSettings>
           <MediaOriginProbe>
             <CardLinks>{ui}</CardLinks>

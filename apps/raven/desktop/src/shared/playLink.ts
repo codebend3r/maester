@@ -170,6 +170,3 @@ export const readDownloadLink = (link: string): DownloadRequest | null => {
   if (url === null || url.protocol !== URL_PROTOCOLS.raven) return null
   return readDownloadQuery({ url })
 }
-
-export const watchUrlFor = ({ origin, mediaId }: { origin: string; mediaId: number }): string =>
-  `${origin}/watch/${mediaId}`

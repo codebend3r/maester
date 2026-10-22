@@ -5,9 +5,5 @@
   "compilerOptions": {
     "paths": { "@/e2e/*": ["./e2e/*"], "@/*": ["./src/*"] }
   },
-  "references": [
-    { "path": "./tsconfig.main.json" },
-    { "path": "./tsconfig.preload.json" },
-    { "path": "./tsconfig.renderer.json" }
-  ]
+  "references": [{ "path": "./tsconfig.main.json" }, { "path": "./tsconfig.preload.json" }]
 }

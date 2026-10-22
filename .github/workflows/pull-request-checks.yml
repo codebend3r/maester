@@ -249,8 +249,7 @@ jobs:
       - name: 📂 Unpack the native handoff
         run: tar -xf "$RUNNER_TEMP/raven-native-handoff.tar"
 
-      # Vite's log carries the renderer's gzip sizes, for the 250 KB budget. Nx replays it
-      # on a cache hit.
+      # Builds the web app first, which the packaged app serves from its resources.
       - name: 🏗️ Build desktop app
         run: bun run desktop:build
 

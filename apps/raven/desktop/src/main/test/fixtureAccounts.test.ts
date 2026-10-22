@@ -1,7 +1,3 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import {
   AUTH_CONFIG_STATES,
   AUTH_HEADERS,
@@ -17,7 +13,12 @@ import {
   isString,
   MEDIA_TICKET_PARAM,
   MEMBER_STATUSES,
+  SERVER_METHODS,
 } from '@raven/core'
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   ACCOUNT_TICKET_PREFIX,
   AUTH_V1,
@@ -32,14 +33,13 @@ import {
 } from '@/e2e/fixtureAuth'
 import {
   FIXTURE_ADMIN_KINDS,
-  FIXTURE_MEDIA,
+  FIXTURE_LOCK_PATHS,
   type FixtureServer,
   MEDIA_PATHS,
   startFixtureServer,
 } from '@/e2e/fixtureServer'
-import { API_PATHS } from '@/main/servers/allowlist'
+import { FIXTURE_MEDIA } from '@/e2e/fixtureLibrary'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { SERVER_METHODS } from '@/shared/protocol'
 
 const PIN = '3001'
 const TICKET_MS = 60_000
@@ -111,7 +111,7 @@ const logout = ({ server, access }: { server: FixtureServer; access: string }) =
 
 // Minting needs the library PIN's unlock; redeeming the ticket does not.
 const unlockCookie = async (server: FixtureServer) => {
-  const response = await fetch(`${server.origin}${API_PATHS.unlock}`, {
+  const response = await fetch(`${server.origin}${FIXTURE_LOCK_PATHS.unlock}`, {
     method: SERVER_METHODS.post,
     headers: JSON_HEADERS,
     body: JSON.stringify({ pin: PIN }),

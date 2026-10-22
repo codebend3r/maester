@@ -2,7 +2,7 @@
 // the way of clicks between its toasts.
 .toaster {
   position: fixed;
-  inset: var(--space-4) var(--space-4) auto;
+  inset: calc(var(--space-4) + var(--titlebar-inset)) var(--space-4) auto;
   z-index: 10;
   display: grid;
   justify-items: center;

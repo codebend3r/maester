@@ -1,6 +1,6 @@
+import { DESKTOP_EVENTS, type DesktopEvent, PAGE_PATHS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { type MenuEntry, menuTemplate } from '@/main/menu'
-import type { DesktopEvent } from '@/shared/protocol'
 
 const setup = ({ isDevelopment = false }: { isDevelopment?: boolean } = {}) => {
   const sent: DesktopEvent[] = []
@@ -85,7 +85,7 @@ describe('menuTemplate', () => {
     })
     expect(settings.accelerator).toBe('CommandOrControl+,')
     click(settings)
-    expect(sent).toEqual([{ type: 'navigate', to: 'settings' }])
+    expect(sent).toEqual([{ type: DESKTOP_EVENTS.navigate, to: PAGE_PATHS.settings }])
   })
 
   it('keeps the standard app menu roles', () => {

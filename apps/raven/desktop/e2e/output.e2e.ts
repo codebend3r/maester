@@ -2,16 +2,27 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, type Page, test } from '@playwright/test'
 import { type Clips, makeClips } from '@/e2e/clips'
-import { freshUserData, openFile, removeDir, withApp } from '@/e2e/harness'
+import {
+  expectOffline,
+  freshUserData,
+  heading,
+  openFile,
+  removeDir,
+  sideLink,
+  withApp,
+} from '@/e2e/harness'
 
 const SAVED = 'Sound output saved.'
 
+/** Settings' This computer section, which the frame offers with no server too. */
 const openThisComputer = async (page: Page) => {
-  await page.getByRole('button', { name: 'Settings' }).click()
-  await expect(page.getByRole('heading', { name: 'This computer' })).toBeVisible()
+  await expectOffline({ page })
+  await sideLink({ page, name: 'Settings' }).click()
+  await expect(page.getByRole('region', { name: 'This computer' })).toBeVisible()
 }
 
-const soundOutput = (page: Page) => page.getByRole('group', { name: 'Sound output' })
+const soundOutput = (page: Page) =>
+  page.getByRole('region', { name: 'This computer' }).getByRole('group', { name: 'Sound output' })
 
 /** The profile main wrote to `desktop-config.json`, or null before it has. */
 const storedProfile = async (userData: string): Promise<unknown> => {
@@ -43,9 +54,7 @@ test.describe.serial('choosing how this computer sends sound', () => {
       run: async ({ page }) => {
         await openThisComputer(page)
         const output = soundOutput(page)
-        await expect(
-          output.getByRole('radio', { name: 'Speakers or TV (PCM, up to 7.1)' }),
-        ).toBeChecked()
+        await expect(output.getByRole('radio', { name: 'Speakers or TV' })).toBeChecked()
 
         await output.getByRole('radio', { name: 'Headphones' }).check()
         await expect(page.getByText(SAVED)).toBeVisible()
@@ -74,7 +83,7 @@ test.describe.serial('choosing how this computer sends sound', () => {
         await expect.poll(() => storedProfile(userData)).toBe('passthrough')
 
         await openFile({ app, path: clips.first })
-        await expect(page.getByRole('heading', { name: 'Clip 01', exact: true })).toBeVisible()
+        await expect(heading({ page, name: 'Clip 01' })).toBeVisible()
         await expect(page.locator('html')).toHaveAttribute('data-surface', 'native')
         // The mute button, since the slider hides on a window as narrow as CI's.
         await expect(

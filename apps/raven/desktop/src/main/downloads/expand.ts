@@ -1,29 +1,29 @@
 import {
-  ADMIN_LOCK_STATES,
   AUTH_REFUSALS,
+  DOWNLOAD_KINDS,
   DOWNLOAD_TARGET_KINDS,
+  type DownloadGroup,
+  type DownloadKind,
+  type DownloadTarget,
   episodeCode,
-  isAdminLock,
+  type Guard,
   isItemDetails,
   isLibrary,
   isMediaItem,
   isSagaList,
   ITEM_TYPES,
-  itemLabel,
-  LOCKED_STATUS,
-  mediaLabel,
-  type DownloadTarget,
-  type Guard,
   type ItemDetails,
+  itemLabel,
   type ItemSummary,
+  LOCKED_STATUS,
   type MediaItem,
+  mediaLabel,
 } from '@raven/core'
 import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import { ACCOUNT_REFUSAL_STATUSES, refusalAt } from '@/main/servers/authRefusals'
 import { CALL_MESSAGES, type ServerCalls } from '@/main/servers/serverCalls'
 import { HTTP_STATUSES } from '@/shared/httpStatuses'
-import { DOWNLOAD_KINDS, type DownloadGroup, type DownloadKind } from '@/shared/protocol'
 
 export const DOWNLOAD_MAX_FILES = 500
 
@@ -36,7 +36,6 @@ export type ExpandedFile = {
 
 export const EXPAND_REASONS = {
   locked: 'locked',
-  hidden: 'hidden',
   gone: 'gone',
   unreachable: 'unreachable',
   tooMany: 'tooMany',
@@ -60,7 +59,6 @@ export const EXPAND_MESSAGES = {
 } as const
 
 const LOCKED_MESSAGE = (name: string): string => `${name} keeps that behind its PIN.`
-const HIDDEN_MESSAGE = (name: string): string => `${name} keeps that behind its admin password.`
 
 type Failure = Extract<Expansion, { ok: false }>
 type Read<T> = { ok: true; value: T } | { ok: false; failure: Failure }
@@ -73,13 +71,7 @@ type Draft = {
   entries: Entry[]
 }
 type Calls = Pick<ServerCalls, 'call'>
-type Server = {
-  calls: Calls
-  serverId: string
-  serverName: string
-  /** Whether the server's accounts are ready: its admin lock then hides nothing the password could lift. */
-  hasAccounts: boolean
-}
+type Server = { calls: Calls; serverId: string; serverName: string }
 
 export const episodeLabel = ({
   season,
@@ -138,19 +130,10 @@ const isAccountRefused = (result: { status: number; body: string }): boolean => 
   return reason !== null && reason !== AUTH_REFUSALS.unavailable
 }
 
-/** Whether a 404 is the admin lock hiding the title, which the admin password lifts. */
-const isHiddenByAdminLock = async ({ calls, serverId }: Pick<Server, 'calls' | 'serverId'>) => {
-  const result = await calls.call({ serverId, call: { name: CALL_NAMES.getAdminLock } })
-  if (!result.ok || !isSuccess(result.status)) return false
-  const lock = parseJson(result.body)
-  return isAdminLock(lock) && lock.state === ADMIN_LOCK_STATES.on && lock.available
-}
-
 const read = async <T>({
   calls,
   serverId,
   serverName,
-  hasAccounts,
   call,
   guard,
 }: Server & { call: AllowedCall; guard: Guard<T> }): Promise<Read<T>> => {
@@ -162,10 +145,9 @@ const read = async <T>({
   if (isAccountRefused(result)) {
     return fail({ reason: EXPAND_REASONS.account, message: EXPAND_MESSAGES.account(serverName) })
   }
+  // With accounts, a title the account may not see is a 404 too, as the server answers anyone.
   if (result.status === HTTP_STATUSES.notFound) {
-    return !hasAccounts && (await isHiddenByAdminLock({ calls, serverId }))
-      ? fail({ reason: EXPAND_REASONS.hidden, message: HIDDEN_MESSAGE(serverName) })
-      : fail({ reason: EXPAND_REASONS.gone, message: EXPAND_MESSAGES.gone(serverName) })
+    return fail({ reason: EXPAND_REASONS.gone, message: EXPAND_MESSAGES.gone(serverName) })
   }
   if (!isSuccess(result.status)) {
     return fail({
@@ -382,14 +364,13 @@ export const expandTarget = async ({
   calls,
   serverId,
   serverName,
-  hasAccounts,
   target,
   skip,
 }: Server & {
   target: DownloadTarget
   skip: (mediaId: number) => boolean
 }): Promise<Expansion> => {
-  const server = { calls, serverId, serverName, hasAccounts }
+  const server = { calls, serverId, serverName }
   const draft = await draftOf({ server, target })
   if (!draft.ok) return draft.failure
   const { kind, title, groupTitle, groupKey } = draft.value

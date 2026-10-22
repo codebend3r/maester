@@ -26,6 +26,13 @@
     }
   }
 
+  // Held while what it started runs: still focusable, so focus stays on it,
+  // where `disabled` would drop it to the page.
+  &[aria-disabled='true'] {
+    cursor: progress;
+    opacity: var(--opacity-held);
+  }
+
   // Disabled reads as an outline with nothing in it, whatever its tone.
   &:disabled {
     border-color: var(--color-line);

@@ -1,14 +1,25 @@
-import { describe, expect, it } from 'bun:test'
 import {
-  ADMIN_LOCK_STATES,
   AUTH_REFUSALS,
+  DESKTOP_EVENTS,
+  DESKTOP_REPLIES,
+  type DesktopEvent,
+  type DesktopReply,
+  DOWNLOAD_ASK_KINDS,
+  DOWNLOAD_STATUS_KINDS,
   DOWNLOAD_TARGET_KINDS,
-  LOCKED_STATUS,
   type DownloadTarget,
+  LOCKED_STATUS,
   type MediaItem,
   type Saga,
+  DOWNLOAD_KINDS,
 } from '@raven/core'
-import { EMPTY_CONFIG, type ConfigStore, type DesktopConfig } from '@/main/desktopConfig'
+import { describe, expect, it } from 'bun:test'
+import {
+  type ConfigStore,
+  type DesktopConfig,
+  SERVER_GONE,
+  SERVER_NAME,
+} from '@/main/desktopConfig'
 import { ASK_TTL_MS } from '@/main/downloads/asks'
 import { AUTO_DELETE_DELAY_MS } from '@/main/downloads/autoDelete'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
@@ -20,7 +31,9 @@ import {
 } from '@/main/downloads/downloadService'
 import {
   EMPTY_DOWNLOADS,
+  FAIL_REASONS,
   NO_PENDING,
+  PAUSE_REASONS,
   type DownloadEntry,
   type DownloadsState,
   type EntryStatus,
@@ -34,6 +47,7 @@ import { SPACE_RESERVE_BYTES } from '@/main/downloads/space'
 import { CALL_NAMES } from '@/main/servers/allowlist'
 import { CALL_MESSAGES } from '@/main/servers/serverCalls'
 import { tokenFor } from '@/main/test/accountTokens'
+import { configFor } from '@/main/test/configFakes'
 import { createGrants } from '@/main/grants'
 import {
   addRecent,
@@ -49,7 +63,6 @@ import {
   fakeDisk,
   fakeNetwork,
   serving,
-  ticketFor,
   ticks,
   until,
 } from '@/main/test/downloadFakes'
@@ -64,17 +77,6 @@ import {
   show,
   type Reply,
 } from '@/main/test/serverFakes'
-import {
-  ACCOUNT_STATES,
-  DESKTOP_EVENTS,
-  DESKTOP_REPLIES,
-  SERVER_GONE,
-  type AccountView,
-  type DesktopEvent,
-  type DesktopReply,
-  DOWNLOAD_ASK_KINDS,
-  DOWNLOAD_STATUS_KINDS,
-} from '@/shared/protocol'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
@@ -84,17 +86,13 @@ const NOW = 1_700_000_000_000
 const GIB = 1024 ** 3
 const BLOCK = 4096
 
-const SERVER = {
-  id: SERVER_ID,
-  origin: 'https://vhagar.example',
-  name: 'Vhagar',
-  addedAt: 1,
-  signIn: null,
-}
+const SERVER = { id: SERVER_ID, origin: 'https://vhagar.example', name: SERVER_NAME }
+/** The account the page is signed in with, unless a test signs it out or in as another. */
+const ACCOUNT = '30000000-0000-4000-8000-00000000000c'
 
 const DOWNLOADS = `${USER_DATA}/downloads`
 
-const FAR_TICKET = ticketFor({ ticket: 'one', renewAt: NOW + 6 * 3_600_000 })
+const FAR_TICKET = accountTicket('one')
 
 /** An access read that never answers, so a queued file waits where it is. */
 const NEVER = (): Promise<AccessOutcome> => new Promise(() => undefined)
@@ -122,7 +120,7 @@ const memoryFs = (): StateFs => {
 }
 
 const memoryConfig = (): ConfigStore => {
-  const state: { value: DesktopConfig } = { value: { ...EMPTY_CONFIG, servers: [SERVER] } }
+  const state: { value: DesktopConfig } = { value: configFor(SERVER) }
   return {
     read: () => state.value,
     update: (change) => {
@@ -207,12 +205,7 @@ const setup = ({
   startAt = NOW,
   isPageReady = true,
   syncRetryMs = SYNC_RETRY_MS,
-  isReady = false,
-  readAccount = async () => {
-    throw new Error('a server without accounts has no account to read')
-  },
-  hasAccounts = false,
-  accountId = null,
+  accountId = ACCOUNT,
 }: {
   replies?: Record<string, Reply>
   free?: number
@@ -229,13 +222,7 @@ const setup = ({
   isPageReady?: boolean
   /** The sync's retry, as main passes it; the spec's five minutes unless a test shortens it. */
   syncRetryMs?: number
-  /** Whether the server's accounts are ready. */
-  isReady?: boolean
-  /** The account main reads for the server. */
-  readAccount?: (serverId: string) => Promise<AccountView>
-  /** Whether the server has accounts, so a play belongs to the account signed in. */
-  hasAccounts?: boolean
-  /** The account signed in to the server, as its stored session names it. */
+  /** The account signed in to the server, as the page's session names it. */
   accountId?: string | null
 } = {}) => {
   const signedIn = { accountId }
@@ -307,8 +294,6 @@ const setup = ({
     },
   })
   const statted: string[] = []
-  const accountReads: string[] = []
-  const toldAccounts: string[] = []
   const service = createDownloadService({
     store,
     config,
@@ -326,27 +311,18 @@ const setup = ({
     send: (event) => sent.push(event),
     warn: (message) => warnings.push(message),
     access: media.access,
-    fetchFor: network.fetchFor,
+    fetch: network.fetch,
     fs: drive.fs,
     showItemInFolder: (path) => shown.push(path),
     ready: Promise.resolve(),
     wasSetAside: false,
     syncRetryMs,
-    isReady: async () => isReady,
-    readAccount: (serverId) => {
-      accountReads.push(serverId)
-      return readAccount(serverId)
-    },
-    accountChanged: async (serverId) => {
-      toldAccounts.push(serverId)
-    },
     grants,
     state,
     stat: async (path) => {
       statted.push(path)
       return videoAt(path)
     },
-    hasAccounts: () => hasAccounts,
     accountIdOf: () => signedIn.accountId,
   })
   if (isPageReady) service.pageReady()
@@ -373,8 +349,6 @@ const setup = ({
     drive,
     network,
     media,
-    accountReads,
-    toldAccounts,
   }
 }
 
@@ -408,29 +382,44 @@ describe('constants', () => {
     )
     expect(DOWNLOAD_MESSAGES.unknown).toBe('That download is no longer in raven player.')
     expect(
-      DOWNLOAD_MESSAGES.queued({ files: 3, kind: 'saga', label: 'x', serverName: 'Vhagar' }),
-    ).toBe('Downloading 3 movies from Vhagar')
+      DOWNLOAD_MESSAGES.queued({
+        files: 3,
+        kind: DOWNLOAD_KINDS.saga,
+        label: 'x',
+        serverName: SERVER_NAME,
+      }),
+    ).toBe('Downloading 3 movies from raven')
     expect(
-      DOWNLOAD_MESSAGES.queued({ files: 2, kind: 'movie', label: 'x', serverName: 'Vhagar' }),
-    ).toBe('Downloading 2 movies from Vhagar')
+      DOWNLOAD_MESSAGES.queued({
+        files: 2,
+        kind: DOWNLOAD_KINDS.movie,
+        label: 'x',
+        serverName: SERVER_NAME,
+      }),
+    ).toBe('Downloading 2 movies from raven')
     expect(
-      DOWNLOAD_MESSAGES.queued({ files: 10, kind: 'show', label: 'x', serverName: 'Vhagar' }),
-    ).toBe('Downloading 10 episodes from Vhagar')
+      DOWNLOAD_MESSAGES.queued({
+        files: 10,
+        kind: DOWNLOAD_KINDS.show,
+        label: 'x',
+        serverName: SERVER_NAME,
+      }),
+    ).toBe('Downloading 10 episodes from raven')
     expect(
       DOWNLOAD_MESSAGES.queued({
         files: 1,
         kind: 'season',
         label: 'S01E02 Half Loop',
-        serverName: 'Vhagar',
+        serverName: SERVER_NAME,
       }),
-    ).toBe('Downloading S01E02 Half Loop from Vhagar')
+    ).toBe('Downloading S01E02 Half Loop from raven')
     expect(DOWNLOAD_MESSAGES.noSpace).toBe('Not enough space')
     expect(DOWNLOAD_MESSAGES.changed).toBe('The file changed on the server')
-    expect(DOWNLOAD_MESSAGES.answered({ serverName: 'Vhagar', status: 401 })).toBe(
-      'Vhagar answered 401',
+    expect(DOWNLOAD_MESSAGES.answered({ serverName: SERVER_NAME, status: 401 })).toBe(
+      'raven answered 401',
     )
-    expect(DOWNLOAD_MESSAGES.relocked('Vhagar')).toBe('Vhagar locked this library again')
-    expect(DOWNLOAD_MESSAGES.unreachable('Vhagar')).toBe('Vhagar could not be reached')
+    expect(DOWNLOAD_MESSAGES.relocked(SERVER_NAME)).toBe('raven locked this library again')
+    expect(DOWNLOAD_MESSAGES.unreachable(SERVER_NAME)).toBe('raven could not be reached')
     expect(DOWNLOAD_MESSAGES.downloaded('Dune')).toBe('Downloaded Dune')
     expect(DOWNLOAD_MESSAGES.failed({ label: 'Dune', why: 'Not enough space' })).toBe(
       'Could not download Dune: Not enough space',
@@ -443,13 +432,16 @@ describe('ask', () => {
   it('answers a movie as ready with its file count, bytes, the free space and whether it fits', async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
     expect(
-      await world.service.ask({ serverId: SERVER_ID, target: { kind: 'media', mediaId: 9 } }),
+      await world.service.ask({
+        serverId: SERVER_ID,
+        target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
+      }),
     ).toEqual({
       type: 'downloadAsk',
       ask: {
         askId: '00000000-0000-4000-8000-000000000001',
         serverId: SERVER_ID,
-        serverName: 'Vhagar',
+        serverName: SERVER_NAME,
         autoDelete: false,
         status: {
           kind: 'ready',
@@ -470,7 +462,7 @@ describe('ask', () => {
       replies: { [mediaCall(9)]: ok(MOVIE) },
       free: 41 * GIB + SPACE_RESERVE_BYTES - BLOCK,
     })
-    const ask = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
     expect(ask.status).toMatchObject({ kind: 'ready', fits: false })
   })
 
@@ -478,7 +470,8 @@ describe('ask', () => {
     const room = 41 * GIB + SPACE_RESERVE_BYTES + 5 * GIB
     const alone = setup({ replies: { [mediaCall(9)]: ok(MOVIE) }, free: room })
     expect(
-      (await askFor({ world: alone, target: { kind: 'media', mediaId: 9 } })).status,
+      (await askFor({ world: alone, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } }))
+        .status,
     ).toMatchObject({ kind: 'ready', bytes: 41 * GIB, fits: true })
     const busy = setup({
       replies: { [mediaCall(9)]: ok(MOVIE) },
@@ -497,13 +490,14 @@ describe('ask', () => {
             downloadId: '00000000-0000-4000-8000-0000000000a2',
             mediaId: 13,
             size: 40 * GIB,
-            status: { kind: 'paused', bytes: 0, reason: 'viewer' },
+            status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, reason: PAUSE_REASONS.viewer },
           }),
         ],
       },
     })
     expect(
-      (await askFor({ world: busy, target: { kind: 'media', mediaId: 9 } })).status,
+      (await askFor({ world: busy, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } }))
+        .status,
     ).toMatchObject({ kind: 'ready', bytes: 41 * GIB, fits: false })
   })
 
@@ -533,27 +527,21 @@ describe('ask', () => {
     expect(ask.status).toMatchObject({ kind: 'ready', files: 3 })
   })
 
-  it('answers locked for a library behind its PIN, and hidden behind the admin lock', async () => {
+  it('answers locked for a library behind its PIN', async () => {
     const locked = setup({ replies: { [itemCall(5)]: { status: LOCKED_STATUS, body: '' } } })
     expect((await askFor({ world: locked, target: { kind: 'item', itemId: 5 } })).status).toEqual({
       kind: 'locked',
     })
-    const hidden = setup({
-      replies: { [keyOf({ name: CALL_NAMES.getAdminLock })]: ok({ state: 'on', available: true }) },
-    })
-    expect((await askFor({ world: hidden, target: { kind: 'item', itemId: 5 } })).status).toEqual({
-      kind: 'hidden',
-    })
   })
 
   it.each([
-    ['gone', {}, EXPAND_MESSAGES.gone('Vhagar')],
+    ['gone', {}, EXPAND_MESSAGES.gone(SERVER_NAME)],
     [
       'unreachable',
-      { [itemCall(5)]: { unreachable: 'raven player could not reach Vhagar.' } },
-      'raven player could not reach Vhagar.',
+      { [itemCall(5)]: { unreachable: 'raven player could not reach raven.' } },
+      'raven player could not reach raven.',
     ],
-    ['unreadable', { [itemCall(5)]: ok({ id: 5 }) }, EXPAND_MESSAGES.unreadable('Vhagar')],
+    ['unreadable', { [itemCall(5)]: ok({ id: 5 }) }, EXPAND_MESSAGES.unreadable(SERVER_NAME)],
   ])('refuses an expansion that is %s with its message', async (_name, replies, message) => {
     const world = setup({ replies })
     expect(
@@ -572,7 +560,7 @@ describe('ask', () => {
         serverId: SERVER_ID,
         target: { kind: 'saga', libraryId: 1, tmdbId: '119' },
       }),
-    ).toEqual({ type: 'refused', message: EXPAND_MESSAGES.tooMany })
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.tooMany })
   })
 
   it('refuses a file whose container could not be a file name, and warns by its title', async () => {
@@ -580,8 +568,11 @@ describe('ask', () => {
       replies: { [mediaCall(9)]: ok({ ...MOVIE, container: '../../x' }) },
     })
     expect(
-      await world.service.ask({ serverId: SERVER_ID, target: { kind: 'media', mediaId: 9 } }),
-    ).toEqual({ type: 'refused', message: EXPAND_MESSAGES.unreadable('Vhagar') })
+      await world.service.ask({
+        serverId: SERVER_ID,
+        target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
+      }),
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.unreadable(SERVER_NAME) })
     expect(world.warnings.join('\n')).toContain('Fellowship (2001)')
     expect(world.warnings.join('\n')).not.toContain('../../x')
   })
@@ -593,8 +584,11 @@ describe('ask', () => {
   ])('refuses a file whose size is %s, and warns by its title', async (_name, size) => {
     const world = setup({ replies: { [mediaCall(9)]: ok({ ...MOVIE, size }) } })
     expect(
-      await world.service.ask({ serverId: SERVER_ID, target: { kind: 'media', mediaId: 9 } }),
-    ).toEqual({ type: 'refused', message: EXPAND_MESSAGES.unreadable('Vhagar') })
+      await world.service.ask({
+        serverId: SERVER_ID,
+        target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
+      }),
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.unreadable(SERVER_NAME) })
     expect(world.warnings.join('\n')).toContain('Fellowship (2001)')
   })
 
@@ -603,7 +597,7 @@ describe('ask', () => {
     expect(
       await world.service.ask({
         serverId: OTHER_SERVER_ID,
-        target: { kind: 'media', mediaId: 9 },
+        target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
       }),
     ).toEqual({ type: 'refused', message: SERVER_GONE })
     expect(world.log).toEqual([])
@@ -639,27 +633,15 @@ describe('retryAsk', () => {
     world.table[itemCall(5)] = { status: 404, body: '' }
     expect(await world.service.retryAsk({ askId: locked.askId })).toEqual({
       type: 'refused',
-      message: EXPAND_MESSAGES.gone('Vhagar'),
+      message: EXPAND_MESSAGES.gone(SERVER_NAME),
     })
     expect(await world.service.retryAsk({ askId: locked.askId })).toEqual(askGone)
   })
 })
 
 describe('an account ask', () => {
-  const accountOf = (state: AccountView['state']): AccountView => ({
-    serverId: SERVER_ID,
-    state,
-    email: state === ACCOUNT_STATES.signedOut ? null : 'me@example.com',
-    isRemembered: true,
-    signInHost: 'project.supabase.co',
-  })
-
-  it('asks a signed out person to sign in, reading no title from the server', async () => {
-    const world = setup({
-      replies: { [mediaCall(9)]: ok(MOVIE) },
-      isReady: true,
-      readAccount: async () => accountOf(ACCOUNT_STATES.signedOut),
-    })
+  it('asks a page signed out to sign in, reading no title from the server', async () => {
+    const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) }, accountId: null })
     expect(
       await world.service.ask({
         serverId: SERVER_ID,
@@ -670,33 +652,18 @@ describe('an account ask', () => {
       ask: {
         askId: '00000000-0000-4000-8000-000000000001',
         serverId: SERVER_ID,
-        serverName: 'Vhagar',
+        serverName: SERVER_NAME,
         autoDelete: false,
-        status: { kind: DOWNLOAD_ASK_KINDS.account, account: accountOf(ACCOUNT_STATES.signedOut) },
+        status: { kind: DOWNLOAD_ASK_KINDS.account },
       },
     })
     expect(world.log).toEqual([])
-    expect(world.accountReads).toEqual([SERVER_ID])
   })
 
-  it.each([ACCOUNT_STATES.pending, ACCOUNT_STATES.revoked] as const)(
-    'shows a %s account the same way',
-    async (state) => {
-      const world = setup({ isReady: true, readAccount: async () => accountOf(state) })
-      const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
-      expect(ask.status).toEqual({ kind: DOWNLOAD_ASK_KINDS.account, account: accountOf(state) })
-    },
-  )
-
-  it('expands once the person signs in, under the same ask id', async () => {
-    const account = { view: accountOf(ACCOUNT_STATES.signedOut) }
-    const world = setup({
-      replies: { [mediaCall(9)]: ok(MOVIE) },
-      isReady: true,
-      readAccount: async () => account.view,
-    })
+  it('expands once the page signs in, under the same ask id', async () => {
+    const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) }, accountId: null })
     const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
-    account.view = accountOf(ACCOUNT_STATES.approved)
+    world.signedIn.accountId = ACCOUNT
     expect(await world.service.retryAsk({ askId: ask.askId })).toMatchObject({
       type: DESKTOP_REPLIES.downloadAsk,
       ask: {
@@ -707,86 +674,36 @@ describe('an account ask', () => {
   })
 
   it('refuses to queue an ask still waiting on its account', async () => {
-    const world = setup({
-      isReady: true,
-      readAccount: async () => accountOf(ACCOUNT_STATES.signedOut),
-    })
+    const world = setup({ accountId: null })
     const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
     expect(await world.service.confirm({ askId: ask.askId, autoDelete: false })).toEqual({
       type: DESKTOP_REPLIES.refused,
-      message: EXPAND_MESSAGES.account('Vhagar'),
+      message: EXPAND_MESSAGES.account(SERVER_NAME),
     })
     expect(world.store.read().entries).toEqual([])
   })
 
-  it('answers gone, never hidden, for a hidden title on a server with accounts', async () => {
-    const adminCall = keyOf({ name: CALL_NAMES.getAdminLock })
-    const world = setup({
-      isReady: true,
-      readAccount: async () => accountOf(ACCOUNT_STATES.approved),
-      replies: { [adminCall]: ok({ state: ADMIN_LOCK_STATES.on, available: true }) },
-    })
+  it('answers gone for a title the account cannot see', async () => {
+    const world = setup()
     expect(
       await world.service.ask({
         serverId: SERVER_ID,
         target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 5 },
       }),
-    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.gone('Vhagar') })
-    expect(world.log).not.toContain(adminCall)
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.gone(SERVER_NAME) })
   })
 
-  it('expands a server whose accounts are not ready as it always has, reading no account', async () => {
-    const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
-    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
-    expect(ask.status).toMatchObject({ kind: DOWNLOAD_ASK_KINDS.ready, files: 1 })
-    expect(world.accountReads).toEqual([])
-  })
-
-  it('asks for the account when the server refuses one main read as approved', async () => {
-    const reads = { count: 0 }
-    const world = setup({
-      replies: {
-        [mediaCall(9)]: { status: 403, body: { reason: AUTH_REFUSALS.revoked, message: 'No.' } },
-      },
-      isReady: true,
-      readAccount: async () => {
-        reads.count += 1
-        return accountOf(reads.count === 1 ? ACCOUNT_STATES.approved : ACCOUNT_STATES.revoked)
-      },
-    })
-    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
-    expect(ask.status).toEqual({
-      kind: DOWNLOAD_ASK_KINDS.account,
-      account: accountOf(ACCOUNT_STATES.revoked),
-    })
-  })
-
-  it('refuses with why when the server refuses an account main still reads as approved', async () => {
-    const world = setup({
-      replies: {
-        [mediaCall(9)]: { status: 401, body: { reason: AUTH_REFUSALS.signedOut, message: 'No.' } },
-      },
-      isReady: true,
-      readAccount: async () => accountOf(ACCOUNT_STATES.approved),
-    })
+  it.each([
+    ['removed', { status: 403, body: { reason: AUTH_REFUSALS.revoked, message: 'No.' } }],
+    ['signed out', { status: 401, body: { reason: AUTH_REFUSALS.signedOut, message: 'No.' } }],
+  ])('refuses with why when the server refuses the account as %s', async (_name, refusal) => {
+    const world = setup({ replies: { [mediaCall(9)]: refusal } })
     expect(
       await world.service.ask({
         serverId: SERVER_ID,
         target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
       }),
-    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.account('Vhagar') })
-  })
-
-  it('expands when the account cannot be read, and leaves the refusal to the server', async () => {
-    const world = setup({
-      replies: { [mediaCall(9)]: ok(MOVIE) },
-      isReady: true,
-      readAccount: async () => {
-        throw new Error('down')
-      },
-    })
-    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
-    expect(ask.status).toMatchObject({ kind: DOWNLOAD_ASK_KINDS.ready, files: 1 })
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.account(SERVER_NAME) })
   })
 })
 
@@ -797,22 +714,21 @@ describe('downloads with an account ticket', () => {
     entries: [entryFor({ size: 8, status: { kind: DOWNLOAD_STATUS_KINDS.queued } })],
   })
 
-  it('tells main to read the account again when a download is refused for it', async () => {
+  it('fails a download refused for its account, and says why', async () => {
     const world = setup({
       initial: queued(),
       access: async () => ({
         ok: false,
         reason: ACCESS_REFUSALS.account,
-        message: DOWNLOAD_MESSAGES.removed('Vhagar'),
+        message: DOWNLOAD_MESSAGES.removed(SERVER_NAME),
       }),
     })
-    await until(() => world.toldAccounts.length === 1)
-    expect(world.toldAccounts).toEqual([SERVER_ID])
+    await until(() => world.sent.some(({ type }) => type === DESKTOP_EVENTS.notice))
     expect(world.sent).toContainEqual({
       type: DESKTOP_EVENTS.notice,
       message: DOWNLOAD_MESSAGES.failed({
         label: 'S01E01 Good News',
-        why: DOWNLOAD_MESSAGES.removed('Vhagar'),
+        why: DOWNLOAD_MESSAGES.removed(SERVER_NAME),
       }),
     })
   })
@@ -828,7 +744,6 @@ describe('downloads with an account ticket', () => {
           null) === DOWNLOAD_STATUS_KINDS.failed,
     )
     expect(world.network.fileRequests()[0]?.signal.aborted ?? null).toBe(true)
-    expect(world.toldAccounts).toEqual([])
   })
 })
 
@@ -864,7 +779,9 @@ describe('confirm', () => {
       },
       expect.objectContaining({ mediaId: 13, label: 'S01E03 In Perpetuity', autoDelete: true }),
     ])
-    expect(world.sent).toEqual([{ type: 'notice', message: 'Downloading 2 episodes from Vhagar' }])
+    expect(world.sent).toEqual([
+      { type: DESKTOP_EVENTS.notice, message: 'Downloading 2 episodes from raven' },
+    ])
     world.fire()
     expect(downloadEvents(world.sent)).toEqual([
       { type: 'downloads', downloads: reply.downloads, autoDeleteDefault: true },
@@ -879,7 +796,7 @@ describe('confirm', () => {
 
   it("keeps the dialog's choice as the default the next ask starts from", async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE), [itemCall(5)]: ok(SEASON) } })
-    const ask = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
     expect(ask.autoDelete).toBe(false)
     await world.service.confirm({ askId: ask.askId, autoDelete: true })
     expect(world.service.list()).toMatchObject({ type: 'downloads', autoDeleteDefault: true })
@@ -892,8 +809,11 @@ describe('confirm', () => {
 
   it('keeps the choice even when every file was queued meanwhile', async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
-    const first = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
-    const second = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    const first = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
+    const second = await askFor({
+      world,
+      target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
+    })
     await world.service.confirm({ askId: first.askId, autoDelete: false })
     await world.service.confirm({ askId: second.askId, autoDelete: true })
     expect(world.store.read()).toMatchObject({ autoDeleteDefault: true })
@@ -902,10 +822,10 @@ describe('confirm', () => {
 
   it('names the one file it queues', async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
-    const ask = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
     await world.service.confirm({ askId: ask.askId, autoDelete: false })
     expect(world.sent).toEqual([
-      { type: 'notice', message: 'Downloading Fellowship (2001) from Vhagar' },
+      { type: DESKTOP_EVENTS.notice, message: 'Downloading Fellowship (2001) from raven' },
     ])
   })
 
@@ -917,12 +837,18 @@ describe('confirm', () => {
         autoDelete: false,
       }),
     ).toEqual(askGone)
-    const expired = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    const expired = await askFor({
+      world,
+      target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
+    })
     world.clock.now += ASK_TTL_MS + 1
     expect(await world.service.confirm({ askId: expired.askId, autoDelete: false })).toEqual(
       askGone,
     )
-    const answered = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    const answered = await askFor({
+      world,
+      target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
+    })
     await world.service.confirm({ askId: answered.askId, autoDelete: false })
     expect(await world.service.confirm({ askId: answered.askId, autoDelete: false })).toEqual(
       askGone,
@@ -932,7 +858,7 @@ describe('confirm', () => {
 
   it('keeps an ask for its full ten minutes', async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
-    const ask = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
     world.clock.now += ASK_TTL_MS
     expect((await world.service.confirm({ askId: ask.askId, autoDelete: false })).type).toBe(
       'downloads',
@@ -944,16 +870,19 @@ describe('confirm', () => {
     const locked = await askFor({ world, target: { kind: 'item', itemId: 5 } })
     expect(await world.service.confirm({ askId: locked.askId, autoDelete: false })).toEqual({
       type: 'refused',
-      message: 'Vhagar keeps that behind its PIN.',
+      message: 'raven keeps that behind its PIN.',
     })
     world.table[itemCall(5)] = ok(SEASON)
     expect((await world.service.retryAsk({ askId: locked.askId })).type).toBe('downloadAsk')
   })
 
-  it('refuses once the server has been removed, and queues nothing', async () => {
+  it('refuses once the server is not the one raven player plays from, and queues nothing', async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
-    const ask = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
-    world.config.update((current) => ({ ...current, servers: [] }))
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
+    world.config.update((current) => ({
+      ...current,
+      server: { ...current.server, id: OTHER_SERVER_ID },
+    }))
     expect(await world.service.confirm({ askId: ask.askId, autoDelete: false })).toEqual({
       type: 'refused',
       message: SERVER_GONE,
@@ -963,8 +892,11 @@ describe('confirm', () => {
 
   it('says nothing when every file was queued meanwhile', async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
-    const first = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
-    const second = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    const first = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
+    const second = await askFor({
+      world,
+      target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
+    })
     await world.service.confirm({ askId: first.askId, autoDelete: false })
     world.sent.length = 0
     expect((await world.service.confirm({ askId: second.askId, autoDelete: false })).type).toBe(
@@ -978,7 +910,7 @@ describe('confirm', () => {
 describe('decline', () => {
   it('drops the ask', async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
-    const ask = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
     expect(world.service.decline({ askId: ask.askId })).toEqual({ type: 'done' })
     expect(await world.service.confirm({ askId: ask.askId, autoDelete: false })).toEqual(askGone)
     expect(world.store.read().entries).toEqual([])
@@ -994,7 +926,10 @@ describe('setDefaults', () => {
       autoDeleteDefault: true,
     })
     expect(world.store.read().autoDeleteDefault).toBe(true)
-    expect((await askFor({ world, target: { kind: 'media', mediaId: 9 } })).autoDelete).toBe(true)
+    expect(
+      (await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } }))
+        .autoDelete,
+    ).toBe(true)
     world.fire()
     expect(downloadEvents(world.sent)).toEqual([
       { type: 'downloads', downloads: [], autoDeleteDefault: true },
@@ -1010,7 +945,7 @@ describe('list and views', () => {
       label: 'Dune (2021)',
       group: { kind: 'movie', key: 'movie:41', title: 'Dune (2021)', order: 0 },
       createdAt: NOW - 5000,
-      status: { kind: 'paused', bytes: 7, reason: 'viewer' },
+      status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 7, reason: PAUSE_REASONS.viewer },
       watchedAt: NOW - 100,
     })
     const newer = entryFor({ status: { kind: 'downloading', bytes: GIB }, autoDelete: true })
@@ -1025,7 +960,7 @@ describe('list and views', () => {
           serverId: SERVER_ID,
           label: 'S01E01 Good News',
           group: { kind: 'season', key: 'show:4', title: 'Severance', order: 10_001 },
-          serverName: 'Vhagar',
+          serverName: SERVER_NAME,
           size: 2 * GIB,
           status: { kind: 'downloading', bytes: GIB },
           autoDelete: true,
@@ -1082,7 +1017,7 @@ describe('readSpace', () => {
 describe('the downloads event', () => {
   it('folds the changes of one quarter second into one list, sent after it', async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
-    const ask = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
     await world.service.confirm({ askId: ask.askId, autoDelete: false })
     world.service.setDefaults({ autoDelete: true })
     expect(downloadEvents(world.sent)).toEqual([])
@@ -1140,9 +1075,9 @@ describe('the queue', () => {
     expect(world.network.fileRequests()[0]?.headers).toEqual({ Range: 'bytes=4096-' })
   })
 
-  it('drops at launch the downloads of a server raven player no longer keeps', async () => {
+  it('removes at launch the folders no download names, and keeps every download', async () => {
     const world = setup({
-      initial: holding(entryFor({}), entryFor({ downloadId: OTHER_ID, serverId: OTHER_SERVER_ID })),
+      initial: holding(entryFor({})),
       disk: { [`${DOWNLOADS}/${OTHER_SERVER_ID}/11/video.mkv`]: 8 },
     })
     await until(() => world.drive.removed.length === 1)
@@ -1152,7 +1087,7 @@ describe('the queue', () => {
 
   it('starts what a confirmation queues', async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) }, access: async () => FAR_TICKET })
-    const ask = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
     await world.service.confirm({ askId: ask.askId, autoDelete: false })
     await until(() => world.network.fileRequests().length === 1)
     expect(world.network.fileRequests()[0]?.url).toContain('/api/media/9/file?t=one')
@@ -1162,18 +1097,29 @@ describe('the queue', () => {
     const world = setup({ initial: holding(queuedFile()), access: async () => FAR_TICKET })
     await until(() => world.network.fileRequests().length === 1)
     const reply = downloadsOf(await world.service.pause({ downloadId: ID }))
-    expect(reply.downloads[0]?.status).toEqual({ kind: 'paused', bytes: 0, message: null })
+    expect(reply.downloads[0]?.status).toEqual({
+      kind: DOWNLOAD_STATUS_KINDS.paused,
+      bytes: 0,
+      message: null,
+    })
     expect(world.network.fileRequests()[0]?.signal.aborted ?? null).toBe(true)
   })
 
   it('resumes and retries through the queue', async () => {
     const world = setup({
       initial: holding(
-        queuedFile({ status: { kind: 'paused', bytes: 0, reason: 'viewer' } }),
+        queuedFile({
+          status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, reason: PAUSE_REASONS.viewer },
+        }),
         queuedFile({
           downloadId: OTHER_ID,
           mediaId: 12,
-          status: { kind: 'failed', bytes: 0, reason: 'other', message: 'x' },
+          status: {
+            kind: DOWNLOAD_STATUS_KINDS.failed,
+            bytes: 0,
+            reason: FAIL_REASONS.other,
+            message: 'x',
+          },
         }),
       ),
       access: async () => FAR_TICKET,
@@ -1241,14 +1187,6 @@ describe('the queue', () => {
     expect(world.drive.removed).toContain(DOWNLOADS)
   })
 
-  it("removes a server's downloads", async () => {
-    const world = setup({ initial: holding(entryFor({})) })
-    await world.service.removeServer({ serverId: SERVER_ID })
-    expect(world.store.read().entries).toEqual([])
-    expect(world.drive.removed).toContain(`${DOWNLOADS}/${SERVER_ID}`)
-    expect(world.media.forgotten).toEqual([SERVER_ID])
-  })
-
   it('shows the downloads folder, made first', async () => {
     const world = setup()
     expect(await world.service.showFolder()).toEqual({ type: 'done' })
@@ -1260,7 +1198,10 @@ describe('the queue', () => {
     const world = setup({ initial: holding(queuedFile()), access: async () => FAR_TICKET })
     world.network.answers.file = serving({ size: 8 })
     await until(() => statusOf(world)?.kind === 'ready')
-    expect(world.sent).toContainEqual({ type: 'notice', message: 'Downloaded S01E01 Good News' })
+    expect(world.sent).toContainEqual({
+      type: DESKTOP_EVENTS.notice,
+      message: 'Downloaded S01E01 Good News',
+    })
   })
 
   it('says Could not download <label>: <why> when a file fails', async () => {
@@ -1269,7 +1210,7 @@ describe('the queue', () => {
     await until(() => statusOf(world)?.kind === 'failed')
     expect(world.sent).toContainEqual({
       type: 'notice',
-      message: `Could not download S01E01 Good News: ${EXPAND_MESSAGES.gone('Vhagar')}`,
+      message: `Could not download S01E01 Good News: ${EXPAND_MESSAGES.gone(SERVER_NAME)}`,
     })
   })
 
@@ -1281,28 +1222,25 @@ describe('the queue', () => {
     expect(world.sent.filter(({ type }) => type === 'notice')).toEqual([])
   })
 
-  it('marks a row paused by a relock as needing the unlock, even once its server is renamed', () => {
+  it('marks a row paused by a relock as needing the unlock', () => {
     const world = setup({
       initial: holding(
-        entryFor({ status: { kind: 'paused', bytes: 0, reason: 'relocked' } }),
+        entryFor({
+          status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, reason: PAUSE_REASONS.relocked },
+        }),
         entryFor({
           downloadId: OTHER_ID,
           mediaId: 12,
-          status: { kind: 'paused', bytes: 0, reason: 'viewer' },
+          status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, reason: PAUSE_REASONS.viewer },
         }),
       ),
     })
     expect(world.service.views().map(({ needsUnlock }) => needsUnlock)).toEqual([true, false])
-    world.config.update((config) => ({
-      ...config,
-      servers: config.servers.map((server) => ({ ...server, name: 'Caraxes' })),
-    }))
     const [relocked] = world.service.views()
-    expect(relocked?.needsUnlock).toBe(true)
     expect(relocked?.status).toEqual({
       kind: 'paused',
       bytes: 0,
-      message: DOWNLOAD_MESSAGES.relocked('Caraxes'),
+      message: DOWNLOAD_MESSAGES.relocked(SERVER_NAME),
     })
   })
 
@@ -1316,48 +1254,101 @@ describe('the queue', () => {
       })
     const world = setup({
       initial: holding(
-        stopped(1, { kind: 'paused', bytes: 1, reason: 'viewer' }),
-        stopped(2, { kind: 'paused', bytes: 2, reason: 'noSpace' }),
-        stopped(3, { kind: 'paused', bytes: 3, reason: 'unreachable' }),
-        stopped(4, { kind: 'failed', bytes: 4, reason: 'noSpace', message: '' }),
-        stopped(5, { kind: 'failed', bytes: 5, reason: 'changed', message: '' }),
-        stopped(6, { kind: 'failed', bytes: 6, reason: 'unauthorized', message: '' }),
-        stopped(7, { kind: 'failed', bytes: 7, reason: 'unreachable', message: '' }),
-        stopped(8, { kind: 'failed', bytes: 8, reason: 'gone', message: '' }),
-        stopped(9, { kind: 'failed', bytes: 9, reason: 'other', message: 'write EIO' }),
+        stopped(1, { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 1, reason: PAUSE_REASONS.viewer }),
+        stopped(2, { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 2, reason: PAUSE_REASONS.noSpace }),
+        stopped(3, {
+          kind: DOWNLOAD_STATUS_KINDS.paused,
+          bytes: 3,
+          reason: PAUSE_REASONS.unreachable,
+        }),
+        stopped(4, {
+          kind: DOWNLOAD_STATUS_KINDS.failed,
+          bytes: 4,
+          reason: FAIL_REASONS.noSpace,
+          message: '',
+        }),
+        stopped(5, {
+          kind: DOWNLOAD_STATUS_KINDS.failed,
+          bytes: 5,
+          reason: FAIL_REASONS.changed,
+          message: '',
+        }),
+        stopped(6, {
+          kind: DOWNLOAD_STATUS_KINDS.failed,
+          bytes: 6,
+          reason: FAIL_REASONS.unauthorized,
+          message: '',
+        }),
+        stopped(7, {
+          kind: DOWNLOAD_STATUS_KINDS.failed,
+          bytes: 7,
+          reason: FAIL_REASONS.unreachable,
+          message: '',
+        }),
+        stopped(8, {
+          kind: DOWNLOAD_STATUS_KINDS.failed,
+          bytes: 8,
+          reason: FAIL_REASONS.gone,
+          message: '',
+        }),
+        stopped(9, {
+          kind: DOWNLOAD_STATUS_KINDS.failed,
+          bytes: 9,
+          reason: FAIL_REASONS.other,
+          message: 'write EIO',
+        }),
       ),
     })
     expect(world.service.views().map(({ status }) => status)).toEqual([
-      { kind: 'paused', bytes: 1, message: null },
-      { kind: 'paused', bytes: 2, message: 'Not enough space' },
-      { kind: 'paused', bytes: 3, message: 'Vhagar could not be reached' },
-      { kind: 'failed', bytes: 4, message: 'Not enough space' },
-      { kind: 'failed', bytes: 5, message: 'The file changed on the server' },
-      { kind: 'failed', bytes: 6, message: 'Vhagar answered 401' },
-      { kind: 'failed', bytes: 7, message: 'Vhagar could not be reached' },
-      { kind: 'failed', bytes: 8, message: EXPAND_MESSAGES.gone('Vhagar') },
-      { kind: 'failed', bytes: 9, message: 'write EIO' },
+      { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 1, message: null },
+      { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 2, message: 'Not enough space' },
+      { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 3, message: 'raven could not be reached' },
+      { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 4, message: 'Not enough space' },
+      { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 5, message: 'The file changed on the server' },
+      { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 6, message: 'raven answered 401' },
+      { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 7, message: 'raven could not be reached' },
+      { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 8, message: EXPAND_MESSAGES.gone(SERVER_NAME) },
+      { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 9, message: 'write EIO' },
     ])
   })
 
   it('says the server is gone for a reason that names a server raven player no longer keeps', () => {
     expect(
-      viewStatusOf({ status: { kind: 'paused', bytes: 0, reason: 'relocked' }, serverName: '' }),
-    ).toEqual({ kind: 'paused', bytes: 0, message: SERVER_GONE })
-    expect(
       viewStatusOf({
-        status: { kind: 'failed', bytes: 0, reason: 'gone', message: '' },
+        status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, reason: PAUSE_REASONS.relocked },
         serverName: '',
       }),
-    ).toEqual({ kind: 'failed', bytes: 0, message: SERVER_GONE })
+    ).toEqual({ kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, message: SERVER_GONE })
     expect(
-      viewStatusOf({ status: { kind: 'paused', bytes: 0, reason: 'noSpace' }, serverName: '' }),
-    ).toEqual({ kind: 'paused', bytes: 0, message: 'Not enough space' })
+      viewStatusOf({
+        status: {
+          kind: DOWNLOAD_STATUS_KINDS.failed,
+          bytes: 0,
+          reason: FAIL_REASONS.gone,
+          message: '',
+        },
+        serverName: '',
+      }),
+    ).toEqual({ kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 0, message: SERVER_GONE })
+    expect(
+      viewStatusOf({
+        status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, reason: PAUSE_REASONS.noSpace },
+        serverName: '',
+      }),
+    ).toEqual({ kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, message: 'Not enough space' })
   })
 
   it('requeues at launch what an outage stopped', async () => {
     const world = setup({
-      initial: holding(queuedFile({ status: { kind: 'paused', bytes: 0, reason: 'unreachable' } })),
+      initial: holding(
+        queuedFile({
+          status: {
+            kind: DOWNLOAD_STATUS_KINDS.paused,
+            bytes: 0,
+            reason: PAUSE_REASONS.unreachable,
+          },
+        }),
+      ),
       access: async () => FAR_TICKET,
     })
     await until(() => world.network.fileRequests().length === 1)
@@ -1445,7 +1436,7 @@ describe('playing a download', () => {
     expect(world.grants.fileOf(fileId)?.path).toBe(VIDEO)
     expect(queue).toEqual([])
     expect(world.service.sidecarsOf(fileId)).toHaveLength(1)
-    expect(world.service.fromLabelOf({ path: VIDEO })).toBe('Downloaded from Vhagar')
+    expect(world.service.fromLabelOf({ path: VIDEO })).toBe('Downloaded from raven')
     expect(world.service.labelOf({ path: VIDEO })).toBe('S01E01 Good News')
     world.service.noteOpened({ fileId })
     world.service.notePlaying({ fileId })
@@ -1458,7 +1449,7 @@ describe('playing a download', () => {
       position: 750,
       furthest: 750,
       at: NOW,
-      accountId: null,
+      accountId: ACCOUNT,
     })
     expect(world.service.views()[0]?.watched).toBe(0.25)
     world.fire()
@@ -1481,7 +1472,6 @@ describe('playing a download', () => {
 
   it.each([
     ['remove', (world: World) => world.service.remove({ downloadId: ID })],
-    ['removeServer', (world: World) => world.service.removeServer({ serverId: SERVER_ID })],
     ['removeAll', (world: World) => world.service.removeAll()],
   ])("drops a download's recent and resume spot through %s", async (_, removing) => {
     const world = setup({
@@ -1490,16 +1480,6 @@ describe('playing a download', () => {
       player: remembering(VIDEO, MOVIE_PATH),
     })
     await removing(world)
-    expect(pathsIn(world.state.read())).toEqual({ recents: [MOVIE_PATH], resume: [MOVIE_PATH] })
-  })
-
-  it('drops at launch the recent and resume spot of a download of a server raven player no longer keeps', async () => {
-    const path = videoOf(11, OTHER_SERVER_ID)
-    const world = setup({
-      initial: holding(entryFor({ serverId: OTHER_SERVER_ID })),
-      player: remembering(path, MOVIE_PATH),
-    })
-    await until(() => world.store.read().entries.length === 0)
     expect(pathsIn(world.state.read())).toEqual({ recents: [MOVIE_PATH], resume: [MOVIE_PATH] })
   })
 
@@ -1517,7 +1497,7 @@ describe('playing a download', () => {
       downloadId: '00000000-0000-4000-8000-0000000000ff',
       mediaId: 13,
       group: { kind: 'season', key: 'show:4', title: 'Severance', order: 10_003 },
-      status: { kind: 'paused', bytes: 7, reason: 'viewer' },
+      status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 7, reason: PAUSE_REASONS.viewer },
     })
     const world = setup({
       initial: holding(
@@ -1563,7 +1543,7 @@ describe('reaching the server', () => {
   const VIDEO = `${DOWNLOADS}/${SERVER_ID}/11/video.mkv`
   const OTHER_VIDEO = `${DOWNLOADS}/${SERVER_ID}/12/video.mkv`
   const FILE: Video = { size: 2 * GIB, mtimeMs: MTIME }
-  const PLAYED = { play: true, position: 750, furthest: 750, at: NOW, accountId: null }
+  const PLAYED = { play: true, position: 750, furthest: 750, at: NOW, accountId: ACCOUNT }
   const progress = (mediaId: number, position: number): string =>
     keyOf({ name: CALL_NAMES.saveProgress, mediaId, position, audio: null })
   const playOf = (mediaId: number): string => keyOf({ name: CALL_NAMES.recordPlay, mediaId })
@@ -1613,7 +1593,6 @@ describe('reaching the server', () => {
       initial: holding(entryFor({})),
       videos: { [VIDEO]: FILE },
       replies: { [playOf(11)]: OFFLINE, [progress(11, 750)]: OFFLINE },
-      hasAccounts: true,
       accountId: ACCOUNT_A,
     })
     await ticks(10)
@@ -1653,6 +1632,49 @@ describe('reaching the server', () => {
     ])
   })
 
+  it('keeps the last account signed in, and holds a play while none is for it until it is back', async () => {
+    const ACCOUNT_A = '30000000-0000-4000-8000-00000000000a'
+    const ACCOUNT_B = '30000000-0000-4000-8000-00000000000b'
+    const world = setup({
+      initial: holding(entryFor({})),
+      videos: { [VIDEO]: FILE },
+      replies: { [playOf(11)]: NO_CONTENT, [progress(11, 750)]: NO_CONTENT },
+      accountId: ACCOUNT_A,
+    })
+    expect(world.config.read().lastAccountId).toBeNull()
+    world.service.accountSwitched({ serverId: SERVER_ID })
+    expect(world.config.read().lastAccountId).toBe(ACCOUNT_A)
+    world.signedIn.accountId = null
+    world.service.accountSwitched({ serverId: SERVER_ID })
+    expect(world.config.read().lastAccountId).toBe(ACCOUNT_A)
+    await ticks(10)
+    const before = world.heard.length
+
+    const granted = await world.grants.grant(VIDEO)
+    if (!granted.ok) throw new Error('expected a grant')
+    world.service.noteOpened({ fileId: granted.file.fileId })
+    world.service.notePosition({ fileId: granted.file.fileId, position: 750, duration: 3000 })
+    expect(world.store.read().owed).toEqual([
+      { serverId: SERVER_ID, mediaId: 11, pending: { ...PLAYED, accountId: ACCOUNT_A } },
+    ])
+    world.signedIn.accountId = ACCOUNT_B
+    world.service.accountSwitched({ serverId: SERVER_ID })
+    expect(world.config.read().lastAccountId).toBe(ACCOUNT_B)
+    await ticks(10)
+    fireAfter(world, SYNC_DEBOUNCE_MS)
+    await ticks(10)
+    expect(world.heard.slice(before)).toEqual([])
+
+    world.signedIn.accountId = ACCOUNT_A
+    world.service.accountSwitched({ serverId: SERVER_ID })
+    await until(() => world.store.read().owed.length === 0)
+    const tokenOfA = tokenFor({ accountId: ACCOUNT_A })
+    expect(world.heard.slice(before)).toEqual([
+      { call: playOf(11), token: tokenOfA },
+      { call: progress(11, 750), token: tokenOfA },
+    ])
+  })
+
   it("keeps a title left open across a switch with the account that opened it, never the next one's", async () => {
     const ACCOUNT_A = '30000000-0000-4000-8000-00000000000a'
     const ACCOUNT_B = '30000000-0000-4000-8000-00000000000b'
@@ -1661,7 +1683,6 @@ describe('reaching the server', () => {
       initial: holding(entryFor({})),
       videos: { [VIDEO]: FILE },
       replies: { [playOf(11)]: OFFLINE, [progress(11, 1000)]: OFFLINE },
-      hasAccounts: true,
       accountId: ACCOUNT_A,
     })
     await ticks(10)
@@ -1838,28 +1859,6 @@ describe('reaching the server', () => {
     expect(world.store.read()).toMatchObject({ entries: [], owed: [] })
   })
 
-  it('drops what a removed server was owed, and sends it nothing', async () => {
-    const world = setup({
-      initial: { ...holding(), owed: [{ serverId: SERVER_ID, mediaId: 11, pending: PLAYED }] },
-      replies: { [playOf(11)]: { unreachable: 'offline' } },
-    })
-    await world.service.removeServer({ serverId: SERVER_ID })
-    expect(world.store.read().owed).toEqual([])
-    const before = world.log.length
-    await world.service.removeAll()
-    expect(world.log.length).toBe(before)
-  })
-
-  it('does not wait on the server to forget a server', async () => {
-    const world = setup({
-      initial: holding(withPending()),
-      videos: { [VIDEO]: FILE },
-    })
-    world.silence.until = new Promise(() => undefined)
-    await world.service.removeServer({ serverId: SERVER_ID })
-    expect(entries(world)).toEqual([])
-  })
-
   it('sends nothing more after dispose', async () => {
     const world = setup({
       initial: holding(withPending()),
@@ -1885,7 +1884,10 @@ describe('deleting once watched', () => {
   const NO_CONTENT: Reply = { status: 204, body: '' }
   const PLAY = keyOf({ name: CALL_NAMES.recordPlay, mediaId: 11 })
   const PROGRESS = keyOf({ name: CALL_NAMES.saveProgress, mediaId: 11, position: 0, audio: null })
-  const DELETED = { type: 'notice', message: 'Deleted S01E01 Good News after watching' } as const
+  const DELETED = {
+    type: DESKTOP_EVENTS.notice,
+    message: 'Deleted S01E01 Good News after watching',
+  } as const
   const holding = (...entries: DownloadEntry[]): DownloadsState => ({
     ...EMPTY_DOWNLOADS,
     entries,
@@ -2167,7 +2169,6 @@ describe('deleting once watched', () => {
   it.each([
     ['remove', (world: World) => world.service.remove({ downloadId: ID })],
     ['removeAll', (world: World) => world.service.removeAll()],
-    ['removeServer', (world: World) => world.service.removeServer({ serverId: SERVER_ID })],
   ])('stops the clock of a download deleted through %s', async (_, removing) => {
     const world = settingUp({ watchedAt: NOW - 3 * MINUTE })
     await until(() => world.service.views()[0]?.deletesAt !== null)
