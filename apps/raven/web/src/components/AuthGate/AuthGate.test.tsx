@@ -1,4 +1,4 @@
-import { DESKTOP_PATHS } from '@/desktop/paths'
+import { DESKTOP_PATHS, playPathOf } from '@/desktop/paths'
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
@@ -74,7 +74,7 @@ describe('AuthGate', () => {
 
   it('keeps a local file or download playing while the account is read', () => {
     getMe.mockImplementation(() => new Promise(() => undefined))
-    renderGate({ route: `/play/${FILE_ID}` })
+    renderGate({ route: playPathOf(FILE_ID) })
     expect(screen.getByText('Library')).toBeInTheDocument()
     expect(screen.queryByText('Checking your account')).toBeNull()
   })
@@ -86,7 +86,7 @@ describe('AuthGate', () => {
         reason: { reason: AUTH_REFUSALS.unavailable, message: 'Accounts are unavailable.' },
       }),
     )
-    renderGate({ route: `/play/${FILE_ID}` })
+    renderGate({ route: playPathOf(FILE_ID) })
     await waitFor(() => expect(getMe).toHaveBeenCalled())
     expect(screen.getByText('Library')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
@@ -95,7 +95,7 @@ describe('AuthGate', () => {
   it('keeps a local file or download playing while accounts cannot be reached', () => {
     renderGate({
       authConfig: { state: AUTH_CONFIG_STATES.unavailable },
-      route: `/play/${FILE_ID}`,
+      route: playPathOf(FILE_ID),
     })
     expect(screen.getByText('Library')).toBeInTheDocument()
   })

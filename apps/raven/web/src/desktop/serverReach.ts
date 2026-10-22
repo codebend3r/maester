@@ -5,6 +5,7 @@ import { useEffect, useEffectEvent, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { DESKTOP_PATHS, offlineReturnIn } from '@/desktop/paths'
 import { useServerReach } from '@/stores/serverReach'
+import { handled } from '@/desktop/handled'
 
 /** How often raven player asks again while its server cannot be reached. */
 export const OFFLINE_RETRY_MS = 5_000
@@ -72,7 +73,7 @@ export const useReturnWhenReached = (): void => {
 
   const goBack = useEffectEvent(() => {
     const returnTo = pathname === DESKTOP_PATHS.downloads ? offlineReturnIn(state) : null
-    if (returnTo !== null) void navigate(returnTo, { replace: true })
+    if (returnTo !== null) handled(Promise.resolve(navigate(returnTo, { replace: true })))
   })
 
   useEffect(() => {

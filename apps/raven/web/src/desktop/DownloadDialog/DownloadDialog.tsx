@@ -178,7 +178,7 @@ const AccountDialog = ({ ask, onClose }: { ask: DownloadAsk; onClose: () => void
 
   const signIn = () => {
     close()
-    void navigate(signInPath({ returnTo: `${pathname}${search}` }))
+    handled(Promise.resolve(navigate(signInPath({ returnTo: `${pathname}${search}` }))))
   }
 
   return (

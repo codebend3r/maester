@@ -9,6 +9,7 @@ import { useDragging } from '@/stores/dragging'
 import { Where, where } from '@/test/authPage'
 import { asDesktop, fakeClient, FILE_ID, RECENT_ID, sentOfType } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
+import { DESKTOP_PATHS, playPathOf } from '@/desktop/paths'
 
 const RECENT: RecentView = {
   recentId: RECENT_ID,
@@ -49,11 +50,11 @@ const localMain = ({
 const renderPage = (client = localMain()) => {
   asDesktop(client)
   renderWithProviders({
-    route: '/local',
+    route: DESKTOP_PATHS.local,
     ui: (
       <>
         <Routes>
-          <Route path="/local" element={<LocalPage />} />
+          <Route path={DESKTOP_PATHS.local} element={<LocalPage />} />
           <Route path="*" element={<Where />} />
         </Routes>
         <Toaster />
@@ -67,7 +68,7 @@ describe('LocalPage', () => {
   it('plays a video chosen from this Mac', async () => {
     const client = renderPage()
     await userEvent.click(screen.getByRole('button', { name: 'Choose a video' }))
-    await waitFor(() => expect(where()).toBe(`/play/${FILE_ID}`))
+    await waitFor(() => expect(where()).toBe(playPathOf(FILE_ID)))
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.openDialog })).toHaveLength(1)
   })
 
@@ -85,7 +86,7 @@ describe('LocalPage', () => {
     expect(await screen.findByRole('progressbar', { name: '25% watched' })).toBeInTheDocument()
     expect(screen.getByText('Movies')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /^Holiday\.mkv/ }))
-    await waitFor(() => expect(where()).toBe(`/play/${FILE_ID}`))
+    await waitFor(() => expect(where()).toBe(playPathOf(FILE_ID)))
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.openRecent })).toEqual([
       { type: DESKTOP_REQUESTS.openRecent, recentId: RECENT_ID },
     ])
