@@ -71,8 +71,8 @@ export const useVideoState = ({
       play: () => {
         // Play is intent; only playing confirms frames for progress and history.
         playing.current = true
-        dispatch({ type: VIDEO_EVENTS.waiting })
         dispatch({ type: VIDEO_EVENTS.played })
+        dispatch({ type: VIDEO_EVENTS.waiting })
       },
       playing: () => {
         playing.current = true
@@ -84,6 +84,10 @@ export const useVideoState = ({
         dispatch({ type: VIDEO_EVENTS.ended })
       },
       waiting: () => dispatch({ type: VIDEO_EVENTS.waiting }),
+      // A first frame held paused, as when autoplay is refused; playing ends a wait otherwise.
+      canplay: (element) => {
+        if (element.paused) dispatch({ type: VIDEO_EVENTS.flowing })
+      },
       pause: (element) => {
         // Letting go of a source on the way to another pauses too; that is not the viewer.
         if (element.readyState === HTMLMediaElement.HAVE_NOTHING) return

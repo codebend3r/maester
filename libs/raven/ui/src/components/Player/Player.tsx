@@ -4,6 +4,7 @@ import { ENGINE_KINDS, type Engine, type HtmlSource, sourceKey } from '@/compone
 import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
 import { NativeStage } from '@/components/Player/NativeStage'
+import { Preloader } from '@/components/Player/Preloader'
 import { DIRECT_RENDITION } from '@/components/Player/rendition'
 import { Stage } from '@/components/Player/Stage'
 import { Unplayable } from '@/components/Player/Unplayable'
@@ -13,7 +14,7 @@ import { type TrackSelection, useTrackSelection } from '@/components/Player/useT
 
 const Waiting = () => (
   <div className={styles.stage} aria-busy="true">
-    <output className={styles.spinner} aria-label="Loading" />
+    <Preloader />
   </div>
 )
 

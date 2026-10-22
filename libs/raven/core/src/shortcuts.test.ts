@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import {
   type PlayerAction,
+  type SkipStep,
   shortcutFor,
   shortcutRows,
   stepCaptionScale,
+  stepSkip,
   stepSpeed,
 } from '@/shortcuts'
 
@@ -18,10 +20,10 @@ describe('shortcutFor', () => {
     ['k', { type: 'togglePlay' }],
     [' ', { type: 'togglePlay' }],
     ['K', { type: 'togglePlay' }],
-    ['j', { type: 'seekBy', seconds: -10 }],
-    ['l', { type: 'seekBy', seconds: 10 }],
-    ['ArrowLeft', { type: 'seekBy', seconds: -5 }],
-    ['ArrowRight', { type: 'seekBy', seconds: 5 }],
+    ['j', { type: 'skip', direction: -1 }],
+    ['l', { type: 'skip', direction: 1 }],
+    ['ArrowLeft', { type: 'skip', direction: -1 }],
+    ['ArrowRight', { type: 'skip', direction: 1 }],
     ['ArrowUp', { type: 'volumeBy', delta: 0.05 }],
     ['ArrowDown', { type: 'volumeBy', delta: -0.05 }],
     ['m', { type: 'toggleMute' }],
@@ -64,13 +66,53 @@ describe('stepSpeed', () => {
   it('walks the ladder and stops at its ends', () => {
     expect(stepSpeed({ current: 1, direction: 1 })).toBe(1.25)
     expect(stepSpeed({ current: 1, direction: -1 })).toBe(0.75)
-    expect(stepSpeed({ current: 2, direction: 1 })).toBe(2)
+    expect(stepSpeed({ current: 2, direction: 1 })).toBe(2.5)
+    expect(stepSpeed({ current: 4, direction: 1 })).toBe(4)
     expect(stepSpeed({ current: 0.25, direction: -1 })).toBe(0.25)
   })
 
   it('snaps an off-ladder speed to its neighbours', () => {
     expect(stepSpeed({ current: 1.1, direction: 1 })).toBe(1.25)
     expect(stepSpeed({ current: 1.1, direction: -1 })).toBe(1)
+  })
+})
+
+describe('stepSkip', () => {
+  const run = (presses: ReadonlyArray<{ direction: 1 | -1; at: number }>) =>
+    presses
+      .reduce<SkipStep[]>(
+        (steps, skip) => [...steps, stepSkip({ last: steps.at(-1) ?? null, ...skip })],
+        [],
+      )
+      .map((step) => step.seconds * step.direction)
+
+  it('goes 10 seconds on a lone press', () => {
+    expect(run([{ direction: 1, at: 0 }])).toEqual([10])
+    expect(run([{ direction: -1, at: 0 }])).toEqual([-10])
+  })
+
+  it('climbs to 20 and then 30 on quick presses, and stays at 30', () => {
+    expect(run([0, 400, 800, 1_200].map((at) => ({ direction: 1 as const, at })))).toEqual([
+      10, 20, 30, 30,
+    ])
+  })
+
+  it('stays at 10 when the presses come a second or more apart', () => {
+    expect(run([0, 1_000, 2_000].map((at) => ({ direction: -1 as const, at })))).toEqual([
+      -10, -10, -10,
+    ])
+  })
+
+  it('starts again at 10 after a pause or a change of direction', () => {
+    expect(
+      run([
+        { direction: 1, at: 0 },
+        { direction: 1, at: 500 },
+        { direction: -1, at: 900 },
+        { direction: -1, at: 1_300 },
+        { direction: -1, at: 3_000 },
+      ]),
+    ).toEqual([10, 20, -10, -20, -10])
   })
 })
 

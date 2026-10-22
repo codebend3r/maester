@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { BezelState } from '@/components/Player/Bezel'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import type { EngineHandle } from '@/components/Player/engine'
@@ -8,8 +9,10 @@ import {
   PLAYER_ACTIONS,
   type PlayerAction,
   SEEK_EDGES,
+  type SkipStep,
   languageName,
   stepCaptionScale,
+  stepSkip,
   stepSpeed,
 } from '@raven/core'
 import { useHostServices } from '@/stores/playerServices'
@@ -60,6 +63,7 @@ export const usePlayerActions = ({
   const subtitles = usePlayerPrefs((prefs) => prefs.subtitles)
   const { isVolumeFixed = false } = useHostServices()
   const seek = actions.seek
+  const lastSkip = useRef<SkipStep | null>(null)
 
   const togglePlay = () => {
     if (state.paused) actions.play()
@@ -124,13 +128,20 @@ export const usePlayerActions = ({
         flash({ icon: state.paused ? 'play' : 'pause', text: state.paused ? 'Play' : 'Pause' })
         togglePlay()
         return
-      case PLAYER_ACTIONS.seekBy:
-        seek(now + action.seconds)
+      case PLAYER_ACTIONS.skip: {
+        const step = stepSkip({
+          last: lastSkip.current,
+          direction: action.direction,
+          at: performance.now(),
+        })
+        lastSkip.current = step
+        seek(now + step.seconds * step.direction)
         flash({
-          icon: action.seconds < 0 ? 'rewind' : 'forward',
-          text: `${action.seconds < 0 ? 'Back' : 'Forward'} ${Math.abs(action.seconds)}s`,
+          icon: step.direction < 0 ? 'rewind' : 'forward',
+          text: `${step.direction < 0 ? 'Back' : 'Forward'} ${step.seconds}s`,
         })
         return
+      }
       case PLAYER_ACTIONS.seekToFraction:
         if (duration == null) return
         seek(duration * action.fraction)

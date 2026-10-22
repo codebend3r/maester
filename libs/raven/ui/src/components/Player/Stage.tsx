@@ -37,6 +37,7 @@ import {
 } from '@/components/Player/playbackFacts'
 import styles from '@/components/Player/Player.module.scss'
 import { type PlaybackFile, PlaybackInfo } from '@/components/Player/PlaybackInfo'
+import { Preloader } from '@/components/Player/Preloader'
 import { playingAudio } from '@/components/Player/selection'
 import { SettingsMenu } from '@/components/Player/SettingsMenu'
 import { ShortcutsDialog } from '@/components/Player/ShortcutsDialog'
@@ -311,8 +312,8 @@ export const PlayerChrome = ({
     >
       {engine.surface}
       {!engine.drawsSubtitles && (renderSubtitles?.(chromeShown) ?? null)}
-      {state.waiting && !state.paused && <output className={styles.spinner} aria-label="Loading" />}
-      {state.paused && chromeShown && (
+      {state.waiting && <Preloader />}
+      {state.paused && !state.waiting && chromeShown && (
         // The picture under it takes the click; this only says a click will play.
         <span className={styles.paused} aria-hidden="true">
           <Icon name="play" size={40} />
@@ -402,7 +403,7 @@ export const PlayerChrome = ({
         onNext={upNext.playNext}
         onTogglePlay={controls.togglePlay}
         onSeek={seek}
-        onSkip={(seconds) => controls.act({ type: PLAYER_ACTIONS.seekBy, seconds })}
+        onSkip={(direction) => controls.act({ type: PLAYER_ACTIONS.skip, direction })}
         onVolume={controls.changeVolume}
         onToggleMute={controls.toggleMute}
         onToggleMenu={toggleMenu}

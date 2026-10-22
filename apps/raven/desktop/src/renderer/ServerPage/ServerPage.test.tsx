@@ -360,6 +360,7 @@ describe('ServerPage', () => {
     })
     await loaded({ fake })
     fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+    fake.emit({ type: PLAYER_EVENTS.waiting, waiting: false })
     fake.emit({ type: PLAYER_EVENTS.time, time: 40 })
     await waitFor(() =>
       expect(serverCallsOf(client)).toContainEqual({
@@ -406,11 +407,13 @@ describe('ServerPage', () => {
     })
     await loaded({ fake })
     fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+    fake.emit({ type: PLAYER_EVENTS.waiting, waiting: false })
     await waitFor(() => expect(callNamesOf(client)).toContain('POST /api/media/7/plays'))
     fake.emit({ type: PLAYER_EVENTS.error, reason: PLAYER_ERROR_REASONS.locked, message: 'x' })
     await enter({ label: 'PIN', value: '1234' })
     await loaded({ fake, count: 2 })
     fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+    fake.emit({ type: PLAYER_EVENTS.waiting, waiting: false })
     fake.emit({ type: PLAYER_EVENTS.time, time: 50 })
     await waitFor(() => expect(callNamesOf(client)).toContain('PUT /api/media/7/progress'))
     expect(callNamesOf(client).filter((name) => name === 'POST /api/media/7/plays')).toHaveLength(1)
@@ -430,6 +433,7 @@ describe('ServerPage', () => {
     await loaded({ fake })
     fake.emit({ type: PLAYER_EVENTS.duration, duration: 100 })
     fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+    fake.emit({ type: PLAYER_EVENTS.waiting, waiting: false })
     fake.emit({ type: PLAYER_EVENTS.time, time: 40 })
     await act(async () =>
       next.resolve(reply({ body: mediaItemFor({ id: 8, title: 'Episode 2' }) })),

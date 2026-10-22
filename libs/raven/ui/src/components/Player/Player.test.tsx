@@ -681,17 +681,18 @@ describe('the player chrome', () => {
     expect(screen.getByRole('button', { name: 'Pause (k)' })).toBeInTheDocument()
   })
 
-  it('skips ten seconds either way from the bar, and back to the start', async () => {
+  it('skips either way from the bar, further on quick presses, and back to the start', async () => {
     const { container } = renderWithProviders({
       ui: <TestPlayer media={uhd} backTo="/libraries/2" />,
     })
     const video = container.querySelector('video')
     if (!video) throw new Error('no video')
     await userEvent.click(screen.getByRole('button', { name: 'Forward 10 seconds (l)' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Forward 10 seconds (l)' }))
-    expect(video.currentTime).toBe(20)
-    await userEvent.click(screen.getByRole('button', { name: 'Back 10 seconds (j)' }))
     expect(video.currentTime).toBe(10)
+    await userEvent.click(screen.getByRole('button', { name: 'Forward 10 seconds (l)' }))
+    expect(video.currentTime).toBe(30)
+    await userEvent.click(screen.getByRole('button', { name: 'Back 10 seconds (j)' }))
+    expect(video.currentTime).toBe(20)
     await userEvent.click(screen.getByRole('button', { name: 'Back to the start (Home)' }))
     expect(video.currentTime).toBe(0)
   })
