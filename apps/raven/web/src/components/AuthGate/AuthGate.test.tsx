@@ -1,16 +1,17 @@
-import { DESKTOP_PATHS, playPathOf } from '@/desktop/paths'
+import { playPathOf } from '@/desktop/paths'
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import {
-  type AuthConfig,
   ApiError,
   AUTH_CONFIG_STATES,
   AUTH_REFUSALS,
-  MEMBER_STATUSES,
   AUTH_ROUTES,
+  type AuthConfig,
+  DESKTOP_PATHS,
+  MEMBER_STATUSES,
 } from '@raven/core'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { api } from '@/lib/api'

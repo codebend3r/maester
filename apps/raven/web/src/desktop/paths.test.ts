@@ -1,6 +1,6 @@
-import { PAGE_PATHS } from '@raven/core'
+import { DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
-import { isFilePlaying, isOfflinePage, isPlaying, playPathOf, DESKTOP_PATHS } from '@/desktop/paths'
+import { isFilePlaying, isOfflinePage, isPlaying, playPathOf } from '@/desktop/paths'
 import { FILE_ID } from '@/test/desktop'
 
 describe('desktop paths', () => {

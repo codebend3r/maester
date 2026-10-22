@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { PAGE_ORIGIN, SERVER_METHODS } from '@raven/core'
+import { AUTH_ROUTES, PAGE_ORIGIN, SERVER_METHODS } from '@raven/core'
 import { makeClips, makeTrackClip } from '@/e2e/clips'
 import { FIXTURE_MEDIA, FIXTURE_MOVIE_NAMES, FIXTURE_TITLES } from '@/e2e/fixtureLibrary'
 import { type FixtureServer, isTicketOnly, MEDIA_PATHS, startWebFixture } from '@/e2e/fixtureServer'
@@ -57,7 +57,7 @@ test.describe.serial('the raven web app in raven player', () => {
 
   test('signs in through the web sign-in page', async () => {
     const { page } = running()
-    await expect(page).toHaveURL(new RegExp(`^${PAGE_ORIGIN}/sign-in`, 'u'))
+    await expect(page).toHaveURL(new RegExp(`^${PAGE_ORIGIN}${AUTH_ROUTES.signIn}`, 'u'))
     await signIn({ page })
     expect(page.url()).toBe(`${PAGE_ORIGIN}/`)
   })

@@ -1,4 +1,5 @@
 import {
+  DESKTOP_PATHS,
   DESKTOP_REQUESTS,
   isOpaqueId,
   listOf,
@@ -13,7 +14,7 @@ import type { PlayerServices, ProgressSink } from '@raven/ui/headless'
 import type { DesktopClient } from '@/desktop/client'
 import { handled } from '@/desktop/handled'
 import type { MenuHub } from '@/desktop/menuHub'
-import { DESKTOP_PATHS, playPathOf } from '@/desktop/paths'
+import { playPathOf } from '@/desktop/paths'
 
 /** What the page leaves in `location.state` when it opens a file: the files to play after it. */
 export const isPlayState = object({ queue: listOf(isOpaqueId) })

@@ -1,9 +1,10 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import {
+  DESKTOP_PATHS,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
-  DOWNLOAD_STATUS_KINDS,
   DOWNLOAD_KINDS,
+  DOWNLOAD_STATUS_KINDS,
 } from '@raven/core'
 import { Toaster } from '@raven/ui'
 import { screen, waitFor, within } from '@testing-library/react'
@@ -25,7 +26,7 @@ import {
   viewOf,
 } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
-import { DESKTOP_PATHS, playPathOf } from '@/desktop/paths'
+import { playPathOf } from '@/desktop/paths'
 
 const EPISODE_2 = viewOf({
   downloadId: DL_2,

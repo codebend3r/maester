@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { DESKTOP_REPLIES, DESKTOP_REQUESTS, type DesktopReply, type RecentView } from '@raven/core'
+import {
+  DESKTOP_PATHS,
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  type DesktopReply,
+  type RecentView,
+} from '@raven/core'
 import { Toaster } from '@raven/ui'
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -9,7 +15,7 @@ import { useDragging } from '@/stores/dragging'
 import { Where, where } from '@/test/authPage'
 import { asDesktop, fakeClient, FILE_ID, RECENT_ID, sentOfType } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
-import { DESKTOP_PATHS, playPathOf } from '@/desktop/paths'
+import { playPathOf } from '@/desktop/paths'
 
 const RECENT: RecentView = {
   recentId: RECENT_ID,

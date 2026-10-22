@@ -35,6 +35,13 @@ const isGatewayStatus = oneOf(Object.values(GATEWAY_STATUSES))
 export const isUnreachableAnswer = ({ status, body }: { status: number; body: unknown }): boolean =>
   isServerUnreachableBody(body) || (isGatewayStatus(status) && body === null)
 
+/** raven player's own pages, which a browser does not have. */
+export const DESKTOP_PATHS = {
+  downloads: '/downloads',
+  local: '/local',
+  play: '/play/:fileId',
+} as const
+
 /** The environment variables a raven player build reads. */
 export const DESKTOP_ENV = {
   /** The server `/api` goes to, an http or https origin with no path. */

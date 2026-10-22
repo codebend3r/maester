@@ -1,6 +1,8 @@
 import {
+  DESKTOP_PATHS,
   isPlayerRequest,
   PAGE_ORIGIN,
+  PAGE_PATHS,
   PLAYER_COMMANDS,
   PLAYER_CONNECTION_STATUSES,
   type PlayerCommand,
@@ -12,7 +14,6 @@ import { waitFor } from '@testing-library/react'
 import { type ReactNode, StrictMode } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import type { DesktopClient } from '@/desktop/client'
-import { DESKTOP_PATHS } from '@/desktop/paths'
 import { PlayRoute } from '@/desktop/PlayPage/PlayPage'
 import { listenForPlayer, type PlayerConnections } from '@/desktop/playerConnection'
 import { PinPrompt } from '@/components/PinPrompt/PinPrompt'
@@ -49,7 +50,7 @@ export const renderPlayers = ({
   const pages = (
     <>
       <Routes>
-        <Route path="/watch/:id" element={<WatchPage />} />
+        <Route path={`${PAGE_PATHS.watch}/:id`} element={<WatchPage />} />
         <Route path={DESKTOP_PATHS.play} element={<PlayRoute />} />
         <Route path="*" element={<Where />} />
       </Routes>
