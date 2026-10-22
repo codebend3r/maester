@@ -47,10 +47,10 @@ const APPLE_HTTP_STATUSES: ReadonlyMap<string, ReadonlyMap<number, number>> = ne
 ])
 
 /**
- * The statuses the server lets go of a source with while it plays: 401 for a ticket past its life,
- * 403 for an account it no longer lets in, 404 for an HLS session it ended or forgot (the
- * capability's deadline, an account recheck, the session cap, a restart) and 423 for a library
- * locked again. Each is the source's to hand out afresh, where the server says why if it will not.
+ * The statuses the server lets go of a source with while it plays: 401 for a direct file whose
+ * ticket's pass ended (its 12 hours, an account recheck, the pass cap, a restart), 403 for an
+ * account it no longer lets in, 404 for an HLS session it ended or forgot (the capability's
+ * deadline, an account recheck, the session cap, a restart) and 423 for a library locked again. Each is the source's to hand out afresh, where the server says why if it will not.
  */
 const LET_GO_STATUSES: ReadonlySet<number> = new Set([
   ...Object.values(HTTP_STATUSES),

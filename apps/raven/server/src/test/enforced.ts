@@ -19,6 +19,7 @@ import {
 import { CACHE_POLICIES, CONTENT_TYPES, HEADERS } from '@shared/server'
 import { createApp } from '@/app'
 import { ACCOUNT_REQUIREMENTS } from '@/auth/accountGuard'
+import { PASS_KINDS, type PassKind } from '@/auth/accountPasses'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
@@ -143,16 +144,21 @@ export const ROUTES = {
 export type Route = (typeof ROUTES)[keyof typeof ROUTES]
 
 /**
- * The routes an HLS session's capability opens, under accounts `ready`, in
- * place of an account ticket: every one that names the session.
+ * The routes each kind of account pass opens under accounts `ready`: an HLS
+ * session's capability, in place of an account ticket, every route that
+ * names the session; and the pass an account ticket earns by opening its
+ * file, past the ticket's five minutes, that file alone.
  */
-export const HLS_CAPABILITY_ROUTES = [
-  ROUTES.hlsVideo,
-  ROUTES.hlsInit,
-  ROUTES.hlsSegment,
-  ROUTES.hlsSubtitles,
-  ROUTES.hlsSubtitleSegment,
-] as const satisfies readonly Route[]
+export const PASS_ROUTES = {
+  [PASS_KINDS.capability]: [
+    ROUTES.hlsVideo,
+    ROUTES.hlsInit,
+    ROUTES.hlsSegment,
+    ROUTES.hlsSubtitles,
+    ROUTES.hlsSubtitleSegment,
+  ],
+  [PASS_KINDS.ticket]: [ROUTES.file],
+} as const satisfies Record<PassKind, readonly Route[]>
 
 /** `path` with each `:name` filled from `params`, else with `1`. */
 export const pathOf = ({

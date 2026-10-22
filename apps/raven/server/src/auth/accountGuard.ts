@@ -20,13 +20,16 @@ import {
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AUDIENCES, audienceOf } from '@/admin/adminGuard'
+import { isAccountOutage } from '@/auth/accessRechecks'
 import { accessTokenOf } from '@/auth/accessToken'
+import { PASS_KINDS, type PassGrant, passKindOf } from '@/auth/accountPasses'
 import { ACCOUNT_TICKET_PREFIX, AccountTickets } from '@/auth/accountTickets'
 import { authFailure } from '@/auth/authFailure'
 import { AuthSessions, requireApproved } from '@/auth/authSessions'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
-import { isCapabilityRoute, isHlsCapability } from '@/hls/hlsCapability'
+import { isHlsCapability } from '@/hls/hlsCapability'
 import { HlsSessions, noSuchSession } from '@/hls/hlsSessions'
+import { FilePasses } from '@/media/filePasses'
 import { isMediaPlaneRoute } from '@/media/mediaPlaneMark'
 import { ROUTE_PARAMS, requestParts } from '@/requestParts'
 import type { MarkTargets } from '@/routeMarks'
@@ -115,7 +118,7 @@ const capabilityOf = ({
   query: Record<string, unknown>
   targets: MarkTargets
 }): string | null => {
-  if (!isCapabilityRoute(targets)) return null
+  if (passKindOf(targets) !== PASS_KINDS.capability) return null
   const capability = query[MEDIA_TICKET_PARAM]
   return isHlsCapability(capability) ? capability : null
 }
@@ -150,7 +153,8 @@ const admit = ({
  * refused as unavailable and the rest pass for the legacy browser, as before
  * accounts. `unavailable` refuses everything but the open routes. `ready`
  * resolves the caller from Bearer, from the session cookie on a GET or
- * HEAD, from an account ticket on the media plane, or from an HLS
+ * HEAD, from an account ticket on the media plane (or, on `file`, from the
+ * pass the ticket earned there once it has expired), or from an HLS
  * session's capability on that session's routes, and holds it to the
  * route's requirement.
  */
@@ -161,6 +165,7 @@ export class AccountGuard implements CanActivate {
     @Inject(AccountTickets) private readonly tickets: AccountTickets,
     @Inject(AUTH_STATE) private readonly auth: AuthConfig,
     @Inject(HlsSessions) private readonly hls: Pick<HlsSessions, 'grantOf'>,
+    @Inject(FilePasses) private readonly files: Pick<FilePasses, 'grantOf'>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -181,7 +186,13 @@ export class AccountGuard implements CanActivate {
     }
     const request = http.getRequest<FastifyRequest>()
     if (ticket !== null) {
-      await this.admitTicket({ request, ticket, id: params[ROUTE_PARAMS.id], requirement })
+      await this.admitTicket({
+        request,
+        ticket,
+        id: params[ROUTE_PARAMS.id],
+        isFileRoute: passKindOf(targets) === PASS_KINDS.ticket,
+        requirement,
+      })
       return true
     }
     if (this.auth.state !== AUTH_CONFIG_STATES.ready) throw authFailure(AUTH_REFUSALS.unavailable)
@@ -218,26 +229,57 @@ export class AccountGuard implements CanActivate {
         ? this.hls.grantOf({ mediaId: Number(id), session, capability })
         : null
     if (grant === null) throw noSuchSession()
-    admit({ requirement, account: grant.account })
-    this.sessions.bindTicket({ request, session: grant, unlockedUntil: grant.unlockedUntil })
+    this.admitGrant({ request, grant, requirement })
   }
 
-  /** Redeems an account ticket for the media id it names, and binds the account it stands for. */
+  /**
+   * Redeems an account ticket for the media id it names, or, on `file`
+   * once the ticket has expired or while accounts cannot answer, the pass
+   * it earned there, and binds the account it stands for. Neither left is
+   * a ticket that opens nothing.
+   */
   private async admitTicket({
     request,
     ticket,
     id,
+    isFileRoute,
     requirement,
   }: {
     request: FastifyRequest
     ticket: string
     id: unknown
+    isFileRoute: boolean
     requirement: GatedRequirement
   }): Promise<void> {
     if (!isMediaIdParam(id)) throw authFailure(AUTH_REFUSALS.signedOut)
-    const { session, unlockedUntil } = await this.tickets.redeem({ ticket, id: Number(id) })
-    admit({ requirement, account: session.account })
-    this.sessions.bindTicket({ request, session, unlockedUntil })
+    const mediaId = Number(id)
+    const held = (): PassGrant | null =>
+      isFileRoute ? this.files.grantOf({ ticket, mediaId }) : null
+    const grant = await this.tickets.redeem({ ticket, id: mediaId }).then(
+      (redeemed) => redeemed ?? held(),
+      (error: unknown) => {
+        // An outage keeps a held pass inside the ticket's five minutes, as its recheck does past them.
+        const kept = isAccountOutage(error) ? held() : null
+        if (kept === null) throw error
+        return kept
+      },
+    )
+    if (grant === null) throw authFailure(AUTH_REFUSALS.signedOut)
+    this.admitGrant({ request, grant, requirement })
+  }
+
+  /** Holds the account a ticket or a pass stands for to the route's requirement, and binds it. */
+  private admitGrant({
+    request,
+    grant,
+    requirement,
+  }: {
+    request: FastifyRequest
+    grant: PassGrant
+    requirement: GatedRequirement
+  }): void {
+    admit({ requirement, account: grant.account })
+    this.sessions.bindTicket({ request, session: grant, unlockedUntil: grant.unlockedUntil })
   }
 
   /** Authenticates Bearer, or the session cookie on a GET or HEAD, and binds its session. */

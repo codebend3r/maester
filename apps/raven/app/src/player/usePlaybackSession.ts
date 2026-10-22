@@ -8,9 +8,11 @@ import { useCookieVersion } from '@/stores/cookieVersion'
 export const LOAD_TIMEOUT_MS = 15_000
 
 /**
- * How long a direct play may wait for data before it is opened again from the spot. AVPlayer
- * answered a file's ranges refused past their ticket's life (401) with a dozen seconds of retries
- * and then a stall it never reported as an error, so the stall is the only word of it.
+ * How long a direct play may wait for data before it is opened again from the spot. The server
+ * keeps a file's ticket opening it past the ticket's five minutes, so this is the safety net for
+ * a pass that ended (its 12 hours, an account recheck, the pass cap, a restart) and for a stall
+ * of any other kind: AVPlayer answered a file's refused ranges (401) with a dozen seconds of
+ * retries and then a stall it never reported as an error, so the stall is the only word of it.
  */
 export const STALL_REOPEN_MS = 10_000
 
@@ -149,8 +151,8 @@ const stepDown = ({ ladder, at }: { ladder: Ladder; at: number }): SessionState 
 
 /**
  * Whether the way being played has played on since it was last opened again, so the server's
- * letting go of it is one more lapse of a long play (a ticket past its life, an HLS session the
- * server ended or forgot) rather than a source that fails wherever it is opened.
+ * letting go of it is one more lapse of a long play (a file pass or an HLS session the server
+ * ended or forgot) rather than a source that fails wherever it is opened.
  */
 const hasPlayedOn = ({ ladder, at }: { ladder: Ladder; at: number }): boolean =>
   ladder.reopenedAt === null || at > ladder.reopenedAt
@@ -168,9 +170,9 @@ export const hasWayBelow = (state: SessionState): boolean =>
  * to decode, or, while a way is left below, has not loaded within `LOAD_TIMEOUT_MS`, each from
  * the spot it got to. A remux the server refuses (its 409, keyframes too far apart to cut)
  * fails like any other, so the transcode below it is next. A source the server lets go of while
- * it plays (`dropped`: its ticket past its life, its HLS session ended, forgotten or lost to a
- * restart) is opened again the same way from the spot, with a source handed out afresh, so a film
- * longer than a ticket plays to its end; only a refusal of that source shows. One the server lets
+ * it plays (`dropped`: its file pass or its HLS session ended, forgotten or lost to a restart)
+ * is opened again the same way from the spot, with a source handed out afresh, so a film longer
+ * than a pass plays to its end; only a refusal of that source shows. One the server lets
  * go of before it loaded, or again before it played on from its reopening, fails as any other.
  */
 export const sessionReducer = (state: SessionState, event: SessionEvent): SessionState => {

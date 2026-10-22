@@ -412,7 +412,7 @@ describe('account-bound playback tickets', () => {
     expect(result.expiresAt).toBe(session.expiresAt)
     await expect(
       app.get(AccountTickets).redeem({ id: video, ticket: result.ticket, now: result.expiresAt }),
-    ).rejects.toMatchObject({ response: { reason: AUTH_REFUSALS.signedOut } })
+    ).resolves.toBeNull()
   })
 
   it('grants a ticket for a locked library to the owner only once the PIN is entered, and never to a member', async () => {

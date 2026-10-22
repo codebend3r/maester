@@ -32,6 +32,14 @@ const recheckOf = (error: unknown): { recheck: Recheck; reason: string } => {
 }
 
 /**
+ * Whether `error` is an outage of the account infrastructure, which keeps
+ * what was already authorized, rather than a refusal or an integrity
+ * failure, which end it.
+ */
+export const isAccountOutage = (error: unknown): boolean =>
+  recheckOf(error).recheck === RECHECKS.unanswered
+
+/**
  * Checks the account behind a response that stays open, SSE or media bytes,
  * on a bounded interval. The token checked is the freshest the server has
  * seen for that account, so a client that keeps calling keeps its response,
