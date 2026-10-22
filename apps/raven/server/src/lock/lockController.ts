@@ -41,7 +41,10 @@ export class LockController {
     return { available: true, unlocked: true }
   }
 
-  /** Shuts the locked libraries again for this browser. */
+  /**
+   * Shuts the locked libraries again for this browser, and for an account
+   * ends what its tickets opened past the PIN on a locked library.
+   */
   @ForViewers()
   @Post('lock')
   @HttpCode(200)
@@ -49,7 +52,7 @@ export class LockController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): LockState {
-    reply.header(HEADERS.setCookie, this.lock.lockCookie())
+    reply.header(HEADERS.setCookie, this.lock.relock({ request }))
     return { ...this.lock.state({ request }), unlocked: false }
   }
 }

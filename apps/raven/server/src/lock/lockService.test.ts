@@ -18,12 +18,18 @@ const OWNER: Account = {
 const MEMBER: Account = { ...OWNER, id: AUTH_TEST_IDS.friend, isOwner: false }
 
 /** A lock with one locked library holding one video, read by a caller bound as `caller`. */
-const lockFor = ({ caller }: { caller: Caller }) => {
+const lockFor = ({
+  caller,
+  lockedIds = () => new Set([LOCKED_LIBRARY]),
+}: {
+  caller: Caller
+  lockedIds?: () => Set<number>
+}) => {
   const sessions = { callerOf: () => caller }
   return new LockService(
     { ...readServerConfig({}), libraryPin: '6006' },
-    { lockedIds: () => new Set([LOCKED_LIBRARY]) },
-    { libraryOf: () => LOCKED_LIBRARY },
+    { lockedIds },
+    { libraryOf: (id) => (id === VIDEO ? LOCKED_LIBRARY : null) },
     { librariesHolding: () => [LOCKED_LIBRARY] },
     new Management(AUTH_TEST_CONFIG, { isLocked: () => true }, sessions),
     sessions,
@@ -64,5 +70,34 @@ describe('a ticket that carries a PIN unlock', () => {
       caller: ticketCaller({ account: OWNER, unlockedUntil: Date.now() - 1 }),
     })
     expect(expired.unlockedUntil({ request: REQUEST })).toBeNull()
+  })
+})
+
+describe('the PIN locking again', () => {
+  it('forgets the unlock cookie and tells the passes of the account that locks it, and none for a browser without accounts', () => {
+    const owner = lockFor({ caller: ticketCaller({ account: OWNER }) })
+    const legacy = lockFor({ caller: { kind: CALLERS.legacy } })
+    const told: string[] = []
+    const watches = [owner, legacy].map((lock) =>
+      lock.relocks.subscribe((accountId) => told.push(accountId)),
+    )
+    const cookies = [owner, legacy].map((lock) => lock.relock({ request: REQUEST }))
+    watches.forEach((watch) => watch.unsubscribe())
+
+    expect(told).toEqual([OWNER.id])
+    cookies.forEach((cookie) => expect(cookie).toContain('Max-Age=0'))
+  })
+
+  it("answers whether a media needs the unlock by its library's lock as it is asked, not as it was named", () => {
+    const state = { locked: new Set<number>() }
+    const lock = lockFor({
+      caller: ticketCaller({ account: OWNER }),
+      lockedIds: () => state.locked,
+    })
+    const needsUnlock = lock.unlockNeedOf({ mediaId: VIDEO })
+    const unfiled = lock.unlockNeedOf({ mediaId: VIDEO + 1 })
+    expect(needsUnlock()).toBe(false)
+    state.locked = new Set([LOCKED_LIBRARY])
+    expect([needsUnlock(), unfiled()]).toEqual([true, false])
   })
 })

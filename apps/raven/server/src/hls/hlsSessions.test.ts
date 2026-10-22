@@ -19,7 +19,7 @@ import {
   type StreamMode,
   VIDEO_CODECS,
 } from '@raven/core'
-import { Subject } from 'rxjs'
+import { NEVER, Subject } from 'rxjs'
 import { type MockInstance, afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ACCOUNT_PASS_MS, type PassAccess } from '@/auth/accountPasses'
 import { SOFTWARE } from '@/ffmpeg/encoder'
@@ -907,7 +907,13 @@ describe('HlsSessions', () => {
     /** Access for the friend that ends when `ended` emits. */
     const accessOf = ({ ended = new Subject<void>() }: { ended?: Subject<void> } = {}) => ({
       ended,
-      access: { account: FRIEND, unlockedUntil: null, ended },
+      access: {
+        account: FRIEND,
+        unlockedUntil: null,
+        ended,
+        relocked: NEVER,
+        needsUnlock: () => false,
+      },
     })
 
     it('gives each a capability of its own, which opens that session of that media alone', () => {

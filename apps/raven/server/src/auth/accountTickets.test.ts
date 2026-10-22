@@ -1,4 +1,5 @@
 import { AUTH_REFUSALS, MEMBER_STATUSES } from '@raven/core'
+import { Subject } from 'rxjs'
 import { describe, expect, it } from 'vitest'
 import { AccountTickets } from '@/auth/accountTickets'
 import { AuthBackend } from '@/auth/authBackend'
@@ -22,7 +23,7 @@ const setup = async ({ unlockedUntil = null }: { unlockedUntil?: number | null }
     new MembershipLookups(backend, MEMBERSHIP_TTL_MS),
   )
   const session = await sessions.authenticate({ token: await fixture.mint() })
-  const lock = { unlockedUntil: () => unlockedUntil }
+  const lock = { unlockedUntil: () => unlockedUntil, relocks: new Subject<string>() }
   /** A request the account gate bound to `bound`, sent by Bearer unless it says otherwise. */
   const requestFor = ({ bound, isBearer = true }: { bound: Session; isBearer?: boolean }) => {
     const request = { headers: bearerHeaders({ token: bound.token }) }
@@ -130,5 +131,18 @@ describe('bounded account ticket storage', () => {
     const { tickets, request } = await setup({ unlockedUntil })
     const { ticket } = tickets.issue({ id: 7, request })
     await expect(tickets.redeem({ id: 7, ticket })).resolves.toMatchObject({ unlockedUntil })
+  })
+
+  it("takes the unlock back from an account's live tickets as the PIN locks again for it, and from no other account's", async () => {
+    const unlockedUntil = Date.now() + 60_000
+    const { tickets, request, session, lock } = await setup({ unlockedUntil })
+    const { ticket } = tickets.issue({ id: 7, request })
+    lock.relocks.next(AUTH_TEST_IDS.guest)
+    await expect(tickets.redeem({ id: 7, ticket })).resolves.toMatchObject({ unlockedUntil })
+    lock.relocks.next(session.account.id)
+    await expect(tickets.redeem({ id: 7, ticket })).resolves.toMatchObject({
+      account: { id: session.account.id },
+      unlockedUntil: null,
+    })
   })
 })

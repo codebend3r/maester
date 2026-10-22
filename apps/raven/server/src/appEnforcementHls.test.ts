@@ -95,6 +95,14 @@ describe("an account's HLS session", () => {
   const bearerOf = (caller: CallerKind) =>
     headersFor({ fixture, caller, via: TOKEN_CARRIERS.bearer })
 
+  /** Asks for an account ticket for `id` with `headers`, as the player does to open it again. */
+  const mintFor = ({ id, headers }: { id: number; headers: Record<string, string> }) =>
+    plane.app.inject({
+      method: ROUTES.accountTicket.method,
+      url: pathOf({ route: ROUTES.accountTicket, params: { id } }),
+      headers,
+    })
+
   /** An account ticket for `id`, minted by `caller` with Bearer, or with `headers` when given. */
   const ticketFor = async ({
     caller,
@@ -105,11 +113,7 @@ describe("an account's HLS session", () => {
     id: number
     headers?: Record<string, string>
   }) => {
-    const response = await plane.app.inject({
-      method: ROUTES.accountTicket.method,
-      url: pathOf({ route: ROUTES.accountTicket, params: { id } }),
-      headers: headers ?? (await bearerOf(caller)),
-    })
+    const response = await mintFor({ id, headers: headers ?? (await bearerOf(caller)) })
     const body: unknown = response.json()
     if (!isMediaTicket(body)) throw new Error('No ticket was minted')
     return body.ticket
@@ -230,6 +234,16 @@ describe("an account's HLS session", () => {
     return { headers: { ...headers, [AUTH_HEADERS.cookie]: cookie }, lapsesAt: Number(expires) }
   }
 
+  /** Locks the PIN again with `headers`, as the owner's Lock button does. */
+  const relock = async ({ headers }: { headers: Record<string, string> }) => {
+    const response = await plane.app.inject({
+      method: ROUTES.relock.method,
+      url: ROUTES.relock.path,
+      headers,
+    })
+    expect(response.statusCode).toBe(200)
+  }
+
   /** Locks or opens the library as the owner, past the PIN, as a locked library's settings are changed. */
   const setLocked = async ({ isLocked }: { isLocked: boolean }) => {
     const { headers } = await unlockAsOwner({ headers: await bearerOf(CALLER_KINDS.owner) })
@@ -273,7 +287,7 @@ describe("an account's HLS session", () => {
 
   // These move the clock ahead and back first, so a membership answer cached while it was ahead
   // must never hide what the tests after them check.
-  it("carries the owner's PIN unlock into the session, and answers 423 once it lapses", async () => {
+  it("carries the owner's PIN unlock into the session, and ends it once the unlock lapses", async () => {
     await setLocked({ isLocked: true })
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
@@ -287,8 +301,11 @@ describe("an account's HLS session", () => {
       const opened = await open({ caller: CALLER_KINDS.owner, id: plane.ids.video, headers })
       const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
       expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
+      vi.setSystemTime(lapsesAt - 1)
+      expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
       vi.setSystemTime(lapsesAt)
-      expect(await statusesOf({ urls })).toEqual(urls.map(() => LOCKED_STATUS))
+      expect(await statusesOf({ urls })).toEqual([404, 404, 404, 404, 404])
+      expect((await mintFor({ id: opened.id, headers: owner })).statusCode).toBe(LOCKED_STATUS)
     } finally {
       vi.useRealTimers()
       await setLocked({ isLocked: false })
@@ -314,6 +331,36 @@ describe("an account's HLS session", () => {
       expect(await statusesOf({ urls })).toEqual([404, 404, 404, 404, 404])
     } finally {
       vi.useRealTimers()
+    }
+  })
+
+  it('ends a session on a locked library as the owner locks again, and its reopen meets the lock', async () => {
+    await setLocked({ isLocked: true })
+    try {
+      const owner = await bearerOf(CALLER_KINDS.owner)
+      const { headers } = await unlockAsOwner({ headers: owner })
+      const opened = await open({ caller: CALLER_KINDS.owner, id: plane.ids.video, headers })
+      const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
+      expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
+      await relock({ headers })
+      expect(await statusesOf({ urls })).toEqual([404, 404, 404, 404, 404])
+      expect((await mintFor({ id: opened.id, headers: owner })).statusCode).toBe(LOCKED_STATUS)
+    } finally {
+      await setLocked({ isLocked: false })
+    }
+  })
+
+  it('keeps a session on an unlocked library through a relock, without the unlock', async () => {
+    const { headers } = await unlockAsOwner({ headers: await bearerOf(CALLER_KINDS.owner) })
+    const opened = await open({ caller: CALLER_KINDS.owner, id: plane.ids.video, headers })
+    const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
+    await relock({ headers })
+    expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
+    await setLocked({ isLocked: true })
+    try {
+      expect(await statusesOf({ urls })).toEqual(urls.map(() => LOCKED_STATUS))
+    } finally {
+      await setLocked({ isLocked: false })
     }
   })
 

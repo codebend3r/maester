@@ -451,6 +451,29 @@ describe('the media plane routes', () => {
       }
     })
 
+    it('changes nothing as the PIN locks again with accounts off: a ticket minted past it plays on', async () => {
+      const { app, admin } = on()
+      const cookie = await unlocked()
+      const url = `/api/media/${locked()}/file?t=${await ticketFor(locked())}`
+      const range = { [HEADERS.range]: 'bytes=0-99' }
+      expect((await asBrowser({ url, headers: range })).statusCode).toBe(206)
+      expect(await apiFor({ app, cookie }).lock()).toMatchObject({ unlocked: false })
+      const after = await Promise.all(
+        [url, `/api/media/${locked()}/subtitles/external-0?t=${await ticketFor(locked())}`].map(
+          async (asked) => (await asBrowser({ url: asked, headers: range })).statusCode,
+        ),
+      )
+      expect(after).toEqual([206, 200])
+      expect(
+        (
+          await asBrowser({
+            url: `/api/media/${locked()}/file`,
+            headers: { ...range, cookie: admin },
+          })
+        ).statusCode,
+      ).toBe(423)
+    })
+
     it('refuses the stream with a ticket for another video, an expired one and a tampered one (423)', async () => {
       const { app, admin, video } = on()
       const tickets = app.get(MediaTickets)

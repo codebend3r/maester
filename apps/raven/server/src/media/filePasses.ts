@@ -7,6 +7,7 @@ import { type AccountPass, type PassGrant, openPass, ticketAccessOf } from '@/au
 import { ACCOUNT_TICKET_PREFIX } from '@/auth/accountTickets'
 import { AuthSessions } from '@/auth/authSessions'
 import { CLOCK, type Clock } from '@/clock'
+import { LockService } from '@/lock/lockService'
 
 /** How many passes the server holds in all; one more lets go of the least recently used. */
 export const FILE_PASS_CAP = 256
@@ -46,7 +47,8 @@ const digestOf = (ticket: string): string =>
  * once an account ticket has opened its file, that ticket goes on opening
  * that file for its account past the ticket's five minutes, on a pass with
  * an HLS session's rules: `ACCOUNT_PASS_MS` from that first open, rechecked
- * with the account, and ended as its account loses access. The same ticket
+ * with the account, and ended as its account loses access, or, on a locked
+ * library, as the PIN unlock it was minted under goes. The same ticket
  * opens nothing more on any other media or route. Passes live in memory
  * alone, so a restart ends every one and the player's reopen mints a new
  * ticket.
@@ -59,6 +61,7 @@ export class FilePasses implements OnModuleDestroy {
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(AuthSessions) private readonly callers: Pick<AuthSessions, 'callerOf'>,
     @Inject(AccessRechecks) private readonly rechecks: Pick<AccessRechecks, 'ended'>,
+    @Inject(LockService) private readonly lock: Pick<LockService, 'relocks' | 'unlockNeedOf'>,
   ) {}
 
   /**
@@ -71,7 +74,13 @@ export class FilePasses implements OnModuleDestroy {
     if (!isString(ticket) || !ticket.startsWith(ACCOUNT_TICKET_PREFIX)) return
     const digest = digestOf(ticket)
     if (this.grantOf({ ticket, mediaId }) !== null) return
-    const access = ticketAccessOf({ request, callers: this.callers, rechecks: this.rechecks })
+    const access = ticketAccessOf({
+      request,
+      mediaId,
+      callers: this.callers,
+      rechecks: this.rechecks,
+      lock: this.lock,
+    })
     if (access === null) return
     this.makeRoom({ accountId: access.account.id })
     const record: Held = {

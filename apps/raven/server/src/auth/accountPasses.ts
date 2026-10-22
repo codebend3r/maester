@@ -2,10 +2,11 @@ import { SetMetadata } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { type Account, isString } from '@raven/core'
 import { sameSecret } from '@shared/server'
-import type { Observable } from 'rxjs'
+import { type Observable, filter, map } from 'rxjs'
 import type { AccessRechecks } from '@/auth/accessRechecks'
 import { type AuthSessions, CALLERS } from '@/auth/authSessions'
 import type { Clock } from '@/clock'
+import type { LockService } from '@/lock/lockService'
 import type { MarkTargets } from '@/routeMarks'
 
 /**
@@ -19,48 +20,73 @@ export const ACCOUNT_PASS_MS = 12 * 60 * 60 * 1000
 /** What a pass lets a request through as: the account and the PIN unlock of the ticket that opened it. */
 export type PassGrant = { account: Account; unlockedUntil: number | null }
 
-/** What opens a pass: its grant, and when its account loses access, which ends it. */
-export type PassAccess = PassGrant & { ended: Observable<void> }
+/** What opens a pass: its grant, when its account loses access, which ends it, and what its unlock rests on. */
+export type PassAccess = PassGrant & {
+  ended: Observable<void>
+  /** Emits as the PIN locks again for the pass's account. */
+  relocked: Observable<void>
+  /**
+   * Whether the pass's media sits in a locked library, asked as its unlock
+   * goes rather than read as it opens, since a library may be locked or
+   * opened while the pass lives.
+   */
+  needsUnlock: () => boolean
+}
 
 /**
  * An account's way back into one media past its ticket's five minutes,
  * keyed by its secret: an HLS session's capability, or the account ticket
  * that opened a direct file. It ends at `ACCOUNT_PASS_MS` from its open,
  * when its account loses access (the recheck `access.ended` stands for),
- * or when its holder ends it, and is never logged.
+ * or when its holder ends it, and is never logged. One opened past the
+ * owner's PIN also ends as that unlock goes, by a relock or its lapse,
+ * when its media then sits in a locked library; otherwise it plays on
+ * without the unlock, so a library locked later holds it as it holds any
+ * request.
  */
 export type AccountPass = {
   /**
    * The grant, when `given` is the secret, compared in constant time, and
    * `mediaId` the pass's media; null otherwise. Asked at or past its
-   * deadline, it ends the pass, so a host that slept through the deadline's
-   * timer carries no pass past it.
+   * deadline, or past an unlock its locked library needs, it ends the pass,
+   * so a host that slept through either timer carries no pass past it.
    */
   grantFor: ({ given, mediaId }: { given: unknown; mediaId: number }) => PassGrant | null
-  /** Ends the pass, once: stops its recheck and its deadline, and tells its holder. */
+  /** Ends the pass, once: stops its recheck, its relocks and its timers, and tells its holder. */
   end: () => void
 }
 
 /**
- * What a request an account ticket opened stands for, to open a pass with:
- * the account and unlock the ticket carried, rechecked as an open response
- * is. Null for any other caller, which earns no pass.
+ * What a request an account ticket opened stands for, to open a pass on
+ * media `mediaId` with: the account and unlock the ticket carried,
+ * rechecked as an open response is, and the PIN's relocks of that account.
+ * Null for any other caller, which earns no pass.
  */
 export const ticketAccessOf = ({
   request,
+  mediaId,
   callers,
   rechecks,
+  lock,
 }: {
   request: object
+  mediaId: number
   callers: Pick<AuthSessions, 'callerOf'>
   rechecks: Pick<AccessRechecks, 'ended'>
+  lock: Pick<LockService, 'relocks' | 'unlockNeedOf'>
 }): PassAccess | null => {
   const caller = callers.callerOf({ request })
   if (caller.kind !== CALLERS.ticket) return null
+  const { account } = caller.session
   return {
-    account: caller.session.account,
+    account,
     unlockedUntil: caller.unlockedUntil,
     ended: rechecks.ended({ request }),
+    relocked: lock.relocks.pipe(
+      filter((accountId) => accountId === account.id),
+      map(() => undefined),
+    ),
+    needsUnlock: lock.unlockNeedOf({ mediaId }),
   }
 }
 
@@ -78,31 +104,49 @@ export const openPass = ({
   /** Called once, however the pass ends, so its holder forgets it. */
   onEnd: () => void
 }): AccountPass => {
-  const grant: PassGrant = { account: access.account, unlockedUntil: access.unlockedUntil }
   const until = clock.now() + ACCOUNT_PASS_MS
-  const state: { isOver: boolean; stop: () => void } = { isOver: false, stop: () => undefined }
+  const state: { isOver: boolean; stop: () => void; unlockedUntil: number | null } = {
+    isOver: false,
+    stop: () => undefined,
+    unlockedUntil: access.unlockedUntil,
+  }
   const end = (): void => {
     if (state.isOver) return
     state.isOver = true
     state.stop()
     onEnd()
   }
+  /** The unlock goes: a pass on a locked library ends, as a fresh request would be refused; any other plays on without it. */
+  const loseUnlock = (): void => {
+    if (state.unlockedUntil === null) return
+    if (access.needsUnlock()) return end()
+    state.unlockedUntil = null
+  }
   const cancelDeadline = clock.after({ ms: ACCOUNT_PASS_MS, run: end })
+  const cancelLapse =
+    state.unlockedUntil === null
+      ? () => undefined
+      : clock.after({ ms: state.unlockedUntil - clock.now(), run: loseUnlock })
   // A recheck that finds no live token for the account ends the pass inside `subscribe`.
   const watch = access.ended.subscribe(end)
+  const relock = access.relocked.subscribe(loseUnlock)
   state.stop = () => {
     cancelDeadline()
+    cancelLapse()
     watch.unsubscribe()
+    relock.unsubscribe()
   }
   if (state.isOver) state.stop()
   const grantFor: AccountPass['grantFor'] = ({ given, mediaId: asked }) => {
     if (state.isOver || asked !== mediaId) return null
     if (!isString(given) || !sameSecret({ given, expected: secret })) return null
-    if (clock.now() >= until) {
+    const now = clock.now()
+    const hasLapsed = state.unlockedUntil !== null && now >= state.unlockedUntil
+    if (now >= until || (hasLapsed && access.needsUnlock())) {
       end()
       return null
     }
-    return grant
+    return { account: access.account, unlockedUntil: state.unlockedUntil }
   }
   return { grantFor, end }
 }
