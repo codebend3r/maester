@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { PAGE_ORIGIN } from '@raven/core'
+import { DESKTOP_PATHS, PAGE_ORIGIN } from '@raven/core'
 import { type Clips, makeClips } from '@/e2e/clips'
 import {
   expectOffline,
@@ -211,7 +211,7 @@ test.describe.serial('playing a local file through the web engine fallback', () 
         await dropForgedFileOnLocal({ page, name: clips.first })
 
         await expect(page.getByText('Drop a video file to play it.')).toBeVisible()
-        expect(page.url()).toBe(`${PAGE_ORIGIN}/local`)
+        expect(page.url()).toBe(`${PAGE_ORIGIN}${DESKTOP_PATHS.local}`)
         await expect(localHeading(page)).toBeVisible()
       },
     })

@@ -1,4 +1,5 @@
 import {
+  DESKTOP_PATHS,
   DESKTOP_REQUESTS,
   type LocalFile,
   MENU_PLAYER_ACTIONS,
@@ -8,7 +9,7 @@ import {
 } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { createMenuHub } from '@/desktop/menuHub'
-import { DESKTOP_PATHS, playPathOf } from '@/desktop/paths'
+import { playPathOf } from '@/desktop/paths'
 import {
   ENGINE_NOTES,
   ENGINE_USES,

@@ -1,6 +1,12 @@
 import { request } from 'node:http'
 import { expect, test } from '@playwright/test'
-import { DESKTOP_REPLIES, isDesktopReply, PAGE_ORIGIN, WEB_HOST_PORT } from '@raven/core'
+import {
+  DESKTOP_PATHS,
+  DESKTOP_REPLIES,
+  isDesktopReply,
+  PAGE_ORIGIN,
+  WEB_HOST_PORT,
+} from '@raven/core'
 import { type Clips, makeClips } from '@/e2e/clips'
 import {
   browserOpens,
@@ -158,7 +164,7 @@ test.describe('the security baseline', () => {
         message: 'Drop a video file to play it.',
       })),
     )
-    expect(page.url()).toBe(`${PAGE_ORIGIN}/downloads`)
+    expect(page.url()).toBe(`${PAGE_ORIGIN}${DESKTOP_PATHS.downloads}`)
   })
 
   test('sends the content security policy', async () => {
@@ -246,7 +252,7 @@ test.describe('the security baseline', () => {
     }, NAVIGATION_KEY)
     expect(decision).toEqual({ url: ELSEWHERE, isPrevented: true })
     await expect.poll(() => browserOpens({ app })).toEqual([ELSEWHERE])
-    expect(page.url()).toBe(`${PAGE_ORIGIN}/downloads`)
+    expect(page.url()).toBe(`${PAGE_ORIGIN}${DESKTOP_PATHS.downloads}`)
     expect(await page.evaluate(() => document.body.dataset.e2eMarker)).toBe('kept')
   })
 })

@@ -1,7 +1,8 @@
 import {
-  AUDIO_PROFILES,
   AUDIO_DEVICES,
+  AUDIO_PROFILES,
   CARRIED_FORMATS,
+  DESKTOP_PATHS,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   type DesktopReply,
@@ -19,7 +20,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { DESKTOP_PATHS, playPathOf } from '@/desktop/paths'
+import { playPathOf } from '@/desktop/paths'
 import { ENGINE_MOVED, ENGINE_NOTES, STATS_UNAVAILABLE } from '@/desktop/player/playerServices'
 import { CONNECTION_STATUSES } from '@/desktop/playerConnection'
 import { where } from '@/test/authPage'

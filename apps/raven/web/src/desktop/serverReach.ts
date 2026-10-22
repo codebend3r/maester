@@ -1,9 +1,9 @@
-import { ApiError } from '@raven/core'
+import { ApiError, DESKTOP_PATHS } from '@raven/core'
 import { queryKeys } from '@raven/ui/headless'
 import { hashKey, type Query, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { DESKTOP_PATHS, offlineReturnIn } from '@/desktop/paths'
+import { offlineReturnIn } from '@/desktop/paths'
 import { useServerReach } from '@/stores/serverReach'
 import { handled } from '@/desktop/handled'
 

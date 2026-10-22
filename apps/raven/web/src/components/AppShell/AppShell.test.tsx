@@ -1,12 +1,12 @@
-import { DESKTOP_PATHS } from '@/desktop/paths'
 import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import {
-  ADMIN_LOCK_STATES,
   type Account,
+  ADMIN_LOCK_STATES,
   type AdminLock,
-  KINDS,
-  isLibraryKind,
+  DESKTOP_PATHS,
   DOWNLOAD_STATUS_KINDS,
+  isLibraryKind,
+  KINDS,
   PAGE_PATHS,
 } from '@raven/core'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'

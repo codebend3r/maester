@@ -1,7 +1,6 @@
-import { DESKTOP_PATHS } from '@/desktop/paths'
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen } from '@testing-library/react'
-import { AUTH_PATHS, AUTH_ROUTES, DESKTOP_REQUESTS } from '@raven/core'
+import { AUTH_PATHS, AUTH_ROUTES, DESKTOP_PATHS, DESKTOP_REQUESTS } from '@raven/core'
 import { AppRoutes } from '@/AppRoutes'
 import { api } from '@/lib/api'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'

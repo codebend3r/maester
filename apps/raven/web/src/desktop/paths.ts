@@ -1,12 +1,5 @@
-import { isPagePath, object, PAGE_PATHS } from '@raven/core'
+import { DESKTOP_PATHS, isPagePath, object, PAGE_PATHS } from '@raven/core'
 import { generatePath, matchPath } from 'react-router-dom'
-
-/** raven player's own pages, which a browser does not have. */
-export const DESKTOP_PATHS = {
-  downloads: '/downloads',
-  local: '/local',
-  play: '/play/:fileId',
-} as const
 
 /** A local file or download playing, by the id main granted for it. */
 export const playPathOf = (fileId: string): string => generatePath(DESKTOP_PATHS.play, { fileId })

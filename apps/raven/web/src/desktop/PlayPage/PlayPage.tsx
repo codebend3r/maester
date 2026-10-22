@@ -1,4 +1,5 @@
 import {
+  DESKTOP_PATHS,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   fileUrlFor,
@@ -15,7 +16,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { refusalText } from '@/desktop/client'
 import { useIsOutputFixed } from '@/desktop/output'
-import { DESKTOP_PATHS } from '@/desktop/paths'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { NativePlaying } from '@/desktop/player/NativePlaying'
 import { PlayerMessage } from '@/desktop/player/PlayerMessage'
