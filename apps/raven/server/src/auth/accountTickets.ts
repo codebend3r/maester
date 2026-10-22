@@ -43,8 +43,10 @@ export class AccountTickets {
       AuthSessions,
       'authenticate' | 'callerOf'
     >,
-    @Inject(LockService) private readonly lock: Pick<LockService, 'unlockedUntil'>,
-  ) {}
+    @Inject(LockService) private readonly lock: Pick<LockService, 'unlockedUntil' | 'relocks'>,
+  ) {
+    this.lock.relocks.subscribe((accountId) => this.relock({ accountId }))
+  }
 
   /**
    * Mints a ticket for the caller the account gate bound to `request`. Only
@@ -78,6 +80,20 @@ export class AccountTickets {
       unlockedUntil: this.lock.unlockedUntil({ request }),
     })
     return { ticket, expiresAt }
+  }
+
+  /**
+   * Takes the unlock back from the account's live tickets as the PIN locks
+   * again for it, so none opens a locked library, or a new pass, past the
+   * relock.
+   */
+  private relock({ accountId }: { accountId: string }): void {
+    this.entries = new Map(
+      [...this.entries].map(([ticket, entry]): [string, Entry] => [
+        ticket,
+        entry.accountId === accountId ? { ...entry, unlockedUntil: null } : entry,
+      ]),
+    )
   }
 
   /**

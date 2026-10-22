@@ -12,6 +12,10 @@ import { AUTH_TEST_IDS } from '@/test/auth'
 import { manualClock } from '@/test/clock'
 
 const MEDIA = 7
+/** A media in a locked library, beside `MEDIA` in an unlocked one. */
+const LOCKED_MEDIA = 8
+/** When the unlock the tickets here are minted under lapses: never, within a test. */
+const UNLOCKED_UNTIL = Number.MAX_SAFE_INTEGER
 
 const accountOf = (id: string): Account => ({
   id,
@@ -41,7 +45,15 @@ const setup = ({ clock = manualClock().clock }: { clock?: Clock } = {}) => {
       return ended
     },
   }
-  const passes = new FilePasses(clock, callers, rechecks)
+  const relocks = new Subject<string>()
+  const lock = {
+    relocks,
+    unlockNeedOf:
+      ({ mediaId }: { mediaId: number }) =>
+      () =>
+        mediaId === LOCKED_MEDIA,
+  }
+  const passes = new FilePasses(clock, callers, rechecks, lock)
   /** A request the account gate bound to an account ticket of `account`'s, minted under `unlockedUntil`. */
   const ticketRequest = ({
     account = FRIEND,
@@ -55,8 +67,9 @@ const setup = ({ clock = manualClock().clock }: { clock?: Clock } = {}) => {
   const held = ({
     account = FRIEND,
     mediaId = MEDIA,
-  }: { account?: Account; mediaId?: number } = {}) => {
-    const request = ticketRequest({ account })
+    unlockedUntil = null,
+  }: { account?: Account; mediaId?: number; unlockedUntil?: number | null } = {}) => {
+    const request = ticketRequest({ account, unlockedUntil })
     const ticket = newTicket()
     passes.hold({ request, ticket, mediaId })
     return {
@@ -70,7 +83,7 @@ const setup = ({ clock = manualClock().clock }: { clock?: Clock } = {}) => {
       },
     }
   }
-  return { passes, callers, ticketRequest, held }
+  return { passes, callers, ticketRequest, held, relocks }
 }
 
 describe('the passes account tickets earn on a direct file', () => {
@@ -201,5 +214,17 @@ describe('the passes account tickets earn on a direct file', () => {
     expect([kept.isOpen(), kept.isWatched()]).toEqual([true, true])
     passes.onModuleDestroy()
     expect([kept.isOpen(), kept.isWatched()]).toEqual([false, false])
+  })
+
+  it("ends an account's passes on a locked library as the PIN locks again for it, and no other account's", () => {
+    const { held, relocks } = setup()
+    const locked = held({ mediaId: LOCKED_MEDIA, unlockedUntil: UNLOCKED_UNTIL })
+    const unlocked = held({ mediaId: MEDIA, unlockedUntil: UNLOCKED_UNTIL })
+    const theirs = held({ account: GUEST, mediaId: LOCKED_MEDIA, unlockedUntil: UNLOCKED_UNTIL })
+    relocks.next(FRIEND.id)
+
+    expect([locked.isOpen(), locked.isWatched()]).toEqual([false, false])
+    expect([unlocked.isOpen(), unlocked.isWatched()]).toEqual([true, true])
+    expect(theirs.isOpen()).toBe(true)
   })
 })

@@ -9,6 +9,7 @@ import {
 } from '@raven/core'
 import { readCookie, sameSecret } from '@shared/server'
 import type { FastifyRequest } from 'fastify'
+import { type Observable, Subject } from 'rxjs'
 import { authFailure } from '@/auth/authFailure'
 import { AuthSessions, CALLERS, accountOf } from '@/auth/authSessions'
 import { Management } from '@/auth/management'
@@ -64,6 +65,8 @@ type LockServiceUnlockProps = { pin: string; request: Request }
 
 type LockServiceViewerProps = { request: Request }
 
+type LockServiceUnlockNeedOfProps = { mediaId: number }
+
 type LockServiceAccountIdOfProps = { request: Request }
 
 type LockServiceIsOwnerOrLegacyProps = { request: Request }
@@ -88,6 +91,14 @@ type LockServiceCookieUntilProps = { request: Request }
 export class LockService {
   private readonly key = randomBytes(32)
   private readonly tries = new WrongTries()
+  private readonly relocked = new Subject<string>()
+
+  /**
+   * The account each relock is for, as it happens, so the account tickets
+   * and passes it minted past the PIN let go of the unlock. A browser
+   * without accounts relocks only its own cookie, and nothing is told.
+   */
+  readonly relocks: Observable<string> = this.relocked.asObservable()
 
   constructor(
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
@@ -130,9 +141,25 @@ export class LockService {
     }
   }
 
-  /** The cookie that forgets the session. */
-  lockCookie(): string {
+  /**
+   * Shuts the locked libraries again for this caller: the cookie that
+   * forgets its session, and, for an account, word to `relocks`.
+   */
+  relock({ request }: { request: Request }): string {
+    const accountId = this.accountIdOf({ request })
+    if (accountId !== NO_ACCOUNT) this.relocked.next(accountId)
     return `${SERVER_COOKIES.unlock}=; Max-Age=0; ${this.attributes()}`
+  }
+
+  /**
+   * Whether media `mediaId` needs the PIN to open, asked later: its library
+   * is found now, and whether that library is locked is read at each ask,
+   * since a library may be locked or opened in between. A media no library
+   * holds needs nothing, as `viewer` lets it show.
+   */
+  unlockNeedOf({ mediaId }: LockServiceUnlockNeedOfProps): () => boolean {
+    const libraryId = this.index.libraryOf(mediaId)
+    return () => libraryId != null && this.libraries.lockedIds().has(libraryId)
   }
 
   viewer({ request }: LockServiceViewerProps): Viewer {

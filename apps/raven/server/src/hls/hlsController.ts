@@ -44,7 +44,7 @@ import { subtitleSegmentVtt, subtitleSpanOf, subtitleWindowsOf } from '@/hls/sub
 import { variantOf, videoStringOf } from '@/hls/variant'
 import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { PrivateBy } from '@/lock/lockGuard'
-import { PRIVACIES } from '@/lock/lockService'
+import { LockService, PRIVACIES } from '@/lock/lockService'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import {
@@ -139,6 +139,7 @@ export class HlsController {
     @Inject(HlsSessions) private readonly sessions: HlsSessions,
     @Inject(StreamSessions) private readonly streams: StreamSessions,
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
+    @Inject(LockService) private readonly lock: LockService,
     @Inject(AuthSessions) private readonly callers: AuthSessions,
   ) {}
 
@@ -218,7 +219,13 @@ export class HlsController {
       },
       keyframesFor,
       // Only an account ticket's session has a pass; any other caller's needs no capability.
-      access: ticketAccessOf({ request, callers: this.callers, rechecks: this.rechecks }),
+      access: ticketAccessOf({
+        request,
+        mediaId: id,
+        callers: this.callers,
+        rechecks: this.rechecks,
+        lock: this.lock,
+      }),
     })
 
     const uris = sessionUris({ session, key: keyFor({ session, ticket }) })

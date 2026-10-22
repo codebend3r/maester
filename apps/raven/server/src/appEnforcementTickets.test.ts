@@ -18,7 +18,7 @@ import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ACCOUNT_TICKET_PREFIX } from '@/auth/accountTickets'
 import { ROUTE_METHODS, type RouteMethod, cookieSet } from '@/test/app'
-import { AUTH_TEST_IDS, authFixture } from '@/test/auth'
+import { AUTH_TEST_IDS, authFixture, bearerHeaders } from '@/test/auth'
 import {
   CALLER_KINDS,
   ROUTES,
@@ -40,6 +40,8 @@ describe('account tickets on the media paths', () => {
   const PAST_THE_END = { [HEADERS.range]: 'bytes=999999999-' }
   const SUBRIP = ['1', '00:00:00,200 --> 00:00:00,900', 'Wake up, Neo.', ''].join('\n')
   const TICKET_MS = ACCOUNT_TICKET_SECONDS * 1000
+  /** Two days: a token that outlives the unlock, so no recheck ends a pass for want of one. */
+  const LONG_TOKEN_SECONDS = 2 * 24 * 60 * 60
 
   let tickets: Awaited<ReturnType<typeof authFixture>>
   let plane: Awaited<ReturnType<typeof createEnforcedApp>>
@@ -121,6 +123,27 @@ describe('account tickets on the media paths', () => {
     })
     expect(unlocking.statusCode).toBe(200)
     return { ...headers, [AUTH_HEADERS.cookie]: cookieSet(unlocking) }
+  }
+
+  type LapseOfProps = { headers: Record<string, string> }
+
+  /** When the unlock the PIN earned `headers`' cookie lapses: the expiry it is signed with. */
+  const lapseOf = ({ headers }: LapseOfProps): number => {
+    const [, value = ''] = (headers[AUTH_HEADERS.cookie] ?? '').split('=')
+    const [expires = ''] = value.split('.')
+    return Number(expires)
+  }
+
+  type RelockProps = { headers: Record<string, string> }
+
+  /** Locks the PIN again with `headers`, as the owner's Lock button does. */
+  const relock = async ({ headers }: RelockProps) => {
+    const response = await plane.app.inject({
+      method: ROUTES.relock.method,
+      url: ROUTES.relock.path,
+      headers,
+    })
+    expect(response.statusCode).toBe(200)
   }
 
   type SetLockedProps = { isLocked: boolean }
@@ -239,31 +262,80 @@ describe('account tickets on the media paths', () => {
     }
   })
 
-  it('keeps a ticket minted past the PIN playing after the owner locks again: on its pass once it opened its file, else until it expires', async () => {
+  it("ends a ticket's pass on a locked library as the owner locks again, and takes back every live ticket's unlock", async () => {
     await setLocked({ isLocked: true })
     try {
       const unlocked = await unlockAsOwner({ headers: await owner() })
       const played = await ticketOf({ route: ROUTES.accountTicket, headers: unlocked })
       const unplayed = await ticketOf({ route: ROUTES.accountTicket, headers: unlocked })
-      const relocked = await plane.app.inject({
-        method: ROUTES.relock.method,
-        url: ROUTES.relock.path,
-        headers: unlocked,
-      })
-      expect(relocked.statusCode).toBeLessThan(300)
       expect((await redeem({ ticket: played, headers: FIRST_BYTES })).statusCode).toBe(206)
+      await relock({ headers: unlocked })
+      expect(
+        await Promise.all(
+          [played, unplayed].map(
+            async (ticket) => (await redeem({ ticket, headers: FIRST_BYTES })).statusCode,
+          ),
+        ),
+      ).toEqual([LOCKED_STATUS, LOCKED_STATUS])
       vi.useFakeTimers({ toFake: ['Date'] })
       try {
         vi.setSystemTime(Date.now() + TICKET_MS + 1_000)
-        // The pass carries the unlock the ticket was minted under, as an HLS session's capability does.
-        expect((await redeem({ ticket: played, headers: FIRST_BYTES })).statusCode).toBe(206)
         expect(
-          outcomeOf({ response: await redeem({ ticket: unplayed, headers: FIRST_BYTES }) }),
+          outcomeOf({ response: await redeem({ ticket: played, headers: FIRST_BYTES }) }),
         ).toMatchObject({ status: 401, reason: AUTH_REFUSALS.signedOut })
+        // The player opens the video again, and its new ticket meets the lock.
+        const reopened = await mint({ route: ROUTES.accountTicket, headers: await owner() })
+        expect(reopened.statusCode).toBe(LOCKED_STATUS)
       } finally {
         vi.useRealTimers()
       }
     } finally {
+      await setLocked({ isLocked: false })
+    }
+  })
+
+  it("keeps a ticket's pass on an unlocked library through a relock, without the unlock", async () => {
+    const unlocked = await unlockAsOwner({ headers: await owner() })
+    const ticket = await ticketOf({ route: ROUTES.accountTicket, headers: unlocked })
+    expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(206)
+    await relock({ headers: unlocked })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(Date.now() + TICKET_MS + 1_000)
+      expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(206)
+      await setLocked({ isLocked: true })
+      try {
+        expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(LOCKED_STATUS)
+      } finally {
+        await setLocked({ isLocked: false })
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("ends a ticket's pass on a locked library as the owner's unlock lapses", async () => {
+    await setLocked({ isLocked: true })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const start = Date.now()
+      const longOwner = bearerHeaders({
+        token: await tickets.mint({ id: AUTH_TEST_IDS.owner, expiresIn: LONG_TOKEN_SECONDS }),
+      })
+      const unlocked = await unlockAsOwner({ headers: longOwner })
+      // Opened a minute after the unlock, so the pass's deadline falls after the unlock lapses.
+      vi.setSystemTime(start + 60_000)
+      const ticket = await ticketOf({ route: ROUTES.accountTicket, headers: unlocked })
+      expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(206)
+      const lapsesAt = lapseOf({ headers: unlocked })
+      vi.setSystemTime(lapsesAt - 1)
+      expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(206)
+      vi.setSystemTime(lapsesAt)
+      expect(outcomeOf({ response: await redeem({ ticket, headers: FIRST_BYTES }) })).toMatchObject(
+        { status: 401, reason: AUTH_REFUSALS.signedOut },
+      )
+    } finally {
+      vi.useRealTimers()
       await setLocked({ isLocked: false })
     }
   })

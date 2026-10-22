@@ -12,6 +12,7 @@ import {
   type Account,
 } from '@raven/core'
 import { decodeJwt } from 'jose'
+import { NEVER } from 'rxjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccessRechecks } from '@/auth/accessRechecks'
 import { AuthBackend } from '@/auth/authBackend'
@@ -315,6 +316,8 @@ describe('an HLS session opened with an account ticket', () => {
         account: session.account,
         unlockedUntil: null,
         ended: env.rechecks.ended({ request }),
+        relocked: NEVER,
+        needsUnlock: () => false,
       },
     })
     const isOpen = (): boolean =>
@@ -357,7 +360,10 @@ describe("a direct file's pass, held by the account ticket that opened it", () =
   const held = async () => {
     const env = await setup()
     // Only the account's rechecks end it here: its deadline never comes.
-    const passes = new FilePasses(STILL_CLOCK, env.sessions, env.rechecks)
+    const passes = new FilePasses(STILL_CLOCK, env.sessions, env.rechecks, {
+      relocks: NEVER,
+      unlockNeedOf: () => () => false,
+    })
     const request = {}
     env.sessions.bindTicket({ request, session: await env.signIn(), unlockedUntil: null })
     passes.hold({ request, ticket: TICKET, mediaId: MEDIA })
