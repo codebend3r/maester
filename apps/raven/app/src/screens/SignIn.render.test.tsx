@@ -355,7 +355,7 @@ describe('SignIn', () => {
     const press = async (text: string) => {
       const button = alertButton(text)
       expect(button).toBeDefined()
-      await act(() => button?.onPress?.())
+      await act(() => (button?.onPress ?? (() => undefined))())
     }
 
     beforeEach(() => {
