@@ -16,7 +16,7 @@ raven's projects live in the workspace described by the root `CLAUDE.md`, which 
 
 The image builds from the repo root: `docker build -f apps/raven/Dockerfile .`. `Dockerfile.dockerignore` allowlists what it copies; a new path the image needs goes there too.
 
-Supabase Auth preparation lives in `@raven/supabase` (`apps/raven/supabase`). Its runbook is `supabase/README.md`, and its raven-first design is `docs/superpowers/specs/2026-10-17-supabase-sign-in-design.md`. Membership is pending until the explicitly bootstrapped owner approves it; user metadata never grants ownership. With accounts `ready` the server enforces them: see "Accounts" below. No cloud deployment or owner bootstrap happens as part of a PR.
+Supabase Auth preparation lives in `@raven/supabase` (`apps/raven/supabase`). Its runbook is `supabase/README.md`, and its raven-first design is `docs/superpowers/specs/2026-10-17-supabase-sign-in-design.md`. A confirmed sign-up is approved while `private.enrolment`'s `approve_until` is in the future (Dec 1 2026, New York time) and pending after it, until the explicitly bootstrapped owner approves it; either way the `signup-alert` Edge Function emails the owner. User metadata never grants ownership. With accounts `ready` the server enforces them: see "Accounts" below. No cloud deployment or owner bootstrap happens as part of a PR.
 
 ## Conventions
 

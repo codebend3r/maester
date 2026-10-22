@@ -15,6 +15,13 @@ export default {
       // points no import names.
       entry: ['src/main/main.ts', 'src/preload/preload.ts', 'forge.config.ts'],
     },
+    'apps/raven/supabase': {
+      // Deno runs the Edge Functions and resolves their imports through each
+      // function's deno.json, which knip does not read.
+      entry: ['functions/*/index.ts', 'functions/*/*.test.ts'],
+      paths: { '@/alert': ['functions/signup-alert/alert.ts'] },
+      ignoreDependencies: ['nodemailer'],
+    },
     'libs/raven/mpv': {
       // The native build consumes both: node-addon-api is the addon's C++
       // header set, and buildAddon.ts spawns cmake-js by name.

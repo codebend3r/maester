@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../../tooling/oxlint/base.json"],
+  "globals": { "Deno": "readonly" },
+  "overrides": [
+    {
+      "files": ["functions/**/*.test.ts"],
+      "rules": { "unicorn/consistent-function-scoping": "off" }
+    }
+  ]
+}

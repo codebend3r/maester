@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "@/alert": "./alert.ts",
+    "nodemailer": "npm:nodemailer@10.0.15"
+  }
+}

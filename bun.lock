@@ -125,6 +125,7 @@
       "version": "0.7.1",
       "devDependencies": {
         "oxfmt": "0.68.0",
+        "oxlint": "1.83.0",
         "supabase": "2.121.0",
       },
     },

@@ -87,3 +87,7 @@ content_path = "./supabase/templates/password-changed.html"
 
 [auth.sessions]
 inactivity_timeout = "720h"
+
+# The database calls it with a shared secret from Vault, not a user's JWT.
+[functions.signup-alert]
+verify_jwt = false
