@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { ADMIN_LOCK_STATES, createApiClient } from '@raven/core'
+import { ADMIN_LOCK_STATES, AUTH_HEADERS, SERVER_COOKIES, createApiClient } from '@raven/core'
 
 import { type CookieJar, cookieKeyFor, createCookieJar } from '@/servers/cookieJar'
 import {
@@ -54,14 +54,17 @@ const jarWith = (stored: Record<string, string> | null): CookieJar =>
 describe('serverFetchFor', () => {
   it("sends the server's cookies, and never the system's", async () => {
     const { fetch, sent } = recordingFetch()
-    const jar = jarWith({ raven_unlock: 'abc', raven_admin: 'def' })
+    const jar = jarWith({ [SERVER_COOKIES.unlock]: 'abc', [SERVER_COOKIES.admin]: 'def' })
     const serverFetch = serverFetchFor({ server: SERVER, jar, fetch })
     await serverFetch('http://nas:8080/api/home', { headers: { accept: 'application/json' } })
     expect(sent).toEqual([
       {
         url: 'http://nas:8080/api/home',
         init: {
-          headers: { accept: 'application/json', cookie: 'raven_unlock=abc; raven_admin=def' },
+          headers: {
+            accept: 'application/json',
+            [AUTH_HEADERS.cookie]: 'raven_unlock=abc; raven_admin=def',
+          },
           credentials: FETCH_CREDENTIALS.omit,
         },
       },
@@ -79,7 +82,7 @@ describe('serverFetchFor', () => {
     const { fetch, sent } = recordingFetch()
     const serverFetch = serverFetchFor({
       server: SERVER,
-      jar: jarWith({ raven_unlock: 'a' }),
+      jar: jarWith({ [SERVER_COOKIES.unlock]: 'a' }),
       fetch,
     })
     await serverFetch('https://media.example/api/media-origins/ping?bytes=1')
@@ -119,10 +122,10 @@ describe('serverFetchFor', () => {
   })
 
   it('forgets a cookie the server clears with Max-Age=0', async () => {
-    const jar = jarWith({ raven_unlock: 'a', raven_admin: 'b' })
+    const jar = jarWith({ [SERVER_COOKIES.unlock]: 'a', [SERVER_COOKIES.admin]: 'b' })
     const { fetch } = recordingFetch({ setCookie: 'raven_unlock=; Max-Age=0; Path=/api' })
     await serverFetchFor({ server: SERVER, jar, fetch })('http://nas:8080/api/lock/lock')
-    expect(await jar.read(SERVER.id)).toEqual({ raven_admin: 'b' })
+    expect(await jar.read(SERVER.id)).toEqual({ [SERVER_COOKIES.admin]: 'b' })
   })
 
   it("ignores a set-cookie from outside the server's API", async () => {
@@ -146,13 +149,13 @@ describe('serverFetchFor', () => {
     const jar = jarWith(null)
     const { fetch } = recordingFetch({ setCookie: 'raven_unlock=abc; Path=/api', landedAt: '' })
     await serverFetchFor({ server: SERVER, jar, fetch })('http://nas:8080/api/lock/unlock')
-    expect(await jar.read(SERVER.id)).toEqual({ raven_unlock: 'abc' })
+    expect(await jar.read(SERVER.id)).toEqual({ [SERVER_COOKIES.unlock]: 'abc' })
   })
 
   it('keeps the cookies it has when a response sets none', async () => {
-    const jar = jarWith({ raven_unlock: 'abc' })
+    const jar = jarWith({ [SERVER_COOKIES.unlock]: 'abc' })
     const { fetch } = recordingFetch()
     await serverFetchFor({ server: SERVER, jar, fetch })('http://nas:8080/api/home')
-    expect(await jar.read(SERVER.id)).toEqual({ raven_unlock: 'abc' })
+    expect(await jar.read(SERVER.id)).toEqual({ [SERVER_COOKIES.unlock]: 'abc' })
   })
 })

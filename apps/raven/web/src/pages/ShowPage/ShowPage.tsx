@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   DOWNLOAD_TARGET_KINDS,
-  ITEM_TYPES,
   type ItemDetails,
   ROUTE_STATES,
   type SeasonSummary,
@@ -10,6 +9,8 @@ import {
   episodeCode,
   itemPath,
   seasonEntryKey,
+  seasonsOf,
+  seasonsWatched,
   showFacts,
   watchLink,
   watchedStateOf,
@@ -93,15 +94,10 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId
   const libraryName = useQuery(librariesQuery).data?.find((entry) => entry.id === libraryId)?.name
   const code = next.data?.item ? episodeCode(next.data.item) : null
-  const seasons = details.children.flatMap((child) =>
-    child.type === ITEM_TYPES.season ? [child] : [],
-  )
-  const episodeCount = seasons.reduce((sum, season) => sum + season.episodeCount, 0)
+  const seasons = seasonsOf(details)
+  const marks = seasonsWatched(seasons)
   const toggle = useWatchedToggle({
-    state: watchedStateOf({
-      watched: seasons.reduce((sum, season) => sum + season.watchedCount, 0),
-      total: episodeCount,
-    }),
+    state: watchedStateOf(marks),
     targets: [{ kind: 'item', id: details.id, libraryId: null }],
   })
 
@@ -171,7 +167,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
           {details.favourite != null && (
             <FavouriteButton isFavourite={details.favourite} onToggle={favourite.mutate} />
           )}
-          {episodeCount > 0 && <ShuffleButton itemId={details.id}>Shuffle</ShuffleButton>}
+          {marks.total > 0 && <ShuffleButton itemId={details.id}>Shuffle</ShuffleButton>}
           <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.item, itemId: details.id }} />
           <WatchedToggle {...toggle} />
           <SelectButton />

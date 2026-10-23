@@ -5,6 +5,7 @@ import {
   ITEM_TYPES,
   type Library,
   matchTypeFor,
+  withLibraries,
 } from '@raven/core'
 import { type ReactNode, useId } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -108,19 +109,6 @@ const LibraryShelf = ({
   }
 }
 
-/** Each row with the library it is for; a row for a library not in the list is left out. */
-const withLibraries = ({
-  shelves,
-  libraries,
-}: {
-  shelves: HomeShelf[]
-  libraries: Library[]
-}): Array<{ shelf: HomeShelf; library: Library }> =>
-  shelves.flatMap((shelf) => {
-    const library = libraries.find((entry) => entry.id === shelf.libraryId)
-    return library ? [{ shelf, library }] : []
-  })
-
 /** Rows of cards standing in while they are read, under the hero's shape when home has one. */
 const SkeletonShelves = ({
   label,
@@ -173,7 +161,8 @@ const SearchResults = ({ query, libraries }: { query: string; libraries: Library
         </p>
       )}
       {results.isPending && <SkeletonShelves label="Searching every library" count={1} />}
-      {results.isSuccess && shelves.length === 0 && (
+      {/* The last search's answer stands in while this one is read: it says nothing of this one. */}
+      {results.isSuccess && !results.isPlaceholderData && shelves.length === 0 && (
         <p className={styles.message}>{`Nothing in any library matches "${query}".`}</p>
       )}
       {shelves.map(({ shelf, library }) => (

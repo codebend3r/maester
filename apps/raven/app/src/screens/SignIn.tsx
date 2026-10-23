@@ -100,13 +100,13 @@ export const SignIn = () => {
     goHome()
   }
 
-  const submitAddress = async () => {
+  const submitAddress = () => {
     const origin = serverOriginOf(address)
     if (origin === null) {
       setError(COPY.badAddress)
       return
     }
-    await run(async () => {
+    run(async () => {
       const known = useActiveServer.getState().servers.find((server) => server.origin === origin)
       const server = known ?? {
         id: newServerId(),
@@ -123,7 +123,7 @@ export const SignIn = () => {
     })
   }
 
-  const submitSecret = async ({ kind, server }: SecretStep) =>
+  const submitSecret = ({ kind, server }: SecretStep) =>
     run(async () => {
       const api = apiFor(server)
       await SECRET_STEPS[kind].unlock({ api, secret })
@@ -134,12 +134,12 @@ export const SignIn = () => {
       await finish(server)
     })
 
-  const startOver = async (server: AppServer) => {
+  const startOver = (server: AppServer) => {
     askFor({ kind: STEPS.address })
     setError(null)
     // A server never added would otherwise keep its cookies with nothing left to forget them.
     const isListed = useActiveServer.getState().servers.some((known) => known.id === server.id)
-    if (!isListed) await cookieJar.forget(server.id)
+    if (!isListed) cookieJar.forget(server.id).catch(() => undefined)
   }
 
   const errorLine = error !== null && (
@@ -156,7 +156,7 @@ export const SignIn = () => {
             isFirst
             label={COPY.address}
             onChangeText={setAddress}
-            onSubmit={() => void submitAddress()}
+            onSubmit={() => submitAddress()}
             placeholder={COPY.example}
             value={address}
           />
@@ -164,7 +164,7 @@ export const SignIn = () => {
           <FormButton
             isDisabled={isBusy}
             label={COPY.continue}
-            onPress={() => void submitAddress()}
+            onPress={() => submitAddress()}
             tone={BUTTON_TONES.primary}
           />
         </Form>
@@ -181,26 +181,26 @@ export const SignIn = () => {
             isSecret
             label={label}
             onChangeText={setSecret}
-            onSubmit={() => void submitSecret(step)}
+            onSubmit={() => submitSecret(step)}
             value={secret}
           />
           {errorLine}
           <FormButton
             isDisabled={isBusy}
             label={COPY.unlock}
-            onPress={() => void submitSecret(step)}
+            onPress={() => submitSecret(step)}
             tone={BUTTON_TONES.primary}
           />
           <FormButton
             isDisabled={isBusy}
             label={COPY.notNow}
-            onPress={() => void run(() => finish(step.server))}
+            onPress={() => run(() => finish(step.server))}
             tone={BUTTON_TONES.quiet}
           />
           <FormButton
             isDisabled={isBusy}
             label={COPY.otherAddress}
-            onPress={() => void startOver(step.server)}
+            onPress={() => startOver(step.server)}
             tone={BUTTON_TONES.ghost}
           />
         </Form>

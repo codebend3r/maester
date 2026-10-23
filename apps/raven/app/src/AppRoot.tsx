@@ -10,6 +10,7 @@ import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useUnlockRoute } from '@/queries/useUnlockRoute'
 import { APP_ROUTES, APP_SCREENS } from '@/routes'
 import { useActiveServer } from '@/stores/activeServer'
+import { configureLibraryViews } from '@/stores/libraryViews'
 import { followReduceMotion } from '@/stores/reduceMotion'
 import { COLOURS } from '@/theme/appTheme'
 
@@ -21,6 +22,7 @@ const loadStores = async (): Promise<void> => {
   // the app on a blank screen; the next write puts the file right.
   await Promise.allSettled([
     configureStorage({ storage: AsyncStorage }),
+    configureLibraryViews({ storage: AsyncStorage }),
     useActiveServer.persist.rehydrate(),
   ])
 }
@@ -45,7 +47,8 @@ export const AppRoot = () => {
   const session = useAppQueries()
 
   useEffect(() => {
-    void loadStores().then(() => setLoaded(true))
+    const show = () => setLoaded(true)
+    loadStores().then(show, show)
   }, [])
   useEffect(() => clearOnServerSwitch({ client: queryClient, store: useActiveServer }), [])
   useEffect(() => followReduceMotion(), [])
@@ -61,6 +64,9 @@ export const AppRoot = () => {
         <Stack.Protected guard={session !== null} redirectTo={APP_ROUTES.signIn}>
           <Stack.Screen name={APP_SCREENS.home} />
           <Stack.Screen name={APP_SCREENS.item} />
+          <Stack.Screen name={APP_SCREENS.library} />
+          <Stack.Screen name={APP_SCREENS.play} />
+          <Stack.Screen name={APP_SCREENS.search} />
           <Stack.Screen name={APP_SCREENS.unlock} />
         </Stack.Protected>
       </Stack>

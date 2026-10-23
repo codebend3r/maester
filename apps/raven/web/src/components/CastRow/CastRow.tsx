@@ -1,56 +1,10 @@
-import type { Credit, CreditJob } from '@raven/core'
+import { type Credit, castMembers, initialsOf } from '@raven/core'
 import { useId, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
 import styles from '@/components/CastRow/CastRow.module.scss'
-
-/** A person once, with every role they have on this item. */
-export type CastMember = {
-  personId: number
-  name: string
-  roles: string[]
-  photoVersion: string | null
-}
-
-const JOB_NAMES: Record<CreditJob, string> = {
-  cast: 'Actor',
-  guest: 'Guest star',
-  director: 'Director',
-  writer: 'Writer',
-  creator: 'Creator',
-  producer: 'Producer',
-}
-
-/**
- * Credits by person, in billing order: someone who acts and directs is one
- * entry, "Mark Kimball / Director". A crew role names the job in full
- * ("Screenplay") where TMDB gives one.
- */
-export const castMembers = (credits: readonly Credit[]): CastMember[] => {
-  const byPerson = credits.reduce((members, credit) => {
-    const role = credit.role ?? JOB_NAMES[credit.job]
-    const known = members.get(credit.personId)
-    return members.set(credit.personId, {
-      personId: credit.personId,
-      name: credit.name,
-      roles: known
-        ? [...known.roles, role].filter((value, index, all) => all.indexOf(value) === index)
-        : [role],
-      photoVersion: known?.photoVersion ?? credit.photoVersion,
-    })
-  }, new Map<number, CastMember>())
-  return [...byPerson.values()]
-}
-
-const initials = (name: string): string =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part.slice(0, 1))
-    .slice(0, 2)
-    .join('')
 
 /**
  * Cast & Crew: a ruled heading with round previous and next buttons beside
@@ -113,7 +67,7 @@ export const CastRow = ({
                   {photo ? (
                     <img src={photo} alt="" loading="lazy" decoding="async" />
                   ) : (
-                    <span aria-hidden="true">{initials(member.name)}</span>
+                    <span aria-hidden="true">{initialsOf(member.name)}</span>
                   )}
                 </span>
                 <span className={styles.caption}>

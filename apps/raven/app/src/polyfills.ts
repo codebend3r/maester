@@ -3,7 +3,9 @@
 // last two at module scope. Each `polyfill.js` entry installs itself only when
 // the engine lacks the constructor or its English data, so what Hermes has
 // natively (NumberFormat, DateTimeFormat) stays native. Each one needs the
-// ones above it, and each locale's data follows its polyfill.
+// ones above it, and each locale's data follows its polyfill. Its Array has no
+// `toSorted` either, which core sorts with: see `installToSorted`.
+import { installToSorted } from '@/arrayToSorted'
 import '@formatjs/intl-getcanonicallocales/polyfill.js'
 import '@formatjs/intl-locale/polyfill.js'
 import '@formatjs/intl-pluralrules/polyfill.js'
@@ -12,3 +14,5 @@ import '@formatjs/intl-relativetimeformat/polyfill.js'
 import '@formatjs/intl-relativetimeformat/locale-data/en.js'
 import '@formatjs/intl-displaynames/polyfill.js'
 import '@formatjs/intl-displaynames/locale-data/en.js'
+
+installToSorted({ prototype: Array.prototype })

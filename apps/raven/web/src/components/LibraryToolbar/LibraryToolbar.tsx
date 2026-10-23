@@ -1,12 +1,12 @@
 import {
-  type DirectedSortFieldName,
+  GROUPING_LABELS,
   LIBRARY_VIEWS,
+  LIBRARY_VIEW_LABELS,
   type LibrarySettings,
   type LibraryView,
   type LibraryViewChange,
-  type MediaGroupBy,
-  type SortDirection,
-  type SortFieldName,
+  SORT_DIRECTION_LABELS,
+  SORT_FIELD_LABELS,
   groupingsFor,
   isMediaGroupBy,
   isSortFieldName,
@@ -22,32 +22,8 @@ import { Button, Icon } from '@raven/ui'
 import type { IconName } from '@raven/ui'
 import { SearchField } from '@/components/SearchField/SearchField'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
-import type { Search } from '@/lib/useSearch'
+import type { Search } from '@raven/ui/headless'
 import styles from '@/components/LibraryToolbar/LibraryToolbar.module.scss'
-
-const FIELDS: Record<SortFieldName, string> = {
-  title: 'Title',
-  added: 'Date added',
-  changed: 'Date changed',
-  size: 'File size',
-  bitrate: 'Bitrate',
-  resolution: 'Resolution',
-  release: 'Release date',
-  rating: 'Rating',
-  random: 'Random',
-}
-
-/** How each way a field runs reads: A to Z, newest first. */
-const DIRECTIONS: Record<DirectedSortFieldName, Record<SortDirection, string>> = {
-  title: { ascending: 'A to Z', descending: 'Z to A' },
-  added: { ascending: 'Oldest first', descending: 'Newest first' },
-  changed: { ascending: 'Oldest first', descending: 'Newest first' },
-  size: { ascending: 'Smallest first', descending: 'Largest first' },
-  bitrate: { ascending: 'Lowest first', descending: 'Highest first' },
-  resolution: { ascending: 'Lowest first', descending: 'Highest first' },
-  release: { ascending: 'Oldest first', descending: 'Newest first' },
-  rating: { ascending: 'Lowest first', descending: 'Highest first' },
-}
 
 /**
  * The button beside the sort that turns the order around, saying which way
@@ -62,7 +38,7 @@ const DirectionButton = ({
 }) => {
   const { field, direction } = sortParts(settings.sort)
   if (direction === null) return null
-  const labels = DIRECTIONS[field]
+  const labels = SORT_DIRECTION_LABELS[field]
   return (
     <Button
       tone="ghost"
@@ -77,19 +53,12 @@ const DirectionButton = ({
   )
 }
 
-const VIEWS: Record<LibraryView, { label: string; icon: IconName }> = {
-  grid: { label: 'Grid', icon: 'grid' },
-  covers: { label: 'Covers', icon: 'covers' },
-  list: { label: 'List', icon: 'list' },
-  tiles: { label: 'Tiles', icon: 'tiles' },
-  grouped: { label: 'Grouped', icon: 'grouped' },
-}
-
-const GROUPINGS: Record<MediaGroupBy, string> = {
-  match: 'Matched or not',
-  resolution: 'Resolution',
-  codec: 'Video codec',
-  month: 'Month added',
+const VIEW_ICONS: Record<LibraryView, IconName> = {
+  grid: 'grid',
+  covers: 'covers',
+  list: 'list',
+  tiles: 'tiles',
+  grouped: 'grouped',
 }
 
 /**
@@ -153,7 +122,7 @@ export const LibraryToolbar = ({
           >
             {sortFieldsFor(settings.kind).map((field) => (
               <option key={field} value={field}>
-                {FIELDS[field]}
+                {SORT_FIELD_LABELS[field]}
               </option>
             ))}
           </select>
@@ -175,7 +144,7 @@ export const LibraryToolbar = ({
             >
               {groupingsFor(settings.kind).map((grouping) => (
                 <option key={grouping} value={grouping}>
-                  {GROUPINGS[grouping]}
+                  {GROUPING_LABELS[grouping]}
                 </option>
               ))}
             </select>
@@ -200,10 +169,10 @@ export const LibraryToolbar = ({
             <Button
               key={view}
               tone="ghost"
-              icon={VIEWS[view].icon}
+              icon={VIEW_ICONS[view]}
               className={styles.view}
-              aria-label={VIEWS[view].label}
-              title={VIEWS[view].label}
+              aria-label={LIBRARY_VIEW_LABELS[view]}
+              title={LIBRARY_VIEW_LABELS[view]}
               aria-pressed={settings.view === view}
               onClick={() => onChange({ view })}
             />

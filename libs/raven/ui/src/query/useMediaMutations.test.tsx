@@ -34,7 +34,7 @@ const setUp = ({ media = mediaItem() }: { media?: MediaItem } = {}) => {
   TABS.forEach(([key, empty]) => client.setQueryData(key, empty))
   client.setQueryData(queryKeys.inProgress(3), [])
   const { result } = renderQueryHook({ client, hook: () => useMediaMutations({ media }) })
-  const isStale = (key: QueryKey) => !!client.getQueryState(key)?.isInvalidated
+  const isStale = (key: QueryKey) => client.getQueryState(key)?.isInvalidated ?? false
   return { result, isStale, client }
 }
 

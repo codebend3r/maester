@@ -102,7 +102,7 @@ describe('watchedEdits', () => {
     expect(client.getQueryData<PosterEntry[]>(queryKeys.inProgress(2))).toEqual([
       entry(anotherMovie),
     ])
-    expect(client.getQueryData<Home>(queryKeys.home)?.inProgress).toEqual([entry(abroad)])
+    expect(client.getQueryData<Home>(queryKeys.home)!.inProgress).toEqual([entry(abroad)])
   })
 
   it('marks the video, its shelf and its favourites entry', () => {
@@ -122,7 +122,7 @@ describe('watchedEdits', () => {
       entry(marked),
       entry(abroad),
     ])
-    expect(client.getQueryData<Home>(queryKeys.home)?.shelves).toEqual([
+    expect(client.getQueryData<Home>(queryKeys.home)!.shelves).toEqual([
       { libraryId: 2, type: HOME_SHELF_TYPES.media, media: [marked, anotherMovie] },
     ])
   })
@@ -159,21 +159,21 @@ describe('watchedEdits', () => {
       itemDetails({ id: 40, versions: [cardFile, splitFile] }),
     )
     apply({ client, edits: watchedEdits({ media: cardFile, watched: true }) })
-    expect(client.getQueryData<Saga[]>(queryKeys.sagas(2))?.at(0)?.media).toEqual([
+    expect(client.getQueryData<Saga[]>(queryKeys.sagas(2))!.at(0)!.media).toEqual([
       marked,
       anotherMovie,
     ])
     const [card] = client.getQueryData<Duplicates>(queryKeys.duplicates(2))?.at(0)?.cards ?? []
-    expect(card?.entry.media).toEqual(marked)
-    expect(card?.files.map((file) => file.media)).toEqual([
+    expect(card!.entry.media).toEqual(marked)
+    expect(card!.files.map((file) => file.media)).toEqual([
       marked,
       { ...otherFile, watched: true, position: 0 },
     ])
-    expect(client.getQueryData<HistoryEntry[]>(history)?.map((each) => each.media)).toEqual([
+    expect(client.getQueryData<HistoryEntry[]>(history)!.map((each) => each.media)).toEqual([
       marked,
       anotherMovie,
     ])
-    expect(client.getQueryData<ItemDetails>(queryKeys.item(40))?.versions).toEqual([
+    expect(client.getQueryData<ItemDetails>(queryKeys.item(40))!.versions).toEqual([
       marked,
       splitFile,
     ])
@@ -205,7 +205,7 @@ describe('watchedEdits on a TV library', () => {
     client.setQueryData(queryKeys.unmatched(2), [lone])
     apply({ client, edits: watchedEdits({ media: lone, watched: true }) })
     const marked = { ...lone, watched: true, position: 0 }
-    expect(client.getQueryData<ShowListing>(SHOWS)?.unmatched).toEqual([
+    expect(client.getQueryData<ShowListing>(SHOWS)!.unmatched).toEqual([
       marked,
       mediaItem({ id: 21 }),
     ])
@@ -239,7 +239,7 @@ describe('favouriteEdits', () => {
     const marked = { ...cardFile, favourite: true }
     expect(client.getQueryData<MediaItem>(queryKeys.mediaItem(7))).toEqual(marked)
     expect(client.getQueryData<MediaItem[]>(LISTING)).toEqual([marked, anotherMovie])
-    expect(client.getQueryData<ShowListing>(SHOWS)?.unmatched).toEqual([marked])
+    expect(client.getQueryData<ShowListing>(SHOWS)!.unmatched).toEqual([marked])
     expect(client.getQueryData<MediaItem[]>(queryKeys.unmatched(2))).toEqual([marked])
     expect(client.getQueryData<PosterEntry[]>(queryKeys.inProgress(2))).toEqual([entry(marked)])
     expect(client.getQueryData<Home>(queryKeys.home)).toEqual(
@@ -251,7 +251,7 @@ describe('favouriteEdits', () => {
     expect(client.getQueryData<HomeSearch>(queryKeys.homeSearch('bus'))).toEqual([
       { libraryId: 2, type: HOME_SHELF_TYPES.media, media: [marked] },
     ])
-    expect(client.getQueryData<ItemDetails>(queryKeys.item(40))?.versions).toEqual([marked])
+    expect(client.getQueryData<ItemDetails>(queryKeys.item(40))!.versions).toEqual([marked])
   })
 
   it('takes an unmarked video off the favourites, and leaves lists without it alone', () => {
@@ -273,7 +273,7 @@ describe('itemFavouriteEdits', () => {
     client.setQueryData(queryKeys.item(40), itemDetails({ id: 40 }))
     client.setQueryData(queryKeys.favouriteTitles, titles)
     apply({ client, edits: itemFavouriteEdits({ item: itemDetails({ id: 40 }), favourite: true }) })
-    expect(client.getQueryData<ItemDetails>(queryKeys.item(40))?.favourite).toBe(true)
+    expect(client.getQueryData<ItemDetails>(queryKeys.item(40))!.favourite).toBe(true)
     expect(client.getQueryData<ItemSummary[]>(queryKeys.favouriteTitles)).toBe(titles)
   })
 
@@ -286,7 +286,7 @@ describe('itemFavouriteEdits', () => {
       itemSummary({ id: 41 }),
     ])
     apply({ client, edits: itemFavouriteEdits({ item, favourite: false }) })
-    expect(client.getQueryData<ItemDetails>(queryKeys.item(40))?.favourite).toBe(false)
+    expect(client.getQueryData<ItemDetails>(queryKeys.item(40))!.favourite).toBe(false)
     expect(client.getQueryData<ItemSummary[]>(queryKeys.favouriteTitles)).toEqual([
       itemSummary({ id: 41 }),
     ])
@@ -300,9 +300,9 @@ describe('librarySettingsEdits', () => {
     client.setQueryData(queryKeys.library(2), library())
     client.setQueryData(queryKeys.libraries, [library(), other])
     apply({ client, edits: librarySettingsEdits({ libraryId: 2, change: { pinned: false } }) })
-    expect(client.getQueryData<Library>(queryKeys.library(2))?.settings.pinned).toBe(false)
+    expect(client.getQueryData<Library>(queryKeys.library(2))!.settings.pinned).toBe(false)
     const [changed, untouched] = client.getQueryData<Library[]>(queryKeys.libraries) ?? []
-    expect(changed?.settings.pinned).toBe(false)
+    expect(changed!.settings.pinned).toBe(false)
     expect(untouched).toBe(other)
   })
 })

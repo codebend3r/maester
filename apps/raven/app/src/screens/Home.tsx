@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 
-import { type ShelfCard, homeShelvesOf } from '@/queries/homeShelves'
+import type { ShelfCard } from '@/queries/cards'
+import { homeShelvesOf } from '@/queries/homeShelves'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useServerCookies } from '@/queries/useServerCookies'
 import { Shelf, Shelves } from '@/layouts'
-import { APP_ROUTES } from '@/routes'
+import { APP_ROUTES, ROUTE_TARGETS, hrefOf } from '@/routes'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
 
 const COPY = {
@@ -31,33 +32,46 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
         })
   const failure = home.error ?? libraries.error
   const isBare = home.isSuccess && libraries.isSuccess && cookies !== null && shelves.length === 0
+  const isLoading = failure === null && !isBare && shelves.length === 0
   const notice = ((): string | null => {
     if (failure !== null) return failure.message
     if (isBare) return COPY.bare
-    return shelves.length === 0 ? COPY.loading : null
+    return isLoading ? COPY.loading : null
   })()
 
   // Focus starts on a card, so on the first shelf that has one.
   const focusShelf = shelves.findIndex(({ cards }) => cards.length > 0)
 
-  const open = ({ itemId }: ShelfCard) => {
-    if (itemId === null) return
-    router.push({ pathname: APP_ROUTES.item, params: { id: String(itemId) } })
-  }
+  const open = ({ target }: ShelfCard) => router.push(hrefOf(target))
+
+  const openLibrary = (libraryId: number) =>
+    router.push(hrefOf({ kind: ROUTE_TARGETS.library, libraryId, query: '' }))
 
   return (
-    <Shelves notice={notice} title={COPY.title}>
+    <Shelves
+      isLoading={isLoading}
+      notice={notice}
+      onSearch={() => router.push(APP_ROUTES.search)}
+      title={COPY.title}
+    >
       {shelves.map((shelf, index) => (
-        <Shelf key={shelf.key} isFirst={index === focusShelf} onOpen={open} shelf={shelf} />
+        <Shelf
+          key={shelf.key}
+          isFirst={index === focusShelf}
+          onOpen={open}
+          onOpenLibrary={openLibrary}
+          shelf={shelf}
+        />
       ))}
     </Shelves>
   )
 }
 
 /**
- * `/`: what is being watched, then each pinned library's newest, as shelves of cards. A
- * card opens its item. Each server gets a Home of its own, so nothing one showed, its
- * scroll or its focus, carries over to the next.
+ * `/`: what is being watched, then each pinned library's newest, as shelves of cards. A card
+ * opens its item, a library shelf's See all the library, and Search the search through every
+ * library. Each server gets a Home of its own, so nothing one showed, its scroll or its focus,
+ * carries over to the next.
  */
 export const Home = () => {
   const session = useAppQueries()

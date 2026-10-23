@@ -1,0 +1,35 @@
+appId: io.github.codebend3r.raven.app
+name: A library opens from its Home shelf and sorts the ways its type allows
+---
+- runFlow: signIn.yaml
+- extendedWaitUntil:
+    visible: Kestrel Point
+    timeout: 30000
+# Each library shelf's title has a way into the library beside it, named for the library.
+- tapOn: See all in Films
+- extendedWaitUntil:
+    visible: 'Sort: Title'
+    timeout: 30000
+# A movie library starts grouped by match, each bucket folded, as on the web.
+- assertVisible: 'View: Grouped'
+- tapOn: Matched, 1 video
+- assertVisible: Kestrel Point
+# The sort opens the system's action sheet with the sorts a movie library has.
+- tapOn: 'Sort: Title'
+- assertVisible: File size
+- tapOn: Date added
+- extendedWaitUntil:
+    visible: 'Sort: Date added'
+    timeout: 30000
+- assertVisible: Kestrel Point
+- assertVisible: 'Order: Newest first'
+- tapOn: Back
+- tapOn: See all in Series
+- extendedWaitUntil:
+    visible: Lantern Bay
+    timeout: 30000
+# A show library's cards are shows, so it has no sort by a file's size.
+- tapOn: 'Sort: Title'
+- assertNotVisible: File size
+- tapOn: Cancel
+- assertVisible: 'Sort: Title'

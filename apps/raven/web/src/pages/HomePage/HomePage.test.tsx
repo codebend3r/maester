@@ -272,6 +272,20 @@ describe('HomePage', () => {
       expect(await screen.findByText('Nothing in any library matches "zzz".')).toBeInTheDocument()
     })
 
+    it('says nothing matches only once the server says so, not while the last search stands in', async () => {
+      serve({ route: '/?q=zzz', found: [] })
+      expect(await screen.findByText('Nothing in any library matches "zzz".')).toBeInTheDocument()
+
+      const later = held<HomeSearch>()
+      spies.search.mockImplementation(() => later.promise)
+      await userEvent.type(searchbox(), 'q')
+      await waitFor(() => expect(spies.search.mock.calls.at(-1)).toEqual(['zzzq']))
+      expect(screen.queryByText(/^Nothing in any library matches/)).not.toBeInTheDocument()
+
+      await act(async () => later.answer([]))
+      expect(await screen.findByText('Nothing in any library matches "zzzq".')).toBeInTheDocument()
+    })
+
     it('puts the rows back when the search is cleared, or the link home is followed', async () => {
       serve({ route: '/?q=bus' })
       await screen.findByRole('heading', { name: 'Films' })

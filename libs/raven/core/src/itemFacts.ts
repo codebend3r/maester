@@ -1,5 +1,15 @@
-import { CREDIT_JOBS, type ItemDetails, type MediaItem, type MediaTracks } from '@/contract'
-import { formatBytes, formatChannels, formatRuntime } from '@/format'
+import type { ApiClient } from '@/apiClient'
+import {
+  CREDIT_JOBS,
+  type EpisodeSummary,
+  ITEM_IMAGE_KINDS,
+  ITEM_TYPES,
+  type ItemDetails,
+  type MediaItem,
+  type MediaTracks,
+  type SeasonSummary,
+} from '@/contract'
+import { formatBitrate, formatBytes, formatChannels, formatRuntime } from '@/format'
 import { languageName } from '@/languageName'
 import { resolutionLabel } from '@/media'
 import { codecLabel } from '@/playback'
@@ -167,3 +177,85 @@ export const versionFacts = (media: MediaItem): string[] =>
     media.videoCodec ? codecLabel(media.videoCodec) : null,
     formatBytes(media.size),
   ].filter((fact): fact is string => fact != null && fact !== '')
+
+/** The file's facts as label and value: its tracks, then its container, bitrate and size. */
+export const allFileFacts = ({
+  media,
+  tracks,
+}: {
+  media: MediaItem
+  tracks: MediaTracks | undefined
+}): Array<{ label: string; value: string }> =>
+  [
+    ...fileFacts({ media, tracks }),
+    { label: 'Container', value: media.container.toUpperCase() },
+    { label: 'Bitrate', value: formatBitrate(media.bitrate) ?? '' },
+    { label: 'Size', value: formatBytes(media.size) },
+  ].filter((fact) => fact.value !== '')
+
+/** A show's seasons on disk, in order. */
+export const seasonsOf = (details: ItemDetails): SeasonSummary[] =>
+  details.children.flatMap((child) => (child.type === ITEM_TYPES.season ? [child] : []))
+
+/** A season's episodes on disk, in order. */
+export const episodesOf = (details: ItemDetails): EpisodeSummary[] =>
+  details.children.flatMap((child) => (child.type === ITEM_TYPES.episode ? [child] : []))
+
+/** The first episode on disk not yet watched that has a file to play. */
+export const nextEpisodeIn = (episodes: readonly EpisodeSummary[]): EpisodeSummary | undefined =>
+  episodes.find((episode) => !episode.watched && episode.primary != null)
+
+/** A season's year, and how many of its episodes are on disk. */
+export const seasonFacts = (season: ItemDetails): string[] =>
+  present([
+    season.year == null ? null : String(season.year),
+    plural({ n: episodesOf(season).length, one: 'episode', many: 'episodes' }),
+  ])
+
+/** "3 of 8 watched". */
+export const watchedCountLabel = ({ watched, total }: { watched: number; total: number }): string =>
+  `${watched} of ${total} watched`
+
+/** How many of a show's episodes on disk are watched, across its seasons. */
+export const seasonsWatched = (
+  seasons: readonly SeasonSummary[],
+): { watched: number; total: number } =>
+  seasons.reduce(
+    (sum, season) => ({
+      watched: sum.watched + season.watchedCount,
+      total: sum.total + season.episodeCount,
+    }),
+    { watched: 0, total: 0 },
+  )
+
+/** How many of a season's episodes on disk are watched. */
+export const episodesWatched = (
+  episodes: readonly EpisodeSummary[],
+): { watched: number; total: number } => ({
+  watched: episodes.filter((episode) => episode.watched).length,
+  total: episodes.length,
+})
+
+/** An episode row's air date and length, the file's own where it has been probed. */
+export const episodeRowFacts = (episode: EpisodeSummary): string[] =>
+  present([
+    formatAirDate(episode.released),
+    runtimeFact({ file: episode.primary ?? undefined, runtime: episode.runtime }),
+  ])
+
+/** The still an episode shows: TMDB's or the one beside the file, else a frame of the file. */
+export const episodeStillUrl = ({
+  api,
+  episode,
+}: {
+  api: Pick<ApiClient, 'itemImageUrl' | 'thumbnailUrl'>
+  episode: EpisodeSummary
+}): string | null => {
+  if (episode.stillVersion != null)
+    return api.itemImageUrl({
+      id: episode.id,
+      kind: ITEM_IMAGE_KINDS.still,
+      version: episode.stillVersion,
+    })
+  return episode.primary ? api.thumbnailUrl(episode.primary) : null
+}

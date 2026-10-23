@@ -1,0 +1,52 @@
+appId: io.github.codebend3r.raven.app
+name: A title opens from Home, marks watched and back, and a show leads to its episodes
+---
+- runFlow: signIn.yaml
+- extendedWaitUntil:
+    visible: Kestrel Point
+    timeout: 30000
+# A movie's card opens its page, with Play from the top, as it was never started.
+- tapOn: Kestrel Point
+- extendedWaitUntil:
+    visible: Mark watched
+    timeout: 30000
+- assertVisible: Play
+# Watched shows as soon as it is pressed, and pressing it again takes the mark off, so the
+# fixture is left as it was found.
+- tapOn: Mark watched
+- extendedWaitUntil:
+    visible: Watched
+    timeout: 10000
+- tapOn: Watched
+- extendedWaitUntil:
+    visible: Mark watched
+    timeout: 10000
+# Play goes to the player's route, which says it is still to come.
+- tapOn: Play
+- extendedWaitUntil:
+    visible: Playing in the app is on its way. Until then, play this on the web.
+    timeout: 10000
+- tapOn: Back
+- extendedWaitUntil:
+    visible: Mark watched
+    timeout: 10000
+- tapOn: Back
+# A show lists its seasons, and a season its episodes, each opening its page.
+- extendedWaitUntil:
+    visible: Lantern Bay
+    timeout: 30000
+- tapOn: Lantern Bay
+- extendedWaitUntil:
+    visible: Seasons
+    timeout: 30000
+- tapOn: Season 1
+- extendedWaitUntil:
+    visible: Episodes
+    timeout: 30000
+# A row is read out with its line and watched state after its name.
+- tapOn: E1 · Low Tide.*
+- extendedWaitUntil:
+    visible: Lantern Bay · Season 1 · Episode 1
+    timeout: 30000
+- assertVisible: Low Tide
+- assertVisible: Mark watched

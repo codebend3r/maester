@@ -25,6 +25,8 @@ export { configureStorage } from '@/stores/configureStorage'
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'
 export { playerQueryKeys } from '@/lib/playerQueryKeys'
+export { useSearch } from '@/lib/useSearch'
+export type { Search } from '@/lib/useSearch'
 export { createQueryClient, mutationKeys, queryKeys } from '@/query/queryClient'
 export {
   EDITED_PARTS,
@@ -56,7 +58,8 @@ export {
 } from '@/query/edits'
 export { HISTORY_SHOWS, ravenQueriesFor } from '@/query/ravenQueries'
 export type { HistoryShow, RavenQueries } from '@/query/ravenQueries'
-export { mediaMutationsFor } from '@/query/useMediaMutations'
+export { itemFavouriteFor, useServerItemFavourite } from '@/query/useItemFavourite'
+export { mediaMutationsFor, useServerMediaMutations } from '@/query/useMediaMutations'
 export { usePlaybackPolicy } from '@/query/usePlaybackPolicy'
 export {
   EVENTS_RETRY_MS,
@@ -65,7 +68,7 @@ export {
   serverEventsFor,
 } from '@/query/useServerEvents'
 export type { ServerEventSource } from '@/query/useServerEvents'
-export { watchedChangeFor } from '@/query/useWatchedChange'
+export { useServerWatchedToggle, watchedChangeFor } from '@/query/useWatchedChange'
 export { usePageBackdrop } from '@/stores/pageBackdrop'
 export { createSelectionStore, releaseSelectionStore } from '@/stores/selection'
 export type { SelectionStore } from '@/stores/selection'

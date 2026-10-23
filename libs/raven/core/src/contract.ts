@@ -1043,14 +1043,20 @@ export type FilmographyEntry = Infer<typeof isFilmographyEntry>
  * while the server fetches it, or `unavailable` when TMDB is not configured
  * or cannot be reached.
  */
+export const FILMOGRAPHY_STATES = {
+  ready: 'ready',
+  pending: 'pending',
+  unavailable: 'unavailable',
+} as const
+
 export const isPersonFilmography = union(
   object({
-    state: oneOf(['ready']),
+    state: oneOf([FILMOGRAPHY_STATES.ready]),
     fetchedAt: isString,
     entries: listOf(isFilmographyEntry),
   }),
-  object({ state: oneOf(['pending']) }),
-  object({ state: oneOf(['unavailable']) }),
+  object({ state: oneOf([FILMOGRAPHY_STATES.pending]) }),
+  object({ state: oneOf([FILMOGRAPHY_STATES.unavailable]) }),
 )
 
 export type PersonFilmography = Infer<typeof isPersonFilmography>

@@ -13,9 +13,8 @@ import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button, Icon } from '@raven/ui'
 import { SearchField } from '@/components/SearchField/SearchField'
 import { api } from '@/lib/api'
-import { afterMatch } from '@raven/ui/headless'
+import { afterMatch, useSearch } from '@raven/ui/headless'
 import { matchSearchQuery } from '@/lib/queries'
-import { useSearch } from '@/lib/useSearch'
 import styles from '@/components/FixMatchDialog/FixMatchDialog.module.scss'
 
 const NOT_A: Record<MatchItemType, string> = { movie: 'Not a movie', show: 'Not a show' }

@@ -1,19 +1,7 @@
 import type { RefObject } from 'react'
-import type { JumpScale } from '@raven/core'
+import { JUMP_SCALE_LABELS, type JumpScale } from '@raven/core'
 import { holdInPlace } from '@/lib/holdInPlace'
 import styles from '@/components/JumpPicker/JumpPicker.module.scss'
-
-/** What the strip is called aloud, by what it jumps by. */
-const NAMES: Record<JumpScale['field'], string> = {
-  title: 'Jump to a letter',
-  added: 'Jump to when videos came',
-  changed: 'Jump to when videos changed',
-  size: 'Jump to a size',
-  bitrate: 'Jump to a bitrate',
-  resolution: 'Jump to a resolution',
-  release: 'Jump to a year',
-  rating: 'Jump to a score',
-}
 
 /** A link the keyboard reaches: not a picture link hidden from it and from screen readers. */
 const FOCUSABLE_LINK = 'a[href]:not([aria-hidden="true"]):not([tabindex="-1"])'
@@ -60,7 +48,7 @@ export const JumpPicker = ({
   scale: JumpScale
   scope: RefObject<HTMLElement | null>
 }) => (
-  <nav className={styles.picker} aria-label={NAMES[scale.field]}>
+  <nav className={styles.picker} aria-label={JUMP_SCALE_LABELS[scale.field]}>
     {scale.unit && (
       <p className={styles.unit} aria-hidden="true">
         {scale.unit}

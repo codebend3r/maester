@@ -13,20 +13,20 @@ export const useSubmit = ({ unreachable }: { unreachable: string }) => {
   const [error, setError] = useState<string | null>(null)
   const isRunning = useRef(false)
 
-  const run = async (work: () => Promise<void>): Promise<void> => {
+  const run = (work: () => Promise<void>): void => {
     if (isRunning.current) return
     isRunning.current = true
     setBusy(true)
     setError(null)
-    try {
-      await work()
-    } catch (failure) {
-      const isRefusal = failure instanceof ApiError && failure.status < SERVER_ERROR
-      setError(isRefusal ? failure.message : unreachable)
-    } finally {
+    const settle = () => {
       isRunning.current = false
       setBusy(false)
     }
+    work().then(settle, (failure: unknown) => {
+      const isRefusal = failure instanceof ApiError && failure.status < SERVER_ERROR
+      setError(isRefusal ? failure.message : unreachable)
+      settle()
+    })
   }
 
   return { isBusy, error, setError, run }

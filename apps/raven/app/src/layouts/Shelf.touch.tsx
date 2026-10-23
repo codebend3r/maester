@@ -1,13 +1,19 @@
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { CARD_SHAPES, type ShelfCard } from '@/queries/homeShelves'
-import { CardPicture } from '@/layouts/Card'
-import { NOTHING_HERE, type ShelfKit, type ShelfProps, type ShelvesProps } from '@/layouts/shelfKit'
+import { CARD_SHAPES } from '@/queries/cards'
+import { TouchCard } from '@/layouts/TouchCard'
+import { BREAKPOINTS } from '@/layouts/screenSizes'
+import {
+  NOTHING_HERE,
+  SEARCH_EVERY_LIBRARY,
+  SEE_ALL,
+  type ShelfKit,
+  type ShelfProps,
+  type ShelvesProps,
+  seeAllLabelOf,
+} from '@/layouts/shelfKit'
 import { COLOURS, SIZES } from '@/theme/appTheme'
-
-/** The web's 48rem: from there on the screen is a tablet's, and the cards grow. */
-const TABLET_WIDTH = 48 * 16
 
 /** Card widths in points: about two and a half posters across a phone, more on a tablet. */
 const CARD_WIDTHS = {
@@ -17,62 +23,76 @@ const CARD_WIDTHS = {
 
 const useCardWidths = () => {
   const { width } = useWindowDimensions()
-  return width >= TABLET_WIDTH ? CARD_WIDTHS.tablet : CARD_WIDTHS.phone
+  return width >= BREAKPOINTS.tablet ? CARD_WIDTHS.tablet : CARD_WIDTHS.phone
 }
 
-const Shelves = ({ title, notice, children }: ShelvesProps) => {
+const Shelves = ({ title, notice, onSearch, children }: ShelvesProps) => {
   const insets = useSafeAreaInsets()
   return (
     <ScrollView
       contentContainerStyle={[
         styles.shelves,
-        { paddingTop: insets.top + SIZES.space3, paddingBottom: insets.bottom + SIZES.space5 },
+        {
+          paddingTop: insets.top + SIZES.space3,
+          paddingBottom: insets.bottom + SIZES.space5,
+          // Clear of the Dynamic Island and the corners of a phone held sideways.
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
       ]}
       style={styles.ground}
     >
-      <Text accessibilityRole="header" style={styles.pageTitle}>
-        {title}
-      </Text>
+      <View style={styles.pageRow}>
+        <Text accessibilityRole="header" style={styles.pageTitle}>
+          {title}
+        </Text>
+        <Pressable
+          accessibilityLabel={SEARCH_EVERY_LIBRARY.label}
+          accessibilityRole="link"
+          hitSlop={SIZES.space2}
+          onPress={onSearch}
+          style={({ pressed }) => [styles.search, pressed && styles.pressed]}
+        >
+          <Text style={styles.searchLabel}>{SEARCH_EVERY_LIBRARY.text}</Text>
+        </Pressable>
+      </View>
       {notice !== null && <Text style={styles.notice}>{notice}</Text>}
       {children}
     </ScrollView>
   )
 }
 
-const TouchCard = ({
-  card,
-  width,
-  onPress,
-}: {
-  card: ShelfCard
-  width: number
-  onPress: () => void
-}) => (
-  <Pressable
-    accessibilityLabel={card.title}
-    accessibilityRole="button"
-    onPress={onPress}
-    style={({ pressed }) => [styles.card, { width }, pressed && styles.pressed]}
-  >
-    <CardPicture card={card} width={width} />
-    <View>
-      <Text numberOfLines={1} style={styles.cardTitle}>
-        {card.title}
+/**
+ * A shelf's title, and beside a library's the way into the library, as the web's shelf
+ * heading links to it.
+ */
+const ShelfTitle = ({ shelf, onOpenLibrary }: Pick<ShelfProps, 'shelf' | 'onOpenLibrary'>) => {
+  const { libraryId } = shelf
+  return (
+    <View style={styles.titleRow}>
+      <Text accessibilityRole="header" numberOfLines={1} style={styles.shelfTitle}>
+        {shelf.title}
       </Text>
-      {card.line !== null && (
-        <Text numberOfLines={1} style={styles.line}>
-          {card.line}
-        </Text>
+      {libraryId !== null && (
+        <Pressable
+          accessibilityLabel={seeAllLabelOf(shelf.title)}
+          accessibilityRole="link"
+          hitSlop={SIZES.space2}
+          onPress={() => onOpenLibrary(libraryId)}
+          style={({ pressed }) => pressed && styles.pressed}
+        >
+          <Text style={styles.seeAll}>{SEE_ALL}</Text>
+        </Pressable>
       )}
     </View>
-  </Pressable>
-)
+  )
+}
 
 /**
  * A shelf under the thumb: its title, then a row that scrolls sideways and comes to rest on a
  * card's edge, each card as wide as its own shape asks.
  */
-const Shelf = ({ shelf, onOpen }: ShelfProps) => {
+const Shelf = ({ shelf, onOpen, onOpenLibrary }: ShelfProps) => {
   const widths = useCardWidths()
   const snaps = shelf.cards.reduce<number[]>(
     (offsets, card) => offsets.concat((offsets.at(-1) ?? 0) + widths[card.shape] + SIZES.space3),
@@ -80,9 +100,7 @@ const Shelf = ({ shelf, onOpen }: ShelfProps) => {
   )
   return (
     <View style={styles.shelf}>
-      <Text accessibilityRole="header" style={styles.shelfTitle}>
-        {shelf.title}
-      </Text>
+      <ShelfTitle shelf={shelf} onOpenLibrary={onOpenLibrary} />
       {shelf.cards.length === 0 ? (
         <Text style={styles.notice}>{NOTHING_HERE}</Text>
       ) : (
@@ -90,6 +108,9 @@ const Shelf = ({ shelf, onOpen }: ShelfProps) => {
           contentContainerStyle={styles.row}
           decelerationRate="fast"
           horizontal
+          // Under a search box the keyboard may be up: a card's first tap opens it, not only
+          // puts the keyboard away.
+          keyboardShouldPersistTaps="handled"
           showsHorizontalScrollIndicator={false}
           snapToOffsets={snaps}
         >
@@ -113,23 +134,33 @@ export const touchShelf: ShelfKit = { Shelves, Shelf }
 const styles = StyleSheet.create({
   ground: { flex: 1, backgroundColor: COLOURS.ground },
   shelves: { gap: SIZES.space4 },
-  pageTitle: {
-    color: COLOURS.text,
-    fontSize: SIZES.textXl,
-    fontWeight: 'bold',
+  pageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SIZES.space2,
     paddingHorizontal: SIZES.space3,
   },
+  pageTitle: { flexShrink: 1, color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
+  search: {
+    minHeight: SIZES.fieldHeight,
+    justifyContent: 'center',
+    paddingHorizontal: SIZES.space3,
+    borderRadius: SIZES.radius,
+    backgroundColor: COLOURS.quiet,
+  },
+  searchLabel: { color: COLOURS.text, fontSize: SIZES.text, fontWeight: '600' },
   notice: { color: COLOURS.muted, fontSize: SIZES.text, paddingHorizontal: SIZES.space3 },
   shelf: { gap: SIZES.space2 },
-  shelfTitle: {
-    color: COLOURS.text,
-    fontSize: SIZES.textLg,
-    fontWeight: 'bold',
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: SIZES.space2,
     paddingHorizontal: SIZES.space3,
   },
-  row: { gap: SIZES.space3, paddingHorizontal: SIZES.space3 },
-  card: { gap: SIZES.space1 },
+  shelfTitle: { flexShrink: 1, color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
+  seeAll: { color: COLOURS.muted, fontSize: SIZES.textSm, fontWeight: '600' },
   pressed: { opacity: 0.6 },
-  cardTitle: { color: COLOURS.text, fontSize: SIZES.textSm, fontWeight: '600' },
-  line: { color: COLOURS.muted, fontSize: SIZES.textXs },
+  row: { gap: SIZES.space3, paddingHorizontal: SIZES.space3 },
 })

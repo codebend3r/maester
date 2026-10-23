@@ -103,6 +103,7 @@ export const serverEventsFor = ({
         connection.source = source
         source.addEventListener(SERVER_STREAM_EVENTS.message, ({ data }) => {
           const event = typeof data === 'string' ? parseServerEvent(data) : null
+          // A read that fails shows on its own query.
           if (event) follow({ queryClient, event }).catch(() => undefined)
         })
         source.addEventListener(SERVER_STREAM_EVENTS.error, () => {

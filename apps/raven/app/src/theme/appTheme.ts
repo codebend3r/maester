@@ -24,6 +24,7 @@ const size = (name: string): number => tokenOf({ tokens: numbers, name })
 /** The default theme's colours the screens paint with, by what they are for. */
 export const COLOURS = {
   ground: colour('--color-night'),
+  deep: colour('--color-deep'),
   raised: colour('--color-canopy'),
   line: colour('--color-moss-line'),
   text: colour('--color-bark'),

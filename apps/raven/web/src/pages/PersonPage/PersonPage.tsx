@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   type CreditJob,
+  FILMOGRAPHY_STATES,
   type ItemSummary,
   type PersonDetails,
   ROUTE_STATES,
@@ -56,7 +57,7 @@ const eyebrowOf = ({
   person: PersonDetails
   groups: readonly CreditGroup[]
 }): string | null => {
-  if (person.filmography.state === 'ready') {
+  if (person.filmography.state === FILMOGRAPHY_STATES.ready) {
     const held = heldOnOpening(person.filmography.entries)
     const parts = [
       person.profile?.knownFor ?? null,
@@ -139,7 +140,7 @@ const PersonCredits = ({ person, groups }: { person: PersonDetails; groups: Cred
       return (
         <section className={styles.filmography} aria-labelledby={id}>
           <SectionHeading id={id}>Filmography</SectionHeading>
-          {filmography.state === 'ready' ? (
+          {filmography.state === FILMOGRAPHY_STATES.ready ? (
             <Filmography name={person.name} entries={filmography.entries} />
           ) : (
             <FilmographySkeleton name={person.name} />

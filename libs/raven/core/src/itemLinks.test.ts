@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test'
+import { ITEM_TYPES } from '@/contract'
 import {
+  CARD_DESTINATIONS,
+  cardDestination,
   cardLink,
   episodeBackPath,
   inLibrary,
@@ -16,10 +19,10 @@ import { itemSummary, mediaItem } from '@/test/fixtures'
 
 describe('itemPath', () => {
   it("puts a season's page under its show", () => {
-    expect(itemPath(itemSummary({ type: 'season', show: { id: 5, title: 'X' }, season: 2 }))).toBe(
-      '/shows/5/seasons/2',
-    )
-    expect(itemPath(itemSummary({ type: 'season', show: null, season: 2 }))).toBeNull()
+    expect(
+      itemPath(itemSummary({ type: ITEM_TYPES.season, show: { id: 5, title: 'X' }, season: 2 })),
+    ).toBe('/shows/5/seasons/2')
+    expect(itemPath(itemSummary({ type: ITEM_TYPES.season, show: null, season: 2 }))).toBeNull()
   })
 })
 
@@ -100,7 +103,7 @@ describe('readWatchState', () => {
 
 describe('cardLink', () => {
   it("opens a matched movie's page, naming the file when the movie was split onto several cards", () => {
-    const item = itemSummary({ id: 4, type: 'movie' })
+    const item = itemSummary({ id: 4, type: ITEM_TYPES.movie })
     expect(cardLink({ media: mediaItem({ id: 9, libraryId: 2, item }), hasPages: true })).toEqual({
       to: '/movies/4?library=2',
     })
@@ -113,13 +116,50 @@ describe('cardLink', () => {
   })
 
   it("opens the page as the card's own library shows it", () => {
-    const media = mediaItem({ id: 9, libraryId: 5, item: itemSummary({ id: 4, type: 'movie' }) })
+    const media = mediaItem({
+      id: 9,
+      libraryId: 5,
+      item: itemSummary({ id: 4, type: ITEM_TYPES.movie }),
+    })
     expect(cardLink({ media, hasPages: true })).toEqual({ to: '/movies/4?library=5' })
   })
 
   it('plays a file straight away where the library has no pages', () => {
-    const media = mediaItem({ id: 9, item: itemSummary({ id: 4, type: 'movie' }) })
+    const media = mediaItem({ id: 9, item: itemSummary({ id: 4, type: ITEM_TYPES.movie }) })
     expect(cardLink({ media, hasPages: false })).toEqual(watchLink({ media }))
+  })
+})
+
+describe('cardDestination', () => {
+  it("goes to a matched video's page in its library, naming the file of a split card", () => {
+    const item = itemSummary({ id: 4, type: ITEM_TYPES.movie })
+    expect(
+      cardDestination({ media: mediaItem({ id: 9, libraryId: 2, item }), hasPages: true }),
+    ).toEqual({
+      kind: CARD_DESTINATIONS.page,
+      item,
+      path: '/movies/4',
+      libraryId: 2,
+      file: null,
+    })
+    expect(
+      cardDestination({
+        media: mediaItem({ id: 9, libraryId: 2, item, variant: 'Final Cut' }),
+        hasPages: true,
+      }),
+    ).toMatchObject({ kind: CARD_DESTINATIONS.page, file: 9 })
+  })
+
+  it('goes to the player for a file matched to nothing, an item with no page, or a library with no pages', () => {
+    const unmatched = mediaItem({ id: 3 })
+    expect(cardDestination({ media: unmatched, hasPages: true })).toEqual({
+      kind: CARD_DESTINATIONS.player,
+      media: unmatched,
+    })
+    const loose = mediaItem({ item: itemSummary({ type: ITEM_TYPES.season, show: null }) })
+    expect(cardDestination({ media: loose, hasPages: true }).kind).toBe(CARD_DESTINATIONS.player)
+    const movie = mediaItem({ item: itemSummary({ type: ITEM_TYPES.movie }) })
+    expect(cardDestination({ media: movie, hasPages: false }).kind).toBe(CARD_DESTINATIONS.player)
   })
 })
 
@@ -149,7 +189,7 @@ describe('inLibrary', () => {
       id: 1e21,
       libraryId: 1e21,
       variant: 'Final Cut',
-      item: itemSummary({ id: 4, type: 'movie' }),
+      item: itemSummary({ id: 4, type: ITEM_TYPES.movie }),
     })
     expect(cardLink({ media, hasPages: true })).toEqual({
       to: '/movies/4?library=1e%2B21&file=1e%2B21',

@@ -2,15 +2,28 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
+import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Home } from '@/screens/Home'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { NAS, SPARSE, homeApi } from '@/test/homeServer'
+import { heldAnswer } from '@/test/heldAnswer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { renderScreen } from '@/test/renderScreen'
 
-const mockApi = jest.fn(homeApi)
+/** What Home's read waits on before it is answered, per test. */
+const mockHome: { answer: Promise<void> } = { answer: Promise.resolve() }
+const mockApi = jest.fn((server: AppServer) => {
+  const api = homeApi(server)
+  return {
+    ...api,
+    getHome: async () => {
+      await mockHome.answer
+      return api.getHome()
+    },
+  }
+})
 
 // The layouts pick their variant once, as they load, so the TV is set before anything does.
 jest.mock('react-native/Libraries/Utilities/Platform', () => {
@@ -20,7 +33,9 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   Object.defineProperty(platform.default, 'isTV', { get: () => true })
   return platform
 })
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }))
+const mockPush = jest.fn()
+
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }))
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
@@ -36,6 +51,7 @@ const renderHome = async () => renderScreen({ ui: <Home /> })
 
 describe('Home on a TV', () => {
   beforeEach(() => {
+    mockHome.answer = Promise.resolve()
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
 
@@ -75,6 +91,33 @@ describe('Home on a TV', () => {
 
     await fireEvent(first, NATIVE_EVENTS.blur)
     expect(scaleOf()).toEqual([{ scale: 1 }])
+  })
+
+  it("lets the remote open a library from its shelf's title", async () => {
+    await renderHome()
+    await fireEvent.press(await screen.findByRole('link', { name: 'See all in Series' }))
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: APP_ROUTES.library,
+      params: { [APP_ROUTE_PARAMS.id]: '2' },
+    })
+  })
+
+  it('offers the search in the top row once the shelves are drawn, never before them or first', async () => {
+    const { answer, release } = heldAnswer()
+    mockHome.answer = answer
+    await renderHome()
+    expect(await screen.findByText('Gathering your libraries')).toBeTruthy()
+    // Drawn alone, it would be all tvOS had to give the opening focus to.
+    expect(screen.queryByRole('link', { name: 'Search every library' })).toBeNull()
+
+    release()
+    await screen.findByRole('header', { name: 'Films' })
+    const search = screen.getByRole('link', { name: 'Search every library' })
+    expect(search.props.hasTVPreferredFocus).not.toBe(true)
+    expect(screen.getAllByRole('button')[0]!.props.hasTVPreferredFocus).toBe(true)
+
+    await fireEvent.press(search)
+    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.search)
   })
 
   it('puts focus on the first card of the first shelf that has one', async () => {
