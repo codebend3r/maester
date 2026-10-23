@@ -174,7 +174,7 @@ describe('episodeStillUrl', () => {
 
   it("uses the episode's still, else a frame of its file, else nothing", () => {
     expect(episodeStillUrl({ api, episode: episodeSummary({ id: 6, stillVersion: 's1' }) })).toBe(
-      '/api/items/6/images/still?v=s1',
+      '/api/pictures/items/6/still/s1',
     )
     expect(
       episodeStillUrl({

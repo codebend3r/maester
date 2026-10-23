@@ -41,8 +41,8 @@ describe('playablePage', () => {
       rating: 'R',
       facts: movieFacts({ details: BUSBOYS, primary: BUSBOYS_FILE }),
       progress: { fraction: 0.5, label: '50 min left' },
-      poster: { shape: CARD_SHAPES.poster, picture: at('/api/items/40/images/poster?v=p40') },
-      backdrop: at('/api/items/40/images/backdrop?v=b40'),
+      poster: { shape: CARD_SHAPES.poster, picture: at('/api/pictures/items/40/poster/p40') },
+      backdrop: at('/api/pictures/items/40/backdrop/b40'),
       tagline: 'Every table has a story.',
       summary: 'Two busboys at a downtown steakhouse plan one last perfect shift.',
     })
@@ -62,7 +62,7 @@ describe('playablePage', () => {
         name: 'Mark Kimball',
         role: 'Rudy / Director',
         initials: 'MK',
-        picture: at('/api/people/1/photo?v=k1'),
+        picture: at('/api/pictures/people/1/k1'),
       },
       { key: '2', name: 'Ana Ortiz', role: 'Lena', initials: 'AO', picture: null },
     ])
@@ -110,12 +110,12 @@ describe('playablePage', () => {
     expect(hero.eyebrow).toBe('Severance · Season 1 · Episode 1')
     expect(hero.poster).toEqual({
       shape: CARD_SHAPES.wide,
-      picture: at('/api/items/6/images/still?v=s6'),
+      picture: at('/api/pictures/items/6/still/s6'),
     })
     expect(hero.backdrop).toBeNull()
     expect(castTitle).toBe('Guest stars & crew')
     expect(episode({ show: SEVERANCE }).hero.backdrop).toEqual(
-      at('/api/items/4/images/backdrop?v=b4'),
+      at('/api/pictures/items/4/backdrop/b4'),
     )
   })
 
@@ -132,7 +132,7 @@ describe('playablePage', () => {
       tracks: undefined,
       ...pictures,
     })
-    expect(page.hero.backdrop).toEqual(at('/api/items/6/images/still?v=s6'))
+    expect(page.hero.backdrop).toEqual(at('/api/pictures/items/6/still/s6'))
   })
 })
 
@@ -146,7 +146,7 @@ describe('showPage', () => {
         title: 'Season 1',
         line: '2 episodes',
         shape: CARD_SHAPES.poster,
-        picture: at('/api/items/5/images/poster?v=p5'),
+        picture: at('/api/pictures/items/5/poster/p5'),
         progress: 0,
         target: { kind: ROUTE_TARGETS.item, itemId: 5, libraryId: null, fileId: null },
       },
@@ -164,7 +164,7 @@ describe('seasonPage', () => {
       title: 'Season 1',
       facts: ['2022', '2 episodes'],
       progress: { fraction: 0, label: '0 of 2 watched' },
-      backdrop: at('/api/items/4/images/backdrop?v=b4'),
+      backdrop: at('/api/pictures/items/4/backdrop/b4'),
     })
     expect(page.episodes.map(({ title, line, target }) => [title, line, target])).toEqual([
       [
@@ -178,7 +178,7 @@ describe('seasonPage', () => {
         { kind: ROUTE_TARGETS.item, itemId: 8, libraryId: SERIES.id, fileId: null },
       ],
     ])
-    expect(page.episodes[0]!.picture).toEqual(at('/api/items/6/images/still?v=s6'))
+    expect(page.episodes[0]!.picture).toEqual(at('/api/pictures/items/6/still/s6'))
   })
 
   it('waits for the show for its backdrop', () => {

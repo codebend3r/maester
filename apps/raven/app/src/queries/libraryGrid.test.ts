@@ -54,7 +54,7 @@ describe('librarySectionsOf', () => {
     expect(all!.cards[1]).toMatchObject({
       key: 'media:31',
       target: { kind: ROUTE_TARGETS.item, itemId: 51, libraryId: FILMS.id, fileId: null },
-      picture: { uri: `${NAS.origin}/api/items/51/images/poster?v=p51`, headers: COOKIE },
+      picture: { uri: `${NAS.origin}/api/pictures/items/51/poster/p51`, headers: COOKIE },
     })
   })
 
