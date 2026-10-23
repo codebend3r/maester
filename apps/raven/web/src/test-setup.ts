@@ -2,7 +2,7 @@ import { afterEach } from 'bun:test'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import {
-  configurePlayerPrefs,
+  configureStorage,
   usePageBackdrop,
   usePlayerPrefs,
   useUnlockPrompt,
@@ -25,7 +25,7 @@ import { FakeEventSource } from '@/test/eventSource'
 import { pacePolls, resetPolls } from '@/test/polls'
 
 pacePolls()
-await configurePlayerPrefs({ storage: window.localStorage })
+await configureStorage({ storage: window.localStorage })
 
 const initialAuthSession = useAuthSession.getInitialState()
 const initialPrefs = usePlayerPrefs.getInitialState()

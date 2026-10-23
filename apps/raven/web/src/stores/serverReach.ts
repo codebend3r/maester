@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { createJSONStorage, devtools, persist } from 'zustand/middleware'
+import { STORE_KEYS } from '@/stores/storage'
 
 type ServerReach = {
   /**
@@ -9,4 +11,13 @@ type ServerReach = {
   isOffline: boolean
 }
 
-export const useServerReach = create<ServerReach>()(() => ({ isOffline: false }))
+export const useServerReach = create<ServerReach>()(
+  devtools(
+    persist((): ServerReach => ({ isOffline: false }), {
+      name: STORE_KEYS.serverReach,
+      storage: createJSONStorage(() => window.localStorage),
+      partialize: ({ isOffline }) => ({ isOffline }),
+    }),
+    { name: 'raven/serverReach' },
+  ),
+)

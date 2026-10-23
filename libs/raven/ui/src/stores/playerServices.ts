@@ -1,5 +1,7 @@
 import { useId, useLayoutEffect } from 'react'
 import { create } from 'zustand'
+import { createJSONStorage, devtools, persist } from 'zustand/middleware'
+import { STORE_KEYS, UNCONFIGURED_STORAGE } from '@/stores/storage'
 import type { PlayerServices } from '@/components/Player/PlayerServices'
 
 type PlayerServicesState = {
@@ -11,7 +13,16 @@ type PlayerServicesState = {
 const EMPTY: PlayerServicesState = { host: null, services: null }
 
 /** What the host on screen gives its player: the title, progress, escape and the rest. */
-export const usePlayerServices = create<PlayerServicesState>()(() => EMPTY)
+export const usePlayerServices = create<PlayerServicesState>()(
+  devtools(
+    persist(() => EMPTY, {
+      name: STORE_KEYS.playerServices,
+      storage: createJSONStorage(() => UNCONFIGURED_STORAGE),
+      partialize: () => ({}),
+    }),
+    { name: 'raven/playerServices' },
+  ),
+)
 
 /** The player's own parts read the host's services here; the host sets them before the player renders. */
 export const useHostServices = (): PlayerServices => {

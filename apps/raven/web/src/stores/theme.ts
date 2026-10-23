@@ -1,5 +1,6 @@
 import { DEFAULT_THEME, type ThemeId, isThemeId } from '@raven/core'
 import { create } from 'zustand'
+import { devtools } from 'zustand/middleware'
 
 /** Where the choice is kept, as the bare id; index.html reads it before first paint. */
 export const THEME_KEY = 'raven-theme'
@@ -29,18 +30,23 @@ type ThemeState = {
 }
 
 /** The theme this device wears, kept across visits. */
-export const useTheme = create<ThemeState>()((set) => ({
-  theme: readTheme(),
-  pick: (theme) => {
-    try {
-      window.localStorage.setItem(THEME_KEY, theme)
-    } catch {
-      // Storage refused: the theme still changes, for this visit only.
-    }
-    applyTheme(theme)
-    set({ theme })
-  },
-}))
+export const useTheme = create<ThemeState>()(
+  devtools(
+    (set) => ({
+      theme: readTheme(),
+      pick: (theme) => {
+        try {
+          window.localStorage.setItem(THEME_KEY, theme)
+        } catch {
+          // Storage refused: the theme still changes, for this visit only.
+        }
+        applyTheme(theme)
+        set({ theme })
+      },
+    }),
+    { name: 'raven/theme' },
+  ),
+)
 
 /**
  * Wears the saved theme, then follows a theme picked in another tab, which

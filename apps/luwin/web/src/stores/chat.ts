@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
+import { type StateStorage, createJSONStorage, devtools, persist } from 'zustand/middleware'
 import { type CaseTurn, type ChatRoute, ROUTES, decide, forget, streamTurn } from '@/lib/api'
 import {
   ENTRY_KINDS,
@@ -97,122 +97,125 @@ type ChatState = {
  * entries are only appended.
  */
 export const useChat = create<ChatState>()(
-  persist(
-    (set, get) => {
-      const updateReply = ({ id, change }: { id: number; change: (reply: Reply) => Reply }) =>
-        set(({ entries }) => {
-          const entry = entries[id]
-          return entry?.kind === ENTRY_KINDS.reply
-            ? { entries: entries.with(id, change(entry)) }
-            : {}
-        })
+  devtools(
+    persist(
+      (set, get) => {
+        const updateReply = ({ id, change }: { id: number; change: (reply: Reply) => Reply }) =>
+          set(({ entries }) => {
+            const entry = entries[id]
+            return entry?.kind === ENTRY_KINDS.reply
+              ? { entries: entries.with(id, change(entry)) }
+              : {}
+          })
 
-      const runTurn = async ({
-        said,
-        route,
-        body,
-        expected,
-      }: {
-        said: string
-        route: ChatRoute
-        body: Record<string, unknown>
-        expected: CaseTurn | null
-      }) => {
-        const start = get().entries.length
-        const reply: Reply = {
-          kind: ENTRY_KINDS.reply,
-          id: start + 1,
-          state: REPLY_STATES.running,
-          chunks: [],
-          tools: [],
-          confirmations: [],
-          choices: [],
-          notices: [],
-          titles: [],
-          failure: null,
-          cause: null,
+        const runTurn = async ({
+          said,
+          route,
+          body,
           expected,
-        }
-        set(({ entries }) => ({
-          isBusy: true,
-          entries: [...entries, { kind: ENTRY_KINDS.said, id: start, text: said }, reply],
-        }))
-        try {
-          await streamTurn({
-            route,
-            body,
-            onEvent: (event) =>
-              updateReply({ id: reply.id, change: (r) => applyEvent({ reply: r, event }) }),
-          })
-        } catch {
-          updateReply({
-            id: reply.id,
-            change: (r) => ({ ...r, state: REPLY_STATES.failed, failure: UNREACHABLE }),
-          })
-        } finally {
-          // A stream that ended without `done` or `error` was cut off.
-          updateReply({
-            id: reply.id,
-            change: (r) =>
-              r.state === REPLY_STATES.running
-                ? { ...r, state: REPLY_STATES.failed, failure: 'The reply was cut off.' }
-                : r,
-          })
-          set({ isBusy: false })
-        }
-      }
-
-      return {
-        owner: null,
-        entries: [],
-        settled: [],
-        isBusy: false,
-        send: ({ text, expected }) =>
-          runTurn({ said: text, route: ROUTES.chat, body: { text }, expected: expected ?? null }),
-        pick: (choice) =>
-          runTurn({
-            said: choice.display,
-            route: ROUTES.pick,
-            body: { label: choice.label, value: choice.value, year: choice.year },
-            expected: null,
-          }),
-        press: async ({ pendingId, approve }) => {
-          set({ isBusy: true })
-          const decision = await decide({ pendingId, approve }).catch(() => null)
-          set(({ entries, settled }) => ({
-            isBusy: false,
-            settled: decision?.isSettled ? [...settled, pendingId] : settled,
-            entries: [
-              ...entries,
-              {
-                kind: ENTRY_KINDS.decision,
-                id: entries.length,
-                text: decision?.text ?? UNREACHABLE,
-                notices: decision?.notices ?? [],
-              },
-            ],
+        }: {
+          said: string
+          route: ChatRoute
+          body: Record<string, unknown>
+          expected: CaseTurn | null
+        }) => {
+          const start = get().entries.length
+          const reply: Reply = {
+            kind: ENTRY_KINDS.reply,
+            id: start + 1,
+            state: REPLY_STATES.running,
+            chunks: [],
+            tools: [],
+            confirmations: [],
+            choices: [],
+            notices: [],
+            titles: [],
+            failure: null,
+            cause: null,
+            expected,
+          }
+          set(({ entries }) => ({
+            isBusy: true,
+            entries: [...entries, { kind: ENTRY_KINDS.said, id: start, text: said }, reply],
           }))
-        },
-        startOver: async () => {
-          set({ isBusy: true })
-          await forget().catch(() => null)
-          set({ entries: [], settled: [], isBusy: false })
-        },
-        adopt: (owner) => {
-          if (get().owner === owner) return
-          set({ owner, entries: [], settled: [] })
-        },
-      }
-    },
-    {
-      name: CHAT_STORAGE_KEY,
-      storage: createJSONStorage(() => quietStorage),
-      partialize: ({ owner, entries, settled }): Partial<SavedChat> => ({
-        ...(owner == null ? {} : { owner }),
-        entries,
-        settled,
-      }),
-      merge: (saved, current) => ({ ...current, ...toSavedChat(saved) }),
-    },
+          try {
+            await streamTurn({
+              route,
+              body,
+              onEvent: (event) =>
+                updateReply({ id: reply.id, change: (r) => applyEvent({ reply: r, event }) }),
+            })
+          } catch {
+            updateReply({
+              id: reply.id,
+              change: (r) => ({ ...r, state: REPLY_STATES.failed, failure: UNREACHABLE }),
+            })
+          } finally {
+            // A stream that ended without `done` or `error` was cut off.
+            updateReply({
+              id: reply.id,
+              change: (r) =>
+                r.state === REPLY_STATES.running
+                  ? { ...r, state: REPLY_STATES.failed, failure: 'The reply was cut off.' }
+                  : r,
+            })
+            set({ isBusy: false })
+          }
+        }
+
+        return {
+          owner: null,
+          entries: [],
+          settled: [],
+          isBusy: false,
+          send: ({ text, expected }) =>
+            runTurn({ said: text, route: ROUTES.chat, body: { text }, expected: expected ?? null }),
+          pick: (choice) =>
+            runTurn({
+              said: choice.display,
+              route: ROUTES.pick,
+              body: { label: choice.label, value: choice.value, year: choice.year },
+              expected: null,
+            }),
+          press: async ({ pendingId, approve }) => {
+            set({ isBusy: true })
+            const decision = await decide({ pendingId, approve }).catch(() => null)
+            set(({ entries, settled }) => ({
+              isBusy: false,
+              settled: decision?.isSettled ? [...settled, pendingId] : settled,
+              entries: [
+                ...entries,
+                {
+                  kind: ENTRY_KINDS.decision,
+                  id: entries.length,
+                  text: decision?.text ?? UNREACHABLE,
+                  notices: decision?.notices ?? [],
+                },
+              ],
+            }))
+          },
+          startOver: async () => {
+            set({ isBusy: true })
+            await forget().catch(() => null)
+            set({ entries: [], settled: [], isBusy: false })
+          },
+          adopt: (owner) => {
+            if (get().owner === owner) return
+            set({ owner, entries: [], settled: [] })
+          },
+        }
+      },
+      {
+        name: CHAT_STORAGE_KEY,
+        storage: createJSONStorage(() => quietStorage),
+        partialize: ({ owner, entries, settled }): Partial<SavedChat> => ({
+          ...(owner == null ? {} : { owner }),
+          entries,
+          settled,
+        }),
+        merge: (saved, current) => ({ ...current, ...toSavedChat(saved) }),
+      },
+    ),
+    { name: 'luwin/chat' },
   ),
 )

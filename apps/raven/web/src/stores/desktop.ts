@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { createJSONStorage, devtools, persist } from 'zustand/middleware'
+import { STORE_KEYS } from '@/stores/storage'
 import type { DesktopClient } from '@/desktop/client'
 import type { MenuHub } from '@/desktop/menuHub'
 import type { PlayerConnections } from '@/desktop/playerConnection'
@@ -12,7 +14,16 @@ type DesktopBridge = {
 }
 
 /** The page's bridge to Raven, which only the desktop app's own page has. */
-export const useDesktopBridge = create<DesktopBridge>()(() => ({ desktop: null }))
+export const useDesktopBridge = create<DesktopBridge>()(
+  devtools(
+    persist((): DesktopBridge => ({ desktop: null }), {
+      name: STORE_KEYS.desktop,
+      storage: createJSONStorage(() => window.localStorage),
+      partialize: () => ({}),
+    }),
+    { name: 'raven/desktop' },
+  ),
+)
 
 /** Whether the page runs inside Raven. */
 export const useIsDesktop = (): boolean => useDesktopBridge((state) => state.desktop !== null)

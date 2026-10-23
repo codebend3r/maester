@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from 'bun:test'
 import type { StateStorage } from 'zustand/middleware'
-import { PLAYER_PREFS_KEY, configurePlayerPrefs, usePlayerPrefs } from '@/stores/playerPrefs'
+import { configureStorage } from '@/stores/configureStorage'
+import { PLAYER_PREFS_KEY, usePlayerPrefs } from '@/stores/playerPrefs'
 
 const mapStorage = (entries: Map<string, string>): StateStorage => ({
   getItem: (name) => entries.get(name) ?? null,
@@ -12,9 +13,9 @@ const mapStorage = (entries: Map<string, string>): StateStorage => ({
   },
 })
 
-describe('configurePlayerPrefs', () => {
+describe('configureStorage', () => {
   // The store is shared by every test file in the run; leave it on localStorage.
-  afterAll(() => configurePlayerPrefs({ storage: window.localStorage }))
+  afterAll(() => configureStorage({ storage: window.localStorage }))
 
   test('hydrates the prefs from the storage it is given', async () => {
     const version = usePlayerPrefs.persist.getOptions().version ?? 0
@@ -22,14 +23,14 @@ describe('configurePlayerPrefs', () => {
       [PLAYER_PREFS_KEY, JSON.stringify({ state: { volume: 0.4 }, version })],
     ])
 
-    await configurePlayerPrefs({ storage: mapStorage(entries) })
+    await configureStorage({ storage: mapStorage(entries) })
 
     expect(usePlayerPrefs.getState().volume).toBe(0.4)
   })
 
   test('writes later changes into that storage', async () => {
     const entries = new Map<string, string>()
-    await configurePlayerPrefs({ storage: mapStorage(entries) })
+    await configureStorage({ storage: mapStorage(entries) })
 
     usePlayerPrefs.getState().setVolume({ volume: 0.7, muted: false })
 

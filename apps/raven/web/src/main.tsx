@@ -6,7 +6,7 @@ import '@fontsource/young-serif'
 import '@fontsource-variable/instrument-sans/wdth.css'
 // Shared primitives load before host components that override them.
 import '@raven/ui/styles.css'
-import { configurePlayerPrefs } from '@raven/ui/headless'
+import { configureStorage } from '@raven/ui/headless'
 import { AppRoutes } from '@/AppRoutes'
 import { CardLinks } from '@/components/CardLink/CardLink'
 import { startDesktop } from '@/desktop/startDesktop'
@@ -18,7 +18,7 @@ import { followTheme } from '@/stores/theme'
 
 followTheme()
 startDesktop({ bridge: window.ravenDesktop, root: document.documentElement, target: window })
-await configurePlayerPrefs({ storage: window.localStorage })
+await configureStorage({ storage: window.localStorage })
 const rootElement = document.getElementById('root')
 
 if (rootElement) {

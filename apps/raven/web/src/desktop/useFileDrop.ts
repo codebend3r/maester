@@ -25,7 +25,12 @@ export const useFileDrop = ({
   const reply = useEffectEvent(onReply)
 
   // Unmounted mid-drag, the count goes, so the flag goes too.
-  useEffect(() => () => setIsDragging(false), [])
+  useEffect(
+    () => () => {
+      setIsDragging(false)
+    },
+    [],
+  )
 
   useEffect(() => {
     // Selected text and links are dragged too; only files are a drop to play.

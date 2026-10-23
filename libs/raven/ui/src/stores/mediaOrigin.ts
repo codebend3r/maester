@@ -1,6 +1,8 @@
 import { type MediaOrigin, isMediaOrigin } from '@raven/core'
 import { create } from 'zustand'
-import { createJSONStorage, persist } from 'zustand/middleware'
+import { createJSONStorage, devtools, persist } from 'zustand/middleware'
+import { localOrMemoryStorage } from '@/stores/browserStorage'
+import { STORE_KEYS } from '@/stores/storage'
 
 export type MediaPick = { origin: MediaOrigin; at: number }
 
@@ -29,51 +31,32 @@ const isMediaPick = (value: unknown): value is MediaPick =>
   'at' in value &&
   typeof value.at === 'number'
 
-const memory = new Map<string, string>()
-
-const memoryStorage: Storage = {
-  get length() {
-    return memory.size
-  },
-  clear: () => memory.clear(),
-  getItem: (key) => memory.get(key) ?? null,
-  key: (index) => [...memory.keys()][index] ?? null,
-  removeItem: (key) => void memory.delete(key),
-  setItem: (key, value) => void memory.set(key, value),
-}
-
-/** Reading `window.sessionStorage` itself throws in some private or locked-down windows. */
-export const sessionOrMemoryStorage = (): Storage => {
-  try {
-    return window.sessionStorage
-  } catch {
-    return memoryStorage
-  }
-}
-
-/** The pick lasts for the tab's session: a new tab probes again, a reload does not. */
+/** The pick lasts across reloads and tabs until it goes stale. */
 export const useMediaOrigin = create<MediaOriginState>()(
-  persist(
-    (set) => ({
-      pick: null,
-      isProbing: false,
-      setPick: (pick) => set({ pick }),
-      setProbing: (isProbing) => set({ isProbing }),
-    }),
-    {
-      name: 'raven-media-origin',
-      storage: createJSONStorage(sessionOrMemoryStorage),
-      partialize: ({ pick }) => ({ pick }),
-      merge: (persisted, current) => ({
-        ...current,
-        pick:
-          typeof persisted === 'object' &&
-          persisted !== null &&
-          'pick' in persisted &&
-          isMediaPick(persisted.pick)
-            ? persisted.pick
-            : null,
+  devtools(
+    persist(
+      (set) => ({
+        pick: null,
+        isProbing: false,
+        setPick: (pick) => set({ pick }),
+        setProbing: (isProbing) => set({ isProbing }),
       }),
-    },
+      {
+        name: STORE_KEYS.mediaOrigin,
+        storage: createJSONStorage(localOrMemoryStorage),
+        partialize: ({ pick }) => ({ pick }),
+        merge: (persisted, current) => ({
+          ...current,
+          pick:
+            typeof persisted === 'object' &&
+            persisted !== null &&
+            'pick' in persisted &&
+            isMediaPick(persisted.pick)
+              ? persisted.pick
+              : null,
+        }),
+      },
+    ),
+    { name: 'raven/mediaOrigin' },
   ),
 )

@@ -3,13 +3,14 @@ import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { useMediaOrigin } from '@/stores/mediaOrigin'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
-import { configurePlayerPrefs, usePlayerPrefs } from '@/stores/playerPrefs'
+import { configureStorage } from '@/stores/configureStorage'
+import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { usePlayerServices } from '@/stores/playerServices'
 import { useToasts } from '@/stores/toasts'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { resetBrowserSupport } from '@/test/canPlay'
 
-await configurePlayerPrefs({ storage: window.localStorage })
+await configureStorage({ storage: window.localStorage })
 
 const initialPrefs = usePlayerPrefs.getInitialState()
 const initialMediaOrigin = useMediaOrigin.getInitialState()
@@ -26,6 +27,6 @@ afterEach(() => {
   usePlayerServices.setState(initialServices, true)
   useToasts.setState(initialToasts, true)
   useUnlockPrompt.setState(initialUnlockPrompt, true)
-  window.sessionStorage.clear()
+  window.localStorage.clear()
   resetBrowserSupport()
 })
