@@ -8,7 +8,7 @@ import {
   PLAYER_SOURCE_KINDS,
 } from '@raven/core'
 import { focusManager, onlineManager } from '@tanstack/react-query'
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SERVER_COPY } from '@/renderer/ServerPage/serverServices'
 import { accountOf } from '@/renderer/test/accountFakes'
@@ -62,7 +62,7 @@ describe('ServerPage accounts', () => {
     expect(loadsOf(fake)).toHaveLength(0)
     await userEvent.type(screen.getByLabelText('Email'), 'me@example.com')
     await userEvent.type(screen.getByLabelText('Password'), 'hunter2')
-    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     await waitFor(() => expect(loadsOf(fake)).toHaveLength(1))
     expect(callNamesOf(client)).toEqual(['GET /api/media/7'])
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.signIn })).toEqual([
@@ -93,7 +93,7 @@ describe('ServerPage accounts', () => {
       account: { current: accountOf({ state: ACCOUNT_STATES.pending }) },
       replies: { refreshAccount: ACCOUNT_DONE(APPROVED) },
     })
-    await userEvent.click(await screen.findByRole('button', { name: 'Check again' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Check again' }))
     await waitFor(() => expect(loadsOf(fake)).toHaveLength(1))
   })
 
@@ -154,7 +154,7 @@ describe('ServerPage accounts', () => {
     expect(await screen.findByText(ACCOUNT_COPY.failed('Vhagar'))).toBeInTheDocument()
     expect(callNamesOf(client)).toEqual([])
     account.current = APPROVED
-    await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() => expect(loadsOf(fake)).toHaveLength(1))
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.readAccount })).toHaveLength(2)
   })
@@ -238,7 +238,7 @@ describe('ServerPage accounts', () => {
     expect(loadsOf(fake)).toHaveLength(0)
     await userEvent.type(screen.getByLabelText('Email'), 'me@example.com')
     await userEvent.type(screen.getByLabelText('Password'), 'hunter2')
-    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     await waitFor(() => expect(loadsOf(fake)).toHaveLength(1))
   })
 
@@ -434,6 +434,7 @@ describe('ServerPage accounts', () => {
       account.current = OTHER_APPROVED
       await rendered.client.emit({ type: DESKTOP_EVENTS.accountSwitched, serverId: S })
       await rendered.client.emit({ type: DESKTOP_EVENTS.account, account: OTHER_APPROVED })
+      await waitFor(() => expect(rendered.queryClient.isFetching()).toBe(0))
       return rendered
     }
 
@@ -455,11 +456,10 @@ describe('ServerPage accounts', () => {
         restore: () => onlineManager.setOnline(true),
       },
     ])('neither reads it again nor reloads its player on $event', async ({ happen, restore }) => {
-      const { client, fake } = await switchedMidPlay()
+      const { client, fake, queryClient } = await switchedMidPlay()
       try {
         act(happen)
-        await act(async () => {})
-        await act(async () => {})
+        await waitFor(() => expect(queryClient.isFetching()).toBe(0))
         expect(callNamesOf(client)).toEqual(['GET /api/media/7'])
         expect(loadsOf(fake)).toHaveLength(1)
         expect(screen.getByRole('heading', { name: 'Episode 1' })).toBeInTheDocument()

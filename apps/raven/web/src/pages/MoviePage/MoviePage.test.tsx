@@ -508,7 +508,6 @@ describe('MoviePage', () => {
 
     afterEach(() => {
       handoff.mockClear()
-      usePlayerPrefs.setState({ opensInRavenPlayer: false })
     })
 
     it('is left out while this browser does not open videos in raven player', async () => {

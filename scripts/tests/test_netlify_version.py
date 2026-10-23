@@ -7,10 +7,14 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# A git hook exports GIT_DIR, GIT_INDEX_FILE and the like, which would point
+# every git call below at the repo being pushed instead of the throwaway one.
+ENV = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+
 
 def git(repo: Path, *args: str) -> str:
     return subprocess.check_output(
-        ["git", "-C", str(repo), *args], text=True, stderr=subprocess.PIPE
+        ["git", "-C", str(repo), *args], text=True, stderr=subprocess.PIPE, env=ENV
     ).strip()
 
 
@@ -35,6 +39,7 @@ def repo(tmp_path: Path) -> Path:
         ["git", "clone", "--depth", "1", source.as_uri(), str(checkout)],
         check=True,
         capture_output=True,
+        env=ENV,
     )
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -49,8 +54,8 @@ def build(repo: Path, *, context: str = "production") -> subprocess.CompletedPro
         ["bash", str(ROOT / "apps/raven/netlify-build.sh")],
         cwd=repo,
         env={
-            **os.environ,
-            "PATH": f"{repo.parent / 'bin'}:{os.environ['PATH']}",
+            **ENV,
+            "PATH": f"{repo.parent / 'bin'}:{ENV['PATH']}",
             "CONTEXT": context,
             "BRANCH": "main",
             "VITE_RAVEN_VERSION": "0.6.2.999",

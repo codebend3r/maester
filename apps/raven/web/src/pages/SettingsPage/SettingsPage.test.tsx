@@ -10,7 +10,7 @@ import {
   type Account,
   type PlaybackSettingsState,
 } from '@raven/core'
-import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@raven/ui/headless'
+import { usePlayerPrefs } from '@raven/ui/headless'
 import { api } from '@/lib/api'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
 import { held } from '@/test/held'
@@ -336,10 +336,7 @@ describe('Advanced on SettingsPage', () => {
   const spies = { get: spyOn(api, 'getPlaybackSettings') }
 
   beforeEach(() => spies.get.mockImplementation(async () => STATE))
-  afterEach(() => {
-    Object.values(spies).forEach((spy) => spy.mockReset())
-    usePlayerPrefs.getState().setControlsLingerSeconds(CONTROLS_LINGER_SECONDS.initial)
-  })
+  afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
 
   const slider = () => screen.getByRole('slider', { name: "Hide the player's controls after" })
 

@@ -256,6 +256,8 @@ describe('the player controls', () => {
   })
 
   it("answers YouTube's keys", async () => {
+    // Its keys turn subtitles on; the cues they would read are no part of this test.
+    spies.push(spyOn(api, 'getSubtitles').mockImplementation(() => new Promise(() => undefined)))
     const { container } = renderWithProviders({
       ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
     })
@@ -705,10 +707,7 @@ describe('the controls fading out', () => {
     stubTracks()
     jest.useFakeTimers()
   })
-  afterEach(() => {
-    jest.useRealTimers()
-    usePlayerPrefs.getState().setControlsLingerSeconds(CONTROLS_LINGER_SECONDS.initial)
-  })
+  afterEach(() => jest.useRealTimers())
 
   const renderPlayer = () =>
     renderWithProviders({
@@ -750,9 +749,9 @@ describe('the controls fading out', () => {
     expect(bar()).not.toHaveClass('hidden')
     idle(1)
     expect(bar()).toHaveClass('hidden')
-    usePlayerPrefs.getState().setControlsLingerSeconds(1)
+    act(() => usePlayerPrefs.getState().setControlsLingerSeconds(1))
     expect(usePlayerPrefs.getState().controlsLingerSeconds).toBe(CONTROLS_LINGER_SECONDS.min)
-    usePlayerPrefs.getState().setControlsLingerSeconds(30)
+    act(() => usePlayerPrefs.getState().setControlsLingerSeconds(30))
     expect(usePlayerPrefs.getState().controlsLingerSeconds).toBe(CONTROLS_LINGER_SECONDS.max)
   })
 

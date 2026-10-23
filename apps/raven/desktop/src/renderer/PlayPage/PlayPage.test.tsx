@@ -19,10 +19,10 @@ import {
   type PlayerRefusalReason,
 } from '@raven/core'
 import type { NativePlayer } from '@raven/ui/headless'
-import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NavigationType } from 'react-router-dom'
-import { listenForPlayer } from '@/renderer/desktop/playerConnection'
+import { listenForPlayer, PLAYER_CLOSED } from '@/renderer/desktop/playerConnection'
 import { ENGINE_MOVED, ENGINE_NOTES, STATS_UNAVAILABLE } from '@/renderer/PlayPage/playerServices'
 import { connectionsOf, fakeClient, renderDesktop } from '@/renderer/test/render'
 import {
@@ -500,7 +500,7 @@ describe('PlayPage engines', () => {
   it('shows the window buttons again when it goes Home', async () => {
     const fake = fakePlayer()
     const client = fakeClient({ request: clips })
-    const { router } = renderDesktop({
+    const { router, queryClient } = renderDesktop({
       client,
       route: `/play/${A}`,
       player: connectionsOf({ status: 'native', player: fake.player }),
@@ -508,6 +508,7 @@ describe('PlayPage engines', () => {
     await screen.findByRole('heading', { name: 'Clip 01' })
     client.request.mockClear()
     await act(() => router.navigate('/'))
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0))
     expect(sentOfType({ client, type: 'windowButtons' })).toContainEqual({
       type: 'windowButtons',
       isVisible: true,
@@ -694,6 +695,15 @@ const handedOver = () => {
   }
 }
 
+/**
+ * Unmounts the page and waits a turn for main to answer the stop the player sends as it goes,
+ * so the answer, or the refusal and the warning it logs, lands before the test lets go.
+ */
+const answeredStop = async () => {
+  cleanup()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 /** happy-dom has no MediaError, which the html engine reads a failed video's codes from. */
 const FAKE_MEDIA_ERROR = {
   MEDIA_ERR_ABORTED: 1,
@@ -734,6 +744,8 @@ describe('PlayPage when the html engine cannot play', () => {
   })
 
   it('says the engine stopped when the video lost it mid-play', async () => {
+    // The native player's stop goes nowhere once the engine is gone, and it logs that.
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
     const main = handedOver()
     opened.push(main)
     renderDesktop({
@@ -748,6 +760,9 @@ describe('PlayPage when the html engine cannot play', () => {
     await failVideo()
     expect(screen.getByText(ENGINE_NOTES.stopped)).toBeInTheDocument()
     expect(screen.queryByText(ENGINE_NOTES.fallback)).toBeNull()
+    await answeredStop()
+    expect(warn).toHaveBeenCalledWith(`raven player refused stop: ${PLAYER_CLOSED}`)
+    warn.mockRestore()
   })
 })
 
@@ -759,7 +774,8 @@ describe('PlayPage when the video engine stops', () => {
     warnSpy = spyOn(console, 'warn').mockImplementation(() => {})
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    await answeredStop()
     opened.splice(0).forEach(({ connections }) => connections.dispose())
     warnSpy.mockRestore()
   })

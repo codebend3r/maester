@@ -127,7 +127,7 @@ describe('AccountMenu', () => {
   it('is busy while the session ends', async () => {
     const user = userEvent.setup()
     const ending = held<SignOutResult>()
-    renderMenu({ signOut: () => ending.promise })
+    const { client } = renderMenu({ signOut: () => ending.promise })
     await user.click(trigger())
 
     await user.click(screen.getByRole('menuitem', { name: 'Sign out' }))
@@ -135,6 +135,7 @@ describe('AccountMenu', () => {
     expect(screen.getByRole('menuitem', { name: 'Signing out' })).toBeDisabled()
 
     await act(async () => ending.answer({ error: null }))
+    await waitFor(() => expect(client.getQueryData(queryKeys.account(ACCOUNT_ID))).toBeUndefined())
   })
 
   it('says why signing out failed, and offers it again', async () => {

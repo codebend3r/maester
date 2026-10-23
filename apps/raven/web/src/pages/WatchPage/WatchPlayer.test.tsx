@@ -10,7 +10,7 @@ import {
 import { Toaster, useMediaOrigin } from '@raven/ui'
 import { queryKeys, usePlayerPrefs } from '@raven/ui/headless'
 import { QueryClient } from '@tanstack/react-query'
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { WatchProbe } from '@/test/watchProbe'
@@ -60,6 +60,7 @@ const stubTracks = (tracks: MediaTracks = TRACKS) =>
   spies.push(spyOn(api, 'getTracks').mockImplementation(async () => tracks))
 
 afterEach(() => {
+  cleanup()
   spies.splice(0).forEach((spy) => spy.mockRestore())
   useMediaOrigin.setState({ pick: null, isProbing: false })
 })
@@ -112,7 +113,6 @@ describe('Player file link on the media plane', () => {
     const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {})
     spies.push(clipboard)
     renderWithProviders({ ui: <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" /> })
-    await waitFor(() => expect(api.getMediaTicket).toHaveBeenCalledWith(7))
     // The link is built from the ticket, so the click waits until the page holds one.
     await waitFor(async () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
@@ -120,6 +120,7 @@ describe('Player file link on the media plane', () => {
         'https://raven.home.example/api/media/7/file?t=abc.def',
       )
     })
+    expect(api.getMediaTicket).toHaveBeenCalledWith(7)
     expect(
       await screen.findByText(
         'Link copied. Paste it into VLC or IINA to play it there; it works for 6 hours.',
@@ -289,7 +290,7 @@ describe('WatchPage favourite', () => {
       return answer.promise
     })
     spies.push(setFavourite)
-    renderWithProviders({
+    const { client } = renderWithProviders({
       ui: (
         <Routes>
           <Route path="watch/:id" element={<WatchPage />} />
@@ -305,6 +306,8 @@ describe('WatchPage favourite', () => {
     expect(setFavourite).toHaveBeenCalledWith({ id: 7, favourite: true })
 
     await act(async () => answer.answer(saved))
+    // The answer has the video read again; the heart holds once that read is in.
+    await waitFor(() => expect(client.isFetching()).toBe(0))
     expect(screen.getByRole('button', { name: 'Favourite' })).toHaveAttribute(
       'aria-pressed',
       'true',

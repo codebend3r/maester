@@ -69,7 +69,7 @@ describe('refreshing a library as its folders change', () => {
 
   afterAll(async () => {
     await closeAfterWork(state)
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   it('takes in a video added to a folder under it', async () => {
@@ -183,7 +183,7 @@ describe('a library whose folders cannot be watched', () => {
 
   afterAll(async () => {
     await closeAfterWork(state)
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   it('is left to the quick scan, which still takes in new videos', async () => {

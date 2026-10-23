@@ -61,7 +61,7 @@ describe('who is streaming', () => {
 
   afterAll(async () => {
     await state.app?.close()
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   const report = (payload: object) =>

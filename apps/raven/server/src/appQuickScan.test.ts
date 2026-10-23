@@ -67,7 +67,7 @@ describe('a quick scan', () => {
   afterAll(async () => {
     await settle()
     await state.app?.close()
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   it('starts from a full scan that remembers when it finished, and no quick scan yet', async () => {

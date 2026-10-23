@@ -11,7 +11,6 @@ describe('DownloadButton', () => {
 
   afterEach(() => {
     open.mockClear()
-    usePlayerPrefs.setState({ opensInRavenPlayer: false })
   })
 
   it('renders nothing while this browser does not open videos in raven player', () => {

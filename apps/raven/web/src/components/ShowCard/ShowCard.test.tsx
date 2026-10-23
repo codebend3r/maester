@@ -6,6 +6,7 @@ import { POSTER_SIZES } from '@/lib/posters'
 import { showEntry } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { usePageBackdrop } from '@raven/ui/headless'
+import { reported } from '@/test/viewport'
 
 describe('ShowCard', () => {
   afterEach(() => {
@@ -44,7 +45,7 @@ describe('ShowCard', () => {
     expect(screen.getByText('Added 3 days ago')).toBeInTheDocument()
   })
 
-  it("opens the show's page, plays the next episode, and says the years and count", () => {
+  it("opens the show's page, plays the next episode, and says the years and count", async () => {
     const { container } = renderWithProviders({
       ui: (
         <ul>
@@ -52,6 +53,7 @@ describe('ShowCard', () => {
         </ul>
       ),
     })
+    await reported()
     expect(screen.getByRole('link', { name: 'Severance' })).toHaveAttribute('href', '/shows/4')
     expect(screen.getByRole('link', { name: 'Play Severance S01E02' })).toHaveAttribute(
       'href',
@@ -63,7 +65,7 @@ describe('ShowCard', () => {
     expect(container.querySelector('img')).toHaveAttribute('src', '/api/items/4/images/poster?v=p1')
   })
 
-  it('offers its poster at each width, sized as the row or grid holding it lays it out', () => {
+  it('offers its poster at each width, sized as the row or grid holding it lays it out', async () => {
     const srcset = [
       '/api/items/4/images/poster?v=p1&w=185 185w',
       '/api/items/4/images/poster?v=p1&w=342 342w',
@@ -76,12 +78,15 @@ describe('ShowCard', () => {
         </ul>
       ),
     })
+    await reported()
     expect(row.container.querySelector('img')).toHaveAttribute('srcset', srcset)
     expect(row.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.row)
     const grid = renderWithProviders({ ui: <ShowGrid shows={[showEntry()]} /> })
+    await reported()
     expect(grid.container.querySelector('img')).toHaveAttribute('srcset', srcset)
     expect(grid.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.showCard)
     const tiles = renderWithProviders({ ui: <ShowTiles shows={[showEntry()]} /> })
+    await reported()
     expect(tiles.container.querySelector('img')).toHaveAttribute('srcset', srcset)
     expect(tiles.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.showTile)
   })

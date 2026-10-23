@@ -113,6 +113,7 @@ describe('useAccountActions', () => {
       message: 'raven player could not reach its sign-in. Try again.',
     }
     expect(await first.result.current.refresh(S)).toEqual(unreached)
+    first.unmount()
     const odd = setup({ type: DESKTOP_REPLIES.done })
     const second = renderHook(() => useAccountActions(), { wrapper: odd.wrapper })
     expect(await second.result.current.signOut(S)).toEqual(unreached)
@@ -144,6 +145,7 @@ describe('useAccountActions', () => {
       serverId: S,
       page: ACCOUNT_PAGES.forgot,
     })
+    first.unmount()
     const refused = setup({ type: DESKTOP_REPLIES.refused, message: 'No browser.' })
     const second = renderHook(() => useAccountActions(), { wrapper: refused.wrapper })
     expect(

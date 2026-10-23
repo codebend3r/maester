@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type {
   AdminLock,
@@ -115,8 +115,9 @@ describe('LibraryPage', () => {
     spies.list.mockImplementation(async () => {
       throw new Error('The server is away.')
     })
-    renderLibraryPage()
+    const { client } = renderLibraryPage()
     expect(await screen.findByRole('alert')).toHaveTextContent('The server is away.')
+    await waitFor(() => expect(client.isFetching()).toBe(0))
   })
 
   it('opens in the view and sort the library was left in', async () => {
@@ -389,15 +390,20 @@ describe('LibraryPage', () => {
         ratingsRefresh: { state: 'running', done: 1, total: 3, startedAt: ISO },
       }),
     )
-    spies.get.mockImplementation(async () =>
-      library({ id: 2, ratingsRefresh: { state: 'idle', finishedAt: ISO } }),
-    )
-    spies.list.mockImplementation(async () => ITEMS)
+    // The poll that finds it finished waits for the test, so it lands inside act().
+    const finished = held<Library>()
+    spies.get.mockImplementation(() => finished.promise)
+    spies.list.mockImplementationOnce(async () => ITEMS)
+    spies.list.mockImplementation(async () => [...ITEMS, mediaItem({ id: 4, title: 'Rescored' })])
     renderLibraryPage()
     await screen.findByText('Refreshing ratings · 1 of 3')
+    await waitFor(() => expect(spies.get.mock.calls.length).toBeGreaterThan(1))
+    await act(async () =>
+      finished.answer(library({ id: 2, ratingsRefresh: { state: 'idle', finishedAt: ISO } })),
+    )
     // A boolean, as a failed match on an element prints its whole DOM and starves the poll.
     await waitFor(() => expect(!!screen.queryByText(/Refreshing ratings/)).toBe(false))
-    await waitFor(() => expect(spies.list.mock.calls.length).toBeGreaterThan(1))
+    expect(await screen.findByRole('link', { name: 'Rescored' })).toBeInTheDocument()
   })
 
   it('leaves Rescan, Match again and Edit out while the admin lock is on', async () => {

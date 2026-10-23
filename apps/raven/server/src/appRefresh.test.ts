@@ -111,7 +111,7 @@ const refreshServer = ({
     close: async (): Promise<void> => {
       await settle()
       await state.app?.close()
-      await rm(state.root, { recursive: true, force: true })
+      await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
     },
     /** Each score a movie has, by source. */
     scoresOf: (tmdbId: string): Record<string, number> =>

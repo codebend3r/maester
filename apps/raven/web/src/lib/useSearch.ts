@@ -14,9 +14,12 @@ export const useSearch = ({ initial = '' }: { initial?: string } = {}) => {
   const [text, setText] = useState(initial)
   const [query, setQuery] = useState(initial.trim())
   useEffect(() => {
-    const timer = window.setTimeout(() => setQuery(text.trim()), SEARCH_DELAY_MS)
+    const next = text.trim()
+    // Nothing to wait for while the query already follows the text.
+    if (next === query) return
+    const timer = window.setTimeout(() => setQuery(next), SEARCH_DELAY_MS)
     return () => window.clearTimeout(timer)
-  }, [text])
+  }, [text, query])
   return {
     text,
     setText,

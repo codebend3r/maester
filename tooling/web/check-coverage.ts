@@ -53,17 +53,17 @@ const results = METRICS.map(({ name, hit, found }) => {
   }
 })
 
-process.stdout.write(
-  results
-    .map(
-      ({ name, covered, coverable, floor, percent }) =>
-        `coverage: ${name} ${percent.toFixed(2)}% (${covered}/${coverable}), floor ${floor}%\n`,
-    )
-    .join(''),
-)
-
+// Quiet while the totals hold, so a passing run prints only the tests' dots.
 const failing = results.filter(({ percent, floor }) => percent < floor)
 if (failing.length > 0) {
+  console.error(
+    failing
+      .map(
+        ({ name, covered, coverable, floor, percent }) =>
+          `coverage: ${name} ${percent.toFixed(2)}% (${covered}/${coverable}), floor ${floor}%`,
+      )
+      .join('\n'),
+  )
   console.error(
     `Coverage fell below the floor for ${failing.map(({ name }) => name).join(' and ')}. ` +
       'Run bun test --coverage for the per-file table.',

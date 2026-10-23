@@ -6,6 +6,7 @@ import { ContinueWatching, tileWords, timeLeft } from '@/pages/HomePage/Continue
 import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEASON_ONE_CARD } from '@/test/tv'
+import { reported } from '@/test/viewport'
 
 const MOVIE = matchedMovie({
   id: 20,
@@ -88,10 +89,11 @@ describe('ContinueWatching', () => {
     )
   })
 
-  it("wears its season's poster, as wide as the tile shows it, and is tinted with the narrowest", () => {
+  it("wears its season's poster, as wide as the tile shows it, and is tinted with the narrowest", async () => {
     renderWithProviders({
       ui: <ContinueWatching entries={[{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }]} />,
     })
+    await reported()
     const [poster, tint] = [...section().querySelectorAll('img')]
     expect(poster?.getAttribute('src')).toContain('/api/items/5/images/poster')
     expect(poster?.getAttribute('sizes')).toBe(POSTER_SIZES.showTile)
@@ -99,7 +101,7 @@ describe('ContinueWatching', () => {
     expect(tint?.getAttribute('sizes')).toBe('1px')
   })
 
-  it('shows and is tinted with a frame grab where there is no poster', () => {
+  it('shows and is tinted with a frame grab where there is no poster', async () => {
     const clip = mediaItem({
       id: 8,
       title: 'Clip',
@@ -108,6 +110,7 @@ describe('ContinueWatching', () => {
       thumbnailVersion: 3,
     })
     renderWithProviders({ ui: <ContinueWatching entries={[{ media: clip, poster: null }]} /> })
+    await reported()
     const sources = [...section().querySelectorAll('img')].map((img) => img.getAttribute('src'))
     expect(sources).toEqual(['/api/media/8/thumbnail?v=3', '/api/media/8/thumbnail?v=3'])
   })
