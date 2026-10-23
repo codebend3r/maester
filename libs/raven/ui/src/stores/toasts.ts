@@ -38,7 +38,8 @@ export const useToasts = create<ToastsState>()(
       {
         name: STORE_KEYS.toasts,
         storage: createJSONStorage(localOrMemoryStorage),
-        partialize: ({ toasts, nextId }) => ({ toasts, nextId }),
+        // A toast belongs to the launch that raised it; kept, the next launch would show it again.
+        partialize: ({ nextId }) => ({ nextId }),
       },
     ),
     { name: 'raven/toasts' },
