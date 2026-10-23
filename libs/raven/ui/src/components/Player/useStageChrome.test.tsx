@@ -1,6 +1,22 @@
 import { describe, expect, it, mock } from 'bun:test'
 import { act, renderHook } from '@testing-library/react'
-import { useFullscreen, useLeaveFullscreen } from '@/components/Player/useStageChrome'
+import { useBezel, useFullscreen, useLeaveFullscreen } from '@/components/Player/useStageChrome'
+
+describe('useBezel', () => {
+  it('flashes for the bezel animation and restarts with each flash', async () => {
+    const { result } = renderHook(() => useBezel())
+    expect(result.current.isFlashing).toBe(false)
+    act(() => result.current.flash({ icon: 'forward', text: 'Forward 10s' }))
+    expect(result.current.isFlashing).toBe(true)
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
+    act(() => result.current.flash({ icon: 'forward', text: 'Forward 20s' }))
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
+    expect(result.current.isFlashing).toBe(true)
+    expect(result.current.bezel?.text).toBe('Forward 20s')
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
+    expect(result.current.isFlashing).toBe(false)
+  })
+})
 
 describe('useFullscreen', () => {
   it('enters and exits the page fullscreen and follows its change event', () => {

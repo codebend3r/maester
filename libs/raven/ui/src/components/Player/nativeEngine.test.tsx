@@ -264,6 +264,20 @@ describe('the native engine', () => {
     expect(fake.sent.at(-1)).toEqual({ type: 'seek', time: 0 })
   })
 
+  it('keeps the loading ring out from under a skip’s flash, and shows it once the flash ends', async () => {
+    const fake = fakePlayer()
+    renderNative({ player: fake.player })
+    await settled()
+    await fake.emit({ type: 'duration', duration: 120 })
+    await fake.emit({ type: 'paused', paused: false })
+    await fake.emit({ type: 'waiting', waiting: false })
+    fireEvent.keyDown(window, { key: 'l' })
+    await fake.emit({ type: 'waiting', waiting: true })
+    expect(screen.queryByLabelText('Loading')).toBeNull()
+    await act(() => new Promise((resolve) => setTimeout(resolve, 750)))
+    expect(screen.getByLabelText('Loading')).toBeInTheDocument()
+  })
+
   it('shows Unplayable on an error event', async () => {
     const fake = fakePlayer()
     renderNative({ player: fake.player })
