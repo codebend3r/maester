@@ -1,0 +1,13 @@
+{
+  // The app itself: React Native's types only, so screen code that reaches for
+  // a Node or Bun global fails here. Bun reads `paths` from this file too.
+  "extends": "../../../tooling/tsconfig/react-native.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "app", "index.ts"],
+  // The bun tests run under Bun; tsconfig.node.json checks them.
+  "exclude": ["src/**/*.test.ts"]
+}

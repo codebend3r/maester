@@ -1,4 +1,4 @@
-import { PAGE_ORIGIN, UNLOCK_COOKIE, UNLOCK_COOKIE_PATH } from '@raven/core'
+import { PAGE_ORIGIN, SERVER_COOKIES, UNLOCK_COOKIE_PATH } from '@raven/core'
 import { loggable } from '@/main/servers/serverCalls'
 import { messageOf } from '@/shared/messageOf'
 
@@ -45,10 +45,10 @@ export const createPageUnlock =
     try {
       const found = await cookies.get({
         url: `${PAGE_ORIGIN}${UNLOCK_COOKIE_PATH}`,
-        name: UNLOCK_COOKIE,
+        name: SERVER_COOKIES.unlock,
       })
       const value = found[0]?.value ?? null
-      return value !== null && isCookieValue(value) ? `${UNLOCK_COOKIE}=${value}` : null
+      return value !== null && isCookieValue(value) ? `${SERVER_COOKIES.unlock}=${value}` : null
     } catch (error) {
       warn(`Raven could not read the page's unlock: ${loggable(messageOf(error))}`)
       return null

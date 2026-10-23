@@ -1,0 +1,43 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../../tooling/oxlint/react.json"],
+  // React Native has no DOM: a browser global here is a bug.
+  "env": {
+    "browser": false
+  },
+  "ignorePatterns": ["ios", "android", "build", ".expo"],
+  "overrides": [
+    {
+      // expo-router reads each route from its file's default export, and Expo,
+      // Metro and Babel read their configs the same way.
+      "files": ["app/**", "app.config.ts", "metro.config.ts", "babel.config.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
+      // Expo loads app.config.ts with its own require hook, which reads no
+      // tsconfig `paths`, and Node adds no `.ts`, so it names its ./src module
+      // by relative path and extension.
+      "files": ["app.config.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      // formatjs's package exports list each polyfill and locale file only
+      // with its `.js`; without it Metro warns and falls back to the files.
+      "files": ["src/polyfills.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off",
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}

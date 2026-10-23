@@ -14,6 +14,9 @@ env:
   # Nx Cloud's remote cache: a task any job or earlier run already did, on the same
   # inputs, restores instead of running. Unset (a fork's PR), Nx caches locally only.
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+  # raven's device app loads babel.config.ts through Node's own type stripping, which
+  # needs Node 22.18 or newer, wherever Metro or jest-expo runs.
+  APP_NODE_VERSION: 24.21.0
 
 # A newer push to the same branch cancels the in-flight run for that branch.
 concurrency:
@@ -63,6 +66,13 @@ jobs:
         with:
           bun-version-file: package.json
 
+      # For the screen tests when they run here, as a fork's PR runs them; the agents'
+      # image has its own Node 24.
+      - name: 🟩 Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.APP_NODE_VERSION }}
+
       # Each Python project's .python-version picks its interpreter. Uncached tasks,
       # such as spellcheck's `uvx typos`, can run in this job instead of on an agent.
       - name: 🐍 Set up uv
@@ -109,6 +119,11 @@ jobs:
         run: |
           bun run dead-code
           bun run dead-css
+
+      # jest-expo for the device app's tests that render a native component, which
+      # `bun test` cannot load. They run on the agents like the unit tests.
+      - name: 📱 Screen tests
+        run: bun run test:screens --outputStyle=static
 
       # Every project's build. The agents stay up until this target is done
       # (.nx/ci-config.yaml), so a new step goes before it.
@@ -341,23 +356,284 @@ jobs:
           path: apps/raven/desktop/test-results
           if-no-files-found: ignore
 
+  # Whether this PR touches raven's device app, what it imports (core and ui, through
+  # Nx's graph), the server its flows sign in to, or this workflow. The app jobs below are
+  # two cold React Native builds each, so they run only then; the 🖥️ Desktop gate takes
+  # their skip as a pass.
+  app-affected:
+    name: 🔍 App affected
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      affected: ${{ steps.affected.outputs.affected }}
+    steps:
+      # The PR's head with its whole history, so Nx can find the merge base with the base.
+      - name: 📥 Checkout exact PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      # Bun's version comes from `packageManager` in package.json.
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      # Nx reads the project graph from the installed workspace.
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      - name: 🔍 Is the app affected
+        id: affected
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          projects="$(bunx nx show projects --affected --base="$BASE" --head="$HEAD" --json)"
+          echo "Affected: $projects"
+          # Anything but a list of names fails the job here, rather than reading as no app.
+          echo "$projects" | jq -e 'type == "array" and all(type == "string")' > /dev/null
+          workflow="$(git diff --name-only "$BASE...$HEAD" -- .github/workflows/pull-request-checks.yml)"
+          if echo "$projects" | jq -e 'index("@raven/app") != null or index("@raven/server") != null' > /dev/null || [ -n "$workflow" ]; then
+            echo "affected=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "affected=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # raven's device app for iPhone, iPad and Apple TV: both simulator builds, a launch on
+  # the Apple TV simulator, and the Maestro flows on the iPhone simulator against a real
+  # raven server. Maestro's driver installs only on iPhone and iPad, so the Apple TV gets
+  # the launch check instead.
+  app-apple:
+    name: 📱 App on Apple devices
+    needs: app-affected
+    if: needs.app-affected.outputs.affected == 'true'
+    runs-on: macos-26
+    # Two Release builds of React Native from cold (neither is cached) and the flows.
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      # The flows reach the fixture server over plain http on the loopback, which only
+      # the development variant's App Transport Security allows.
+      APP_VARIANT: development
+    steps:
+      # The PR's head commit, so the artifact names below match the commit that was built.
+      - name: 📥 Checkout exact PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # Bun's version comes from `packageManager` in package.json.
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 🟩 Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.APP_NODE_VERSION }}
+
+      # The fixture server encodes its clips and probes them with ffmpeg and ffprobe.
+      - name: 🎞️ Install ffmpeg
+        run: brew install ffmpeg
+
+      # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      # Each build runs its prebuild first (bun runs `prebuild:tvos` before `build:tvos`),
+      # which regenerates ios/ and installs the pods, so the pods are checked right after.
+      - name: 📺 Build for the Apple TV simulator
+        run: bunx nx run @raven/app:build:tvos
+
+      # `expo prebuild` exits 0 when `pod install` fails, so the pods are checked by hand:
+      # CocoaPods writes Pods/Manifest.lock as a copy of Podfile.lock once it has installed.
+      - name: 🔎 Check the Apple TV pods
+        working-directory: apps/raven/app/ios
+        run: |
+          grep -q 'SDKROOT = appletvos' raven.xcodeproj/project.pbxproj
+          cmp Podfile.lock Pods/Manifest.lock
+
+      # A fresh Apple TV 4K on the runner's newest tvOS runtime, booted, with the build
+      # launched on it: ten seconds later launchd must still list the app with a pid, not
+      # the `-` of one that exited. The screenshot goes up with the artifacts.
+      - name: 🚬 Launch on the Apple TV simulator
+        run: |
+          runtime="$(xcrun simctl list -j runtimes tvOS | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')"
+          device="$(xcrun simctl create raven-tv com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K "$runtime")"
+          xcrun simctl boot "$device"
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl install "$device" apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app
+          xcrun simctl launch "$device" io.github.codebend3r.raven.app
+          sleep 10
+          xcrun simctl io "$device" screenshot "$RUNNER_TEMP/raven-tv.png"
+          xcrun simctl spawn "$device" launchctl list | grep -E '^[0-9]+[[:space:]].*UIKitApplication:io\.github\.codebend3r\.raven\.app'
+          xcrun simctl shutdown "$device"
+
+      - name: 📱 Build for the iPhone and iPad simulator
+        run: bunx nx run @raven/app:build:ios
+
+      - name: 🔎 Check the iPhone and iPad pods
+        working-directory: apps/raven/app/ios
+        run: cmp Podfile.lock Pods/Manifest.lock
+
+      # A real raven server with a locked film library and an open series library, in the
+      # background for the flows. It prints its ready line once its libraries are scanned.
+      - name: 🗄️ Start the fixture server
+        run: |
+          bunx nx run @raven/server:serve:fixture > "$RUNNER_TEMP/fixture.log" 2>&1 &
+          for _ in $(seq 1 90); do
+            if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
+              grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/fixture.log"
+          exit 1
+
+      # A fresh iPhone 16 on the runner's newest iOS runtime, booted, with the build on it.
+      - name: 📱 Boot the iPhone simulator
+        run: |
+          runtime="$(xcrun simctl list -j runtimes iOS | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')"
+          device="$(xcrun simctl create raven-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
+          xcrun simctl boot "$device"
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl install "$device" apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
+
+      # Maestro's own release, the zip its Homebrew formula installs, pinned by version and
+      # checksum. It runs on the runner's Java.
+      - name: 🎭 Install Maestro
+        env:
+          MAESTRO_VERSION: 2.11.0
+          MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/maestro.zip" "https://github.com/mobile-dev-inc/maestro/releases/download/cli-$MAESTRO_VERSION/maestro.zip"
+          echo "$MAESTRO_SHA256  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
+
+      # Signs in with the PIN and the admin password, then finds the locked movie on Home.
+      - name: 🎬 App end to end
+        run: bun run app:e2e
+
+      # Maestro's screenshots and logs and the fixture server's log, only when a step failed.
+      - name: 📤 End to end logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-app-e2e-logs-${{ github.event.pull_request.head.sha }}
+          path: |
+            ~/.maestro/tests
+            ${{ runner.temp }}/fixture.log
+          if-no-files-found: ignore
+
+      # Each simulator build zipped as Finder would, which keeps the execute bits an
+      # artifact drops, so the unzipped app still launches.
+      - name: 📦 Pack the simulator apps
+        run: |
+          ditto -c -k --keepParent apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app "$RUNNER_TEMP/raven-appletvsimulator.zip"
+          ditto -c -k --keepParent apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app "$RUNNER_TEMP/raven-iphonesimulator.zip"
+
+      # Both simulator builds, for trying the PR's app by hand on a simulator, and the
+      # Apple TV launch's screenshot.
+      - name: 📤 Simulator apps
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-app-simulators-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/raven-appletvsimulator.zip
+            ${{ runner.temp }}/raven-iphonesimulator.zip
+            ${{ runner.temp }}/raven-tv.png
+          if-no-files-found: error
+
+  # raven's device app for Android TV, on Linux (Ruling 20): GitHub's macOS arm64 runners
+  # cannot run the Android emulator, so this is where its flows will run too.
+  app-android-tv:
+    name: 📺 App on Android TV
+    needs: app-affected
+    if: needs.app-affected.outputs.affected == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      # The PR's head commit, so the artifact name below matches the commit that was built.
+      - name: 📥 Checkout exact PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # Bun's version comes from `packageManager` in package.json.
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 🟩 Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.APP_NODE_VERSION }}
+
+      # The runner's Android SDK is ANDROID_HOME already; Gradle runs on its JDK 17.
+      - name: ☕ Use JDK 17
+        run: echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+
+      # Gradle's downloads, keyed on the lockfile, which pins React Native, Expo and the
+      # native modules android/ is generated from.
+      - name: 🗃️ Gradle cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('bun.lock', 'apps/raven/app/package.json') }}
+
+      # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      # Runs `prebuild:android-tv` first, which regenerates android/ with the leanback
+      # launcher, then Gradle's Release APK.
+      - name: 📺 Build the Android TV APK
+        run: bunx nx run @raven/app:build:android-tv
+
+      # The Release APK, signed with the debug key Expo's template sets up, for sideloading
+      # the PR's build by hand.
+      - name: 📤 Android TV APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-app-android-tv-${{ github.event.pull_request.head.sha }}
+          path: apps/raven/app/android/app/build/outputs/apk/release
+          if-no-files-found: error
+
   # The "Protect main" ruleset requires a check named 🖥️ Desktop, so this one stands
-  # for every desktop job and passes only when all of them did.
+  # for every desktop and device app job and passes only when all of them did. The two
+  # app jobs may also be skipped, when the PR leaves the app alone (app-affected).
   desktop:
     name: 🖥️ Desktop
-    needs: [desktop-native, desktop-app, desktop-playback]
+    needs: [desktop-native, desktop-app, desktop-playback, app-affected, app-apple, app-android-tv]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      # Prints each needed job's result, then fails on the first that isn't a success.
+      # Prints each needed job's result, then fails on the first that isn't a success, or
+      # for the app jobs a skip.
       - name: ✅ Every desktop job passed
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
+          REQUIRED: >-
+            ${{ needs.desktop-native.result }} ${{ needs.desktop-app.result }}
+            ${{ needs.desktop-playback.result }} ${{ needs.app-affected.result }}
+          APP_RESULTS: ${{ needs.app-apple.result }} ${{ needs.app-android-tv.result }}
         run: |
           echo "$RESULTS"
-          for result in $RESULTS; do
+          for result in $REQUIRED; do
             test "$result" = success
+          done
+          for result in $APP_RESULTS; do
+            test "$result" = success || test "$result" = skipped
           done
 
   # The production images, built and health checked by the shared smoke workflow.

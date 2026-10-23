@@ -17,9 +17,9 @@ import {
   type MediaItem,
   MEMBER_STATUSES,
   type MediaTracks,
+  SERVER_COOKIES,
   SERVER_METHODS,
   SUBTITLE_SOURCES,
-  UNLOCK_COOKIE,
 } from '@raven/core'
 import {
   ACCOUNT_TICKET_PREFIX,
@@ -235,7 +235,8 @@ const FIXTURE_SIDECAR =
 
 const FIXTURE_PAGE = '<!doctype html><html><head><title>Sign in</title></head><body></body></html>'
 
-const ADMIN_COOKIE = 'raven_admin'
+const UNLOCK_COOKIE = SERVER_COOKIES.unlock
+const ADMIN_COOKIE = SERVER_COOKIES.admin
 const COOKIE_ATTRIBUTES = 'Path=/api; HttpOnly; SameSite=Strict'
 const ADMIN_MAX_AGE_S = 34_560_000
 /** As the server's `WrongTries`: five wrong in a row make every try wait a minute, the right one too. */

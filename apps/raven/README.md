@@ -513,6 +513,30 @@ bunx nx run @raven/desktop:e2e            # Playwright against electron .
 2. A pull request that touches the release's files (the workflow, the shared native build action, `forge.config.ts`, `src/build/` or `release/`) runs `desktop-release.yml` as a dry run, which builds the assets as a workflow artifact and never publishes. So does a run from the Actions tab.
 3. Dispatching that dry run on `main` before tagging builds what the tag will, at the old version (the tag builds the Release commit, which carries the new one, and checks the tag against it), so a broken release shows before the tag exists. It does not make the tag's build faster. Both workflows restore the libmpv source build (`@raven/mpv:fetch:libmpv`, an Nx cached target) only from Nx Cloud, and the repository has no `NX_CLOUD_ACCESS_TOKEN` secret yet. The `.nx/cache` fallback saves nothing: Nx 23 keeps its local cache in `~/.nx/<workspace id>/cache`, and even moved to `.nx/cache` with `NX_CACHE_DIRECTORY` it is found only through a database named for the machine, so the next runner misses it. So every `🎞️ Desktop native` job and every release build compiles libmpv from source, 11 to 14 minutes on recent runs, well inside the release job's 150 minutes. Once the secret is set, Nx Cloud serves the build to a later run with the same inputs (the source lock, the patches, the build scripts, node-addon-api's version and the Xcode version).
 
+## The device app
+
+`@raven/app` is raven on iPhone, iPad, Apple TV and Android TV. Its [README](app/README.md) covers building it and signing in to a server.
+
+### Test it end to end
+
+The Maestro flows in `apps/raven/app/e2e` sign in to a real raven server and check Home. That server comes from the repo with a fixture library:
+
+```bash
+bunx nx run @raven/server:serve:fixture
+```
+
+It encodes two short clips with ffmpeg into a temporary folder, a film in a locked library and an episode in an open one, matches both against a fake TMDB, and listens on `http://127.0.0.1:8490` until you stop it, when it deletes the folder. Once its libraries are scanned it prints `raven fixture server ready at http://127.0.0.1:8490 (PIN 1357, admin password Raven-Admin-2026)`.
+
+With it running, build the development variant (plain http to the loopback needs it), install it on a booted iPhone simulator and run the flows, which need [Maestro](https://maestro.mobile.dev) (`brew tap mobile-dev-inc/tap`, then `brew install mobile-dev-inc/tap/maestro`):
+
+```bash
+APP_VARIANT=development bunx nx run @raven/app:build:ios
+xcrun simctl install booted apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
+bun run app:e2e
+```
+
+Maestro's driver installs only on iPhone and iPad simulators, so the flows run on an iPhone; the Apple TV build gets a launch check instead. In the PR checks, the `📱 App on Apple devices` job builds both, launches the Apple TV build, and runs the flows against the fixture server; `📺 App on Android TV` builds the APK. Both stand behind `🖥️ Desktop`.
+
 ## Layout
 
 ```

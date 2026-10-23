@@ -1,0 +1,15 @@
+{
+  // What runs under Node or Bun: the configs Expo, Metro and Babel load, and
+  // the bun tests with the modules they import.
+  "extends": "../../../tooling/tsconfig/node.json",
+  "compilerOptions": {
+    "types": ["bun"],
+    "resolveJsonModule": true,
+    // Only app.config.ts writes one: see the comment on its import.
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["app.config.ts", "metro.config.ts", "babel.config.ts", "src/**/*.test.ts"]
+}

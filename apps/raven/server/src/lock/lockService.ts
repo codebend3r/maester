@@ -4,7 +4,7 @@ import {
   AUTH_HEADERS,
   AUTH_REFUSALS,
   type LockState,
-  UNLOCK_COOKIE,
+  SERVER_COOKIES,
   UNLOCK_COOKIE_PATH,
 } from '@raven/core'
 import { readCookie, sameSecret } from '@shared/server'
@@ -108,13 +108,13 @@ export class LockService {
     const payload = `${Date.now() + SESSION_MS}.${this.accountIdOf({ request })}`
     return {
       ok: true,
-      cookie: `${UNLOCK_COOKIE}=${payload}.${this.sign(payload)}; ${this.attributes()}`,
+      cookie: `${SERVER_COOKIES.unlock}=${payload}.${this.sign(payload)}; ${this.attributes()}`,
     }
   }
 
   /** The cookie that forgets the session. */
   lockCookie(): string {
-    return `${UNLOCK_COOKIE}=; Max-Age=0; ${this.attributes()}`
+    return `${SERVER_COOKIES.unlock}=; Max-Age=0; ${this.attributes()}`
   }
 
   viewer({ request }: { request: Request }): Viewer {
@@ -195,9 +195,10 @@ export class LockService {
    */
   private cookieUntil({ request }: { request: Request }): number | null {
     const parts =
-      readCookie({ header: request.headers[AUTH_HEADERS.cookie], name: UNLOCK_COOKIE })?.split(
-        '.',
-      ) ?? []
+      readCookie({
+        header: request.headers[AUTH_HEADERS.cookie],
+        name: SERVER_COOKIES.unlock,
+      })?.split('.') ?? []
     if (parts.length !== COOKIE_PARTS) return null
     const [expires = '', accountId = '', signature = ''] = parts
     const isSigned =

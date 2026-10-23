@@ -4,21 +4,18 @@ import {
   PLAY_LINK_MAX_NEXT,
   type PlayRequest,
   isMediaId,
-  isString,
+  serverOriginOf,
 } from '@raven/core'
 
 export const MAX_LINK_LENGTH = 4096
-export const MAX_ORIGIN_LENGTH = 2048
 
 /** `URL.protocol` for the schemes a link or a server address may use. */
 export const URL_PROTOCOLS = { http: 'http:', https: 'https:', raven: 'raven:' } as const
 const ROOT_PATH = '/'
-const UNREACHABLE_PORT = '0'
 
 // `new URL` silently drops tabs and newlines and ignores zero-width characters
 // in a host, so what it would rewrite is refused up front.
 const HIDDEN = /[\s\p{Cc}\p{Cf}]/u
-const HTTP_ORIGIN_ONLY = /^https?:\/\/[^/\\]+\/?$/i
 // A watch page's scheme and authority as written: `new URL` drops an empty user.
 const WATCH_AUTHORITY = /^https?:\/\/[^/?#\\]*/i
 const MEDIA_ID = /^[1-9]\d{0,15}$/
@@ -29,24 +26,6 @@ const LINK_KEYS = new Set(['server', 'media', 'at', 'next'])
 const DOWNLOAD_KEYS = new Set(['server', 'media', 'item', 'saga'])
 
 const parse = (raw: string): URL | null => (URL.canParse(raw) ? new URL(raw) : null)
-
-/** The normalised origin of a server address, or null for anything that is not a bare http or https origin. */
-export const serverOriginOf = (raw: string): string | null => {
-  const address = raw.trim()
-  if (address.length > MAX_ORIGIN_LENGTH) return null
-  if (address.includes('@') || address.includes('?') || address.includes('#')) return null
-  if (HIDDEN.test(address) || !HTTP_ORIGIN_ONLY.test(address)) return null
-  const url = parse(address)
-  if (url === null) return null
-  if (url.protocol !== URL_PROTOCOLS.http && url.protocol !== URL_PROTOCOLS.https) return null
-  if (url.hostname === '' || url.pathname !== ROOT_PATH) return null
-  // A trailing dot names the same host as a second origin; port 0 reaches nothing.
-  if (url.hostname.endsWith('.') || url.port === UNREACHABLE_PORT) return null
-  return url.origin
-}
-
-export const isServerOrigin = (value: unknown): value is string =>
-  isString(value) && serverOriginOf(value) === value
 
 const mediaIdOf = (text: string): number | null => {
   if (!MEDIA_ID.test(text)) return null

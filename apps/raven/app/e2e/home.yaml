@@ -1,0 +1,12 @@
+appId: io.github.codebend3r.raven.app
+name: Home shows the fixture's locked movie once signed in
+---
+- runFlow: signIn.yaml
+# The movie is in a locked library, so it is on Home only once the PIN and the admin
+# password have both opened it.
+- extendedWaitUntil:
+    visible: Kestrel Point
+    timeout: 30000
+- assertVisible: Films
+- assertVisible: Series
+- assertVisible: Lantern Bay

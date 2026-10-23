@@ -7,7 +7,9 @@ import {
   mediaLabel,
   pickScore,
   primaryVersion,
+  tileWords,
 } from '@/items'
+import { ITEM_TYPES } from '@/contract'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 
 describe('episodeCode', () => {
@@ -29,7 +31,7 @@ describe('itemLabel', () => {
     expect(
       itemLabel(
         itemSummary({
-          type: 'episode',
+          type: ITEM_TYPES.episode,
           title: 'Half Loop',
           show: { id: 3, title: 'Severance' },
           season: 1,
@@ -88,7 +90,7 @@ describe('mediaLabel and cardTitle', () => {
   it('name an episode by its show and number as well, with no year', () => {
     const episode = mediaItem({
       item: itemSummary({
-        type: 'episode',
+        type: ITEM_TYPES.episode,
         title: 'Lost / Found',
         year: 2024,
         show: { id: 3, title: 'The Acolyte' },
@@ -108,5 +110,40 @@ describe('primaryVersion', () => {
     expect(primaryVersion([best, resumed])).toBe(resumed)
     expect(primaryVersion([best, mediaItem({ id: 3 })])).toBe(best)
     expect(primaryVersion([])).toBeUndefined()
+  })
+})
+
+describe('tileWords', () => {
+  const episode = (overrides: Partial<Parameters<typeof itemSummary>[0]> = {}) =>
+    mediaItem({
+      item: itemSummary({
+        type: ITEM_TYPES.episode,
+        title: 'Half Loop',
+        year: 2022,
+        show: { id: 4, title: 'Severance' },
+        season: 1,
+        episode: 2,
+        ...overrides,
+      }),
+    })
+
+  it('names an episode by its show, with its number and title under it', () => {
+    expect(tileWords(episode())).toEqual({ title: 'Severance', line: 'S01E02 · Half Loop' })
+  })
+
+  it('names a movie by its title, with its year under it', () => {
+    const movie = mediaItem({ item: itemSummary({ title: 'Busboys', year: 2026 }) })
+    expect(tileWords(movie)).toEqual({ title: 'Busboys', line: '2026' })
+  })
+
+  it('has no line for a file with no year, nor for an episode with nothing to say', () => {
+    expect(tileWords(mediaItem({ title: 'Clip', year: null }))).toEqual({
+      title: 'Clip',
+      line: null,
+    })
+    expect(tileWords(episode({ title: '', season: null, episode: null }))).toEqual({
+      title: 'Severance',
+      line: null,
+    })
   })
 })

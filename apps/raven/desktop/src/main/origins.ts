@@ -1,5 +1,4 @@
-import { DEFAULT_SERVER_ORIGIN, DESKTOP_ENV } from '@raven/core'
-import { isServerOrigin, serverOriginOf } from '@/shared/playLink'
+import { DEFAULT_SERVER_ORIGIN, DESKTOP_ENV, isServerOrigin, serverOriginOf } from '@raven/core'
 
 /**
  * A test hook: another Supabase Auth origin the page may call, as e2e's stand-in Auth on

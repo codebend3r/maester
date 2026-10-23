@@ -1,0 +1,69 @@
+import { create } from 'zustand'
+import { createJSONStorage, persist } from 'zustand/middleware'
+
+import type { CookieJar } from '@/servers/cookieJar'
+import { type SecretStore, secretStateStorage } from '@/servers/secretStore'
+import {
+  ADD_OUTCOMES,
+  type AddOutcome,
+  type AppServer,
+  addServer,
+  removeServer,
+  storedServersOf,
+} from '@/servers/serverList'
+
+type ActiveServerState = {
+  servers: AppServer[]
+  activeId: string | null
+  add: (server: AppServer) => AddOutcome
+  /** Drops the server and its cookies; with it goes the active one when it was that. */
+  remove: (id: string) => Promise<void>
+  /** Makes a listed server the one the app talks to; an id not on the list changes nothing. */
+  activate: (id: string) => void
+}
+
+/** The secure-store key the list and the active id are kept under, as one JSON value. */
+export const SERVER_LIST_KEY = 'raven.servers'
+
+/**
+ * The servers the app knows and the one it talks to, kept in the secure store, which keeps
+ * them on tvOS too, where AsyncStorage's folder may be emptied. It hydrates only when asked,
+ * so nothing reads the list before it is loaded, and it guards what it reads.
+ */
+export const createActiveServerStore = ({
+  store,
+  jar,
+}: {
+  store: SecretStore
+  jar: Pick<CookieJar, 'forget'>
+}) =>
+  create<ActiveServerState>()(
+    persist(
+      (set, get) => ({
+        servers: [],
+        activeId: null,
+        add: (server) => {
+          const outcome = addServer({ servers: get().servers, server })
+          if (outcome.kind === ADD_OUTCOMES.added) set({ servers: outcome.servers })
+          return outcome
+        },
+        remove: async (id) => {
+          set(({ servers, activeId }) => ({
+            servers: removeServer({ servers, id }),
+            activeId: activeId === id ? null : activeId,
+          }))
+          await jar.forget(id)
+        },
+        activate: (id) => {
+          if (get().servers.some((server) => server.id === id)) set({ activeId: id })
+        },
+      }),
+      {
+        name: SERVER_LIST_KEY,
+        storage: createJSONStorage(() => secretStateStorage({ store })),
+        skipHydration: true,
+        partialize: ({ servers, activeId }) => ({ servers, activeId }),
+        merge: (stored, current) => ({ ...current, ...storedServersOf(stored) }),
+      },
+    ),
+  )

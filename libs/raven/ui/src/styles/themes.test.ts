@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEFAULT_THEME, THEMES, parseTokens } from '@raven/core'
+import { DEFAULT_THEME, THEMES, parseThemes, parseTokens } from '@raven/core'
 
 const globals = readFileSync(join(import.meta.dir, 'globals.scss'), 'utf8')
 const themes = readFileSync(join(import.meta.dir, 'themes.scss'), 'utf8')
@@ -32,6 +32,15 @@ describe('THEMES', () => {
     const root = new Map(parseTokens(globals).map((token) => [token.name, token.value]))
     themeBlock(DEFAULT_THEME).forEach((value, name) => {
       expect(root.get(name)).toBe(value)
+    })
+  })
+
+  it('parses into one set of colours per theme, each with its own ground', () => {
+    const parsed = parseThemes(themes)
+    expect(Object.keys(parsed)).toEqual(THEMES.map((theme) => theme.id))
+    THEMES.forEach((theme) => {
+      expect(parsed[theme.id]).toHaveProperty('--color-night')
+      expect(parsed[theme.id]).toEqual(Object.fromEntries(themeBlock(theme.id)))
     })
   })
 

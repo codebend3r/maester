@@ -1,0 +1,10 @@
+{
+  // A React Native app on the react-native-tvos fork, bundled by Metro.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "jsx": "react-native",
+    "resolveJsonModule": true,
+    "types": ["react-native"]
+  }
+}

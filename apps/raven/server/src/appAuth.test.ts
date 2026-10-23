@@ -11,13 +11,13 @@ import {
   AUTH_REFUSALS,
   LOCKED_STATUS,
   MEMBER_STATUSES,
+  SERVER_COOKIES,
   createApiClient,
   isMediaTicket,
 } from '@raven/core'
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
-import { ADMIN_COOKIE } from '@/admin/adminService'
 import { ACCOUNT_TICKET_PREFIX, AccountTickets } from '@/auth/accountTickets'
 import { AuthSessions } from '@/auth/authSessions'
 import { readServerConfig, type ServerConfig } from '@/config'
@@ -37,7 +37,7 @@ import { ROUTES, withTicket } from '@/test/enforced'
 import { injectFetch } from '@/test/server'
 
 /** A cookie shaped like the admin lock's, which a server with accounts ready gives no meaning. */
-const ADMIN_COOKIE_BEFORE_ACCOUNTS = `${ADMIN_COOKIE}=1.2.${'x'.repeat(43)}`
+const ADMIN_COOKIE_BEFORE_ACCOUNTS = `${SERVER_COOKIES.admin}=1.2.${'x'.repeat(43)}`
 
 const LIBRARY_PIN = '3001'
 /** These tests change accounts, and the state of the auth service, under tokens they have already used. */

@@ -6,6 +6,7 @@ import {
   isOpaqueId,
   isOutputSettings,
   isPassthroughFormat,
+  isServerOrigin,
   isString,
   listOf,
   nullable,
@@ -14,7 +15,6 @@ import {
   type OutputSettings,
   union,
 } from '@raven/core'
-import { isServerOrigin } from '@/shared/playLink'
 import { loadJson, type JsonStore, type StateFs } from '@/main/stateStore'
 
 export const CONFIG_FILE = 'desktop-config.json'

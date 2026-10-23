@@ -1,4 +1,4 @@
-import { type FSWatcher, type WatchEventType, watch } from 'node:fs'
+import { type FSWatcher, type WatchEventType, statSync, watch } from 'node:fs'
 import { join } from 'node:path'
 import { isRecord } from '@raven/core'
 import { ERROR_CODES } from '@/errorMessage'
@@ -32,6 +32,8 @@ const isOutOfWatches = (error: unknown): boolean =>
 /** macOS and Windows watch a whole tree with one native watch. */
 export const watchTree: WatchFolder = ({ root, onChange, onError }) => {
   try {
+    // Node 24's recursive watch on Linux neither throws nor errors when the root is not there.
+    statSync(root)
     const watcher = watch(root, { recursive: true, persistent: false }, (_event, name) =>
       onChange(name == null ? root : join(root, name)),
     )

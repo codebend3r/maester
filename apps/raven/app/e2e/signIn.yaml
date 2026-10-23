@@ -1,0 +1,34 @@
+appId: io.github.codebend3r.raven.app
+name: Sign in to the fixture server with its PIN and admin password
+# The fixture server's address and secrets, as `serve:fixture` prints them.
+env:
+  SERVER: http://127.0.0.1:8490
+  PIN: '1357'
+  ADMIN_PASSWORD: Raven-Admin-2026
+---
+# Each field's label is announced as the field's own label too, and Maestro picks the
+# label first, so a field is tapped as the element below its label.
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible: Sign in to raven
+    timeout: 60000
+- tapOn:
+    below: Server address
+- inputText: ${SERVER}
+- tapOn: Continue
+- extendedWaitUntil:
+    visible: This server keeps some libraries behind a PIN.
+    timeout: 30000
+- tapOn:
+    below: PIN
+- inputText: ${PIN}
+- tapOn: Unlock
+- extendedWaitUntil:
+    visible: Locked libraries stay hidden on this device until the server's admin password is entered.
+    timeout: 30000
+- tapOn:
+    below: Admin password
+- inputText: ${ADMIN_PASSWORD}
+- tapOn: Unlock
