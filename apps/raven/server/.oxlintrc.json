@@ -11,7 +11,7 @@
       }
     },
     {
-      "files": ["src/**/*.test.ts", "src/test/**"],
+      "files": ["src/**/*.test.ts", "src/test/**", "src/e2e/**"],
       "rules": {
         "no-console": "off",
         "typescript/no-non-null-assertion": "off",

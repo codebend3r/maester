@@ -62,6 +62,19 @@ export const cardTitle = (media: MediaItem): { title: string; year: number | nul
   return { title, year: media.item.year }
 }
 
+/** What a wide tile names: the show, with the episode under it, else the movie and its year. */
+export const tileWords = (media: MediaItem): { title: string; line: string | null } => {
+  const { item } = media
+  if (item && item.type === ITEM_TYPES.episode && item.show) {
+    const line = [episodeCode(item), item.title]
+      .filter((part): part is string => part != null && part !== '')
+      .join(' · ')
+    return { title: item.show.title, line: line === '' ? null : line }
+  }
+  const { title, year } = cardTitle(media)
+  return { title, line: year == null ? null : String(year) }
+}
+
 /** The score a card shows: the library's chosen source, else TMDB's, else none. */
 export const pickScore = ({
   ratings,

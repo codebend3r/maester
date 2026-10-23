@@ -1,13 +1,11 @@
 import {
-  ITEM_TYPES,
   type MediaItem,
   type PosterEntry,
   cardLink,
-  cardTitle,
-  episodeCode,
   formatRuntime,
   mediaLabel,
   resolutionLabel,
+  tileWords,
   watchLink,
 } from '@raven/core'
 import { Button, Icon } from '@raven/ui'
@@ -21,19 +19,6 @@ import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/pages/HomePage/ContinueWatching.module.scss'
-
-/** What a tile names: the show, with the episode under it, else the movie and its year. */
-export const tileWords = (media: MediaItem): { title: string; line: string | null } => {
-  const { item } = media
-  if (item?.type === ITEM_TYPES.episode && item.show) {
-    const line = [episodeCode(item), item.title]
-      .filter((part): part is string => part != null && part !== '')
-      .join(' · ')
-    return { title: item.show.title, line: line === '' ? null : line }
-  }
-  const { title, year } = cardTitle(media)
-  return { title, line: year == null ? null : String(year) }
-}
 
 /** "23m left", "1h 12m left"; null until the video's length is known. */
 export const timeLeft = (media: MediaItem): string | null => {

@@ -1,4 +1,22 @@
-import type { ItemDetails, ItemSummary, Library, MediaItem } from '@raven/core'
+import {
+  CREDIT_JOBS,
+  FOLDER_LAYOUTS,
+  ITEM_TYPES,
+  LIBRARY_KINDS,
+  LIBRARY_VIEWS,
+  MATCH_STATES,
+  MEDIA_GROUPINGS,
+  MEDIA_SORTS,
+  PATH_LAYOUTS,
+  RATING_KINDS,
+  RATING_SOURCES,
+  RATINGS_REFRESH_STATES,
+  SCAN_STATES,
+  type ItemDetails,
+  type ItemSummary,
+  type Library,
+  type MediaItem,
+} from '@raven/core'
 
 export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   id: 7,
@@ -38,12 +56,12 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   id: 2,
   name: 'Movies',
   paths: ['/media/Movies'],
-  layouts: [{ path: '/media/Movies', layout: 'flat', groups: 0 }],
+  layouts: [{ path: '/media/Movies', layout: PATH_LAYOUTS.flat, groups: 0 }],
   itemCount: 12,
   unmatchedCount: 0,
   createdAt: '2026-09-27T00:00:00.000Z',
   scan: {
-    state: 'idle',
+    state: SCAN_STATES.idle,
     found: 12,
     processed: 12,
     startedAt: null,
@@ -54,25 +72,25 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   settings: {
     saveProgress: true,
     pinned: true,
-    sort: 'title',
-    view: 'grid',
-    groupBy: 'resolution',
+    sort: MEDIA_SORTS.title,
+    view: LIBRARY_VIEWS.grid,
+    groupBy: MEDIA_GROUPINGS.resolution,
     watchedPercent: 95,
-    kind: 'other',
-    ratingsSource: 'tmdb',
+    kind: LIBRARY_KINDS.other,
+    ratingsSource: RATING_SOURCES.tmdb,
     autoRefresh: true,
     locked: false,
-    folderLayout: 'auto',
+    folderLayout: FOLDER_LAYOUTS.auto,
     icon: null,
   },
   backdrop: null,
-  ratingsRefresh: { state: 'idle', finishedAt: null },
+  ratingsRefresh: { state: RATINGS_REFRESH_STATES.idle, finishedAt: null },
   ...overrides,
 })
 
 export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary => ({
   id: 40,
-  type: 'movie',
+  type: ITEM_TYPES.movie,
   title: 'Busboys',
   year: 2026,
   show: null,
@@ -80,13 +98,19 @@ export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary =
   episode: null,
   posterVersion: 'p1',
   backdropVersion: null,
-  ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 1200 }],
+  ratings: [{ source: RATING_SOURCES.tmdb, kind: RATING_KINDS.audience, value: 8.2, votes: 1200 }],
   ...overrides,
 })
 
 /** A matched movie in a Movies library: the file's parsed name, and the movie it is. */
 export const matchedMovie = (overrides: Partial<MediaItem> = {}): MediaItem =>
-  mediaItem({ title: 'Busboys', year: 2026, match: 'matched', item: itemSummary(), ...overrides })
+  mediaItem({
+    title: 'Busboys',
+    year: 2026,
+    match: MATCH_STATES.matched,
+    item: itemSummary(),
+    ...overrides,
+  })
 
 export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails => ({
   ...itemSummary(),
@@ -107,10 +131,22 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   aiMatch: null,
   reviews: [],
   credits: [
-    { personId: 1, name: 'Mark Kimball', job: 'cast', role: 'Rudy', photoVersion: 'k1' },
-    { personId: 2, name: 'Ana Ortiz', job: 'cast', role: 'Lena', photoVersion: null },
-    { personId: 1, name: 'Mark Kimball', job: 'director', role: 'Director', photoVersion: 'k1' },
-    { personId: 3, name: 'Jo Park', job: 'writer', role: 'Screenplay', photoVersion: null },
+    { personId: 1, name: 'Mark Kimball', job: CREDIT_JOBS.cast, role: 'Rudy', photoVersion: 'k1' },
+    { personId: 2, name: 'Ana Ortiz', job: CREDIT_JOBS.cast, role: 'Lena', photoVersion: null },
+    {
+      personId: 1,
+      name: 'Mark Kimball',
+      job: CREDIT_JOBS.director,
+      role: 'Director',
+      photoVersion: 'k1',
+    },
+    {
+      personId: 3,
+      name: 'Jo Park',
+      job: CREDIT_JOBS.writer,
+      role: 'Screenplay',
+      photoVersion: null,
+    },
   ],
   versions: [matchedMovie()],
   children: [],

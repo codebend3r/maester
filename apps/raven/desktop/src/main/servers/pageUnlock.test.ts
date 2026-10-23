@@ -1,4 +1,4 @@
-import { PAGE_ORIGIN, UNLOCK_COOKIE } from '@raven/core'
+import { PAGE_ORIGIN, SERVER_COOKIES } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { createPageUnlock, type PageCookies } from '@/main/servers/pageUnlock'
 
@@ -17,8 +17,8 @@ describe('createPageUnlock', () => {
   it("reads the unlock cookie from the page's jar under /api and answers a Cookie header", async () => {
     const { cookies, asked } = jarOf(['1700000000000.account-one.c2ln-bmVk_'])
     const unlock = createPageUnlock({ cookies, warn: () => undefined })
-    expect(await unlock()).toBe(`${UNLOCK_COOKIE}=1700000000000.account-one.c2ln-bmVk_`)
-    expect(asked).toEqual([{ url: `${PAGE_ORIGIN}/api`, name: UNLOCK_COOKIE }])
+    expect(await unlock()).toBe(`${SERVER_COOKIES.unlock}=1700000000000.account-one.c2ln-bmVk_`)
+    expect(asked).toEqual([{ url: `${PAGE_ORIGIN}/api`, name: SERVER_COOKIES.unlock }])
   })
 
   it('reads the jar again on every call, so an unlock or a lock in the page counts at once', async () => {
@@ -27,7 +27,7 @@ describe('createPageUnlock', () => {
     const unlock = createPageUnlock({ cookies, warn: () => undefined })
     expect(await unlock()).toBeNull()
     values.push('a.b.c')
-    expect(await unlock()).toBe(`${UNLOCK_COOKIE}=a.b.c`)
+    expect(await unlock()).toBe(`${SERVER_COOKIES.unlock}=a.b.c`)
     values.pop()
     expect(await unlock()).toBeNull()
   })

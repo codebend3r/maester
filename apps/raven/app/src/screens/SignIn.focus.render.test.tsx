@@ -1,0 +1,64 @@
+import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import type { LockState } from '@raven/core'
+import { fireEvent, render, screen } from '@testing-library/react-native'
+
+import { SignIn } from '@/screens/SignIn'
+import { useActiveServer } from '@/stores/activeServer'
+import { NATIVE_EVENTS } from '@/test/nativeEvents'
+
+const mockGetLock = jest.fn<() => Promise<LockState>>()
+
+// The layouts pick their variant once, as they load, so the TV is set before anything does.
+jest.mock('react-native/Libraries/Utilities/Platform', () => {
+  const platform = jest.requireActual<{ default: object }>(
+    'react-native/Libraries/Utilities/Platform',
+  )
+  Object.defineProperty(platform.default, 'isTV', { get: () => true })
+  return platform
+})
+jest.mock('expo-router', () => ({ useRouter: () => ({ replace: jest.fn() }) }))
+jest.mock('@/servers/serverClient', () => ({
+  apiFor: () => ({ getLock: mockGetLock }),
+  newServerId: () => '0f8fad5b-d9cb-469f-a165-70867728950e',
+  cookieJar: { forget: async () => {} },
+  secretStore: {
+    getItemAsync: async () => null,
+    setItemAsync: async () => {},
+    deleteItemAsync: async () => {},
+  },
+}))
+
+describe('SignIn on a TV', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    useActiveServer.setState({ servers: [], activeId: null })
+    mockGetLock.mockResolvedValue({ available: false, unlocked: false })
+  })
+
+  it('drops what was typed when Menu cancels the keyboard, as the field does', async () => {
+    await render(<SignIn />)
+    const field = screen.getByLabelText('Server address')
+    await fireEvent.changeText(field, 'http://127.0.0.1:8490')
+    // tvOS reports each key as it is typed, then puts the field back on Menu, saying so
+    // only as the edit ends.
+    await fireEvent(field, NATIVE_EVENTS.endEditing, { nativeEvent: { text: '' } })
+    expect(screen.getByLabelText('Server address').props.value).toBe('')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByText(/Enter the server's address on its own/)).toBeTruthy()
+    expect(mockGetLock).not.toHaveBeenCalled()
+  })
+
+  it('keeps what was typed when the keyboard sends it', async () => {
+    await render(<SignIn />)
+    const field = screen.getByLabelText('Server address')
+    await fireEvent.changeText(field, 'http://127.0.0.1:8490')
+    await fireEvent(field, NATIVE_EVENTS.endEditing, {
+      nativeEvent: { text: 'http://127.0.0.1:8490' },
+    })
+    expect(screen.getByLabelText('Server address').props.value).toBe('http://127.0.0.1:8490')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
+    expect(mockGetLock).toHaveBeenCalledTimes(1)
+  })
+})

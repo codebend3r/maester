@@ -37,6 +37,9 @@ pre-push:
     - name: 🧪 test
       run: bun run test
 
+    - name: 📱 test screens
+      run: bun run test:screens
+
     - name: 📦 build
       run: bun run build
 

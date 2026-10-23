@@ -1,0 +1,157 @@
+import { describe, expect, it } from 'bun:test'
+import { HOME_SHELF_TYPES, ITEM_TYPES, LIBRARY_KINDS, THUMBNAIL_STATES } from '@raven/core'
+
+import { CARD_SHAPES, CONTINUE_WATCHING, homeShelvesOf } from '@/queries/homeShelves'
+import { FILMS, HOME, NAS, SERIES, homeApi } from '@/test/homeServer'
+import { mediaItemFor } from '@/test/mediaItem'
+
+const COOKIE = { Cookie: 'raven_unlock=u.1' }
+const headersFor = () => COOKIE
+
+describe('homeShelvesOf', () => {
+  it('puts Continue watching first, then each library shelf under its name', () => {
+    const shelves = homeShelvesOf({
+      home: HOME,
+      libraries: [FILMS, SERIES],
+      api: homeApi(),
+      headersFor,
+    })
+    expect(shelves.map(({ title }) => title)).toEqual([CONTINUE_WATCHING, 'Films', 'Series'])
+    expect(shelves.map(({ cards }) => cards.map(({ title }) => title))).toEqual([
+      ['Busboys'],
+      ['Busboys', 'Night Train'],
+      ['Severance'],
+    ])
+  })
+
+  it('shows Continue watching wide, on the backdrop, with how far in it is', () => {
+    const [continuing] = homeShelvesOf({
+      home: HOME,
+      libraries: [FILMS, SERIES],
+      api: homeApi(),
+      headersFor,
+    })
+    expect(continuing?.cards[0] ?? null).toEqual({
+      key: 'media:20',
+      title: 'Busboys',
+      line: '2026',
+      shape: CARD_SHAPES.wide,
+      picture: { uri: `${NAS.origin}/api/pictures/items/40/backdrop/b40`, headers: COOKIE },
+      progress: 0.25,
+      itemId: 40,
+    })
+  })
+
+  it("shows a movie library's and a show library's cards as posters", () => {
+    const [, films, series] = homeShelvesOf({
+      home: HOME,
+      libraries: [FILMS, SERIES],
+      api: homeApi(),
+      headersFor,
+    })
+    expect(films?.cards[1] ?? null).toEqual({
+      key: 'media:21',
+      title: 'Night Train',
+      line: '2025',
+      shape: CARD_SHAPES.poster,
+      picture: { uri: `${NAS.origin}/api/pictures/items/41/poster/p41`, headers: COOKIE },
+      progress: 0,
+      itemId: 41,
+    })
+    expect(series?.cards[0] ?? null).toEqual({
+      key: 'show:4',
+      title: 'Severance',
+      line: '2022 to now',
+      shape: CARD_SHAPES.poster,
+      picture: { uri: `${NAS.origin}/api/pictures/items/4/poster/p4`, headers: COOKIE },
+      progress: 0,
+      itemId: 4,
+    })
+  })
+
+  it('shows any other library as frame grabs, and a card with no picture as none', () => {
+    const clips = { ...FILMS, id: 3, settings: { ...FILMS.settings, kind: LIBRARY_KINDS.other } }
+    const [shelf] = homeShelvesOf({
+      home: {
+        inProgress: [],
+        shelves: [
+          {
+            libraryId: clips.id,
+            type: HOME_SHELF_TYPES.media,
+            media: [
+              mediaItemFor({ id: 30, title: 'Beach', duration: 95, thumbnailVersion: 3 }),
+              mediaItemFor({
+                id: 31,
+                title: 'Bare',
+                duration: null,
+                thumbnail: THUMBNAIL_STATES.pending,
+              }),
+            ],
+          },
+        ],
+      },
+      libraries: [clips],
+      api: homeApi(),
+      headersFor,
+    })
+    expect(
+      (shelf?.cards ?? []).map(({ shape, picture, line, itemId }) => ({
+        shape,
+        picture,
+        line,
+        itemId,
+      })),
+    ).toEqual([
+      {
+        shape: CARD_SHAPES.wide,
+        picture: { uri: `${NAS.origin}/api/media/30/thumbnail?v=3`, headers: COOKIE },
+        line: '2m',
+        itemId: null,
+      },
+      { shape: CARD_SHAPES.wide, picture: null, line: null, itemId: null },
+    ])
+  })
+
+  it('names an episode in progress by its show, and shows its own frame', () => {
+    const episode = mediaItemFor({
+      id: 50,
+      position: 60,
+      duration: 600,
+      thumbnailVersion: 2,
+      item: {
+        id: 60,
+        type: ITEM_TYPES.episode,
+        title: 'Half Loop',
+        year: 2022,
+        show: { id: 4, title: 'Severance' },
+        season: 1,
+        episode: 2,
+        posterVersion: null,
+        backdropVersion: null,
+        ratings: [],
+      },
+    })
+    const [shelf] = homeShelvesOf({
+      home: { inProgress: [{ media: episode, poster: null }], shelves: [] },
+      libraries: [],
+      api: homeApi(),
+      headersFor,
+    })
+    expect(shelf?.cards[0] ?? null).toMatchObject({
+      title: 'Severance',
+      line: 'S01E02 · Half Loop',
+      picture: { uri: `${NAS.origin}/api/media/50/thumbnail?v=2` },
+      itemId: 60,
+    })
+  })
+
+  it('leaves out a shelf for a library not in the list, and an empty Continue watching', () => {
+    const shelves = homeShelvesOf({
+      home: { ...HOME, inProgress: [] },
+      libraries: [SERIES],
+      api: homeApi(),
+      headersFor,
+    })
+    expect(shelves.map(({ title }) => title)).toEqual(['Series'])
+  })
+})

@@ -13,6 +13,7 @@
     "format:check": "oxfmt --check .",
     "lint:ts": "oxlint",
     "lint:ts:fix": "oxlint --fix",
+    "serve:fixture": "tsx src/e2e/fixtureServer.ts",
     "start": "node dist/main.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -51,6 +52,7 @@
     "includedScripts": [
       "build",
       "dev",
+      "serve:fixture",
       "typecheck",
       "lint:ts",
       "lint:ts:fix",
@@ -58,6 +60,15 @@
       "format:check",
       "test",
       "test:watch"
-    ]
+    ],
+    "targets": {
+      "serve:fixture": {
+        "continuous": true,
+        "cache": false,
+        "dependsOn": [
+          "^build"
+        ]
+      }
+    }
   }
 }

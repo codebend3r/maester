@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { DEFAULT_SERVER_ORIGIN, DESKTOP_ENV } from '@raven/core'
 import { AUTH_ORIGIN_HOOK, authOriginFrom, linkOriginsFrom, serverOriginFrom } from '@/main/origins'
-import { isServerOrigin } from '@/shared/playLink'
+import { isServerOrigin } from '@raven/core'
 
 describe('authOriginFrom', () => {
   const HOOK = 'http://127.0.0.1:9000'

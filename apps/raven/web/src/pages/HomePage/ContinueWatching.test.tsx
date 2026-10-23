@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { mediaLabel } from '@raven/core'
 import { POSTER_SIZES } from '@/lib/posters'
-import { ContinueWatching, tileWords, timeLeft } from '@/pages/HomePage/ContinueWatching'
+import { ContinueWatching, timeLeft } from '@/pages/HomePage/ContinueWatching'
 import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEASON_ONE_CARD } from '@/test/tv'
@@ -17,28 +17,6 @@ const MOVIE = matchedMovie({
 
 const section = () => screen.getByRole('region', { name: 'Continue watching' })
 const tiles = () => within(section()).getAllByRole('listitem')
-
-describe('tileWords', () => {
-  it('names an episode by its show, with its number and title under it', () => {
-    expect(tileWords(EPISODE_TWO)).toEqual({ title: 'Severance', line: 'S01E02 · Half Loop' })
-  })
-
-  it('names a movie by its title, with its year under it', () => {
-    expect(tileWords(MOVIE)).toEqual({ title: 'Busboys', line: '2026' })
-  })
-
-  it('has no line for a file with no year, nor for an episode with nothing to say', () => {
-    expect(tileWords(mediaItem({ title: 'Clip' }))).toEqual({ title: 'Clip', line: null })
-    const bare = itemSummary({
-      type: 'episode',
-      title: '',
-      show: { id: 4, title: 'Severance' },
-      season: null,
-      episode: null,
-    })
-    expect(tileWords(mediaItem({ item: bare }))).toEqual({ title: 'Severance', line: null })
-  })
-})
 
 describe('timeLeft', () => {
   it('says how long is left, in hours and minutes', () => {

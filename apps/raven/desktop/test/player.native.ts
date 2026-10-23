@@ -25,7 +25,7 @@ import {
   type PlayerCommand,
   type PlayerEvent,
   SERVER_METHODS,
-  UNLOCK_COOKIE,
+  SERVER_COOKIES,
 } from '@raven/core'
 import {
   MPV_END_FILE_REASONS,
@@ -1720,12 +1720,12 @@ const accountPartsFor = async ({
   const entry: ServerEntry = { ...named, origin: fixture.origin }
   const serverOf = (serverId: string) => (serverId === entry.id ? entry : null)
   const account = createPageAccount({ onSwitched: () => undefined, onEnded: () => undefined })
-  const unlock = jar.find(({ name }) => name === UNLOCK_COOKIE) ?? null
+  const unlock = jar.find(({ name }) => name === SERVER_COOKIES.unlock) ?? null
   const calls = createServerCalls({
     serverOf,
     fetch: fetchThrough(fetch),
     authorize: () => account.accessToken(),
-    unlockOf: async () => (unlock === null ? null : `${UNLOCK_COOKIE}=${unlock.value}`),
+    unlockOf: async () => (unlock === null ? null : `${SERVER_COOKIES.unlock}=${unlock.value}`),
     warn,
   })
   const tickets = createAccountTickets({

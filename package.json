@@ -10,7 +10,8 @@
   "type": "module",
   "scripts": {
     "affected": "bun run --sequential spellcheck typescript-only one-command-per-script dead-code dead-css affected:tasks",
-    "affected:tasks": "nx affected -t lint:py lint:ts lint:css format:check typecheck test build",
+    "affected:tasks": "nx affected -t lint:py lint:ts lint:css format:check typecheck test test:screens build",
+    "app:e2e": "nx run @raven/app:e2e",
     "claude-audit": "bash scripts/audit_claude_md.sh",
     "build": "nx run-many -t build",
     "dead-code": "nx run maester:dead-code",
@@ -39,9 +40,10 @@
     "sandbox:luwin": "nx run-many -t sandbox -p @luwin/api @luwin/web",
     "spellcheck": "nx run maester:spellcheck",
     "test": "nx run-many -t test",
+    "test:screens": "nx run-many -t test:screens",
     "typecheck": "nx run-many -t typecheck",
     "typescript-only": "nx run maester:typescript-only",
-    "verify": "nx run-many -t spellcheck typescript-only one-command-per-script dead-code dead-css lint:py lint:ts lint:css format:check typecheck test build",
+    "verify": "nx run-many -t spellcheck typescript-only one-command-per-script dead-code dead-css lint:py lint:ts lint:css format:check typecheck test test:screens build",
     "verify:uncached": "bun run verify --skip-nx-cache"
   },
   "devDependencies": {
@@ -53,6 +55,10 @@
     "oxlint": "1.83.0",
     "sass": "1.104.1",
     "typescript": "6.0.3"
+  },
+  "overrides": {
+    "react-native": "npm:react-native-tvos@0.88.0-0",
+    "react-native-gesture-handler": "3.3.0"
   },
   "packageManager": "bun@1.4.2",
   "nx": {

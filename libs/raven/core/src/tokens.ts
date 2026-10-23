@@ -66,6 +66,24 @@ export const parseTokens = (scss: string): DesignToken[] => {
   ).tokens
 }
 
+const THEME_BLOCK = /^\[data-theme=(['"])([\w-]+)\1\] \{$([\s\S]*?)^\}/gm
+const PROPERTY = /^\s*(--[\w-]+):\s*(.+);$/gm
+
+/**
+ * Reads each `[data-theme='<id>'] { ... }` block of a stylesheet: the custom
+ * properties it declares, by theme id. Only a block whose selector starts its
+ * line counts, and only its `--` properties.
+ */
+export const parseThemes = (scss: string): Record<string, Record<string, string>> =>
+  Object.fromEntries(
+    [...scss.matchAll(THEME_BLOCK)].map(([, , id = '', body = '']) => [
+      id,
+      Object.fromEntries(
+        [...body.matchAll(PROPERTY)].map(([, name = '', value = '']) => [name, value]),
+      ),
+    ]),
+  )
+
 const HEX = /^#([0-9a-f]{6})$/i
 
 /** WCAG relative luminance of a `#rrggbb` colour. */

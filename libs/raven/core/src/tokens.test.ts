@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { contrastRatio, parseTokens } from '@/tokens'
+import { contrastRatio, parseThemes, parseTokens } from '@/tokens'
 
 const SCSS = `
 // The palette.
@@ -46,6 +46,46 @@ describe('parseTokens', () => {
       { name: '--line-tight', value: '1.1', group: 'line', note: null },
       { name: '--focus-ring', value: '2px solid var(--color-bark)', group: 'other', note: null },
     ])
+  })
+})
+
+const THEMES_SCSS = `
+// The themes.
+
+[data-theme='verdigris'] {
+  --color-night: #15201e;
+  // A note inside a block.
+  --glow: 0.6;
+
+  color-scheme: dark;
+}
+
+[data-theme="patina"] {
+  --color-night: #f2ead9;
+  --glow: 0.3;
+
+  color-scheme: light;
+}
+
+:root {
+  --color-night: #000000;
+}
+
+.picker [data-theme='nested'] {
+  --color-night: #111111;
+}
+`
+
+describe('parseThemes', () => {
+  it("reads each theme's custom properties by its id, in the order they are declared", () => {
+    expect(parseThemes(THEMES_SCSS)).toEqual({
+      verdigris: { '--color-night': '#15201e', '--glow': '0.6' },
+      patina: { '--color-night': '#f2ead9', '--glow': '0.3' },
+    })
+  })
+
+  it('has no themes for a stylesheet without a theme block', () => {
+    expect(parseThemes(':root {\n  --color-night: #000000;\n}\n')).toEqual({})
   })
 })
 

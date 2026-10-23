@@ -2,11 +2,11 @@ import {
   AUTH_CONFIG_STATES,
   AUTH_HEADERS,
   MEMBER_STATUSES,
+  SERVER_COOKIES,
   type Account,
   type AuthConfig,
 } from '@raven/core'
 import { describe, expect, it } from 'vitest'
-import { ADMIN_COOKIE } from '@/admin/adminService'
 import { CALLERS, type Caller } from '@/auth/authSessions'
 import { Management } from '@/auth/management'
 import { AUTH_TEST_CONFIG, AUTH_TEST_IDS } from '@/test/auth'
@@ -36,7 +36,7 @@ const ticketOf = (account: Account): Caller => ({
 
 const LEGACY: Caller = { kind: CALLERS.legacy }
 
-const COOKIE_SENT = `${ADMIN_COOKIE}=anything`
+const COOKIE_SENT = `${SERVER_COOKIES.admin}=anything`
 const REQUEST = { headers: { [AUTH_HEADERS.cookie]: COOKIE_SENT } }
 const REQUEST_WITHOUT_COOKIE = { headers: {} }
 

@@ -7,9 +7,9 @@ import {
   AUTH_REFUSALS,
   LIBRARY_KINDS,
   LOCKED_STATUS,
+  SERVER_COOKIES,
   isLibrary,
   isLockState,
-  UNLOCK_COOKIE,
 } from '@raven/core'
 import { HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -98,7 +98,7 @@ describe('the library PIN bound to the account', () => {
     expect((await file({ headers })).statusCode).toBe(LOCKED_STATUS)
     const unlocking = await unlockWith({ headers })
     expect(unlocking.statusCode).toBe(200)
-    expect(String(unlocking.headers[HEADERS.setCookie])).toContain(`${UNLOCK_COOKIE}=`)
+    expect(String(unlocking.headers[HEADERS.setCookie])).toContain(`${SERVER_COOKIES.unlock}=`)
     const cookie = cookieSet(unlocking)
     expect(
       (await file({ headers: { ...headers, [AUTH_HEADERS.cookie]: cookie } })).statusCode,
@@ -177,7 +177,7 @@ describe('the library PIN bound to the account', () => {
     const cookie = await ownerUnlockCookie()
     const [name = '', value = ''] = cookie.split('=')
     const [expires = '', , signature = ''] = value.split('.')
-    expect(name).toBe(UNLOCK_COOKIE)
+    expect(name).toBe(SERVER_COOKIES.unlock)
     const legacy = `${name}=${expires}.${signature}`
     const headers = { ...(await asOwner()), [AUTH_HEADERS.cookie]: legacy }
     expect((await file({ headers })).statusCode).toBe(LOCKED_STATUS)
