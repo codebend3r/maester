@@ -25,8 +25,22 @@ export const MPV_OPTIONS = {
 
 export type MpvOption = { name: string; value: string | number | boolean }
 
-const ao = ({ name, canChooseAo }: { name: string; canChooseAo: boolean }): MpvOption[] =>
-  canChooseAo ? [{ name: MPV_OPTIONS.ao, value: name }] : []
+const AUDIO_OUTPUTS = { coreaudio: 'coreaudio', avfoundation: 'avfoundation' } as const
+
+/**
+ * Each output names the other as its fallback, which mpv opens when the first fails to start.
+ * CoreAudio refuses the channel layout mpv asks for on some Macs (macOS 27's built-in speakers
+ * at 48 kHz answer -50), and without a fallback every title played silent.
+ */
+const AO_CHOICES = {
+  coreaudio: `${AUDIO_OUTPUTS.coreaudio},${AUDIO_OUTPUTS.avfoundation}`,
+  avfoundation: `${AUDIO_OUTPUTS.avfoundation},${AUDIO_OUTPUTS.coreaudio}`,
+} as const
+
+type AoChoice = (typeof AO_CHOICES)[keyof typeof AO_CHOICES]
+
+const ao = ({ value, canChooseAo }: { value: AoChoice; canChooseAo: boolean }): MpvOption[] =>
+  canChooseAo ? [{ name: MPV_OPTIONS.ao, value }] : []
 
 export const isVolumeFixedFor = carriesPassthrough
 
@@ -53,7 +67,7 @@ export const outputOptions = ({
       { name: MPV_OPTIONS.audioChannels, value: 'auto-safe' },
       { name: MPV_OPTIONS.audioExclusive, value: true },
       { name: MPV_OPTIONS.audioNormalizeDownmix, value: false },
-      ...ao({ name: 'coreaudio', canChooseAo }),
+      ...ao({ value: AO_CHOICES.coreaudio, canChooseAo }),
       { name: MPV_OPTIONS.volume, value: 100 },
       { name: MPV_OPTIONS.mute, value: false },
     ]
@@ -66,7 +80,10 @@ export const outputOptions = ({
       { name: MPV_OPTIONS.audioExclusive, value: false },
       { name: MPV_OPTIONS.audioChannels, value: output.spatial ? 'auto-safe' : 'stereo' },
       { name: MPV_OPTIONS.audioNormalizeDownmix, value: !output.spatial },
-      ...ao({ name: output.spatial ? 'avfoundation' : 'coreaudio', canChooseAo }),
+      ...ao({
+        value: output.spatial ? AO_CHOICES.avfoundation : AO_CHOICES.coreaudio,
+        canChooseAo,
+      }),
     ]
   }
 
@@ -76,7 +93,7 @@ export const outputOptions = ({
     { name: MPV_OPTIONS.audioChannels, value: 'auto-safe' },
     { name: MPV_OPTIONS.audioExclusive, value: false },
     { name: MPV_OPTIONS.audioNormalizeDownmix, value: false },
-    ...ao({ name: 'coreaudio', canChooseAo }),
+    ...ao({ value: AO_CHOICES.coreaudio, canChooseAo }),
   ]
 }
 
