@@ -1,5 +1,7 @@
 import { DESKTOP_REQUESTS, type DownloadAsk } from '@raven/core'
 import { create } from 'zustand'
+import { createJSONStorage, devtools, persist } from 'zustand/middleware'
+import { STORE_KEYS } from '@/stores/storage'
 import { handled } from '@/desktop/handled'
 import { useDesktopBridge } from '@/stores/desktop'
 
@@ -21,12 +23,24 @@ export const declineAsk = (ask: DownloadAsk): void => {
  * The download ask Raven's dialog shows, from a reply or an event. A new ask replaces
  * one still shown, which is declined, as its dialog goes without answering.
  */
-export const useDownloadAsk = create<DownloadAskState>()((set, get) => ({
-  shown: null,
-  show: (ask) => {
-    const replaced = get().shown?.ask ?? null
-    if (replaced !== null && replaced.askId !== ask.askId) declineAsk(replaced)
-    set((last) => ({ shown: { ask, instance: (last.shown?.instance ?? 0) + 1 } }))
-  },
-  close: () => set({ shown: null }),
-}))
+export const useDownloadAsk = create<DownloadAskState>()(
+  devtools(
+    persist(
+      (set, get) => ({
+        shown: null,
+        show: (ask) => {
+          const replaced = get().shown?.ask ?? null
+          if (replaced !== null && replaced.askId !== ask.askId) declineAsk(replaced)
+          set((last) => ({ shown: { ask, instance: (last.shown?.instance ?? 0) + 1 } }))
+        },
+        close: () => set({ shown: null }),
+      }),
+      {
+        name: STORE_KEYS.downloadAsk,
+        storage: createJSONStorage(() => window.localStorage),
+        partialize: ({ shown }) => ({ shown }),
+      },
+    ),
+    { name: 'raven/downloadAsk' },
+  ),
+)

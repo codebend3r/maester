@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { createJSONStorage, devtools, persist } from 'zustand/middleware'
+import { STORE_KEYS } from '@/stores/storage'
 
 type HoverBackdrops = {
   /**
@@ -9,4 +11,13 @@ type HoverBackdrops = {
   isOn: boolean
 }
 
-export const useHoverBackdrops = create<HoverBackdrops>()(() => ({ isOn: true }))
+export const useHoverBackdrops = create<HoverBackdrops>()(
+  devtools(
+    persist((): HoverBackdrops => ({ isOn: true }), {
+      name: STORE_KEYS.hoverBackdrops,
+      storage: createJSONStorage(() => window.localStorage),
+      partialize: ({ isOn }) => ({ isOn }),
+    }),
+    { name: 'raven/hoverBackdrops' },
+  ),
+)

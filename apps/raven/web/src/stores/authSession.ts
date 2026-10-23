@@ -1,5 +1,7 @@
 import type { Session } from '@supabase/supabase-js'
 import { create } from 'zustand'
+import { createJSONStorage, devtools, persist } from 'zustand/middleware'
+import { STORE_KEYS } from '@/stores/storage'
 import {
   type AuthClient,
   type ReadyAuthConfig,
@@ -61,36 +63,48 @@ const followAccount = ({
 }
 
 /** Who is signed in on this browser, and the token every `/api/` call carries. */
-export const useAuthSession = create<AuthSessionState>()((set, get) => ({
-  client: null,
-  session: null,
-  status: AUTH_SESSION_STATUSES.booting,
-  isRecovery: false,
-  endRecovery: () => set({ isRecovery: false }),
-  start: ({ config, createClient = createAuthClient }) => {
-    if (get().client !== null) return
-    const client = createClient({ config })
-    set({ client })
-    client.onAuthStateChange((event, session) => {
-      const previous = get().session
-      const next = summaryOf(session)
-      set({
-        session: next,
-        isRecovery:
-          next !== null &&
-          (event === AUTH_EVENTS.passwordRecovery ||
-            (get().isRecovery && previous?.userId === next.userId)),
-      })
-      followAccount({ previous, next })
-    })
-    const settle = (session: Session | null) =>
-      set({ session: summaryOf(session), status: AUTH_SESSION_STATUSES.ready })
-    client.getSession().then(
-      ({ data }) => settle(data.session),
-      () => settle(null),
-    )
-  },
-}))
+export const useAuthSession = create<AuthSessionState>()(
+  devtools(
+    persist(
+      (set, get) => ({
+        client: null,
+        session: null,
+        status: AUTH_SESSION_STATUSES.booting,
+        isRecovery: false,
+        endRecovery: () => set({ isRecovery: false }),
+        start: ({ config, createClient = createAuthClient }) => {
+          if (get().client !== null) return
+          const client = createClient({ config })
+          set({ client })
+          client.onAuthStateChange((event, session) => {
+            const previous = get().session
+            const next = summaryOf(session)
+            set({
+              session: next,
+              isRecovery:
+                next !== null &&
+                (event === AUTH_EVENTS.passwordRecovery ||
+                  (get().isRecovery && previous?.userId === next.userId)),
+            })
+            followAccount({ previous, next })
+          })
+          const settle = (session: Session | null) =>
+            set({ session: summaryOf(session), status: AUTH_SESSION_STATUSES.ready })
+          client.getSession().then(
+            ({ data }) => settle(data.session),
+            () => settle(null),
+          )
+        },
+      }),
+      {
+        name: STORE_KEYS.authSession,
+        storage: createJSONStorage(() => window.localStorage),
+        partialize: ({ session }) => ({ session }),
+      },
+    ),
+    { name: 'raven/authSession' },
+  ),
+)
 
 /** Calls `listener` with the session's access token each time it changes, null on sign out; returns the unsubscribe. */
 export const onAccessTokenChange = (listener: (token: string | null) => void): (() => void) =>

@@ -29,7 +29,10 @@ const isUnreachable = (error: Error): boolean =>
 const follow = (query: Pick<Query, 'state'> | undefined): void => {
   if (query === undefined) return
   const { data, error } = query.state
-  if (error !== null) return useServerReach.setState({ isOffline: isUnreachable(error) })
+  if (error !== null) {
+    useServerReach.setState({ isOffline: isUnreachable(error) })
+    return
+  }
   if (data !== undefined) useServerReach.setState({ isOffline: false })
 }
 

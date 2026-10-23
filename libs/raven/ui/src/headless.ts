@@ -20,7 +20,8 @@ export type {
   ProgressSink,
   TrackChoice,
 } from '@/components/Player/PlayerServices'
-export { CONTROLS_LINGER_SECONDS, configurePlayerPrefs, usePlayerPrefs } from '@/stores/playerPrefs'
+export { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@/stores/playerPrefs'
+export { configureStorage } from '@/stores/configureStorage'
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'
 export { playerQueryKeys } from '@/lib/playerQueryKeys'
@@ -66,6 +67,6 @@ export {
 export type { ServerEventSource } from '@/query/useServerEvents'
 export { watchedChangeFor } from '@/query/useWatchedChange'
 export { usePageBackdrop } from '@/stores/pageBackdrop'
-export { createSelectionStore } from '@/stores/selection'
+export { createSelectionStore, releaseSelectionStore } from '@/stores/selection'
 export type { SelectionStore } from '@/stores/selection'
 export { useUnlockPrompt } from '@/stores/unlockPrompt'

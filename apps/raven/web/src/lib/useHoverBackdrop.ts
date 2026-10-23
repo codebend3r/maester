@@ -70,7 +70,9 @@ export const useHoverBackdrop = (url: string | null) => {
 export const useOwnBackdrop = (): boolean => {
   useLayoutEffect(() => {
     useHoverBackdrops.setState({ isOn: false })
-    return () => useHoverBackdrops.setState({ isOn: true })
+    return () => {
+      useHoverBackdrops.setState({ isOn: true })
+    }
   }, [])
   return useHoverBackdrops((state) => !state.isOn)
 }

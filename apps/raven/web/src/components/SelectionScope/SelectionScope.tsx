@@ -1,7 +1,11 @@
 import type { WatchTarget } from '@raven/core'
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from 'zustand'
-import { type SelectionStore, createSelectionStore } from '@raven/ui/headless'
+import {
+  type SelectionStore,
+  createSelectionStore,
+  releaseSelectionStore,
+} from '@raven/ui/headless'
 import {
   type SelectionScopeValue,
   type SelectionSource,
@@ -45,10 +49,12 @@ export const SelectionScope = ({
   }))
   useLayoutEffect(() => {
     useSelectionScopes.setState((state) => ({ scopes: [...state.scopes, scope] }))
-    return () =>
+    return () => {
       useSelectionScopes.setState((state) => ({
         scopes: state.scopes.filter((each) => each !== scope),
       }))
+      releaseSelectionStore(scope.store)
+    }
   }, [scope])
   const isOpen = useSelectionScopes((state) => state.scopes.includes(scope))
   return isOpen && children

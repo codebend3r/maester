@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { createJSONStorage, persist } from 'zustand/middleware'
+import { createJSONStorage, devtools, persist } from 'zustand/middleware'
 
 type SideMenu = {
   collapsed: boolean
@@ -14,17 +14,20 @@ type SideMenu = {
  * the toggle, by key or by click, counts as having seen the tip about it.
  */
 export const useSideMenu = create<SideMenu>()(
-  persist(
-    (set) => ({
-      collapsed: false,
-      tipSeen: false,
-      toggle: () => set((current) => ({ collapsed: !current.collapsed, tipSeen: true })),
-      dismissTip: () => set({ tipSeen: true }),
-    }),
-    {
-      name: 'raven-side-menu',
-      storage: createJSONStorage(() => window.localStorage),
-      partialize: ({ collapsed, tipSeen }) => ({ collapsed, tipSeen }),
-    },
+  devtools(
+    persist(
+      (set) => ({
+        collapsed: false,
+        tipSeen: false,
+        toggle: () => set((current) => ({ collapsed: !current.collapsed, tipSeen: true })),
+        dismissTip: () => set({ tipSeen: true }),
+      }),
+      {
+        name: 'raven-side-menu',
+        storage: createJSONStorage(() => window.localStorage),
+        partialize: ({ collapsed, tipSeen }) => ({ collapsed, tipSeen }),
+      },
+    ),
+    { name: 'raven/sideMenu' },
   ),
 )
