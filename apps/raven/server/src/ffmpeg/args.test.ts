@@ -1,3 +1,4 @@
+import { QUALITIES } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import type { VideoEncoder } from '@/ffmpeg/encoder'
 import {
@@ -7,6 +8,7 @@ import {
   subtitleWindowArgs,
   thumbnailArgs,
   thumbnailSeek,
+  transcodeBitrate,
 } from '@/ffmpeg/args'
 
 describe('thumbnailSeek', () => {
@@ -151,7 +153,7 @@ describe('streamArgs', () => {
       maxHeight: 2160,
       quality: 'low',
     })
-    expect(after({ args: low, flag: '-b:v' })).toBe('4M')
+    expect(after({ args: low, flag: '-b:v' })).toBe('4000000')
     expect(after({ args: low, flag: '-vf' })).toBe("scale=w=-2:h='min(2160,ih)'")
   })
 
@@ -193,6 +195,13 @@ describe('streamArgs', () => {
     expect(args).not.toContain('-c:a')
     expect(args.filter((arg) => arg === '-map')).toHaveLength(1)
     expect(args).not.toContain('-tag:v')
+  })
+})
+
+describe('transcodeBitrate', () => {
+  it("is the viewer's ceiling, else the quality setting's target", () => {
+    expect(transcodeBitrate({ quality: QUALITIES.high, bitrate: 3_000_000 })).toBe(3_000_000)
+    expect(transcodeBitrate({ quality: QUALITIES.high, bitrate: null })).toBe(16_000_000)
   })
 })
 

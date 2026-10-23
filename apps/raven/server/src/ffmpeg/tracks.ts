@@ -6,7 +6,7 @@ import {
   isString,
   languageTag,
 } from '@raven/core'
-import { CODEC_TYPES, type CodecType } from '@/ffmpeg/probe'
+import { CODEC_TYPES, type CodecType, rateOf } from '@/ffmpeg/probe'
 
 type Stream = Record<string, unknown>
 
@@ -56,17 +56,8 @@ const tag = ({ stream, name }: { stream: Stream; name: string }): string | null 
 const codecOf = (stream: Stream): string | null =>
   isString(stream.codec_name) ? stream.codec_name : null
 
-/** "24000/1001" from ffprobe, as 23.976; null for "0/0" and other nonsense. */
-const frameRateOf = (stream: Stream | undefined): number | null => {
-  const rates = [stream?.avg_frame_rate, stream?.r_frame_rate].filter(isString)
-  const parsed = rates
-    .map((rate) => {
-      const [top = NaN, bottom = 1] = rate.split('/').map(Number)
-      return top / bottom
-    })
-    .find((rate) => isNumber(rate) && rate > 0 && rate < 1000)
-  return parsed ?? null
-}
+const frameRateOf = (stream: Stream | undefined): number | null =>
+  rateOf(stream?.avg_frame_rate ?? null) ?? rateOf(stream?.r_frame_rate ?? null)
 
 /**
  * Reads the audio and subtitle tracks from `ffprobe -show_streams -of json`

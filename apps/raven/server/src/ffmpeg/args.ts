@@ -1,7 +1,7 @@
 import { ENCODER_KINDS, PLAYBACK_MODES, type StreamMode } from '@raven/core'
 import { SOFTWARE, type VideoEncoder } from '@/ffmpeg/encoder'
 
-const QUIET = ['-hide_banner', '-loglevel', 'error', '-nostdin']
+export const QUIET = ['-hide_banner', '-loglevel', 'error', '-nostdin']
 
 /**
  * PQ or HLG down to SDR BT.709, so an HDR frame does not come out grey and
@@ -64,20 +64,39 @@ export const thumbnailArgs = ({
   output,
 ]
 
+/** Seconds as ffmpeg's arguments take them, to the millisecond like the plan. */
+export const secondsArg = (seconds: number): string => seconds.toFixed(3)
+
 /** The scale filter that caps a transcode at `maxHeight` lines without ever upscaling. */
 const scaleTo = (maxHeight: number): string => `w=-2:h='min(${maxHeight},ih)'`
 
 export type TranscodeQuality = 'low' | 'medium' | 'high'
 
-/** How hard each encoder squeezes at each quality: a CRF or QP, and a bitrate for VideoToolbox. */
-const QUALITY: Record<TranscodeQuality, { crf: string; qp: string; bitrate: string }> = {
-  low: { crf: '28', qp: '28', bitrate: '4M' },
-  medium: { crf: '23', qp: '23', bitrate: '8M' },
-  high: { crf: '18', qp: '18', bitrate: '16M' },
+/**
+ * How hard each encoder squeezes at each quality: a CRF or QP, and a
+ * bitrate in bits per second for VideoToolbox.
+ */
+const QUALITY: Record<TranscodeQuality, { crf: string; qp: string; bitrate: number }> = {
+  low: { crf: '28', qp: '28', bitrate: 4_000_000 },
+  medium: { crf: '23', qp: '23', bitrate: 8_000_000 },
+  high: { crf: '18', qp: '18', bitrate: 16_000_000 },
 }
 
+/**
+ * The video bitrate a transcode aims for: the viewer's ceiling when they
+ * asked for a size, else VideoToolbox's target for the quality setting,
+ * which the CRF of the other encoders lands near.
+ */
+export const transcodeBitrate = ({
+  quality,
+  bitrate,
+}: {
+  quality: TranscodeQuality
+  bitrate: number | null
+}): number => bitrate ?? QUALITY[quality].bitrate
+
 /** ffprobe's `codec_name` for the codecs the args treat apart. */
-const VIDEO_CODECS = { h264: 'h264', hevc: 'hevc' } as const
+export const VIDEO_CODECS = { h264: 'h264', hevc: 'hevc' } as const
 
 /** Codecs every Intel GPU recent enough for VAAPI decodes; anything else decodes on the CPU. */
 const GPU_DECODES: ReadonlySet<string> = new Set([VIDEO_CODECS.h264, VIDEO_CODECS.hevc])
@@ -88,6 +107,15 @@ const GPU_DECODES: ReadonlySet<string> = new Set([VIDEO_CODECS.h264, VIDEO_CODEC
  */
 const ceiling = (bitrate: number | null): string[] =>
   bitrate == null ? [] : ['-maxrate', String(bitrate), '-bufsize', String(bitrate * 2)]
+
+/** Video flags: those before `-i`, and the encoding after it. */
+type VideoArgs = { input: string[]; output: string[] }
+
+/** A remux's video, copied. Safari and AVPlayer only play HEVC in MP4 under the hvc1 tag. */
+export const copyVideo = (videoCodec: string | null): VideoArgs => ({
+  input: [],
+  output: ['-c:v', 'copy', ...(videoCodec === VIDEO_CODECS.hevc ? ['-tag:v', 'hvc1'] : [])],
+})
 
 /**
  * The flags before `-i` and the video encoding after it, for a transcode.
@@ -101,13 +129,14 @@ const ceiling = (bitrate: number | null): string[] =>
  *   what phones record, is made to look right on SDR screens without it.
  *   Anything else decodes on the CPU and is uploaded for the encoder.
  */
-const transcodeVideo = ({
+export const transcodeVideo = ({
   encoder,
   videoCodec,
   tonemap,
   maxHeight,
   quality,
   bitrate,
+  trimFrom = null,
 }: {
   encoder: VideoEncoder
   videoCodec: string | null
@@ -115,10 +144,13 @@ const transcodeVideo = ({
   maxHeight: number
   quality: TranscodeQuality
   bitrate: number | null
-}): { input: string[]; output: string[] } => {
+  /** Drops the frames before this time, on the file's clock, before any other filter. */
+  trimFrom?: number | null
+}): VideoArgs => {
   const scale = scaleTo(maxHeight)
   const squeeze = QUALITY[quality]
-  const cpuFilters = [`scale=${scale}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
+  const trim = trimFrom == null ? [] : [`trim=start=${secondsArg(trimFrom)}`]
+  const cpuFilters = [...trim, `scale=${scale}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
   // A keyframe every two seconds keeps fragments small, so playback starts
   // and seeks quickly.
   const shared = ['-profile:v', 'high', '-g', '48']
@@ -130,7 +162,7 @@ const transcodeVideo = ({
         '-c:v',
         'h264_videotoolbox',
         '-b:v',
-        bitrate == null ? squeeze.bitrate : String(bitrate),
+        String(transcodeBitrate({ quality, bitrate })),
         ...ceiling(bitrate),
         ...shared,
         '-pix_fmt',
@@ -148,7 +180,7 @@ const transcodeVideo = ({
       ? ':out_color_matrix=bt709:out_color_primaries=bt709:out_color_transfer=bt709:out_range=tv'
       : ''
     const filters = gpuDecode
-      ? [`scale_vaapi=${scale}:format=nv12${toBt709}`]
+      ? [...trim, `scale_vaapi=${scale}:format=nv12${toBt709}`]
       : [...cpuFilters, 'format=nv12', 'hwupload']
     return {
       input: [
@@ -257,11 +289,7 @@ export const streamArgs = ({
 }): string[] => {
   const video =
     mode === PLAYBACK_MODES.remux
-      ? // Safari only plays HEVC in MP4 under the hvc1 tag.
-        {
-          input: [],
-          output: ['-c:v', 'copy', ...(videoCodec === VIDEO_CODECS.hevc ? ['-tag:v', 'hvc1'] : [])],
-        }
+      ? copyVideo(videoCodec)
       : transcodeVideo({ encoder, videoCodec, tonemap, maxHeight, quality, bitrate })
   return [
     ...QUIET,

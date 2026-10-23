@@ -47,6 +47,19 @@ export const holdOpen = () => {
   return { gate, opened, reached }
 }
 
+/** A route with its `:name` placeholders filled in from `values`, keyed by the names. */
+export const routePath = ({
+  route,
+  values,
+}: {
+  route: string
+  values: Record<string, string | number>
+}): string =>
+  Object.entries(values).reduce(
+    (path, [name, value]) => path.replace(`:${name}`, String(value)),
+    route,
+  )
+
 /** What Chrome offers over https: the browser that reaches raven through Netlify. */
 export const BROWSER_ENCODINGS = 'gzip, deflate, br, zstd'
 

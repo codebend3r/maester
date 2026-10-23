@@ -22,6 +22,10 @@ import { ServerEvents } from '@/events/serverEvents'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { BrowseController } from '@/fs/browseController'
 import { HealthController } from '@/health/healthController'
+import { HlsController } from '@/hls/hlsController'
+import { HLS_CLOCK, SYSTEM_CLOCK } from '@/hls/hlsClock'
+import { HlsSessions } from '@/hls/hlsSessions'
+import { KeyframesService } from '@/hls/keyframesService'
 import { ItemsController } from '@/items/itemsController'
 import { MatchController } from '@/items/matchController'
 import { PeopleController } from '@/items/peopleController'
@@ -91,6 +95,7 @@ export const CONTROLLERS = [
   MediaController,
   MediaOriginsController,
   PlaybackController,
+  HlsController,
   FavouritesController,
   WatchedController,
   HomeController,
@@ -210,6 +215,9 @@ export class AppModule {
         FfmpegService,
         ThumbnailService,
         TracksService,
+        KeyframesService,
+        { provide: HLS_CLOCK, useValue: SYSTEM_CLOCK },
+        HlsSessions,
         SubtitlesService,
         MediaArtifacts,
         ScannerService,

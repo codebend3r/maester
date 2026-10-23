@@ -24,6 +24,7 @@ import {
   AUTH_SCHEME,
   MEMBER_STATUSES,
   MEDIA_ORIGIN_KINDS,
+  PLAYBACK_MODES,
   type HomeShelf,
   type ItemImageOptions,
   type ItemMetadataState,
@@ -622,6 +623,26 @@ describe('playback calls', () => {
     expect(calls[0]?.url).toBe(
       'https://raven.tail.example/api/media/7/subtitles/embedded-2?window=1&t=abc.def',
     )
+  })
+
+  it('builds HLS master URLs on the access origin, and relative ones without', () => {
+    const { client } = clientReturning(respond({}))
+    const access = {
+      origin: { kind: MEDIA_ORIGIN_KINDS.lan, url: 'https://nas.local:8443' },
+      ticket: 'abc',
+    } as const satisfies MediaAccess
+    expect(
+      client.hlsUrl({ id: 7, mode: PLAYBACK_MODES.remux, audio: 1, quality: null, access }),
+    ).toBe('https://nas.local:8443/api/media/7/hls/master.m3u8?mode=remux&audio=1&t=abc')
+    expect(
+      client.hlsUrl({
+        id: 7,
+        mode: PLAYBACK_MODES.transcode,
+        audio: null,
+        quality: 'low720',
+        access: null,
+      }),
+    ).toBe('http://nas:8484/api/media/7/hls/master.m3u8?mode=transcode&quality=low720')
   })
 
   it('builds stream URLs', () => {

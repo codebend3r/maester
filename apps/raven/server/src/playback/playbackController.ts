@@ -1,8 +1,6 @@
-import { stat } from 'node:fs/promises'
 import {
   BadRequestException,
   Controller,
-  ForbiddenException,
   Get,
   Header,
   Inject,
@@ -20,13 +18,8 @@ import {
   type MediaStreams,
   type MediaTicket,
   type MediaTracks,
-  PLAYBACK_MODES,
-  STREAM_QUALITIES,
   STREAM_TIME_SHIFT,
-  type StreamQuality,
   TRANSCODINGS,
-  isStreamMode,
-  isStreamQuality,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS, wholeNumber, CACHE_POLICIES } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
@@ -35,47 +28,29 @@ import { AccountTickets } from '@/auth/accountTickets'
 import { AuthSessions } from '@/auth/authSessions'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
 import { streamArgs } from '@/ffmpeg/args'
-import { SOFTWARE } from '@/ffmpeg/encoder'
 import { FFMPEG_SIGNALS, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { parseStreams } from '@/ffmpeg/streams'
+import { KeyframesService } from '@/hls/keyframesService'
 import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { PrivateBy } from '@/lock/lockGuard'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MediaTickets } from '@/media/mediaTickets'
+import {
+  audioTrackOf,
+  capHeight,
+  refuseWhatSettingsTurnOff,
+  sizeOnDisk,
+  streamModeOf,
+  streamSizeOf,
+  videoEncodingOf,
+} from '@/playback/conversion'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
 import { StreamSessions } from '@/streams/streamSessions'
 import { RESPONSE_EVENTS, trackStream } from '@/streams/trackStream'
 import { ROUTE_PARAMS } from '@/requestParts'
-
-/** The size a viewer asked a transcode for, or null for the server's settings. */
-const streamQualityOf = ({
-  quality,
-  mode,
-}: {
-  quality: string | undefined
-  mode: string | undefined
-}): StreamQuality | null => {
-  if (quality == null) return null
-  if (!isStreamQuality(quality)) {
-    throw new BadRequestException('quality must be one of the listed sizes')
-  }
-  if (mode !== PLAYBACK_MODES.transcode) {
-    throw new BadRequestException('quality applies to a transcode only')
-  }
-  return quality
-}
-
-/** The server's setting is the ceiling a viewer's pick can not lift. */
-const capHeight = ({
-  size,
-  maxHeight,
-}: {
-  size: (typeof STREAM_QUALITIES)[StreamQuality] | null
-  maxHeight: number
-}): number => Math.min(size?.height ?? maxHeight, maxHeight)
 
 /**
  * What a player needs beyond the file itself: the tracks to choose from,
@@ -97,6 +72,7 @@ export class PlaybackController {
     @Inject(AccountTickets) private readonly accountTickets: AccountTickets,
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
     @Inject(AuthSessions) private readonly callers: AuthSessions,
+    @Inject(KeyframesService) private readonly keyframes: KeyframesService,
   ) {}
 
   private fileOf(id: number): MediaFile {
@@ -128,7 +104,21 @@ export class PlaybackController {
 
   @Get(':id/tracks')
   async listTracks(@Param('id', ParseIntPipe) id: number): Promise<MediaTracks> {
-    return (await this.tracks.tracksFor(this.fileOf(id))).tracks
+    const file = this.fileOf(id)
+    const { tracks } = await this.tracks.tracksFor(file)
+    this.warmKeyframes(file)
+    return tracks
+  }
+
+  /**
+   * Every player reads the tracks before it plays, so the whole-file
+   * keyframe probe an HLS remux waits for starts here, in the background,
+   * and is usually done by the time the master playlist is asked for. A
+   * probe already stored or running is not started again.
+   */
+  private warmKeyframes(file: MediaFile): void {
+    if (this.settings.playback().transcoding === TRANSCODINGS.off) return
+    this.keyframes.warm({ id: file.id, path: file.path })
   }
 
   /**
@@ -176,45 +166,33 @@ export class PlaybackController {
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    if (!isStreamMode(mode)) throw new BadRequestException('mode must be remux or transcode')
+    const streamMode = streamModeOf(mode)
     const playback = this.settings.playback()
-    if (playback.transcoding === TRANSCODINGS.off) {
-      throw new ForbiddenException('Server conversion is off in Settings; only direct play is on.')
-    }
-    if (playback.transcoding === TRANSCODINGS.remuxOnly && mode === PLAYBACK_MODES.transcode) {
-      throw new ForbiddenException('Transcoding is off in Settings; only remuxing is on.')
-    }
-    const picked = streamQualityOf({ quality, mode })
-    const size = picked == null ? null : STREAM_QUALITIES[picked]
+    refuseWhatSettingsTurnOff({ playback, mode: streamMode })
+    const sized = streamSizeOf({ quality, mode: streamMode })
+    const size = sized?.size ?? null
     const from = start == null ? 0 : Number(start)
     if (!Number.isFinite(from) || from < 0) {
       throw new BadRequestException('start must be a number of seconds')
     }
     const file = this.fileOf(id)
-    const info = await stat(file.path).catch(() => null)
-    if (!info?.isFile()) throw new NotFoundException('The file is no longer on disk')
+    await sizeOnDisk(file)
 
     const { tracks } = await this.tracks.tracksFor(file)
-    const chosen = audio == null ? tracks.defaultAudio : wholeNumber(audio)
-    if (
-      audio != null &&
-      (chosen == null || !tracks.audio.some((track) => track.index === chosen))
-    ) {
-      throw new BadRequestException(`No audio track ${audio}`)
-    }
-    const tonemap =
-      mode === PLAYBACK_MODES.transcode &&
-      file.hdr &&
-      playback.tonemap &&
-      (await this.ffmpeg.canTonemap())
-    const encoder = mode === PLAYBACK_MODES.transcode ? await this.ffmpeg.videoEncoder() : SOFTWARE
+    const chosen = audioTrackOf({ tracks, audio })
+    const { tonemap, encoder } = await videoEncodingOf({
+      ffmpeg: this.ffmpeg,
+      file,
+      mode: streamMode,
+      playback,
+    })
 
     const child = this.ffmpeg.stream(
       streamArgs({
         input: file.path,
         start: from,
-        mode,
-        audio: chosen,
+        mode: streamMode,
+        audio: chosen?.index ?? null,
         videoCodec: file.videoCodec,
         tonemap,
         streamShift: STREAM_TIME_SHIFT,
@@ -232,9 +210,9 @@ export class PlaybackController {
       rechecks: this.rechecks,
       auth: this.callers,
       mediaId: id,
-      mode,
-      quality: picked,
-      audio: chosen,
+      mode: streamMode,
+      quality: sized?.key ?? null,
+      audio: chosen?.index ?? null,
       request,
       reply,
     })

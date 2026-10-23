@@ -16,6 +16,8 @@ export const RAVEN_CONTENT_TYPES = {
   jpeg: 'image/jpeg',
   png: 'image/png',
   mp4: 'video/mp4',
+  /** An HLS media segment of fragmented MP4; its init segment goes as `mp4`. */
+  segment: 'video/iso.segment',
 } as const
 
 /**

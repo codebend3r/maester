@@ -78,6 +78,8 @@ import {
   type StreamQuality,
   type SubtitleCue,
   type UnlockRequest,
+  HLS_PARAMS,
+  HLS_PATHS,
   IMAGE_SOURCES,
   ITEM_IMAGE_KINDS,
   LIBRARY_BACKDROP_TYPES,
@@ -1139,6 +1141,34 @@ export const createApiClient = ({
           }),
         ),
       ),
+
+    /**
+     * The HLS master playlist for a converted stream. It mints a session
+     * that holds `mode`, `audio` and `quality`, which are read as for
+     * `streamUrl`.
+     */
+    hlsUrl: ({
+      id,
+      mode,
+      audio,
+      quality,
+      access,
+    }: {
+      id: number
+      mode: StreamMode
+      audio: number | null
+      quality: StreamQuality | null
+      access: MediaAccess | null
+    }): string =>
+      mediaUrl({
+        path: HLS_PATHS.master.replace(`:${HLS_PARAMS.id}`, String(id)),
+        query: {
+          [HLS_PARAMS.mode]: mode,
+          ...(audio == null ? {} : { [HLS_PARAMS.audio]: String(audio) }),
+          ...(quality == null ? {} : { [HLS_PARAMS.quality]: quality }),
+        },
+        access,
+      }),
 
     /**
      * A converted stream as fragmented MP4, starting at `start` seconds into

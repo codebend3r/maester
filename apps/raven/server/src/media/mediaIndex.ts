@@ -6,7 +6,9 @@ import {
   type ThumbnailState,
   containerOf,
   isMediaTracks,
+  isNumber,
   isThumbnailState,
+  listOf,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
@@ -48,6 +50,8 @@ type FileRow = {
   hdr: number
   thumbnail: string
 }
+
+const isKeyframes = listOf(isNumber)
 
 /** Its name, and the folder it sits in under the folder its titles sit in (a library path, or a letter or group folder). */
 const placeOf = (file: FoundFile): { fileName: string; folder: string } => ({
@@ -186,7 +190,7 @@ export class MediaIndex {
     this.db
       .prepare(
         `UPDATE media SET size = ?, mtime_ms = ?, probed = 0, probe_error = NULL, thumbnail = 'pending',
-                tracks = NULL, changed_at = ?
+                tracks = NULL, keyframes = NULL, changed_at = ?
           WHERE id = ?`,
       )
       .run(size, Math.round(mtimeMs), at.toISOString(), id)
@@ -305,6 +309,22 @@ export class MediaIndex {
 
   saveTracks({ id, tracks }: { id: number; tracks: MediaTracks }): void {
     this.db.prepare('UPDATE media SET tracks = ? WHERE id = ?').run(JSON.stringify(tracks), id)
+  }
+
+  /** The video keyframes a probe stored, in seconds, or null when none are stored (or they no longer read). */
+  storedKeyframes(id: number): number[] | null {
+    const row = this.db
+      .prepare<[number], { keyframes: string | null }>('SELECT keyframes FROM media WHERE id = ?')
+      .get(id)
+    const keyframes = row?.keyframes ?? null
+    if (keyframes === null) return null
+    return parseJsonAs({ json: keyframes, guard: isKeyframes })
+  }
+
+  saveKeyframes({ id, keyframes }: { id: number; keyframes: number[] }): void {
+    this.db
+      .prepare('UPDATE media SET keyframes = ? WHERE id = ?')
+      .run(JSON.stringify(keyframes), id)
   }
 
   setThumbnail({ id, state }: { id: number; state: ThumbnailState }): void {

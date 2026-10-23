@@ -74,10 +74,16 @@ describe('responseHeaders', () => {
 })
 
 describe('mediaPlanePaths', () => {
-  it('is the four routes marked for the media plane', () => {
+  it('is the routes marked for the media plane', () => {
     expect(mediaPlanePaths(CONTROLLERS).toSorted()).toEqual([
       '/api/media-origins/ping',
       '/api/media/:id/file',
+      '/api/media/:id/hls/:session/init',
+      '/api/media/:id/hls/:session/segment/:n',
+      '/api/media/:id/hls/:session/subtitles/:trackId',
+      '/api/media/:id/hls/:session/subtitles/:trackId/:n',
+      '/api/media/:id/hls/:session/video.m3u8',
+      '/api/media/:id/hls/master.m3u8',
       '/api/media/:id/stream',
       '/api/media/:id/subtitles/:trackId',
     ])

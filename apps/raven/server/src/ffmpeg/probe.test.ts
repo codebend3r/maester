@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseProbe } from '@/ffmpeg/probe'
+import { isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
 
 /** Trimmed from a real ffprobe run on a 4K HDR episode on the NAS. */
 const hdrEpisode = {
@@ -78,5 +78,49 @@ describe('parseProbe', () => {
   it('returns null for a file with nothing playable', () => {
     expect(parseProbe({ streams: [{ codec_type: 'subtitle' }], format: {} })).toBeNull()
     expect(parseProbe('garbage')).toBeNull()
+  })
+})
+
+describe('mediaClockOf', () => {
+  const video = { codec_type: 'video', start_time: '2.580000', r_frame_rate: '24000/1001' }
+  const audio = { codec_type: 'audio', start_time: '2.500000' }
+
+  it("reads the start, the video's first frame and its rate", () => {
+    expect(
+      mediaClockOf({
+        format: { format_name: 'mpegts', start_time: '11.375000', duration: '40.062500' },
+        streams: [audio, { ...video, start_time: '11.440000', r_frame_rate: '25/1' }],
+      }),
+    ).toEqual({ start: 11.375, end: 51.4375, videoStart: 11.44, frameRate: 25 })
+  })
+
+  it("takes Matroska's duration as its end, since it counts from 0", () => {
+    const clock = mediaClockOf({
+      format: { format_name: 'matroska,webm', start_time: '2.500000', duration: '14.501000' },
+      streams: [video, audio],
+    })
+    expect(clock).toMatchObject({ start: 2.5, end: 14.501, videoStart: 2.58 })
+    expect(clock.frameRate).toBeCloseTo(23.976, 3)
+  })
+
+  it('starts before zero, skips cover art, and knows nothing it is not told', () => {
+    expect(
+      mediaClockOf({
+        format: { start_time: '-0.023000' },
+        streams: [{ codec_type: 'video', disposition: { attached_pic: 1 }, start_time: '5' }],
+      }),
+    ).toEqual({ start: -0.023, end: null, videoStart: -0.023, frameRate: null })
+    expect(mediaClockOf(null)).toEqual({ start: 0, end: null, videoStart: 0, frameRate: null })
+  })
+})
+
+describe('isTransportStream', () => {
+  it('knows MPEG-TS, M2TS included, from the format ffprobe names', () => {
+    expect(
+      ['mpegts', 'matroska,webm', 'mov,mp4,m4a,3gp,3g2,mj2'].map((format_name) =>
+        isTransportStream({ format: { format_name } }),
+      ),
+    ).toEqual([true, false, false])
+    expect(isTransportStream(null)).toBe(false)
   })
 })

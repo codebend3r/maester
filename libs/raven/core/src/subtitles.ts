@@ -77,6 +77,42 @@ export const parseWebVtt = (text: string): SubtitleCue[] =>
     .filter((cue): cue is SubtitleCue => cue != null)
     .toSorted((a, b) => a.start - b.start || a.end - b.end)
 
+/** Seconds as "HH:MM:SS.mmm", the way WebVTT writes a time; a time that is not a finite number is 0. */
+const formatTimestamp = (seconds: number): string => {
+  const total = Number.isFinite(seconds) ? Math.round(Math.max(0, seconds) * 1000) : 0
+  const [hours, minutes, secs] = [
+    Math.floor(total / 3_600_000),
+    Math.floor(total / 60_000) % 60,
+    Math.floor(total / 1000) % 60,
+  ].map((part) => String(part).padStart(2, '0'))
+  return `${hours}:${minutes}:${secs}.${String(total % 1000).padStart(3, '0')}`
+}
+
+/**
+ * Cues as a WebVTT document, the inverse of `parseWebVtt` for what it keeps.
+ * `timestampMap` ties the cues' local clock to the 90 kHz MPEG-TS clock an
+ * HLS player runs on, so a segment of cues lines up with the video.
+ */
+export const formatWebVtt = ({
+  cues,
+  timestampMap,
+}: {
+  cues: readonly SubtitleCue[]
+  timestampMap: { mpegts: number; local: number } | null
+}): string => {
+  const header =
+    timestampMap === null
+      ? ['WEBVTT']
+      : [
+          'WEBVTT',
+          `X-TIMESTAMP-MAP=MPEGTS:${Math.round(timestampMap.mpegts)},LOCAL:${formatTimestamp(timestampMap.local)}`,
+        ]
+  const blocks = cues.map(
+    (cue) => `${formatTimestamp(cue.start)} --> ${formatTimestamp(cue.end)}\n${cue.text}`,
+  )
+  return `${[header.join('\n'), ...blocks].join('\n\n')}\n\n`
+}
+
 const cueKey = (cue: SubtitleCue): string => `${cue.start}|${cue.end}|${cue.text}`
 
 /** Two windows overlap by their lead, so the same cue can arrive twice. */

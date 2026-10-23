@@ -16,3 +16,5 @@ tha = "tha"
 seeked = "seeked"
 # Mi Vida Loca (1993), a film raven matches by its English title.
 loca = "loca"
+# The MP4 track box, which the HLS tests read the clock from.
+trak = "trak"

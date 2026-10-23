@@ -1,10 +1,12 @@
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { Logger } from '@nestjs/common'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { readServerConfig } from '@/config'
 import { DEFAULT_PLAYBACK_SETTINGS, type HwAccel } from '@raven/core'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
+import { RUN_EVENTS, RUN_SIGNALS } from '@/hls/segmentRun'
 
 describe('FfmpegService', () => {
   const state = { dir: '' }
@@ -18,6 +20,23 @@ describe('FfmpegService', () => {
       '#!/bin/sh\necho "Invalid data found when processing input" >&2\nexit 1\n',
     )
     await writeFile(join(state.dir, 'works'), '#!/bin/sh\nexit 0\n')
+    // Prints its arguments, then three packets in decode order.
+    await writeFile(
+      join(state.dir, 'packets'),
+      '#!/bin/sh\necho "$@" > "$0.args"\nprintf "2.000000,K__\\n0.000000,K__\\n1.000000,___\\n"\n',
+    )
+    await chmod(join(state.dir, 'packets'), 0o755)
+    // A Debian ffmpeg beside a Homebrew ffprobe.
+    await writeFile(
+      join(state.dir, 'ffmpeg-5'),
+      '#!/bin/sh\necho "ffmpeg version 5.1.9-0+deb12u1 Copyright"\n',
+    )
+    await writeFile(
+      join(state.dir, 'ffprobe-9'),
+      '#!/bin/sh\necho "ffprobe version 9.0.2 Copyright"\n',
+    )
+    await chmod(join(state.dir, 'ffmpeg-5'), 0o755)
+    await chmod(join(state.dir, 'ffprobe-9'), 0o755)
     await writeFile(join(state.dir, 'renderD128'), '')
     await chmod(join(state.dir, 'works'), 0o755)
     await chmod(join(state.dir, 'slow'), 0o755)
@@ -35,9 +54,30 @@ describe('FfmpegService', () => {
         ffprobePath: join(state.dir, tool),
         ffmpegPath: join(state.dir, tool),
         ffmpegTimeoutSeconds: 1,
+        keyframeProbeTimeoutSeconds: 1,
       },
       { playback: () => DEFAULT_PLAYBACK_SETTINGS },
     )
+
+  it('warns at start when ffmpeg and ffprobe are different builds', async () => {
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined)
+    try {
+      await new FfmpegService(
+        {
+          ...readServerConfig({}),
+          ffmpegPath: join(state.dir, 'ffmpeg-5'),
+          ffprobePath: join(state.dir, 'ffprobe-9'),
+        },
+        { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+      ).warnOfMismatchedTools()
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('ffmpeg is 5.1.9-0+deb12u1 and ffprobe is 9.0.2'),
+      )
+    } finally {
+      warn.mockRestore()
+    }
+  })
 
   // Both wait out the same second, side by side.
   it('reports a timeout as a timeout, so the scan can retry later', async () => {
@@ -47,10 +87,55 @@ describe('FfmpegService', () => {
     ])
   })
 
+  it('kills a segment run still going when the server stops', async () => {
+    const ffmpeg = service('slow')
+    const child = ffmpeg.segment([])
+    const closed = new Promise<NodeJS.Signals | null>((resolve) => {
+      child.on(RUN_EVENTS.close, (_code, signal) => resolve(signal))
+    })
+
+    ffmpeg.onModuleDestroy()
+
+    expect(await closed).toBe(RUN_SIGNALS.kill)
+  })
+
   it("passes on ffprobe's own reason for a broken file", async () => {
     const failure = service('broken').probeFile('/media/a.mkv')
     await expect(failure).rejects.toThrow('Invalid data found when processing input')
     await expect(failure).rejects.not.toBeInstanceOf(FfmpegTimeoutError)
+  })
+
+  it("lists a file's video keyframes from ffprobe's packets, without decoding", async () => {
+    expect(await service('packets').probeKeyframes('/media/a.mkv')).toEqual([0, 2])
+    expect(await readFile(join(state.dir, 'packets.args'), 'utf8')).toBe(
+      '-v error -select_streams v:0 -show_entries packet=pts_time,flags -of csv=p=0 /media/a.mkv\n',
+    )
+  })
+
+  it("reports a keyframe probe's failure and timeout as probeFile does", async () => {
+    await expect(service('broken').probeKeyframes('/media/a.mkv')).rejects.toThrow(
+      'Invalid data found when processing input',
+    )
+    await expect(service('slow').probeKeyframes('/media/a.mkv')).rejects.toBeInstanceOf(
+      FfmpegTimeoutError,
+    )
+  })
+
+  it('gives the keyframe probe its own, longer time limit than a header probe', async () => {
+    await writeFile(join(state.dir, 'sleepy'), '#!/bin/sh\nsleep 2\nprintf "0.000000,K__\\n"\n')
+    await chmod(join(state.dir, 'sleepy'), 0o755)
+    const sleepy = new FfmpegService(
+      {
+        ...readServerConfig({}),
+        ffprobePath: join(state.dir, 'sleepy'),
+        ffmpegTimeoutSeconds: 1,
+        keyframeProbeTimeoutSeconds: 10,
+      },
+      { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+    )
+
+    expect(await sleepy.probeKeyframes('/media/a.mkv')).toEqual([0])
+    await expect(sleepy.probeJson('/media/a.mkv')).rejects.toBeInstanceOf(FfmpegTimeoutError)
   })
 
   describe('choosing how transcodes encode', () => {

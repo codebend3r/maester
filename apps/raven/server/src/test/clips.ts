@@ -5,6 +5,9 @@ import { promisify } from 'node:util'
 
 const run = promisify(execFile)
 
+/** The test pattern's frames per second. */
+const CLIP_FPS = 24
+
 /**
  * Encodes a short test-pattern clip with a tone, so the suite exercises the
  * real ffprobe and ffmpeg rather than fixtures. `audio` picks the audio
@@ -15,34 +18,51 @@ export const encodeClip = async ({
   seconds = 6,
   audio = 'aac',
   size = '320x240',
+  keyframeEvery,
+  startAt,
+  frameRate = String(CLIP_FPS),
+  videoDelay,
 }: {
   path: string
   seconds?: number
   audio?: 'aac' | 'ac3'
   /** The frame size, `WIDTHxHEIGHT`. */
   size?: string
+  /** Seconds between keyframes, exactly, with no scene cut adding one. */
+  keyframeEvery?: number
+  /** Where the file's own clock starts, in seconds, as a broadcast recording's does. */
+  startAt?: number
+  /** Frames per second, as ffmpeg writes a rate: `24000/1001` for NTSC film. */
+  frameRate?: string
+  /** How long after the sound the picture starts, as in many broadcast recordings. */
+  videoDelay?: number
 }): Promise<void> => {
+  const [top = CLIP_FPS, bottom = 1] = frameRate.split('/').map(Number)
+  const gop = keyframeEvery == null ? null : String(Math.round((keyframeEvery * top) / bottom))
   await mkdir(dirname(path), { recursive: true })
   await run('ffmpeg', [
     '-hide_banner',
     '-loglevel',
     'error',
     '-y',
+    ...(videoDelay == null ? [] : ['-itsoffset', String(videoDelay)]),
     '-f',
     'lavfi',
     '-i',
-    `testsrc2=size=${size}:rate=24:duration=${seconds}`,
+    `testsrc2=size=${size}:rate=${frameRate}:duration=${seconds}`,
     '-f',
     'lavfi',
     '-i',
     `sine=frequency=440:duration=${seconds}`,
     '-c:v',
     'libx264',
+    ...(gop == null ? [] : ['-g', gop, '-keyint_min', gop, '-sc_threshold', '0']),
     '-pix_fmt',
     'yuv420p',
     '-c:a',
     audio,
     '-shortest',
+    ...(startAt == null ? [] : ['-output_ts_offset', String(startAt)]),
     path,
   ])
 }
@@ -50,16 +70,19 @@ export const encodeClip = async ({
 /**
  * An MKV like a remux in miniature: a keyframe every two seconds, English
  * AC-3 audio (the default) and a Japanese AAC commentary, and an English
- * SRT track holding `cues`.
+ * SRT track holding `cues`. `bFrames` sets how many B-frames x264 may put
+ * between references, which reorders the video so its dts runs behind its pts.
  */
 export const encodeRichClip = async ({
   path,
   seconds = 30,
   cues,
+  bFrames,
 }: {
   path: string
   seconds?: number
   cues: string
+  bFrames?: number
 }): Promise<void> => {
   await mkdir(dirname(path), { recursive: true })
   const srt = `${path}.source.srt`
@@ -95,6 +118,7 @@ export const encodeRichClip = async ({
     'libx264',
     '-g',
     '48',
+    ...(bFrames == null ? [] : ['-bf', String(bFrames)]),
     '-pix_fmt',
     'yuv420p',
     '-c:a:0',

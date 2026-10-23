@@ -5,14 +5,18 @@ import {
   ACCOUNT_TICKET_SECONDS,
   AUTH_HEADERS,
   AUTH_REFUSALS,
+  HLS_PARAMS,
   LIBRARY_KINDS,
   MEDIA_ORIGIN_KINDS,
+  MEDIA_TICKET_PARAM,
   MEMBER_STATUSES,
   type MediaOrigin,
+  PLAYBACK_MODES,
   SUBTITLE_SOURCES,
   LOCKED_STATUS,
   isMediaOrigins,
   isMediaTicket,
+  toQueryString,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -179,6 +183,31 @@ describe('account tickets on the media paths', () => {
     })
     expect(subtitles.statusCode).toBe(200)
     expect(subtitles.headers[HEADERS.contentType]).toBe(CONTENT_TYPES.vtt)
+  })
+
+  it('opens an HLS session with the ticket alone, and every URI its playlists name carries it', async () => {
+    const ticket = await ticketOf({ route: ROUTES.mediaTicket, headers: await member() })
+    const master = await plane.app.inject({
+      url: `${pathOf({ route: ROUTES.hlsMaster, params: { id: plane.ids.video } })}?${toQueryString(
+        { [HLS_PARAMS.mode]: PLAYBACK_MODES.remux, [MEDIA_TICKET_PARAM]: ticket },
+      )}`,
+    })
+    expect(master.statusCode).toBe(200)
+    expect(master.headers[HEADERS.contentType]).toBe(CONTENT_TYPES.m3u8)
+    const carried = `${MEDIA_TICKET_PARAM}=${encodeURIComponent(ticket)}`
+    const variant = master.body.split('\n').find((line) => line !== '' && !line.startsWith('#'))
+    expect(variant).toContain(carried)
+    const playlist = await plane.app.inject({ url: variant ?? '' })
+    expect(playlist.statusCode).toBe(200)
+    const init = playlist.body.match(/URI="([^"]+)"/)?.[1] ?? ''
+    expect(init).toContain(carried)
+    const opened = await plane.app.inject({ url: init })
+    expect(opened.statusCode).toBe(200)
+    const anonymous = await plane.app.inject({ url: init.split('?')[0] ?? '' })
+    expect(outcomeOf({ response: anonymous })).toMatchObject({
+      status: 401,
+      reason: AUTH_REFUSALS.signedOut,
+    })
   })
 
   it('signs out an expired ticket and one for another video, and a new mint plays again', async () => {

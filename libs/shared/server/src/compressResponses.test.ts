@@ -30,6 +30,12 @@ const POSTER = Buffer.concat([
   Buffer.alloc(16 * 1024, 0),
 ])
 
+const PLAYLIST = [
+  '#EXTM3U',
+  ...Array.from({ length: 200 }, (_, n) => `#EXTINF:6.000,\n/segment/${n}?t=ticket`),
+  '#EXT-X-ENDLIST',
+].join('\n')
+
 const events = new Subject<string>()
 
 @Controller('api')
@@ -56,6 +62,11 @@ class SampleController {
   @Get('subtitles')
   async subtitles(@Res() reply: FastifyReply): Promise<void> {
     await reply.header(HEADERS.contentType, CONTENT_TYPES.vtt).send(VTT)
+  }
+
+  @Get('playlist')
+  async playlist(@Res() reply: FastifyReply): Promise<void> {
+    await reply.header(HEADERS.contentType, CONTENT_TYPES.m3u8).send(PLAYLIST)
   }
 
   @Post('echo')
@@ -171,6 +182,15 @@ describe('compressResponses', () => {
     })
     expect(answer.headers[HEADERS.contentEncoding]).toBe(ENCODINGS.br)
     expect(decoded(answer).toString()).toBe(VTT)
+  })
+
+  it('compresses an HLS playlist', async () => {
+    const answer = await get({
+      url: '/api/playlist',
+      headers: { [HEADERS.acceptEncoding]: BROWSER },
+    })
+    expect(answer.headers[HEADERS.contentEncoding]).toBe(ENCODINGS.br)
+    expect(decoded(answer).toString()).toBe(PLAYLIST)
   })
 
   it('sends a picture as it is', async () => {
