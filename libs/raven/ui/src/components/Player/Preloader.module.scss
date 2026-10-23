@@ -1,0 +1,52 @@
+// Over the picture in every theme: the mark in the fixed on-picture colour,
+// the ring's arc in the theme's red. The ring and the mark share one cell.
+.preloader {
+  grid-area: stage;
+  place-self: center;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-areas: 'preloader';
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  pointer-events: none;
+
+  > * {
+    grid-area: preloader;
+  }
+}
+
+.ring {
+  width: 100%;
+  height: 100%;
+  border: 3px solid var(--color-bark-faint);
+  border-top-color: var(--color-leaf-bright);
+  border-radius: 50%;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: turn 900ms linear infinite;
+  }
+}
+
+.mark {
+  width: 2.25rem;
+  height: 2.25rem;
+  fill: var(--color-on-picture);
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: breathe 1.8s ease-in-out infinite;
+  }
+}
+
+@keyframes turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.55;
+  }
+}

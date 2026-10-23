@@ -182,6 +182,7 @@ describe('ServerPage accounts', () => {
     })
     await loaded({ fake })
     fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+    fake.emit({ type: PLAYER_EVENTS.waiting, waiting: false })
     fake.emit({ type: PLAYER_EVENTS.time, time: 40 })
     await waitFor(() => expect(callNamesOf(client)).toContain('PUT /api/media/7/progress'))
     account.current = accountOf({ state: ACCOUNT_STATES.revoked, email: 'me@example.com' })
@@ -334,6 +335,7 @@ describe('ServerPage accounts', () => {
     })
     await loaded({ fake })
     fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+    fake.emit({ type: PLAYER_EVENTS.waiting, waiting: false })
     fake.emit({ type: PLAYER_EVENTS.time, time: 40 })
     await waitFor(() => expect(callNamesOf(client)).toContain('PUT /api/media/7/progress'))
     fake.emit({
@@ -410,6 +412,7 @@ describe('ServerPage accounts', () => {
       await waitFor(() => expect(loadsOf(fake)).toHaveLength(2))
       await loaded({ fake, count: 2 })
       fake.emit({ type: PLAYER_EVENTS.paused, paused: false })
+      fake.emit({ type: PLAYER_EVENTS.waiting, waiting: false })
       fake.emit({ type: PLAYER_EVENTS.time, time: 60 })
       await waitFor(() => expect(callNamesOf(client)).toContain('PUT /api/media/7/progress'))
       refuse()

@@ -8,6 +8,7 @@ export type VideoState = {
   buffered: Ranges
   ended: boolean
   paused: boolean
+  /** Playing, or just started, but short of frames to show; never while paused. */
   waiting: boolean
   rate: number
 }
@@ -43,7 +44,8 @@ export const initialVideoState = (startAt: number): VideoState => ({
   buffered: [],
   ended: false,
   paused: true,
-  waiting: false,
+  // A new source has no frames yet, whether or not it is to play.
+  waiting: true,
   rate: 1,
 })
 
@@ -62,9 +64,9 @@ export const videoReducer = (state: VideoState, event: VideoEvent): VideoState =
     case VIDEO_EVENTS.played:
       return { ...state, paused: false, ended: false }
     case VIDEO_EVENTS.paused:
-      return { ...state, paused: true }
+      return { ...state, paused: true, waiting: false }
     case VIDEO_EVENTS.waiting:
-      return { ...state, waiting: true }
+      return state.paused ? state : { ...state, waiting: true }
     case VIDEO_EVENTS.flowing:
       return { ...state, waiting: false }
     case VIDEO_EVENTS.rate:

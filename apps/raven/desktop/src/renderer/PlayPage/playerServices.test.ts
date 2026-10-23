@@ -39,8 +39,8 @@ const settled = () => new Promise((resolve) => setTimeout(resolve, 0))
 describe('playerActionFor', () => {
   const table: Array<[MenuPlayerAction, PlayerAction | null]> = [
     ['togglePlay', { type: 'togglePlay' }],
-    ['skipBack', { type: 'seekBy', seconds: -10 }],
-    ['skipForward', { type: 'seekBy', seconds: 10 }],
+    ['skipBack', { type: 'skip', direction: -1 }],
+    ['skipForward', { type: 'skip', direction: 1 }],
     ['showShortcuts', { type: 'showShortcuts' }],
     ['next', null],
     ['stats', { type: 'toggleStats' }],
@@ -141,7 +141,7 @@ describe('servicesFor', () => {
     menu.emit('skipForward')
     menu.emit('next')
     expect(listener).toHaveBeenCalledTimes(1)
-    expect(listener).toHaveBeenCalledWith({ type: 'seekBy', seconds: 10 })
+    expect(listener).toHaveBeenCalledWith({ type: 'skip', direction: 1 })
     unsubscribe()
     menu.emit('togglePlay')
     expect(listener).toHaveBeenCalledTimes(1)

@@ -62,10 +62,28 @@ describe('Controls', () => {
     expect(screen.getByRole('button', { name: 'Nothing up next' })).toBeDisabled()
   })
 
-  it('shows the time played beside the timeline and when the video ends', () => {
+  it('shows the time played beside the timeline and the video’s length', () => {
     render(<Controls {...props()} />)
     expect(screen.getByText('40:00')).toBeInTheDocument()
-    expect(screen.getByText('Ends at 2:20 AM')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Length 1:42:00, show the end time' }),
+    ).toHaveTextContent('1:42:00')
+    expect(screen.queryByText('Ends at 2:20 AM')).toBeNull()
+  })
+
+  it('toggles between the length and when the video ends', async () => {
+    render(<Controls {...props()} />)
+    await userEvent.click(screen.getByRole('button', { name: /^Length 1:42:00/ }))
+    expect(
+      screen.getByRole('button', { name: 'Ends at 2:20 AM, show the length' }),
+    ).toHaveTextContent('Ends at 2:20 AM')
+    await userEvent.click(screen.getByRole('button', { name: /^Ends at 2:20 AM/ }))
+    expect(screen.getByRole('button', { name: /^Length 1:42:00/ })).toBeInTheDocument()
+  })
+
+  it('shows neither while the length is unknown', () => {
+    render(<Controls {...props({ duration: null, endsAt: null })} />)
+    expect(screen.queryByRole('button', { name: /^Length/ })).toBeNull()
   })
 
   it('fills the ring only while the countdown runs', () => {

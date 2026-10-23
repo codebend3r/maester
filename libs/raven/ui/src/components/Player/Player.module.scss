@@ -30,31 +30,6 @@
   }
 }
 
-// A red arc turning on the night: the stream is filling.
-.spinner {
-  grid-area: stage;
-  place-self: center;
-  position: relative;
-  z-index: 1;
-  width: 3rem;
-  height: 3rem;
-  border: 3px solid var(--color-bark-faint);
-  border-top-color: var(--color-leaf-bright);
-  border-radius: 50%;
-
-  @media (prefers-reduced-motion: no-preference) {
-    animation: spin 900ms linear infinite;
-  }
-
-  pointer-events: none;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(1turn);
-  }
-}
-
 // The large mark in the middle while paused. It lets clicks through to the
 // picture, which plays, and waits a beat before showing, so the flash after
 // a key press has gone and an autoplay that starts at once never shows it.

@@ -13,6 +13,7 @@ import {
   isPlayerRequest,
   type OutputSettings,
   PLAYER_COMMANDS,
+  PLAYER_EVENTS,
   type PlayerCommand,
   type PlayerEvent,
   type PlayerRefusalReason,
@@ -599,6 +600,8 @@ describe('PlayPage engines', () => {
       player: connectionsOf({ status: 'native', player: fake.player }),
     })
     await screen.findByRole('heading', { name: 'Clip 01' })
+    // As mpv reports once the file loads, so the preloader is not the only status.
+    await act(async () => fake.emit({ type: PLAYER_EVENTS.waiting, waiting: false }))
     await act(async () => native.menu.emit('stats'))
     expect(screen.getByRole('status')).toBeEmptyDOMElement()
     expect(commandTypes(fake.send)).toContain('stats')

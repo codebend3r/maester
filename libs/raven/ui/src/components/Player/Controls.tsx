@@ -1,5 +1,5 @@
 import { formatDuration } from '@raven/core'
-import { type ReactNode, type RefObject, useId } from 'react'
+import { type ComponentPropsWithRef, type ReactNode, type RefObject, useId, useState } from 'react'
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import styles from '@/components/Player/Controls.module.scss'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
@@ -16,7 +16,7 @@ const muteLabel = ({ isVolumeFixed, muted }: { isVolumeFixed: boolean; muted: bo
   return muted ? 'Unmute (m)' : 'Mute (m)'
 }
 
-/** What each pill wears in place of its words on a phone. */
+/** What each pill wears; its words show in a tip on hover or focus. */
 const MENU_ICONS = {
   subtitles: 'captions',
   audio: 'headphones',
@@ -53,9 +53,31 @@ const ControlButton = ({
 )
 
 /**
- * A glass pill naming a menu and what it is set to, "Subtitles · English".
- * The quality pill shows only its value, "4K · Direct play". On a phone
- * each shrinks to its icon, its label unchanged.
+ * A round glass button for the right of the bar. It wears only its icon at
+ * every width, and its words show in a tip above it on hover or focus.
+ */
+const Pill = ({
+  label,
+  icon,
+  tip,
+  ...button
+}: ComponentPropsWithRef<'button'> & {
+  label: string
+  icon: IconName
+  /** The tip's words. */
+  tip: ReactNode
+}) => (
+  <button {...button} type="button" className={styles.pill} aria-label={label}>
+    <Icon name={icon} size={20} />
+    <span className={styles.tip} aria-hidden="true">
+      {tip}
+    </span>
+  </button>
+)
+
+/**
+ * A pill naming a menu and what it is set to, "Subtitles · English". The
+ * quality pill's tip shows only its value, "4K · Direct play".
  */
 const MenuPill = ({
   section,
@@ -73,23 +95,42 @@ const MenuPill = ({
   const title = MENU_TITLES[section]
   const showsTitle = section !== MENU_SECTIONS.playback || value == null
   return (
-    <button
+    <Pill
       ref={buttonRef}
-      type="button"
-      className={classes(styles.pill, open && styles.open)}
-      aria-label={value == null ? title : `${title}: ${value}`}
+      label={value == null ? title : `${title}: ${value}`}
+      icon={MENU_ICONS[section]}
+      tip={
+        <>
+          {showsTitle && title}
+          {showsTitle && value != null && <span className={styles.dot}> · </span>}
+          {value}
+        </>
+      }
       aria-haspopup="dialog"
       aria-expanded={open}
       onClick={() => onToggle(section)}
+    />
+  )
+}
+
+/**
+ * The video's length, or with a press the clock time it ends at; the
+ * length comes first. Nothing shows while the length is unknown.
+ */
+const EndTime = ({ duration, endsAt }: { duration: number | null; endsAt: string | null }) => {
+  const [showsEndTime, setShowsEndTime] = useState(false)
+  if (duration == null || endsAt == null) return null
+  const length = formatDuration(duration)
+  return (
+    <button
+      type="button"
+      className={styles.ends}
+      aria-label={
+        showsEndTime ? `${endsAt}, show the length` : `Length ${length}, show the end time`
+      }
+      onClick={() => setShowsEndTime((current) => !current)}
     >
-      <span className={styles.pillIcon}>
-        <Icon name={MENU_ICONS[section]} size={20} />
-      </span>
-      <span className={styles.pillText}>
-        {showsTitle && title}
-        {showsTitle && value != null && <span className={styles.dot}> · </span>}
-        {value}
-      </span>
+      {showsEndTime ? endsAt : length}
     </button>
   )
 }
@@ -162,13 +203,17 @@ export type ControlsProps = {
   upNext: string | null
   /** How far the countdown to what is up next has run, 0 to 1; null while none runs. */
   countdown: number | null
-  /** "Ends at 2:20 AM": when the video ends at this speed; null while its length is unknown. */
+  /**
+   * "Ends at 2:20 AM": when the video ends at this speed; null while its
+   * length is unknown. The bar shows the length until it is pressed.
+   */
   endsAt: string | null
   onRestart: () => void
   onNext: () => void
   onTogglePlay: () => void
   onSeek: (time: number) => void
-  onSkip: (seconds: number) => void
+  /** Back or forward 10 seconds, further on quick presses. */
+  onSkip: (direction: 1 | -1) => void
   onVolume: (volume: number) => void
   onToggleMute: () => void
   onToggleMenu: (section: MenuSection) => void
@@ -178,8 +223,8 @@ export type ControlsProps = {
 /**
  * The bar along the bottom: the time played beside the timeline, then the
  * transport (back to the start, back 10 seconds, play, forward 10 seconds,
- * next) and when the video ends on the left, and volume and glass pills for
- * subtitles, audio, quality and full screen on the right.
+ * next) and the video's length or end time on the left, and volume and glass
+ * icon pills for subtitles, audio, quality and full screen on the right.
  */
 export const Controls = ({
   shown,
@@ -235,11 +280,7 @@ export const Controls = ({
       >
         <Icon name="skipPrevious" size={22} />
       </ControlButton>
-      <ControlButton
-        label="Back 10 seconds (j)"
-        onClick={() => onSkip(-10)}
-        className={styles.back}
-      >
+      <ControlButton label="Back 10 seconds (j)" onClick={() => onSkip(-1)} className={styles.back}>
         <Icon name="rewind" size={24} />
       </ControlButton>
       <ControlButton
@@ -251,13 +292,13 @@ export const Controls = ({
       </ControlButton>
       <ControlButton
         label="Forward 10 seconds (l)"
-        onClick={() => onSkip(10)}
+        onClick={() => onSkip(1)}
         className={styles.forward}
       >
         <Icon name="forward" size={24} />
       </ControlButton>
       <NextButton upNext={upNext} countdown={countdown} onNext={onNext} />
-      {endsAt != null && <p className={styles.ends}>{endsAt}</p>}
+      <EndTime duration={duration} endsAt={endsAt} />
       <div className={styles.volume}>
         <ControlButton
           label={muteLabel({ isVolumeFixed, muted })}
@@ -295,17 +336,12 @@ export const Controls = ({
             onToggle={onToggleMenu}
           />
         ))}
-        <button
-          type="button"
-          className={styles.pill}
-          aria-label={`${fullscreenLabel} (f)`}
+        <Pill
+          label={`${fullscreenLabel} (f)`}
+          icon={fullscreen ? 'fullscreenExit' : 'fullscreen'}
+          tip={fullscreenLabel}
           onClick={onToggleFullscreen}
-        >
-          <span className={styles.pillIcon}>
-            <Icon name={fullscreen ? 'fullscreenExit' : 'fullscreen'} size={20} />
-          </span>
-          <span className={styles.pillText}>{fullscreenLabel}</span>
-        </button>
+        />
       </div>
     </div>
   )

@@ -132,12 +132,27 @@
   accent-color: var(--color-on-picture);
 }
 
+// The length or the end time, a bare button that reads like the time played.
 .ends {
   grid-area: ends;
-  padding-inline-start: var(--space-3);
+  justify-self: start;
+  padding: var(--space-0) var(--space-1);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
   font-size: var(--font-size-md);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  cursor: pointer;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background-color 150ms ease;
+  }
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+  }
 }
 
 .pills {
@@ -149,22 +164,26 @@
 }
 
 // Dark glass, lifted a little toward the text colour so it shows on the
-// fade as well as on a bright picture.
+// fade as well as on a bright picture. Round, holding only its icon; the tip
+// shares its cell and is lifted above it.
 .pill {
+  position: relative;
   display: grid;
+  grid-template-areas: 'pill';
   place-items: center;
-  min-width: var(--control-size);
+  width: var(--control-size);
   height: var(--control-size);
-  padding: 0 var(--space-3);
+  padding: 0;
   border: 0;
-  border-radius: var(--radius-pill);
+  border-radius: 50%;
   background: color-mix(in srgb, var(--color-on-picture) 12%, var(--color-picture-glass));
   color: var(--color-on-picture);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  white-space: nowrap;
   cursor: pointer;
   backdrop-filter: blur(12px);
+
+  > * {
+    grid-area: pill;
+  }
 
   @media (prefers-reduced-motion: no-preference) {
     transition: background-color 150ms ease;
@@ -173,16 +192,56 @@
   &:hover {
     background: color-mix(in srgb, var(--color-on-picture) 22%, var(--color-picture-glass));
   }
+
+  // Its menu is showing.
+  &[aria-expanded='true'] {
+    --icon-tint: 0.4;
+
+    background: color-mix(in srgb, var(--color-on-picture) 22%, var(--color-picture-glass));
+  }
 }
 
-.open {
-  --icon-tint: 0.4;
+// What the pill is, above it, in the same glass. The last pill sits at the
+// bar's edge, so its tip lines up with its right side instead of its centre.
+.tip {
+  position: absolute;
+  inset-block-end: calc(100% + var(--space-1));
+  inset-inline-start: 50%;
+  padding: var(--space-0) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-picture-glass);
+  box-shadow: var(--shadow-menu);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  translate: -50% 0;
 
-  background: color-mix(in srgb, var(--color-on-picture) 22%, var(--color-picture-glass));
-}
+  @media (prefers-reduced-motion: no-preference) {
+    transition: opacity 150ms ease;
+  }
 
-.pillIcon {
-  display: none;
+  .pill:last-child > & {
+    inset-inline: auto 0;
+    translate: none;
+  }
+
+  .pill:focus-visible > & {
+    opacity: 1;
+  }
+
+  // A touch leaves :hover behind after a tap, so only a pointer that hovers shows it.
+  @media (hover: hover) {
+    .pill:hover > & {
+      opacity: 1;
+    }
+  }
+
+  // The open menu already names it.
+  .pill[aria-expanded='true'] > & {
+    opacity: 0;
+  }
 }
 
 .dot {
@@ -192,22 +251,6 @@
 // The volume slider is the first to go; mute stays.
 @media (max-width: 64rem) {
   .volumeSlider {
-    display: none;
-  }
-}
-
-// The pills keep their labels but show only their icons.
-@media (max-width: 48rem) {
-  .pill {
-    width: var(--control-size);
-    padding: 0;
-  }
-
-  .pillIcon {
-    display: grid;
-  }
-
-  .pillText {
     display: none;
   }
 }

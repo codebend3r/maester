@@ -19,11 +19,17 @@ import { DEFAULT_PLAYBACK_STATE } from '@/test/render'
 describe('videoReducer', () => {
   it('starts paused at the resume point, and follows the element', () => {
     const start = initialVideoState(42)
-    expect(start).toMatchObject({ time: 42, paused: true, waiting: false, rate: 1 })
-    const playing = videoReducer(start, { type: 'played' })
-    expect(playing.paused).toBe(false)
+    expect(start).toMatchObject({ time: 42, paused: true, waiting: true, rate: 1 })
+    const playing = videoReducer(videoReducer(start, { type: 'played' }), { type: 'flowing' })
+    expect(playing).toMatchObject({ paused: false, waiting: false })
     const stalled = videoReducer(playing, { type: 'waiting' })
+    expect(stalled.waiting).toBe(true)
     expect(videoReducer(stalled, { type: 'flowing' }).waiting).toBe(false)
+    expect(videoReducer(stalled, { type: 'paused' }).waiting).toBe(false)
+    // A paused video waits for nothing it shows, as on a seek while paused.
+    expect(videoReducer(videoReducer(start, { type: 'paused' }), { type: 'waiting' }).waiting).toBe(
+      false,
+    )
     expect(videoReducer(start, { type: 'moved', time: 50, buffered: [[0, 60]] })).toMatchObject({
       time: 50,
       buffered: [[0, 60]],

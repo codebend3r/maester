@@ -1341,6 +1341,13 @@ const attachPlayer = ({
   screen.on('display-removed', followDisplay)
   screen.on('display-metrics-changed', followDisplay)
 
+  // A new page load drops the port the last page's `ready` is still waiting on the engine for.
+  // Handed over late, it would reach the new page, which keeps the first port it gets, and
+  // the new page's own `ready` would then close it under it.
+  window.webContents.on('did-navigate', () => {
+    connector.disconnect()
+  })
+
   // A crashed page holds no port; stop what it was playing until its reload asks again,
   // and put the window back for Home even when the service had nothing left to stop.
   window.webContents.on('render-process-gone', () => {

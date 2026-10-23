@@ -77,7 +77,7 @@ describe('useWatchProgress state transitions', () => {
     const services = servicesFor()
     const position = { current: 20 }
     usePlayerServices.setState({ services })
-    const initial = initialVideoState(20)
+    const initial = { ...initialVideoState(20), waiting: false }
     const { rerender, unmount } = renderHook(
       ({ state }) => useWatchProgress({ state, position, duration: 120, audio: 1 }),
       { initialProps: { state: initial } },
@@ -198,7 +198,7 @@ describe('PlayerChrome with a fake engine handle', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Play (k)' }))
     expect(actions.play).toHaveBeenCalledTimes(1)
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    expect(actions.seek).toHaveBeenLastCalledWith(25)
+    expect(actions.seek).toHaveBeenLastCalledWith(30)
     fireEvent.keyDown(window, { key: 'ArrowUp' })
     expect(actions.setVolume).toHaveBeenCalled()
     fireEvent.keyDown(window, { key: 'm' })
@@ -288,7 +288,7 @@ describe('PlayerChrome host actions', () => {
     expect(listeners.size).toBe(1)
     act(() => emit({ type: 'togglePlay' }))
     expect(actions.play).toHaveBeenCalledTimes(1)
-    act(() => emit({ type: 'seekBy', seconds: 10 }))
+    act(() => emit({ type: 'skip', direction: 1 }))
     expect(actions.seek).toHaveBeenLastCalledWith(30)
     unmount()
     expect(listeners.size).toBe(0)
@@ -312,6 +312,7 @@ describe('Player HTML local files', () => {
       const play = spyOn(video, 'play').mockImplementation(async () => {})
       fireEvent.loadedMetadata(video)
       expect(video.currentTime).toBe(20)
+      Object.defineProperty(video, 'paused', { value: false, configurable: true })
       fireEvent.play(video)
       fireEvent.canPlay(video)
       expect(services.progress.started).not.toHaveBeenCalled()

@@ -39,9 +39,9 @@ export const playerActionFor = (action: MenuPlayerAction): PlayerAction | null =
     case MENU_PLAYER_ACTIONS.togglePlay:
       return { type: PLAYER_ACTIONS.togglePlay }
     case MENU_PLAYER_ACTIONS.skipBack:
-      return { type: PLAYER_ACTIONS.seekBy, seconds: -10 }
+      return { type: PLAYER_ACTIONS.skip, direction: -1 }
     case MENU_PLAYER_ACTIONS.skipForward:
-      return { type: PLAYER_ACTIONS.seekBy, seconds: 10 }
+      return { type: PLAYER_ACTIONS.skip, direction: 1 }
     case MENU_PLAYER_ACTIONS.showShortcuts:
       return { type: PLAYER_ACTIONS.showShortcuts }
     case MENU_PLAYER_ACTIONS.stats:

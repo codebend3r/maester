@@ -2,7 +2,7 @@ import { KEYS } from '@/keys'
 
 export const PLAYER_ACTIONS = {
   togglePlay: 'togglePlay',
-  seekBy: 'seekBy',
+  skip: 'skip',
   seekToFraction: 'seekToFraction',
   seekToEdge: 'seekToEdge',
   volumeBy: 'volumeBy',
@@ -25,7 +25,7 @@ type SeekEdge = (typeof SEEK_EDGES)[keyof typeof SEEK_EDGES]
 /** Something the player does in answer to a key. */
 export type PlayerAction =
   | { type: typeof PLAYER_ACTIONS.togglePlay }
-  | { type: typeof PLAYER_ACTIONS.seekBy; seconds: number }
+  | { type: typeof PLAYER_ACTIONS.skip; direction: 1 | -1 }
   | { type: typeof PLAYER_ACTIONS.seekToFraction; fraction: number }
   | { type: typeof PLAYER_ACTIONS.seekToEdge; edge: SeekEdge }
   | { type: typeof PLAYER_ACTIONS.volumeBy; delta: number }
@@ -49,10 +49,10 @@ export type KeyPress = {
 const FIXED: Record<string, PlayerAction> = {
   k: { type: PLAYER_ACTIONS.togglePlay },
   [KEYS.space]: { type: PLAYER_ACTIONS.togglePlay },
-  j: { type: PLAYER_ACTIONS.seekBy, seconds: -10 },
-  l: { type: PLAYER_ACTIONS.seekBy, seconds: 10 },
-  [KEYS.arrowLeft]: { type: PLAYER_ACTIONS.seekBy, seconds: -5 },
-  [KEYS.arrowRight]: { type: PLAYER_ACTIONS.seekBy, seconds: 5 },
+  j: { type: PLAYER_ACTIONS.skip, direction: -1 },
+  l: { type: PLAYER_ACTIONS.skip, direction: 1 },
+  [KEYS.arrowLeft]: { type: PLAYER_ACTIONS.skip, direction: -1 },
+  [KEYS.arrowRight]: { type: PLAYER_ACTIONS.skip, direction: 1 },
   [KEYS.arrowUp]: { type: PLAYER_ACTIONS.volumeBy, delta: 0.05 },
   [KEYS.arrowDown]: { type: PLAYER_ACTIONS.volumeBy, delta: -0.05 },
   m: { type: PLAYER_ACTIONS.toggleMute },
@@ -97,8 +97,10 @@ type ShortcutRow = {
 /** Every row the `?` dialog can show, in YouTube's order. */
 const SHORTCUT_ROWS: readonly ShortcutRow[] = [
   { keys: ['k', 'Space'], action: 'Play or pause' },
-  { keys: ['j', 'l'], action: 'Back or forward 10 seconds' },
-  { keys: ['←', '→'], action: 'Back or forward 5 seconds' },
+  {
+    keys: ['j', 'l', '←', '→'],
+    action: 'Back or forward 10 seconds, up to 30 when pressed quickly',
+  },
   { keys: ['↑', '↓'], action: 'Volume up or down' },
   { keys: ['m'], action: 'Mute' },
   { keys: ['f'], action: 'Full screen' },
@@ -117,7 +119,7 @@ const SHORTCUT_ROWS: readonly ShortcutRow[] = [
 export const shortcutRows = ({ canShowStats }: { canShowStats: boolean }): readonly ShortcutRow[] =>
   SHORTCUT_ROWS.filter((row) => canShowStats || row.isStats !== true)
 
-export const SPEEDS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+export const SPEEDS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4]
 
 /** The next speed up or down the ladder from `current`, staying on it at the ends. */
 export const stepSpeed = ({
@@ -132,6 +134,37 @@ export const stepSpeed = ({
   const exact = SPEEDS[from] === current
   const next = direction > 0 ? (exact ? from + 1 : from) : from - 1
   return SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, next))] ?? current
+}
+
+/** How far the first skip goes, and how much further each quick press after it goes. */
+const SKIP_SECONDS = 10
+
+/** The furthest one skip goes. */
+const SKIP_MAX_SECONDS = 30
+
+/** A press this soon after the last one in the same direction goes a step further. */
+const SKIP_WINDOW_MS = 1_000
+
+/** One skip: which way, how far, and when it was pressed, in milliseconds. */
+export type SkipStep = { direction: 1 | -1; seconds: number; at: number }
+
+/**
+ * How far a skip pressed at `at` goes: 10 seconds, or a step up the ladder
+ * to 20 and then 30 when it comes within a second of the last skip the same
+ * way. A slower press, or one the other way, starts again at 10.
+ */
+export const stepSkip = ({
+  last,
+  direction,
+  at,
+}: {
+  last: SkipStep | null
+  direction: 1 | -1
+  at: number
+}): SkipStep => {
+  const isQuick = last != null && last.direction === direction && at - last.at < SKIP_WINDOW_MS
+  const seconds = isQuick ? Math.min(last.seconds + SKIP_SECONDS, SKIP_MAX_SECONDS) : SKIP_SECONDS
+  return { direction, seconds, at }
 }
 
 const CAPTION_SCALES: readonly number[] = [0.75, 1, 1.25, 1.5, 1.75, 2]
