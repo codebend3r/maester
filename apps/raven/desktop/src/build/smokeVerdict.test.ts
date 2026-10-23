@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { logLinesSince, SMOKE_STAGES, smokeGaps, withoutTestHooks } from '@/build/smokeVerdict'
 
 const LAUNCH =
-  '2026-10-16T12:00:00.000Z info launch raven player 0.5.4 (packaged), Electron 44.7.0, macOS 27.0.0'
+  '2026-10-16T12:00:00.000Z info launch Raven 0.5.4 (packaged), Electron 44.7.0, macOS 27.0.0'
 const WEB_HOST =
   '2026-10-16T12:00:00.300Z info web host ready at http://localhost:47484, /api goes to https://raven.example'
 const ENGINE = '2026-10-16T12:00:00.400Z info video engine ready: mpv v0.41.0, FFmpeg 8.0'
@@ -24,19 +24,18 @@ describe('smokeGaps', () => {
   it('wants the packaged launch line', () => {
     const lines = [LAUNCH.replace('(packaged)', '(unpackaged)'), WEB_HOST, ENGINE, LAUNCH_MARK]
     expect(smokeGaps({ lines, stage: SMOKE_STAGES.started, version: '0.5.4' })).toEqual([
-      'launch raven player 0.5.4 (packaged)',
+      'launch Raven 0.5.4 (packaged)',
     ])
   })
 
   it('wants the version package.json names', () => {
     expect(smokeGaps({ lines: STARTED, stage: SMOKE_STAGES.started, version: '0.5.5' })).toEqual([
-      'launch raven player 0.5.5 (packaged)',
+      'launch Raven 0.5.5 (packaged)',
     ])
   })
 
   it('says why the video engine did not open', () => {
-    const failure =
-      '2026-10-16T12:00:00.400Z warn raven player could not open its video engine: no addon'
+    const failure = '2026-10-16T12:00:00.400Z warn Raven could not open its video engine: no addon'
     expect(
       smokeGaps({
         lines: [LAUNCH, WEB_HOST, failure, LAUNCH_MARK],
@@ -64,7 +63,7 @@ describe('smokeGaps', () => {
 
   it('names every needle of an empty log, in order', () => {
     expect(smokeGaps({ lines: [], stage: SMOKE_STAGES.quit, version: '0.5.4' })).toEqual([
-      'launch raven player 0.5.4 (packaged)',
+      'launch Raven 0.5.4 (packaged)',
       'web host ready',
       'video engine ready: mpv v',
       'raven-launch-ms ',

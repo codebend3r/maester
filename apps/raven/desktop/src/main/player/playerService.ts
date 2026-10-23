@@ -49,13 +49,13 @@ export type PlayerActivity = { isPlaying: boolean; isShowing: boolean }
 
 export const PLAYER_MESSAGES = {
   notOpen: 'That video is no longer open. Open it again from On this Mac or Downloads.',
-  cannotOpen: 'raven player could not open this video.',
-  stopped: 'raven player could not keep playing this video.',
+  cannotOpen: 'Raven could not open this video.',
+  stopped: 'Raven could not keep playing this video.',
   engineStopped: ENGINE_STOPPED,
   noTrack: 'That track is not in this video.',
-  failed: 'raven player could not do that.',
+  failed: 'Raven could not do that.',
   /** A server title's failure when the server could not say why; the source names the server when it can. */
-  lost: 'raven player lost its connection to the server. Where you stopped last is saved there.',
+  lost: 'Raven lost its connection to the server. Where you stopped last is saved there.',
 } as const
 
 /**
@@ -853,7 +853,7 @@ export const createPlayerService = ({
   const onRedirect = () => {
     if (phase !== PLAYER_PHASES.loading && phase !== PLAYER_PHASES.loaded) return
     settleTo(PLAYER_PHASES.idle)
-    warn('mpv opened a playlist, which raven player does not follow')
+    warn('mpv opened a playlist, which Raven does not follow')
     emit({
       type: PLAYER_EVENTS.error,
       reason: PLAYER_ERROR_REASONS.open,

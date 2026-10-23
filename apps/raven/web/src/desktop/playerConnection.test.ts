@@ -75,9 +75,9 @@ describe('nativePlayerOver', () => {
       id: 1,
       ok: false,
       reason: PLAYER_REFUSAL_REASONS.refused,
-      message: 'raven player could not do that.',
+      message: 'Raven could not do that.',
     })
-    await expect(loading).rejects.toThrow('raven player could not do that.')
+    await expect(loading).rejects.toThrow('Raven could not do that.')
     player.close()
   })
 
@@ -288,7 +288,7 @@ describe('listenForPlayer', () => {
     fromMain({
       type: PLAYER_EVENTS.error,
       reason: PLAYER_ERROR_REASONS.decode,
-      message: 'raven player could not keep playing.',
+      message: 'Raven could not keep playing.',
     })
     await wait()
     expect(connections.read().status).toBe(CONNECTION_STATUSES.native)
@@ -320,9 +320,9 @@ describe('listenForPlayer', () => {
       id: 1,
       ok: false,
       reason: PLAYER_REFUSAL_REASONS.refused,
-      message: 'raven player could not do that.',
+      message: 'Raven could not do that.',
     })
-    await expect(refused).rejects.toThrow('raven player could not do that.')
+    await expect(refused).rejects.toThrow('Raven could not do that.')
     expect(connections.read().status).toBe(CONNECTION_STATUSES.native)
     fromMain({ id: 2, ok: false, reason: PLAYER_REFUSAL_REASONS.engine, message: ENGINE_STOPPED })
     await expect(loading).rejects.toThrow(ENGINE_STOPPED)

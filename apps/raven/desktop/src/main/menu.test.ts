@@ -9,7 +9,7 @@ const setup = ({ isDevelopment = false }: { isDevelopment?: boolean } = {}) => {
   const help = { showLogs: 0, showCrashReports: 0, copyDiagnostics: 0 }
   const updates = { checks: 0 }
   const template = menuTemplate({
-    appName: 'raven player',
+    appName: 'Raven',
     isDevelopment,
     actions: {
       openDialog: () => {
@@ -68,7 +68,7 @@ describe('menuTemplate', () => {
   it('lists the top menus in order', () => {
     const { template } = setup()
     expect(template.map((entry) => entry.label ?? entry.role)).toEqual([
-      'raven player',
+      'Raven',
       'File',
       'Playback',
       'View',
@@ -80,7 +80,7 @@ describe('menuTemplate', () => {
   it('opens Settings with Command comma', () => {
     const { template, sent } = setup()
     const settings = itemOf({
-      menu: topLevel({ template, name: 'raven player' }),
+      menu: topLevel({ template, name: 'Raven' }),
       label: 'Settings…',
     })
     expect(settings.accelerator).toBe('CommandOrControl+,')
@@ -91,7 +91,7 @@ describe('menuTemplate', () => {
   it('keeps the standard app menu roles', () => {
     const { template } = setup()
     expect(
-      (topLevel({ template, name: 'raven player' }).submenu ?? []).map(
+      (topLevel({ template, name: 'Raven' }).submenu ?? []).map(
         (entry) => entry.role ?? entry.type ?? entry.label,
       ),
     ).toEqual([
@@ -111,7 +111,7 @@ describe('menuTemplate', () => {
   it('checks for updates from the app menu, with no accelerator', () => {
     const { template, updates, sent } = setup()
     const check = itemOf({
-      menu: topLevel({ template, name: 'raven player' }),
+      menu: topLevel({ template, name: 'Raven' }),
       label: 'Check for Updates…',
     })
     expect(check.id).toBe('check-for-updates')

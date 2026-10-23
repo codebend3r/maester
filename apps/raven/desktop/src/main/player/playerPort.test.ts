@@ -100,8 +100,8 @@ describe('connectPort', () => {
     port.send('play')
     await settle()
     expect(warn.mock.calls).toEqual([
-      ['raven player dropped a player message without a request id.'],
-      ['raven player refused player request 3: it is not a command it knows.'],
+      ['Raven dropped a player message without a request id.'],
+      ['Raven refused player request 3: it is not a command it knows.'],
     ])
   })
 
@@ -137,7 +137,7 @@ describe('connectPort', () => {
     port.send({ id: 2, command: { type: 'play' } })
     await settle()
     expect(port.posted).toEqual([
-      { id: 1, ok: false, reason: 'refused', message: 'raven player could not do that.' },
+      { id: 1, ok: false, reason: 'refused', message: 'Raven could not do that.' },
       { id: 2, ok: true },
     ])
     expect(warn).toHaveBeenCalledTimes(1)
@@ -156,13 +156,13 @@ describe('connectPort', () => {
         id: MAX_PENDING + 1,
         ok: false,
         reason: 'refused',
-        message: 'raven player is busy. Try again.',
+        message: 'Raven is busy. Try again.',
       },
       {
         id: MAX_PENDING + 2,
         ok: false,
         reason: 'refused',
-        message: 'raven player is busy. Try again.',
+        message: 'Raven is busy. Try again.',
       },
     ])
     expect(warn).toHaveBeenCalledTimes(1)

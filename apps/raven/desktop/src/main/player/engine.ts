@@ -77,8 +77,7 @@ export const engineOptionsFor = ({ surface }: { surface: MpvSurface }): readonly
 }
 
 export const ENGINE_MESSAGES = {
-  unavailable:
-    'raven player could not start its video engine, so it plays only the videos Chromium can.',
+  unavailable: 'Raven could not start its video engine, so it plays only the videos Chromium can.',
   off: 'The video engine is off for this run.',
 } as const
 

@@ -1,6 +1,6 @@
 name: 🖥️ Desktop release
 
-# Builds raven player for macOS arm64 and attaches it to the release of each pushed
+# Builds Raven for macOS arm64 and attaches it to the release of each pushed
 # vX.Y.Z tag (scripts/bump_version.sh --push): the dmg, the zip, the libmpv sources
 # tarball and SHA256SUMS. release.yml still creates that release from the commit log;
 # this workflow waits for it, uploads the assets with --clobber (a re-run replaces
@@ -34,7 +34,7 @@ concurrency:
 
 jobs:
   build:
-    name: 🖥️ Build raven player for macOS arm64
+    name: 🖥️ Build Raven for macOS arm64
     # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
     runs-on: macos-26
     # Room for a cold libmpv source build when no cache holds it.
@@ -84,7 +84,7 @@ jobs:
       - name: 🗂️ Gather the release assets
         run: bunx nx run @raven/desktop:release:assets
 
-      - name: 📤 raven player release assets
+      - name: 📤 Raven release assets
         uses: actions/upload-artifact@v7
         with:
           name: raven-player-release-${{ github.sha }}
@@ -92,7 +92,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: 🏷️ Attach raven player to the release
+    name: 🏷️ Attach Raven to the release
     needs: build
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
@@ -135,8 +135,8 @@ jobs:
       - name: 📝 Append the install notes
         run: |
           body=$(gh release view "$TAG" --json body -q .body)
-          if tr -d '\r' <<< "$body" | grep -qx '## Installing raven player'; then
-            echo "$TAG's notes already say how to install raven player."
+          if tr -d '\r' <<< "$body" | grep -qx '## Installing Raven'; then
+            echo "$TAG's notes already say how to install Raven."
             exit 0
           fi
           {

@@ -22,7 +22,7 @@ describe('startDesktop', () => {
     expect(document.documentElement.dataset.desktop).toBeUndefined()
   })
 
-  it("keeps raven player's bridge and marks the page as the app's", () => {
+  it("keeps Raven's bridge and marks the page as the app's", () => {
     started({ request: noop, dropFiles: noop, subscribe: noop })
     expect(useDesktopBridge.getState().desktop).not.toBeNull()
     expect(document.documentElement.dataset.desktop).toBe('')

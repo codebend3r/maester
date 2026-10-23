@@ -42,7 +42,7 @@ export type DownloadPlaybackDeps = {
   stat: (path: string) => Promise<{ size: number; mtimeMs: number }>
   now: () => number
   warn: (message: string) => void
-  /** The server's name, or '' for a server raven player no longer plays from. */
+  /** The server's name, or '' for a server Raven no longer plays from. */
   serverNameOf: (serverId: string) => string
   change: (apply: (state: DownloadsState) => DownloadsState) => void
   /** Tells the page the list changed when only a share watched did. */
@@ -53,12 +53,12 @@ export type DownloadPlaybackDeps = {
   onLeft: () => void
   /**
    * The account signed in to a server, as the page's session names it; null when none is, and
-   * for a server raven player no longer reaches, whose downloads owe it nothing.
+   * for a server Raven no longer reaches, whose downloads owe it nothing.
    */
   accountIdOf: (input: { serverId: string }) => string | null
   /**
    * The last account the page signed in to a server with, kept past a sign out and a relaunch;
-   * null until one has, and for a server raven player no longer reaches.
+   * null until one has, and for a server Raven no longer reaches.
    */
   lastAccountIdOf: (input: { serverId: string }) => string | null
 }
@@ -163,7 +163,7 @@ const forgetVideos = (state: PlayerState, { paths }: { paths: readonly string[] 
 const isMarked = (entry: DownloadEntry | null): boolean =>
   entry !== null && entry.watchedAt !== null
 
-/** The play side of raven player's downloads: a download played as a local file, and what it leaves. */
+/** The play side of Raven's downloads: a download played as a local file, and what it leaves. */
 export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlayback => {
   const { store, grants } = deps
   /** Each ready download's video as last read, so the views read its share watched at once. */
@@ -258,7 +258,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     const later = laterReady(entry).slice(0, MAX_QUEUE)
     const fileId = await grantVideo(entry)
     if (fileId === null) {
-      deps.warn(`raven player could not open the file of ${loggable(entry.label)}`)
+      deps.warn(`Raven could not open the file of ${loggable(entry.label)}`)
       return refused(DOWNLOAD_MESSAGES.fileGone)
     }
     sit({ fileId, entry })
@@ -266,9 +266,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
       later.map(async (other) => {
         const queuedId = await grantVideo(other)
         if (queuedId === null) {
-          deps.warn(
-            `raven player left ${loggable(other.label)} out of the queue: its file has gone`,
-          )
+          deps.warn(`Raven left ${loggable(other.label)} out of the queue: its file has gone`)
         }
         return queuedId
       }),
@@ -287,7 +285,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     if (entry === null || entry.status.kind !== DOWNLOAD_STATUS_KINDS.ready) return null
     const fileId = await grantVideo(entry)
     if (fileId === null) {
-      deps.warn(`raven player could not open the file of ${loggable(entry.label)}`)
+      deps.warn(`Raven could not open the file of ${loggable(entry.label)}`)
       return null
     }
     noteOpened({ fileId })
@@ -420,7 +418,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
 
   const readFiles: DownloadPlayback['readFiles'] = (entries) => {
     readAll(entries).catch((error: unknown) => {
-      deps.warn(`raven player could not read its downloaded files: ${loggable(errorText(error))}`)
+      deps.warn(`Raven could not read its downloaded files: ${loggable(errorText(error))}`)
     })
   }
 

@@ -18,7 +18,7 @@ import {
 import { type RunCommand, signAdHoc } from './src/build/machO'
 import { MPV_STAGING } from './src/build/stageMpv'
 
-const APP_NAME = 'raven player'
+const APP_NAME = 'Raven'
 const signing = signingFrom(process.env)
 const execFileAsync = promisify(execFile)
 const run: RunCommand = ({ command, args }) => execFileAsync(command, args)

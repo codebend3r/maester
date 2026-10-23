@@ -3,5 +3,5 @@
  * so no promise is left floating.
  */
 export const handled = (action: Promise<unknown>): void => {
-  action.catch((error: unknown) => console.error('raven player could not finish that.', error))
+  action.catch((error: unknown) => console.error('Raven could not finish that.', error))
 }

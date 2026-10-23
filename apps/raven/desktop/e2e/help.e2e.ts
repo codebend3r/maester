@@ -96,7 +96,7 @@ test.describe('the Help menu', () => {
           .toBe(true)
       },
     })
-    expect(text.startsWith('raven player ')).toBe(true)
+    expect(text.startsWith('Raven ')).toBe(true)
     expect(text).toContain('Video engine: mpv v0.')
     expect(text).toContain('hwdec=auto')
     expect(text).not.toContain('/')
@@ -104,7 +104,7 @@ test.describe('the Help menu', () => {
 
   test('copies diagnostics that say why the engine is unavailable', async () => {
     const text = await copiedDiagnostics({ mpv: ENGINE_MODES.off, ready: async () => undefined })
-    expect(text.startsWith('raven player ')).toBe(true)
+    expect(text.startsWith('Raven ')).toBe(true)
     expect(text).toContain('Video engine: unavailable (The video engine is off for this run.)')
   })
 })

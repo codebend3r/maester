@@ -39,7 +39,7 @@ export const stageMpv = async ({
   const missing = missingMpvFiles({ exists: (relative) => fs.exists(join(from, relative)) })
   if (missing.length > 0) {
     throw new Error(
-      `raven player packages the video engine, and these are missing from ${from}: ${missing.join(', ')}. CI builds them (bunx nx run @raven/mpv:build:native).`,
+      `Raven packages the video engine, and these are missing from ${from}: ${missing.join(', ')}. CI builds them (bunx nx run @raven/mpv:build:native).`,
     )
   }
   await fs.remove(to)

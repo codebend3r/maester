@@ -98,7 +98,7 @@ describe('settleDownloads', () => {
       },
     ])
     expect(warnings).toEqual([
-      `raven player could not move a download to its server: ENOENT: ${dirOf(adopted)}`,
+      `Raven could not move a download to its server: ENOENT: ${dirOf(adopted)}`,
     ])
   })
 

@@ -98,7 +98,7 @@ export type DocumentTypes = {
 
 /**
  * Info.plist's document types for the extensions, claimed by UTI and never by bare
- * extension, at `Alternate` rank so raven player is offered without taking over a default.
+ * extension, at `Alternate` rank so Raven is offered without taking over a default.
  * Throws when an extension has no UTI, so a new video extension fails until it is placed.
  */
 export const documentTypes = (extensions: readonly string[]): DocumentTypes => {

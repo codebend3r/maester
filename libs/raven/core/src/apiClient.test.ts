@@ -464,7 +464,7 @@ describe('createApiClient', () => {
     expect(isLockedError(new ApiError({ status: 403, message: 'No' }))).toBe(false)
   })
 
-  it("tells raven player's unreachable server apart from the server's own 502", async () => {
+  it("tells Raven's unreachable server apart from the server's own 502", async () => {
     const unreachable = clientReturning(
       respond({ status: 502, body: { error: WEB_HOST_ERRORS.serverUnreachable } }),
     )

@@ -85,7 +85,7 @@ const Group = ({ grouped, onDeleted }: { grouped: Grouped; onDeleted: () => void
   )
 }
 
-/** Every title raven player has downloaded or is downloading, and the disk they are kept on. */
+/** Every title Raven has downloaded or is downloading, and the disk they are kept on. */
 export const DownloadsPage = () => {
   const downloads = useDownloads()
   const space = useSpace()

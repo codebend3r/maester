@@ -518,7 +518,7 @@ describe('isStoredPlayerState', () => {
     expect(isStoredPlayerState(JSON.parse(JSON.stringify(written)))).toBe(true)
   })
 
-  it("reads an older raven player's server titles and leaves them out of the recents", () => {
+  it("reads an older Raven's server titles and leaves them out of the recents", () => {
     const written: unknown = JSON.parse(
       JSON.stringify({
         ...EMPTY_STATE,

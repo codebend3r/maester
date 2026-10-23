@@ -7,14 +7,14 @@ import { offlineReturnIn } from '@/desktop/paths'
 import { useServerReach } from '@/stores/serverReach'
 import { handled } from '@/desktop/handled'
 
-/** How often raven player asks again while its server cannot be reached. */
+/** How often Raven asks again while its server cannot be reached. */
 export const OFFLINE_RETRY_MS = 5_000
 
 const AUTH_CONFIG_HASH = hashKey(queryKeys.authConfig)
 
 /**
  * Whether a failed read of the account config means the server is out of reach: the network
- * failed before any answer, or the answer came from in front of it (raven player's web host, or
+ * failed before any answer, or the answer came from in front of it (Raven's web host, or
  * a proxy's gateway error with no JSON; see core's `isUnreachableAnswer`). Any other answer,
  * an error status among them, came from the server.
  */

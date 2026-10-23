@@ -47,7 +47,7 @@ export const createGrants = ({ fs, newId }: { fs: GrantFs; newId: () => string }
 
   // An id already held by another file would re-point that grant, so draw again.
   const unusedId = (draws: number): string => {
-    if (draws === 0) throw new Error('raven player could not draw a unique file id.')
+    if (draws === 0) throw new Error('Raven could not draw a unique file id.')
     const id = newId()
     return byId.has(id) ? unusedId(draws - 1) : id
   }

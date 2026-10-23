@@ -25,7 +25,7 @@ const pcm = [
   { name: 'audio-channels', value: 'auto-safe' },
   { name: 'audio-exclusive', value: false },
   { name: 'audio-normalize-downmix', value: false },
-  { name: 'ao', value: 'coreaudio' },
+  { name: 'ao', value: 'coreaudio,avfoundation' },
 ]
 
 test('pcm', () => {
@@ -45,7 +45,7 @@ test('passthrough joins the formats and fixes the volume', () => {
     { name: 'audio-channels', value: 'auto-safe' },
     { name: 'audio-exclusive', value: true },
     { name: 'audio-normalize-downmix', value: false },
-    { name: 'ao', value: 'coreaudio' },
+    { name: 'ao', value: 'coreaudio,avfoundation' },
     { name: 'volume', value: 100 },
     { name: 'mute', value: false },
   ])
@@ -70,7 +70,7 @@ test('headphones downmix to stereo, or go spatial through avfoundation', () => {
     { name: 'audio-exclusive', value: false },
     { name: 'audio-channels', value: 'stereo' },
     { name: 'audio-normalize-downmix', value: true },
-    { name: 'ao', value: 'coreaudio' },
+    { name: 'ao', value: 'coreaudio,avfoundation' },
   ])
   expect(
     outputOptions({
@@ -84,7 +84,7 @@ test('headphones downmix to stereo, or go spatial through avfoundation', () => {
     { name: 'audio-exclusive', value: false },
     { name: 'audio-channels', value: 'auto-safe' },
     { name: 'audio-normalize-downmix', value: false },
-    { name: 'ao', value: 'avfoundation' },
+    { name: 'ao', value: 'avfoundation,coreaudio' },
   ])
 })
 
@@ -161,8 +161,8 @@ test('spatial only applies to headphones', () => {
       devices,
       canChooseAo: true,
     })
-    expect(options).not.toContainEqual({ name: 'ao', value: 'avfoundation' })
-    expect(options).toContainEqual({ name: 'ao', value: 'coreaudio' })
+    expect(options).not.toContainEqual({ name: 'ao', value: 'avfoundation,coreaudio' })
+    expect(options).toContainEqual({ name: 'ao', value: 'coreaudio,avfoundation' })
   })
 })
 

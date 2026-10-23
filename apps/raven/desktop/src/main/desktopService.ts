@@ -38,14 +38,14 @@ import { UPDATE_COPY, type UpdateService } from '@/main/updateService'
 import { MAX_QUEUE } from '@/shared/hostNames'
 
 export const MESSAGES = {
-  notVideo: 'raven player opens video files only.',
+  notVideo: 'Raven opens video files only.',
   missing: 'That file could not be found.',
   nothingDropped: 'Drop a video file to play it.',
   notOpen: 'That video is no longer open. Open it again from On this Mac or Downloads.',
   unknownRecent: 'That video is no longer in your recents.',
-  unknownRequest: 'raven player does not understand that request.',
-  failed: 'raven player could not do that. Try again.',
-  badSession: 'raven player could not read that sign in.',
+  unknownRequest: 'Raven does not understand that request.',
+  failed: 'Raven could not do that. Try again.',
+  badSession: 'Raven could not read that sign in.',
 } as const
 
 /** How long the recents wait on one file's check: a sleeping share can block for minutes. */

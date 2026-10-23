@@ -64,7 +64,7 @@ describe('useChangeDownloads', () => {
     const { result } = renderHook(() => useChangeDownloads(), { wrapper })
     expect(await result.current({ type: DESKTOP_REQUESTS.pauseAllDownloads })).toBe(false)
     expect(useToasts.getState().toasts.map((toast) => toast.message)).toEqual([
-      'raven player could not change its downloads. Try again.',
+      'Raven could not change its downloads. Try again.',
     ])
   })
 })

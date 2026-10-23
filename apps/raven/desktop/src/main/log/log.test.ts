@@ -1403,7 +1403,7 @@ describe('createLog', () => {
 
 describe('SILENT_LOG', () => {
   it('writes nothing and is never dirty', async () => {
-    SILENT_LOG.info('launch raven player')
+    SILENT_LOG.info('launch Raven')
     SILENT_LOG.warn('w')
     SILENT_LOG.error('e')
     expect(SILENT_LOG.isDirty()).toBe(false)

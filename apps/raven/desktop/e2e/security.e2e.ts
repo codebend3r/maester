@@ -51,7 +51,7 @@ test.describe('the security baseline', () => {
   let launched: Launched | null = null
 
   const running = (): Launched => {
-    if (launched === null) throw new Error('raven player is not running.')
+    if (launched === null) throw new Error('Raven is not running.')
     return launched
   }
 
@@ -233,7 +233,7 @@ test.describe('the security baseline', () => {
     // runs after it and sees whether it prevented the navigation.
     await app.evaluate(({ BrowserWindow }, key) => {
       const [window] = BrowserWindow.getAllWindows()
-      if (window === undefined) throw new Error('raven player has no window.')
+      if (window === undefined) throw new Error('Raven has no window.')
       const decided = new Promise((resolve) => {
         window.webContents.once('will-navigate', (event) => {
           resolve({ url: event.url, isPrevented: event.defaultPrevented })

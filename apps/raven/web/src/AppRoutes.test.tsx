@@ -37,7 +37,7 @@ describe('AppRoutes signed out', () => {
   })
 })
 
-describe('AppRoutes inside raven player', () => {
+describe('AppRoutes inside Raven', () => {
   const list = spyOn(api, 'listLibraries')
 
   afterEach(() => list.mockReset())

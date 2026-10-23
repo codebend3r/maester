@@ -214,7 +214,7 @@ describe('createEngineSlot', () => {
       warn,
     })
     expect(await slot.get()).toEqual({ status: 'native', engine: { name: 'mpv' } })
-    expect(warn).toHaveBeenCalledWith('raven player could not watch its video engine: no listeners')
+    expect(warn).toHaveBeenCalledWith('Raven could not watch its video engine: no listeners')
   })
 })
 

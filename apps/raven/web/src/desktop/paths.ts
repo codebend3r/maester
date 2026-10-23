@@ -4,7 +4,7 @@ import { generatePath, matchPath } from 'react-router-dom'
 /** A local file or download playing, by the id main granted for it. */
 export const playPathOf = (fileId: string): string => generatePath(DESKTOP_PATHS.play, { fileId })
 
-/** What raven player shows while its server cannot be reached: nothing that needs the server. */
+/** What Raven shows while its server cannot be reached: nothing that needs the server. */
 const OFFLINE_PAGES = [
   DESKTOP_PATHS.downloads,
   DESKTOP_PATHS.local,

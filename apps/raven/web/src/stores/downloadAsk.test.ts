@@ -28,7 +28,7 @@ describe('useDownloadAsk', () => {
     expect(useDownloadAsk.getState().shown).toEqual({ ask: askOf(OTHER_ASK_ID), instance: 3 })
   })
 
-  it('declines nothing outside raven player', () => {
+  it('declines nothing outside Raven', () => {
     useDownloadAsk.getState().show(askOf(ASK_ID))
     useDownloadAsk.getState().show(askOf(OTHER_ASK_ID))
     expect(useDownloadAsk.getState().shown?.instance).toBe(2)

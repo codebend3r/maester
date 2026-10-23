@@ -46,7 +46,7 @@ const release = ({
 })
 
 /** The toast main's notice of a newer release raises, over whatever page is open. */
-const updateNotice = (page: Page) => page.getByText(/^raven player [\d.]+ is out\. Settings has/u)
+const updateNotice = (page: Page) => page.getByText(/^Raven [\d.]+ is out\. Settings has/u)
 
 /** Settings' Updates section, from the side menu of the frame a launch with no server opens. */
 const openUpdates = async (page: Page) => {
@@ -121,10 +121,10 @@ test.describe('the release check', () => {
             await stubBrowser({ app })
             const notice = updateNotice(page)
             await expect(notice).toBeVisible({ timeout: NOTICE_WAIT_MS })
-            await expect(notice).toHaveText("raven player 99.0.0 is out. Settings has what's new.")
+            await expect(notice).toHaveText("Raven 99.0.0 is out. Settings has what's new.")
 
             const updates = await openUpdates(page)
-            await expect(updates.getByText('raven player 99.0.0 is out.')).toBeVisible()
+            await expect(updates.getByText('Raven 99.0.0 is out.')).toBeVisible()
             await updates.getByRole('button', { name: "See what's new" }).click()
             await expect
               .poll(() => browserOpens({ app }))
@@ -180,7 +180,7 @@ test.describe('the release check', () => {
           run: async ({ page }) => {
             const notice = updateNotice(page)
             await expect(notice).toBeVisible({ timeout: NOTICE_WAIT_MS })
-            await expect(notice).toContainText('raven player 99.0.0 is out.')
+            await expect(notice).toContainText('Raven 99.0.0 is out.')
             expect(fixture.requests()).toBe(2)
           },
         })
@@ -201,12 +201,12 @@ test.describe('the release check', () => {
           run: async ({ page }) => {
             await expect
               .poll(() => checkedStatus(page), { timeout: NOTICE_WAIT_MS })
-              .toEqual({ latest: null, problem: 'GitHub listed no raven player release.' })
+              .toEqual({ latest: null, problem: 'GitHub listed no Raven release.' })
             await expect(updateNotice(page)).toHaveCount(0)
             const updates = await openUpdates(page)
             await updates.getByRole('button', { name: 'Check now' }).click()
             await expect(updates.getByRole('status')).toHaveText(
-              'raven player could not check for updates. GitHub listed no raven player release.',
+              'Raven could not check for updates. GitHub listed no Raven release.',
             )
             await expect(updates.getByText(/is the newest release/)).toHaveCount(0)
           },

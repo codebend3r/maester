@@ -35,7 +35,7 @@ export const removeFolder = async ({
   what: string
 }): Promise<void> => {
   await fs.rm(path).catch((error: unknown) => {
-    warn(`raven player could not remove ${what}: ${loggable(errorText(error))}`)
+    warn(`Raven could not remove ${what}: ${loggable(errorText(error))}`)
   })
 }
 
@@ -48,14 +48,14 @@ const sweepFolders = async ({
 }: SweepDeps & { wasSetAside: boolean }): Promise<void> => {
   // A set-aside list names nothing, so every folder would look unnamed; they wait for a later launch.
   if (wasSetAside) {
-    warn('raven player kept every download folder: its list of downloads was set aside')
+    warn('Raven kept every download folder: its list of downloads was set aside')
     return
   }
   /** The names in a folder; none when it does not exist, and none, with a warning, when it cannot be read. */
   const namesIn = (path: string): Promise<string[]> =>
     fs.readdir(path).catch((error: unknown) => {
       if (!isMissingFile(error)) {
-        warn(`raven player could not read its downloads: ${loggable(errorText(error))}`)
+        warn(`Raven could not read its downloads: ${loggable(errorText(error))}`)
       }
       return []
     })
@@ -90,10 +90,10 @@ const sweepFolders = async ({
     ...unnamed.map((path) => removing({ path, what: 'a download folder no download names' })),
   ])
   if (unnamedServers.length > 0) {
-    warn(`raven player removed ${unnamedServers.length} server folders no download names`)
+    warn(`Raven removed ${unnamedServers.length} server folders no download names`)
   }
   if (unnamed.length > 0) {
-    warn(`raven player removed ${unnamed.length} download folders no download names`)
+    warn(`Raven removed ${unnamed.length} download folders no download names`)
   }
 }
 
@@ -103,5 +103,5 @@ const sweepFolders = async ({
  */
 export const sweepDownloads = (input: SweepDeps & { wasSetAside: boolean }): Promise<void> =>
   sweepFolders(input).catch((error: unknown) => {
-    input.warn(`raven player could not sweep its downloads: ${loggable(errorText(error))}`)
+    input.warn(`Raven could not sweep its downloads: ${loggable(errorText(error))}`)
   })

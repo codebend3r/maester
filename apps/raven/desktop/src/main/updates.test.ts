@@ -340,7 +340,7 @@ const nextLink = (page: number) => `<${pageUrl(page)}>; rel="next"`
 describe('checkForUpdates', () => {
   const NEWER = JSON.stringify([release({ tag: 'v0.6.0' })])
 
-  it('asks for GitHub JSON as raven player, with a deadline', async () => {
+  it('asks for GitHub JSON as Raven, with a deadline', async () => {
     const { fetch, calls } = replying({ status: 200, text: NEWER })
     await check({ fetch })
     expect(calls.length).toBe(1)
@@ -567,8 +567,8 @@ describe('checkForUpdates', () => {
     expect(UPDATE_PROBLEMS).toEqual({
       unreachable: 'GitHub did not answer.',
       busy: 'GitHub is busy. Try again later.',
-      unreadable: 'GitHub sent something raven player could not read.',
-      unlisted: 'GitHub listed no raven player release.',
+      unreadable: 'GitHub sent something Raven could not read.',
+      unlisted: 'GitHub listed no Raven release.',
     })
   })
 })

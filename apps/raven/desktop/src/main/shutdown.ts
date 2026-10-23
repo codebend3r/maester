@@ -115,7 +115,7 @@ export const createShutdown = ({
       engine.destroy().then(
         () => STEP_OUTCOMES.stopped,
         (error: unknown) => {
-          warn(`raven player could not stop its video engine: ${messageOf(error)}`)
+          warn(`Raven could not stop its video engine: ${messageOf(error)}`)
           return STEP_OUTCOMES.failed
         },
       ),
@@ -123,7 +123,7 @@ export const createShutdown = ({
     ])
     if (outcome !== STEP_OUTCOMES.timedOut) return
     hasTimedOut = true
-    warn(`raven player's video engine did not stop within ${DESTROY_MS} ms.`)
+    warn(`Raven's video engine did not stop within ${DESTROY_MS} ms.`)
   }
 
   const settleWrites = async () => {
@@ -137,7 +137,7 @@ export const createShutdown = ({
     ])
     if (outcome !== STEP_OUTCOMES.timedOut) return
     hasWritesTimedOut = true
-    warn(`raven player's saves to a server did not finish within ${DESTROY_MS} ms.`)
+    warn(`Raven's saves to a server did not finish within ${DESTROY_MS} ms.`)
   }
 
   const flushLog = async () => {
@@ -151,7 +151,7 @@ export const createShutdown = ({
     ])
     if (outcome !== STEP_OUTCOMES.timedOut) return
     hasLogTimedOut = true
-    warn(`raven player's log did not write within ${LOG_FLUSH_MS} ms.`)
+    warn(`Raven's log did not write within ${LOG_FLUSH_MS} ms.`)
   }
 
   const settle = async () => {

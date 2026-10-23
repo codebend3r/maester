@@ -76,7 +76,7 @@ const CountedIcon = ({ icon, count }: { icon: IconName; count: number }) => (
   </span>
 )
 
-/** raven player's own rows: the files on this Mac, and the downloads with how many are under way. */
+/** Raven's own rows: the files on this Mac, and the downloads with how many are under way. */
 const DesktopNavItems = ({ isIconsOnly }: { isIconsOnly: boolean }) => {
   const inProgress = useInProgressCount()
   return (

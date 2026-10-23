@@ -26,19 +26,17 @@ export const createRequestHandler = ({
 }): ((request: { frameUrl: string | null; payload: unknown }) => Promise<DesktopReply>) => {
   return async ({ frameUrl, payload }) => {
     if (!isTrustedSender(frameUrl)) {
-      warn(
-        `raven player refused a request from ${frameUrl ?? 'an unknown frame'}, not ${PAGE_ORIGIN}.`,
-      )
+      warn(`Raven refused a request from ${frameUrl ?? 'an unknown frame'}, not ${PAGE_ORIGIN}.`)
       return REFUSED
     }
     try {
       const reply = await handle(payload)
       if (reply.type === DESKTOP_REPLIES.refused) {
-        warn(`raven player refused a request: ${reply.message}`)
+        warn(`Raven refused a request: ${reply.message}`)
       }
       return reply
     } catch (error) {
-      warn(`raven player failed to answer a request: ${describeError(error)}`)
+      warn(`Raven failed to answer a request: ${describeError(error)}`)
       return REFUSED
     }
   }

@@ -162,9 +162,7 @@ describe('linkOriginsFrom', () => {
       pick({ isPackaged: true, built: 'https://raven.example/api,ftp://x,raven.example', env: {} }),
     ).toEqual({
       origins: [],
-      warnings: [
-        'raven player ignored 3 of RAVEN_DESKTOP_LINK_ORIGINS: not http or https origins.',
-      ],
+      warnings: ['Raven ignored 3 of RAVEN_DESKTOP_LINK_ORIGINS: not http or https origins.'],
     })
   })
 })

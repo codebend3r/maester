@@ -50,7 +50,7 @@ export const createPageUnlock =
       const value = found[0]?.value ?? null
       return value !== null && isCookieValue(value) ? `${UNLOCK_COOKIE}=${value}` : null
     } catch (error) {
-      warn(`raven player could not read the page's unlock: ${loggable(messageOf(error))}`)
+      warn(`Raven could not read the page's unlock: ${loggable(messageOf(error))}`)
       return null
     }
   }

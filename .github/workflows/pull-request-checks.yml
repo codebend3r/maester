@@ -268,7 +268,7 @@ jobs:
         run: bun run desktop:smoke:packaged
 
       # The unsigned app, for trying the PR's build by hand.
-      - name: 📤 Unsigned raven player
+      - name: 📤 Unsigned Raven
         uses: actions/upload-artifact@v7
         with:
           name: raven-player-darwin-arm64-${{ github.event.pull_request.head.sha }}

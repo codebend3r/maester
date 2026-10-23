@@ -8,6 +8,6 @@ interface ImportMetaEnv {
 }
 
 interface Window {
-  /** raven player's preload bridge, on the desktop app's own origin only; checked before use. */
+  /** Raven's preload bridge, on the desktop app's own origin only; checked before use. */
   readonly ravenDesktop?: unknown
 }

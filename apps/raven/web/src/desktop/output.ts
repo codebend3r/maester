@@ -10,9 +10,9 @@ import { type DesktopClient, refusalText } from '@/desktop/client'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { useDesktop } from '@/stores/desktop'
 
-const UNREADABLE = 'raven player could not read its sound settings.'
+const UNREADABLE = 'Raven could not read its sound settings.'
 
-/** How raven player sends sound from this Mac, the devices it can send it to, and whether mpv runs. */
+/** How Raven sends sound from this Mac, the devices it can send it to, and whether mpv runs. */
 export type OutputRead = { output: OutputSettings; devices: AudioDevice[]; isEngineReady: boolean }
 
 /** Main's sound output, read once: Settings writes it back into the cache as it changes. */

@@ -2,7 +2,7 @@
   // The tab bar's rows, padding and hairline (TabBar.module.scss), which a
   // phone's page leaves room for under itself.
   --tab-bar-height: calc(var(--control-size-large) + 2 * var(--space-0) + 1px);
-  // How far the logo and the bar sit under the top: raven player's window
+  // How far the logo and the bar sit under the top: Raven's window
   // runs its traffic lights over it, so there they clear those too.
   --side-top: max(var(--space-5), calc(var(--titlebar-inset) + var(--space-3)));
 
@@ -160,7 +160,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-// raven player's window has no title bar: this strip along its top is what
+// Raven's window has no title bar: this strip along its top is what
 // drags it, over the page as it scrolls. --titlebar-inset is 0 in a browser,
 // where the strip is never drawn anyway.
 .titlebar {

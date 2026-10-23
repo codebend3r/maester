@@ -38,7 +38,7 @@ export type JsonStoreOptions<T> = {
   onError: (error: unknown) => void
 }
 
-/** The `code` of the Node system errors raven player tells apart. */
+/** The `code` of the Node system errors Raven tells apart. */
 export const ERROR_CODES = {
   enoent: 'ENOENT',
   addressInUse: 'EADDRINUSE',

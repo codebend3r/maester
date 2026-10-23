@@ -37,11 +37,11 @@ const FORMAT_LABELS = {
 } as const satisfies Record<(typeof CARRIED_FORMATS)[number], string>
 
 const SAVED = 'Sound output saved. It applies to the video you play next.'
-const UNSAVED = 'raven player could not save the sound output. Try again.'
+const UNSAVED = 'Raven could not save the sound output. Try again.'
 
 type OutputPick = { id: number; apply: (base: OutputSettings) => OutputSettings }
 
-/** How raven player sends sound from this Mac: mpv's audio output, passthrough and device. */
+/** How Raven sends sound from this Mac: mpv's audio output, passthrough and device. */
 export const ThisComputerSection = () => {
   const { client } = useDesktop()
   const queryClient = useQueryClient()
@@ -115,7 +115,7 @@ export const ThisComputerSection = () => {
   const isDeviceListMissing = !isEngineReady || devices.length === 0
 
   return (
-    <Section icon="volume" title="This computer" help="How raven player sends sound from this Mac.">
+    <Section icon="volume" title="This computer" help="How Raven sends sound from this Mac.">
       {read.isError && (
         <p className={settings.error} role="alert">
           {read.error.message}
@@ -125,7 +125,7 @@ export const ThisComputerSection = () => {
         <>
           {!isEngineReady && (
             <p className={settings.hint}>
-              raven player's video engine is not running, so the sound settings wait until it is.
+              Raven's video engine is not running, so the sound settings wait until it is.
             </p>
           )}
           <fieldset className={settings.setting}>

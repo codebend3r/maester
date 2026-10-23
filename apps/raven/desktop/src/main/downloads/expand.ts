@@ -52,9 +52,9 @@ export type Expansion =
     }
 
 export const EXPAND_MESSAGES = {
-  tooMany: 'That is more than raven player downloads at once.',
+  tooMany: 'That is more than Raven downloads at once.',
   gone: (name: string) => `That title is not on ${name} any more.`,
-  unreadable: (name: string) => `${name} answered with something raven player could not read.`,
+  unreadable: (name: string) => `${name} answered with something Raven could not read.`,
   account: (name: string) => `${name} did not let your account download that.`,
 } as const
 

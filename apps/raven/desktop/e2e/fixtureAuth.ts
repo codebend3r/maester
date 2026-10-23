@@ -375,7 +375,7 @@ export const createFixtureAuth = ({
       answerTicketMint({ request, response, mediaId: mintId })
       return true
     }
-    // raven player's page signs in here from its own origin, as it does at Supabase.
+    // Raven's page signs in here from its own origin, as it does at Supabase.
     if (pathname.startsWith(AUTH_V1_PREFIX)) allowCrossOrigin({ response, origin: PAGE_ORIGIN })
     if (method === PREFLIGHT_METHOD && pathname.startsWith(AUTH_V1_PREFIX)) {
       sendEmpty({ response, status: 204 })

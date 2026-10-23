@@ -164,9 +164,7 @@ describe('checkNow', () => {
       latest: null,
       problem: UPDATE_PROBLEMS.unreachable,
     })
-    expect(warnings).toEqual([
-      `raven player could not check for updates: ${UPDATE_PROBLEMS.unreachable}`,
-    ])
+    expect(warnings).toEqual([`Raven could not check for updates: ${UPDATE_PROBLEMS.unreachable}`])
   })
 
   it('keeps a newer release through a failure, and a current answer clears both', async () => {
@@ -219,7 +217,7 @@ describe('checkNow', () => {
   })
 })
 
-describe('a list with no raven player release in it', () => {
+describe('a list with no Raven release in it', () => {
   // GitHub as it answers when build releases fill the page: none of them carries the app.
   const onlyBuilds: UpdateFetch = async () => ({
     status: 200,
@@ -246,11 +244,9 @@ describe('a list with no raven player release in it', () => {
       current: CURRENT,
       checkedAt: NOW,
       latest: null,
-      problem: 'GitHub listed no raven player release.',
+      problem: 'GitHub listed no Raven release.',
     })
-    expect(warnings).toEqual([
-      'raven player could not check for updates: GitHub listed no raven player release.',
-    ])
+    expect(warnings).toEqual(['Raven could not check for updates: GitHub listed no Raven release.'])
   })
 
   it('tells the menu it could not check, never that this is the newest', async () => {
@@ -260,8 +256,8 @@ describe('a list with no raven player release in it', () => {
     const dialog = updateDialogFor({ check: await service.checkNow(), current: CURRENT })
     expect(dialog).toMatchObject({
       type: 'warning',
-      message: 'raven player could not check for updates.',
-      detail: 'GitHub listed no raven player release.',
+      message: 'Raven could not check for updates.',
+      detail: 'GitHub listed no Raven release.',
       opensRelease: false,
     })
     expect(dialog.message).not.toContain('newest')
@@ -328,7 +324,7 @@ describe('openRelease', () => {
     const { service, warnings } = setup({ isBrowserBroken: true })
     await service.checkNow()
     expect(await service.openRelease()).toBe(false)
-    expect(warnings).toEqual(['raven player could not open the release page: no browser'])
+    expect(warnings).toEqual(['Raven could not open the release page: no browser'])
   })
 })
 
@@ -349,9 +345,9 @@ describe('updateDialogFor', () => {
   it('offers the release page for a newer release', () => {
     expect(updateDialogFor({ check: NEWER, current: CURRENT })).toEqual({
       type: 'info',
-      message: 'raven player 0.6.0 is out.',
+      message: 'Raven 0.6.0 is out.',
       detail:
-        'Download it from its release page. While raven player is signed ad hoc it cannot update itself.',
+        'Download it from its release page. While Raven is signed ad hoc it cannot update itself.',
       buttons: ['See Release', 'Later'],
       defaultId: 0,
       cancelId: 1,
@@ -362,7 +358,7 @@ describe('updateDialogFor', () => {
   it('says the running version is the newest', () => {
     expect(updateDialogFor({ check: UP_TO_DATE, current: CURRENT })).toEqual({
       type: 'info',
-      message: 'raven player 0.5.4 is the newest release.',
+      message: 'Raven 0.5.4 is the newest release.',
       detail: '',
       buttons: ['OK'],
       defaultId: 0,
@@ -511,7 +507,7 @@ describe('createMenuCheck', () => {
     await menuCheck()
     expect(shown.at(1)).toEqual({
       type: 'warning',
-      message: 'raven player could not open the release page.',
+      message: 'Raven could not open the release page.',
       detail: '',
       buttons: ['OK'],
       defaultId: 0,

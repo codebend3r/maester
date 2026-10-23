@@ -105,7 +105,7 @@ export const sendQuietly = ({
   onRefused?: () => void
 }): void => {
   player.send(command).then(onAccepted, (error: unknown) => {
-    console.warn(`raven player refused ${command.type}: ${reasonOf(error)}`)
+    console.warn(`Raven refused ${command.type}: ${reasonOf(error)}`)
     onRefused()
   })
 }

@@ -141,12 +141,12 @@ describe('signingFrom', () => {
 })
 
 describe('adHocApps', () => {
-  const outputPaths = ['/o/raven player-darwin-arm64']
+  const outputPaths = ['/o/Raven-darwin-arm64']
 
   it('signs each packaged app ad hoc on macOS without an identity', () => {
-    expect(
-      adHocApps({ platform: 'darwin', signing: {}, outputPaths, appName: 'raven player' }),
-    ).toEqual(['/o/raven player-darwin-arm64/raven player.app'])
+    expect(adHocApps({ platform: 'darwin', signing: {}, outputPaths, appName: 'Raven' })).toEqual([
+      '/o/Raven-darwin-arm64/Raven.app',
+    ])
   })
 
   it('signs nothing ad hoc when an identity signs the app', () => {
@@ -155,15 +155,13 @@ describe('adHocApps', () => {
         platform: 'darwin',
         signing: { osxSign: { identity: 'Developer ID Application: Someone' } },
         outputPaths,
-        appName: 'raven player',
+        appName: 'Raven',
       }),
     ).toEqual([])
   })
 
   it('signs nothing off macOS', () => {
-    expect(
-      adHocApps({ platform: 'linux', signing: {}, outputPaths, appName: 'raven player' }),
-    ).toEqual([])
+    expect(adHocApps({ platform: 'linux', signing: {}, outputPaths, appName: 'Raven' })).toEqual([])
   })
 })
 

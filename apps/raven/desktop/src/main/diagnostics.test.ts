@@ -34,7 +34,7 @@ describe('diagnosticsText', () => {
   it('lists the app, the system and a native engine in six lines', () => {
     expect(diagnosticsText(NATIVE)).toBe(
       [
-        'raven player 0.5.4 (packaged, arm64)',
+        'Raven 0.5.4 (packaged, arm64)',
         'macOS 26.0.1',
         'Electron 44.7.0, Chromium 146.0.7680.65, Node 24.11.1',
         'Video engine: mpv v0.41.0, FFmpeg 8.1.2',
@@ -72,10 +72,10 @@ describe('diagnosticsText', () => {
   it('says why the engine is unavailable', () => {
     expect(diagnosticsText(UNAVAILABLE)).toBe(
       [
-        'raven player 0.5.4 (unpackaged, arm64)',
+        'Raven 0.5.4 (unpackaged, arm64)',
         'macOS 26.0.1',
         'Electron 44.7.0, Chromium 146.0.7680.65, Node 24.11.1',
-        'Video engine: unavailable (raven player could not start its video engine, so it plays only the videos Chromium can.)',
+        'Video engine: unavailable (Raven could not start its video engine, so it plays only the videos Chromium can.)',
         'Hardware decoding: unknown',
         'Display: 60 Hz, EDR headroom unknown',
         '',

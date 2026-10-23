@@ -169,14 +169,14 @@ import { IPC_CHANNELS } from '@/shared/hostNames'
 const launchedAt = performance.now()
 
 const USER_DATA_HOOK = 'RAVEN_DESKTOP_USER_DATA'
-/** Where an older raven player kept its own sign-ins, encrypted: the page signs in now. */
+/** Where an older Raven kept its own sign-ins, encrypted: the page signs in now. */
 const FORMER_ACCOUNTS_DIR = 'accounts'
 
-const PRODUCT_NAME = 'raven player'
+const PRODUCT_NAME = 'Raven'
 const STORE_NOTICES = {
-  state: 'raven player could not save your recent videos.',
-  config: 'raven player could not save its settings.',
-  downloads: 'raven player could not save its downloads.',
+  state: 'Raven could not save your recent videos.',
+  config: 'Raven could not save its settings.',
+  downloads: 'Raven could not save its downloads.',
 } as const
 // Finder sends one `open-file` per file; this gathers a multi-file open into one batch.
 const OPEN_BATCH_MS = 100
@@ -266,7 +266,7 @@ const log = isPrimary
       now: Date.now,
       timers,
       onError: (error) => {
-        console.error('raven player could not write its log.', error)
+        console.error('Raven could not write its log.', error)
       },
     })
   : SILENT_LOG
@@ -283,7 +283,7 @@ const reportError = ({ text, error }: { text: string; error: unknown }): void =>
 }
 
 const reportEndFailure = (error: unknown): void => {
-  console.error('raven player could not end.', error)
+  console.error('Raven could not end.', error)
 }
 
 /** A budget mark (Ruling 13): always logged, and on stdout unpackaged, where e2e reads it. */
@@ -351,7 +351,7 @@ const startApp = (): void => {
     try {
       window.webContents.send(IPC_CHANNELS.event, event)
     } catch (error) {
-      warn(`raven player could not reach its window. ${errorText(error)}`)
+      warn(`Raven could not reach its window. ${errorText(error)}`)
     }
   }
   const liveWindow = (): BrowserWindow | null => {
@@ -424,7 +424,7 @@ const startApp = (): void => {
     timers,
     deliver: (paths) => {
       openFromMain(paths).catch((error: unknown) => {
-        reportError({ text: 'raven player could not open those files.', error })
+        reportError({ text: 'Raven could not open those files.', error })
       })
     },
   })
@@ -443,7 +443,7 @@ const startApp = (): void => {
     timers,
     deliver: (links) => {
       openLinksFromMain(links).catch((error: unknown) => {
-        reportError({ text: 'raven player could not open that link.', error })
+        reportError({ text: 'Raven could not open that link.', error })
       })
     },
   })
@@ -482,7 +482,7 @@ const startApp = (): void => {
       timers,
       debounceMs: STATE_DEBOUNCE_MS,
       onError: (error) => {
-        reportError({ text: 'raven player could not save its state.', error })
+        reportError({ text: 'Raven could not save its state.', error })
         send({ type: DESKTOP_EVENTS.notice, message: STORE_NOTICES.state })
       },
     })
@@ -502,13 +502,13 @@ const startApp = (): void => {
       timers,
       debounceMs: 0,
       onError: (error) => {
-        reportError({ text: 'raven player could not save its settings.', error })
+        reportError({ text: 'Raven could not save its settings.', error })
         send({ type: DESKTOP_EVENTS.notice, message: STORE_NOTICES.config })
       },
     })
     const theServer = () => serverOf(config.read())
     const serverOfId = (serverId: string) => serverById({ config: config.read(), serverId })
-    // Nothing opens an older raven player's server sessions any more, so none of the folders
+    // Nothing opens an older Raven's server sessions any more, so none of the folders
     // it removes is open; the removals go on while the window opens.
     const formerSessions = await clearFormerPartitions({
       dir: join(userData, PARTITIONS_DIR),
@@ -520,11 +520,11 @@ const startApp = (): void => {
       warn,
     })
     formerSessions.removing.catch((error: unknown) => {
-      warn(`raven player could not clear its old server sessions: ${errorText(error)}`)
+      warn(`Raven could not clear its old server sessions: ${errorText(error)}`)
     })
     rm(join(userData, FORMER_ACCOUNTS_DIR), { recursive: true, force: true }).catch(
       (error: unknown) => {
-        warn(`raven player could not clear its old sign-ins: ${errorText(error)}`)
+        warn(`Raven could not clear its old sign-ins: ${errorText(error)}`)
       },
     )
     const grants = createGrants({ fs: { realpath, stat }, newId: randomUUID })
@@ -586,7 +586,7 @@ const startApp = (): void => {
       timers,
       debounceMs: DOWNLOADS_DEBOUNCE_MS,
       onError: (error) => {
-        reportError({ text: 'raven player could not save its downloads.', error })
+        reportError({ text: 'Raven could not save its downloads.', error })
         send({ type: DESKTOP_EVENTS.notice, message: STORE_NOTICES.downloads })
       },
     })
@@ -693,7 +693,7 @@ const startApp = (): void => {
       if (!launchCheck.isPending) return
       launchCheck.isPending = false
       updates.atLaunch().catch((error: unknown) => {
-        warn(`raven player could not check for updates: ${errorText(error)}`)
+        warn(`Raven could not check for updates: ${errorText(error)}`)
       })
     }
 
@@ -728,11 +728,11 @@ const startApp = (): void => {
         const player = players.current
         if (player === null) return
         player.connect().catch((error: unknown) => {
-          warn(`raven player could not hand the page its player: ${errorText(error)}`)
+          warn(`Raven could not hand the page its player: ${errorText(error)}`)
         })
       },
       onError: (error) => {
-        reportError({ text: 'raven player failed to answer a request.', error })
+        reportError({ text: 'Raven failed to answer a request.', error })
       },
       newId: randomUUID,
       now: Date.now,
@@ -846,7 +846,7 @@ const startApp = (): void => {
     // The actions settle every failure themselves; this only keeps a surprise off the floor.
     const fromMenu = (action: () => Promise<void>) => () => {
       action().catch((error: unknown) => {
-        reportError({ text: 'raven player could not finish a Help item.', error })
+        reportError({ text: 'Raven could not finish a Help item.', error })
       })
     }
 
@@ -876,7 +876,7 @@ const startApp = (): void => {
                 .openDialog()
                 .then(announce)
                 .catch((error: unknown) => {
-                  reportError({ text: 'raven player could not show the open dialog.', error })
+                  reportError({ text: 'Raven could not show the open dialog.', error })
                 })
             },
             send,
@@ -886,7 +886,7 @@ const startApp = (): void => {
             copyDiagnostics: fromMenu(help.copyDiagnostics),
             checkForUpdates: () => {
               checkFromMenu().catch((error: unknown) => {
-                reportError({ text: 'raven player could not check for updates.', error })
+                reportError({ text: 'Raven could not check for updates.', error })
               })
             },
           },
@@ -934,7 +934,7 @@ const startApp = (): void => {
 
   services.ready = createService()
   services.ready.catch((error: unknown) => {
-    reportError({ text: 'raven player could not start.', error })
+    reportError({ text: 'Raven could not start.', error })
     endAfterLog({ log, wait: (ms) => sleep(ms), end: () => app.exit(1) }).catch(reportEndFailure)
   })
 
@@ -945,7 +945,7 @@ const startApp = (): void => {
 /**
  * The web app, served from the loopback web host with `/api` passed on to the server. A
  * custom scheme cannot hold it: Chromium keeps no `document.cookie` there, where the web's
- * Supabase session lives. The port is fixed, so when another app holds it raven player says
+ * Supabase session lives. The port is fixed, so when another app holds it Raven says
  * so and quits rather than move the page to an origin with none of its sign-in or settings.
  */
 const startWebHost = async ({ serverOrigin }: { serverOrigin: string }): Promise<void> => {
@@ -973,7 +973,7 @@ const startWebHost = async ({ serverOrigin }: { serverOrigin: string }): Promise
       warn,
     })
   } catch (error) {
-    dialog.showErrorBox('raven player could not open', webHostFailureText(error))
+    dialog.showErrorBox('Raven could not open', webHostFailureText(error))
     throw error
   }
   log.info(`${WEB_HOST_READY} at ${PAGE_ORIGIN}, /api goes to ${serverOrigin}`)
@@ -996,7 +996,7 @@ const serveFiles = ({ grants }: { grants: Grants }): void => {
 
 const openInBrowser = (url: string): void => {
   shell.openExternal(url).catch((error: unknown) => {
-    warn(`raven player could not open a link in the browser. ${errorText(error)}`)
+    warn(`Raven could not open a link in the browser. ${errorText(error)}`)
   })
 }
 
@@ -1086,9 +1086,9 @@ const openWindow = ({ store }: { store: StateStore }): BrowserWindow => {
 
   window
     .loadURL(`${PAGE_ORIGIN}/`)
-    .then(() => log.info(`raven player loaded ${PAGE_ORIGIN}/`))
+    .then(() => log.info(`Raven loaded ${PAGE_ORIGIN}/`))
     .catch((error: unknown) => {
-      reportError({ text: 'raven player could not load its page.', error })
+      reportError({ text: 'Raven could not load its page.', error })
     })
   return window
 }
@@ -1277,7 +1277,7 @@ const attachPlayer = ({
           mode,
           surfaceFor,
           open: openLogged,
-          warn: (message) => warn(`raven player could not open its video engine: ${message}`),
+          warn: (message) => warn(`Raven could not open its video engine: ${message}`),
         })
         if (opened.status === ENGINE_STATUSES.unavailable) engineNote = opened.message
         return opened
@@ -1317,7 +1317,7 @@ const attachPlayer = ({
 
   const startEngine = () => {
     engine.get().catch((error: unknown) => {
-      warn(`raven player could not open its video engine: ${errorText(error)}`)
+      warn(`Raven could not open its video engine: ${errorText(error)}`)
     })
   }
   // Whichever comes first of this and the page's `ready` (through the connector).
@@ -1327,7 +1327,7 @@ const attachPlayer = ({
     const current = engine.current()
     if (current === null) return
     applyDisplayTo({ window, engine: current }).catch((error: unknown) => {
-      warn(`raven player could not follow the display: ${errorText(error)}`)
+      warn(`Raven could not follow the display: ${errorText(error)}`)
     })
   }
   window.on('moved', followDisplay)
@@ -1398,10 +1398,10 @@ const attachPlayer = ({
 
 if (isPrimary) {
   log.info(
-    `launch raven player ${app.getVersion()} (${app.isPackaged ? 'packaged' : 'unpackaged'}), Electron ${process.versions.electron}, macOS ${process.getSystemVersion()}`,
+    `launch Raven ${app.getVersion()} (${app.isPackaged ? 'packaged' : 'unpackaged'}), Electron ${process.versions.electron}, macOS ${process.getSystemVersion()}`,
   )
   startApp()
 } else {
-  // Another raven player is running; it receives this launch's files through `second-instance`.
+  // Another Raven is running; it receives this launch's files through `second-instance`.
   app.quit()
 }

@@ -251,9 +251,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
 
   const runSync = (work: Promise<void>): void => {
     work.catch((error: unknown) => {
-      deps.warn(
-        `raven player could not tell its servers what was watched: ${loggable(errorText(error))}`,
-      )
+      deps.warn(`Raven could not tell its servers what was watched: ${loggable(errorText(error))}`)
     })
   }
 
@@ -497,7 +495,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     await Promise.all([startClocks(), sync.runAll()])
   }
   resumeLaunch().catch((error: unknown) => {
-    deps.warn(`raven player could not resume its downloads: ${loggable(errorText(error))}`)
+    deps.warn(`Raven could not resume its downloads: ${loggable(errorText(error))}`)
   })
 
   return {

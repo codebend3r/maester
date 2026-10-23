@@ -81,7 +81,7 @@ export type QueueFs = {
 export type DownloadQueueDeps = {
   store: DownloadsStore
   serverOf: (serverId: string) => ServerEntry | null
-  /** Every server raven player keeps, as the config holds them now. */
+  /** Every server Raven keeps, as the config holds them now. */
   servers: () => readonly ServerEntry[]
   access: MediaAccess
   /** A bare fetch with no cookie, `redirect: 'error'`: the ticket in the URL is the file's only key. */
@@ -320,9 +320,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     failEntry({ entry: job.entry, reason: FAIL_REASONS.unreachable })
     pauseServerOf({ job, reason: PAUSE_REASONS.unreachable })
     syncOutageRetry()
-    deps.warn(
-      `raven player could not reach ${loggable(job.server.name)} for ${loggable(job.entry.label)}`,
-    )
+    deps.warn(`Raven could not reach ${loggable(job.server.name)} for ${loggable(job.entry.label)}`)
   }
 
   /** Fails each of `downloadIds` with `message`, its bytes kept, and stops the ones that run. */
@@ -647,7 +645,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       .catch((error: unknown) => {
         if (stop.signal.aborted) return
         failEntry({ entry, reason: FAIL_REASONS.other, message: errorText(error) })
-        deps.warn(`raven player could not download ${loggable(entry.label)}`)
+        deps.warn(`Raven could not download ${loggable(entry.label)}`)
       })
       .finally(() => {
         running.delete(downloadId)
@@ -655,7 +653,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
         kick()
       })
       .catch((error: unknown) => {
-        deps.warn(`raven player's downloads stopped short: ${loggable(errorText(error))}`)
+        deps.warn(`Raven's downloads stopped short: ${loggable(errorText(error))}`)
       })
   }
 
@@ -663,7 +661,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     if (isDisposed || sleep.isAsleep) return
     if (launch.sweeping !== null) {
       launch.sweeping.then(kick).catch((error: unknown) => {
-        deps.warn(`raven player's downloads stopped short: ${loggable(errorText(error))}`)
+        deps.warn(`Raven's downloads stopped short: ${loggable(errorText(error))}`)
       })
       return
     }
@@ -839,7 +837,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     if (ended.length === 0) return
     failRuns({ downloadIds: ended, message: DOWNLOAD_MESSAGES.signInAgain(server.name) })
     ended.forEach(told)
-    deps.warn(`raven player stopped downloading from ${loggable(server.name)}: its sign-in ended`)
+    deps.warn(`Raven stopped downloading from ${loggable(server.name)}: its sign-in ended`)
   }
 
   const dispose: DownloadQueue['dispose'] = () => {

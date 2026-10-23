@@ -66,7 +66,7 @@ const writeReleaseAssets = async ({
   const release = join(project, RELEASE_DIR)
   const made = join(project, 'out', 'make')
   const dmg = join(made, 'dmg', 'darwin', 'arm64', dmgFileName({ version, arch: 'arm64' }))
-  const zip = join(made, 'zip', 'darwin', 'arm64', `raven player-darwin-arm64-${version}.zip`)
+  const zip = join(made, 'zip', 'darwin', 'arm64', `Raven-darwin-arm64-${version}.zip`)
   await rm(release, { recursive: true, force: true })
   await mkdir(release, { recursive: true })
   if (!existsSync(dmg) || !existsSync(zip)) {
@@ -93,9 +93,7 @@ const writeReleaseAssets = async ({
     assets.map(async (name) => ({ name, sha256: await sha256Of({ path: join(release, name) }) })),
   )
   await writeFile(join(release, names.sums), sha256Sums(entries))
-  process.stdout.write(
-    `raven player ${version}: ${assets.length} assets and SHA256SUMS in ${release}\n`,
-  )
+  process.stdout.write(`Raven ${version}: ${assets.length} assets and SHA256SUMS in ${release}\n`)
   return 0
 }
 

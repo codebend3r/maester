@@ -3,23 +3,23 @@ import type { DesktopClient } from '@/desktop/client'
 import type { MenuHub } from '@/desktop/menuHub'
 import type { PlayerConnections } from '@/desktop/playerConnection'
 
-/** raven player's ways to main: its client, the Playback menu's hub and the player connection. */
+/** Raven's ways to main: its client, the Playback menu's hub and the player connection. */
 export type Desktop = { client: DesktopClient; menu: MenuHub; player: PlayerConnections }
 
 type DesktopBridge = {
-  /** Set once before the first render inside raven player; null in a browser. */
+  /** Set once before the first render inside Raven; null in a browser. */
   desktop: Desktop | null
 }
 
-/** The page's bridge to raven player, which only the desktop app's own page has. */
+/** The page's bridge to Raven, which only the desktop app's own page has. */
 export const useDesktopBridge = create<DesktopBridge>()(() => ({ desktop: null }))
 
-/** Whether the page runs inside raven player. */
+/** Whether the page runs inside Raven. */
 export const useIsDesktop = (): boolean => useDesktopBridge((state) => state.desktop !== null)
 
-/** The bridge, for what renders only inside raven player. */
+/** The bridge, for what renders only inside Raven. */
 export const useDesktop = (): Desktop => {
   const desktop = useDesktopBridge((state) => state.desktop)
-  if (desktop === null) throw new Error('useDesktop needs raven player, and there is none.')
+  if (desktop === null) throw new Error('useDesktop needs Raven, and there is none.')
   return desktop
 }

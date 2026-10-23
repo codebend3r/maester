@@ -7,7 +7,7 @@ export const END_MARGIN_S = 10
 
 export const RECENT_KINDS = { file: 'file' } as const
 
-/** The kinds of recent an older raven player kept besides: server titles, before the web app. */
+/** The kinds of recent an older Raven kept besides: server titles, before the web app. */
 export const FORMER_RECENT_KINDS = { server: 'server' } as const
 
 const isRecentEntry = object({
@@ -17,7 +17,7 @@ const isRecentEntry = object({
 })
 
 /**
- * A server title in an older raven player's recents. It is read only to be dropped: the web app's
+ * A server title in an older Raven's recents. It is read only to be dropped: the web app's
  * own lists show what was watched on the server now.
  */
 const isFormerRecent = object({ kind: oneOf([FORMER_RECENT_KINDS.server]) })
@@ -55,7 +55,7 @@ const STATE_FIELDS = {
 
 const isPlayerState = object({ ...STATE_FIELDS, recents: listOf(isRecentEntry) })
 
-/** What `player-state.json` may hold: this, or an older raven player's, whose recents held server titles too. */
+/** What `player-state.json` may hold: this, or an older Raven's, whose recents held server titles too. */
 export const isStoredPlayerState = object({
   ...STATE_FIELDS,
   recents: listOf(union(isRecentEntry, isFormerRecent)),
@@ -86,7 +86,7 @@ const upsertFirst = <T extends { path: string }>({
   cap: number
 }): T[] => [entry, ...list.filter((existing) => existing.path !== entry.path)].slice(0, cap)
 
-/** The state as this raven player keeps it: an older one's server titles leave the recents. */
+/** The state as this Raven keeps it: an older one's server titles leave the recents. */
 export const upgradeState = (stored: Infer<typeof isStoredPlayerState>): PlayerState => ({
   ...stored,
   recents: stored.recents.filter(isRecentEntry),

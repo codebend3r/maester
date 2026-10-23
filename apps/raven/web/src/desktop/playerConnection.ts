@@ -36,10 +36,10 @@ export type PlayerConnections = {
 export type RendererPort = Pick<MessagePort, 'postMessage' | 'start' | 'close' | 'addEventListener'>
 
 const REPLY_TIMEOUT_MS = 10_000
-export const PLAYER_NO_ANSWER = 'raven player did not answer.'
-export const PLAYER_CLOSED = 'raven player closed its connection to this page.'
+export const PLAYER_NO_ANSWER = 'Raven did not answer.'
+export const PLAYER_CLOSED = 'Raven closed its connection to this page.'
 export const PLAYER_NOT_HANDED =
-  'raven player could not reach its video engine, so it plays only the videos Chromium can.'
+  'Raven could not reach its video engine, so it plays only the videos Chromium can.'
 /** Longer than main waits on its engine (`OPEN_MS`, 5 s), so main's answer normally comes first. */
 const PLAYER_WAIT_MS = 8000
 
@@ -111,7 +111,7 @@ export const nativePlayerOver = ({
       const entry = take(data.id)
       // A reply after its timeout, or to an id this page never sent.
       if (entry === null) {
-        console.warn(`raven player dropped a reply to request ${data.id}, which is not waiting.`)
+        console.warn(`Raven dropped a reply to request ${data.id}, which is not waiting.`)
         return
       }
       if (data.ok) {
@@ -130,7 +130,7 @@ export const nativePlayerOver = ({
       listeners.forEach((listener) => listener(data))
       return
     }
-    console.warn('raven player ignored a player message it does not understand.')
+    console.warn('Raven ignored a player message it does not understand.')
   })
   // Main closing its end (on a reload or a second `ready`) fails what is still waiting.
   port.addEventListener('close', shut)

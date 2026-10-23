@@ -77,7 +77,7 @@ Setting the three Supabase variables on raven turns enforcement on for everyone 
 2. Configure the SMTP provider and the sender DNS (SPF, DKIM, DMARC). Send a real signup and a real recovery email, and open each link in another browser.
 3. Set `site_url` and the redirect allowlist to raven's real web origins: the Netlify site and the Funnel address.
 4. Bootstrap the owner (step 7 above): sign up, verify, set the private owner UUID and approve the owner.
-5. Release the compatible raven player (`raven-auth-desktop` merged and tagged) and tell its users that older builds lose access to an enforcing server.
+5. Release the compatible Raven (`raven-auth-desktop` merged and tagged) and tell its users that older builds lose access to an enforcing server.
 6. Back up `/volume1/docker/raven/data` (SQLite, settings and the admin secret), for a rollback.
 7. Stage the whole flow: a staging raven with accounts `ready` behind a Netlify deploy preview. Verify Netlify forwards `Cookie`, `Authorization` and server-sent events unbuffered, and caches no `/api` response.
 8. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `RAVEN_WEB_URL` in Vhagar's `.env`, and review `RAVEN_MEDIA_ORIGINS` and `RAVEN_WEB_ORIGINS`. `ADMIN_PASSWORD` becomes inert; keep it only for the rollback. Deploy (the `deploy-raven-vhagar` skill). The first `ready` start records that this server enforces accounts.

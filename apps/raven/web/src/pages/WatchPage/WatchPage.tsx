@@ -104,7 +104,7 @@ export const WatchPage = () => {
   if (page.state === ROUTE_STATES.ready) {
     return (
       <WatchPlayer
-        // A play link raven player opens for the title on screen names where to start: a new player.
+        // A play link Raven opens for the title on screen names where to start: a new player.
         key={isDesktop ? `${page.data.id}${search}` : page.data.id}
         media={page.data}
         upNext={handed?.upNext ?? []}
@@ -113,7 +113,7 @@ export const WatchPage = () => {
       />
     )
   }
-  // Outside the side menu, raven player's window has no other way back while this waits.
+  // Outside the side menu, Raven's window has no other way back while this waits.
   if (isDesktop) return <PlayerMessage message={messageOf(page)} fallback={LIBRARIES_PATH} />
   return <WatchMessage message={messageOf(page)} />
 }
@@ -196,11 +196,11 @@ export const WatchPlayer = ({
       appVersion: ravenVersion,
       send: (diagnostics) => api.reportPlaybackError(diagnostics),
     },
-    // Inside raven player the title already plays there.
+    // Inside Raven the title already plays there.
     ...(opensInRavenPlayer &&
       !isDesktop && {
         handoff: {
-          label: 'Open in raven player',
+          label: 'Open in Raven',
           run: (at) =>
             ravenPlayer.open(
               playLinkFor({

@@ -378,9 +378,9 @@ describe('constants', () => {
 
   it('words the notices and refusals as the spec fixes them', () => {
     expect(DOWNLOAD_MESSAGES.askGone).toBe(
-      'That download request has expired. Open the title in raven on the web and choose Download to raven player again.',
+      'That download request has expired. Open the title in raven on the web and choose Download to Raven again.',
     )
-    expect(DOWNLOAD_MESSAGES.unknown).toBe('That download is no longer in raven player.')
+    expect(DOWNLOAD_MESSAGES.unknown).toBe('That download is no longer in Raven.')
     expect(
       DOWNLOAD_MESSAGES.queued({
         files: 3,
@@ -538,8 +538,8 @@ describe('ask', () => {
     ['gone', {}, EXPAND_MESSAGES.gone(SERVER_NAME)],
     [
       'unreachable',
-      { [itemCall(5)]: { unreachable: 'raven player could not reach raven.' } },
-      'raven player could not reach raven.',
+      { [itemCall(5)]: { unreachable: 'Raven could not reach raven.' } },
+      'Raven could not reach raven.',
     ],
     ['unreadable', { [itemCall(5)]: ok({ id: 5 }) }, EXPAND_MESSAGES.unreadable(SERVER_NAME)],
   ])('refuses an expansion that is %s with its message', async (_name, replies, message) => {
@@ -592,7 +592,7 @@ describe('ask', () => {
     expect(world.warnings.join('\n')).toContain('Fellowship (2001)')
   })
 
-  it('refuses a server raven player no longer keeps, and calls nothing', async () => {
+  it('refuses a server Raven no longer keeps, and calls nothing', async () => {
     const world = setup()
     expect(
       await world.service.ask({
@@ -881,7 +881,7 @@ describe('confirm', () => {
     expect((await world.service.retryAsk({ askId: locked.askId })).type).toBe('downloadAsk')
   })
 
-  it('refuses once the server is not the one raven player plays from, and queues nothing', async () => {
+  it('refuses once the server is not the one Raven plays from, and queues nothing', async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
     const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
     world.config.update((current) => ({
@@ -1317,7 +1317,7 @@ describe('the queue', () => {
     ])
   })
 
-  it('says the server is gone for a reason that names a server raven player no longer keeps', () => {
+  it('says the server is gone for a reason that names a server Raven no longer keeps', () => {
     expect(
       viewStatusOf({
         status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, reason: PAUSE_REASONS.relocked },

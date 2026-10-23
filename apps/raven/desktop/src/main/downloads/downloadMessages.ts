@@ -19,10 +19,10 @@ const FILE_NOUNS = {
 
 export const DOWNLOAD_MESSAGES = {
   askGone:
-    'That download request has expired. Open the title in raven on the web and choose Download to raven player again.',
-  unknown: 'That download is no longer in raven player.',
+    'That download request has expired. Open the title in raven on the web and choose Download to Raven again.',
+  unknown: 'That download is no longer in Raven.',
   fileGone: "That download's file could not be found.",
-  /** With no name, the server is no longer in raven player, and its folder would name a media id. */
+  /** With no name, the server is no longer in Raven, and its folder would name a media id. */
   downloadedFrom: (serverName: string): string =>
     serverName === '' ? 'Downloaded' : `Downloaded from ${serverName}`,
   queued: ({
@@ -80,7 +80,7 @@ export const accountRefusedMessage = ({
   }
 }
 
-/** Words that name the server; with no name, the server is no longer in raven player. */
+/** Words that name the server; with no name, the server is no longer in Raven. */
 const naming = ({
   serverName,
   words,

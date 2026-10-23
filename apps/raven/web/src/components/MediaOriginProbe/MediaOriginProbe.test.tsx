@@ -43,7 +43,7 @@ describe('MediaOriginProbe', () => {
     origins.mockRestore()
   })
 
-  it('asks for nothing inside raven player, whose mpv finds its own way to the server', () => {
+  it('asks for nothing inside Raven, whose mpv finds its own way to the server', () => {
     const origins = spyOn(api, 'getMediaOrigins').mockImplementation(() => new Promise(() => {}))
     asDesktop()
     const { getByText } = render(

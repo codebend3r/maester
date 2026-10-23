@@ -37,7 +37,7 @@ import { useIsDesktop } from '@/stores/desktop'
 
 /**
  * Every page, behind the sign-in gate but the account pages and Get. Inside
- * raven player the frame adds Downloads and On this Mac, and the app's own
+ * Raven the frame adds Downloads and On this Mac, and the app's own
  * part of the page runs over every route.
  */
 export const AppRoutes = () => {
@@ -71,7 +71,7 @@ export const AppRoutes = () => {
             )}
             <Route path="*" element={<NotFoundPage />} />
           </Route>
-          {/* The player takes the whole screen, outside the browsing frame, as a file raven player plays does. */}
+          {/* The player takes the whole screen, outside the browsing frame, as a file Raven plays does. */}
           <Route path={`${PAGE_PATHS.watch}/:id`} element={<WatchPage />} />
           {isDesktop && <Route path={DESKTOP_PATHS.play} element={<PlayRoute />} />}
         </Route>

@@ -30,15 +30,33 @@ export const useIdle = (ms: number): { active: boolean; wake: () => void } => {
   }
 }
 
-/** The flash in the middle of the picture; each `flash` restarts it, even with the same words. */
+/** How long a flash shows: the length of the bezel's animation in `Bezel.module.scss`. */
+const BEZEL_MS = 700
+
+/**
+ * The flash in the middle of the picture; each `flash` restarts it, even with the same words.
+ * `isFlashing` holds while it shows, so nothing else is drawn in the middle under it.
+ */
 export const useBezel = (): {
   bezel: BezelState | null
+  isFlashing: boolean
   flash: (next: Omit<BezelState, 'id'>) => void
 } => {
   const [bezel, setBezel] = useState<BezelState | null>(null)
+  const [isFlashing, setIsFlashing] = useState(false)
+  const id = bezel?.id ?? null
+  useEffect(() => {
+    if (id === null) return
+    const timer = window.setTimeout(() => setIsFlashing(false), BEZEL_MS)
+    return () => window.clearTimeout(timer)
+  }, [id])
   return {
     bezel,
-    flash: (next) => setBezel((current) => ({ ...next, id: (current?.id ?? 0) + 1 })),
+    isFlashing,
+    flash: (next) => {
+      setIsFlashing(true)
+      setBezel((current) => ({ ...next, id: (current?.id ?? 0) + 1 }))
+    },
   }
 }
 

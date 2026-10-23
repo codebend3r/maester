@@ -23,14 +23,14 @@ describe('hdiutilArgs', () => {
   it('creates a compressed image of the staging folder, replacing an old one', () => {
     expect(
       hdiutilArgs({
-        volumeName: 'raven player',
+        volumeName: 'Raven',
         sourceDir: '/t/stage',
         output: '/o/make/dmg/darwin/arm64/raven-player-0.5.4-arm64.dmg',
       }),
     ).toEqual([
       'create',
       '-volname',
-      'raven player',
+      'Raven',
       '-srcfolder',
       '/t/stage',
       '-format',
@@ -91,9 +91,9 @@ describe('makeDmg', () => {
   })
 
   const options = () => ({
-    dir: '/o/raven player-darwin-arm64',
+    dir: '/o/Raven-darwin-arm64',
     makeDir,
-    appName: 'raven player',
+    appName: 'Raven',
     packageJSON: { version: '0.5.4' },
     targetArch: 'arm64',
   })
@@ -116,11 +116,11 @@ describe('makeDmg', () => {
     expect(calls).toEqual([
       {
         command: 'ditto',
-        args: ['/o/raven player-darwin-arm64/raven player.app', join(stage, 'raven player.app')],
+        args: ['/o/Raven-darwin-arm64/Raven.app', join(stage, 'Raven.app')],
       },
       {
         command: 'hdiutil',
-        args: hdiutilArgs({ volumeName: 'raven player', sourceDir: stage, output: output() }),
+        args: hdiutilArgs({ volumeName: 'Raven', sourceDir: stage, output: output() }),
       },
     ])
     expect(links).toEqual(['/Applications'])

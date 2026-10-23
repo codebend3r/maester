@@ -7,7 +7,7 @@ import { useModal } from '@/desktop/useModal'
 import { useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/DesktopDialog.module.scss'
 
-const UNOPENED = 'raven player could not open that link. Try again.'
+const UNOPENED = 'Raven could not open that link. Try again.'
 
 const OUTCOME_KINDS = { open: 'open', stay: 'stay' } as const
 
@@ -42,7 +42,7 @@ const outcomeOf = (reply: DesktopReply): Outcome => {
   }
 }
 
-/** File > Open Link: a pasted raven player link or watch page goes to main, which reads it. */
+/** File > Open Link: a pasted Raven link or watch page goes to main, which reads it. */
 export const OpenLinkDialog = ({ onClose }: { onClose: () => void }) => {
   const { client } = useDesktop()
   const openReply = useOpenReply()
@@ -110,7 +110,7 @@ export const OpenLinkDialog = ({ onClose }: { onClose: () => void }) => {
           Open a link
         </h2>
         <p id={ids.hint} className={styles.hint}>
-          Paste a raven player link or the address of a title on raven.
+          Paste a Raven link or the address of a title on raven.
         </p>
         <label className={styles.field}>
           Link

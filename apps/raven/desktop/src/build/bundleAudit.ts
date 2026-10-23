@@ -2,7 +2,7 @@ import { basename, dirname, isAbsolute, join, sep } from 'node:path'
 import { WEB_DIST } from '@/build/forgeOptions'
 import { MPV_MACH_O } from '@/build/stageMpv'
 
-export const PACKAGED_APP = join('out', 'raven player-darwin-arm64', 'raven player.app')
+export const PACKAGED_APP = join('out', 'Raven-darwin-arm64', 'Raven.app')
 export const MPV_IN_APP = join('Contents', 'Resources', 'mpv', 'darwin-arm64')
 /** The web app's build, which the web host serves the window. */
 export const WEB_IN_APP = join('Contents', 'Resources', basename(WEB_DIST))

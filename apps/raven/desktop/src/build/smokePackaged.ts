@@ -20,7 +20,7 @@ import { logsDirFor } from '@/main/log/opens'
 import { ERROR_CODES } from '@/main/stateStore'
 
 const POLL_MS = 250
-const RUNNING_PATTERN = 'raven player.app/Contents/MacOS/raven player'
+const RUNNING_PATTERN = 'Raven.app/Contents/MacOS/Raven'
 const MARKS = ['raven-launch-ms ', 'raven-quit-ms '] as const
 
 const execFileAsync = promisify(execFile)
@@ -91,13 +91,13 @@ const smoke = async ({ project }: { project: string }): Promise<number> => {
     return 1
   }
   if (await isRavenRunning()) {
-    console.error('Quit raven player first: the smoke launches its own and reads its log.')
+    console.error('Quit Raven first: the smoke launches its own and reads its log.')
     return 1
   }
   const version = versionOf(JSON.parse(await readFile(join(project, 'package.json'), 'utf8')))
   const logPath = join(logsDirFor({ home: homedir(), userDataOverride: null }), LOG_FILE)
   const from = await sizeOf({ path: logPath })
-  const child = spawn(join(app, 'Contents', 'MacOS', 'raven player'), [], {
+  const child = spawn(join(app, 'Contents', 'MacOS', 'Raven'), [], {
     env: withoutTestHooks({ env: process.env }),
     stdio: 'ignore',
   })
@@ -107,7 +107,7 @@ const smoke = async ({ project }: { project: string }): Promise<number> => {
   })
   // A spawn that fails emits only `error`, which would otherwise end the smoke uncaught.
   child.on('error', (error) => {
-    console.error(`raven player did not start: ${error.message}`)
+    console.error(`Raven did not start: ${error.message}`)
     lifecycle.hasExited = true
   })
   const state = { lines: new Array<string>() }
@@ -116,7 +116,7 @@ const smoke = async ({ project }: { project: string }): Promise<number> => {
     return smokeGaps({ lines: state.lines, stage, version })
   }
   const fail = ({ stage, why }: { stage: SmokeStage; why: string[] }): number => {
-    console.error(`raven player failed the packaged smoke at the ${stage} stage. Missing:`)
+    console.error(`Raven failed the packaged smoke at the ${stage} stage. Missing:`)
     why.forEach((gap) => console.error(`  ${gap}`))
     console.error('New log lines:')
     state.lines.forEach((line) => console.error(`  ${line}`))
@@ -135,7 +135,7 @@ const smoke = async ({ project }: { project: string }): Promise<number> => {
       return fail({
         stage: SMOKE_STAGES.started,
         why: lifecycle.hasExited
-          ? [...startGaps, 'raven player exited by itself before SIGTERM']
+          ? [...startGaps, 'Raven exited by itself before SIGTERM']
           : startGaps,
       })
     }
@@ -159,7 +159,7 @@ const smoke = async ({ project }: { project: string }): Promise<number> => {
       .filter((line) => MARKS.some((needle) => line.includes(needle)))
       .forEach((line) => process.stdout.write(`${line}\n`))
     process.stdout.write(
-      `raven player ${version} launched, served its page, opened its video engine and quit on SIGTERM.\n`,
+      `Raven ${version} launched, served its page, opened its video engine and quit on SIGTERM.\n`,
     )
     return 0
   } finally {

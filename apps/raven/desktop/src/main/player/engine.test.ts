@@ -43,16 +43,16 @@ test('addonPathFor', () => {
     addonPathFor({
       isPackaged: false,
       appPath: '/repo/apps/raven/desktop',
-      resourcesPath: '/Applications/raven player.app/Contents/Resources',
+      resourcesPath: '/Applications/Raven.app/Contents/Resources',
     }),
   ).toBe('/repo/libs/raven/mpv/resources/darwin-arm64/raven_mpv.node')
   expect(
     addonPathFor({
       isPackaged: true,
-      appPath: '/Applications/raven player.app/Contents/Resources/app.asar',
-      resourcesPath: '/Applications/raven player.app/Contents/Resources',
+      appPath: '/Applications/Raven.app/Contents/Resources/app.asar',
+      resourcesPath: '/Applications/Raven.app/Contents/Resources',
     }),
-  ).toBe('/Applications/raven player.app/Contents/Resources/mpv/darwin-arm64/raven_mpv.node')
+  ).toBe('/Applications/Raven.app/Contents/Resources/mpv/darwin-arm64/raven_mpv.node')
 })
 
 const windowSurface: MpvSurface = { kind: 'window', handle: Buffer.alloc(8) }

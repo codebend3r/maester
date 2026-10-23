@@ -49,7 +49,7 @@ export const createConnector = <T extends { service: PlayerService }, R>({
     try {
       return await engine()
     } catch (error) {
-      warn(`raven player could not open its video engine: ${messageOf(error)}`)
+      warn(`Raven could not open its video engine: ${messageOf(error)}`)
       return UNAVAILABLE
     }
   }
@@ -59,7 +59,7 @@ export const createConnector = <T extends { service: PlayerService }, R>({
     const deadline = Promise.withResolvers<OpenedEngine<T>>()
     const timer = timers.set({
       run: () => {
-        warn(`raven player's video engine did not open within ${OPEN_MS} ms.`)
+        warn(`Raven's video engine did not open within ${OPEN_MS} ms.`)
         deadline.resolve(UNAVAILABLE)
       },
       ms: OPEN_MS,
@@ -82,7 +82,7 @@ export const createConnector = <T extends { service: PlayerService }, R>({
         try {
           post({ connection: { status: PLAYER_CONNECTION_STATUSES.native }, ports: [remote] })
         } catch (error) {
-          warn(`raven player could not hand the page its player: ${messageOf(error)}`)
+          warn(`Raven could not hand the page its player: ${messageOf(error)}`)
           connection.close()
           current = null
         }

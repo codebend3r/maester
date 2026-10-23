@@ -276,17 +276,13 @@ describe('PlayPage', () => {
 
   it('says it cannot open an answer that is no file', async () => {
     renderPlayers({ client: playMain({ describeFile: () => DONE }), route: playPathOf(A) })
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'raven player cannot open that video.',
-    )
+    expect(await screen.findByRole('alert')).toHaveTextContent('Raven cannot open that video.')
   })
 
   it('refuses an id that is not an opaque id without asking main', async () => {
     const client = playMain()
     renderPlayers({ client, route: playPathOf('not-an-id') })
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'raven player cannot open that video.',
-    )
+    expect(await screen.findByRole('alert')).toHaveTextContent('Raven cannot open that video.')
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.describeFile })).toEqual([])
   })
 })

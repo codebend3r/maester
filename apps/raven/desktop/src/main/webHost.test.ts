@@ -574,14 +574,14 @@ describe('the web host: /api', () => {
     expect(reply.status).toBe(502)
     expect(reply.headers[HTTP_HEADERS.contentType]).toBe('application/json')
     expect(JSON.parse(reply.body)).toEqual({ error: WEB_HOST_ERRORS.serverUnreachable })
-    expect(warnings).toEqual(['raven player could not reach its server: ECONNREFUSED'])
+    expect(warnings).toEqual(['Raven could not reach its server: ECONNREFUSED'])
   })
 
   it("names why when localhost's two addresses both refuse", async () => {
     const { port, warnings } = await host({ serverOrigin: 'http://localhost:1' })
     const reply = await ask({ port, path: AUTH_PATHS.config })
     expect(reply.status).toBe(502)
-    expect(warnings).toEqual(['raven player could not reach its server: ECONNREFUSED'])
+    expect(warnings).toEqual(['Raven could not reach its server: ECONNREFUSED'])
   })
 
   it('tells once that the server is gone, and once that it is back', async () => {
@@ -598,7 +598,7 @@ describe('the web host: /api', () => {
     await new Promise<void>((resolve) => back.listen(serverPort, '127.0.0.1', resolve))
     expect((await ask({ port, path: AUTH_PATHS.me })).status).toBe(200)
     await ask({ port, path: AUTH_PATHS.me })
-    expect(notes).toEqual(['raven player reached its server again'])
+    expect(notes).toEqual(['Raven reached its server again'])
     expect(warnings).toHaveLength(1)
   })
 
@@ -638,14 +638,14 @@ describe('webHostFailureText', () => {
       syscall: 'listen',
     })
     expect(webHostFailureText(taken)).toBe(
-      'Another app is using port 47484 on this Mac. Quit it, then open raven player again.',
+      'Another app is using port 47484 on this Mac. Quit it, then open Raven again.',
     )
   })
 
   it('says what failed otherwise', () => {
     const refused = Object.assign(new Error('listen EACCES'), { code: 'EACCES', syscall: 'listen' })
     expect(webHostFailureText(refused)).toBe(
-      'raven player could not start serving its page: listen EACCES',
+      'Raven could not start serving its page: listen EACCES',
     )
   })
 })

@@ -286,13 +286,13 @@ describe('the admin lock on SettingsPage', () => {
   })
 })
 
-describe('Open videos in raven player on SettingsPage', () => {
+describe('Open videos in Raven on SettingsPage', () => {
   const spies = { get: spyOn(api, 'getPlaybackSettings') }
 
   beforeEach(() => spies.get.mockImplementation(async () => STATE))
   afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
 
-  const toggle = () => screen.getByRole('checkbox', { name: /^Open videos in raven player/ })
+  const toggle = () => screen.getByRole('checkbox', { name: /^Open videos in Raven/ })
 
   it('sits in Playback, off until this browser turns it on', async () => {
     renderWithProviders({ ui: <SettingsPage />, playback: null })
@@ -301,7 +301,7 @@ describe('Open videos in raven player on SettingsPage', () => {
     expect(within(playback).getByRole('heading', { name: 'This browser' })).toBeInTheDocument()
     expect(toggle()).not.toBeChecked()
     expect(toggle().closest('label')).toHaveTextContent(
-      "Offers raven player for videos this browser cannot play, in the player's settings, and Download to raven player on a title's page. Turn it on only where raven player is installed.",
+      "Offers Raven for videos this browser cannot play, in the player's settings, and Download to Raven on a title's page. Turn it on only where Raven is installed.",
     )
     await userEvent.click(toggle())
     expect(toggle()).toBeChecked()
@@ -464,7 +464,7 @@ describe('accounts on SettingsPage', () => {
   })
 })
 
-describe('SettingsPage inside raven player', () => {
+describe('SettingsPage inside Raven', () => {
   const spies = { get: spyOn(api, 'getPlaybackSettings') }
 
   beforeEach(() => spies.get.mockImplementation(async () => STATE))
@@ -473,11 +473,11 @@ describe('SettingsPage inside raven player', () => {
     Object.values(spies).forEach((spy) => spy.mockReset())
   })
 
-  it("adds the app's own sections, and leaves out this browser's raven player toggle", async () => {
+  it("adds the app's own sections, and leaves out this browser's Raven toggle", async () => {
     asDesktop(downloadsMain())
     renderWithProviders({ ui: <SettingsPage />, playback: null })
     await screen.findByRole('radio', { name: /Remux only/ })
-    expect(screen.queryByRole('checkbox', { name: /^Open videos in raven player/ })).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: /^Open videos in Raven/ })).toBeNull()
     expect(screen.getByRole('region', { name: 'Downloads' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'This computer' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Updates' })).toBeInTheDocument()

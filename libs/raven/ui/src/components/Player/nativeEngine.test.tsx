@@ -89,7 +89,7 @@ const servicesFor = (overrides: Partial<PlayerServices> = {}): PlayerServices =>
   progress: { started: () => {}, save: () => {}, left: () => {} },
   posterUrl: null,
   escape: null,
-  unplayableNote: 'raven player could not play this video.',
+  unplayableNote: 'Raven could not play this video.',
   ...overrides,
 })
 
@@ -264,13 +264,27 @@ describe('the native engine', () => {
     expect(fake.sent.at(-1)).toEqual({ type: 'seek', time: 0 })
   })
 
+  it('keeps the loading ring out from under a skip’s flash, and shows it once the flash ends', async () => {
+    const fake = fakePlayer()
+    renderNative({ player: fake.player })
+    await settled()
+    await fake.emit({ type: 'duration', duration: 120 })
+    await fake.emit({ type: 'paused', paused: false })
+    await fake.emit({ type: 'waiting', waiting: false })
+    fireEvent.keyDown(window, { key: 'l' })
+    await fake.emit({ type: 'waiting', waiting: true })
+    expect(screen.queryByLabelText('Loading')).toBeNull()
+    await act(() => new Promise((resolve) => setTimeout(resolve, 750)))
+    expect(screen.getByLabelText('Loading')).toBeInTheDocument()
+  })
+
   it('shows Unplayable on an error event', async () => {
     const fake = fakePlayer()
     renderNative({ player: fake.player })
     await settled()
     await fake.emit({ type: 'error', reason: 'decode', message: 'Bad frame' })
     expect(screen.getByText('Bad frame')).toBeInTheDocument()
-    expect(screen.getByText('raven player could not play this video.')).toBeInTheDocument()
+    expect(screen.getByText('Raven could not play this video.')).toBeInTheDocument()
   })
 
   it('tells the host about an engine error before Unplayable shows', async () => {
@@ -462,14 +476,14 @@ describe('the native engine', () => {
     const refused = fakePlayer({ loadError: new Error('') })
     const { unmount } = renderNative({ player: refused.player })
     await settled()
-    expect(screen.getByText('raven player could not open this video.')).toBeInTheDocument()
+    expect(screen.getByText('Raven could not open this video.')).toBeInTheDocument()
     unmount()
 
     const errored = fakePlayer()
     renderNative({ player: errored.player })
     await settled()
     await errored.emit({ type: 'error', reason: 'decode', message: '' })
-    expect(screen.getAllByText('raven player could not play this video.')).not.toHaveLength(0)
+    expect(screen.getAllByText('Raven could not play this video.')).not.toHaveLength(0)
     expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument()
   })
 
@@ -485,7 +499,7 @@ describe('the native engine', () => {
     await fake.emit({ type: 'tracks', tracks: TRACKS })
     fireEvent.keyDown(window, { key: 'i' })
     await settled()
-    expect(warn).toHaveBeenCalledWith('raven player refused stats: Not now.')
+    expect(warn).toHaveBeenCalledWith('Raven refused stats: Not now.')
     await userEvent.click(screen.getByRole('button', { name: /^Audio/ }))
     await userEvent.click(await screen.findByRole('radio', { name: /French/ }))
     await settled()

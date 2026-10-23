@@ -76,7 +76,7 @@ describe('what an account watched', () => {
     const running = world.sync.runAll()
     await ticks(3)
     world.signedIn.accountId = ACCOUNT_B
-    held.open({ ok: false, message: 'raven player is signed in to Vhagar as someone else now.' })
+    held.open({ ok: false, message: 'Raven is signed in to Vhagar as someone else now.' })
     await running
     expect(world.pendingOf()).toEqual(asA)
     expect(world.pending.size).toBe(0)

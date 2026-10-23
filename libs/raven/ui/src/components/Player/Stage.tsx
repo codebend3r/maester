@@ -154,7 +154,7 @@ export const PlayerChrome = ({
   // Nothing holds the controls past this: not a pause, an open menu or a focused button.
   const lingerSeconds = usePlayerPrefs((prefs) => prefs.controlsLingerSeconds)
   const idle = useIdle(lingerSeconds * 1_000)
-  const { bezel, flash } = useBezel()
+  const { bezel, isFlashing, flash } = useBezel()
   const [overlay, setOverlay] = useState<Overlay>(OVERLAYS.none)
   // Apart from the overlay: it stays open over the video, menus and all.
   const [infoOpen, setInfoOpen] = useState(false)
@@ -317,7 +317,8 @@ export const PlayerChrome = ({
     >
       {engine.surface}
       {!engine.drawsSubtitles && (renderSubtitles?.(chromeShown) ?? null)}
-      {state.waiting && <Preloader />}
+      {/* A skip waits for data while its flash shows: one thing at a time in the middle. */}
+      {state.waiting && !isFlashing && <Preloader />}
       {state.paused && !state.waiting && chromeShown && (
         // The picture under it takes the click; this only says a click will play.
         <span className={styles.paused} aria-hidden="true">

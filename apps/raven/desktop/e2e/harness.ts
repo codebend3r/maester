@@ -158,10 +158,10 @@ export const markWithin = ({
       const found = marks.seen.find((mark) => mark.name === name)
       if (found !== undefined) return settle(() => resolve(found.value))
       if (!marks.isClosed) return
-      settle(() => reject(new Error(`raven player quit before printing its ${name} mark.`)))
+      settle(() => reject(new Error(`Raven quit before printing its ${name} mark.`)))
     }
     const timer = setTimeout(() => {
-      settle(() => reject(new Error(`raven player's ${name} mark was not seen within ${ms} ms.`)))
+      settle(() => reject(new Error(`Raven's ${name} mark was not seen within ${ms} ms.`)))
     }, ms)
     const unwatch = marks.watch(check)
     check()
@@ -182,7 +182,7 @@ export const closeApp = async ({ app }: { app: ElectronApplication }): Promise<v
   deadline.abort()
   if (outcome === QUIT_OUTCOMES.closed) return
   app.process().kill('SIGKILL')
-  throw new Error(`raven player did not quit within ${QUIT_MS} ms.`)
+  throw new Error(`Raven did not quit within ${QUIT_MS} ms.`)
 }
 
 /** Headless mpv (`vo=null`, `ao=null`), or none, which is the html fallback's run (Ruling 15). */
@@ -355,7 +355,7 @@ const dismissMenuTip = async ({ page }: { page: Page }): Promise<void> => {
 }
 
 /**
- * The frame raven player opens with no server to reach: Downloads, with only the pages that need
+ * The frame Raven opens with no server to reach: Downloads, with only the pages that need
  * none in the side menu.
  */
 export const expectOffline = async ({ page }: { page: Page }): Promise<void> => {

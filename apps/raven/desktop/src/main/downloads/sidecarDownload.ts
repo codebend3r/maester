@@ -41,7 +41,7 @@ const textUpTo = async ({
       read.bytes += chunk.length
       if (read.bytes > max) {
         read.isOver = true
-        throw new RangeError('The subtitle is larger than raven player keeps')
+        throw new RangeError('The subtitle is larger than Raven keeps')
       }
       read.text += decoder.decode(chunk, { stream: true })
     },
@@ -99,7 +99,7 @@ export const createSidecarDownload = ({
       reply !== null && reply.ok && reply.status === HTTP_STATUSES.ok ? parseJson(reply.body) : null
     if (isMediaTracks(body)) return sidecarTracksOf(body)
     if (!signal.aborted) {
-      warn(`raven player kept no subtitles for ${loggable(entry.label)}: no track list`)
+      warn(`Raven kept no subtitles for ${loggable(entry.label)}: no track list`)
     }
     return []
   }
@@ -117,7 +117,7 @@ export const createSidecarDownload = ({
     const { entry, signal: stop } = job
     const skipped = (why = ''): null => {
       if (!stop.aborted) {
-        warn(`raven player skipped subtitle ${track.id} of ${loggable(entry.label)}${why}`)
+        warn(`Raven skipped subtitle ${track.id} of ${loggable(entry.label)}${why}`)
       }
       return null
     }
@@ -156,7 +156,7 @@ export const createSidecarDownload = ({
       () => false,
     )
     if (!isMade) {
-      warn(`raven player kept no subtitles for ${loggable(job.entry.label)}: no folder for them`)
+      warn(`Raven kept no subtitles for ${loggable(job.entry.label)}: no folder for them`)
       return []
     }
     const written = await Promise.all(tracks.map((track) => fetchSidecar({ job, access, track })))
