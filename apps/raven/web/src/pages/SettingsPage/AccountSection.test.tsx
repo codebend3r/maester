@@ -67,13 +67,14 @@ describe('AccountSection', () => {
   it('is busy while the session ends', async () => {
     const user = userEvent.setup()
     const ending = held<SignOutResult>()
-    renderAccount({ signOut: () => ending.promise })
+    const { client } = renderAccount({ signOut: () => ending.promise })
 
     await user.click(await screen.findByRole('button', { name: 'Sign out' }))
 
     expect(screen.getByRole('button', { name: 'Signing out' })).toBeDisabled()
 
     await act(async () => ending.answer({ error: null }))
+    await waitFor(() => expect(client.getQueryData(queryKeys.account(ACCOUNT_ID))).toBeUndefined())
   })
 
   it('says why signing out failed, and offers it again', async () => {

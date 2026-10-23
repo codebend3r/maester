@@ -121,7 +121,7 @@ describe('bug reports on a server without accounts', () => {
 
   afterAll(async () => {
     await state.app?.close()
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   it('keeps a viewer’s report as new, under the shared account, with its first problem', async () => {
@@ -267,7 +267,7 @@ describe('bug reports on a server with accounts', () => {
 
   afterAll(async () => {
     await state.app?.close()
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   it('files a member’s report under the member’s own account, whatever the body says', async () => {

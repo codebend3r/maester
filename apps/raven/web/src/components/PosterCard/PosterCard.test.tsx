@@ -6,6 +6,7 @@ import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { usePageBackdrop } from '@raven/ui/headless'
 import { atPixelRatio, restorePixelRatio } from '@/test/pixelRatio'
 import { renderWithProviders } from '@/test/render'
+import { reported } from '@/test/viewport'
 
 const picture = (container: HTMLElement): HTMLImageElement | null => container.querySelector('img')
 
@@ -84,10 +85,11 @@ describe('PosterCard', () => {
     expect(screen.getByText('2026')).toBeInTheDocument()
   })
 
-  it('offers its poster at each width, so the browser fetches the narrowest its grid needs', () => {
+  it('offers its poster at each width, so the browser fetches the narrowest its grid needs', async () => {
     const { container } = renderWithProviders({
       ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />,
     })
+    await reported()
     expect(picture(container)).toHaveAttribute(
       'srcset',
       [
@@ -100,16 +102,17 @@ describe('PosterCard', () => {
   })
 
   // A grid poster is at least 128 px wide, so 342 px covers it up to 342 / 128 = 2.67x.
-  it('leaves the widths out on a screen dense enough to need the widest anyway', () => {
-    const at = (ratio: number) => {
+  it('leaves the widths out on a screen dense enough to need the widest anyway', async () => {
+    const at = async (ratio: number) => {
       atPixelRatio(ratio)
-      return picture(
-        renderWithProviders({ ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} /> })
-          .container,
-      )
+      const { container } = renderWithProviders({
+        ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />,
+      })
+      await reported()
+      return picture(container)
     }
-    expect(at(2.6)).toHaveAttribute('sizes', POSTER_SIZES.grid)
-    const dense = [at(2.75), at(3)]
+    expect(await at(2.6)).toHaveAttribute('sizes', POSTER_SIZES.grid)
+    const dense = [await at(2.75), await at(3)]
     expect(dense.map((poster) => poster?.getAttribute('src'))).toEqual([
       '/api/items/40/images/poster?v=p1',
       '/api/items/40/images/poster?v=p1',
@@ -118,12 +121,14 @@ describe('PosterCard', () => {
     expect(dense.map((poster) => poster?.hasAttribute('sizes') ?? true)).toEqual([false, false])
   })
 
-  it('falls back from the poster to the frame grab, then to a letter', () => {
+  it('falls back from the poster to the frame grab, then to a letter', async () => {
     const { container } = renderWithProviders({
       ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />,
     })
+    await reported()
     expect(picture(container)).toHaveAttribute('src', '/api/items/40/images/poster?v=p1')
     fireEvent.error(picture(container) ?? document.body)
+    await reported()
     expect(picture(container)).toHaveAttribute('src', '/api/media/7/thumbnail?v=1')
     expect(picture(container)).not.toHaveAttribute('srcset')
     expect(picture(container)).not.toHaveAttribute('sizes')
@@ -132,7 +137,7 @@ describe('PosterCard', () => {
     expect(container.textContent).toContain('B')
   })
 
-  it('uses the frame grab straight away when there is no poster', () => {
+  it('uses the frame grab straight away when there is no poster', async () => {
     const { container } = renderWithProviders({
       ui: (
         <PosterCard
@@ -141,6 +146,7 @@ describe('PosterCard', () => {
         />
       ),
     })
+    await reported()
     expect(picture(container)).toHaveAttribute('src', '/api/media/7/thumbnail?v=1')
   })
 

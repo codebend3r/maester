@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import {
@@ -70,8 +70,9 @@ describe('AuthGate', () => {
   })
 
   it('shows the loading screen while the stored session is read', () => {
+    getMe.mockImplementation(() => new Promise(() => undefined))
     renderGate()
-    useAuthSession.setState({ status: AUTH_SESSION_STATUSES.booting, session: null })
+    act(() => useAuthSession.setState({ status: AUTH_SESSION_STATUSES.booting, session: null }))
     expect(screen.queryByText('Library')).toBeNull()
   })
 
@@ -102,7 +103,7 @@ describe('AuthGate', () => {
     expect(screen.queryByText('Library')).toBeNull()
     expect(getMe).not.toHaveBeenCalled()
 
-    useAuthSession.setState({ session: SIGNED_IN })
+    act(() => useAuthSession.setState({ session: SIGNED_IN }))
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('Library')).toBeInTheDocument()
     expect(getAuthConfig).toHaveBeenCalledTimes(1)
@@ -171,6 +172,7 @@ describe('AuthGate', () => {
     expect(screen.queryByTestId('where')).toBeNull()
     expect(useAuthSession.getState().session).not.toBeNull()
 
+    getAuthConfig.mockResolvedValue(readyConfig)
     getMe.mockResolvedValue(fakeAccount())
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('Library')).toBeInTheDocument()

@@ -166,12 +166,17 @@ export const PlayerChrome = ({
   useEffect(() => {
     const previousTitle = document.title
     document.title = label
-    const resumedTimer = window.setTimeout(() => setResumedAt(null), 6000)
     return () => {
       document.title = previousTitle
-      window.clearTimeout(resumedTimer)
     }
   }, [label])
+
+  const isResumeShown = resumedAt !== null
+  useEffect(() => {
+    if (!isResumeShown) return
+    const resumedTimer = window.setTimeout(() => setResumedAt(null), 6000)
+    return () => window.clearTimeout(resumedTimer)
+  }, [isResumeShown])
 
   const closeMenu = () => {
     setOverlay(OVERLAYS.none)

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Library, LibraryViewChange } from '@raven/core'
 import { api } from '@/lib/api'
@@ -365,19 +365,12 @@ describe('LibrariesPage', () => {
     pollFast()
     const refresh = (ratingsRefresh: Library['ratingsRefresh']) =>
       library({ id: 2, name: 'Clips', ratingsRefresh })
+    // The polls after the first wait for the test, so the first read is counted before the next.
+    const waiting = held<Library[]>()
     spies.list.mockImplementationOnce(async () => [
       refresh({ state: 'running', done: 2, total: 7, startedAt: ISO }),
     ])
-    spies.list.mockImplementation(async () => [
-      refresh({
-        state: 'waiting',
-        done: 4,
-        total: 7,
-        startedAt: ISO,
-        reason: 'budget',
-        resumesAt: '2999-01-01T00:00:00.000Z',
-      }),
-    ])
+    spies.list.mockImplementation(() => waiting.promise)
     spies.media.mockImplementation(async () => [mediaItem()])
     const Listing = () => {
       useQuery(mediaListQuery({ libraryId: 2, search: '', sort: 'title', seed: 0 }))
@@ -393,6 +386,18 @@ describe('LibrariesPage', () => {
     })
     await screen.findByText('Refreshing ratings · 2 of 7')
     await waitFor(() => expect(spies.media).toHaveBeenCalledTimes(1))
+    await act(async () =>
+      waiting.answer([
+        refresh({
+          state: 'waiting',
+          done: 4,
+          total: 7,
+          startedAt: ISO,
+          reason: 'budget',
+          resumesAt: '2999-01-01T00:00:00.000Z',
+        }),
+      ]),
+    )
     await screen.findByText(/^Ratings: 4 of 7/)
     await waitFor(() => expect(spies.media.mock.calls.length).toBeGreaterThan(1))
   })

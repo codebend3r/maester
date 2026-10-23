@@ -1,8 +1,12 @@
+import { act } from '@testing-library/react'
+
 /**
  * happy-dom's IntersectionObserver never reports, so no picture that waits
  * for the screen would ever load. This one reports every element it is
- * given as on the screen at once, as a page short enough to show it all
- * would, unless a test says otherwise.
+ * given as on the screen, as a page short enough to show it all would,
+ * unless a test says otherwise. Like a browser's, it reports after the
+ * element mounts rather than while React commits it, and each report is an
+ * act() of its own, so the update it causes lands as a test expects.
  */
 const reporting: { isOnScreen: boolean; observers: Set<FakeIntersectionObserver> } = {
   isOnScreen: true,
@@ -26,25 +30,27 @@ class FakeIntersectionObserver {
   report({ target, isIntersecting }: { target: Element; isIntersecting: boolean }): void {
     if (!this.#targets.has(target)) return
     const box = target.getBoundingClientRect()
-    this.#callback(
-      [
-        {
-          target,
-          isIntersecting,
-          intersectionRatio: isIntersecting ? 1 : 0,
-          boundingClientRect: box,
-          intersectionRect: box,
-          rootBounds: null,
-          time: performance.now(),
-        },
-      ],
-      this,
+    act(() =>
+      this.#callback(
+        [
+          {
+            target,
+            isIntersecting,
+            intersectionRatio: isIntersecting ? 1 : 0,
+            boundingClientRect: box,
+            intersectionRect: box,
+            rootBounds: null,
+            time: performance.now(),
+          },
+        ],
+        this,
+      ),
     )
   }
 
   observe(target: Element): void {
     this.#targets.add(target)
-    this.report({ target, isIntersecting: reporting.isOnScreen })
+    queueMicrotask(() => this.report({ target, isIntersecting: reporting.isOnScreen }))
   }
 
   unobserve(target: Element): void {
@@ -79,3 +85,6 @@ export const moveOnScreen = ({
   isOnScreen: boolean
 }): void =>
   reporting.observers.forEach((observer) => observer.report({ target, isIntersecting: isOnScreen }))
+
+/** Waits for the reports on what just mounted, as a test that reads a picture at once needs. */
+export const reported = (): Promise<void> => act(async () => {})

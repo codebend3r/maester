@@ -254,6 +254,7 @@ describe('PendingPage', () => {
       expect(screen.getByRole('button', { name: 'Check again' })).toBeDisabled()
 
       await act(async () => ending.answer({ error: null }))
+      expect(await screen.findByRole('button', { name: 'Sign out' })).toBeEnabled()
     })
   })
 
@@ -343,12 +344,13 @@ describe('PendingPage', () => {
 
     it('lets an approved account on to the library once approved', async () => {
       const user = userEvent.setup()
-      getMe.mockResolvedValueOnce(fakeAccount({ status: MEMBER_STATUSES.pending }))
-      getMe.mockResolvedValue(fakeAccount())
+      getMe.mockResolvedValue(fakeAccount({ status: MEMBER_STATUSES.pending }))
       const getHome = spyOn(api, 'getHome').mockReturnValue(new Promise(() => undefined))
       renderApp({ route: '/libraries/3' })
+      const checkAgain = await screen.findByRole('button', { name: 'Check again' })
 
-      await user.click(await screen.findByRole('button', { name: 'Check again' }))
+      getMe.mockResolvedValue(fakeAccount())
+      await user.click(checkAgain)
 
       await waitFor(() => expect(where()).toBe(HOME_PATH))
       expect(screen.queryByRole('heading', WAITING)).toBeNull()

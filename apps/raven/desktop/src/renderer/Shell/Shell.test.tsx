@@ -185,10 +185,13 @@ describe('Shell', () => {
     const { queryClient } = renderDesktop({ client, routes: STUB_ROUTES })
     await settled()
     await client.emit({ type: 'downloads', downloads: [], autoDeleteDefault: true })
-    expect(queryClient.getQueryState(DOWNLOADS_KEY)?.data).toEqual({
-      downloads: [],
-      autoDeleteDefault: true,
-    })
+    // A wait, so the Downloads button redraws from the seeded query inside it.
+    await waitFor(() =>
+      expect(queryClient.getQueryState(DOWNLOADS_KEY)?.data).toEqual({
+        downloads: [],
+        autoDeleteDefault: true,
+      }),
+    )
   })
 
   it("seeds a server's account query from an account event, and no other, without asking main", async () => {

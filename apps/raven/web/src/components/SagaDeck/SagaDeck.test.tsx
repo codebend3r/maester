@@ -5,9 +5,10 @@ import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { POSTER_SIZES } from '@/lib/posters'
 import { itemSummary, matchedMovie } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
+import { reported } from '@/test/viewport'
 
 describe('SagaDecks', () => {
-  it('fetches each poster in a deck no wider than the deck shows it', () => {
+  it('fetches each poster in a deck no wider than the deck shows it', async () => {
     const { container } = renderWithProviders({
       ui: (
         <SagaDecks
@@ -25,6 +26,7 @@ describe('SagaDecks', () => {
         />
       ),
     })
+    await reported()
     const posters = [...container.querySelectorAll('img')]
     expect(posters.map((poster) => poster.getAttribute('srcset')?.split(', ')[0])).toEqual([
       '/api/items/10/images/poster?v=p1&w=185 185w',

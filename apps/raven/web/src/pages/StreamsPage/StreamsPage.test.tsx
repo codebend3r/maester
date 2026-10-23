@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, spyOn } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import {
   ApiError,
   type MediaStreams,
@@ -64,6 +64,9 @@ describe('StreamsPage', () => {
     tracks: spyOn(api, 'getTracks'),
     probe: spyOn(api, 'getStreams'),
   }
+
+  // A stream's tracks stay unread unless a test serves them.
+  beforeEach(() => spies.tracks.mockImplementation(() => new Promise(() => undefined)))
 
   afterEach(() => {
     cleanup()

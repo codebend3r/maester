@@ -5,6 +5,7 @@ import { POSTER_SIZES } from '@/lib/posters'
 import { matchedMovie, mediaItem } from '@/test/fixtures'
 import { atPixelRatio, restorePixelRatio } from '@/test/pixelRatio'
 import { renderWithProviders } from '@/test/render'
+import { reported } from '@/test/viewport'
 
 describe('MediaTiles', () => {
   afterEach(restorePixelRatio)
@@ -23,10 +24,11 @@ describe('MediaTiles', () => {
     expect(tile).toHaveTextContent('Comedy/2026')
   })
 
-  it("gives a Movies library's tile a poster no wider than its small column needs", () => {
+  it("gives a Movies library's tile a poster no wider than its small column needs", async () => {
     const { container } = renderWithProviders({
       ui: <MediaTiles items={[matchedMovie()]} posters />,
     })
+    await reported()
     const poster = container.querySelector('img')
     expect(poster).toHaveAttribute('src', '/api/items/40/images/poster?v=p1')
     expect(poster?.getAttribute('srcset')).toContain('/api/items/40/images/poster?v=p1&w=185 185w')

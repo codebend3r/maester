@@ -5,6 +5,7 @@ import { MediaList } from '@/components/MediaList/MediaList'
 import { POSTER_SIZES } from '@/lib/posters'
 import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
+import { reported } from '@/test/viewport'
 
 describe('MediaList', () => {
   it('lays each video out as a row of its facts under named columns', () => {
@@ -103,14 +104,16 @@ describe('MediaList', () => {
     expect(titles()).toEqual(['Low', 'None', 'High'])
   })
 
-  it('gives each row a small poster in a Movies library, a frame grab elsewhere, out of the tab order', () => {
+  it('gives each row a small poster in a Movies library, a frame grab elsewhere, out of the tab order', async () => {
     const movies = renderWithProviders({ ui: <MediaList movies items={[matchedMovie()]} /> })
+    await reported()
     const poster = movies.container.querySelector('tbody img')
     expect(poster).toHaveAttribute('src', '/api/items/40/images/poster?v=p1')
     expect(poster).toHaveAttribute('sizes', POSTER_SIZES.list)
     expect(poster?.closest('a')).toHaveAttribute('tabindex', '-1')
     movies.unmount()
     const files = renderWithProviders({ ui: <MediaList items={[mediaItem()]} /> })
+    await reported()
     expect(files.container.querySelector('tbody img')).toHaveAttribute(
       'src',
       '/api/media/7/thumbnail?v=1',

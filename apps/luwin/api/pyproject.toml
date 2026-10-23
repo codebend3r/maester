@@ -48,4 +48,6 @@ extend-immutable-calls = ["luwin.config.setting"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# One line of dots, as the bun and vitest suites print, with no running percentage.
+console_output_style = "classic"
 asyncio_mode = "auto"

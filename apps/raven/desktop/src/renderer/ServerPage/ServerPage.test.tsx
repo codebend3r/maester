@@ -421,7 +421,7 @@ describe('ServerPage', () => {
 
   it("keeps the engine's length for the recents when the next title's name arrives", async () => {
     const next = heldReply()
-    const { client, fake, router } = playTitle({
+    const { client, fake, router, queryClient } = playTitle({
       calls: {
         'GET /api/media/7': reply({ body: mediaItemFor({ duration: null }) }),
         'GET /api/media/8': next.promise,
@@ -440,6 +440,7 @@ describe('ServerPage', () => {
     )
     await screen.findByRole('link', { name: 'Up next: Episode 2' })
     await act(async () => router.navigate('/'))
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0))
     const notes = sentOfType({ client, type: DESKTOP_REQUESTS.noteServerTitle })
     expect(notes.at(-1)).toMatchObject({ type: DESKTOP_REQUESTS.noteServerTitle, watched: 0.4 })
   })
