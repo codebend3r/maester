@@ -1,9 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { photoVersionOf } from '@/metadata/metadataRepository'
 import { BLANK_ITEM, type FetchedPerson, type FetchedPersonCredit } from '@/metadata/tmdbClient'
-import { PeopleRepository } from '@/people/peopleRepository'
 import { testDatabase } from '@/test/database'
-import { repositories } from '@/test/repositories'
+import { peopleRepositoryOf, pictureVersionsOf, repositories } from '@/test/repositories'
 
 const credit = (
   fields: Pick<FetchedPersonCredit, 'creditId' | 'type' | 'tmdbId' | 'title' | 'position'> &
@@ -64,7 +62,7 @@ const KEANU: FetchedPerson = {
 
 describe("the people store's filmographies", () => {
   const database = testDatabase('raven-people-repository-')
-  const people = () => new PeopleRepository(database.get())
+  const people = () => peopleRepositoryOf(database.get())
   const state = { personId: 0, matrixId: 0 }
 
   beforeAll(async () => {
@@ -107,7 +105,10 @@ describe("the people store's filmographies", () => {
     expect(people().profile(state.personId)).toEqual({
       tmdbId: '6384',
       name: 'Keanu Charles Reeves',
-      photoVersion: photoVersionOf('/keanu-new.jpg'),
+      photoVersion: pictureVersionsOf(database.get()).photo({
+        id: state.personId,
+        photo: '/keanu-new.jpg',
+      }),
       fetchedAt: '2026-10-17T12:00:00.000Z',
       profile: {
         imdbId: 'nm0000206',

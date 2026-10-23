@@ -24,7 +24,7 @@ import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
-import { ItemHeader, ItemHeaderSkeleton, pictureBackdrop } from '@/components/ItemHeader/ItemHeader'
+import { ItemHeader, ItemHeaderSkeleton, itemBackdrop } from '@/components/ItemHeader/ItemHeader'
 import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { RouteState } from '@/components/RouteState/RouteState'
@@ -140,13 +140,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
               version: details.posterVersion,
             }),
           }}
-          backdrop={pictureBackdrop(
-            api.itemImageUrl({
-              id: details.id,
-              kind: 'backdrop',
-              version: details.backdropVersion,
-            }),
-          )}
+          backdrop={itemBackdrop({ id: details.id, version: details.backdropVersion })}
           manage={
             <AdminOnly>
               <Button

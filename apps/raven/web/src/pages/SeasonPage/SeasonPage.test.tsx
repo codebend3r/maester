@@ -75,7 +75,7 @@ describe('SeasonPage', () => {
     expect(
       within(first ?? list).getByText('Good News About Hell is an episode.'),
     ).toBeInTheDocument()
-    expect(first?.querySelector('img')?.getAttribute('src')).toContain('/images/still?v=still1')
+    expect(first?.querySelector('img')?.getAttribute('src')).toContain('/still/still1')
     expect(spies.item.mock.calls.map(([id]) => id).toSorted()).toEqual([4, 5])
   })
 

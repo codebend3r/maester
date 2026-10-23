@@ -95,9 +95,9 @@ describe('ContinueWatching', () => {
     })
     await reported()
     const [poster, tint] = [...section().querySelectorAll('img')]
-    expect(poster?.getAttribute('src')).toContain('/api/items/5/images/poster')
+    expect(poster?.getAttribute('src')).toContain('/api/pictures/items/5/poster')
     expect(poster?.getAttribute('sizes')).toBe(POSTER_SIZES.showTile)
-    expect(tint?.getAttribute('srcset')).toContain('/api/items/5/images/poster')
+    expect(tint?.getAttribute('srcset')).toContain('/api/pictures/items/5/poster')
     expect(tint?.getAttribute('sizes')).toBe('1px')
   })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { DEFAULT_SAGA_BACKDROP } from '@raven/core'
 import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { POSTER_SIZES } from '@/lib/posters'
@@ -29,13 +29,39 @@ describe('SagaDecks', () => {
     await reported()
     const posters = [...container.querySelectorAll('img')]
     expect(posters.map((poster) => poster.getAttribute('srcset')?.split(', ')[0])).toEqual([
-      '/api/items/10/images/poster?v=p1&w=185 185w',
-      '/api/items/20/images/poster?v=p2&w=185 185w',
+      '/api/pictures/items/10/poster/p1?w=185 185w',
+      '/api/pictures/items/20/poster/p2?w=185 185w',
     ])
     expect(posters.map((poster) => poster.getAttribute('sizes'))).toEqual([
       POSTER_SIZES.deck,
       POSTER_SIZES.deck,
     ])
+  })
+
+  it('asks for the posters hidden under a stacked deck only once it first fans out', async () => {
+    const { container } = renderWithProviders({
+      ui: (
+        <SagaDecks
+          libraryId={2}
+          sagas={[
+            {
+              tmdbId: '10',
+              name: 'Star Wars Collection',
+              backdrop: DEFAULT_SAGA_BACKDROP,
+              media: [1, 2, 3, 4, 5, 6].map((id) =>
+                matchedMovie({ id, item: itemSummary({ id: id * 10, posterVersion: `p${id}` }) }),
+              ),
+            },
+          ]}
+        />
+      ),
+    })
+    await reported()
+    expect(container.querySelectorAll('img')).toHaveLength(4)
+    fireEvent.pointerEnter(screen.getByRole('link', { name: /Star Wars Collection/ }))
+    expect(container.querySelectorAll('img')).toHaveLength(6)
+    fireEvent.pointerLeave(screen.getByRole('link', { name: /Star Wars Collection/ }))
+    expect(container.querySelectorAll('img')).toHaveLength(6)
   })
 
   const saga = (watched: boolean[]) => ({

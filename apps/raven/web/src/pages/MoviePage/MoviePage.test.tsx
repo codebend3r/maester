@@ -297,10 +297,7 @@ describe('MoviePage', () => {
   it("shows the title as the movie's logo", async () => {
     open({ details: itemDetails({ logoVersion: 'abc' }) })
     const heading = await screen.findByRole('heading', { level: 1, name: 'Busboys' })
-    expect(heading.querySelector('img')).toHaveAttribute(
-      'src',
-      expect.stringContaining('/images/logo'),
-    )
+    expect(heading.querySelector('img')).toHaveAttribute('src', expect.stringContaining('/logo/'))
   })
 
   it('spells the title out when Settings says Text', async () => {

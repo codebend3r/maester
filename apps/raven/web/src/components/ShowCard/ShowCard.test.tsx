@@ -29,7 +29,7 @@ describe('ShowCard', () => {
       pointerType: 'mouse',
     })
     await waitFor(() =>
-      expect(usePageBackdrop.getState().current).toBe('/api/items/4/images/backdrop?v=b9'),
+      expect(usePageBackdrop.getState().current).toBe('/api/pictures/items/4/backdrop/b9'),
     )
   })
 
@@ -62,14 +62,14 @@ describe('ShowCard', () => {
     expect(screen.getByText('2022 to now')).toBeInTheDocument()
     expect(screen.getByText('9 episodes')).toBeInTheDocument()
     expect(screen.getByLabelText('Video resolution: 1080p')).toBeInTheDocument()
-    expect(container.querySelector('img')).toHaveAttribute('src', '/api/items/4/images/poster?v=p1')
+    expect(container.querySelector('img')).toHaveAttribute('src', '/api/pictures/items/4/poster/p1')
   })
 
   it('offers its poster at each width, sized as the row or grid holding it lays it out', async () => {
     const srcset = [
-      '/api/items/4/images/poster?v=p1&w=185 185w',
-      '/api/items/4/images/poster?v=p1&w=342 342w',
-      '/api/items/4/images/poster?v=p1 500w',
+      '/api/pictures/items/4/poster/p1?w=185 185w',
+      '/api/pictures/items/4/poster/p1?w=342 342w',
+      '/api/pictures/items/4/poster/p1 500w',
     ].join(', ')
     const row = renderWithProviders({
       ui: (

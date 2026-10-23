@@ -20,6 +20,7 @@ export const SETTINGS_KEYS = {
   playback: 'playback',
   display: 'display',
   admin: 'admin',
+  pictures: 'pictures',
   accounts: 'accounts',
   viewing: 'viewing',
 } as const
@@ -101,10 +102,22 @@ export class SettingsRepository {
    * every browser's admin lock as it was.
    */
   adminSecret(): string {
-    const stored = this.read({ key: SETTINGS_KEYS.admin })?.secret ?? null
+    return this.secretAt({ key: SETTINGS_KEYS.admin })
+  }
+
+  /**
+   * The secret picture versions are keyed with, kept the same way, so a
+   * picture's address outlives a restart and every cache holding it stays good.
+   */
+  pictureSecret(): string {
+    return this.secretAt({ key: SETTINGS_KEYS.pictures })
+  }
+
+  private secretAt({ key }: { key: string }): string {
+    const stored = this.read({ key })?.secret ?? null
     if (isString(stored) && stored !== '') return stored
     const secret = randomBytes(32).toString('base64url')
-    this.write({ key: SETTINGS_KEYS.admin, value: { secret } })
+    this.write({ key, value: { secret } })
     return secret
   }
 

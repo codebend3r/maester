@@ -25,6 +25,8 @@ import { HealthController } from '@/health/healthController'
 import { ItemsController } from '@/items/itemsController'
 import { MatchController } from '@/items/matchController'
 import { PeopleController } from '@/items/peopleController'
+import { ItemPictureFiles } from '@/items/itemPictureFiles'
+import { PicturesController } from '@/items/picturesController'
 import { ReviewsController } from '@/items/reviewsController'
 import { LibrariesController } from '@/libraries/librariesController'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
@@ -55,6 +57,7 @@ import { AiMatcher } from '@/metadata/aiMatcher'
 import { ImageCache } from '@/metadata/imageCache'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { ItemOverrides } from '@/metadata/itemOverrides'
+import { PictureVersions } from '@/metadata/pictureVersions'
 import { ItemPictures } from '@/metadata/itemPictures'
 import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MatchFactsCache } from '@/metadata/matchFactsCache'
@@ -96,6 +99,7 @@ export const CONTROLLERS = [
   ItemsController,
   MatchController,
   PeopleController,
+  PicturesController,
   ReviewsController,
   SettingsController,
   EventsController,
@@ -172,7 +176,9 @@ export class AppModule {
         ServerEvents,
         LibrariesRepository,
         SettingsRepository,
+        PictureVersions,
         ItemImagesRepository,
+        ItemPictureFiles,
         MetadataRepository,
         PeopleRepository,
         ItemOverrides,

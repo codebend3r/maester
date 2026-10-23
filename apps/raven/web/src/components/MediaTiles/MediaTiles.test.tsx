@@ -30,8 +30,8 @@ describe('MediaTiles', () => {
     })
     await reported()
     const poster = container.querySelector('img')
-    expect(poster).toHaveAttribute('src', '/api/items/40/images/poster?v=p1')
-    expect(poster?.getAttribute('srcset')).toContain('/api/items/40/images/poster?v=p1&w=185 185w')
+    expect(poster).toHaveAttribute('src', '/api/pictures/items/40/poster/p1')
+    expect(poster?.getAttribute('srcset')).toContain('/api/pictures/items/40/poster/p1?w=185 185w')
     expect(poster).toHaveAttribute('sizes', POSTER_SIZES.movieTile)
   })
 

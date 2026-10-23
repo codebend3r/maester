@@ -99,6 +99,7 @@ export const PosterCard = ({
     : null
   const link = cardLink({ media, hasPages: true })
   const hasPage = link.state == null
+  const pageItem = hasPage ? (media.item?.id ?? null) : null
   const sorted = sort ? sortFact({ media, sort }) : null
   const facts = [
     year == null ? null : String(year),
@@ -117,6 +118,7 @@ export const PosterCard = ({
       <div className={styles.poster}>
         <CardLink
           {...link}
+          prefetchItem={pageItem}
           className={styles.picture}
           tabIndex={-1}
           aria-hidden="true"
@@ -138,6 +140,7 @@ export const PosterCard = ({
       <div className={styles.words}>
         <CardLink
           {...link}
+          prefetchItem={pageItem}
           className={styles.title}
           tabIndex={select.linkTabIndex}
           onContextMenu={menu.onContextMenu}

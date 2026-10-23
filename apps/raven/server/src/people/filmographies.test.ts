@@ -7,9 +7,8 @@ import {
   Filmographies,
   MOST_WAITING,
 } from '@/people/filmographies'
-import { PeopleRepository } from '@/people/peopleRepository'
 import { testDatabase } from '@/test/database'
-import { repositories } from '@/test/repositories'
+import { peopleRepositoryOf, repositories } from '@/test/repositories'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -72,7 +71,7 @@ const stubTmdb = () => {
 
 describe("a person's filmography from TMDB", () => {
   const database = testDatabase('raven-filmographies-')
-  const people = () => new PeopleRepository(database.get())
+  const people = () => peopleRepositoryOf(database.get())
   const counter = { next: 0 }
 
   /** A person with one credit, as matching leaves them, whose filmography is yet to be fetched. */
