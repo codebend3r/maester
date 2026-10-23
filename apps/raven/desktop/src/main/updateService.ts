@@ -15,9 +15,9 @@ const RELEASES_HOOK = 'RAVEN_DESKTOP_RELEASES_URL'
 export const UPDATE_COPY = {
   ...UPDATE_WORDS,
   newerDetail:
-    'Download it from its release page. While raven player is signed ad hoc it cannot update itself.',
-  noRelease: 'raven player has not found a newer release.',
-  unopened: 'raven player could not open the release page.',
+    'Download it from its release page. While Raven is signed ad hoc it cannot update itself.',
+  noRelease: 'Raven has not found a newer release.',
+  unopened: 'Raven could not open the release page.',
 } as const
 
 const DIALOG_TYPES = { info: 'info', warning: 'warning' } as const
@@ -206,7 +206,7 @@ export const createUpdateService = ({
     )
     if (!result.ok) {
       problem = result.problem
-      warn(`raven player could not check for updates: ${result.problem}`)
+      warn(`Raven could not check for updates: ${result.problem}`)
       return result
     }
     problem = null
@@ -237,7 +237,7 @@ export const createUpdateService = ({
       await openExternal(finding.pageUrl)
       return true
     } catch (error) {
-      warn(`raven player could not open the release page: ${errorText(error)}`)
+      warn(`Raven could not open the release page: ${errorText(error)}`)
       return false
     }
   }

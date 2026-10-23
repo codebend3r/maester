@@ -22,7 +22,7 @@ export const useSendAccountToken = (client: DesktopClient): void => {
     const send = async (session: SessionView['session']) => {
       const reply = await client.request({ type: DESKTOP_REQUESTS.accountToken, session })
       if (reply.type === DESKTOP_REPLIES.refused) {
-        console.warn(`raven player refused the page's account: ${reply.message}`)
+        console.warn(`Raven refused the page's account: ${reply.message}`)
       }
     }
     const sendWhenReady = (state: SessionView) => {

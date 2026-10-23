@@ -17,13 +17,13 @@ import { refusalText } from '@/desktop/client'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { useDesktop } from '@/stores/desktop'
 
-const NO_DOWNLOADS = 'raven player could not read its downloads.'
-const NO_SPACE = 'raven player could not read its disk space.'
-const UNCHANGED = 'raven player could not change its downloads. Try again.'
+const NO_DOWNLOADS = 'Raven could not read its downloads.'
+const NO_SPACE = 'Raven could not read its disk space.'
+const UNCHANGED = 'Raven could not change its downloads. Try again.'
 
 export type DownloadsData = { downloads: DownloadView[]; shouldAutoDelete: boolean }
 
-/** The downloads raven player keeps, and whether a new one starts out deleting once watched. */
+/** The downloads Raven keeps, and whether a new one starts out deleting once watched. */
 export const useDownloads = (): UseQueryResult<DownloadsData> => {
   const { client } = useDesktop()
   return useQuery({
@@ -86,7 +86,7 @@ export const applyDownloadsEvent = async ({ queryClient, event }: ListChange): P
   ])
 }
 
-/** The disk raven player keeps its downloads on. */
+/** The disk Raven keeps its downloads on. */
 export const useSpace = (): UseQueryResult<SpaceView> => {
   const { client } = useDesktop()
   return useQuery({

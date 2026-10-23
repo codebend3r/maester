@@ -1,6 +1,6 @@
 name: 🔩 raven desktop native build
 description: >-
-  Builds raven player's native pieces on a macOS arm64 runner: Bun, the disposable
+  Builds Raven's native pieces on a macOS arm64 runner: Bun, the disposable
   toolchain, the install, the Nx cached libmpv and MoltenVK source build and the N-API
   addon. The caller audits them.
 

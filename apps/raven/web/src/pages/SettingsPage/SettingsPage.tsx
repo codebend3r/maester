@@ -231,7 +231,7 @@ const SettingsSection = <T,>({
 
 /**
  * Playback that this browser keeps for itself. Off by default: a page cannot
- * tell whether raven player is installed, and a `raven://` link nothing
+ * tell whether Raven is installed, and a `raven://` link nothing
  * handles does nothing in Chrome and shows an error in Safari.
  */
 const BrowserPlayback = () => {
@@ -249,11 +249,10 @@ const BrowserPlayback = () => {
           checked={opensInRavenPlayer}
           onChange={(event) => setOpensInRavenPlayer(event.target.checked)}
         />
-        <span className={styles.choiceLabel}>Open videos in raven player</span>
+        <span className={styles.choiceLabel}>Open videos in Raven</span>
         <span className={styles.choiceHint}>
-          Offers raven player for videos this browser cannot play, in the player's settings, and
-          Download to raven player on a title's page. Turn it on only where raven player is
-          installed.
+          Offers Raven for videos this browser cannot play, in the player's settings, and Download
+          to Raven on a title's page. Turn it on only where Raven is installed.
         </span>
       </label>
     </section>
@@ -491,7 +490,7 @@ const AdminLockSection = () => {
 }
 
 /**
- * Settings while raven player cannot reach its server: only what the app
+ * Settings while Raven cannot reach its server: only what the app
  * and this browser keep for themselves.
  */
 const OfflineSettings = () => {
@@ -511,7 +510,7 @@ const OfflineSettings = () => {
 
 /**
  * How the server plays video, and how pages look, for every viewer, then
- * the account, raven player's own settings inside the app, and the advanced
+ * the account, Raven's own settings inside the app, and the advanced
  * settings and the admin lock at the foot, for this browser. Each change
  * shows at once and saves on its own behind it, put back if the save
  * fails; Reset to defaults puts the server's settings back at once, after a

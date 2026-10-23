@@ -20,7 +20,7 @@ const updateWords = (version: string): string =>
   `${UPDATE_WORDS.newer(version)} Settings has what's new.`
 
 /**
- * raven player's part of the page, mounted once over every route: it hears main's events and
+ * Raven's part of the page, mounted once over every route: it hears main's events and
  * says the page is ready for them, hands main the page's account, follows whether the server
  * can be reached (going back to the page it left while it could not), takes files dropped on
  * the window, and shows the download and Open Link dialogs.

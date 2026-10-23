@@ -17,7 +17,7 @@ export type DesktopClient = {
 
 const UNREADABLE = {
   type: DESKTOP_REPLIES.refused,
-  message: 'raven player could not read its own reply.',
+  message: 'Raven could not read its own reply.',
 } as const satisfies DesktopReply
 
 /** Main's reply, or a refusal saying it could not be read; it never rejects. */
@@ -48,7 +48,7 @@ export const clientFor = (bridge: unknown): DesktopClient | null => {
     subscribe: (listener) =>
       bridge.subscribe((event) => {
         if (!isDesktopEvent(event)) {
-          console.warn('raven player ignored an event it does not understand.')
+          console.warn('Raven ignored an event it does not understand.')
           return
         }
         listener(event)

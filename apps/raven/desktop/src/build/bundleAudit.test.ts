@@ -156,7 +156,7 @@ describe('fileProblems', () => {
 
   it('leaves @rpath links outside the engine to their own rpaths', () => {
     const file = auditedFile({
-      relative: 'Contents/MacOS/raven player',
+      relative: 'Contents/MacOS/Raven',
       dir: 'Contents/MacOS',
       links: ['@rpath/Electron Framework.framework/Electron Framework'],
       rpaths: ['@executable_path/../Frameworks'],
@@ -198,9 +198,9 @@ describe('fileProblems', () => {
   })
 
   it("resolves an executable's own @executable_path against its folder", () => {
-    const helper = 'Contents/Frameworks/raven player Helper.app/Contents/MacOS'
+    const helper = 'Contents/Frameworks/Raven Helper.app/Contents/MacOS'
     const file = auditedFile({
-      relative: `${helper}/raven player Helper`,
+      relative: `${helper}/Raven Helper`,
       dir: helper,
       links: ['@rpath/Electron Framework.framework/Electron Framework'],
       rpaths: ['@executable_path/../../..'],

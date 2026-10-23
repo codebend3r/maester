@@ -165,11 +165,11 @@ const isPresent = (path: string): Promise<boolean> =>
 /** `downloads.json` as main left it, narrowed by the guard main reads it with. */
 const storedDownloads = async ({ userData }: { userData: string }): Promise<DownloadsState> => {
   const value = parseJson(await readFile(join(userData, DOWNLOADS_FILE), 'utf8'))
-  if (!isDownloadsState(value)) throw new Error('downloads.json is not what raven player keeps.')
+  if (!isDownloadsState(value)) throw new Error('downloads.json is not what Raven keeps.')
   return value
 }
 
-const askDialog = (page: Page) => page.getByRole('dialog', { name: 'Download to raven player' })
+const askDialog = (page: Page) => page.getByRole('dialog', { name: 'Download to Raven' })
 
 /** Answers the download dialog once its question names what `question` says. */
 const confirmDownload = async ({ page, question }: { page: Page; question: string }) => {
@@ -217,10 +217,10 @@ const expectReady = async ({ page, label, size }: { page: Page; label: string; s
   await expect(row.getByText(formatBytes(size), { exact: true })).toBeVisible()
 }
 
-/** The id raven player files its server's downloads under, as its config holds it. */
+/** The id Raven files its server's downloads under, as its config holds it. */
 const serverIdOf = async ({ userData }: { userData: string }): Promise<string> => {
   const config = parseJson(await readFile(join(userData, CONFIG_FILE), 'utf8'))
-  if (!isDesktopConfig(config)) throw new Error('raven player saved no config.')
+  if (!isDesktopConfig(config)) throw new Error('Raven saved no config.')
   return config.server.id
 }
 

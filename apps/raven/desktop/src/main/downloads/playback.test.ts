@@ -345,7 +345,7 @@ describe('openTitle', () => {
   it('opens nothing, with a warning, for a download whose file has gone', async () => {
     const world = setup({ entries: [entryFor({})] })
     expect(await world.playback.openTitle({ serverId: SERVER_ID, mediaId: 11 })).toBeNull()
-    expect(world.warnings).toEqual(['raven player could not open the file of S01E01 Good News'])
+    expect(world.warnings).toEqual(['Raven could not open the file of S01E01 Good News'])
   })
 })
 
@@ -427,7 +427,7 @@ describe('what names a download', () => {
     expect(world.playback.fromLabelOf({ path: VIDEO })).toBe('Downloaded from Caraxes')
   })
 
-  it('says only "Downloaded" for a download of a server raven player no longer keeps, never its folder', () => {
+  it('says only "Downloaded" for a download of a server Raven no longer keeps, never its folder', () => {
     const world = setup({ entries: [entryFor({ serverId: OTHER_SERVER_ID })] })
     expect(world.playback.fromLabelOf({ path: videoOf(11, OTHER_SERVER_ID) })).toBe('Downloaded')
   })

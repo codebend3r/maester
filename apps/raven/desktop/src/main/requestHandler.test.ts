@@ -105,7 +105,7 @@ describe('createRequestHandler', () => {
     await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: ENVELOPE })
     // Node names the call `realpath`, Bun `lstat`.
     expect(warnings).toHaveLength(1)
-    expect(warnings[0] ?? '').toMatch(/^raven player failed to answer a request: [a-z]+ ENOENT$/)
+    expect(warnings[0] ?? '').toMatch(/^Raven failed to answer a request: [a-z]+ ENOENT$/)
   })
 
   it('falls back to the message of an error without a stack', async () => {

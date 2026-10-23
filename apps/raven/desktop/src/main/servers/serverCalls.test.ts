@@ -125,7 +125,7 @@ const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve
 
 describe('SERVER_GONE', () => {
   it("is main's one message for a server it no longer reaches, written out here", () => {
-    expect(SERVER_GONE).toBe('raven player no longer plays from that server.')
+    expect(SERVER_GONE).toBe('Raven no longer plays from that server.')
     expect(CALL_MESSAGES.unknownServer).toBe(SERVER_GONE)
     expect(SOURCE_MESSAGES.unknownServer).toBe(SERVER_GONE)
   })
@@ -138,18 +138,12 @@ describe('the call values', () => {
     expect(MAX_SAGAS_REPLY_CHARS).toBe(8 * 1_048_576)
     expect(MAX_IN_FLIGHT).toBe(6)
     expect(WRITE_RESERVE).toBe(2)
-    expect(CALL_MESSAGES.offList).toBe('raven player does not make that call.')
-    expect(CALL_MESSAGES.unreachable('raven.example')).toBe(
-      'raven player could not reach raven.example.',
-    )
-    expect(CALL_MESSAGES.tooBig('raven.example')).toBe(
-      'raven.example sent more than raven player reads.',
-    )
-    expect(CALL_MESSAGES.busy('raven.example')).toBe(
-      'raven player is still waiting on raven.example.',
-    )
+    expect(CALL_MESSAGES.offList).toBe('Raven does not make that call.')
+    expect(CALL_MESSAGES.unreachable('raven.example')).toBe('Raven could not reach raven.example.')
+    expect(CALL_MESSAGES.tooBig('raven.example')).toBe('raven.example sent more than Raven reads.')
+    expect(CALL_MESSAGES.busy('raven.example')).toBe('Raven is still waiting on raven.example.')
     expect(CALL_MESSAGES.otherAccount('raven.example')).toBe(
-      'raven player is signed in to raven.example as someone else now.',
+      'Raven is signed in to raven.example as someone else now.',
     )
   })
 })

@@ -99,7 +99,7 @@ const NO_ENGINE: PlayerConnection = {
   message: 'The video engine is off for this test.',
 }
 
-/** Runs the page as raven player's, as `startDesktop` sets it: its bridge is `client` and `player`. */
+/** Runs the page as Raven's, as `startDesktop` sets it: its bridge is `client` and `player`. */
 export const asPlayingDesktop = ({
   client = fakeClient(),
   player = connectionsOf(NO_ENGINE),
@@ -112,7 +112,7 @@ export const asPlayingDesktop = ({
   return { client, menu, player }
 }
 
-/** Runs the page as raven player's with no video engine: its bridge is `client`. */
+/** Runs the page as Raven's with no video engine: its bridge is `client`. */
 export const asDesktop = (client: DesktopClient = fakeClient()) => asPlayingDesktop({ client })
 
 /** A native player whose commands are recorded and answered at once; `emit` plays main's events. */

@@ -146,7 +146,7 @@ export const diagnosticsText = ({
   displayHz,
 }: DiagnosticsInput): string =>
   [
-    `raven player ${app.version} (${app.isPackaged ? 'packaged' : 'unpackaged'}, ${app.arch})`,
+    `Raven ${app.version} (${app.isPackaged ? 'packaged' : 'unpackaged'}, ${app.arch})`,
     `macOS ${os}`,
     `Electron ${versions.electron}, Chromium ${versions.chrome}, Node ${versions.node}`,
     ...engineLines({ engine, displayHz }),

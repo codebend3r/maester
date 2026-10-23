@@ -127,7 +127,7 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
     clocks.set(downloadId, { kind: CLOCK_KINDS.deleting })
     deleteNow(entry).catch((error: unknown) => {
       deps.warn(
-        `raven player could not finish deleting ${loggable(entry.label)}: ${loggable(errorText(error))}`,
+        `Raven could not finish deleting ${loggable(entry.label)}: ${loggable(errorText(error))}`,
       )
     })
   }

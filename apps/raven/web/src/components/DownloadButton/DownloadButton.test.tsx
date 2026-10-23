@@ -35,7 +35,7 @@ describe('DownloadButton', () => {
     open.mockClear()
   })
 
-  it('renders nothing while this browser does not open videos in raven player', () => {
+  it('renders nothing while this browser does not open videos in Raven', () => {
     const { container } = render(
       <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.saga, libraryId: 2, tmdbId: '119' }} />,
     )
@@ -47,24 +47,22 @@ describe('DownloadButton', () => {
     render(
       <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.saga, libraryId: 2, tmdbId: '119' }} />,
     )
-    expect(screen.getByRole('button', { name: 'Download to raven player' })).toHaveAttribute(
-      'data-wide',
-    )
+    expect(screen.getByRole('button', { name: 'Download to Raven' })).toHaveAttribute('data-wide')
   })
 
-  it('opens the saga download link in raven player when pressed', async () => {
+  it('opens the saga download link in Raven when pressed', async () => {
     usePlayerPrefs.setState({ opensInRavenPlayer: true })
     render(
       <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.saga, libraryId: 2, tmdbId: '119' }} />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Download to raven player' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Download to Raven' }))
     expect(open).toHaveBeenCalledTimes(1)
     expect(open).toHaveBeenCalledWith(
       `raven://download?server=${encodeURIComponent(window.location.origin)}&saga=2%3A119`,
     )
   })
 
-  it('is always there inside raven player, and asks the app to download the title', async () => {
+  it('is always there inside Raven, and asks the app to download the title', async () => {
     const ask = askOf()
     const client = fakeClient({
       request: async () => ({ type: DESKTOP_REPLIES.downloadAsk, ask }),
@@ -80,7 +78,7 @@ describe('DownloadButton', () => {
     expect(open).not.toHaveBeenCalled()
   })
 
-  it('asks once while raven player reads the title, however often it is pressed', async () => {
+  it('asks once while Raven reads the title, however often it is pressed', async () => {
     const reply = held<DesktopReply>()
     const client = fakeClient({ request: () => reply.promise })
     asDesktop(client)
@@ -94,7 +92,7 @@ describe('DownloadButton', () => {
     expect(button).toHaveAttribute('aria-disabled', 'false')
   })
 
-  it("says raven player's refusal", async () => {
+  it("says Raven's refusal", async () => {
     asDesktop(
       fakeClient({
         request: async () => ({ type: DESKTOP_REPLIES.refused, message: 'Sign in first.' }),

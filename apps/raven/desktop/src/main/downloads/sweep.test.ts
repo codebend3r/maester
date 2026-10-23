@@ -144,7 +144,7 @@ describe('sweepDownloads', () => {
       wasSetAside: false,
     })
     expect(await sweeping).toBeUndefined()
-    expect(world.warnings).toEqual(['raven player could not sweep its downloads: the list is gone'])
+    expect(world.warnings).toEqual(['Raven could not sweep its downloads: the list is gone'])
   })
 })
 

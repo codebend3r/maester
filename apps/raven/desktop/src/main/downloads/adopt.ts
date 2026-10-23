@@ -73,7 +73,7 @@ export const settleDownloads = async ({
     } catch (error) {
       // A queued download may have no folder yet: there is nothing to move.
       if ((await isThere(to)) || !(await isThere(from))) return true
-      warn(`raven player could not move a download to its server: ${loggable(errorText(error))}`)
+      warn(`Raven could not move a download to its server: ${loggable(errorText(error))}`)
       return false
     }
   }

@@ -147,7 +147,7 @@ describe('DownloadsPage', () => {
     )
   })
 
-  it('plays a ready download in raven player', async () => {
+  it('plays a ready download in Raven', async () => {
     const client = downloadsMain({
       downloads: [DUNE],
       answers: {
@@ -216,9 +216,7 @@ describe('DownloadsPage', () => {
     })
     renderPage(client)
     expect(await screen.findByRole('alert')).toHaveTextContent('The list is unreadable.')
-    expect(
-      await screen.findByText('raven player could not read its disk space.'),
-    ).toBeInTheDocument()
+    expect(await screen.findByText('Raven could not read its disk space.')).toBeInTheDocument()
   })
 
   it('counts down to a delete once watched', async () => {

@@ -64,7 +64,7 @@ describe('ticketFor', () => {
     ])
   })
 
-  test('reuses the ticket inside the window, by raven player clock', async () => {
+  test('reuses the ticket inside the window, by Raven clock', async () => {
     const { tickets, made, clock } = setup()
     await tickets.ticketFor(TITLE)
     clock.now += ACCOUNT_TICKET_RENEW_MS - 1

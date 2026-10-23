@@ -17,8 +17,8 @@ export type PortLike = {
   close: () => void
 }
 
-export const UNKNOWN_COMMAND = 'raven player does not understand that command.'
-const BUSY = 'raven player is busy. Try again.'
+export const UNKNOWN_COMMAND = 'Raven does not understand that command.'
+const BUSY = 'Raven is busy. Try again.'
 
 /** Requests waiting or in flight before the port refuses more; the page never needs this many. */
 export const MAX_PENDING = 100
@@ -61,7 +61,7 @@ export const connectPort = ({
     try {
       port.post(message)
     } catch (error) {
-      warn(`raven player could not post to the page: ${messageOf(error)}`)
+      warn(`Raven could not post to the page: ${messageOf(error)}`)
     }
   }
 
@@ -73,7 +73,7 @@ export const connectPort = ({
       if (outcome.ok) return { id, ok: true }
       return { id, ok: false, reason: outcome.reason, message: outcome.message }
     } catch (error) {
-      warn(`raven player failed a ${command.type} command: ${messageOf(error)}`)
+      warn(`Raven failed a ${command.type} command: ${messageOf(error)}`)
       return refusal({ id, message: PLAYER_MESSAGES.failed })
     }
   }
@@ -89,7 +89,7 @@ export const connectPort = ({
 
   const enqueue = (request: PlayerRequest) => {
     if (state.pending >= MAX_PENDING) {
-      if (!state.isOverflowing) warn(`raven player refused commands past ${MAX_PENDING} waiting.`)
+      if (!state.isOverflowing) warn(`Raven refused commands past ${MAX_PENDING} waiting.`)
       state.isOverflowing = true
       post(refusal({ id: request.id, message: BUSY }))
       return
@@ -103,7 +103,7 @@ export const connectPort = ({
     state.isOpen = false
     unsubscribe()
     service.reset().catch((error: unknown) => {
-      warn(`raven player could not stop for a closed page: ${messageOf(error)}`)
+      warn(`Raven could not stop for a closed page: ${messageOf(error)}`)
     })
     port.close()
   }
@@ -122,10 +122,10 @@ export const connectPort = ({
     }
     const id = idOf(data)
     if (id === null) {
-      warnRefusing('raven player dropped a player message without a request id.')
+      warnRefusing('Raven dropped a player message without a request id.')
       return
     }
-    warnRefusing(`raven player refused player request ${id}: it is not a command it knows.`)
+    warnRefusing(`Raven refused player request ${id}: it is not a command it knows.`)
     post(refusal({ id, message: UNKNOWN_COMMAND }))
   })
   port.onClose(close)

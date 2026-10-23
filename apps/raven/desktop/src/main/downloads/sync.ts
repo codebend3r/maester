@@ -196,7 +196,7 @@ export const createSync = ({
       logged.set(key, due.owing)
       const what = due.label === null ? 'a deleted download' : loggable(due.label)
       warn(
-        `raven player could not tell its server what was watched of ${what}: it answered ${result.status}`,
+        `Raven could not tell its server what was watched of ${what}: it answered ${result.status}`,
       )
     }
     return DELIVERIES.denied
@@ -246,9 +246,7 @@ export const createSync = ({
     ({ label }: { label: string | null }) =>
     (error: unknown): void => {
       const what = label === null ? '' : ` of ${loggable(label)}`
-      warn(
-        `raven player could not tell its server what was watched${what}: ${loggable(errorText(error))}`,
-      )
+      warn(`Raven could not tell its server what was watched${what}: ${loggable(errorText(error))}`)
     }
 
   /** Forgets the logged owings that are gone, so the map holds only those still held. */
@@ -470,7 +468,7 @@ export const settleWithin = async ({
     await Promise.race([work, timedOut])
   } catch (error) {
     warn(
-      `raven player could not finish telling its server what was watched: ${loggable(errorText(error))}`,
+      `Raven could not finish telling its server what was watched: ${loggable(errorText(error))}`,
     )
   } finally {
     timers.clear(waited.handle)

@@ -84,10 +84,10 @@ describe('constants', () => {
   })
 
   it('words the refusals', () => {
-    expect(EXPAND_MESSAGES.tooMany).toBe('That is more than raven player downloads at once.')
+    expect(EXPAND_MESSAGES.tooMany).toBe('That is more than Raven downloads at once.')
     expect(EXPAND_MESSAGES.gone('Vhagar')).toBe('That title is not on Vhagar any more.')
     expect(EXPAND_MESSAGES.unreadable('Vhagar')).toBe(
-      'Vhagar answered with something raven player could not read.',
+      'Vhagar answered with something Raven could not read.',
     )
     expect(EXPAND_MESSAGES.account('Vhagar')).toBe('Vhagar did not let your account download that.')
   })
@@ -620,12 +620,12 @@ describe('expandTarget', () => {
 
   it('carries the message of an unreachable call', async () => {
     const { expansion } = run({
-      replies: { [itemCall(5)]: { unreachable: 'raven player could not reach Vhagar.' } },
+      replies: { [itemCall(5)]: { unreachable: 'Raven could not reach Vhagar.' } },
       target: { kind: 'item', itemId: 5 },
     })
     const result = failed(await expansion)
     expect(result.reason).toBe('unreachable')
-    expect(result.message).toBe('raven player could not reach Vhagar.')
+    expect(result.message).toBe('Raven could not reach Vhagar.')
   })
 
   it.each([

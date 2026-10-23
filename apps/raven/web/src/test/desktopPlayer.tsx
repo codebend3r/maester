@@ -23,7 +23,7 @@ import { asPlayingDesktop } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
 
 /**
- * raven player's two players, the watch page and the play page, over `client` and `player`,
+ * Raven's two players, the watch page and the play page, over `client` and `player`,
  * with `Where` standing in for every page they lead to, and the PIN prompt and toasts the app
  * runs over them. Returns the Playback menu's hub and what `renderWithProviders` does.
  */

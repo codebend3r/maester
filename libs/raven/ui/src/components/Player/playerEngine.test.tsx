@@ -572,8 +572,8 @@ describe('Player shows the host note on Unplayable', () => {
   }
 
   it("shows the host's note", () => {
-    failing('raven player could not play this video.')
-    expect(screen.getByText('raven player could not play this video.')).toBeInTheDocument()
+    failing('Raven could not play this video.')
+    expect(screen.getByText('Raven could not play this video.')).toBeInTheDocument()
     expect(screen.queryByText("This video can't play in this browser.")).toBeNull()
   })
 
@@ -608,11 +608,11 @@ describe('Player hands a title off to another player', () => {
     const copy = mock(() => {})
     failing({
       ...servicesFor(),
-      handoff: { label: 'Open in raven player', run },
+      handoff: { label: 'Open in Raven', run },
       escape: { label: 'Copy file link', run: copy },
     })
-    expect(panelButtons()).toEqual(['Back', 'Open in raven player', 'Copy file link'])
-    const handoff = screen.getByRole('button', { name: 'Open in raven player' })
+    expect(panelButtons()).toEqual(['Back', 'Open in Raven', 'Copy file link'])
+    const handoff = screen.getByRole('button', { name: 'Open in Raven' })
     expect(handoff).toHaveClass('primary')
     expect(handoff.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'play')
     await userEvent.click(handoff)
@@ -673,8 +673,8 @@ describe('Player hands a title off to another player', () => {
     expect(screen.getByRole('button', { name: 'Try playing anyway' })).toHaveClass('primary')
     cleanup()
 
-    unplayable({ ...servicesFor(), handoff: { label: 'Open in raven player', run: () => {} } })
-    expect(screen.getByRole('button', { name: 'Open in raven player' })).toHaveClass('primary')
+    unplayable({ ...servicesFor(), handoff: { label: 'Open in Raven', run: () => {} } })
+    expect(screen.getByRole('button', { name: 'Open in Raven' })).toHaveClass('primary')
     expect(screen.getByRole('button', { name: 'Try playing anyway' })).not.toHaveClass('primary')
   })
 })
@@ -719,12 +719,12 @@ describe('PlayerChrome handoff in the playback menu', () => {
       order.push('run')
     })
     chrome({
-      services: { ...servicesFor(), handoff: { label: 'Open in raven player', run } },
+      services: { ...servicesFor(), handoff: { label: 'Open in Raven', run } },
       actions,
     })
     await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
     const menu = await screen.findByRole('dialog', { name: 'Playback' })
-    const handoff = within(menu).getByRole('button', { name: 'Open in raven player' })
+    const handoff = within(menu).getByRole('button', { name: 'Open in Raven' })
     expect(handoff.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'play')
     await userEvent.click(handoff)
     expect(order).toEqual(['pause', 'run'])
@@ -737,12 +737,12 @@ describe('PlayerChrome handoff in the playback menu', () => {
     chrome({ services: servicesFor(), actions: actionsFor() })
     await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
     const menu = await screen.findByRole('dialog', { name: 'Playback' })
-    expect(within(menu).queryByRole('button', { name: 'Open in raven player' })).toBeNull()
+    expect(within(menu).queryByRole('button', { name: 'Open in Raven' })).toBeNull()
   })
 })
 
 describe('player preferences', () => {
-  it('remembers whether to open videos in raven player', () => {
+  it('remembers whether to open videos in Raven', () => {
     expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(false)
     act(() => usePlayerPrefs.getState().setOpensInRavenPlayer(true))
     expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(true)

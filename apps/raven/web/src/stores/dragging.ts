@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 type Dragging = {
-  /** Whether files are being dragged over raven player's window; its drop handling keeps it. */
+  /** Whether files are being dragged over Raven's window; its drop handling keeps it. */
   isDragging: boolean
 }
 

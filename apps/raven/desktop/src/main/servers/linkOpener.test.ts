@@ -84,7 +84,7 @@ describe('createLinkOpener', () => {
     const world = setup()
     expect(await world.opener.open({ link })).toEqual(refused(LINK_MESSAGES.otherServer))
     expect(world.asks).toEqual([])
-    expect(world.warnings).toEqual(['raven player refused a link to another server'])
+    expect(world.warnings).toEqual(['Raven refused a link to another server'])
   })
 
   it('refuses a link to a host ending in a dot as unreadable', async () => {
@@ -117,7 +117,7 @@ describe('createLinkOpener', () => {
       type: DESKTOP_REPLIES.navigate,
       to: '/watch/7?at=30&next=8',
     })
-    expect(world.warnings).toEqual(['raven player opened the first of 2 links and dropped 1'])
+    expect(world.warnings).toEqual(['Raven opened the first of 2 links and dropped 1'])
   })
 
   it('opens a batch of one without a warning, and is done for an empty one', async () => {

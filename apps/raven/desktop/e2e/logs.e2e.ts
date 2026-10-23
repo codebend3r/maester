@@ -44,7 +44,7 @@ const ESCAPED = /[.*+?^${}()|[\]\\]/gu
 const holdsSecret = ({ line, secret }: { line: string; secret: string }): boolean =>
   new RegExp(`(^|[^0-9A-Za-z])${secret.replace(ESCAPED, '\\$&')}($|[^0-9A-Za-z])`, 'u').test(line)
 
-test.describe.serial('the raven player log', () => {
+test.describe.serial('the Raven log', () => {
   let clips: Clips = { folder: '', first: '', second: '' }
   let tracks = { folder: '', path: '' }
 
@@ -77,7 +77,7 @@ test.describe.serial('the raven player log', () => {
 
       const lines = await readLog({ userData })
       const at = (text: string) => indexOf({ lines, text })
-      const launch = at('launch raven player ')
+      const launch = at('launch Raven ')
       expect(launch).toBe(0)
       expect(lines[launch] ?? '').toContain('(unpackaged)')
       const engine = at('video engine ready: mpv v0.')

@@ -22,11 +22,11 @@ export const WRITE_RESERVE = 2
 
 export const CALL_MESSAGES = {
   unknownServer: SERVER_GONE,
-  offList: 'raven player does not make that call.',
-  unreachable: (name: string) => `raven player could not reach ${name}.`,
-  tooBig: (name: string) => `${name} sent more than raven player reads.`,
-  busy: (name: string) => `raven player is still waiting on ${name}.`,
-  otherAccount: (name: string) => `raven player is signed in to ${name} as someone else now.`,
+  offList: 'Raven does not make that call.',
+  unreachable: (name: string) => `Raven could not reach ${name}.`,
+  tooBig: (name: string) => `${name} sent more than Raven reads.`,
+  busy: (name: string) => `Raven is still waiting on ${name}.`,
+  otherAccount: (name: string) => `Raven is signed in to ${name} as someone else now.`,
 } as const
 
 export type ServerFetch = (input: {

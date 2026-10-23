@@ -260,7 +260,7 @@ describe('AuthGate', () => {
   })
 })
 
-describe('AuthGate inside raven player with its server out of reach', () => {
+describe('AuthGate inside Raven with its server out of reach', () => {
   const renderOffline = (route: string) => {
     useServerReach.setState({ isOffline: true })
     return renderWithProviders({

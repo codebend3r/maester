@@ -228,7 +228,7 @@ body {
   }
 }
 
-// raven player's window has no title bar of its own (macOS `hiddenInset`): the page
+// Raven's window has no title bar of its own (macOS `hiddenInset`): the page
 // runs under it, and this clears the traffic lights.
 :root[data-desktop] {
   --titlebar-inset: 1.75rem;

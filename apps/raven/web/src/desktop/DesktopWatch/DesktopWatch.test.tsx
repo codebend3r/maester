@@ -133,7 +133,7 @@ afterEach(() => {
   spies.splice(0).forEach((made) => made.mockRestore())
 })
 
-describe('WatchPage inside raven player', () => {
+describe('WatchPage inside Raven', () => {
   it('asks main for the title and plays what it hands over on mpv, from the saved spot', async () => {
     const client = titleMain()
     const fake = fakePlayer()
@@ -504,7 +504,7 @@ describe('WatchPage inside raven player', () => {
     expect(loadsOf(fake)).toHaveLength(1)
   })
 
-  it('offers no Open in raven player, being in it', async () => {
+  it('offers no Open in Raven, being in it', async () => {
     usePlayerPrefs.setState({ opensInRavenPlayer: true })
     const fake = fakePlayer()
     renderPlayers({ client: titleMain(), player: nativeOf(fake), route: WATCH })
@@ -513,10 +513,10 @@ describe('WatchPage inside raven player', () => {
     fake.emit({
       type: PLAYER_EVENTS.error,
       reason: PLAYER_ERROR_REASONS.decode,
-      message: 'raven player could not play this video.',
+      message: 'Raven could not play this video.',
     })
     expect(await screen.findByRole('button', { name: 'Copy file link' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Open in raven player' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Open in Raven' })).toBeNull()
   })
 
   it('fixes the volume under a passthrough output', async () => {

@@ -18,7 +18,7 @@ export const declineAsk = (ask: DownloadAsk): void => {
 }
 
 /**
- * The download ask raven player's dialog shows, from a reply or an event. A new ask replaces
+ * The download ask Raven's dialog shows, from a reply or an event. A new ask replaces
  * one still shown, which is declined, as its dialog goes without answering.
  */
 export const useDownloadAsk = create<DownloadAskState>()((set, get) => ({

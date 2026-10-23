@@ -138,7 +138,7 @@ const RELAYED_LOAD = {
 /** A sidecar as mpv lists it once `sub-add` has added it: the file's third subtitle. */
 const LATE_SIDECAR = mpvTrack({ id: 3, type: 'sub', lang: 'spa', codec: 'webvtt', external: true })
 
-const GONE_MESSAGE = 'That server is no longer in raven player.'
+const GONE_MESSAGE = 'That server is no longer in Raven.'
 const REMOVED = {
   reason: PLAYER_ERROR_REASONS.account,
   message: 'Your access to Vhagar was removed.',
@@ -1755,7 +1755,7 @@ describe('createPlayerService', () => {
       ])
       expect(activity).toEqual([{ isPlaying: false, isShowing: true }])
       expect(mpv.log).toEqual(['stop'])
-      expect(warnings).toEqual(['mpv opened a playlist, which raven player does not follow'])
+      expect(warnings).toEqual(['mpv opened a playlist, which Raven does not follow'])
       service.receive({ type: 'file-loaded' })
       await settle()
       expect(events.length).toBe(1)

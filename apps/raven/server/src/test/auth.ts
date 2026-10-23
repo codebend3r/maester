@@ -65,7 +65,7 @@ export const MISADDRESSED_CLAIMS = {
 } as const
 const FORGING_SECRET = new TextEncoder().encode('a-test-secret-long-enough-for-the-HMAC')
 
-/** The Authorization header that carries `token`, as raven player and the API client send it. */
+/** The Authorization header that carries `token`, as Raven and the API client send it. */
 export const bearerHeaders = ({ token }: { token: string }) => ({
   [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${token}`,
 })

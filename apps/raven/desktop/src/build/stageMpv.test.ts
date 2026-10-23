@@ -41,7 +41,7 @@ describe('stageMpv', () => {
   it('refuses to stage without the video engine, naming what is missing, and copies nothing', async () => {
     const { calls, fs } = fakeFs({ absent: ['lib/libMoltenVK.dylib'] })
     await expect(stageMpv({ from: FROM, to: TO, fs })).rejects.toThrow(
-      `raven player packages the video engine, and these are missing from ${FROM}: lib/libMoltenVK.dylib. CI builds them (bunx nx run @raven/mpv:build:native).`,
+      `Raven packages the video engine, and these are missing from ${FROM}: lib/libMoltenVK.dylib. CI builds them (bunx nx run @raven/mpv:build:native).`,
     )
     expect(calls).toEqual([])
   })

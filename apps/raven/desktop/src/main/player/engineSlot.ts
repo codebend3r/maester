@@ -74,7 +74,7 @@ export const createEngineSlot = <T>({
     const raw = Promise.resolve()
       .then(() => (state === SLOT_STATES.opening ? open() : UNAVAILABLE))
       .catch((error: unknown): OpenedEngine<T> => {
-        warn(`raven player could not open its video engine: ${messageOf(error)}`)
+        warn(`Raven could not open its video engine: ${messageOf(error)}`)
         return UNAVAILABLE
       })
     opened = raw
@@ -87,7 +87,7 @@ export const createEngineSlot = <T>({
       try {
         watch({ engine: result.engine, onDied: died })
       } catch (error) {
-        warn(`raven player could not watch its video engine: ${messageOf(error)}`)
+        warn(`Raven could not watch its video engine: ${messageOf(error)}`)
       }
       return isDead() ? UNAVAILABLE : result
     })

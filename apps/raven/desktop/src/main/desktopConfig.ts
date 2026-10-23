@@ -19,14 +19,14 @@ import { loadJson, type JsonStore, type StateFs } from '@/main/stateStore'
 
 export const CONFIG_FILE = 'desktop-config.json'
 
-/** What raven player calls its server in what it says: it plays from that one alone. */
+/** What Raven calls its server in what it says: it plays from that one alone. */
 export const SERVER_NAME = 'raven'
 
-/** Said of a server an older raven player kept besides, which raven player no longer reaches. */
-export const SERVER_GONE = 'raven player no longer plays from that server.'
+/** Said of a server an older Raven kept besides, which Raven no longer reaches. */
+export const SERVER_GONE = 'Raven no longer plays from that server.'
 
 /**
- * The server raven player plays from, by the opaque id its downloads are filed under, and the
+ * The server Raven plays from, by the opaque id its downloads are filed under, and the
  * origin that id was given for. Versions 2 to 4 kept a list of these, each with more fields
  * (a name, when it was added, version 4's pinned sign-in), which are no longer read.
  */
@@ -34,7 +34,7 @@ const isServerRecord = object({ id: isOpaqueId, origin: isServerOrigin })
 
 type ServerRecord = Infer<typeof isServerRecord>
 
-/** The server as the rest of main reads it: its record, and the name raven player says. */
+/** The server as the rest of main reads it: its record, and the name Raven says. */
 export type ServerEntry = ServerRecord & { name: string }
 
 /** Whether the release check runs at launch, and when it last answered. */
@@ -59,7 +59,7 @@ export const isDesktopConfig = object({
 export type DesktopConfig = Infer<typeof isDesktopConfig>
 
 /**
- * What a file on disk may hold: this version, the one before raven player kept a single
+ * What a file on disk may hold: this version, the one before Raven kept a single
  * server, the one before sign-ins were pinned, the one before the release check, or the one
  * before servers existed.
  */
@@ -92,7 +92,7 @@ export type FixedServer = { origin: string; aliases: readonly string[] }
 export const namesServer = ({ server, origin }: { server: FixedServer; origin: string }): boolean =>
   origin === server.origin || server.aliases.includes(origin)
 
-/** The server as main reads it, with the name raven player says. */
+/** The server as main reads it, with the name Raven says. */
 export const serverOf = (config: DesktopConfig): ServerEntry => ({
   ...config.server,
   name: SERVER_NAME,

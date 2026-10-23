@@ -3,7 +3,7 @@ import { type ReactNode, useId } from 'react'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 
-/** One of raven player's settings sections, headed and ruled as Settings' own are. */
+/** One of Raven's settings sections, headed and ruled as Settings' own are. */
 export const Section = ({
   icon,
   title,

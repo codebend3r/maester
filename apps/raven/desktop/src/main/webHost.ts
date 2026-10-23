@@ -30,7 +30,7 @@ import { URL_PROTOCOLS } from '@/shared/playLink'
 /** The log line the packaged smoke waits for: the page has somewhere to load from. */
 export const WEB_HOST_READY = 'web host ready'
 
-/** The only methods raven player's own pages and files answer. */
+/** The only methods Raven's own pages and files answer. */
 export const ALLOWED_METHODS = [HTTP_METHODS.get, HTTP_METHODS.head].join(', ')
 
 const API_PATH = '/api'
@@ -308,7 +308,7 @@ export const createWebHostHandler = ({
 
   const unreachable = ({ response, error }: { response: ServerResponse; error: unknown }) => {
     if (reach.isReachable) {
-      quietly(warn)(`raven player could not reach its server: ${reasonOf(error)}`)
+      quietly(warn)(`Raven could not reach its server: ${reasonOf(error)}`)
     }
     reach.isReachable = false
     answer({
@@ -346,7 +346,7 @@ export const createWebHostHandler = ({
       socket.once(HTTP_EVENTS.close, () => timers.clear(timer))
     })
     outgoing.on(HTTP_EVENTS.response, (upstream) => {
-      if (!reach.isReachable) quietly(info)('raven player reached its server again')
+      if (!reach.isReachable) quietly(info)('Raven reached its server again')
       reach.isReachable = true
       response.writeHead(upstream.statusCode ?? HTTP_STATUSES.badGateway, passed(upstream.headers))
       // Sent at once, so an event stream opens before its first event.
@@ -430,11 +430,11 @@ const MISSING_ADDRESS_CODES: ReadonlySet<unknown> = new Set([
 const isMissingAddress = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && MISSING_ADDRESS_CODES.has(error.code)
 
-/** What the person is told when the web host cannot listen, and raven player quits. */
+/** What the person is told when the web host cannot listen, and Raven quits. */
 export const webHostFailureText = (error: unknown): string =>
   error instanceof Error && 'code' in error && error.code === ERROR_CODES.addressInUse
-    ? `Another app is using port ${WEB_HOST_PORT} on this Mac. Quit it, then open raven player again.`
-    : `raven player could not start serving its page: ${errorText(error)}`
+    ? `Another app is using port ${WEB_HOST_PORT} on this Mac. Quit it, then open Raven again.`
+    : `Raven could not start serving its page: ${errorText(error)}`
 
 /**
  * Listens on `port` on each of `addresses` (`LOOPBACK_ADDRESSES`), or on none: when one is taken,

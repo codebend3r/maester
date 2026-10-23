@@ -504,7 +504,7 @@ describe('AppShell', () => {
     expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
   })
 
-  it('adds On this Mac and Downloads over Settings inside raven player, the downloads under way counted', async () => {
+  it('adds On this Mac and Downloads over Settings inside Raven, the downloads under way counted', async () => {
     spies.list.mockImplementation(async () => [])
     asDesktop(downloadsMain({ downloads: [viewOf(), viewOf({ downloadId: DL_2 })] }))
     renderShell({ route: '/' })
@@ -557,7 +557,7 @@ describe('AppShell', () => {
     expect(document.querySelector('.titlebar')).toBeNull()
   })
 
-  it('keeps only what needs no server while raven player cannot reach it', () => {
+  it('keeps only what needs no server while Raven cannot reach it', () => {
     asDesktop(downloadsMain())
     useServerReach.setState({ isOffline: true })
     renderShell({ route: '/libraries' })

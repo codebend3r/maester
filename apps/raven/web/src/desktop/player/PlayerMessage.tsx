@@ -5,7 +5,7 @@ import { handled } from '@/desktop/handled'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
 
 /**
- * raven player's place for a video that is not playing: waiting for it (a null message), or
+ * Raven's place for a video that is not playing: waiting for it (a null message), or
  * saying why it will not. The player's routes sit outside the side menu and the window has no
  * Back of its own, so Back and Escape always lead out: to the page behind, or `fallback`.
  */

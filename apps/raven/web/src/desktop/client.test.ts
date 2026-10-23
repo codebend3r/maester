@@ -4,7 +4,7 @@ import { clientFor } from '@/desktop/client'
 
 const REFUSED = {
   type: DESKTOP_REPLIES.refused,
-  message: 'raven player could not read its own reply.',
+  message: 'Raven could not read its own reply.',
 }
 
 const bridgeOf = ({

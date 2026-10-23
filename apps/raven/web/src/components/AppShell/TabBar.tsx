@@ -33,7 +33,7 @@ const Tab = ({
  * Favourites and Settings along the foot of the screen, with Streams and
  * Reports between them for whoever may manage. The pinned
  * libraries are reached from Libraries, so any library's pages mark it.
- * A narrow raven player window adds On this Mac and Downloads before
+ * A narrow Raven window adds On this Mac and Downloads before
  * Settings, and keeps only those three while it cannot reach its server.
  */
 export const TabBar = () => {

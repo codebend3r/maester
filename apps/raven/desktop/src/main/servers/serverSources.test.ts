@@ -230,7 +230,7 @@ describe('resolve', () => {
     ['a 500', reply({ status: 500, body: '{"message":"boom"}' })],
     ['an HTML page', reply({ status: 200, body: '<html>' })],
     ['a body that is not tracks', reply({ status: 200, body: '{"audio":3}' })],
-    ['an unreachable server', { ok: false, message: 'raven player could not reach Vhagar.' }],
+    ['an unreachable server', { ok: false, message: 'Raven could not reach Vhagar.' }],
   ] as const)('tracks answering %s give no sidecars and a warning', async (_label, answered) => {
     const { sources, warnings } = setup({ answer: () => answered })
     const resolved = await sources.resolve(SOURCE)
@@ -313,13 +313,13 @@ describe('resolve', () => {
     },
   )
 
-  test('a relay that cannot open is a title raven player could not open, with nothing secret said', async () => {
+  test('a relay that cannot open is a title Raven could not open, with nothing secret said', async () => {
     const { sources, warnings } = setup({ isOpenFailing: true })
     expect(await sources.resolve(SOURCE)).toEqual({
       ok: false,
       message: SOURCE_MESSAGES.cannotOpen('Vhagar'),
     })
-    expect(warnings).toEqual(['raven player could not relay a title from Vhagar'])
+    expect(warnings).toEqual(['Raven could not relay a title from Vhagar'])
   })
 })
 
@@ -358,7 +358,7 @@ describe('explain', () => {
 
   test('an unreachable server lost the connection', async () => {
     const { sources } = setup({
-      answer: () => ({ ok: false, message: 'raven player could not reach Vhagar.' }),
+      answer: () => ({ ok: false, message: 'Raven could not reach Vhagar.' }),
     })
     expect(await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })).toEqual({
       reason: 'network',

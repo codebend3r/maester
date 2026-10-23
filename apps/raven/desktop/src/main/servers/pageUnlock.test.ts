@@ -52,6 +52,6 @@ describe('createPageUnlock', () => {
     }
     const unlock = createPageUnlock({ cookies, warn: (message) => warnings.push(message) })
     expect(await unlock()).toBeNull()
-    expect(warnings).toEqual(["raven player could not read the page's unlock: jar shut"])
+    expect(warnings).toEqual(["Raven could not read the page's unlock: jar shut"])
   })
 })

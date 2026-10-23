@@ -503,23 +503,23 @@ describe('MoviePage', () => {
     )
   })
 
-  describe('Download to raven player', () => {
+  describe('Download to Raven', () => {
     const handoff = spyOn(ravenPlayer, 'open').mockImplementation(() => {})
 
     afterEach(() => {
       handoff.mockClear()
     })
 
-    it('is left out while this browser does not open videos in raven player', async () => {
+    it('is left out while this browser does not open videos in Raven', async () => {
       open({ details: itemDetails() })
       await screen.findByRole('heading', { name: 'Busboys' })
-      expect(screen.queryByRole('button', { name: 'Download to raven player' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Download to Raven' })).toBeNull()
     })
 
-    it('hands the file Play starts to raven player', async () => {
+    it('hands the file Play starts to Raven', async () => {
       usePlayerPrefs.setState({ opensInRavenPlayer: true })
       open({ details: itemDetails() })
-      await userEvent.click(await screen.findByRole('button', { name: 'Download to raven player' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Download to Raven' }))
       expect(handoff).toHaveBeenCalledTimes(1)
       expect(handoff).toHaveBeenCalledWith(
         `raven://download?server=${encodeURIComponent(window.location.origin)}&media=7`,

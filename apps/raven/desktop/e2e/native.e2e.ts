@@ -395,7 +395,7 @@ test.describe.serial('playing a local file through mpv', () => {
         await expect.poll(async () => (await trafficOf({ page })).replies.length).toBe(8)
 
         const { replies, events, strays } = await trafficOf({ page })
-        const unknown = 'raven player does not understand that command.'
+        const unknown = 'Raven does not understand that command.'
         const notOpen = 'That video is no longer open. Open it again from On this Mac or Downloads.'
         expect(replies).toEqual([
           { id: 9001, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: unknown },
@@ -423,7 +423,7 @@ test.describe.serial('playing a local file through mpv', () => {
     try {
       await playNatively({ app, page, path: clips.first, title: 'Clip 01' })
       const pid = app.process().pid
-      if (pid === undefined) throw new Error('raven player has no process id.')
+      if (pid === undefined) throw new Error('Raven has no process id.')
       const tree = await processTree({ pid })
       // Electron's helpers (GPU, network, renderer) are in the tree, so this proves more than main.
       expect(tree.length).toBeGreaterThan(1)

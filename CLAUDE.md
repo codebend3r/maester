@@ -66,7 +66,7 @@ These apply to every TypeScript project: everything but `@luwin/api` and the Pyt
 
 ## React
 
-These apply to every React project: `@raven/web`, `@rookery/web`, `@luwin/web` and `@raven/ui`. raven player's UI is `@raven/web`'s `src/desktop`.
+These apply to every React project: `@raven/web`, `@rookery/web`, `@luwin/web` and `@raven/ui`. Raven's UI is `@raven/web`'s `src/desktop`.
 
 - Global state lives in zustand, never in a React context. State that more than one component reads or writes is a store in the project's `src/stores/`, made with `create` (`apps/raven/web/src/stores/theme.ts`, `libs/raven/ui/src/stores/playerPrefs.ts`). A component reads it through a selector, `useTheme((state) => state.theme)`, so it re-renders only when its slice changes. Never write a `createContext` and a `*Provider` to pass state, a setter or a callback down the tree: the component that needs the value imports the store.
 - State one component owns stays in `useState` or `useReducer`, and server data stays in TanStack Query. A store holds client state the tree shares, not a copy of an API response.
@@ -102,21 +102,21 @@ Shared tool config lives at the root, so every project lints and compiles by the
 - oxfmt has no `extends`, so each project keeps its own `.oxfmtrc.json`; keep their options identical.
 - `nx.json` lists `tsconfig.base.json` and `tooling/` as shared inputs, so a change there reruns every project's tasks.
 
-| Project           | Path                  | What                                                                                                   |
-| ----------------- | --------------------- | ------------------------------------------------------------------------------------------------------ |
-| `@luwin/api`      | `apps/luwin/api`      | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite                                |
-| `@raven/supabase` | `apps/raven/supabase` | Supabase Auth configuration, membership approval, migrations, local seed and database tests            |
-| `@raven/server`   | `apps/raven/server`   | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest                                  |
-| `@raven/web`      | `apps/raven/web`      | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom                          |
-| `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check                               |
-| `@raven/ui`       | `libs/raven/ui`       | Shared React player, engine/services contracts, primitives and styles                                  |
-| `@raven/mpv`      | `libs/raven/mpv`      | N-API addon over our pinned libmpv build: macOS video surface, typed async wrapper                     |
-| `@raven/desktop`  | `apps/raven/desktop`  | raven player: Electron 44 and Forge, serving `@raven/web`, libmpv through `@raven/mpv`, Playwright e2e |
-| `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest                             |
-| `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom                               |
-| `@luwin/web`      | `apps/luwin/web`      | luwin's chat page, and the sandbox for testing its answers: React 19, Vite 8, TanStack Query, zustand  |
-| `@shared/server`  | `libs/shared/server`  | The servers' shared scaffolding: web app serving, SQLite migrations, env                               |
-| `scripts`         | `scripts`             | Repo tooling; its Python is linted with luwin's pinned ruff and config                                 |
+| Project           | Path                  | What                                                                                                  |
+| ----------------- | --------------------- | ----------------------------------------------------------------------------------------------------- |
+| `@luwin/api`      | `apps/luwin/api`      | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite                               |
+| `@raven/supabase` | `apps/raven/supabase` | Supabase Auth configuration, membership approval, migrations, local seed and database tests           |
+| `@raven/server`   | `apps/raven/server`   | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest                                 |
+| `@raven/web`      | `apps/raven/web`      | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom                         |
+| `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check                              |
+| `@raven/ui`       | `libs/raven/ui`       | Shared React player, engine/services contracts, primitives and styles                                 |
+| `@raven/mpv`      | `libs/raven/mpv`      | N-API addon over our pinned libmpv build: macOS video surface, typed async wrapper                    |
+| `@raven/desktop`  | `apps/raven/desktop`  | Raven: Electron 44 and Forge, serving `@raven/web`, libmpv through `@raven/mpv`, Playwright e2e       |
+| `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest                            |
+| `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom                              |
+| `@luwin/web`      | `apps/luwin/web`      | luwin's chat page, and the sandbox for testing its answers: React 19, Vite 8, TanStack Query, zustand |
+| `@shared/server`  | `libs/shared/server`  | The servers' shared scaffolding: web app serving, SQLite migrations, env                              |
+| `scripts`         | `scripts`             | Repo tooling; its Python is linted with luwin's pinned ruff and config                                |
 
 Python projects declare `package.json` scripts that call uv (`uv run pytest -q`, `uv run ruff check .`); Nx runs them in the project's folder. There is no Python Nx plugin and no uv workspace.
 

@@ -511,7 +511,7 @@ const isSameList = <T>({ left, right }: { left: readonly T[]; right: readonly T[
   left.length === right.length && left.every((item, index) => item === right[index])
 
 /**
- * Files every download under the one server raven player plays from. The downloads in `moved`,
+ * Files every download under the one server Raven plays from. The downloads in `moved`,
  * an adopted server's whose folders now sit under the server's id, become the server's, and what
  * an adopted server was owed, or its downloads that did not move still owe, is the server's too.
  * A download of any other server is no longer reached: a ready one stays to play, owing that

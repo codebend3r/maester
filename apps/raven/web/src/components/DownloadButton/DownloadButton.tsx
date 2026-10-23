@@ -7,7 +7,7 @@ import { useOpenReply } from '@/desktop/openReply'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { type Desktop, useDesktopBridge } from '@/stores/desktop'
 
-/** Inside raven player: main reads the title and asks before it downloads. */
+/** Inside Raven: main reads the title and asks before it downloads. */
 const DesktopDownloadButton = ({
   desktop,
   target,
@@ -37,9 +37,9 @@ const DesktopDownloadButton = ({
 }
 
 /**
- * Hands a title to raven player to keep on its disk. Inside raven player it
+ * Hands a title to Raven to keep on its disk. Inside Raven it
  * is always there and asks the app itself; in a browser it is shown only
- * where this browser says raven player is installed, as Settings' toggle
+ * where this browser says Raven is installed, as Settings' toggle
  * does, and opens a `raven://download` link. Its label cannot wrap or
  * shrink, so it marks itself wide and the header's action row makes room
  * for it (see ItemHeader).
@@ -55,7 +55,7 @@ export const DownloadButton = ({ target }: { target: DownloadTarget }) => {
       data-wide
       onClick={() => ravenPlayer.open(downloadLinkFor({ origin: window.location.origin, target }))}
     >
-      Download to raven player
+      Download to Raven
     </Button>
   )
 }

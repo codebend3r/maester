@@ -11,7 +11,7 @@ import { useDesktop } from '@/stores/desktop'
 import { useDragging } from '@/stores/dragging'
 import styles from '@/desktop/LocalPage/LocalPage.module.scss'
 
-const NO_RECENTS = 'raven player could not list your recent videos.'
+const NO_RECENTS = 'Raven could not list your recent videos.'
 
 /** The videos opened from this Mac lately, newest first. */
 const useRecents = () => {
@@ -29,7 +29,7 @@ const useRecents = () => {
 
 /**
  * On this Mac: a video file from this computer, chosen or dropped anywhere on the window, plays
- * in raven player, and the ones opened lately wait here with how far they were watched.
+ * in Raven, and the ones opened lately wait here with how far they were watched.
  */
 export const LocalPage = () => {
   const { client } = useDesktop()
@@ -69,7 +69,7 @@ export const LocalPage = () => {
     <section className={styles.page} aria-labelledby={ids.title}>
       <header className={styles.header}>
         <h1 id={ids.title}>On this Mac</h1>
-        <p className={styles.hint}>Play a video file from this computer in raven player.</p>
+        <p className={styles.hint}>Play a video file from this computer in Raven.</p>
       </header>
       <section
         className={isDragging ? `${styles.drop} ${styles.dragging}` : styles.drop}

@@ -22,7 +22,7 @@ import styles from '@/desktop/DesktopDialog.module.scss'
 
 type ReadyStatus = Extract<DownloadAsk['status'], { kind: typeof DOWNLOAD_ASK_KINDS.ready }>
 
-const TITLE = 'Download to raven player'
+const TITLE = 'Download to Raven'
 
 const nounFor = ({ kind, files }: { kind: DownloadKind; files: number }): string => {
   switch (kind) {
@@ -205,7 +205,7 @@ const AccountDialog = ({ ask, onClose }: { ask: DownloadAsk; onClose: () => void
   )
 }
 
-/** What raven player asks before it downloads a title, from a Download button or a link. */
+/** What Raven asks before it downloads a title, from a Download button or a link. */
 export const DownloadDialog = ({ ask, onClose }: { ask: DownloadAsk; onClose: () => void }) => {
   const { status } = ask
   switch (status.kind) {

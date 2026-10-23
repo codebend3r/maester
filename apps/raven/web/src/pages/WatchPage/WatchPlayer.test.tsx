@@ -351,7 +351,7 @@ describe('WatchPlayer up next', () => {
   })
 })
 
-describe('WatchPlayer Open in raven player', () => {
+describe('WatchPlayer Open in Raven', () => {
   const opened = () => {
     const open = spyOn(ravenPlayer, 'open').mockImplementation(() => {})
     spies.push(open)
@@ -382,7 +382,7 @@ describe('WatchPlayer Open in raven player', () => {
     setBrowserSupport(() => false)
     renderWithProviders({ ui: <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" /> })
     await screen.findByRole('button', { name: 'Copy file link' })
-    expect(screen.queryByRole('button', { name: 'Open in raven player' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Open in Raven' })).toBeNull()
   })
 
   it('offers nothing in the playback menu while this browser has not asked for it', async () => {
@@ -391,7 +391,7 @@ describe('WatchPlayer Open in raven player', () => {
     })
     await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
     const menu = await screen.findByRole('dialog', { name: 'Playback' })
-    expect(within(menu).queryByRole('button', { name: 'Open in raven player' })).toBeNull()
+    expect(within(menu).queryByRole('button', { name: 'Open in Raven' })).toBeNull()
   })
 
   it('offers it first on Unplayable once asked for, with the title and its up next', async () => {
@@ -409,19 +409,17 @@ describe('WatchPlayer Open in raven player', () => {
     })
     await screen.findByRole('button', { name: 'Copy file link' })
     expect(unplayableButtons()).toEqual([
-      'Open in raven player',
+      'Open in Raven',
       'Try playing anyway',
       'Copy file link',
       'Report this error',
     ])
     // The built library hashes its class names, so the tone is matched by its stem.
-    expect(screen.getByRole('button', { name: 'Open in raven player' }).className).toMatch(
-      /primary/,
-    )
+    expect(screen.getByRole('button', { name: 'Open in Raven' }).className).toMatch(/primary/)
     expect(screen.getByRole('button', { name: 'Try playing anyway' }).className).not.toMatch(
       /primary/,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Open in raven player' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Open in Raven' }))
     // Written out, so a change to the link's shape fails here as well as in core.
     expect(open.mock.calls).toEqual([
       ['raven://play?server=http%3A%2F%2Flocalhost%3A8484&media=7&at=0&next=8%2C9'],
@@ -441,7 +439,7 @@ describe('WatchPlayer Open in raven player', () => {
         />
       ),
     })
-    await userEvent.click(await screen.findByRole('button', { name: 'Open in raven player' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Open in Raven' }))
     expect(open.mock.calls).toEqual([
       [playLinkFor({ origin: window.location.origin, mediaId: 7, at: 600, next: [] })],
     ])
@@ -473,7 +471,7 @@ describe('WatchPlayer Open in raven player', () => {
     playingAt({ video, seconds: 42.7 })
     await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
     const menu = await screen.findByRole('dialog', { name: 'Playback' })
-    await userEvent.click(within(menu).getByRole('button', { name: 'Open in raven player' }))
+    await userEvent.click(within(menu).getByRole('button', { name: 'Open in Raven' }))
     expect(order).toEqual(['pause', 'open'])
     expect(open.mock.calls).toEqual([
       [playLinkFor({ origin: window.location.origin, mediaId: 7, at: 42, next: [8] })],
@@ -491,7 +489,7 @@ describe('WatchPlayer Open in raven player', () => {
     renderWithProviders({
       ui: <Player media={mediaItem()} upNext={upNext} backTo="/libraries/2" />,
     })
-    await userEvent.click(await screen.findByRole('button', { name: 'Open in raven player' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Open in Raven' }))
     const next = playable.slice(0, PLAY_LINK_MAX_NEXT).map(({ id }) => id)
     expect(open.mock.calls).toEqual([
       [playLinkFor({ origin: window.location.origin, mediaId: 7, at: 0, next })],

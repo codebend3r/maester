@@ -8,7 +8,7 @@ import {
 } from '@raven/core'
 import { MPV_PROPERTIES, type MpvPropertyValue } from '@raven/mpv'
 
-/** The mpv options raven player sets that `@raven/mpv` does not read back as properties. */
+/** The mpv options Raven sets that `@raven/mpv` does not read back as properties. */
 export const MPV_OPTIONS = {
   volume: 'volume',
   mute: 'mute',

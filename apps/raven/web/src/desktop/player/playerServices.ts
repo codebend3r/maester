@@ -25,13 +25,13 @@ export const ENGINE_USES = { native: 'native', fallback: 'fallback', stopped: 's
 export type EngineUse = (typeof ENGINE_USES)[keyof typeof ENGINE_USES]
 
 export const ENGINE_NOTES = {
-  native: 'raven player could not play this video.',
-  fallback: "raven player's video engine did not start, and this video needs it.",
-  stopped: "raven player's video engine stopped, and this video needs it.",
+  native: 'Raven could not play this video.',
+  fallback: "Raven's video engine did not start, and this video needs it.",
+  stopped: "Raven's video engine stopped, and this video needs it.",
 } as const satisfies Record<EngineUse, string>
 
 export const ENGINE_MOVED =
-  "raven player's video engine stopped, so this video moved to the built-in player."
+  "Raven's video engine stopped, so this video moved to the built-in player."
 
 /** What the Playback menu's Video Info says when the built-in player, which has no overlay, plays. */
 export const STATS_UNAVAILABLE = 'Video info is not available in the built-in player.'
@@ -59,7 +59,7 @@ export const playerActionFor = (action: MenuPlayerAction): PlayerAction | null =
 }
 
 /**
- * What raven player adds to any player's services: the Playback menu's actions, and the window's
+ * What Raven adds to any player's services: the Playback menu's actions, and the window's
  * traffic lights, which show and hide with the controls.
  */
 export const windowPartsFor = ({

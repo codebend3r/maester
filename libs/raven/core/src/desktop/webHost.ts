@@ -1,7 +1,7 @@
 import { object, oneOf } from '@/schema'
 
 /**
- * raven player serves the web app's build from this loopback port and proxies `/api` to its
+ * Raven serves the web app's build from this loopback port and proxies `/api` to its
  * server. The port is fixed so the page's origin, and with it its cookies and storage, is the
  * same on every launch.
  */
@@ -27,7 +27,7 @@ const GATEWAY_STATUSES = { badGateway: 502, unavailable: 503, timeout: 504 } as 
 const isGatewayStatus = oneOf(Object.values(GATEWAY_STATUSES))
 
 /**
- * Whether an answer says the server is out of reach rather than answering: raven player's web
+ * Whether an answer says the server is out of reach rather than answering: Raven's web
  * host said so, or a proxy in front of it (a Funnel with the NAS down) gave a gateway status
  * with a body that is not JSON, which the server itself never sends. `body` is null when the
  * body did not parse.
@@ -35,14 +35,14 @@ const isGatewayStatus = oneOf(Object.values(GATEWAY_STATUSES))
 export const isUnreachableAnswer = ({ status, body }: { status: number; body: unknown }): boolean =>
   isServerUnreachableBody(body) || (isGatewayStatus(status) && body === null)
 
-/** raven player's own pages, which a browser does not have. */
+/** Raven's own pages, which a browser does not have. */
 export const DESKTOP_PATHS = {
   downloads: '/downloads',
   local: '/local',
   play: '/play/:fileId',
 } as const
 
-/** The environment variables a raven player build reads. */
+/** The environment variables a Raven build reads. */
 export const DESKTOP_ENV = {
   /** The server `/api` goes to, an http or https origin with no path. */
   serverOrigin: 'RAVEN_DESKTOP_SERVER_ORIGIN',
@@ -52,7 +52,7 @@ export const DESKTOP_ENV = {
 
 /**
  * The server a build without `RAVEN_DESKTOP_SERVER_ORIGIN` uses: Vhagar's Tailscale Funnel, where
- * Netlify's `RAVEN_API_ORIGIN` sends the web app's `/api`, so raven player signs in to the same
+ * Netlify's `RAVEN_API_ORIGIN` sends the web app's `/api`, so Raven signs in to the same
  * accounts and keeps the same library, progress and favourites as the web.
  */
 export const DEFAULT_SERVER_ORIGIN = 'https://raven.tail5586d4.ts.net'

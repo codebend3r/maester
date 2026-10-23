@@ -244,7 +244,7 @@ export const createMediaAccess = ({
     const body =
       reply !== null && reply.ok && reply.status === HTTP_STATUSES.ok ? parseJson(reply.body) : null
     if (!isMediaOrigins(body)) {
-      safeWarn(`${loggable(server.name)} did not list media origins raven player can read`)
+      safeWarn(`${loggable(server.name)} did not list media origins Raven can read`)
       return null
     }
     const checked = body.origins.map((origin) => ({
@@ -254,7 +254,7 @@ export const createMediaAccess = ({
     const refused = checked.filter((entry) => entry.trusted === null).map((entry) => entry.kind)
     if (refused.length > 0) {
       safeWarn(
-        `${loggable(server.name)} listed media origins raven player does not trust: ${refused.join(', ')}`,
+        `${loggable(server.name)} listed media origins Raven does not trust: ${refused.join(', ')}`,
       )
     }
     const settled = await Promise.allSettled(
@@ -279,7 +279,7 @@ export const createMediaAccess = ({
     return pick
   }
 
-  /** When each server's downloads minted, by raven player's clock, inside the last window. */
+  /** When each server's downloads minted, by Raven's clock, inside the last window. */
   let minted: ReadonlyMap<string, readonly number[]> = new Map()
 
   /** True once `ms` has passed, false as soon as `signal` aborts. */

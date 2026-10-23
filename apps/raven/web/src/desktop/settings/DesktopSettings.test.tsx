@@ -189,7 +189,7 @@ describe('DesktopSettings: This computer', () => {
       }),
     )
     expect(await within(section('This computer')).findByRole('alert')).toHaveTextContent(
-      'raven player could not read its sound settings.',
+      'Raven could not read its sound settings.',
     )
   })
 })
@@ -198,11 +198,11 @@ describe('DesktopSettings: Updates', () => {
   it('turns the daily check off and on, and checks now', async () => {
     const client = renderSettings()
     const daily = await screen.findByRole('checkbox', { name: /Check for updates once a day/ })
-    expect(screen.getByText('This is raven player 1.2.0. Not checked yet.')).toBeInTheDocument()
+    expect(screen.getByText('This is Raven 1.2.0. Not checked yet.')).toBeInTheDocument()
     await userEvent.click(daily)
     await waitFor(() => expect(daily).not.toBeChecked())
     await userEvent.click(screen.getByRole('button', { name: 'Check now' }))
-    expect(await screen.findByText('raven player 1.2.0 is the newest release.')).toBeInTheDocument()
+    expect(await screen.findByText('Raven 1.2.0 is the newest release.')).toBeInTheDocument()
     expect(screen.getByText(/Last checked/)).toBeInTheDocument()
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.setUpdateCheck })).toEqual([
       { type: DESKTOP_REQUESTS.setUpdateCheck, isEnabled: false },
@@ -219,9 +219,9 @@ describe('DesktopSettings: Updates', () => {
             : undefined,
       }),
     )
-    expect(await screen.findByText('raven player 2.0.0 is out.')).toBeInTheDocument()
+    expect(await screen.findByText('Raven 2.0.0 is out.')).toBeInTheDocument()
     expect(
-      screen.getByText('raven player could not check for updates. GitHub was slow.'),
+      screen.getByText('Raven could not check for updates. GitHub was slow.'),
     ).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: "See what's new" }))
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.openRelease })).toHaveLength(1)
@@ -241,7 +241,7 @@ describe('DesktopSettings: Updates', () => {
     )
     await userEvent.click(await screen.findByRole('button', { name: "See what's new" }))
     expect(await within(section('Updates')).findByRole('alert')).toHaveTextContent(
-      'raven player could not open the release page. Try again.',
+      'Raven could not open the release page. Try again.',
     )
   })
 })

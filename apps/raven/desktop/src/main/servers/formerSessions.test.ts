@@ -154,7 +154,7 @@ describe('clearFormerPartitions', () => {
     await Promise.resolve()
     expect(removed).toEqual([])
     expect(warnings).toEqual([
-      `raven player did not list its server sessions within ${FORMER_LIST_MS} ms, so it clears none this time`,
+      `Raven did not list its server sessions within ${FORMER_LIST_MS} ms, so it clears none this time`,
     ])
   })
 })

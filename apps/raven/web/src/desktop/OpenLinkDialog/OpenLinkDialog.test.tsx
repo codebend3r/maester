@@ -45,7 +45,7 @@ describe('OpenLinkDialog', () => {
     const replies = [
       {
         type: DESKTOP_REPLIES.refused,
-        message: 'raven player opens links to its own server only.',
+        message: 'Raven opens links to its own server only.',
       },
       { type: DESKTOP_REPLIES.done },
     ] as const
@@ -56,12 +56,12 @@ describe('OpenLinkDialog', () => {
     await userEvent.type(screen.getByLabelText('Link'), LINK)
     await userEvent.click(screen.getByRole('button', { name: 'Open' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'raven player opens links to its own server only.',
+      'Raven opens links to its own server only.',
     )
     await userEvent.click(screen.getByRole('button', { name: 'Open' }))
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(
-        'raven player could not open that link. Try again.',
+        'Raven could not open that link. Try again.',
       ),
     )
   })

@@ -7,7 +7,7 @@ const FOLDERS = { logs: '/tmp/raven-logs', crashDumps: '/tmp/raven-crashpad' }
 const setup = ({
   openPath = async () => '',
   mkdir = async () => undefined,
-  diagnostics = async () => 'raven player 0.5.4 (packaged, arm64)\n',
+  diagnostics = async () => 'Raven 0.5.4 (packaged, arm64)\n',
   writeClipboard = async () => undefined,
 }: {
   openPath?: (path: string) => Promise<string>
@@ -94,7 +94,7 @@ describe('createHelpActions', () => {
   it('copies the diagnostics and says so', async () => {
     const { actions, clipboard, notices, warnings } = setup()
     await actions.copyDiagnostics()
-    expect(clipboard).toEqual(['raven player 0.5.4 (packaged, arm64)\n'])
+    expect(clipboard).toEqual(['Raven 0.5.4 (packaged, arm64)\n'])
     expect(notices).toEqual([HELP_MESSAGES.copied])
     expect(warnings).toEqual([])
   })

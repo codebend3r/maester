@@ -17,7 +17,7 @@ import {
 export const FILE_SCHEME = 'raven-file'
 export const WINDOW_MESSAGE_TYPES = { playerPort: 'raven:player-port' } as const
 /** Main's words once mpv has gone. They ride with reason `engine`, which is what the page reads. */
-export const ENGINE_STOPPED = "raven player's video engine stopped. Open the video again."
+export const ENGINE_STOPPED = "Raven's video engine stopped. Open the video again."
 
 // A standard scheme lowercases its host, so an id must already be lowercase to
 // survive a round trip through `raven-file://<id>`.
@@ -43,7 +43,7 @@ const MAX_PAGE_PATH = 2048
 export const isPagePath = (value: unknown): value is string =>
   isString(value) && value.length <= MAX_PAGE_PATH && /^\/(?![/\\])[^\\\s\p{Cc}]*$/u.test(value)
 
-/** The query a watch path carries for raven player: where to start, and the titles after it. */
+/** The query a watch path carries for Raven: where to start, and the titles after it. */
 export const WATCH_PARAMS = { at: 'at', next: 'next' } as const
 
 /** Where to start and what plays after, as a watch path's query carries them. */
@@ -295,11 +295,11 @@ export const isUpdateStatus = object({
 
 export type UpdateStatus = Infer<typeof isUpdateStatus>
 
-/** What raven player says of a release check, in main's own dialogs and in the page's Settings. */
+/** What Raven says of a release check, in main's own dialogs and in the page's Settings. */
 export const UPDATE_WORDS = {
-  newer: (version: string) => `raven player ${version} is out.`,
-  current: (version: string) => `raven player ${version} is the newest release.`,
-  failed: 'raven player could not check for updates.',
+  newer: (version: string) => `Raven ${version} is out.`,
+  current: (version: string) => `Raven ${version} is the newest release.`,
+  failed: 'Raven could not check for updates.',
 } as const
 
 export const DESKTOP_REQUESTS = {

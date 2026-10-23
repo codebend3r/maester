@@ -26,7 +26,7 @@ const run: ToolRun = async ({ command, args }) => {
 
 /**
  * otool reads `name(member)` as a member of the archive `name`, so a path ending in `)`, as
- * "raven player Helper (Renderer)" does, is read through a link with a plain name. The files
+ * "Raven Helper (Renderer)" does, is read through a link with a plain name. The files
  * are audited one at a time, so one link serves them all.
  */
 const otoolPathFor = async ({ path, scratch }: { path: string; scratch: string }) => {
@@ -106,7 +106,7 @@ const audit = async ({ project }: { project: string }): Promise<number> => {
     return 1
   }
   process.stdout.write(
-    `raven player bundle: ${paths.length} Mach-O files, all inside the app and signed.\n`,
+    `Raven bundle: ${paths.length} Mach-O files, all inside the app and signed.\n`,
   )
   return 0
 }

@@ -18,7 +18,7 @@ import {
 import { expectPlayingNatively, wake } from '@/e2e/playerView'
 
 /** The web's own sign-in, Home and title pages, and a title they play, all in the app's window. */
-test.describe.serial('the raven web app in raven player', () => {
+test.describe.serial('the raven web app in Raven', () => {
   let userData = ''
   let folders: string[] = []
   let started: FixtureServer | null = null
@@ -30,7 +30,7 @@ test.describe.serial('the raven web app in raven player', () => {
   }
 
   const running = (): Launched => {
-    if (launched === null) throw new Error('raven player is not running.')
+    if (launched === null) throw new Error('Raven is not running.')
     return launched
   }
 

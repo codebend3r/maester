@@ -39,12 +39,12 @@ import { messageOf } from '@/shared/messageOf'
 
 export const SOURCE_MESSAGES = {
   unknownServer: SERVER_GONE,
-  badTitle: 'raven player cannot open that title.',
+  badTitle: 'Raven cannot open that title.',
   lost: (name: string) =>
-    `raven player lost its connection to ${name}. Where you stopped last is saved there.`,
+    `Raven lost its connection to ${name}. Where you stopped last is saved there.`,
   relocked: (name: string) => `${name} locked this library again.`,
   gone: (name: string) => `This title is not on ${name} any more.`,
-  cannotOpen: (name: string) => `raven player could not open this title from ${name}.`,
+  cannotOpen: (name: string) => `Raven could not open this title from ${name}.`,
   signIn: (name: string) => `Sign in to ${name} to play this.`,
   signInAgain: (name: string) => `Sign in to ${name} again.`,
   pending: (name: string) => `Your account on ${name} is waiting for approval.`,
@@ -219,7 +219,7 @@ export const createServerSources = ({
       .open({ server, mediaId, sidecarTrackIds: tracks.map((track) => track.id) })
       .catch(() => null)
     if (opened === null) {
-      warn(`raven player could not relay a title from ${loggable(server.name)}`)
+      warn(`Raven could not relay a title from ${loggable(server.name)}`)
       return { ok: false, message: SOURCE_MESSAGES.cannotOpen(server.name) }
     }
     const sidecars: Sidecars = tracks.flatMap((track, index) => {

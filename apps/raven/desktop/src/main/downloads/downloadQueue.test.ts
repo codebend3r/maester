@@ -481,7 +481,7 @@ describe('an outage', () => {
   const unreachableAccess: AccessOutcome = {
     ok: false,
     reason: 'unreachable',
-    message: 'raven player could not reach Vhagar.',
+    message: 'Raven could not reach Vhagar.',
   }
   const waiting = { kind: 'paused', bytes: 0, reason: 'unreachable' } as const
 
@@ -1351,7 +1351,7 @@ describe('the outage retry', () => {
   const unreachable: AccessOutcome = {
     ok: false,
     reason: 'unreachable',
-    message: 'raven player could not reach Vhagar.',
+    message: 'Raven could not reach Vhagar.',
   }
   const retries = (pending: ReturnType<typeof setup>['pending']) =>
     [...pending.values()].filter(({ ms }) => ms === OUTAGE_RETRY_MS)

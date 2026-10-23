@@ -30,12 +30,12 @@ export const serverOriginFrom = ({
   const hook = hookOf({ isPackaged, env, name: DESKTOP_ENV.serverOrigin })
   if (isServerOrigin(hook)) return hook
   if (hook !== '') {
-    warn(`raven player ignored ${DESKTOP_ENV.serverOrigin}: it is not an http or https origin.`)
+    warn(`Raven ignored ${DESKTOP_ENV.serverOrigin}: it is not an http or https origin.`)
   }
   if (isServerOrigin(built)) return built
   if ((built ?? '') !== '') {
     warn(
-      `raven player was built with a ${DESKTOP_ENV.serverOrigin} that is not an http or https origin, so it uses ${DEFAULT_SERVER_ORIGIN}.`,
+      `Raven was built with a ${DESKTOP_ENV.serverOrigin} that is not an http or https origin, so it uses ${DEFAULT_SERVER_ORIGIN}.`,
     )
   }
   return DEFAULT_SERVER_ORIGIN
@@ -48,8 +48,7 @@ export const serverOriginFrom = ({
 export const authOriginFrom = ({ isPackaged, env, warn }: HookInput): string | null => {
   const hook = hookOf({ isPackaged, env, name: AUTH_ORIGIN_HOOK })
   if (isServerOrigin(hook)) return hook
-  if (hook !== '')
-    warn(`raven player ignored ${AUTH_ORIGIN_HOOK}: it is not an http or https origin.`)
+  if (hook !== '') warn(`Raven ignored ${AUTH_ORIGIN_HOOK}: it is not an http or https origin.`)
   return null
 }
 
@@ -73,9 +72,7 @@ export const linkOriginsFrom = ({
   const origins = listed.map(serverOriginOf)
   const ignored = origins.filter((origin) => origin === null).length
   if (ignored > 0) {
-    warn(
-      `raven player ignored ${ignored} of ${DESKTOP_ENV.linkOrigins}: not http or https origins.`,
-    )
+    warn(`Raven ignored ${ignored} of ${DESKTOP_ENV.linkOrigins}: not http or https origins.`)
   }
   return [...new Set(origins.filter((origin) => origin !== null))]
 }

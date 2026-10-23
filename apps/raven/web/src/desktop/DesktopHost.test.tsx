@@ -92,9 +92,7 @@ describe('DesktopHost', () => {
     await client.emit({ type: DESKTOP_EVENTS.notice, message: 'That file is gone.' })
     await client.emit({ type: DESKTOP_EVENTS.updateAvailable, version: '2.0.0' })
     expect(screen.getByText('That file is gone.')).toBeInTheDocument()
-    expect(
-      screen.getByText("raven player 2.0.0 is out. Settings has what's new."),
-    ).toBeInTheDocument()
+    expect(screen.getByText("Raven 2.0.0 is out. Settings has what's new.")).toBeInTheDocument()
   })
 
   it('hands the Playback menu to whoever plays', async () => {
@@ -108,7 +106,7 @@ describe('DesktopHost', () => {
   it('asks about a download main pushes, and declines it when cancelled', async () => {
     const { client } = renderHost()
     await client.emit({ type: DESKTOP_EVENTS.downloadAsk, ask: READY_ASK })
-    expect(screen.getByRole('dialog', { name: 'Download to raven player' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Download to Raven' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.declineDownload })).toEqual([

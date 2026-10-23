@@ -59,7 +59,7 @@ export const DownloadsSection = () => {
       : `Delete all downloads? ${formatBytes(used)} will be freed.`
 
   return (
-    <Section icon="download" title="Downloads" help="What raven player keeps on this Mac.">
+    <Section icon="download" title="Downloads" help="What Raven keeps on this Mac.">
       {downloads.isError && (
         <p className={settings.error} role="alert">
           {downloads.error.message}

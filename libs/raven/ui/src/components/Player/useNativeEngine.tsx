@@ -9,8 +9,8 @@ import { type Ranges, initialVideoState, videoReducer } from '@/components/Playe
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 const ENGINE_NAME = 'mpv'
-const COULD_NOT_OPEN = 'raven player could not open this video.'
-const COULD_NOT_PLAY = 'raven player could not play this video.'
+const COULD_NOT_OPEN = 'Raven could not open this video.'
+const COULD_NOT_PLAY = 'Raven could not play this video.'
 
 const messageOf = (error: unknown): string =>
   error instanceof Error && error.message !== '' ? error.message : COULD_NOT_OPEN

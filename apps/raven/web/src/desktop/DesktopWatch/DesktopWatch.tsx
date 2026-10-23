@@ -30,14 +30,14 @@ import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { mediaQuery } from '@/lib/queries'
 import { useDesktop } from '@/stores/desktop'
 
-/** Why a title from the server is not playing: raven player plays them on mpv only. */
+/** Why a title from the server is not playing: Raven plays them on mpv only. */
 export const WATCH_COPY = {
-  noEngine: "raven player's video engine did not start, so it cannot play this title.",
+  noEngine: "Raven's video engine did not start, so it cannot play this title.",
   engineStopped:
-    "raven player's video engine stopped, so it cannot play this title. Quit raven player and open it again to keep watching.",
-  unplayable: 'raven player could not play this title.',
-  unreadable: 'raven player could not open this title.',
-  tooSlow: 'raven player could not get this title ready in time. Try again in a moment.',
+    "Raven's video engine stopped, so it cannot play this title. Quit Raven and open it again to keep watching.",
+  unplayable: 'Raven could not play this title.',
+  unreadable: 'Raven could not open this title.',
+  tooSlow: 'Raven could not get this title ready in time. Try again in a moment.',
 } as const
 
 /**
@@ -286,9 +286,9 @@ const WatchTitle = ({
 }
 
 /**
- * The browser's watch page inside raven player: the same title, progress, next title,
+ * The browser's watch page inside Raven: the same title, progress, next title,
  * favourite, report and escape, with mpv drawing the picture under the page. Without mpv a
- * title from the server does not play, since raven player plays them only there.
+ * title from the server does not play, since Raven plays them only there.
  */
 export const DesktopWatch = ({
   services,

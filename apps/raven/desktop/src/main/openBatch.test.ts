@@ -104,7 +104,7 @@ describe('pathsFromArgv', () => {
   it('keeps only absolute paths after the executable, skipping switches', () => {
     expect(
       pathsFromArgv([
-        '/Applications/raven player.app/Contents/MacOS/raven player',
+        '/Applications/Raven.app/Contents/MacOS/Raven',
         '--inspect',
         '/m/Film.mkv',
         '.',
@@ -131,7 +131,7 @@ describe('launchPaths', () => {
   it('keeps every path after a packaged executable', () => {
     expect(
       launchPaths({
-        argv: ['/Applications/raven player.app/Contents/MacOS/raven player', '/m/Film.mkv'],
+        argv: ['/Applications/Raven.app/Contents/MacOS/Raven', '/m/Film.mkv'],
         isDefaultApp: false,
       }),
     ).toEqual(['/m/Film.mkv'])
@@ -147,9 +147,10 @@ describe('eventForOpen', () => {
   })
 
   it('turns a refusal into a notice', () => {
-    expect(
-      eventForOpen({ type: 'refused', message: 'raven player opens video files only.' }),
-    ).toEqual({ type: 'notice', message: 'raven player opens video files only.' })
+    expect(eventForOpen({ type: 'refused', message: 'Raven opens video files only.' })).toEqual({
+      type: 'notice',
+      message: 'Raven opens video files only.',
+    })
   })
 
   it("turns a link's watch page into the event that shows it", () => {

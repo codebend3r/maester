@@ -33,7 +33,7 @@ import { useMenuNext } from '@/desktop/player/useMenuNext'
 import { CONNECTION_STATUSES } from '@/desktop/playerConnection'
 import { useDesktop } from '@/stores/desktop'
 
-const NOT_OPENABLE = 'raven player cannot open that video.'
+const NOT_OPENABLE = 'Raven cannot open that video.'
 
 /**
  * Where a file that is not playing goes back to when no page of the app is behind it: Back

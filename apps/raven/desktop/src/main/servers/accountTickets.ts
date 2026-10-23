@@ -7,7 +7,7 @@ import { HTTP_STATUSES } from '@/shared/httpStatuses'
 
 /**
  * How long a minted account ticket is used before another is minted: a minute short of the
- * server's five, timed by raven player's own clock, never by the `expiresAt` the server names.
+ * server's five, timed by Raven's own clock, never by the `expiresAt` the server names.
  */
 export const ACCOUNT_TICKET_RENEW_MS = 240_000
 

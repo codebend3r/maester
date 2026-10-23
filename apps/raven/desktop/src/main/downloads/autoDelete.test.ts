@@ -140,7 +140,7 @@ describe('the clock', () => {
     expect(world.autoDelete.deletesAt({ downloadId: ID })).toBe(NOW + 7 * MINUTE)
   })
 
-  it('deletes at once at launch when the ten minutes ran out while raven player was closed', async () => {
+  it('deletes at once at launch when the ten minutes ran out while Raven was closed', async () => {
     const world = setup({ entries: [entryFor({ watchedAt: NOW - 11 * MINUTE })] })
     world.autoDelete.rebuild()
     expect(world.removed).toEqual([ID])

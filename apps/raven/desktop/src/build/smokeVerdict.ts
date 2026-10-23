@@ -13,12 +13,7 @@ const QUIT_MARK = 'raven-quit-ms '
 const TEST_HOOK_PREFIX = 'RAVEN_DESKTOP_'
 
 const needlesFor = ({ stage, version }: { stage: SmokeStage; version: string }): string[] => {
-  const started = [
-    `launch raven player ${version} (packaged)`,
-    WEB_HOST_READY,
-    ENGINE_READY,
-    LAUNCH_MARK,
-  ]
+  const started = [`launch Raven ${version} (packaged)`, WEB_HOST_READY, ENGINE_READY, LAUNCH_MARK]
   switch (stage) {
     case SMOKE_STAGES.started:
       return started

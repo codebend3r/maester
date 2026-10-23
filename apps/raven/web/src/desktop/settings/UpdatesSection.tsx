@@ -16,10 +16,10 @@ import { useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/settings/DesktopSettings.module.scss'
 import settings from '@/pages/SettingsPage/SettingsPage.module.scss'
 
-const UNREADABLE = 'raven player could not read its update settings.'
-const UNCHANGED = 'raven player could not change its update check. Try again.'
-const UNCHECKED = 'raven player could not check for updates. Try again.'
-const UNOPENED = 'raven player could not open the release page. Try again.'
+const UNREADABLE = 'Raven could not read its update settings.'
+const UNCHANGED = 'Raven could not change its update check. Try again.'
+const UNCHECKED = 'Raven could not check for updates. Try again.'
+const UNOPENED = 'Raven could not open the release page. Try again.'
 
 /** The result lines a status holds; "newest" only from a check this visit just ran. */
 const resultsOf = ({
@@ -125,7 +125,7 @@ export const UpdatesSection = () => {
     <Section
       icon="rescan"
       title="Updates"
-      help="raven player asks GitHub for its newest release and sends nothing else. It never installs one by itself."
+      help="Raven asks GitHub for its newest release and sends nothing else. It never installs one by itself."
     >
       {read.isError && (
         <p className={settings.error} role="alert">
@@ -142,7 +142,7 @@ export const UpdatesSection = () => {
           />
           <span className={settings.choiceLabel}>Check for updates once a day</span>
           <span id={hintId} className={settings.choiceHint}>
-            {`This is raven player ${status.current}. ${
+            {`This is Raven ${status.current}. ${
               status.checkedAt === null
                 ? 'Not checked yet.'
                 : `Last checked ${new Date(status.checkedAt).toLocaleString()}.`

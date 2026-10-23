@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { isContainerName, isMediaId, isOpaqueId, isSidecarTrackId } from '@raven/core'
 
-/** What a download leaves free on the disk, so the system and raven player keep room to work. */
+/** What a download leaves free on the disk, so the system and Raven keep room to work. */
 export const SPACE_RESERVE_BYTES = 2 * 1024 ** 3
 
 /** The folder under userData that holds every server's downloads. */

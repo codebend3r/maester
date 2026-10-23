@@ -20,7 +20,7 @@ type PlayerPrefs = {
   subtitles: { on: boolean; language: string | null }
   /** The audio language last picked by hand; null while the file's default has been fine. */
   audioLanguage: string | null
-  /** Whether this browser offers "Open in raven player"; off, since a page cannot tell the app is installed. */
+  /** Whether this browser offers "Open in Raven"; off, since a page cannot tell the app is installed. */
   opensInRavenPlayer: boolean
   /** How many seconds the controls and cursor linger after the last mouse move, key press or click. */
   controlsLingerSeconds: number

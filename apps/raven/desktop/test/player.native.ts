@@ -996,7 +996,7 @@ after(async () => {
   await rm(folder, { recursive: true, force: true })
 })
 
-/** A fixture whose accounts are ready, as every server raven player plays from is. */
+/** A fixture whose accounts are ready, as every server Raven plays from is. */
 const startFixture = async ({ mode }: { mode: Omit<FixtureMode, 'accounts'> }) => {
   const { first, second } = await fixtureClips()
   return startFixtureServer({
@@ -1588,7 +1588,7 @@ const ACCOUNT_SERVER = {
 const ACCOUNT_TICKET_MS = 300_000
 /** Shorter than Supabase's hour, so the film of seeks below outlives the first JWT. */
 const ACCOUNT_JWT_SECONDS = 1800
-/** Past a ticket's life, and past the four minutes raven player reuses one for. */
+/** Past a ticket's life, and past the four minutes Raven reuses one for. */
 const TICKET_STEP_MS = 310_000
 /**
  * Where the seeks land, latest first, so each lands where mpv has read nothing yet. Six steps
@@ -1615,7 +1615,7 @@ const READY_ACCOUNTS = {
   jwtSeconds: ACCOUNT_JWT_SECONDS,
 } as const
 
-/** The clock the fixture and raven player's account parts share, which a test moves on. */
+/** The clock the fixture and Raven's account parts share, which a test moves on. */
 type Clock = { skewMs: number }
 
 const startAccountFixture = async ({

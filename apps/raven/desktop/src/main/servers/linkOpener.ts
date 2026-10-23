@@ -6,8 +6,8 @@ import { readDownloadLink, readPlayLink } from '@/shared/playLink'
 
 export const LINK_MESSAGES = {
   unreadable:
-    'raven player could not read that link. It opens raven://play and raven://download links and raven watch pages.',
-  otherServer: 'raven player opens links to its own server only.',
+    'Raven could not read that link. It opens raven://play and raven://download links and raven watch pages.',
+  otherServer: 'Raven opens links to its own server only.',
 } as const
 
 const LINK_LOG_MAX = 100
@@ -40,7 +40,7 @@ export const createLinkOpener = ({
   const safeWarn = quietly(warn)
 
   const otherServer = (): DesktopReply => {
-    safeWarn('raven player refused a link to another server')
+    safeWarn('Raven refused a link to another server')
     return { type: DESKTOP_REPLIES.refused, message: LINK_MESSAGES.otherServer }
   }
 
@@ -55,7 +55,7 @@ export const createLinkOpener = ({
       if (!isServerOrigin(download.origin)) return otherServer()
       return downloads.ask({ serverId: serverId(), target: download.target })
     }
-    safeWarn(`raven player could not read a link: ${loggable(link.slice(0, LINK_LOG_MAX))}`)
+    safeWarn(`Raven could not read a link: ${loggable(link.slice(0, LINK_LOG_MAX))}`)
     return { type: DESKTOP_REPLIES.refused, message: LINK_MESSAGES.unreadable }
   }
 
@@ -66,9 +66,7 @@ export const createLinkOpener = ({
       if (first === undefined) return { type: DESKTOP_REPLIES.done }
       // A page can fire links in a burst; acting on each would stack asks or move the page over and over.
       if (dropped.length > 0) {
-        safeWarn(
-          `raven player opened the first of ${links.length} links and dropped ${dropped.length}`,
-        )
+        safeWarn(`Raven opened the first of ${links.length} links and dropped ${dropped.length}`)
       }
       return open({ link: first })
     },

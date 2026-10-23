@@ -2,9 +2,9 @@ import { errorText } from '@/main/log/errorText'
 
 export const HELP_MESSAGES = {
   copied: 'Copied the diagnostics.',
-  notCopied: 'raven player could not copy the diagnostics.',
-  noLogs: 'raven player could not open its logs folder.',
-  noCrashReports: 'raven player could not open its crash reports folder.',
+  notCopied: 'Raven could not copy the diagnostics.',
+  noLogs: 'Raven could not open its logs folder.',
+  noCrashReports: 'Raven could not open its crash reports folder.',
 } as const
 
 export type HelpActions = {

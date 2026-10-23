@@ -55,9 +55,9 @@ export type UpdateFinding =
 export const UPDATE_PROBLEMS = {
   unreachable: 'GitHub did not answer.',
   busy: 'GitHub is busy. Try again later.',
-  unreadable: 'GitHub sent something raven player could not read.',
+  unreadable: 'GitHub sent something Raven could not read.',
   // Nothing read carried the app, so there is no evidence this copy is the newest.
-  unlisted: 'GitHub listed no raven player release.',
+  unlisted: 'GitHub listed no Raven release.',
 } as const
 
 export type UpdateCheck = { ok: true; finding: UpdateFinding } | { ok: false; problem: string }

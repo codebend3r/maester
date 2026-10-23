@@ -132,7 +132,7 @@ describe('LocalPage', () => {
   it('says why the recents could not be listed', async () => {
     renderPage(localMain({ answers: { listRecents: { type: DESKTOP_REPLIES.done } } }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'raven player could not list your recent videos.',
+      'Raven could not list your recent videos.',
     )
   })
 })
