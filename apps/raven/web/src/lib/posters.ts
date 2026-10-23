@@ -1,4 +1,4 @@
-import { type ItemSummary, POSTER_OWN_WIDTH, POSTER_WIDTHS } from '@raven/core'
+import { type ItemSummary, POSTER_OWN_WIDTH } from '@raven/core'
 import { api } from '@/lib/api'
 
 /**
@@ -77,7 +77,7 @@ const NARROWEST: Record<PosterSizes, number> = {
  * rounding down between two (checked in Chrome 155), so that is the test.
  */
 const needsOwnWidth = (sizes: PosterSizes): boolean =>
-  POSTER_WIDTHS.every(
+  api.posterWidths.every(
     (width) => width === POSTER_OWN_WIDTH || width < NARROWEST[sizes] * window.devicePixelRatio,
   )
 

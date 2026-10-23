@@ -5,9 +5,8 @@ import { LOCAL, localEpisode, localSeason } from '@/metadata/localItems'
 import { MatchFiles } from '@/metadata/matchFiles'
 import type { ExternalScore } from '@/metadata/scoreSources'
 import { BLANK_ITEM, type FetchedItem, type FetchedPerson } from '@/metadata/tmdbClient'
-import { PeopleRepository } from '@/people/peopleRepository'
 import { testDatabase } from '@/test/database'
-import { repositories } from '@/test/repositories'
+import { peopleRepositoryOf, repositories } from '@/test/repositories'
 
 const show: FetchedItem = {
   ...localSeason({ showTmdbId: '1', number: 1 }),
@@ -331,7 +330,7 @@ describe('the libraries holding each item, and the people cleared up', () => {
 
   it('keeps a person with no credits whose filmography was fetched lately, and their credits go with them', () => {
     const stored = metadata()
-    const people = new PeopleRepository(database.get())
+    const people = peopleRepositoryOf(database.get())
     const gone = stored.save({
       item: {
         ...BLANK_ITEM,

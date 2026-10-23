@@ -3,7 +3,7 @@ import { isMatchItemType, isNumber, listOf, type PersonProfile } from '@raven/co
 import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
-import { photoVersionOf } from '@/metadata/metadataRepository'
+import { PictureVersions } from '@/metadata/pictureVersions'
 import type { FetchedPerson, FetchedPersonCredit } from '@/metadata/tmdbClient'
 
 /** One of a person's TMDB credits as stored, with raven's item for its title. */
@@ -64,7 +64,10 @@ const isGenreIds = listOf(isNumber)
 /** A person's page as TMDB describes it: who they are, and everything they are credited on. */
 @Injectable()
 export class PeopleRepository {
-  constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
+  constructor(
+    @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(PictureVersions) private readonly pictureVersions: PictureVersions,
+  ) {}
 
   private get db(): Sqlite.Database {
     return this.database.db
@@ -83,7 +86,7 @@ export class PeopleRepository {
     return {
       tmdbId: row.tmdb_id,
       name: row.name,
-      photoVersion: photoVersionOf(row.photo),
+      photoVersion: this.pictureVersions.photo({ id: personId, photo: row.photo }),
       fetchedAt: row.filmography_fetched_at,
       profile:
         row.filmography_fetched_at == null

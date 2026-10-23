@@ -8,6 +8,7 @@ import {
   useRef,
 } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { prefetchItemHandlers } from '@/lib/prefetchItem'
 import { type Follow, useCardLinks } from '@/stores/cardLinks'
 
 /**
@@ -56,16 +57,20 @@ export const CardLink = ({
   to,
   state,
   onClick,
+  prefetchItem,
   children,
   ...rest
 }: Omit<ComponentProps<'a'>, 'href' | 'target' | 'download'> & {
   to: AppPath
   state?: unknown
+  /** The item whose page `to` opens, read ahead when the link is pointed at or focused. */
+  prefetchItem?: number | null
 }) => {
   const follow = useCardLinks((links) => links.follow)
   if (!follow) throw new Error('CardLink needs CardLinks around it')
   return (
     <a
+      {...prefetchItemHandlers(prefetchItem)}
       {...rest}
       href={to}
       onClick={(event) => {

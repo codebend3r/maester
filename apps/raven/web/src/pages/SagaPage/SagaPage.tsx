@@ -21,6 +21,7 @@ import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink } from '@raven/ui'
 import {
   type HeaderBackdrop,
+  itemBackdrop,
   ItemHeader,
   ItemHeaderSkeleton,
 } from '@/components/ItemHeader/ItemHeader'
@@ -66,7 +67,7 @@ const headerBackdrop = (saga: Saga): HeaderBackdrop | null => {
     }
     case SAGA_BACKDROP_TYPES.still: {
       const cover = sagaCover(saga)
-      return cover && { type: 'picture', url: api.sagaPictureUrl(cover) }
+      return cover && itemBackdrop({ id: cover.id, version: cover.version })
     }
     default: {
       const unknown: never = backdrop

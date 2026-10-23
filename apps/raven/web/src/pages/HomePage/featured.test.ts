@@ -106,8 +106,8 @@ describe('featuredOf', () => {
     expect(featured).toMatchObject({
       key: 'media:5',
       itemId: 105,
-      poster: '/api/items/105/images/poster?v=p5',
-      backdrop: '/api/items/105/images/backdrop?v=b5',
+      poster: '/api/pictures/items/105/poster/p5',
+      backdrop: '/api/pictures/items/105/backdrop/b5',
       eyebrow: 'New in Films',
       title: 'Movie 5',
       facts: ['2026', '2h 46m', '4K HDR'],

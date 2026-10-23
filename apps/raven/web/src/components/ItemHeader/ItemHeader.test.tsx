@@ -21,13 +21,13 @@ const header = (logo: string | null) => (
 
 describe('ItemHeader', () => {
   it('shows the logo in place of the title, still named by the title', () => {
-    render(header('/api/items/835/images/logo?v=l1'))
+    render(header('/api/pictures/items/835/logo/l1'))
     const heading = screen.getByRole('heading', { level: 1, name: 'Saving Private Ryan' })
-    expect(heading.querySelector('img')).toHaveAttribute('src', '/api/items/835/images/logo?v=l1')
+    expect(heading.querySelector('img')).toHaveAttribute('src', '/api/pictures/items/835/logo/l1')
   })
 
   it('falls back to the words when the logo will not load', () => {
-    render(header('/api/items/835/images/logo?v=l1'))
+    render(header('/api/pictures/items/835/logo/l1'))
     fireEvent.error(screen.getByRole('img', { name: 'Saving Private Ryan' }))
     const heading = screen.getByRole('heading', { level: 1, name: 'Saving Private Ryan' })
     expect(heading.querySelector('img')).toBeNull()
@@ -44,7 +44,11 @@ describe('ItemHeader', () => {
           contentRating={null}
           facts={[]}
           ratings={[]}
-          backdrop={{ type: 'picture', url: '/api/items/835/images/backdrop?v=b1' }}
+          backdrop={{
+            type: 'picture',
+            url: '/api/pictures/items/835/backdrop/b1',
+            srcSet: null,
+          }}
           back={{ to: '/libraries/4', label: '4k Movies' }}
         />
       </MemoryRouter>,

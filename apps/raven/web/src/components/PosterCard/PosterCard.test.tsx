@@ -28,7 +28,7 @@ describe('PosterCard', () => {
     })
     const card = container.querySelector('li') ?? document.body
     fireEvent.pointerEnter(card, { pointerType: 'mouse' })
-    await waitFor(() => expect(shownBehind()).toBe('/api/items/40/images/backdrop?v=b9'))
+    await waitFor(() => expect(shownBehind()).toBe('/api/pictures/items/40/backdrop/b9'))
     fireEvent.pointerLeave(card, { pointerType: 'mouse' })
     expect(shownBehind()).not.toBeNull()
     await waitFor(() => expect(shownBehind()).toBeNull())
@@ -44,7 +44,7 @@ describe('PosterCard', () => {
       ),
     })
     fireEvent.focus(screen.getByRole('link', { name: 'Busboys' }))
-    expect(shownBehind()).toBe('/api/items/40/images/backdrop?v=b9')
+    expect(shownBehind()).toBe('/api/pictures/items/40/backdrop/b9')
   })
 
   it('leaves the page alone for a touch, and for a movie with no backdrop', async () => {
@@ -93,9 +93,9 @@ describe('PosterCard', () => {
     expect(picture(container)).toHaveAttribute(
       'srcset',
       [
-        '/api/items/40/images/poster?v=p1&w=185 185w',
-        '/api/items/40/images/poster?v=p1&w=342 342w',
-        '/api/items/40/images/poster?v=p1 500w',
+        '/api/pictures/items/40/poster/p1?w=185 185w',
+        '/api/pictures/items/40/poster/p1?w=342 342w',
+        '/api/pictures/items/40/poster/p1 500w',
       ].join(', '),
     )
     expect(picture(container)).toHaveAttribute('sizes', POSTER_SIZES.grid)
@@ -114,8 +114,8 @@ describe('PosterCard', () => {
     expect(await at(2.6)).toHaveAttribute('sizes', POSTER_SIZES.grid)
     const dense = [await at(2.75), await at(3)]
     expect(dense.map((poster) => poster?.getAttribute('src'))).toEqual([
-      '/api/items/40/images/poster?v=p1',
-      '/api/items/40/images/poster?v=p1',
+      '/api/pictures/items/40/poster/p1',
+      '/api/pictures/items/40/poster/p1',
     ])
     expect(dense.map((poster) => poster?.hasAttribute('srcset') ?? true)).toEqual([false, false])
     expect(dense.map((poster) => poster?.hasAttribute('sizes') ?? true)).toEqual([false, false])
@@ -126,7 +126,7 @@ describe('PosterCard', () => {
       ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />,
     })
     await reported()
-    expect(picture(container)).toHaveAttribute('src', '/api/items/40/images/poster?v=p1')
+    expect(picture(container)).toHaveAttribute('src', '/api/pictures/items/40/poster/p1')
     fireEvent.error(picture(container) ?? document.body)
     await reported()
     expect(picture(container)).toHaveAttribute('src', '/api/media/7/thumbnail?v=1')

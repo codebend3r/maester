@@ -385,7 +385,7 @@ describe('PersonPage', () => {
       renderPerson()
       await screen.findByRole('table', { name: 'Filmography' })
       const own = rowOf('The Matrix').querySelector('img')
-      expect(own).toHaveAttribute('src', `/api/items/1/images/poster?v=${MATRIX.posterVersion}`)
+      expect(own).toHaveAttribute('src', `/api/pictures/items/1/poster/${MATRIX.posterVersion}`)
       expect(own).toHaveAttribute('sizes', POSTER_SIZES.list)
       const tmdb = rowOf('John Wick').querySelector('img')
       expect(tmdb).toHaveAttribute('src', '/api/images/poster/wick.jpg?w=342')
@@ -682,11 +682,11 @@ describe('PersonPage', () => {
         '/shows/4',
       )
       const poster = acting.querySelector('img')
-      expect(poster).toHaveAttribute('src', `/api/items/1/images/poster?v=${MATRIX.posterVersion}`)
+      expect(poster).toHaveAttribute('src', `/api/pictures/items/1/poster/${MATRIX.posterVersion}`)
       expect(poster?.getAttribute('srcset')?.split(', ')).toEqual([
-        `/api/items/1/images/poster?v=${MATRIX.posterVersion}&w=185 185w`,
-        `/api/items/1/images/poster?v=${MATRIX.posterVersion}&w=342 342w`,
-        `/api/items/1/images/poster?v=${MATRIX.posterVersion} 500w`,
+        `/api/pictures/items/1/poster/${MATRIX.posterVersion}?w=185 185w`,
+        `/api/pictures/items/1/poster/${MATRIX.posterVersion}?w=342 342w`,
+        `/api/pictures/items/1/poster/${MATRIX.posterVersion} 500w`,
       ])
       expect(poster).toHaveAttribute('sizes', POSTER_SIZES.grid)
       expect(screen.queryByRole('table')).toBeNull()

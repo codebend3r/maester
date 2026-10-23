@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import { moveOnScreen as move, startOnScreen } from '@/test/viewport'
 
-const SRC = '/api/items/4/images/poster?v=p1'
+const SRC = '/api/pictures/items/4/poster/p1'
 const SRC_SET = `${SRC}&w=154 154w, ${SRC} 500w`
 
 const moveOnScreen = (args: Parameters<typeof move>[0]) => act(() => move(args))

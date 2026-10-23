@@ -29,8 +29,6 @@ import {
   isMatchItemType,
   isShowMatchChoice,
   type ItemDetails,
-  POSTER_WIDTHS,
-  posterWidthFrom,
   type ItemImageOptions,
   type ItemMetadataState,
   type MediaItem,
@@ -39,6 +37,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { isChoosableImageKind } from '@/items/imageKinds'
 import { itemChildren } from '@/items/itemChildren'
+import { ItemPictureFiles, pictureWidth } from '@/items/itemPictureFiles'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy } from '@/lock/lockGuard'
@@ -74,6 +73,7 @@ export class ItemsController {
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(TitleFavourites) private readonly titleFavourites: TitleFavourites,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
+    @Inject(ItemPictureFiles) private readonly pictureFiles: ItemPictureFiles,
   ) {}
 
   private requireItem(id: number): void {
@@ -386,33 +386,8 @@ export class ItemsController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (!isItemImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
-    const posterWidth = asked === undefined ? undefined : posterWidthFrom(asked)
-    if (posterWidth === null || (posterWidth !== undefined && kind !== ITEM_IMAGE_KINDS.poster)) {
-      throw new BadRequestException(`w must be one of ${POSTER_WIDTHS.join(', ')}, for a poster`)
-    }
-    const width = posterWidth ?? IMAGE_WIDTHS[kind]
-    const image = this.stored.image({ itemId: id, kind })
-    const chosen =
-      image?.source === STORED_IMAGE_SOURCES.chosen
-        ? await this.images.tmdb({ path: image.ref, width })
-        : null
-    const localRef =
-      image?.source === STORED_IMAGE_SOURCES.local
-        ? image.ref
-        : this.stored.imageFrom({ itemId: id, kind, source: STORED_IMAGE_SOURCES.local })
-    const local =
-      chosen == null && localRef != null
-        ? await this.images.local({ itemId: id, kind, source: localRef, width })
-        : null
-    // A picture beside the media that will not decode falls back to TMDB's.
-    const tmdbPath =
-      chosen == null && local == null
-        ? this.stored.imageFrom({ itemId: id, kind, source: STORED_IMAGE_SOURCES.tmdb })
-        : null
-    const path =
-      chosen ??
-      local ??
-      (tmdbPath == null ? null : await this.images.tmdb({ path: tmdbPath, width }))
+    const width = pictureWidth({ kind, asked })
+    const path = await this.pictureFiles.pathOf({ id, kind, width })
     await sendImage({ reply, path, version })
   }
 }

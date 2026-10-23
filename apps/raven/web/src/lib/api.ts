@@ -12,10 +12,13 @@ const accessToken = (): string | null => useAuthSession.getState().session?.acce
 /**
  * Same origin in every setup: Docker serves this app from the media server,
  * and in development Vite proxies /api to it. Progress saves use keepalive
- * so the last one still lands when the player page is closing.
+ * so the last one still lands when the player page is closing. A build for
+ * Netlify names its Image CDN, which pictures then go through.
  */
 export const api = createApiClient({
   accessToken,
+  // Unset and '' alike mean no CDN.
+  pictureCdn: import.meta.env.VITE_PICTURE_CDN || null,
   fetch: refreshingFetch({
     fetch: (url, init) => window.fetch(url, { ...init, keepalive: init?.method === METHODS.put }),
     accessToken,

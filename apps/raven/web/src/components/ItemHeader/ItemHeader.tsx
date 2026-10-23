@@ -7,6 +7,7 @@ import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { RatingPanel } from '@/components/RatingPanel/RatingPanel'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { Slideshow } from '@/components/Slideshow/Slideshow'
+import { api } from '@/lib/api'
 import styles from '@/components/ItemHeader/ItemHeader.module.scss'
 
 /** What sits beside the title: a poster, an episode's still, or no picture at all. */
@@ -26,7 +27,7 @@ const HEADER_BACKDROP_TYPES = { picture: 'picture', slideshow: 'slideshow' } as 
 
 /** What fades into the page behind the header: one picture, or several in turn, by their urls. */
 export type HeaderBackdrop =
-  | { type: typeof HEADER_BACKDROP_TYPES.picture; url: string }
+  | { type: typeof HEADER_BACKDROP_TYPES.picture; url: string; srcSet: string | null }
   | {
       type: typeof HEADER_BACKDROP_TYPES.slideshow
       slides: readonly string[]
@@ -38,12 +39,44 @@ export type HeaderProgress = { fraction: number; label: string }
 
 /** A page's one picture behind its header, or none while it has none. */
 export const pictureBackdrop = (url: string | null): HeaderBackdrop | null =>
-  url == null ? null : { type: HEADER_BACKDROP_TYPES.picture, url }
+  url == null ? null : { type: HEADER_BACKDROP_TYPES.picture, url, srcSet: null }
 
+/**
+ * An item's own backdrop behind its header, at each width an image CDN
+ * makes of it so a phone fetches one no wider than its screen; none while
+ * it has none.
+ */
+export const itemBackdrop = ({
+  id,
+  version,
+}: {
+  id: number
+  version: string | null
+}): HeaderBackdrop | null => {
+  const url = api.itemImageUrl({ id, kind: 'backdrop', version })
+  if (url == null) return null
+  return {
+    type: HEADER_BACKDROP_TYPES.picture,
+    url,
+    srcSet: api.backdropSrcSet({ id, version }),
+  }
+}
+
+// The page's largest picture, so it is fetched ahead of what lazy lists ask for.
 const BackdropPicture = ({ backdrop }: { backdrop: HeaderBackdrop }) => {
   switch (backdrop.type) {
     case HEADER_BACKDROP_TYPES.picture:
-      return <img className={styles.backdropPicture} src={backdrop.url} alt="" decoding="async" />
+      return (
+        <img
+          className={styles.backdropPicture}
+          src={backdrop.url}
+          srcSet={backdrop.srcSet ?? undefined}
+          sizes={backdrop.srcSet == null ? undefined : '100vw'}
+          alt=""
+          decoding="async"
+          fetchPriority="high"
+        />
+      )
     case HEADER_BACKDROP_TYPES.slideshow:
       return (
         <Slideshow
@@ -85,7 +118,7 @@ const PICTURES = {
 const Picture = ({ picture, title }: { picture: HeaderPicture; title: string }) => {
   const className = PICTURES[picture.shape]
   const content = picture.url ? (
-    <img src={picture.url} alt="" decoding="async" />
+    <img src={picture.url} alt="" decoding="async" fetchPriority="high" />
   ) : (
     <span className={styles.letter} aria-hidden="true">
       {title.slice(0, 1)}

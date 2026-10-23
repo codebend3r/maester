@@ -139,7 +139,7 @@ describe('the Duplicates tab', () => {
       within(movie('Alexander')).queryByRole('button', { name: 'Put back together' }),
     ).toBeNull()
     const poster = movie('Alexander').querySelector('img')
-    expect(poster?.getAttribute('srcset')).toContain('&w=185 185w')
+    expect(poster?.getAttribute('srcset')).toContain('?w=185 185w')
     expect(poster).toHaveAttribute('sizes', POSTER_SIZES.duplicate)
   })
 

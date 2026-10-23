@@ -253,7 +253,7 @@ describe('LibrariesPage', () => {
       const picture = row?.querySelector(BACKDROP)
       return picture instanceof HTMLElement ? picture.style.backgroundImage : null
     }
-    expect(await pictureBehind('Films')).toContain('/api/items/7/images/backdrop?v=abc')
+    expect(await pictureBehind('Films')).toContain('/api/pictures/items/7/backdrop/abc')
     expect(await pictureBehind('Clips')).toContain('/api/media/9/thumbnail?v=41')
     expect(await pictureBehind('Empty')).toBeNull()
   })

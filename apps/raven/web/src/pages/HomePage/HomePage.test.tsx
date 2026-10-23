@@ -87,7 +87,7 @@ describe('HomePage', () => {
       }),
     ).toHaveAttribute('href', '/watch/13')
     expect(shelf('Continue watching').querySelector('img')?.getAttribute('src')).toContain(
-      '/api/items/5/images/poster',
+      '/api/pictures/items/5/poster',
     )
     expect(
       within(shelf('Continue watching')).getByRole('link', { name: mediaLabel(EPISODE_TWO) }),

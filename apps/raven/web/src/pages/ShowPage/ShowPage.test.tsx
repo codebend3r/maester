@@ -73,7 +73,7 @@ describe('ShowPage', () => {
     const heading = await screen.findByRole('heading', { level: 1, name: 'Severance' })
     expect(heading.querySelector('img')).toHaveAttribute(
       'src',
-      expect.stringContaining('/api/items/4/images/logo'),
+      expect.stringContaining('/api/pictures/items/4/logo'),
     )
   })
 
@@ -166,12 +166,12 @@ describe('ShowPage', () => {
     open()
     const season = (await screen.findByRole('link', { name: /Season 1/ })).querySelector('img')
     expect(season?.getAttribute('srcset')?.split(', ')).toEqual([
-      '/api/items/5/images/poster?v=p5&w=185 185w',
-      '/api/items/5/images/poster?v=p5&w=342 342w',
-      '/api/items/5/images/poster?v=p5 500w',
+      '/api/pictures/items/5/poster/p5?w=185 185w',
+      '/api/pictures/items/5/poster/p5?w=342 342w',
+      '/api/pictures/items/5/poster/p5 500w',
     ])
     expect(season).toHaveAttribute('sizes', POSTER_SIZES.season)
-    const own = document.querySelector('img[src="/api/items/4/images/poster?v=s4"]')
+    const own = document.querySelector('img[src="/api/pictures/items/4/poster/s4"]')
     expect(own).toBeInTheDocument()
     expect(own).not.toHaveAttribute('srcset')
   })

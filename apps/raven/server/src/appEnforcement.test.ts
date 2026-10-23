@@ -14,7 +14,7 @@ import {
   isLibrary,
   isMediaTicket,
 } from '@raven/core'
-import { HEADERS } from '@shared/server'
+import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { CONTROLLERS } from '@/appModule'
@@ -121,9 +121,18 @@ it('declares every route exactly as the inventory says', () => {
     .toSorted(byRoute)
   expect(declared).toEqual(ROUTE_LIST.toSorted(byRoute))
   expect(declared.filter(({ account }) => account === ACCOUNT_REQUIREMENTS.anyone)).toEqual(
-    [ROUTES.authConfig, ROUTES.health, ROUTES.ping].toSorted(byRoute),
+    [
+      ROUTES.authConfig,
+      ROUTES.health,
+      ROUTES.ping,
+      ROUTES.itemPicture,
+      ROUTES.photoPicture,
+    ].toSorted(byRoute),
   )
 })
+
+/** The open routes whose address is their own permission: they answer only a current version. */
+const CAPABILITY_ROUTES: ReadonlySet<Route> = new Set([ROUTES.itemPicture, ROUTES.photoPicture])
 
 describe('the default-deny gate', () => {
   it('refuses every protected route to anonymous, unverified, pending and revoked callers', async () => {
@@ -163,7 +172,11 @@ describe('the default-deny gate', () => {
   })
 
   it('answers the open routes to anyone without asking about accounts', async () => {
-    const open = asSent(ROUTE_LIST.filter(({ account }) => account === ACCOUNT_REQUIREMENTS.anyone))
+    const open = asSent(
+      ROUTE_LIST.filter(
+        (route) => route.account === ACCOUNT_REQUIREMENTS.anyone && !CAPABILITY_ROUTES.has(route),
+      ),
+    )
     const callers: readonly CallerKind[] = [CALLER_KINDS.anonymous, CALLER_KINDS.member]
     const statuses = await Promise.all(
       callers.map(async (caller) => {
@@ -177,6 +190,40 @@ describe('the default-deny gate', () => {
       }),
     )
     expect(statuses.flat()).toEqual(Array.from({ length: open.length * callers.length }, () => 200))
+    expect(fixture.fetcher).not.toHaveBeenCalled()
+  })
+
+  it('answers a picture to anyone naming its current version, for any cache to keep, and no other', async () => {
+    const { item } = enforced.ids
+    if (item === null) throw new Error('The enforced library matched no item')
+    const { posterVersion } = await enforced.ownerApi.getItem(item)
+    if (posterVersion === null) throw new Error('The enforced movie has no poster')
+    fixture.fetcher.mockClear()
+    const picture = ({ version }: { version: string }) =>
+      send({
+        options: {
+          url: pathOf({
+            route: ROUTES.itemPicture,
+            params: { id: item, kind: ITEM_IMAGE_KINDS.poster, version },
+          }),
+        },
+      })
+
+    const shown = await picture({ version: posterVersion })
+    expect({
+      status: shown.statusCode,
+      cacheControl: shown.headers[HEADERS.cacheControl],
+      isVariedByAccount: outcomeOf({ response: shown }).isVariedByAccount,
+    }).toEqual({ status: 200, cacheControl: CACHE_POLICIES.immutable, isVariedByAccount: false })
+
+    const guesses = await Promise.all(
+      [
+        '1',
+        `${posterVersion.slice(0, -1)}${posterVersion.endsWith('A') ? 'B' : 'A'}`,
+        `${posterVersion}x`,
+      ].map(async (version) => (await picture({ version })).statusCode),
+    )
+    expect(guesses).toEqual([404, 404, 404])
     expect(fixture.fetcher).not.toHaveBeenCalled()
   })
 

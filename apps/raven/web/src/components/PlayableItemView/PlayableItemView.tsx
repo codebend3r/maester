@@ -31,6 +31,7 @@ import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import {
   type HeaderProgress,
   ItemHeader,
+  itemBackdrop,
   pictureBackdrop,
 } from '@/components/ItemHeader/ItemHeader'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
@@ -220,13 +221,7 @@ export const PlayableItemView = ({
                 }),
                 play: playPicture,
               },
-              backdrop: pictureBackdrop(
-                api.itemImageUrl({
-                  id: details.id,
-                  kind: 'backdrop',
-                  version: details.backdropVersion,
-                }),
-              ),
+              backdrop: itemBackdrop({ id: details.id, version: details.backdropVersion }),
             }
           : {
               picture: { shape: 'still', url: still, play: playPicture },

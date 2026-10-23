@@ -1100,6 +1100,20 @@ export type PosterWidth = Infer<typeof isPosterWidth>
 
 export const POSTER_WIDTHS = isPosterWidth.values
 
+/** A backdrop's own width: what the server keeps and serves it at. */
+export const BACKDROP_OWN_WIDTH = 1280
+
+/**
+ * The widths a poster is asked of an image CDN at, narrowest first: finer
+ * steps than the server keeps, since the CDN resizes at the edge, so each
+ * card's poster comes within a step of the width it shows. None is wider
+ * than the poster's own.
+ */
+export const CDN_POSTER_WIDTHS = [120, 160, 200, 240, 280, 320, 380, 440, POSTER_OWN_WIDTH] as const
+
+/** The widths a backdrop is asked of an image CDN at, narrowest first, up to its own. */
+export const CDN_BACKDROP_WIDTHS = [480, 640, 800, 960, 1120, BACKDROP_OWN_WIDTH] as const
+
 /**
  * The poster width a query's `w` asks for, written as `posterSrcSet` writes
  * it, or null for anything else: another number, or the same one spelled
@@ -1831,6 +1845,19 @@ export const BUG_REPORT_STATUSES = {
 export const isBugReportStatus = oneOf(Object.values(BUG_REPORT_STATUSES))
 
 export type BugReportStatus = Infer<typeof isBugReportStatus>
+
+/** The parameters a capability picture address names. */
+export const PICTURE_PARAMS = { id: 'id', kind: 'kind', version: 'version' } as const
+
+/**
+ * Pictures by their capability address: the version, keyed with the
+ * server's secret, is the permission, so anyone holding the address may
+ * fetch it and any cache may keep it.
+ */
+export const PICTURE_PATHS = {
+  item: '/api/pictures/items/:id/:kind/:version',
+  photo: '/api/pictures/people/:id/:version',
+} as const
 
 export const BUG_REPORT_PARAMS = { id: 'id' } as const
 

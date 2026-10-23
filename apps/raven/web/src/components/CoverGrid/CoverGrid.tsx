@@ -12,6 +12,7 @@ import { ItemPoster, PosterImage } from '@/components/PosterImage/PosterImage'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { POSTER_SIZES } from '@/lib/posters'
+import { pageItemOf } from '@/lib/prefetchItem'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/CoverGrid/CoverGrid.module.scss'
 
@@ -27,7 +28,7 @@ const Cover = ({
 }: {
   entry: string
   title: string
-  link: Pick<ComponentProps<typeof CardLink>, 'to' | 'state'>
+  link: Pick<ComponentProps<typeof CardLink>, 'to' | 'state' | 'prefetchItem'>
   children: ReactNode
 }) => {
   const select = useSelectable({ key: entry, title })
@@ -64,7 +65,7 @@ export const MediaCovers = ({ items, posters }: { items: MediaItem[]; posters: b
         key={media.id}
         entry={mediaEntryKey(media)}
         title={cardTitle(media).title}
-        link={cardLink({ media, hasPages: true })}
+        link={{ ...cardLink({ media, hasPages: true }), prefetchItem: pageItemOf(media) }}
       >
         <PosterImage media={media} sizes={POSTER_SIZES.cover} />
       </Cover>
@@ -80,7 +81,7 @@ export const ShowCovers = ({ shows }: { shows: ShowEntry[] }) => (
         key={show.id}
         entry={showEntryKey(show)}
         title={show.title}
-        link={{ to: `/shows/${show.id}` }}
+        link={{ to: `/shows/${show.id}`, prefetchItem: show.id }}
       >
         <ItemPoster item={show} sizes={POSTER_SIZES.cover} />
       </Cover>

@@ -20,6 +20,13 @@ const LOCAL_API_ORIGIN = 'http://localhost:8484'
 const NETLIFY_VALUES = { on: 'true' } as const
 
 /**
+ * Netlify's Image CDN on the site's own origin. It fetches a relative
+ * picture through the `/api` proxy below, with no cookie or token, so only
+ * raven's capability pictures (`/api/pictures`) go through it.
+ */
+const NETLIFY_IMAGE_CDN = '/.netlify/images'
+
+/**
  * On Netlify (netlify.toml) the app is served apart from raven, so the build
  * writes a `_redirects` that proxies /api to RAVEN_API_ORIGIN, raven's public
  * address. The app still calls its own origin, which keeps the PIN and admin
@@ -87,6 +94,11 @@ const restartOnRavenEnv = (): Plugin => ({
 
 export default defineConfig(({ mode }) => ({
   plugins: [react(), netlifyApiProxy(), restartOnRavenEnv()],
+  define: {
+    'import.meta.env.VITE_PICTURE_CDN': JSON.stringify(
+      process.env[ENV.netlify] === NETLIFY_VALUES.on ? NETLIFY_IMAGE_CDN : '',
+    ),
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

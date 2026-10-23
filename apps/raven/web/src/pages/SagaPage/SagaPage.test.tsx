@@ -51,7 +51,7 @@ const RINGS: Saga = {
 }
 
 const backdropOf = ({ id, version }: { id: number; version: string }) =>
-  document.querySelector(`img[src*="/api/items/${id}/images/backdrop?v=${version}"]`)
+  document.querySelector(`img[src*="/api/pictures/items/${id}/backdrop/${version}"]`)
 
 describe('SagaPage', () => {
   const spies = {
@@ -152,7 +152,7 @@ describe('SagaPage', () => {
   it("fetches each movie's poster no wider than the saga's list shows it", async () => {
     open()
     await screen.findByRole('heading', { name: 'The Lord of the Rings Collection' })
-    const posters = [...document.querySelectorAll('img[src*="/images/poster"]')]
+    const posters = [...document.querySelectorAll('img[src*="/poster/"]')]
     expect(posters.map((poster) => poster.getAttribute('sizes'))).toEqual([
       POSTER_SIZES.movieTile,
       POSTER_SIZES.movieTile,

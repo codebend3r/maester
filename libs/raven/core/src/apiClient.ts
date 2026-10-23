@@ -111,6 +111,11 @@ import {
   isPlaybackSettingsState,
   isPosterEntries,
   MEDIA_PROBE_BYTES,
+  BACKDROP_OWN_WIDTH,
+  CDN_BACKDROP_WIDTHS,
+  CDN_POSTER_WIDTHS,
+  PICTURE_PARAMS,
+  PICTURE_PATHS,
   POSTER_OWN_WIDTH,
   POSTER_WIDTHS,
   isSagaBackdrop,
@@ -223,24 +228,76 @@ const subjectQuery = (subject: MatchSubject | null): Record<string, string> => {
   }
 }
 
+/**
+ * The capability address of an item's picture of `kind` at `version`,
+ * which it changes with, so it can be cached for good, by anyone.
+ */
+const itemPicturePath = ({
+  id,
+  kind,
+  version,
+}: {
+  id: number
+  kind: ItemImageKind
+  version: string
+}): string =>
+  PICTURE_PATHS.item
+    .replace(`:${PICTURE_PARAMS.id}`, String(id))
+    .replace(`:${PICTURE_PARAMS.kind}`, kind)
+    .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(version))
+
 export type ApiClient = ReturnType<typeof createApiClient>
 
 /**
  * Every call a client makes to the media server. `baseUrl` is '' for a web
  * app served by the server itself, or the server's origin for anything
  * running elsewhere (a native app, the Vite dev server behind a proxy).
+ * `pictureCdn` is the path of an image CDN on the page's own site, such as
+ * Netlify's `/.netlify/images`: capability pictures then go through it, which
+ * resizes them to the width asked and re-encodes them as AVIF or WebP at the
+ * edge, and keeps each one there for the next viewer.
  */
 export const createApiClient = ({
   baseUrl = '',
   fetch,
   accessToken = () => null,
+  pictureCdn = null,
 }: {
   baseUrl?: string
   fetch: FetchLike
   accessToken?: () => string | null
+  pictureCdn?: string | null
 }) => {
   const root = baseUrl.replace(/\/+$/, '')
   const url = (path: string): string => `${root}${path}`
+
+  /**
+   * A capability picture at `path`, narrowed to `width` when one is given:
+   * through the image CDN when there is one, else straight from the server,
+   * which keeps a poster at the fixed few `POSTER_WIDTHS`.
+   */
+  const pictureAt = ({ path, width }: { path: string; width?: number }): string => {
+    if (pictureCdn !== null) {
+      const query: Record<string, string> =
+        width === undefined ? { url: url(path) } : { url: url(path), w: String(width) }
+      return `${pictureCdn}?${toQueryString(query)}`
+    }
+    return width === undefined ? url(path) : `${url(path)}?${toQueryString({ w: String(width) })}`
+  }
+
+  /** `widths` as an `img`'s `srcset` of `path`, the widest, the picture's own, asked with no width. */
+  const pictureSrcSet = ({
+    path,
+    widths,
+    own,
+  }: {
+    path: string
+    widths: readonly number[]
+    own: number
+  }): string =>
+    widths
+      .map((width) => `${pictureAt(width === own ? { path } : { path, width })} ${width}w`)
+      .join(', ')
 
   /** A media path on the origin `access` names, with its ticket; on this server's own without. */
   const mediaUrl = ({
@@ -345,16 +402,10 @@ export const createApiClient = ({
   const thumbnailAt = ({ id, version }: { id: number; version: number }): string =>
     url(`/api/media/${id}/thumbnail?v=${version}`)
 
-  /** An item's picture of `kind` at `version`, which it changes with, so it can be cached for good. */
-  const itemImageAt = ({
-    id,
-    kind,
-    version,
-  }: {
-    id: number
-    kind: ItemImageKind
-    version: string
-  }): string => url(`/api/items/${id}/images/${kind}?${toQueryString({ v: version })}`)
+  const itemImageAt = (picture: Parameters<typeof itemPicturePath>[0]): string =>
+    pictureAt({ path: itemPicturePath(picture) })
+
+  const posterWidths: readonly number[] = pictureCdn === null ? POSTER_WIDTHS : CDN_POSTER_WIDTHS
 
   return {
     getAuthConfig: (): Promise<AuthConfig> =>
@@ -817,14 +868,31 @@ export const createApiClient = ({
      * null when it has none. The widest is `itemImageUrl`'s own URL, so a
      * card that shows it and the item's page share one download.
      */
-    posterSrcSet: ({ id, version }: { id: number; version: string | null }): string | null => {
-      if (version == null) return null
-      // Built once and widened by hand: a library lists thousands of posters.
-      const own = itemImageAt({ id, kind: ITEM_IMAGE_KINDS.poster, version })
-      return POSTER_WIDTHS.map((width) =>
-        width === POSTER_OWN_WIDTH ? `${own} ${width}w` : `${own}&w=${width} ${width}w`,
-      ).join(', ')
-    },
+    posterSrcSet: ({ id, version }: { id: number; version: string | null }): string | null =>
+      version == null
+        ? null
+        : pictureSrcSet({
+            path: itemPicturePath({ id, kind: ITEM_IMAGE_KINDS.poster, version }),
+            widths: posterWidths,
+            own: POSTER_OWN_WIDTH,
+          }),
+
+    /** The widths `posterSrcSet` lists, narrowest first: finer through an image CDN. */
+    posterWidths,
+
+    /**
+     * An item's backdrop at each width an image CDN makes of it, for an
+     * `img`'s `srcset` beside `itemImageUrl`'s; null with no CDN, where the
+     * server keeps a backdrop at its own width alone, or with no backdrop.
+     */
+    backdropSrcSet: ({ id, version }: { id: number; version: string | null }): string | null =>
+      version == null || pictureCdn === null
+        ? null
+        : pictureSrcSet({
+            path: itemPicturePath({ id, kind: ITEM_IMAGE_KINDS.backdrop, version }),
+            widths: CDN_BACKDROP_WIDTHS,
+            own: BACKDROP_OWN_WIDTH,
+          }),
 
     /** One of a saga's movies' backdrops; versioned, so cached for good. */
     sagaPictureUrl: (picture: SagaPicture): string =>
@@ -874,7 +942,11 @@ export const createApiClient = ({
     }): string | null =>
       photoVersion == null
         ? null
-        : url(`/api/people/${personId}/photo?${toQueryString({ v: photoVersion })}`),
+        : pictureAt({
+            path: PICTURE_PATHS.photo
+              .replace(`:${PICTURE_PARAMS.id}`, String(personId))
+              .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(photoVersion)),
+          }),
 
     /** A Fix match result's poster, through the server's image cache. */
     candidatePosterUrl: (poster: string | null): string | null =>

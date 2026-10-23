@@ -53,11 +53,11 @@ describe('FavouritesPage', () => {
       '/episodes/7?library=2',
     )
     expect(container.querySelector('img')?.getAttribute('src')).toContain(
-      '/api/items/5/images/poster',
+      '/api/pictures/items/5/poster',
     )
     expect(container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.grid)
     expect(container.querySelector('img')?.getAttribute('srcset')).toContain(
-      '/api/items/5/images/poster?v=p5&w=185 185w',
+      '/api/pictures/items/5/poster/p5?w=185 185w',
     )
     spy.mockRestore()
   })

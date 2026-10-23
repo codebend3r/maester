@@ -10,6 +10,7 @@ import {
   LIBRARY_KINDS,
   MEDIA_TICKET_PARAM,
   type MediaOrigin,
+  PICTURE_PATHS,
   createApiClient,
   isAuthRefusal,
 } from '@raven/core'
@@ -115,6 +116,8 @@ export const ROUTES = {
   mediaTicket: { method: GET, path: '/api/media/:id/ticket', account: approved },
   tracks: { method: GET, path: '/api/media/:id/tracks', account: approved },
   person: { method: GET, path: '/api/people/:id', account: approved },
+  itemPicture: { method: GET, path: PICTURE_PATHS.item, account: anyone },
+  photoPicture: { method: GET, path: PICTURE_PATHS.photo, account: anyone },
   personPhoto: { method: GET, path: '/api/people/:id/photo', account: approved },
   reviewAvatar: { method: GET, path: '/api/reviews/:id/avatar', account: approved },
   reportError: { method: POST, path: BUG_REPORT_PATHS.reports, account: approved },

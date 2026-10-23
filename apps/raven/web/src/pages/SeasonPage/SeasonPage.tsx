@@ -23,7 +23,7 @@ import {
   Dotted,
   ItemHeader,
   ItemHeaderSkeleton,
-  pictureBackdrop,
+  itemBackdrop,
 } from '@/components/ItemHeader/ItemHeader'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { RouteState } from '@/components/RouteState/RouteState'
@@ -171,9 +171,7 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
             shape: 'poster',
             url: api.itemImageUrl({ id: season.id, kind: 'poster', version: season.posterVersion }),
           }}
-          backdrop={pictureBackdrop(
-            api.itemImageUrl({ id: show.id, kind: 'backdrop', version: show.backdropVersion }),
-          )}
+          backdrop={itemBackdrop({ id: show.id, version: show.backdropVersion })}
         >
           {nextFile && (
             <ButtonLink tone="primary" icon="play" {...watchLink({ media: nextFile })}>

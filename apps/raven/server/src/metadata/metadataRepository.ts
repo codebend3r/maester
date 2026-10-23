@@ -22,7 +22,8 @@ import {
 import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
-import { ItemImagesRepository, lineOf, versionOf } from '@/metadata/itemImagesRepository'
+import { ItemImagesRepository, lineOf } from '@/metadata/itemImagesRepository'
+import { PictureVersions } from '@/metadata/pictureVersions'
 import { LOCAL } from '@/metadata/localItems'
 import type { ExternalScore, ScoreProvider, ScoreTitle } from '@/metadata/scoreSources'
 import type { FetchedItem, FetchedSaga, MovieExtras } from '@/metadata/tmdbClient'
@@ -158,10 +159,6 @@ export type StoredPerson = Pick<PersonDetails, 'id' | 'tmdbId' | 'name' | 'photo
   credits: LocalCredit[]
 }
 
-/** Changes whenever a person's TMDB photo does; null when they have none. */
-export const photoVersionOf = (photo: string | null): string | null =>
-  photo == null ? null : versionOf(`tmdb:${photo}`)
-
 const DAY_MS = 24 * 60 * 60 * 1000
 
 /** A person whose filmography was fetched this recently keeps their id with no credits left. */
@@ -206,6 +203,7 @@ export class MetadataRepository {
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(ItemImagesRepository) private readonly images: ItemImagesRepository,
+    @Inject(PictureVersions) private readonly pictureVersions: PictureVersions,
   ) {}
 
   private get db(): Sqlite.Database {
@@ -724,7 +722,7 @@ export class MetadataRepository {
       .map((row) => ({
         id: row.id,
         author: row.author,
-        avatarVersion: row.avatar == null ? null : versionOf(`tmdb:${row.avatar}`),
+        avatarVersion: this.pictureVersions.avatar({ id: row.id, avatar: row.avatar }),
         rating: row.rating,
         content: row.content,
         url: row.url,
@@ -929,7 +927,7 @@ export class MetadataRepository {
       id: row.id,
       tmdbId: row.tmdb_id,
       name: row.name,
-      photoVersion: photoVersionOf(row.photo),
+      photoVersion: this.pictureVersions.photo({ id: row.id, photo: row.photo }),
       credits: credits.flatMap((credit) => {
         const item = summaries.get(credit.item_id)
         return item && isCreditJob(credit.job)
@@ -968,7 +966,7 @@ export class MetadataRepository {
                 name: row.name,
                 job: row.job,
                 role: row.role,
-                photoVersion: photoVersionOf(row.photo),
+                photoVersion: this.pictureVersions.photo({ id: row.person_id, photo: row.photo }),
               },
             ]
           : [],

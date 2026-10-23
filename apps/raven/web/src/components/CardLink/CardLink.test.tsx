@@ -1,8 +1,10 @@
 import { describe, expect, it, spyOn } from 'bun:test'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom'
 import { CardLink } from '@/components/CardLink/CardLink'
+import { api } from '@/lib/api'
+import { queryClient } from '@/lib/queryClient'
 import { renderWithProviders } from '@/test/render'
 
 /** Prints how the page got where it is, where that is, and the state it was handed. */
@@ -42,6 +44,30 @@ const isLeftToTheBrowser = ({ link, init }: { link: HTMLElement; init: MouseEven
 }
 
 describe('CardLink', () => {
+  it("reads its item's page ahead once pointed at a moment, or focused, and not on a pass", async () => {
+    const getItem = spyOn(api, 'getItem').mockImplementation(() => new Promise(() => undefined))
+    renderLink({
+      link: (
+        <CardLink to="/movies/40" prefetchItem={40}>
+          Busboys
+        </CardLink>
+      ),
+    })
+    const link = screen.getByRole('link', { name: 'Busboys' })
+    fireEvent.pointerEnter(link)
+    fireEvent.pointerLeave(link)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(getItem).not.toHaveBeenCalled()
+    fireEvent.pointerEnter(link)
+    await waitFor(() => expect(getItem).toHaveBeenCalledWith(40))
+    getItem.mockClear()
+    queryClient.clear()
+    fireEvent.focus(link)
+    expect(getItem).toHaveBeenCalledWith(40)
+    getItem.mockRestore()
+    queryClient.clear()
+  })
+
   it('is a link to its address, wearing what it is given', () => {
     renderLink({
       link: (

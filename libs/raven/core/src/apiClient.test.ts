@@ -11,8 +11,12 @@ import {
 } from '@/apiClient'
 import { WEB_HOST_ERRORS } from '@/desktop/webHost'
 import {
+  BACKDROP_OWN_WIDTH,
   BUG_REPORT_STATUSES,
+  CDN_BACKDROP_WIDTHS,
+  CDN_POSTER_WIDTHS,
   DEFAULT_SAGA_BACKDROP,
+  POSTER_OWN_WIDTH,
   AUTH_CONFIG_STATES,
   AUTH_HEADERS,
   AUTH_PATHS,
@@ -773,20 +777,20 @@ describe('the metadata calls', () => {
   it('builds versioned image URLs, and none without a version', () => {
     const { client } = clientReturning(respond({}))
     expect(client.itemImageUrl({ id: 2, kind: 'poster', version: 'abc' })).toBe(
-      'http://nas:8484/api/items/2/images/poster?v=abc',
+      'http://nas:8484/api/pictures/items/2/poster/abc',
     )
     expect(client.itemImageUrl({ id: 2, kind: 'backdrop', version: null })).toBeNull()
     expect(client.libraryBackdropUrl({ type: 'item', id: 3, version: 'def' })).toBe(
-      'http://nas:8484/api/items/3/images/backdrop?v=def',
+      'http://nas:8484/api/pictures/items/3/backdrop/def',
     )
     expect(client.libraryBackdropUrl({ type: 'thumbnail', id: 8, version: 41 })).toBe(
       'http://nas:8484/api/media/8/thumbnail?v=41',
     )
     expect(client.sagaPictureUrl({ id: 4, version: 'ghi', title: 'Sintel' })).toBe(
-      'http://nas:8484/api/items/4/images/backdrop?v=ghi',
+      'http://nas:8484/api/pictures/items/4/backdrop/ghi',
     )
     expect(client.photoUrl({ personId: 5, photoVersion: 'x' })).toBe(
-      'http://nas:8484/api/people/5/photo?v=x',
+      'http://nas:8484/api/pictures/people/5/x',
     )
     expect(client.candidatePosterUrl('/abc.jpg')).toBe('http://nas:8484/api/images/poster/abc.jpg')
   })
@@ -810,12 +814,58 @@ describe('the metadata calls', () => {
     const { client } = clientReturning(respond({}))
     expect(client.posterSrcSet({ id: 2, version: 'abc' })).toBe(
       [
-        'http://nas:8484/api/items/2/images/poster?v=abc&w=185 185w',
-        'http://nas:8484/api/items/2/images/poster?v=abc&w=342 342w',
-        'http://nas:8484/api/items/2/images/poster?v=abc 500w',
+        'http://nas:8484/api/pictures/items/2/poster/abc?w=185 185w',
+        'http://nas:8484/api/pictures/items/2/poster/abc?w=342 342w',
+        'http://nas:8484/api/pictures/items/2/poster/abc 500w',
       ].join(', '),
     )
     expect(client.posterSrcSet({ id: 2, version: null })).toBeNull()
+    expect(client.backdropSrcSet({ id: 2, version: 'abc' })).toBeNull()
+  })
+
+  describe('through an image CDN', () => {
+    const client = createApiClient({
+      fetch: async () => respond({}),
+      pictureCdn: '/.netlify/images',
+    })
+    const at = ({ path, width }: { path: string; width?: number }): string =>
+      `/.netlify/images?url=${encodeURIComponent(path)}${width === undefined ? '' : `&w=${width}`}`
+
+    it('sends every capability picture through it, at its own width', () => {
+      expect(client.itemImageUrl({ id: 2, kind: 'poster', version: 'abc' })).toBe(
+        at({ path: '/api/pictures/items/2/poster/abc' }),
+      )
+      expect(client.photoUrl({ personId: 5, photoVersion: 'x' })).toBe(
+        at({ path: '/api/pictures/people/5/x' }),
+      )
+    })
+
+    it('leaves the pictures only an account may see on the server', () => {
+      expect(client.libraryBackdropUrl({ type: 'thumbnail', id: 8, version: 41 })).toBe(
+        '/api/media/8/thumbnail?v=41',
+      )
+      expect(client.candidatePosterUrl('/abc.jpg')).toBe('/api/images/poster/abc.jpg')
+    })
+
+    it('lists a poster at each of its finer widths, the widest at its own URL', () => {
+      const path = '/api/pictures/items/2/poster/abc'
+      expect(client.posterWidths).toEqual(CDN_POSTER_WIDTHS)
+      expect(client.posterSrcSet({ id: 2, version: 'abc' })).toBe(
+        CDN_POSTER_WIDTHS.map(
+          (width) => `${at(width === POSTER_OWN_WIDTH ? { path } : { path, width })} ${width}w`,
+        ).join(', '),
+      )
+    })
+
+    it('lists a backdrop at each width, the widest at its own URL', () => {
+      const path = '/api/pictures/items/3/backdrop/def'
+      expect(client.backdropSrcSet({ id: 3, version: 'def' })).toBe(
+        CDN_BACKDROP_WIDTHS.map(
+          (width) => `${at(width === BACKDROP_OWN_WIDTH ? { path } : { path, width })} ${width}w`,
+        ).join(', '),
+      )
+      expect(client.backdropSrcSet({ id: 3, version: null })).toBeNull()
+    })
   })
 })
 

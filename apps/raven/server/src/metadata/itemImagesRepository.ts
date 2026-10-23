@@ -1,12 +1,8 @@
-import { createHash } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import { IMAGE_SOURCES, ITEM_IMAGE_KINDS, type ItemImageKind } from '@raven/core'
 import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
-
-/** A short stable tag for a picture's source, so its URL changes exactly when the picture does. */
-export const versionOf = (ref: string): string =>
-  createHash('sha1').update(ref).digest('base64url').slice(0, 11)
+import { PictureVersions } from '@/metadata/pictureVersions'
 
 /** `chosen` is what Edit images picked, a TMDB path; it beats a local picture, which beats TMDB's own. */
 export const STORED_IMAGE_SOURCES = { ...IMAGE_SOURCES, chosen: 'chosen' } as const
@@ -39,7 +35,10 @@ const toImageSource = (source: string): StoredImageSource =>
  */
 @Injectable()
 export class ItemImagesRepository {
-  constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
+  constructor(
+    @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(PictureVersions) private readonly pictureVersions: PictureVersions,
+  ) {}
 
   private get db(): Sqlite.Database {
     return this.database.db
@@ -146,7 +145,15 @@ export class ItemImagesRepository {
       (versions, row) =>
         versions.has(row.item_id)
           ? versions
-          : versions.set(row.item_id, versionOf(`${row.source}:${row.ref}`)),
+          : versions.set(
+              row.item_id,
+              this.pictureVersions.item({
+                id: row.item_id,
+                kind,
+                source: row.source,
+                ref: row.ref,
+              }),
+            ),
       new Map<number, string>(),
     )
   }

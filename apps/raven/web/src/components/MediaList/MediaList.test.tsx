@@ -108,7 +108,7 @@ describe('MediaList', () => {
     const movies = renderWithProviders({ ui: <MediaList movies items={[matchedMovie()]} /> })
     await reported()
     const poster = movies.container.querySelector('tbody img')
-    expect(poster).toHaveAttribute('src', '/api/items/40/images/poster?v=p1')
+    expect(poster).toHaveAttribute('src', '/api/pictures/items/40/poster/p1')
     expect(poster).toHaveAttribute('sizes', POSTER_SIZES.list)
     expect(poster?.closest('a')).toHaveAttribute('tabindex', '-1')
     movies.unmount()

@@ -103,12 +103,12 @@ describe('EpisodePage', () => {
 
   it("lies under its season's backdrop, which is its show's, and under its still for a show with none", async () => {
     const backdrop = () =>
-      document.querySelector<HTMLImageElement>('img[alt=""][src*="/images/"]')?.src ?? ''
+      document.querySelector<HTMLImageElement>('img[alt=""][src*="/api/pictures/"]')?.src ?? ''
     open({ show: { ...SEVERANCE, backdropVersion: 'b4' } })
-    await waitFor(() => expect(backdrop()).toContain('/api/items/4/images/backdrop?v=b4'))
+    await waitFor(() => expect(backdrop()).toContain('/api/pictures/items/4/backdrop/b4'))
     cleanup()
     open({ show: { ...SEVERANCE, backdropVersion: null } })
-    await waitFor(() => expect(backdrop()).toContain('/api/items/7/images/still?v=still1'))
+    await waitFor(() => expect(backdrop()).toContain('/api/pictures/items/7/still/still1'))
   })
 
   it('plays from its still', async () => {
