@@ -1,10 +1,11 @@
 import { create } from 'zustand'
 
 /**
- * The card another screen was opened from, by its place on this one. It lasts through the
- * screen being covered once, so the card can take the focus back as the screen returns.
+ * The card another screen was opened from, by its place on this one, and whether that card is
+ * drawn: its shelf can go while the screen is covered. It lasts through the screen being covered
+ * once, so the card can take the focus back as the screen returns.
  */
-type Opener = { card: string; hasBeenCovered: boolean }
+type Opener = { card: string; isDrawn: boolean; hasBeenCovered: boolean }
 
 /** What one screen keeps of the remote's focus, on a TV. */
 type ScreenFocus = {
@@ -46,7 +47,25 @@ export const settleScreen = ({ screen }: { screen: string }): void => {
 
 /** The card at `card` opens another screen; it takes the focus back when this one returns. */
 export const rememberOpener = ({ screen, card }: { screen: string; card: string }): void =>
-  change({ screen, to: { hasSettled: true, opener: { card, hasBeenCovered: false } } })
+  change({
+    screen,
+    to: { hasSettled: true, opener: { card, isDrawn: true, hasBeenCovered: false } },
+  })
+
+/** The card at `card` is drawn, or goes (`isDrawn`); only the opener's own card counts. */
+export const drawCard = ({
+  screen,
+  card,
+  isDrawn,
+}: {
+  screen: string
+  card: string
+  isDrawn: boolean
+}): void => {
+  const opener = openerOf({ screen })
+  if (opener === null || opener.card !== card || opener.isDrawn === isDrawn) return
+  change({ screen, to: { opener: { ...opener, isDrawn } } })
+}
 
 /** Hands the opener back once, and only to the card it names: true for that card, then never. */
 export const takeOpener = ({ screen, card }: { screen: string; card: string }): boolean => {
@@ -67,6 +86,20 @@ export const coverScreen = ({ screen }: { screen: string }): void => {
     screen,
     to: { opener: opener.hasBeenCovered ? null : { ...opener, hasBeenCovered: true } },
   })
+}
+
+/**
+ * The transition that brings the screen back to the front has ended (the navigator's
+ * `transitionEnd`, which `AppRoot` hears). An opener whose card is no longer drawn (its shelf
+ * went while the screen was covered) has nothing to take the focus back to, so the screen gives
+ * its opening focus again rather than leave the remote on nothing, as Android TV would. It waits
+ * for the transition's end, since on Android TV the transition takes the focus from anything
+ * asked for before then.
+ */
+export const returnScreen = ({ screen }: { screen: string }): void => {
+  const opener = openerOf({ screen })
+  if (opener === null || opener.isDrawn) return
+  change({ screen, to: { hasSettled: false, opener: null } })
 }
 
 /** Forgets a screen that has gone, so one opened in its place starts afresh. */

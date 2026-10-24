@@ -1,5 +1,7 @@
 appId: io.github.codebend3r.raven.app
 name: A library opens from its Home shelf and sorts the ways its type allows
+tags:
+  - touch
 ---
 - runFlow: signIn.yaml
 - extendedWaitUntil:

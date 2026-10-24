@@ -1,5 +1,7 @@
 appId: io.github.codebend3r.raven.app
 name: A search from Home finds a title and opens it, and a library searches its own
+tags:
+  - touch
 ---
 - runFlow: signIn.yaml
 - extendedWaitUntil:

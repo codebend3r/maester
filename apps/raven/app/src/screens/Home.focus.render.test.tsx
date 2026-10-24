@@ -289,4 +289,26 @@ describe('Home on a TV', () => {
     await returnToTestScreen()
     expect(askedFor()).toEqual([])
   })
+
+  // Android TV restores no focus as a screen comes back, so with the card gone nothing on Home
+  // would have it.
+  it('gives Home its opening focus again when the card a screen was opened from has gone', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    // Busboys under Continue watching opens; while its page covers Home, the spot is cleared.
+    await fireEvent(screen.getAllByRole('button')[2]!, NATIVE_EVENTS.focus)
+    await fireEvent.press(screen.getAllByRole('button')[0]!)
+    await leaveTestScreen()
+    mockHome.home = { ...HOME, inProgress: [] }
+    await act(async () => shown.client.invalidateQueries())
+    await untilIdle(shown.client)
+    await waitFor(() =>
+      expect(screen.queryByRole('header', { name: 'Continue watching' })).toBeNull(),
+    )
+    expect(preferred()).toEqual([])
+
+    await returnToTestScreen()
+    expect(askedFor()).toEqual([])
+    expect(preferred()).toEqual([BUSBOYS])
+  })
 })

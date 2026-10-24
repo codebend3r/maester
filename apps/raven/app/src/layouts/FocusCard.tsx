@@ -1,17 +1,21 @@
 import { type ComponentRef, useRef, useState } from 'react'
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
+import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture } from '@/layouts/Card'
 import { useOpenerFocus } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import { NOTHING_ON_FOCUS } from '@/layouts/tvControls'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { COLOURS } from '@/theme/appTheme'
+import { TV_SIZES, tvSize } from '@/theme/tvSizes'
 
 /** A card's width in points on a 1920 by 1080 point screen, read from across the room. */
 export const FOCUS_CARD_WIDTHS = { [CARD_SHAPES.poster]: 232, [CARD_SHAPES.wide]: 400 } as const
+
+/** A card's width on this TV: its width on a 1920 point screen, sized to this one. */
+export const focusCardWidthOf = (shape: CardShape): number => tvSize(FOCUS_CARD_WIDTHS[shape])
 
 /** How much the focused card grows. */
 const FOCUS_SCALE = 1.08
@@ -23,7 +27,7 @@ const EASE_OUT = Easing.bezier(0.2, 0.8, 0.2, 1)
 
 /** How tall a focus card's caption stands, from its picture's foot: its title, then its line. */
 export const focusCaptionHeightOf = (fontScale: number): number =>
-  SIZES.space3 + linesHeightOf({ sizes: [SIZES.textLg, SIZES.text], fontScale })
+  TV_SIZES.space3 + linesHeightOf({ sizes: [TV_SIZES.textLg, TV_SIZES.text], fontScale })
 
 /**
  * A card the remote moves to, on a shelf or in a grid: it grows and takes the ring while
@@ -91,7 +95,12 @@ export const FocusCard = ({
       }}
     >
       <Animated.View style={[styles.card, { width, transform: [{ scale }] }]}>
-        <CardPicture card={card} ring={isFocused ? SIZES.tvFocusRing : 0} width={width} />
+        <CardPicture
+          card={card}
+          radius={TV_SIZES.radius}
+          ring={isFocused ? TV_SIZES.tvFocusRing : 0}
+          width={width}
+        />
         <View>
           <Text numberOfLines={1} style={[styles.title, isFocused && styles.focusedTitle]}>
             {card.title}
@@ -108,13 +117,13 @@ export const FocusCard = ({
 }
 
 const styles = StyleSheet.create({
-  card: { gap: SIZES.space3 },
+  card: { gap: TV_SIZES.space3 },
   title: {
     color: COLOURS.muted,
-    fontSize: SIZES.textLg,
-    lineHeight: SIZES.textLg * LINE_RATIO,
+    fontSize: TV_SIZES.textLg,
+    lineHeight: TV_SIZES.textLg * LINE_RATIO,
     fontWeight: '600',
   },
   focusedTitle: { color: COLOURS.text },
-  line: { color: COLOURS.muted, fontSize: SIZES.text, lineHeight: SIZES.text * LINE_RATIO },
+  line: { color: COLOURS.muted, fontSize: TV_SIZES.text, lineHeight: TV_SIZES.text * LINE_RATIO },
 })

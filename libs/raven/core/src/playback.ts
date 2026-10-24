@@ -1,5 +1,6 @@
 import {
   DIRECT_PLAYS,
+  HLS_COPY_AUDIO_CODECS,
   type MediaItem,
   PLAYBACK_MODES,
   type PlaybackMode,
@@ -50,10 +51,20 @@ const CODEC_LABELS: Record<string, string> = {
 }
 
 /** ffprobe's names for the containers the clients' play tables name. */
-export const CONTAINERS = { mp4: 'mp4', mov: 'mov' } as const
+export const CONTAINERS = { mp4: 'mp4', mov: 'mov', mkv: 'mkv', webm: 'webm' } as const
 
 /** ffprobe's `codec_name` for the video codecs the server and the clients' play tables treat apart. */
-export const VIDEO_CODECS = { h264: 'h264', hevc: 'hevc' } as const
+export const VIDEO_CODECS = { h264: 'h264', hevc: 'hevc', av1: 'av1', vp9: 'vp9' } as const
+
+/** ffprobe's `codec_name` for the audio codecs the clients' play tables name: those HLS copies, and more. */
+export const AUDIO_CODECS = {
+  ...HLS_COPY_AUDIO_CODECS,
+  mp3: 'mp3',
+  opus: 'opus',
+  vorbis: 'vorbis',
+  dts: 'dts',
+  truehd: 'truehd',
+} as const
 
 export const codecLabel = (codec: string | null): string =>
   codec == null ? 'Unknown' : (CODEC_LABELS[codec] ?? codec.toUpperCase())

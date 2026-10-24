@@ -38,6 +38,13 @@ import { planFor } from '@/platform/playbackPlan'
 import { mediaSourcesFor } from '@/player/mediaSources'
 import { progressSinkFor, watchAppHide } from '@/player/progressSink'
 import {
+  AUDIO_HEARINGS,
+  type AudioHearing,
+  type HeardAudio,
+  hearAudio,
+  isAudioDropped,
+} from '@/player/droppedAudio'
+import {
   SUBTITLE_CHOICES,
   audioOptionsOf,
   audioPlaceFor,
@@ -47,6 +54,7 @@ import {
 import {
   SESSION_EVENTS,
   SESSION_PHASES,
+  hasWayBelow,
   modeOf,
   noticeOf,
   sourcedOf,
@@ -201,13 +209,27 @@ const Playing = ({
     }
   }, [refusal])
 
+  // ExoPlayer may play the original without the audio asked for, saying nothing: once the pick
+  // has settled, a play with a way left below steps down when it did.
+  const heardAudio = useRef<HeardAudio | null>(null)
+  const hear = (hearing: AudioHearing) => {
+    const { heard, toJudge } = hearAudio({ heard: heardAudio.current, hearing })
+    heardAudio.current = heard
+    if (toJudge === null || state.phase !== SESSION_PHASES.playing || !hasWayBelow(state)) return
+    if (isAudioDropped({ platform: DEVICE_PLATFORM, mode, place: audioPlace, reported: toJudge })) {
+      dispatch({ type: SESSION_EVENTS.failed, attempt: hearing.attempt, at: position.current })
+    }
+  }
+
+  // A seek before the video has loaded is lost by the player, so it is not taken at all.
   const seek = (to: number) => {
     const current = player.current
-    if (current === null) return
+    if (current === null || state.phase !== SESSION_PHASES.playing) return
     const target = Math.min(Math.max(0, to), duration ?? to)
     current.seek(target)
     position.current = target
     dispatchVideo({ type: VIDEO_EVENTS.sought, time: target })
+    hear({ type: AUDIO_HEARINGS.sought, attempt: state.attempt, clock: target })
   }
 
   const togglePlay = () => {
@@ -251,7 +273,10 @@ const Playing = ({
             dispatchVideo({ type: VIDEO_EVENTS.ended })
           },
           onError: () => dispatch({ type: SESSION_EVENTS.failed, attempt, at: position.current }),
-          onLoad: ({ duration: length }) => {
+          onAudioTracks: ({ audioTracks }) =>
+            hear({ type: AUDIO_HEARINGS.tracks, attempt, reported: audioTracks }),
+          onLoad: ({ duration: length, audioTracks }) => {
+            hear({ type: AUDIO_HEARINGS.loaded, attempt, reported: audioTracks, place: audioPlace })
             if (length > 0) setDuration(length)
             dispatchVideo({ type: VIDEO_EVENTS.duration, duration: length > 0 ? length : null })
             dispatch({ type: SESSION_EVENTS.loaded, attempt })
@@ -261,6 +286,7 @@ const Playing = ({
           onProgress: ({ currentTime }) => {
             position.current = currentTime
             dispatchVideo({ type: VIDEO_EVENTS.moved, time: currentTime, buffered: [] })
+            hear({ type: AUDIO_HEARINGS.moved, attempt, clock: currentTime })
           },
           paused: isPaused,
           progressUpdateInterval: PROGRESS_EVERY_MS,

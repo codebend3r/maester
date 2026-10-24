@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import type { KeyboardTypeOptions } from 'react-native'
 
+import type { FormStyles } from '@/layouts/formStyles'
+
 export type FormProps = { title: string; children: ReactNode }
 
 export type FieldProps = {
@@ -31,11 +33,15 @@ export type FormButtonProps = {
   isDisabled?: boolean
 }
 
-/** A form's pieces, which each platform lays out and drives its own way. */
+/**
+ * A form's pieces, which each platform lays out and drives its own way, and its styles at the
+ * platform's scale, whose lines (`note`, `notice`, `error`) the screens draw.
+ */
 export type FormKit = {
   Form: (props: FormProps) => ReactNode
   Field: (props: FieldProps) => ReactNode
   FormButton: (props: FormButtonProps) => ReactNode
+  formStyles: FormStyles
 }
 
 /** The keyboard a field opens: digits for a PIN, plain for a password, a web address's otherwise. */

@@ -14,16 +14,19 @@ export const pictureHeightOf = ({ shape, width }: { shape: CardShape; width: num
 /**
  * A card's picture: its poster, backdrop or frame grab, else its title's first letter, with
  * where playback stopped along its foot. `ring` draws the focus ring just outside it, as
- * the web's `:focus-visible` outline does, in the theme's focus colour.
+ * the web's `:focus-visible` outline does, in the theme's focus colour. `radius` rounds its
+ * corners: the web's `--radius-md`, which a TV sizes to its screen.
  */
 export const CardPicture = ({
   card,
   width,
   ring = 0,
+  radius = SIZES.radius,
 }: {
   card: Pick<ShelfCard, 'title' | 'shape' | 'picture' | 'progress'>
   width: number
   ring?: number
+  radius?: number
 }) => {
   // What failed is the picture with those headers: with new cookies it is asked for again.
   const [failed, setFailed] = useState<string | null>(null)
@@ -33,7 +36,7 @@ export const CardPicture = ({
   const outset = -2 * ring
   return (
     <View style={{ width, height }}>
-      <View style={styles.frame}>
+      <View style={[styles.frame, { borderRadius: radius }]}>
         {picture !== null ? (
           <Image
             key={pictureKey}
@@ -57,7 +60,7 @@ export const CardPicture = ({
             styles.ring,
             {
               borderWidth: ring,
-              borderRadius: SIZES.radius - outset,
+              borderRadius: radius - outset,
               top: outset,
               right: outset,
               bottom: outset,
@@ -76,7 +79,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLOURS.raised,
-    borderRadius: SIZES.radius,
     overflow: 'hidden',
   },
   initial: { color: COLOURS.muted, fontWeight: 'bold' },

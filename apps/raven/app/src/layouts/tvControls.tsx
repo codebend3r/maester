@@ -1,28 +1,109 @@
-import { type AccessibilityRole, Pressable, StyleSheet, Text } from 'react-native'
+import { type ComponentRef, useRef, useState } from 'react'
+import {
+  type AccessibilityRole,
+  Pressable,
+  type StyleProp,
+  StyleSheet,
+  Text,
+  TextInput,
+  type TextInputProps,
+  View,
+  type ViewStyle,
+} from 'react-native'
 
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { useFocusOnMount } from '@/layouts/focus'
+import { tvFormStyles } from '@/layouts/formStyles'
+import { COLOURS } from '@/theme/appTheme'
+import { TV_SIZES } from '@/theme/tvSizes'
 
 /** What a TV control does on focus unless told more: nothing beyond its own ring or growth. */
 export const NOTHING_ON_FOCUS = (): void => undefined
 
 /** The round end of tvOS's focused field plate: half the field's height. */
-const PLATE_END = SIZES.controlLarge / 2
+const PLATE_END = TV_SIZES.controlLarge / 2
 
 /**
  * A TV text field's frame and the input inside it. tvOS draws a focused text field as its own
  * raised plate with round ends. The input runs past the frame by those ends, which the frame
- * clips, so what shows has the frame's corners, the radius every other control has.
+ * clips, so what shows has the frame's corners, the radius every other control has. Android's
+ * text input pads itself top and bottom, which would stand it taller than the plate buttons
+ * beside it, so the input sets its own.
  */
-export const tvFieldStyles = StyleSheet.create({
-  frame: { minHeight: SIZES.controlLarge, overflow: 'hidden', paddingHorizontal: 0 },
+const tvFieldStyles = StyleSheet.create({
+  frame: { minHeight: TV_SIZES.controlLarge, overflow: 'hidden', paddingHorizontal: 0 },
   input: {
     color: COLOURS.text,
-    fontSize: SIZES.textLg,
-    minHeight: SIZES.controlLarge,
+    fontSize: TV_SIZES.textLg,
+    minHeight: TV_SIZES.controlLarge,
+    paddingVertical: 0,
     marginHorizontal: -PLATE_END,
-    paddingHorizontal: PLATE_END + SIZES.space2,
+    paddingHorizontal: PLATE_END + TV_SIZES.space2,
   },
 })
+
+/**
+ * A text field the remote selects, which opens the platform's own keyboard. The keyboard reports
+ * the text back as it is typed; leaving it with Menu cancels the edit, and the native field goes
+ * back to what it held, but no change is reported, so the field takes the text it ends editing
+ * with as the truth. `isPreferred` gives it the remote as it is drawn, so a screen never opens
+ * with nothing focused: Android's text input has no preferred focus, and its own `focus()`
+ * opens the keyboard, so the frame asks, and the focus goes on to the input inside it.
+ */
+export const TvTextField = ({
+  label,
+  value,
+  onChangeText,
+  onSubmit,
+  isPreferred,
+  onFocused = NOTHING_ON_FOCUS,
+  frameStyle,
+  ...input
+}: {
+  label: string
+  value: string
+  onChangeText: (text: string) => void
+  onSubmit: (text: string) => void
+  isPreferred: boolean
+  onFocused?: () => void
+  frameStyle?: StyleProp<ViewStyle>
+} & Pick<
+  TextInputProps,
+  'placeholder' | 'placeholderTextColor' | 'keyboardType' | 'returnKeyType' | 'secureTextEntry'
+>) => {
+  const [isFocused, setFocused] = useState(false)
+  const frame = useRef<ComponentRef<typeof View>>(null)
+  useFocusOnMount({ view: frame, isAsked: isPreferred })
+  return (
+    <View
+      ref={frame}
+      collapsable={false}
+      style={[
+        tvFormStyles.input,
+        tvFieldStyles.frame,
+        frameStyle,
+        isFocused && tvFormStyles.focused,
+      ]}
+    >
+      <TextInput
+        {...input}
+        accessibilityLabel={label}
+        autoCapitalize="none"
+        autoCorrect={false}
+        hasTVPreferredFocus={isPreferred}
+        onBlur={() => setFocused(false)}
+        onChangeText={onChangeText}
+        onEndEditing={({ nativeEvent }) => onChangeText(nativeEvent.text)}
+        onFocus={() => {
+          setFocused(true)
+          onFocused()
+        }}
+        onSubmitEditing={({ nativeEvent }) => onSubmit(nativeEvent.text)}
+        style={tvFieldStyles.input}
+        value={value}
+      />
+    </View>
+  )
+}
 
 /**
  * A TV control's plate: the quiet fill, at least as wide as it is tall, whose edge turns to
@@ -30,18 +111,18 @@ export const tvFieldStyles = StyleSheet.create({
  */
 export const plateStyles = StyleSheet.create({
   plate: {
-    minWidth: SIZES.controlLarge,
-    minHeight: SIZES.controlLarge,
+    minWidth: TV_SIZES.controlLarge,
+    minHeight: TV_SIZES.controlLarge,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: SIZES.space3,
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.tvFocusRing,
+    paddingHorizontal: TV_SIZES.space3,
+    borderRadius: TV_SIZES.radius,
+    borderWidth: TV_SIZES.tvFocusRing,
     borderColor: COLOURS.quiet,
     backgroundColor: COLOURS.quiet,
   },
   focused: { borderColor: COLOURS.text },
-  label: { color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: '600' },
+  label: { color: COLOURS.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
 })
 
 /**

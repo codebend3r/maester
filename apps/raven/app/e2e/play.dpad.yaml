@@ -1,0 +1,88 @@
+appId: io.github.codebend3r.raven.app
+name: The remote plays a film from Home, skips ahead, and Back leaves it under Continue watching
+tags:
+  - dpad
+---
+- runFlow: signIn.yaml
+# Home opens with the remote on the film, its first card.
+- extendedWaitUntil:
+    visible:
+      text: Kestrel Point
+      focused: true
+    timeout: 30000
+# A run stopped part way can leave the film under Continue watching, so the flow clears it
+# first, and then nothing is being watched.
+- runFlow:
+    when:
+      visible: Continue watching
+    commands:
+      - runFlow: steps/clearSpot.dpad.yaml
+      # The card the page was opened from went with its shelf, so Home gives its opening
+      # focus again, to the film on its own shelf.
+      - extendedWaitUntil:
+          visible:
+            text: Kestrel Point
+            focused: true
+          timeout: 10000
+- assertNotVisible: Continue watching
+# Select opens the film's page with the remote on Play.
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: Play
+      focused: true
+    timeout: 30000
+- assertVisible: Mark watched
+# The film is an MKV, which plays through the server's HLS remux under raven's own controls.
+# They fade once it has played untouched for a few seconds, which says frames are flowing.
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible: Show the controls
+    timeout: 60000
+# The remote's play and pause key pauses wherever the focus is, and the controls come back
+# and stay while it is paused, with the remote on the line.
+- pressKey: Remote Media Play Pause
+- extendedWaitUntil:
+    visible: Play
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      text: Position, .*
+      focused: true
+    timeout: 10000
+# Paused, right on the line skips ten seconds ahead of the spot it reads out.
+- copyTextFrom:
+    text: Position, .*
+    focused: true
+- evalScript: ${output.ahead = ((said) => { const spot = said.match(/(\d+):(\d\d) of/); if (spot === null) { throw new Error("The line read out " + said + ", not a spot of a length"); } const seconds = Number(spot[1]) * 60 + Number(spot[2]) + 10; return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'); })(maestro.copiedText)}
+- pressKey: Remote Dpad Right
+- extendedWaitUntil:
+    visible:
+      text: Position, ${output.ahead} of .*
+      focused: true
+    timeout: 10000
+# Back leaves the player for the page, which offers to resume from the spot it skipped to.
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Resume from ${output.ahead}
+      focused: true
+    timeout: 30000
+# Back again returns to Home, where the film now sits under Continue watching, and the remote
+# is back on the card the page was opened from, on the films' own shelf below.
+- pressKey: Back
+- extendedWaitUntil:
+    visible: Continue watching
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: Kestrel Point
+      focused: true
+      below: Films
+    timeout: 10000
+# Clearing the spot leaves the fixture as it was found, with the remote still on the film's
+# card on its own shelf.
+- runFlow: steps/clearSpot.dpad.yaml
+- assertVisible:
+    text: Kestrel Point
+    focused: true

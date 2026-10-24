@@ -1,5 +1,7 @@
 appId: io.github.codebend3r.raven.app
 name: A film plays from its page under raven's controls, and Back returns to the page
+tags:
+  - touch
 ---
 - runFlow: signIn.yaml
 - extendedWaitUntil:

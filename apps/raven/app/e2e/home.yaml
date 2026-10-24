@@ -8,5 +8,17 @@ name: Home shows the fixture's locked movie once signed in
     visible: Kestrel Point
     timeout: 30000
 - assertVisible: Films
+# On a TV the series' shelf can sit below the screen, under Continue watching, so the remote
+# moves down to it.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - repeat:
+          while:
+            notVisible: Lantern Bay
+          times: 3
+          commands:
+            - pressKey: Remote Dpad Down
 - assertVisible: Series
 - assertVisible: Lantern Bay

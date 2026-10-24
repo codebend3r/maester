@@ -6,6 +6,7 @@ import { focusItem } from '@/layouts/ItemLayout.focus'
 import { touchItem } from '@/layouts/ItemLayout.touch'
 import { touchGrid } from '@/layouts/Grid.touch'
 import { focusPicker } from '@/layouts/Picker.focus'
+import { dpadPlayerChrome } from '@/layouts/PlayerChrome.dpad'
 import { focusPlayerChrome } from '@/layouts/PlayerChrome.focus'
 import { focusSearch } from '@/layouts/Search.focus'
 import { touchSearch } from '@/layouts/Search.touch'
@@ -14,11 +15,14 @@ import { focusShelf } from '@/layouts/Shelf.focus'
 import { touchShelf } from '@/layouts/Shelf.touch'
 import { touchForm } from '@/layouts/Form.touch'
 import { touchPlayerChrome } from '@/layouts/PlayerChrome.touch'
+import type { PlayerChromeKit } from '@/layouts/playerKit'
+import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
+import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 
 export { BUTTON_TONES } from '@/layouts/formKit'
 
 /** The form a screen asks for: driven by focus on a TV, by touch everywhere else. */
-export const { Form, Field, FormButton } = Platform.isTV ? focusForm : touchForm
+export const { Form, Field, FormButton, formStyles } = Platform.isTV ? focusForm : touchForm
 
 /** Home's shelves: rows the remote moves along on a TV, rows under the thumb everywhere else. */
 export const { Shelves, Shelf } = Platform.isTV ? focusShelf : touchShelf
@@ -46,10 +50,16 @@ export const { ItemLayout, ItemNotice } = Platform.isTV ? focusItem : touchItem
 export const { SearchField, SearchLayout } = Platform.isTV ? focusSearch : touchSearch
 
 /**
- * The player's controls: the system's own transport on a TV, which the remote drives and whose
- * panel lists the stream's renditions; raven's own over the video under the thumb, with the
- * subtitle cues raven draws itself. Android TV takes the TV's until it has controls of its own.
+ * Each platform's player controls, the one layout that differs between the two TVs: Apple TV's
+ * system transport, which the Siri Remote drives and whose panel lists the stream's renditions;
+ * raven's own under the d-pad on Android TV and under the thumb on iPhones and iPads, both with
+ * the subtitle cues raven draws itself.
  */
-export const { PlayerChrome, shouldDrawCaptions } = Platform.isTV
-  ? focusPlayerChrome
-  : touchPlayerChrome
+const PLAYER_CHROMES: Record<AppPlatform, PlayerChromeKit> = {
+  [APP_PLATFORMS.ios]: touchPlayerChrome,
+  [APP_PLATFORMS.tvos]: focusPlayerChrome,
+  [APP_PLATFORMS.androidTv]: dpadPlayerChrome,
+}
+
+/** The player's controls, and whether raven draws the subtitles under them, for this device. */
+export const { PlayerChrome, shouldDrawCaptions } = PLAYER_CHROMES[DEVICE_PLATFORM]
