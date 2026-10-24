@@ -103,6 +103,19 @@ The device app's build, prebuild and e2e targets are cached by Nx (their inputs 
 
 Then `bun run app:e2e`. A cold Maestro driver can start slowly; set `MAESTRO_DRIVER_STARTUP_TIMEOUT=300000` if it times out. Maestro cannot drive tvOS, so only the iPhone flows run locally. Stop the fixture server when done.
 
+To run one flow, call Maestro directly: `maestro test apps/raven/app/e2e/<flow>.yaml`. To iterate on the flows, build iOS once and rerun `bun run app:e2e` with the fixture server up.
+
+### The Apple device PR jobs, locally
+
+The two jobs (`app-tvos` and `app-ios` in `.github/workflows/pull-request-checks.yml`, which run in parallel in CI) need macOS and Xcode, so neither Docker nor `act` can run them; run their steps by hand with `APP_VARIANT=development`. Beyond the e2e steps above they also check the pods and launch the tvOS build:
+
+1. `bunx nx run @raven/app:build:tvos`, then `cd apps/raven/app/ios && grep -q 'SDKROOT = appletvos' raven.xcodeproj/project.pbxproj && cmp Podfile.lock Pods/Manifest.lock`. `expo prebuild` exits 0 when `pod install` fails, so this check is the only thing that catches it.
+2. Create, boot, install and launch on an Apple TV 4K simulator (`xcrun simctl create raven-tv com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K "$runtime"`, with `runtime` from `xcrun simctl list -j runtimes tvOS`), `sleep 10`, then confirm `xcrun simctl spawn "$device" launchctl list` shows `io.github.codebend3r.raven.app` with a pid, not `-`.
+3. `bunx nx run @raven/app:build:ios`, then `cmp Podfile.lock Pods/Manifest.lock` in `apps/raven/app/ios`.
+4. The fixture server, iPhone simulator and `bun run app:e2e` steps above.
+
+`prebuild` runs `expo prebuild --clean`, which regenerates `ios/` on every build, so never hand edit it. The builds compile arm64 only (`ARCHS=arm64`), so they need an Apple Silicon Mac, and each takes several minutes cold; later local builds reuse `apps/raven/app/build/`. A `raven-phone` or `raven-tv` simulator left over from `dev:ios` or `dev:tvos` clashes with the `simctl create` names, so delete it (`xcrun simctl delete raven-phone`) first.
+
 ## 4. Read the failure
 
 Nx ends with a `Failed tasks:` list. Rerun just one to see its output: `bunx nx run <project>:<target> --skip-nx-cache` (for example `bunx nx run @luwin/api:lint:py --skip-nx-cache`).

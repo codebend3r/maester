@@ -91,39 +91,18 @@ jobs:
       - name: 📦 Install
         run: bun install --frozen-lockfile
 
-      # ruff format, and oxfmt for each project and the root files.
-      - name: 🎨 Format check
-        run: bun run format:check
-
-      # tsc for every TypeScript project, without emitting.
-      - name: 🔎 Typecheck
-        run: bun run typecheck
-
-      # typos over the whole repo, dotfiles included.
-      - name: 🔤 Spellcheck
-        run: bun run spellcheck
-
-      # ruff, oxlint and gale.
-      - name: 🧹 Lint
-        run: bun run lint
-
-      # pytest, vitest and bun test. raven's server and core tests encode real
-      # clips with ffmpeg. `static` keeps every test's output; Nx's CI default
-      # collapses the passing ones to a line.
-      - name: 🧪 Unit tests
-        run: bun run test --outputStyle=static
-
-      # knip: no unused file, export, type or dependency. Then no module class
-      # that no TSX reads.
-      - name: 🪦 Dead code
-        run: |
-          bun run dead-code
-          bun run dead-css
-
-      # jest-expo for the device app's tests that render a native component, which
-      # `bun test` cannot load. They run on the agents like the unit tests.
-      - name: 📱 Screen tests
-        run: bun run test:screens --outputStyle=static
+      # Every check but the build, in one Nx run so the agents work through the whole task
+      # graph at once instead of idling at the end of each check: ruff format and oxfmt,
+      # tsc without emitting, typos over the whole repo (dotfiles included), ruff, oxlint
+      # and gale, pytest, vitest and bun test (raven's server and core tests encode real
+      # clips with ffmpeg), jest-expo for the device app's tests that render a native
+      # component, which `bun test` cannot load, and knip (no unused file, export, type or
+      # dependency) with the check that every module class is read by a TSX. `static` keeps
+      # every test's output; Nx's CI default collapses the passing ones to a line.
+      - name: 🧪 Checks and tests
+        run: >-
+          bunx nx run-many --outputStyle=static
+          -t format:check typecheck spellcheck lint:py lint:ts lint:css test test:screens dead-code dead-css
 
       # Every project's build. The agents stay up until this target is done
       # (.nx/ci-config.yaml), so a new step goes before it.
@@ -184,6 +163,27 @@ jobs:
       - name: 🔩 Build the native pieces
         uses: ./.github/actions/raven-desktop-native
 
+      # What the app and playback jobs load: the addon and its dylibs, and the source-built
+      # ffmpeg that makes the playback clips. A tar keeps ffmpeg's execute bit, which an
+      # artifact drops. Packed and uploaded before the audit below, so the jobs that load it
+      # start while the audit runs; this job still has to pass for the gate to.
+      - name: 📦 Pack the playback handoff
+        run: >-
+          tar -cf "$RUNNER_TEMP/raven-native-handoff.tar"
+          libs/raven/mpv/resources/darwin-arm64
+          libs/raven/mpv/native-build/prefix/bin/ffmpeg
+
+      # Only the jobs below read it, so it lives for a day.
+      - name: 📤 Playback handoff
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-native-handoff-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/raven-native-handoff.tar
+          if-no-files-found: error
+          retention-days: 1
+          # A re-run of this job replaces the handoff its first attempt left.
+          overwrite: true
+
       # Both only read the built resources, so Nx runs them at once. test:native is
       # cached, keyed on the native sources, the build recipe and the Xcode version.
       - name: 🔎 Audit native resources and run the real headless libmpv tests
@@ -206,26 +206,6 @@ jobs:
           name: raven-native-sources-${{ github.event.pull_request.head.sha }}
           path: libs/raven/mpv/native-build/source-bundle
           if-no-files-found: error
-
-      # What the app and playback jobs load: the addon and its dylibs, and the source-built
-      # ffmpeg that makes the playback clips. A tar keeps ffmpeg's execute bit, which an
-      # artifact drops.
-      - name: 📦 Pack the playback handoff
-        run: >-
-          tar -cf "$RUNNER_TEMP/raven-native-handoff.tar"
-          libs/raven/mpv/resources/darwin-arm64
-          libs/raven/mpv/native-build/prefix/bin/ffmpeg
-
-      # Only the jobs below read it, so it lives for a day.
-      - name: 📤 Playback handoff
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-native-handoff-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/raven-native-handoff.tar
-          if-no-files-found: error
-          retention-days: 1
-          # A re-run of this job replaces the handoff its first attempt left.
-          overwrite: true
 
   # Forge bundles the addon and libmpv (stage:mpv), so this waits for the native build.
   desktop-app:
@@ -358,7 +338,7 @@ jobs:
 
   # Whether this PR touches raven's device app, what it imports (core and ui, through
   # Nx's graph), the server its flows sign in to, or this workflow. The app jobs below are
-  # two cold React Native builds each, so they run only then; the 🖥️ Desktop gate takes
+  # cold React Native builds, so they run only then; the 🖥️ Desktop gate takes
   # their skip as a pass.
   app-affected:
     name: 🔍 App affected
@@ -401,17 +381,104 @@ jobs:
             echo "affected=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # raven's device app for iPhone, iPad and Apple TV: both simulator builds, a launch on
-  # the Apple TV simulator, and the Maestro flows on the iPhone simulator against a real
-  # raven server. Maestro's driver installs only on iPhone and iPad, so the Apple TV gets
-  # the launch check instead.
-  app-apple:
-    name: 📱 App on Apple devices
+  # raven's device app on Apple TV: the simulator build and a launch on the Apple TV
+  # simulator. Maestro's driver installs only on iPhone and iPad, so the Apple TV gets
+  # the launch check instead. It runs beside app-ios, on its own runner, since the two
+  # builds share nothing.
+  app-tvos:
+    name: 📺 App on Apple TV
     needs: app-affected
     if: needs.app-affected.outputs.affected == 'true'
     runs-on: macos-26
-    # Two Release builds of React Native from cold (neither is cached) and the flows.
-    timeout-minutes: 90
+    # One Release build of React Native from cold (it is not cached) and a launch.
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+    steps:
+      # The PR's head commit, so the artifact name below matches the commit that was built.
+      - name: 📥 Checkout exact PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # Bun's version comes from `packageManager` in package.json.
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 🟩 Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.APP_NODE_VERSION }}
+
+      # CocoaPods' downloaded specs and sources, keyed on the lockfile that pins the pods'
+      # versions. `expo prebuild --clean` rebuilds ios/ and Pods/, so only the downloads
+      # are worth keeping.
+      - name: 🗃️ CocoaPods cache
+        uses: actions/cache@v6
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: cocoapods-${{ runner.os }}-tvos-${{ hashFiles('bun.lock', 'apps/raven/app/package.json') }}
+
+      # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      # Runs `prebuild:tvos` first (bun runs it before `build:tvos`), which regenerates
+      # ios/ and installs the pods, so the pods are checked right after.
+      - name: 📺 Build for the Apple TV simulator
+        run: bunx nx run @raven/app:build:tvos
+
+      # `expo prebuild` exits 0 when `pod install` fails, so the pods are checked by hand:
+      # CocoaPods writes Pods/Manifest.lock as a copy of Podfile.lock once it has installed.
+      - name: 🔎 Check the Apple TV pods
+        working-directory: apps/raven/app/ios
+        run: |
+          grep -q 'SDKROOT = appletvos' raven.xcodeproj/project.pbxproj
+          cmp Podfile.lock Pods/Manifest.lock
+
+      # A fresh Apple TV 4K on the runner's newest tvOS runtime, booted, with the build
+      # launched on it: ten seconds later launchd must still list the app with a pid, not
+      # the `-` of one that exited. The screenshot goes up with the artifact.
+      - name: 🚬 Launch on the Apple TV simulator
+        run: |
+          runtime="$(xcrun simctl list -j runtimes tvOS | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')"
+          device="$(xcrun simctl create raven-tv com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K "$runtime")"
+          xcrun simctl boot "$device"
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl install "$device" apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app
+          xcrun simctl launch "$device" io.github.codebend3r.raven.app
+          sleep 10
+          xcrun simctl io "$device" screenshot "$RUNNER_TEMP/raven-tv.png"
+          xcrun simctl spawn "$device" launchctl list | grep -E '^[0-9]+[[:space:]].*UIKitApplication:io\.github\.codebend3r\.raven\.app'
+          xcrun simctl shutdown "$device"
+
+      # The build zipped as Finder would, which keeps the execute bits an artifact drops,
+      # so the unzipped app still launches.
+      - name: 📦 Pack the simulator app
+        run: ditto -c -k --keepParent apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app "$RUNNER_TEMP/raven-appletvsimulator.zip"
+
+      # The build, for trying the PR's app by hand on a simulator, and the launch's screenshot.
+      - name: 📤 Simulator app
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-app-tvos-simulator-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/raven-appletvsimulator.zip
+            ${{ runner.temp }}/raven-tv.png
+          if-no-files-found: error
+
+  # raven's device app on iPhone and iPad: the simulator build and the Maestro flows on
+  # the iPhone simulator against a real raven server.
+  app-ios:
+    name: 📱 App on iPhone and iPad
+    needs: app-affected
+    if: needs.app-affected.outputs.affected == 'true'
+    runs-on: macos-26
+    # One Release build of React Native from cold (it is not cached) and the flows.
+    timeout-minutes: 60
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       HOMEBREW_NO_AUTO_UPDATE: '1'
@@ -440,39 +507,53 @@ jobs:
       - name: 🎞️ Install ffmpeg
         run: brew install ffmpeg
 
+      # CocoaPods' downloaded specs and sources, keyed on the lockfile that pins the pods'
+      # versions. `expo prebuild --clean` rebuilds ios/ and Pods/, so only the downloads
+      # are worth keeping.
+      - name: 🗃️ CocoaPods cache
+        uses: actions/cache@v6
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: cocoapods-${{ runner.os }}-ios-${{ hashFiles('bun.lock', 'apps/raven/app/package.json') }}
+
       # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
       - name: 📦 Install
         run: bun install --frozen-lockfile
 
-      # Each build runs its prebuild first (bun runs `prebuild:tvos` before `build:tvos`),
-      # which regenerates ios/ and installs the pods, so the pods are checked right after.
-      - name: 📺 Build for the Apple TV simulator
-        run: bunx nx run @raven/app:build:tvos
+      # The fixture server, the simulator's boot and Maestro's download do not depend on
+      # the build, so they start before it and finish while it compiles. Each runs in the
+      # background; the steps after the build wait for them. The fixture server prints its
+      # ready line once its libraries are scanned.
+      - name: 🗄️ Start the fixture server
+        run: bunx nx run @raven/server:serve:fixture > "$RUNNER_TEMP/fixture.log" 2>&1 &
 
-      # `expo prebuild` exits 0 when `pod install` fails, so the pods are checked by hand:
-      # CocoaPods writes Pods/Manifest.lock as a copy of Podfile.lock once it has installed.
-      - name: 🔎 Check the Apple TV pods
-        working-directory: apps/raven/app/ios
+      # A fresh iPhone 16 on the runner's newest iOS runtime. `simctl boot` returns at once
+      # and CoreSimulator boots it in the background; the wait step below blocks on it.
+      - name: 📱 Boot the iPhone simulator
         run: |
-          grep -q 'SDKROOT = appletvos' raven.xcodeproj/project.pbxproj
-          cmp Podfile.lock Pods/Manifest.lock
-
-      # A fresh Apple TV 4K on the runner's newest tvOS runtime, booted, with the build
-      # launched on it: ten seconds later launchd must still list the app with a pid, not
-      # the `-` of one that exited. The screenshot goes up with the artifacts.
-      - name: 🚬 Launch on the Apple TV simulator
-        run: |
-          runtime="$(xcrun simctl list -j runtimes tvOS | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')"
-          device="$(xcrun simctl create raven-tv com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K "$runtime")"
+          runtime="$(xcrun simctl list -j runtimes iOS | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')"
+          device="$(xcrun simctl create raven-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
           xcrun simctl boot "$device"
-          xcrun simctl bootstatus "$device" -b
-          xcrun simctl install "$device" apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app
-          xcrun simctl launch "$device" io.github.codebend3r.raven.app
-          sleep 10
-          xcrun simctl io "$device" screenshot "$RUNNER_TEMP/raven-tv.png"
-          xcrun simctl spawn "$device" launchctl list | grep -E '^[0-9]+[[:space:]].*UIKitApplication:io\.github\.codebend3r\.raven\.app'
-          xcrun simctl shutdown "$device"
+          echo "SIMULATOR=$device" >> "$GITHUB_ENV"
 
+      # Maestro's own release, the zip its Homebrew formula installs, pinned by version and
+      # checksum. It runs on the runner's Java. The download runs in the background and
+      # leaves `maestro.ok` or `maestro.failed` for the wait step.
+      - name: 🎭 Install Maestro
+        env:
+          MAESTRO_VERSION: 2.11.0
+          MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
+        run: |
+          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
+          (
+            set -e
+            curl -fsSL -o "$RUNNER_TEMP/maestro.zip" "https://github.com/mobile-dev-inc/maestro/releases/download/cli-$MAESTRO_VERSION/maestro.zip"
+            echo "$MAESTRO_SHA256  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c -
+            unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"
+          ) > "$RUNNER_TEMP/maestro.log" 2>&1 && touch "$RUNNER_TEMP/maestro.ok" || touch "$RUNNER_TEMP/maestro.failed" &
+
+      # Runs `prebuild:ios` first (bun runs it before `build:ios`), which regenerates ios/
+      # and installs the pods, so the pods are checked right after.
       - name: 📱 Build for the iPhone and iPad simulator
         run: bunx nx run @raven/app:build:ios
 
@@ -480,11 +561,16 @@ jobs:
         working-directory: apps/raven/app/ios
         run: cmp Podfile.lock Pods/Manifest.lock
 
-      # A real raven server with a locked film library and an open series library, in the
-      # background for the flows. It prints its ready line once its libraries are scanned.
-      - name: 🗄️ Start the fixture server
+      - name: ⏳ Wait for the iPhone simulator
+        run: xcrun simctl bootstatus "$SIMULATOR" -b
+
+      - name: 📲 Install the build on the iPhone simulator
+        run: xcrun simctl install "$SIMULATOR" apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
+
+      # A real raven server with a locked film library and an open series library, started
+      # above for the flows.
+      - name: 🗄️ Wait for the fixture server
         run: |
-          bunx nx run @raven/server:serve:fixture > "$RUNNER_TEMP/fixture.log" 2>&1 &
           for _ in $(seq 1 90); do
             if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
               grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
@@ -495,26 +581,18 @@ jobs:
           cat "$RUNNER_TEMP/fixture.log"
           exit 1
 
-      # A fresh iPhone 16 on the runner's newest iOS runtime, booted, with the build on it.
-      - name: 📱 Boot the iPhone simulator
+      - name: 🎭 Wait for Maestro
         run: |
-          runtime="$(xcrun simctl list -j runtimes iOS | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')"
-          device="$(xcrun simctl create raven-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
-          xcrun simctl boot "$device"
-          xcrun simctl bootstatus "$device" -b
-          xcrun simctl install "$device" apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
-
-      # Maestro's own release, the zip its Homebrew formula installs, pinned by version and
-      # checksum. It runs on the runner's Java.
-      - name: 🎭 Install Maestro
-        env:
-          MAESTRO_VERSION: 2.11.0
-          MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
-        run: |
-          curl -fsSL -o "$RUNNER_TEMP/maestro.zip" "https://github.com/mobile-dev-inc/maestro/releases/download/cli-$MAESTRO_VERSION/maestro.zip"
-          echo "$MAESTRO_SHA256  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c -
-          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
+          for _ in $(seq 1 90); do
+            test -f "$RUNNER_TEMP/maestro.ok" && exit 0
+            if test -f "$RUNNER_TEMP/maestro.failed"; then
+              cat "$RUNNER_TEMP/maestro.log"
+              exit 1
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/maestro.log"
+          exit 1
 
       # Every flow in `apps/raven/app/e2e`, each signing in with the PIN and the admin password
       # first. A fresh runner can start Maestro's XCTest driver slower than it waits by default,
@@ -535,23 +613,17 @@ jobs:
             ${{ runner.temp }}/fixture.log
           if-no-files-found: ignore
 
-      # Each simulator build zipped as Finder would, which keeps the execute bits an
-      # artifact drops, so the unzipped app still launches.
-      - name: 📦 Pack the simulator apps
-        run: |
-          ditto -c -k --keepParent apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app "$RUNNER_TEMP/raven-appletvsimulator.zip"
-          ditto -c -k --keepParent apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app "$RUNNER_TEMP/raven-iphonesimulator.zip"
+      # The build zipped as Finder would, which keeps the execute bits an artifact drops,
+      # so the unzipped app still launches.
+      - name: 📦 Pack the simulator app
+        run: ditto -c -k --keepParent apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app "$RUNNER_TEMP/raven-iphonesimulator.zip"
 
-      # Both simulator builds, for trying the PR's app by hand on a simulator, and the
-      # Apple TV launch's screenshot.
-      - name: 📤 Simulator apps
+      # The build, for trying the PR's app by hand on a simulator.
+      - name: 📤 Simulator app
         uses: actions/upload-artifact@v7
         with:
-          name: raven-app-simulators-${{ github.event.pull_request.head.sha }}
-          path: |
-            ${{ runner.temp }}/raven-appletvsimulator.zip
-            ${{ runner.temp }}/raven-iphonesimulator.zip
-            ${{ runner.temp }}/raven-tv.png
+          name: raven-app-ios-simulator-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/raven-iphonesimulator.zip
           if-no-files-found: error
 
   # raven's device app for Android TV, on Linux (Ruling 20): GitHub's macOS arm64 runners
@@ -613,11 +685,20 @@ jobs:
           if-no-files-found: error
 
   # The "Protect main" ruleset requires a check named 🖥️ Desktop, so this one stands
-  # for every desktop and device app job and passes only when all of them did. The two
+  # for every desktop and device app job and passes only when all of them did. The
   # app jobs may also be skipped, when the PR leaves the app alone (app-affected).
   desktop:
     name: 🖥️ Desktop
-    needs: [desktop-native, desktop-app, desktop-playback, app-affected, app-apple, app-android-tv]
+    needs:
+      [
+        desktop-native,
+        desktop-app,
+        desktop-playback,
+        app-affected,
+        app-tvos,
+        app-ios,
+        app-android-tv,
+      ]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -630,7 +711,7 @@ jobs:
           REQUIRED: >-
             ${{ needs.desktop-native.result }} ${{ needs.desktop-app.result }}
             ${{ needs.desktop-playback.result }} ${{ needs.app-affected.result }}
-          APP_RESULTS: ${{ needs.app-apple.result }} ${{ needs.app-android-tv.result }}
+          APP_RESULTS: ${{ needs.app-tvos.result }} ${{ needs.app-ios.result }} ${{ needs.app-android-tv.result }}
         run: |
           echo "$RESULTS"
           for result in $REQUIRED; do

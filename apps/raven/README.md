@@ -535,7 +535,7 @@ xcrun simctl install booted apps/raven/app/build/ios/Build/Products/Release-ipho
 bun run app:e2e
 ```
 
-Maestro's driver installs only on iPhone and iPad simulators, so the flows run on an iPhone; the Apple TV build gets a launch check instead. In the PR checks, the `📱 App on Apple devices` job builds both, launches the Apple TV build, and runs the flows against the fixture server; `📺 App on Android TV` builds the APK. Both stand behind `🖥️ Desktop`.
+Maestro's driver installs only on iPhone and iPad simulators, so the flows run on an iPhone; the Apple TV build gets a launch check instead. In the PR checks, two jobs run side by side on their own runners: `📺 App on Apple TV` builds the Apple TV simulator app and launches it, and `📱 App on iPhone and iPad` builds the iPhone app and runs the flows against the fixture server; `📺 App on Android TV` builds the APK. All three stand behind `🖥️ Desktop`.
 
 ## Layout
 
