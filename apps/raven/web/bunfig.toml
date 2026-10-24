@@ -1,4 +1,8 @@
 [test]
+# The default 5s is too tight for the typing-heavy page tests when --parallel and
+# coverage share a small CI runner, and a late timeout also leaks an unhandled
+# Testing Library error into the next test.
+timeout = 20000
 # happy-dom must register the DOM before test-setup imports Testing Library,
 # network replaces its fetch so no test reaches for a server, eventSource
 # and mediaError stand in for the EventSource and MediaError happy-dom

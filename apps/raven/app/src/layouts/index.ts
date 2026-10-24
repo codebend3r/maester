@@ -12,6 +12,7 @@ import { touchPicker } from '@/layouts/Picker.touch'
 import { focusShelf } from '@/layouts/Shelf.focus'
 import { touchShelf } from '@/layouts/Shelf.touch'
 import { touchForm } from '@/layouts/Form.touch'
+import { touchPlayerChrome } from '@/layouts/PlayerChrome.touch'
 
 export { BUTTON_TONES } from '@/layouts/formKit'
 
@@ -42,3 +43,10 @@ export const { ItemLayout, ItemNotice } = Platform.isTV ? focusItem : touchItem
  * remote selects, on a TV; a field over results under the thumb everywhere else.
  */
 export const { SearchField, SearchLayout } = Platform.isTV ? focusSearch : touchSearch
+
+/**
+ * The player's controls: raven's own over the video under the thumb. Apple TV's system
+ * transport and Android TV's d-pad controls come with their own players (PR 7 and PR 8), so
+ * until then every platform draws these.
+ */
+export const { PlayerChrome } = touchPlayerChrome

@@ -1,0 +1,39 @@
+appId: io.github.codebend3r.raven.app
+name: A film plays from its page under raven's controls, and Back returns to the page
+---
+- runFlow: signIn.yaml
+- extendedWaitUntil:
+    visible: Kestrel Point
+    timeout: 30000
+- tapOn: Kestrel Point
+- extendedWaitUntil:
+    visible: Mark watched
+    timeout: 30000
+- tapOn: Play
+# The film is an MKV, which plays through the server's HLS remux. The controls show while it
+# starts, and a pause keeps them up.
+- extendedWaitUntil:
+    visible: Pause
+    timeout: 60000
+- tapOn: Pause
+- extendedWaitUntil:
+    visible: Play
+    timeout: 10000
+- assertVisible: Position
+- assertVisible: Back 10 seconds
+- assertVisible: Forward 10 seconds
+- tapOn: Back
+- extendedWaitUntil:
+    visible: Mark watched
+    timeout: 30000
+# The spot saved on the pause is cleared by a mark, and taking the mark off again leaves the
+# film as the fixture had it, never started.
+- tapOn: Mark watched
+- extendedWaitUntil:
+    visible: Watched
+    timeout: 10000
+- tapOn: Watched
+- extendedWaitUntil:
+    visible: Mark watched
+    timeout: 10000
+- assertVisible: Play

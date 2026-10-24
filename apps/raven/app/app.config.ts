@@ -53,8 +53,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       package: APP_ID,
       versionCode: buildNumber,
     },
-    // config-tv acts only when EXPO_TV=1, which the TV prebuild scripts set.
-    plugins: ['expo-router', '@react-native-tvos/config-tv', 'react-native-video'],
+    plugins: [
+      'expo-router',
+      // config-tv acts only when EXPO_TV=1, which the TV prebuild scripts set.
+      '@react-native-tvos/config-tv',
+      // Picture in Picture needs the audio background mode. The player still pauses when the
+      // app leaves the screen without it (`playInBackground` off): this is video.
+      ['react-native-video', { enableBackgroundAudio: true }],
+    ],
   }
   return isDevelopment ? withCleartextTraffic(app) : app
 }

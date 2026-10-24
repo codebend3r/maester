@@ -12,7 +12,7 @@ const card = (key: string): ShelfCard => ({
   shape: CARD_SHAPES.poster,
   picture: null,
   progress: 0,
-  target: { kind: ROUTE_TARGETS.play, mediaId: 1 },
+  target: { kind: ROUTE_TARGETS.play, mediaId: 1, at: 0 },
 })
 
 const section = ({

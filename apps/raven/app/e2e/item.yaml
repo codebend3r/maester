@@ -21,15 +21,6 @@ name: A title opens from Home, marks watched and back, and a show leads to its e
 - extendedWaitUntil:
     visible: Mark watched
     timeout: 10000
-# Play goes to the player's route, which says it is still to come.
-- tapOn: Play
-- extendedWaitUntil:
-    visible: Playing in the app is on its way. Until then, play this on the web.
-    timeout: 10000
-- tapOn: Back
-- extendedWaitUntil:
-    visible: Mark watched
-    timeout: 10000
 - tapOn: Back
 # A show lists its seasons, and a season its episodes, each opening its page.
 - extendedWaitUntil:

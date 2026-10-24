@@ -12,7 +12,8 @@ export const APP_ROUTES = {
 /**
  * The params the routes carry, as `useLocalSearchParams` reads them: the ids their file names
  * hold, an item page's library and file, which ride in its query as the web's `?library=`
- * and `?file=` do, and the search a library opens on, as the web's `?q=`.
+ * and `?file=` do, the search a library opens on, as the web's `?q=`, and the spot the player
+ * starts at, as the desktop's play link's `?at=`.
  */
 export const APP_ROUTE_PARAMS = {
   id: 'id',
@@ -20,6 +21,7 @@ export const APP_ROUTE_PARAMS = {
   file: 'file',
   mediaId: 'mediaId',
   query: 'q',
+  at: 'at',
 } as const
 
 /** Each route's name as its navigator knows it: its file under `app/`, without the extension. */
@@ -44,7 +46,12 @@ export type RouteTarget =
       /** The file the page's Play starts, for a card a movie was split onto; null otherwise. */
       fileId: number | null
     }
-  | { kind: typeof ROUTE_TARGETS.play; mediaId: number }
+  | {
+      kind: typeof ROUTE_TARGETS.play
+      mediaId: number
+      /** Where to start, in seconds, as Resume says; 0 starts where the server last saved. */
+      at: number
+    }
   | {
       kind: typeof ROUTE_TARGETS.library
       libraryId: number
@@ -85,7 +92,10 @@ export const hrefOf = (target: RouteTarget): Href => {
     case ROUTE_TARGETS.play:
       return {
         pathname: APP_ROUTES.play,
-        params: { [APP_ROUTE_PARAMS.mediaId]: String(target.mediaId) },
+        params: {
+          [APP_ROUTE_PARAMS.mediaId]: String(target.mediaId),
+          ...paramOf({ name: APP_ROUTE_PARAMS.at, value: target.at > 0 ? target.at : null }),
+        },
       }
     case ROUTE_TARGETS.library:
       return {
@@ -100,4 +110,10 @@ export const hrefOf = (target: RouteTarget): Href => {
       return unknown
     }
   }
+}
+
+/** A spot in seconds a route param names; 0, the server's own spot, for anything but one. */
+export const secondsOf = (param: unknown): number => {
+  const seconds = typeof param === 'string' ? Number(param) : Number.NaN
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : 0
 }

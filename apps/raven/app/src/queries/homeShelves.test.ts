@@ -124,13 +124,13 @@ describe('homeShelvesOf', () => {
         shape: CARD_SHAPES.wide,
         picture: { uri: `${NAS.origin}/api/media/30/thumbnail?v=3`, headers: COOKIE },
         line: '2m',
-        target: { kind: ROUTE_TARGETS.play, mediaId: 30 },
+        target: { kind: ROUTE_TARGETS.play, mediaId: 30, at: 0 },
       },
       {
         shape: CARD_SHAPES.wide,
         picture: null,
         line: null,
-        target: { kind: ROUTE_TARGETS.play, mediaId: 31 },
+        target: { kind: ROUTE_TARGETS.play, mediaId: 31, at: 0 },
       },
     ])
   })

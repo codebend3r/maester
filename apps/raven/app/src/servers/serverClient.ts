@@ -6,7 +6,12 @@ import EventSource from 'react-native-sse'
 
 import { allowlistedFetch } from '@/servers/allowlist'
 import { createCookieJar } from '@/servers/cookieJar'
-import { APP_STATES, eventSourceFor, isForegroundState } from '@/servers/eventSource'
+import {
+  APP_STATES,
+  APP_STATE_EVENTS,
+  eventSourceFor,
+  isForegroundState,
+} from '@/servers/eventSource'
 import type { SecretStore } from '@/servers/secretStore'
 import { serverFetchFor } from '@/servers/serverFetch'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
@@ -37,8 +42,6 @@ const headersFor = async ({
   url: string
 }): Promise<Record<string, string>> =>
   cookieHeadersFor({ server, cookies: await cookieJar.read(server.id) })(url)
-
-const APP_STATE_EVENTS = { change: 'change' } as const
 
 /** The server's event stream, over `react-native-sse`, with its cookies, kept open while the app is. */
 export const openEventsFor = (server: AppServer) =>

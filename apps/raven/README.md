@@ -208,7 +208,7 @@ Playback resumes where you stopped; reaching the library's **Watched at** (95% b
 
 ### HLS for native players
 
-Players without Media Source Extensions, AVPlayer on Apple TV and iPhone and ExoPlayer on Android TV, get the same remux or transcode as HLS. The routes are on the media plane, so a media ticket (`?t=`) opens them, and every URI a playlist names carries the request's ticket:
+Players without Media Source Extensions, AVPlayer on Apple TV and iPhone and ExoPlayer on Android TV, get the same remux or transcode as HLS. The routes are on the media plane, so a media ticket (`?t=`) opens them, as it opens `file` and `stream`: an account ticket under accounts `ready`, the HMAC ticket only when accounts are `off`. Every URI a playlist names carries the request's ticket:
 
 | Route | What it answers |
 | --- | --- |
@@ -535,7 +535,7 @@ xcrun simctl install booted apps/raven/app/build/ios/Build/Products/Release-ipho
 bun run app:e2e
 ```
 
-Maestro's driver installs only on iPhone and iPad simulators, so the flows run on an iPhone; the Apple TV build gets a launch check instead. In the PR checks, the `📱 App on Apple devices` job builds both, launches the Apple TV build, and runs the flows against the fixture server; `📺 App on Android TV` builds the APK. Both stand behind `🖥️ Desktop`.
+Maestro's driver installs only on iPhone and iPad simulators, so the flows run on an iPhone; the Apple TV build gets a launch check instead. In the PR checks, two jobs run side by side on their own runners: `📺 App on Apple TV` builds the Apple TV simulator app and launches it, and `📱 App on iPhone and iPad` builds the iPhone app and runs the flows against the fixture server; `📺 App on Android TV` builds the APK. All three stand behind `🖥️ Desktop`.
 
 ## Layout
 

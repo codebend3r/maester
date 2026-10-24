@@ -1,0 +1,193 @@
+import { describe, expect, it } from 'bun:test'
+import { ACCESS_REFUSALS, type AccessRefusal, PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
+
+import {
+  SESSION_COPY,
+  SESSION_EVENTS,
+  SESSION_PHASES,
+  type SessionState,
+  hasWayBelow,
+  initialSession,
+  modeOf,
+  noticeOf,
+  sessionReducer,
+  sourcedOf,
+} from '@/player/usePlaybackSession'
+import type { SourceOutcome } from '@/servers/mediaAccess'
+
+const { direct, remux, transcode } = PLAYBACK_MODES
+const LADDER: readonly PlaybackMode[] = [direct, remux, transcode]
+const RESUME_AT = 3000
+const MKV_PROBLEM = "The MKV container isn't supported here."
+
+const SOURCED: SourceOutcome = {
+  ok: true,
+  source: { uri: 'http://nas:8080/api/media/20/file', headers: {} },
+}
+
+const LOCKED: AccessRefusal = {
+  ok: false,
+  reason: ACCESS_REFUSALS.locked,
+  message: "This video's library on nas:8080 is locked.",
+}
+
+const opened = ({
+  modes = LADDER,
+  at = RESUME_AT,
+  problems = [],
+}: {
+  modes?: readonly PlaybackMode[]
+  at?: number
+  problems?: readonly string[]
+} = {}): SessionState => initialSession({ modes, at, audio: null, problems })
+
+/** The attempt a state is on, which events for it must name. */
+const attemptOf = (state: SessionState): number =>
+  state.phase === SESSION_PHASES.failed ? -1 : state.attempt
+
+const sourced = (state: SessionState): SessionState =>
+  sessionReducer(state, {
+    type: SESSION_EVENTS.sourced,
+    attempt: attemptOf(state),
+    outcome: SOURCED,
+  })
+
+const loaded = (state: SessionState): SessionState =>
+  sessionReducer(state, { type: SESSION_EVENTS.loaded, attempt: attemptOf(state) })
+
+const failed = ({ state, at }: { state: SessionState; at: number }): SessionState =>
+  sessionReducer(state, { type: SESSION_EVENTS.failed, attempt: attemptOf(state), at })
+
+describe('the playback ladder', () => {
+  it("starts at the plan's first mode, from the resume spot, asking for its source", () => {
+    const state = opened()
+    expect(state).toMatchObject({ phase: SESSION_PHASES.sourcing, at: RESUME_AT, attempt: 0 })
+    expect(modeOf(state)).toBe(direct)
+  })
+
+  it('reloads the remux from the same spot when direct play fails', () => {
+    const playing = loaded(sourced(opened()))
+    expect(playing.phase).toBe(SESSION_PHASES.playing)
+    const next = failed({ state: playing, at: 3125.5 })
+    expect(next).toMatchObject({ phase: SESSION_PHASES.sourcing, at: 3125.5, attempt: 1 })
+    expect(modeOf(next)).toBe(remux)
+  })
+
+  it('goes to the transcode when the server refuses the remux, as its 409 does', () => {
+    const next = failed({ state: sourced(opened({ modes: [remux, transcode] })), at: RESUME_AT })
+    expect(modeOf(next)).toBe(transcode)
+    expect(next).toMatchObject({ phase: SESSION_PHASES.sourcing, at: RESUME_AT })
+  })
+
+  it('steps down when the player has not loaded in time, and only for the load it timed', () => {
+    const loading = sourced(opened())
+    const stale = sessionReducer(loading, { type: SESSION_EVENTS.timedOut, attempt: 7 })
+    expect(stale).toBe(loading)
+    const next = sessionReducer(loading, {
+      type: SESSION_EVENTS.timedOut,
+      attempt: attemptOf(loading),
+    })
+    expect(modeOf(next)).toBe(remux)
+    expect(next).toMatchObject({ at: RESUME_AT, attempt: 1 })
+    const playing = loaded(sourced(opened()))
+    expect(
+      sessionReducer(playing, { type: SESSION_EVENTS.timedOut, attempt: attemptOf(playing) }),
+    ).toBe(playing)
+  })
+
+  it('gives the last way all the time it takes, as a transcode on a NAS may need, but not one with a way below', () => {
+    const transcoding = sourced(opened({ modes: [remux, transcode] }))
+    const lastWay = failed({ state: transcoding, at: RESUME_AT })
+    const loadingLast = sourced(lastWay)
+    expect(modeOf(loadingLast)).toBe(transcode)
+    expect(hasWayBelow(loadingLast)).toBe(false)
+    expect(
+      sessionReducer(loadingLast, {
+        type: SESSION_EVENTS.timedOut,
+        attempt: attemptOf(loadingLast),
+      }),
+    ).toBe(loadingLast)
+    expect(hasWayBelow(transcoding)).toBe(true)
+    const next = sessionReducer(transcoding, {
+      type: SESSION_EVENTS.timedOut,
+      attempt: attemptOf(transcoding),
+    })
+    expect(modeOf(next)).toBe(transcode)
+  })
+
+  it('ignores what an earlier load says once the ladder has moved on', () => {
+    const playing = loaded(sourced(opened()))
+    expect(sessionReducer(playing, { type: SESSION_EVENTS.failed, attempt: 9, at: 10 })).toBe(
+      playing,
+    )
+  })
+
+  it("says every way has failed, then gives the plan's problems", () => {
+    const lastWay = sourced(opened({ modes: [transcode], problems: [MKV_PROBLEM] }))
+    expect(failed({ state: lastWay, at: 12 })).toEqual({
+      phase: SESSION_PHASES.failed,
+      problems: [SESSION_COPY.exhausted, MKV_PROBLEM],
+    })
+    expect(failed({ state: sourced(opened({ modes: [direct] })), at: 12 })).toEqual({
+      phase: SESSION_PHASES.failed,
+      problems: [SESSION_COPY.exhausted],
+    })
+  })
+
+  it('has nothing to try for a plan with no way to play', () => {
+    expect(opened({ modes: [], problems: [MKV_PROBLEM] })).toEqual({
+      phase: SESSION_PHASES.failed,
+      problems: [MKV_PROBLEM],
+    })
+    expect(opened({ modes: [] })).toEqual({
+      phase: SESSION_PHASES.failed,
+      problems: [SESSION_COPY.noWay],
+    })
+  })
+
+  it('holds a refusal, and asks again in the same way once it is retried', () => {
+    const state = opened()
+    const refused = sessionReducer(state, {
+      type: SESSION_EVENTS.sourced,
+      attempt: attemptOf(state),
+      outcome: LOCKED,
+    })
+    expect(refused).toMatchObject({ phase: SESSION_PHASES.refused, refusal: LOCKED })
+    const retried = sessionReducer(refused, { type: SESSION_EVENTS.retried })
+    expect(retried).toMatchObject({ phase: SESSION_PHASES.sourcing, attempt: 1, at: RESUME_AT })
+    expect(modeOf(retried)).toBe(direct)
+  })
+
+  it('reloads a stream from the spot for another audio track, where direct play switches itself', () => {
+    const streaming = loaded(sourced(opened({ modes: [remux, transcode] })))
+    const picked = sessionReducer(streaming, {
+      type: SESSION_EVENTS.audioPicked,
+      audio: 1,
+      at: 640,
+    })
+    expect(picked).toMatchObject({ phase: SESSION_PHASES.sourcing, audio: 1, at: 640, attempt: 1 })
+    expect(modeOf(picked)).toBe(remux)
+    const playing = loaded(sourced(opened()))
+    expect(
+      sessionReducer(playing, { type: SESSION_EVENTS.audioPicked, audio: 1, at: 640 }),
+    ).toMatchObject({ phase: SESSION_PHASES.playing, audio: 1, attempt: 0 })
+  })
+
+  it('says what stands in for the video until frames flow, and hands the source over meanwhile', () => {
+    const asking = opened()
+    expect([noticeOf(asking), sourcedOf(asking)]).toEqual([SESSION_COPY.starting, null])
+    const loading = sourced(asking)
+    expect([noticeOf(loading), sourcedOf(loading)]).toEqual([SESSION_COPY.starting, SOURCED])
+    const playing = loaded(loading)
+    expect([noticeOf(playing), sourcedOf(playing)]).toEqual([null, SOURCED])
+    const refused = sessionReducer(asking, {
+      type: SESSION_EVENTS.sourced,
+      attempt: attemptOf(asking),
+      outcome: LOCKED,
+    })
+    expect([noticeOf(refused), sourcedOf(refused)]).toEqual([LOCKED.message, null])
+    expect(noticeOf(opened({ modes: [], problems: [MKV_PROBLEM, SESSION_COPY.noWay] }))).toBe(
+      `${MKV_PROBLEM}\n${SESSION_COPY.noWay}`,
+    )
+  })
+})

@@ -3,10 +3,11 @@ import {
   HLS_COPY_AUDIO_CODECS,
   PLAYBACK_MODES,
   type StreamMode,
+  VIDEO_CODECS,
   audioCodecString,
   videoCodecString,
 } from '@raven/core'
-import { type TranscodeQuality, VIDEO_CODECS, transcodeBitrate } from '@/ffmpeg/args'
+import { type TranscodeQuality, transcodeBitrate } from '@/ffmpeg/args'
 import { hlsAudioCodec } from '@/ffmpeg/hlsArgs'
 import { type SegmentPlan, playlistLength } from '@/hls/segmentPlan'
 

@@ -1,4 +1,10 @@
-import { AUTH_REFUSALS, MEDIA_ORIGIN_KINDS, MEDIA_PROBE_BYTES, type MediaOrigin } from '@raven/core'
+import {
+  AUTH_REFUSALS,
+  MEDIA_ORIGIN_KINDS,
+  MEDIA_PROBE_BYTES,
+  MEDIA_PROBE_TIMEOUT_MS,
+  type MediaOrigin,
+} from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { CALL_NAMES } from '@/main/servers/allowlist'
 import { SERVER_GONE, type ServerEntry } from '@/main/desktopConfig'
@@ -8,7 +14,6 @@ import {
   createMediaAccess,
   DOWNLOAD_MINTS,
   fileUrlFor,
-  PROBE_TIMEOUT_MS,
   sidecarUrlFor,
   type Access,
   type AccessOutcome,
@@ -279,10 +284,9 @@ describe('createMediaAccess', () => {
     expect(
       succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE })),
     ).toEqual({ url: LAN.url, ticket: TICKET })
-    expect(PROBE_TIMEOUT_MS).toBe(2000)
     expect(asked).toEqual([
-      { url: pingOf(PUBLIC), timeoutMs: PROBE_TIMEOUT_MS, at: 0 },
-      { url: pingOf(LAN), timeoutMs: PROBE_TIMEOUT_MS, at: 0 },
+      { url: pingOf(PUBLIC), timeoutMs: MEDIA_PROBE_TIMEOUT_MS, at: 0 },
+      { url: pingOf(LAN), timeoutMs: MEDIA_PROBE_TIMEOUT_MS, at: 0 },
     ])
   })
 

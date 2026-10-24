@@ -8,27 +8,47 @@ env:
 ---
 # Each field's label is announced as the field's own label too, and Maestro picks the
 # label first, so a field is tapped as the element below its label.
+#
+# The first keyboard a fresh simulator shows can swallow all but the first key, so each field
+# is typed inside a `retry` that clears it first and checks what came of it: the address by
+# its text, the secrets, which show as dots, by the step after them.
 - launchApp:
     clearState: true
     clearKeychain: true
 - extendedWaitUntil:
     visible: Sign in to raven
     timeout: 60000
-- tapOn:
-    below: Server address
-- inputText: ${SERVER}
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn:
+          below: Server address
+      - eraseText
+      - inputText: ${SERVER}
+      - assertVisible: ${SERVER}
 - tapOn: Continue
 - extendedWaitUntil:
     visible: This server keeps some libraries behind a PIN.
     timeout: 30000
-- tapOn:
-    below: PIN
-- inputText: ${PIN}
-- tapOn: Unlock
-- extendedWaitUntil:
-    visible: Locked libraries stay hidden on this device until the server's admin password is entered.
-    timeout: 30000
-- tapOn:
-    below: Admin password
-- inputText: ${ADMIN_PASSWORD}
-- tapOn: Unlock
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn:
+          below: PIN
+      - eraseText
+      - inputText: ${PIN}
+      - tapOn: Unlock
+      - extendedWaitUntil:
+          visible: Locked libraries stay hidden on this device until the server's admin password is entered.
+          timeout: 30000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn:
+          below: Admin password
+      - eraseText
+      - inputText: ${ADMIN_PASSWORD}
+      - tapOn: Unlock
+      - extendedWaitUntil:
+          notVisible: Admin password
+          timeout: 30000

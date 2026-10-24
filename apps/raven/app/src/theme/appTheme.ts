@@ -3,7 +3,7 @@ import { designTokens, themeTokens } from '@raven/ui/designTokens'
 
 import { nativeTokens } from '@/theme/nativeTokens'
 
-const { numbers } = nativeTokens(
+const { numbers, colours: fixedColours } = nativeTokens(
   Object.fromEntries(designTokens.map(({ name, value }) => [name, value])),
 )
 const { colours } = nativeTokens(themeTokens[DEFAULT_THEME] ?? {})
@@ -20,6 +20,8 @@ const tokenOf = <T>({ tokens, name }: { tokens: Readonly<Record<string, T>>; nam
 
 const colour = (name: string): string => tokenOf({ tokens: colours, name })
 const size = (name: string): number => tokenOf({ tokens: numbers, name })
+/** A colour every theme shares, as what sits on a picture does. */
+const fixedColour = (name: string): string => tokenOf({ tokens: fixedColours, name })
 
 /** The default theme's colours the screens paint with, by what they are for. */
 export const COLOURS = {
@@ -35,6 +37,7 @@ export const COLOURS = {
   notice: colour('--color-amber'),
   error: colour('--color-leaf-bright'),
   track: colour('--color-moss'),
+  onPicture: fixedColour('--color-on-picture'),
 } as const
 
 /** The shared scale's lengths, in points, named as the web's custom properties are. */

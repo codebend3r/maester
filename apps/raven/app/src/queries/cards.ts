@@ -90,7 +90,7 @@ const videoTarget = ({ media, hasPages }: { media: MediaItem; hasPages: boolean 
         fileId: destination.file,
       }
     case CARD_DESTINATIONS.player:
-      return { kind: ROUTE_TARGETS.play, mediaId: destination.media.id }
+      return { kind: ROUTE_TARGETS.play, mediaId: destination.media.id, at: 0 }
     default: {
       const unknown: never = destination
       return unknown

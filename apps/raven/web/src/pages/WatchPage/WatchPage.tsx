@@ -8,6 +8,7 @@ import {
   mediaLabel,
   playLinkFor,
   readWatchState,
+  resumeAtFor,
   routeState,
   watchLink,
 } from '@raven/core'
@@ -143,7 +144,6 @@ export const WatchPlayer = ({
   )
   const opensInRavenPlayer = usePlayerPrefs((prefs) => prefs.opensInRavenPlayer)
   const [next, ...after] = upNext
-  const resumable = media.position > 0 && media.position < (media.duration ?? Infinity) - 10
   const mediaPlane = useMediaPlane({ api, mediaId: media.id, reprobe: useReprobe() })
   useTicketFollowsSession({ mediaId: media.id })
   const hasAccounts = (useQuery(authConfigQuery).data?.state ?? null) === AUTH_CONFIG_STATES.ready
@@ -162,7 +162,7 @@ export const WatchPlayer = ({
     title: {
       label: mediaLabel(media),
       duration: media.duration,
-      resumeAt: resumable ? media.position : 0,
+      resumeAt: resumeAtFor({ at: 0, media }),
       backTo,
       next: next
         ? {

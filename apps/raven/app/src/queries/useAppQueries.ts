@@ -14,10 +14,12 @@ export type AppQueries = {
   useServerEvents: () => void
 }
 
-const appQueriesFor = lastPerServer((server): AppQueries => {
-  const api = apiFor(server)
-  const { useServerEvents } = serverEventsFor({ api, openEvents: openEventsFor(server) })
-  return { server, api, queries: ravenQueriesFor(api), useServerEvents }
+const appQueriesFor = lastPerServer({
+  make: (server): AppQueries => {
+    const api = apiFor(server)
+    const { useServerEvents } = serverEventsFor({ api, openEvents: openEventsFor(server) })
+    return { server, api, queries: ravenQueriesFor(api), useServerEvents }
+  },
 })
 
 /**
