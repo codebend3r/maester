@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  AUDIO_CODECS,
   CONTAINERS,
   DIRECT_PLAYS,
   HLS_COPY_AUDIO,
@@ -9,6 +10,7 @@ import {
   type PlaybackSettings,
   TRANSCODINGS,
   VIDEO_CODECS,
+  audioCodecString,
   planPlayback,
   streamMimeType,
   videoCodecString,
@@ -16,30 +18,34 @@ import {
 import { mediaItemFor } from '@/test/mediaItem'
 
 import { canPlayFor } from '@/platform/canPlay'
-import { APP_PLATFORMS } from '@/platform/platform'
+import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 
-const planOnIos = ({
+const planOn = ({
+  platform,
   media,
   transcoding = TRANSCODINGS.on,
 }: {
+  platform: AppPlatform
   media: MediaItem
   transcoding?: PlaybackSettings['transcoding']
 }) =>
   planPlayback({
     media,
-    ...canPlayFor(APP_PLATFORMS.ios),
+    ...canPlayFor(platform),
     defaultAudio: true,
     policy: { directPlay: DIRECT_PLAYS.auto, transcoding },
   })
 
-/** ffprobe's names for what Apple's table leaves out, which only these files carry. */
-const UNLISTED = {
-  mkv: 'mkv',
-  av1: 'av1',
-  truehd: 'truehd',
-  opus: 'opus',
-  dts: 'dts',
-} as const
+const planOnIos = ({
+  media,
+  transcoding,
+}: {
+  media: MediaItem
+  transcoding?: PlaybackSettings['transcoding']
+}) => planOn({ platform: APP_PLATFORMS.ios, media, transcoding })
+
+/** ffprobe's name for a container no table lists, which only this file carries. */
+const UNLISTED = { avi: 'avi' } as const
 
 const MKV_REFUSED = "The MKV container isn't supported here."
 
@@ -59,10 +65,10 @@ describe('canPlayFor on iPhone and iPad', () => {
 
   it('starts an HEVC TrueHD MKV at the remux, whose HLS copies the video', () => {
     const media = mediaItemFor({
-      container: UNLISTED.mkv,
+      container: CONTAINERS.mkv,
       videoCodec: VIDEO_CODECS.hevc,
       videoBitDepth: 10,
-      audioCodec: UNLISTED.truehd,
+      audioCodec: AUDIO_CODECS.truehd,
     })
     expect(planOnIos({ media })).toEqual({
       modes: [PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode],
@@ -86,10 +92,10 @@ describe('canPlayFor on iPhone and iPad', () => {
   it('plays every stream the server converts to, since the stereo AAC the planner names is copied as it is', () => {
     const { canStream } = canPlayFor(APP_PLATFORMS.ios)
     const media = mediaItemFor({
-      container: UNLISTED.mkv,
+      container: CONTAINERS.mkv,
       videoCodec: VIDEO_CODECS.hevc,
       videoBitDepth: 10,
-      audioCodec: UNLISTED.truehd,
+      audioCodec: AUDIO_CODECS.truehd,
     })
     expect(canStream(streamMimeType({ media, mode: PLAYBACK_MODES.remux }))).toBe(true)
     expect(canStream(streamMimeType({ media, mode: PLAYBACK_MODES.transcode }))).toBe(true)
@@ -104,17 +110,17 @@ describe('canPlayFor on iPhone and iPad', () => {
 
   it('sends an AV1 MKV through the transcode, since AVPlayer decodes no AV1 here', () => {
     const media = mediaItemFor({
-      container: UNLISTED.mkv,
-      videoCodec: UNLISTED.av1,
+      container: CONTAINERS.mkv,
+      videoCodec: VIDEO_CODECS.av1,
       videoBitDepth: 10,
-      audioCodec: UNLISTED.opus,
+      audioCodec: AUDIO_CODECS.opus,
     })
     expect(planOnIos({ media }).modes).toEqual([PLAYBACK_MODES.transcode])
   })
 
   it('sends a 10-bit H.264 MKV through the transcode, since AVPlayer has no High 10 decoder', () => {
     const media = mediaItemFor({
-      container: UNLISTED.mkv,
+      container: CONTAINERS.mkv,
       videoCodec: VIDEO_CODECS.h264,
       videoBitDepth: 10,
       audioCodec: HLS_COPY_AUDIO_CODECS.aac,
@@ -138,7 +144,7 @@ describe('canPlayFor on iPhone and iPad', () => {
 
   it('leaves an MKV no way to play when the server converts nothing', () => {
     const media = mediaItemFor({
-      container: UNLISTED.mkv,
+      container: CONTAINERS.mkv,
       videoCodec: VIDEO_CODECS.hevc,
       videoBitDepth: 10,
       audioCodec: HLS_COPY_AUDIO_CODECS.eac3,
@@ -162,6 +168,132 @@ describe('canPlayFor on iPhone and iPad', () => {
     expect(HLS_COPY_AUDIO.map((codec) => plays(codec))).toEqual(
       HLS_COPY_AUDIO.map(() => PLAYBACK_MODES.direct),
     )
-    expect(plays(UNLISTED.dts)).toBe(PLAYBACK_MODES.remux)
+    expect(plays(AUDIO_CODECS.dts)).toBe(PLAYBACK_MODES.remux)
+  })
+})
+
+describe('canPlayFor on Android TV', () => {
+  const planOnTv = (media: MediaItem) => planOn({ platform: APP_PLATFORMS.androidTv, media })
+  const EVERY_WAY = [PLAYBACK_MODES.direct, PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode]
+
+  it('starts an HEVC E-AC-3 MKV as the original file, which ExoPlayer reads', () => {
+    const media = mediaItemFor({
+      container: CONTAINERS.mkv,
+      videoCodec: VIDEO_CODECS.hevc,
+      videoBitDepth: 10,
+      audioCodec: HLS_COPY_AUDIO_CODECS.eac3,
+    })
+    expect(planOnTv(media)).toEqual({ modes: EVERY_WAY, problems: [] })
+  })
+
+  it('tries TrueHD and DTS as they are, a maybe the device answers, with the remux after them', () => {
+    const plays = (audioCodec: string) =>
+      planOnTv(
+        mediaItemFor({
+          container: CONTAINERS.mkv,
+          videoCodec: VIDEO_CODECS.h264,
+          videoBitDepth: 8,
+          audioCodec,
+        }),
+      ).modes
+    expect(plays(AUDIO_CODECS.truehd)).toEqual(EVERY_WAY)
+    expect(plays(AUDIO_CODECS.dts)).toEqual(EVERY_WAY)
+  })
+
+  it('plays VP9 in WebM as it is', () => {
+    const media = mediaItemFor({
+      container: CONTAINERS.webm,
+      videoCodec: VIDEO_CODECS.vp9,
+      videoBitDepth: 8,
+      audioCodec: AUDIO_CODECS.opus,
+    })
+    expect(planOnTv(media).modes).toEqual(EVERY_WAY)
+  })
+
+  it('plays AV1 as it is, at either depth', () => {
+    const planAt = (videoBitDepth: number) =>
+      planOnTv(
+        mediaItemFor({
+          container: CONTAINERS.mkv,
+          videoCodec: VIDEO_CODECS.av1,
+          videoBitDepth,
+          audioCodec: AUDIO_CODECS.opus,
+        }),
+      ).modes
+    expect(planAt(8)).toEqual(EVERY_WAY)
+    expect(planAt(10)).toEqual(EVERY_WAY)
+  })
+
+  it('plays every audio codec in its table as it is, in MP4 and MOV too', () => {
+    const playable = [
+      AUDIO_CODECS.aac,
+      AUDIO_CODECS.ac3,
+      AUDIO_CODECS.eac3,
+      AUDIO_CODECS.opus,
+      AUDIO_CODECS.vorbis,
+      AUDIO_CODECS.flac,
+      AUDIO_CODECS.mp3,
+    ]
+    const firstWay = ({ container, audioCodec }: { container: string; audioCodec: string }) =>
+      planOnTv(
+        mediaItemFor({ container, videoCodec: VIDEO_CODECS.h264, videoBitDepth: 8, audioCodec }),
+      ).modes[0] ?? null
+    expect(
+      [CONTAINERS.mp4, CONTAINERS.mov].flatMap((container) =>
+        playable.map((audioCodec) => firstWay({ container, audioCodec })),
+      ),
+    ).toEqual(Array.from({ length: playable.length * 2 }, () => PLAYBACK_MODES.direct))
+  })
+
+  it('sends a 10-bit H.264 MKV through the transcode, as on Apple: few TVs decode High 10', () => {
+    const media = mediaItemFor({
+      container: CONTAINERS.mkv,
+      videoCodec: VIDEO_CODECS.h264,
+      videoBitDepth: 10,
+      audioCodec: HLS_COPY_AUDIO_CODECS.aac,
+    })
+    expect(planOnTv(media).modes).toEqual([PLAYBACK_MODES.transcode])
+  })
+
+  it('starts a container ExoPlayer is not given at the remux', () => {
+    const media = mediaItemFor({
+      container: UNLISTED.avi,
+      videoCodec: VIDEO_CODECS.h264,
+      videoBitDepth: 8,
+      audioCodec: AUDIO_CODECS.mp3,
+    })
+    expect(planOnTv(media)).toEqual({
+      modes: [PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode],
+      problems: ["The AVI container isn't supported here."],
+    })
+  })
+
+  it('plays every stream the server converts to, whatever video it copies', () => {
+    const { canStream } = canPlayFor(APP_PLATFORMS.androidTv)
+    const streams = [
+      { codec: VIDEO_CODECS.hevc, bitDepth: 10, audio: AUDIO_CODECS.truehd },
+      { codec: VIDEO_CODECS.av1, bitDepth: 10, audio: AUDIO_CODECS.opus },
+      { codec: VIDEO_CODECS.vp9, bitDepth: 8, audio: AUDIO_CODECS.vorbis },
+      { codec: VIDEO_CODECS.h264, bitDepth: 8, audio: AUDIO_CODECS.dts },
+    ].flatMap(({ codec, bitDepth, audio }) => {
+      const media = mediaItemFor({
+        container: CONTAINERS.mkv,
+        videoCodec: codec,
+        videoBitDepth: bitDepth,
+        audioCodec: audio,
+      })
+      return [PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode].map((mode) =>
+        canStream(streamMimeType({ media, mode })),
+      )
+    })
+    expect(streams).toEqual(streams.map(() => true))
+  })
+
+  it('decodes the audio an HLS stream carries, all but ALAC, which the route copies as it is', () => {
+    const { canStream } = canPlayFor(APP_PLATFORMS.androidTv)
+    const carried = [...HLS_COPY_AUDIO, HLS_COPY_AUDIO_CODECS.eac3]
+    expect(
+      carried.filter((codec) => !canStream(`video/mp4; codecs="${audioCodecString(codec)}"`)),
+    ).toEqual([HLS_COPY_AUDIO_CODECS.alac])
   })
 })

@@ -1,13 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import { StyleSheet, Text } from 'react-native'
+import { Text } from 'react-native'
 
 import { useAppQueries } from '@/queries/useAppQueries'
-import { BUTTON_TONES, Field, Form, FormButton } from '@/layouts'
+import { BUTTON_TONES, Field, Form, FormButton, formStyles } from '@/layouts'
 import { APP_ROUTES } from '@/routes'
 import { useSubmit } from '@/screens/useSubmit'
-import { COLOURS, SIZES } from '@/theme/appTheme'
 
 const COPY = {
   prompt: 'What you opened sits in a library this server keeps behind its PIN.',
@@ -47,7 +46,7 @@ export const Unlock = () => {
 
   return (
     <Form title={session?.server.name ?? ''}>
-      <Text style={styles.note}>{COPY.prompt}</Text>
+      <Text style={formStyles.note}>{COPY.prompt}</Text>
       <Field
         isFirst
         isNumeric
@@ -58,7 +57,7 @@ export const Unlock = () => {
         value={pin}
       />
       {error !== null && (
-        <Text accessibilityLiveRegion="polite" style={styles.error}>
+        <Text accessibilityLiveRegion="polite" style={formStyles.error}>
           {error}
         </Text>
       )}
@@ -77,8 +76,3 @@ export const Unlock = () => {
     </Form>
   )
 }
-
-const styles = StyleSheet.create({
-  note: { color: COLOURS.muted, fontSize: SIZES.text },
-  error: { color: COLOURS.error, fontSize: SIZES.text },
-})

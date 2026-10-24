@@ -1,14 +1,10 @@
-import { useMemo, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { useMemo } from 'react'
+import { StyleSheet, View } from 'react-native'
 import Video, { type VideoMetadata } from 'react-native-video'
 
+import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
 import { type PlayerChromeKit, type PlayerChromeProps } from '@/layouts/playerKit'
-import { PlateButton } from '@/layouts/tvControls'
-import { COLOURS, SIZES } from '@/theme/appTheme'
-
-const GUTTER = SIZES.space8
-
-const BACK = 'Back'
+import { COLOURS } from '@/theme/appTheme'
 
 /** What the system's info panel shows: the title, the synopsis and the poster, where known. */
 const infoOf = ({
@@ -22,15 +18,13 @@ const infoOf = ({
 })
 
 /**
- * The video under the system's own transport on a TV (AVPlayerViewController on Apple TV): the
- * remote's swipe scrubs, a press plays and pauses, the info panel shows the title, synopsis and
- * poster, and the audio and subtitle panel lists the stream's renditions. raven draws nothing
- * over it, so the transport owns the remote's focus, and Menu leaves the player. While there is
- * nothing to play (opening, refused, or no way left), the title and the line stand alone with
- * Back, which takes the remote's focus as it appears and lets go once it has had it.
+ * The video under Apple TV's own transport (AVPlayerViewController): the remote's swipe scrubs,
+ * a press plays and pauses, the info panel shows the title, synopsis and poster, and the audio
+ * and subtitle panel lists the stream's renditions. raven draws nothing over it, so the
+ * transport owns the remote's focus, and Menu leaves the player. While there is nothing to play
+ * it is the TV's notice with Back.
  */
 const PlayerChrome = ({ title, summary, artwork, surface, notice, onBack }: PlayerChromeProps) => {
-  const [isOpening, setOpening] = useState(true)
   const source = surface?.source ?? null
   // The source is the video: a new object of the same values must not reload it.
   const withInfo = useMemo(
@@ -38,56 +32,23 @@ const PlayerChrome = ({ title, summary, artwork, surface, notice, onBack }: Play
       source === null ? undefined : { ...source, metadata: infoOf({ title, summary, artwork }) },
     [source, title, summary, artwork],
   )
-  if (surface !== null) {
-    return (
-      <View style={styles.ground}>
-        <Video
-          {...surface}
-          controls
-          resizeMode="contain"
-          source={withInfo}
-          style={StyleSheet.absoluteFill}
-        />
-      </View>
-    )
-  }
+  if (surface === null) return <PlayerNotice notice={notice} onBack={onBack} title={title} />
   return (
-    <View style={[styles.ground, styles.page]}>
-      {title !== '' && (
-        <Text accessibilityRole="header" style={styles.title}>
-          {title}
-        </Text>
-      )}
-      {notice !== null && (
-        <Text accessibilityLiveRegion="polite" style={styles.notice}>
-          {notice}
-        </Text>
-      )}
-      <View style={styles.actions}>
-        <PlateButton
-          accessibilityRole="button"
-          isPreferred={isOpening}
-          label={BACK}
-          onFocused={() => setOpening(false)}
-          onPress={onBack}
-          text={BACK}
-        />
-      </View>
+    <View style={styles.ground}>
+      <Video
+        {...surface}
+        controls
+        resizeMode="contain"
+        source={withInfo}
+        style={StyleSheet.absoluteFill}
+      />
     </View>
   )
 }
 
-/** The player on a TV: the system's transport, which the remote drives. */
+/** The player on Apple TV: the system's transport, which the remote drives and draws over. */
 export const focusPlayerChrome: PlayerChromeKit = { PlayerChrome, shouldDrawCaptions: false }
 
 const styles = StyleSheet.create({
   ground: { flex: 1, backgroundColor: COLOURS.ground },
-  page: { justifyContent: 'center', gap: SIZES.space4, paddingHorizontal: GUTTER },
-  title: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
-  notice: {
-    maxWidth: SIZES.measure,
-    color: COLOURS.text,
-    fontSize: SIZES.textLg,
-  },
-  actions: { flexDirection: 'row' },
 })

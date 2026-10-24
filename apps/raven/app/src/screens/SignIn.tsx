@@ -1,16 +1,15 @@
 import { ADMIN_LOCK_STATES, type ApiClient, serverNameFor, serverOriginOf } from '@raven/core'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import { StyleSheet, Text } from 'react-native'
+import { Text } from 'react-native'
 
-import { BUTTON_TONES, Field, Form, FormButton } from '@/layouts'
+import { BUTTON_TONES, Field, Form, FormButton, formStyles } from '@/layouts'
 import { APP_ROUTES } from '@/routes'
 import { useSubmit } from '@/screens/useSubmit'
 import { apiFor, cookieJar, newServerId } from '@/servers/serverClient'
 import { ADD_OUTCOMES, type AppServer } from '@/servers/serverList'
 import { TICKET_SUPPORT, ticketSupportOf } from '@/servers/tickets'
 import { useActiveServer } from '@/stores/activeServer'
-import { COLOURS, SIZES } from '@/theme/appTheme'
 
 /** The spec's words for a server without `RAVEN_MEDIA_SECRET`, which the app then plays from with its cookie. */
 export const TICKETS_OFF =
@@ -143,7 +142,7 @@ export const SignIn = () => {
   }
 
   const errorLine = error !== null && (
-    <Text accessibilityLiveRegion="polite" style={styles.error}>
+    <Text accessibilityLiveRegion="polite" style={formStyles.error}>
       {error}
     </Text>
   )
@@ -174,7 +173,7 @@ export const SignIn = () => {
       const { prompt, label, isNumeric } = SECRET_STEPS[step.kind]
       return (
         <Form key={step.kind} title={step.server.name}>
-          <Text style={styles.note}>{prompt}</Text>
+          <Text style={formStyles.note}>{prompt}</Text>
           <Field
             isFirst
             isNumeric={isNumeric}
@@ -209,7 +208,7 @@ export const SignIn = () => {
     case STEPS.ticketsOff:
       return (
         <Form title={COPY.title}>
-          <Text accessibilityLiveRegion="polite" style={styles.notice}>
+          <Text accessibilityLiveRegion="polite" style={formStyles.notice}>
             {TICKETS_OFF}
           </Text>
           <FormButton label={COPY.continue} onPress={goHome} tone={BUTTON_TONES.primary} />
@@ -221,9 +220,3 @@ export const SignIn = () => {
     }
   }
 }
-
-const styles = StyleSheet.create({
-  note: { color: COLOURS.muted, fontSize: SIZES.text },
-  notice: { color: COLOURS.notice, fontSize: SIZES.textLg },
-  error: { color: COLOURS.error, fontSize: SIZES.text },
-})

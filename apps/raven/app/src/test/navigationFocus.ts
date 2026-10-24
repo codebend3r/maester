@@ -3,7 +3,7 @@ import { isRecord } from '@raven/core'
 import { act } from '@testing-library/react-native'
 import { create } from 'zustand'
 
-import { useScreenFocus } from '@/stores/screenFocus'
+import { returnScreen, useScreenFocus } from '@/stores/screenFocus'
 
 /** Whether the screen a render test draws is the one in front, as the navigator would say. */
 const useTestScreen = create<{ isFocused: boolean }>()(() => ({ isFocused: true }))
@@ -28,19 +28,32 @@ export const tvFocusMocks = { requestTVFocus: (view: unknown) => focusRequests(v
 /** The views that asked for the remote's focus, in order. */
 export const focusRequested = (): unknown[] => focusRequests.mock.calls.map(([view]) => view)
 
-/** The cards that asked for the remote's focus, by title, in order. */
-export const askedFor = (): unknown[] =>
-  focusRequested().map((view) =>
-    isRecord(view) && isRecord(view.props) ? view.props.accessibilityLabel : view,
-  )
+/**
+ * The label a view that asked for the focus is read by: its own, or, for a text field's frame,
+ * which asks for the field inside it, the field's.
+ */
+const labelOf = (view: unknown): unknown => {
+  if (!isRecord(view) || !isRecord(view.props)) return view
+  const { accessibilityLabel, children } = view.props
+  if (accessibilityLabel !== undefined) return accessibilityLabel
+  return isRecord(children) && isRecord(children.props) ? children.props.accessibilityLabel : view
+}
+
+/** The cards and fields that asked for the remote's focus, by label, in order. */
+export const askedFor = (): unknown[] => focusRequested().map(labelOf)
 
 /** Another screen goes on top of the test's, as a card or a link opens it. */
 export const leaveTestScreen = async (): Promise<void> =>
   act(() => useTestScreen.setState({ isFocused: false }))
 
-/** The screen on top goes back, as Menu or Back takes it, and the test's is in front again. */
-export const returnToTestScreen = async (): Promise<void> =>
-  act(() => useTestScreen.setState({ isFocused: true }))
+/**
+ * The screen on top goes back, as Menu or Back takes it, and the test's is in front again, then
+ * the transition that reveals it ends, which the navigator tells the screen focus store.
+ */
+export const returnToTestScreen = async (): Promise<void> => {
+  await act(() => useTestScreen.setState({ isFocused: true }))
+  await act(() => returnScreen({ screen: TEST_ROUTE.key }))
+}
 
 /** The test's screen in front with nothing remembered of its focus, as each test starts. */
 export const resetTestScreen = (): void => {

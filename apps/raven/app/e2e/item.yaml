@@ -1,5 +1,7 @@
 appId: io.github.codebend3r.raven.app
 name: A title opens from Home, marks watched and back, and a show leads to its episodes
+tags:
+  - touch
 ---
 - runFlow: signIn.yaml
 - extendedWaitUntil:

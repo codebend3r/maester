@@ -4,6 +4,7 @@ import { type RefObject, useEffect, useRef } from 'react'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import {
   coverScreen,
+  drawCard,
   isOpeningIn,
   leaveScreen,
   rememberOpener,
@@ -24,6 +25,25 @@ const useScreenTurn = ({ isToFront, onTurn }: { isToFront: boolean; onTurn: () =
     if (isFocused === isToFront && isFocusedBefore.current !== isToFront) onTurn()
     isFocusedBefore.current = isFocused
   }, [isFocused, isToFront, onTurn])
+}
+
+/**
+ * Asks the remote's focus for the view `view` holds once, as it is drawn, when `isAsked` was
+ * true then. A view that mounts asking through `hasTVPreferredFocus` asks before it is in the
+ * window, and the fork retries that only once, which on Android TV is still too early: the
+ * screen opened with nothing focused.
+ */
+export const useFocusOnMount = ({
+  view,
+  isAsked = true,
+}: {
+  view: RefObject<unknown>
+  isAsked?: boolean
+}): void => {
+  const isAskedOnMount = useRef(isAsked)
+  useEffect(() => {
+    if (isAskedOnMount.current) requestTVFocus(view.current)
+  }, [view])
 }
 
 /** Whether the screen still gives its opening focus, and the way to say something has had it. */
@@ -57,7 +77,8 @@ export const useScreenFocusScope = (): OpeningFocus => {
  * A card's part in taking the focus back to the card another screen was opened from. The card
  * calls `remember` as it opens one; when this screen returns, the card remembered asks for the
  * remote's focus once, whether its view lived on under the screen on top or mounted afresh
- * there. `place` is the card's place on its screen, unique there.
+ * there; it says as it is drawn and as it goes, so a return whose card has gone gives the
+ * screen's opening focus instead. `place` is the card's place on its screen, unique there.
  */
 export const useOpenerFocus = ({
   place,
@@ -67,6 +88,10 @@ export const useOpenerFocus = ({
   view: RefObject<unknown>
 }): { remember: () => void } => {
   const screen = useRoute().key
+  useEffect(() => {
+    drawCard({ screen, card: place, isDrawn: true })
+    return () => drawCard({ screen, card: place, isDrawn: false })
+  }, [screen, place])
   useScreenTurn({
     isToFront: true,
     onTurn: () => {

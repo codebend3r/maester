@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { type MediaTracks, PLAYBACK_MODES, SUBTITLE_SOURCES, type SubtitleTrack } from '@raven/core'
+import {
+  AUDIO_CODECS,
+  type MediaTracks,
+  PLAYBACK_MODES,
+  SUBTITLE_SOURCES,
+  type SubtitleTrack,
+} from '@raven/core'
 
 import {
   SUBTITLE_CHOICES,
@@ -8,10 +14,11 @@ import {
   subtitleOptionsOf,
   subtitlePlaceFor,
 } from '@/player/playerTracks'
+import { SUBTITLE_CODECS } from '@/test/subtitleCodecs'
 
 const subtitle = (track: Partial<SubtitleTrack> & Pick<SubtitleTrack, 'id'>): SubtitleTrack => ({
   source: SUBTITLE_SOURCES.embedded,
-  codec: 'mov_text',
+  codec: SUBTITLE_CODECS.movText,
   language: 'en',
   title: null,
   default: false,
@@ -22,20 +29,31 @@ const subtitle = (track: Partial<SubtitleTrack> & Pick<SubtitleTrack, 'id'>): Su
 })
 
 const ENGLISH = subtitle({ id: 'embedded-0' })
-const PICTURES = subtitle({ id: 'embedded-1', codec: 'hdmv_pgs_subtitle', supported: false })
+const PICTURES = subtitle({ id: 'embedded-1', codec: SUBTITLE_CODECS.pgs, supported: false })
 const FRENCH = subtitle({ id: 'embedded-2', language: 'fr' })
-const SIDECAR = subtitle({ id: 'external-0', source: SUBTITLE_SOURCES.external, codec: 'srt' })
+const SIDECAR = subtitle({
+  id: 'external-0',
+  source: SUBTITLE_SOURCES.external,
+  codec: SUBTITLE_CODECS.srt,
+})
 const UNTAGGED = subtitle({
   id: 'external-1',
   source: SUBTITLE_SOURCES.external,
-  codec: 'srt',
+  codec: SUBTITLE_CODECS.srt,
   language: null,
 })
 
 const TRACKS: MediaTracks = {
   audio: [
-    { index: 0, codec: 'ac3', channels: 6, language: 'en', title: null, default: true },
-    { index: 1, codec: 'aac', channels: 2, language: 'ja', title: 'Commentary', default: false },
+    { index: 0, codec: AUDIO_CODECS.ac3, channels: 6, language: 'en', title: null, default: true },
+    {
+      index: 1,
+      codec: AUDIO_CODECS.aac,
+      channels: 2,
+      language: 'ja',
+      title: 'Commentary',
+      default: false,
+    },
   ],
   subtitles: [ENGLISH, PICTURES, FRENCH, SIDECAR, UNTAGGED],
   defaultAudio: 0,

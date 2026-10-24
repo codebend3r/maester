@@ -45,6 +45,8 @@ export type PickerProps<K extends string> = {
   options: readonly PickerOption<K>[]
   value: K
   onChoose: (key: K) => void
+  /** Hears a TV picker's list open and close, for a screen that must stay up while it is open. */
+  onOpenChange?: (isOpen: boolean) => void
 }
 
 export type ToolButtonProps = { label: string; accessibilityLabel: string; onPress: () => void }

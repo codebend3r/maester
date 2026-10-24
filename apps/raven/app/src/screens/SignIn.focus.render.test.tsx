@@ -5,6 +5,8 @@ import { fireEvent, render, screen } from '@testing-library/react-native'
 import { SignIn } from '@/screens/SignIn'
 import { useActiveServer } from '@/stores/activeServer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
+import type * as NavigationFocus from '@/test/navigationFocus'
+import { askedFor, resetTestScreen } from '@/test/navigationFocus'
 
 const mockGetLock = jest.fn<() => Promise<LockState>>()
 
@@ -17,6 +19,10 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   return platform
 })
 jest.mock('expo-router', () => ({ useRouter: () => ({ replace: jest.fn() }) }))
+jest.mock(
+  '@/layouts/tvFocus',
+  () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
+)
 jest.mock('@/servers/serverClient', () => ({
   apiFor: () => ({ getLock: mockGetLock }),
   newServerId: () => '0f8fad5b-d9cb-469f-a165-70867728950e',
@@ -31,8 +37,24 @@ jest.mock('@/servers/serverClient', () => ({
 describe('SignIn on a TV', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    resetTestScreen()
     useActiveServer.setState({ servers: [], activeId: null })
     mockGetLock.mockResolvedValue({ available: false, unlocked: false })
+  })
+
+  // Asked for as it mounts, the preferred focus comes before the field is in the window, which
+  // on Android TV left the step with nothing focused.
+  it('asks for the remote on the field of each step once it is drawn', async () => {
+    mockGetLock.mockResolvedValue({ available: true, unlocked: false })
+    await render(<SignIn />)
+    expect(askedFor()).toEqual(['Server address'])
+
+    const field = screen.getByLabelText('Server address')
+    await fireEvent(field, NATIVE_EVENTS.submitEditing, {
+      nativeEvent: { text: 'http://127.0.0.1:8490' },
+    })
+    expect(await screen.findByLabelText('PIN')).toBeTruthy()
+    expect(askedFor()).toEqual(['Server address', 'PIN'])
   })
 
   it('drops what was typed when Menu cancels the keyboard, as the field does', async () => {

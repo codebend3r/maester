@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import {
   type FieldProps,
@@ -8,9 +7,9 @@ import {
   type FormProps,
   keyboardFor,
 } from '@/layouts/formKit'
-import { formStyles, toneStyles } from '@/layouts/formStyles'
-import { tvFieldStyles } from '@/layouts/tvControls'
-import { SIZES } from '@/theme/appTheme'
+import { toneStyles, tvFormStyles as formStyles } from '@/layouts/formStyles'
+import { TvTextField } from '@/layouts/tvControls'
+import { TV_SIZES } from '@/theme/tvSizes'
 
 const Form = ({ title, children }: FormProps) => (
   <View style={[formStyles.ground, styles.ground]}>
@@ -23,10 +22,7 @@ const Form = ({ title, children }: FormProps) => (
   </View>
 )
 
-// Selecting a field with the remote opens the platform's own keyboard, which reports
-// the text back as it is typed; the field only needs to show where focus is. Leaving the
-// keyboard with Menu cancels the edit: the native field goes back to what it held, but no
-// change is reported, so the field takes the text it ends editing with as the truth.
+/** A labelled field; the step's first takes the remote as it is drawn. */
 const Field = ({
   label,
   value,
@@ -36,33 +32,22 @@ const Field = ({
   isSecret = false,
   isNumeric = false,
   isFirst = false,
-}: FieldProps) => {
-  const [isFocused, setFocused] = useState(false)
-  return (
-    <View style={styles.field}>
-      <Text style={[formStyles.label, styles.label]}>{label}</Text>
-      <View style={[formStyles.input, tvFieldStyles.frame, isFocused && formStyles.focused]}>
-        <TextInput
-          accessibilityLabel={label}
-          autoCapitalize="none"
-          autoCorrect={false}
-          hasTVPreferredFocus={isFirst}
-          keyboardType={keyboardFor({ isNumeric, isSecret })}
-          onBlur={() => setFocused(false)}
-          onChangeText={onChangeText}
-          onEndEditing={({ nativeEvent }) => onChangeText(nativeEvent.text)}
-          onFocus={() => setFocused(true)}
-          onSubmitEditing={({ nativeEvent }) => onSubmit({ text: nativeEvent.text })}
-          placeholder={placeholder}
-          returnKeyType="go"
-          secureTextEntry={isSecret}
-          style={tvFieldStyles.input}
-          value={value}
-        />
-      </View>
-    </View>
-  )
-}
+}: FieldProps) => (
+  <View style={styles.field}>
+    <Text style={[formStyles.label, styles.label]}>{label}</Text>
+    <TvTextField
+      isPreferred={isFirst}
+      keyboardType={keyboardFor({ isNumeric, isSecret })}
+      label={label}
+      onChangeText={onChangeText}
+      onSubmit={(text) => onSubmit({ text })}
+      placeholder={placeholder}
+      returnKeyType="go"
+      secureTextEntry={isSecret}
+      value={value}
+    />
+  </View>
+)
 
 const FormButton = ({ label, onPress, tone, isDisabled = false }: FormButtonProps) => (
   <Pressable
@@ -83,13 +68,13 @@ const FormButton = ({ label, onPress, tone, isDisabled = false }: FormButtonProp
 )
 
 /** The TV form: read from the sofa, so larger, and driven by the remote's focus. */
-export const focusForm: FormKit = { Form, Field, FormButton }
+export const focusForm: FormKit = { Form, Field, FormButton, formStyles }
 
 const styles = StyleSheet.create({
-  ground: { justifyContent: 'center', padding: SIZES.space5 },
-  content: { gap: SIZES.space5, width: '100%', maxWidth: SIZES.measure, alignSelf: 'center' },
-  label: { fontSize: SIZES.textLg },
-  field: { gap: SIZES.space3 },
-  button: { minHeight: SIZES.controlLarge, borderWidth: SIZES.tvFocusRing },
-  buttonText: { fontSize: SIZES.textLg },
+  ground: { justifyContent: 'center', padding: TV_SIZES.space5 },
+  content: { gap: TV_SIZES.space5, width: '100%', maxWidth: TV_SIZES.measure, alignSelf: 'center' },
+  label: { fontSize: TV_SIZES.textLg },
+  field: { gap: TV_SIZES.space3 },
+  button: { minHeight: TV_SIZES.controlLarge, borderWidth: TV_SIZES.tvFocusRing },
+  buttonText: { fontSize: TV_SIZES.textLg },
 })

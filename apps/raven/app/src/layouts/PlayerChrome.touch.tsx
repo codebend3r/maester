@@ -1,8 +1,7 @@
-import { type CueRun, cueRuns, formatDuration } from '@raven/core'
+import { formatDuration } from '@raven/core'
 import { usePlayerPrefs } from '@raven/ui/headless'
 import { useEffect, useState } from 'react'
 import {
-  type AccessibilityActionEvent,
   Animated,
   type GestureResponderEvent,
   Pressable,
@@ -15,12 +14,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Video from 'react-native-video'
 
 import { touchPicker } from '@/layouts/Picker.touch'
+import { CaptionText } from '@/layouts/PlayerCaption'
 import {
   PLAYER_COPY,
   type PlayerChromeKit,
   type PlayerChromeProps,
   SKIP_SECONDS,
   type Transport,
+  playedShareOf,
+  scrubberAccessibilityOf,
+  within,
 } from '@/layouts/playerKit'
 import { TouchBack } from '@/layouts/TouchBack'
 import { useReduceMotion } from '@/stores/reduceMotion'
@@ -45,24 +48,6 @@ const GLYPHS = {
   forward: `${SKIP_SECONDS} \u21BB`,
 } as const
 
-/** The actions VoiceOver offers on the scrubber: a swipe up or down skips. */
-const SEEK_ACTIONS = { increment: 'increment', decrement: 'decrement' } as const
-
-/** A cue's styled runs, each keyed by where it starts in the cue's text. */
-const keyedRuns = (text: string): (CueRun & { key: string })[] =>
-  cueRuns(text)
-    .filter((run) => run.text !== '')
-    .reduce<{ at: number; runs: (CueRun & { key: string })[] }>(
-      ({ at, runs }, run) => ({
-        at: at + run.text.length,
-        runs: [...runs, { ...run, key: String(at) }],
-      }),
-      { at: 0, runs: [] },
-    ).runs
-
-const within = ({ value, length }: { value: number; length: number }): number =>
-  Math.min(length, Math.max(0, value))
-
 /**
  * Where the video is, as a line to drag along: the finger's spot shows as it moves and is sought
  * on letting go. VoiceOver reads it as the time of the length, and skips by a swipe.
@@ -79,25 +64,10 @@ const Scrubber = ({
       ? position
       : within({ value: (event.nativeEvent.locationX / width) * duration, length: duration })
   const shown = dragged ?? position
-  const share =
-    duration > 0 ? `${(within({ value: shown, length: duration }) / duration) * 100}%` : '0%'
-  const onAction = ({ nativeEvent }: AccessibilityActionEvent) => {
-    if (nativeEvent.actionName === SEEK_ACTIONS.increment) onSeek(position + SKIP_SECONDS)
-    if (nativeEvent.actionName === SEEK_ACTIONS.decrement) onSeek(position - SKIP_SECONDS)
-  }
+  const share = playedShareOf({ at: shown, duration })
   return (
     <View
-      accessible
-      accessibilityActions={[{ name: SEEK_ACTIONS.increment }, { name: SEEK_ACTIONS.decrement }]}
-      accessibilityLabel={PLAYER_COPY.seek}
-      accessibilityRole="adjustable"
-      accessibilityValue={{
-        min: 0,
-        max: Math.round(duration),
-        now: Math.round(shown),
-        text: PLAYER_COPY.of({ at: formatDuration(shown), length: formatDuration(duration) }),
-      }}
-      onAccessibilityAction={onAction}
+      {...scrubberAccessibilityOf({ position, shown, duration, onSeek })}
       onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)}
       onMoveShouldSetResponder={() => true}
       onResponderGrant={(event) => setDragged(timeAt(event))}
@@ -294,20 +264,7 @@ const PlayerChrome = ({
       </Animated.View>
       {caption !== null && (
         <View pointerEvents="none" style={[styles.captionSlot, sides]}>
-          <Text style={styles.caption}>
-            {keyedRuns(caption).map((run) => (
-              <Text
-                key={run.key}
-                style={[
-                  run.italic && styles.italic,
-                  run.bold && styles.bold,
-                  run.underline && styles.underline,
-                ]}
-              >
-                {run.text}
-              </Text>
-            ))}
-          </Text>
+          <CaptionText caption={caption} />
         </View>
       )}
     </View>
@@ -383,20 +340,6 @@ const styles = StyleSheet.create({
     // Clear of the time and the scrubber along the bottom.
     marginBottom: SIZES.controlLarge + SIZES.space4,
   },
-  caption: {
-    maxWidth: SIZES.measure,
-    paddingHorizontal: SIZES.space2,
-    paddingVertical: SIZES.space1,
-    borderRadius: SIZES.radius,
-    overflow: 'hidden',
-    backgroundColor: COLOURS.deep,
-    color: COLOURS.onPicture,
-    fontSize: SIZES.textLg,
-    textAlign: 'center',
-  },
-  italic: { fontStyle: 'italic' },
-  bold: { fontWeight: '700' },
-  underline: { textDecorationLine: 'underline' },
   noticeSlot: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   notice: {
     maxWidth: SIZES.measure,

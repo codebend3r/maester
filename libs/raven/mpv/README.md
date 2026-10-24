@@ -48,15 +48,18 @@ to P5, not the headless tests.
 
 ## Reproducible source build
 
-Run targets through Nx from the repository root:
+After installing the native toolchain, run from the repository root:
 
 ```sh
-bunx nx run @raven/mpv:fetch:sources
-bunx nx run @raven/mpv:fetch:libmpv
-bunx nx run @raven/mpv:build:native
-bunx nx run @raven/mpv:test:native
-bunx nx run @raven/mpv:audit:native
+bun run mpv:native
 ```
+
+The root command defaults `DEVELOPER_DIR` to `/Applications/Xcode.app/Contents/Developer`,
+respecting an explicit override. Nx orders both checks after the uncached `build:native`,
+which depends on cached `fetch:libmpv`. This builds missing runtime resources and refreshes
+HEAD-specific sources and provenance after every cache restoration, rebase or squash.
+Direct Nx native targets also follow these dependencies, but need `DEVELOPER_DIR` supplied
+when the system's `xcode-select` points to Command Line Tools.
 
 `fetch:sources` is portable and only downloads source. The remaining targets need
 macOS arm64, Xcode with its Metal Toolchain, cmake, ninja, meson, pkgconf, Python 3,
@@ -169,7 +172,10 @@ check, not a p99 performance measurement.
 `test:native` is a cached Nx target, keyed on this project's files (the native sources and
 build scripts among them), its dependencies' production files and the Xcode version, which
 together fix the addon and libmpv it loads. A run whose inputs match an earlier pass restores
-that pass. It loads the built resources rather than building them, so `build:native` runs first.
+that pass. The test process loads built resources; Nx first runs its uncached `build:native`
+dependency, which refreshes the current HEAD's source receipt after cached runtime restoration.
+The audit has the same prerequisite. A source receipt mismatch must be repaired by that build,
+not by weakening the audit or manually relabeling cached provenance.
 
 Local P3 implementation/review readiness can be conditional on generic gates and
 syntax-only Objective-C++ checks when the developer's Metal Toolchain is absent.

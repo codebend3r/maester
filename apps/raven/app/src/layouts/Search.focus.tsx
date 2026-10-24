@@ -1,71 +1,49 @@
-import { useState } from 'react'
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { useScreenFocusScope } from '@/layouts/focus'
-import { formStyles } from '@/layouts/formStyles'
 import {
   CLEAR_SEARCH,
   type SearchFieldProps,
   type SearchKit,
   type SearchLayoutProps,
 } from '@/layouts/searchKit'
-import { NOTHING_ON_FOCUS, PlateButton, tvFieldStyles } from '@/layouts/tvControls'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { NOTHING_ON_FOCUS, PlateButton, TvTextField } from '@/layouts/tvControls'
+import { COLOURS } from '@/theme/appTheme'
+import { TV_SIZES } from '@/theme/tvSizes'
 
 /**
- * A search box the remote selects, which opens the platform's own keyboard. It reports each
- * key as it is typed, and the box searches once typing pauses or the keyboard sends it.
- * Leaving the keyboard with Menu cancels the edit: the native field goes back to what it held
- * but reports no change, so the box takes the text it ends editing with, as sign-in's does.
+ * A search box the remote selects, which opens the platform's own keyboard. It searches once
+ * typing pauses or the keyboard sends it, and a clear button beside it empties it.
  */
 const SearchField = ({
   search,
   label,
   isPreferred = false,
   onFocused = NOTHING_ON_FOCUS,
-}: SearchFieldProps) => {
-  const [isFocused, setFocused] = useState(false)
-  return (
-    <View style={styles.box}>
-      <View
-        style={[
-          formStyles.input,
-          tvFieldStyles.frame,
-          styles.frame,
-          isFocused && formStyles.focused,
-        ]}
-      >
-        <TextInput
-          accessibilityLabel={label}
-          autoCapitalize="none"
-          autoCorrect={false}
-          hasTVPreferredFocus={isPreferred}
-          onBlur={() => setFocused(false)}
-          onChangeText={search.setText}
-          onEndEditing={({ nativeEvent }) => search.setText(nativeEvent.text)}
-          onFocus={() => {
-            setFocused(true)
-            onFocused()
-          }}
-          onSubmitEditing={({ nativeEvent }) => search.searchFor(nativeEvent.text)}
-          placeholder={label}
-          placeholderTextColor={COLOURS.muted}
-          returnKeyType="search"
-          style={tvFieldStyles.input}
-          value={search.text}
-        />
-      </View>
-      {search.text !== '' && (
-        <PlateButton
-          label={CLEAR_SEARCH.label}
-          onPress={() => search.searchFor('')}
-          accessibilityRole="button"
-          text={CLEAR_SEARCH.text}
-        />
-      )}
-    </View>
-  )
-}
+}: SearchFieldProps) => (
+  <View style={styles.box}>
+    <TvTextField
+      frameStyle={styles.frame}
+      isPreferred={isPreferred}
+      label={label}
+      onChangeText={search.setText}
+      onFocused={onFocused}
+      onSubmit={search.searchFor}
+      placeholder={label}
+      placeholderTextColor={COLOURS.muted}
+      returnKeyType="search"
+      value={search.text}
+    />
+    {search.text !== '' && (
+      <PlateButton
+        label={CLEAR_SEARCH.label}
+        onPress={() => search.searchFor('')}
+        accessibilityRole="button"
+        text={CLEAR_SEARCH.text}
+      />
+    )}
+  </View>
+)
 
 /**
  * The search screen on a TV: the title and the field at the top, and the results below as
@@ -93,10 +71,10 @@ export const focusSearch: SearchKit = { SearchField, SearchLayout }
 
 const styles = StyleSheet.create({
   ground: { flex: 1, backgroundColor: COLOURS.ground },
-  page: { gap: SIZES.space4, paddingVertical: SIZES.space6 },
-  header: { gap: SIZES.space3, paddingHorizontal: SIZES.space8 },
-  title: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
-  notice: { color: COLOURS.muted, fontSize: SIZES.textLg },
-  box: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space2 },
-  frame: { width: SIZES.measure },
+  page: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
+  header: { gap: TV_SIZES.space3, paddingHorizontal: TV_SIZES.space8 },
+  title: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+  notice: { color: COLOURS.muted, fontSize: TV_SIZES.textLg },
+  box: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space2 },
+  frame: { width: TV_SIZES.measure },
 })
