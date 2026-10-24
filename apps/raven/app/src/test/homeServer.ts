@@ -50,6 +50,7 @@ const libraryFor = ({ id, name, kind }: { id: number; name: string; kind: Librar
     settings: {
       saveProgress: true,
       pinned: true,
+      inHero: true,
       sort: MEDIA_SORTS.title,
       view: LIBRARY_VIEWS.grid,
       groupBy: MEDIA_GROUPINGS.resolution,

@@ -39,6 +39,8 @@ export {
   afterFavourites,
   afterItemEdited,
   afterLibraryEvent,
+  afterHeroLibraries,
+  afterHeroPicked,
   afterLibrarySaved,
   afterLibraryView,
   afterMatch,

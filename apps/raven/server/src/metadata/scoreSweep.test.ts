@@ -892,7 +892,12 @@ describe('the score sweep', () => {
       omdb: OMDB_OFF().source,
       mdblist: mdblist.source,
     })
-    const refreshing = new RatingsRefresh(libraries, repository, { quickScan: vi.fn() }, sweep)
+    const refreshing = new RatingsRefresh(
+      libraries,
+      repository,
+      { quickScan: vi.fn(), cancel: vi.fn() },
+      sweep,
+    )
 
     await Array.from({ length: 8 }).reduce<Promise<void>>(
       (pressed) =>

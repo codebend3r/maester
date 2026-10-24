@@ -81,6 +81,10 @@ export const queryKeys = {
   /** A search from home, under home's key so whatever reads home again reads it again too. */
   homeSearch: (query: string) => ['home', 'search', query],
   homeSearches: ['home', 'search'],
+  /** The hero's titles, under home's key so whatever reads home again reads them again too. */
+  hero: ['home', 'hero'],
+  /** The movies and shows the admin picked for the hero. */
+  heroPicks: ['hero', 'picks'],
   history: ({
     libraryId,
     show,
@@ -147,6 +151,8 @@ export const mutationKeys = {
   watched: ['watched'],
   /** Any library's pin: they all show in the libraries list and on home. */
   pin: ['pin'],
+  /** Any library's place in the hero: they all show in the libraries list and in the hero. */
+  heroLibrary: ['hero-library'],
   /** One library's sort, view or grouping, which only its page changes. */
   libraryView: (libraryId: number) => ['library-view', libraryId],
   playbackSettings: ['settings', 'playback'],

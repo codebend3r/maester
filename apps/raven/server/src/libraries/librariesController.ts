@@ -27,6 +27,7 @@ import {
   type SagaBackdrop,
   type ShowListing,
   isJoinRequest,
+  isLibraryHeroChange,
   isLibraryViewChange,
   isRecord,
   isSagaBackdrop,
@@ -265,6 +266,32 @@ export class LibrariesController {
     })
   }
 
+  /** Includes the library's titles in home's hero, or leaves them out. */
+  @AdminOnly()
+  @Put(':id/hero')
+  setInHero(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+  ): Library {
+    const { name, paths, settings: current } = this.find(id)
+    const settings = parseBody({
+      guard: isLibraryHeroChange,
+      body,
+      message: 'inHero must be true or false.',
+    })
+    if (settings.inHero && current.locked) {
+      throw new BadRequestException('A locked library can never show in the hero.')
+    }
+    const record = this.libraries.update({ id, input: { name, paths, settings } })
+    if (!record) throw new NotFoundException(`No library ${id}`)
+    return this.withStatus({
+      record,
+      canSee: true,
+      isAdmin: this.management.canManage({ request }),
+    })
+  }
+
   @AdminOnly()
   @Delete(':id')
   @HttpCode(204)
@@ -279,6 +306,16 @@ export class LibrariesController {
     this.scanner.forget(id)
     // The pass finds no library, and clears up the items it left.
     this.metadata.enqueue(id)
+  }
+
+  /** Cancels a Rescan, or any scan running: it stops at its next step. */
+  @AdminOnly()
+  @Post(':id/scan/cancel')
+  @HttpCode(200)
+  cancelScan(@Param('id', ParseIntPipe) id: number): Library {
+    const record = this.find(id)
+    this.scanner.cancel(id)
+    return this.withStatus({ record, canSee: true, isAdmin: true })
   }
 
   @AdminOnly()
@@ -301,6 +338,16 @@ export class LibrariesController {
   refresh(@Param('id', ParseIntPipe) id: number): Library {
     const record = this.find(id)
     this.ratings.start(id)
+    return this.withStatus({ record, canSee: true, isAdmin: true })
+  }
+
+  /** Cancels a Refresh: its ratings stop being asked for and its scan stops. */
+  @AdminOnly()
+  @Post(':id/refresh/cancel')
+  @HttpCode(200)
+  cancelRefresh(@Param('id', ParseIntPipe) id: number): Library {
+    const record = this.find(id)
+    this.ratings.cancel(id)
     return this.withStatus({ record, canSee: true, isAdmin: true })
   }
 

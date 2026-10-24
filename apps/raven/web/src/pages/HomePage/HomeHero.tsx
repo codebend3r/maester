@@ -1,7 +1,5 @@
-import { useQueries } from '@tanstack/react-query'
 import { Button, ButtonLink } from '@raven/ui'
 import { type KeyboardEvent, useEffect, useState, useSyncExternalStore } from 'react'
-import { itemQuery } from '@/lib/queries'
 import type { Featured } from '@/pages/HomePage/featured'
 import styles from '@/pages/HomePage/HomeHero.module.scss'
 
@@ -40,6 +38,9 @@ const FAN = {
   previous: styles.previous,
   away: styles.away,
 } as const
+
+/** How far past the front a poster is still fetched: the next, and the one after it. */
+const FAN_LOADED = 2
 
 const fanPlace = ({ offset, count }: { offset: number; count: number }): keyof typeof FAN => {
   if (offset === 0) return 'front'
@@ -104,13 +105,10 @@ const useAttention = (node: HTMLElement | null): boolean => {
  */
 const Slide = ({
   entry,
-  line,
   place,
   isCurrent,
 }: {
   entry: Featured
-  /** Its summary, else its tagline, once its page's details have come. */
-  line: string | null
   /** "2 of 5". */
   place: string
   isCurrent: boolean
@@ -126,7 +124,7 @@ const Slide = ({
     <h2 className={[styles.title, TITLE_SIZES[titleSize(entry.title)]].filter(Boolean).join(' ')}>
       {entry.title}
     </h2>
-    <p className={styles.line}>{line}</p>
+    <p className={styles.line}>{entry.line}</p>
     <div className={styles.actions}>
       <div className={styles.buttons}>
         {entry.play && (
@@ -167,7 +165,6 @@ export const HomeHero = ({ featured }: { featured: Featured[] }) => {
   const [node, setNode] = useState<HTMLElement | null>(null)
   const isAttendedTo = useAttention(node)
   const isStill = useSyncExternalStore(followLessMotion, asksForLessMotion)
-  const details = useQueries({ queries: featured.map(({ itemId }) => itemQuery(itemId)) })
   const at = turn.index % count
   const isHeld = isStill || isAttendedTo || count < 2
 
@@ -193,7 +190,7 @@ export const HomeHero = ({ featured }: { featured: Featured[] }) => {
       ref={setNode}
       className={styles.hero}
       aria-roledescription="carousel"
-      aria-label="Just added"
+      aria-label="Featured"
     >
       <div className={styles.wash} aria-hidden="true">
         {featured.flatMap(({ key, backdrop }, index) =>
@@ -205,6 +202,7 @@ export const HomeHero = ({ featured }: { featured: Featured[] }) => {
                   src={backdrop}
                   alt=""
                   decoding="async"
+                  fetchPriority={index === at ? 'high' : 'auto'}
                 />,
               ]
             : [],
@@ -212,18 +210,14 @@ export const HomeHero = ({ featured }: { featured: Featured[] }) => {
       </div>
 
       <div className={styles.slides}>
-        {featured.map((entry, index) => {
-          const about = details[index]?.data
-          return (
-            <Slide
-              key={entry.key}
-              entry={entry}
-              line={about?.summary ?? about?.tagline ?? null}
-              place={`${index + 1} of ${count}`}
-              isCurrent={index === at}
-            />
-          )
-        })}
+        {featured.map((entry, index) => (
+          <Slide
+            key={entry.key}
+            entry={entry}
+            place={`${index + 1} of ${count}`}
+            isCurrent={index === at}
+          />
+        ))}
       </div>
 
       {count > 1 && (
@@ -251,15 +245,21 @@ export const HomeHero = ({ featured }: { featured: Featured[] }) => {
 
       <div className={styles.stack} aria-hidden="true">
         <div className={styles.fan}>
-          {featured.map(({ key, poster }, index) => (
-            <img
-              key={key}
-              className={`${styles.poster} ${FAN[fanPlace({ offset: (index - at + count) % count, count })]}`}
-              src={poster}
-              alt=""
-              decoding="async"
-            />
-          ))}
+          {featured.flatMap(({ key, poster }, index) => {
+            const offset = (index - at + count) % count
+            // Only the posters in view, and the one the next turn brings in, are fetched.
+            if (offset > FAN_LOADED && offset !== count - 1) return []
+            return [
+              <img
+                key={key}
+                className={`${styles.poster} ${FAN[fanPlace({ offset, count })]}`}
+                src={poster}
+                alt=""
+                decoding="async"
+                fetchPriority={offset === 0 ? 'high' : 'auto'}
+              />,
+            ]
+          })}
         </div>
       </div>
     </section>

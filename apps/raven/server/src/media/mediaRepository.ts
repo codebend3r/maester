@@ -197,7 +197,8 @@ const EPISODE_FILES = `
     JOIN media_items mi ON mi.media_id = m.id
     JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
     JOIN shown_items s ON s.id = e.parent_id
-   WHERE m.library_id = ?`
+   WHERE m.library_id = ?
+     AND (? IS NULL OR s.parent_id IN (SELECT value FROM json_each(?)))`
 
 const BY_TITLE = 'COALESCE(item_sort_title, title) COLLATE NOCASE, id'
 
@@ -395,6 +396,7 @@ export class MediaRepository {
     sort = 'title',
     seed = 0,
     limit,
+    showIds = null,
     account,
   }: {
     libraryId: number
@@ -402,11 +404,14 @@ export class MediaRepository {
     sort?: MediaSort
     seed?: number
     limit?: number
+    /** Only these shows; null lists them all. */
+    showIds?: readonly number[] | null
     account: AccountKey
   }): ShowEntry[] {
     const pattern = likePattern(search.trim())
+    const only = showIds == null ? null : JSON.stringify(showIds)
     const rows = this.db
-      .prepare<[ByAccount, number, string, string, number], ShowRow>(
+      .prepare<[ByAccount, number, string | null, string | null, string, string, number], ShowRow>(
         `WITH files AS (${EPISODE_FILES})
          SELECT sh.id, sh.ended, COUNT(DISTINCT f.episode_id) AS episodes,
                 COUNT(DISTINCT CASE WHEN f.watched = 1 THEN f.episode_id END) AS watched_episodes,
@@ -421,10 +426,10 @@ export class MediaRepository {
           ORDER BY ${SHOW_ORDER_BY[sort]}
           LIMIT ?`,
       )
-      .all({ account }, libraryId, pattern, pattern, sqlLimit({ sort, limit }))
-    const showIds = rows.map((row) => row.id)
-    const summaries = this.metadata.summaries(showIds)
-    const next = this.nextUnwatched({ showIds, libraryIds: [libraryId], account })
+      .all({ account }, libraryId, only, only, pattern, pattern, sqlLimit({ sort, limit }))
+    const listedIds = rows.map((row) => row.id)
+    const summaries = this.metadata.summaries(listedIds)
+    const next = this.nextUnwatched({ showIds: listedIds, libraryIds: [libraryId], account })
     const episodes = new Map(
       this.getMany({ ids: [...next.values()], account }).map((item) => [item.id, item]),
     )
@@ -445,6 +450,48 @@ export class MediaRepository {
       ]
     })
     return sort === MEDIA_SORTS.random ? shuffle({ items: entries, seed }).slice(0, limit) : entries
+  }
+
+  /**
+   * The ids of a library's matched movies, or of its shows, the most
+   * recently released first (a title with no date goes by its year, one with
+   * neither goes last), at most `limit`. A read of the matched items alone,
+   * so the hero costs none of a listing's per-file work.
+   */
+  newestReleased({
+    libraryId,
+    type,
+    limit,
+  }: {
+    libraryId: number
+    type: typeof ITEM_TYPES.movie | typeof ITEM_TYPES.show
+    limit: number
+  }): number[] {
+    const held =
+      type === ITEM_TYPES.movie
+        ? `SELECT mi.item_id AS id
+             FROM media m JOIN media_items mi ON mi.media_id = m.id
+            WHERE m.library_id = ?`
+        : `SELECT s.parent_id AS id
+             FROM media m
+             JOIN media_items mi ON mi.media_id = m.id
+             JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
+             JOIN shown_items s ON s.id = e.parent_id
+            WHERE m.library_id = ?`
+    return this.db
+      .prepare<[number, string, number], { id: number }>(
+        `WITH held AS (${held}),
+              released AS (
+                SELECT i.id, i.sort_title,
+                       COALESCE(i.released, CAST(i.year AS TEXT)) AS released
+                  FROM shown_items i
+                 WHERE i.id IN (SELECT id FROM held) AND i.type = ?)
+         SELECT id FROM released
+          ORDER BY released IS NULL, released DESC, sort_title COLLATE NOCASE, id
+          LIMIT ?`,
+      )
+      .all(libraryId, type, limit)
+      .map((row) => row.id)
   }
 
   /**

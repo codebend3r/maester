@@ -15,6 +15,8 @@ export const {
   favouritesQuery,
   favouriteTitlesQuery,
   homeQuery,
+  heroQuery,
+  heroPicksQuery,
   homeSearchQuery,
   mediaQuery,
   tracksQuery,

@@ -16,7 +16,7 @@ export class RatingsRefresh {
   constructor(
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
-    @Inject(ScannerService) private readonly scanner: Pick<ScannerService, 'quickScan'>,
+    @Inject(ScannerService) private readonly scanner: Pick<ScannerService, 'quickScan' | 'cancel'>,
     @Inject(ScoreSweep)
     private readonly scoreSweep: Pick<ScoreSweep, 'kick' | 'canSettle' | 'requestsPause'>,
   ) {}
@@ -40,6 +40,17 @@ export class RatingsRefresh {
     }
     this.scanner.quickScan(libraryId)
     this.scoreSweep.kick()
+  }
+
+  /**
+   * Cancels the library's Refresh: its remaining titles are not asked for,
+   * the refresh is over as of now, and the scan under way stops. Scores
+   * already fetched stay.
+   */
+  cancel(libraryId: number): void {
+    this.metadata.clearLibraryRequests(libraryId)
+    this.libraries.finishRatingsRefreshes(new Date().toISOString())
+    this.scanner.cancel(libraryId)
   }
 
   /**

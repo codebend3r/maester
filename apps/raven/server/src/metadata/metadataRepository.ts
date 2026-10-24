@@ -667,6 +667,20 @@ export class MetadataRepository {
     })()
   }
 
+  /** Each item's summary, else its tagline, as the hero reads it under the title; null where it has neither. */
+  blurbs(ids: readonly number[]): Map<number, string | null> {
+    if (ids.length === 0) return new Map()
+    return new Map(
+      this.db
+        .prepare<[string], { id: number; blurb: string | null }>(
+          `SELECT id, COALESCE(NULLIF(summary, ''), NULLIF(tagline, '')) AS blurb
+             FROM shown_items WHERE id IN (SELECT value FROM json_each(?))`,
+        )
+        .all(JSON.stringify([...new Set(ids)]))
+        .map((row) => [row.id, row.blurb]),
+    )
+  }
+
   /** An item's page, apart from its files, its children, the AI note and its favourite mark, which the caller adds. */
   details(id: number): Omit<ItemDetails, 'versions' | 'children' | 'aiMatch' | 'favourite'> | null {
     const row = this.db.prepare<[number], ItemRow>('SELECT * FROM shown_items WHERE id = ?').get(id)
@@ -856,6 +870,11 @@ export class MetadataRepository {
   /** Settles every library's request for the item's scores. */
   clearRequest(itemId: number): void {
     this.db.prepare('DELETE FROM score_requests WHERE item_id = ?').run(itemId)
+  }
+
+  /** Drops a library's requests, for a Refresh the admin cancelled. */
+  clearLibraryRequests(libraryId: number): void {
+    this.db.prepare('DELETE FROM score_requests WHERE library_id = ?').run(libraryId)
   }
 
   /** Drops every request, for when no source could ever answer one. */

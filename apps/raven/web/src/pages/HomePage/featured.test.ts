@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import type { HomeShelf, Library } from '@raven/core'
-import { FEATURED_COUNT, featuredOf } from '@/pages/HomePage/featured'
+import type { Hero } from '@raven/core'
+import { featuredOf } from '@/pages/HomePage/featured'
 import { itemSummary, library, matchedMovie, mediaItem, showEntry } from '@/test/fixtures'
 
 const FILMS = library({ id: 2, name: 'Films' })
@@ -33,82 +33,73 @@ const show = ({ id, addedAt }: { id: number; addedAt: string }) =>
     }),
   })
 
-const titles = (shelves: ReadonlyArray<{ shelf: HomeShelf; library: Library }>) =>
-  featuredOf(shelves).map((entry) => entry.title)
+/** The hero's entry for a movie in Films, with the line the server read for it. */
+const movieEntry = ({
+  media,
+  line = null,
+}: {
+  media: ReturnType<typeof arrival>
+  line?: string | null
+}): Hero[number] => ({ libraryId: 2, type: 'media', media, line })
+
+const showHeroEntry = ({
+  entry,
+  line = null,
+}: {
+  entry: ReturnType<typeof show>
+  line?: string | null
+}): Hero[number] => ({ libraryId: 3, type: 'shows', entry, line })
+
+const LIBRARIES = [FILMS, SERIES]
 
 describe('featuredOf', () => {
-  it("takes each library's newest arrival first, the most recent first, then each one's next", () => {
-    expect(
-      titles([
-        {
-          library: FILMS,
-          shelf: {
-            libraryId: 2,
-            type: 'media',
-            media: [
-              arrival({ id: 1, addedAt: '2026-10-10T00:00:00.000Z' }),
-              arrival({ id: 2, addedAt: '2026-10-09T00:00:00.000Z' }),
-            ],
-          },
-        },
-        {
-          library: SERIES,
-          shelf: {
-            libraryId: 3,
-            type: 'shows',
-            shows: [
-              show({ id: 7, addedAt: '2026-10-12T00:00:00.000Z' }),
-              show({ id: 8, addedAt: '2026-10-11T00:00:00.000Z' }),
-            ],
-          },
-        },
-      ]),
-    ).toEqual(['Show 7', 'Movie 1', 'Show 8', 'Movie 2'])
-  })
-
-  it(`stops at ${FEATURED_COUNT}`, () => {
-    const media = Array.from({ length: 8 }, (_, index) =>
-      arrival({ id: index + 1, addedAt: `2026-10-0${9 - index}T00:00:00.000Z` }),
-    )
-    expect(titles([{ library: FILMS, shelf: { libraryId: 2, type: 'media', media } }])).toEqual([
+  it('keeps the order the server chose, whichever library each title is in', () => {
+    const hero = [
+      showHeroEntry({ entry: show({ id: 7, addedAt: '2026-10-12T00:00:00.000Z' }) }),
+      movieEntry({ media: arrival({ id: 1, addedAt: '2026-10-10T00:00:00.000Z' }) }),
+      showHeroEntry({ entry: show({ id: 8, addedAt: '2026-10-11T00:00:00.000Z' }) }),
+    ]
+    expect(featuredOf({ hero, libraries: LIBRARIES }).map((entry) => entry.title)).toEqual([
+      'Show 7',
       'Movie 1',
-      'Movie 2',
-      'Movie 3',
-      'Movie 4',
-      'Movie 5',
+      'Show 8',
     ])
   })
 
-  it('leaves out what has no poster or no backdrop, and files matched to nothing', () => {
+  it('carries the line the server read under each title', () => {
+    const hero = [
+      movieEntry({
+        media: arrival({ id: 1, addedAt: '2026-10-10T00:00:00.000Z' }),
+        line: 'A crew of thieves.',
+      }),
+    ]
+    expect(featuredOf({ hero, libraries: LIBRARIES })[0]?.line).toBe('A crew of thieves.')
+  })
+
+  it('leaves out a title whose library is not known, and one with no picture to show', () => {
     const noBackdrop = matchedMovie({ id: 3, item: itemSummary({ backdropVersion: null }) })
-    const noPoster = matchedMovie({
-      id: 4,
-      item: itemSummary({ posterVersion: null, backdropVersion: 'b4' }),
-    })
-    const bareShow = showEntry()
-    expect(
-      featuredOf([
-        {
-          library: FILMS,
-          shelf: { libraryId: 2, type: 'media', media: [noBackdrop, noPoster, mediaItem()] },
-        },
-        { library: SERIES, shelf: { libraryId: 3, type: 'shows', shows: [bareShow] } },
-      ]),
-    ).toEqual([])
+    const hero: Hero = [
+      {
+        libraryId: 99,
+        type: 'media',
+        media: arrival({ id: 1, addedAt: '2026-10-10T00:00:00.000Z' }),
+        line: null,
+      },
+      { libraryId: 2, type: 'media', media: noBackdrop, line: null },
+      { libraryId: 2, type: 'media', media: mediaItem(), line: null },
+    ]
+    expect(featuredOf({ hero, libraries: LIBRARIES })).toEqual([])
   })
 
   it("says what a movie is, plays it and opens its page in the movie's library", () => {
     const movie = arrival({ id: 5, addedAt: '2026-10-10T00:00:00.000Z' })
     const hdr = { ...movie, width: 3840, height: 2160, hdr: true, duration: 9960 }
-    const [featured] = featuredOf([
-      { library: FILMS, shelf: { libraryId: 2, type: 'media', media: [hdr] } },
-    ])
+    const [featured] = featuredOf({ hero: [movieEntry({ media: hdr })], libraries: LIBRARIES })
     expect(featured).toMatchObject({
       key: 'media:5',
-      itemId: 105,
       poster: '/api/pictures/items/105/poster/p5',
       backdrop: '/api/pictures/items/105/backdrop/b5',
-      eyebrow: 'New in Films',
+      eyebrow: 'Featured in Films',
       title: 'Movie 5',
       facts: ['2026', '2h 46m', '4K HDR'],
       details: '/movies/105?library=2',
@@ -123,19 +114,16 @@ describe('featuredOf', () => {
     const movie = arrival({ id: 6, addedAt: '2026-10-10T00:00:00.000Z' })
     const bare = { ...movie, duration: null, width: null, height: null }
     expect(
-      featuredOf([{ library: FILMS, shelf: { libraryId: 2, type: 'media', media: [bare] } }])[0]
-        ?.facts,
+      featuredOf({ hero: [movieEntry({ media: bare })], libraries: LIBRARIES })[0]?.facts,
     ).toEqual(['2026'])
   })
 
   it('says how long a show has run and how much of it there is, and plays what is next', () => {
     const entry = { ...show({ id: 9, addedAt: '2026-10-10T00:00:00.000Z' }), endedYear: 2025 }
-    const [featured] = featuredOf([
-      { library: SERIES, shelf: { libraryId: 3, type: 'shows', shows: [entry] } },
-    ])
+    const [featured] = featuredOf({ hero: [showHeroEntry({ entry })], libraries: LIBRARIES })
     expect(featured).toMatchObject({
       key: 'show:9',
-      eyebrow: 'New in Series',
+      eyebrow: 'Featured in Series',
       title: 'Show 9',
       facts: ['2022 to 2025', '9 episodes'],
       details: '/shows/9',
@@ -146,8 +134,7 @@ describe('featuredOf', () => {
   it('has nothing to play for a show watched to the end', () => {
     const entry = { ...show({ id: 9, addedAt: '2026-10-10T00:00:00.000Z' }), next: null }
     expect(
-      featuredOf([{ library: SERIES, shelf: { libraryId: 3, type: 'shows', shows: [entry] } }])[0]
-        ?.play,
+      featuredOf({ hero: [showHeroEntry({ entry })], libraries: LIBRARIES })[0]?.play,
     ).toBeNull()
   })
 })

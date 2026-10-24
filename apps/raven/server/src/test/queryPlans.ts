@@ -33,6 +33,7 @@ export const PRODUCTION_STATISTICS = [
   ['credits', 'sqlite_autoindex_credits_1', '669689 17 1 1'],
   ['favourites', 'favourites', '1 1 1'],
   ['favourites', 'favourites_media', '1 1'],
+  ['hero_picks', null, '1'],
   ['item_favourites', 'item_favourites', '1 1 1'],
   ['item_favourites', 'item_favourites_item', '1 1'],
   ['item_images', 'sqlite_autoindex_item_images_1', '56977 2 1 1'],

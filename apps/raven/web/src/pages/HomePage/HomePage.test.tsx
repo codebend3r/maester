@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, spyOn } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { type Home, type HomeSearch, type ItemDetails, mediaLabel } from '@raven/core'
+import { type Hero, type Home, type HomeSearch, mediaLabel } from '@raven/core'
 import { Link, useLocation } from 'react-router-dom'
 import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { api } from '@/lib/api'
@@ -28,10 +28,14 @@ const AddressProbe = () => {
 describe('HomePage', () => {
   const spies = {
     home: spyOn(api, 'getHome'),
+    hero: spyOn(api, 'getHero'),
     libraries: spyOn(api, 'listLibraries'),
     search: spyOn(api, 'searchHome'),
-    item: spyOn(api, 'getItem'),
   }
+
+  beforeEach(() => {
+    spies.hero.mockImplementation(async () => [])
+  })
 
   const open = (home: Home) => {
     spies.home.mockImplementation(async () => home)
@@ -44,7 +48,7 @@ describe('HomePage', () => {
     spies.home.mockReset()
     spies.libraries.mockReset()
     spies.search.mockReset()
-    spies.item.mockReset()
+    spies.hero.mockReset()
   })
 
   it('stands in for its shelves while home is read, hiding the stand-ins from a screen reader', async () => {
@@ -53,6 +57,15 @@ describe('HomePage', () => {
     renderWithProviders({ ui: <HomePage /> })
     expect(await screen.findByText('Gathering your libraries')).toBeInTheDocument()
     expect(screen.queryAllByRole('listitem')).toEqual([])
+  })
+
+  it('stands in for the hero while its titles are read, apart from the shelves', async () => {
+    spies.hero.mockImplementation(() => held<Hero>().promise)
+    spies.home.mockImplementation(async () => ({ inProgress: [], shelves: [] }))
+    spies.libraries.mockImplementation(async () => LIBRARIES)
+    renderWithProviders({ ui: <HomePage /> })
+    expect(await screen.findByText('Gathering the newest titles')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Gathering your libraries')).toBeNull())
   })
 
   it('shows no Back on a first visit, and steps back once the app has been browsed', async () => {
@@ -98,9 +111,14 @@ describe('HomePage', () => {
     )
   })
 
-  it('leads with the newest arrival that has a poster and a backdrop, ahead of what is in progress', async () => {
-    spies.item.mockImplementation(() => held<ItemDetails>().promise)
-    const pictured = matchedMovie({ item: itemSummary({ backdropVersion: 'b1' }) })
+  it('leads with the hero the server chose, ahead of what is in progress', async () => {
+    const pictured = matchedMovie({
+      item: itemSummary({ backdropVersion: 'b1' }),
+    })
+    const chosen: Hero = [
+      { libraryId: 2, type: 'media', media: pictured, line: 'A line from the server.' },
+    ]
+    spies.hero.mockImplementation(async () => chosen)
     open({
       inProgress: [{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }],
       shelves: [
@@ -108,18 +126,18 @@ describe('HomePage', () => {
         { libraryId: 3, type: 'shows', shows: [showEntry()] },
       ],
     })
-    const hero = await screen.findByRole('region', { name: 'Just added' })
-    expect(within(hero).getByText('New in Films')).toBeInTheDocument()
+    const hero = await screen.findByRole('region', { name: 'Featured' })
+    expect(within(hero).getByText('Featured in Films')).toBeInTheDocument()
+    expect(within(hero).getByText('A line from the server.')).toBeInTheDocument()
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
     ).toEqual(['Busboys', 'Continue watching', 'Films', 'Series'])
-    expect(spies.item.mock.calls).toEqual([[40]])
   })
 
-  it('leaves the hero out when no arrival has the pictures for it', async () => {
+  it('leaves the hero out when the server chose nothing', async () => {
     open({ inProgress: [], shelves: [{ libraryId: 2, type: 'media', media: [matchedMovie()] }] })
     await screen.findByRole('heading', { name: 'Films' })
-    expect(screen.queryByRole('region', { name: 'Just added' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Featured' })).toBeNull()
   })
 
   it("lays each library's row out as the library does: posters, shows, frame grabs", async () => {
