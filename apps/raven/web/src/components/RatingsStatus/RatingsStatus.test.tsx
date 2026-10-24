@@ -22,7 +22,7 @@ describe('RatingsStatus', () => {
 
   it('counts the titles done while it runs', () => {
     renderWithProviders({ ui: <RatingsStatus refresh={running} /> })
-    expect(screen.getByText('Refreshing ratings · 1,200 of 3,400')).toBeInTheDocument()
+    expect(screen.getByText('Updating ratings · 1,200 of 3,400')).toBeInTheDocument()
   })
 
   it('says the rest wait for midnight UTC when the daily limit is spent', () => {
@@ -66,7 +66,7 @@ describe('RatingsStatus', () => {
     expect(region?.textContent).toBe('')
     await userEvent.click(screen.getByRole('button', { name: 'Start' }))
     expect(container.querySelector('[aria-live="polite"]')).toBe(region)
-    expect(region?.textContent).toBe('Refreshing ratings · 1,200 of 3,400')
+    expect(region?.textContent).toBe('Updating ratings · 1,200 of 3,400')
   })
 
   it('says nothing while the admin lock is on', () => {
@@ -74,6 +74,6 @@ describe('RatingsStatus', () => {
       ui: <RatingsStatus refresh={running} />,
       adminLock: { state: 'on', available: true },
     })
-    expect(screen.queryByText(/Refreshing ratings/)).toBeNull()
+    expect(screen.queryByText(/Updating ratings/)).toBeNull()
   })
 })

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { KINDS, type Library, plural } from '@raven/core'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
@@ -18,6 +18,7 @@ import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { MANAGEMENT_MODES, useCanManage, useManagement } from '@/lib/management'
 import { api } from '@/lib/api'
 import {
+  afterHeroLibraries,
   afterPins,
   librarySettingsEdits,
   mutationKeys,
@@ -65,11 +66,53 @@ const PinButton = ({ library }: { library: Library }) => {
       icon="pin"
       className={styles.pin}
       aria-pressed={pinned}
+      title={
+        pinned
+          ? 'Pinned: this library has its own link in the side menu and a row on Home. Press to unpin it.'
+          : 'Pin this library: give it its own link in the side menu and a row on Home.'
+      }
       onClick={() => pin.mutate(!pinned)}
     >
       <span aria-hidden="true">{pinned ? 'Pinned' : 'Pin'}</span>
       <span className="visually-hidden">Pin {library.name}</span>
     </Button>
+  )
+}
+
+/**
+ * Whether home's hero may show this library's titles. The admin's, so it
+ * mounts inside `AdminOnly`; it shows at once and the server's answer settles it.
+ * A locked library is never in the hero, so its box stays off and cannot be ticked.
+ */
+const HeroCheckbox = ({ library }: { library: Library }) => {
+  const queryClient = useQueryClient()
+  const id = useId()
+  const include = useOptimisticMutation({
+    mutationKey: mutationKeys.heroLibrary,
+    mutationFn: (inHero: boolean) => api.setLibraryInHero({ id: library.id, inHero }),
+    edits: (inHero) => librarySettingsEdits({ libraryId: library.id, change: { inHero } }),
+    settle: () => afterHeroLibraries(queryClient),
+  })
+  return (
+    <div className={styles.heroSetting}>
+      <input
+        id={id}
+        type="checkbox"
+        checked={library.settings.inHero}
+        disabled={library.settings.locked}
+        onChange={(event) => include.mutate(event.target.checked)}
+      />
+      <label
+        htmlFor={id}
+        title={
+          library.settings.locked
+            ? 'A locked library never shows in the hero'
+            : "Let Home's hero show this library's movies and shows"
+        }
+      >
+        Include in hero display<span className="visually-hidden"> for {library.name}</span>
+      </label>
+    </div>
   )
 }
 
@@ -122,10 +165,17 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
           <ScanStatus scan={library.scan} />
           <RatingsStatus refresh={library.ratingsRefresh} />
           <LibraryActionErrors actions={actions} className={styles.error} />
+          <AdminOnly>
+            <HeroCheckbox library={library} />
+          </AdminOnly>
         </div>
         <div className={styles.actions}>
-          <PinButton library={library} />
-          <LibraryActions library={library} isShut={isShut} actions={actions} />
+          <LibraryActions
+            library={library}
+            isShut={isShut}
+            actions={actions}
+            lead={<PinButton library={library} />}
+          />
         </div>
       </div>
     </li>
@@ -180,7 +230,13 @@ export const LibrariesPage = () => {
         <div className={styles.emptyBody}>
           <h1 className={styles.emptyTitle}>The server did not answer</h1>
           <p role="alert">{libraries.error.message}</p>
-          <Button onClick={() => libraries.refetch()}>Try again</Button>
+          <Button
+            icon="reset"
+            title="Ask the server for the libraries again"
+            onClick={() => libraries.refetch()}
+          >
+            Try again
+          </Button>
         </div>
       </section>
     )
@@ -197,7 +253,12 @@ export const LibrariesPage = () => {
             video inside is indexed, given a thumbnail, and ready to play.
           </p>
           {canManage ? (
-            <Button tone="primary" icon="plus" onClick={() => setAdding(true)}>
+            <Button
+              tone="primary"
+              icon="plus"
+              title="Add a library: a name, a type and the folders that hold its videos"
+              onClick={() => setAdding(true)}
+            >
               Add library
             </Button>
           ) : (
@@ -222,7 +283,13 @@ export const LibrariesPage = () => {
           {libraries.data && <p className={styles.summary}>{summaryOf(libraries.data)}</p>}
         </hgroup>
         <AdminOnly>
-          <Button tone="primary" icon="plus" className={styles.add} onClick={() => setAdding(true)}>
+          <Button
+            tone="primary"
+            icon="plus"
+            className={styles.add}
+            title="Add a library: a name, a type and the folders that hold its videos"
+            onClick={() => setAdding(true)}
+          >
             Add library
           </Button>
         </AdminOnly>

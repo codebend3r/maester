@@ -14,7 +14,7 @@ const noteOf = (refresh: RatingsRefresh): string | null => {
     case 'idle':
       return null
     case 'running':
-      return `Refreshing ratings · ${count.format(refresh.done)} of ${count.format(refresh.total)}`
+      return `Updating ratings · ${count.format(refresh.done)} of ${count.format(refresh.total)}`
     case 'waiting':
       return `Ratings: ${count.format(refresh.done)} of ${count.format(refresh.total)} · ${WAITING[refresh.reason]}`
     default: {
@@ -25,11 +25,11 @@ const noteOf = (refresh: RatingsRefresh): string | null => {
 }
 
 /**
- * What the ratings Refresh has done, so far, while it runs or waits and the
+ * What Update ratings has done, so far, while it runs or waits and the
  * admin lock is off, as the button that starts it is. `done` counts the
  * titles given up on, so it can jump; and a daily limit can hold it while
  * the other sources are still asked. Idle says nothing, as a finished
- * Refresh may have had nothing to ask for. The live region stays mounted,
+ * update may have had nothing to ask for. The live region stays mounted,
  * as ScanStatus's does, so a screen reader hears the first line and
  * when it goes.
  */

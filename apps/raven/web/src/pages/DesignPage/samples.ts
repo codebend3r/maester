@@ -106,6 +106,7 @@ export const SAMPLE_SCANS: Array<{ label: string; scan: ScanStatus }> = [
     label: 'Scanning',
     scan: {
       state: 'indexing',
+      kind: 'full',
       found: 1240,
       processed: 812,
       startedAt: '2026-10-09T12:00:00.000Z',
@@ -118,6 +119,7 @@ export const SAMPLE_SCANS: Array<{ label: string; scan: ScanStatus }> = [
     label: 'Done',
     scan: {
       state: 'idle',
+      kind: 'full',
       found: 1240,
       processed: 1240,
       startedAt: '2026-10-09T12:00:00.000Z',
@@ -130,6 +132,7 @@ export const SAMPLE_SCANS: Array<{ label: string; scan: ScanStatus }> = [
     label: 'Failed',
     scan: {
       state: 'idle',
+      kind: 'full',
       found: 0,
       processed: 0,
       startedAt: '2026-10-09T12:00:00.000Z',

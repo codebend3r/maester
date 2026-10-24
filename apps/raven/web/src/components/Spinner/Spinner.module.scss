@@ -1,0 +1,20 @@
+.spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid var(--color-lichen-faint);
+  border-top-color: currentcolor;
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .spinner {
+    animation: turn 0.8s linear infinite;
+  }
+}
+
+@keyframes turn {
+  to {
+    rotate: 1turn;
+  }
+}

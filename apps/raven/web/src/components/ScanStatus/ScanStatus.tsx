@@ -18,6 +18,23 @@ const lookingNote = (found: number): string =>
     ? 'Looking through the folders'
     : `Looking through the folders, ${plural({ n: found, one: 'video', many: 'videos' })} found so far`
 
+/** What the running scan is doing: walking the folders, indexing what it found, or waiting for the new videos to be matched. */
+const progressNote = (scan: Status): string => {
+  switch (scan.state) {
+    case SCAN_STATES.walking:
+      return lookingNote(scan.found)
+    case SCAN_STATES.matching:
+      return 'Matching the new videos'
+    case SCAN_STATES.idle:
+    case SCAN_STATES.indexing:
+      return `Indexing ${count.format(scan.processed)} of ${count.format(scan.found)}`
+    default: {
+      const unreachable: never = scan.state
+      return unreachable
+    }
+  }
+}
+
 /**
  * When the library was last fully scanned and last quick-scanned, as far as
  * either has run: "Full scan 2 h ago · Quick scan 4 min ago". A library
@@ -41,15 +58,15 @@ export const ScanStatus = ({ scan }: { scan: Status }) => {
     <div className={styles.status} aria-live="polite">
       {isScanning(scan) ? (
         <div className={styles.scanning}>
-          <span className={styles.note}>
-            {scan.state === SCAN_STATES.walking
-              ? lookingNote(scan.found)
-              : `Indexing ${count.format(scan.processed)} of ${count.format(scan.found)}`}
-          </span>
+          <span className={styles.note}>{progressNote(scan)}</span>
           <progress
             className={styles.bar}
             max={Math.max(scan.found, 1)}
-            value={scan.state === SCAN_STATES.walking ? undefined : scan.processed}
+            value={
+              scan.state === SCAN_STATES.walking || scan.state === SCAN_STATES.matching
+                ? undefined
+                : scan.processed
+            }
             aria-label="Scan progress"
           />
         </div>

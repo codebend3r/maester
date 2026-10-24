@@ -5,6 +5,7 @@ import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 
 const scanning = (overrides: Partial<Status>): Status => ({
   state: 'walking',
+  kind: 'full',
   found: 0,
   processed: 0,
   startedAt: '2026-10-12T04:38:34.481Z',
@@ -31,6 +32,16 @@ describe('ScanStatus', () => {
     render(<ScanStatus scan={scanning({ state: 'indexing', found: 12, processed: 5 })} />)
     expect(screen.getByText('Indexing 5 of 12')).toBeInTheDocument()
     expect(screen.getByRole('progressbar', { name: 'Scan progress' })).toHaveAttribute('value', '5')
+  })
+
+  it('says the new videos are being matched, with a bar that only shows it is moving', () => {
+    render(
+      <ScanStatus
+        scan={scanning({ state: 'matching', kind: 'quick', found: 1366, processed: 1366 })}
+      />,
+    )
+    expect(screen.getByText('Matching the new videos')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: 'Scan progress' })).not.toHaveAttribute('value')
   })
 
   it('says when the library was last scanned, and why the scan failed', () => {

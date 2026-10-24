@@ -685,9 +685,15 @@ describe("each provider's scores", () => {
       )
     expect(isDue()).toEqual([false, false])
 
-    expect(libraries.startRatingsRefresh({ id: libraryId, at: daysAgo(1), shouldAsk: true })).toBe(
-      1,
+    // A ratings update asked for the title, as it does for one already answered when it is told to.
+    const { db } = database.get()
+    db.prepare('INSERT INTO score_requests (library_id, item_id) VALUES (?, ?)').run(
+      libraryId,
+      fresh,
     )
+    db.prepare(
+      'UPDATE libraries SET ratings_refresh_started_at = ?, ratings_refresh_total = 1 WHERE id = ?',
+    ).run(daysAgo(1), libraryId)
 
     expect(isDue()).toEqual([true, true])
     expect(

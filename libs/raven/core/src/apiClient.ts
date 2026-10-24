@@ -33,6 +33,10 @@ import {
   type WatchedChange,
   type HistoryEntry,
   type Home,
+  type Hero,
+  type LibraryHeroChange,
+  type HeroPickChange,
+  type HeroPicks,
   type HomeSearch,
   type ImageChoice,
   type ImageOption,
@@ -91,6 +95,8 @@ import {
   isDuplicates,
   isHistory,
   isHome,
+  isHero,
+  isHeroPicks,
   isHomeSearch,
   isFavouriteTitles,
   isItemDetails,
@@ -477,6 +483,17 @@ export const createApiClient = ({
         guard: isLibrary,
       }),
 
+    /** Includes a library's titles in home's hero, or leaves them out; the admin's. */
+    setLibraryInHero: ({ id, inHero }: { id: number } & LibraryHeroChange): Promise<Library> =>
+      expect({
+        request: send({
+          path: `/api/libraries/${id}/hero`,
+          method: 'PUT',
+          body: { inHero } satisfies LibraryHeroChange,
+        }),
+        guard: isLibrary,
+      }),
+
     deleteLibrary: async (id: number): Promise<void> => {
       await send({ path: `/api/libraries/${id}`, method: 'DELETE' })
     },
@@ -524,19 +541,48 @@ export const createApiClient = ({
         guard: isAdminLock,
       }),
 
+    /** A full scan: every file in the library read again. */
     scanLibrary: (id: number): Promise<Library> =>
       expect({
         request: send({ path: `/api/libraries/${id}/scan`, method: 'POST' }),
         guard: isLibrary,
       }),
 
-    /**
-     * Refresh: a quick scan for new files, and every movie's and show's
-     * ratings fetched again. Pressed while one runs, it only scans.
-     */
-    refreshLibrary: (id: number): Promise<Library> =>
+    /** Stops a full scan under way; the admin's. */
+    cancelScan: (id: number): Promise<Library> =>
       expect({
-        request: send({ path: `/api/libraries/${id}/refresh`, method: 'POST' }),
+        request: send({ path: `/api/libraries/${id}/scan/cancel`, method: 'POST' }),
+        guard: isLibrary,
+      }),
+
+    /**
+     * A quick scan: only what is new is read and added to the library, and
+     * the ratings of the new titles are fetched once they are matched.
+     */
+    quickScanLibrary: (id: number): Promise<Library> =>
+      expect({
+        request: send({ path: `/api/libraries/${id}/quick-scan`, method: 'POST' }),
+        guard: isLibrary,
+      }),
+
+    /** Stops a quick scan under way, and the ratings that would follow it. */
+    cancelQuickScan: (id: number): Promise<Library> =>
+      expect({
+        request: send({ path: `/api/libraries/${id}/quick-scan/cancel`, method: 'POST' }),
+        guard: isLibrary,
+      }),
+
+    /** Update ratings: the ratings of every title in the library that has none are fetched. */
+    updateLibraryRatings: (id: number): Promise<Library> =>
+      expect({
+        request: send({ path: `/api/libraries/${id}/ratings`, method: 'POST' }),
+        guard: isLibrary,
+      }),
+
+    /** Stops Update ratings: the titles still waiting are not asked for, and the ratings fetched stay. */
+    cancelLibraryRatings: (id: number): Promise<Library> =>
+      expect({
+        request: send({ path: `/api/libraries/${id}/ratings/cancel`, method: 'POST' }),
         guard: isLibrary,
       }),
 
@@ -696,6 +742,25 @@ export const createApiClient = ({
       expect({
         request: send({ path: `/api/home/search?${toQueryString({ q: query.trim() })}` }),
         guard: isHomeSearch,
+      }),
+
+    /** The titles home's hero takes turns with, each with the line it reads; libraries still locked stay out. */
+    getHero: (): Promise<Hero> =>
+      expect({ request: send({ path: '/api/home/hero' }), guard: isHero }),
+
+    /** The movies and shows the admin picked for the hero, and how many it holds at most. */
+    getHeroPicks: (): Promise<HeroPicks> =>
+      expect({ request: send({ path: '/api/hero/picks' }), guard: isHeroPicks }),
+
+    /** Adds a movie or show to the hero, or takes it out; answers with the picks as they stand after. */
+    setHeroPick: ({ itemId, isShown }: HeroPickChange): Promise<HeroPicks> =>
+      expect({
+        request: send({
+          path: '/api/hero/picks',
+          method: 'PUT',
+          body: { itemId, isShown } satisfies HeroPickChange,
+        }),
+        guard: isHeroPicks,
       }),
 
     /** Notes that a video started playing, for its library's history. */

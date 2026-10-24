@@ -39,6 +39,9 @@ import { LockController } from '@/lock/lockController'
 import { LockGuard } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { FavouritesController } from '@/media/favouritesController'
+import { HeroController } from '@/hero/heroController'
+import { HeroRepository } from '@/hero/heroRepository'
+import { HeroSelection } from '@/hero/heroSelection'
 import { HomeController } from '@/media/homeController'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaController } from '@/media/mediaController'
@@ -99,6 +102,7 @@ export const CONTROLLERS = [
   FavouritesController,
   WatchedController,
   HomeController,
+  HeroController,
   BrowseController,
   HealthController,
   ItemsController,
@@ -189,6 +193,8 @@ export class AppModule {
         ItemOverrides,
         SagaBackdrops,
         MediaRepository,
+        HeroRepository,
+        HeroSelection,
         MovieSplits,
         ViewingAdoption,
         ViewingAccounts,

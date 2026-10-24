@@ -260,7 +260,8 @@ export const walkVideos = async ({
   roots,
   places = roots,
   limit = 16,
-  gate = SCAN_FILESYSTEM,
+  gate: sharedGate = SCAN_FILESYSTEM,
+  signal,
   onFound,
   known = () => null,
 }: {
@@ -268,11 +269,22 @@ export const walkVideos = async ({
   places?: readonly string[]
   limit?: number
   gate?: Gate
+  /** Once aborted, every filesystem call the walk has left fails at once, so it ends quickly. */
+  signal?: AbortSignal
   /** Told how many videos each folder held as the walk reads it, for a count that climbs. */
   onFound?: (count: number) => void
   /** What is already known of a file at this path, or null to read it from disk. */
   known?: (path: string) => KnownStats | null
 }): Promise<WalkResult> => {
+  const gate: Gate = signal
+    ? {
+        run: (task) =>
+          sharedGate.run(async () => {
+            signal.throwIfAborted()
+            return task()
+          }),
+      }
+    : sharedGate
   const looked = await Promise.all(
     places
       .flatMap((place) => {

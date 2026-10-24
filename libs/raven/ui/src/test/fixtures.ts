@@ -11,6 +11,7 @@ import {
   RATING_KINDS,
   RATING_SOURCES,
   RATINGS_REFRESH_STATES,
+  SCAN_KINDS,
   SCAN_STATES,
   type ItemDetails,
   type ItemSummary,
@@ -62,6 +63,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   createdAt: '2026-09-27T00:00:00.000Z',
   scan: {
     state: SCAN_STATES.idle,
+    kind: SCAN_KINDS.full,
     found: 12,
     processed: 12,
     startedAt: null,
@@ -72,6 +74,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   settings: {
     saveProgress: true,
     pinned: true,
+    inHero: true,
     sort: MEDIA_SORTS.title,
     view: LIBRARY_VIEWS.grid,
     groupBy: MEDIA_GROUPINGS.resolution,

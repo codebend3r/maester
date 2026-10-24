@@ -209,7 +209,11 @@ describe('the media server', () => {
         .unlock('')
         .catch((error: unknown) => error)
       const [listed, unlocked] = await Promise.all([listing, unlocking])
-      libraries.update({ id: library.id, input: { ...input, settings: { locked: false } } })
+      // Locking took the library out of the hero; it goes back in for the tests that follow.
+      libraries.update({
+        id: library.id,
+        input: { ...input, settings: { locked: false, inHero: true } },
+      })
       expect(listed).toMatchObject({ status: 423 })
       expect(unlocked).toMatchObject({ status: 503 })
     })
@@ -349,6 +353,7 @@ describe('the media server', () => {
         expect((await api().getLibrary(library.id)).settings).toEqual({
           saveProgress: true,
           pinned: true,
+          inHero: true,
           sort: 'title',
           view: 'grid',
           groupBy: 'resolution',
@@ -429,6 +434,7 @@ describe('the media server', () => {
         expect(updated.settings).toEqual({
           saveProgress: true,
           pinned: false,
+          inHero: true,
           sort: 'title',
           view: 'grid',
           groupBy: 'resolution',

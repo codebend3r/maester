@@ -1,0 +1,16 @@
+// A row of buttons packed together, as wide as each needs: History and the
+// rest of what manages the library, then the scans and Update ratings.
+.row {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+}
+
+// A narrow card cannot hold a row on one line: they stack, each as wide as it is.
+@container (max-width: 40rem) {
+  .row {
+    grid-auto-flow: row;
+    justify-items: start;
+  }
+}

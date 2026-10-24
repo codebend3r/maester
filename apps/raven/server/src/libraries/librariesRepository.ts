@@ -47,6 +47,7 @@ type LibraryRow = {
   unmatched_count: number
   save_progress: number
   pinned: number
+  in_hero: number
   sort: string
   view_mode: string
   group_by: string
@@ -62,8 +63,13 @@ type LibraryRow = {
 const isSettingName = keyOf(isLibrarySettings.shape)
 
 /**
- * Asks for fresh scores for each movie and show a library holds, reached up
- * from its files through their episodes and seasons, but those raven made up.
+ * Asks for scores for each movie and show a library holds, reached up from
+ * its files through their episodes and seasons, but those raven made up,
+ * that have no IMDb, Rotten Tomatoes or Metacritic score and that neither
+ * score source has answered for (TMDB's own vote is there from the match, so
+ * it says nothing). `@since` leaves out titles fetched from TMDB before
+ * then, so a quick scan asks only for the ones it added; an empty one asks
+ * for every title without a rating.
  */
 const REQUEST_SCORES = `WITH RECURSIVE up(id) AS (
     SELECT mi.item_id FROM media m JOIN media_items mi ON mi.media_id = m.id
@@ -72,7 +78,10 @@ const REQUEST_SCORES = `WITH RECURSIVE up(id) AS (
      WHERE i.parent_id IS NOT NULL)
   INSERT OR IGNORE INTO score_requests (library_id, item_id)
   SELECT @id, i.id FROM up JOIN items i ON i.id = up.id
-   WHERE i.type IN ('movie', 'show') AND i.tmdb_id NOT GLOB @local`
+   WHERE i.type IN ('movie', 'show') AND i.tmdb_id NOT GLOB @local
+     AND i.fetched_at >= @since
+     AND i.mdblist_fetched_at IS NULL AND i.omdb_fetched_at IS NULL
+     AND NOT EXISTS (SELECT 1 FROM ratings r WHERE r.item_id = i.id AND r.source <> 'tmdb')`
 
 /** A 4K frame, as `resolutionLabel` in `@raven/core` reads one: scope encodes shave height, so width counts too. */
 const IS_4K = '(m.width >= 3200 OR m.height >= 1800)'
@@ -87,6 +96,7 @@ const toSettings = (row: LibraryRow): LibrarySettings => {
   const stored = {
     saveProgress: row.save_progress === 1,
     pinned: row.pinned === 1,
+    inHero: row.in_hero === 1,
     sort: row.sort,
     view: row.view_mode,
     groupBy: row.group_by,
@@ -115,6 +125,7 @@ const toSettings = (row: LibraryRow): LibrarySettings => {
 const settingParams = (settings: LibrarySettings) => ({
   save_progress: Number(settings.saveProgress),
   pinned: Number(settings.pinned),
+  in_hero: Number(settings.inHero),
   sort: settings.sort,
   view_mode: settings.view,
   group_by: settings.groupBy,
@@ -266,31 +277,36 @@ export class LibrariesRepository {
   }
 
   /**
-   * Begins a Refresh at `at`, asking for fresh scores for each of the
-   * library's movies and shows when `shouldAsk`, in one transaction so no
-   * request is ever left without its start. One that asks for nothing
-   * finishes at once. Answers how many titles it asked for.
+   * Begins a ratings update at `at`, or adds to the one under way, asking for
+   * scores for each of the library's movies and shows that have no rating
+   * from the source it shows, when `shouldAsk`, in one transaction so no
+   * request is ever left without its start. `since` keeps to the titles
+   * fetched from TMDB at or after it. One that asks for nothing finishes at
+   * once. Answers how many titles it asked for.
    */
   startRatingsRefresh({
     id,
     at,
     shouldAsk,
+    since = '',
   }: {
     id: number
     at: string
     shouldAsk: boolean
+    since?: string
   }): number {
     return this.db.transaction(() => {
-      const total = shouldAsk
-        ? this.db.prepare(REQUEST_SCORES).run({ id, local: `${LOCAL}*` }).changes
+      const asked = shouldAsk
+        ? this.db.prepare(REQUEST_SCORES).run({ id, local: `${LOCAL}*`, since }).changes
         : 0
+      const { startedAt, total } = this.ratingsRefresh(id)
       this.db
         .prepare(
           'UPDATE libraries SET ratings_refresh_started_at = ?, ratings_refresh_total = ? WHERE id = ?',
         )
-        .run(at, total, id)
-      if (total === 0) this.finishRatingsRefreshes(at)
-      return total
+        .run(startedAt ?? at, startedAt == null ? asked : total + asked, id)
+      this.finishRatingsRefreshes(at)
+      return asked
     })()
   }
 

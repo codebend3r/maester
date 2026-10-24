@@ -86,6 +86,7 @@ export const library = (overrides: { id: number; watchedPercent: number }): Libr
   createdAt: '2026-10-16T00:00:00.000Z',
   scan: {
     state: 'idle',
+    kind: 'full',
     found: 0,
     processed: 0,
     startedAt: null,
@@ -96,6 +97,7 @@ export const library = (overrides: { id: number; watchedPercent: number }): Libr
   settings: {
     saveProgress: true,
     pinned: true,
+    inHero: true,
     sort: 'title',
     view: 'grid',
     groupBy: 'resolution',

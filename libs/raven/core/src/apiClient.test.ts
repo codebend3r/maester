@@ -174,11 +174,18 @@ describe('createApiClient', () => {
     })
   })
 
-  it('asks the server to refresh a library', async () => {
+  it.each([
+    { call: 'scanLibrary', path: 'scan' },
+    { call: 'cancelScan', path: 'scan/cancel' },
+    { call: 'quickScanLibrary', path: 'quick-scan' },
+    { call: 'cancelQuickScan', path: 'quick-scan/cancel' },
+    { call: 'updateLibraryRatings', path: 'ratings' },
+    { call: 'cancelLibraryRatings', path: 'ratings/cancel' },
+  ] as const)('posts $call to the library’s $path', async ({ call, path }) => {
     const { client, calls } = clientReturning(respond({ body: library() }))
-    await expect(client.refreshLibrary(3)).resolves.toEqual(library())
+    await expect(client[call](3)).resolves.toEqual(library())
     expect(calls[0]).toMatchObject({
-      url: 'http://nas:8484/api/libraries/3/refresh',
+      url: `http://nas:8484/api/libraries/3/${path}`,
       init: { method: 'POST' },
     })
   })

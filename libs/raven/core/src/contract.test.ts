@@ -149,6 +149,7 @@ describe('isLibrary', () => {
           settings: {
             saveProgress: false,
             pinned: true,
+            inHero: false,
             sort: 'random',
             view: 'tiles',
             groupBy: 'month',

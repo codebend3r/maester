@@ -130,7 +130,21 @@ const refreshServer = ({
         .get(DatabaseService)
         .db.prepare<[], { requests: number }>('SELECT COUNT(*) AS requests FROM score_requests')
         .get()?.requests ?? 0,
-    /** The movies the server's one library holds, which a Refresh asks for. */
+    /**
+     * Makes every movie unrated again: no IMDb, Rotten Tomatoes or Metacritic score, and no
+     * score source having been asked, as a title just added is before its ratings come.
+     */
+    forgetRatings: (): void => {
+      const { db } = app().get(DatabaseService)
+      db.prepare(
+        "UPDATE items SET mdblist_fetched_at = NULL, omdb_fetched_at = NULL WHERE type = 'movie'",
+      ).run()
+      db.prepare(
+        `DELETE FROM ratings WHERE source <> 'tmdb'
+           AND item_id IN (SELECT id FROM items WHERE type = 'movie')`,
+      ).run()
+    },
+    /** The movies the server's one library holds, which Update ratings asks for once they are unrated. */
     titles: (): number =>
       app()
         .get(DatabaseService)
@@ -141,7 +155,7 @@ const refreshServer = ({
   }
 }
 
-describe('a library Refresh', () => {
+describe('a library Update ratings and Quick scan', () => {
   const tmdb = fakeTmdb({ movies: MOVIES, mdblist: MDBLIST })
   const holding: { mdblist: ReturnType<typeof holdOpen> | null; isMdblistDown: boolean } = {
     mdblist: null,
@@ -176,7 +190,7 @@ describe('a library Refresh', () => {
     }
   }
   const library = () => server.api().getLibrary(server.state.libraryId)
-  const refresh = () => server.api().refreshLibrary(server.state.libraryId)
+  const updateRatings = () => server.api().updateLibraryRatings(server.state.libraryId)
 
   beforeAll(server.open)
 
@@ -189,16 +203,22 @@ describe('a library Refresh', () => {
     await server.close()
   })
 
-  it("takes in a new file and fetches every title's ratings again, a month old or not", async () => {
+  it('fetches the ratings of the titles that have none, and leaves the others alone', async () => {
     expect((await library()).ratingsRefresh).toEqual({ state: 'idle', finishedAt: null })
     expect(server.scoresOf('949')).toEqual({ rottenTomatoes: 8.7, tmdb: 8.2 })
+    // Rated titles are left as they are: a changed answer is not asked for.
     tmdb.state.mdblist = { ...tmdb.state.mdblist, 'movie:949': { rottenTomatoes: 90 } }
-    tmdb.state.movies = tmdb.state.movies.with(0, { ...HEAT, voteAverage: 7.5 })
-    await copyFile(server.at('Heat (1995).mp4'), server.at('Ronin (1998).mp4'))
+    const nothing = await updateRatings()
+    expect(nothing.ratingsRefresh).toEqual({ state: 'idle', finishedAt: expect.any(String) })
+    expect(server.requests()).toBe(0)
+    expect(server.scoresOf('949')).toEqual({ rottenTomatoes: 8.7, tmdb: 8.2 })
+
+    server.forgetRatings()
+    expect(server.scoresOf('949')).toEqual({ tmdb: 8.2 })
     const titles = server.titles()
 
-    const refreshed = await refresh()
-    expect(refreshed.ratingsRefresh).toEqual({
+    const updating = await updateRatings()
+    expect(updating.ratingsRefresh).toEqual({
       state: 'running',
       done: 0,
       total: titles,
@@ -210,21 +230,37 @@ describe('a library Refresh', () => {
       state: 'idle',
       finishedAt: expect.any(String),
     })
+    expect(server.scoresOf('949')).toEqual({ rottenTomatoes: 9, tmdb: 8.2 })
+  })
+
+  it('takes in a new file with a quick scan, and fetches the ratings that go with it', async () => {
+    await copyFile(server.at('Heat (1995).mp4'), server.at('Ronin (1998).mp4'))
+
+    const started = await server.api().quickScanLibrary(server.state.libraryId)
+    expect(started.scan).toMatchObject({ kind: 'quick' })
+    expect(started.scan.state).not.toBe('idle')
+
+    await server.settle()
+    const after = await library()
+    expect(after.scan.state).toBe('idle')
+    expect(after.scan.quickScannedAt).toEqual(expect.any(String))
+    expect(after.ratingsRefresh.state).toBe('idle')
     const media = await server.api().listMedia({ libraryId: server.state.libraryId })
     expect(media.map((item) => item.item?.title ?? null).toSorted()).toEqual([
       'Collateral',
       'Heat',
       'Ronin',
     ])
-    expect(server.scoresOf('949')).toEqual({ rottenTomatoes: 9, tmdb: 7.5 })
+    expect(server.scoresOf('8195')).toEqual({ rottenTomatoes: 6.8, tmdb: 8.2 })
   })
 
   it('keeps its count when pressed again while it runs', async () => {
+    server.forgetRatings()
     const mdblist = holdMdblist()
-    const first = await refresh()
+    const first = await updateRatings()
     await mdblist.reached
 
-    const second = await refresh()
+    const second = await updateRatings()
 
     expect(first.ratingsRefresh).toMatchObject({
       state: 'running',
@@ -238,17 +274,18 @@ describe('a library Refresh', () => {
   })
 
   it('waits for MDBList while it is down, saying when it asks again', async () => {
+    server.forgetRatings()
     holding.isMdblistDown = true
 
     const titles = server.titles()
 
-    const refreshed = await refresh()
+    const refreshed = await updateRatings()
     expect(refreshed.ratingsRefresh).toMatchObject({ state: 'running', done: 0, total: titles })
     await server.settle()
 
     const { ratingsRefresh } = await library()
     if (ratingsRefresh.state !== 'waiting')
-      throw new Error(`The Refresh is ${ratingsRefresh.state}`)
+      throw new Error(`Update ratings is ${ratingsRefresh.state}`)
     expect(ratingsRefresh).toMatchObject({ done: 0, total: titles, reason: 'unavailable' })
     const wait = Date.parse(ratingsRefresh.resumesAt) - Date.now()
     expect(wait).toBeGreaterThan(14 * 60_000)
@@ -256,9 +293,10 @@ describe('a library Refresh', () => {
   })
 
   it('drops what it asked for with the library', async () => {
-    // With MDBList down, the Refresh waits on every title.
+    // With MDBList down, the update waits on every title.
+    server.forgetRatings()
     holding.isMdblistDown = true
-    await refresh()
+    await updateRatings()
     expect(server.titles()).toBeGreaterThanOrEqual(2)
     expect(server.requests()).toBe(server.titles())
 
@@ -268,7 +306,7 @@ describe('a library Refresh', () => {
   })
 })
 
-describe("a Refresh past MDBList's daily limit", () => {
+describe("Update ratings past MDBList's daily limit", () => {
   const tmdb = fakeTmdb({
     movies: MOVIES,
     mdblist: MDBLIST,
@@ -303,9 +341,10 @@ describe("a Refresh past MDBList's daily limit", () => {
 
   it('does two titles a day, keeps its progress through a restart, and finishes the third after midnight UTC', async () => {
     vi.setSystemTime(NEXT_NOON)
+    server.forgetRatings()
     const calls = { mdblist: tmdb.state.mdblistCalls, omdb: tmdb.state.omdbCalls }
 
-    const refreshed = await server.api().refreshLibrary(server.state.libraryId)
+    const refreshed = await server.api().updateLibraryRatings(server.state.libraryId)
     expect(refreshed.ratingsRefresh).toEqual({
       state: 'running',
       done: 0,

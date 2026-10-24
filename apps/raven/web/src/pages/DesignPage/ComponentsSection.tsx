@@ -127,7 +127,7 @@ export const ComponentsSection = () => (
         </Button>
         <Button icon="close" aria-label="Close" />
         <Button disabled icon="rescan">
-          Rescan
+          Full scan
         </Button>
         <ButtonLink tone="pill" to="/" icon="back">
           Libraries

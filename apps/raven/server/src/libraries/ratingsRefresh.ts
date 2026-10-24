@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import type { RatingsRefresh as RatingsRefreshStatus } from '@raven/core'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
@@ -6,40 +6,91 @@ import { ScoreSweep } from '@/metadata/scoreSweep'
 import { ScannerService } from '@/scanner/scannerService'
 
 /**
- * A library's Refresh: a quick scan for new files, and every movie's and
- * show's IMDb, Rotten Tomatoes, Metacritic and TMDB scores fetched again,
- * past the 30-day wait, by the score sweep. What it asked for is kept in the
- * database, so a restart carries on where it left off.
+ * A library's ratings: Update ratings asks for the score of every movie and
+ * show that has none from the source the library shows, and a quick scan
+ * asks for the scores of the titles it added once they are matched. Both are
+ * fetched by the score sweep, past the 30-day wait. What was asked for is
+ * kept in the database, so a restart carries on where it left off.
  */
 @Injectable()
 export class RatingsRefresh {
+  private readonly logger = new Logger(RatingsRefresh.name)
+
+  /** The quick scans the admin started that have yet to hand their new titles to the sweep. */
+  private readonly quickScans = new Map<number, { isCancelled: boolean }>()
+
   constructor(
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
-    @Inject(ScannerService) private readonly scanner: Pick<ScannerService, 'quickScan'>,
+    @Inject(ScannerService)
+    private readonly scanner: Pick<ScannerService, 'quickScanNow' | 'whenIdle' | 'cancel'>,
     @Inject(ScoreSweep)
     private readonly scoreSweep: Pick<ScoreSweep, 'kick' | 'canSettle' | 'requestsPause'>,
   ) {}
 
   /**
-   * Asks for the library's titles unless a Refresh of it is under way, which
-   * keeps its count, then quick-scans the library and wakes the sweep. One
-   * whose last title has gone counts as over, so a press then starts anew.
-   * With no source that could ever settle a request, it asks for nothing,
-   * and so does a library with no titles: either finishes at once.
+   * Asks for the scores of the library's titles that have none, adding to an
+   * update under way, and wakes the sweep. With no source that could ever
+   * settle a request it asks for nothing, and so does a library with no
+   * unrated titles: either finishes at once.
    */
-  start(libraryId: number): void {
+  start({ libraryId, since = '' }: { libraryId: number; since?: string }): void {
     const at = new Date().toISOString()
+    // An update whose last title left outside the sweep is over, so this one starts anew.
     this.libraries.finishRatingsRefreshes(at)
-    if (this.libraries.ratingsRefresh(libraryId).startedAt == null) {
-      this.libraries.startRatingsRefresh({
-        id: libraryId,
-        at,
-        shouldAsk: this.scoreSweep.canSettle(),
-      })
-    }
-    this.scanner.quickScan(libraryId)
+    this.libraries.startRatingsRefresh({
+      id: libraryId,
+      at,
+      shouldAsk: this.scoreSweep.canSettle(),
+      since,
+    })
     this.scoreSweep.kick()
+  }
+
+  /**
+   * A quick scan for what is new, which asks for the scores of the titles it
+   * added once they are matched. Cancelling it, or the library going, stops
+   * the scores being asked for.
+   */
+  quickScan(libraryId: number): void {
+    const since = new Date().toISOString()
+    const job = { isCancelled: false }
+    this.quickScans.set(libraryId, job)
+    this.scanner.quickScanNow(libraryId)
+    this.afterQuickScan({ libraryId, since, job }).catch((error: unknown) =>
+      this.logger.warn(error instanceof Error ? error.message : String(error)),
+    )
+  }
+
+  private async afterQuickScan({
+    libraryId,
+    since,
+    job,
+  }: {
+    libraryId: number
+    since: string
+    job: { isCancelled: boolean }
+  }): Promise<void> {
+    await this.scanner.whenIdle(libraryId)
+    if (this.quickScans.get(libraryId) === job) this.quickScans.delete(libraryId)
+    if (job.isCancelled || !this.libraries.get(libraryId)) return
+    this.start({ libraryId, since })
+  }
+
+  /** Stops a quick scan the admin started, and the scores that would follow it. */
+  cancelQuickScan(libraryId: number): void {
+    const job = this.quickScans.get(libraryId)
+    if (job) job.isCancelled = true
+    this.scanner.cancel(libraryId)
+  }
+
+  /**
+   * Cancels Update ratings: the titles it still waits on are not asked for,
+   * and it is over as of now. Scores already fetched stay.
+   */
+  cancel(libraryId: number): void {
+    this.metadata.clearLibraryRequests(libraryId)
+    this.libraries.finishRatingsRefreshes(new Date().toISOString())
   }
 
   /**

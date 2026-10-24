@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DOWNLOAD_TARGET_KINDS,
+  ITEM_TYPES,
   type ItemDetails,
   type Library,
   type MatchItemType,
@@ -27,6 +28,7 @@ import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
+import { HeroToggle } from '@/components/HeroToggle/HeroToggle'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import {
   type HeaderProgress,
@@ -247,6 +249,7 @@ export const PlayableItemView = ({
                 </Button>
               </>
             )}
+            {details.type === ITEM_TYPES.movie && <HeroToggle itemId={details.id} />}
             {/* Without its favourite and watched, which the page has beside it, all the menu holds needs the admin lock off. */}
             <MediaMenu
               media={primary}

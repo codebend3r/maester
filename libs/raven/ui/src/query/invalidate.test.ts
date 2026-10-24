@@ -5,6 +5,7 @@ import {
   EDITED_PARTS,
   afterAiLookups,
   afterFavourites,
+  afterHeroPicked,
   afterItemEdited,
   afterLibraryEvent,
   afterLibrarySaved,
@@ -187,5 +188,18 @@ describe('afterItemEdited', () => {
     await afterItemEdited({ queryClient: client, updated, part: EDITED_PARTS.images })
     expect(client.getQueryData<typeof updated>(queryKeys.item(40))).toEqual(updated)
     expect(client.getQueryState(queryKeys.item(40))!.isInvalidated).toBe(false)
+  })
+})
+
+describe('afterHeroPicked', () => {
+  it("reads the hero and the admin's picks again, and the shelves under home's other keys not at all", async () => {
+    const shelves = ['home', 'shelves']
+    const client = holding([queryKeys.hero, queryKeys.heroPicks, queryKeys.favourites, shelves])
+    await afterHeroPicked(client)
+    const isStale = (key: QueryKey) => client.getQueryState(key)?.isInvalidated
+    expect(isStale(queryKeys.hero)).toBe(true)
+    expect(isStale(queryKeys.heroPicks)).toBe(true)
+    expect(isStale(queryKeys.favourites)).toBe(false)
+    expect(isStale(shelves)).toBe(false)
   })
 })
