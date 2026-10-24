@@ -10,7 +10,7 @@ import {
   mediaLabel,
 } from '@raven/core'
 import { usePlayerPrefs } from '@raven/ui/headless'
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { type ReactVideoProps, SelectedTrackType } from 'react-native-video'
 
 import { APP_ROUTE_PARAMS } from '@/routes'
@@ -194,5 +194,27 @@ describe('Player on a TV', () => {
     await moveVideoTo({ props, seconds: 42 })
     unmount()
     await waitFor(() => expect(savedSpots().at(-1)).toEqual({ position: 42, audio: AUDIO_PLAYED }))
+  })
+
+  // AVPlayer reports the buffer only after it ran empty, so a fast stream never says it flows.
+  it('saves the spot of a stream that starts without ever reporting its buffer', async () => {
+    const { unmount } = await renderPlayer({
+      [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_UNSUBTITLED.id),
+    })
+    const props = await loadedVideo()
+    await act(async () => {
+      props.onLoad?.({
+        currentTime: 0,
+        duration: BUSBOYS_MP4.duration ?? 0,
+        naturalSize: { width: 1920, height: 1080, orientation: 'landscape' },
+        audioTracks: [],
+        textTracks: [],
+        videoTracks: [],
+      })
+      props.onPlaybackStateChanged?.({ isPlaying: true, isSeeking: false })
+    })
+    await moveVideoTo({ props, seconds: 20 })
+    unmount()
+    await waitFor(() => expect(savedSpots().at(-1)).toEqual({ position: 20, audio: AUDIO_PLAYED }))
   })
 })

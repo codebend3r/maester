@@ -256,8 +256,12 @@ const Playing = ({
             dispatchVideo({ type: VIDEO_EVENTS.duration, duration: length > 0 ? length : null })
             dispatch({ type: SESSION_EVENTS.loaded, attempt })
           },
-          onPlaybackStateChanged: ({ isPlaying }) =>
-            dispatchVideo({ type: isPlaying ? VIDEO_EVENTS.played : VIDEO_EVENTS.paused }),
+          // AVPlayer says its buffer ran full only after it ran empty, which a fast stream never
+          // does, so playing is also what says frames flow; without it the play never starts.
+          onPlaybackStateChanged: ({ isPlaying }) => {
+            dispatchVideo({ type: isPlaying ? VIDEO_EVENTS.played : VIDEO_EVENTS.paused })
+            if (isPlaying) dispatchVideo({ type: VIDEO_EVENTS.flowing })
+          },
           onProgress: ({ currentTime }) => {
             position.current = currentTime
             dispatchVideo({ type: VIDEO_EVENTS.moved, time: currentTime, buffered: [] })
