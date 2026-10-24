@@ -52,7 +52,7 @@ const Field = ({
           onChangeText={onChangeText}
           onEndEditing={({ nativeEvent }) => onChangeText(nativeEvent.text)}
           onFocus={() => setFocused(true)}
-          onSubmitEditing={onSubmit}
+          onSubmitEditing={({ nativeEvent }) => onSubmit({ text: nativeEvent.text })}
           placeholder={placeholder}
           returnKeyType="go"
           secureTextEntry={isSecret}

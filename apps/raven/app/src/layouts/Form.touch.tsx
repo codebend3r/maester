@@ -46,7 +46,7 @@ const Field = ({
       autoCorrect={false}
       keyboardType={keyboardFor({ isNumeric, isSecret })}
       onChangeText={onChangeText}
-      onSubmitEditing={onSubmit}
+      onSubmitEditing={({ nativeEvent }) => onSubmit({ text: nativeEvent.text })}
       placeholder={placeholder}
       returnKeyType="go"
       secureTextEntry={isSecret}

@@ -3,6 +3,7 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-nativ
 
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import { CardPicture } from '@/layouts/Card'
+import { useOpenerFocus } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import { NOTHING_ON_FOCUS } from '@/layouts/tvControls'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
@@ -28,10 +29,13 @@ export const focusCaptionHeightOf = (fontScale: number): number =>
  * A card the remote moves to, on a shelf or in a grid: it grows and takes the ring while
  * focused, smoothly unless the system asks for less motion, when it changes at once.
  * `isPreferred` asks the remote's focus for it as the screen opens; `jump` takes the focus
- * once per jump that lands on it. `onFocused` hears each time it gets the focus.
+ * once per jump that lands on it, and coming back to the screen takes it back to the card that
+ * was pressed. `place` is where the card sits on its screen, unique there: the card's own key,
+ * or more where one title can sit in two places. `onFocused` hears each time it gets the focus.
  */
 export const FocusCard = ({
   card,
+  place = card.key,
   width,
   isPreferred,
   jump = null,
@@ -39,6 +43,7 @@ export const FocusCard = ({
   onPress,
 }: {
   card: ShelfCard
+  place?: string
   width: number
   isPreferred: boolean
   jump?: JumpFocus | null
@@ -47,6 +52,7 @@ export const FocusCard = ({
 }) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
   useJumpFocus({ jump, view: pressable })
+  const { remember } = useOpenerFocus({ place, view: pressable })
   const isReduced = useReduceMotion((state) => state.isReduced)
   const [isFocused, setFocused] = useState(false)
   const [scale] = useState(() => new Animated.Value(1))
@@ -79,7 +85,10 @@ export const FocusCard = ({
         grow(FOCUS_SCALE)
         onFocused()
       }}
-      onPress={onPress}
+      onPress={() => {
+        remember()
+        onPress()
+      }}
     >
       <Animated.View style={[styles.card, { width, transform: [{ scale }] }]}>
         <CardPicture card={card} ring={isFocused ? SIZES.tvFocusRing : 0} width={width} />

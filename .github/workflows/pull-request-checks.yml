@@ -381,20 +381,22 @@ jobs:
             echo "affected=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # raven's device app on Apple TV: the simulator build and a launch on the Apple TV
-  # simulator. Maestro's driver installs only on iPhone and iPad, so the Apple TV gets
-  # the launch check instead. It runs beside app-ios, on its own runner, since the two
-  # builds share nothing.
+  # raven's device app on Apple TV: the simulator build and an XCUITest that drives it
+  # with the Siri Remote against a real raven server. It runs beside app-ios, on its own
+  # runner, since the two builds share nothing.
   app-tvos:
     name: 📺 App on Apple TV
     needs: app-affected
     if: needs.app-affected.outputs.affected == 'true'
     runs-on: macos-26
-    # One Release build of React Native from cold (it is not cached) and a launch.
+    # One Release build of React Native from cold (it is not cached) and the remote flow.
     timeout-minutes: 60
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       HOMEBREW_NO_AUTO_UPDATE: '1'
+      # The flow reaches the fixture server over plain http on the loopback, which only
+      # the development variant's App Transport Security allows.
+      APP_VARIANT: development
     steps:
       # The PR's head commit, so the artifact name below matches the commit that was built.
       - name: 📥 Checkout exact PR head
@@ -413,6 +415,10 @@ jobs:
         with:
           node-version: ${{ env.APP_NODE_VERSION }}
 
+      # The fixture server encodes its clips and probes them with ffmpeg and ffprobe.
+      - name: 🎞️ Install ffmpeg
+        run: brew install ffmpeg
+
       # CocoaPods' downloaded specs and sources, keyed on the lockfile that pins the pods'
       # versions. `expo prebuild --clean` rebuilds ios/ and Pods/, so only the downloads
       # are worth keeping.
@@ -425,6 +431,11 @@ jobs:
       # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
       - name: 📦 Install
         run: bun install --frozen-lockfile
+
+      # A real raven server with a locked film library and an open series library, started
+      # while the app builds. It prints its ready line once its libraries are scanned.
+      - name: 🗄️ Start the fixture server
+        run: bunx nx run @raven/server:serve:fixture > "$RUNNER_TEMP/fixture.log" 2>&1 &
 
       # Runs `prebuild:tvos` first (bun runs it before `build:tvos`), which regenerates
       # ios/ and installs the pods, so the pods are checked right after.
@@ -439,28 +450,55 @@ jobs:
           grep -q 'SDKROOT = appletvos' raven.xcodeproj/project.pbxproj
           cmp Podfile.lock Pods/Manifest.lock
 
-      # A fresh Apple TV 4K on the runner's newest tvOS runtime, booted, with the build
-      # launched on it: ten seconds later launchd must still list the app with a pid, not
-      # the `-` of one that exited. The screenshot goes up with the artifact.
-      - name: 🚬 Launch on the Apple TV simulator
+      - name: 🗄️ Wait for the fixture server
         run: |
-          runtime="$(xcrun simctl list -j runtimes tvOS | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')"
+          for _ in $(seq 1 90); do
+            if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
+              grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/fixture.log"
+          exit 1
+
+      # A fresh Apple TV 4K on the tvOS runtime of the selected Xcode's SDK, booted, with the
+      # build on it. A runner with no such runtime fails here rather than testing on another.
+      - name: 📺 Boot the Apple TV simulator
+        run: |
+          sdk="$(xcrun --sdk appletvsimulator --show-sdk-version)"
+          runtime="$(xcrun simctl list -j runtimes tvOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
           device="$(xcrun simctl create raven-tv com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K "$runtime")"
           xcrun simctl boot "$device"
           xcrun simctl bootstatus "$device" -b
           xcrun simctl install "$device" apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app
-          xcrun simctl launch "$device" io.github.codebend3r.raven.app
-          sleep 10
-          xcrun simctl io "$device" screenshot "$RUNNER_TEMP/raven-tv.png"
-          xcrun simctl spawn "$device" launchctl list | grep -E '^[0-9]+[[:space:]].*UIKitApplication:io\.github\.codebend3r\.raven\.app'
-          xcrun simctl shutdown "$device"
+
+      # The XCUITest the tvOS prebuild added (`tvos-e2e/`) signs in, plays the film from
+      # Home and returns with the Siri Remote. The screen it ends on goes up with the app.
+      - name: 🎬 Apple TV end to end
+        env:
+          TVOS_SIMULATOR: raven-tv
+        run: |
+          bun run app:e2e:tvos
+          xcrun simctl io raven-tv screenshot "$RUNNER_TEMP/raven-tv.png"
+          xcrun simctl shutdown raven-tv
+
+      - name: 📤 End to end logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-app-tvos-e2e-logs-${{ github.event.pull_request.head.sha }}
+          path: |
+            apps/raven/app/build/tvos-e2e/Logs/Test
+            ${{ runner.temp }}/fixture.log
+          if-no-files-found: ignore
 
       # The build zipped as Finder would, which keeps the execute bits an artifact drops,
       # so the unzipped app still launches.
       - name: 📦 Pack the simulator app
         run: ditto -c -k --keepParent apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app "$RUNNER_TEMP/raven-appletvsimulator.zip"
 
-      # The build, for trying the PR's app by hand on a simulator, and the launch's screenshot.
+      # The build, for trying the PR's app by hand on a simulator, and the flow's screenshot.
       - name: 📤 Simulator app
         uses: actions/upload-artifact@v7
         with:
@@ -527,11 +565,13 @@ jobs:
       - name: 🗄️ Start the fixture server
         run: bunx nx run @raven/server:serve:fixture > "$RUNNER_TEMP/fixture.log" 2>&1 &
 
-      # A fresh iPhone 16 on the runner's newest iOS runtime. `simctl boot` returns at once
-      # and CoreSimulator boots it in the background; the wait step below blocks on it.
+      # A fresh iPhone 16 on the iOS runtime of the selected Xcode's SDK. `simctl boot`
+      # returns at once and CoreSimulator boots it in the background; a runner with no such
+      # runtime fails here rather than testing on another.
       - name: 📱 Boot the iPhone simulator
         run: |
-          runtime="$(xcrun simctl list -j runtimes iOS | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')"
+          sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          runtime="$(xcrun simctl list -j runtimes iOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
           device="$(xcrun simctl create raven-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
           xcrun simctl boot "$device"
           echo "SIMULATOR=$device" >> "$GITHUB_ENV"

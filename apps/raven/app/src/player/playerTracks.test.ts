@@ -6,6 +6,7 @@ import {
   audioOptionsOf,
   audioPlaceFor,
   subtitleOptionsOf,
+  subtitlePlaceFor,
 } from '@/player/playerTracks'
 
 const subtitle = (track: Partial<SubtitleTrack> & Pick<SubtitleTrack, 'id'>): SubtitleTrack => ({
@@ -69,5 +70,28 @@ describe('audioPlaceFor', () => {
   it("leaves the file's default to the player, and a stream to the track it carries", () => {
     expect(audioPlaceFor({ mode: PLAYBACK_MODES.direct, tracks: TRACKS, audio: null })).toBeNull()
     expect(audioPlaceFor({ mode: PLAYBACK_MODES.remux, tracks: TRACKS, audio: 1 })).toBeNull()
+  })
+})
+
+describe('subtitlePlaceFor', () => {
+  it("picks a stream's rendition by the track's place among the text tracks, pictures left out", () => {
+    expect(
+      subtitlePlaceFor({ mode: PLAYBACK_MODES.remux, tracks: TRACKS, subtitle: FRENCH.id }),
+    ).toBe(1)
+    expect(
+      subtitlePlaceFor({ mode: PLAYBACK_MODES.transcode, tracks: TRACKS, subtitle: SIDECAR.id }),
+    ).toBe(2)
+    expect(
+      subtitlePlaceFor({ mode: PLAYBACK_MODES.remux, tracks: TRACKS, subtitle: PICTURES.id }),
+    ).toBeNull()
+  })
+
+  it('leaves the choice to the player with subtitles off, and in direct play, which has none', () => {
+    expect(
+      subtitlePlaceFor({ mode: PLAYBACK_MODES.remux, tracks: TRACKS, subtitle: null }),
+    ).toBeNull()
+    expect(
+      subtitlePlaceFor({ mode: PLAYBACK_MODES.direct, tracks: TRACKS, subtitle: ENGLISH.id }),
+    ).toBeNull()
   })
 })

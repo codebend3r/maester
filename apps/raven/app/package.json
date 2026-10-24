@@ -15,6 +15,7 @@
     "dev:ipad": "APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-pad",
     "dev:tvos": "EXPO_TV=1 APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-tv",
     "e2e": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} maestro test e2e",
+    "e2e:tvos": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild test -project ios/raven.xcodeproj -scheme RavenRemoteTests -destination \"platform=tvOS Simulator,name=${TVOS_SIMULATOR:-Apple TV 4K (3rd generation)}\" -derivedDataPath build/tvos-e2e CODE_SIGNING_ALLOWED=NO",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint:ts": "oxlint",
@@ -126,6 +127,7 @@
       "test",
       "test:screens",
       "e2e",
+      "e2e:tvos",
       "dev:ios",
       "dev:ipad",
       "dev:tvos"

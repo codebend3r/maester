@@ -100,8 +100,8 @@ export const SignIn = () => {
     goHome()
   }
 
-  const submitAddress = () => {
-    const origin = serverOriginOf(address)
+  const submitAddress = ({ text }: { text: string }) => {
+    const origin = serverOriginOf(text)
     if (origin === null) {
       setError(COPY.badAddress)
       return
@@ -123,10 +123,10 @@ export const SignIn = () => {
     })
   }
 
-  const submitSecret = ({ kind, server }: SecretStep) =>
+  const submitSecret = ({ step: { kind, server }, text }: { step: SecretStep; text: string }) =>
     run(async () => {
       const api = apiFor(server)
-      await SECRET_STEPS[kind].unlock({ api, secret })
+      await SECRET_STEPS[kind].unlock({ api, secret: text })
       if (kind === STEPS.pin && (await isAdminLockHeld(api))) {
         askFor({ kind: STEPS.admin, server })
         return
@@ -156,7 +156,7 @@ export const SignIn = () => {
             isFirst
             label={COPY.address}
             onChangeText={setAddress}
-            onSubmit={() => submitAddress()}
+            onSubmit={submitAddress}
             placeholder={COPY.example}
             value={address}
           />
@@ -164,7 +164,7 @@ export const SignIn = () => {
           <FormButton
             isDisabled={isBusy}
             label={COPY.continue}
-            onPress={() => submitAddress()}
+            onPress={() => submitAddress({ text: address })}
             tone={BUTTON_TONES.primary}
           />
         </Form>
@@ -181,14 +181,14 @@ export const SignIn = () => {
             isSecret
             label={label}
             onChangeText={setSecret}
-            onSubmit={() => submitSecret(step)}
+            onSubmit={({ text }) => submitSecret({ step, text })}
             value={secret}
           />
           {errorLine}
           <FormButton
             isDisabled={isBusy}
             label={COPY.unlock}
-            onPress={() => submitSecret(step)}
+            onPress={() => submitSecret({ step, text: secret })}
             tone={BUTTON_TONES.primary}
           />
           <FormButton

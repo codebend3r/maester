@@ -6,6 +6,37 @@
     "browser": false
   },
   "ignorePatterns": ["ios", "android", "build", ".expo"],
+  "rules": {
+    // React Native has no DOM: `autoFocus` on a TV focus guide hands the remote coming into it
+    // to a control inside, which is how a TV is driven, not a page stealing the keyboard.
+    "jsx-a11y/no-autofocus": ["error", { "ignoreNonDOM": true }],
+    // The base config's patterns, repeated since a rule's options replace the base's, and the
+    // ruling that tvOS's Menu stays with the native stack: `BackHandler` hears Menu only once the
+    // fork's menu key is on (`TVEventControl.enableTVMenuKey()`), which takes the press from
+    // UIKit, so Home could no longer leave raven and the player's own Menu would break.
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "react-native",
+            "importNames": ["BackHandler", "TVEventControl"],
+            "message": "tvOS's Menu stays with the native stack: see \"Menu is the navigator's\" in apps/raven/app/CLAUDE.md."
+          }
+        ],
+        "patterns": [
+          {
+            "regex": "^\\.{1,2}(/|$)",
+            "message": "Import through the @/ alias, not a relative path."
+          },
+          {
+            "regex": "\\.(?:[cm]?[jt]sx?)$",
+            "message": "Leave the extension off: @/lib/api, not @/lib/api.js."
+          }
+        ]
+      }
+    ]
+  },
   "overrides": [
     {
       // expo-router reads each route from its file's default export, and Expo,

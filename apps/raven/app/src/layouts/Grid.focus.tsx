@@ -13,6 +13,7 @@ import {
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
 import { FOCUS_CARD_WIDTHS, FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
+import { useOpenerFocus, useScreenFocusScope } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
   CHEVRONS,
@@ -45,7 +46,8 @@ const headerHeightOf = (fontScale: number): number =>
   ) + SIZES.space3
 
 /**
- * A card of the list or tiles view, the remote's to move to: a row of words, ringed while focused.
+ * A card of the list or tiles view, the remote's to move to: a row of words, ringed while
+ * focused. It takes the focus back when the page it opened goes back, as a `FocusCard` does.
  */
 const RowCard = ({
   card,
@@ -64,6 +66,7 @@ const RowCard = ({
 }) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
   useJumpFocus({ jump, view: pressable })
+  const { remember } = useOpenerFocus({ place: card.key, view: pressable })
   return (
     <Pressable
       ref={pressable}
@@ -71,7 +74,10 @@ const RowCard = ({
       accessibilityRole="button"
       hasTVPreferredFocus={isPreferred}
       onFocus={onFocused}
-      onPress={onPress}
+      onPress={() => {
+        remember()
+        onPress()
+      }}
       style={({ focused }) => [styles.rowCard, focused && styles.focused]}
     >
       {hasPicture && <CardPicture card={card} width={TILE_WIDTHS[card.shape]} />}
@@ -201,8 +207,7 @@ const Grid = ({
   // The first card, or bucket, takes the focus as the grid opens, and only then: once anything
   // on the screen has had it, a card drawn later (after a sort, or once a search finds some)
   // must not pull it from the viewer. The header hears its controls' focus as it bubbles up.
-  const [isOpening, setOpening] = useState(true)
-  const settle = () => setOpening(false)
+  const { isOpening, settle } = useScreenFocusScope()
   const preferred = isOpening ? firstKeyOf(rows) : null
   // What the rows draw from beyond `rows` itself, the one value while neither changes.
   const drawn = useMemo(() => ({ jumped, preferred }), [jumped, preferred])

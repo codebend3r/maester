@@ -86,7 +86,7 @@ describe('Item on a phone or tablet', () => {
   afterEach(() => untilIdle(shown.client))
 
   it('shows a half-watched movie with Resume and the time left', async () => {
-    await renderItem({ id: String(BUSBOYS.id) })
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(BUSBOYS.id) })
 
     expect(await screen.findByRole('header', { name: 'Busboys' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Resume from 50:00' })).toBeTruthy()
@@ -100,7 +100,7 @@ describe('Item on a phone or tablet', () => {
   })
 
   it('plays the file Play starts', async () => {
-    await renderItem({ id: String(BUSBOYS.id) })
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(BUSBOYS.id) })
     await fireEvent.press(await screen.findByRole('button', { name: 'Resume from 50:00' }))
     expect(mockPush).toHaveBeenCalledWith({
       pathname: APP_ROUTES.play,
@@ -114,7 +114,7 @@ describe('Item on a phone or tablet', () => {
   it('marks the movie watched, flipping the button before the server answers', async () => {
     const { answer, release } = heldAnswer()
     mockServer.writes = () => answer
-    await renderItem({ id: String(BUSBOYS.id) })
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(BUSBOYS.id) })
 
     await fireEvent.press(
       await screen.findByRole('checkbox', { name: 'Mark watched', checked: false }),
@@ -134,7 +134,7 @@ describe('Item on a phone or tablet', () => {
   })
 
   it("lists a show's seasons, each opening its page, and plays the next episode", async () => {
-    await renderItem({ id: String(SEVERANCE.id) })
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE.id) })
 
     expect(await screen.findByRole('header', { name: 'Severance' })).toBeTruthy()
     expect(screen.getByRole('header', { name: 'Seasons' })).toBeTruthy()
@@ -150,7 +150,7 @@ describe('Item on a phone or tablet', () => {
     const next = heldAnswer()
     const nextPath = pathFor({ path: APP_CLIENT_CALLS.nextEpisode.path, id: SEVERANCE.id })
     mockServer.reads = (path) => (path === nextPath ? next.answer : Promise.resolve())
-    await renderItem({ id: String(SEVERANCE.id) })
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE.id) })
 
     expect(await screen.findByRole('checkbox', { name: 'Favourite', checked: false })).toBeTruthy()
     expect(screen.getByRole('checkbox', { name: 'Mark watched' })).toBeTruthy()
@@ -163,7 +163,7 @@ describe('Item on a phone or tablet', () => {
   it('marks a show a favourite, showing it before the server answers', async () => {
     const { answer, release } = heldAnswer()
     mockServer.writes = () => answer
-    await renderItem({ id: String(SEVERANCE.id) })
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE.id) })
 
     await fireEvent.press(
       await screen.findByRole('checkbox', { name: 'Favourite', checked: false }),
@@ -181,7 +181,7 @@ describe('Item on a phone or tablet', () => {
   })
 
   it("lists a season's episodes, each opening its page in its library", async () => {
-    await renderItem({ id: String(SEVERANCE_ONE.id) })
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE_ONE.id) })
 
     expect(await screen.findByRole('header', { name: 'Season 1' })).toBeTruthy()
     expect(screen.getByText('Severance')).toBeTruthy()
@@ -200,7 +200,7 @@ describe('Item on a phone or tablet', () => {
   })
 
   it('names an episode by its show, season and number', async () => {
-    await renderItem({ id: String(GOOD_NEWS_ABOUT_HELL.id) })
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(GOOD_NEWS_ABOUT_HELL.id) })
 
     expect(await screen.findByRole('header', { name: 'Good News About Hell' })).toBeTruthy()
     expect(screen.getByText('Severance · Season 1 · Episode 1')).toBeTruthy()
@@ -208,7 +208,7 @@ describe('Item on a phone or tablet', () => {
   })
 
   it('says a title is not there for an address that names none, and asks nothing', async () => {
-    await renderItem({ id: '1e3' })
+    await renderItem({ [APP_ROUTE_PARAMS.id]: '1e3' })
 
     expect(await screen.findByText('This title is not on the server.')).toBeTruthy()
     expect(mockServer.heard.map(({ path }) => path)).not.toContain(
@@ -217,7 +217,7 @@ describe('Item on a phone or tablet', () => {
   })
 
   it('says a title the server does not have is not there', async () => {
-    await renderItem({ id: '999' })
+    await renderItem({ [APP_ROUTE_PARAMS.id]: '999' })
     expect(await screen.findByText('This title is not on the server.')).toBeTruthy()
   })
 })

@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
+import type Video from 'react-native-video'
 
 import type { PickerProps } from '@/layouts/gridKit'
 
@@ -19,10 +20,20 @@ export type Transport = {
   onSeek: (seconds: number) => void
 }
 
+/**
+ * The video as the screen drives it: its source, what it is told and what it reports. Each
+ * chrome draws it under everything, with what only its platform's player takes.
+ */
+export type VideoSurface = ComponentProps<typeof Video>
+
 export type PlayerChromeProps = {
   title: string
-  /** The video itself, drawn under everything. */
-  surface: ReactNode
+  /** What the video is about, for a platform that shows it beside the player; null when unknown. */
+  summary: string | null
+  /** The video's poster, for a platform that shows it beside the player; null when it has none. */
+  artwork: string | null
+  /** The video, once there is a source to play; null while there is nothing to draw. */
+  surface: VideoSurface | null
   /** A line in place of the video: while it opens, when it is refused, when nothing plays. */
   notice: string | null
   /** The subtitle cues showing now, as WebVTT text, drawn over the video whether or not the controls are. */
@@ -36,8 +47,15 @@ export type PlayerChromeProps = {
   onBack: () => void
 }
 
-/** The player's controls, which each platform draws and drives its own way. */
-export type PlayerChromeKit = { PlayerChrome: (props: PlayerChromeProps) => ReactNode }
+/**
+ * The player's controls, which each platform draws and drives its own way. `shouldDrawCaptions`
+ * says whether raven draws the subtitle cues over the video; where it does not, the platform's
+ * player draws the HLS rendition the screen picks.
+ */
+export type PlayerChromeKit = {
+  PlayerChrome: (props: PlayerChromeProps) => ReactNode
+  shouldDrawCaptions: boolean
+}
 
 export const PLAYER_COPY = {
   play: 'Play',

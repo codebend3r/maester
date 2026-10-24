@@ -6,6 +6,7 @@ import { focusItem } from '@/layouts/ItemLayout.focus'
 import { touchItem } from '@/layouts/ItemLayout.touch'
 import { touchGrid } from '@/layouts/Grid.touch'
 import { focusPicker } from '@/layouts/Picker.focus'
+import { focusPlayerChrome } from '@/layouts/PlayerChrome.focus'
 import { focusSearch } from '@/layouts/Search.focus'
 import { touchSearch } from '@/layouts/Search.touch'
 import { touchPicker } from '@/layouts/Picker.touch'
@@ -45,8 +46,10 @@ export const { ItemLayout, ItemNotice } = Platform.isTV ? focusItem : touchItem
 export const { SearchField, SearchLayout } = Platform.isTV ? focusSearch : touchSearch
 
 /**
- * The player's controls: raven's own over the video under the thumb. Apple TV's system
- * transport and Android TV's d-pad controls come with their own players (PR 7 and PR 8), so
- * until then every platform draws these.
+ * The player's controls: the system's own transport on a TV, which the remote drives and whose
+ * panel lists the stream's renditions; raven's own over the video under the thumb, with the
+ * subtitle cues raven draws itself. Android TV takes the TV's until it has controls of its own.
  */
-export const { PlayerChrome } = touchPlayerChrome
+export const { PlayerChrome, shouldDrawCaptions } = Platform.isTV
+  ? focusPlayerChrome
+  : touchPlayerChrome
