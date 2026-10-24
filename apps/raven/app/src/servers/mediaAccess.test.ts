@@ -1,8 +1,11 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import {
   ACCESS_REFUSALS,
+  ACCOUNT_ACCESS_MESSAGES,
   APP_CLIENT_CALLS,
+  AUTH_REFUSALS,
   AUTH_HEADERS,
+  AUTH_SCHEME,
   HLS_PARAMS,
   HLS_PATHS,
   MEDIA_ORIGIN_KINDS,
@@ -26,10 +29,13 @@ import {
 import { STATUSES, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import {
+  ACCOUNT_TICKETS,
+  ACCOUNT_TOKENS,
   LAN,
   NAS_COOKIES,
   PUBLIC,
   TICKETS,
+  accountServer,
   fakeNetwork,
   mediaServer,
   probesOf,
@@ -47,10 +53,14 @@ const setUp = ({
   server = mediaServer({}),
   elapsedMs = QUICK_LAN,
   cookies = NAS_COOKIES,
+  token = null,
+  hasAccounts = false,
 }: {
-  server?: ReturnType<typeof mediaServer>
+  server?: Pick<ReturnType<typeof mediaServer>, 'api' | 'heard'>
   elapsedMs?: Readonly<Record<string, number>>
   cookies?: ServerCookies
+  token?: string | null
+  hasAccounts?: boolean
 } = {}) => {
   const clock = { now: READ_AT }
   const away: { maxHeight: MaxHeight } = { maxHeight: MAX_HEIGHTS.fullHd }
@@ -61,9 +71,10 @@ const setUp = ({
     server: NAS,
     now: () => clock.now,
     probe: probes.probe,
-    readCookies: async () => cookies,
+    readCredentials: async () => ({ cookies, token }),
     watchNetwork: network.watchNetwork,
     awayMaxHeight: () => away.maxHeight,
+    hasAccounts: () => hasAccounts,
   })
   return { media, clock, away, probes, network, heard: server.heard }
 }
@@ -271,11 +282,12 @@ describe('mediaAccessFor', () => {
       server: NAS,
       now: () => READ_AT,
       probe: probesOf({ elapsedMs: QUICK_LAN }).probe,
-      readCookies: async () => {
+      readCredentials: async () => {
         throw new Error('The keychain is locked')
       },
       watchNetwork: fakeNetwork().watchNetwork,
       awayMaxHeight: () => MAX_HEIGHTS.fullHd,
+      hasAccounts: () => false,
     })
     expect(await media.source(direct)).toEqual({
       ok: false,
@@ -335,6 +347,165 @@ describe('mediaAccessFor', () => {
       const messages = outcomes.flatMap((outcome) => (outcome.ok ? [] : [outcome.message]))
       expect(
         [...logged, ...messages].filter((line) => TICKETS.some((ticket) => line.includes(ticket))),
+      ).toEqual([])
+    } finally {
+      spies.forEach((spy) => spy.mockRestore())
+    }
+  })
+})
+
+describe('mediaAccessFor on a server with accounts', () => {
+  const TOKEN = 'eyJhbGciOiJFUzI1NiJ9.eyJuIjoiMSJ9.c2ln'
+  const mintPath = pathFor({ path: APP_CLIENT_CALLS.getAccountTicket.path, id: BUSBOYS.id })
+
+  const accountSetUp = ({
+    server = accountServer({}),
+    elapsedMs = QUICK_LAN,
+  }: {
+    server?: ReturnType<typeof accountServer>
+    elapsedMs?: Readonly<Record<string, number>>
+  } = {}) => ({
+    ...setUp({ server, elapsedMs, token: TOKEN, hasAccounts: true }),
+    server,
+  })
+
+  const refusedWith = (message: string): SourceOutcome => ({
+    ok: false,
+    reason: ACCESS_REFUSALS.account,
+    message,
+  })
+
+  it('plays a direct source from the picked origin by an account ticket, with no cookie and no Bearer', async () => {
+    const { media, heard } = accountSetUp()
+    expect(sourceOf(await media.source(direct))).toEqual({
+      uri: ticketed({ origin: LAN.url, path: filePath, ticket: ACCOUNT_TICKETS[0] }),
+      headers: {},
+    })
+    expect(heard).not.toContain(ticketPath)
+    expect(heard).toContain(mintPath)
+  })
+
+  it("plays from the server's own address by account ticket when no origin answers, never by cookie", async () => {
+    const unlisted = accountSetUp({ server: accountServer({ origins: [] }) })
+    expect(sourceOf(await unlisted.media.source(direct))).toEqual({
+      uri: ticketed({ origin: NAS.origin, path: filePath, ticket: ACCOUNT_TICKETS[0] }),
+      headers: {},
+    })
+    const silent = accountSetUp({ elapsedMs: {} })
+    const query = toQueryString({
+      [HLS_PARAMS.mode]: PLAYBACK_MODES.remux,
+      [HLS_PARAMS.audio]: '1',
+      [MEDIA_TICKET_PARAM]: ACCOUNT_TICKETS[0],
+    })
+    expect(sourceOf(await silent.media.source(remux))).toEqual({
+      uri: `${NAS.origin}${masterPath}?${query}`,
+      headers: {},
+    })
+  })
+
+  it('opens a remux master by account ticket, and mints a fresh one for every source and step down', async () => {
+    const { media, heard } = accountSetUp()
+    expect(sourceOf(await media.source(direct)).uri).toContain(ACCOUNT_TICKETS[0])
+    const query = toQueryString({
+      [HLS_PARAMS.mode]: PLAYBACK_MODES.remux,
+      [HLS_PARAMS.audio]: '1',
+      [MEDIA_TICKET_PARAM]: ACCOUNT_TICKETS[1],
+    })
+    expect(sourceOf(await media.source(remux))).toEqual({
+      uri: `${LAN.url}${masterPath}?${query}`,
+      headers: {},
+    })
+    expect(sourceOf(await media.source(remux)).uri).toContain(ACCOUNT_TICKETS[2])
+    expect(heard.filter((path) => path === mintPath)).toHaveLength(3)
+  })
+
+  it('caps a transcode from the public origin, and asks none from its own address', async () => {
+    const away = accountSetUp({ elapsedMs: AWAY })
+    expect(qualityOf(await away.media.source(transcode))).toBe(LOW_1080)
+    const own = accountSetUp({ server: accountServer({ origins: [] }) })
+    expect(qualityOf(await own.media.source(transcode))).toBeNull()
+  })
+
+  it('mints once more with a refreshed token when the server refuses the first as signed out', async () => {
+    const server = accountServer({
+      mints: [
+        { status: STATUSES.unauthorized, reason: AUTH_REFUSALS.signedOut },
+        { status: STATUSES.ok },
+      ],
+    })
+    const { media } = accountSetUp({ server })
+    expect(sourceOf(await media.source(direct)).uri).toContain(ACCOUNT_TICKETS[0])
+    expect(server.bearers).toEqual([
+      `${AUTH_SCHEME} ${ACCOUNT_TOKENS.signedIn}`,
+      `${AUTH_SCHEME} ${ACCOUNT_TOKENS.refreshed}`,
+    ])
+    expect(server.rejections()).toBe(0)
+  })
+
+  it('asks the viewer to sign in again when the refreshed token is refused too', async () => {
+    const server = accountServer({
+      mints: [{ status: STATUSES.unauthorized, reason: AUTH_REFUSALS.signedOut }],
+    })
+    const { media } = accountSetUp({ server })
+    expect(await media.source(direct)).toEqual(
+      refusedWith(ACCOUNT_ACCESS_MESSAGES.signInAgain(NAS.name)),
+    )
+    expect(server.bearers).toHaveLength(2)
+    expect(server.rejections()).toBe(1)
+  })
+
+  it('says the access was removed for an account revoked, sent back to waiting or refused with no reason', async () => {
+    const outcomes = await Promise.all(
+      [AUTH_REFUSALS.revoked, AUTH_REFUSALS.pending, AUTH_REFUSALS.notOwner, null].map(
+        async (reason) =>
+          accountSetUp({
+            server: accountServer({ mints: [{ status: STATUSES.forbidden, reason }] }),
+          }).media.source(direct),
+      ),
+    )
+    expect(outcomes).toEqual(
+      outcomes.map(() => refusedWith(ACCOUNT_ACCESS_MESSAGES.removed(NAS.name))),
+    )
+  })
+
+  it('says accounts being down is an outage, and a locked library is locked', async () => {
+    const down = accountSetUp({
+      server: accountServer({
+        mints: [{ status: STATUSES.unavailable, reason: AUTH_REFUSALS.unavailable }],
+      }),
+    })
+    expect(await down.media.source(direct)).toEqual({
+      ok: false,
+      reason: ACCESS_REFUSALS.unreachable,
+      message: MEDIA_ACCESS_MESSAGES.unreachable(NAS.name),
+    })
+    const locked = accountSetUp({
+      server: accountServer({ mints: [{ status: STATUSES.locked, reason: null }] }),
+    })
+    expect(await locked.media.source(direct)).toEqual({
+      ok: false,
+      reason: ACCESS_REFUSALS.locked,
+      message: MEDIA_ACCESS_MESSAGES.locked(NAS.name),
+    })
+  })
+
+  it('never puts an account ticket in a log line or a refusal', async () => {
+    const spies = CONSOLE_METHODS.map((method) =>
+      spyOn(console, method).mockImplementation(() => undefined),
+    )
+    try {
+      const { media } = accountSetUp()
+      await media.source(direct)
+      await media.source(remux)
+      const refused = await accountSetUp({
+        server: accountServer({ mints: [{ status: STATUSES.forbidden, reason: null }] }),
+      }).media.source(direct)
+      const logged = spies.flatMap((spy) => spy.mock.calls.flat()).map(String)
+      const messages = refused.ok ? [] : [refused.message]
+      expect(
+        [...logged, ...messages].filter((line) =>
+          ACCOUNT_TICKETS.some((ticket) => line.includes(ticket)),
+        ),
       ).toEqual([])
     } finally {
       spies.forEach((spy) => spy.mockRestore())

@@ -20,7 +20,10 @@ const calls = Object.entries(APP_CLIENT_CALLS)
 const routeOf = ({ method, path }: AppClientCall) =>
   routes.find((route) => route.method === method && route.path === path)
 
-/** The spec's writes (progress, plays, watched, the favourites, the PIN), and the admin lock's unlock, ruled in by Task 17. */
+/**
+ * The spec's writes (progress, plays, watched, the favourites, the PIN), the admin lock's unlock,
+ * ruled in by Task 17, and an account's media ticket, which Ruling 28 mints with a POST.
+ */
 const WRITES = [
   APP_CLIENT_CALLS.saveProgress,
   APP_CLIENT_CALLS.recordPlay,
@@ -29,7 +32,11 @@ const WRITES = [
   APP_CLIENT_CALLS.setItemFavourite,
   APP_CLIENT_CALLS.unlock,
   APP_CLIENT_CALLS.unlockAdmin,
+  APP_CLIENT_CALLS.getAccountTicket,
 ]
+
+/** The reads a server with accounts answers the app: its sign-in settings and the account signed in. */
+const ACCOUNT_READS = [APP_CLIENT_CALLS.getAuthConfig, APP_CLIENT_CALLS.getMe]
 
 /** A server that answers every request with an empty body, writing down which listed call each one was. */
 const recordingFetch = (heard: (AppClientCall | null)[]): FetchLike => {
@@ -97,7 +104,25 @@ describe('the calls raven’s app may make', () => {
       api.setItemFavourite({ id: 3, favourite: true }),
       api.unlock('1234'),
       api.unlockAdmin('password'),
+      api.getAccountTicket({ id: 7 }),
     ])
     expect(heard).toEqual(WRITES)
+  })
+
+  it("names the accounts' reads after the client methods that send them", async () => {
+    const heard: (AppClientCall | null)[] = []
+    const api = createApiClient({ fetch: recordingFetch(heard) })
+    await Promise.allSettled([api.getAuthConfig(), api.getMe()])
+    expect(heard).toEqual(ACCOUNT_READS)
+  })
+
+  it("opens the accounts' calls to an approved account, the config to anyone", () => {
+    expect(routeOf(APP_CLIENT_CALLS.getAuthConfig)?.account ?? null).toBe(
+      ACCOUNT_REQUIREMENTS.anyone,
+    )
+    expect(routeOf(APP_CLIENT_CALLS.getMe)?.account ?? null).toBe(ACCOUNT_REQUIREMENTS.session)
+    expect(routeOf(APP_CLIENT_CALLS.getAccountTicket)?.account ?? null).toBe(
+      ACCOUNT_REQUIREMENTS.approved,
+    )
   })
 })

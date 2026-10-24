@@ -4,10 +4,10 @@ import { useRouter } from 'expo-router'
 import type { ShelfCard } from '@/queries/cards'
 import { homeShelvesOf } from '@/queries/homeShelves'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
-import { useServerCookies } from '@/queries/useServerCookies'
+import { useServerCredentials } from '@/queries/useServerCredentials'
 import { Shelf, Shelves } from '@/layouts'
 import { APP_ROUTES, ROUTE_TARGETS, hrefOf } from '@/routes'
-import { cookieHeadersFor } from '@/servers/serverHeaders'
+import { serverHeadersFor } from '@/servers/serverHeaders'
 
 const COPY = {
   title: 'Home',
@@ -19,19 +19,20 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
   const router = useRouter()
   const home = useQuery(queries.homeQuery)
   const libraries = useQuery(queries.librariesQuery)
-  const cookies = useServerCookies(server)
+  const credentials = useServerCredentials(server)
 
   const shelves =
-    home.data === undefined || libraries.data === undefined || cookies === null
+    home.data === undefined || libraries.data === undefined || credentials === null
       ? []
       : homeShelvesOf({
           home: home.data,
           libraries: libraries.data,
           api,
-          headersFor: cookieHeadersFor({ server, cookies }),
+          headersFor: serverHeadersFor({ server, credentials }),
         })
   const failure = home.error ?? libraries.error
-  const isBare = home.isSuccess && libraries.isSuccess && cookies !== null && shelves.length === 0
+  const isBare =
+    home.isSuccess && libraries.isSuccess && credentials !== null && shelves.length === 0
   const isLoading = failure === null && !isBare && shelves.length === 0
   const notice = ((): string | null => {
     if (failure !== null) return failure.message

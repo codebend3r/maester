@@ -9,6 +9,7 @@ import { AuthBackend } from '@/auth/authBackend'
 import { AuthController } from '@/auth/authController'
 import { AUTH_STATE, resolveAuthState } from '@/auth/effectiveAuth'
 import { AUTH_VERIFY, AuthSessions } from '@/auth/authSessions'
+import { TicketAccesses } from '@/auth/ticketAccesses'
 import { Management } from '@/auth/management'
 import { MEMBERSHIP_TTL, MEMBERSHIP_TTL_MS, MembershipLookups } from '@/auth/membershipLookups'
 import { AUTH_FETCH, createTokenVerifier, type AuthFetch } from '@/auth/tokenVerifier'
@@ -23,7 +24,7 @@ import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { BrowseController } from '@/fs/browseController'
 import { HealthController } from '@/health/healthController'
 import { HlsController } from '@/hls/hlsController'
-import { HLS_CLOCK, SYSTEM_CLOCK } from '@/hls/hlsClock'
+import { CLOCK, SYSTEM_CLOCK } from '@/clock'
 import { HlsSessions } from '@/hls/hlsSessions'
 import { KeyframesService } from '@/hls/keyframesService'
 import { ItemsController } from '@/items/itemsController'
@@ -39,6 +40,7 @@ import { LockController } from '@/lock/lockController'
 import { LockGuard } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { FavouritesController } from '@/media/favouritesController'
+import { FilePasses } from '@/media/filePasses'
 import { HomeController } from '@/media/homeController'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaController } from '@/media/mediaController'
@@ -216,8 +218,10 @@ export class AppModule {
         ThumbnailService,
         TracksService,
         KeyframesService,
-        { provide: HLS_CLOCK, useValue: SYSTEM_CLOCK },
+        { provide: CLOCK, useValue: SYSTEM_CLOCK },
         HlsSessions,
+        FilePasses,
+        TicketAccesses,
         SubtitlesService,
         MediaArtifacts,
         ScannerService,

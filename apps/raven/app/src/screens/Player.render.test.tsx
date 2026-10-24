@@ -1,29 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import {
+  ACCOUNT_ACCESS_MESSAGES,
   APP_CALL_METHODS,
   APP_CLIENT_CALLS,
   DEFAULT_THEME,
   HLS_PARAMS,
   HLS_PATHS,
+  MEDIA_TICKET_PARAM,
   PLAYBACK_MODES,
   THEMES,
   THEME_TONES,
   mediaLabel,
+  toQueryString,
 } from '@raven/core'
 import { SAVE_EVERY_S, usePlayerPrefs, useUnlockPrompt } from '@raven/ui/headless'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 import type { ReactVideoProps } from 'react-native-video'
 
+import { APPLE_ERROR_DOMAINS, URL_ERROR_HTTP_CODES } from '@/player/playerErrors'
 import { useUnlockRoute } from '@/queries/useUnlockRoute'
 import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Player } from '@/screens/Player'
+import { ACCOUNT_ANSWERS } from '@/servers/authConfigs'
 import type { AppServer } from '@/servers/serverList'
+import { useAccountAnswers } from '@/stores/accountAnswers'
 import { useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { type HeardRequest, STATUSES, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
-import { BUSBOYS_MP4, CUE_TEXT, playerApi } from '@/test/playerServer'
+import { BUSBOYS_MP4, CUE_TEXT, accountTicketOf, playerApi } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 import { appThemeOf } from '@/theme/appTheme'
 import type * as VideoMock from '@/test/videoMock'
@@ -35,10 +41,11 @@ const mockBack = jest.fn()
 const mockParams = jest.fn((): Record<string, string> => ({
   [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id),
 }))
-/** What the server heard, and how it answers the ticket, per test. */
-const mockServer: { heard: HeardRequest[]; ticketStatus: number } = {
+/** What the server heard, and how it answers the ticket and an account's mints, per test. */
+const mockServer: { heard: HeardRequest[]; ticketStatus: number; mints: readonly number[] } = {
   heard: [],
   ticketStatus: STATUSES.ok,
+  mints: [STATUSES.ok],
 }
 
 jest.mock('expo-router', () => ({
@@ -52,6 +59,7 @@ const mockApi = jest.fn((_server: AppServer) =>
       mockServer.heard = [...mockServer.heard, request]
     },
     ticketStatus: mockServer.ticketStatus,
+    mints: mockServer.mints,
   }),
 )
 
@@ -59,6 +67,7 @@ jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => ({}), forget: async () => {} },
+  credentialsFor: async () => ({ cookies: {}, token: null }),
   secretStore: {
     getItemAsync: async () => null,
     setItemAsync: async () => {},
@@ -78,7 +87,7 @@ const WithUnlock = () => {
   return <Player />
 }
 
-const shown = { client: createScreenClient() }
+const shown = { client: createScreenClient(), serverId: NAS.id }
 
 let servers = 0
 
@@ -133,6 +142,8 @@ describe('Player on a phone or tablet', () => {
     jest.clearAllMocks()
     mockServer.heard = []
     mockServer.ticketStatus = STATUSES.ok
+    mockServer.mints = [STATUSES.ok]
+    useAccountAnswers.setState({ answers: {} })
     resetDrawnVideo()
     useUnlockPrompt.setState({ open: false })
     useAppPrefs.setState(DEFAULT_APP_PREFS)
@@ -140,6 +151,7 @@ describe('Player on a phone or tablet', () => {
     // A server of its own for each test, so no test plays on a ticket or a probe another held.
     const server = { ...NAS, id: `0f8fad5b-d9cb-469f-a165-${String(++servers).padStart(12, '0')}` }
     useActiveServer.setState({ servers: [server], activeId: server.id })
+    shown.serverId = server.id
   })
 
   // The subtitle windows keep their own half hour in the cache, which would hold jest open: the
@@ -229,6 +241,84 @@ describe('Player on a phone or tablet', () => {
       `${NAS.origin}${master}?${HLS_PARAMS.mode}=${PLAYBACK_MODES.remux}`,
     )
     expect(videoProps().source!.startPosition).toBe(3125 * 1000)
+  })
+
+  describe('on a server with accounts', () => {
+    const master = pathFor({ path: HLS_PATHS.master, id: BUSBOYS_MP4.id })
+    const mintPath = pathFor({ path: APP_CLIENT_CALLS.getAccountTicket.path, id: BUSBOYS_MP4.id })
+    const mints = (): number => mockServer.heard.filter(({ path }) => path === mintPath).length
+    const remuxBy = (ticket: string) =>
+      `${NAS.origin}${master}?${toQueryString({
+        [HLS_PARAMS.mode]: PLAYBACK_MODES.remux,
+        [MEDIA_TICKET_PARAM]: ticket,
+      })}`
+    /** What AVPlayer said on the iOS simulator once the server had forgotten the stream's session. */
+    const SESSION_GONE = {
+      error: {
+        code: URL_ERROR_HTTP_CODES.notFound,
+        domain: APPLE_ERROR_DOMAINS.url,
+        localizedDescription: 'The requested URL was not found on this server.',
+      },
+    }
+
+    beforeEach(() => {
+      useAccountAnswers.setState({ answers: { [shown.serverId]: ACCOUNT_ANSWERS.ready } })
+    })
+
+    /** Plays Busboys from its spot, then through the remux once direct play fails at `at`. */
+    const remuxFrom = async (at: number) => {
+      await renderPlayer({
+        [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id),
+        [APP_ROUTE_PARAMS.at]: String(BUSBOYS_MP4.position),
+      })
+      const file = await loadedVideo()
+      expect(file.source!.uri).toBe(
+        `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })}?${toQueryString({ [MEDIA_TICKET_PARAM]: accountTicketOf(1) })}`,
+      )
+      expect(file.source!.headers).toEqual({})
+      await start(file)
+      await moveVideoTo({ props: file, seconds: at })
+      await act(async () => {
+        file.onError!({ error: { code: -11828, localizedDescription: 'Cannot Open' } })
+      })
+      await screen.findByRole('button', { name: 'Pause' })
+      return videoProps()
+    }
+
+    it('plays by account ticket, a fresh one for the step down, and no cookie', async () => {
+      const stream = await remuxFrom(3125)
+      expect(stream.source!.uri).toBe(remuxBy(accountTicketOf(2)))
+      expect(stream.source!.headers).toEqual({})
+      expect(stream.source!.startPosition).toBe(3125 * 1000)
+      expect(mints()).toBe(2)
+    })
+
+    it('opens the master again with a fresh ticket from the spot when the server lets go of the stream mid-play', async () => {
+      const stream = await remuxFrom(3125)
+      await start(stream)
+      await moveVideoTo({ props: stream, seconds: 4210 })
+      await act(async () => {
+        stream.onError!(SESSION_GONE)
+      })
+      await screen.findByRole('button', { name: 'Pause' })
+      expect(videoProps().source!.uri).toBe(remuxBy(accountTicketOf(3)))
+      expect(videoProps().source!.startPosition).toBe(4210 * 1000)
+      expect(mints()).toBe(3)
+      expect(
+        screen.queryByText("This video didn't start in any of the ways the server offers."),
+      ).toBeNull()
+    })
+
+    it('shows the account refusal when the server will not mint for the reopen', async () => {
+      mockServer.mints = [STATUSES.ok, STATUSES.ok, STATUSES.forbidden]
+      const stream = await remuxFrom(3125)
+      await start(stream)
+      await moveVideoTo({ props: stream, seconds: 4210 })
+      await act(async () => {
+        stream.onError!(SESSION_GONE)
+      })
+      expect(await screen.findByText(ACCOUNT_ACCESS_MESSAGES.removed(NAS.name))).toBeTruthy()
+    })
   })
 
   it('skips ten seconds either way from where the video is', async () => {

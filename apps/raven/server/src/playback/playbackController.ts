@@ -207,7 +207,7 @@ export class PlaybackController {
     reply.raw.on(RESPONSE_EVENTS.close, () => child.kill(FFMPEG_SIGNALS.kill))
     trackStream({
       sessions: this.streams,
-      rechecks: this.rechecks,
+      ended: this.rechecks.ended({ request }),
       auth: this.callers,
       mediaId: id,
       mode: streamMode,

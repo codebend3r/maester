@@ -1,12 +1,7 @@
 import { mkdtemp, rm, truncate } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-  MEMBER_STATUSES,
-  PLAYBACK_MODES,
-  type MemberStatusChange,
-  isMediaTicket,
-} from '@raven/core'
+import { MEMBER_STATUSES, PLAYBACK_MODES, type MemberStatusChange } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { decodeJwt } from 'jose'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -22,13 +17,16 @@ import {
   TOKEN_CARRIERS,
   createEnforcedApp,
   headersFor,
+  mintedTicket,
   pathOf,
+  pinMoves,
   withTicket,
 } from '@/test/enforced'
 import { encodeClip } from '@/test/clips'
 
 describe('open responses once access goes', () => {
   const RECHECK_MS = 100
+  const PIN = '8008'
   /** Several rechecks long, and the bound a test holds the server to. */
   const CUT_WITHIN_MS = 1_000
   /** Larger than every buffer between the server and a body left unread, so the response stays open. */
@@ -48,6 +46,7 @@ describe('open responses once access goes', () => {
   let liveRoot: string
   let base: string
   let longVideo: number
+  let pin: ReturnType<typeof pinMoves>
 
   beforeAll(async () => {
     liveRoot = await mkdtemp(join(tmpdir(), 'raven-enforcement-open-'))
@@ -60,7 +59,13 @@ describe('open responses once access goes', () => {
         isOwner: false,
       }
     })
-    open = await createEnforcedApp({ root: liveRoot, fixture: live, accessRecheckMs: RECHECK_MS })
+    open = await createEnforcedApp({
+      root: liveRoot,
+      fixture: live,
+      libraryPin: PIN,
+      accessRecheckMs: RECHECK_MS,
+    })
+    pin = pinMoves({ enforced: open, fixture: live, pin: PIN })
     // Its remux is larger than every buffer to an unread body, so ffmpeg is still writing at the cut.
     await encodeClip({ path: join(open.mediaDir, LONG_CLIP), seconds: 30, size: LONG_CLIP_SIZE })
     await open.ownerApi.scanLibrary(open.ids.library)
@@ -153,16 +158,8 @@ describe('open responses once access goes', () => {
   const setFriend = ({ status }: MemberStatusChange) =>
     open.ownerApi.setMemberStatus({ id: AUTH_TEST_IDS.friend, change: { status } })
 
-  const ticketFor = async ({ headers }: { headers: Record<string, string> }): Promise<string> => {
-    const response = await open.app.inject({
-      method: ROUTES.accountTicket.method,
-      url: pathOf({ route: ROUTES.accountTicket, params: { id: open.ids.video } }),
-      headers,
-    })
-    const body: unknown = response.json()
-    if (!isMediaTicket(body)) throw new Error('No ticket was minted')
-    return body.ticket
-  }
+  const ticketFor = ({ headers }: { headers: Record<string, string> }): Promise<string> =>
+    mintedTicket({ app: open.app, id: open.ids.video, headers })
 
   /** A ticket minted from a token of `SHORT_TOKEN_SECONDS`, and when that token expires. */
   const shortTicket = async ({ id }: { id: string }) => {
@@ -283,6 +280,30 @@ describe('open responses once access goes', () => {
       expect(await drain(opened)).toEqual({ received: LARGE_FILE_BYTES, isCut: false })
     } finally {
       aborter.abort()
+    }
+  })
+
+  it("cuts a file opened past the owner's PIN on a locked library soon after the PIN locks again", async () => {
+    await pin.setLocked({ isLocked: true })
+    const aborter = new AbortController()
+    try {
+      const owner = await headersFor({
+        fixture: live,
+        caller: CALLER_KINDS.owner,
+        via: TOKEN_CARRIERS.bearer,
+      })
+      const { headers } = await pin.unlock({ headers: owner })
+      const opened = await openBody({
+        path: fileWith({ ticket: await ticketFor({ headers }) }),
+        signal: aborter.signal,
+      })
+      await pin.relock({ headers })
+      expect(await drainWithin({ reader: opened.reader, ms: CUT_WITHIN_MS })).toMatchObject({
+        isCut: true,
+      })
+    } finally {
+      aborter.abort()
+      await pin.setLocked({ isLocked: false })
     }
   })
 })

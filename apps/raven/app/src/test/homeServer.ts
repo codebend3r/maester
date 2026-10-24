@@ -27,6 +27,7 @@ export const NAS: AppServer = {
   name: 'nas:8080',
   origin: 'http://nas:8080',
   addedAt: 1,
+  account: null,
 }
 
 const libraryFor = ({ id, name, kind }: { id: number; name: string; kind: LibraryKind }) =>
@@ -113,6 +114,7 @@ export const OTHER: AppServer = {
   name: 'other:8484',
   origin: 'http://other:8484',
   addedAt: 2,
+  account: null,
 }
 
 const OTHER_SHOWS = libraryFor({ id: 7, name: 'Cartoons', kind: LIBRARY_KINDS.shows })
@@ -128,6 +130,7 @@ export const SPARSE: AppServer = {
   name: 'sparse:8484',
   origin: 'http://sparse:8484',
   addedAt: 3,
+  account: null,
 }
 
 const SPARSE_HOME: Home = {

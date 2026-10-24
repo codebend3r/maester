@@ -56,6 +56,18 @@ describe('appClientCallOf', () => {
     expect(callOf({ method: get, url: '/api/items/1/2/images/poster' })).toBeNull()
   })
 
+  it("reads the accounts' calls: the config, the account and a title's account ticket", () => {
+    expect(callOf({ method: get, url: 'http://nas:8484/api/auth/config' })).toBe(
+      APP_CLIENT_CALLS.getAuthConfig,
+    )
+    expect(callOf({ method: get, url: '/api/me' })).toBe(APP_CLIENT_CALLS.getMe)
+    expect(callOf({ method: post, url: '/api/auth/media/12/ticket' })).toBe(
+      APP_CLIENT_CALLS.getAccountTicket,
+    )
+    expect(callOf({ method: get, url: '/api/auth/media/12/ticket' })).toBeNull()
+    expect(callOf({ method: get, url: '/api/auth/members' })).toBeNull()
+  })
+
   it('is no call when the method differs', () => {
     expect(callOf({ method: post, url: '/api/home' })).toBeNull()
     expect(callOf({ method: get, url: '/api/lock/unlock' })).toBeNull()

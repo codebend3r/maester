@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react'
 import {
+  Alert,
   KeyboardAvoidingView,
   Pressable,
   ScrollView,
@@ -9,10 +11,14 @@ import {
 } from 'react-native'
 
 import {
+  BUTTON_TONES,
+  type ConfirmProps,
   type FieldProps,
   type FormButtonProps,
   type FormKit,
   type FormProps,
+  type FormSheetProps,
+  type WebPagesProps,
   keyboardFor,
 } from '@/layouts/formKit'
 import { useToneStyles, useTouchFormStyles } from '@/layouts/formStyles'
@@ -46,6 +52,7 @@ const Field = ({
   placeholder,
   isSecret = false,
   isNumeric = false,
+  isEmail = false,
 }: FieldProps) => {
   const formStyles = useTouchFormStyles()
   const muted = useTheme((theme) => theme.palette.muted)
@@ -56,7 +63,7 @@ const Field = ({
         accessibilityLabel={label}
         autoCapitalize="none"
         autoCorrect={false}
-        keyboardType={keyboardFor({ isNumeric, isSecret })}
+        keyboardType={keyboardFor({ isNumeric, isSecret, isEmail })}
         onChangeText={onChangeText}
         onSubmitEditing={({ nativeEvent }) => onSubmit({ text: nativeEvent.text })}
         placeholder={placeholder}
@@ -91,11 +98,52 @@ const FormButton = ({ label, onPress, tone, isDisabled = false }: FormButtonProp
   )
 }
 
+/**
+ * The question in the system's alert, asked once as the step is drawn, over the form with the
+ * question on it. The answer that changes nothing is the alert's cancel, which a dismissal
+ * outside it gives too.
+ */
+const Confirm = ({ title, question, detail, yesLabel, noLabel, onAnswer }: ConfirmProps) => {
+  const formStyles = useTouchFormStyles()
+  const hasAsked = useRef(false)
+  useEffect(() => {
+    if (hasAsked.current) return
+    hasAsked.current = true
+    const answer = (isYes: boolean) => () => onAnswer({ isYes })
+    Alert.alert(
+      question,
+      detail,
+      [
+        { text: noLabel, style: 'cancel', onPress: answer(false) },
+        { text: yesLabel, onPress: answer(true) },
+      ],
+      { cancelable: true, onDismiss: answer(false) },
+    )
+  }, [question, detail, yesLabel, noLabel, onAnswer])
+  return (
+    <Form title={title}>
+      <Text style={formStyles.notice}>{question}</Text>
+    </Form>
+  )
+}
+
+/** Under the thumb a step is the screen itself; its own button goes back. */
+const FormSheet = ({ children }: FormSheetProps) => children
+
+/** Each page a button that opens the browser on it. */
+const WebPages = ({ pages }: WebPagesProps) =>
+  pages.map(({ label, onOpen }) => (
+    <FormButton key={label} label={label} onPress={onOpen} tone={BUTTON_TONES.ghost} />
+  ))
+
 /** The phone and tablet form: one column under the thumb, lifted clear of the keyboard. */
 export const touchForm: FormKit = {
   Form,
   Field,
   FormButton,
+  Confirm,
+  FormSheet,
+  WebPages,
   useFormStyles: useTouchFormStyles,
 }
 

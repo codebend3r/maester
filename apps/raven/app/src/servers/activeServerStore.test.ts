@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'bun:test'
+import { AUTH_V1 } from '@raven/core'
 
+import { createAccountSessions } from '@/accounts/accountSessions'
+import { accountKeyFor, createSessionStore } from '@/accounts/sessionStore'
 import { ADD_OUTCOMES, type AppServer } from '@/servers/serverList'
 import { SERVER_LIST_KEY, createActiveServerStore } from '@/servers/activeServerStore'
+import { PIN } from '@/test/accountPins'
+import { ACCOUNT, stubAuth } from '@/test/authStub'
 import { failingStore, memoryStore } from '@/test/memoryStore'
 
 const NAS: AppServer = {
@@ -9,15 +14,18 @@ const NAS: AppServer = {
   name: 'nas:8080',
   origin: 'http://nas:8080',
   addedAt: 1,
+  account: null,
 }
 
 const noJar = { forget: async () => {} }
+const noSessions = { forget: async () => {}, signOut: async () => {} }
 
 const DEN: AppServer = {
   id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
   name: 'den:8080',
   origin: 'http://den:8080',
   addedAt: 2,
+  account: null,
 }
 
 /** A jar that records the servers whose cookies it forgot. */
@@ -36,7 +44,7 @@ const recordingJar = () => {
 describe('createActiveServerStore', () => {
   it('keeps the list and the active id as one value under raven.servers', async () => {
     const { store, items } = memoryStore()
-    const useServers = createActiveServerStore({ store, jar: noJar })
+    const useServers = createActiveServerStore({ store, jar: noJar, sessions: noSessions })
     expect(useServers.getState().add(NAS).kind).toBe(ADD_OUTCOMES.added)
     useServers.getState().activate(NAS.id)
     await Promise.resolve()
@@ -48,12 +56,12 @@ describe('createActiveServerStore', () => {
 
   it('reads them back in a new launch', async () => {
     const { store } = memoryStore()
-    const first = createActiveServerStore({ store, jar: noJar })
+    const first = createActiveServerStore({ store, jar: noJar, sessions: noSessions })
     first.getState().add(NAS)
     first.getState().activate(NAS.id)
     await Promise.resolve()
 
-    const next = createActiveServerStore({ store, jar: noJar })
+    const next = createActiveServerStore({ store, jar: noJar, sessions: noSessions })
     expect(next.getState().servers).toEqual([])
     await next.persist.rehydrate()
     expect(next.getState()).toMatchObject({ servers: [NAS], activeId: NAS.id })
@@ -65,20 +73,24 @@ describe('createActiveServerStore', () => {
       version: 0,
     }
     const { store } = memoryStore([[SERVER_LIST_KEY, JSON.stringify(stored)]])
-    const useServers = createActiveServerStore({ store, jar: noJar })
+    const useServers = createActiveServerStore({ store, jar: noJar, sessions: noSessions })
     await useServers.persist.rehydrate()
     expect(useServers.getState()).toMatchObject({ servers: [NAS], activeId: null })
   })
 
   it('starts empty from a value that is not JSON', async () => {
     const { store } = memoryStore([[SERVER_LIST_KEY, 'not json']])
-    const useServers = createActiveServerStore({ store, jar: noJar })
+    const useServers = createActiveServerStore({ store, jar: noJar, sessions: noSessions })
     await useServers.persist.rehydrate()
     expect(useServers.getState()).toMatchObject({ servers: [], activeId: null })
   })
 
   it('works for the run when the store fails, rather than failing', async () => {
-    const useServers = createActiveServerStore({ store: failingStore, jar: noJar })
+    const useServers = createActiveServerStore({
+      store: failingStore,
+      jar: noJar,
+      sessions: noSessions,
+    })
     await useServers.persist.rehydrate()
     useServers.getState().add(NAS)
     useServers.getState().activate(NAS.id)
@@ -93,7 +105,11 @@ describe('createActiveServerStore', () => {
         forgotten.push(serverId)
       },
     }
-    const useServers = createActiveServerStore({ store: memoryStore().store, jar })
+    const useServers = createActiveServerStore({
+      store: memoryStore().store,
+      jar,
+      sessions: noSessions,
+    })
     useServers.getState().add(NAS)
     useServers.getState().activate(NAS.id)
     await useServers.getState().remove(NAS.id)
@@ -101,9 +117,78 @@ describe('createActiveServerStore', () => {
     expect(forgotten).toEqual([NAS.id])
   })
 
+  it('forgets the account session of a server it drops, and only that one', async () => {
+    const { store, items } = memoryStore()
+    const sessions = createAccountSessions({
+      store: createSessionStore({ store }),
+      fetch: stubAuth({ config: PIN }).fetch,
+      onChange: () => {},
+    })
+    const nas = { ...NAS, account: PIN }
+    const den = { ...DEN, account: PIN }
+    const signIn = (server: AppServer) =>
+      sessions.signIn({ server, account: PIN, email: ACCOUNT.email, password: ACCOUNT.password })
+    await signIn(nas)
+    await signIn(den)
+    const useServers = createActiveServerStore({ store, jar: noJar, sessions })
+    useServers.getState().add(nas)
+    useServers.getState().add(den)
+    await useServers.getState().remove(NAS.id)
+    expect(await sessions.accessToken({ server: nas })).toBeNull()
+    expect(await sessions.accessToken({ server: den })).not.toBeNull()
+    expect(items.has(accountKeyFor(NAS.id))).toBe(false)
+    expect(items.has(accountKeyFor(DEN.id))).toBe(true)
+  })
+
+  it('signs a server out at Auth and keeps it on the list, its pin and the active id with it', async () => {
+    const { store, items } = memoryStore()
+    const auth = stubAuth({ config: PIN })
+    const sessions = createAccountSessions({
+      store: createSessionStore({ store }),
+      fetch: auth.fetch,
+      onChange: () => {},
+    })
+    const nas = { ...NAS, account: PIN }
+    await sessions.signIn({
+      server: nas,
+      account: PIN,
+      email: ACCOUNT.email,
+      password: ACCOUNT.password,
+    })
+    const useServers = createActiveServerStore({ store, jar: noJar, sessions })
+    useServers.getState().add(nas)
+    useServers.getState().activate(NAS.id)
+
+    await useServers.getState().signOut(NAS.id)
+    expect(new URL(auth.state.requests.at(-1)?.url ?? '').pathname).toBe(AUTH_V1.logout)
+    expect(await sessions.accessToken({ server: nas })).toBeNull()
+    expect(items.has(accountKeyFor(NAS.id))).toBe(false)
+    expect(useServers.getState()).toMatchObject({ servers: [nas], activeId: NAS.id })
+  })
+
+  it('signs out nothing for a server not on the list', async () => {
+    const asked: unknown[] = []
+    const useServers = createActiveServerStore({
+      store: memoryStore().store,
+      jar: noJar,
+      sessions: {
+        ...noSessions,
+        signOut: async (input) => {
+          asked.push(input)
+        },
+      },
+    })
+    await useServers.getState().signOut(NAS.id)
+    expect(asked).toEqual([])
+  })
+
   it('switches to the next server left when the active one is removed, forgetting its cookies', async () => {
     const { forgotten, jar } = recordingJar()
-    const useServers = createActiveServerStore({ store: memoryStore().store, jar })
+    const useServers = createActiveServerStore({
+      store: memoryStore().store,
+      jar,
+      sessions: noSessions,
+    })
     useServers.getState().add(NAS)
     useServers.getState().add(DEN)
     useServers.getState().activate(NAS.id)
@@ -114,7 +199,11 @@ describe('createActiveServerStore', () => {
 
   it('keeps the active server when another is removed', async () => {
     const { forgotten, jar } = recordingJar()
-    const useServers = createActiveServerStore({ store: memoryStore().store, jar })
+    const useServers = createActiveServerStore({
+      store: memoryStore().store,
+      jar,
+      sessions: noSessions,
+    })
     useServers.getState().add(NAS)
     useServers.getState().add(DEN)
     useServers.getState().activate(NAS.id)
@@ -125,7 +214,7 @@ describe('createActiveServerStore', () => {
 
   it('renames a server and keeps the name, refusing a name the list will not take', async () => {
     const { store, items } = memoryStore()
-    const useServers = createActiveServerStore({ store, jar: noJar })
+    const useServers = createActiveServerStore({ store, jar: noJar, sessions: noSessions })
     useServers.getState().add(NAS)
     expect(useServers.getState().rename({ id: NAS.id, name: ' Attic ' })).toBe(true)
     expect(useServers.getState().rename({ id: NAS.id, name: '' })).toBe(false)
@@ -134,5 +223,29 @@ describe('createActiveServerStore', () => {
     expect(JSON.parse(items.get(SERVER_LIST_KEY) ?? '')).toMatchObject({
       state: { servers: [{ ...NAS, name: 'Attic' }] },
     })
+  })
+
+  it("keeps a server's pinned sign-in with it, and reads it back in a new launch", async () => {
+    const { store } = memoryStore()
+    const first = createActiveServerStore({ store, jar: noJar, sessions: noSessions })
+    first.getState().add(NAS)
+    expect(first.getState().pin({ id: NAS.id, account: PIN })).toBe(true)
+    expect(first.getState().pin({ id: DEN.id, account: PIN })).toBe(false)
+    await Promise.resolve()
+
+    const next = createActiveServerStore({ store, jar: noJar, sessions: noSessions })
+    await next.persist.rehydrate()
+    expect(next.getState().servers).toEqual([{ ...NAS, account: PIN }])
+  })
+
+  it('forgets the pin with the server, so adding it again starts with none', async () => {
+    const { store, items } = memoryStore()
+    const useServers = createActiveServerStore({ store, jar: noJar, sessions: noSessions })
+    useServers.getState().add(NAS)
+    useServers.getState().pin({ id: NAS.id, account: PIN })
+    await useServers.getState().remove(NAS.id)
+    expect(items.get(SERVER_LIST_KEY) ?? '').not.toContain(PIN.supabaseUrl)
+    useServers.getState().add(NAS)
+    expect(useServers.getState().servers).toEqual([NAS])
   })
 })

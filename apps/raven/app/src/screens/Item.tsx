@@ -30,11 +30,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { Pictures } from '@/queries/cards'
 import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
-import { useServerCookies } from '@/queries/useServerCookies'
+import { useServerCredentials } from '@/queries/useServerCredentials'
 import { ItemLayout, ItemNotice } from '@/layouts'
 import { type CheckState, ITEM_ACTIONS, type ItemAction } from '@/layouts/itemKit'
 import { APP_ROUTE_PARAMS, ROUTE_TARGETS, type RouteTarget, hrefOf } from '@/routes'
-import { cookieHeadersFor } from '@/servers/serverHeaders'
+import { serverHeadersFor } from '@/servers/serverHeaders'
 
 const COPY = {
   opening: 'Opening the title',
@@ -365,7 +365,7 @@ const ServerItem = ({
 }) => {
   const router = useRouter()
   const item = useQuery(session.queries.itemQuery(id))
-  const cookies = useServerCookies(session.server)
+  const credentials = useServerCredentials(session.server)
   const onBack = () => router.back()
   const page = routeState({ id, query: item })
   switch (page.state) {
@@ -376,14 +376,14 @@ const ServerItem = ({
     case ROUTE_STATES.loading:
       return <ItemNotice notice={COPY.opening} onBack={onBack} />
     case ROUTE_STATES.ready:
-      // The pictures wait for the server's cookies, so none is asked for twice.
-      return cookies === null ? (
+      // The pictures wait for the server's credentials, so none is asked for twice.
+      return credentials === null ? (
         <ItemNotice notice={COPY.opening} onBack={onBack} />
       ) : (
         <ItemOf
           key={page.data.id}
           context={{
-            headersFor: cookieHeadersFor({ server: session.server, cookies }),
+            headersFor: serverHeadersFor({ server: session.server, credentials }),
             onOpen: (target) => router.push(hrefOf(target)),
             onBack,
           }}

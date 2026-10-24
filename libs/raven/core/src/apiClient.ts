@@ -443,7 +443,7 @@ export const createApiClient = ({
         guard: isAccount,
       }),
 
-    getAccountMediaTicket: ({ id }: { id: number }): Promise<MediaTicket> =>
+    getAccountTicket: ({ id }: { id: number }): Promise<MediaTicket> =>
       expect({
         request: send({
           path: AUTH_PATHS.ticket.replace(`:${AUTH_PARAMS.id}`, String(id)),

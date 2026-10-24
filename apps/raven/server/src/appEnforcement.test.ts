@@ -5,20 +5,24 @@ import { join } from 'node:path'
 import {
   AUTH_HEADERS,
   AUTH_REFUSALS,
+  HLS_PARAMS,
   ITEM_IMAGE_KINDS,
   LIBRARY_KINDS,
   MEMBER_STATUSES,
   type MemberStatusChange,
+  PLAYBACK_MODES,
   TITLE_DISPLAYS,
   WATCH_TARGET_KINDS,
   isLibrary,
   isMediaTicket,
+  toQueryString,
 } from '@raven/core'
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { CONTROLLERS } from '@/appModule'
 import { ACCOUNT_REQUIREMENTS } from '@/auth/accountGuard'
+import { PASS_KINDS } from '@/auth/accountPasses'
 import { AuthSessions } from '@/auth/authSessions'
 import { MEMBERSHIP_TTL_MS } from '@/auth/membershipLookups'
 import { RAVEN_CACHE_POLICIES } from '@/http'
@@ -48,11 +52,13 @@ import {
 import {
   CALLER_KINDS,
   type CallerKind,
+  PASS_ROUTES,
   ROUTES,
   type Route,
   TOKEN_CARRIERS,
   createEnforcedApp,
   headersFor,
+  hlsSessionIn,
   outcomeOf,
   pathOf,
   withTicket,
@@ -133,6 +139,18 @@ it('declares every route exactly as the inventory says', () => {
 
 /** The open routes whose address is their own permission: they answer only a current version. */
 const CAPABILITY_ROUTES: ReadonlySet<Route> = new Set([ROUTES.itemPicture, ROUTES.photoPicture])
+
+it("opens only an HLS session's own routes to its capability, and only `file` to a ticket's pass", () => {
+  const marks = routeMarks(CONTROLLERS)
+  const kinds = Object.values(PASS_KINDS)
+  const opened = kinds.map((kind) =>
+    marks
+      .filter(({ pass }) => pass === kind)
+      .map(({ method, path, account }) => ({ method, path, account }))
+      .toSorted(byRoute),
+  )
+  expect(opened).toEqual(kinds.map((kind) => PASS_ROUTES[kind].toSorted(byRoute)))
+})
 
 describe('the default-deny gate', () => {
   it('refuses every protected route to anonymous, unverified, pending and revoked callers', async () => {
@@ -253,15 +271,39 @@ describe('the default-deny gate', () => {
     )
   })
 
-  it('never takes a legacy media ticket for an account', async () => {
+  it('never takes a legacy media ticket for an account, on no HLS route either', async () => {
     const id = enforced.ids.video
     const tickets = enforced.app.get(MediaTickets)
     const { ticket } = tickets.issue({ id })
     expect(tickets.verify({ ticket, id })).toBe(true)
+    const master = await send({
+      options: {
+        url: `${pathOf({ route: ROUTES.hlsMaster, params: { id } })}?${toQueryString({
+          [HLS_PARAMS.mode]: PLAYBACK_MODES.remux,
+        })}`,
+        headers: await headersFor({
+          fixture,
+          caller: CALLER_KINDS.owner,
+          via: TOKEN_CARRIERS.bearer,
+        }),
+      },
+    })
+    expect(master.statusCode).toBe(200)
+    const params = {
+      [HLS_PARAMS.id]: id,
+      [HLS_PARAMS.session]: hlsSessionIn(master.body),
+    }
     const responses = await Promise.all(
-      [ROUTES.file, ROUTES.stream, ROUTES.hlsMaster].map((route) =>
-        send({ options: { url: withTicket({ route, params: { id }, ticket }) } }),
-      ),
+      [
+        ROUTES.file,
+        ROUTES.stream,
+        ROUTES.hlsMaster,
+        ROUTES.hlsVideo,
+        ROUTES.hlsInit,
+        ROUTES.hlsSegment,
+        ROUTES.hlsSubtitles,
+        ROUTES.hlsSubtitleSegment,
+      ].map((route) => send({ options: { url: withTicket({ route, params, ticket }) } })),
     )
     responses.forEach((response) =>
       expect(outcomeOf({ response })).toMatchObject({

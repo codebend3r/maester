@@ -93,6 +93,18 @@ describe('coalesced membership lookups', () => {
     expect(current).toHaveBeenCalledTimes(2)
   })
 
+  it('asks again once the clock goes back to before an answer began, never reusing it until then', async () => {
+    const { current, lookups } = setup()
+    const ahead = START.getTime() + 12 * 60 * 60 * 1000
+    vi.setSystemTime(ahead)
+    await lookups.current({ token: TOKENS.first })
+    vi.setSystemTime(START)
+    await lookups.current({ token: TOKENS.first })
+    expect(current).toHaveBeenCalledTimes(2)
+    await lookups.current({ token: TOKENS.first })
+    expect(current).toHaveBeenCalledTimes(2)
+  })
+
   it('reuses an answer of no membership as well', async () => {
     const { current, lookups } = setup({ answer: async () => null })
     expect(await lookups.current({ token: TOKENS.first })).toBeNull()

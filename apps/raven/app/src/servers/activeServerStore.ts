@@ -1,7 +1,8 @@
-import { renamedServers } from '@raven/core'
+import { type SignInConfig, renamedServers } from '@raven/core'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
+import type { AccountSessions } from '@/accounts/accountSessions'
 import type { CookieJar } from '@/servers/cookieJar'
 import { type SecretStore, secretStateStorage } from '@/servers/secretStore'
 import {
@@ -9,6 +10,7 @@ import {
   type AddOutcome,
   type AppServer,
   addServer,
+  pinServer,
   removeServer,
   storedServersOf,
 } from '@/servers/serverList'
@@ -18,13 +20,24 @@ type ActiveServerState = {
   activeId: string | null
   add: (server: AppServer) => AddOutcome
   /**
-   * Drops the server and its cookies. When it was the active one, the first server left
+   * Drops the server, its cookies and its account session. When it was the active one, the first server left
    * becomes active, or none when it was the last, and the active id's change empties the
    * query cache (`clearOnServerSwitch`). Another server's answers are never in the cache.
    */
   remove: (id: string) => Promise<void>
+  /**
+   * Ends the account's sign-in to a listed server, at Auth and in the keychain. The server stays
+   * on the list, its pin with it; signed out of the active one, the app opens its account step.
+   */
+  signOut: (id: string) => Promise<void>
   /** Gives a listed server the name typed; false, and nothing changed, when it will not do. */
   rename: (input: { id: string; name: string }) => boolean
+  /**
+   * Pins a listed server's sign-in in place of any it had, kept with the server and so
+   * forgotten with it; false, and nothing changed, for a server not listed or endpoints the
+   * app could not sign in through.
+   */
+  pin: (input: { id: string; account: SignInConfig }) => boolean
   /** Makes a listed server the one the app talks to; an id not on the list changes nothing. */
   activate: (id: string) => void
 }
@@ -40,9 +53,11 @@ export const SERVER_LIST_KEY = 'raven.servers'
 export const createActiveServerStore = ({
   store,
   jar,
+  sessions,
 }: {
   store: SecretStore
   jar: Pick<CookieJar, 'forget'>
+  sessions: Pick<AccountSessions, 'forget' | 'signOut'>
 }) =>
   create<ActiveServerState>()(
     persist(
@@ -59,12 +74,21 @@ export const createActiveServerStore = ({
             const left = removeServer({ servers, id })
             return { servers: left, activeId: activeId === id ? (left[0]?.id ?? null) : activeId }
           })
-          await jar.forget(id)
+          await Promise.all([jar.forget(id), sessions.forget({ serverId: id })])
+        },
+        signOut: async (id) => {
+          const server = get().servers.find((known) => known.id === id)
+          if (server !== undefined) await sessions.signOut({ server })
         },
         rename: ({ id, name }) => {
           const renamed = renamedServers({ servers: get().servers, id, name })
           if (renamed !== null) set({ servers: renamed })
           return renamed !== null
+        },
+        pin: ({ id, account }) => {
+          const pinned = pinServer({ servers: get().servers, id, account })
+          if (pinned !== null) set({ servers: pinned })
+          return pinned !== null
         },
         activate: (id) => {
           if (get().servers.some((server) => server.id === id)) set({ activeId: id })

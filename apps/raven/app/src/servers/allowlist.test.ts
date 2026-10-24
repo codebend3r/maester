@@ -5,6 +5,9 @@ import { allowlistedFetch } from '@/servers/allowlist'
 
 const ORIGIN = 'http://nas.local:8484'
 
+/** A server that signs in with no accounts: the PIN and the admin password. */
+const accountless = () => false
+
 /** A server that answers every request with no content, keeping each address it was asked for. */
 const answering = () => {
   const asked: string[] = []
@@ -24,7 +27,10 @@ const answering = () => {
 describe('allowlistedFetch', () => {
   it('sends a listed call on to the server', async () => {
     const { asked, fetch } = answering()
-    const api = createApiClient({ baseUrl: ORIGIN, fetch: allowlistedFetch({ fetch }) })
+    const api = createApiClient({
+      baseUrl: ORIGIN,
+      fetch: allowlistedFetch({ fetch, hasAccounts: accountless }),
+    })
     await api.recordPlay(3)
     await api.saveProgress({ id: 3, position: 40, audio: null })
     expect(asked).toEqual([
@@ -35,7 +41,10 @@ describe('allowlistedFetch', () => {
 
   it('throws on a call the app may not make, before the server hears of it', async () => {
     const { asked, fetch } = answering()
-    const api = createApiClient({ baseUrl: ORIGIN, fetch: allowlistedFetch({ fetch }) })
+    const api = createApiClient({
+      baseUrl: ORIGIN,
+      fetch: allowlistedFetch({ fetch, hasAccounts: accountless }),
+    })
     await expect(api.deleteMedia(3)).rejects.toThrow(
       "raven's app does not call DELETE http://nas.local:8484/api/media/3",
     )
@@ -50,7 +59,9 @@ describe('allowlistedFetch', () => {
   it('throws on a listed path asked for with the wrong method', async () => {
     const { asked, fetch } = answering()
     await expect(
-      allowlistedFetch({ fetch })(`${ORIGIN}/api/home`, { method: APP_CALL_METHODS.post }),
+      allowlistedFetch({ fetch, hasAccounts: accountless })(`${ORIGIN}/api/home`, {
+        method: APP_CALL_METHODS.post,
+      }),
     ).rejects.toThrow("raven's app does not call POST")
     expect(asked).toEqual([])
   })
@@ -58,9 +69,38 @@ describe('allowlistedFetch', () => {
   it('leaves a ticket out of what it throws', async () => {
     const { fetch } = answering()
     await expect(
-      allowlistedFetch({ fetch })(`${ORIGIN}/api/media/3/location?t=secret`),
+      allowlistedFetch({ fetch, hasAccounts: accountless })(
+        `${ORIGIN}/api/media/3/location?t=secret`,
+      ),
     ).rejects.toThrow(
       /^raven's app does not call GET http:\/\/nas\.local:8484\/api\/media\/3\/location$/u,
     )
+  })
+
+  it('throws on the admin lock and its unlock for a server that signs in with accounts, before the server hears of it', async () => {
+    const { asked, fetch } = answering()
+    const api = createApiClient({
+      baseUrl: ORIGIN,
+      fetch: allowlistedFetch({ fetch, hasAccounts: () => true }),
+    })
+    await expect(api.getAdminLock()).rejects.toThrow(
+      "raven's app does not call GET http://nas.local:8484/api/admin on a server with accounts",
+    )
+    await expect(api.unlockAdmin('Pass#word2026')).rejects.toThrow(
+      'POST http://nas.local:8484/api/admin/unlock on a server with accounts',
+    )
+    expect(asked).toEqual([])
+    await allowlistedFetch({ fetch, hasAccounts: () => true })(`${ORIGIN}/api/lock`)
+    expect(asked).toEqual([`${APP_CALL_METHODS.get} ${ORIGIN}/api/lock`])
+  })
+
+  it('asks whether the server has accounts at each call, not once', async () => {
+    const { asked, fetch } = answering()
+    let hasAccounts = false
+    const send = allowlistedFetch({ fetch, hasAccounts: () => hasAccounts })
+    await send(`${ORIGIN}/api/admin`)
+    hasAccounts = true
+    await expect(send(`${ORIGIN}/api/admin`)).rejects.toThrow('on a server with accounts')
+    expect(asked).toEqual([`${APP_CALL_METHODS.get} ${ORIGIN}/api/admin`])
   })
 })

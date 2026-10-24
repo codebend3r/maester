@@ -56,6 +56,7 @@ jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => ({}), forget: async () => {} },
+  credentialsFor: async () => ({ cookies: {}, token: null }),
   secretStore: {
     getItemAsync: async () => null,
     setItemAsync: async () => {},

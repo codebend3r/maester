@@ -157,6 +157,7 @@ export const libraryApi = ({
   createApiClient({
     baseUrl: NAS.origin,
     fetch: allowlistedFetch({
+      hasAccounts: () => false,
       fetch: async (url) => {
         const path = url.slice(NAS.origin.length)
         record(path)

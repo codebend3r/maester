@@ -18,3 +18,5 @@ seeked = "seeked"
 loca = "loca"
 # The MP4 track box, which the HLS tests read the clock from.
 trak = "trak"
+# A simulator's or device's id, as `xcrun simctl` names it.
+udid = "udid"

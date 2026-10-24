@@ -29,12 +29,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ShelfCard } from '@/queries/cards'
 import { type Listing, librarySectionsOf } from '@/queries/libraryGrid'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
-import { useServerCookies } from '@/queries/useServerCookies'
+import { useServerCredentials } from '@/queries/useServerCredentials'
 import { Grid, Picker, SearchField, ToolButton } from '@/layouts'
 import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
 import { appViewsFor, useLibraryView } from '@/screens/useLibraryView'
 import type { LibraryChoice } from '@/stores/libraryViews'
-import { cookieHeadersFor } from '@/servers/serverHeaders'
+import { serverHeadersFor } from '@/servers/serverHeaders'
 
 const COPY = {
   library: 'Library',
@@ -160,16 +160,16 @@ const LibraryGrid = ({
     search: search.query,
     seed: view.seed,
   })
-  const cookies = useServerCookies(server)
+  const credentials = useServerCredentials(server)
 
   const sections =
-    listed === null || cookies === null
+    listed === null || credentials === null
       ? []
       : librarySectionsOf({
           settings,
           listing: listed,
           api,
-          headersFor: cookieHeadersFor({ server, cookies }),
+          headersFor: serverHeadersFor({ server, credentials }),
           now: new Date(),
         })
   // Nothing matches only once the server says so, not while the last search stands in.

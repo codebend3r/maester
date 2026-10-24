@@ -27,6 +27,7 @@ import {
 import type { SettingsAction } from '@/layouts/settingsKit'
 import { APP_ROUTES } from '@/routes'
 import type { AppServer } from '@/servers/serverList'
+import { useAccountState } from '@/stores/accountState'
 import { useActiveServer } from '@/stores/activeServer'
 import { useAppPrefs } from '@/stores/appPrefs'
 
@@ -55,12 +56,18 @@ const COPY = {
 } as const
 
 /** What each of a server's buttons does. */
-const SERVER_ACTIONS = { use: 'use', rename: 'rename', remove: 'remove' } as const
+const SERVER_ACTIONS = {
+  use: 'use',
+  rename: 'rename',
+  signOut: 'signOut',
+  remove: 'remove',
+} as const
 
 /** Each button's words and what it is called aloud, for the server named `name`. */
 const ACTION_WORDS = {
   [SERVER_ACTIONS.use]: { text: 'Use', label: (name: string) => `Use ${name}` },
   [SERVER_ACTIONS.rename]: { text: 'Rename', label: (name: string) => `Rename ${name}` },
+  [SERVER_ACTIONS.signOut]: { text: 'Sign out', label: (name: string) => `Sign out of ${name}` },
   [SERVER_ACTIONS.remove]: { text: 'Remove', label: (name: string) => `Remove ${name}` },
 } as const satisfies Record<keyof typeof SERVER_ACTIONS, unknown>
 
@@ -124,6 +131,8 @@ const Rename = ({ server, onDone }: { server: AppServer; onDone: () => void }) =
  * nothing here asks a server anything. A switch or a removal of the server in use changes the
  * active server, which empties the query cache, so every screen reads the new one. Adding goes
  * through sign-in. Removing forgets the server's cookies; the last one gone, sign-in follows.
+ * A server whose account is signed in can sign out, keeping its place on the list; signed out
+ * of the one in use, the app opens its account step, as for a session that ended.
  */
 export const Settings = () => {
   const router = useRouter()
@@ -131,6 +140,8 @@ export const Settings = () => {
   const activeId = useActiveServer((state) => state.activeId)
   const activate = useActiveServer((state) => state.activate)
   const remove = useActiveServer((state) => state.remove)
+  const signOut = useActiveServer((state) => state.signOut)
+  const signedIn = useAccountState((state) => state.signedIn)
   const theme = useAppPrefs((state) => state.theme)
   const shouldPreferDirectPlay = useAppPrefs((state) => state.shouldPreferDirectPlay)
   const isTranscodeAllowed = useAppPrefs((state) => state.isTranscodeAllowed)
@@ -159,9 +170,17 @@ export const Settings = () => {
       label: ACTION_WORDS[key].label(server.name),
     })
     const use = { ...words(SERVER_ACTIONS.use), onPress: () => activate(server.id) }
+    const end = {
+      ...words(SERVER_ACTIONS.signOut),
+      // The sessions forget the sign-in whatever Auth or the keychain says.
+      onPress: () => {
+        signOut(server.id).catch(() => undefined)
+      },
+    }
     return [
       ...(server.id === activeId ? [] : [use]),
       { ...words(SERVER_ACTIONS.rename), onPress: () => setRenaming(server) },
+      ...(signedIn[server.id] === true ? [end] : []),
       {
         ...words(SERVER_ACTIONS.remove),
         onPress: () =>
