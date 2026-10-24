@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Text } from 'react-native'
 
-import { BUTTON_TONES, Field, Form, FormButton, formStyles } from '@/layouts'
+import { BUTTON_TONES, Field, Form, FormButton, useFormStyles } from '@/layouts'
 import { APP_ROUTES } from '@/routes'
 import { useSubmit } from '@/screens/useSubmit'
 import { apiFor, cookieJar, newServerId } from '@/servers/serverClient'
@@ -32,6 +32,7 @@ const COPY = {
   unlock: 'Unlock',
   notNow: 'Not now',
   otherAddress: 'Use another address',
+  cancel: 'Cancel',
 } as const
 
 const STEPS = { address: 'address', pin: 'pin', admin: 'admin', ticketsOff: 'ticketsOff' } as const
@@ -70,12 +71,14 @@ const isAdminLockHeld = async (api: ApiClient): Promise<boolean> => {
  */
 export const SignIn = () => {
   const router = useRouter()
+  const formStyles = useFormStyles()
   const [step, setStep] = useState<Step>({ kind: STEPS.address })
   const [address, setAddress] = useState('')
   const [secret, setSecret] = useState('')
   const { isBusy, error, setError, run } = useSubmit({ unreachable: COPY.unreachable })
 
-  const goHome = () => router.replace(APP_ROUTES.home)
+  // From Settings, Home is under it in the stack: go back down to it rather than stack another.
+  const goHome = () => router.dismissTo(APP_ROUTES.home)
 
   const askFor = (next: Step) => {
     setSecret('')
@@ -166,6 +169,13 @@ export const SignIn = () => {
             onPress={() => submitAddress({ text: address })}
             tone={BUTTON_TONES.primary}
           />
+          {router.canGoBack() && (
+            <FormButton
+              label={COPY.cancel}
+              onPress={() => router.back()}
+              tone={BUTTON_TONES.ghost}
+            />
+          )}
         </Form>
       )
     case STEPS.pin:

@@ -15,7 +15,7 @@ import { CardPicture } from '@/layouts/Card'
 import { FocusBand } from '@/layouts/FocusBand'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
 import { useScreenFocusScope } from '@/layouts/focus'
-import { toneStyles } from '@/layouts/formStyles'
+import { useToneStyles } from '@/layouts/formStyles'
 import {
   ITEM_HEADINGS,
   type ItemAction,
@@ -29,8 +29,8 @@ import {
   playLabelOf,
 } from '@/layouts/itemKit'
 import { LINE_RATIO } from '@/layouts/textHeights'
-import { COLOURS } from '@/theme/appTheme'
 import { TV_SIZES, tvSize } from '@/theme/tvSizes'
+import { themedStyles } from '@/theme/useTheme'
 
 const GUTTER = TV_SIZES.space8
 
@@ -57,11 +57,14 @@ type Opens = ItemLayoutProps['onOpen']
 /** What every focusable part of the page tells it on focus, so the opening focus is let go. */
 type Settles = { onSettle: () => void }
 
-const Heading = ({ title }: { title: string }) => (
-  <Text accessibilityRole="header" style={styles.heading}>
-    {title}
-  </Text>
-)
+const Heading = ({ title }: { title: string }) => {
+  const styles = useStyles()
+  return (
+    <Text accessibilityRole="header" style={styles.heading}>
+      {title}
+    </Text>
+  )
+}
 
 /**
  * Play, filled as the one action the page is for, or a mark, ticked while it is on, ringed
@@ -72,6 +75,8 @@ const ActionButton = ({
   isPreferred,
   onSettle,
 }: Settles & { action: ItemAction; isPreferred: boolean }) => {
+  const styles = useStyles()
+  const toneStyles = useToneStyles()
   const look = actionLookOf(action)
   return (
     <Pressable
@@ -92,14 +97,17 @@ const ActionButton = ({
   )
 }
 
-const ProgressLine = ({ progress }: { progress: NonNullable<ItemHero['progress']> }) => (
-  <View style={styles.progress}>
-    <View style={styles.track}>
-      <View style={[styles.fill, { width: `${progress.fraction * 100}%` }]} />
+const ProgressLine = ({ progress }: { progress: NonNullable<ItemHero['progress']> }) => {
+  const styles = useStyles()
+  return (
+    <View style={styles.progress}>
+      <View style={styles.track}>
+        <View style={[styles.fill, { width: `${progress.fraction * 100}%` }]} />
+      </View>
+      <Text style={styles.line}>{progress.label}</Text>
     </View>
-    <Text style={styles.line}>{progress.label}</Text>
-  </View>
-)
+  )
+}
 
 /**
  * The heading over the backdrop: the picture beside the names, facts and summary, then the
@@ -118,6 +126,7 @@ const Hero = ({
   file: ItemPage['file']
   isOpening: boolean
 }) => {
+  const styles = useStyles()
   const facts = heroFactsOf(hero)
   return (
     <View style={styles.hero}>
@@ -163,22 +172,25 @@ const Hero = ({
 }
 
 /** A titled row the remote moves along, scrolled as the focus moves. */
-const Rail = ({ title, children }: { title: string; children: ReactNode }) => (
-  <FocusBand>
-    <View style={styles.section}>
-      <View style={styles.padded}>
-        <Heading title={title} />
+const Rail = ({ title, children }: { title: string; children: ReactNode }) => {
+  const styles = useStyles()
+  return (
+    <FocusBand>
+      <View style={styles.section}>
+        <View style={styles.padded}>
+          <Heading title={title} />
+        </View>
+        <ScrollView
+          contentContainerStyle={styles.row}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        >
+          {children}
+        </ScrollView>
       </View>
-      <ScrollView
-        contentContainerStyle={styles.row}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
-        {children}
-      </ScrollView>
-    </View>
-  </FocusBand>
-)
+    </FocusBand>
+  )
+}
 
 /** A row of cards the remote moves along, under its heading. */
 const CardRow = ({
@@ -205,33 +217,37 @@ const Versions = ({
   versions,
   onOpen,
   onSettle,
-}: Settles & { versions: VersionRow[]; onOpen: Opens }) => (
-  <FocusBand>
-    <View style={[styles.section, styles.padded]}>
-      <Heading title={ITEM_HEADINGS.versions} />
-      <View style={styles.versions}>
-        {versions.map((version) => (
-          <Pressable
-            key={version.key}
-            accessibilityLabel={playLabelOf(version.fileName)}
-            accessibilityRole="button"
-            onFocus={onSettle}
-            onPress={() => onOpen(version.target)}
-            style={({ focused }) => [styles.version, focused && styles.focused]}
-          >
-            <Text style={styles.versionTitle}>{dotted(version.facts)}</Text>
-            <Text numberOfLines={1} style={styles.line}>
-              {version.fileName}
-            </Text>
-          </Pressable>
-        ))}
+}: Settles & { versions: VersionRow[]; onOpen: Opens }) => {
+  const styles = useStyles()
+  return (
+    <FocusBand>
+      <View style={[styles.section, styles.padded]}>
+        <Heading title={ITEM_HEADINGS.versions} />
+        <View style={styles.versions}>
+          {versions.map((version) => (
+            <Pressable
+              key={version.key}
+              accessibilityLabel={playLabelOf(version.fileName)}
+              accessibilityRole="button"
+              onFocus={onSettle}
+              onPress={() => onOpen(version.target)}
+              style={({ focused }) => [styles.version, focused && styles.focused]}
+            >
+              <Text style={styles.versionTitle}>{dotted(version.facts)}</Text>
+              <Text numberOfLines={1} style={styles.line}>
+                {version.fileName}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
-    </View>
-  </FocusBand>
-)
+    </FocusBand>
+  )
+}
 
 /** A person the remote can move to, so the row scrolls along with the focus. */
 const Person = ({ person, onSettle }: Settles & { person: PersonCard }) => {
+  const styles = useStyles()
   const [isFocused, setFocused] = useState(false)
   return (
     // Deliberately inert until the app has a person page: it takes the focus only so the
@@ -270,6 +286,7 @@ const Person = ({ person, onSettle }: Settles & { person: PersonCard }) => {
  * along for the seasons or episodes, the versions and the cast.
  */
 const ItemLayout = ({ page, actions, isPlayPending, onOpen }: ItemLayoutProps) => {
+  const styles = useStyles()
   const screen = useWindowDimensions()
   // Preferred focus is for the opening only: once anything here has had the focus, a button
   // that changes or mounts again leaves the viewer where they are.
@@ -332,86 +349,95 @@ const ItemLayout = ({ page, actions, isPlayPending, onOpen }: ItemLayoutProps) =
 }
 
 /** Menu goes back on a TV, so the notice is only its line. */
-const ItemNotice = ({ notice }: ItemNoticeProps) => (
-  <View style={[styles.ground, styles.notice]}>
-    <Text style={styles.summary}>{notice}</Text>
-  </View>
-)
+const ItemNotice = ({ notice }: ItemNoticeProps) => {
+  const styles = useStyles()
+  return (
+    <View style={[styles.ground, styles.notice]}>
+      <Text style={styles.summary}>{notice}</Text>
+    </View>
+  )
+}
 
 /** An item's page on a TV. */
 export const focusItem: ItemKit = { ItemLayout, ItemNotice }
 
-const styles = StyleSheet.create({
-  ground: { flex: 1, backgroundColor: COLOURS.ground },
-  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, opacity: BACKDROP_OPACITY },
-  scroll: { flex: 1 },
-  page: { gap: TV_SIZES.space5, paddingTop: TV_SIZES.space6, paddingBottom: TV_SIZES.space6 },
-  padded: { paddingHorizontal: GUTTER },
-  notice: { justifyContent: 'center', paddingHorizontal: GUTTER },
-  hero: { flexDirection: 'row', alignItems: 'flex-start', gap: TV_SIZES.space6 },
-  words: { flex: 1, maxWidth: WORDS_WIDTH, gap: TV_SIZES.space2 },
-  eyebrow: { color: COLOURS.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
-  title: {
-    color: COLOURS.text,
-    fontSize: TV_SIZES.textXl,
-    lineHeight: TV_SIZES.textXl * LINE_RATIO,
-    fontWeight: 'bold',
-  },
-  byline: { color: COLOURS.text, fontSize: TV_SIZES.textLg },
-  line: { color: COLOURS.muted, fontSize: TV_SIZES.text, lineHeight: TV_SIZES.text * LINE_RATIO },
-  progress: { gap: TV_SIZES.space1, maxWidth: TV_SIZES.measure },
-  track: { height: TV_SIZES.space1, borderRadius: TV_SIZES.space0, backgroundColor: COLOURS.track },
-  fill: { height: '100%', borderRadius: TV_SIZES.space0, backgroundColor: COLOURS.accent },
-  tagline: { color: COLOURS.text, fontSize: TV_SIZES.textLg, fontStyle: 'italic' },
-  summary: {
-    color: COLOURS.text,
-    fontSize: TV_SIZES.textLg,
-    lineHeight: TV_SIZES.textLg * LINE_RATIO,
-  },
-  actions: { flexDirection: 'row', gap: TV_SIZES.space3, paddingVertical: TV_SIZES.space2 },
-  action: {
-    minHeight: TV_SIZES.controlLarge,
-    justifyContent: 'center',
-    paddingHorizontal: TV_SIZES.space4,
-    borderRadius: TV_SIZES.radius,
-    borderWidth: TV_SIZES.tvFocusRing,
-  },
-  actionLabel: { fontSize: TV_SIZES.textLg, fontWeight: 'bold' },
-  focused: { borderColor: COLOURS.text },
-  section: { gap: TV_SIZES.space1 },
-  heading: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  row: { gap: TV_SIZES.space5, paddingHorizontal: GUTTER, paddingVertical: TV_SIZES.space4 },
-  versions: { gap: TV_SIZES.space2, paddingTop: TV_SIZES.space2 },
-  version: {
-    alignSelf: 'flex-start',
-    gap: TV_SIZES.space0,
-    padding: TV_SIZES.space3,
-    borderRadius: TV_SIZES.radius,
-    borderWidth: TV_SIZES.tvFocusRing,
-    borderColor: 'transparent',
-    backgroundColor: COLOURS.raised,
-  },
-  versionTitle: { color: COLOURS.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
-  person: { width: PERSON_WIDTH, alignItems: 'center', gap: TV_SIZES.space1 },
-  photo: {
-    width: PHOTO_SIZE,
-    height: PHOTO_SIZE,
-    borderRadius: PHOTO_SIZE / 2,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLOURS.raised,
-    borderWidth: TV_SIZES.tvFocusRing,
-    borderColor: 'transparent',
-  },
-  focusedPhoto: { borderColor: COLOURS.text },
-  initials: { color: COLOURS.muted, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  personName: {
-    color: COLOURS.muted,
-    fontSize: TV_SIZES.text,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  focusedName: { color: COLOURS.text },
-  personRole: { color: COLOURS.muted, fontSize: TV_SIZES.textSm, textAlign: 'center' },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    ground: { flex: 1, backgroundColor: colours.ground },
+    backdrop: { position: 'absolute', top: 0, left: 0, right: 0, opacity: BACKDROP_OPACITY },
+    scroll: { flex: 1 },
+    page: { gap: TV_SIZES.space5, paddingTop: TV_SIZES.space6, paddingBottom: TV_SIZES.space6 },
+    padded: { paddingHorizontal: GUTTER },
+    notice: { justifyContent: 'center', paddingHorizontal: GUTTER },
+    hero: { flexDirection: 'row', alignItems: 'flex-start', gap: TV_SIZES.space6 },
+    words: { flex: 1, maxWidth: WORDS_WIDTH, gap: TV_SIZES.space2 },
+    eyebrow: { color: colours.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+    title: {
+      color: colours.text,
+      fontSize: TV_SIZES.textXl,
+      lineHeight: TV_SIZES.textXl * LINE_RATIO,
+      fontWeight: 'bold',
+    },
+    byline: { color: colours.text, fontSize: TV_SIZES.textLg },
+    line: { color: colours.muted, fontSize: TV_SIZES.text, lineHeight: TV_SIZES.text * LINE_RATIO },
+    progress: { gap: TV_SIZES.space1, maxWidth: TV_SIZES.measure },
+    track: {
+      height: TV_SIZES.space1,
+      borderRadius: TV_SIZES.space0,
+      backgroundColor: colours.track,
+    },
+    fill: { height: '100%', borderRadius: TV_SIZES.space0, backgroundColor: colours.accent },
+    tagline: { color: colours.text, fontSize: TV_SIZES.textLg, fontStyle: 'italic' },
+    summary: {
+      color: colours.text,
+      fontSize: TV_SIZES.textLg,
+      lineHeight: TV_SIZES.textLg * LINE_RATIO,
+    },
+    actions: { flexDirection: 'row', gap: TV_SIZES.space3, paddingVertical: TV_SIZES.space2 },
+    action: {
+      minHeight: TV_SIZES.controlLarge,
+      justifyContent: 'center',
+      paddingHorizontal: TV_SIZES.space4,
+      borderRadius: TV_SIZES.radius,
+      borderWidth: TV_SIZES.tvFocusRing,
+    },
+    actionLabel: { fontSize: TV_SIZES.textLg, fontWeight: 'bold' },
+    focused: { borderColor: colours.text },
+    section: { gap: TV_SIZES.space1 },
+    heading: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    row: { gap: TV_SIZES.space5, paddingHorizontal: GUTTER, paddingVertical: TV_SIZES.space4 },
+    versions: { gap: TV_SIZES.space2, paddingTop: TV_SIZES.space2 },
+    version: {
+      alignSelf: 'flex-start',
+      gap: TV_SIZES.space0,
+      padding: TV_SIZES.space3,
+      borderRadius: TV_SIZES.radius,
+      borderWidth: TV_SIZES.tvFocusRing,
+      borderColor: 'transparent',
+      backgroundColor: colours.raised,
+    },
+    versionTitle: { color: colours.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+    person: { width: PERSON_WIDTH, alignItems: 'center', gap: TV_SIZES.space1 },
+    photo: {
+      width: PHOTO_SIZE,
+      height: PHOTO_SIZE,
+      borderRadius: PHOTO_SIZE / 2,
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colours.raised,
+      borderWidth: TV_SIZES.tvFocusRing,
+      borderColor: 'transparent',
+    },
+    focusedPhoto: { borderColor: colours.text },
+    initials: { color: colours.muted, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    personName: {
+      color: colours.muted,
+      fontSize: TV_SIZES.text,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    focusedName: { color: colours.text },
+    personRole: { color: colours.muted, fontSize: TV_SIZES.textSm, textAlign: 'center' },
+  }),
+)

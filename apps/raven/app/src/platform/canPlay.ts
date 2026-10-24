@@ -22,29 +22,35 @@ type PlayTable = {
   containers: readonly string[]
   videoCodecs: Readonly<Record<string, readonly number[]>>
   audioCodecs: readonly string[]
+  /**
+   * The codecs listed above that some files or devices still refuse, in every container the
+   * table plays. A maybe counts as a yes for a viewer who prefers direct play, as a browser's
+   * "maybe" does, and as a no otherwise.
+   */
+  maybes: readonly string[]
 }
 
 /**
  * AVPlayer on iPhone, iPad and Apple TV: MP4 and MOV holding 8-bit H.264 or HEVC at any
  * depth, with the audio the HLS route copies, which is the audio AVPlayer decodes. It has no
  * High 10 decoder, and a remux copies the same video, so `canStream` refuses 10-bit H.264 as
- * well and the plan goes straight to the transcode. HEVC in MP4 is a maybe, since AVPlayer
- * refuses it under the `hev1` tag and the index does not keep the tag: it counts as a yes, as
- * a browser's "maybe" does, and a refusal steps down to the remux, which re-tags it `hvc1`.
+ * well and the plan goes straight to the transcode. HEVC in MP4 or MOV (one MIME type, the same
+ * ISO format) is a maybe, since AVPlayer refuses it under the `hev1` tag and the index does not
+ * keep the tag: tried as it is, a refusal steps down to the remux, which re-tags it `hvc1`.
  */
 const APPLE = {
   containers: [CONTAINERS.mp4, CONTAINERS.mov],
   videoCodecs: { [VIDEO_CODECS.h264]: [8], [VIDEO_CODECS.hevc]: [8, 10] },
   audioCodecs: HLS_COPY_AUDIO,
+  maybes: [VIDEO_CODECS.hevc],
 } as const satisfies PlayTable
 
 /**
  * ExoPlayer on Android TV, which reads MKV and WebM as well as MP4 and MOV and decodes H.264,
  * HEVC, AV1 and VP9; it starts generous and narrows from what fails in use. H.264 is 8-bit only,
  * as on Apple: few TVs have a High 10 decoder, and a remux copies the same video. DTS and TrueHD
- * are a maybe, played or passed through by some devices and not others: they count as a yes, as
- * a browser's "maybe" does, so the original file is tried and a refusal steps down to the remux,
- * whose audio the server makes E-AC-3.
+ * are maybes, played or passed through by some devices and not others: the original file is
+ * tried and a refusal steps down to the remux, whose audio the server makes E-AC-3.
  */
 const EXOPLAYER = {
   containers: [CONTAINERS.mkv, CONTAINERS.mp4, CONTAINERS.mov, CONTAINERS.webm],
@@ -65,6 +71,7 @@ const EXOPLAYER = {
     AUDIO_CODECS.dts,
     AUDIO_CODECS.truehd,
   ],
+  maybes: [AUDIO_CODECS.dts, AUDIO_CODECS.truehd],
 } as const satisfies PlayTable
 
 const PLAY_TABLES: Record<AppPlatform, PlayTable> = {
@@ -107,7 +114,23 @@ const canPlayFrom = (table: PlayTable): CanPlay => {
   }
 }
 
-type PlatformSupport = Pick<Parameters<typeof planPlayback>[0], 'canPlay' | 'canStream'>
+/** What the platform plays for sure: the table without its maybes. */
+const surelyOf = (table: PlayTable): PlayTable => {
+  const isSure = (codec: string) => !table.maybes.includes(codec)
+  return {
+    ...table,
+    videoCodecs: Object.fromEntries(
+      Object.entries(table.videoCodecs).filter(([codec]) => isSure(codec)),
+    ),
+    audioCodecs: table.audioCodecs.filter(isSure),
+    maybes: [],
+  }
+}
+
+type PlatformSupport = Pick<Parameters<typeof planPlayback>[0], 'canPlay' | 'canStream'> & {
+  /** `canPlay` with every maybe a no, for a viewer who would rather the server convert one. */
+  canPlaySurely: CanPlay
+}
 
 /**
  * What `planPlayback` asks this platform. React Native has no `canPlayType`, so the answers
@@ -116,9 +139,11 @@ type PlatformSupport = Pick<Parameters<typeof planPlayback>[0], 'canPlay' | 'can
  * H.264, and the audio copied or made E-AC-3, which both tables play but for ALAC on Android
  * TV. A stream plays, then, where its video plays in MP4, which is what `canPlay` answers for
  * that string: both tables play MP4 and the stereo AAC `streamMimeType` names, so the audio
- * never refuses one.
+ * never refuses one. A maybe never refuses a stream either: a remux re-tags HEVC `hvc1`, and
+ * its audio is copied or made E-AC-3.
  */
 export const canPlayFor = (platform: AppPlatform): PlatformSupport => {
-  const canPlay = canPlayFrom(PLAY_TABLES[platform])
-  return { canPlay, canStream: canPlay }
+  const table = PLAY_TABLES[platform]
+  const canPlay = canPlayFrom(table)
+  return { canPlay, canStream: canPlay, canPlaySurely: canPlayFrom(surelyOf(table)) }
 }

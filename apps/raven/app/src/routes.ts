@@ -6,6 +6,7 @@ export const APP_ROUTES = {
   library: '/library/[id]',
   play: '/play/[mediaId]',
   search: '/search',
+  settings: '/settings',
   unlock: '/unlock',
 } as const
 
@@ -31,6 +32,7 @@ export const APP_SCREENS = {
   library: 'library/[id]',
   play: 'play/[mediaId]',
   search: 'search',
+  settings: 'settings',
   unlock: 'unlock',
 } as const
 

@@ -30,8 +30,8 @@ import { pressedKeyOf, remoteAnswerOf } from '@/layouts/remoteKeys'
 import { PlateButton } from '@/layouts/tvControls'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { COLOURS } from '@/theme/appTheme'
 import { TV_SIZES } from '@/theme/tvSizes'
+import { pictureStyles } from '@/theme/useTheme'
 
 const { Picker } = focusPicker
 
@@ -103,6 +103,7 @@ const Scrubber = ({
 }) => {
   const [isOpening, setOpening] = useState(true)
   const { position, onSeek, onTogglePlay } = transport
+  const styles = useStyles()
   const duration = transport.duration ?? 0
   const share = playedShareOf({ at: position, duration })
   return (
@@ -137,8 +138,9 @@ const Scrubber = ({
 }
 
 /**
- * The controls over the video: the title along the top; the time and the line along the
- * bottom, over play and pause, the track pickers and Back. The line takes the remote's focus
+ * The controls over the video, dark in every theme as the web's: the title along the top; the
+ * time and the line along the bottom, over play and pause, the track pickers and Back, on the
+ * player's glass, with the lists they open. The line takes the remote's focus
  * as they appear, so a press of left or right goes on skipping; the buttons are a band, so Down
  * from the line lands on the first of them rather than on the one under the thumb.
  */
@@ -160,6 +162,7 @@ const Controls = ({
   onBottomHeight: (height: number) => void
 }) => {
   const scrubber: Focusable = useRef(null)
+  const styles = useStyles()
   // Brought back while they fade out, the controls are still drawn, and the hidden state's
   // catcher, which had the focus, goes: the line asks again.
   useEffect(() => {
@@ -188,19 +191,26 @@ const Controls = ({
             {transport !== null && (
               <PlateButton
                 accessibilityRole="button"
+                isOverPicture
                 label={transport.isPaused ? PLAYER_COPY.play : PLAYER_COPY.pause}
                 onPress={transport.onTogglePlay}
                 text={transport.isPaused ? PLAYER_COPY.play : PLAYER_COPY.pause}
               />
             )}
             {audio !== null && (
-              <Picker label={PLAYER_COPY.audio} onOpenChange={onPicking} {...audio} />
+              <Picker isOverPicture label={PLAYER_COPY.audio} onOpenChange={onPicking} {...audio} />
             )}
             {subtitles !== null && (
-              <Picker label={PLAYER_COPY.subtitles} onOpenChange={onPicking} {...subtitles} />
+              <Picker
+                isOverPicture
+                label={PLAYER_COPY.subtitles}
+                onOpenChange={onPicking}
+                {...subtitles}
+              />
             )}
             <PlateButton
               accessibilityRole="button"
+              isOverPicture
               label={PLAYER_COPY.leave}
               onPress={onBack}
               text={PLAYER_COPY.leave}
@@ -251,6 +261,7 @@ const DpadPlayer = ({
   const [isScrubbing, setScrubbing] = useState(false)
   const [isPicking, setPicking] = useState(false)
   const [bottomHeight, setBottomHeight] = useState(0)
+  const styles = useStyles()
   const isPlaying = transport !== null && !transport.isPaused
   // Only a video that plays hides its controls: paused, opening or ended, they stay up.
   const isVisible = isShown || !isPlaying
@@ -341,54 +352,56 @@ const PlayerChrome = (props: PlayerChromeProps) => {
 /** The player on Android TV: raven's controls, which the d-pad drives, with raven's subtitles. */
 export const dpadPlayerChrome: PlayerChromeKit = { PlayerChrome, shouldDrawCaptions: true }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLOURS.ground },
-  scrim: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: COLOURS.ground,
-    opacity: SCRIM_OPACITY,
-  },
-  frame: { flex: 1, justifyContent: 'space-between', padding: GUTTER },
-  title: { color: COLOURS.onPicture, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  bottom: { gap: TV_SIZES.space3 },
-  timeline: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
-  time: { color: COLOURS.onPicture, fontSize: TV_SIZES.text, fontVariant: ['tabular-nums'] },
-  scrubberSlot: { flex: 1 },
-  scrubber: { height: TV_SIZES.controlLarge, justifyContent: 'center' },
-  line: {
-    height: TV_SIZES.space1,
-    borderRadius: TV_SIZES.space1,
-    backgroundColor: COLOURS.track,
-    overflow: 'hidden',
-  },
-  lineFocused: { height: TV_SIZES.space2 },
-  played: { height: '100%', backgroundColor: COLOURS.accent },
-  thumb: {
-    position: 'absolute',
-    width: THUMB,
-    height: THUMB,
-    borderRadius: THUMB,
-    backgroundColor: COLOURS.onPicture,
-  },
-  thumbFocused: {
-    width: THUMB_FOCUSED,
-    height: THUMB_FOCUSED,
-    borderRadius: THUMB_FOCUSED,
-    borderWidth: TV_SIZES.tvFocusRing,
-    borderColor: COLOURS.accent,
-  },
-  buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: TV_SIZES.space3 },
-  captionSlot: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingHorizontal: GUTTER,
-  },
-  noticeSlot: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  notice: {
-    maxWidth: TV_SIZES.measure,
-    color: COLOURS.onPicture,
-    fontSize: TV_SIZES.textLg,
-    textAlign: 'center',
-  },
-})
+const useStyles = pictureStyles((colours) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colours.ground },
+    scrim: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: colours.ground,
+      opacity: SCRIM_OPACITY,
+    },
+    frame: { flex: 1, justifyContent: 'space-between', padding: GUTTER },
+    title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    bottom: { gap: TV_SIZES.space3 },
+    timeline: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
+    time: { color: colours.text, fontSize: TV_SIZES.text, fontVariant: ['tabular-nums'] },
+    scrubberSlot: { flex: 1 },
+    scrubber: { height: TV_SIZES.controlLarge, justifyContent: 'center' },
+    line: {
+      height: TV_SIZES.space1,
+      borderRadius: TV_SIZES.space1,
+      backgroundColor: colours.track,
+      overflow: 'hidden',
+    },
+    lineFocused: { height: TV_SIZES.space2 },
+    played: { height: '100%', backgroundColor: colours.played },
+    thumb: {
+      position: 'absolute',
+      width: THUMB,
+      height: THUMB,
+      borderRadius: THUMB,
+      backgroundColor: colours.text,
+    },
+    thumbFocused: {
+      width: THUMB_FOCUSED,
+      height: THUMB_FOCUSED,
+      borderRadius: THUMB_FOCUSED,
+      borderWidth: TV_SIZES.tvFocusRing,
+      borderColor: colours.played,
+    },
+    buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: TV_SIZES.space3 },
+    captionSlot: {
+      ...StyleSheet.absoluteFill,
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      paddingHorizontal: GUTTER,
+    },
+    noticeSlot: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+    notice: {
+      maxWidth: TV_SIZES.measure,
+      color: colours.text,
+      fontSize: TV_SIZES.textLg,
+      textAlign: 'center',
+    },
+  }),
+)

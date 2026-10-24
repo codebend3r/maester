@@ -13,6 +13,26 @@ const NAS: AppServer = {
 
 const noJar = { forget: async () => {} }
 
+const DEN: AppServer = {
+  id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+  name: 'den:8080',
+  origin: 'http://den:8080',
+  addedAt: 2,
+}
+
+/** A jar that records the servers whose cookies it forgot. */
+const recordingJar = () => {
+  const forgotten: string[] = []
+  return {
+    forgotten,
+    jar: {
+      forget: async (serverId: string) => {
+        forgotten.push(serverId)
+      },
+    },
+  }
+}
+
 describe('createActiveServerStore', () => {
   it('keeps the list and the active id as one value under raven.servers', async () => {
     const { store, items } = memoryStore()
@@ -79,5 +99,40 @@ describe('createActiveServerStore', () => {
     await useServers.getState().remove(NAS.id)
     expect(useServers.getState()).toMatchObject({ servers: [], activeId: null })
     expect(forgotten).toEqual([NAS.id])
+  })
+
+  it('switches to the next server left when the active one is removed, forgetting its cookies', async () => {
+    const { forgotten, jar } = recordingJar()
+    const useServers = createActiveServerStore({ store: memoryStore().store, jar })
+    useServers.getState().add(NAS)
+    useServers.getState().add(DEN)
+    useServers.getState().activate(NAS.id)
+    await useServers.getState().remove(NAS.id)
+    expect(useServers.getState()).toMatchObject({ servers: [DEN], activeId: DEN.id })
+    expect(forgotten).toEqual([NAS.id])
+  })
+
+  it('keeps the active server when another is removed', async () => {
+    const { forgotten, jar } = recordingJar()
+    const useServers = createActiveServerStore({ store: memoryStore().store, jar })
+    useServers.getState().add(NAS)
+    useServers.getState().add(DEN)
+    useServers.getState().activate(NAS.id)
+    await useServers.getState().remove(DEN.id)
+    expect(useServers.getState()).toMatchObject({ servers: [NAS], activeId: NAS.id })
+    expect(forgotten).toEqual([DEN.id])
+  })
+
+  it('renames a server and keeps the name, refusing a name the list will not take', async () => {
+    const { store, items } = memoryStore()
+    const useServers = createActiveServerStore({ store, jar: noJar })
+    useServers.getState().add(NAS)
+    expect(useServers.getState().rename({ id: NAS.id, name: ' Attic ' })).toBe(true)
+    expect(useServers.getState().rename({ id: NAS.id, name: '' })).toBe(false)
+    await Promise.resolve()
+    expect(useServers.getState().servers).toEqual([{ ...NAS, name: 'Attic' }])
+    expect(JSON.parse(items.get(SERVER_LIST_KEY) ?? '')).toMatchObject({
+      state: { servers: [{ ...NAS, name: 'Attic' }] },
+    })
   })
 })

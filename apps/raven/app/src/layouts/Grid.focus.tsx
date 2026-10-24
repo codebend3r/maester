@@ -25,8 +25,8 @@ import {
 import { GRID_ROWS, type GridRow, gridColumnsOf } from '@/layouts/gridRows'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useGrid } from '@/layouts/useGrid'
-import { COLOURS } from '@/theme/appTheme'
 import { TV_SIZES, tvSize } from '@/theme/tvSizes'
+import { themedStyles } from '@/theme/useTheme'
 
 const GUTTER = TV_SIZES.space8
 const GAP = TV_SIZES.space5
@@ -69,6 +69,7 @@ const RowCard = ({
   onPress: () => void
 }) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
+  const styles = useStyles()
   useJumpFocus({ jump, view: pressable })
   const { remember } = useOpenerFocus({ place: card.key, view: pressable })
   return (
@@ -111,36 +112,39 @@ const JumpRow = ({
 }: {
   jump: JumpScale
   onJump: (keys: ReadonlySet<string>) => void
-}) => (
-  <ScrollView
-    accessibilityLabel={JUMP_SCALE_LABELS[jump.field]}
-    contentContainerStyle={styles.jumpRow}
-    horizontal
-    showsHorizontalScrollIndicator={false}
-    style={styles.jumpScroll}
-  >
-    {jump.unit !== null && <Text style={styles.unit}>{jump.unit}</Text>}
-    {jump.marks.map((mark) => {
-      const keys = jump.entries.get(mark.key)
-      return (
-        <Pressable
-          key={mark.key}
-          accessibilityLabel={mark.name}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: keys === undefined }}
-          disabled={keys === undefined}
-          focusable={keys !== undefined}
-          onPress={() => keys !== undefined && onJump(keys)}
-          style={({ focused }) => [styles.mark, focused && styles.focused]}
-        >
-          <Text style={[styles.markLabel, keys === undefined && styles.markEmpty]}>
-            {mark.label}
-          </Text>
-        </Pressable>
-      )
-    })}
-  </ScrollView>
-)
+}) => {
+  const styles = useStyles()
+  return (
+    <ScrollView
+      accessibilityLabel={JUMP_SCALE_LABELS[jump.field]}
+      contentContainerStyle={styles.jumpRow}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.jumpScroll}
+    >
+      {jump.unit !== null && <Text style={styles.unit}>{jump.unit}</Text>}
+      {jump.marks.map((mark) => {
+        const keys = jump.entries.get(mark.key)
+        return (
+          <Pressable
+            key={mark.key}
+            accessibilityLabel={mark.name}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: keys === undefined }}
+            disabled={keys === undefined}
+            focusable={keys !== undefined}
+            onPress={() => keys !== undefined && onJump(keys)}
+            style={({ focused }) => [styles.mark, focused && styles.focused]}
+          >
+            <Text style={[styles.markLabel, keys === undefined && styles.markEmpty]}>
+              {mark.label}
+            </Text>
+          </Pressable>
+        )
+      })}
+    </ScrollView>
+  )
+}
 
 /**
  * The key of what takes the focus as the grid opens: its first row's first card, or its first
@@ -170,6 +174,7 @@ const Grid = ({
   onOpen,
 }: GridProps) => {
   const screen = useWindowDimensions()
+  const styles = useStyles()
   const isRows = isRowView(view)
   const { columnsOf, widthOf } = gridColumnsOf({
     room: screen.width - 2 * GUTTER,
@@ -328,78 +333,80 @@ const Grid = ({
 /** A library on a TV. */
 export const focusGrid: GridKit = { Grid }
 
-const styles = StyleSheet.create({
-  ground: { flex: 1, backgroundColor: COLOURS.ground },
-  header: {
-    flexShrink: 0,
-    gap: TV_SIZES.space2,
-    paddingTop: TV_SIZES.space6,
-    paddingHorizontal: GUTTER,
-    paddingBottom: TV_SIZES.space2,
-  },
-  title: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  line: { color: COLOURS.muted, fontSize: TV_SIZES.textLg },
-  toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: TV_SIZES.space3 },
-  notice: { color: COLOURS.muted, fontSize: TV_SIZES.textLg },
-  // A horizontal ScrollView grows by default, which would leave the cards below no room.
-  jumpScroll: { flexGrow: 0 },
-  jumpRow: { gap: TV_SIZES.space0, paddingVertical: TV_SIZES.space1, alignItems: 'center' },
-  unit: { color: COLOURS.muted, fontSize: TV_SIZES.text, paddingRight: TV_SIZES.space1 },
-  mark: {
-    minWidth: TV_SIZES.controlLarge,
-    minHeight: TV_SIZES.controlLarge,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: TV_SIZES.radius,
-    borderWidth: TV_SIZES.tvFocusRing,
-    borderColor: 'transparent',
-  },
-  markLabel: { color: COLOURS.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
-  markEmpty: { color: COLOURS.line },
-  focused: { borderColor: COLOURS.text, backgroundColor: COLOURS.quiet },
-  listSlot: { flex: 1 },
-  content: { paddingHorizontal: GUTTER, paddingBottom: TV_SIZES.space6 },
-  bucketRow: { justifyContent: 'center' },
-  bucket: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: TV_SIZES.space2,
-    minHeight: TV_SIZES.controlLarge,
-    paddingHorizontal: TV_SIZES.space3,
-    borderRadius: TV_SIZES.radius,
-    borderWidth: TV_SIZES.tvFocusRing,
-    borderColor: 'transparent',
-  },
-  chevron: { color: COLOURS.muted, fontSize: TV_SIZES.textLg },
-  bucketTitle: {
-    color: COLOURS.text,
-    fontSize: TV_SIZES.textXl,
-    lineHeight: TV_SIZES.textXl * LINE_RATIO,
-    fontWeight: 'bold',
-  },
-  count: { color: COLOURS.muted, fontSize: TV_SIZES.textLg },
-  cards: { flexDirection: 'row', gap: GAP, paddingVertical: GROWTH_ROOM },
-  rowCards: { paddingVertical: TV_SIZES.space1 },
-  rowCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: TV_SIZES.space3,
-    padding: TV_SIZES.space3,
-    borderRadius: TV_SIZES.radius,
-    borderWidth: TV_SIZES.tvFocusRing,
-    borderColor: 'transparent',
-  },
-  words: { flex: 1 },
-  rowTitle: {
-    color: COLOURS.text,
-    fontSize: TV_SIZES.textLg,
-    lineHeight: TV_SIZES.textLg * LINE_RATIO,
-    fontWeight: '600',
-  },
-  rowLine: {
-    color: COLOURS.muted,
-    fontSize: TV_SIZES.text,
-    lineHeight: TV_SIZES.text * LINE_RATIO,
-  },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    ground: { flex: 1, backgroundColor: colours.ground },
+    header: {
+      flexShrink: 0,
+      gap: TV_SIZES.space2,
+      paddingTop: TV_SIZES.space6,
+      paddingHorizontal: GUTTER,
+      paddingBottom: TV_SIZES.space2,
+    },
+    title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    line: { color: colours.muted, fontSize: TV_SIZES.textLg },
+    toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: TV_SIZES.space3 },
+    notice: { color: colours.muted, fontSize: TV_SIZES.textLg },
+    // A horizontal ScrollView grows by default, which would leave the cards below no room.
+    jumpScroll: { flexGrow: 0 },
+    jumpRow: { gap: TV_SIZES.space0, paddingVertical: TV_SIZES.space1, alignItems: 'center' },
+    unit: { color: colours.muted, fontSize: TV_SIZES.text, paddingRight: TV_SIZES.space1 },
+    mark: {
+      minWidth: TV_SIZES.controlLarge,
+      minHeight: TV_SIZES.controlLarge,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: TV_SIZES.radius,
+      borderWidth: TV_SIZES.tvFocusRing,
+      borderColor: 'transparent',
+    },
+    markLabel: { color: colours.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+    markEmpty: { color: colours.line },
+    focused: { borderColor: colours.text, backgroundColor: colours.quiet },
+    listSlot: { flex: 1 },
+    content: { paddingHorizontal: GUTTER, paddingBottom: TV_SIZES.space6 },
+    bucketRow: { justifyContent: 'center' },
+    bucket: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: TV_SIZES.space2,
+      minHeight: TV_SIZES.controlLarge,
+      paddingHorizontal: TV_SIZES.space3,
+      borderRadius: TV_SIZES.radius,
+      borderWidth: TV_SIZES.tvFocusRing,
+      borderColor: 'transparent',
+    },
+    chevron: { color: colours.muted, fontSize: TV_SIZES.textLg },
+    bucketTitle: {
+      color: colours.text,
+      fontSize: TV_SIZES.textXl,
+      lineHeight: TV_SIZES.textXl * LINE_RATIO,
+      fontWeight: 'bold',
+    },
+    count: { color: colours.muted, fontSize: TV_SIZES.textLg },
+    cards: { flexDirection: 'row', gap: GAP, paddingVertical: GROWTH_ROOM },
+    rowCards: { paddingVertical: TV_SIZES.space1 },
+    rowCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: TV_SIZES.space3,
+      padding: TV_SIZES.space3,
+      borderRadius: TV_SIZES.radius,
+      borderWidth: TV_SIZES.tvFocusRing,
+      borderColor: 'transparent',
+    },
+    words: { flex: 1 },
+    rowTitle: {
+      color: colours.text,
+      fontSize: TV_SIZES.textLg,
+      lineHeight: TV_SIZES.textLg * LINE_RATIO,
+      fontWeight: '600',
+    },
+    rowLine: {
+      color: colours.muted,
+      fontSize: TV_SIZES.text,
+      lineHeight: TV_SIZES.text * LINE_RATIO,
+    },
+  }),
+)
