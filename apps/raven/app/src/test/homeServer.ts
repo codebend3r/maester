@@ -9,6 +9,7 @@ import {
   PATH_LAYOUTS,
   RATING_SOURCES,
   RATINGS_REFRESH_STATES,
+  SCAN_KINDS,
   SCAN_STATES,
   type Home,
   ITEM_TYPES,
@@ -40,6 +41,7 @@ const libraryFor = ({ id, name, kind }: { id: number; name: string; kind: Librar
     createdAt: '2026-10-16T00:00:00.000Z',
     scan: {
       state: SCAN_STATES.idle,
+      kind: SCAN_KINDS.full,
       found: 0,
       processed: 0,
       startedAt: null,
@@ -50,6 +52,7 @@ const libraryFor = ({ id, name, kind }: { id: number; name: string; kind: Librar
     settings: {
       saveProgress: true,
       pinned: true,
+      inHero: true,
       sort: MEDIA_SORTS.title,
       view: LIBRARY_VIEWS.grid,
       groupBy: MEDIA_GROUPINGS.resolution,

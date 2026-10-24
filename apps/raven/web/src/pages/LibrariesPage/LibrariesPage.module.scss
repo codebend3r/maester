@@ -92,16 +92,19 @@
   opacity: 0.45;
 }
 
-// The icon's well down the left, the lines beside it, the buttons at the right.
+// The icon's well down the left, the lines beside it, and the buttons under
+// them, whatever the card's width: up to eight buttons sit beside the lines
+// nowhere without squeezing the folders and the scan's words.
 .details {
   z-index: 1;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:
-    'icon name actions'
-    'icon count actions'
-    'icon paths actions'
-    'icon status actions';
+    'icon name'
+    'icon count'
+    'icon paths'
+    'icon status'
+    'actions actions';
   gap: var(--space-1) var(--space-3);
   align-content: start;
   padding: var(--space-4);
@@ -177,6 +180,15 @@
   gap: var(--space-1);
 }
 
+// The admin's checkbox for the hero, under how the scan stands.
+.heroSetting {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  font-size: var(--font-size-sm);
+}
+
 // Match again refused, under how the scan stands.
 .error {
   padding: var(--space-2) var(--space-3);
@@ -189,15 +201,13 @@
 .actions {
   grid-area: actions;
   display: grid;
-  grid-auto-flow: column;
-  align-self: center;
-  justify-content: end;
   gap: var(--space-1);
+  padding-top: var(--space-2);
 }
 
 // A disabled button is an empty outline, which the picture would show
 // through; a haze of the card keeps its word legible.
-.actions > button:disabled {
+.actions button:disabled {
   background: var(--color-canopy-haze);
 }
 
@@ -223,51 +233,7 @@
   --icon-tint: 0.9;
 }
 
-// The buttons under the details, as wide as they need, as many to a line as fit.
-@mixin actions-under-details($children) {
-  .details:has(.actions > :nth-child(#{$children})) {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'icon name'
-      'icon count'
-      'icon paths'
-      'icon status'
-      'actions actions';
-    row-gap: var(--space-1);
-  }
-
-  .details:has(.actions > :nth-child(#{$children})) .actions {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(auto-fill, minmax(7.5rem, max-content));
-    justify-content: start;
-    padding-top: var(--space-2);
-  }
-}
-
-// The admin lock off gives a card five buttons or six (Pin and History, then
-// Refresh, Rescan, Edit and Match again where its type is matched), which
-// need a wide card to sit beside the details; anything narrower puts them
-// under the details. Six need a little more width than five, or the folders
-// beside them break inside a path.
-@container (max-width: 67.2rem) {
-  @include actions-under-details(6);
-}
-
-@container (max-width: 64rem) {
-  @include actions-under-details(4);
-}
-
 @container (max-width: 40rem) {
-  .details {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'icon name'
-      'icon count'
-      'icon paths'
-      'icon status'
-      'actions actions';
-  }
-
   .paths {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -275,11 +241,6 @@
   .path {
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
-  }
-
-  .actions {
-    justify-content: start;
-    padding-top: var(--space-2);
   }
 }
 

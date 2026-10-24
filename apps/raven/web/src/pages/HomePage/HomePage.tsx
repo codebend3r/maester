@@ -16,7 +16,7 @@ import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { ShowCard } from '@/components/ShowCard/ShowCard'
 import { Bone, Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { POSTER_SIZES } from '@/lib/posters'
-import { homeQuery, homeSearchQuery, librariesQuery } from '@/lib/queries'
+import { heroQuery, homeQuery, homeSearchQuery, librariesQuery } from '@/lib/queries'
 import { ContinueWatching } from '@/pages/HomePage/ContinueWatching'
 import { HomeHero } from '@/pages/HomePage/HomeHero'
 import { featuredOf } from '@/pages/HomePage/featured'
@@ -109,31 +109,27 @@ const LibraryShelf = ({
   }
 }
 
-/** Rows of cards standing in while they are read, under the hero's shape when home has one. */
-const SkeletonShelves = ({
-  label,
-  count,
-  hasHero = false,
-}: {
-  label: string
-  count: number
-  hasHero?: boolean
-}) => (
-  <Loading label={label}>
-    {hasHero && (
-      <div className={styles.skeletonHero}>
-        <div className={styles.skeletonWords}>
-          <Bone shape="small" width="short" />
-          <Bone shape="hero" width="most" />
-          <Bone shape="text" width="most" />
-          <Bone shape="text" width="half" />
-          <Bone shape="button" />
-        </div>
-        <div className={styles.skeletonPoster}>
-          <Bone shape="poster" />
-        </div>
+/** The hero's shape, standing in while its titles are read. */
+const HeroSkeleton = () => (
+  <Loading label="Gathering the newest titles">
+    <div className={styles.skeletonHero}>
+      <div className={styles.skeletonWords}>
+        <Bone shape="small" width="short" />
+        <Bone shape="hero" width="most" />
+        <Bone shape="text" width="most" />
+        <Bone shape="text" width="half" />
+        <Bone shape="button" />
       </div>
-    )}
+      <div className={styles.skeletonPoster}>
+        <Bone shape="poster" />
+      </div>
+    </div>
+  </Loading>
+)
+
+/** Rows of cards standing in while they are read. */
+const SkeletonShelves = ({ label, count }: { label: string; count: number }) => (
+  <Loading label={label}>
     {Array.from({ length: count }, (_, index) => (
       <section key={index} className={styles.shelf}>
         <Bone shape="heading" width="short" />
@@ -172,11 +168,18 @@ const SearchResults = ({ query, libraries }: { query: string; libraries: Library
   )
 }
 
-/** The newest arrivals in turn, then what is being watched, then each pinned library's newest. */
-const Shelves = ({ libraries }: { libraries: Library[] }) => {
+/** The hero's titles in turn, then what is being watched, then each pinned library's newest. */
+const Shelves = ({
+  libraries,
+  areLibrariesPending,
+}: {
+  libraries: Library[]
+  areLibrariesPending: boolean
+}) => {
   const home = useQuery(homeQuery)
+  const hero = useQuery(heroQuery)
   const shelves = withLibraries({ shelves: home.data?.shelves ?? [], libraries })
-  const featured = featuredOf(shelves)
+  const featured = featuredOf({ hero: hero.data ?? [], libraries })
   const inProgress = home.data?.inProgress ?? []
   const isBare = home.isSuccess && inProgress.length === 0 && home.data.shelves.length === 0
 
@@ -187,7 +190,8 @@ const Shelves = ({ libraries }: { libraries: Library[] }) => {
           {home.error.message}
         </p>
       )}
-      {home.isPending && <SkeletonShelves label="Gathering your libraries" count={2} hasHero />}
+      {(hero.isPending || areLibrariesPending) && <HeroSkeleton />}
+      {home.isPending && <SkeletonShelves label="Gathering your libraries" count={2} />}
       {isBare && (
         <p className={styles.message}>
           Nothing to show yet. Pin a library in its settings and its newest videos show here, and
@@ -205,7 +209,7 @@ const Shelves = ({ libraries }: { libraries: Library[] }) => {
 }
 
 /**
- * `/`: the newest arrivals with artwork taking turns in the hero, then what
+ * `/`: the hero's titles, picked by the admin or the newest releases, taking turns, then what
  * is being watched, as wide tiles, then a row for each pinned library with
  * its eight newest arrivals, in the side menu's order. A search from the
  * shell's bar, which rides in the address as `?q=`, shows what it found in
@@ -228,7 +232,11 @@ export const HomePage = () => {
         </h1>
       </header>
 
-      {query ? <SearchResults query={query} libraries={known} /> : <Shelves libraries={known} />}
+      {query ? (
+        <SearchResults query={query} libraries={known} />
+      ) : (
+        <Shelves libraries={known} areLibrariesPending={libraries.isPending} />
+      )}
     </section>
   )
 }

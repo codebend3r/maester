@@ -155,9 +155,9 @@ describe('a library locked behind the PIN', () => {
     })
   })
 
-  it("says where a locked library's Refresh stands while keeping the rest to itself", async () => {
+  it("says where a locked library's Update ratings stands while keeping the rest to itself", async () => {
     const { cookie } = await unlock('3001')
-    const refreshed = await api(cookie).refreshLibrary(state.private)
+    const refreshed = await api(cookie).updateLibraryRatings(state.private)
     await app().get(ScannerService).whenIdle(state.private)
     await app().get(MetadataService).whenIdle()
 

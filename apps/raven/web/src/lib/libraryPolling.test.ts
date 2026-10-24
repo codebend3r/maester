@@ -13,6 +13,7 @@ const scanning = (): Library =>
   library({
     scan: {
       state: 'indexing',
+      kind: 'full',
       found: 9,
       processed: 3,
       startedAt: '2026-10-17T09:59:00.000Z',

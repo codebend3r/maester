@@ -1,6 +1,7 @@
 import { Controller, Get, Req, Inject, Query } from '@nestjs/common'
 import {
   HOME_SHELF_TYPES,
+  type Hero,
   type Home,
   type HomeSearch,
   type HomeShelf,
@@ -10,6 +11,8 @@ import {
   listsShows,
 } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
+import { Management } from '@/auth/management'
+import { HeroSelection } from '@/hero/heroSelection'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { LockService, type Viewer } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
@@ -30,6 +33,8 @@ export class HomeController {
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(LockService) private readonly lock: LockService,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
+    @Inject(HeroSelection) private readonly hero: HeroSelection,
+    @Inject(Management) private readonly management: Management,
   ) {}
 
   /** A library's row: its shows for a TV shows library, its videos for any other. */
@@ -59,12 +64,16 @@ export class HomeController {
 
   /**
    * Every video in progress with the poster its card shows, then each pinned
-   * library's newest arrivals; libraries still locked stay out.
+   * library's newest arrivals; libraries still locked stay out. What is in
+   * progress in a locked library is the admin's alone, even once the PIN has
+   * opened it for someone else.
    */
   @Get()
   home(@Req() request: FastifyRequest): Home {
     const viewer = this.lock.viewer({ request })
     const account = this.accounts.keyOf({ request })
+    const locked = this.libraries.lockedIds()
+    const canManage = this.management.canManage({ request })
     const shelves = this.seenBy(viewer)
       .filter((library) => library.settings.pinned)
       .map((library) =>
@@ -74,10 +83,25 @@ export class HomeController {
       inProgress: this.media.withPosters(
         this.media
           .listInProgress({ account })
-          .filter((media) => viewer.seesLibrary(media.libraryId)),
+          .filter(
+            ({ libraryId }) =>
+              viewer.seesLibrary(libraryId) && (!locked.has(libraryId) || canManage),
+          ),
       ),
       shelves,
     }
+  }
+
+  /**
+   * The titles home's hero takes turns with, read apart from the shelves so
+   * neither waits for the other; libraries still locked stay out.
+   */
+  @Get('hero')
+  heroEntries(@Req() request: FastifyRequest): Hero {
+    return this.hero.entries({
+      viewer: this.lock.viewer({ request }),
+      account: this.accounts.keyOf({ request }),
+    })
   }
 
   /**

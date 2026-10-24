@@ -213,14 +213,16 @@ describe('the score sweep', () => {
     )
     return id
   }
-  /** A library holding `itemIds` whose Refresh asked for them now, as `RatingsRefresh.start` leaves it. */
+  /** A library holding `itemIds` whose ratings update asked for each of them now, as `RatingsRefresh.start` leaves it. */
   const refresh = (itemIds: number[]): number => {
     const id = libraryHolding(itemIds)
-    new LibrariesRepository(database.get()).startRatingsRefresh({
-      id,
-      at: new Date().toISOString(),
-      shouldAsk: true,
-    })
+    const { db } = database.get()
+    itemIds.forEach((itemId) =>
+      db.prepare('INSERT INTO score_requests (library_id, item_id) VALUES (?, ?)').run(id, itemId),
+    )
+    db.prepare(
+      'UPDATE libraries SET ratings_refresh_started_at = ?, ratings_refresh_total = ? WHERE id = ?',
+    ).run(new Date().toISOString(), itemIds.length, id)
     return id
   }
   const DOWN = () => new Error('MDBList could not be reached.')
@@ -892,12 +894,17 @@ describe('the score sweep', () => {
       omdb: OMDB_OFF().source,
       mdblist: mdblist.source,
     })
-    const refreshing = new RatingsRefresh(libraries, repository, { quickScan: vi.fn() }, sweep)
+    const refreshing = new RatingsRefresh(
+      libraries,
+      repository,
+      { quickScanNow: vi.fn(), whenIdle: vi.fn(async () => undefined), cancel: vi.fn() },
+      sweep,
+    )
 
     await Array.from({ length: 8 }).reduce<Promise<void>>(
       (pressed) =>
         pressed.then(() => {
-          refreshing.start(libraryId)
+          refreshing.start({ libraryId: libraryId })
           return sweep.whenIdle()
         }),
       Promise.resolve(),

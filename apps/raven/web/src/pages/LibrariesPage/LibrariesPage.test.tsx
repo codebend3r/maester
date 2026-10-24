@@ -25,8 +25,13 @@ describe('LibrariesPage', () => {
     lock: spyOn(api, 'getLock'),
     health: spyOn(api, 'getMetadataHealth'),
     match: spyOn(api, 'matchLibrary'),
-    refresh: spyOn(api, 'refreshLibrary'),
+    ratings: spyOn(api, 'updateLibraryRatings'),
     scan: spyOn(api, 'scanLibrary'),
+    quick: spyOn(api, 'quickScanLibrary'),
+    cancelQuick: spyOn(api, 'cancelQuickScan'),
+    inHero: spyOn(api, 'setLibraryInHero'),
+    cancelRatings: spyOn(api, 'cancelLibraryRatings'),
+    cancelScan: spyOn(api, 'cancelScan'),
     media: spyOn(api, 'listMedia'),
   }
 
@@ -42,19 +47,24 @@ describe('LibrariesPage', () => {
     spies.lock.mockReset()
     spies.health.mockReset()
     spies.match.mockReset()
-    spies.refresh.mockReset()
+    spies.ratings.mockReset()
     spies.scan.mockReset()
+    spies.quick.mockReset()
+    spies.cancelQuick.mockReset()
+    spies.inHero.mockReset()
+    spies.cancelRatings.mockReset()
+    spies.cancelScan.mockReset()
     spies.media.mockReset()
   })
 
-  it("offers each library's history, a rescan and Edit, each named for its library", async () => {
+  it("offers each library's history, its scans, Update ratings and Edit, each named for its library", async () => {
     spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
     renderWithProviders({ ui: <LibrariesPage /> })
     expect(await screen.findByRole('link', { name: 'History Clips' })).toHaveAttribute(
       'href',
       '/libraries/2/history',
     )
-    expect(screen.getByRole('button', { name: 'Rescan Clips' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Full scan Clips' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Edit Clips' })).toBeEnabled()
     // An Other library is never matched.
     expect(screen.queryByRole('button', { name: /^Match again/ })).toBeNull()
@@ -308,10 +318,10 @@ describe('LibrariesPage', () => {
     expect(await screen.findByText('Movies · 1,217 videos · 22 not matched')).toBeInTheDocument()
   })
 
-  it('refreshes a library, which looks for new files and asks for its ratings again', async () => {
+  it('updates a library’s ratings, which asks for the titles that have none', async () => {
     const clips = library({ id: 2, name: 'Clips' })
     spies.list.mockImplementation(async () => [clips])
-    spies.refresh.mockImplementation(async () =>
+    spies.ratings.mockImplementation(async () =>
       library({
         id: 2,
         name: 'Clips',
@@ -319,10 +329,10 @@ describe('LibrariesPage', () => {
       }),
     )
     renderWithProviders({ ui: <LibrariesPage /> })
-    const button = await screen.findByRole('button', { name: 'Refresh Clips' })
+    const button = await screen.findByRole('button', { name: 'Update ratings Clips' })
     expect(button).toHaveAttribute(
       'title',
-      'Look for new files and fetch ratings again. While a refresh is under way, it scans again and retries what waits.',
+      'Find the movies and shows with no rating and fetch their ratings; needs a ratings source (TMDB, OMDb or MDBList)',
     )
     spies.list.mockImplementation(async () => [
       library({
@@ -332,11 +342,11 @@ describe('LibrariesPage', () => {
       }),
     ])
     await userEvent.click(button)
-    expect(spies.refresh).toHaveBeenCalledWith(2)
-    expect(await screen.findByText('Refreshing ratings · 0 of 7')).toBeInTheDocument()
+    expect(spies.ratings).toHaveBeenCalledWith(2)
+    expect(await screen.findByText('Updating ratings · 0 of 7')).toBeInTheDocument()
   })
 
-  it('keeps Refresh enabled while a refresh runs, as pressing it rescans and tries again', async () => {
+  it('turns Update ratings into its own Cancel while it runs, in the same button', async () => {
     spies.list.mockImplementation(async () => [
       library({
         id: 2,
@@ -345,20 +355,172 @@ describe('LibrariesPage', () => {
       }),
     ])
     renderWithProviders({ ui: <LibrariesPage /> })
-    expect(await screen.findByRole('button', { name: 'Refresh Clips' })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: 'Cancel update ratings Clips' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Update ratings Clips' })).toBeNull()
   })
 
-  it("says why a refresh or a rescan was refused, in the library's row", async () => {
+  it('includes a library in the hero, or leaves it out, from a checkbox on its card', async () => {
+    const clips = library({ id: 2, name: 'Clips' })
+    // The server's copy, which the list is read from again once the change settles.
+    const stored = { current: clips }
+    spies.list.mockImplementation(async () => [stored.current])
+    spies.inHero.mockImplementation(async ({ inHero }) => {
+      stored.current = { ...clips, settings: { ...clips.settings, inHero } }
+      return stored.current
+    })
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const box = await screen.findByRole('checkbox', { name: 'Include in hero display for Clips' })
+    expect(box).toBeChecked()
+    await userEvent.click(box)
+    expect(spies.inHero).toHaveBeenCalledWith({ id: 2, inHero: false })
+    await waitFor(() => expect(box).not.toBeChecked())
+  })
+
+  it('tells what each button on a library does when it is hovered, a disabled one included', async () => {
+    const films = library({
+      id: 4,
+      name: 'Films',
+      unmatchedCount: 0,
+      settings: { ...library().settings, kind: 'movies' },
+    })
+    spies.list.mockImplementation(async () => [films])
+    renderWithProviders({ ui: <LibrariesPage /> })
+    await screen.findByRole('button', { name: 'Full scan Films' })
+    const actions = [
+      'Pin Films',
+      'Quick scan Films',
+      'Full scan Films',
+      'Update ratings Films',
+      'Match again Films',
+      'Edit Films',
+    ]
+    actions.forEach((name) => {
+      expect(screen.getByRole('button', { name }).getAttribute('title')).toBeTruthy()
+      // Each wears an icon, the Pin's included.
+      expect(screen.getByRole('button', { name }).querySelector('svg')).not.toBeNull()
+    })
+    expect(screen.getByRole('link', { name: 'History Films' }).querySelector('svg')).not.toBeNull()
+    expect(screen.getByRole('link', { name: 'History Films' }).getAttribute('title')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Match again Films' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Match again Films' })).toHaveAttribute(
+      'title',
+      expect.stringContaining('nothing to match again'),
+    )
+    expect(screen.getByRole('button', { name: /^Add library/ }).getAttribute('title')).toBeTruthy()
+  })
+
+  it('keeps a locked library out of the hero: its box is off and cannot be ticked', async () => {
+    const locked = library({
+      id: 2,
+      name: 'Tutorials',
+      settings: { ...library().settings, locked: true, inHero: false },
+    })
+    spies.list.mockImplementation(async () => [locked])
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const box = await screen.findByRole('checkbox', {
+      name: 'Include in hero display for Tutorials',
+    })
+    expect(box).not.toBeChecked()
+    expect(box).toBeDisabled()
+    await userEvent.click(box)
+    expect(spies.inHero).not.toHaveBeenCalled()
+  })
+
+  it('shows a spinner on Update ratings while it runs, and cancels it', async () => {
+    const running = library({
+      id: 2,
+      name: 'Clips',
+      ratingsRefresh: { state: 'running', done: 2, total: 7, startedAt: ISO },
+    })
+    spies.list.mockImplementation(async () => [running])
+    spies.cancelRatings.mockImplementation(async () => library({ id: 2, name: 'Clips' }))
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const button = await screen.findByRole('button', { name: 'Cancel update ratings Clips' })
+    expect(button.querySelector('[class*="spinner"]')).not.toBeNull()
+    // The button that started it is the one that cancels it: there is no second one.
+    expect(screen.queryByRole('button', { name: 'Update ratings Clips' })).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^Cancel/ })).toHaveLength(1)
+    await userEvent.click(button)
+    expect(spies.cancelRatings).toHaveBeenCalledWith(2)
+  })
+
+  it('shows a spinner on Full scan while a full scan runs, and cancels it', async () => {
+    const scanning = library({
+      id: 2,
+      name: 'Clips',
+      scan: { ...library().scan, state: 'indexing', found: 10, processed: 3 },
+    })
+    spies.list.mockImplementation(async () => [scanning])
+    spies.cancelScan.mockImplementation(async () => library({ id: 2, name: 'Clips' }))
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const button = await screen.findByRole('button', { name: 'Cancel full scan Clips' })
+    expect(button).toBeEnabled()
+    expect(button.querySelector('[class*="spinner"]')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'Full scan Clips' })).toBeNull()
+    await userEvent.click(button)
+    expect(spies.cancelScan).toHaveBeenCalledWith(2)
+  })
+
+  it('shows a spinner on Quick scan while a quick scan runs, and cancels it', async () => {
+    const scanning = library({
+      id: 2,
+      name: 'Clips',
+      scan: { ...library().scan, state: 'indexing', kind: 'quick', found: 10, processed: 9 },
+    })
+    spies.list.mockImplementation(async () => [scanning])
+    spies.cancelQuick.mockImplementation(async () => library({ id: 2, name: 'Clips' }))
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const button = await screen.findByRole('button', { name: 'Cancel quick scan Clips' })
+    expect(button).toBeEnabled()
+    expect(button.querySelector('[class*="spinner"]')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'Quick scan Clips' })).toBeNull()
+    // The other scan waits, as it is, with no spinner and no Cancel of its own.
+    const full = screen.getByRole('button', { name: 'Full scan Clips' })
+    expect(full).toBeDisabled()
+    expect(full.querySelector('[class*="spinner"]')).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^Cancel/ })).toHaveLength(1)
+    await userEvent.click(button)
+    expect(spies.cancelQuick).toHaveBeenCalledWith(2)
+  })
+
+  it('starts a quick scan from its button, and says it is matching the new videos', async () => {
+    const clips = library({ id: 2, name: 'Clips' })
+    const matching = library({
+      id: 2,
+      name: 'Clips',
+      scan: { ...clips.scan, state: 'matching', kind: 'quick', found: 12, processed: 12 },
+    })
+    spies.list.mockImplementation(async () => [clips])
+    spies.quick.mockImplementation(async () => matching)
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const button = await screen.findByRole('button', { name: 'Quick scan Clips' })
+    // From then on the server says what the scan is doing.
+    spies.list.mockImplementation(async () => [matching])
+    await userEvent.click(button)
+    expect(spies.quick).toHaveBeenCalledWith(2)
+    expect(await screen.findByText('Matching the new videos')).toBeInTheDocument()
+  })
+
+  it('offers no Cancel while nothing runs', async () => {
     spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
-    spies.refresh.mockRejectedValue(new Error('The server is busy'))
+    renderWithProviders({ ui: <LibrariesPage /> })
+    await screen.findByRole('button', { name: 'Full scan Clips' })
+    expect(screen.queryByRole('button', { name: /^Cancel/ })).toBeNull()
+  })
+
+  it("says why a scan or Update ratings was refused, in the library's row", async () => {
+    spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
+    spies.ratings.mockRejectedValue(new Error('The server is busy'))
     spies.scan.mockRejectedValue(new Error('The folders are gone'))
     renderWithProviders({ ui: <LibrariesPage /> })
-    await userEvent.click(await screen.findByRole('button', { name: 'Refresh Clips' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Update ratings Clips' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Could not refresh: The server is busy',
+      'Could not update ratings: The server is busy',
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Rescan Clips' }))
-    expect(await screen.findByText('Could not rescan: The folders are gone')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Full scan Clips' }))
+    expect(
+      await screen.findByText('Could not run a full scan: The folders are gone'),
+    ).toBeInTheDocument()
   })
 
   it("reads the library's listings again when a refresh waits for the daily limit, as scores changed", async () => {
@@ -384,7 +546,7 @@ describe('LibrariesPage', () => {
         </>
       ),
     })
-    await screen.findByText('Refreshing ratings · 2 of 7')
+    await screen.findByText('Updating ratings · 2 of 7')
     await waitFor(() => expect(spies.media).toHaveBeenCalledTimes(1))
     await act(async () =>
       waiting.answer([
@@ -404,13 +566,13 @@ describe('LibrariesPage', () => {
 
   it('shows nothing new when the answer is already idle', async () => {
     spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
-    spies.refresh.mockImplementation(async () =>
+    spies.ratings.mockImplementation(async () =>
       library({ id: 2, name: 'Clips', ratingsRefresh: { state: 'idle', finishedAt: ISO } }),
     )
     renderWithProviders({ ui: <LibrariesPage /> })
-    await userEvent.click(await screen.findByRole('button', { name: 'Refresh Clips' }))
-    await waitFor(() => expect(spies.refresh).toHaveBeenCalled())
-    expect(screen.queryByText(/ratings/i)).toBeNull()
+    await userEvent.click(await screen.findByRole('button', { name: 'Update ratings Clips' }))
+    await waitFor(() => expect(spies.ratings).toHaveBeenCalled())
+    expect(screen.queryByText(/^Updating ratings|^Ratings:/)).toBeNull()
   })
 
   it('shows a waiting refresh and why', async () => {
@@ -444,7 +606,7 @@ describe('LibrariesPage', () => {
       }),
     ])
     renderWithProviders({ ui: <LibrariesPage /> })
-    await screen.findByText('Refreshing ratings · 2 of 7')
+    await screen.findByText('Updating ratings · 2 of 7')
     await waitFor(() => expect(spies.list.mock.calls.length).toBeGreaterThan(2))
   })
 
@@ -470,13 +632,14 @@ describe('LibrariesPage', () => {
     expect(spies.list).toHaveBeenCalledTimes(1)
   })
 
-  it('leaves Add library, Rescan and Refresh out while the admin lock is on, but keeps the pin', async () => {
+  it('leaves Add library and the scans and Update ratings out while the admin lock is on, but keeps the pin', async () => {
     spies.list.mockImplementation(async () => [library({ name: 'Clips' })])
     renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })
     expect(await screen.findByRole('button', { name: 'Pin Clips' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add library' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Rescan' })).toBeNull()
-    expect(screen.queryByRole('button', { name: /^Refresh/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Quick scan/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Full scan/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Update ratings/ })).toBeNull()
   })
 
   it('shows the folders only while the admin lock is off, even in a list cached with them', async () => {

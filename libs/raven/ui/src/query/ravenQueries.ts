@@ -123,6 +123,18 @@ export const ravenQueriesFor = (api: ApiClient) => {
       queryFn: () => api.getHome(),
     }),
 
+    /** The titles home's hero takes turns with, read apart from the shelves. */
+    heroQuery: queryOptions({
+      queryKey: queryKeys.hero,
+      queryFn: () => api.getHero(),
+    }),
+
+    /** The admin's picks for the hero, and how many it holds at most. */
+    heroPicksQuery: queryOptions({
+      queryKey: queryKeys.heroPicks,
+      queryFn: () => api.getHeroPicks(),
+    }),
+
     /** What a search from home finds in every library; a blank one asks for nothing. */
     homeSearchQuery: (query: string) =>
       queryOptions({

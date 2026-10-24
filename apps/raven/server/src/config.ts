@@ -43,6 +43,8 @@ export type ServerConfig = ListenConfig & {
   scanOnStart: boolean
   /** Quick-scan every library that refreshes automatically this often; 0 turns the timer off. */
   quickScanIntervalMinutes: number
+  /** How many titles home's hero holds at most, picked by the admin or by release date; at least 1. */
+  heroCount: number
   /** How transcodes encode: `auto` tries the GPU this machine has, `none` keeps to the CPU. */
   hwAccel: HwAccel
   /** The VAAPI render node, passed into the container on a NAS with a GPU. */
@@ -108,6 +110,7 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   thumbnailWidth: Math.max(160, wholeNumber(env.THUMBNAIL_WIDTH) ?? 480),
   scanOnStart: flag({ value: env.SCAN_ON_START, fallback: true }),
   quickScanIntervalMinutes: wholeNumber(env.QUICK_SCAN_INTERVAL_MINUTES) ?? 10,
+  heroCount: Math.max(1, wholeNumber(env.HERO_COUNT) ?? 10),
   hwAccel: hwAccelFrom(env.HW_ACCEL),
   vaapiDevice: env.VAAPI_DEVICE?.trim() || '/dev/dri/renderD128',
   tmdbApiToken: env.TMDB_API_TOKEN?.trim() || null,

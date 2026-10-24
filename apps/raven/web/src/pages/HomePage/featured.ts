@@ -1,7 +1,8 @@
 import {
   type AppPath,
   HOME_SHELF_TYPES,
-  type HomeShelf,
+  type Hero,
+  type HeroEntry,
   type ItemSummary,
   type Library,
   type MediaItem,
@@ -17,22 +18,18 @@ import {
 } from '@raven/core'
 import { api } from '@/lib/api'
 
-/** How many arrivals home's hero takes turns with. */
-export const FEATURED_COUNT = 5
-
-/** One of the arrivals home's hero shows: what it says, its pictures, and where its buttons go. */
+/** One of the titles home's hero shows: what it says, its pictures, and where its buttons go. */
 export type Featured = {
   key: string
-  /** The movie or show it is, whose words the hero reads. */
-  itemId: number
   poster: string
   backdrop: string
-  /** Where it arrived: "New in Movies". */
+  /** Where it is: "Featured in Movies". */
   eyebrow: string
   title: string
   /** The year, the length and the quality, or a show's years and episodes. */
   facts: string[]
-  addedAt: string
+  /** Its summary, else its tagline; null when it has neither. */
+  line: string | null
   /** The video Play starts, handed over; null when a show has nothing left to watch. */
   play: { to: AppPath; state: WatchState } | null
   details: AppPath
@@ -60,7 +57,15 @@ const quality = (media: MediaItem): string | null => {
   return label === '' ? null : label
 }
 
-const fromMedia = ({ media, library }: { media: MediaItem; library: Library }): Featured[] => {
+const fromMedia = ({
+  media,
+  line,
+  library,
+}: {
+  media: MediaItem
+  line: string | null
+  library: Library
+}): Featured[] => {
   const { item } = media
   if (!item) return []
   const artwork = artworkOf(item)
@@ -69,74 +74,82 @@ const fromMedia = ({ media, library }: { media: MediaItem; library: Library }): 
   return [
     {
       key: `media:${media.id}`,
-      itemId: item.id,
       ...artwork,
-      eyebrow: `New in ${library.name}`,
+      eyebrow: `Featured in ${library.name}`,
       title,
       facts: [
         year == null ? null : String(year),
         formatRuntime(media.duration),
         quality(media),
       ].filter(isFact),
-      addedAt: media.addedAt,
+      line,
       play: watchLink({ media }),
       details: cardLink({ media, hasPages: true }).to,
     },
   ]
 }
 
-const fromShow = ({ entry, library }: { entry: ShowEntry; library: Library }): Featured[] => {
+const fromShow = ({
+  entry,
+  line,
+  library,
+}: {
+  entry: ShowEntry
+  line: string | null
+  library: Library
+}): Featured[] => {
   const { show, next } = entry
   const artwork = artworkOf(show)
   if (!artwork) return []
   return [
     {
       key: `show:${show.id}`,
-      itemId: show.id,
       ...artwork,
-      eyebrow: `New in ${library.name}`,
+      eyebrow: `Featured in ${library.name}`,
       title: show.title,
       facts: [
         showYears({ year: show.year, endedYear: entry.endedYear }),
         plural({ n: entry.episodes, one: 'episode', many: 'episodes' }),
       ].filter(isFact),
-      addedAt: entry.addedAt,
+      line,
       play: next ? watchLink({ media: next }) : null,
       details: `/shows/${show.id}`,
     },
   ]
 }
 
-/** A shelf's arrivals that have the pictures the hero needs, newest first, as the shelf has them. */
-const candidates = ({ shelf, library }: { shelf: HomeShelf; library: Library }): Featured[] => {
-  switch (shelf.type) {
+/** The hero's entry as the slide it is, or nothing when its library is not among `libraries` or its pictures have no address. */
+const featuredFrom = ({
+  entry,
+  libraries,
+}: {
+  entry: HeroEntry
+  libraries: readonly Library[]
+}): Featured[] => {
+  const library = libraries.find(({ id }) => id === entry.libraryId)
+  if (!library) return []
+  switch (entry.type) {
     case HOME_SHELF_TYPES.shows:
-      return shelf.shows.flatMap((entry) => fromShow({ entry, library }))
+      return fromShow({ entry: entry.entry, line: entry.line, library })
     case HOME_SHELF_TYPES.media:
-      return shelf.media.flatMap((media) => fromMedia({ media, library }))
+      return fromMedia({ media: entry.media, line: entry.line, library })
     default: {
-      const unknown: never = shelf
+      const unknown: never = entry
       return unknown
     }
   }
 }
 
-const newestFirst = (a: Featured, b: Featured): number => b.addedAt.localeCompare(a.addedAt)
-
 /**
- * What home's hero takes turns with: the newest arrival with a poster and a
- * backdrop from each pinned library, the most recent first, then each one's
- * second newest, and so on, up to `FEATURED_COUNT`. Taking from each library
- * in turn keeps one busy library from filling the hero on its own.
+ * What home's hero takes turns with, as the server chose and ordered it: the
+ * admin's picks, else each pinned library's newest release. The server holds
+ * it to `HERO_COUNT`; this only gives each title its pictures' addresses and
+ * its buttons.
  */
-export const featuredOf = (
-  shelves: ReadonlyArray<{ shelf: HomeShelf; library: Library }>,
-): Featured[] => {
-  const lists = shelves.map(candidates)
-  const depth = Math.max(0, ...lists.map((list) => list.length))
-  return Array.from({ length: depth }, (_, round) =>
-    lists.flatMap((list) => list.slice(round, round + 1)).toSorted(newestFirst),
-  )
-    .flat()
-    .slice(0, FEATURED_COUNT)
-}
+export const featuredOf = ({
+  hero,
+  libraries,
+}: {
+  hero: Hero
+  libraries: readonly Library[]
+}): Featured[] => hero.flatMap((entry) => featuredFrom({ entry, libraries }))

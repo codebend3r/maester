@@ -30,7 +30,7 @@ describe('LibraryPage', () => {
     view: spyOn(api, 'setLibraryView'),
     lockState: spyOn(api, 'getLock'),
     lock: spyOn(api, 'lock'),
-    refresh: spyOn(api, 'refreshLibrary'),
+    ratings: spyOn(api, 'updateLibraryRatings'),
   }
   const state: { sent: LibraryViewChange[]; listed: Array<{ sort?: MediaSort; seed?: number }> } = {
     sent: [],
@@ -75,7 +75,7 @@ describe('LibraryPage', () => {
     spies.view.mockReset()
     spies.lockState.mockReset()
     spies.lock.mockReset()
-    spies.refresh.mockReset()
+    spies.ratings.mockReset()
     state.sent = []
     state.listed = []
   })
@@ -341,23 +341,23 @@ describe('LibraryPage', () => {
     )
   })
 
-  it('refreshes the library from its header', async () => {
-    spies.refresh.mockImplementation(async () => library({ id: 2 }))
+  it('updates the library’s ratings from its header', async () => {
+    spies.ratings.mockImplementation(async () => library({ id: 2 }))
     serve()
-    await userEvent.click(await screen.findByRole('button', { name: 'Refresh Movies' }))
-    expect(spies.refresh).toHaveBeenCalledWith(2)
+    await userEvent.click(await screen.findByRole('button', { name: 'Update ratings Movies' }))
+    expect(spies.ratings).toHaveBeenCalledWith(2)
   })
 
-  it('says why a refresh was refused, below the tabs', async () => {
-    spies.refresh.mockRejectedValue(new Error('The server is busy'))
+  it('says why updating ratings was refused, below the tabs', async () => {
+    spies.ratings.mockRejectedValue(new Error('The server is busy'))
     serve()
-    await userEvent.click(await screen.findByRole('button', { name: 'Refresh Movies' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Update ratings Movies' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Could not refresh: The server is busy',
+      'Could not update ratings: The server is busy',
     )
   })
 
-  it('shows a running refresh under the scan status, while the admin lock is off', async () => {
+  it('shows running ratings under the scan status, while the admin lock is off', async () => {
     spies.get.mockImplementation(async () =>
       library({
         id: 2,
@@ -366,10 +366,10 @@ describe('LibraryPage', () => {
     )
     spies.list.mockImplementation(async () => ITEMS)
     renderLibraryPage()
-    expect(await screen.findByText('Refreshing ratings · 1,200 of 3,400')).toBeInTheDocument()
+    expect(await screen.findByText('Updating ratings · 1,200 of 3,400')).toBeInTheDocument()
   })
 
-  it('shows no refresh status while the admin lock is on', async () => {
+  it('shows no ratings status while the admin lock is on', async () => {
     spies.get.mockImplementation(async () =>
       library({
         id: 2,
@@ -379,7 +379,7 @@ describe('LibraryPage', () => {
     spies.list.mockImplementation(async () => ITEMS)
     renderLibraryPage({ adminLock: { state: 'on', available: true } })
     await screen.findByRole('link', { name: /^History/ })
-    expect(screen.queryByText(/Refreshing ratings/)).toBeNull()
+    expect(screen.queryByText(/Updating ratings/)).toBeNull()
   })
 
   it('reads the listings again once the refresh finishes, as scores change with no event', async () => {
@@ -396,21 +396,22 @@ describe('LibraryPage', () => {
     spies.list.mockImplementationOnce(async () => ITEMS)
     spies.list.mockImplementation(async () => [...ITEMS, mediaItem({ id: 4, title: 'Rescored' })])
     renderLibraryPage()
-    await screen.findByText('Refreshing ratings · 1 of 3')
+    await screen.findByText('Updating ratings · 1 of 3')
     await waitFor(() => expect(spies.get.mock.calls.length).toBeGreaterThan(1))
     await act(async () =>
       finished.answer(library({ id: 2, ratingsRefresh: { state: 'idle', finishedAt: ISO } })),
     )
     // A boolean, as a failed match on an element prints its whole DOM and starves the poll.
-    await waitFor(() => expect(!!screen.queryByText(/Refreshing ratings/)).toBe(false))
+    await waitFor(() => expect(!!screen.queryByText(/Updating ratings/)).toBe(false))
     expect(await screen.findByRole('link', { name: 'Rescored' })).toBeInTheDocument()
   })
 
-  it('leaves Rescan, Match again and Edit out while the admin lock is on', async () => {
+  it('leaves the scans, Update ratings, Match again and Edit out while the admin lock is on', async () => {
     serve({ settings: { kind: 'movies' }, adminLock: { state: 'on', available: true } })
     expect(await screen.findByRole('link', { name: /^History/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Refresh/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /^Rescan/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Quick scan/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Full scan/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Update ratings/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Match again/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Edit/ })).toBeNull()
   })

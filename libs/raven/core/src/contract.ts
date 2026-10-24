@@ -114,16 +114,31 @@ export type AuthRefusal = Infer<typeof isAuthRefusal>
 
 /**
  * A scan first walks the library's paths for videos, then indexes what it
- * found; `idle` between scans.
+ * found; a quick scan the admin started then waits while the new videos are
+ * matched; `idle` between scans.
  */
-export const SCAN_STATES = { idle: 'idle', walking: 'walking', indexing: 'indexing' } as const
+export const SCAN_STATES = {
+  idle: 'idle',
+  walking: 'walking',
+  indexing: 'indexing',
+  matching: 'matching',
+} as const
 
 export const isScanState = oneOf(Object.values(SCAN_STATES))
 
 export type ScanState = Infer<typeof isScanState>
 
+/** Which scan the status is of: one that reads every file, or one that takes in what is new. */
+export const SCAN_KINDS = { full: 'full', quick: 'quick' } as const
+
+export const isScanKind = oneOf(Object.values(SCAN_KINDS))
+
+export type ScanKind = Infer<typeof isScanKind>
+
 export const isScanStatus = object({
   state: isScanState,
+  /** The scan under way, or the last one to run; a quick scan takes in new, renamed and deleted files. */
+  kind: isScanKind,
   /**
    * Video files found under the library's paths: climbing while the walk
    * looks, as a big share takes minutes, then all of them.
@@ -137,7 +152,7 @@ export const isScanStatus = object({
   /**
    * When the last quick scan finished, kept across restarts; null before
    * any. A quick scan takes in new, renamed and deleted files without
-   * reading the files it knows, and never takes over the scan status.
+   * reading the files it knows, and leaves the full scan's time alone.
    */
   quickScannedAt: nullable(isString),
   /** The last full scan's failure, cleared when the next scan starts. */
@@ -146,7 +161,7 @@ export const isScanStatus = object({
 
 export type ScanStatus = Infer<typeof isScanStatus>
 
-/** Whether a scan is under way, walking or indexing. */
+/** Whether a scan is under way: walking, indexing or matching. */
 export const isScanning = (scan: ScanStatus): boolean => scan.state !== SCAN_STATES.idle
 
 export const SORT_DIRECTIONS = { ascending: 'ascending', descending: 'descending' } as const
@@ -404,6 +419,8 @@ export const isLibrarySettings = object({
   saveProgress: isBoolean,
   /** Give the library its own link in the side menu. */
   pinned: isBoolean,
+  /** Let home's hero show its titles, the newest releases and the admin's picks alike. */
+  inHero: isBoolean,
   /** The order its videos are listed in. */
   sort: isMediaSort,
   /** How its videos are laid out: cards, a table, tiles, or cards in groups. */
@@ -444,6 +461,11 @@ export const isLibraryViewChange = exactPartial({
 })
 
 export type LibraryViewChange = Infer<typeof isLibraryViewChange>
+
+/** `PUT /api/libraries/:id/hero`: whether the library's titles may show in home's hero. */
+export const isLibraryHeroChange = object({ inHero: isLibrarySettings.shape.inHero })
+
+export type LibraryHeroChange = Infer<typeof isLibraryHeroChange>
 
 export const LIBRARY_BACKDROP_TYPES = { item: 'item', thumbnail: 'thumbnail' } as const
 
@@ -516,7 +538,7 @@ export const isLibrary = object({
 
 export type Library = Infer<typeof isLibrary>
 
-/** Whether a library's ratings are being fetched again, or are waiting to be. */
+/** Whether a library's missing ratings are being fetched, or are waiting to be. */
 export const isRefreshingRatings = (library: Library): boolean =>
   library.ratingsRefresh.state !== 'idle'
 
@@ -984,6 +1006,51 @@ export type Home = Infer<typeof isHome>
 export const isHomeSearch = listOf(isHomeShelf)
 
 export type HomeSearch = Infer<typeof isHomeSearch>
+
+/**
+ * One title in home's hero: a show with what its card shows, or a movie's
+ * best file, in the library that holds it, and the line the hero reads under
+ * its title (its summary, else its tagline).
+ */
+export const isHeroEntry = union(
+  object({
+    libraryId: isNumber,
+    type: oneOf([HOME_SHELF_TYPES.shows]),
+    entry: isShowEntry,
+    line: nullable(isString),
+  }),
+  object({
+    libraryId: isNumber,
+    type: oneOf([HOME_SHELF_TYPES.media]),
+    media: isMediaItem,
+    line: nullable(isString),
+  }),
+)
+
+export type HeroEntry = Infer<typeof isHeroEntry>
+
+/**
+ * `GET /api/home/hero`: the titles home's hero takes turns with. The ones the
+ * admin picked when any are picked, else each pinned library's newest
+ * released title, a round at a time; never more than the server's
+ * `HERO_COUNT`.
+ */
+export const isHero = listOf(isHeroEntry)
+
+export type Hero = Infer<typeof isHero>
+
+/**
+ * `GET /api/hero/picks`: the movies and shows the admin picked for the hero,
+ * in the order they were picked, and how many titles the hero holds at most.
+ */
+export const isHeroPicks = object({ itemIds: listOf(isNumber), limit: isNumber })
+
+export type HeroPicks = Infer<typeof isHeroPicks>
+
+/** `PUT /api/hero/picks`: a movie or show to add to the hero, or take out of it. */
+export const isHeroPickChange = object({ itemId: isNumber, isShown: isBoolean })
+
+export type HeroPickChange = Infer<typeof isHeroPickChange>
 
 /** What TMDB says of a person; every field is null when it has nothing. */
 export const isPersonProfile = object({

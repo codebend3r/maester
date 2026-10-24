@@ -190,7 +190,7 @@ export const FormsSection = () => {
             <Button tone="primary" icon="plus" type="submit">
               Add library
             </Button>
-            <Button icon="rescan">Rescan</Button>
+            <Button icon="rescan">Full scan</Button>
             <Button tone="danger" icon="trash">
               Delete library
             </Button>

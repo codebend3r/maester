@@ -24,6 +24,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   createdAt: '2026-09-27T00:00:00.000Z',
   scan: {
     state: 'idle',
+    kind: 'full',
     found: 12,
     processed: 12,
     startedAt: null,
@@ -34,6 +35,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   settings: {
     saveProgress: true,
     pinned: true,
+    inHero: true,
     sort: 'title',
     view: 'grid',
     groupBy: 'resolution',

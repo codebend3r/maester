@@ -13,7 +13,7 @@ const count = new Intl.NumberFormat()
 
 /**
  * The library's name, type and counts, how its scan stands, and at their
- * right what can be done to it: its history, Refresh, Rescan, Match again,
+ * right what can be done to it: its history, Quick scan, Full scan, Update ratings, Match again,
  * Edit, and Lock once open.
  */
 export const LibraryHeader = ({
@@ -53,12 +53,24 @@ export const LibraryHeader = ({
           <RatingsStatus refresh={library.ratingsRefresh} />
         </div>
         <div className={styles.actions}>
-          <LibraryActions library={library} isShut={isShut} actions={actions} />
-          {settings.locked && !isShut && (
-            <Button disabled={relock.isPending} onClick={() => relock.mutate()}>
-              Lock
-            </Button>
-          )}
+          <LibraryActions
+            library={library}
+            isShut={isShut}
+            actions={actions}
+            trail={
+              settings.locked &&
+              !isShut && (
+                <Button
+                  icon="lock"
+                  disabled={relock.isPending}
+                  title="Lock this library again: the PIN is asked for it the next time"
+                  onClick={() => relock.mutate()}
+                >
+                  Lock
+                </Button>
+              )
+            }
+          />
         </div>
       </div>
     </header>

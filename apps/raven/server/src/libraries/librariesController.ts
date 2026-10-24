@@ -27,6 +27,7 @@ import {
   type SagaBackdrop,
   type ShowListing,
   isJoinRequest,
+  isLibraryHeroChange,
   isLibraryViewChange,
   isRecord,
   isSagaBackdrop,
@@ -265,6 +266,32 @@ export class LibrariesController {
     })
   }
 
+  /** Includes the library's titles in home's hero, or leaves them out. */
+  @AdminOnly()
+  @Put(':id/hero')
+  setInHero(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+  ): Library {
+    const { name, paths, settings: current } = this.find(id)
+    const settings = parseBody({
+      guard: isLibraryHeroChange,
+      body,
+      message: 'inHero must be true or false.',
+    })
+    if (settings.inHero && current.locked) {
+      throw new BadRequestException('A locked library can never show in the hero.')
+    }
+    const record = this.libraries.update({ id, input: { name, paths, settings } })
+    if (!record) throw new NotFoundException(`No library ${id}`)
+    return this.withStatus({
+      record,
+      canSee: true,
+      isAdmin: this.management.canManage({ request }),
+    })
+  }
+
   @AdminOnly()
   @Delete(':id')
   @HttpCode(204)
@@ -281,6 +308,16 @@ export class LibrariesController {
     this.metadata.enqueue(id)
   }
 
+  /** Cancels a full scan, or any scan running: it stops at its next step. */
+  @AdminOnly()
+  @Post(':id/scan/cancel')
+  @HttpCode(200)
+  cancelScan(@Param('id', ParseIntPipe) id: number): Library {
+    const record = this.find(id)
+    this.scanner.cancel(id)
+    return this.withStatus({ record, canSee: true, isAdmin: true })
+  }
+
   @AdminOnly()
   @Post(':id/scan')
   @HttpCode(200)
@@ -291,16 +328,50 @@ export class LibrariesController {
   }
 
   /**
-   * Refresh: a quick scan for new files, and every movie's and show's
-   * ratings fetched again. Pressed again while one runs, it only scans; the
-   * response already reports the Refresh as under way.
+   * A quick scan: only what is new in the library's folders is read and
+   * added, and the scores of the titles it added are fetched once they are
+   * matched. Pressed while one runs, it changes nothing.
    */
   @AdminOnly()
-  @Post(':id/refresh')
+  @Post(':id/quick-scan')
   @HttpCode(200)
-  refresh(@Param('id', ParseIntPipe) id: number): Library {
+  quickScan(@Param('id', ParseIntPipe) id: number): Library {
     const record = this.find(id)
-    this.ratings.start(id)
+    this.ratings.quickScan(id)
+    return this.withStatus({ record, canSee: true, isAdmin: true })
+  }
+
+  /** Cancels a quick scan, and the scores that would follow it. */
+  @AdminOnly()
+  @Post(':id/quick-scan/cancel')
+  @HttpCode(200)
+  cancelQuickScan(@Param('id', ParseIntPipe) id: number): Library {
+    const record = this.find(id)
+    this.ratings.cancelQuickScan(id)
+    return this.withStatus({ record, canSee: true, isAdmin: true })
+  }
+
+  /**
+   * Update ratings: every movie and show in the library with no rating from
+   * the source it shows has its scores fetched. Pressed while one runs, it
+   * adds whatever has no rating since.
+   */
+  @AdminOnly()
+  @Post(':id/ratings')
+  @HttpCode(200)
+  updateRatings(@Param('id', ParseIntPipe) id: number): Library {
+    const record = this.find(id)
+    this.ratings.start({ libraryId: id })
+    return this.withStatus({ record, canSee: true, isAdmin: true })
+  }
+
+  /** Cancels Update ratings: the titles still waiting are not asked for. */
+  @AdminOnly()
+  @Post(':id/ratings/cancel')
+  @HttpCode(200)
+  cancelRatings(@Param('id', ParseIntPipe) id: number): Library {
+    const record = this.find(id)
+    this.ratings.cancel(id)
     return this.withStatus({ record, canSee: true, isAdmin: true })
   }
 

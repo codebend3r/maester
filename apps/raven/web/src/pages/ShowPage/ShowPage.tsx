@@ -39,6 +39,7 @@ import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
+import { HeroToggle } from '@/components/HeroToggle/HeroToggle'
 import { api } from '@/lib/api'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { displaySettingsQuery, librariesQuery, nextEpisodeQuery } from '@/lib/queries'
@@ -156,6 +157,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
               <Button icon="search" onClick={() => setFixing(true)}>
                 Fix match
               </Button>
+              <HeroToggle itemId={details.id} />
             </AdminOnly>
           }
         >

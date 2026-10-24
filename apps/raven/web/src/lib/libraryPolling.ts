@@ -39,7 +39,7 @@ const delayOf = ({ library, now }: { library: Library; now: number }): number | 
 /**
  * How long until the libraries shown are read again, or false when nothing
  * in them is moving: the soonest any of them needs, a scan's every 1.5 s, a
- * running Refresh's every 5 s, and a waiting one's when it resumes.
+ * running Update ratings' every 5 s, and a waiting one's when it resumes.
  */
 export const libraryPollDelay = ({
   libraries,

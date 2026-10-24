@@ -41,6 +41,20 @@
     box-shadow: none;
     cursor: not-allowed;
   }
+
+  // On, for every toggle (Favourite, In hero, Watched, Pin): an outline and
+  // a glow in the accent, and the icon coloured and filled in, so it reads
+  // at a glance without relying on a fill that a tone may already have.
+  &[aria-pressed='true']:not(:disabled) {
+    --icon-tint: 0.9;
+
+    border-color: var(--color-leaf-bright);
+    box-shadow: 0 0 0 1px var(--color-leaf-bright);
+
+    > svg {
+      color: var(--color-leaf-bright);
+    }
+  }
 }
 
 .quiet {
