@@ -77,11 +77,29 @@ export const afterWatched = (queryClient: QueryClient): Promise<unknown> =>
     ],
   })
 
+/** The admin put a title in the hero or took one out: the picks, and the hero they decide. */
+export const afterHeroPicked = (queryClient: QueryClient): Promise<unknown> =>
+  refetch({
+    queryClient,
+    filters: [{ queryKey: queryKeys.heroPicks }, { queryKey: queryKeys.hero }],
+  })
+
 /** Libraries were pinned or unpinned: every library, and home, whose shelves follow the pins. */
 export const afterPins = (queryClient: QueryClient): Promise<unknown> =>
   refetch({
     queryClient,
     filters: [{ queryKey: queryKeys.libraries }, { queryKey: queryKeys.home }],
+  })
+
+/** A library was included in the hero or left out: every library, and the hero and its picks. */
+export const afterHeroLibraries = (queryClient: QueryClient): Promise<unknown> =>
+  refetch({
+    queryClient,
+    filters: [
+      { queryKey: queryKeys.libraries },
+      { queryKey: queryKeys.hero },
+      { queryKey: queryKeys.heroPicks },
+    ],
   })
 
 /** A library was rescanned: every library and everything listed under them. */

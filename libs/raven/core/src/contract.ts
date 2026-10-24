@@ -404,6 +404,8 @@ export const isLibrarySettings = object({
   saveProgress: isBoolean,
   /** Give the library its own link in the side menu. */
   pinned: isBoolean,
+  /** Let home's hero show its titles, the newest releases and the admin's picks alike. */
+  inHero: isBoolean,
   /** The order its videos are listed in. */
   sort: isMediaSort,
   /** How its videos are laid out: cards, a table, tiles, or cards in groups. */
@@ -444,6 +446,11 @@ export const isLibraryViewChange = exactPartial({
 })
 
 export type LibraryViewChange = Infer<typeof isLibraryViewChange>
+
+/** `PUT /api/libraries/:id/hero`: whether the library's titles may show in home's hero. */
+export const isLibraryHeroChange = object({ inHero: isLibrarySettings.shape.inHero })
+
+export type LibraryHeroChange = Infer<typeof isLibraryHeroChange>
 
 export const LIBRARY_BACKDROP_TYPES = { item: 'item', thumbnail: 'thumbnail' } as const
 
@@ -984,6 +991,51 @@ export type Home = Infer<typeof isHome>
 export const isHomeSearch = listOf(isHomeShelf)
 
 export type HomeSearch = Infer<typeof isHomeSearch>
+
+/**
+ * One title in home's hero: a show with what its card shows, or a movie's
+ * best file, in the library that holds it, and the line the hero reads under
+ * its title (its summary, else its tagline).
+ */
+export const isHeroEntry = union(
+  object({
+    libraryId: isNumber,
+    type: oneOf([HOME_SHELF_TYPES.shows]),
+    entry: isShowEntry,
+    line: nullable(isString),
+  }),
+  object({
+    libraryId: isNumber,
+    type: oneOf([HOME_SHELF_TYPES.media]),
+    media: isMediaItem,
+    line: nullable(isString),
+  }),
+)
+
+export type HeroEntry = Infer<typeof isHeroEntry>
+
+/**
+ * `GET /api/home/hero`: the titles home's hero takes turns with. The ones the
+ * admin picked when any are picked, else each pinned library's newest
+ * released title, a round at a time; never more than the server's
+ * `HERO_COUNT`.
+ */
+export const isHero = listOf(isHeroEntry)
+
+export type Hero = Infer<typeof isHero>
+
+/**
+ * `GET /api/hero/picks`: the movies and shows the admin picked for the hero,
+ * in the order they were picked, and how many titles the hero holds at most.
+ */
+export const isHeroPicks = object({ itemIds: listOf(isNumber), limit: isNumber })
+
+export type HeroPicks = Infer<typeof isHeroPicks>
+
+/** `PUT /api/hero/picks`: a movie or show to add to the hero, or take out of it. */
+export const isHeroPickChange = object({ itemId: isNumber, isShown: isBoolean })
+
+export type HeroPickChange = Infer<typeof isHeroPickChange>
 
 /** What TMDB says of a person; every field is null when it has nothing. */
 export const isPersonProfile = object({

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { KINDS, type Library, plural } from '@raven/core'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
@@ -18,6 +18,7 @@ import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { MANAGEMENT_MODES, useCanManage, useManagement } from '@/lib/management'
 import { api } from '@/lib/api'
 import {
+  afterHeroLibraries,
   afterPins,
   librarySettingsEdits,
   mutationKeys,
@@ -74,6 +75,39 @@ const PinButton = ({ library }: { library: Library }) => {
 }
 
 /**
+ * Whether home's hero may show this library's titles. The admin's, so it
+ * mounts inside `AdminOnly`; it shows at once and the server's answer settles it.
+ * A locked library is never in the hero, so its box stays off and cannot be ticked.
+ */
+const HeroCheckbox = ({ library }: { library: Library }) => {
+  const queryClient = useQueryClient()
+  const id = useId()
+  const include = useOptimisticMutation({
+    mutationKey: mutationKeys.heroLibrary,
+    mutationFn: (inHero: boolean) => api.setLibraryInHero({ id: library.id, inHero }),
+    edits: (inHero) => librarySettingsEdits({ libraryId: library.id, change: { inHero } }),
+    settle: () => afterHeroLibraries(queryClient),
+  })
+  return (
+    <div className={styles.heroSetting}>
+      <input
+        id={id}
+        type="checkbox"
+        checked={library.settings.inHero}
+        disabled={library.settings.locked}
+        onChange={(event) => include.mutate(event.target.checked)}
+      />
+      <label
+        htmlFor={id}
+        title={library.settings.locked ? 'A locked library never shows in the hero' : undefined}
+      >
+        Include in hero display<span className="visually-hidden"> for {library.name}</span>
+      </label>
+    </div>
+  )
+}
+
+/**
  * A library's card: its type icon in a well beside its name, its counts,
  * its folders grouped by the folder that holds them, how its scan stands,
  * and at its right Pin and the library page's own actions. The picture of
@@ -122,6 +156,9 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
           <ScanStatus scan={library.scan} />
           <RatingsStatus refresh={library.ratingsRefresh} />
           <LibraryActionErrors actions={actions} className={styles.error} />
+          <AdminOnly>
+            <HeroCheckbox library={library} />
+          </AdminOnly>
         </div>
         <div className={styles.actions}>
           <PinButton library={library} />

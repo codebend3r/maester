@@ -142,6 +142,7 @@ describe('LibraryDialog', () => {
         settings: {
           saveProgress: true,
           pinned: true,
+          inHero: true,
           sort: 'title',
           view: 'grid',
           groupBy: 'resolution',
@@ -172,6 +173,7 @@ describe('LibraryDialog', () => {
       settings: {
         saveProgress: false,
         pinned: true,
+        inHero: true,
         sort: 'title',
         view: 'grid',
         groupBy: 'resolution',

@@ -1,0 +1,7 @@
+// A button and the Cancel that appears beside it while its work runs, one
+// place in the row of actions.
+.pair {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+}

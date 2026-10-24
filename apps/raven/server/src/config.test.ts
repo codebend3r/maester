@@ -10,6 +10,13 @@ describe('readServerConfig', () => {
     ).toMatchObject({ scanOnStart: false, quickScanIntervalMinutes: 0 })
   })
 
+  it('holds ten titles in the hero unless HERO_COUNT says otherwise, and never fewer than one', () => {
+    expect(readServerConfig({})).toMatchObject({ heroCount: 10 })
+    expect(readServerConfig({ HERO_COUNT: '4' })).toMatchObject({ heroCount: 4 })
+    expect(readServerConfig({ HERO_COUNT: '0' })).toMatchObject({ heroCount: 1 })
+    expect(readServerConfig({ HERO_COUNT: 'many' })).toMatchObject({ heroCount: 10 })
+  })
+
   it('leaves the AI lookup off without a key, on Haiku 5.5 at low effort, 200 a day', () => {
     expect(readServerConfig({})).toMatchObject({
       anthropicApiKey: null,

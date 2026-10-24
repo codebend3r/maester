@@ -72,6 +72,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   settings: {
     saveProgress: true,
     pinned: true,
+    inHero: true,
     sort: MEDIA_SORTS.title,
     view: LIBRARY_VIEWS.grid,
     groupBy: MEDIA_GROUPINGS.resolution,

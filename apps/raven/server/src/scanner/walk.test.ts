@@ -43,6 +43,13 @@ describe('walkVideos', () => {
     expect(result.unreadable).toEqual([])
   })
 
+  it('reads nothing once its signal is aborted, so a cancelled scan ends quickly', async () => {
+    const abort = new AbortController()
+    abort.abort()
+    const result = await walkVideos({ roots: [at('Movies'), at('TV')], signal: abort.signal })
+    expect(result.files).toEqual([])
+  })
+
   it('tells how many videos each folder held as it reads it, adding up to what it found', async () => {
     const counts: number[] = []
     const result = await walkVideos({

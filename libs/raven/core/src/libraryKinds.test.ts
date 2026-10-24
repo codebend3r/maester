@@ -86,6 +86,14 @@ describe('withLibraryKind', () => {
       expect(coherentSettings({ ...defaultLibrarySettings(kind), locked: true }).locked).toBe(true)
     })
   })
+
+  it('never lets a locked library into the hero, whatever the type or what was sent', () => {
+    isLibraryKind.values.forEach((kind) => {
+      const sent = { ...defaultLibrarySettings(kind), locked: true, inHero: true }
+      expect(coherentSettings(sent).inHero).toBe(false)
+      expect(coherentSettings({ ...sent, locked: false }).inHero).toBe(true)
+    })
+  })
 })
 
 describe('the rules for each type of library', () => {

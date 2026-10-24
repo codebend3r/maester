@@ -20,7 +20,10 @@ describe("a library's Refresh", () => {
   const database = testDatabase('raven-ratings-refresh-')
   const libraries = () => new LibrariesRepository(database.get())
   const metadata = () => repositories(database.get()).metadata
-  const scanner = () => ({ quickScan: vi.fn<ScannerService['quickScan']>() })
+  const scanner = () => ({
+    quickScan: vi.fn<ScannerService['quickScan']>(),
+    cancel: vi.fn<ScannerService['cancel']>(),
+  })
 
   /** A movies library of its own, holding two movies, each in a file. */
   const library = (name: string): { id: number; itemIds: number[] } => {
@@ -126,6 +129,24 @@ describe("a library's Refresh", () => {
     metadata().clearRequest(refreshed)
     expect(refresh.status(id)).toEqual({ state: 'idle', finishedAt: expect.any(String) })
     expect(libraries().ratingsRefresh(id)).toMatchObject({ startedAt: null, total: 2 })
+  })
+
+  it('ends when cancelled: its remaining titles are dropped and its scan is stopped', () => {
+    const { id } = library('Cancelled')
+    const other = library('Other')
+    const sweep = { kick: vi.fn(), canSettle: () => true, requestsPause: () => null }
+    const scanning = scanner()
+    const refresh = new RatingsRefresh(libraries(), metadata(), scanning, sweep)
+    refresh.start(id)
+    refresh.start(other.id)
+
+    refresh.cancel(id)
+
+    expect(scanning.cancel).toHaveBeenCalledWith(id)
+    expect(metadata().requestsLeft(id)).toBe(0)
+    expect(refresh.status(id)).toEqual({ state: 'idle', finishedAt: expect.any(String) })
+    // Another library's Refresh carries on.
+    expect(refresh.status(other.id)).toMatchObject({ state: 'running', total: 2 })
   })
 
   it('starts anew when pressed after its last title left outside the sweep, unread', () => {

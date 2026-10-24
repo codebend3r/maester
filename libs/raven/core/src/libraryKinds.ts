@@ -165,6 +165,7 @@ export const groupingsFor = (kind: LibraryKind): readonly MediaGroupBy[] =>
 export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   saveProgress: true,
   pinned: true,
+  inHero: true,
   sort: MEDIA_SORTS.title,
   view: LIBRARY_VIEWS.grid,
   groupBy: MEDIA_GROUPINGS.resolution,
@@ -179,13 +180,15 @@ export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
 
 /**
  * Settings its type can show: a sort, view or grouping the library's type
- * has no use for is swapped for that type's own. Applied wherever settings
- * are stored or read from an address, so nothing downstream checks again.
+ * has no use for is swapped for that type's own. A locked library is never
+ * in the hero, whatever was sent or stored. Applied wherever settings are
+ * stored or read from an address, so nothing downstream checks again.
  */
 export const coherentSettings = (settings: LibrarySettings): LibrarySettings => {
   const rules: KindRules = KIND_RULES[settings.kind]
   return {
     ...settings,
+    inHero: settings.inHero && !settings.locked,
     sort: rules.fields.includes(sortParts(settings.sort).field)
       ? settings.sort
       : DEFAULT_LIBRARY_SETTINGS.sort,

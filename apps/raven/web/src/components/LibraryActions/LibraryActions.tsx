@@ -1,10 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { type Library, METADATA_SERVICE_STATES, isScanning, matchTypeFor } from '@raven/core'
+import {
+  type Library,
+  METADATA_SERVICE_STATES,
+  isRefreshingRatings,
+  isScanning,
+  matchTypeFor,
+} from '@raven/core'
 import { useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink } from '@raven/ui'
 import { useRatingsRefreshDone } from '@/components/LibraryActions/useRatingsRefreshDone'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
+import styles from '@/components/LibraryActions/LibraryActions.module.scss'
+import { Spinner } from '@/components/Spinner/Spinner'
 import { api } from '@/lib/api'
 import { afterRematch, afterRescan, queryKeys, useUnlockPrompt } from '@raven/ui/headless'
 import { metadataHealthQuery } from '@/lib/queries'
@@ -36,6 +44,22 @@ export const useLibraryActions = (library: Library) => {
   })
   useRatingsRefreshDone(library)
 
+  const cancelRescan = useMutation({
+    mutationFn: () => api.cancelScan(library.id),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.library(library.id), updated)
+      return afterRescan(queryClient)
+    },
+  })
+
+  const cancelRefresh = useMutation({
+    mutationFn: () => api.cancelRefresh(library.id),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.library(library.id), updated)
+      return afterRescan(queryClient)
+    },
+  })
+
   const rematch = useMutation({
     mutationFn: () => api.matchLibrary(library.id),
     onSuccess: (updated) => {
@@ -44,7 +68,7 @@ export const useLibraryActions = (library: Library) => {
     },
   })
 
-  return { refresh, rescan, rematch }
+  return { refresh, rescan, rematch, cancelRefresh, cancelRescan }
 }
 
 /**
@@ -52,7 +76,7 @@ export const useLibraryActions = (library: Library) => {
  * caller to place where its errors show.
  */
 export const LibraryActionErrors = ({
-  actions: { refresh, rescan, rematch },
+  actions: { refresh, rescan, rematch, cancelRefresh, cancelRescan },
   className,
 }: {
   actions: ReturnType<typeof useLibraryActions>
@@ -62,6 +86,8 @@ export const LibraryActionErrors = ({
     { verb: 'refresh', failure: refresh.error },
     { verb: 'rescan', failure: rescan.error },
     { verb: 'match again', failure: rematch.error },
+    { verb: 'cancel the refresh', failure: cancelRefresh.error },
+    { verb: 'cancel the rescan', failure: cancelRescan.error },
   ].map(
     ({ verb, failure }) =>
       failure && (
@@ -80,7 +106,7 @@ export const LibraryActionErrors = ({
 export const LibraryActions = ({
   library,
   isShut,
-  actions: { refresh, rescan, rematch },
+  actions: { refresh, rescan, rematch, cancelRefresh, cancelRescan },
 }: {
   library: Library
   isShut: boolean
@@ -92,6 +118,9 @@ export const LibraryActions = ({
   const metadata = useQuery({ ...metadataHealthQuery, enabled: matchType != null })
   const canMatch = metadata.data?.tmdb === METADATA_SERVICE_STATES.ok
   const whose = <span className="visually-hidden"> {library.name}</span>
+  // A press shows at once; the library's own status keeps it up until the work has ended.
+  const isRefreshing = refresh.isPending || isRefreshingRatings(library)
+  const isRescanning = rescan.isPending || isScanning(library.scan)
 
   // A locked library's folders stay on the server until the PIN is entered,
   // so Edit asks for it rather than open with none.
@@ -104,19 +133,40 @@ export const LibraryActions = ({
     <>
       <ButtonLink to={`/libraries/${library.id}/history`}>History{whose}</ButtonLink>
       <AdminOnly>
-        <Button
-          disabled={refresh.isPending}
-          title="Look for new files and fetch ratings again. While a refresh is under way, it scans again and retries what waits."
-          onClick={() => refresh.mutate()}
-        >
-          Refresh{whose}
-        </Button>
-        <Button
-          disabled={isScanning(library.scan) || rescan.isPending}
-          onClick={() => rescan.mutate()}
-        >
-          Rescan{whose}
-        </Button>
+        <span className={styles.pair}>
+          <Button
+            disabled={refresh.isPending}
+            title="Look for new files and fetch ratings again. While a refresh is under way, it scans again and retries what waits."
+            onClick={() => refresh.mutate()}
+          >
+            {isRefreshing && <Spinner />}
+            Refresh{whose}
+          </Button>
+          {isRefreshing && (
+            <Button
+              disabled={cancelRefresh.isPending}
+              title="Stop the refresh: the ratings still waiting are not fetched, and its scan stops."
+              onClick={() => cancelRefresh.mutate()}
+            >
+              Cancel refresh{whose}
+            </Button>
+          )}
+        </span>
+        <span className={styles.pair}>
+          <Button disabled={isRescanning || rescan.isPending} onClick={() => rescan.mutate()}>
+            {isRescanning && <Spinner />}
+            Rescan{whose}
+          </Button>
+          {isRescanning && (
+            <Button
+              disabled={cancelRescan.isPending}
+              title="Stop the rescan at its next step; the library keeps what was indexed."
+              onClick={() => cancelRescan.mutate()}
+            >
+              Cancel rescan{whose}
+            </Button>
+          )}
+        </span>
         {matchType && (
           <Button
             disabled={!canMatch || library.unmatchedCount === 0 || rematch.isPending}

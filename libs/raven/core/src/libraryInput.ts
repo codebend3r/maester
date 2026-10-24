@@ -21,6 +21,7 @@ const normalisePath = (path: string): string => {
 const SETTING_PROBLEMS = {
   saveProgress: 'Save progress must be on or off.',
   pinned: 'Pinned must be on or off.',
+  inHero: 'Include in hero display must be on or off.',
   sort: 'Sort is not one of the choices.',
   view: 'View is not one of the choices.',
   groupBy: 'Group by is not one of the choices.',

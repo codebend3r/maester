@@ -33,6 +33,10 @@ import {
   type WatchedChange,
   type HistoryEntry,
   type Home,
+  type Hero,
+  type LibraryHeroChange,
+  type HeroPickChange,
+  type HeroPicks,
   type HomeSearch,
   type ImageChoice,
   type ImageOption,
@@ -91,6 +95,8 @@ import {
   isDuplicates,
   isHistory,
   isHome,
+  isHero,
+  isHeroPicks,
   isHomeSearch,
   isFavouriteTitles,
   isItemDetails,
@@ -477,6 +483,17 @@ export const createApiClient = ({
         guard: isLibrary,
       }),
 
+    /** Includes a library's titles in home's hero, or leaves them out; the admin's. */
+    setLibraryInHero: ({ id, inHero }: { id: number } & LibraryHeroChange): Promise<Library> =>
+      expect({
+        request: send({
+          path: `/api/libraries/${id}/hero`,
+          method: 'PUT',
+          body: { inHero } satisfies LibraryHeroChange,
+        }),
+        guard: isLibrary,
+      }),
+
     deleteLibrary: async (id: number): Promise<void> => {
       await send({ path: `/api/libraries/${id}`, method: 'DELETE' })
     },
@@ -537,6 +554,20 @@ export const createApiClient = ({
     refreshLibrary: (id: number): Promise<Library> =>
       expect({
         request: send({ path: `/api/libraries/${id}/refresh`, method: 'POST' }),
+        guard: isLibrary,
+      }),
+
+    /** Stops a scan under way, a Rescan or a Refresh's; the admin's. */
+    cancelScan: (id: number): Promise<Library> =>
+      expect({
+        request: send({ path: `/api/libraries/${id}/scan/cancel`, method: 'POST' }),
+        guard: isLibrary,
+      }),
+
+    /** Cancels a Refresh: its ratings are not asked for any more and its scan stops. */
+    cancelRefresh: (id: number): Promise<Library> =>
+      expect({
+        request: send({ path: `/api/libraries/${id}/refresh/cancel`, method: 'POST' }),
         guard: isLibrary,
       }),
 
@@ -696,6 +727,25 @@ export const createApiClient = ({
       expect({
         request: send({ path: `/api/home/search?${toQueryString({ q: query.trim() })}` }),
         guard: isHomeSearch,
+      }),
+
+    /** The titles home's hero takes turns with, each with the line it reads; libraries still locked stay out. */
+    getHero: (): Promise<Hero> =>
+      expect({ request: send({ path: '/api/home/hero' }), guard: isHero }),
+
+    /** The movies and shows the admin picked for the hero, and how many it holds at most. */
+    getHeroPicks: (): Promise<HeroPicks> =>
+      expect({ request: send({ path: '/api/hero/picks' }), guard: isHeroPicks }),
+
+    /** Adds a movie or show to the hero, or takes it out; answers with the picks as they stand after. */
+    setHeroPick: ({ itemId, isShown }: HeroPickChange): Promise<HeroPicks> =>
+      expect({
+        request: send({
+          path: '/api/hero/picks',
+          method: 'PUT',
+          body: { itemId, isShown } satisfies HeroPickChange,
+        }),
+        guard: isHeroPicks,
       }),
 
     /** Notes that a video started playing, for its library's history. */

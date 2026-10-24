@@ -96,6 +96,7 @@ export const library = (overrides: { id: number; watchedPercent: number }): Libr
   settings: {
     saveProgress: true,
     pinned: true,
+    inHero: true,
     sort: 'title',
     view: 'grid',
     groupBy: 'resolution',

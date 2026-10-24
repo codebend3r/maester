@@ -27,6 +27,9 @@ describe('LibrariesPage', () => {
     match: spyOn(api, 'matchLibrary'),
     refresh: spyOn(api, 'refreshLibrary'),
     scan: spyOn(api, 'scanLibrary'),
+    inHero: spyOn(api, 'setLibraryInHero'),
+    cancelRefresh: spyOn(api, 'cancelRefresh'),
+    cancelScan: spyOn(api, 'cancelScan'),
     media: spyOn(api, 'listMedia'),
   }
 
@@ -44,6 +47,9 @@ describe('LibrariesPage', () => {
     spies.match.mockReset()
     spies.refresh.mockReset()
     spies.scan.mockReset()
+    spies.inHero.mockReset()
+    spies.cancelRefresh.mockReset()
+    spies.cancelScan.mockReset()
     spies.media.mockReset()
   })
 
@@ -346,6 +352,78 @@ describe('LibrariesPage', () => {
     ])
     renderWithProviders({ ui: <LibrariesPage /> })
     expect(await screen.findByRole('button', { name: 'Refresh Clips' })).toBeEnabled()
+  })
+
+  it('includes a library in the hero, or leaves it out, from a checkbox on its card', async () => {
+    const clips = library({ id: 2, name: 'Clips' })
+    // The server's copy, which the list is read from again once the change settles.
+    const stored = { current: clips }
+    spies.list.mockImplementation(async () => [stored.current])
+    spies.inHero.mockImplementation(async ({ inHero }) => {
+      stored.current = { ...clips, settings: { ...clips.settings, inHero } }
+      return stored.current
+    })
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const box = await screen.findByRole('checkbox', { name: 'Include in hero display for Clips' })
+    expect(box).toBeChecked()
+    await userEvent.click(box)
+    expect(spies.inHero).toHaveBeenCalledWith({ id: 2, inHero: false })
+    await waitFor(() => expect(box).not.toBeChecked())
+  })
+
+  it('keeps a locked library out of the hero: its box is off and cannot be ticked', async () => {
+    const locked = library({
+      id: 2,
+      name: 'Tutorials',
+      settings: { ...library().settings, locked: true, inHero: false },
+    })
+    spies.list.mockImplementation(async () => [locked])
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const box = await screen.findByRole('checkbox', {
+      name: 'Include in hero display for Tutorials',
+    })
+    expect(box).not.toBeChecked()
+    expect(box).toBeDisabled()
+    await userEvent.click(box)
+    expect(spies.inHero).not.toHaveBeenCalled()
+  })
+
+  it('shows a spinner on Refresh while one runs, and cancels it', async () => {
+    const running = library({
+      id: 2,
+      name: 'Clips',
+      ratingsRefresh: { state: 'running', done: 2, total: 7, startedAt: ISO },
+    })
+    spies.list.mockImplementation(async () => [running])
+    spies.cancelRefresh.mockImplementation(async () => library({ id: 2, name: 'Clips' }))
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const refresh = await screen.findByRole('button', { name: 'Refresh Clips' })
+    expect(refresh.querySelector('[class*="spinner"]')).not.toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel refresh Clips' }))
+    expect(spies.cancelRefresh).toHaveBeenCalledWith(2)
+  })
+
+  it('shows a spinner on Rescan while a scan runs, and cancels it', async () => {
+    const scanning = library({
+      id: 2,
+      name: 'Clips',
+      scan: { ...library().scan, state: 'indexing', found: 10, processed: 3 },
+    })
+    spies.list.mockImplementation(async () => [scanning])
+    spies.cancelScan.mockImplementation(async () => library({ id: 2, name: 'Clips' }))
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const rescan = await screen.findByRole('button', { name: 'Rescan Clips' })
+    expect(rescan).toBeDisabled()
+    expect(rescan.querySelector('[class*="spinner"]')).not.toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel rescan Clips' }))
+    expect(spies.cancelScan).toHaveBeenCalledWith(2)
+  })
+
+  it('offers no Cancel while nothing runs', async () => {
+    spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
+    renderWithProviders({ ui: <LibrariesPage /> })
+    await screen.findByRole('button', { name: 'Rescan Clips' })
+    expect(screen.queryByRole('button', { name: /^Cancel/ })).toBeNull()
   })
 
   it("says why a refresh or a rescan was refused, in the library's row", async () => {
