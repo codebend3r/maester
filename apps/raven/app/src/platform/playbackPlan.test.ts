@@ -3,6 +3,7 @@ import {
   CONTAINERS,
   DIRECT_PLAYS,
   HLS_COPY_AUDIO_CODECS,
+  type MediaItem,
   type MediaTracks,
   PLAYBACK_MODES,
   type PlaybackPolicy,
@@ -12,6 +13,7 @@ import {
   VIDEO_CODECS,
 } from '@raven/core'
 import { mediaItemFor } from '@/test/mediaItem'
+import { SUBTITLE_CODECS } from '@/test/subtitleCodecs'
 
 import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 import { planFor } from '@/platform/playbackPlan'
@@ -24,8 +26,13 @@ const MP4 = mediaItemFor({
   audioCodec: HLS_COPY_AUDIO_CODECS.aac,
 })
 
-/** ffprobe's names for the subtitle formats these files carry. */
-const SUBTITLE_CODECS = { srt: 'srt', movText: 'mov_text', pgs: 'hdmv_pgs_subtitle' } as const
+/** An HEVC E-AC-3 MKV, which only Android TV plays as it is. */
+const MKV = mediaItemFor({
+  container: CONTAINERS.mkv,
+  videoCodec: VIDEO_CODECS.hevc,
+  videoBitDepth: 10,
+  audioCodec: HLS_COPY_AUDIO_CODECS.eac3,
+})
 
 const subtitleTrack = (overrides: Partial<SubtitleTrack> & Pick<SubtitleTrack, 'id'>) =>
   ({
@@ -73,17 +80,22 @@ const AUTO: PlaybackPolicy = { directPlay: DIRECT_PLAYS.auto, transcoding: TRANS
 /** Apple TV under its TV chrome, where the system's player draws the subtitles. */
 const APPLE_TV = { platform: APP_PLATFORMS.tvos, shouldDrawCaptions: false } as const
 
+/** Android TV under its d-pad chrome, which draws the subtitles itself. */
+const ANDROID_TV = { platform: APP_PLATFORMS.androidTv, shouldDrawCaptions: true } as const
+
 const modesOn = ({
   platform,
   shouldDrawCaptions,
+  media = MP4,
   tracks,
   policy = AUTO,
 }: {
   platform: AppPlatform
   shouldDrawCaptions: boolean
+  media?: MediaItem
   tracks: MediaTracks | null
   policy?: PlaybackPolicy
-}) => planFor({ platform, shouldDrawCaptions, media: MP4, tracks, policy }).modes
+}) => planFor({ platform, shouldDrawCaptions, media, tracks, policy }).modes
 
 const EVERY_WAY = [PLAYBACK_MODES.direct, PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode]
 const CONVERTED = [PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode]
@@ -129,11 +141,12 @@ describe('planFor where the system draws the subtitles', () => {
     ).toEqual([PLAYBACK_MODES.direct])
   })
 
-  it('starts at the remux on Android TV too, while it takes the TV chrome', () => {
+  it("takes the chrome's word, not the platform's: Android TV would start at the remux too", () => {
     expect(
       modesOn({
-        platform: APP_PLATFORMS.androidTv,
+        ...ANDROID_TV,
         shouldDrawCaptions: false,
+        media: MKV,
         tracks: tracksWith([SIDECAR]),
       }),
     ).toEqual(CONVERTED)
@@ -149,5 +162,15 @@ describe('planFor where raven draws the subtitles', () => {
         tracks: tracksWith([SIDECAR]),
       }),
     ).toEqual(EVERY_WAY)
+  })
+
+  it('keeps a direct-playable MKV with a sidecar as it is on Android TV', () => {
+    expect(modesOn({ ...ANDROID_TV, media: MKV, tracks: tracksWith([SIDECAR]) })).toEqual(EVERY_WAY)
+  })
+
+  it("keeps an embedded text track's file as it is on Android TV too", () => {
+    expect(modesOn({ ...ANDROID_TV, media: MKV, tracks: tracksWith([EMBEDDED_TEXT]) })).toEqual(
+      EVERY_WAY,
+    )
   })
 })

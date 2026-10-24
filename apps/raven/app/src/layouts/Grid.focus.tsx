@@ -12,7 +12,7 @@ import {
 
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
-import { FOCUS_CARD_WIDTHS, FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
+import { focusCardWidthOf, FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
 import { useOpenerFocus, useScreenFocusScope } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
@@ -25,25 +25,29 @@ import {
 import { GRID_ROWS, type GridRow, gridColumnsOf } from '@/layouts/gridRows'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useGrid } from '@/layouts/useGrid'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { COLOURS } from '@/theme/appTheme'
+import { TV_SIZES, tvSize } from '@/theme/tvSizes'
 
-const GUTTER = SIZES.space8
-const GAP = SIZES.space5
+const GUTTER = TV_SIZES.space8
+const GAP = TV_SIZES.space5
 
 /** A row of the list and tiles views is at least this wide, so a TV holds three. */
-const LEAST_ROW_WIDTH = 480
+const LEAST_ROW_WIDTH = tvSize(480)
 
-const TILE_WIDTHS = { [CARD_SHAPES.poster]: 72, [CARD_SHAPES.wide]: 144 } as const
+const TILE_WIDTHS = {
+  [CARD_SHAPES.poster]: tvSize(72),
+  [CARD_SHAPES.wide]: tvSize(144),
+} as const
 
 /** Room above and below each row for a card grown by focus, as Home's rows leave it. */
-const GROWTH_ROOM = SIZES.space4
+const GROWTH_ROOM = TV_SIZES.space4
 
 /** How tall a bucket's heading row stands: the remote's control, or its title at the viewer's size. */
 const headerHeightOf = (fontScale: number): number =>
   Math.max(
-    SIZES.controlLarge,
-    linesHeightOf({ sizes: [SIZES.textXl], fontScale }) + 2 * SIZES.tvFocusRing,
-  ) + SIZES.space3
+    TV_SIZES.controlLarge,
+    linesHeightOf({ sizes: [TV_SIZES.textXl], fontScale }) + 2 * TV_SIZES.tvFocusRing,
+  ) + TV_SIZES.space3
 
 /**
  * A card of the list or tiles view, the remote's to move to: a row of words, ringed while
@@ -80,7 +84,9 @@ const RowCard = ({
       }}
       style={({ focused }) => [styles.rowCard, focused && styles.focused]}
     >
-      {hasPicture && <CardPicture card={card} width={TILE_WIDTHS[card.shape]} />}
+      {hasPicture && (
+        <CardPicture card={card} radius={TV_SIZES.radius} width={TILE_WIDTHS[card.shape]} />
+      )}
       <View style={styles.words}>
         <Text numberOfLines={1} style={styles.rowTitle}>
           {card.title}
@@ -168,10 +174,10 @@ const Grid = ({
   const { columnsOf, widthOf } = gridColumnsOf({
     room: screen.width - 2 * GUTTER,
     gap: GAP,
-    leastOf: (shape) => (isRows ? LEAST_ROW_WIDTH : FOCUS_CARD_WIDTHS[shape]),
+    leastOf: (shape) => (isRows ? LEAST_ROW_WIDTH : focusCardWidthOf(shape)),
   })
   const wordsHeight = linesHeightOf({
-    sizes: [SIZES.textLg, SIZES.text],
+    sizes: [TV_SIZES.textLg, TV_SIZES.text],
     fontScale: screen.fontScale,
   })
   const heightOf = (row: GridRow): number => {
@@ -180,8 +186,8 @@ const Grid = ({
       const picture = pictureHeightOf({ shape: row.shape, width: TILE_WIDTHS[row.shape] })
       return (
         Math.max(view === LIBRARY_VIEWS.tiles ? picture : 0, wordsHeight) +
-        SIZES.space3 * 2 +
-        SIZES.space2
+        TV_SIZES.space3 * 2 +
+        TV_SIZES.space2
       )
     }
     return (
@@ -326,70 +332,74 @@ const styles = StyleSheet.create({
   ground: { flex: 1, backgroundColor: COLOURS.ground },
   header: {
     flexShrink: 0,
-    gap: SIZES.space2,
-    paddingTop: SIZES.space6,
+    gap: TV_SIZES.space2,
+    paddingTop: TV_SIZES.space6,
     paddingHorizontal: GUTTER,
-    paddingBottom: SIZES.space2,
+    paddingBottom: TV_SIZES.space2,
   },
-  title: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
-  line: { color: COLOURS.muted, fontSize: SIZES.textLg },
-  toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SIZES.space3 },
-  notice: { color: COLOURS.muted, fontSize: SIZES.textLg },
+  title: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+  line: { color: COLOURS.muted, fontSize: TV_SIZES.textLg },
+  toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: TV_SIZES.space3 },
+  notice: { color: COLOURS.muted, fontSize: TV_SIZES.textLg },
   // A horizontal ScrollView grows by default, which would leave the cards below no room.
   jumpScroll: { flexGrow: 0 },
-  jumpRow: { gap: SIZES.space0, paddingVertical: SIZES.space1, alignItems: 'center' },
-  unit: { color: COLOURS.muted, fontSize: SIZES.text, paddingRight: SIZES.space1 },
+  jumpRow: { gap: TV_SIZES.space0, paddingVertical: TV_SIZES.space1, alignItems: 'center' },
+  unit: { color: COLOURS.muted, fontSize: TV_SIZES.text, paddingRight: TV_SIZES.space1 },
   mark: {
-    minWidth: SIZES.controlLarge,
-    minHeight: SIZES.controlLarge,
+    minWidth: TV_SIZES.controlLarge,
+    minHeight: TV_SIZES.controlLarge,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.tvFocusRing,
+    borderRadius: TV_SIZES.radius,
+    borderWidth: TV_SIZES.tvFocusRing,
     borderColor: 'transparent',
   },
-  markLabel: { color: COLOURS.muted, fontSize: SIZES.textLg, fontWeight: '600' },
+  markLabel: { color: COLOURS.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
   markEmpty: { color: COLOURS.line },
   focused: { borderColor: COLOURS.text, backgroundColor: COLOURS.quiet },
   listSlot: { flex: 1 },
-  content: { paddingHorizontal: GUTTER, paddingBottom: SIZES.space6 },
+  content: { paddingHorizontal: GUTTER, paddingBottom: TV_SIZES.space6 },
   bucketRow: { justifyContent: 'center' },
   bucket: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    gap: SIZES.space2,
-    minHeight: SIZES.controlLarge,
-    paddingHorizontal: SIZES.space3,
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.tvFocusRing,
+    gap: TV_SIZES.space2,
+    minHeight: TV_SIZES.controlLarge,
+    paddingHorizontal: TV_SIZES.space3,
+    borderRadius: TV_SIZES.radius,
+    borderWidth: TV_SIZES.tvFocusRing,
     borderColor: 'transparent',
   },
-  chevron: { color: COLOURS.muted, fontSize: SIZES.textLg },
+  chevron: { color: COLOURS.muted, fontSize: TV_SIZES.textLg },
   bucketTitle: {
     color: COLOURS.text,
-    fontSize: SIZES.textXl,
-    lineHeight: SIZES.textXl * LINE_RATIO,
+    fontSize: TV_SIZES.textXl,
+    lineHeight: TV_SIZES.textXl * LINE_RATIO,
     fontWeight: 'bold',
   },
-  count: { color: COLOURS.muted, fontSize: SIZES.textLg },
+  count: { color: COLOURS.muted, fontSize: TV_SIZES.textLg },
   cards: { flexDirection: 'row', gap: GAP, paddingVertical: GROWTH_ROOM },
-  rowCards: { paddingVertical: SIZES.space1 },
+  rowCards: { paddingVertical: TV_SIZES.space1 },
   rowCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SIZES.space3,
-    padding: SIZES.space3,
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.tvFocusRing,
+    gap: TV_SIZES.space3,
+    padding: TV_SIZES.space3,
+    borderRadius: TV_SIZES.radius,
+    borderWidth: TV_SIZES.tvFocusRing,
     borderColor: 'transparent',
   },
   words: { flex: 1 },
   rowTitle: {
     color: COLOURS.text,
-    fontSize: SIZES.textLg,
-    lineHeight: SIZES.textLg * LINE_RATIO,
+    fontSize: TV_SIZES.textLg,
+    lineHeight: TV_SIZES.textLg * LINE_RATIO,
     fontWeight: '600',
   },
-  rowLine: { color: COLOURS.muted, fontSize: SIZES.text, lineHeight: SIZES.text * LINE_RATIO },
+  rowLine: {
+    color: COLOURS.muted,
+    fontSize: TV_SIZES.text,
+    lineHeight: TV_SIZES.text * LINE_RATIO,
+  },
 })

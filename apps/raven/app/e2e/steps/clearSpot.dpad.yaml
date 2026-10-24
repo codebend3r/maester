@@ -1,0 +1,37 @@
+appId: io.github.codebend3r.raven.app
+name: From Home's focused film, clear its saved spot with a mark and its undoing
+---
+# The spot is cleared by a mark, and taking the mark off again leaves the film as the fixture
+# had it, never started, so Home has nothing under Continue watching again.
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: Resume from .*
+      focused: true
+    timeout: 30000
+- repeat:
+    while:
+      notVisible:
+        text: Mark watched
+        focused: true
+    times: 4
+    commands:
+      - pressKey: Remote Dpad Right
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: Watched
+      focused: true
+    timeout: 10000
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: Mark watched
+      focused: true
+    timeout: 10000
+- assertVisible: Play
+- pressKey: Back
+- extendedWaitUntil:
+    notVisible: Continue watching
+    timeout: 30000
+- assertVisible: Kestrel Point

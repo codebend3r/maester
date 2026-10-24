@@ -22,7 +22,7 @@
     "format:check": "oxfmt --check .",
     "lint:ts": "oxlint",
     "lint:ts:fix": "oxlint --fix",
-    "test": "bun test --dots src",
+    "test": "bun test --dots --path-ignore-patterns=native-build src",
     "test:native": "node --import tsx --test --test-timeout=120000 test/native.test.ts",
     "test:watch": "bun test --dots --watch src",
     "typecheck": "tsgo --noEmit"
@@ -106,13 +106,15 @@
       "build:native": {
         "cache": false,
         "dependsOn": [
-          "^build"
+          "^build",
+          "fetch:libmpv"
         ]
       },
       "test:native": {
         "cache": true,
         "dependsOn": [
-          "^build"
+          "^build",
+          "build:native"
         ],
         "inputs": [
           "default",
@@ -128,7 +130,8 @@
       "audit:native": {
         "cache": false,
         "dependsOn": [
-          "^build"
+          "^build",
+          "build:native"
         ]
       }
     }

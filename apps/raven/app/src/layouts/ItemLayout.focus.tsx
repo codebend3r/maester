@@ -13,7 +13,7 @@ import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import type { ItemHero, ItemPage, PersonCard, VersionRow } from '@/queries/itemPage'
 import { CardPicture } from '@/layouts/Card'
 import { FocusBand } from '@/layouts/FocusBand'
-import { FOCUS_CARD_WIDTHS, FocusCard } from '@/layouts/FocusCard'
+import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
 import { useScreenFocusScope } from '@/layouts/focus'
 import { toneStyles } from '@/layouts/formStyles'
 import {
@@ -29,20 +29,24 @@ import {
   playLabelOf,
 } from '@/layouts/itemKit'
 import { LINE_RATIO } from '@/layouts/textHeights'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { COLOURS } from '@/theme/appTheme'
+import { TV_SIZES, tvSize } from '@/theme/tvSizes'
 
-const GUTTER = SIZES.space8
+const GUTTER = TV_SIZES.space8
 
 /** The heading's picture in points on a 1920 by 1080 point screen: a poster, or a still. */
-const HERO_WIDTHS = { [CARD_SHAPES.poster]: 280, [CARD_SHAPES.wide]: 480 } as const
+const HERO_WIDTHS = {
+  [CARD_SHAPES.poster]: tvSize(280),
+  [CARD_SHAPES.wide]: tvSize(480),
+} as const
 
 /** How wide the words beside the picture run: about seventy characters at the TV's size. */
-const WORDS_WIDTH = 1040
+const WORDS_WIDTH = tvSize(1040)
 
-const PHOTO_SIZE = 120
+const PHOTO_SIZE = tvSize(120)
 
 /** A person's column: their photo, with room either side for a name under it. */
-const PERSON_WIDTH = 176
+const PERSON_WIDTH = tvSize(176)
 
 /** The backdrop fills the screen's width at 16:9, dimmed so the words over it read. */
 const BACKDROP_RATIO = 9 / 16
@@ -117,7 +121,11 @@ const Hero = ({
   const facts = heroFactsOf(hero)
   return (
     <View style={styles.hero}>
-      <CardPicture card={heroPictureOf(hero)} width={HERO_WIDTHS[hero.poster.shape]} />
+      <CardPicture
+        card={heroPictureOf(hero)}
+        radius={TV_SIZES.radius}
+        width={HERO_WIDTHS[hero.poster.shape]}
+      />
       <View style={styles.words}>
         {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
         <Text accessibilityRole="header" style={styles.title}>
@@ -187,7 +195,7 @@ const CardRow = ({
         isPreferred={false}
         onFocused={onSettle}
         onPress={() => onOpen(card.target)}
-        width={FOCUS_CARD_WIDTHS[card.shape]}
+        width={focusCardWidthOf(card.shape)}
       />
     ))}
   </Rail>
@@ -337,54 +345,54 @@ const styles = StyleSheet.create({
   ground: { flex: 1, backgroundColor: COLOURS.ground },
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, opacity: BACKDROP_OPACITY },
   scroll: { flex: 1 },
-  page: { gap: SIZES.space5, paddingTop: SIZES.space6, paddingBottom: SIZES.space6 },
+  page: { gap: TV_SIZES.space5, paddingTop: TV_SIZES.space6, paddingBottom: TV_SIZES.space6 },
   padded: { paddingHorizontal: GUTTER },
   notice: { justifyContent: 'center', paddingHorizontal: GUTTER },
-  hero: { flexDirection: 'row', alignItems: 'flex-start', gap: SIZES.space6 },
-  words: { flex: 1, maxWidth: WORDS_WIDTH, gap: SIZES.space2 },
-  eyebrow: { color: COLOURS.muted, fontSize: SIZES.textLg, fontWeight: '600' },
+  hero: { flexDirection: 'row', alignItems: 'flex-start', gap: TV_SIZES.space6 },
+  words: { flex: 1, maxWidth: WORDS_WIDTH, gap: TV_SIZES.space2 },
+  eyebrow: { color: COLOURS.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
   title: {
     color: COLOURS.text,
-    fontSize: SIZES.textXl,
-    lineHeight: SIZES.textXl * LINE_RATIO,
+    fontSize: TV_SIZES.textXl,
+    lineHeight: TV_SIZES.textXl * LINE_RATIO,
     fontWeight: 'bold',
   },
-  byline: { color: COLOURS.text, fontSize: SIZES.textLg },
-  line: { color: COLOURS.muted, fontSize: SIZES.text, lineHeight: SIZES.text * LINE_RATIO },
-  progress: { gap: SIZES.space1, maxWidth: SIZES.measure },
-  track: { height: SIZES.space1, borderRadius: SIZES.space0, backgroundColor: COLOURS.track },
-  fill: { height: '100%', borderRadius: SIZES.space0, backgroundColor: COLOURS.accent },
-  tagline: { color: COLOURS.text, fontSize: SIZES.textLg, fontStyle: 'italic' },
+  byline: { color: COLOURS.text, fontSize: TV_SIZES.textLg },
+  line: { color: COLOURS.muted, fontSize: TV_SIZES.text, lineHeight: TV_SIZES.text * LINE_RATIO },
+  progress: { gap: TV_SIZES.space1, maxWidth: TV_SIZES.measure },
+  track: { height: TV_SIZES.space1, borderRadius: TV_SIZES.space0, backgroundColor: COLOURS.track },
+  fill: { height: '100%', borderRadius: TV_SIZES.space0, backgroundColor: COLOURS.accent },
+  tagline: { color: COLOURS.text, fontSize: TV_SIZES.textLg, fontStyle: 'italic' },
   summary: {
     color: COLOURS.text,
-    fontSize: SIZES.textLg,
-    lineHeight: SIZES.textLg * LINE_RATIO,
+    fontSize: TV_SIZES.textLg,
+    lineHeight: TV_SIZES.textLg * LINE_RATIO,
   },
-  actions: { flexDirection: 'row', gap: SIZES.space3, paddingVertical: SIZES.space2 },
+  actions: { flexDirection: 'row', gap: TV_SIZES.space3, paddingVertical: TV_SIZES.space2 },
   action: {
-    minHeight: SIZES.controlLarge,
+    minHeight: TV_SIZES.controlLarge,
     justifyContent: 'center',
-    paddingHorizontal: SIZES.space4,
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.tvFocusRing,
+    paddingHorizontal: TV_SIZES.space4,
+    borderRadius: TV_SIZES.radius,
+    borderWidth: TV_SIZES.tvFocusRing,
   },
-  actionLabel: { fontSize: SIZES.textLg, fontWeight: 'bold' },
+  actionLabel: { fontSize: TV_SIZES.textLg, fontWeight: 'bold' },
   focused: { borderColor: COLOURS.text },
-  section: { gap: SIZES.space1 },
-  heading: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
-  row: { gap: SIZES.space5, paddingHorizontal: GUTTER, paddingVertical: SIZES.space4 },
-  versions: { gap: SIZES.space2, paddingTop: SIZES.space2 },
+  section: { gap: TV_SIZES.space1 },
+  heading: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+  row: { gap: TV_SIZES.space5, paddingHorizontal: GUTTER, paddingVertical: TV_SIZES.space4 },
+  versions: { gap: TV_SIZES.space2, paddingTop: TV_SIZES.space2 },
   version: {
     alignSelf: 'flex-start',
-    gap: SIZES.space0,
-    padding: SIZES.space3,
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.tvFocusRing,
+    gap: TV_SIZES.space0,
+    padding: TV_SIZES.space3,
+    borderRadius: TV_SIZES.radius,
+    borderWidth: TV_SIZES.tvFocusRing,
     borderColor: 'transparent',
     backgroundColor: COLOURS.raised,
   },
-  versionTitle: { color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: '600' },
-  person: { width: PERSON_WIDTH, alignItems: 'center', gap: SIZES.space1 },
+  versionTitle: { color: COLOURS.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+  person: { width: PERSON_WIDTH, alignItems: 'center', gap: TV_SIZES.space1 },
   photo: {
     width: PHOTO_SIZE,
     height: PHOTO_SIZE,
@@ -393,17 +401,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLOURS.raised,
-    borderWidth: SIZES.tvFocusRing,
+    borderWidth: TV_SIZES.tvFocusRing,
     borderColor: 'transparent',
   },
   focusedPhoto: { borderColor: COLOURS.text },
-  initials: { color: COLOURS.muted, fontSize: SIZES.textXl, fontWeight: 'bold' },
+  initials: { color: COLOURS.muted, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
   personName: {
     color: COLOURS.muted,
-    fontSize: SIZES.text,
+    fontSize: TV_SIZES.text,
     fontWeight: '600',
     textAlign: 'center',
   },
   focusedName: { color: COLOURS.text },
-  personRole: { color: COLOURS.muted, fontSize: SIZES.textSm, textAlign: 'center' },
+  personRole: { color: COLOURS.muted, fontSize: TV_SIZES.textSm, textAlign: 'center' },
 })

@@ -1,9 +1,12 @@
 import {
+  AUDIO_CODECS,
+  CONTAINERS,
   ITEM_TYPES,
   type ItemSummary,
   MATCH_STATES,
   type MediaItem,
   THUMBNAIL_STATES,
+  VIDEO_CODECS,
 } from '@raven/core'
 
 /** A title's summary, a 2026 movie unless a test says otherwise, with versioned pictures. */
@@ -28,14 +31,14 @@ export const mediaItemFor = (overrides: Partial<MediaItem> = {}): MediaItem => (
   fileName: 'Episode 1.mkv',
   folder: '',
   size: 1_000_000,
-  container: 'mkv',
+  container: CONTAINERS.mkv,
   duration: 1200,
   width: 1920,
   height: 1080,
-  videoCodec: 'hevc',
+  videoCodec: VIDEO_CODECS.hevc,
   videoBitDepth: 10,
   hdr: false,
-  audioCodec: 'eac3',
+  audioCodec: AUDIO_CODECS.eac3,
   audioChannels: 6,
   bitrate: 5_000_000,
   thumbnail: THUMBNAIL_STATES.ready,

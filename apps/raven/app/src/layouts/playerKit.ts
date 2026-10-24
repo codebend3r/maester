@@ -1,4 +1,6 @@
+import { formatDuration } from '@raven/core'
 import type { ComponentProps, ReactNode } from 'react'
+import type { AccessibilityActionEvent, AccessibilityActionInfo } from 'react-native'
 import type Video from 'react-native-video'
 
 import type { PickerProps } from '@/layouts/gridKit'
@@ -59,6 +61,7 @@ export type PlayerChromeKit = {
 
 export const PLAYER_COPY = {
   play: 'Play',
+  leave: 'Back',
   pause: 'Pause',
   back: (seconds: number) => `Back ${seconds} seconds`,
   forward: (seconds: number) => `Forward ${seconds} seconds`,
@@ -70,3 +73,45 @@ export const PLAYER_COPY = {
   showControls: 'Show the controls',
   hideControls: 'Hide the controls',
 } as const
+
+/** The actions a screen reader offers on the scrubber: a swipe up or down skips. */
+const SEEK_ACTIONS = { increment: 'increment', decrement: 'decrement' } as const
+
+const SEEK_ACTION_LIST: AccessibilityActionInfo[] = [
+  { name: SEEK_ACTIONS.increment },
+  { name: SEEK_ACTIONS.decrement },
+]
+
+/** `value` kept between the start and `length`. */
+export const within = ({ value, length }: { value: number; length: number }): number =>
+  Math.min(length, Math.max(0, value))
+
+/** How far along the line the spot `at` is, as a width or an offset: `'40%'`. */
+export const playedShareOf = ({ at, duration }: { at: number; duration: number }): `${number}%` =>
+  duration > 0 ? `${(within({ value: at, length: duration }) / duration) * 100}%` : '0%'
+
+/**
+ * What a screen reader makes of a scrubber: the time `shown` of the length, and a skip either
+ * way from where the video is, so VoiceOver and TalkBack drive it as the remote and the thumb do.
+ */
+export const scrubberAccessibilityOf = ({
+  position,
+  shown,
+  duration,
+  onSeek,
+}: Pick<Transport, 'position' | 'onSeek'> & { shown: number; duration: number }) => ({
+  accessible: true,
+  accessibilityActions: SEEK_ACTION_LIST,
+  accessibilityLabel: PLAYER_COPY.seek,
+  accessibilityRole: 'adjustable' as const,
+  accessibilityValue: {
+    min: 0,
+    max: Math.round(duration),
+    now: Math.round(shown),
+    text: PLAYER_COPY.of({ at: formatDuration(shown), length: formatDuration(duration) }),
+  },
+  onAccessibilityAction: ({ nativeEvent }: AccessibilityActionEvent) => {
+    if (nativeEvent.actionName === SEEK_ACTIONS.increment) onSeek(position + SKIP_SECONDS)
+    if (nativeEvent.actionName === SEEK_ACTIONS.decrement) onSeek(position - SKIP_SECONDS)
+  },
+})

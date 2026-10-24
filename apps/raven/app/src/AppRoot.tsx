@@ -12,6 +12,7 @@ import { APP_ROUTES, APP_SCREENS } from '@/routes'
 import { useActiveServer } from '@/stores/activeServer'
 import { configureLibraryViews } from '@/stores/libraryViews'
 import { followReduceMotion } from '@/stores/reduceMotion'
+import { returnScreen } from '@/stores/screenFocus'
 import { COLOURS } from '@/theme/appTheme'
 
 /** One cache for the app's life, emptied whenever the active server changes. */
@@ -58,7 +59,14 @@ export const AppRoot = () => {
     <QueryClientProvider client={queryClient}>
       {session !== null && <ServerEvents key={session.server.id} session={session} />}
       <UnlockRoute />
+      {/* A screen's opening focus comes back once the transition that reveals it has ended:
+          on Android TV the transition takes the focus from anything asked for before then. */}
       <Stack
+        screenListeners={{
+          transitionEnd: ({ target, data }) => {
+            if (target !== undefined && !data.closing) returnScreen({ screen: target })
+          },
+        }}
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLOURS.ground } }}
       >
         <Stack.Protected guard={session !== null} redirectTo={APP_ROUTES.signIn}>

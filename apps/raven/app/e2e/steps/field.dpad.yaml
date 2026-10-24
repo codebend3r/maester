@@ -1,0 +1,24 @@
+appId: io.github.codebend3r.raven.app
+name: Type into the field named FIELD with the remote, check it shows SHOWN, then send it
+---
+# Each step opens with the remote on its field, untouched.
+- extendedWaitUntil:
+    visible:
+      text: ${FIELD}
+      focused: true
+    timeout: 10000
+# Select opens the platform's keyboard on the field.
+- pressKey: Remote Dpad Center
+# What is typed is checked before it is sent, clearing the field to type it again when a key
+# was lost, and go goes as a key of its own.
+- retry:
+    maxRetries: 2
+    commands:
+      - eraseText
+      - inputText: ${TEXT}
+      - extendedWaitUntil:
+          visible:
+            text: ${SHOWN}
+            focused: true
+          timeout: 5000
+- pressKey: Enter

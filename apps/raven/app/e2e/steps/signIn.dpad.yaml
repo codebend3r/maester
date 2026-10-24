@@ -1,0 +1,32 @@
+appId: io.github.codebend3r.raven.app
+name: Sign in with the remote and the platform's keyboard
+---
+# A secret shows as one dot a character, so its field is checked by as many dots as it has
+# characters.
+- runFlow:
+    file: field.dpad.yaml
+    env:
+      FIELD: Server address
+      TEXT: ${SERVER}
+      SHOWN: ${SERVER}
+- extendedWaitUntil:
+    visible: This server keeps some libraries behind a PIN.
+    timeout: 30000
+- runFlow:
+    file: field.dpad.yaml
+    env:
+      FIELD: PIN
+      TEXT: ${PIN}
+      SHOWN: ${PIN.replace(/./g, '•')}
+- extendedWaitUntil:
+    visible: Locked libraries stay hidden on this device until the server's admin password is entered.
+    timeout: 30000
+- runFlow:
+    file: field.dpad.yaml
+    env:
+      FIELD: Admin password
+      TEXT: ${ADMIN_PASSWORD}
+      SHOWN: ${ADMIN_PASSWORD.replace(/./g, '•')}
+- extendedWaitUntil:
+    notVisible: Admin password
+    timeout: 30000

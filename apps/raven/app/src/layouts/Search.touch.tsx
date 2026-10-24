@@ -10,7 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { TouchBack } from '@/layouts/TouchBack'
-import { formStyles } from '@/layouts/formStyles'
+import { touchFormStyles as formStyles } from '@/layouts/formStyles'
 import {
   CLEAR_SEARCH,
   type SearchFieldProps,
