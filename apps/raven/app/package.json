@@ -11,6 +11,9 @@
     "build:android-tv": "./android/gradlew -p android assembleRelease",
     "build:ios": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/raven.xcworkspace -scheme raven -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
     "build:tvos": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/raven.xcworkspace -scheme raven -configuration Release -sdk appletvsimulator -destination 'generic/platform=tvOS Simulator' -derivedDataPath build/tvos CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
+    "dev:ios": "APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-phone",
+    "dev:ipad": "APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-pad",
+    "dev:tvos": "EXPO_TV=1 APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-tv",
     "e2e": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} maestro test e2e",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
@@ -19,6 +22,9 @@
     "prebuild:android-tv": "EXPO_TV=1 expo prebuild --platform android --clean",
     "prebuild:ios": "NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo prebuild --platform ios --clean",
     "prebuild:tvos": "EXPO_TV=1 NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo prebuild --platform ios --clean",
+    "predev:ios": "APP_VARIANT=development bun run prebuild:ios",
+    "predev:ipad": "APP_VARIANT=development bun run prebuild:ios",
+    "predev:tvos": "APP_VARIANT=development bun run prebuild:tvos",
     "start": "bun run --sequential start:watchman start:metro",
     "start:metro": "expo start",
     "start:watchman": "watchman --version",
@@ -119,7 +125,10 @@
       "format:check",
       "test",
       "test:screens",
-      "e2e"
+      "e2e",
+      "dev:ios",
+      "dev:ipad",
+      "dev:tvos"
     ],
     "targets": {
       "start": {
@@ -142,14 +151,150 @@
       "build:ios": {
         "dependsOn": [
           "^build"
-        ]
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "env": "APP_VARIANT"
+          },
+          {
+            "env": "DEVELOPER_DIR"
+          },
+          {
+            "runtime": "xcodebuild -version"
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/ios",
+          "{projectRoot}/build/ios"
+        ],
+        "cache": true
       },
       "build:tvos": {
         "dependsOn": [
           "^build"
-        ]
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "env": "APP_VARIANT"
+          },
+          {
+            "env": "DEVELOPER_DIR"
+          },
+          {
+            "runtime": "xcodebuild -version"
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/ios",
+          "{projectRoot}/build/tvos"
+        ],
+        "cache": true
       },
       "build:android-tv": {
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "env": "APP_VARIANT"
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/android"
+        ],
+        "cache": true
+      },
+      "prebuild:ios": {
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "env": "APP_VARIANT"
+          },
+          {
+            "env": "DEVELOPER_DIR"
+          },
+          {
+            "runtime": "xcodebuild -version"
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/ios"
+        ],
+        "cache": true
+      },
+      "prebuild:tvos": {
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "env": "APP_VARIANT"
+          },
+          {
+            "env": "DEVELOPER_DIR"
+          },
+          {
+            "runtime": "xcodebuild -version"
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/ios"
+        ],
+        "cache": true
+      },
+      "prebuild:android-tv": {
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "env": "APP_VARIANT"
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/android"
+        ],
+        "cache": true
+      },
+      "e2e": {
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "env": "APP_VARIANT"
+          },
+          {
+            "env": "DEVELOPER_DIR"
+          },
+          {
+            "runtime": "xcodebuild -version"
+          },
+          "{workspaceRoot}/apps/raven/server/src/**/*"
+        ],
+        "cache": true
+      },
+      "dev:ios": {
+        "continuous": true,
+        "cache": false,
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "dev:ipad": {
+        "continuous": true,
+        "cache": false,
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "dev:tvos": {
+        "continuous": true,
+        "cache": false,
         "dependsOn": [
           "^build"
         ]
