@@ -12,7 +12,9 @@ import {
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import type { ItemHero, ItemPage, PersonCard, VersionRow } from '@/queries/itemPage'
 import { CardPicture } from '@/layouts/Card'
+import { FocusBand } from '@/layouts/FocusBand'
 import { FOCUS_CARD_WIDTHS, FocusCard } from '@/layouts/FocusCard'
+import { useScreenFocusScope } from '@/layouts/focus'
 import { toneStyles } from '@/layouts/formStyles'
 import {
   ITEM_HEADINGS,
@@ -154,18 +156,20 @@ const Hero = ({
 
 /** A titled row the remote moves along, scrolled as the focus moves. */
 const Rail = ({ title, children }: { title: string; children: ReactNode }) => (
-  <View style={styles.section}>
-    <View style={styles.padded}>
-      <Heading title={title} />
+  <FocusBand>
+    <View style={styles.section}>
+      <View style={styles.padded}>
+        <Heading title={title} />
+      </View>
+      <ScrollView
+        contentContainerStyle={styles.row}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {children}
+      </ScrollView>
     </View>
-    <ScrollView
-      contentContainerStyle={styles.row}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-    >
-      {children}
-    </ScrollView>
-  </View>
+  </FocusBand>
 )
 
 /** A row of cards the remote moves along, under its heading. */
@@ -194,26 +198,28 @@ const Versions = ({
   onOpen,
   onSettle,
 }: Settles & { versions: VersionRow[]; onOpen: Opens }) => (
-  <View style={[styles.section, styles.padded]}>
-    <Heading title={ITEM_HEADINGS.versions} />
-    <View style={styles.versions}>
-      {versions.map((version) => (
-        <Pressable
-          key={version.key}
-          accessibilityLabel={playLabelOf(version.fileName)}
-          accessibilityRole="button"
-          onFocus={onSettle}
-          onPress={() => onOpen(version.target)}
-          style={({ focused }) => [styles.version, focused && styles.focused]}
-        >
-          <Text style={styles.versionTitle}>{dotted(version.facts)}</Text>
-          <Text numberOfLines={1} style={styles.line}>
-            {version.fileName}
-          </Text>
-        </Pressable>
-      ))}
+  <FocusBand>
+    <View style={[styles.section, styles.padded]}>
+      <Heading title={ITEM_HEADINGS.versions} />
+      <View style={styles.versions}>
+        {versions.map((version) => (
+          <Pressable
+            key={version.key}
+            accessibilityLabel={playLabelOf(version.fileName)}
+            accessibilityRole="button"
+            onFocus={onSettle}
+            onPress={() => onOpen(version.target)}
+            style={({ focused }) => [styles.version, focused && styles.focused]}
+          >
+            <Text style={styles.versionTitle}>{dotted(version.facts)}</Text>
+            <Text numberOfLines={1} style={styles.line}>
+              {version.fileName}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
-  </View>
+  </FocusBand>
 )
 
 /** A person the remote can move to, so the row scrolls along with the focus. */
@@ -259,8 +265,7 @@ const ItemLayout = ({ page, actions, isPlayPending, onOpen }: ItemLayoutProps) =
   const screen = useWindowDimensions()
   // Preferred focus is for the opening only: once anything here has had the focus, a button
   // that changes or mounts again leaves the viewer where they are.
-  const [isOpening, setOpening] = useState(true)
-  const settle = () => setOpening(false)
+  const { isOpening, settle } = useScreenFocusScope()
   return (
     <View style={styles.ground}>
       {page.hero.backdrop !== null && (
@@ -271,15 +276,17 @@ const ItemLayout = ({ page, actions, isPlayPending, onOpen }: ItemLayoutProps) =
         />
       )}
       <ScrollView contentContainerStyle={styles.page} style={styles.scroll}>
-        <View style={styles.padded}>
-          <Hero
-            actions={isPlayPending ? null : actions}
-            file={page.file}
-            hero={page.hero}
-            isOpening={isOpening}
-            onSettle={settle}
-          />
-        </View>
+        <FocusBand>
+          <View style={styles.padded}>
+            <Hero
+              actions={isPlayPending ? null : actions}
+              file={page.file}
+              hero={page.hero}
+              isOpening={isOpening}
+              onSettle={settle}
+            />
+          </View>
+        </FocusBand>
         {/* The rows wait for the actions, so nothing below can take the opening focus from Play. */}
         {!isPlayPending && (
           <>

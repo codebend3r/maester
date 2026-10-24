@@ -1,6 +1,7 @@
 export const BUILD_ENV = {
   runNumber: 'GITHUB_RUN_NUMBER',
   appVariant: 'APP_VARIANT',
+  tv: 'EXPO_TV',
 } as const
 
 // Apple's CFBundleVersion and Android's versionCode both want a positive whole

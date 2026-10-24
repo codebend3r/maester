@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { APP_CLIENT_CALLS } from '@raven/core'
-import { fireEvent, screen } from '@testing-library/react-native'
+import { fireEvent, screen, within } from '@testing-library/react-native'
 
 import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Item } from '@/screens/Item'
@@ -11,6 +11,13 @@ import { NAS } from '@/test/homeServer'
 import { pathFor } from '@/test/fixtureFetch'
 import { BUSBOYS, SEVERANCE, SEVERANCE_ONE, itemApi } from '@/test/itemServer'
 import { heldAnswer } from '@/test/heldAnswer'
+import type * as NavigationFocus from '@/test/navigationFocus'
+import {
+  askedFor,
+  leaveTestScreen,
+  resetTestScreen,
+  returnToTestScreen,
+} from '@/test/navigationFocus'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
@@ -41,9 +48,14 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   return platform
 })
 jest.mock('expo-router', () => ({
+  ...jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').navigationFocusMocks,
   useRouter: () => ({ push: mockPush, back: jest.fn() }),
   useLocalSearchParams: () => mockParams(),
 }))
+jest.mock(
+  '@/layouts/tvFocus',
+  () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
+)
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
@@ -61,6 +73,18 @@ const preferred = (): string[] =>
     .filter((node) => node.props.hasTVPreferredFocus === true)
     .map((node) => node.props.accessibilityLabel)
 
+/** A host element on screen, as the queries hand it back. */
+type ScreenNode = ReturnType<typeof screen.getByRole>
+
+/**
+ * The nearest focus guide holding `node` that hands the remote coming into it to a card of its
+ * own (`autoFocus`), or null.
+ */
+const guideAround = (node: ScreenNode | null): ScreenNode | null => {
+  if (node === null) return null
+  return node.props.autoFocus === true ? node : guideAround(node.parent)
+}
+
 /** The client this test's screen reads through. */
 const shown = { client: createScreenClient() }
 
@@ -73,6 +97,7 @@ const renderItem = async (id: number) => {
 describe('Item on a TV', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    resetTestScreen()
     mockServer.writes = async () => undefined
     mockServer.reads = async () => undefined
     mockServer.release = () => undefined
@@ -146,5 +171,30 @@ describe('Item on a TV', () => {
     expect(await screen.findByRole('button', { name: 'E2 · Half Loop' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'E1 · Good News About Hell' })).toBeTruthy()
     expect(preferred()).toEqual(['Play S01E01'])
+  })
+
+  it("brings the remote down from a show's actions to its seasons, and up again", async () => {
+    await renderItem(SEVERANCE.id)
+    const play = await screen.findByRole('button', { name: 'Play S01E01' })
+    // Each is a guide the width of the page: Play sits to the right of the poster, past the
+    // seasons' first card, so without them Down skipped the row for whatever lay under Play.
+    const seasons = guideAround(screen.getByRole('button', { name: 'Season 1' }))
+    const actions = guideAround(play)
+    if (seasons === null || actions === null) throw new Error('No focus guide')
+    expect(within(seasons).queryByRole('button', { name: 'Play S01E01' })).toBeNull()
+    expect(within(actions).queryByRole('button', { name: 'Season 1' })).toBeNull()
+    expect(within(actions).getByRole('checkbox', { name: 'Mark watched' })).toBeTruthy()
+  })
+
+  it('takes the focus back to the season a page was opened from', async () => {
+    await renderItem(SEVERANCE.id)
+    const season = await screen.findByRole('button', { name: 'Season 1' })
+    await fireEvent(season, NATIVE_EVENTS.focus)
+    await fireEvent.press(season)
+    await leaveTestScreen()
+    expect(askedFor()).toEqual([])
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Season 1'])
+    expect(preferred()).toEqual([])
   })
 })

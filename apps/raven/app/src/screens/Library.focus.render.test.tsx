@@ -4,8 +4,8 @@ import {
   type Library as LibraryRecord,
   MEDIA_SORTS,
   JUMP_SCALE_LABELS,
+  LIBRARY_VIEWS,
   SORT_FIELD_LABELS,
-  isRecord,
   sortFieldsFor,
 } from '@raven/core'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
@@ -19,6 +19,13 @@ import { useLibraryViews } from '@/stores/libraryViews'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import { FILM_SEARCHES, GROUPED_FILMS, libraryApi, libraryPath } from '@/test/libraryServer'
+import type * as NavigationFocus from '@/test/navigationFocus'
+import {
+  askedFor,
+  leaveTestScreen,
+  resetTestScreen,
+  returnToTestScreen,
+} from '@/test/navigationFocus'
 import { renderScreen } from '@/test/renderScreen'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
@@ -46,14 +53,14 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   return platform
 })
 jest.mock('expo-router', () => ({
+  ...jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').navigationFocusMocks,
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => mockParams(),
 }))
-// The fork's requestTVFocus is native; what matters is which card asks for the focus, and when.
-const mockRequestTVFocus = jest.fn<(instance: unknown) => void>()
-jest.mock('@/layouts/tvFocus', () => ({
-  requestTVFocus: (instance: unknown) => mockRequestTVFocus(instance),
-}))
+jest.mock(
+  '@/layouts/tvFocus',
+  () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
+)
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
@@ -93,12 +100,6 @@ const layOut = async () => {
     }, Promise.resolve())
 }
 
-/** The cards that asked for the remote's focus after a jump, by title, in order. */
-const askedFor = (): unknown[] =>
-  mockRequestTVFocus.mock.calls.map(([instance]) =>
-    isRecord(instance) && isRecord(instance.props) ? instance.props.accessibilityLabel : instance,
-  )
-
 const renderLibrary = async ({ id }: { id: number }) => {
   mockParams.mockReturnValue({ [APP_ROUTE_PARAMS.id]: String(id) })
   const rendered = await renderScreen({ ui: <Library /> })
@@ -111,7 +112,7 @@ describe('Library on a TV', () => {
     jest.restoreAllMocks()
     mockServer.requests = []
     mockServer.libraries = []
-    mockRequestTVFocus.mockClear()
+    resetTestScreen()
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
     useLibraryViews.setState({ choices: {} })
   })
@@ -131,7 +132,9 @@ describe('Library on a TV', () => {
 
     await fireEvent(screen.getByRole('button', { name: 'Ashfall Gate' }), NATIVE_EVENTS.focus)
     await fireEvent.changeText(field, FILM_SEARCHES.busboys)
-    await fireEvent(field, NATIVE_EVENTS.submitEditing)
+    await fireEvent(field, NATIVE_EVENTS.submitEditing, {
+      nativeEvent: { text: FILM_SEARCHES.busboys },
+    })
     expect(mockServer.requests).toContain(
       libraryPath({
         call: APP_CLIENT_CALLS.listMedia,
@@ -259,7 +262,9 @@ describe('Library on a TV', () => {
 
     const field = screen.getByLabelText('Search Films')
     await fireEvent.changeText(field, FILM_SEARCHES.busboys)
-    await fireEvent(field, NATIVE_EVENTS.submitEditing)
+    await fireEvent(field, NATIVE_EVENTS.submitEditing, {
+      nativeEvent: { text: FILM_SEARCHES.busboys },
+    })
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Night Train' })).toBeNull())
     expect(screen.getByRole('button', { name: 'Busboys' }).props.hasTVPreferredFocus).not.toBe(true)
   })
@@ -296,5 +301,29 @@ describe('Library on a TV', () => {
       ).toBe(true),
     )
     expect(screen.queryByLabelText('Sort')).toBeNull()
+  })
+
+  it('takes the focus back to the card a page was opened from, and to no other', async () => {
+    await renderLibrary({ id: FILMS.id })
+    const card = await screen.findByRole('button', { name: 'Night Train' })
+    await fireEvent(card, NATIVE_EVENTS.focus)
+    await fireEvent.press(card)
+    await leaveTestScreen()
+    expect(askedFor()).toEqual([])
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Night Train'])
+    expect(preferred(FILM_TITLES)).toEqual([])
+  })
+
+  it('takes it back to a card of the list view too', async () => {
+    useLibraryViews
+      .getState()
+      .choose({ serverId: NAS.id, libraryId: FILMS.id, change: { view: LIBRARY_VIEWS.list } })
+    await renderLibrary({ id: FILMS.id })
+    const card = await screen.findByRole('button', { name: 'Busboys' })
+    await fireEvent.press(card)
+    await leaveTestScreen()
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Busboys'])
   })
 })

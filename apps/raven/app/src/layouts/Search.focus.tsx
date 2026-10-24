@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 
+import { useScreenFocusScope } from '@/layouts/focus'
 import { formStyles } from '@/layouts/formStyles'
 import {
   CLEAR_SEARCH,
@@ -46,7 +47,7 @@ const SearchField = ({
             setFocused(true)
             onFocused()
           }}
-          onSubmitEditing={() => search.searchNow()}
+          onSubmitEditing={({ nativeEvent }) => search.searchFor(nativeEvent.text)}
           placeholder={label}
           placeholderTextColor={COLOURS.muted}
           returnKeyType="search"
@@ -72,19 +73,14 @@ const SearchField = ({
  * once the field has had the focus, results that arrive leave it where the viewer put it.
  */
 const SearchLayout = ({ title, label, search, notice, children }: SearchLayoutProps) => {
-  const [isOpening, setOpening] = useState(true)
+  const { isOpening, settle } = useScreenFocusScope()
   return (
     <ScrollView contentContainerStyle={styles.page} style={styles.ground}>
       <View style={styles.header}>
         <Text accessibilityRole="header" style={styles.title}>
           {title}
         </Text>
-        <SearchField
-          isPreferred={isOpening}
-          label={label}
-          onFocused={() => setOpening(false)}
-          search={search}
-        />
+        <SearchField isPreferred={isOpening} label={label} onFocused={settle} search={search} />
         {notice !== null && <Text style={styles.notice}>{notice}</Text>}
       </View>
       {children}

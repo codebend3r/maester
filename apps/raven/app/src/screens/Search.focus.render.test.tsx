@@ -7,6 +7,13 @@ import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import type { HeardRequest } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
+import type * as NavigationFocus from '@/test/navigationFocus'
+import {
+  askedFor,
+  leaveTestScreen,
+  resetTestScreen,
+  returnToTestScreen,
+} from '@/test/navigationFocus'
 import { DUNE_QUERY, isSearch, searchApi, searchPathFor } from '@/test/searchServer'
 import { renderScreen } from '@/test/renderScreen'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
@@ -29,7 +36,14 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   Object.defineProperty(platform.default, 'isTV', { get: () => true })
   return platform
 })
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), back: jest.fn() }) }))
+jest.mock('expo-router', () => ({
+  ...jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').navigationFocusMocks,
+  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+}))
+jest.mock(
+  '@/layouts/tvFocus',
+  () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
+)
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: AppServer) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
@@ -65,6 +79,7 @@ describe('Search on a TV', () => {
   beforeEach(() => {
     jest.useFakeTimers()
     jest.clearAllMocks()
+    resetTestScreen()
     mockServer.heard = []
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
@@ -85,7 +100,7 @@ describe('Search on a TV', () => {
     expect(preferred()).toEqual([])
 
     await fireEvent.changeText(field, DUNE_QUERY)
-    await fireEvent(field, NATIVE_EVENTS.submitEditing)
+    await fireEvent(field, NATIVE_EVENTS.submitEditing, { nativeEvent: { text: DUNE_QUERY } })
     expect(searches()).toEqual([searchPathFor(DUNE_QUERY)])
     expect(await screen.findByRole('button', { name: 'Dune' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Dune: Prophecy' })).toBeTruthy()
@@ -114,5 +129,20 @@ describe('Search on a TV', () => {
     expect(screen.getByLabelText(FIELD).props.value).toBe('')
     await pause(SEARCH_DELAY_MS * 5)
     expect(searches()).toEqual([])
+  })
+
+  it('takes the focus back to the result a page was opened from', async () => {
+    await renderScreen({ ui: <Search /> })
+    const field = screen.getByLabelText(FIELD)
+    await fireEvent(field, NATIVE_EVENTS.focus)
+    await fireEvent.changeText(field, DUNE_QUERY)
+    await fireEvent(field, NATIVE_EVENTS.submitEditing, { nativeEvent: { text: DUNE_QUERY } })
+    const show = await screen.findByRole('button', { name: 'Dune: Prophecy' })
+    await fireEvent(show, NATIVE_EVENTS.focus)
+    await fireEvent.press(show)
+    await leaveTestScreen()
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Dune: Prophecy'])
+    expect(preferred()).toEqual([])
   })
 })

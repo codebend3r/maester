@@ -1,6 +1,11 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
+import type { ShelfCard } from '@/queries/cards'
+import type { ShelfView } from '@/queries/homeShelves'
+
+import { FocusBand } from '@/layouts/FocusBand'
 import { FOCUS_CARD_WIDTHS, FocusCard } from '@/layouts/FocusCard'
+import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import {
   NOTHING_HERE,
   SEARCH_EVERY_LIBRARY,
@@ -16,33 +21,42 @@ import { COLOURS, SIZES } from '@/theme/appTheme'
 /**
  * Home's shelves under its title and, beside it, the way into the search. That is drawn only
  * once the shelves are read, with them: drawn alone, it would be all tvOS had to give the
- * opening focus to, which belongs to the first card.
+ * opening focus to, which belongs to the first card. Anything here taking the focus spends the
+ * opening focus, so a shelf drawn later never pulls the focus back.
  */
-const Shelves = ({ title, notice, isLoading, onSearch, children }: ShelvesProps) => (
-  <ScrollView contentContainerStyle={styles.shelves} style={styles.ground}>
-    <View style={styles.pageRow}>
-      <Text accessibilityRole="header" style={styles.pageTitle}>
-        {title}
-      </Text>
-      {!isLoading && (
-        <PlateButton
-          label={SEARCH_EVERY_LIBRARY.label}
-          onPress={onSearch}
-          accessibilityRole="link"
-          text={SEARCH_EVERY_LIBRARY.text}
-        />
-      )}
-    </View>
-    {notice !== null && <Text style={styles.notice}>{notice}</Text>}
-    {children}
-  </ScrollView>
-)
+const Shelves = ({ title, notice, isLoading, onSearch, children }: ShelvesProps) => {
+  const { settle } = useScreenFocusScope()
+  return (
+    <ScrollView contentContainerStyle={styles.shelves} style={styles.ground}>
+      <View style={styles.pageRow}>
+        <Text accessibilityRole="header" style={styles.pageTitle}>
+          {title}
+        </Text>
+        {!isLoading && (
+          <PlateButton
+            label={SEARCH_EVERY_LIBRARY.label}
+            onFocused={settle}
+            onPress={onSearch}
+            accessibilityRole="link"
+            text={SEARCH_EVERY_LIBRARY.text}
+          />
+        )}
+      </View>
+      {notice !== null && <Text style={styles.notice}>{notice}</Text>}
+      {children}
+    </ScrollView>
+  )
+}
 
 /**
  * A shelf's title, and after a library's the way into the library, which the remote reaches
  * above the row, as the web's shelf heading links to it.
  */
-const ShelfTitle = ({ shelf, onOpenLibrary }: Pick<ShelfProps, 'shelf' | 'onOpenLibrary'>) => {
+const ShelfTitle = ({
+  shelf,
+  onOpenLibrary,
+  onFocused,
+}: Pick<ShelfProps, 'shelf' | 'onOpenLibrary'> & { onFocused: () => void }) => {
   const { libraryId } = shelf
   return (
     <View style={styles.titleRow}>
@@ -53,6 +67,7 @@ const ShelfTitle = ({ shelf, onOpenLibrary }: Pick<ShelfProps, 'shelf' | 'onOpen
         <Pressable
           accessibilityLabel={seeAllLabelOf(shelf.title)}
           accessibilityRole="link"
+          onFocus={onFocused}
           onPress={() => onOpenLibrary(libraryId)}
           style={({ focused }) => [styles.seeAll, focused && styles.focusedLink]}
         >
@@ -67,31 +82,46 @@ const ShelfTitle = ({ shelf, onOpenLibrary }: Pick<ShelfProps, 'shelf' | 'onOpen
   )
 }
 
-/** A shelf the remote moves along: its title, then one row, scrolled as focus moves. */
-const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) => (
-  <View style={styles.shelf}>
-    <ShelfTitle shelf={shelf} onOpenLibrary={onOpenLibrary} />
-    {shelf.cards.length === 0 ? (
-      <Text style={styles.notice}>{NOTHING_HERE}</Text>
-    ) : (
-      <ScrollView
-        contentContainerStyle={styles.row}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
-        {shelf.cards.map((card, index) => (
-          <FocusCard
-            key={card.key}
-            card={card}
-            isPreferred={isFirst && index === 0}
-            onPress={() => onOpen(card)}
-            width={FOCUS_CARD_WIDTHS[card.shape]}
-          />
-        ))}
-      </ScrollView>
-    )}
-  </View>
-)
+/** Where a card sits on its screen: one title can sit on two shelves, as Continue watching's do. */
+const placeOf = ({ shelf, card }: { shelf: ShelfView; card: ShelfCard }): string =>
+  `${shelf.key}/${card.key}`
+
+/**
+ * A shelf the remote moves along: its title, then one row, scrolled as focus moves. The row is a
+ * band the width of the screen, so the remote coming down or up into it from anywhere lands on
+ * a card: the first, or the one it last left there.
+ */
+const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) => {
+  const { isOpening, settle } = useOpeningFocus()
+  return (
+    <View style={styles.shelf}>
+      <ShelfTitle onFocused={settle} onOpenLibrary={onOpenLibrary} shelf={shelf} />
+      {shelf.cards.length === 0 ? (
+        <Text style={styles.notice}>{NOTHING_HERE}</Text>
+      ) : (
+        <FocusBand>
+          <ScrollView
+            contentContainerStyle={styles.row}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            {shelf.cards.map((card, index) => (
+              <FocusCard
+                key={card.key}
+                card={card}
+                isPreferred={isOpening && isFirst && index === 0}
+                onFocused={settle}
+                onPress={() => onOpen(card)}
+                place={placeOf({ shelf, card })}
+                width={FOCUS_CARD_WIDTHS[card.shape]}
+              />
+            ))}
+          </ScrollView>
+        </FocusBand>
+      )}
+    </View>
+  )
+}
 
 /**
  * Home on a TV: shelves down the screen, each a row the remote moves along, never the touch

@@ -18,6 +18,7 @@
     "app:dev:ipad": "nx run @raven/app:dev:ipad",
     "app:dev:tvos": "nx run @raven/app:dev:tvos",
     "app:e2e": "nx run @raven/app:e2e",
+    "app:e2e:tvos": "nx run @raven/app:e2e:tvos",
     "app:prebuild:android-tv": "nx run @raven/app:prebuild:android-tv",
     "app:prebuild:ios": "nx run @raven/app:prebuild:ios",
     "app:prebuild:tvos": "nx run @raven/app:prebuild:tvos",

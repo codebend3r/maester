@@ -32,7 +32,7 @@ const SearchField = ({ search, label, isPreferred = false }: SearchFieldProps) =
       autoFocus={isPreferred}
       autoCorrect={false}
       onChangeText={search.setText}
-      onSubmitEditing={() => search.searchNow()}
+      onSubmitEditing={({ nativeEvent }) => search.searchFor(nativeEvent.text)}
       placeholder={label}
       placeholderTextColor={COLOURS.muted}
       returnKeyType="search"
