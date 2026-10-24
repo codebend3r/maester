@@ -1,12 +1,12 @@
-import { DEFAULT_THEME } from '@raven/core'
+import { DEFAULT_THEME, THEMES, type ThemeId, type ThemeTone, themeOf } from '@raven/core'
 import { designTokens, themeTokens } from '@raven/ui/designTokens'
 
 import { nativeTokens } from '@/theme/nativeTokens'
+import { OVER_PICTURE_TOKENS, PALETTE_TOKENS } from '@/theme/tokenNames'
 
-const { numbers, colours: fixedColours } = nativeTokens(
+const { numbers, colours: rootColours } = nativeTokens(
   Object.fromEntries(designTokens.map(({ name, value }) => [name, value])),
 )
-const { colours } = nativeTokens(themeTokens[DEFAULT_THEME] ?? {})
 
 /**
  * The token `name` from `tokens`. One the stylesheets dropped or renamed fails the app as
@@ -18,27 +18,69 @@ const tokenOf = <T>({ tokens, name }: { tokens: Readonly<Record<string, T>>; nam
   return value
 }
 
-const colour = (name: string): string => tokenOf({ tokens: colours, name })
 const size = (name: string): number => tokenOf({ tokens: numbers, name })
-/** A colour every theme shares, as what sits on a picture does. */
-const fixedColour = (name: string): string => tokenOf({ tokens: fixedColours, name })
 
-/** The default theme's colours the screens paint with, by what they are for. */
-export const COLOURS = {
-  ground: colour('--color-night'),
-  deep: colour('--color-deep'),
-  raised: colour('--color-canopy'),
-  line: colour('--color-moss-line'),
-  text: colour('--color-bark'),
-  muted: colour('--color-lichen'),
-  accent: colour('--color-leaf'),
-  onAccent: colour('--color-on-leaf'),
-  quiet: colour('--color-moss'),
-  notice: colour('--color-amber'),
-  error: colour('--color-leaf-bright'),
-  track: colour('--color-moss'),
-  onPicture: fixedColour('--color-on-picture'),
-} as const
+/** A colour globals.scss gives every theme alike. */
+const fixed = (name: string): string => tokenOf({ tokens: rootColours, name })
+
+export type Palette = Record<keyof typeof PALETTE_TOKENS, string>
+
+/**
+ * A theme as the app wears it: its colours, the ones it wears over the video, and whether its
+ * ground is light or dark, which picks the logo drawn for it and how the system draws over it.
+ */
+export type AppTheme = { id: ThemeId; palette: Palette; overPicture: Palette; tone: ThemeTone }
+
+/** A theme's colours, read from themes.scss through the built `themeTokens`, never copied. */
+const paletteOf = (id: ThemeId): Palette => {
+  const { colours } = nativeTokens(themeTokens[id] ?? {})
+  const colour = (name: string): string => tokenOf({ tokens: colours, name })
+  return {
+    ground: colour(PALETTE_TOKENS.ground),
+    deep: colour(PALETTE_TOKENS.deep),
+    raised: colour(PALETTE_TOKENS.raised),
+    line: colour(PALETTE_TOKENS.line),
+    text: colour(PALETTE_TOKENS.text),
+    muted: colour(PALETTE_TOKENS.muted),
+    accent: colour(PALETTE_TOKENS.accent),
+    onAccent: colour(PALETTE_TOKENS.onAccent),
+    quiet: colour(PALETTE_TOKENS.quiet),
+    notice: colour(PALETTE_TOKENS.notice),
+    error: colour(PALETTE_TOKENS.error),
+    track: colour(PALETTE_TOKENS.track),
+    played: colour(PALETTE_TOKENS.played),
+  }
+}
+
+/** `palette` over the video: the player's dark glass and on-picture text, the same in every theme. */
+const overPictureOf = (palette: Palette): Palette => ({
+  ...palette,
+  ground: fixed(OVER_PICTURE_TOKENS.ground),
+  deep: fixed(OVER_PICTURE_TOKENS.deep),
+  raised: fixed(OVER_PICTURE_TOKENS.raised),
+  quiet: fixed(OVER_PICTURE_TOKENS.quiet),
+  line: fixed(OVER_PICTURE_TOKENS.line),
+  track: fixed(OVER_PICTURE_TOKENS.track),
+  text: fixed(OVER_PICTURE_TOKENS.text),
+  muted: fixed(OVER_PICTURE_TOKENS.muted),
+})
+
+const appThemeFor = ({ id, tone }: { id: ThemeId; tone: ThemeTone }): AppTheme => {
+  const palette = paletteOf(id)
+  return { id, palette, overPicture: overPictureOf(palette), tone }
+}
+
+/** Every theme the app can wear, made once as it loads, so each is the same object every time. */
+export const APP_THEMES: readonly AppTheme[] = THEMES.map(appThemeFor)
+
+// Every id has its theme above; this is what `find` falls back on to say so to the compiler.
+const DEFAULT_APP_THEME: AppTheme =
+  APP_THEMES.find(({ id }) => id === DEFAULT_THEME) ??
+  appThemeFor({ id: DEFAULT_THEME, tone: themeOf(DEFAULT_THEME).tone })
+
+/** The theme by its id, the same object for the same id. */
+export const appThemeOf = (id: ThemeId): AppTheme =>
+  APP_THEMES.find((theme) => theme.id === id) ?? DEFAULT_APP_THEME
 
 /** The shared scale's lengths, in points, named as the web's custom properties are. */
 export const SIZES = {

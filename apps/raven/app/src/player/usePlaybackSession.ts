@@ -240,7 +240,7 @@ export const usePlaybackSession = ({
     const mode = modeOf(state)
     if (state.phase !== SESSION_PHASES.sourcing || mode === null) return () => undefined
     const { at: from } = state
-    sources.source({ media, mode, audio: state.audio, quality: null }).then(
+    sources.source({ media, mode, audio: state.audio }).then(
       (outcome) => {
         if (status.isCurrent) dispatch({ type: SESSION_EVENTS.sourced, attempt: asked, outcome })
       },

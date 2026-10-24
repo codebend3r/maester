@@ -19,7 +19,8 @@ import {
 } from '@/layouts/gridKit'
 import { GRID_ROWS, type GridRow, gridColumnsOf } from '@/layouts/gridRows'
 import { useGrid } from '@/layouts/useGrid'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { SIZES } from '@/theme/appTheme'
+import { themedStyles } from '@/theme/useTheme'
 
 const GUTTER = SIZES.space3
 const GAP = SIZES.space3
@@ -56,26 +57,29 @@ const RowCard = ({
   card: ShelfCard
   hasPicture: boolean
   onPress: () => void
-}) => (
-  <Pressable
-    accessibilityLabel={card.title}
-    accessibilityRole="button"
-    onPress={onPress}
-    style={({ pressed }) => [styles.rowCard, pressed && styles.pressed]}
-  >
-    {hasPicture && <CardPicture card={card} width={TILE_WIDTHS[card.shape]} />}
-    <View style={styles.words}>
-      <Text numberOfLines={1} style={styles.rowTitle}>
-        {card.title}
-      </Text>
-      {card.line !== null && (
-        <Text numberOfLines={1} style={styles.rowLine}>
-          {card.line}
+}) => {
+  const styles = useStyles()
+  return (
+    <Pressable
+      accessibilityLabel={card.title}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.rowCard, pressed && styles.pressed]}
+    >
+      {hasPicture && <CardPicture card={card} width={TILE_WIDTHS[card.shape]} />}
+      <View style={styles.words}>
+        <Text numberOfLines={1} style={styles.rowTitle}>
+          {card.title}
         </Text>
-      )}
-    </View>
-  </Pressable>
-)
+        {card.line !== null && (
+          <Text numberOfLines={1} style={styles.rowLine}>
+            {card.line}
+          </Text>
+        )}
+      </View>
+    </Pressable>
+  )
+}
 
 /**
  * A strip down the right edge, as the web's, of the steps the order runs through, fitted to
@@ -94,6 +98,7 @@ const JumpStrip = ({
   onJump: (keys: ReadonlySet<string>) => void
 }) => {
   const labelHeight = linesHeightOf({ sizes: [SIZES.textXs], fontScale })
+  const styles = useStyles()
   const unit = jump.unit === null ? 0 : labelHeight
   const { height, marks } = fitJumpMarks({ scale: jump, room: room - unit, labelHeight })
   return (
@@ -138,6 +143,7 @@ const Grid = ({
 }: GridProps) => {
   const screen = useWindowDimensions()
   const insets = useSafeAreaInsets()
+  const styles = useStyles()
   const [top, setTop] = useState(0)
   // The strip's slot runs between the top and bottom insets; until it is laid out, that is
   // the window's height between them.
@@ -280,52 +286,58 @@ const Grid = ({
 /** A library on a phone or tablet. */
 export const touchGrid: GridKit = { Grid }
 
-const styles = StyleSheet.create({
-  ground: { flex: 1, backgroundColor: COLOURS.ground },
-  header: { gap: SIZES.space2, paddingBottom: SIZES.space4 },
-  title: { color: COLOURS.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
-  line: { color: COLOURS.muted, fontSize: SIZES.textSm },
-  toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space1 },
-  notice: { color: COLOURS.muted, fontSize: SIZES.text },
-  pressed: { opacity: 0.6 },
-  bucket: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space1 },
-  chevron: { color: COLOURS.muted, fontSize: SIZES.text, width: SIZES.space3 },
-  bucketTitle: {
-    flexShrink: 1,
-    color: COLOURS.text,
-    fontSize: SIZES.textLg,
-    lineHeight: SIZES.textLg * LINE_RATIO,
-    fontWeight: 'bold',
-  },
-  count: { color: COLOURS.muted, fontSize: SIZES.textSm },
-  cards: { flexDirection: 'row', gap: GAP },
-  rowCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SIZES.space2,
-    paddingVertical: SIZES.space2,
-  },
-  words: { flex: 1 },
-  rowTitle: {
-    color: COLOURS.text,
-    fontSize: SIZES.text,
-    lineHeight: SIZES.text * LINE_RATIO,
-    fontWeight: '600',
-  },
-  rowLine: { color: COLOURS.muted, fontSize: SIZES.textXs, lineHeight: SIZES.textXs * LINE_RATIO },
-  stripSlot: { position: 'absolute', width: STRIP_WIDTH, justifyContent: 'center' },
-  strip: { alignItems: 'center' },
-  unit: { color: COLOURS.muted, fontSize: SIZES.textXs, lineHeight: SIZES.textXs * LINE_RATIO },
-  mark: {
-    minWidth: STRIP_WIDTH,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  markLabel: {
-    color: COLOURS.muted,
-    fontSize: SIZES.textXs,
-    lineHeight: SIZES.textXs * LINE_RATIO,
-    fontWeight: '600',
-  },
-  markEmpty: { color: COLOURS.line },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    ground: { flex: 1, backgroundColor: colours.ground },
+    header: { gap: SIZES.space2, paddingBottom: SIZES.space4 },
+    title: { color: colours.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
+    line: { color: colours.muted, fontSize: SIZES.textSm },
+    toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space1 },
+    notice: { color: colours.muted, fontSize: SIZES.text },
+    pressed: { opacity: 0.6 },
+    bucket: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space1 },
+    chevron: { color: colours.muted, fontSize: SIZES.text, width: SIZES.space3 },
+    bucketTitle: {
+      flexShrink: 1,
+      color: colours.text,
+      fontSize: SIZES.textLg,
+      lineHeight: SIZES.textLg * LINE_RATIO,
+      fontWeight: 'bold',
+    },
+    count: { color: colours.muted, fontSize: SIZES.textSm },
+    cards: { flexDirection: 'row', gap: GAP },
+    rowCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SIZES.space2,
+      paddingVertical: SIZES.space2,
+    },
+    words: { flex: 1 },
+    rowTitle: {
+      color: colours.text,
+      fontSize: SIZES.text,
+      lineHeight: SIZES.text * LINE_RATIO,
+      fontWeight: '600',
+    },
+    rowLine: {
+      color: colours.muted,
+      fontSize: SIZES.textXs,
+      lineHeight: SIZES.textXs * LINE_RATIO,
+    },
+    stripSlot: { position: 'absolute', width: STRIP_WIDTH, justifyContent: 'center' },
+    strip: { alignItems: 'center' },
+    unit: { color: colours.muted, fontSize: SIZES.textXs, lineHeight: SIZES.textXs * LINE_RATIO },
+    mark: {
+      minWidth: STRIP_WIDTH,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    markLabel: {
+      color: colours.muted,
+      fontSize: SIZES.textXs,
+      lineHeight: SIZES.textXs * LINE_RATIO,
+      fontWeight: '600',
+    },
+    markEmpty: { color: colours.line },
+  }),
+)

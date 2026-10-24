@@ -1,22 +1,32 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { THEME_TONES } from '@raven/core'
 import { configureStorage, createQueryClient } from '@raven/ui/headless'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
+import { hideAsync, preventAutoHideAsync } from 'expo-splash-screen'
 import { useEffect, useState } from 'react'
-import { View } from 'react-native'
+import { Appearance, StatusBar } from 'react-native'
 
 import { clearOnServerSwitch } from '@/queries/serverCache'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useUnlockRoute } from '@/queries/useUnlockRoute'
 import { APP_ROUTES, APP_SCREENS } from '@/routes'
 import { useActiveServer } from '@/stores/activeServer'
+import { configureAppPrefs } from '@/stores/appPrefs'
 import { configureLibraryViews } from '@/stores/libraryViews'
 import { followReduceMotion } from '@/stores/reduceMotion'
 import { returnScreen } from '@/stores/screenFocus'
-import { COLOURS } from '@/theme/appTheme'
+import type { AppTheme } from '@/theme/appTheme'
+import { followTheme, useTheme } from '@/theme/useTheme'
 
 /** One cache for the app's life, emptied whenever the active server changes. */
 const queryClient = createQueryClient()
+
+/** A splash the system cannot hold or hide leaves the app as it is: the next frame is raven's. */
+const SPLASH_IGNORED = (): void => undefined
+
+// The splash stays up until the stores are read, so the theme picked is the first thing drawn.
+preventAutoHideAsync().catch(SPLASH_IGNORED)
 
 const loadStores = async (): Promise<void> => {
   // A store whose storage cannot be read starts from its defaults rather than holding
@@ -24,6 +34,7 @@ const loadStores = async (): Promise<void> => {
   await Promise.allSettled([
     configureStorage({ storage: AsyncStorage }),
     configureLibraryViews({ storage: AsyncStorage }),
+    configureAppPrefs({ storage: AsyncStorage }),
     useActiveServer.persist.rehydrate(),
   ])
 }
@@ -34,6 +45,12 @@ const ServerEvents = ({ session }: { session: AppQueries }) => {
   return null
 }
 
+/**
+ * Has the system draw what it draws for raven (alerts, action sheets, keyboards, the TV's own
+ * focused fields) light or dark as the theme's ground is.
+ */
+const wearSystemLook = ({ tone }: AppTheme) => Appearance.setColorScheme(tone)
+
 const UnlockRoute = () => {
   useUnlockRoute()
   return null
@@ -41,11 +58,16 @@ const UnlockRoute = () => {
 
 /**
  * Loads what the app keeps on the device before any route renders, then the routes. Every
- * route but sign-in needs a server, so without one they send the viewer to sign in.
+ * route but sign-in needs a server, so without one they send the viewer to sign in. Until the
+ * prefs are read the splash stays up and the app paints nothing, so the first frame of a theme
+ * is the one picked, never the default's on its way to it; the splash goes once that frame is
+ * drawn, and after that a theme picked in Settings repaints everything at once.
  */
 export const AppRoot = () => {
   const [isLoaded, setLoaded] = useState(false)
   const session = useAppQueries()
+  const ground = useTheme((theme) => theme.palette.ground)
+  const tone = useTheme((theme) => theme.tone)
 
   useEffect(() => {
     const show = () => setLoaded(true)
@@ -53,10 +75,15 @@ export const AppRoot = () => {
   }, [])
   useEffect(() => clearOnServerSwitch({ client: queryClient, store: useActiveServer }), [])
   useEffect(() => followReduceMotion(), [])
+  useEffect(() => (isLoaded ? followTheme({ apply: wearSystemLook }) : undefined), [isLoaded])
+  useEffect(() => {
+    if (isLoaded) hideAsync().catch(SPLASH_IGNORED)
+  }, [isLoaded])
 
-  if (!isLoaded) return <View style={{ flex: 1, backgroundColor: COLOURS.ground }} />
+  if (!isLoaded) return null
   return (
     <QueryClientProvider client={queryClient}>
+      <StatusBar barStyle={tone === THEME_TONES.light ? 'dark-content' : 'light-content'} />
       {session !== null && <ServerEvents key={session.server.id} session={session} />}
       <UnlockRoute />
       {/* A screen's opening focus comes back once the transition that reveals it has ended:
@@ -67,7 +94,7 @@ export const AppRoot = () => {
             if (target !== undefined && !data.closing) returnScreen({ screen: target })
           },
         }}
-        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLOURS.ground } }}
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: ground } }}
       >
         <Stack.Protected guard={session !== null} redirectTo={APP_ROUTES.signIn}>
           <Stack.Screen name={APP_SCREENS.home} />
@@ -75,6 +102,7 @@ export const AppRoot = () => {
           <Stack.Screen name={APP_SCREENS.library} />
           <Stack.Screen name={APP_SCREENS.play} />
           <Stack.Screen name={APP_SCREENS.search} />
+          <Stack.Screen name={APP_SCREENS.settings} />
           <Stack.Screen name={APP_SCREENS.unlock} />
         </Stack.Protected>
       </Stack>

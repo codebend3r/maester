@@ -1,3 +1,4 @@
+import { type ComponentRef, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import type { ShelfCard } from '@/queries/cards'
@@ -5,42 +6,74 @@ import type { ShelfView } from '@/queries/homeShelves'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
-import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
+import { useOpenerFocus, useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import {
   NOTHING_HERE,
   SEARCH_EVERY_LIBRARY,
   SEE_ALL,
+  SETTINGS_ENTRY,
   type ShelfKit,
   type ShelfProps,
   type ShelvesProps,
   seeAllLabelOf,
 } from '@/layouts/shelfKit'
+import { Logo } from '@/layouts/Logo'
 import { PlateButton } from '@/layouts/tvControls'
-import { COLOURS } from '@/theme/appTheme'
 import { TV_SIZES } from '@/theme/tvSizes'
+import { themedStyles } from '@/theme/useTheme'
+
+/** Where the Settings entry sits on Home, a place no shelf's card shares. */
+const SETTINGS_PLACE = 'settings'
 
 /**
- * Home's shelves under its title and, beside it, the way into the search. That is drawn only
- * once the shelves are read, with them: drawn alone, it would be all tvOS had to give the
- * opening focus to, which belongs to the first card. Anything here taking the focus spends the
- * opening focus, so a shelf drawn later never pulls the focus back.
+ * The way into Settings, which takes the remote's focus back when Settings goes, as a card does
+ * for the screen it opened: Android TV restores nothing on its own.
  */
-const Shelves = ({ title, notice, isLoading, onSearch, children }: ShelvesProps) => {
+const SettingsEntry = ({ onPress, onFocused }: { onPress: () => void; onFocused: () => void }) => {
+  const view = useRef<ComponentRef<typeof Pressable>>(null)
+  const { remember } = useOpenerFocus({ place: SETTINGS_PLACE, view })
+  return (
+    <PlateButton
+      ref={view}
+      accessibilityRole="link"
+      label={SETTINGS_ENTRY.label}
+      onFocused={onFocused}
+      onPress={() => {
+        remember()
+        onPress()
+      }}
+      text={SETTINGS_ENTRY.label}
+    />
+  )
+}
+
+/**
+ * Home's shelves under its title and, beside it, the ways into the search and Settings. Those
+ * are drawn only once the shelves are read, with them: drawn alone, they would be all tvOS had
+ * to give the opening focus to, which belongs to the first card. Anything here taking the focus
+ * spends the opening focus, so a shelf drawn later never pulls the focus back.
+ */
+const Shelves = ({ title, notice, isLoading, onSearch, onSettings, children }: ShelvesProps) => {
   const { settle } = useScreenFocusScope()
+  const styles = useStyles()
   return (
     <ScrollView contentContainerStyle={styles.shelves} style={styles.ground}>
       <View style={styles.pageRow}>
+        <Logo width={TV_SIZES.textXl} />
         <Text accessibilityRole="header" style={styles.pageTitle}>
           {title}
         </Text>
         {!isLoading && (
-          <PlateButton
-            label={SEARCH_EVERY_LIBRARY.label}
-            onFocused={settle}
-            onPress={onSearch}
-            accessibilityRole="link"
-            text={SEARCH_EVERY_LIBRARY.text}
-          />
+          <>
+            <PlateButton
+              label={SEARCH_EVERY_LIBRARY.label}
+              onFocused={settle}
+              onPress={onSearch}
+              accessibilityRole="link"
+              text={SEARCH_EVERY_LIBRARY.text}
+            />
+            <SettingsEntry onFocused={settle} onPress={onSettings} />
+          </>
         )}
       </View>
       {notice !== null && <Text style={styles.notice}>{notice}</Text>}
@@ -59,6 +92,7 @@ const ShelfTitle = ({
   onFocused,
 }: Pick<ShelfProps, 'shelf' | 'onOpenLibrary'> & { onFocused: () => void }) => {
   const { libraryId } = shelf
+  const styles = useStyles()
   return (
     <View style={styles.titleRow}>
       <Text accessibilityRole="header" style={styles.shelfTitle}>
@@ -94,6 +128,7 @@ const placeOf = ({ shelf, card }: { shelf: ShelfView; card: ShelfCard }): string
  */
 const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) => {
   const { isOpening, settle } = useOpeningFocus()
+  const styles = useStyles()
   return (
     <View style={styles.shelf}>
       <ShelfTitle onFocused={settle} onOpenLibrary={onOpenLibrary} shelf={shelf} />
@@ -131,38 +166,40 @@ const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) =>
  */
 export const focusShelf: ShelfKit = { Shelves, Shelf }
 
-const styles = StyleSheet.create({
-  ground: { flex: 1, backgroundColor: COLOURS.ground },
-  shelves: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
-  pageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: TV_SIZES.space5,
-    paddingHorizontal: TV_SIZES.space8,
-  },
-  pageTitle: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  notice: { color: COLOURS.muted, fontSize: TV_SIZES.textLg, paddingHorizontal: TV_SIZES.space8 },
-  shelf: { gap: TV_SIZES.space1 },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: TV_SIZES.space3,
-    paddingHorizontal: TV_SIZES.space8,
-  },
-  shelfTitle: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  seeAll: {
-    paddingHorizontal: TV_SIZES.space2,
-    paddingVertical: TV_SIZES.space0,
-    borderRadius: TV_SIZES.radius,
-    borderWidth: TV_SIZES.tvFocusRing,
-    borderColor: 'transparent',
-  },
-  focusedLink: { borderColor: COLOURS.text, backgroundColor: COLOURS.quiet },
-  seeAllLabel: { color: COLOURS.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
-  focusedLabel: { color: COLOURS.text },
-  row: {
-    gap: TV_SIZES.space5,
-    paddingHorizontal: TV_SIZES.space8,
-    paddingVertical: TV_SIZES.space4,
-  },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    ground: { flex: 1, backgroundColor: colours.ground },
+    shelves: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
+    pageRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: TV_SIZES.space5,
+      paddingHorizontal: TV_SIZES.space8,
+    },
+    pageTitle: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    notice: { color: colours.muted, fontSize: TV_SIZES.textLg, paddingHorizontal: TV_SIZES.space8 },
+    shelf: { gap: TV_SIZES.space1 },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: TV_SIZES.space3,
+      paddingHorizontal: TV_SIZES.space8,
+    },
+    shelfTitle: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    seeAll: {
+      paddingHorizontal: TV_SIZES.space2,
+      paddingVertical: TV_SIZES.space0,
+      borderRadius: TV_SIZES.radius,
+      borderWidth: TV_SIZES.tvFocusRing,
+      borderColor: 'transparent',
+    },
+    focusedLink: { borderColor: colours.text, backgroundColor: colours.quiet },
+    seeAllLabel: { color: colours.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+    focusedLabel: { color: colours.text },
+    row: {
+      gap: TV_SIZES.space5,
+      paddingHorizontal: TV_SIZES.space8,
+      paddingVertical: TV_SIZES.space4,
+    },
+  }),
+)

@@ -117,7 +117,8 @@ const SEARCH_FILMS = 'Search Films'
 const filmSearches = (): string[] =>
   mockServer.requests.filter(
     (path) =>
-      path.startsWith(libraryPath({ call: listMedia, library: FILMS })) && path.includes('q='),
+      path.startsWith(libraryPath({ call: listMedia, library: FILMS })) &&
+      path.includes(`${APP_ROUTE_PARAMS.query}=`),
   )
 
 /** Types `text` into Films' search box one key at a time, as a keyboard reports it. */

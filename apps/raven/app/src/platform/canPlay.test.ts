@@ -297,3 +297,71 @@ describe('canPlayFor on Android TV', () => {
     ).toEqual([HLS_COPY_AUDIO_CODECS.alac])
   })
 })
+
+describe('canPlaySurely, for a viewer who would rather not try a maybe', () => {
+  const sureOn = ({ platform, media }: { platform: AppPlatform; media: MediaItem }) =>
+    planPlayback({
+      media,
+      canPlay: canPlayFor(platform).canPlaySurely,
+      canStream: canPlayFor(platform).canStream,
+      defaultAudio: true,
+      policy: { directPlay: DIRECT_PLAYS.auto, transcoding: TRANSCODINGS.on },
+    }).modes
+
+  it('leaves HEVC in MP4 or MOV, the same ISO format, to the remux on Apple, and keeps H.264', () => {
+    const hevcIn = (container: string) =>
+      mediaItemFor({
+        container,
+        videoCodec: VIDEO_CODECS.hevc,
+        videoBitDepth: 10,
+        audioCodec: HLS_COPY_AUDIO_CODECS.aac,
+      })
+    const converted = [PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode]
+    expect(sureOn({ platform: APP_PLATFORMS.tvos, media: hevcIn(CONTAINERS.mp4) })).toEqual(
+      converted,
+    )
+    expect(sureOn({ platform: APP_PLATFORMS.ios, media: hevcIn(CONTAINERS.mov) })).toEqual(
+      converted,
+    )
+    const h264 = mediaItemFor({
+      container: CONTAINERS.mp4,
+      videoCodec: VIDEO_CODECS.h264,
+      videoBitDepth: 8,
+      audioCodec: HLS_COPY_AUDIO_CODECS.aac,
+    })
+    expect(sureOn({ platform: APP_PLATFORMS.ios, media: h264 })[0]).toBe(PLAYBACK_MODES.direct)
+  })
+
+  it('leaves TrueHD and DTS to the remux on Android TV, and keeps what ExoPlayer surely plays', () => {
+    const mkvWith = (audioCodec: string) =>
+      mediaItemFor({
+        container: CONTAINERS.mkv,
+        videoCodec: VIDEO_CODECS.hevc,
+        videoBitDepth: 10,
+        audioCodec,
+      })
+    const converted = [PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode]
+    expect(
+      sureOn({ platform: APP_PLATFORMS.androidTv, media: mkvWith(AUDIO_CODECS.truehd) }),
+    ).toEqual(converted)
+    expect(sureOn({ platform: APP_PLATFORMS.androidTv, media: mkvWith(AUDIO_CODECS.dts) })).toEqual(
+      converted,
+    )
+    expect(
+      sureOn({ platform: APP_PLATFORMS.androidTv, media: mkvWith(HLS_COPY_AUDIO_CODECS.eac3) })[0],
+    ).toBe(PLAYBACK_MODES.direct)
+  })
+
+  it('answers every stream as canStream does, since a remux re-tags HEVC and carries AAC', () => {
+    const { canPlaySurely, canStream } = canPlayFor(APP_PLATFORMS.ios)
+    const media = mediaItemFor({
+      container: CONTAINERS.mkv,
+      videoCodec: VIDEO_CODECS.hevc,
+      videoBitDepth: 10,
+      audioCodec: AUDIO_CODECS.truehd,
+    })
+    const stream = streamMimeType({ media, mode: PLAYBACK_MODES.remux })
+    expect(canStream(stream)).toBe(true)
+    expect(canPlaySurely(stream)).toBe(false)
+  })
+})

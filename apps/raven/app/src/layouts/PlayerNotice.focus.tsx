@@ -3,15 +3,16 @@ import { StyleSheet, Text, View } from 'react-native'
 
 import { PLAYER_COPY, type PlayerChromeProps } from '@/layouts/playerKit'
 import { PlateButton } from '@/layouts/tvControls'
-import { COLOURS } from '@/theme/appTheme'
 import { TV_SIZES } from '@/theme/tvSizes'
+import { pictureStyles } from '@/theme/useTheme'
 
 const GUTTER = TV_SIZES.space8
 
 /**
  * A TV player while there is nothing to play (opening, refused, or no way left): the title and
  * the line stand alone with Back, which takes the remote's focus as it appears and lets go once
- * it has had it. Both TV chromes draw it until the video has a source.
+ * it has had it. Both TV chromes draw it until the video has a source. It is dark in every
+ * theme, as the web's page for a video that cannot play, like the player it stands in for.
  */
 export const PlayerNotice = ({
   title,
@@ -19,6 +20,7 @@ export const PlayerNotice = ({
   onBack,
 }: Pick<PlayerChromeProps, 'title' | 'notice' | 'onBack'>) => {
   const [isOpening, setOpening] = useState(true)
+  const styles = useStyles()
   return (
     <View style={styles.page}>
       {title !== '' && (
@@ -34,6 +36,7 @@ export const PlayerNotice = ({
       <View style={styles.actions}>
         <PlateButton
           accessibilityRole="button"
+          isOverPicture
           isPreferred={isOpening}
           label={PLAYER_COPY.leave}
           onFocused={() => setOpening(false)}
@@ -45,19 +48,21 @@ export const PlayerNotice = ({
   )
 }
 
-const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: TV_SIZES.space4,
-    paddingHorizontal: GUTTER,
-    backgroundColor: COLOURS.ground,
-  },
-  title: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  notice: {
-    maxWidth: TV_SIZES.measure,
-    color: COLOURS.text,
-    fontSize: TV_SIZES.textLg,
-  },
-  actions: { flexDirection: 'row' },
-})
+const useStyles = pictureStyles((colours) =>
+  StyleSheet.create({
+    page: {
+      flex: 1,
+      justifyContent: 'center',
+      gap: TV_SIZES.space4,
+      paddingHorizontal: GUTTER,
+      backgroundColor: colours.ground,
+    },
+    title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    notice: {
+      maxWidth: TV_SIZES.measure,
+      color: colours.text,
+      fontSize: TV_SIZES.textLg,
+    },
+    actions: { flexDirection: 'row' },
+  }),
+)

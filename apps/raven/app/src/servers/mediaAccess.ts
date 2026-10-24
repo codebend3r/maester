@@ -6,15 +6,19 @@ import {
   ApiError,
   type ApiClient,
   LOCKED_STATUS,
+  MEDIA_ORIGIN_KINDS,
   MEDIA_PROBE_BYTES,
   MEDIA_PROBE_TIMEOUT_MS,
+  type MaxHeight,
   type MediaAccess,
   type MediaItem,
   type MediaOrigin,
   type OriginProbe,
   PLAYBACK_MODES,
   type PlaybackMode,
+  STREAM_QUALITIES,
   type StreamQuality,
+  isStreamQuality,
   pickOrigin,
   serverOriginOf,
   ticketRenewAt,
@@ -49,8 +53,19 @@ export type SourceRequest = {
   media: Pick<MediaItem, 'id'>
   mode: PlaybackMode
   audio: number | null
-  quality: StreamQuality | null
 }
+
+/**
+ * The size a transcode away from home asks for. The server takes no height, only one of
+ * `STREAM_QUALITIES`, and sizes only a transcode (a remux copies the video). The cap is there to
+ * save data, so it is the size at that height with the fewest bits, never more than the server's
+ * own quality setting would spend. A cap no size is as tall as (4K: the sizes stop at 1080p) asks
+ * for none, and the server's own settings stand.
+ */
+const awayQualityOf = (maxHeight: MaxHeight): StreamQuality | null =>
+  isStreamQuality.values
+    .filter((key) => STREAM_QUALITIES[key].height === maxHeight)
+    .toSorted((a, b) => STREAM_QUALITIES[a].bitrate - STREAM_QUALITIES[b].bitrate)[0] ?? null
 
 export type MediaSources = {
   source: (request: SourceRequest) => Promise<SourceOutcome>
@@ -109,8 +124,9 @@ const refusalOf = ({ error, server }: { error: unknown; server: AppServer }): Ti
  * ticket is read per video and renewed `MEDIA_TICKET_RENEW_MS` after it was read, by `now`. A
  * server that lists no origin, has none answering, or hands out no ticket (the 503 of one
  * without `RAVEN_MEDIA_SECRET`) plays from its own address with its cookies as headers, which
- * `cookieHeadersFor` gives only to its own API. Nothing here logs: a ticket is only ever in the
- * source's address.
+ * `cookieHeadersFor` gives only to its own API. A transcode from the `public` origin, away
+ * from home, asks for the size `awayMaxHeight` reads at the moment, Settings' cap. Nothing here
+ * logs: a ticket is only ever in the source's address.
  */
 export const mediaAccessFor = ({
   api,
@@ -119,6 +135,7 @@ export const mediaAccessFor = ({
   probe,
   readCookies,
   watchNetwork,
+  awayMaxHeight,
 }: {
   api: ApiClient
   server: AppServer
@@ -126,6 +143,7 @@ export const mediaAccessFor = ({
   probe: ProbeFetch
   readCookies: () => Promise<ServerCookies>
   watchNetwork: WatchNetwork
+  awayMaxHeight: () => MaxHeight
 }): MediaSources => {
   /** Held as a promise, so sources asked for at once share one read and one probe. */
   let pick: Promise<MediaOrigin | null> | null = null
@@ -212,8 +230,14 @@ export const mediaAccessFor = ({
     return readTicket(mediaId)
   }
 
+  /** A transcode's size: capped away from home, from the `public` origin, and else the server's. */
+  const transcodeQualityOf = (access: MediaAccess | null): StreamQuality | null =>
+    access !== null && access.origin.kind === MEDIA_ORIGIN_KINDS.public
+      ? awayQualityOf(awayMaxHeight())
+      : null
+
   const uriFor = ({
-    request: { media, mode, audio, quality },
+    request: { media, mode, audio },
     access,
   }: {
     request: SourceRequest
@@ -223,8 +247,15 @@ export const mediaAccessFor = ({
       case PLAYBACK_MODES.direct:
         return api.fileUrl({ id: media.id, access })
       case PLAYBACK_MODES.remux:
+        return api.hlsUrl({ id: media.id, mode, audio, quality: null, access })
       case PLAYBACK_MODES.transcode:
-        return api.hlsUrl({ id: media.id, mode, audio, quality, access })
+        return api.hlsUrl({
+          id: media.id,
+          mode,
+          audio,
+          quality: transcodeQualityOf(access),
+          access,
+        })
       default: {
         const unreachable: never = mode
         return unreachable

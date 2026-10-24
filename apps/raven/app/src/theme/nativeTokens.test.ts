@@ -37,13 +37,27 @@ describe('nativeTokens', () => {
     })
   })
 
+  it("keeps a translucent rgb() as React Native's rgba()", () => {
+    expect(
+      nativeTokens({
+        '--color-picture-glass': 'rgb(10 14 13 / 72%)',
+        '--color-bark-faint': 'rgb(241 236 226 / 22%)',
+        '--color-scrim': 'rgb(0 0 0 / 55%)',
+      }).colours,
+    ).toEqual({
+      '--color-picture-glass': 'rgba(10, 14, 13, 0.72)',
+      '--color-bark-faint': 'rgba(241, 236, 226, 0.22)',
+      '--color-scrim': 'rgba(0, 0, 0, 0.55)',
+    })
+  })
+
   it('drops what React Native cannot express', () => {
     expect(
       nativeTokens({
         '--gutter': 'clamp(1.25rem, 4vw, 3.5rem)',
         '--focus-ring': '2px solid var(--color-bark)',
         '--color-line': 'color-mix(in srgb, var(--color-bark) 10%, transparent)',
-        '--color-scrim': 'rgb(0 0 0 / 55%)',
+        '--color-mixed': 'rgb(0 0 0 / var(--glow))',
         '--fade-from-top': 'linear-gradient(to bottom, rgb(0 0 0 / 70%), rgb(0 0 0 / 0%))',
         '--shadow-menu': '0 8px 24px rgb(0 0 0 / 40%)',
         '--font-display': "'Young Serif', georgia, serif",
