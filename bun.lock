@@ -17,11 +17,11 @@
     },
     "apps/luwin/api": {
       "name": "@luwin/api",
-      "version": "0.7.3",
+      "version": "0.7.4",
     },
     "apps/luwin/web": {
       "name": "@luwin/web",
-      "version": "0.7.3",
+      "version": "0.7.4",
       "dependencies": {
         "@fontsource-variable/instrument-sans": "5.3.0",
         "@fontsource/young-serif": "5.3.0",
@@ -50,7 +50,7 @@
     },
     "apps/raven/app": {
       "name": "@raven/app",
-      "version": "0.7.3",
+      "version": "0.7.4",
       "dependencies": {
         "@babel/runtime": "7.29.7",
         "@expo/metro-runtime": "58.0.14",
@@ -97,7 +97,7 @@
     },
     "apps/raven/desktop": {
       "name": "@raven/desktop",
-      "version": "0.7.3",
+      "version": "0.7.4",
       "dependencies": {
         "@raven/core": "workspace:*",
         "@raven/mpv": "workspace:*",
@@ -122,7 +122,7 @@
     },
     "apps/raven/server": {
       "name": "@raven/server",
-      "version": "0.7.3",
+      "version": "0.7.4",
       "dependencies": {
         "@anthropic-ai/sdk": "0.133.0",
         "@nestjs/common": "12.1.0",
@@ -150,7 +150,7 @@
     },
     "apps/raven/supabase": {
       "name": "@raven/supabase",
-      "version": "0.7.3",
+      "version": "0.7.4",
       "devDependencies": {
         "oxfmt": "0.68.0",
         "oxlint": "1.83.0",
@@ -159,7 +159,7 @@
     },
     "apps/raven/web": {
       "name": "@raven/web",
-      "version": "0.7.3",
+      "version": "0.7.4",
       "dependencies": {
         "@fontsource-variable/instrument-sans": "5.3.0",
         "@fontsource/young-serif": "5.3.0",
@@ -194,7 +194,7 @@
     },
     "apps/rookery/server": {
       "name": "@rookery/server",
-      "version": "0.7.3",
+      "version": "0.7.4",
       "dependencies": {
         "@nestjs/common": "12.1.0",
         "@nestjs/core": "12.1.0",
@@ -219,7 +219,7 @@
     },
     "apps/rookery/web": {
       "name": "@rookery/web",
-      "version": "0.7.3",
+      "version": "0.7.4",
       "dependencies": {
         "@fontsource-variable/instrument-sans": "5.3.0",
         "@fontsource/young-serif": "5.3.0",
@@ -247,7 +247,7 @@
     },
     "libs/raven/core": {
       "name": "@raven/core",
-      "version": "0.7.3",
+      "version": "0.7.4",
       "devDependencies": {
         "@typescript/native-preview": "7.0.0-dev.20260707.2",
         "bun-types": "1.4.2",
@@ -259,7 +259,7 @@
     },
     "libs/raven/mpv": {
       "name": "@raven/mpv",
-      "version": "0.7.3",
+      "version": "0.7.4",
       "dependencies": {
         "@raven/core": "workspace:*",
         "node-addon-api": "8.5.0",
@@ -278,7 +278,7 @@
     },
     "libs/raven/ui": {
       "name": "@raven/ui",
-      "version": "0.7.3",
+      "version": "0.7.4",
       "dependencies": {
         "@raven/core": "workspace:*",
       },
@@ -310,7 +310,7 @@
     },
     "libs/shared/server": {
       "name": "@shared/server",
-      "version": "0.7.3",
+      "version": "0.7.4",
       "dependencies": {
         "@fastify/compress": "9.2.2",
         "@fastify/static": "10.1.5",
