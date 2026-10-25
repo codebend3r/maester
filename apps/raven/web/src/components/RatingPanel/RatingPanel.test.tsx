@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { render, screen, within } from '@testing-library/react'
-import { RatingPanel } from '@/components/RatingPanel/RatingPanel'
+import { RatingBadge, RatingChip, RatingPanel } from '@/components/RatingPanel/RatingPanel'
 
 describe('RatingPanel', () => {
   it('reads each score with its source and what it means', () => {
@@ -62,5 +62,56 @@ describe('RatingPanel', () => {
   it('leaves out a source with no score, and shows nothing without any', () => {
     const { container } = render(<RatingPanel ratings={[]} />)
     expect(container.textContent).toBe('')
+  })
+})
+
+describe('RatingChip', () => {
+  const ALL = [
+    { source: 'metacritic', kind: 'critic', value: 5.8, votes: null },
+    { source: 'tmdb', kind: 'audience', value: 7.3, votes: 100 },
+    { source: 'rottenTomatoes', kind: 'critic', value: 9.2, votes: null },
+    { source: 'imdb', kind: 'audience', value: 7.2, votes: null },
+  ] as const
+
+  it('is one chip that reads every score to a screen reader, in the panel order', () => {
+    render(<RatingChip ratings={ALL} />)
+    expect(screen.getByRole('img').getAttribute('aria-label')).toBe(
+      'Ratings: Rotten Tomatoes 92%, IMDb 7.2 out of 10, Metacritic 58 out of 100, TMDB 7.3 out of 10',
+    )
+  })
+
+  it('leads with TMDB, else the first it has, and counts the rest', () => {
+    const { container, rerender } = render(<RatingChip ratings={ALL} />)
+    expect(container.textContent).toContain('+3')
+    rerender(<RatingChip ratings={ALL.filter((rating) => rating.source !== 'tmdb')} />)
+    expect(container.textContent).toContain('+2')
+  })
+
+  it('lists each score in the popover, and has none for a single score', () => {
+    const { container, rerender } = render(<RatingChip ratings={ALL} />)
+    expect(container.querySelectorAll('ul > li')).toHaveLength(4)
+    rerender(<RatingChip ratings={ALL.slice(1, 2)} />)
+    expect(container.querySelector('ul')).toBeNull()
+    expect(container.textContent).not.toContain('+')
+  })
+
+  it('renders nothing without scores', () => {
+    const { container } = render(<RatingChip ratings={[]} />)
+    expect(container.firstChild).toBeNull()
+  })
+})
+
+describe('RatingBadge', () => {
+  const rating = { source: 'rottenTomatoes', kind: 'critic', value: 9.2, votes: null } as const
+
+  it('names the source and its scale by default', () => {
+    const { container } = render(<RatingBadge rating={rating} />)
+    expect(container.textContent).toContain('Tomatometer')
+  })
+
+  it('keeps only the score when bare, still naming the source for a screen reader', () => {
+    const { container } = render(<RatingBadge rating={rating} isBare />)
+    expect(container.textContent).toBe('Rotten Tomatoes: 92%92')
+    expect(container.textContent).not.toMatch(/tomatometer/i)
   })
 })

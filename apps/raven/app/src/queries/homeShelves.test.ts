@@ -152,6 +152,7 @@ describe('homeShelvesOf', () => {
         posterVersion: null,
         backdropVersion: null,
         ratings: [],
+        released: null,
       },
     })
     const [shelf] = homeShelvesOf({

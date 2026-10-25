@@ -173,8 +173,9 @@ export class LibrariesRepository {
   }
 
   /**
-   * Every library, or just one when `id` is given. The 4K libraries come
-   * first, those whose probed videos are mostly 4K, then the rest, each by
+   * Every library, or just one when `id` is given. The ones the admin has
+   * placed come first, in their order. The rest follow with the 4K libraries
+   * first, those whose probed videos are mostly 4K, then the others, each by
    * name, so the side menu, the Libraries page and Home all lead with them.
    * Each count reads an index, never the files themselves; a probe fills
    * in the width, so `m.width IS NOT NULL` picks the probed files and lets
@@ -193,7 +194,7 @@ export class LibrariesRepository {
                    FROM media m WHERE m.library_id = l.id AND m.width IS NOT NULL) AS is_4k
            FROM libraries l
           WHERE ? IS NULL OR l.id = ?
-          ORDER BY is_4k DESC, l.name COLLATE NOCASE`,
+          ORDER BY l.position IS NULL, l.position, is_4k DESC, l.name COLLATE NOCASE`,
       )
       .all(id, id)
     const paths = this.db
@@ -405,6 +406,22 @@ export class LibrariesRepository {
       this.replacePaths({ id, paths: input.paths })
     })()
     return this.get(id)
+  }
+
+  /**
+   * Places the libraries in the order of `ids`. It takes every library
+   * there is, once each, so the order is whole; false when `ids` is not that.
+   */
+  reorder(ids: readonly number[]): boolean {
+    const known = this.db.prepare<[], { id: number }>('SELECT id FROM libraries').all()
+    const isWhole =
+      ids.length === known.length &&
+      new Set(ids).size === ids.length &&
+      known.every((row) => ids.includes(row.id))
+    if (!isWhole) return false
+    const place = this.db.prepare('UPDATE libraries SET position = ? WHERE id = ?')
+    this.db.transaction(() => ids.forEach((id, position) => place.run(position, id)))()
+    return true
   }
 
   /** The libraries kept behind the PIN. */

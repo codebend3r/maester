@@ -6,14 +6,11 @@ import { isFilePlaying, isOfflinePage, offlineReturnOf } from '@/desktop/paths'
 import { ACCESS_KINDS, type AccessState, useAccessState } from '@/lib/accessState'
 import { signInPath } from '@/lib/authRoutes'
 import { queryKeys } from '@raven/ui/headless'
+import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/components/AuthGate/AuthGate.module.scss'
 
-const Loading = () => (
-  <main className={styles.screen}>
-    <output className={styles.copy}>Checking your account</output>
-  </main>
-)
+const Loading = () => <RavenLoader isFullscreen shouldShowLabel={false} />
 
 const Retry = ({ title, message }: { title: string; message: string }) => {
   const queryClient = useQueryClient()

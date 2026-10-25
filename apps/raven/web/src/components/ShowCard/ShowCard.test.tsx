@@ -91,10 +91,9 @@ describe('ShowCard', () => {
     expect(tiles.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.showTile)
   })
 
-  it("shows a tile's scores as the ratings panel does, each in a badge", () => {
+  it("shows a tile's scores in one chip, led by the TMDB score", () => {
     renderWithProviders({ ui: <ShowTiles shows={[showEntry()]} /> })
-    const ratings = screen.getByRole('list', { name: 'Ratings' })
-    expect(within(ratings).getByText('TMDB: 8.2 out of 10')).toBeInTheDocument()
+    const ratings = screen.getByRole('img', { name: 'Ratings: TMDB 8.2 out of 10' })
     expect(within(ratings).getByText('/10')).toBeInTheDocument()
   })
 

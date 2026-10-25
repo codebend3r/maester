@@ -69,7 +69,7 @@ describe('AuthGate', () => {
   it('shows a loading screen until the account is read', () => {
     getMe.mockImplementation(() => new Promise(() => undefined))
     renderGate()
-    expect(screen.getByRole('status')).toHaveTextContent('Checking your account')
+    expect(screen.getByRole('status')).toHaveTextContent('Loading')
     expect(screen.queryByText('Library')).toBeNull()
   })
 
@@ -77,7 +77,7 @@ describe('AuthGate', () => {
     getMe.mockImplementation(() => new Promise(() => undefined))
     renderGate({ route: playPathOf(FILE_ID) })
     expect(screen.getByText('Library')).toBeInTheDocument()
-    expect(screen.queryByText('Checking your account')).toBeNull()
+    expect(screen.queryByText('Loading')).toBeNull()
   })
 
   it('keeps a local file or download playing when the account cannot be read', async () => {

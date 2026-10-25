@@ -154,6 +154,46 @@
   gap: var(--space-4);
 }
 
+// The listing and, over its top edge while a change of view lays itself out,
+// the note saying so. The old view stays, dimmed, until the new one is ready.
+.listing {
+  display: grid;
+  grid-template-areas: 'stack';
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.listingBody {
+  grid-area: stack;
+}
+
+.changing {
+  opacity: 0.45;
+  pointer-events: none;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: opacity 120ms ease-out;
+  }
+}
+
+.switching {
+  position: sticky;
+  top: var(--space-4);
+  z-index: 2;
+  grid-area: stack;
+  justify-self: center;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-night-wash);
+  box-shadow: var(--shadow-menu);
+  font-size: var(--font-size-sm);
+}
+
 .more {
   justify-self: start;
 }

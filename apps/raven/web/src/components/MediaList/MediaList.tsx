@@ -8,6 +8,7 @@ import {
   cardTitle,
   formatBitrate,
   formatBytes,
+  formatAirDate,
   formatRuntime,
   mediaEntryKey,
   resolutionLabel,
@@ -39,8 +40,7 @@ const day = new Intl.DateTimeFormat(undefined, {
  * One video as a table row, its small poster or frame grab before its
  * title; a right click on either opens the row's menu. The picture is a
  * second way to the same place, so it stays out of the tab order and the
- * reading order. In a Movies library the title opens the movie's page and a
- * Year column follows it.
+ * reading order. In a Movies library the title opens the movie's page.
  */
 const MediaRow = ({
   media,
@@ -90,24 +90,27 @@ const MediaRow = ({
           <PartlyWatched media={media} />
         </div>
       </th>
-      {movies && <td className={styles.number}>{year ?? ''}</td>}
       {movies &&
         RATING_COLUMNS.map((column) => {
           const rating = media.item?.ratings.find((entry) => entry.source === column.source)
           return (
-            <td key={column.source} className={`${styles.number} ${styles.roomy}`}>
-              {rating && <RatingBadge rating={rating} />}
+            <td key={column.source} className={`${styles.score} ${styles.roomy}`}>
+              {rating && <RatingBadge rating={rating} isBare />}
             </td>
           )
         })}
       <td className={movies ? `${styles.number} ${styles.spare}` : styles.number}>
         {formatRuntime(media.duration)}
       </td>
-      <td className={styles.roomy}>{resolutionLabel(media)}</td>
+      <td className={movies ? styles.extra : styles.roomy}>{resolutionLabel(media)}</td>
       <td className={`${styles.number} ${styles.extra}`}>{formatBytes(media.size)}</td>
       <td className={`${styles.number} ${styles.extra}`}>{formatBitrate(media.bitrate)}</td>
       <td className={styles.extra}>{day.format(new Date(media.addedAt))}</td>
-      <td className={styles.extra}>{day.format(new Date(media.changedAt))}</td>
+      <td className={movies ? undefined : styles.extra}>
+        {movies
+          ? (formatAirDate(media.item?.released ?? null) ?? year ?? '')
+          : day.format(new Date(media.changedAt))}
+      </td>
       <td className={styles.menuCell}>{menu.menu}</td>
     </tr>
   )
@@ -122,7 +125,6 @@ const RATING_COLUMNS: readonly { source: RatingSource; label: string }[] = [
 
 type Column =
   | 'title'
-  | 'year'
   | 'rottenTomatoes'
   | 'imdb'
   | 'metacritic'
@@ -133,13 +135,13 @@ type Column =
   | 'bitrate'
   | 'added'
   | 'changed'
+  | 'released'
 
 const score = ({ media, source }: { media: MediaItem; source: RatingSource }): number | null =>
   media.item?.ratings.find((rating) => rating.source === source)?.value ?? null
 
 const COLUMNS: Record<Column, SortColumn<MediaItem>> = {
   title: { value: (media) => sortTitle(cardTitle(media).title), first: 'asc' },
-  year: { value: (media) => cardTitle(media).year, first: 'desc' },
   rottenTomatoes: {
     value: (media) => score({ media, source: RATING_SOURCES.rottenTomatoes }),
     first: 'desc',
@@ -160,6 +162,14 @@ const COLUMNS: Record<Column, SortColumn<MediaItem>> = {
   bitrate: { value: (media) => media.bitrate, first: 'desc' },
   added: { value: (media) => media.addedAt, first: 'desc' },
   changed: { value: (media) => media.changedAt, first: 'desc' },
+  // The cell's own fallback: a movie TMDB gave no day sorts by its year, which sorts before any day in it.
+  released: {
+    value: (media) => {
+      const { year } = cardTitle(media)
+      return media.item?.released ?? (year == null ? null : String(year))
+    },
+    first: 'desc',
+  },
 }
 
 /**
@@ -174,7 +184,7 @@ export const MediaList = ({
   matchType = null,
 }: {
   items: MediaItem[]
-  /** A Movies library: titles open the movie's page, and the year and ratings get columns. */
+  /** A Movies library: titles open the movie's page, and the ratings and release date get columns. */
   movies?: boolean
   /** What the library matches its files to, for the menu's Fix match. */
   matchType?: MatchItemType | null
@@ -202,13 +212,12 @@ export const MediaList = ({
         <thead>
           <tr>
             {header({ key: 'title', label: 'Title' })}
-            {movies && header({ key: 'year', label: 'Year', className: styles.number })}
             {movies &&
               RATING_COLUMNS.map((column) =>
                 header({
                   key: column.source,
                   label: column.label,
-                  className: `${styles.number} ${styles.roomy}`,
+                  className: `${styles.score} ${styles.roomy}`,
                 }),
               )}
             {header({
@@ -216,7 +225,11 @@ export const MediaList = ({
               label: 'Length',
               className: movies ? `${styles.number} ${styles.spare}` : styles.number,
             })}
-            {header({ key: 'resolution', label: 'Resolution', className: styles.roomy })}
+            {header({
+              key: 'resolution',
+              label: 'Resolution',
+              className: movies ? styles.extra : styles.roomy,
+            })}
             {header({ key: 'size', label: 'Size', className: `${styles.number} ${styles.extra}` })}
             {header({
               key: 'bitrate',
@@ -224,7 +237,11 @@ export const MediaList = ({
               className: `${styles.number} ${styles.extra}`,
             })}
             {header({ key: 'added', label: 'Added', className: styles.extra })}
-            {header({ key: 'changed', label: 'Changed', className: styles.extra })}
+            {header({
+              key: movies ? 'released' : 'changed',
+              label: movies ? 'Released' : 'Changed',
+              className: movies ? undefined : styles.extra,
+            })}
             <th scope="col">
               <span className="visually-hidden">Actions</span>
             </th>

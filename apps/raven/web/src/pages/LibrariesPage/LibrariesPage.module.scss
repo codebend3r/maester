@@ -32,9 +32,16 @@
   font-variant-numeric: tabular-nums;
 }
 
-.add {
+.headerActions {
   grid-area: add;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-2);
   justify-self: end;
+}
+
+.failure {
+  color: var(--color-bark);
 }
 
 .list {
@@ -92,22 +99,44 @@
   opacity: 0.45;
 }
 
-// The icon's well down the left, the lines beside it, and the buttons under
-// them, whatever the card's width: up to eight buttons sit beside the lines
-// nowhere without squeezing the folders and the scan's words.
+// The icon's well down the left, the name and counts beside it and the
+// toggle at their right, and what an open card adds under them, whatever the
+// card's width: up to eight buttons sit beside the lines nowhere without
+// squeezing the folders and the scan's words. A folded card is the first two rows.
 .details {
   z-index: 1;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    'icon name'
-    'icon count'
-    'icon paths'
-    'icon status'
-    'actions actions';
+    'icon name toggle'
+    'icon count toggle'
+    'more more more';
   gap: var(--space-1) var(--space-3);
   align-content: start;
   padding: var(--space-4);
+}
+
+.folded {
+  grid-template-areas:
+    'icon name toggle'
+    'icon count toggle';
+}
+
+.toggle {
+  grid-area: toggle;
+  align-self: center;
+}
+
+.toggle[aria-expanded='true'] svg {
+  rotate: 180deg;
+}
+
+// The folders, how the scan stands and the buttons, stacked.
+.more {
+  grid-area: more;
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
 }
 
 .well {
@@ -148,7 +177,6 @@
 // at half the width, so a long parent wraps inside it and leaves the names
 // room; a long name wraps in its own column.
 .paths {
-  grid-area: paths;
   display: grid;
   grid-template-columns: fit-content(50%) minmax(0, 1fr);
   gap: var(--space-0) var(--space-3);
@@ -175,7 +203,6 @@
 }
 
 .status {
-  grid-area: status;
   display: grid;
   gap: var(--space-1);
 }
@@ -199,10 +226,8 @@
 }
 
 .actions {
-  grid-area: actions;
   display: grid;
   gap: var(--space-1);
-  padding-top: var(--space-2);
 }
 
 // A disabled button is an empty outline, which the picture would show
@@ -244,7 +269,65 @@
   }
 }
 
+// A library in edit mode: one thin line, grip then icon then name, with its
+// two move buttons at the right. The whole line drags.
+.thin {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: 'grip well name moves';
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+  cursor: grab;
+}
+
+.thin:hover {
+  background: var(--color-canopy-hi);
+}
+
+.dragging {
+  border-color: var(--color-leaf-bright);
+  opacity: 0.6;
+}
+
+.grip {
+  grid-area: grip;
+  display: grid;
+  color: var(--color-lichen);
+}
+
+.thinWell {
+  grid-area: well;
+  display: grid;
+  place-items: center;
+  width: var(--control-size);
+  height: var(--control-size);
+  border-radius: var(--radius-md);
+  background: var(--color-moss);
+}
+
+.thinName {
+  grid-area: name;
+  font-family: var(--font-display);
+  line-height: var(--line-tight);
+  overflow-wrap: anywhere;
+}
+
+.moves {
+  grid-area: moves;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-0);
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  .toggle svg {
+    transition: rotate 200ms var(--ease-out);
+  }
+
   .row {
     transition:
       background-color 200ms ease,
@@ -290,7 +373,7 @@
       'add';
   }
 
-  .add {
+  .headerActions {
     justify-self: start;
   }
 }

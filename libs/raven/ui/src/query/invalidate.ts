@@ -91,6 +91,13 @@ export const afterPins = (queryClient: QueryClient): Promise<unknown> =>
     filters: [{ queryKey: queryKeys.libraries }, { queryKey: queryKeys.home }],
   })
 
+/** The libraries were put in a new order: every library, and home, whose shelves follow it. */
+export const afterLibraryOrder = (queryClient: QueryClient): Promise<unknown> =>
+  refetch({
+    queryClient,
+    filters: [{ queryKey: queryKeys.libraries }, { queryKey: queryKeys.home }],
+  })
+
 /** A library was included in the hero or left out: every library, and the hero and its picks. */
 export const afterHeroLibraries = (queryClient: QueryClient): Promise<unknown> =>
   refetch({

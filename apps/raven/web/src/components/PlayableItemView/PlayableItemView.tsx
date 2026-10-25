@@ -78,6 +78,8 @@ type PlayableConfig = {
   showsReviews: boolean
   /** Whether a link to the saga the movie is in sits under the header. */
   showsSaga: boolean
+  /** Whether the header links the library above the title: where back names the library itself. */
+  linksLibrary: boolean
   /** Whether the header says how long is left of a video started, with its line. */
   showsTimeLeft: boolean
   /** Whether the episodes either side follow the file. */
@@ -101,6 +103,7 @@ const PLAYABLE = {
     showsContentRating: true,
     showsReviews: true,
     showsSaga: true,
+    linksLibrary: true,
     showsTimeLeft: false,
     showsNeighbours: false,
     castTitle: undefined,
@@ -120,6 +123,7 @@ const PLAYABLE = {
     showsContentRating: false,
     showsReviews: false,
     showsSaga: false,
+    linksLibrary: false,
     showsTimeLeft: true,
     showsNeighbours: true,
     castTitle: 'Guest stars & crew',
@@ -199,6 +203,7 @@ export const PlayableItemView = ({
     <article className={styles.page} aria-labelledby={titleId}>
       <ItemHeader
         back={back}
+        library={config.linksLibrary ? back : undefined}
         titleId={titleId}
         eyebrow={config.eyebrow(details)}
         title={details.title}

@@ -179,14 +179,6 @@
   min-width: 0;
 }
 
-// Each score as a card shows it, as many to a line as fit.
-.scores {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 7.5rem), 1fr));
-  justify-items: start;
-  gap: var(--space-0);
-}
-
 // The facts read as one line of words, wrapping between facts rather than
 // inside one, a dot apart.
 .facts {

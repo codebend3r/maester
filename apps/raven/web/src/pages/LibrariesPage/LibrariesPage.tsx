@@ -1,10 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { KINDS, type Library, plural } from '@raven/core'
-import { useId, useState } from 'react'
+import { type DragEvent, useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
-import { Button } from '@raven/ui'
+import { Button, Icon } from '@raven/ui'
 import {
   LibraryActionErrors,
   LibraryActions,
@@ -27,10 +27,14 @@ import {
 import { foldersByParent } from '@/lib/folders'
 import { libraryPollDelay } from '@/lib/libraryPolling'
 import { LIBRARY_LOCK_STATES, lockState } from '@/lib/libraryLock'
+import { useLibraryOrdering } from '@/lib/useLibraryOrdering'
 import { librariesQuery, lockQuery } from '@/lib/queries'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
 const count = new Intl.NumberFormat()
+
+/** Firefox starts no drag that sets no data. */
+const DRAG_DATA_TYPE = 'text/plain'
 
 /** How many libraries there are and how many videos they hold between them. */
 const summaryOf = (libraries: readonly Library[]): string =>
@@ -125,7 +129,18 @@ const HeroCheckbox = ({ library }: { library: Library }) => {
  * more, and a list cached from before is held to the same. Its folders show
  * only while the admin lock is off.
  */
-const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) => {
+const LibraryRow = ({
+  library,
+  isShut,
+  isOpen,
+  onToggle,
+}: {
+  library: Library
+  isShut: boolean
+  isOpen: boolean
+  onToggle: () => void
+}) => {
+  const detailsId = useId()
   const actions = useLibraryActions(library)
   const backdrop = !isShut && library.backdrop && api.libraryBackdropUrl(library.backdrop)
   const lockNote = isShut ? ' · Locked' : ' · Unlocked'
@@ -138,7 +153,7 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
       {backdrop && (
         <span className={styles.backdrop} style={{ backgroundImage: `url("${backdrop}")` }} />
       )}
-      <div className={styles.details}>
+      <div className={isOpen ? styles.details : `${styles.details} ${styles.folded}`}>
         <span className={styles.well}>
           <LibraryIcon settings={library.settings} size={26} />
         </span>
@@ -151,36 +166,105 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
           {library.itemCount === 1 ? 'video' : 'videos'}
           {library.unmatchedCount > 0 && ` · ${count.format(library.unmatchedCount)} not matched`}
         </span>
-        {paths.length > 0 && (
-          <ul className={styles.paths} aria-label="Folders">
-            {foldersByParent(paths).map(({ parent, names }) => (
-              <li key={parent} className={styles.path}>
-                <span className={styles.parent}>{parent}</span>
-                <span className={styles.names}>{names.join(' · ')}</span>
-              </li>
-            ))}
-          </ul>
+        <Button
+          icon="expand"
+          tone="ghost"
+          className={styles.toggle}
+          aria-expanded={isOpen}
+          aria-controls={detailsId}
+          aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${library.name}`}
+          title={isOpen ? 'Show less' : 'Show its folders, scan and actions'}
+          onClick={onToggle}
+        />
+        {isOpen && (
+          <div id={detailsId} className={styles.more}>
+            {paths.length > 0 && (
+              <ul className={styles.paths} aria-label="Folders">
+                {foldersByParent(paths).map(({ parent, names }) => (
+                  <li key={parent} className={styles.path}>
+                    <span className={styles.parent}>{parent}</span>
+                    <span className={styles.names}>{names.join(' · ')}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className={styles.status}>
+              <ScanStatus scan={library.scan} />
+              <RatingsStatus refresh={library.ratingsRefresh} />
+              <LibraryActionErrors actions={actions} className={styles.error} />
+              <AdminOnly>
+                <HeroCheckbox library={library} />
+              </AdminOnly>
+            </div>
+            <div className={styles.actions}>
+              <LibraryActions
+                library={library}
+                isShut={isShut}
+                actions={actions}
+                lead={<PinButton library={library} />}
+              />
+            </div>
+          </div>
         )}
-        <div className={styles.status}>
-          <ScanStatus scan={library.scan} />
-          <RatingsStatus refresh={library.ratingsRefresh} />
-          <LibraryActionErrors actions={actions} className={styles.error} />
-          <AdminOnly>
-            <HeroCheckbox library={library} />
-          </AdminOnly>
-        </div>
-        <div className={styles.actions}>
-          <LibraryActions
-            library={library}
-            isShut={isShut}
-            actions={actions}
-            lead={<PinButton library={library} />}
-          />
-        </div>
       </div>
     </li>
   )
 }
+
+/**
+ * A library in edit mode, down to a thin line: a grip, its icon and name, and
+ * a button each to move it up or down, for the keyboard and for a touch
+ * screen. The line itself drags; whichever line it is held over takes its place.
+ */
+const ThinLibraryRow = ({
+  library,
+  place,
+  isDragging,
+  drag,
+}: {
+  library: Library
+  place: { isFirst: boolean; isLast: boolean; onMove: (step: number) => void }
+  isDragging: boolean
+  drag: {
+    onStart: (event: DragEvent) => void
+    onOver: (event: DragEvent) => void
+    onEnd: () => void
+  }
+}) => (
+  // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- dragging is the pointer's way; the move buttons are the keyboard's
+  <li
+    className={isDragging ? `${styles.thin} ${styles.dragging}` : styles.thin}
+    draggable
+    onDragStart={drag.onStart}
+    onDragOver={drag.onOver}
+    onDrop={(event) => event.preventDefault()}
+    onDragEnd={drag.onEnd}
+  >
+    <span className={styles.grip} aria-hidden="true">
+      <Icon name="grip" size={18} />
+    </span>
+    <span className={styles.thinWell}>
+      <LibraryIcon settings={library.settings} size={18} />
+    </span>
+    <span className={styles.thinName}>{library.name}</span>
+    <span className={styles.moves}>
+      <Button
+        icon="up"
+        tone="ghost"
+        aria-label={`Move ${library.name} up`}
+        disabled={place.isFirst}
+        onClick={() => place.onMove(-1)}
+      />
+      <Button
+        icon="down"
+        tone="ghost"
+        aria-label={`Move ${library.name} down`}
+        disabled={place.isLast}
+        onClick={() => place.onMove(1)}
+      />
+    </span>
+  </li>
+)
 
 /** Three cards on their way, each a line for its name over one for its counts. */
 const RowsSkeleton = () => (
@@ -199,9 +283,12 @@ const RowsSkeleton = () => (
 /**
  * `/libraries`: every library as a card, in the order the server keeps
  * them, under a title saying how many there are and how many videos they
- * hold, with Add library at its right while the admin lock is off. With
- * none yet it says what a library is; when the server does not answer it
- * says so and offers to ask again.
+ * hold, with Add library at its right while the admin lock is off. A card
+ * is folded to its name and counts until it is opened. The admin's Edit
+ * order folds every card to a thin line to drag into place, or to move with
+ * its buttons; Finish, or leaving the page, saves the order, and the cards
+ * come back as they were opened. With none yet it says what a library is;
+ * when the server does not answer it says so and offers to ask again.
  */
 export const LibrariesPage = () => {
   const [adding, setAdding] = useState(false)
@@ -212,6 +299,10 @@ export const LibrariesPage = () => {
     // climb live, and read once when a waiting Refresh resumes.
     refetchInterval: (query) => libraryPollDelay({ libraries: query.state.data ?? [] }),
   })
+  // The ones opened, kept while the cards are thin so they open again after.
+  const [openIds, setOpenIds] = useState<ReadonlySet<number>>(new Set())
+  const [draggingId, setDraggingId] = useState<number | null>(null)
+  const ordering = useLibraryOrdering({ libraries: libraries.data ?? [] })
 
   // Whether this browser holds the PIN, asked only when some library is locked.
   const lock = useQuery({
@@ -283,31 +374,90 @@ export const LibrariesPage = () => {
           {libraries.data && <p className={styles.summary}>{summaryOf(libraries.data)}</p>}
         </hgroup>
         <AdminOnly>
-          <Button
-            tone="primary"
-            icon="plus"
-            className={styles.add}
-            title="Add a library: a name, a type and the folders that hold its videos"
-            onClick={() => setAdding(true)}
-          >
-            Add library
-          </Button>
+          <span className={styles.headerActions}>
+            {(libraries.data?.length ?? 0) > 1 && (
+              <Button
+                tone={ordering.isEditing ? 'primary' : 'quiet'}
+                icon={ordering.isEditing ? 'check' : 'edit'}
+                title={
+                  ordering.isEditing
+                    ? 'Save the order and show the libraries in full again'
+                    : 'Drag the libraries into the order they list in'
+                }
+                onClick={ordering.isEditing ? ordering.finish : ordering.start}
+              >
+                {ordering.isEditing ? 'Finish' : 'Edit order'}
+              </Button>
+            )}
+            {!ordering.isEditing && (
+              <Button
+                tone="primary"
+                icon="plus"
+                title="Add a library: a name, a type and the folders that hold its videos"
+                onClick={() => setAdding(true)}
+              >
+                Add library
+              </Button>
+            )}
+          </span>
         </AdminOnly>
       </header>
+      {ordering.failure && (
+        <p role="alert" className={styles.failure}>
+          {ordering.failure.message}
+        </p>
+      )}
       {libraries.isPending ? (
         <RowsSkeleton />
       ) : (
-        <ul className={styles.list}>
-          {(libraries.data ?? []).map((library) => (
-            <LibraryRow
-              key={library.id}
-              library={library}
-              isShut={
-                lockState({ locked: library.settings.locked, lock: lock.data }).state !==
-                LIBRARY_LOCK_STATES.open
-              }
-            />
-          ))}
+        <ul
+          className={styles.list}
+          aria-label={ordering.isEditing ? 'Libraries, in order' : undefined}
+        >
+          {ordering.ordered.map((library, index) =>
+            ordering.isEditing ? (
+              <ThinLibraryRow
+                key={library.id}
+                library={library}
+                isDragging={draggingId === library.id}
+                place={{
+                  isFirst: index === 0,
+                  isLast: index === ordering.ordered.length - 1,
+                  onMove: (step) => ordering.move({ id: library.id, to: index + step }),
+                }}
+                drag={{
+                  onStart: (event) => {
+                    event.dataTransfer.effectAllowed = 'move'
+                    event.dataTransfer.setData(DRAG_DATA_TYPE, String(library.id))
+                    setDraggingId(library.id)
+                  },
+                  onOver: (event) => {
+                    event.preventDefault()
+                    if (draggingId === null || draggingId === library.id) return
+                    ordering.move({ id: draggingId, to: index })
+                  },
+                  onEnd: () => setDraggingId(null),
+                }}
+              />
+            ) : (
+              <LibraryRow
+                key={library.id}
+                library={library}
+                isOpen={openIds.has(library.id)}
+                onToggle={() =>
+                  setOpenIds((current) =>
+                    current.has(library.id)
+                      ? new Set([...current].filter((id) => id !== library.id))
+                      : new Set([...current, library.id]),
+                  )
+                }
+                isShut={
+                  lockState({ locked: library.settings.locked, lock: lock.data }).state !==
+                  LIBRARY_LOCK_STATES.open
+                }
+              />
+            ),
+          )}
         </ul>
       )}
       {dialog}

@@ -70,7 +70,7 @@ export const createdBy = (details: ItemDetails): string | null => {
   return creators.length > 0 ? `Created by ${joinNames(creators)}` : null
 }
 
-/** Year, runtime, up to three genres, and how many files the movie is once there are two or more. */
+/** Release day (the year when TMDB gave none), runtime, up to three genres, and how many files the movie is once there are two or more. */
 export const movieFacts = ({
   details,
   primary,
@@ -79,7 +79,7 @@ export const movieFacts = ({
   primary: MediaItem | undefined
 }): string[] =>
   present([
-    details.year == null ? null : String(details.year),
+    formatAirDate(details.released) ?? (details.year == null ? null : String(details.year)),
     runtimeFact({ file: primary, runtime: details.runtime }),
     ...details.genres.slice(0, 3),
     details.versions.length > 1

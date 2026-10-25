@@ -390,6 +390,8 @@ From the repo root:
 ```bash
 bun install
 bun run dev:raven   # shared player build watcher, server on :8484 (watch mode, no scan on start) and Vite on :5173, proxying /api
+bun run dev:raven:prod   # same, but no local server: Vite proxies /api to Vhagar through its Funnel address (https://raven.tail5586d4.ts.net; a terminal without macOS Local Network access cannot reach the LAN one), so it reads and writes the production database
+bun run dev:raven:db   # stop the local server first: replaces data/raven.db with a copy of Vhagar's (old one kept in data/backups), rewrites media paths to /Volumes and refreshes posters and thumbnails
 bun run verify         # spellcheck, TypeScript only, one command per script, lint (gale for the SCSS), format check, typecheck, tests and build for every project
 ```
 

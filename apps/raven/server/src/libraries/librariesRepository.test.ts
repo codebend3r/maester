@@ -240,4 +240,39 @@ describe('what each library holds, and the order they come in', () => {
         .map((library) => library.name),
     ).toEqual(['Scope', 'Tall', 'Zulu', 'archive', 'Clips', 'Mixed'])
   })
+
+  it('lists the libraries in the order the admin placed them, and a new one after them', () => {
+    const [zulu, scope, archive] = [
+      addLibrary({ name: 'Zulu', frames: [UHD] }),
+      addLibrary({ name: 'Scope', frames: [UHD] }),
+      addLibrary({ name: 'archive', frames: [] }),
+    ].map((library) => library.id)
+    const names = () =>
+      libraries()
+        .list()
+        .map((library) => library.name)
+
+    expect(libraries().reorder([archive, zulu, scope])).toBe(true)
+    expect(names()).toEqual(['archive', 'Zulu', 'Scope'])
+
+    addLibrary({ name: 'Newest', frames: [UHD] })
+    expect(names()).toEqual(['archive', 'Zulu', 'Scope', 'Newest'])
+  })
+
+  it('refuses an order that leaves a library out, repeats one or names one that is not there', () => {
+    const first = addLibrary({ name: 'First', frames: [] }).id
+    const second = addLibrary({ name: 'Second', frames: [] }).id
+    const before = libraries()
+      .list()
+      .map((library) => library.id)
+
+    expect(libraries().reorder([second])).toBe(false)
+    expect(libraries().reorder([second, second])).toBe(false)
+    expect(libraries().reorder([second, first, 9999])).toBe(false)
+    expect(
+      libraries()
+        .list()
+        .map((library) => library.id),
+    ).toEqual(before)
+  })
 })

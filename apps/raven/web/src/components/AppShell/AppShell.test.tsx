@@ -285,10 +285,10 @@ describe('AppShell', () => {
     renderShell({ route: '/' })
     await within(nav()).findByRole('link', { name: 'Tutorials (locked)' })
     await userEvent.click(toggle())
-    expect(within(nav()).getByRole('link', { name: 'Tutorials (locked)' })).toHaveAttribute(
-      'title',
-      'Tutorials (locked)',
-    )
+    await userEvent.hover(within(nav()).getByRole('link', { name: 'Tutorials (locked)' }))
+    expect(
+      await screen.findByText('Tutorials (locked)', { selector: '[aria-hidden]' }),
+    ).toBeVisible()
     expect(iconsOf(within(nav()).getByRole('link', { name: 'Clips' }))).toEqual(['video'])
     await userEvent.click(toggle())
   })
@@ -301,14 +301,18 @@ describe('AppShell', () => {
 
     await userEvent.click(toggle())
     expect(toggle()).toHaveAttribute('aria-expanded', 'false')
-    const favourites = within(nav()).getByRole('link', { name: 'Favourites' })
-    expect(favourites).toHaveAttribute('title', 'Favourites')
-    expect(within(nav()).getByRole('link', { name: 'Movies' })).toHaveAttribute('title', 'Movies')
+    const movies = within(nav()).getByRole('link', { name: 'Movies' })
+    expect(movies).not.toHaveAttribute('title')
+    await userEvent.hover(movies)
+    expect(screen.getByText('Movies', { selector: '[aria-hidden]' })).toBeInTheDocument()
+    await userEvent.unhover(movies)
+    expect(screen.queryByText('Movies', { selector: '[aria-hidden]' })).toBeNull()
     expect(useSideMenu.getState().collapsed).toBe(true)
 
     await userEvent.click(toggle())
     expect(toggle()).toHaveAttribute('aria-expanded', 'true')
-    expect(within(nav()).getByRole('link', { name: 'Favourites' })).not.toHaveAttribute('title')
+    await userEvent.hover(within(nav()).getByRole('link', { name: 'Favourites' }))
+    expect(screen.queryByText('Favourites', { selector: '[aria-hidden]' })).toBeNull()
   })
 
   it("shows raven's version beside the toggle while the menu is open", async () => {
@@ -416,11 +420,10 @@ describe('AppShell', () => {
     ])
     renderShell({ route: '/' })
     await within(nav()).findByRole('link', { name: 'Tutorials (locked)' })
-    expect(within(nav()).getByRole('link', { name: 'Home' })).toHaveAttribute('title', 'Home')
-    expect(within(nav()).getByRole('link', { name: 'Tutorials (locked)' })).toHaveAttribute(
-      'title',
-      'Tutorials (locked)',
-    )
+    await userEvent.hover(within(nav()).getByRole('link', { name: 'Tutorials (locked)' }))
+    expect(
+      screen.getByText('Tutorials (locked)', { selector: '[aria-hidden]' }),
+    ).toBeInTheDocument()
     expect(within(logo()).getByText('raven')).toHaveClass('visually-hidden')
     expect(within(nav()).queryByText('Pinned')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Side menu' })).toBeNull()

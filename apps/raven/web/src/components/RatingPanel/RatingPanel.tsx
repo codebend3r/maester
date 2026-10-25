@@ -1,4 +1,4 @@
-import { RATING_SOURCES, type Rating, type RatingSource } from '@raven/core'
+import { RATING_SOURCES, type Rating, type RatingSource, pickScore } from '@raven/core'
 import { RATING_SOURCE_LABELS } from '@/lib/ratingSources'
 import styles from '@/components/RatingPanel/RatingPanel.module.scss'
 
@@ -100,21 +100,24 @@ const RatingItem = ({ rating }: { rating: Rating }) => {
 
 /**
  * One score where a card or a row has a line for it: the panel's score,
- * scale and name in a small frame, its bar along the frame's foot.
+ * scale and name in a small frame, its bar along the frame's foot. `isBare`
+ * keeps only the score, for a table whose column header already names the source.
  */
-export const RatingBadge = ({ rating }: { rating: Rating }) => {
+export const RatingBadge = ({ rating, isBare = false }: { rating: Rating; isBare?: boolean }) => {
   const source = SOURCES[rating.source]
   const score = source.score(rating)
   return (
-    <span className={`${styles.badge} ${source.className}`}>
+    <span className={`${styles.badge} ${isBare ? styles.badgeBare : ''} ${source.className}`}>
       <span className="visually-hidden">{`${source.site}: ${score}${source.spoken}`}</span>
       <span className={styles.badgeScore} aria-hidden="true">
         <span className={styles.badgeValue}>{score}</span>
-        <span className={styles.badgeScale}>{source.shown}</span>
+        {!isBare && <span className={styles.badgeScale}>{source.shown}</span>}
       </span>
-      <span className={styles.badgeLabel} aria-hidden="true">
-        {source.label}
-      </span>
+      {!isBare && (
+        <span className={styles.badgeLabel} aria-hidden="true">
+          {source.label}
+        </span>
+      )}
       <span className={styles.badgeTrack} aria-hidden="true">
         <span className={styles.fill} style={{ width: barWidth(rating) }} />
       </span>
@@ -139,5 +142,68 @@ export const RatingPanel = ({ ratings }: { ratings: readonly Rating[] }) => {
         ))}
       </ul>
     )
+  )
+}
+
+const inSourceOrder = (ratings: readonly Rating[]): Rating[] =>
+  SOURCE_ORDER.flatMap((source) => ratings.find((each) => each.source === source) ?? [])
+
+/**
+ * Every score a title has, as one chip: the lead score, TMDB's unless the
+ * caller names another, and how many more there are. Pointing at it or
+ * focusing it opens a popover over the chip with each score in its own row.
+ * The popover grows upward so a card that clips what lies below it keeps it.
+ * A title with a single score gets the chip alone.
+ */
+export const RatingChip = ({
+  ratings,
+  lead = RATING_SOURCES.tmdb,
+}: {
+  ratings: readonly Rating[]
+  lead?: RatingSource
+}) => {
+  const scored = inSourceOrder(ratings)
+  const first = pickScore({ ratings: scored, source: lead }) ?? scored[0]
+  if (!first) return null
+  const more = scored.length - 1
+  const spoken = scored
+    .map(
+      (rating) =>
+        `${SOURCES[rating.source].site} ${SOURCES[rating.source].score(rating)}${SOURCES[rating.source].spoken}`,
+    )
+    .join(', ')
+  return (
+    <span
+      className={styles.chip}
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a chip of marks read as one label, not a picture
+      role="img"
+      // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focus is how the keyboard reaches the popover
+      tabIndex={more > 0 ? 0 : undefined}
+      aria-label={`Ratings: ${spoken}`}
+    >
+      <span className={styles.chipFace} aria-hidden="true">
+        <RatingBadge rating={first} />
+        {more > 0 && <span className={styles.chipMore}>{`+${more}`}</span>}
+      </span>
+      {more > 0 && (
+        <ul className={styles.popover} aria-hidden="true">
+          {scored.map((rating) => {
+            const source = SOURCES[rating.source]
+            return (
+              <li key={rating.source} className={`${styles.popoverRow} ${source.className}`}>
+                <span className={styles.popoverSite}>{source.site}</span>
+                <span className={styles.popoverScore}>
+                  <span className={styles.badgeValue}>{source.score(rating)}</span>
+                  <span className={styles.badgeScale}>{source.shown}</span>
+                </span>
+                <span className={styles.popoverTrack}>
+                  <span className={styles.fill} style={{ width: barWidth(rating) }} />
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </span>
   )
 }

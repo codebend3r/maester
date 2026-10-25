@@ -5,6 +5,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom'
 import { Button, Icon, type IconName, useKeyShortcut } from '@raven/ui'
 import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
 import { isAnyOf, libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
+import { NavTip } from '@/components/AppShell/NavTip'
 import { TabBar } from '@/components/AppShell/TabBar'
 import { useIsMediumScreen } from '@/components/AppShell/useIsMediumScreen'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
@@ -28,7 +29,7 @@ import styles from '@/components/AppShell/AppShell.module.scss'
 /**
  * A row of the side menu, marked as current when the location matches any
  * of its patterns. Down to its icon, it keeps its name for screen readers
- * and as a tooltip. A note adds its word to the name both ways:
+ * and shows it as a tooltip at once. A note adds its word to the name both ways:
  * `Tutorials (locked)`.
  */
 const NavItem = ({
@@ -49,18 +50,22 @@ const NavItem = ({
   const isCurrent = useIsCurrent(patterns)
   const suffix = note ? ` (${note})` : ''
   return (
-    <Link
-      to={to}
-      className={styles.navLink}
-      aria-current={isCurrent ? 'page' : undefined}
-      title={isIconsOnly ? `${label}${suffix}` : undefined}
-    >
-      {icon}
-      <span className={isIconsOnly ? 'visually-hidden' : styles.label}>
-        {label}
-        {!!note && <span className="visually-hidden">{suffix}</span>}
-      </span>
-    </Link>
+    <NavTip text={`${label}${suffix}`} isOn={isIconsOnly}>
+      {(handlers) => (
+        <Link
+          to={to}
+          className={styles.navLink}
+          aria-current={isCurrent ? 'page' : undefined}
+          {...handlers}
+        >
+          {icon}
+          <span className={isIconsOnly ? 'visually-hidden' : styles.label}>
+            {label}
+            {!!note && <span className="visually-hidden">{suffix}</span>}
+          </span>
+        </Link>
+      )}
+    </NavTip>
   )
 }
 

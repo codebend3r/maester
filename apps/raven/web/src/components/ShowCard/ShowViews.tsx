@@ -15,7 +15,7 @@ import {
 } from '@raven/core'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { Icon } from '@raven/ui'
-import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
+import { RatingBadge, RatingChip } from '@/components/RatingPanel/RatingPanel'
 import { ItemPoster } from '@/components/PosterImage/PosterImage'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
@@ -115,7 +115,7 @@ const ShowRow = ({ entry }: { entry: ShowEntry }) => {
         const rating = entry.show.ratings.find((it) => it.source === column.source)
         return (
           <td key={column.source} className={`${styles.number} ${styles.roomy}`}>
-            {rating && <RatingBadge rating={rating} />}
+            {rating && <RatingBadge rating={rating} isBare />}
           </td>
         )
       })}
@@ -214,15 +214,7 @@ const ShowTile = ({ entry, sort }: { entry: ShowEntry; sort: MediaSort | undefin
             </span>
           )}
         </span>
-        {entry.show.ratings.length > 0 && (
-          <ul className={styles.scores} aria-label="Ratings">
-            {entry.show.ratings.map((rating) => (
-              <li key={rating.source}>
-                <RatingBadge rating={rating} />
-              </li>
-            ))}
-          </ul>
-        )}
+        {entry.show.ratings.length > 0 && <RatingChip ratings={entry.show.ratings} />}
       </div>
       {!select.selecting && <NextPlay entry={entry} />}
     </li>

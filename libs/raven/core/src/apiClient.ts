@@ -35,6 +35,7 @@ import {
   type Home,
   type Hero,
   type LibraryHeroChange,
+  type LibraryOrder,
   type HeroPickChange,
   type HeroPicks,
   type HomeSearch,
@@ -493,6 +494,15 @@ export const createApiClient = ({
         }),
         guard: isLibrary,
       }),
+
+    /** Lists the libraries in the order of `ids`, which names every one; the admin's. */
+    reorderLibraries: async ({ ids }: LibraryOrder): Promise<void> => {
+      await send({
+        path: '/api/libraries/order',
+        method: 'PUT',
+        body: { ids } satisfies LibraryOrder,
+      })
+    },
 
     deleteLibrary: async (id: number): Promise<void> => {
       await send({ path: `/api/libraries/${id}`, method: 'DELETE' })

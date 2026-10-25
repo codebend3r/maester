@@ -150,15 +150,6 @@
   padding-inline: var(--space-0);
 }
 
-// The scores small, as a card shows them, as many to a line as fit.
-.scores {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 4.5rem);
-  gap: var(--space-0) var(--space-1);
-  color: var(--color-birch);
-  font-size: var(--font-size-xs);
-}
-
 .note {
   font-size: var(--font-size-sm);
 }

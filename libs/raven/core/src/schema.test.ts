@@ -9,6 +9,7 @@ import {
   nullable,
   object,
   oneOf,
+  optional,
   union,
 } from '@/schema'
 
@@ -31,6 +32,16 @@ describe('nullable and listOf', () => {
     expect(listOf(isNumber)([1, 2])).toBe(true)
     expect(listOf(isNumber)([1, '2'])).toBe(false)
     expect(listOf(isNumber)({ 0: 1 })).toBe(false)
+  })
+})
+
+describe('optional', () => {
+  it('lets a field be left out, but checks it when it is there', () => {
+    const isTagged = object({ tag: optional(nullable(isString)) })
+    expect(isTagged({})).toBe(true)
+    expect(isTagged({ tag: null })).toBe(true)
+    expect(isTagged({ tag: 'new' })).toBe(true)
+    expect(isTagged({ tag: 4 })).toBe(false)
   })
 })
 

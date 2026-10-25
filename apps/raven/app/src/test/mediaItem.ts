@@ -20,6 +20,7 @@ export const summaryFor = (overrides: Partial<ItemSummary> & Pick<ItemSummary, '
     posterVersion: `p${overrides.id}`,
     backdropVersion: `b${overrides.id}`,
     ratings: [],
+    released: null,
     ...overrides,
   }) satisfies ItemSummary
 

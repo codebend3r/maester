@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Library, LibraryViewChange } from '@raven/core'
 import { api } from '@/lib/api'
@@ -15,6 +15,15 @@ import { renderWithProviders } from '@/test/render'
 
 /** The picture laid behind a row; the icons carry a style too, for their size. */
 const BACKDROP = '[style*="background-image"]'
+
+/** Opens every card, which start folded, once the libraries are there. */
+const openAll = async () => {
+  const toggles = await screen.findAllByRole('button', { name: /^Expand / })
+  await toggles.reduce(
+    (done, toggle) => done.then(() => userEvent.click(toggle)),
+    Promise.resolve(),
+  )
+}
 
 const ISO = '2026-10-17T09:00:00.000Z'
 
@@ -33,6 +42,7 @@ describe('LibrariesPage', () => {
     cancelRatings: spyOn(api, 'cancelLibraryRatings'),
     cancelScan: spyOn(api, 'cancelScan'),
     media: spyOn(api, 'listMedia'),
+    reorder: spyOn(api, 'reorderLibraries'),
   }
 
   beforeEach(() => {
@@ -55,11 +65,13 @@ describe('LibrariesPage', () => {
     spies.cancelRatings.mockReset()
     spies.cancelScan.mockReset()
     spies.media.mockReset()
+    spies.reorder.mockReset()
   })
 
   it("offers each library's history, its scans, Update ratings and Edit, each named for its library", async () => {
     spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     expect(await screen.findByRole('link', { name: 'History Clips' })).toHaveAttribute(
       'href',
       '/libraries/2/history',
@@ -82,6 +94,7 @@ describe('LibrariesPage', () => {
     spies.health.mockImplementation(async () => metadataHealth())
     spies.match.mockImplementation(async () => matched)
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const button = await screen.findByRole('button', { name: 'Match again Films' })
     await waitFor(() => expect(button).toBeEnabled())
     spies.list.mockImplementation(async () => [matched])
@@ -93,6 +106,7 @@ describe('LibrariesPage', () => {
   it('opens Edit on the library, with its name filled in', async () => {
     spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     await userEvent.click(await screen.findByRole('button', { name: 'Edit Clips' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByLabelText('Name')).toHaveValue('Clips')
@@ -104,6 +118,7 @@ describe('LibrariesPage', () => {
     ])
     spies.lock.mockImplementation(async () => ({ available: true, unlocked: false }))
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     await userEvent.click(await screen.findByRole('button', { name: 'Edit Tutorials' }))
     expect(useUnlockPrompt.getState().open).toBe(true)
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -119,6 +134,7 @@ describe('LibrariesPage', () => {
       return movies
     })
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const pin = await screen.findByRole('button', { name: 'Pin Movies' })
     expect(pin).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(pin)
@@ -130,6 +146,7 @@ describe('LibrariesPage', () => {
     spies.list.mockImplementation(async () => [clips])
     spies.view.mockImplementation(() => held<Library>().promise)
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const pin = await screen.findByRole('button', { name: 'Pin Clips' })
     await userEvent.click(pin)
     await waitFor(() => expect(pin).toHaveAttribute('aria-pressed', 'true'))
@@ -143,6 +160,7 @@ describe('LibrariesPage', () => {
       throw new Error('The server is away.')
     })
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const pin = await screen.findByRole('button', { name: 'Pin Clips' })
     await userEvent.click(pin)
     await waitFor(() => expect(pin).toHaveAttribute('aria-pressed', 'false'))
@@ -154,6 +172,7 @@ describe('LibrariesPage', () => {
       library({ id: 2, name: 'Clips', settings: { ...library().settings, pinned: false } }),
     ])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const pinned = await screen.findByRole('button', { name: 'Pin Films' })
     const unpinned = screen.getByRole('button', { name: 'Pin Clips' })
     expect(within(pinned).getByText('Pinned')).toHaveAttribute('aria-hidden', 'true')
@@ -181,6 +200,7 @@ describe('LibrariesPage', () => {
       library({ name: 'Shows', paths: ['/media/TV', '/mnt/archive/TV'] }),
     ])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const folders = await screen.findByRole('list', { name: 'Folders' })
     expect(
       within(folders)
@@ -197,6 +217,7 @@ describe('LibrariesPage', () => {
       library({ name: 'Shows', paths: ['/media/vermithor/TV', '/media/vermithor/Mini-Series'] }),
     ])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const folders = await screen.findByRole('list', { name: 'Folders' })
     const lines = within(folders).getAllByRole('listitem')
     expect(lines).toHaveLength(1)
@@ -215,6 +236,7 @@ describe('LibrariesPage', () => {
       library({ name: 'Clips', settings: { ...library().settings, pinned: false } }),
     ])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     expect(await screen.findByRole('button', { name: 'Pin Clips' })).toHaveAttribute(
       'aria-pressed',
       'false',
@@ -299,6 +321,7 @@ describe('LibrariesPage', () => {
     ])
     spies.lock.mockImplementation(async () => ({ available: true, unlocked: true }))
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     expect(await screen.findByText('/media')).toBeInTheDocument()
     const row = screen.getByRole('link', { name: 'Tutorials' }).closest('li')
     expect(row).toHaveTextContent('Other · Unlocked · 12 videos')
@@ -329,6 +352,7 @@ describe('LibrariesPage', () => {
       }),
     )
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const button = await screen.findByRole('button', { name: 'Update ratings Clips' })
     expect(button).toHaveAttribute(
       'title',
@@ -355,6 +379,7 @@ describe('LibrariesPage', () => {
       }),
     ])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     expect(await screen.findByRole('button', { name: 'Cancel update ratings Clips' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'Update ratings Clips' })).toBeNull()
   })
@@ -369,6 +394,7 @@ describe('LibrariesPage', () => {
       return stored.current
     })
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const box = await screen.findByRole('checkbox', { name: 'Include in hero display for Clips' })
     expect(box).toBeChecked()
     await userEvent.click(box)
@@ -385,6 +411,7 @@ describe('LibrariesPage', () => {
     })
     spies.list.mockImplementation(async () => [films])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     await screen.findByRole('button', { name: 'Full scan Films' })
     const actions = [
       'Pin Films',
@@ -417,6 +444,7 @@ describe('LibrariesPage', () => {
     })
     spies.list.mockImplementation(async () => [locked])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const box = await screen.findByRole('checkbox', {
       name: 'Include in hero display for Tutorials',
     })
@@ -435,6 +463,7 @@ describe('LibrariesPage', () => {
     spies.list.mockImplementation(async () => [running])
     spies.cancelRatings.mockImplementation(async () => library({ id: 2, name: 'Clips' }))
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const button = await screen.findByRole('button', { name: 'Cancel update ratings Clips' })
     expect(button.querySelector('[class*="spinner"]')).not.toBeNull()
     // The button that started it is the one that cancels it: there is no second one.
@@ -453,6 +482,7 @@ describe('LibrariesPage', () => {
     spies.list.mockImplementation(async () => [scanning])
     spies.cancelScan.mockImplementation(async () => library({ id: 2, name: 'Clips' }))
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const button = await screen.findByRole('button', { name: 'Cancel full scan Clips' })
     expect(button).toBeEnabled()
     expect(button.querySelector('[class*="spinner"]')).not.toBeNull()
@@ -470,6 +500,7 @@ describe('LibrariesPage', () => {
     spies.list.mockImplementation(async () => [scanning])
     spies.cancelQuick.mockImplementation(async () => library({ id: 2, name: 'Clips' }))
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const button = await screen.findByRole('button', { name: 'Cancel quick scan Clips' })
     expect(button).toBeEnabled()
     expect(button.querySelector('[class*="spinner"]')).not.toBeNull()
@@ -493,6 +524,7 @@ describe('LibrariesPage', () => {
     spies.list.mockImplementation(async () => [clips])
     spies.quick.mockImplementation(async () => matching)
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     const button = await screen.findByRole('button', { name: 'Quick scan Clips' })
     // From then on the server says what the scan is doing.
     spies.list.mockImplementation(async () => [matching])
@@ -504,6 +536,7 @@ describe('LibrariesPage', () => {
   it('offers no Cancel while nothing runs', async () => {
     spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     await screen.findByRole('button', { name: 'Full scan Clips' })
     expect(screen.queryByRole('button', { name: /^Cancel/ })).toBeNull()
   })
@@ -513,6 +546,7 @@ describe('LibrariesPage', () => {
     spies.ratings.mockRejectedValue(new Error('The server is busy'))
     spies.scan.mockRejectedValue(new Error('The folders are gone'))
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     await userEvent.click(await screen.findByRole('button', { name: 'Update ratings Clips' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not update ratings: The server is busy',
@@ -546,6 +580,7 @@ describe('LibrariesPage', () => {
         </>
       ),
     })
+    await openAll()
     await screen.findByText('Updating ratings · 2 of 7')
     await waitFor(() => expect(spies.media).toHaveBeenCalledTimes(1))
     await act(async () =>
@@ -570,6 +605,7 @@ describe('LibrariesPage', () => {
       library({ id: 2, name: 'Clips', ratingsRefresh: { state: 'idle', finishedAt: ISO } }),
     )
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     await userEvent.click(await screen.findByRole('button', { name: 'Update ratings Clips' }))
     await waitFor(() => expect(spies.ratings).toHaveBeenCalled())
     expect(screen.queryByText(/^Updating ratings|^Ratings:/)).toBeNull()
@@ -591,6 +627,7 @@ describe('LibrariesPage', () => {
       }),
     ])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     expect(
       await screen.findByText('Ratings: 5 of 7 · the rest after midnight UTC (daily limit)'),
     ).toBeInTheDocument()
@@ -606,6 +643,7 @@ describe('LibrariesPage', () => {
       }),
     ])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     await screen.findByText('Updating ratings · 2 of 7')
     await waitFor(() => expect(spies.list.mock.calls.length).toBeGreaterThan(2))
   })
@@ -627,6 +665,7 @@ describe('LibrariesPage', () => {
       }),
     ])
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     await screen.findByText('Ratings: 5 of 7 · waiting for the ratings service')
     await new Promise((resolve) => setTimeout(resolve, 300))
     expect(spies.list).toHaveBeenCalledTimes(1)
@@ -635,6 +674,7 @@ describe('LibrariesPage', () => {
   it('leaves Add library and the scans and Update ratings out while the admin lock is on, but keeps the pin', async () => {
     spies.list.mockImplementation(async () => [library({ name: 'Clips' })])
     renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })
+    await openAll()
     expect(await screen.findByRole('button', { name: 'Pin Clips' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add library' })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Quick scan/ })).toBeNull()
@@ -647,12 +687,14 @@ describe('LibrariesPage', () => {
       library({ name: 'Clips', paths: ['/media/vermithor/Clips'] }),
     ])
     renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })
+    await openAll()
     expect(await screen.findByRole('button', { name: 'Pin Clips' })).toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Folders' })).toBeNull()
     expect(screen.queryByText('/media/vermithor')).toBeNull()
     cleanup()
 
     renderWithProviders({ ui: <LibrariesPage /> })
+    await openAll()
     expect(await screen.findByText('/media/vermithor')).toBeInTheDocument()
   })
 
@@ -710,5 +752,148 @@ describe('LibrariesPage', () => {
     renderWithProviders({ ui: <LibrariesPage />, route: '/libraries', behind: ['/'] })
     expect(await screen.findByRole('button', { name: 'Back' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Home' })).toBeNull()
+  })
+  describe('folded cards and the order', () => {
+    const three = () => [
+      library({ id: 1, name: 'Alpha' }),
+      library({ id: 2, name: 'Bravo' }),
+      library({ id: 3, name: 'Charlie' }),
+    ]
+    const names = () =>
+      within(screen.getByRole('list'))
+        .getAllByRole('listitem')
+
+        .map((item) => item.textContent?.match(/Alpha|Bravo|Charlie/)?.[0] ?? '')
+
+    beforeEach(() => {
+      spies.reorder.mockImplementation(async () => undefined)
+    })
+
+    it('folds every card to its name and counts until it is opened, and folds it again', async () => {
+      spies.list.mockImplementation(async () => three())
+      renderWithProviders({ ui: <LibrariesPage /> })
+      const toggle = await screen.findByRole('button', { name: 'Expand Alpha' })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByRole('button', { name: 'Full scan Alpha' })).toBeNull()
+
+      await userEvent.click(toggle)
+      expect(screen.getByRole('button', { name: 'Collapse Alpha' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      )
+      expect(screen.getByRole('button', { name: 'Full scan Alpha' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Full scan Bravo' })).toBeNull()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Collapse Alpha' }))
+      expect(screen.queryByRole('button', { name: 'Full scan Alpha' })).toBeNull()
+    })
+
+    it('thins the cards in edit mode and opens the ones that were open again on Finish', async () => {
+      spies.list.mockImplementation(async () => three())
+      renderWithProviders({ ui: <LibrariesPage /> })
+      await userEvent.click(await screen.findByRole('button', { name: 'Expand Bravo' }))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Edit order' }))
+      expect(screen.queryByRole('button', { name: 'Full scan Bravo' })).toBeNull()
+      expect(screen.queryByRole('button', { name: /^Expand / })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Add library' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Move Alpha up' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Move Charlie down' })).toBeDisabled()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Finish' }))
+      expect(screen.getByRole('button', { name: 'Full scan Bravo' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Expand Alpha' })).toBeInTheDocument()
+      expect(spies.reorder).not.toHaveBeenCalled()
+    })
+
+    it('moves a library with its buttons, and saves the whole order on Finish, at once on screen', async () => {
+      let kept = three()
+      spies.list.mockImplementation(async () => kept)
+      // The server keeps the order it is sent, as it answers the read after.
+      spies.reorder.mockImplementation(async ({ ids }) => {
+        kept = ids.flatMap((id) => kept.filter((each) => each.id === id))
+      })
+      renderWithProviders({ ui: <LibrariesPage /> })
+      await userEvent.click(await screen.findByRole('button', { name: 'Edit order' }))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Move Charlie up' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Move Charlie up' }))
+      expect(names()).toEqual(['Charlie', 'Alpha', 'Bravo'])
+      expect(spies.reorder).not.toHaveBeenCalled()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Finish' }))
+      expect(spies.reorder).toHaveBeenCalledWith({ ids: [3, 1, 2] })
+      expect(names()).toEqual(['Charlie', 'Alpha', 'Bravo'])
+    })
+
+    it('moves a library by dragging its line over another', async () => {
+      spies.list.mockImplementation(async () => three())
+      renderWithProviders({ ui: <LibrariesPage /> })
+      await userEvent.click(await screen.findByRole('button', { name: 'Edit order' }))
+
+      const lines = within(screen.getByRole('list', { name: 'Libraries, in order' })).getAllByRole(
+        'listitem',
+      )
+      const data = new Map<string, string>()
+      const dataTransfer = {
+        effectAllowed: '',
+        setData: (type: string, value: string) => data.set(type, value),
+      }
+      const [alpha, , charlie] = lines
+      fireEvent.dragStart(alpha, { dataTransfer })
+      fireEvent.dragOver(charlie, { dataTransfer })
+      fireEvent.dragEnd(alpha, { dataTransfer })
+      expect(data.get('text/plain')).toBe('1')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Finish' }))
+      expect(spies.reorder).toHaveBeenCalledWith({ ids: [2, 3, 1] })
+    })
+
+    it('saves the order when the admin leaves the page mid-edit', async () => {
+      spies.list.mockImplementation(async () => three())
+      const page = renderWithProviders({ ui: <LibrariesPage /> })
+      await userEvent.click(await screen.findByRole('button', { name: 'Edit order' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Move Alpha down' }))
+
+      page.unmount()
+      await waitFor(() => expect(spies.reorder).toHaveBeenCalledWith({ ids: [2, 1, 3] }))
+    })
+
+    it('saves nothing on leaving when the order did not change', async () => {
+      spies.list.mockImplementation(async () => three())
+      const page = renderWithProviders({ ui: <LibrariesPage /> })
+      await userEvent.click(await screen.findByRole('button', { name: 'Edit order' }))
+      page.unmount()
+      expect(spies.reorder).not.toHaveBeenCalled()
+    })
+
+    it('puts the order back and says why when the server refuses it', async () => {
+      spies.list.mockImplementation(async () => three())
+      spies.reorder.mockImplementation(async () => {
+        throw new Error('ids must name every library once.')
+      })
+      renderWithProviders({ ui: <LibrariesPage /> })
+      await userEvent.click(await screen.findByRole('button', { name: 'Edit order' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Move Alpha down' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Finish' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'ids must name every library once.',
+      )
+      await waitFor(() => expect(names()).toEqual(['Alpha', 'Bravo', 'Charlie']))
+    })
+
+    it('offers no editing of the order with one library, or while the admin lock is on', async () => {
+      spies.list.mockImplementation(async () => [library({ name: 'Alpha' })])
+      renderWithProviders({ ui: <LibrariesPage /> })
+      await screen.findByRole('button', { name: 'Expand Alpha' })
+      expect(screen.queryByRole('button', { name: 'Edit order' })).toBeNull()
+      cleanup()
+
+      spies.list.mockImplementation(async () => three())
+      renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })
+      await screen.findByRole('button', { name: 'Expand Alpha' })
+      expect(screen.queryByRole('button', { name: 'Edit order' })).toBeNull()
+    })
   })
 })

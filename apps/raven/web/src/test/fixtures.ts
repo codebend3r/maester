@@ -111,6 +111,7 @@ export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary =
   posterVersion: 'p1',
   backdropVersion: null,
   ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 1200 }],
+  released: '1999-03-31',
   ...overrides,
 })
 

@@ -125,9 +125,9 @@ describe('ShowPage', () => {
       route: '/shows/4',
       libraries: [library({ id: EPISODE_TWO.libraryId, name: 'Series' })],
     })
-    expect(await screen.findByRole('link', { name: 'Series' })).toHaveAttribute(
-      'href',
-      `/libraries/${EPISODE_TWO.libraryId}`,
+    const links = await screen.findAllByRole('link', { name: 'Series' })
+    links.forEach((link) =>
+      expect(link).toHaveAttribute('href', `/libraries/${EPISODE_TWO.libraryId}`),
     )
     expect(screen.getByText('Show')).toBeInTheDocument()
   })

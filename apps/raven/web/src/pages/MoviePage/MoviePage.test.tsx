@@ -124,7 +124,9 @@ describe('MoviePage', () => {
       screen.getByRole('listitem', { name: 'TMDB: 8.2 out of 10. Average user rating.' }),
     ).toBeInTheDocument()
     expect(screen.getByText('Every table has a story.')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Films' })).toHaveAttribute('href', '/libraries/2')
+    screen
+      .getAllByRole('link', { name: 'Films' })
+      .forEach((link) => expect(link).toHaveAttribute('href', '/libraries/2'))
   })
 
   it('links a movie in a saga to the saga, saying which part it is', async () => {
@@ -407,7 +409,9 @@ describe('MoviePage', () => {
       open({ details: AVATAR, libraries: LIBRARIES, route: '/movies/40?library=3' })
       expect(await played()).toEqual(['/watch/7', '/watch/5'])
       expect(screen.getByText('2 files')).toBeInTheDocument()
-      expect(screen.getByRole('link', { name: 'Films' })).toHaveAttribute('href', '/libraries/3')
+      screen
+        .getAllByRole('link', { name: 'Films' })
+        .forEach((link) => expect(link).toHaveAttribute('href', '/libraries/3'))
       await userEvent.click(screen.getByRole('link', { name: 'Play Busboys' }))
       expect(await screen.findByText('Watching 7')).toBeInTheDocument()
     })
@@ -422,7 +426,9 @@ describe('MoviePage', () => {
     it('keeps to the library of the best file for an address naming no library, or one without the movie', async () => {
       open({ details: AVATAR, libraries: LIBRARIES, route: '/movies/40?library=9' })
       expect(await played()).toEqual(['/watch/8', '/watch/6'])
-      expect(screen.getByRole('link', { name: '4K Films' })).toHaveAttribute('href', '/libraries/2')
+      screen
+        .getAllByRole('link', { name: '4K Films' })
+        .forEach((link) => expect(link).toHaveAttribute('href', '/libraries/2'))
     })
   })
 

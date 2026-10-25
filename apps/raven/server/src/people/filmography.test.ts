@@ -39,6 +39,7 @@ const summary = ({
   posterVersion: null,
   backdropVersion: null,
   ratings: [],
+  released: null,
 })
 
 /** Nothing held, nothing seen, no local credits: what each test then adds to. */

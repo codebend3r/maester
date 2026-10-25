@@ -13,7 +13,6 @@ import {
   resolutionLabel,
   sortFact,
 } from '@raven/core'
-import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
@@ -124,15 +123,6 @@ const MediaTile = ({
           <PartlyWatched media={media} />
           <WatchedWords watched={withWatched && media.watched} />
         </span>
-        {posters && media.item && media.item.ratings.length > 0 && (
-          <ul className={styles.scores} aria-label="Ratings">
-            {media.item.ratings.map((rating) => (
-              <li key={rating.source}>
-                <RatingBadge rating={rating} />
-              </li>
-            ))}
-          </ul>
-        )}
         {media.folder !== '' && <span className={styles.folder}>{media.folder}</span>}
         {posters && media.match === MATCH_STATES.unmatched && (
           <span className={styles.note}>Not matched</span>
