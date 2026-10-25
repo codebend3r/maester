@@ -179,7 +179,7 @@
   background: color-mix(in srgb, var(--color-on-picture) 12%, var(--color-picture-glass));
   color: var(--color-on-picture);
   cursor: pointer;
-  backdrop-filter: blur(12px);
+  backdrop-filter: var(--filter-glass);
 
   > * {
     grid-area: pill;

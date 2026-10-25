@@ -11,7 +11,7 @@
   border-radius: var(--radius-pill);
   background: var(--color-picture-scrim);
   color: var(--color-on-picture);
-  backdrop-filter: blur(10px);
+  backdrop-filter: var(--filter-glass);
   pointer-events: none;
   // Without motion it stays out of sight, as it always ended; the player's
   // live region says the same words.

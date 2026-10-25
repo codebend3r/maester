@@ -347,6 +347,9 @@ describe('the native engine', () => {
     const fake = fakePlayer()
     const { unmount } = renderNative({ player: fake.player })
     await settled()
+    // The last title's frame is still in the video layer, so the page stays opaque until this one has a frame.
+    expect(document.documentElement.dataset.surface).toBeUndefined()
+    await fake.emit({ type: 'waiting', waiting: false })
     expect(document.documentElement.dataset.surface).toBe('native')
     expect(fake.listenerCount()).toBe(1)
     unmount()

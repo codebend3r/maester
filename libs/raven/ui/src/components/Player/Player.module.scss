@@ -45,7 +45,7 @@
   border-radius: 50%;
   background: var(--color-picture-scrim);
   color: var(--color-on-picture);
-  backdrop-filter: blur(10px);
+  backdrop-filter: var(--filter-glass);
   pointer-events: none;
 
   @media (prefers-reduced-motion: no-preference) {
@@ -111,7 +111,7 @@
   border-color: transparent;
   background: color-mix(in srgb, var(--color-on-picture) 12%, var(--color-picture-glass));
   color: var(--color-on-picture);
-  backdrop-filter: blur(12px);
+  backdrop-filter: var(--filter-glass);
 
   &:hover:not(:disabled) {
     background: color-mix(in srgb, var(--color-on-picture) 22%, var(--color-picture-glass));
@@ -281,7 +281,7 @@
   border-radius: var(--radius-xl);
   background: var(--color-picture-glass);
   box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(14px);
+  backdrop-filter: var(--filter-glass);
 }
 
 // A way back that reads as text, its arrow lined up with the panel's words.

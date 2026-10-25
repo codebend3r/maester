@@ -60,6 +60,7 @@
   --color-on-picture-soft: rgb(246 242 234 / 85%);
   --color-picture-scrim: rgb(10 14 13 / 60%);
   --color-picture-glass: rgb(10 14 13 / 72%);
+  --filter-glass: blur(12px);
   // The ground washed over a backdrop behind page content.
   --color-night-wash: color-mix(in srgb, var(--color-night) 55%, transparent);
   // The ground as glass over a picture: score chips over posters.
@@ -237,6 +238,11 @@ body {
 // A desktop host draws the video under the page, so the page lets it through.
 :root[data-surface='native'] {
   --color-stage: transparent;
+  // The video is another view under the page, so a blur has nothing to read, and blurred
+  // overlays over it showed ghost frames of a moving tip and of closed menus. Near opaque
+  // glass stands in for it.
+  --filter-glass: none;
+  --color-picture-glass: rgb(10 14 13 / 92%);
 }
 
 :root[data-surface='native'] body {
