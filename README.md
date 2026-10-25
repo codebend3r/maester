@@ -34,7 +34,7 @@ bun run verify     # spellcheck, lint, format check, typecheck, tests and build 
 bun run affected   # the same for the projects changed since main; spellcheck still covers the whole repo
 ```
 
-Every pull request runs each of these on every project, one step each, spread across Nx Agents (`.nx/ci-config.yaml`, `.nx/workflows/agents.yaml`), then builds and health checks both production images (`.github/workflows/pull-request-checks.yml`).
+Every pull request runs each check on every project in its own parallel matrix job, then builds and health checks both production images (`.github/workflows/pull-request-checks.yml`).
 
 The git hooks are lefthook's (`lefthook.yml`):
 

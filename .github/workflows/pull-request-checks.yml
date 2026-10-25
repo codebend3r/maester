@@ -24,20 +24,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The checks `bun run verify` runs, one step each so the log shows them apart,
-  # spread across Nx Agents: this job hands out each step's tasks and the agents
-  # run them. Their count and setup live in .nx/ci-config.yaml and
-  # .nx/workflows/agents.yaml.
-  # Only this job distributes: `start-nx-agents` marks its own runner, and an
-  # `nx` command distributes only where that mark is. The macOS jobs below run
-  # their tasks on their own runners, with the remote cache, and need no opt out.
+  # The checks `bun run verify` runs before the build, one target per runner so
+  # they execute in parallel and each has its own named log. Nx Cloud still shares
+  # completed tasks between jobs through its remote cache.
   checks:
-    name: ✅ Checks
+    name: ${{ matrix.check.name }}
     runs-on: ubuntu-24.04
     permissions:
       actions: write
       contents: read
     timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        check:
+          - name: 🎨 Format
+            target: format:check
+            uv: true
+          - name: 🧩 Type-check
+            target: typecheck
+          - name: 🔤 Spellcheck
+            target: spellcheck
+            uv: true
+          - name: 🐍 Python lint
+            target: lint:py
+            uv: true
+          - name: 🟦 TypeScript lint
+            target: lint:ts
+          - name: 🖌️ CSS lint
+            target: lint:css
+          - name: 🧪 Tests
+            target: test
+            ffmpeg: true
+            uv: true
+          - name: 📸 Screen tests
+            target: test:screens
+            node: true
+          - name: 🧹 Dead code
+            target: dead-code
+          - name: 🧼 Dead CSS
+            target: dead-css
     env:
       # uv runs against the committed lockfiles, never re-resolving them.
       UV_FROZEN: '1'
@@ -46,81 +72,107 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v7
 
-      # First, so the agents boot while this job installs. Agents need the token,
-      # so a fork's PR skips them and runs every task in this job instead.
-      - name: 🤖 Start Nx Agents
-        id: agents
-        if: env.NX_CLOUD_ACCESS_TOKEN != ''
-        continue-on-error: true
-        run: npx --yes nx-cloud@19.1.3 start-nx-agents
-
-      # Nx Cloud refuses the run once the organization is over its plan's usage, or
-      # when it is down. Every task then runs in this job, cached locally only, as a
-      # fork's PR does, instead of each nx command retrying the cloud and warning.
-      - name: ☁️ Run without Nx Cloud
-        if: steps.agents.outcome == 'failure'
-        run: |
-          echo "::warning::Nx Agents did not start, so this job runs every task itself without Nx Cloud."
-          echo 'NX_NO_CLOUD=true' >> "$GITHUB_ENV"
-
       # Bun's version comes from `packageManager` in package.json.
       - name: 🍞 Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
 
-      # For the screen tests when they run here, as a fork's PR runs them; the agents'
-      # image has its own Node 24.
+      # raven's screen tests load babel.config.ts through Node's type stripping.
       - name: 🟩 Set up Node
+        if: matrix.check.node == true
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.APP_NODE_VERSION }}
 
-      # Each Python project's .python-version picks its interpreter. Uncached tasks,
-      # such as spellcheck's `uvx typos`, can run in this job instead of on an agent.
+      # Python checks use each project's pinned interpreter and lockfile.
       - name: 🐍 Set up uv
+        if: matrix.check.uv == true
         uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
           cache-dependency-glob: '**/uv.lock'
 
-      # raven's server and core tests encode real clips with ffmpeg. The agents
-      # install their own, so only a run without them needs it here.
-      - name: 🎞️ Install ffmpeg
-        if: steps.agents.outcome != 'success'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      # The pinned build keeps raven's encoded test cues stable across runner images.
+      - name: 🎞️ Install test system tools
+        if: matrix.check.ffmpeg == true
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata
+          build=ffmpeg-n9.0.2-28-g669f5ab083-linux64-gpl-9.0
+          curl -fsSL -o "/tmp/$build.tar.xz" "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-17-20-51/$build.tar.xz"
+          echo "cc171d4d373f9ca633741d38fae6a17cd914075818febb1465f6f64e6d57f7ca  /tmp/$build.tar.xz" | sha256sum -c -
+          tar -xf "/tmp/$build.tar.xz" -C /tmp
+          sudo install -m 755 "/tmp/$build/bin/ffmpeg" "/tmp/$build/bin/ffprobe" /usr/local/bin/
+          ffmpeg -version | head -n 1
 
       # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
       - name: 📦 Install
         run: bun install --frozen-lockfile
 
-      # Every check but the build, in one Nx run so the agents work through the whole task
-      # graph at once instead of idling at the end of each check: ruff format and oxfmt,
-      # tsc without emitting, typos over the whole repo (dotfiles included), ruff, oxlint
-      # and gale, pytest, vitest and bun test (raven's server and core tests encode real
-      # clips with ffmpeg), jest-expo for the device app's tests that render a native
-      # component, which `bun test` cannot load, and knip (no unused file, export, type or
-      # dependency) with the check that every module class is read by a TSX. `static` keeps
-      # every test's output; Nx's CI default collapses the passing ones to a line.
-      - name: 🧪 Checks and tests
-        run: >-
-          bunx nx run-many --outputStyle=static
-          -t format:check typecheck spellcheck lint:py lint:ts lint:css test test:screens dead-code dead-css
-
-      # Every project's build. The agents stay up until this target is done
-      # (.nx/ci-config.yaml), so a new step goes before it.
-      - name: 🏗️ Build
-        run: bun run build
+      # `static` keeps every test's output; Nx's CI default collapses passing tasks.
+      - name: ${{ matrix.check.name }}
+        run: bunx nx run-many --outputStyle=static -t ${{ matrix.check.target }}
 
       # Fail fast: a failed job cancels the whole run, so nothing else keeps burning runner
-      # minutes. Last, so this job's own failure() uploads have already run. A fork's PR
-      # token is read-only, so the cancel may be refused there; that must not mask the failure.
+      # minutes. A fork's PR token is read-only, so refusal must not mask the failure.
       - name: 🛑 Cancel the run
         if: failure()
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
+
+  # Keep the existing order: every matrix check passes, then every project builds.
+  build:
+    name: 🏗️ Build
+    needs: checks
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+    timeout-minutes: 30
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      - name: 🏗️ Build
+        run: bun run build
+
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
+
+  # The "Protect main" ruleset requires this stable check name. It passes only
+  # when every matrix check and the build passed.
+  checks-complete:
+    name: ✅ Checks
+    needs: [checks, build]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: ✅ Every check passed
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          echo "Checks: $CHECKS_RESULT"
+          echo "Build: $BUILD_RESULT"
+          test "$CHECKS_RESULT" = success
+          test "$BUILD_RESULT" = success
 
   supabase:
     name: 🗄️ Supabase
