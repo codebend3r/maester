@@ -10,6 +10,7 @@ import { configureStorage } from '@raven/ui/headless'
 import { AppRoutes } from '@/AppRoutes'
 import { CardLinks } from '@/components/CardLink/CardLink'
 import { startDesktop } from '@/desktop/startDesktop'
+import { KeepLibraryListings } from '@/lib/keepLibraryListings'
 import { MediaOriginProbe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { queryClient } from '@/lib/queryClient'
 import { PrefetchPlaybackSettings } from '@/lib/prefetchPlaybackSettings'
@@ -28,11 +29,13 @@ if (rootElement) {
         <BrowserRouter>
           <StartAuthSession>
             <PrefetchPlaybackSettings>
-              <MediaOriginProbe>
-                <CardLinks>
-                  <AppRoutes />
-                </CardLinks>
-              </MediaOriginProbe>
+              <KeepLibraryListings>
+                <MediaOriginProbe>
+                  <CardLinks>
+                    <AppRoutes />
+                  </CardLinks>
+                </MediaOriginProbe>
+              </KeepLibraryListings>
             </PrefetchPlaybackSettings>
           </StartAuthSession>
         </BrowserRouter>
