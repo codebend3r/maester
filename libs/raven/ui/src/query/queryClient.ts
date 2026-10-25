@@ -159,6 +159,8 @@ export const mutationKeys = {
   pin: ['pin'],
   /** Any library's place in the hero: they all show in the libraries list and in the hero. */
   heroLibrary: ['hero-library'],
+  /** Any change to the libraries' order: the whole list is sent each time. */
+  libraryOrder: ['library-order'],
   /** One library's sort, view or grouping, which only its page changes. */
   libraryView: (libraryId: number) => ['library-view', libraryId],
   playbackSettings: ['settings', 'playback'],

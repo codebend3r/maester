@@ -39,6 +39,8 @@
     "desktop:test:native": "nx run @raven/desktop:test:native",
     "dev:luwin": "nx run-many -t dev -p @luwin/api @luwin/web",
     "dev:raven": "nx run-many -t dev -p @raven/server @raven/ui @raven/web",
+    "dev:raven:prod": "RAVEN_DEV_API_ORIGIN=https://raven.tail5586d4.ts.net nx run-many -t dev -p @raven/ui @raven/web",
+    "dev:raven:db": "scripts/pull_raven_db.sh",
     "dev:rookery": "nx run-many -t dev -p @rookery/server @rookery/web",
     "format": "nx run-many -t format",
     "format:check": "nx run-many -t format:check",

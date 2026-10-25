@@ -226,7 +226,7 @@ describe('ResetPasswordPage', () => {
     it('waits while the config or the stored session is read, without sending the visitor away', () => {
       renderReset({ status: AUTH_SESSION_STATUSES.booting, isRecovery: false })
 
-      expect(screen.getByRole('status')).toHaveTextContent('Checking your account')
+      expect(screen.getByRole('status')).toHaveTextContent('Loading')
       expect(where()).toBe(AUTH_ROUTES.reset)
     })
 

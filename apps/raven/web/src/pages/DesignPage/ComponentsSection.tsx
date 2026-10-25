@@ -10,7 +10,7 @@ import { MediaGroups } from '@/components/MediaGroups/MediaGroups'
 import { MediaList } from '@/components/MediaList/MediaList'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
-import { RatingBadge, RatingPanel } from '@/components/RatingPanel/RatingPanel'
+import { RatingBadge, RatingChip, RatingPanel } from '@/components/RatingPanel/RatingPanel'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
@@ -246,6 +246,17 @@ export const ComponentsSection = () => (
         {[...SAMPLE_RATINGS, ...SAMPLE_RATINGS_LOW, ...SAMPLE_RATINGS_RED].map((rating) => (
           <RatingBadge key={`${rating.source}-${rating.value}`} rating={rating} />
         ))}
+      </div>
+    </Specimen>
+
+    <Specimen
+      name="RatingChip"
+      note="Every score a title has in one chip, where a tile has no room for four badges: the lead score and how many more. Hover or focus it for each source's score in a popover."
+    >
+      <div className={styles.row}>
+        <RatingChip ratings={SAMPLE_RATINGS} />
+        <RatingChip ratings={SAMPLE_RATINGS_LOW} />
+        <RatingChip ratings={SAMPLE_RATINGS.slice(0, 1)} />
       </div>
     </Specimen>
 

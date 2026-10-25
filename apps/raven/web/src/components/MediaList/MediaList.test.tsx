@@ -74,7 +74,6 @@ describe('MediaList', () => {
         .map((header) => header.textContent),
     ).toEqual([
       'Title',
-      'Year',
       'RT',
       'IMDb',
       'Metacritic',
@@ -84,7 +83,7 @@ describe('MediaList', () => {
       'Size',
       'Bitrate',
       'Added',
-      'Changed',
+      'Released',
       'Actions',
     ])
     const titles = () =>
@@ -145,5 +144,67 @@ describe('MediaList', () => {
     expect(within(watched).getByRole('rowheader')).toHaveTextContent('Watched')
     expect(within(unwatched).queryByText('Watched')).toBeNull()
     expect(within(header).queryByText('Watched')).toBeNull()
+  })
+
+  it('replaces Changed with the release date in a Movies library, the year when TMDB gave no day, and sorts by it', async () => {
+    const movie = ({
+      id,
+      title,
+      released,
+      year,
+    }: {
+      id: number
+      title: string
+      released: string | null
+      year: number | null
+    }) => mediaItem({ id, title, year, item: itemSummary({ id, title, year, released }) })
+    renderWithProviders({
+      ui: (
+        <MediaList
+          movies
+          items={[
+            movie({ id: 1, title: 'Older', released: '1999-03-31', year: 1999 }),
+            movie({ id: 2, title: 'Newer', released: '2024-11-05', year: 2024 }),
+            movie({ id: 3, title: 'Dayless', released: null, year: 2001 }),
+          ]}
+        />
+      ),
+    })
+    const table = screen.getByRole('table', { name: 'Videos' })
+    expect(within(table).queryByRole('columnheader', { name: 'Changed' })).toBeNull()
+    const rows = () => within(table).getAllByRole('row').slice(1)
+    expect(within(rows()[0]!).getByText('Mar 31, 1999')).toBeInTheDocument()
+    expect(within(rows()[2]!).getAllByText('2001').length).toBeGreaterThan(0)
+
+    await userEvent.click(within(table).getByRole('button', { name: 'Released' }))
+    expect(
+      within(table)
+        .getAllByRole('rowheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Newer', 'Dayless', 'Older'])
+  })
+
+  it('sorts the release column by year while the server sends no release dates', async () => {
+    const movie = ({ id, title, year }: { id: number; title: string; year: number }) =>
+      mediaItem({ id, title, year, item: itemSummary({ id, title, year, released: undefined }) })
+    renderWithProviders({
+      ui: (
+        <MediaList
+          movies
+          items={[
+            movie({ id: 1, title: 'Middle', year: 2001 }),
+            movie({ id: 2, title: 'Oldest', year: 1966 }),
+            movie({ id: 3, title: 'Newest', year: 2026 }),
+          ]}
+        />
+      ),
+    })
+    const table = screen.getByRole('table', { name: 'Videos' })
+    await userEvent.click(within(table).getByRole('button', { name: 'Released' }))
+    expect(
+      within(table)
+        .getAllByRole('rowheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Newest', 'Middle', 'Oldest'])
   })
 })

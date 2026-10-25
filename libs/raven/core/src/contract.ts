@@ -7,6 +7,7 @@ import {
   isString,
   isStringArray,
   listOf,
+  optional,
   keyOf,
   nullable,
   object,
@@ -467,6 +468,11 @@ export const isLibraryHeroChange = object({ inHero: isLibrarySettings.shape.inHe
 
 export type LibraryHeroChange = Infer<typeof isLibraryHeroChange>
 
+/** `PUT /api/libraries/order`: every library's id, once each, in the order they should list. */
+export const isLibraryOrder = object({ ids: listOf(isNumber) })
+
+export type LibraryOrder = Infer<typeof isLibraryOrder>
+
 export const LIBRARY_BACKDROP_TYPES = { item: 'item', thumbnail: 'thumbnail' } as const
 
 /**
@@ -627,6 +633,12 @@ export const isItemSummary = object({
   backdropVersion: nullable(isString),
   /** Every score it has, one per source. */
   ratings: listOf(isRating),
+  /**
+   * The day it came out or first aired, as `YYYY-MM-DD`, from TMDB; null when
+   * it gave none, and absent from a server older than this field, which a web
+   * app served apart from it (Netlify, a dev server on Vhagar) can still meet.
+   */
+  released: optional(nullable(isString)),
 })
 
 export type ItemSummary = Infer<typeof isItemSummary>

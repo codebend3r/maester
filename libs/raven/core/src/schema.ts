@@ -50,6 +50,12 @@ export const nullable =
   (value): value is T | null =>
     value === null || guard(value)
 
+/** A value `guard` accepts, or none at all: a field an older server does not send yet. */
+export const optional =
+  <T>(guard: Guard<T>): Guard<T | undefined> =>
+  (value): value is T | undefined =>
+    value === undefined || guard(value)
+
 /** A list whose every entry passes `guard`. */
 export const listOf =
   <T>(guard: Guard<T>): Guard<T[]> =>

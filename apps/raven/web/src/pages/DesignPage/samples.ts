@@ -155,6 +155,7 @@ const sampleMovie = (
   posterVersion: null,
   backdropVersion: null,
   ratings: [],
+  released: null,
   ...overrides,
 })
 

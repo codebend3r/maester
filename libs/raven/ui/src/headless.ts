@@ -41,6 +41,7 @@ export {
   afterLibraryEvent,
   afterHeroLibraries,
   afterHeroPicked,
+  afterLibraryOrder,
   afterLibrarySaved,
   afterLibraryView,
   afterMatch,
@@ -59,6 +60,7 @@ export type { Edit } from '@/query/optimistic'
 export {
   favouriteEdits,
   itemFavouriteEdits,
+  libraryOrderEdits,
   librarySettingsEdits,
   watchedEdits,
   withoutEntry,

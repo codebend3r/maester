@@ -21,7 +21,7 @@ import {
   showEntryKey,
   watchLink,
 } from '@raven/core'
-import { type ReactNode, useRef } from 'react'
+import { type ReactNode, useDeferredValue, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ButtonLink } from '@raven/ui'
 import { Duplicates } from '@/components/Duplicates/Duplicates'
@@ -33,6 +33,7 @@ import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
 import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionScope'
 import { Loading } from '@/components/Skeleton/Skeleton'
+import { Spinner } from '@/components/Spinner/Spinner'
 import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
 import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
@@ -154,6 +155,10 @@ const ListingBody = ({
   }
 }
 
+/** Whether two settings lay a listing out the same way. */
+const sameLayout = ({ a, b }: { a: LibrarySettings; b: LibrarySettings }): boolean =>
+  a.view === b.view && a.sort === b.sort && a.groupBy === b.groupBy
+
 /**
  * Every video or show in the library, searched, sorted and laid out as it
  * was left, with Play and Shuffle, and a strip down the side that jumps
@@ -163,7 +168,9 @@ const AllSection = ({ library }: { library: Library }) => {
   const cards = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const view = useLibraryView({ library })
-  const { settings } = view
+  // The listing follows a change of view once it can lay itself out, the old one standing till then.
+  const settings = useDeferredValue(view.settings)
+  const isChanging = !sameLayout({ a: settings, b: view.settings })
   const scanning = isScanning(library.scan)
   const listing = useLibraryListing({
     libraryId: library.id,
@@ -217,7 +224,7 @@ const AllSection = ({ library }: { library: Library }) => {
         <LibraryToolbar
           name={library.name}
           search={view.search}
-          settings={settings}
+          settings={view.shown}
           onChange={view.change}
           playable={queue.playable}
           onPlay={() => watch(queue.first())}
@@ -235,7 +242,19 @@ const AllSection = ({ library }: { library: Library }) => {
 
         {scale && !empty && <JumpPicker scale={scale} scope={cards} />}
 
-        <ListingBody listing={listing} settings={settings} empty={empty} />
+        <div className={styles.listing} aria-busy={isChanging}>
+          <div
+            className={isChanging ? `${styles.listingBody} ${styles.changing}` : styles.listingBody}
+          >
+            <ListingBody listing={listing} settings={settings} empty={empty} />
+          </div>
+          {isChanging && (
+            <output className={styles.switching}>
+              <Spinner />
+              Changing the view
+            </output>
+          )}
+        </div>
 
         <SelectionBar />
       </div>

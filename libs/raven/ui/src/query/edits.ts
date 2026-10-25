@@ -292,6 +292,24 @@ export const watchedEdits = ({
   ]
 }
 
+/**
+ * The libraries were put in the order of `ids`: the list the side menu and
+ * the Libraries page read. A library `ids` leaves out follows the rest.
+ */
+export const libraryOrderEdits = ({ ids }: { ids: readonly number[] }): Edit[] => [
+  editKey<Library[]>({
+    queryKey: queryKeys.libraries,
+    update: (libraries) => {
+      const rank = (library: Library): number => {
+        const place = ids.indexOf(library.id)
+        return place === -1 ? ids.length : place
+      }
+      const ordered = libraries.toSorted((a, b) => rank(a) - rank(b))
+      return ordered.every((library, index) => library === libraries[index]) ? libraries : ordered
+    },
+  }),
+]
+
 /** A library's settings changed: on its own page, and in the libraries list the side menu reads. */
 export const librarySettingsEdits = ({
   libraryId,

@@ -94,6 +94,10 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   const showsLogo = useQuery(displaySettingsQuery).data?.titles !== TITLE_DISPLAYS.text
   const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId
   const libraryName = useQuery(librariesQuery).data?.find((entry) => entry.id === libraryId)?.name
+  const library = {
+    to: libraryId == null ? '/libraries' : `/libraries/${libraryId}`,
+    label: libraryName ?? 'Library',
+  }
   const code = next.data?.item ? episodeCode(next.data.item) : null
   const seasons = seasonsOf(details)
   const marks = seasonsWatched(seasons)
@@ -113,10 +117,8 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
     >
       <article className={styles.page} aria-labelledby={ids.title}>
         <ItemHeader
-          back={{
-            to: libraryId == null ? '/libraries' : `/libraries/${libraryId}`,
-            label: libraryName ?? 'Library',
-          }}
+          back={library}
+          library={library}
           titleId={ids.title}
           eyebrow={['Show']}
           title={details.title}

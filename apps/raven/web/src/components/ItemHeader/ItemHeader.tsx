@@ -216,6 +216,7 @@ export const ItemHeader = ({
   backdrop,
   logo = null,
   back,
+  library,
   progress,
   children,
   manage,
@@ -236,6 +237,8 @@ export const ItemHeader = ({
   logo?: string | null
   /** Where the page goes back to, over the backdrop's top corner. */
   back: BackFallback
+  /** The library the item lives in, linked above its title; left out where the page has none. */
+  library?: BackFallback
   /** A line of how far through the item the viewer is, where the page has one. */
   progress?: HeaderProgress
   /**
@@ -254,6 +257,12 @@ export const ItemHeader = ({
     <div className={LAYOUTS[picture?.shape ?? PICTURE_SHAPES.none]}>
       {picture && <Picture picture={picture} title={title} />}
       <div className={styles.details}>
+        {library && (
+          <Link to={library.to} className={styles.library}>
+            <Icon name="back" size={14} />
+            {library.label}
+          </Link>
+        )}
         {eyebrow.length > 0 && (
           <p className={styles.eyebrow}>
             <Dotted parts={eyebrow} />

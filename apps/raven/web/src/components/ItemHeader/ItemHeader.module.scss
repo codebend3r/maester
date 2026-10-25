@@ -180,6 +180,26 @@
   min-width: 0;
 }
 
+.library {
+  display: grid;
+  grid-auto-flow: column;
+  justify-self: start;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-birch);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color-bark);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
 .eyebrow {
   color: var(--color-birch);
   font-size: var(--font-size-xs);

@@ -153,6 +153,17 @@
   white-space: nowrap;
 }
 
+.badgeBare {
+  grid-template-columns: auto;
+  grid-template-areas:
+    'score'
+    'track';
+}
+
+.badgeBare .badgeScore {
+  padding-inline-end: var(--space-0);
+}
+
 .badgeScore {
   grid-area: score;
   display: grid;
@@ -256,4 +267,104 @@
 .site {
   font-size: var(--font-size-sm);
   font-weight: 700;
+}
+
+// One chip for all of a title's scores: the lead score and how many more, with
+// every score in a popover that opens over the chip. It opens upward from the
+// chip's foot, over the title's own lines, so a card that clips its overflow
+// keeps it.
+.chip {
+  position: relative;
+  display: inline-grid;
+  justify-self: start;
+  border-radius: var(--radius-sm);
+  outline: none;
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.chipFace {
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.chipMore {
+  color: var(--color-lichen);
+  font-size: var(--font-size-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.popover {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  display: grid;
+  gap: var(--space-1);
+  min-width: 11rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy-hi);
+  box-shadow: var(--shadow-menu);
+  pointer-events: none;
+  visibility: hidden;
+
+  .chip:hover &,
+  .chip:focus-visible & {
+    visibility: visible;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    opacity: 0;
+    transition:
+      opacity 150ms var(--ease-out),
+      visibility 150ms;
+
+    .chip:hover &,
+    .chip:focus-visible & {
+      opacity: 1;
+    }
+  }
+}
+
+.popoverRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'site score'
+    'track track';
+  align-items: baseline;
+  gap: 2px var(--space-3);
+}
+
+.popoverSite {
+  grid-area: site;
+  color: var(--color-birch);
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.popoverScore {
+  grid-area: score;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: baseline;
+  gap: 1px;
+}
+
+.popoverTrack {
+  grid-area: track;
+  height: 2px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-track);
 }

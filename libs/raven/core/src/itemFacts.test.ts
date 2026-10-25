@@ -33,12 +33,13 @@ describe('movie facts', () => {
   it('counts the files only once the movie has two or more', () => {
     const one = itemDetails({
       year: 2026,
+      released: '2026-03-07',
       runtime: 97,
       genres: ['Comedy', 'Drama', 'Crime', 'Romance'],
       versions: [mediaItem({ id: 1, duration: null })],
     })
     expect(movieFacts({ details: one, primary: undefined })).toEqual([
-      '2026',
+      formatAirDate('2026-03-07') ?? '',
       '1h 37m',
       'Comedy',
       'Drama',
@@ -46,6 +47,11 @@ describe('movie facts', () => {
     ])
     const two = { ...one, versions: [mediaItem({ id: 1 }), mediaItem({ id: 2 })] }
     expect(movieFacts({ details: two, primary: undefined }).at(-1)).toBe('2 files')
+  })
+
+  it('falls back to the year when TMDB gave no release day', () => {
+    const undated = itemDetails({ year: 2026, released: null, runtime: null, genres: [] })
+    expect(movieFacts({ details: undated, primary: undefined })).toEqual(['2026'])
   })
 })
 

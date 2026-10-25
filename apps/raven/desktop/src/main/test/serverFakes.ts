@@ -50,6 +50,7 @@ export const summary = (overrides: Partial<ItemSummary>): ItemSummary => ({
   posterVersion: null,
   backdropVersion: null,
   ratings: [],
+  released: null,
   ...overrides,
 })
 

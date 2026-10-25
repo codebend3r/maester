@@ -77,6 +77,7 @@ export const ROUTES = {
   libraries: { method: GET, path: '/api/libraries', account: approved },
   createLibrary: { method: POST, path: '/api/libraries', account: owner },
   library: { method: GET, path: '/api/libraries/:id', account: approved },
+  reorderLibraries: { method: PUT, path: '/api/libraries/order', account: owner },
   setLibraryInHero: { method: PUT, path: '/api/libraries/:id/hero', account: owner },
   updateLibrary: { method: PUT, path: '/api/libraries/:id', account: owner },
   deleteLibrary: { method: DELETE, path: '/api/libraries/:id', account: owner },

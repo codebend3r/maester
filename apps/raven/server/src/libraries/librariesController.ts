@@ -28,6 +28,7 @@ import {
   type ShowListing,
   isJoinRequest,
   isLibraryHeroChange,
+  isLibraryOrder,
   isLibraryViewChange,
   isRecord,
   isSagaBackdrop,
@@ -264,6 +265,22 @@ export class LibrariesController {
       canSee: true,
       isAdmin: this.management.canManage({ request }),
     })
+  }
+
+  /** Lists the libraries in the admin's order: `ids` names every library once. */
+  @Public()
+  @AdminOnly()
+  @Put('order')
+  @HttpCode(204)
+  reorder(@Body() body: unknown): void {
+    const { ids } = parseBody({
+      guard: isLibraryOrder,
+      body,
+      message: 'ids must name every library once.',
+    })
+    if (!this.libraries.reorder(ids)) {
+      throw new BadRequestException('ids must name every library once.')
+    }
   }
 
   /** Includes the library's titles in home's hero, or leaves them out. */

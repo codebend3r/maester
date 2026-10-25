@@ -122,6 +122,7 @@ type SummaryRow = {
   type: string
   title: string
   year: number | null
+  released: string | null
   number: number | null
   parent_number: number | null
   show_id: number | null
@@ -548,7 +549,7 @@ export class MetadataRepository {
     const ratings = this.ratingsFor(unique)
     const rows = this.db
       .prepare<[string], SummaryRow>(
-        `SELECT i.id, i.type, i.title, i.year, i.number,
+        `SELECT i.id, i.type, i.title, i.year, i.released, i.number,
                 p.number AS parent_number,
                 CASE i.type WHEN 'season' THEN p.id WHEN 'episode' THEN g.id END AS show_id,
                 CASE i.type WHEN 'season' THEN p.title WHEN 'episode' THEN g.title END AS show_title
@@ -585,6 +586,7 @@ export class MetadataRepository {
               posterVersion: posters.get(row.id) ?? null,
               backdropVersion: backdrops.get(row.id) ?? null,
               ratings: ratings.get(row.id) ?? [],
+              released: row.released,
             },
           ],
         ]

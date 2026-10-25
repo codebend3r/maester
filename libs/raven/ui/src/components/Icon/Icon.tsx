@@ -12,6 +12,8 @@ export type IconName =
   | 'check'
   | 'folder'
   | 'up'
+  | 'down'
+  | 'grip'
   | 'expand'
   | 'download'
   | 'alert'
@@ -142,6 +144,13 @@ const DRAWINGS: Record<IconName, Drawing> = {
   back: { stroke: 'M14.5 6.5L9 12l5.5 5.5' },
   next: { stroke: 'M9.5 6.5L15 12l-5.5 5.5' },
   up: { stroke: 'M12 19V5.5M6 11l6-6 6 6' },
+  down: { stroke: 'M12 5v13.5M6 13l6 6 6-6' },
+  grip: {
+    stroke: '',
+    marks: [8.5, 15.5]
+      .flatMap((cx) => [6, 12, 18].map((cy) => circle({ cx, cy, r: 1.4 })))
+      .join(''),
+  },
   expand: { stroke: 'M6.5 9.5L12 15l5.5-5.5' },
   download: { stroke: 'M12 4.5V15M7.5 10.5l4.5 4.5 4.5-4.5M5 19.5h14' },
   plus: { stroke: 'M12 5.5v13M5.5 12h13' },

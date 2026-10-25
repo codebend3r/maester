@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { AUTH_ROUTES } from '@raven/core'
-import { AuthCard, Brand, Lead, Status } from '@/components/AuthScreen/AuthCard'
+import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
+import { AuthCard, Brand, Lead } from '@/components/AuthScreen/AuthCard'
 import { PosterWall } from '@/components/AuthScreen/PosterWall'
 import { type AccessKind, ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { HOME_PATH, signInPath } from '@/lib/authRoutes'
@@ -66,7 +67,7 @@ const Frame = ({ children }: { children: ReactNode }) => (
 const Waiting = () => (
   <section className={styles.card}>
     <Brand />
-    <Status>Checking your account</Status>
+    <RavenLoader size={24} shouldShowLabel={false} />
   </section>
 )
 

@@ -8,7 +8,7 @@ import {
   isMediaGroupBy,
   isMediaSort,
 } from '@raven/core'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import {
@@ -55,17 +55,32 @@ const writeView = ({
 
 /**
  * How a library is being looked at: its saved settings under whatever the
- * address says, and the search. A change of sort, view or grouping shows at
- * once, rides in the address, and saves behind; a failed save puts the
- * library back as it was and says so.
+ * address says, and the search. A change of sort, view or grouping rides in
+ * the address and saves behind; a failed save puts the library back as it was
+ * and says so. Laying a big listing out takes a while, so `shown` takes the
+ * change at once, for the controls that name it, and `settings` follows once
+ * the address has it, for the listing.
  */
 export const useLibraryView = ({ library }: { library: Library }) => {
   const queryClient = useQueryClient()
   const [address, setAddress] = useSearchParams()
   const search = useAddressSearch()
   const [seed] = useState(dealSeed)
+  // What was asked for, until the address it was asked against gives way to one that carries it.
+  const [request, setRequest] = useState<{
+    change: LibraryViewChange
+    against: URLSearchParams
+  } | null>(null)
+  const asked = request?.against === address ? request.change : null
   // The address may ask for what the library's type cannot show; that is settled here, once.
-  const settings = coherentSettings({ ...library.settings, ...viewFromUrl(address) })
+  const settings = useMemo(
+    () => coherentSettings({ ...library.settings, ...viewFromUrl(address) }),
+    [library.settings, address],
+  )
+  const shown = useMemo(
+    () => coherentSettings({ ...library.settings, ...viewFromUrl(address), ...asked }),
+    [library.settings, address, asked],
+  )
 
   const save = useOptimisticMutation({
     mutationKey: mutationKeys.libraryView(library.id),
@@ -76,12 +91,14 @@ export const useLibraryView = ({ library }: { library: Library }) => {
 
   return {
     settings,
+    shown,
     search,
     /** The search once typing settles. */
     query: search.query,
     /** The random sort's deal; 0 for every other sort, so they share a cache entry. */
     seed: settings.sort === MEDIA_SORTS.random ? seed : 0,
     change: (change: LibraryViewChange) => {
+      setRequest({ change: { ...asked, ...change }, against: address })
       setAddress(writeView({ params: address, change }), { replace: true })
       save.mutate({ id: library.id, change })
     },

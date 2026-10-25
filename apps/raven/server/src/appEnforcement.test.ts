@@ -414,7 +414,7 @@ describe('owner-only management', () => {
 
   it('refuses every owner route to an approved member', async () => {
     const ownerRoutes = ROUTE_LIST.filter(({ account }) => account === ACCOUNT_REQUIREMENTS.owner)
-    expect(ownerRoutes).toHaveLength(35)
+    expect(ownerRoutes).toHaveLength(36)
     const headers = await asMember()
     const observed = await Promise.all(
       asSent(ownerRoutes).map(async ({ route, method }) => {

@@ -293,7 +293,7 @@ describe('PendingPage', () => {
       getMe.mockImplementation(() => new Promise(() => undefined))
       renderPending()
 
-      expect(screen.getByRole('status')).toHaveTextContent('Checking your account')
+      expect(screen.getByRole('status')).toHaveTextContent('Loading')
       expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
     })
 

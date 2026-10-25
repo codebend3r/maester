@@ -63,6 +63,7 @@ describe('aboutLine', () => {
         posterVersion: null,
         backdropVersion: null,
         ratings: [],
+        released: null,
       },
     })
     expect(aboutLine({ media: matched, label: 'Abominable', mode: 'remux' })).toBe(

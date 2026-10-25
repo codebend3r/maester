@@ -566,6 +566,10 @@ export const MIGRATIONS: readonly string[] = [
   `
   UPDATE libraries SET in_hero = 0 WHERE locked = 1;
   `,
+  // The admin's order for the libraries; one never placed has none and follows the placed ones.
+  `
+  ALTER TABLE libraries ADD COLUMN position INTEGER;
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

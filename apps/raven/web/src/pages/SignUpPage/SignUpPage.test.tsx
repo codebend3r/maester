@@ -293,7 +293,7 @@ describe('SignUpPage', () => {
     it('waits while the config or the stored session is read', () => {
       renderSignUp({ status: AUTH_SESSION_STATUSES.booting })
 
-      expect(screen.getByRole('status')).toHaveTextContent('Checking your account')
+      expect(screen.getByRole('status')).toHaveTextContent('Loading')
       expect(screen.queryByLabelText('Email')).toBeNull()
     })
 

@@ -35,6 +35,15 @@
   }
 }
 
+// Score badges differ in width, so their columns centre header and cell on one axis.
+.score {
+  font-variant-numeric: tabular-nums;
+
+  &:is(th, td) {
+    text-align: center;
+  }
+}
+
 // The title's column takes whatever the facts leave, so a title is never
 // squeezed to a letter a line.
 .titleHeader {
@@ -132,8 +141,8 @@
 }
 
 // Each breakpoint is the title's floor plus what the columns still showing
-// take: a Movies library's year, scores and file facts come to about
-// 76rem, without the file facts 52rem, and any other library's facts come
+// take: a Movies library's release date, scores and file facts come to
+// about 92rem, without the file facts 46rem, and any other library's facts come
 // to about 38rem. A column drops before it would eat into the title.
 @container (max-width: 92rem) {
   .movies .extra {
@@ -141,20 +150,14 @@
   }
 }
 
-@container (max-width: 68rem) {
-  .movies .roomy {
-    display: none;
-  }
-}
-
 @container (max-width: 54rem) {
-  .extra {
+  .table:not(.movies) .extra {
     display: none;
   }
 }
 
 // A phone's room keeps the title rather than its picture, and a Movies
-// library's year rather than its length.
+// library's release date rather than its length.
 @container (max-width: 30rem) {
   .roomy,
   .spare,

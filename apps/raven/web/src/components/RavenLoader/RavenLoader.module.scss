@@ -1,0 +1,70 @@
+.root,
+.fullscreen {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  color: var(--color-bark);
+}
+
+.fullscreen {
+  min-block-size: 100dvh;
+  background: var(--color-night);
+}
+
+.mark {
+  overflow: visible;
+}
+
+.path {
+  fill: currentcolor;
+  fill-opacity: 1;
+  stroke: var(--color-leaf-bright);
+  stroke-width: 5;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: draw 3.6s cubic-bezier(0.6, 0, 0.3, 1) infinite;
+  }
+}
+
+.label {
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-lichen);
+}
+
+.srOnly {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes draw {
+  0% {
+    stroke-dashoffset: 1;
+    fill-opacity: 0;
+  }
+
+  55% {
+    stroke-dashoffset: 0;
+    fill-opacity: 0;
+  }
+
+  75%,
+  90% {
+    stroke-dashoffset: 0;
+    fill-opacity: 1;
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+    fill-opacity: 0;
+  }
+}
