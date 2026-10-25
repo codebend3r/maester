@@ -702,7 +702,7 @@ The mapping is a pure function in `@raven/ui` (`fromPlayerEvent`), tested on its
 
 ### CI and release
 
-- **Portable PR checks:** `✅ Checks` runs workspace format/type/lint/unit/build and dead-code/dead-CSS targets on Ubuntu, distributed through Nx Agents when the token is available. `@raven/mpv:build` compiles only the TypeScript wrapper; native builds/tests remain separate macOS targets.
+- **Portable PR checks:** Ubuntu matrix jobs run workspace format/type/lint/unit and dead-code/dead-CSS targets in parallel, then `🏗️ Build` builds every project. The required `✅ Checks` result covers the whole group. `@raven/mpv:build` compiles only the TypeScript wrapper; native builds/tests remain separate macOS targets.
 - **macOS PR jobs:** `🎞️ Desktop native` builds/audits/tests pinned native resources and hands them to parallel `📦 Desktop app` and desktop playback jobs. App builds/makes/audits/smokes the package; playback runs main-service native tests and Playwright e2e. The aggregate required `🖥️ Desktop` check depends on all of them. Outputs include app artifacts and matching native sources. These automated/headless jobs do not certify the visual hardware matrix.
 - **Release:** `.github/workflows/desktop-release.yml` runs on three-component version tags (including prerelease suffixes), not four-component build tags. It checks the app version, builds/signs/audits/smokes arm64, and attaches the DMG, ZIP, matching sources tarball and `SHA256SUMS`. A path-filtered PR or dispatch is a dry run, never publication. Developer ID signing/notarization are wired but disabled.
 
