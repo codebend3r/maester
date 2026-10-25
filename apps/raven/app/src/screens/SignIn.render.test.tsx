@@ -3,6 +3,7 @@ import {
   ADMIN_LOCK_STATES,
   type AdminLock,
   ApiError,
+  DEFAULT_THEME,
   type Home,
   type LockState,
   type MediaTicket,
@@ -11,17 +12,27 @@ import {
 import { fireEvent, render, screen } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
+import { useAccountSession } from '@/account/accountSession'
+import { AUTH_OUTCOMES, type AuthOutcome } from '@/account/supabaseAuth'
+import { RAVEN_SERVER } from '@/servers/ravenServer'
 import { APP_ROUTES } from '@/routes'
 import { SignIn, TICKETS_OFF } from '@/screens/SignIn'
 import { useActiveServer } from '@/stores/activeServer'
-import { COLOURS } from '@/theme/appTheme'
+import { appThemeOf } from '@/theme/appTheme'
 import { mediaItemFor } from '@/test/mediaItem'
-import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
-const MOCK_SERVER_ID = '0f8fad5b-d9cb-469f-a165-70867728950e'
 const HOME: Home = { inProgress: [{ media: mediaItemFor({ id: 7 }), poster: null }], shelves: [] }
+const SESSION = {
+  accessToken: 'access',
+  refreshToken: 'refresh',
+  expiresAt: 1,
+  userId: 'u1',
+  email: 'viewer@example.com',
+}
 
-const mockReplace = jest.fn<(href: string) => void>()
+const mockDismissTo = jest.fn<(href: string) => void>()
+const mockSignIn = jest.fn<(input: { email: string; password: string }) => Promise<AuthOutcome>>()
+const mockSignOut = jest.fn()
 const getLock = jest.fn<() => Promise<LockState>>()
 const unlock = jest.fn<(pin: string) => Promise<LockState>>()
 const getHome = jest.fn<() => Promise<Home>>()
@@ -36,14 +47,13 @@ const mockApiFor = jest.fn((_server: unknown) => ({
   getHome,
   getMediaTicket,
 }))
-const mockNewServerId = jest.fn(() => MOCK_SERVER_ID)
-const mockForget = jest.fn(async (_serverId: string) => {})
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ replace: mockReplace }) }))
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ dismissTo: mockDismissTo }),
+}))
 jest.mock('@/servers/serverClient', () => ({
   apiFor: (server: unknown) => mockApiFor(server),
-  newServerId: () => mockNewServerId(),
-  cookieJar: { forget: (serverId: string) => mockForget(serverId) },
+  cookieJar: { forget: async () => {} },
   secretStore: {
     getItemAsync: async () => null,
     setItemAsync: async () => {},
@@ -51,29 +61,85 @@ jest.mock('@/servers/serverClient', () => ({
   },
 }))
 
-const enterAddress = async (address: string) => {
-  await fireEvent.changeText(screen.getByLabelText('Server address'), address)
+const signInWith = async ({ email, password }: { email: string; password: string }) => {
+  await fireEvent.changeText(screen.getByLabelText('Email'), email)
+  await fireEvent.changeText(screen.getByLabelText('Password'), password)
   await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
 }
+
+const signInAsViewer = () => signInWith({ email: SESSION.email, password: 'hunter2' })
 
 describe('SignIn', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     useActiveServer.setState({ servers: [], activeId: null })
+    useAccountSession.setState({ signIn: mockSignIn, signOut: mockSignOut })
+    mockSignIn.mockResolvedValue({ kind: AUTH_OUTCOMES.ok, session: SESSION })
+    getLock.mockResolvedValue({ available: false, unlocked: false })
     getHome.mockResolvedValue(HOME)
     getMediaTicket.mockResolvedValue({ ticket: 't', expiresAt: 1 })
     getAdminLock.mockResolvedValue({ state: ADMIN_LOCK_STATES.off })
-    mockNewServerId.mockImplementation(() => MOCK_SERVER_ID)
   })
 
   const unlockWithPin = async () => {
     getLock.mockResolvedValue({ available: true, unlocked: false })
     unlock.mockResolvedValue({ available: true, unlocked: true })
     await render(<SignIn />)
-    await enterAddress('http://nas:8080')
+    await signInAsViewer()
     await fireEvent.changeText(await screen.findByLabelText('PIN'), '1234')
     await fireEvent.press(screen.getByRole('button', { name: 'Unlock' }))
   }
+
+  it("signs in with the account's email and password, then goes Home on the one server", async () => {
+    await render(<SignIn />)
+    await signInWith({ email: ' viewer@example.com ', password: 'hunter2' })
+
+    expect(mockSignIn).toHaveBeenCalledWith({ email: 'viewer@example.com', password: 'hunter2' })
+    expect(unlock).not.toHaveBeenCalled()
+    expect(getMediaTicket).toHaveBeenCalledWith(7)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(useActiveServer.getState()).toMatchObject({
+      servers: [{ id: RAVEN_SERVER.id }],
+      activeId: RAVEN_SERVER.id,
+    })
+  })
+
+  it('asks for both an email and a password before calling anyone', async () => {
+    await render(<SignIn />)
+    await signInWith({ email: '', password: 'hunter2' })
+    expect(await screen.findByText('Enter your email and password.')).toBeTruthy()
+    expect(mockSignIn).not.toHaveBeenCalled()
+  })
+
+  it("shows the account service's words when it refuses", async () => {
+    mockSignIn.mockResolvedValue({ kind: AUTH_OUTCOMES.refused, message: 'Wrong password.' })
+    await render(<SignIn />)
+    await signInAsViewer()
+    expect(await screen.findByText('Wrong password.')).toBeTruthy()
+    expect(mockDismissTo).not.toHaveBeenCalled()
+  })
+
+  it("says so when raven can't be reached", async () => {
+    mockSignIn.mockResolvedValue({ kind: AUTH_OUTCOMES.unreachable })
+    await render(<SignIn />)
+    await signInAsViewer()
+    expect(await screen.findByText(/Couldn't reach raven/)).toBeTruthy()
+    expect(mockDismissTo).not.toHaveBeenCalled()
+  })
+
+  it('submits once while a submit is still running', async () => {
+    mockSignIn.mockReturnValue(new Promise(() => {}))
+    await render(<SignIn />)
+    await signInAsViewer()
+    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
+    expect(mockSignIn).toHaveBeenCalledTimes(1)
+  })
+
+  it('unlocks with the PIN and goes Home', async () => {
+    await unlockWithPin()
+    expect(unlock).toHaveBeenCalledWith('1234')
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
+  })
 
   it('asks for the admin password after the PIN when the admin lock holds, then goes Home', async () => {
     getAdminLock.mockResolvedValue({ state: ADMIN_LOCK_STATES.on, available: true })
@@ -81,11 +147,11 @@ describe('SignIn', () => {
     await unlockWithPin()
 
     await fireEvent.changeText(await screen.findByLabelText('Admin password'), 'Pass#word2026')
-    expect(mockReplace).not.toHaveBeenCalled()
+    expect(mockDismissTo).not.toHaveBeenCalled()
     await fireEvent.press(screen.getByRole('button', { name: 'Unlock' }))
 
     expect(unlockAdmin).toHaveBeenCalledWith('Pass#word2026')
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 
   it('goes on without the admin password on Not now', async () => {
@@ -94,7 +160,7 @@ describe('SignIn', () => {
     await screen.findByLabelText('Admin password')
     await fireEvent.press(screen.getByRole('button', { name: 'Not now' }))
     expect(unlockAdmin).not.toHaveBeenCalled()
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 
   it("shows the server's words for a wrong admin password", async () => {
@@ -106,7 +172,7 @@ describe('SignIn', () => {
     await fireEvent.changeText(await screen.findByLabelText('Admin password'), 'wrong')
     await fireEvent.press(screen.getByRole('button', { name: 'Unlock' }))
     expect(await screen.findByText('That password is not right.')).toBeTruthy()
-    expect(mockReplace).not.toHaveBeenCalled()
+    expect(mockDismissTo).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -115,67 +181,44 @@ describe('SignIn', () => {
   ])('asks for no admin password when the admin lock is %s', async (_name, lock: AdminLock) => {
     getAdminLock.mockResolvedValue(lock)
     await unlockWithPin()
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
     expect(screen.queryByLabelText('Admin password')).toBeNull()
   })
 
   it('reads the admin lock only after a PIN, never on Not now', async () => {
     getLock.mockResolvedValue({ available: true, unlocked: false })
     await render(<SignIn />)
-    await enterAddress('http://nas:8080')
+    await signInAsViewer()
     await screen.findByLabelText('PIN')
     await fireEvent.press(screen.getByRole('button', { name: 'Not now' }))
     expect(getAdminLock).not.toHaveBeenCalled()
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 
-  it("forgets a new server's cookies when the viewer starts over", async () => {
+  it('signs the account out and starts over from the PIN step', async () => {
     getLock.mockResolvedValue({ available: true, unlocked: false })
     await render(<SignIn />)
-    await enterAddress('http://nas:8080')
+    await signInAsViewer()
     await screen.findByLabelText('PIN')
-    await fireEvent.press(screen.getByRole('button', { name: 'Use another address' }))
-    expect(mockForget).toHaveBeenCalledWith(MOCK_SERVER_ID)
-    expect(await screen.findByLabelText('Server address')).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Sign out' }))
+    expect(mockSignOut).toHaveBeenCalled()
+    expect(await screen.findByLabelText('Email')).toBeTruthy()
   })
 
-  it('submits the address once while a submit is still running', async () => {
-    getLock.mockReturnValue(new Promise(() => {}))
-    await render(<SignIn />)
-    const field = screen.getByLabelText('Server address')
-    await fireEvent.changeText(field, 'http://nas:8080')
-    await fireEvent(field, NATIVE_EVENTS.submitEditing, {
-      nativeEvent: { text: 'http://nas:8080' },
-    })
-    await fireEvent(field, NATIVE_EVENTS.submitEditing, {
-      nativeEvent: { text: 'http://nas:8080' },
-    })
-    expect(getLock).toHaveBeenCalledTimes(1)
-  })
-
-  it('fills only Unlock as the primary action; Not now is quiet and another address bare', async () => {
+  it('fills only Unlock as the primary action; Not now is quiet and Sign out bare', async () => {
     getLock.mockResolvedValue({ available: true, unlocked: false })
     await render(<SignIn />)
-    await enterAddress('http://nas:8080')
+    await signInAsViewer()
     await screen.findByLabelText('PIN')
     const fillOf = (name: string): unknown =>
       StyleSheet.flatten(screen.getByRole('button', { name }).props.style)?.backgroundColor ?? null
-    expect(fillOf('Unlock')).toBe(COLOURS.accent)
-    expect(fillOf('Not now')).toBe(COLOURS.quiet)
-    expect(fillOf('Use another address')).toBe('transparent')
-  })
-
-  it('says so when the server cannot be added, and stays', async () => {
-    getLock.mockResolvedValue({ available: false, unlocked: false })
-    mockNewServerId.mockImplementation(() => 'not-a-uuid')
-    await render(<SignIn />)
-    await enterAddress('http://nas:8080')
-    expect(await screen.findByText(/couldn't be added/)).toBeTruthy()
-    expect(mockReplace).not.toHaveBeenCalled()
+    const { palette } = appThemeOf(DEFAULT_THEME)
+    expect(fillOf('Unlock')).toBe(palette.accent)
+    expect(fillOf('Not now')).toBe(palette.quiet)
+    expect(fillOf('Sign out')).toBe('transparent')
   })
 
   it('says so when the device keeps as many servers as it can, and stays', async () => {
-    getLock.mockResolvedValue({ available: false, unlocked: false })
     const full = Array.from({ length: SERVERS_CAP }, (_, n) => ({
       id: `7c9e6679-7425-40de-944b-${String(n).padStart(12, '0')}`,
       name: `nas${n}`,
@@ -184,106 +227,36 @@ describe('SignIn', () => {
     }))
     useActiveServer.setState({ servers: full, activeId: null })
     await render(<SignIn />)
-    await enterAddress('http://nas:8080')
+    await signInAsViewer()
     expect(await screen.findByText(/as many servers as it can/)).toBeTruthy()
-    expect(useActiveServer.getState().servers).toHaveLength(SERVERS_CAP)
-    expect(mockReplace).not.toHaveBeenCalled()
-  })
-
-  it('shows an error rather than failing when no id can be made', async () => {
-    mockNewServerId.mockImplementation(() => {
-      throw new Error('no randomness')
-    })
-    await render(<SignIn />)
-    await enterAddress('http://nas:8080')
-    expect(await screen.findByText(/Couldn't reach a raven server/)).toBeTruthy()
-  })
-
-  it('unlocks with the PIN and goes Home on the new server', async () => {
-    getLock.mockResolvedValue({ available: true, unlocked: false })
-    unlock.mockResolvedValue({ available: true, unlocked: true })
-    await render(<SignIn />)
-
-    await enterAddress('HTTP://nas:8080/')
-    await fireEvent.changeText(await screen.findByLabelText('PIN'), '1234')
-    await fireEvent.press(screen.getByRole('button', { name: 'Unlock' }))
-
-    expect(unlock).toHaveBeenCalledWith('1234')
-    expect(getMediaTicket).toHaveBeenCalledWith(7)
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
-    expect(useActiveServer.getState()).toMatchObject({
-      servers: [{ id: MOCK_SERVER_ID, name: 'nas:8080', origin: 'http://nas:8080' }],
-      activeId: MOCK_SERVER_ID,
-    })
-  })
-
-  it('asks for no PIN when the server has none', async () => {
-    getLock.mockResolvedValue({ available: false, unlocked: false })
-    await render(<SignIn />)
-    await enterAddress('http://nas:8080')
-    expect(unlock).not.toHaveBeenCalled()
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
-  })
-
-  it("shows the spec's words when the server hands out no tickets, then goes Home", async () => {
-    getLock.mockResolvedValue({ available: false, unlocked: false })
-    getMediaTicket.mockRejectedValue(new ApiError({ status: 503, message: 'no secret' }))
-    await render(<SignIn />)
-
-    await enterAddress('http://nas:8080')
-    expect(await screen.findByText(TICKETS_OFF)).toBeTruthy()
-    expect(TICKETS_OFF).toBe(
-      "This server can't hand out media tickets. Set RAVEN_MEDIA_SECRET on it to play in the app",
-    )
-    expect(mockReplace).not.toHaveBeenCalled()
-    expect(useActiveServer.getState().activeId).toBe(MOCK_SERVER_ID)
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
-  })
-
-  it('refuses an address that is not a bare origin, without calling it', async () => {
-    await render(<SignIn />)
-    await enterAddress('http://nas:8080/library')
-    expect(await screen.findByText(/like http:\/\/192\.168\.1\.20:8484/)).toBeTruthy()
-    expect(mockApiFor).not.toHaveBeenCalled()
-  })
-
-  it("says so when the address doesn't answer", async () => {
-    getLock.mockRejectedValue(new TypeError('Network request failed'))
-    await render(<SignIn />)
-    await enterAddress('http://nas:8080')
-    expect(await screen.findByText(/Couldn't reach a raven server/)).toBeTruthy()
-    expect(useActiveServer.getState().servers).toEqual([])
+    expect(mockDismissTo).not.toHaveBeenCalled()
   })
 
   it("shows the server's words for a wrong PIN", async () => {
     getLock.mockResolvedValue({ available: true, unlocked: false })
     unlock.mockRejectedValue(new ApiError({ status: 401, message: 'That PIN is not right.' }))
     await render(<SignIn />)
-
-    await enterAddress('http://nas:8080')
+    await signInAsViewer()
     await fireEvent.changeText(await screen.findByLabelText('PIN'), '0000')
     await fireEvent.press(screen.getByRole('button', { name: 'Unlock' }))
 
     expect(await screen.findByText('That PIN is not right.')).toBeTruthy()
-    expect(mockReplace).not.toHaveBeenCalled()
+    expect(mockDismissTo).not.toHaveBeenCalled()
   })
 
-  it('signs in again to a server already on the list, under its own id', async () => {
-    const known = {
-      id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
-      name: 'nas',
-      origin: 'http://nas:8080',
-      addedAt: 1,
-    }
-    useActiveServer.setState({ servers: [known], activeId: null })
-    getLock.mockResolvedValue({ available: true, unlocked: true })
+  it("shows the spec's words when the server hands out no tickets, then goes Home", async () => {
+    getMediaTicket.mockRejectedValue(new ApiError({ status: 503, message: 'no secret' }))
     await render(<SignIn />)
+    await signInAsViewer()
 
-    await enterAddress('http://nas:8080')
-    expect(mockApiFor).toHaveBeenCalledWith(known)
-    expect(useActiveServer.getState()).toMatchObject({ servers: [known], activeId: known.id })
-    expect(mockReplace).toHaveBeenCalledWith(APP_ROUTES.home)
+    expect(await screen.findByText(TICKETS_OFF)).toBeTruthy()
+    expect(TICKETS_OFF).toBe(
+      "This server can't hand out media tickets. Set RAVEN_MEDIA_SECRET on it to play in the app",
+    )
+    expect(mockDismissTo).not.toHaveBeenCalled()
+    expect(useActiveServer.getState().activeId).toBe(RAVEN_SERVER.id)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 })

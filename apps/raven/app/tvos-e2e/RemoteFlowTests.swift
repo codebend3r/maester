@@ -4,9 +4,8 @@ import XCTest
 /// `@raven/server`'s `serve:fixture` on the loopback. It drives the build installed on the
 /// simulator (Release, development variant), so it names the app by its bundle id.
 final class RemoteFlowTests: XCTestCase {
-  /// The fixture server's address and secrets, as `serve:fixture` prints them.
+  /// The fixture server's secrets, as `serve:fixture` prints them.
   private enum Fixture {
-    static let address = "http://127.0.0.1:8490"
     static let pin = "1357"
     static let adminPassword = "Raven-Admin-2026"
     static let film = "Kestrel Point"
@@ -19,9 +18,6 @@ final class RemoteFlowTests: XCTestCase {
     static let markWatched = "Mark watched"
     static let watched = "Watched"
     static let keyboardGo = "go"
-    static let continueButton = "Continue"
-    static let unreachable =
-      "Couldn't reach a raven server there. Check the address and that raven is running."
     static let bullet: Character = "•"
   }
 
@@ -84,34 +80,13 @@ final class RemoteFlowTests: XCTestCase {
 
   // MARK: - Steps
 
-  /// The address, then the PIN, then the admin password, each on the platform's keyboard.
+  /// The PIN, then the admin password, each on the platform's keyboard.
   private func signIn() {
-    let field = app.textFields.firstMatch
-    guard field.waitForExistence(timeout: 60) else { return }
-    press(.select)
-    sleep(2)
-    XCTAssertTrue(type(Fixture.address, into: field) { $0 == Fixture.address }, "The address")
-    // Go waits for the check: sent in one burst with the text, it beat the last keys in CI.
-    app.typeText("\n")
-    XCTAssertTrue(reachPinStep(), "The server answers the address")
-    enterSecret(Fixture.pin, isNumberPad: true)
-    enterSecret(Fixture.adminPassword, isNumberPad: false)
+    enterSecret(Fixture.pin)
+    enterSecret(Fixture.adminPassword)
   }
 
-  /// Waits for the PIN step. A request that fails though the field holds the right address
-  /// (a cold fixture, or a submit that read the text early) is sent again with Continue.
-  private func reachPinStep(tries: Int = 3) -> Bool {
-    (0...tries).contains { attempt in
-      if app.secureTextFields.firstMatch.waitForExistence(timeout: 10) { return true }
-      guard attempt < tries, app.staticTexts[Copy.unreachable].exists else { return false }
-      XCTAssertEqual(valueOf(app.textFields.firstMatch), Fixture.address)
-      XCTAssertTrue(waitForFocus(pressing: .down, tries: 3) { $0 == Copy.continueButton })
-      press(.select)
-      return false
-    }
-  }
-
-  private func enterSecret(_ secret: String, isNumberPad: Bool) {
+  private func enterSecret(_ secret: String) {
     let field = app.secureTextFields.firstMatch
     XCTAssertTrue(field.waitForExistence(timeout: 30))
     XCTAssertTrue(waitForFocus(timeout: 10) { _ in field.hasFocus })
@@ -121,12 +96,8 @@ final class RemoteFlowTests: XCTestCase {
       shown.count == secret.count && shown.allSatisfy { $0 == Copy.bullet }
     }
     XCTAssertTrue(isWhole, "Every character of the secret")
-    if isNumberPad {
-      // The number pad's go sits under the digits.
-      press(.down)
-    } else {
-      XCTAssertTrue(waitForFocus(pressing: .down, tries: 8) { $0 == Copy.keyboardGo })
-    }
+    // tvOS can show the full keyboard for a secure PIN, not just a number pad.
+    XCTAssertTrue(waitForFocus(pressing: .down, tries: 8) { $0 == Copy.keyboardGo })
     press(.select)
     sleep(3)
   }

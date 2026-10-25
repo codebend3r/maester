@@ -29,6 +29,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ShelfCard } from '@/queries/cards'
 import { type Listing, librarySectionsOf } from '@/queries/libraryGrid'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
+import { useAccessToken } from '@/account/accountSession'
 import { useServerCookies } from '@/queries/useServerCookies'
 import { Grid, Picker, SearchField, ToolButton } from '@/layouts'
 import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
@@ -161,6 +162,7 @@ const LibraryGrid = ({
     seed: view.seed,
   })
   const cookies = useServerCookies(server)
+  const accessToken = useAccessToken()
 
   const sections =
     listed === null || cookies === null
@@ -169,7 +171,7 @@ const LibraryGrid = ({
           settings,
           listing: listed,
           api,
-          headersFor: cookieHeadersFor({ server, cookies }),
+          headersFor: cookieHeadersFor({ server, cookies, accessToken }),
           now: new Date(),
         })
   // Nothing matches only once the server says so, not while the last search stands in.

@@ -1,9 +1,9 @@
 import { type ApiClient, createApiClient } from '@raven/core'
-import { randomUUID } from 'expo-crypto'
-import * as SecureStore from 'expo-secure-store'
 import { AppState } from 'react-native'
 import EventSource from 'react-native-sse'
 
+import { accessTokenNow, useAccountSession } from '@/account/accountSession'
+import { refreshingFetch } from '@/account/refreshingFetch'
 import { allowlistedFetch } from '@/servers/allowlist'
 import { createCookieJar } from '@/servers/cookieJar'
 import {
@@ -12,25 +12,28 @@ import {
   eventSourceFor,
   isForegroundState,
 } from '@/servers/eventSource'
-import type { SecretStore } from '@/servers/secretStore'
+import { secretStore } from '@/servers/deviceSecretStore'
 import { serverFetchFor } from '@/servers/serverFetch'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
 import type { AppServer } from '@/servers/serverList'
 import { bumpCookieVersion } from '@/stores/cookieVersion'
 
-/** The keychain on Apple, which tvOS keeps as well, and the keystore on Android. */
-export const secretStore: SecretStore = SecureStore
+export { secretStore }
 
 /** Every server's cookies. */
 export const cookieJar = createCookieJar({ store: secretStore, onChange: bumpCookieVersion })
-
-export const newServerId = (): string => randomUUID()
 
 /** The client for one server, in its own session: its cookies and no other, and only the app's calls. */
 export const apiFor = (server: AppServer): ApiClient =>
   createApiClient({
     baseUrl: server.origin,
-    fetch: allowlistedFetch({ fetch: serverFetchFor({ server, jar: cookieJar, fetch }) }),
+    accessToken: accessTokenNow,
+    fetch: allowlistedFetch({
+      fetch: refreshingFetch({
+        fetch: serverFetchFor({ server, jar: cookieJar, fetch }),
+        refresh: () => useAccountSession.getState().refresh(),
+      }),
+    }),
   })
 
 /** What a request made outside `fetch` (a picture, the event stream) sends to `url` on `server`. */
@@ -41,7 +44,11 @@ const headersFor = async ({
   server: AppServer
   url: string
 }): Promise<Record<string, string>> =>
-  cookieHeadersFor({ server, cookies: await cookieJar.read(server.id) })(url)
+  cookieHeadersFor({
+    server,
+    cookies: await cookieJar.read(server.id),
+    accessToken: accessTokenNow(),
+  })(url)
 
 /** The server's event stream, over `react-native-sse`, with its cookies, kept open while the app is. */
 export const openEventsFor = (server: AppServer) =>

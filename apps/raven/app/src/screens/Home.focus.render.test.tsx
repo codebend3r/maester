@@ -171,16 +171,38 @@ describe('Home on a TV', () => {
     await renderHome()
     expect(await screen.findByText('Gathering your libraries')).toBeTruthy()
     // Drawn alone, it would be all tvOS had to give the opening focus to.
-    expect(screen.queryByRole('link', { name: 'Search every library' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Search' })).toBeNull()
 
     release()
     await screen.findByRole('header', { name: 'Films' })
-    const search = screen.getByRole('link', { name: 'Search every library' })
+    const search = screen.getByRole('link', { name: 'Search' })
     expect(search.props.hasTVPreferredFocus).not.toBe(true)
     expect(screen.getAllByRole('button')[0]!.props.hasTVPreferredFocus).toBe(true)
 
     await fireEvent.press(search)
     expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.search)
+  })
+
+  it('offers Settings beside the search with the shelves, and takes the focus back to it on return', async () => {
+    const { answer, release } = heldAnswer()
+    mockHome.answer = answer
+    await renderHome()
+    expect(await screen.findByText('Gathering your libraries')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull()
+
+    release()
+    await screen.findByRole('header', { name: 'Films' })
+    const settings = screen.getByRole('link', { name: 'Settings' })
+    expect(preferred()).toEqual(['Busboys'])
+
+    await fireEvent(settings, NATIVE_EVENTS.focus)
+    await fireEvent.press(settings)
+    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.settings)
+    await leaveTestScreen()
+    expect(askedFor()).toEqual([])
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Settings'])
+    expect(preferred()).toEqual([])
   })
 
   it('puts focus on the first card of the first shelf that has one', async () => {
@@ -200,7 +222,7 @@ describe('Home on a TV', () => {
     await screen.findByRole('header', { name: 'Films' })
     expect(preferred()).toEqual(['Busboys'])
 
-    await fireEvent(screen.getByRole('link', { name: 'Search every library' }), NATIVE_EVENTS.focus)
+    await fireEvent(screen.getByRole('link', { name: 'Search' }), NATIVE_EVENTS.focus)
     expect(preferred()).toEqual([])
 
     // The shelves are drawn again: every card goes, then mounts afresh, the first unpreferred.
@@ -253,7 +275,7 @@ describe('Home on a TV', () => {
 
     // The viewer moves on, then opens the search, which is not a card, and comes back.
     await fireEvent(screen.getAllByRole('button')[3]!, NATIVE_EVENTS.focus)
-    await fireEvent.press(screen.getByRole('link', { name: 'Search every library' }))
+    await fireEvent.press(screen.getByRole('link', { name: 'Search' }))
     await leaveTestScreen()
     await returnToTestScreen()
     expect(askedFor()).toEqual(['Night Train'])
@@ -284,7 +306,7 @@ describe('Home on a TV', () => {
 
     // The card is drawn again, then the search, which is not a card, opens and goes back.
     await answerHome({ home: HOME, card: NIGHT_TRAIN, isDrawn: true })
-    await fireEvent.press(screen.getByRole('link', { name: 'Search every library' }))
+    await fireEvent.press(screen.getByRole('link', { name: 'Search' }))
     await leaveTestScreen()
     await returnToTestScreen()
     expect(askedFor()).toEqual([])

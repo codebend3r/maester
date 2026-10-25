@@ -9,6 +9,7 @@ import {
   type PlaybackPolicy,
   SUBTITLE_SOURCES,
   type SubtitleTrack,
+  AUDIO_CODECS,
   TRANSCODINGS,
   VIDEO_CODECS,
 } from '@raven/core'
@@ -16,7 +17,8 @@ import { mediaItemFor } from '@/test/mediaItem'
 import { SUBTITLE_CODECS } from '@/test/subtitleCodecs'
 
 import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
-import { planFor } from '@/platform/playbackPlan'
+import { type PlaybackPrefs, TRANSCODING_OFF_HERE, planFor } from '@/platform/playbackPlan'
+import { DEFAULT_APP_PREFS } from '@/stores/appPrefs'
 
 /** An H.264 AAC MP4 every Apple device plays as it is. */
 const MP4 = mediaItemFor({
@@ -83,19 +85,23 @@ const APPLE_TV = { platform: APP_PLATFORMS.tvos, shouldDrawCaptions: false } as 
 /** Android TV under its d-pad chrome, which draws the subtitles itself. */
 const ANDROID_TV = { platform: APP_PLATFORMS.androidTv, shouldDrawCaptions: true } as const
 
-const modesOn = ({
+const planOn = ({
   platform,
   shouldDrawCaptions,
   media = MP4,
   tracks,
   policy = AUTO,
+  prefs = DEFAULT_APP_PREFS,
 }: {
   platform: AppPlatform
   shouldDrawCaptions: boolean
   media?: MediaItem
   tracks: MediaTracks | null
   policy?: PlaybackPolicy
-}) => planFor({ platform, shouldDrawCaptions, media, tracks, policy }).modes
+  prefs?: PlaybackPrefs
+}) => planFor({ platform, shouldDrawCaptions, media, tracks, policy, prefs })
+
+const modesOn = (input: Parameters<typeof planOn>[0]) => planOn(input).modes
 
 const EVERY_WAY = [PLAYBACK_MODES.direct, PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode]
 const CONVERTED = [PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode]
@@ -172,5 +178,89 @@ describe('planFor where raven draws the subtitles', () => {
     expect(modesOn({ ...ANDROID_TV, media: MKV, tracks: tracksWith([EMBEDDED_TEXT]) })).toEqual(
       EVERY_WAY,
     )
+  })
+})
+
+/** An iPhone, where raven draws the subtitles. */
+const IPHONE = { platform: APP_PLATFORMS.ios, shouldDrawCaptions: true, tracks: null } as const
+
+/** HEVC in MP4, which AVPlayer refuses under the `hev1` tag: a maybe. */
+const HEVC_MP4 = mediaItemFor({
+  container: CONTAINERS.mp4,
+  videoCodec: VIDEO_CODECS.hevc,
+  videoBitDepth: 10,
+  audioCodec: HLS_COPY_AUDIO_CODECS.aac,
+})
+
+/** 10-bit H.264, which only a transcode plays on Apple. */
+const HIGH_10 = mediaItemFor({
+  container: CONTAINERS.mp4,
+  videoCodec: VIDEO_CODECS.h264,
+  videoBitDepth: 10,
+  audioCodec: HLS_COPY_AUDIO_CODECS.aac,
+})
+
+const NO_TRANSCODE: PlaybackPrefs = { ...DEFAULT_APP_PREFS, isTranscodeAllowed: false }
+const NO_MAYBES: PlaybackPrefs = { ...DEFAULT_APP_PREFS, shouldPreferDirectPlay: false }
+
+describe("planFor narrowed by this device's settings", () => {
+  it('takes the transcode out of the plan when this device allows none', () => {
+    expect(modesOn({ ...IPHONE, prefs: NO_TRANSCODE })).toEqual([
+      PLAYBACK_MODES.direct,
+      PLAYBACK_MODES.remux,
+    ])
+    expect(modesOn({ ...ANDROID_TV, media: MKV, tracks: null, prefs: NO_TRANSCODE })).toEqual([
+      PLAYBACK_MODES.direct,
+      PLAYBACK_MODES.remux,
+    ])
+  })
+
+  it('says so when the transcode was the only way left', () => {
+    expect(planOn({ ...IPHONE, media: HIGH_10, prefs: NO_TRANSCODE })).toEqual({
+      modes: [],
+      problems: ["10-bit H.264 video isn't supported here.", TRANSCODING_OFF_HERE],
+    })
+  })
+
+  it("never widens the server's policy: what it turns off stays off", () => {
+    expect(
+      modesOn({ ...IPHONE, policy: { ...AUTO, transcoding: TRANSCODINGS.remuxOnly } }),
+    ).toEqual([PLAYBACK_MODES.direct, PLAYBACK_MODES.remux])
+    expect(
+      planOn({
+        ...IPHONE,
+        media: HIGH_10,
+        policy: { ...AUTO, transcoding: TRANSCODINGS.remuxOnly },
+      }).problems,
+    ).not.toContain(TRANSCODING_OFF_HERE)
+  })
+
+  it('tries a maybe as it is first only while this device prefers direct play', () => {
+    expect(modesOn({ ...IPHONE, media: HEVC_MP4 })).toEqual(EVERY_WAY)
+    expect(modesOn({ ...IPHONE, media: HEVC_MP4, prefs: NO_MAYBES })).toEqual(CONVERTED)
+    const trueHd = mediaItemFor({
+      container: CONTAINERS.mkv,
+      videoCodec: VIDEO_CODECS.hevc,
+      videoBitDepth: 10,
+      audioCodec: AUDIO_CODECS.truehd,
+    })
+    expect(modesOn({ ...ANDROID_TV, media: trueHd, tracks: null, prefs: NO_MAYBES })).toEqual(
+      CONVERTED,
+    )
+  })
+
+  it('plays what it surely can as it is whether or not direct play is preferred', () => {
+    expect(modesOn({ ...IPHONE, prefs: NO_MAYBES })).toEqual(EVERY_WAY)
+  })
+
+  it('still tries a maybe as it is when nothing else is left', () => {
+    expect(
+      modesOn({
+        ...IPHONE,
+        media: HEVC_MP4,
+        policy: { ...AUTO, transcoding: TRANSCODINGS.off },
+        prefs: NO_MAYBES,
+      }),
+    ).toEqual([PLAYBACK_MODES.direct])
   })
 })

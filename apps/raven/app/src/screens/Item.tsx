@@ -30,6 +30,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { Pictures } from '@/queries/cards'
 import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
+import { useAccessToken } from '@/account/accountSession'
 import { useServerCookies } from '@/queries/useServerCookies'
 import { ItemLayout, ItemNotice } from '@/layouts'
 import { type CheckState, ITEM_ACTIONS, type ItemAction } from '@/layouts/itemKit'
@@ -366,6 +367,7 @@ const ServerItem = ({
   const router = useRouter()
   const item = useQuery(session.queries.itemQuery(id))
   const cookies = useServerCookies(session.server)
+  const accessToken = useAccessToken()
   const onBack = () => router.back()
   const page = routeState({ id, query: item })
   switch (page.state) {
@@ -383,7 +385,7 @@ const ServerItem = ({
         <ItemOf
           key={page.data.id}
           context={{
-            headersFor: cookieHeadersFor({ server: session.server, cookies }),
+            headersFor: cookieHeadersFor({ server: session.server, cookies, accessToken }),
             onOpen: (target) => router.push(hrefOf(target)),
             onBack,
           }}

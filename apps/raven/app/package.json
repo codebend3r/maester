@@ -53,11 +53,11 @@
     "@tanstack/react-query": "5.103.1",
     "expo": "58.0.14",
     "expo-constants": "58.0.12",
-    "expo-crypto": "58.0.7",
     "expo-keep-awake": "58.0.3",
     "expo-linking": "58.0.13",
     "expo-router": "58.0.23",
     "expo-secure-store": "58.0.2",
+    "expo-splash-screen": "58.0.10",
     "react": "19.3.0",
     "react-native": "npm:react-native-tvos@0.88.0-0",
     "react-native-safe-area-context": "5.10.1",
@@ -137,6 +137,13 @@
       "dev:tvos"
     ],
     "targets": {
+      "test": {
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/apps/raven/web/public/brand/raven-mark-on-*.png"
+        ]
+      },
       "start": {
         "continuous": true,
         "cache": false,
@@ -165,6 +172,9 @@
             "env": "APP_VARIANT"
           },
           {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+          },
+          {
             "env": "DEVELOPER_DIR"
           },
           {
@@ -188,6 +198,9 @@
             "env": "APP_VARIANT"
           },
           {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+          },
+          {
             "env": "DEVELOPER_DIR"
           },
           {
@@ -209,6 +222,9 @@
           "^production",
           {
             "env": "APP_VARIANT"
+          },
+          {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
           }
         ],
         "outputs": [
@@ -217,11 +233,17 @@
         "cache": true
       },
       "prebuild:ios": {
+        "dependsOn": [
+          "^build"
+        ],
         "inputs": [
           "default",
           "^production",
           {
             "env": "APP_VARIANT"
+          },
+          {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
           },
           {
             "env": "DEVELOPER_DIR"
@@ -236,11 +258,17 @@
         "cache": true
       },
       "prebuild:tvos": {
+        "dependsOn": [
+          "^build"
+        ],
         "inputs": [
           "default",
           "^production",
           {
             "env": "APP_VARIANT"
+          },
+          {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
           },
           {
             "env": "DEVELOPER_DIR"
@@ -255,11 +283,17 @@
         "cache": true
       },
       "prebuild:android-tv": {
+        "dependsOn": [
+          "^build"
+        ],
         "inputs": [
           "default",
           "^production",
           {
             "env": "APP_VARIANT"
+          },
+          {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
           }
         ],
         "outputs": [
@@ -273,6 +307,9 @@
           "^production",
           {
             "env": "APP_VARIANT"
+          },
+          {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
           },
           {
             "env": "DEVELOPER_DIR"

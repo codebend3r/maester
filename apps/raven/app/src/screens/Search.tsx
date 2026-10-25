@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router'
 import type { ShelfCard } from '@/queries/cards'
 import { libraryShelvesOf } from '@/queries/homeShelves'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
+import { useAccessToken } from '@/account/accountSession'
 import { useServerCookies } from '@/queries/useServerCookies'
 import { SearchLayout, Shelf } from '@/layouts'
 import { ROUTE_TARGETS, hrefOf } from '@/routes'
@@ -28,6 +29,7 @@ const ServerSearch = ({ session: { server, api, queries } }: { session: AppQueri
   const results = useQuery(queries.homeSearchQuery(query))
   const libraries = useQuery(queries.librariesQuery)
   const cookies = useServerCookies(server)
+  const accessToken = useAccessToken()
 
   const shelves =
     !isAsked || results.data === undefined || libraries.data === undefined || cookies === null
@@ -36,7 +38,7 @@ const ServerSearch = ({ session: { server, api, queries } }: { session: AppQueri
           shelves: results.data,
           libraries: libraries.data,
           api,
-          headersFor: cookieHeadersFor({ server, cookies }),
+          headersFor: cookieHeadersFor({ server, cookies, accessToken }),
         })
   const notice = ((): string | null => {
     if (!isAsked) return null

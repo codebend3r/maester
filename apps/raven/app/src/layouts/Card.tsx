@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { Image, StyleSheet, View } from 'react-native'
 
+import { Text } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { SIZES } from '@/theme/appTheme'
+import { themedStyles } from '@/theme/useTheme'
 
 const POSTER_RATIO = 3 / 2
 const WIDE_RATIO = 9 / 16
@@ -30,6 +32,7 @@ export const CardPicture = ({
 }) => {
   // What failed is the picture with those headers: with new cookies it is asked for again.
   const [failed, setFailed] = useState<string | null>(null)
+  const styles = useStyles()
   const height = pictureHeightOf({ shape: card.shape, width })
   const pictureKey = card.picture === null ? null : JSON.stringify(card.picture)
   const picture = pictureKey === failed ? null : card.picture
@@ -73,23 +76,25 @@ export const CardPicture = ({
   )
 }
 
-const styles = StyleSheet.create({
-  frame: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLOURS.raised,
-    overflow: 'hidden',
-  },
-  initial: { color: COLOURS.muted, fontWeight: 'bold' },
-  track: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: SIZES.space0,
-    backgroundColor: COLOURS.track,
-  },
-  fill: { height: '100%', backgroundColor: COLOURS.accent },
-  ring: { position: 'absolute', borderColor: COLOURS.text },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    frame: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colours.raised,
+      overflow: 'hidden',
+    },
+    initial: { color: colours.muted, fontWeight: 'bold' },
+    track: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: SIZES.space0,
+      backgroundColor: colours.track,
+    },
+    fill: { height: '100%', backgroundColor: colours.accent },
+    ring: { position: 'absolute', borderColor: colours.text },
+  }),
+)
