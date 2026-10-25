@@ -1,6 +1,6 @@
 {
   "name": "@raven/app",
-  "version": "0.6.3",
+  "version": "0.7.3",
   "private": true,
   "description": "raven on iPhone, iPad, Apple TV and Android TV",
   "main": "index.ts",
