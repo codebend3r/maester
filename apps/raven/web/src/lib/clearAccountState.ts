@@ -1,4 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
+import { listingStore } from '@/lib/listingStore'
+import { stopKeepingListings } from '@/lib/savedListings'
 import { useSelectionScopes } from '@/stores/selectionScope'
 import { useUnlockPrompt } from '@raven/ui/headless'
 
@@ -8,7 +10,8 @@ import { useUnlockPrompt } from '@raven/ui/headless'
  * watching it until their next render, and a page that clears twice (the
  * session's change, then the sign out) would leave the gate waiting on a
  * query nothing fetches. A mutation under way, the sign out among them, keeps
- * its state for the button that started it.
+ * its state for the button that started it. The listings kept on this device
+ * go too.
  */
 export const clearAccountState = async ({
   queryClient,
@@ -17,5 +20,7 @@ export const clearAccountState = async ({
 }): Promise<void> => {
   useUnlockPrompt.getState().close()
   useSelectionScopes.getState().scopes.forEach((scope) => scope.store.getState().end())
+  stopKeepingListings()
   await queryClient.resetQueries()
+  await listingStore.clear()
 }

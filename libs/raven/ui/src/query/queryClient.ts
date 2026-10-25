@@ -14,6 +14,12 @@ const askForPin = (error: Error): void => {
   if (isLockedError(error)) useUnlockPrompt.getState().ask()
 }
 
+/**
+ * How long a library's listing stays cached once nothing shows it, so going
+ * back to a library draws its cards at once instead of from a blank page.
+ */
+export const LISTING_GC_MS = 30 * 60_000
+
 export const createQueryClient = (): QueryClient =>
   new QueryClient({
     queryCache: new QueryCache({ onError: askForPin }),

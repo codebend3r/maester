@@ -7,7 +7,7 @@ import {
   type MatchSubject,
   type MediaSort,
 } from '@raven/core'
-import { queryKeys } from '@/query/queryClient'
+import { LISTING_GC_MS, queryKeys } from '@/query/queryClient'
 import { playerQueriesFor } from '@/lib/playerQueries'
 
 /** What a history lists: what was watched by the library's own measure, or everything that played. */
@@ -49,6 +49,7 @@ export const ravenQueriesFor = (api: ApiClient) => {
       queryOptions({
         queryKey: queryKeys.media(listing),
         queryFn: () => api.listMedia(listing),
+        gcTime: LISTING_GC_MS,
         placeholderData: keepPreviousData,
       }),
 
@@ -56,6 +57,7 @@ export const ravenQueriesFor = (api: ApiClient) => {
       queryOptions({
         queryKey: queryKeys.shows(listing),
         queryFn: () => api.listShows(listing),
+        gcTime: LISTING_GC_MS,
         placeholderData: keepPreviousData,
       }),
 

@@ -32,7 +32,7 @@ export { useTrackCues } from '@/lib/useTrackCues'
 export { playerQueryKeys } from '@/lib/playerQueryKeys'
 export { useSearch } from '@/lib/useSearch'
 export type { Search } from '@/lib/useSearch'
-export { createQueryClient, mutationKeys, queryKeys } from '@/query/queryClient'
+export { LISTING_GC_MS, createQueryClient, mutationKeys, queryKeys } from '@/query/queryClient'
 export {
   EDITED_PARTS,
   afterAiLookups,
