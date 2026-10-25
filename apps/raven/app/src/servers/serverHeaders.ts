@@ -1,4 +1,4 @@
-import { APP_CALL_METHODS, AUTH_HEADERS } from '@raven/core'
+import { APP_CALL_METHODS, AUTH_HEADERS, AUTH_SCHEME } from '@raven/core'
 
 import { checkAppCall } from '@/servers/allowlist'
 import { type ServerCookies, cookieHeaderOf } from '@/servers/cookieJar'
@@ -10,14 +10,29 @@ export const isServerApi = ({ server, address }: { server: AppServer; address: s
 
 /**
  * The headers a request the app does not make through `fetch` carries to `url`: a picture,
- * the event stream. The server's cookies on its own API, and nothing anywhere else. It
+ * the event stream. The server's cookies and the account's token on its own API, and nothing anywhere else. It
  * throws for a URL outside the app's calls, as the app's `fetch` does, so such a request
  * never gets the cookies.
  */
 export const cookieHeadersFor =
-  ({ server, cookies }: { server: AppServer; cookies: ServerCookies }) =>
+  ({
+    server,
+    cookies,
+    accessToken = null,
+  }: {
+    server: AppServer
+    cookies: ServerCookies
+    /** The signed-in account's token, sent beside the cookies on the server's own API. */
+    accessToken?: string | null
+  }) =>
   (url: string): Record<string, string> => {
     checkAppCall({ method: APP_CALL_METHODS.get, url })
-    const cookie = isServerApi({ server, address: url }) ? cookieHeaderOf(cookies) : null
-    return cookie === null ? {} : { [AUTH_HEADERS.cookie]: cookie }
+    if (!isServerApi({ server, address: url })) return {}
+    const cookie = cookieHeaderOf(cookies)
+    return {
+      ...(cookie === null ? {} : { [AUTH_HEADERS.cookie]: cookie }),
+      ...(accessToken === null
+        ? {}
+        : { [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${accessToken}` }),
+    }
   }

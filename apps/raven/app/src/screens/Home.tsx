@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router'
 import type { ShelfCard } from '@/queries/cards'
 import { homeShelvesOf } from '@/queries/homeShelves'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
+import { useAccessToken } from '@/account/accountSession'
 import { useServerCookies } from '@/queries/useServerCookies'
 import { Shelf, Shelves } from '@/layouts'
 import { APP_ROUTES, ROUTE_TARGETS, hrefOf } from '@/routes'
@@ -20,6 +21,7 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
   const home = useQuery(queries.homeQuery)
   const libraries = useQuery(queries.librariesQuery)
   const cookies = useServerCookies(server)
+  const accessToken = useAccessToken()
 
   const shelves =
     home.data === undefined || libraries.data === undefined || cookies === null
@@ -28,7 +30,7 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
           home: home.data,
           libraries: libraries.data,
           api,
-          headersFor: cookieHeadersFor({ server, cookies }),
+          headersFor: cookieHeadersFor({ server, cookies, accessToken }),
         })
   const failure = home.error ?? libraries.error
   const isBare = home.isSuccess && libraries.isSuccess && cookies !== null && shelves.length === 0
@@ -42,6 +44,10 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
   // Focus starts on a card, so on the first shelf that has one.
   const focusShelf = shelves.findIndex(({ cards }) => cards.length > 0)
 
+  const pinnedLibraries = (libraries.data ?? [])
+    .filter((library) => library.settings.pinned)
+    .map(({ id, name }) => ({ id, name }))
+
   const open = ({ target }: ShelfCard) => router.push(hrefOf(target))
 
   const openLibrary = (libraryId: number) =>
@@ -51,7 +57,10 @@ const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries
     <Shelves
       isLoading={isLoading}
       notice={notice}
+      libraries={pinnedLibraries}
+      onOpenLibrary={openLibrary}
       onSearch={() => router.push(APP_ROUTES.search)}
+      onSettings={() => router.push(APP_ROUTES.settings)}
       title={COPY.title}
     >
       {shelves.map((shelf, index) => (

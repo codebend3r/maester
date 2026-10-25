@@ -1,10 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import { Text } from 'react-native'
 
+import { Text } from '@/layouts/Text'
 import { useAppQueries } from '@/queries/useAppQueries'
-import { BUTTON_TONES, Field, Form, FormButton, formStyles } from '@/layouts'
+import { BUTTON_TONES, Field, Form, FormButton, useFormStyles } from '@/layouts'
 import { APP_ROUTES } from '@/routes'
 import { useSubmit } from '@/screens/useSubmit'
 
@@ -24,6 +24,7 @@ const COPY = {
 export const Unlock = () => {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const formStyles = useFormStyles()
   const session = useAppQueries()
   const [pin, setPin] = useState('')
   const { isBusy, error, run } = useSubmit({ unreachable: COPY.unreachable })

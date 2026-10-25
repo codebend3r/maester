@@ -47,9 +47,17 @@ export type PickerProps<K extends string> = {
   onChoose: (key: K) => void
   /** Hears a TV picker's list open and close, for a screen that must stay up while it is open. */
   onOpenChange?: (isOpen: boolean) => void
+  /** Drawn over the video: the chip, and the sheet or list it opens, are dark in every theme. */
+  isOverPicture?: boolean
 }
 
-export type ToolButtonProps = { label: string; accessibilityLabel: string; onPress: () => void }
+export type ToolButtonProps = {
+  label: string
+  accessibilityLabel: string
+  onPress: () => void
+  /** Drawn over the video: dark in every theme. */
+  isOverPicture?: boolean
+}
 
 /** The way back out of a picker without choosing. */
 export const CANCEL = 'Cancel'

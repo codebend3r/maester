@@ -9,6 +9,8 @@ import { focusPicker } from '@/layouts/Picker.focus'
 import { dpadPlayerChrome } from '@/layouts/PlayerChrome.dpad'
 import { focusPlayerChrome } from '@/layouts/PlayerChrome.focus'
 import { focusSearch } from '@/layouts/Search.focus'
+import { focusSettings } from '@/layouts/Settings.focus'
+import { touchSettings } from '@/layouts/Settings.touch'
 import { touchSearch } from '@/layouts/Search.touch'
 import { touchPicker } from '@/layouts/Picker.touch'
 import { focusShelf } from '@/layouts/Shelf.focus'
@@ -22,7 +24,7 @@ import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 export { BUTTON_TONES } from '@/layouts/formKit'
 
 /** The form a screen asks for: driven by focus on a TV, by touch everywhere else. */
-export const { Form, Field, FormButton, formStyles } = Platform.isTV ? focusForm : touchForm
+export const { Form, Field, FormButton, useFormStyles } = Platform.isTV ? focusForm : touchForm
 
 /** Home's shelves: rows the remote moves along on a TV, rows under the thumb everywhere else. */
 export const { Shelves, Shelf } = Platform.isTV ? focusShelf : touchShelf
@@ -48,6 +50,13 @@ export const { ItemLayout, ItemNotice } = Platform.isTV ? focusItem : touchItem
  * remote selects, on a TV; a field over results under the thumb everywhere else.
  */
 export const { SearchField, SearchLayout } = Platform.isTV ? focusSearch : touchSearch
+
+/**
+ * Settings: plates the remote moves down through and the TV's picker lists on a TV, a rename in
+ * a sheet that Menu or Back closes; the system's switches and sheets under the thumb.
+ */
+export const { SettingsPage, SettingsSection, SettingsToggle, SettingsButton, SettingsChoice } =
+  Platform.isTV ? focusSettings : touchSettings
 
 /**
  * Each platform's player controls, the one layout that differs between the two TVs: Apple TV's

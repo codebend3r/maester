@@ -4,17 +4,18 @@ import {
   Pressable,
   type StyleProp,
   StyleSheet,
-  Text,
   TextInput,
   type TextInputProps,
   View,
   type ViewStyle,
 } from 'react-native'
 
+import { BODY_FONT } from '@/theme/fonts'
+import { Text } from '@/layouts/Text'
 import { useFocusOnMount } from '@/layouts/focus'
-import { tvFormStyles } from '@/layouts/formStyles'
-import { COLOURS } from '@/theme/appTheme'
+import { useTvFormStyles } from '@/layouts/formStyles'
 import { TV_SIZES } from '@/theme/tvSizes'
+import { themedStyles, useTheme } from '@/theme/useTheme'
 
 /** What a TV control does on focus unless told more: nothing beyond its own ring or growth. */
 export const NOTHING_ON_FOCUS = (): void => undefined
@@ -29,17 +30,20 @@ const PLATE_END = TV_SIZES.controlLarge / 2
  * text input pads itself top and bottom, which would stand it taller than the plate buttons
  * beside it, so the input sets its own.
  */
-const tvFieldStyles = StyleSheet.create({
-  frame: { minHeight: TV_SIZES.controlLarge, overflow: 'hidden', paddingHorizontal: 0 },
-  input: {
-    color: COLOURS.text,
-    fontSize: TV_SIZES.textLg,
-    minHeight: TV_SIZES.controlLarge,
-    paddingVertical: 0,
-    marginHorizontal: -PLATE_END,
-    paddingHorizontal: PLATE_END + TV_SIZES.space2,
-  },
-})
+const useFieldStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    frame: { minHeight: TV_SIZES.controlLarge, overflow: 'hidden', paddingHorizontal: 0 },
+    input: {
+      color: colours.text,
+      fontFamily: BODY_FONT,
+      fontSize: TV_SIZES.textLg,
+      minHeight: TV_SIZES.controlLarge,
+      paddingVertical: 0,
+      marginHorizontal: -PLATE_END,
+      paddingHorizontal: PLATE_END + TV_SIZES.space2,
+    },
+  }),
+)
 
 /**
  * A text field the remote selects, which opens the platform's own keyboard. The keyboard reports
@@ -72,6 +76,9 @@ export const TvTextField = ({
 >) => {
   const [isFocused, setFocused] = useState(false)
   const frame = useRef<ComponentRef<typeof View>>(null)
+  const tvFormStyles = useTvFormStyles()
+  const tvFieldStyles = useFieldStyles()
+  const muted = useTheme((theme) => theme.palette.muted)
   useFocusOnMount({ view: frame, isAsked: isPreferred })
   return (
     <View
@@ -85,6 +92,7 @@ export const TvTextField = ({
       ]}
     >
       <TextInput
+        placeholderTextColor={muted}
         {...input}
         accessibilityLabel={label}
         autoCapitalize="none"
@@ -107,34 +115,38 @@ export const TvTextField = ({
 
 /**
  * A TV control's plate: the quiet fill, at least as wide as it is tall, whose edge turns to
- * the text colour while it has the focus.
+ * the text colour while it has the focus. Over the video the fill is translucent glass, so the
+ * edge stays clear until then rather than lay a second coat of it round the plate.
  */
-export const plateStyles = StyleSheet.create({
-  plate: {
-    minWidth: TV_SIZES.controlLarge,
-    minHeight: TV_SIZES.controlLarge,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: TV_SIZES.space3,
-    borderRadius: TV_SIZES.radius,
-    borderWidth: TV_SIZES.tvFocusRing,
-    borderColor: COLOURS.quiet,
-    backgroundColor: COLOURS.quiet,
-  },
-  focused: { borderColor: COLOURS.text },
-  label: { color: COLOURS.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
-})
+export const usePlateStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    plate: {
+      minWidth: TV_SIZES.controlLarge,
+      minHeight: TV_SIZES.controlLarge,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: TV_SIZES.space3,
+      borderRadius: TV_SIZES.radius,
+      borderWidth: TV_SIZES.tvFocusRing,
+      borderColor: 'transparent',
+      backgroundColor: colours.quiet,
+    },
+    focused: { borderColor: colours.text },
+    label: { color: colours.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+  }),
+)
 
 /**
  * A plain button on a plate, the remote's to press: `text` is what it shows, `label` is said,
- * `isPreferred` asks the remote's focus for it as it appears, and `onFocused` hears each time
- * it gets the focus.
+ * `isPreferred` asks the remote's focus for it as it appears, `onFocused` hears each time it
+ * gets the focus, and `isOverPicture` gives it the player's dark glass in every theme.
  */
 export const PlateButton = ({
   text,
   label,
   accessibilityRole,
   isPreferred = false,
+  isOverPicture = false,
   onFocused = NOTHING_ON_FOCUS,
   onPress,
 }: {
@@ -142,17 +154,21 @@ export const PlateButton = ({
   label: string
   accessibilityRole: AccessibilityRole
   isPreferred?: boolean
+  isOverPicture?: boolean
   onFocused?: () => void
   onPress: () => void
-}) => (
-  <Pressable
-    accessibilityLabel={label}
-    accessibilityRole={accessibilityRole}
-    hasTVPreferredFocus={isPreferred}
-    onFocus={onFocused}
-    onPress={onPress}
-    style={({ focused }) => [plateStyles.plate, focused && plateStyles.focused]}
-  >
-    <Text style={plateStyles.label}>{text}</Text>
-  </Pressable>
-)
+}) => {
+  const plateStyles = usePlateStyles({ isOverPicture })
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole={accessibilityRole}
+      hasTVPreferredFocus={isPreferred}
+      onFocus={onFocused}
+      onPress={onPress}
+      style={({ focused }) => [plateStyles.plate, focused && plateStyles.focused]}
+    >
+      <Text style={plateStyles.label}>{text}</Text>
+    </Pressable>
+  )
+}

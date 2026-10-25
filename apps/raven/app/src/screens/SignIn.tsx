@@ -1,12 +1,15 @@
-import { ADMIN_LOCK_STATES, type ApiClient, serverNameFor, serverOriginOf } from '@raven/core'
+import { ADMIN_LOCK_STATES, type ApiClient } from '@raven/core'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import { Text } from 'react-native'
 
-import { BUTTON_TONES, Field, Form, FormButton, formStyles } from '@/layouts'
+import { Text } from '@/layouts/Text'
+import { BUTTON_TONES, Field, Form, FormButton, useFormStyles } from '@/layouts'
+import { useAccountSession } from '@/account/accountSession'
+import { AUTH_OUTCOMES } from '@/account/supabaseAuth'
 import { APP_ROUTES } from '@/routes'
 import { useSubmit } from '@/screens/useSubmit'
-import { apiFor, cookieJar, newServerId } from '@/servers/serverClient'
+import { IS_SIGN_IN_BYPASSED, RAVEN_SERVER } from '@/servers/ravenServer'
+import { apiFor } from '@/servers/serverClient'
 import { ADD_OUTCOMES, type AppServer } from '@/servers/serverList'
 import { TICKET_SUPPORT, ticketSupportOf } from '@/servers/tickets'
 import { useActiveServer } from '@/stores/activeServer'
@@ -17,10 +20,10 @@ export const TICKETS_OFF =
 
 const COPY = {
   title: 'Sign in to raven',
-  address: 'Server address',
-  example: 'http://192.168.1.20:8484',
-  badAddress: "Enter the server's address on its own, like http://192.168.1.20:8484",
-  unreachable: "Couldn't reach a raven server there. Check the address and that raven is running.",
+  email: 'Email',
+  password: 'Password',
+  badAccount: 'Enter your email and password.',
+  unreachable: "Couldn't reach raven. Check your connection and try again.",
   pin: 'PIN',
   pinPrompt: 'This server keeps some libraries behind a PIN.',
   adminPassword: 'Admin password',
@@ -31,15 +34,15 @@ const COPY = {
   continue: 'Continue',
   unlock: 'Unlock',
   notNow: 'Not now',
-  otherAddress: 'Use another address',
+  signOut: 'Sign out',
 } as const
 
-const STEPS = { address: 'address', pin: 'pin', admin: 'admin', ticketsOff: 'ticketsOff' } as const
+const STEPS = { account: 'account', pin: 'pin', admin: 'admin', ticketsOff: 'ticketsOff' } as const
 
 /** A step that asks for a secret the server unlocks with. */
 type SecretStep = { kind: typeof STEPS.pin | typeof STEPS.admin; server: AppServer }
 
-type Step = { kind: typeof STEPS.address } | SecretStep | { kind: typeof STEPS.ticketsOff }
+type Step = { kind: typeof STEPS.account } | SecretStep | { kind: typeof STEPS.ticketsOff }
 
 /** What the PIN step and the admin step each ask for, and the call that sends it. */
 const SECRET_STEPS = {
@@ -64,18 +67,24 @@ const isAdminLockHeld = async (api: ApiClient): Promise<boolean> => {
 }
 
 /**
- * The first launch: the server's address, then its PIN when it has locked libraries, then
- * the admin password when the admin lock would still hide them, as the desktop asks. The
- * server joins the list and becomes the active one only once it has answered as raven.
+ * The first launch: the account's email and password (the web's Supabase sign-in, against the
+ * one server the app talks to), then the PIN when the account may see locked libraries, then
+ * the admin password when the admin lock would still hide them. An end to end build names an
+ * accountless fixture in its bundle, so it begins at the PIN.
  */
 export const SignIn = () => {
   const router = useRouter()
-  const [step, setStep] = useState<Step>({ kind: STEPS.address })
-  const [address, setAddress] = useState('')
+  const formStyles = useFormStyles()
+  const [step, setStep] = useState<Step>(
+    IS_SIGN_IN_BYPASSED ? { kind: STEPS.pin, server: RAVEN_SERVER } : { kind: STEPS.account },
+  )
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [secret, setSecret] = useState('')
   const { isBusy, error, setError, run } = useSubmit({ unreachable: COPY.unreachable })
 
-  const goHome = () => router.replace(APP_ROUTES.home)
+  // From Settings, Home is under it in the stack: go back down to it rather than stack another.
+  const goHome = () => router.dismissTo(APP_ROUTES.home)
 
   const askFor = (next: Step) => {
     setSecret('')
@@ -99,26 +108,32 @@ export const SignIn = () => {
     goHome()
   }
 
-  const submitAddress = ({ text }: { text: string }) => {
-    const origin = serverOriginOf(text)
-    if (origin === null) {
-      setError(COPY.badAddress)
+  const submitAccount = ({ typedPassword = password }: { typedPassword?: string } = {}) => {
+    const trimmed = email.trim()
+    if (trimmed === '' || typedPassword === '') {
+      setError(COPY.badAccount)
       return
     }
     run(async () => {
-      const known = useActiveServer.getState().servers.find((server) => server.origin === origin)
-      const server = known ?? {
-        id: newServerId(),
-        name: serverNameFor(origin),
-        origin,
-        addedAt: Date.now(),
-      }
-      const lock = await apiFor(server).getLock()
-      if (lock.available && !lock.unlocked) {
-        askFor({ kind: STEPS.pin, server })
+      const outcome = await useAccountSession.getState().signIn({
+        email: trimmed,
+        password: typedPassword,
+      })
+      if (outcome.kind === AUTH_OUTCOMES.unreachable) {
+        setError(COPY.unreachable)
         return
       }
-      await finish(server)
+      if (outcome.kind === AUTH_OUTCOMES.refused) {
+        setError(outcome.message)
+        return
+      }
+      setPassword('')
+      const lock = await apiFor(RAVEN_SERVER).getLock()
+      if (lock.available && !lock.unlocked) {
+        askFor({ kind: STEPS.pin, server: RAVEN_SERVER })
+        return
+      }
+      await finish(RAVEN_SERVER)
     })
   }
 
@@ -133,12 +148,10 @@ export const SignIn = () => {
       await finish(server)
     })
 
-  const startOver = (server: AppServer) => {
-    askFor({ kind: STEPS.address })
+  const signOut = () => {
+    useAccountSession.getState().signOut()
+    askFor({ kind: STEPS.account })
     setError(null)
-    // A server never added would otherwise keep its cookies with nothing left to forget them.
-    const isListed = useActiveServer.getState().servers.some((known) => known.id === server.id)
-    if (!isListed) cookieJar.forget(server.id).catch(() => undefined)
   }
 
   const errorLine = error !== null && (
@@ -148,22 +161,32 @@ export const SignIn = () => {
   )
 
   switch (step.kind) {
-    case STEPS.address:
+    case STEPS.account:
       return (
         <Form title={COPY.title}>
           <Field
+            isEmail
             isFirst
-            label={COPY.address}
-            onChangeText={setAddress}
-            onSubmit={submitAddress}
-            placeholder={COPY.example}
-            value={address}
+            label={COPY.email}
+            onChangeText={setEmail}
+            onSubmit={({ text }) => setEmail(text)}
+            value={email}
+          />
+          <Field
+            isSecret
+            label={COPY.password}
+            onChangeText={setPassword}
+            onSubmit={({ text }) => {
+              setPassword(text)
+              submitAccount({ typedPassword: text })
+            }}
+            value={password}
           />
           {errorLine}
           <FormButton
             isDisabled={isBusy}
             label={COPY.continue}
-            onPress={() => submitAddress({ text: address })}
+            onPress={() => submitAccount()}
             tone={BUTTON_TONES.primary}
           />
         </Form>
@@ -198,8 +221,8 @@ export const SignIn = () => {
           />
           <FormButton
             isDisabled={isBusy}
-            label={COPY.otherAddress}
-            onPress={() => startOver(step.server)}
+            label={COPY.signOut}
+            onPress={signOut}
             tone={BUTTON_TONES.ghost}
           />
         </Form>

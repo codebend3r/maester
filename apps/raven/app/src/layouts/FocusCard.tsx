@@ -1,6 +1,7 @@
 import { type ComponentRef, useRef, useState } from 'react'
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native'
 
+import { Text } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture } from '@/layouts/Card'
 import { useOpenerFocus } from '@/layouts/focus'
@@ -8,8 +9,8 @@ import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import { NOTHING_ON_FOCUS } from '@/layouts/tvControls'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { COLOURS } from '@/theme/appTheme'
 import { TV_SIZES, tvSize } from '@/theme/tvSizes'
+import { themedStyles } from '@/theme/useTheme'
 
 /** A card's width in points on a 1920 by 1080 point screen, read from across the room. */
 export const FOCUS_CARD_WIDTHS = { [CARD_SHAPES.poster]: 232, [CARD_SHAPES.wide]: 400 } as const
@@ -60,6 +61,7 @@ export const FocusCard = ({
   const isReduced = useReduceMotion((state) => state.isReduced)
   const [isFocused, setFocused] = useState(false)
   const [scale] = useState(() => new Animated.Value(1))
+  const styles = useStyles()
 
   const grow = (toValue: number) => {
     if (isReduced) {
@@ -116,14 +118,16 @@ export const FocusCard = ({
   )
 }
 
-const styles = StyleSheet.create({
-  card: { gap: TV_SIZES.space3 },
-  title: {
-    color: COLOURS.muted,
-    fontSize: TV_SIZES.textLg,
-    lineHeight: TV_SIZES.textLg * LINE_RATIO,
-    fontWeight: '600',
-  },
-  focusedTitle: { color: COLOURS.text },
-  line: { color: COLOURS.muted, fontSize: TV_SIZES.text, lineHeight: TV_SIZES.text * LINE_RATIO },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    card: { gap: TV_SIZES.space3 },
+    title: {
+      color: colours.muted,
+      fontSize: TV_SIZES.textLg,
+      lineHeight: TV_SIZES.textLg * LINE_RATIO,
+      fontWeight: '600',
+    },
+    focusedTitle: { color: colours.text },
+    line: { color: colours.muted, fontSize: TV_SIZES.text, lineHeight: TV_SIZES.text * LINE_RATIO },
+  }),
+)

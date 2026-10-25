@@ -30,12 +30,10 @@ jobs:
   checks:
     name: ${{ matrix.check.name }}
     runs-on: ubuntu-24.04
-    permissions:
-      actions: write
-      contents: read
     timeout-minutes: 30
     strategy:
-      fail-fast: true
+      # Report every portable check in one run, even when another check fails.
+      fail-fast: false
       matrix:
         check:
           - name: 🎨 Format
@@ -115,23 +113,12 @@ jobs:
       - name: ${{ matrix.check.name }}
         run: bunx nx run-many --outputStyle=static -t ${{ matrix.check.target }}
 
-      # Fail fast: a failed job cancels the whole run, so nothing else keeps burning runner
-      # minutes. A fork's PR token is read-only, so refusal must not mask the failure.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
-
-  # Keep the existing order: every matrix check passes, then every project builds.
+  # Keep the existing order: every matrix check finishes, then every project builds.
   build:
     name: 🏗️ Build
     needs: checks
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
-    permissions:
-      actions: write
-      contents: read
     timeout-minutes: 30
     steps:
       - name: 📥 Checkout
@@ -147,13 +134,6 @@ jobs:
 
       - name: 🏗️ Build
         run: bun run build
-
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
 
   # The "Protect main" ruleset requires this stable check name. It passes only
   # when every matrix check and the build passed.
@@ -177,9 +157,6 @@ jobs:
   supabase:
     name: 🗄️ Supabase
     runs-on: ubuntu-24.04
-    permissions:
-      actions: write
-      contents: read
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -208,25 +185,12 @@ jobs:
         if: always()
         run: bunx nx run @raven/supabase:db:stop
 
-      # Fail fast: a failed job cancels the whole run, so nothing else keeps burning runner
-      # minutes. Last, so this job's own failure() uploads have already run. A fork's PR
-      # token is read-only, so the cancel may be refused there; that must not mask the failure.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
-
   # One native build feeds the other desktop jobs, handed over as an artifact: the app
   # job packages its addon and dylibs, and the two playback checks load them side by side.
   desktop-native:
     name: 🎞️ Desktop native
     # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
     runs-on: macos-26
-    permissions:
-      actions: write
-      contents: read
     timeout-minutes: 120
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
@@ -288,24 +252,11 @@ jobs:
           path: libs/raven/mpv/native-build/source-bundle
           if-no-files-found: error
 
-      # Fail fast: a failed job cancels the whole run, so nothing else keeps burning runner
-      # minutes. Last, so this job's own failure() uploads have already run. A fork's PR
-      # token is read-only, so the cancel may be refused there; that must not mask the failure.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
-
   # Forge bundles the addon and libmpv (stage:mpv), so this waits for the native build.
   desktop-app:
     name: 📦 Desktop app
     needs: desktop-native
     runs-on: macos-26
-    permissions:
-      actions: write
-      contents: read
     timeout-minutes: 30
     env:
       # Keeps the Xcode version the cached app is keyed on the same as the native job's.
@@ -364,26 +315,13 @@ jobs:
           path: apps/raven/desktop/out/make
           if-no-files-found: error
 
-      # Fail fast: a failed job cancels the whole run, so nothing else keeps burning runner
-      # minutes. Last, so this job's own failure() uploads have already run. A fork's PR
-      # token is read-only, so the cancel may be refused there; that must not mask the failure.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
-
   desktop-playback:
     name: ${{ matrix.check.name }}
     needs: desktop-native
     runs-on: macos-26
-    permissions:
-      actions: write
-      contents: read
     timeout-minutes: 30
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         check:
           - name: 🧪 Desktop player against headless libmpv
@@ -443,16 +381,6 @@ jobs:
           path: apps/raven/desktop/test-results
           if-no-files-found: ignore
 
-      # Fail fast: a failed job cancels the whole run, so nothing else keeps burning runner
-      # minutes. Last, so this job's own failure() uploads have already run. A fork's PR
-      # token is read-only, so the cancel may be refused there; that must not mask the failure.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
-
   # Whether this PR touches raven's device app, what it imports (core and ui, through
   # Nx's graph), the server its flows sign in to, or this workflow. The app jobs below are
   # cold React Native builds, so they run only then; the 🖥️ Desktop gate takes
@@ -460,9 +388,6 @@ jobs:
   app-affected:
     name: 🔍 App affected
     runs-on: ubuntu-24.04
-    permissions:
-      actions: write
-      contents: read
     timeout-minutes: 10
     outputs:
       affected: ${{ steps.affected.outputs.affected }}
@@ -501,16 +426,6 @@ jobs:
             echo "affected=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Fail fast: a failed job cancels the whole run, so nothing else keeps burning runner
-      # minutes. Last, so this job's own failure() uploads have already run. A fork's PR
-      # token is read-only, so the cancel may be refused there; that must not mask the failure.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
-
   # raven's device app on Apple TV: the simulator build and an XCUITest that drives it
   # with the Siri Remote against a real raven server. It runs beside app-ios, on its own
   # runner, since the two builds share nothing.
@@ -519,17 +434,15 @@ jobs:
     needs: app-affected
     if: needs.app-affected.outputs.affected == 'true'
     runs-on: macos-26
-    permissions:
-      actions: write
-      contents: read
     # One Release build of React Native from cold (it is not cached) and the remote flow.
     timeout-minutes: 60
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       HOMEBREW_NO_AUTO_UPDATE: '1'
-      # The flow reaches the fixture server over plain http on the loopback, which only
-      # the development variant's App Transport Security allows.
+      # The flow reaches the accountless fixture over plain http on the loopback. The
+      # development variant allows it, and Expo bundles its address into this test build.
       APP_VARIANT: development
+      EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN: http://127.0.0.1:8490
     steps:
       # The PR's head commit, so the artifact name below matches the commit that was built.
       - name: 📥 Checkout exact PR head
@@ -648,16 +561,6 @@ jobs:
             ${{ runner.temp }}/raven-tv.png
           if-no-files-found: error
 
-      # Fail fast: a failed job cancels the whole run, so nothing else keeps burning runner
-      # minutes. Last, so this job's own failure() uploads have already run. A fork's PR
-      # token is read-only, so the cancel may be refused there; that must not mask the failure.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
-
   # raven's device app on iPhone and iPad: the simulator build and the Maestro flows on
   # the iPhone simulator against a real raven server.
   app-ios:
@@ -665,17 +568,15 @@ jobs:
     needs: app-affected
     if: needs.app-affected.outputs.affected == 'true'
     runs-on: macos-26
-    permissions:
-      actions: write
-      contents: read
     # One Release build of React Native from cold (it is not cached) and the flows.
     timeout-minutes: 60
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       HOMEBREW_NO_AUTO_UPDATE: '1'
-      # The flows reach the fixture server over plain http on the loopback, which only
-      # the development variant's App Transport Security allows.
+      # The flows reach the accountless fixture over plain http on the loopback. The
+      # development variant allows it, and Expo bundles its address into this test build.
       APP_VARIANT: development
+      EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN: http://127.0.0.1:8490
     steps:
       # The PR's head commit, so the artifact names below match the commit that was built.
       - name: 📥 Checkout exact PR head
@@ -829,16 +730,6 @@ jobs:
           path: ${{ runner.temp }}/raven-iphonesimulator.zip
           if-no-files-found: error
 
-      # Fail fast: a failed job cancels the whole run, so nothing else keeps burning runner
-      # minutes. Last, so this job's own failure() uploads have already run. A fork's PR
-      # token is read-only, so the cancel may be refused there; that must not mask the failure.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
-
   # raven's device app for Android TV, on Linux (Ruling 20): GitHub's macOS arm64 runners
   # cannot run the Android emulator. The Release APK, then, against a real raven server, the
   # Maestro flows on an Android TV emulator, driven by the remote's keys.
@@ -847,15 +738,13 @@ jobs:
     needs: app-affected
     if: needs.app-affected.outputs.affected == 'true'
     runs-on: ubuntu-24.04
-    permissions:
-      actions: write
-      contents: read
     # A Release build of React Native from cold, the emulator's boot and the flows.
     timeout-minutes: 60
     env:
-      # The flows reach the fixture server over plain http on the loopback, which only the
-      # development variant's cleartext traffic allows.
+      # The flows reach the accountless fixture over plain http on the loopback. The
+      # development variant allows it, and Expo bundles its address into this test build.
       APP_VARIANT: development
+      EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN: http://127.0.0.1:8490
       # The emulator both runner steps start, its build pinned to the one the flows were
       # written on (36.5.11), so the AVD cache's key can name everything its snapshot was
       # made with.
@@ -952,9 +841,32 @@ jobs:
             ~/.android/adb*
           key: ${{ steps.avd-key.outputs.key }}
 
-      # Only on a cache miss: makes the AVD, boots it once and saves the snapshot.
+      # Only on a cache miss: makes the AVD, boots it once and saves the snapshot. The runner
+      # unlocks the screen with `adb shell input keyevent 82` the moment the boot completes,
+      # and that call sometimes exits 255 while the Android TV image is still settling, which
+      # fails the step with a healthy emulator. The second attempt below retries it, and
+      # reuses the AVD the first one made.
       - name: 📺 Make the Android TV AVD
+        id: make-avd
         if: steps.avd-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        # reactivecircus/android-emulator-runner v2.38.0
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 36
+          target: android-tv
+          arch: x86_64
+          profile: tv_1080p
+          emulator-build: ${{ env.EMULATOR_BUILD }}
+          cores: ${{ env.EMULATOR_CORES }}
+          ram-size: ${{ env.EMULATOR_RAM }}
+          force-avd-creation: false
+          emulator-options: ${{ env.EMULATOR_OPTIONS }}
+          disable-animations: false
+          script: echo "Saved the Android TV AVD's snapshot"
+
+      - name: 📺 Make the Android TV AVD again
+        if: steps.make-avd.outcome == 'failure'
         # reactivecircus/android-emulator-runner v2.38.0
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
@@ -1034,16 +946,6 @@ jobs:
             ~/.maestro/tests
             ${{ runner.temp }}/fixture.log
           if-no-files-found: ignore
-
-      # Fail fast: a failed job cancels the whole run, so nothing else keeps burning runner
-      # minutes. Last, so this job's own failure() uploads have already run. A fork's PR
-      # token is read-only, so the cancel may be refused there; that must not mask the failure.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
 
   # The "Protect main" ruleset requires a check named 🖥️ Desktop, so this one stands
   # for every desktop and device app job and passes only when all of them did. The

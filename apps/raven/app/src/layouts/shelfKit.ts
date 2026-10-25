@@ -3,6 +3,9 @@ import type { ReactNode } from 'react'
 import type { ShelfCard } from '@/queries/cards'
 import type { ShelfView } from '@/queries/homeShelves'
 
+/** A pinned library as the side menu lists it. */
+export type MenuLibrary = { id: number; name: string }
+
 export type ShelvesProps = {
   title: string
   /** A line in place of the shelves: while they load, when they fail, or when there are none. */
@@ -11,6 +14,12 @@ export type ShelvesProps = {
   isLoading: boolean
   /** Opens the search through every library. */
   onSearch: () => void
+  /** Opens Settings. */
+  onSettings: () => void
+  /** The pinned libraries, in the order the web's side menu lists them. */
+  libraries: readonly MenuLibrary[]
+  /** Opens a library from the side menu. */
+  onOpenLibrary: (libraryId: number) => void
   children: ReactNode
 }
 
@@ -38,3 +47,9 @@ export const seeAllLabelOf = (title: string): string => `${SEE_ALL} in ${title}`
 
 /** The way into the search through every library, and what it is called aloud. */
 export const SEARCH_EVERY_LIBRARY = { text: 'Search', label: 'Search every library' } as const
+
+/** The side menu's heading over the pinned libraries, as the web's. */
+export const PINNED_HEADING = 'Pinned'
+
+/** The way into Settings: a gear under the thumb, a plate in the TV's top row. */
+export const SETTINGS_ENTRY = { label: 'Settings', gear: '\u2699\uFE0E' } as const

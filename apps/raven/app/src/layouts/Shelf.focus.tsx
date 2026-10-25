@@ -1,51 +1,158 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { type ComponentRef, type Ref, useRef } from 'react'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
+import { Text } from '@/layouts/Text'
 import type { ShelfCard } from '@/queries/cards'
 import type { ShelfView } from '@/queries/homeShelves'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
-import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
+import { useOpenerFocus, useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import {
   NOTHING_HERE,
+  PINNED_HEADING,
+  type MenuLibrary,
   SEARCH_EVERY_LIBRARY,
   SEE_ALL,
+  SETTINGS_ENTRY,
   type ShelfKit,
   type ShelfProps,
   type ShelvesProps,
   seeAllLabelOf,
 } from '@/layouts/shelfKit'
-import { PlateButton } from '@/layouts/tvControls'
-import { COLOURS } from '@/theme/appTheme'
+import { Logo } from '@/layouts/Logo'
 import { TV_SIZES } from '@/theme/tvSizes'
+import { themedStyles } from '@/theme/useTheme'
+
+/** Where the Settings entry sits on Home, a place no shelf's card shares. */
+const SETTINGS_PLACE = 'settings'
+
+/** One row of the side menu: a link the remote moves down, its edge and fill showing focus. */
+const MenuRow = ({
+  label,
+  onPress,
+  onFocused,
+  ref,
+}: {
+  label: string
+  onPress: () => void
+  onFocused: () => void
+  ref?: Ref<ComponentRef<typeof Pressable>>
+}) => {
+  const styles = useStyles()
+  return (
+    <Pressable
+      ref={ref}
+      accessibilityLabel={label}
+      accessibilityRole="link"
+      onFocus={onFocused}
+      onPress={onPress}
+      style={({ focused }) => [styles.menuRow, focused && styles.focusedLink]}
+    >
+      {({ focused }) => (
+        <Text numberOfLines={1} style={[styles.menuLabel, focused === true && styles.focusedLabel]}>
+          {label}
+        </Text>
+      )}
+    </Pressable>
+  )
+}
 
 /**
- * Home's shelves under its title and, beside it, the way into the search. That is drawn only
- * once the shelves are read, with them: drawn alone, it would be all tvOS had to give the
- * opening focus to, which belongs to the first card. Anything here taking the focus spends the
- * opening focus, so a shelf drawn later never pulls the focus back.
+ * The way into Settings, which takes the remote's focus back when Settings goes, as a card does
+ * for the screen it opened: Android TV restores nothing on its own.
  */
-const Shelves = ({ title, notice, isLoading, onSearch, children }: ShelvesProps) => {
-  const { settle } = useScreenFocusScope()
+const SettingsEntry = ({ onPress, onFocused }: { onPress: () => void; onFocused: () => void }) => {
+  const view = useRef<ComponentRef<typeof Pressable>>(null)
+  const { remember } = useOpenerFocus({ place: SETTINGS_PLACE, view })
   return (
-    <ScrollView contentContainerStyle={styles.shelves} style={styles.ground}>
-      <View style={styles.pageRow}>
-        <Text accessibilityRole="header" style={styles.pageTitle}>
-          {title}
+    <MenuRow
+      ref={view}
+      label={SETTINGS_ENTRY.label}
+      onFocused={onFocused}
+      onPress={() => {
+        remember()
+        onPress()
+      }}
+    />
+  )
+}
+
+/**
+ * The side menu, as the web's: the search, then the pinned libraries under their heading, and
+ * Settings at the foot. It is the left column of Home on a TV, the remote's way to every library.
+ */
+const SideMenu = ({
+  libraries,
+  onSearch,
+  onSettings,
+  onOpenLibrary,
+  onFocused,
+}: Pick<ShelvesProps, 'onSearch' | 'onSettings' | 'onOpenLibrary' | 'libraries'> & {
+  onFocused: () => void
+}) => {
+  const styles = useStyles()
+  return (
+    <ScrollView contentContainerStyle={styles.menuContent} style={styles.menu}>
+      <MenuRow label={SEARCH_EVERY_LIBRARY.text} onFocused={onFocused} onPress={onSearch} />
+      {libraries.length > 0 && (
+        <Text accessibilityRole="header" style={styles.menuHeading}>
+          {PINNED_HEADING}
         </Text>
-        {!isLoading && (
-          <PlateButton
-            label={SEARCH_EVERY_LIBRARY.label}
-            onFocused={settle}
-            onPress={onSearch}
-            accessibilityRole="link"
-            text={SEARCH_EVERY_LIBRARY.text}
-          />
-        )}
-      </View>
-      {notice !== null && <Text style={styles.notice}>{notice}</Text>}
-      {children}
+      )}
+      {libraries.map((library: MenuLibrary) => (
+        <MenuRow
+          key={library.id}
+          label={library.name}
+          onFocused={onFocused}
+          onPress={() => onOpenLibrary(library.id)}
+        />
+      ))}
+      <SettingsEntry onFocused={onFocused} onPress={onSettings} />
     </ScrollView>
+  )
+}
+
+/**
+ * Home's shelves under its title, with the side menu beside them. The menu is drawn only once
+ * the shelves are read, with them: drawn alone, it would be all tvOS had to give the opening
+ * focus to, which belongs to the first card. Anything here taking the focus spends the opening
+ * focus, so a shelf drawn later never pulls the focus back.
+ */
+const Shelves = ({
+  title,
+  notice,
+  isLoading,
+  onSearch,
+  onSettings,
+  libraries,
+  onOpenLibrary,
+  children,
+}: ShelvesProps) => {
+  const { settle } = useScreenFocusScope()
+  const styles = useStyles()
+  return (
+    <View style={styles.screen}>
+      {!isLoading && (
+        <SideMenu
+          libraries={libraries}
+          onFocused={settle}
+          onOpenLibrary={onOpenLibrary}
+          onSearch={onSearch}
+          onSettings={onSettings}
+        />
+      )}
+      <ScrollView contentContainerStyle={styles.shelves} style={styles.ground}>
+        <View style={styles.pageRow}>
+          <Logo width={TV_SIZES.textXl} />
+          <Text accessibilityRole="header" style={styles.pageTitle}>
+            {title}
+          </Text>
+        </View>
+        {notice !== null && <Text style={styles.notice}>{notice}</Text>}
+        {children}
+      </ScrollView>
+    </View>
   )
 }
 
@@ -59,6 +166,7 @@ const ShelfTitle = ({
   onFocused,
 }: Pick<ShelfProps, 'shelf' | 'onOpenLibrary'> & { onFocused: () => void }) => {
   const { libraryId } = shelf
+  const styles = useStyles()
   return (
     <View style={styles.titleRow}>
       <Text accessibilityRole="header" style={styles.shelfTitle}>
@@ -94,6 +202,7 @@ const placeOf = ({ shelf, card }: { shelf: ShelfView; card: ShelfCard }): string
  */
 const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) => {
   const { isOpening, settle } = useOpeningFocus()
+  const styles = useStyles()
   return (
     <View style={styles.shelf}>
       <ShelfTitle onFocused={settle} onOpenLibrary={onOpenLibrary} shelf={shelf} />
@@ -131,38 +240,62 @@ const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) =>
  */
 export const focusShelf: ShelfKit = { Shelves, Shelf }
 
-const styles = StyleSheet.create({
-  ground: { flex: 1, backgroundColor: COLOURS.ground },
-  shelves: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
-  pageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: TV_SIZES.space5,
-    paddingHorizontal: TV_SIZES.space8,
-  },
-  pageTitle: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  notice: { color: COLOURS.muted, fontSize: TV_SIZES.textLg, paddingHorizontal: TV_SIZES.space8 },
-  shelf: { gap: TV_SIZES.space1 },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: TV_SIZES.space3,
-    paddingHorizontal: TV_SIZES.space8,
-  },
-  shelfTitle: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  seeAll: {
-    paddingHorizontal: TV_SIZES.space2,
-    paddingVertical: TV_SIZES.space0,
-    borderRadius: TV_SIZES.radius,
-    borderWidth: TV_SIZES.tvFocusRing,
-    borderColor: 'transparent',
-  },
-  focusedLink: { borderColor: COLOURS.text, backgroundColor: COLOURS.quiet },
-  seeAllLabel: { color: COLOURS.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
-  focusedLabel: { color: COLOURS.text },
-  row: {
-    gap: TV_SIZES.space5,
-    paddingHorizontal: TV_SIZES.space8,
-    paddingVertical: TV_SIZES.space4,
-  },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    screen: { flex: 1, flexDirection: 'row', backgroundColor: colours.ground },
+    ground: { flex: 1, backgroundColor: colours.ground },
+    menu: { flexGrow: 0, width: TV_SIZES.space8 * 5, backgroundColor: colours.raised },
+    menuContent: {
+      gap: TV_SIZES.space1,
+      paddingHorizontal: TV_SIZES.space3,
+      paddingVertical: TV_SIZES.space6,
+    },
+    menuHeading: {
+      color: colours.muted,
+      fontSize: TV_SIZES.textSm,
+      fontWeight: '600',
+      paddingHorizontal: TV_SIZES.space2,
+      paddingTop: TV_SIZES.space4,
+    },
+    menuRow: {
+      borderColor: 'transparent',
+      borderRadius: TV_SIZES.radius,
+      borderWidth: TV_SIZES.tvFocusRing,
+      paddingHorizontal: TV_SIZES.space2,
+      paddingVertical: TV_SIZES.space1,
+    },
+    menuLabel: { color: colours.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+    shelves: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
+    pageRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: TV_SIZES.space5,
+      paddingHorizontal: TV_SIZES.space8,
+    },
+    pageTitle: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    notice: { color: colours.muted, fontSize: TV_SIZES.textLg, paddingHorizontal: TV_SIZES.space8 },
+    shelf: { gap: TV_SIZES.space1 },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: TV_SIZES.space3,
+      paddingHorizontal: TV_SIZES.space8,
+    },
+    shelfTitle: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    seeAll: {
+      paddingHorizontal: TV_SIZES.space2,
+      paddingVertical: TV_SIZES.space0,
+      borderRadius: TV_SIZES.radius,
+      borderWidth: TV_SIZES.tvFocusRing,
+      borderColor: 'transparent',
+    },
+    focusedLink: { borderColor: colours.text, backgroundColor: colours.quiet },
+    seeAllLabel: { color: colours.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+    focusedLabel: { color: colours.text },
+    row: {
+      gap: TV_SIZES.space5,
+      paddingHorizontal: TV_SIZES.space8,
+      paddingVertical: TV_SIZES.space4,
+    },
+  }),
+)

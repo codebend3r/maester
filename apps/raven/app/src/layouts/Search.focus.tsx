@@ -1,5 +1,6 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, View } from 'react-native'
 
+import { Text } from '@/layouts/Text'
 import { useScreenFocusScope } from '@/layouts/focus'
 import {
   CLEAR_SEARCH,
@@ -8,8 +9,8 @@ import {
   type SearchLayoutProps,
 } from '@/layouts/searchKit'
 import { NOTHING_ON_FOCUS, PlateButton, TvTextField } from '@/layouts/tvControls'
-import { COLOURS } from '@/theme/appTheme'
 import { TV_SIZES } from '@/theme/tvSizes'
+import { themedStyles } from '@/theme/useTheme'
 
 /**
  * A search box the remote selects, which opens the platform's own keyboard. It searches once
@@ -20,30 +21,32 @@ const SearchField = ({
   label,
   isPreferred = false,
   onFocused = NOTHING_ON_FOCUS,
-}: SearchFieldProps) => (
-  <View style={styles.box}>
-    <TvTextField
-      frameStyle={styles.frame}
-      isPreferred={isPreferred}
-      label={label}
-      onChangeText={search.setText}
-      onFocused={onFocused}
-      onSubmit={search.searchFor}
-      placeholder={label}
-      placeholderTextColor={COLOURS.muted}
-      returnKeyType="search"
-      value={search.text}
-    />
-    {search.text !== '' && (
-      <PlateButton
-        label={CLEAR_SEARCH.label}
-        onPress={() => search.searchFor('')}
-        accessibilityRole="button"
-        text={CLEAR_SEARCH.text}
+}: SearchFieldProps) => {
+  const styles = useStyles()
+  return (
+    <View style={styles.box}>
+      <TvTextField
+        frameStyle={styles.frame}
+        isPreferred={isPreferred}
+        label={label}
+        onChangeText={search.setText}
+        onFocused={onFocused}
+        onSubmit={search.searchFor}
+        placeholder={label}
+        returnKeyType="search"
+        value={search.text}
       />
-    )}
-  </View>
-)
+      {search.text !== '' && (
+        <PlateButton
+          label={CLEAR_SEARCH.label}
+          onPress={() => search.searchFor('')}
+          accessibilityRole="button"
+          text={CLEAR_SEARCH.text}
+        />
+      )}
+    </View>
+  )
+}
 
 /**
  * The search screen on a TV: the title and the field at the top, and the results below as
@@ -52,6 +55,7 @@ const SearchField = ({
  */
 const SearchLayout = ({ title, label, search, notice, children }: SearchLayoutProps) => {
   const { isOpening, settle } = useScreenFocusScope()
+  const styles = useStyles()
   return (
     <ScrollView contentContainerStyle={styles.page} style={styles.ground}>
       <View style={styles.header}>
@@ -69,12 +73,14 @@ const SearchLayout = ({ title, label, search, notice, children }: SearchLayoutPr
 /** Search on a TV. */
 export const focusSearch: SearchKit = { SearchField, SearchLayout }
 
-const styles = StyleSheet.create({
-  ground: { flex: 1, backgroundColor: COLOURS.ground },
-  page: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
-  header: { gap: TV_SIZES.space3, paddingHorizontal: TV_SIZES.space8 },
-  title: { color: COLOURS.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-  notice: { color: COLOURS.muted, fontSize: TV_SIZES.textLg },
-  box: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space2 },
-  frame: { width: TV_SIZES.measure },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    ground: { flex: 1, backgroundColor: colours.ground },
+    page: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
+    header: { gap: TV_SIZES.space3, paddingHorizontal: TV_SIZES.space8 },
+    title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    notice: { color: colours.muted, fontSize: TV_SIZES.textLg },
+    box: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space2 },
+    frame: { width: TV_SIZES.measure },
+  }),
+)

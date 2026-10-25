@@ -113,7 +113,8 @@
         "dependsOn": [
           {
             "projects": [
-              "@raven/core"
+              "@raven/core",
+              "@raven/ui"
             ],
             "target": "build"
           }

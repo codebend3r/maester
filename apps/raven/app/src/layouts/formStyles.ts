@@ -1,8 +1,10 @@
 import { StyleSheet } from 'react-native'
 
+import { BODY_FONT } from '@/theme/fonts'
 import { BUTTON_TONES, type ButtonTone } from '@/layouts/formKit'
-import { COLOURS, SIZES, type Sizes } from '@/theme/appTheme'
+import { type Palette, SIZES, type Sizes } from '@/theme/appTheme'
 import { TV_SIZES } from '@/theme/tvSizes'
+import { themedStyles } from '@/theme/useTheme'
 
 /**
  * What both form variants share, at a scale's lengths; each variant scales it further for the
@@ -10,15 +12,16 @@ import { TV_SIZES } from '@/theme/tvSizes'
  * to the text colour, which shows on each tone's fill and on none. A form's lines say what a
  * step asks (`note`), what the server said (`notice`) and what went wrong (`error`).
  */
-const formStylesFor = ({ sizes }: { sizes: Sizes }) =>
+const formStylesFor = ({ sizes, colours }: { sizes: Sizes; colours: Palette }) =>
   StyleSheet.create({
-    ground: { flex: 1, backgroundColor: COLOURS.ground },
-    title: { color: COLOURS.text, fontSize: sizes.textXl, fontWeight: 'bold' },
-    label: { color: COLOURS.muted, fontSize: sizes.textSm },
+    ground: { flex: 1, backgroundColor: colours.ground },
+    title: { color: colours.text, fontSize: sizes.textXl, fontWeight: 'bold' },
+    label: { color: colours.muted, fontSize: sizes.textSm },
     input: {
-      color: COLOURS.text,
-      backgroundColor: COLOURS.raised,
-      borderColor: COLOURS.line,
+      color: colours.text,
+      fontFamily: BODY_FONT,
+      backgroundColor: colours.raised,
+      borderColor: colours.line,
       borderWidth: 1,
       borderRadius: sizes.radius,
       minHeight: sizes.fieldHeight,
@@ -34,33 +37,62 @@ const formStylesFor = ({ sizes }: { sizes: Sizes }) =>
       paddingHorizontal: sizes.space2,
     },
     buttonText: { fontSize: sizes.text, fontWeight: 'bold' },
-    focused: { borderColor: COLOURS.text },
+    checkRow: {
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      borderColor: 'transparent',
+      borderRadius: sizes.radius,
+      borderWidth: sizes.focusRing,
+      flexDirection: 'row',
+      gap: sizes.space2,
+      padding: sizes.space1,
+    },
+    checkBox: {
+      alignItems: 'center',
+      borderColor: colours.text,
+      borderRadius: sizes.space1,
+      borderWidth: sizes.focusRing,
+      height: sizes.text * 1.5,
+      justifyContent: 'center',
+      width: sizes.text * 1.5,
+    },
+    checkBoxOn: { backgroundColor: colours.accent, borderColor: colours.accent },
+    checkTick: { color: colours.onAccent, fontSize: sizes.text, fontWeight: 'bold' },
+    checkText: { color: colours.text, fontSize: sizes.text },
+    focused: { borderColor: colours.text },
     disabled: { opacity: 0.5 },
-    note: { color: COLOURS.muted, fontSize: sizes.text },
-    notice: { color: COLOURS.notice, fontSize: sizes.textLg },
-    error: { color: COLOURS.error, fontSize: sizes.text },
+    note: { color: colours.muted, fontSize: sizes.text },
+    notice: { color: colours.notice, fontSize: sizes.textLg },
+    error: { color: colours.error, fontSize: sizes.text },
   })
 
 export type FormStyles = ReturnType<typeof formStylesFor>
 
-/** The form under the thumb, at the shared scale. */
-export const touchFormStyles: FormStyles = formStylesFor({ sizes: SIZES })
+/** The form under the thumb, at the shared scale, in the theme worn now. */
+export const useTouchFormStyles: () => FormStyles = themedStyles((colours) =>
+  formStylesFor({ sizes: SIZES, colours }),
+)
 
-/** The form on a TV, sized to its screen. */
-export const tvFormStyles: FormStyles = formStylesFor({ sizes: TV_SIZES })
+/** The form on a TV, sized to its screen, in the theme worn now. */
+export const useTvFormStyles: () => FormStyles = themedStyles((colours) =>
+  formStylesFor({ sizes: TV_SIZES, colours }),
+)
 
 /** Each tone's fill, edge and label, as the web's `.primary`, `.quiet` and `.ghost` paint them. */
-export const toneStyles = {
-  [BUTTON_TONES.primary]: StyleSheet.create({
-    button: { backgroundColor: COLOURS.accent, borderColor: COLOURS.accent },
-    label: { color: COLOURS.onAccent },
-  }),
-  [BUTTON_TONES.quiet]: StyleSheet.create({
-    button: { backgroundColor: COLOURS.quiet, borderColor: COLOURS.quiet },
-    label: { color: COLOURS.text },
-  }),
-  [BUTTON_TONES.ghost]: StyleSheet.create({
-    button: { backgroundColor: 'transparent', borderColor: 'transparent' },
-    label: { color: COLOURS.text },
-  }),
-} as const satisfies Record<ButtonTone, unknown>
+export const useToneStyles = themedStyles(
+  (colours) =>
+    ({
+      [BUTTON_TONES.primary]: StyleSheet.create({
+        button: { backgroundColor: colours.accent, borderColor: colours.accent },
+        label: { color: colours.onAccent },
+      }),
+      [BUTTON_TONES.quiet]: StyleSheet.create({
+        button: { backgroundColor: colours.quiet, borderColor: colours.quiet },
+        label: { color: colours.text },
+      }),
+      [BUTTON_TONES.ghost]: StyleSheet.create({
+        button: { backgroundColor: 'transparent', borderColor: 'transparent' },
+        label: { color: colours.text },
+      }),
+    }) as const satisfies Record<ButtonTone, unknown>,
+)

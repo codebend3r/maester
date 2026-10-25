@@ -1,21 +1,14 @@
 import type { ReactNode } from 'react'
-import {
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native'
+import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { Text } from '@/layouts/Text'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import type { EpisodeRow, ItemHero, ItemPage, PersonCard, VersionRow } from '@/queries/itemPage'
 import { CardPicture } from '@/layouts/Card'
 import { TouchBack } from '@/layouts/TouchBack'
 import { TouchCard } from '@/layouts/TouchCard'
-import { toneStyles } from '@/layouts/formStyles'
+import { useToneStyles } from '@/layouts/formStyles'
 import {
   ITEM_HEADINGS,
   WATCHED_MARK,
@@ -32,7 +25,8 @@ import {
 } from '@/layouts/itemKit'
 import { isTablet } from '@/layouts/screenSizes'
 import { LINE_RATIO } from '@/layouts/textHeights'
-import { COLOURS, SIZES } from '@/theme/appTheme'
+import { SIZES } from '@/theme/appTheme'
+import { themedStyles } from '@/theme/useTheme'
 
 /** How wide the heading's picture stands: a poster, or an episode's wider still. */
 const HERO_WIDTHS = {
@@ -61,14 +55,19 @@ const useGutters = () => {
   return { left: SIZES.space3 + insets.left, right: SIZES.space3 + insets.right }
 }
 
-const Heading = ({ title }: { title: string }) => (
-  <Text accessibilityRole="header" style={styles.heading}>
-    {title}
-  </Text>
-)
+const Heading = ({ title }: { title: string }) => {
+  const styles = useStyles()
+  return (
+    <Text accessibilityRole="header" style={styles.heading}>
+      {title}
+    </Text>
+  )
+}
 
 /** Play, filled as the one action the page is for, or a mark, ticked while it is on. */
 const ActionButton = ({ action }: { action: ItemAction }) => {
+  const styles = useStyles()
+  const toneStyles = useToneStyles()
   const look = actionLookOf(action)
   return (
     <Pressable
@@ -88,16 +87,20 @@ const ActionButton = ({ action }: { action: ItemAction }) => {
 }
 
 /** Where playback stopped, or how much is watched, as a line with its words. */
-const ProgressLine = ({ progress }: { progress: NonNullable<ItemHero['progress']> }) => (
-  <View style={styles.progress}>
-    <View style={styles.track}>
-      <View style={[styles.fill, { width: `${progress.fraction * 100}%` }]} />
+const ProgressLine = ({ progress }: { progress: NonNullable<ItemHero['progress']> }) => {
+  const styles = useStyles()
+  return (
+    <View style={styles.progress}>
+      <View style={styles.track}>
+        <View style={[styles.fill, { width: `${progress.fraction * 100}%` }]} />
+      </View>
+      <Text style={styles.small}>{progress.label}</Text>
     </View>
-    <Text style={styles.small}>{progress.label}</Text>
-  </View>
-)
+  )
+}
 
 const Hero = ({ hero, actions }: { hero: ItemHero; actions: ItemAction[] }) => {
+  const styles = useStyles()
   const { width, height } = useWindowDimensions()
   const widths = isTablet({ width, height }) ? HERO_WIDTHS.tablet : HERO_WIDTHS.phone
   // Held sideways the screen is short, so the title sits by the poster's top, not its foot.
@@ -128,45 +131,52 @@ const Hero = ({ hero, actions }: { hero: ItemHero; actions: ItemAction[] }) => {
   )
 }
 
-const FileFacts = ({ facts }: { facts: ItemPage['file'] }) => (
-  <View style={styles.facts}>
-    <Heading title={ITEM_HEADINGS.file} />
-    {facts.map((fact) => (
-      <View key={fact.label} style={styles.fact}>
-        <Text style={styles.factLabel}>{fact.label}</Text>
-        <Text style={styles.factValue}>{fact.value}</Text>
-      </View>
-    ))}
-  </View>
-)
-
-const Versions = ({ versions, onOpen }: { versions: VersionRow[]; onOpen: Opens }) => (
-  <View style={styles.section}>
-    <Heading title={ITEM_HEADINGS.versions} />
-    {versions.map((version) => (
-      <Pressable
-        key={version.key}
-        accessibilityLabel={playLabelOf(version.fileName)}
-        accessibilityRole="button"
-        onPress={() => onOpen(version.target)}
-        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-      >
-        <View style={styles.words}>
-          <Text style={styles.rowTitle}>{dotted(version.facts)}</Text>
-          <Text numberOfLines={1} style={styles.small}>
-            {version.fileName}
-          </Text>
+const FileFacts = ({ facts }: { facts: ItemPage['file'] }) => {
+  const styles = useStyles()
+  return (
+    <View style={styles.facts}>
+      <Heading title={ITEM_HEADINGS.file} />
+      {facts.map((fact) => (
+        <View key={fact.label} style={styles.fact}>
+          <Text style={styles.factLabel}>{fact.label}</Text>
+          <Text style={styles.factValue}>{fact.value}</Text>
         </View>
-        <Text style={styles.play}>{'▶'}</Text>
-      </Pressable>
-    ))}
-  </View>
-)
+      ))}
+    </View>
+  )
+}
+
+const Versions = ({ versions, onOpen }: { versions: VersionRow[]; onOpen: Opens }) => {
+  const styles = useStyles()
+  return (
+    <View style={styles.section}>
+      <Heading title={ITEM_HEADINGS.versions} />
+      {versions.map((version) => (
+        <Pressable
+          key={version.key}
+          accessibilityLabel={playLabelOf(version.fileName)}
+          accessibilityRole="button"
+          onPress={() => onOpen(version.target)}
+          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        >
+          <View style={styles.words}>
+            <Text style={styles.rowTitle}>{dotted(version.facts)}</Text>
+            <Text numberOfLines={1} style={styles.small}>
+              {version.fileName}
+            </Text>
+          </View>
+          <Text style={styles.play}>{'▶'}</Text>
+        </Pressable>
+      ))}
+    </View>
+  )
+}
 
 type Opens = ItemLayoutProps['onOpen']
 
 /** A titled row that scrolls sideways, running to the screen's edges past the gutters. */
 const Rail = ({ title, children }: { title: string; children: ReactNode }) => {
+  const styles = useStyles()
   const gutters = useGutters()
   const padded = { paddingLeft: gutters.left, paddingRight: gutters.right }
   return (
@@ -201,50 +211,56 @@ const Seasons = ({ seasons, onOpen }: { seasons: ShelfCard[]; onOpen: Opens }) =
   )
 }
 
-const Episodes = ({ episodes, onOpen }: { episodes: EpisodeRow[]; onOpen: Opens }) => (
-  <View style={styles.section}>
-    <Heading title={ITEM_HEADINGS.episodes} />
-    {episodes.map((episode) => (
-      <Pressable
-        key={episode.key}
-        accessibilityLabel={episodeLabelOf(episode)}
-        accessibilityRole="button"
-        onPress={() => onOpen(episode.target)}
-        style={({ pressed }) => [styles.episode, pressed && styles.pressed]}
-      >
-        <CardPicture card={episode} width={STILL_WIDTH} />
-        <View style={styles.words}>
-          <Text style={styles.rowTitle}>{episode.title}</Text>
-          {episode.line !== null && <Text style={styles.small}>{episode.line}</Text>}
-          {episode.summary !== null && (
-            <Text numberOfLines={3} style={styles.small}>
-              {episode.summary}
-            </Text>
-          )}
-          {episode.isWatched && <Text style={styles.small}>{WATCHED_MARK}</Text>}
-        </View>
-      </Pressable>
-    ))}
-  </View>
-)
-
-const Person = ({ person }: { person: PersonCard }) => (
-  <View style={styles.person}>
-    <View style={styles.photo}>
-      {person.picture !== null ? (
-        <Image resizeMode="cover" source={person.picture} style={StyleSheet.absoluteFill} />
-      ) : (
-        <Text style={styles.initials}>{person.initials}</Text>
-      )}
+const Episodes = ({ episodes, onOpen }: { episodes: EpisodeRow[]; onOpen: Opens }) => {
+  const styles = useStyles()
+  return (
+    <View style={styles.section}>
+      <Heading title={ITEM_HEADINGS.episodes} />
+      {episodes.map((episode) => (
+        <Pressable
+          key={episode.key}
+          accessibilityLabel={episodeLabelOf(episode)}
+          accessibilityRole="button"
+          onPress={() => onOpen(episode.target)}
+          style={({ pressed }) => [styles.episode, pressed && styles.pressed]}
+        >
+          <CardPicture card={episode} width={STILL_WIDTH} />
+          <View style={styles.words}>
+            <Text style={styles.rowTitle}>{episode.title}</Text>
+            {episode.line !== null && <Text style={styles.small}>{episode.line}</Text>}
+            {episode.summary !== null && (
+              <Text numberOfLines={3} style={styles.small}>
+                {episode.summary}
+              </Text>
+            )}
+            {episode.isWatched && <Text style={styles.small}>{WATCHED_MARK}</Text>}
+          </View>
+        </Pressable>
+      ))}
     </View>
-    <Text numberOfLines={2} style={styles.personName}>
-      {person.name}
-    </Text>
-    <Text numberOfLines={2} style={styles.personRole}>
-      {person.role}
-    </Text>
-  </View>
-)
+  )
+}
+
+const Person = ({ person }: { person: PersonCard }) => {
+  const styles = useStyles()
+  return (
+    <View style={styles.person}>
+      <View style={styles.photo}>
+        {person.picture !== null ? (
+          <Image resizeMode="cover" source={person.picture} style={StyleSheet.absoluteFill} />
+        ) : (
+          <Text style={styles.initials}>{person.initials}</Text>
+        )}
+      </View>
+      <Text numberOfLines={2} style={styles.personName}>
+        {person.name}
+      </Text>
+      <Text numberOfLines={2} style={styles.personRole}>
+        {person.role}
+      </Text>
+    </View>
+  )
+}
 
 const Cast = ({ title, cast }: { title: string; cast: PersonCard[] }) => (
   <Rail title={title}>
@@ -256,6 +272,7 @@ const Cast = ({ title, cast }: { title: string; cast: PersonCard[] }) => (
 
 /** The backdrop across the top, under the way back; without one, room for the way back. */
 const Top = ({ backdrop, onBack }: Pick<ItemPage['hero'], 'backdrop'> & { onBack: () => void }) => {
+  const styles = useStyles()
   const screen = useWindowDimensions()
   const insets = useSafeAreaInsets()
   const gutters = useGutters()
@@ -285,6 +302,7 @@ const Top = ({ backdrop, onBack }: Pick<ItemPage['hero'], 'backdrop'> & { onBack
  * marks are drawn at once and Play once it is known, as on the web.
  */
 const ItemLayout = ({ page, actions, onOpen, onBack }: ItemLayoutProps) => {
+  const styles = useStyles()
   const insets = useSafeAreaInsets()
   const gutters = useGutters()
   const padded = { paddingLeft: gutters.left, paddingRight: gutters.right }
@@ -319,6 +337,7 @@ const ItemLayout = ({ page, actions, onOpen, onBack }: ItemLayoutProps) => {
 }
 
 const ItemNotice = ({ notice, onBack }: ItemNoticeProps) => {
+  const styles = useStyles()
   const insets = useSafeAreaInsets()
   const gutters = useGutters()
   return (
@@ -338,85 +357,87 @@ const ItemNotice = ({ notice, onBack }: ItemNoticeProps) => {
 /** An item's page on a phone or tablet. */
 export const touchItem: ItemKit = { ItemLayout, ItemNotice }
 
-const styles = StyleSheet.create({
-  ground: { flex: 1, backgroundColor: COLOURS.ground },
-  page: { gap: SIZES.space4 },
-  notice: { gap: SIZES.space3 },
-  top: { position: 'absolute', top: 0, left: 0 },
-  hero: { gap: SIZES.space3 },
-  headRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SIZES.space3 },
-  headRowWide: { alignItems: 'flex-start' },
-  heading: { color: COLOURS.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
-  words: { flex: 1, gap: SIZES.space0 },
-  eyebrow: { color: COLOURS.muted, fontSize: SIZES.textSm, fontWeight: '600' },
-  title: {
-    color: COLOURS.text,
-    fontSize: SIZES.textXl,
-    lineHeight: SIZES.textXl * LINE_RATIO,
-    fontWeight: 'bold',
-  },
-  byline: { color: COLOURS.text, fontSize: SIZES.textSm },
-  small: { color: COLOURS.muted, fontSize: SIZES.textSm, lineHeight: SIZES.textSm * LINE_RATIO },
-  progress: { gap: SIZES.space0, paddingTop: SIZES.space0, maxWidth: SIZES.measure },
-  track: { height: SIZES.space0, borderRadius: SIZES.space0, backgroundColor: COLOURS.track },
-  fill: { height: '100%', borderRadius: SIZES.space0, backgroundColor: COLOURS.accent },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space1 },
-  action: {
-    minHeight: SIZES.fieldHeight,
-    justifyContent: 'center',
-    paddingHorizontal: SIZES.space3,
-    borderRadius: SIZES.radius,
-    borderWidth: SIZES.focusRing,
-  },
-  actionLabel: { fontSize: SIZES.text, fontWeight: 'bold' },
-  pressed: { opacity: 0.6 },
-  tagline: { color: COLOURS.text, fontSize: SIZES.text, fontStyle: 'italic' },
-  summary: {
-    color: COLOURS.text,
-    fontSize: SIZES.text,
-    lineHeight: SIZES.text * LINE_RATIO,
-    maxWidth: SIZES.measure,
-  },
-  section: { gap: SIZES.space2 },
-  facts: { gap: SIZES.space2, maxWidth: SIZES.measure },
-  fact: {
-    flexDirection: 'row',
-    gap: SIZES.space3,
-    paddingVertical: SIZES.space1,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLOURS.line,
-  },
-  factLabel: { width: '30%', color: COLOURS.muted, fontSize: SIZES.textSm },
-  factValue: { flex: 1, color: COLOURS.text, fontSize: SIZES.textSm },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SIZES.space2,
-    minHeight: SIZES.fieldHeight,
-    paddingVertical: SIZES.space1,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLOURS.line,
-  },
-  rowTitle: { color: COLOURS.text, fontSize: SIZES.text, fontWeight: '600' },
-  play: { color: COLOURS.text, fontSize: SIZES.textLg, paddingHorizontal: SIZES.space1 },
-  cards: { gap: SIZES.space3 },
-  episode: { flexDirection: 'row', alignItems: 'flex-start', gap: SIZES.space2 },
-  person: { width: PERSON_WIDTH, alignItems: 'center', gap: SIZES.space0 },
-  photo: {
-    width: PHOTO_SIZE,
-    height: PHOTO_SIZE,
-    borderRadius: PHOTO_SIZE / 2,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLOURS.raised,
-  },
-  initials: { color: COLOURS.muted, fontSize: SIZES.textLg, fontWeight: 'bold' },
-  personName: {
-    color: COLOURS.text,
-    fontSize: SIZES.textXs,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  personRole: { color: COLOURS.muted, fontSize: SIZES.textXs, textAlign: 'center' },
-})
+const useStyles = themedStyles((colours) =>
+  StyleSheet.create({
+    ground: { flex: 1, backgroundColor: colours.ground },
+    page: { gap: SIZES.space4 },
+    notice: { gap: SIZES.space3 },
+    top: { position: 'absolute', top: 0, left: 0 },
+    hero: { gap: SIZES.space3 },
+    headRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SIZES.space3 },
+    headRowWide: { alignItems: 'flex-start' },
+    heading: { color: colours.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
+    words: { flex: 1, gap: SIZES.space0 },
+    eyebrow: { color: colours.muted, fontSize: SIZES.textSm, fontWeight: '600' },
+    title: {
+      color: colours.text,
+      fontSize: SIZES.textXl,
+      lineHeight: SIZES.textXl * LINE_RATIO,
+      fontWeight: 'bold',
+    },
+    byline: { color: colours.text, fontSize: SIZES.textSm },
+    small: { color: colours.muted, fontSize: SIZES.textSm, lineHeight: SIZES.textSm * LINE_RATIO },
+    progress: { gap: SIZES.space0, paddingTop: SIZES.space0, maxWidth: SIZES.measure },
+    track: { height: SIZES.space0, borderRadius: SIZES.space0, backgroundColor: colours.track },
+    fill: { height: '100%', borderRadius: SIZES.space0, backgroundColor: colours.accent },
+    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space1 },
+    action: {
+      minHeight: SIZES.fieldHeight,
+      justifyContent: 'center',
+      paddingHorizontal: SIZES.space3,
+      borderRadius: SIZES.radius,
+      borderWidth: SIZES.focusRing,
+    },
+    actionLabel: { fontSize: SIZES.text, fontWeight: 'bold' },
+    pressed: { opacity: 0.6 },
+    tagline: { color: colours.text, fontSize: SIZES.text, fontStyle: 'italic' },
+    summary: {
+      color: colours.text,
+      fontSize: SIZES.text,
+      lineHeight: SIZES.text * LINE_RATIO,
+      maxWidth: SIZES.measure,
+    },
+    section: { gap: SIZES.space2 },
+    facts: { gap: SIZES.space2, maxWidth: SIZES.measure },
+    fact: {
+      flexDirection: 'row',
+      gap: SIZES.space3,
+      paddingVertical: SIZES.space1,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colours.line,
+    },
+    factLabel: { width: '30%', color: colours.muted, fontSize: SIZES.textSm },
+    factValue: { flex: 1, color: colours.text, fontSize: SIZES.textSm },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SIZES.space2,
+      minHeight: SIZES.fieldHeight,
+      paddingVertical: SIZES.space1,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colours.line,
+    },
+    rowTitle: { color: colours.text, fontSize: SIZES.text, fontWeight: '600' },
+    play: { color: colours.text, fontSize: SIZES.textLg, paddingHorizontal: SIZES.space1 },
+    cards: { gap: SIZES.space3 },
+    episode: { flexDirection: 'row', alignItems: 'flex-start', gap: SIZES.space2 },
+    person: { width: PERSON_WIDTH, alignItems: 'center', gap: SIZES.space0 },
+    photo: {
+      width: PHOTO_SIZE,
+      height: PHOTO_SIZE,
+      borderRadius: PHOTO_SIZE / 2,
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colours.raised,
+    },
+    initials: { color: colours.muted, fontSize: SIZES.textLg, fontWeight: 'bold' },
+    personName: {
+      color: colours.text,
+      fontSize: SIZES.textXs,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    personRole: { color: colours.muted, fontSize: SIZES.textXs, textAlign: 'center' },
+  }),
+)

@@ -14,6 +14,7 @@ export type FieldProps = {
   placeholder?: string
   isSecret?: boolean
   isNumeric?: boolean
+  isEmail?: boolean
   /** The field the screen opens on: focused first, on a TV by the remote. */
   isFirst?: boolean
 }
@@ -34,21 +35,24 @@ export type FormButtonProps = {
 }
 
 /**
- * A form's pieces, which each platform lays out and drives its own way, and its styles at the
- * platform's scale, whose lines (`note`, `notice`, `error`) the screens draw.
+ * A form's pieces, which each platform lays out and drives its own way, and the hook for its
+ * styles at the platform's scale in the theme worn now, whose lines (`note`, `notice`,
+ * `error`) the screens draw.
  */
 export type FormKit = {
   Form: (props: FormProps) => ReactNode
   Field: (props: FieldProps) => ReactNode
   FormButton: (props: FormButtonProps) => ReactNode
-  formStyles: FormStyles
+  useFormStyles: () => FormStyles
 }
 
 /** The keyboard a field opens: digits for a PIN, plain for a password, a web address's otherwise. */
 export const keyboardFor = ({
   isNumeric = false,
   isSecret = false,
-}: Pick<FieldProps, 'isNumeric' | 'isSecret'>): KeyboardTypeOptions => {
+  isEmail = false,
+}: Pick<FieldProps, 'isNumeric' | 'isSecret' | 'isEmail'>): KeyboardTypeOptions => {
   if (isNumeric) return 'number-pad'
+  if (isEmail) return 'email-address'
   return isSecret ? 'default' : 'url'
 }

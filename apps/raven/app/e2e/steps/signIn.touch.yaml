@@ -4,21 +4,8 @@ name: Sign in with the thumb and the on-screen keyboard
 # Each field's label is announced as the field's own label too, and Maestro picks the
 # label first, so a field is tapped as the element below its label.
 #
-# The first keyboard a fresh simulator shows can swallow all but the first key, so each field
-# is typed inside a `retry` that clears it first and checks what came of it: the address by
-# its text, the secrets, which show as dots, by the step after them.
-- retry:
-    maxRetries: 2
-    commands:
-      - tapOn:
-          below: Server address
-      - eraseText
-      - inputText: ${SERVER}
-      - assertVisible: ${SERVER}
-- tapOn: Continue
-- extendedWaitUntil:
-    visible: This server keeps some libraries behind a PIN.
-    timeout: 30000
+# The first keyboard a fresh simulator shows can swallow all but the first key, so each secret
+# is typed inside a `retry` that clears it first and checks the step reached after it.
 - retry:
     maxRetries: 2
     commands:

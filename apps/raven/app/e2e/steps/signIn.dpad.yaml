@@ -6,15 +6,6 @@ name: Sign in with the remote and the platform's keyboard
 - runFlow:
     file: field.dpad.yaml
     env:
-      FIELD: Server address
-      TEXT: ${SERVER}
-      SHOWN: ${SERVER}
-- extendedWaitUntil:
-    visible: This server keeps some libraries behind a PIN.
-    timeout: 30000
-- runFlow:
-    file: field.dpad.yaml
-    env:
       FIELD: PIN
       TEXT: ${PIN}
       SHOWN: ${PIN.replace(/./g, '•')}

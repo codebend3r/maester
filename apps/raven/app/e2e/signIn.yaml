@@ -1,10 +1,8 @@
 appId: io.github.codebend3r.raven.app
-name: Sign in to the fixture server with its PIN and admin password
-# The fixture server's address and secrets, as `serve:fixture` prints them. The Android TV
-# emulator reaches the computer's loopback through `adb reverse tcp:8490 tcp:8490`, which
-# `e2e:android-tv` sets up first, so both platforms sign in to the same address.
+name: Unlock the fixture server with its PIN and admin password
+# The fixture server's secrets, as `serve:fixture` prints them. The build names the fixture
+# through EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN, so this accountless test starts at the PIN.
 env:
-  SERVER: http://127.0.0.1:8490
   PIN: '1357'
   ADMIN_PASSWORD: Raven-Admin-2026
 ---
@@ -12,7 +10,7 @@ env:
     clearState: true
     clearKeychain: true
 - extendedWaitUntil:
-    visible: Sign in to raven
+    visible: This server keeps some libraries behind a PIN.
     timeout: 60000
 # Maestro drives the iPhone simulator and the Android TV emulator: the thumb on one, the
 # remote on the other.
