@@ -29,7 +29,7 @@
   background: var(--color-picture-glass);
   color: var(--color-on-picture);
   box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(14px);
+  backdrop-filter: var(--filter-glass);
 }
 
 .header {

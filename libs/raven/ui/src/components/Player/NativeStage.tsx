@@ -1,8 +1,8 @@
-import { useEffect } from 'react'
 import type { Engine } from '@/components/Player/engine'
 import { DIRECT_RENDITION } from '@/components/Player/rendition'
 import { PlayerChrome } from '@/components/Player/Stage'
 import { useNativeEngine } from '@/components/Player/useNativeEngine'
+import { useNativeSurface } from '@/components/Player/useNativeSurface'
 import { useFullscreen } from '@/components/Player/useStageChrome'
 
 /** The stage for a player in another process: the picture is its own surface under a transparent page. */
@@ -22,12 +22,7 @@ export const NativeStage = ({
     onFailure,
     toggleFullscreen: fullscreen.toggle,
   })
-  useEffect(() => {
-    document.documentElement.dataset.surface = 'native'
-    return () => {
-      delete document.documentElement.dataset.surface
-    }
-  }, [])
+  useNativeSurface({ isWaiting: native.engine.state.waiting })
   return (
     <PlayerChrome
       engine={native.engine}

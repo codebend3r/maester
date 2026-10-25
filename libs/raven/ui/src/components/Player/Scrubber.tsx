@@ -69,7 +69,7 @@ export const Scrubber = ({
   onSeek: (time: number) => void
 }) => {
   const track = useRef<HTMLDivElement>(null)
-  const [hover, setHover] = useState<number | null>(null)
+  const tipRef = useRef<HTMLSpanElement>(null)
   const [dragging, setDragging] = useState<number | null>(null)
   const total = duration ?? 0
   const shown = dragging ?? time
@@ -84,6 +84,19 @@ export const Scrubber = ({
     return Math.min(total, Math.max(0, ((clientX - box.left) / box.width) * total))
   }
 
+  // The tip follows the pointer through the DOM, not state, so a sweep across
+  // the bar renders nothing in React.
+  const moveTip = (at: number | null) => {
+    const tip = tipRef.current
+    if (tip === null) return
+    tip.hidden = at === null || total <= 0
+    if (at === null) return
+    tip.style.left = percent({ time: at, duration: total })
+    tip.textContent = formatDuration(at)
+  }
+
+  const leave = () => moveTip(null)
+
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (total <= 0 || event.button !== 0) return
     event.currentTarget.setPointerCapture?.(event.pointerId)
@@ -92,7 +105,7 @@ export const Scrubber = ({
 
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const at = timeAt(event.clientX)
-    setHover(at)
+    moveTip(at)
     if (dragging != null) setDragging(at)
   }
 
@@ -103,7 +116,6 @@ export const Scrubber = ({
   }
 
   const label = `${formatDuration(shown)} of ${formatDuration(duration)}`
-  const tip = dragging ?? hover
 
   return (
     // A range input cannot draw buffered stretches under its track or wait
@@ -125,8 +137,11 @@ export const Scrubber = ({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={() => setDragging(null)}
-      onPointerLeave={() => setHover(null)}
+      onPointerCancel={() => {
+        setDragging(null)
+        leave()
+      }}
+      onPointerLeave={leave}
     >
       <span className={styles.rail} style={railStyle} aria-hidden="true">
         {buffered.map(([start, end]) => (
@@ -149,15 +164,7 @@ export const Scrubber = ({
         style={{ left: percent({ time: shown, duration: total }) }}
         aria-hidden="true"
       />
-      {tip != null && total > 0 && (
-        <span
-          className={styles.tip}
-          style={{ left: percent({ time: tip, duration: total }) }}
-          aria-hidden="true"
-        >
-          {formatDuration(tip)}
-        </span>
-      )}
+      <span ref={tipRef} className={styles.tip} aria-hidden="true" hidden />
     </div>
   )
 }

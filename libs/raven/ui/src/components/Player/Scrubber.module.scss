@@ -86,6 +86,6 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   transform: translateX(-50%);
-  backdrop-filter: blur(12px);
+  backdrop-filter: var(--filter-glass);
   pointer-events: none;
 }

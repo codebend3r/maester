@@ -31,6 +31,28 @@ describe('Scrubber', () => {
     }
   })
 
+  it('shows the tip only while the pointer is over a bar with a duration', () => {
+    const { container, rerender } = render(
+      <Scrubber time={0} duration={100} buffered={[]} onSeek={() => {}} />,
+    )
+    const slider = screen.getByRole('slider')
+    const tip = container.querySelector<HTMLElement>('[aria-hidden="true"][hidden]')
+    expect(tip).not.toBeNull()
+    const rect = spyOn(slider, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 10))
+    try {
+      fireEvent.pointerMove(slider, { clientX: 30 })
+      expect(tip?.hidden).toBe(false)
+      expect(tip?.textContent).toBe('0:30')
+      fireEvent.pointerLeave(slider)
+      expect(tip?.hidden).toBe(true)
+      rerender(<Scrubber time={0} duration={null} buffered={[]} onSeek={() => {}} />)
+      fireEvent.pointerMove(slider, { clientX: 30 })
+      expect(tip?.hidden).toBe(true)
+    } finally {
+      rect.mockRestore()
+    }
+  })
+
   it('does not seek without a duration or on a secondary button', () => {
     const seek = mock(() => {})
     const { rerender } = render(<Scrubber time={0} duration={null} buffered={[]} onSeek={seek} />)
