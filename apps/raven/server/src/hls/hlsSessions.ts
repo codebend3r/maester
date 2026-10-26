@@ -17,6 +17,7 @@ import {
   type StreamQuality,
 } from '@raven/core'
 import { type AccountPass, type PassAccess, type PassGrant, openPass } from '@/auth/accountPasses'
+import { AUTH_ENCODINGS } from '@/auth/accessToken'
 import { CLOCK, type Clock } from '@/clock'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
@@ -297,7 +298,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     const capability = access === null ? null : mintCapability()
     const session = {
       ...source,
-      id: randomBytes(16).toString('base64url'),
+      id: randomBytes(16).toString(AUTH_ENCODINGS.base64url),
       mediaId,
       asked,
       capability,
