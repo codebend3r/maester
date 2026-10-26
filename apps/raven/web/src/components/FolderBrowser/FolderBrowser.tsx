@@ -4,18 +4,17 @@ import { Button, Icon } from '@raven/ui'
 import { browseQuery } from '@/lib/queries'
 import styles from '@/components/FolderBrowser/FolderBrowser.module.scss'
 
+type FolderBrowserProps = {
+  onChoose: (path: string) => void
+  exclude: readonly string[]
+}
+
 /**
  * Walks the server's folders (as the server sees them: container paths under
  * Docker) so a library path is picked rather than typed from memory: where
  * it is, with the way up, the folders inside, and Use this folder.
  */
-export const FolderBrowser = ({
-  onChoose,
-  exclude,
-}: {
-  onChoose: (path: string) => void
-  exclude: readonly string[]
-}) => {
+export const FolderBrowser = ({ onChoose, exclude }: FolderBrowserProps) => {
   const [path, setPath] = useState<string | null>(null)
   const listing = useQuery(browseQuery(path))
   const current = listing.data?.path ?? path ?? ''

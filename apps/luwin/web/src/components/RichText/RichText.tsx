@@ -1,7 +1,9 @@
 import styles from '@/components/RichText/RichText.module.scss'
 import { SEGMENT_KINDS, type Segment, parseRichText } from '@/lib/richText'
 
-const SegmentView = ({ segment }: { segment: Segment }) => {
+type SegmentViewProps = { segment: Segment }
+
+const SegmentView = ({ segment }: SegmentViewProps) => {
   switch (segment.kind) {
     case SEGMENT_KINDS.text:
       return segment.text
@@ -22,8 +24,10 @@ const SegmentView = ({ segment }: { segment: Segment }) => {
   }
 }
 
+type RichTextProps = { text: string }
+
 /** A reply's text with its links clickable, its bold bold and its italics italic. */
-export const RichText = ({ text }: { text: string }) =>
+export const RichText = ({ text }: RichTextProps) =>
   parseRichText(text).map((segment, index) => (
     <SegmentView key={`${index}-${segment.text}`} segment={segment} />
   ))

@@ -7,13 +7,13 @@ import { queryKeys } from '@/query/queryClient'
  * component says what happened rather than which caches it touches.
  */
 
-const refetch = ({
-  queryClient,
-  filters,
-}: {
+type RefetchProps = {
   queryClient: QueryClient
   filters: readonly InvalidateQueryFilters[]
-}): Promise<unknown> => Promise.all(filters.map((filter) => queryClient.invalidateQueries(filter)))
+}
+
+const refetch = ({ queryClient, filters }: RefetchProps): Promise<unknown> =>
+  Promise.all(filters.map((filter) => queryClient.invalidateQueries(filter)))
 
 /** A file or show now points somewhere else: its pages, the listings and their counts. */
 export const afterMatch = (queryClient: QueryClient): Promise<unknown> =>
@@ -113,17 +113,16 @@ export const afterHeroLibraries = (queryClient: QueryClient): Promise<unknown> =
 export const afterRescan = (queryClient: QueryClient): Promise<unknown> =>
   refetch({ queryClient, filters: [{ queryKey: queryKeys.libraries }] })
 
+type AfterRematchProps = {
+  queryClient: QueryClient
+  libraryId: number
+}
+
 /**
  * A library's files not matched went back to TMDB: the libraries list for its
  * count, and its listings, which then poll while any file is pending.
  */
-export const afterRematch = ({
-  queryClient,
-  libraryId,
-}: {
-  queryClient: QueryClient
-  libraryId: number
-}): Promise<unknown> =>
+export const afterRematch = ({ queryClient, libraryId }: AfterRematchProps): Promise<unknown> =>
   refetch({
     queryClient,
     filters: [
@@ -134,14 +133,16 @@ export const afterRematch = ({
     ],
   })
 
+type AfterLibraryViewProps = {
+  queryClient: QueryClient
+  libraryId: number
+}
+
 /** A library's sort, view or grouping was saved: the library, and the list the side menu reads. */
 export const afterLibraryView = ({
   queryClient,
   libraryId,
-}: {
-  queryClient: QueryClient
-  libraryId: number
-}): Promise<unknown> =>
+}: AfterLibraryViewProps): Promise<unknown> =>
   refetch({
     queryClient,
     filters: [
@@ -150,28 +151,29 @@ export const afterLibraryView = ({
     ],
   })
 
+type AfterSagaBackdropProps = {
+  queryClient: QueryClient
+  libraryId: number
+}
+
 /** A saga's backdrop was picked: the library's sagas, which its page and its deck read. */
 export const afterSagaBackdrop = ({
   queryClient,
   libraryId,
-}: {
+}: AfterSagaBackdropProps): Promise<unknown> =>
+  refetch({ queryClient, filters: [{ queryKey: queryKeys.sagas(libraryId) }] })
+
+type AfterWatchingProps = {
   queryClient: QueryClient
   libraryId: number
-}): Promise<unknown> =>
-  refetch({ queryClient, filters: [{ queryKey: queryKeys.sagas(libraryId) }] })
+}
 
 /**
  * The player closed: resume lines and watched marks on the library's
  * listings, In progress and the history, all under the library, home's show
  * where it stopped, and the item pages and favourites, which show the same.
  */
-export const afterWatching = ({
-  queryClient,
-  libraryId,
-}: {
-  queryClient: QueryClient
-  libraryId: number
-}): Promise<unknown> =>
+export const afterWatching = ({ queryClient, libraryId }: AfterWatchingProps): Promise<unknown> =>
   refetch({
     queryClient,
     filters: [
@@ -185,16 +187,18 @@ export const afterWatching = ({
 /** What of an item an editor changes: its pictures or its metadata. */
 export const EDITED_PARTS = { images: 'images', metadata: 'metadata' } as const
 
+type AfterItemEditedProps = {
+  queryClient: QueryClient
+  updated: ItemDetails
+  part: (typeof EDITED_PARTS)[keyof typeof EDITED_PARTS]
+}
+
 /** An item's pictures or metadata were edited: its page takes the answer, its editor and the listings read again. */
 export const afterItemEdited = ({
   queryClient,
   updated,
   part,
-}: {
-  queryClient: QueryClient
-  updated: ItemDetails
-  part: (typeof EDITED_PARTS)[keyof typeof EDITED_PARTS]
-}): Promise<unknown> => {
+}: AfterItemEditedProps): Promise<unknown> => {
   queryClient.setQueryData(queryKeys.item(updated.id), updated)
   return refetch({
     queryClient,
@@ -211,14 +215,16 @@ export const afterItemEdited = ({
   })
 }
 
+type AfterLibraryEventProps = {
+  queryClient: QueryClient
+  libraryId: number
+}
+
 /** The server says a library's folders changed: it, its count, and whatever its videos show on. */
 export const afterLibraryEvent = ({
   queryClient,
   libraryId,
-}: {
-  queryClient: QueryClient
-  libraryId: number
-}): Promise<unknown> =>
+}: AfterLibraryEventProps): Promise<unknown> =>
   refetch({
     queryClient,
     filters: [
@@ -230,19 +236,18 @@ export const afterLibraryEvent = ({
     ],
   })
 
+type AfterSplitProps = {
+  queryClient: QueryClient
+  libraryId: number
+}
+
 /**
  * A movie's files were split onto cards of their own or put back on one:
  * everything the library shows, its listings counting and titling its
  * cards, home's shelves, and the item pages, which list a card's files.
  * The duplicates already hold the answer, so theirs reads back the same.
  */
-export const afterSplit = ({
-  queryClient,
-  libraryId,
-}: {
-  queryClient: QueryClient
-  libraryId: number
-}): Promise<unknown> =>
+export const afterSplit = ({ queryClient, libraryId }: AfterSplitProps): Promise<unknown> =>
   refetch({
     queryClient,
     filters: [
@@ -264,14 +269,16 @@ export const afterReconnect = (queryClient: QueryClient): Promise<unknown> =>
     ],
   })
 
+type AfterMatchingPassProps = {
+  queryClient: QueryClient
+  libraryId: number
+}
+
 /** A matching pass finished: the library's count of files not matched changed, and home's shows with it. */
 export const afterMatchingPass = ({
   queryClient,
   libraryId,
-}: {
-  queryClient: QueryClient
-  libraryId: number
-}): Promise<unknown> =>
+}: AfterMatchingPassProps): Promise<unknown> =>
   refetch({
     queryClient,
     filters: [
@@ -281,18 +288,17 @@ export const afterMatchingPass = ({
     ],
   })
 
+type AfterAiLookupsProps = {
+  queryClient: QueryClient
+  libraryId: number
+}
+
 /**
  * The AI lookups ended: what the library's Not matched tab lists and
  * suggests, its other listings and its count, which a sure pick changes, and
  * home's shows.
  */
-export const afterAiLookups = ({
-  queryClient,
-  libraryId,
-}: {
-  queryClient: QueryClient
-  libraryId: number
-}): Promise<unknown> =>
+export const afterAiLookups = ({ queryClient, libraryId }: AfterAiLookupsProps): Promise<unknown> =>
   refetch({
     queryClient,
     filters: [

@@ -68,19 +68,18 @@ const ORDER: Record<MediaGroupBy, (a: MediaGroup, b: MediaGroup) => number> = {
   month: (a, b) => unprobedLast(a, b) || b.key.localeCompare(a.key),
 }
 
+type GroupMediaProps = {
+  items: MediaItem[]
+  by: MediaGroupBy
+}
+
 /**
  * Buckets videos for the grouped view. Videos keep their order inside a
  * bucket, so the library's sort still applies; the buckets themselves go
  * matched before not matched, largest resolution first, most common codec
  * first, or newest month first, with anything not yet probed at the end.
  */
-export const groupMedia = ({
-  items,
-  by,
-}: {
-  items: MediaItem[]
-  by: MediaGroupBy
-}): MediaGroup[] => {
+export const groupMedia = ({ items, by }: GroupMediaProps): MediaGroup[] => {
   const keyOf = KEYS[by]
   return [...new Set(items.map(keyOf))]
     .map((key): MediaGroup => ({

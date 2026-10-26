@@ -33,7 +33,7 @@ export type PlayerConnections = {
   subscribe: (listener: () => void) => () => void
 }
 
-export type RendererPort = Pick<MessagePort, 'postMessage' | 'start' | 'close' | 'addEventListener'>
+type RendererPort = Pick<MessagePort, 'postMessage' | 'start' | 'close' | 'addEventListener'>
 
 const REPLY_TIMEOUT_MS = 10_000
 export const PLAYER_NO_ANSWER = 'Raven did not answer.'
@@ -49,15 +49,22 @@ type Pending = {
   timer: ReturnType<typeof setTimeout>
 }
 
+type PlayerRefusalProps = { message: string; isEngineGone: boolean }
+
 /** A command the player did not carry out, and whether its native engine is gone for good. */
 export class PlayerRefusal extends Error {
   readonly isEngineGone: boolean
 
-  constructor({ message, isEngineGone }: { message: string; isEngineGone: boolean }) {
+  constructor({ message, isEngineGone }: PlayerRefusalProps) {
     super(message)
     this.name = 'PlayerRefusal'
     this.isEngineGone = isEngineGone
   }
+}
+
+type NativePlayerOverProps = {
+  port: RendererPort
+  timeoutMs: number
 }
 
 /**
@@ -67,10 +74,7 @@ export class PlayerRefusal extends Error {
 export const nativePlayerOver = ({
   port,
   timeoutMs,
-}: {
-  port: RendererPort
-  timeoutMs: number
-}): NativePlayer & { close: () => void } => {
+}: NativePlayerOverProps): NativePlayer & { close: () => void } => {
   const pending = new Map<number, Pending>()
   const listeners = new Set<(event: PlayerEvent) => void>()
   const state = { nextId: 0, isOpen: true }
@@ -83,15 +87,13 @@ export const nativePlayerOver = ({
     return entry
   }
 
-  const fail = ({
-    id,
-    message,
-    isEngineGone,
-  }: {
+  type FailProps = {
     id: number
     message: string
     isEngineGone: boolean
-  }) => {
+  }
+
+  const fail = ({ id, message, isEngineGone }: FailProps) => {
     const entry = take(id)
     if (entry !== null) entry.reject(new PlayerRefusal({ message, isEngineGone }))
   }
@@ -177,6 +179,12 @@ export const isEngineStop = (
 ): event is Extract<PlayerEvent, { type: typeof PLAYER_EVENTS.error }> =>
   event.type === PLAYER_EVENTS.error && event.reason === PLAYER_ERROR_REASONS.engine
 
+type ListenForPlayerProps = {
+  target: Pick<Window, 'addEventListener' | 'removeEventListener'>
+  origin: string
+  waitMs?: number
+}
+
 /**
  * Waits for the preload to hand over main's player. Only a message posted to this window
  * on the app's origin, with exactly the ports its connection carries, is taken. The
@@ -193,11 +201,7 @@ export const listenForPlayer = ({
   target,
   origin,
   waitMs = PLAYER_WAIT_MS,
-}: {
-  target: Pick<Window, 'addEventListener' | 'removeEventListener'>
-  origin: string
-  waitMs?: number
-}): PlayerConnections & { dispose: () => void } => {
+}: ListenForPlayerProps): PlayerConnections & { dispose: () => void } => {
   const listeners = new Set<() => void>()
   let connection: PlayerConnection = WAITING
   let opened: ReturnType<typeof nativePlayerOver> | null = null

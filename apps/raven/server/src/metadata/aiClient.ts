@@ -38,8 +38,10 @@ export type AiState = { state: MetadataServiceState; error: string | null }
 /** Today in UTC, when the day's count starts again, as OMDb's does. */
 const today = (): string => new Date().toISOString().slice(0, 10)
 
+type SaidProps = { status: number; body: unknown }
+
 /** A failed answer's status, and Anthropic's own words for it when its error body has some. */
-const said = ({ status, body }: { status: number; body: unknown }): string => {
+const said = ({ status, body }: SaidProps): string => {
   const words = isRecord(body) && isRecord(body.error) ? body.error.message : null
   return isString(words) && words.trim() !== '' ? `${status}: ${words}` : String(status)
 }

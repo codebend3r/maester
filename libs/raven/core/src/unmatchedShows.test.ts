@@ -2,7 +2,9 @@ import { describe, expect, it } from 'bun:test'
 import { mediaItem } from '@/test/fixtures'
 import { showFolderOf, unmatchedShowsOf } from '@/unmatchedShows'
 
-const episode = ({ id, folder, fileName }: { id: number; folder: string; fileName: string }) =>
+type EpisodeProps = { id: number; folder: string; fileName: string }
+
+const episode = ({ id, folder, fileName }: EpisodeProps) =>
   mediaItem({ id, folder, fileName, match: 'unmatched' })
 
 describe('unmatchedShowsOf', () => {

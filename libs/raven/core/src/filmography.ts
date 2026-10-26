@@ -8,28 +8,25 @@ export const isFilmographyTab = oneOf(FILMOGRAPHY_TABS)
 
 export type FilmographyTab = Infer<typeof isFilmographyTab>
 
-const isOnTab = ({
-  department,
-  tab,
-}: {
+type IsOnTabProps = {
   department: FilmographyDepartment
   tab: FilmographyTab
-}): boolean => tab === 'all' || department === tab
+}
+
+const isOnTab = ({ department, tab }: IsOnTabProps): boolean => tab === 'all' || department === tab
+
+type EntriesOnProps = {
+  entries: readonly FilmographyEntry[]
+  tab: FilmographyTab
+  isSelfShown: boolean
+}
 
 /**
  * The entries a tab lists, in their order, each with only the credits that
  * tab shows; an entry left with none is dropped. Credits as themselves go
  * unless `isSelfShown`.
  */
-export const entriesOn = ({
-  entries,
-  tab,
-  isSelfShown,
-}: {
-  entries: readonly FilmographyEntry[]
-  tab: FilmographyTab
-  isSelfShown: boolean
-}): FilmographyEntry[] =>
+export const entriesOn = ({ entries, tab, isSelfShown }: EntriesOnProps): FilmographyEntry[] =>
   entries.flatMap((entry) => {
     const credits = entry.credits.filter(
       (credit) =>
@@ -38,14 +35,16 @@ export const entriesOn = ({
     return credits.length > 0 ? [{ ...entry, credits }] : []
   })
 
+type TabCountsProps = {
+  entries: readonly FilmographyEntry[]
+  isSelfShown: boolean
+}
+
 /** How many entries each tab lists under the same toggle. */
 export const tabCounts = ({
   entries,
   isSelfShown,
-}: {
-  entries: readonly FilmographyEntry[]
-  isSelfShown: boolean
-}): Record<FilmographyTab, number> => ({
+}: TabCountsProps): Record<FilmographyTab, number> => ({
   all: entriesOn({ entries, tab: 'all', isSelfShown }).length,
   acting: entriesOn({ entries, tab: 'acting', isSelfShown }).length,
   directing: entriesOn({ entries, tab: 'directing', isSelfShown }).length,
@@ -72,19 +71,18 @@ const partsOf = (date: string | null): { year: number; month: number; day: numbe
   return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) }
 }
 
+type AgeOnProps = {
+  birthday: string | null
+  on: string | null
+}
+
 /**
  * Whole years from `birthday` to `on`, both `YYYY-MM-DD`; null when either is
  * missing or malformed, or `on` comes before `birthday`. Read from the
  * strings, not a `Date`, so no time zone can move the day. A Feb 29 birthday
  * comes on Mar 1 in a year without one.
  */
-export const ageOn = ({
-  birthday,
-  on,
-}: {
-  birthday: string | null
-  on: string | null
-}): number | null => {
+export const ageOn = ({ birthday, on }: AgeOnProps): number | null => {
   const born = partsOf(birthday)
   const now = partsOf(on)
   if (!born || !now) return null

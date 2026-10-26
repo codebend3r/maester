@@ -25,7 +25,9 @@ const parseJson = (text: string | null): unknown => {
   }
 }
 
-export const fieldOf = ({ body, name }: { body: string | null; name: string }): string | null => {
+type FieldOfProps = { body: string | null; name: string }
+
+export const fieldOf = ({ body, name }: FieldOfProps): string | null => {
   const value = parseJson(body)
   if (!isRecord(value)) return null
   const field = value[name]
@@ -42,14 +44,13 @@ const CORS_HEADERS = {
 /** The preflight a browser sends before a cross-origin call with headers of its own. */
 export const PREFLIGHT_METHOD = 'OPTIONS'
 
-/** Lets `origin` call what `response` answers, with the headers supabase-js sends. */
-export const allowCrossOrigin = ({
-  response,
-  origin,
-}: {
+type AllowCrossOriginProps = {
   response: ServerResponse
   origin: string
-}): void => {
+}
+
+/** Lets `origin` call what `response` answers, with the headers supabase-js sends. */
+export const allowCrossOrigin = ({ response, origin }: AllowCrossOriginProps): void => {
   response.setHeader(CORS_HEADERS.allowOrigin, origin)
   response.setHeader(CORS_HEADERS.allowMethods, 'GET, POST, PUT, DELETE, OPTIONS')
   response.setHeader(
@@ -58,17 +59,14 @@ export const allowCrossOrigin = ({
   )
 }
 
-export const sendJson = ({
-  response,
-  status,
-  body,
-  cookie = null,
-}: {
+type SendJsonProps = {
   response: ServerResponse
   status: number
   body: unknown
   cookie?: string | null
-}) => {
+}
+
+export const sendJson = ({ response, status, body, cookie = null }: SendJsonProps) => {
   response.writeHead(status, {
     [HTTP_HEADERS.contentType]: 'application/json; charset=utf-8',
     ...(cookie === null ? {} : { [HTTP_HEADERS.setCookie]: cookie }),
@@ -76,7 +74,9 @@ export const sendJson = ({
   response.end(JSON.stringify(body))
 }
 
-export const sendEmpty = ({ response, status }: { response: ServerResponse; status: number }) => {
+type SendEmptyProps = { response: ServerResponse; status: number }
+
+export const sendEmpty = ({ response, status }: SendEmptyProps) => {
   response.writeHead(status)
   response.end()
 }

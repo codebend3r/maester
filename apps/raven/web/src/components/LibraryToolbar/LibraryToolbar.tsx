@@ -25,17 +25,16 @@ import { SelectButton } from '@/components/SelectButton/SelectButton'
 import type { Search } from '@raven/ui/headless'
 import styles from '@/components/LibraryToolbar/LibraryToolbar.module.scss'
 
+type DirectionButtonProps = {
+  settings: LibrarySettings
+  onChange: (change: LibraryViewChange) => void
+}
+
 /**
  * The button beside the sort that turns the order around, saying which way
  * it runs now; a field with no direction, as Random, has none.
  */
-const DirectionButton = ({
-  settings,
-  onChange,
-}: {
-  settings: LibrarySettings
-  onChange: (change: LibraryViewChange) => void
-}) => {
+const DirectionButton = ({ settings, onChange }: DirectionButtonProps) => {
   const { field, direction } = sortParts(settings.sort)
   if (direction === null) return null
   const labels = SORT_DIRECTION_LABELS[field]
@@ -61,6 +60,16 @@ const VIEW_ICONS: Record<LibraryView, IconName> = {
   grouped: 'grouped',
 }
 
+type LibraryToolbarProps = {
+  name: string
+  search: Search
+  settings: LibrarySettings
+  onChange: (change: LibraryViewChange) => void
+  playable: boolean
+  onPlay: () => void
+  onShuffle: () => void
+}
+
 /**
  * Two rows: search, then what the library is sorted on and beside it which
  * way, where that means something, and the grouping in the grouped view;
@@ -79,15 +88,7 @@ export const LibraryToolbar = ({
   playable,
   onPlay,
   onShuffle,
-}: {
-  name: string
-  search: Search
-  settings: LibrarySettings
-  onChange: (change: LibraryViewChange) => void
-  playable: boolean
-  onPlay: () => void
-  onShuffle: () => void
-}) => {
+}: LibraryToolbarProps) => {
   const ids = { search: useId(), sort: useId(), group: useId() }
   return (
     <search className={styles.toolbar}>

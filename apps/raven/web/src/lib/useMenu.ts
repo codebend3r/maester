@@ -3,26 +3,25 @@ import { type KeyboardEvent, type RefObject, useEffect, useRef, useState } from 
 
 const ITEMS = '[role^="menuitem"]'
 
+type UseMenuListProps = {
+  isOpen: boolean
+  setOpen: (isOpen: boolean) => void
+  root: RefObject<HTMLDivElement | null>
+  trigger: RefObject<HTMLButtonElement | null>
+}
+
 /**
  * The list of a button's menu whose open state lives elsewhere, as a card's
  * does. It opens with focus on the item checked, else the first, so the
  * arrows start from it, and they go round its items. Escape, Tab or a click
  * outside `root` closes it; Escape hands focus back to `trigger`.
  */
-export const useMenuList = ({
-  isOpen,
-  setOpen,
-  root,
-  trigger,
-}: {
-  isOpen: boolean
-  setOpen: (isOpen: boolean) => void
-  root: RefObject<HTMLDivElement | null>
-  trigger: RefObject<HTMLButtonElement | null>
-}) => {
+export const useMenuList = ({ isOpen, setOpen, root, trigger }: UseMenuListProps) => {
   const list = useRef<HTMLUListElement>(null)
 
-  const close = ({ refocus }: { refocus: boolean }) => {
+  type CloseProps = { refocus: boolean }
+
+  const close = ({ refocus }: CloseProps) => {
     setOpen(false)
     if (refocus) trigger.current?.focus()
   }

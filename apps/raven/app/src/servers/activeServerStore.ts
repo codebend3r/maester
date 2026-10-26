@@ -13,6 +13,8 @@ import {
   storedServersOf,
 } from '@/servers/serverList'
 
+type RenameProps = { id: string; name: string }
+
 type ActiveServerState = {
   servers: AppServer[]
   activeId: string | null
@@ -24,7 +26,7 @@ type ActiveServerState = {
    */
   remove: (id: string) => Promise<void>
   /** Gives a listed server the name typed; false, and nothing changed, when it will not do. */
-  rename: (input: { id: string; name: string }) => boolean
+  rename: (input: RenameProps) => boolean
   /** Makes a listed server the one the app talks to; an id not on the list changes nothing. */
   activate: (id: string) => void
 }
@@ -32,18 +34,17 @@ type ActiveServerState = {
 /** The secure-store key the list and the active id are kept under, as one JSON value. */
 export const SERVER_LIST_KEY = 'raven.servers'
 
+type CreateActiveServerStoreProps = {
+  store: SecretStore
+  jar: Pick<CookieJar, 'forget'>
+}
+
 /**
  * The servers the app knows and the one it talks to, kept in the secure store, which keeps
  * them on tvOS too, where AsyncStorage's folder may be emptied. It hydrates only when asked,
  * so nothing reads the list before it is loaded, and it guards what it reads.
  */
-export const createActiveServerStore = ({
-  store,
-  jar,
-}: {
-  store: SecretStore
-  jar: Pick<CookieJar, 'forget'>
-}) =>
+export const createActiveServerStore = ({ store, jar }: CreateActiveServerStoreProps) =>
   create<ActiveServerState>()(
     persist(
       (set, get) => ({

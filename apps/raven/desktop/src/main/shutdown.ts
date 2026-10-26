@@ -16,20 +16,18 @@ export const DESTROY_MS = 500
  */
 export const LOG_FLUSH_MS = 250
 
+type EndAfterLogProps = {
+  log: { flush: () => Promise<void> }
+  wait: (ms: number) => Promise<void>
+  end: () => void
+}
+
 /**
  * Ends the process once the log has written what it holds, or after `LOG_FLUSH_MS`: an
  * ending that runs no `will-quit` (the quit gate giving up, a failed start) would lose its
  * last lines, which say why.
  */
-export const endAfterLog = async ({
-  log,
-  wait,
-  end,
-}: {
-  log: { flush: () => Promise<void> }
-  wait: (ms: number) => Promise<void>
-  end: () => void
-}): Promise<void> => {
+export const endAfterLog = async ({ log, wait, end }: EndAfterLogProps): Promise<void> => {
   await Promise.race([log.flush(), wait(LOG_FLUSH_MS)]).catch(() => undefined)
   end()
 }
@@ -42,11 +40,13 @@ export const endAfterLog = async ({
  */
 export const HARD_EXITS = { kill: 'kill', exit: 'exit' } as const
 
+type HardExitForProps = {
+  isEngineAlive: boolean
+}
+
 export const hardExitFor = ({
   isEngineAlive,
-}: {
-  isEngineAlive: boolean
-}): (typeof HARD_EXITS)[keyof typeof HARD_EXITS] =>
+}: HardExitForProps): (typeof HARD_EXITS)[keyof typeof HARD_EXITS] =>
   isEngineAlive ? HARD_EXITS.kill : HARD_EXITS.exit
 
 /**
@@ -56,11 +56,13 @@ export const hardExitFor = ({
  */
 export const CLOSE_TIMEOUTS = { quitApp: 'quitApp', destroyWindow: 'destroyWindow' } as const
 
+type CloseTimeoutForProps = {
+  isEngineAlive: boolean
+}
+
 export const closeTimeoutFor = ({
   isEngineAlive,
-}: {
-  isEngineAlive: boolean
-}): (typeof CLOSE_TIMEOUTS)[keyof typeof CLOSE_TIMEOUTS] =>
+}: CloseTimeoutForProps): (typeof CLOSE_TIMEOUTS)[keyof typeof CLOSE_TIMEOUTS] =>
   isEngineAlive ? CLOSE_TIMEOUTS.quitApp : CLOSE_TIMEOUTS.destroyWindow
 
 /** How each step of quitting ended; only running out of time changes what comes next. */
@@ -71,6 +73,15 @@ const STEP_OUTCOMES = {
   flushed: 'flushed',
   timedOut: 'timedOut',
 } as const
+
+type CreateShutdownProps = {
+  engine: { isAlive: () => boolean; destroy: () => Promise<void> }
+  stores: readonly { isDirty: () => boolean; flush: () => Promise<void> }[]
+  writes: { hasPending: () => boolean; settle: () => Promise<void> }
+  log: { isDirty: () => boolean; flush: () => Promise<void> }
+  warn: (message: string) => void
+  wait: (ms: number) => Promise<void>
+}
 
 /**
  * What quitting waits on, in the order it must happen: mpv stops while the saves in
@@ -86,14 +97,7 @@ export const createShutdown = ({
   log,
   warn,
   wait,
-}: {
-  engine: { isAlive: () => boolean; destroy: () => Promise<void> }
-  stores: readonly { isDirty: () => boolean; flush: () => Promise<void> }[]
-  writes: { hasPending: () => boolean; settle: () => Promise<void> }
-  log: { isDirty: () => boolean; flush: () => Promise<void> }
-  warn: (message: string) => void
-  wait: (ms: number) => Promise<void>
-}): { isPending: () => boolean; settle: () => Promise<void> } => {
+}: CreateShutdownProps): { isPending: () => boolean; settle: () => Promise<void> } => {
   // Once mpv or the saves have missed their deadline, a later settle (the quit gate's
   // second attempt) goes straight to the stores rather than waiting on them again.
   let hasTimedOut = false

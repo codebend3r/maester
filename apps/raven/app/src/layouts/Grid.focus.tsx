@@ -49,25 +49,20 @@ const headerHeightOf = (fontScale: number): number =>
     linesHeightOf({ sizes: [TV_SIZES.textXl], fontScale }) + 2 * TV_SIZES.tvFocusRing,
   ) + TV_SIZES.space3
 
-/**
- * A card of the list or tiles view, the remote's to move to: a row of words, ringed while
- * focused. It takes the focus back when the page it opened goes back, as a `FocusCard` does.
- */
-const RowCard = ({
-  card,
-  hasPicture,
-  isPreferred,
-  jump,
-  onFocused,
-  onPress,
-}: {
+type RowCardProps = {
   card: ShelfCard
   hasPicture: boolean
   isPreferred: boolean
   jump: JumpFocus | null
   onFocused: () => void
   onPress: () => void
-}) => {
+}
+
+/**
+ * A card of the list or tiles view, the remote's to move to: a row of words, ringed while
+ * focused. It takes the focus back when the page it opened goes back, as a `FocusCard` does.
+ */
+const RowCard = ({ card, hasPicture, isPreferred, jump, onFocused, onPress }: RowCardProps) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
   const styles = useStyles()
   useJumpFocus({ jump, view: pressable })
@@ -102,17 +97,16 @@ const RowCard = ({
   )
 }
 
+type JumpRowProps = {
+  jump: JumpScale
+  onJump: (keys: ReadonlySet<string>) => void
+}
+
 /**
  * The web's jump strip as a row the remote moves along, over the cards: each step takes the
  * focus to the first card under it; a step no card is under cannot be reached.
  */
-const JumpRow = ({
-  jump,
-  onJump,
-}: {
-  jump: JumpScale
-  onJump: (keys: ReadonlySet<string>) => void
-}) => {
+const JumpRow = ({ jump, onJump }: JumpRowProps) => {
   const styles = useStyles()
   return (
     <ScrollView
@@ -223,7 +217,9 @@ const Grid = ({
   // What the rows draw from beyond `rows` itself, the one value while neither changes.
   const drawn = useMemo(() => ({ jumped, preferred }), [jumped, preferred])
 
-  const renderRow = ({ item: row }: { item: GridRow }) => {
+  type RenderRowProps = { item: GridRow }
+
+  const renderRow = ({ item: row }: RenderRowProps) => {
     switch (row.kind) {
       case GRID_ROWS.header:
         return (

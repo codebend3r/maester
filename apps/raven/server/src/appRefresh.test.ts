@@ -31,22 +31,19 @@ const MDBLIST = {
   'movie:8195': { rottenTomatoes: 68 },
 }
 
+type RefreshServerProps = {
+  prefix: string
+  files: string[]
+  fetch: MetadataFetch
+  config?: Partial<ServerConfig>
+}
+
 /**
  * A server with MDBList's key over a movies library of `files`, matched by a
  * fake TMDB and MDBList, as a browser with the admin lock off sees it, so
  * the library can be added, refreshed and deleted.
  */
-const refreshServer = ({
-  prefix,
-  files,
-  fetch,
-  config = {},
-}: {
-  prefix: string
-  files: string[]
-  fetch: MetadataFetch
-  config?: Partial<ServerConfig>
-}) => {
+const refreshServer = ({ prefix, files, fetch, config = {} }: RefreshServerProps) => {
   const state: {
     root: string
     media: string

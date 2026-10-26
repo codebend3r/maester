@@ -1,3 +1,9 @@
+type SafeReturnToProps = {
+  value: unknown
+  appOrigins: readonly string[]
+  fallback: string
+}
+
 /**
  * Where a browser may be sent after signing in or out: a path on rookery, or
  * a URL on one of the apps in `APP_ORIGINS`. Anything else becomes
@@ -5,15 +11,7 @@
  * site. Backslashes and control characters are refused outright, since
  * browsers read `/\evil.example` and `/<tab>/evil.example` as `//evil.example`.
  */
-export const safeReturnTo = ({
-  value,
-  appOrigins,
-  fallback,
-}: {
-  value: unknown
-  appOrigins: readonly string[]
-  fallback: string
-}): string => {
+export const safeReturnTo = ({ value, appOrigins, fallback }: SafeReturnToProps): string => {
   if (typeof value !== 'string' || value === '') return fallback
   // oxlint-disable-next-line no-control-regex
   if (/[\\\u0000-\u001f\u007f]/.test(value)) return fallback

@@ -118,19 +118,21 @@ describe('the pictures that stand for an item', () => {
   const metadata = () => repositories(database.get()).metadata
   const ids = { show: 0, postered: 0, bare: 0, inPostered: 0, inBare: 0, movie: 0, plain: 0 }
 
+  type ItemProps = {
+    type: FetchedItem['type']
+    tmdbId: string
+    number?: number | null
+    poster?: string | null
+    backdrop?: string | null
+  }
+
   const item = ({
     type,
     tmdbId,
     number = null,
     poster = null,
     backdrop = null,
-  }: {
-    type: FetchedItem['type']
-    tmdbId: string
-    number?: number | null
-    poster?: string | null
-    backdrop?: string | null
-  }): FetchedItem => ({
+  }: ItemProps): FetchedItem => ({
     ...show,
     type,
     tmdbId,
@@ -215,8 +217,10 @@ describe('the libraries holding each item, and the people cleared up', () => {
   const metadata = () => repositories(database.get()).metadata
   const ids = { shows: 0, films: 0, show: 0, episode: 0, movie: 0, bare: 0 }
 
+  type FileProps = { libraryId: number; root: string; name: string }
+
   /** A file in `libraryId` under `root`, as a scan leaves it. */
-  const file = ({ libraryId, root, name }: { libraryId: number; root: string; name: string }) =>
+  const file = ({ libraryId, root, name }: FileProps) =>
     new MediaIndex(database.get()).insert({
       libraryId,
       kind: 'other',
@@ -393,27 +397,27 @@ describe("each provider's scores", () => {
   const DAY_MS = 24 * 60 * 60 * 1000
   const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS).toISOString()
 
-  const title = ({
-    type = 'movie',
-    tmdbId,
-    imdbId = null,
-  }: {
+  type TitleProps = {
     type?: FetchedItem['type']
     tmdbId: string
     imdbId?: string | null
-  }): number =>
+  }
+
+  const title = ({ type = 'movie', tmdbId, imdbId = null }: TitleProps): number =>
     metadata().save({
       item: { ...BLANK_ITEM, type, tmdbId, number: null, title: `Title ${tmdbId}`, imdbId },
     })
-  const score = ({
-    source,
-    value,
-    votes = null,
-  }: {
+  type ScoreProps = {
     source: ExternalScore['source']
     value: number
     votes?: number | null
-  }): ExternalScore => ({ source, value, votes })
+  }
+
+  const score = ({ source, value, votes = null }: ScoreProps): ExternalScore => ({
+    source,
+    value,
+    votes,
+  })
   const rows = (itemId: number) =>
     database
       .get()
@@ -422,15 +426,13 @@ describe("each provider's scores", () => {
         { source: string; value: number; votes: number | null; provider: string }
       >('SELECT source, value, votes, provider FROM ratings WHERE item_id = ? ORDER BY source')
       .all(itemId)
-  const stamp = ({
-    itemId,
-    omdb = null,
-    mdblist = null,
-  }: {
+  type StampProps = {
     itemId: number
     omdb?: string | null
     mdblist?: string | null
-  }) =>
+  }
+
+  const stamp = ({ itemId, omdb = null, mdblist = null }: StampProps) =>
     database
       .get()
       .db.prepare('UPDATE items SET omdb_fetched_at = ?, mdblist_fetched_at = ? WHERE id = ?')

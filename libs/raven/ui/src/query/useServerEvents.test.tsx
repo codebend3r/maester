@@ -34,7 +34,9 @@ const fakeSource = (url: string) => {
       state.closed = true
     },
   } satisfies ServerEventSource
-  const emit = ({ type, data }: { type: StreamEvent; data?: unknown }) =>
+  type EmitProps = { type: StreamEvent; data?: unknown }
+
+  const emit = ({ type, data }: EmitProps) =>
     (listeners.get(type) ?? []).forEach((listener) => listener({ data }))
   /** The source giving up, as a browser does when a reconnect is refused with a 401. */
   const end = () => {
@@ -69,8 +71,10 @@ const fakeTokens = () => {
   return { onAccessTokenChange, change, listeners }
 }
 
+type SetUpProps = { tokens?: ReturnType<typeof fakeTokens> }
+
 /** The hook mounted over a cache holding `HELD`, with every stream it opens kept. */
-const setUp = ({ tokens }: { tokens?: ReturnType<typeof fakeTokens> } = {}) => {
+const setUp = ({ tokens }: SetUpProps = {}) => {
   const { api } = recordingApi({ body: null })
   const opened: Array<ReturnType<typeof fakeSource>> = []
   const { useServerEvents } = serverEventsFor({

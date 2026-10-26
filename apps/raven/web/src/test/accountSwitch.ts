@@ -26,14 +26,13 @@ export const unanswered = (): Promise<never> => new Promise(() => undefined)
 export const authorizations = (requests: readonly ApiRequest[]): (string | null)[] =>
   requests.map(({ authorization }) => authorization)
 
-/** At least one call went out, and every one carried `account`'s token. */
-export const expectEveryCallAs = ({
-  requests,
-  account,
-}: {
+type ExpectEveryCallAsProps = {
   requests: readonly ApiRequest[]
   account: TestAccount
-}): void => {
+}
+
+/** At least one call went out, and every one carried `account`'s token. */
+export const expectEveryCallAs = ({ requests, account }: ExpectEveryCallAsProps): void => {
   expect(new Set(authorizations(requests))).toEqual(new Set([bearerOf(account)]))
 }
 
@@ -75,13 +74,17 @@ export const useRecordedApi = () => {
   }
 }
 
+type SignInThroughProps = { account: TestAccount }
+
 /** Signs `account` in through a fake Supabase client, which can then switch the browser to another. */
-export const signInThrough = async ({ account }: { account: TestAccount }) => {
+export const signInThrough = async ({ account }: SignInThroughProps) => {
   const fake = fakeAuthClient({ session: fakeSession(account) })
   useAuthSession.getState().start({ config: readyConfig, createClient: () => fake.client })
   await waitFor(() => expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.ready))
+  type SignInThroughSwitchToProps = { next: TestAccount }
+
   return {
-    switchTo: ({ next }: { next: TestAccount }) =>
+    switchTo: ({ next }: SignInThroughSwitchToProps) =>
       act(() => fake.emit({ event: AUTH_CHANGES.signedIn, session: fakeSession(next) })),
   }
 }

@@ -26,6 +26,13 @@ const STATUS: UpdateStatus = {
 
 type Answer = (request: DesktopRequest) => DesktopReply | undefined
 
+type SettingsMainProps = {
+  output?: OutputSettings
+  isEngineReady?: boolean
+  status?: UpdateStatus
+  answer?: Answer
+}
+
 /**
  * Main for Settings: the downloads as `downloadsMain` keeps them, the sound output as written,
  * and the release check; `answer` comes first.
@@ -35,12 +42,7 @@ const settingsMain = ({
   isEngineReady = true,
   status = STATUS,
   answer = () => undefined,
-}: {
-  output?: OutputSettings
-  isEngineReady?: boolean
-  status?: UpdateStatus
-  answer?: Answer
-} = {}) => {
+}: SettingsMainProps = {}) => {
   const downloads = downloadsMain({ downloads: [viewOf()] })
   const state = { output }
   downloads.request.mockImplementation(async (request) => {

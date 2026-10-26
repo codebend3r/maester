@@ -7,6 +7,12 @@ import type { ExternalScore, ScoreProvider, ScoreSource, ScoreTitle } from '@/me
 
 const NAMES = { omdb: 'OMDb', mdblist: 'MDBList' } as const satisfies Record<ScoreProvider, string>
 
+type ScoresAskProps = {
+  source: ScoreSource
+  itemId: number
+  title: ScoreTitle
+}
+
 /**
  * IMDb, Rotten Tomatoes and Metacritic scores for a movie or show, while a
  * key and today's calls allow. MDBList is asked first when it can be, and
@@ -82,11 +88,7 @@ export class Scores {
     source,
     itemId,
     title,
-  }: {
-    source: ScoreSource
-    itemId: number
-    title: ScoreTitle
-  }): Promise<ExternalScore[] | 'unknown' | null> {
+  }: ScoresAskProps): Promise<ExternalScore[] | 'unknown' | null> {
     try {
       const answer = await source.lookUp(title)
       this.metadata.saveScores({

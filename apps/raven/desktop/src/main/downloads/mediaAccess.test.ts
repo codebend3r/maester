@@ -107,7 +107,9 @@ const pingNetwork = (answers: Record<string, PingAnswer>) => {
       setTimeout(step, 0)
     })
 
-  const bodyOf = ({ answer, startedAt }: { answer: PingAnswer; startedAt: number }) => {
+  type BodyOfProps = { answer: PingAnswer; startedAt: number }
+
+  const bodyOf = ({ answer, startedAt }: BodyOfProps) => {
     const bytes = answer.bytes ?? MEDIA_PROBE_BYTES
     const firstAt = startedAt + (answer.firstByteMs ?? 10)
     const lastAt = firstAt + (bytes / (answer.bytesPerSecond ?? 50 * MB)) * 1000
@@ -140,20 +142,22 @@ const pingNetwork = (answers: Record<string, PingAnswer>) => {
   return { probe, clock: () => time, asked }
 }
 
-const run = ({
-  replies,
-  answers,
-  server = SERVER,
-  now = 0,
-  minted = () => ({ kind: TICKET_OUTCOMES.ticket, ticket: TICKET }),
-}: {
+type RunProps = {
   replies: Record<string, Reply>
   answers: Record<string, PingAnswer>
   server?: ServerEntry | null
   now?: number
   /** What each account ticket mint answers. */
   minted?: () => TicketOutcome
-}) => {
+}
+
+const run = ({
+  replies,
+  answers,
+  server = SERVER,
+  now = 0,
+  minted = () => ({ kind: TICKET_OUTCOMES.ticket, ticket: TICKET }),
+}: RunProps) => {
   const { calls, log } = fakeCalls(replies)
   const network = pingNetwork(answers)
   const warnings: string[] = []
@@ -184,13 +188,12 @@ const withOrigins = (origins: MediaOrigin[]): Record<string, Reply> => ({
   [originsCall]: ok({ origins }),
 })
 
-const pickedFrom = async ({
-  origins,
-  answers,
-}: {
+type PickedFromProps = {
   origins: MediaOrigin[]
   answers: Record<string, PingAnswer>
-}): Promise<Access> => {
+}
+
+const pickedFrom = async ({ origins, answers }: PickedFromProps): Promise<Access> => {
   const { access } = run({ replies: withOrigins(origins), answers })
   return succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE }))
 }

@@ -8,19 +8,17 @@ export type GridRow =
   | { kind: typeof GRID_ROWS.header; key: string; section: GridSection; isOpen: boolean }
   | { kind: typeof GRID_ROWS.cards; key: string; shape: CardShape; cards: ShelfCard[] }
 
+type GridColumnsOfProps = {
+  room: number
+  gap: number
+  leastOf: (shape: CardShape) => number
+}
+
 /**
  * How a grid `room` points wide lays out each shape of card: in as many columns of at least
  * `leastOf` it as fit with `gap` between them, and never none, each card as wide as its share.
  */
-export const gridColumnsOf = ({
-  room,
-  gap,
-  leastOf,
-}: {
-  room: number
-  gap: number
-  leastOf: (shape: CardShape) => number
-}) => {
+export const gridColumnsOf = ({ room, gap, leastOf }: GridColumnsOfProps) => {
   const columnsOf = (shape: CardShape): number =>
     Math.max(1, Math.floor((room + gap) / (leastOf(shape) + gap)))
   const widthOf = (shape: CardShape): number => {
@@ -33,7 +31,9 @@ export const gridColumnsOf = ({
 /** Whether a section folds: a bucket does, and the untitled run of a plain grid never. */
 export const isBucket = (section: GridSection): boolean => section.title !== null
 
-const cardRows = ({ section, columns }: { section: GridSection; columns: number }): GridRow[] =>
+type CardRowsProps = { section: GridSection; columns: number }
+
+const cardRows = ({ section, columns }: CardRowsProps): GridRow[] =>
   Array.from({ length: Math.ceil(section.cards.length / columns) }, (_, at) => ({
     kind: GRID_ROWS.cards,
     key: `${section.key}:${at}`,
@@ -41,18 +41,16 @@ const cardRows = ({ section, columns }: { section: GridSection; columns: number 
     cards: section.cards.slice(at * columns, (at + 1) * columns),
   }))
 
-/**
- * The rows of a grid: each bucket's heading, then its cards when it is open, `columnsOf` to a row.
- */
-export const gridRowsOf = ({
-  sections,
-  open,
-  columnsOf,
-}: {
+type GridRowsOfProps = {
   sections: readonly GridSection[]
   open: ReadonlySet<string>
   columnsOf: (shape: CardShape) => number
-}): GridRow[] =>
+}
+
+/**
+ * The rows of a grid: each bucket's heading, then its cards when it is open, `columnsOf` to a row.
+ */
+export const gridRowsOf = ({ sections, open, columnsOf }: GridRowsOfProps): GridRow[] =>
   sections.flatMap((section) => {
     const cards = cardRows({ section, columns: columnsOf(section.shape) })
     if (!isBucket(section)) return cards
@@ -61,25 +59,26 @@ export const gridRowsOf = ({
     return isOpen ? [header, ...cards] : [header]
   })
 
+type JumpTargetOfProps = {
+  sections: readonly GridSection[]
+  keys: ReadonlySet<string>
+}
+
 /** The first card the grid shows of those under a jump mark, and the section it is in. */
 export const jumpTargetOf = ({
   sections,
   keys,
-}: {
-  sections: readonly GridSection[]
-  keys: ReadonlySet<string>
-}): { section: string; card: string } | null =>
+}: JumpTargetOfProps): { section: string; card: string } | null =>
   sections
     .flatMap((section) => section.cards.map((card) => ({ section: section.key, card: card.key })))
     .find(({ card }) => keys.has(card)) ?? null
 
-/** How far down the list row `index` starts, its rows being of fixed heights. */
-export const offsetOfRow = ({
-  rows,
-  index,
-  heightOf,
-}: {
+type OffsetOfRowProps = {
   rows: readonly GridRow[]
   index: number
   heightOf: (row: GridRow) => number
-}): number => rows.slice(0, index).reduce((offset, row) => offset + heightOf(row), 0)
+}
+
+/** How far down the list row `index` starts, its rows being of fixed heights. */
+export const offsetOfRow = ({ rows, index, heightOf }: OffsetOfRowProps): number =>
+  rows.slice(0, index).reduce((offset, row) => offset + heightOf(row), 0)

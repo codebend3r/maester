@@ -7,6 +7,14 @@ const PRESSED = { unwatched: false, partly: 'mixed', watched: true } as const sa
   boolean | 'mixed'
 >
 
+type WatchedToggleProps = {
+  state: WatchedState
+  onToggle: () => void
+  label?: string
+  isLabelShown?: boolean
+  className?: string
+}
+
 /**
  * The Watched button of a page or an episode row. `partly` reads as
  * `mixed`: pressing it marks everything watched, and pressing it again
@@ -19,13 +27,7 @@ export const WatchedToggle = ({
   label = 'Watched',
   isLabelShown = true,
   className,
-}: {
-  state: WatchedState
-  onToggle: () => void
-  label?: string
-  isLabelShown?: boolean
-  className?: string
-}) => (
+}: WatchedToggleProps) => (
   <Button
     icon="check"
     aria-label={isLabelShown ? undefined : label}

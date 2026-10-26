@@ -61,17 +61,23 @@ type SessionEvent =
   | { type: typeof SESSION_EVENTS.audioPicked; audio: number | null; at: number }
   | { type: typeof SESSION_EVENTS.retried }
 
-/** Nothing to play: the plan's own reasons when it has any, else what the player can say. */
-const failedWith = ({
-  problems,
-  fallback,
-}: {
+type FailedWithProps = {
   problems: readonly string[]
   fallback: string
-}): SessionState => ({
+}
+
+/** Nothing to play: the plan's own reasons when it has any, else what the player can say. */
+const failedWith = ({ problems, fallback }: FailedWithProps): SessionState => ({
   phase: SESSION_PHASES.failed,
   problems: problems.length > 0 ? problems : [fallback],
 })
+
+type InitialSessionProps = {
+  modes: readonly PlaybackMode[]
+  at: number
+  audio: number | null
+  problems: readonly string[]
+}
 
 /** Opens the ladder at the plan's first way, from `at`; a plan with none has failed already. */
 export const initialSession = ({
@@ -79,12 +85,7 @@ export const initialSession = ({
   at,
   audio,
   problems,
-}: {
-  modes: readonly PlaybackMode[]
-  at: number
-  audio: number | null
-  problems: readonly string[]
-}): SessionState =>
+}: InitialSessionProps): SessionState =>
   modes.length === 0
     ? failedWith({ problems, fallback: SESSION_COPY.noWay })
     : { phase: SESSION_PHASES.sourcing, modes, step: 0, at, audio, attempt: 0, problems }
@@ -96,16 +97,14 @@ export const modeOf = (state: SessionState): PlaybackMode | null =>
 const isStream = (mode: PlaybackMode | null): boolean =>
   mode === PLAYBACK_MODES.remux || mode === PLAYBACK_MODES.transcode
 
-/** Asks for a source again, the same way or the next, from `at`. */
-const sourcing = ({
-  ladder,
-  step,
-  at,
-}: {
+type SourcingProps = {
   ladder: Ladder
   step: number
   at: number
-}): SessionState => ({
+}
+
+/** Asks for a source again, the same way or the next, from `at`. */
+const sourcing = ({ ladder, step, at }: SourcingProps): SessionState => ({
   phase: SESSION_PHASES.sourcing,
   modes: ladder.modes,
   step,
@@ -115,11 +114,13 @@ const sourcing = ({
   problems: ladder.problems,
 })
 
+type StepDownProps = { ladder: Ladder; at: number }
+
 /**
  * The next way down from where `ladder` stands, from `at`. Once there is none, the player says
  * every way failed, then gives the plan's reasons for the ways it never offered, as the web does.
  */
-const stepDown = ({ ladder, at }: { ladder: Ladder; at: number }): SessionState => {
+const stepDown = ({ ladder, at }: StepDownProps): SessionState => {
   const step = ladder.step + 1
   if (step >= ladder.modes.length)
     return { phase: SESSION_PHASES.failed, problems: [SESSION_COPY.exhausted, ...ladder.problems] }
@@ -206,6 +207,15 @@ export const noticeOf = (state: SessionState): string | null => {
   }
 }
 
+type UsePlaybackSessionProps = {
+  media: Pick<MediaItem, 'id'>
+  modes: readonly PlaybackMode[]
+  at: number
+  audio: number | null
+  problems: readonly string[]
+  sources: MediaSources
+}
+
 /**
  * Plays `media` down its plan's ladder: asks `sources` for each way's source in turn, steps
  * down when the player says one failed or it has not loaded in time, and asks again after a
@@ -218,14 +228,7 @@ export const usePlaybackSession = ({
   audio,
   problems,
   sources,
-}: {
-  media: Pick<MediaItem, 'id'>
-  modes: readonly PlaybackMode[]
-  at: number
-  audio: number | null
-  problems: readonly string[]
-  sources: MediaSources
-}): { state: SessionState; dispatch: (event: SessionEvent) => void } => {
+}: UsePlaybackSessionProps): { state: SessionState; dispatch: (event: SessionEvent) => void } => {
   const [state, dispatch] = useReducer(
     sessionReducer,
     { modes, at, audio, problems },

@@ -15,8 +15,10 @@ const PARTITION_FOLDER = /^server%3A(.+)$/u
 /** How a step that races its budget ends. */
 const RACE_OUTCOMES = { late: 'late' } as const
 
+type FormerPartitionsProps = { names: readonly string[] }
+
 /** The folders in `names` that are an older Raven's server partitions. */
-export const formerPartitions = ({ names }: { names: readonly string[] }): string[] =>
+export const formerPartitions = ({ names }: FormerPartitionsProps): string[] =>
   names.filter((name) => {
     const id = PARTITION_FOLDER.exec(name)?.[1] ?? null
     return id !== null && isOpaqueId(id)
@@ -30,6 +32,16 @@ const isMissing = (error: unknown): boolean => isRecord(error) && error.code ===
  */
 export const FORMER_LIST_MS = 1000
 
+type ClearFormerPartitionsProps = {
+  dir: string
+  fs: {
+    readdir: (path: string) => Promise<readonly string[]>
+    remove: (path: string) => Promise<void>
+  }
+  timers: Timers
+  warn: (message: string) => void
+}
+
 /**
  * Lists an older Raven's server partitions and starts removing them. It answers once the
  * folder is listed: `removing` settles when the removals do, and never rejects.
@@ -39,15 +51,7 @@ export const clearFormerPartitions = async ({
   fs,
   timers,
   warn,
-}: {
-  dir: string
-  fs: {
-    readdir: (path: string) => Promise<readonly string[]>
-    remove: (path: string) => Promise<void>
-  }
-  timers: Timers
-  warn: (message: string) => void
-}): Promise<{ removing: Promise<void> }> => {
+}: ClearFormerPartitionsProps): Promise<{ removing: Promise<void> }> => {
   const listing = fs.readdir(dir).catch((error: unknown): readonly string[] => {
     if (!isMissing(error)) {
       warn(`Raven could not read its server sessions: ${loggable(messageOf(error))}`)

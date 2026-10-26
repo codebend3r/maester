@@ -47,13 +47,15 @@ const summaryOf = (libraries: readonly Library[]): string =>
     }),
   ].join(' · ')
 
+type PinButtonProps = { library: Library }
+
 /**
  * Pin as a toggle: outlined while off, filled while on, when it reads
  * Pinned. A toggle keeps one name whatever its state, which `aria-pressed`
  * carries, so the word on screen is for the eye and the name stays
  * "Pin" and the library's.
  */
-const PinButton = ({ library }: { library: Library }) => {
+const PinButton = ({ library }: PinButtonProps) => {
   const queryClient = useQueryClient()
   // Only the pin is sent; the server keeps the rest of the library as it is.
   // It shows at once, here and in the side menu; home's shelves follow it.
@@ -83,12 +85,14 @@ const PinButton = ({ library }: { library: Library }) => {
   )
 }
 
+type HeroCheckboxProps = { library: Library }
+
 /**
  * Whether home's hero may show this library's titles. The admin's, so it
  * mounts inside `AdminOnly`; it shows at once and the server's answer settles it.
  * A locked library is never in the hero, so its box stays off and cannot be ticked.
  */
-const HeroCheckbox = ({ library }: { library: Library }) => {
+const HeroCheckbox = ({ library }: HeroCheckboxProps) => {
   const queryClient = useQueryClient()
   const id = useId()
   const include = useOptimisticMutation({
@@ -120,6 +124,13 @@ const HeroCheckbox = ({ library }: { library: Library }) => {
   )
 }
 
+type LibraryRowProps = {
+  library: Library
+  isShut: boolean
+  isOpen: boolean
+  onToggle: () => void
+}
+
 /**
  * A library's card: its type icon in a well beside its name, its counts,
  * its folders grouped by the folder that holds them, how its scan stands,
@@ -129,17 +140,7 @@ const HeroCheckbox = ({ library }: { library: Library }) => {
  * more, and a list cached from before is held to the same. Its folders show
  * only while the admin lock is off.
  */
-const LibraryRow = ({
-  library,
-  isShut,
-  isOpen,
-  onToggle,
-}: {
-  library: Library
-  isShut: boolean
-  isOpen: boolean
-  onToggle: () => void
-}) => {
+const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
   const detailsId = useId()
   const actions = useLibraryActions(library)
   const backdrop = !isShut && library.backdrop && api.libraryBackdropUrl(library.backdrop)
@@ -211,17 +212,7 @@ const LibraryRow = ({
   )
 }
 
-/**
- * A library in edit mode, down to a thin line: a grip, its icon and name, and
- * a button each to move it up or down, for the keyboard and for a touch
- * screen. The line itself drags; whichever line it is held over takes its place.
- */
-const ThinLibraryRow = ({
-  library,
-  place,
-  isDragging,
-  drag,
-}: {
+type ThinLibraryRowProps = {
   library: Library
   place: { isFirst: boolean; isLast: boolean; onMove: (step: number) => void }
   isDragging: boolean
@@ -230,7 +221,14 @@ const ThinLibraryRow = ({
     onOver: (event: DragEvent) => void
     onEnd: () => void
   }
-}) => (
+}
+
+/**
+ * A library in edit mode, down to a thin line: a grip, its icon and name, and
+ * a button each to move it up or down, for the keyboard and for a touch
+ * screen. The line itself drags; whichever line it is held over takes its place.
+ */
+const ThinLibraryRow = ({ library, place, isDragging, drag }: ThinLibraryRowProps) => (
   // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- dragging is the pointer's way; the move buttons are the keyboard's
   <li
     className={isDragging ? `${styles.thin} ${styles.dragging}` : styles.thin}

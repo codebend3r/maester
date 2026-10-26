@@ -128,13 +128,7 @@ const fileIds = (): (() => string) => {
   }
 }
 
-const setup = ({
-  entries = [],
-  videos = {},
-  player = EMPTY_STATE,
-  accountId = ACCOUNT_A,
-  lastAccountId = null,
-}: {
+type SetupProps = {
   entries?: DownloadEntry[]
   /** Finished videos by path. */
   videos?: Record<string, Video>
@@ -143,7 +137,15 @@ const setup = ({
   accountId?: string | null
   /** The last account signed in to the server, as the config keeps it. */
   lastAccountId?: string | null
-} = {}) => {
+}
+
+const setup = ({
+  entries = [],
+  videos = {},
+  player = EMPTY_STATE,
+  accountId = ACCOUNT_A,
+  lastAccountId = null,
+}: SetupProps = {}) => {
   const signedIn = { accountId, lastAccountId }
   const store = memoryStore<DownloadsState>({ ...EMPTY_DOWNLOADS, entries })
   const state = memoryStore(player)

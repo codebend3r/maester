@@ -164,23 +164,20 @@ export type MediaAccess = { origin: MediaOrigin; ticket: string }
 
 export type FetchLike = (url: string, init?: FetchInit) => Promise<FetchResponse>
 
+type ApiErrorProps = {
+  status: number
+  message: string
+  refusal?: AuthRefusal | null
+  isServerUnreachable?: boolean
+}
+
 export class ApiError extends Error {
   readonly status: number
   readonly refusal: AuthRefusal | null
   /** Whether the answer came from in front of a server out of reach (see `isUnreachableAnswer`). */
   readonly isServerUnreachable: boolean
 
-  constructor({
-    status,
-    message,
-    refusal = null,
-    isServerUnreachable = false,
-  }: {
-    status: number
-    message: string
-    refusal?: AuthRefusal | null
-    isServerUnreachable?: boolean
-  }) {
+  constructor({ status, message, refusal = null, isServerUnreachable = false }: ApiErrorProps) {
     super(message)
     this.name = 'ApiError'
     this.status = status
@@ -196,8 +193,10 @@ export const LOCKED_STATUS = 423
 export const isLockedError = (error: unknown): error is ApiError =>
   error instanceof ApiError && error.status === LOCKED_STATUS
 
+type ErrorMessageProps = { body: unknown; fallback: string }
+
 /** Nest's error body carries `message` as a string or, for validation, a list. */
-const errorMessage = ({ body, fallback }: { body: unknown; fallback: string }): string => {
+const errorMessage = ({ body, fallback }: ErrorMessageProps): string => {
   if (!isRecord(body)) return fallback
   if (isString(body.message)) return body.message
   if (isStringArray(body.message)) return body.message.join(' ')
@@ -237,25 +236,30 @@ const subjectQuery = (subject: MatchSubject | null): Record<string, string> => {
   }
 }
 
+type ItemPicturePathProps = {
+  id: number
+  kind: ItemImageKind
+  version: string
+}
+
 /**
  * The capability address of an item's picture of `kind` at `version`,
  * which it changes with, so it can be cached for good, by anyone.
  */
-const itemPicturePath = ({
-  id,
-  kind,
-  version,
-}: {
-  id: number
-  kind: ItemImageKind
-  version: string
-}): string =>
+const itemPicturePath = ({ id, kind, version }: ItemPicturePathProps): string =>
   PICTURE_PATHS.item
     .replace(`:${PICTURE_PARAMS.id}`, String(id))
     .replace(`:${PICTURE_PARAMS.kind}`, kind)
     .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(version))
 
 export type ApiClient = ReturnType<typeof createApiClient>
+
+type CreateApiClientProps = {
+  baseUrl?: string
+  fetch: FetchLike
+  accessToken?: () => string | null
+  pictureCdn?: string | null
+}
 
 /**
  * Every call a client makes to the media server. `baseUrl` is '' for a web
@@ -271,21 +275,18 @@ export const createApiClient = ({
   fetch,
   accessToken = () => null,
   pictureCdn = null,
-}: {
-  baseUrl?: string
-  fetch: FetchLike
-  accessToken?: () => string | null
-  pictureCdn?: string | null
-}) => {
+}: CreateApiClientProps) => {
   const root = baseUrl.replace(/\/+$/, '')
   const url = (path: string): string => `${root}${path}`
+
+  type PictureAtProps = { path: string; width?: number }
 
   /**
    * A capability picture at `path`, narrowed to `width` when one is given:
    * through the image CDN when there is one, else straight from the server,
    * which keeps a poster at the fixed few `POSTER_WIDTHS`.
    */
-  const pictureAt = ({ path, width }: { path: string; width?: number }): string => {
+  const pictureAt = ({ path, width }: PictureAtProps): string => {
     if (pictureCdn !== null) {
       const query: Record<string, string> =
         width === undefined ? { url: url(path) } : { url: url(path), w: String(width) }
@@ -294,34 +295,39 @@ export const createApiClient = ({
     return width === undefined ? url(path) : `${url(path)}?${toQueryString({ w: String(width) })}`
   }
 
-  /** `widths` as an `img`'s `srcset` of `path`, the widest, the picture's own, asked with no width. */
-  const pictureSrcSet = ({
-    path,
-    widths,
-    own,
-  }: {
+  type PictureSrcSetProps = {
     path: string
     widths: readonly number[]
     own: number
-  }): string =>
+  }
+
+  /** `widths` as an `img`'s `srcset` of `path`, the widest, the picture's own, asked with no width. */
+  const pictureSrcSet = ({ path, widths, own }: PictureSrcSetProps): string =>
     widths
       .map((width) => `${pictureAt(width === own ? { path } : { path, width })} ${width}w`)
       .join(', ')
 
-  /** A media path on the origin `access` names, with its ticket; on this server's own without. */
-  const mediaUrl = ({
-    path,
-    query,
-    access,
-  }: {
+  type MediaUrlProps = {
     path: string
     query: Record<string, string>
     access: MediaAccess | null
-  }): string => {
+  }
+
+  /** A media path on the origin `access` names, with its ticket; on this server's own without. */
+  const mediaUrl = ({ path, query, access }: MediaUrlProps): string => {
     const queryString = toQueryString(
       access === null ? query : { ...query, [MEDIA_TICKET_PARAM]: access.ticket },
     )
     return `${access === null ? root : access.origin.url}${path}${queryString === '' ? '' : `?${queryString}`}`
+  }
+
+  type CallProps = {
+    path: string
+    /** A full address, for the media origins; `path` is then unused. */
+    href?: string
+    method?: string
+    accept?: string
+    body?: unknown
   }
 
   /** Calls the server, failing with its own message when it says no. */
@@ -331,14 +337,7 @@ export const createApiClient = ({
     method = 'GET',
     accept = 'application/json',
     body,
-  }: {
-    path: string
-    /** A full address, for the media origins; `path` is then unused. */
-    href?: string
-    method?: string
-    accept?: string
-    body?: unknown
-  }): Promise<FetchResponse> => {
+  }: CallProps): Promise<FetchResponse> => {
     // Absolute media URLs are a separate trust boundary, even when their origin
     // happens to match the server. Only the generated API URL receives credentials.
     const token = href === url(path) && path.startsWith(AUTH_API_PREFIX) ? accessToken() : null
@@ -365,11 +364,13 @@ export const createApiClient = ({
     return response
   }
 
-  const send = async (request: {
+  type SendProps = {
     path: string
     method?: string
     body?: unknown
-  }): Promise<unknown> => {
+  }
+
+  const send = async (request: SendProps): Promise<unknown> => {
     const response = await call(request)
     return response.status === 204 ? null : readJson(response)
   }
@@ -378,13 +379,12 @@ export const createApiClient = ({
   const sendForText = async (href: string): Promise<string> =>
     (await call({ path: '', href, accept: 'text/vtt' })).text()
 
-  const expect = async <T>({
-    request,
-    guard,
-  }: {
+  type ExpectProps<T> = {
     request: Promise<unknown>
     guard: Guard<T>
-  }): Promise<T> => {
+  }
+
+  const expect = async <T>({ request, guard }: ExpectProps<T>): Promise<T> => {
     const value = await request
     if (!guard(value)) {
       throw new ApiError({
@@ -395,26 +395,147 @@ export const createApiClient = ({
     return value
   }
 
-  /** One of a library's lists, read at `path` under it. */
-  const libraryGet = <T>({
-    libraryId,
-    path,
-    guard,
-  }: {
+  type LibraryGetProps<T> = {
     libraryId: number
     path: string
     guard: Guard<T>
-  }): Promise<T> =>
+  }
+
+  /** One of a library's lists, read at `path` under it. */
+  const libraryGet = <T>({ libraryId, path, guard }: LibraryGetProps<T>): Promise<T> =>
     expect({ request: send({ path: `/api/libraries/${libraryId}/${path}` }), guard })
 
+  type ThumbnailAtProps = { id: number; version: number }
+
   /** A video's thumbnail at `version`, which it changes with, so it can be cached for good. */
-  const thumbnailAt = ({ id, version }: { id: number; version: number }): string =>
+  const thumbnailAt = ({ id, version }: ThumbnailAtProps): string =>
     url(`/api/media/${id}/thumbnail?v=${version}`)
 
   const itemImageAt = (picture: Parameters<typeof itemPicturePath>[0]): string =>
     pictureAt({ path: itemPicturePath(picture) })
 
   const posterWidths: readonly number[] = pictureCdn === null ? POSTER_WIDTHS : CDN_POSTER_WIDTHS
+
+  type CreateApiClientListMembersProps = { pageSize?: number; pageOffset?: number }
+
+  type CreateApiClientSetMemberStatusProps = {
+    id: string
+    change: MemberStatusChange
+  }
+
+  type CreateApiClientGetAccountMediaTicketProps = { id: number }
+
+  type CreateApiClientUpdateLibraryProps = { id: number; input: LibraryInput }
+
+  type CreateApiClientSetLibraryViewProps = { id: number; change: LibraryViewChange }
+
+  type CreateApiClientSetFavouriteProps = { id: number; favourite: boolean }
+
+  type CreateApiClientSetItemFavouriteProps = {
+    id: number
+    favourite: boolean
+  }
+
+  type CreateApiClientSetSagaBackdropProps = {
+    libraryId: number
+    sagaId: Saga['tmdbId']
+    backdrop: SagaBackdrop
+  }
+
+  type CreateApiClientListHistoryProps = {
+    libraryId: number
+    limit: number
+    watchedOnly?: boolean
+  }
+
+  type CreateApiClientSetItemMatchProps = { itemId: number; tmdbId: string }
+
+  type CreateApiClientSearchMatchesProps = {
+    type: MatchItemType
+    query: string
+    year?: number | null
+    libraryId?: number | null
+    /** The file or show the search is for, which its results are scored against. */
+    subject?: MatchSubject | null
+  }
+
+  type CreateApiClientSetMatchProps = {
+    mediaId: number
+    tmdbId: string | null
+  }
+
+  type CreateApiClientItemImageUrlProps = {
+    id: number
+    kind: ItemImageKind
+    version: string | null
+  }
+
+  type CreateApiClientPosterSrcSetProps = { id: number; version: string | null }
+
+  type CreateApiClientBackdropSrcSetProps = { id: number; version: string | null }
+
+  type CreateApiClientReviewAvatarUrlProps = {
+    reviewId: number
+    avatarVersion: string | null
+  }
+
+  type CreateApiClientPhotoUrlProps = {
+    personId: number
+    photoVersion: string | null
+  }
+
+  type CreateApiClientSetItemMetadataProps = {
+    id: number
+    change: ItemMetadataChange
+  }
+
+  type CreateApiClientChooseItemImageProps = {
+    id: number
+    kind: ChoosableImageKind
+    choice: ImageChoice
+  }
+
+  type CreateApiClientImageOptionUrlProps = {
+    id: number
+    kind: ChoosableImageKind
+    option: ImageOption
+  }
+
+  type CreateApiClientFileUrlProps = { id: number; access?: MediaAccess | null }
+
+  type CreateApiClientSetBugReportStatusProps = {
+    id: number
+    status: BugReportStatus
+  }
+
+  type CreateApiClientPingUrlProps = {
+    origin: MediaOrigin
+    bytes?: number
+  }
+
+  type CreateApiClientGetSubtitlesProps = {
+    id: number
+    trackId: string
+    window?: number
+    access?: MediaAccess | null
+  }
+
+  type CreateApiClientHlsUrlProps = {
+    id: number
+    mode: StreamMode
+    audio: number | null
+    quality: StreamQuality | null
+    access: MediaAccess | null
+  }
+
+  type CreateApiClientStreamUrlProps = {
+    id: number
+    mode: StreamMode
+    start: number
+    audio: number | null
+    quality?: StreamQuality | null
+    access?: MediaAccess | null
+  }
 
   return {
     getAuthConfig: (): Promise<AuthConfig> =>
@@ -426,7 +547,7 @@ export const createApiClient = ({
     listMembers: ({
       pageSize = 100,
       pageOffset = 0,
-    }: { pageSize?: number; pageOffset?: number } = {}): Promise<Account[]> =>
+    }: CreateApiClientListMembersProps = {}): Promise<Account[]> =>
       expect({
         request: send({
           path: `${AUTH_PATHS.members}?${toQueryString({ [AUTH_PARAMS.pageSize]: String(pageSize), [AUTH_PARAMS.pageOffset]: String(pageOffset) })}`,
@@ -434,13 +555,7 @@ export const createApiClient = ({
         guard: isAccountList,
       }),
 
-    setMemberStatus: ({
-      id,
-      change,
-    }: {
-      id: string
-      change: MemberStatusChange
-    }): Promise<Account> =>
+    setMemberStatus: ({ id, change }: CreateApiClientSetMemberStatusProps): Promise<Account> =>
       expect({
         request: send({
           path: AUTH_PATHS.memberStatus.replace(`:${AUTH_PARAMS.id}`, encodeURIComponent(id)),
@@ -450,7 +565,9 @@ export const createApiClient = ({
         guard: isAccount,
       }),
 
-    getAccountMediaTicket: ({ id }: { id: number }): Promise<MediaTicket> =>
+    getAccountMediaTicket: ({
+      id,
+    }: CreateApiClientGetAccountMediaTicketProps): Promise<MediaTicket> =>
       expect({
         request: send({
           path: AUTH_PATHS.ticket.replace(`:${AUTH_PARAMS.id}`, String(id)),
@@ -471,14 +588,14 @@ export const createApiClient = ({
         guard: isLibrary,
       }),
 
-    updateLibrary: ({ id, input }: { id: number; input: LibraryInput }): Promise<Library> =>
+    updateLibrary: ({ id, input }: CreateApiClientUpdateLibraryProps): Promise<Library> =>
       expect({
         request: send({ path: `/api/libraries/${id}`, method: 'PUT', body: input }),
         guard: isLibrary,
       }),
 
     /** How a library is laid out, or its pin: what any viewer may change, the admin lock on or off. */
-    setLibraryView: ({ id, change }: { id: number; change: LibraryViewChange }): Promise<Library> =>
+    setLibraryView: ({ id, change }: CreateApiClientSetLibraryViewProps): Promise<Library> =>
       expect({
         request: send({ path: `/api/libraries/${id}/view`, method: 'PUT', body: change }),
         guard: isLibrary,
@@ -635,7 +752,7 @@ export const createApiClient = ({
       })
     },
 
-    setFavourite: ({ id, favourite }: { id: number; favourite: boolean }): Promise<MediaItem> =>
+    setFavourite: ({ id, favourite }: CreateApiClientSetFavouriteProps): Promise<MediaItem> =>
       expect({
         request: send({
           path: `/api/media/${id}/favourite`,
@@ -649,10 +766,7 @@ export const createApiClient = ({
     setItemFavourite: ({
       id,
       favourite,
-    }: {
-      id: number
-      favourite: boolean
-    }): Promise<ItemDetails> =>
+    }: CreateApiClientSetItemFavouriteProps): Promise<ItemDetails> =>
       expect({
         request: send({
           path: `/api/items/${id}/favourite`,
@@ -696,11 +810,7 @@ export const createApiClient = ({
       libraryId,
       sagaId,
       backdrop,
-    }: {
-      libraryId: number
-      sagaId: Saga['tmdbId']
-      backdrop: SagaBackdrop
-    }): Promise<SagaBackdrop> =>
+    }: CreateApiClientSetSagaBackdropProps): Promise<SagaBackdrop> =>
       expect({
         request: send({
           path: `/api/libraries/${libraryId}/sagas/${encodeURIComponent(sagaId)}/backdrop`,
@@ -786,11 +896,7 @@ export const createApiClient = ({
       libraryId,
       limit,
       watchedOnly = false,
-    }: {
-      libraryId: number
-      limit: number
-      watchedOnly?: boolean
-    }): Promise<HistoryEntry[]> => {
+    }: CreateApiClientListHistoryProps): Promise<HistoryEntry[]> => {
       const query = toQueryString({
         limit: String(limit),
         ...(watchedOnly ? { watched: 'true' } : {}),
@@ -853,7 +959,7 @@ export const createApiClient = ({
       }),
 
     /** Points every file under a show at another show, keeping their numbers; returns the show they moved to. */
-    setItemMatch: ({ itemId, tmdbId }: { itemId: number; tmdbId: string }): Promise<ItemDetails> =>
+    setItemMatch: ({ itemId, tmdbId }: CreateApiClientSetItemMatchProps): Promise<ItemDetails> =>
       expect({
         request: send({
           path: `/api/items/${itemId}/match`,
@@ -884,14 +990,7 @@ export const createApiClient = ({
       year,
       libraryId,
       subject = null,
-    }: {
-      type: MatchItemType
-      query: string
-      year?: number | null
-      libraryId?: number | null
-      /** The file or show the search is for, which its results are scored against. */
-      subject?: MatchSubject | null
-    }): Promise<MatchCandidate[]> =>
+    }: CreateApiClientSearchMatchesProps): Promise<MatchCandidate[]> =>
       expect({
         request: send({
           path: `/api/match/search?${toQueryString({
@@ -909,13 +1008,7 @@ export const createApiClient = ({
      * Points a file, and every file in its folder, at a TMDB id, and keeps
      * that through renames; `null` says it is not a movie at all.
      */
-    setMatch: ({
-      mediaId,
-      tmdbId,
-    }: {
-      mediaId: number
-      tmdbId: string | null
-    }): Promise<MediaItem> =>
+    setMatch: ({ mediaId, tmdbId }: CreateApiClientSetMatchProps): Promise<MediaItem> =>
       expect({
         request: send({
           path: `/api/media/${mediaId}/match`,
@@ -930,22 +1023,15 @@ export const createApiClient = ({
       (await expect({ request: send({ path: '/api/health' }), guard: isServerHealth })).metadata,
 
     /** An item's poster, backdrop or still; null when it has none. Versioned, so cached for good. */
-    itemImageUrl: ({
-      id,
-      kind,
-      version,
-    }: {
-      id: number
-      kind: ItemImageKind
-      version: string | null
-    }): string | null => (version == null ? null : itemImageAt({ id, kind, version })),
+    itemImageUrl: ({ id, kind, version }: CreateApiClientItemImageUrlProps): string | null =>
+      version == null ? null : itemImageAt({ id, kind, version }),
 
     /**
      * An item's poster at each width it comes in, for an `img`'s `srcset`;
      * null when it has none. The widest is `itemImageUrl`'s own URL, so a
      * card that shows it and the item's page share one download.
      */
-    posterSrcSet: ({ id, version }: { id: number; version: string | null }): string | null =>
+    posterSrcSet: ({ id, version }: CreateApiClientPosterSrcSetProps): string | null =>
       version == null
         ? null
         : pictureSrcSet({
@@ -962,7 +1048,7 @@ export const createApiClient = ({
      * `img`'s `srcset` beside `itemImageUrl`'s; null with no CDN, where the
      * server keeps a backdrop at its own width alone, or with no backdrop.
      */
-    backdropSrcSet: ({ id, version }: { id: number; version: string | null }): string | null =>
+    backdropSrcSet: ({ id, version }: CreateApiClientBackdropSrcSetProps): string | null =>
       version == null || pictureCdn === null
         ? null
         : pictureSrcSet({
@@ -1001,22 +1087,13 @@ export const createApiClient = ({
     reviewAvatarUrl: ({
       reviewId,
       avatarVersion,
-    }: {
-      reviewId: number
-      avatarVersion: string | null
-    }): string | null =>
+    }: CreateApiClientReviewAvatarUrlProps): string | null =>
       avatarVersion == null
         ? null
         : url(`/api/reviews/${reviewId}/avatar?${toQueryString({ v: avatarVersion })}`),
 
     /** A person's photo; null when TMDB has none. */
-    photoUrl: ({
-      personId,
-      photoVersion,
-    }: {
-      personId: number
-      photoVersion: string | null
-    }): string | null =>
+    photoUrl: ({ personId, photoVersion }: CreateApiClientPhotoUrlProps): string | null =>
       photoVersion == null
         ? null
         : pictureAt({
@@ -1078,13 +1155,7 @@ export const createApiClient = ({
       }),
 
     /** Edit metadata: writes the fields given over TMDB's, or clears each sent as null. */
-    setItemMetadata: ({
-      id,
-      change,
-    }: {
-      id: number
-      change: ItemMetadataChange
-    }): Promise<ItemDetails> =>
+    setItemMetadata: ({ id, change }: CreateApiClientSetItemMetadataProps): Promise<ItemDetails> =>
       expect({
         request: send({ path: `/api/items/${id}/metadata`, method: 'PUT', body: change }),
         guard: isItemDetails,
@@ -1099,32 +1170,20 @@ export const createApiClient = ({
       id,
       kind,
       choice,
-    }: {
-      id: number
-      kind: ChoosableImageKind
-      choice: ImageChoice
-    }): Promise<ItemDetails> =>
+    }: CreateApiClientChooseItemImageProps): Promise<ItemDetails> =>
       expect({
         request: send({ path: `/api/items/${id}/images/${kind}`, method: 'PUT', body: choice }),
         guard: isItemDetails,
       }),
 
     /** A picture Edit images offers, through the server's cache (TMDB's) or scaled (a local one). */
-    imageOptionUrl: ({
-      id,
-      kind,
-      option,
-    }: {
-      id: number
-      kind: ChoosableImageKind
-      option: ImageOption
-    }): string =>
+    imageOptionUrl: ({ id, kind, option }: CreateApiClientImageOptionUrlProps): string =>
       option.source === IMAGE_SOURCES.local
         ? url(`/api/items/${id}/images/${kind}/local`)
         : url(`/api/images/${kind}${option.ref}`),
 
     /** The original file, served with byte ranges: what a player loads for direct play. */
-    fileUrl: ({ id, access = null }: { id: number; access?: MediaAccess | null }): string =>
+    fileUrl: ({ id, access = null }: CreateApiClientFileUrlProps): string =>
       mediaUrl({ path: `/api/media/${id}/file`, query: {}, access }),
 
     /** The server's event stream: `ServerEvent`s, read with `parseServerEvent`. */
@@ -1167,10 +1226,7 @@ export const createApiClient = ({
     setBugReportStatus: ({
       id,
       status,
-    }: {
-      id: number
-      status: BugReportStatus
-    }): Promise<BugReport> =>
+    }: CreateApiClientSetBugReportStatusProps): Promise<BugReport> =>
       expect({
         request: send({
           path: BUG_REPORT_PATHS.status.replace(`:${BUG_REPORT_PARAMS.id}`, String(id)),
@@ -1184,13 +1240,8 @@ export const createApiClient = ({
       expect({ request: send({ path: `/api/media/${id}/ticket` }), guard: isMediaTicket }),
 
     /** The address of `origin`'s speed probe: `bytes` of noise, never from disk. */
-    pingUrl: ({
-      origin,
-      bytes = MEDIA_PROBE_BYTES,
-    }: {
-      origin: MediaOrigin
-      bytes?: number
-    }): string => `${origin.url}/api/media-origins/ping?bytes=${bytes}`,
+    pingUrl: ({ origin, bytes = MEDIA_PROBE_BYTES }: CreateApiClientPingUrlProps): string =>
+      `${origin.url}/api/media-origins/ping?bytes=${bytes}`,
 
     /**
      * One subtitle track's cues. Embedded tracks come a window at a time
@@ -1201,12 +1252,7 @@ export const createApiClient = ({
       trackId,
       window = 0,
       access = null,
-    }: {
-      id: number
-      trackId: string
-      window?: number
-      access?: MediaAccess | null
-    }): Promise<SubtitleCue[]> =>
+    }: CreateApiClientGetSubtitlesProps): Promise<SubtitleCue[]> =>
       parseWebVtt(
         await sendForText(
           mediaUrl({
@@ -1222,19 +1268,7 @@ export const createApiClient = ({
      * that holds `mode`, `audio` and `quality`, which are read as for
      * `streamUrl`.
      */
-    hlsUrl: ({
-      id,
-      mode,
-      audio,
-      quality,
-      access,
-    }: {
-      id: number
-      mode: StreamMode
-      audio: number | null
-      quality: StreamQuality | null
-      access: MediaAccess | null
-    }): string =>
+    hlsUrl: ({ id, mode, audio, quality, access }: CreateApiClientHlsUrlProps): string =>
       mediaUrl({
         path: HLS_PATHS.master.replace(`:${HLS_PARAMS.id}`, String(id)),
         query: {
@@ -1258,14 +1292,7 @@ export const createApiClient = ({
       audio,
       quality = null,
       access = null,
-    }: {
-      id: number
-      mode: StreamMode
-      start: number
-      audio: number | null
-      quality?: StreamQuality | null
-      access?: MediaAccess | null
-    }): string =>
+    }: CreateApiClientStreamUrlProps): string =>
       mediaUrl({
         path: `/api/media/${id}/stream`,
         query: {

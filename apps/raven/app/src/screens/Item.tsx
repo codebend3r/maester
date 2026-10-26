@@ -61,15 +61,13 @@ type ItemContext = Pick<Pictures, 'headersFor'> & {
   onBack: () => void
 }
 
-const playOf = ({
-  media,
-  label,
-  context,
-}: {
+type PlayOfProps = {
   media: MediaItem
   label: string
   context: ItemContext
-}): ItemAction => ({
+}
+
+const playOf = ({ media, label, context }: PlayOfProps): ItemAction => ({
   kind: ITEM_ACTIONS.play,
   key: ACTION_KEYS.play,
   label,
@@ -77,13 +75,12 @@ const playOf = ({
     context.onOpen({ kind: ROUTE_TARGETS.play, mediaId: media.id, at: media.position }),
 })
 
-const favouriteOf = ({
-  isOn,
-  onToggle,
-}: {
+type FavouriteOfProps = {
   isOn: boolean
   onToggle: (isMarked: boolean) => void
-}): ItemAction => ({
+}
+
+const favouriteOf = ({ isOn, onToggle }: FavouriteOfProps): ItemAction => ({
   kind: ITEM_ACTIONS.toggle,
   key: ACTION_KEYS.favourite,
   label: COPY.favourite,
@@ -91,14 +88,13 @@ const favouriteOf = ({
   onPress: () => onToggle(!isOn),
 })
 
-/** Watched reads as what pressing it does until everything is: then it says it is. */
-const watchedOf = ({
-  state,
-  onToggle,
-}: {
+type WatchedOfProps = {
   state: WatchedState
   onToggle: () => void
-}): ItemAction => ({
+}
+
+/** Watched reads as what pressing it does until everything is: then it says it is. */
+const watchedOf = ({ state, onToggle }: WatchedOfProps): ItemAction => ({
   kind: ITEM_ACTIONS.toggle,
   key: ACTION_KEYS.watched,
   label: state === WATCHED_STATES.watched ? COPY.watched : COPY.markWatched,
@@ -110,24 +106,31 @@ const watchedOf = ({
 const playNextLabel = (code: string | null): string =>
   code === null ? COPY.play : `${COPY.play} ${code}`
 
+type MarksOfProps = {
+  details: ItemDetails
+  favourite: ReturnType<typeof useServerItemFavourite>
+  watched: ReturnType<typeof useServerWatchedToggle>
+}
+
 /**
  * A show's or a season's marks: Favourite where the server says it can be one, then Watched
  * over every episode under it.
  */
-const marksOf = ({
-  details,
-  favourite,
-  watched,
-}: {
-  details: ItemDetails
-  favourite: ReturnType<typeof useServerItemFavourite>
-  watched: ReturnType<typeof useServerWatchedToggle>
-}): ItemAction[] => [
+const marksOf = ({ details, favourite, watched }: MarksOfProps): ItemAction[] => [
   ...(details.favourite === null
     ? []
     : [favouriteOf({ isOn: details.favourite, onToggle: favourite.mutate })]),
   watchedOf(watched),
 ]
+
+type PlayableItemProps = {
+  kind: typeof ITEM_TYPES.movie | typeof ITEM_TYPES.episode
+  details: ItemDetails
+  versions: MediaItem[]
+  primary: MediaItem
+  session: AppQueries
+  context: ItemContext
+}
 
 /**
  * A movie or an episode once the library's files it shows are known: Play, or Resume where it
@@ -141,14 +144,7 @@ const PlayableItem = ({
   primary,
   session,
   context,
-}: {
-  kind: typeof ITEM_TYPES.movie | typeof ITEM_TYPES.episode
-  details: ItemDetails
-  versions: MediaItem[]
-  primary: MediaItem
-  session: AppQueries
-  context: ItemContext
-}) => {
+}: PlayableItemProps) => {
   const { queries } = session
   const { favourite, watched } = useServerMediaMutations({ api: session.api, media: primary })
   const libraries = useQuery(queries.librariesQuery)
@@ -195,19 +191,17 @@ const PlayableItem = ({
   )
 }
 
+type ShowItemProps = {
+  details: ItemDetails
+  session: AppQueries
+  context: ItemContext
+}
+
 /**
  * A show: Play for the episode the server says comes next, once it says, Favourite and Watched
  * over every episode, then its seasons.
  */
-const ShowItem = ({
-  details,
-  session,
-  context,
-}: {
-  details: ItemDetails
-  session: AppQueries
-  context: ItemContext
-}) => {
+const ShowItem = ({ details, session, context }: ShowItemProps) => {
   const next = useQuery(session.queries.nextEpisodeQuery(details.id))
   const favourite = useServerItemFavourite({ api: session.api, item: details })
   const toggle = useServerWatchedToggle({
@@ -239,16 +233,14 @@ const ShowItem = ({
   )
 }
 
-/** A season: Play for its first episode not yet watched, Favourite and Watched, then its episodes. */
-const SeasonItem = ({
-  details,
-  session,
-  context,
-}: {
+type SeasonItemProps = {
   details: ItemDetails
   session: AppQueries
   context: ItemContext
-}) => {
+}
+
+/** A season: Play for its first episode not yet watched, Favourite and Watched, then its episodes. */
+const SeasonItem = ({ details, session, context }: SeasonItemProps) => {
   // A season sits under its show's backdrop, and carries its show's content rating.
   const show = useQuery(session.queries.itemQuery(details.show?.id ?? null))
   const favourite = useServerItemFavourite({ api: session.api, item: details })
@@ -282,26 +274,21 @@ const SeasonItem = ({
   )
 }
 
-/**
- * A movie's or an episode's files as one library shows them: the one the address names, else
- * the one holding the file Play would start, and within it the one card the address's file
- * sits on, as the web's pages keep to.
- */
-const PlayableFiles = ({
-  kind,
-  details,
-  library,
-  file,
-  session,
-  context,
-}: {
+type PlayableFilesProps = {
   kind: typeof ITEM_TYPES.movie | typeof ITEM_TYPES.episode
   details: ItemDetails
   library: number | null
   file: number | null
   session: AppQueries
   context: ItemContext
-}) => {
+}
+
+/**
+ * A movie's or an episode's files as one library shows them: the one the address names, else
+ * the one holding the file Play would start, and within it the one card the address's file
+ * sits on, as the web's pages keep to.
+ */
+const PlayableFiles = ({ kind, details, library, file, session, context }: PlayableFilesProps) => {
   const shown = libraryFiles({ versions: details.versions, library, file })
   if (shown === null) return <ItemNotice notice={COPY.missing} onBack={context.onBack} />
   return (
@@ -316,19 +303,15 @@ const PlayableFiles = ({
   )
 }
 
-const ItemOf = ({
-  details,
-  library,
-  file,
-  session,
-  context,
-}: {
+type ItemOfProps = {
   details: ItemDetails
   library: number | null
   file: number | null
   session: AppQueries
   context: ItemContext
-}) => {
+}
+
+const ItemOf = ({ details, library, file, session, context }: ItemOfProps) => {
   switch (details.type) {
     case ITEM_TYPES.movie:
     case ITEM_TYPES.episode:
@@ -353,17 +336,14 @@ const ItemOf = ({
   }
 }
 
-const ServerItem = ({
-  session,
-  id,
-  library,
-  file,
-}: {
+type ServerItemProps = {
   session: AppQueries
   id: number | null
   library: number | null
   file: number | null
-}) => {
+}
+
+const ServerItem = ({ session, id, library, file }: ServerItemProps) => {
   const router = useRouter()
   const item = useQuery(session.queries.itemQuery(id))
   const cookies = useServerCookies(session.server)

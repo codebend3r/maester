@@ -11,16 +11,14 @@ import { themedStyles } from '@/theme/useTheme'
 export const touchCaptionHeightOf = (fontScale: number): number =>
   SIZES.space1 + linesHeightOf({ sizes: [SIZES.textSm, SIZES.textXs], fontScale })
 
-/** A card under the thumb, on a shelf or in a grid: its picture, its title and its line. */
-export const TouchCard = ({
-  card,
-  width,
-  onPress,
-}: {
+type TouchCardProps = {
   card: ShelfCard
   width: number
   onPress: () => void
-}) => {
+}
+
+/** A card under the thumb, on a shelf or in a grid: its picture, its title and its line. */
+export const TouchCard = ({ card, width, onPress }: TouchCardProps) => {
   const styles = useStyles()
   return (
     <Pressable

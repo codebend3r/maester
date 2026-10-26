@@ -5,6 +5,8 @@ import { api } from '@/lib/api'
 import { useIsDesktop } from '@/stores/desktop'
 import { useOriginProbe } from '@/stores/originProbe'
 
+type MediaOriginProbeProps = { children: ReactNode }
+
 /**
  * Probes the server's media origins as the app opens and as the network
  * changes, and puts `reprobe` in `useOriginProbe` for whatever plays media
@@ -13,7 +15,7 @@ import { useOriginProbe } from '@/stores/originProbe'
  * player it never probes: mpv plays through the app, which picks its own way
  * to the server.
  */
-export const MediaOriginProbe = ({ children }: { children: ReactNode }) => {
+export const MediaOriginProbe = ({ children }: MediaOriginProbeProps) => {
   const isServed = useIsServed()
   const isDesktop = useIsDesktop()
   const isEnabled = isServed && !isDesktop

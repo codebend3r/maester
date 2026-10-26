@@ -24,12 +24,14 @@ const run: ToolRun = async ({ command, args }) => {
   return stdout
 }
 
+type OtoolPathForProps = { path: string; scratch: string }
+
 /**
  * otool reads `name(member)` as a member of the archive `name`, so a path ending in `)`, as
  * "Raven Helper (Renderer)" does, is read through a link with a plain name. The files
  * are audited one at a time, so one link serves them all.
  */
-const otoolPathFor = async ({ path, scratch }: { path: string; scratch: string }) => {
+const otoolPathFor = async ({ path, scratch }: OtoolPathForProps) => {
   if (!path.endsWith(')')) return path
   const link = join(scratch, 'macho')
   await rm(link, { force: true })
@@ -39,15 +41,13 @@ const otoolPathFor = async ({ path, scratch }: { path: string; scratch: string }
 
 type Audited = Awaited<ReturnType<typeof auditMachO>>
 
-const auditFile = async ({
-  app,
-  path,
-  scratch,
-}: {
+type AuditFileProps = {
   app: string
   path: string
   scratch: string
-}): Promise<Audited> =>
+}
+
+const auditFile = async ({ app, path, scratch }: AuditFileProps): Promise<Audited> =>
   auditMachO({
     relative: relative(app, path),
     path,
@@ -55,7 +55,9 @@ const auditFile = async ({
     run,
   })
 
-const auditFiles = async ({ app, paths }: { app: string; paths: readonly string[] }) => {
+type AuditFilesProps = { app: string; paths: readonly string[] }
+
+const auditFiles = async ({ app, paths }: AuditFilesProps) => {
   const scratch = await mkdtemp(join(tmpdir(), 'raven-audit-'))
   try {
     return await paths.reduce<Promise<Audited[]>>(
@@ -67,7 +69,9 @@ const auditFiles = async ({ app, paths }: { app: string; paths: readonly string[
   }
 }
 
-const audit = async ({ project }: { project: string }): Promise<number> => {
+type AuditProps = { project: string }
+
+const audit = async ({ project }: AuditProps): Promise<number> => {
   const app = join(project, PACKAGED_APP)
   if (!existsSync(app)) {
     console.error('Run bunx nx run @raven/desktop:make first.')

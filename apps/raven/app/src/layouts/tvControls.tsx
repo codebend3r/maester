@@ -136,6 +136,16 @@ export const usePlateStyles = themedStyles((colours) =>
   }),
 )
 
+type PlateButtonProps = {
+  text: string
+  label: string
+  accessibilityRole: AccessibilityRole
+  isPreferred?: boolean
+  isOverPicture?: boolean
+  onFocused?: () => void
+  onPress: () => void
+}
+
 /**
  * A plain button on a plate, the remote's to press: `text` is what it shows, `label` is said,
  * `isPreferred` asks the remote's focus for it as it appears, `onFocused` hears each time it
@@ -149,15 +159,7 @@ export const PlateButton = ({
   isOverPicture = false,
   onFocused = NOTHING_ON_FOCUS,
   onPress,
-}: {
-  text: string
-  label: string
-  accessibilityRole: AccessibilityRole
-  isPreferred?: boolean
-  isOverPicture?: boolean
-  onFocused?: () => void
-  onPress: () => void
-}) => {
+}: PlateButtonProps) => {
   const plateStyles = usePlateStyles({ isOverPicture })
   return (
     <Pressable

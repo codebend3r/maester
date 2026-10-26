@@ -36,14 +36,16 @@ export const listingKeyOf = (library: ListedLibrary) =>
     ? queryKeys.shows(listingOf(library))
     : queryKeys.media(listingOf(library))
 
+type PrefetchListingProps = {
+  queryClient: QueryClient
+  library: ListedLibrary
+}
+
 /** Reads the listing a library opens on into the cache, unless it is still fresh. */
 export const prefetchListing = async ({
   queryClient,
   library,
-}: {
-  queryClient: QueryClient
-  library: ListedLibrary
-}): Promise<void> => {
+}: PrefetchListingProps): Promise<void> => {
   if (listsShows(library.settings.kind)) {
     await queryClient.prefetchQuery(showListQuery(listingOf(library)))
     return
@@ -51,22 +53,19 @@ export const prefetchListing = async ({
   await queryClient.prefetchQuery(mediaListQuery(listingOf(library)))
 }
 
+type SeedListingProps = {
+  queryClient: QueryClient
+  library: ListedLibrary
+  data: unknown
+  updatedAt: number
+}
+
 /**
  * Puts a listing read earlier in the cache as old as it was, unless one is
  * already there. With no one watching it yet it would be dropped in minutes,
  * so it is given the keep a listing read now gets.
  */
-export const seedListing = ({
-  queryClient,
-  library,
-  data,
-  updatedAt,
-}: {
-  queryClient: QueryClient
-  library: ListedLibrary
-  data: unknown
-  updatedAt: number
-}): void => {
+export const seedListing = ({ queryClient, library, data, updatedAt }: SeedListingProps): void => {
   const queryKey = listingKeyOf(library)
   if (queryClient.getQueryData(queryKey) !== undefined) return
   queryClient.setQueryData(queryKey, data, { updatedAt })

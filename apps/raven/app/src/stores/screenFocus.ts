@@ -24,62 +24,75 @@ export const useScreenFocus = create<ScreenFocusState>()(() => ({ screens: {} })
 
 const FRESH: ScreenFocus = { hasSettled: false, opener: null }
 
-const screenOf = ({ state, screen }: { state: ScreenFocusState; screen: string }): ScreenFocus =>
-  state.screens[screen] ?? FRESH
+type ScreenOfProps = { state: ScreenFocusState; screen: string }
 
-const openerOf = ({ screen }: { screen: string }): Opener | null =>
+const screenOf = ({ state, screen }: ScreenOfProps): ScreenFocus => state.screens[screen] ?? FRESH
+
+type OpenerOfProps = { screen: string }
+
+const openerOf = ({ screen }: OpenerOfProps): Opener | null =>
   screenOf({ state: useScreenFocus.getState(), screen }).opener
 
-const change = ({ screen, to }: { screen: string; to: Partial<ScreenFocus> }): void =>
+type ChangeProps = { screen: string; to: Partial<ScreenFocus> }
+
+const change = ({ screen, to }: ChangeProps): void =>
   useScreenFocus.setState((state) => ({
     screens: { ...state.screens, [screen]: { ...screenOf({ state, screen }), ...to } },
   }))
 
+type IsOpeningInProps = { state: ScreenFocusState; screen: string }
+
 /** Whether the screen still gives its opening focus: nothing on it has had the focus yet. */
-export const isOpeningIn = ({ state, screen }: { state: ScreenFocusState; screen: string }) =>
+export const isOpeningIn = ({ state, screen }: IsOpeningInProps) =>
   !screenOf({ state, screen }).hasSettled
 
+type SettleScreenProps = { screen: string }
+
 /** Something on the screen has the focus: its opening focus is spent. */
-export const settleScreen = ({ screen }: { screen: string }): void => {
+export const settleScreen = ({ screen }: SettleScreenProps): void => {
   if (isOpeningIn({ state: useScreenFocus.getState(), screen }))
     change({ screen, to: { hasSettled: true } })
 }
 
+type RememberOpenerProps = { screen: string; card: string }
+
 /** The card at `card` opens another screen; it takes the focus back when this one returns. */
-export const rememberOpener = ({ screen, card }: { screen: string; card: string }): void =>
+export const rememberOpener = ({ screen, card }: RememberOpenerProps): void =>
   change({
     screen,
     to: { hasSettled: true, opener: { card, isDrawn: true, hasBeenCovered: false } },
   })
 
-/** The card at `card` is drawn, or goes (`isDrawn`); only the opener's own card counts. */
-export const drawCard = ({
-  screen,
-  card,
-  isDrawn,
-}: {
+type DrawCardProps = {
   screen: string
   card: string
   isDrawn: boolean
-}): void => {
+}
+
+/** The card at `card` is drawn, or goes (`isDrawn`); only the opener's own card counts. */
+export const drawCard = ({ screen, card, isDrawn }: DrawCardProps): void => {
   const opener = openerOf({ screen })
   if (opener === null || opener.card !== card || opener.isDrawn === isDrawn) return
   change({ screen, to: { opener: { ...opener, isDrawn } } })
 }
 
+type TakeOpenerProps = { screen: string; card: string }
+
 /** Hands the opener back once, and only to the card it names: true for that card, then never. */
-export const takeOpener = ({ screen, card }: { screen: string; card: string }): boolean => {
+export const takeOpener = ({ screen, card }: TakeOpenerProps): boolean => {
   if ((openerOf({ screen })?.card ?? null) !== card) return false
   change({ screen, to: { opener: null } })
   return true
 }
+
+type CoverScreenProps = { screen: string }
 
 /**
  * Another screen covers this one. The opener just remembered lasts through it; one that has
  * lasted through a cover already, which no card took as the screen came back, goes, so a
  * return from a screen no card opened asks for nothing.
  */
-export const coverScreen = ({ screen }: { screen: string }): void => {
+export const coverScreen = ({ screen }: CoverScreenProps): void => {
   const opener = openerOf({ screen })
   if (opener === null) return
   change({
@@ -87,6 +100,8 @@ export const coverScreen = ({ screen }: { screen: string }): void => {
     to: { opener: opener.hasBeenCovered ? null : { ...opener, hasBeenCovered: true } },
   })
 }
+
+type ReturnScreenProps = { screen: string }
 
 /**
  * The transition that brings the screen back to the front has ended (the navigator's
@@ -96,14 +111,16 @@ export const coverScreen = ({ screen }: { screen: string }): void => {
  * for the transition's end, since on Android TV the transition takes the focus from anything
  * asked for before then.
  */
-export const returnScreen = ({ screen }: { screen: string }): void => {
+export const returnScreen = ({ screen }: ReturnScreenProps): void => {
   const opener = openerOf({ screen })
   if (opener === null || opener.isDrawn) return
   change({ screen, to: { hasSettled: false, opener: null } })
 }
 
+type LeaveScreenProps = { screen: string }
+
 /** Forgets a screen that has gone, so one opened in its place starts afresh. */
-export const leaveScreen = ({ screen }: { screen: string }): void =>
+export const leaveScreen = ({ screen }: LeaveScreenProps): void =>
   useScreenFocus.setState((state) => ({
     screens: Object.fromEntries(Object.entries(state.screens).filter(([key]) => key !== screen)),
   }))

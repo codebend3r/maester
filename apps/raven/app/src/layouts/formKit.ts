@@ -5,12 +5,14 @@ import type { FormStyles } from '@/layouts/formStyles'
 
 export type FormProps = { title: string; children: ReactNode }
 
+type OnSubmitProps = { text: string }
+
 export type FieldProps = {
   label: string
   value: string
   onChangeText: (text: string) => void
   /** Gets the text the keyboard sent, which a fast typist's last keys may not have reached `value` with yet. */
-  onSubmit: (input: { text: string }) => void
+  onSubmit: (input: OnSubmitProps) => void
   placeholder?: string
   isSecret?: boolean
   isNumeric?: boolean

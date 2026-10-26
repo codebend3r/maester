@@ -50,11 +50,13 @@ export const pictureStyles = <T>(build: (palette: Palette) => T): (() => T) => {
 /** The theme worn now, for code that runs outside a render, as a press does. */
 export const themeNow = (): AppTheme => appThemeOf(useAppPrefs.getState().theme)
 
+type FollowThemeProps = { apply: (theme: AppTheme) => void }
+
 /**
  * Hands the theme worn now to `apply`, then each one picked after it, for what React does not
  * draw: the system's own light or dark look. Returns the way to stop.
  */
-export const followTheme = ({ apply }: { apply: (theme: AppTheme) => void }): (() => void) => {
+export const followTheme = ({ apply }: FollowThemeProps): (() => void) => {
   apply(themeNow())
   return useAppPrefs.subscribe((prefs, previous) => {
     if (prefs.theme !== previous.theme) apply(appThemeOf(prefs.theme))

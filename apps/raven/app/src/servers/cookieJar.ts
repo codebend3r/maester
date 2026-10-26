@@ -16,10 +16,12 @@ type CookieChange =
 /** What a response's `set-cookie` does to each cookie it names; one it leaves out is unchanged. */
 export type CookieChanges = Partial<Record<ServerCookieName, CookieChange>>
 
+type ApplyProps = { serverId: string; changes: CookieChanges }
+
 /** Each server's cookies, held by the app and never by the system's shared jar. */
 export type CookieJar = {
   read: (serverId: string) => Promise<ServerCookies>
-  apply: (args: { serverId: string; changes: CookieChanges }) => Promise<void>
+  apply: (args: ApplyProps) => Promise<void>
   forget: (serverId: string) => Promise<void>
 }
 
@@ -91,7 +93,9 @@ const storedCookiesOf = (stored: string | null): ServerCookies => {
   )
 }
 
-const applied = ({ cookies, changes }: { cookies: ServerCookies; changes: CookieChanges }) =>
+type AppliedProps = { cookies: ServerCookies; changes: CookieChanges }
+
+const applied = ({ cookies, changes }: AppliedProps) =>
   Object.fromEntries(
     COOKIE_NAMES.flatMap((name) => {
       const change = changes[name]
@@ -99,6 +103,11 @@ const applied = ({ cookies, changes }: { cookies: ServerCookies; changes: Cookie
       return change.kind === COOKIE_CHANGES.set ? [[name, change.value]] : []
     }),
   )
+
+type CreateCookieJarProps = {
+  store: SecretStore
+  onChange?: (serverId: string) => void
+}
 
 /**
  * A jar over `store`, keeping each server's cookies as one JSON value under
@@ -112,14 +121,13 @@ const applied = ({ cookies, changes }: { cookies: ServerCookies; changes: Cookie
 export const createCookieJar = ({
   store,
   onChange = () => {},
-}: {
-  store: SecretStore
-  onChange?: (serverId: string) => void
-}): CookieJar => {
+}: CreateCookieJarProps): CookieJar => {
   const known = new Map<string, ServerCookies>()
   const turns = new Map<string, Promise<void>>()
 
-  const inTurn = ({ serverId, work }: { serverId: string; work: () => Promise<void> }) => {
+  type InTurnProps = { serverId: string; work: () => Promise<void> }
+
+  const inTurn = ({ serverId, work }: InTurnProps) => {
     const turn = (turns.get(serverId) ?? Promise.resolve()).then(work)
     turns.set(
       serverId,
@@ -140,7 +148,9 @@ export const createCookieJar = ({
     return cookies
   }
 
-  const write = async ({ serverId, cookies }: { serverId: string; cookies: ServerCookies }) => {
+  type WriteProps = { serverId: string; cookies: ServerCookies }
+
+  const write = async ({ serverId, cookies }: WriteProps) => {
     known.set(serverId, cookies)
     onChange(serverId)
     const key = cookieKeyFor(serverId)

@@ -36,15 +36,17 @@ const cookieToken = (header: string): string | null => {
   }
 }
 
+type AccessTokenOfProps = {
+  method: string
+  authorization: string | undefined
+  cookie: string | undefined
+}
+
 export const accessTokenOf = ({
   method,
   authorization,
   cookie,
-}: {
-  method: string
-  authorization: string | undefined
-  cookie: string | undefined
-}): string | null => {
+}: AccessTokenOfProps): string | null => {
   // An explicitly supplied bad Bearer must not fall back to another account's cookie.
   if (authorization !== undefined) {
     const [scheme, token, extra] = authorization.split(' ')

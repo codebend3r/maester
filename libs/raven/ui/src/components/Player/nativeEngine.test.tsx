@@ -15,15 +15,13 @@ import type { PlayerServices } from '@/components/Player/PlayerServices'
 import { renderWithProviders } from '@/test/render'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
-const fakePlayer = ({
-  deferLoad = false,
-  loadError = null,
-  refuse = [],
-}: {
+type FakePlayerProps = {
   deferLoad?: boolean
   loadError?: Error | null
   refuse?: PlayerCommand['type'][]
-} = {}) => {
+}
+
+const fakePlayer = ({ deferLoad = false, loadError = null, refuse = [] }: FakePlayerProps = {}) => {
   const sent: PlayerCommand[] = []
   const listeners = new Set<(event: PlayerEvent) => void>()
   const held: { resolve: () => void; reject: (error: Error) => void }[] = []
@@ -43,11 +41,13 @@ const fakePlayer = ({
       return () => listeners.delete(listener)
     },
   }
+  type FakePlayerRefuseLoadProps = { index?: number; message: string }
+
   return {
     player,
     sent,
     answerLoad: (index = held.length - 1) => held[index].resolve(),
-    refuseLoad: ({ index = held.length - 1, message }: { index?: number; message: string }) =>
+    refuseLoad: ({ index = held.length - 1, message }: FakePlayerRefuseLoadProps) =>
       held[index].reject(new Error(message)),
     emit: (event: PlayerEvent) => act(() => listeners.forEach((listener) => listener(event))),
     listenerCount: () => listeners.size,
@@ -93,8 +93,10 @@ const servicesFor = (overrides: Partial<PlayerServices> = {}): PlayerServices =>
   ...overrides,
 })
 
+type HostProps = { player: NativePlayer }
+
 // The engine and its source are rebuilt on every render, as a host's would be.
-const Host = ({ player }: { player: NativePlayer }) => {
+const Host = ({ player }: HostProps) => {
   const [renders, setRenders] = useState(0)
   const [fileId, setFileId] = useState('f1')
   const [isShown, setIsShown] = useState(true)
@@ -114,13 +116,12 @@ const Host = ({ player }: { player: NativePlayer }) => {
   )
 }
 
-const renderNative = ({
-  player,
-  services = servicesFor(),
-}: {
+type RenderNativeProps = {
   player: NativePlayer
   services?: PlayerServices
-}) =>
+}
+
+const renderNative = ({ player, services = servicesFor() }: RenderNativeProps) =>
   renderWithProviders({
     ui: (
       <Routes>
@@ -290,7 +291,9 @@ describe('the native engine', () => {
   it('tells the host about an engine error before Unplayable shows', async () => {
     const fake = fakePlayer()
     const seen: string[] = []
-    const onEngineError = mock((error: { reason: string; message: string }) => {
+    type OnEngineErrorMockCallbackProps = { reason: string; message: string }
+
+    const onEngineError = mock((error: OnEngineErrorMockCallbackProps) => {
       seen.push(`${error.reason}: ${error.message}`)
       // Unplayable has not replaced the controls yet.
       if (screen.queryByText('Locked again') === null) seen.push('before Unplayable')

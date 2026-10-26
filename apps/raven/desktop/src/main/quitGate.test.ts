@@ -15,15 +15,13 @@ const deferred = () => {
   return { promise, ...handlers }
 }
 
-const setup = ({
-  isDirty,
-  flush,
-  wait = () => new Promise<void>(() => undefined),
-}: {
+type SetupProps = {
   isDirty: () => boolean
   flush: () => Promise<void>
   wait?: (ms: number) => Promise<void>
-}) => {
+}
+
+const setup = ({ isDirty, flush, wait = () => new Promise<void>(() => undefined) }: SetupProps) => {
   const waits: number[] = []
   const calls = { prevented: 0, quit: 0, exit: 0, flush: 0, waits }
   const gate = createQuitGate({

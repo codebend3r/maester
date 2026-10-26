@@ -58,26 +58,25 @@ export const SECTIONS = {
   }
 >
 
-/** Whether a library of `kind` has the tab. */
-export const hasSection = ({
-  kind,
-  section,
-}: {
+type HasSectionProps = {
   kind: LibraryKind
   section: LibrarySection
-}): boolean => SECTIONS[section].isFor(kind)
+}
+
+/** Whether a library of `kind` has the tab. */
+export const hasSection = ({ kind, section }: HasSectionProps): boolean =>
+  SECTIONS[section].isFor(kind)
 
 export const sectionsFor = (kind: LibraryKind): LibrarySection[] =>
   Object.values(LIBRARY_SECTIONS).filter((section) => hasSection({ kind, section }))
 
-/** A tab's address; All is the library's own. */
-export const sectionPath = ({
-  libraryId,
-  section,
-}: {
+type SectionPathProps = {
   libraryId: number
   section: LibrarySection
-}): string =>
+}
+
+/** A tab's address; All is the library's own. */
+export const sectionPath = ({ libraryId, section }: SectionPathProps): string =>
   section === LIBRARY_SECTIONS.all
     ? `/libraries/${libraryId}`
     : `/libraries/${libraryId}/${section}`

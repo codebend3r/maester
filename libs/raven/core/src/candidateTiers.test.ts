@@ -17,8 +17,10 @@ const facts = (overrides: Partial<TierFacts>): TierFacts => ({
 
 const [japanese, animated, anything] = TIER_SETS.anime
 
+type FitsProps = { set: readonly CandidateTier[]; result: TierFacts }
+
 /** Which of a set's tiers a result fits, by index. */
-const fits = ({ set, result }: { set: readonly CandidateTier[]; result: TierFacts }): number[] =>
+const fits = ({ set, result }: FitsProps): number[] =>
   set.flatMap((tier, index) => (fitsTier({ tier, result }) ? [index] : []))
 
 describe('fitsTier', () => {

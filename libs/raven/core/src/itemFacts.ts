@@ -18,27 +18,25 @@ import { plural } from '@/plural'
 const present = (facts: ReadonlyArray<string | null>): string[] =>
   facts.filter((fact): fact is string => fact != null)
 
-/** "2011 to 2019", "2022 to now", or just the year for a show that began and ended in one. */
-export const showYears = ({
-  year,
-  endedYear,
-}: {
+type ShowYearsProps = {
   year: number | null
   endedYear: number | null
-}): string | null => {
+}
+
+/** "2011 to 2019", "2022 to now", or just the year for a show that began and ended in one. */
+export const showYears = ({ year, endedYear }: ShowYearsProps): string | null => {
   if (year == null) return null
   if (endedYear == null) return `${year} to now`
   return endedYear === year ? String(year) : `${year} to ${endedYear}`
 }
 
-/** How long it runs: the file's own length when probed, else TMDB's runtime in minutes. */
-export const runtimeFact = ({
-  file,
-  runtime,
-}: {
+type RuntimeFactProps = {
   file: MediaItem | undefined
   runtime: number | null
-}): string | null =>
+}
+
+/** How long it runs: the file's own length when probed, else TMDB's runtime in minutes. */
+export const runtimeFact = ({ file, runtime }: RuntimeFactProps): string | null =>
   formatRuntime(file?.duration ?? null) ?? (runtime == null ? null : formatRuntime(runtime * 60))
 
 /** "A", "A and B", "A, B and C". */
@@ -70,14 +68,13 @@ export const createdBy = (details: ItemDetails): string | null => {
   return creators.length > 0 ? `Created by ${joinNames(creators)}` : null
 }
 
-/** Release day (the year when TMDB gave none), runtime, up to three genres, and how many files the movie is once there are two or more. */
-export const movieFacts = ({
-  details,
-  primary,
-}: {
+type MovieFactsProps = {
   details: ItemDetails
   primary: MediaItem | undefined
-}): string[] =>
+}
+
+/** Release day (the year when TMDB gave none), runtime, up to three genres, and how many files the movie is once there are two or more. */
+export const movieFacts = ({ details, primary }: MovieFactsProps): string[] =>
   present([
     formatAirDate(details.released) ?? (details.year == null ? null : String(details.year)),
     runtimeFact({ file: primary, runtime: details.runtime }),
@@ -87,14 +84,13 @@ export const movieFacts = ({
       : null,
   ])
 
-/** Air date and runtime. */
-export const episodeFacts = ({
-  details,
-  primary,
-}: {
+type EpisodeFactsProps = {
   details: ItemDetails
   primary: MediaItem | undefined
-}): string[] =>
+}
+
+/** Air date and runtime. */
+export const episodeFacts = ({ details, primary }: EpisodeFactsProps): string[] =>
   present([
     formatAirDate(details.released),
     runtimeFact({ file: primary, runtime: details.runtime }),
@@ -131,14 +127,16 @@ export const formatAirDate = (date: string | null): string | null => {
   return airDate.format(new Date(`${date.slice(0, 10)}T12:00:00`))
 }
 
+type FileFactsProps = {
+  media: MediaItem
+  tracks: MediaTracks | undefined
+}
+
 /** The file's video, audio and subtitles, as the tracks the scan stored describe them. */
 export const fileFacts = ({
   media,
   tracks,
-}: {
-  media: MediaItem
-  tracks: MediaTracks | undefined
-}): Array<{ label: string; value: string }> => {
+}: FileFactsProps): Array<{ label: string; value: string }> => {
   const resolution = resolutionLabel(media)
   const codec = media.videoCodec ? codecLabel(media.videoCodec) : null
   const video = [resolution, codec == null ? null : `(${codec})`, media.hdr ? 'HDR' : null]
@@ -178,14 +176,16 @@ export const versionFacts = (media: MediaItem): string[] =>
     formatBytes(media.size),
   ].filter((fact): fact is string => fact != null && fact !== '')
 
+type AllFileFactsProps = {
+  media: MediaItem
+  tracks: MediaTracks | undefined
+}
+
 /** The file's facts as label and value: its tracks, then its container, bitrate and size. */
 export const allFileFacts = ({
   media,
   tracks,
-}: {
-  media: MediaItem
-  tracks: MediaTracks | undefined
-}): Array<{ label: string; value: string }> =>
+}: AllFileFactsProps): Array<{ label: string; value: string }> =>
   [
     ...fileFacts({ media, tracks }),
     { label: 'Container', value: media.container.toUpperCase() },
@@ -212,8 +212,10 @@ export const seasonFacts = (season: ItemDetails): string[] =>
     plural({ n: episodesOf(season).length, one: 'episode', many: 'episodes' }),
   ])
 
+type WatchedCountLabelProps = { watched: number; total: number }
+
 /** "3 of 8 watched". */
-export const watchedCountLabel = ({ watched, total }: { watched: number; total: number }): string =>
+export const watchedCountLabel = ({ watched, total }: WatchedCountLabelProps): string =>
   `${watched} of ${total} watched`
 
 /** How many of a show's episodes on disk are watched, across its seasons. */
@@ -243,14 +245,13 @@ export const episodeRowFacts = (episode: EpisodeSummary): string[] =>
     runtimeFact({ file: episode.primary ?? undefined, runtime: episode.runtime }),
   ])
 
-/** The still an episode shows: TMDB's or the one beside the file, else a frame of the file. */
-export const episodeStillUrl = ({
-  api,
-  episode,
-}: {
+type EpisodeStillUrlProps = {
   api: Pick<ApiClient, 'itemImageUrl' | 'thumbnailUrl'>
   episode: EpisodeSummary
-}): string | null => {
+}
+
+/** The still an episode shows: TMDB's or the one beside the file, else a frame of the file. */
+export const episodeStillUrl = ({ api, episode }: EpisodeStillUrlProps): string | null => {
   if (episode.stillVersion != null)
     return api.itemImageUrl({
       id: episode.id,

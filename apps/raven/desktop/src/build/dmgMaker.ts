@@ -18,18 +18,18 @@ export const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, 
 /** The macOS tools the dmg is made with. */
 export const DMG_TOOLS = { ditto: 'ditto', hdiutil: 'hdiutil' } as const
 
-export const dmgFileName = ({ version, arch }: { version: string; arch: string }): string =>
+type DmgFileNameProps = { version: string; arch: string }
+
+export const dmgFileName = ({ version, arch }: DmgFileNameProps): string =>
   `raven-player-${version}-${arch}.dmg`
 
-export const hdiutilArgs = ({
-  volumeName,
-  sourceDir,
-  output,
-}: {
+type HdiutilArgsProps = {
   volumeName: string
   sourceDir: string
   output: string
-}): string[] => [
+}
+
+export const hdiutilArgs = ({ volumeName, sourceDir, output }: HdiutilArgsProps): string[] => [
   'create',
   '-volname',
   volumeName,
@@ -54,11 +54,22 @@ export const versionOf = (packageJSON: unknown): string => {
   return packageJSON.version
 }
 
+type RunCommandProps = { command: string; args: string[] }
+
 /** Runs a command to its end; rejects when it fails. */
-export type RunCommand = (command: { command: string; args: string[] }) => Promise<unknown>
+type RunCommand = (command: RunCommandProps) => Promise<unknown>
 
 const execFileAsync = promisify(execFile)
 const runCommand: RunCommand = ({ command, args }) => execFileAsync(command, args)
+
+type MakeDmgProps = {
+  dir: string
+  makeDir: string
+  appName: string
+  packageJSON: unknown
+  targetArch: string
+  run: RunCommand
+}
 
 export const makeDmg = async ({
   dir,
@@ -67,14 +78,7 @@ export const makeDmg = async ({
   packageJSON,
   targetArch,
   run,
-}: {
-  dir: string
-  makeDir: string
-  appName: string
-  packageJSON: unknown
-  targetArch: string
-  run: RunCommand
-}): Promise<string[]> => {
+}: MakeDmgProps): Promise<string[]> => {
   const outputDir = join(makeDir, 'dmg', 'darwin', targetArch)
   const output = join(outputDir, dmgFileName({ version: versionOf(packageJSON), arch: targetArch }))
   const bundle = `${appName}.app`

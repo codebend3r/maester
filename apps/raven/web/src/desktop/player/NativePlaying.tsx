@@ -9,6 +9,14 @@ import {
 import { useEffect, useMemo, useRef } from 'react'
 import { isEngineGone, isEngineStop } from '@/desktop/playerConnection'
 
+type NativePlayingProps = {
+  services: PlayerServices
+  player: NativePlayer
+  source: PlayerSource
+  resumeAt: number
+  onLost: (at: number) => void
+}
+
 /**
  * The native engine, watched for its loss: mpv stopping under the page, or main answering
  * that it has. `onLost` gets where the video was, for the page to carry on from there. It hosts
@@ -20,13 +28,7 @@ export const NativePlaying = ({
   source,
   resumeAt,
   onLost,
-}: {
-  services: PlayerServices
-  player: NativePlayer
-  source: PlayerSource
-  resumeAt: number
-  onLost: (at: number) => void
-}) => {
+}: NativePlayingProps) => {
   const isHosting = useHostPlayer(services)
   // Refs, so the page itself never renders on `time`.
   const position = useRef(resumeAt)

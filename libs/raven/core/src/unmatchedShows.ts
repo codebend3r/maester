@@ -11,8 +11,10 @@ export type UnmatchedShow = {
   files: MediaItem[]
 }
 
+type ShowFolderOfProps = { folder: string }
+
 /** The first segment of a file's folder when it names a show, so a Fix match covers every season under it. */
-export const showFolderOf = (file: { folder: string }): string | null => {
+export const showFolderOf = (file: ShowFolderOfProps): string | null => {
   const first = file.folder.split(/[\\/]/).find((segment) => segment !== '') ?? ''
   return first !== '' && seasonFolderNumber(first) == null ? first : null
 }

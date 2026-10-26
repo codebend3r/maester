@@ -45,14 +45,18 @@ const OTHER: ServerEntry = {
   name: 'other.example',
 }
 
-const reply = ({ status = 200, text = '{}' }: { status?: number; text?: string } = {}): Answer => ({
+type ReplyProps = { status?: number; text?: string }
+
+const reply = ({ status = 200, text = '{}' }: ReplyProps = {}): Answer => ({
   kind: ANSWER_KINDS.reply,
   status,
   text,
 })
 
+type FakeFetchProps = { answer?: (sent: Sent) => Answer }
+
 /** A `ServerFetch` that records what it was sent and answers from `answer`, holding a reply until it is released. */
-const fakeFetch = ({ answer = () => reply() }: { answer?: (sent: Sent) => Answer } = {}) => {
+const fakeFetch = ({ answer = () => reply() }: FakeFetchProps = {}) => {
   const sent: Sent[] = []
   const held: (() => void)[] = []
   const fetch: ServerFetch = (input) => {
@@ -83,7 +87,9 @@ const fakeFetch = ({ answer = () => reply() }: { answer?: (sent: Sent) => Answer
       }
     }
   }
-  const release = ({ index }: { index: number }): void => {
+  type ReleaseProps = { index: number }
+
+  const release = ({ index }: ReleaseProps): void => {
     const resolve = held.at(index) ?? (() => undefined)
     resolve()
   }
@@ -93,19 +99,25 @@ const fakeFetch = ({ answer = () => reply() }: { answer?: (sent: Sent) => Answer
   return { fetch, sent, release, releaseAll }
 }
 
+type SetupPropsAuthorizeProps = { serverId: string }
+
+type UnlockOfProps = { serverId: string }
+
+type SetupProps = {
+  answer?: (sent: Sent) => Answer
+  servers?: readonly ServerEntry[]
+  isWarnBroken?: boolean
+  authorize?: (input: SetupPropsAuthorizeProps) => string | null
+  unlockOf?: (input: UnlockOfProps) => Promise<string | null>
+}
+
 const setup = ({
   answer,
   servers = [SERVER, OTHER],
   isWarnBroken = false,
   authorize = () => null,
   unlockOf = async () => null,
-}: {
-  answer?: (sent: Sent) => Answer
-  servers?: readonly ServerEntry[]
-  isWarnBroken?: boolean
-  authorize?: (input: { serverId: string }) => string | null
-  unlockOf?: (input: { serverId: string }) => Promise<string | null>
-} = {}) => {
+}: SetupProps = {}) => {
   const fake = fakeFetch({ answer })
   const warnings: string[] = []
   const calls = createServerCalls({
@@ -476,8 +488,10 @@ describe('createServerCalls.call', () => {
   describe('the reply cap', () => {
     const PAST_ONE_MIB = 'x'.repeat(MAX_REPLY_CHARS * 2)
 
+    type StreamingProps = { text: string }
+
     /** Server calls over `fetchThrough`, so the cap is the one the real stream read keeps. */
-    const streaming = ({ text }: { text: string }) =>
+    const streaming = ({ text }: StreamingProps) =>
       createServerCalls({
         serverOf: () => SERVER,
         fetch: fetchThrough(() => Promise.resolve(new Response(text))),
@@ -669,11 +683,15 @@ describe('createServerCalls with the page signed in', () => {
   const TOKEN = 'access-token-one'
   const ORIGINS = { name: CALL_NAMES.getMediaOrigins } as const
 
+  type TokensOfProps = { tokens: readonly (string | null)[] }
+
   /** Hands out `tokens` in order, one per call, and notes which server each was for. */
-  const tokensOf = ({ tokens }: { tokens: readonly (string | null)[] }) => {
+  const tokensOf = ({ tokens }: TokensOfProps) => {
     const asked: string[] = []
     const queue = [...tokens]
-    const authorize = ({ serverId }: { serverId: string }): string | null => {
+    type AuthorizeProps = { serverId: string }
+
+    const authorize = ({ serverId }: AuthorizeProps): string | null => {
       asked.push(serverId)
       return queue.shift() ?? null
     }
@@ -760,12 +778,16 @@ describe('createServerCalls.call refuses a call that slipped past the types', ()
   // A guard that passes any value, so a test can hand over what a compromised caller
   // would without a cast: the calls must refuse it on their own.
   const passesAnything = (value: unknown): value is AllowedCall => value !== undefined
-  const forge = ({ fields }: { fields: Record<string, unknown> }): AllowedCall => {
+  type ForgeProps = { fields: Record<string, unknown> }
+
+  const forge = ({ fields }: ForgeProps): AllowedCall => {
     if (!passesAnything(fields)) throw new Error('a forged call needs fields')
     return fields
   }
 
-  const refused = async ({ forged }: { forged: AllowedCall }): Promise<void> => {
+  type RefusedProps = { forged: AllowedCall }
+
+  const refused = async ({ forged }: RefusedProps): Promise<void> => {
     const { calls, sent, warnings } = setup()
     expect(await calls.call({ serverId: SERVER.id, call: forged })).toEqual({
       ok: false,

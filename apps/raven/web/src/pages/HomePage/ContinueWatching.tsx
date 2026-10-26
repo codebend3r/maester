@@ -27,12 +27,14 @@ export const timeLeft = (media: MediaItem): string | null => {
   return left == null ? null : `${left} left`
 }
 
+type TintProps = { entry: PosterEntry }
+
 /**
  * The picture a tile is tinted with, blurred past knowing: the poster at its
  * narrowest width, which `sizes` asks the browser for, else the frame grab
  * the tile already shows.
  */
-const Tint = ({ entry: { media, poster } }: { entry: PosterEntry }) => {
+const Tint = ({ entry: { media, poster } }: TintProps) => {
   const srcSet = poster ? api.posterSrcSet({ id: poster.id, version: poster.posterVersion }) : null
   const thumbnail = api.thumbnailUrl(media)
   if (srcSet) {
@@ -51,13 +53,15 @@ const Tint = ({ entry: { media, poster } }: { entry: PosterEntry }) => {
   return <img className={styles.tint} src={thumbnail} alt="" loading="lazy" decoding="async" />
 }
 
+type ContinueTileProps = { entry: PosterEntry }
+
 /**
  * A video in progress as a wide tile tinted from its artwork: its poster, or
  * a frame grab where it has none, its name, the episode or year, how far in
  * it is and how long is left. The tile resumes it; its name opens its page,
  * where it has one. A right click opens the card's menu.
  */
-const ContinueTile = ({ entry }: { entry: PosterEntry }) => {
+const ContinueTile = ({ entry }: ContinueTileProps) => {
   const { media, poster } = entry
   const menu = useCardMenu({ media, matchType: null, beside: true })
   const label = mediaLabel(media)
@@ -122,11 +126,13 @@ const ContinueTile = ({ entry }: { entry: PosterEntry }) => {
 /** Three rows of two: as many as fit before the library rows without burying them. */
 const FIRST_TILES = 6
 
+type ContinueWatchingProps = { entries: PosterEntry[] }
+
 /**
  * Every video in progress, the most recently watched first, as wide tiles
  * two across. Past the first three rows the rest wait behind Show all.
  */
-export const ContinueWatching = ({ entries }: { entries: PosterEntry[] }) => {
+export const ContinueWatching = ({ entries }: ContinueWatchingProps) => {
   const id = useId()
   const [isAll, setAll] = useState(false)
   const hasMore = entries.length > FIRST_TILES

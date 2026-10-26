@@ -59,6 +59,8 @@ export type PlayerChromeKit = {
   shouldDrawCaptions: boolean
 }
 
+type PLAYER_COPYOfProps = { at: string; length: string }
+
 export const PLAYER_COPY = {
   play: 'Play',
   leave: 'Back',
@@ -66,7 +68,7 @@ export const PLAYER_COPY = {
   back: (seconds: number) => `Back ${seconds} seconds`,
   forward: (seconds: number) => `Forward ${seconds} seconds`,
   seek: 'Position',
-  of: ({ at, length }: { at: string; length: string }) => `${at} of ${length}`,
+  of: ({ at, length }: PLAYER_COPYOfProps) => `${at} of ${length}`,
   audio: 'Audio',
   subtitles: 'Subtitles',
   pictureInPicture: 'Picture in Picture',
@@ -82,12 +84,16 @@ const SEEK_ACTION_LIST: AccessibilityActionInfo[] = [
   { name: SEEK_ACTIONS.decrement },
 ]
 
+type WithinProps = { value: number; length: number }
+
 /** `value` kept between the start and `length`. */
-export const within = ({ value, length }: { value: number; length: number }): number =>
+export const within = ({ value, length }: WithinProps): number =>
   Math.min(length, Math.max(0, value))
 
+type PlayedShareOfProps = { at: number; duration: number }
+
 /** How far along the line the spot `at` is, as a width or an offset: `'40%'`. */
-export const playedShareOf = ({ at, duration }: { at: number; duration: number }): `${number}%` =>
+export const playedShareOf = ({ at, duration }: PlayedShareOfProps): `${number}%` =>
   duration > 0 ? `${(within({ value: at, length: duration }) / duration) * 100}%` : '0%'
 
 /**

@@ -13,16 +13,18 @@ type Bounded<T> =
 
 const NODE_TIMERS = createNodeTimers()
 
+type WithinProps<T> = {
+  task: Promise<T>
+  ms: number
+  timers?: Timers
+}
+
 /** The task's answer, or why there is none: it rejected, or did not answer within `ms`. */
 export const within = async <T>({
   task,
   ms,
   timers = NODE_TIMERS,
-}: {
-  task: Promise<T>
-  ms: number
-  timers?: Timers
-}): Promise<Bounded<T>> => {
+}: WithinProps<T>): Promise<Bounded<T>> => {
   const timer: { handle: unknown } = { handle: null }
   const timeout = new Promise<Bounded<T>>((resolve) => {
     timer.handle = timers.set({ run: () => resolve({ outcome: BOUNDED_OUTCOMES.late }), ms })
@@ -38,14 +40,13 @@ export const within = async <T>({
   }
 }
 
-/** Settles with null as soon as `signal` aborts, so a stopped run never waits on a slow server. */
-export const unlessStopped = <T>({
-  task,
-  signal,
-}: {
+type UnlessStoppedProps<T> = {
   task: Promise<T>
   signal: AbortSignal
-}): Promise<T | null> => {
+}
+
+/** Settles with null as soon as `signal` aborts, so a stopped run never waits on a slow server. */
+export const unlessStopped = <T>({ task, signal }: UnlessStoppedProps<T>): Promise<T | null> => {
   if (signal.aborted) return Promise.resolve(null)
   const stopped = Promise.withResolvers<null>()
   const onAbort = (): void => stopped.resolve(null)

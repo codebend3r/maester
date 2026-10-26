@@ -65,15 +65,19 @@ const useWornColours = () => {
   return { theme, valueOf }
 }
 
+type InkOnProps = { value: string; bark: string; night: string }
+
 /** Bark or night, whichever reads better on `value`. */
-const inkOn = ({ value, bark, night }: { value: string; bark: string; night: string }): string => {
+const inkOn = ({ value, bark, night }: InkOnProps): string => {
   const onBark = contrastRatio({ foreground: bark, background: value }) ?? 0
   const onNight = contrastRatio({ foreground: night, background: value }) ?? 0
   return onBark >= onNight ? 'var(--color-bark)' : 'var(--color-night)'
 }
 
+type ContrastOfProps = { value: string; against: string }
+
 /** How a colour reads on a ground: its ratio, and whether that is enough for body text. */
-const contrastOf = ({ value, against }: { value: string; against: string }) => {
+const contrastOf = ({ value, against }: ContrastOfProps) => {
   const measured = contrastRatio({ foreground: value, background: against })
   if (measured == null) return { text: 'Varies', className: styles.varies }
   return {
@@ -82,8 +86,10 @@ const contrastOf = ({ value, against }: { value: string; against: string }) => {
   }
 }
 
+type ThemeStripProps = { worn: ThemeId }
+
 /** Every theme in miniature, each tile wearing its own: the ground, the text, play and the rest. */
-const ThemeStrip = ({ worn }: { worn: ThemeId }) => (
+const ThemeStrip = ({ worn }: ThemeStripProps) => (
   <div className={styles.themes}>
     <div className={styles.themesHeader}>
       <h3 className={styles.themesTitle}>Themes</h3>
@@ -130,7 +136,9 @@ const ThemeStrip = ({ worn }: { worn: ThemeId }) => (
   </div>
 )
 
-export const ColourSection = ({ tokens }: { tokens: readonly DesignToken[] }) => {
+type ColourSectionProps = { tokens: readonly DesignToken[] }
+
+export const ColourSection = ({ tokens }: ColourSectionProps) => {
   const { theme, valueOf } = useWornColours()
   const colours = tokens.filter((token) => token.group === TOKEN_GROUPS.colour)
   const tokenNamed = (name: string) => colours.find((token) => token.name === name)

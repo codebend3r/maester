@@ -9,6 +9,8 @@ function toSorted<T>(this: readonly T[], compare?: (a: T, b: T) => number): T[] 
   return [...this].sort(compare)
 }
 
+type InstallToSortedProps = { prototype: object }
+
 /**
  * Gives `prototype` the language's `toSorted` where the engine has none. React Native
  * 0.88's Hermes has `toReversed`, `toSpliced` and `with` but not `toSorted`, which
@@ -16,7 +18,7 @@ function toSorted<T>(this: readonly T[], compare?: (a: T, b: T) => number): T[] 
  * origins), so `src/polyfills.ts` installs it on `Array.prototype` before anything loads
  * core.
  */
-export const installToSorted = ({ prototype }: { prototype: object }): void => {
+export const installToSorted = ({ prototype }: InstallToSortedProps): void => {
   if (TO_SORTED in prototype) return
   Object.defineProperty(prototype, TO_SORTED, {
     value: toSorted,

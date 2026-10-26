@@ -37,14 +37,13 @@ const byPath = (a: string, b: string): number => {
   return 0
 }
 
-/** The paths to sign, deepest first and ties by path, so nothing is signed before what it holds; the app comes last. */
-export const signingOrder = ({
-  app,
-  entries,
-}: {
+type SigningOrderProps = {
   app: string
   entries: readonly Signable[]
-}): string[] => [
+}
+
+/** The paths to sign, deepest first and ties by path, so nothing is signed before what it holds; the app comes last. */
+export const signingOrder = ({ app, entries }: SigningOrderProps): string[] => [
   ...entries
     .map(({ path }) => path)
     .filter((path) => path.startsWith(`${app}${sep}`))
@@ -52,7 +51,9 @@ export const signingOrder = ({
   app,
 ]
 
-const readHeader = async ({ path }: { path: string }): Promise<Uint8Array> => {
+type ReadHeaderProps = { path: string }
+
+const readHeader = async ({ path }: ReadHeaderProps): Promise<Uint8Array> => {
   const file = await open(path, 'r')
   try {
     const header = new Uint8Array(4)
@@ -65,13 +66,12 @@ const readHeader = async ({ path }: { path: string }): Promise<Uint8Array> => {
 
 const pathOf = (entry: Dirent): string => join(entry.parentPath, entry.name)
 
-const signableOf = async ({
-  app,
-  entry,
-}: {
+type SignableOfProps = {
   app: string
   entry: Dirent
-}): Promise<Signable | null> => {
+}
+
+const signableOf = async ({ app, entry }: SignableOfProps): Promise<Signable | null> => {
   const path = pathOf(entry)
   if (entry.isDirectory()) {
     const isBundle = BUNDLE_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))
@@ -81,8 +81,10 @@ const signableOf = async ({
   return isMachO(await readHeader({ path })) ? { path, kind: SIGNABLE_KINDS.machO } : null
 }
 
+type ListSignablesProps = { app: string }
+
 /** Every regular Mach-O file and every nested `.app` or `.framework` inside the app; symlinks are skipped. */
-export const listSignables = async ({ app }: { app: string }): Promise<Signable[]> => {
+export const listSignables = async ({ app }: ListSignablesProps): Promise<Signable[]> => {
   const entries = await readdir(app, { recursive: true, withFileTypes: true })
   // Defensive: on the real app Bun and Node list the same entries, but a recursive readdir
   // that descended into a symlinked folder (a framework's Versions/Current) would list its
@@ -98,14 +100,18 @@ export const listSignables = async ({ app }: { app: string }): Promise<Signable[
   }, Promise.resolve([]))
 }
 
-export const adHocSignArgs = ({ path }: { path: string }): string[] => [
+type AdHocSignArgsProps = { path: string }
+
+export const adHocSignArgs = ({ path }: AdHocSignArgsProps): string[] => [
   '--sign',
   '-',
   '--force',
   path,
 ]
 
-export const verifyAppArgs = ({ app }: { app: string }): string[] => [
+type VerifyAppArgsProps = { app: string }
+
+export const verifyAppArgs = ({ app }: VerifyAppArgsProps): string[] => [
   '--verify',
   '--deep',
   '--strict',
@@ -113,11 +119,15 @@ export const verifyAppArgs = ({ app }: { app: string }): string[] => [
   app,
 ]
 
+type RunCommandProps = { command: string; args: string[] }
+
 /** Runs a command to its end; rejects when it fails. */
-export type RunCommand = (command: { command: string; args: string[] }) => Promise<unknown>
+export type RunCommand = (command: RunCommandProps) => Promise<unknown>
+
+type SignAdHocProps = { app: string; run: RunCommand }
 
 /** Signs every Mach-O and nested bundle in signing order, one at a time, then verifies the app. */
-export const signAdHoc = async ({ app, run }: { app: string; run: RunCommand }): Promise<void> => {
+export const signAdHoc = async ({ app, run }: SignAdHocProps): Promise<void> => {
   const entries = await listSignables({ app })
   await signingOrder({ app, entries }).reduce<Promise<unknown>>(
     (previous, path) =>

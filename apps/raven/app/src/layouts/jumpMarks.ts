@@ -23,11 +23,13 @@ const own = (scale: JumpScale): StripMark[] =>
     keys: scale.entries.get(key) ?? null,
   }))
 
+type GatheredProps = { scale: JumpScale; size: number }
+
 /**
  * Runs of `size` neighbouring marks, each drawn as its first and jumping to the first card under
  * any.
  */
-const gathered = ({ scale, size }: { scale: JumpScale; size: number }): StripMark[] =>
+const gathered = ({ scale, size }: GatheredProps): StripMark[] =>
   Array.from({ length: Math.ceil(scale.marks.length / size) }, (_, at) => {
     const run = scale.marks.slice(at * size, (at + 1) * size)
     const [first] = run
@@ -42,6 +44,12 @@ const gathered = ({ scale, size }: { scale: JumpScale; size: number }): StripMar
     }
   })
 
+type FitJumpMarksProps = {
+  scale: JumpScale
+  room: number
+  labelHeight: number
+}
+
 /**
  * The marks a strip of `room` points draws, and how tall each stands. As on the web each takes
  * the alphabet's share of the room, at most the web's cap; where that is under what a finger
@@ -53,11 +61,7 @@ export const fitJumpMarks = ({
   scale,
   room,
   labelHeight,
-}: {
-  scale: JumpScale
-  room: number
-  labelHeight: number
-}): { height: number; marks: StripMark[] } => {
+}: FitJumpMarksProps): { height: number; marks: StripMark[] } => {
   const least = Math.max(JUMP_MARK_HEIGHTS.least, labelHeight)
   const most = Math.max(JUMP_MARK_HEIGHTS.most, least)
   const share = Math.min(most, room / LETTERS.length)

@@ -30,14 +30,18 @@ describe('play history', () => {
   const libraries = () => new LibrariesRepository(database.get())
   const createLibrary = (name: string): number =>
     libraries().create({ name, paths: [`/${name}`] }).id
-  const add = ({ libraryId, name }: { libraryId: number; name: string }): number =>
+  type AddProps = { libraryId: number; name: string }
+
+  const add = ({ libraryId, name }: AddProps): number =>
     index().insert({
       libraryId,
       kind: 'other',
       file: { path: `/${libraryId}/${name}.mp4`, root: `/${libraryId}`, size: 100, mtimeMs: 1 },
     })
+  type AddMinuteProps = { libraryId: number; name: string }
+
   /** A one-minute video, so seconds read straight across as sixtieths. */
-  const addMinute = ({ libraryId, name }: { libraryId: number; name: string }): number => {
+  const addMinute = ({ libraryId, name }: AddMinuteProps): number => {
     const id = add({ libraryId, name })
     index().saveProbe({
       id,
@@ -52,7 +56,9 @@ describe('play history', () => {
       .map((entry) => entry.media.id)
   /** A time on 10 October 2026, this many minutes after 7pm UTC. */
   const at = (minutes: number): Date => new Date(Date.UTC(2026, 9, 10, 19, minutes))
-  const history = ({ libraryId, limit = 100 }: { libraryId: number; limit?: number }) =>
+  type HistoryProps = { libraryId: number; limit?: number }
+
+  const history = ({ libraryId, limit = 100 }: HistoryProps) =>
     viewing()
       .history({ libraryId, limit, account: TEST_ACCOUNTS.a })
       .map((entry) => ({
@@ -60,18 +66,15 @@ describe('play history', () => {
         lastPlayedAt: entry.lastPlayedAt,
         plays: entry.plays,
       }))
-  /** A play of `kind` written straight to the table, as account A's. */
-  const addPlay = ({
-    id,
-    at: playedAt,
-    furthest,
-    kind,
-  }: {
+  type AddPlayProps = {
     id: number
     at: Date
     furthest: number
     kind: PlayKind
-  }): void => {
+  }
+
+  /** A play of `kind` written straight to the table, as account A's. */
+  const addPlay = ({ id, at: playedAt, furthest, kind }: AddPlayProps): void => {
     database
       .get()
       .db.prepare(

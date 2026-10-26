@@ -4,6 +4,8 @@ import { afterWatched } from '@/query/invalidate'
 import { useOptimisticMutation } from '@/query/optimistic'
 import { mutationKeys } from '@/query/queryClient'
 
+type UseServerWatchedChangeProps = { api: ApiClient }
+
 /**
  * Marks whatever `targets` name watched or unwatched when the cache cannot
  * be patched ahead of the answer: a show, season or saga, whose counts and
@@ -11,7 +13,7 @@ import { mutationKeys } from '@/query/queryClient'
  * video's own optimistic mark, and everything marked is read again once the
  * last of them settles.
  */
-const useServerWatchedChange = ({ api }: { api: ApiClient }) => {
+const useServerWatchedChange = ({ api }: UseServerWatchedChangeProps) => {
   const queryClient = useQueryClient()
   return useOptimisticMutation({
     mutationKey: mutationKeys.watched,
@@ -21,31 +23,31 @@ const useServerWatchedChange = ({ api }: { api: ApiClient }) => {
   })
 }
 
+type UseServerWatchedToggleProps = {
+  api: ApiClient
+  state: WatchedState
+  targets: WatchedChange['targets']
+}
+
 /**
  * What a Watched toggle needs: pressing it marks everything `targets` name
  * watched, unless it all is already, and then unwatched.
  */
-export const useServerWatchedToggle = ({
-  api,
-  state,
-  targets,
-}: {
-  api: ApiClient
-  state: WatchedState
-  targets: WatchedChange['targets']
-}) => {
+export const useServerWatchedToggle = ({ api, state, targets }: UseServerWatchedToggleProps) => {
   const { mutate } = useServerWatchedChange({ api })
   return { state, onToggle: () => mutate({ watched: state !== WATCHED_STATES.watched, targets }) }
 }
 
+type WatchedChangeForProps = { api: ApiClient }
+
+type WatchedChangeForUseWatchedToggleProps = {
+  state: WatchedState
+  targets: WatchedChange['targets']
+}
+
 /** The watched-change hooks over one server's `api`, for a host with one server. */
-export const watchedChangeFor = ({ api }: { api: ApiClient }) => ({
+export const watchedChangeFor = ({ api }: WatchedChangeForProps) => ({
   useWatchedChange: () => useServerWatchedChange({ api }),
-  useWatchedToggle: ({
-    state,
-    targets,
-  }: {
-    state: WatchedState
-    targets: WatchedChange['targets']
-  }) => useServerWatchedToggle({ api, state, targets }),
+  useWatchedToggle: ({ state, targets }: WatchedChangeForUseWatchedToggleProps) =>
+    useServerWatchedToggle({ api, state, targets }),
 })

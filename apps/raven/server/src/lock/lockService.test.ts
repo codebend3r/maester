@@ -17,8 +17,10 @@ const OWNER: Account = {
 }
 const MEMBER: Account = { ...OWNER, id: AUTH_TEST_IDS.friend, isOwner: false }
 
+type LockForProps = { caller: Caller }
+
 /** A lock with one locked library holding one video, read by a caller bound as `caller`. */
-const lockFor = ({ caller }: { caller: Caller }) => {
+const lockFor = ({ caller }: LockForProps) => {
   const sessions = { callerOf: () => caller }
   return new LockService(
     { ...readServerConfig({}), libraryPin: '6006' },
@@ -30,13 +32,15 @@ const lockFor = ({ caller }: { caller: Caller }) => {
   )
 }
 
+type TicketCallerProps = {
+  account: Account
+  unlockedUntil?: number
+}
+
 const ticketCaller = ({
   account,
   unlockedUntil = Date.now() + 60_000,
-}: {
-  account: Account
-  unlockedUntil?: number
-}): Caller => ({
+}: TicketCallerProps): Caller => ({
   kind: CALLERS.ticket,
   session: { account, token: 'jwt', expiresAt: Date.now() + 60_000 },
   unlockedUntil,

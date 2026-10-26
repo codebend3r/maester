@@ -19,11 +19,18 @@ const TIME = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-di
 const dayKey = (date: Date): string =>
   `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
 
-const dayLabel = ({ date, now }: { date: Date; now: Date }): string => {
+type DayLabelProps = { date: Date; now: Date }
+
+const dayLabel = ({ date, now }: DayLabelProps): string => {
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
   if (dayKey(date) === dayKey(now)) return 'Today'
   if (dayKey(date) === dayKey(yesterday)) return 'Yesterday'
   return (date.getFullYear() === now.getFullYear() ? DAY : DAY_WITH_YEAR).format(date)
+}
+
+type HistoryDaysProps = {
+  entries: HistoryEntry[]
+  now?: Date
 }
 
 /**
@@ -31,13 +38,7 @@ const dayLabel = ({ date, now }: { date: Date; now: Date }): string => {
  * the viewer's own days, unlike the grouped view's months: yesterday means
  * yesterday where they are.
  */
-export const historyDays = ({
-  entries,
-  now = new Date(),
-}: {
-  entries: HistoryEntry[]
-  now?: Date
-}): HistoryDay[] => {
+export const historyDays = ({ entries, now = new Date() }: HistoryDaysProps): HistoryDay[] => {
   const dated = entries.map((entry) => {
     const date = new Date(entry.lastPlayedAt)
     return { entry, date, key: dayKey(date) }
@@ -61,14 +62,13 @@ const howFar = (entry: HistoryEntry): string => {
   return `${Math.min(100, Math.floor((entry.furthest / duration) * 100))}% watched`
 }
 
-/** The line under a finished video, with no day above it: the day it last played, and how often it has. */
-export const finishedNote = ({
-  entry,
-  now = new Date(),
-}: {
+type FinishedNoteProps = {
   entry: HistoryEntry
   now?: Date
-}): string =>
+}
+
+/** The line under a finished video, with no day above it: the day it last played, and how often it has. */
+export const finishedNote = ({ entry, now = new Date() }: FinishedNoteProps): string =>
   [
     dayLabel({ date: new Date(entry.lastPlayedAt), now }),
     ...(entry.plays > 1 ? [`${entry.plays} plays`] : []),

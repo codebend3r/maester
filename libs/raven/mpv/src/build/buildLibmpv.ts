@@ -67,15 +67,13 @@ await locked.reduce(async (previous, source) => {
   })
 }, Promise.resolve())
 
-const meson = async ({
-  name,
-  options,
-  stepEnv = env,
-}: {
+type MesonProps = {
   name: string
   options: string[]
   stepEnv?: Record<string, string>
-}) => {
+}
+
+const meson = async ({ name, options, stepEnv = env }: MesonProps) => {
   const build = resolve(src(name), '_build')
   await run({
     args: [
@@ -98,7 +96,9 @@ const meson = async ({
   await run({ args: ['meson', 'compile', '-C', build, '-j', jobs], env: stepEnv })
   await run({ args: ['meson', 'install', '-C', build], env: stepEnv })
 }
-const cmake = async ({ name, options }: { name: string; options: string[] }) => {
+type CmakeProps = { name: string; options: string[] }
+
+const cmake = async ({ name, options }: CmakeProps) => {
   const build = resolve(src(name), '_build')
   await run({
     args: [

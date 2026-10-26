@@ -8,13 +8,12 @@ import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { useToasts } from '@raven/ui'
 import { asDesktop, DL_2, fakeClient, viewOf } from '@/test/desktop'
 
-const invalidatedBy = async ({
-  before,
-  after,
-}: {
+type InvalidatedByProps = {
   before: DownloadsData['downloads']
   after: DownloadsData['downloads']
-}) => {
+}
+
+const invalidatedBy = async ({ before, after }: InvalidatedByProps) => {
   const queryClient = new QueryClient()
   queryClient.setQueryData(DESKTOP_QUERY_KEYS.downloads, {
     downloads: before,
@@ -58,7 +57,9 @@ describe('applyDownloadsEvent', () => {
 describe('useChangeDownloads', () => {
   it('says an answer it cannot use, and that the change was not made', async () => {
     asDesktop(fakeClient({ request: async () => ({ type: DESKTOP_REPLIES.recents, recents: [] }) }))
-    const wrapper = ({ children }: { children: ReactNode }) => (
+    type WrapperProps = { children: ReactNode }
+
+    const wrapper = ({ children }: WrapperProps) => (
       <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
     )
     const { result } = renderHook(() => useChangeDownloads(), { wrapper })

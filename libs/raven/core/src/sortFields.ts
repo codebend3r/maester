@@ -44,14 +44,13 @@ export const sortParts = (sort: MediaSort): SortParts => {
   }
 }
 
-/** The sort for a field run one way; a field with no direction has the one. */
-export const sortOf = ({
-  field,
-  direction,
-}: {
+type SortOfProps = {
   field: SortFieldName
   direction: SortDirection
-}): MediaSort => {
+}
+
+/** The sort for a field run one way; a field with no direction has the one. */
+export const sortOf = ({ field, direction }: SortOfProps): MediaSort => {
   const rule: SortField = SORT_FIELDS[field]
   return rule.type === SORT_FIELD_TYPES.directed ? rule[direction] : rule.sort
 }

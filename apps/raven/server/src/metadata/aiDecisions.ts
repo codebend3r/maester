@@ -71,6 +71,16 @@ const rowOf = (outcome: AiOutcome): Row => {
   }
 }
 
+type AiDecisionsSuggestionsAtProps = {
+  libraryId: number
+  places: readonly string[]
+}
+
+type AiDecisionsHighReasonProps = {
+  places: readonly DecisionPlace[]
+  tmdbId: string
+}
+
 /**
  * What the AI lookup decided for each group it was asked about, by library
  * and place, so a group is asked once. A sure pick is matched; an unsure
@@ -144,13 +154,7 @@ export class AiDecisions {
    * where a Fix match has answered. The places are groups' places inside the
    * library, as `groupPlaceOf` gives them, never a path on disk.
    */
-  suggestionsAt({
-    libraryId,
-    places,
-  }: {
-    libraryId: number
-    places: readonly string[]
-  }): Map<string, AiSuggestion> {
+  suggestionsAt({ libraryId, places }: AiDecisionsSuggestionsAtProps): Map<string, AiSuggestion> {
     if (places.length === 0) return new Map()
     const rows = this.db
       .prepare<
@@ -194,13 +198,7 @@ export class AiDecisions {
   }
 
   /** The reason of the newest sure pick of `tmdbId` at any of `places`; null when none chose it. */
-  highReason({
-    places,
-    tmdbId,
-  }: {
-    places: readonly DecisionPlace[]
-    tmdbId: string
-  }): string | null {
+  highReason({ places, tmdbId }: AiDecisionsHighReasonProps): string | null {
     if (places.length === 0) return null
     return (
       this.db

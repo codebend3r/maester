@@ -77,7 +77,9 @@ export const details = (overrides: Partial<ItemDetails>): ItemDetails => ({
   ...overrides,
 })
 
-export const library = (overrides: { id: number; watchedPercent: number }): Library => ({
+type LibraryProps = { id: number; watchedPercent: number }
+
+export const library = (overrides: LibraryProps): Library => ({
   id: overrides.id,
   name: 'Library',
   paths: [],
@@ -116,19 +118,15 @@ export const library = (overrides: { id: number; watchedPercent: number }): Libr
 
 export const show = { id: 4, title: 'Severance' }
 
-export const episode = ({
-  id,
-  season,
-  number,
-  title,
-  primary,
-}: {
+type EpisodeProps = {
   id: number
   season: number
   number: number
   title: string
   primary: MediaItem | null
-}): EpisodeSummary => ({
+}
+
+export const episode = ({ id, season, number, title, primary }: EpisodeProps): EpisodeSummary => ({
   ...summary({ id, type: 'episode', title, show, season, episode: number }),
   type: 'episode',
   summary: null,
@@ -139,7 +137,9 @@ export const episode = ({
   primary,
 })
 
-export const season = ({ id, number }: { id: number; number: number }): SeasonSummary => ({
+type SeasonProps = { id: number; number: number }
+
+export const season = ({ id, number }: SeasonProps): SeasonSummary => ({
   ...summary({ id, type: 'season', title: `Season ${number}`, show, season: number }),
   type: 'season',
   episodeCount: 2,

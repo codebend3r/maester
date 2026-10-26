@@ -96,7 +96,9 @@ const readIds = (name: string): NameIds => {
   return { tmdb: first('tmdb'), imdb: first('imdb'), tvdb: first('tvdb') }
 }
 
-const mergeIds = ({ first, second }: { first: NameIds; second: NameIds }): NameIds => ({
+type MergeIdsProps = { first: NameIds; second: NameIds }
+
+const mergeIds = ({ first, second }: MergeIdsProps): NameIds => ({
   tmdb: first.tmdb ?? second.tmdb,
   imdb: first.imdb ?? second.imdb,
   tvdb: first.tvdb ?? second.tvdb,
@@ -155,13 +157,15 @@ const unsortTitle = (title: string): string => {
 /** A DVD region code left in a title: `Alien Resurrection R2`. */
 const REGION_TAG = /\s+R[1-6]$/i
 
+type BeforeOwnYearProps = { title: string; year: number | null }
+
 /**
  * A title that repeats its own year ends there: `Alexander 2004 Revisited
  * the Final Cut (2004)` is `Alexander`. A year that is the title, `2012`,
  * one that ends it, `Death to 2020`, or a different number, `Blade Runner
  * 2049`, stays.
  */
-const beforeOwnYear = ({ title, year }: { title: string; year: number | null }): string => {
+const beforeOwnYear = ({ title, year }: BeforeOwnYearProps): string => {
   if (year == null) return title
   const at = title.search(new RegExp(`(?<=\\s)${year}(?=\\s)`))
   return at > 0 ? tidy(title.slice(0, at)) : title
@@ -194,12 +198,19 @@ export const yearOf = (name: string): number | null => readName(name).year
 const lastSegment = (folder: string): string =>
   folder.split(/[\\/]/).findLast((segment) => segment !== '') ?? ''
 
+type EditionKeptProps = { name: NameReading; year: number | null }
+
 /** The title with its edition kept, when the name had one, in `year` when it has none of its own. */
-const editionKept = ({ name, year }: { name: NameReading; year: number | null }): MovieReading[] =>
+const editionKept = ({ name, year }: EditionKeptProps): MovieReading[] =>
   name.withEdition == null ? [] : [{ title: name.withEdition, year: name.year ?? year }]
 
 const readingKey = (reading: MovieReading): string =>
   `${foldTitle(reading.title)}|${reading.year ?? ''}`
+
+type ParseMovieNameProps = {
+  fileName: string
+  folder: string
+}
 
 /**
  * A movie's title, year, edition and ids. Its own folder is read first when
@@ -207,13 +218,7 @@ const readingKey = (reading: MovieReading): string =>
  * file's name is. Ids and editions are taken from either, and the readings
  * not taken are kept as alternatives.
  */
-export const parseMovieName = ({
-  fileName,
-  folder,
-}: {
-  fileName: string
-  folder: string
-}): ParsedMovieName => {
+export const parseMovieName = ({ fileName, folder }: ParseMovieNameProps): ParsedMovieName => {
   const fromFile = readName(stemOf(fileName))
   const folderName = lastSegment(folder)
   const fromFolder = folderName ? readName(folderName) : null
@@ -300,6 +305,11 @@ const cutIn = (words: readonly string[]): FileCut | null => {
   return key === '' ? null : { label: words.join(' '), key }
 }
 
+type ReadCutProps = {
+  fileName: string
+  titles: readonly (string | null)[]
+}
+
 /**
  * Which cut of a movie a file is: Plex's `{edition-...}` when the name has
  * one, else what the name says beyond the movie's `titles`, its year and
@@ -308,13 +318,7 @@ const cutIn = (words: readonly string[]): FileCut | null => {
  * which is the cut most files are. Pass TMDB's own titles, not an edited
  * one; a missing original title is null.
  */
-export const readCut = ({
-  fileName,
-  titles,
-}: {
-  fileName: string
-  titles: readonly (string | null)[]
-}): FileCut | null => {
+export const readCut = ({ fileName, titles }: ReadCutProps): FileCut | null => {
   const stem = stemOf(fileName)
   const tagged = EDITION_PATTERN.exec(stem)?.[1]
   if (tagged != null) return cutIn(wordsOf(tagged))
@@ -356,8 +360,10 @@ const EXTRAS_FOLDERS: ReadonlySet<string> = new Set([
 
 const EXTRAS_SUFFIX = /-(trailer|featurette|behindthescenes|deleted|interview|scene|short|other)$/i
 
+type IsExtraProps = { fileName: string; folder: string }
+
 /** A trailer, featurette or other extra, by Plex's folder names and suffixes: never matched. */
-export const isExtra = ({ fileName, folder }: { fileName: string; folder: string }): boolean =>
+export const isExtra = ({ fileName, folder }: IsExtraProps): boolean =>
   folder.split(/[\\/]/).some((segment) => EXTRAS_FOLDERS.has(segment.trim().toLowerCase())) ||
   EXTRAS_SUFFIX.test(stemOf(fileName))
 
@@ -472,13 +478,21 @@ const EPISODE_CODE =
 const ABSOLUTE = /\((\d{3,4})\)/
 const AIR_DATE = /(?<!\d)((?:19|20)\d{2})[.-](\d{2})[.-](\d{2})(?!\d)/
 
+type EpisodeRunProps = { first: number; second: number | null }
+
 /** One episode number, or the run from `first` to `second` when they read as a range. */
-const episodeRun = ({ first, second }: { first: number; second: number | null }): number[] => {
+const episodeRun = ({ first, second }: EpisodeRunProps): number[] => {
   if (second == null) return [first]
   if (second > first && second - first < 50) {
     return Array.from({ length: second - first + 1 }, (_, index) => first + index)
   }
   return second === first ? [first] : [first, second]
+}
+
+type ParseEpisodeNameProps = {
+  fileName: string
+  folder: string
+  fallbackShow?: string
 }
 
 /**
@@ -490,11 +504,7 @@ export const parseEpisodeName = ({
   fileName,
   folder,
   fallbackShow = '',
-}: {
-  fileName: string
-  folder: string
-  fallbackShow?: string
-}): ParsedEpisodeName => {
+}: ParseEpisodeNameProps): ParsedEpisodeName => {
   const stem = stripTags(stemOf(fileName))
   const ids = mergeIds({ first: readIds(fileName), second: readIds(folder) })
   const segments = folder.split(/[\\/]/).filter((segment) => segment !== '')

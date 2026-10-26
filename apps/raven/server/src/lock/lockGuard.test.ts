@@ -152,10 +152,9 @@ describe('the lock marks on routes', () => {
 describe('the lock guard and a media ticket', () => {
   const VALID = 'good-ticket'
 
-  const guard = ({
-    isAdminLocked = false,
-    isLegacy = true,
-  }: { isAdminLocked?: boolean; isLegacy?: boolean } = {}) =>
+  type GuardProps = { isAdminLocked?: boolean; isLegacy?: boolean }
+
+  const guard = ({ isAdminLocked = false, isLegacy = true }: GuardProps = {}) =>
     new LockGuard(
       {
         viewer: () => ({
@@ -169,15 +168,14 @@ describe('the lock guard and a media ticket', () => {
       { verify: ({ ticket, id }) => ticket === VALID && id === 7 },
     )
 
-  const contextOf = ({
-    controller,
-    handler,
-    query,
-  }: {
+  type ContextOfProps = {
     controller: new () => object
     handler: () => string
     query: Record<string, unknown>
-  }) => new ExecutionContextHost([{ params: { id: '7' }, query, headers: {} }], controller, handler)
+  }
+
+  const contextOf = ({ controller, handler, query }: ContextOfProps) =>
+    new ExecutionContextHost([{ params: { id: '7' }, query, headers: {} }], controller, handler)
 
   const bytes = new ShutController().bytes
   const plain = new ShutController().plain

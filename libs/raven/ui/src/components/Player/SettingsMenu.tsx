@@ -17,15 +17,7 @@ const SUBTITLE_STATUS: Record<SubtitleStatus, string | null> = {
   error: 'These subtitles could not be loaded.',
 }
 
-const Option = ({
-  name,
-  checked,
-  disabled,
-  isInline,
-  label,
-  details,
-  onSelect,
-}: {
+type OptionProps = {
   name: string
   checked: boolean
   disabled?: boolean
@@ -34,7 +26,9 @@ const Option = ({
   label: string
   details?: string
   onSelect: () => void
-}) => (
+}
+
+const Option = ({ name, checked, disabled, isInline, label, details, onSelect }: OptionProps) => (
   <label
     className={[styles.option, disabled ? styles.disabled : '', isInline ? styles.inline : '']
       .filter(Boolean)
@@ -125,15 +119,13 @@ const SubtitleGroup = ({ labelledBy, selection, subtitleStatus }: GroupProps) =>
   )
 }
 
-const ChoiceGroup = ({
-  name,
-  group,
-  select,
-}: {
+type ChoiceGroupProps = {
   name: string
   group: Group
   select: PlayChoices['select']
-}) => (
+}
+
+const ChoiceGroup = ({ name, group, select }: ChoiceGroupProps) => (
   <fieldset className={styles.group}>
     <legend className={styles.legend}>{group.legend}</legend>
     {group.options.map((option) => (
@@ -150,15 +142,13 @@ const ChoiceGroup = ({
   </fieldset>
 )
 
-const SpeedGroup = ({
-  name,
-  rate,
-  onPickRate,
-}: {
+type SpeedGroupProps = {
   name: string
   rate: number
   onPickRate: (rate: number) => void
-}) => (
+}
+
+const SpeedGroup = ({ name, rate, onPickRate }: SpeedGroupProps) => (
   <fieldset className={styles.group}>
     <legend className={styles.legend}>Speed</legend>
     <div className={styles.speeds}>
@@ -175,16 +165,14 @@ const SpeedGroup = ({
   </fieldset>
 )
 
-/** Whether what is up next starts by itself once the video ends. */
-const AutoplayGroup = ({
-  name,
-  autoplay,
-  onPickAutoplay,
-}: {
+type AutoplayGroupProps = {
   name: string
   autoplay: boolean
   onPickAutoplay: (isOn: boolean) => void
-}) => (
+}
+
+/** Whether what is up next starts by itself once the video ends. */
+const AutoplayGroup = ({ name, autoplay, onPickAutoplay }: AutoplayGroupProps) => (
   <fieldset className={styles.group}>
     <legend className={styles.legend}>Autoplay</legend>
     <div className={styles.speeds}>
@@ -203,6 +191,25 @@ const AutoplayGroup = ({
     </div>
   </fieldset>
 )
+
+type SettingsMenuProps = {
+  section: MenuSection
+  menuRef: RefObject<HTMLDialogElement | null>
+  selection: TrackSelection
+  subtitleStatus: SubtitleStatus
+  rate: number
+  mode: PlaybackMode
+  steppedDown?: StepDown | null
+  /** The ways the file can play, when the viewer may pick one; a local file has one. */
+  choices?: PlayChoices | null
+  onPickRate: (rate: number) => void
+  autoplay: boolean
+  onPickAutoplay: (isOn: boolean) => void
+  onShowInfo: () => void
+  onClose: () => void
+  onHandoff?: () => void
+  handoffLabel?: string
+}
 
 /**
  * The menu a pill opens over the picture: the audio tracks, the subtitles,
@@ -227,24 +234,7 @@ export const SettingsMenu = ({
   onClose,
   onHandoff,
   handoffLabel,
-}: {
-  section: MenuSection
-  menuRef: RefObject<HTMLDialogElement | null>
-  selection: TrackSelection
-  subtitleStatus: SubtitleStatus
-  rate: number
-  mode: PlaybackMode
-  steppedDown?: StepDown | null
-  /** The ways the file can play, when the viewer may pick one; a local file has one. */
-  choices?: PlayChoices | null
-  onPickRate: (rate: number) => void
-  autoplay: boolean
-  onPickAutoplay: (isOn: boolean) => void
-  onShowInfo: () => void
-  onClose: () => void
-  onHandoff?: () => void
-  handoffLabel?: string
-}) => {
+}: SettingsMenuProps) => {
   const id = useId()
   const heading = `${id}-heading`
   const group: GroupProps = { labelledBy: heading, selection, mode, subtitleStatus }

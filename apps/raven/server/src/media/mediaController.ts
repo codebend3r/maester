@@ -64,7 +64,9 @@ const errorCode = (error: unknown): string =>
  */
 const READ_CHUNK = 1024 * 1024
 
-const readFile = ({ path, start, end }: { path: string; start?: number; end?: number }) =>
+type ReadFileProps = { path: string; start?: number; end?: number }
+
+const readFile = ({ path, start, end }: ReadFileProps) =>
   createReadStream(path, { start, end, highWaterMark: READ_CHUNK })
 
 /** What a client is told when the file stays put. Never the path: that stays server-side. */
@@ -78,6 +80,8 @@ const deleteFailure = (error: unknown): string => {
   }
   return `Could not delete the file${code ? ` (${code})` : ''}.`
 }
+
+type MediaControllerFindProps = { id: number; account: AccountKey }
 
 @Controller('api/media')
 @PrivateBy('media')
@@ -97,7 +101,7 @@ export class MediaController {
     @Inject(AuthSessions) private readonly callers: AuthSessions,
   ) {}
 
-  private find({ id, account }: { id: number; account: AccountKey }): MediaItem {
+  private find({ id, account }: MediaControllerFindProps): MediaItem {
     const item = this.media.get({ id, account })
     if (!item) throw new NotFoundException(`No media ${id}`)
     return item

@@ -3,25 +3,20 @@ import { Button, Icon } from '@raven/ui'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
 
-/**
- * A label above its control, and under it the reason it was refused, with
- * the alert beside it. `aside` sits at the label's right: a gauge's reading.
- */
-const Field = ({
-  label,
-  error,
-  aside,
-  isDisabled = false,
-  children,
-  id,
-}: {
+type FieldProps = {
   label: string
   error?: string
   aside?: string
   isDisabled?: boolean
   children: ReactNode
   id: string
-}) => (
+}
+
+/**
+ * A label above its control, and under it the reason it was refused, with
+ * the alert beside it. `aside` sits at the label's right: a gauge's reading.
+ */
+const Field = ({ label, error, aside, isDisabled = false, children, id }: FieldProps) => (
   <div className={styles.field}>
     <span className={styles.labelRow}>
       <label htmlFor={id} className={isDisabled ? styles.disabledLabel : undefined}>

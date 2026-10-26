@@ -31,15 +31,17 @@ const LOCKED: AccessRefusal = {
   message: "This video's library on nas:8080 is locked.",
 }
 
+type OpenedProps = {
+  modes?: readonly PlaybackMode[]
+  at?: number
+  problems?: readonly string[]
+}
+
 const opened = ({
   modes = LADDER,
   at = RESUME_AT,
   problems = [],
-}: {
-  modes?: readonly PlaybackMode[]
-  at?: number
-  problems?: readonly string[]
-} = {}): SessionState => initialSession({ modes, at, audio: null, problems })
+}: OpenedProps = {}): SessionState => initialSession({ modes, at, audio: null, problems })
 
 /** The attempt a state is on, which events for it must name. */
 const attemptOf = (state: SessionState): number =>
@@ -55,7 +57,9 @@ const sourced = (state: SessionState): SessionState =>
 const loaded = (state: SessionState): SessionState =>
   sessionReducer(state, { type: SESSION_EVENTS.loaded, attempt: attemptOf(state) })
 
-const failed = ({ state, at }: { state: SessionState; at: number }): SessionState =>
+type FailedProps = { state: SessionState; at: number }
+
+const failed = ({ state, at }: FailedProps): SessionState =>
   sessionReducer(state, { type: SESSION_EVENTS.failed, attempt: attemptOf(state), at })
 
 describe('the playback ladder', () => {

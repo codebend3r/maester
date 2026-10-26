@@ -27,6 +27,23 @@ export const DEFAULT_PLAYBACK_STATE: PlaybackSettingsState = {
   effective: { encoder: 'software', tonemapAvailable: true },
 }
 
+type RenderWithProvidersProps = {
+  ui: ReactNode
+  route?: string
+  /** The `location.state` `route` opens with, as a link inside the app would leave it. */
+  state?: unknown
+  /** Pages already in history before `route`, oldest first, as if the app had been browsed there. */
+  behind?: string[]
+  playback?: PlaybackSettingsState | null
+  display?: DisplaySettings | null
+  adminLock?: AdminLock | null
+  authConfig?: AuthConfig | null
+  account?: Account | null
+  libraries?: Library[] | null
+  /** The cache to render over, for a test that needs the one the session store resets. */
+  client?: QueryClient
+}
+
 /**
  * Renders `ui` inside a fresh query client and an in-memory router, starting at
  * `route` with the pages in `behind` before it in history, wrapped as
@@ -52,22 +69,7 @@ export const renderWithProviders = ({
   account = null,
   libraries = null,
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
-}: {
-  ui: ReactNode
-  route?: string
-  /** The `location.state` `route` opens with, as a link inside the app would leave it. */
-  state?: unknown
-  /** Pages already in history before `route`, oldest first, as if the app had been browsed there. */
-  behind?: string[]
-  playback?: PlaybackSettingsState | null
-  display?: DisplaySettings | null
-  adminLock?: AdminLock | null
-  authConfig?: AuthConfig | null
-  account?: Account | null
-  libraries?: Library[] | null
-  /** The cache to render over, for a test that needs the one the session store resets. */
-  client?: QueryClient
-}) => {
+}: RenderWithProvidersProps) => {
   if (playback) client.setQueryData(queryKeys.playbackSettings, playback)
   if (display) client.setQueryData(queryKeys.displaySettings, display)
   if (adminLock) client.setQueryData(queryKeys.adminLock, adminLock)

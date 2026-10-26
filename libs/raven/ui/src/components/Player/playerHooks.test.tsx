@@ -45,7 +45,9 @@ const failure = (message: string): PlaybackFailure => ({
   frames: null,
 })
 
-const withSettings = ({ children }: { children: ReactNode }) => {
+type WithSettingsProps = { children: ReactNode }
+
+const withSettings = ({ children }: WithSettingsProps) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   client.setQueryData(queryKeys.playbackSettings, DEFAULT_PLAYBACK_STATE)
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -85,8 +87,10 @@ describe('usePlaybackLadder', () => {
     setBrowserSupport((mime) => !mime.includes('mlpa'))
     setStreamSupport(() => true)
     const defaultTrack: { audio: number | null } = { audio: null }
+    type CallbackRenderHookCallbackProps = { audio: number | null }
+
     const { result, rerender } = renderHook(
-      ({ audio }: { audio: number | null }) =>
+      ({ audio }: CallbackRenderHookCallbackProps) =>
         usePlaybackLadder({
           api,
           media: mediaItem({ audioCodec: 'truehd' }),

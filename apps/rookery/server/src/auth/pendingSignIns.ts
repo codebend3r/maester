@@ -15,6 +15,10 @@ export type PendingSignIn = {
 
 type PendingRow = { id: string; plex_pin_id: string; plex_code: string; return_to: string }
 
+type PendingSignInsCreateProps = { pin: PlexPin; returnTo: string; now: Date }
+
+type PendingSignInsLiveProps = { id: string; now: Date }
+
 /** Sign-ins under way: the PIN Plex is holding, and where to go once it is approved. */
 @Injectable()
 export class PendingSignIns {
@@ -25,7 +29,7 @@ export class PendingSignIns {
   }
 
   /** Saves a new sign-in, pruning ones that ran out; returns its id for the `rookery_pin` cookie. */
-  create({ pin, returnTo, now }: { pin: PlexPin; returnTo: string; now: Date }): string {
+  create({ pin, returnTo, now }: PendingSignInsCreateProps): string {
     const id = randomBytes(24).toString('base64url')
     this.db
       .prepare('DELETE FROM pending_sign_ins WHERE created_at <= ?')
@@ -40,7 +44,7 @@ export class PendingSignIns {
   }
 
   /** The sign-in behind `id`, or null when there is none or it ran out. */
-  live({ id, now }: { id: string; now: Date }): PendingSignIn | null {
+  live({ id, now }: PendingSignInsLiveProps): PendingSignIn | null {
     const row = this.db
       .prepare<[string, string], PendingRow>(
         `SELECT id, plex_pin_id, plex_code, return_to FROM pending_sign_ins

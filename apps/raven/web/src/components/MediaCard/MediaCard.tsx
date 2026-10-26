@@ -30,6 +30,14 @@ import styles from '@/components/MediaCard/MediaCard.module.scss'
 /** A label on glass over the frame grab, with the words a screen reader hears for it. */
 type Badge = { text: string; label: string }
 
+type MediaCardProps = {
+  media: MediaItem
+  /** What the library matches its files to, for the menu's Fix match. */
+  matchType?: MatchItemType | null
+  /** The order the listing is in, whose value the card shows. */
+  sort?: MediaSort
+}
+
 /**
  * One video in the grid, as its frame grab: its resolution and HDR on glass
  * in one top corner, the check in the other, and over a dark foot how long
@@ -41,17 +49,7 @@ type Badge = { text: string; label: string }
  * corner, opens the card's menu. Sorted, it shows the value its listing is
  * sorted by above its facts, and says that value nowhere else.
  */
-export const MediaCard = ({
-  media,
-  matchType = null,
-  sort,
-}: {
-  media: MediaItem
-  /** What the library matches its files to, for the menu's Fix match. */
-  matchType?: MatchItemType | null
-  /** The order the listing is in, whose value the card shows. */
-  sort?: MediaSort
-}) => {
+export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => {
   const menu = useCardMenu({ media, matchType })
   const thumbnail = api.thumbnailUrl(media)
   const label = mediaLabel(media)

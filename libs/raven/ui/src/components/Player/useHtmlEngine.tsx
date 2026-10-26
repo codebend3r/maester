@@ -16,6 +16,15 @@ import { useTrackCues } from '@/lib/useTrackCues'
 
 const ENGINE_NAME = 'HTML video'
 
+type UseHtmlEngineProps = {
+  source: HtmlSource
+  rendition: Rendition
+  selection: TrackSelection
+  onFailure: (failure: PlaybackFailure) => void
+  onSlow?: (delivery: Delivery) => void
+  toggleFullscreen: () => void
+}
+
 export const useHtmlEngine = ({
   source,
   rendition,
@@ -23,14 +32,7 @@ export const useHtmlEngine = ({
   onFailure,
   onSlow,
   toggleFullscreen,
-}: {
-  source: HtmlSource
-  rendition: Rendition
-  selection: TrackSelection
-  onFailure: (failure: PlaybackFailure) => void
-  onSlow?: (delivery: Delivery) => void
-  toggleFullscreen: () => void
-}) => {
+}: UseHtmlEngineProps) => {
   const { title, posterUrl } = useHostServices()
   const videoRef = useRef<HTMLVideoElement>(null)
   const volume = usePlayerPrefs((prefs) => prefs.volume)

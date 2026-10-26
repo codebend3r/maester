@@ -21,30 +21,34 @@ const selection: TrackSelection = {
   pickSubtitle: () => {},
 }
 
+type ChoicesForProps = {
+  modes?: readonly PlaybackMode[]
+  rendition: Rendition
+  qualities?: readonly StreamQuality[]
+  select?: PlayChoices['select']
+}
+
 const choicesFor = ({
   modes = [PLAYBACK_MODES.transcode],
   rendition,
   qualities = [],
   select = () => {},
-}: {
-  modes?: readonly PlaybackMode[]
-  rendition: Rendition
-  qualities?: readonly StreamQuality[]
-  select?: PlayChoices['select']
-}): PlayChoices => ({
+}: ChoicesForProps): PlayChoices => ({
   groups: choiceGroups({ modes, rendition, qualities, original: '24.2 Mb/s, 4K' }),
   select,
 })
+
+type RenderPlaybackProps = {
+  choices: PlayChoices
+  mode?: PlaybackMode
+  onPickAutoplay?: (isOn: boolean) => void
+}
 
 const renderPlayback = ({
   choices,
   mode = PLAYBACK_MODES.transcode,
   onPickAutoplay = () => {},
-}: {
-  choices: PlayChoices
-  mode?: PlaybackMode
-  onPickAutoplay?: (isOn: boolean) => void
-}) =>
+}: RenderPlaybackProps) =>
   render(
     <SettingsMenu
       section={MENU_SECTIONS.playback}

@@ -20,17 +20,16 @@ const WIDTHS = {
   short: styles.short,
 } as const
 
+type BoneProps = {
+  shape: keyof typeof SHAPES
+  width?: keyof typeof WIDTHS
+}
+
 /**
  * One grey stand-in for something on its way. Without a `width` it takes
  * what its container gives it, or a button's own.
  */
-export const Bone = ({
-  shape,
-  width,
-}: {
-  shape: keyof typeof SHAPES
-  width?: keyof typeof WIDTHS
-}) => (
+export const Bone = ({ shape, width }: BoneProps) => (
   <span
     className={
       width ? `${styles.bone} ${SHAPES[shape]} ${WIDTHS[width]}` : `${styles.bone} ${SHAPES[shape]}`
@@ -38,8 +37,10 @@ export const Bone = ({
   />
 )
 
+type SkeletonCardProps = { picture: 'poster' | 'frame' }
+
 /** A card on its way: its picture, a line for its title and one for its facts. */
-const SkeletonCard = ({ picture }: { picture: 'poster' | 'frame' }) => (
+const SkeletonCard = ({ picture }: SkeletonCardProps) => (
   <li className={styles.card}>
     <Bone shape={picture} />
     <Bone shape="text" width="most" />
@@ -47,17 +48,19 @@ const SkeletonCard = ({ picture }: { picture: 'poster' | 'frame' }) => (
   </li>
 )
 
+type SkeletonCardsProps = {
+  picture: 'poster' | 'frame'
+  count?: number
+}
+
 /**
  * `count` cards on their way, for a grid that lays its own cards out. Stand-ins
  * have nothing to tell them apart, so each is keyed by its place.
  */
-export const SkeletonCards = ({
-  picture,
-  count = 12,
-}: {
-  picture: 'poster' | 'frame'
-  count?: number
-}) => Array.from({ length: count }, (_, index) => <SkeletonCard key={index} picture={picture} />)
+export const SkeletonCards = ({ picture, count = 12 }: SkeletonCardsProps) =>
+  Array.from({ length: count }, (_, index) => <SkeletonCard key={index} picture={picture} />)
+
+type LoadingProps = { label: string; children: ReactNode }
 
 /**
  * What a page or a part of one shows while what it needs is on its way: the
@@ -65,7 +68,7 @@ export const SkeletonCards = ({
  * label is plain text rather than a live region, which many screen readers
  * leave unread when it arrives already filled.
  */
-export const Loading = ({ label, children }: { label: string; children: ReactNode }) => (
+export const Loading = ({ label, children }: LoadingProps) => (
   <div className={styles.loading}>
     <p className="visually-hidden">{label}</p>
     <div className={styles.shapes} aria-hidden="true">

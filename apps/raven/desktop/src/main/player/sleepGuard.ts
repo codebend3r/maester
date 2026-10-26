@@ -1,10 +1,9 @@
-export const createSleepGuard = ({
-  start,
-  stop,
-}: {
+type CreateSleepGuardProps = {
   start: () => number
   stop: (id: number) => void
-}) => {
+}
+
+export const createSleepGuard = ({ start, stop }: CreateSleepGuardProps) => {
   let held: number | null = null
 
   return {

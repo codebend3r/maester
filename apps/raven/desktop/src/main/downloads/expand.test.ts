@@ -33,7 +33,9 @@ import { mediaItemFor } from '@/shared/test/mediaItem'
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
 const SERVER_NAME = 'Vhagar'
 
-const file = ({ id, libraryId = 1 }: { id: number; libraryId?: number }): MediaItem =>
+type FileProps = { id: number; libraryId?: number }
+
+const file = ({ id, libraryId = 1 }: FileProps): MediaItem =>
   mediaItemFor({ id, libraryId, title: `File ${id}` })
 
 const succeeded = (expansion: Expansion) => {
@@ -56,15 +58,13 @@ const itemCall = (itemId: number): string => keyOf({ name: CALL_NAMES.getItem, i
 const mediaCall = (mediaId: number): string => keyOf({ name: CALL_NAMES.getMedia, mediaId })
 const sagasCall = keyOf({ name: CALL_NAMES.getSagas, libraryId: 1 })
 
-const run = ({
-  replies,
-  target,
-  skip = () => false,
-}: {
+type RunProps = {
   replies: Record<string, Reply>
   target: Parameters<typeof expandTarget>[0]['target']
   skip?: (mediaId: number) => boolean
-}) => {
+}
+
+const run = ({ replies, target, skip = () => false }: RunProps) => {
   const { calls, log } = fakeCalls({ ...library1, ...replies })
   return {
     log,

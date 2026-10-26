@@ -7,20 +7,21 @@ import {
 type StreamEvent = Parameters<ServerEventSource['addEventListener']>[0]
 type Listener = Parameters<ServerEventSource['addEventListener']>[1]
 
+type ListenerProps = { type: string; data?: string | null }
+
 /** The part of `react-native-sse`'s `EventSource` the app uses: only a message carries `data`. */
 export type NativeEventSource = {
-  addEventListener: (
-    type: StreamEvent,
-    listener: (event: { type: string; data?: string | null }) => void,
-  ) => void
+  addEventListener: (type: StreamEvent, listener: (event: ListenerProps) => void) => void
   close: () => void
 }
 
 /** Where an event source connects, and the headers it sends. */
 export type SourceRequest = { url: string; headers: Record<string, string> }
 
+type ScheduleProps = { run: () => void; ms: number }
+
 /** Runs `run` after `ms`; returns the way to cancel it. */
-export type Schedule = (wait: { run: () => void; ms: number }) => () => void
+export type Schedule = (wait: ScheduleProps) => () => void
 
 /** Whether the app is in the foreground, and the way to hear when that changes. */
 export type AppActivity = {
@@ -68,6 +69,13 @@ type Stream = {
   generation: number
 }
 
+type EventSourceForProps = {
+  headersFor: (url: string) => Promise<Record<string, string>>
+  createSource: (source: SourceRequest) => NativeEventSource
+  schedule: Schedule
+  app: AppActivity
+}
+
 /**
  * The `openEvents` that `serverEventsFor` takes, over `react-native-sse`. React Native has no
  * `EventSource`, and the stream needs the server's cookies, which the jar reads
@@ -83,17 +91,7 @@ type Stream = {
  * time, and none after `close`.
  */
 export const eventSourceFor =
-  ({
-    headersFor,
-    createSource,
-    schedule,
-    app,
-  }: {
-    headersFor: (url: string) => Promise<Record<string, string>>
-    createSource: (source: SourceRequest) => NativeEventSource
-    schedule: Schedule
-    app: AppActivity
-  }) =>
+  ({ headersFor, createSource, schedule, app }: EventSourceForProps) =>
   (url: string): ServerEventSource => {
     const listeners: Array<{ type: StreamEvent; listener: Listener }> = []
     const stream: Stream = {
@@ -107,7 +105,9 @@ export const eventSourceFor =
       generation: 0,
     }
 
-    const hear = ({ type, data }: { type: StreamEvent; data?: string | null }) =>
+    type HearProps = { type: StreamEvent; data?: string | null }
+
+    const hear = ({ type, data }: HearProps) =>
       listeners.filter((entry) => entry.type === type).forEach(({ listener }) => listener({ data }))
 
     const drop = () => {

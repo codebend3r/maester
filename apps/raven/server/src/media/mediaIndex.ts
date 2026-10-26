@@ -59,6 +59,43 @@ const placeOf = (file: FoundFile): { fileName: string; folder: string } => ({
   folder: relative(file.root, dirname(file.path)),
 })
 
+type MediaIndexInsertProps = {
+  libraryId: number
+  kind: LibraryKind
+  file: FoundFile
+  at?: Date
+}
+
+type MediaIndexMarkChangedProps = {
+  id: number
+  size: number
+  mtimeMs: number
+  at?: Date
+}
+
+type MediaIndexMoveProps = {
+  id: number
+  kind: LibraryKind
+  file: FoundFile
+  at?: Date
+}
+
+type MediaIndexApplyProps = {
+  libraryId: number
+  kind: LibraryKind
+  changes: Reconciled
+}
+
+type MediaIndexSaveProbeProps = { id: number; probe: ProbeResult; tracks: MediaTracks }
+
+type MediaIndexSaveProbeErrorProps = { id: number; error: string }
+
+type MediaIndexSaveTracksProps = { id: number; tracks: MediaTracks }
+
+type MediaIndexSaveKeyframesProps = { id: number; keyframes: number[] }
+
+type MediaIndexSetThumbnailProps = { id: number; state: ThumbnailState }
+
 /**
  * The media table as files: the index the scanner diffs the disk against
  * and the changes it writes back, what a probe found, and the file state
@@ -138,17 +175,7 @@ export class MediaIndex {
   }
 
   /** A file new to the library; it changed when it came. */
-  insert({
-    libraryId,
-    kind,
-    file,
-    at = new Date(),
-  }: {
-    libraryId: number
-    kind: LibraryKind
-    file: FoundFile
-    at?: Date
-  }): number {
+  insert({ libraryId, kind, file, at = new Date() }: MediaIndexInsertProps): number {
     const { fileName, folder } = placeOf(file)
     const named = namedAs({ kind, fileName, folder })
     const result = this.db
@@ -176,17 +203,7 @@ export class MediaIndex {
   }
 
   /** The file was replaced on disk: forget what the old one held so it gets probed again. */
-  markChanged({
-    id,
-    size,
-    mtimeMs,
-    at = new Date(),
-  }: {
-    id: number
-    size: number
-    mtimeMs: number
-    at?: Date
-  }): void {
+  markChanged({ id, size, mtimeMs, at = new Date() }: MediaIndexMarkChangedProps): void {
     this.db
       .prepare(
         `UPDATE media SET size = ?, mtime_ms = ?, probed = 0, probe_error = NULL, thumbnail = 'pending',
@@ -201,17 +218,7 @@ export class MediaIndex {
    * its match, progress, favourite, plays and thumbnail stay. Its name is
    * read again, and one no match was found for gets another try.
    */
-  move({
-    id,
-    kind,
-    file,
-    at = new Date(),
-  }: {
-    id: number
-    kind: LibraryKind
-    file: FoundFile
-    at?: Date
-  }): void {
+  move({ id, kind, file, at = new Date() }: MediaIndexMoveProps): void {
     const { fileName, folder } = placeOf(file)
     const named = namedAs({ kind, fileName, folder })
     this.db
@@ -240,15 +247,7 @@ export class MediaIndex {
    * library half updated, and hands back the files to probe: the new ones,
    * the replaced ones, and any never probed.
    */
-  apply({
-    libraryId,
-    kind,
-    changes,
-  }: {
-    libraryId: number
-    kind: LibraryKind
-    changes: Reconciled
-  }): ProbeTarget[] {
+  apply({ libraryId, kind, changes }: MediaIndexApplyProps): ProbeTarget[] {
     const at = new Date()
     return this.db.transaction(() => {
       this.remove(changes.gone)
@@ -269,7 +268,7 @@ export class MediaIndex {
   }
 
   /** What a probe found, and the tracks it found. */
-  saveProbe({ id, probe, tracks }: { id: number; probe: ProbeResult; tracks: MediaTracks }): void {
+  saveProbe({ id, probe, tracks }: MediaIndexSaveProbeProps): void {
     this.db
       .prepare(
         `UPDATE media SET probed = 1, probe_error = NULL, duration = ?, width = ?, height = ?,
@@ -292,7 +291,7 @@ export class MediaIndex {
       )
   }
 
-  saveProbeError({ id, error }: { id: number; error: string }): void {
+  saveProbeError({ id, error }: MediaIndexSaveProbeErrorProps): void {
     this.db
       .prepare(`UPDATE media SET probed = 1, probe_error = ?, thumbnail = 'failed' WHERE id = ?`)
       .run(error, id)
@@ -307,7 +306,7 @@ export class MediaIndex {
     return parseJsonAs({ json: row.tracks, guard: isMediaTracks })
   }
 
-  saveTracks({ id, tracks }: { id: number; tracks: MediaTracks }): void {
+  saveTracks({ id, tracks }: MediaIndexSaveTracksProps): void {
     this.db.prepare('UPDATE media SET tracks = ? WHERE id = ?').run(JSON.stringify(tracks), id)
   }
 
@@ -321,13 +320,13 @@ export class MediaIndex {
     return parseJsonAs({ json: keyframes, guard: isKeyframes })
   }
 
-  saveKeyframes({ id, keyframes }: { id: number; keyframes: number[] }): void {
+  saveKeyframes({ id, keyframes }: MediaIndexSaveKeyframesProps): void {
     this.db
       .prepare('UPDATE media SET keyframes = ? WHERE id = ?')
       .run(JSON.stringify(keyframes), id)
   }
 
-  setThumbnail({ id, state }: { id: number; state: ThumbnailState }): void {
+  setThumbnail({ id, state }: MediaIndexSetThumbnailProps): void {
     this.db.prepare('UPDATE media SET thumbnail = ? WHERE id = ?').run(state, id)
   }
 

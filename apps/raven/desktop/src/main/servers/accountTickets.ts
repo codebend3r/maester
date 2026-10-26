@@ -26,13 +26,15 @@ export type TicketOutcome =
   | { kind: typeof TICKET_OUTCOMES.gone }
   | { kind: typeof TICKET_OUTCOMES.unreachable }
 
+type TicketForProps = {
+  serverId: string
+  mediaId: number
+  isFresh: boolean
+}
+
 export type AccountTickets = {
   /** `isFresh` mints another even inside the window: the one held was just refused. */
-  ticketFor: (input: {
-    serverId: string
-    mediaId: number
-    isFresh: boolean
-  }) => Promise<TicketOutcome>
+  ticketFor: (input: TicketForProps) => Promise<TicketOutcome>
   /** Drops what is held for a server whose access ended. */
   forget: (serverId: string) => void
 }
@@ -64,8 +66,18 @@ const outcomeOf = (reply: ServerCallResult): TicketOutcome => {
 type Held = { serverId: string; ticket: string; renewAt: number }
 type Minting = { serverId: string; outcome: Promise<TicketOutcome> }
 
-const keyOf = ({ serverId, mediaId }: { serverId: string; mediaId: number }): string =>
-  `${serverId}/${mediaId}`
+type KeyOfProps = { serverId: string; mediaId: number }
+
+const keyOf = ({ serverId, mediaId }: KeyOfProps): string => `${serverId}/${mediaId}`
+
+type IsSignedInProps = { serverId: string }
+
+type CreateAccountTicketsProps = {
+  calls: Pick<ServerCalls, 'call'>
+  /** Whether the page is signed in to the server, so a mint has a token to go out with. */
+  isSignedIn: (input: IsSignedInProps) => boolean
+  now: () => number
+}
 
 /**
  * Account tickets for main's own media requests: the relay's and the downloads'. One is held per
@@ -76,22 +88,16 @@ export const createAccountTickets = ({
   calls,
   isSignedIn,
   now,
-}: {
-  calls: Pick<ServerCalls, 'call'>
-  /** Whether the page is signed in to the server, so a mint has a token to go out with. */
-  isSignedIn: (input: { serverId: string }) => boolean
-  now: () => number
-}): AccountTickets => {
+}: CreateAccountTicketsProps): AccountTickets => {
   let held: ReadonlyMap<string, Held> = new Map()
   let minting: ReadonlyMap<string, Minting> = new Map()
 
-  const mint = async ({
-    serverId,
-    mediaId,
-  }: {
+  type MintProps = {
     serverId: string
     mediaId: number
-  }): Promise<TicketOutcome> => {
+  }
+
+  const mint = async ({ serverId, mediaId }: MintProps): Promise<TicketOutcome> => {
     // Signed out, the server would refuse the mint as signed out too, so main does not ask it.
     if (!isSignedIn({ serverId })) {
       return { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.signedOut }
@@ -101,7 +107,9 @@ export const createAccountTickets = ({
     )
   }
 
-  const start = ({ serverId, mediaId }: { serverId: string; mediaId: number }) => {
+  type StartProps = { serverId: string; mediaId: number }
+
+  const start = ({ serverId, mediaId }: StartProps) => {
     const key = keyOf({ serverId, mediaId })
     const startedAt = now()
     const outcome = mint({ serverId, mediaId }).catch(() => UNREACHABLE)

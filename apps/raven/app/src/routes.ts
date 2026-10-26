@@ -69,8 +69,10 @@ export const itemTarget = (itemId: number): RouteTarget => ({
   fileId: null,
 })
 
+type ParamOfProps = { name: string; value: number | string | null }
+
 /** A param's value, left out when there is none. */
-const paramOf = ({ name, value }: { name: string; value: number | string | null }) =>
+const paramOf = ({ name, value }: ParamOfProps) =>
   value === null || value === '' ? {} : { [name]: String(value) }
 
 /** A route and its params, as the router takes them. */

@@ -3,6 +3,11 @@ import { basename, join } from 'node:path'
 import { Logger } from '@nestjs/common'
 import Sqlite from 'better-sqlite3'
 
+type MigrateProps = {
+  db: Sqlite.Database
+  migrations: readonly string[]
+}
+
 /**
  * Brings `db` up to date: each migration moves the schema one version
  * forward and runs exactly once, tracked by SQLite's `user_version`, each in
@@ -10,13 +15,7 @@ import Sqlite from 'better-sqlite3'
  * database at the version before it. Append new migrations; never edit a
  * shipped one, since existing databases have already run it.
  */
-export const migrate = ({
-  db,
-  migrations,
-}: {
-  db: Sqlite.Database
-  migrations: readonly string[]
-}): void => {
+export const migrate = ({ db, migrations }: MigrateProps): void => {
   const current = Number(db.pragma('user_version', { simple: true }))
   migrations.slice(current).forEach((sql, offset) => {
     db.transaction(() => {
@@ -30,6 +29,8 @@ const logger = new Logger('SQLite')
 
 /** A refresh slower than this is logged, so its cost on a slow disk shows. */
 const SLOW_REFRESH_MS = 100
+
+type RefreshStatisticsProps = { db: Sqlite.Database }
 
 /**
  * Brings the query planner's statistics in line with the data: SQLite's
@@ -52,7 +53,7 @@ const SLOW_REFRESH_MS = 100
  * lock held too long, a full disk) is logged and passed over: it never
  * fails an open, or the scan or pass whose writes it follows.
  */
-export const refreshStatistics = ({ db }: { db: Sqlite.Database }): void => {
+export const refreshStatistics = ({ db }: RefreshStatisticsProps): void => {
   const start = performance.now()
   try {
     db.pragma('optimize = 0x10002')
@@ -70,20 +71,18 @@ export const refreshStatistics = ({ db }: { db: Sqlite.Database }): void => {
   logger.log(`Refreshed the query planner's statistics of ${basename(db.name)} in ${ms} ms`)
 }
 
+type OpenSqliteProps = {
+  dataDir: string
+  file: string
+  migrations: readonly string[]
+}
+
 /**
  * Opens `file` in `dataDir`, making the folder when it is missing, migrates
  * it and refreshes the planner's statistics. WAL lets reads go on while
  * something writes, and foreign keys are on, so `ON DELETE CASCADE` holds.
  */
-export const openSqlite = ({
-  dataDir,
-  file,
-  migrations,
-}: {
-  dataDir: string
-  file: string
-  migrations: readonly string[]
-}): Sqlite.Database => {
+export const openSqlite = ({ dataDir, file, migrations }: OpenSqliteProps): Sqlite.Database => {
   mkdirSync(dataDir, { recursive: true })
   const db = new Sqlite(join(dataDir, file))
   db.pragma('journal_mode = WAL')

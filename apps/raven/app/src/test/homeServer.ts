@@ -30,7 +30,9 @@ export const NAS: AppServer = {
   addedAt: 1,
 }
 
-const libraryFor = ({ id, name, kind }: { id: number; name: string; kind: LibraryKind }) =>
+type LibraryForProps = { id: number; name: string; kind: LibraryKind }
+
+const libraryFor = ({ id, name, kind }: LibraryForProps) =>
   ({
     id,
     name,

@@ -85,6 +85,15 @@ const APPLE_TV = { platform: APP_PLATFORMS.tvos, shouldDrawCaptions: false } as 
 /** Android TV under its d-pad chrome, which draws the subtitles itself. */
 const ANDROID_TV = { platform: APP_PLATFORMS.androidTv, shouldDrawCaptions: true } as const
 
+type PlanOnProps = {
+  platform: AppPlatform
+  shouldDrawCaptions: boolean
+  media?: MediaItem
+  tracks: MediaTracks | null
+  policy?: PlaybackPolicy
+  prefs?: PlaybackPrefs
+}
+
 const planOn = ({
   platform,
   shouldDrawCaptions,
@@ -92,14 +101,7 @@ const planOn = ({
   tracks,
   policy = AUTO,
   prefs = DEFAULT_APP_PREFS,
-}: {
-  platform: AppPlatform
-  shouldDrawCaptions: boolean
-  media?: MediaItem
-  tracks: MediaTracks | null
-  policy?: PlaybackPolicy
-  prefs?: PlaybackPrefs
-}) => planFor({ platform, shouldDrawCaptions, media, tracks, policy, prefs })
+}: PlanOnProps) => planFor({ platform, shouldDrawCaptions, media, tracks, policy, prefs })
 
 const modesOn = (input: Parameters<typeof planOn>[0]) => planOn(input).modes
 

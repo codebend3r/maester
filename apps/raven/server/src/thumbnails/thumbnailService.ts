@@ -16,6 +16,12 @@ const exists = async (path: string): Promise<boolean> =>
     () => false,
   )
 
+type ThumbnailServiceRenderProps = {
+  input: string
+  seek: number
+  tonemap: boolean
+}
+
 /**
  * Generates one JPEG per video in the background and caches it under
  * `<data>/thumbnails/<id>.jpg`. Scans never wait on it: the library shows
@@ -69,15 +75,7 @@ export class ThumbnailService implements OnApplicationBootstrap {
     return this.queue.size()
   }
 
-  private async render({
-    input,
-    seek,
-    tonemap,
-  }: {
-    input: string
-    seek: number
-    tonemap: boolean
-  }): Promise<string> {
+  private async render({ input, seek, tonemap }: ThumbnailServiceRenderProps): Promise<string> {
     // ffmpeg picks the image muxer from the extension, so the temp file keeps .jpg.
     const temp = join(
       this.dir,

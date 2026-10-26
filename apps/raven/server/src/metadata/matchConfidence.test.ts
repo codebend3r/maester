@@ -37,6 +37,16 @@ const episodes = (season: number, ...numbers: number[]): EpisodeNumbers[] =>
 
 const ANY = TIER_SETS.any[0]
 
+type ScoreProps = {
+  title: string
+  year?: number | null
+  country?: string | null
+  results: SearchResult[]
+  tier?: CandidateTier
+  onDisk?: OnDisk | null
+  facts?: Map<string, MatchFacts>
+}
+
 const score = ({
   title,
   year = null,
@@ -45,15 +55,7 @@ const score = ({
   tier = ANY,
   onDisk = null,
   facts = new Map(),
-}: {
-  title: string
-  year?: number | null
-  country?: string | null
-  results: SearchResult[]
-  tier?: CandidateTier
-  onDisk?: OnDisk | null
-  facts?: Map<string, MatchFacts>
-}): number[] => scoreCandidates({ title, year, country, results, tier, onDisk, facts })
+}: ScoreProps): number[] => scoreCandidates({ title, year, country, results, tier, onDisk, facts })
 
 describe('scoreCandidates', () => {
   it('scores an exact title with nothing else to go on 100', () => {
@@ -288,7 +290,9 @@ describe('scoreCandidates', () => {
 
   describe('a movie file', () => {
     const film = [result({ tmdbId: '1', title: 'Heat', year: 1995 })]
-    const run = ({ minutes, runtime }: { minutes: number | null; runtime: number | null }) =>
+    type RunProps = { minutes: number | null; runtime: number | null }
+
+    const run = ({ minutes, runtime }: RunProps) =>
       score({
         title: 'Heat',
         year: 1995,

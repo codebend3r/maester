@@ -7,13 +7,15 @@ type Engine = { name: string }
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
+type SetupProps = {
+  opened?: OpenedEngine<Engine> | Promise<OpenedEngine<Engine>>
+  destroy?: () => Promise<void>
+}
+
 const setup = ({
   opened = { status: 'native', engine: { name: 'mpv' } },
   destroy = async () => {},
-}: {
-  opened?: OpenedEngine<Engine> | Promise<OpenedEngine<Engine>>
-  destroy?: () => Promise<void>
-} = {}) => {
+}: SetupProps = {}) => {
   const log: string[] = []
   const warn = mock((_message: string) => {})
   const watched: { onDied: () => void } = { onDied: () => {} }
@@ -219,7 +221,9 @@ describe('createEngineSlot', () => {
 })
 
 describe('watchService', () => {
-  const serviceWith = ({ isDead = false }: { isDead?: boolean } = {}) => {
+  type ServiceWithProps = { isDead?: boolean }
+
+  const serviceWith = ({ isDead = false }: ServiceWithProps = {}) => {
     const listeners: ((event: PlayerEvent) => void)[] = []
     return {
       service: {

@@ -14,15 +14,13 @@ export type MediaPlane = {
   reportUnreachable: () => void
 }
 
-export const useMediaPlane = ({
-  api,
-  mediaId,
-  reprobe,
-}: {
+type UseMediaPlaneProps = {
   api: ApiClient
   mediaId: number
   reprobe: () => void
-}): MediaPlane => {
+}
+
+export const useMediaPlane = ({ api, mediaId, reprobe }: UseMediaPlaneProps): MediaPlane => {
   const pick = useMediaOrigin((state) => state.pick)
   const ticket = useQuery({
     ...playerQueriesFor(api).mediaTicket(mediaId),

@@ -13,10 +13,12 @@ import { renderWithProviders } from '@/test/render'
 type SignOutResult = Awaited<ReturnType<AuthClient['signOut']>>
 
 describe('AccountSection', () => {
+  type RenderAccountProps = { account?: Account; signOut?: AuthClient['signOut'] }
+
   const renderAccount = ({
     account = fakeAccount({ email: 'jordan@example.com' }),
     signOut = async (): Promise<SignOutResult> => ({ error: null }),
-  }: { account?: Account; signOut?: AuthClient['signOut'] } = {}) => {
+  }: RenderAccountProps = {}) => {
     useAuthSession.setState({
       client: fakeAuthClient({ calls: { signOut } }).client,
       status: AUTH_SESSION_STATUSES.ready,

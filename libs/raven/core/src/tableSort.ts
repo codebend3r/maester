@@ -21,7 +21,9 @@ export type ActiveSort<K extends string> = { key: K; direction: ColumnDirection 
 
 type SortValue = ReturnType<SortColumn<unknown>['value']>
 
-const compare = ({ a, b }: { a: SortValue; b: SortValue }): number => {
+type CompareProps = { a: SortValue; b: SortValue }
+
+const compare = ({ a, b }: CompareProps): number => {
   if (a == null && b == null) return 0
   // Rows with nothing to sort by go last whichever way the column points.
   if (a == null) return 1
@@ -30,16 +32,18 @@ const compare = ({ a, b }: { a: SortValue; b: SortValue }): number => {
   return String(a).localeCompare(String(b), undefined, { sensitivity: 'base', numeric: true })
 }
 
+type SortRowsProps<T, K extends string> = {
+  rows: readonly T[]
+  columns: Record<K, SortColumn<T>>
+  active: ActiveSort<K> | null
+}
+
 /** `rows` in the order `active` asks for; the order they came in when nothing is active. */
 export const sortRows = <T, K extends string>({
   rows,
   columns,
   active,
-}: {
-  rows: readonly T[]
-  columns: Record<K, SortColumn<T>>
-  active: ActiveSort<K> | null
-}): T[] => {
+}: SortRowsProps<T, K>): T[] => {
   if (active == null) return [...rows]
   const column = columns[active.key]
   const sign = active.direction === TABLE_SORT_DIRECTIONS.asc ? 1 : -1
@@ -54,16 +58,18 @@ export const sortRows = <T, K extends string>({
     .map((entry) => entry.row)
 }
 
+type NextSortProps<K extends string> = {
+  active: ActiveSort<K> | null
+  key: K
+  first: ColumnDirection
+}
+
 /** The next sort after a click on `key`: its first direction, then the other, then off. */
 export const nextSort = <K extends string>({
   active,
   key,
   first,
-}: {
-  active: ActiveSort<K> | null
-  key: K
-  first: ColumnDirection
-}): ActiveSort<K> | null => {
+}: NextSortProps<K>): ActiveSort<K> | null => {
   if (active?.key !== key) return { key, direction: first }
   if (active.direction === first) {
     return {

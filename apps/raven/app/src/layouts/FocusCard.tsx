@@ -30,6 +30,16 @@ const EASE_OUT = Easing.bezier(0.2, 0.8, 0.2, 1)
 export const focusCaptionHeightOf = (fontScale: number): number =>
   TV_SIZES.space3 + linesHeightOf({ sizes: [TV_SIZES.textLg, TV_SIZES.text], fontScale })
 
+type FocusCardProps = {
+  card: ShelfCard
+  place?: string
+  width: number
+  isPreferred: boolean
+  jump?: JumpFocus | null
+  onFocused?: () => void
+  onPress: () => void
+}
+
 /**
  * A card the remote moves to, on a shelf or in a grid: it grows and takes the ring while
  * focused, smoothly unless the system asks for less motion, when it changes at once.
@@ -46,15 +56,7 @@ export const FocusCard = ({
   jump = null,
   onFocused = NOTHING_ON_FOCUS,
   onPress,
-}: {
-  card: ShelfCard
-  place?: string
-  width: number
-  isPreferred: boolean
-  jump?: JumpFocus | null
-  onFocused?: () => void
-  onPress: () => void
-}) => {
+}: FocusCardProps) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
   useJumpFocus({ jump, view: pressable })
   const { remember } = useOpenerFocus({ place, view: pressable })

@@ -76,8 +76,10 @@ const headerBackdrop = (saga: Saga): HeaderBackdrop | null => {
   }
 }
 
+type SagaWatchedToggleProps = { saga: Saga; libraryId: number }
+
 /** Watched for the whole saga: its movies are marked together. */
-const SagaWatchedToggle = ({ saga, libraryId }: { saga: Saga; libraryId: number }) => {
+const SagaWatchedToggle = ({ saga, libraryId }: SagaWatchedToggleProps) => {
   const toggle = useWatchedToggle({
     state: watchedStateOf({
       watched: saga.media.filter((media) => media.watched).length,
@@ -88,14 +90,18 @@ const SagaWatchedToggle = ({ saga, libraryId }: { saga: Saga; libraryId: number 
   return <WatchedToggle {...toggle} />
 }
 
+type OwnBackdropProps = { children: ReactNode }
+
 /** The saga has a backdrop of its own, which pointing at a movie leaves up. */
-const OwnBackdrop = ({ children }: { children: ReactNode }) => {
+const OwnBackdrop = ({ children }: OwnBackdropProps) => {
   const isOwn = useOwnBackdrop()
   return isOwn && children
 }
 
+type SagaViewProps = { library: Library; sagaId: string }
+
 /** The saga once its library is known and open to this browser. */
-const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => {
+const SagaView = ({ library, sagaId }: SagaViewProps) => {
   const titleId = useId()
   const filmsId = useId()
   const [isEditing, setEditing] = useState(false)

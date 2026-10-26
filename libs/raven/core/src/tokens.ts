@@ -94,18 +94,17 @@ const luminance = (hex: string): number => {
   return 0.2126 * red + 0.7152 * green + 0.0722 * blue
 }
 
+type ContrastRatioProps = {
+  foreground: string
+  background: string
+}
+
 /**
  * The WCAG contrast ratio between two `#rrggbb` colours, 1 to 21, whichever
  * way round they are. Null for anything else (a colour with alpha depends
  * on what is under it).
  */
-export const contrastRatio = ({
-  foreground,
-  background,
-}: {
-  foreground: string
-  background: string
-}): number | null => {
+export const contrastRatio = ({ foreground, background }: ContrastRatioProps): number | null => {
   if (!HEX.test(foreground) || !HEX.test(background)) return null
   const [lighter = 0, darker = 0] = [luminance(foreground), luminance(background)].toSorted(
     (a, b) => b - a,

@@ -4,7 +4,9 @@ import styles from '@/components/AuthScreen/AuthScreen.module.scss'
 
 const MISMATCH_COPY = 'The passwords do not match.'
 
-const FieldAlert = ({ id, children }: { id: string; children: string }) => (
+type FieldAlertProps = { id: string; children: string }
+
+const FieldAlert = ({ id, children }: FieldAlertProps) => (
   <p id={id} role="alert" className={styles.alert}>
     <span className={styles.alertIcon}>
       <Icon name="alert" size={18} />
@@ -13,13 +15,12 @@ const FieldAlert = ({ id, children }: { id: string; children: string }) => (
   </p>
 )
 
-export const EmailField = ({
-  value,
-  onChange,
-}: {
+type EmailFieldProps = {
   value: string
   onChange: (value: string) => void
-}) => {
+}
+
+export const EmailField = ({ value, onChange }: EmailFieldProps) => {
   const id = useId()
   return (
     <div className={styles.field}>
@@ -43,6 +44,18 @@ export const EmailField = ({
   )
 }
 
+type PasswordFieldProps = {
+  label: string
+  autoComplete: string
+  value: string
+  onChange: (value: string) => void
+  error: string | null
+  isShown: boolean
+  onToggleShown: () => void
+  alsoReveals?: string
+  children?: ReactNode
+}
+
 /**
  * A password with Show beside it to read it back, and `error` under it,
  * marked as the field to fix. Show also reads back `alsoReveals`, the id of
@@ -58,17 +71,7 @@ export const PasswordField = ({
   onToggleShown,
   alsoReveals,
   children,
-}: {
-  label: string
-  autoComplete: string
-  value: string
-  onChange: (value: string) => void
-  error: string | null
-  isShown: boolean
-  onToggleShown: () => void
-  alsoReveals?: string
-  children?: ReactNode
-}) => {
+}: PasswordFieldProps) => {
   const ids = { input: useId(), error: useId() }
   const isInvalid = error !== null
   return (
@@ -107,6 +110,16 @@ export const PasswordField = ({
   )
 }
 
+type PasswordFieldsProps = {
+  label: string
+  password: string
+  confirmation: string
+  refusal: { password: string; message: string } | null
+  isMismatched: boolean
+  onPasswordChange: (value: string) => void
+  onConfirmationChange: (value: string) => void
+}
+
 /**
  * A new password typed twice, with one Show and Hide for both. `refusal` is
  * what the server said against the password it was sent, shown under the
@@ -121,15 +134,7 @@ export const PasswordFields = ({
   isMismatched,
   onPasswordChange,
   onConfirmationChange,
-}: {
-  label: string
-  password: string
-  confirmation: string
-  refusal: { password: string; message: string } | null
-  isMismatched: boolean
-  onPasswordChange: (value: string) => void
-  onConfirmationChange: (value: string) => void
-}) => {
+}: PasswordFieldsProps) => {
   const ids = { confirm: useId(), mismatch: useId() }
   const [isShown, setShown] = useState(false)
   const isRefused = !isMismatched && refusal !== null && refusal.password === password

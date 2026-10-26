@@ -28,7 +28,9 @@ import { queryKeys } from '@/query/queryClient'
 import { HISTORY_SHOWS } from '@/query/ravenQueries'
 import { itemDetails, itemSummary, library, matchedMovie, mediaItem } from '@/test/fixtures'
 
-const apply = ({ client, edits }: { client: QueryClient; edits: readonly Edit[] }): void =>
+type ApplyProps = { client: QueryClient; edits: readonly Edit[] }
+
+const apply = ({ client, edits }: ApplyProps): void =>
   edits.flatMap((change) => change.plan(client)).forEach(({ write }) => write())
 
 const LISTING = queryKeys.media({ libraryId: 2, search: '', sort: MEDIA_SORTS.title, seed: 0 })

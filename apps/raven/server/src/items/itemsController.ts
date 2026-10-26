@@ -56,6 +56,8 @@ import { MetadataService } from '@/metadata/metadataService'
 import { TMDB_IMAGE_PATH, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 import { ROUTE_PARAMS } from '@/requestParts'
 
+type ItemsControllerDetailsProps = { id: number; request: FastifyRequest }
+
 /** Movies, shows, seasons and episodes: their pages, their pictures, and fetching them again. */
 @Controller('api/items')
 @PrivateBy('item')
@@ -81,7 +83,7 @@ export class ItemsController {
   }
 
   /** The item's page, with only the files, children and AI note this caller may see. */
-  private details({ id, request }: { id: number; request: FastifyRequest }): ItemDetails {
+  private details({ id, request }: ItemsControllerDetailsProps): ItemDetails {
     const details = this.metadata.details(id)
     if (!details) throw new NotFoundException(`No item ${id}`)
     const viewer = this.lock.viewer({ request })

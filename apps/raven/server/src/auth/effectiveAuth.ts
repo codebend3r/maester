@@ -12,6 +12,12 @@ export type EnforcementRecord = (typeof ENFORCEMENT_RECORDS)[keyof typeof ENFORC
 
 const UNAVAILABLE: AuthConfig = { state: AUTH_CONFIG_STATES.unavailable }
 
+type EffectiveAuthProps = {
+  configured: AuthConfig
+  hasEnforced: boolean
+  isOptedOut: boolean
+}
+
 /**
  * The auth state the server runs in, and what to do with its enforcement
  * record. A server that once enforced accounts never falls back to anonymous
@@ -21,11 +27,7 @@ export const effectiveAuth = ({
   configured,
   hasEnforced,
   isOptedOut,
-}: {
-  configured: AuthConfig
-  hasEnforced: boolean
-  isOptedOut: boolean
-}): { auth: AuthConfig; record: EnforcementRecord } => {
+}: EffectiveAuthProps): { auth: AuthConfig; record: EnforcementRecord } => {
   const failClosed = { auth: UNAVAILABLE, record: ENFORCEMENT_RECORDS.keep }
   switch (configured.state) {
     case AUTH_CONFIG_STATES.ready:
@@ -44,14 +46,13 @@ export const effectiveAuth = ({
 
 const logger = new Logger(effectiveAuth.name)
 
-/** Applies `effectiveAuth` to the config and the stored record at start, and says why when it fails closed. */
-export const resolveAuthState = ({
-  config,
-  settings,
-}: {
+type ResolveAuthStateProps = {
   config: ServerConfig
   settings: SettingsRepository
-}): AuthConfig => {
+}
+
+/** Applies `effectiveAuth` to the config and the stored record at start, and says why when it fails closed. */
+export const resolveAuthState = ({ config, settings }: ResolveAuthStateProps): AuthConfig => {
   const hasEnforced = settings.accountsEnforcedAt() !== null
   const { auth, record } = effectiveAuth({
     configured: config.auth,

@@ -30,10 +30,9 @@ const FILE: LocalFile = {
   tracks: null,
 }
 
-const setup = ({
-  file = FILE,
-  engine = ENGINE_USES.native,
-}: { file?: LocalFile; engine?: EngineUse } = {}) => {
+type SetupProps = { file?: LocalFile; engine?: EngineUse }
+
+const setup = ({ file = FILE, engine = ENGINE_USES.native }: SetupProps = {}) => {
   const client = fakeClient()
   const menu = createMenuHub()
   return { client, menu, services: fileServicesFor({ file, client, menu, engine }) }

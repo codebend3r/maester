@@ -52,17 +52,18 @@ const memoryStore = (initial: DownloadsState): DownloadsStore => {
   }
 }
 
-const setup = ({
-  entries = [],
-  disk = {},
-}: {
+type SetupProps = {
   entries?: DownloadEntry[]
   disk?: Record<string, number>
-} = {}) => {
+}
+
+const setup = ({ entries = [], disk = {} }: SetupProps = {}) => {
   const store = memoryStore({ ...EMPTY_DOWNLOADS, entries })
   const drive = fakeDisk(disk)
   const warnings: string[] = []
-  const sweep = ({ wasSetAside }: { wasSetAside: boolean }) =>
+  type SweepProps = { wasSetAside: boolean }
+
+  const sweep = ({ wasSetAside }: SweepProps) =>
     sweepDownloads({
       store,
       fs: drive.fs,

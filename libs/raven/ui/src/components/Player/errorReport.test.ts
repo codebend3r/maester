@@ -10,7 +10,9 @@ import { mediaItem } from '@/test/fixtures'
 
 /** Puts a field on `navigator` the way a browser that has it does, until the test ends. */
 const given: string[] = []
-const giveNavigator = ({ name, value }: { name: string; value: unknown }) => {
+type GiveNavigatorProps = { name: string; value: unknown }
+
+const giveNavigator = ({ name, value }: GiveNavigatorProps) => {
   Object.defineProperty(navigator, name, { value, configurable: true })
   given.push(name)
 }

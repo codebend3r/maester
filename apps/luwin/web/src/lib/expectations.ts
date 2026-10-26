@@ -23,15 +23,13 @@ const toPattern = (pattern: string): RegExp | null => {
 
 const quoted = (names: string[]) => `[${names.map((name) => `'${name}'`).join(', ')}]`
 
-const patternFailures = ({
-  pattern,
-  reply,
-  shouldMatch,
-}: {
+type PatternFailuresProps = {
   pattern: string | null
   reply: string
   shouldMatch: boolean
-}): string[] => {
+}
+
+const patternFailures = ({ pattern, reply, shouldMatch }: PatternFailuresProps): string[] => {
   if (pattern == null) return []
   const compiled = toPattern(pattern)
   if (!compiled) return [`can't check /${pattern}/ in the browser`]
@@ -39,15 +37,13 @@ const patternFailures = ({
   return [shouldMatch ? `reply did not match /${pattern}/` : `reply matched forbidden /${pattern}/`]
 }
 
-export const checkTurn = ({
-  turn,
-  tools,
-  reply,
-}: {
+type CheckTurnProps = {
   turn: CaseTurn
   tools: string[]
   reply: string
-}): Verdict => {
+}
+
+export const checkTurn = ({ turn, tools, reply }: CheckTurnProps): Verdict => {
   const failures = [
     ...turn.expectTools
       .filter((name) => !tools.includes(name))

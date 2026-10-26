@@ -49,8 +49,10 @@ import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import styles from '@/pages/ShowPage/ShowPage.module.scss'
 
+type SeasonCardProps = { season: SeasonSummary; show: ItemDetails }
+
 /** One season in the row: its poster, name and how many episodes are on disk. */
-const SeasonCard = ({ season, show }: { season: SeasonSummary; show: ItemDetails }) => {
+const SeasonCard = ({ season, show }: SeasonCardProps) => {
   const poster = posterSources({ item: season, sizes: POSTER_SIZES.season })
   const to = itemPath(season) ?? `/shows/${show.id}`
   const count = season.episodeCount
@@ -82,7 +84,9 @@ const SeasonCard = ({ season, show }: { season: SeasonSummary; show: ItemDetails
   )
 }
 
-const ShowView = ({ details }: { details: ItemDetails }) => {
+type ShowViewProps = { details: ItemDetails }
+
+const ShowView = ({ details }: ShowViewProps) => {
   const ids = { title: useId(), seasons: useId() }
   const navigate = useNavigate()
   const [fixing, setFixing] = useState(false)

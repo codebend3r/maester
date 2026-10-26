@@ -25,7 +25,9 @@ const answering = (): ProbeFetch =>
     }
   })
 
-const clientWith = ({ origins }: { origins: MediaOrigin[] }) => ({
+type ClientWithProps = { origins: MediaOrigin[] }
+
+const clientWith = ({ origins }: ClientWithProps) => ({
   ...api,
   getMediaOrigins: mock(async () => ({ origins })),
 })

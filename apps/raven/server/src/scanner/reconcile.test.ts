@@ -2,15 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { type IndexedFile, changesAnything, reconcile } from '@/scanner/reconcile'
 import type { FoundFile } from '@/scanner/walk'
 
-const found = ({
-  path,
-  size = 100,
-  mtimeMs = 1,
-}: {
+type FoundProps = {
   path: string
   size?: number
   mtimeMs?: number
-}): FoundFile => ({
+}
+
+const found = ({ path, size = 100, mtimeMs = 1 }: FoundProps): FoundFile => ({
   path,
   root: '/m',
   size,

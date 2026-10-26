@@ -13,8 +13,10 @@ import { useServerReach } from '@/stores/serverReach'
 import { Where, where } from '@/test/authPage'
 import { asDesktop } from '@/test/desktop'
 
+type RenderHostProps = { route?: string; ui?: ReactNode }
+
 /** The host over a fresh cache, with nothing else reading the account config unless `ui` does. */
-const renderHost = ({ route = '/', ui = null }: { route?: string; ui?: ReactNode } = {}) => {
+const renderHost = ({ route = '/', ui = null }: RenderHostProps = {}) => {
   asDesktop()
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
@@ -30,7 +32,9 @@ const renderHost = ({ route = '/', ui = null }: { route?: string; ui?: ReactNode
 
 const UNREACHABLE = new ApiError({ status: 502, message: 'Bad Gateway', isServerUnreachable: true })
 
-const failConfig = ({ client, error }: { client: QueryClient; error: Error }) =>
+type FailConfigProps = { client: QueryClient; error: Error }
+
+const failConfig = ({ client, error }: FailConfigProps) =>
   act(() =>
     client
       .fetchQuery({

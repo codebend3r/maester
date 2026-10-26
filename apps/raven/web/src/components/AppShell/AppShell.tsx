@@ -26,27 +26,22 @@ import { useServerReach } from '@/stores/serverReach'
 import { useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
 
-/**
- * A row of the side menu, marked as current when the location matches any
- * of its patterns. Down to its icon, it keeps its name for screen readers
- * and shows it as a tooltip at once. A note adds its word to the name both ways:
- * `Tutorials (locked)`.
- */
-const NavItem = ({
-  to,
-  patterns,
-  icon,
-  label,
-  isIconsOnly,
-  note,
-}: {
+type NavItemProps = {
   to: string
   patterns: readonly string[]
   icon: ReactNode
   label: string
   isIconsOnly: boolean
   note?: string
-}) => {
+}
+
+/**
+ * A row of the side menu, marked as current when the location matches any
+ * of its patterns. Down to its icon, it keeps its name for screen readers
+ * and shows it as a tooltip at once. A note adds its word to the name both ways:
+ * `Tutorials (locked)`.
+ */
+const NavItem = ({ to, patterns, icon, label, isIconsOnly, note }: NavItemProps) => {
   const isCurrent = useIsCurrent(patterns)
   const suffix = note ? ` (${note})` : ''
   return (
@@ -69,8 +64,10 @@ const NavItem = ({
   )
 }
 
+type CountedIconProps = { icon: IconName; count: number }
+
 /** An icon with a count over its corner, for the eye only: the row's name says the count. */
-const CountedIcon = ({ icon, count }: { icon: IconName; count: number }) => (
+const CountedIcon = ({ icon, count }: CountedIconProps) => (
   <span className={styles.counted}>
     <Icon name={icon} />
     {count > 0 && (
@@ -81,8 +78,10 @@ const CountedIcon = ({ icon, count }: { icon: IconName; count: number }) => (
   </span>
 )
 
+type DesktopNavItemsProps = { isIconsOnly: boolean }
+
 /** Raven's own rows: the files on this Mac, and the downloads with how many are under way. */
-const DesktopNavItems = ({ isIconsOnly }: { isIconsOnly: boolean }) => {
+const DesktopNavItems = ({ isIconsOnly }: DesktopNavItemsProps) => {
   const inProgress = useInProgressCount()
   return (
     <>
@@ -119,8 +118,10 @@ const FollowServer = () => {
 /** What B does on a medium screen, where the menu keeps to its icons. */
 const ignore = () => undefined
 
+type ShortcutTipProps = { onDismiss: () => void }
+
 /** Rises above the toggle until it is first used or put away. */
-const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
+const ShortcutTip = ({ onDismiss }: ShortcutTipProps) => (
   <aside className={styles.tip} aria-label="Tip">
     <p>
       Press <kbd>B</kbd> to collapse or expand the side menu.

@@ -193,20 +193,7 @@ const entryFor = (overrides: Partial<DownloadEntry>): DownloadEntry => ({
   ...overrides,
 })
 
-const setup = ({
-  replies = {},
-  free = 412 * GIB,
-  total = 1000 * GIB,
-  initial = EMPTY_DOWNLOADS,
-  access = NEVER,
-  disk = {},
-  videos = {},
-  player = EMPTY_STATE,
-  startAt = NOW,
-  isPageReady = true,
-  syncRetryMs = SYNC_RETRY_MS,
-  accountId = ACCOUNT,
-}: {
+type SetupProps = {
   replies?: Record<string, Reply>
   free?: number
   total?: number
@@ -224,7 +211,22 @@ const setup = ({
   syncRetryMs?: number
   /** The account signed in to the server, as the page's session names it. */
   accountId?: string | null
-} = {}) => {
+}
+
+const setup = ({
+  replies = {},
+  free = 412 * GIB,
+  total = 1000 * GIB,
+  initial = EMPTY_DOWNLOADS,
+  access = NEVER,
+  disk = {},
+  videos = {},
+  player = EMPTY_STATE,
+  startAt = NOW,
+  isPageReady = true,
+  syncRetryMs = SYNC_RETRY_MS,
+  accountId = ACCOUNT,
+}: SetupProps = {}) => {
   const signedIn = { accountId }
   /** Each call the server heard, with the Bearer token it carried. */
   const heard: { call: string; token: string | null }[] = []
@@ -354,7 +356,9 @@ const setup = ({
 
 type World = ReturnType<typeof setup>
 
-const askFor = async ({ world, target }: { world: World; target: DownloadTarget }) => {
+type AskForProps = { world: World; target: DownloadTarget }
+
+const askFor = async ({ world, target }: AskForProps) => {
   const reply = await world.service.ask({ serverId: SERVER_ID, target })
   if (reply.type !== 'downloadAsk') throw new Error(`expected an ask, got ${reply.type}`)
   return reply.ask
@@ -1897,10 +1901,9 @@ describe('deleting once watched', () => {
     ...EMPTY_DOWNLOADS,
     entries,
   })
-  const settingUp = (
-    entry: Partial<DownloadEntry>,
-    { isPageReady = true }: { isPageReady?: boolean } = {},
-  ) =>
+  type SettingUpProps = { isPageReady?: boolean }
+
+  const settingUp = (entry: Partial<DownloadEntry>, { isPageReady = true }: SettingUpProps = {}) =>
     setup({
       initial: holding(entryFor({ autoDelete: true, ...entry })),
       videos: { [VIDEO]: FILE },
@@ -1934,8 +1937,10 @@ describe('deleting once watched', () => {
     world.service.noteOpened({ fileId: reply.target.fileId })
     return reply.target.fileId
   }
+  type ReachProps = { fileId: string; position: number }
+
   /** Saves a position as the play page's savePosition does: the player state, then the download. */
-  const reach = (world: World, { fileId, position }: { fileId: string; position: number }) => {
+  const reach = (world: World, { fileId, position }: ReachProps) => {
     world.state.update((state) =>
       savePosition({
         state,

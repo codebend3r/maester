@@ -99,14 +99,16 @@ const NO_ENGINE: PlayerConnection = {
   message: 'The video engine is off for this test.',
 }
 
+type AsPlayingDesktopProps = {
+  client?: DesktopClient
+  player?: PlayerConnections
+}
+
 /** Runs the page as Raven's, as `startDesktop` sets it: its bridge is `client` and `player`. */
 export const asPlayingDesktop = ({
   client = fakeClient(),
   player = connectionsOf(NO_ENGINE),
-}: {
-  client?: DesktopClient
-  player?: PlayerConnections
-}) => {
+}: AsPlayingDesktopProps) => {
   const menu = createMenuHub()
   useDesktopBridge.setState({ desktop: { client, menu, player } })
   return { client, menu, player }
@@ -144,19 +146,28 @@ export const settled = (ms = 10) =>
     await new Promise((resolve) => setTimeout(resolve, ms))
   })
 
+type SentOfTypeProps<T extends DesktopRequest['type']> = {
+  client: FakeClient
+  type: T
+}
+
 /** The requests of `type` the page sent, in order. */
 export const sentOfType = <T extends DesktopRequest['type']>({
   client,
   type,
-}: {
-  client: FakeClient
-  type: T
-}): Extract<DesktopRequest, { type: T }>[] =>
+}: SentOfTypeProps<T>): Extract<DesktopRequest, { type: T }>[] =>
   client.request.mock.calls
     .map(([request]) => request)
     .filter((request): request is Extract<DesktopRequest, { type: T }> => request.type === type)
 
 type Answers = Partial<Record<DesktopRequest['type'], DesktopReply>>
+
+type DownloadsMainProps = {
+  downloads?: DownloadView[]
+  shouldAutoDelete?: boolean
+  space?: SpaceView
+  answers?: Answers
+}
 
 /**
  * Main as the downloads screens see it: it keeps the list and answers each change with the new
@@ -167,25 +178,19 @@ export const downloadsMain = ({
   shouldAutoDelete = false,
   space = SPACE,
   answers = {},
-}: {
-  downloads?: DownloadView[]
-  shouldAutoDelete?: boolean
-  space?: SpaceView
-  answers?: Answers
-} = {}) => {
+}: DownloadsMainProps = {}) => {
   const state = { downloads, shouldAutoDelete }
   const listed = (): DesktopReply => ({
     type: DESKTOP_REPLIES.downloads,
     downloads: state.downloads,
     shouldAutoDeleteByDefault: state.shouldAutoDelete,
   })
-  const update = ({
-    downloadId,
-    change,
-  }: {
+  type UpdateProps = {
     downloadId: string
     change: (view: DownloadView) => DownloadView
-  }): DesktopReply => {
+  }
+
+  const update = ({ downloadId, change }: UpdateProps): DesktopReply => {
     state.downloads = state.downloads.map((view) =>
       view.downloadId === downloadId ? change(view) : view,
     )

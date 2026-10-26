@@ -5,8 +5,12 @@ import { MPV_FILES, MPV_MACH_O, missingMpvFiles, STAGED_PATHS, stageMpv } from '
 const FROM = '/repo/libs/raven/mpv/resources/darwin-arm64'
 const TO = '/repo/apps/raven/desktop/staging/mpv/darwin-arm64'
 
-const fakeFs = ({ absent }: { absent: readonly string[] }) => {
+type FakeFsProps = { absent: readonly string[] }
+
+const fakeFs = ({ absent }: FakeFsProps) => {
   const calls: string[] = []
+  type FsCopyProps = { from: string; to: string }
+
   return {
     calls,
     fs: {
@@ -14,7 +18,7 @@ const fakeFs = ({ absent }: { absent: readonly string[] }) => {
       remove: async (path: string) => {
         calls.push(`remove ${path}`)
       },
-      copy: async ({ from, to }: { from: string; to: string }) => {
+      copy: async ({ from, to }: FsCopyProps) => {
         calls.push(`copy ${from} -> ${to}`)
       },
     },
@@ -63,10 +67,12 @@ describe('stageMpv', () => {
 
   it('copies one path at a time', async () => {
     const order: string[] = []
+    type CopyProps = { from: string; to: string }
+
     const fs = {
       exists: () => true,
       remove: async () => {},
-      copy: async ({ from }: { from: string; to: string }) => {
+      copy: async ({ from }: CopyProps) => {
         order.push(`start ${from}`)
         await Promise.resolve()
         order.push(`end ${from}`)

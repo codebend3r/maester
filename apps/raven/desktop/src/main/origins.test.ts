@@ -6,7 +6,9 @@ import { isServerOrigin } from '@raven/core'
 describe('authOriginFrom', () => {
   const HOOK = 'http://127.0.0.1:9000'
 
-  const pick = (input: { isPackaged: boolean; env: Record<string, string | undefined> }) => {
+  type PickProps = { isPackaged: boolean; env: Record<string, string | undefined> }
+
+  const pick = (input: PickProps) => {
     const warnings: string[] = []
     const origin = authOriginFrom({ ...input, warn: (message) => warnings.push(message) })
     return { origin, warnings }
@@ -68,11 +70,13 @@ describe('serverOriginFrom', () => {
   const BUILT = 'https://raven.example.ts.net'
   const HOOK = 'http://127.0.0.1:9000'
 
-  const pick = (input: {
+  type Pick2Props = {
     isPackaged: boolean
     built: string | undefined
     env: Record<string, string | undefined>
-  }) => {
+  }
+
+  const pick = (input: Pick2Props) => {
     const warnings: string[] = []
     const origin = serverOriginFrom({ ...input, warn: (message) => warnings.push(message) })
     return { origin, warnings }
@@ -119,11 +123,13 @@ describe('serverOriginFrom', () => {
 })
 
 describe('linkOriginsFrom', () => {
-  const pick = (input: {
+  type Pick3Props = {
     isPackaged: boolean
     built: string | undefined
     env: Record<string, string | undefined>
-  }) => {
+  }
+
+  const pick = (input: Pick3Props) => {
     const warnings: string[] = []
     const origins = linkOriginsFrom({ ...input, warn: (message) => warnings.push(message) })
     return { origins, warnings }

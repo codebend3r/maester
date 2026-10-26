@@ -14,17 +14,20 @@ export const ADOPTION_RETRY_MS = 60_000
 const sqliteCodeOf = (error: unknown): string | null =>
   isRecord(error) && isString(error.code) ? error.code : null
 
-/** The adopted owner's key without accounts; never anyone's while accounts are ready or unavailable. */
-const legacyKeyFor = ({
-  auth,
-  settings,
-}: {
+type LegacyKeyForProps = {
   auth: AuthConfig
   settings: Pick<SettingsRepository, 'viewingOwner'>
-}): AccountKey => {
+}
+
+/** The adopted owner's key without accounts; never anyone's while accounts are ready or unavailable. */
+const legacyKeyFor = ({ auth, settings }: LegacyKeyForProps): AccountKey => {
   if (auth.state !== AUTH_CONFIG_STATES.off) return VIEWING_ACCOUNTS.local
   return settings.viewingOwner() ?? VIEWING_ACCOUNTS.local
 }
+
+type ViewingAccountsKeyOfProps = { request: object }
+
+type ViewingAccountsAdoptForProps = { account: Account }
 
 /**
  * Which account's viewing a request reads and writes, from the caller the
@@ -55,7 +58,7 @@ export class ViewingAccounts {
     this.isAdoptionPending = auth.state === AUTH_CONFIG_STATES.ready && this.adoption.hasLocalRows()
   }
 
-  keyOf({ request }: { request: object }): AccountKey {
+  keyOf({ request }: ViewingAccountsKeyOfProps): AccountKey {
     const caller = this.sessions.callerOf({ request })
     switch (caller.kind) {
       case CALLERS.legacy:
@@ -78,7 +81,7 @@ export class ViewingAccounts {
    * viewing, and the owner's first request after `ADOPTION_RETRY_MS` tries
    * again. Only the SQLite code is logged, never the error's message.
    */
-  private adoptFor({ account }: { account: Account }): void {
+  private adoptFor({ account }: ViewingAccountsAdoptForProps): void {
     if (!this.isAdoptionPending || !isApprovedOwner(account)) return
     if (Date.now() < this.retryAt) return
     try {

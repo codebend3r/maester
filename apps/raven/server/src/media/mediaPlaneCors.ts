@@ -61,13 +61,15 @@ export const responseHeaders = (origin: string): Record<string, string> => ({
   ].join(', '),
 })
 
+type PreflightHeadersProps = {
+  origin: string
+  wantsPrivateNetwork: boolean
+}
+
 export const preflightHeaders = ({
   origin,
   wantsPrivateNetwork,
-}: {
-  origin: string
-  wantsPrivateNetwork: boolean
-}): Record<string, string> => ({
+}: PreflightHeadersProps): Record<string, string> => ({
   [CORS_HEADERS.allowOrigin]: origin,
   [HEADERS.vary]: VARIES.origin,
   [CORS_HEADERS.allowMethods]: Object.values(MEDIA_PLANE_METHODS).join(', '),
@@ -83,6 +85,12 @@ const withOrigin = (existing: string | number | string[] | undefined): string =>
   return current === '' ? VARIES.origin : `${current}, ${VARIES.origin}`
 }
 
+type RegisterMediaPlaneCorsProps = {
+  fastify: FastifyInstance
+  isMediaPlanePath: (path: string) => boolean
+  isAllowedOrigin: (origin: string | undefined) => boolean
+}
+
 /**
  * Lets the web origins call the media plane routes from another origin: it
  * answers their preflight and puts the CORS headers on the reply, so a 423
@@ -94,11 +102,7 @@ export const registerMediaPlaneCors = ({
   fastify,
   isMediaPlanePath,
   isAllowedOrigin,
-}: {
-  fastify: FastifyInstance
-  isMediaPlanePath: (path: string) => boolean
-  isAllowedOrigin: (origin: string | undefined) => boolean
-}): void => {
+}: RegisterMediaPlaneCorsProps): void => {
   fastify.addHook('onRequest', async (request, reply) => {
     const { origin } = request.headers
     if (origin === undefined || !isAllowedOrigin(origin) || !isMediaPlanePath(request.url)) return

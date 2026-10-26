@@ -20,15 +20,7 @@ export type VideoSource =
   | { kind: typeof VIDEO_SOURCE_KINDS.file; url: string }
   | { kind: typeof VIDEO_SOURCE_KINDS.stream; mime: string; url: (start: number) => string }
 
-export const sourceFor = ({
-  api,
-  id,
-  mode,
-  audio,
-  quality = null,
-  mime,
-  access,
-}: {
+type SourceForProps = {
   api: ApiClient
   id: number
   mode: PlaybackMode
@@ -40,7 +32,17 @@ export const sourceFor = ({
   mime: string | null
   /** Read for each URL built, so a stream's next request carries the newest ticket. */
   access: () => MediaAccess | null
-}): VideoSource =>
+}
+
+export const sourceFor = ({
+  api,
+  id,
+  mode,
+  audio,
+  quality = null,
+  mime,
+  access,
+}: SourceForProps): VideoSource =>
   mode === PLAYBACK_MODES.direct || mime == null
     ? { kind: VIDEO_SOURCE_KINDS.file, url: api.fileUrl({ id, access: access() }) }
     : {
@@ -56,6 +58,19 @@ const failureMessage = (error: MediaError | null): string => {
     return "The browser couldn't open this file."
   }
   return 'Playback stopped unexpectedly.'
+}
+
+type UseMediaSourceProps = {
+  videoRef: RefObject<HTMLVideoElement | null>
+  source: HtmlSource
+  rendition: Rendition
+  audio: number | null
+  position: RefObject<number>
+  playing: RefObject<boolean>
+  /** The browser would not start playing. */
+  onRefused: () => void
+  onFailure: (message: string) => void
+  onSlow?: (delivery: Delivery) => void
 }
 
 /**
@@ -75,18 +90,7 @@ export const useMediaSource = ({
   onRefused,
   onFailure,
   onSlow,
-}: {
-  videoRef: RefObject<HTMLVideoElement | null>
-  source: HtmlSource
-  rendition: Rendition
-  audio: number | null
-  position: RefObject<number>
-  playing: RefObject<boolean>
-  /** The browser would not start playing. */
-  onRefused: () => void
-  onFailure: (message: string) => void
-  onSlow?: (delivery: Delivery) => void
-}): void => {
+}: UseMediaSourceProps): void => {
   const { mode, quality } = rendition
   const mime =
     mode === PLAYBACK_MODES.direct || htmlSource.kind === PLAYER_SOURCE_KINDS.file
@@ -134,20 +138,17 @@ export const useMediaSource = ({
     },
   })
 
+  type AttachUseEffectEventCallbackProps = {
+    element: HTMLVideoElement
+    source: VideoSource
+    duration: number | null
+    /** Whether the media comes from an origin that could prove unreachable. */
+    isRemote: boolean
+  }
+
   // Starts the source where playback is, playing on if it was.
   const attach = useEffectEvent(
-    ({
-      element,
-      source,
-      duration,
-      isRemote,
-    }: {
-      element: HTMLVideoElement
-      source: VideoSource
-      duration: number | null
-      /** Whether the media comes from an origin that could prove unreachable. */
-      isRemote: boolean
-    }): (() => void) => {
+    ({ element, source, duration, isRemote }: AttachUseEffectEventCallbackProps): (() => void) => {
       const from = position.current
       const play = () => {
         if (playing.current) element.play()?.catch(() => onRefused())

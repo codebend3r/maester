@@ -4,13 +4,21 @@ import type { MediaRepository } from '@/media/mediaRepository'
 import type { AccountKey } from '@/media/viewingAccountKeys'
 import type { MetadataRepository } from '@/metadata/metadataRepository'
 
-const ofType = <T extends ItemSummary['type']>({
-  children,
-  type,
-}: {
+type OfTypeProps<T extends ItemSummary['type']> = {
   children: readonly ItemSummary[]
   type: T
-}): number[] => children.flatMap((child) => (child.type === type ? [child.id] : []))
+}
+
+const ofType = <T extends ItemSummary['type']>({ children, type }: OfTypeProps<T>): number[] =>
+  children.flatMap((child) => (child.type === type ? [child.id] : []))
+
+type ItemChildrenProps = {
+  parentId: number
+  viewer: Viewer
+  metadata: MetadataRepository
+  media: MediaRepository
+  account: AccountKey
+}
 
 /**
  * A show's seasons or a season's episodes on disk, as its page lists them:
@@ -25,13 +33,7 @@ export const itemChildren = ({
   metadata,
   media,
   account,
-}: {
-  parentId: number
-  viewer: Viewer
-  metadata: MetadataRepository
-  media: MediaRepository
-  account: AccountKey
-}): ItemChild[] => {
+}: ItemChildrenProps): ItemChild[] => {
   const children = metadata.childrenOnDisk(parentId).filter((child) => viewer.seesItem(child.id))
   const episodeIds = ofType({ children, type: ITEM_TYPES.episode })
   const onDisk = metadata.episodesOnDisk(ofType({ children, type: ITEM_TYPES.season }))

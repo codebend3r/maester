@@ -75,11 +75,13 @@ const COPY_FEEDBACK = {
 
 type CopyFeedback = (typeof COPY_FEEDBACK)[keyof typeof COPY_FEEDBACK]
 
+type ReportRowProps = { report: BugReport }
+
 /**
  * One report as a card: what failed and for whom, its status to move on as
  * the admin works through it, and Copy debug info for everything it holds.
  */
-const ReportRow = ({ report }: { report: BugReport }) => {
+const ReportRow = ({ report }: ReportRowProps) => {
   const queryClient = useQueryClient()
   const statusId = useId()
   const [copied, setCopied] = useState<CopyFeedback | null>(null)

@@ -83,8 +83,10 @@ class SampleController {
 @Module({ controllers: [SampleController] })
 class SampleModule {}
 
+type DecodedProps = { headers: Record<string, unknown>; rawPayload: Buffer }
+
 /** The body as a browser's fetch hands it over, unpacked from whatever it was sent in. */
-const decoded = (response: { headers: Record<string, unknown>; rawPayload: Buffer }): Buffer => {
+const decoded = (response: DecodedProps): Buffer => {
   const encoding = response.headers[HEADERS.contentEncoding]
   if (encoding === ENCODINGS.br) return brotliDecompressSync(response.rawPayload)
   if (encoding === ENCODINGS.gzip) return gunzipSync(response.rawPayload)
@@ -101,7 +103,9 @@ describe('compressResponses', () => {
     if (!state.app) throw new Error('The app is not booted')
     return state.app
   }
-  const get = ({ url, headers = {} }: { url: string; headers?: Record<string, string> }) =>
+  type GetProps = { url: string; headers?: Record<string, string> }
+
+  const get = ({ url, headers = {} }: GetProps) =>
     app().inject({ method: HTTP_METHODS.get, url, headers })
 
   beforeAll(async () => {
@@ -272,7 +276,9 @@ describe('compressResponses', () => {
       const reader = response.body?.getReader()
       if (!reader) throw new Error('No body to read')
       const decoder = new TextDecoder()
-      const readUntil = async ({ text, read }: { text: string; read: string }): Promise<string> => {
+      type ReadUntilProps = { text: string; read: string }
+
+      const readUntil = async ({ text, read }: ReadUntilProps): Promise<string> => {
         if (read.includes(text)) return read
         const chunk = await reader.read()
         if (chunk.done) throw new Error(`The stream ended before "${text}": ${read}`)

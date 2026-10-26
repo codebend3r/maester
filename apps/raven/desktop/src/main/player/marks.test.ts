@@ -36,7 +36,9 @@ const fakeHistogram = () => {
   }
 }
 
-const setup = ({ isEnabled = true }: { isEnabled?: boolean } = {}) => {
+type SetupProps = { isEnabled?: boolean }
+
+const setup = ({ isEnabled = true }: SetupProps = {}) => {
   const lines: string[] = []
   const clock = { now: 1000 }
   const timers = fakeTimers()

@@ -107,8 +107,9 @@ const manualClock = () => {
   return { clock, advance, pending: () => state.timers.size }
 }
 
-const argAfter = ({ args, flag }: { args: string[]; flag: string }): string | undefined =>
-  args[args.indexOf(flag) + 1]
+type ArgAfterProps = { args: string[]; flag: string }
+
+const argAfter = ({ args, flag }: ArgAfterProps): string | undefined => args[args.indexOf(flag) + 1]
 
 describe('HlsSessions', () => {
   const state: {
@@ -142,7 +143,9 @@ describe('HlsSessions', () => {
       playback: () => DEFAULT_PLAYBACK_SETTINGS,
     })
 
-  const planOf = async ({ ffmpeg, path }: { ffmpeg: FfmpegService; path: string }) => {
+  type PlanOfProps = { ffmpeg: FfmpegService; path: string }
+
+  const planOf = async ({ ffmpeg, path }: PlanOfProps) => {
     const [keyframes, { probe }] = await Promise.all([
       ffmpeg.probeKeyframes(path),
       ffmpeg.probeFile(path),
@@ -209,7 +212,9 @@ describe('HlsSessions', () => {
     await rm(state.root, { recursive: true, force: true })
   })
 
-  const open = ({ pace = null }: { pace?: number | null } = {}) => {
+  type OpenProps = { pace?: number | null }
+
+  const open = ({ pace = null }: OpenProps = {}) => {
     state.dataDirs += 1
     const dataDir = join(state.root, `data-${state.dataDirs}`)
     const ffmpeg = ffmpegFor(dataDir)
@@ -219,6 +224,18 @@ describe('HlsSessions', () => {
     sessions.onModuleInit()
     opened.push(sessions)
     return { ffmpeg, sessions, advance, pending, dataDir }
+  }
+
+  type MintInProps = {
+    sessions: HlsSessions
+    mediaId?: number
+    input?: string
+    plan?: SegmentPlan
+    mode?: StreamMode
+    audio?: AudioTrack | null
+    startTime?: number
+    frameRate?: number | null
+    keyframesFor?: (() => readonly number[] | null) | null
   }
 
   const mintIn = ({
@@ -231,17 +248,7 @@ describe('HlsSessions', () => {
     startTime = 0,
     frameRate = 24,
     keyframesFor = null,
-  }: {
-    sessions: HlsSessions
-    mediaId?: number
-    input?: string
-    plan?: SegmentPlan
-    mode?: StreamMode
-    audio?: AudioTrack | null
-    startTime?: number
-    frameRate?: number | null
-    keyframesFor?: (() => readonly number[] | null) | null
-  }): HlsSession =>
+  }: MintInProps): HlsSession =>
     sessions.mint({
       mediaId,
       asked: null,
@@ -262,8 +269,10 @@ describe('HlsSessions', () => {
       keyframesFor,
     })
 
+  type VideoOfProps = { init: Uint8Array; media: Uint8Array }
+
   /** ffprobe's reading of the video in a segment played after its init. */
-  const videoOf = async ({ init, media }: { init: Uint8Array; media: Uint8Array }) => {
+  const videoOf = async ({ init, media }: VideoOfProps) => {
     state.probes += 1
     const path = join(state.root, `probe-${state.probes}.mp4`)
     await writeFile(path, Buffer.concat([init, media]))
@@ -327,14 +336,16 @@ describe('HlsSessions', () => {
     seekKeyframes: null,
   })
 
+  type TranscodeSourceProps = {
+    path: string
+    isTransportStream: boolean
+  }
+
   /** Probes a clip and plans its transcode, with its keyframes when it is a transport stream. */
   const transcodeSource = async ({
     path,
     isTransportStream,
-  }: {
-    path: string
-    isTransportStream: boolean
-  }): Promise<Source> => {
+  }: TranscodeSourceProps): Promise<Source> => {
     const ffmpeg = ffmpegFor(join(state.root, 'probe-sources'))
     const clock = mediaClockOf(await ffmpeg.probeJson(path))
     return {
@@ -349,16 +360,14 @@ describe('HlsSessions', () => {
     }
   }
 
-  /** Every transcoded segment from `from` to the end, asked for in turn, as ffprobe reads each. */
-  const segmentsFrom = async ({
-    sessions,
-    source,
-    from,
-  }: {
+  type SegmentsFromProps = {
     sessions: HlsSessions
     source: Source
     from: number
-  }) => {
+  }
+
+  /** Every transcoded segment from `from` to the end, asked for in turn, as ffprobe reads each. */
+  const segmentsFrom = async ({ sessions, source, from }: SegmentsFromProps) => {
     const session = mintIn({
       sessions,
       input: source.path,

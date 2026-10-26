@@ -13,7 +13,9 @@ const INDEXED = 'CREATE INDEX notes_body ON notes (body);'
 
 type Database = ReturnType<typeof openSqlite>
 
-const addNotes = ({ db, bodies }: { db: Database; bodies: readonly string[] }): void => {
+type AddNotesProps = { db: Database; bodies: readonly string[] }
+
+const addNotes = ({ db, bodies }: AddNotesProps): void => {
   const insert = db.prepare('INSERT INTO notes (body) VALUES (?)')
   db.transaction(() => bodies.forEach((body) => insert.run(body)))()
 }

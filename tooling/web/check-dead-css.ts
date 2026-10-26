@@ -35,6 +35,13 @@ const loadProgram = (configPath: string): ts.Program => {
   return ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options })
 }
 
+type ResolveStylesheetProps = {
+  specifier: string
+  from: string
+  options: ts.CompilerOptions
+  configDir: string
+}
+
 // Resolves a stylesheet import the way the project's `paths` do, from the
 // folder of the tsconfig that declares them.
 const resolveStylesheet = ({
@@ -42,12 +49,7 @@ const resolveStylesheet = ({
   from,
   options,
   configDir,
-}: {
-  specifier: string
-  from: string
-  options: ts.CompilerOptions
-  configDir: string
-}): string | undefined => {
+}: ResolveStylesheetProps): string | undefined => {
   if (specifier.startsWith('.')) {
     return resolve(dirname(from), specifier)
   }
@@ -93,18 +95,20 @@ const childrenOf = (node: ts.Node): ts.Node[] => {
   return children
 }
 
+type UsesInProps = {
+  node: ts.Node
+  file: ts.SourceFile
+  symbol: ts.Symbol
+  checker: ts.TypeChecker
+}
+
 // Every `styles.x` and `styles[key]` whose `styles` is the given import.
 const usesIn = ({
   node,
   file,
   symbol,
   checker,
-}: {
-  node: ts.Node
-  file: ts.SourceFile
-  symbol: ts.Symbol
-  checker: ts.TypeChecker
-}): { uses: Use[]; problems: Problem[] } => {
+}: UsesInProps): { uses: Use[]; problems: Problem[] } => {
   const nested = childrenOf(node).map((child) => usesIn({ node: child, file, symbol, checker }))
   const uses = nested.flatMap((result) => result.uses)
   const problems = nested.flatMap((result) => result.problems)

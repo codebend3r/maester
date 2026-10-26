@@ -4,10 +4,9 @@ import { MdblistClient, parseMdblistRatings } from '@/metadata/mdblistClient'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
 import { fakeTmdb } from '@/test/fakeTmdb'
 
-const config = ({
-  key = 'mdblist-key',
-  limit = 1000,
-}: { key?: string | null; limit?: number } = {}) => ({
+type ConfigProps = { key?: string | null; limit?: number }
+
+const config = ({ key = 'mdblist-key', limit = 1000 }: ConfigProps = {}) => ({
   ...readServerConfig({}),
   mdblistApiKey: key,
   mdblistDailyLimit: limit,

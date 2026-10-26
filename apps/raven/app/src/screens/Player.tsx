@@ -73,6 +73,12 @@ const COPY = {
 /** How often the player says where it is, in milliseconds: often enough for a smooth clock. */
 const PROGRESS_EVERY_MS = 250
 
+type CaptionsForProps = {
+  mode: PlaybackMode | null
+  tracks: MediaTracks | null
+  subtitle: string | null
+}
+
 /**
  * Who draws the picked subtitle. Where the chrome draws the cues, raven reads them from
  * `cueTrack`, and the player's own rendition is never picked, so it never draws a second.
@@ -83,11 +89,10 @@ const captionsFor = ({
   mode,
   tracks,
   subtitle,
-}: {
-  mode: PlaybackMode | null
-  tracks: MediaTracks | null
-  subtitle: string | null
-}): { cueTrack: SubtitleTrack | null; textTrack: VideoSurface['selectedTextTrack'] } => {
+}: CaptionsForProps): {
+  cueTrack: SubtitleTrack | null
+  textTrack: VideoSurface['selectedTextTrack']
+} => {
   if (shouldDrawCaptions) {
     return {
       cueTrack: tracks?.subtitles.find((track) => track.supported && track.id === subtitle) ?? null,
@@ -108,20 +113,7 @@ const StayAwake = () => {
   return null
 }
 
-/**
- * One video down its plan's ladder, under the platform's chrome: the session asks for each way's
- * source and steps down from the spot when one fails, the player's events drive the shared
- * video state, and that state drives the progress the server hears.
- */
-const Playing = ({
-  media,
-  tracks,
-  summary,
-  policy,
-  at,
-  session,
-  onBack,
-}: {
+type PlayingProps = {
   media: MediaItem
   tracks: MediaTracks | null
   summary: string | null
@@ -129,7 +121,14 @@ const Playing = ({
   at: number
   session: AppQueries
   onBack: () => void
-}) => {
+}
+
+/**
+ * One video down its plan's ladder, under the platform's chrome: the session asks for each way's
+ * source and steps down from the spot when one fails, the player's events drive the shared
+ * video state, and that state drives the progress the server hears.
+ */
+const Playing = ({ media, tracks, summary, policy, at, session, onBack }: PlayingProps) => {
   const queryClient = useQueryClient()
   const audioLanguage = usePlayerPrefs((prefs) => prefs.audioLanguage)
   const subtitlePrefs = usePlayerPrefs((prefs) => prefs.subtitles)
@@ -354,18 +353,15 @@ const Playing = ({
   )
 }
 
-/** A video once the server's playback settings and its tracks are known. */
-const ReadyPlayer = ({
-  media,
-  at,
-  session,
-  onBack,
-}: {
+type ReadyPlayerProps = {
   media: MediaItem
   at: number
   session: AppQueries
   onBack: () => void
-}) => {
+}
+
+/** A video once the server's playback settings and its tracks are known. */
+const ReadyPlayer = ({ media, at, session, onBack }: ReadyPlayerProps) => {
   const policy = usePlaybackPolicy({ queries: session.queries })
   const tracks = useQuery(session.queries.tracksQuery(media.id))
   // Read before the source is handed over, which carries the synopsis on a TV: a source that
@@ -389,16 +385,14 @@ const ReadyPlayer = ({
   )
 }
 
-/** The player's chrome with only a line on it and Back. */
-const Waiting = ({
-  title,
-  notice,
-  onBack,
-}: {
+type WaitingProps = {
   title: string
   notice: string
   onBack: () => void
-}) => (
+}
+
+/** The player's chrome with only a line on it and Back. */
+const Waiting = ({ title, notice, onBack }: WaitingProps) => (
   <PlayerChrome
     artwork={null}
     audio={null}
@@ -414,15 +408,13 @@ const Waiting = ({
   />
 )
 
-const ServerPlayer = ({
-  session,
-  mediaId,
-  at,
-}: {
+type ServerPlayerProps = {
   session: AppQueries
   mediaId: number | null
   at: number
-}) => {
+}
+
+const ServerPlayer = ({ session, mediaId, at }: ServerPlayerProps) => {
   const router = useRouter()
   const onBack = () => router.back()
   const page = routeState({ id: mediaId, query: useQuery(session.queries.mediaQuery(mediaId)) })

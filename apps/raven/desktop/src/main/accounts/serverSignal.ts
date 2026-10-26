@@ -1,4 +1,6 @@
-type ServerListener = (input: { serverId: string }) => void
+type ServerListenerProps = { serverId: string }
+
+type ServerListener = (input: ServerListenerProps) => void
 
 /**
  * Tells whoever listens that something happened to a server: a sign-in ended (`accessEnds`), or

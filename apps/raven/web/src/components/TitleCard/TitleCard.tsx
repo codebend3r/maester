@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import styles from '@/components/TitleCard/TitleCard.module.scss'
 
+type TitleCardProps = { item: ItemSummary }
+
 /**
  * A favourite show or season as a poster that opens its page, its title
  * and facts beneath: a season names its show.
  */
-export const TitleCard = ({ item }: { item: ItemSummary }) => {
+export const TitleCard = ({ item }: TitleCardProps) => {
   const poster = posterSources({ item, sizes: POSTER_SIZES.grid })
   const facts = [item.show?.title ?? null, item.year == null ? null : String(item.year)].filter(
     (fact): fact is string => fact != null,

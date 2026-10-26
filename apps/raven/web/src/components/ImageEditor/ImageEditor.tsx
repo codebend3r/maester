@@ -58,20 +58,16 @@ const GRIDS: Record<ChoosableImageKind, string | undefined> = {
   logo: styles.logos,
 }
 
-/** One tab's pictures to pick from. */
-const Options = ({
-  itemId,
-  kind,
-  options,
-  busy,
-  onChoose,
-}: {
+type OptionsProps = {
   itemId: number
   kind: ChoosableImageKind
   options: readonly ImageOption[]
   busy: boolean
   onChoose: (option: ImageOption) => void
-}) => (
+}
+
+/** One tab's pictures to pick from. */
+const Options = ({ itemId, kind, options, busy, onChoose }: OptionsProps) => (
   <>
     {options.length === 0 ? (
       <p className={styles.hint}>No {kind}s to choose from.</p>
@@ -110,6 +106,14 @@ const Options = ({
   </>
 )
 
+type ImageEditorProps = {
+  details: ItemDetails
+  libraries: readonly Library[]
+  /** A show's pictures are its own; there are no linked files to list. */
+  itemKind?: MatchItemType
+  onDone: () => void
+}
+
 /**
  * Edit images: every poster, backdrop and logo a movie or show could show,
  * the current one marked, and the files that are this movie,
@@ -121,20 +125,16 @@ export const ImageEditor = ({
   libraries,
   itemKind = 'movie',
   onDone,
-}: {
-  details: ItemDetails
-  libraries: readonly Library[]
-  /** A show's pictures are its own; there are no linked files to list. */
-  itemKind?: MatchItemType
-  onDone: () => void
-}) => {
+}: ImageEditorProps) => {
   const ids = { heading: useId(), versions: useId() }
   const [tab, setTab] = useState<ChoosableImageKind>('poster')
   const kinds = KINDS_OF[itemKind]
   const queryClient = useQueryClient()
   const options = useQuery(itemImagesQuery(details.id))
+  type ChooseMutationFnProps = { kind: ChoosableImageKind; option: ImageOption }
+
   const choose = useMutation({
-    mutationFn: ({ kind, option }: { kind: ChoosableImageKind; option: ImageOption }) =>
+    mutationFn: ({ kind, option }: ChooseMutationFnProps) =>
       api.chooseItemImage({ id: details.id, kind, choice: choiceOf(option) }),
     onSuccess: (updated) => afterItemEdited({ queryClient, updated, part: EDITED_PARTS.images }),
   })

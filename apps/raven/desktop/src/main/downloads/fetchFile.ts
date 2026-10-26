@@ -9,11 +9,13 @@ export const PROGRESS_STEP_BYTES = 8 * 1024 ** 2
 export const PROGRESS_STEP_MS = 1000
 export const DOWNLOAD_STALL_MS = 30_000
 
-export type StreamFetch = (input: {
+type StreamFetchProps = {
   url: string
   headers: Record<string, string>
   signal: AbortSignal
-}) => Promise<{
+}
+
+export type StreamFetch = (input: StreamFetchProps) => Promise<{
   status: number
   headers: { get: (name: string) => string | null }
   body: ReadableStream<Uint8Array> | null
@@ -85,17 +87,20 @@ const PLANS = {
 
 type Plan = (typeof PLANS)[keyof typeof PLANS]
 
-const failure = ({
-  reason,
-  status = null,
-  refusal = null,
-  bytes,
-}: {
+type FailureProps = {
   reason: FailureReason
   status?: number | null
   refusal?: AccountRefusal | null
   bytes: number
-}): FetchOutcome => ({ ok: false, reason, status, refusal, bytes })
+}
+
+const failure = ({ reason, status = null, refusal = null, bytes }: FailureProps): FetchOutcome => ({
+  ok: false,
+  reason,
+  status,
+  refusal,
+  bytes,
+})
 
 const isAbortError = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
@@ -111,17 +116,16 @@ export const contentRangeStart = (header: string | null): number | null => {
   return start === null ? null : Number(start)
 }
 
+type PromisedSizeProps = {
+  from: number
+  headers: Answer['headers']
+}
+
 /**
  * The size the part reaches once the body sends all the response promised: the bytes on disk and
  * its `Content-Length`, else past the last byte of its `Content-Range`; `null` when it promised neither.
  */
-const promisedSize = ({
-  from,
-  headers,
-}: {
-  from: number
-  headers: Answer['headers']
-}): number | null => {
+const promisedSize = ({ from, headers }: PromisedSizeProps): number | null => {
   const length = /^\d+$/u.exec(headers.get(HTTP_HEADERS.contentLength) ?? '')?.[0] ?? null
   if (length !== null) return from + Number(length)
   const last = CONTENT_RANGE.exec(headers.get(HTTP_HEADERS.contentRange) ?? '')?.[2] ?? null
@@ -142,15 +146,13 @@ const refusalFor = (status: number): { reason: FailureReason; status: number } |
   }
 }
 
-const planFor = ({
-  status,
-  from,
-  rangeStart,
-}: {
+type PlanForProps = {
   status: number
   from: number
   rangeStart: number | null
-}): Plan => {
+}
+
+const planFor = ({ status, from, rangeStart }: PlanForProps): Plan => {
   if (status !== HTTP_STATUSES.ok && status !== HTTP_STATUSES.partialContent)
     return PLANS.unexpected
   if (from === 0) return status === HTTP_STATUSES.ok ? PLANS.append : PLANS.changed
@@ -163,14 +165,13 @@ const discard = async (body: Answer['body']): Promise<void> => {
   await body?.cancel().catch(() => undefined)
 }
 
-/** The account refusal a `401` or `403` body names; any other refused body is only let go of. */
-const refusalIn = async ({
-  status,
-  body,
-}: {
+type RefusalInProps = {
   status: number
   body: Answer['body']
-}): Promise<AccountRefusal | null> => {
+}
+
+/** The account refusal a `401` or `403` body names; any other refused body is only let go of. */
+const refusalIn = async ({ status, body }: RefusalInProps): Promise<AccountRefusal | null> => {
   if (status !== HTTP_STATUSES.unauthorized && status !== HTTP_STATUSES.forbidden) {
     await discard(body)
     return null

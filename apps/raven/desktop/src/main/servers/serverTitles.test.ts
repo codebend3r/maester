@@ -19,13 +19,12 @@ const SERVER: ServerEntry = {
 const FILE_ID = '20000000-0000-4000-8000-000000000001'
 const TICKET: TicketOutcome = { kind: TICKET_OUTCOMES.ticket, ticket: 'account.t1' }
 
-const setup = ({
-  download = null,
-  ticket = TICKET,
-}: {
+type SetupProps = {
   download?: string | null
   ticket?: TicketOutcome
-} = {}) => {
+}
+
+const setup = ({ download = null, ticket = TICKET }: SetupProps = {}) => {
   const opened: { serverId: string; mediaId: number }[] = []
   const minted: { serverId: string; mediaId: number; isFresh: boolean }[] = []
   const titles = createServerTitles({

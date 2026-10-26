@@ -29,30 +29,48 @@ export const CALL_MESSAGES = {
   otherAccount: (name: string) => `Raven is signed in to ${name} as someone else now.`,
 } as const
 
-export type ServerFetch = (input: {
+type ServerFetchProps = {
   url: string
   method: ServerMethod
   headers: Record<string, string>
   body: string | null
   timeoutMs: number
-}) => Promise<{ status: number; text: (input: { maxChars: number }) => Promise<string> }>
+}
+
+type TextProps = { maxChars: number }
+
+export type ServerFetch = (
+  input: ServerFetchProps,
+) => Promise<{ status: number; text: (input: TextProps) => Promise<string> }>
 
 export type ServerCallResult =
   | { ok: true; status: number; body: string }
   | { ok: false; message: string }
+
+type CallProps = {
+  serverId: string
+  call: AllowedCall
+  accountId?: string | null
+}
 
 export type ServerCalls = {
   /**
    * `accountId`, when given, is the only account the call may go out as: one whose token names
    * another account, or no token, sends nothing.
    */
-  call: (input: {
-    serverId: string
-    call: AllowedCall
-    accountId?: string | null
-  }) => Promise<ServerCallResult>
+  call: (input: CallProps) => Promise<ServerCallResult>
   hasPendingWrites: () => boolean
   settleWrites: () => Promise<void>
+}
+
+type ReadCappedProps = {
+  reader: {
+    read: () => Promise<{ done: true; value?: undefined } | { done: false; value: Uint8Array }>
+    cancel: () => Promise<void>
+  }
+  decoder: TextDecoder
+  text: string
+  maxChars: number
 }
 
 /** Reads a reply's text, stopping one chunk past `maxChars`, so a huge one is never held whole. */
@@ -61,15 +79,7 @@ const readCapped = async ({
   decoder,
   text,
   maxChars,
-}: {
-  reader: {
-    read: () => Promise<{ done: true; value?: undefined } | { done: false; value: Uint8Array }>
-    cancel: () => Promise<void>
-  }
-  decoder: TextDecoder
-  text: string
-  maxChars: number
-}): Promise<string> => {
+}: ReadCappedProps): Promise<string> => {
   const { done, value } = await reader.read()
   if (done) return `${text}${decoder.decode()}`
   const next = `${text}${decoder.decode(value, { stream: true })}`
@@ -109,15 +119,13 @@ export const fetchThrough =
     }
   }
 
-const headersFor = ({
-  body,
-  token,
-  unlock,
-}: {
+type HeadersForProps = {
   body: string | null
   token: string | null
   unlock: string | null
-}): Record<string, string> => ({
+}
+
+const headersFor = ({ body, token, unlock }: HeadersForProps): Record<string, string> => ({
   [HTTP_HEADERS.accept]: 'application/json',
   ...(body === null ? {} : { [HTTP_HEADERS.contentType]: 'application/json' }),
   ...(token === null ? {} : { [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${token}` }),
@@ -151,6 +159,20 @@ const rematch = (call: AllowedCall): AllowedCall | null => {
   }
 }
 
+type AuthorizeProps = { serverId: string }
+
+type UnlockOfProps = { serverId: string }
+
+type CreateServerCallsProps = {
+  serverOf: (serverId: string) => ServerEntry | null
+  fetch: ServerFetch
+  /** The access token to send to the server: the page's, or null while it is signed out. */
+  authorize: (input: AuthorizeProps) => string | null
+  /** The `Cookie` header with the page's unlock for the server, or null when it holds none. */
+  unlockOf: (input: UnlockOfProps) => Promise<string | null>
+  warn: (message: string) => void
+}
+
 /**
  * Runs allowlisted calls against the server. Every URL is its stored origin plus the path
  * `requestFor` builds, and each carries the page's access token as its Bearer when there is one,
@@ -162,15 +184,7 @@ export const createServerCalls = ({
   authorize,
   unlockOf,
   warn,
-}: {
-  serverOf: (serverId: string) => ServerEntry | null
-  fetch: ServerFetch
-  /** The access token to send to the server: the page's, or null while it is signed out. */
-  authorize: (input: { serverId: string }) => string | null
-  /** The `Cookie` header with the page's unlock for the server, or null when it holds none. */
-  unlockOf: (input: { serverId: string }) => Promise<string | null>
-  warn: (message: string) => void
-}): ServerCalls => {
+}: CreateServerCallsProps): ServerCalls => {
   /** A log line never fails a call: the call has already been answered or refused. */
   const safeWarn = quietly(warn)
 
@@ -179,26 +193,27 @@ export const createServerCalls = ({
 
   const countOf = (serverId: string): number => inFlight.get(serverId) ?? 0
 
-  const adjust = ({ serverId, by }: { serverId: string; by: number }): void => {
+  type AdjustProps = { serverId: string; by: number }
+
+  const adjust = ({ serverId, by }: AdjustProps): void => {
     inFlight = new Map([...inFlight, [serverId, countOf(serverId) + by]])
   }
 
   const slotsFor = (call: AllowedCall): number =>
     requestFor(call).method === SERVER_METHODS.get ? MAX_IN_FLIGHT : MAX_IN_FLIGHT + WRITE_RESERVE
 
-  const isBusy = ({ server, call }: { server: ServerEntry; call: AllowedCall }): boolean =>
-    countOf(server.id) >= slotsFor(call)
+  type IsBusyProps = { server: ServerEntry; call: AllowedCall }
 
-  /** One request to the server, in one of its slots. */
-  const attempt = async ({
-    server,
-    call,
-    token,
-  }: {
+  const isBusy = ({ server, call }: IsBusyProps): boolean => countOf(server.id) >= slotsFor(call)
+
+  type AttemptProps = {
     server: ServerEntry
     call: AllowedCall
     token: string | null
-  }): Promise<ServerCallResult> => {
+  }
+
+  /** One request to the server, in one of its slots. */
+  const attempt = async ({ server, call, token }: AttemptProps): Promise<ServerCallResult> => {
     if (isBusy({ server, call })) return { ok: false, message: CALL_MESSAGES.busy(server.name) }
     adjust({ serverId: server.id, by: 1 })
     try {
@@ -208,15 +223,13 @@ export const createServerCalls = ({
     }
   }
 
-  const request = async ({
-    server,
-    call,
-    token,
-  }: {
+  type RequestProps = {
     server: ServerEntry
     call: AllowedCall
     token: string | null
-  }): Promise<ServerCallResult> => {
+  }
+
+  const request = async ({ server, call, token }: RequestProps): Promise<ServerCallResult> => {
     const { method, path, body } = requestFor(call)
     const maxChars = replyCapFor(call)
     try {
@@ -240,19 +253,17 @@ export const createServerCalls = ({
     }
   }
 
+  type SendProps = {
+    server: ServerEntry
+    call: AllowedCall
+    accountId: string | null
+  }
+
   /**
    * Checked against the token's own account, so a call that belongs to one account never goes
    * out under another's token, or under none.
    */
-  const send = ({
-    server,
-    call,
-    accountId,
-  }: {
-    server: ServerEntry
-    call: AllowedCall
-    accountId: string | null
-  }): Promise<ServerCallResult> => {
+  const send = ({ server, call, accountId }: SendProps): Promise<ServerCallResult> => {
     const token = authorize({ serverId: server.id })
     const isAs = accountId === null || (token !== null && accountIdOfToken(token) === accountId)
     if (!isAs) {
@@ -261,11 +272,11 @@ export const createServerCalls = ({
     return attempt({ server, call, token })
   }
 
-  const tracked = async ({
-    task,
-  }: {
+  type TrackedProps = {
     task: Promise<ServerCallResult>
-  }): Promise<ServerCallResult> => {
+  }
+
+  const tracked = async ({ task }: TrackedProps): Promise<ServerCallResult> => {
     const settled = task.then(
       () => undefined,
       () => undefined,

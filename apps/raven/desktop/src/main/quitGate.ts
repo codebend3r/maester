@@ -1,5 +1,16 @@
 const FLUSH_OUTCOMES = { flushed: 'flushed', failed: 'failed', timedOut: 'timedOut' } as const
 
+type CreateQuitGateProps = {
+  isDirty: () => boolean
+  flush: () => Promise<void>
+  timeoutMs: number
+  quit: () => void
+  exit: () => void
+  wait: (ms: number) => Promise<void>
+}
+
+type CreateQuitGateCallbackProps = { preventDefault: () => void }
+
 /**
  * Holds a quit until the state store has written, for at most `timeoutMs`: a hung
  * or failed write must never keep the app open. The store does not retry a failed
@@ -15,14 +26,7 @@ export const createQuitGate = ({
   quit,
   exit,
   wait,
-}: {
-  isDirty: () => boolean
-  flush: () => Promise<void>
-  timeoutMs: number
-  quit: () => void
-  exit: () => void
-  wait: (ms: number) => Promise<void>
-}): ((event: { preventDefault: () => void }) => void) => {
+}: CreateQuitGateProps): ((event: CreateQuitGateCallbackProps) => void) => {
   let isFlushing = false
 
   const save = async (): Promise<void> => {

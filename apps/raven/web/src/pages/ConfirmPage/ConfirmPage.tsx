@@ -48,7 +48,9 @@ type Outcome = (typeof OUTCOMES)[keyof typeof OUTCOMES]
 
 const Verifying = () => <AuthCard title="Confirming your link" lead={<Status>One moment</Status>} />
 
-const Expired = ({ type }: { type: ConfirmType | null }) => {
+type ExpiredProps = { type: ConfirmType | null }
+
+const Expired = ({ type }: ExpiredProps) => {
   const again = type === null ? null : LINK_TYPES[type].resend
 
   return (

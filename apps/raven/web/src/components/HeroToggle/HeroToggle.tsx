@@ -5,12 +5,14 @@ import { afterHeroPicked } from '@raven/ui/headless'
 import { api } from '@/lib/api'
 import { heroPicksQuery } from '@/lib/queries'
 
+type HeroToggleProps = { itemId: number }
+
 /**
  * The admin's switch for one movie or show: whether home's hero shows it.
  * Mount it inside `AdminOnly`, so only a manager asks for the picks. It waits
  * for the picks, and a title not yet in is held back while the hero is full.
  */
-export const HeroToggle = ({ itemId }: { itemId: number }) => {
+export const HeroToggle = ({ itemId }: HeroToggleProps) => {
   const queryClient = useQueryClient()
   const showNotice = useToasts((state) => state.show)
   const picks = useQuery(heroPicksQuery)

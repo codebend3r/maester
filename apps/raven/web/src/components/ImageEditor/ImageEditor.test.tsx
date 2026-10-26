@@ -35,13 +35,12 @@ describe('ImageEditor', () => {
   }
   const state = { done: 0 }
 
-  const open = ({
-    overrides = {},
-    itemKind = ITEM_TYPES.movie,
-  }: {
+  type OpenProps = {
     overrides?: Parameters<typeof itemDetails>[0]
     itemKind?: MatchItemType
-  } = {}) => {
+  }
+
+  const open = ({ overrides = {}, itemKind = ITEM_TYPES.movie }: OpenProps = {}) => {
     spies.options.mockImplementation(async () => OPTIONS)
     spies.choose.mockImplementation(async () => itemDetails({ posterVersion: 'new' }))
     renderWithProviders({

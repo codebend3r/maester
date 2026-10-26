@@ -1,12 +1,11 @@
 import { resolve } from 'node:path'
 
-export const moltenvkBuildCommands = ({
-  source,
-  buildRoot,
-}: {
+type MoltenvkBuildCommandsProps = {
   source: string
   buildRoot: string
-}) => {
+}
+
+export const moltenvkBuildCommands = ({ source, buildRoot }: MoltenvkBuildCommandsProps) => {
   // Upstream packaging removes External/build/Intermediates while Xcode is still running.
   const derivedData = resolve(buildRoot, 'xcode-derived-data')
   return [

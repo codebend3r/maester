@@ -46,6 +46,7 @@ These apply to every TypeScript project: everything but `@luwin/api` and the Pyt
 - Never use a non-null assertion (`!`) outside a test file; narrow the value or fail explicitly instead. oxlint fails on it everywhere but the test files.
 - Never `@ts-ignore`. If a suppression is truly unavoidable, use `@ts-expect-error` with a reason on the same line.
 - Validate untrusted data (route params, query strings, request bodies, fetch responses, file contents) with a type guard at the boundary. Code past the boundary trusts the narrowed type; it does not re-check. raven's guards live in `@raven/core`.
+- Never type a function's or component's parameters inline. Define a named type alias directly above it, called the function's name plus `Props` (`MatchupGate` takes `MatchupGateProps`), and annotate the parameter with it. Do: `type MatchupGateProps = { message: string; children?: ReactNode }` then `function MatchupGate({ message, children }: MatchupGateProps)`. Don't: `function MatchupGate({ message, children }: { message: string; children?: ReactNode })`. This applies to every function that takes an object parameter, not only React components; an audit should flag any inline object type in a parameter position.
 
 ## Code style
 

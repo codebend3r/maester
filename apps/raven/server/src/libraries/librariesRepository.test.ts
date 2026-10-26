@@ -187,8 +187,10 @@ describe('what each library holds, and the order they come in', () => {
   beforeEach(database.open)
   afterEach(database.close)
 
+  type AddLibraryProps = { name: string; frames: readonly Frame[] }
+
   /** A Movies library with a file for each frame, its files' ids in the same order. */
-  const addLibrary = ({ name, frames }: { name: string; frames: readonly Frame[] }) => {
+  const addLibrary = ({ name, frames }: AddLibraryProps) => {
     const index = new MediaIndex(database.get())
     const { id } = libraries().create({ name, paths: [`/${name}`], settings: { kind: 'movies' } })
     const files = frames.map((frame, position) => {

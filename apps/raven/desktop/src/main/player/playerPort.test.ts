@@ -5,9 +5,9 @@ import { fakePort, fakeService } from '@/main/test/playerFakes'
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-const connect = ({
-  service = fakeService(),
-}: { service?: ReturnType<typeof fakeService> } = {}) => {
+type ConnectProps = { service?: ReturnType<typeof fakeService> }
+
+const connect = ({ service = fakeService() }: ConnectProps = {}) => {
   const port = fakePort()
   const warn = mock((_message: string) => {})
   const connection = connectPort({ port: port.port, service: service.service, warn })

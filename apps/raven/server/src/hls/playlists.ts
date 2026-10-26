@@ -21,16 +21,14 @@ const quoted = (value: string): string => `"${value.replace(/["\r\n]/g, '')}"`
 
 const extinf = (seconds: number): string => `#EXTINF:${seconds.toFixed(3)},`
 
-/** The label with the first count from `count` on that names nothing in `taken`. */
-const countedName = ({
-  label,
-  taken,
-  count,
-}: {
+type CountedNameProps = {
   label: string
   taken: ReadonlySet<string>
   count: number
-}): string => {
+}
+
+/** The label with the first count from `count` on that names nothing in `taken`. */
+const countedName = ({ label, taken, count }: CountedNameProps): string => {
   const name = `${label} ${count}`
   return taken.has(name) ? countedName({ label, taken, count: count + 1 }) : name
 }
@@ -67,6 +65,15 @@ const mediaLine = ({ track, uri, name }: SubtitleRendition & { name: string }): 
     `URI=${quoted(uri)}`,
   ].join(',')
 
+type MasterPlaylistProps = {
+  mode: PlaybackMode
+  variantUri: string
+  subtitles: readonly SubtitleRendition[]
+  codecs: string
+  resolution: { width: number; height: number }
+  bandwidth: number
+}
+
 /**
  * The master playlist: one variant, and a rendition for each text subtitle
  * track (a picture track has none). The caller builds every URI so each
@@ -81,14 +88,7 @@ export const masterPlaylist = ({
   codecs,
   resolution,
   bandwidth,
-}: {
-  mode: PlaybackMode
-  variantUri: string
-  subtitles: readonly SubtitleRendition[]
-  codecs: string
-  resolution: { width: number; height: number }
-  bandwidth: number
-}): string => {
+}: MasterPlaylistProps): string => {
   const renditions = subtitles.filter(({ track }) => track.supported)
   const names = uniqueNames(renditions.map(({ track }) => renditionName(track)))
   const streamInf = [
@@ -109,16 +109,14 @@ export const masterPlaylist = ({
   ].join('\n')
 }
 
-/** The video playlist: every segment of the plan, behind the init segment. */
-export const mediaPlaylist = ({
-  plan,
-  initUri,
-  segmentUri,
-}: {
+type MediaPlaylistProps = {
   plan: SegmentPlan
   initUri: string
   segmentUri: (n: number) => string
-}): string => {
+}
+
+/** The video playlist: every segment of the plan, behind the init segment. */
+export const mediaPlaylist = ({ plan, initUri, segmentUri }: MediaPlaylistProps): string => {
   const durations = segmentDurations(plan)
   return [
     '#EXTM3U',
@@ -138,14 +136,13 @@ const SUBTITLE_SEGMENT_MS = HLS_SEGMENT_SECONDS * 1000
 export const subtitleSegmentCount = (duration: number): number =>
   Math.ceil(Math.round(duration * 1000) / SUBTITLE_SEGMENT_MS)
 
-/** A subtitle track's playlist: six-second WebVTT segments, the last one shorter. */
-export const subtitlePlaylist = ({
-  duration,
-  segmentUri,
-}: {
+type SubtitlePlaylistProps = {
   duration: number
   segmentUri: (n: number) => string
-}): string => {
+}
+
+/** A subtitle track's playlist: six-second WebVTT segments, the last one shorter. */
+export const subtitlePlaylist = ({ duration, segmentUri }: SubtitlePlaylistProps): string => {
   const durationMs = Math.round(duration * 1000)
   return [
     '#EXTM3U',

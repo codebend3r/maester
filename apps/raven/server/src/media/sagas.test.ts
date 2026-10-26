@@ -33,16 +33,14 @@ describe("a library's sagas", () => {
   const media = () => repositories(database.get()).media
   const id = (name: string): number => state.ids.get(name) ?? -1
 
-  /** A movie of `saga` and a file for each name, the first the biggest, so best. */
-  const addMovie = ({
-    title,
-    year,
-    files,
-  }: {
+  type AddMovieProps = {
     title: string
     year: number
     files: readonly string[]
-  }): void => {
+  }
+
+  /** A movie of `saga` and a file for each name, the first the biggest, so best. */
+  const addMovie = ({ title, year, files }: AddMovieProps): void => {
     const { metadata } = repositories(database.get())
     const index = new MediaIndex(database.get())
     const itemId = metadata.save({

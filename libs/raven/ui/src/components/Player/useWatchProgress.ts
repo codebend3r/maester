@@ -10,19 +10,21 @@ const watchPageHide: WatchHide = (save) => {
   return () => window.removeEventListener(PAGE_EVENTS.hide, save)
 }
 
+type UseWatchProgressProps = {
+  state: VideoState
+  position: RefObject<number>
+  duration: number | null
+  /** The audio track playing, which each save names for the admin's Streams page. */
+  audio: number | null
+}
+
 /** Progress follows engine state, not a particular engine's DOM events. */
 export const useWatchProgress = ({
   state,
   position,
   duration,
   audio,
-}: {
-  state: VideoState
-  position: RefObject<number>
-  duration: number | null
-  /** The audio track playing, which each save names for the admin's Streams page. */
-  audio: number | null
-}): void => {
+}: UseWatchProgressProps): void => {
   const { progress, title } = useHostServices()
   useProgressReport({
     state,

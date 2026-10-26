@@ -28,15 +28,17 @@ const counts = () => {
   if (!isCounts(value)) throw new Error('Invalid native lifecycle counts')
   return value
 }
+type CollectUntilProps = {
+  matches: () => boolean
+  deadline?: number
+  rounds?: number
+}
+
 const collectUntil = async ({
   matches,
   deadline = Date.now() + 15000,
   rounds = 0,
-}: {
-  matches: () => boolean
-  deadline?: number
-  rounds?: number
-}): Promise<void> => {
+}: CollectUntilProps): Promise<void> => {
   if (typeof global.gc !== 'function') throw new Error('Cleanup test requires --expose-gc')
   global.gc()
   await sleep(10)

@@ -18,6 +18,10 @@ export const ENCODINGS = { br: 'br', gzip: 'gzip' } as const
 const isStream = (payload: unknown): payload is Stream | ReadableStream =>
   payload instanceof Stream || payload instanceof ReadableStream
 
+type CompressResponsesProps = {
+  app: NestFastifyApplication
+}
+
 /**
  * Compresses what compresses well, JSON and the web app's text, with Brotli
  * or gzip as the browser asks. Must run before the routes are registered:
@@ -31,11 +35,7 @@ const isStream = (payload: unknown): payload is Stream | ReadableStream =>
  * plugin's `syncThreshold` (4 to 64 KB by core count) zlib runs on libuv's
  * threadpool, off the event loop.
  */
-export const compressResponses = async ({
-  app,
-}: {
-  app: NestFastifyApplication
-}): Promise<void> => {
+export const compressResponses = async ({ app }: CompressResponsesProps): Promise<void> => {
   const fastify = app.getHttpAdapter().getInstance()
   // A Range asks for bytes of the uncompressed file, so it is answered as it
   // always was. `x-no-compression` is the plugin's way to skip one request.

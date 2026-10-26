@@ -70,18 +70,18 @@ export const FIXTURE_MOVIE_NAMES = {
 
 const FIXTURE_SHOW = { id: FIXTURE_ITEMS.show, title: FIXTURE_TITLES.show }
 
-const movieSummary = ({ id, title }: { id: number; title: string }): ItemSummary =>
+type MovieSummaryProps = { id: number; title: string }
+
+const movieSummary = ({ id, title }: MovieSummaryProps): ItemSummary =>
   summary({ id, type: ITEM_TYPES.movie, title, year: FIXTURE_YEAR })
 
-const episodeSummary = ({
-  id,
-  number,
-  title,
-}: {
+type EpisodeSummaryProps = {
   id: number
   number: number
   title: string
-}): ItemSummary =>
+}
+
+const episodeSummary = ({ id, number, title }: EpisodeSummaryProps): ItemSummary =>
   summary({
     id,
     type: ITEM_TYPES.episode,
@@ -136,13 +136,12 @@ const seasonCard: SeasonSummary = {
   watchedCount: 0,
 }
 
-const episodeCard = ({
-  item,
-  primary,
-}: {
+type EpisodeCardProps = {
   item: ItemSummary
   primary: MediaItem
-}): EpisodeSummary => ({
+}
+
+const episodeCard = ({ item, primary }: EpisodeCardProps): EpisodeSummary => ({
   ...item,
   type: ITEM_TYPES.episode,
   summary: null,
@@ -153,19 +152,19 @@ const episodeCard = ({
   primary,
 })
 
+type TitleDetailsProps = { item: ItemSummary; primary: MediaItem }
+
 /** A movie's or an episode's own page: the item, with its file as its one version. */
-const titleDetails = ({ item, primary }: { item: ItemSummary; primary: MediaItem }): ItemDetails =>
+const titleDetails = ({ item, primary }: TitleDetailsProps): ItemDetails =>
   details({ ...item, tmdbId: String(item.id), versions: [primary] })
 
-const libraryOf = ({
-  id,
-  name,
-  kind,
-}: {
+type LibraryOfProps = {
   id: number
   name: string
   kind: Library['settings']['kind']
-}): Library => {
+}
+
+const libraryOf = ({ id, name, kind }: LibraryOfProps): Library => {
   const base = library({ id, watchedPercent: 90 })
   return { ...base, name, settings: { ...base.settings, kind } }
 }
@@ -183,23 +182,24 @@ export type FixtureCatalog = {
   home: Home
 }
 
-const mediaOf = ({
-  media,
-  mediaId,
-}: {
+type MediaOfProps = {
   media: ReadonlyMap<number, MediaItem>
   mediaId: number
-}) => {
+}
+
+const mediaOf = ({ media, mediaId }: MediaOfProps) => {
   const found = media.get(mediaId)
   if (found === undefined) throw new Error(`The fixture lost media ${mediaId}`)
   return found
 }
 
+type CatalogOfProps = { media: ReadonlyMap<number, MediaItem> }
+
 /**
  * What the server's library routes answer, built on the titles as `GET /api/media/:id` answers
  * them, and checked against core's guards so a page never reads a shape the server never sends.
  */
-export const catalogOf = ({ media }: { media: ReadonlyMap<number, MediaItem> }): FixtureCatalog => {
+export const catalogOf = ({ media }: CatalogOfProps): FixtureCatalog => {
   const first = mediaOf({ media, mediaId: FIXTURE_MEDIA.first })
   const second = mediaOf({ media, mediaId: FIXTURE_MEDIA.second })
   const firstEpisode = mediaOf({ media, mediaId: FIXTURE_MEDIA.firstEpisode })

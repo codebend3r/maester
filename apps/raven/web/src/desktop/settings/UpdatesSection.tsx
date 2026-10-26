@@ -21,14 +21,13 @@ const UNCHANGED = 'Raven could not change its update check. Try again.'
 const UNCHECKED = 'Raven could not check for updates. Try again.'
 const UNOPENED = 'Raven could not open the release page. Try again.'
 
-/** The result lines a status holds; "newest" only from a check this visit just ran. */
-const resultsOf = ({
-  status,
-  hasJustChecked,
-}: {
+type ResultsOfProps = {
   status: UpdateStatus
   hasJustChecked: boolean
-}): string[] => {
+}
+
+/** The result lines a status holds; "newest" only from a check this visit just ran. */
+const resultsOf = ({ status, hasJustChecked }: ResultsOfProps): string[] => {
   const newer = status.latest === null ? [] : [UPDATE_WORDS.newer(status.latest)]
   const failed = status.problem === null ? [] : [`${UPDATE_WORDS.failed} ${status.problem}`]
   const lines = [...newer, ...failed]
@@ -67,14 +66,13 @@ export const UpdatesSection = () => {
     retry: false,
   })
 
-  /** Sends `request` and keeps the status main answers with; false when it answered otherwise. */
-  const send = async ({
-    request,
-    fallback,
-  }: {
+  type SendProps = {
     request: UpdateRequest
     fallback: string
-  }): Promise<boolean> => {
+  }
+
+  /** Sends `request` and keeps the status main answers with; false when it answered otherwise. */
+  const send = async ({ request, fallback }: SendProps): Promise<boolean> => {
     setRefusal('')
     const reply = await client.request(request)
     if (reply.type !== DESKTOP_REPLIES.updates) {

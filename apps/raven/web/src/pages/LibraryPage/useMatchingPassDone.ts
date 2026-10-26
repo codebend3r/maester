@@ -9,19 +9,18 @@ export const POLL_MS = 3000
 export const anyPending = (items: readonly MediaItem[]): boolean =>
   items.some((item) => item.match === MATCH_STATES.pending)
 
+type UseMatchingPassDoneProps = {
+  libraryId: number
+  files: readonly MediaItem[]
+}
+
 /**
  * Nothing else reads the library again after a matching pass, so once
  * `files` go from some pending to none, its count of files not matched is
  * refetched. Every listing that polls through a pass calls it: All, and the
  * Not matched tab.
  */
-export const useMatchingPassDone = ({
-  libraryId,
-  files,
-}: {
-  libraryId: number
-  files: readonly MediaItem[]
-}): void => {
+export const useMatchingPassDone = ({ libraryId, files }: UseMatchingPassDoneProps): void => {
   const queryClient = useQueryClient()
   const isMatching = anyPending(files)
   const wasMatching = useRef(false)

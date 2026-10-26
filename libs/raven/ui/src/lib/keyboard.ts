@@ -9,17 +9,22 @@ const INPUT_TYPES = { checkbox: 'checkbox' } as const
 const isCheckbox = (target: EventTarget | null): boolean =>
   target instanceof HTMLInputElement && target.type === INPUT_TYPES.checkbox
 
-/** Whether a key comes from a dialog outside `root`: a dialog someone else opened keeps its keys. */
-export const isInForeignDialog = ({
-  target,
-  root,
-}: {
+type IsInForeignDialogProps = {
   target: EventTarget | null
   root: Element | null
-}): boolean => {
+}
+
+/** Whether a key comes from a dialog outside `root`: a dialog someone else opened keeps its keys. */
+export const isInForeignDialog = ({ target, root }: IsInForeignDialogProps): boolean => {
   if (!(target instanceof Element)) return false
   const dialog = target.closest('dialog')
   return dialog !== null && !(root?.contains(dialog) ?? false)
+}
+
+type IsShortcutProps = {
+  event: KeyboardEvent
+  key: string
+  inCheckboxes?: boolean
 }
 
 /**
@@ -29,15 +34,7 @@ export const isInForeignDialog = ({
  * by preventing it), and not in a form control or a dialog, which keep their
  * keys. A checkbox types nothing, so `inCheckboxes` lets the key through there.
  */
-export const isShortcut = ({
-  event,
-  key,
-  inCheckboxes = false,
-}: {
-  event: KeyboardEvent
-  key: string
-  inCheckboxes?: boolean
-}): boolean =>
+export const isShortcut = ({ event, key, inCheckboxes = false }: IsShortcutProps): boolean =>
   event.key.toLowerCase() === key &&
   !event.metaKey &&
   !event.ctrlKey &&
@@ -47,16 +44,18 @@ export const isShortcut = ({
   (!isTypingTarget(event.target) || (inCheckboxes && isCheckbox(event.target))) &&
   !(event.target instanceof Element && event.target.closest('dialog'))
 
+type UseKeyShortcutProps = {
+  key: string
+  onPress: () => void
+  inCheckboxes?: boolean
+}
+
 /** Calls `onPress` whenever `key` is pressed as a shortcut anywhere on the page. */
 export const useKeyShortcut = ({
   key,
   onPress,
   inCheckboxes = false,
-}: {
-  key: string
-  onPress: () => void
-  inCheckboxes?: boolean
-}): void => {
+}: UseKeyShortcutProps): void => {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!isShortcut({ event, key, inCheckboxes })) return

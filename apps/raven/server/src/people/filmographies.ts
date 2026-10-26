@@ -24,6 +24,19 @@ const AT_ONCE = 2
 /** How many fetches may wait their turn; past that, a page goes without until the line moves. */
 export const MOST_WAITING = 20
 
+type FilmographiesEnsureProps = { personId: number }
+
+type FilmographiesReadProps = {
+  personId: number
+  sees: (libraryId: number) => boolean
+  localCredits: readonly LocalCredit[]
+  isTurnedAway?: boolean
+}
+
+type FilmographiesFetchProps = { personId: number; tmdbId: string }
+
+type FilmographiesLoadProps = { personId: number; tmdbId: string }
+
 /**
  * Each person's whole filmography from TMDB, fetched when their page is
  * first asked for and again once it is two weeks old. One fetch per person
@@ -47,7 +60,7 @@ export class Filmographies {
    * the deadline, or behind the stored one when that is stale. Never throws.
    * `isTurnedAway` says a first fetch was wanted but the line was full.
    */
-  async ensure({ personId }: { personId: number }): Promise<{ isTurnedAway: boolean }> {
+  async ensure({ personId }: FilmographiesEnsureProps): Promise<{ isTurnedAway: boolean }> {
     const stored = this.people.profile(personId)
     if (!stored) return { isTurnedAway: false }
     const { tmdbId, fetchedAt } = stored
@@ -73,12 +86,7 @@ export class Filmographies {
     sees,
     localCredits,
     isTurnedAway = false,
-  }: {
-    personId: number
-    sees: (libraryId: number) => boolean
-    localCredits: readonly LocalCredit[]
-    isTurnedAway?: boolean
-  }): PersonFilmography {
+  }: FilmographiesReadProps): PersonFilmography {
     const fetchedAt = this.people.profile(personId)?.fetchedAt ?? null
     if (fetchedAt == null) {
       return { state: isTurnedAway || this.inFlight.has(personId) ? 'pending' : 'unavailable' }
@@ -108,7 +116,7 @@ export class Filmographies {
    * The person's fetch, started or joined, or null when the line is full.
    * That is no failure of this person's, so the next view tries again.
    */
-  private fetch({ personId, tmdbId }: { personId: number; tmdbId: string }): Promise<void> | null {
+  private fetch({ personId, tmdbId }: FilmographiesFetchProps): Promise<void> | null {
     const running = this.inFlight.get(personId)
     if (running) return running
     if (this.inFlight.size >= AT_ONCE + MOST_WAITING) return null
@@ -120,7 +128,7 @@ export class Filmographies {
   }
 
   /** Fetches and stores a filmography. It never rejects: a failure is remembered instead. */
-  private async load({ personId, tmdbId }: { personId: number; tmdbId: string }): Promise<void> {
+  private async load({ personId, tmdbId }: FilmographiesLoadProps): Promise<void> {
     try {
       const person = await this.gate.run(() => this.tmdb.person(tmdbId))
       this.people.saveFilmography({ personId, tmdbId, person, at: new Date().toISOString() })

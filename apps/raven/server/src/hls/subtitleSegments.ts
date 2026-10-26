@@ -16,32 +16,38 @@ const MPEG_TS_HZ = 90_000
 
 type Span = { from: number; to: number }
 
+type SubtitleSpanOfProps = { plan: SegmentPlan; n: number }
+
 /**
  * The stretch subtitle segment `n` covers, on the file's own clock: the
  * playlists start where the video's first segment does.
  */
-export const subtitleSpanOf = ({ plan, n }: { plan: SegmentPlan; n: number }): Span => {
+export const subtitleSpanOf = ({ plan, n }: SubtitleSpanOfProps): Span => {
   const from = (plan.boundaries[0] ?? 0) + n * HLS_SEGMENT_SECONDS
   return { from, to: from + HLS_SEGMENT_SECONDS }
+}
+
+type SubtitleWindowsOfProps = {
+  track: SubtitleTrack
+  span: Span
+  startTime: number
 }
 
 /**
  * The windows of the track's WebVTT the span's cues are in: an embedded
  * track's are timed from the file's start, and a sidecar is one whole file.
  */
-export const subtitleWindowsOf = ({
-  track,
-  span,
-  startTime,
-}: {
-  track: SubtitleTrack
-  span: Span
-  startTime: number
-}): number[] => {
+export const subtitleWindowsOf = ({ track, span, startTime }: SubtitleWindowsOfProps): number[] => {
   if (track.source === SUBTITLE_SOURCES.external) return [0]
   const first = subtitleWindowOf(span.from - startTime)
   const last = subtitleWindowOf(span.to - startTime)
   return Array.from({ length: last - first + 1 }, (_, k) => first + k)
+}
+
+type SubtitleSegmentVttProps = {
+  texts: readonly string[]
+  span: Span
+  startTime: number
 }
 
 /**
@@ -50,15 +56,7 @@ export const subtitleWindowsOf = ({
  * own clock, which the video keeps, and the header ties that clock, shifted
  * by `STREAM_TIME_SHIFT`, to the video's.
  */
-export const subtitleSegmentVtt = ({
-  texts,
-  span,
-  startTime,
-}: {
-  texts: readonly string[]
-  span: Span
-  startTime: number
-}): string => {
+export const subtitleSegmentVtt = ({ texts, span, startTime }: SubtitleSegmentVttProps): string => {
   const cues = texts
     .map(parseWebVtt)
     .reduce<SubtitleCue[]>((existing, incoming) => mergeCues({ existing, incoming }), [])

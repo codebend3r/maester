@@ -584,6 +584,8 @@ const LEGACY_FILE = 'weirwood.db'
  */
 const MOVE_ORDER: readonly string[] = ['-wal', '-shm', '']
 
+type AdoptLegacyDatabaseProps = { dataDir: string }
+
 /**
  * Renames weirwood's database in `dataDir` to raven's, once, so the index,
  * progress and favourites carry over. Does nothing when raven's file already
@@ -591,7 +593,7 @@ const MOVE_ORDER: readonly string[] = ['-wal', '-shm', '']
  * yet (SQLite writes its header on first use), so it is replaced. Call it
  * before opening.
  */
-export const adoptLegacyDatabase = ({ dataDir }: { dataDir: string }): void => {
+export const adoptLegacyDatabase = ({ dataDir }: AdoptLegacyDatabaseProps): void => {
   const target = join(dataDir, DATABASE_FILE)
   const legacy = join(dataDir, LEGACY_FILE)
   const holdsDatabase = existsSync(target) && statSync(target).size > 0

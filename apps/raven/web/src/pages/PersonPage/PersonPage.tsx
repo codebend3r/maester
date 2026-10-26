@@ -44,19 +44,18 @@ export const groupCredits = (credits: readonly Credit[]): CreditGroup[] =>
       .filter((credit, index, all) => all.findIndex((c) => c.item.id === credit.item.id) === index),
   })).filter((group) => group.credits.length > 0)
 
+type EyebrowOfProps = {
+  person: PersonDetails
+  groups: readonly CreditGroup[]
+}
+
 /**
  * The line over their name: what they are known for and how many of their
  * titles raven holds, once TMDB's filmography is in, counted as the table
  * opens so it matches the On raven marks; until then, how many credits
  * raven's own titles give them.
  */
-const eyebrowOf = ({
-  person,
-  groups,
-}: {
-  person: PersonDetails
-  groups: readonly CreditGroup[]
-}): string | null => {
+const eyebrowOf = ({ person, groups }: EyebrowOfProps): string | null => {
   if (person.filmography.state === FILMOGRAPHY_STATES.ready) {
     const held = heldOnOpening(person.filmography.entries)
     const parts = [
@@ -71,8 +70,10 @@ const eyebrowOf = ({
     : null
 }
 
+type CardProps = { item: ItemSummary; role: string | null }
+
 /** One title they are credited on: its poster, its name, and the year and their part under it. */
-const Card = ({ item, role }: { item: ItemSummary; role: string | null }) => {
+const Card = ({ item, role }: CardProps) => {
   const poster = posterSources({ item, sizes: POSTER_SIZES.grid })
   return (
     <li className={styles.card}>
@@ -96,8 +97,10 @@ const Card = ({ item, role }: { item: ItemSummary; role: string | null }) => {
   )
 }
 
+type HeldCreditsProps = { person: PersonDetails; groups: CreditGroup[] }
+
 /** What raven holds of theirs, grouped by job as poster cards, for when TMDB has no filmography to give. */
-const HeldCredits = ({ person, groups }: { person: PersonDetails; groups: CreditGroup[] }) => {
+const HeldCredits = ({ person, groups }: HeldCreditsProps) => {
   const id = useId()
   return (
     <>
@@ -130,8 +133,10 @@ const HeldCredits = ({ person, groups }: { person: PersonDetails; groups: Credit
   )
 }
 
+type PersonCreditsProps = { person: PersonDetails; groups: CreditGroup[] }
+
 /** Their filmography under its heading: in, on its way, or what raven holds when TMDB has none. */
-const PersonCredits = ({ person, groups }: { person: PersonDetails; groups: CreditGroup[] }) => {
+const PersonCredits = ({ person, groups }: PersonCreditsProps) => {
   const id = useId()
   const { filmography } = person
   switch (filmography.state) {
@@ -176,7 +181,9 @@ const PersonSkeleton = () => (
   </>
 )
 
-const PersonView = ({ person }: { person: PersonDetails }) => {
+type PersonViewProps = { person: PersonDetails }
+
+const PersonView = ({ person }: PersonViewProps) => {
   const id = useId()
   const groups = groupCredits(person.credits)
   return (

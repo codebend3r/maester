@@ -29,13 +29,13 @@ const MODE_NOUNS = {
   transcode: 'the transcode',
 } as const satisfies Record<PlaybackMode, string>
 
-const joined = ({
-  parts,
-  separator = ' · ',
-}: {
+type JoinedProps = {
   parts: ReadonlyArray<string | null>
   separator?: string
-}): string => parts.filter((part): part is string => !!part).join(separator)
+}
+
+const joined = ({ parts, separator = ' · ' }: JoinedProps): string =>
+  parts.filter((part): part is string => !!part).join(separator)
 
 /** "4K HDR", "1080p", or null before the file is probed. */
 export const pictureLabel = (media: MediaItem): string | null => {
@@ -44,22 +44,19 @@ export const pictureLabel = (media: MediaItem): string | null => {
   return media.hdr ? `${resolution} HDR` : resolution
 }
 
+type AboutLineProps = {
+  media: MediaItem | null
+  label: string
+  mode: PlaybackMode
+  context?: string | null
+}
+
 /**
  * The line under the player's title: where the title came from when the host
  * names it, the year, unless the title already ends with it, then the picture
  * and how it is playing.
  */
-export const aboutLine = ({
-  media,
-  label,
-  mode,
-  context = null,
-}: {
-  media: MediaItem | null
-  label: string
-  mode: PlaybackMode
-  context?: string | null
-}): string => {
+export const aboutLine = ({ media, label, mode, context = null }: AboutLineProps): string => {
   const year = media?.item?.year ?? media?.year ?? null
   const shownYear = year != null && !label.includes(`(${year})`) ? String(year) : null
   return joined({
@@ -67,19 +64,17 @@ export const aboutLine = ({
   })
 }
 
+type QualityLabelProps = {
+  media: MediaItem | null
+  mode: PlaybackMode
+  quality?: StreamQuality | null
+}
+
 /**
  * What reaches the screen and how, for the quality pill. A conversion's
  * size is the server's to pick, so only an untouched picture names its own.
  */
-export const qualityLabel = ({
-  media,
-  mode,
-  quality = null,
-}: {
-  media: MediaItem | null
-  mode: PlaybackMode
-  quality?: StreamQuality | null
-}): string => {
+export const qualityLabel = ({ media, mode, quality = null }: QualityLabelProps): string => {
   if (mode === PLAYBACK_MODES.transcode && quality != null) {
     return joined({ parts: [`${STREAM_QUALITIES[quality].height}p`, MODE_NAMES[mode]] })
   }
@@ -96,18 +91,20 @@ export const originalDetails = (media: MediaItem): string | null => {
   return text === '' ? null : text
 }
 
+type AudioPillLabelProps = {
+  mode: PlaybackMode
+  tracks: MediaTracks | null
+  audio: number | null
+  playsPickedAudio?: boolean
+}
+
 /** "English 5.1" for the audio pill; null until the tracks are read. */
 export const audioPillLabel = ({
   mode,
   tracks,
   audio,
   playsPickedAudio,
-}: {
-  mode: PlaybackMode
-  tracks: MediaTracks | null
-  audio: number | null
-  playsPickedAudio?: boolean
-}): string | null => {
+}: AudioPillLabelProps): string | null => {
   const index = playingAudio({ mode, tracks, audio, playsPickedAudio })
   const track = tracks?.audio.find((candidate) => candidate.index === index) ?? null
   if (!track) return null
@@ -127,6 +124,14 @@ export const stepDownNote = ({ from, delivery }: StepDown): string => {
     : `Switched to a transcode because the connection carried ${carried} and ${MODE_NOUNS[from]} needs ${needed}.`
 }
 
+type EndsAtLabelProps = {
+  now: number
+  time: number
+  duration: number | null
+  rate: number
+  locale?: string
+}
+
 /**
  * "Ends at 2:20 AM": the clock time the video ends at `rate`, from `now`;
  * null while its length is unknown. `locale` is the browser's unless a test
@@ -138,13 +143,7 @@ export const endsAtLabel = ({
   duration,
   rate,
   locale,
-}: {
-  now: number
-  time: number
-  duration: number | null
-  rate: number
-  locale?: string
-}): string | null => {
+}: EndsAtLabelProps): string | null => {
   if (duration == null || rate <= 0) return null
   const remaining = Math.max(0, duration - time) / rate
   const clock = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' })

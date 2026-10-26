@@ -6,6 +6,11 @@ import { preferredAudio, preferredSubtitle } from '@/components/Player/selection
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
+type UseNativeTrackSelectionProps = {
+  tracks: MediaTracks | null
+  player: NativePlayer
+}
+
 /**
  * Which audio and subtitle tracks the player in the other process plays. The
  * stored pick starts it; otherwise the language preferences apply once, when
@@ -14,10 +19,7 @@ import { usePlayerPrefs } from '@/stores/playerPrefs'
 export const useNativeTrackSelection = ({
   tracks,
   player,
-}: {
-  tracks: MediaTracks | null
-  player: NativePlayer
-}): TrackSelection => {
+}: UseNativeTrackSelectionProps): TrackSelection => {
   const { trackPicks } = useHostServices()
   const audioLanguage = usePlayerPrefs((prefs) => prefs.audioLanguage)
   const subtitlePrefs = usePlayerPrefs((prefs) => prefs.subtitles)

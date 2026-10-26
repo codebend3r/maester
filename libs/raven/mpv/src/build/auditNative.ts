@@ -16,16 +16,14 @@ import {
   write,
 } from '@/build/context'
 
-/** Every undefined symbol must bind to a library the file loads; nm is in Xcode and its CLI tools. */
-export const inspectSymbols = async ({
-  file,
-  path,
-  dependencies,
-}: {
+type InspectSymbolsProps = {
   file: AuditedFile
   path: string
   dependencies: string[]
-}) =>
+}
+
+/** Every undefined symbol must bind to a library the file loads; nm is in Xcode and its CLI tools. */
+export const inspectSymbols = async ({ file, path, dependencies }: InspectSymbolsProps) =>
   symbolProblems({
     file,
     imports: parseImports({ listing: await output({ args: ['nm', '-um', path] }) }),
@@ -33,7 +31,9 @@ export const inspectSymbols = async ({
     dependencies,
   })
 
-export const auditNative = async ({ requireAddon = true }: { requireAddon?: boolean } = {}) => {
+type AuditNativeProps = { requireAddon?: boolean }
+
+export const auditNative = async ({ requireAddon = true }: AuditNativeProps = {}) => {
   requireMacArm()
   const files: AuditedFile[] = [
     'lib/libMoltenVK.dylib',

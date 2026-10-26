@@ -25,39 +25,36 @@ import { queryKeys } from '@/query/queryClient'
  * that does not hold what changed is left alone.
  */
 
-/** `items` with `change` made to each one `matches`, or the very same list where none does. */
-const mapWhere = <T>({
-  items,
-  matches,
-  change,
-}: {
+type MapWhereProps<T> = {
   items: T[]
   matches: (item: T) => boolean
   change: (item: T) => T
-}): T[] =>
+}
+
+/** `items` with `change` made to each one `matches`, or the very same list where none does. */
+const mapWhere = <T>({ items, matches, change }: MapWhereProps<T>): T[] =>
   items.some(matches) ? items.map((item) => (matches(item) ? change(item) : item)) : items
 
-/** Poster entries without video `id`'s. */
-export const withoutEntry = ({
-  entries,
-  id,
-}: {
+type WithoutEntryProps = {
   entries: PosterEntry[]
   id: number
-}): PosterEntry[] => entries.filter((entry) => entry.media.id !== id)
+}
+
+/** Poster entries without video `id`'s. */
+export const withoutEntry = ({ entries, id }: WithoutEntryProps): PosterEntry[] =>
+  entries.filter((entry) => entry.media.id !== id)
+
+type ItemFavouriteEditsProps = {
+  item: ItemDetails
+  favourite: boolean
+}
 
 /**
  * A show or season marked or unmarked as a favourite: its own page, and
  * the favourites, which an unmarked one leaves. A marked one joins them once
  * read again, since the page's details are not a card's summary.
  */
-export const itemFavouriteEdits = ({
-  item,
-  favourite,
-}: {
-  item: ItemDetails
-  favourite: boolean
-}): Edit[] => [
+export const itemFavouriteEdits = ({ item, favourite }: ItemFavouriteEditsProps): Edit[] => [
   editKey<ItemDetails>({
     queryKey: queryKeys.item(item.id),
     update: (details) => (details.favourite === favourite ? details : { ...details, favourite }),
@@ -72,19 +69,18 @@ export const itemFavouriteEdits = ({
   }),
 ]
 
+type FavouriteEditsProps = {
+  media: MediaItem
+  favourite: boolean
+}
+
 /**
  * A video marked or unmarked as a favourite wherever a heart or its menu
  * shows it: its own record, its library's listings, files not matched and
  * In progress, home and its searches, its item's page, and the favourites, which an unmarked
  * one leaves. Its history, sagas and duplicates follow once read again.
  */
-export const favouriteEdits = ({
-  media,
-  favourite,
-}: {
-  media: MediaItem
-  favourite: boolean
-}): Edit[] => {
+export const favouriteEdits = ({ media, favourite }: FavouriteEditsProps): Edit[] => {
   const isVideo = (item: MediaItem): boolean => item.id === media.id
   const mark = (item: MediaItem): MediaItem => ({ ...item, favourite })
   const markAll = (items: MediaItem[]): MediaItem[] =>
@@ -153,6 +149,11 @@ export const favouriteEdits = ({
   ]
 }
 
+type WatchedEditsProps = {
+  media: MediaItem
+  watched: boolean
+}
+
 /**
  * A card marked watched or unwatched, wherever one of its files shows: the
  * same files as `favouriteEdits` reaches, plus sagas, duplicates, history
@@ -160,13 +161,7 @@ export const favouriteEdits = ({
  * either way, so the position goes to 0 and the card leaves In progress.
  * A card is the files of one movie that share it, else a file by itself.
  */
-export const watchedEdits = ({
-  media,
-  watched,
-}: {
-  media: MediaItem
-  watched: boolean
-}): Edit[] => {
+export const watchedEdits = ({ media, watched }: WatchedEditsProps): Edit[] => {
   const { libraryId } = media
   const isOnCard = (item: MediaItem): boolean =>
     item.libraryId === libraryId &&
@@ -292,11 +287,13 @@ export const watchedEdits = ({
   ]
 }
 
+type LibraryOrderEditsProps = { ids: readonly number[] }
+
 /**
  * The libraries were put in the order of `ids`: the list the side menu and
  * the Libraries page read. A library `ids` leaves out follows the rest.
  */
-export const libraryOrderEdits = ({ ids }: { ids: readonly number[] }): Edit[] => [
+export const libraryOrderEdits = ({ ids }: LibraryOrderEditsProps): Edit[] => [
   editKey<Library[]>({
     queryKey: queryKeys.libraries,
     update: (libraries) => {
@@ -310,14 +307,13 @@ export const libraryOrderEdits = ({ ids }: { ids: readonly number[] }): Edit[] =
   }),
 ]
 
-/** A library's settings changed: on its own page, and in the libraries list the side menu reads. */
-export const librarySettingsEdits = ({
-  libraryId,
-  change,
-}: {
+type LibrarySettingsEditsProps = {
   libraryId: number
   change: Partial<LibrarySettings>
-}): Edit[] => [
+}
+
+/** A library's settings changed: on its own page, and in the libraries list the side menu reads. */
+export const librarySettingsEdits = ({ libraryId, change }: LibrarySettingsEditsProps): Edit[] => [
   editKey<Library>({
     queryKey: queryKeys.library(libraryId),
     update: (library) => ({ ...library, settings: { ...library.settings, ...change } }),

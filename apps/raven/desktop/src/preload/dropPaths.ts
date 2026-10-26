@@ -1,9 +1,16 @@
+type ElementAtProps = { list: unknown[]; index: number }
+
 // An element read through its descriptor: a getter is never run, so the page cannot
 // hand over a different value than the one it put in the list.
-const elementAt = ({ list, index }: { list: unknown[]; index: number }): unknown => {
+const elementAt = ({ list, index }: ElementAtProps): unknown => {
   const descriptor = Object.getOwnPropertyDescriptor(list, index)
   if (descriptor === undefined || !('value' in descriptor)) return undefined
   return descriptor.value
+}
+
+type DropPathsProps = {
+  files: unknown
+  pathOf: (file: File) => string
 }
 
 /**
@@ -13,13 +20,7 @@ const elementAt = ({ list, index }: { list: unknown[]; index: number }): unknown
  * count. Only a `File` the user dropped has a path; one the page made itself maps to
  * `''` and is left out, so a page cannot name a path by building a `File`.
  */
-export const dropPaths = ({
-  files,
-  pathOf,
-}: {
-  files: unknown
-  pathOf: (file: File) => string
-}): string[] => {
+export const dropPaths = ({ files, pathOf }: DropPathsProps): string[] => {
   if (!Array.isArray(files)) return []
   const count = Object.getOwnPropertyDescriptor(files, 'length')?.value ?? 0
   if (typeof count !== 'number') return []

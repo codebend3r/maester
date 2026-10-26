@@ -45,6 +45,28 @@ export const requireApproved = (account: Account): void => {
   }
 }
 
+type AuthSessionsAuthenticateProps = { token: string }
+
+type AuthSessionsFreshestForProps = { accountId: string }
+
+type AuthSessionsReleaseProps = { accountId: string }
+
+type AuthSessionsBindSessionProps = {
+  request: object
+  session: Session
+  isBearer: boolean
+}
+
+type AuthSessionsBindTicketProps = {
+  request: object
+  session: Session
+  unlockedUntil: number | null
+}
+
+type AuthSessionsCallerOfProps = { request: object }
+
+type AuthSessionsSessionOfProps = { request: object }
+
 @Injectable()
 export class AuthSessions {
   private readonly callers = new WeakMap<object, Caller>()
@@ -55,7 +77,7 @@ export class AuthSessions {
     @Inject(MembershipLookups) private readonly lookups: Pick<MembershipLookups, 'current'>,
   ) {}
 
-  async authenticate({ token }: { token: string }) {
+  async authenticate({ token }: AuthSessionsAuthenticateProps) {
     const identity = await this.verify({ token })
     const account = await this.lookups.current({ token })
     if (account === null) throw authFailure(AUTH_REFUSALS.pending)
@@ -86,47 +108,31 @@ export class AuthSessions {
   }
 
   /** The unexpired token with the latest expiry seen for the account, or null when none is live. */
-  freshestFor({ accountId }: { accountId: string }): Freshest | null {
+  freshestFor({ accountId }: AuthSessionsFreshestForProps): Freshest | null {
     const held = this.freshest.get(accountId)
     return held !== undefined && held.expiresAt > Date.now() ? held : null
   }
 
   /** Lets go of the token held for the account, once it is known to be no longer approved. */
-  release({ accountId }: { accountId: string }): void {
+  release({ accountId }: AuthSessionsReleaseProps): void {
     this.freshest = new Map([...this.freshest].filter(([id]) => id !== accountId))
   }
 
-  bindSession({
-    request,
-    session,
-    isBearer,
-  }: {
-    request: object
-    session: Session
-    isBearer: boolean
-  }): void {
+  bindSession({ request, session, isBearer }: AuthSessionsBindSessionProps): void {
     this.callers.set(request, { kind: CALLERS.session, session, isBearer })
   }
 
   /** Binds the caller a redeemed ticket stands for: the session it was minted from, rechecked, and its unlock. */
-  bindTicket({
-    request,
-    session,
-    unlockedUntil,
-  }: {
-    request: object
-    session: Session
-    unlockedUntil: number | null
-  }): void {
+  bindTicket({ request, session, unlockedUntil }: AuthSessionsBindTicketProps): void {
     this.callers.set(request, { kind: CALLERS.ticket, session, unlockedUntil })
   }
 
   /** The caller the account gate bound to `request`; the legacy browser when it bound none. */
-  callerOf({ request }: { request: object }): Caller {
+  callerOf({ request }: AuthSessionsCallerOfProps): Caller {
     return this.callers.get(request) ?? LEGACY
   }
 
-  sessionOf({ request }: { request: object }): Session {
+  sessionOf({ request }: AuthSessionsSessionOfProps): Session {
     const caller = this.callerOf({ request })
     if (caller.kind !== CALLERS.session) throw authFailure(AUTH_REFUSALS.signedOut)
     return caller.session

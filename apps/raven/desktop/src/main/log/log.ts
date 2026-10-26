@@ -12,11 +12,17 @@ const LOG_LEVELS = { info: 'info', warn: 'warn', error: 'error' } as const
 
 type LogLevel = (typeof LOG_LEVELS)[keyof typeof LOG_LEVELS]
 
+type MkdirProps = { path: string; options: { recursive: true; mode: number } }
+
+type AppendFileProps = { path: string; data: string; options: { mode: number } }
+
+type RenameProps = { from: string; to: string }
+
 export type LogFs = {
-  mkdir: (input: { path: string; options: { recursive: true; mode: number } }) => Promise<unknown>
+  mkdir: (input: MkdirProps) => Promise<unknown>
   size: (path: string) => Promise<number | null>
-  appendFile: (input: { path: string; data: string; options: { mode: number } }) => Promise<void>
-  rename: (input: { from: string; to: string }) => Promise<void>
+  appendFile: (input: AppendFileProps) => Promise<void>
+  rename: (input: RenameProps) => Promise<void>
   remove: (path: string) => Promise<void>
 }
 
@@ -29,23 +35,25 @@ export const LOG_FS_OPS = {
   remove: 'remove',
 } as const satisfies { [K in keyof LogFs]: K }
 
+type LogFsFromPropsMkdirProps = { recursive: true; mode: number }
+
+type LogFsFromPropsAppendFileProps = { mode: number }
+
+type RmProps = { force: true }
+
+type LogFsFromProps = {
+  mkdir: (path: string, options: LogFsFromPropsMkdirProps) => Promise<unknown>
+  stat: (path: string) => Promise<{ size: number }>
+  appendFile: (path: string, data: string, options: LogFsFromPropsAppendFileProps) => Promise<void>
+  rename: (from: string, to: string) => Promise<void>
+  rm: (path: string, options: RmProps) => Promise<void>
+}
+
 /**
  * The log's file system over Node's: a missing file has no size and removing one is no
  * error, while a rename of one rejects with Node's own `ENOENT`, which the log skips.
  */
-export const logFsFrom = ({
-  mkdir,
-  stat,
-  appendFile,
-  rename,
-  rm,
-}: {
-  mkdir: (path: string, options: { recursive: true; mode: number }) => Promise<unknown>
-  stat: (path: string) => Promise<{ size: number }>
-  appendFile: (path: string, data: string, options: { mode: number }) => Promise<void>
-  rename: (from: string, to: string) => Promise<void>
-  rm: (path: string, options: { force: true }) => Promise<void>
-}): LogFs => ({
+export const logFsFrom = ({ mkdir, stat, appendFile, rename, rm }: LogFsFromProps): LogFs => ({
   mkdir: ({ path, options }) => mkdir(path, options),
   size: (path) =>
     stat(path).then(
@@ -240,8 +248,10 @@ export const redact = (text: string): string =>
 const stamp = (at: number): string =>
   Number.isFinite(at) && Math.abs(at) <= LATEST_TIME ? new Date(at).toISOString() : 'invalid-time'
 
+type CutProps = { text: string; max: number }
+
 // Cutting between the halves of a surrogate pair would leave a lone half in the file.
-const cut = ({ text, max }: { text: string; max: number }): string => {
+const cut = ({ text, max }: CutProps): string => {
   const head = text.slice(0, max)
   return HIGH_SURROGATE_AT_END.test(head) ? head.slice(0, -1) : head
 }
@@ -251,26 +261,26 @@ const cut = ({ text, max }: { text: string; max: number }): string => {
 // whatever this cap leaves of a secret is either blanked or past the line's end.
 const MESSAGE_MAX = LOG_LINE_MAX * 4
 
-export const logLine = ({
-  at,
-  level,
-  message,
-}: {
+type LogLineProps = {
   at: number
   level: LogLevel
   message: string
-}): string => {
+}
+
+export const logLine = ({ at, level, message }: LogLineProps): string => {
   const redacted = redact(cut({ text: message, max: MESSAGE_MAX }))
   return `${stamp(at)} ${level} ${cut({ text: redacted.replace(CONTROL, ' '), max: LOG_LINE_MAX })}\n`
+}
+
+type RotationMovesProps = {
+  file: string
+  files: number
 }
 
 export const rotationMoves = ({
   file,
   files,
-}: {
-  file: string
-  files: number
-}): { from: string; to: string }[] =>
+}: RotationMovesProps): { from: string; to: string }[] =>
   Array.from({ length: Math.max(files - 1, 0) }, (_, index) => files - 1 - index).map((to) => ({
     from: to === 1 ? file : `${file}.${to - 1}`,
     to: `${file}.${to}`,
@@ -284,10 +294,12 @@ const errorCode = (error: unknown): string => {
   return error.name
 }
 
+type LogWriteErrorProps = { op: FsOp; cause: unknown }
+
 class LogWriteError extends Error {
   readonly kind: string
 
-  constructor({ op, cause }: { op: FsOp; cause: unknown }) {
+  constructor({ op, cause }: LogWriteErrorProps) {
     const code = errorCode(cause)
     super(`raven log: ${op} failed (${code})`, { cause })
     this.name = 'LogWriteError'
@@ -300,7 +312,9 @@ const failureKind = (error: unknown): string =>
 
 const byteLength = (text: string): number => Buffer.byteLength(text, 'utf8')
 
-const fit = ({ lines, room }: { lines: string[]; room: number }) =>
+type FitProps = { lines: string[]; room: number }
+
+const fit = ({ lines, room }: FitProps) =>
   lines.reduce(
     (fitted, line) => {
       if (fitted.isFull) return fitted
@@ -312,19 +326,15 @@ const fit = ({ lines, room }: { lines: string[]; room: number }) =>
     { taken: 0, bytes: 0, isFull: false },
   )
 
-export const createLog = ({
-  dir,
-  fs,
-  now,
-  timers,
-  onError,
-}: {
+type CreateLogProps = {
   dir: string
   fs: LogFs
   now: () => number
   timers: Timers
   onError: (error: unknown) => void
-}): Log => {
+}
+
+export const createLog = ({ dir, fs, now, timers, onError }: CreateLogProps): Log => {
   const file = join(dir, LOG_FILE)
   const oldest = `${file}.${LOG_FILES - 1}`
   const moves = rotationMoves({ file, files: LOG_FILES })
@@ -351,7 +361,9 @@ export const createLog = ({
     }
   }
 
-  const attempt = async <T>({ op, run }: { op: FsOp; run: () => Promise<T> }): Promise<T> => {
+  type AttemptProps<T> = { op: FsOp; run: () => Promise<T> }
+
+  const attempt = async <T>({ op, run }: AttemptProps<T>): Promise<T> => {
     try {
       return await run()
     } catch (cause) {
@@ -377,7 +389,9 @@ export const createLog = ({
     }
   }
 
-  const move = async ({ from, to }: { from: string; to: string }): Promise<void> => {
+  type MoveProps = { from: string; to: string }
+
+  const move = async ({ from, to }: MoveProps): Promise<void> => {
     try {
       await fs.rename({ from, to })
     } catch (cause) {
@@ -399,14 +413,13 @@ export const createLog = ({
     )
   }
 
-  // Splits a batch at the cap, so no file ever passes LOG_MAX_BYTES.
-  const writeLines = async ({
-    lines,
-    size,
-  }: {
+  type WriteLinesProps = {
     lines: string[]
     size: number
-  }): Promise<number> => {
+  }
+
+  // Splits a batch at the cap, so no file ever passes LOG_MAX_BYTES.
+  const writeLines = async ({ lines, size }: WriteLinesProps): Promise<number> => {
     if (lines.length === 0) return size
     const fitted = fit({ lines, room: LOG_MAX_BYTES - size })
     if (fitted.taken === 0 && size > 0) {
@@ -476,8 +489,10 @@ export const createLog = ({
     windowCount = 0
   }
 
+  type WriteProps = { level: LogLevel; isCounted: boolean }
+
   const write =
-    ({ level, isCounted }: { level: LogLevel; isCounted: boolean }) =>
+    ({ level, isCounted }: WriteProps) =>
     (message: string): void => {
       try {
         const at = now()

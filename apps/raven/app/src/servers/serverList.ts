@@ -37,18 +37,17 @@ export type AddOutcome =
   | { kind: typeof ADD_OUTCOMES.taken }
   | { kind: typeof ADD_OUTCOMES.full }
 
+type AddServerProps = {
+  servers: readonly AppServer[]
+  server: AppServer
+}
+
 /**
  * The list with the server added: refused when it is malformed (an origin `serverOriginOf`
  * would not write so, an id `randomUUID` would not make), when its origin or id is already
  * listed, or when the list holds `SERVERS_CAP` already.
  */
-export const addServer = ({
-  servers,
-  server,
-}: {
-  servers: readonly AppServer[]
-  server: AppServer
-}): AddOutcome => {
+export const addServer = ({ servers, server }: AddServerProps): AddOutcome => {
   if (!isAppServer(server)) return { kind: ADD_OUTCOMES.invalid }
   if (servers.some(({ id, origin }) => origin === server.origin || id === server.id)) {
     return { kind: ADD_OUTCOMES.taken }
@@ -57,13 +56,13 @@ export const addServer = ({
   return { kind: ADD_OUTCOMES.added, servers: [...servers, server] }
 }
 
-export const removeServer = ({
-  servers,
-  id,
-}: {
+type RemoveServerProps = {
   servers: readonly AppServer[]
   id: string
-}): AppServer[] => servers.filter((server) => server.id !== id)
+}
+
+export const removeServer = ({ servers, id }: RemoveServerProps): AppServer[] =>
+  servers.filter((server) => server.id !== id)
 
 type StoredServers = { servers: AppServer[]; activeId: string | null }
 

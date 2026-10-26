@@ -93,6 +93,11 @@ const HOP_BY_HOP = new Set<string>([
 // The web signs in with Supabase Auth directly: the one origin the page calls besides its own.
 const SUPABASE_ORIGINS = 'https://*.supabase.co'
 
+type ContentSecurityPolicyProps = {
+  scriptHashes: readonly string[]
+  authOrigin: string | null
+}
+
 /**
  * The page's policy. Its styles, fonts and scripts are files of its own build, its posters come
  * through `/api`, and only its inline scripts (the theme, set before first paint) need a hash.
@@ -101,10 +106,7 @@ const SUPABASE_ORIGINS = 'https://*.supabase.co'
 export const contentSecurityPolicy = ({
   scriptHashes,
   authOrigin,
-}: {
-  scriptHashes: readonly string[]
-  authOrigin: string | null
-}): string =>
+}: ContentSecurityPolicyProps): string =>
   [
     "default-src 'self'",
     ["script-src 'self'", ...scriptHashes.map((hash) => `'sha256-${hash}'`)].join(' '),
@@ -128,30 +130,26 @@ export const inlineScriptHashes = (html: string): string[] =>
     createHash('sha256').update(body).digest('base64'),
   )
 
-/** The web app's build: the copy in the app's resources, or the web project's own unpackaged. */
-export const webRootFor = ({
-  isPackaged,
-  appPath,
-  resourcesPath,
-}: {
+type WebRootForProps = {
   isPackaged: boolean
   appPath: string
   resourcesPath: string
-}): string => (isPackaged ? join(resourcesPath, basename(WEB_DIST)) : join(appPath, WEB_DIST))
+}
+
+/** The web app's build: the copy in the app's resources, or the web project's own unpackaged. */
+export const webRootFor = ({ isPackaged, appPath, resourcesPath }: WebRootForProps): string =>
+  isPackaged ? join(resourcesPath, basename(WEB_DIST)) : join(appPath, WEB_DIST)
 
 type Handler = (request: IncomingMessage, response: ServerResponse) => void
 
-const answer = ({
-  response,
-  status,
-  headers = {},
-  body,
-}: {
+type AnswerProps = {
   response: ServerResponse
   status: number
   headers?: OutgoingHttpHeaders
   body?: Uint8Array | string
-}): void => {
+}
+
+const answer = ({ response, status, headers = {}, body }: AnswerProps): void => {
   response.writeHead(status, headers)
   response.end(body)
 }
@@ -177,7 +175,9 @@ const decode = (pathname: string): string | null => {
   }
 }
 
-const isInside = ({ root, path }: { root: string; path: string }): boolean =>
+type IsInsideProps = { root: string; path: string }
+
+const isInside = ({ root, path }: IsInsideProps): boolean =>
   path === root || path.startsWith(root.endsWith(sep) ? root : `${root}${sep}`)
 
 /**
@@ -209,6 +209,17 @@ const passed = (headers: IncomingHttpHeaders): OutgoingHttpHeaders => {
   )
 }
 
+type CreateWebHostHandlerProps = {
+  root: string
+  serverOrigin: string
+  /** The test hook's Supabase Auth origin, which the policy lets the page call; null for none. */
+  authOrigin: string | null
+  readFile: (path: string) => Promise<Uint8Array>
+  timers: Timers
+  warn: (message: string) => void
+  info: (message: string) => void
+}
+
 /**
  * The web host's requests: the web app's build, with every route of the single-page app
  * answered by its `index.html`, and `/api` passed on to the server untouched, streamed both
@@ -222,16 +233,7 @@ export const createWebHostHandler = ({
   timers,
   warn,
   info,
-}: {
-  root: string
-  serverOrigin: string
-  /** The test hook's Supabase Auth origin, which the policy lets the page call; null for none. */
-  authOrigin: string | null
-  readFile: (path: string) => Promise<Uint8Array>
-  timers: Timers
-  warn: (message: string) => void
-  info: (message: string) => void
-}): Handler => {
+}: CreateWebHostHandlerProps): Handler => {
   const base = resolve(root)
   const indexPath = join(base, INDEX)
   // Told once each time it changes, since the page asks again and again while it is down.
@@ -248,15 +250,13 @@ export const createWebHostHandler = ({
       () => null,
     )
 
-  const serveFile = async ({
-    request,
-    response,
-    url,
-  }: {
+  type ServeFileProps = {
     request: IncomingMessage
     response: ServerResponse
     url: URL
-  }): Promise<void> => {
+  }
+
+  const serveFile = async ({ request, response, url }: ServeFileProps): Promise<void> => {
     if (request.method !== HTTP_METHODS.get && request.method !== HTTP_METHODS.head) {
       answer({
         response,
@@ -306,7 +306,9 @@ export const createWebHostHandler = ({
     })
   }
 
-  const unreachable = ({ response, error }: { response: ServerResponse; error: unknown }) => {
+  type UnreachableProps = { response: ServerResponse; error: unknown }
+
+  const unreachable = ({ response, error }: UnreachableProps) => {
     if (reach.isReachable) {
       quietly(warn)(`Raven could not reach its server: ${reasonOf(error)}`)
     }
@@ -322,15 +324,13 @@ export const createWebHostHandler = ({
     })
   }
 
-  const forward = ({
-    request,
-    response,
-    url,
-  }: {
+  type ForwardProps = {
     request: IncomingMessage
     response: ServerResponse
     url: URL
-  }): void => {
+  }
+
+  const forward = ({ request, response, url }: ForwardProps): void => {
     const target = new URL(`${url.pathname}${url.search}`, serverOrigin)
     const send = target.protocol === URL_PROTOCOLS.https ? requestHttps : requestHttp
     const outgoing = send(target, { method: request.method, headers: passed(request.headers) })
@@ -392,19 +392,15 @@ export const createWebHostHandler = ({
   }
 }
 
-const listenOn = ({
-  createServer,
-  handler,
-  port,
-  address,
-  warn,
-}: {
+type ListenOnProps = {
   createServer: (handler: Handler) => Server
   handler: Handler
   port: number
   address: string
   warn: (message: string) => void
-}) =>
+}
+
+const listenOn = ({ createServer, handler, port, address, warn }: ListenOnProps) =>
   new Promise<Server>((resolvePromise, reject) => {
     const server = createServer(handler)
     server.once(HTTP_EVENTS.error, reject)
@@ -436,6 +432,14 @@ export const webHostFailureText = (error: unknown): string =>
     ? `Another app is using port ${WEB_HOST_PORT} on this Mac. Quit it, then open Raven again.`
     : `Raven could not start serving its page: ${errorText(error)}`
 
+type ListenWebHostProps = {
+  createServer: (handler: Handler) => Server
+  handler: Handler
+  port: number
+  addresses: readonly string[]
+  warn: (message: string) => void
+}
+
 /**
  * Listens on `port` on each of `addresses` (`LOOPBACK_ADDRESSES`), or on none: when one is taken,
  * the others are closed again and the failure (`EADDRINUSE`) is thrown. An address this Mac does
@@ -447,13 +451,7 @@ export const listenWebHost = async ({
   port,
   addresses,
   warn,
-}: {
-  createServer: (handler: Handler) => Server
-  handler: Handler
-  port: number
-  addresses: readonly string[]
-  warn: (message: string) => void
-}): Promise<void> => {
+}: ListenWebHostProps): Promise<void> => {
   const opened = await addresses.reduce<Promise<Server[]>>(async (previous, address) => {
     const listening = await previous
     try {

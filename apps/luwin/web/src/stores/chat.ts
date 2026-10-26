@@ -41,8 +41,10 @@ const quietStorage: StateStorage = {
 
 const UNREACHABLE = "Couldn't reach luwin; check that its server or the sandbox is running."
 
+type ApplyEventProps = { reply: Reply; event: ChatEvent }
+
 /** `reply` with one more of its stream's events applied. */
-const applyEvent = ({ reply, event }: { reply: Reply; event: ChatEvent }): Reply => {
+const applyEvent = ({ reply, event }: ApplyEventProps): Reply => {
   switch (event.name) {
     case CHAT_EVENTS.tool:
       return { ...reply, tools: [...reply.tools, event.tool] }
@@ -73,6 +75,10 @@ const applyEvent = ({ reply, event }: { reply: Reply; event: ChatEvent }): Reply
   }
 }
 
+type SendProps = { text: string; expected?: CaseTurn }
+
+type PressProps = { pendingId: number; approve: boolean }
+
 type ChatState = {
   /** Whose conversation this is: the sandbox world's id, or the signed-in user's. */
   owner: string | null
@@ -80,9 +86,9 @@ type ChatState = {
   /** Pending actions whose buttons are spent. */
   settled: number[]
   isBusy: boolean
-  send: (message: { text: string; expected?: CaseTurn }) => Promise<void>
+  send: (message: SendProps) => Promise<void>
   pick: (choice: Choice) => Promise<void>
-  press: (press: { pendingId: number; approve: boolean }) => Promise<void>
+  press: (press: PressProps) => Promise<void>
   /** Forgets the conversation on the server, then clears the page. */
   startOver: () => Promise<void>
   /**
@@ -100,7 +106,9 @@ export const useChat = create<ChatState>()(
   devtools(
     persist(
       (set, get) => {
-        const updateReply = ({ id, change }: { id: number; change: (reply: Reply) => Reply }) =>
+        type UpdateReplyProps = { id: number; change: (reply: Reply) => Reply }
+
+        const updateReply = ({ id, change }: UpdateReplyProps) =>
           set(({ entries }) => {
             const entry = entries[id]
             return entry?.kind === ENTRY_KINDS.reply
@@ -108,17 +116,14 @@ export const useChat = create<ChatState>()(
               : {}
           })
 
-        const runTurn = async ({
-          said,
-          route,
-          body,
-          expected,
-        }: {
+        type RunTurnProps = {
           said: string
           route: ChatRoute
           body: Record<string, unknown>
           expected: CaseTurn | null
-        }) => {
+        }
+
+        const runTurn = async ({ said, route, body, expected }: RunTurnProps) => {
           const start = get().entries.length
           const reply: Reply = {
             kind: ENTRY_KINDS.reply,

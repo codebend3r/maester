@@ -85,7 +85,9 @@ const HTTP_METHODS = { post: 'POST' } as const
 const HEADERS = { contentType: 'content-type' } as const
 const CONTENT_TYPES = { json: 'application/json' } as const
 
-const post = async ({ url, body }: { url: string; body: unknown }): Promise<Response> => {
+type PostProps = { url: string; body: unknown }
+
+const post = async ({ url, body }: PostProps): Promise<Response> => {
   const response = await fetch(url, {
     method: HTTP_METHODS.post,
     headers: { [HEADERS.contentType]: CONTENT_TYPES.json },
@@ -173,23 +175,25 @@ export const fetchSandbox = async (): Promise<SandboxState | null> => {
   return toSandboxState(await readJson(response))
 }
 
-export const openCase = async ({ id }: { id: string }): Promise<SandboxState> =>
+type OpenCaseProps = { id: string }
+
+export const openCase = async ({ id }: OpenCaseProps): Promise<SandboxState> =>
   toSandboxState(await readJson(await post({ url: ROUTES.sandboxCase, body: { case: id } })))
 
-export const setSandboxTier = async ({ tier }: { tier: SandboxTier }): Promise<void> => {
+type SetSandboxTierProps = { tier: SandboxTier }
+
+export const setSandboxTier = async ({ tier }: SetSandboxTierProps): Promise<void> => {
   await post({ url: ROUTES.sandboxTier, body: { tier } })
 }
 
-/** Runs one turn, handing each event to `onEvent` as the stream delivers it. */
-export const streamTurn = async ({
-  route,
-  body,
-  onEvent,
-}: {
+type StreamTurnProps = {
   route: ChatRoute
   body: Record<string, unknown>
   onEvent: (event: ChatEvent) => void
-}): Promise<void> => {
+}
+
+/** Runs one turn, handing each event to `onEvent` as the stream delivers it. */
+export const streamTurn = async ({ route, body, onEvent }: StreamTurnProps): Promise<void> => {
   const response = await post({ url: route, body })
   if (!response.body) throw new ApiError(response.status)
   await readEvents({
@@ -201,13 +205,12 @@ export const streamTurn = async ({
   })
 }
 
-export const decide = async ({
-  pendingId,
-  approve,
-}: {
+type DecideProps = {
   pendingId: number
   approve: boolean
-}): Promise<Decision> => {
+}
+
+export const decide = async ({ pendingId, approve }: DecideProps): Promise<Decision> => {
   const body = await readJson(
     await post({ url: ROUTES.decide, body: { pending_id: pendingId, approve } }),
   )

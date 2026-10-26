@@ -5,15 +5,24 @@ import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 /** The player's audio tracks as it reports them, each saying whether it was picked. */
 type ReportedAudio = readonly { index: number; selected?: boolean }[]
 
+type IsAskedPickedProps = { place: number | null; reported: ReportedAudio }
+
 /**
  * Whether the track asked for is the one the player picked: the track at `place`, its place
  * among the player's (which keep the file's order), or any where the player was left to
  * choose (`place` null).
  */
-const isAskedPicked = ({ place, reported }: { place: number | null; reported: ReportedAudio }) =>
+const isAskedPicked = ({ place, reported }: IsAskedPickedProps) =>
   place === null
     ? reported.some((track) => track.selected === true)
     : (reported.at(place)?.selected ?? false)
+
+type IsAudioDroppedProps = {
+  platform: AppPlatform
+  mode: PlaybackMode | null
+  place: number | null
+  reported: ReportedAudio
+}
 
 /**
  * Whether the original file is playing without the audio track asked for. ExoPlayer selects no
@@ -24,17 +33,7 @@ const isAskedPicked = ({ place, reported }: { place: number | null; reported: Re
  * names only audio they decode. Nor is a stream, which carries only the track the session asked
  * the server for.
  */
-export const isAudioDropped = ({
-  platform,
-  mode,
-  place,
-  reported,
-}: {
-  platform: AppPlatform
-  mode: PlaybackMode | null
-  place: number | null
-  reported: ReportedAudio
-}): boolean =>
+export const isAudioDropped = ({ platform, mode, place, reported }: IsAudioDroppedProps): boolean =>
   platform === APP_PLATFORMS.androidTv &&
   mode === PLAYBACK_MODES.direct &&
   reported.length > 0 &&
@@ -92,6 +91,11 @@ const freshFor = (attempt: number): HeardAudio => ({
   isJudged: false,
 })
 
+type HearAudioProps = {
+  heard: HeardAudio | null
+  hearing: AudioHearing
+}
+
 /**
  * Hears what the player says of an attempt's audio, and says when to judge it: once per
  * attempt, at a tick after the load, with the player's last word (`toJudge`). `react-native-video`
@@ -103,10 +107,7 @@ const freshFor = (attempt: number): HeardAudio => ({
 export const hearAudio = ({
   heard,
   hearing,
-}: {
-  heard: HeardAudio | null
-  hearing: AudioHearing
-}): { heard: HeardAudio | null; toJudge: ReportedAudio | null } => {
+}: HearAudioProps): { heard: HeardAudio | null; toJudge: ReportedAudio | null } => {
   const last = heard !== null && heard.attempt === hearing.attempt ? heard : null
   switch (hearing.type) {
     case AUDIO_HEARINGS.loaded: {

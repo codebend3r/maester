@@ -86,14 +86,13 @@ const asShowFile = ({ libraryId, fileName, folder, match }: MatchFile): SubjectF
   edition: null,
 })
 
-/** The file or show a search names, or null for none; a malformed id, or both, is a 400. */
-const subjectFrom = ({
-  mediaId,
-  itemId,
-}: {
+type SubjectFromProps = {
   mediaId: string | undefined
   itemId: string | undefined
-}): MatchSubject | null => {
+}
+
+/** The file or show a search names, or null for none; a malformed id, or both, is a 400. */
+const subjectFrom = ({ mediaId, itemId }: SubjectFromProps): MatchSubject | null => {
   if (mediaId != null && itemId != null) {
     throw new BadRequestException('Name a file or a show, not both.')
   }
@@ -106,6 +105,23 @@ const subjectFrom = ({
     return { kind: MATCH_SUBJECT_KINDS.item, id: Number(itemId) }
   }
   return null
+}
+
+type MatchControllerPreferredByProps = {
+  libraryId: string | undefined
+  request: FastifyRequest
+}
+
+type MatchControllerOnDiskOfProps = {
+  type: MatchItemType
+  subject: MatchSubject | null
+  request: FastifyRequest
+}
+
+type MatchControllerSubjectFilesProps = {
+  type: MatchItemType
+  subject: MatchSubject
+  account: AccountKey
 }
 
 /** Fix match: searching TMDB from a page, and pointing a file at what the viewer picks. */
@@ -197,13 +213,7 @@ export class MatchController {
    * one raven no longer has, or one the lock keeps from this caller, so the
    * order never tells a hidden library's type, or that it is there.
    */
-  private preferredBy({
-    libraryId,
-    request,
-  }: {
-    libraryId: string | undefined
-    request: FastifyRequest
-  }): CandidateTier {
+  private preferredBy({ libraryId, request }: MatchControllerPreferredByProps): CandidateTier {
     if (libraryId == null) return {}
     if (!WHOLE_NUMBER.test(libraryId)) {
       throw new BadRequestException('libraryId must be a library id')
@@ -219,15 +229,10 @@ export class MatchController {
    * nothing for no subject, one raven no longer has, or one in a library
    * the lock keeps from this caller, so the scores never tell it is there.
    */
-  private onDiskOf({
-    type,
-    subject,
-    request,
-  }: {
-    type: MatchItemType
-    subject: MatchSubject | null
-    request: FastifyRequest
-  }): { onDisk: OnDisk | null; country: string | null } {
+  private onDiskOf({ type, subject, request }: MatchControllerOnDiskOfProps): {
+    onDisk: OnDisk | null
+    country: string | null
+  } {
     if (subject == null) return NOTHING_ON_DISK
     const viewer = this.lock.viewer({ request })
     // An extra is never matched (`off`), so a trailer's numbers say nothing of the show.
@@ -279,11 +284,7 @@ export class MatchController {
     type,
     subject,
     account,
-  }: {
-    type: MatchItemType
-    subject: MatchSubject
-    account: AccountKey
-  }): SubjectFile[] {
+  }: MatchControllerSubjectFilesProps): SubjectFile[] {
     switch (subject.kind) {
       case MATCH_SUBJECT_KINDS.media: {
         const file = this.media.get({ id: subject.id, account })

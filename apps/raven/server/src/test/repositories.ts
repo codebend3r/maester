@@ -37,14 +37,16 @@ export const repositories = (database: DatabaseService) => {
   }
 }
 
+type ViewingCountsOfProps = {
+  database: DatabaseService
+  account: AccountKey
+}
+
 /** How many spots, plays, video favourites and title favourites `account` holds. */
 export const viewingCountsOf = ({
   database,
   account,
-}: {
-  database: DatabaseService
-  account: AccountKey
-}): AdoptedCounts | undefined =>
+}: ViewingCountsOfProps): AdoptedCounts | undefined =>
   database.db
     .prepare<{ account: AccountKey }, AdoptedCounts>(
       `SELECT

@@ -46,7 +46,9 @@ const SIDECAR = Array.from({ length: 80 }, (_, index) => {
 
 const EXPOSED = 'content-length, content-range, accept-ranges'
 
-const mediaPlane = ({ secret }: { secret: Buffer | null }): ServerConfig['mediaPlane'] => ({
+type MediaPlaneProps = { secret: Buffer | null }
+
+const mediaPlane = ({ secret }: MediaPlaneProps): ServerConfig['mediaPlane'] => ({
   origins: ORIGINS,
   webOrigins: [
     'https://raven-player.netlify.app',
@@ -75,15 +77,13 @@ describe('the media plane routes', () => {
     return state.off
   }
 
-  const start = async ({
-    name,
-    secret,
-    libraryPin,
-  }: {
+  type StartProps = {
     name: string
     secret: Buffer | null
     libraryPin?: string
-  }): Promise<Started> => {
+  }
+
+  const start = async ({ name, secret, libraryPin }: StartProps): Promise<Started> => {
     const media = join(state.root, name, 'media')
     await encodeClip({ path: join(media, 'Heat (1995).mp4'), seconds: 2 })
     const app = await createApp({
@@ -244,15 +244,14 @@ describe('the media plane routes', () => {
       return body.ticket
     }
 
-    const asBrowser = ({
-      url,
-      origin = NETLIFY,
-      headers = {},
-    }: {
+    type AsBrowserProps = {
       url: string
       origin?: string
       headers?: Record<string, string>
-    }) => on().app.inject({ method: 'GET', url, headers: { origin, ...headers } })
+    }
+
+    const asBrowser = ({ url, origin = NETLIFY, headers = {} }: AsBrowserProps) =>
+      on().app.inject({ method: 'GET', url, headers: { origin, ...headers } })
 
     beforeAll(async () => {
       const { app, admin } = on()
@@ -270,13 +269,12 @@ describe('the media plane routes', () => {
       vault.locked = id
     })
 
-    const preflight = ({
-      origin,
-      privateNetwork = false,
-    }: {
+    type PreflightProps = {
       origin: string
       privateNetwork?: boolean
-    }) =>
+    }
+
+    const preflight = ({ origin, privateNetwork = false }: PreflightProps) =>
       on().app.inject({
         method: 'OPTIONS',
         url: `/api/media/${on().video}/stream`,

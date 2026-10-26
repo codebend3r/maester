@@ -66,14 +66,18 @@ export const OUTAGE_RETRY_MS = 300_000
 /** How long a wake from sleep is given for the network to come back before files start again. */
 export const RESUME_SETTLE_MS = 5000
 
+type RenameProps = { from: string; to: string }
+
+type WriteFileProps = { path: string; text: string }
+
 /** The parts of `node:fs/promises` the queue uses; main passes a recursive `mkdir` and a forced, recursive `rm`. */
 export type QueueFs = {
   mkdir: (path: string) => Promise<void>
-  rename: (input: { from: string; to: string }) => Promise<void>
+  rename: (input: RenameProps) => Promise<void>
   rm: (path: string) => Promise<void>
   readdir: (path: string) => Promise<string[]>
   openPart: (path: string) => Promise<PartFile>
-  writeFile: (input: { path: string; text: string }) => Promise<void>
+  writeFile: (input: WriteFileProps) => Promise<void>
   /** A file's size, 0 when there is no such file. */
   size: (path: string) => Promise<number>
 }
@@ -101,13 +105,25 @@ export type DownloadQueueDeps = {
   onAwake: () => void
 }
 
+type PauseProps = { downloadId: string }
+
+type ResumeProps = { downloadId: string }
+
+type RetryProps = { downloadId: string }
+
+type RemoveProps = { downloadId: string }
+
+type SweepProps = { wasSetAside: boolean }
+
+type AccessEndedProps = { serverId: string }
+
 export type DownloadQueue = {
   /** Starts queued files, and files a last run left downloading, up to `DOWNLOAD_CONCURRENCY`. */
   kick: () => void
-  pause: (input: { downloadId: string }) => Promise<void>
+  pause: (input: PauseProps) => Promise<void>
   /** Requeues the file; a file paused by a relock requeues every file its server's relock paused. */
-  resume: (input: { downloadId: string }) => void
-  retry: (input: { downloadId: string }) => void
+  resume: (input: ResumeProps) => void
+  retry: (input: RetryProps) => void
   /** Requeues every file waiting on an outage and starts what can start: at launch, after the sweep. */
   retryOutages: () => void
   /** The computer is going to sleep: every fetch stops, its file left downloading, and none starts. */
@@ -117,13 +133,13 @@ export type DownloadQueue = {
   pauseAll: () => Promise<void>
   resumeAll: () => void
   /** Aborts the file, drops it and removes its folder. */
-  remove: (input: { downloadId: string }) => Promise<void>
+  remove: (input: RemoveProps) => Promise<void>
   /** Aborts every file, drops them all and removes the whole downloads folder. */
   removeAll: () => Promise<void>
   /** At launch: `sweepDownloads`, holding any kick until it is done. Never rejects. */
-  sweep: (input: { wasSetAside: boolean }) => Promise<void>
+  sweep: (input: SweepProps) => Promise<void>
   /** The server's sign-in ended in main: its files fetched with an account ticket fail. */
-  accessEnded: (input: { serverId: string }) => void
+  accessEnded: (input: AccessEndedProps) => void
   /** Aborts every fetch; the entries stay as they are for the next launch. */
   dispose: () => void
 }
@@ -182,11 +198,13 @@ const lackedBy = ({ disk }: Run): number => (disk.hasRoom ? Math.max(disk.size -
 
 type Failure = Extract<FetchOutcome, { ok: false }>
 
+type IsResumableCutProps = { outcome: Failure; from: number }
+
 /**
  * A response the server cut once the fetch had written past `from`, as it ends one whose account
  * lost access: a new ticket resumes it at once. One cut with nothing new is an outage.
  */
-const isResumableCut = ({ outcome, from }: { outcome: Failure; from: number }): boolean =>
+const isResumableCut = ({ outcome, from }: IsResumableCutProps): boolean =>
   outcome.reason === FETCH_REASONS.cut && outcome.bytes > from
 
 /**
@@ -226,28 +244,27 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     deps.onFailed(entry)
   }
 
-  const failEntry = ({
-    entry,
-    reason,
-    message,
-  }: {
+  type FailEntryProps = {
     entry: DownloadEntry
     reason: FailReason
     message?: string
-  }): void => {
+  }
+
+  const failEntry = ({ entry, reason, message }: FailEntryProps): void => {
     store.update((state) => fail(state, { downloadId: entry.downloadId, reason, message }))
     told(entry.downloadId)
   }
 
-  type RunPick = (input: { downloadId: string; run: Run }) => boolean
+  type RunPickProps = { downloadId: string; run: Run }
 
-  const stopRuns = ({
-    reason,
-    isStopped,
-  }: {
+  type RunPick = (input: RunPickProps) => boolean
+
+  type StopRunsProps = {
     reason: StopReason
     isStopped: RunPick
-  }): Promise<void> => {
+  }
+
+  const stopRuns = ({ reason, isStopped }: StopRunsProps): Promise<void> => {
     const stopped = [...running].filter(([downloadId, run]) => isStopped({ downloadId, run }))
     stopped.forEach(([, run]) => run.stop.abort(stopping(reason)))
     return Promise.all(stopped.map(([, run]) => run.done)).then(() => undefined)
@@ -294,8 +311,10 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     told(entry.downloadId)
   }
 
+  type PauseServerOfProps = { job: Job; reason: PauseReason }
+
   /** Every other waiting or running file of the job's server waits paused for `reason`. */
-  const pauseServerOf = ({ job, reason }: { job: Job; reason: PauseReason }): void => {
+  const pauseServerOf = ({ job, reason }: PauseServerOfProps): void => {
     const { entry, server } = job
     saveBytes(({ run }) => run.serverId === server.id)
     store.update((state) => pauseServer(state, { serverId: server.id, reason }))
@@ -323,14 +342,13 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     deps.warn(`Raven could not reach ${loggable(job.server.name)} for ${loggable(job.entry.label)}`)
   }
 
-  /** Fails each of `downloadIds` with `message`, its bytes kept, and stops the ones that run. */
-  const failRuns = ({
-    downloadIds,
-    message,
-  }: {
+  type FailRunsProps = {
     downloadIds: readonly string[]
     message: string
-  }): void => {
+  }
+
+  /** Fails each of `downloadIds` with `message`, its bytes kept, and stops the ones that run. */
+  const failRuns = ({ downloadIds, message }: FailRunsProps): void => {
     const isPicked: RunPick = ({ downloadId }) => downloadIds.includes(downloadId)
     saveBytes(isPicked)
     store.update((state) =>
@@ -342,12 +360,14 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     stopRuns({ reason: STOP_REASONS.account, isStopped: isPicked }).catch(() => undefined)
   }
 
+  type FailAccountProps = { job: Job; message: string }
+
   /**
    * The server refused the account: this file fails with why, and so do the files of its group
    * still under way, which would meet the same refusal. Main reads the account again, so the page
    * hears it; the files told of are this one alone.
    */
-  const failAccount = ({ job, message }: { job: Job; message: string }): void => {
+  const failAccount = ({ job, message }: FailAccountProps): void => {
     const { entry, server } = job
     const group = store
       .read()
@@ -364,7 +384,9 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     deps.warn(`${loggable(server.name)} refused the account for ${loggable(entry.label)}`)
   }
 
-  const failAccountFor = ({ job, reason }: { job: Job; reason: AccountRefusal }): void =>
+  type FailAccountForProps = { job: Job; reason: AccountRefusal }
+
+  const failAccountFor = ({ job, reason }: FailAccountForProps): void =>
     failAccount({
       job,
       message: accountRefusedMessage({ reason, serverName: job.server.name }),
@@ -414,15 +436,17 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     }
   }
 
+  type FetchOnceProps = {
+    job: Job
+    access: Access
+    signal: AbortSignal
+  }
+
   const fetchOnce = async ({
     job,
     access,
     signal,
-  }: {
-    job: Job
-    access: Access
-    signal: AbortSignal
-  }): Promise<{ outcome: FetchOutcome; from: number }> => {
+  }: FetchOnceProps): Promise<{ outcome: FetchOutcome; from: number }> => {
     const { entry, disk } = job
     /** What the part held when the fetch last asked: its `Range`, so a cut can tell it made progress. */
     const asked = { bytes: disk.bytes }
@@ -463,8 +487,10 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     return { outcome, from: asked.bytes }
   }
 
+  type SettleFailureProps = { job: Job; outcome: Failure }
+
   /** Fails or pauses the file for why its fetch stopped short. */
-  const settleFailure = ({ job, outcome }: { job: Job; outcome: Failure }): void => {
+  const settleFailure = ({ job, outcome }: SettleFailureProps): void => {
     const { entry, server } = job
     switch (outcome.reason) {
       case FETCH_REASONS.locked:
@@ -519,6 +545,12 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     }
   }
 
+  type FetchVideoProps = {
+    job: Job
+    access: Access
+    hasRetried: boolean
+  }
+
   /**
    * Fetches the video into its `.part` and answers the access it ended with, or null once the
    * file has been failed, paused or stopped. A 401 or 423 reads a new access once before it
@@ -528,11 +560,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     job,
     access,
     hasRetried,
-  }: {
-    job: Job
-    access: Access
-    hasRetried: boolean
-  }): Promise<Access | null> => {
+  }: FetchVideoProps): Promise<Access | null> => {
     const { entry, signal } = job
     const { outcome, from } = await fetchOnce({ job, access, signal })
     if (signal.aborted) return null
@@ -561,18 +589,15 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     warn: (message) => deps.warn(message),
   })
 
-  /** One file, from the space check to `ready`. */
-  const work = async ({
-    downloadId,
-    signal,
-    disk,
-    held,
-  }: {
+  type WorkProps = {
     downloadId: string
     signal: AbortSignal
     disk: RunDisk
     held: RunAccess
-  }): Promise<void> => {
+  }
+
+  /** One file, from the space check to `ready`. */
+  const work = async ({ downloadId, signal, disk, held }: WorkProps): Promise<void> => {
     const entry = entryById(store.read(), { downloadId })
     if (entry === null) return
     const server = deps.serverOf(entry.serverId)
@@ -680,7 +705,9 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     next.forEach(begin)
   }
 
-  const stopOne = ({ downloadId, reason }: { downloadId: string; reason: StopReason }) =>
+  type StopOneProps = { downloadId: string; reason: StopReason }
+
+  const stopOne = ({ downloadId, reason }: StopOneProps) =>
     stopRuns({ reason, isStopped: (candidate) => candidate.downloadId === downloadId })
 
   const pauseOne: DownloadQueue['pause'] = async ({ downloadId }) => {
@@ -711,13 +738,12 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     })
   }
 
-  const resumeEach = ({
-    downloadIds,
-    isRetry,
-  }: {
+  type ResumeEachProps = {
     downloadIds: readonly string[]
     isRetry: boolean
-  }): void => {
+  }
+
+  const resumeEach = ({ downloadIds, isRetry }: ResumeEachProps): void => {
     downloadIds.forEach((downloadId) =>
       isRetry ? retried.add(downloadId) : retried.delete(downloadId),
     )
@@ -796,7 +822,9 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     })
   }
 
-  const removing = ({ path, what }: { path: string; what: string }): Promise<void> =>
+  type RemovingProps = { path: string; what: string }
+
+  const removing = ({ path, what }: RemovingProps): Promise<void> =>
     removeFolder({ fs, warn: deps.warn, path, what })
 
   const removeOne: DownloadQueue['remove'] = async ({ downloadId }) => {

@@ -39,6 +39,16 @@ export const isStrongPassword = (password: string): boolean =>
 const NO_PASSWORD = "Set ADMIN_PASSWORD in raven's .env to turn the admin lock off."
 const WEAK_PASSWORD = `ADMIN_PASSWORD in raven's .env is too weak to turn the admin lock off: use ${MIN_LENGTH} characters or more, with lower and upper case letters, a digit and a symbol.`
 
+type AdminServiceIsLockedProps = { cookie: string | undefined }
+
+type AdminServiceStateProps = { cookie: string | undefined }
+
+type AdminServiceLockProps = { cookie: string | undefined }
+
+type AdminServiceRenewedProps = { cookie: string | undefined }
+
+type AdminServiceKeepUnlockedProps = { cookie: string | undefined }
+
 /**
  * The admin lock: on for every browser until the admin password is entered
  * there. While it holds, locked libraries are left out altogether, and the
@@ -76,11 +86,11 @@ export class AdminService implements OnModuleInit {
     return password != null && isStrongPassword(password)
   }
 
-  isLocked({ cookie }: { cookie: string | undefined }): boolean {
+  isLocked({ cookie }: AdminServiceIsLockedProps): boolean {
     return this.session(cookie) == null
   }
 
-  state({ cookie }: { cookie: string | undefined }): AdminLock {
+  state({ cookie }: AdminServiceStateProps): AdminLock {
     const session = this.session(cookie)
     if (session == null) return { state: 'on', available: this.available }
     return this.lockOf(session)
@@ -105,20 +115,20 @@ export class AdminService implements OnModuleInit {
    * Turns the lock back on once `TURN_ON_DELAY_MS` has passed. Null when it
    * holds already, or is on its way, whose wait is not drawn out again.
    */
-  lock({ cookie }: { cookie: string | undefined }): AdminChange | null {
+  lock({ cookie }: AdminServiceLockProps): AdminChange | null {
     const session = this.session(cookie)
     if (session == null || session.locksAt != null) return null
     return this.change({ ...session, locksAt: Date.now() + TURN_ON_DELAY_MS })
   }
 
   /** The session's cookie again, for another 400 days in the browser; null when the lock holds. */
-  renewed({ cookie }: { cookie: string | undefined }): AdminChange | null {
+  renewed({ cookie }: AdminServiceRenewedProps): AdminChange | null {
     const session = this.session(cookie)
     return session == null ? null : this.change(session)
   }
 
   /** Takes back a lock on its way, with no password. Null once it holds, when only the password opens it. */
-  keepUnlocked({ cookie }: { cookie: string | undefined }): AdminChange | null {
+  keepUnlocked({ cookie }: AdminServiceKeepUnlockedProps): AdminChange | null {
     const session = this.session(cookie)
     if (session == null) return null
     return this.change({ ...session, locksAt: null })

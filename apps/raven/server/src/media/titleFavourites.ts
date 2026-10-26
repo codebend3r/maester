@@ -9,6 +9,18 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 /** A movie or episode is a favourite by its files; a show or season by itself. */
 const FAVOURITE_TITLE_TYPES: ReadonlySet<ItemType> = new Set([ITEM_TYPES.show, ITEM_TYPES.season])
 
+type TitleFavouritesIsOpenProps = { itemId: number; locked: ReadonlySet<number> }
+
+type TitleFavouritesFavouriteOfProps = { itemId: number; account: AccountKey }
+
+type TitleFavouritesSetProps = {
+  itemId: number
+  favourite: boolean
+  account: AccountKey
+}
+
+type TitleFavouritesListProps = { account: AccountKey }
+
 /**
  * Shows and seasons each account marked as favourites. A locked library's
  * are left out, whether or not the PIN is entered: one that only locked
@@ -27,7 +39,7 @@ export class TitleFavourites {
   }
 
   /** Whether a library that is not locked holds a file under the item. */
-  private isOpen({ itemId, locked }: { itemId: number; locked: ReadonlySet<number> }): boolean {
+  private isOpen({ itemId, locked }: TitleFavouritesIsOpenProps): boolean {
     return this.metadata.librariesHolding(itemId).some((libraryId) => !locked.has(libraryId))
   }
 
@@ -45,7 +57,7 @@ export class TitleFavourites {
    * `account`'s mark on a show or season, or null where it cannot have one,
    * as `ItemDetails.favourite` says.
    */
-  favouriteOf({ itemId, account }: { itemId: number; account: AccountKey }): boolean | null {
+  favouriteOf({ itemId, account }: TitleFavouritesFavouriteOfProps): boolean | null {
     if (!this.canBeFavourite(itemId)) return null
     return !!this.db
       .prepare<[ByAccount, number], { item_id: number }>(
@@ -59,15 +71,7 @@ export class TitleFavourites {
    * reshuffle. Unmarking always goes through, so a favourite left behind in
    * a library locked since can still be cleared.
    */
-  set({
-    itemId,
-    favourite,
-    account,
-  }: {
-    itemId: number
-    favourite: boolean
-    account: AccountKey
-  }): FavouriteOutcome {
+  set({ itemId, favourite, account }: TitleFavouritesSetProps): FavouriteOutcome {
     return this.db.transaction(() => {
       const type = this.metadata.get(itemId)?.type
       if (type == null || !FAVOURITE_TITLE_TYPES.has(type)) return FAVOURITE_OUTCOMES.missing
@@ -94,7 +98,7 @@ export class TitleFavourites {
    * Every show and season `account` favoured that a library that is not
    * locked holds, most recently marked first.
    */
-  list({ account }: { account: AccountKey }): ItemSummary[] {
+  list({ account }: TitleFavouritesListProps): ItemSummary[] {
     const locked = this.libraries.lockedIds()
     const ids = this.db
       .prepare<ByAccount, { item_id: number }>(

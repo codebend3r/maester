@@ -31,6 +31,12 @@ const refusalOf = (status: number): Answer => ({
   body: { message: status === STATUSES.locked ? 'This library is locked.' : 'No ticket.' },
 })
 
+type MediaServerProps = {
+  origins?: readonly MediaOrigin[]
+  originsStatus?: number
+  tickets?: readonly number[]
+}
+
 /**
  * The NAS as `apiFor` reaches it, through the app's allowlist: `getMediaOrigins` lists `origins`
  * (or refuses with `originsStatus`), and each ticket read answers the next status of `tickets`,
@@ -41,11 +47,7 @@ export const mediaServer = ({
   origins = [LAN, PUBLIC],
   originsStatus = STATUSES.ok,
   tickets = [STATUSES.ok],
-}: {
-  origins?: readonly MediaOrigin[]
-  originsStatus?: number
-  tickets?: readonly number[]
-}): { api: ApiClient; heard: string[] } => {
+}: MediaServerProps): { api: ApiClient; heard: string[] } => {
   const heard: string[] = []
   let ticketReads = 0
   let issued = 0
@@ -78,6 +80,10 @@ export const mediaServer = ({
   return { api, heard }
 }
 
+type ProbesOfProps = {
+  elapsedMs: Readonly<Record<string, number>>
+}
+
 /**
  * Each origin's ping as long as `elapsedMs` names, in milliseconds; one it leaves out never
  * answers. `retime` sets new times, as a move to another network would. `probed` is every ping
@@ -85,9 +91,7 @@ export const mediaServer = ({
  */
 export const probesOf = ({
   elapsedMs,
-}: {
-  elapsedMs: Readonly<Record<string, number>>
-}): {
+}: ProbesOfProps): {
   probe: ProbeFetch
   probed: string[]
   retime: (next: Readonly<Record<string, number>>) => void

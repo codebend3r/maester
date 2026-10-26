@@ -358,8 +358,10 @@ describe('WatchPlayer Open in Raven', () => {
     return open
   }
 
+  type PlayingAtProps = { video: HTMLVideoElement; seconds: number }
+
   /** A title this browser plays, playing at `seconds` into the file. */
-  const playingAt = ({ video, seconds }: { video: HTMLVideoElement; seconds: number }) => {
+  const playingAt = ({ video, seconds }: PlayingAtProps) => {
     Object.defineProperties(video, {
       readyState: { value: HTMLMediaElement.HAVE_METADATA, configurable: true },
       currentTime: { value: seconds, writable: true, configurable: true },

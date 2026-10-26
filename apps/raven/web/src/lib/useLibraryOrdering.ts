@@ -14,13 +14,15 @@ import { moveId, sameOrder } from '@/lib/libraryOrder'
 const idsOf = (libraries: readonly Library[]): readonly number[] =>
   libraries.map((library) => library.id)
 
+type UseLibraryOrderingProps = { libraries: readonly Library[] }
+
 /**
  * The admin's reordering of the libraries. Starting an edit takes a draft of
  * the order; moves change only the draft; Finish sends it, shown at once and
  * put back if the server refuses. Leaving the page with the draft changed
  * sends it too, so a click on another route loses nothing.
  */
-export const useLibraryOrdering = ({ libraries }: { libraries: readonly Library[] }) => {
+export const useLibraryOrdering = ({ libraries }: UseLibraryOrderingProps) => {
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<readonly number[] | null>(null)
   const save = useOptimisticMutation({
@@ -53,6 +55,8 @@ export const useLibraryOrdering = ({ libraries }: { libraries: readonly Library[
       ]
     : libraries
 
+  type UseLibraryOrderingMoveProps = { id: number; to: number }
+
   return {
     isEditing: draft !== null,
     ordered,
@@ -65,7 +69,7 @@ export const useLibraryOrdering = ({ libraries }: { libraries: readonly Library[
       if (draft && !sameOrder({ a: draft, b: before.current })) save.mutate(draft)
       setDraft(null)
     },
-    move: ({ id, to }: { id: number; to: number }) =>
+    move: ({ id, to }: UseLibraryOrderingMoveProps) =>
       setDraft((current) => (current ? moveId({ ids: current, id, to }) : current)),
   }
 }

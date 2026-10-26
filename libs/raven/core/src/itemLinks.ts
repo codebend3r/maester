@@ -12,8 +12,10 @@ export const PAGE_PATHS = { settings: '/settings', watch: '/watch' } as const
 /** The page that plays a video. */
 export const watchPageOf = (mediaId: number): AppPath => `${PAGE_PATHS.watch}/${mediaId}`
 
+type SeasonPathProps = { showId: number; season: number }
+
 /** A season's page, by its show and number. */
-const seasonPath = ({ showId, season }: { showId: number; season: number }): AppPath =>
+const seasonPath = ({ showId, season }: SeasonPathProps): AppPath =>
   `/shows/${showId}/seasons/${season}`
 
 /** Where an item's page lives, or null for one that has no page of its own. */
@@ -26,20 +28,18 @@ export const itemPath = (item: ItemSummary): AppPath | null => {
     : null
 }
 
+type InLibraryProps = {
+  page: AppPath
+  libraryId: number
+  file?: number | null
+}
+
 /**
  * `page`, a movie's or an episode's, as library `libraryId` shows it: only
  * that library's files, so two libraries holding the same movie never mix
  * on its page. `file` names the one Play starts.
  */
-export const inLibrary = ({
-  page,
-  libraryId,
-  file = null,
-}: {
-  page: AppPath
-  libraryId: number
-  file?: number | null
-}): AppPath =>
+export const inLibrary = ({ page, libraryId, file = null }: InLibraryProps): AppPath =>
   `${page}?${toQueryString({
     library: String(libraryId),
     ...(file == null ? {} : { file: String(file) }),
@@ -51,17 +51,22 @@ export const queryId = (value: string | null): number | null => {
   return value != null && value !== '' && Number.isInteger(id) ? id : null
 }
 
-/** The card a page shows: the chosen file's, else the movie's own while it has files, else Play's. */
-const shownCard = ({
-  everyCard,
-  chosen,
-}: {
+type ShownCardProps = {
   everyCard: readonly MediaItem[]
   chosen: MediaItem | undefined
-}): string | null => {
+}
+
+/** The card a page shows: the chosen file's, else the movie's own while it has files, else Play's. */
+const shownCard = ({ everyCard, chosen }: ShownCardProps): string | null => {
   if (chosen) return chosen.card
   if (everyCard.some((version) => version.card == null)) return null
   return primaryVersion(everyCard)?.card ?? null
+}
+
+type LibraryFilesProps = {
+  versions: readonly MediaItem[]
+  library: number | null
+  file: number | null
 }
 
 /**
@@ -79,11 +84,11 @@ export const libraryFiles = ({
   versions,
   library,
   file,
-}: {
-  versions: readonly MediaItem[]
-  library: number | null
-  file: number | null
-}): { versions: MediaItem[]; everyCard: MediaItem[]; primary: MediaItem } | null => {
+}: LibraryFilesProps): {
+  versions: MediaItem[]
+  everyCard: MediaItem[]
+  primary: MediaItem
+} | null => {
   const named = versions.some((version) => version.libraryId === library) ? library : null
   const libraryId =
     named ??
@@ -97,14 +102,13 @@ export const libraryFiles = ({
   return primary ? { versions: shown, everyCard, primary } : null
 }
 
-/** Where an episode's page leads back to: its season, else its show, else its library. */
-export const episodeBackPath = ({
-  item,
-  libraryId,
-}: {
+type EpisodeBackPathProps = {
   item: ItemSummary
   libraryId: number
-}): string => {
+}
+
+/** Where an episode's page leads back to: its season, else its show, else its library. */
+export const episodeBackPath = ({ item, libraryId }: EpisodeBackPathProps): string => {
   if (!item.show) return `/libraries/${libraryId}`
   return item.season == null
     ? `/shows/${item.show.id}`
@@ -119,6 +123,12 @@ const isWatchState = object({ media: isMediaItem, upNext: isMediaList, isShuffle
 
 export type WatchState = Infer<typeof isWatchState>
 
+type WatchLinkProps = {
+  media: MediaItem
+  upNext?: WatchState['upNext']
+  isShuffled?: boolean
+}
+
 /**
  * The link to play a video, with the video riding along in router state so
  * the player starts without fetching it again, and any to play after it, in
@@ -128,39 +138,37 @@ export const watchLink = ({
   media,
   upNext = [],
   isShuffled = false,
-}: {
-  media: MediaItem
-  upNext?: WatchState['upNext']
-  isShuffled?: boolean
-}): { to: AppPath; state: WatchState } => ({
+}: WatchLinkProps): { to: AppPath; state: WatchState } => ({
   to: watchPageOf(media.id),
   state: { media, upNext, isShuffled },
 })
+
+type QueueLinkProps = {
+  queue: readonly MediaItem[]
+  isShuffled?: boolean
+}
 
 /** The link to play the first of `queue`, with the rest to play after it; null for an empty queue. */
 export const queueLink = ({
   queue,
   isShuffled = false,
-}: {
-  queue: readonly MediaItem[]
-  isShuffled?: boolean
-}): { to: AppPath; state: WatchState } | null => {
+}: QueueLinkProps): { to: AppPath; state: WatchState } | null => {
   const [media, ...upNext] = queue
   return media ? watchLink({ media, upNext, isShuffled }) : null
+}
+
+type ReadWatchStateProps = {
+  state: unknown
+  /** null for an address that names no video. */
+  id: number | null
 }
 
 /**
  * What `watchLink` handed over for video `id`; null for a direct visit, a
  * refresh of a link from before, or another video's state.
  */
-export const readWatchState = ({
-  state,
-  id,
-}: {
-  state: unknown
-  /** null for an address that names no video. */
-  id: number | null
-}): WatchState | null => (isWatchState(state) && state.media.id === id ? state : null)
+export const readWatchState = ({ state, id }: ReadWatchStateProps): WatchState | null =>
+  isWatchState(state) && state.media.id === id ? state : null
 
 /** Where a card goes: an item's page, or straight to the player. */
 export const CARD_DESTINATIONS = { page: 'page', player: 'player' } as const
@@ -176,18 +184,17 @@ export type CardDestination =
     }
   | { kind: typeof CARD_DESTINATIONS.player; media: MediaItem }
 
+type CardDestinationProps = {
+  media: MediaItem
+  hasPages: boolean
+}
+
 /**
  * Where a card goes: a matched item's page as the card's library shows it,
  * where the library has pages, or straight to the player for anything else.
  * A card a movie was split onto names its file, so the page plays that one.
  */
-export const cardDestination = ({
-  media,
-  hasPages,
-}: {
-  media: MediaItem
-  hasPages: boolean
-}): CardDestination => {
+export const cardDestination = ({ media, hasPages }: CardDestinationProps): CardDestination => {
   const path = hasPages && media.item ? itemPath(media.item) : null
   if (path == null || !media.item) return { kind: CARD_DESTINATIONS.player, media }
   return {
@@ -199,14 +206,16 @@ export const cardDestination = ({
   }
 }
 
+type CardLinkProps = {
+  media: MediaItem
+  hasPages: boolean
+}
+
 /** A card's destination as a link: the page's address in its library, or the player's with the video handed over. */
 export const cardLink = ({
   media,
   hasPages,
-}: {
-  media: MediaItem
-  hasPages: boolean
-}): { to: AppPath; state?: WatchState } => {
+}: CardLinkProps): { to: AppPath; state?: WatchState } => {
   const destination = cardDestination({ media, hasPages })
   switch (destination.kind) {
     case CARD_DESTINATIONS.page:

@@ -21,14 +21,18 @@ type Result = {
     | { type: typeof OUTCOME_TYPES.failed }
 }
 
+type InPartsProps<T> = { list: readonly T[]; size: number }
+
 /** `list` cut into parts of at most `size`, in order. */
-const inParts = <T,>({ list, size }: { list: readonly T[]; size: number }): T[][] =>
+const inParts = <T,>({ list, size }: InPartsProps<T>): T[][] =>
   Array.from({ length: Math.ceil(list.length / size) }, (_, index) =>
     list.slice(index * size, (index + 1) * size),
   )
 
+type SelectingBarProps = { scope: SelectionScopeValue }
+
 /** The bar while selecting: the count, what marking came to, and the buttons. */
-const SelectingBar = ({ scope }: { scope: SelectionScopeValue }) => {
+const SelectingBar = ({ scope }: SelectingBarProps) => {
   const { store, resolve, allKeys } = scope
   const keys = useSelection((state) => state.keys)
   const change = useWatchedChange()

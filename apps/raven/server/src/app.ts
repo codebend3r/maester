@@ -11,21 +11,7 @@ import { isAllowedWebOrigin } from '@/media/mediaPlaneConfig'
 import { mediaPlanePaths, pathMatcher, registerMediaPlaneCors } from '@/media/mediaPlaneCors'
 import type { WatchOptions } from '@/scanner/libraryWatcher'
 
-/**
- * The configured application, not yet listening, so a test can drive it
- * through `inject` exactly as `main.ts` serves it.
- */
-export const createApp = async ({
-  config,
-  quiet = false,
-  metadataFetch,
-  aiFetch,
-  watch,
-  authFetch,
-  authKeys,
-  accessRecheckMs,
-  membershipTtlMs,
-}: {
+type CreateAppProps = {
   config: ServerConfig
   quiet?: boolean
   /** Stands in for TMDB in tests; left out, metadata calls go to the network. */
@@ -40,7 +26,23 @@ export const createApp = async ({
   accessRecheckMs?: number
   /** How long a membership answer is reused; 5 s when left out. A test that changes an account under a token already used asks for 0. */
   membershipTtlMs?: number
-}): Promise<NestFastifyApplication> => {
+}
+
+/**
+ * The configured application, not yet listening, so a test can drive it
+ * through `inject` exactly as `main.ts` serves it.
+ */
+export const createApp = async ({
+  config,
+  quiet = false,
+  metadataFetch,
+  aiFetch,
+  watch,
+  authFetch,
+  authKeys,
+  accessRecheckMs,
+  membershipTtlMs,
+}: CreateAppProps): Promise<NestFastifyApplication> => {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule.register({
       config,

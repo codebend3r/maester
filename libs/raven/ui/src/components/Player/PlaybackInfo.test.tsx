@@ -53,6 +53,16 @@ afterEach(() => {
   spies.splice(0).forEach((spy) => spy.mockRestore())
 })
 
+type RenderInfoProps = {
+  mode?: PlaybackMode
+  steppedDown?: StepDown | null
+  media?: MediaItem | null
+  audio?: number | null
+  readStats?: () => EngineStats
+  onClose?: () => void
+  playback?: typeof DEFAULT_PLAYBACK_STATE | null
+}
+
 const renderInfo = ({
   mode = 'direct',
   media = null,
@@ -61,15 +71,7 @@ const renderInfo = ({
   onClose = () => {},
   playback = DEFAULT_PLAYBACK_STATE,
   steppedDown = null,
-}: {
-  mode?: PlaybackMode
-  steppedDown?: StepDown | null
-  media?: MediaItem | null
-  audio?: number | null
-  readStats?: () => EngineStats
-  onClose?: () => void
-  playback?: typeof DEFAULT_PLAYBACK_STATE | null
-}) =>
+}: RenderInfoProps) =>
   renderWithProviders({
     ui: (
       <PlaybackInfo
@@ -91,8 +93,10 @@ const section = (title: string): HTMLElement => {
   return found
 }
 
+type ValueOfProps = { title: string; term: string }
+
 /** The value beside a term, in the one section that has it. */
-const valueOf = ({ title, term }: { title: string; term: string }): string | null =>
+const valueOf = ({ title, term }: ValueOfProps): string | null =>
   within(section(title)).queryByText(term)?.nextElementSibling?.textContent ?? null
 
 describe('PlaybackInfo', () => {

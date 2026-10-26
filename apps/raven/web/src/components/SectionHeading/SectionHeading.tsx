@@ -1,20 +1,18 @@
 import type { ReactNode } from 'react'
 import styles from '@/components/SectionHeading/SectionHeading.module.scss'
 
+type SectionHeadingProps = {
+  id?: string
+  children: ReactNode
+  aside?: ReactNode
+}
+
 /**
  * A section's heading in the large serif, ruled off from what follows, with
  * room at its right for a count or the section's own controls (a scroller's
  * previous and next). `id` is for the section's `aria-labelledby`.
  */
-export const SectionHeading = ({
-  id,
-  children,
-  aside,
-}: {
-  id?: string
-  children: ReactNode
-  aside?: ReactNode
-}) => (
+export const SectionHeading = ({ id, children, aside }: SectionHeadingProps) => (
   <header className={styles.head}>
     <h2 id={id} className={styles.title}>
       {children}

@@ -8,19 +8,18 @@ export type BackFallback = { to: string; label: string }
 /** The way back for a page that hangs off the home page. */
 export const HOME = { to: '/', label: 'Home' } as const satisfies BackFallback
 
+type BackButtonProps = {
+  fallback: BackFallback | null
+  className?: string
+}
+
 /**
  * A step back through the app's own history, as the browser's Back would, so
  * the page behind comes back scrolled where it was. A page opened straight
  * from its address has none: `fallback` names where it goes instead, and
  * with no fallback there is no button.
  */
-export const BackButton = ({
-  fallback,
-  className,
-}: {
-  fallback: BackFallback | null
-  className?: string
-}) => {
+export const BackButton = ({ fallback, className }: BackButtonProps) => {
   const navigate = useNavigate()
   const canGoBack = useCanGoBack()
   const classes = [styles.back, className ?? ''].filter(Boolean).join(' ')

@@ -10,13 +10,15 @@ import styles from '@/components/SagaLink/SagaLink.module.scss'
 /** The most posters the card fans; a longer saga shows its first few. */
 const FANNED = 3
 
+type SagaLinkProps = { itemId: number; libraryId: number }
+
 /**
  * A movie's way to its saga: a card under the header with a fan of the
  * saga's posters, the movie's place in it and the saga's name, opening the
  * saga's page. Nothing while the library's sagas load, or when the movie is
  * in none (a saga holds two movies or more).
  */
-export const SagaLink = ({ itemId, libraryId }: { itemId: number; libraryId: number }) => {
+export const SagaLink = ({ itemId, libraryId }: SagaLinkProps) => {
   const sagas = useQuery(sagasQuery(libraryId))
   const saga = sagas.data?.find((entry) => entry.media.some((media) => media.item?.id === itemId))
   if (!saga) return null

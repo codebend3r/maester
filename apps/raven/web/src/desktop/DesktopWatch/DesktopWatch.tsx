@@ -70,20 +70,18 @@ type Answer = { reply: DesktopReply; count: number }
 const keepsTitle = (query: Query<Answer>) =>
   (query.state.data?.reply.type ?? null) === DESKTOP_REPLIES.title ? 'static' : Infinity
 
+type AskForTitleProps = {
+  client: DesktopClient
+  request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.playTitle }>
+  hasLeft: () => boolean
+}
+
 /**
  * Asks main for the title, answering `TOO_SLOW` once `waitMs` passes with no answer. A download
  * main hands over after the page stopped waiting, or after it left, is one the page will never
  * play, so main hears the page left it, or the download would stay marked in use.
  */
-const askForTitle = ({
-  client,
-  request,
-  hasLeft,
-}: {
-  client: DesktopClient
-  request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.playTitle }>
-  hasLeft: () => boolean
-}): Promise<DesktopReply> =>
+const askForTitle = ({ client, request, hasLeft }: AskForTitleProps): Promise<DesktopReply> =>
   new Promise((resolve) => {
     const wait = { isOver: false }
     const timer = setTimeout(() => {
@@ -108,14 +106,13 @@ const askForTitle = ({
     )
   })
 
-/** The next title by id alone, as a play link names it: its label is read from the server. */
-const useLinkedNext = ({
-  next,
-  handed,
-}: {
+type UseLinkedNextProps = {
   next: number[]
   handed: PlayerServices['title']['next']
-}): PlayerServices['title']['next'] => {
+}
+
+/** The next title by id alone, as a play link names it: its label is read from the server. */
+const useLinkedNext = ({ next, handed }: UseLinkedNextProps): PlayerServices['title']['next'] => {
   const [first, ...rest] = next
   const isNeeded = handed === null && first !== undefined
   const media = useQuery(mediaQuery(isNeeded ? first : null)).data
@@ -125,6 +122,15 @@ const useLinkedNext = ({
     state: null,
     label: mediaLabel(media),
   }
+}
+
+type WatchTitleProps = {
+  services: PlayerServices
+  media: MediaItem
+  upNext: readonly MediaItem[]
+  player: NativePlayer
+  isOutputFixed: boolean
+  onLost: () => void
 }
 
 /**
@@ -141,14 +147,7 @@ const WatchTitle = ({
   player,
   isOutputFixed,
   onLost,
-}: {
-  services: PlayerServices
-  media: MediaItem
-  upNext: readonly MediaItem[]
-  player: NativePlayer
-  isOutputFixed: boolean
-  onLost: () => void
-}) => {
+}: WatchTitleProps) => {
   const { client, menu } = useDesktop()
   const askPin = useUnlockPrompt((state) => state.ask)
   const { search } = useLocation()
@@ -285,20 +284,18 @@ const WatchTitle = ({
   return <PlayerMessage message={WATCH_COPY.unreadable} fallback={backTo} />
 }
 
+type DesktopWatchProps = {
+  services: PlayerServices
+  media: MediaItem
+  upNext: readonly MediaItem[]
+}
+
 /**
  * The browser's watch page inside Raven: the same title, progress, next title,
  * favourite, report and escape, with mpv drawing the picture under the page. Without mpv a
  * title from the server does not play, since Raven plays them only there.
  */
-export const DesktopWatch = ({
-  services,
-  media,
-  upNext,
-}: {
-  services: PlayerServices
-  media: MediaItem
-  upNext: readonly MediaItem[]
-}) => {
+export const DesktopWatch = ({ services, media, upNext }: DesktopWatchProps) => {
   const chosen = useChosenEngine()
   // Read while main is asked for the engine, so the volume is settled by the time the video loads.
   const isOutputFixed = useIsOutputFixed()

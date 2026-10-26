@@ -10,7 +10,9 @@ import {
   stemOf,
 } from '@/metadata/places'
 
-const file = ({ path, root = '/tv' }: { path: string; root?: string }) => {
+type FileProps = { path: string; root?: string }
+
+const file = ({ path, root = '/tv' }: FileProps) => {
   const inside = path.slice(root.length + 1)
   const slash = inside.lastIndexOf('/')
   return {

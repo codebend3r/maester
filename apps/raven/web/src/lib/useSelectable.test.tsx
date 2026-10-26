@@ -7,7 +7,9 @@ import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionS
 import { useSelectable } from '@/lib/useSelectable'
 import { Peek, peeked } from '@/test/selection'
 
-const Card = ({ id, opened }: { id: string; opened: string[] }) => {
+type CardProps = { id: string; opened: string[] }
+
+const Card = ({ id, opened }: CardProps) => {
   const select = useSelectable({ key: id, title: id })
   return (
     <li data-entry={id} {...select.rootProps}>

@@ -13,16 +13,7 @@ export type HelpActions = {
   copyDiagnostics: () => Promise<void>
 }
 
-/** The Help menu's own items. None of them rejects: a failure is a notice and a warning. */
-export const createHelpActions = ({
-  folders,
-  mkdir,
-  openPath,
-  writeClipboard,
-  diagnostics,
-  notify,
-  warn,
-}: {
+type CreateHelpActionsProps = {
   folders: { logs: string; crashDumps: string }
   mkdir: (path: string) => Promise<unknown>
   /** Electron's `shell.openPath`: '' on success, else why it failed. */
@@ -32,14 +23,29 @@ export const createHelpActions = ({
   diagnostics: () => Promise<string>
   notify: (message: string) => void
   warn: (message: string) => void
-}): HelpActions => {
-  const failed = ({ message, why }: { message: string; why: string }): void => {
+}
+
+/** The Help menu's own items. None of them rejects: a failure is a notice and a warning. */
+export const createHelpActions = ({
+  folders,
+  mkdir,
+  openPath,
+  writeClipboard,
+  diagnostics,
+  notify,
+  warn,
+}: CreateHelpActionsProps): HelpActions => {
+  type FailedProps = { message: string; why: string }
+
+  const failed = ({ message, why }: FailedProps): void => {
     notify(message)
     warn(`${message} ${why}`)
   }
 
+  type ShowProps = { folder: string; message: string }
+
   // A folder is made first: nothing may have crashed or logged into it yet.
-  const show = async ({ folder, message }: { folder: string; message: string }) => {
+  const show = async ({ folder, message }: ShowProps) => {
     try {
       await mkdir(folder)
       const answer = await openPath(folder)

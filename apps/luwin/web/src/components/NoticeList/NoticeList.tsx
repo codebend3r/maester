@@ -11,8 +11,10 @@ const HEADINGS = {
   [NOTICE_KINDS.directMessage]: 'Direct message',
 } as const satisfies Record<NoticeKind, string>
 
+type NoticeListProps = { notices: Notice[] }
+
 /** What a turn or a press sent outside the reply: notes and approvals for the admin, DMs. */
-export const NoticeList = ({ notices }: { notices: Notice[] }) => {
+export const NoticeList = ({ notices }: NoticeListProps) => {
   const press = useChat((state) => state.press)
   const settled = useChat((state) => state.settled)
   const isBusy = useChat((state) => state.isBusy)

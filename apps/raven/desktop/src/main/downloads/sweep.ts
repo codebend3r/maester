@@ -7,7 +7,7 @@ import { loggable } from '@/main/servers/serverCalls'
 import { isMissingFile } from '@/main/stateStore'
 
 /** The parts of `node:fs/promises` the sweep uses; main passes a forced, recursive `rm`. */
-export type SweepFs = {
+type SweepFs = {
   readdir: (path: string) => Promise<string[]>
   rm: (path: string) => Promise<void>
 }
@@ -22,18 +22,15 @@ export type SweepDeps = {
 const isMediaFolder = (name: string): boolean =>
   /^\d+$/u.test(name) && isMediaId(Number(name)) && String(Number(name)) === name
 
-/** Removes a folder; one that stays is swept at the next launch, so a failure is only logged. */
-export const removeFolder = async ({
-  fs,
-  warn,
-  path,
-  what,
-}: {
+type RemoveFolderProps = {
   fs: Pick<SweepFs, 'rm'>
   warn: (message: string) => void
   path: string
   what: string
-}): Promise<void> => {
+}
+
+/** Removes a folder; one that stays is swept at the next launch, so a failure is only logged. */
+export const removeFolder = async ({ fs, warn, path, what }: RemoveFolderProps): Promise<void> => {
   await fs.rm(path).catch((error: unknown) => {
     warn(`Raven could not remove ${what}: ${loggable(errorText(error))}`)
   })
@@ -59,15 +56,18 @@ const sweepFolders = async ({
       }
       return []
     })
-  const removing = ({ path, what }: { path: string; what: string }) =>
-    removeFolder({ fs, warn, path, what })
+  type RemovingProps = { path: string; what: string }
+
+  const removing = ({ path, what }: RemovingProps) => removeFolder({ fs, warn, path, what })
 
   const root = downloadsDirFor({ userData })
   const listed = (await namesIn(root)).filter(isOpaqueId)
   // Read as each folder is listed, so a file queued meanwhile keeps its folder.
   const isServerNamed = (serverId: string): boolean =>
     store.read().entries.some((entry) => entry.serverId === serverId)
-  const isNamed = ({ serverId, name }: { serverId: string; name: string }): boolean =>
+  type IsNamedProps = { serverId: string; name: string }
+
+  const isNamed = ({ serverId, name }: IsNamedProps): boolean =>
     store
       .read()
       .entries.some((entry) => entry.serverId === serverId && String(entry.mediaId) === name)

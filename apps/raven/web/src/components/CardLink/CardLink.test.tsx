@@ -14,7 +14,9 @@ const Where = () => {
   return <p data-testid="where">{`${type} ${pathname}${search} ${JSON.stringify(state)}`}</p>
 }
 
-const renderLink = ({ link, route = '/libraries/2' }: { link: ReactNode; route?: string }) =>
+type RenderLinkProps = { link: ReactNode; route?: string }
+
+const renderLink = ({ link, route = '/libraries/2' }: RenderLinkProps) =>
   renderWithProviders({
     ui: (
       <>
@@ -27,11 +29,13 @@ const renderLink = ({ link, route = '/libraries/2' }: { link: ReactNode; route?:
 
 const where = () => screen.getByTestId('where').textContent
 
+type IsLeftToTheBrowserProps = { link: HTMLElement; init: MouseEventInit }
+
 /**
  * Clicks `link` and says whether the click was left for the browser to
  * follow, then cancels it, so the test page itself goes nowhere.
  */
-const isLeftToTheBrowser = ({ link, init }: { link: HTMLElement; init: MouseEventInit }) => {
+const isLeftToTheBrowser = ({ link, init }: IsLeftToTheBrowserProps) => {
   const seen = { isLeft: false }
   const watch = (event: Event) => {
     seen.isLeft = !event.defaultPrevented

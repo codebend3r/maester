@@ -22,16 +22,18 @@ const scaledTo = ({ width, height, maxHeight }: Frame & { maxHeight: number }): 
   return { width: Math.round((width * scaled) / height / 2) * 2, height: scaled }
 }
 
+type VideoStringOfProps = {
+  mode: StreamMode
+  videoCodec: string | null
+  bitDepth: number | null
+}
+
 /** A transcode's video is 8-bit H.264 High; a remux's is the file's own, or null when HLS cannot name it. */
 export const videoStringOf = ({
   mode,
   videoCodec,
   bitDepth,
-}: {
-  mode: StreamMode
-  videoCodec: string | null
-  bitDepth: number | null
-}): string | null => {
+}: VideoStringOfProps): string | null => {
   if (mode === PLAYBACK_MODES.transcode) {
     return videoCodecString({ codec: VIDEO_CODECS.h264, bitDepth: null })
   }
@@ -41,6 +43,19 @@ export const videoStringOf = ({
 const audioStringOf = (track: AudioTrack): string | null => {
   const codec = hlsAudioCodec(track)
   return HLS_AUDIO_STRINGS[codec] ?? audioCodecString(codec)
+}
+
+type VariantOfProps = {
+  mode: StreamMode
+  videoString: string
+  audio: AudioTrack | null
+  frame: Frame
+  plan: SegmentPlan
+  fileBitrate: number | null
+  bytes: number
+  maxHeight: number
+  quality: TranscodeQuality
+  bitrate: number | null
 }
 
 /**
@@ -60,18 +75,7 @@ export const variantOf = ({
   maxHeight,
   quality,
   bitrate,
-}: {
-  mode: StreamMode
-  videoString: string
-  audio: AudioTrack | null
-  frame: Frame
-  plan: SegmentPlan
-  fileBitrate: number | null
-  bytes: number
-  maxHeight: number
-  quality: TranscodeQuality
-  bitrate: number | null
-}): { codecs: string; resolution: Frame; bandwidth: number } => {
+}: VariantOfProps): { codecs: string; resolution: Frame; bandwidth: number } => {
   const audioString = audio ? audioStringOf(audio) : null
   const codecs = [videoString, ...(audioString == null ? [] : [audioString])].join(',')
   if (mode === PLAYBACK_MODES.remux) {

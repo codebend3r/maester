@@ -29,22 +29,45 @@ const cardOf = (row: FileRow): string => `${row.item_id}|${row.entry}`
 const cutOf = (row: FileRow) =>
   readCut({ fileName: row.file_name, titles: [row.title, row.original_title] })
 
+type GroupByProps<T> = { rows: readonly T[]; key: (row: T) => string }
+
 /** Rows gathered by `key`, each group keeping the rows' order. */
-const groupBy = <T>({ rows, key }: { rows: readonly T[]; key: (row: T) => string }) =>
+const groupBy = <T>({ rows, key }: GroupByProps<T>) =>
   rows.reduce(
     (groups, row) => groups.set(key(row), [...(groups.get(key(row)) ?? []), row]),
     new Map<string, T[]>(),
   )
 
+type TitleOfProps = { cards: readonly DuplicateCard[] }
+
 /** A movie's title as it sorts, "The Whale" under W, from its first card. */
-const titleOf = ({ cards }: { cards: readonly DuplicateCard[] }): string => {
+const titleOf = ({ cards }: TitleOfProps): string => {
   const media = cards[0]?.entry.media
   return sortTitle(media?.item?.title ?? media?.title ?? '')
 }
 
+type ByTitleProps = { cards: readonly DuplicateCard[] }
+
+type ByTitle2Props = { cards: readonly DuplicateCard[] }
+
 /** Movies in the order of their titles, as the listing sorts them. */
-const byTitle = (a: { cards: readonly DuplicateCard[] }, b: { cards: readonly DuplicateCard[] }) =>
+const byTitle = (a: ByTitleProps, b: ByTitle2Props) =>
   titleOf(a).localeCompare(titleOf(b), undefined, { sensitivity: 'base' })
+
+type MovieSplitsListProps = { libraryId: number; account: AccountKey }
+
+type MovieSplitsSplitProps = {
+  libraryId: number
+  mediaId: number
+  how: SplitHow
+  account: AccountKey
+}
+
+type MovieSplitsJoinProps = {
+  libraryId: number
+  itemId: number
+  account: AccountKey
+}
 
 /**
  * A movie library's duplicates: the movies with more than one file, whose
@@ -85,7 +108,7 @@ export class MovieSplits {
    * poster in another, however many movies there are. Each file is as
    * `account` sees it.
    */
-  list({ libraryId, account }: { libraryId: number; account: AccountKey }): Duplicates {
+  list({ libraryId, account }: MovieSplitsListProps): Duplicates {
     const movies = [
       ...groupBy({ rows: this.files(libraryId), key: (row) => String(row.item_id) }).values(),
     ].flatMap((files) => {
@@ -132,17 +155,7 @@ export class MovieSplits {
    * card of its own; `smart` gives each cut its own, keeping the files of
    * one cut together and those that name no cut on the movie's own card.
    */
-  split({
-    libraryId,
-    mediaId,
-    how,
-    account,
-  }: {
-    libraryId: number
-    mediaId: number
-    how: SplitHow
-    account: AccountKey
-  }): Duplicates {
+  split({ libraryId, mediaId, how, account }: MovieSplitsSplitProps): Duplicates {
     const rows = this.files(libraryId)
     const target = rows.find((row) => row.id === mediaId)
     if (!target) throw new NotFoundException(`No movie file ${mediaId} in library ${libraryId}`)
@@ -176,15 +189,7 @@ export class MovieSplits {
   }
 
   /** Puts every file of the movie in the library back on its one card. */
-  join({
-    libraryId,
-    itemId,
-    account,
-  }: {
-    libraryId: number
-    itemId: number
-    account: AccountKey
-  }): Duplicates {
+  join({ libraryId, itemId, account }: MovieSplitsJoinProps): Duplicates {
     const changed = this.db
       .prepare(
         `UPDATE media SET split = NULL

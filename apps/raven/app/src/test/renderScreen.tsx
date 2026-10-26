@@ -35,14 +35,13 @@ export const createScreenClient = (): QueryClient => {
 export const untilIdle = async (client: QueryClient): Promise<void> =>
   waitFor(() => expect(client.isFetching() + client.isMutating()).toBe(0))
 
-/** Renders a screen as the app does: inside the safe area, with a query client. */
-export const renderScreen = async ({
-  ui,
-  client = createScreenClient(),
-}: {
+type RenderScreenProps = {
   ui: ReactElement
   client?: QueryClient
-}) =>
+}
+
+/** Renders a screen as the app does: inside the safe area, with a query client. */
+export const renderScreen = async ({ ui, client = createScreenClient() }: RenderScreenProps) =>
   render(
     <SafeAreaProvider initialMetrics={METRICS}>
       <QueryClientProvider client={client}>{ui}</QueryClientProvider>

@@ -76,15 +76,14 @@ export const EMPTY_STATE: PlayerState = {
   window: null,
 }
 
-const upsertFirst = <T extends { path: string }>({
-  list,
-  entry,
-  cap,
-}: {
+type UpsertFirstProps<T extends { path: string }> = {
   list: readonly T[]
   entry: T
   cap: number
-}): T[] => [entry, ...list.filter((existing) => existing.path !== entry.path)].slice(0, cap)
+}
+
+const upsertFirst = <T extends { path: string }>({ list, entry, cap }: UpsertFirstProps<T>): T[] =>
+  [entry, ...list.filter((existing) => existing.path !== entry.path)].slice(0, cap)
 
 /** The state as this Raven keeps it: an older one's server titles leave the recents. */
 export const upgradeState = (stored: Infer<typeof isStoredPlayerState>): PlayerState => ({
@@ -95,8 +94,10 @@ export const upgradeState = (stored: Infer<typeof isStoredPlayerState>): PlayerS
 /** One key per recent: a file by its path. */
 export const recentKey = (entry: RecentEntry): string => `${entry.kind}:${entry.path}`
 
+type WithRecentProps = { state: PlayerState; entry: RecentEntry }
+
 /** Puts `entry` first, dropping any older entry with its key, and keeps the newest `RECENTS_CAP`. */
-const withRecent = ({ state, entry }: { state: PlayerState; entry: RecentEntry }): PlayerState => {
+const withRecent = ({ state, entry }: WithRecentProps): PlayerState => {
   const key = recentKey(entry)
   return {
     ...state,
@@ -107,46 +108,56 @@ const withRecent = ({ state, entry }: { state: PlayerState; entry: RecentEntry }
   }
 }
 
-export const addRecent = ({
-  state,
-  path,
-  at,
-}: {
+type AddRecentProps = {
   state: PlayerState
   path: string
   at: number
-}): PlayerState => withRecent({ state, entry: { kind: RECENT_KINDS.file, path, openedAt: at } })
+}
 
-export const removeRecentByKey = ({
-  state,
-  key,
-}: {
+export const addRecent = ({ state, path, at }: AddRecentProps): PlayerState =>
+  withRecent({ state, entry: { kind: RECENT_KINDS.file, path, openedAt: at } })
+
+type RemoveRecentByKeyProps = {
   state: PlayerState
   key: string
-}): PlayerState => ({
+}
+
+export const removeRecentByKey = ({ state, key }: RemoveRecentByKeyProps): PlayerState => ({
   ...state,
   recents: state.recents.filter((entry) => recentKey(entry) !== key),
 })
 
-export const removeRecent = ({ state, path }: { state: PlayerState; path: string }): PlayerState =>
+type RemoveRecentProps = { state: PlayerState; path: string }
+
+export const removeRecent = ({ state, path }: RemoveRecentProps): PlayerState =>
   removeRecentByKey({ state, key: recentKey({ kind: RECENT_KINDS.file, path, openedAt: 0 }) })
 
 export const clearRecents = (state: PlayerState): PlayerState => ({ ...state, recents: [] })
 
-const isFinished = ({
-  position,
-  duration,
-}: {
+type IsFinishedProps = {
   position: number
   duration: number | null
-}): boolean => position <= 0 || (duration !== null && position >= duration - END_MARGIN_S)
+}
+
+const isFinished = ({ position, duration }: IsFinishedProps): boolean =>
+  position <= 0 || (duration !== null && position >= duration - END_MARGIN_S)
+
+type SavedForProps = { state: PlayerState; file: FileFacts }
 
 /** The saved entry for this file as it is now: a replaced file (other size or mtime) has none. */
-const savedFor = ({ state, file }: { state: PlayerState; file: FileFacts }): ResumeEntry | null => {
+const savedFor = ({ state, file }: SavedForProps): ResumeEntry | null => {
   const saved = state.resume.find((entry) => entry.path === file.path)
   if (!saved) return null
   if (saved.size !== file.size || saved.mtimeMs !== file.mtimeMs) return null
   return saved
+}
+
+type SavePositionProps = {
+  state: PlayerState
+  file: FileFacts
+  position: number
+  duration: number | null
+  at: number
 }
 
 export const savePosition = ({
@@ -155,13 +166,7 @@ export const savePosition = ({
   position,
   duration: reported,
   at,
-}: {
-  state: PlayerState
-  file: FileFacts
-  position: number
-  duration: number | null
-  at: number
-}): PlayerState => {
+}: SavePositionProps): PlayerState => {
   // A player that leaves before it learns the length reports none; the length known before still holds.
   const duration = reported ?? savedFor({ state, file })?.duration ?? null
   if (isFinished({ position, duration })) {
@@ -177,37 +182,44 @@ export const savePosition = ({
   }
 }
 
+type ForgetResumeProps = { state: PlayerState; path: string }
+
 /** Drops the path's resume spot; with none, the same state, so the store writes nothing. */
-export const forgetResume = ({ state, path }: { state: PlayerState; path: string }): PlayerState =>
+export const forgetResume = ({ state, path }: ForgetResumeProps): PlayerState =>
   state.resume.some((entry) => entry.path === path)
     ? { ...state, resume: state.resume.filter((entry) => entry.path !== path) }
     : state
 
-/** Where the file starts: its saved spot, or `fallback` when it has none (a download's server spot). */
-export const resumeFor = ({
-  state,
-  file,
-  fallback = 0,
-}: {
+type ResumeForProps = {
   state: PlayerState
   file: FileFacts
   fallback?: number
-}): number => {
+}
+
+/** Where the file starts: its saved spot, or `fallback` when it has none (a download's server spot). */
+export const resumeFor = ({ state, file, fallback = 0 }: ResumeForProps): number => {
   const saved = savedFor({ state, file })
   if (!saved) return fallback
   return isFinished(saved) ? 0 : saved.position
 }
 
-export const watchedShare = ({
-  state,
-  file,
-}: {
+type WatchedShareProps = {
   state: PlayerState
   file: FileFacts
-}): number | null => {
+}
+
+export const watchedShare = ({ state, file }: WatchedShareProps): number | null => {
   const saved = savedFor({ state, file })
   if (!saved || saved.duration === null || saved.duration <= 0) return null
   return Math.min(1, Math.max(0, saved.position / saved.duration))
+}
+
+type SetTrackPickProps = {
+  state: PlayerState
+  path: string
+  audio: number | null
+  subtitle: string | null
+  at: number
 }
 
 export const setTrackPick = ({
@@ -216,13 +228,7 @@ export const setTrackPick = ({
   audio,
   subtitle,
   at,
-}: {
-  state: PlayerState
-  path: string
-  audio: number | null
-  subtitle: string | null
-  at: number
-}): PlayerState => ({
+}: SetTrackPickProps): PlayerState => ({
   ...state,
   tracks: upsertFirst({
     list: state.tracks,
@@ -231,22 +237,26 @@ export const setTrackPick = ({
   }),
 })
 
+type TrackPickForProps = {
+  state: PlayerState
+  path: string
+}
+
 export const trackPickFor = ({
   state,
   path,
-}: {
-  state: PlayerState
-  path: string
-}): { audio: number | null; subtitle: string | null } | null => {
+}: TrackPickForProps): { audio: number | null; subtitle: string | null } | null => {
   const pick = state.tracks.find((entry) => entry.path === path)
   if (!pick) return null
   return { audio: pick.audio, subtitle: pick.subtitle }
 }
 
-export const setWindowBounds = ({
-  state,
-  bounds,
-}: {
+type SetWindowBoundsProps = {
   state: PlayerState
   bounds: WindowBounds
-}): PlayerState => ({ ...state, window: bounds })
+}
+
+export const setWindowBounds = ({ state, bounds }: SetWindowBoundsProps): PlayerState => ({
+  ...state,
+  window: bounds,
+})

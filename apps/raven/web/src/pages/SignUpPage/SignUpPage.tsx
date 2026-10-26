@@ -33,8 +33,10 @@ const SignUpForm = () => {
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [hasTried, setTried] = useState(false)
+  type SignUpMutationFnProps = { email: string; password: string }
+
   const signUp = useMutation({
-    mutationFn: (credentials: { email: string; password: string }) =>
+    mutationFn: (credentials: SignUpMutationFnProps) =>
       callAuth(async (client) => {
         const answer = await client.signUp({ ...credentials, options: { emailRedirectTo } })
         // The same answer for a new address and for one that already has an

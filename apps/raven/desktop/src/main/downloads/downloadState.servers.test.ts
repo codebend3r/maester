@@ -13,7 +13,9 @@ describe('keepOneServer', () => {
   const PLAYED: Pending = { play: true, position: 180, furthest: 190, at: 50, accountId: 'ada' }
   const LATER: Pending = { play: false, position: 200, furthest: 200, at: 60, accountId: 'ada' }
   const ready = { kind: DOWNLOAD_STATUS_KINDS.ready } as const
-  const keep = ({ state, moved = [] }: { state: DownloadsState; moved?: readonly string[] }) =>
+  type KeepProps = { state: DownloadsState; moved?: readonly string[] }
+
+  const keep = ({ state, moved = [] }: KeepProps) =>
     keepOneServer({ state, serverId: SERVER_A, adopted: [SERVER_B], moved: new Set(moved) })
 
   it("keeps the server's own downloads and what it is owed as they are", () => {

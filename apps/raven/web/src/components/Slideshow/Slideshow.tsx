@@ -25,6 +25,11 @@ const MOTIONS = {
   slide: styles.slide,
 } as const satisfies Record<SlideshowMotion, string | undefined>
 
+type SlideRolesProps<T> = {
+  slides: readonly T[]
+  step: number
+}
+
 /**
  * The pictures laid out `step` changes in, each with its part, in the
  * order they came, so the ones already laid out never swap places and
@@ -34,10 +39,7 @@ const MOTIONS = {
 export const slideRoles = <T,>({
   slides,
   step,
-}: {
-  slides: readonly T[]
-  step: number
-}): Array<{ slide: T; role: SlideRole }> => {
+}: SlideRolesProps<T>): Array<{ slide: T; role: SlideRole }> => {
   const at = (offset: number) => (step + offset) % slides.length
   const roleOf = (index: number): SlideRole | null => {
     if (index === at(0)) return step === 0 ? 'first' : 'current'
@@ -77,21 +79,19 @@ const useStep = (count: number): number => {
   return step
 }
 
+type SlideshowProps = {
+  slides: readonly string[]
+  motion: SlideshowMotion
+  className?: string
+}
+
 /**
  * Pictures shown one after another, first to last and round again, each
  * coming in by `motion`: a cross fade, a slow zoom as it fades in, or a
  * slide that pushes the last one out. Decorative: it takes no pointer and
  * says nothing to a screen reader. `className` frames it.
  */
-export const Slideshow = ({
-  slides,
-  motion,
-  className,
-}: {
-  slides: readonly string[]
-  motion: SlideshowMotion
-  className?: string
-}) => {
+export const Slideshow = ({ slides, motion, className }: SlideshowProps) => {
   const step = useStep(slides.length)
   return (
     <div

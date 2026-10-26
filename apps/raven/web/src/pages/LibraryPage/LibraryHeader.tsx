@@ -11,22 +11,19 @@ import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 const count = new Intl.NumberFormat()
 
+type LibraryHeaderProps = {
+  titleId: string
+  library: Library
+  actions: ReturnType<typeof useLibraryActions>
+  isShut: boolean
+}
+
 /**
  * The library's name, type and counts, how its scan stands, and at their
  * right what can be done to it: its history, Quick scan, Full scan, Update ratings, Match again,
  * Edit, and Lock once open.
  */
-export const LibraryHeader = ({
-  titleId,
-  library,
-  actions,
-  isShut,
-}: {
-  titleId: string
-  library: Library
-  actions: ReturnType<typeof useLibraryActions>
-  isShut: boolean
-}) => {
+export const LibraryHeader = ({ titleId, library, actions, isShut }: LibraryHeaderProps) => {
   const queryClient = useQueryClient()
   const relock = useMutation({
     mutationFn: api.lock,

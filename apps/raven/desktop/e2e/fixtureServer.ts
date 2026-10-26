@@ -149,6 +149,10 @@ export const isTicketOnly = ({
 export const routesOf = (requests: readonly FixtureRequest[]): string[] =>
   requests.map(({ method, path }) => `${method} ${path}`)
 
+type ThrottleProps = { byte: number | null }
+
+type StallProps = { path: RegExp }
+
 export type FixtureServer = {
   origin: string
   /**
@@ -174,9 +178,9 @@ export type FixtureServer = {
    * link does; an answer that starts past it goes out at full speed. `null` sends the
    * rest of each slowed answer at once and slows nothing more.
    */
-  throttle: (input: { byte: number | null }) => void
+  throttle: (input: ThrottleProps) => void
   /** Holds every answer whose path matches `path` until the returned release is called. */
-  stall: (input: { path: RegExp }) => () => void
+  stall: (input: StallProps) => () => void
   /**
    * Listens again at the same two addresses after `close`, keeping all it knew (sessions,
    * unlocks, the request logs), as a server back from an outage does.
@@ -283,11 +287,13 @@ type Slowed = { finish: () => void; stop: () => void }
 type Stall = { path: RegExp; gate: Promise<void>; release: () => void }
 type Title = { title: string; path: string; bytes: Buffer }
 type Tries = { failed: number; waitUntil: number }
-type Serve = (input: {
+type ServeProps = {
   request: IncomingMessage
   response: ServerResponse
   body: string | null
-}) => void
+}
+
+type Serve = (input: ServeProps) => void
 
 const NO_TRIES: Tries = { failed: 0, waitUntil: 0 }
 
@@ -317,7 +323,9 @@ const probeLengthOf = (query: URLSearchParams): number => {
   return Math.min(Math.max(asked, 1), PROBE_MAX_BYTES)
 }
 
-const afterWrong = ({ tries, now }: { tries: Tries; now: number }): Tries =>
+type AfterWrongProps = { tries: Tries; now: number }
+
+const afterWrong = ({ tries, now }: AfterWrongProps): Tries =>
   tries.failed + 1 < WRONG_TRIES
     ? { failed: tries.failed + 1, waitUntil: tries.waitUntil }
     : { failed: 0, waitUntil: now + WRONG_WAIT_MS }
@@ -348,14 +356,16 @@ const readBody = (request: IncomingMessage): Promise<string | null> =>
     request.on('error', reject)
   })
 
+type RangeOfProps = {
+  header: string | undefined
+  size: number
+}
+
 /** A `Range` header read as raven's `parseRange` reads it. */
 const rangeOf = ({
   header,
   size,
-}: {
-  header: string | undefined
-  size: number
-}): { start: number; end: number } | typeof RANGE_OUTCOMES.unsatisfiable | null => {
+}: RangeOfProps): { start: number; end: number } | typeof RANGE_OUTCOMES.unsatisfiable | null => {
   const match = /^bytes=(\d*)-(\d*)/u.exec((header ?? '').trim())
   if (match === null) return null
   const [, rawStart = '', rawEnd = ''] = match
@@ -371,21 +381,18 @@ const rangeOf = ({
   return { start, end }
 }
 
-/**
- * Sends `bytes` from `from` to `end` a `TRICKLE_BYTES` chunk every `TRICKLE_MS`: slower
- * than either clip plays, yet each read returns, so mpv can still act on a seek.
- */
-const trickle = ({
-  response,
-  bytes,
-  from,
-  end,
-}: {
+type TrickleProps = {
   response: ServerResponse
   bytes: Buffer
   from: number
   end: number
-}): Slowed => {
+}
+
+/**
+ * Sends `bytes` from `from` to `end` a `TRICKLE_BYTES` chunk every `TRICKLE_MS`: slower
+ * than either clip plays, yet each read returns, so mpv can still act on a seek.
+ */
+const trickle = ({ response, bytes, from, end }: TrickleProps): Slowed => {
   const position = { next: from }
   const timer = setInterval(() => {
     if (response.destroyed) return clearInterval(timer)
@@ -410,7 +417,9 @@ const trickle = ({
 const contentTypeOf = (path: string) =>
   extname(path).toLowerCase() === MP4_EXTENSION ? 'video/mp4' : 'video/x-matroska'
 
-const listen = async ({ server, port }: { server: Server; port: number }): Promise<string> => {
+type ListenProps = { server: Server; port: number }
+
+const listen = async ({ server, port }: ListenProps): Promise<string> => {
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
     server.listen(port, '127.0.0.1', () => {
@@ -429,6 +438,14 @@ const shut = (server: Server): Promise<void> =>
     server.closeAllConnections()
     server.close(() => resolve())
   })
+
+type StartFixtureServerProps = {
+  clips: { first: string; second: string; tracks: string }
+  mode: FixtureMode
+  now?: () => number
+  hasMediaPlane?: boolean
+  port?: number
+}
 
 /**
  * A stand-in raven server on `127.0.0.1`, shaped like `apps/raven/server` (Ruling 1): the
@@ -449,13 +466,7 @@ export const startFixtureServer = async ({
   now = Date.now,
   hasMediaPlane = false,
   port = 0,
-}: {
-  clips: { first: string; second: string; tracks: string }
-  mode: FixtureMode
-  now?: () => number
-  hasMediaPlane?: boolean
-  port?: number
-}): Promise<FixtureServer> => {
+}: StartFixtureServerProps): Promise<FixtureServer> => {
   if (!isMediaTracks(FIXTURE_TRACKS)) throw new Error('The fixture track list is not a MediaTracks')
   const [tracksBytes, firstBytes, secondBytes] = await Promise.all([
     readFile(clips.tracks),
@@ -513,13 +524,12 @@ export const startFixtureServer = async ({
   let slowed: readonly Slowed[] = []
   let stalls: readonly Stall[] = []
 
-  const logOf = ({
-    request,
-    body,
-  }: {
+  type LogOfProps = {
     request: IncomingMessage
     body: string | null
-  }): FixtureRequest => {
+  }
+
+  const logOf = ({ request, body }: LogOfProps): FixtureRequest => {
     const cookies = cookiesOf(request)
     return {
       method: request.method ?? '',
@@ -535,17 +545,14 @@ export const startFixtureServer = async ({
     }
   }
 
-  const sendFile = ({
-    request,
-    response,
-    path,
-    bytes,
-  }: {
+  type SendFileProps = {
     request: IncomingMessage
     response: ServerResponse
     path: string
     bytes: Buffer
-  }) => {
+  }
+
+  const sendFile = ({ request, response, path, bytes }: SendFileProps) => {
     const range = rangeOf({ header: request.headers.range, size: bytes.length })
     const common = {
       [HTTP_HEADERS.acceptRanges]: 'bytes',
@@ -615,20 +622,18 @@ export const startFixtureServer = async ({
 
   const canSee = (cookies: ReadonlyMap<string, string>) => !mode.isLocked || isUnlocked(cookies)
 
+  type IsHeldBackProps = {
+    request: IncomingMessage
+    response: ServerResponse
+    missing: string
+  }
+
   /**
    * Answers for what sits in the locked library when this browser may not see it, as the
    * server's `LockGuard` does: 404 while the admin lock holds, so nothing asks for the PIN,
    * else 423. False, answering nothing, when it may see it.
    */
-  const isHeldBack = ({
-    request,
-    response,
-    missing,
-  }: {
-    request: IncomingMessage
-    response: ServerResponse
-    missing: string
-  }): boolean => {
+  const isHeldBack = ({ request, response, missing }: IsHeldBackProps): boolean => {
     const cookies = cookiesOf(request)
     if (canSee(cookies)) return false
     const isHidden = adminHolds(cookies)
@@ -648,7 +653,9 @@ export const startFixtureServer = async ({
     isHeldBack,
   })
 
-  const sendPing = ({ response, query }: { response: ServerResponse; query: URLSearchParams }) => {
+  type SendPingProps = { response: ServerResponse; query: URLSearchParams }
+
+  const sendPing = ({ response, query }: SendPingProps) => {
     const length = probeLengthOf(query)
     response.writeHead(200, {
       [HTTP_HEADERS.contentType]: 'application/octet-stream',
@@ -663,17 +670,14 @@ export const startFixtureServer = async ({
     response.end(FIXTURE_SIDECAR)
   }
 
-  const answerMedia = ({
-    request,
-    response,
-    mediaId,
-    rest,
-  }: {
+  type AnswerMediaProps = {
     request: IncomingMessage
     response: ServerResponse
     mediaId: number
     rest: string
-  }) => {
+  }
+
+  const answerMedia = ({ request, response, mediaId, rest }: AnswerMediaProps) => {
     const title = titles.get(mediaId)
     const missing = `No media ${mediaId}`
     if (title === undefined) return sendJson({ response, status: 404, body: { message: missing } })
@@ -722,15 +726,13 @@ export const startFixtureServer = async ({
     }
   }
 
-  const answerItem = ({
-    request,
-    response,
-    itemId,
-  }: {
+  type AnswerItemProps = {
     request: IncomingMessage
     response: ServerResponse
     itemId: number
-  }) => {
+  }
+
+  const answerItem = ({ request, response, itemId }: AnswerItemProps) => {
     const item = items.get(itemId)
     const missing = `No item ${itemId}`
     if (item === undefined) return sendJson({ response, status: 404, body: { message: missing } })
@@ -738,28 +740,26 @@ export const startFixtureServer = async ({
     return sendJson({ response, status: 200, body: item })
   }
 
-  const answerSagas = ({
-    request,
-    response,
-  }: {
+  type AnswerSagasProps = {
     request: IncomingMessage
     response: ServerResponse
-  }) => {
+  }
+
+  const answerSagas = ({ request, response }: AnswerSagasProps) => {
     if (isHeldBack({ request, response, missing: `No library ${FIXTURE_ITEMS.library}` })) return
     sendJson({ response, status: 200, body: sagas })
+  }
+
+  type LibraryRouteOfProps = {
+    request: IncomingMessage
+    response: ServerResponse
   }
 
   /**
    * How the routes of the library and the media plane, which name no title, answer a request;
    * null for any other request.
    */
-  const libraryRouteOf = ({
-    request,
-    response,
-  }: {
-    request: IncomingMessage
-    response: ServerResponse
-  }): (() => void) | null => {
+  const libraryRouteOf = ({ request, response }: LibraryRouteOfProps): (() => void) | null => {
     if (request.method !== SERVER_METHODS.get) return null
     const { pathname, query } = partsOf(request.url ?? '')
     if (pathname === API_PATHS.mediaOrigins) {
@@ -781,14 +781,13 @@ export const startFixtureServer = async ({
     return () => answerItem({ request, response, itemId: Number(item[1]) })
   }
 
-  /** The web's reads that name no library or title; null for any other path. */
-  const webRouteOf = ({
-    pathname,
-    response,
-  }: {
+  type WebRouteOfProps = {
     pathname: string
     response: ServerResponse
-  }): (() => void) | null => {
+  }
+
+  /** The web's reads that name no library or title; null for any other path. */
+  const webRouteOf = ({ pathname, response }: WebRouteOfProps): (() => void) | null => {
     switch (pathname) {
       case WEB_PATHS.libraries:
         return () => sendJson({ response, status: 200, body: libraries })
@@ -819,17 +818,16 @@ export const startFixtureServer = async ({
     }
   }
 
+  type AnswerMediaPlaneProps = {
+    request: IncomingMessage
+    response: ServerResponse
+  }
+
   /**
    * The media origin: a title's file and sidecar for that title's ticket alone. A browser
    * sends no cookie to another origin, so a cookie here opens nothing.
    */
-  const answerMediaPlane = ({
-    request,
-    response,
-  }: {
-    request: IncomingMessage
-    response: ServerResponse
-  }) => {
+  const answerMediaPlane = ({ request, response }: AnswerMediaPlaneProps) => {
     if (!hasMediaPlane || request.method !== SERVER_METHODS.get) return sendMissing(response)
     const { pathname, query } = partsOf(request.url ?? '')
     if (pathname === PING_PATH) return sendPing({ response, query })
@@ -850,7 +848,9 @@ export const startFixtureServer = async ({
     return sendFile({ request, response, path: title.path, bytes: title.bytes })
   }
 
-  const answerUnlock = ({ response, body }: { response: ServerResponse; body: string | null }) => {
+  type AnswerUnlockProps = { response: ServerResponse; body: string | null }
+
+  const answerUnlock = ({ response, body }: AnswerUnlockProps) => {
     if (now() < pinTries.waitUntil) {
       return sendJson({
         response,
@@ -874,13 +874,12 @@ export const startFixtureServer = async ({
     return sendJson({ response, status: 401, body: { message: 'That PIN is not right.' } })
   }
 
-  const answerAdminUnlock = ({
-    response,
-    body,
-  }: {
+  type AnswerAdminUnlockProps = {
     response: ServerResponse
     body: string | null
-  }) => {
+  }
+
+  const answerAdminUnlock = ({ response, body }: AnswerAdminUnlockProps) => {
     switch (mode.admin.kind) {
       case FIXTURE_ADMIN_KINDS.noPassword:
         return sendJson({ response, status: 503, body: { message: NO_PASSWORD } })
@@ -917,15 +916,13 @@ export const startFixtureServer = async ({
     })
   }
 
-  const answer = ({
-    request,
-    response,
-    body,
-  }: {
+  type AnswerProps = {
     request: IncomingMessage
     response: ServerResponse
     body: string | null
-  }) => {
+  }
+
+  const answer = ({ request, response, body }: AnswerProps) => {
     const path = request.url ?? ''
     const cookies = cookiesOf(request)
     const route = `${request.method ?? ''} ${path}`
@@ -949,16 +946,17 @@ export const startFixtureServer = async ({
     return answerMedia({ request, response, mediaId: Number(media[1]), rest: media[2] ?? '' })
   }
 
+  type ListenerProps = { serve: Serve }
+
   /** A listener and its own request log: each request is logged, then held by any stall it matches. */
-  const listener = ({ serve }: { serve: Serve }) => {
+  const listener = ({ serve }: ListenerProps) => {
     const requests: FixtureRequest[] = []
-    const handle = async ({
-      request,
-      response,
-    }: {
+    type HandleProps = {
       request: IncomingMessage
       response: ServerResponse
-    }) => {
+    }
+
+    const handle = async ({ request, response }: HandleProps) => {
       const body = await readBody(request)
       requests.push(logOf({ request, body }))
       const path = request.url ?? ''
@@ -998,7 +996,9 @@ export const startFixtureServer = async ({
     requests: away.requests,
   }
 
-  const stall = ({ path }: { path: RegExp }) => {
+  type Stall2Props = { path: RegExp }
+
+  const stall = ({ path }: Stall2Props) => {
     const opened: { release: () => void } = { release: () => {} }
     const gate = new Promise<void>((resolve) => {
       opened.release = resolve
@@ -1073,6 +1073,11 @@ const WEB_TICKET_MS = 300_000
 /** An access token's life on the web's fixture, as Supabase's default hour. */
 const WEB_JWT_SECONDS = 3600
 
+type StartWebFixtureProps = {
+  clips: { first: string; second: string; tracks: string }
+  hasMediaPlane?: boolean
+}
+
 /**
  * The server Raven's web pages run against: accounts on, the fixture's account approved,
  * no library locked. With `hasMediaPlane` it lists its media origin too.
@@ -1080,10 +1085,7 @@ const WEB_JWT_SECONDS = 3600
 export const startWebFixture = ({
   clips,
   hasMediaPlane = false,
-}: {
-  clips: { first: string; second: string; tracks: string }
-  hasMediaPlane?: boolean
-}): Promise<FixtureServer> =>
+}: StartWebFixtureProps): Promise<FixtureServer> =>
   startFixtureServer({
     clips,
     mode: {

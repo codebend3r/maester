@@ -17,7 +17,9 @@ const signedOut = { status: AUTH_SESSION_STATUSES.ready, session: null }
 const booting = { status: AUTH_SESSION_STATUSES.booting, session: null }
 const noAccount = { data: undefined, error: null }
 
-const refused = ({ status, reason }: { status: number; reason: AuthRefusal['reason'] }) =>
+type RefusedProps = { status: number; reason: AuthRefusal['reason'] }
+
+const refused = ({ status, reason }: RefusedProps) =>
   new ApiError({ status, message: 'refused', refusal: { reason, message: 'refused' } })
 
 const refusal = (reason: AuthRefusal['reason']) => refused({ status: 403, reason })

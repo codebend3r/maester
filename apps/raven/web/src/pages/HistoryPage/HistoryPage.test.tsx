@@ -8,15 +8,13 @@ import { HistoryPage } from '@/pages/HistoryPage/HistoryPage'
 import { library, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
-const played = ({
-  id,
-  title,
-  watched,
-}: {
+type PlayedProps = {
   id: number
   title: string
   watched: boolean
-}): HistoryEntry => ({
+}
+
+const played = ({ id, title, watched }: PlayedProps): HistoryEntry => ({
   media: mediaItem({ id, title, duration: 100 }),
   lastPlayedAt: new Date().toISOString(),
   plays: 1,

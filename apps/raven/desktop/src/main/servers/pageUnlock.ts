@@ -2,9 +2,11 @@ import { PAGE_ORIGIN, SERVER_COOKIES, UNLOCK_COOKIE_PATH } from '@raven/core'
 import { loggable } from '@/main/servers/serverCalls'
 import { messageOf } from '@/shared/messageOf'
 
+type GetProps = { url: string; name: string }
+
 /** The part of the page session's cookie jar main reads, as Electron's `session.cookies` has it. */
 export type PageCookies = {
-  get: (filter: { url: string; name: string }) => Promise<readonly { value: string }[]>
+  get: (filter: GetProps) => Promise<readonly { value: string }[]>
 }
 
 const MAX_VALUE_CHARS = 4096
@@ -27,6 +29,11 @@ const isCookieValue = (value: string): boolean =>
     return COOKIE_OCTETS.some(([low, high]) => code >= low && code <= high)
   })
 
+type CreatePageUnlockProps = {
+  cookies: PageCookies
+  warn: (message: string) => void
+}
+
 /**
  * The `Cookie` header that carries the page's library PIN unlock on main's own calls to the
  * server. The page enters the PIN, so main reads its cookie from the page's jar on every call,
@@ -34,13 +41,7 @@ const isCookieValue = (value: string): boolean =>
  * cannot be read.
  */
 export const createPageUnlock =
-  ({
-    cookies,
-    warn,
-  }: {
-    cookies: PageCookies
-    warn: (message: string) => void
-  }): (() => Promise<string | null>) =>
+  ({ cookies, warn }: CreatePageUnlockProps): (() => Promise<string | null>) =>
   async () => {
     try {
       const found = await cookies.get({

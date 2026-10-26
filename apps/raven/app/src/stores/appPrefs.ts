@@ -95,8 +95,10 @@ export const useAppPrefs = create<AppPrefs>()(
   ),
 )
 
+type ConfigureAppPrefsProps = { storage: StateStorage }
+
 /** Gives the preferences their storage, AsyncStorage in the app, and reads them back from it. */
-export const configureAppPrefs = async ({ storage }: { storage: StateStorage }) => {
+export const configureAppPrefs = async ({ storage }: ConfigureAppPrefsProps) => {
   useAppPrefs.persist.setOptions({ storage: createJSONStorage(() => storage) })
   await useAppPrefs.persist.rehydrate()
 }

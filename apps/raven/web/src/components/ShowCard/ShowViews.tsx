@@ -28,8 +28,10 @@ import styles from '@/components/ShowCard/ShowViews.module.scss'
 const episodesLabel = (entry: ShowEntry): string =>
   `${entry.episodes} ${entry.episodes === 1 ? 'episode' : 'episodes'}`
 
+type NextPlayProps = { entry: ShowEntry }
+
 /** The play button a show's row carries: its first episode not yet watched, when there is one. */
-const NextPlay = ({ entry }: { entry: ShowEntry }) => {
+const NextPlay = ({ entry }: NextPlayProps) => {
   const { show, next } = entry
   if (!next) return null
   const code = next.item ? episodeCode(next.item) : null
@@ -45,11 +47,13 @@ const NextPlay = ({ entry }: { entry: ShowEntry }) => {
   )
 }
 
+type SmallPosterProps = { entry: ShowEntry; inRow?: boolean }
+
 /**
  * A show's small poster, or its initial; a second way to the page, so out
  * of the tab order. A list's row shows it smaller than a tile.
  */
-const SmallPoster = ({ entry, inRow = false }: { entry: ShowEntry; inRow?: boolean }) => (
+const SmallPoster = ({ entry, inRow = false }: SmallPosterProps) => (
   <CardLink
     to={`/shows/${entry.show.id}`}
     className={inRow ? `${styles.frame} ${styles.rowFrame}` : styles.frame}
@@ -69,7 +73,9 @@ const RATING_COLUMNS: readonly { source: RatingSource; label: string }[] = [
 
 type Column = 'title' | 'years' | 'episodes' | RatingSource
 
-const score = ({ entry, source }: { entry: ShowEntry; source: RatingSource }): number | null =>
+type ScoreProps = { entry: ShowEntry; source: RatingSource }
+
+const score = ({ entry, source }: ScoreProps): number | null =>
   entry.show.ratings.find((rating) => rating.source === source)?.value ?? null
 
 const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
@@ -88,8 +94,10 @@ const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
   tmdb: { value: (entry) => score({ entry, source: RATING_SOURCES.tmdb }), first: 'desc' },
 }
 
+type ShowRowProps = { entry: ShowEntry }
+
 /** One show as a table row, its small poster before its title. */
-const ShowRow = ({ entry }: { entry: ShowEntry }) => {
+const ShowRow = ({ entry }: ShowRowProps) => {
   const select = useSelectable({ key: showEntryKey(entry.show), title: entry.show.title })
   return (
     <tr data-entry={showEntryKey(entry.show)} {...select.rootProps}>
@@ -124,18 +132,18 @@ const ShowRow = ({ entry }: { entry: ShowEntry }) => {
   )
 }
 
+type ShowListProps = { shows: ShowEntry[] }
+
 /** Every show as a row of facts: title, years, episodes on disk and each of its scores, every column sortable. */
-export const ShowList = ({ shows }: { shows: ShowEntry[] }) => {
+export const ShowList = ({ shows }: ShowListProps) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: shows, columns: COLUMNS })
-  const header = ({
-    key,
-    label,
-    className,
-  }: {
+  type HeaderProps = {
     key: Column
     label: string
     className?: string
-  }) => (
+  }
+
+  const header = ({ key, label, className }: HeaderProps) => (
     <SortHeader key={key} sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
       {label}
     </SortHeader>
@@ -178,8 +186,10 @@ export const ShowList = ({ shows }: { shows: ShowEntry[] }) => {
   )
 }
 
+type ShowTileProps = { entry: ShowEntry; sort: MediaSort | undefined }
+
 /** One show as a tile: a card with a small poster, its title and facts beside it. */
-const ShowTile = ({ entry, sort }: { entry: ShowEntry; sort: MediaSort | undefined }) => {
+const ShowTile = ({ entry, sort }: ShowTileProps) => {
   const select = useSelectable({ key: showEntryKey(entry.show), title: entry.show.title })
   const sorted = sort ? showSortFact({ entry, sort }) : null
   const facts = [
@@ -221,15 +231,14 @@ const ShowTile = ({ entry, sort }: { entry: ShowEntry; sort: MediaSort | undefin
   )
 }
 
-/** Every show as a tile, as many side by side as fit, each a small poster beside its facts. */
-export const ShowTiles = ({
-  shows,
-  sort,
-}: {
+type ShowTilesProps = {
   shows: ShowEntry[]
   /** The order the listing is in, whose value each tile shows. */
   sort?: MediaSort
-}) => (
+}
+
+/** Every show as a tile, as many side by side as fit, each a small poster beside its facts. */
+export const ShowTiles = ({ shows, sort }: ShowTilesProps) => (
   <ul className={styles.tiles} aria-label="Shows">
     {shows.map((entry) => (
       <ShowTile key={entry.show.id} entry={entry} sort={sort} />

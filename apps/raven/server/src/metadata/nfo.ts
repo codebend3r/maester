@@ -6,13 +6,12 @@ const MAX_BYTES = 1024 * 1024
 
 const ROOTS = /<(movie|tvshow|episodedetails)[\s>]/i
 
-const firstMatch = ({
-  xml,
-  patterns,
-}: {
+type FirstMatchProps = {
   xml: string
   patterns: readonly RegExp[]
-}): string | null =>
+}
+
+const firstMatch = ({ xml, patterns }: FirstMatchProps): string | null =>
   patterns.map((pattern) => pattern.exec(xml)?.[1]?.trim() ?? '').find((value) => value !== '') ??
   null
 

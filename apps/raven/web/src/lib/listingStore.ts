@@ -1,8 +1,10 @@
 const DATABASE = { name: 'raven-listings', store: 'records', version: 1 } as const
 
+type WriteProps = { scope: string; record: unknown }
+
 export type ListingStore = {
   read: (scope: string) => Promise<unknown>
-  write: (options: { scope: string; record: unknown }) => Promise<void>
+  write: (options: WriteProps) => Promise<void>
   clear: () => Promise<void>
 }
 
@@ -18,13 +20,12 @@ const openDatabase = (): Promise<IDBDatabase> =>
     )
   })
 
-const request = async <T>({
-  mode,
-  act,
-}: {
+type RequestProps<T> = {
   mode: IDBTransactionMode
   act: (store: IDBObjectStore) => IDBRequest<T>
-}): Promise<T> => {
+}
+
+const request = async <T>({ mode, act }: RequestProps<T>): Promise<T> => {
   const database = await openDatabase()
   try {
     return await new Promise<T>((resolve, reject) => {

@@ -3,24 +3,29 @@ import { ITEM_IMAGE_KINDS, type ItemImageKind, POSTER_WIDTHS, posterWidthFrom } 
 import { IMAGE_WIDTHS, type ImageWidth, ImageCache } from '@/metadata/imageCache'
 import { ItemImagesRepository, STORED_IMAGE_SOURCES } from '@/metadata/itemImagesRepository'
 
+type PictureWidthProps = {
+  kind: ItemImageKind
+  asked: unknown
+}
+
 /**
  * The width a picture of `kind` is served at: its own, or for a poster a
  * narrower one `asked` names in `?w=`, so a card fetches one no wider than
  * it shows. A width that is not a poster's, or one asked of another kind, is
  * refused.
  */
-export const pictureWidth = ({
-  kind,
-  asked,
-}: {
-  kind: ItemImageKind
-  asked: unknown
-}): ImageWidth => {
+export const pictureWidth = ({ kind, asked }: PictureWidthProps): ImageWidth => {
   const posterWidth = asked === undefined ? undefined : posterWidthFrom(asked)
   if (posterWidth === null || (posterWidth !== undefined && kind !== ITEM_IMAGE_KINDS.poster)) {
     throw new BadRequestException(`w must be one of ${POSTER_WIDTHS.join(', ')}, for a poster`)
   }
   return posterWidth ?? IMAGE_WIDTHS[kind]
+}
+
+type ItemPictureFilesPathOfProps = {
+  id: number
+  kind: ItemImageKind
+  width: ImageWidth
 }
 
 /** Where on disk the picture an item shows is kept, at the width it is asked for. */
@@ -35,15 +40,7 @@ export class ItemPictureFiles {
    * The chosen picture first, then one beside the media, then TMDB's; null
    * when the item has none that can be had.
    */
-  async pathOf({
-    id,
-    kind,
-    width,
-  }: {
-    id: number
-    kind: ItemImageKind
-    width: ImageWidth
-  }): Promise<string | null> {
+  async pathOf({ id, kind, width }: ItemPictureFilesPathOfProps): Promise<string | null> {
     const image = this.stored.image({ itemId: id, kind })
     const chosen =
       image?.source === STORED_IMAGE_SOURCES.chosen

@@ -6,14 +6,18 @@ import { FETCH_CREDENTIALS } from '@/servers/serverFetch'
 
 const SIGNAL_EVENTS = { abort: 'abort' } as const
 
+type PingFetchProps = { signal: AbortSignal; credentials: typeof FETCH_CREDENTIALS.omit }
+
 /**
  * The slice of React Native's `fetch` a ping needs. Its response arrives once the body has, and
  * `blob` hands the body over by size without copying it into JavaScript.
  */
 type PingFetch = (
   url: string,
-  init: { signal: AbortSignal; credentials: typeof FETCH_CREDENTIALS.omit },
+  init: PingFetchProps,
 ) => Promise<{ ok: boolean; blob: () => Promise<{ size: number }> }>
+
+type ProbeFetchOfProps = { fetch: PingFetch; clock: () => number }
 
 /**
  * `ProbeFetch` over the platform's `fetch`, timed by `clock` in milliseconds. A ping carries no
@@ -22,7 +26,7 @@ type PingFetch = (
  * which it also aborts.
  */
 export const probeFetchOf =
-  ({ fetch, clock }: { fetch: PingFetch; clock: () => number }): ProbeFetch =>
+  ({ fetch, clock }: ProbeFetchOfProps): ProbeFetch =>
   async ({ url, timeoutMs }) => {
     checkAppCall({ method: APP_CALL_METHODS.get, url })
     const controller = new AbortController()

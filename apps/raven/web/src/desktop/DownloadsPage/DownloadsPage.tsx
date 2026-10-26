@@ -62,8 +62,10 @@ const groupsOf = (downloads: DownloadView[]): Grouped[] =>
     return first === undefined ? [] : [{ group: first.group, views }]
   })
 
+type GroupProps = { grouped: Grouped; onDeleted: () => void }
+
 /** A title's downloads under its name; a movie on its own is its own heading. */
-const Group = ({ grouped, onDeleted }: { grouped: Grouped; onDeleted: () => void }) => {
+const Group = ({ grouped, onDeleted }: GroupProps) => {
   const headingId = useId()
   const { group, views } = grouped
   const isOwnTitle = views.length === 1 && (views[0]?.label ?? null) === group.title

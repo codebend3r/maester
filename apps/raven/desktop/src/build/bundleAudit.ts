@@ -72,11 +72,15 @@ export type AuditedFile = {
 const executableDirOf = (file: AuditedFile): string =>
   file.isExecutable ? file.dir : EXECUTABLE_DIR
 
-const isUnder = ({ path, prefix }: { path: string; prefix: string }): boolean =>
+type IsUnderProps = { path: string; prefix: string }
+
+const isUnder = ({ path, prefix }: IsUnderProps): boolean =>
   path === prefix || path.startsWith(`${prefix}/`)
 
+type ResolveRelativeProps = { path: string; file: AuditedFile }
+
 /** A loader or executable relative path, resolved against the app's folder; null for any other. */
-const resolveRelative = ({ path, file }: { path: string; file: AuditedFile }): string | null => {
+const resolveRelative = ({ path, file }: ResolveRelativeProps): string | null => {
   if (isUnder({ path, prefix: LOADER_PATH })) return join(file.dir, path.slice(LOADER_PATH.length))
   if (isUnder({ path, prefix: EXECUTABLE_PATH })) {
     return join(executableDirOf(file), path.slice(EXECUTABLE_PATH.length))
@@ -87,22 +91,23 @@ const resolveRelative = ({ path, file }: { path: string; file: AuditedFile }): s
 const isOutsideApp = (relative: string): boolean =>
   relative === PARENT_DIR || relative.startsWith(`${PARENT_DIR}${sep}`) || isAbsolute(relative)
 
-const climbsOut = ({ path, file }: { path: string; file: AuditedFile }): boolean => {
+type ClimbsOutProps = { path: string; file: AuditedFile }
+
+const climbsOut = ({ path, file }: ClimbsOutProps): boolean => {
   const resolved = resolveRelative({ path, file })
   return resolved !== null && isOutsideApp(resolved)
 }
 
 const isInEngine = (relative: string): boolean => relative.startsWith(`${MPV_IN_APP}${sep}`)
 
-// Only the engine's links are resolved here. Electron's resolve through its framework layout,
-// as Forge ships it, and the packaged smoke proves they load.
-const engineProblems = ({
-  file,
-  exists,
-}: {
+type EngineProblemsProps = {
   file: AuditedFile
   exists: (path: string) => boolean
-}): string[] => {
+}
+
+// Only the engine's links are resolved here. Electron's resolve through its framework layout,
+// as Forge ships it, and the packaged smoke proves they load.
+const engineProblems = ({ file, exists }: EngineProblemsProps): string[] => {
   const searched = file.rpaths.flatMap((rpath) => {
     const dir = resolveRelative({ path: rpath, file })
     return dir === null || isOutsideApp(dir) ? [] : [dir]
@@ -123,13 +128,12 @@ const engineProblems = ({
   return [...unfound, ...missing]
 }
 
-export const fileProblems = ({
-  file,
-  exists,
-}: {
+type FileProblemsProps = {
   file: AuditedFile
   exists: (path: string) => boolean
-}): string[] => {
+}
+
+export const fileProblems = ({ file, exists }: FileProblemsProps): string[] => {
   const outside = file.links
     .filter(
       (link) =>
@@ -148,17 +152,19 @@ export const fileProblems = ({
   return [...outside, ...searches, ...escapes, ...archs, ...engine]
 }
 
+type BundleProblemsProps = {
+  files: readonly AuditedFile[]
+  exists: (relative: string) => boolean
+  plistVersion: string
+  packageVersion: string
+}
+
 export const bundleProblems = ({
   files,
   exists,
   plistVersion,
   packageVersion,
-}: {
-  files: readonly AuditedFile[]
-  exists: (relative: string) => boolean
-  plistVersion: string
-  packageVersion: string
-}): string[] => {
+}: BundleProblemsProps): string[] => {
   const missing = [...MPV_MACH_O.map((name) => join(MPV_IN_APP, name)), join(WEB_IN_APP, WEB_PAGE)]
     .filter((relative) => !exists(relative))
     .map((relative) => `${relative} is missing from the app`)
@@ -169,8 +175,10 @@ export const bundleProblems = ({
   return [...missing, ...version, ...files.flatMap((file) => fileProblems({ file, exists }))]
 }
 
+type ToolRunProps = { command: string; args: string[] }
+
 /** Runs a command and answers its standard output; rejects when it fails. */
-export type ToolRun = (command: { command: string; args: string[] }) => Promise<string>
+export type ToolRun = (command: ToolRunProps) => Promise<string>
 
 /** What a failed command said: its standard error when it wrote one, else its message. */
 const failureText = (error: unknown): string => {
@@ -188,17 +196,19 @@ const failureText = (error: unknown): string => {
 
 type ToolAnswer = { ok: true; output: string } | { ok: false; problem: string }
 
+type AskProps = {
+  run: ToolRun
+  read: MachORead
+  path: string
+  relative: string
+}
+
 const ask = async ({
   run,
   read: { command, flag },
   path,
   relative,
-}: {
-  run: ToolRun
-  read: MachORead
-  path: string
-  relative: string
-}): Promise<ToolAnswer> => {
+}: AskProps): Promise<ToolAnswer> => {
   try {
     return { ok: true, output: await run({ command, args: [flag, path] }) }
   } catch (error) {
@@ -207,22 +217,31 @@ const ask = async ({
   }
 }
 
+type SignatureProblemsProps = {
+  run: ToolRun
+  args: string[]
+  name: string
+}
+
 /** codesign answers on stderr and fails with a status, so a failure is the problem it names. */
 export const signatureProblems = async ({
   run,
   args,
   name,
-}: {
-  run: ToolRun
-  args: string[]
-  name: string
-}): Promise<string[]> => {
+}: SignatureProblemsProps): Promise<string[]> => {
   try {
     await run({ command: 'codesign', args })
     return []
   } catch (error) {
     return [`${name} is not signed: ${failureText(error)}`]
   }
+}
+
+type AuditMachOProps = {
+  relative: string
+  path: string
+  otoolPath: string
+  run: ToolRun
 }
 
 /**
@@ -235,12 +254,7 @@ export const auditMachO = async ({
   path,
   otoolPath,
   run,
-}: {
-  relative: string
-  path: string
-  otoolPath: string
-  run: ToolRun
-}): Promise<{ file: AuditedFile | null; problems: string[] }> => {
+}: AuditMachOProps): Promise<{ file: AuditedFile | null; problems: string[] }> => {
   const [links, load, archs, signature] = await Promise.all([
     ask({ run, read: MACH_O_READS.links, path: otoolPath, relative }),
     ask({ run, read: MACH_O_READS.loadCommands, path: otoolPath, relative }),

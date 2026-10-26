@@ -6,13 +6,15 @@ import { type Palette, SIZES, type Sizes } from '@/theme/appTheme'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
+type FormStylesForProps = { sizes: Sizes; colours: Palette }
+
 /**
  * What both form variants share, at a scale's lengths; each variant scales it further for the
  * distance it is read from. Every control has the web's `--radius-md`, and focus turns its edge
  * to the text colour, which shows on each tone's fill and on none. A form's lines say what a
  * step asks (`note`), what the server said (`notice`) and what went wrong (`error`).
  */
-const formStylesFor = ({ sizes, colours }: { sizes: Sizes; colours: Palette }) =>
+const formStylesFor = ({ sizes, colours }: FormStylesForProps) =>
   StyleSheet.create({
     ground: { flex: 1, backgroundColor: colours.ground },
     title: { color: colours.text, fontSize: sizes.textXl, fontWeight: 'bold' },

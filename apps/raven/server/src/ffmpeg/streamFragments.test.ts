@@ -10,7 +10,9 @@ import { streamArgs } from '@/ffmpeg/args'
 const run = promisify(execFile)
 const BOX_TYPES = { fragment: 'moof' } as const
 
-const boxes = ({ bytes, offset = 0 }: { bytes: Buffer; offset?: number }): string[] => {
+type BoxesProps = { bytes: Buffer; offset?: number }
+
+const boxes = ({ bytes, offset = 0 }: BoxesProps): string[] => {
   if (offset === bytes.length) return []
   if (offset + 8 > bytes.length) throw new Error('Incomplete MP4 box header')
   const size = bytes.readUInt32BE(offset)

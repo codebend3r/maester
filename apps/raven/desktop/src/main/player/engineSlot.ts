@@ -19,21 +19,29 @@ const UNAVAILABLE = {
   message: ENGINE_MESSAGES.unavailable,
 } as const satisfies OpenedEngine<never>
 
+type WatchServiceProps = {
+  engine: { service: Pick<PlayerService, 'subscribe' | 'isDead'> }
+  onDied: () => void
+}
+
 /**
  * Tells `onDied` when the service's mpv stops for good, including a stop that came before
  * this was asked to watch.
  */
-export const watchService = ({
-  engine,
-  onDied,
-}: {
-  engine: { service: Pick<PlayerService, 'subscribe' | 'isDead'> }
-  onDied: () => void
-}): void => {
+export const watchService = ({ engine, onDied }: WatchServiceProps): void => {
   engine.service.subscribe((event) => {
     if (event.type === PLAYER_EVENTS.error && event.reason === PLAYER_ERROR_REASONS.engine) onDied()
   })
   if (engine.service.isDead()) onDied()
+}
+
+type WatchProps<T> = { engine: T; onDied: () => void }
+
+type CreateEngineSlotProps<T> = {
+  open: () => Promise<OpenedEngine<T>>
+  destroyOf: (engine: T) => Promise<void>
+  watch: (input: WatchProps<T>) => void
+  warn: (message: string) => void
 }
 
 /**
@@ -42,17 +50,7 @@ export const watchService = ({
  * and until its destroy settles, so a close or quit in that time still waits for mpv to
  * stop. Once `watch` reports it died, a page that asks is told to use the html engine.
  */
-export const createEngineSlot = <T>({
-  open,
-  destroyOf,
-  watch,
-  warn,
-}: {
-  open: () => Promise<OpenedEngine<T>>
-  destroyOf: (engine: T) => Promise<void>
-  watch: (input: { engine: T; onDied: () => void }) => void
-  warn: (message: string) => void
-}) => {
+export const createEngineSlot = <T>({ open, destroyOf, watch, warn }: CreateEngineSlotProps<T>) => {
   let state: SlotState = SLOT_STATES.idle
   let engine: T | null = null
   let opened: Promise<OpenedEngine<T>> | null = null

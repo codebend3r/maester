@@ -14,13 +14,12 @@ export type LibraryLock =
   | { state: typeof LIBRARY_LOCK_STATES.checking }
   | { state: typeof LIBRARY_LOCK_STATES.shut; available: boolean }
 
-export const lockState = ({
-  locked,
-  lock,
-}: {
+type LockStateProps = {
   locked: boolean
   lock: LockState | undefined
-}): LibraryLock => {
+}
+
+export const lockState = ({ locked, lock }: LockStateProps): LibraryLock => {
   if (!locked) return { state: LIBRARY_LOCK_STATES.open }
   if (!lock) return { state: LIBRARY_LOCK_STATES.checking }
   if (lock.unlocked) return { state: LIBRARY_LOCK_STATES.open }

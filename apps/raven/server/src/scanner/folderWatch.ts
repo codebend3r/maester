@@ -13,17 +13,19 @@ const PLATFORMS = { linux: 'linux' } as const satisfies Record<string, NodeJS.Pl
 /** A watch that has stopped once closed. */
 export type Watching = { close: () => void }
 
+type WatchFolderProps = {
+  root: string
+  onChange: (path: string) => void
+  onError: (error: unknown) => void
+}
+
 /**
  * Watches everything under `root`: `onChange` gets each path that was
  * added, removed, renamed or written, and `onError` the failure that
  * stopped the watch (the path is not there, the share went away, or the
  * system ran out of watches). Failures are reported, never thrown.
  */
-export type WatchFolder = (args: {
-  root: string
-  onChange: (path: string) => void
-  onError: (error: unknown) => void
-}) => Watching
+export type WatchFolder = (args: WatchFolderProps) => Watching
 
 /** The system has no watches left to give, which no later folder will fix. */
 const isOutOfWatches = (error: unknown): boolean =>

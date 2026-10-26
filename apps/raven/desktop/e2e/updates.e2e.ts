@@ -30,15 +30,13 @@ const appVersion = async (): Promise<string> => {
   return manifest.version
 }
 
-const release = ({
-  tag,
-  isPrerelease = false,
-  dmg = null,
-}: {
+type ReleaseProps = {
   tag: string
   isPrerelease?: boolean
   dmg?: string | null
-}) => ({
+}
+
+const release = ({ tag, isPrerelease = false, dmg = null }: ReleaseProps) => ({
   tag_name: tag,
   draft: false,
   prerelease: isPrerelease,
@@ -66,21 +64,22 @@ const checkedStatus = async (page: Page) => {
   return { latest: reply.status.latest, problem: reply.status.problem }
 }
 
-/** The stored config with `edit` applied to its `updates`, written back as main keeps it. */
-const editUpdates = async ({
-  userData,
-  edit,
-}: {
+type EditUpdatesProps = {
   userData: string
   edit: (updates: Record<string, unknown>) => Record<string, unknown>
-}): Promise<void> => {
+}
+
+/** The stored config with `edit` applied to its `updates`, written back as main keeps it. */
+const editUpdates = async ({ userData, edit }: EditUpdatesProps): Promise<void> => {
   const file = join(userData, CONFIG_FILE)
   const config: unknown = JSON.parse(await readFile(file, 'utf8'))
   if (!isRecord(config) || !isRecord(config.updates)) throw new Error('no update settings stored')
   await writeFile(file, `${JSON.stringify({ ...config, updates: edit(config.updates) })}\n`)
 }
 
-const storedIsEnabled = async ({ userData }: { userData: string }): Promise<unknown> => {
+type StoredIsEnabledProps = { userData: string }
+
+const storedIsEnabled = async ({ userData }: StoredIsEnabledProps): Promise<unknown> => {
   const text = await readFile(join(userData, CONFIG_FILE), 'utf8').catch(() => null)
   if (text === null) return null
   const config: unknown = JSON.parse(text)
@@ -88,15 +87,15 @@ const storedIsEnabled = async ({ userData }: { userData: string }): Promise<unkn
   return config.updates.isEnabled
 }
 
-const withFixture = async ({
-  releases,
-  pages,
-  run,
-}: {
+type RunProps = { fixture: ReleasesFixture; userData: string }
+
+type WithFixtureProps = {
   releases?: unknown
   pages?: readonly unknown[]
-  run: (input: { fixture: ReleasesFixture; userData: string }) => Promise<void>
-}): Promise<void> => {
+  run: (input: RunProps) => Promise<void>
+}
+
+const withFixture = async ({ releases, pages, run }: WithFixtureProps): Promise<void> => {
   // One after the other inside the try, so whichever was made is cleaned up when the other fails.
   let fixture: ReleasesFixture | null = null
   let userData = ''

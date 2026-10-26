@@ -3,18 +3,17 @@ import { useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import styles from '@/components/Player/ShortcutsDialog.module.scss'
 
+type ShortcutsDialogProps = {
+  onClose: () => void
+  canShowStats?: boolean
+}
+
 /**
  * The `?` list, as a modal <dialog>: the browser traps focus inside it and
  * lifts it above a full-screen stage. Escape, `?` again, or the close
  * button put it away.
  */
-export const ShortcutsDialog = ({
-  onClose,
-  canShowStats = false,
-}: {
-  onClose: () => void
-  canShowStats?: boolean
-}) => {
+export const ShortcutsDialog = ({ onClose, canShowStats = false }: ShortcutsDialogProps) => {
   const heading = useId()
   const dialog = useRef<HTMLDialogElement>(null)
   const rows = shortcutRows({ canShowStats })

@@ -137,6 +137,15 @@ const LOCKED: AccessOutcome = {
   message: 'Vhagar locked this library again',
 }
 
+type SetupProps = {
+  entries?: DownloadEntry[]
+  free?: number
+  access?: MediaAccess['accessFor']
+  disk?: Record<string, number>
+  tracks?: MediaTracks
+  servers?: ServerEntry[]
+}
+
 const setup = ({
   entries = [],
   free = 100 * GIB,
@@ -144,14 +153,7 @@ const setup = ({
   disk = {},
   tracks = tracksWith([]),
   servers = SERVERS,
-}: {
-  entries?: DownloadEntry[]
-  free?: number
-  access?: MediaAccess['accessFor']
-  disk?: Record<string, number>
-  tracks?: MediaTracks
-  servers?: ServerEntry[]
-} = {}) => {
+}: SetupProps = {}) => {
   const store = memoryStore({ ...EMPTY_DOWNLOADS, entries })
   const { timers, pending } = fakeTimers()
   const drive = fakeDisk(disk)
@@ -681,7 +683,9 @@ describe('pause, resume and retry', () => {
 })
 
 describe('an account ticket', () => {
-  const accountFileUrl = ({ n, ticket = 'account.one' }: { n: number; ticket?: string }): string =>
+  type AccountFileUrlProps = { n: number; ticket?: string }
+
+  const accountFileUrl = ({ n, ticket = 'account.one' }: AccountFileUrlProps): string =>
     `${ORIGIN}/api/media/${n}/file?t=${ticket}`
 
   it('fetches the subtitles and the file with one account ticket, through the bare fetch', async () => {
@@ -910,16 +914,22 @@ describe('a response the server cuts mid-file', () => {
       return accountTicket(`account.${mediaId}.${read}`)
     }
   }
-  const mintedUrl = ({ n, read }: { n: number; read: number }): string =>
+  type MintedUrlProps = { n: number; read: number }
+
+  const mintedUrl = ({ n, read }: MintedUrlProps): string =>
     `${ORIGIN}/api/media/${n}/file?t=account.${n}.${read}`
-  const requestsOf = ({ world, n }: { world: ReturnType<typeof setup>; n: number }) =>
+  type RequestsOfProps = { world: ReturnType<typeof setup>; n: number }
+
+  const requestsOf = ({ world, n }: RequestsOfProps) =>
     world.network
       .fileRequests()
       .filter(({ url }) => url.includes(`/media/${n}/`))
       .map(({ url, headers }) => ({ url, headers }))
   const isOutageArmed = (world: ReturnType<typeof setup>): boolean =>
     [...world.pending.values()].some(({ ms }) => ms === OUTAGE_RETRY_MS)
-  const asksFor = ({ world, n }: { world: ReturnType<typeof setup>; n: number }): number =>
+  type AsksForProps = { world: ReturnType<typeof setup>; n: number }
+
+  const asksFor = ({ world, n }: AsksForProps): number =>
     world.media.asked.filter(({ mediaId }) => mediaId === n).length
 
   it('resumes an account file from the bytes on disk on one new ticket, failing and pausing nothing', async () => {
@@ -1045,7 +1055,9 @@ describe('a response the server cuts mid-file', () => {
 })
 
 describe('an account whose access ended', () => {
-  const byServer = async ({ serverId }: { serverId: string }) =>
+  type ByServerProps = { serverId: string }
+
+  const byServer = async ({ serverId }: ByServerProps) =>
     serverId === SERVER_ID ? accountTicket() : FAR_TICKET
 
   it("fails the server's running account files, keeping their bytes, and leaves other servers", async () => {

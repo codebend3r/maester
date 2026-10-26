@@ -15,7 +15,9 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { ERROR_CODES } from '@/errorMessage'
 import { SKIPPED_FOLDERS } from '@/scanner/walk'
 
-const isInside = ({ root, path }: { root: string; path: string }): boolean =>
+type IsInsideProps = { root: string; path: string }
+
+const isInside = ({ root, path }: IsInsideProps): boolean =>
   path === root || path.startsWith(root.endsWith(sep) ? root : `${root}${sep}`)
 
 const errorCode = (error: unknown): string | null =>

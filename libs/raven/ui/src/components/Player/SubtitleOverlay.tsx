@@ -5,18 +5,7 @@ import styles from '@/components/Player/SubtitleOverlay.module.scss'
 const keyOf = (cues: readonly SubtitleCue[]): string =>
   cues.map((cue) => `${cue.start}|${cue.text}`).join('\n')
 
-/**
- * Draws the cues showing now. Reads the playhead every frame rather than
- * waiting for `timeupdate`, which only fires four times a second, and
- * re-renders only when the set of cues on screen changes.
- */
-export const SubtitleOverlay = ({
-  cues,
-  video,
-  shift,
-  lifted,
-  scale,
-}: {
+type SubtitleOverlayProps = {
   cues: readonly SubtitleCue[]
   video: RefObject<HTMLVideoElement | null>
   /** Seconds the element's clock runs ahead of the file's. */
@@ -24,7 +13,14 @@ export const SubtitleOverlay = ({
   /** Raised clear of the controls while they show. */
   lifted: boolean
   scale: number
-}) => {
+}
+
+/**
+ * Draws the cues showing now. Reads the playhead every frame rather than
+ * waiting for `timeupdate`, which only fires four times a second, and
+ * re-renders only when the set of cues on screen changes.
+ */
+export const SubtitleOverlay = ({ cues, video, shift, lifted, scale }: SubtitleOverlayProps) => {
   const [showing, setShowing] = useState<SubtitleCue[]>([])
   const shown = useRef('')
   const root = useRef<HTMLDivElement>(null)

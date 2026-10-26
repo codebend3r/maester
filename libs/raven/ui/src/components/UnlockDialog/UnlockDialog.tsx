@@ -24,14 +24,7 @@ const SECRETS = {
   },
 } as const satisfies Record<UnlockSecret, unknown>
 
-/** Asks for a secret over whatever page asked; the host unlocks, and says what reads again. */
-export const UnlockDialog = ({
-  secret,
-  hint,
-  unlock,
-  onUnlocked,
-  onClose,
-}: {
+type UnlockDialogProps = {
   /** Shown from mount only: a host asking for another secret keys the dialog by it, so it opens afresh. */
   secret: UnlockSecret
   /** Under the title. Left out: the web's own words for the secret. */
@@ -42,7 +35,10 @@ export const UnlockDialog = ({
   onUnlocked: () => void | Promise<unknown>
   /** Dismissed without unlocking: Cancel or Escape. */
   onClose: () => void
-}) => {
+}
+
+/** Asks for a secret over whatever page asked; the host unlocks, and says what reads again. */
+export const UnlockDialog = ({ secret, hint, unlock, onUnlocked, onClose }: UnlockDialogProps) => {
   const words = SECRETS[secret]
   const dialog = useRef<HTMLDialogElement>(null)
   const isUnlocked = useRef(false)

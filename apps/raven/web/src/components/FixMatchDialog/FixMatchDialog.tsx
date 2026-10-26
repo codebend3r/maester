@@ -30,18 +30,15 @@ const TIER_WORDS: Record<ConfidenceTier, string> = {
   weak: 'Weak match',
 }
 
-const Candidate = ({
-  candidate,
-  isBest,
-  disabled,
-  onChoose,
-}: {
+type CandidateProps = {
   candidate: MatchCandidate
   /** The first result, when it is Strong: named the best match. */
   isBest: boolean
   disabled: boolean
   onChoose: () => void
-}) => {
+}
+
+const Candidate = ({ candidate, isBest, disabled, onChoose }: CandidateProps) => {
   const tierId = useId()
   const poster = api.candidatePosterUrl(candidate.poster)
   const name = candidate.year == null ? candidate.title : `${candidate.title} (${candidate.year})`
@@ -86,6 +83,28 @@ const Candidate = ({
   )
 }
 
+type FixMatchDialogProps<T> = {
+  /** What the dialog searches for: a movie, or a show. */
+  type: MatchItemType
+  /** What the search box starts with: the parsed title. */
+  title: string
+  year: number | null
+  /** Named under the heading, so the viewer knows which file this is for. */
+  fileName?: string
+  /** Why the AI lookup matched what is being fixed, being sure; null or left out when it did not. */
+  aiMatch?: AiMatch | null
+  /** The library the file is in: the results its type prefers are listed first. */
+  libraryId?: number
+  /** The file (and its show folder) or the show being fixed: the results are scored against what it has on disk. */
+  subject: MatchSubject
+  /** Points the file or show at `tmdbId`, or at nothing for null. */
+  match: (tmdbId: string | null) => Promise<T>
+  /** Whether "Not a movie" (or show) is offered. */
+  allowNone?: boolean
+  onClose: () => void
+  onMatched?: (result: T) => void
+}
+
 /**
  * Fix match: searches TMDB with the title and year a name gave, and again
  * as the viewer edits them, scored against what the subject has on disk
@@ -107,27 +126,7 @@ export const FixMatchDialog = <T,>({
   allowNone = true,
   onClose,
   onMatched,
-}: {
-  /** What the dialog searches for: a movie, or a show. */
-  type: MatchItemType
-  /** What the search box starts with: the parsed title. */
-  title: string
-  year: number | null
-  /** Named under the heading, so the viewer knows which file this is for. */
-  fileName?: string
-  /** Why the AI lookup matched what is being fixed, being sure; null or left out when it did not. */
-  aiMatch?: AiMatch | null
-  /** The library the file is in: the results its type prefers are listed first. */
-  libraryId?: number
-  /** The file (and its show folder) or the show being fixed: the results are scored against what it has on disk. */
-  subject: MatchSubject
-  /** Points the file or show at `tmdbId`, or at nothing for null. */
-  match: (tmdbId: string | null) => Promise<T>
-  /** Whether "Not a movie" (or show) is offered. */
-  allowNone?: boolean
-  onClose: () => void
-  onMatched?: (result: T) => void
-}) => {
+}: FixMatchDialogProps<T>) => {
   const dialog = useRef<HTMLDialogElement>(null)
   const ids = { title: useId(), note: useId(), query: useId(), year: useId(), results: useId() }
   const queryClient = useQueryClient()

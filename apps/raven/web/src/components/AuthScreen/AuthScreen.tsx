@@ -40,8 +40,10 @@ const ADMITTED: Record<Audience, readonly Answered[]> = {
   [AUDIENCES.waiting]: [ACCESS_KINDS.pending, ACCESS_KINDS.revoked],
 }
 
+type DestinationOfProps = { kind: Answered; approvedTo: string }
+
 /** Where a visitor a page does not admit belongs. */
-const destinationOf = ({ kind, approvedTo }: { kind: Answered; approvedTo: string }): string => {
+const destinationOf = ({ kind, approvedTo }: DestinationOfProps): string => {
   switch (kind) {
     case ACCESS_KINDS.signedOut:
       return signInPath({ returnTo: HOME_PATH })
@@ -57,7 +59,9 @@ const destinationOf = ({ kind, approvedTo }: { kind: Answered; approvedTo: strin
   }
 }
 
-const Frame = ({ children }: { children: ReactNode }) => (
+type FrameProps = { children: ReactNode }
+
+const Frame = ({ children }: FrameProps) => (
   <div className={styles.page}>
     <PosterWall />
     <main className={styles.side}>{children}</main>
@@ -78,6 +82,12 @@ const Unavailable = () => (
   />
 )
 
+type AuthScreenProps = {
+  audience: Audience
+  approvedTo?: string
+  children: ReactNode
+}
+
 /**
  * The screen every page of the auth flow sits in, beside the poster wall.
  * While accounts are off the page is not there; while they cannot be
@@ -85,15 +95,7 @@ const Unavailable = () => (
  * it shows `children` to its `audience` and sends anyone else on: to sign
  * in, to the pending page, or, once approved, to `approvedTo`.
  */
-export const AuthScreen = ({
-  audience,
-  approvedTo = HOME_PATH,
-  children,
-}: {
-  audience: Audience
-  approvedTo?: string
-  children: ReactNode
-}) => {
+export const AuthScreen = ({ audience, approvedTo = HOME_PATH, children }: AuthScreenProps) => {
   const access = useAccessState()
 
   switch (access.kind) {

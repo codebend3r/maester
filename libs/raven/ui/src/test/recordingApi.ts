@@ -2,8 +2,10 @@ import { type FetchInit, createApiClient } from '@raven/core'
 
 type Call = { url: string; init?: FetchInit }
 
+type RecordingApiProps = { body: unknown }
+
 /** An `ApiClient` whose every call is recorded and answered with `body`, as a server would. */
-export const recordingApi = ({ body }: { body: unknown }) => {
+export const recordingApi = ({ body }: RecordingApiProps) => {
   const calls: Call[] = []
   const api = createApiClient({
     fetch: async (url, init) => {

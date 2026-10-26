@@ -58,6 +58,11 @@ export const playerActionFor = (action: MenuPlayerAction): PlayerAction | null =
   }
 }
 
+type WindowPartsForProps = {
+  client: DesktopClient
+  menu: MenuHub
+}
+
 /**
  * What Raven adds to any player's services: the Playback menu's actions, and the window's
  * traffic lights, which show and hide with the controls.
@@ -65,10 +70,7 @@ export const playerActionFor = (action: MenuPlayerAction): PlayerAction | null =
 export const windowPartsFor = ({
   client,
   menu,
-}: {
-  client: DesktopClient
-  menu: MenuHub
-}): Required<Pick<PlayerServices, 'hostActions' | 'chrome'>> => ({
+}: WindowPartsForProps): Required<Pick<PlayerServices, 'hostActions' | 'chrome'>> => ({
   hostActions: {
     subscribe: (listener) =>
       menu.subscribe((action) => {
@@ -82,18 +84,17 @@ export const windowPartsFor = ({
   },
 })
 
+type FileProgressForProps = {
+  client: DesktopClient
+  fileId: string
+}
+
 /**
  * Progress for a file main granted: positions go to main, which keeps a local file's resume point
  * and sends a download's to its server under the account it was opened with. Main counts a
  * download's first position after an open as a play, so a file left while it loads says nothing.
  */
-export const fileProgressFor = ({
-  client,
-  fileId,
-}: {
-  client: DesktopClient
-  fileId: string
-}): ProgressSink => {
+export const fileProgressFor = ({ client, fileId }: FileProgressForProps): ProgressSink => {
   // Main stores a share watched, which needs the length only the engine learns.
   let length: number | null = null
   let hasStarted = false
@@ -121,18 +122,20 @@ export const fileProgressFor = ({
   }
 }
 
+type FileServicesForProps = {
+  file: LocalFile
+  client: DesktopClient
+  menu: MenuHub
+  engine: EngineUse
+}
+
 /** A local file's or a download's services, as main described the file. */
 export const fileServicesFor = ({
   file,
   client,
   menu,
   engine,
-}: {
-  file: LocalFile
-  client: DesktopClient
-  menu: MenuHub
-  engine: EngineUse
-}): PlayerServices => ({
+}: FileServicesForProps): PlayerServices => ({
   title: {
     label: file.label,
     // Only a download's folder says where it came from; any other file's is just its folder.

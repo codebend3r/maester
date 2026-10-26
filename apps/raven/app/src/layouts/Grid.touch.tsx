@@ -27,10 +27,12 @@ const GUTTER = SIZES.space3
 const GAP = SIZES.space3
 const ROW_GAP = SIZES.space4
 
+type LeastWidthOfProps = { shape: CardShape; screen: number }
+
 /**
  * The narrowest card a row holds, as the web's grid has it: posters narrower on a narrower screen.
  */
-const leastWidthOf = ({ shape, screen }: { shape: CardShape; screen: number }): number => {
+const leastWidthOf = ({ shape, screen }: LeastWidthOfProps): number => {
   if (shape === CARD_SHAPES.wide) return 240
   if (screen <= BREAKPOINTS.tablet) return 128
   return screen <= BREAKPOINTS.wide ? 150 : 168
@@ -49,16 +51,14 @@ const headerHeightOf = (fontScale: number): number =>
 /** How wide the jump strip stands at the right edge, and so the room the cards leave it. */
 const STRIP_WIDTH = SIZES.space5
 
-/** A card of the list or tiles view: a row of words, with its picture in the tiles view. */
-const RowCard = ({
-  card,
-  hasPicture,
-  onPress,
-}: {
+type RowCardProps = {
   card: ShelfCard
   hasPicture: boolean
   onPress: () => void
-}) => {
+}
+
+/** A card of the list or tiles view: a row of words, with its picture in the tiles view. */
+const RowCard = ({ card, hasPicture, onPress }: RowCardProps) => {
   const styles = useStyles()
   return (
     <Pressable
@@ -82,22 +82,19 @@ const RowCard = ({
   )
 }
 
+type JumpStripProps = {
+  jump: JumpScale
+  room: number
+  fontScale: number
+  onJump: (keys: ReadonlySet<string>) => void
+}
+
 /**
  * A strip down the right edge, as the web's, of the steps the order runs through, fitted to
  * the `room` it has: each step as tall as fits, or neighbouring steps gathered into one where
  * they cannot all be pressed, as on a phone held sideways.
  */
-const JumpStrip = ({
-  jump,
-  room,
-  fontScale,
-  onJump,
-}: {
-  jump: JumpScale
-  room: number
-  fontScale: number
-  onJump: (keys: ReadonlySet<string>) => void
-}) => {
+const JumpStrip = ({ jump, room, fontScale, onJump }: JumpStripProps) => {
   const labelHeight = linesHeightOf({ sizes: [SIZES.textXs], fontScale })
   const styles = useStyles()
   const unit = jump.unit === null ? 0 : labelHeight
@@ -177,7 +174,9 @@ const Grid = ({
   }
   const { list, rows, toggle, jumpTo } = useGrid({ sections, columnsOf, heightOf, top })
 
-  const renderRow = ({ item: row }: { item: GridRow }) => {
+  type RenderRowProps = { item: GridRow }
+
+  const renderRow = ({ item: row }: RenderRowProps) => {
     switch (row.kind) {
       case GRID_ROWS.header:
         return (

@@ -62,8 +62,10 @@ const loadStores = async (): Promise<void> => {
   pinRavenServer()
 }
 
+type ServerEventsProps = { session: AppQueries }
+
 /** Keeps the cache in step with the active server's event stream, while it is the active one. */
-const ServerEvents = ({ session }: { session: AppQueries }) => {
+const ServerEvents = ({ session }: ServerEventsProps) => {
   session.useServerEvents()
   return null
 }

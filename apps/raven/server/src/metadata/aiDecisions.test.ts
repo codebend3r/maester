@@ -16,15 +16,14 @@ describe("the AI lookup's decisions", () => {
   const database = testDatabase('raven-ai-decisions-')
   const state = { library: 0, other: 0 }
   const decisions = () => new AiDecisions(database.get())
-  const record = ({
-    place,
-    outcome,
-    libraryId = state.library,
-  }: {
+  type RecordProps = {
     place: string
     outcome: AiOutcome
     libraryId?: number
-  }) => decisions().record({ libraryId, place, outcome, model: MODEL })
+  }
+
+  const record = ({ place, outcome, libraryId = state.library }: RecordProps) =>
+    decisions().record({ libraryId, place, outcome, model: MODEL })
 
   beforeAll(async () => {
     await database.open()
@@ -120,7 +119,9 @@ describe("the AI lookup's decisions", () => {
   })
 
   it("says why a sure pick matched, for an item's places and id", () => {
-    const reason = ({ places, tmdbId }: { places: string[]; tmdbId: string }) =>
+    type ReasonProps = { places: string[]; tmdbId: string }
+
+    const reason = ({ places, tmdbId }: ReasonProps) =>
       decisions().highReason({
         places: places.map((place) => ({ libraryId: state.library, place })),
         tmdbId,

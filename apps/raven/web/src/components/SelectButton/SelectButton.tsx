@@ -6,13 +6,15 @@ import {
 } from '@/components/SelectionScope/SelectionScope'
 import styles from '@/components/SelectButton/SelectButton.module.scss'
 
+type SelectButtonProps = { className?: string }
+
 /**
  * Starts select mode in the scope it sits in, and ends it when pressed
  * again: a pill, outlined while off and filled in bark while selecting. It
  * gets the focus back when the bar closes the mode. Outside a scope there
  * is nothing to select, so it is not there.
  */
-export const SelectButton = ({ className }: { className?: string }) => {
+export const SelectButton = ({ className }: SelectButtonProps) => {
   const scope = useSelectionScope()
   const selecting = useSelection((state) => state.selecting)
   const ref = useSelectButtonRef()

@@ -7,14 +7,14 @@ export const libraryPages = (id: number | string): string[] => [
   `/libraries/${id}/sagas/:saga`,
 ]
 
-/** Whether `pathname` is one of the pages `patterns` describe. */
-export const isAnyOf = ({
-  patterns,
-  pathname,
-}: {
+type IsAnyOfProps = {
   patterns: readonly string[]
   pathname: string
-}): boolean => patterns.some((pattern) => matchPath(pattern, pathname) != null)
+}
+
+/** Whether `pathname` is one of the pages `patterns` describe. */
+export const isAnyOf = ({ patterns, pathname }: IsAnyOfProps): boolean =>
+  patterns.some((pattern) => matchPath(pattern, pathname) != null)
 
 /** Whether the page open now is one of those `patterns` describe, so its link is marked as current. */
 export const useIsCurrent = (patterns: readonly string[]): boolean => {

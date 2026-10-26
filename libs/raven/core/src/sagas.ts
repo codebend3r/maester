@@ -61,18 +61,19 @@ export const sagaRuntime = (saga: Saga): string | null => {
   return total && `${total} in all`
 }
 
+type SagaPathProps = { libraryId: number; saga: Saga }
+
 /** A saga's own page, under its library's. */
-export const sagaPath = ({ libraryId, saga }: { libraryId: number; saga: Saga }): string =>
+export const sagaPath = ({ libraryId, saga }: SagaPathProps): string =>
   `/libraries/${libraryId}/sagas/${encodeURIComponent(saga.tmdbId)}`
 
-/** A saga's movies as targets: each by its item in the saga's library, else its own file. */
-export const sagaTargets = ({
-  saga,
-  libraryId,
-}: {
+type SagaTargetsProps = {
   saga: Saga
   libraryId: number
-}): WatchTarget[] =>
+}
+
+/** A saga's movies as targets: each by its item in the saga's library, else its own file. */
+export const sagaTargets = ({ saga, libraryId }: SagaTargetsProps): WatchTarget[] =>
   saga.media.map((media) =>
     media.item
       ? { kind: WATCH_TARGET_KINDS.item, id: media.item.id, libraryId }

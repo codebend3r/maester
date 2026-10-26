@@ -10,13 +10,15 @@ export const libmpvLinkLibraries = ['glslang', 'glslang-default-resource-limits'
 /** The search paths a bundled library or the addon may carry: beside itself, or its `lib`. */
 export const RPATHS = { loaderPath: '@loader_path', loaderPathLib: '@loader_path/lib' } as const
 
+type WithLinkLibrariesProps<T extends { LDFLAGS: string }> = {
+  env: T
+  libraries: readonly string[]
+}
+
 export const withLinkLibraries = <T extends { LDFLAGS: string }>({
   env,
   libraries,
-}: {
-  env: T
-  libraries: readonly string[]
-}) => ({
+}: WithLinkLibrariesProps<T>) => ({
   ...env,
   LDFLAGS: [env.LDFLAGS, ...libraries.map((library) => `-l${library}`)].join(' '),
 })

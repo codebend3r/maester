@@ -20,8 +20,10 @@ describe('playback settings', () => {
     return state.app
   }
   const api = (): ApiClient => apiFor({ app: app(), cookie: state.admin })
+  type PutProps = { url: string; payload: Record<string, unknown> }
+
   /** A change by hand, for a value the client's types will not let it send. */
-  const put = ({ url, payload }: { url: string; payload: Record<string, unknown> }) =>
+  const put = ({ url, payload }: PutProps) =>
     injectAs({ app: app(), cookie: state.admin })({ method: 'PUT', url, payload })
   const read = () => api().getPlaybackSettings()
 

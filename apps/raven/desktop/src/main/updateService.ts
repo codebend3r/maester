@@ -34,14 +34,13 @@ export type UpdateDialogOptions = {
 
 export type UpdateDialog = UpdateDialogOptions & { opensRelease: boolean }
 
-/** What Check for Updates… shows for a check's outcome. */
-export const updateDialogFor = ({
-  check,
-  current,
-}: {
+type UpdateDialogForProps = {
   check: UpdateCheck
   current: string
-}): UpdateDialog => {
+}
+
+/** What Check for Updates… shows for a check's outcome. */
+export const updateDialogFor = ({ check, current }: UpdateDialogForProps): UpdateDialog => {
   if (!check.ok) {
     return {
       type: DIALOG_TYPES.warning,
@@ -91,6 +90,13 @@ const unopenedDialog = (): UpdateDialogOptions => ({
   cancelId: 0,
 })
 
+type CreateMenuCheckProps = {
+  updates: Pick<UpdateService, 'checkNow' | 'openRelease'>
+  current: string
+  show: (options: UpdateDialogOptions) => Promise<number>
+  announce: (version: string) => void
+}
+
 /**
  * Check for Updates… from the menu: checks, tells the page about a newer release, shows the
  * outcome, and opens the release page from See Release. A click while one is still running,
@@ -101,12 +107,7 @@ export const createMenuCheck = ({
   current,
   show,
   announce,
-}: {
-  updates: Pick<UpdateService, 'checkNow' | 'openRelease'>
-  current: string
-  show: (options: UpdateDialogOptions) => Promise<number>
-  announce: (version: string) => void
-}): (() => Promise<void>) => {
+}: CreateMenuCheckProps): (() => Promise<void>) => {
   let isRunning = false
 
   const run = async (): Promise<void> => {
@@ -132,6 +133,11 @@ export const createMenuCheck = ({
   }
 }
 
+type UpdateSourceFromProps = {
+  isPackaged: boolean
+  env: Readonly<Record<string, string | undefined>>
+}
+
 /**
  * Where the check asks, and whether it may run at launch (Ruling 10): unpackaged, only the
  * test hook allows it, so `dev` and e2e never call GitHub on their own. Packaged, the hook
@@ -140,10 +146,7 @@ export const createMenuCheck = ({
 export const updateSourceFrom = ({
   isPackaged,
   env,
-}: {
-  isPackaged: boolean
-  env: Readonly<Record<string, string | undefined>>
-}): { url: string; isLaunchCheckAllowed: boolean } => {
+}: UpdateSourceFromProps): { url: string; isLaunchCheckAllowed: boolean } => {
   if (isPackaged) return { url: RELEASES_URL, isLaunchCheckAllowed: true }
   const hook = env[RELEASES_HOOK] ?? ''
   if (hook === '') return { url: RELEASES_URL, isLaunchCheckAllowed: false }
@@ -161,6 +164,16 @@ export type UpdateService = {
 
 type NewerFinding = Extract<UpdateFinding, { kind: typeof UPDATE_FINDING_KINDS.newer }>
 
+type CreateUpdateServiceProps = {
+  config: ConfigStore
+  check: () => Promise<UpdateCheck>
+  current: string
+  now: () => number
+  openExternal: (url: string) => Promise<void>
+  announce: (version: string) => void
+  warn: (message: string) => void
+}
+
 export const createUpdateService = ({
   config,
   check,
@@ -169,15 +182,7 @@ export const createUpdateService = ({
   openExternal,
   announce,
   warn,
-}: {
-  config: ConfigStore
-  check: () => Promise<UpdateCheck>
-  current: string
-  now: () => number
-  openExternal: (url: string) => Promise<void>
-  announce: (version: string) => void
-  warn: (message: string) => void
-}): UpdateService => {
+}: CreateUpdateServiceProps): UpdateService => {
   // Kept for the session only: a restart asks again when the check is due.
   let finding: NewerFinding | null = null
   let problem: string | null = null

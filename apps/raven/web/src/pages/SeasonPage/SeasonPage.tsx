@@ -49,12 +49,14 @@ import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/pages/SeasonPage/SeasonPage.module.scss'
 
+type EpisodeRowProps = { episode: EpisodeSummary }
+
 /**
  * One episode on disk, on a row that lights under the pointer: its still
  * with the check or where playback stopped, its number and title, air date
  * and length, three lines of summary, then Watched and Play.
  */
-const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
+const EpisodeRow = ({ episode }: EpisodeRowProps) => {
   const select = useSelectable({ key: episodeEntryKey(episode), title: episode.title })
   const toggle = useWatchedToggle({
     state: episode.watched ? 'watched' : 'unwatched',
@@ -120,7 +122,9 @@ const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
   )
 }
 
-const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }) => {
+type SeasonViewProps = { show: ItemDetails; season: ItemDetails }
+
+const SeasonView = ({ show, season }: SeasonViewProps) => {
   const ids = { title: useId(), episodes: useId() }
   const episodes = episodesOf(season)
   const { watched: watchedCount, total: count } = episodesWatched(episodes)

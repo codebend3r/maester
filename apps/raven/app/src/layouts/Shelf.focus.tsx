@@ -27,18 +27,15 @@ import { themedStyles } from '@/theme/useTheme'
 /** Where the Settings entry sits on Home, a place no shelf's card shares. */
 const SETTINGS_PLACE = 'settings'
 
-/** One row of the side menu: a link the remote moves down, its edge and fill showing focus. */
-const MenuRow = ({
-  label,
-  onPress,
-  onFocused,
-  ref,
-}: {
+type MenuRowProps = {
   label: string
   onPress: () => void
   onFocused: () => void
   ref?: Ref<ComponentRef<typeof Pressable>>
-}) => {
+}
+
+/** One row of the side menu: a link the remote moves down, its edge and fill showing focus. */
+const MenuRow = ({ label, onPress, onFocused, ref }: MenuRowProps) => {
   const styles = useStyles()
   return (
     <Pressable
@@ -58,11 +55,13 @@ const MenuRow = ({
   )
 }
 
+type SettingsEntryProps = { onPress: () => void; onFocused: () => void }
+
 /**
  * The way into Settings, which takes the remote's focus back when Settings goes, as a card does
  * for the screen it opened: Android TV restores nothing on its own.
  */
-const SettingsEntry = ({ onPress, onFocused }: { onPress: () => void; onFocused: () => void }) => {
+const SettingsEntry = ({ onPress, onFocused }: SettingsEntryProps) => {
   const view = useRef<ComponentRef<typeof Pressable>>(null)
   const { remember } = useOpenerFocus({ place: SETTINGS_PLACE, view })
   return (
@@ -191,9 +190,10 @@ const ShelfTitle = ({
   )
 }
 
+type PlaceOfProps = { shelf: ShelfView; card: ShelfCard }
+
 /** Where a card sits on its screen: one title can sit on two shelves, as Continue watching's do. */
-const placeOf = ({ shelf, card }: { shelf: ShelfView; card: ShelfCard }): string =>
-  `${shelf.key}/${card.key}`
+const placeOf = ({ shelf, card }: PlaceOfProps): string => `${shelf.key}/${card.key}`
 
 /**
  * A shelf the remote moves along: its title, then one row, scrolled as focus moves. The row is a

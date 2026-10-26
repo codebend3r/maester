@@ -59,19 +59,21 @@ export const gate = () => {
   return { answer, open: held.open }
 }
 
+type SetupSyncProps = {
+  entries?: DownloadEntry[]
+  owed?: Owed[]
+  retryMs?: number
+  /** The account signed in to the server, as the page's session names it. */
+  accountId?: string | null
+}
+
 /** A sync over one store in memory, its calls answered by `server.answer` and recorded in `log`. */
 export const setupSync = ({
   entries = [entryFor()],
   owed = [],
   retryMs = SYNC_RETRY_MS,
   accountId = null,
-}: {
-  entries?: DownloadEntry[]
-  owed?: Owed[]
-  retryMs?: number
-  /** The account signed in to the server, as the page's session names it. */
-  accountId?: string | null
-} = {}) => {
+}: SetupSyncProps = {}) => {
   const signedIn = { accountId }
   const store = memoryStore({ ...EMPTY_DOWNLOADS, entries, owed })
   const { timers, pending } = fakeTimers()
@@ -96,16 +98,14 @@ export const setupSync = ({
     retryMs,
     accountIdOf: () => signedIn.accountId,
   })
-  /** Records a play and a position for a download, as playback does, then touches it. */
-  const note = ({
-    downloadId = ID,
-    play = false,
-    position,
-  }: {
+  type NoteProps = {
     downloadId?: string
     play?: boolean
     position: number
-  }): void => {
+  }
+
+  /** Records a play and a position for a download, as playback does, then touches it. */
+  const note = ({ downloadId = ID, play = false, position }: NoteProps): void => {
     store.update((state) =>
       notePending(state, { downloadId, play, position, at: NOW, accountId: signedIn.accountId }),
     )

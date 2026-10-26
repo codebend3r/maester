@@ -12,11 +12,22 @@ export const LINK_MESSAGES = {
 
 const LINK_LOG_MAX = 100
 
+type OpenProps = { link: string }
+
 export type LinkOpener = {
   /** A link the page was given (File > Open Link). */
-  open: (input: { link: string }) => Promise<DesktopReply>
+  open: (input: OpenProps) => Promise<DesktopReply>
   /** A batch of links main was handed (`open-url`); the opener acts on the first. */
   openBatch: (links: readonly string[]) => Promise<DesktopReply>
+}
+
+type CreateLinkOpenerProps = {
+  /** Whether a link's `server` names the one server. */
+  isServerOrigin: (origin: string) => boolean
+  /** The one server's id, read at each link. */
+  serverId: () => string
+  downloads: Pick<DownloadService, 'ask'>
+  warn: (message: string) => void
 }
 
 /**
@@ -29,14 +40,7 @@ export const createLinkOpener = ({
   serverId,
   downloads,
   warn,
-}: {
-  /** Whether a link's `server` names the one server. */
-  isServerOrigin: (origin: string) => boolean
-  /** The one server's id, read at each link. */
-  serverId: () => string
-  downloads: Pick<DownloadService, 'ask'>
-  warn: (message: string) => void
-}): LinkOpener => {
+}: CreateLinkOpenerProps): LinkOpener => {
   const safeWarn = quietly(warn)
 
   const otherServer = (): DesktopReply => {

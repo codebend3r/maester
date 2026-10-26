@@ -7,8 +7,10 @@ export const SERVER = {
   origin: 'https://raven.example',
 } as const
 
+type ConfigForProps = { id: string; origin: string }
+
 /** A version 5 config for the server given, with the default output and release check. */
-export const configFor = ({ id, origin }: { id: string; origin: string }): DesktopConfig => ({
+export const configFor = ({ id, origin }: ConfigForProps): DesktopConfig => ({
   version: 5,
   output: DEFAULT_OUTPUT_SETTINGS,
   server: { id, origin },

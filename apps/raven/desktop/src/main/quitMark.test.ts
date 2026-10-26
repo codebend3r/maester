@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import { createQuitMark } from '@/main/quitMark'
 
-const setup = ({ isEnabled }: { isEnabled: boolean }) => {
+type SetupProps = { isEnabled: boolean }
+
+const setup = ({ isEnabled }: SetupProps) => {
   const clock = { ms: 100 }
   const lines: string[] = []
   const mark = createQuitMark({

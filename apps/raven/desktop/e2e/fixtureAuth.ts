@@ -148,7 +148,9 @@ const ticketRouteOf = (pathname: string): number | null => {
 
 const base64urlJson = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url')
 
-const sendRefusal = ({ response, refusal }: { response: ServerResponse; refusal: Refusal }) =>
+type SendRefusalProps = { response: ServerResponse; refusal: Refusal }
+
+const sendRefusal = ({ response, refusal }: SendRefusalProps) =>
   sendJson({
     response,
     status: refusal.status,
@@ -160,6 +162,22 @@ export const TICKET_CHECKS = { none: 'none', passed: 'passed', refused: 'refused
 
 type TicketCheck = (typeof TICKET_CHECKS)[keyof typeof TICKET_CHECKS]
 
+type IsHeldBackProps = {
+  request: IncomingMessage
+  response: ServerResponse
+  missing: string
+}
+
+type CreateFixtureAuthProps = {
+  accounts: FixtureAccounts
+  /** The fixture's own origin, which a `ready` config names as its Supabase and web URL. */
+  origin: () => string
+  now: () => number
+  hasTitle: (mediaId: number) => boolean
+  /** Answers for a title in the locked library this browser may not see; false when it may. */
+  isHeldBack: (input: IsHeldBackProps) => boolean
+}
+
 /**
  * The fixture's accounts: the config route, a stub Supabase Auth at `/auth/v1` that signs in
  * `FIXTURE_ACCOUNT`, `/api/me`, and the account tickets, minted and redeemed as the server does.
@@ -170,19 +188,7 @@ export const createFixtureAuth = ({
   now,
   hasTitle,
   isHeldBack,
-}: {
-  accounts: FixtureAccounts
-  /** The fixture's own origin, which a `ready` config names as its Supabase and web URL. */
-  origin: () => string
-  now: () => number
-  hasTitle: (mediaId: number) => boolean
-  /** Answers for a title in the locked library this browser may not see; false when it may. */
-  isHeldBack: (input: {
-    request: IncomingMessage
-    response: ServerResponse
-    missing: string
-  }) => boolean
-}) => {
+}: CreateFixtureAuthProps) => {
   let issuedTokens: readonly string[] = []
   let status: Account['status'] =
     accounts.kind === FIXTURE_ACCOUNT_KINDS.ready ? accounts.status : MEMBER_STATUSES.approved
@@ -199,8 +205,10 @@ export const createFixtureAuth = ({
     return end !== undefined && now() < end
   }
 
+  type RedeemProps = { ticket: string; mediaId: number }
+
   /** As the media plane does: the ticket is this title's and unexpired, then the account is checked again. */
-  const redeem = ({ ticket, mediaId }: { ticket: string; mediaId: number }): Refusal | null => {
+  const redeem = ({ ticket, mediaId }: RedeemProps): Refusal | null => {
     const held = accountTickets.get(ticket)
     if (held === undefined || held.mediaId !== mediaId || now() >= held.expiresAt) return SIGNED_OUT
     return refusalOfStatus(status)
@@ -240,15 +248,13 @@ export const createFixtureAuth = ({
     }
   }
 
-  const answerToken = ({
-    response,
-    query,
-    body,
-  }: {
+  type AnswerTokenProps = {
     response: ServerResponse
     query: URLSearchParams
     body: string | null
-  }) => {
+  }
+
+  const answerToken = ({ response, query, body }: AnswerTokenProps) => {
     const grant = query.get(GRANT_PARAM)
     if (grant === GRANTS.password) {
       const isRight =
@@ -281,27 +287,24 @@ export const createFixtureAuth = ({
     return sendMissing(response)
   }
 
-  const answerLogout = ({
-    request,
-    response,
-  }: {
+  type AnswerLogoutProps = {
     request: IncomingMessage
     response: ServerResponse
-  }) => {
+  }
+
+  const answerLogout = ({ request, response }: AnswerLogoutProps) => {
     const token = bearerOf(request)
     refreshes = new Map([...refreshes].filter(([, access]) => access !== token))
     sendEmpty({ response, status: 204 })
   }
 
-  const answerTicketMint = ({
-    request,
-    response,
-    mediaId,
-  }: {
+  type AnswerTicketMintProps = {
     request: IncomingMessage
     response: ServerResponse
     mediaId: number
-  }) => {
+  }
+
+  const answerTicketMint = ({ request, response, mediaId }: AnswerTicketMintProps) => {
     const token = bearerOf(request)
     if (accounts.kind !== FIXTURE_ACCOUNT_KINDS.ready) {
       return sendRefusal({ response, refusal: refusalFor(AUTH_REFUSALS.unavailable) })
@@ -349,19 +352,17 @@ export const createFixtureAuth = ({
     }
   }
 
+  type AnswerAccountsProps = {
+    request: IncomingMessage
+    response: ServerResponse
+    body: string | null
+  }
+
   /**
    * The routes accounts add, which the pre-accounts server did not have: the config, the stub
    * Auth, the account and the ticket. False for a request they do not answer.
    */
-  const answerAccounts = ({
-    request,
-    response,
-    body,
-  }: {
-    request: IncomingMessage
-    response: ServerResponse
-    body: string | null
-  }): boolean => {
+  const answerAccounts = ({ request, response, body }: AnswerAccountsProps): boolean => {
     const { pathname, query } = partsOf(request.url ?? '')
     const method = request.method ?? ''
     const config = authConfig()
@@ -410,16 +411,14 @@ export const createFixtureAuth = ({
     return true
   }
 
-  /** An account ticket on a media plane request, redeemed as the server's media plane does. */
-  const checkTicket = ({
-    request,
-    response,
-    mediaId,
-  }: {
+  type CheckTicketProps = {
     request: IncomingMessage
     response: ServerResponse
     mediaId: number
-  }): TicketCheck => {
+  }
+
+  /** An account ticket on a media plane request, redeemed as the server's media plane does. */
+  const checkTicket = ({ request, response, mediaId }: CheckTicketProps): TicketCheck => {
     const presented =
       accounts.kind === FIXTURE_ACCOUNT_KINDS.ready ? accountTicketOf(request) : null
     if (presented === null) return TICKET_CHECKS.none

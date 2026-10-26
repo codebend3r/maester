@@ -26,6 +26,10 @@ type SessionRow = { user_id: string; expires_at: string; last_seen_at: string }
 /** What the database keeps in place of a token: its SHA-256, hex. */
 export const hashToken = (token: string): string => createHash('sha256').update(token).digest('hex')
 
+type SessionsRepositoryCreateProps = { userId: string; now: Date }
+
+type SessionsRepositoryLookupProps = { token: string; now: Date }
+
 @Injectable()
 export class SessionsRepository {
   constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
@@ -35,7 +39,7 @@ export class SessionsRepository {
   }
 
   /** A new session for `userId`; returns the token for the cookie. Expired sessions go first. */
-  create({ userId, now }: { userId: string; now: Date }): string {
+  create({ userId, now }: SessionsRepositoryCreateProps): string {
     const token = randomBytes(32).toString('base64url')
     const at = now.toISOString()
     this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(at)
@@ -49,7 +53,7 @@ export class SessionsRepository {
   }
 
   /** The session behind `token`, moving its `last_seen_at` when it is a minute stale. */
-  lookup({ token, now }: { token: string; now: Date }): SessionLookup {
+  lookup({ token, now }: SessionsRepositoryLookupProps): SessionLookup {
     const hash = hashToken(token)
     const row = this.db
       .prepare<[string], SessionRow>(

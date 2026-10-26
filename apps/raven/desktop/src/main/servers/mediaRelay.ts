@@ -61,18 +61,17 @@ type LoopbackServer = {
 /** Starts a server for the handler and answers the port it listens on. */
 type RelayListen = (handler: RelayHandler) => Promise<{ port: number }>
 
+type ListenOnLoopbackProps = {
+  createServer: (handler: RelayHandler) => LoopbackServer
+  warn: (message: string) => void
+}
+
 /**
  * A listen on `RELAY_HOST`, on a port the system picks, over main's `node:http`. Once it listens,
  * a later error on the server is warned rather than thrown in main.
  */
 export const listenOnLoopback =
-  ({
-    createServer,
-    warn,
-  }: {
-    createServer: (handler: RelayHandler) => LoopbackServer
-    warn: (message: string) => void
-  }): RelayListen =>
+  ({ createServer, warn }: ListenOnLoopbackProps): RelayListen =>
   (handler) =>
     new Promise((resolve, reject) => {
       const server = createServer(handler)
@@ -90,16 +89,18 @@ export const listenOnLoopback =
       })
     })
 
-/**
- * Main's `net.fetch` for a relayed request: no cookie, no redirect followed, nothing cached.
- * The signal aborts the fetch and its body as mpv lets go of the request.
- */
-export type UpstreamFetch = (input: {
+type UpstreamFetchProps = {
   url: string
   method: RelayMethod
   headers: Record<string, string>
   signal: AbortSignal
-}) => Promise<{
+}
+
+/**
+ * Main's `net.fetch` for a relayed request: no cookie, no redirect followed, nothing cached.
+ * The signal aborts the fetch and its body as mpv lets go of the request.
+ */
+export type UpstreamFetch = (input: UpstreamFetchProps) => Promise<{
   status: number
   headers: { get: (name: string) => string | null }
   body: ReadableStream<Uint8Array> | null
@@ -114,13 +115,15 @@ type RelayedLoad = {
   sidecarUrls: readonly string[]
 }
 
+type OpenProps = {
+  server: Pick<ServerEntry, 'id' | 'origin' | 'name'>
+  mediaId: number
+  sidecarTrackIds: readonly string[]
+}
+
 export type MediaRelay = {
   /** Retires every earlier secret: the relay serves the newest load alone. */
-  open: (input: {
-    server: Pick<ServerEntry, 'id' | 'origin' | 'name'>
-    mediaId: number
-    sidecarTrackIds: readonly string[]
-  }) => Promise<RelayedLoad>
+  open: (input: OpenProps) => Promise<RelayedLoad>
   close: (loadId: string) => void
   closeServer: (serverId: string) => void
   closeAll: () => void
@@ -176,7 +179,9 @@ const statusForOutcome = (
   }
 }
 
-const answer = ({ response, status }: { response: ServerResponse; status: number }): void => {
+type AnswerProps = { response: ServerResponse; status: number }
+
+const answer = ({ response, status }: AnswerProps): void => {
   if (response.headersSent || response.destroyed) {
     response.destroy()
     return
@@ -185,14 +190,13 @@ const answer = ({ response, status }: { response: ServerResponse; status: number
   response.end()
 }
 
-/** Writes a chunk, waiting while the socket drains; a response that closes stops the wait. */
-const writeChunk = ({
-  response,
-  chunk,
-}: {
+type WriteChunkProps = {
   response: ServerResponse
   chunk: Uint8Array
-}): Promise<void> =>
+}
+
+/** Writes a chunk, waiting while the socket drains; a response that closes stops the wait. */
+const writeChunk = ({ response, chunk }: WriteChunkProps): Promise<void> =>
   new Promise((resolve, reject) => {
     if (response.destroyed) {
       reject(new Error('The player let go of the request.'))
@@ -219,6 +223,15 @@ const passedHeaders = (upstream: Upstream): Record<string, string> =>
     }),
   )
 
+type CreateMediaRelayProps = {
+  listen: RelayListen
+  fetchUpstream: UpstreamFetch
+  tickets: Pick<AccountTickets, 'ticketFor'>
+  /** `RELAY_SECRET_BYTES` random bytes in base64url. */
+  newSecret: (bytes: number) => string
+  warn: (message: string) => void
+}
+
 /**
  * The loopback media relay: mpv opens `http://127.0.0.1:<port>/<secret>/file` (and its sidecars),
  * and each request it makes, every seek and reconnect, goes to the server with an account ticket
@@ -232,14 +245,7 @@ export const createMediaRelay = ({
   tickets,
   newSecret,
   warn,
-}: {
-  listen: RelayListen
-  fetchUpstream: UpstreamFetch
-  tickets: Pick<AccountTickets, 'ticketFor'>
-  /** `RELAY_SECRET_BYTES` random bytes in base64url. */
-  newSecret: (bytes: number) => string
-  warn: (message: string) => void
-}): MediaRelay => {
+}: CreateMediaRelayProps): MediaRelay => {
   let current: Load | null = null
   let refusal: { loadId: string; reason: AuthRefusal['reason'] } | null = null
   let requests: readonly Request[] = []
@@ -259,23 +265,30 @@ export const createMediaRelay = ({
 
   const isCurrent = (load: Load): boolean => (current?.loadId ?? null) === load.loadId
 
+  type RecordProps = {
+    load: Load
+    path: string
+    reason: AuthRefusal['reason']
+  }
+
   /**
    * Every refusal is logged, but only the file's own is why the title ends: mpv plays on past a
    * sidecar it could not read, so a refused sidecar must not turn the end into an error.
    */
-  const record = ({
-    load,
-    path,
-    reason,
-  }: {
-    load: Load
-    path: string
-    reason: AuthRefusal['reason']
-  }): void => {
+  const record = ({ load, path, reason }: RecordProps): void => {
     // A request of a load already retired answers late; the newer load's record stands.
     if (!isCurrent(load)) return
     if (path === MEDIA_FILE_PATH) refusal = { loadId: load.loadId, reason }
     safeWarn(`${loggable(load.name)} refused a relayed request: ${reason}`)
+  }
+
+  type TicketedProps = {
+    load: Load
+    path: string
+    method: RelayMethod
+    headers: Record<string, string>
+    signal: AbortSignal
+    isFresh: boolean
   }
 
   const ticketed = async ({
@@ -285,14 +298,7 @@ export const createMediaRelay = ({
     headers,
     signal,
     isFresh,
-  }: {
-    load: Load
-    path: string
-    method: RelayMethod
-    headers: Record<string, string>
-    signal: AbortSignal
-    isFresh: boolean
-  }): Promise<
+  }: TicketedProps): Promise<
     | { kind: typeof TICKET_OUTCOMES.ticket; upstream: Upstream }
     | Exclude<TicketOutcome, { kind: typeof TICKET_OUTCOMES.ticket }>
   > => {
@@ -312,6 +318,15 @@ export const createMediaRelay = ({
     return { kind: TICKET_OUTCOMES.ticket, upstream }
   }
 
+  type RelayProps = {
+    load: Load
+    path: string
+    method: RelayMethod
+    range: string | null
+    response: ServerResponse
+    signal: AbortSignal
+  }
+
   const relay = async ({
     load,
     path,
@@ -319,14 +334,7 @@ export const createMediaRelay = ({
     range,
     response,
     signal,
-  }: {
-    load: Load
-    path: string
-    method: RelayMethod
-    range: string | null
-    response: ServerResponse
-    signal: AbortSignal
-  }): Promise<void> => {
+  }: RelayProps): Promise<void> => {
     const headers: Record<string, string> = range === null ? {} : { [HTTP_HEADERS.range]: range }
     const request = { load, path, method, headers, signal }
     const first = await ticketed({ ...request, isFresh: false })
@@ -368,13 +376,12 @@ export const createMediaRelay = ({
     response.end()
   }
 
-  const serve = async ({
-    request,
-    response,
-  }: {
+  type ServeProps = {
     request: IncomingMessage
     response: ServerResponse
-  }): Promise<void> => {
+  }
+
+  const serve = async ({ request, response }: ServeProps): Promise<void> => {
     const load = current
     const path = load?.routes.get(request.url ?? '') ?? null
     if (!isRelayMethod(request.method) || load === null || path === null) {

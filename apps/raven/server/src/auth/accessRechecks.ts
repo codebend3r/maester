@@ -31,6 +31,10 @@ const recheckOf = (error: unknown): { recheck: Recheck; reason: string } => {
   }
 }
 
+type AccessRechecksEndedProps = { request: object }
+
+type AccessRechecksRecheckProps = { token: string }
+
 /**
  * Checks the account behind a response that stays open, SSE or media bytes,
  * on a bounded interval. The token checked is the freshest the server has
@@ -54,7 +58,7 @@ export class AccessRechecks {
    * at the next tick, never past the last token's expiry. A legacy caller
    * never ends this way.
    */
-  ended({ request }: { request: object }): Observable<void> {
+  ended({ request }: AccessRechecksEndedProps): Observable<void> {
     const account = accountOf(this.sessions.callerOf({ request }))
     if (account === null) return NEVER
     const accountId = account.id
@@ -88,7 +92,7 @@ export class AccessRechecks {
   }
 
   /** The membership check one recheck makes, with a warning that names why when it fails. */
-  private async recheck({ token }: { token: string }): Promise<Recheck> {
+  private async recheck({ token }: AccessRechecksRecheckProps): Promise<Recheck> {
     try {
       const session = await this.sessions.authenticate({ token })
       requireApproved(session.account)

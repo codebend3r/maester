@@ -14,20 +14,18 @@ import { api } from '@/lib/api'
 import { useReturnFocus } from '@/lib/useReturnFocus'
 import styles from '@/components/UnmatchedShows/UnmatchedShows.module.scss'
 
+type UnmatchedShowEntryProps = {
+  group: UnmatchedShow
+  renderFiles: (files: MediaItem[]) => ReactNode
+  suggestionOf: (file: MediaItem) => AiSuggestion | null
+}
+
 /**
  * One show folder: a toggle to its episodes, and Fix match, which points the
  * whole folder at a show, with the admin lock off. When the AI lookup
  * suggested a show, its card holds Accept and the folder's Fix match.
  */
-const UnmatchedShowEntry = ({
-  group,
-  renderFiles,
-  suggestionOf,
-}: {
-  group: UnmatchedShow
-  renderFiles: (files: MediaItem[]) => ReactNode
-  suggestionOf: (file: MediaItem) => AiSuggestion | null
-}) => {
+const UnmatchedShowEntry = ({ group, renderFiles, suggestionOf }: UnmatchedShowEntryProps) => {
   const regionId = useId()
   const fixButton = useRef<HTMLButtonElement>(null)
   const [isOpen, setIsOpen] = useState(false)
@@ -104,6 +102,13 @@ const UnmatchedShowEntry = ({
 /** A listing the AI lookup has nothing for. */
 const NO_SUGGESTION = (): AiSuggestion | null => null
 
+type UnmatchedShowsProps = {
+  files: MediaItem[]
+  renderFiles: (files: MediaItem[]) => ReactNode
+  /** What the AI lookup suggests for a file's show folder; none unless given. */
+  suggestionOf?: (file: MediaItem) => AiSuggestion | null
+}
+
 /**
  * A TV library's unmatched files, one entry per show folder, each opening
  * in place to its episodes. Fix match on an entry re-points the whole
@@ -113,12 +118,7 @@ export const UnmatchedShows = ({
   files,
   renderFiles,
   suggestionOf = NO_SUGGESTION,
-}: {
-  files: MediaItem[]
-  renderFiles: (files: MediaItem[]) => ReactNode
-  /** What the AI lookup suggests for a file's show folder; none unless given. */
-  suggestionOf?: (file: MediaItem) => AiSuggestion | null
-}) => (
+}: UnmatchedShowsProps) => (
   <ul className={styles.list}>
     {unmatchedShowsOf(files).map((group) => (
       <UnmatchedShowEntry

@@ -38,20 +38,21 @@ const viewFromUrl = (params: URLSearchParams): LibraryViewChange => {
   }
 }
 
-/** The address with `change` written into it. */
-const writeView = ({
-  params,
-  change,
-}: {
+type WriteViewProps = {
   params: URLSearchParams
   change: LibraryViewChange
-}): URLSearchParams => {
+}
+
+/** The address with `change` written into it. */
+const writeView = ({ params, change }: WriteViewProps): URLSearchParams => {
   const next = new URLSearchParams(params)
   if (change.sort != null) next.set('sort', change.sort)
   if (change.view != null) next.set('view', change.view)
   if (change.groupBy != null) next.set('group', change.groupBy)
   return next
 }
+
+type UseLibraryViewProps = { library: Library }
 
 /**
  * How a library is being looked at: its saved settings under whatever the
@@ -61,7 +62,7 @@ const writeView = ({
  * change at once, for the controls that name it, and `settings` follows once
  * the address has it, for the listing.
  */
-export const useLibraryView = ({ library }: { library: Library }) => {
+export const useLibraryView = ({ library }: UseLibraryViewProps) => {
   const queryClient = useQueryClient()
   const [address, setAddress] = useSearchParams()
   const search = useAddressSearch()

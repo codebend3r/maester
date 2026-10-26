@@ -1,17 +1,15 @@
+type CreateQuitMarkProps = {
+  isEnabled: boolean
+  now: () => number
+  write: (line: string) => void
+}
+
 /**
  * The quit budget mark (spec Review Focus 5): `raven-quit-ms` from the first `before-quit`
  * to the first `will-quit` (every window closed, mpv stopped, the stores written) or the
  * quit gate giving up, written once to the log, and on stdout unpackaged (Ruling 13).
  */
-export const createQuitMark = ({
-  isEnabled,
-  now,
-  write,
-}: {
-  isEnabled: boolean
-  now: () => number
-  write: (line: string) => void
-}) => {
+export const createQuitMark = ({ isEnabled, now, write }: CreateQuitMarkProps) => {
   const quit: { startedAt: number | null; hasEnded: boolean } = {
     startedAt: null,
     hasEnded: false,

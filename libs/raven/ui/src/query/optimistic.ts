@@ -23,18 +23,17 @@ export type Edit = { plan: (queryClient: QueryClient) => Write[] }
 /** What the edits of a change replaced, to put back if the server refuses it. */
 type Snapshot = ReadonlyArray<readonly [QueryKey, unknown]>
 
+type EditAllProps<T> = {
+  filters: QueryFilters
+  update: (data: T) => T
+}
+
 /**
  * An edit to every query `filters` find, each holding a `T`, as every
  * listing of a library does. `update` hands back the very same data where
  * it changes nothing.
  */
-export const editAll = <T>({
-  filters,
-  update,
-}: {
-  filters: QueryFilters
-  update: (data: T) => T
-}): Edit => ({
+export const editAll = <T>({ filters, update }: EditAllProps<T>): Edit => ({
   plan: (queryClient) =>
     queryClient
       .getQueriesData<T>(filters)
@@ -48,40 +47,39 @@ export const editAll = <T>({
       })),
 })
 
-/** An edit to the one query `queryKey` names, its data typed as that query's. */
-export const edit = <T>({
-  queryKey,
-  update,
-}: {
+type EditProps<T> = {
   queryKey: DataTag<QueryKey, T, Error>
   update: (data: T) => T
-}): Edit => editAll<T>({ filters: { queryKey, exact: true }, update })
+}
+
+/** An edit to the one query `queryKey` names, its data typed as that query's. */
+export const edit = <T>({ queryKey, update }: EditProps<T>): Edit =>
+  editAll<T>({ filters: { queryKey, exact: true }, update })
+
+type EditKeyProps<T> = {
+  queryKey: QueryKey
+  update: (data: NoInfer<T>) => NoInfer<T>
+}
 
 /**
  * An edit to the one query a bare key from `queryKeys` names. The key carries
  * no type, so `T` says what the query holds; left out, it is `never` and no
  * `update` fits.
  */
-export const editKey = <T = never>({
-  queryKey,
-  update,
-}: {
-  queryKey: QueryKey
-  update: (data: NoInfer<T>) => NoInfer<T>
-}): Edit => editAll<T>({ filters: { queryKey, exact: true }, update })
+export const editKey = <T = never>({ queryKey, update }: EditKeyProps<T>): Edit =>
+  editAll<T>({ filters: { queryKey, exact: true }, update })
+
+type ApplyEditsProps = {
+  queryClient: QueryClient
+  edits: readonly Edit[]
+}
 
 /**
  * Shows a change before the server answers: every query it changes has any
  * fetch in flight called off, so an older answer cannot land over it, then
  * takes the change. What each held before comes back.
  */
-const applyEdits = async ({
-  queryClient,
-  edits,
-}: {
-  queryClient: QueryClient
-  edits: readonly Edit[]
-}): Promise<Snapshot> => {
+const applyEdits = async ({ queryClient, edits }: ApplyEditsProps): Promise<Snapshot> => {
   const planned = () => edits.flatMap((change) => change.plan(queryClient))
   const touched = [
     ...new Map(planned().map(({ queryKey }) => [hashKey(queryKey), queryKey])).values(),
@@ -93,6 +91,13 @@ const applyEdits = async ({
   // Planned again: a fetch called off has put back what it held before.
   planned().forEach(({ write }) => write())
   return snapshot
+}
+
+type UseOptimisticMutationProps<TVariables> = {
+  mutationKey: MutationKey
+  mutationFn: (variables: TVariables) => Promise<unknown>
+  edits: (variables: TVariables) => readonly Edit[]
+  settle: () => Promise<unknown>
 }
 
 /**
@@ -108,12 +113,7 @@ export const useOptimisticMutation = <TVariables>({
   mutationFn,
   edits,
   settle,
-}: {
-  mutationKey: MutationKey
-  mutationFn: (variables: TVariables) => Promise<unknown>
-  edits: (variables: TVariables) => readonly Edit[]
-  settle: () => Promise<unknown>
-}) => {
+}: UseOptimisticMutationProps<TVariables>) => {
   const queryClient = useQueryClient()
   const [failure, setFailure] = useState<Error | null>(null)
   // The change asking is still counted while its own callbacks run, and a

@@ -112,24 +112,23 @@ const sizeOf = (mediaId: number): number => {
 /** A server with accounts, whose media origin serves a title's file for its account ticket. */
 const startAccountsFixture = () => startWebFixture({ clips: fixtureClips, hasMediaPlane: true })
 
-const requestsTo = ({
-  requests,
-  method,
-  path,
-}: {
+type RequestsToProps = {
   requests: readonly FixtureRequest[]
   method: string
   path: string
-}) => requests.filter((request) => request.method === method && request.path === path)
+}
 
-/** Every fetch of a title's file a listener heard, its ticket already left out of the path. */
-const fileFetches = ({
-  requests,
-  mediaId,
-}: {
+const requestsTo = ({ requests, method, path }: RequestsToProps) =>
+  requests.filter((request) => request.method === method && request.path === path)
+
+type FileFetchesProps = {
   requests: readonly FixtureRequest[]
   mediaId: number
-}) => requestsTo({ requests, method: SERVER_METHODS.get, path: MEDIA_PATHS.file(mediaId) })
+}
+
+/** Every fetch of a title's file a listener heard, its ticket already left out of the path. */
+const fileFetches = ({ requests, mediaId }: FileFetchesProps) =>
+  requestsTo({ requests, method: SERVER_METHODS.get, path: MEDIA_PATHS.file(mediaId) })
 
 /** A body read as JSON, or null; never an error, which would print the body. */
 const parseJson = (text: string | null): unknown => {
@@ -162,8 +161,10 @@ const isPresent = (path: string): Promise<boolean> =>
     () => false,
   )
 
+type StoredDownloadsProps = { userData: string }
+
 /** `downloads.json` as main left it, narrowed by the guard main reads it with. */
-const storedDownloads = async ({ userData }: { userData: string }): Promise<DownloadsState> => {
+const storedDownloads = async ({ userData }: StoredDownloadsProps): Promise<DownloadsState> => {
   const value = parseJson(await readFile(join(userData, DOWNLOADS_FILE), 'utf8'))
   if (!isDownloadsState(value)) throw new Error('downloads.json is not what Raven keeps.')
   return value
@@ -171,25 +172,33 @@ const storedDownloads = async ({ userData }: { userData: string }): Promise<Down
 
 const askDialog = (page: Page) => page.getByRole('dialog', { name: 'Download to Raven' })
 
+type ConfirmDownloadProps = { page: Page; question: string }
+
 /** Answers the download dialog once its question names what `question` says. */
-const confirmDownload = async ({ page, question }: { page: Page; question: string }) => {
+const confirmDownload = async ({ page, question }: ConfirmDownloadProps) => {
   const ask = askDialog(page)
   await expect(ask).toContainText(question)
   await ask.getByRole('button', { name: 'Download', exact: true }).click()
   await expect(ask).toHaveCount(0)
 }
 
+type DownloadFromPageProps = { page: Page; question: string }
+
 /** Download on the title page that is open, then the dialog's Download. */
-const downloadFromPage = async ({ page, question }: { page: Page; question: string }) => {
+const downloadFromPage = async ({ page, question }: DownloadFromPageProps) => {
   await page.getByRole('button', { name: 'Download', exact: true }).click()
   await confirmDownload({ page, question })
 }
 
+type DownloadsLinkProps = { page: Page; count: number }
+
 /** The side menu's Downloads, whose name carries the count its badge shows. */
-const downloadsLink = ({ page, count }: { page: Page; count: number }) =>
+const downloadsLink = ({ page, count }: DownloadsLinkProps) =>
   sideLink({ page, name: count === 0 ? 'Downloads' : `Downloads (${count} in progress)` })
 
-const openDownloads = async ({ page }: { page: Page }) => {
+type OpenDownloadsProps = { page: Page }
+
+const openDownloads = async ({ page }: OpenDownloadsProps) => {
   await page
     .getByRole('navigation', { name: 'Main' })
     .getByRole('link', { name: /^Downloads/u })
@@ -197,19 +206,25 @@ const openDownloads = async ({ page }: { page: Page }) => {
   await expect(heading({ page, name: 'Downloads' })).toBeVisible()
 }
 
+type OpenTitleProps = { page: Page; title: string }
+
 /** A title's page, from its card on Home. */
-const openTitle = async ({ page, title }: { page: Page; title: string }) => {
+const openTitle = async ({ page, title }: OpenTitleProps) => {
   await sideLink({ page, name: 'Home' }).click()
   await page.getByRole('link', { name: title, exact: true }).click()
   await expect(heading({ page, name: title })).toBeVisible()
 }
 
+type RowOfProps = { page: Page; label: string }
+
 /** A download's own row: the innermost item naming it, inside its title's group. */
-const rowOf = ({ page, label }: { page: Page; label: string }) =>
+const rowOf = ({ page, label }: RowOfProps) =>
   page.getByRole('listitem').filter({ hasText: label, hasNot: page.getByRole('listitem') })
 
+type ExpectReadyProps = { page: Page; label: string; size: number }
+
 /** The row reads ready: it offers Play, and names the whole file's size. */
-const expectReady = async ({ page, label, size }: { page: Page; label: string; size: number }) => {
+const expectReady = async ({ page, label, size }: ExpectReadyProps) => {
   const row = rowOf({ page, label })
   await expect(row.getByRole('button', { name: `Play ${label}` })).toBeVisible({
     timeout: READY_WAIT_MS,
@@ -217,8 +232,10 @@ const expectReady = async ({ page, label, size }: { page: Page; label: string; s
   await expect(row.getByText(formatBytes(size), { exact: true })).toBeVisible()
 }
 
+type ServerIdOfProps = { userData: string }
+
 /** The id Raven files its server's downloads under, as its config holds it. */
-const serverIdOf = async ({ userData }: { userData: string }): Promise<string> => {
+const serverIdOf = async ({ userData }: ServerIdOfProps): Promise<string> => {
   const config = parseJson(await readFile(join(userData, CONFIG_FILE), 'utf8'))
   if (!isDesktopConfig(config)) throw new Error('Raven saved no config.')
   return config.server.id
@@ -467,7 +484,9 @@ test.describe.serial('downloading from the web pages, and playing offline', () =
 
         // The server comes back as it was: the page finds it, signs main in again, and main sends.
         await fixture.reopen()
-        const heard = (route: { method: string; path: string }) =>
+        type HeardProps = { method: string; path: string }
+
+        const heard = (route: HeardProps) =>
           requestsTo({ requests: fixture.requests.slice(heardBefore), ...route })
         await expect
           .poll(() => heard(PLAYED).length > 0 && heard(SAVED).length > 0, {

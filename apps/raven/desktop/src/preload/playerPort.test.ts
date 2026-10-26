@@ -4,7 +4,9 @@ import { forwardPlayerPort } from '@/preload/playerPort'
 
 const { port1, port2 } = new MessageChannel()
 
-const forward = ({ payload, ports }: { payload: unknown; ports: readonly MessagePort[] }) => {
+type ForwardProps = { payload: unknown; ports: readonly MessagePort[] }
+
+const forward = ({ payload, ports }: ForwardProps) => {
   const sent: { message: unknown; transfer: MessagePort[] }[] = []
   forwardPlayerPort({
     payload,

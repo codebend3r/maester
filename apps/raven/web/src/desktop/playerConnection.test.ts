@@ -148,17 +148,19 @@ describe('nativePlayerOver', () => {
   })
 })
 
+type PortMessageProps = {
+  data: unknown
+  origin?: string
+  source?: Window | null
+  ports?: MessagePort[]
+}
+
 const portMessage = ({
   data,
   origin = PAGE_ORIGIN,
   source = window,
   ports = [],
-}: {
-  data: unknown
-  origin?: string
-  source?: Window | null
-  ports?: MessagePort[]
-}) => {
+}: PortMessageProps) => {
   window.dispatchEvent(new MessageEvent('message', { data, origin, source, ports }))
 }
 
@@ -176,8 +178,10 @@ const UNAVAILABLE = {
 
 const listening: Array<ReturnType<typeof listenForPlayer>> = []
 
+type ListenProps = { waitMs?: number }
+
 /** Each test's listener goes when it ends, so it never takes the next test's messages. */
-const listen = (options: { waitMs?: number } = {}) => {
+const listen = (options: ListenProps = {}) => {
   const connections = listenForPlayer({ target: window, origin: PAGE_ORIGIN, ...options })
   listening.push(connections)
   return connections

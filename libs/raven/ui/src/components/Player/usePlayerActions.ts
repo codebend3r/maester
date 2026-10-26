@@ -21,13 +21,28 @@ import { usePlayerPrefs } from '@/stores/playerPrefs'
 /** Frames per second to step by when the file does not say. */
 const FALLBACK_FRAME_RATE = 24
 
-const clamp = ({ value, min, max }: { value: number; min: number; max: number }): number =>
-  Math.min(max, Math.max(min, value))
+type ClampProps = { value: number; min: number; max: number }
+
+const clamp = ({ value, min, max }: ClampProps): number => Math.min(max, Math.max(min, value))
 
 export const OVERLAYS = { none: 'none', shortcuts: 'shortcuts' } as const
 
 /** What sits over the picture besides the controls: one pill's menu or the shortcuts, never both. */
 export type Overlay = (typeof OVERLAYS)[keyof typeof OVERLAYS] | MenuSection
+
+type UsePlayerActionsProps = {
+  engine: EngineHandle
+  selection: TrackSelection
+  flash: (next: Omit<BezelState, 'id'>) => void
+  toggleFullscreen: () => void
+  overlay: Overlay
+  setOverlay: (change: (current: Overlay) => Overlay) => void
+  closeMenu: () => void
+  /** Puts Playback info away; null while it is not open. */
+  closeInfo: (() => void) | null
+  /** Back to where the viewer came from. */
+  leave: () => void
+}
 
 /**
  * What the player does, for the keys and the buttons alike: `act` answers a
@@ -44,19 +59,7 @@ export const usePlayerActions = ({
   closeMenu,
   closeInfo,
   leave,
-}: {
-  engine: EngineHandle
-  selection: TrackSelection
-  flash: (next: Omit<BezelState, 'id'>) => void
-  toggleFullscreen: () => void
-  overlay: Overlay
-  setOverlay: (change: (current: Overlay) => Overlay) => void
-  closeMenu: () => void
-  /** Puts Playback info away; null while it is not open. */
-  closeInfo: (() => void) | null
-  /** Back to where the viewer came from. */
-  leave: () => void
-}) => {
+}: UsePlayerActionsProps) => {
   const captionScale = usePlayerPrefs((prefs) => prefs.captionScale)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)

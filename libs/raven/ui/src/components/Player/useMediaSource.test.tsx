@@ -70,17 +70,14 @@ describe('sourceFor', () => {
 const media = mediaItem()
 const ignore = () => {}
 
-const Harness = ({
-  mode,
-  mediaPlane,
-  onCommit = ignore,
-  onFailure = ignore,
-}: {
+type HarnessProps = {
   mode: PlaybackMode
   mediaPlane?: MediaPlane
   onCommit?: (video: HTMLVideoElement | null) => void
   onFailure?: (message: string) => void
-}) => {
+}
+
+const Harness = ({ mode, mediaPlane, onCommit = ignore, onFailure = ignore }: HarnessProps) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const position = useRef(0)
   const playing = useRef(false)

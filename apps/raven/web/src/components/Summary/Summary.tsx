@@ -5,20 +5,18 @@ import styles from '@/components/Summary/Summary.module.scss'
 /** A summary longer than this gets clamped to three lines with More. */
 const LONG_SUMMARY = 240
 
-/**
- * An item's tagline in the serif and its summary as a lead beneath, the
- * summary clamped to three lines behind More when it runs long.
- */
-export const Summary = ({
-  tagline,
-  summary,
-  className,
-}: {
+type SummaryProps = {
   tagline: string | null
   summary: string | null
   /** Where the page's layout places it. */
   className?: string
-}) => {
+}
+
+/**
+ * An item's tagline in the serif and its summary as a lead beneath, the
+ * summary clamped to three lines behind More when it runs long.
+ */
+export const Summary = ({ tagline, summary, className }: SummaryProps) => {
   const id = useId()
   const [expanded, setExpanded] = useState(false)
   const text = summary ?? ''

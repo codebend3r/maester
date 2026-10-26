@@ -33,7 +33,9 @@ const setup = async () => {
     new MembershipLookups(new AuthBackend(AUTH_TEST_CONFIG, fixture.fetcher), MEMBERSHIP_TTL_MS),
   )
   const rechecks = new AccessRechecks(sessions, RECHECK_MS)
-  const signIn = async ({ expiresIn = TOKEN_SECONDS }: { expiresIn?: number } = {}) =>
+  type SignInProps = { expiresIn?: number }
+
+  const signIn = async ({ expiresIn = TOKEN_SECONDS }: SignInProps = {}) =>
     sessions.authenticate({ token: await fixture.mint({ id: AUTH_TEST_IDS.friend, expiresIn }) })
   /** A request the account gate bound to the friend's session, and what its recheck saw. */
   const watch = async () => {
@@ -51,7 +53,9 @@ const setup = async () => {
     })
     return { seen, subscription, token: session.token }
   }
-  const setStatus = ({ status }: { status: Account['status'] }) => {
+  type SetStatusProps = { status: Account['status'] }
+
+  const setStatus = ({ status }: SetStatusProps) => {
     const friend = fixture.accounts[AUTH_TEST_IDS.friend]
     if (friend === undefined) throw new Error('Missing friend fixture')
     fixture.accounts[AUTH_TEST_IDS.friend] = { ...friend, status }

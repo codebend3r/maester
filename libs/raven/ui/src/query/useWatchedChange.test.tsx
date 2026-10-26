@@ -17,7 +17,9 @@ const setUp = () => {
   return { result, client }
 }
 
-const change = ({ id, watched }: { id: number; watched: boolean }) => ({
+type ChangeProps = { id: number; watched: boolean }
+
+const change = ({ id, watched }: ChangeProps) => ({
   watched,
   targets: [{ kind: WATCH_TARGET_KINDS.item, id, libraryId: null }],
 })

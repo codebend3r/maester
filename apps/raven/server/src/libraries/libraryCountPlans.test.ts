@@ -20,13 +20,12 @@ const PROBE = {
 
 const TRACKS = { audio: [], subtitles: [], defaultAudio: null, frameRate: 24 }
 
-type Read = ({
-  libraries,
-  libraryId,
-}: {
+type ReadProps = {
   libraries: LibrariesRepository
   libraryId: number
-}) => unknown
+}
+
+type Read = ({ libraries, libraryId }: ReadProps) => unknown
 
 /** The reads that count each library's files. */
 const READS = {

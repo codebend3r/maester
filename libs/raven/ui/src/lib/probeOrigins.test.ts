@@ -14,14 +14,13 @@ const clock = () => {
 
 type Chunk = { after: number; size: number }
 
-/** A body whose chunks arrive after the given delays on the test's clock. */
-const bodyOf = ({
-  chunks,
-  advance,
-}: {
+type BodyOfProps = {
   chunks: readonly Chunk[]
   advance: (ms: number) => void
-}): ReadableStream<Uint8Array> => {
+}
+
+/** A body whose chunks arrive after the given delays on the test's clock. */
+const bodyOf = ({ chunks, advance }: BodyOfProps): ReadableStream<Uint8Array> => {
   const queue = [...chunks]
   return new ReadableStream<Uint8Array>(
     {

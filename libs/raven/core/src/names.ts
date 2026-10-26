@@ -13,8 +13,10 @@ const WHITESPACE = /\s+/gu
 const tidy = (text: string): string =>
   text.replace(WHITESPACE, ' ').replace(HIDDEN_ALL, '').replace(WHITESPACE, ' ').trim()
 
+type TidyTextProps = { text: string; max: number }
+
 /** `text` tidied and cut to `max` code points, so a cut never splits a surrogate pair. */
-export const tidyText = ({ text, max }: { text: string; max: number }): string =>
+export const tidyText = ({ text, max }: TidyTextProps): string =>
   Array.from(tidy(text)).slice(0, max).join('').trim()
 
 /**

@@ -17,7 +17,9 @@ type UpdateResult = Awaited<ReturnType<AuthClient['updateUser']>>
 
 const updated = (): UpdateResult => ({ data: { user: fakeSession().user }, error: null })
 
-const refused = ({ code, message }: { code: string; message: string }): UpdateResult => ({
+type RefusedProps = { code: string; message: string }
+
+const refused = ({ code, message }: RefusedProps): UpdateResult => ({
   data: { user: null },
   error: new AuthApiError(message, 422, code),
 })
@@ -35,13 +37,12 @@ const password = () => screen.getByLabelText('New password')
 const confirmation = () => screen.getByLabelText('Confirm password')
 const submit = () => screen.getByRole('button', { name: /^(Update password|Updating password)/ })
 
-const fillIn = async ({
-  user,
-  confirm = 'correct-horse-battery',
-}: {
+type FillInProps = {
   user: ReturnType<typeof userEvent.setup>
   confirm?: string
-}) => {
+}
+
+const fillIn = async ({ user, confirm = 'correct-horse-battery' }: FillInProps) => {
   await user.type(password(), 'correct-horse-battery')
   await user.type(confirmation(), confirm)
 }

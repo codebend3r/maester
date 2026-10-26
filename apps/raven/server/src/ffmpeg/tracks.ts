@@ -45,10 +45,14 @@ const TEXT_SUBTITLES: ReadonlySet<string> = new Set([
 
 const isTextSubtitle = (codec: string | null): boolean => codec != null && TEXT_SUBTITLES.has(codec)
 
-const flag = ({ stream, name }: { stream: Stream; name: string }): boolean =>
+type FlagProps = { stream: Stream; name: string }
+
+const flag = ({ stream, name }: FlagProps): boolean =>
   isRecord(stream.disposition) && stream.disposition[name] === 1
 
-const tag = ({ stream, name }: { stream: Stream; name: string }): string | null => {
+type TagProps = { stream: Stream; name: string }
+
+const tag = ({ stream, name }: TagProps): string | null => {
   const value = isRecord(stream.tags) ? stream.tags[name] : null
   return isString(value) && value.trim() !== '' ? value.trim() : null
 }

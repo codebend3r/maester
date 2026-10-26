@@ -3,6 +3,11 @@ import { useEffect, useRef } from 'react'
 import type { DesktopClient } from '@/desktop/client'
 import { handled } from '@/desktop/handled'
 
+type UseLeaveSignalProps = {
+  client: DesktopClient
+  fileId: string | null
+}
+
 /**
  * Tells main the page left its file, so a deletion that waited for the player can run. React
  * runs this cleanup before the Player's, whose unmount saves where it was, so the leave waits
@@ -11,13 +16,7 @@ import { handled } from '@/desktop/handled'
  * this effect for another file in the same page would take back the old file's leave. A null
  * `fileId`, a title playing from its server, has nothing to leave.
  */
-export const useLeaveSignal = ({
-  client,
-  fileId,
-}: {
-  client: DesktopClient
-  fileId: string | null
-}): void => {
+export const useLeaveSignal = ({ client, fileId }: UseLeaveSignalProps): void => {
   const leaving = useRef<symbol | null>(null)
   useEffect(() => {
     leaving.current = null

@@ -40,15 +40,14 @@ const COOKIE_SENT = `${SERVER_COOKIES.admin}=anything`
 const REQUEST = { headers: { [AUTH_HEADERS.cookie]: COOKIE_SENT } }
 const REQUEST_WITHOUT_COOKIE = { headers: {} }
 
-const managementWith = ({
-  auth,
-  caller,
-  isAdminLocked = true,
-}: {
+type ManagementWithProps = {
   auth: AuthConfig
   caller: Caller
   isAdminLocked?: boolean
-}) => new Management(auth, { isLocked: () => isAdminLocked }, { callerOf: () => caller })
+}
+
+const managementWith = ({ auth, caller, isAdminLocked = true }: ManagementWithProps) =>
+  new Management(auth, { isLocked: () => isAdminLocked }, { callerOf: () => caller })
 
 describe('who can manage raven', () => {
   it('follows the admin lock when accounts are off', () => {

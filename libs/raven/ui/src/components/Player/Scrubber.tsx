@@ -2,16 +2,24 @@ import { formatDuration } from '@raven/core'
 import { type CSSProperties, type PointerEvent, useRef, useState } from 'react'
 import styles from '@/components/Player/Scrubber.module.scss'
 
-const share = ({ time, duration }: { time: number; duration: number }): number =>
+type ShareProps = { time: number; duration: number }
+
+const share = ({ time, duration }: ShareProps): number =>
   duration > 0 ? Math.min(100, Math.max(0, (time / duration) * 100)) : 0
 
-const percent = ({ time, duration }: { time: number; duration: number }): string =>
-  `${share({ time, duration })}%`
+type PercentProps = { time: number; duration: number }
+
+const percent = ({ time, duration }: PercentProps): string => `${share({ time, duration })}%`
 
 const NO_CHAPTERS: readonly number[] = []
 
 const gapStart = (at: number): string => `calc(${at}% - var(--chapter-gap) / 2)`
 const gapEnd = (at: number): string => `calc(${at}% + var(--chapter-gap) / 2)`
+
+type ChapterMaskProps = {
+  chapters: readonly number[]
+  duration: number
+}
 
 /**
  * A mask that cuts a gap into the track at each chapter's start, so the
@@ -19,13 +27,7 @@ const gapEnd = (at: number): string => `calc(${at}% + var(--chapter-gap) / 2)`
  * so any opaque colour does for the parts that show. Null without chapters
  * inside the video.
  */
-export const chapterMask = ({
-  chapters,
-  duration,
-}: {
-  chapters: readonly number[]
-  duration: number
-}): string | null => {
+export const chapterMask = ({ chapters, duration }: ChapterMaskProps): string | null => {
   const cuts = chapters
     .filter((start) => start > 0 && start < duration)
     .toSorted((a, b) => a - b)
@@ -46,6 +48,16 @@ export const chapterMask = ({
   return `linear-gradient(to right, ${[...stops.parts, `${solid} ${stops.from} 100%`].join(', ')})`
 }
 
+type ScrubberProps = {
+  time: number
+  duration: number | null
+  /** File-time ranges. */
+  buffered: ReadonlyArray<[number, number]>
+  /** Where each chapter starts, in seconds of the file. */
+  chapters?: readonly number[]
+  onSeek: (time: number) => void
+}
+
 /**
  * The timeline: what is buffered, what has played, and a round thumb for
  * the playhead, broken at each chapter when the video has them. Hovering
@@ -59,15 +71,7 @@ export const Scrubber = ({
   buffered,
   chapters = NO_CHAPTERS,
   onSeek,
-}: {
-  time: number
-  duration: number | null
-  /** File-time ranges. */
-  buffered: ReadonlyArray<[number, number]>
-  /** Where each chapter starts, in seconds of the file. */
-  chapters?: readonly number[]
-  onSeek: (time: number) => void
-}) => {
+}: ScrubberProps) => {
   const track = useRef<HTMLDivElement>(null)
   const tipRef = useRef<HTMLSpanElement>(null)
   const [dragging, setDragging] = useState<number | null>(null)

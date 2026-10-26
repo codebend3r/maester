@@ -4,8 +4,10 @@ import type { TitleCard } from '@/lib/events'
 
 const named = (card: TitleCard) => (card.year == null ? card.title : `${card.title} (${card.year})`)
 
+type CardProps = { card: TitleCard }
+
 /** One title: its logo, or its name when it has none, and a link to each copy. */
-const Card = ({ card }: { card: TitleCard }) => {
+const Card = ({ card }: CardProps) => {
   const [isLogoBroken, setLogoBroken] = useState(false)
   const showsLogo = card.logoUrl != null && !isLogoBroken
   return (
@@ -35,8 +37,10 @@ const Card = ({ card }: { card: TitleCard }) => {
   )
 }
 
+type TitleCardsProps = { cards: TitleCard[] }
+
 /** The titles a reply's tools found, each shown once. */
-export const TitleCards = ({ cards }: { cards: TitleCard[] }) => (
+export const TitleCards = ({ cards }: TitleCardsProps) => (
   <ul className={styles.cards} aria-label="Titles">
     {cards.map((card) => (
       <Card key={card.key} card={card} />

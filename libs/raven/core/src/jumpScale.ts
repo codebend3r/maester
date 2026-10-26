@@ -52,7 +52,9 @@ type Entry = {
   changed: string | null
 }
 
-const fromMedia = ({ media, source }: { media: MediaItem; source: RatingSource }): Entry => ({
+type FromMediaProps = { media: MediaItem; source: RatingSource }
+
+const fromMedia = ({ media, source }: FromMediaProps): Entry => ({
   key: mediaEntryKey(media),
   letter: mediaLetter(media),
   bitrate: media.bitrate,
@@ -64,7 +66,9 @@ const fromMedia = ({ media, source }: { media: MediaItem; source: RatingSource }
   changed: media.changedAt,
 })
 
-const fromShow = ({ entry, source }: { entry: ShowEntry; source: RatingSource }): Entry => ({
+type FromShowProps = { entry: ShowEntry; source: RatingSource }
+
+const fromShow = ({ entry, source }: FromShowProps): Entry => ({
   key: showEntryKey(entry.show),
   letter: showLetter(entry.show),
   bitrate: entry.bitrate,
@@ -100,11 +104,13 @@ type Ruler = {
   cut: (range: Range) => Cut
 }
 
+type NiceStepProps = { span: number; most: number }
+
 /**
  * The step a number scale climbs by: one, two or five times a power of
  * ten, the smallest that cuts `span` into at most `most` steps.
  */
-export const niceStep = ({ span, most }: { span: number; most: number }): number => {
+export const niceStep = ({ span, most }: NiceStepProps): number => {
   if (span <= 0) return 1
   const power = 10 ** Math.floor(Math.log10(span / most))
   return [1, 2, 5, 10].map((n) => n * power).find((step) => span / step <= most) ?? 10 * power
@@ -113,16 +119,14 @@ export const niceStep = ({ span, most }: { span: number; most: number }): number
 /** How many marks a number scale reaches for at most, so the strip fits any screen. */
 const MOST_STEPS = 16
 
-/** Round steps of `unit`, by `step` or else by what fits the strip. */
-const steps = ({
-  unit,
-  value,
-  step: fixed,
-}: {
+type StepsProps = {
   unit: string
   value: (entry: Entry) => number | null
   step: number | null
-}): Ruler => ({
+}
+
+/** Round steps of `unit`, by `step` or else by what fits the strip. */
+const steps = ({ unit, value, step: fixed }: StepsProps): Ruler => ({
   unit,
   value,
   cut: ({ low, high }) => {
@@ -140,16 +144,14 @@ const steps = ({
   },
 })
 
-/** Every one of `list` in its order, whatever the entries hold; an entry's value is its place in it. */
-const listed = <T extends string>({
-  list,
-  item,
-  face,
-}: {
+type ListedProps<T extends string> = {
   list: readonly T[]
   item: (entry: Entry) => T | null
   face: (each: T) => Omit<JumpMark, 'key'>
-}): Ruler => ({
+}
+
+/** Every one of `list` in its order, whatever the entries hold; an entry's value is its place in it. */
+const listed = <T extends string>({ list, item, face }: ListedProps<T>): Ruler => ({
   unit: null,
   value: (entry) => {
     const each = item(entry)
@@ -232,14 +234,13 @@ const RELEASE: Ruler = {
 /** A TV library's bitrate step, the same whatever its shows run to. */
 const SHOW_BITRATE_STEP = 5
 
-/** Each field's ruler, for a library whose scores come from `source` and which may list shows. */
-const rulers = ({
-  source,
-  hasShows,
-}: {
+type RulersProps = {
   source: RatingSource
   hasShows: boolean
-}): Record<JumpField, Ruler> => ({
+}
+
+/** Each field's ruler, for a library whose scores come from `source` and which may list shows. */
+const rulers = ({ source, hasShows }: RulersProps): Record<JumpField, Ruler> => ({
   title: listed({
     list: LETTERS,
     item: (entry) => entry.letter,
@@ -269,6 +270,13 @@ const rulers = ({
   rating: scores(source),
 })
 
+type JumpScaleProps = {
+  sort: MediaSort
+  files: readonly MediaItem[]
+  shows?: readonly ShowEntry[]
+  source: RatingSource
+}
+
 /**
  * The jump strip for a listing in `sort` order: letters for titles, round
  * steps of bitrate or size, resolutions, years or decades, whole scores,
@@ -281,12 +289,7 @@ export const jumpScale = ({
   files,
   shows = [],
   source,
-}: {
-  sort: MediaSort
-  files: readonly MediaItem[]
-  shows?: readonly ShowEntry[]
-  source: RatingSource
-}): JumpScale | null => {
+}: JumpScaleProps): JumpScale | null => {
   const { field, direction } = sortParts(sort)
   const hasShows = shows.length > 0
   if (field === SORT_FIELD_NAMES.random || (hasShows && field === SORT_FIELD_NAMES.changed))

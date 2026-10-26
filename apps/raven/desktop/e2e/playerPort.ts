@@ -64,11 +64,13 @@ const NO_TRAFFIC: PlayerTraffic = { ports: 0, requests: [], replies: [], events:
 
 const listed = (value: unknown): unknown[] => (Array.isArray(value) ? [...value] : [])
 
+type TapPlayerPortProps = { page: Page }
+
 /**
  * Taps the player port: installs the tap for every page load from now on, then reloads,
  * which hands the new page a fresh port (Ruling 12), and waits for the tap to hold it.
  */
-export const tapPlayerPort = async ({ page }: { page: Page }): Promise<void> => {
+export const tapPlayerPort = async ({ page }: TapPlayerPortProps): Promise<void> => {
   await page.context().addInitScript(installTap, {
     tapKey: TAP_KEY,
     portKey: PORT_KEY,
@@ -78,7 +80,9 @@ export const tapPlayerPort = async ({ page }: { page: Page }): Promise<void> => 
   await expect.poll(async () => (await trafficOf({ page })).ports).toBe(1)
 }
 
-export const trafficOf = async ({ page }: { page: Page }): Promise<PlayerTraffic> => {
+type TrafficOfProps = { page: Page }
+
+export const trafficOf = async ({ page }: TrafficOfProps): Promise<PlayerTraffic> => {
   const record = await page.evaluate((key) => {
     const found: unknown = Reflect.get(window, key)
     return found ?? null
@@ -94,8 +98,10 @@ export const trafficOf = async ({ page }: { page: Page }): Promise<PlayerTraffic
   }
 }
 
+type PostOnPortProps = { page: Page; messages: unknown[] }
+
 /** Posts `messages` on the page's player port as they are, in order, the way a page could. */
-export const postOnPort = async ({ page, messages }: { page: Page; messages: unknown[] }) => {
+export const postOnPort = async ({ page, messages }: PostOnPortProps) => {
   await page.evaluate(
     ({ key, sent }) => {
       const port: unknown = Reflect.get(window, key)

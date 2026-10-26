@@ -38,6 +38,21 @@ const toReport = (row: Row): BugReport => ({
   diagnostics: parseJsonAs({ json: row.diagnostics, guard: isRecord }) ?? {},
 })
 
+type BugReportsRepositoryAddProps = {
+  account: AccountKey
+  email: string | null
+  diagnostics: PlaybackDiagnostics
+  at: Date
+}
+
+type BugReportsRepositoryCountSinceProps = { account: AccountKey; since: Date }
+
+type BugReportsRepositorySetStatusProps = {
+  id: number
+  status: BugReportStatus
+  at: Date
+}
+
 /** What the player sent when a video would not play, and where the admin has got to with each. */
 @Injectable()
 export class BugReportsRepository {
@@ -48,17 +63,7 @@ export class BugReportsRepository {
   }
 
   /** Keeps a new report, under the account that sent it. */
-  add({
-    account,
-    email,
-    diagnostics,
-    at,
-  }: {
-    account: AccountKey
-    email: string | null
-    diagnostics: PlaybackDiagnostics
-    at: Date
-  }): BugReport {
+  add({ account, email, diagnostics, at }: BugReportsRepositoryAddProps): BugReport {
     const now = at.toISOString()
     const row = this.db
       .prepare<[Omit<Row, 'id'> & { updated_at: string }], Row>(
@@ -92,7 +97,7 @@ export class BugReportsRepository {
   }
 
   /** How many reports `account` has sent since `since`. */
-  countSince({ account, since }: { account: AccountKey; since: Date }): number {
+  countSince({ account, since }: BugReportsRepositoryCountSinceProps): number {
     const row = this.db
       .prepare<[string, string], { sent: number }>(
         'SELECT COUNT(*) AS sent FROM bug_reports WHERE account_id = ? AND created_at >= ?',
@@ -102,15 +107,7 @@ export class BugReportsRepository {
   }
 
   /** The report with its new status, or null when no report has that id. */
-  setStatus({
-    id,
-    status,
-    at,
-  }: {
-    id: number
-    status: BugReportStatus
-    at: Date
-  }): BugReport | null {
+  setStatus({ id, status, at }: BugReportsRepositorySetStatusProps): BugReport | null {
     const row = this.db
       .prepare<[string, string, number], Row>(
         `UPDATE bug_reports SET status = ?, updated_at = ? WHERE id = ? RETURNING ${COLUMNS}`,

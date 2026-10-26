@@ -23,6 +23,23 @@ type CardRow = {
   duration: number | null
 }
 
+type WatchedCardsResolveProps = { targets: readonly WatchTarget[]; viewer: Viewer }
+
+type WatchedCardsOfFileProps = { id: number; viewer: Viewer }
+
+type WatchedCardsOfItemProps = {
+  itemId: number
+  libraryId: number | null
+  viewer: Viewer
+}
+
+type WatchedCardsCardsOfProps = {
+  itemIds: readonly number[]
+  libraryId: number | null
+  split: { only: string | null } | null
+  viewer: Viewer
+}
+
 /**
  * Turns what a viewer picked into the cards to mark. A card is what the
  * listings count as one entry, so the rule is written once over cards and a
@@ -44,7 +61,7 @@ export class WatchedCards {
    * nothing, or only what the viewer may not see, resolves to none, so the
    * answer never tells a hidden library is there.
    */
-  resolve({ targets, viewer }: { targets: readonly WatchTarget[]; viewer: Viewer }): WatchCard[] {
+  resolve({ targets, viewer }: WatchedCardsResolveProps): WatchCard[] {
     return targets.flatMap((target): WatchCard[] => {
       switch (target.kind) {
         case WATCH_TARGET_KINDS.media:
@@ -60,7 +77,7 @@ export class WatchedCards {
   }
 
   /** The card a file is on: its first item's files in its library with its `split`, or the file alone. */
-  private ofFile({ id, viewer }: { id: number; viewer: Viewer }): WatchCard[] {
+  private ofFile({ id, viewer }: WatchedCardsOfFileProps): WatchCard[] {
     const file = this.db
       .prepare<
         [number],
@@ -87,15 +104,7 @@ export class WatchedCards {
   }
 
   /** A card for each movie and episode under the item, in `libraryId` or in every library the viewer sees. */
-  private ofItem({
-    itemId,
-    libraryId,
-    viewer,
-  }: {
-    itemId: number
-    libraryId: number | null
-    viewer: Viewer
-  }): WatchCard[] {
+  private ofItem({ itemId, libraryId, viewer }: WatchedCardsOfItemProps): WatchCard[] {
     return this.cardsOf({
       itemIds: this.metadata.itemsUnder(itemId),
       libraryId,
@@ -110,17 +119,7 @@ export class WatchedCards {
    * a movie to one of its cards. Reading by item, not by file, keeps a file
    * holding two episodes on both their cards.
    */
-  private cardsOf({
-    itemIds,
-    libraryId,
-    split,
-    viewer,
-  }: {
-    itemIds: readonly number[]
-    libraryId: number | null
-    split: { only: string | null } | null
-    viewer: Viewer
-  }): WatchCard[] {
+  private cardsOf({ itemIds, libraryId, split, viewer }: WatchedCardsCardsOfProps): WatchCard[] {
     if (libraryId != null && !viewer.seesLibrary(libraryId)) return []
     const rows = this.db
       .prepare<

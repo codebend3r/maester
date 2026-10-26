@@ -5,21 +5,18 @@ import { isPlaying, playPathOf } from '@/desktop/paths'
 import { useDownloadAsk } from '@/stores/downloadAsk'
 import { handled } from '@/desktop/handled'
 
-/**
- * What to do with main's answer to opening something: play a file (replacing a video already
- * on screen, so Back leaves the player), show a page, ask about a download, or say why not.
- */
-const applyReply = ({
-  reply,
-  navigate,
-  pathname,
-  showNotice,
-}: {
+type ApplyReplyProps = {
   reply: DesktopReply
   navigate: NavigateFunction
   pathname: string
   showNotice: (message: string) => void
-}): void => {
+}
+
+/**
+ * What to do with main's answer to opening something: play a file (replacing a video already
+ * on screen, so Back leaves the player), show a page, ask about a download, or say why not.
+ */
+const applyReply = ({ reply, navigate, pathname, showNotice }: ApplyReplyProps): void => {
   switch (reply.type) {
     case DESKTOP_REPLIES.play:
       return handled(

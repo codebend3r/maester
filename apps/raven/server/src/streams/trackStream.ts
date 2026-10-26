@@ -11,19 +11,18 @@ export const RESPONSE_EVENTS = { close: 'close' } as const
 const headerOf = (value: string | string[] | undefined): string =>
   (Array.isArray(value) ? value[0] : value) ?? ''
 
+type ClientOfProps = {
+  request: FastifyRequest
+  auth: Pick<AuthSessions, 'callerOf'>
+}
+
 /**
  * Who sent a request. Behind a proxy the socket is the proxy's, so the first
  * address it forwards wins; the header is the client's to set, which is
  * fine for a label on the admin's Streams page and for nothing else. The
  * viewer is the account the gate bound to the request, never a header's.
  */
-export const clientOf = ({
-  request,
-  auth,
-}: {
-  request: FastifyRequest
-  auth: Pick<AuthSessions, 'callerOf'>
-}): StreamClient => {
+export const clientOf = ({ request, auth }: ClientOfProps): StreamClient => {
   const account = accountOf(auth.callerOf({ request }))
   return {
     address:
@@ -31,6 +30,18 @@ export const clientOf = ({
     userAgent: headerOf(request.headers[RAVEN_HEADERS.userAgent]),
     viewer: account == null ? null : { id: account.id, email: account.email },
   }
+}
+
+type TrackStreamProps = {
+  sessions: StreamSessions
+  rechecks: Pick<AccessRechecks, 'ended'>
+  auth: Pick<AuthSessions, 'callerOf'>
+  mediaId: number
+  mode: PlaybackMode
+  quality: StreamQuality | null
+  audio: number | null
+  request: FastifyRequest
+  reply: FastifyReply
 }
 
 /**
@@ -49,17 +60,7 @@ export const trackStream = ({
   audio,
   request,
   reply,
-}: {
-  sessions: StreamSessions
-  rechecks: Pick<AccessRechecks, 'ended'>
-  auth: Pick<AuthSessions, 'callerOf'>
-  mediaId: number
-  mode: PlaybackMode
-  quality: StreamQuality | null
-  audio: number | null
-  request: FastifyRequest
-  reply: FastifyReply
-}): void => {
+}: TrackStreamProps): void => {
   // A finished response lets go of its socket before it says it closed, so
   // the count is read off the socket held from the start.
   const socket = reply.raw.socket

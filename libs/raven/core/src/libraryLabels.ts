@@ -56,6 +56,12 @@ export const JUMP_SCALE_LABELS: Record<JumpScale['field'], string> = {
   rating: 'Jump to a score',
 }
 
+type EmptyListingMessageProps = {
+  isEmpty: boolean
+  query: string
+  isScanning: boolean
+}
+
 /**
  * What a library's page says in place of a listing with nothing in it, or null while there is
  * something.
@@ -64,11 +70,7 @@ export const emptyListingMessage = ({
   isEmpty,
   query,
   isScanning,
-}: {
-  isEmpty: boolean
-  query: string
-  isScanning: boolean
-}): string | null => {
+}: EmptyListingMessageProps): string | null => {
   if (!isEmpty) return null
   if (query !== '') return `Nothing here matches "${query}".`
   if (isScanning) return 'Looking through the folders. Videos appear here as they are found.'

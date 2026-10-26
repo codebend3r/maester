@@ -63,14 +63,13 @@ type Failure = { reason: PlayerErrorReason; message: string }
 
 type ServerSource = Extract<PlayerSource, { kind: typeof PLAYER_SOURCE_KINDS.server }>
 
-/** What the player says when the server refused the account mid-play; null when it is no account matter. */
-const accountFailureOf = ({
-  reason,
-  name,
-}: {
+type AccountFailureOfProps = {
   reason: AuthRefusal['reason']
   name: string
-}): Failure | null => {
+}
+
+/** What the player says when the server refused the account mid-play; null when it is no account matter. */
+const accountFailureOf = ({ reason, name }: AccountFailureOfProps): Failure | null => {
   switch (reason) {
     case AUTH_REFUSALS.signedOut:
       return { reason: PLAYER_ERROR_REASONS.account, message: SOURCE_MESSAGES.signInAgain(name) }
@@ -88,6 +87,11 @@ const accountFailureOf = ({
   }
 }
 
+type StartRefusalOfProps = {
+  outcome: Exclude<TicketOutcome, { kind: typeof TICKET_OUTCOMES.ticket }>
+  name: string
+}
+
 /**
  * Why a title cannot start, when its first ticket could not be minted: the reason the page acts on
  * (sign in, the PIN, or only the words) and the words.
@@ -95,10 +99,7 @@ const accountFailureOf = ({
 export const startRefusalOf = ({
   outcome,
   name,
-}: {
-  outcome: Exclude<TicketOutcome, { kind: typeof TICKET_OUTCOMES.ticket }>
-  name: string
-}): { reason: TitleRefusal; message: string } => {
+}: StartRefusalOfProps): { reason: TitleRefusal; message: string } => {
   switch (outcome.kind) {
     case TICKET_OUTCOMES.refused:
       switch (outcome.reason) {
@@ -133,6 +134,14 @@ export const startRefusalOf = ({
 const accountRefusalIn = (result: ServerCallResult): AuthRefusal['reason'] | null =>
   result.ok ? refusalAt({ ...result, statuses: ACCOUNT_REFUSAL_STATUSES }) : null
 
+type CreateServerSourcesProps = {
+  serverOf: (serverId: string) => ServerEntry | null
+  calls: Pick<ServerCalls, 'call'>
+  tickets: Pick<AccountTickets, 'ticketFor'>
+  relay: Pick<MediaRelay, 'open' | 'refusalOf' | 'close'>
+  warn: (message: string) => void
+}
+
 /**
  * Server titles for the player, which mpv plays through the loopback relay: main builds every
  * URL from the stored origin and the sidecars from the server's own track list, and no cookie,
@@ -145,24 +154,20 @@ export const createServerSources = ({
   tickets,
   relay,
   warn,
-}: {
-  serverOf: (serverId: string) => ServerEntry | null
-  calls: Pick<ServerCalls, 'call'>
-  tickets: Pick<AccountTickets, 'ticketFor'>
-  relay: Pick<MediaRelay, 'open' | 'refusalOf' | 'close'>
-  warn: (message: string) => void
-}): {
+}: CreateServerSourcesProps): {
   resolve: (source: ServerSource) => Promise<ResolvedSource>
   explain: FailureExplainer
   refusedAccount: AccountRefusalReader
 } => {
+  type TrackListOfProps = {
+    server: ServerEntry
+    mediaId: number
+  }
+
   const trackListOf = async ({
     server,
     mediaId,
-  }: {
-    server: ServerEntry
-    mediaId: number
-  }): Promise<readonly SubtitleTrack[]> => {
+  }: TrackListOfProps): Promise<readonly SubtitleTrack[]> => {
     const name = loggable(server.name)
     try {
       const bounded = await within({
@@ -198,15 +203,17 @@ export const createServerSources = ({
     }
   }
 
+  type ResolveRelayedProps = {
+    server: ServerEntry
+    mediaId: number
+    trackList: Promise<readonly SubtitleTrack[]>
+  }
+
   const resolveRelayed = async ({
     server,
     mediaId,
     trackList,
-  }: {
-    server: ServerEntry
-    mediaId: number
-    trackList: Promise<readonly SubtitleTrack[]>
-  }): Promise<ResolvedSource> => {
+  }: ResolveRelayedProps): Promise<ResolvedSource> => {
     // The first ticket before anything opens: a title the account may not play is refused here.
     const [tracks, first] = await Promise.all([
       trackList,

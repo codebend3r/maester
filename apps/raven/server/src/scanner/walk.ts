@@ -54,8 +54,10 @@ export type FoundFile = {
   mtimeMs: number
 }
 
+type IsUnderProps = { path: string; root: string }
+
 /** Whether `path` is `root` or lies under it. */
-export const isUnder = ({ path, root }: { path: string; root: string }): boolean =>
+export const isUnder = ({ path, root }: IsUnderProps): boolean =>
   path === root || path.startsWith(root.endsWith('/') ? root : `${root}/`)
 
 /** The places not already under another: a folder copied in arrives with each of its files. */
@@ -66,8 +68,10 @@ export const outermost = (places: readonly string[]): string[] => {
   )
 }
 
+type IsSkippedPlaceProps = { root: string; path: string }
+
 /** Whether a walk from `root` would skip `path`: it sits in, or is, a hidden or NAS folder. */
-export const isSkippedPlace = ({ root, path }: { root: string; path: string }): boolean =>
+export const isSkippedPlace = ({ root, path }: IsSkippedPlaceProps): boolean =>
   relative(root, path).split(sep).some(isSkippedName)
 
 export type WalkResult = {
@@ -91,16 +95,14 @@ const reason = (error: unknown): string =>
       ? error.message
       : String(error)
 
-/** A symlink is followed to a file, never to a folder, so a loop cannot trap the walk. */
-const classify = async ({
-  dir,
-  entry,
-  gate,
-}: {
+type ClassifyProps = {
   dir: string
   entry: Dirent
   gate: Gate
-}): Promise<EntryKind | null> => {
+}
+
+/** A symlink is followed to a file, never to a folder, so a loop cannot trap the walk. */
+const classify = async ({ dir, entry, gate }: ClassifyProps): Promise<EntryKind | null> => {
   if (entry.isDirectory()) return ENTRY_KINDS.dir
   if (entry.isFile()) return ENTRY_KINDS.file
   if (!entry.isSymbolicLink()) return null
@@ -108,7 +110,9 @@ const classify = async ({
   return target?.isFile() ? ENTRY_KINDS.file : null
 }
 
-const list = async ({ dir, gate }: { dir: string; gate: Gate }): Promise<Listing> => {
+type ListProps = { dir: string; gate: Gate }
+
+const list = async ({ dir, gate }: ListProps): Promise<Listing> => {
   try {
     const entries = await gate.run(() => readdir(dir, { withFileTypes: true }))
     const kinds = await Promise.all(
@@ -132,19 +136,16 @@ const list = async ({ dir, gate }: { dir: string; gate: Gate }): Promise<Listing
 
 type Tree = { files: string[]; folders: string[]; errors: string[]; readable: boolean }
 
-/** Breadth-first, one level at a time, so no more than `limit` folders are open at once. */
-const walkTree = async ({
-  root,
-  limit,
-  gate,
-  onFound,
-}: {
+type WalkTreeProps = {
   root: string
   limit: number
   gate: Gate
   /** Told how many videos each folder held, as each is read. */
   onFound?: (count: number) => void
-}): Promise<Tree> => {
+}
+
+/** Breadth-first, one level at a time, so no more than `limit` folders are open at once. */
+const walkTree = async ({ root, limit, gate, onFound }: WalkTreeProps): Promise<Tree> => {
   const level = async ({
     dirs,
     files,
@@ -176,31 +177,31 @@ const walkTree = async ({
   return { ...rest, readable: true }
 }
 
+type FoldersUnderProps = {
+  root: string
+  limit?: number
+  gate?: Gate
+}
+
 /** Every folder at and under `root` that a walk enters, for watching them one by one. */
 export const foldersUnder = async ({
   root,
   limit = 16,
   gate = SCAN_FILESYSTEM,
-}: {
+}: FoldersUnderProps): Promise<string[]> => (await walkTree({ root, limit, gate })).folders
+
+type KindOfProps = {
+  place: string
   root: string
-  limit?: number
-  gate?: Gate
-}): Promise<string[]> => (await walkTree({ root, limit, gate })).folders
+  gate: Gate
+}
 
 /**
  * What is at a place: a folder, a file, or nothing. A library path is
  * followed wherever it leads; below one, a symlink counts only when it leads
  * to a file, as in the walk.
  */
-const kindOf = async ({
-  place,
-  root,
-  gate,
-}: {
-  place: string
-  root: string
-  gate: Gate
-}): Promise<EntryKind | null> => {
+const kindOf = async ({ place, root, gate }: KindOfProps): Promise<EntryKind | null> => {
   const info = await gate.run(() => (place === root ? stat(place) : lstat(place))).catch(() => null)
   if (info?.isDirectory()) return ENTRY_KINDS.dir
   if (info?.isFile()) return ENTRY_KINDS.file
@@ -211,25 +212,21 @@ const kindOf = async ({
 
 type Look = { files: string[]; errors: string[]; unreadable: string | null }
 
+type LookAtProps = {
+  place: string
+  root: string
+  limit: number
+  gate: Gate
+  onFound?: (count: number) => void
+}
+
 /**
  * The videos at one place under a library path. A folder is walked and a
  * file taken as it is. A place that is not there holds nothing, so what the
  * index had there has gone, unless its library path is missing too, which
  * says the share is down rather than the files deleted.
  */
-const lookAt = async ({
-  place,
-  root,
-  limit,
-  gate,
-  onFound,
-}: {
-  place: string
-  root: string
-  limit: number
-  gate: Gate
-  onFound?: (count: number) => void
-}): Promise<Look> => {
+const lookAt = async ({ place, root, limit, gate, onFound }: LookAtProps): Promise<Look> => {
   const kind = await kindOf({ place, root, gate })
   if (kind === ENTRY_KINDS.dir) {
     const tree = await walkTree({ root: place, limit, gate, onFound })
@@ -245,6 +242,19 @@ const lookAt = async ({
 
 /** The size and modification time a walk may take for a file instead of reading them. */
 export type KnownStats = Pick<FoundFile, 'size' | 'mtimeMs'>
+
+type WalkVideosProps = {
+  roots: readonly string[]
+  places?: readonly string[]
+  limit?: number
+  gate?: Gate
+  /** Once aborted, every filesystem call the walk has left fails at once, so it ends quickly. */
+  signal?: AbortSignal
+  /** Told how many videos each folder held as the walk reads it, for a count that climbs. */
+  onFound?: (count: number) => void
+  /** What is already known of a file at this path, or null to read it from disk. */
+  known?: (path: string) => KnownStats | null
+}
 
 /**
  * Every video file at the given places under a library's paths, with the
@@ -264,18 +274,7 @@ export const walkVideos = async ({
   signal,
   onFound,
   known = () => null,
-}: {
-  roots: readonly string[]
-  places?: readonly string[]
-  limit?: number
-  gate?: Gate
-  /** Once aborted, every filesystem call the walk has left fails at once, so it ends quickly. */
-  signal?: AbortSignal
-  /** Told how many videos each folder held as the walk reads it, for a count that climbs. */
-  onFound?: (count: number) => void
-  /** What is already known of a file at this path, or null to read it from disk. */
-  known?: (path: string) => KnownStats | null
-}): Promise<WalkResult> => {
+}: WalkVideosProps): Promise<WalkResult> => {
   const gate: Gate = signal
     ? {
         run: (task) =>

@@ -41,6 +41,14 @@ export const stateOf = (activity: PlayerActivity): BudgetState => {
   return activity.isPlaying ? BUDGET_STATES.playing : BUDGET_STATES.paused
 }
 
+type CreateBudgetsProps = {
+  metrics: () => readonly MetricLike[]
+  timers: Timers
+  mark: (line: string) => void
+  windowMs: number
+  sampleMs: number
+}
+
 /**
  * Marks memory on a page with no video and while playing, and CPU while paused, restarting its
  * timer only when the state changes. Reports after `dispose` are ignored: the player can still
@@ -52,13 +60,7 @@ export const createBudgets = ({
   mark,
   windowMs,
   sampleMs,
-}: {
-  metrics: () => readonly MetricLike[]
-  timers: Timers
-  mark: (line: string) => void
-  windowMs: number
-  sampleMs: number
-}): { report: (activity: PlayerActivity) => void; dispose: () => void } => {
+}: CreateBudgetsProps): { report: (activity: PlayerActivity) => void; dispose: () => void } => {
   let state: BudgetState = BUDGET_STATES.home
   let timer: unknown = null
   let isDisposed = false
@@ -129,19 +131,23 @@ export const createBudgets = ({
   }
 }
 
-/** The test hook's window, read only unpackaged; null leaves the spec's 60 s and 10 s. */
-export const budgetWindowFrom = ({
-  isPackaged,
-  env,
-}: {
+type BudgetWindowFromProps = {
   isPackaged: boolean
   env: Readonly<Record<string, string | undefined>>
-}): number | null => {
+}
+
+/** The test hook's window, read only unpackaged; null leaves the spec's 60 s and 10 s. */
+export const budgetWindowFrom = ({ isPackaged, env }: BudgetWindowFromProps): number | null => {
   if (isPackaged) return null
   const value = env[BUDGET_HOOK] ?? ''
   if (!WHOLE_NUMBER.test(value)) return null
   const ms = Number(value)
   return ms >= HOOK_MIN_MS && ms <= HOOK_MAX_MS ? ms : null
+}
+
+type SyncRetryFromProps = {
+  isPackaged: boolean
+  env: Readonly<Record<string, string | undefined>>
 }
 
 /**
@@ -150,13 +156,7 @@ export const budgetWindowFrom = ({
  * so is one under the budget hook's floor: a retry that fast against a server that cannot be
  * reached would spin, writing a warning each try.
  */
-export const syncRetryFrom = ({
-  isPackaged,
-  env,
-}: {
-  isPackaged: boolean
-  env: Readonly<Record<string, string | undefined>>
-}): number | null => {
+export const syncRetryFrom = ({ isPackaged, env }: SyncRetryFromProps): number | null => {
   if (isPackaged) return null
   const value = env[SYNC_RETRY_HOOK] ?? ''
   if (!WHOLE_NUMBER.test(value)) return null

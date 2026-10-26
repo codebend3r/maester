@@ -42,7 +42,9 @@ export const useMediaOriginProbe = ({
   const hiddenAt = useRef<number | null>(null)
   const isForcedPending = useRef(false)
 
-  const run = useCallback(async function runProbe({ isForced }: { isForced: boolean }) {
+  type RunProbeProps = { isForced: boolean }
+
+  const run = useCallback(async function runProbe({ isForced }: RunProbeProps) {
     if (!setup.current.isEnabled) return
     const { isProbing, setPick, setProbing } = useMediaOrigin.getState()
     if (isProbing) {

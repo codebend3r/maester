@@ -11,6 +11,17 @@ const unlessTmdbFailed = (error: unknown): null => {
   throw error
 }
 
+type MatchFactsCacheReadProps = {
+  type: MatchItemType
+  tmdbIds: readonly string[]
+  deadlineMs: number
+}
+
+type MatchFactsCacheOneProps = {
+  type: MatchItemType
+  tmdbId: string
+}
+
 /**
  * The details Fix match's confidence reads, kept in memory a day so a
  * search asked again costs TMDB nothing. The oldest goes past 500.
@@ -30,11 +41,7 @@ export class MatchFactsCache {
     type,
     tmdbIds,
     deadlineMs,
-  }: {
-    type: MatchItemType
-    tmdbIds: readonly string[]
-    deadlineMs: number
-  }): Promise<Map<string, MatchFacts>> {
+  }: MatchFactsCacheReadProps): Promise<Map<string, MatchFacts>> {
     const deadline = { stop: () => {} }
     const timeUp = new Promise<null>((resolve) => {
       const timer = setTimeout(() => resolve(null), deadlineMs)
@@ -57,13 +64,7 @@ export class MatchFactsCache {
     }
   }
 
-  private async one({
-    type,
-    tmdbId,
-  }: {
-    type: MatchItemType
-    tmdbId: string
-  }): Promise<MatchFacts> {
+  private async one({ type, tmdbId }: MatchFactsCacheOneProps): Promise<MatchFacts> {
     const key = `${type}:${tmdbId}`
     const kept = this.kept.get(key)
     if (kept != null && Date.now() - kept.at < DAY_MS) return kept.facts

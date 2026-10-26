@@ -35,6 +35,34 @@ export const createQueryClient = (): QueryClient =>
     },
   })
 
+type QueryKeysMediaProps = {
+  libraryId: number
+  search: string
+  sort: MediaSort
+  seed: number
+}
+
+type QueryKeysShowsProps = {
+  libraryId: number
+  search: string
+  sort: MediaSort
+  seed: number
+}
+
+type QueryKeysHistoryProps = {
+  libraryId: number | null
+  show: string
+  limit: number
+}
+
+type QueryKeysMatchSearchProps = {
+  type: MatchItemType
+  query: string
+  year: number | null
+  libraryId: number | null
+  subject: MatchSubject | null
+}
+
 /**
  * Every cache key, in one place. An id may be null for a query that waits on
  * it (`skipToken`); the key still names what it would hold.
@@ -49,30 +77,20 @@ export const queryKeys = {
   members: (userId: string) => ['auth', 'members', userId],
   libraries: ['libraries'],
   library: (id: number | null) => ['libraries', id],
-  media: ({
+  media: ({ libraryId, search, sort, seed }: QueryKeysMediaProps) => [
+    'libraries',
     libraryId,
-    search,
-    sort,
-    seed,
-  }: {
-    libraryId: number
-    search: string
-    sort: MediaSort
-    seed: number
-  }) => ['libraries', libraryId, 'media', { search, sort, seed }],
+    'media',
+    { search, sort, seed },
+  ],
   /** The prefix every media list of a library shares, whatever its search and sort. */
   mediaLists: (libraryId: number) => ['libraries', libraryId, 'media'],
-  shows: ({
+  shows: ({ libraryId, search, sort, seed }: QueryKeysShowsProps) => [
+    'libraries',
     libraryId,
-    search,
-    sort,
-    seed,
-  }: {
-    libraryId: number
-    search: string
-    sort: MediaSort
-    seed: number
-  }) => ['libraries', libraryId, 'shows', { search, sort, seed }],
+    'shows',
+    { search, sort, seed },
+  ],
   /** The prefix a library's show listings share. */
   showLists: (libraryId: number) => ['libraries', libraryId, 'shows'],
   /** Every video's own queries: the item, its tracks, subtitles and location. */
@@ -91,15 +109,12 @@ export const queryKeys = {
   hero: ['home', 'hero'],
   /** The movies and shows the admin picked for the hero. */
   heroPicks: ['hero', 'picks'],
-  history: ({
+  history: ({ libraryId, show, limit }: QueryKeysHistoryProps) => [
+    'libraries',
     libraryId,
-    show,
-    limit,
-  }: {
-    libraryId: number | null
-    show: string
-    limit: number
-  }) => ['libraries', libraryId, 'history', { show, limit }],
+    'history',
+    { show, limit },
+  ],
   /** The prefix every history of a library, or of all of them, shares. */
   historyLists: (libraryId: number | null) => ['libraries', libraryId, 'history'],
   /** A library's tabs beside its listing: in progress, favourites, sagas, files not matched. */
@@ -127,19 +142,15 @@ export const queryKeys = {
   displaySettings: ['settings', 'display'],
   nextEpisode: (showId: number) => ['items', showId, 'next'],
   person: (id: number | null) => ['people', id],
-  matchSearch: ({
+  matchSearch: ({ type, query, year, libraryId, subject }: QueryKeysMatchSearchProps) => [
+    'match',
     type,
     query,
     year,
     libraryId,
-    subject,
-  }: {
-    type: MatchItemType
-    query: string
-    year: number | null
-    libraryId: number | null
-    subject: MatchSubject | null
-  }) => ['match', type, query, year, libraryId, subject?.kind ?? null, subject?.id ?? null],
+    subject?.kind ?? null,
+    subject?.id ?? null,
+  ],
   metadataHealth: ['health', 'metadata'],
 }
 

@@ -7,7 +7,7 @@ import { PictureVersions } from '@/metadata/pictureVersions'
 /** `chosen` is what Edit images picked, a TMDB path; it beats a local picture, which beats TMDB's own. */
 export const STORED_IMAGE_SOURCES = { ...IMAGE_SOURCES, chosen: 'chosen' } as const
 
-export type StoredImageSource = (typeof STORED_IMAGE_SOURCES)[keyof typeof STORED_IMAGE_SOURCES]
+type StoredImageSource = (typeof STORED_IMAGE_SOURCES)[keyof typeof STORED_IMAGE_SOURCES]
 
 /** Where an item's picture comes from: a file beside the media wins over TMDB's. */
 export type ImageRef = { source: StoredImageSource; ref: string }
@@ -28,6 +28,36 @@ export const lineOf = (line: ItemLine): number[] =>
 const toImageSource = (source: string): StoredImageSource =>
   Object.values(STORED_IMAGE_SOURCES).find((known) => known === source) ?? STORED_IMAGE_SOURCES.tmdb
 
+type ItemImagesRepositorySetLocalImagesProps = {
+  itemId: number
+  images: Partial<Record<ItemImageKind, string>>
+}
+
+type ItemImagesRepositoryImageProps = { itemId: number; kind: ItemImageKind }
+
+type ItemImagesRepositoryImageFromProps = {
+  itemId: number
+  kind: ItemImageKind
+  source: StoredImageSource
+}
+
+type ItemImagesRepositoryChooseImageProps = {
+  itemId: number
+  kind: ItemImageKind
+  ref: string | null
+}
+
+type ItemImagesRepositorySetTmdbLogoProps = { itemId: number; logo: string | null }
+
+type ItemImagesRepositoryReplaceImageProps = {
+  itemId: number
+  kind: ItemImageKind
+  source: StoredImageSource
+  ref: string | null
+}
+
+type ItemImagesRepositoryVersionsProps = { ids: readonly number[]; kind: ItemImageKind }
+
 /**
  * The pictures each item holds, from TMDB, from beside the media and from
  * Edit images, and which of them it shows. TMDB's own are stored with the
@@ -45,13 +75,7 @@ export class ItemImagesRepository {
   }
 
   /** Replaces an item's pictures from beside the media; a kind left out has none. */
-  setLocalImages({
-    itemId,
-    images,
-  }: {
-    itemId: number
-    images: Partial<Record<ItemImageKind, string>>
-  }): void {
+  setLocalImages({ itemId, images }: ItemImagesRepositorySetLocalImagesProps): void {
     this.db.transaction(() => {
       this.db.prepare(`DELETE FROM item_images WHERE item_id = ? AND source = 'local'`).run(itemId)
       const insert = this.db.prepare(
@@ -62,7 +86,7 @@ export class ItemImagesRepository {
   }
 
   /** The picture an item shows for `kind`, or null when it has none. */
-  image({ itemId, kind }: { itemId: number; kind: ItemImageKind }): ImageRef | null {
+  image({ itemId, kind }: ItemImagesRepositoryImageProps): ImageRef | null {
     const row = this.db
       .prepare<[string, string], { item_id: number; source: string; ref: string }>(IMAGE_REFS)
       .get(kind, JSON.stringify([itemId]))
@@ -71,15 +95,7 @@ export class ItemImagesRepository {
   }
 
   /** The picture of `source` an item holds for `kind`, whatever it shows. */
-  imageFrom({
-    itemId,
-    kind,
-    source,
-  }: {
-    itemId: number
-    kind: ItemImageKind
-    source: StoredImageSource
-  }): string | null {
+  imageFrom({ itemId, kind, source }: ItemImagesRepositoryImageFromProps): string | null {
     return (
       this.db
         .prepare<[number, string, string], { ref: string }>(
@@ -90,20 +106,12 @@ export class ItemImagesRepository {
   }
 
   /** Edit images: the item shows TMDB's picture at `ref` for `kind` from now on, or, for null, whatever it would by itself. */
-  chooseImage({
-    itemId,
-    kind,
-    ref,
-  }: {
-    itemId: number
-    kind: ItemImageKind
-    ref: string | null
-  }): void {
+  chooseImage({ itemId, kind, ref }: ItemImagesRepositoryChooseImageProps): void {
     this.replaceImage({ itemId, kind, source: STORED_IMAGE_SOURCES.chosen, ref })
   }
 
   /** Keeps TMDB's logo for a movie, or, for null, notes that TMDB has none. */
-  setTmdbLogo({ itemId, logo }: { itemId: number; logo: string | null }): void {
+  setTmdbLogo({ itemId, logo }: ItemImagesRepositorySetTmdbLogoProps): void {
     this.replaceImage({
       itemId,
       kind: ITEM_IMAGE_KINDS.logo,
@@ -113,17 +121,7 @@ export class ItemImagesRepository {
   }
 
   /** The item's picture of `source` for `kind` becomes `ref`, or goes for null. */
-  private replaceImage({
-    itemId,
-    kind,
-    source,
-    ref,
-  }: {
-    itemId: number
-    kind: ItemImageKind
-    source: StoredImageSource
-    ref: string | null
-  }): void {
+  private replaceImage({ itemId, kind, source, ref }: ItemImagesRepositoryReplaceImageProps): void {
     this.db.transaction(() => {
       this.db
         .prepare(`DELETE FROM item_images WHERE item_id = ? AND kind = ? AND source = ?`)
@@ -137,7 +135,7 @@ export class ItemImagesRepository {
   }
 
   /** The version of the picture each item shows for `kind`; one with none is left out. */
-  versions({ ids, kind }: { ids: readonly number[]; kind: ItemImageKind }): Map<number, string> {
+  versions({ ids, kind }: ItemImagesRepositoryVersionsProps): Map<number, string> {
     const rows = this.db
       .prepare<[string, string], { item_id: number; source: string; ref: string }>(IMAGE_REFS)
       .all(kind, JSON.stringify(ids))

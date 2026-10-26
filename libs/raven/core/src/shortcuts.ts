@@ -115,20 +115,21 @@ const SHORTCUT_ROWS: readonly ShortcutRow[] = [
   { keys: ['Esc'], action: 'Close, leave full screen, or back to the library' },
 ]
 
+type ShortcutRowsProps = { canShowStats: boolean }
+
 /** The rows the `?` dialog shows for a player that can or cannot show video info. */
-export const shortcutRows = ({ canShowStats }: { canShowStats: boolean }): readonly ShortcutRow[] =>
+export const shortcutRows = ({ canShowStats }: ShortcutRowsProps): readonly ShortcutRow[] =>
   SHORTCUT_ROWS.filter((row) => canShowStats || row.isStats !== true)
 
 export const SPEEDS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4]
 
-/** The next speed up or down the ladder from `current`, staying on it at the ends. */
-export const stepSpeed = ({
-  current,
-  direction,
-}: {
+type StepSpeedProps = {
   current: number
   direction: 1 | -1
-}): number => {
+}
+
+/** The next speed up or down the ladder from `current`, staying on it at the ends. */
+export const stepSpeed = ({ current, direction }: StepSpeedProps): number => {
   const index = SPEEDS.findIndex((speed) => speed >= current - 0.001)
   const from = index < 0 ? SPEEDS.length - 1 : index
   const exact = SPEEDS[from] === current
@@ -148,20 +149,18 @@ const SKIP_WINDOW_MS = 1_000
 /** One skip: which way, how far, and when it was pressed, in milliseconds. */
 export type SkipStep = { direction: 1 | -1; seconds: number; at: number }
 
+type StepSkipProps = {
+  last: SkipStep | null
+  direction: 1 | -1
+  at: number
+}
+
 /**
  * How far a skip pressed at `at` goes: 10 seconds, or a step up the ladder
  * to 20 and then 30 when it comes within a second of the last skip the same
  * way. A slower press, or one the other way, starts again at 10.
  */
-export const stepSkip = ({
-  last,
-  direction,
-  at,
-}: {
-  last: SkipStep | null
-  direction: 1 | -1
-  at: number
-}): SkipStep => {
+export const stepSkip = ({ last, direction, at }: StepSkipProps): SkipStep => {
   const isQuick = last != null && last.direction === direction && at - last.at < SKIP_WINDOW_MS
   const seconds = isQuick ? Math.min(last.seconds + SKIP_SECONDS, SKIP_MAX_SECONDS) : SKIP_SECONDS
   return { direction, seconds, at }
@@ -169,13 +168,12 @@ export const stepSkip = ({
 
 const CAPTION_SCALES: readonly number[] = [0.75, 1, 1.25, 1.5, 1.75, 2]
 
-export const stepCaptionScale = ({
-  current,
-  direction,
-}: {
+type StepCaptionScaleProps = {
   current: number
   direction: 1 | -1
-}): number => {
+}
+
+export const stepCaptionScale = ({ current, direction }: StepCaptionScaleProps): number => {
   const index = CAPTION_SCALES.findIndex((scale) => scale >= current - 0.001)
   const from = index < 0 ? CAPTION_SCALES.length - 1 : index
   const next = Math.max(0, Math.min(CAPTION_SCALES.length - 1, from + direction))

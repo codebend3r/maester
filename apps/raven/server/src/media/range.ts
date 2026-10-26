@@ -6,6 +6,11 @@ export const RANGE_UNITS = { bytes: 'bytes' } as const
 /** What a range no byte of the file satisfies reads as: a 416. */
 export const RANGE_OUTCOMES = { unsatisfiable: 'unsatisfiable' } as const
 
+type ParseRangeProps = {
+  header: string | undefined
+  size: number
+}
+
 /**
  * Reads a `Range: bytes=...` header against a file of `size` bytes. null
  * means serve the whole file; 'unsatisfiable' is a 416. Only the first range
@@ -14,10 +19,7 @@ export const RANGE_OUTCOMES = { unsatisfiable: 'unsatisfiable' } as const
 export const parseRange = ({
   header,
   size,
-}: {
-  header: string | undefined
-  size: number
-}): ByteRange | typeof RANGE_OUTCOMES.unsatisfiable | null => {
+}: ParseRangeProps): ByteRange | typeof RANGE_OUTCOMES.unsatisfiable | null => {
   if (!header) return null
   const match = /^bytes=(\d*)-(\d*)/.exec(header.trim())
   if (!match) return null

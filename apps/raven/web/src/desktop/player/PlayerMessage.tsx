@@ -4,18 +4,17 @@ import { useNavigate } from 'react-router-dom'
 import { handled } from '@/desktop/handled'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
 
+type PlayerMessageProps = {
+  message: string | null
+  fallback: string
+}
+
 /**
  * Raven's place for a video that is not playing: waiting for it (a null message), or
  * saying why it will not. The player's routes sit outside the side menu and the window has no
  * Back of its own, so Back and Escape always lead out: to the page behind, or `fallback`.
  */
-export const PlayerMessage = ({
-  message,
-  fallback,
-}: {
-  message: string | null
-  fallback: string
-}) => {
+export const PlayerMessage = ({ message, fallback }: PlayerMessageProps) => {
   const navigate = useNavigate()
   const canGoBack = useCanGoBack()
   const leave = useCallback(

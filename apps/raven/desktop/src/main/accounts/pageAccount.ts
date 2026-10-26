@@ -13,20 +13,19 @@ export type PageAccount = {
   accountId: () => string | null
 }
 
+type CreatePageAccountProps = {
+  /** Another account, or none, is signed in now. */
+  onSwitched: () => void
+  /** The page signed out, or into another account: whatever main holds on the last one's behalf ends. */
+  onEnded: () => void
+}
+
 /**
  * The account the page signed in with, which main uses wherever it reaches the server for it:
  * media and account tickets, the relay, downloads and the plays it syncs. It lives in memory
  * alone; main never writes a token, so a relaunch waits for the page to send it again.
  */
-export const createPageAccount = ({
-  onSwitched,
-  onEnded,
-}: {
-  /** Another account, or none, is signed in now. */
-  onSwitched: () => void
-  /** The page signed out, or into another account: whatever main holds on the last one's behalf ends. */
-  onEnded: () => void
-}): PageAccount => {
+export const createPageAccount = ({ onSwitched, onEnded }: CreatePageAccountProps): PageAccount => {
   let current: PageSession | null = null
 
   const set: PageAccount['set'] = (session) => {

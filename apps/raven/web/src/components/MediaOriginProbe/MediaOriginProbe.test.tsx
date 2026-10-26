@@ -13,15 +13,19 @@ import { asDesktop } from '@/test/desktop'
 
 afterEach(() => useMediaOrigin.setState({ pick: null, isProbing: false }))
 
-const clientWith = ({ config }: { config: AuthConfig }) => {
+type ClientWithProps = { config: AuthConfig }
+
+const clientWith = ({ config }: ClientWithProps) => {
   const client = new QueryClient()
   client.setQueryData(queryKeys.authConfig, config)
   return client
 }
 
+type WrapperOfCallbackProps = { children: ReactNode }
+
 const wrapperOf =
   (client: QueryClient) =>
-  ({ children }: { children: ReactNode }) => (
+  ({ children }: WrapperOfCallbackProps) => (
     <QueryClientProvider client={client}>
       <MediaOriginProbe>{children}</MediaOriginProbe>
     </QueryClientProvider>

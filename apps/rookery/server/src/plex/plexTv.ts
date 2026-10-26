@@ -45,8 +45,10 @@ export type PlexTv = {
 /** The DI token the plex.tv client is provided under. */
 export const PLEX_TV_CLIENT = Symbol('PLEX_TV_CLIENT')
 
+type PlexAuthUrlProps = { code: string; forwardUrl: string }
+
 /** Where the browser goes to approve `code`; Plex sends it on to `forwardUrl` afterwards. */
-export const plexAuthUrl = ({ code, forwardUrl }: { code: string; forwardUrl: string }): string =>
+export const plexAuthUrl = ({ code, forwardUrl }: PlexAuthUrlProps): string =>
   `${PLEX_AUTH_APP}#?${new URLSearchParams({
     clientID: PLEX_CLIENT_ID,
     code,
@@ -63,16 +65,18 @@ const text = (value: unknown): string | null =>
 const idText = (value: unknown): string | null =>
   typeof value === 'number' && Number.isInteger(value) ? String(value) : text(value)
 
+type HttpPlexTvRequestProps = {
+  method?: HttpMethod
+  path: string
+  token?: string
+}
+
 export class HttpPlexTv implements PlexTv {
   private async request({
     method = HTTP_METHODS.get,
     path,
     token,
-  }: {
-    method?: HttpMethod
-    path: string
-    token?: string
-  }): Promise<{ status: number; body: unknown }> {
+  }: HttpPlexTvRequestProps): Promise<{ status: number; body: unknown }> {
     try {
       const response = await fetch(`${PLEX_TV}${path}`, {
         method,

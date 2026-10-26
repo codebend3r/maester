@@ -35,20 +35,24 @@ export const fileWatched = (file: string): string =>
                    OR (pl.kind = 'played' AND ${file}.duration > 0
                        AND pl.furthest >= ${file}.duration * l.watched_percent / 100.0)))`
 
+type CardWatchedProps = { file: string; item: string }
+
 /**
  * Whether the card of the file `file` is watched by `@account`, `item`
  * being its first item: any file in its library with the same item and
  * `split`, or the file alone when nothing is matched to it. The CROSS JOIN
  * starts the walk from the item's files, as the version count does.
  */
-export const cardWatched = ({ file, item }: { file: string; item: string }): string =>
+export const cardWatched = ({ file, item }: CardWatchedProps): string =>
   `CASE WHEN ${item}.id IS NULL THEN ${fileWatched(file)}
         ELSE EXISTS (SELECT 1 FROM media_items x CROSS JOIN media y ON y.id = x.media_id
                       WHERE x.item_id = ${item}.id AND y.library_id = ${file}.library_id
                         AND y.split IS ${file}.split AND ${fileWatched('y')})
    END`
 
+type ScoreProps = { item: string; source: string }
+
 /** An item's score: from the source its library shows, else TMDB's own. */
-export const score = ({ item, source }: { item: string; source: string }): string =>
+export const score = ({ item, source }: ScoreProps): string =>
   `COALESCE((SELECT r.value FROM ratings r WHERE r.item_id = ${item} AND r.source = ${source}),
             (SELECT r.value FROM ratings r WHERE r.item_id = ${item} AND r.source = 'tmdb'))`

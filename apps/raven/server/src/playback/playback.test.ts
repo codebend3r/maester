@@ -81,16 +81,15 @@ describe('playback', () => {
   }
   const api = (): ApiClient => apiFor({ app: app(), cookie: state.admin })
   const movieId = (): number => state.movie?.id ?? -1
-  /** A converted stream's address, built as the player builds it. */
-  const streamUrl = ({
-    mode,
-    start = 0,
-    audio = null,
-  }: {
+  type StreamUrlProps = {
     mode: StreamMode
     start?: number
     audio?: number | null
-  }) => api().streamUrl({ id: movieId(), mode, start, audio })
+  }
+
+  /** A converted stream's address, built as the player builds it. */
+  const streamUrl = ({ mode, start = 0, audio = null }: StreamUrlProps) =>
+    api().streamUrl({ id: movieId(), mode, start, audio })
 
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-playback-'))

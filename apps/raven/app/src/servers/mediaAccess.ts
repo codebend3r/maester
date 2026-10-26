@@ -30,18 +30,24 @@ import { cookieHeadersFor } from '@/servers/serverHeaders'
 import type { AppServer } from '@/servers/serverList'
 import { TICKETS_OFF_STATUS } from '@/servers/tickets'
 
+type ProbeFetchProps = {
+  url: string
+  timeoutMs: number
+}
+
 /**
  * One origin's ping, read to its end within `timeoutMs`: whether it answered 2xx, how many bytes
  * came, and how long the whole of it took. React Native's `fetch` hands a response over only once
  * its body has arrived, so the wait for the first byte cannot be told apart from the transfer.
  */
-export type ProbeFetch = (input: {
-  url: string
-  timeoutMs: number
-}) => Promise<{ ok: boolean; bytes: number; elapsedMs: number }>
+export type ProbeFetch = (
+  input: ProbeFetchProps,
+) => Promise<{ ok: boolean; bytes: number; elapsedMs: number }>
+
+type WatchNetworkProps = { onChange: () => void }
 
 /** Calls `onChange` whenever the device moves to another network, until the returned stop is called. */
-export type WatchNetwork = (input: { onChange: () => void }) => () => void
+export type WatchNetwork = (input: WatchNetworkProps) => () => void
 
 /** What the native player is given: the address it loads and the headers it sends with each request. */
 type PlayerSource = { uri: string; headers: Record<string, string> }
@@ -93,15 +99,20 @@ type TicketRead =
   | { kind: typeof TICKET_READS.off }
   | { kind: typeof TICKET_READS.refused; refusal: AccessRefusal }
 
-const accessRefusal = ({
-  reason,
-  server,
-}: {
+type AccessRefusalProps = {
   reason: AccessRefusalReason
   server: AppServer
-}): AccessRefusal => ({ ok: false, reason, message: MEDIA_ACCESS_MESSAGES[reason](server.name) })
+}
 
-const refusalOf = ({ error, server }: { error: unknown; server: AppServer }): TicketRead => {
+const accessRefusal = ({ reason, server }: AccessRefusalProps): AccessRefusal => ({
+  ok: false,
+  reason,
+  message: MEDIA_ACCESS_MESSAGES[reason](server.name),
+})
+
+type RefusalOfProps = { error: unknown; server: AppServer }
+
+const refusalOf = ({ error, server }: RefusalOfProps): TicketRead => {
   const refused = (reason: AccessRefusalReason): TicketRead => ({
     kind: TICKET_READS.refused,
     refusal: accessRefusal({ reason, server }),
@@ -114,6 +125,18 @@ const refusalOf = ({ error, server }: { error: unknown; server: AppServer }): Ti
   // A proxy in front of a restarting server answers 502 or 504.
   if (error.status >= SERVER_ERROR_STATUS) return refused(ACCESS_REFUSALS.unreachable)
   return refused(ACCESS_REFUSALS.unreadable)
+}
+
+type MediaAccessForProps = {
+  api: ApiClient
+  server: AppServer
+  now: () => number
+  probe: ProbeFetch
+  readCookies: () => Promise<ServerCookies>
+  /** The account's token, sent beside the cookies when the app plays from the server's own address. */
+  readAccessToken?: () => string | null
+  watchNetwork: WatchNetwork
+  awayMaxHeight: () => MaxHeight
 }
 
 /**
@@ -137,17 +160,7 @@ export const mediaAccessFor = ({
   readAccessToken = () => null,
   watchNetwork,
   awayMaxHeight,
-}: {
-  api: ApiClient
-  server: AppServer
-  now: () => number
-  probe: ProbeFetch
-  readCookies: () => Promise<ServerCookies>
-  /** The account's token, sent beside the cookies when the app plays from the server's own address. */
-  readAccessToken?: () => string | null
-  watchNetwork: WatchNetwork
-  awayMaxHeight: () => MaxHeight
-}): MediaSources => {
+}: MediaAccessForProps): MediaSources => {
   /** Held as a promise, so sources asked for at once share one read and one probe. */
   let pick: Promise<MediaOrigin | null> | null = null
   let held: ReadonlyMap<number, HeldTicket> = new Map()
@@ -239,13 +252,12 @@ export const mediaAccessFor = ({
       ? awayQualityOf(awayMaxHeight())
       : null
 
-  const uriFor = ({
-    request: { media, mode, audio },
-    access,
-  }: {
+  type UriForProps = {
     request: SourceRequest
     access: MediaAccess | null
-  }): string => {
+  }
+
+  const uriFor = ({ request: { media, mode, audio }, access }: UriForProps): string => {
     switch (mode) {
       case PLAYBACK_MODES.direct:
         return api.fileUrl({ id: media.id, access })

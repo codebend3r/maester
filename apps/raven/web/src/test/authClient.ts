@@ -26,13 +26,15 @@ export const fakeAccount = (overrides: Partial<Account> = {}): Account => ({
   ...overrides,
 })
 
+type FakeSessionProps = {
+  userId?: string
+  accessToken?: string
+}
+
 export const fakeSession = ({
   userId = ACCOUNT_ID,
   accessToken = 'access-token',
-}: {
-  userId?: string
-  accessToken?: string
-} = {}): Session => ({
+}: FakeSessionProps = {}): Session => ({
   access_token: accessToken,
   refresh_token: 'refresh-token',
   expires_in: 3600,
@@ -52,15 +54,14 @@ const unused = async (): Promise<never> => {
 
 type Listener = (event: AuthChangeEvent, session: Session | null) => void
 
+type FakeAuthClientProps = { session?: Session | null; calls?: Partial<AuthClient> }
+
 /**
  * An auth client that answers `getSession` with `session` and tells whoever
  * listened about the events `emit` sends; every other call fails the test
  * unless `calls` answers it.
  */
-export const fakeAuthClient = ({
-  session = null,
-  calls = {},
-}: { session?: Session | null; calls?: Partial<AuthClient> } = {}) => {
+export const fakeAuthClient = ({ session = null, calls = {} }: FakeAuthClientProps = {}) => {
   const listeners = new Set<Listener>()
   const client: AuthClient = {
     signInWithPassword: unused,
@@ -89,10 +90,12 @@ export const fakeAuthClient = ({
     },
     ...calls,
   }
+  type FakeAuthClientEmitProps = { event: AuthChangeEvent; session: Session | null }
+
   return {
     client,
     listenerCount: () => listeners.size,
-    emit: ({ event, session: next }: { event: AuthChangeEvent; session: Session | null }) =>
+    emit: ({ event, session: next }: FakeAuthClientEmitProps) =>
       listeners.forEach((listener) => listener(event, next)),
   }
 }

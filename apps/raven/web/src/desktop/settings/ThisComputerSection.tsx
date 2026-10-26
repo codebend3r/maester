@@ -63,7 +63,9 @@ export const ThisComputerSection = () => {
 
   const settle = (id: number) => setPicks((current) => current.filter((pick) => pick.id !== id))
 
-  const write = async ({ pick, base }: { pick: OutputPick; base: OutputSettings }) => {
+  type WriteProps = { pick: OutputPick; base: OutputSettings }
+
+  const write = async ({ pick, base }: WriteProps) => {
     const next = pick.apply(confirmed.current ?? base)
     const reply = await client.request({ type: DESKTOP_REQUESTS.writeOutput, output: next })
     if (reply.type !== DESKTOP_REPLIES.done) {
@@ -93,13 +95,12 @@ export const ThisComputerSection = () => {
 
   const choose = (changes: Partial<OutputSettings>) => change((base) => ({ ...base, ...changes }))
 
-  const toggleFormat = ({
-    format,
-    isOn,
-  }: {
+  type ToggleFormatProps = {
     format: (typeof CARRIED_FORMATS)[number]
     isOn: boolean
-  }) =>
+  }
+
+  const toggleFormat = ({ format, isOn }: ToggleFormatProps) =>
     change((base) => {
       const kept = base.passthrough.filter((candidate) => candidate !== format)
       const next = isOn ? [...kept, format] : kept

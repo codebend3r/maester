@@ -13,6 +13,8 @@ export type AdoptedCounts = {
 
 type Adopting = { owner: string; local: typeof VIEWING_ACCOUNTS.local }
 
+type ViewingAdoptionAdoptProps = { ownerId: string }
+
 /**
  * Gives the owner every spot, play and favourite recorded before accounts,
  * which a migration could only keep under `VIEWING_ACCOUNTS.local`. One
@@ -48,7 +50,7 @@ export class ViewingAdoption {
   }
 
   /** Moves every row from before accounts to `ownerId` and, when any moved, records that owner; counts what moved. */
-  adopt({ ownerId }: { ownerId: string }): AdoptedCounts {
+  adopt({ ownerId }: ViewingAdoptionAdoptProps): AdoptedCounts {
     const adopting: Adopting = { owner: ownerId, local: VIEWING_ACCOUNTS.local }
     const local = { local: VIEWING_ACCOUNTS.local }
     return this.db.transaction((): AdoptedCounts => {

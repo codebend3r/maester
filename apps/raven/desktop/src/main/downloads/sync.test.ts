@@ -494,7 +494,9 @@ describe('after an unreachable answer', () => {
 })
 
 describe('the launch and retry runs', () => {
-  const pendingAt = ({ at, position }: { at: number; position: number }): Pending => ({
+  type PendingAtProps = { at: number; position: number }
+
+  const pendingAt = ({ at, position }: PendingAtProps): Pending => ({
     play: false,
     position,
     furthest: position,

@@ -125,6 +125,17 @@ const DEFAULT_WATCH: WatchOptions = {
   quietMs: 2_000,
 }
 
+type AppModuleRegisterProps = {
+  config: ServerConfig
+  metadataFetch?: MetadataFetch
+  aiFetch?: AiFetch
+  watch?: Partial<WatchOptions>
+  authFetch?: AuthFetch
+  authKeys?: JWTVerifyGetKey
+  accessRecheckMs?: number
+  membershipTtlMs?: number
+}
+
 /**
  * Takes its config as an argument so a test can point it at a temporary data
  * dir, the fetches metadata and the AI lookup use so a test can answer for TMDB and Claude, and the
@@ -141,16 +152,7 @@ export class AppModule {
     authKeys,
     accessRecheckMs = DEFAULT_ACCESS_RECHECK_MS,
     membershipTtlMs = MEMBERSHIP_TTL_MS,
-  }: {
-    config: ServerConfig
-    metadataFetch?: MetadataFetch
-    aiFetch?: AiFetch
-    watch?: Partial<WatchOptions>
-    authFetch?: AuthFetch
-    authKeys?: JWTVerifyGetKey
-    accessRecheckMs?: number
-    membershipTtlMs?: number
-  }): DynamicModule {
+  }: AppModuleRegisterProps): DynamicModule {
     assertRoutesMarked(CONTROLLERS)
     return {
       module: AppModule,

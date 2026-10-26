@@ -6,7 +6,9 @@ const { get, put, post } = APP_CALL_METHODS
 /** A method the server takes that the app never sends. */
 const UNSENT_METHODS = { delete: 'DELETE' } as const
 
-const callOf = ({ method, url }: { method: string; url: string }) => {
+type CallOfProps = { method: string; url: string }
+
+const callOf = ({ method, url }: CallOfProps) => {
   const name = appClientCallOf({ method, url })
   return name === null ? null : APP_CLIENT_CALLS[name]
 }

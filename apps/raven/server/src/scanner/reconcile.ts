@@ -23,13 +23,21 @@ export type Reconciled = {
   unprobed: Array<{ id: number; path: string }>
 }
 
+type IdentityProps = { size: number; mtimeMs: number }
+
 /** A rename keeps both, so two files sharing them are taken for one. */
-const identity = ({ size, mtimeMs }: { size: number; mtimeMs: number }): string =>
-  `${size}:${mtimeMs}`
+const identity = ({ size, mtimeMs }: IdentityProps): string => `${size}:${mtimeMs}`
+
+type IsReplacedProps = { indexed: IndexedFile; file: FoundFile }
 
 /** Still at its path, but with a new size or modification time. */
-const isReplaced = ({ indexed, file }: { indexed: IndexedFile; file: FoundFile }): boolean =>
+const isReplaced = ({ indexed, file }: IsReplacedProps): boolean =>
   indexed.size !== file.size || indexed.mtimeMs !== file.mtimeMs
+
+type ReconcileProps = {
+  known: ReadonlyMap<string, IndexedFile>
+  found: readonly FoundFile[]
+}
 
 /**
  * Compares what the index holds for the places looked at with what was
@@ -37,13 +45,7 @@ const isReplaced = ({ indexed, file }: { indexed: IndexedFile; file: FoundFile }
  * modification time are the same file moved, as long as no other file
  * shares them; otherwise it is one removal and one addition.
  */
-export const reconcile = ({
-  known,
-  found,
-}: {
-  known: ReadonlyMap<string, IndexedFile>
-  found: readonly FoundFile[]
-}): Reconciled => {
+export const reconcile = ({ known, found }: ReconcileProps): Reconciled => {
   const foundPaths = new Set(found.map((file) => file.path))
   const missing = [...known.entries()]
     .filter(([path]) => !foundPaths.has(path))

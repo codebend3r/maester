@@ -34,13 +34,12 @@ const facts = ({ path, ...overrides }: { path: string } & Partial<FileFacts>): F
 
 const distinct = (count: number): number[] => Array.from({ length: count }, (_, index) => index)
 
-const withMany = ({
-  count,
-  reduce,
-}: {
+type WithManyProps = {
   count: number
   reduce: (state: PlayerState, index: number) => PlayerState
-}) => distinct(count).reduce(reduce, EMPTY_STATE)
+}
+
+const withMany = ({ count, reduce }: WithManyProps) => distinct(count).reduce(reduce, EMPTY_STATE)
 
 describe('constants', () => {
   it('pins the caps and the end margin', () => {

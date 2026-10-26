@@ -51,13 +51,12 @@ const readyOf = (
     ...overrides,
   })
 
-const renderDialog = ({
-  ask,
-  client = fakeClient(),
-}: {
+type RenderDialogProps = {
   ask: DownloadAsk
   client?: FakeClient
-}) => {
+}
+
+const renderDialog = ({ ask, client = fakeClient() }: RenderDialogProps) => {
   asDesktop(client)
   const onClose = mock(() => undefined)
   renderWithProviders({

@@ -302,8 +302,10 @@ describe('auditMachO', () => {
   const RELATIVE = join(LIB, 'libmpv.2.dylib')
   const PATH = `/o/a.app/${RELATIVE}`
 
+  type KeyOfProps = { command: string; flag: string }
+
   /** A read as the fake keys it: the tool and its first argument. */
-  const keyOf = ({ command, flag }: { command: string; flag: string }) => `${command} ${flag}`
+  const keyOf = ({ command, flag }: KeyOfProps) => `${command} ${flag}`
 
   const answers =
     (failures: Partial<Record<string, unknown>>): ToolRun =>

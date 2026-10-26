@@ -11,12 +11,14 @@ import { ENGINE_MODES } from '@/main/player/engine'
 
 const COPIED_KEY = 'ravenE2eCopied'
 
+type StubClipboardProps = { app: ElectronApplication }
+
 /**
  * The system clipboard is the person's own, so the suite never touches it: main's
  * `clipboard.writeText` becomes a recorder. main looks it up at each call, so the
  * stand-in takes its place, and the stub fails loudly rather than let a write through.
  */
-const stubClipboard = async ({ app }: { app: ElectronApplication }): Promise<void> => {
+const stubClipboard = async ({ app }: StubClipboardProps): Promise<void> => {
   await app.evaluate(({ clipboard }, key) => {
     Reflect.set(globalThis, key, [])
     const record = async (...args: unknown[]) => {
@@ -34,8 +36,10 @@ const stubClipboard = async ({ app }: { app: ElectronApplication }): Promise<voi
   }, COPIED_KEY)
 }
 
+type CopiedTextsProps = { app: ElectronApplication }
+
 /** What main wrote to the clipboard since `stubClipboard`, in order. */
-const copiedTexts = async ({ app }: { app: ElectronApplication }): Promise<string[]> => {
+const copiedTexts = async ({ app }: CopiedTextsProps): Promise<string[]> => {
   const copied = await app.evaluate((_modules, key) => {
     const value: unknown = Reflect.get(globalThis, key)
     return value
@@ -45,7 +49,9 @@ const copiedTexts = async ({ app }: { app: ElectronApplication }): Promise<strin
     : []
 }
 
-const copyDiagnostics = async ({ app }: { app: ElectronApplication }): Promise<void> => {
+type CopyDiagnosticsProps = { app: ElectronApplication }
+
+const copyDiagnostics = async ({ app }: CopyDiagnosticsProps): Promise<void> => {
   await app.evaluate(({ Menu }) => {
     const item = Menu.getApplicationMenu()?.getMenuItemById('copy-diagnostics') ?? null
     if (item === null) throw new Error('no Copy Diagnostics item')
@@ -53,14 +59,15 @@ const copyDiagnostics = async ({ app }: { app: ElectronApplication }): Promise<v
   })
 }
 
-/** Copies the diagnostics into the stand-in clipboard and answers what was copied. */
-const copiedDiagnostics = async ({
-  mpv,
-  ready,
-}: {
+type ReadyProps = { userData: string; page: Page }
+
+type CopiedDiagnosticsProps = {
   mpv: MpvMode
-  ready: (input: { userData: string; page: Page }) => Promise<void>
-}): Promise<string> => {
+  ready: (input: ReadyProps) => Promise<void>
+}
+
+/** Copies the diagnostics into the stand-in clipboard and answers what was copied. */
+const copiedDiagnostics = async ({ mpv, ready }: CopiedDiagnosticsProps): Promise<string> => {
   const userData = await freshUserData()
   try {
     return await withApp({

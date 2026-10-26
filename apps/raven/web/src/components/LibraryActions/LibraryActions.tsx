@@ -18,18 +18,17 @@ import { api } from '@/lib/api'
 import { afterRematch, afterRescan, queryKeys, useUnlockPrompt } from '@raven/ui/headless'
 import { metadataHealthQuery } from '@/lib/queries'
 
+type UseLibraryCallProps = {
+  library: Library
+  call: (id: number) => Promise<Library>
+}
+
 /**
  * One call to the server about a library, whose answer is the library as it
  * stands after: it goes into the cache at once, and the listings that hold
  * a scan's progress are read again.
  */
-const useLibraryCall = ({
-  library,
-  call,
-}: {
-  library: Library
-  call: (id: number) => Promise<Library>
-}) => {
+const useLibraryCall = ({ library, call }: UseLibraryCallProps) => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => call(library.id),
@@ -77,6 +76,11 @@ export const useLibraryActions = (library: Library) => {
   }
 }
 
+type LibraryActionErrorsProps = {
+  actions: ReturnType<typeof useLibraryActions>
+  className: string
+}
+
 /**
  * Why a scan, Update ratings, a cancel or Match again was refused, one line
  * each, for the caller to place where its errors show.
@@ -92,10 +96,7 @@ export const LibraryActionErrors = ({
     rematch,
   },
   className,
-}: {
-  actions: ReturnType<typeof useLibraryActions>
-  className: string
-}) =>
+}: LibraryActionErrorsProps) =>
   [
     { verb: 'quick scan', failure: quickScan.error },
     { verb: 'cancel the quick scan', failure: cancelQuickScan.error },
@@ -112,6 +113,20 @@ export const LibraryActionErrors = ({
         </p>
       ),
   )
+
+type LongActionProps = {
+  label: string
+  /** What the button wears until it runs, when the spinner takes its place. */
+  icon: IconName
+  whose: ReactNode
+  title: string
+  cancelTitle: string
+  isRunning: boolean
+  isDisabled: boolean
+  isCancelling: boolean
+  onStart: () => void
+  onCancel: () => void
+}
 
 /**
  * One of a library's long actions: a button that starts it, and, while it
@@ -130,19 +145,7 @@ const LongAction = ({
   isCancelling,
   onStart,
   onCancel,
-}: {
-  label: string
-  /** What the button wears until it runs, when the spinner takes its place. */
-  icon: IconName
-  whose: ReactNode
-  title: string
-  cancelTitle: string
-  isRunning: boolean
-  isDisabled: boolean
-  isCancelling: boolean
-  onStart: () => void
-  onCancel: () => void
-}) => (
+}: LongActionProps) => (
   <Button
     icon={isRunning ? undefined : icon}
     disabled={isRunning ? isCancelling : isDisabled}
@@ -155,20 +158,28 @@ const LongAction = ({
   </Button>
 )
 
-/** What Match again says on hover: what it does, or why it cannot now. */
-const matchAgainTitle = ({
-  matchType,
-  canMatch,
-  unmatched,
-}: {
+type MatchAgainTitleProps = {
   matchType: string
   canMatch: boolean
   unmatched: number
-}): string => {
+}
+
+/** What Match again says on hover: what it does, or why it cannot now. */
+const matchAgainTitle = ({ matchType, canMatch, unmatched }: MatchAgainTitleProps): string => {
   if (!canMatch) return 'TMDB is not answering, so files cannot be matched right now'
   if (unmatched === 0)
     return `Every file in this library has its ${matchType}, so there is nothing to match again`
   return `Search TMDB again for the files no ${matchType} was found for`
+}
+
+type LibraryActionsProps = {
+  library: Library
+  isShut: boolean
+  /** What goes first in the row of buttons: the Libraries page's Pin. */
+  lead?: ReactNode
+  /** What goes last in it: the library page's Lock. */
+  trail?: ReactNode
+  actions: ReturnType<typeof useLibraryActions>
 }
 
 /**
@@ -191,15 +202,7 @@ export const LibraryActions = ({
     cancelRatings,
     rematch,
   },
-}: {
-  library: Library
-  isShut: boolean
-  /** What goes first in the row of buttons: the Libraries page's Pin. */
-  lead?: ReactNode
-  /** What goes last in it: the library page's Lock. */
-  trail?: ReactNode
-  actions: ReturnType<typeof useLibraryActions>
-}) => {
+}: LibraryActionsProps) => {
   const [isEditing, setEditing] = useState(false)
   const matchType = matchTypeFor(library.settings.kind)
   // Files only leave pending while TMDB answers, so Match again waits on it.

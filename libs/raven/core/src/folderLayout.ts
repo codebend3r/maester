@@ -16,6 +16,12 @@ export const isLetterFolder = (name: string): boolean =>
 const isSeasonFolder = (name: string | undefined): boolean =>
   name != null && seasonFolderNumber(name) != null
 
+type GroupFolderOfProps = {
+  kind: LibraryKind
+  folder: string
+  layout: FolderLayout
+}
+
 /**
  * The top folder of a file's place when it groups titles rather than being
  * one, so the titles are the folders inside it; null when the top folder is
@@ -31,15 +37,7 @@ const isSeasonFolder = (name: string | undefined): boolean =>
  *
  * A library that is never matched, or one set to `flat`, has none.
  */
-export const groupFolderOf = ({
-  kind,
-  folder,
-  layout,
-}: {
-  kind: LibraryKind
-  folder: string
-  layout: FolderLayout
-}): string | null => {
+export const groupFolderOf = ({ kind, folder, layout }: GroupFolderOfProps): string | null => {
   const type = matchTypeFor(kind)
   if (layout === FOLDER_LAYOUTS.flat || type == null) return null
   const [top, second, third] = folder.split(/[\\/]/).filter((segment) => segment !== '')

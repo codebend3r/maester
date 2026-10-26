@@ -186,15 +186,15 @@ const NIGHT = '#15201e'
 
 const timers = createNodeTimers()
 
-// No cookie rides along, a redirect fails rather than carry the request elsewhere, and
-// nothing is cached: the releases list, a media origin's probe and a ticketed download.
-const fetchBare = ({
-  url,
-  init,
-}: {
+type FetchBareProps = {
   url: string
   init: { headers: Record<string, string>; signal: AbortSignal }
-}) => net.fetch(url, { ...init, credentials: 'omit', redirect: 'error', cache: 'no-store' })
+}
+
+// No cookie rides along, a redirect fails rather than carry the request elsewhere, and
+// nothing is cached: the releases list, a media origin's probe and a ticketed download.
+const fetchBare = ({ url, init }: FetchBareProps) =>
+  net.fetch(url, { ...init, credentials: 'omit', redirect: 'error', cache: 'no-store' })
 
 const fetchReleases: UpdateFetch = fetchBare
 
@@ -228,14 +228,13 @@ const openPart = async (path: string): Promise<PartFile> => {
   }
 }
 
-/** The traffic lights are macOS's; elsewhere there is nothing to show or hide. */
-const showWindowButtons = ({
-  window,
-  isVisible,
-}: {
+type ShowWindowButtonsProps = {
   window: BrowserWindow
   isVisible: boolean
-}): void => {
+}
+
+/** The traffic lights are macOS's; elsewhere there is nothing to show or hide. */
+const showWindowButtons = ({ window, isVisible }: ShowWindowButtonsProps): void => {
   if (process.platform !== PLATFORMS.darwin) return
   window.setWindowButtonVisibility(isVisible)
 }
@@ -276,7 +275,9 @@ const warn = (message: string): void => {
   if (!app.isPackaged) console.warn(message)
 }
 
-const reportError = ({ text, error }: { text: string; error: unknown }): void => {
+type ReportErrorProps = { text: string; error: unknown }
+
+const reportError = ({ text, error }: ReportErrorProps): void => {
   const message = `${text} ${errorText(error)}`
   log.error(message)
   if (!app.isPackaged) console.error(message)
@@ -541,7 +542,9 @@ const startApp = (): void => {
       },
       onEnded: () => accessEnds.notify({ serverId: theServer().id }),
     })
-    const accountIdOf = ({ serverId }: { serverId: string }): string | null =>
+    type AccountIdOfProps = { serverId: string }
+
+    const accountIdOf = ({ serverId }: AccountIdOfProps): string | null =>
       serverId === theServer().id ? account.accountId() : null
     const serverCalls = createServerCalls({
       serverOf: serverOfId,
@@ -942,13 +945,15 @@ const startApp = (): void => {
   app.on('window-all-closed', () => app.quit())
 }
 
+type StartWebHostProps = { serverOrigin: string }
+
 /**
  * The web app, served from the loopback web host with `/api` passed on to the server. A
  * custom scheme cannot hold it: Chromium keeps no `document.cookie` there, where the web's
  * Supabase session lives. The port is fixed, so when another app holds it Raven says
  * so and quits rather than move the page to an origin with none of its sign-in or settings.
  */
-const startWebHost = async ({ serverOrigin }: { serverOrigin: string }): Promise<void> => {
+const startWebHost = async ({ serverOrigin }: StartWebHostProps): Promise<void> => {
   // A test hook too: an unpackaged run may let the page sign in at a stand-in Supabase Auth.
   const authOrigin = authOriginFrom({ isPackaged: app.isPackaged, env: process.env, warn })
   const handler = createWebHostHandler({
@@ -979,7 +984,9 @@ const startWebHost = async ({ serverOrigin }: { serverOrigin: string }): Promise
   log.info(`${WEB_HOST_READY} at ${PAGE_ORIGIN}, /api goes to ${serverOrigin}`)
 }
 
-const serveFiles = ({ grants }: { grants: Grants }): void => {
+type ServeFilesProps = { grants: Grants }
+
+const serveFiles = ({ grants }: ServeFilesProps): void => {
   protocol.handle(
     FILE_SCHEME,
     createFileHandler({
@@ -1008,8 +1015,10 @@ const secureContents = (): void => {
     isPermissionAllowed(permission),
   )
 
+  type KeepOnPageProps = { url: string; preventDefault: () => void }
+
   // A navigation, or a redirect on the way to one, stays on the page or goes to the browser.
-  const keepOnPage = (event: { url: string; preventDefault: () => void }): void => {
+  const keepOnPage = (event: KeepOnPageProps): void => {
     const decision = navigationFor(event.url)
     if (decision.isAllowed) return
     event.preventDefault()
@@ -1028,7 +1037,9 @@ const secureContents = (): void => {
   })
 }
 
-const answerRequests = ({ service, grants }: { service: DesktopService; grants: Grants }) => {
+type AnswerRequestsProps = { service: DesktopService; grants: Grants }
+
+const answerRequests = ({ service, grants }: AnswerRequestsProps) => {
   const answer = createRequestHandler({
     isTrustedSender,
     // The page describes a file as it opens it, so this is where a local open is logged.
@@ -1045,7 +1056,9 @@ const answerRequests = ({ service, grants }: { service: DesktopService; grants: 
   )
 }
 
-const openWindow = ({ store }: { store: StateStore }): BrowserWindow => {
+type OpenWindowProps = { store: StateStore }
+
+const openWindow = ({ store }: OpenWindowProps): BrowserWindow => {
   const bounds = placeWindow({
     saved: store.read().window,
     displays: screen.getAllDisplays(),
@@ -1117,8 +1130,10 @@ const isPageLive = (window: BrowserWindow): boolean =>
   !window.webContents.isDestroyed() &&
   isPageUrl(window.webContents.getURL())
 
+type DisplayOfProps = { window: BrowserWindow; mpv: Mpv }
+
 /** The display the window is on, read for mpv; null once mpv is gone. */
-const displayOf = ({ window, mpv }: { window: BrowserWindow; mpv: Mpv }) => {
+const displayOf = ({ window, mpv }: DisplayOfProps) => {
   if (window.isDestroyed()) return null
   return displayReading({
     frequency: screen.getDisplayMatching(window.getBounds()).displayFrequency,
@@ -1126,16 +1141,27 @@ const displayOf = ({ window, mpv }: { window: BrowserWindow; mpv: Mpv }) => {
   })
 }
 
-const applyDisplayTo = async ({
-  window,
-  engine,
-}: {
+type ApplyDisplayToProps = {
   window: BrowserWindow
   engine: NativeEngine
-}): Promise<void> => {
+}
+
+const applyDisplayTo = async ({ window, engine }: ApplyDisplayToProps): Promise<void> => {
   const reading = displayOf({ window, mpv: engine.mpv })
   if (reading === null) return
   await engine.service.applyDisplay(reading)
+}
+
+type AttachPlayerProps = {
+  window: BrowserWindow
+  grants: Grants
+  config: ConfigStore
+  sources: ReturnType<typeof createServerSources>
+  serverOfId: (serverId: string) => ServerEntry | null
+  relay: Pick<MediaRelay, 'closeAll'>
+  marks: ReturnType<typeof createMarks>
+  budgets: ReturnType<typeof createBudgets>
+  downloads: Pick<DownloadService, 'sidecarsOf' | 'notePlaying'>
 }
 
 /**
@@ -1152,17 +1178,7 @@ const attachPlayer = ({
   budgets,
   downloads,
   serverOfId,
-}: {
-  window: BrowserWindow
-  grants: Grants
-  config: ConfigStore
-  sources: ReturnType<typeof createServerSources>
-  serverOfId: (serverId: string) => ServerEntry | null
-  relay: Pick<MediaRelay, 'closeAll'>
-  marks: ReturnType<typeof createMarks>
-  budgets: ReturnType<typeof createBudgets>
-  downloads: Pick<DownloadService, 'sidecarsOf' | 'notePlaying'>
-}) => {
+}: AttachPlayerProps) => {
   const mode = engineMode()
   // mpv's events arrive from the moment it opens; the service exists a moment later.
   const sink: { service: PlayerService | null } = { service: null }

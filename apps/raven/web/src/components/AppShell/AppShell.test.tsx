@@ -27,15 +27,13 @@ import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { MEDIUM_SCREEN } from '@/components/AppShell/useIsMediumScreen'
 
-const renderShell = ({
-  route,
-  adminLock,
-  account,
-}: {
+type RenderShellProps = {
   route: string
   adminLock?: AdminLock
   account?: Account
-}) =>
+}
+
+const renderShell = ({ route, adminLock, account }: RenderShellProps) =>
   renderWithProviders({
     ui: (
       <Routes>

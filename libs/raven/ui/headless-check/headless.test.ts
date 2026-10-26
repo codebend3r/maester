@@ -18,8 +18,10 @@ const DOM_GLOBALS = [
 const specifiersOf = (source: string): string[] =>
   [...source.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map((match) => match[1] ?? '')
 
+type IsOfPackageProps = { specifier: string; name: string }
+
 /** A specifier that names `name` or one of its subpaths, as `react-dom/client` does. */
-const isOfPackage = ({ specifier, name }: { specifier: string; name: string }): boolean =>
+const isOfPackage = ({ specifier, name }: IsOfPackageProps): boolean =>
   specifier === name || specifier.startsWith(`${name}/`)
 
 /**
@@ -31,8 +33,10 @@ const domReadsOf = (source: string): string[] =>
     ...source.matchAll(new RegExp(`(?<![.\\w$"'\`])(${DOM_GLOBALS.join('|')})\\b(?!\\s*:)`, 'g')),
   ].map((match) => match[1] ?? '')
 
+type WalkProps = { file: string; seen?: ReadonlyMap<string, string> }
+
 /** The entry and every chunk it imports, transitively, with each one's source. */
-const walk = ({ file, seen = new Map() }: { file: string; seen?: ReadonlyMap<string, string> }) => {
+const walk = ({ file, seen = new Map() }: WalkProps) => {
   if (seen.has(file)) return seen
   const source = readFileSync(file, 'utf8')
   const withFile = new Map(seen).set(file, source)

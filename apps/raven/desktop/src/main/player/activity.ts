@@ -3,6 +3,11 @@ import type { PlayerActivity } from '@/main/player/playerService'
 /** Electron reads `#AARRGGBB`; zero alpha lets the video under the page show through. */
 export const CLEAR = '#00000000'
 
+type CreateActivityProps = {
+  onPlaying: (isPlaying: boolean) => void
+  onShowing: (isShowing: boolean) => void
+}
+
 /**
  * Splits the service's activity: whether it plays goes to the sleep guard every time,
  * whether a video shows goes to the window only when it changes. Nothing shows at first.
@@ -12,10 +17,7 @@ export const CLEAR = '#00000000'
 export const createActivity = ({
   onPlaying,
   onShowing,
-}: {
-  onPlaying: (isPlaying: boolean) => void
-  onShowing: (isShowing: boolean) => void
-}): { report: (activity: PlayerActivity) => void; hide: () => void } => {
+}: CreateActivityProps): { report: (activity: PlayerActivity) => void; hide: () => void } => {
   let isShowing = false
   return {
     report: (activity) => {

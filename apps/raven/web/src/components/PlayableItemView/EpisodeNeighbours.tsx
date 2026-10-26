@@ -37,19 +37,17 @@ const useNeighbours = (
   ]
 }
 
+type EpisodeNeighboursProps = {
+  episode: ItemDetails
+  libraryId: number
+  className?: string
+}
+
 /**
  * The previous and next episodes as cards: each still, which way it is,
  * its title and its number, opening its page in the same library.
  */
-export const EpisodeNeighbours = ({
-  episode,
-  libraryId,
-  className,
-}: {
-  episode: ItemDetails
-  libraryId: number
-  className?: string
-}) => {
+export const EpisodeNeighbours = ({ episode, libraryId, className }: EpisodeNeighboursProps) => {
   const neighbours = useNeighbours(episode)
   if (neighbours.length === 0) return null
   return (

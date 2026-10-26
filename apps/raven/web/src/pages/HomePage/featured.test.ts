@@ -6,8 +6,10 @@ import { itemSummary, library, matchedMovie, mediaItem, showEntry } from '@/test
 const FILMS = library({ id: 2, name: 'Films' })
 const SERIES = library({ id: 3, name: 'Series' })
 
+type ArrivalProps = { id: number; addedAt: string }
+
 /** A movie with both pictures the hero needs, arrived at `addedAt`. */
-const arrival = ({ id, addedAt }: { id: number; addedAt: string }) =>
+const arrival = ({ id, addedAt }: ArrivalProps) =>
   matchedMovie({
     id,
     title: `Movie ${id}`,
@@ -20,7 +22,9 @@ const arrival = ({ id, addedAt }: { id: number; addedAt: string }) =>
     }),
   })
 
-const show = ({ id, addedAt }: { id: number; addedAt: string }) =>
+type ShowProps = { id: number; addedAt: string }
+
+const show = ({ id, addedAt }: ShowProps) =>
   showEntry({
     addedAt,
     show: itemSummary({
@@ -33,22 +37,30 @@ const show = ({ id, addedAt }: { id: number; addedAt: string }) =>
     }),
   })
 
-/** The hero's entry for a movie in Films, with the line the server read for it. */
-const movieEntry = ({
-  media,
-  line = null,
-}: {
+type MovieEntryProps = {
   media: ReturnType<typeof arrival>
   line?: string | null
-}): Hero[number] => ({ libraryId: 2, type: 'media', media, line })
+}
 
-const showHeroEntry = ({
-  entry,
-  line = null,
-}: {
+/** The hero's entry for a movie in Films, with the line the server read for it. */
+const movieEntry = ({ media, line = null }: MovieEntryProps): Hero[number] => ({
+  libraryId: 2,
+  type: 'media',
+  media,
+  line,
+})
+
+type ShowHeroEntryProps = {
   entry: ReturnType<typeof show>
   line?: string | null
-}): Hero[number] => ({ libraryId: 3, type: 'shows', entry, line })
+}
+
+const showHeroEntry = ({ entry, line = null }: ShowHeroEntryProps): Hero[number] => ({
+  libraryId: 3,
+  type: 'shows',
+  entry,
+  line,
+})
 
 const LIBRARIES = [FILMS, SERIES]
 

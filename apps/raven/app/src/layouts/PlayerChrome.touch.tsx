@@ -90,17 +90,14 @@ const Scrubber = ({
   )
 }
 
-const RoundButton = ({
-  glyph,
-  label,
-  isLarge = false,
-  onPress,
-}: {
+type RoundButtonProps = {
   glyph: string
   label: string
   isLarge?: boolean
   onPress: () => void
-}) => {
+}
+
+const RoundButton = ({ glyph, label, isLarge = false, onPress }: RoundButtonProps) => {
   const styles = useStyles()
   return (
     <Pressable
@@ -119,8 +116,10 @@ const RoundButton = ({
   )
 }
 
+type TransportControlsProps = { transport: Transport }
+
 /** Play and pause between the skips, then the time over the line to drag along. */
-const TransportControls = ({ transport }: { transport: Transport }) => {
+const TransportControls = ({ transport }: TransportControlsProps) => {
   const { isPaused, position, duration, onTogglePlay, onSeek } = transport
   const length = duration ?? 0
   const styles = useStyles()

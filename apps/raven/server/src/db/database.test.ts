@@ -17,7 +17,9 @@ describe('the database file', () => {
   const state = { dir: '' }
   const at = (name: string): string => join(state.dir, name)
   const files = async (): Promise<string[]> => (await readdir(state.dir)).toSorted()
-  const seed = async ({ names }: { names: string[] }): Promise<void> => {
+  type SeedProps = { names: string[] }
+
+  const seed = async ({ names }: SeedProps): Promise<void> => {
     await Promise.all(names.map((name) => writeFile(at(name), name)))
   }
 
@@ -322,15 +324,14 @@ describe('migrations', () => {
       `INSERT INTO media (library_id, path, file_name, folder, title, container, size, mtime_ms, added_at, duration)
        VALUES (?, ?, ?, '', ?, 'mkv', 1, 1, '2026-01-01T00:00:00.000Z', ?)`,
     )
-    const add = ({
-      libraryId,
-      name,
-      duration,
-    }: {
+    type AddProps = {
       libraryId: number
       name: string
       duration: number | null
-    }) => Number(file.run(libraryId, `/${name}.mkv`, `${name}.mkv`, name, duration).lastInsertRowid)
+    }
+
+    const add = ({ libraryId, name, duration }: AddProps) =>
+      Number(file.run(libraryId, `/${name}.mkv`, `${name}.mkv`, name, duration).lastInsertRowid)
     const between = add({ libraryId: standard, name: 'between', duration: 100 })
     const past = add({ libraryId: standard, name: 'past', duration: 100 })
     const lenientPast = add({ libraryId: lenient, name: 'lenient', duration: 100 })

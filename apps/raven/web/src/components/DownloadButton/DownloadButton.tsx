@@ -7,14 +7,13 @@ import { useOpenReply } from '@/desktop/openReply'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { type Desktop, useDesktopBridge } from '@/stores/desktop'
 
-/** Inside Raven: main reads the title and asks before it downloads. */
-const DesktopDownloadButton = ({
-  desktop,
-  target,
-}: {
+type DesktopDownloadButtonProps = {
   desktop: Desktop
   target: DownloadTarget
-}) => {
+}
+
+/** Inside Raven: main reads the title and asks before it downloads. */
+const DesktopDownloadButton = ({ desktop, target }: DesktopDownloadButtonProps) => {
   const openReply = useOpenReply()
   // One ask at a time: a second click while main reads the title would ask twice.
   const isAskingNow = useRef(false)
@@ -36,6 +35,8 @@ const DesktopDownloadButton = ({
   )
 }
 
+type DownloadButtonProps = { target: DownloadTarget }
+
 /**
  * Hands a title to Raven to keep on its disk. Inside Raven it
  * is always there and asks the app itself; in a browser it is shown only
@@ -44,7 +45,7 @@ const DesktopDownloadButton = ({
  * shrink, so it marks itself wide and the header's action row makes room
  * for it (see ItemHeader).
  */
-export const DownloadButton = ({ target }: { target: DownloadTarget }) => {
+export const DownloadButton = ({ target }: DownloadButtonProps) => {
   const desktop = useDesktopBridge((state) => state.desktop)
   const opensInRavenPlayer = usePlayerPrefs((prefs) => prefs.opensInRavenPlayer)
   if (desktop !== null) return <DesktopDownloadButton desktop={desktop} target={target} />

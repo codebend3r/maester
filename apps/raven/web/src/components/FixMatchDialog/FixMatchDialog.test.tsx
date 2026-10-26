@@ -14,17 +14,14 @@ import { api } from '@/lib/api'
 import { itemDetails, itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
-const Harness = ({
-  media,
-  onMatched,
-  aiMatch = null,
-  matchType = 'movie',
-}: {
+type HarnessProps = {
   media: MediaItem
   onMatched: (media: MediaItem) => void
   aiMatch?: AiMatch | null
   matchType?: MatchItemType
-}) => {
+}
+
+const Harness = ({ media, onMatched, aiMatch = null, matchType = 'movie' }: HarnessProps) => {
   const [open, setOpen] = useState(false)
   return (
     <MediaMenu
@@ -59,17 +56,21 @@ describe('Fix match', () => {
 
   const unmatched = mediaItem({ title: 'Busboys', year: 2026, match: 'unmatched' })
 
-  const candidate = ({
-    tmdbId,
-    year,
-    confidence,
-    poster = null,
-  }: {
+  type CandidateProps = {
     tmdbId: string
     year: number
     confidence: number
     poster?: string | null
-  }) => ({ tmdbId, title: 'Busboys', year, overview: null, poster, confidence })
+  }
+
+  const candidate = ({ tmdbId, year, confidence, poster = null }: CandidateProps) => ({
+    tmdbId,
+    title: 'Busboys',
+    year,
+    overview: null,
+    poster,
+    confidence,
+  })
 
   const openWith = async (candidates: ReturnType<typeof candidate>[]) => {
     spies.search.mockImplementation(async () => candidates)

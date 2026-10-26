@@ -19,7 +19,9 @@ const entry = ({
   ...rest,
 })
 
-const dayName = ({ date, hasYear = false }: { date: Date; hasYear?: boolean }): string =>
+type DayNameProps = { date: Date; hasYear?: boolean }
+
+const dayName = ({ date, hasYear = false }: DayNameProps): string =>
   new Intl.DateTimeFormat(undefined, {
     weekday: 'long',
     month: 'long',
@@ -94,7 +96,9 @@ describe('historyNote', () => {
 describe('finishedNote', () => {
   it('names the day a finished video last played, and how often it has past once', () => {
     const now = new Date(2026, 9, 11, 20, 0)
-    const finished = ({ playedAt, plays = 1 }: { playedAt: Date; plays?: number }) =>
+    type FinishedProps = { playedAt: Date; plays?: number }
+
+    const finished = ({ playedAt, plays = 1 }: FinishedProps) =>
       finishedNote({ entry: entry({ playedAt, plays, watched: true }), now })
     expect(finished({ playedAt: new Date(2026, 9, 11, 9, 0) })).toBe('Today')
     expect(finished({ playedAt: new Date(2026, 9, 10, 9, 0), plays: 3 })).toBe(

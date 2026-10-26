@@ -1,11 +1,10 @@
-/** The value of cookie `name` in a `Cookie` header, or null when it is missing or empty. */
-export const readCookie = ({
-  header,
-  name,
-}: {
+type ReadCookieProps = {
   header: string | undefined
   name: string
-}): string | null => {
+}
+
+/** The value of cookie `name` in a `Cookie` header, or null when it is missing or empty. */
+export const readCookie = ({ header, name }: ReadCookieProps): string | null => {
   const found = (header ?? '')
     .split(';')
     .map((part) => part.trim())

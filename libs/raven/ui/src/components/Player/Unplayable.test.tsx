@@ -31,7 +31,9 @@ const TRACKS: MediaTracks = {
   frameRate: 24,
 }
 
-const ReportingPlayer = ({ media, report }: { media: MediaItem; report?: ErrorReporter }) => {
+type ReportingPlayerProps = { media: MediaItem; report?: ErrorReporter }
+
+const ReportingPlayer = ({ media, report }: ReportingPlayerProps) => {
   const isHosting = useHostPlayer({
     title: { label: media.title, duration: media.duration, resumeAt: 42, backTo: '/', next: null },
     posterUrl: null,
@@ -42,8 +44,10 @@ const ReportingPlayer = ({ media, report }: { media: MediaItem; report?: ErrorRe
   return isHosting && <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />
 }
 
+type AppProps = { media?: MediaItem; report?: ErrorReporter }
+
 /** The player opened from a library page, as a viewer reaches it. */
-const app = ({ media = mediaItem(), report }: { media?: MediaItem; report?: ErrorReporter }) =>
+const app = ({ media = mediaItem(), report }: AppProps) =>
   renderWithProviders({
     ui: (
       <Routes>

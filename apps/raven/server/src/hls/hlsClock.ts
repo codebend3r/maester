@@ -1,8 +1,10 @@
+type AfterProps = { ms: number; run: () => void }
+
 /** The clock and timers the HLS sessions run on; a test moves them by hand. */
 export type HlsClock = {
   now: () => number
   /** Calls `run` after `ms`; what it returns cancels that. */
-  after: ({ ms, run }: { ms: number; run: () => void }) => () => void
+  after: ({ ms, run }: AfterProps) => () => void
 }
 
 /** The DI token the sessions' clock is provided under. */

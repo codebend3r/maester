@@ -26,8 +26,10 @@ export const callAuth = async <T extends { error: Error | null }>(
   return result
 }
 
+type ResendConfirmationProps = { email: string }
+
 /** Sends the email that confirms a new account's address again. */
-export const resendConfirmation = ({ email }: { email: string }) =>
+export const resendConfirmation = ({ email }: ResendConfirmationProps) =>
   callAuth((client) => client.resend({ type: RESEND_TYPES.signup, email }))
 
 /** Supabase answered and refused the refresh token, as opposed to failing to answer. */
@@ -54,12 +56,14 @@ export const refreshSession = async (): Promise<RefreshOutcome> => {
   }
 }
 
+type SignOutProps = { queryClient: QueryClient }
+
 /**
  * Ends the session and empties what it left behind. When Supabase cannot be
  * reached its sign out keeps the session, so the local one is ended instead:
  * the cookie goes either way.
  */
-export const signOut = async ({ queryClient }: { queryClient: QueryClient }): Promise<void> => {
+export const signOut = async ({ queryClient }: SignOutProps): Promise<void> => {
   const client = useAuthSession.getState().client
   if (client !== null) {
     const { error } = await client.signOut()

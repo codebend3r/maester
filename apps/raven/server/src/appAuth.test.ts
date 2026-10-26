@@ -43,7 +43,9 @@ const LIBRARY_PIN = '3001'
 /** These tests change accounts, and the state of the auth service, under tokens they have already used. */
 const NO_REUSE_MS = 0
 
-const accountPath = ({ path, id }: { path: string; id: string | number }) =>
+type AccountPathProps = { path: string; id: string | number }
+
+const accountPath = ({ path, id }: AccountPathProps) =>
   path.replace(`:${AUTH_PARAMS.id}`, String(id))
 
 let app: NestFastifyApplication
@@ -255,7 +257,9 @@ describe('account endpoints', () => {
   })
 
   it('rejects malformed account changes, missing users and owner removal', async () => {
-    const send = ({ id, status }: { id: string; status: string }) =>
+    type SendProps = { id: string; status: string }
+
+    const send = ({ id, status }: SendProps) =>
       app.inject({
         method: AUTH_METHODS.post,
         url: accountPath({ path: AUTH_PATHS.memberStatus, id }),
@@ -425,8 +429,9 @@ describe('account-bound playback tickets', () => {
     if (first === undefined) throw new Error('Missing private video')
     await manager.updateLibrary({ id: library.id, input: { ...input, settings: { locked: true } } })
     const url = accountPath({ path: AUTH_PATHS.ticket, id: first.id })
-    const mint = ({ headers }: { headers: Record<string, string> }) =>
-      app.inject({ method: AUTH_METHODS.post, url, headers })
+    type MintProps = { headers: Record<string, string> }
+
+    const mint = ({ headers }: MintProps) => app.inject({ method: AUTH_METHODS.post, url, headers })
     const owner = bearerHeaders({ token: ownerToken })
     expect((await mint({ headers: bearerHeaders({ token: friendToken }) })).statusCode).toBe(404)
     expect((await mint({ headers: owner })).statusCode).toBe(LOCKED_STATUS)
@@ -475,15 +480,13 @@ it('keeps health available but new account endpoints closed when configuration i
 })
 
 describe('a server that enforced accounts', () => {
-  const start = ({
-    dataDir,
-    auth,
-    isOptedOut = false,
-  }: {
+  type StartProps = {
     dataDir: string
     auth: ServerConfig['auth']
     isOptedOut?: boolean
-  }) =>
+  }
+
+  const start = ({ dataDir, auth, isOptedOut = false }: StartProps) =>
     createApp({
       config: {
         ...testConfig({ dataDir, mediaDir: root }),
@@ -496,7 +499,9 @@ describe('a server that enforced accounts', () => {
       watch: NOT_WATCHING,
     })
 
-  const answers = async ({ server }: { server: NestFastifyApplication }) => {
+  type AnswersProps = { server: NestFastifyApplication }
+
+  const answers = async ({ server }: AnswersProps) => {
     await server.init()
     const [config, health, me, libraries] = await Promise.all(
       [AUTH_PATHS.config, ROUTES.health.path, AUTH_PATHS.me, ROUTES.libraries.path].map(

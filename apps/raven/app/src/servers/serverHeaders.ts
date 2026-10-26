@@ -4,9 +4,18 @@ import { checkAppCall } from '@/servers/allowlist'
 import { type ServerCookies, cookieHeaderOf } from '@/servers/cookieJar'
 import type { AppServer } from '@/servers/serverList'
 
+type IsServerApiProps = { server: AppServer; address: string }
+
 /** Whether `address` is on the server's own API, the only place its cookies, `Path=/api`, go. */
-export const isServerApi = ({ server, address }: { server: AppServer; address: string }): boolean =>
+export const isServerApi = ({ server, address }: IsServerApiProps): boolean =>
   address.startsWith(`${server.origin}/api/`)
+
+type CookieHeadersForProps = {
+  server: AppServer
+  cookies: ServerCookies
+  /** The signed-in account's token, sent beside the cookies on the server's own API. */
+  accessToken?: string | null
+}
 
 /**
  * The headers a request the app does not make through `fetch` carries to `url`: a picture,
@@ -15,16 +24,7 @@ export const isServerApi = ({ server, address }: { server: AppServer; address: s
  * never gets the cookies.
  */
 export const cookieHeadersFor =
-  ({
-    server,
-    cookies,
-    accessToken = null,
-  }: {
-    server: AppServer
-    cookies: ServerCookies
-    /** The signed-in account's token, sent beside the cookies on the server's own API. */
-    accessToken?: string | null
-  }) =>
+  ({ server, cookies, accessToken = null }: CookieHeadersForProps) =>
   (url: string): Record<string, string> => {
     checkAppCall({ method: APP_CALL_METHODS.get, url })
     if (!isServerApi({ server, address: url })) return {}

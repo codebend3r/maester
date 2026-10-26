@@ -74,23 +74,20 @@ const PLAY_REPLY = {
   target: { fileId: '00000000-0000-4000-8000-0000000000bb', queue: [] },
 } as const satisfies DesktopReply
 
-/**
- * A download service that records what reached it and answers each with a fixed reply. It
- * knows the two videos under `DOWNLOADED`, and `resumeAt` holds the position each
- * `notePosition` found already saved.
- */
-const fakeDownloads = ({
-  grants,
-  savedPosition,
-  serverPosition,
-  watched,
-}: {
+type FakeDownloadsProps = {
   grants: Grants
   savedPosition: () => number | null
   serverPosition: number
   /** The download videos marked watched. */
   watched: readonly string[]
-}) => {
+}
+
+/**
+ * A download service that records what reached it and answers each with a fixed reply. It
+ * knows the two videos under `DOWNLOADED`, and `resumeAt` holds the position each
+ * `notePosition` found already saved.
+ */
+const fakeDownloads = ({ grants, savedPosition, serverPosition, watched }: FakeDownloadsProps) => {
   const reached: { name: string; input: unknown }[] = []
   const resumeAt: (number | null)[] = []
   const note = (name: string, input: unknown = null) => {
@@ -230,18 +227,7 @@ const memoryConfig = (): ConfigStore & { set: (config: DesktopConfig) => void } 
   }
 }
 
-const setup = ({
-  files,
-  dialog = [],
-  addRecentDocument,
-  stat,
-  failOutputWrite = false,
-  failOutputRead = false,
-  updateAnswers = [],
-  serverPosition = 0,
-  watched = [],
-  isSessionTaken = true,
-}: {
+type SetupProps = {
   /** Whether the page's account takes the session it is sent. */
   isSessionTaken?: boolean
   /** The download videos the fake download service says are marked watched. */
@@ -255,7 +241,20 @@ const setup = ({
   dialog?: string[] | Error
   addRecentDocument?: (path: string) => void
   stat?: (path: string) => Promise<{ size: number; mtimeMs: number }>
-}) => {
+}
+
+const setup = ({
+  files,
+  dialog = [],
+  addRecentDocument,
+  stat,
+  failOutputWrite = false,
+  failOutputRead = false,
+  updateAnswers = [],
+  serverPosition = 0,
+  watched = [],
+  isSessionTaken = true,
+}: SetupProps) => {
   const table = new Map(
     Object.entries(files).map(([path, entry]) => [
       path,
@@ -481,7 +480,9 @@ describe('handle', () => {
     const { service } = setup({ files: show })
     const target = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
     const refused = { type: 'refused', message: MESSAGES.unknownRequest } as const
-    const save = ({ position, duration }: { position: unknown; duration: unknown }) =>
+    type SaveProps = { position: unknown; duration: unknown }
+
+    const save = ({ position, duration }: SaveProps) =>
       service.handle({
         kind: 'page',
         request: { type: 'savePosition', fileId: target.fileId, position, duration },
@@ -611,15 +612,14 @@ describe('openDialog', () => {
 })
 
 describe('describeFile', () => {
-  const describeFile = ({
-    service,
-    fileId,
-    queue = [],
-  }: {
+  type DescribeFileProps = {
     service: ReturnType<typeof setup>['service']
     fileId: string
     queue?: string[]
-  }) => service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue } })
+  }
+
+  const describeFile = ({ service, fileId, queue = [] }: DescribeFileProps) =>
+    service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue } })
 
   it('describes the file, finds the next in its folder and records the open', async () => {
     const { service, spies, store } = setup({ files: show })
@@ -785,25 +785,22 @@ describe('describeFile', () => {
 })
 
 describe('savePosition', () => {
-  const save = ({
-    service,
-    fileId,
-    position,
-    duration,
-  }: {
+  type Save2Props = {
     service: ReturnType<typeof setup>['service']
     fileId: string
     position: number
     duration: number | null
-  }) =>
+  }
+
+  const save = ({ service, fileId, position, duration }: Save2Props) =>
     service.handle({ kind: 'page', request: { type: 'savePosition', fileId, position, duration } })
-  const describe1 = ({
-    service,
-    fileId,
-  }: {
+  type Describe1Props = {
     service: ReturnType<typeof setup>['service']
     fileId: string
-  }) => service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue: [] } })
+  }
+
+  const describe1 = ({ service, fileId }: Describe1Props) =>
+    service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue: [] } })
 
   it('resumes from the saved position', async () => {
     const { service } = setup({ files: show })
@@ -877,24 +874,22 @@ describe('savePosition', () => {
 })
 
 describe('saveTracks', () => {
-  const saveTracks = ({
-    service,
-    fileId,
-    audio,
-    subtitle,
-  }: {
+  type SaveTracksProps = {
     service: ReturnType<typeof setup>['service']
     fileId: string
     audio: unknown
     subtitle: unknown
-  }) => service.handle({ kind: 'page', request: { type: 'saveTracks', fileId, audio, subtitle } })
-  const describing = ({
-    service,
-    fileId,
-  }: {
+  }
+
+  const saveTracks = ({ service, fileId, audio, subtitle }: SaveTracksProps) =>
+    service.handle({ kind: 'page', request: { type: 'saveTracks', fileId, audio, subtitle } })
+  type DescribingProps = {
     service: ReturnType<typeof setup>['service']
     fileId: string
-  }) => service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue: [] } })
+  }
+
+  const describing = ({ service, fileId }: DescribingProps) =>
+    service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue: [] } })
 
   it('describes a file with no pick as tracks null', async () => {
     const { service } = setup({ files: show })
@@ -1074,13 +1069,12 @@ describe('recents', () => {
       throw new Error(`expected recents, got ${reply.type}`)
     return reply.recents
   }
-  const open = async ({
-    service,
-    path,
-  }: {
+  type OpenProps = {
     service: ReturnType<typeof setup>['service']
     path: string
-  }) => {
+  }
+
+  const open = async ({ service, path }: OpenProps) => {
     const { fileId } = idOf(await service.openPaths([path]))
     await service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue: [] } })
     return fileId
@@ -1319,7 +1313,9 @@ describe('recents', () => {
 
 describe('the server', () => {
   type Service = ReturnType<typeof setup>['service']
-  const ask = ({ service, request }: { service: Service; request: unknown }) =>
+  type AskProps = { service: Service; request: unknown }
+
+  const ask = ({ service, request }: AskProps) =>
     service.handle({ kind: ENVELOPE_KINDS.page, request })
   const SESSION = { accessToken: 'header.payload.signature', userId: 'ada' }
 
@@ -1391,8 +1387,9 @@ describe('the server', () => {
 
 describe('updates', () => {
   type Service = ReturnType<typeof setup>['service']
-  const ask = ({ service, request }: { service: Service; request: unknown }) =>
-    service.handle({ kind: 'page', request })
+  type Ask2Props = { service: Service; request: unknown }
+
+  const ask = ({ service, request }: Ask2Props) => service.handle({ kind: 'page', request })
   const PAGE = 'https://github.com/codebend3r/maester/releases/tag/v0.6.0'
   const NEWER: UpdateCheck = {
     ok: true,
@@ -1471,8 +1468,9 @@ describe('updates', () => {
 
 describe('downloads', () => {
   type Service = ReturnType<typeof setup>['service']
-  const ask = ({ service, request }: { service: Service; request: unknown }) =>
-    service.handle({ kind: 'page', request })
+  type Ask3Props = { service: Service; request: unknown }
+
+  const ask = ({ service, request }: Ask3Props) => service.handle({ kind: 'page', request })
 
   it('hands a confirmation to the download service and answers its list', async () => {
     const { service, reached } = setup({ files: {} })

@@ -37,18 +37,20 @@ describe('LibraryPage', () => {
     listed: [],
   }
 
+  type ServeProps = {
+    settings?: Partial<LibrarySettings>
+    items?: MediaItem[]
+    route?: string
+    adminLock?: AdminLock
+  }
+
   /** Serves one library whose settings change as the page saves them. */
   const serve = ({
     settings = {},
     items = ITEMS,
     route = '/libraries/2',
     adminLock,
-  }: {
-    settings?: Partial<LibrarySettings>
-    items?: MediaItem[]
-    route?: string
-    adminLock?: AdminLock
-  } = {}) => {
+  }: ServeProps = {}) => {
     const current: { library: Library } = {
       library: library({ id: 2, settings: { ...library().settings, ...settings } }),
     }

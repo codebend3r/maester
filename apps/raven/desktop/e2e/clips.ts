@@ -39,7 +39,9 @@ const encodeArgs = (output: string): string[] => [
   output,
 ]
 
-const run = ({ binary, args, output }: { binary: string; args: string[]; output: string }) =>
+type RunProps = { binary: string; args: string[]; output: string }
+
+const run = ({ binary, args, output }: RunProps) =>
   new Promise<void>((resolve, reject) => {
     execFile(binary, args, (error, _stdout, stderr) => {
       if (error === null) return resolve()
@@ -48,7 +50,9 @@ const run = ({ binary, args, output }: { binary: string; args: string[]; output:
     })
   })
 
-const encode = ({ binary, output }: { binary: string; output: string }): Promise<void> =>
+type EncodeProps = { binary: string; output: string }
+
+const encode = ({ binary, output }: EncodeProps): Promise<void> =>
   run({ binary, args: encodeArgs(output), output })
 
 const ffmpegBinary = () => process.env.RAVEN_E2E_FFMPEG ?? 'ffmpeg'
@@ -75,8 +79,10 @@ export const makeClips = async (): Promise<Clips> => {
   return { folder, first, second }
 }
 
+type TrackArgsProps = { subtitles: string; output: string }
+
 // The same encoders `@raven/mpv`'s native test uses, all built into ffmpeg.
-const trackArgs = ({ subtitles, output }: { subtitles: string; output: string }): string[] => [
+const trackArgs = ({ subtitles, output }: TrackArgsProps): string[] => [
   '-hide_banner',
   '-loglevel',
   'error',

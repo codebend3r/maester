@@ -24,6 +24,8 @@ const noteOf = (refresh: RatingsRefresh): string | null => {
   }
 }
 
+type RatingsStatusProps = { refresh: RatingsRefresh }
+
 /**
  * What Update ratings has done, so far, while it runs or waits and the
  * admin lock is off, as the button that starts it is. `done` counts the
@@ -33,7 +35,7 @@ const noteOf = (refresh: RatingsRefresh): string | null => {
  * as ScanStatus's does, so a screen reader hears the first line and
  * when it goes.
  */
-export const RatingsStatus = ({ refresh }: { refresh: RatingsRefresh }) => {
+export const RatingsStatus = ({ refresh }: RatingsStatusProps) => {
   const canManage = useCanManage()
   if (!canManage) return null
   return (

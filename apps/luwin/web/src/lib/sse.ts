@@ -18,17 +18,14 @@ const parseBlock = (block: string): RawEvent => {
   return { name: name ?? '', data }
 }
 
-const pump = async ({
-  reader,
-  decoder,
-  buffer,
-  onEvent,
-}: {
+type PumpProps = {
   reader: ReadableStreamDefaultReader<Uint8Array>
   decoder: TextDecoder
   buffer: string
   onEvent: (event: RawEvent) => void
-}): Promise<void> => {
+}
+
+const pump = async ({ reader, decoder, buffer, onEvent }: PumpProps): Promise<void> => {
   const { done, value } = await reader.read()
   const text = buffer + decoder.decode(value, { stream: !done })
   const blocks = text.split('\n\n')
@@ -39,12 +36,11 @@ const pump = async ({
   await pump({ reader, decoder, buffer: rest, onEvent })
 }
 
-/** Hands each event in `body` to `onEvent` as it arrives; resolves when the stream ends. */
-export const readEvents = async ({
-  body,
-  onEvent,
-}: {
+type ReadEventsProps = {
   body: ReadableStream<Uint8Array>
   onEvent: (event: RawEvent) => void
-}): Promise<void> =>
+}
+
+/** Hands each event in `body` to `onEvent` as it arrives; resolves when the stream ends. */
+export const readEvents = async ({ body, onEvent }: ReadEventsProps): Promise<void> =>
   pump({ reader: body.getReader(), decoder: new TextDecoder(), buffer: '', onEvent })

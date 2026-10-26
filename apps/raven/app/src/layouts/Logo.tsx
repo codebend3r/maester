@@ -20,8 +20,10 @@ const MARK_HEIGHT_PER_WIDTH = 1024 / 938
 /** What the mark is called aloud: the app it stands for. */
 const LOGO_NAME = 'raven'
 
+type LogoProps = { width: number }
+
 /** raven's mark, `width` points wide, drawn for the ground of the theme worn now. */
-export const Logo = ({ width }: { width: number }) => {
+export const Logo = ({ width }: LogoProps) => {
   const tone = useTheme((theme) => theme.tone)
   return (
     <Image

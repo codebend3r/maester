@@ -23,9 +23,10 @@ export type HeardRequest = { method: string; path: string; body: unknown }
 /** The `:id` placeholder in the allowlist's paths. */
 const ID_PARAM = ':id'
 
+type PathForProps = { path: string; id: number }
+
 /** A route's path for one id: `/api/items/40`. */
-export const pathFor = ({ path, id }: { path: string; id: number }): string =>
-  path.replace(ID_PARAM, String(id))
+export const pathFor = ({ path, id }: PathForProps): string => path.replace(ID_PARAM, String(id))
 
 const isSuccess = (status: number): boolean => status >= 200 && status < 300
 

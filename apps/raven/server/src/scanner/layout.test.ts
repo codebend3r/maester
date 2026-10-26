@@ -9,7 +9,9 @@ import {
 } from '@/scanner/layout'
 import type { FoundFile } from '@/scanner/walk'
 
-const found = ({ path, root }: { path: string; root: string }): FoundFile => ({
+type FoundProps = { path: string; root: string }
+
+const found = ({ path, root }: FoundProps): FoundFile => ({
   path,
   root,
   size: 1,
@@ -101,7 +103,9 @@ describe('title roots', () => {
   })
 })
 
-const row = ({ id, path, folder }: { id: number; path: string; folder: string }) => ({
+type RowProps = { id: number; path: string; folder: string }
+
+const row = ({ id, path, folder }: RowProps) => ({
   id,
   path,
   folder,
@@ -327,7 +331,9 @@ describe('planRelayout', () => {
         folder: 'Ahsoka/Season 1',
       }),
     ]
-    const planFor = ({ layout, files }: { layout: 'auto' | 'flat'; files: typeof rows }) =>
+    type PlanForProps = { layout: 'auto' | 'flat'; files: typeof rows }
+
+    const planFor = ({ layout, files }: PlanForProps) =>
       planRelayout({ rows: files, roots: ['/m/TV'], kind: 'shows', layout, overrides: ['Andor'] })
     const flat = planFor({ layout: 'flat', files: rows })
     expect(flat.overrides).toEqual([])

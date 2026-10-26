@@ -19,6 +19,13 @@ const SUBTITLE_STATUSES = {
 
 export type SubtitleStatus = (typeof SUBTITLE_STATUSES)[keyof typeof SUBTITLE_STATUSES]
 
+type UseTrackCuesProps = {
+  video: { api: ApiClient; mediaId: number } | null
+  track: SubtitleTrack | null
+  time: number
+  duration: number | null
+}
+
 /**
  * The cues around `time` for one track of a server's video, from its WebVTT route. An embedded
  * track is fetched a window at a time, the one playing plus the next as it draws near; a sidecar
@@ -30,12 +37,7 @@ export const useTrackCues = ({
   track,
   time,
   duration,
-}: {
-  video: { api: ApiClient; mediaId: number } | null
-  track: SubtitleTrack | null
-  time: number
-  duration: number | null
-}): { cues: SubtitleCue[]; status: SubtitleStatus } => {
+}: UseTrackCuesProps): { cues: SubtitleCue[]; status: SubtitleStatus } => {
   const queries = (() => {
     if (track == null || video == null) return []
     const windows =

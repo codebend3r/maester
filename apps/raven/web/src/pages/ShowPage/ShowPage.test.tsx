@@ -24,13 +24,12 @@ describe('ShowPage', () => {
     setItemMatch: spyOn(api, 'setItemMatch'),
   }
 
-  const open = ({
-    details = SEVERANCE,
-    adminLock,
-  }: {
+  type OpenProps = {
     details?: ItemDetails
     adminLock?: AdminLock
-  } = {}) => {
+  }
+
+  const open = ({ details = SEVERANCE, adminLock }: OpenProps = {}) => {
     spies.item.mockImplementation(async () => details)
     spies.next.mockImplementation(async () => EPISODE_TWO)
     renderWithProviders({

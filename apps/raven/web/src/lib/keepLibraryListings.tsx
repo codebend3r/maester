@@ -27,7 +27,9 @@ const scopeOf = (access: AccessState): string | null => {
   }
 }
 
-const Keep = ({ scope }: { scope: string }) => {
+type KeepProps = { scope: string }
+
+const Keep = ({ scope }: KeepProps) => {
   const queryClient = useQueryClient()
   // Narrowed to what decides the work, so the refreshes a scan brings leave the list as it was and the work running.
   const libraries = useQuery({
@@ -52,6 +54,8 @@ const Keep = ({ scope }: { scope: string }) => {
   return null
 }
 
+type KeepLibraryListingsProps = { children: ReactNode }
+
 /**
  * Once the viewer is served, puts back the library listings this device
  * saved, reads the rest in the background one library at a time while the
@@ -59,7 +63,7 @@ const Keep = ({ scope }: { scope: string }) => {
  * for an approved account when accounts are on, as the server answers no
  * one else, and keeps each account's listings apart.
  */
-export const KeepLibraryListings = ({ children }: { children: ReactNode }) => {
+export const KeepLibraryListings = ({ children }: KeepLibraryListingsProps) => {
   const scope = scopeOf(useAccessState())
   return (
     <>

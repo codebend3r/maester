@@ -52,8 +52,10 @@ const toDraft = (metadata: ItemMetadata): Draft => ({
   summary: metadata.summary ?? '',
 })
 
+type ValueOfProps = { key: Field; text: string }
+
 /** A draft value as the API takes it; a blank is null, as is a year that is not a number. */
-const valueOf = ({ key, text }: { key: Field; text: string }): string | number | null => {
+const valueOf = ({ key, text }: ValueOfProps): string | number | null => {
   const trimmed = text.trim()
   if (trimmed === '') return null
   if (key !== FIELD_KEYS.year) return trimmed
@@ -64,6 +66,15 @@ const valueOf = ({ key, text }: { key: Field; text: string }): string | number |
 /** The edition a file name carries, for the wand: the first version that has one. */
 const editionFrom = (versions: readonly ItemDetails['versions'][number][]): string | null =>
   versions.find((version) => version.edition != null)?.edition ?? null
+
+type MetadataEditorProps = {
+  /** The item, its `versions` the files on the card the page is for. */
+  details: ItemDetails
+  /** A movie's files in the page's library, on every card. */
+  everyCard?: readonly MediaItem[]
+  itemKind: MatchItemType
+  onDone: () => void
+}
 
 /**
  * Edit metadata: a movie's files, which Split apart gives a card each when
@@ -79,14 +90,7 @@ export const MetadataEditor = ({
   everyCard = details.versions,
   itemKind,
   onDone,
-}: {
-  /** The item, its `versions` the files on the card the page is for. */
-  details: ItemDetails
-  /** A movie's files in the page's library, on every card. */
-  everyCard?: readonly MediaItem[]
-  itemKind: MatchItemType
-  onDone: () => void
-}) => {
+}: MetadataEditorProps) => {
   const ids = { heading: useId(), form: useId() }
   const queryClient = useQueryClient()
   const state = useQuery(itemMetadataQuery(details.id))

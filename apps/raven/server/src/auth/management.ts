@@ -15,6 +15,10 @@ import { AUTH_STATE } from '@/auth/effectiveAuth'
 export const isApprovedOwner = (account: Account): boolean =>
   account.status === MEMBER_STATUSES.approved && account.isOwner
 
+type ManagementCanManageProps = { request: Pick<FastifyRequest, 'headers'> }
+
+type ManagementIsOwnerCallerProps = { request: object }
+
 /**
  * Who may manage raven. With accounts off it is the browser whose admin
  * lock is off, as before accounts. Once they are ready it is the approved
@@ -35,7 +39,7 @@ export class Management {
     return this.auth.state === AUTH_CONFIG_STATES.off
   }
 
-  canManage({ request }: { request: Pick<FastifyRequest, 'headers'> }): boolean {
+  canManage({ request }: ManagementCanManageProps): boolean {
     switch (this.auth.state) {
       case AUTH_CONFIG_STATES.off:
         return !this.admin.isLocked({ cookie: request.headers[AUTH_HEADERS.cookie] })
@@ -50,7 +54,7 @@ export class Management {
     }
   }
 
-  private isOwnerCaller({ request }: { request: object }): boolean {
+  private isOwnerCaller({ request }: ManagementIsOwnerCallerProps): boolean {
     const account = accountOf(this.sessions.callerOf({ request }))
     return account !== null && isApprovedOwner(account)
   }

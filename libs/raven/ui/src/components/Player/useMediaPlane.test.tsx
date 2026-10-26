@@ -15,8 +15,12 @@ const REFRESH_MS = 2 * 60_000
 
 const apiWithTickets = (getMediaTicket: typeof api.getMediaTicket) => ({ ...api, getMediaTicket })
 
-const harness = ({ client = new QueryClient() }: { client?: QueryClient } = {}) => {
-  const Wrapper = ({ children }: { children: ReactNode }) => (
+type HarnessProps = { client?: QueryClient }
+
+const harness = ({ client = new QueryClient() }: HarnessProps = {}) => {
+  type WrapperProps = { children: ReactNode }
+
+  const Wrapper = ({ children }: WrapperProps) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   )
   return Wrapper

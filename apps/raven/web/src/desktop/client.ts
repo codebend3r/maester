@@ -30,14 +30,14 @@ const replyOf = async (invoke: () => Promise<unknown>): Promise<DesktopReply> =>
   }
 }
 
-/** What main said when it refused, else `fallback` for any other answer than the one asked for. */
-export const refusalText = ({
-  reply,
-  fallback,
-}: {
+type RefusalTextProps = {
   reply: DesktopReply
   fallback: string
-}): string => (reply.type === DESKTOP_REPLIES.refused ? reply.message : fallback)
+}
+
+/** What main said when it refused, else `fallback` for any other answer than the one asked for. */
+export const refusalText = ({ reply, fallback }: RefusalTextProps): string =>
+  reply.type === DESKTOP_REPLIES.refused ? reply.message : fallback
 
 /** A client over the preload's bridge, or null where there is none: in a browser. */
 export const clientFor = (bridge: unknown): DesktopClient | null => {

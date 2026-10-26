@@ -9,14 +9,13 @@ import {
 
 const pad = (value: number): string => String(value).padStart(2, '0')
 
-/** "S01E02", or "S01" for a season; null when there is no number to show. */
-export const episodeCode = ({
-  season,
-  episode,
-}: {
+type EpisodeCodeProps = {
   season: number | null
   episode: number | null
-}): string | null => {
+}
+
+/** "S01E02", or "S01" for a season; null when there is no number to show. */
+export const episodeCode = ({ season, episode }: EpisodeCodeProps): string | null => {
   if (season == null) return null
   return episode == null ? `S${pad(season)}` : `S${pad(season)}E${pad(episode)}`
 }
@@ -75,14 +74,13 @@ export const tileWords = (media: MediaItem): { title: string; line: string | nul
   return { title, line: year == null ? null : String(year) }
 }
 
-/** The score a card shows: the library's chosen source, else TMDB's, else none. */
-export const pickScore = ({
-  ratings,
-  source,
-}: {
+type PickScoreProps = {
   ratings: readonly Rating[]
   source: RatingSource
-}): Rating | null =>
+}
+
+/** The score a card shows: the library's chosen source, else TMDB's, else none. */
+export const pickScore = ({ ratings, source }: PickScoreProps): Rating | null =>
   ratings.find((rating) => rating.source === source) ??
   ratings.find((rating) => rating.source === RATING_SOURCES.tmdb) ??
   null

@@ -8,14 +8,13 @@ export const wholeNumber = (value: string | undefined): number | null => {
     : null
 }
 
-/** `1`, `true`, `yes` or `on` is true, their opposites false, and anything else `fallback`. */
-export const flag = ({
-  value,
-  fallback,
-}: {
+type FlagProps = {
   value: string | undefined
   fallback: boolean
-}): boolean => {
+}
+
+/** `1`, `true`, `yes` or `on` is true, their opposites false, and anything else `fallback`. */
+export const flag = ({ value, fallback }: FlagProps): boolean => {
   const normalised = value?.trim().toLowerCase() ?? ''
   if (['1', 'true', 'yes', 'on'].includes(normalised)) return true
   if (['0', 'false', 'no', 'off'].includes(normalised)) return false
@@ -39,14 +38,13 @@ export const LISTEN_ENV_VARS = {
   webDir: 'WEB_DIR',
 } as const
 
-/** `PORT`, `HOST`, `DATA_DIR` and `WEB_DIR`, with `defaultPort` when `PORT` is not a whole number. */
-export const readListenConfig = ({
-  env,
-  defaultPort,
-}: {
+type ReadListenConfigProps = {
   env: NodeJS.ProcessEnv
   defaultPort: number
-}): ListenConfig => {
+}
+
+/** `PORT`, `HOST`, `DATA_DIR` and `WEB_DIR`, with `defaultPort` when `PORT` is not a whole number. */
+export const readListenConfig = ({ env, defaultPort }: ReadListenConfigProps): ListenConfig => {
   const webDir = env[LISTEN_ENV_VARS.webDir]?.trim()
   return {
     port: wholeNumber(env[LISTEN_ENV_VARS.port]) ?? defaultPort,

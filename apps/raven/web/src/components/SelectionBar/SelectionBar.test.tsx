@@ -13,7 +13,9 @@ import { mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { Peek, peeked } from '@/test/selection'
 
-const Card = ({ id }: { id: string }) => {
+type CardProps = { id: string }
+
+const Card = ({ id }: CardProps) => {
   const select = useSelectable({ key: id, title: id })
   return (
     <li data-entry={id} {...select.rootProps}>

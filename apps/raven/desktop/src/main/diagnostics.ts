@@ -26,15 +26,17 @@ export type DiagnosticsInput = {
   displayHz: number | null
 }
 
+type ReadProps = {
+  name: typeof MPV_PROPERTIES.ffmpegVersion | typeof MPV_PROPERTIES.hwdecCurrent
+}
+
 /**
  * The part of `Mpv` the diagnostics read, written out so a test can fake it: a real `Mpv`
  * fits it. Only properties the wrapper already guards (Ruling 14).
  */
-export type DiagnosableMpv = {
+type DiagnosableMpv = {
   version: string
-  read: (input: {
-    name: typeof MPV_PROPERTIES.ffmpegVersion | typeof MPV_PROPERTIES.hwdecCurrent
-  }) => Promise<string>
+  read: (input: ReadProps) => Promise<string>
   display: () => DisplayInfo
 }
 
@@ -43,14 +45,13 @@ export const DIAGNOSTICS_READ_MS = 1000
 
 const UNKNOWN = 'unknown'
 
-// A reading that rejects is absent (nothing playing); one that never answers is unknown.
-const readWithin = async ({
-  read,
-  ms,
-}: {
+type ReadWithinProps = {
   read: () => Promise<string>
   ms: number
-}): Promise<string | null> => {
+}
+
+// A reading that rejects is absent (nothing playing); one that never answers is unknown.
+const readWithin = async ({ read, ms }: ReadWithinProps): Promise<string | null> => {
   const deadline = Promise.withResolvers<string>()
   const timer = setTimeout(() => deadline.resolve(UNKNOWN), ms)
   // Through `then`, so a read that throws before returning its promise is a rejection too.
@@ -74,13 +75,17 @@ const displayOrNull = (mpv: DiagnosableMpv): DisplayInfo | null => {
   }
 }
 
+type ReadEngineDiagnosticsProps = {
+  mpv: DiagnosableMpv
+  readMs?: number
+}
+
 export const readEngineDiagnostics = async ({
   mpv,
   readMs = DIAGNOSTICS_READ_MS,
-}: {
-  mpv: DiagnosableMpv
-  readMs?: number
-}): Promise<Extract<EngineDiagnostics, { kind: typeof ENGINE_STATUSES.native }>> => {
+}: ReadEngineDiagnosticsProps): Promise<
+  Extract<EngineDiagnostics, { kind: typeof ENGINE_STATUSES.native }>
+> => {
   const [ffmpeg, hwdecCurrent] = await Promise.all([
     readWithin({ read: () => mpv.read({ name: MPV_PROPERTIES.ffmpegVersion }), ms: readMs }),
     readWithin({ read: () => mpv.read({ name: MPV_PROPERTIES.hwdecCurrent }), ms: readMs }),
@@ -96,22 +101,21 @@ export const readEngineDiagnostics = async ({
 
 const STILL_OPENING = 'still opening'
 
-/** Why there is no engine to read: off for this run, what the engine said as it fell back, or not yet open. */
-export const unavailableReason = ({
-  mode,
-  note,
-}: {
+type UnavailableReasonProps = {
   mode: EngineMode
   note: string | null
-}): string => (mode === ENGINE_MODES.off ? ENGINE_MESSAGES.off : (note ?? STILL_OPENING))
+}
 
-const engineLines = ({
-  engine,
-  displayHz,
-}: {
+/** Why there is no engine to read: off for this run, what the engine said as it fell back, or not yet open. */
+export const unavailableReason = ({ mode, note }: UnavailableReasonProps): string =>
+  mode === ENGINE_MODES.off ? ENGINE_MESSAGES.off : (note ?? STILL_OPENING)
+
+type EngineLinesProps = {
   engine: EngineDiagnostics
   displayHz: number | null
-}): string[] => {
+}
+
+const engineLines = ({ engine, displayHz }: EngineLinesProps): string[] => {
   // Electron reports 0 for a display whose rate it does not know.
   const hz = displayHz !== null && displayHz > 0 ? displayHz : 'unknown'
   switch (engine.kind) {

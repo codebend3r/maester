@@ -63,13 +63,17 @@ describe('the library PIN bound to the account', () => {
   const asOwner = () =>
     headersFor({ fixture, caller: CALLER_KINDS.owner, via: TOKEN_CARRIERS.bearer })
 
-  const file = ({ headers }: { headers: Record<string, string> }) =>
+  type FileProps = { headers: Record<string, string> }
+
+  const file = ({ headers }: FileProps) =>
     locked.app.inject({
       url: pathOf({ route: ROUTES.file, params: { id: locked.ids.video } }),
       headers,
     })
 
-  const unlockWith = ({ headers, pin = PIN }: { headers: Record<string, string>; pin?: string }) =>
+  type UnlockWithProps = { headers: Record<string, string>; pin?: string }
+
+  const unlockWith = ({ headers, pin = PIN }: UnlockWithProps) =>
     locked.app.inject({
       method: ROUTES.unlock.method,
       url: ROUTES.unlock.path,
@@ -77,11 +81,11 @@ describe('the library PIN bound to the account', () => {
       payload: { pin },
     })
 
-  const libraryIdsSeenBy = async ({
-    headers,
-  }: {
+  type LibraryIdsSeenByProps = {
     headers: Record<string, string>
-  }): Promise<number[]> => {
+  }
+
+  const libraryIdsSeenBy = async ({ headers }: LibraryIdsSeenByProps): Promise<number[]> => {
     const body: unknown = (await locked.app.inject({ url: ROUTES.libraries.path, headers })).json()
     return Array.isArray(body) ? body.filter(isLibrary).map(({ id }) => id) : []
   }
@@ -151,7 +155,9 @@ describe('the library PIN bound to the account', () => {
   })
 
   it('tells a member the lock is not theirs, and the owner it is', async () => {
-    const stateFor = async ({ headers }: { headers: Record<string, string> }) => {
+    type StateForProps = { headers: Record<string, string> }
+
+    const stateFor = async ({ headers }: StateForProps) => {
       const body: unknown = (
         await locked.app.inject({ url: ROUTES.lockState.path, headers })
       ).json()
@@ -222,7 +228,9 @@ describe('a legacy media ticket beside an account', () => {
     await rm(legacyRoot, { recursive: true, force: true, maxRetries: 5 })
   })
 
-  const fileWithLegacyTicket = async ({ headers }: { headers: Record<string, string> }) => {
+  type FileWithLegacyTicketProps = { headers: Record<string, string> }
+
+  const fileWithLegacyTicket = async ({ headers }: FileWithLegacyTicketProps) => {
     const id = legacy.ids.video
     const { ticket } = legacy.app.get(MediaTickets).issue({ id })
     return legacy.app.inject({

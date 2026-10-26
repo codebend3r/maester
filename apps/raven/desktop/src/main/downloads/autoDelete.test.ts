@@ -53,7 +53,9 @@ const memoryStore = (initial: DownloadsState): JsonStore<DownloadsState> => {
   }
 }
 
-const setup = ({ entries = [entryFor()] }: { entries?: DownloadEntry[] } = {}) => {
+type SetupProps = { entries?: DownloadEntry[] }
+
+const setup = ({ entries = [entryFor()] }: SetupProps = {}) => {
   const store = memoryStore({ ...EMPTY_DOWNLOADS, entries })
   const { timers, pending } = fakeTimers()
   const clock = { now: NOW }

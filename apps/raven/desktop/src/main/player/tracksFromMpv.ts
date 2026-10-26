@@ -19,13 +19,12 @@ const subtitleEntries = (list: readonly MpvTrack[]) => {
   })
 }
 
-export const tracksFromMpv = ({
-  list,
-  frameRate,
-}: {
+type TracksFromMpvProps = {
   list: readonly MpvTrack[]
   frameRate: number | null
-}): MediaTracks => {
+}
+
+export const tracksFromMpv = ({ list, frameRate }: TracksFromMpvProps): MediaTracks => {
   const audio = list
     .filter((track) => track.type === MPV_TRACK_TYPES.audio)
     .map((track, index) => {
@@ -61,10 +60,14 @@ export const tracksFromMpv = ({
   }
 }
 
-export const aidFor = ({ list, index }: { list: readonly MpvTrack[]; index: number }) =>
+type AidForProps = { list: readonly MpvTrack[]; index: number }
+
+export const aidFor = ({ list, index }: AidForProps) =>
   list.filter((track) => track.type === MPV_TRACK_TYPES.audio)[index]?.id ?? null
 
-export const sidFor = ({ list, id }: { list: readonly MpvTrack[]; id: string }) => {
+type SidForProps = { list: readonly MpvTrack[]; id: string }
+
+export const sidFor = ({ list, id }: SidForProps) => {
   if (!SUBTITLE_ID.test(id)) return null
   return subtitleEntries(list).find((entry) => entry.id === id)?.track.id ?? null
 }

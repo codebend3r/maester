@@ -31,7 +31,9 @@ const SESSION = {
 }
 
 const mockDismissTo = jest.fn<(href: string) => void>()
-const mockSignIn = jest.fn<(input: { email: string; password: string }) => Promise<AuthOutcome>>()
+type MockSignInCallbackProps = { email: string; password: string }
+
+const mockSignIn = jest.fn<(input: MockSignInCallbackProps) => Promise<AuthOutcome>>()
 const mockSignOut = jest.fn()
 const getLock = jest.fn<() => Promise<LockState>>()
 const unlock = jest.fn<(pin: string) => Promise<LockState>>()
@@ -61,7 +63,9 @@ jest.mock('@/servers/serverClient', () => ({
   },
 }))
 
-const signInWith = async ({ email, password }: { email: string; password: string }) => {
+type SignInWithProps = { email: string; password: string }
+
+const signInWith = async ({ email, password }: SignInWithProps) => {
   await fireEvent.changeText(screen.getByLabelText('Email'), email)
   await fireEvent.changeText(screen.getByLabelText('Password'), password)
   await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))

@@ -81,13 +81,12 @@ describe('resolveAuthState', () => {
     new SettingsRepository(database.get()).forgetAccountsEnforced()
   })
 
-  const resolve = ({
-    auth,
-    isOptedOut,
-  }: {
+  type ResolveProps = {
     auth: typeof AUTH_TEST_CONFIG | typeof OFF
     isOptedOut: boolean
-  }) => {
+  }
+
+  const resolve = ({ auth, isOptedOut }: ResolveProps) => {
     const settings = new SettingsRepository(database.get())
     return {
       settings,

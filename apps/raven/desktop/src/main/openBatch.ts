@@ -6,6 +6,12 @@ import { MAX_QUEUE } from '@/shared/hostNames'
 // The first item plays and the rest queue, so a batch past this has nowhere to go.
 const BATCH_CAP = MAX_QUEUE + 1
 
+type CreateOpenBatchProps<T> = {
+  delayMs: number
+  timers: Timers
+  deliver: (items: T[]) => void
+}
+
 /**
  * Holds opens (Finder's one `open-file` per file, links, a second launch) until the
  * renderer is ready, then hands them over in bursts so a multi-file open plays the
@@ -15,11 +21,7 @@ export const createOpenBatch = <T>({
   delayMs,
   timers,
   deliver,
-}: {
-  delayMs: number
-  timers: Timers
-  deliver: (items: T[]) => void
-}): { push: (item: T) => void; ready: () => void } => {
+}: CreateOpenBatchProps<T>): { push: (item: T) => void; ready: () => void } => {
   let held: T[] = []
   let isReady = false
   let timer: unknown
@@ -50,17 +52,16 @@ export const createOpenBatch = <T>({
 export const pathsFromArgv = (argv: readonly string[]): string[] =>
   argv.slice(1).filter((arg) => !arg.startsWith('-') && isAbsolute(arg))
 
+type LaunchPathsProps = {
+  argv: readonly string[]
+  isDefaultApp: boolean
+}
+
 /**
  * `pathsFromArgv` for a launch. Unpackaged, Electron is run as `electron <app> ...`,
  * so the first argument that is not a switch is the app's folder, not a file to open.
  */
-export const launchPaths = ({
-  argv,
-  isDefaultApp,
-}: {
-  argv: readonly string[]
-  isDefaultApp: boolean
-}): string[] => {
+export const launchPaths = ({ argv, isDefaultApp }: LaunchPathsProps): string[] => {
   if (!isDefaultApp) return pathsFromArgv(argv)
   const appIndex = argv.findIndex((arg, index) => index > 0 && !arg.startsWith('-'))
   return pathsFromArgv(appIndex === -1 ? argv : argv.toSpliced(appIndex, 1))

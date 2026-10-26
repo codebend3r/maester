@@ -33,18 +33,25 @@ export type PlayChoices = {
   select: (pick: PlayPick) => void
 }
 
-const modeOption = ({
-  mode,
-  rendition,
-}: {
+type ModeOptionProps = {
   mode: PlaybackMode
   rendition: Rendition
-}): ChoiceOption => ({
+}
+
+const modeOption = ({ mode, rendition }: ModeOptionProps): ChoiceOption => ({
   label: describeMode(mode),
   details: null,
   isChecked: mode === rendition.mode,
   pick: { kind: PICK_KINDS.mode, mode },
 })
+
+type ChoiceGroupsProps = {
+  modes: readonly PlaybackMode[]
+  rendition: Rendition
+  qualities: readonly StreamQuality[]
+  /** The original file's bitrate and picture, as the first size reads. */
+  original: string | null
+}
 
 /**
  * Without sizes, the ways to play. With them, Plex's list: the original
@@ -56,13 +63,7 @@ export const choiceGroups = ({
   rendition,
   qualities,
   original,
-}: {
-  modes: readonly PlaybackMode[]
-  rendition: Rendition
-  qualities: readonly StreamQuality[]
-  /** The original file's bitrate and picture, as the first size reads. */
-  original: string | null
-}): ChoiceGroup[] => {
+}: ChoiceGroupsProps): ChoiceGroup[] => {
   const asModes = (candidates: readonly PlaybackMode[]): ChoiceGroup[] =>
     candidates.length > 1
       ? [

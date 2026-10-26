@@ -5,11 +5,13 @@ import { useMenu } from '@/lib/useMenu'
 import { useTheme } from '@/stores/theme'
 import styles from '@/components/ThemePicker/ThemePicker.module.scss'
 
+type PreviewProps = { theme: ThemeId }
+
 /**
  * A theme in miniature, in its own colours: the ground, a poster, a line of
  * title and one of meta, and the bar Play wears.
  */
-const Preview = ({ theme }: { theme: ThemeId }) => (
+const Preview = ({ theme }: PreviewProps) => (
   <span className={styles.preview} data-theme={theme} aria-hidden="true">
     <span className={styles.poster} />
     <span className={styles.title} />
@@ -18,6 +20,8 @@ const Preview = ({ theme }: { theme: ThemeId }) => (
   </span>
 )
 
+type ThemePickerProps = { className?: string }
+
 /**
  * The round button in a page's corner, its swatch the current theme's play,
  * text and moss, and the menu it opens: every theme with a preview, its name
@@ -25,7 +29,7 @@ const Preview = ({ theme }: { theme: ThemeId }) => (
  * on this device and closes the menu. Escape, Tab or a click elsewhere
  * closes it too.
  */
-export const ThemePicker = ({ className }: { className?: string }) => {
+export const ThemePicker = ({ className }: ThemePickerProps) => {
   const id = useId()
   const { isOpen, toggle, close, root, trigger, list, onKeyDown } = useMenu()
   const { theme, pick } = useTheme()

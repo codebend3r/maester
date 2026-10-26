@@ -60,8 +60,10 @@ describe('a library locked behind the PIN', () => {
   /** The client as a browser holding `cookie`, or none, beside its admin session. */
   const api = (cookie?: string): ApiClient =>
     apiFor({ app: app(), cookie: cookies(state.admin, cookie) })
+  type InjectProps = { method: RouteMethod; url: string }
+
   /** A request by hand from the same browser. */
-  const inject = ({ method, url }: { method: RouteMethod; url: string }) =>
+  const inject = ({ method, url }: InjectProps) =>
     app().inject({ method, url, headers: { cookie: state.admin } })
   const at = (...parts: string[]) => join(state.root, 'media', ...parts)
   /**
@@ -453,8 +455,10 @@ describe('the admin lock', () => {
       () => 200,
       (error: unknown) => (isRecord(error) ? error.status : error),
     )
+  type PostProps = { path: string; cookie: string }
+
   /** A POST to the admin lock by hand, for the cookie its answer sets. */
-  const post = async ({ path, cookie }: { path: string; cookie: string }) => {
+  const post = async ({ path, cookie }: PostProps) => {
     const response = await app().inject({
       method: 'POST',
       url: `/api/admin/${path}`,
@@ -628,7 +632,9 @@ describe('the admin lock', () => {
   it('lets anyone sort, view, group or pin a library, and change nothing else of it', async () => {
     const before = await api(state.admin).getLibrary(state.open)
     const { kind, sort, view, groupBy, pinned } = before.settings
-    const another = <T>({ values, current }: { values: readonly T[]; current: T }): T =>
+    type AnotherProps<T> = { values: readonly T[]; current: T }
+
+    const another = <T>({ values, current }: AnotherProps<T>): T =>
       values.find((value) => value !== current) ?? current
     const change = {
       sort: another({ values: sortsFor(kind), current: sort }),

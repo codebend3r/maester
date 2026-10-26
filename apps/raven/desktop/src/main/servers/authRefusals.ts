@@ -37,24 +37,26 @@ export const ACCOUNT_REFUSAL_STATUSES = [
   HTTP_STATUSES.forbidden,
 ] as const
 
+type RefusalAtProps = {
+  status: number
+  body: string
+  statuses: readonly number[]
+}
+
 /** The reason a reply gives when its status is one of `statuses`; null for any other reply. */
 export const refusalAt = ({
   status,
   body,
   statuses,
-}: {
+}: RefusalAtProps): AuthRefusal['reason'] | null =>
+  statuses.includes(status) ? refusalIn(body) : null
+
+type AccountRefusalOfProps = {
   status: number
   body: string
-  statuses: readonly number[]
-}): AuthRefusal['reason'] | null => (statuses.includes(status) ? refusalIn(body) : null)
+}
 
 /** Why a `401` or `403` refused the account: the reason its body gives, or the one its status stands for. */
-export const accountRefusalOf = ({
-  status,
-  body,
-}: {
-  status: number
-  body: string
-}): AuthRefusal['reason'] =>
+export const accountRefusalOf = ({ status, body }: AccountRefusalOfProps): AuthRefusal['reason'] =>
   refusalIn(body) ??
   (status === HTTP_STATUSES.unauthorized ? AUTH_REFUSALS.signedOut : AUTH_REFUSALS.revoked)

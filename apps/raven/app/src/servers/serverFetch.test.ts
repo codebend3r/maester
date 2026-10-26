@@ -20,6 +20,8 @@ const SERVER: AppServer = {
 
 type Sent = { url: string; init: Parameters<NativeFetch>[1] }
 
+type RecordingFetchProps = { setCookie?: string | null; body?: unknown; landedAt?: string }
+
 /**
  * A fetch that records each request and answers with `setCookie` and `body`, reporting
  * `landedAt` as where the request ended (the request's own address unless set).
@@ -28,7 +30,7 @@ const recordingFetch = ({
   setCookie = null,
   body = { available: true, unlocked: true },
   landedAt,
-}: { setCookie?: string | null; body?: unknown; landedAt?: string } = {}) => {
+}: RecordingFetchProps = {}) => {
   const sent: Sent[] = []
   const fetch: NativeFetch = async (url, init) => {
     sent.push({ url, init })

@@ -115,13 +115,15 @@ const lifecycleCounts = () => {
 
 setFlagsFromString('--expose-gc')
 const gc: unknown = runInNewContext('gc')
+type CollectUntilProps = {
+  matches: () => boolean
+  deadline?: number
+}
+
 const collectUntil = async ({
   matches,
   deadline = Date.now() + 15000,
-}: {
-  matches: () => boolean
-  deadline?: number
-}): Promise<void> => {
+}: CollectUntilProps): Promise<void> => {
   if (!isFunction(gc)) throw new Error('No garbage collector to reclaim native owners with')
   gc()
   await sleep(10)
@@ -131,8 +133,10 @@ const collectUntil = async ({
   await collectUntil({ matches, deadline })
 }
 
+type ReleasedProps = { deadline: number }
+
 /** Waits until no engine holds a libmpv handle or an event callback; both go on destroy. */
-const released = async ({ deadline }: { deadline: number }): Promise<void> => {
+const released = async ({ deadline }: ReleasedProps): Promise<void> => {
   const { handles, callbacks } = lifecycleCounts()
   if (handles === 0 && callbacks === 0) return
   if (Date.now() > deadline)
@@ -240,33 +244,35 @@ const isOf =
   (event: PlayerEvent): event is EventOf<K> =>
     event.type === type
 
+type WhereProps<K extends PlayerEvent['type']> = {
+  type: K
+  holds?: (event: EventOf<K>) => boolean
+}
+
 const where =
-  <K extends PlayerEvent['type']>({
-    type,
-    holds = () => true,
-  }: {
-    type: K
-    holds?: (event: EventOf<K>) => boolean
-  }) =>
+  <K extends PlayerEvent['type']>({ type, holds = () => true }: WhereProps<K>) =>
   (event: PlayerEvent): event is EventOf<K> =>
     isOf(type)(event) && holds(event)
 
-const near = ({ value, target, within }: { value: number; target: number; within: number }) =>
-  Math.abs(value - target) <= within
+type NearProps = { value: number; target: number; within: number }
+
+const near = ({ value, target, within }: NearProps) => Math.abs(value - target) <= within
 
 type Servers = Parameters<typeof resolveSourceWith>[0]['servers']
+
+type OpenHarnessProps = {
+  servers?: Servers
+  explain?: FailureExplainer
+  refusedAccount?: AccountRefusalReader
+  serverStallMs?: number
+}
 
 const openHarness = async ({
   servers = NO_SERVERS,
   explain = noExplanation,
   refusedAccount = noRefusedAccount,
   serverStallMs,
-}: {
-  servers?: Servers
-  explain?: FailureExplainer
-  refusedAccount?: AccountRefusalReader
-  serverStallMs?: number
-} = {}) => {
+}: OpenHarnessProps = {}) => {
   const events: PlayerEvent[] = []
   // What mpv itself said, in stream order, without the property changes.
   const raw: MpvEvent[] = []
@@ -301,16 +307,18 @@ const openHarness = async ({
     Array.from(listeners).forEach((listener) => listener(event))
   })
 
+  type NextEventProps<T extends PlayerEvent> = {
+    matches: (event: PlayerEvent) => event is T
+    label: string
+    timeoutMs?: number
+  }
+
   /** Registers now and resolves with the first matching event, or fails after `timeoutMs`. */
   const nextEvent = <T extends PlayerEvent>({
     matches,
     label,
     timeoutMs = WAIT_MS,
-  }: {
-    matches: (event: PlayerEvent) => event is T
-    label: string
-    timeoutMs?: number
-  }): Promise<T> => {
+  }: NextEventProps<T>): Promise<T> => {
     const pending = new Promise<T>((resolveEvent, reject) => {
       const listener = (event: PlayerEvent) => {
         if (!matches(event)) return
@@ -329,15 +337,17 @@ const openHarness = async ({
     return pending
   }
 
-  const eventAfter = async <T extends PlayerEvent>({
-    action,
-    ...wait
-  }: {
+  type EventAfterProps<T extends PlayerEvent> = {
     action: () => Promise<unknown>
     matches: (event: PlayerEvent) => event is T
     label: string
     timeoutMs?: number
-  }): Promise<T> => {
+  }
+
+  const eventAfter = async <T extends PlayerEvent>({
+    action,
+    ...wait
+  }: EventAfterProps<T>): Promise<T> => {
     const pending = nextEvent(wait)
     await action()
     return pending
@@ -347,35 +357,37 @@ const openHarness = async ({
   const sendOk = async (command: PlayerCommand) => {
     assert.deepEqual(await send(command), { ok: true }, `${command.type} was refused`)
   }
-  const load = ({
-    fileId,
-    start = 0,
-    audio = null,
-    subtitle = null,
-  }: {
+  type LoadProps = {
     fileId: FileId
     start?: number
     audio?: number | null
     subtitle?: string | null
-  }) => sendOk({ type: 'load', source: { kind: 'file', fileId }, start, audio, subtitle })
+  }
+
+  const load = ({ fileId, start = 0, audio = null, subtitle = null }: LoadProps) =>
+    sendOk({ type: 'load', source: { kind: 'file', fileId }, start, audio, subtitle })
+
+  type WaitForProps = {
+    label: string
+    check: () => Promise<boolean>
+    deadline?: number
+  }
 
   /** Polls observable state until it holds, so nothing here waits on a fixed sleep. */
   const waitFor = async ({
     label,
     check,
     deadline = Date.now() + WAIT_MS,
-  }: {
-    label: string
-    check: () => Promise<boolean>
-    deadline?: number
-  }): Promise<void> => {
+  }: WaitForProps): Promise<void> => {
     if (await check()) return
     if (Date.now() > deadline) throw new Error(`Timed out waiting for ${label}`)
     await sleep(20)
     await waitFor({ label, check, deadline })
   }
 
-  const playing = ({ fileId, start = 0 }: { fileId: FileId; start?: number }) =>
+  type PlayingProps = { fileId: FileId; start?: number }
+
+  const playing = ({ fileId, start = 0 }: PlayingProps) =>
     eventAfter({
       label: `${fileId} playing`,
       matches: where({ type: 'paused', holds: (event) => !event.paused }),
@@ -420,7 +432,9 @@ const withHarness = async (run: (harness: Harness) => Promise<void>) => {
   }
 }
 
-const destroyWithin = async ({ harness, ms }: { harness: Harness; ms: number }) => {
+type DestroyWithinProps = { harness: Harness; ms: number }
+
+const destroyWithin = async ({ harness, ms }: DestroyWithinProps) => {
   const started = Date.now()
   const outcome = await Promise.race([
     harness.destroy().then(() => 'destroyed' as const),
@@ -996,8 +1010,10 @@ after(async () => {
   await rm(folder, { recursive: true, force: true })
 })
 
+type StartFixtureProps = { mode: Omit<FixtureMode, 'accounts'> }
+
 /** A fixture whose accounts are ready, as every server Raven plays from is. */
-const startFixture = async ({ mode }: { mode: Omit<FixtureMode, 'accounts'> }) => {
+const startFixture = async ({ mode }: StartFixtureProps) => {
   const { first, second } = await fixtureClips()
   return startFixtureServer({
     clips: { first, second, tracks: clip.path },
@@ -1016,15 +1032,13 @@ const cookiesFrom = (response: Response): Jar =>
     return [{ name: pair.slice(0, split).trim(), value: pair.slice(split + 1).trim() }]
   })
 
-const unlockWith = async ({
-  fixture,
-  path,
-  body,
-}: {
+type UnlockWithProps = {
   fixture: FixtureServer
   path: string
   body: Record<string, string>
-}): Promise<Jar> => {
+}
+
+const unlockWith = async ({ fixture, path, body }: UnlockWithProps): Promise<Jar> => {
   const response = await fetch(`${fixture.origin}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -1034,30 +1048,31 @@ const unlockWith = async ({
   return cookiesFrom(response)
 }
 
-const unlockPin = ({ fixture }: { fixture: FixtureServer }) =>
+type UnlockPinProps = { fixture: FixtureServer }
+
+const unlockPin = ({ fixture }: UnlockPinProps) =>
   unlockWith({ fixture, path: FIXTURE_LOCK_PATHS.unlock, body: { pin: FIXTURE_PIN } })
 
 type Asked = Parameters<FailureExplainer>[0]
+
+type RunProps = {
+  harness: Harness
+  asked: readonly Asked[]
+  sourceWarnings: readonly string[]
+}
+
+type WithFixtureTitlesProps = {
+  fixture: FixtureServer
+  jar: Jar
+  serverStallMs?: number
+  run: (input: RunProps) => Promise<void>
+}
 
 /**
  * Runs `run` on a harness whose server titles resolve and explain through the fixture, signed
  * in and played through the relay as main plays them, the page's unlock taken from `jar`.
  */
-const withFixtureTitles = async ({
-  fixture,
-  jar,
-  serverStallMs,
-  run,
-}: {
-  fixture: FixtureServer
-  jar: Jar
-  serverStallMs?: number
-  run: (input: {
-    harness: Harness
-    asked: readonly Asked[]
-    sourceWarnings: readonly string[]
-  }) => Promise<void>
-}) => {
+const withFixtureTitles = async ({ fixture, jar, serverStallMs, run }: WithFixtureTitlesProps) => {
   const asked: Asked[] = []
   const parts = await accountPartsFor({
     fixture,
@@ -1082,13 +1097,12 @@ const withFixtureTitles = async ({
   }
 }
 
-const titleLoad = ({
-  mediaId,
-  subtitle = null,
-}: {
+type TitleLoadProps = {
   mediaId: number
   subtitle?: string | null
-}): PlayerCommand => ({
+}
+
+const titleLoad = ({ mediaId, subtitle = null }: TitleLoadProps): PlayerCommand => ({
   type: 'load',
   source: { kind: 'server', serverId: FIXTURE_SERVER.id, mediaId },
   start: 0,
@@ -1096,17 +1110,19 @@ const titleLoad = ({
   subtitle,
 })
 
+type PlayingTitleProps = {
+  harness: Harness
+  mediaId: number
+  subtitle?: string | null
+  timeoutMs?: number
+}
+
 const playingTitle = ({
   harness,
   mediaId,
   subtitle = null,
   timeoutMs = WAIT_MS,
-}: {
-  harness: Harness
-  mediaId: number
-  subtitle?: string | null
-  timeoutMs?: number
-}) =>
+}: PlayingTitleProps) =>
   harness.eventAfter({
     label: `media ${mediaId} playing`,
     matches: where({ type: 'paused', holds: (event) => !event.paused }),
@@ -1114,15 +1130,14 @@ const playingTitle = ({
     timeoutMs,
   })
 
-const requestsTo = ({
-  log,
-  path,
-  from = 0,
-}: {
+type RequestsToProps = {
   log: readonly FixtureRequest[]
   path: string
   from?: number
-}) => log.slice(from).filter((request) => request.path === path)
+}
+
+const requestsTo = ({ log, path, from = 0 }: RequestsToProps) =>
+  log.slice(from).filter((request) => request.path === path)
 
 const fileOfMedia = (mediaId: number) => `/api/media/${mediaId}/file`
 const SIDECAR_PATH = sidecarOfMedia(FIXTURE_MEDIA.first)
@@ -1133,24 +1148,24 @@ const rangeStart = (range: string | null) => {
   return match === null ? null : Number(match[1])
 }
 
-const externalTrackId = async ({ harness }: { harness: Harness }) =>
+type ExternalTrackIdProps = { harness: Harness }
+
+const externalTrackId = async ({ harness }: ExternalTrackIdProps) =>
   (await harness.mpv.read({ name: 'track-list' })).find(
     (track) => track.type === MPV_TRACK_TYPES.sub && track.external === true,
   )?.id ?? null
+
+type PlayingUpToThrottleProps = {
+  harness: Harness
+  fixture: FixtureServer
+  mediaId: number
+}
 
 /**
  * Plays a title until mpv has read what the throttle lets through and waits on the rest,
  * and answers the byte the fixture holds it at.
  */
-const playingUpToThrottle = async ({
-  harness,
-  fixture,
-  mediaId,
-}: {
-  harness: Harness
-  fixture: FixtureServer
-  mediaId: number
-}) => {
+const playingUpToThrottle = async ({ harness, fixture, mediaId }: PlayingUpToThrottleProps) => {
   const path = mediaId === FIXTURE_MEDIA.second ? (await fixtureClips()).second : clip.path
   const held = Math.floor((await stat(path)).size * THROTTLE_SHARE)
   fixture.throttle({ byte: held })
@@ -1160,6 +1175,14 @@ const playingUpToThrottle = async ({
     matches: where({ type: 'time', holds: (event) => event.time >= 1 }),
   })
   return held
+}
+
+type FailingWhenDrainedProps = {
+  harness: Harness
+  fixture: FixtureServer
+  label: string
+  action: () => Promise<void>
+  timeoutMs: number
 }
 
 /**
@@ -1173,13 +1196,7 @@ const failingWhenDrained = async ({
   label,
   action,
   timeoutMs,
-}: {
-  harness: Harness
-  fixture: FixtureServer
-  label: string
-  action: () => Promise<void>
-  timeoutMs: number
-}) => {
+}: FailingWhenDrainedProps) => {
   await playingUpToThrottle({ harness, fixture, mediaId: FIXTURE_MEDIA.first })
   await harness.waitFor({
     label: 'mpv waiting on the trickle',
@@ -1618,13 +1635,15 @@ const READY_ACCOUNTS = {
 /** The clock the fixture and Raven's account parts share, which a test moves on. */
 type Clock = { skewMs: number }
 
+type StartAccountFixtureProps = {
+  clock: Clock
+  admin?: FixtureAdmin
+}
+
 const startAccountFixture = async ({
   clock,
   admin = { kind: FIXTURE_ADMIN_KINDS.off },
-}: {
-  clock: Clock
-  admin?: FixtureAdmin
-}) => {
+}: StartAccountFixtureProps) => {
   const { first, second } = await fixtureClips()
   return startFixtureServer({
     clips: { first, second, tracks: clip.path },
@@ -1648,27 +1667,24 @@ const isAuthSession = object({
 /** How long before its token runs out the page renews it, as Supabase's client does. */
 const FRESH_MARGIN_MS = 360_000
 
+type PageSessionForProps = {
+  fixture: FixtureServer
+  account: PageAccount
+  now: () => number
+}
+
 /**
  * The page's side of the account, over the fixture's stub Auth: it signs in, renews its token
  * before it runs out on `now`, as the web's Supabase client does, and sends main each new one.
  */
-const pageSessionFor = async ({
-  fixture,
-  account,
-  now,
-}: {
-  fixture: FixtureServer
-  account: PageAccount
-  now: () => number
-}) => {
+const pageSessionFor = async ({ fixture, account, now }: PageSessionForProps) => {
   const held = { refresh: '', endsAt: 0 }
-  const ask = async ({
-    grant,
-    body,
-  }: {
+  type AskProps = {
     grant: (typeof GRANTS)[keyof typeof GRANTS]
     body: Record<string, string>
-  }) => {
+  }
+
+  const ask = async ({ grant, body }: AskProps) => {
     const response = await fetch(`${fixture.origin}${AUTH_V1.token}?${GRANT_PARAM}=${grant}`, {
       method: SERVER_METHODS.post,
       headers: { [HTTP_HEADERS.contentType]: 'application/json' },
@@ -1695,6 +1711,14 @@ const pageSessionFor = async ({
   }
 }
 
+type AccountPartsForProps = {
+  fixture: FixtureServer
+  jar: Jar
+  clock: Clock
+  /** The id and name the server goes by. */
+  named?: { id: string; name: string }
+}
+
 /**
  * The account parts main builds for its server, over the fixture: the page signed in at the
  * fixture's stub Auth, its token the Bearer on main's calls, the tickets and the loopback relay,
@@ -1705,13 +1729,7 @@ const accountPartsFor = async ({
   jar,
   clock,
   named = ACCOUNT_SERVER,
-}: {
-  fixture: FixtureServer
-  jar: Jar
-  clock: Clock
-  /** The id and name the server goes by. */
-  named?: { id: string; name: string }
-}) => {
+}: AccountPartsForProps) => {
   const warnings: string[] = []
   const warn = (message: string) => {
     warnings.push(message)
@@ -1779,25 +1797,24 @@ const accountPartsFor = async ({
 
 type AccountParts = Awaited<ReturnType<typeof accountPartsFor>>
 
+type WithAccountTitlesPropsRunProps = {
+  harness: Harness
+  parts: AccountParts
+  targets: readonly ServerTarget[]
+}
+
+type WithAccountTitlesProps = {
+  fixture: FixtureServer
+  jar: Jar
+  clock: Clock
+  run: (input: WithAccountTitlesPropsRunProps) => Promise<void>
+}
+
 /**
  * Runs `run` on a harness whose server titles resolve, explain and read their refusals through
  * the account parts, and answers the targets each load resolved to, the relay's URLs included.
  */
-const withAccountTitles = async ({
-  fixture,
-  jar,
-  clock,
-  run,
-}: {
-  fixture: FixtureServer
-  jar: Jar
-  clock: Clock
-  run: (input: {
-    harness: Harness
-    parts: AccountParts
-    targets: readonly ServerTarget[]
-  }) => Promise<void>
-}) => {
+const withAccountTitles = async ({ fixture, jar, clock, run }: WithAccountTitlesProps) => {
   const parts = await accountPartsFor({ fixture, jar, clock })
   const targets: ServerTarget[] = []
   const harness = await openHarness({
@@ -1821,7 +1838,9 @@ const withAccountTitles = async ({
   }
 }
 
-const accountLoad = ({ mediaId }: { mediaId: number }): PlayerCommand => ({
+type AccountLoadProps = { mediaId: number }
+
+const accountLoad = ({ mediaId }: AccountLoadProps): PlayerCommand => ({
   type: PLAYER_COMMANDS.load,
   source: { kind: PLAYER_SOURCE_KINDS.server, serverId: ACCOUNT_SERVER.id, mediaId },
   start: 0,
@@ -1829,7 +1848,9 @@ const accountLoad = ({ mediaId }: { mediaId: number }): PlayerCommand => ({
   subtitle: null,
 })
 
-const playingAccountTitle = ({ harness }: { harness: Harness }) =>
+type PlayingAccountTitleProps = { harness: Harness }
+
+const playingAccountTitle = ({ harness }: PlayingAccountTitleProps) =>
   harness.eventAfter({
     label: 'the account title playing',
     matches: where({ type: PLAYER_EVENTS.paused, holds: (event) => !event.paused }),
@@ -1840,13 +1861,17 @@ const playingAccountTitle = ({ harness }: { harness: Harness }) =>
 const secretOf = (target: ServerTarget | undefined) =>
   new URL(target?.url ?? `http://${RELAY_HOST}/`).pathname.split('/')[1] ?? ''
 
+type ThrottleClipProps = { fixture: FixtureServer }
+
 /** Holds the track clip at a share of its bytes, so mpv reads only what a seek asks for past it. */
-const throttleClip = async ({ fixture }: { fixture: FixtureServer }) => {
+const throttleClip = async ({ fixture }: ThrottleClipProps) => {
   const { size } = await stat(clip.path)
   fixture.throttle({ byte: Math.floor(size * THROTTLE_SHARE) })
 }
 
-const timeOf = async ({ harness }: { harness: Harness }) =>
+type TimeOfProps = { harness: Harness }
+
+const timeOf = async ({ harness }: TimeOfProps) =>
   (await harness.mpv.read({ name: MPV_PROPERTIES.timePos })) ?? Number.NaN
 
 describe('account titles through the relay against headless libmpv', () => {

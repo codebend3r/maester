@@ -90,26 +90,24 @@ const varyByAccount = (existing: string | number | string[] | undefined): string
 const isMediaIdParam = (value: unknown): value is string =>
   isString(value) && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value))
 
-/** An account ticket in `?t=` on a media plane route, or null; a legacy ticket is never one. */
-const accountTicketOf = ({
-  query,
-  targets,
-}: {
+type AccountTicketOfProps = {
   query: Record<string, unknown>
   targets: MarkTargets
-}): string | null => {
+}
+
+/** An account ticket in `?t=` on a media plane route, or null; a legacy ticket is never one. */
+const accountTicketOf = ({ query, targets }: AccountTicketOfProps): string | null => {
   if (!isMediaPlaneRoute(targets)) return null
   const ticket = query[MEDIA_TICKET_PARAM]
   return isString(ticket) && ticket.startsWith(ACCOUNT_TICKET_PREFIX) ? ticket : null
 }
 
-const admit = ({
-  requirement,
-  account,
-}: {
+type AdmitProps = {
   requirement: GatedRequirement
   account: Account
-}): void => {
+}
+
+const admit = ({ requirement, account }: AdmitProps): void => {
   switch (requirement) {
     case ACCOUNT_REQUIREMENTS.session:
       return
@@ -125,6 +123,18 @@ const admit = ({
       throw new Error(`Unknown account requirement: ${String(unreachable)}`)
     }
   }
+}
+
+type AccountGuardAdmitTicketProps = {
+  request: FastifyRequest
+  ticket: string
+  id: unknown
+  requirement: GatedRequirement
+}
+
+type AccountGuardAdmitSessionProps = {
+  request: FastifyRequest
+  requirement: GatedRequirement
 }
 
 /**
@@ -176,12 +186,7 @@ export class AccountGuard implements CanActivate {
     ticket,
     id,
     requirement,
-  }: {
-    request: FastifyRequest
-    ticket: string
-    id: unknown
-    requirement: GatedRequirement
-  }): Promise<void> {
+  }: AccountGuardAdmitTicketProps): Promise<void> {
     if (!isMediaIdParam(id)) throw authFailure(AUTH_REFUSALS.signedOut)
     const { session, unlockedUntil } = await this.tickets.redeem({ ticket, id: Number(id) })
     admit({ requirement, account: session.account })
@@ -192,10 +197,7 @@ export class AccountGuard implements CanActivate {
   private async admitSession({
     request,
     requirement,
-  }: {
-    request: FastifyRequest
-    requirement: GatedRequirement
-  }): Promise<void> {
+  }: AccountGuardAdmitSessionProps): Promise<void> {
     const authorization = request.headers[AUTH_HEADERS.authorization]
     const token = accessTokenOf({
       method: request.method,

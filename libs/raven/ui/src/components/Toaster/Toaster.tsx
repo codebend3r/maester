@@ -4,7 +4,9 @@ import { Icon } from '@/components/Icon/Icon'
 import styles from '@/components/Toaster/Toaster.module.scss'
 import { TOAST_MS, type Toast, useToasts } from '@/stores/toasts'
 
-const ToastNote = ({ toast }: { toast: Toast }) => {
+type ToastNoteProps = { toast: Toast }
+
+const ToastNote = ({ toast }: ToastNoteProps) => {
   const dismiss = useToasts((state) => state.dismiss)
   useEffect(() => {
     const timer = setTimeout(() => dismiss(toast.id), TOAST_MS)

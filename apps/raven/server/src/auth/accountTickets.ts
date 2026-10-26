@@ -25,6 +25,18 @@ type Entry = {
 /** What a redeemed ticket stands for: the session it was minted from, rechecked, and the PIN unlock it was minted under. */
 type Redemption = { session: Session; unlockedUntil: number | null }
 
+type AccountTicketsIssueProps = {
+  id: number
+  request: Pick<FastifyRequest, 'headers'>
+  now?: number
+}
+
+type AccountTicketsRedeemProps = {
+  ticket: string
+  id: number
+  now?: number
+}
+
 /** Opaque, process-local capabilities; no JWT or refresh credential enters a media URL. */
 @Injectable()
 export class AccountTickets {
@@ -44,15 +56,7 @@ export class AccountTickets {
    * route as on the POST. An owner past the PIN passes that unlock on to the
    * ticket, for as long as it holds.
    */
-  issue({
-    id,
-    request,
-    now = Date.now(),
-  }: {
-    id: number
-    request: Pick<FastifyRequest, 'headers'>
-    now?: number
-  }): MediaTicket {
+  issue({ id, request, now = Date.now() }: AccountTicketsIssueProps): MediaTicket {
     const caller = this.sessions.callerOf({ request })
     if (caller.kind !== CALLERS.session || !caller.isBearer) {
       throw authFailure(AUTH_REFUSALS.signedOut)
@@ -80,15 +84,7 @@ export class AccountTickets {
     return { ticket, expiresAt }
   }
 
-  async redeem({
-    ticket,
-    id,
-    now = Date.now(),
-  }: {
-    ticket: string
-    id: number
-    now?: number
-  }): Promise<Redemption> {
+  async redeem({ ticket, id, now = Date.now() }: AccountTicketsRedeemProps): Promise<Redemption> {
     const entry = this.entries.get(ticket)
     if (entry === undefined || entry.id !== id || entry.expiresAt <= now) {
       throw authFailure(AUTH_REFUSALS.signedOut)

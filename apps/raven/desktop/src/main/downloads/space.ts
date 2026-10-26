@@ -15,28 +15,32 @@ export type SpaceFs = {
 
 export type Space = { free: number; total: number }
 
-export const readSpace = async ({ fs, dir }: { fs: SpaceFs; dir: string }): Promise<Space> => {
+type ReadSpaceProps = { fs: SpaceFs; dir: string }
+
+export const readSpace = async ({ fs, dir }: ReadSpaceProps): Promise<Space> => {
   await fs.mkdir(dir)
   const { bavail, bsize, blocks } = await fs.statfs(dir)
   return { free: bavail * bsize, total: blocks * bsize }
 }
 
-export const fits = ({ bytes, free }: { bytes: number; free: number }): boolean =>
-  bytes + SPACE_RESERVE_BYTES <= free
+type FitsProps = { bytes: number; free: number }
+
+export const fits = ({ bytes, free }: FitsProps): boolean => bytes + SPACE_RESERVE_BYTES <= free
 
 type EntryParts = { userData: string; serverId: string; mediaId: number }
 
-export const downloadsDirFor = ({ userData }: { userData: string }): string =>
+type DownloadsDirForProps = { userData: string }
+
+export const downloadsDirFor = ({ userData }: DownloadsDirForProps): string =>
   join(userData, DOWNLOADS_DIR)
 
-/** One server's downloads, the folder removing that server removes. */
-export const serverDirFor = ({
-  userData,
-  serverId,
-}: {
+type ServerDirForProps = {
   userData: string
   serverId: string
-}): string => {
+}
+
+/** One server's downloads, the folder removing that server removes. */
+export const serverDirFor = ({ userData, serverId }: ServerDirForProps): string => {
   if (!isOpaqueId(serverId)) throw new RangeError('A download needs a server id')
   return join(downloadsDirFor({ userData }), serverId)
 }

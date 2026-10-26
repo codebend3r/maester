@@ -42,17 +42,14 @@ describe('marking cards watched', () => {
       .db.prepare<unknown[], T>(sql)
       .all(...params)
 
-  const addFile = ({
-    libraryId,
-    name,
-    height = 1080,
-    duration = 60,
-  }: {
+  type AddFileProps = {
     libraryId: number
     name: string
     height?: number
     duration?: number | null
-  }): number => {
+  }
+
+  const addFile = ({ libraryId, name, height = 1080, duration = 60 }: AddFileProps): number => {
     const id = index().insert({
       libraryId,
       kind: 'other',
@@ -77,27 +74,32 @@ describe('marking cards watched', () => {
     }
     return id
   }
-  const fetched = ({
-    type,
-    tmdbId,
-    title,
-    number = null,
-  }: {
+  type FetchedProps = {
     type: ItemType
     tmdbId: string
     title: string
     number?: number | null
-  }): FetchedItem => ({ ...BLANK_ITEM, type, tmdbId, number, title })
+  }
+
+  const fetched = ({ type, tmdbId, title, number = null }: FetchedProps): FetchedItem => ({
+    ...BLANK_ITEM,
+    type,
+    tmdbId,
+    number,
+    title,
+  })
+  type AddMovieProps = {
+    title: string
+    heights: readonly number[]
+    libraryId?: number
+  }
+
   /** A movie with a file for each height, the tallest best. */
   const addMovie = ({
     title,
     heights,
     libraryId = state.libraryId,
-  }: {
-    title: string
-    heights: readonly number[]
-    libraryId?: number
-  }): { itemId: number; ids: number[] } => {
+  }: AddMovieProps): { itemId: number; ids: number[] } => {
     const itemId = stores().metadata.save({
       item: fetched({ type: 'movie', tmdbId: title, title }),
     })
@@ -105,8 +107,10 @@ describe('marking cards watched', () => {
     stores().metadata.link({ mediaIds: ids, itemIds: [itemId] })
     return { itemId, ids }
   }
+  type AddShowProps = { title: string; count: number }
+
   /** A show of `count` episodes; the files link by `fileIn`. */
-  const addShow = ({ title, count }: { title: string; count: number }) => {
+  const addShow = ({ title, count }: AddShowProps) => {
     const { metadata } = stores()
     const showId = metadata.save({ item: fetched({ type: 'show', tmdbId: title, title }) })
     const seasonId = metadata.save({
@@ -135,27 +139,28 @@ describe('marking cards watched', () => {
     stores().metadata.link({ mediaIds: [id], itemIds })
     return id
   }
+  type SetProps = {
+    watched: boolean
+    targets: WatchTarget[]
+    viewer?: Viewer
+    account?: AccountKey
+  }
+
   const set = ({
     watched,
     targets,
     viewer = EVERYONE,
     account = TEST_ACCOUNTS.a,
-  }: {
-    watched: boolean
-    targets: WatchTarget[]
-    viewer?: Viewer
-    account?: AccountKey
-  }): void => {
+  }: SetProps): void => {
     watching().set({ cards: cards().resolve({ targets, viewer }), watched, at: NOW, account })
   }
   const file = (id: number): WatchTarget => ({ kind: 'media', id })
-  const item = ({
-    id,
-    libraryId = null,
-  }: {
+  type ItemProps = {
     id: number
     libraryId?: number | null
-  }): WatchTarget => ({
+  }
+
+  const item = ({ id, libraryId = null }: ItemProps): WatchTarget => ({
     kind: 'item',
     id,
     libraryId,
@@ -165,10 +170,14 @@ describe('marking cards watched', () => {
       'SELECT kind, furthest, played_at FROM plays WHERE media_id = ? ORDER BY id',
       id,
     )
-  const isWatchedBy = ({ id, account }: { id: number; account: AccountKey }): boolean =>
+  type IsWatchedByProps = { id: number; account: AccountKey }
+
+  const isWatchedBy = ({ id, account }: IsWatchedByProps): boolean =>
     stores().media.get({ id, account })?.watched ?? false
   const isWatched = (id: number): boolean => isWatchedBy({ id, account: TEST_ACCOUNTS.a })
-  const spotBy = ({ id, account }: { id: number; account: AccountKey }): number | undefined =>
+  type SpotByProps = { id: number; account: AccountKey }
+
+  const spotBy = ({ id, account }: SpotByProps): number | undefined =>
     rows<{ position: number }>(
       'SELECT position FROM playback_progress WHERE account_id = ? AND media_id = ?',
       account,

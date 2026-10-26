@@ -55,6 +55,14 @@ const filmFacts = (media: MediaItem): string[] => {
   ].filter((fact): fact is string => fact != null)
 }
 
+type SagaFilmProps = {
+  media: MediaItem
+  later: MediaItem[]
+  place: number
+  standing: Standing
+  ratingsSource: RatingSource
+}
+
 /**
  * One movie of the saga on a row: its place in the order in large serif
  * figures (dim once watched), its poster, title, facts and score, whether
@@ -62,19 +70,7 @@ const filmFacts = (media: MediaItem): string[] => {
  * saga's movies after it, `later`. The title opens its page; a right click
  * opens its menu; in select mode a click anywhere on the row selects it.
  */
-const SagaFilm = ({
-  media,
-  later,
-  place,
-  standing,
-  ratingsSource,
-}: {
-  media: MediaItem
-  later: MediaItem[]
-  place: number
-  standing: Standing
-  ratingsSource: RatingSource
-}) => {
+const SagaFilm = ({ media, later, place, standing, ratingsSource }: SagaFilmProps) => {
   const menu = useCardMenu({ media, matchType: 'movie', inline: true })
   const { title } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
@@ -148,17 +144,16 @@ const SagaFilm = ({
   )
 }
 
+type SagaFilmsProps = {
+  media: readonly MediaItem[]
+  ratingsSource: RatingSource
+}
+
 /**
  * A saga's movies in release order, numbered, each on a row of its own with
  * the score its library goes by.
  */
-export const SagaFilms = ({
-  media,
-  ratingsSource,
-}: {
-  media: readonly MediaItem[]
-  ratingsSource: RatingSource
-}) => {
+export const SagaFilms = ({ media, ratingsSource }: SagaFilmsProps) => {
   const standing = standings(media)
   return (
     <ol className={styles.films}>

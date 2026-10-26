@@ -98,7 +98,9 @@ describe('who each route is for', () => {
 })
 
 describe('the admin guard', () => {
-  const guardFor = ({ canManage, isLegacy }: { canManage: boolean; isLegacy: boolean }) =>
+  type GuardForProps = { canManage: boolean; isLegacy: boolean }
+
+  const guardFor = ({ canManage, isLegacy }: GuardForProps) =>
     new AdminGuard({ canManage: () => canManage, isLegacy: () => isLegacy })
 
   const contextOf = (handler: () => string) =>

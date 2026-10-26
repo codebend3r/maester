@@ -88,17 +88,21 @@ const pathOf = (url: string): string | null => {
   return path.startsWith('/') ? path : null
 }
 
-const hasMatchingSegments = ({
-  template,
-  segments,
-}: {
+type HasMatchingSegmentsProps = {
   template: readonly string[]
   segments: readonly string[]
-}): boolean =>
+}
+
+const hasMatchingSegments = ({ template, segments }: HasMatchingSegmentsProps): boolean =>
   template.length === segments.length &&
   template.every((part, at) =>
     part.startsWith(PLACEHOLDER) ? (segments[at] ?? '') !== '' : part === segments[at],
   )
+
+type AppClientCallOfProps = {
+  method: string
+  url: string
+}
 
 /**
  * Which listed call a request is, or null when it is none. Each `:name` stands for exactly
@@ -107,10 +111,7 @@ const hasMatchingSegments = ({
 export const appClientCallOf = ({
   method,
   url,
-}: {
-  method: string
-  url: string
-}): AppClientCallName | null => {
+}: AppClientCallOfProps): AppClientCallName | null => {
   const path = pathOf(url)
   if (path === null) return null
   const segments = path.split('/')

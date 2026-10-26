@@ -15,6 +15,8 @@ const QUERY_STATUSES = { error: 'error' } as const satisfies Record<string, Quer
 /** Keeps a ticket that is already due from being refetched in a tight loop. */
 const MIN_REFRESH_WAIT_MS = 1000
 
+type PlayerQueriesForSubtitlesProps = { id: number; trackId: string; window: number }
+
 export const playerQueriesFor = (api: ApiClient) => ({
   tracks: (id: number) =>
     queryOptions({
@@ -53,7 +55,7 @@ export const playerQueriesFor = (api: ApiClient) => ({
       },
       refetchIntervalInBackground: true,
     }),
-  subtitles: (input: { id: number; trackId: string; window: number }) =>
+  subtitles: (input: PlayerQueriesForSubtitlesProps) =>
     queryOptions({
       queryKey: queryKeys.subtitles(input),
       queryFn: () => api.getSubtitles(input),

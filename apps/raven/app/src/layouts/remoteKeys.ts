@@ -34,6 +34,11 @@ const isLongPress = (name: string): name is keyof typeof LONG_PRESSES => name in
 /** Android's `KeyEvent` actions, which the fork hands on with each key. */
 export const KEY_ACTIONS = { down: 0, up: 1 } as const
 
+type PressedKeyOfProps = {
+  eventType: string
+  eventKeyAction?: unknown
+}
+
 /**
  * The key a remote event presses, once. On Android TV the fork sends a press as the key coming
  * up (its key-down events are off), and a key held down as its long name, once going down and
@@ -44,10 +49,7 @@ export const KEY_ACTIONS = { down: 0, up: 1 } as const
 export const pressedKeyOf = ({
   eventType,
   eventKeyAction,
-}: {
-  eventType: string
-  eventKeyAction?: unknown
-}): RemoteKey | null => {
+}: PressedKeyOfProps): RemoteKey | null => {
   if (eventKeyAction !== undefined && Number(eventKeyAction) !== KEY_ACTIONS.up) return null
   if (isLongPress(eventType)) return LONG_PRESSES[eventType]
   return isRemoteKey(eventType) ? eventType : null
@@ -57,6 +59,13 @@ export const pressedKeyOf = ({
 type RemoteAnswer = { seekBy: number; shouldTogglePlay: boolean }
 
 const NO_ANSWER: RemoteAnswer = { seekBy: 0, shouldTogglePlay: false }
+
+type RemoteAnswerOfProps = {
+  key: RemoteKey
+  isShown: boolean
+  isScrubbing: boolean
+  isPaused: boolean
+}
 
 /**
  * What the d-pad player does with a press. Left and right skip ten seconds from the scrubber,
@@ -69,12 +78,7 @@ export const remoteAnswerOf = ({
   isShown,
   isScrubbing,
   isPaused,
-}: {
-  key: RemoteKey
-  isShown: boolean
-  isScrubbing: boolean
-  isPaused: boolean
-}): RemoteAnswer => {
+}: RemoteAnswerOfProps): RemoteAnswer => {
   const isSeeking = isScrubbing || !isShown
   switch (key) {
     case REMOTE_KEYS.left:

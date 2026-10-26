@@ -11,6 +11,13 @@ export const IMAGE_AUDIENCES = { browser: 'browser', everyone: 'everyone' } as c
 
 type ImageAudience = (typeof IMAGE_AUDIENCES)[keyof typeof IMAGE_AUDIENCES]
 
+type SendImageProps = {
+  reply: FastifyReply
+  path: string | null
+  version: string | undefined
+  audience?: ImageAudience
+}
+
 /**
  * Sends a cached picture or thumbnail. Versioned URLs (`?v=`) change whenever
  * the picture does, so they are cached for good. Only by the browser,
@@ -25,12 +32,7 @@ export const sendImage = async ({
   path,
   version,
   audience = IMAGE_AUDIENCES.browser,
-}: {
-  reply: FastifyReply
-  path: string | null
-  version: string | undefined
-  audience?: ImageAudience
-}): Promise<void> => {
+}: SendImageProps): Promise<void> => {
   const info = path == null ? null : await stat(path).catch(() => null)
   if (path == null || !info?.isFile()) throw new NotFoundException('No picture')
   const policy =

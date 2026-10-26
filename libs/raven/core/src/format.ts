@@ -45,9 +45,10 @@ export const formatChannels = (channels: number | null): string | null => {
   return named[channels] ?? `${channels} ch`
 }
 
+type TrimmedProps = { value: number; places: number }
+
 /** Up to `places` after the point, trailing zeros dropped: 23.976, 24, 44.1. */
-const trimmed = ({ value, places }: { value: number; places: number }): string =>
-  String(Number(value.toFixed(places)))
+const trimmed = ({ value, places }: TrimmedProps): string => String(Number(value.toFixed(places)))
 
 /** "48 kHz", "44.1 kHz"; null when unknown. */
 export const formatSampleRate = (samplesPerSecond: number | null): string | null => {
@@ -79,16 +80,18 @@ const AGO_FORMATS: Record<TimeAgoStyle, Intl.RelativeTimeFormat> = {
   long: new Intl.RelativeTimeFormat(undefined, { numeric: 'auto', style: 'long' }),
 }
 
+type TimeAgoProps = {
+  at: string
+  now?: Date
+  style?: TimeAgoStyle
+}
+
 /** How long ago `at` was, in the largest whole unit; "just now" under a minute. */
 export const timeAgo = ({
   at,
   now = new Date(),
   style = TIME_AGO_STYLES.narrow,
-}: {
-  at: string
-  now?: Date
-  style?: TimeAgoStyle
-}): string => {
+}: TimeAgoProps): string => {
   const seconds = Math.max(0, (now.getTime() - new Date(at).getTime()) / 1000)
   const found = AGO_UNITS.find((candidate) => seconds >= candidate.seconds)
   return found

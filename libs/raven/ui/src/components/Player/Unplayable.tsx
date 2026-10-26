@@ -20,6 +20,15 @@ const REPORT_STATES = { idle: 'idle', sending: 'sending', failed: 'failed' } as 
 
 type ReportState = (typeof REPORT_STATES)[keyof typeof REPORT_STATES]
 
+type UnplayableProps = {
+  problems: string[]
+  /** Leaves the player, for the page that opened it. */
+  onBack: () => void
+  onTryAnyway: (() => void) | null
+  /** What a report says beyond the problems: the file, its tracks and the ways tried. */
+  context?: ReportContext
+}
+
 /**
  * What stands in for the video when nothing this browser and server can do
  * together will play it: no way to convert, or every way tried and failed.
@@ -32,14 +41,7 @@ export const Unplayable = ({
   onBack,
   onTryAnyway,
   context = NO_CONTEXT,
-}: {
-  problems: string[]
-  /** Leaves the player, for the page that opened it. */
-  onBack: () => void
-  onTryAnyway: (() => void) | null
-  /** What a report says beyond the problems: the file, its tracks and the ways tried. */
-  context?: ReportContext
-}) => {
+}: UnplayableProps) => {
   const {
     title,
     posterUrl: thumbnail,

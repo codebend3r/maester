@@ -26,6 +26,12 @@ export type AutoDeleteDeps = {
   warn: (message: string) => void
 }
 
+type ScheduleProps = { downloadId: string }
+
+type CancelProps = { downloadId: string }
+
+type DeletesAtProps = { downloadId: string }
+
 export type AutoDelete = {
   /** At launch: a clock for every ready download set to delete once watched and watched. */
   rebuild: () => void
@@ -33,8 +39,8 @@ export type AutoDelete = {
    * After a position is noted or the switch is turned on: a download with no clock gets one at
    * `watchedAt` plus the delay, and a deletion that waits on the viewer is tried again.
    */
-  schedule: (input: { downloadId: string }) => void
-  cancel: (input: { downloadId: string }) => void
+  schedule: (input: ScheduleProps) => void
+  cancel: (input: CancelProps) => void
   /** The player left a download: any deletion held while its file played is tried again. */
   playbackLeft: () => void
   /**
@@ -43,7 +49,7 @@ export type AutoDelete = {
    */
   rearm: () => void
   /** When the clock deletes this download, while it runs; null once it waits on the viewer. */
-  deletesAt: (input: { downloadId: string }) => number | null
+  deletesAt: (input: DeletesAtProps) => number | null
   dispose: () => void
 }
 
@@ -69,14 +75,13 @@ const watchedAtOf = (entry: DownloadEntry | null): number | null =>
     ? entry.watchedAt
     : null
 
-/** Whether a download's ten minutes have run out: ready, set to delete once watched, and watched. */
-export const isDueForDeletion = ({
-  entry,
-  now,
-}: {
+type IsDueForDeletionProps = {
   entry: DownloadEntry | null
   now: number
-}): boolean => {
+}
+
+/** Whether a download's ten minutes have run out: ready, set to delete once watched, and watched. */
+export const isDueForDeletion = ({ entry, now }: IsDueForDeletionProps): boolean => {
   const watchedAt = watchedAtOf(entry)
   return watchedAt !== null && watchedAt + AUTO_DELETE_DELAY_MS <= now
 }
@@ -132,9 +137,11 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
     })
   }
 
+  type ArmProps = { downloadId: string; at: number }
+
   // A wait past what a timer holds (a clock put back since the title was watched) is cut to it,
   // and the timer then arms the rest, so the clock never runs out early.
-  const arm = ({ downloadId, at }: { downloadId: string; at: number }): void => {
+  const arm = ({ downloadId, at }: ArmProps): void => {
     if (isDisposed) return
     const wait = at - deps.now()
     if (wait <= 0) return due(downloadId)

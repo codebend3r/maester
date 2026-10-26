@@ -256,7 +256,9 @@ describe('readCut', () => {
 })
 
 describe('canSplitByCut', () => {
-  const cut = ({ label, key }: { label: string; key: string }) => ({ cut: { label, key } })
+  type CutProps = { label: string; key: string }
+
+  const cut = ({ label, key }: CutProps) => ({ cut: { label, key } })
 
   it('tells files apart by their cuts’ keys, the plain cut counting as one', () => {
     expect(canSplitByCut([{ cut: null }, cut({ label: 'Final Cut', key: 'final' })])).toBe(true)

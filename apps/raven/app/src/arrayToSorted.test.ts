@@ -2,16 +2,14 @@ import { describe, expect, it } from 'bun:test'
 
 import { TO_SORTED, installToSorted } from '@/arrayToSorted'
 
-/** What the polyfill put on `target`, called on `list`. */
-const sortedBy = ({
-  target,
-  list,
-  compare,
-}: {
+type SortedByProps = {
   target: object
   list: number[]
   compare?: (a: number, b: number) => number
-}): unknown => {
+}
+
+/** What the polyfill put on `target`, called on `list`. */
+const sortedBy = ({ target, list, compare }: SortedByProps): unknown => {
   const toSorted: unknown = Reflect.get(target, TO_SORTED)
   if (typeof toSorted !== 'function') throw new Error('No toSorted')
   return Reflect.apply(toSorted, list, [compare])
@@ -51,8 +49,12 @@ describe('the installed toSorted', () => {
       { rank: 1, name: 'one' },
       { rank: 2, name: 'second two' },
     ]
+    type SortedCallbackProps = { rank: number }
+
+    type SortedCallback2Props = { rank: number }
+
     const sorted: unknown = Reflect.apply(toSorted, pairs, [
-      (a: { rank: number }, b: { rank: number }) => a.rank - b.rank,
+      (a: SortedCallbackProps, b: SortedCallback2Props) => a.rank - b.rank,
     ])
     expect(sorted).toEqual([pairs[1], pairs[0], pairs[2]])
   })

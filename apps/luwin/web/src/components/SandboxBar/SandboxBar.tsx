@@ -12,8 +12,10 @@ import {
 import { QUERY_KEYS } from '@/lib/queryKeys'
 import { useChat } from '@/stores/chat'
 
+type SandboxBarProps = { state: SandboxState; tier: Tier }
+
 /** The sandbox's controls: which case's fakes luwin runs in, at which tier, and a fresh start. */
-export const SandboxBar = ({ state, tier }: { state: SandboxState; tier: Tier }) => {
+export const SandboxBar = ({ state, tier }: SandboxBarProps) => {
   const queryClient = useQueryClient()
   const isBusy = useChat((chat) => chat.isBusy)
   const startOver = useChat((chat) => chat.startOver)

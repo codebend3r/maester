@@ -132,12 +132,16 @@ const loadedVideo = async (): Promise<ReactVideoProps> =>
 const sourceUri = ({ source }: ReactVideoProps): string | null =>
   source !== undefined && typeof source.uri === 'string' ? source.uri : null
 
+type AudioPickedProps = { count: number; picked: number | null }
+
 /** What ExoPlayer says of a file's audio tracks: which of them, by place, it picked. */
-const audioPicked = ({ count, picked }: { count: number; picked: number | null }) =>
+const audioPicked = ({ count, picked }: AudioPickedProps) =>
   Array.from({ length: count }, (_, index) => ({ index, selected: index === picked }))
 
+type LoadWithProps = { audioTracks: ReturnType<typeof audioPicked> }
+
 /** Fires what the player says as it opens its source, with the audio tracks it reports then. */
-const loadWith = async ({ audioTracks }: { audioTracks: ReturnType<typeof audioPicked> }) => {
+const loadWith = async ({ audioTracks }: LoadWithProps) => {
   const { onLoad } = await loadedVideo()
   if (onLoad === undefined) throw new Error('The player hears no load')
   await act(async () => {
@@ -159,7 +163,9 @@ const videoProps = (): ReactVideoProps => {
   return props
 }
 
-const playing = async ({ id }: { id: number }): Promise<ReactVideoProps> => {
+type PlayingProps = { id: number }
+
+const playing = async ({ id }: PlayingProps): Promise<ReactVideoProps> => {
   await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(id) })
   const props = await loadedVideo()
   await startVideo({ props, duration: BUSBOYS_MP4.duration ?? 0 })

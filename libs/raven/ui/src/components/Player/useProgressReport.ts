@@ -9,6 +9,18 @@ import { progressStepOf } from '@/components/Player/watchProgress'
  */
 export type WatchHide = (save: () => void) => () => void
 
+type UseProgressReportProps = {
+  state: VideoState
+  position: RefObject<number>
+  duration: number | null
+  /** The audio track playing, which each save names for the admin's Streams page. */
+  audio: number | null
+  /** Where playback started, the last spot saved until another is. */
+  resumeAt: number
+  progress: ProgressSink
+  watchHide: WatchHide
+}
+
 /**
  * Reports a player's progress to `progress` from its state, whatever plays the video: the play
  * once frames flow, the spot on the clock, a pause and the end, the length once known, the
@@ -22,17 +34,7 @@ export const useProgressReport = ({
   resumeAt,
   progress,
   watchHide,
-}: {
-  state: VideoState
-  position: RefObject<number>
-  duration: number | null
-  /** The audio track playing, which each save names for the admin's Streams page. */
-  audio: number | null
-  /** Where playback started, the last spot saved until another is. */
-  resumeAt: number
-  progress: ProgressSink
-  watchHide: WatchHide
-}): void => {
+}: UseProgressReportProps): void => {
   const lastSaved = useRef(resumeAt)
   const started = useRef(false)
   const previous = useRef(state)

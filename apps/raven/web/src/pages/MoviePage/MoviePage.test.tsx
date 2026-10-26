@@ -30,6 +30,15 @@ describe('MoviePage', () => {
     sagas: spyOn(api, 'listSagas'),
   }
 
+  type OpenProps = {
+    details: ItemDetails
+    route?: string
+    display?: DisplaySettings
+    adminLock?: AdminLock
+    libraries?: Library[]
+    sagas?: Saga[]
+  }
+
   const open = ({
     details,
     route = '/movies/40',
@@ -37,14 +46,7 @@ describe('MoviePage', () => {
     adminLock,
     libraries = [library({ id: 2, name: 'Films' })],
     sagas = [],
-  }: {
-    details: ItemDetails
-    route?: string
-    display?: DisplaySettings
-    adminLock?: AdminLock
-    libraries?: Library[]
-    sagas?: Saga[]
-  }) => {
+  }: OpenProps) => {
     spies.item.mockImplementation(async () => details)
     spies.libraries.mockImplementation(async () => libraries)
     spies.sagas.mockImplementation(async () => sagas)

@@ -94,6 +94,13 @@ type RunCut = {
   tolerance: number
 }
 
+type RunCutProps = {
+  source: HlsSource
+  from: number
+  seekKeyframes: readonly number[] | null
+  timeBase: HlsDialect['timeBase']
+}
+
 /**
  * Where a run starts reading and how it cuts: a remux on its keyframes, a
  * transcode on the frame at each boundary.
@@ -120,12 +127,7 @@ const runCut = ({
   from,
   seekKeyframes,
   timeBase,
-}: {
-  source: HlsSource
-  from: number
-  seekKeyframes: readonly number[] | null
-  timeBase: HlsDialect['timeBase']
-}): RunCut => {
+}: RunCutProps): RunCut => {
   const start = plan.boundaries[from] ?? 0
   const read = (seek: string[]): string[] => [...seek, '-copyts', '-i', input]
   if (mode === PLAYBACK_MODES.remux) {
@@ -167,6 +169,17 @@ const runCut = ({
   }
 }
 
+type HlsArgsProps = {
+  source: HlsSource
+  /** The segment the run starts at. */
+  from: number
+  folder: string
+  /** The keyframes of a file whose seek lands mid-GOP (MPEG-TS), which a transcode seeks to; null for any other. */
+  seekKeyframes: readonly number[] | null
+  /** How this ffmpeg takes the version-dependent flags. */
+  dialect: HlsDialect
+}
+
 /**
  * One HLS run: the plan's segments from `from` onwards, each a file of its
  * own in `folder`, on the file's own clock plus `STREAM_TIME_SHIFT`. A run
@@ -191,16 +204,7 @@ export const hlsArgs = ({
   folder,
   seekKeyframes,
   dialect,
-}: {
-  source: HlsSource
-  /** The segment the run starts at. */
-  from: number
-  folder: string
-  /** The keyframes of a file whose seek lands mid-GOP (MPEG-TS), which a transcode seeks to; null for any other. */
-  seekKeyframes: readonly number[] | null
-  /** How this ffmpeg takes the version-dependent flags. */
-  dialect: HlsDialect
-}): string[] => {
+}: HlsArgsProps): string[] => {
   const { plan, mode, audio } = source
   const start = plan.boundaries[from] ?? 0
   const offsets = runSegmentTimes({ plan, from })

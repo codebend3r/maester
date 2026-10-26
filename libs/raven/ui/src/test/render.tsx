@@ -12,6 +12,15 @@ export const DEFAULT_PLAYBACK_STATE: PlaybackSettingsState = {
   effective: { encoder: 'software', tonemapAvailable: true },
 }
 
+type RenderWithProvidersProps = {
+  ui: ReactNode
+  route?: string
+  behind?: string[]
+  playback?: PlaybackSettingsState | null
+  /** Set before the first render, as a host sets them; left out for a host the test renders itself. */
+  services?: PlayerServices
+}
+
 /** The player's host requirements: a query cache, a router and its services in the store. */
 export const renderWithProviders = ({
   ui,
@@ -19,14 +28,7 @@ export const renderWithProviders = ({
   behind = [],
   playback = DEFAULT_PLAYBACK_STATE,
   services,
-}: {
-  ui: ReactNode
-  route?: string
-  behind?: string[]
-  playback?: PlaybackSettingsState | null
-  /** Set before the first render, as a host sets them; left out for a host the test renders itself. */
-  services?: PlayerServices
-}) => {
+}: RenderWithProvidersProps) => {
   if (services) usePlayerServices.setState({ services })
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   if (playback) client.setQueryData(playerQueryKeys.playbackSettings, playback)

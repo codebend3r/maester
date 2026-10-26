@@ -7,18 +7,17 @@ import { themedStyles } from '@/theme/useTheme'
 /** The way back, and what it is called aloud without its arrow. */
 const BACK = { text: '‹ Back', label: 'Back' } as const
 
+type TouchBackProps = {
+  onPress: () => void
+  isRaised?: boolean
+}
+
 /**
  * The way back on a touch screen, at the top of a page, as tall as a finger needs. `isRaised`
  * raises it on the picture's dark glass, drawn from the `overPicture` palette, the same in
  * every theme, for where it sits over a picture.
  */
-export const TouchBack = ({
-  onPress,
-  isRaised = false,
-}: {
-  onPress: () => void
-  isRaised?: boolean
-}) => {
+export const TouchBack = ({ onPress, isRaised = false }: TouchBackProps) => {
   const styles = useStyles({ isOverPicture: isRaised })
   return (
     <Pressable

@@ -4,7 +4,9 @@ import { createRemoteJWKSet, customFetch, errors, jwtVerify, type JWTVerifyGetKe
 import { authFailure } from '@/auth/authFailure'
 
 export const AUTH_FETCH = Symbol('AUTH_FETCH')
-export type AuthFetch = (request: { url: string; init: RequestInit }) => Promise<Response>
+type AuthFetchProps = { url: string; init: RequestInit }
+
+export type AuthFetch = (request: AuthFetchProps) => Promise<Response>
 
 const ALGORITHMS = ['ES256', 'RS256'] as const
 export const AUTH_JWT_ROLE = 'authenticated'
@@ -22,15 +24,13 @@ const INVALID_TOKEN_ERRORS = [
   errors.JWKSNoMatchingKey,
 ] as const
 
-export const createTokenVerifier = ({
-  config,
-  keys,
-  authFetch,
-}: {
+type CreateTokenVerifierProps = {
   config: AuthConfig
   keys?: JWTVerifyGetKey
   authFetch: AuthFetch
-}) => {
+}
+
+export const createTokenVerifier = ({ config, keys, authFetch }: CreateTokenVerifierProps) => {
   const keySet =
     config.state === AUTH_CONFIG_STATES.ready
       ? (keys ??
@@ -42,7 +42,9 @@ export const createTokenVerifier = ({
         }))
       : null
 
-  return async ({ token }: { token: string }) => {
+  type CreateTokenVerifierCallbackProps = { token: string }
+
+  return async ({ token }: CreateTokenVerifierCallbackProps) => {
     if (config.state !== AUTH_CONFIG_STATES.ready || keySet === null) {
       throw authFailure(AUTH_REFUSALS.unavailable)
     }

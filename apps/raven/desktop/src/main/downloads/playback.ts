@@ -31,6 +31,12 @@ import { loggable } from '@/main/servers/serverCalls'
 import type { StateStore } from '@/main/stateStore'
 import { MAX_QUEUE } from '@/shared/hostNames'
 
+type OnNotedProps = { downloadId: string }
+
+type AccountIdOfProps = { serverId: string }
+
+type LastAccountIdOfProps = { serverId: string }
+
 export type DownloadPlaybackDeps = {
   /** Read here; every change goes through `change`, so the page hears it. */
   store: DownloadsStore
@@ -48,69 +54,93 @@ export type DownloadPlaybackDeps = {
   /** Tells the page the list changed when only a share watched did. */
   announce: () => void
   /** A position was recorded as pending for this download, so the server is owed it. */
-  onNoted: (input: { downloadId: string }) => void
+  onNoted: (input: OnNotedProps) => void
   /** The player left the download it was on, for another file or for nothing of this computer's. */
   onLeft: () => void
   /**
    * The account signed in to a server, as the page's session names it; null when none is, and
    * for a server Raven no longer reaches, whose downloads owe it nothing.
    */
-  accountIdOf: (input: { serverId: string }) => string | null
+  accountIdOf: (input: AccountIdOfProps) => string | null
   /**
    * The last account the page signed in to a server with, kept past a sign out and a relaunch;
    * null until one has, and for a server Raven no longer reaches.
    */
-  lastAccountIdOf: (input: { serverId: string }) => string | null
+  lastAccountIdOf: (input: LastAccountIdOfProps) => string | null
 }
+
+type OpenProps = { downloadId: string }
+
+type OpenTitleProps = { serverId: string; mediaId: number }
+
+type NextOfProps = { fileId: string }
+
+type FromLabelOfProps = { path: string }
+
+type LabelOfProps = { path: string }
+
+type IsStaleDownloadProps = { path: string }
+
+type ServerPositionOfProps = { fileId: string }
+
+type NoteOpenedProps = { fileId: string }
+
+type NotePositionProps = { fileId: string; position: number; duration: number | null }
+
+type NotePlayingProps = { fileId: string | null }
+
+type PlaybackLeftProps = { fileId: string }
+
+type IsWatchedProps = { path: string }
 
 export type DownloadPlayback = {
   /** Plays a ready download as a local file, with its group's later ready files queued. */
-  open: (input: { downloadId: string }) => Promise<DesktopReply>
+  open: (input: OpenProps) => Promise<DesktopReply>
   /**
    * The granted video of a server title's ready download, which playing the title prefers: the
    * page is on it, and the next position noted for it is a play. Null when there is none, or its
    * file has gone.
    */
-  openTitle: (input: { serverId: string; mediaId: number }) => Promise<string | null>
+  openTitle: (input: OpenTitleProps) => Promise<string | null>
   /**
    * The next ready download of a granted download's group, granted, for a play whose queue has
    * run out (opened from On this Mac's recents, or past `MAX_QUEUE`); null after the last, and for any
    * other file.
    */
-  nextOf: (input: { fileId: string }) => Promise<Readonly<GrantedFile> | null>
+  nextOf: (input: NextOfProps) => Promise<Readonly<GrantedFile> | null>
   /** The subtitle files kept beside a granted download's video; none for any other file. */
   sidecarsOf: (fileId: string) => readonly LocalSidecar[]
   /**
    * "Downloaded from <server>" for a path in the downloads folder, or "Downloaded" once raven
    * player no longer plays from the server; else null.
    */
-  fromLabelOf: (input: { path: string }) => string | null
+  fromLabelOf: (input: FromLabelOfProps) => string | null
   /** The title of the download whose video is at `path`, else null. */
-  labelOf: (input: { path: string }) => string | null
+  labelOf: (input: LabelOfProps) => string | null
   /**
    * Whether `path` lies in the downloads folder but is no download's video: a deleted download
    * that a play queue still holds a grant for, since a grant outlives its download.
    */
-  isStaleDownload: (input: { path: string }) => boolean
+  isStaleDownload: (input: IsStaleDownloadProps) => boolean
   /**
    * Where the server had a granted download when it was confirmed, for a file with no local
    * resume spot; 0 once a position was noted here, and for any other file.
    */
-  serverPositionOf: (input: { fileId: string }) => number
+  serverPositionOf: (input: ServerPositionOfProps) => number
   /**
    * The page opened a granted file: the page is on it, and the next position noted for a
    * download's video is a play.
    */
-  noteOpened: (input: { fileId: string }) => void
+  noteOpened: (input: NoteOpenedProps) => void
   /** A position saved for a granted file; for a download's video, what the server will hear. */
-  notePosition: (input: { fileId: string; position: number; duration: number | null }) => void
+  notePosition: (input: NotePositionProps) => void
   /**
    * What the engine loaded: a granted file, or nothing of this computer's (a server title, the
    * player hiding for a page with no video).
    */
-  notePlaying: (input: { fileId: string | null }) => void
+  notePlaying: (input: NotePlayingProps) => void
   /** The play page left this file; a page already on the next file stays on it. */
-  playbackLeft: (input: { fileId: string }) => void
+  playbackLeft: (input: PlaybackLeftProps) => void
   /** A page said ready: a new page, on no file, though the engine may not have stopped yet. */
   noteNewPage: () => void
   /**
@@ -130,7 +160,7 @@ export type DownloadPlayback = {
    */
   watchedOf: (entry: DownloadEntry) => number | null
   /** Whether the video at `path` is a download marked watched, which the recents show whole. */
-  isWatched: (input: { path: string }) => boolean
+  isWatched: (input: IsWatchedProps) => boolean
   /** Reads these ready downloads' files for their share watched, then tells the page. */
   readFiles: (entries: readonly DownloadEntry[]) => void
   /** The queue's `onRemoved`: what names a removed download goes, its recent and resume spot too. */
@@ -146,8 +176,10 @@ const NO_SLOT: Slot = { fileId: null, downloadId: null }
 
 const PLAY_SIDES = { page: 'page', engine: 'engine' } as const
 
+type ForgetVideosProps = { paths: readonly string[] }
+
 /** Drops these videos' recents and resume spots; the same state when it names none of them. */
-const forgetVideos = (state: PlayerState, { paths }: { paths: readonly string[] }): PlayerState => {
+const forgetVideos = (state: PlayerState, { paths }: ForgetVideosProps): PlayerState => {
   const isNamed = (path: string): boolean =>
     state.recents.some((recent) => recent.kind === RECENT_KINDS.file && recent.path === path) ||
     state.resume.some((spot) => spot.path === path)
@@ -238,15 +270,19 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     return file ?? firstGranted(rest)
   }
 
+  type SittingAccountOfProps = { serverId: string }
+
   /**
    * The account a sitting belongs to: the one signed in, or while none is, the last that was,
    * so a play before the page sends its session waits for that account rather than going to
    * whoever signs in next. Null only before any account has signed in.
    */
-  const sittingAccountOf = ({ serverId }: { serverId: string }): string | null =>
+  const sittingAccountOf = ({ serverId }: SittingAccountOfProps): string | null =>
     deps.accountIdOf({ serverId }) ?? deps.lastAccountIdOf({ serverId })
 
-  const sit = ({ fileId, entry }: { fileId: string; entry: DownloadEntry }): void => {
+  type SitProps = { fileId: string; entry: DownloadEntry }
+
+  const sit = ({ fileId, entry }: SitProps): void => {
     freshFiles.add(fileId)
     sittings.set(fileId, sittingAccountOf({ serverId: entry.serverId }))
   }
@@ -322,8 +358,10 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
 
   const playingIds = (): (string | null)[] => [playing.page.downloadId, playing.engine.downloadId]
 
+  type PlayProps = { side: keyof typeof playing; fileId: string | null }
+
   /** Puts one side on a file, or on none, and says so once no side is on a download it was on. */
-  const play = ({ side, fileId }: { side: keyof typeof playing; fileId: string | null }): void => {
+  const play = ({ side, fileId }: PlayProps): void => {
     const before = playingIds()
     playing[side] = {
       fileId,

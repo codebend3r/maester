@@ -7,7 +7,9 @@ import { useMenu } from '@/lib/useMenu'
 import { useSignOut } from '@/lib/useSignOut'
 import styles from '@/components/AccountMenu/AccountMenu.module.scss'
 
-const Menu = ({ account }: { account: Account }) => {
+type MenuProps = { account: Account }
+
+const Menu = ({ account }: MenuProps) => {
   const id = useId()
   const { isOpen, toggle, close, root, trigger, list, onKeyDown } = useMenu()
   const end = useSignOut()

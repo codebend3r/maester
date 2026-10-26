@@ -35,6 +35,12 @@ const rangesFrom = (ranges: Array<[number, number]>) => ({
   end: (index: number) => ranges[index]?.[1] ?? 0,
 })
 
+type FakeBufferProps = {
+  source: { readyState: string }
+  onReopen: () => void
+  quotaSeconds: number
+}
+
 /**
  * Each chunk is two bytes, the stream times it covers: [4, 6] is the
  * fragment from 4s to 6s on the shifted clock. A third byte marks a chunk
@@ -44,15 +50,7 @@ const rangesFrom = (ranges: Array<[number, number]>) => ({
  * of the cut-off fragment, and like the real one it throws unless the
  * source is open.
  */
-const fakeBuffer = ({
-  source,
-  onReopen,
-  quotaSeconds,
-}: {
-  source: { readyState: string }
-  onReopen: () => void
-  quotaSeconds: number
-}) => {
+const fakeBuffer = ({ source, onReopen, quotaSeconds }: FakeBufferProps) => {
   const events = listeners()
   const state: {
     ranges: Array<[number, number]>
@@ -157,16 +155,14 @@ const fakeVideo = () => {
   return video
 }
 
-/** Responses by start time; each is a list of [from, to] chunks. */
-const setup = ({
-  streams = {},
-  ok = true,
-  quotaSeconds = Infinity,
-}: {
+type SetupProps = {
   streams?: Record<string, Array<[number, number]>>
   ok?: boolean
   quotaSeconds?: number
-} = {}) => {
+}
+
+/** Responses by start time; each is a list of [from, to] chunks. */
+const setup = ({ streams = {}, ok = true, quotaSeconds = Infinity }: SetupProps = {}) => {
   const sourceEvents = listeners()
   const sourceState: { readyState: string; ended: number; duration: number; mime: string } = {
     readyState: MEDIA_SOURCE_STATES.closed,
@@ -259,19 +255,17 @@ const settle = async () => {
 }
 
 describe('createStreamSession', () => {
+  type DeliverProps = {
+    chunks: number
+    secondsApart: number
+    quotaSeconds?: number
+  }
+
   /**
    * One second of video per chunk from `from`, each `secondsApart` of wall
    * time after the last, with the playhead left where the stream started.
    */
-  const deliver = async ({
-    chunks,
-    secondsApart,
-    quotaSeconds = Infinity,
-  }: {
-    chunks: number
-    secondsApart: number
-    quotaSeconds?: number
-  }) => {
+  const deliver = async ({ chunks, secondsApart, quotaSeconds = Infinity }: DeliverProps) => {
     const video = fakeVideo()
     const base = setup({ quotaSeconds })
     const fed = handFed()

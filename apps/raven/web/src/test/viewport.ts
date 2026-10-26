@@ -13,6 +13,8 @@ const reporting: { isOnScreen: boolean; observers: Set<FakeIntersectionObserver>
   observers: new Set(),
 }
 
+type FakeIntersectionObserverReportProps = { target: Element; isIntersecting: boolean }
+
 class FakeIntersectionObserver {
   readonly root = null
   readonly rootMargin: string
@@ -27,7 +29,7 @@ class FakeIntersectionObserver {
     reporting.observers.add(this)
   }
 
-  report({ target, isIntersecting }: { target: Element; isIntersecting: boolean }): void {
+  report({ target, isIntersecting }: FakeIntersectionObserverReportProps): void {
     if (!this.#targets.has(target)) return
     const box = target.getBoundingClientRect()
     act(() =>
@@ -76,14 +78,13 @@ export const startOnScreen = (isOnScreen: boolean): void => {
   reporting.isOnScreen = isOnScreen
 }
 
-/** Scrolls `target` onto the screen or off it. */
-export const moveOnScreen = ({
-  target,
-  isOnScreen,
-}: {
+type MoveOnScreenProps = {
   target: Element
   isOnScreen: boolean
-}): void =>
+}
+
+/** Scrolls `target` onto the screen or off it. */
+export const moveOnScreen = ({ target, isOnScreen }: MoveOnScreenProps): void =>
   reporting.observers.forEach((observer) => observer.report({ target, isIntersecting: isOnScreen }))
 
 /** Waits for the reports on what just mounted, as a test that reads a picture at once needs. */

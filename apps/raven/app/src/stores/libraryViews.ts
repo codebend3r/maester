@@ -23,26 +23,29 @@ export type LibraryChoice = Infer<typeof isLibraryChoice>
 
 type Choices = Record<string, LibraryChoice>
 
+type ChooseProps = { serverId: string; libraryId: number; change: LibraryChoice }
+
 type LibraryViews = {
   choices: Choices
-  choose: (args: { serverId: string; libraryId: number; change: LibraryChoice }) => void
+  choose: (args: ChooseProps) => void
 }
 
-const keyOf = ({ serverId, libraryId }: { serverId: string; libraryId: number }): string =>
-  `${serverId}/${libraryId}`
+type KeyOfProps = { serverId: string; libraryId: number }
+
+const keyOf = ({ serverId, libraryId }: KeyOfProps): string => `${serverId}/${libraryId}`
 
 /** Nothing chosen, the one value, so a selector reading it gives the same answer each time. */
 const NO_CHOICE: LibraryChoice = {}
 
-/** The choice made for a library on a server, or nothing chosen. */
-export const libraryChoiceOf = ({
-  choices,
-  ...library
-}: {
+type LibraryChoiceOfProps = {
   choices: Choices
   serverId: string
   libraryId: number
-}): LibraryChoice => choices[keyOf(library)] ?? NO_CHOICE
+}
+
+/** The choice made for a library on a server, or nothing chosen. */
+export const libraryChoiceOf = ({ choices, ...library }: LibraryChoiceOfProps): LibraryChoice =>
+  choices[keyOf(library)] ?? NO_CHOICE
 
 /** What was read back, kept only where it is a choice. */
 const choicesOf = (saved: unknown): Choices => {
@@ -88,8 +91,10 @@ export const useLibraryViews = create<LibraryViews>()(
   ),
 )
 
+type ConfigureLibraryViewsProps = { storage: StateStorage }
+
 /** Gives the choices their storage, AsyncStorage in the app, and reads them back from it. */
-export const configureLibraryViews = async ({ storage }: { storage: StateStorage }) => {
+export const configureLibraryViews = async ({ storage }: ConfigureLibraryViewsProps) => {
   useLibraryViews.persist.setOptions({ storage: createJSONStorage(() => storage) })
   await useLibraryViews.persist.rehydrate()
 }

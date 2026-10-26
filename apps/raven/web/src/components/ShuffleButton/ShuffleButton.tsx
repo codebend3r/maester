@@ -14,6 +14,8 @@ const LABELS = {
   empty: 'Nothing to play',
 } as const satisfies Record<PickState, string | null>
 
+type ShuffleButtonProps = { itemId: number; children: string }
+
 /**
  * Plays the episodes under `itemId`, a show or a season, in a random order,
  * among the files this browser may see: the first at once, the rest one
@@ -21,7 +23,7 @@ const LABELS = {
  * loading a single episode. `children` is the label, "Shuffle" or "Shuffle
  * season".
  */
-export const ShuffleButton = ({ itemId, children }: { itemId: number; children: string }) => {
+export const ShuffleButton = ({ itemId, children }: ShuffleButtonProps) => {
   const navigate = useNavigate()
   const [state, setState] = useState<PickState>(PICK_STATES.idle)
   const pick = () => {

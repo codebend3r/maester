@@ -50,17 +50,23 @@ const TRACKS: MediaTracks = {
   frameRate: null,
 }
 
-const reply = ({ status, body }: { status: number; body: string }): ServerCallResult => ({
+type ReplyProps = { status: number; body: string }
+
+const reply = ({ status, body }: ReplyProps): ServerCallResult => ({
   ok: true,
   status,
   body,
 })
 
+type FakeCallsProps = { answer: (call: AllowedCall) => ServerCallResult | null }
+
 /** Calls answered by `answer`, or held until the test settles them when it gives null. */
-const fakeCalls = ({ answer }: { answer: (call: AllowedCall) => ServerCallResult | null }) => {
+const fakeCalls = ({ answer }: FakeCallsProps) => {
   const made: { serverId: string; call: AllowedCall }[] = []
+  type CallsCallProps = { serverId: string; call: AllowedCall }
+
   const calls = {
-    call: ({ serverId, call }: { serverId: string; call: AllowedCall }) => {
+    call: ({ serverId, call }: CallsCallProps) => {
       made.push({ serverId, call })
       const answered = answer(call)
       if (answered === null) return new Promise<ServerCallResult>(() => {})
@@ -72,14 +78,13 @@ const fakeCalls = ({ answer }: { answer: (call: AllowedCall) => ServerCallResult
 
 const RELAY_BASE = `http://127.0.0.1:4000/${'s'.repeat(43)}`
 
-/** A relay that answers fixed URLs, keeping what it was asked. */
-const fakeRelay = ({
-  refusal = null,
-  isOpenFailing = false,
-}: {
+type FakeRelayProps = {
   refusal?: ReturnType<MediaRelay['refusalOf']>
   isOpenFailing?: boolean
-}) => {
+}
+
+/** A relay that answers fixed URLs, keeping what it was asked. */
+const fakeRelay = ({ refusal = null, isOpenFailing = false }: FakeRelayProps) => {
   const opened: Parameters<MediaRelay['open']>[0][] = []
   const closed: string[] = []
   const refusalsAsked: string[] = []
@@ -105,19 +110,21 @@ const fakeRelay = ({
   return { relay, opened, closed, refusalsAsked }
 }
 
+type SetupProps = {
+  answer?: (call: AllowedCall) => ServerCallResult | null
+  servers?: readonly ServerEntry[]
+  ticket?: TicketOutcome
+  refusal?: ReturnType<MediaRelay['refusalOf']>
+  isOpenFailing?: boolean
+}
+
 const setup = ({
   answer = () => reply({ status: 200, body: JSON.stringify(TRACKS) }),
   servers = [SERVER],
   ticket = { kind: TICKET_OUTCOMES.ticket, ticket: 'account.t1' },
   refusal = null,
   isOpenFailing = false,
-}: {
-  answer?: (call: AllowedCall) => ServerCallResult | null
-  servers?: readonly ServerEntry[]
-  ticket?: TicketOutcome
-  refusal?: ReturnType<MediaRelay['refusalOf']>
-  isOpenFailing?: boolean
-} = {}) => {
+}: SetupProps = {}) => {
   const { calls, made } = fakeCalls({ answer })
   const warnings: string[] = []
   const minted: { serverId: string; mediaId: number; isFresh: boolean }[] = []

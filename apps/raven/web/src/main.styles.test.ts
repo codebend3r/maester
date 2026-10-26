@@ -2,15 +2,13 @@ import { expect, test } from 'bun:test'
 import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
 
-const ruleIndex = ({
-  css,
-  selector,
-  declaration,
-}: {
+type RuleIndexProps = {
   css: string
   selector: RegExp
   declaration: string
-}) => {
+}
+
+const ruleIndex = ({ css, selector, declaration }: RuleIndexProps) => {
   const index = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].findIndex(
     (match) => selector.test(match[1] ?? '') && (match[2] ?? '').includes(declaration),
   )

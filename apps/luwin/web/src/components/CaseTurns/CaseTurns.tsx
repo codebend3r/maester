@@ -3,7 +3,9 @@ import styles from '@/components/CaseTurns/CaseTurns.module.scss'
 import type { CaseTurn } from '@/lib/api'
 import { useChat } from '@/stores/chat'
 
-const Expectation = ({ term, values }: { term: string; values: string[] }) =>
+type ExpectationProps = { term: string; values: string[] }
+
+const Expectation = ({ term, values }: ExpectationProps) =>
   values.length > 0 && (
     <>
       <dt className={styles.term}>{term}</dt>
@@ -11,8 +13,10 @@ const Expectation = ({ term, values }: { term: string; values: string[] }) =>
     </>
   )
 
+type CaseTurnsProps = { name: string; turns: CaseTurn[] }
+
 /** The open case's own messages, each sent with what the case expects of the answer. */
-export const CaseTurns = ({ name, turns }: { name: string; turns: CaseTurn[] }) => {
+export const CaseTurns = ({ name, turns }: CaseTurnsProps) => {
   const send = useChat((state) => state.send)
   const isBusy = useChat((state) => state.isBusy)
   return (

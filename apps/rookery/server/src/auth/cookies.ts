@@ -10,21 +10,16 @@ export const PIN_COOKIE = 'rookery_pin'
 const PIN_PATH = '/auth/plex'
 const SESSION_PATH = '/'
 
-const serialize = ({
-  name,
-  value,
-  path,
-  maxAgeSeconds,
-  domain,
-  secure,
-}: {
+type SerializeProps = {
   name: string
   value: string
   path: string
   maxAgeSeconds: number
   domain: string | null
   secure: boolean
-}): string =>
+}
+
+const serialize = ({ name, value, path, maxAgeSeconds, domain, secure }: SerializeProps): string =>
   [
     `${name}=${value}`,
     `Path=${path}`,
@@ -37,7 +32,9 @@ const serialize = ({
 
 const seconds = (ms: number): number => Math.floor(ms / 1000)
 
-export const sessionCookie = ({ token, config }: { token: string; config: ServerConfig }) =>
+type SessionCookieProps = { token: string; config: ServerConfig }
+
+export const sessionCookie = ({ token, config }: SessionCookieProps) =>
   serialize({
     name: SESSION_COOKIE,
     value: token,
@@ -47,8 +44,10 @@ export const sessionCookie = ({ token, config }: { token: string; config: Server
     secure: config.secureCookies,
   })
 
+type ClearedSessionCookieProps = { config: ServerConfig }
+
 /** Clears the session cookie; the `Domain` must match the one it was set with. */
-export const clearedSessionCookie = ({ config }: { config: ServerConfig }) =>
+export const clearedSessionCookie = ({ config }: ClearedSessionCookieProps) =>
   serialize({
     name: SESSION_COOKIE,
     value: '',
@@ -58,7 +57,9 @@ export const clearedSessionCookie = ({ config }: { config: ServerConfig }) =>
     secure: config.secureCookies,
   })
 
-export const pinCookie = ({ id, config }: { id: string; config: ServerConfig }) =>
+type PinCookieProps = { id: string; config: ServerConfig }
+
+export const pinCookie = ({ id, config }: PinCookieProps) =>
   serialize({
     name: PIN_COOKIE,
     value: id,
@@ -68,7 +69,9 @@ export const pinCookie = ({ id, config }: { id: string; config: ServerConfig }) 
     secure: config.secureCookies,
   })
 
-export const clearedPinCookie = ({ config }: { config: ServerConfig }) =>
+type ClearedPinCookieProps = { config: ServerConfig }
+
+export const clearedPinCookie = ({ config }: ClearedPinCookieProps) =>
   serialize({
     name: PIN_COOKIE,
     value: '',

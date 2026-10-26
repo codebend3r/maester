@@ -25,6 +25,8 @@ import { type MatchPass, RESOLVED_KINDS, type SearchTitle } from '@/metadata/mat
 import type { MetadataRepository } from '@/metadata/metadataRepository'
 import { filePlace, holdsOneMovie, rootOf, showDirOf, showPlace, stemOf } from '@/metadata/places'
 
+type MatchProps = { files: readonly MatchFile[]; pass: MatchPass }
+
 /** How files are matched to one type of TMDB item: which go together, and what a Fix match covers. */
 export type KindMatcher = {
   /** Files in the units matched together: one movie file, or one show folder's files. */
@@ -35,7 +37,7 @@ export type KindMatcher = {
    * card; a show folder that fails part way through waits, pending, to be
    * matched whole.
    */
-  match: (args: { files: readonly MatchFile[]; pass: MatchPass }) => Promise<void>
+  match: (args: MatchProps) => Promise<void>
   /** The place a Fix match on `file` is kept under, and every file it covers. */
   fixGroup: (file: MatchFile) => { place: string; files: MatchFile[] }
 }
@@ -48,14 +50,13 @@ export type MatcherDeps = {
   decisions: AiDecisions
 }
 
-/** Extras are never matched; the rest are what a unit is about. */
-const withoutExtras = ({
-  files,
-  deps,
-}: {
+type WithoutExtrasProps = {
   files: readonly MatchFile[]
   deps: MatcherDeps
-}): MatchFile[] => {
+}
+
+/** Extras are never matched; the rest are what a unit is about. */
+const withoutExtras = ({ files, deps }: WithoutExtrasProps): MatchFile[] => {
   const extras = files.filter((file) => isExtra(file))
   if (extras.length > 0) deps.files.setMatch({ ids: extras.map((file) => file.id), match: 'off' })
   return files.filter((file) => !isExtra(file))
@@ -82,33 +83,41 @@ export const showSearchTitles = (parsed: ParsedEpisodeName): SearchTitle[] => {
   ]
 }
 
+type MovieSearchTitlesProps = {
+  file: Pick<MatchFile, 'title' | 'year'>
+  parsed: ParsedMovieName
+}
+
 /**
  * The titles a movie file is searched by, in turn: its name's title and
  * year, then the name's other readings, such as the file's own name where
  * its folder is misnamed.
  */
-export const movieSearchTitles = ({
-  file,
-  parsed,
-}: {
-  file: Pick<MatchFile, 'title' | 'year'>
-  parsed: ParsedMovieName
-}): SearchTitle[] => [{ title: file.title, year: file.year }, ...parsed.alternatives]
+export const movieSearchTitles = ({ file, parsed }: MovieSearchTitlesProps): SearchTitle[] => [
+  { title: file.title, year: file.year },
+  ...parsed.alternatives,
+]
 
 const movieMatcher = (deps: MatcherDeps): KindMatcher => {
+  type FixForProps = { file: MatchFile; own: boolean }
+
   /** The Fix match for a movie file: its own place first, then its folder's when that is one movie. */
-  const fixFor = ({ file, own }: { file: MatchFile; own: boolean }): FixMatch => {
+  const fixFor = ({ file, own }: FixForProps): FixMatch => {
     const forFile = deps.files.fixMatchAt({ libraryId: file.libraryId, place: filePlace(file) })
     if (forFile.kind !== FIX_MATCH_KINDS.none || !own) return forFile
     return deps.files.fixMatchAt({ libraryId: file.libraryId, place: file.folder })
   }
 
+  type DecidedForProps = { file: MatchFile; own: boolean }
+
   /** A sure AI pick for a movie file: kept at its own place, or at its folder's when that is one movie. */
-  const decidedFor = ({ file, own }: { file: MatchFile; own: boolean }): string | null =>
+  const decidedFor = ({ file, own }: DecidedForProps): string | null =>
     deps.decisions.highPickAt({ libraryId: file.libraryId, place: filePlace(file) }) ??
     (own ? deps.decisions.highPickAt({ libraryId: file.libraryId, place: file.folder }) : null)
 
-  const matchMovie = async ({ file, pass }: { file: MatchFile; pass: MatchPass }) => {
+  type MatchMovieProps = { file: MatchFile; pass: MatchPass }
+
+  const matchMovie = async ({ file, pass }: MatchMovieProps) => {
     const dir = dirname(file.path)
     const own = pass.folders.ownFolder({ libraryId: file.libraryId, folder: file.folder })
     const assets = movieAssets({
@@ -164,16 +173,14 @@ type ShowContext = {
 }
 
 const showMatcher = (deps: MatcherDeps): KindMatcher => {
-  /** Links one file to its episode (or episodes), making the season and episode when TMDB has none. The items it touched. */
-  const placeEpisode = async ({
-    file,
-    show,
-    pass,
-  }: {
+  type PlaceEpisodeProps = {
     file: MatchFile
     show: ShowContext
     pass: MatchPass
-  }): Promise<number[]> => {
+  }
+
+  /** Links one file to its episode (or episodes), making the season and episode when TMDB has none. The items it touched. */
+  const placeEpisode = async ({ file, show, pass }: PlaceEpisodeProps): Promise<number[]> => {
     const parsed = parseEpisodeName({ ...file, fallbackShow: show.fallbackShow })
     if (parsed.season == null) {
       deps.files.settle({ ids: [file.id], itemIds: [show.showId], match: show.match })
@@ -206,17 +213,16 @@ const showMatcher = (deps: MatcherDeps): KindMatcher => {
     return [season.id, ...episodeIds]
   }
 
+  type MatchShowGroupProps = {
+    files: readonly MatchFile[]
+    pass: MatchPass
+  }
+
   /**
    * The files of one show folder (or one file at a root): the show is found
    * once, then each file is placed in its season and episode.
    */
-  const matchShowGroup = async ({
-    files,
-    pass,
-  }: {
-    files: readonly MatchFile[]
-    pass: MatchPass
-  }): Promise<void> => {
+  const matchShowGroup = async ({ files, pass }: MatchShowGroupProps): Promise<void> => {
     const episodes = withoutExtras({ files, deps })
     const [first] = episodes
     if (!first) return

@@ -70,21 +70,18 @@ const whenEmpty =
   (list: readonly unknown[]): string | null =>
     list.length === 0 ? message : null
 
-/**
- * A tab's body: its failure, `shape` while it loads, the line `empty` gives
- * for what came back, if any, else its content.
- */
-const SectionBody = <T,>({
-  query,
-  shape,
-  empty,
-  children,
-}: {
+type SectionBodyProps<T> = {
   query: UseQueryResult<T>
   shape: ReactNode
   empty: (data: T) => string | null
   children: (data: T) => ReactNode
-}) => {
+}
+
+/**
+ * A tab's body: its failure, `shape` while it loads, the line `empty` gives
+ * for what came back, if any, else its content.
+ */
+const SectionBody = <T,>({ query, shape, empty, children }: SectionBodyProps<T>) => {
   if (query.isError) {
     return (
       <p className={styles.message} role="alert">
@@ -98,11 +95,13 @@ const SectionBody = <T,>({
   return children(query.data)
 }
 
+type EntryGridProps = { library: Library; entries: PosterEntry[] }
+
 /**
  * Videos as the library lays its cards out: posters where it is matched (an
  * episode wears its season's), frame grabs where it is not.
  */
-const EntryGrid = ({ library, entries }: { library: Library; entries: PosterEntry[] }) => {
+const EntryGrid = ({ library, entries }: EntryGridProps) => {
   const matchType = matchTypeFor(library.settings.kind)
   const posters = new Map(entries.map(({ media, poster }) => [media.id, poster]))
   return (
@@ -123,16 +122,14 @@ const EntryGrid = ({ library, entries }: { library: Library; entries: PosterEntr
   )
 }
 
-/** The listing as it stands: its shape on its way, why it could not be read, why it is empty, or itself. */
-const ListingBody = ({
-  listing,
-  settings,
-  empty,
-}: {
+type ListingBodyProps = {
   listing: ListingState
   settings: LibrarySettings
   empty: string | null
-}) => {
+}
+
+/** The listing as it stands: its shape on its way, why it could not be read, why it is empty, or itself. */
+const ListingBody = ({ listing, settings, empty }: ListingBodyProps) => {
   switch (listing.state) {
     case LISTING_STATES.pending:
       return <LibraryListingSkeleton settings={settings} />
@@ -155,16 +152,20 @@ const ListingBody = ({
   }
 }
 
+type SameLayoutProps = { a: LibrarySettings; b: LibrarySettings }
+
 /** Whether two settings lay a listing out the same way. */
-const sameLayout = ({ a, b }: { a: LibrarySettings; b: LibrarySettings }): boolean =>
+const sameLayout = ({ a, b }: SameLayoutProps): boolean =>
   a.view === b.view && a.sort === b.sort && a.groupBy === b.groupBy
+
+type AllSectionProps = { library: Library }
 
 /**
  * Every video or show in the library, searched, sorted and laid out as it
  * was left, with Play and Shuffle, and a strip down the side that jumps
  * through the order. The strip scrolls within this tab's cards.
  */
-const AllSection = ({ library }: { library: Library }) => {
+const AllSection = ({ library }: AllSectionProps) => {
   const cards = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const view = useLibraryView({ library })
@@ -262,8 +263,10 @@ const AllSection = ({ library }: { library: Library }) => {
   )
 }
 
+type InProgressSectionProps = { library: Library }
+
 /** What was left partway through, the most recently watched first. */
-const InProgressSection = ({ library }: { library: Library }) => {
+const InProgressSection = ({ library }: InProgressSectionProps) => {
   const query = useQuery(inProgressQuery(library.id))
   return (
     <SectionBody
@@ -280,8 +283,10 @@ const InProgressSection = ({ library }: { library: Library }) => {
   )
 }
 
+type FavouritesSectionProps = { library: Library }
+
 /** The library's favourites, most recently marked first. */
-const FavouritesSection = ({ library }: { library: Library }) => {
+const FavouritesSection = ({ library }: FavouritesSectionProps) => {
   const query = useQuery(libraryFavouritesQuery(library.id))
   return (
     <SectionBody
@@ -296,11 +301,13 @@ const FavouritesSection = ({ library }: { library: Library }) => {
   )
 }
 
+type SagasSectionProps = { library: Library }
+
 /**
  * The library's movies gathered by the TMDB collection they belong to, by
  * name, each saga a deck of its posters that opens its own page.
  */
-const SagasSection = ({ library }: { library: Library }) => {
+const SagasSection = ({ library }: SagasSectionProps) => {
   const query = useQuery(sagasQuery(library.id))
   return (
     <SectionBody
@@ -330,14 +337,13 @@ const suggestionsIn =
   (file: MediaItem): AiSuggestion | null =>
     files.find((each) => each.id === file.id)?.aiSuggestion ?? null
 
-/** What the Not matched tab says to do about its files: Fix match, once the viewer may manage. */
-const notMatchedHint = ({
-  matchType,
-  management,
-}: {
+type NotMatchedHintProps = {
   matchType: ReturnType<typeof matchTypeFor>
   management: ReturnType<typeof useManagement>
-}): string => {
+}
+
+/** What the Not matched tab says to do about its files: Fix match, once the viewer may manage. */
+const notMatchedHint = ({ matchType, management }: NotMatchedHintProps): string => {
   const title = matchType ?? 'title'
   if (!management.canManage) {
     return management.mode === MANAGEMENT_MODES.adminLock
@@ -350,6 +356,8 @@ const notMatchedHint = ({
   return `Open a file's menu and choose Fix match to point it at the right ${title}.`
 }
 
+type NotMatchedSectionProps = { library: Library }
+
 /**
  * The files no movie or show was found for, each with Fix match in its menu,
  * and what the AI lookup suggests where it was not sure. While TMDB answers,
@@ -357,7 +365,7 @@ const notMatchedHint = ({
  * again for its count of files not matched. The lookups run after that, so
  * once they end, the tab reads both again.
  */
-const NotMatchedSection = ({ library }: { library: Library }) => {
+const NotMatchedSection = ({ library }: NotMatchedSectionProps) => {
   const matchType = matchTypeFor(library.settings.kind)
   const metadata = useQuery(metadataHealthQuery)
   const canMatch = metadata.data?.tmdb === METADATA_SERVICE_STATES.ok
@@ -406,11 +414,13 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
   )
 }
 
+type DuplicatesSectionProps = { library: Library }
+
 /**
  * The movies holding more than one file on their card, each to split
  * apart, and the movies already split, each to put back together.
  */
-const DuplicatesSection = ({ library }: { library: Library }) => {
+const DuplicatesSection = ({ library }: DuplicatesSectionProps) => {
   const query = useQuery(duplicatesQuery(library.id))
   return (
     <SectionBody
@@ -423,8 +433,10 @@ const DuplicatesSection = ({ library }: { library: Library }) => {
   )
 }
 
+type FinishedSectionProps = { library: Library }
+
 /** What was watched to the end most recently, with a way to the whole history. */
-const FinishedSection = ({ library }: { library: Library }) => {
+const FinishedSection = ({ library }: FinishedSectionProps) => {
   const matchType = matchTypeFor(library.settings.kind)
   const query = useQuery(
     historyQuery({ libraryId: library.id, show: 'watched', limit: FINISHED_LIMIT }),
@@ -466,6 +478,8 @@ const FinishedSection = ({ library }: { library: Library }) => {
   )
 }
 
+type SECTION_VIEWSCallbackProps = { library: Library }
+
 /** Each tab's content. */
 const SECTION_VIEWS = {
   all: AllSection,
@@ -475,16 +489,15 @@ const SECTION_VIEWS = {
   'not-matched': NotMatchedSection,
   duplicates: DuplicatesSection,
   finished: FinishedSection,
-} as const satisfies Record<LibrarySection, (props: { library: Library }) => ReactNode>
+} as const satisfies Record<LibrarySection, (props: SECTION_VIEWSCallbackProps) => ReactNode>
 
-/** The open tab's content. */
-export const SectionView = ({
-  library,
-  section,
-}: {
+type SectionViewProps = {
   library: Library
   section: LibrarySection
-}) => {
+}
+
+/** The open tab's content. */
+export const SectionView = ({ library, section }: SectionViewProps) => {
   const View = SECTION_VIEWS[section]
   return <View library={library} />
 }

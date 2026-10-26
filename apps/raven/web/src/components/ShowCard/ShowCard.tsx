@@ -26,20 +26,18 @@ import { useSelectable } from '@/lib/useSelectable'
 import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import styles from '@/components/ShowCard/ShowCard.module.scss'
 
+type UseShowCardProps = {
+  entry: ShowEntry
+  ratingsSource: RatingSource
+  sort: MediaSort | undefined
+}
+
 /**
  * What both shapes of a show's card share: its backdrop behind the page
  * while pointed at, its selection, its facts and score, and how its next
  * episode's play button is named.
  */
-const useShowCard = ({
-  entry,
-  ratingsSource,
-  sort,
-}: {
-  entry: ShowEntry
-  ratingsSource: RatingSource
-  sort: MediaSort | undefined
-}) => {
+const useShowCard = ({ entry, ratingsSource, sort }: UseShowCardProps) => {
   const { show, next } = entry
   const hover = useHoverBackdrop(
     api.itemImageUrl({ id: show.id, kind: 'backdrop', version: show.backdropVersion }),
@@ -60,18 +58,15 @@ const useShowCard = ({
   }
 }
 
-/** The facts under a show's title, a dot apart, with its score and the words of its count. */
-const ShowFacts = ({
-  entry,
-  facts,
-  score,
-  className,
-}: {
+type ShowFactsProps = {
   entry: ShowEntry
   facts: string[]
   score: ReturnType<typeof pickScore>
   className: string
-}) => (
+}
+
+/** The facts under a show's title, a dot apart, with its score and the words of its count. */
+const ShowFacts = ({ entry, facts, score, className }: ShowFactsProps) => (
   <span className={className}>
     {facts.map((fact) => (
       <span key={fact} className={styles.fact}>
@@ -87,6 +82,15 @@ const ShowFacts = ({
   </span>
 )
 
+type ShowCardProps = {
+  entry: ShowEntry
+  ratingsSource?: RatingSource
+  /** The order the listing is in, whose value the card shows. */
+  sort?: MediaSort
+  /** How wide the list holding the card shows its poster. */
+  sizes: PosterSizes
+}
+
 /**
  * A show as a poster, its title, years and episode count beneath, as a row
  * on the home page lays it out. The card opens the show's page; its play
@@ -94,19 +98,7 @@ const ShowFacts = ({
  * so the player starts at once. Sorted by when shows were added, it says
  * when the newest episode came.
  */
-export const ShowCard = ({
-  entry,
-  ratingsSource = 'tmdb',
-  sort,
-  sizes,
-}: {
-  entry: ShowEntry
-  ratingsSource?: RatingSource
-  /** The order the listing is in, whose value the card shows. */
-  sort?: MediaSort
-  /** How wide the list holding the card shows its poster. */
-  sizes: PosterSizes
-}) => {
+export const ShowCard = ({ entry, ratingsSource = 'tmdb', sort, sizes }: ShowCardProps) => {
   const { show, next } = entry
   const card = useShowCard({ entry, ratingsSource, sort })
 
@@ -158,6 +150,13 @@ export const ShowCard = ({
   )
 }
 
+type WideShowCardProps = {
+  entry: ShowEntry
+  ratingsSource?: RatingSource
+  /** The order the listing is in, whose value the card shows. */
+  sort?: MediaSort
+}
+
 /**
  * A show as a wide card, its poster beside its title, years and episodes,
  * on a ground washed toward the poster's own colours. Below them, the next
@@ -165,16 +164,7 @@ export const ShowCard = ({
  * page and its play button starts that episode at once. The wash is the
  * poster again, blurred: the same file, so nothing more is fetched.
  */
-const WideShowCard = ({
-  entry,
-  ratingsSource = 'tmdb',
-  sort,
-}: {
-  entry: ShowEntry
-  ratingsSource?: RatingSource
-  /** The order the listing is in, whose value the card shows. */
-  sort?: MediaSort
-}) => {
+const WideShowCard = ({ entry, ratingsSource = 'tmdb', sort }: WideShowCardProps) => {
   const { show, next } = entry
   const card = useShowCard({ entry, ratingsSource, sort })
   const wash = posterSources({ item: show, sizes: POSTER_SIZES.showCard })
@@ -252,16 +242,14 @@ const WideShowCard = ({
   )
 }
 
-/** The grid a TV library lays its shows out in, each a wide card. */
-export const ShowGrid = ({
-  shows,
-  ratingsSource = 'tmdb',
-  sort,
-}: {
+type ShowGridProps = {
   shows: ShowEntry[]
   ratingsSource?: RatingSource
   sort?: MediaSort
-}) => (
+}
+
+/** The grid a TV library lays its shows out in, each a wide card. */
+export const ShowGrid = ({ shows, ratingsSource = 'tmdb', sort }: ShowGridProps) => (
   <ul className={styles.grid}>
     {shows.map((entry) => (
       <WideShowCard key={entry.show.id} entry={entry} ratingsSource={ratingsSource} sort={sort} />
@@ -284,8 +272,10 @@ const WideShowSkeleton = () => (
   </li>
 )
 
+type ShowGridSkeletonProps = { count?: number }
+
 /** The show grid while its shows are on their way, as wide cards of stand-ins. */
-export const ShowGridSkeleton = ({ count = 6 }: { count?: number }) => (
+export const ShowGridSkeleton = ({ count = 6 }: ShowGridSkeletonProps) => (
   <ul className={styles.grid}>
     {Array.from({ length: count }, (_, index) => (
       <WideShowSkeleton key={index} />

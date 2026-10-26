@@ -16,6 +16,16 @@ const UNAVAILABLE = {
   message: ENGINE_MESSAGES.unavailable,
 } as const satisfies OpenedEngine<never>
 
+type PostProps<R> = { connection: PlayerConnectionStatus; ports: R[] }
+
+type CreateConnectorProps<T extends { service: PlayerService }, R> = {
+  engine: () => Promise<OpenedEngine<T>>
+  channel: () => { local: PortLike; remote: R }
+  post: (input: PostProps<R>) => void
+  warn: (message: string) => void
+  timers: Timers
+}
+
 /**
  * Hands each page load its player: on every `ready`, the old port is closed (which
  * stops playback) before a new one is made, so two ports never drive one engine.
@@ -27,13 +37,7 @@ export const createConnector = <T extends { service: PlayerService }, R>({
   post,
   warn,
   timers,
-}: {
-  engine: () => Promise<OpenedEngine<T>>
-  channel: () => { local: PortLike; remote: R }
-  post: (input: { connection: PlayerConnectionStatus; ports: R[] }) => void
-  warn: (message: string) => void
-  timers: Timers
-}): { connect: () => Promise<void>; disconnect: () => void } => {
+}: CreateConnectorProps<T, R>): { connect: () => Promise<void>; disconnect: () => void } => {
   let current: { close: () => void } | null = null
   // Bumped by every connect and disconnect, so an engine that opens late hands over nothing.
   let generation = 0
@@ -67,7 +71,9 @@ export const createConnector = <T extends { service: PlayerService }, R>({
     return Promise.race([open(), deadline.promise]).finally(() => timers.clear(timer))
   }
 
-  const hand = ({ opened }: { opened: OpenedEngine<T> }) => {
+  type HandProps = { opened: OpenedEngine<T> }
+
+  const hand = ({ opened }: HandProps) => {
     switch (opened.status) {
       case ENGINE_STATUSES.unavailable:
         post({

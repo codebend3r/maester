@@ -58,8 +58,9 @@ describe('streamArgs', () => {
     tonemap: false,
     streamShift: 1,
   }
-  const after = ({ args, flag }: { args: string[]; flag: string }): string | undefined =>
-    args[args.indexOf(flag) + 1]
+  type AfterProps = { args: string[]; flag: string }
+
+  const after = ({ args, flag }: AfterProps): string | undefined => args[args.indexOf(flag) + 1]
 
   describe('on a GPU', () => {
     const vaapi: VideoEncoder = { kind: 'vaapi', device: '/dev/dri/renderD128' }

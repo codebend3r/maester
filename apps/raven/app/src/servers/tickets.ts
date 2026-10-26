@@ -15,16 +15,16 @@ const firstMediaIdOf = (home: Home): number | null => {
   return home.inProgress[0]?.media.id ?? shelved[0]?.id ?? null
 }
 
+type TicketSupportOfProps = {
+  api: Pick<ApiClient, 'getHome' | 'getMediaTicket'>
+}
+
 /**
  * Asks for a ticket for any video on Home, to learn whether the server hands them out.
  * Anything but a ticket or a 503 (a locked library's 423, no video at all, a network
  * failure) says nothing either way.
  */
-export const ticketSupportOf = async ({
-  api,
-}: {
-  api: Pick<ApiClient, 'getHome' | 'getMediaTicket'>
-}): Promise<TicketSupport> => {
+export const ticketSupportOf = async ({ api }: TicketSupportOfProps): Promise<TicketSupport> => {
   try {
     const id = firstMediaIdOf(await api.getHome())
     if (id === null) return TICKET_SUPPORT.unknown

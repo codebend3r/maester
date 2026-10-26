@@ -24,24 +24,29 @@ import { clockOf, expectButton, expectNative } from '@/e2e/playerView'
 // What the fixture's title plays for before the app quits.
 const PLAY_SECONDS = 3
 
+type ExpectLoggedProps = { userData: string; text: string }
+
 /** Waits until a line of the log holds `text`, which main writes a moment after it happens. */
-const expectLogged = async ({ userData, text }: { userData: string; text: string }) => {
+const expectLogged = async ({ userData, text }: ExpectLoggedProps) => {
   await expect
     .poll(async () => (await readLog({ userData })).some((line) => line.includes(text)))
     .toBe(true)
 }
 
+type IndexOfProps = { lines: readonly string[]; text: string }
+
 /** Where the first line holding `text` sits in the log, or -1. */
-const indexOf = ({ lines, text }: { lines: readonly string[]; text: string }) =>
-  lines.findIndex((line) => line.includes(text))
+const indexOf = ({ lines, text }: IndexOfProps) => lines.findIndex((line) => line.includes(text))
 
 // A budget mark as the log holds it: a stamp, its level, then only a name and a number.
 const MARK_ENTRY = /^\S+ info raven-[a-z][a-z0-9-]* \d+$/
 
 const ESCAPED = /[.*+?^${}()|[\]\\]/gu
 
+type HoldsSecretProps = { line: string; secret: string }
+
 /** Whether `line` holds `secret` as a whole word, so a PIN does not match inside a longer number. */
-const holdsSecret = ({ line, secret }: { line: string; secret: string }): boolean =>
+const holdsSecret = ({ line, secret }: HoldsSecretProps): boolean =>
   new RegExp(`(^|[^0-9A-Za-z])${secret.replace(ESCAPED, '\\$&')}($|[^0-9A-Za-z])`, 'u').test(line)
 
 test.describe.serial('the Raven log', () => {

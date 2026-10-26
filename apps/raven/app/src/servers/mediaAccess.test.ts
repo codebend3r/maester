@@ -43,15 +43,17 @@ const LOW_720: StreamQuality = 'low720'
 
 const QUICK_LAN = { [LAN.url]: 20, [PUBLIC.url]: 200 }
 
+type SetUpProps = {
+  server?: ReturnType<typeof mediaServer>
+  elapsedMs?: Readonly<Record<string, number>>
+  cookies?: ServerCookies
+}
+
 const setUp = ({
   server = mediaServer({}),
   elapsedMs = QUICK_LAN,
   cookies = NAS_COOKIES,
-}: {
-  server?: ReturnType<typeof mediaServer>
-  elapsedMs?: Readonly<Record<string, number>>
-  cookies?: ServerCookies
-} = {}) => {
+}: SetUpProps = {}) => {
   const clock = { now: READ_AT }
   const away: { maxHeight: MaxHeight } = { maxHeight: MAX_HEIGHTS.fullHd }
   const probes = probesOf({ elapsedMs })
@@ -73,7 +75,9 @@ const sourceOf = (outcome: SourceOutcome) => {
   return outcome.source
 }
 
-const ticketed = ({ origin, path, ticket }: { origin: string; path: string; ticket: string }) =>
+type TicketedProps = { origin: string; path: string; ticket: string }
+
+const ticketed = ({ origin, path, ticket }: TicketedProps) =>
   `${origin}${path}?${toQueryString({ [MEDIA_TICKET_PARAM]: ticket })}`
 
 const filePath = pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS.id })

@@ -49,8 +49,10 @@ export const fakeTimers = () => {
   return { timers, fire, pending }
 }
 
+type FakePortProps = { log?: string[] }
+
 /** A port whose posts are recorded; `send` delivers a message and `fireClose` closes the far end. */
-export const fakePort = ({ log = [] }: { log?: string[] } = {}) => {
+export const fakePort = ({ log = [] }: FakePortProps = {}) => {
   const posted: unknown[] = []
   const messageListeners: ((data: unknown) => void)[] = []
   const closeListeners: (() => void)[] = []
@@ -82,11 +84,10 @@ export const fakePort = ({ log = [] }: { log?: string[] } = {}) => {
   }
 }
 
+type FakeServiceProps = { outcome?: (command: PlayerCommand) => PlayerOutcome; log?: string[] }
+
 /** A service that records `handle`; `deferNext` holds the next answer until `release`. */
-export const fakeService = ({
-  outcome = () => OK,
-  log = [],
-}: { outcome?: (command: PlayerCommand) => PlayerOutcome; log?: string[] } = {}) => {
+export const fakeService = ({ outcome = () => OK, log = [] }: FakeServiceProps = {}) => {
   const handled: PlayerCommand[] = []
   const listeners = new Set<(event: PlayerEvent) => void>()
   const held: (() => void)[] = []

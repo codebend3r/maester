@@ -205,11 +205,13 @@ const BY_TITLE = 'COALESCE(item_sort_title, title) COLLATE NOCASE, id'
 /** SQLite reads a negative LIMIT as none. */
 const NO_LIMIT = -1
 
+type SqlLimitProps = { sort: MediaSort; limit: number | undefined }
+
 /**
  * The LIMIT a listing reads with. A random sort deals from every row, so it
  * reads them all and is cut after the shuffle.
  */
-const sqlLimit = ({ sort, limit }: { sort: MediaSort; limit: number | undefined }): number =>
+const sqlLimit = ({ sort, limit }: SqlLimitProps): number =>
   sort === MEDIA_SORTS.random ? NO_LIMIT : (limit ?? NO_LIMIT)
 
 const YEAR = 'COALESCE(item_year, year)'
@@ -238,6 +240,85 @@ const ORDER_BY: Record<MediaSort, string> = {
   'rating-low': `score IS NULL, score, ${BY_TITLE}`,
   random: BY_TITLE,
 }
+
+type MediaRepositoryGetManyProps = { ids: readonly number[]; account: AccountKey }
+
+type MediaRepositoryGetProps = { id: number; account: AccountKey }
+
+type MediaRepositoryListProps = {
+  libraryId: number
+  search?: string
+  sort?: MediaSort
+  seed?: number
+  limit?: number
+  account: AccountKey
+}
+
+type MediaRepositoryNextUnwatchedProps = {
+  showIds: readonly number[]
+  libraryIds: readonly number[]
+  account: AccountKey
+}
+
+type MediaRepositoryListShowsProps = {
+  libraryId: number
+  search?: string
+  sort?: MediaSort
+  seed?: number
+  limit?: number
+  /** Only these shows; null lists them all. */
+  showIds?: readonly number[] | null
+  account: AccountKey
+}
+
+type MediaRepositoryNewestReleasedProps = {
+  libraryId: number
+  type: typeof ITEM_TYPES.movie | typeof ITEM_TYPES.show
+  limit: number
+}
+
+type MediaRepositoryNextEpisodeProps = {
+  showId: number
+  libraryIds: readonly number[]
+  account: AccountKey
+}
+
+type MediaRepositoryShuffledEpisodesProps = {
+  itemId: number
+  libraryIds: readonly number[]
+  roll?: () => number
+  account: AccountKey
+}
+
+type MediaRepositoryWatchedEpisodesProps = {
+  ids: readonly number[]
+  account: AccountKey
+}
+
+type MediaRepositoryListUnmatchedProps = {
+  libraryId: number
+  search?: string
+  account: AccountKey
+}
+
+type MediaRepositoryForItemProps = { itemId: number; account: AccountKey }
+
+type MediaRepositoryForItemsProps = {
+  itemIds: readonly number[]
+  account: AccountKey
+}
+
+type MediaRepositoryListInProgressProps = {
+  libraryId?: number | null
+  account: AccountKey
+}
+
+type MediaRepositoryListFavouritesProps = {
+  libraryId?: number | null
+  account: AccountKey
+}
+
+type MediaRepositoryListSagasProps = { libraryId: number; account: AccountKey }
 
 /**
  * The videos as a client sees them: listings, a show's next episode, an
@@ -275,7 +356,7 @@ export class MediaRepository {
    * The videos with these ids, in the order asked, as `account` sees them;
    * one that is gone is left out.
    */
-  getMany({ ids, account }: { ids: readonly number[]; account: AccountKey }): MediaItem[] {
+  getMany({ ids, account }: MediaRepositoryGetManyProps): MediaItem[] {
     if (ids.length === 0) return []
     const found = new Map(
       this.items(
@@ -289,7 +370,7 @@ export class MediaRepository {
     return ids.flatMap((id) => found.get(id) ?? [])
   }
 
-  get({ id, account }: { id: number; account: AccountKey }): MediaItem | null {
+  get({ id, account }: MediaRepositoryGetProps): MediaItem | null {
     return this.getMany({ ids: [id], account })[0] ?? null
   }
 
@@ -307,14 +388,7 @@ export class MediaRepository {
     seed = 0,
     limit,
     account,
-  }: {
-    libraryId: number
-    search?: string
-    sort?: MediaSort
-    seed?: number
-    limit?: number
-    account: AccountKey
-  }): MediaItem[] {
+  }: MediaRepositoryListProps): MediaItem[] {
     const pattern = likePattern(search.trim())
     const rows = this.db
       .prepare<[ByAccount, number, string, string, string, number], MediaRow>(
@@ -349,11 +423,7 @@ export class MediaRepository {
     showIds,
     libraryIds,
     account,
-  }: {
-    showIds: readonly number[]
-    libraryIds: readonly number[]
-    account: AccountKey
-  }): Map<number, number> {
+  }: MediaRepositoryNextUnwatchedProps): Map<number, number> {
     const rows = this.db
       .prepare<[ByAccount, string, string], { show_id: number; media_id: number }>(
         `WITH files AS (
@@ -398,16 +468,7 @@ export class MediaRepository {
     limit,
     showIds = null,
     account,
-  }: {
-    libraryId: number
-    search?: string
-    sort?: MediaSort
-    seed?: number
-    limit?: number
-    /** Only these shows; null lists them all. */
-    showIds?: readonly number[] | null
-    account: AccountKey
-  }): ShowEntry[] {
+  }: MediaRepositoryListShowsProps): ShowEntry[] {
     const pattern = likePattern(search.trim())
     const only = showIds == null ? null : JSON.stringify(showIds)
     const rows = this.db
@@ -458,15 +519,7 @@ export class MediaRepository {
    * neither goes last), at most `limit`. A read of the matched items alone,
    * so the hero costs none of a listing's per-file work.
    */
-  newestReleased({
-    libraryId,
-    type,
-    limit,
-  }: {
-    libraryId: number
-    type: typeof ITEM_TYPES.movie | typeof ITEM_TYPES.show
-    limit: number
-  }): number[] {
+  newestReleased({ libraryId, type, limit }: MediaRepositoryNewestReleasedProps): number[] {
     const held =
       type === ITEM_TYPES.movie
         ? `SELECT mi.item_id AS id
@@ -498,15 +551,7 @@ export class MediaRepository {
    * The first episode of a show not yet watched, by the measure of whichever
    * of `libraryIds` holds the file, specials last; null once every one is.
    */
-  nextEpisode({
-    showId,
-    libraryIds,
-    account,
-  }: {
-    showId: number
-    libraryIds: readonly number[]
-    account: AccountKey
-  }): MediaItem | null {
+  nextEpisode({ showId, libraryIds, account }: MediaRepositoryNextEpisodeProps): MediaItem | null {
     const next = this.nextUnwatched({ showIds: [showId], libraryIds, account }).get(showId)
     return next == null ? null : this.get({ id: next, account })
   }
@@ -523,12 +568,7 @@ export class MediaRepository {
     libraryIds,
     roll = Math.random,
     account,
-  }: {
-    itemId: number
-    libraryIds: readonly number[]
-    roll?: () => number
-    account: AccountKey
-  }): MediaItem[] {
+  }: MediaRepositoryShuffledEpisodesProps): MediaItem[] {
     const rows = this.db
       .prepare<[number, number, string], { media_id: number }>(
         `WITH files AS (
@@ -558,10 +598,7 @@ export class MediaRepository {
   watchedEpisodes({
     ids,
     account,
-  }: {
-    ids: readonly number[]
-    account: AccountKey
-  }): { episodeId: number; libraryId: number }[] {
+  }: MediaRepositoryWatchedEpisodesProps): { episodeId: number; libraryId: number }[] {
     if (ids.length === 0) return []
     return this.db
       .prepare<[ByAccount, string], { episode_id: number; library_id: number }>(
@@ -580,11 +617,7 @@ export class MediaRepository {
     libraryId,
     search = '',
     account,
-  }: {
-    libraryId: number
-    search?: string
-    account: AccountKey
-  }): MediaItem[] {
+  }: MediaRepositoryListUnmatchedProps): MediaItem[] {
     return this.items(
       this.db
         .prepare<[ByAccount, number, string], MediaRow>(
@@ -598,18 +631,12 @@ export class MediaRepository {
   }
 
   /** Every file that is an item, in any library, best first. */
-  forItem({ itemId, account }: { itemId: number; account: AccountKey }): MediaItem[] {
+  forItem({ itemId, account }: MediaRepositoryForItemProps): MediaItem[] {
     return this.forItems({ itemIds: [itemId], account }).get(itemId) ?? []
   }
 
   /** Every file that is each of the items, in any library, best first, in one read. */
-  forItems({
-    itemIds,
-    account,
-  }: {
-    itemIds: readonly number[]
-    account: AccountKey
-  }): Map<number, MediaItem[]> {
+  forItems({ itemIds, account }: MediaRepositoryForItemsProps): Map<number, MediaItem[]> {
     if (itemIds.length === 0) return new Map()
     const rows = this.db
       .prepare<[ByAccount, string], MediaRow & { linked_item: number }>(
@@ -633,13 +660,7 @@ export class MediaRepository {
    * A finished or barely started video has no spot, so it is not in
    * progress.
    */
-  listInProgress({
-    libraryId = null,
-    account,
-  }: {
-    libraryId?: number | null
-    account: AccountKey
-  }): MediaItem[] {
+  listInProgress({ libraryId = null, account }: MediaRepositoryListInProgressProps): MediaItem[] {
     return this.items(
       this.db
         .prepare<{ libraryId: number | null; account: AccountKey }, MediaRow>(
@@ -695,13 +716,7 @@ export class MediaRepository {
    * alone, most recently marked first. A locked library's are left out,
    * whether or not the PIN is entered.
    */
-  listFavourites({
-    libraryId = null,
-    account,
-  }: {
-    libraryId?: number | null
-    account: AccountKey
-  }): MediaItem[] {
+  listFavourites({ libraryId = null, account }: MediaRepositoryListFavouritesProps): MediaItem[] {
     return this.items(
       this.db
         .prepare<{ libraryId: number | null; account: AccountKey }, MediaRow>(
@@ -720,7 +735,7 @@ export class MediaRepository {
    * several cards is still one movie, so a single movie of a collection is
    * no saga yet, however many cards it has.
    */
-  listSagas({ libraryId, account }: { libraryId: number; account: AccountKey }): Saga[] {
+  listSagas({ libraryId, account }: MediaRepositoryListSagasProps): Saga[] {
     const movies = this.items(
       this.db
         .prepare<[ByAccount, number], MediaRow>(

@@ -44,27 +44,30 @@ type Fact = { term: string; value: string | null }
 const joined = (parts: ReadonlyArray<string | null>): string =>
   parts.filter((part): part is string => !!part).join(' · ')
 
+type ProgressWordsProps = { stream: LiveStream }
+
 /** Where playback is, as "12:04 of 45:30"; "Starting" until the player first reports. */
-const progressWords = ({ stream }: { stream: LiveStream }): string => {
+const progressWords = ({ stream }: ProgressWordsProps): string => {
   if (stream.position == null) return 'Starting'
   if (stream.media.duration == null) return formatDuration(stream.position)
   return `${formatDuration(stream.position)} of ${formatDuration(stream.media.duration)}`
 }
 
+type WatcherWordsProps = { stream: LiveStream }
+
 /** Who is watching on what: "sam@example.com on iPhone", or the client alone on a server without accounts. */
-const watcherWords = ({ stream }: { stream: LiveStream }): string =>
+const watcherWords = ({ stream }: WatcherWordsProps): string =>
   stream.viewer == null
     ? `${stream.device}, ${stream.browser}`
     : `${stream.viewer} on ${stream.device}`
 
-/** The picture the player gets: the file's own, or what a conversion makes of it. */
-const sentVideo = ({
-  mode,
-  quality,
-}: {
+type SentVideoProps = {
   mode: PlaybackMode
   quality: StreamQuality | null
-}): string => {
+}
+
+/** The picture the player gets: the file's own, or what a conversion makes of it. */
+const sentVideo = ({ mode, quality }: SentVideoProps): string => {
   switch (mode) {
     case PLAYBACK_MODES.direct:
       return 'The original file'
@@ -81,14 +84,18 @@ const sentVideo = ({
   }
 }
 
+type SentAudioProps = { mode: PlaybackMode; track: AudioTrack }
+
 /** The sound the player gets: the track as it is on direct play, stereo AAC from a conversion. */
-const sentAudio = ({ mode, track }: { mode: PlaybackMode; track: AudioTrack }): string =>
+const sentAudio = ({ mode, track }: SentAudioProps): string =>
   mode === PLAYBACK_MODES.direct
     ? joined([codecLabel(track.codec), formatChannels(track.channels)])
     : CONVERTED_AUDIO
 
+type FactsProps = { title: string; facts: readonly Fact[] }
+
 /** A titled group of terms and values; a fact with no value is left out. */
-const Facts = ({ title, facts }: { title: string; facts: readonly Fact[] }) => (
+const Facts = ({ title, facts }: FactsProps) => (
   <section className={styles.panel}>
     <h3 className={styles.panelTitle}>{title}</h3>
     <dl className={styles.facts}>
@@ -106,21 +113,19 @@ const Facts = ({ title, facts }: { title: string; facts: readonly Fact[] }) => (
   </section>
 )
 
+type StreamDetailsProps = {
+  id: string
+  stream: LiveStream
+  track: AudioTrack | null
+}
+
 /**
  * An open card's four panels: who is watching, and the picture, the sound
  * and the bandwidth, each as the file has it and as the player gets it. The
  * file's streams are probed on the server, so they are asked for only once
  * a card opens.
  */
-const StreamDetails = ({
-  id,
-  stream,
-  track,
-}: {
-  id: string
-  stream: LiveStream
-  track: AudioTrack | null
-}) => {
+const StreamDetails = ({ id, stream, track }: StreamDetailsProps) => {
   const { media, mode } = stream
   const probe = useQuery(mediaStreamsQuery(media.id))
   const video = probe.data?.video ?? null
@@ -182,6 +187,8 @@ const StreamDetails = ({
   )
 }
 
+type StreamRowProps = { stream: LiveStream }
+
 /**
  * One stream as a card, closed to start with: its picture, name and who
  * is watching, a line of tags for the picture, the sound, the rate and the
@@ -189,7 +196,7 @@ const StreamDetails = ({
  * right. Stop cuts the connections; the player is free to ask again, and
  * the list shows it if it does.
  */
-const StreamRow = ({ stream }: { stream: LiveStream }) => {
+const StreamRow = ({ stream }: StreamRowProps) => {
   const queryClient = useQueryClient()
   const [isOpen, setIsOpen] = useState(false)
   const detailsId = useId()

@@ -21,9 +21,11 @@ export const pageWithoutLayout = () => {
     const spot = spots.get(this) ?? { top: 0, height: 0 }
     return new DOMRect(0, spot.top - window.scrollY, 100, spot.height)
   })
+  type PageWithoutLayoutPlaceProps = { element: Element; top: number; height?: number }
+
   return {
     /** Puts `element` `top` px down the page, `height` tall. */
-    place: ({ element, top, height = 300 }: { element: Element; top: number; height?: number }) => {
+    place: ({ element, top, height = 300 }: PageWithoutLayoutPlaceProps) => {
       spots.set(element, { top, height })
     },
     /** Scrolls the page to `y` as the browser would, with no call to scroll it. */

@@ -34,60 +34,50 @@ describe('the owner adopting the viewing from before accounts', () => {
   const settings = () => new SettingsRepository(database.get())
   const adoption = () => new ViewingAdoption(database.get(), settings())
 
-  const spot = ({
-    account,
-    mediaId,
-    position,
-    at,
-  }: {
+  type SpotProps = {
     account: AccountKey
     mediaId: number
     position: number
     at: string
-  }) =>
+  }
+
+  const spot = ({ account, mediaId, position, at }: SpotProps) =>
     db()
       .prepare(
         'INSERT INTO playback_progress (account_id, media_id, position, updated_at) VALUES (?, ?, ?, ?)',
       )
       .run(account, mediaId, position, at)
 
-  const favourite = ({
-    account,
-    mediaId,
-    at,
-  }: {
+  type FavouriteProps = {
     account: AccountKey
     mediaId: number
     at: string
-  }) =>
+  }
+
+  const favourite = ({ account, mediaId, at }: FavouriteProps) =>
     db()
       .prepare('INSERT INTO favourites (account_id, media_id, added_at) VALUES (?, ?, ?)')
       .run(account, mediaId, at)
 
-  const titleFavourite = ({
-    account,
-    itemId,
-    at,
-  }: {
+  type TitleFavouriteProps = {
     account: AccountKey
     itemId: number
     at: string
-  }) =>
+  }
+
+  const titleFavourite = ({ account, itemId, at }: TitleFavouriteProps) =>
     db()
       .prepare('INSERT INTO item_favourites (account_id, item_id, added_at) VALUES (?, ?, ?)')
       .run(account, itemId, at)
 
-  const play = ({
-    account,
-    mediaId,
-    at,
-    kind,
-  }: {
+  type PlayProps = {
     account: AccountKey
     mediaId: number
     at: string
     kind: PlayKind
-  }) =>
+  }
+
+  const play = ({ account, mediaId, at, kind }: PlayProps) =>
     db()
       .prepare(
         `INSERT INTO plays (account_id, media_id, played_at, furthest, kind)
@@ -117,8 +107,10 @@ describe('the owner adopting the viewing from before accounts', () => {
       .all(),
   })
 
+  type CountsOfProps = { account: AccountKey }
+
   /** How many rows `account` holds in each table. */
-  const countsOf = ({ account }: { account: AccountKey }) =>
+  const countsOf = ({ account }: CountsOfProps) =>
     viewingCountsOf({ database: database.get(), account })
 
   /** The stored `viewing` setting, as written. */
