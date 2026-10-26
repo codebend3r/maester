@@ -27,6 +27,8 @@ type MembershipLookupsAskProps = { token: string }
 
 type MembershipLookupsStoreProps = { key: string; entry: Entry; now: number }
 
+type MembershipLookupsIsFreshProps = { entry: Entry; now: number }
+
 /**
  * `current_membership` lookups, shared. Callers with the same token share
  * one lookup while it is in flight, and its answer is reused until the TTL
@@ -46,7 +48,7 @@ export class MembershipLookups {
     const key = createHash('sha256').update(token).digest(AUTH_ENCODINGS.base64url)
     const now = Date.now()
     const held = this.entries.get(key)
-    if (held !== undefined && now - held.startedAt < this.ttlMs) return held.result
+    if (held !== undefined && this.isFresh({ entry: held, now })) return held.result
     const entry: Entry = { startedAt: now, result: this.ask({ token }), answered: null }
     this.store({ key, entry, now })
     // Settled once stored, so even a backend that throws at once is dropped; it never rejects.
@@ -65,6 +67,17 @@ export class MembershipLookups {
       if (entry.answered === null || entry.answered.accountId === accountId)
         this.entries.delete(key)
     })
+  }
+
+  /**
+   * Whether an answer may be reused: begun within the TTL, and not after
+   * `now`. One begun after it is from a clock since set back (a test's
+   * faked one, or a host's corrected one), and is asked again rather than
+   * held until real time catches up with it.
+   */
+  private isFresh({ entry, now }: MembershipLookupsIsFreshProps): boolean {
+    const age = now - entry.startedAt
+    return age >= 0 && age < this.ttlMs
   }
 
   /** Notes whose membership the lookup found, or drops it once it fails, so a failure is never reused. */
@@ -86,7 +99,7 @@ export class MembershipLookups {
     this.entries.delete(key)
     if (this.entries.size >= MAX_LOOKUPS) {
       this.entries.forEach((held, heldKey) => {
-        if (now - held.startedAt >= this.ttlMs) this.entries.delete(heldKey)
+        if (!this.isFresh({ entry: held, now })) this.entries.delete(heldKey)
       })
     }
     if (this.entries.size >= MAX_LOOKUPS) {

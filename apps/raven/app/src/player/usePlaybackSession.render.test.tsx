@@ -5,6 +5,7 @@ import { act, renderHook } from '@testing-library/react-native'
 import {
   LOAD_TIMEOUT_MS,
   SESSION_EVENTS,
+  STALL_REOPEN_MS,
   SESSION_PHASES,
   type SessionState,
   modeOf,
@@ -26,16 +27,22 @@ const SOURCES: MediaSources = {
 const attemptOf = (state: SessionState): number =>
   state.phase === SESSION_PHASES.failed ? -1 : state.attempt
 
+type RenderSessionProps = { isWaiting: boolean; clock?: number }
+
 const renderSession = (modes: readonly PlaybackMode[]) =>
-  renderHook(() =>
-    usePlaybackSession({
-      media: { id: 20 },
-      modes,
-      at: 0,
-      audio: null,
-      problems: [],
-      sources: SOURCES,
-    }),
+  renderHook(
+    ({ isWaiting, clock = 0 }: RenderSessionProps) =>
+      usePlaybackSession({
+        media: { id: 20 },
+        modes,
+        at: 0,
+        audio: null,
+        problems: [],
+        sources: SOURCES,
+        isWaiting,
+        clock,
+      }),
+    { initialProps: { isWaiting: false } },
   )
 
 /** Lets the session's source requests answer. */
@@ -94,5 +101,69 @@ describe('usePlaybackSession', () => {
     })
     expect(result.current.state.phase).toBe(SESSION_PHASES.playing)
     expect(modeOf(result.current.state)).toBe(direct)
+  })
+
+  describe('a stall', () => {
+    /** The session playing its first way, its source loaded. */
+    const playing = async (modes: readonly PlaybackMode[]) => {
+      const session = await renderSession(modes)
+      await settle()
+      await act(async () => {
+        session.result.current.dispatch({
+          type: SESSION_EVENTS.loaded,
+          attempt: attemptOf(session.result.current.state),
+        })
+      })
+      return session
+    }
+
+    it('opens a direct play again from the spot once it has waited for data too long, as a lapsed ticket leaves AVPlayer', async () => {
+      const { result, rerender } = await playing([direct, remux])
+      await rerender({ isWaiting: true, clock: 312.5 })
+      await act(async () => {
+        jest.advanceTimersByTime(STALL_REOPEN_MS - 1)
+      })
+      expect(result.current.state.phase).toBe(SESSION_PHASES.playing)
+      await act(async () => {
+        jest.advanceTimersByTime(1)
+      })
+      expect(modeOf(result.current.state)).toBe(direct)
+      expect(result.current.state).toMatchObject({ at: 312.5, attempt: 1 })
+    })
+
+    it('waits while the clock still moves, as a player still playing what it holds', async () => {
+      const { result, rerender } = await playing([direct, remux])
+      await rerender({ isWaiting: true, clock: 1 })
+      await act(async () => {
+        jest.advanceTimersByTime(STALL_REOPEN_MS - 1)
+      })
+      await rerender({ isWaiting: true, clock: 2 })
+      await act(async () => {
+        jest.advanceTimersByTime(STALL_REOPEN_MS - 1)
+      })
+      expect(result.current.state).toMatchObject({ phase: SESSION_PHASES.playing, attempt: 0 })
+    })
+
+    it('lets a stall end by itself when the data comes', async () => {
+      const { result, rerender } = await playing([direct, remux])
+      await rerender({ isWaiting: true })
+      await act(async () => {
+        jest.advanceTimersByTime(STALL_REOPEN_MS - 1)
+      })
+      await rerender({ isWaiting: false })
+      await act(async () => {
+        jest.advanceTimersByTime(STALL_REOPEN_MS * 2)
+      })
+      expect(result.current.state).toMatchObject({ phase: SESSION_PHASES.playing, attempt: 0 })
+    })
+
+    it('leaves a stream to its player, which says when the server let go of it', async () => {
+      const { result, rerender } = await playing([remux, transcode])
+      await rerender({ isWaiting: true })
+      await act(async () => {
+        jest.advanceTimersByTime(STALL_REOPEN_MS * 2)
+      })
+      expect(result.current.state).toMatchObject({ phase: SESSION_PHASES.playing, attempt: 0 })
+    })
   })
 })

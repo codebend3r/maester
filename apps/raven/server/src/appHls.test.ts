@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
+  AUTH_REFUSALS,
   HLS_COPY_AUDIO_CODECS,
   HLS_PARAMS,
   HLS_PATHS,
@@ -36,7 +37,7 @@ import {
   testConfig,
 } from '@/test/app'
 import { encodeClip, encodeRichClip } from '@/test/clips'
-import { ROUTES } from '@/test/enforced'
+import { ROUTES, outcomeOf } from '@/test/enforced'
 import { apiFor } from '@/test/server'
 
 const run = promisify(execFile)
@@ -306,6 +307,25 @@ describe('the HLS route', () => {
     const uris = urisIn(decodedBody(response).toString())
     expect(uris.length).toBeGreaterThan(0)
     uris.forEach((uri) => expect(uri).not.toContain('?'))
+  })
+
+  it('refuses a repeated ticket on every HLS route as a ticket that opens nothing', async () => {
+    const cookie = state.unlocked
+    const opening = masterUrl({ clip: 'rich', mode: PLAYBACK_MODES.remux, ticket: null })
+    const urisAt = async (url: string) => urisIn(decodedBody(await get({ url, cookie })).toString())
+    const listed = await urisAt(opening)
+    const video = listed.find((uri) => uri.includes('/video.m3u8')) ?? ''
+    const subtitles = listed.find((uri) => uri !== video) ?? ''
+    const [init = '', segment = ''] = await urisAt(video)
+    const [subtitleSegment = ''] = await urisAt(subtitles)
+    const urls = [opening, video, init, segment, subtitles, subtitleSegment]
+    const repeated = `${MEDIA_TICKET_PARAM}=a&${MEDIA_TICKET_PARAM}=b`
+    const answers = await Promise.all(
+      urls.map((url) => get({ url: `${url}${url.includes('?') ? '&' : '?'}${repeated}`, cookie })),
+    )
+    expect(answers.map((response) => outcomeOf({ response }))).toEqual(
+      urls.map(() => expect.objectContaining({ status: 401, reason: AUTH_REFUSALS.signedOut })),
+    )
   })
 
   it("lists segments whose durations add up to the file's, behind its init", async () => {

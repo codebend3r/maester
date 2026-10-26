@@ -30,7 +30,7 @@ const sessionOf = (account: Account): Caller => ({
 
 const ticketOf = (account: Account): Caller => ({
   kind: CALLERS.ticket,
-  session: { account, ...TOKEN },
+  session: { account },
   unlockedUntil: null,
 })
 

@@ -56,6 +56,8 @@ The app talks to raven at `https://raven-player.netlify.app`, the same public we
 
 A release build reaches that HTTPS address only. A development build may use plain HTTP for Metro and for the end to end fixture: `APP_VARIANT=development` sets `NSAllowsLocalNetworking` on Apple and `usesCleartextTraffic` on Android. The fixture build also sets `EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490`, which skips account sign-in on that accountless server and starts at its PIN.
 
+Under an account every video plays by the account ticket the app asks the server for as it opens the video, from the fastest media origin or the server's own address; the player sends no cookie and no token. A direct file plays on the pass its ticket earns by opening it, and a remux or a transcode on its stream's own pass, which the server ties to that file or that stream, so a film longer than the ticket's five minutes plays to its end. When the server lets go of a video mid-play (a pass or a stream it ended or forgot after its twelve hours, a restart, or too many at once), the app opens it again from the same spot and says nothing. If the server will not hand out the ticket, the player says why in raven player's words: "Sign in to X again." or "Your access to X was removed."
+
 To install a build on your own iPhone, iPad, Apple TV or Android TV, follow the [raven README](../README.md#raven-app-iphone-ipad-apple-tv-android-tv).
 
 ## Playing
@@ -90,6 +92,8 @@ APP_VARIANT=development EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490 bu
 $ANDROID_HOME/platform-tools/adb install apps/raven/app/android/app/build/outputs/apk/release/app-release.apk
 bun run app:e2e:android-tv
 ```
+
+The flows sign in with the PIN: the fixture server has no accounts, since `ready` needs Supabase Auth (the local stack in Docker, which the macOS runners lack, or the cloud). Playing under an account is covered by the bun and jest tests instead (`mediaAccess.test.ts`, `usePlaybackSession.test.ts`, `playerErrors.test.ts`, `Player.render.test.tsx`), and the server's own suite plays its HLS routes by account ticket and capability (`appEnforcementHls.test.ts`).
 
 Maestro cannot drive an Apple TV, so the TV's flow is an XCUITest, `tvos-e2e/RemoteFlowTests.swift`, which presses the Siri Remote's buttons (`XCUIRemote`) and types on the platform's keyboard: it signs in, plays the film from Home, presses Menu twice and finds the film under Continue watching with the focus back on the card it opened, then presses Menu on Home and checks raven went to the background. It ends by marking the film watched and back, so the fixture is left as it was found. `prebuild:tvos` copies it into `ios/` as the `RavenRemoteTests` target and scheme (`plugins/withTvRemoteTests.ts`), so build the development variant for Apple TV, install it on the simulator and run it:
 
@@ -140,4 +144,6 @@ Check these on the devices too, since only a device can answer them:
 - **No picture in Apple TV's info panel for a locked library.** `react-native-video` fetches the panel's poster with no headers, and a locked library's pictures need the unlock cookie.
 - **ALAC over HLS may be silent on Android TV.** The remux copies ALAC, which ExoPlayer leaves out on a TV with no ALAC decoder, and `canStream` cannot see it. The fix is the server's: make ALAC FLAC or E-AC-3 over HLS, or say what the stream carries.
 - **See all may open a library with its first bucket shut on Android TV.** On the emulator, Home's See all pressed with `adb shell input keyevent DPAD_CENTER` opened the library with the remote on its first bucket heading and that bucket shut, as if the key reached the heading too. It is still to be checked with a real remote.
+- **One account's streams can end everyone's.** The server keeps eight HLS sessions in all and drops the longest idle to open a ninth, so an account that opens eight ends every other device's stream, which then opens the master again.
+- **A direct play the server lets go of on Apple pauses for a dozen seconds first.** When a file's pass ends mid-play (its twelve hours, a restart, or too many at once), AVPlayer retries the refused ranges for a dozen seconds and then stalls without a word, so the app opens the file again from the spot once it has waited ten seconds. ExoPlayer on Android TV reports a refused range as an error with its status, which the app reads, so the reopen should come sooner there; that is still to be seen on the emulator.
 - **No covers view.** The web's bare covers view has no layout in the app yet: a library left on covers opens on the grid, and the app's view picker does not offer it.

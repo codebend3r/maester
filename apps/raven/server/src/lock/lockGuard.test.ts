@@ -93,6 +93,7 @@ describe('the lock marks on routes', () => {
         audience: null,
         account: ACCOUNT_REQUIREMENTS.approved,
         mediaPlane: false,
+        pass: null,
       },
       {
         method: 'GET',
@@ -101,6 +102,7 @@ describe('the lock marks on routes', () => {
         audience: null,
         account: ACCOUNT_REQUIREMENTS.approved,
         mediaPlane: true,
+        pass: null,
       },
       {
         method: 'PUT',
@@ -109,6 +111,7 @@ describe('the lock marks on routes', () => {
         audience: null,
         account: ACCOUNT_REQUIREMENTS.approved,
         mediaPlane: false,
+        pass: null,
       },
     ])
   })

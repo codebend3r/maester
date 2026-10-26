@@ -16,12 +16,15 @@ import {
   MEDIA_TICKET_SECONDS,
   type StreamQuality,
 } from '@raven/core'
+import { type AccountPass, type PassAccess, type PassGrant, openPass } from '@/auth/accountPasses'
+import { AUTH_ENCODINGS } from '@/auth/accessToken'
+import { CLOCK, type Clock } from '@/clock'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import type { HlsDialect } from '@/ffmpeg/ffmpegVersion'
 import { type HlsSource, hlsArgs } from '@/ffmpeg/hlsArgs'
-import { HLS_CLOCK, type HlsClock } from '@/hls/hlsClock'
+import { mintCapability } from '@/hls/hlsCapability'
 import { splitSegmentFile } from '@/hls/segmentFiles'
 import { RunReplaced, SegmentRun } from '@/hls/segmentRun'
 
@@ -39,7 +42,10 @@ export const HLS_INIT_GRACE_MS = 1500
 /** How many sessions the server keeps; minting one more drops the longest idle. */
 export const HLS_SESSION_CAP = 8
 
-/** A session unasked for this long is forgotten: no ticket that opened it is still good. */
+/**
+ * A session unasked for this long is forgotten: no legacy ticket that
+ * opened it is still good, and a player gone this long opens it again.
+ */
 const HLS_RECORD_MS = MEDIA_TICKET_SECONDS * 1000
 
 type SegmentsPastKeepingProps = {
@@ -53,6 +59,10 @@ type SegmentsPastKeepingProps = {
  */
 export const segmentsPastKeeping = ({ segments, furthest }: SegmentsPastKeepingProps): number[] =>
   [...segments].filter((n) => n <= furthest - HLS_KEPT_SEGMENTS)
+
+/** What a request for a session that is not kept, or not for it, is told. */
+export const noSuchSession = (): NotFoundException =>
+  new NotFoundException('No such stream session; open the stream again')
 
 /** What a request for a session that ended while it waited is told. */
 const sessionEnded = (): NotFoundException =>
@@ -68,13 +78,22 @@ class LaunchTimeout extends Error {
 
 /**
  * A minted session: the media it plays, the size the viewer asked a
- * transcode for (null for the settings'), and the source every one of its
- * runs reads.
+ * transcode for (null for the settings'), the source every one of its
+ * runs reads, and the capability its routes take in place of a ticket,
+ * the secret of its account pass, when an account opened it (null
+ * otherwise).
  */
-export type HlsSession = HlsSource & { id: string; mediaId: number; asked: StreamQuality | null }
+export type HlsSession = HlsSource & {
+  id: string
+  mediaId: number
+  asked: StreamQuality | null
+  capability: string | null
+}
 
 type Entry = {
   session: HlsSession
+  /** The account pass its capability is the secret of, which ends the session as it ends; null for a session with none. */
+  pass: AccountPass | null
   keyframesFor: (() => readonly number[] | null) | null
   /** Whether it has said that a restart without keyframes may start late. */
   hasWarnedOfSeek: boolean
@@ -148,9 +167,15 @@ type HlsSessionsMintProps = {
    * far as they are known when a run starts; null for any other.
    */
   keyframesFor: (() => readonly number[] | null) | null
+  /** The account an account ticket opened it for; null for any other caller. */
+  access: PassAccess | null
 }
 
-type HlsSessionsGetProps = { mediaId: number; session: string }
+type HlsSessionsGetProps = { mediaId: number; session: string; key?: unknown }
+
+type HlsSessionsOpenedByProps = { mediaId: number; session: string; key: unknown }
+
+type HlsSessionsGrantOfProps = { mediaId: number; session: string; capability: string }
 
 type HlsSessionsInitProps = { session: string; signal?: AbortSignal }
 
@@ -227,6 +252,14 @@ type HlsSessionsPruneProps = { entry: Entry; n: number }
  * its files deleted, but it is kept, so a player paused for longer resumes
  * with a new run. It is forgotten after `MEDIA_TICKET_SECONDS` unasked, or
  * when it is the longest idle and an eighth is minted.
+ *
+ * A session an account's ticket opened has an account pass, whose secret
+ * is a capability of its own, which its routes take in place of the
+ * ticket, so it outlives the ticket's five minutes, though never past
+ * `ACCOUNT_PASS_MS` from the mint. The pass and the session end together:
+ * forgotten, dropped, evicted, ended when the account loses access, or
+ * asked for past that deadline. Sessions live in memory alone, so a
+ * restart ends every one.
  */
 @Injectable()
 export class HlsSessions implements OnModuleInit, OnModuleDestroy {
@@ -238,7 +271,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(SERVER_CONFIG) config: ServerConfig,
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
-    @Inject(HLS_CLOCK) private readonly clock: HlsClock,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {
     this.root = join(config.dataDir, 'hls')
   }
@@ -255,16 +288,24 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Opens a session. Nothing runs until a segment is asked for. */
-  mint({ mediaId, asked, source, keyframesFor }: HlsSessionsMintProps): HlsSession {
+  mint({ mediaId, asked, source, keyframesFor, access }: HlsSessionsMintProps): HlsSession {
     const kept = [...this.entries.values()]
     if (kept.length >= HLS_SESSION_CAP) {
       this.end(
         kept.reduce((idlest, entry) => (entry.lastAskedAt < idlest.lastAskedAt ? entry : idlest)),
       )
     }
-    const session = { ...source, id: randomBytes(16).toString('base64url'), mediaId, asked }
+    const capability = access === null ? null : mintCapability()
+    const session = {
+      ...source,
+      id: randomBytes(16).toString(AUTH_ENCODINGS.base64url),
+      mediaId,
+      asked,
+      capability,
+    }
     const entry: Entry = {
       session,
+      pass: null,
       keyframesFor,
       hasWarnedOfSeek: false,
       folder: join(this.root, session.id),
@@ -280,15 +321,34 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     }
     this.entries.set(session.id, entry)
     this.touch(entry)
+    if (access !== null && capability !== null) {
+      // Kept before the pass opens, since a pass whose account is already gone ends it at once.
+      entry.pass = openPass({
+        secret: capability,
+        mediaId,
+        access,
+        clock: this.clock,
+        onEnd: () => this.end(entry),
+      })
+    }
     return session
   }
 
-  /** The session, when it is kept and plays this media. */
-  get({ mediaId, session }: HlsSessionsGetProps): HlsSession | null {
-    const entry = this.entries.get(session)
-    if (!entry || entry.session.mediaId !== mediaId) return null
-    this.touch(entry)
-    return entry.session
+  /**
+   * The session, when it is kept, plays this media, and `key` is its
+   * capability or it has none: once it has one, nothing else opens it, and
+   * a request past the capability's deadline ends it.
+   */
+  get({ mediaId, session, key }: HlsSessionsGetProps): HlsSession | null {
+    const opened = this.openedBy({ mediaId, session, key })
+    if (!opened) return null
+    this.touch(opened.entry)
+    return opened.entry.session
+  }
+
+  /** What `capability` lets a request to this session of this media through as, or null when it opens none. */
+  grantOf({ mediaId, session, capability }: HlsSessionsGrantOfProps): PassGrant | null {
+    return this.openedBy({ mediaId, session, key: capability })?.grant ?? null
   }
 
   /**
@@ -324,8 +384,21 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
 
   private entryOf(session: string): Entry {
     const entry = this.entries.get(session)
-    if (!entry) throw new NotFoundException('No such stream session; open the stream again')
+    if (!entry) throw noSuchSession()
     return entry
+  }
+
+  /** The kept session of this media that `key` opens, and what its pass grants (null for a session with none). */
+  private openedBy({
+    mediaId,
+    session,
+    key,
+  }: HlsSessionsOpenedByProps): { entry: Entry; grant: PassGrant | null } | null {
+    const entry = this.entries.get(session)
+    if (!entry || entry.session.mediaId !== mediaId) return null
+    if (entry.pass === null) return { entry, grant: null }
+    const grant = entry.pass.grantFor({ given: key, mediaId })
+    return grant === null ? null : { entry, grant }
   }
 
   private isKept(entry: Entry): boolean {
@@ -582,6 +655,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     if (!this.isKept(entry)) return
     this.entries.delete(entry.session.id)
     entry.cancelTimers()
+    if (entry.pass !== null) entry.pass.end()
     this.release(entry)
     const cleanup: Promise<void> = this.stopRun({ entry, reason: sessionEnded() })
       .then(() => rm(entry.folder, { recursive: true, force: true }))

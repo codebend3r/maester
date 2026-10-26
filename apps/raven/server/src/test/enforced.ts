@@ -6,6 +6,7 @@ import {
   AUTH_PATHS,
   BUG_REPORT_PATHS,
   type ApiClient,
+  HLS_PARAMS,
   HLS_PATHS,
   ITEM_TYPES,
   LIBRARY_KINDS,
@@ -14,15 +15,17 @@ import {
   PICTURE_PATHS,
   createApiClient,
   isAuthRefusal,
+  isMediaTicket,
 } from '@raven/core'
 import { CACHE_POLICIES, CONTENT_TYPES, HEADERS } from '@shared/server'
 import { createApp } from '@/app'
 import { ACCOUNT_REQUIREMENTS } from '@/auth/accountGuard'
+import { PASS_KINDS, type PassKind } from '@/auth/accountPasses'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
-import { NOT_WATCHING, ROUTE_METHODS, testConfig } from '@/test/app'
+import { NOT_WATCHING, ROUTE_METHODS, cookieSet, testConfig } from '@/test/app'
 import {
   AUTH_TEST_CONFIG,
   AUTH_TEST_IDS,
@@ -150,6 +153,23 @@ export const ROUTES = {
 
 export type Route = (typeof ROUTES)[keyof typeof ROUTES]
 
+/**
+ * The routes each kind of account pass opens under accounts `ready`: an HLS
+ * session's capability, in place of an account ticket, every route that
+ * names the session; and the pass an account ticket earns by opening its
+ * file, past the ticket's five minutes, that file alone.
+ */
+export const PASS_ROUTES = {
+  [PASS_KINDS.capability]: [
+    ROUTES.hlsVideo,
+    ROUTES.hlsInit,
+    ROUTES.hlsSegment,
+    ROUTES.hlsSubtitles,
+    ROUTES.hlsSubtitleSegment,
+  ],
+  [PASS_KINDS.ticket]: [ROUTES.file],
+} as const satisfies Record<PassKind, readonly Route[]>
+
 type PathOfProps = {
   route: Route
   params?: Record<string, number | string>
@@ -171,6 +191,15 @@ type WithTicketProps = {
 /** `route`'s path with a media ticket in `?t=`, as the media plane is asked for it. */
 export const withTicket = ({ route, params, ticket }: WithTicketProps): string =>
   `${pathOf({ route, params })}?${MEDIA_TICKET_PARAM}=${ticket}`
+
+/** The session the first video playlist URI in `text` names, or '' when it names none. */
+export const hlsSessionIn = (text: string): string => {
+  const pattern = HLS_PATHS.video
+    .replace('.', '\\.')
+    .replace(`:${HLS_PARAMS.id}`, '\\d+')
+    .replace(`:${HLS_PARAMS.session}`, '([A-Za-z0-9_-]+)')
+  return new RegExp(pattern).exec(text)?.[1] ?? ''
+}
 
 /** Who a request comes from, by the account its token names, or none. */
 export const CALLER_KINDS = {
@@ -251,6 +280,9 @@ export const outcomeOf = ({
   }
 }
 
+/** The movies library `createEnforcedApp` makes. */
+const LIBRARY_NAME = 'Enforced'
+
 const MATRIX = { id: 603, title: 'The Matrix', released: '1999-03-31' } as const
 
 const ANDOR: FakeShow = {
@@ -327,7 +359,7 @@ export const createEnforcedApp = async ({
     accessToken: () => ownerToken,
   })
   const library = await ownerApi.createLibrary({
-    name: 'Enforced',
+    name: LIBRARY_NAME,
     paths: [mediaDir],
     settings: { kind: LIBRARY_KINDS.movies },
   })
@@ -424,4 +456,109 @@ export const addLeftovers = async ({ enforced }: AddLeftoversProps): Promise<Lef
     throw new Error('The enforced movies library did not list its extra files')
   }
   return { unmatched: unmatched.id, duplicate: duplicate.media.id }
+}
+
+/**
+ * Two days: a token that outlives every jump of a test's clock and every
+ * unlock, so no recheck ends what it opened for want of a live one.
+ */
+export const LONG_TOKEN_SECONDS = 2 * 24 * 60 * 60
+
+type Enforced = Awaited<ReturnType<typeof createEnforcedApp>>
+
+type MintedTicketProps = {
+  app: NestFastifyApplication
+  route?: typeof ROUTES.accountTicket | typeof ROUTES.mediaTicket
+  id: number
+  headers: Record<string, string>
+}
+
+/** The ticket `route` mints for media `id` with `headers`: an account ticket, or the legacy one. */
+export const mintedTicket = async ({
+  app,
+  route = ROUTES.accountTicket,
+  id,
+  headers,
+}: MintedTicketProps): Promise<string> => {
+  const response = await app.inject({
+    method: route.method,
+    url: pathOf({ route, params: { id } }),
+    headers,
+  })
+  const body: unknown = response.json()
+  if (!isMediaTicket(body)) throw new Error('No ticket was minted')
+  return body.ticket
+}
+
+type PinMovesProps = {
+  enforced: Pick<Enforced, 'app' | 'mediaDir' | 'ids'>
+  fixture: AuthFixture
+  pin: string
+}
+
+/**
+ * The PIN's moves on a server `createEnforcedApp` made with `libraryPin`
+ * `pin`: unlocking it, locking it again as the Lock button does, and
+ * locking or opening the movies library past it as the owner.
+ */
+export const pinMoves = ({ enforced, fixture, pin }: PinMovesProps) => {
+  const { app } = enforced
+  type AnsweredProps = { response: { statusCode: number }; what: string }
+
+  const answered = ({ response, what }: AnsweredProps) => {
+    if (response.statusCode !== 200) throw new Error(`${what} answered ${response.statusCode}`)
+  }
+
+  type UnlockProps = { headers: Record<string, string> }
+
+  /** `headers` with the unlock cookie the PIN earns them, and when that unlock lapses. */
+  const unlock = async ({ headers }: UnlockProps) => {
+    const response = await app.inject({
+      method: ROUTES.unlock.method,
+      url: ROUTES.unlock.path,
+      headers,
+      payload: { pin },
+    })
+    answered({ response, what: 'The unlock' })
+    const cookie = cookieSet(response)
+    const [, value = ''] = cookie.split('=')
+    const [expires = ''] = value.split('.')
+    return { headers: { ...headers, [AUTH_HEADERS.cookie]: cookie }, lapsesAt: Number(expires) }
+  }
+
+  type RelockProps = { headers: Record<string, string> }
+
+  /** Locks the PIN again with `headers`, as the Lock button does. */
+  const relock = async ({ headers }: RelockProps): Promise<void> => {
+    const response = await app.inject({
+      method: ROUTES.relock.method,
+      url: ROUTES.relock.path,
+      headers,
+    })
+    answered({ response, what: 'The relock' })
+  }
+
+  type SetLockedProps = { isLocked: boolean }
+
+  /** Locks or opens the movies library as the owner, past the PIN, as its settings are changed. */
+  const setLocked = async ({ isLocked }: SetLockedProps): Promise<void> => {
+    const bearer = await headersFor({
+      fixture,
+      caller: CALLER_KINDS.owner,
+      via: TOKEN_CARRIERS.bearer,
+    })
+    const response = await app.inject({
+      method: ROUTES.updateLibrary.method,
+      url: pathOf({ route: ROUTES.updateLibrary, params: { id: enforced.ids.library } }),
+      headers: (await unlock({ headers: bearer })).headers,
+      payload: {
+        name: LIBRARY_NAME,
+        paths: [enforced.mediaDir],
+        settings: { kind: LIBRARY_KINDS.movies, locked: isLocked },
+      },
+    })
+    answered({ response, what: 'The library' })
+  }
+
+  return { unlock, relock, setLocked }
 }

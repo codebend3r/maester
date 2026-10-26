@@ -21,7 +21,6 @@ import { type MockInstance, afterAll, afterEach, beforeAll, describe, expect, it
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { type FfmpegStream, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, mediaClockOf } from '@/ffmpeg/probe'
-import type { HlsClock } from '@/hls/hlsClock'
 import {
   HLS_INIT_GRACE_MS,
   HLS_SESSION_CAP,
@@ -33,6 +32,7 @@ import { segmentFileName } from '@/hls/segmentFiles'
 import { type SegmentPlan, remuxPlan, transcodePlan } from '@/hls/segmentPlan'
 import { HLS_SEGMENT_WAIT_MS, RUN_EVENTS, RUN_SIGNALS } from '@/hls/segmentRun'
 import { eventually, testConfig } from '@/test/app'
+import { manualClock } from '@/test/clock'
 import { encodeClip, encodeRichClip } from '@/test/clips'
 import { mdatOf, videoTfdt } from '@/test/mp4'
 
@@ -81,30 +81,6 @@ class WatchedFfmpeg extends FfmpegService {
       .map(({ child }) => child)
       .filter((child) => child.exitCode === null && child.signalCode === null)
   }
-}
-
-/** A clock that moves only when the test says, firing what falls due. */
-const manualClock = () => {
-  const state = { now: 0, timers: new Set<{ at: number; run: () => void }>() }
-  const clock: HlsClock = {
-    now: () => state.now,
-    after: ({ ms, run: fire }) => {
-      const timer = { at: state.now + ms, run: fire }
-      state.timers.add(timer)
-      return () => {
-        state.timers.delete(timer)
-      }
-    },
-  }
-  const advance = (ms: number): void => {
-    state.now += ms
-    const due = [...state.timers].filter((timer) => timer.at <= state.now)
-    due.forEach((timer) => {
-      state.timers.delete(timer)
-      timer.run()
-    })
-  }
-  return { clock, advance, pending: () => state.timers.size }
 }
 
 type ArgAfterProps = { args: string[]; flag: string }
@@ -267,6 +243,7 @@ describe('HlsSessions', () => {
         tonemap: false,
       },
       keyframesFor,
+      access: null,
     })
 
   type VideoOfProps = { init: Uint8Array; media: Uint8Array }

@@ -12,6 +12,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common'
 import {
+  AUTH_REFUSALS,
   HLS_PARAMS,
   HLS_PATHS,
   MEDIA_TICKET_PARAM,
@@ -19,15 +20,19 @@ import {
   type StreamMode,
   type SubtitleTrack,
   isHlsSessionId,
+  isString,
 } from '@raven/core'
 import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, wholeNumber } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AccessRechecks } from '@/auth/accessRechecks'
+import { OpenedByPass, PASS_KINDS } from '@/auth/accountPasses'
+import { authFailure } from '@/auth/authFailure'
 import { AuthSessions } from '@/auth/authSessions'
+import { TicketAccesses } from '@/auth/ticketAccesses'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
 import { type HlsPath, sessionUris } from '@/hls/hlsUris'
-import { type HlsSession, HlsSessions } from '@/hls/hlsSessions'
+import { type HlsSession, HlsSessions, noSuchSession } from '@/hls/hlsSessions'
 import { KeyframesService } from '@/hls/keyframesService'
 import {
   masterPlaylist,
@@ -63,6 +68,25 @@ const MEDIA_ROUTES = 'api/media'
 /** An HLS path as this controller's route: what follows its `api/media` prefix. */
 const routeOf = (path: HlsPath): string => path.slice(`/${MEDIA_ROUTES}/`.length)
 
+/** `?t=` as one value may arrive: absent, or a string. Repeated, it is an array. */
+const isTicketQuery = (value: unknown): value is string | undefined =>
+  value === undefined || isString(value)
+
+/** `?t=` at the boundary: a repeated one is refused as a ticket that opens nothing is. */
+const ticketIn = (value: unknown): string | undefined => {
+  if (!isTicketQuery(value)) throw authFailure(AUTH_REFUSALS.signedOut)
+  return value
+}
+
+type HlsControllerKeyForProps = {
+  session: Pick<HlsSession, 'capability'>
+  ticket: string | undefined
+}
+
+/** What every URI a session's playlist names carries: its capability, else the request's ticket. */
+const keyFor = ({ session, ticket }: HlsControllerKeyForProps): string | null =>
+  session.capability ?? ticket ?? null
+
 type HlsControllerPlanOfProps = {
   mode: StreamMode
   file: MediaFile
@@ -70,7 +94,11 @@ type HlsControllerPlanOfProps = {
   end: number
 }
 
-type HlsControllerSessionOfProps = { id: number; session: string }
+type HlsControllerSessionOfProps = {
+  id: number
+  session: string
+  key: string | undefined
+}
 
 type HlsControllerTextTrackOfProps = {
   file: MediaFile
@@ -95,7 +123,9 @@ type HlsControllerSendMediaProps = {
  * Extensions: the native players on phones and TVs. The master playlist
  * opens a session, and the session's playlists, init and segments are
  * asked for by its id. Each route is on the media plane, so a ticket for
- * the video opens it, and every URI a playlist names carries that ticket.
+ * the video opens it. Every URI a playlist names carries the legacy ticket
+ * the master was opened with, or, when an account ticket opened it, the
+ * session's own capability, which then alone opens the session's routes.
  */
 @Controller(MEDIA_ROUTES)
 @PrivateBy(PRIVACIES.media)
@@ -110,6 +140,7 @@ export class HlsController {
     @Inject(HlsSessions) private readonly sessions: HlsSessions,
     @Inject(StreamSessions) private readonly streams: StreamSessions,
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
+    @Inject(TicketAccesses) private readonly accesses: Pick<TicketAccesses, 'accessOf'>,
     @Inject(AuthSessions) private readonly callers: AuthSessions,
   ) {}
 
@@ -126,9 +157,11 @@ export class HlsController {
     @Query(HLS_PARAMS.mode) mode: string | undefined,
     @Query(HLS_PARAMS.audio) audio: string | undefined,
     @Query(HLS_PARAMS.quality) quality: string | undefined,
-    @Query(MEDIA_TICKET_PARAM) ticket: string | undefined,
+    @Query(MEDIA_TICKET_PARAM) query: unknown,
+    @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
+    const ticket = ticketIn(query)
     const streamMode = streamModeOf(mode)
     const playback = this.settings.playback()
     refuseWhatSettingsTurnOff({ playback, mode: streamMode })
@@ -186,9 +219,11 @@ export class HlsController {
         tonemap,
       },
       keyframesFor,
+      // Only an account ticket's session has a pass; any other caller's needs no capability.
+      access: this.accesses.accessOf({ request, mediaId: id }),
     })
 
-    const uris = sessionUris({ session, ticket: ticket ?? null })
+    const uris = sessionUris({ session, key: keyFor({ session, ticket }) })
     const playlist = masterPlaylist({
       mode: streamMode,
       variantUri: uris.video,
@@ -211,15 +246,17 @@ export class HlsController {
 
   /** Every segment of the session's plan, behind its init. */
   @MediaPlane()
+  @OpenedByPass(PASS_KINDS.capability)
   @Get(routeOf(HLS_PATHS.video))
   async video(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
     @Param(HLS_PARAMS.session) session: string,
-    @Query(MEDIA_TICKET_PARAM) ticket: string | undefined,
+    @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session })
-    const uris = sessionUris({ session: opened, ticket: ticket ?? null })
+    const ticket = ticketIn(query)
+    const opened = this.sessionOf({ id, session, key: ticket })
+    const uris = sessionUris({ session: opened, key: keyFor({ session: opened, ticket }) })
     await this.sendPlaylist({
       reply,
       playlist: mediaPlaylist({ plan: opened.plan, initUri: uris.init, segmentUri: uris.segment }),
@@ -227,14 +264,16 @@ export class HlsController {
   }
 
   @MediaPlane()
+  @OpenedByPass(PASS_KINDS.capability)
   @Get(routeOf(HLS_PATHS.init))
   async init(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
     @Param(HLS_PARAMS.session) session: string,
+    @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session })
+    const opened = this.sessionOf({ id, session, key: ticketIn(query) })
     await this.sendMedia({
       request,
       reply,
@@ -245,15 +284,17 @@ export class HlsController {
   }
 
   @MediaPlane()
+  @OpenedByPass(PASS_KINDS.capability)
   @Get(routeOf(HLS_PATHS.segment))
   async segment(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
     @Param(HLS_PARAMS.session) session: string,
     @Param(HLS_PARAMS.n) n: string,
+    @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session })
+    const opened = this.sessionOf({ id, session, key: ticketIn(query) })
     const number = wholeNumber(n)
     if (number == null) throw new NotFoundException(`No segment ${n} in this stream`)
     await this.sendMedia({
@@ -267,17 +308,19 @@ export class HlsController {
 
   /** A text subtitle track as six-second WebVTT segments, timed as the video playlist is. */
   @MediaPlane()
+  @OpenedByPass(PASS_KINDS.capability)
   @Get(routeOf(HLS_PATHS.subtitles))
   async subtitlePlaylist(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
     @Param(HLS_PARAMS.session) session: string,
     @Param(HLS_PARAMS.trackId) trackId: string,
-    @Query(MEDIA_TICKET_PARAM) ticket: string | undefined,
+    @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session })
+    const ticket = ticketIn(query)
+    const opened = this.sessionOf({ id, session, key: ticket })
     await this.textTrackOf({ file: this.fileOf(id), trackId })
-    const uris = sessionUris({ session: opened, ticket: ticket ?? null })
+    const uris = sessionUris({ session: opened, key: keyFor({ session: opened, ticket }) })
     await this.sendPlaylist({
       reply,
       playlist: subtitlePlaylist({
@@ -294,15 +337,17 @@ export class HlsController {
    * onto the file's own clock, which the video keeps.
    */
   @MediaPlane()
+  @OpenedByPass(PASS_KINDS.capability)
   @Get(routeOf(HLS_PATHS.subtitleSegment))
   async subtitleSegment(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
     @Param(HLS_PARAMS.session) session: string,
     @Param(HLS_PARAMS.trackId) trackId: string,
     @Param(HLS_PARAMS.n) n: string,
+    @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const opened = this.sessionOf({ id, session })
+    const opened = this.sessionOf({ id, session, key: ticketIn(query) })
     const file = this.fileOf(id)
     const track = await this.textTrackOf({ file, trackId })
     const number = wholeNumber(n)
@@ -353,9 +398,10 @@ export class HlsController {
     return file
   }
 
-  private sessionOf({ id, session }: HlsControllerSessionOfProps): HlsSession {
-    const opened = isHlsSessionId(session) ? this.sessions.get({ mediaId: id, session }) : null
-    if (!opened) throw new NotFoundException('No such stream session; open the stream again')
+  /** The session `key` opens: any key for one without a capability, only its capability for one with. */
+  private sessionOf({ id, session, key }: HlsControllerSessionOfProps): HlsSession {
+    const opened = isHlsSessionId(session) ? this.sessions.get({ mediaId: id, session, key }) : null
+    if (!opened) throw noSuchSession()
     return opened
   }
 
@@ -373,7 +419,7 @@ export class HlsController {
   }
 
   private async sendPlaylist({ reply, playlist }: HlsControllerSendPlaylistProps): Promise<void> {
-    // Each URI in it carries a ticket, and the session behind it ends.
+    // Each URI in it carries a ticket or a capability, and the session behind it ends.
     await reply
       .header(HEADERS.contentType, CONTENT_TYPES.m3u8)
       .header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
@@ -401,7 +447,7 @@ export class HlsController {
     if (body == null) return
     trackStream({
       sessions: this.streams,
-      rechecks: this.rechecks,
+      ended: this.rechecks.ended({ request }),
       auth: this.callers,
       mediaId: session.mediaId,
       mode: session.mode,

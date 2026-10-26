@@ -18,6 +18,7 @@ import {
 
 import type { ServerCookies } from '@/servers/cookieJar'
 import {
+  ACCOUNT_ACCESS_MESSAGES,
   MEDIA_ACCESS_MESSAGES,
   mediaAccessFor,
   type SourceOutcome,
@@ -35,6 +36,9 @@ import {
   probesOf,
 } from '@/test/mediaServer'
 
+/** The token of the account signed in; the tests never read what it says. */
+const ACCOUNT_TOKEN = 'token.signed-in'
+
 const BUSBOYS = { id: 20 }
 const READ_AT = 1_000_000
 /** The sizes a cap asks a transcode for, typed so a name `STREAM_QUALITIES` lacks fails the check. */
@@ -47,12 +51,15 @@ type SetUpProps = {
   server?: ReturnType<typeof mediaServer>
   elapsedMs?: Readonly<Record<string, number>>
   cookies?: ServerCookies
+  /** The signed-in account's token; null for a server without accounts. */
+  accessToken?: string | null
 }
 
 const setUp = ({
   server = mediaServer({}),
   elapsedMs = QUICK_LAN,
   cookies = NAS_COOKIES,
+  accessToken = null,
 }: SetUpProps = {}) => {
   const clock = { now: READ_AT }
   const away: { maxHeight: MaxHeight } = { maxHeight: MAX_HEIGHTS.fullHd }
@@ -64,6 +71,7 @@ const setUp = ({
     now: () => clock.now,
     probe: probes.probe,
     readCookies: async () => cookies,
+    readAccessToken: () => accessToken,
     watchNetwork: network.watchNetwork,
     awayMaxHeight: () => away.maxHeight,
   })
@@ -253,6 +261,26 @@ describe('mediaAccessFor', () => {
     expect(sourceOf(await refused.media.source(direct)).headers).toEqual(cookieHeader)
   })
 
+  it("plays a signed-in account from the server's own address by its ticket, with no cookie or Bearer", async () => {
+    const { media } = setUp({
+      server: mediaServer({ origins: [] }),
+      accessToken: ACCOUNT_TOKEN,
+    })
+    expect(sourceOf(await media.source(direct))).toEqual({
+      uri: ticketed({ origin: NAS.origin, path: filePath, ticket: TICKETS[0] }),
+      headers: {},
+    })
+    const query = toQueryString({
+      [HLS_PARAMS.mode]: PLAYBACK_MODES.remux,
+      [HLS_PARAMS.audio]: '1',
+      [MEDIA_TICKET_PARAM]: TICKETS[0],
+    })
+    expect(sourceOf(await media.source(remux))).toEqual({
+      uri: `${NAS.origin}${masterPath}?${query}`,
+      headers: {},
+    })
+  })
+
   it('sends no cookie header when the jar holds none', async () => {
     const { media } = setUp({ server: mediaServer({ origins: [] }), cookies: {} })
     expect(sourceOf(await media.source(direct))).toEqual({
@@ -294,6 +322,27 @@ describe('mediaAccessFor', () => {
       ok: false,
       reason: ACCESS_REFUSALS.locked,
       message: MEDIA_ACCESS_MESSAGES.locked(NAS.name),
+    })
+  })
+
+  it("refuses a ticket the server withholds from the account, in raven player's words", async () => {
+    const signedOut = setUp({
+      server: mediaServer({ tickets: [STATUSES.unauthorized] }),
+      accessToken: ACCOUNT_TOKEN,
+    })
+    expect(await signedOut.media.source(direct)).toEqual({
+      ok: false,
+      reason: ACCESS_REFUSALS.account,
+      message: ACCOUNT_ACCESS_MESSAGES.signInAgain(NAS.name),
+    })
+    const removed = setUp({
+      server: mediaServer({ tickets: [STATUSES.forbidden] }),
+      accessToken: ACCOUNT_TOKEN,
+    })
+    expect(await removed.media.source(direct)).toEqual({
+      ok: false,
+      reason: ACCESS_REFUSALS.account,
+      message: ACCOUNT_ACCESS_MESSAGES.removed(NAS.name),
     })
   })
 

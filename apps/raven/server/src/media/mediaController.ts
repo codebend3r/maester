@@ -29,18 +29,22 @@ import {
   isProgressReport,
   isRecord,
   isString,
+  MEDIA_TICKET_PARAM,
   PLAYBACK_MODES,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
+import { merge } from 'rxjs'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { AccessRechecks } from '@/auth/accessRechecks'
+import { OpenedByPass, PASS_KINDS } from '@/auth/accountPasses'
 import { AuthSessions } from '@/auth/authSessions'
 import { ERROR_CODES, errorMessage } from '@/errorMessage'
 import { RAVEN_CACHE_POLICIES, RAVEN_HEADERS } from '@/http'
 import { sendImage } from '@/items/sendImage'
 import { PrivateBy } from '@/lock/lockGuard'
 import { FAVOURITE_OUTCOMES } from '@/media/favouriteOutcomes'
+import { FilePasses } from '@/media/filePasses'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
@@ -99,6 +103,7 @@ export class MediaController {
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(AuthSessions) private readonly callers: AuthSessions,
+    @Inject(FilePasses) private readonly passes: Pick<FilePasses, 'hold'>,
   ) {}
 
   private find({ id, account }: MediaControllerFindProps): MediaItem {
@@ -229,22 +234,28 @@ export class MediaController {
    * Direct play: the file itself, with byte ranges. The browser asks for the
    * first bytes, finds the index, and starts playing; seeking is just another
    * range request, so the server does nothing but read. Files the client
-   * cannot decode as they are go through `PlaybackController`'s stream.
+   * cannot decode as they are go through `PlaybackController`'s stream. An
+   * account ticket that opens the file earns a pass, so the native player's
+   * later ranges, which carry that same ticket, outlive its five minutes; a
+   * range still streaming as that pass ends is cut, as a recheck cuts it.
    */
   @MediaPlane()
+  @OpenedByPass(PASS_KINDS.ticket)
   @Get(':id/file')
   async file(
     @Param('id', ParseIntPipe) id: number,
+    @Query(MEDIA_TICKET_PARAM) ticket: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const file = this.fileOf(id)
     const info = await stat(file.path).catch(() => null)
     if (!info?.isFile()) throw new NotFoundException('The file is no longer on disk')
+    const passEnded = this.passes.hold({ request, ticket, mediaId: id })
 
     trackStream({
       sessions: this.streams,
-      rechecks: this.rechecks,
+      ended: merge(this.rechecks.ended({ request }), passEnded),
       auth: this.callers,
       mediaId: id,
       mode: PLAYBACK_MODES.direct,

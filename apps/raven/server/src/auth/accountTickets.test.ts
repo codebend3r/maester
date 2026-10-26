@@ -1,7 +1,9 @@
 import { AUTH_REFUSALS, MEMBER_STATUSES } from '@raven/core'
+import { Subject } from 'rxjs'
 import { describe, expect, it } from 'vitest'
 import { AccountTickets } from '@/auth/accountTickets'
 import { AuthBackend } from '@/auth/authBackend'
+import { authFailure } from '@/auth/authFailure'
 import { AuthSessions } from '@/auth/authSessions'
 import { MEMBERSHIP_TTL_MS, MembershipLookups } from '@/auth/membershipLookups'
 import { createTokenVerifier } from '@/auth/tokenVerifier'
@@ -23,7 +25,7 @@ const setup = async ({ unlockedUntil = null }: SetupProps = {}) => {
     new MembershipLookups(backend, MEMBERSHIP_TTL_MS),
   )
   const session = await sessions.authenticate({ token: await fixture.mint() })
-  const lock = { unlockedUntil: () => unlockedUntil }
+  const lock = { unlockedUntil: () => unlockedUntil, relocks: new Subject<string>() }
   type RequestForProps = { bound: Session; isBearer?: boolean }
 
   /** A request the account gate bound to `bound`, sent by Bearer unless it says otherwise. */
@@ -49,13 +51,13 @@ describe('bounded account ticket storage', () => {
     const issued = Array.from({ length: 32 }, () => tickets.issue({ id: 7, request, now }))
     expect(() => tickets.issue({ id: 7, request, now })).toThrow()
     await expect(tickets.redeem({ id: 7, ticket: issued[0]!.ticket, now })).resolves.toMatchObject({
-      session: { account: { id: session.account.id } },
+      account: { id: session.account.id },
     })
     const renewed = tickets.issue({ id: 7, request, now: now + 300_000 })
     expect(renewed.ticket).not.toBe(issued[0]!.ticket)
     await expect(
       tickets.redeem({ id: 7, ticket: issued[0]!.ticket, now: now + 300_000 }),
-    ).rejects.toMatchObject({ response: { reason: AUTH_REFUSALS.signedOut } })
+    ).resolves.toBeNull()
   })
 
   it('invalidates tickets on server restart and never reuses a capability', async () => {
@@ -65,7 +67,7 @@ describe('bounded account ticket storage', () => {
     expect(first.ticket).not.toBe(second.ticket)
     await expect(
       new AccountTickets(sessions, lock).redeem({ ticket: first.ticket, id: 7 }),
-    ).rejects.toMatchObject({ response: { reason: AUTH_REFUSALS.signedOut } })
+    ).resolves.toBeNull()
   })
 
   it('refuses expired sessions, invalid media ids and unapproved issuance', async () => {
@@ -109,10 +111,42 @@ describe('bounded account ticket storage', () => {
     })
   })
 
+  it('opens nothing for another media, and refuses a removed account', async () => {
+    const { tickets, request, sessions, lock } = await setup()
+    const { ticket } = tickets.issue({ id: 7, request })
+    await expect(tickets.redeem({ id: 8, ticket })).resolves.toBeNull()
+    const removed = new AccountTickets(
+      {
+        callerOf: sessions.callerOf.bind(sessions),
+        authenticate: async () => {
+          throw authFailure(AUTH_REFUSALS.revoked)
+        },
+      },
+      lock,
+    )
+    const minted = removed.issue({ id: 7, request })
+    await expect(removed.redeem({ id: 7, ticket: minted.ticket })).rejects.toMatchObject({
+      response: { reason: AUTH_REFUSALS.revoked },
+    })
+  })
+
   it('hands back the PIN unlock the ticket was minted under', async () => {
     const unlockedUntil = Date.now() + 60_000
     const { tickets, request } = await setup({ unlockedUntil })
     const { ticket } = tickets.issue({ id: 7, request })
     await expect(tickets.redeem({ id: 7, ticket })).resolves.toMatchObject({ unlockedUntil })
+  })
+
+  it("takes the unlock back from an account's live tickets as the PIN locks again for it, and from no other account's", async () => {
+    const unlockedUntil = Date.now() + 60_000
+    const { tickets, request, session, lock } = await setup({ unlockedUntil })
+    const { ticket } = tickets.issue({ id: 7, request })
+    lock.relocks.next(AUTH_TEST_IDS.guest)
+    await expect(tickets.redeem({ id: 7, ticket })).resolves.toMatchObject({ unlockedUntil })
+    lock.relocks.next(session.account.id)
+    await expect(tickets.redeem({ id: 7, ticket })).resolves.toMatchObject({
+      account: { id: session.account.id },
+      unlockedUntil: null,
+    })
   })
 })
