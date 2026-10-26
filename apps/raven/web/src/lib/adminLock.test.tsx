@@ -56,9 +56,9 @@ describe('useAdminLock', () => {
     const client = new QueryClient()
     client.setQueryData(queryKeys.authConfig, config)
     client.setQueryData(queryKeys.adminLock, { state: ADMIN_LOCK_STATES.off })
-    type Wrapper2Props = { children: ReactNode }
+    type WrapperProps = { children: ReactNode }
 
-    const wrapper = ({ children }: Wrapper2Props) => (
+    const wrapper = ({ children }: WrapperProps) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     )
     return renderHook(() => useAdminLock(), { wrapper })

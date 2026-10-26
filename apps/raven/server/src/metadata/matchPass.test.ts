@@ -338,13 +338,13 @@ describe('looking up the other titles of a show', () => {
 
 describe('looking up the other titles of a show known only by an alternative', () => {
   const database = testDatabase('raven-match-pass-alias-only-')
-  type Show2Props = {
+  type ShowProps = {
     id: number
     title: string
     alternativeTitles?: string[]
   }
 
-  const show = ({ id, title, alternativeTitles = [] }: Show2Props) => ({
+  const show = ({ id, title, alternativeTitles = [] }: ShowProps) => ({
     id,
     title,
     first: '1970-01-01',

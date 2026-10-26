@@ -17,16 +17,16 @@ const FILE_NOUNS = {
   [DOWNLOAD_KINDS.show]: 'episodes',
 } as const satisfies Record<DownloadKind, string>
 
-type DOWNLOAD_MESSAGESQueuedProps = {
+type QueuedProps = {
   files: number
   kind: DownloadKind
   label: string
   serverName: string
 }
 
-type DOWNLOAD_MESSAGESAnsweredProps = { serverName: string; status: number }
+type AnsweredProps = { serverName: string; status: number }
 
-type DOWNLOAD_MESSAGESFailedProps = { label: string; why: string }
+type FailedProps = { label: string; why: string }
 
 export const DOWNLOAD_MESSAGES = {
   askGone:
@@ -36,22 +36,20 @@ export const DOWNLOAD_MESSAGES = {
   /** With no name, the server is no longer in Raven, and its folder would name a media id. */
   downloadedFrom: (serverName: string): string =>
     serverName === '' ? 'Downloaded' : `Downloaded from ${serverName}`,
-  queued: ({ files, kind, label, serverName }: DOWNLOAD_MESSAGESQueuedProps): string =>
+  queued: ({ files, kind, label, serverName }: QueuedProps): string =>
     files === 1
       ? `Downloading ${label} from ${serverName}`
       : `Downloading ${files} ${FILE_NOUNS[kind]} from ${serverName}`,
   noSpace: 'Not enough space',
   changed: 'The file changed on the server',
-  answered: ({ serverName, status }: DOWNLOAD_MESSAGESAnsweredProps): string =>
-    `${serverName} answered ${status}`,
+  answered: ({ serverName, status }: AnsweredProps): string => `${serverName} answered ${status}`,
   relocked: (name: string): string => `${name} locked this library again`,
   signInAgain: (name: string): string => `Sign in to ${name} again`,
   waiting: (name: string): string => `Your account on ${name} is waiting for approval`,
   removed: (name: string): string => `Your access to ${name} was removed`,
   unreachable: (name: string): string => `${name} could not be reached`,
   downloaded: (label: string): string => `Downloaded ${label}`,
-  failed: ({ label, why }: DOWNLOAD_MESSAGESFailedProps): string =>
-    `Could not download ${label}: ${why}`,
+  failed: ({ label, why }: FailedProps): string => `Could not download ${label}: ${why}`,
   deletedAfterWatching: (label: string): string => `Deleted ${label} after watching`,
 } as const
 

@@ -510,13 +510,13 @@ describe('what is watched, card by card', () => {
     metadata.link({ mediaIds: ids, itemIds: [itemId] })
     return { itemId, ids }
   }
-  type AddShow2Props = {
+  type AddShowProps = {
     title: string
     count: number
   }
 
   /** A show whose episodes are numbered 1 to `count`; `shared` is one file holding episodes 1 and 2. */
-  const addShow = ({ title, count }: AddShow2Props): { showId: number; episodeIds: number[] } => {
+  const addShow = ({ title, count }: AddShowProps): { showId: number; episodeIds: number[] } => {
     const { metadata } = repositories(database.get())
     const showId = metadata.save({ item: fetched({ type: 'show', tmdbId: title, title }) })
     const seasonId = metadata.save({

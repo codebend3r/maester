@@ -46,12 +46,10 @@ const titleOf = ({ cards }: TitleOfProps): string => {
   return sortTitle(media?.item?.title ?? media?.title ?? '')
 }
 
-type ByTitleProps = { cards: readonly DuplicateCard[] }
-
-type ByTitle2Props = { cards: readonly DuplicateCard[] }
+type ByTitleProps = TitleOfProps
 
 /** Movies in the order of their titles, as the listing sorts them. */
-const byTitle = (a: ByTitleProps, b: ByTitle2Props) =>
+const byTitle = (a: ByTitleProps, b: ByTitleProps) =>
   titleOf(a).localeCompare(titleOf(b), undefined, { sensitivity: 'base' })
 
 type MovieSplitsListProps = { libraryId: number; account: AccountKey }

@@ -37,8 +37,6 @@ type Waiter = { n: number; settle: (error: Error | null) => void }
 
 type OnSegmentProps = { n: number; path: string }
 
-type SegmentRunPropsOnSegmentProps = { n: number; path: string }
-
 type SegmentRunProps = {
   child: FfmpegStream
   folder: string
@@ -47,7 +45,7 @@ type SegmentRunProps = {
   last: number
   clock: HlsClock
   /** Told of each segment the run finishes, and its file. */
-  onSegment: ({ n, path }: SegmentRunPropsOnSegmentProps) => void
+  onSegment: ({ n, path }: OnSegmentProps) => void
   /** Told once ffmpeg has exited, whether it finished or was killed. */
   onEnd: () => void
 }

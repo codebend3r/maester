@@ -996,9 +996,7 @@ export const startFixtureServer = async ({
     requests: away.requests,
   }
 
-  type Stall2Props = { path: RegExp }
-
-  const stall = ({ path }: Stall2Props) => {
+  const stall = ({ path }: StallProps) => {
     const opened: { release: () => void } = { release: () => {} }
     const gate = new Promise<void>((resolve) => {
       opened.release = resolve

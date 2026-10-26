@@ -180,9 +180,9 @@ describe('MediaList', () => {
   })
 
   it('sorts the release column by year while the server sends no release dates', async () => {
-    type Movie2Props = { id: number; title: string; year: number }
+    type MovieProps = { id: number; title: string; year: number }
 
-    const movie = ({ id, title, year }: Movie2Props) =>
+    const movie = ({ id, title, year }: MovieProps) =>
       mediaItem({ id, title, year, item: itemSummary({ id, title, year, released: undefined }) })
     renderWithProviders({
       ui: (

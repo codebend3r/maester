@@ -682,9 +682,9 @@ describe('Player hands a title off to another player', () => {
 })
 
 describe('PlayerChrome handoff in the playback menu', () => {
-  type Chrome2Props = { services: PlayerServices; actions: EngineActions }
+  type ChromeProps = { services: PlayerServices; actions: EngineActions }
 
-  const chrome = ({ services, actions }: Chrome2Props) => {
+  const chrome = ({ services, actions }: ChromeProps) => {
     const engine: EngineHandle = {
       state: { ...initialVideoState(20), paused: false },
       duration: 120,

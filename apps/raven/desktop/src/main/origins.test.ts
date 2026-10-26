@@ -70,13 +70,13 @@ describe('serverOriginFrom', () => {
   const BUILT = 'https://raven.example.ts.net'
   const HOOK = 'http://127.0.0.1:9000'
 
-  type Pick2Props = {
+  type PickProps = {
     isPackaged: boolean
     built: string | undefined
     env: Record<string, string | undefined>
   }
 
-  const pick = (input: Pick2Props) => {
+  const pick = (input: PickProps) => {
     const warnings: string[] = []
     const origin = serverOriginFrom({ ...input, warn: (message) => warnings.push(message) })
     return { origin, warnings }
@@ -123,13 +123,13 @@ describe('serverOriginFrom', () => {
 })
 
 describe('linkOriginsFrom', () => {
-  type Pick3Props = {
+  type PickProps = {
     isPackaged: boolean
     built: string | undefined
     env: Record<string, string | undefined>
   }
 
-  const pick = (input: Pick3Props) => {
+  const pick = (input: PickProps) => {
     const warnings: string[] = []
     const origins = linkOriginsFrom({ ...input, warn: (message) => warnings.push(message) })
     return { origins, warnings }

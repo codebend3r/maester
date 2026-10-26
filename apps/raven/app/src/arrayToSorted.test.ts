@@ -51,10 +51,8 @@ describe('the installed toSorted', () => {
     ]
     type SortedCallbackProps = { rank: number }
 
-    type SortedCallback2Props = { rank: number }
-
     const sorted: unknown = Reflect.apply(toSorted, pairs, [
-      (a: SortedCallbackProps, b: SortedCallback2Props) => a.rank - b.rank,
+      (a: SortedCallbackProps, b: SortedCallbackProps) => a.rank - b.rank,
     ])
     expect(sorted).toEqual([pairs[1], pairs[0], pairs[2]])
   })

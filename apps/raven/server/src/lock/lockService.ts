@@ -147,9 +147,7 @@ export class LockService {
       // it may be a locked library's.
       return holding.some(seesLibrary)
     }
-    type Sees2Props = { privacy: Privacy; id: number }
-
-    const sees = ({ privacy, id }: Sees2Props): boolean => {
+    const sees = ({ privacy, id }: SeesProps): boolean => {
       switch (privacy) {
         case PRIVACIES.library:
           return seesLibrary(id)

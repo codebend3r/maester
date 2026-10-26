@@ -785,14 +785,14 @@ describe('describeFile', () => {
 })
 
 describe('savePosition', () => {
-  type Save2Props = {
+  type SaveProps = {
     service: ReturnType<typeof setup>['service']
     fileId: string
     position: number
     duration: number | null
   }
 
-  const save = ({ service, fileId, position, duration }: Save2Props) =>
+  const save = ({ service, fileId, position, duration }: SaveProps) =>
     service.handle({ kind: 'page', request: { type: 'savePosition', fileId, position, duration } })
   type Describe1Props = {
     service: ReturnType<typeof setup>['service']
@@ -1387,9 +1387,9 @@ describe('the server', () => {
 
 describe('updates', () => {
   type Service = ReturnType<typeof setup>['service']
-  type Ask2Props = { service: Service; request: unknown }
+  type AskProps = { service: Service; request: unknown }
 
-  const ask = ({ service, request }: Ask2Props) => service.handle({ kind: 'page', request })
+  const ask = ({ service, request }: AskProps) => service.handle({ kind: 'page', request })
   const PAGE = 'https://github.com/codebend3r/maester/releases/tag/v0.6.0'
   const NEWER: UpdateCheck = {
     ok: true,
@@ -1468,9 +1468,9 @@ describe('updates', () => {
 
 describe('downloads', () => {
   type Service = ReturnType<typeof setup>['service']
-  type Ask3Props = { service: Service; request: unknown }
+  type AskProps = { service: Service; request: unknown }
 
-  const ask = ({ service, request }: Ask3Props) => service.handle({ kind: 'page', request })
+  const ask = ({ service, request }: AskProps) => service.handle({ kind: 'page', request })
 
   it('hands a confirmation to the download service and answers its list', async () => {
     const { service, reached } = setup({ files: {} })

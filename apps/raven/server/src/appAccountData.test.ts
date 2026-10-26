@@ -107,9 +107,7 @@ const ascending = (a: number, b: number): number => a - b
 
 type ByIdProps = { id: number }
 
-type ById2Props = { id: number }
-
-const byId = (a: ByIdProps, b: ById2Props): number => a.id - b.id
+const byId = (a: ByIdProps, b: ByIdProps): number => a.id - b.id
 
 type ViewingOfProps = { api: Client }
 
