@@ -30,8 +30,10 @@ const GUEST = accountOf(AUTH_TEST_IDS.guest)
 
 const newTicket = (): string => `${ACCOUNT_TICKET_PREFIX}${randomBytes(32).toString('base64url')}`
 
+type SetupProps = { clock?: Clock }
+
 /** File passes over real callers, whose account rechecks are subjects a test ends by hand. */
-const setup = ({ clock = manualClock().clock }: { clock?: Clock } = {}) => {
+const setup = ({ clock = manualClock().clock }: SetupProps = {}) => {
   const callers = new AuthSessions(
     async () => {
       throw new Error('No token is verified here')
@@ -39,37 +41,38 @@ const setup = ({ clock = manualClock().clock }: { clock?: Clock } = {}) => {
     { current: async () => null },
   )
   const watched = new Map<object, Subject<void>>()
+  type EndedProps = { request: object }
+
   const rechecks = {
-    ended: ({ request }: { request: object }) => {
+    ended: ({ request }: EndedProps) => {
       const ended = new Subject<void>()
       watched.set(request, ended)
       return ended
     },
   }
   const relocks = new Subject<string>()
+  type UnlockNeedOfProps = { mediaId: number }
+
   const lock = {
     relocks,
     unlockNeedOf:
-      ({ mediaId }: { mediaId: number }) =>
+      ({ mediaId }: UnlockNeedOfProps) =>
       () =>
         mediaId === LOCKED_MEDIA,
   }
   const passes = new FilePasses(clock, new TicketAccesses(callers, rechecks, lock))
+  type TicketRequestProps = { account?: Account; unlockedUntil?: number | null }
+
   /** A request the account gate bound to an account ticket of `account`'s, minted under `unlockedUntil`. */
-  const ticketRequest = ({
-    account = FRIEND,
-    unlockedUntil = null,
-  }: { account?: Account; unlockedUntil?: number | null } = {}) => {
+  const ticketRequest = ({ account = FRIEND, unlockedUntil = null }: TicketRequestProps = {}) => {
     const request = {}
     callers.bindTicket({ request, grant: { account, unlockedUntil } })
     return request
   }
+  type HeldProps = { account?: Account; mediaId?: number; unlockedUntil?: number | null }
+
   /** Holds a fresh ticket of `account`'s on `mediaId`, as its first `file` request does. */
-  const held = ({
-    account = FRIEND,
-    mediaId = MEDIA,
-    unlockedUntil = null,
-  }: { account?: Account; mediaId?: number; unlockedUntil?: number | null } = {}) => {
+  const held = ({ account = FRIEND, mediaId = MEDIA, unlockedUntil = null }: HeldProps = {}) => {
     const request = ticketRequest({ account, unlockedUntil })
     const ticket = newTicket()
     const told = { isEnded: false }

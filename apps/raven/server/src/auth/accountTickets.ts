@@ -33,6 +33,8 @@ type AccountTicketsRedeemProps = {
   now?: number
 }
 
+type AccountTicketsRelockProps = { accountId: string }
+
 /** Opaque, process-local capabilities; no JWT or refresh credential enters a media URL. */
 @Injectable()
 export class AccountTickets {
@@ -87,7 +89,7 @@ export class AccountTickets {
    * again for it, so none opens a locked library, or a new pass, past the
    * relock.
    */
-  private relock({ accountId }: { accountId: string }): void {
+  private relock({ accountId }: AccountTicketsRelockProps): void {
     this.entries = new Map(
       [...this.entries].map(([ticket, entry]): [string, Entry] => [
         ticket,

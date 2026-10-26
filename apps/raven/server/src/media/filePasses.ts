@@ -42,6 +42,20 @@ const endLeastRecentlyUsed = (records: readonly Held[]): void => {
 const digestOf = (ticket: string): string =>
   createHash('sha256').update(ticket).digest(AUTH_ENCODINGS.base64url)
 
+type FilePassesMakeRoomProps = { accountId: string }
+
+type FilePassesForgetProps = { digest: string; record: Held }
+
+type FilePassesDropProps = { mediaId: number }
+
+type FilePassesGrantOfProps = { ticket: string; mediaId: number }
+
+type FilePassesHoldProps = {
+  request: object
+  ticket: unknown
+  mediaId: number
+}
+
 /**
  * The account passes direct play earns. A native player keeps the address
  * it opened a file with and asks it for ranges for as long as it plays, so
@@ -71,15 +85,7 @@ export class FilePasses implements OnModuleDestroy {
    * their response here. A ticket already held keeps the deadline of its
    * first open.
    */
-  hold({
-    request,
-    ticket,
-    mediaId,
-  }: {
-    request: object
-    ticket: unknown
-    mediaId: number
-  }): Observable<void> {
+  hold({ request, ticket, mediaId }: FilePassesHoldProps): Observable<void> {
     if (!isString(ticket) || !ticket.startsWith(ACCOUNT_TICKET_PREFIX)) return NEVER
     const digest = digestOf(ticket)
     const kept = this.held.get(digest)
@@ -107,7 +113,7 @@ export class FilePasses implements OnModuleDestroy {
   }
 
   /** What `ticket`'s pass lets a request for media `mediaId`'s file through as, or null when it holds none. */
-  grantOf({ ticket, mediaId }: { ticket: string; mediaId: number }): PassGrant | null {
+  grantOf({ ticket, mediaId }: FilePassesGrantOfProps): PassGrant | null {
     const record = this.held.get(digestOf(ticket))
     const grant = record?.pass?.grantFor({ given: ticket, mediaId }) ?? null
     if (record !== undefined && grant !== null) record.lastUsedAt = this.clock.now()
@@ -115,7 +121,7 @@ export class FilePasses implements OnModuleDestroy {
   }
 
   /** Ends every pass on a media whose file is gone. */
-  drop({ mediaId }: { mediaId: number }): void {
+  drop({ mediaId }: FilePassesDropProps): void {
     ;[...this.held.values()].filter((record) => record.mediaId === mediaId).forEach(endHeld)
   }
 
@@ -123,14 +129,14 @@ export class FilePasses implements OnModuleDestroy {
     ;[...this.held.values()].forEach(endHeld)
   }
 
-  private forget({ digest, record }: { digest: string; record: Held }): void {
+  private forget({ digest, record }: FilePassesForgetProps): void {
     if (this.held.get(digest) === record) this.held.delete(digest)
     record.ended.next()
     record.ended.complete()
   }
 
   /** Ends the least recently used pass of the account at its share, else of all at the cap. */
-  private makeRoom({ accountId }: { accountId: string }): void {
+  private makeRoom({ accountId }: FilePassesMakeRoomProps): void {
     const all = [...this.held.values()]
     const own = all.filter((record) => record.accountId === accountId)
     if (own.length >= FILE_PASSES_PER_ACCOUNT) return endLeastRecentlyUsed(own)

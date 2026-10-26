@@ -27,6 +27,8 @@ type MembershipLookupsAskProps = { token: string }
 
 type MembershipLookupsStoreProps = { key: string; entry: Entry; now: number }
 
+type MembershipLookupsIsFreshProps = { entry: Entry; now: number }
+
 /**
  * `current_membership` lookups, shared. Callers with the same token share
  * one lookup while it is in flight, and its answer is reused until the TTL
@@ -73,7 +75,7 @@ export class MembershipLookups {
    * faked one, or a host's corrected one), and is asked again rather than
    * held until real time catches up with it.
    */
-  private isFresh({ entry, now }: { entry: Entry; now: number }): boolean {
+  private isFresh({ entry, now }: MembershipLookupsIsFreshProps): boolean {
     const age = now - entry.startedAt
     return age >= 0 && age < this.ttlMs
   }

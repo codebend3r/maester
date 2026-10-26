@@ -72,21 +72,30 @@ describe("an account ticket's pass on the file it opened", () => {
     await rm(root, { recursive: true, force: true, maxRetries: 5 })
   })
 
+  type TicketForProps = {
+    caller?: CallerKind
+    id?: number
+    headers?: Record<string, string>
+  }
+
   /** An account ticket for `id`, minted by `caller` with Bearer, or with `headers` when given. */
   const ticketFor = async ({
     caller = CALLER_KINDS.member,
     id = plane.ids.video,
     headers,
-  }: {
-    caller?: CallerKind
-    id?: number
-    headers?: Record<string, string>
-  } = {}): Promise<string> =>
+  }: TicketForProps = {}): Promise<string> =>
     mintedTicket({
       app: plane.app,
       id,
       headers: headers ?? (await headersFor({ fixture, caller, via: TOKEN_CARRIERS.bearer })),
     })
+
+  type PlayProps = {
+    ticket: string
+    id?: number
+    headers?: Record<string, string>
+    method?: RouteMethod
+  }
 
   /** Asks for `id`'s file with `ticket` alone, as a native player's range request does. */
   const play = ({
@@ -94,12 +103,7 @@ describe("an account ticket's pass on the file it opened", () => {
     id = plane.ids.video,
     headers = FIRST_BYTES,
     method = ROUTE_METHODS.get,
-  }: {
-    ticket: string
-    id?: number
-    headers?: Record<string, string>
-    method?: RouteMethod
-  }) =>
+  }: PlayProps) =>
     plane.app.inject({
       method,
       url: withTicket({ route: ROUTES.file, params: { id }, ticket }),
@@ -118,14 +122,13 @@ describe("an account ticket's pass on the file it opened", () => {
     return { status, reason }
   }
 
-  /** Runs `work` on a faked clock, from `start`, the real time it was faked at. */
-  const onFakedClock = async ({
-    clock,
-    work,
-  }: {
+  type OnFakedClockProps = {
     clock: (typeof CLOCKS)[keyof typeof CLOCKS]
     work: (start: number) => Promise<void>
-  }): Promise<void> => {
+  }
+
+  /** Runs `work` on a faked clock, from `start`, the real time it was faked at. */
+  const onFakedClock = async ({ clock, work }: OnFakedClockProps): Promise<void> => {
     vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: clock === CLOCKS.running })
     try {
       await work(Date.now())
@@ -134,13 +137,13 @@ describe("an account ticket's pass on the file it opened", () => {
     }
   }
 
-  const setStatus = ({
-    id,
-    status,
-  }: {
+  type SetStatusProps = {
     id: string
     status: typeof MEMBER_STATUSES.approved | typeof MEMBER_STATUSES.revoked
-  }) => plane.ownerApi.setMemberStatus({ id, change: { status } })
+  }
+
+  const setStatus = ({ id, status }: SetStatusProps) =>
+    plane.ownerApi.setMemberStatus({ id, change: { status } })
 
   it('opens its file by range past its five minutes once it has opened it', async () => {
     const ticket = await ticketFor()

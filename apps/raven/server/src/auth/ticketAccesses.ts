@@ -5,6 +5,8 @@ import type { PassAccess } from '@/auth/accountPasses'
 import { AuthSessions, CALLERS } from '@/auth/authSessions'
 import { LockService } from '@/lock/lockService'
 
+type TicketAccessesAccessOfProps = { request: object; mediaId: number }
+
 /**
  * What a request an account ticket opened stands for, to open a pass on a
  * media with, for the HLS master and `file` alike: the account and unlock
@@ -20,7 +22,7 @@ export class TicketAccesses {
   ) {}
 
   /** The access for media `mediaId`; null for any caller but an account ticket, which earns no pass. */
-  accessOf({ request, mediaId }: { request: object; mediaId: number }): PassAccess | null {
+  accessOf({ request, mediaId }: TicketAccessesAccessOfProps): PassAccess | null {
     const caller = this.callers.callerOf({ request })
     if (caller.kind !== CALLERS.ticket) return null
     const { account } = caller.session

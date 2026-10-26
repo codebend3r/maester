@@ -77,6 +77,8 @@ type LockServiceIsUnlockedProps = { request: Request }
 
 type LockServiceCookieUntilProps = { request: Request }
 
+type LockServiceRelockProps = { request: Request }
+
 /**
  * Keeps locked libraries behind the server's PIN. Entering it gives the
  * browser a session cookie signed with a key that lives only as long as
@@ -145,7 +147,7 @@ export class LockService {
    * Shuts the locked libraries again for this caller: the cookie that
    * forgets its session, and, for an account, word to `relocks`.
    */
-  relock({ request }: { request: Request }): string {
+  relock({ request }: LockServiceRelockProps): string {
     const accountId = this.accountIdOf({ request })
     if (accountId !== NO_ACCOUNT) this.relocked.next(accountId)
     return `${SERVER_COOKIES.unlock}=; Max-Age=0; ${this.attributes()}`

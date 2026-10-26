@@ -30,6 +30,8 @@ export type PassAccess = PassGrant & {
   needsUnlock: () => boolean
 }
 
+type AccountPassGrantForProps = { given: unknown; mediaId: number }
+
 /**
  * An account's way back into one media past its ticket's five minutes,
  * keyed by its secret: an HLS session's capability, or the account ticket
@@ -48,25 +50,21 @@ export type AccountPass = {
    * deadline, or past an unlock its locked library needs, it ends the pass,
    * so a host that slept through either timer carries no pass past it.
    */
-  grantFor: ({ given, mediaId }: { given: unknown; mediaId: number }) => PassGrant | null
+  grantFor: ({ given, mediaId }: AccountPassGrantForProps) => PassGrant | null
   /** Ends the pass, once: stops its recheck, its relocks and its timers, and tells its holder. */
   end: () => void
 }
 
-export const openPass = ({
-  secret,
-  mediaId,
-  access,
-  clock,
-  onEnd,
-}: {
+type OpenPassProps = {
   secret: string
   mediaId: number
   access: PassAccess
   clock: Clock
   /** Called once, however the pass ends, so its holder forgets it. */
   onEnd: () => void
-}): AccountPass => {
+}
+
+export const openPass = ({ secret, mediaId, access, clock, onEnd }: OpenPassProps): AccountPass => {
   const until = clock.now() + ACCOUNT_PASS_MS
   const state: { isOver: boolean; stop: () => void; unlockedUntil: number | null } = {
     isOver: false,

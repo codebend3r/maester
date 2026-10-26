@@ -20,6 +20,12 @@ const HOUR_MS = 60 * 60 * 1000
 /** Whether a pass's media sits in a locked library, as the test says it does at each moment. */
 const LIBRARIES = { locked: 'locked', open: 'open' } as const
 
+type OpenedProps = {
+  clock?: Clock
+  unlockedUntil?: number | null
+  library?: (typeof LIBRARIES)[keyof typeof LIBRARIES]
+}
+
 /**
  * A pass for the friend on `MEDIA`, minted under `unlockedUntil`, with the
  * subjects that end its access and lock the PIN again, what its holder was
@@ -29,11 +35,7 @@ const opened = ({
   clock = manualClock().clock,
   unlockedUntil = 42,
   library = LIBRARIES.open,
-}: {
-  clock?: Clock
-  unlockedUntil?: number | null
-  library?: (typeof LIBRARIES)[keyof typeof LIBRARIES]
-} = {}) => {
+}: OpenedProps = {}) => {
   const ended = new Subject<void>()
   const relocked = new Subject<void>()
   const state = { library }

@@ -30,8 +30,10 @@ const FRIEND: Account = {
   isOwner: false,
 }
 
+type AccessOfProps = { ended?: Subject<void> }
+
 /** Access for the friend that ends when `ended` emits. */
-const accessOf = ({ ended = new Subject<void>() }: { ended?: Subject<void> } = {}) => ({
+const accessOf = ({ ended = new Subject<void>() }: AccessOfProps = {}) => ({
   ended,
   access: {
     account: FRIEND,
@@ -94,15 +96,13 @@ describe("an account's HLS session", () => {
     return { sessions, advance }
   }
 
-  const mintIn = ({
-    sessions,
-    mediaId = 1,
-    access = null,
-  }: {
+  type MintInProps = {
     sessions: HlsSessions
     mediaId?: number
     access?: PassAccess | null
-  }): HlsSession =>
+  }
+
+  const mintIn = ({ sessions, mediaId = 1, access = null }: MintInProps): HlsSession =>
     sessions.mint({
       mediaId,
       asked: null,

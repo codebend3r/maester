@@ -27,9 +27,11 @@ const SOURCES: MediaSources = {
 const attemptOf = (state: SessionState): number =>
   state.phase === SESSION_PHASES.failed ? -1 : state.attempt
 
+type RenderSessionProps = { isWaiting: boolean; clock?: number }
+
 const renderSession = (modes: readonly PlaybackMode[]) =>
   renderHook(
-    ({ isWaiting, clock = 0 }: { isWaiting: boolean; clock?: number }) =>
+    ({ isWaiting, clock = 0 }: RenderSessionProps) =>
       usePlaybackSession({
         media: { id: 20 },
         modes,

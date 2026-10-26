@@ -203,7 +203,9 @@ describe('the ladder when the server lets go of a source mid-play', () => {
     message: 'Sign in to nas:8080 again.',
   }
 
-  const dropped = ({ state, at }: { state: SessionState; at: number }): SessionState =>
+  type DroppedProps = { state: SessionState; at: number }
+
+  const dropped = ({ state, at }: DroppedProps): SessionState =>
     sessionReducer(state, { type: SESSION_EVENTS.dropped, attempt: attemptOf(state), at })
 
   it('opens the same way again from the spot reached, for a source to be handed out afresh', () => {

@@ -89,30 +89,31 @@ describe("an account's HLS session", () => {
     await rm(root, { recursive: true, force: true, maxRetries: 5 })
   })
 
-  const get = ({ url, headers = {} }: { url: string; headers?: Record<string, string> }) =>
-    plane.app.inject({ url, headers })
+  type GetProps = { url: string; headers?: Record<string, string> }
+
+  const get = ({ url, headers = {} }: GetProps) => plane.app.inject({ url, headers })
 
   const bearerOf = (caller: CallerKind) =>
     headersFor({ fixture, caller, via: TOKEN_CARRIERS.bearer })
 
+  type MintForProps = { id: number; headers: Record<string, string> }
+
   /** Asks for an account ticket for `id` with `headers`, as the player does to open it again. */
-  const mintFor = ({ id, headers }: { id: number; headers: Record<string, string> }) =>
+  const mintFor = ({ id, headers }: MintForProps) =>
     plane.app.inject({
       method: ROUTES.accountTicket.method,
       url: pathOf({ route: ROUTES.accountTicket, params: { id } }),
       headers,
     })
 
-  /** An account ticket for `id`, minted by `caller` with Bearer, or with `headers` when given. */
-  const ticketFor = async ({
-    caller,
-    id,
-    headers,
-  }: {
+  type TicketForProps = {
     caller: CallerKind
     id: number
     headers?: Record<string, string>
-  }): Promise<string> =>
+  }
+
+  /** An account ticket for `id`, minted by `caller` with Bearer, or with `headers` when given. */
+  const ticketFor = async ({ caller, id, headers }: TicketForProps): Promise<string> =>
     mintedTicket({ app: plane.app, id, headers: headers ?? (await bearerOf(caller)) })
 
   /** The URIs a playlist names on lines of their own: a master's variant, a media playlist's segments. */
@@ -137,17 +138,15 @@ describe("an account's HLS session", () => {
     named: string[]
   }
 
-  /** Opens a remux of `id` with an account ticket alone, as a native player does. */
-  const open = async ({
-    caller,
-    id,
-    headers,
-  }: {
+  type OpenProps = {
     caller: CallerKind
     id: number
     /** What the ticket is minted with, when not the caller's Bearer alone. */
     headers?: Record<string, string>
-  }): Promise<Opened> => {
+  }
+
+  /** Opens a remux of `id` with an account ticket alone, as a native player does. */
+  const open = async ({ caller, id, headers }: OpenProps): Promise<Opened> => {
     const ticket = await ticketFor({ caller, id, headers })
     const query = toQueryString({
       [HLS_PARAMS.mode]: PLAYBACK_MODES.remux,
@@ -174,16 +173,14 @@ describe("an account's HLS session", () => {
     }
   }
 
-  /** The five routes a session's capability opens, for `session` of media `id`, carrying `key`. */
-  const sessionRoutes = ({
-    id,
-    session,
-    key,
-  }: {
+  type SessionRoutesProps = {
     id: number
     session: string
     key: string | null
-  }): string[] =>
+  }
+
+  /** The five routes a session's capability opens, for `session` of media `id`, carrying `key`. */
+  const sessionRoutes = ({ id, session, key }: SessionRoutesProps): string[] =>
     [
       HLS_PATHS.video,
       HLS_PATHS.init,
@@ -206,23 +203,21 @@ describe("an account's HLS session", () => {
         key === null ? path : `${path}?${toQueryString({ [MEDIA_TICKET_PARAM]: key })}`,
       )
 
-  const statusesOf = async ({
-    urls,
-    headers,
-  }: {
+  type StatusesOfProps = {
     urls: string[]
     headers?: Record<string, string>
-  }): Promise<number[]> =>
+  }
+
+  const statusesOf = async ({ urls, headers }: StatusesOfProps): Promise<number[]> =>
     Promise.all(urls.map(async (url) => (await get({ url, headers })).statusCode))
 
-  /** The status and refusal of each response, for the routes that answer an auth refusal. */
-  const refusalsOf = async ({
-    urls,
-    headers,
-  }: {
+  type RefusalsOfProps = {
     urls: string[]
     headers?: Record<string, string>
-  }) =>
+  }
+
+  /** The status and refusal of each response, for the routes that answer an auth refusal. */
+  const refusalsOf = async ({ urls, headers }: RefusalsOfProps) =>
     Promise.all(
       urls.map(async (url) => {
         const { status, reason } = outcomeOf({ response: await get({ url, headers }) })
@@ -232,13 +227,13 @@ describe("an account's HLS session", () => {
 
   const SIGNED_OUT = { status: 401, reason: AUTH_REFUSALS.signedOut } as const
 
-  const setStatus = ({
-    id,
-    status,
-  }: {
+  type SetStatusProps = {
     id: string
     status: typeof MEMBER_STATUSES.approved | typeof MEMBER_STATUSES.revoked
-  }) => plane.ownerApi.setMemberStatus({ id, change: { status } })
+  }
+
+  const setStatus = ({ id, status }: SetStatusProps) =>
+    plane.ownerApi.setMemberStatus({ id, change: { status } })
 
   // These move the clock ahead and back first, so a membership answer cached while it was ahead
   // must never hide what the tests after them check.

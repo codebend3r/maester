@@ -163,6 +163,13 @@ type AccountGuardAdmitSessionProps = {
   requirement: GatedRequirement
 }
 
+type AccountGuardAdmitCapabilityProps = {
+  request: FastifyRequest
+  capability: string
+  params: Record<string, unknown>
+  requirement: GatedRequirement
+}
+
 /**
  * The account gate, default-deny. Open routes pass in every state. With
  * accounts `off`, a route that asks for an account by its own mark is
@@ -232,12 +239,7 @@ export class AccountGuard implements CanActivate {
     capability,
     params,
     requirement,
-  }: {
-    request: FastifyRequest
-    capability: string
-    params: Record<string, unknown>
-    requirement: GatedRequirement
-  }): void {
+  }: AccountGuardAdmitCapabilityProps): void {
     const id = params[ROUTE_PARAMS.id]
     const session = params[HLS_PARAMS.session]
     const grant =

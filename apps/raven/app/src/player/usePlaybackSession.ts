@@ -150,12 +150,14 @@ const stepDown = ({ ladder, at }: StepDownProps): SessionState => {
   return sourcing({ ladder, step, at })
 }
 
+type HasPlayedOnProps = { ladder: Ladder; at: number }
+
 /**
  * Whether the way being played has played on since it was last opened again, so the server's
  * letting go of it is one more lapse of a long play (a file pass or an HLS session the server
  * ended or forgot) rather than a source that fails wherever it is opened.
  */
-const hasPlayedOn = ({ ladder, at }: { ladder: Ladder; at: number }): boolean =>
+const hasPlayedOn = ({ ladder, at }: HasPlayedOnProps): boolean =>
   ladder.reopenedAt === null || at > ladder.reopenedAt
 
 /**

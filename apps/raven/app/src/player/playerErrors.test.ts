@@ -27,14 +27,13 @@ const { unauthorized, forbidden, notFound, conflict, locked, failed } = STATUSES
 /** What AVPlayer reports through `react-native-video` on iOS and tvOS. */
 const apple = (error: OnVideoErrorData['error']): OnVideoErrorData => ({ error, target: 12 })
 
-/** What ExoPlayer reports through `react-native-video` on Android TV for an HTTP status. */
-const exo = ({
-  status,
-  code = EXO_ERROR_CODES.badHttpStatus,
-}: {
+type ExoProps = {
   status: number | null
   code?: string
-}) => ({
+}
+
+/** What ExoPlayer reports through `react-native-video` on Android TV for an HTTP status. */
+const exo = ({ status, code = EXO_ERROR_CODES.badHttpStatus }: ExoProps) => ({
   error: {
     errorString: 'ExoPlaybackException: ERROR_CODE_IO_BAD_HTTP_STATUS',
     errorException: 'androidx.media3.exoplayer.ExoPlaybackException: Source error',

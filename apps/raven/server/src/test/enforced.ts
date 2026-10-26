@@ -466,18 +466,20 @@ export const LONG_TOKEN_SECONDS = 2 * 24 * 60 * 60
 
 type Enforced = Awaited<ReturnType<typeof createEnforcedApp>>
 
+type MintedTicketProps = {
+  app: NestFastifyApplication
+  route?: typeof ROUTES.accountTicket | typeof ROUTES.mediaTicket
+  id: number
+  headers: Record<string, string>
+}
+
 /** The ticket `route` mints for media `id` with `headers`: an account ticket, or the legacy one. */
 export const mintedTicket = async ({
   app,
   route = ROUTES.accountTicket,
   id,
   headers,
-}: {
-  app: NestFastifyApplication
-  route?: typeof ROUTES.accountTicket | typeof ROUTES.mediaTicket
-  id: number
-  headers: Record<string, string>
-}): Promise<string> => {
+}: MintedTicketProps): Promise<string> => {
   const response = await app.inject({
     method: route.method,
     url: pathOf({ route, params: { id } }),
@@ -488,27 +490,29 @@ export const mintedTicket = async ({
   return body.ticket
 }
 
+type PinMovesProps = {
+  enforced: Pick<Enforced, 'app' | 'mediaDir' | 'ids'>
+  fixture: AuthFixture
+  pin: string
+}
+
 /**
  * The PIN's moves on a server `createEnforcedApp` made with `libraryPin`
  * `pin`: unlocking it, locking it again as the Lock button does, and
  * locking or opening the movies library past it as the owner.
  */
-export const pinMoves = ({
-  enforced,
-  fixture,
-  pin,
-}: {
-  enforced: Pick<Enforced, 'app' | 'mediaDir' | 'ids'>
-  fixture: AuthFixture
-  pin: string
-}) => {
+export const pinMoves = ({ enforced, fixture, pin }: PinMovesProps) => {
   const { app } = enforced
-  const answered = ({ response, what }: { response: { statusCode: number }; what: string }) => {
+  type AnsweredProps = { response: { statusCode: number }; what: string }
+
+  const answered = ({ response, what }: AnsweredProps) => {
     if (response.statusCode !== 200) throw new Error(`${what} answered ${response.statusCode}`)
   }
 
+  type UnlockProps = { headers: Record<string, string> }
+
   /** `headers` with the unlock cookie the PIN earns them, and when that unlock lapses. */
-  const unlock = async ({ headers }: { headers: Record<string, string> }) => {
+  const unlock = async ({ headers }: UnlockProps) => {
     const response = await app.inject({
       method: ROUTES.unlock.method,
       url: ROUTES.unlock.path,
@@ -522,8 +526,10 @@ export const pinMoves = ({
     return { headers: { ...headers, [AUTH_HEADERS.cookie]: cookie }, lapsesAt: Number(expires) }
   }
 
+  type RelockProps = { headers: Record<string, string> }
+
   /** Locks the PIN again with `headers`, as the Lock button does. */
-  const relock = async ({ headers }: { headers: Record<string, string> }): Promise<void> => {
+  const relock = async ({ headers }: RelockProps): Promise<void> => {
     const response = await app.inject({
       method: ROUTES.relock.method,
       url: ROUTES.relock.path,
@@ -532,8 +538,10 @@ export const pinMoves = ({
     answered({ response, what: 'The relock' })
   }
 
+  type SetLockedProps = { isLocked: boolean }
+
   /** Locks or opens the movies library as the owner, past the PIN, as its settings are changed. */
-  const setLocked = async ({ isLocked }: { isLocked: boolean }): Promise<void> => {
+  const setLocked = async ({ isLocked }: SetLockedProps): Promise<void> => {
     const bearer = await headersFor({
       fixture,
       caller: CALLER_KINDS.owner,
