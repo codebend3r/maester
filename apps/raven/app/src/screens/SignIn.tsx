@@ -44,8 +44,6 @@ type SecretStep = { kind: typeof STEPS.pin | typeof STEPS.admin; server: AppServ
 
 type Step = { kind: typeof STEPS.account } | SecretStep | { kind: typeof STEPS.ticketsOff }
 
-type SECRET_STEPSUnlockProps = { api: ApiClient; secret: string }
-
 type UnlockProps = { api: ApiClient; secret: string }
 
 /** What the PIN step and the admin step each ask for, and the call that sends it. */
@@ -54,7 +52,7 @@ const SECRET_STEPS = {
     prompt: COPY.pinPrompt,
     label: COPY.pin,
     isNumeric: true,
-    unlock: ({ api, secret }: SECRET_STEPSUnlockProps) => api.unlock(secret),
+    unlock: ({ api, secret }: UnlockProps) => api.unlock(secret),
   },
   [STEPS.admin]: {
     prompt: COPY.adminPrompt,
