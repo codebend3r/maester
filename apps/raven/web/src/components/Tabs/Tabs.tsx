@@ -4,6 +4,14 @@ import styles from '@/components/Tabs/Tabs.module.scss'
 
 type Tab<T extends string> = { value: T; label: string; count: number }
 
+type TabsProps<T extends string> = {
+  label: string
+  tabs: readonly Tab<T>[]
+  chosen: T
+  onChoose: (value: T) => void
+  children: ReactNode
+}
+
 /**
  * A row of tabs, each with how many it holds, over the chosen tab's panel,
  * `children`. Only the chosen tab is in the tab order; the arrow keys move
@@ -15,18 +23,14 @@ export const Tabs = <T extends string>({
   chosen,
   onChoose,
   children,
-}: {
-  label: string
-  tabs: readonly Tab<T>[]
-  chosen: T
-  onChoose: (value: T) => void
-  children: ReactNode
-}) => {
+}: TabsProps<T>) => {
   const id = useId()
   const tabId = (value: T) => `${id}-${value}`
   const panelId = `${id}-panel`
 
-  const step = ({ from, by }: { from: number; by: number }) => {
+  type StepProps = { from: number; by: number }
+
+  const step = ({ from, by }: StepProps) => {
     const next = tabs[(from + by + tabs.length) % tabs.length]
     if (next === undefined) return
     onChoose(next.value)

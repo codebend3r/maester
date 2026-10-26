@@ -8,10 +8,12 @@ import { testDatabase } from '@/test/database'
 import { type PlanStep, planLikeProduction, tracedDatabase } from '@/test/queryPlans'
 import { repositories } from '@/test/repositories'
 
-type Read = (from: {
+type ReadProps = {
   metadata: MetadataRepository
   ids: { show: number; movie: number }
-}) => Map<number, number[]>
+}
+
+type Read = (from: ReadProps) => Map<number, number[]>
 
 /** The reads that find which libraries hold a file of an item. */
 const READS = {

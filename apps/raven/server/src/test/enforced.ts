@@ -150,29 +150,27 @@ export const ROUTES = {
 
 export type Route = (typeof ROUTES)[keyof typeof ROUTES]
 
-/** `path` with each `:name` filled from `params`, else with `1`. */
-export const pathOf = ({
-  route,
-  params = {},
-}: {
+type PathOfProps = {
   route: Route
   params?: Record<string, number | string>
-}): string =>
+}
+
+/** `path` with each `:name` filled from `params`, else with `1`. */
+export const pathOf = ({ route, params = {} }: PathOfProps): string =>
   route.path
     .split('/')
     .map((segment) => (segment.startsWith(':') ? String(params[segment.slice(1)] ?? 1) : segment))
     .join('/')
 
-/** `route`'s path with a media ticket in `?t=`, as the media plane is asked for it. */
-export const withTicket = ({
-  route,
-  params,
-  ticket,
-}: {
+type WithTicketProps = {
   route: Route
   params?: Record<string, number | string>
   ticket: string
-}): string => `${pathOf({ route, params })}?${MEDIA_TICKET_PARAM}=${ticket}`
+}
+
+/** `route`'s path with a media ticket in `?t=`, as the media plane is asked for it. */
+export const withTicket = ({ route, params, ticket }: WithTicketProps): string =>
+  `${pathOf({ route, params })}?${MEDIA_TICKET_PARAM}=${ticket}`
 
 /** Who a request comes from, by the account its token names, or none. */
 export const CALLER_KINDS = {
@@ -201,16 +199,18 @@ const CALLER_IDS = {
 
 type AuthFixture = Awaited<ReturnType<typeof authFixture>>
 
+type HeadersForProps = {
+  fixture: AuthFixture
+  caller: CallerKind
+  via: (typeof TOKEN_CARRIERS)[keyof typeof TOKEN_CARRIERS]
+}
+
 /** The headers `caller` sends, with a freshly minted token carried `via` Bearer or the cookie. */
 export const headersFor = async ({
   fixture,
   caller,
   via,
-}: {
-  fixture: AuthFixture
-  caller: CallerKind
-  via: (typeof TOKEN_CARRIERS)[keyof typeof TOKEN_CARRIERS]
-}): Promise<Record<string, string>> => {
+}: HeadersForProps): Promise<Record<string, string>> => {
   if (caller === CALLER_KINDS.anonymous) return {}
   const token = await fixture.mint({ id: CALLER_IDS[caller] })
   return via === TOKEN_CARRIERS.bearer
@@ -226,12 +226,14 @@ type Answered = {
   json: () => unknown
 }
 
+type OutcomeOfProps = {
+  response: Answered
+}
+
 /** What a response says about who may have it: its status, its refusal, and how it may be cached. */
 export const outcomeOf = ({
   response,
-}: {
-  response: Answered
-}): {
+}: OutcomeOfProps): {
   status: number
   reason: string | null
   isVariedByAccount: boolean
@@ -266,6 +268,20 @@ const ANDOR: FakeShow = {
 /** What the fake TMDB knows: The Matrix, and the first two episodes of Andor. */
 export const ENFORCED_TITLES = { movies: [MATRIX], shows: [ANDOR] }
 
+type CreateEnforcedAppProps = {
+  root: string
+  fixture: AuthFixture
+  libraryPin?: string | null
+  /** RAVEN_MEDIA_SECRET, for a test that needs a legacy ticket to offer. */
+  mediaSecret?: Buffer | null
+  /** RAVEN_MEDIA_ORIGINS, as the server reads them. */
+  mediaOrigins?: readonly MediaOrigin[]
+  /** How often open SSE and media responses are checked again; a minute when left out. */
+  accessRecheckMs?: number
+  /** How long The Matrix runs, for a test that saves a spot further in than a second. */
+  movieSeconds?: number
+}
+
 /**
  * A server with accounts `ready`, on which the owner has made and scanned
  * one movies library holding The Matrix, matched against a fake TMDB. The
@@ -279,19 +295,7 @@ export const createEnforcedApp = async ({
   mediaOrigins = [],
   accessRecheckMs,
   movieSeconds = 1,
-}: {
-  root: string
-  fixture: AuthFixture
-  libraryPin?: string | null
-  /** RAVEN_MEDIA_SECRET, for a test that needs a legacy ticket to offer. */
-  mediaSecret?: Buffer | null
-  /** RAVEN_MEDIA_ORIGINS, as the server reads them. */
-  mediaOrigins?: readonly MediaOrigin[]
-  /** How often open SSE and media responses are checked again; a minute when left out. */
-  accessRecheckMs?: number
-  /** How long The Matrix runs, for a test that saves a spot further in than a second. */
-  movieSeconds?: number
-}): Promise<{
+}: CreateEnforcedAppProps): Promise<{
   app: NestFastifyApplication
   mediaDir: string
   ownerApi: ApiClient
@@ -341,19 +345,18 @@ export const createEnforcedApp = async ({
 /** Where `addShow` finds Andor's season, and its two episodes in order. */
 export type ShowIds = { library: number; show: number; season: number; episodes: [number, number] }
 
+type AddShowProps = {
+  root: string
+  enforced: Pick<Awaited<ReturnType<typeof createEnforcedApp>>, 'app' | 'ownerApi'>
+}
+
 /**
  * Adds a shows library holding the first two episodes of Andor, matched
  * against the fake TMDB, to a server `createEnforcedApp` made. It is a
  * separate step because the other suites count the one library that
  * function leaves.
  */
-export const addShow = async ({
-  root,
-  enforced,
-}: {
-  root: string
-  enforced: Pick<Awaited<ReturnType<typeof createEnforcedApp>>, 'app' | 'ownerApi'>
-}): Promise<ShowIds> => {
+export const addShow = async ({ root, enforced }: AddShowProps): Promise<ShowIds> => {
   const { app, ownerApi } = enforced
   const showsDir = join(root, 'shows')
   const season = join(showsDir, 'Andor (2022)', 'Season 01')
@@ -389,19 +392,19 @@ const LEFTOVER_FILES = {
   duplicate: 'The Matrix (1999) Final Cut.mp4',
 } as const
 
+type AddLeftoversProps = {
+  enforced: Pick<
+    Awaited<ReturnType<typeof createEnforcedApp>>,
+    'app' | 'mediaDir' | 'ownerApi' | 'ids'
+  >
+}
+
 /**
  * Adds to the movies library `createEnforcedApp` made a file the fake TMDB
  * cannot match and a second file of The Matrix, so Not matched and Duplicates
  * have something to list. A separate step for the same reason as `addShow`.
  */
-export const addLeftovers = async ({
-  enforced,
-}: {
-  enforced: Pick<
-    Awaited<ReturnType<typeof createEnforcedApp>>,
-    'app' | 'mediaDir' | 'ownerApi' | 'ids'
-  >
-}): Promise<LeftoverIds> => {
+export const addLeftovers = async ({ enforced }: AddLeftoversProps): Promise<LeftoverIds> => {
   const { app, mediaDir, ownerApi, ids } = enforced
   const matrix = join(mediaDir, 'The Matrix (1999).mp4')
   await Promise.all(

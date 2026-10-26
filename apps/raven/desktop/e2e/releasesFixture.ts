@@ -17,6 +17,11 @@ const pageOf = (search: URLSearchParams): number => {
   return /^[1-9]\d{0,2}$/.test(page) ? Number(page) : 0
 }
 
+type StartReleasesFixtureProps = {
+  releases?: unknown
+  pages?: readonly unknown[]
+}
+
 /**
  * A stand-in for GitHub's releases list on `127.0.0.1`, so no e2e run ever asks GitHub.
  * `releases` is the one page; `pages` serves each in turn, linked by `Link: rel="next"` as
@@ -25,10 +30,7 @@ const pageOf = (search: URLSearchParams): number => {
 export const startReleasesFixture = async ({
   releases = [],
   pages,
-}: {
-  releases?: unknown
-  pages?: readonly unknown[]
-}): Promise<ReleasesFixture> => {
+}: StartReleasesFixtureProps): Promise<ReleasesFixture> => {
   const bodies = (pages ?? [releases]).map((page) => JSON.stringify(page))
   const counted = { releases: 0 }
   const served = { url: '' }

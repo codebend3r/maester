@@ -61,6 +61,13 @@ type CreditRow = {
 
 const isGenreIds = listOf(isNumber)
 
+type PeopleRepositorySaveFilmographyProps = {
+  personId: number
+  tmdbId: string
+  person: FetchedPerson
+  at: string
+}
+
 /** A person's page as TMDB describes it: who they are, and everything they are credited on. */
 @Injectable()
 export class PeopleRepository {
@@ -106,17 +113,7 @@ export class PeopleRepository {
    * Puts what TMDB says of a person in place of what it said before, credits
    * and all. `tmdbId` is the one the fetch asked for.
    */
-  saveFilmography({
-    personId,
-    tmdbId,
-    person,
-    at,
-  }: {
-    personId: number
-    tmdbId: string
-    person: FetchedPerson
-    at: string
-  }): void {
+  saveFilmography({ personId, tmdbId, person, at }: PeopleRepositorySaveFilmographyProps): void {
     this.db.transaction(() => {
       const updated = this.db
         .prepare(

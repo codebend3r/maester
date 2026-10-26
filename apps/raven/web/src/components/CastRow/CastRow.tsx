@@ -6,6 +6,11 @@ import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
 import styles from '@/components/CastRow/CastRow.module.scss'
 
+type CastRowProps = {
+  credits: readonly Credit[]
+  title?: string
+}
+
 /**
  * Cast & Crew: a ruled heading with round previous and next buttons beside
  * it, over large round photos (initials where TMDB has none) in a row that
@@ -13,13 +18,7 @@ import styles from '@/components/CastRow/CastRow.module.scss'
  * The buttons scroll a page at a time; the list itself scrolls with the
  * keyboard too, since it takes focus.
  */
-export const CastRow = ({
-  credits,
-  title = 'Cast & Crew',
-}: {
-  credits: readonly Credit[]
-  title?: string
-}) => {
+export const CastRow = ({ credits, title = 'Cast & Crew' }: CastRowProps) => {
   const id = useId()
   const list = useRef<HTMLUListElement>(null)
   const members = castMembers(credits)

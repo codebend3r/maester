@@ -19,18 +19,15 @@ import { DEFAULT_PLAYBACK_STATE, renderWithProviders } from '@/test/render'
 import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostPlayer } from '@/stores/playerServices'
 
-/** A host as the web's is: new services on every render, the player only once they are in the store. */
-const TestPlayer = ({
-  media,
-  backTo,
-  next = null,
-  favourite,
-}: {
+type TestPlayerProps = {
   media: MediaItem
   backTo: string
   next?: PlayerTitle['next']
   favourite?: PlayerFavourite
-}) => {
+}
+
+/** A host as the web's is: new services on every render, the player only once they are in the store. */
+const TestPlayer = ({ media, backTo, next = null, favourite }: TestPlayerProps) => {
   const isHosting = useHostPlayer({
     title: { label: media.title, duration: media.duration, resumeAt: 0, backTo, next },
     posterUrl: null,

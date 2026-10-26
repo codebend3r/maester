@@ -82,19 +82,17 @@ const WITHOUT_FILMS: HomeAnswer = {
   shelves: HOME.shelves.filter((shelf) => shelf.libraryId !== FILMS.id),
 }
 
+type AnswerHomeProps = {
+  home: HomeAnswer
+  card: string
+  isDrawn: boolean
+}
+
 /**
  * The server answers Home anew and the shelves are read again, as an event or a refetch does,
  * until the card titled `card` is drawn (`isDrawn`) or gone.
  */
-const answerHome = async ({
-  home,
-  card,
-  isDrawn,
-}: {
-  home: HomeAnswer
-  card: string
-  isDrawn: boolean
-}) => {
+const answerHome = async ({ home, card, isDrawn }: AnswerHomeProps) => {
   mockHome.home = home
   await act(async () => shown.client.invalidateQueries())
   await untilIdle(shown.client)

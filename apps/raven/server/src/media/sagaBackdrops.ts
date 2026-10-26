@@ -3,6 +3,12 @@ import { DEFAULT_SAGA_BACKDROP, type SagaBackdrop, isSagaBackdrop } from '@raven
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
 
+type SagaBackdropsSaveProps = {
+  libraryId: number
+  sagaId: string
+  backdrop: SagaBackdrop
+}
+
 /** What each library's saga pages show behind their titles. */
 @Injectable()
 export class SagaBackdrops {
@@ -28,15 +34,7 @@ export class SagaBackdrops {
     )
   }
 
-  save({
-    libraryId,
-    sagaId,
-    backdrop,
-  }: {
-    libraryId: number
-    sagaId: string
-    backdrop: SagaBackdrop
-  }): void {
+  save({ libraryId, sagaId, backdrop }: SagaBackdropsSaveProps): void {
     this.db
       .prepare(
         `INSERT INTO saga_backdrops (library_id, saga_tmdb_id, backdrop) VALUES (?, ?, ?)

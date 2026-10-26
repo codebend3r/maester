@@ -6,9 +6,11 @@ import {
   type OriginProbe,
 } from '@raven/core'
 
+type ProbeFetchProps = { signal: AbortSignal; cache: 'no-store' }
+
 export type ProbeFetch = (
   url: string,
-  init: { signal: AbortSignal; cache: 'no-store' },
+  init: ProbeFetchProps,
 ) => Promise<{ ok: boolean; body: ReadableStream<Uint8Array> | null }>
 
 type ProbeInput = {
@@ -18,13 +20,12 @@ type ProbeInput = {
   timeoutMs?: number
 }
 
-const countBytes = async ({
-  reader,
-  received,
-}: {
+type CountBytesProps = {
   reader: ReadableStreamDefaultReader<Uint8Array>
   received: number
-}): Promise<number> => {
+}
+
+const countBytes = async ({ reader, received }: CountBytesProps): Promise<number> => {
   const { done, value } = await reader.read()
   if (done) return received
   return countBytes({ reader, received: received + value.length })

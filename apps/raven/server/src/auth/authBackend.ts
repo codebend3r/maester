@@ -32,6 +32,26 @@ const isRows = listOf(
   object({ id: isAccountId, email: isString, status: isMemberStatus, is_owner: isBoolean }),
 )
 
+type AuthBackendCurrentProps = { token: string }
+
+type AuthBackendListProps = {
+  token: string
+  pageSize: number
+  pageOffset: number
+}
+
+type AuthBackendSetStatusProps = {
+  token: string
+  id: string
+  change: MemberStatusChange
+}
+
+type AuthBackendRpcProps = {
+  token: string
+  name: (typeof RPCS)[keyof typeof RPCS]
+  body: Record<string, unknown>
+}
+
 @Injectable()
 export class AuthBackend {
   constructor(
@@ -39,7 +59,7 @@ export class AuthBackend {
     @Inject(AUTH_FETCH) private readonly fetcher: AuthFetch,
   ) {}
 
-  async current({ token }: { token: string }): Promise<Account | null> {
+  async current({ token }: AuthBackendCurrentProps): Promise<Account | null> {
     const rows = await this.rpc({ token, name: RPCS.current, body: {} })
     if (rows.length > 1) {
       throw new IntegrityFailure({ failure: INTEGRITY_FAILURES.ambiguousMembership })
@@ -47,15 +67,7 @@ export class AuthBackend {
     return rows[0] ?? null
   }
 
-  async list({
-    token,
-    pageSize,
-    pageOffset,
-  }: {
-    token: string
-    pageSize: number
-    pageOffset: number
-  }): Promise<Account[]> {
+  async list({ token, pageSize, pageOffset }: AuthBackendListProps): Promise<Account[]> {
     return this.rpc({
       token,
       name: RPCS.list,
@@ -63,15 +75,7 @@ export class AuthBackend {
     })
   }
 
-  async setStatus({
-    token,
-    id,
-    change,
-  }: {
-    token: string
-    id: string
-    change: MemberStatusChange
-  }): Promise<Account> {
+  async setStatus({ token, id, change }: AuthBackendSetStatusProps): Promise<Account> {
     const rows = await this.rpc({
       token,
       name: RPCS.status,
@@ -89,15 +93,7 @@ export class AuthBackend {
     return account
   }
 
-  private async rpc({
-    token,
-    name,
-    body,
-  }: {
-    token: string
-    name: (typeof RPCS)[keyof typeof RPCS]
-    body: Record<string, unknown>
-  }): Promise<Account[]> {
+  private async rpc({ token, name, body }: AuthBackendRpcProps): Promise<Account[]> {
     const { auth } = this
     if (auth.state !== AUTH_CONFIG_STATES.ready) throw authFailure(AUTH_REFUSALS.unavailable)
     const response = await this.fetcher({

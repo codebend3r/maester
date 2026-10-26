@@ -6,5 +6,6 @@ export const CLOCK = Symbol('CLOCK')
 
 export const systemClock: Clock = () => new Date()
 
-export const addMs = ({ date, ms }: { date: Date; ms: number }): Date =>
-  new Date(date.getTime() + ms)
+type AddMsProps = { date: Date; ms: number }
+
+export const addMs = ({ date, ms }: AddMsProps): Date => new Date(date.getTime() + ms)

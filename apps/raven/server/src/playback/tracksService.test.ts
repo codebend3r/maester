@@ -30,7 +30,9 @@ describe('TracksService', () => {
     if (!found) throw new Error(`no media ${id}`)
     return found
   }
-  const add = ({ name, mtimeMs }: { name: string; mtimeMs: number }): number =>
+  type AddProps = { name: string; mtimeMs: number }
+
+  const add = ({ name, mtimeMs }: AddProps): number =>
     index().insert({
       libraryId: state.libraryId,
       kind: 'other',

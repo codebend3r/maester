@@ -3,10 +3,9 @@ import { readServerConfig } from '@/config'
 import { OmdbClient, parseOmdbRatings } from '@/metadata/omdbClient'
 import { fakeTmdb } from '@/test/fakeTmdb'
 
-const config = ({
-  key = 'omdb-key',
-  limit = 1000,
-}: { key?: string | null; limit?: number } = {}) => ({
+type ConfigProps = { key?: string | null; limit?: number }
+
+const config = ({ key = 'omdb-key', limit = 1000 }: ConfigProps = {}) => ({
   ...readServerConfig({}),
   omdbApiKey: key,
   omdbDailyLimit: limit,

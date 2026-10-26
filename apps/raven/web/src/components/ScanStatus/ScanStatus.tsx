@@ -48,11 +48,13 @@ const scannedNote = ({ finishedAt, quickScannedAt }: Status): string | null => {
   ].join(' · ')
 }
 
+type ScanStatusProps = { scan: Status }
+
 /**
  * Live scan progress, a bar with what the scan is doing beside it, or when
  * the library was last brought up to date.
  */
-export const ScanStatus = ({ scan }: { scan: Status }) => {
+export const ScanStatus = ({ scan }: ScanStatusProps) => {
   const scanned = scannedNote(scan)
   return (
     <div className={styles.status} aria-live="polite">

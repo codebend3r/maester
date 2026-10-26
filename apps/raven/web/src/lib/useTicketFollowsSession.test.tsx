@@ -9,12 +9,16 @@ import { SIGNED_IN } from '@/test/authClient'
 
 const MEDIA_ID = 7
 
+type SetUpProps = { isEnabled?: boolean }
+
 /** Video 7's ticket query, as the player holds it, beside the hook; `isEnabled` false as before an origin is picked. */
-const setUp = ({ isEnabled = true }: { isEnabled?: boolean } = {}) => {
+const setUp = ({ isEnabled = true }: SetUpProps = {}) => {
   useAuthSession.setState({ session: SIGNED_IN })
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const mint = jest.fn(async () => ({ ticket: 'account.ticket', expiresAt: Date.now() + 300_000 }))
-  const wrapper = ({ children }: { children: ReactNode }) => (
+  type WrapperProps = { children: ReactNode }
+
+  const wrapper = ({ children }: WrapperProps) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   )
   renderHook(

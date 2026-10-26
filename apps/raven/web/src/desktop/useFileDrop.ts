@@ -8,17 +8,16 @@ const DRAG_TYPES = { files: 'Files' } as const
 
 const setIsDragging = (isDragging: boolean) => useDragging.setState({ isDragging })
 
+type UseFileDropProps = {
+  client: DesktopClient
+  onReply: (reply: DesktopReply) => void
+}
+
 /**
  * Whether files are being dragged over the window, kept in `useDragging`, and the drop itself:
  * the files go to main in the order dropped, and what main answers goes to `onReply`.
  */
-export const useFileDrop = ({
-  client,
-  onReply,
-}: {
-  client: DesktopClient
-  onReply: (reply: DesktopReply) => void
-}) => {
+export const useFileDrop = ({ client, onReply }: UseFileDropProps) => {
   // Entering a child element fires dragenter on it before dragleave on the one left, so a
   // count, not a flag, keeps the drop zone from flickering.
   const depth = useRef(0)

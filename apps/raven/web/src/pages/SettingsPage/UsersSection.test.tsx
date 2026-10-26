@@ -31,7 +31,9 @@ const GONE_KAI = fakeAccount({
 })
 const EVERYONE = [OWNER, WAITING_PAT, WAITING_SAM, MEMBER_LEE, GONE_KAI]
 
-const refused = ({ reason }: { reason: (typeof AUTH_REFUSALS)[keyof typeof AUTH_REFUSALS] }) =>
+type RefusedProps = { reason: (typeof AUTH_REFUSALS)[keyof typeof AUTH_REFUSALS] }
+
+const refused = ({ reason }: RefusedProps) =>
   new ApiError({ status: 403, message: 'Refused', refusal: { reason, message: 'Refused' } })
 
 const tab = (name: RegExp) => screen.getByRole('tab', { name })
@@ -314,7 +316,9 @@ describe('UsersSection', () => {
   })
 
   describe('Remove access', () => {
-    const askAboutSam = async ({ user }: { user: ReturnType<typeof userEvent.setup> }) => {
+    type AskAboutSamProps = { user: ReturnType<typeof userEvent.setup> }
+
+    const askAboutSam = async ({ user }: AskAboutSamProps) => {
       await user.click(
         await screen.findByRole('button', { name: 'Remove access for sam@example.com' }),
       )

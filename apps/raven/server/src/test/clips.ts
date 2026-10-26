@@ -8,6 +8,22 @@ const run = promisify(execFile)
 /** The test pattern's frames per second. */
 const CLIP_FPS = 24
 
+type EncodeClipProps = {
+  path: string
+  seconds?: number
+  audio?: 'aac' | 'ac3'
+  /** The frame size, `WIDTHxHEIGHT`. */
+  size?: string
+  /** Seconds between keyframes, exactly, with no scene cut adding one. */
+  keyframeEvery?: number
+  /** Where the file's own clock starts, in seconds, as a broadcast recording's does. */
+  startAt?: number
+  /** Frames per second, as ffmpeg writes a rate: `24000/1001` for NTSC film. */
+  frameRate?: string
+  /** How long after the sound the picture starts, as in many broadcast recordings. */
+  videoDelay?: number
+}
+
 /**
  * Encodes a short test-pattern clip with a tone, so the suite exercises the
  * real ffprobe and ffmpeg rather than fixtures. `audio` picks the audio
@@ -22,21 +38,7 @@ export const encodeClip = async ({
   startAt,
   frameRate = String(CLIP_FPS),
   videoDelay,
-}: {
-  path: string
-  seconds?: number
-  audio?: 'aac' | 'ac3'
-  /** The frame size, `WIDTHxHEIGHT`. */
-  size?: string
-  /** Seconds between keyframes, exactly, with no scene cut adding one. */
-  keyframeEvery?: number
-  /** Where the file's own clock starts, in seconds, as a broadcast recording's does. */
-  startAt?: number
-  /** Frames per second, as ffmpeg writes a rate: `24000/1001` for NTSC film. */
-  frameRate?: string
-  /** How long after the sound the picture starts, as in many broadcast recordings. */
-  videoDelay?: number
-}): Promise<void> => {
+}: EncodeClipProps): Promise<void> => {
   const [top = CLIP_FPS, bottom = 1] = frameRate.split('/').map(Number)
   const gop = keyframeEvery == null ? null : String(Math.round((keyframeEvery * top) / bottom))
   await mkdir(dirname(path), { recursive: true })
@@ -67,6 +69,13 @@ export const encodeClip = async ({
   ])
 }
 
+type EncodeRichClipProps = {
+  path: string
+  seconds?: number
+  cues: string
+  bFrames?: number
+}
+
 /**
  * An MKV like a remux in miniature: a keyframe every two seconds, English
  * AC-3 audio (the default) and a Japanese AAC commentary, and an English
@@ -78,12 +87,7 @@ export const encodeRichClip = async ({
   seconds = 30,
   cues,
   bFrames,
-}: {
-  path: string
-  seconds?: number
-  cues: string
-  bFrames?: number
-}): Promise<void> => {
+}: EncodeRichClipProps): Promise<void> => {
   await mkdir(dirname(path), { recursive: true })
   const srt = `${path}.source.srt`
   await writeFile(srt, cues)
@@ -144,14 +148,13 @@ export const encodeRichClip = async ({
   await rm(srt)
 }
 
-/** A still picture, such as a poster beside a movie, of one flat colour. */
-export const encodeImage = async ({
-  path,
-  size = '200x300',
-}: {
+type EncodeImageProps = {
   path: string
   size?: string
-}): Promise<void> => {
+}
+
+/** A still picture, such as a poster beside a movie, of one flat colour. */
+export const encodeImage = async ({ path, size = '200x300' }: EncodeImageProps): Promise<void> => {
   await mkdir(dirname(path), { recursive: true })
   await run('ffmpeg', [
     '-hide_banner',

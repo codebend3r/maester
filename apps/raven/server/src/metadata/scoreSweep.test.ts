@@ -35,6 +35,13 @@ type Answer = ExternalScore[] | 'unknown' | Error
 
 const today = (): string => new Date().toISOString().slice(0, 10)
 
+type FakeSourceProps = {
+  provider: ScoreProvider
+  answer: (title: ScoreTitle, call: number) => Answer
+  limit?: number
+  hasKey?: boolean
+}
+
 /**
  * A score source that counts its calls against `limit` a UTC day, as the
  * real clients do, and answers each with `answer`: given the title and the
@@ -42,17 +49,7 @@ const today = (): string => new Date().toISOString().slice(0, 10)
  * hold the calls in flight. `spend` uses the day up, as a source told so
  * does, and `refuse` turns it off with calls left, as a refused key does.
  */
-const fakeSource = ({
-  provider,
-  answer,
-  limit = 100,
-  hasKey = true,
-}: {
-  provider: ScoreProvider
-  answer: (title: ScoreTitle, call: number) => Answer
-  limit?: number
-  hasKey?: boolean
-}) => {
+const fakeSource = ({ provider, answer, limit = 100, hasKey = true }: FakeSourceProps) => {
   const state = {
     answer,
     isRefused: false,
@@ -133,30 +130,30 @@ describe('the score sweep', () => {
   const database = testDatabase('raven-score-sweep-')
   const metadata = () => repositories(database.get()).metadata
   const sweeps: ScoreSweep[] = []
+  type SweepWithProps = {
+    omdb: ScoreSource
+    mdblist: ScoreSource
+    tmdb?: { score: ReturnType<typeof tmdbAnswering>; enabled: boolean }
+  }
+
   const sweepWith = ({
     omdb,
     mdblist,
     tmdb = { score: tmdbAnswering(), enabled: true },
-  }: {
-    omdb: ScoreSource
-    mdblist: ScoreSource
-    tmdb?: { score: ReturnType<typeof tmdbAnswering>; enabled: boolean }
-  }) => {
+  }: SweepWithProps) => {
     const repository = metadata()
     const libraries = new LibrariesRepository(database.get())
     const sweep = new ScoreSweep(repository, new Scores(repository, omdb, mdblist), libraries, tmdb)
     sweeps.push(sweep)
     return { sweep, repository, libraries, tmdbScore: tmdb.score }
   }
-  const title = ({
-    type = 'movie',
-    tmdbId,
-    imdbId = `tt${tmdbId}`,
-  }: {
+  type TitleProps = {
     type?: 'movie' | 'show'
     tmdbId: string
     imdbId?: string | null
-  }): number =>
+  }
+
+  const title = ({ type = 'movie', tmdbId, imdbId = `tt${tmdbId}` }: TitleProps): number =>
     metadata().save({
       item: { ...BLANK_ITEM, type, tmdbId, number: null, title: tmdbId, imdbId },
     })
@@ -178,7 +175,9 @@ describe('the score sweep', () => {
       .get(itemId)
   const isStamped = (itemIds: number[]): boolean[] =>
     itemIds.map((itemId) => stamps(itemId)?.mdblist != null)
-  const stampMdblist = ({ itemId, at }: { itemId: number; at: string }) =>
+  type StampMdblistProps = { itemId: number; at: string }
+
+  const stampMdblist = ({ itemId, at }: StampMdblistProps) =>
     database
       .get()
       .db.prepare('UPDATE items SET mdblist_fetched_at = ? WHERE id = ?')

@@ -71,6 +71,12 @@ export type DownloadServiceDeps = {
 
 type ById = { downloadId: string }
 
+type SetDefaultsProps = { autoDelete: boolean }
+
+type AccessEndedProps = { serverId: string }
+
+type AccountSwitchedProps = { serverId: string }
+
 export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' | 'decline'> &
   Pick<
     DownloadPlayback,
@@ -90,7 +96,7 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
   > & {
     list: () => DesktopReply
     readSpace: () => Promise<DesktopReply>
-    setDefaults: (input: { autoDelete: boolean }) => DesktopReply
+    setDefaults: (input: SetDefaultsProps) => DesktopReply
     views: () => DownloadView[]
     pause: (input: ById) => Promise<DesktopReply>
     resume: (input: ById) => DesktopReply
@@ -112,13 +118,13 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     /** Main's `powerMonitor` `resume`: files start again once the network has had a moment. */
     onResume: () => void
     /** A server's sign-in ended in main: its downloads fetched with an account ticket fail. */
-    accessEnded: (input: { serverId: string }) => void
+    accessEnded: (input: AccessEndedProps) => void
     /**
      * The account signed in to a server changed: what its downloads hold for any other account
      * waits in `owed` for that account, and what the one signed in now is owed goes out. An
      * account signed in is kept in the config as the last one, which a play while none is waits for.
      */
-    accountSwitched: (input: { serverId: string }) => void
+    accountSwitched: (input: AccountSwitchedProps) => void
     /** Stops the events and every fetch; after it the page hears nothing more. */
     dispose: () => void
   }
@@ -128,14 +134,13 @@ type DownloadsList = Extract<DesktopEvent, { type: typeof DESKTOP_EVENTS.downloa
 
 const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
 
-/** A stored status as the page reads it: its reason in words, named by the server's name now. */
-export const viewStatusOf = ({
-  status,
-  serverName,
-}: {
+type ViewStatusOfProps = {
   status: EntryStatus
   serverName: string
-}): DownloadStatus => {
+}
+
+/** A stored status as the page reads it: its reason in words, named by the server's name now. */
+export const viewStatusOf = ({ status, serverName }: ViewStatusOfProps): DownloadStatus => {
   switch (status.kind) {
     case DOWNLOAD_STATUS_KINDS.queued:
     case DOWNLOAD_STATUS_KINDS.downloading:
@@ -367,6 +372,11 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     return list()
   }
 
+  type RemoveAfterSyncProps = {
+    downloadId: string
+    isKept: () => boolean
+  }
+
   /**
    * Waits for the server to hear what was watched, then removes the download unless `isKept`
    * says otherwise by then. True once it removed it.
@@ -374,10 +384,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   const removeAfterSync = async ({
     downloadId,
     isKept,
-  }: {
-    downloadId: string
-    isKept: () => boolean
-  }): Promise<boolean> => {
+  }: RemoveAfterSyncProps): Promise<boolean> => {
     await waitForSync(sync.runFor({ downloadIds: [downloadId] }))
     if (isKept()) return false
     await queue.remove({ downloadId })
@@ -442,13 +449,12 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     return { type: DESKTOP_REPLIES.done }
   }
 
-  const keepLastAccount = ({
-    serverId,
-    accountId,
-  }: {
+  type KeepLastAccountProps = {
     serverId: string
     accountId: string | null
-  }): void => {
+  }
+
+  const keepLastAccount = ({ serverId, accountId }: KeepLastAccountProps): void => {
     const current = config.read()
     if (accountId === null || current.lastAccountId === accountId) return
     if (serverById({ config: current, serverId }) === null) return

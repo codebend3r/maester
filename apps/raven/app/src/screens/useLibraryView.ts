@@ -25,6 +25,11 @@ export const appViewsFor = (kind: Parameters<typeof viewsFor>[0]): LibraryView[]
 /** A fresh deal for a random sort; the order holds while the library is open. */
 const dealSeed = (): number => Math.floor(Math.random() * 2 ** 31)
 
+type UseLibraryViewProps = {
+  serverId: string
+  library: Library
+}
+
 /**
  * How a library is looked at on this device: the server's settings under what was chosen
  * here (see `useLibraryViews`), made coherent with its type, and the way to choose again.
@@ -32,10 +37,7 @@ const dealSeed = (): number => Math.floor(Math.random() * 2 ** 31)
 export const useLibraryView = ({
   serverId,
   library,
-}: {
-  serverId: string
-  library: Library
-}): {
+}: UseLibraryViewProps): {
   settings: LibrarySettings
   /** The random sort's deal; 0 for every other sort, so they share a cache entry. */
   seed: number

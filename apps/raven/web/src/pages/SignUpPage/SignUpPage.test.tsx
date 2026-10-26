@@ -28,7 +28,9 @@ const alreadyRegistered = (): SignUpResult => ({
   error: null,
 })
 
-const refusedSignUp = ({ code, message }: { code: string; message: string }): SignUpResult => ({
+type RefusedSignUpProps = { code: string; message: string }
+
+const refusedSignUp = ({ code, message }: RefusedSignUpProps): SignUpResult => ({
   data: { user: null, session: null },
   error: new AuthApiError(message, 422, code),
 })
@@ -41,13 +43,12 @@ const password = () => screen.getByLabelText('Password')
 const confirmation = () => screen.getByLabelText('Confirm password')
 const submit = () => screen.getByRole('button', { name: /^(Create account|Creating account)/ })
 
-const fillIn = async ({
-  user,
-  confirm = 'correct-horse',
-}: {
+type FillInProps = {
   user: ReturnType<typeof userEvent.setup>
   confirm?: string
-}) => {
+}
+
+const fillIn = async ({ user, confirm = 'correct-horse' }: FillInProps) => {
   await user.type(email(), 'jordan@example.com')
   await user.type(password(), 'correct-horse')
   await user.type(confirmation(), confirm)

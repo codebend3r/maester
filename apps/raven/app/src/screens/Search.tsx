@@ -20,7 +20,9 @@ const COPY = {
 /** What the screen says when a search finds nothing, as the web's Home says it. */
 const nothingMatches = (query: string): string => `Nothing in any library matches "${query}".`
 
-const ServerSearch = ({ session: { server, api, queries } }: { session: AppQueries }) => {
+type ServerSearchProps = { session: AppQueries }
+
+const ServerSearch = ({ session: { server, api, queries } }: ServerSearchProps) => {
   const router = useRouter()
   const search = useSearch()
   const { query } = search

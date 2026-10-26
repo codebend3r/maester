@@ -30,7 +30,9 @@ export const useHoverBackdrop = (url: string | null) => {
     if (timer.current) clearTimeout(timer.current)
     timer.current = null
   }
-  const after = ({ ms, run }: { ms: number; run: () => void }) => {
+  type AfterProps = { ms: number; run: () => void }
+
+  const after = ({ ms, run }: AfterProps) => {
     cancel()
     timer.current = setTimeout(run, ms)
   }

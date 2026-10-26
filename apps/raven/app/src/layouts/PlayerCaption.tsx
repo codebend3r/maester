@@ -17,18 +17,17 @@ const keyedRuns = (text: string): (CueRun & { key: string })[] =>
       { at: 0, runs: [] },
     ).runs
 
+type CaptionTextProps = {
+  caption: string
+  fontSize?: number
+}
+
 /**
  * The subtitle cues showing now, as raven draws them over the video wherever it draws them
  * itself: WebVTT's italic, bold and underline runs on the picture's dark glass in every theme. The chrome places it, and a
  * TV's sizes the text to its screen (`fontSize`).
  */
-export const CaptionText = ({
-  caption,
-  fontSize = SIZES.textLg,
-}: {
-  caption: string
-  fontSize?: number
-}) => {
+export const CaptionText = ({ caption, fontSize = SIZES.textLg }: CaptionTextProps) => {
   const styles = useStyles()
   return (
     <Text style={[styles.caption, { fontSize }]}>

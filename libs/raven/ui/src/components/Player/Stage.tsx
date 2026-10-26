@@ -98,6 +98,22 @@ export const Stage = ({ engine, ...props }: StageProps) => {
   )
 }
 
+type PlayerChromeProps = {
+  engine: EngineHandle
+  onBack: () => void
+  rendition: Rendition
+  selection: TrackSelection
+  subtitleStatus: SubtitleStatus
+  renderSubtitles?: (lifted: boolean) => ReactNode
+  fullscreen: ReturnType<typeof useFullscreen>
+  /** The library file playing, for the line under the title and Playback info; null for a local file. */
+  file?: PlaybackFile | null
+  /** Why the picture dropped to a transcode, when the connection is the reason. */
+  steppedDown?: StepDown | null
+  /** The ways to play this file and the viewer's pick among them; null where there is one. */
+  choices?: PlayChoices | null
+}
+
 /**
  * Shared controls consume only the engine handle, never the picture's DOM:
  * the top bar with the way back, the title and what is playing, the bar at
@@ -114,21 +130,7 @@ export const PlayerChrome = ({
   file = null,
   steppedDown = null,
   choices = null,
-}: {
-  engine: EngineHandle
-  onBack: () => void
-  rendition: Rendition
-  selection: TrackSelection
-  subtitleStatus: SubtitleStatus
-  renderSubtitles?: (lifted: boolean) => ReactNode
-  fullscreen: ReturnType<typeof useFullscreen>
-  /** The library file playing, for the line under the title and Playback info; null for a local file. */
-  file?: PlaybackFile | null
-  /** Why the picture dropped to a transcode, when the connection is the reason. */
-  steppedDown?: StepDown | null
-  /** The ways to play this file and the viewer's pick among them; null where there is one. */
-  choices?: PlayChoices | null
-}) => {
+}: PlayerChromeProps) => {
   const { mode, quality } = rendition
   const { title, hostActions, favourite, chrome, isVolumeFixed, handoff } = useHostServices()
   const media = file?.media ?? null

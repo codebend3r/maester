@@ -61,14 +61,18 @@ const LAST_REPLY: Anthropic.TextBlockParam = {
 
 const { years, seasons, queryLength } = AI_INPUT_BOUNDS
 
+type SpreadProps<T> = { items: readonly T[]; count: number }
+
 /** `count` of `items`, evenly spaced from the first, so a long show is sampled over every season. */
-const spread = <T>({ items, count }: { items: readonly T[]; count: number }): T[] =>
+const spread = <T>({ items, count }: SpreadProps<T>): T[] =>
   items.length <= count
     ? [...items]
     : Array.from({ length: count }, (_, index) => items[Math.floor((index * items.length) / count)])
 
+type InPlaceProps = { place: string; file: MatchFile }
+
 /** A file's path inside its group's place; a loose file is its own place, so its name. */
-const inPlace = ({ place, file }: { place: string; file: MatchFile }): string =>
+const inPlace = ({ place, file }: InPlaceProps): string =>
   relative(place, filePlace(file)) || file.fileName
 
 /** Searches as Claude is told of them: the title and year, without the country a search narrows by. */
@@ -76,14 +80,13 @@ const plainTitles = (
   titles: ReadonlyArray<{ title: string; year: number | null }>,
 ): AiGroup['tried'] => titles.map(({ title, year }) => ({ title, year }))
 
-/** What matching read from a group's first file, and the searches it ran with it. */
-const readingOf = ({
-  type,
-  first,
-}: {
+type ReadingOfProps = {
   type: MatchItemType
   first: MatchFile
-}): Pick<AiGroup, 'parsed' | 'tried'> => {
+}
+
+/** What matching read from a group's first file, and the searches it ran with it. */
+const readingOf = ({ type, first }: ReadingOfProps): Pick<AiGroup, 'parsed' | 'tried'> => {
   if (type === ITEM_TYPES.show) {
     const parsed = readShowFile(first)
     return {
@@ -97,23 +100,20 @@ const readingOf = ({
   }
 }
 
+type AiGroupOfProps = {
+  library: LibraryRecord
+  type: MatchItemType
+  place: string
+  files: readonly MatchFile[]
+}
+
 /**
  * A group left unmatched, as one lookup describes it: the library's type,
  * how its path was read, the group's place, some of its files as paths
  * inside the place, and what matching read and searched. Nothing in it is a
  * path outside the library.
  */
-export const aiGroupOf = ({
-  library,
-  type,
-  place,
-  files,
-}: {
-  library: LibraryRecord
-  type: MatchItemType
-  place: string
-  files: readonly MatchFile[]
-}): AiGroup => {
+export const aiGroupOf = ({ library, type, place, files }: AiGroupOfProps): AiGroup => {
   const ordered = files.toSorted((a, b) => filePlace(a).localeCompare(filePlace(b)))
   const [first] = ordered
   if (first == null) throw new Error(`No files to look up for "${place}"`)
@@ -134,21 +134,24 @@ export const aiGroupOf = ({
 /** One lookup's own state: what `search_tmdb` offered, by type and id. */
 type Lookup = { group: AiGroup; offered: Map<string, AiPick> }
 
+type OfferedKeyProps = { type: MatchItemType; tmdbId: string }
+
 /** TMDB's movie and show ids overlap, so an offer is known by both. */
-const offeredKey = ({ type, tmdbId }: { type: MatchItemType; tmdbId: string }): string =>
-  `${type}:${tmdbId}`
+const offeredKey = ({ type, tmdbId }: OfferedKeyProps): string => `${type}:${tmdbId}`
 
 const undecided = (reason: string): AiOutcome => ({ kind: AI_OUTCOME_KINDS.undecided, reason })
+
+type AnswerProps = {
+  use: Anthropic.ToolUseBlock
+  content: string
+  isError?: boolean
+}
 
 const answer = ({
   use,
   content,
   isError = false,
-}: {
-  use: Anthropic.ToolUseBlock
-  content: string
-  isError?: boolean
-}): Anthropic.ToolResultBlockParam => ({
+}: AnswerProps): Anthropic.ToolResultBlockParam => ({
   type: 'tool_result',
   tool_use_id: use.id,
   content,
@@ -161,6 +164,29 @@ const pickOf = (result: SearchResult): AiPick => ({
   year: result.year,
   poster: result.poster,
 })
+
+type AiMatcherTurnProps = {
+  lookup: Lookup
+  messages: readonly Anthropic.MessageParam[]
+  turn: number
+}
+
+type AiMatcherRunProps = {
+  lookup: Lookup
+  use: Anthropic.ToolUseBlock
+}
+
+type AiMatcherSearchProps = {
+  lookup: Lookup
+  use: Anthropic.ToolUseBlock
+}
+
+type AiMatcherEpisodesProps = {
+  lookup: Lookup
+  use: Anthropic.ToolUseBlock
+}
+
+type AiMatcherChooseProps = { lookup: Lookup; input: unknown }
 
 /**
  * The AI lookup for one group: Claude searches TMDB and lists seasons with
@@ -212,15 +238,7 @@ export class AiMatcher {
     }
   }
 
-  private async turn({
-    lookup,
-    messages,
-    turn,
-  }: {
-    lookup: Lookup
-    messages: readonly Anthropic.MessageParam[]
-    turn: number
-  }): Promise<AiOutcome> {
+  private async turn({ lookup, messages, turn }: AiMatcherTurnProps): Promise<AiOutcome> {
     const response = await this.ai.send(this.request(messages))
     // Haiku 5.5 has no server-side fallback for a refusal, so it is no decision.
     if (response.stop_reason === STOP_REASONS.refusal) {
@@ -250,13 +268,7 @@ export class AiMatcher {
   }
 
   /** Runs one tool call; one raven cannot run is answered as an error, for Claude to recover from. */
-  private run({
-    lookup,
-    use,
-  }: {
-    lookup: Lookup
-    use: Anthropic.ToolUseBlock
-  }): Promise<Anthropic.ToolResultBlockParam> {
+  private run({ lookup, use }: AiMatcherRunProps): Promise<Anthropic.ToolResultBlockParam> {
     if (use.name === AI_TOOL_NAMES.search) return this.search({ lookup, use })
     if (use.name === AI_TOOL_NAMES.episodes) return this.episodes({ lookup, use })
     return Promise.resolve(
@@ -267,10 +279,7 @@ export class AiMatcher {
   private async search({
     lookup,
     use,
-  }: {
-    lookup: Lookup
-    use: Anthropic.ToolUseBlock
-  }): Promise<Anthropic.ToolResultBlockParam> {
+  }: AiMatcherSearchProps): Promise<Anthropic.ToolResultBlockParam> {
     const { input } = use
     if (!isSearchInput(input)) {
       return answer({
@@ -294,10 +303,7 @@ export class AiMatcher {
   private async episodes({
     lookup,
     use,
-  }: {
-    lookup: Lookup
-    use: Anthropic.ToolUseBlock
-  }): Promise<Anthropic.ToolResultBlockParam> {
+  }: AiMatcherEpisodesProps): Promise<Anthropic.ToolResultBlockParam> {
     const { input } = use
     if (!isEpisodesInput(input)) {
       return answer({
@@ -337,7 +343,7 @@ export class AiMatcher {
     })
   }
 
-  private choose({ lookup, input }: { lookup: Lookup; input: unknown }): AiOutcome {
+  private choose({ lookup, input }: AiMatcherChooseProps): AiOutcome {
     if (!isChooseInput(input)) return undecided('Its answer did not fit choose_match.')
     const reason = input.reason.trim().slice(0, REASON_LENGTH)
     if (input.tmdbId == null) {

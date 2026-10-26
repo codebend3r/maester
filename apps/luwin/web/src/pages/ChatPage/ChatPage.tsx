@@ -12,7 +12,9 @@ import { useChat } from '@/stores/chat'
 
 const RETURN_TO = 'return_to'
 
-const Notice = ({ children }: { children: string }) => (
+type NoticeProps = { children: string }
+
+const Notice = ({ children }: NoticeProps) => (
   <main className={styles.notice}>
     <p>{children}</p>
   </main>

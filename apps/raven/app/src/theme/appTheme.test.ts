@@ -20,14 +20,14 @@ const root = nativeTokens(
   ),
 ).colours
 
-/** The palette `tokens` name, read off a set of declarations. */
-const paletteFrom = ({
-  tokens,
-  declared,
-}: {
+type PaletteFromProps = {
   tokens: Record<string, string>
   declared: Record<string, string>
-}) => Object.fromEntries(Object.entries(tokens).map(([use, token]) => [use, declared[token]]))
+}
+
+/** The palette `tokens` name, read off a set of declarations. */
+const paletteFrom = ({ tokens, declared }: PaletteFromProps) =>
+  Object.fromEntries(Object.entries(tokens).map(([use, token]) => [use, declared[token]]))
 
 const PATINA = THEMES.find((theme) => theme.name === 'Patina')?.id ?? DEFAULT_THEME
 

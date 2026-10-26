@@ -20,8 +20,10 @@ import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { PictureVersions } from '@/metadata/pictureVersions'
 
+type IsCurrentProps = { given: string; current: string | null | undefined }
+
 /** Whether `given` is the picture's current version; constant time, and never for a picture with none. */
-const isCurrent = ({ given, current }: { given: string; current: string | null | undefined }) =>
+const isCurrent = ({ given, current }: IsCurrentProps) =>
   current != null && sameSecret({ given, expected: current })
 
 /**

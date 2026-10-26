@@ -4,15 +4,17 @@ import { ENROLMENT_STATUSES, handleSignupAlert, HTTP_METHODS, SIGNUP_ALERT_HEADE
 const SECRET = 'test-secret'
 const SETTINGS_URL = 'https://raven.test/settings'
 
+type AlertRequestProps = {
+  method?: string
+  secret?: string | null
+  body?: string | null
+}
+
 const alertRequest = ({
   method = HTTP_METHODS.post,
   secret = SECRET,
   body = JSON.stringify({ email: 'friend@maester.test', status: ENROLMENT_STATUSES.approved }),
-}: {
-  method?: string
-  secret?: string | null
-  body?: string | null
-}) =>
+}: AlertRequestProps) =>
   new Request('https://functions.test/signup-alert', {
     method,
     headers: secret === null ? {} : { [SIGNUP_ALERT_HEADER]: secret },

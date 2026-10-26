@@ -42,27 +42,27 @@ const FAN = {
 /** How far past the front a poster is still fetched: the next, and the one after it. */
 const FAN_LOADED = 2
 
-const fanPlace = ({ offset, count }: { offset: number; count: number }): keyof typeof FAN => {
+type FanPlaceProps = { offset: number; count: number }
+
+const fanPlace = ({ offset, count }: FanPlaceProps): keyof typeof FAN => {
   if (offset === 0) return 'front'
   if (offset === 1) return 'next'
   return offset === count - 1 ? 'previous' : 'away'
+}
+
+type IsInWashProps = {
+  index: number
+  at: number
+  from: number | null
+  count: number
 }
 
 /**
  * Which backdrops the wash lays out: the one up, the one it took over from,
  * fading out, and the next, loading unseen so it is there by its turn.
  */
-const isInWash = ({
-  index,
-  at,
-  from,
-  count,
-}: {
-  index: number
-  at: number
-  from: number | null
-  count: number
-}): boolean => index === at || index === from || index === (at + 1) % count
+const isInWash = ({ index, at, from, count }: IsInWashProps): boolean =>
+  index === at || index === from || index === (at + 1) % count
 
 const STEPS: Readonly<Partial<Record<string, number>>> = { ArrowLeft: -1, ArrowRight: 1 }
 
@@ -96,6 +96,13 @@ const useAttention = (node: HTMLElement | null): boolean => {
   return isPointedAt || isFocused
 }
 
+type SlideProps = {
+  entry: Featured
+  /** "2 of 5". */
+  place: string
+  isCurrent: boolean
+}
+
 /**
  * One arrival's words: where it came, its title and line, Play, the way to
  * its page and what it is. Every arrival's are laid out in one cell, so the
@@ -103,16 +110,7 @@ const useAttention = (node: HTMLElement | null): boolean => {
  * change; all but the current one are hidden, from sight, the focus and a
  * screen reader alike.
  */
-const Slide = ({
-  entry,
-  place,
-  isCurrent,
-}: {
-  entry: Featured
-  /** "2 of 5". */
-  place: string
-  isCurrent: boolean
-}) => (
+const Slide = ({ entry, place, isCurrent }: SlideProps) => (
   <article
     className={isCurrent ? `${styles.slide} ${styles.current}` : styles.slide}
     aria-roledescription="slide"
@@ -148,6 +146,8 @@ const Slide = ({
   </article>
 )
 
+type HomeHeroProps = { featured: Featured[] }
+
 /**
  * Home's hero: the newest arrivals in turn, each with its title, its line,
  * Play and a way to its page, beside a fan of the posters before and after
@@ -156,7 +156,7 @@ const Slide = ({
  * browser that asks for less motion. Previous and Next, or the arrow keys on
  * them, step through by hand, and a screen reader hears where it landed.
  */
-export const HomeHero = ({ featured }: { featured: Featured[] }) => {
+export const HomeHero = ({ featured }: HomeHeroProps) => {
   const count = featured.length
   const [turn, setTurn] = useState<{ index: number; from: number | null }>({
     index: 0,

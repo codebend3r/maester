@@ -5,19 +5,17 @@ import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { itemQuery, librariesQuery } from '@/lib/queries'
 import styles from '@/components/ImageEditor/ImageEditor.module.scss'
 
+type ImageEditorDialogProps = {
+  itemId: number
+  itemKind: MatchItemType
+  onClose: () => void
+}
+
 /**
  * Edit images away from the item's page, from a card's menu: the same editor
  * in a dialog over the page, for a movie, or for an episode's show.
  */
-export const ImageEditorDialog = ({
-  itemId,
-  itemKind,
-  onClose,
-}: {
-  itemId: number
-  itemKind: MatchItemType
-  onClose: () => void
-}) => {
+export const ImageEditorDialog = ({ itemId, itemKind, onClose }: ImageEditorDialogProps) => {
   const dialog = useRef<HTMLDialogElement>(null)
   const details = useQuery(itemQuery(itemId))
   const libraries = useQuery(librariesQuery)

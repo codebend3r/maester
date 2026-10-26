@@ -10,12 +10,14 @@ import { pageWithoutLayout } from '@/test/scrolling'
 const HEAT = mediaItem({ id: 1, title: 'Heat', item: null, bitrate: 72_000_000 })
 const CLIP = mediaItem({ id: 2, title: 'Lost Clip', item: null, bitrate: 8_000_000 })
 
+type PageProps = { scale: JumpScale | null }
+
 /**
  * Cards in a page, one folded away in a bucket, with the picker beside them.
  * Each card leads with its picture's link, kept from the keyboard as the
  * real cards keep it, before the title's.
  */
-const Page = ({ scale }: { scale: JumpScale | null }) => {
+const Page = ({ scale }: PageProps) => {
   const scope = useRef<HTMLDivElement>(null)
   return (
     <div ref={scope}>

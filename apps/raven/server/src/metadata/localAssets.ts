@@ -12,8 +12,10 @@ export const listFolder = (dir: string): Promise<string[]> =>
 
 const stemOf = (name: string): string => name.slice(0, name.lastIndexOf('.')).toLowerCase()
 
+type FirstImageProps = { names: readonly string[]; stems: readonly string[] }
+
 /** The first of `stems`, in order, that names an image in `names`. */
-const firstImage = ({ names, stems }: { names: readonly string[]; stems: readonly string[] }) =>
+const firstImage = ({ names, stems }: FirstImageProps) =>
   stems
     .map((stem) =>
       names.find((name) => IMAGE_EXTENSION.test(name) && stemOf(name) === stem.toLowerCase()),
@@ -26,21 +28,19 @@ export type MovieAssets = {
   nfo: string | null
 }
 
+type MovieAssetsProps = {
+  names: readonly string[]
+  stem: string
+  ownFolder: boolean
+}
+
 /**
  * A movie's pictures and NFO among its folder's file names. Names tied to the
  * file (`<stem>-poster`, `<stem>.nfo`) always count; the folder's own
  * (`poster`, `fanart`, `movie.nfo`) only when the folder holds this one
  * movie, so a `folder.jpg` at a library's root is not every movie's poster.
  */
-export const movieAssets = ({
-  names,
-  stem,
-  ownFolder,
-}: {
-  names: readonly string[]
-  stem: string
-  ownFolder: boolean
-}): MovieAssets => ({
+export const movieAssets = ({ names, stem, ownFolder }: MovieAssetsProps): MovieAssets => ({
   poster: firstImage({
     names,
     stems: [`${stem}-poster`, ...(ownFolder ? ['poster', 'folder', 'cover'] : [])],
@@ -68,14 +68,13 @@ export const showAssets = (names: readonly string[]): ShowAssets => ({
   nfo: names.find((name) => name.toLowerCase() === NFO_NAMES.show) ?? null,
 })
 
-/** A season's poster: `Season01`, `season01-poster`, or `season-specials-poster` for season 0. */
-export const seasonPoster = ({
-  names,
-  number,
-}: {
+type SeasonPosterProps = {
   names: readonly string[]
   number: number
-}): string | null => {
+}
+
+/** A season's poster: `Season01`, `season01-poster`, or `season-specials-poster` for season 0. */
+export const seasonPoster = ({ names, number }: SeasonPosterProps): string | null => {
   const padded = String(number).padStart(2, '0')
   return firstImage({
     names,
@@ -91,11 +90,11 @@ export const seasonPoster = ({
   })
 }
 
-/** An episode's still beside it: `<stem>-thumb`. */
-export const episodeStill = ({
-  names,
-  stem,
-}: {
+type EpisodeStillProps = {
   names: readonly string[]
   stem: string
-}): string | null => firstImage({ names, stems: [`${stem}-thumb`] })
+}
+
+/** An episode's still beside it: `<stem>-thumb`. */
+export const episodeStill = ({ names, stem }: EpisodeStillProps): string | null =>
+  firstImage({ names, stems: [`${stem}-thumb`] })

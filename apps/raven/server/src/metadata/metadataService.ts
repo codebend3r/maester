@@ -46,23 +46,98 @@ import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 import { type LayoutRow, indexedLayoutsOf, planRelayout } from '@/scanner/layout'
 
+type DecisionPlacesOfProps = {
+  type: MatchItemType
+  file: MatchFile
+}
+
 /**
  * Where a matched file's group may keep its decision: a show's folder; a
  * movie's file, or its folder when that holds the one movie. The decision's
  * id must still be the item's, so a folder of several movies never claims one.
  */
-const decisionPlacesOf = ({
-  type,
-  file,
-}: {
-  type: MatchItemType
-  file: MatchFile
-}): DecisionPlace[] => {
+const decisionPlacesOf = ({ type, file }: DecisionPlacesOfProps): DecisionPlace[] => {
   if (type === ITEM_TYPES.show) return [{ libraryId: file.libraryId, place: showPlace(file) }]
   return [
     { libraryId: file.libraryId, place: filePlace(file) },
     ...(file.folder === '' ? [] : [{ libraryId: file.libraryId, place: file.folder }]),
   ]
+}
+
+type MetadataServiceScheduleProps = { key: string; task: () => Promise<void> }
+
+type MetadataServiceChangeKindProps = { libraryId: number; kind: LibraryKind }
+
+type MetadataServiceChangePreferenceProps = { libraryId: number; kind: LibraryKind }
+
+type MetadataServiceRefreshLayoutsProps = {
+  library: LibraryRecord
+  rows: readonly LayoutRow[]
+}
+
+type MetadataServiceChangeLayoutProps = { libraryId: number }
+
+type MetadataServiceLoggedProps = { what: string; task: () => Promise<void> }
+
+type MetadataServiceWithSuggestionsProps = {
+  libraryId: number
+  type: MatchItemType
+  files: readonly MediaItem[]
+}
+
+type MetadataServiceAiMatchForProps = {
+  id: number
+  type: ItemType
+  tmdbId: string
+  sees: (libraryId: number) => boolean
+}
+
+type MetadataServiceMatchGroupsProps = {
+  files: readonly MatchFile[]
+  type: MatchItemType
+  pass: MatchPass
+}
+
+type MetadataServiceMatchPendingProps = {
+  libraryId: number
+  type: MatchItemType
+  pass: MatchPass
+}
+
+type MetadataServiceLookUpUnmatchedProps = {
+  library: LibraryRecord
+  type: MatchItemType
+  pass: MatchPass
+}
+
+type MetadataServiceLookUpProps = {
+  library: LibraryRecord
+  type: MatchItemType
+  place: string
+  files: readonly MatchFile[]
+  pass: MatchPass
+  lookups: { isHalted: boolean }
+}
+
+type MetadataServiceRepickProps = {
+  libraryId: number
+  kind: LibraryKind
+}
+
+type MetadataServicePointPlaceProps = {
+  libraryId: number
+  kind: LibraryKind
+  type: MatchItemType
+  place: string
+  fix: FixMatchChoice
+  files: readonly MatchFile[]
+}
+
+type MetadataServiceFixMatchProps = { mediaId: number; tmdbId: string | null }
+
+type MetadataServiceFixShowMatchProps = {
+  showId: number
+  tmdbId: string
 }
 
 /**
@@ -136,7 +211,7 @@ export class MetadataService implements OnApplicationBootstrap {
   }
 
   /** Queues other metadata work, so it never runs beside a pass. */
-  schedule({ key, task }: { key: string; task: () => Promise<void> }): void {
+  schedule({ key, task }: MetadataServiceScheduleProps): void {
     this.queue.push({ key, task })
   }
 
@@ -164,7 +239,7 @@ export class MetadataService implements OnApplicationBootstrap {
    * file's name is read again for the new type and matched from scratch, or
    * left off for a type that is not matched. Fix match choices stay.
    */
-  changeKind({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
+  changeKind({ libraryId, kind }: MetadataServiceChangeKindProps): void {
     this.queue.again({
       key: `kind:${libraryId}:${kind}`,
       task: this.logged({
@@ -188,7 +263,7 @@ export class MetadataService implements OnApplicationBootstrap {
    * for are searched again, and Fix match choices stay. The AI lookup's sure
    * picks stay too; where it was unsure or chose nothing, it is asked again.
    */
-  changePreference({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
+  changePreference({ libraryId, kind }: MetadataServiceChangePreferenceProps): void {
     this.queue.again({
       key: `prefer:${libraryId}:${kind}`,
       task: this.logged({
@@ -240,13 +315,7 @@ export class MetadataService implements OnApplicationBootstrap {
    * holds under it, as a layout change runs no scan. Nothing is written when
    * nothing changed, so a steady boot writes nothing.
    */
-  private refreshLayouts({
-    library,
-    rows,
-  }: {
-    library: LibraryRecord
-    rows: readonly LayoutRow[]
-  }): void {
+  private refreshLayouts({ library, rows }: MetadataServiceRefreshLayoutsProps): void {
     const layouts = indexedLayoutsOf({
       rows,
       roots: library.paths,
@@ -270,7 +339,7 @@ export class MetadataService implements OnApplicationBootstrap {
    * where they regrouped. A change made while one is read runs again after
    * it, which reads the settings as they are then.
    */
-  changeLayout({ libraryId }: { libraryId: number }): void {
+  changeLayout({ libraryId }: MetadataServiceChangeLayoutProps): void {
     this.queue.again({
       key: `layout:${libraryId}`,
       task: this.logged({
@@ -284,7 +353,7 @@ export class MetadataService implements OnApplicationBootstrap {
   }
 
   /** The queue drops a task that throws without a word, so a failure is logged here. */
-  private logged({ what, task }: { what: string; task: () => Promise<void> }): () => Promise<void> {
+  private logged({ what, task }: MetadataServiceLoggedProps): () => Promise<void> {
     return async () => {
       try {
         await task()
@@ -322,11 +391,7 @@ export class MetadataService implements OnApplicationBootstrap {
     libraryId,
     type,
     files,
-  }: {
-    libraryId: number
-    type: MatchItemType
-    files: readonly MediaItem[]
-  }): UnmatchedFile[] {
+  }: MetadataServiceWithSuggestionsProps): UnmatchedFile[] {
     const placed = files.map((file) => ({
       file,
       place:
@@ -354,17 +419,7 @@ export class MetadataService implements OnApplicationBootstrap {
    * Fix match) and a sure decision for that file's group chose the item.
    * Null otherwise, and for a season or episode.
    */
-  aiMatchFor({
-    id,
-    type,
-    tmdbId,
-    sees,
-  }: {
-    id: number
-    type: ItemType
-    tmdbId: string
-    sees: (libraryId: number) => boolean
-  }): AiMatch | null {
+  aiMatchFor({ id, type, tmdbId, sees }: MetadataServiceAiMatchForProps): AiMatch | null {
     if (!isMatchItemType(type)) return null
     const places = [
       ...new Map(
@@ -424,15 +479,7 @@ export class MetadataService implements OnApplicationBootstrap {
   }
 
   /** Matches `files` in the units the matcher keeps together, a few at once, until TMDB stops the pass. */
-  private async matchGroups({
-    files,
-    type,
-    pass,
-  }: {
-    files: readonly MatchFile[]
-    type: MatchItemType
-    pass: MatchPass
-  }): Promise<void> {
+  private async matchGroups({ files, type, pass }: MetadataServiceMatchGroupsProps): Promise<void> {
     const matcher = this.matchers[type]
     await mapWithConcurrency({
       items: matcher.groups(files),
@@ -449,11 +496,7 @@ export class MetadataService implements OnApplicationBootstrap {
     libraryId,
     type,
     pass,
-  }: {
-    libraryId: number
-    type: MatchItemType
-    pass: MatchPass
-  }): Promise<boolean> {
+  }: MetadataServiceMatchPendingProps): Promise<boolean> {
     const attempted = new Set<number>()
     const round = async (): Promise<void> => {
       const files = this.files.pending(libraryId).filter((file) => !attempted.has(file.id))
@@ -478,11 +521,7 @@ export class MetadataService implements OnApplicationBootstrap {
     library,
     type,
     pass,
-  }: {
-    library: LibraryRecord
-    type: MatchItemType
-    pass: MatchPass
-  }): Promise<void> {
+  }: MetadataServiceLookUpUnmatchedProps): Promise<void> {
     if (!this.ai.enabled || pass.guard.isStopped) return
     const libraryId = library.id
     const unfixed = this.files
@@ -543,14 +582,7 @@ export class MetadataService implements OnApplicationBootstrap {
     files,
     pass,
     lookups,
-  }: {
-    library: LibraryRecord
-    type: MatchItemType
-    place: string
-    files: readonly MatchFile[]
-    pass: MatchPass
-    lookups: { isHalted: boolean }
-  }): Promise<void> {
+  }: MetadataServiceLookUpProps): Promise<void> {
     if (lookups.isHalted) return
     // The groups were listed before the lookups began, and the library may
     // have been removed or changed to a type that is not looked up since.
@@ -584,13 +616,7 @@ export class MetadataService implements OnApplicationBootstrap {
    * in place: no file loses its link before its new pick replaces it, and a
    * Fix match is never picked again.
    */
-  private async repick({
-    libraryId,
-    kind,
-  }: {
-    libraryId: number
-    kind: LibraryKind
-  }): Promise<void> {
+  private async repick({ libraryId, kind }: MetadataServiceRepickProps): Promise<void> {
     const type = matchTypeFor(kind)
     if (type == null || !this.tmdb.enabled) return
     this.tmdb.newPass()
@@ -610,14 +636,7 @@ export class MetadataService implements OnApplicationBootstrap {
     place,
     fix,
     files,
-  }: {
-    libraryId: number
-    kind: LibraryKind
-    type: MatchItemType
-    place: string
-    fix: FixMatchChoice
-    files: readonly MatchFile[]
-  }): Promise<void> {
+  }: MetadataServicePointPlaceProps): Promise<void> {
     this.files.saveFixMatch({ libraryId, place, fix })
     if (files.length === 0) return
     this.files.reset(files.map((file) => file.id))
@@ -630,7 +649,7 @@ export class MetadataService implements OnApplicationBootstrap {
    * `null`, and keeps that by place so renames and re-downloads keep it. A
    * file in a library that is not matched is left as it is.
    */
-  async fixMatch({ mediaId, tmdbId }: { mediaId: number; tmdbId: string | null }): Promise<void> {
+  async fixMatch({ mediaId, tmdbId }: MetadataServiceFixMatchProps): Promise<void> {
     const file = this.files.byId(mediaId)
     const kind = file == null ? null : this.libraries.get(file.libraryId)?.settings.kind
     const type = kind == null ? null : matchTypeFor(kind)
@@ -652,13 +671,7 @@ export class MetadataService implements OnApplicationBootstrap {
    * the show with `tmdbId`, keeping its numbers. Answers with the stored id
    * of the show they moved to, or null when TMDB has no such show.
    */
-  async fixShowMatch({
-    showId,
-    tmdbId,
-  }: {
-    showId: number
-    tmdbId: string
-  }): Promise<number | null> {
+  async fixShowMatch({ showId, tmdbId }: MetadataServiceFixShowMatchProps): Promise<number | null> {
     const groups = [
       ...groupBy({
         items: this.files.under(showId),

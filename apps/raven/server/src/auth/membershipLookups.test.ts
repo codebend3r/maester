@@ -8,19 +8,25 @@ const START = new Date('2026-10-19T12:00:00.000Z')
 const CONCURRENT_CALLS = 50
 const TOKENS = { first: 'first-token', second: 'second-token', other: 'other-token' } as const
 
-const accountOf = ({ id }: { id: string }): Account => ({
+type AccountOfProps = { id: string }
+
+const accountOf = ({ id }: AccountOfProps): Account => ({
   id,
   email: `${id}@maester.test`,
   status: MEMBER_STATUSES.approved,
   isOwner: false,
 })
 
-type Lookup = (args: { token: string }) => Promise<Account | null>
+type LookupProps = { token: string }
+
+type Lookup = (args: LookupProps) => Promise<Account | null>
+
+type SetupProps = { answer?: Lookup }
 
 /** Lookups over a backend that answers for the friend, or for whoever `answer` names. */
 const setup = ({
   answer = async () => accountOf({ id: AUTH_TEST_IDS.friend }),
-}: { answer?: Lookup } = {}) => {
+}: SetupProps = {}) => {
   const current = vi.fn<Lookup>(answer)
   const backend: Pick<AuthBackend, 'current'> = { current }
   return { current, lookups: new MembershipLookups(backend, MEMBERSHIP_TTL_MS) }

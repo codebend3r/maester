@@ -33,7 +33,9 @@ const WRITES = [
 
 /** A server that answers every request with an empty body, writing down which listed call each one was. */
 const recordingFetch = (heard: (AppClientCall | null)[]): FetchLike => {
-  const answer = async (url: string, init: { method?: string } = {}) => {
+  type AnswerProps = { method?: string }
+
+  const answer = async (url: string, init: AnswerProps = {}) => {
     const name = appClientCallOf({ method: init.method ?? APP_CALL_METHODS.get, url })
     heard.push(name === null ? null : APP_CLIENT_CALLS[name])
     return {

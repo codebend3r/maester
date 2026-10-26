@@ -5,7 +5,9 @@ import { tokenFor } from '@/main/test/accountTokens'
 const ADA = '30000000-0000-4000-8000-00000000000a'
 const BEA = '30000000-0000-4000-8000-00000000000b'
 
-const sessionOf = ({ accountId, n = 1 }: { accountId: string; n?: number }) => ({
+type SessionOfProps = { accountId: string; n?: number }
+
+const sessionOf = ({ accountId, n = 1 }: SessionOfProps) => ({
   accessToken: `${tokenFor({ accountId })}${'x'.repeat(n)}`,
   userId: accountId,
 })

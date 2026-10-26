@@ -29,14 +29,13 @@ export const openLine = (opened: OpenedTitle): string => {
   }
 }
 
-/** Where the log goes: Electron's pinned logs path, or `<userData>/logs` under the test hook. */
-export const logsDirFor = ({
-  home,
-  userDataOverride,
-}: {
+type LogsDirForProps = {
   home: string
   userDataOverride: string | null
-}): string =>
+}
+
+/** Where the log goes: Electron's pinned logs path, or `<userData>/logs` under the test hook. */
+export const logsDirFor = ({ home, userDataOverride }: LogsDirForProps): string =>
   userDataOverride === null
     ? join(home, 'Library', 'Logs', 'raven')
     : join(userDataOverride, 'logs')

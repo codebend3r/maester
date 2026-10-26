@@ -20,17 +20,14 @@ import { NOT_FOUND, STATUSES, pathFor, responseOf } from '@/test/fixtureFetch'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
-const movieFor = ({
-  id,
-  title,
-  year,
-  addedAt,
-}: {
+type MovieForProps = {
   id: number
   title: string
   year: number
   addedAt: string
-}) =>
+}
+
+const movieFor = ({ id, title, year, addedAt }: MovieForProps) =>
   mediaItemFor({
     id,
     libraryId: FILMS.id,
@@ -60,7 +57,9 @@ export const NIGHT_TRAIN = movieFor({
   addedAt: '2026-10-12T00:00:00.000Z',
 })
 
-const showFor = ({ id, title }: { id: number; title: string }): ShowEntry => ({
+type ShowForProps = { id: number; title: string }
+
+const showFor = ({ id, title }: ShowForProps): ShowEntry => ({
   show: summaryFor({ id, type: ITEM_TYPES.show, title, year: 2024 }),
   episodes: 8,
   watchedEpisodes: 0,
@@ -80,19 +79,16 @@ const SHOWS: ShowListing = {
   unmatched: [],
 }
 
-/** A library route's path for `library`, with the listing's query when it has a sort. */
-export const libraryPath = ({
-  call,
-  library,
-  sort,
-  search,
-}: {
+type LibraryPathProps = {
   call: AppClientCall
   library: Library
   sort?: MediaSort
   /** What the library's search box asks for. */
   search?: string
-}): string => {
+}
+
+/** A library route's path for `library`, with the listing's query when it has a sort. */
+export const libraryPath = ({ call, library, sort, search }: LibraryPathProps): string => {
   const path = pathFor({ path: call.path, id: library.id })
   return sort === undefined ? path : `${path}?${mediaListQuery.encode({ sort, search })}`
 }
@@ -138,6 +134,15 @@ export const GROUPED_FILMS: Library = {
   settings: { ...FILMS.settings, view: LIBRARY_VIEWS.grouped, groupBy: MEDIA_GROUPINGS.match },
 }
 
+type LibraryApiProps = {
+  /** Hears the path and query of every request. */
+  record?: (path: string) => void
+  /** Answers that stand in for these libraries' own. */
+  libraries?: () => Library[]
+  /** What each answer waits on, by its path and query, so a test can look while it waits. */
+  reads?: (path: string) => Promise<void>
+}
+
 /**
  * A movie library and a show library, behind the app's allowlist so an unlisted call fails
  * the test. The app keeps one client per server, so what a test changes is read per request.
@@ -146,14 +151,7 @@ export const libraryApi = ({
   record = () => undefined,
   libraries = () => [],
   reads = async () => undefined,
-}: {
-  /** Hears the path and query of every request. */
-  record?: (path: string) => void
-  /** Answers that stand in for these libraries' own. */
-  libraries?: () => Library[]
-  /** What each answer waits on, by its path and query, so a test can look while it waits. */
-  reads?: (path: string) => Promise<void>
-} = {}): ApiClient =>
+}: LibraryApiProps = {}): ApiClient =>
   createApiClient({
     baseUrl: NAS.origin,
     fetch: allowlistedFetch({

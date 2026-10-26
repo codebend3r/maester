@@ -7,23 +7,23 @@ import { entryDirFor, serverDirFor } from '@/main/downloads/space'
 import { errorText } from '@/main/log/errorText'
 import { loggable } from '@/main/servers/serverCalls'
 
+type RenameProps = { from: string; to: string }
+
 /** The parts of `node:fs/promises` the move uses; main passes a recursive `mkdir`. */
 export type AdoptFs = {
   mkdir: (path: string) => Promise<void>
-  rename: (input: { from: string; to: string }) => Promise<void>
+  rename: (input: RenameProps) => Promise<void>
   exists: (path: string) => Promise<boolean>
 }
 
-/** An adopted server's downloads whose folders move: one per title, none the server already has. */
-const movableOf = ({
-  state,
-  serverId,
-  adopted,
-}: {
+type MovableOfProps = {
   state: DownloadsState
   serverId: string
   adopted: readonly string[]
-}): DownloadEntry[] => {
+}
+
+/** An adopted server's downloads whose folders move: one per title, none the server already has. */
+const movableOf = ({ state, serverId, adopted }: MovableOfProps): DownloadEntry[] => {
   const held = new Set(
     state.entries.filter((entry) => entry.serverId === serverId).map(({ mediaId }) => mediaId),
   )
@@ -36,6 +36,15 @@ const movableOf = ({
           : [...movable, entry],
       [],
     )
+}
+
+type SettleDownloadsProps = {
+  state: DownloadsState
+  serverId: string
+  adopted: readonly string[]
+  userData: string
+  fs: AdoptFs
+  warn: (message: string) => void
 }
 
 /**
@@ -51,14 +60,7 @@ export const settleDownloads = async ({
   userData,
   fs,
   warn,
-}: {
-  state: DownloadsState
-  serverId: string
-  adopted: readonly string[]
-  userData: string
-  fs: AdoptFs
-  warn: (message: string) => void
-}): Promise<DownloadsState> => {
+}: SettleDownloadsProps): Promise<DownloadsState> => {
   const movable = movableOf({ state, serverId, adopted })
   if (movable.length > 0) {
     await fs.mkdir(serverDirFor({ userData, serverId })).catch(() => undefined)

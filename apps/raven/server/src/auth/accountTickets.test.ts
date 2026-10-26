@@ -9,7 +9,9 @@ import { AUTH_TEST_CONFIG, AUTH_TEST_IDS, authFixture, bearerHeaders } from '@/t
 
 type Session = Awaited<ReturnType<AuthSessions['authenticate']>>
 
-const setup = async ({ unlockedUntil = null }: { unlockedUntil?: number | null } = {}) => {
+type SetupProps = { unlockedUntil?: number | null }
+
+const setup = async ({ unlockedUntil = null }: SetupProps = {}) => {
   const fixture = await authFixture()
   const backend = new AuthBackend(AUTH_TEST_CONFIG, fixture.fetcher)
   const sessions = new AuthSessions(
@@ -22,8 +24,10 @@ const setup = async ({ unlockedUntil = null }: { unlockedUntil?: number | null }
   )
   const session = await sessions.authenticate({ token: await fixture.mint() })
   const lock = { unlockedUntil: () => unlockedUntil }
+  type RequestForProps = { bound: Session; isBearer?: boolean }
+
   /** A request the account gate bound to `bound`, sent by Bearer unless it says otherwise. */
-  const requestFor = ({ bound, isBearer = true }: { bound: Session; isBearer?: boolean }) => {
+  const requestFor = ({ bound, isBearer = true }: RequestForProps) => {
     const request = { headers: bearerHeaders({ token: bound.token }) }
     sessions.bindSession({ request, session: bound, isBearer })
     return request

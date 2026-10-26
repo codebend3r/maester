@@ -7,14 +7,13 @@ import { api } from '@/lib/api'
 import { afterSplit } from '@raven/ui/headless'
 import styles from '@/components/MovieFiles/MovieFiles.module.scss'
 
-/** The movie's other cards in the library, each with its files, best first. */
-const otherCards = ({
-  files,
-  everyCard,
-}: {
+type OtherCardsProps = {
   files: readonly MediaItem[]
   everyCard: readonly MediaItem[]
-}): MediaItem[][] => {
+}
+
+/** The movie's other cards in the library, each with its files, best first. */
+const otherCards = ({ files, everyCard }: OtherCardsProps): MediaItem[][] => {
   const shown = new Set(files.map((file) => file.id))
   const cards = everyCard
     .filter((file) => !shown.has(file.id))
@@ -23,6 +22,14 @@ const otherCards = ({
       new Map<string | null, MediaItem[]>(),
     )
   return [...cards.values()]
+}
+
+type MovieFilesProps = {
+  /** The card's files; there is always at least one. */
+  files: readonly [MediaItem, ...MediaItem[]]
+  /** The movie's files in the library, on every card. */
+  everyCard: readonly MediaItem[]
+  itemId: number
 }
 
 /**
@@ -34,17 +41,7 @@ const otherCards = ({
  * listed, each a link to its page, with Put back together to put every
  * file on one card again.
  */
-export const MovieFiles = ({
-  files,
-  everyCard,
-  itemId,
-}: {
-  /** The card's files; there is always at least one. */
-  files: readonly [MediaItem, ...MediaItem[]]
-  /** The movie's files in the library, on every card. */
-  everyCard: readonly MediaItem[]
-  itemId: number
-}) => {
+export const MovieFiles = ({ files, everyCard, itemId }: MovieFilesProps) => {
   const ids = { heading: useId(), others: useId() }
   const queryClient = useQueryClient()
   const [first] = files

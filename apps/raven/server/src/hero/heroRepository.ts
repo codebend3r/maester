@@ -1,6 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { DatabaseService } from '@/db/database'
 
+type HeroRepositoryAddProps = { itemId: number }
+
+type HeroRepositoryRemoveProps = { itemId: number }
+
 /** The movies and shows the admin picked for home's hero, in the order they were picked. */
 @Injectable()
 export class HeroRepository {
@@ -20,13 +24,13 @@ export class HeroRepository {
   }
 
   /** Adds the item, keeping the place it already has; a second add changes nothing. */
-  add({ itemId }: { itemId: number }): void {
+  add({ itemId }: HeroRepositoryAddProps): void {
     this.db
       .prepare('INSERT OR IGNORE INTO hero_picks (item_id, picked_at) VALUES (?, ?)')
       .run(itemId, new Date().toISOString())
   }
 
-  remove({ itemId }: { itemId: number }): void {
+  remove({ itemId }: HeroRepositoryRemoveProps): void {
     this.db.prepare('DELETE FROM hero_picks WHERE item_id = ?').run(itemId)
   }
 }

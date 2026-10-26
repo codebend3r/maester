@@ -22,6 +22,18 @@ import { Where } from '@/test/authPage'
 import { asPlayingDesktop } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
 
+type RenderPlayersProps = {
+  client: DesktopClient
+  player?: PlayerConnections
+  route: string
+  state?: unknown
+  behind?: string[]
+  /** Mounts under StrictMode, which runs every effect twice in development. */
+  isStrict?: boolean
+  /** Rendered beside the pages, as the app's own parts are: a way to navigate, say. */
+  beside?: ReactNode
+}
+
 /**
  * Raven's two players, the watch page and the play page, over `client` and `player`,
  * with `Where` standing in for every page they lead to, and the PIN prompt and toasts the app
@@ -35,17 +47,7 @@ export const renderPlayers = ({
   behind = [],
   isStrict = false,
   beside = null,
-}: {
-  client: DesktopClient
-  player?: PlayerConnections
-  route: string
-  state?: unknown
-  behind?: string[]
-  /** Mounts under StrictMode, which runs every effect twice in development. */
-  isStrict?: boolean
-  /** Rendered beside the pages, as the app's own parts are: a way to navigate, say. */
-  beside?: ReactNode
-}) => {
+}: RenderPlayersProps) => {
   const { menu } = asPlayingDesktop({ client, player })
   const pages = (
     <>

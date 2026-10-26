@@ -3,18 +3,15 @@ import type { ReactNode } from 'react'
 import { Icon } from '@raven/ui'
 import styles from '@/components/SortHeader/SortHeader.module.scss'
 
-/** A column header that sorts the table on a click; `aria-sort` says which way it points. */
-export const SortHeader = ({
-  sort,
-  onToggle,
-  className,
-  children,
-}: {
+type SortHeaderProps = {
   sort: AriaSort
   onToggle: () => void
   className?: string
   children: ReactNode
-}) => (
+}
+
+/** A column header that sorts the table on a click; `aria-sort` says which way it points. */
+export const SortHeader = ({ sort, onToggle, className, children }: SortHeaderProps) => (
   <th scope="col" className={className} aria-sort={sort === ARIA_SORTS.none ? undefined : sort}>
     <button type="button" className={styles.button} onClick={onToggle}>
       {children}

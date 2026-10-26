@@ -51,8 +51,10 @@ const LINK_LIFE = {
 /** Where a video that cannot play goes back to. */
 const LIBRARIES_PATH = '/libraries'
 
+type WatchMessageProps = { message: string | null }
+
 /** The player's place while there is no video: waiting for one (a null message), or saying why. */
-const WatchMessage = ({ message }: { message: string | null }) => (
+const WatchMessage = ({ message }: WatchMessageProps) => (
   <main className={styles.page}>
     {message === null ? (
       <p aria-live="polite">Loading</p>
@@ -119,23 +121,20 @@ export const WatchPage = () => {
   return <WatchMessage message={messageOf(page)} />
 }
 
-/**
- * The browser host owns server history, favourites, links and clipboard
- * behavior. A favourite marked here patches the cached video WatchPage
- * reads, so `media` brings the heart its new state before the server answers.
- */
-export const WatchPlayer = ({
-  media,
-  upNext,
-  isShuffled = false,
-  backTo,
-}: {
+type WatchPlayerProps = {
   media: MediaItem
   upNext: readonly MediaItem[]
   /** The videos after this one were dealt by a shuffle. */
   isShuffled?: boolean
   backTo: string
-}) => {
+}
+
+/**
+ * The browser host owns server history, favourites, links and clipboard
+ * behavior. A favourite marked here patches the cached video WatchPage
+ * reads, so `media` brings the heart its new state before the server answers.
+ */
+export const WatchPlayer = ({ media, upNext, isShuffled = false, backTo }: WatchPlayerProps) => {
   const queryClient = useQueryClient()
   const { favourite } = useMediaMutations({ media })
   const [copied, setCopied] = useState<string | null>(null)
@@ -220,16 +219,14 @@ export const WatchPlayer = ({
   )
 }
 
-/** The browser's own video, hosted for as long as it plays. */
-const BrowserWatch = ({
-  services,
-  media,
-  mediaPlane,
-}: {
+type BrowserWatchProps = {
   services: PlayerServices
   media: MediaItem
   mediaPlane: MediaPlane
-}) => {
+}
+
+/** The browser's own video, hosted for as long as it plays. */
+const BrowserWatch = ({ services, media, mediaPlane }: BrowserWatchProps) => {
   const isHosting = useHostPlayer(services)
   return (
     isHosting && (

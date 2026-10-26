@@ -25,6 +25,14 @@ export const TONEMAP_FILTER = [
 export const thumbnailSeek = (duration: number | null): number =>
   duration == null || duration < 4 ? 0 : Math.round(duration * 0.1 * 1000) / 1000
 
+type ThumbnailArgsProps = {
+  input: string
+  output: string
+  seek: number
+  width: number
+  tonemap: boolean
+}
+
 /**
  * One JPEG from a video. `-ss` goes before `-i` so ffmpeg jumps straight to
  * the nearest keyframe through the container index instead of decoding
@@ -38,13 +46,7 @@ export const thumbnailArgs = ({
   seek,
   width,
   tonemap,
-}: {
-  input: string
-  output: string
-  seek: number
-  width: number
-  tonemap: boolean
-}): string[] => [
+}: ThumbnailArgsProps): string[] => [
   ...QUIET,
   '-y',
   ...(seek > 0 ? ['-ss', String(seek)] : []),
@@ -82,18 +84,18 @@ const QUALITY: Record<TranscodeQuality, { crf: string; qp: string; bitrate: numb
   high: { crf: '18', qp: '18', bitrate: 16_000_000 },
 }
 
+type TranscodeBitrateProps = {
+  quality: TranscodeQuality
+  bitrate: number | null
+}
+
 /**
  * The video bitrate a transcode aims for: the viewer's ceiling when they
  * asked for a size, else VideoToolbox's target for the quality setting,
  * which the CRF of the other encoders lands near.
  */
-export const transcodeBitrate = ({
-  quality,
-  bitrate,
-}: {
-  quality: TranscodeQuality
-  bitrate: number | null
-}): number => bitrate ?? QUALITY[quality].bitrate
+export const transcodeBitrate = ({ quality, bitrate }: TranscodeBitrateProps): number =>
+  bitrate ?? QUALITY[quality].bitrate
 
 /** Codecs every Intel GPU recent enough for VAAPI decodes; anything else decodes on the CPU. */
 const GPU_DECODES: ReadonlySet<string> = new Set([VIDEO_CODECS.h264, VIDEO_CODECS.hevc])
@@ -113,6 +115,17 @@ export const copyVideo = (videoCodec: string | null): VideoArgs => ({
   input: [],
   output: ['-c:v', 'copy', ...(videoCodec === VIDEO_CODECS.hevc ? ['-tag:v', 'hvc1'] : [])],
 })
+
+type TranscodeVideoProps = {
+  encoder: VideoEncoder
+  videoCodec: string | null
+  tonemap: boolean
+  maxHeight: number
+  quality: TranscodeQuality
+  bitrate: number | null
+  /** Drops the frames before this time, on the file's clock, before any other filter. */
+  trimFrom?: number | null
+}
 
 /**
  * The flags before `-i` and the video encoding after it, for a transcode.
@@ -134,16 +147,7 @@ export const transcodeVideo = ({
   quality,
   bitrate,
   trimFrom = null,
-}: {
-  encoder: VideoEncoder
-  videoCodec: string | null
-  tonemap: boolean
-  maxHeight: number
-  quality: TranscodeQuality
-  bitrate: number | null
-  /** Drops the frames before this time, on the file's clock, before any other filter. */
-  trimFrom?: number | null
-}): VideoArgs => {
+}: TranscodeVideoProps): VideoArgs => {
   const scale = scaleTo(maxHeight)
   const squeeze = QUALITY[quality]
   const trim = trimFrom == null ? [] : [`trim=start=${secondsArg(trimFrom)}`]
@@ -244,6 +248,24 @@ export const encoderTestArgs = (encoder: VideoEncoder): string[] => {
   ]
 }
 
+type StreamArgsProps = {
+  input: string
+  start: number
+  mode: StreamMode
+  /** The `0:a:N` track to play, or null when the file has no audio. */
+  audio: number | null
+  videoCodec: string | null
+  tonemap: boolean
+  streamShift: number
+  /** How a transcode encodes; a remux encodes nothing. */
+  encoder?: VideoEncoder
+  /** The frame a transcode is scaled down to, and how hard it is squeezed: the playback settings. */
+  maxHeight?: number
+  quality?: TranscodeQuality
+  /** A ceiling on the transcode's video bitrate in bits per second, when the viewer asked for a size. */
+  bitrate?: number | null
+}
+
 /**
  * A converted stream: fragmented MP4 on stdout, fed to the browser through
  * Media Source Extensions. The stream keeps the file's own clock
@@ -267,23 +289,7 @@ export const streamArgs = ({
   maxHeight = 1080,
   quality = 'medium',
   bitrate = null,
-}: {
-  input: string
-  start: number
-  mode: StreamMode
-  /** The `0:a:N` track to play, or null when the file has no audio. */
-  audio: number | null
-  videoCodec: string | null
-  tonemap: boolean
-  streamShift: number
-  /** How a transcode encodes; a remux encodes nothing. */
-  encoder?: VideoEncoder
-  /** The frame a transcode is scaled down to, and how hard it is squeezed: the playback settings. */
-  maxHeight?: number
-  quality?: TranscodeQuality
-  /** A ceiling on the transcode's video bitrate in bits per second, when the viewer asked for a size. */
-  bitrate?: number | null
-}): string[] => {
+}: StreamArgsProps): string[] => {
   const video =
     mode === PLAYBACK_MODES.remux
       ? copyVideo(videoCodec)
@@ -327,6 +333,15 @@ export const streamArgs = ({
   ]
 }
 
+type SubtitleWindowArgsProps = {
+  input: string
+  /** The `0:s:N` track. */
+  stream: number
+  start: number
+  duration: number
+  output: string
+}
+
 /**
  * One window of an embedded subtitle track as WebVTT. Reads only the
  * window's stretch of the file and keeps cue times as file times.
@@ -345,14 +360,7 @@ export const subtitleWindowArgs = ({
   start,
   duration,
   output,
-}: {
-  input: string
-  /** The `0:s:N` track. */
-  stream: number
-  start: number
-  duration: number
-  output: string
-}): string[] => [
+}: SubtitleWindowArgsProps): string[] => [
   ...QUIET,
   '-y',
   ...(start > 0 ? ['-ss', String(start)] : []),
@@ -369,16 +377,14 @@ export const subtitleWindowArgs = ({
   output,
 ]
 
-/** A whole sidecar subtitle file as WebVTT, read as `charset` when given. */
-export const subtitleFileArgs = ({
-  input,
-  output,
-  charset,
-}: {
+type SubtitleFileArgsProps = {
   input: string
   output: string
   charset: string | null
-}): string[] => [
+}
+
+/** A whole sidecar subtitle file as WebVTT, read as `charset` when given. */
+export const subtitleFileArgs = ({ input, output, charset }: SubtitleFileArgsProps): string[] => [
   ...QUIET,
   '-y',
   ...(charset == null ? [] : ['-sub_charenc', charset]),
@@ -389,19 +395,17 @@ export const subtitleFileArgs = ({
   output,
 ]
 
+type ImageScaleArgsProps = {
+  input: string
+  output: string
+  width: number
+}
+
 /**
  * A poster or backdrop beside the media, scaled down to `width` (never up)
  * and saved as a JPEG for the image cache. The original is only read.
  */
-export const imageScaleArgs = ({
-  input,
-  output,
-  width,
-}: {
-  input: string
-  output: string
-  width: number
-}): string[] => [
+export const imageScaleArgs = ({ input, output, width }: ImageScaleArgsProps): string[] => [
   ...QUIET,
   '-y',
   '-i',

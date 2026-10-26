@@ -94,7 +94,9 @@ describe('matching by library type', () => {
     return found
   }
 
-  const library = ({ name, kind }: { name: string; kind: LibraryKind }) => {
+  type LibraryProps = { name: string; kind: LibraryKind }
+
+  const library = ({ name, kind }: LibraryProps) => {
     const root = join(database.dir(), name)
     const id = new LibrariesRepository(database.get()).create({
       name,
@@ -105,15 +107,13 @@ describe('matching by library type', () => {
     return { root, id, kind }
   }
 
-  const put = async ({
-    lib,
-    files,
-    pictures = [],
-  }: {
+  type PutProps = {
     lib: { root: string; id: number; kind: LibraryKind }
     files: readonly string[]
     pictures?: readonly string[]
-  }) => {
+  }
+
+  const put = async ({ lib, files, pictures = [] }: PutProps) => {
     const index = new MediaIndex(database.get())
     await Promise.all([
       ...files.map(async (path) => {
@@ -164,8 +164,9 @@ describe('matching by library type', () => {
     await database.close()
   })
 
-  const under = ({ name, path }: { name: string; path: string }) =>
-    fileAt(`${join(database.dir(), name)}/${path}`)
+  type UnderProps = { name: string; path: string }
+
+  const under = ({ name, path }: UnderProps) => fileAt(`${join(database.dir(), name)}/${path}`)
 
   it('matches movie files one by one, and a show folder as one', () => {
     const { matchers } = services()

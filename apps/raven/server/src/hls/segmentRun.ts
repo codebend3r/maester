@@ -35,6 +35,21 @@ export class RunReplaced extends Error {
 
 type Waiter = { n: number; settle: (error: Error | null) => void }
 
+type OnSegmentProps = { n: number; path: string }
+
+type SegmentRunProps = {
+  child: FfmpegStream
+  folder: string
+  from: number
+  /** The plan's last segment, after which the run ends rather than pauses. */
+  last: number
+  clock: HlsClock
+  /** Told of each segment the run finishes, and its file. */
+  onSegment: ({ n, path }: OnSegmentProps) => void
+  /** Told once ffmpeg has exited, whether it finished or was killed. */
+  onEnd: () => void
+}
+
 /**
  * One ffmpeg writing a session's segments, in order, from `from`, into a
  * folder of its own. The muxer lists each file on stdout once it has
@@ -48,7 +63,7 @@ export class SegmentRun {
   private readonly folder: string
   private readonly last: number
   private readonly clock: HlsClock
-  private readonly onSegment: ({ n, path }: { n: number; path: string }) => void
+  private readonly onSegment: ({ n, path }: OnSegmentProps) => void
   private readonly onEnd: () => void
   /** The next segment it finishes. */
   private next: number
@@ -62,26 +77,7 @@ export class SegmentRun {
   /** Settles once ffmpeg has exited and its pipes have closed. */
   private readonly closed: Promise<void>
 
-  constructor({
-    child,
-    folder,
-    from,
-    last,
-    clock,
-    onSegment,
-    onEnd,
-  }: {
-    child: FfmpegStream
-    folder: string
-    from: number
-    /** The plan's last segment, after which the run ends rather than pauses. */
-    last: number
-    clock: HlsClock
-    /** Told of each segment the run finishes, and its file. */
-    onSegment: ({ n, path }: { n: number; path: string }) => void
-    /** Told once ffmpeg has exited, whether it finished or was killed. */
-    onEnd: () => void
-  }) {
+  constructor({ child, folder, from, last, clock, onSegment, onEnd }: SegmentRunProps) {
     this.child = child
     this.folder = folder
     this.from = from

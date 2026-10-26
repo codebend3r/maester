@@ -61,6 +61,47 @@ const toMatchFile = (row: FileRow): MatchFile => ({
   match: isMatchState(row.match) ? row.match : 'pending',
 })
 
+type MatchFilesFilesProps = {
+  where: string
+  params: ReadonlyArray<string | number>
+  order?: string
+}
+
+type MatchFilesRewriteNamesProps = {
+  rows: ReadonlyArray<{ id: number; fileName: string; folder: string }>
+  kind: LibraryKind
+}
+
+type MatchFilesInFolderProps = { libraryId: number; folder: string }
+
+type MatchFilesUnderFolderProps = { libraryId: number; folder: string }
+
+type MatchFilesFixMatchAtProps = { libraryId: number; place: string }
+
+type MatchFilesSaveFixMatchProps = {
+  libraryId: number
+  place: string
+  fix: FixMatchChoice
+}
+
+type MatchFilesSettleProps = {
+  ids: readonly number[]
+  itemIds: readonly number[]
+  match: MatchState
+}
+
+type MatchFilesSetMatchProps = { ids: readonly number[]; match: MatchState }
+
+type MatchFilesRenameProps = { libraryId: number; kind: LibraryKind }
+
+type MatchFilesRetitleProps = { libraryId: number; kind: LibraryKind }
+
+type MatchFilesApplyRelayoutProps = {
+  libraryId: number
+  kind: LibraryKind
+  plan: RelayoutPlan
+}
+
 /**
  * The match queue: which files wait to be matched, the files that share a
  * place with one, the Fix match kept for a place, and how matching went.
@@ -81,11 +122,7 @@ export class MatchFiles {
     where,
     params,
     order = 'm.folder, m.file_name',
-  }: {
-    where: string
-    params: ReadonlyArray<string | number>
-    order?: string
-  }): MatchFile[] {
+  }: MatchFilesFilesProps): MatchFile[] {
     return this.db
       .prepare<Array<string | number>, FileRow>(`${SELECT_FILES} WHERE ${where} ORDER BY ${order}`)
       .all(...params)
@@ -93,13 +130,7 @@ export class MatchFiles {
   }
 
   /** Writes each file's name again as its library's type reads it. */
-  private rewriteNames({
-    rows,
-    kind,
-  }: {
-    rows: ReadonlyArray<{ id: number; fileName: string; folder: string }>
-    kind: LibraryKind
-  }): void {
+  private rewriteNames({ rows, kind }: MatchFilesRewriteNamesProps): void {
     const update = this.db.prepare(
       'UPDATE media SET title = ?, year = ?, edition = ?, match = ? WHERE id = ?',
     )
@@ -164,7 +195,7 @@ export class MatchFiles {
   }
 
   /** A library's files in `folder`, with their names, for the files sharing a place. */
-  inFolder({ libraryId, folder }: { libraryId: number; folder: string }): MatchFile[] {
+  inFolder({ libraryId, folder }: MatchFilesInFolderProps): MatchFile[] {
     return this.files({
       where: 'm.library_id = ? AND m.folder = ?',
       params: [libraryId, folder],
@@ -173,7 +204,7 @@ export class MatchFiles {
   }
 
   /** A library's files in `folder` and every folder under it: a show's, season folders included. */
-  underFolder({ libraryId, folder }: { libraryId: number; folder: string }): MatchFile[] {
+  underFolder({ libraryId, folder }: MatchFilesUnderFolderProps): MatchFile[] {
     return this.files({
       where: `m.library_id = ? AND (m.folder = ? OR m.folder LIKE ? ESCAPE '\\')`,
       params: [libraryId, folder, `${escapeLike(folder)}/%`],
@@ -181,7 +212,7 @@ export class MatchFiles {
   }
 
   /** The Fix match kept for a place in a library. */
-  fixMatchAt({ libraryId, place }: { libraryId: number; place: string }): FixMatch {
+  fixMatchAt({ libraryId, place }: MatchFilesFixMatchAtProps): FixMatch {
     const row = this.db
       .prepare<[number, string], { tmdb_id: string | null }>(
         'SELECT tmdb_id FROM match_overrides WHERE library_id = ? AND place = ?',
@@ -194,15 +225,7 @@ export class MatchFiles {
   }
 
   /** Keeps a Fix match for a place, replacing the one it had. */
-  saveFixMatch({
-    libraryId,
-    place,
-    fix,
-  }: {
-    libraryId: number
-    place: string
-    fix: FixMatchChoice
-  }): void {
+  saveFixMatch({ libraryId, place, fix }: MatchFilesSaveFixMatchProps): void {
     this.db
       .prepare(
         `INSERT INTO match_overrides (library_id, place, tmdb_id) VALUES (?, ?, ?)
@@ -224,15 +247,7 @@ export class MatchFiles {
   }
 
   /** Links files to their items, or to none, and records how matching went, together. */
-  settle({
-    ids,
-    itemIds,
-    match,
-  }: {
-    ids: readonly number[]
-    itemIds: readonly number[]
-    match: MatchState
-  }): void {
+  settle({ ids, itemIds, match }: MatchFilesSettleProps): void {
     this.db.transaction(() => {
       if (itemIds.length === 0) this.metadata.unlink(ids)
       else this.metadata.link({ mediaIds: ids, itemIds })
@@ -269,7 +284,7 @@ export class MatchFiles {
     })()
   }
 
-  setMatch({ ids, match }: { ids: readonly number[]; match: MatchState }): void {
+  setMatch({ ids, match }: MatchFilesSetMatchProps): void {
     this.db
       .prepare('UPDATE media SET match = ? WHERE id IN (SELECT value FROM json_each(?))')
       .run(match, JSON.stringify(ids))
@@ -280,7 +295,7 @@ export class MatchFiles {
    * matching over: links go, and files are pending, or off in a library that
    * is not matched. Run when a library's type changes how its files are read.
    */
-  rename({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
+  rename({ libraryId, kind }: MatchFilesRenameProps): void {
     const rows = this.files({ where: 'm.library_id = ?', params: [libraryId] })
     this.db.transaction(() => {
       this.metadata.unlink(rows.map((row) => row.id))
@@ -292,7 +307,7 @@ export class MatchFiles {
    * Reads names again without touching matches, for files indexed before
    * names were parsed. Only titles and years the parser now reads change.
    */
-  retitle({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
+  retitle({ libraryId, kind }: MatchFilesRetitleProps): void {
     const rows = this.pending(libraryId)
     this.db.transaction(() => this.rewriteNames({ rows, kind }))()
   }
@@ -337,15 +352,7 @@ export class MatchFiles {
    * its match unless its new folder reads its name as another title than its
    * old folder did. Fix matches move with their place, or go.
    */
-  applyRelayout({
-    libraryId,
-    kind,
-    plan,
-  }: {
-    libraryId: number
-    kind: LibraryKind
-    plan: RelayoutPlan
-  }): void {
+  applyRelayout({ libraryId, kind, plan }: MatchFilesApplyRelayoutProps): void {
     const setFolder = this.db.prepare('UPDATE media SET folder = ? WHERE id = ?')
     const readFix = this.db.prepare<[number, string], { tmdb_id: string | null }>(
       'SELECT tmdb_id FROM match_overrides WHERE library_id = ? AND place = ?',

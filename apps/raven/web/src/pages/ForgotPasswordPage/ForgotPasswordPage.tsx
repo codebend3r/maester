@@ -20,16 +20,15 @@ const MESSAGES = {
   [OUTCOMES.rateLimited]: RATE_LIMITED_COPY,
 } as const satisfies Record<Outcome, string>
 
+type RequestLinkProps = {
+  email: string
+  redirectTo: string
+}
+
 // Only a rate limit changes what the page says. Success, an unknown address
 // and every other failure read the same, so the page gives nothing away about
 // who has an account.
-const requestLink = async ({
-  email,
-  redirectTo,
-}: {
-  email: string
-  redirectTo: string
-}): Promise<Outcome> => {
+const requestLink = async ({ email, redirectTo }: RequestLinkProps): Promise<Outcome> => {
   try {
     await callAuth((client) => client.resetPasswordForEmail(email, { redirectTo }))
     return OUTCOMES.sent

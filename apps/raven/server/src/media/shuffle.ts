@@ -14,6 +14,8 @@ const generator = (seed: number): (() => number) => {
   }
 }
 
+type ShuffleProps<T> = { items: readonly T[]; seed: number }
+
 /** The items in an order fixed by `seed`: the same seed and items always give the same order. */
-export const shuffle = <T>({ items, seed }: { items: readonly T[]; seed: number }): T[] =>
+export const shuffle = <T>({ items, seed }: ShuffleProps<T>): T[] =>
   shuffled({ items, roll: generator(seed) })

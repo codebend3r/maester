@@ -91,19 +91,31 @@ const HW_ACCEL: Choices<PlaybackSettings['hwAccel']> = {
   videotoolbox: { label: 'VideoToolbox', hint: 'The media engine in a Mac.' },
 }
 
+type IsAtDefaultsProps<T extends Record<string, unknown>> = {
+  current: T
+  defaults: T
+}
+
 /** Whether every setting in `current` is where a fresh install has it. */
 const isAtDefaults = <T extends Record<string, unknown>>({
   current,
   defaults,
-}: {
-  current: T
-  defaults: T
-}): boolean => Object.keys(defaults).every((key) => current[key] === defaults[key])
+}: IsAtDefaultsProps<T>): boolean =>
+  Object.keys(defaults).every((key) => current[key] === defaults[key])
 
 const ENCODER_NAMES = {
   software: 'libx264 on the CPU',
   vaapi: 'VAAPI',
   videotoolbox: 'VideoToolbox',
+}
+
+type SettingProps<V extends string | number> = {
+  label: string
+  icon: IconName
+  values: readonly V[]
+  choices: Choices<V>
+  value: V
+  onChange: (value: V) => void
 }
 
 /** One setting as a group of radio cards, each with a line saying what it means; the chosen one is filled. */
@@ -114,14 +126,7 @@ const Setting = <V extends string | number>({
   choices,
   value,
   onChange,
-}: {
-  label: string
-  icon: IconName
-  values: readonly V[]
-  choices: Choices<V>
-  value: V
-  onChange: (value: V) => void
-}) => {
+}: SettingProps<V>) => {
   const name = useId()
   return (
     <fieldset className={styles.setting}>
@@ -146,8 +151,10 @@ const Setting = <V extends string | number>({
   )
 }
 
+type SettingsSkeletonProps = { count: number }
+
 /** `count` settings on their way: each a title over a card or two. */
-const SettingsSkeleton = ({ count }: { count: number }) =>
+const SettingsSkeleton = ({ count }: SettingsSkeletonProps) =>
   Array.from({ length: count }, (_, index) => (
     <span key={index} className={styles.choices}>
       <Bone shape="text" width="short" />
@@ -155,6 +162,18 @@ const SettingsSkeleton = ({ count }: { count: number }) =>
       <Bone shape="heading" />
     </span>
   ))
+
+type SettingsSectionProps<T> = {
+  icon: IconName
+  title: string
+  hint: string
+  isResetting: boolean
+  query: UseQueryResult<T>
+  shape: ReactNode
+  saveError: Error | null
+  browser?: ReactNode
+  children: (data: T) => ReactNode
+}
 
 /**
  * One source of settings: its heading and what it covers, that the admin
@@ -174,17 +193,7 @@ const SettingsSection = <T,>({
   saveError,
   browser,
   children,
-}: {
-  icon: IconName
-  title: string
-  hint: string
-  isResetting: boolean
-  query: UseQueryResult<T>
-  shape: ReactNode
-  saveError: Error | null
-  browser?: ReactNode
-  children: (data: T) => ReactNode
-}) => {
+}: SettingsSectionProps<T>) => {
   const headingId = useId()
   const { mode, canManage } = useManagement()
   return (
@@ -308,8 +317,10 @@ const AdvancedSection = () => {
   )
 }
 
+type CountdownProps = { deadline: number }
+
 /** Whole seconds until `deadline`, counted down as they pass. */
-const Countdown = ({ deadline }: { deadline: number }) => {
+const Countdown = ({ deadline }: CountdownProps) => {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1_000)
@@ -319,8 +330,10 @@ const Countdown = ({ deadline }: { deadline: number }) => {
   return plural({ n: seconds, one: 'second', many: 'seconds' })
 }
 
+type AdminLockHintProps = { lock: AdminLock; readAt: number }
+
 /** What the admin lock's toggle says under it; `readAt` is when the lock was read, its countdown's start. */
-const AdminLockHint = ({ lock, readAt }: { lock: AdminLock; readAt: number }) => {
+const AdminLockHint = ({ lock, readAt }: AdminLockHintProps) => {
   switch (lock.state) {
     case ADMIN_LOCK_STATES.on:
       return lock.available ? (
@@ -385,7 +398,9 @@ const AdminLockSection = () => {
     if (isAskingNow) passwordInput.current?.focus()
   }, [isAskingNow])
 
-  const toggle = ({ from, checked }: { from: AdminLock; checked: boolean }): void => {
+  type ToggleProps = { from: AdminLock; checked: boolean }
+
+  const toggle = ({ from, checked }: ToggleProps): void => {
     switch (from.state) {
       case ADMIN_LOCK_STATES.on:
         unlock.reset()

@@ -59,15 +59,13 @@ type SeenRequest = {
   turn: number
 }
 
-const json = ({
-  body,
-  status = 200,
-  headers = {},
-}: {
+type JsonProps = {
   body: unknown
   status?: number
   headers?: Record<string, string>
-}): Response =>
+}
+
+const json = ({ body, status = 200, headers = {} }: JsonProps): Response =>
   new Response(JSON.stringify(body), {
     status,
     headers: { [HEADERS.contentType]: CONTENT_TYPES.json, ...headers },
@@ -89,28 +87,31 @@ const placeOf = (body: Record<string, unknown>): string | null => {
 const turnOf = (body: Record<string, unknown>): number =>
   messagesOf(body).filter((message) => isRecord(message) && message.role === ROLES.assistant).length
 
-const toolUse = ({
-  turn,
-  name,
-  input,
-}: {
+type ToolUseProps = {
   turn: number
   name: string
   input: Record<string, unknown>
-}) => ({ type: 'tool_use', id: `toolu_${turn}`, name, input, caller: { type: 'direct' } })
+}
+
+const toolUse = ({ turn, name, input }: ToolUseProps) => ({
+  type: 'tool_use',
+  id: `toolu_${turn}`,
+  name,
+  input,
+  caller: { type: 'direct' },
+})
+
+type AnswerForProps = {
+  reply: FakeReply | undefined
+  turn: number
+}
 
 /**
  * The stop reason and content Claude answers a reply with. Every answer but
  * a refusal opens with a thinking block, as adaptive thinking gives one,
  * which raven must send back exactly as it came.
  */
-const answerFor = ({
-  reply,
-  turn,
-}: {
-  reply: FakeReply | undefined
-  turn: number
-}): { stop: string; content: unknown[] } => {
+const answerFor = ({ reply, turn }: AnswerForProps): { stop: string; content: unknown[] } => {
   const thinking = { type: 'thinking', thinking: '', signature: `signature-${turn}` }
   if (reply == null) {
     return {
@@ -171,6 +172,10 @@ const answerFor = ({
   }
 }
 
+type FakeClaudeProps = {
+  lookups: Readonly<Partial<Record<string, readonly FakeReply[]>>>
+}
+
 /**
  * Claude in miniature for the AI lookup: each lookup, named by its group's
  * place, gets its replies in turn, then words and no choice. A `status`
@@ -180,11 +185,7 @@ const answerFor = ({
  * waiting, recorded but not answered, until the function it returns is
  * called.
  */
-export const fakeClaude = ({
-  lookups,
-}: {
-  lookups: Readonly<Partial<Record<string, readonly FakeReply[]>>>
-}) => {
+export const fakeClaude = ({ lookups }: FakeClaudeProps) => {
   const state: { status: number; message: string; requests: SeenRequest[] } = {
     status: 200,
     message: 'Away',

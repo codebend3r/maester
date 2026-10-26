@@ -42,6 +42,13 @@ const shared = <T>(task: () => Promise<T>): (() => Promise<T>) => {
 
 const bearer = (token: string): string => `${AUTH_SCHEME} ${token}`
 
+type RefreshingFetchProps = {
+  fetch: (url: string, init?: FetchInit) => Promise<Response>
+  accessToken: () => string | null
+  refresh: () => Promise<RefreshOutcome>
+  signOut: () => Promise<void>
+}
+
 /**
  * A `fetch` that answers a `signed_out` refusal of a call carrying a token
  * with one refresh and one repeat of that call. It sits under the API
@@ -51,17 +58,7 @@ const bearer = (token: string): string => `${AUTH_SCHEME} ${token}`
  * with that token. A repeat refused again, or a refresh Supabase rejects,
  * signs out; a refresh that cannot reach Supabase leaves the session alone.
  */
-export const refreshingFetch = ({
-  fetch,
-  accessToken,
-  refresh,
-  signOut,
-}: {
-  fetch: (url: string, init?: FetchInit) => Promise<Response>
-  accessToken: () => string | null
-  refresh: () => Promise<RefreshOutcome>
-  signOut: () => Promise<void>
-}) => {
+export const refreshingFetch = ({ fetch, accessToken, refresh, signOut }: RefreshingFetchProps) => {
   const refreshOnce = shared(refresh)
   const signOutOnce = shared(signOut)
 

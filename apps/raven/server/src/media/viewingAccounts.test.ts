@@ -46,18 +46,22 @@ const ticketOf = (account: Account): Caller => ({
   unlockedUntil: null,
 })
 
+type CallerOfProps = { request: object }
+
+type AccountsForProps = {
+  auth?: AuthConfig
+  owner?: string | null
+  hasPast?: boolean
+  callerOf?: (asked: CallerOfProps) => Caller
+}
+
 /** The accounts as a server in `auth` builds them, with `owner` recorded and `hasPast` saying whether rows from before accounts remain. */
 const accountsFor = ({
   auth = AUTH_TEST_CONFIG,
   owner = null,
   hasPast = false,
   callerOf = () => ({ kind: CALLERS.legacy }),
-}: {
-  auth?: AuthConfig
-  owner?: string | null
-  hasPast?: boolean
-  callerOf?: (asked: { request: object }) => Caller
-}) => {
+}: AccountsForProps) => {
   const adoption = {
     adopt: vi.fn<ViewingAdoption['adopt']>(() => ADOPTED),
     hasLocalRows: vi.fn<ViewingAdoption['hasLocalRows']>(() => hasPast),
@@ -66,7 +70,9 @@ const accountsFor = ({
   return { accounts, adoption }
 }
 
-const keyFor = ({ caller, auth }: { caller: Caller; auth?: AuthConfig }) =>
+type KeyForProps = { caller: Caller; auth?: AuthConfig }
+
+const keyFor = ({ caller, auth }: KeyForProps) =>
   accountsFor({ auth, callerOf: () => caller }).accounts.keyOf({ request: REQUEST })
 
 describe('whose viewing a request reads and writes', () => {

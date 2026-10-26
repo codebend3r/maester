@@ -5,8 +5,10 @@ import { afterFavourites } from '@/query/invalidate'
 import { useOptimisticMutation } from '@/query/optimistic'
 import { mutationKeys } from '@/query/queryClient'
 
+type UseServerItemFavouriteProps = { api: ApiClient; item: ItemDetails }
+
 /** Marking a show or season a favourite, shown on its page before the server answers. */
-export const useServerItemFavourite = ({ api, item }: { api: ApiClient; item: ItemDetails }) => {
+export const useServerItemFavourite = ({ api, item }: UseServerItemFavouriteProps) => {
   const queryClient = useQueryClient()
   return useOptimisticMutation({
     mutationKey: mutationKeys.itemFavourite,
@@ -16,7 +18,12 @@ export const useServerItemFavourite = ({ api, item }: { api: ApiClient; item: It
   })
 }
 
+type ItemFavouriteForProps = { api: ApiClient }
+
+type ItemFavouriteForUseItemFavouriteProps = { item: ItemDetails }
+
 /** The show-and-season favourite hook over one server's `api`, for a host with one server. */
-export const itemFavouriteFor = ({ api }: { api: ApiClient }) => ({
-  useItemFavourite: ({ item }: { item: ItemDetails }) => useServerItemFavourite({ api, item }),
+export const itemFavouriteFor = ({ api }: ItemFavouriteForProps) => ({
+  useItemFavourite: ({ item }: ItemFavouriteForUseItemFavouriteProps) =>
+    useServerItemFavourite({ api, item }),
 })

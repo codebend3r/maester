@@ -24,7 +24,9 @@ type ReadyStatus = Extract<DownloadAsk['status'], { kind: typeof DOWNLOAD_ASK_KI
 
 const TITLE = 'Download to Raven'
 
-const nounFor = ({ kind, files }: { kind: DownloadKind; files: number }): string => {
+type NounForProps = { kind: DownloadKind; files: number }
+
+const nounFor = ({ kind, files }: NounForProps): string => {
   switch (kind) {
     case DOWNLOAD_KINDS.movie:
     case DOWNLOAD_KINDS.saga:
@@ -40,16 +42,14 @@ const nounFor = ({ kind, files }: { kind: DownloadKind; files: number }): string
   }
 }
 
-/** Asks before the title's files are fetched; leaving it any way but Download declines. */
-const ReadyDialog = ({
-  ask,
-  status,
-  onClose,
-}: {
+type ReadyDialogProps = {
   ask: DownloadAsk
   status: ReadyStatus
   onClose: () => void
-}) => {
+}
+
+/** Asks before the title's files are fetched; leaving it any way but Download declines. */
+const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
   const { client } = useDesktop()
   const openReply = useOpenReply()
   const { dialog, close, keepKeys } = useModal()
@@ -129,11 +129,13 @@ const ReadyDialog = ({
   )
 }
 
+type LockedDialogProps = { ask: DownloadAsk; onClose: () => void }
+
 /**
  * The title sits in a locked library: the page enters the PIN as anywhere else, which main's own
  * calls then carry, and main reads the title again.
  */
-const LockedDialog = ({ ask, onClose }: { ask: DownloadAsk; onClose: () => void }) => {
+const LockedDialog = ({ ask, onClose }: LockedDialogProps) => {
   const { client } = useDesktop()
   const openReply = useOpenReply()
   const queryClient = useQueryClient()
@@ -164,8 +166,10 @@ const LockedDialog = ({ ask, onClose }: { ask: DownloadAsk; onClose: () => void 
   )
 }
 
+type AccountDialogProps = { ask: DownloadAsk; onClose: () => void }
+
 /** The page is signed out, so main has no account to download with: the person signs in first. */
-const AccountDialog = ({ ask, onClose }: { ask: DownloadAsk; onClose: () => void }) => {
+const AccountDialog = ({ ask, onClose }: AccountDialogProps) => {
   const navigate = useNavigate()
   const { pathname, search } = useLocation()
   const { dialog, close, keepKeys } = useModal()
@@ -205,8 +209,10 @@ const AccountDialog = ({ ask, onClose }: { ask: DownloadAsk; onClose: () => void
   )
 }
 
+type DownloadDialogProps = { ask: DownloadAsk; onClose: () => void }
+
 /** What Raven asks before it downloads a title, from a Download button or a link. */
-export const DownloadDialog = ({ ask, onClose }: { ask: DownloadAsk; onClose: () => void }) => {
+export const DownloadDialog = ({ ask, onClose }: DownloadDialogProps) => {
   const { status } = ask
   switch (status.kind) {
     case DOWNLOAD_ASK_KINDS.ready:

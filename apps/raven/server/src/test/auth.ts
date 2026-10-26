@@ -65,13 +65,17 @@ export const MISADDRESSED_CLAIMS = {
 } as const
 const FORGING_SECRET = new TextEncoder().encode('a-test-secret-long-enough-for-the-HMAC')
 
+type BearerHeadersProps = { token: string }
+
 /** The Authorization header that carries `token`, as Raven and the API client send it. */
-export const bearerHeaders = ({ token }: { token: string }) => ({
+export const bearerHeaders = ({ token }: BearerHeadersProps) => ({
   [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${token}`,
 })
 
+type AuthCookieProps = { token: string }
+
 /** The `maester-auth` cookie the web's Supabase client keeps for `token`, in its base64 form. */
-export const authCookie = ({ token }: { token: string }) =>
+export const authCookie = ({ token }: AuthCookieProps) =>
   `${AUTH_COOKIE}=base64-${Buffer.from(JSON.stringify({ access_token: token })).toString(AUTH_ENCODINGS.base64url)}`
 
 export const authFixture = async () => {
@@ -172,19 +176,21 @@ export const authFixture = async () => {
     }
     throw new Error(`Unexpected auth URL: ${url}`)
   })
+  type MintProps = {
+    id?: string
+    claims?: JWTPayload
+    expiresIn?: number
+    issuer?: string
+    audience?: string
+  }
+
   const mint = async ({
     id = AUTH_TEST_IDS.friend,
     claims = {},
     expiresIn = 3600,
     issuer = AUTH_TEST_ISSUER,
     audience = AUTH_JWT_ROLE,
-  }: {
-    id?: string
-    claims?: JWTPayload
-    expiresIn?: number
-    issuer?: string
-    audience?: string
-  } = {}) =>
+  }: MintProps = {}) =>
     new SignJWT({ role: AUTH_JWT_ROLE, ...claims })
       .setProtectedHeader({ alg: AUTH_TEST_ALGORITHM, kid: AUTH_TEST_KID })
       .setSubject(id)
@@ -193,12 +199,12 @@ export const authFixture = async () => {
       .setAudience(audience)
       .setExpirationTime(Math.floor(Date.now() / 1000) + expiresIn)
       .sign(pair.privateKey)
-  /** A token with every claim the friend's real one has, signed as `algorithm` says instead. */
-  const forge = async ({
-    algorithm,
-  }: {
+  type ForgeProps = {
     algorithm: (typeof FORGED_ALGORITHMS)[keyof typeof FORGED_ALGORITHMS]
-  }): Promise<string> => {
+  }
+
+  /** A token with every claim the friend's real one has, signed as `algorithm` says instead. */
+  const forge = async ({ algorithm }: ForgeProps): Promise<string> => {
     const now = Math.floor(Date.now() / 1000)
     const claims: JWTPayload = {
       role: AUTH_JWT_ROLE,

@@ -55,7 +55,9 @@ const useGutters = () => {
   return { left: SIZES.space3 + insets.left, right: SIZES.space3 + insets.right }
 }
 
-const Heading = ({ title }: { title: string }) => {
+type HeadingProps = { title: string }
+
+const Heading = ({ title }: HeadingProps) => {
   const styles = useStyles()
   return (
     <Text accessibilityRole="header" style={styles.heading}>
@@ -64,8 +66,10 @@ const Heading = ({ title }: { title: string }) => {
   )
 }
 
+type ActionButtonProps = { action: ItemAction }
+
 /** Play, filled as the one action the page is for, or a mark, ticked while it is on. */
-const ActionButton = ({ action }: { action: ItemAction }) => {
+const ActionButton = ({ action }: ActionButtonProps) => {
   const styles = useStyles()
   const toneStyles = useToneStyles()
   const look = actionLookOf(action)
@@ -86,8 +90,10 @@ const ActionButton = ({ action }: { action: ItemAction }) => {
   )
 }
 
+type ProgressLineProps = { progress: NonNullable<ItemHero['progress']> }
+
 /** Where playback stopped, or how much is watched, as a line with its words. */
-const ProgressLine = ({ progress }: { progress: NonNullable<ItemHero['progress']> }) => {
+const ProgressLine = ({ progress }: ProgressLineProps) => {
   const styles = useStyles()
   return (
     <View style={styles.progress}>
@@ -99,7 +105,9 @@ const ProgressLine = ({ progress }: { progress: NonNullable<ItemHero['progress']
   )
 }
 
-const Hero = ({ hero, actions }: { hero: ItemHero; actions: ItemAction[] }) => {
+type HeroProps = { hero: ItemHero; actions: ItemAction[] }
+
+const Hero = ({ hero, actions }: HeroProps) => {
   const styles = useStyles()
   const { width, height } = useWindowDimensions()
   const widths = isTablet({ width, height }) ? HERO_WIDTHS.tablet : HERO_WIDTHS.phone
@@ -131,7 +139,9 @@ const Hero = ({ hero, actions }: { hero: ItemHero; actions: ItemAction[] }) => {
   )
 }
 
-const FileFacts = ({ facts }: { facts: ItemPage['file'] }) => {
+type FileFactsProps = { facts: ItemPage['file'] }
+
+const FileFacts = ({ facts }: FileFactsProps) => {
   const styles = useStyles()
   return (
     <View style={styles.facts}>
@@ -146,7 +156,9 @@ const FileFacts = ({ facts }: { facts: ItemPage['file'] }) => {
   )
 }
 
-const Versions = ({ versions, onOpen }: { versions: VersionRow[]; onOpen: Opens }) => {
+type VersionsProps = { versions: VersionRow[]; onOpen: Opens }
+
+const Versions = ({ versions, onOpen }: VersionsProps) => {
   const styles = useStyles()
   return (
     <View style={styles.section}>
@@ -174,8 +186,10 @@ const Versions = ({ versions, onOpen }: { versions: VersionRow[]; onOpen: Opens 
 
 type Opens = ItemLayoutProps['onOpen']
 
+type RailProps = { title: string; children: ReactNode }
+
 /** A titled row that scrolls sideways, running to the screen's edges past the gutters. */
-const Rail = ({ title, children }: { title: string; children: ReactNode }) => {
+const Rail = ({ title, children }: RailProps) => {
   const styles = useStyles()
   const gutters = useGutters()
   const padded = { paddingLeft: gutters.left, paddingRight: gutters.right }
@@ -195,7 +209,9 @@ const Rail = ({ title, children }: { title: string; children: ReactNode }) => {
   )
 }
 
-const Seasons = ({ seasons, onOpen }: { seasons: ShelfCard[]; onOpen: Opens }) => {
+type SeasonsProps = { seasons: ShelfCard[]; onOpen: Opens }
+
+const Seasons = ({ seasons, onOpen }: SeasonsProps) => {
   const screen = useWindowDimensions()
   return (
     <Rail title={ITEM_HEADINGS.seasons}>
@@ -211,7 +227,9 @@ const Seasons = ({ seasons, onOpen }: { seasons: ShelfCard[]; onOpen: Opens }) =
   )
 }
 
-const Episodes = ({ episodes, onOpen }: { episodes: EpisodeRow[]; onOpen: Opens }) => {
+type EpisodesProps = { episodes: EpisodeRow[]; onOpen: Opens }
+
+const Episodes = ({ episodes, onOpen }: EpisodesProps) => {
   const styles = useStyles()
   return (
     <View style={styles.section}>
@@ -241,7 +259,9 @@ const Episodes = ({ episodes, onOpen }: { episodes: EpisodeRow[]; onOpen: Opens 
   )
 }
 
-const Person = ({ person }: { person: PersonCard }) => {
+type PersonProps = { person: PersonCard }
+
+const Person = ({ person }: PersonProps) => {
   const styles = useStyles()
   return (
     <View style={styles.person}>
@@ -262,7 +282,9 @@ const Person = ({ person }: { person: PersonCard }) => {
   )
 }
 
-const Cast = ({ title, cast }: { title: string; cast: PersonCard[] }) => (
+type CastProps = { title: string; cast: PersonCard[] }
+
+const Cast = ({ title, cast }: CastProps) => (
   <Rail title={title}>
     {cast.map((person) => (
       <Person key={person.key} person={person} />

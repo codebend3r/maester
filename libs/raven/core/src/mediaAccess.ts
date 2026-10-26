@@ -3,11 +3,13 @@ import { MEDIA_TICKET_REFRESH_SECONDS, MEDIA_TICKET_SECONDS } from '@/contract'
 /** How long after it was read a client renews a media ticket. */
 export const MEDIA_TICKET_RENEW_MS = (MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECONDS) * 1000
 
+type TicketRenewAtProps = { readAt: number }
+
 /**
  * When a ticket read at `readAt` is renewed, in epoch ms by the client's own clock. Timed from the
  * read, never from `expiresAt`, so a clock off the server's changes nothing.
  */
-export const ticketRenewAt = ({ readAt }: { readAt: number }): number =>
+export const ticketRenewAt = ({ readAt }: TicketRenewAtProps): number =>
   readAt + MEDIA_TICKET_RENEW_MS
 
 /** How long a client waits on one origin's ping before it counts the origin as not answering. */

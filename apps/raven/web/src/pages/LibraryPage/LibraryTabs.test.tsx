@@ -22,7 +22,9 @@ import { fakeAccount } from '@/test/authClient'
 import { renderLibraryPage } from '@/test/libraryPage'
 import { pollFast } from '@/test/polls'
 
-const movie = ({ id, title, year }: { id: number; title: string; year: number }) =>
+type MovieProps = { id: number; title: string; year: number }
+
+const movie = ({ id, title, year }: MovieProps) =>
   matchedMovie({ id, title, item: itemSummary({ id: id * 10, title, year }) })
 
 describe('LibraryPage tabs', () => {
@@ -58,6 +60,15 @@ describe('LibraryPage tabs', () => {
     Object.values(spies).forEach((spy) => spy.mockReset())
   })
 
+  type OpenProps = {
+    kind?: LibraryKind
+    route?: string
+    behind?: string[]
+    settings?: Partial<LibrarySettings>
+    adminLock?: AdminLock
+    account?: Account
+  }
+
   const open = ({
     kind = 'movies',
     route = '/libraries/2',
@@ -65,14 +76,7 @@ describe('LibraryPage tabs', () => {
     settings = {},
     adminLock,
     account,
-  }: {
-    kind?: LibraryKind
-    route?: string
-    behind?: string[]
-    settings?: Partial<LibrarySettings>
-    adminLock?: AdminLock
-    account?: Account
-  } = {}) => {
+  }: OpenProps = {}) => {
     spies.get.mockImplementation(async () =>
       library({ id: 2, name: 'Films', settings: { ...library().settings, kind, ...settings } }),
     )

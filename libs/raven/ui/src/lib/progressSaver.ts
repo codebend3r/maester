@@ -12,6 +12,11 @@ export type ProgressSaver = {
   settled: () => Promise<void>
 }
 
+type CreateProgressSaverProps = {
+  send: (report: ProgressReport) => Promise<unknown>
+  wait?: (ms: number) => Promise<void>
+}
+
 /**
  * Sends a title's saved positions one at a time, only the newest of those
  * waiting, so an older spot never lands after a newer one. A save that
@@ -22,14 +27,13 @@ export type ProgressSaver = {
 export const createProgressSaver = ({
   send,
   wait = sleep,
-}: {
-  send: (report: ProgressReport) => Promise<unknown>
-  wait?: (ms: number) => Promise<void>
-}): ProgressSaver => {
+}: CreateProgressSaverProps): ProgressSaver => {
   let wanted: ProgressReport | null = null
   let running: Promise<void> | null = null
 
-  const drain = async ({ failures }: { failures: number }): Promise<void> => {
+  type DrainProps = { failures: number }
+
+  const drain = async ({ failures }: DrainProps): Promise<void> => {
     const report = wanted
     if (report === null) {
       running = null

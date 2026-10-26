@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { moltenvkBuildCommands } from '@/build/moltenvk'
 
-const argument = ({ args, name }: { args: string[]; name: string }) => {
+type ArgumentProps = { args: string[]; name: string }
+
+const argument = ({ args, name }: ArgumentProps) => {
   const index = args.indexOf(name)
   const value = args.at(index + 1)
   if (index < 0 || !value) throw new Error(`Missing build argument: ${name}`)

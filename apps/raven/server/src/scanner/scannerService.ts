@@ -49,12 +49,14 @@ export type Scope =
     }
   | { kind: typeof SCOPE_KINDS.places; places: readonly string[] }
 
+type MergeScopesProps = { waiting: Scope | null; scope: Scope }
+
 /**
  * Two scans waiting their turn, as one: a full scan covers anything, a
  * quick scan covers a refresh as long as it still reads the refresh's
  * places, and places add up.
  */
-export const mergeScopes = ({ waiting, scope }: { waiting: Scope | null; scope: Scope }): Scope => {
+export const mergeScopes = ({ waiting, scope }: MergeScopesProps): Scope => {
   if (waiting == null) return scope
   if (waiting.kind === SCOPE_KINDS.library || scope.kind === SCOPE_KINDS.library) {
     return { kind: SCOPE_KINDS.library }
@@ -73,15 +75,23 @@ export const mergeScopes = ({ waiting, scope }: { waiting: Scope | null; scope: 
   return { kind: SCOPE_KINDS.places, places }
 }
 
+type KnownOutsideProps = { indexed: ReadonlyMap<string, KnownStats>; places: readonly string[] }
+
 /**
  * What a quick scan takes as read: the size and modification time the index
  * holds for a file, unless the file sits at one of the places a refresh
  * asked to read, where it is stat'ed as a refresh would.
  */
 const knownOutside =
-  ({ indexed, places }: { indexed: ReadonlyMap<string, KnownStats>; places: readonly string[] }) =>
+  ({ indexed, places }: KnownOutsideProps) =>
   (path: string): KnownStats | null =>
     places.some((place) => isUnder({ path, root: place })) ? null : (indexed.get(path) ?? null)
+
+type InScopeProps = {
+  path: string
+  scope: Scope
+  unreadable: readonly string[]
+}
 
 /**
  * Whether a scan of `scope` speaks for an indexed path. A full or quick
@@ -89,39 +99,28 @@ const knownOutside =
  * path since dropped go too; a refresh only for its places. Nothing under a
  * place that could not be read is touched.
  */
-const inScope = ({
-  path,
-  scope,
-  unreadable,
-}: {
-  path: string
-  scope: Scope
-  unreadable: readonly string[]
-}): boolean =>
+const inScope = ({ path, scope, unreadable }: InScopeProps): boolean =>
   (scope.kind !== SCOPE_KINDS.places ||
     scope.places.some((place) => isUnder({ path, root: place }))) &&
   !unreadable.some((place) => isUnder({ path, root: place }))
 
-/** What a scan found and did, for the log. */
-const summary = ({
-  walk,
-  changes,
-  toProbe,
-}: {
+type SummaryProps = {
   walk: WalkResult
   changes: Reconciled
   toProbe: readonly ProbeTarget[]
-}): string =>
+}
+
+/** What a scan found and did, for the log. */
+const summary = ({ walk, changes, toProbe }: SummaryProps): string =>
   `${walk.files.length} files, ${changes.added.length} added, ${changes.moved.length} moved, ${toProbe.length} probed, ${changes.gone.length} removed`
 
-/** Resolves when `until` does, or as soon as `signal` aborts, whichever is first. */
-const untilAborted = ({
-  signal,
-  until,
-}: {
+type UntilAbortedProps = {
   signal: AbortSignal
   until: Promise<void>
-}): Promise<void> =>
+}
+
+/** Resolves when `until` does, or as soon as `signal` aborts, whichever is first. */
+const untilAborted = ({ signal, until }: UntilAbortedProps): Promise<void> =>
   new Promise((resolve) => {
     if (signal.aborted) return resolve()
     signal.addEventListener('abort', () => resolve(), { once: true })
@@ -130,6 +129,64 @@ const untilAborted = ({
 
 /** A library's scan running now, and what waits for it to finish. */
 type Slot = { running: Promise<void>; next: Scope | null; abort: AbortController }
+
+type ScannerServiceRefreshProps = { libraryId: number; places: readonly string[] }
+
+type ScannerServiceUpdateProps = { libraryId: number; patch: Partial<ScanStatus> }
+
+type ScannerServiceRequestProps = { libraryId: number; scope: Scope }
+
+type ScannerServiceStartProps = { libraryId: number; scope: Scope }
+
+type ScannerServiceRunProps = {
+  libraryId: number
+  scope: Scope
+  signal: AbortSignal
+}
+
+type ScannerServiceScanLibraryProps = {
+  library: LibraryRecord
+  signal: AbortSignal
+}
+
+type ScannerServiceCancelFullScanProps = {
+  library: LibraryRecord
+  before: ScanStatus
+}
+
+type ScannerServiceFinishFullScanProps = {
+  library: LibraryRecord
+  error: string | null
+}
+
+type ScannerServiceQuickScanLibraryProps = {
+  library: LibraryRecord
+  places: readonly string[]
+  shouldWaitForMatching: boolean
+  signal: AbortSignal
+}
+
+type ScannerServiceRefreshPlacesProps = {
+  library: LibraryRecord
+  places: readonly string[]
+  signal: AbortSignal
+}
+
+type ScannerServiceReindexProps = {
+  library: LibraryRecord
+  scope: Scope
+  /** Aborted by a cancel: the walk ends and nothing is written. */
+  signal: AbortSignal
+  /** A full scan's count of videos found while it walks; a refresh keeps the status as it is. */
+  onFound?: (count: number) => void
+}
+
+type ScannerServiceProbeProps = {
+  toProbe: readonly ProbeTarget[]
+  /** Aborted by a cancel: the files not yet started stay unprobed, for the next scan. */
+  signal: AbortSignal
+  onProbed: () => void
+}
 
 /**
  * Indexes a library: walks its paths, adds new files, follows renamed and
@@ -224,7 +281,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** Looks again at just the places that changed, after any scan of the library under way. */
-  refresh({ libraryId, places }: { libraryId: number; places: readonly string[] }): void {
+  refresh({ libraryId, places }: ScannerServiceRefreshProps): void {
     this.request({ libraryId, scope: { kind: SCOPE_KINDS.places, places: outermost(places) } })
   }
 
@@ -240,7 +297,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     this.statuses.delete(libraryId)
   }
 
-  private update({ libraryId, patch }: { libraryId: number; patch: Partial<ScanStatus> }): void {
+  private update({ libraryId, patch }: ScannerServiceUpdateProps): void {
     this.statuses.set(libraryId, { ...this.status(libraryId), ...patch })
   }
 
@@ -249,7 +306,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
    * status says scanning straight away; a busy one keeps the request for
    * after, merged with whatever else waits.
    */
-  private request({ libraryId, scope }: { libraryId: number; scope: Scope }): void {
+  private request({ libraryId, scope }: ScannerServiceRequestProps): void {
     const slot = this.slots.get(libraryId)
     if (slot) {
       slot.next = mergeScopes({ waiting: slot.next, scope })
@@ -258,7 +315,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     this.start({ libraryId, scope })
   }
 
-  private start({ libraryId, scope }: { libraryId: number; scope: Scope }): void {
+  private start({ libraryId, scope }: ScannerServiceStartProps): void {
     const abort = new AbortController()
     const running = this.run({ libraryId, scope, signal: abort.signal })
       .catch((error: unknown) => this.logger.error(`Scan failed: ${errorMessage(error)}`))
@@ -287,15 +344,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     else this.slots.delete(libraryId)
   }
 
-  private async run({
-    libraryId,
-    scope,
-    signal,
-  }: {
-    libraryId: number
-    scope: Scope
-    signal: AbortSignal
-  }): Promise<void> {
+  private async run({ libraryId, scope, signal }: ScannerServiceRunProps): Promise<void> {
     const library = this.libraries.get(libraryId)
     if (!library) return
     switch (scope.kind) {
@@ -318,13 +367,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** A full scan: everything under the library's paths, its progress and outcome in the status. */
-  private async scanLibrary({
-    library,
-    signal,
-  }: {
-    library: LibraryRecord
-    signal: AbortSignal
-  }): Promise<void> {
+  private async scanLibrary({ library, signal }: ScannerServiceScanLibraryProps): Promise<void> {
     const before = this.status(library.id)
     this.update({
       libraryId: library.id,
@@ -387,13 +430,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** A full scan the admin stopped: idle again, with the last finished scan's time and no error. */
-  private cancelFullScan({
-    library,
-    before,
-  }: {
-    library: LibraryRecord
-    before: ScanStatus
-  }): void {
+  private cancelFullScan({ library, before }: ScannerServiceCancelFullScanProps): void {
     this.update({
       libraryId: library.id,
       patch: { state: SCAN_STATES.idle, finishedAt: before.finishedAt, error: null },
@@ -402,13 +439,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** The full scan is over: its end is remembered, so a restart still says when it was. */
-  private finishFullScan({
-    library,
-    error,
-  }: {
-    library: LibraryRecord
-    error: string | null
-  }): void {
+  private finishFullScan({ library, error }: ScannerServiceFinishFullScanProps): void {
     const at = new Date().toISOString()
     this.libraries.markFullScan({ id: library.id, at })
     this.update({
@@ -427,12 +458,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     places,
     shouldWaitForMatching,
     signal,
-  }: {
-    library: LibraryRecord
-    places: readonly string[]
-    shouldWaitForMatching: boolean
-    signal: AbortSignal
-  }): Promise<void> {
+  }: ScannerServiceQuickScanLibraryProps): Promise<void> {
     this.update({
       libraryId: library.id,
       patch: {
@@ -511,11 +537,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     library,
     places,
     signal,
-  }: {
-    library: LibraryRecord
-    places: readonly string[]
-    signal: AbortSignal
-  }): Promise<void> {
+  }: ScannerServiceRefreshPlacesProps): Promise<void> {
     try {
       const { walk, changes, toProbe } = await this.reindex({
         library,
@@ -540,19 +562,11 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
    * so a failed write leaves no row pointing at a thumbnail that was
    * already deleted.
    */
-  private async reindex({
-    library,
-    scope,
-    signal,
-    onFound,
-  }: {
-    library: LibraryRecord
-    scope: Scope
-    /** Aborted by a cancel: the walk ends and nothing is written. */
-    signal: AbortSignal
-    /** A full scan's count of videos found while it walks; a refresh keeps the status as it is. */
-    onFound?: (count: number) => void
-  }): Promise<{ walk: WalkResult; changes: Reconciled; toProbe: ProbeTarget[] }> {
+  private async reindex({ library, scope, signal, onFound }: ScannerServiceReindexProps): Promise<{
+    walk: WalkResult
+    changes: Reconciled
+    toProbe: ProbeTarget[]
+  }> {
     const indexed = this.index.forLibrary(library.id)
     const walk = await walkVideos({
       roots: library.paths,
@@ -601,16 +615,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** Probes each file a few at a time. A timeout leaves the file unprobed, so the next scan tries it again. */
-  private async probe({
-    toProbe,
-    signal,
-    onProbed,
-  }: {
-    toProbe: readonly ProbeTarget[]
-    /** Aborted by a cancel: the files not yet started stay unprobed, for the next scan. */
-    signal: AbortSignal
-    onProbed: () => void
-  }): Promise<void> {
+  private async probe({ toProbe, signal, onProbed }: ScannerServiceProbeProps): Promise<void> {
     await mapWithConcurrency({
       items: toProbe,
       limit: this.config.probeConcurrency,

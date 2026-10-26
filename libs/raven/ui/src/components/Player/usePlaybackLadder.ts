@@ -26,7 +26,9 @@ import type { Delivery } from '@/lib/streamSource'
 /** The ways to play, best first, for one audio track; a step down belongs to one ladder. */
 type Ladder = { modes: readonly PlaybackMode[]; audio: number | null }
 
-const sameLadder = ({ a, b }: { a: Ladder; b: Ladder }): boolean =>
+type SameLadderProps = { a: Ladder; b: Ladder }
+
+const sameLadder = ({ a, b }: SameLadderProps): boolean =>
   a.audio === b.audio &&
   a.modes.length === b.modes.length &&
   a.modes.every((mode, index) => mode === b.modes[index])
@@ -70,6 +72,13 @@ export type PlaybackStatus =
       choices: PlayChoices
     }
 
+type UsePlaybackLadderProps = {
+  media: MediaItem
+  api: ApiClient
+  audio: number | null
+  isDefaultAudio: boolean
+}
+
 /**
  * How to play a file. The original goes straight to the browser when it can
  * take it; otherwise, or for any audio track but the default, the server
@@ -85,12 +94,7 @@ export const usePlaybackLadder = ({
   api,
   audio,
   isDefaultAudio,
-}: {
-  media: MediaItem
-  api: ApiClient
-  audio: number | null
-  isDefaultAudio: boolean
-}): PlaybackStatus => {
+}: UsePlaybackLadderProps): PlaybackStatus => {
   const settings = useQuery(playerQueriesFor(api).playbackSettings)
   const policy = settings.data?.settings ?? (settings.isError ? DEFAULT_PLAYBACK_SETTINGS : null)
   const plan = useMemo(

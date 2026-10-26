@@ -1,6 +1,8 @@
 import { devtools } from 'zustand/middleware'
 import { createStore } from 'zustand/vanilla'
 
+type RangeProps = { to: string; ordered: readonly string[] }
+
 type Selection = {
   selecting: boolean
   keys: ReadonlySet<string>
@@ -10,7 +12,7 @@ type Selection = {
   start: (key?: string) => void
   toggle: (key: string) => void
   /** Selects every key of `ordered` from the anchor to `to`, whichever comes first. */
-  range: (args: { to: string; ordered: readonly string[] }) => void
+  range: (args: RangeProps) => void
   selectAll: (keys: readonly string[]) => void
   /** Empties the selection and stays in select mode. */
   clear: () => void

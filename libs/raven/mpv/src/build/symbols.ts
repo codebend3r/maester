@@ -11,7 +11,9 @@ export type Import =
 const importLine =
   /^\(undefined\) (?:weak )?external (?<symbol>.+) \((?:from (?<library>[^()]+)|dynamically looked up)\)$/
 
-export const parseImports = ({ listing }: { listing: string }): Import[] =>
+type ParseImportsProps = { listing: string }
+
+export const parseImports = ({ listing }: ParseImportsProps): Import[] =>
   listing
     .split('\n')
     .map((line) => line.trim())
@@ -25,12 +27,16 @@ export const parseImports = ({ listing }: { listing: string }): Import[] =>
         : { kind: IMPORT_KINDS.bound, symbol, library }
     })
 
+type ParseDefinitionsProps = { listing: string }
+
 /** Names from `nm -jU`, one per line; Swift and Objective-C names can hold spaces. */
-export const parseDefinitions = ({ listing }: { listing: string }) =>
+export const parseDefinitions = ({ listing }: ParseDefinitionsProps) =>
   new Set(listing.split('\n').filter((line) => line !== ''))
 
+type LibraryNameProps = { installName: string }
+
 /** The short name nm prints in "(from ...)": the leaf of the install name up to its first dot. */
-export const libraryName = ({ installName }: { installName: string }) =>
+export const libraryName = ({ installName }: LibraryNameProps) =>
   basename(installName).split('.')[0] ?? installName
 
 type Policy = {
@@ -57,17 +63,19 @@ export type AuditedFile = keyof typeof symbolPolicies
 const isGlslang = (symbol: string) =>
   symbol.includes('glslang') || symbol.includes('GetDefaultResources')
 
+type SymbolProblemsProps = {
+  file: AuditedFile
+  imports: Import[]
+  definitions: ReadonlySet<string>
+  dependencies: string[]
+}
+
 export const symbolProblems = ({
   file,
   imports,
   definitions,
   dependencies,
-}: {
-  file: AuditedFile
-  imports: Import[]
-  definitions: ReadonlySet<string>
-  dependencies: string[]
-}) => {
+}: SymbolProblemsProps) => {
   const policy: Policy = symbolPolicies[file]
   const loaded = new Set(dependencies.map((installName) => libraryName({ installName })))
   const lookups = imports

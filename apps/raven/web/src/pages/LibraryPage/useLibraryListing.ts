@@ -11,6 +11,14 @@ import { mediaListQuery, metadataHealthQuery, showListQuery } from '@/lib/querie
 import { LISTING_STATES, type Listing, type ListingState } from '@/pages/LibraryPage/libraryShape'
 import { POLL_MS, anyPending, useMatchingPassDone } from '@/pages/LibraryPage/useMatchingPassDone'
 
+type UseLibraryListingProps = {
+  libraryId: number
+  settings: LibrarySettings
+  search: string
+  seed: number
+  scanning: boolean
+}
+
 /**
  * What a library lists, one shape whatever its type: a TV library's shows
  * and the files no show was found for, or every file of any other. While a
@@ -22,13 +30,7 @@ export const useLibraryListing = ({
   search,
   seed,
   scanning,
-}: {
-  libraryId: number
-  settings: LibrarySettings
-  search: string
-  seed: number
-  scanning: boolean
-}): ListingState => {
+}: UseLibraryListingProps): ListingState => {
   const isShowList = listsShows(settings.kind)
   // Files only leave pending while TMDB answers; without it they wait for good.
   const metadata = useQuery({

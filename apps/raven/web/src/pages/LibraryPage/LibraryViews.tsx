@@ -21,8 +21,10 @@ import { Loading } from '@/components/Skeleton/Skeleton'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
+type ShowsViewProps = { settings: LibrarySettings; shows: ShowEntry[] }
+
 /** A TV library's shows laid out the way its view setting says; the grouped view is the grid, as the page itself splits matched from not. */
-const ShowsView = ({ settings, shows }: { settings: LibrarySettings; shows: ShowEntry[] }) => {
+const ShowsView = ({ settings, shows }: ShowsViewProps) => {
   switch (settings.view) {
     case LIBRARY_VIEWS.list:
       return <ShowList shows={shows} />
@@ -44,13 +46,15 @@ const ShowsView = ({ settings, shows }: { settings: LibrarySettings; shows: Show
 const isMovieLibrary = (settings: LibrarySettings): boolean =>
   matchTypeFor(settings.kind) === ITEM_TYPES.movie
 
+type MediaViewProps = { settings: LibrarySettings; items: MediaItem[] }
+
 /**
  * The library's videos laid out the way its view setting says, a Movies
  * library's as posters, each card or tile showing the value the listing is
  * sorted by. The settings are coherent with the library's type, so a TV
  * library's leftover files are never grouped.
  */
-const MediaView = ({ settings, items }: { settings: LibrarySettings; items: MediaItem[] }) => {
+const MediaView = ({ settings, items }: MediaViewProps) => {
   const matchType = matchTypeFor(settings.kind)
   const movies = isMovieLibrary(settings)
   switch (settings.view) {
@@ -90,19 +94,17 @@ const MediaView = ({ settings, items }: { settings: LibrarySettings; items: Medi
   }
 }
 
+type LibraryListingProps = {
+  settings: LibrarySettings
+  shows: ShowEntry[]
+  files: MediaItem[]
+}
+
 /**
  * A library's listing laid out: its files, or a TV library's shows, with the
  * files no show was found for in a bucket of their own after them.
  */
-export const LibraryListing = ({
-  settings,
-  shows,
-  files,
-}: {
-  settings: LibrarySettings
-  shows: ShowEntry[]
-  files: MediaItem[]
-}) => {
+export const LibraryListing = ({ settings, shows, files }: LibraryListingProps) => {
   const filesView = <MediaView settings={settings} items={files} />
   if (!listsShows(settings.kind)) return filesView
   const showsView = <ShowsView settings={settings} shows={shows} />
@@ -127,8 +129,10 @@ export const LibraryListing = ({
   )
 }
 
+type ListingBonesProps = { settings: LibrarySettings }
+
 /** Stand-ins shaped as the listing will be: covers, rows, a TV library's wide show cards, or cards. */
-const ListingBones = ({ settings }: { settings: LibrarySettings }) => {
+const ListingBones = ({ settings }: ListingBonesProps) => {
   switch (settings.view) {
     case LIBRARY_VIEWS.covers:
       return <CoverGridSkeleton posters={matchTypeFor(settings.kind) != null} />
@@ -146,12 +150,14 @@ const ListingBones = ({ settings }: { settings: LibrarySettings }) => {
   }
 }
 
+type LibraryListingSkeletonProps = { settings: LibrarySettings }
+
 /**
  * The listing while it is on its way, laid out as its view lays it out:
  * bare covers, rows for a list or tiles, wide cards for a TV library's
  * shows, else cards, posters for a Movies library's films.
  */
-export const LibraryListingSkeleton = ({ settings }: { settings: LibrarySettings }) => (
+export const LibraryListingSkeleton = ({ settings }: LibraryListingSkeletonProps) => (
   <Loading label={`Gathering the ${listsShows(settings.kind) ? 'shows' : 'videos'}`}>
     <ListingBones settings={settings} />
   </Loading>

@@ -32,7 +32,9 @@ describe('useFollowAdminLock', () => {
     client.setQueryData(queryKeys.authConfig, { state: AUTH_CONFIG_STATES.off })
     client.setQueryData(queryKeys.adminLock, { state: 'on', available: true })
     const invalidated = spyOn(client, 'invalidateQueries').mockImplementation(async () => undefined)
-    const wrapper = ({ children }: { children: ReactNode }) => (
+    type WrapperProps = { children: ReactNode }
+
+    const wrapper = ({ children }: WrapperProps) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     )
     renderHook(() => useFollowAdminLock(), { wrapper })
@@ -54,7 +56,9 @@ describe('useAdminLock', () => {
     const client = new QueryClient()
     client.setQueryData(queryKeys.authConfig, config)
     client.setQueryData(queryKeys.adminLock, { state: ADMIN_LOCK_STATES.off })
-    const wrapper = ({ children }: { children: ReactNode }) => (
+    type WrapperProps = { children: ReactNode }
+
+    const wrapper = ({ children }: WrapperProps) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     )
     return renderHook(() => useAdminLock(), { wrapper })

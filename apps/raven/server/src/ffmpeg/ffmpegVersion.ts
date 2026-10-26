@@ -2,14 +2,13 @@
 const releaseOf = (line: string | null): string | null =>
   /^\S+ version (\S+)/.exec(line ?? '')?.[1] ?? null
 
-/** What to warn of when ffmpeg and ffprobe are different builds, or null when they match or one is missing. */
-export const toolMismatch = ({
-  ffmpeg,
-  ffprobe,
-}: {
+type ToolMismatchProps = {
   ffmpeg: string | null
   ffprobe: string | null
-}): string | null => {
+}
+
+/** What to warn of when ffmpeg and ffprobe are different builds, or null when they match or one is missing. */
+export const toolMismatch = ({ ffmpeg, ffprobe }: ToolMismatchProps): string | null => {
   const [ffmpegRelease, ffprobeRelease] = [releaseOf(ffmpeg), releaseOf(ffprobe)]
   if (ffmpegRelease == null || ffprobeRelease == null || ffmpegRelease === ffprobeRelease) {
     return null
@@ -43,7 +42,9 @@ type Release = { major: number; minor: number }
 const RUN_RELATIVE_SINCE: Release = { major: 6, minor: 0 }
 const NAMED_TIME_BASE_SINCE: Release = { major: 6, minor: 1 }
 
-const isBefore = ({ release, since }: { release: Release; since: Release }): boolean =>
+type IsBeforeProps = { release: Release; since: Release }
+
+const isBefore = ({ release, since }: IsBeforeProps): boolean =>
   release.major < since.major || (release.major === since.major && release.minor < since.minor)
 
 /** The dialect of the ffmpeg whose `-version` line this is; a build without a release number is new. */

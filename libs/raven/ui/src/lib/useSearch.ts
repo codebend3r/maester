@@ -1,13 +1,15 @@
 import { SEARCH_DELAY_MS } from '@raven/core'
 import { useEffect, useState } from 'react'
 
+type UseSearchProps = { initial?: string }
+
 /**
  * A search box's state: the text as typed, and the `query` it asks for,
  * which follows the text only once typing pauses for `SEARCH_DELAY_MS`, so a
  * search runs once per pause rather than once per keystroke. `searchNow`
  * skips the wait, as Enter does, and `searchFor` sets the box from outside it.
  */
-export const useSearch = ({ initial = '' }: { initial?: string } = {}) => {
+export const useSearch = ({ initial = '' }: UseSearchProps = {}) => {
   const [text, setText] = useState(initial)
   const [query, setQuery] = useState(initial.trim())
   useEffect(() => {

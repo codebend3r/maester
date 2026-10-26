@@ -83,8 +83,10 @@ const rowHeightOf = (card: ReturnType<typeof screen.getByRole>): unknown => {
   return heightOf(card.parent)
 }
 
+type SheetsProps = { answer: string | null }
+
 /** The sheets the screen asked for, and the option each was answered with by `answer`. */
-const sheets = ({ answer }: { answer: string | null }) => {
+const sheets = ({ answer }: SheetsProps) => {
   const asked: { title: string; options: string[] }[] = []
   jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((options, done) => {
     asked.push({ title: options.title ?? '', options: options.options })
@@ -103,7 +105,9 @@ const cardTitles = (titles: readonly string[]): string[] =>
 
 const FILM_TITLES = ['Ashfall Gate', 'Busboys', 'Night Train'] as const
 
-const renderLibrary = async ({ id, query }: { id: number | string; query?: string }) => {
+type RenderLibraryProps = { id: number | string; query?: string }
+
+const renderLibrary = async ({ id, query }: RenderLibraryProps) => {
   mockParams.mockReturnValue({
     [APP_ROUTE_PARAMS.id]: String(id),
     ...(query === undefined ? {} : { [APP_ROUTE_PARAMS.query]: query }),

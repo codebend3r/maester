@@ -8,12 +8,14 @@ const MARKS = {
   light: '/brand/raven-mark-on-light.svg',
 } as const
 
+type LogoProps = { isMarkOnly?: boolean }
+
 /**
  * The mark beside the wordmark, drawn for the theme's ground. The mark is
  * decoration: the word names whatever wraps it. `isMarkOnly` leaves the
  * word out, for a side menu down to its icons.
  */
-export const Logo = ({ isMarkOnly = false }: { isMarkOnly?: boolean }) => {
+export const Logo = ({ isMarkOnly = false }: LogoProps) => {
   const tone = useTheme((state) => themeOf(state.theme).tone)
   return (
     <span className={isMarkOnly ? `${styles.logo} ${styles.markOnly}` : styles.logo}>

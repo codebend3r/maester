@@ -5,6 +5,8 @@
  */
 const TV_ON = ['1', 'true'] as const
 
+type IsTvPrebuildProps = { value: string | undefined }
+
 /** Whether `EXPO_TV` asks for the Apple TV's or Android TV's native project. */
-export const isTvPrebuild = ({ value }: { value: string | undefined }): boolean =>
+export const isTvPrebuild = ({ value }: IsTvPrebuildProps): boolean =>
   TV_ON.some((on) => on === value)

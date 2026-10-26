@@ -16,10 +16,12 @@ type SignOutResult = Awaited<ReturnType<AuthClient['signOut']>>
 const Where = () => <p data-testid="where">{useLocation().pathname}</p>
 
 describe('AccountMenu', () => {
+  type RenderMenuProps = { account?: Account | null; signOut?: AuthClient['signOut'] }
+
   const renderMenu = ({
     account = fakeAccount({ email: 'jordan@example.com' }),
     signOut = async (): Promise<SignOutResult> => ({ error: null }),
-  }: { account?: Account | null; signOut?: AuthClient['signOut'] } = {}) => {
+  }: RenderMenuProps = {}) => {
     const rendered = renderWithProviders({
       ui: (
         <>

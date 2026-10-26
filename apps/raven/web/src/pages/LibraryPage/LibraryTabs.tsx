@@ -10,6 +10,11 @@ import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 const count = new Intl.NumberFormat()
 
+type LibraryTabsProps = {
+  library: Library
+  current: LibrarySection
+}
+
 /**
  * The library's tabs its type has, each a link to its own address, the open
  * one marked, with a count beside those the library counts. The header
@@ -17,13 +22,7 @@ const count = new Intl.NumberFormat()
  * The tabs replace the address rather than stack on it, so Back leaves the
  * library.
  */
-export const LibraryTabs = ({
-  library,
-  current,
-}: {
-  library: Library
-  current: LibrarySection
-}) => (
+export const LibraryTabs = ({ library, current }: LibraryTabsProps) => (
   <nav aria-label="Sections" className={styles.tabsNav}>
     <ul className={styles.tabs}>
       {sectionsFor(library.settings.kind).map((section) => {

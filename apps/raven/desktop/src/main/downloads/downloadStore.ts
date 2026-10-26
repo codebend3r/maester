@@ -13,15 +13,17 @@ export const DOWNLOADS_DEBOUNCE_MS = 1000
 /** The downloads, and whether an unreadable `downloads.json` was set aside to load them empty. */
 export type LoadedDownloads = { state: DownloadsState; wasSetAside: boolean }
 
+type LoadDownloadsProps = {
+  fs: StateFs
+  file: string
+  now: () => number
+}
+
 export const loadDownloads = async ({
   fs,
   file,
   now,
-}: {
-  fs: StateFs
-  file: string
-  now: () => number
-}): Promise<LoadedDownloads> => {
+}: LoadDownloadsProps): Promise<LoadedDownloads> => {
   const read = await readJsonFile({ fs, file, now, guard: isStoredDownloads })
   switch (read.kind) {
     case JSON_READ_KINDS.read:

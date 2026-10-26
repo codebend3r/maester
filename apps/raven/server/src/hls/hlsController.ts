@@ -63,6 +63,33 @@ const MEDIA_ROUTES = 'api/media'
 /** An HLS path as this controller's route: what follows its `api/media` prefix. */
 const routeOf = (path: HlsPath): string => path.slice(`/${MEDIA_ROUTES}/`.length)
 
+type HlsControllerPlanOfProps = {
+  mode: StreamMode
+  file: MediaFile
+  clock: MediaClock
+  end: number
+}
+
+type HlsControllerSessionOfProps = { id: number; session: string }
+
+type HlsControllerTextTrackOfProps = {
+  file: MediaFile
+  trackId: string
+}
+
+type HlsControllerSendPlaylistProps = {
+  reply: FastifyReply
+  playlist: string
+}
+
+type HlsControllerSendMediaProps = {
+  request: FastifyRequest
+  reply: FastifyReply
+  session: HlsSession
+  type: (typeof RAVEN_CONTENT_TYPES)[keyof typeof RAVEN_CONTENT_TYPES]
+  bytes: (signal: AbortSignal) => Promise<Uint8Array>
+}
+
 /**
  * Converted media for players that take HLS rather than Media Source
  * Extensions: the native players on phones and TVs. The master playlist
@@ -295,17 +322,7 @@ export class HlsController {
   }
 
   /** The segments the session cuts: a remux's at its keyframes, a transcode's on its frames. */
-  private async planOf({
-    mode,
-    file,
-    clock,
-    end,
-  }: {
-    mode: StreamMode
-    file: MediaFile
-    clock: MediaClock
-    end: number
-  }): Promise<SegmentPlan> {
+  private async planOf({ mode, file, clock, end }: HlsControllerPlanOfProps): Promise<SegmentPlan> {
     const plan =
       mode === PLAYBACK_MODES.remux
         ? remuxPlan({
@@ -336,7 +353,7 @@ export class HlsController {
     return file
   }
 
-  private sessionOf({ id, session }: { id: number; session: string }): HlsSession {
+  private sessionOf({ id, session }: HlsControllerSessionOfProps): HlsSession {
     const opened = isHlsSessionId(session) ? this.sessions.get({ mediaId: id, session }) : null
     if (!opened) throw new NotFoundException('No such stream session; open the stream again')
     return opened
@@ -346,10 +363,7 @@ export class HlsController {
   private async textTrackOf({
     file,
     trackId,
-  }: {
-    file: MediaFile
-    trackId: string
-  }): Promise<SubtitleTrack> {
+  }: HlsControllerTextTrackOfProps): Promise<SubtitleTrack> {
     const { tracks } = await this.tracks.tracksFor(file)
     const track = tracks.subtitles.find((candidate) => candidate.id === trackId)
     if (track === undefined || !track.supported) {
@@ -358,13 +372,7 @@ export class HlsController {
     return track
   }
 
-  private async sendPlaylist({
-    reply,
-    playlist,
-  }: {
-    reply: FastifyReply
-    playlist: string
-  }): Promise<void> {
+  private async sendPlaylist({ reply, playlist }: HlsControllerSendPlaylistProps): Promise<void> {
     // Each URI in it carries a ticket, and the session behind it ends.
     await reply
       .header(HEADERS.contentType, CONTENT_TYPES.m3u8)
@@ -383,13 +391,7 @@ export class HlsController {
     session,
     type,
     bytes,
-  }: {
-    request: FastifyRequest
-    reply: FastifyReply
-    session: HlsSession
-    type: (typeof RAVEN_CONTENT_TYPES)[keyof typeof RAVEN_CONTENT_TYPES]
-    bytes: (signal: AbortSignal) => Promise<Uint8Array>
-  }): Promise<void> {
+  }: HlsControllerSendMediaProps): Promise<void> {
     const gone = new AbortController()
     reply.raw.on(RESPONSE_EVENTS.close, () => gone.abort())
     const body = await bytes(gone.signal).catch((error: unknown) => {

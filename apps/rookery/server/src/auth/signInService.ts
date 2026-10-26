@@ -34,6 +34,21 @@ export const CALLBACK_PATH = '/auth/plex/callback'
 /** The web app's pages the server sends a browser to. */
 export const PAGE_PATHS = { home: '/', login: '/login' } as const
 
+type SignInServiceReturnToProps = { value: unknown; fallback: string }
+
+type SignInServiceStartProps = {
+  returnTo: unknown
+}
+
+type SignInServiceCompleteProps = { pendingId: string | null }
+
+type SignInServiceClaimTokenProps = {
+  pin: PlexPin
+  attempt?: number
+}
+
+type SignInServiceSignOutProps = { token: string | null }
+
 @Injectable()
 export class SignInService {
   constructor(
@@ -46,16 +61,14 @@ export class SignInService {
   ) {}
 
   /** Where a browser may go next, or `fallback`. */
-  returnTo({ value, fallback }: { value: unknown; fallback: string }): string {
+  returnTo({ value, fallback }: SignInServiceReturnToProps): string {
     return safeReturnTo({ value, appOrigins: this.config.appOrigins, fallback })
   }
 
   /** Opens a PIN at plex.tv; returns the pending sign-in's id and where to send the browser. */
   async start({
     returnTo,
-  }: {
-    returnTo: unknown
-  }): Promise<{ pendingId: string; authUrl: string }> {
+  }: SignInServiceStartProps): Promise<{ pendingId: string; authUrl: string }> {
     const pin = await this.plex.createPin()
     const pendingId = this.pending.create({
       pin,
@@ -76,7 +89,7 @@ export class SignInService {
    * trail the redirect by a moment, so the PIN is asked a few times before
    * the sign-in counts as not approved.
    */
-  async complete({ pendingId }: { pendingId: string | null }): Promise<SignInResult> {
+  async complete({ pendingId }: SignInServiceCompleteProps): Promise<SignInResult> {
     const pending = pendingId ? this.pending.live({ id: pendingId, now: this.clock() }) : null
     if (!pending) {
       return { kind: SIGN_IN_RESULT_KINDS.failed, error: SIGN_IN_ERRORS.expired, returnTo: null }
@@ -104,17 +117,14 @@ export class SignInService {
   private async claimToken({
     pin,
     attempt = 1,
-  }: {
-    pin: PlexPin
-    attempt?: number
-  }): Promise<string | null> {
+  }: SignInServiceClaimTokenProps): Promise<string | null> {
     const token = await this.plex.checkPin(pin)
     if (token != null || attempt >= this.config.pinCheckAttempts) return token
     await sleep(this.config.pinCheckDelayMs)
     return this.claimToken({ pin, attempt: attempt + 1 })
   }
 
-  signOut({ token }: { token: string | null }): void {
+  signOut({ token }: SignInServiceSignOutProps): void {
     if (token) this.sessions.delete(token)
   }
 }

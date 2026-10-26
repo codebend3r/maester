@@ -4,9 +4,11 @@ import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { useCanGoBack } from '@/lib/useCanGoBack'
 
+type AtCallbackProps = { children: ReactNode }
+
 const at =
   (index: number) =>
-  ({ children }: { children: ReactNode }) => (
+  ({ children }: AtCallbackProps) => (
     <MemoryRouter initialEntries={['/a', '/b']} initialIndex={index}>
       {children}
     </MemoryRouter>
@@ -27,9 +29,11 @@ describe('useCanGoBack', () => {
 
   it("falls back to the location's key when the browser has no index", () => {
     expect(renderHook(() => useCanGoBack(), { wrapper: at(1) }).result.current).toBe(true)
+    type WrapperProps = { children: ReactNode }
+
     expect(
       renderHook(() => useCanGoBack(), {
-        wrapper: ({ children }: { children: ReactNode }) => <MemoryRouter>{children}</MemoryRouter>,
+        wrapper: ({ children }: WrapperProps) => <MemoryRouter>{children}</MemoryRouter>,
       }).result.current,
     ).toBe(false)
   })

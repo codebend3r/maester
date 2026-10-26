@@ -16,13 +16,24 @@ const TAB_LABELS: Record<FilmographyTab, string> = {
 
 const count = new Intl.NumberFormat()
 
+type TabSearchProps = { address: URLSearchParams; tab: FilmographyTab }
+
 /** The address of tab `tab`, the rest of `address` kept: All's is the page's own, with no `?credits=`. */
-const tabSearch = ({ address, tab }: { address: URLSearchParams; tab: FilmographyTab }): string => {
+const tabSearch = ({ address, tab }: TabSearchProps): string => {
   const next = new URLSearchParams(address)
   if (tab === 'all') next.delete('credits')
   else next.set('credits', tab)
   const query = next.toString()
   return query === '' ? '' : `?${query}`
+}
+
+type FilmographyToolbarProps = {
+  search: Search
+  tab: FilmographyTab
+  counts: Record<FilmographyTab, number>
+  hasSelfCredits: boolean
+  isSelfShown: boolean
+  onSelfShownChange: (isShown: boolean) => void
 }
 
 /**
@@ -39,14 +50,7 @@ export const FilmographyToolbar = ({
   hasSelfCredits,
   isSelfShown,
   onSelfShownChange,
-}: {
-  search: Search
-  tab: FilmographyTab
-  counts: Record<FilmographyTab, number>
-  hasSelfCredits: boolean
-  isSelfShown: boolean
-  onSelfShownChange: (isShown: boolean) => void
-}) => {
+}: FilmographyToolbarProps) => {
   const id = useId()
   const [address] = useSearchParams()
   return (

@@ -9,6 +9,8 @@ const keysOnPage = (): string[] =>
     .filter((card) => !card.closest('details:not([open])'))
     .map((card) => card.dataset.entry ?? '')
 
+type UseSelectableProps = { key: string; title: string }
+
 /**
  * What a card needs to be selected: `rootProps` for its outermost element,
  * which has `data-entry={key}`, a `linkTabIndex` for its links, and the
@@ -16,7 +18,7 @@ const keysOnPage = (): string[] =>
  * on the card selects it and goes no further, so no link follows it. Outside
  * a scope the card is as it was, and has no checkbox.
  */
-export const useSelectable = ({ key, title }: { key: string; title: string }) => {
+export const useSelectable = ({ key, title }: UseSelectableProps) => {
   const scope = useSelectionScope()
   const selecting = useSelection((state) => state.selecting)
   const selected = useSelection((state) => state.keys.has(key))

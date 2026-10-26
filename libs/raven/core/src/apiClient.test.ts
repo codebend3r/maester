@@ -47,7 +47,9 @@ import {
 
 type Call = { url: string; init?: FetchInit }
 
-const respond = ({ status = 200, body }: { status?: number; body?: unknown }): FetchResponse => ({
+type RespondProps = { status?: number; body?: unknown }
+
+const respond = ({ status = 200, body }: RespondProps): FetchResponse => ({
   ok: status >= 200 && status < 300,
   status,
   statusText: status === 200 ? 'OK' : 'Error',
@@ -332,13 +334,12 @@ describe('createApiClient', () => {
       backdrop: DEFAULT_SAGA_BACKDROP,
       media: [mediaItem()],
     }
-    const asked = async <T>({
-      body,
-      call,
-    }: {
+    type AskedProps<T> = {
       body: Awaited<T>
       call: (client: ApiClient) => Promise<T>
-    }) => {
+    }
+
+    const asked = async <T>({ body, call }: AskedProps<T>) => {
       const { client, calls } = clientReturning(respond({ body }))
       expect(await call(client)).toEqual(body)
       return calls[0]?.url
@@ -856,7 +857,9 @@ describe('the metadata calls', () => {
       fetch: async () => respond({}),
       pictureCdn: '/.netlify/images',
     })
-    const at = ({ path, width }: { path: string; width?: number }): string =>
+    type AtProps = { path: string; width?: number }
+
+    const at = ({ path, width }: AtProps): string =>
       `/.netlify/images?url=${encodeURIComponent(path)}${width === undefined ? '' : `&w=${width}`}`
 
     it('sends every capability picture through it, at its own width', () => {

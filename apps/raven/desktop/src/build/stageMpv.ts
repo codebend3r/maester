@@ -18,24 +18,26 @@ export const MPV_FILES = {
 export const MPV_MACH_O = [MPV_FILES.addon, MPV_FILES.libmpv, MPV_FILES.moltenVk] as const
 export const STAGED_PATHS = [...MPV_MACH_O, 'provenance'] as const
 
-export const missingMpvFiles = ({ exists }: { exists: (relative: string) => boolean }): string[] =>
+type MissingMpvFilesProps = { exists: (relative: string) => boolean }
+
+export const missingMpvFiles = ({ exists }: MissingMpvFilesProps): string[] =>
   MPV_MACH_O.filter((relative) => !exists(relative))
+
+type CopyProps = { from: string; to: string }
 
 type StageFs = {
   exists: (path: string) => boolean
   remove: (path: string) => Promise<void>
-  copy: (paths: { from: string; to: string }) => Promise<void>
+  copy: (paths: CopyProps) => Promise<void>
 }
 
-export const stageMpv = async ({
-  from,
-  to,
-  fs,
-}: {
+type StageMpvProps = {
   from: string
   to: string
   fs: StageFs
-}): Promise<void> => {
+}
+
+export const stageMpv = async ({ from, to, fs }: StageMpvProps): Promise<void> => {
   const missing = missingMpvFiles({ exists: (relative) => fs.exists(join(from, relative)) })
   if (missing.length > 0) {
     throw new Error(

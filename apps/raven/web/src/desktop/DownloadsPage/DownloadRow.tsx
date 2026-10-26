@@ -78,8 +78,10 @@ const DELETES_TICK_MS = 10_000
 const deletesInWords = (minutes: number): string =>
   minutes === 1 ? 'Deletes in 1 minute' : `Deletes in ${minutes} minutes`
 
+type DeletesInProps = { at: number }
+
 /** How long until a download set to delete once watched goes, in whole minutes rounded up. */
-const DeletesIn = ({ at }: { at: number }) => {
+const DeletesIn = ({ at }: DeletesInProps) => {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -91,8 +93,10 @@ const DeletesIn = ({ at }: { at: number }) => {
   return minutes > 0 && <span>{deletesInWords(minutes)}</span>
 }
 
+type StatusLineProps = { view: DownloadView; textId: string }
+
 /** Where a download stands: its progress, its wait, why it stopped, or how much of it was watched. */
-const StatusLine = ({ view, textId }: { view: DownloadView; textId: string }) => {
+const StatusLine = ({ view, textId }: StatusLineProps) => {
   const { status } = view
   switch (status.kind) {
     case DOWNLOAD_STATUS_KINDS.downloading:
@@ -132,15 +136,14 @@ const StatusLine = ({ view, textId }: { view: DownloadView; textId: string }) =>
   }
 }
 
-/** One downloaded file: what it is, where it stands, and what can be done with it. */
-export const DownloadRow = ({
-  view,
-  onDeleted,
-}: {
+type DownloadRowProps = {
   view: DownloadView
   /** The row is gone with its buttons, so the page takes the focus. */
   onDeleted: () => void
-}) => {
+}
+
+/** One downloaded file: what it is, where it stands, and what can be done with it. */
+export const DownloadRow = ({ view, onDeleted }: DownloadRowProps) => {
   const { client } = useDesktop()
   const change = useChangeDownloads()
   const openReply = useOpenReply()

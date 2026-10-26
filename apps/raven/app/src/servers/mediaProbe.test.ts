@@ -22,13 +22,14 @@ const clockOf = (times: readonly number[]) => {
   }
 }
 
-const pingFetch = ({ ok = true, size = MEDIA_PROBE_BYTES }: { ok?: boolean; size?: number }) => {
+type PingFetchProps = { ok?: boolean; size?: number }
+
+const pingFetch = ({ ok = true, size = MEDIA_PROBE_BYTES }: PingFetchProps) => {
   const sent: Sent[] = []
   let blobs = 0
-  const fetch = async (
-    url: string,
-    init: { signal: AbortSignal; credentials: typeof FETCH_CREDENTIALS.omit },
-  ) => {
+  type FetchProps = { signal: AbortSignal; credentials: typeof FETCH_CREDENTIALS.omit }
+
+  const fetch = async (url: string, init: FetchProps) => {
     sent.push({ url, credentials: init.credentials, isAborted: () => init.signal.aborted })
     return {
       ok,

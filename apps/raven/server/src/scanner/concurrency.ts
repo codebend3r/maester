@@ -1,3 +1,9 @@
+type MapWithConcurrencyProps<T, R> = {
+  items: readonly T[]
+  limit: number
+  fn: (item: T) => Promise<R>
+}
+
 /**
  * `items.map(fn)` with at most `limit` calls in flight, results in input
  * order. Used wherever the NAS is on the other end: a thousand parallel
@@ -7,11 +13,7 @@ export const mapWithConcurrency = async <T, R>({
   items,
   limit,
   fn,
-}: {
-  items: readonly T[]
-  limit: number
-  fn: (item: T) => Promise<R>
-}): Promise<R[]> => {
+}: MapWithConcurrencyProps<T, R>): Promise<R[]> => {
   const results = new Map<number, R>()
   const cursor = { next: 0 }
 
@@ -32,12 +34,14 @@ export type Gate = {
   run: <T>(task: () => Promise<T>) => Promise<T>
 }
 
+type CreateGateProps = { limit: number }
+
 /**
  * A limit shared by every caller that holds the same gate, unlike
  * `mapWithConcurrency`, whose limit covers one call. Waiters go in arrival
  * order, and a task that fails still frees its place.
  */
-export const createGate = ({ limit }: { limit: number }): Gate => {
+export const createGate = ({ limit }: CreateGateProps): Gate => {
   const state = { running: 0 }
   const waiting: Array<() => void> = []
 
@@ -71,14 +75,18 @@ export const createGate = ({ limit }: { limit: number }): Gate => {
   }
 }
 
+type PushProps = { key: string; task: () => Promise<void> }
+
+type AgainProps = { key: string; task: () => Promise<void> }
+
 export type TaskQueue = {
   /** Queues `task` under `key`; a key already queued or running is ignored. */
-  push: (args: { key: string; task: () => Promise<void> }) => void
+  push: (args: PushProps) => void
   /**
    * Like `push`, but a key that is running is queued once more, to run
    * after it: for work that changed what the running task has already read.
    */
-  again: (args: { key: string; task: () => Promise<void> }) => void
+  again: (args: AgainProps) => void
   /** Drops a queued task that has not started yet. */
   cancel: (key: string) => void
   /** Resolves once nothing is queued or running. */
@@ -86,12 +94,14 @@ export type TaskQueue = {
   size: () => number
 }
 
+type CreateTaskQueueProps = { concurrency: number }
+
 /**
  * A keyed background queue with fixed concurrency, for work that trickles in
  * from scans and should neither block them nor run twice for the same file.
  * A task that throws is dropped; tasks record their own failures.
  */
-export const createTaskQueue = ({ concurrency }: { concurrency: number }): TaskQueue => {
+export const createTaskQueue = ({ concurrency }: CreateTaskQueueProps): TaskQueue => {
   const queued = new Map<string, () => Promise<void>>()
   const running = new Set<string>()
   // Tasks asked for again while their key ran; each is queued once it ends.
@@ -159,6 +169,13 @@ export type RateLimit = {
   reset: () => void
 }
 
+type CreateRateLimitProps = {
+  perSecond: number
+  inFlight: number
+  now?: () => number
+  sleep?: (ms: number) => Promise<void>
+}
+
 /**
  * A gate that also spaces out starts, for an API with a ceiling on requests
  * a second. Starts are booked a slot apart, so a burst queues rather than
@@ -169,12 +186,7 @@ export const createRateLimit = ({
   inFlight,
   now = Date.now,
   sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
-}: {
-  perSecond: number
-  inFlight: number
-  now?: () => number
-  sleep?: (ms: number) => Promise<void>
-}): RateLimit => {
+}: CreateRateLimitProps): RateLimit => {
   const gate = createGate({ limit: inFlight })
   const state = { rate: perSecond, next: 0 }
 

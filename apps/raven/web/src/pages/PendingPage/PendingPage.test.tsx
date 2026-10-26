@@ -26,10 +26,14 @@ const WAITING = { name: 'Waiting for approval' } as const
 const REMOVED = { name: 'Your access was removed' } as const
 const CHECK_FAILED = 'Could not check. Try again.'
 
-const refusal = ({ status, reason }: { status: number; reason: ApiError['refusal'] }) =>
+type RefusalProps = { status: number; reason: ApiError['refusal'] }
+
+const refusal = ({ status, reason }: RefusalProps) =>
   new ApiError({ status, message: 'Refused', refusal: reason })
 
-const refused = ({ reason }: { reason: (typeof AUTH_REFUSALS)[keyof typeof AUTH_REFUSALS] }) =>
+type RefusedProps = { reason: (typeof AUTH_REFUSALS)[keyof typeof AUTH_REFUSALS] }
+
+const refused = ({ reason }: RefusedProps) =>
   refusal({ status: 403, reason: { reason, message: 'Refused' } })
 
 const renderPending = ({
@@ -318,7 +322,9 @@ describe('PendingPage', () => {
   })
 
   describe('in the app', () => {
-    const renderApp = ({ route }: { route: string }) =>
+    type RenderAppProps = { route: string }
+
+    const renderApp = ({ route }: RenderAppProps) =>
       renderAuthPage({ path: '*', page: <AppRoutes />, route, isSignedIn: true })
 
     it.each([

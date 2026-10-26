@@ -20,7 +20,9 @@ export type AuthClient = Pick<
   | 'onAuthStateChange'
 >
 
-export const createAuthClient = ({ config }: { config: ReadyAuthConfig }): AuthClient =>
+type CreateAuthClientProps = { config: ReadyAuthConfig }
+
+export const createAuthClient = ({ config }: CreateAuthClientProps): AuthClient =>
   createBrowserClient(config.supabaseUrl, config.publishableKey, {
     cookieOptions: { name: config.cookieName, sameSite: 'lax', path: '/' },
   }).auth

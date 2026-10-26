@@ -26,14 +26,13 @@ const RECENT: RecentView = {
 
 const PLAY: DesktopReply = { type: DESKTOP_REPLIES.play, target: { fileId: FILE_ID, queue: [] } }
 
-/** Main with `recents` until they are cleared or removed, and `answers` for the rest. */
-const localMain = ({
-  recents = [RECENT],
-  answers = {},
-}: {
+type LocalMainProps = {
   recents?: RecentView[]
   answers?: Partial<Record<string, DesktopReply>>
-} = {}) => {
+}
+
+/** Main with `recents` until they are cleared or removed, and `answers` for the rest. */
+const localMain = ({ recents = [RECENT], answers = {} }: LocalMainProps = {}) => {
   const state = { recents }
   return fakeClient({
     request: async (request) => {

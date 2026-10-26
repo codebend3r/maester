@@ -7,18 +7,15 @@ import { repositories } from '@/test/repositories'
 
 type Answer = ExternalScore[] | 'unknown' | Error
 
-/** A score source that answers `answer` while `enabled`, counting down `remaining` with each call. */
-const fakeSource = ({
-  provider,
-  answer,
-  enabled = true,
-  remaining = 10,
-}: {
+type FakeSourceProps = {
   provider: ScoreProvider
   answer: Answer
   enabled?: boolean
   remaining?: number
-}) => {
+}
+
+/** A score source that answers `answer` while `enabled`, counting down `remaining` with each call. */
+const fakeSource = ({ provider, answer, enabled = true, remaining = 10 }: FakeSourceProps) => {
   const state = { enabled, remaining, answer }
   const lookUp = vi.fn<ScoreSource['lookUp']>(async () => {
     state.remaining -= 1
@@ -45,8 +42,9 @@ const rottenTomatoes = (value: number): ExternalScore => ({
 describe('asking for scores', () => {
   const database = testDatabase('raven-scores-fetch-')
   const metadata = () => repositories(database.get()).metadata
-  const scores = ({ omdb, mdblist }: { omdb: ScoreSource; mdblist: ScoreSource }) =>
-    new Scores(metadata(), omdb, mdblist)
+  type ScoresProps = { omdb: ScoreSource; mdblist: ScoreSource }
+
+  const scores = ({ omdb, mdblist }: ScoresProps) => new Scores(metadata(), omdb, mdblist)
   const movie = (tmdbId: string) => ({
     itemId: metadata().save({
       item: { ...BLANK_ITEM, type: 'movie', tmdbId, number: null, title: tmdbId, imdbId: 'tt1' },

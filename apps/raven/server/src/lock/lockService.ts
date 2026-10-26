@@ -23,6 +23,8 @@ export const PRIVACIES = { library: 'library', media: 'media', item: 'item' } as
 
 export type Privacy = (typeof PRIVACIES)[keyof typeof PRIVACIES]
 
+type SeesProps = { privacy: Privacy; id: number }
+
 /** What one request may see of the locked libraries. */
 export type Viewer = {
   /** A library shows at all, by its name and type, unless it is locked and the caller cannot manage. */
@@ -32,7 +34,7 @@ export type Viewer = {
   /** A movie or show shows when a library it may show from holds a file of it. */
   seesItem: (itemId: number) => boolean
   /** Whether what a route's id names may show; an id that names nothing is the route's to refuse. */
-  sees: (args: { privacy: Privacy; id: number }) => boolean
+  sees: (args: SeesProps) => boolean
 }
 
 type Request = Pick<FastifyRequest, 'headers'>
@@ -55,6 +57,22 @@ const EVERYTHING: Viewer = {
   seesItem: () => true,
   sees: () => true,
 }
+
+type LockServiceStateProps = { request: Request }
+
+type LockServiceUnlockProps = { pin: string; request: Request }
+
+type LockServiceViewerProps = { request: Request }
+
+type LockServiceAccountIdOfProps = { request: Request }
+
+type LockServiceIsOwnerOrLegacyProps = { request: Request }
+
+type LockServiceUnlockedUntilProps = { request: Request }
+
+type LockServiceIsUnlockedProps = { request: Request }
+
+type LockServiceCookieUntilProps = { request: Request }
 
 /**
  * Keeps locked libraries behind the server's PIN. Entering it gives the
@@ -85,13 +103,13 @@ export class LockService {
     return this.config.libraryPin != null
   }
 
-  state({ request }: { request: Request }): LockState {
+  state({ request }: LockServiceStateProps): LockState {
     if (!this.isOwnerOrLegacy({ request })) return { available: false, unlocked: false }
     return { available: this.available, unlocked: this.isUnlocked({ request }) }
   }
 
   /** Throws 403 `not_owner` for an account that is not the owner, before the PIN is even looked at. */
-  unlock({ pin, request }: { pin: string; request: Request }): Unlocking {
+  unlock({ pin, request }: LockServiceUnlockProps): Unlocking {
     if (!this.isOwnerOrLegacy({ request })) throw authFailure(AUTH_REFUSALS.notOwner)
     const expected = this.config.libraryPin
     if (expected == null) {
@@ -117,7 +135,7 @@ export class LockService {
     return `${SERVER_COOKIES.unlock}=; Max-Age=0; ${this.attributes()}`
   }
 
-  viewer({ request }: { request: Request }): Viewer {
+  viewer({ request }: LockServiceViewerProps): Viewer {
     const locked = this.libraries.lockedIds()
     if (locked.size === 0 || this.isUnlocked({ request })) return EVERYTHING
     const isHidden = !this.management.canManage({ request })
@@ -129,7 +147,7 @@ export class LockService {
       // it may be a locked library's.
       return holding.some(seesLibrary)
     }
-    const sees = ({ privacy, id }: { privacy: Privacy; id: number }): boolean => {
+    const sees = ({ privacy, id }: SeesProps): boolean => {
       switch (privacy) {
         case PRIVACIES.library:
           return seesLibrary(id)
@@ -158,12 +176,12 @@ export class LockService {
   }
 
   /** The account id the unlock cookie names for the request: none for a server without accounts or an unbound request. */
-  private accountIdOf({ request }: { request: Request }): string {
+  private accountIdOf({ request }: LockServiceAccountIdOfProps): string {
     return accountOf(this.sessions.callerOf({ request }))?.id ?? NO_ACCOUNT
   }
 
   /** Whether the PIN is this caller's to enter: the owner once accounts are ready, anyone before. */
-  private isOwnerOrLegacy({ request }: { request: Request }): boolean {
+  private isOwnerOrLegacy({ request }: LockServiceIsOwnerOrLegacyProps): boolean {
     return this.management.isLegacy() || this.management.canManage({ request })
   }
 
@@ -173,7 +191,7 @@ export class LockService {
    * owner minted it under, whichever holds longer. Only a caller who may
    * manage raven is ever unlocked.
    */
-  unlockedUntil({ request }: { request: Request }): number | null {
+  unlockedUntil({ request }: LockServiceUnlockedUntilProps): number | null {
     if (!this.management.canManage({ request })) return null
     const caller = this.sessions.callerOf({ request })
     const now = Date.now()
@@ -184,7 +202,7 @@ export class LockService {
     return holding.length === 0 ? null : Math.max(...holding)
   }
 
-  private isUnlocked({ request }: { request: Request }): boolean {
+  private isUnlocked({ request }: LockServiceIsUnlockedProps): boolean {
     return this.unlockedUntil({ request }) !== null
   }
 
@@ -193,7 +211,7 @@ export class LockService {
    * caller's own account. A cookie from before it named an account has two
    * parts and counts for nothing.
    */
-  private cookieUntil({ request }: { request: Request }): number | null {
+  private cookieUntil({ request }: LockServiceCookieUntilProps): number | null {
     const parts =
       readCookie({
         header: request.headers[AUTH_HEADERS.cookie],

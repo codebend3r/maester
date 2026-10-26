@@ -35,13 +35,12 @@ type Injected = {
   json: () => unknown
 }
 
-const shape = <T>({
-  response,
-  guard,
-}: {
+type ShapeProps<T> = {
   response: Injected
   guard: (value: unknown) => value is T
-}): T => {
+}
+
+const shape = <T>({ response, guard }: ShapeProps<T>): T => {
   const body: unknown = response.json()
   if (!guard(body)) throw new Error(`Unexpected body: ${response.rawPayload.toString()}`)
   return body

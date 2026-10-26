@@ -98,7 +98,9 @@ const asSent = (routes: readonly Route[]): Sent[] =>
       : [{ route, method: route.method }],
   )
 
-const send = ({ options }: { options: InjectOptions }) => enforced.app.inject(options)
+type SendProps = { options: InjectOptions }
+
+const send = ({ options }: SendProps) => enforced.app.inject(options)
 
 const REFUSALS = {
   [CALLER_KINDS.anonymous]: { status: 401, reason: AUTH_REFUSALS.signedOut },
@@ -107,8 +109,10 @@ const REFUSALS = {
   [CALLER_KINDS.revoked]: { status: 403, reason: AUTH_REFUSALS.revoked },
 } as const
 
+type RefusesProps = { route: Route; caller: keyof typeof REFUSALS }
+
 /** Whether a route refuses `caller`: every one not open to anyone, but `me` answers any account its own status. */
-const refuses = ({ route, caller }: { route: Route; caller: keyof typeof REFUSALS }): boolean =>
+const refuses = ({ route, caller }: RefusesProps): boolean =>
   route.account !== ACCOUNT_REQUIREMENTS.anyone &&
   !(
     route.account === ACCOUNT_REQUIREMENTS.session &&
@@ -199,7 +203,9 @@ describe('the default-deny gate', () => {
     const { posterVersion } = await enforced.ownerApi.getItem(item)
     if (posterVersion === null) throw new Error('The enforced movie has no poster')
     fixture.fetcher.mockClear()
-    const picture = ({ version }: { version: string }) =>
+    type PictureProps = { version: string }
+
+    const picture = ({ version }: PictureProps) =>
       send({
         options: {
           url: pathOf({
@@ -288,7 +294,9 @@ describe('the default-deny gate', () => {
 })
 
 describe('tokens on an approved route', () => {
-  const libraries = ({ headers }: { headers: Record<string, string> }) =>
+  type LibrariesProps = { headers: Record<string, string> }
+
+  const libraries = ({ headers }: LibrariesProps) =>
     send({ options: { url: ROUTES.libraries.path, headers } })
 
   it('refuses tokens that are expired, misaddressed, forged or garbage', async () => {
@@ -351,7 +359,9 @@ it('lets an approved member read, write and fetch artwork', async () => {
     caller: CALLER_KINDS.member,
     via: TOKEN_CARRIERS.bearer,
   })
-  const get = ({ route, params }: { route: Route; params?: Record<string, number | string> }) =>
+  type GetProps = { route: Route; params?: Record<string, number | string> }
+
+  const get = ({ route, params }: GetProps) =>
     send({ options: { url: pathOf({ route, params }), headers } })
 
   const reads = await Promise.all(
@@ -507,7 +517,9 @@ describe('owner-only management', () => {
   })
 
   it('shows folders to the owner and hides them from a member', async () => {
-    const foldersSeenBy = async ({ headers }: { headers: Record<string, string> }) => {
+    type FoldersSeenByProps = { headers: Record<string, string> }
+
+    const foldersSeenBy = async ({ headers }: FoldersSeenByProps) => {
       const response = await send({ options: { url: ROUTES.libraries.path, headers } })
       const body: unknown = response.json()
       return Array.isArray(body) ? body.filter(isLibrary).map(({ paths }) => paths) : []
@@ -522,7 +534,9 @@ describe('owner-only management', () => {
       paths: [join(enforced.mediaDir, 'Missing')],
     })
     await enforced.app.get(ScannerService).whenIdle(created.id)
-    const scanErrorFor = async ({ headers }: { headers: Record<string, string> }) => {
+    type ScanErrorForProps = { headers: Record<string, string> }
+
+    const scanErrorFor = async ({ headers }: ScanErrorForProps) => {
       const response = await send({
         options: { url: pathOf({ route: ROUTES.library, params: { id: created.id } }), headers },
       })
@@ -539,15 +553,19 @@ describe('owner-only management', () => {
 })
 
 describe('an admin cookie from before accounts', () => {
-  const displayChange = ({ headers }: { headers: Record<string, string> }) => ({
+  type DisplayChangeProps = { headers: Record<string, string> }
+
+  const displayChange = ({ headers }: DisplayChangeProps) => ({
     method: ROUTES.saveDisplaySettings.method,
     url: ROUTES.saveDisplaySettings.path,
     headers,
     payload: { titles: TITLE_DISPLAYS.text },
   })
 
+  type MintAdminCookieProps = { dir: string }
+
   /** The admin cookie a server with accounts off gives, which manages there. */
-  const mintAdminCookie = async ({ dir }: { dir: string }): Promise<string> => {
+  const mintAdminCookie = async ({ dir }: MintAdminCookieProps): Promise<string> => {
     const before = await createApp({
       config: testConfig({ dataDir: join(dir, 'data'), mediaDir: join(dir, 'media') }),
       quiet: true,
@@ -597,17 +615,23 @@ describe('membership lookups shared between requests', () => {
   const CONCURRENT_REQUESTS = 30
   const FIRST_BYTES = { [HEADERS.range]: 'bytes=0-99' }
 
-  const callsTo = ({ path }: { path: string }) =>
+  type CallsToProps = { path: string }
+
+  const callsTo = ({ path }: CallsToProps) =>
     fixture.fetcher.mock.calls.filter(([{ url }]) => url.endsWith(path)).length
 
   const membershipCalls = () => callsTo({ path: RPC_PATHS.current })
 
   const memberToken = () => fixture.mint({ id: AUTH_TEST_IDS.friend })
 
-  const setMember = ({ status }: { status: MemberStatusChange['status'] }) =>
+  type SetMemberProps = { status: MemberStatusChange['status'] }
+
+  const setMember = ({ status }: SetMemberProps) =>
     enforced.ownerApi.setMemberStatus({ id: AUTH_TEST_IDS.friend, change: { status } })
 
-  const library = ({ token }: { token: string }) =>
+  type LibraryProps = { token: string }
+
+  const library = ({ token }: LibraryProps) =>
     enforced.app.inject({ url: ROUTES.libraries.path, headers: bearerHeaders({ token }) })
 
   afterEach(async () => {

@@ -91,8 +91,10 @@ const ipv4PiecesOf = (text: string): number[] | null => {
   return [a * 256 + b, c * 256 + d]
 }
 
+type Ipv6PiecesOfProps = { text: string; isLast: boolean }
+
 /** The 16-bit pieces of one side of `::`; an IPv4 tail is allowed only where `isLast` says. */
-const ipv6PiecesOf = ({ text, isLast }: { text: string; isLast: boolean }): number[] | null => {
+const ipv6PiecesOf = ({ text, isLast }: Ipv6PiecesOfProps): number[] | null => {
   if (text === '') return []
   const parts = text.split(':')
   const tail = parts.at(-1) ?? ''
@@ -159,17 +161,23 @@ const ACE_PREFIX = 'xn--'
 const digitOf = (digit: number): string =>
   String.fromCodePoint(digit < 26 ? digit + 97 : digit + 22)
 
-const adapt = ({ delta, points, isFirst }: { delta: number; points: number; isFirst: boolean }) => {
+type AdaptProps = { delta: number; points: number; isFirst: boolean }
+
+const adapt = ({ delta, points, isFirst }: AdaptProps) => {
   const scaled = isFirst ? Math.floor(delta / DAMP) : Math.floor(delta / 2)
-  const settle = ({ value, k }: { value: number; k: number }): number =>
+  type SettleProps = { value: number; k: number }
+
+  const settle = ({ value, k }: SettleProps): number =>
     value > ((BASE - T_MIN) * T_MAX) / 2
       ? settle({ value: Math.floor(value / (BASE - T_MIN)), k: k + BASE })
       : k + Math.floor(((BASE - T_MIN + 1) * value) / (value + SKEW))
   return settle({ value: scaled + Math.floor(scaled / points), k: 0 })
 }
 
+type VariableLengthProps = { q: number; bias: number; k?: number }
+
 /** `q` as RFC 3492's generalised variable-length integer. */
-const variableLength = ({ q, bias, k = BASE }: { q: number; bias: number; k?: number }): string => {
+const variableLength = ({ q, bias, k = BASE }: VariableLengthProps): string => {
   const threshold = k <= bias ? T_MIN : k >= bias + T_MAX ? T_MAX : k - bias
   if (q < threshold) return digitOf(q)
   const digit = digitOf(threshold + ((q - threshold) % (BASE - threshold)))
@@ -278,8 +286,10 @@ const splitAuthority = (authority: string): { host: string | null; port: string 
   return { host: hostOf(authority.slice(0, colon)), port: authority.slice(colon + 1) }
 }
 
+type PortOfProps = { port: string; protocol: string }
+
 /** The port to write after the host: '' for none or the scheme's default, null for one that is no port. */
-const portOf = ({ port, protocol }: { port: string; protocol: string }): string | null => {
+const portOf = ({ port, protocol }: PortOfProps): string | null => {
   if (!PORT.test(port)) return null
   if (port === '') return ''
   const value = Number(port)

@@ -76,7 +76,9 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true, maxRetries: 5 })
 })
 
-const clientFor = async ({ id }: { id: string }) => {
+type ClientForProps = { id: string }
+
+const clientFor = async ({ id }: ClientForProps) => {
   const token = await fixture.mint({ id })
   return createApiClient({ fetch: injectFetch({ app: enforced.app }), accessToken: () => token })
 }
@@ -103,10 +105,14 @@ const cardOf = (media: MediaItem) => ({ id: media.id, ...viewOf(media) })
 
 const ascending = (a: number, b: number): number => a - b
 
-const byId = (a: { id: number }, b: { id: number }): number => a.id - b.id
+type ByIdProps = { id: number }
+
+const byId = (a: ByIdProps, b: ByIdProps): number => a.id - b.id
+
+type ViewingOfProps = { api: Client }
 
 /** Everything the per-account routes tell one account, boiled down to what differs between accounts. */
-const viewingOf = async ({ api }: { api: Client }) => {
+const viewingOf = async ({ api }: ViewingOfProps) => {
   const { library, video } = enforced.ids
   const [movie, movies, history, showHistory, inProgress, libraryFavourites] = await Promise.all([
     api.getMedia(video),
@@ -165,11 +171,13 @@ const viewingOf = async ({ api }: { api: Client }) => {
   }
 }
 
+type RecordMemberViewingProps = { api: Client }
+
 /**
  * The member's viewing, safe to record again: the movie half watched and a favourite, the extra
  * files with a spot and a favourite, the show a favourite, its first episode marked.
  */
-const recordMemberViewing = async ({ api }: { api: Client }) => {
+const recordMemberViewing = async ({ api }: RecordMemberViewingProps) => {
   const { video } = enforced.ids
   const [first] = tv.episodes
   await Promise.all(
@@ -391,7 +399,9 @@ describe('each account sees only its own viewing', () => {
     const guestBefore = await viewingOf({ api: guest })
     expect(before.movie.favourite).toBe(true)
 
-    const readMedia = async ({ caller }: { caller: CallerKind }) =>
+    type ReadMediaProps = { caller: CallerKind }
+
+    const readMedia = async ({ caller }: ReadMediaProps) =>
       enforced.app.inject({
         url: pathOf({ route: ROUTES.media, params: { id: enforced.ids.video } }),
         headers: await headersFor({ fixture, caller, via: TOKEN_CARRIERS.bearer }),
@@ -517,7 +527,9 @@ describe('the viewing from before accounts', () => {
     )
   })
 
-  const startOn = async ({ dir, mode }: { dir: string; mode: ServerMode }) => {
+  type StartOnProps = { dir: string; mode: ServerMode }
+
+  const startOn = async ({ dir, mode }: StartOnProps) => {
     const app = await createApp({
       config: {
         ...testConfig({ dataDir: join(dir, 'data'), mediaDir: join(dir, 'media') }),
@@ -536,18 +548,24 @@ describe('the viewing from before accounts', () => {
     return app
   }
 
-  const stop = async ({ app }: { app: NestFastifyApplication }) => {
+  type StopProps = { app: NestFastifyApplication }
+
+  const stop = async ({ app }: StopProps) => {
     state.servers.delete(app)
     await app.close()
   }
 
-  const clientOn = async ({ app, id }: { app: NestFastifyApplication; id: string }) => {
+  type ClientOnProps = { app: NestFastifyApplication; id: string }
+
+  const clientOn = async ({ app, id }: ClientOnProps) => {
     const token = await fixture.mint({ id })
     return createApiClient({ fetch: injectFetch({ app }), accessToken: () => token })
   }
 
+  type PastRowsProps = { app: NestFastifyApplication }
+
   /** How many rows from before accounts each viewing table still holds. */
-  const pastRows = ({ app }: { app: NestFastifyApplication }) =>
+  const pastRows = ({ app }: PastRowsProps) =>
     viewingCountsOf({ database: app.get(DatabaseService), account: VIEWING_ACCOUNTS.local })
 
   const NO_PAST = {
@@ -557,8 +575,10 @@ describe('the viewing from before accounts', () => {
     titleFavourites: 0,
   } as const satisfies AdoptedCounts
 
+  type SpotOwnersProps = { app: NestFastifyApplication; mediaId: number }
+
   /** Whose spots on `mediaId` are kept, by account. */
-  const spotOwners = ({ app, mediaId }: { app: NestFastifyApplication; mediaId: number }) =>
+  const spotOwners = ({ app, mediaId }: SpotOwnersProps) =>
     app
       .get(DatabaseService)
       .db.prepare<[number], { account_id: string }>(
@@ -613,8 +633,10 @@ describe('the viewing from before accounts', () => {
     return { dir, library: library.id, ids, tv: shows }
   }
 
+  type PastOfProps = { api: Client; past: Past }
+
   /** What one account is shown of the past: the movie's card, Home, favourites and history. */
-  const pastOf = async ({ api, past }: { api: Client; past: Past }) => {
+  const pastOf = async ({ api, past }: PastOfProps) => {
     const [movie, home, favourites, titles, history, showHistory] = await Promise.all([
       api.getMedia(past.ids.movie),
       api.getHome(),
@@ -651,8 +673,10 @@ describe('the viewing from before accounts', () => {
     showHistory: [{ id: past.tv.episodes[0], plays: 0, watched: true, marked: true }],
   })
 
+  type AdoptThePastProps = { past: Past }
+
   /** Starts `ready` on the past and lets the owner's first request adopt it. */
-  const adoptThePast = async ({ past }: { past: Past }) => {
+  const adoptThePast = async ({ past }: AdoptThePastProps) => {
     const app = await startOn({ dir: past.dir, mode: SERVER_MODES.ready })
     await (await clientOn({ app, id: AUTH_TEST_IDS.owner })).getHome()
     return app

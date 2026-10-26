@@ -31,11 +31,13 @@ export const tvEventHandlerMock = () => ({
   },
 })
 
+type PressRemoteProps = { key: RemoteKey }
+
 /**
  * Presses a key on the remote: the key going down, then coming up, as the fork sends it with its
  * key-down events on (with them off, as on Android TV, only the second comes).
  */
-export const pressRemote = async ({ key }: { key: RemoteKey }): Promise<void> => {
+export const pressRemote = async ({ key }: PressRemoteProps): Promise<void> => {
   const actions = [KEY_ACTIONS.down, KEY_ACTIONS.up]
   await act(async () => {
     actions.forEach((eventKeyAction) =>

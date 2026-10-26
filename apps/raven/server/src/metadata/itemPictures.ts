@@ -18,8 +18,9 @@ import { showDirOf, stemOf } from '@/metadata/places'
 
 type LocalImages = Partial<Record<ItemImageKind, string>>
 
-const found = ({ kind, dir, name }: { kind: ItemImageKind; dir: string; name: string | null }) =>
-  name == null ? {} : { [kind]: join(dir, name) }
+type FoundProps = { kind: ItemImageKind; dir: string; name: string | null }
+
+const found = ({ kind, dir, name }: FoundProps) => (name == null ? {} : { [kind]: join(dir, name) })
 
 /** For each kind, the first file's picture that has one: the best file's folder wins. */
 const firstOfEach = (pictures: readonly LocalImages[]): LocalImages =>
@@ -29,6 +30,19 @@ const firstOfEach = (pictures: readonly LocalImages[]): LocalImages =>
       return ref == null ? [] : [[kind, ref]]
     }),
   )
+
+type ItemPicturesSyncLocalProps = {
+  itemIds: readonly number[]
+  folders: FolderReader
+}
+
+type ItemPicturesSyncOneProps = { itemId: number; folders: FolderReader }
+
+type ItemPicturesBesideProps = {
+  item: StoredItem
+  file: MatchFile
+  folders: FolderReader
+}
 
 /**
  * Item pictures raven looks after itself: the ones kept beside the media,
@@ -53,13 +67,7 @@ export class ItemPictures {
    * linked to it or under it. Two reads for one item run one after the other,
    * so the later, which sees every file linked by then, is what stays.
    */
-  async syncLocal({
-    itemIds,
-    folders,
-  }: {
-    itemIds: readonly number[]
-    folders: FolderReader
-  }): Promise<void> {
+  async syncLocal({ itemIds, folders }: ItemPicturesSyncLocalProps): Promise<void> {
     await Promise.all(
       [...new Set(itemIds)].map((itemId) => {
         const previous = this.syncing.get(itemId) ?? Promise.resolve()
@@ -72,7 +80,7 @@ export class ItemPictures {
     )
   }
 
-  private async syncOne({ itemId, folders }: { itemId: number; folders: FolderReader }) {
+  private async syncOne({ itemId, folders }: ItemPicturesSyncOneProps) {
     const item = this.metadata.get(itemId)
     if (!item) return
     const files = this.files.under(itemId)
@@ -81,15 +89,7 @@ export class ItemPictures {
   }
 
   /** The pictures one file has beside it for `item`. */
-  private async beside({
-    item,
-    file,
-    folders,
-  }: {
-    item: StoredItem
-    file: MatchFile
-    folders: FolderReader
-  }): Promise<LocalImages> {
+  private async beside({ item, file, folders }: ItemPicturesBesideProps): Promise<LocalImages> {
     const dir = dirname(file.path)
     switch (item.type) {
       case ITEM_TYPES.movie: {

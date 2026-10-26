@@ -80,6 +80,11 @@ const answerFor = (path: string): Answer => {
   return isSearch(path) ? { status: STATUSES.ok, body: [] } : NOT_FOUND
 }
 
+type SearchApiProps = {
+  hear?: (request: HeardRequest) => void
+  reads?: (path: string) => Promise<void>
+}
+
 /**
  * Films and Series, and a search through them that finds Dune in both, behind the app's
  * allowlist so an unlisted call fails the test. Every request is heard, and answered once
@@ -88,10 +93,7 @@ const answerFor = (path: string): Answer => {
 export const searchApi = ({
   hear = () => undefined,
   reads = async () => undefined,
-}: {
-  hear?: (request: HeardRequest) => void
-  reads?: (path: string) => Promise<void>
-} = {}): ApiClient =>
+}: SearchApiProps = {}): ApiClient =>
   createApiClient({
     baseUrl: NAS.origin,
     fetch: allowlistedFetch({

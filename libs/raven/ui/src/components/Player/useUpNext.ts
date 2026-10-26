@@ -6,24 +6,28 @@ import { useHostServices } from '@/stores/playerServices'
 /** How many seconds before the end the countdown to what is up next starts. */
 export const AUTOPLAY_COUNTDOWN_SECONDS = 10
 
+type CountdownAtProps = {
+  time: number
+  duration: number | null
+  isCounting: boolean
+}
+
 /**
  * How far the countdown to what is up next has run, 0 to 1, in the last
  * seconds of the video; null before then, with autoplay off, or with nothing
  * up next. A video shorter than the countdown counts down the whole way.
  */
-const countdownAt = ({
-  time,
-  duration,
-  isCounting,
-}: {
-  time: number
-  duration: number | null
-  isCounting: boolean
-}): number | null => {
+const countdownAt = ({ time, duration, isCounting }: CountdownAtProps): number | null => {
   if (!isCounting || duration == null || duration <= 0) return null
   const span = Math.min(AUTOPLAY_COUNTDOWN_SECONDS, duration)
   const into = time - (duration - span)
   return into < 0 ? null : Math.min(1, into / span)
+}
+
+type UseUpNextProps = {
+  ended: boolean
+  time: number
+  duration: number | null
 }
 
 /**
@@ -31,15 +35,7 @@ const countdownAt = ({
  * autoplay on, a transition to ended replaces the current watch entry with
  * it; with autoplay off it waits for a click.
  */
-export const useUpNext = ({
-  ended,
-  time,
-  duration,
-}: {
-  ended: boolean
-  time: number
-  duration: number | null
-}) => {
+export const useUpNext = ({ ended, time, duration }: UseUpNextProps) => {
   const navigate = useNavigate()
   const {
     title: { next },

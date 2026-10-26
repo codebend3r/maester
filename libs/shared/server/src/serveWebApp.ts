@@ -4,6 +4,12 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { CACHE_POLICIES, HEADERS } from '@/http'
 import { SpaFallbackFilter } from '@/spaFallbackFilter'
 
+type ServeWebAppProps = {
+  app: NestFastifyApplication
+  webDir: string | null
+  serverPrefixes: readonly string[]
+}
+
 /**
  * Hands out the built web app from `webDir` beside the server's own routes,
  * so in Docker there is one port and no CORS. With no `webDir` (in
@@ -15,11 +21,7 @@ export const serveWebApp = async ({
   app,
   webDir,
   serverPrefixes,
-}: {
-  app: NestFastifyApplication
-  webDir: string | null
-  serverPrefixes: readonly string[]
-}): Promise<void> => {
+}: ServeWebAppProps): Promise<void> => {
   if (webDir) {
     // Registered straight on Fastify and awaited: Nest's own useStaticAssets
     // imports the plugin lazily and drops the promise, so the plugin lands

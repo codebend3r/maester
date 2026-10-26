@@ -34,6 +34,10 @@ type Watch =
     }
   | { mode: typeof WATCH_MODES.unwatched; paths: readonly string[] }
 
+type LibraryWatcherNoteChangeProps = { libraryId: number; root: string; path: string }
+
+type LibraryWatcherFallBackProps = { library: LibraryRecord; error: unknown }
+
 /**
  * Refreshes each library that refreshes automatically as its folders
  * change. Changes gather until the folders have been still for a moment (a
@@ -122,7 +126,7 @@ export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** Hidden and NAS folders churn on their own; nothing in them is indexed. */
-  private noteChange({ libraryId, root, path }: { libraryId: number; root: string; path: string }) {
+  private noteChange({ libraryId, root, path }: LibraryWatcherNoteChangeProps) {
     const watch = this.watches.get(libraryId)
     if (watch?.mode !== WATCH_MODES.watching || isSkippedPlace({ root, path })) return
     watch.changed.add(path)
@@ -139,7 +143,7 @@ export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
     watch.changed.clear()
   }
 
-  private fallBack({ library, error }: { library: LibraryRecord; error: unknown }): void {
+  private fallBack({ library, error }: LibraryWatcherFallBackProps): void {
     if (this.watches.get(library.id)?.mode !== WATCH_MODES.watching) return
     this.logger.warn(
       `Could not watch the folders of "${library.name}" (${errorMessage(error)}); its quick scan will find the changes`,

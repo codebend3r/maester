@@ -13,12 +13,14 @@ import {
   useScreenFocus,
 } from '@/stores/screenFocus'
 
+type UseScreenTurnProps = { isToFront: boolean; onTurn: () => void }
+
 /**
  * Calls `onTurn` each time the screen turns to the front (`isToFront`), once another on top of it
  * has gone, or away from it, as another covers it: never as it mounts, and never while it stays
  * where it is.
  */
-const useScreenTurn = ({ isToFront, onTurn }: { isToFront: boolean; onTurn: () => void }): void => {
+const useScreenTurn = ({ isToFront, onTurn }: UseScreenTurnProps): void => {
   const isFocused = useIsFocused()
   const isFocusedBefore = useRef(isFocused)
   useEffect(() => {
@@ -27,19 +29,18 @@ const useScreenTurn = ({ isToFront, onTurn }: { isToFront: boolean; onTurn: () =
   }, [isFocused, isToFront, onTurn])
 }
 
+type UseFocusOnMountProps = {
+  view: RefObject<unknown>
+  isAsked?: boolean
+}
+
 /**
  * Asks the remote's focus for the view `view` holds once, as it is drawn, when `isAsked` was
  * true then. A view that mounts asking through `hasTVPreferredFocus` asks before it is in the
  * window, and the fork retries that only once, which on Android TV is still too early: the
  * screen opened with nothing focused.
  */
-export const useFocusOnMount = ({
-  view,
-  isAsked = true,
-}: {
-  view: RefObject<unknown>
-  isAsked?: boolean
-}): void => {
+export const useFocusOnMount = ({ view, isAsked = true }: UseFocusOnMountProps): void => {
   const isAskedOnMount = useRef(isAsked)
   useEffect(() => {
     if (isAskedOnMount.current) requestTVFocus(view.current)
@@ -73,6 +74,11 @@ export const useScreenFocusScope = (): OpeningFocus => {
   return useOpeningFocus()
 }
 
+type UseOpenerFocusProps = {
+  place: string
+  view: RefObject<unknown>
+}
+
 /**
  * A card's part in taking the focus back to the card another screen was opened from. The card
  * calls `remember` as it opens one; when this screen returns, the card remembered asks for the
@@ -80,13 +86,7 @@ export const useScreenFocusScope = (): OpeningFocus => {
  * there; it says as it is drawn and as it goes, so a return whose card has gone gives the
  * screen's opening focus instead. `place` is the card's place on its screen, unique there.
  */
-export const useOpenerFocus = ({
-  place,
-  view,
-}: {
-  place: string
-  view: RefObject<unknown>
-}): { remember: () => void } => {
+export const useOpenerFocus = ({ place, view }: UseOpenerFocusProps): { remember: () => void } => {
   const screen = useRoute().key
   useEffect(() => {
     drawCard({ screen, card: place, isDrawn: true })

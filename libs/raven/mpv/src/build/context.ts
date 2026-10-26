@@ -42,15 +42,13 @@ export const sources = async () => {
   return value
 }
 
-export const run = async ({
-  args,
-  cwd = project,
-  env = {},
-}: {
+type RunProps = {
   args: string[]
   cwd?: string
   env?: Record<string, string>
-}) => {
+}
+
+export const run = async ({ args, cwd = project, env = {} }: RunProps) => {
   const child = Bun.spawn(args, {
     cwd,
     env: { ...process.env, ...env },
@@ -59,15 +57,13 @@ export const run = async ({
   })
   if ((await child.exited) !== 0) throw new Error(`Native build command failed: ${args[0]}`)
 }
-export const output = async ({
-  args,
-  cwd = project,
-  env = {},
-}: {
+type OutputProps = {
   args: string[]
   cwd?: string
   env?: Record<string, string>
-}) => {
+}
+
+export const output = async ({ args, cwd = project, env = {} }: OutputProps) => {
   const child = Bun.spawn(args, {
     cwd,
     env: { ...process.env, ...env },
@@ -78,7 +74,9 @@ export const output = async ({
   if ((await child.exited) !== 0) throw new Error(`Native inspection failed: ${args[0]}`)
   return text.trim()
 }
-export const write = async ({ path, content }: { path: string; content: string | Uint8Array }) => {
+type WriteProps = { path: string; content: string | Uint8Array }
+
+export const write = async ({ path, content }: WriteProps) => {
   await mkdir(dirname(path), { recursive: true })
   await Bun.write(path, content)
 }

@@ -8,12 +8,14 @@ export const RELEASES = `${REPOSITORY}/releases`
 // release, where they will be once one does.
 export const LATEST_RELEASE = `${RELEASES}/latest`
 
+type WebAppAddressProps = { typed: string; origin: string }
+
 /**
  * Where Open web app goes for a server typed in: the address as typed, over
  * this page's own scheme when it names none, and this server's home while
  * the field is blank or holds something that is not a web address.
  */
-export const webAppAddress = ({ typed, origin }: { typed: string; origin: string }): string => {
+export const webAppAddress = ({ typed, origin }: WebAppAddressProps): string => {
   const home = `${origin}/`
   const trimmed = typed.trim()
   if (trimmed === '') return home

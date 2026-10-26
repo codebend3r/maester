@@ -11,6 +11,8 @@ export const SERVER_STREAM_STATES = { connecting: 0, open: 1, closed: 2 } as con
 
 type ServerStreamEvent = (typeof SERVER_STREAM_EVENTS)[keyof typeof SERVER_STREAM_EVENTS]
 
+type ListenerProps = { data: unknown }
+
 /**
  * The part of an `EventSource` the hook uses, so each platform hands in its
  * own: the browser's, or a library's where there is none. A message's
@@ -19,7 +21,7 @@ type ServerStreamEvent = (typeof SERVER_STREAM_EVENTS)[keyof typeof SERVER_STREA
  * and will not reconnect on its own.
  */
 export type ServerEventSource = {
-  addEventListener: (type: ServerStreamEvent, listener: (event: { data: unknown }) => void) => void
+  addEventListener: (type: ServerStreamEvent, listener: (event: ListenerProps) => void) => void
   close: () => void
   readonly readyState: number
 }
@@ -32,14 +34,13 @@ export type ServerEventSource = {
  */
 export const EVENTS_RETRY_MS = 5_000
 
-/** Reads again what an event says changed. */
-const follow = ({
-  queryClient,
-  event,
-}: {
+type FollowProps = {
   queryClient: QueryClient
   event: ServerEvent
-}): Promise<unknown> => {
+}
+
+/** Reads again what an event says changed. */
+const follow = ({ queryClient, event }: FollowProps): Promise<unknown> => {
   switch (event.type) {
     case SERVER_EVENT_TYPES.library:
       return afterLibraryEvent({ queryClient, libraryId: event.libraryId })
@@ -62,6 +63,12 @@ type AccessTokenChanges = (listener: (token: string | null) => void) => () => vo
 /** A host with no access token, whose stream rides cookies alone. */
 const NO_ACCESS_TOKEN: AccessTokenChanges = () => () => undefined
 
+type ServerEventsForProps = {
+  api: ApiClient
+  openEvents: (url: string) => ServerEventSource
+  onAccessTokenChange?: AccessTokenChanges
+}
+
 /**
  * The server-event hook over one server's `api`, listening on what
  * `openEvents` opens at its event address. A host whose stream travels with
@@ -72,11 +79,7 @@ export const serverEventsFor = ({
   api,
   openEvents,
   onAccessTokenChange = NO_ACCESS_TOKEN,
-}: {
-  api: ApiClient
-  openEvents: (url: string) => ServerEventSource
-  onAccessTokenChange?: AccessTokenChanges
-}) => {
+}: ServerEventsForProps) => {
   /**
    * Keeps the browsing pages in step with the server as it changes: a
    * library whose folders changed is read again, its listings and counts

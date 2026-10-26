@@ -147,14 +147,13 @@ const UPDATE_LIBRARY = `UPDATE libraries
     SET name = @name, ${SETTING_COLUMNS.map((column) => `${column} = @${column}`).join(', ')}
   WHERE id = @id`
 
-/** Whether a library's paths are the same, in the same order, as they were. */
-export const samePaths = ({
-  before,
-  after,
-}: {
+type SamePathsProps = {
   before: readonly string[]
   after: readonly string[]
-}): boolean =>
+}
+
+/** Whether a library's paths are the same, in the same order, as they were. */
+export const samePaths = ({ before, after }: SamePathsProps): boolean =>
   before.length === after.length && before.every((path, index) => path === after[index])
 
 type PathRow = {
@@ -163,6 +162,26 @@ type PathRow = {
   layout: string | null
   group_folders: number
 }
+
+type LibrariesRepositorySaveLayoutsProps = {
+  id: number
+  layouts: ReadonlyArray<{ path: string; layout: PathLayout; groups: number }>
+}
+
+type LibrariesRepositoryMarkFullScanProps = { id: number; at: string }
+
+type LibrariesRepositoryMarkQuickScanProps = { id: number; at: string }
+
+type LibrariesRepositoryStartRatingsRefreshProps = {
+  id: number
+  at: string
+  shouldAsk: boolean
+  since?: string
+}
+
+type LibrariesRepositoryReplacePathsProps = { id: number; paths: string[] }
+
+type LibrariesRepositoryUpdateProps = { id: number; input: LibraryInput }
 
 @Injectable()
 export class LibrariesRepository {
@@ -239,13 +258,7 @@ export class LibrariesRepository {
   }
 
   /** What a full scan found each readable path to be; paths it could not read keep what they had. */
-  saveLayouts({
-    id,
-    layouts,
-  }: {
-    id: number
-    layouts: ReadonlyArray<{ path: string; layout: PathLayout; groups: number }>
-  }): void {
+  saveLayouts({ id, layouts }: LibrariesRepositorySaveLayoutsProps): void {
     const update = this.db.prepare(
       'UPDATE library_paths SET layout = ?, group_folders = ? WHERE library_id = ? AND path = ?',
     )
@@ -268,12 +281,12 @@ export class LibrariesRepository {
   }
 
   /** When a full scan of the library finished, kept so a restart does not forget it. */
-  markFullScan({ id, at }: { id: number; at: string }): void {
+  markFullScan({ id, at }: LibrariesRepositoryMarkFullScanProps): void {
     this.db.prepare('UPDATE libraries SET full_scanned_at = ? WHERE id = ?').run(at, id)
   }
 
   /** When a quick scan of the library finished, kept so a restart does not forget it. */
-  markQuickScan({ id, at }: { id: number; at: string }): void {
+  markQuickScan({ id, at }: LibrariesRepositoryMarkQuickScanProps): void {
     this.db.prepare('UPDATE libraries SET quick_scanned_at = ? WHERE id = ?').run(at, id)
   }
 
@@ -290,12 +303,7 @@ export class LibrariesRepository {
     at,
     shouldAsk,
     since = '',
-  }: {
-    id: number
-    at: string
-    shouldAsk: boolean
-    since?: string
-  }): number {
+  }: LibrariesRepositoryStartRatingsRefreshProps): number {
     return this.db.transaction(() => {
       const asked = shouldAsk
         ? this.db.prepare(REQUEST_SCORES).run({ id, local: `${LOCAL}*`, since }).changes
@@ -345,7 +353,7 @@ export class LibrariesRepository {
   }
 
   /** Each path a library keeps holds on to what a scan found it to be; a new one starts unread. */
-  private replacePaths({ id, paths }: { id: number; paths: string[] }): void {
+  private replacePaths({ id, paths }: LibrariesRepositoryReplacePathsProps): void {
     const found = new Map(
       this.db
         .prepare<[number], Pick<PathRow, 'path' | 'layout' | 'group_folders'>>(
@@ -397,7 +405,7 @@ export class LibrariesRepository {
    * so a new type keeps the view and grouping it can show. Media found only
    * under a dropped path stays until the rescan that follows removes it.
    */
-  update({ id, input }: { id: number; input: LibraryInput }): LibraryRecord | null {
+  update({ id, input }: LibrariesRepositoryUpdateProps): LibraryRecord | null {
     const current = this.get(id)
     if (!current) return null
     const settings = coherentSettings({ ...current.settings, ...input.settings })

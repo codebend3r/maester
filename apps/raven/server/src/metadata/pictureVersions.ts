@@ -6,6 +6,17 @@ import { SettingsRepository } from '@/settings/settingsRepository'
 /** How much of the keyed hash a version keeps: 22 base64url characters, 132 bits. */
 const VERSION_LENGTH = 22
 
+type PictureVersionsItemProps = {
+  id: number
+  kind: ItemImageKind
+  source: string
+  ref: string
+}
+
+type PictureVersionsPhotoProps = { id: number; photo: string | null }
+
+type PictureVersionsAvatarProps = { id: number; avatar: string | null }
+
 /**
  * A picture's version: its owner, its kind and its source hashed with this
  * server's own secret, so it changes exactly when the picture does and
@@ -31,27 +42,17 @@ export class PictureVersions {
   }
 
   /** The version of item `id`'s picture of `kind`, shown from `source` at `ref`. */
-  item({
-    id,
-    kind,
-    source,
-    ref,
-  }: {
-    id: number
-    kind: ItemImageKind
-    source: string
-    ref: string
-  }): string {
+  item({ id, kind, source, ref }: PictureVersionsItemProps): string {
     return this.of(`item:${id}:${kind}:${source}:${ref}`)
   }
 
   /** The version of person `id`'s TMDB photo at `photo`; null for none. */
-  photo({ id, photo }: { id: number; photo: string | null }): string | null {
+  photo({ id, photo }: PictureVersionsPhotoProps): string | null {
     return photo == null ? null : this.of(`person:${id}:tmdb:${photo}`)
   }
 
   /** The version of review `id`'s TMDB avatar at `avatar`; null for none. */
-  avatar({ id, avatar }: { id: number; avatar: string | null }): string | null {
+  avatar({ id, avatar }: PictureVersionsAvatarProps): string | null {
     return avatar == null ? null : this.of(`review:${id}:tmdb:${avatar}`)
   }
 }

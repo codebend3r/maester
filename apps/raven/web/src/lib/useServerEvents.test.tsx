@@ -10,7 +10,9 @@ import { FakeEventSource } from '@/test/eventSource'
 
 const render = () => {
   const client = new QueryClient()
-  const wrapper = ({ children }: { children: ReactNode }) => (
+  type WrapperProps = { children: ReactNode }
+
+  const wrapper = ({ children }: WrapperProps) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   )
   return { client, ...renderHook(() => useServerEvents(), { wrapper }) }

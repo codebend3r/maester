@@ -8,8 +8,10 @@ import { checkTurn } from '@/lib/expectations'
 import { REPLY_STATES, type Reply } from '@/lib/entries'
 import { useChat } from '@/stores/chat'
 
+type VerdictProps = { reply: Reply }
+
 /** How a finished reply measured up to its case message's expectations. */
-const Verdict = ({ reply }: { reply: Reply }) => {
+const Verdict = ({ reply }: VerdictProps) => {
   if (!reply.expected || reply.state !== REPLY_STATES.done) return null
   const verdict = checkTurn({
     turn: reply.expected,
@@ -30,8 +32,10 @@ const Verdict = ({ reply }: { reply: Reply }) => {
   )
 }
 
+type ReplyCardProps = { reply: Reply }
+
 /** One of luwin's answers: its text, the work behind it, and whatever it asks of you. */
-export const ReplyCard = ({ reply }: { reply: Reply }) => {
+export const ReplyCard = ({ reply }: ReplyCardProps) => {
   const pick = useChat((state) => state.pick)
   const press = useChat((state) => state.press)
   const settled = useChat((state) => state.settled)

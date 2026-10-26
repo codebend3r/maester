@@ -36,14 +36,13 @@ export const apiFor = (server: AppServer): ApiClient =>
     }),
   })
 
-/** What a request made outside `fetch` (a picture, the event stream) sends to `url` on `server`. */
-const headersFor = async ({
-  server,
-  url,
-}: {
+type HeadersForProps = {
   server: AppServer
   url: string
-}): Promise<Record<string, string>> =>
+}
+
+/** What a request made outside `fetch` (a picture, the event stream) sends to `url` on `server`. */
+const headersFor = async ({ server, url }: HeadersForProps): Promise<Record<string, string>> =>
   cookieHeadersFor({
     server,
     cookies: await cookieJar.read(server.id),

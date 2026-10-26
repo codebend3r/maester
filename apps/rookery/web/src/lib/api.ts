@@ -45,7 +45,9 @@ export const HTTP_METHODS = { post: 'POST' } as const
 export const HEADERS = { contentType: 'content-type' } as const
 export const CONTENT_TYPES = { json: 'application/json' } as const
 
-const postJson = async ({ url, body }: { url: string; body: Record<string, string> }) => {
+type PostJsonProps = { url: string; body: Record<string, string> }
+
+const postJson = async ({ url, body }: PostJsonProps) => {
   const response = await fetch(url, {
     method: HTTP_METHODS.post,
     headers: { [HEADERS.contentType]: CONTENT_TYPES.json },
@@ -58,8 +60,10 @@ const postJson = async ({ url, body }: { url: string; body: Record<string, strin
 const withReturnTo = (returnTo: string | null): Record<string, string> =>
   returnTo ? { return_to: returnTo } : {}
 
+type StartSignInProps = { returnTo: string | null }
+
 /** Starts a Plex sign-in; resolves to the Plex page the browser goes to next. */
-export const startSignIn = async ({ returnTo }: { returnTo: string | null }): Promise<string> => {
+export const startSignIn = async ({ returnTo }: StartSignInProps): Promise<string> => {
   const response = await postJson({
     url: '/api/auth/plex/start',
     body: withReturnTo(returnTo),
@@ -71,8 +75,10 @@ export const startSignIn = async ({ returnTo }: { returnTo: string | null }): Pr
   return authUrl
 }
 
+type SignOutProps = { returnTo: string | null }
+
 /** Ends the session; resolves to where the browser goes next, which the server has checked. */
-export const signOut = async ({ returnTo }: { returnTo: string | null }): Promise<string> => {
+export const signOut = async ({ returnTo }: SignOutProps): Promise<string> => {
   const response = await postJson({ url: '/api/auth/logout', body: withReturnTo(returnTo) })
   const next = isRecord(response.body) ? response.body.next : null
   if (!response.ok || typeof next !== 'string') throw new AuthError(AUTH_ERRORS.unreachable)

@@ -18,6 +18,11 @@ const HEARING_IMPAIRED: ReadonlySet<string> = new Set(['sdh', 'cc', 'hi'])
 
 const FLAGS: ReadonlySet<string> = new Set(['forced', 'default', ...HEARING_IMPAIRED])
 
+type ParseSidecarNameProps = {
+  videoFileName: string
+  fileName: string
+}
+
 /**
  * What a sidecar's name says, or null when it does not belong to the
  * video. `Movie (2020).en.forced.srt` beside `Movie (2020).mkv` is English
@@ -28,10 +33,7 @@ const FLAGS: ReadonlySet<string> = new Set(['forced', 'default', ...HEARING_IMPA
 export const parseSidecarName = ({
   videoFileName,
   fileName,
-}: {
-  videoFileName: string
-  fileName: string
-}): Omit<Sidecar, 'path'> | null => {
+}: ParseSidecarNameProps): Omit<Sidecar, 'path'> | null => {
   const base = basename(videoFileName, extname(videoFileName))
   const extension = extname(fileName).slice(1).toLowerCase()
   const belongs = fileName.toLowerCase().startsWith(`${base.toLowerCase()}.`)

@@ -24,11 +24,13 @@ describe('EpisodePage', () => {
     spies.tracks.mockReset()
   })
 
+  type OpenProps = { details?: ItemDetails; route?: string; show?: ItemDetails }
+
   const open = ({
     details = episodeDetails(EPISODE_TWO),
     route = '/episodes/7',
     show,
-  }: { details?: ItemDetails; route?: string; show?: ItemDetails } = {}) => {
+  }: OpenProps = {}) => {
     spies.item.mockImplementation(async (id) => (show && id === show.id ? show : details))
     spies.libraries.mockImplementation(async () => [
       library({ id: 2, name: 'TV' }),

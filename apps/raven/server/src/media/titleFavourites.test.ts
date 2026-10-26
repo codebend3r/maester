@@ -8,7 +8,9 @@ import type { FetchedItem } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
-const showNamed = ({ tmdbId, title }: { tmdbId: string; title: string }): FetchedItem => ({
+type ShowNamedProps = { tmdbId: string; title: string }
+
+const showNamed = ({ tmdbId, title }: ShowNamedProps): FetchedItem => ({
   ...localSeason({ showTmdbId: tmdbId, number: 1 }),
   type: 'show',
   tmdbId,
@@ -35,15 +37,13 @@ describe('favourite shows and seasons', () => {
     }).id
     const { metadata } = repositories(database.get())
     const index = new MediaIndex(database.get())
-    const shelve = ({
-      libraryId,
-      tmdbId,
-      title,
-    }: {
+    type ShelveProps = {
       libraryId: number
       tmdbId: string
       title: string
-    }) => {
+    }
+
+    const shelve = ({ libraryId, tmdbId, title }: ShelveProps) => {
       const showId = metadata.save({ item: showNamed({ tmdbId, title }) })
       const season = metadata.saveSeason({
         showId,

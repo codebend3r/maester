@@ -53,13 +53,12 @@ describe('AiMatcher', () => {
     ],
   })
 
-  const lookUp = async ({
-    replies,
-    status = 200,
-  }: {
+  type LookUpProps = {
     replies: readonly FakeReply[]
     status?: number
-  }) => {
+  }
+
+  const lookUp = async ({ replies, status = 200 }: LookUpProps) => {
     const claude = fakeClaude({ lookups: { [WILD.place]: replies } })
     claude.state.status = status
     const matcher = new AiMatcher(
@@ -420,19 +419,15 @@ describe('aiGroupOf', () => {
     createdAt: '2026-10-13T00:00:00.000Z',
     settings: { ...DEFAULT_LIBRARY_SETTINGS, kind },
   })
-  const file = ({
-    id,
-    folder,
-    fileName,
-    title = '',
-    year = null,
-  }: {
+  type FileProps = {
     id: number
     folder: string
     fileName: string
     title?: string
     year?: number | null
-  }): MatchFile => ({
+  }
+
+  const file = ({ id, folder, fileName, title = '', year = null }: FileProps): MatchFile => ({
     id,
     libraryId: 1,
     path: join('/media/TV/D', folder, fileName),

@@ -19,15 +19,17 @@ export const SIDECAR_MAX_BYTES = 16 * 1024 ** 2
 /** A body's text, read only up to `max` bytes: past them, the rest is never read. */
 const TEXT_READS = { text: 'text', tooBig: 'tooBig' } as const
 
+type TextUpToProps = {
+  body: ReadableStream<Uint8Array> | null
+  max: number
+  signal: AbortSignal
+}
+
 const textUpTo = async ({
   body,
   max,
   signal,
-}: {
-  body: ReadableStream<Uint8Array> | null
-  max: number
-  signal: AbortSignal
-}): Promise<
+}: TextUpToProps): Promise<
   { kind: typeof TEXT_READS.text; text: string } | { kind: typeof TEXT_READS.tooBig }
 > => {
   const decoder = new TextDecoder()
@@ -60,6 +62,17 @@ const textUpTo = async ({
 /** The file whose subtitles are fetched, and the signal that stops its run. */
 type SidecarJob = { entry: DownloadEntry; server: ServerEntry; signal: AbortSignal }
 
+type CreateSidecarDownloadProps = {
+  calls: Pick<ServerCalls, 'call'>
+  fetch: StreamFetch
+  fs: Pick<QueueFs, 'mkdir' | 'writeFile'>
+  userData: string
+  timers: Timers
+  warn: (message: string) => void
+}
+
+type CreateSidecarDownloadCallbackProps = { job: SidecarJob; access: Access }
+
 /**
  * A download's subtitles: the server's track list, then each sidecar fetched whole beside the
  * video. A track that fails is logged by title and track and skipped; none ever fails the file.
@@ -71,14 +84,9 @@ export const createSidecarDownload = ({
   userData,
   timers,
   warn,
-}: {
-  calls: Pick<ServerCalls, 'call'>
-  fetch: StreamFetch
-  fs: Pick<QueueFs, 'mkdir' | 'writeFile'>
-  userData: string
-  timers: Timers
-  warn: (message: string) => void
-}): ((input: { job: SidecarJob; access: Access }) => Promise<Sidecar[]>) => {
+}: CreateSidecarDownloadProps): ((
+  input: CreateSidecarDownloadCallbackProps,
+) => Promise<Sidecar[]>) => {
   const partsOf = (entry: DownloadEntry) => ({
     userData,
     serverId: entry.serverId,
@@ -104,16 +112,18 @@ export const createSidecarDownload = ({
     return []
   }
 
+  type FetchSidecarProps = {
+    job: SidecarJob
+    access: Access
+    track: SubtitleTrack
+  }
+
   /** Fetches one subtitle whole and writes it; a failure is logged by title and track and skipped. */
   const fetchSidecar = async ({
     job,
     access,
     track,
-  }: {
-    job: SidecarJob
-    access: Access
-    track: SubtitleTrack
-  }): Promise<Sidecar | null> => {
+  }: FetchSidecarProps): Promise<Sidecar | null> => {
     const { entry, signal: stop } = job
     const skipped = (why = ''): null => {
       if (!stop.aborted) {

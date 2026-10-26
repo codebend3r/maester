@@ -41,13 +41,12 @@ type Injected = {
   json: () => unknown
 }
 
-const shape = <T>({
-  response,
-  guard,
-}: {
+type ShapeProps<T> = {
   response: Injected
   guard: (value: unknown) => value is T
-}): T => {
+}
+
+const shape = <T>({ response, guard }: ShapeProps<T>): T => {
   const body: unknown = response.json()
   if (!guard(body)) throw new Error(`Unexpected body: ${response.rawPayload.toString()}`)
   return body
@@ -273,13 +272,13 @@ describe('movie metadata', () => {
     const [saga] = await sagas()
     expect(saga?.backdrop).toEqual({ type: 'slideshow', motion: 'fade' })
     const heat = saga?.media.find((media) => media.item?.title === 'Heat')?.item
-    const pick = ({
-      payload,
-      sagaId = saga?.tmdbId ?? '',
-    }: {
+    type PickProps = {
       payload: InjectOptions['payload']
       sagaId?: string
-    }) => asAdmin({ method: 'PUT', url: `${url}/${sagaId}/backdrop`, payload })
+    }
+
+    const pick = ({ payload, sagaId = saga?.tmdbId ?? '' }: PickProps) =>
+      asAdmin({ method: 'PUT', url: `${url}/${sagaId}/backdrop`, payload })
 
     const still = { type: 'still', itemId: heat?.id }
     expect((await pick({ payload: still })).json()).toEqual(still)

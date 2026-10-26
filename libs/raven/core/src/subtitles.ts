@@ -24,14 +24,13 @@ export const subtitleWindowRange = (window: number): { start: number; duration: 
 export const subtitleWindowOf = (time: number): number =>
   Math.max(0, Math.floor(time / SUBTITLE_WINDOW_SECONDS))
 
-/** The windows playback needs at `time`: its own, plus the next once it is close. */
-export const subtitleWindows = ({
-  time,
-  duration,
-}: {
+type SubtitleWindowsProps = {
   time: number
   duration: number | null
-}): number[] => {
+}
+
+/** The windows playback needs at `time`: its own, plus the next once it is close. */
+export const subtitleWindows = ({ time, duration }: SubtitleWindowsProps): number[] => {
   const current = subtitleWindowOf(time)
   const nextStart = (current + 1) * SUBTITLE_WINDOW_SECONDS
   const close = time >= nextStart - PREFETCH_SECONDS
@@ -88,18 +87,17 @@ const formatTimestamp = (seconds: number): string => {
   return `${hours}:${minutes}:${secs}.${String(total % 1000).padStart(3, '0')}`
 }
 
+type FormatWebVttProps = {
+  cues: readonly SubtitleCue[]
+  timestampMap: { mpegts: number; local: number } | null
+}
+
 /**
  * Cues as a WebVTT document, the inverse of `parseWebVtt` for what it keeps.
  * `timestampMap` ties the cues' local clock to the 90 kHz MPEG-TS clock an
  * HLS player runs on, so a segment of cues lines up with the video.
  */
-export const formatWebVtt = ({
-  cues,
-  timestampMap,
-}: {
-  cues: readonly SubtitleCue[]
-  timestampMap: { mpegts: number; local: number } | null
-}): string => {
+export const formatWebVtt = ({ cues, timestampMap }: FormatWebVttProps): string => {
   const header =
     timestampMap === null
       ? ['WEBVTT']
@@ -115,14 +113,13 @@ export const formatWebVtt = ({
 
 const cueKey = (cue: SubtitleCue): string => `${cue.start}|${cue.end}|${cue.text}`
 
-/** Two windows overlap by their lead, so the same cue can arrive twice. */
-export const mergeCues = ({
-  existing,
-  incoming,
-}: {
+type MergeCuesProps = {
   existing: readonly SubtitleCue[]
   incoming: readonly SubtitleCue[]
-}): SubtitleCue[] => {
+}
+
+/** Two windows overlap by their lead, so the same cue can arrive twice. */
+export const mergeCues = ({ existing, incoming }: MergeCuesProps): SubtitleCue[] => {
   const seen = new Set(existing.map(cueKey))
   const fresh = incoming.filter((cue) => !seen.has(cueKey(cue)))
   return fresh.length === 0
@@ -130,14 +127,14 @@ export const mergeCues = ({
     : [...existing, ...fresh].toSorted((a, b) => a.start - b.start || a.end - b.end)
 }
 
-/** Every cue showing at `time`, oldest first, as a viewer reads them top to bottom. */
-export const activeCues = ({
-  cues,
-  time,
-}: {
+type ActiveCuesProps = {
   cues: readonly SubtitleCue[]
   time: number
-}): SubtitleCue[] => cues.filter((cue) => cue.start <= time && time < cue.end)
+}
+
+/** Every cue showing at `time`, oldest first, as a viewer reads them top to bottom. */
+export const activeCues = ({ cues, time }: ActiveCuesProps): SubtitleCue[] =>
+  cues.filter((cue) => cue.start <= time && time < cue.end)
 
 /** A stretch of cue text with one style. Line breaks stay in `text` as `\n`. */
 export type CueRun = {

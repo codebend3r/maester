@@ -14,14 +14,13 @@ export const isWatchedState = oneOf(Object.values(WATCHED_STATES))
 
 export type WatchedState = Infer<typeof isWatchedState>
 
-/** An empty group has nothing to have watched, so it reads unwatched. */
-export const watchedStateOf = ({
-  watched,
-  total,
-}: {
+type WatchedStateOfProps = {
   watched: number
   total: number
-}): WatchedState => {
+}
+
+/** An empty group has nothing to have watched, so it reads unwatched. */
+export const watchedStateOf = ({ watched, total }: WatchedStateOfProps): WatchedState => {
   if (watched <= 0) return WATCHED_STATES.unwatched
   return watched >= total ? WATCHED_STATES.watched : WATCHED_STATES.partly
 }

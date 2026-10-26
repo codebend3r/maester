@@ -15,6 +15,13 @@ const COULD_NOT_PLAY = 'Raven could not play this video.'
 const messageOf = (error: unknown): string =>
   error instanceof Error && error.message !== '' ? error.message : COULD_NOT_OPEN
 
+type UseNativeEngineProps = {
+  player: NativePlayer
+  source: PlayerSource
+  onFailure: (message: string) => void
+  toggleFullscreen: () => void
+}
+
 /**
  * The engine for a player in another process: it loads the source, folds the
  * player's events into the same state the html engine keeps from its
@@ -27,12 +34,10 @@ export const useNativeEngine = ({
   source,
   onFailure,
   toggleFullscreen,
-}: {
-  player: NativePlayer
-  source: PlayerSource
-  onFailure: (message: string) => void
-  toggleFullscreen: () => void
-}): { engine: EngineHandle; selection: ReturnType<typeof useNativeTrackSelection> } => {
+}: UseNativeEngineProps): {
+  engine: EngineHandle
+  selection: ReturnType<typeof useNativeTrackSelection>
+} => {
   const { title, trackPicks, isVolumeFixed = false, onEngineError } = useHostServices()
   const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
   const setCaptionScale = usePlayerPrefs((prefs) => prefs.setCaptionScale)

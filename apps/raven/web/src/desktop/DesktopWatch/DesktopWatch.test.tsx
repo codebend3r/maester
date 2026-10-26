@@ -57,6 +57,11 @@ const DONE = { type: DESKTOP_REPLIES.done } as const satisfies DesktopReply
 
 type PlayTitle = Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.playTitle }>
 
+type TitleMainProps = {
+  answer?: (request: PlayTitle) => DesktopReply
+  isPassthrough?: boolean
+}
+
 /** Main answering `playTitle` with `answer` (the source it hands over, by default from the server). */
 const titleMain = ({
   answer = ({ at, next }) => ({
@@ -66,10 +71,7 @@ const titleMain = ({
     next,
   }),
   isPassthrough = false,
-}: {
-  answer?: (request: PlayTitle) => DesktopReply
-  isPassthrough?: boolean
-} = {}) =>
+}: TitleMainProps = {}) =>
   fakeClient({
     request: async (request) => {
       if (request.type === DESKTOP_REQUESTS.playTitle) return answer(request)
@@ -105,8 +107,10 @@ const loadsOf = (fake: ReturnType<typeof fakePlayer>) =>
     .map(([command]) => command)
     .filter((command) => command.type === PLAYER_COMMANDS.load)
 
+type NavigateToProps = { to: string }
+
 /** Stands in for main's `navigate` event: a play link opened while the page shows a title. */
-const NavigateTo = ({ to }: { to: string }) => {
+const NavigateTo = ({ to }: NavigateToProps) => {
   const navigate = useNavigate()
   return (
     <button type="button" onClick={() => handled(Promise.resolve(navigate(to)))}>

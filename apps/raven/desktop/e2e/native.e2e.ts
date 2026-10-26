@@ -48,18 +48,15 @@ const NIGHT = '#15201E'
 const CLEAR = '#000000'
 const ERROR_CODES = { eperm: 'EPERM' } as const
 
-/** Plays `path` through mpv and waits until its clock is moving. */
-const playNatively = async ({
-  app,
-  page,
-  path,
-  title,
-}: {
+type PlayNativelyProps = {
   app: ElectronApplication
   page: Page
   path: string
   title: string
-}) => {
+}
+
+/** Plays `path` through mpv and waits until its clock is moving. */
+const playNatively = async ({ app, page, path, title }: PlayNativelyProps) => {
   await openFile({ app, path })
   await expectPlayingNatively({ page, title })
 }
@@ -70,15 +67,19 @@ const expectLeftPlayer = async (page: Page) => {
   await expect(page.locator('html')).not.toHaveAttribute('data-surface', 'native')
 }
 
+type RepliesToProps = { page: Page; type: PlayerCommand['type'] }
+
 /** The reply to each request of `type` the page sent, in order; null for one not answered yet. */
-const repliesTo = async ({ page, type }: { page: Page; type: PlayerCommand['type'] }) => {
+const repliesTo = async ({ page, type }: RepliesToProps) => {
   const { requests, replies } = await trafficOf({ page })
   return requests
     .filter((sent) => sent.command.type === type)
     .map((sent) => replies.find((reply) => reply.id === sent.id) ?? null)
 }
 
-const lastReplyOf = async ({ page, type }: { page: Page; type: PlayerCommand['type'] }) =>
+type LastReplyOfProps = { page: Page; type: PlayerCommand['type'] }
+
+const lastReplyOf = async ({ page, type }: LastReplyOfProps) =>
   (await repliesTo({ page, type })).at(-1) ?? null
 
 /** The volume, in whole percent, of the last volume command the page sent mpv; null before any. */
@@ -90,8 +91,10 @@ const lastVolumeSent = async (page: Page): Promise<number | null> => {
   return volumes.at(-1) ?? null
 }
 
+type ChildrenOfProps = { pid: number }
+
 /** The pids `pgrep` lists as children of `pid`; it exits 1, with no output, when there are none. */
-const childrenOf = ({ pid }: { pid: number }) =>
+const childrenOf = ({ pid }: ChildrenOfProps) =>
   new Promise<number[]>((resolve) => {
     execFile('pgrep', ['-P', `${pid}`], (_error, stdout) =>
       resolve(
@@ -103,8 +106,10 @@ const childrenOf = ({ pid }: { pid: number }) =>
     )
   })
 
+type ProcessTreeProps = { pid: number }
+
 /** The app's process and every process under it (Electron's helpers), by pid. */
-const processTree = async ({ pid }: { pid: number }): Promise<number[]> => {
+const processTree = async ({ pid }: ProcessTreeProps): Promise<number[]> => {
   const children = await childrenOf({ pid })
   const below = await Promise.all(children.map((child) => processTree({ pid: child })))
   return [pid, ...below.flat()]
@@ -129,8 +134,10 @@ const backgroundOf = (app: ElectronApplication): Promise<string | null> =>
 const audioGroup = (page: Page) => page.getByRole('group', { name: 'Audio' })
 const subtitleGroup = (page: Page) => page.getByRole('group', { name: 'Subtitles' })
 
+type OpenMenuProps = { page: Page; name: 'Audio' | 'Subtitles' }
+
 /** Opens the menu behind the Audio or Subtitles pill, whose radios are named for it. */
-const openMenu = async ({ page, name }: { page: Page; name: 'Audio' | 'Subtitles' }) => {
+const openMenu = async ({ page, name }: OpenMenuProps) => {
   await wake(page)
   await page.getByRole('button', { name: new RegExp(`^${name}`) }).click()
   await expect(page.getByRole('group', { name })).toBeVisible()

@@ -16,13 +16,12 @@ const MAX_GAP_MS = HLS_MAX_KEYFRAME_GAP_SECONDS * SECOND_MS
 const toMs = (seconds: number): number => Math.round(seconds * SECOND_MS)
 const toSeconds = (ms: number): number => ms / SECOND_MS
 
-const fromMs = ({
-  boundariesMs,
-  durationMs,
-}: {
+type FromMsProps = {
   boundariesMs: number[]
   durationMs: number
-}): SegmentPlan => ({
+}
+
+const fromMs = ({ boundariesMs, durationMs }: FromMsProps): SegmentPlan => ({
   boundaries: boundariesMs.map(toSeconds),
   duration: toSeconds(durationMs),
 })
@@ -32,19 +31,18 @@ const spansMs = (plan: SegmentPlan): number[] => {
   return starts.map((start, index) => (starts[index + 1] ?? toMs(plan.duration)) - start)
 }
 
+type RemuxPlanProps = {
+  keyframes: readonly number[]
+  duration: number
+}
+
 /**
  * Cuts a remux's segments at its keyframes: the first at the first keyframe,
  * each next at the first keyframe six seconds or more after the last start.
  * Null when two boundaries, or the last one and the end, lie further apart
  * than a remux can bear; the caller answers 409.
  */
-export const remuxPlan = ({
-  keyframes,
-  duration,
-}: {
-  keyframes: readonly number[]
-  duration: number
-}): SegmentPlan | null => {
+export const remuxPlan = ({ keyframes, duration }: RemuxPlanProps): SegmentPlan | null => {
   const durationMs = toMs(duration)
   const inside = keyframes.map(toMs).filter((keyframe) => keyframe < durationMs)
   const [first] = inside
@@ -64,6 +62,12 @@ export const remuxPlan = ({
   return isTooSparse ? null : fromMs({ boundariesMs, durationMs })
 }
 
+type TranscodePlanProps = {
+  start: number
+  duration: number
+  frameRate: number | null
+}
+
 /**
  * Cuts a transcode every six seconds from `start`, the video's first frame,
  * each boundary moved to the nearest frame of `frameRate` after it: six
@@ -71,15 +75,7 @@ export const remuxPlan = ({
  * frames lands on whichever one a run's own start rounds to. The encoder is
  * told to put a keyframe at each boundary.
  */
-export const transcodePlan = ({
-  start,
-  duration,
-  frameRate,
-}: {
-  start: number
-  duration: number
-  frameRate: number | null
-}): SegmentPlan => {
+export const transcodePlan = ({ start, duration, frameRate }: TranscodePlanProps): SegmentPlan => {
   const durationMs = toMs(duration)
   const count = Math.max(1, Math.ceil((durationMs - toMs(start)) / SEGMENT_MS))
   const offset = (index: number): number =>
@@ -98,12 +94,14 @@ export const segmentDurations = (plan: SegmentPlan): number[] => spansMs(plan).m
 export const playlistLength = (plan: SegmentPlan): number =>
   plan.duration - (plan.boundaries[0] ?? 0)
 
+type RunSegmentTimesProps = { plan: SegmentPlan; from: number }
+
 /**
  * The boundaries after segment `from`, relative to it, for ffmpeg's
  * `-segment_times`: the segment muxer reads them as offsets from the run's
  * first packet, not from the file's start.
  */
-export const runSegmentTimes = ({ plan, from }: { plan: SegmentPlan; from: number }): number[] => {
+export const runSegmentTimes = ({ plan, from }: RunSegmentTimesProps): number[] => {
   const start = toMs(plan.boundaries[from] ?? 0)
   return plan.boundaries.slice(from + 1).map((boundary) => toSeconds(toMs(boundary) - start))
 }

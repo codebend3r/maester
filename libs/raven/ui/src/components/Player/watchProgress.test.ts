@@ -30,15 +30,13 @@ describe('progressStepOf', () => {
   })
 
   it(`saves once the clock is ${SAVE_EVERY_S} seconds from the last save, on a pause, and at the end`, () => {
-    const step = ({
-      state,
-      previous,
-      position,
-    }: {
+    type StepProps = {
       state: VideoState
       previous: VideoState
       position: number
-    }) =>
+    }
+
+    const step = ({ state, previous, position }: StepProps) =>
       progressStepOf({ state, previous, hasStarted: true, lastSaved: 20, position, duration: 120 })
     expect(
       step({ state: { ...PLAYING, time: 29 }, previous: PLAYING, position: 29 }).saveAt,

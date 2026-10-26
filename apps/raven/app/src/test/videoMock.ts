@@ -50,14 +50,16 @@ export const videoModuleMock = () => ({
   default: Video,
 })
 
+type StartVideoProps = {
+  props: ReactVideoProps
+  duration: number
+}
+
 /** Fires what the player says as it opens its source, `duration` seconds long, and starts. */
 export const startVideo = async ({
   props: { onLoad, onPlaybackStateChanged, onBuffer },
   duration,
-}: {
-  props: ReactVideoProps
-  duration: number
-}): Promise<void> => {
+}: StartVideoProps): Promise<void> => {
   if (onLoad === undefined || onPlaybackStateChanged === undefined || onBuffer === undefined) {
     throw new Error('The player must hear its load, playback and buffering events')
   }
@@ -75,14 +77,16 @@ export const startVideo = async ({
   })
 }
 
+type MoveVideoToProps = {
+  props: ReactVideoProps
+  seconds: number
+}
+
 /** Fires the player's report that it has reached `seconds`. */
 export const moveVideoTo = async ({
   props: { onProgress },
   seconds,
-}: {
-  props: ReactVideoProps
-  seconds: number
-}): Promise<void> => {
+}: MoveVideoToProps): Promise<void> => {
   if (onProgress === undefined) throw new Error('The player hears no progress')
   await act(async () => {
     onProgress({ currentTime: seconds, playableDuration: seconds, seekableDuration: 6000 })

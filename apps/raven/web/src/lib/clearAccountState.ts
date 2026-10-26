@@ -4,6 +4,10 @@ import { stopKeepingListings } from '@/lib/savedListings'
 import { useSelectionScopes } from '@/stores/selectionScope'
 import { useUnlockPrompt } from '@raven/ui/headless'
 
+type ClearAccountStateProps = {
+  queryClient: QueryClient
+}
+
 /**
  * Everything one account left in this tab that the next one must not see.
  * Queries are reset rather than removed: removing one detaches whoever is
@@ -13,11 +17,7 @@ import { useUnlockPrompt } from '@raven/ui/headless'
  * its state for the button that started it. The listings kept on this device
  * go too.
  */
-export const clearAccountState = async ({
-  queryClient,
-}: {
-  queryClient: QueryClient
-}): Promise<void> => {
+export const clearAccountState = async ({ queryClient }: ClearAccountStateProps): Promise<void> => {
   useUnlockPrompt.getState().close()
   useSelectionScopes.getState().scopes.forEach((scope) => scope.store.getState().end())
   stopKeepingListings()

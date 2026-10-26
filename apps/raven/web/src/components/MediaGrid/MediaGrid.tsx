@@ -5,6 +5,16 @@ import { SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/MediaGrid/MediaGrid.module.scss'
 
+type MediaGridProps = {
+  items: MediaItem[]
+  posters?: boolean
+  matchType?: MatchItemType | null
+  ratingsSource?: RatingSource
+  sort?: MediaSort
+  /** The item whose poster a card shows, when not the video's own: an episode's season. */
+  posterOf?: (media: MediaItem) => ItemSummary | null
+}
+
 /**
  * The card grid a library and the favourites share; `posters` lays a Movies
  * library out as posters, and `sort` has each card show the value it is in
@@ -17,15 +27,7 @@ export const MediaGrid = ({
   ratingsSource = 'tmdb',
   sort,
   posterOf,
-}: {
-  items: MediaItem[]
-  posters?: boolean
-  matchType?: MatchItemType | null
-  ratingsSource?: RatingSource
-  sort?: MediaSort
-  /** The item whose poster a card shows, when not the video's own: an episode's season. */
-  posterOf?: (media: MediaItem) => ItemSummary | null
-}) => (
+}: MediaGridProps) => (
   <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid}>
     {items.map((item) =>
       posters ? (
@@ -45,14 +47,13 @@ export const MediaGrid = ({
   </ul>
 )
 
-/** The grid while its cards are on their way: stand-ins shaped as its cards, posters or frame grabs. */
-export const MediaGridSkeleton = ({
-  posters = false,
-  count,
-}: {
+type MediaGridSkeletonProps = {
   posters?: boolean
   count?: number
-}) => (
+}
+
+/** The grid while its cards are on their way: stand-ins shaped as its cards, posters or frame grabs. */
+export const MediaGridSkeleton = ({ posters = false, count }: MediaGridSkeletonProps) => (
   <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid}>
     <SkeletonCards picture={posters ? 'poster' : 'frame'} count={count} />
   </ul>

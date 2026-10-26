@@ -7,12 +7,14 @@ import styles from '@/components/PosterImage/PosterImage.module.scss'
 
 type Source = NonNullable<ReturnType<typeof posterSources>>
 
+type PictureProps = { sources: Source[]; initial: string }
+
 /**
  * The first of `sources` that loads, else `initial`, dim in the middle. A
  * picture that fails to load gives way to the next. The frame is the
  * container's to give.
  */
-const Picture = ({ sources, initial }: { sources: Source[]; initial: string }) => {
+const Picture = ({ sources, initial }: PictureProps) => {
   const [failed, setFailed] = useState<ReadonlyArray<string>>([])
   const source = sources.find(({ src }) => !failed.includes(src))
   if (!source) {
@@ -33,6 +35,12 @@ const Picture = ({ sources, initial }: { sources: Source[]; initial: string }) =
   )
 }
 
+type PosterImageProps = {
+  media: MediaItem
+  poster?: ItemSummary | null
+  sizes: PosterSizes
+}
+
 /**
  * A video's poster, else its frame grab cropped to the frame, else its
  * title's first letter. The poster is the video's own item's unless
@@ -40,15 +48,7 @@ const Picture = ({ sources, initial }: { sources: Source[]; initial: string }) =
  * how wide the container shows it, so the browser fetches a poster no
  * wider than that.
  */
-export const PosterImage = ({
-  media,
-  poster = media.item,
-  sizes,
-}: {
-  media: MediaItem
-  poster?: ItemSummary | null
-  sizes: PosterSizes
-}) => {
+export const PosterImage = ({ media, poster = media.item, sizes }: PosterImageProps) => {
   const thumbnail = api.thumbnailUrl(media)
   const sources = [
     poster ? posterSources({ item: poster, sizes }) : null,
@@ -57,8 +57,10 @@ export const PosterImage = ({
   return <Picture sources={sources} initial={cardTitle(media).title.slice(0, 1)} />
 }
 
+type ItemPosterProps = { item: ItemSummary; sizes: PosterSizes }
+
 /** An item's own poster, as a show's card shows it, else its title's first letter. */
-export const ItemPoster = ({ item, sizes }: { item: ItemSummary; sizes: PosterSizes }) => {
+export const ItemPoster = ({ item, sizes }: ItemPosterProps) => {
   const poster = posterSources({ item, sizes })
   return <Picture sources={poster ? [poster] : []} initial={item.title.slice(0, 1)} />
 }

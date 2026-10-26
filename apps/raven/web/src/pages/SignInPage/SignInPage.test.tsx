@@ -115,7 +115,9 @@ describe('SignInPage', () => {
   it('reads Signing in… while it signs in, then goes to the return path', async () => {
     const user = userEvent.setup()
     const attempt = held<SignInResult>()
-    const signInWithPassword = mock((_credentials: { email: string; password: string }) => {
+    type SignInWithPasswordMockCallbackProps = { email: string; password: string }
+
+    const signInWithPassword = mock((_credentials: SignInWithPasswordMockCallbackProps) => {
       return attempt.promise
     })
     renderSignIn({
@@ -207,7 +209,9 @@ describe('SignInPage', () => {
   })
 
   describe('an email not yet confirmed', () => {
-    const renderUnconfirmed = async ({ resend }: { resend?: AuthClient['resend'] }) => {
+    type RenderUnconfirmedProps = { resend?: AuthClient['resend'] }
+
+    const renderUnconfirmed = async ({ resend }: RenderUnconfirmedProps) => {
       const user = userEvent.setup()
       renderSignIn({
         calls: {

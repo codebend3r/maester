@@ -3,8 +3,9 @@ import { contentTypeFor, createFileHandler, parseRange } from '@/main/fileProtoc
 import type { GrantedFile } from '@/main/grants'
 
 describe('parseRange', () => {
-  const parse = ({ header, size = 1000 }: { header: string | null; size?: number }) =>
-    parseRange({ header, size })
+  type ParseProps = { header: string | null; size?: number }
+
+  const parse = ({ header, size = 1000 }: ParseProps) => parseRange({ header, size })
 
   it('treats no header as all', () => {
     expect(parse({ header: null })).toEqual({ kind: 'all' })
@@ -101,10 +102,9 @@ const granted = (overrides: Partial<GrantedFile> = {}): GrantedFile => ({
 
 type RangeCall = { path: string; start: number; end: number }
 
-const setup = ({
-  file = granted(),
-  size = 1000,
-}: { file?: GrantedFile | null; size?: number | null } = {}) => {
+type SetupProps = { file?: GrantedFile | null; size?: number | null }
+
+const setup = ({ file = granted(), size = 1000 }: SetupProps = {}) => {
   const rangeCalls: RangeCall[] = []
   const statCalls: string[] = []
   const lookups: string[] = []
@@ -134,15 +134,14 @@ const setup = ({
   return { handler, rangeCalls, statCalls, lookups, state }
 }
 
-const get = ({
-  url = `raven-file://${ID}`,
-  range,
-  method = 'GET',
-}: {
+type GetProps = {
   url?: string
   range?: string
   method?: string
-}) => new Request(url, { method, headers: range === undefined ? {} : { Range: range } })
+}
+
+const get = ({ url = `raven-file://${ID}`, range, method = 'GET' }: GetProps) =>
+  new Request(url, { method, headers: range === undefined ? {} : { Range: range } })
 
 describe('file handler ranges', () => {
   it('serves the whole file without a Range header', async () => {

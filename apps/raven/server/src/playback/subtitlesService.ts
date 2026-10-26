@@ -12,6 +12,24 @@ import { TracksService } from '@/playback/tracksService'
 /** Most sidecars that are not UTF-8 are Windows Latin-1, from the DVD-rip years. */
 const FALLBACK_CHARSET = 'CP1252'
 
+type SubtitlesServiceVttProps = {
+  file: MediaFile
+  trackId: string
+  window: number
+}
+
+type SubtitlesServiceExtractProps = {
+  folder: string
+  path: string
+  version: string
+  args: (output: string) => string[][]
+}
+
+type SubtitlesServiceClearOtherVersionsProps = {
+  folder: string
+  version: string
+}
+
 /**
  * Subtitles as WebVTT, cached on disk under `<data>/subtitles/<id>/`.
  * Embedded tracks are extracted one window at a time (see
@@ -34,15 +52,7 @@ export class SubtitlesService {
   }
 
   /** One track's WebVTT; for an embedded track, only window `window`. */
-  async vtt({
-    file,
-    trackId,
-    window,
-  }: {
-    file: MediaFile
-    trackId: string
-    window: number
-  }): Promise<string> {
+  async vtt({ file, trackId, window }: SubtitlesServiceVttProps): Promise<string> {
     const { tracks, sidecars } = await this.tracks.tracksFor(file)
     const track = tracks.subtitles.find((candidate) => candidate.id === trackId)
     if (!track) throw new NotFoundException(`No subtitle track ${trackId}`)
@@ -101,12 +111,7 @@ export class SubtitlesService {
     path,
     version,
     args,
-  }: {
-    folder: string
-    path: string
-    version: string
-    args: (output: string) => string[][]
-  }): Promise<string> {
+  }: SubtitlesServiceExtractProps): Promise<string> {
     await mkdir(folder, { recursive: true })
     await this.clearOtherVersions({ folder, version })
     // ffmpeg picks the muxer from the extension too, so the temp file keeps .vtt.
@@ -136,10 +141,7 @@ export class SubtitlesService {
   private async clearOtherVersions({
     folder,
     version,
-  }: {
-    folder: string
-    version: string
-  }): Promise<void> {
+  }: SubtitlesServiceClearOtherVersionsProps): Promise<void> {
     const names = await readdir(folder).catch(() => [])
     await Promise.all(
       names

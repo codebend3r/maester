@@ -2,6 +2,8 @@ import { type Search, useSearch } from '@raven/ui/headless'
 import { useDeferredValue, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
+type UseAddressSearchProps = { page?: string }
+
 /**
  * A search that rides in the address as `?q=`, so a refresh, a shared link
  * or Back lands on it again. The query is written once it settles,
@@ -11,7 +13,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
  * anywhere: elsewhere it starts empty, and a query settling there opens the
  * page on it.
  */
-export const useAddressSearch = ({ page }: { page?: string } = {}): Search => {
+export const useAddressSearch = ({ page }: UseAddressSearchProps = {}): Search => {
   const [address, setAddress] = useSearchParams()
   const navigate = useNavigate()
   const { key, pathname } = useLocation()

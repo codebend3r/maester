@@ -11,11 +11,13 @@ import type { ReactNode, RefObject } from 'react'
 import type { MediaPlane } from '@/components/Player/useMediaPlane'
 import type { VideoState } from '@/components/Player/videoState'
 
+type SetVolumeProps = { volume: number; muted: boolean }
+
 export type EngineActions = {
   play: () => void
   pause: () => void
   seek: (time: number) => void
-  setVolume: (level: { volume: number; muted: boolean }) => void
+  setVolume: (level: SetVolumeProps) => void
   setRate: (rate: number) => void
   setAudio: (index: number | null) => void
   setSubtitle: (id: string | null) => void
@@ -88,6 +90,13 @@ export const sourceKey = (source: PlayerSource): string => {
 const reasonOf = (error: unknown): string =>
   error instanceof Error && error.message !== '' ? error.message : 'no reason given'
 
+type SendQuietlyProps = {
+  player: NativePlayer
+  command: PlayerCommand
+  onAccepted?: () => void
+  onRefused?: () => void
+}
+
 /**
  * For every command whose refusal the viewer need not be told about: it never
  * throws, and a refusal is logged and handed to `onRefused` to undo what the
@@ -98,12 +107,7 @@ export const sendQuietly = ({
   command,
   onAccepted = () => {},
   onRefused = () => {},
-}: {
-  player: NativePlayer
-  command: PlayerCommand
-  onAccepted?: () => void
-  onRefused?: () => void
-}): void => {
+}: SendQuietlyProps): void => {
   player.send(command).then(onAccepted, (error: unknown) => {
     console.warn(`Raven refused ${command.type}: ${reasonOf(error)}`)
     onRefused()

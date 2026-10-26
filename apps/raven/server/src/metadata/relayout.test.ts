@@ -8,8 +8,10 @@ import { planRelayout } from '@/scanner/layout'
 import { testDatabase } from '@/test/database'
 import { repositories } from '@/test/repositories'
 
+type FetchedProps = { type: FetchedItem['type']; tmdbId: string }
+
 /** The least TMDB item `MetadataRepository.save` takes, as `metadataRepository.test.ts` builds one. */
-const fetched = ({ type, tmdbId }: { type: FetchedItem['type']; tmdbId: string }): FetchedItem => ({
+const fetched = ({ type, tmdbId }: FetchedProps): FetchedItem => ({
   ...localSeason({ showTmdbId: '1', number: 1 }),
   type,
   tmdbId,
@@ -23,15 +25,13 @@ describe('relayout', () => {
   beforeAll(database.open)
   afterAll(database.close)
 
-  const setUp = ({
-    kind,
-    root,
-    paths,
-  }: {
+  type SetUpProps = {
     kind: 'shows' | 'movies'
     root: string
     paths: string[]
-  }) => {
+  }
+
+  const setUp = ({ kind, root, paths }: SetUpProps) => {
     const libraries = new LibrariesRepository(database.get())
     const { metadata } = repositories(database.get())
     const files = new MatchFiles(database.get(), metadata)

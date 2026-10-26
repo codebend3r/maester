@@ -17,14 +17,13 @@ export type ByteRange =
 const ALL: ByteRange = { kind: BYTE_RANGE_KINDS.all }
 const SINGLE_RANGE = /^bytes=(\d*)-(\d*)$/
 
-/** One byte range and nothing else: anything malformed or multi-range is served whole. */
-export const parseRange = ({
-  header,
-  size,
-}: {
+type ParseRangeProps = {
   header: string | null
   size: number
-}): ByteRange => {
+}
+
+/** One byte range and nothing else: anything malformed or multi-range is served whole. */
+export const parseRange = ({ header, size }: ParseRangeProps): ByteRange => {
   if (header === null) return ALL
   const match = SINGLE_RANGE.exec(header)
   if (match === null) return ALL
@@ -62,15 +61,13 @@ const CONTENT_TYPES = new Map(
 export const contentTypeFor = (fileName: string): string =>
   CONTENT_TYPES.get(extensionOf(fileName)) ?? 'application/octet-stream'
 
-const answer = ({
-  status,
-  body = null,
-  headers = {},
-}: {
+type AnswerProps = {
   status: number
   body?: ReadableStream<Uint8Array> | null
   headers?: Record<string, string>
-}): Response =>
+}
+
+const answer = ({ status, body = null, headers = {} }: AnswerProps): Response =>
   new Response(body, {
     status,
     headers: { ...headers, [HTTP_HEADERS.contentTypeOptions]: 'nosniff' },
@@ -84,15 +81,19 @@ const hostOf = (url: string): string | null => {
   }
 }
 
+type ReadRangeProps = { path: string; start: number; end: number }
+
+type CreateFileHandlerProps = {
+  grants: Pick<Grants, 'fileOf'>
+  stat: (path: string) => Promise<{ size: number } | null>
+  readRange: (input: ReadRangeProps) => ReadableStream<Uint8Array>
+}
+
 export const createFileHandler = ({
   grants,
   stat,
   readRange,
-}: {
-  grants: Pick<Grants, 'fileOf'>
-  stat: (path: string) => Promise<{ size: number } | null>
-  readRange: (input: { path: string; start: number; end: number }) => ReadableStream<Uint8Array>
-}): ((request: Request) => Promise<Response>) => {
+}: CreateFileHandlerProps): ((request: Request) => Promise<Response>) => {
   return async (request) => {
     if (request.method !== HTTP_METHODS.get && request.method !== HTTP_METHODS.head) {
       return answer({ status: 405, headers: { [HTTP_HEADERS.allow]: ALLOWED_METHODS } })

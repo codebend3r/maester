@@ -46,11 +46,15 @@ const refused = (code: string): VerifyResult => ({
   error: new AuthApiError('Words from the server', 403, code),
 })
 
-const linkTo = ({ type, tokenHash = TOKEN_HASH }: { type: string; tokenHash?: string }) =>
+type LinkToProps = { type: string; tokenHash?: string }
+
+const linkTo = ({ type, tokenHash = TOKEN_HASH }: LinkToProps) =>
   `${AUTH_ROUTES.confirm}?${new URLSearchParams({
     [AUTH_QUERY.tokenHash]: tokenHash,
     [AUTH_QUERY.type]: type,
   })}`
+
+type SignedInCallbackProps = { emit: Emit }
 
 /**
  * Supabase tells its listeners about the new session before `verifyOtp`
@@ -59,7 +63,7 @@ const linkTo = ({ type, tokenHash = TOKEN_HASH }: { type: string; tokenHash?: st
  */
 const signedIn =
   (session: Session = fakeSession()) =>
-  async ({ emit }: { emit: Emit }) => {
+  async ({ emit }: SignedInCallbackProps) => {
     emit(session)
     return confirmed(session)
   }
@@ -69,17 +73,21 @@ const verified =
   async () =>
     confirmed(session)
 
+type VerifyProps = { params: VerifyParams; emit: Emit }
+
+type RenderConfirmProps = {
+  route: string
+  verify: (call: VerifyProps) => Promise<VerifyResult>
+  authConfig?: AuthConfig
+  session?: Session | null
+}
+
 const renderConfirm = async ({
   route,
   verify,
   authConfig = readyConfig,
   session = null,
-}: {
-  route: string
-  verify: (call: { params: VerifyParams; emit: Emit }) => Promise<VerifyResult>
-  authConfig?: AuthConfig
-  session?: Session | null
-}) => {
+}: RenderConfirmProps) => {
   const verifyOtp = mock(async (params: VerifyParams) =>
     verify({
       params,

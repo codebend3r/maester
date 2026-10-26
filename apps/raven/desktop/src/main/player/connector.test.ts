@@ -12,11 +12,11 @@ type Posted = { connection: PlayerConnectionStatus; ports: RemotePort[] }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-const setup = ({
-  engine,
-}: {
+type SetupProps = {
   engine?: (service: ReturnType<typeof fakeService>) => () => Promise<OpenedEngine<Engine>>
-} = {}) => {
+}
+
+const setup = ({ engine }: SetupProps = {}) => {
   const log: string[] = []
   const service = fakeService({ log })
   const ports: ReturnType<typeof fakePort>[] = []

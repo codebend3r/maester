@@ -51,17 +51,19 @@ const fakeFs = () => {
   return { fs, files }
 }
 
+type SetupProps = {
+  updates?: UpdateSettings
+  answers?: UpdateCheck[]
+  isBrowserBroken?: boolean
+  check?: () => Promise<UpdateCheck>
+}
+
 const setup = ({
   updates = { isEnabled: true, checkedAt: null },
   answers = [NEWER],
   isBrowserBroken = false,
   check,
-}: {
-  updates?: UpdateSettings
-  answers?: UpdateCheck[]
-  isBrowserBroken?: boolean
-  check?: () => Promise<UpdateCheck>
-} = {}) => {
+}: SetupProps = {}) => {
   const disk = fakeFs()
   const clock = fakeTimers()
   const initial: DesktopConfig = { ...EMPTY_CONFIG, updates }
@@ -407,15 +409,17 @@ describe('updateSourceFrom', () => {
 })
 
 describe('createMenuCheck', () => {
+  type MenuSetupProps = {
+    check?: () => Promise<UpdateCheck>
+    isOpened?: boolean
+    responses?: number[]
+  }
+
   const menuSetup = ({
     check = async () => NEWER,
     isOpened = true,
     responses = [0],
-  }: {
-    check?: () => Promise<UpdateCheck>
-    isOpened?: boolean
-    responses?: number[]
-  } = {}) => {
+  }: MenuSetupProps = {}) => {
     const shown: UpdateDialogOptions[] = []
     const announced: string[] = []
     const calls = { checks: 0, opens: 0 }

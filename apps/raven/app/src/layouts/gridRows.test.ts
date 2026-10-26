@@ -15,15 +15,13 @@ const card = (key: string): ShelfCard => ({
   target: { kind: ROUTE_TARGETS.play, mediaId: 1, at: 0 },
 })
 
-const section = ({
-  key,
-  title = null,
-  cards,
-}: {
+type SectionProps = {
   key: string
   title?: string | null
   cards: string[]
-}): GridSection => ({
+}
+
+const section = ({ key, title = null, cards }: SectionProps): GridSection => ({
   key,
   title,
   count: title === null ? null : `${cards.length} videos`,
@@ -39,7 +37,9 @@ const keysOf = (rows: ReturnType<typeof gridRowsOf>) =>
   )
 
 describe('gridColumnsOf', () => {
-  const columnsOf = ({ room, least, gap }: { room: number; least: number; gap: number }) =>
+  type ColumnsOfProps = { room: number; least: number; gap: number }
+
+  const columnsOf = ({ room, least, gap }: ColumnsOfProps) =>
     gridColumnsOf({ room, gap, leastOf: () => least }).columnsOf(CARD_SHAPES.poster)
 
   it('fits as many columns as the least width allows, with the gaps between them', () => {

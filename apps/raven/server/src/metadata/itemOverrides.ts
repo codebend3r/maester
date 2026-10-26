@@ -29,6 +29,8 @@ type OverrideRow = {
   content_rating: string | null
 }
 
+type ItemOverridesWriteProps = { itemId: number; change: ItemMetadataChange }
+
 /**
  * Edit metadata: what was written over TMDB's words for an item. Pages show
  * it through the `shown_items` view; TMDB's own words stay in `items`, so a
@@ -77,7 +79,7 @@ export class ItemOverrides {
    * field left out stays as it is; an item with nothing written over keeps
    * no row.
    */
-  write({ itemId, change }: { itemId: number; change: ItemMetadataChange }): void {
+  write({ itemId, change }: ItemOverridesWriteProps): void {
     this.db.transaction(() => {
       const current = this.db
         .prepare<[number], OverrideRow>('SELECT * FROM item_overrides WHERE item_id = ?')

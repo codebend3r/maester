@@ -24,13 +24,12 @@ const WEBDL = matchedMovie({
 
 const files = () => screen.getByRole('region', { name: /^(File|\d+ files)$/ })
 
-const show = ({
-  card,
-  everyCard = card,
-}: {
+type ShowProps = {
   card: readonly [MediaItem, ...MediaItem[]]
   everyCard?: readonly MediaItem[]
-}) =>
+}
+
+const show = ({ card, everyCard = card }: ShowProps) =>
   renderWithProviders({ ui: <MovieFiles files={card} everyCard={everyCard} itemId={STRAYS.id} /> })
 
 describe('MovieFiles', () => {

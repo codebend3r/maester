@@ -3,7 +3,9 @@ import { create } from 'zustand'
 import { createJSONStorage, devtools, persist } from 'zustand/middleware'
 import { STORE_KEYS } from '@/stores/storage'
 
-export type Follow = (link: { to: AppPath; state: unknown }) => void
+type FollowProps = { to: AppPath; state: unknown }
+
+export type Follow = (link: FollowProps) => void
 
 type CardLinksState = {
   /** Opens a card link's address in the app; null until `CardLinks` mounts. */

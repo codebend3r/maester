@@ -52,11 +52,13 @@ const Library = () => {
 
 const cleanups: Array<() => void> = []
 
+type SetUpProps = { entries?: string[] }
+
 /**
  * The library in a page with no layout, its cards 300 px tall and 100
  * apart, and the player outside the shell, as the app has it.
  */
-const setUp = ({ entries = ['/library'] }: { entries?: string[] } = {}) => {
+const setUp = ({ entries = ['/library'] }: SetUpProps = {}) => {
   const page = pageWithoutLayout()
   const router = createMemoryRouter(
     [

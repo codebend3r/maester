@@ -17,22 +17,22 @@ import styles from '@/pages/PersonPage/PersonPage.module.scss'
 const fold = (text: string): string =>
   text.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase()
 
+type MatchesProps = { entry: FilmographyEntry; query: string }
+
 /** Whether a title, or a part they play in it the tab shows, holds `query`, already folded. */
-const matches = ({ entry, query }: { entry: FilmographyEntry; query: string }): boolean =>
+const matches = ({ entry, query }: MatchesProps): boolean =>
   query === '' || fold(`${entry.title}\n${rolesOf(entry)}`).includes(query)
 
 const noTitles = (name: string): string => `TMDB lists no titles for ${name}.`
 
-/** What shows in place of a table with no rows, or null while it has some. */
-const emptyMessage = ({
-  rows,
-  query,
-  name,
-}: {
+type EmptyMessageProps = {
   rows: number
   query: string
   name: string
-}): string | null => {
+}
+
+/** What shows in place of a table with no rows, or null while it has some. */
+const emptyMessage = ({ rows, query, name }: EmptyMessageProps): string | null => {
   if (rows > 0) return null
   if (query) return `No titles match "${query}".`
   return noTitles(name)
@@ -55,25 +55,26 @@ export const heldOnOpening = (entries: readonly FilmographyEntry[]): number =>
     (entry) => entry.item != null,
   ).length
 
+type FilmographySkeletonProps = { name: string }
+
 /** A person's whole filmography on its way: rows of stand-ins, which a screen reader hears as `name`'s. */
-export const FilmographySkeleton = ({ name }: { name: string }) => (
+export const FilmographySkeleton = ({ name }: FilmographySkeletonProps) => (
   <Loading label={`Fetching ${name}'s filmography`}>
     <FilmographyBones />
   </Loading>
 )
+
+type FilmographyProps = {
+  name: string
+  entries: readonly FilmographyEntry[]
+}
 
 /**
  * A person's whole filmography as TMDB lists it, raven's titles marked:
  * the search, the toggle and the tabs over the table. The tab rides in the
  * address as `?credits=`, and one with nothing on it is All.
  */
-export const Filmography = ({
-  name,
-  entries,
-}: {
-  name: string
-  entries: readonly FilmographyEntry[]
-}) => {
+export const Filmography = ({ name, entries }: FilmographyProps) => {
   const search = useAddressSearch()
   const [address] = useSearchParams()
   const [isSelfAsked, setIsSelfAsked] = useState(false)

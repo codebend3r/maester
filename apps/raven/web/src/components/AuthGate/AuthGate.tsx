@@ -12,7 +12,9 @@ import styles from '@/components/AuthGate/AuthGate.module.scss'
 
 const Loading = () => <RavenLoader isFullscreen shouldShowLabel={false} />
 
-const Retry = ({ title, message }: { title: string; message: string }) => {
+type RetryProps = { title: string; message: string }
+
+const Retry = ({ title, message }: RetryProps) => {
   const queryClient = useQueryClient()
   const isRetrying = useIsFetching({ queryKey: queryKeys.auth }) > 0
   return (

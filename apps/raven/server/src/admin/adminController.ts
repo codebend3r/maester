@@ -20,8 +20,10 @@ import { Management } from '@/auth/management'
 import { RAVEN_HEADERS } from '@/http'
 import { parseBody } from '@/parseBody'
 
+type AppliedProps = { change: AdminChange; reply: FastifyReply }
+
 /** The lock as a change leaves it, with the cookie that carries it set on the reply. */
-const applied = ({ change, reply }: { change: AdminChange; reply: FastifyReply }): AdminLock => {
+const applied = ({ change, reply }: AppliedProps): AdminLock => {
   reply.header(HEADERS.setCookie, change.cookie)
   return change.lock
 }

@@ -11,8 +11,10 @@ const servicesFor = (label: string): PlayerServices => ({
   escape: null,
 })
 
+type ProbeProps = { firsts: string[] }
+
 /** Stands in for the player: notes the title its first render read. */
-const Probe = ({ firsts }: { firsts: string[] }) => {
+const Probe = ({ firsts }: ProbeProps) => {
   const { title } = useHostServices()
   const [first] = useState(title.label)
   useEffect(() => {
@@ -21,7 +23,9 @@ const Probe = ({ firsts }: { firsts: string[] }) => {
   return <p>{title.label}</p>
 }
 
-const Host = ({ services, firsts = [] }: { services: PlayerServices; firsts?: string[] }) => {
+type HostProps = { services: PlayerServices; firsts?: string[] }
+
+const Host = ({ services, firsts = [] }: HostProps) => {
   const isHosting = useHostPlayer(services)
   return isHosting && <Probe firsts={firsts} />
 }
@@ -51,8 +55,10 @@ describe('useHostPlayer', () => {
 
     const earlier = servicesFor('Earlier')
     const later = servicesFor('Later')
+    type PairProps = { hasEarlier: boolean }
+
     // Both mounted at once, the later one set its services last.
-    const Pair = ({ hasEarlier }: { hasEarlier: boolean }) => (
+    const Pair = ({ hasEarlier }: PairProps) => (
       <>
         {hasEarlier && <Host services={earlier} />}
         <Host services={later} />

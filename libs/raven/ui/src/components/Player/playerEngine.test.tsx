@@ -136,8 +136,10 @@ describe('useWatchProgress duration sink', () => {
     usePlayerServices.setState({ services })
     const state = initialVideoState(0)
     const initialProps: { length: number | null } = { length: null }
+    type CallbackRenderHookCallbackProps = { length: number | null }
+
     const { rerender } = renderHook(
-      ({ length }: { length: number | null }) =>
+      ({ length }: CallbackRenderHookCallbackProps) =>
         useWatchProgress({ state, position, duration: length, audio: null }),
       { initialProps },
     )
@@ -434,21 +436,21 @@ describe('PlayerChrome seams for a native host', () => {
   afterEach(() => jest.useRealTimers())
 
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const wrapper = ({ children }: { children: ReactNode }) => (
+  type WrapperProps = { children: ReactNode }
+
+  const wrapper = ({ children }: WrapperProps) => (
     <QueryClientProvider client={client}>
       <MemoryRouter>{children}</MemoryRouter>
     </QueryClientProvider>
   )
 
-  const chrome = ({
-    services,
-    actions,
-    time = 20,
-  }: {
+  type ChromeProps = {
     services: PlayerServices
     actions: EngineActions
     time?: number
-  }) => {
+  }
+
+  const chrome = ({ services, actions, time = 20 }: ChromeProps) => {
     const engine: EngineHandle = {
       state: { ...initialVideoState(time), paused: false },
       duration: 120,
@@ -680,7 +682,9 @@ describe('Player hands a title off to another player', () => {
 })
 
 describe('PlayerChrome handoff in the playback menu', () => {
-  const chrome = ({ services, actions }: { services: PlayerServices; actions: EngineActions }) => {
+  type ChromeProps = { services: PlayerServices; actions: EngineActions }
+
+  const chrome = ({ services, actions }: ChromeProps) => {
     const engine: EngineHandle = {
       state: { ...initialVideoState(20), paused: false },
       duration: 120,

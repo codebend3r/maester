@@ -30,7 +30,9 @@ const fileSelection: TrackSelection = {
   pickSubtitle: () => {},
 }
 
-export const Player = ({ engine }: { engine: Engine }) => {
+type PlayerProps = { engine: Engine }
+
+export const Player = ({ engine }: PlayerProps) => {
   const { title } = useHostServices()
   const leave = useLeave(title.backTo)
   switch (engine.kind) {
@@ -45,13 +47,12 @@ export const Player = ({ engine }: { engine: Engine }) => {
   }
 }
 
-const NativeView = ({
-  engine,
-  onBack,
-}: {
+type NativeViewProps = {
   engine: Extract<Engine, { kind: 'native' }>
   onBack: () => void
-}) => {
+}
+
+const NativeView = ({ engine, onBack }: NativeViewProps) => {
   const [failure, setFailure] = useState<string | null>(null)
   if (failure !== null) {
     return <Unplayable problems={[failure]} onBack={onBack} onTryAnyway={null} />
@@ -66,13 +67,12 @@ const NativeView = ({
   )
 }
 
-const HtmlView = ({
-  engine,
-  onBack,
-}: {
+type HtmlViewProps = {
   engine: Extract<Engine, { kind: 'html' }>
   onBack: () => void
-}) => {
+}
+
+const HtmlView = ({ engine, onBack }: HtmlViewProps) => {
   const source = engine.source
   switch (source.kind) {
     case PLAYER_SOURCE_KINDS.server:
@@ -86,13 +86,12 @@ const HtmlView = ({
   }
 }
 
-const FilePlayer = ({
-  source,
-  onBack,
-}: {
+type FilePlayerProps = {
   source: Extract<HtmlSource, { kind: 'file' }>
   onBack: () => void
-}) => {
+}
+
+const FilePlayer = ({ source, onBack }: FilePlayerProps) => {
   const [failure, setFailure] = useState<string | null>(null)
   if (failure !== null) {
     return <Unplayable problems={[failure]} onBack={onBack} onTryAnyway={null} />
@@ -108,13 +107,12 @@ const FilePlayer = ({
   )
 }
 
-const ServerPlayer = ({
-  source,
-  onBack,
-}: {
+type ServerPlayerProps = {
   source: Extract<HtmlSource, { kind: 'server' }>
   onBack: () => void
-}) => {
+}
+
+const ServerPlayer = ({ source, onBack }: ServerPlayerProps) => {
   const selection = useTrackSelection({ mediaId: source.media.id, api: source.api })
   const playback = usePlaybackLadder({
     media: source.media,

@@ -9,13 +9,12 @@ type Entry = { real: string; isFile: boolean; size: number; mtimeMs: number }
 const missing = (path: string): Error =>
   Object.assign(new Error(`ENOENT: no such file or directory, '${path}'`), { code: 'ENOENT' })
 
-const setup = ({
-  entries,
-  ids = null,
-}: {
+type SetupProps = {
   entries: Record<string, Partial<Entry>>
   ids?: readonly string[] | null
-}) => {
+}
+
+const setup = ({ entries, ids = null }: SetupProps) => {
   const table = new Map(
     Object.entries(entries).map(([path, entry]) => [
       path,

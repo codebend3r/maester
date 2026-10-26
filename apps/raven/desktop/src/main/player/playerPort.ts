@@ -26,7 +26,9 @@ export const MAX_PENDING = 100
 type PlayerRequest = Infer<typeof isPlayerRequest>
 type PlayerReply = Infer<typeof isPlayerReply>
 
-const refusal = ({ id, message }: { id: number; message: string }): PlayerReply => ({
+type RefusalProps = { id: number; message: string }
+
+const refusal = ({ id, message }: RefusalProps): PlayerReply => ({
   id,
   ok: false,
   reason: PLAYER_REFUSAL_REASONS.refused,
@@ -38,19 +40,17 @@ const idOf = (data: unknown): number | null => {
   return isNumber(data.id) ? data.id : null
 }
 
+type ConnectPortProps = {
+  port: PortLike
+  service: PlayerService
+  warn: (message: string) => void
+}
+
 /**
  * One page's player port. Only a request that passes `isPlayerRequest` reaches the
  * service, one at a time in arrival order, and only its narrowed command goes on.
  */
-export const connectPort = ({
-  port,
-  service,
-  warn,
-}: {
-  port: PortLike
-  service: PlayerService
-  warn: (message: string) => void
-}): { close: () => void } => {
+export const connectPort = ({ port, service, warn }: ConnectPortProps): { close: () => void } => {
   // `isRefusing` quiets the warnings for a run of messages it cannot use, as
   // `isOverflowing` does for a run of commands past `MAX_PENDING`: one warning per run.
   const state = { isOpen: true, pending: 0, isOverflowing: false, isRefusing: false }

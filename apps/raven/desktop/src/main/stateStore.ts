@@ -6,14 +6,20 @@ import {
   upgradeState,
 } from '@/main/playerState'
 
+type WriteFileProps = { path: string; data: string }
+
+type RenameProps = { from: string; to: string }
+
 export type StateFs = {
   readFile: (path: string) => Promise<string>
-  writeFile: (input: { path: string; data: string }) => Promise<void>
-  rename: (input: { from: string; to: string }) => Promise<void>
+  writeFile: (input: WriteFileProps) => Promise<void>
+  rename: (input: RenameProps) => Promise<void>
 }
 
+type SetProps = { run: () => void; ms: number }
+
 export type Timers = {
-  set: (input: { run: () => void; ms: number }) => unknown
+  set: (input: SetProps) => unknown
   clear: (handle: unknown) => void
 }
 
@@ -90,15 +96,13 @@ export const loadJson = async <T>({ empty, ...input }: JsonFile<T> & { empty: T 
   return read.kind === JSON_READ_KINDS.read ? read.value : empty
 }
 
-export const loadState = async ({
-  fs,
-  file,
-  now,
-}: {
+type LoadStateProps = {
   fs: StateFs
   file: string
   now: () => number
-}): Promise<PlayerState> =>
+}
+
+export const loadState = async ({ fs, file, now }: LoadStateProps): Promise<PlayerState> =>
   upgradeState(await loadJson({ fs, file, now, guard: isStoredPlayerState, empty: EMPTY_STATE }))
 
 export const createJsonStore = <T>({

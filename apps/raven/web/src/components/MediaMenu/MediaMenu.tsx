@@ -28,18 +28,15 @@ import styles from '@/components/MediaMenu/MediaMenu.module.scss'
  */
 export const MENU_HOST = styles.host
 
-/** Deleting is the one action here that cannot be undone, so it asks first. */
-const ConfirmDelete = ({
-  media,
-  remove,
-  onClose,
-  onDeleted,
-}: {
+type ConfirmDeleteProps = {
   media: MediaItem
   remove: UseMutationResult<void, Error, void>
   onClose: () => void
   onDeleted?: () => void
-}) => {
+}
+
+/** Deleting is the one action here that cannot be undone, so it asks first. */
+const ConfirmDelete = ({ media, remove, onClose, onDeleted }: ConfirmDeleteProps) => {
   const dialog = useRef<HTMLDialogElement>(null)
   const id = useId()
 
@@ -92,16 +89,14 @@ const artworkOf = (item: ItemSummary | null): { id: number; kind: MatchItemType 
   return null
 }
 
-/** One entry in the menu. */
-const MenuItem = ({
-  icon,
-  label,
-  onClick,
-}: {
+type MenuItemProps = {
   icon: IconName
   label: string
   onClick: () => void
-}) => (
+}
+
+/** One entry in the menu. */
+const MenuItem = ({ icon, label, onClick }: MenuItemProps) => (
   <li role="none">
     <button type="button" role="menuitem" className={styles.item} onClick={onClick}>
       <Icon name={icon} size={16} />
@@ -110,8 +105,10 @@ const MenuItem = ({
   </li>
 )
 
+type WrappingPathProps = { path: string }
+
 /** A path that wraps after a slash rather than in the middle of a name. */
-const WrappingPath = ({ path }: { path: string }) =>
+const WrappingPath = ({ path }: WrappingPathProps) =>
   path.split('/').map((part, index, parts) => (
     <Fragment key={parts.slice(0, index + 1).join('/')}>
       {index > 0 && (
@@ -123,11 +120,13 @@ const WrappingPath = ({ path }: { path: string }) =>
     </Fragment>
   ))
 
+type LocationItemProps = { media: MediaItem }
+
 /**
  * Where the file lives, read each time the menu opens, since a rename moves
  * it; choosing it copies the path.
  */
-const LocationItem = ({ media }: { media: MediaItem }) => {
+const LocationItem = ({ media }: LocationItemProps) => {
   const [copied, setCopied] = useState(false)
   const location = useQuery(mediaLocationQuery(media.id))
   const path = location.data?.path ?? null

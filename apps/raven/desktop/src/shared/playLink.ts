@@ -48,16 +48,18 @@ const queueOf = (text: string | undefined): number[] | null => {
   return ids.every(isMediaId) ? ids : null
 }
 
+type ReadRavenParamsProps = {
+  url: URL
+  host: string
+  keys: ReadonlySet<string>
+}
+
 /** The query of a `raven://<host>` link as a map, or null when the link is not strictly that host's. */
 const readRavenParams = ({
   url,
   host,
   keys: allowed,
-}: {
-  url: URL
-  host: string
-  keys: ReadonlySet<string>
-}): Map<string, string> | null => {
+}: ReadRavenParamsProps): Map<string, string> | null => {
   // `raven:` is not a special scheme, so `new URL` keeps the host's case as written.
   if (url.host.toLowerCase() !== host) return null
   if (url.username !== '' || url.password !== '' || url.port !== '') return null
@@ -72,7 +74,9 @@ const readRavenParams = ({
   return new Map(entries)
 }
 
-const readPlayQuery = ({ url }: { url: URL }): PlayRequest | null => {
+type ReadPlayQueryProps = { url: URL }
+
+const readPlayQuery = ({ url }: ReadPlayQueryProps): PlayRequest | null => {
   const params = readRavenParams({ url, host: 'play', keys: LINK_KEYS })
   if (params === null) return null
   const server = params.get('server')
@@ -86,11 +90,11 @@ const readPlayQuery = ({ url }: { url: URL }): PlayRequest | null => {
   return { origin, mediaId, at, next }
 }
 
-const targetOf = ({
-  params,
-}: {
+type TargetOfProps = {
   params: Map<string, string>
-}): DownloadRequest['target'] | null => {
+}
+
+const targetOf = ({ params }: TargetOfProps): DownloadRequest['target'] | null => {
   const media = params.get('media')
   const item = params.get('item')
   const saga = params.get('saga')
@@ -111,7 +115,9 @@ const targetOf = ({
   return { kind: DOWNLOAD_TARGET_KINDS.saga, libraryId, tmdbId }
 }
 
-const readDownloadQuery = ({ url }: { url: URL }): DownloadRequest | null => {
+type ReadDownloadQueryProps = { url: URL }
+
+const readDownloadQuery = ({ url }: ReadDownloadQueryProps): DownloadRequest | null => {
   const params = readRavenParams({ url, host: 'download', keys: DOWNLOAD_KEYS })
   if (params === null) return null
   const origin = serverOriginOf(params.get('server') ?? '')
@@ -120,7 +126,9 @@ const readDownloadQuery = ({ url }: { url: URL }): DownloadRequest | null => {
   return { origin, target }
 }
 
-const readWatchPage = ({ url, text }: { url: URL; text: string }): PlayRequest | null => {
+type ReadWatchPageProps = { url: URL; text: string }
+
+const readWatchPage = ({ url, text }: ReadWatchPageProps): PlayRequest | null => {
   const match = WATCH_PATH.exec(url.pathname)
   const mediaId = mediaIdOf(match?.[1] ?? '')
   const origin = serverOriginOf(WATCH_AUTHORITY.exec(text)?.[0] ?? '')

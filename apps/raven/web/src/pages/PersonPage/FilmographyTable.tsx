@@ -74,8 +74,10 @@ const posterOf = (entry: FilmographyEntry): ReturnType<typeof posterSources> => 
     : { ...api.tmdbPosterSources(entry.poster), sizes: POSTER_SIZES.list }
 }
 
+type SmallPosterProps = { entry: FilmographyEntry }
+
 /** A title's small poster, or its initial; the title beside it says what it is, so it is hidden. */
-const SmallPoster = ({ entry }: { entry: FilmographyEntry }) => {
+const SmallPoster = ({ entry }: SmallPosterProps) => {
   const poster = posterOf(entry)
   const [hasFailed, setHasFailed] = useState(false)
   return (
@@ -96,14 +98,13 @@ const SmallPoster = ({ entry }: { entry: FilmographyEntry }) => {
   )
 }
 
-/** One title: its year, poster, name and kind, their parts in it, and whether raven holds it. */
-const FilmographyRow = ({
-  entry,
-  hasDepartment,
-}: {
+type FilmographyRowProps = {
   entry: FilmographyEntry
   hasDepartment: boolean
-}) => {
+}
+
+/** One title: its year, poster, name and kind, their parts in it, and whether raven holds it. */
+const FilmographyRow = ({ entry, hasDepartment }: FilmographyRowProps) => {
   const page = entry.item ? itemPath(entry.item) : null
   const roles = rolesOf(entry)
   const episodes = episodesOf(entry)
@@ -154,6 +155,12 @@ const FilmographyRow = ({
   )
 }
 
+type FilmographyTableProps = {
+  entries: readonly FilmographyEntry[]
+  tab: FilmographyTab
+  isHidden: boolean
+}
+
 /**
  * The titles a tab lists, as rows of facts in the server's order until a
  * column is sorted: Year, Title and On raven sort. Department shows on All
@@ -166,22 +173,16 @@ export const FilmographyTable = memo(function FilmographyTable({
   entries,
   tab,
   isHidden,
-}: {
-  entries: readonly FilmographyEntry[]
-  tab: FilmographyTab
-  isHidden: boolean
-}) {
+}: FilmographyTableProps) {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: entries, columns: COLUMNS })
   const hasDepartment = tab === 'all'
-  const header = ({
-    column,
-    label,
-    className,
-  }: {
+  type HeaderProps = {
     column: Column
     label: string
     className?: string
-  }) => (
+  }
+
+  const header = ({ column, label, className }: HeaderProps) => (
     <SortHeader sort={ariaSort(column)} onToggle={() => toggle(column)} className={className}>
       {label}
     </SortHeader>

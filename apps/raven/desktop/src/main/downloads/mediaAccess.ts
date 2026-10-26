@@ -34,14 +34,18 @@ import { HTTP_STATUSES } from '@/shared/httpStatuses'
  */
 export const DOWNLOAD_MINTS = { budget: 16, windowMs: 300_000 } as const
 
+type ProbeFetchProps = {
+  url: string
+  timeoutMs: number
+}
+
 /**
  * Main builds this on `net.fetch`. It owns the timeout, which covers reading the body too: a probe
  * that fails rejects, and one that stalls past the timeout errors its body's read.
  */
-export type ProbeFetch = (input: {
-  url: string
-  timeoutMs: number
-}) => Promise<{ ok: boolean; body: ReadableStream<Uint8Array> | null }>
+export type ProbeFetch = (
+  input: ProbeFetchProps,
+) => Promise<{ ok: boolean; body: ReadableStream<Uint8Array> | null }>
 
 /**
  * The origin a file is fetched from and the account ticket it goes with. The server checks the
@@ -60,14 +64,22 @@ export type AccessOutcome =
   | { ok: true; access: Access }
   | { ok: false; reason: (typeof ACCESS_REFUSALS)[keyof typeof ACCESS_REFUSALS]; message: string }
 
+type AccessForProps = {
+  serverId: string
+  mediaId: number
+  signal: AbortSignal
+}
+
 export type MediaAccess = {
   /** `signal` is the run's: a run stopped while it waits on the mint budget mints nothing. */
-  accessFor: (input: {
-    serverId: string
-    mediaId: number
-    signal: AbortSignal
-  }) => Promise<AccessOutcome>
+  accessFor: (input: AccessForProps) => Promise<AccessOutcome>
   forget: (serverId: string) => void
+}
+
+type MeasureOriginProps = {
+  origin: MediaOrigin
+  probe: ProbeFetch
+  clock: () => number
 }
 
 /**
@@ -79,11 +91,7 @@ const measureOrigin = async ({
   origin,
   probe,
   clock,
-}: {
-  origin: MediaOrigin
-  probe: ProbeFetch
-  clock: () => number
-}): Promise<OriginProbe | null> => {
+}: MeasureOriginProps): Promise<OriginProbe | null> => {
   const url = `${origin.url}/api/media-origins/ping?${toQueryString({ bytes: String(MEDIA_PROBE_BYTES) })}`
   const startedAt = clock()
   const response = await probe({ url, timeoutMs: MEDIA_PROBE_TIMEOUT_MS })
@@ -116,31 +124,29 @@ const measureOrigin = async ({
   }
 }
 
-const mediaUrlFor = ({
-  access,
-  mediaId,
-  path,
-}: {
+type MediaUrlForProps = {
   access: Access
   mediaId: number
   path: string
-}): string => {
+}
+
+const mediaUrlFor = ({ access, mediaId, path }: MediaUrlForProps): string => {
   if (!isMediaId(mediaId)) throw new RangeError('A download needs a media id')
   return `${access.url}${API_PATHS.media}/${mediaId}/${path}?${toQueryString({ [MEDIA_TICKET_PARAM]: access.ticket })}`
 }
 
-export const fileUrlFor = ({ access, mediaId }: { access: Access; mediaId: number }): string =>
+type FileUrlForProps = { access: Access; mediaId: number }
+
+export const fileUrlFor = ({ access, mediaId }: FileUrlForProps): string =>
   mediaUrlFor({ access, mediaId, path: MEDIA_FILE_PATH })
 
-export const sidecarUrlFor = ({
-  access,
-  mediaId,
-  trackId,
-}: {
+type SidecarUrlForProps = {
   access: Access
   mediaId: number
   trackId: string
-}): string => {
+}
+
+export const sidecarUrlFor = ({ access, mediaId, trackId }: SidecarUrlForProps): string => {
   if (!isSidecarTrackId(trackId)) throw new RangeError('A subtitle needs an external track id')
   return mediaUrlFor({ access, mediaId, path: subtitlePathOf(trackId) })
 }
@@ -161,14 +167,13 @@ const trustedOrigin = (origin: MediaOrigin): MediaOrigin | null => {
   }
 }
 
-/** What a mint that gave no ticket comes to, in the refusals the queue already knows. */
-const mintRefusalOf = ({
-  outcome,
-  server,
-}: {
+type MintRefusalOfProps = {
   outcome: Exclude<TicketOutcome, { kind: typeof TICKET_OUTCOMES.ticket }>
   server: ServerEntry
-}): AccessOutcome => {
+}
+
+/** What a mint that gave no ticket comes to, in the refusals the queue already knows. */
+const mintRefusalOf = ({ outcome, server }: MintRefusalOfProps): AccessOutcome => {
   switch (outcome.kind) {
     case TICKET_OUTCOMES.refused:
       // Accounts that are down, or a server at its ticket cap, is an outage the retry outlasts.
@@ -205,6 +210,17 @@ const mintRefusalOf = ({
   }
 }
 
+type CreateMediaAccessProps = {
+  calls: Pick<ServerCalls, 'call'>
+  serverOf: (serverId: string) => ServerEntry | null
+  probe: ProbeFetch
+  probeClock: () => number
+  now: () => number
+  timers: Timers
+  tickets: Pick<AccountTickets, 'ticketFor'>
+  warn: (message: string) => void
+}
+
 /**
  * Each run reaches the server with an account ticket minted for it, on the media origin the probes
  * pick. `probeClock` times the probes in monotonic milliseconds, so a wall clock that jumps never
@@ -219,16 +235,7 @@ export const createMediaAccess = ({
   timers,
   tickets,
   warn,
-}: {
-  calls: Pick<ServerCalls, 'call'>
-  serverOf: (serverId: string) => ServerEntry | null
-  probe: ProbeFetch
-  probeClock: () => number
-  now: () => number
-  timers: Timers
-  tickets: Pick<AccountTickets, 'ticketFor'>
-  warn: (message: string) => void
-}): MediaAccess => {
+}: CreateMediaAccessProps): MediaAccess => {
   /** The pick is held as a promise so two files asking at once share one read and one probe. */
   let picks: ReadonlyMap<string, Promise<MediaOrigin | null>> = new Map()
 
@@ -281,8 +288,10 @@ export const createMediaAccess = ({
   /** When each server's downloads minted, by Raven's clock, inside the last window. */
   let minted: ReadonlyMap<string, readonly number[]> = new Map()
 
+  type WaitForProps = { ms: number; signal: AbortSignal }
+
   /** True once `ms` has passed, false as soon as `signal` aborts. */
-  const waitFor = ({ ms, signal }: { ms: number; signal: AbortSignal }): Promise<boolean> =>
+  const waitFor = ({ ms, signal }: WaitForProps): Promise<boolean> =>
     new Promise((resolve) => {
       const timer: { handle: unknown } = { handle: undefined }
       const onAbort = (): void => {
@@ -299,17 +308,16 @@ export const createMediaAccess = ({
       signal.addEventListener(SIGNAL_EVENTS.abort, onAbort, { once: true })
     })
 
+  type TakeMintProps = {
+    serverId: string
+    signal: AbortSignal
+  }
+
   /**
    * Takes one of the server's mints, waiting while the window's are spent until the oldest ages
    * out. False when the run stopped first, and nothing was taken.
    */
-  const takeMint = async ({
-    serverId,
-    signal,
-  }: {
-    serverId: string
-    signal: AbortSignal
-  }): Promise<boolean> => {
+  const takeMint = async ({ serverId, signal }: TakeMintProps): Promise<boolean> => {
     if (signal.aborted) return false
     const time = now()
     const recent = (minted.get(serverId) ?? []).filter(
@@ -327,16 +335,18 @@ export const createMediaAccess = ({
     return (await waitFor({ ms, signal })) && takeMint({ serverId, signal })
   }
 
+  type AccountAccessProps = {
+    server: ServerEntry
+    mediaId: number
+    signal: AbortSignal
+  }
+
   /** The picked origin, or the server's own when none answers, with a ticket minted fresh. */
   const accountAccess = async ({
     server,
     mediaId,
     signal,
-  }: {
-    server: ServerEntry
-    mediaId: number
-    signal: AbortSignal
-  }): Promise<AccessOutcome> => {
+  }: AccountAccessProps): Promise<AccessOutcome> => {
     // The queue has already let go of a stopped run, so what this answers is never read.
     if (!(await takeMint({ serverId: server.id, signal }))) {
       return {

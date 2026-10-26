@@ -86,15 +86,13 @@ const ACCEPTED: readonly Accepted[] = [
 
 const CASES = ACCEPTED.map((entry) => [entry.call.name, entry] as const)
 
-const refuse = ({
-  method,
-  path,
-  body = null,
-}: {
+type RefuseProps = {
   method: string
   path: string
   body?: string | null
-}): void => {
+}
+
+const refuse = ({ method, path, body = null }: RefuseProps): void => {
   expect(matchCall({ method, path, body })).toBeNull()
 }
 

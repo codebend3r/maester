@@ -4,17 +4,19 @@ import { redact } from '@/main/log/log'
 
 const FOLDERS = { logs: '/tmp/raven-logs', crashDumps: '/tmp/raven-crashpad' }
 
+type SetupProps = {
+  openPath?: (path: string) => Promise<string>
+  mkdir?: (path: string) => Promise<unknown>
+  diagnostics?: () => Promise<string>
+  writeClipboard?: (text: string) => Promise<unknown>
+}
+
 const setup = ({
   openPath = async () => '',
   mkdir = async () => undefined,
   diagnostics = async () => 'Raven 0.5.4 (packaged, arm64)\n',
   writeClipboard = async () => undefined,
-}: {
-  openPath?: (path: string) => Promise<string>
-  mkdir?: (path: string) => Promise<unknown>
-  diagnostics?: () => Promise<string>
-  writeClipboard?: (text: string) => Promise<unknown>
-} = {}) => {
+}: SetupProps = {}) => {
   const calls: string[] = []
   const notices: string[] = []
   const warnings: string[] = []

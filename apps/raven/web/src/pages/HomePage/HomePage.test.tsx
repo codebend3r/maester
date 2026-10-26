@@ -232,7 +232,9 @@ describe('HomePage', () => {
       { libraryId: 3, type: 'shows', shows: [showEntry()] },
     ]
 
-    const serve = ({ route = '/', found = FOUND }: { route?: string; found?: HomeSearch } = {}) => {
+    type ServeProps = { route?: string; found?: HomeSearch }
+
+    const serve = ({ route = '/', found = FOUND }: ServeProps = {}) => {
       spies.home.mockImplementation(async () => HOME)
       spies.libraries.mockImplementation(async () => LIBRARIES)
       spies.search.mockImplementation(async () => found)

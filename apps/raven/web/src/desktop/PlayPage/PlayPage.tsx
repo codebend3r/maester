@@ -41,13 +41,17 @@ const NOT_OPENABLE = 'Raven cannot open that video.'
  */
 const OPENED_FROM = DESKTOP_PATHS.local
 
-const engineUseFor = ({ isNative, isLost }: { isNative: boolean; isLost: boolean }): EngineUse => {
+type EngineUseForProps = { isNative: boolean; isLost: boolean }
+
+const engineUseFor = ({ isNative, isLost }: EngineUseForProps): EngineUse => {
   if (isNative) return ENGINE_USES.native
   return isLost ? ENGINE_USES.stopped : ENGINE_USES.fallback
 }
 
+type HtmlPlayingProps = { services: PlayerServices; fileId: string }
+
 /** The html engine, a host of its own: a loss mounts it, on the services that carry on from there. */
-const HtmlPlaying = ({ services, fileId }: { services: PlayerServices; fileId: string }) => {
+const HtmlPlaying = ({ services, fileId }: HtmlPlayingProps) => {
   const isHosting = useHostPlayer(services)
   return (
     isHosting && (
@@ -61,19 +65,17 @@ const HtmlPlaying = ({ services, fileId }: { services: PlayerServices; fileId: s
   )
 }
 
+type PlayingProps = {
+  file: LocalFile
+  chosen: Chosen
+  isOutputFixed: boolean
+}
+
 /**
  * A granted file on mpv, or on Chromium's own video through `raven-file://` when mpv never
  * started or stops mid-play, carrying on from where it was.
  */
-const Playing = ({
-  file,
-  chosen,
-  isOutputFixed,
-}: {
-  file: LocalFile
-  chosen: Chosen
-  isOutputFixed: boolean
-}) => {
+const Playing = ({ file, chosen, isOutputFixed }: PlayingProps) => {
   const { client, menu } = useDesktop()
   const showNotice = useToasts((state) => state.show)
   const [lostAt, setLostAt] = useState<number | null>(null)
@@ -128,7 +130,9 @@ const Playing = ({
   )
 }
 
-const PlayPage = ({ fileId, queue }: { fileId: string; queue: string[] }) => {
+type PlayPageProps = { fileId: string; queue: string[] }
+
+const PlayPage = ({ fileId, queue }: PlayPageProps) => {
   const { client } = useDesktop()
   useLeaveSignal({ client, fileId })
   const chosen = useChosenEngine()

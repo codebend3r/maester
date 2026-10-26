@@ -28,15 +28,13 @@ const BURST_WAIT_SECONDS = 300
 // The URL, a rating's fields and how an unknown title answers are unconfirmed
 // until checked with a key; they live in the next four helpers alone.
 
-const mdblistUrl = ({
-  type,
-  tmdbId,
-  key,
-}: {
+type MdblistUrlProps = {
   type: MatchItemType
   tmdbId: string
   key: string
-}): string =>
+}
+
+const mdblistUrl = ({ type, tmdbId, key }: MdblistUrlProps): string =>
   `${API}/tmdb/${type}/${encodeURIComponent(tmdbId)}/?${new URLSearchParams({ apikey: key }).toString()}`
 
 /**
@@ -89,14 +87,18 @@ const wholeHeader = (header: string | null): number | null => {
 const retryAfterMs = (header: string | null): number =>
   Math.min(wholeHeader(header) ?? 1, 30) * 1000
 
+type IsDaySpentProps = { body: unknown; headers: Headers }
+
 /**
  * Whether a 429 means the day is spent rather than a burst: MDBList says so,
  * asks to wait past its 5-minute window, or counts no calls left.
  */
-const isDaySpent = ({ body, headers }: { body: unknown; headers: Headers }): boolean =>
+const isDaySpent = ({ body, headers }: IsDaySpentProps): boolean =>
   (isRecord(body) && body.error === DAILY_LIMIT_ERROR) ||
   (wholeHeader(headers.get('retry-after')) ?? 0) > BURST_WAIT_SECONDS ||
   wholeHeader(headers.get('x-ratelimit-remaining')) === 0
+
+type MdblistClientNoteReportedProps = { headers: Headers; atCall: number }
 
 /**
  * MDBList, for IMDb, Rotten Tomatoes and Metacritic scores by TMDB id, which
@@ -158,7 +160,7 @@ export class MdblistClient implements ScoreSource {
   }
 
   /** Notes the calls left that an answer to call `atCall` reports, unless a later call's is known. */
-  private noteReported({ headers, atCall }: { headers: Headers; atCall: number }): void {
+  private noteReported({ headers, atCall }: MdblistClientNoteReportedProps): void {
     const left = wholeHeader(headers.get('x-ratelimit-remaining'))
     const { reported } = this.budget
     if (left == null || (reported != null && reported.atCall > atCall)) return

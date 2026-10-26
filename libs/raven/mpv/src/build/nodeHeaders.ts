@@ -16,15 +16,13 @@ export const nodeHeaders = {
   },
 } as const
 
-const checkedDownload = async ({
-  path,
-  url,
-  sha256,
-}: {
+type CheckedDownloadProps = {
   path: string
   url: string
   sha256: string
-}) => {
+}
+
+const checkedDownload = async ({ path, url, sha256 }: CheckedDownloadProps) => {
   const file = Bun.file(path)
   if (await file.exists()) {
     if (digest(await file.bytes()) !== sha256)

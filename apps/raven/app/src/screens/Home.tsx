@@ -16,7 +16,9 @@ const COPY = {
   bare: 'Nothing to show yet. Pin a library in its settings and its newest videos show here, and whatever you start watching waits at the top.',
 } as const
 
-const ServerHome = ({ session: { server, api, queries } }: { session: AppQueries }) => {
+type ServerHomeProps = { session: AppQueries }
+
+const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
   const router = useRouter()
   const home = useQuery(queries.homeQuery)
   const libraries = useQuery(queries.librariesQuery)

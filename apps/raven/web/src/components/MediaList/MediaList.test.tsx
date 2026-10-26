@@ -30,17 +30,14 @@ describe('MediaList', () => {
   })
 
   it('gives each rating its own column in a Movies library, and sorts on a header click', async () => {
-    const rated = ({
-      id,
-      title,
-      imdb,
-      tmdb,
-    }: {
+    type RatedProps = {
       id: number
       title: string
       imdb: number | null
       tmdb: number
-    }) =>
+    }
+
+    const rated = ({ id, title, imdb, tmdb }: RatedProps) =>
       matchedMovie({
         id,
         title,
@@ -147,17 +144,15 @@ describe('MediaList', () => {
   })
 
   it('replaces Changed with the release date in a Movies library, the year when TMDB gave no day, and sorts by it', async () => {
-    const movie = ({
-      id,
-      title,
-      released,
-      year,
-    }: {
+    type MovieProps = {
       id: number
       title: string
       released: string | null
       year: number | null
-    }) => mediaItem({ id, title, year, item: itemSummary({ id, title, year, released }) })
+    }
+
+    const movie = ({ id, title, released, year }: MovieProps) =>
+      mediaItem({ id, title, year, item: itemSummary({ id, title, year, released }) })
     renderWithProviders({
       ui: (
         <MediaList
@@ -185,7 +180,9 @@ describe('MediaList', () => {
   })
 
   it('sorts the release column by year while the server sends no release dates', async () => {
-    const movie = ({ id, title, year }: { id: number; title: string; year: number }) =>
+    type MovieProps = { id: number; title: string; year: number }
+
+    const movie = ({ id, title, year }: MovieProps) =>
       mediaItem({ id, title, year, item: itemSummary({ id, title, year, released: undefined }) })
     renderWithProviders({
       ui: (

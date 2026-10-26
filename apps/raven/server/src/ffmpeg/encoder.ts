@@ -15,6 +15,13 @@ export type VideoEncoder =
 
 export const SOFTWARE: VideoEncoder = { kind: ENCODER_KINDS.software }
 
+type EncoderCandidatesProps = {
+  hwAccel: HwAccel
+  platform: string
+  vaapiDevice: string
+  deviceExists: boolean
+}
+
 /**
  * The GPU encoders worth a test encode, best first, for a setting on this
  * platform. Software is always the fallback, so it is never listed.
@@ -24,12 +31,7 @@ export const encoderCandidates = ({
   platform,
   vaapiDevice,
   deviceExists,
-}: {
-  hwAccel: HwAccel
-  platform: string
-  vaapiDevice: string
-  deviceExists: boolean
-}): VideoEncoder[] => {
+}: EncoderCandidatesProps): VideoEncoder[] => {
   const videotoolbox: VideoEncoder[] =
     platform === PLATFORMS.darwin ? [{ kind: ENCODER_KINDS.videotoolbox }] : []
   const vaapi: VideoEncoder[] = deviceExists

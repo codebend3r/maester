@@ -7,8 +7,10 @@ import { Titled } from '@/pages/SettingsPage/Titled'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import accountStyles from '@/pages/SettingsPage/AccountSection.module.scss'
 
+type AccountSectionProps = { account: Account }
+
 /** Who is signed in, and the way out. */
-export const AccountSection = ({ account }: { account: Account }) => {
+export const AccountSection = ({ account }: AccountSectionProps) => {
   const headingId = useId()
   const end = useSignOut()
 

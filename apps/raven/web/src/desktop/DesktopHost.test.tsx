@@ -51,10 +51,9 @@ const READY_ASK = askOf({
   canFit: true,
 })
 
-const renderHost = ({
-  client = fakeClient(),
-  route = '/',
-}: { client?: FakeClient; route?: string } = {}) => {
+type RenderHostProps = { client?: FakeClient; route?: string }
+
+const renderHost = ({ client = fakeClient(), route = '/' }: RenderHostProps = {}) => {
   const { menu } = asDesktop(client)
   const rendered = renderWithProviders({
     route,

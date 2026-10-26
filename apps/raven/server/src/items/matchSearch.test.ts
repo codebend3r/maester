@@ -21,13 +21,12 @@ import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 type Injected = { statusCode: number; rawPayload: Buffer; json: () => unknown }
 
-const shape = <T>({
-  response,
-  guard,
-}: {
+type ShapeProps<T> = {
   response: Injected
   guard: (value: unknown) => value is T
-}): T => {
+}
+
+const shape = <T>({ response, guard }: ShapeProps<T>): T => {
   const body: unknown = response.json()
   if (!guard(body)) throw new Error(`Unexpected body: ${response.rawPayload.toString()}`)
   return body
@@ -104,13 +103,12 @@ describe('Fix match confidence', () => {
     if (!state.app) throw new Error('app not started')
     return state.app
   }
-  const search = async ({
-    query,
-    cookie,
-  }: {
+  type SearchProps = {
     query: string
     cookie?: string
-  }): Promise<MatchCandidate[]> =>
+  }
+
+  const search = async ({ query, cookie }: SearchProps): Promise<MatchCandidate[]> =>
     shape({
       response: await app().inject({
         method: 'GET',
@@ -121,7 +119,9 @@ describe('Fix match confidence', () => {
     })
   const scores = (candidates: readonly MatchCandidate[]) =>
     candidates.map((candidate) => [candidate.tmdbId, candidate.confidence])
-  const mediaOf = async ({ library, cookie }: { library: number; cookie?: string }) =>
+  type MediaOfProps = { library: number; cookie?: string }
+
+  const mediaOf = async ({ library, cookie }: MediaOfProps) =>
     shape({
       response: await app().inject({
         method: 'GET',
@@ -130,15 +130,13 @@ describe('Fix match confidence', () => {
       }),
       guard: isMediaList,
     })
-  const fileNamed = async ({
-    library,
-    name,
-    cookie,
-  }: {
+  type FileNamedProps = {
     library: number
     name: string
     cookie?: string
-  }) => {
+  }
+
+  const fileNamed = async ({ library, name, cookie }: FileNamedProps) => {
     const found = (await mediaOf({ library, cookie })).find((file) => file.fileName === name)
     if (!found) throw new Error(`No file ${name}`)
     return found

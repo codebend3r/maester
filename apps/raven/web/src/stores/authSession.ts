@@ -18,6 +18,8 @@ export type AuthSessionStatus = (typeof AUTH_SESSION_STATUSES)[keyof typeof AUTH
 /** The two things the app reads off a Supabase session, so no refresh token reaches a component. */
 export type SessionSummary = { accessToken: string; userId: string }
 
+type StartProps = { config: ReadyAuthConfig; createClient?: typeof createAuthClient }
+
 export type AuthSessionState = {
   client: AuthClient | null
   session: SessionSummary | null
@@ -30,11 +32,16 @@ export type AuthSessionState = {
   isRecovery: boolean
   endRecovery: () => void
   /** Builds the client once, reads the stored session and follows every change to it. */
-  start: (options: { config: ReadyAuthConfig; createClient?: typeof createAuthClient }) => void
+  start: (options: StartProps) => void
 }
 
 const summaryOf = (session: Session | null): SessionSummary | null =>
   session === null ? null : { accessToken: session.access_token, userId: session.user.id }
+
+type FollowAccountProps = {
+  previous: SessionSummary | null
+  next: SessionSummary | null
+}
 
 /**
  * What the previous account left behind is dropped whenever the account
@@ -45,13 +52,7 @@ const summaryOf = (session: Session | null): SessionSummary | null =>
  * auth listener, which must not wait on anything, so a refetch that fails is
  * left to the queries that show it.
  */
-const followAccount = ({
-  previous,
-  next,
-}: {
-  previous: SessionSummary | null
-  next: SessionSummary | null
-}): void => {
+const followAccount = ({ previous, next }: FollowAccountProps): void => {
   if (previous?.userId === next?.userId) return
   if (previous !== null) {
     clearAccountState({ queryClient }).catch(() => undefined)

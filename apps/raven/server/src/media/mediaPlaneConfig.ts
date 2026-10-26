@@ -143,13 +143,12 @@ const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/
 const wildcardLabel = (label: string): RegExp =>
   new RegExp(`^${label.split('*').map(escapeRegExp).join('[^.]+')}$`)
 
-const matchesPattern = ({
-  origin,
-  pattern,
-}: {
+type MatchesPatternProps = {
   origin: NonNullable<ReturnType<typeof splitOrigin>>
   pattern: NonNullable<ReturnType<typeof splitOrigin>>
-}): boolean => {
+}
+
+const matchesPattern = ({ origin, pattern }: MatchesPatternProps): boolean => {
   if (origin.scheme !== pattern.scheme || origin.port !== pattern.port) return false
   const originLabels = origin.host.split('.')
   const patternLabels = pattern.host.split('.')
@@ -157,14 +156,13 @@ const matchesPattern = ({
   return patternLabels.every((label, index) => wildcardLabel(label).test(originLabels[index] ?? ''))
 }
 
-/** Whether a request's `Origin` header is one of `allowed` (as `parseWebOrigins` returns them). */
-export const isAllowedWebOrigin = ({
-  origin,
-  allowed,
-}: {
+type IsAllowedWebOriginProps = {
   origin: string | undefined
   allowed: readonly string[]
-}): boolean => {
+}
+
+/** Whether a request's `Origin` header is one of `allowed` (as `parseWebOrigins` returns them). */
+export const isAllowedWebOrigin = ({ origin, allowed }: IsAllowedWebOriginProps): boolean => {
   const requested = origin ? splitOrigin(origin) : null
   if (!requested || requested.host.includes('*')) return false
   return allowed.some((entry) => {

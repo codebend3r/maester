@@ -12,6 +12,14 @@ const stopsThePass = (error: unknown): boolean =>
 
 type GuardState = { stopped: false } | { stopped: true; error: unknown }
 
+type PassGuardProps = {
+  logger: Logger
+  /** Logged before a task's own failure: `Could not match`. */
+  failed: string
+  /** Logged once when TMDB stopped the pass: `Matching stopped for now`. */
+  stopped: string
+}
+
 /**
  * Runs the tasks of one pass over TMDB, a matching pass or the sweep: a task
  * that fails is logged and the rest go on, while TMDB going away (down, or
@@ -20,15 +28,7 @@ type GuardState = { stopped: false } | { stopped: true; error: unknown }
 export class PassGuard {
   private state: GuardState = { stopped: false }
 
-  constructor(
-    private readonly options: {
-      logger: Logger
-      /** Logged before a task's own failure: `Could not match`. */
-      failed: string
-      /** Logged once when TMDB stopped the pass: `Matching stopped for now`. */
-      stopped: string
-    },
-  ) {}
+  constructor(private readonly options: PassGuardProps) {}
 
   get isStopped(): boolean {
     return this.state.stopped

@@ -11,6 +11,11 @@ export const MANAGEMENT_MODES = {
 /** Who decides whether this browser may manage raven: the admin lock, the owner, or nobody yet. */
 export type ManagementMode = (typeof MANAGEMENT_MODES)[keyof typeof MANAGEMENT_MODES]
 
+type ManagementOfProps = {
+  access: AccessState
+  adminLock: AdminLock | undefined
+}
+
 /**
  * How raven is managed from where the viewer stands. Accounts off keeps the
  * admin lock; an approved account manages only as the owner; anything else,
@@ -19,10 +24,7 @@ export type ManagementMode = (typeof MANAGEMENT_MODES)[keyof typeof MANAGEMENT_M
 export const managementOf = ({
   access,
   adminLock,
-}: {
-  access: AccessState
-  adminLock: AdminLock | undefined
-}): { mode: ManagementMode; canManage: boolean } => {
+}: ManagementOfProps): { mode: ManagementMode; canManage: boolean } => {
   switch (access.kind) {
     case ACCESS_KINDS.disabled:
       return { mode: MANAGEMENT_MODES.adminLock, canManage: !isAdminLocked(adminLock) }

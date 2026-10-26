@@ -135,18 +135,20 @@ export type MpvReply = { isOk: boolean }
 
 const ignoreReply = () => {}
 
+type OpenMpvProps = {
+  surface: MpvSurface
+  onEvent: (event: MpvEvent) => void
+  addonPath?: string
+  loadAddon?: (path: string) => unknown
+}
+
 /** Main-process API only. The renderer must use the allowlisted PlayerCommand bridge, never this API. */
 export const openMpv = async ({
   surface,
   onEvent,
   addonPath = fileURLToPath(new URL('../resources/darwin-arm64/raven_mpv.node', import.meta.url)),
   loadAddon = createRequire(import.meta.url),
-}: {
-  surface: MpvSurface
-  onEvent: (event: MpvEvent) => void
-  addonPath?: string
-  loadAddon?: (path: string) => unknown
-}) => {
+}: OpenMpvProps) => {
   const addon: unknown = loadAddon(addonPath)
   if (!isNativeAddon(addon)) throw new Error('Invalid raven mpv addon')
   const major = Math.floor(addon.apiVersion / 65536)
@@ -199,13 +201,12 @@ export const openMpv = async ({
   const native: unknown = addon.create(surface, receive)
   if (!isNativeHandle(native)) throw new Error('Invalid raven mpv handle')
 
-  const request = ({
-    send,
-    onReply = ignoreReply,
-  }: {
+  type RequestProps = {
     send: (id: number) => void
     onReply?: (reply: MpvReply) => void
-  }) =>
+  }
+
+  const request = ({ send, onReply = ignoreReply }: RequestProps) =>
     new Promise<unknown>((resolve, reject) => {
       if (isDestroyed) {
         reject(new Error('mpv is destroyed'))
@@ -225,11 +226,13 @@ export const openMpv = async ({
         reject(error)
       }
     })
+  type ReadProps<K extends MpvProperty> = {
+    name: K
+  }
+
   const read = async <K extends MpvProperty>({
     name,
-  }: {
-    name: K
-  }): Promise<MpvPropertyValue<K>> => {
+  }: ReadProps<K>): Promise<MpvPropertyValue<K>> => {
     const value = await request({ send: (id) => native.get(id, name) })
     const guard = propertyGuard(name)
     if (!guard(value)) throw new Error(`Invalid mpv property: ${name}`)
@@ -245,6 +248,15 @@ export const openMpv = async ({
   try {
     const version = await read({ name: MPV_PROPERTIES.mpvVersion })
     if (!supportsVersion(version)) throw new Error('libmpv 0.40 or newer is required')
+    type OpenMpvCommandProps = {
+      args: string[]
+      onReply?: (reply: MpvReply) => void
+    }
+
+    type OpenMpvSetProps = { name: string; value: string | number | boolean }
+
+    type OpenMpvObserveProps = { name: MpvProperty }
+
     return {
       version,
       read,
@@ -253,21 +265,15 @@ export const openMpv = async ({
        * around it, whatever the reply says. The promise settles later: the addon delivers
        * up to 256 events a turn, so its continuation runs after the events behind the reply.
        */
-      command: async ({
-        args,
-        onReply,
-      }: {
-        args: string[]
-        onReply?: (reply: MpvReply) => void
-      }) => {
+      command: async ({ args, onReply }: OpenMpvCommandProps) => {
         await request({ send: (id) => native.command(id, args), onReply })
       },
-      set: async ({ name, value }: { name: string; value: string | number | boolean }) => {
+      set: async ({ name, value }: OpenMpvSetProps) => {
         if (!(isString(value) || isNumber(value) || isBoolean(value)))
           throw new Error('Invalid mpv property value')
         await request({ send: (id) => native.set(id, name, value) })
       },
-      observe: ({ name }: { name: MpvProperty }) => {
+      observe: ({ name }: OpenMpvObserveProps) => {
         if (isDestroyed) throw new Error('mpv is destroyed')
         native.observe(name)
       },

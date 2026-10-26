@@ -3,8 +3,10 @@ import { AUTH_COOKIE } from '@raven/core'
 
 const encode = (value: unknown): string => Buffer.from(JSON.stringify(value)).toString('base64url')
 
+type SessionOfProps = { padding: number }
+
 /** A session Supabase accepts as a sign in answer; `padding` grows it past one cookie. */
-export const sessionOf = ({ padding }: { padding: number }) => {
+export const sessionOf = ({ padding }: SessionOfProps) => {
   const expiresAt = Math.floor(Date.now() / 1000) + 3600
   const claims = { sub: 'u1', exp: expiresAt, aud: 'authenticated', role: 'authenticated' }
   return {
@@ -24,7 +26,9 @@ export const sessionOf = ({ padding }: { padding: number }) => {
   }
 }
 
-export const answer = ({ body, status }: { body: unknown; status: number }) =>
+type AnswerProps = { body: unknown; status: number }
+
+export const answer = ({ body, status }: AnswerProps) =>
   spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
       async () =>

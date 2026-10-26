@@ -26,6 +26,8 @@ export const INTEGRITY_FAILURES = {
 
 export type IntegrityFailureKind = (typeof INTEGRITY_FAILURES)[keyof typeof INTEGRITY_FAILURES]
 
+type IntegrityFailureProps = { failure: IntegrityFailureKind }
+
 /**
  * A membership answer that cannot be trusted: for another account, for
  * several, or not shaped like a membership. Clients are told only that
@@ -35,7 +37,7 @@ export type IntegrityFailureKind = (typeof INTEGRITY_FAILURES)[keyof typeof INTE
 export class IntegrityFailure extends HttpException {
   readonly failure: IntegrityFailureKind
 
-  constructor({ failure }: { failure: IntegrityFailureKind }) {
+  constructor({ failure }: IntegrityFailureProps) {
     const { status, message } = FAILURES[AUTH_REFUSALS.unavailable]
     super({ reason: AUTH_REFUSALS.unavailable, message } satisfies AuthRefusal, status)
     this.failure = failure

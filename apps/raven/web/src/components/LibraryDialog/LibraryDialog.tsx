@@ -29,20 +29,21 @@ import { lockQuery, metadataHealthQuery } from '@/lib/queries'
 import { RATING_SOURCE_LABELS } from '@/lib/ratingSources'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
 
-/** What Edit library calls each way a path was read. */
-const pathLayoutLabel = ({
-  layout,
-  groups,
-}: {
+type PathLayoutLabelProps = {
   layout: PathLayout | null
   groups: number
-}): string => {
+}
+
+/** What Edit library calls each way a path was read. */
+const pathLayoutLabel = ({ layout, groups }: PathLayoutLabelProps): string => {
   if (layout == null) return 'not scanned yet'
   if (layout === PATH_LAYOUTS.flat) return 'one folder per title'
   return layout === PATH_LAYOUTS.lettered
     ? `letter folders (${groups})`
     : `group folders (${groups})`
 }
+
+type LibraryDialogProps = { library?: Library; onClose: () => void }
 
 /**
  * Creates a library, or edits one when `library` is given: its name, type,
@@ -51,7 +52,7 @@ const pathLayoutLabel = ({
  * Save at its end. A native modal <dialog> handles focus trapping and
  * Escape; closing hands focus back to whatever opened it.
  */
-export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose: () => void }) => {
+export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
   const dialog = useRef<HTMLDialogElement>(null)
   const ids = {
     name: useId(),

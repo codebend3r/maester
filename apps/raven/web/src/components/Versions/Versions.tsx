@@ -5,18 +5,17 @@ import { Icon } from '@raven/ui'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import styles from '@/components/Versions/Versions.module.scss'
 
+type VersionsProps = {
+  versions: readonly MediaItem[]
+  libraries: readonly Library[]
+}
+
 /**
  * Every file that is this movie, best first, each on a ruled row: what sets
  * it apart as chips, its file name, and a round button that plays it.
  * Shown only when there is more than one.
  */
-export const Versions = ({
-  versions,
-  libraries,
-}: {
-  versions: readonly MediaItem[]
-  libraries: readonly Library[]
-}) => {
+export const Versions = ({ versions, libraries }: VersionsProps) => {
   const id = useId()
   if (versions.length < 2) return null
   const libraryName = (libraryId: number) =>

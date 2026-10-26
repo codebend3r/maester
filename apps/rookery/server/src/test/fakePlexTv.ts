@@ -2,6 +2,12 @@ import { type PlexAccount, type PlexPin, type PlexTv, PlexUnavailable } from '@/
 
 const TOKEN_PREFIX = 'token-for-pin-'
 
+type FakePlexTvApproveProps = {
+  pin: PlexPin
+  account: PlexAccount
+  afterChecks?: number
+}
+
 /**
  * plex.tv in memory. A test approves a PIN with `approve`, optionally only
  * after a number of checks, to stand in for the token trailing the redirect.
@@ -26,15 +32,7 @@ export class FakePlexTv implements PlexTv {
   }
 
   /** The friend approves `pin` as `account`; the token shows up after `afterChecks` checks. */
-  approve({
-    pin,
-    account,
-    afterChecks = 0,
-  }: {
-    pin: PlexPin
-    account: PlexAccount
-    afterChecks?: number
-  }): void {
+  approve({ pin, account, afterChecks = 0 }: FakePlexTvApproveProps): void {
     this.approvals.set(pin.id, { account, afterChecks })
   }
 

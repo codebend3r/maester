@@ -2,11 +2,20 @@ import type { MediaItem } from '@raven/core'
 import { Icon } from '@raven/ui'
 import styles from '@/components/FavouriteMark/FavouriteMark.module.scss'
 
+type FavouriteWordsProps = { media: MediaItem }
+
 /** The heart's word, for a screen reader; the heart itself is only a picture. */
-export const FavouriteWords = ({ media }: { media: MediaItem }) =>
+export const FavouriteWords = ({ media }: FavouriteWordsProps) =>
   media.favourite && <span className="visually-hidden">Favourite</span>
 
 const FAVOURITE_TONES = { inline: 'inline', overlay: 'overlay', scrim: 'scrim' } as const
+
+type FavouriteMarkProps = {
+  media: MediaItem
+  tone?: (typeof FAVOURITE_TONES)[keyof typeof FAVOURITE_TONES]
+  decorative?: boolean
+  className?: string
+}
 
 /**
  * A solid heart for a favourite; nothing for any other video. `inline` sits
@@ -21,12 +30,7 @@ export const FavouriteMark = ({
   tone = FAVOURITE_TONES.inline,
   decorative = false,
   className,
-}: {
-  media: MediaItem
-  tone?: (typeof FAVOURITE_TONES)[keyof typeof FAVOURITE_TONES]
-  decorative?: boolean
-  className?: string
-}) =>
+}: FavouriteMarkProps) =>
   media.favourite && (
     <span
       className={[styles.mark, styles[tone], className ?? ''].filter(Boolean).join(' ')}

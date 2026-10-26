@@ -6,9 +6,11 @@ type Listener = (state: ReportedState) => void
 const configured: { reachabilityShouldRun?: () => boolean }[] = []
 let listeners: Listener[] = []
 
+type ConfigureProps = { reachabilityShouldRun?: () => boolean }
+
 // NetInfo's own module reaches React Native's native modules, which bun cannot load.
 mock.module('@react-native-community/netinfo', () => ({
-  configure: (configuration: { reachabilityShouldRun?: () => boolean }) => {
+  configure: (configuration: ConfigureProps) => {
     configured.push(configuration)
   },
   addEventListener: (listener: Listener) => {
@@ -24,15 +26,17 @@ const { watchNetwork } = await import('@/servers/networkChanges')
 /** NetInfo's names for two kinds of network. */
 const NETWORK_TYPES = { wifi: 'wifi', cellular: 'cellular' } as const
 
-const stateOf = ({
-  type,
-  isConnected = true,
-  ipAddress = null,
-}: {
+type StateOfProps = {
   type: string
   isConnected?: boolean
   ipAddress?: string | null
-}): ReportedState => ({ type, isConnected, details: ipAddress === null ? null : { ipAddress } })
+}
+
+const stateOf = ({ type, isConnected = true, ipAddress = null }: StateOfProps): ReportedState => ({
+  type,
+  isConnected,
+  details: ipAddress === null ? null : { ipAddress },
+})
 
 const report = (state: ReportedState) => listeners.forEach((listener) => listener(state))
 

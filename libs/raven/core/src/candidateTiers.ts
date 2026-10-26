@@ -58,7 +58,9 @@ export const TIER_SETS = {
 export const isUnfiltered = (tier: CandidateTier): boolean =>
   tier.genres == null && tier.languages == null && tier.countries == null
 
-export const fitsTier = ({ tier, result }: { tier: CandidateTier; result: TierFacts }): boolean => {
+type FitsTierProps = { tier: CandidateTier; result: TierFacts }
+
+export const fitsTier = ({ tier, result }: FitsTierProps): boolean => {
   const hasGenre = tier.genres?.some((genre) => result.genreIds.includes(genre)) ?? true
   if (tier.languages == null && tier.countries == null) return hasGenre
   const { originalLanguage } = result

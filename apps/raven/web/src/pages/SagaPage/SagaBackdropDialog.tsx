@@ -25,20 +25,18 @@ const LABELS = {
   off: { label: 'Off', hint: "One movie's backdrop, held still." },
 } as const satisfies Record<Choice, { label: string; hint: string }>
 
+type SagaBackdropDialogProps = {
+  libraryId: number
+  saga: Saga
+  onClose: () => void
+}
+
 /**
  * Edit backdrop: whether a saga's page shows its movies' backdrops in turn,
  * and how each comes in, or holds its cover still, and which movie's that
  * is. A native modal <dialog> traps focus and closes on Escape.
  */
-export const SagaBackdropDialog = ({
-  libraryId,
-  saga,
-  onClose,
-}: {
-  libraryId: number
-  saga: Saga
-  onClose: () => void
-}) => {
+export const SagaBackdropDialog = ({ libraryId, saga, onClose }: SagaBackdropDialogProps) => {
   const dialog = useRef<HTMLDialogElement>(null)
   const ids = { title: useId(), choice: useId(), cover: useId() }
   const queryClient = useQueryClient()

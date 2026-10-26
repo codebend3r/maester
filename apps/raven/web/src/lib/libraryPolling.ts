@@ -15,7 +15,9 @@ export const RATINGS_POLL_MS = 5000
  */
 const LONGEST_WAIT_MS = 24 * 60 * 60 * 1000
 
-const delayOf = ({ library, now }: { library: Library; now: number }): number | false => {
+type DelayOfProps = { library: Library; now: number }
+
+const delayOf = ({ library, now }: DelayOfProps): number | false => {
   if (isScanning(library.scan)) return SCAN_POLL_MS
   const { ratingsRefresh } = library
   switch (ratingsRefresh.state) {
@@ -36,6 +38,11 @@ const delayOf = ({ library, now }: { library: Library; now: number }): number | 
   }
 }
 
+type LibraryPollDelayProps = {
+  libraries: readonly Library[]
+  now?: number
+}
+
 /**
  * How long until the libraries shown are read again, or false when nothing
  * in them is moving: the soonest any of them needs, a scan's every 1.5 s, a
@@ -44,10 +51,7 @@ const delayOf = ({ library, now }: { library: Library; now: number }): number | 
 export const libraryPollDelay = ({
   libraries,
   now = Date.now(),
-}: {
-  libraries: readonly Library[]
-  now?: number
-}): number | false =>
+}: LibraryPollDelayProps): number | false =>
   libraries.reduce<number | false>((soonest, library) => {
     const delay = delayOf({ library, now })
     if (delay === false) return soonest

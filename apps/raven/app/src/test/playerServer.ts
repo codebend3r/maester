@@ -132,8 +132,10 @@ const {
   subtitles,
 } = APP_CLIENT_CALLS
 
+type FilePathsProps = { path: string }
+
 /** A route's path for each file. */
-const filePaths = ({ path }: { path: string }): string[] =>
+const filePaths = ({ path }: FilePathsProps): string[] =>
   FILES.map(({ media }) => pathFor({ path, id: media.id }))
 
 const READS: Record<string, unknown> = {
@@ -161,6 +163,12 @@ const bodyOf = (body: string | undefined): unknown => (body === undefined ? null
 /** The path a request names, without its query. */
 const pathOnly = (path: string): string => path.split('?')[0] ?? path
 
+type PlayerApiProps = {
+  hear: (request: HeardRequest) => void
+  ticketStatus?: number
+  directPlay?: PlaybackSettings['directPlay']
+}
+
 /**
  * Busboys, as an MP4 with a text track, one without and one with two audio tracks, and its page,
  * on a server that lists no media origin, behind the app's allowlist so an unlisted call fails
@@ -172,12 +180,10 @@ export const playerApi = ({
   hear,
   ticketStatus = STATUSES.ok,
   directPlay = DIRECT_PLAYS.auto,
-}: {
-  hear: (request: HeardRequest) => void
-  ticketStatus?: number
-  directPlay?: PlaybackSettings['directPlay']
-}): ApiClient => {
-  const answerFor = ({ method, path }: { method: string; path: string }): Answer => {
+}: PlayerApiProps): ApiClient => {
+  type AnswerForProps = { method: string; path: string }
+
+  const answerFor = ({ method, path }: AnswerForProps): Answer => {
     if (method !== APP_CALL_METHODS.get) {
       return WRITES.has(path) ? { status: STATUSES.noContent, body: null } : NOT_FOUND
     }

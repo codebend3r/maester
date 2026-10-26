@@ -32,7 +32,9 @@ export const numeric = (value: unknown): number | null => {
 /** The `disposition` flags raven reads off a stream. */
 const DISPOSITIONS = { default: 'default', attachedPicture: 'attached_pic' } as const
 
-const disposition = ({ stream, flag }: { stream: Stream; flag: string }): boolean =>
+type DispositionProps = { stream: Stream; flag: string }
+
+const disposition = ({ stream, flag }: DispositionProps): boolean =>
   isRecord(stream.disposition) && stream.disposition[flag] === 1
 
 /** 10 from "yuv420p10le", 12 from "yuv444p12be", 8 from "yuv420p". */

@@ -9,13 +9,12 @@ const credentials = { email: 'a@example.com', password: 'password' }
 
 const written: string[] = []
 
-const descriptorOf = ({
-  target,
-  key,
-}: {
+type DescriptorOfProps = {
   target: object | null
   key: string
-}): PropertyDescriptor | undefined => {
+}
+
+const descriptorOf = ({ target, key }: DescriptorOfProps): PropertyDescriptor | undefined => {
   if (target == null) return undefined
   return (
     Object.getOwnPropertyDescriptor(target, key) ??

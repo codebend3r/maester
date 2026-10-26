@@ -3,6 +3,8 @@ import type { MatchFiles } from '@/metadata/matchFiles'
 import { OnceEach } from '@/metadata/onceEach'
 import { holdsOneMovie } from '@/metadata/places'
 
+type FolderReaderOwnFolderProps = { libraryId: number; folder: string }
+
 /**
  * What matching and refreshing read about folders, each once: the file
  * names in a folder, and whether a folder holds one movie. One reader lives
@@ -23,7 +25,7 @@ export class FolderReader {
    * Whether a library folder holds one movie, perhaps in several qualities:
    * its own pictures, NFO and Fix match then belong to that movie.
    */
-  ownFolder({ libraryId, folder }: { libraryId: number; folder: string }): boolean {
+  ownFolder({ libraryId, folder }: FolderReaderOwnFolderProps): boolean {
     return this.ownFolders.get({
       key: `${libraryId}:${folder}`,
       make: () =>

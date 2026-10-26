@@ -25,8 +25,9 @@ const listing = (id: number) => ({ libraryId: id, search: '', sort: 'title', see
 
 const items = [mediaItem({ id: 70, libraryId: 1 })]
 
-const read = ({ client, id }: { client: QueryClient; id: number }) =>
-  client.getQueryData(queryKeys.media(listing(id)))
+type ReadProps = { client: QueryClient; id: number }
+
+const read = ({ client, id }: ReadProps) => client.getQueryData(queryKeys.media(listing(id)))
 
 describe('saved listings', () => {
   it('brings a listing back as old as it was, for another visit to show first', async () => {
@@ -116,7 +117,9 @@ describe('saved listings', () => {
     const libraries = [library({ id: 1 })]
     await saveListings({ store, scope: 'a', queryClient: first, libraries, now: 0 })
 
-    const restoreInto = async ({ scope, now }: { scope: string; now: number }) => {
+    type RestoreIntoProps = { scope: string; now: number }
+
+    const restoreInto = async ({ scope, now }: RestoreIntoProps) => {
       const client = new QueryClient()
       await restoreListings({ store, scope, queryClient: client, libraries, now })
       return read({ client, id: 1 })

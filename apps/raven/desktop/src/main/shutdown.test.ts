@@ -33,13 +33,12 @@ const shutdownOf = (
   },
 ) => createShutdown({ wait: never, writes: noWrites, log: cleanLog, ...input })
 
-const fakeEngine = ({
-  log,
-  destroy = async () => {},
-}: {
+type FakeEngineProps = {
   log: string[]
   destroy?: () => Promise<void>
-}) => {
+}
+
+const fakeEngine = ({ log, destroy = async () => {} }: FakeEngineProps) => {
   const state = { isAlive: true, destroys: 0 }
   return {
     state,
@@ -59,7 +58,9 @@ const fakeEngine = ({
   }
 }
 
-const fakeStore = ({ log, name, isDirty }: { log: string[]; name: string; isDirty: boolean }) => {
+type FakeStoreProps = { log: string[]; name: string; isDirty: boolean }
+
+const fakeStore = ({ log, name, isDirty }: FakeStoreProps) => {
   const state = { isDirty }
   return {
     state,
@@ -241,8 +242,10 @@ describe('a destroy that never settles', () => {
   })
 })
 
+type FakeWritesProps = { log: string[] }
+
 /** Saves in flight to a server: pending until `finish` settles them. */
-const fakeWrites = ({ log }: { log: string[] }) => {
+const fakeWrites = ({ log }: FakeWritesProps) => {
   const done = Promise.withResolvers<void>()
   const state = { isPending: true }
   return {
@@ -367,8 +370,10 @@ describe('saves in flight', () => {
   })
 })
 
+type FakeLogProps = { log: string[]; isHeld?: boolean }
+
 /** The log: dirty until a flush that `finish` settles, or at once when given no hold. */
-const fakeLog = ({ log, isHeld = false }: { log: string[]; isHeld?: boolean }) => {
+const fakeLog = ({ log, isHeld = false }: FakeLogProps) => {
   const done = Promise.withResolvers<void>()
   const state = { isDirty: true }
   return {

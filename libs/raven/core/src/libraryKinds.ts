@@ -51,7 +51,9 @@ const MATCHED_FIELDS: readonly SortFieldName[] = [SORT_FIELD_NAMES.release, SORT
  */
 const FILE_FIELDS: readonly SortFieldName[] = [SORT_FIELD_NAMES.size, SORT_FIELD_NAMES.resolution]
 
-const without = <T>({ all, left }: { all: readonly T[]; left: readonly T[] }): T[] =>
+type WithoutProps<T> = { all: readonly T[]; left: readonly T[] }
+
+const without = <T>({ all, left }: WithoutProps<T>): T[] =>
   all.filter((item) => !left.includes(item))
 
 /** A library of movies starts grouped into matched and not. */
@@ -126,18 +128,17 @@ export const tiersFor = (kind: LibraryKind): readonly CandidateTier[] =>
 export const firstTierFor = (kind: LibraryKind): CandidateTier =>
   TIER_SETS[KIND_RULES[kind].prefer][0]
 
+type MatchesAlikeProps = {
+  before: LibraryKind
+  after: LibraryKind
+}
+
 /**
  * Whether two types of library match their files alike: to the same type of
  * TMDB item, preferring the same results. A change between two that do not
  * matches every file again.
  */
-export const matchesAlike = ({
-  before,
-  after,
-}: {
-  before: LibraryKind
-  after: LibraryKind
-}): boolean =>
+export const matchesAlike = ({ before, after }: MatchesAlikeProps): boolean =>
   matchTypeFor(before) === matchTypeFor(after) &&
   KIND_RULES[before].prefer === KIND_RULES[after].prefer
 
@@ -205,14 +206,14 @@ export const defaultLibrarySettings = (kind: LibraryKind): LibrarySettings => ({
   groupBy: KIND_RULES[kind].groupBy,
 })
 
-/** Settings with the library's type changed, and whatever the new type cannot show swapped for its own. */
-export const withLibraryKind = ({
-  settings,
-  kind,
-}: {
+type WithLibraryKindProps = {
   settings: LibrarySettings
   kind: LibraryKind
-}): LibrarySettings => coherentSettings({ ...settings, kind })
+}
+
+/** Settings with the library's type changed, and whatever the new type cannot show swapped for its own. */
+export const withLibraryKind = ({ settings, kind }: WithLibraryKindProps): LibrarySettings =>
+  coherentSettings({ ...settings, kind })
 
 /**
  * How each type of library looks: what it is called and the icon it wears

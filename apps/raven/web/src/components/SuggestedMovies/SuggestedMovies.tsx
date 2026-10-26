@@ -14,8 +14,10 @@ import styles from '@/components/SuggestedMovies/SuggestedMovies.module.scss'
  */
 export type SuggestedMovie = { file: MediaItem; label: string; suggestion: AiSuggestion }
 
+type LabelOfProps = { file: MediaItem; place: string }
+
 /** What a card is labelled by: its folder's name when its place is the file's folder, else the file. */
-const labelOf = ({ file, place }: { file: MediaItem; place: string }): string =>
+const labelOf = ({ file, place }: LabelOfProps): string =>
   place === file.folder ? (place.split('/').at(-1) ?? place) : file.fileName
 
 /**
@@ -37,14 +39,13 @@ export const suggestedMoviesOf = (files: readonly UnmatchedFile[]): SuggestedMov
         })
   }, [])
 
-/** One suggestion: its card, labelled by the folder or the file it is for, and Fix match on that file. */
-const SuggestedMovieEntry = ({
-  entry,
-  libraryId,
-}: {
+type SuggestedMovieEntryProps = {
   entry: SuggestedMovie
   libraryId: number
-}) => {
+}
+
+/** One suggestion: its card, labelled by the folder or the file it is for, and Fix match on that file. */
+const SuggestedMovieEntry = ({ entry, libraryId }: SuggestedMovieEntryProps) => {
   const fixButton = useRef<HTMLButtonElement>(null)
   const [isFixing, setIsFixing] = useState(false)
   useReturnFocus({ isOpen: isFixing, target: fixButton })
@@ -76,17 +77,16 @@ const SuggestedMovieEntry = ({
   )
 }
 
+type SuggestedMoviesProps = {
+  files: readonly UnmatchedFile[]
+  libraryId: number
+}
+
 /**
  * The AI lookup's suggestions in a movie library's Not matched tab, under a
  * ruled heading counting them, above its files; nothing when it has none.
  */
-export const SuggestedMovies = ({
-  files,
-  libraryId,
-}: {
-  files: readonly UnmatchedFile[]
-  libraryId: number
-}) => {
+export const SuggestedMovies = ({ files, libraryId }: SuggestedMoviesProps) => {
   const headingId = useId()
   const suggested = suggestedMoviesOf(files)
   if (suggested.length === 0) return null

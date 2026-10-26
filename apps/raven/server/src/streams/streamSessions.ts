@@ -60,8 +60,10 @@ export type StreamSession = Pick<
   sendRate: number | null
 }
 
+type KeyOfProps = { mediaId: number; client: StreamClient }
+
 /** Two accounts on one browser are two streams. */
-const keyOf = ({ mediaId, client }: { mediaId: number; client: StreamClient }): string =>
+const keyOf = ({ mediaId, client }: KeyOfProps): string =>
   `${mediaId}\n${client.address}\n${client.userAgent}\n${client.viewer?.id ?? ''}`
 
 const rateOf = (samples: readonly Sample[]): number | null => {
@@ -70,6 +72,28 @@ const rateOf = (samples: readonly Sample[]): number | null => {
   if (first == null || last == null || last.at <= first.at) return null
   return ((last.sent - first.sent) * 8 * 1000) / (last.at - first.at)
 }
+
+type StreamSessionsOpenProps = {
+  mediaId: number
+  mode: PlaybackMode
+  quality: StreamQuality | null
+  audio: number | null
+  client: StreamClient
+  connection: StreamConnection
+  now?: number
+}
+
+type StreamSessionsReportProps = {
+  mediaId: number
+  client: StreamClient
+  position: number
+  audio: number | null
+  now?: number
+}
+
+type StreamSessionsListProps = { now?: number }
+
+type StreamSessionsSampleProps = { session: Session; now: number }
 
 /**
  * What the server is sending, to whom, right now. A direct play is a run of
@@ -96,15 +120,7 @@ export class StreamSessions {
     client,
     connection,
     now = Date.now(),
-  }: {
-    mediaId: number
-    mode: PlaybackMode
-    quality: StreamQuality | null
-    audio: number | null
-    client: StreamClient
-    connection: StreamConnection
-    now?: number
-  }): () => void {
+  }: StreamSessionsOpenProps): () => void {
     const key = keyOf({ mediaId, client })
     const session = this.sessions.get(key) ?? {
       id: randomUUID(),
@@ -139,19 +155,7 @@ export class StreamSessions {
    * tell. Ignored for a stream that is not registered, such as one just
    * stopped.
    */
-  report({
-    mediaId,
-    client,
-    position,
-    audio,
-    now = Date.now(),
-  }: {
-    mediaId: number
-    client: StreamClient
-    position: number
-    audio: number | null
-    now?: number
-  }): void {
+  report({ mediaId, client, position, audio, now = Date.now() }: StreamSessionsReportProps): void {
     const session = this.sessions.get(keyOf({ mediaId, client }))
     if (session == null) return
     session.position = position
@@ -160,7 +164,7 @@ export class StreamSessions {
   }
 
   /** The live streams, oldest first; those that went quiet are forgotten. */
-  list({ now = Date.now() }: { now?: number } = {}): StreamSession[] {
+  list({ now = Date.now() }: StreamSessionsListProps = {}): StreamSession[] {
     this.sessions.forEach((session, key) => {
       this.sample({ session, now })
       if (now - session.lastSeenAt >= IDLE_MS) this.sessions.delete(key)
@@ -209,7 +213,7 @@ export class StreamSessions {
    * A response that sent bytes since the last look is still being read.
    * Each look also notes the bytes sent so far, for the send rate.
    */
-  private sample({ session, now }: { session: Session; now: number }): void {
+  private sample({ session, now }: StreamSessionsSampleProps): void {
     session.connections.forEach((before, connection) => {
       const written = connection.written()
       if (written === before) return

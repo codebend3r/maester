@@ -35,13 +35,12 @@ import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 type Injected = { statusCode: number; rawPayload: Buffer; json: () => unknown }
 
-const shape = <T>({
-  response,
-  guard,
-}: {
+type ShapeProps<T> = {
   response: Injected
   guard: (value: unknown) => value is T
-}): T => {
+}
+
+const shape = <T>({ response, guard }: ShapeProps<T>): T => {
   const body: unknown = response.json()
   if (!guard(body)) throw new Error(`Unexpected body: ${response.rawPayload.toString()}`)
   return body
@@ -127,6 +126,16 @@ const HEET = ['Heet (1995)/Heet (1995) 1080p.mp4', 'Heet (1995)/Heet (1995) 2160
 const ODDS = ['Odds/Hete (1995).mp4', 'Odds/Haet (1995).mp4']
 const HOME_VIDEO = 'Home Video (2001)/Home Video (2001).mp4'
 
+type StartServerProps = {
+  prefix: string
+  files: readonly string[]
+  aiDailyLimit: number
+  /** The library `files` are in, named as its folder is. */
+  library?: { name: string; kind: LibraryKind }
+  /** Settings over the test's own, such as a PIN. */
+  config?: Partial<ServerConfig>
+}
+
 /**
  * A server over a temp tree, answering for TMDB and Claude: `files` in a
  * library, TV shows unless `library` says otherwise, and one video in an
@@ -138,15 +147,7 @@ const startServer = ({
   aiDailyLimit,
   library = { name: 'TV', kind: 'shows' },
   config = {},
-}: {
-  prefix: string
-  files: readonly string[]
-  aiDailyLimit: number
-  /** The library `files` are in, named as its folder is. */
-  library?: { name: string; kind: LibraryKind }
-  /** Settings over the test's own, such as a PIN. */
-  config?: Partial<ServerConfig>
-}) => {
+}: StartServerProps) => {
   const tmdb = fakeTmdb({ movies: MOVIES, shows: SHOWS })
   const claude = fakeClaude({ lookups: LOOKUPS })
   const state: {
@@ -169,15 +170,13 @@ const startServer = ({
     await app().get(MetadataService).whenIdle()
     await app().get(ThumbnailService).whenIdle()
   }
-  const get = async <T>({
-    url,
-    guard,
-    cookie,
-  }: {
+  type GetProps<T> = {
     url: string
     guard: (value: unknown) => value is T
     cookie?: string
-  }): Promise<T> =>
+  }
+
+  const get = async <T>({ url, guard, cookie }: GetProps<T>): Promise<T> =>
     shape({
       response: await app().inject({
         method: 'GET',
@@ -186,7 +185,9 @@ const startServer = ({
       }),
       guard,
     })
-  const create = async ({ name, path, kind }: { name: string; path: string; kind: LibraryKind }) =>
+  type CreateProps = { name: string; path: string; kind: LibraryKind }
+
+  const create = async ({ name, path, kind }: CreateProps) =>
     shape({
       response: await asAdmin({
         method: 'POST',
@@ -197,8 +198,10 @@ const startServer = ({
     }).id
   /** The folder the library's files are in. */
   const libraryPath = () => join(state.root, library.name)
+  type UpdateProps = { settings: LibraryInput['settings'] }
+
   /** Edit library: `settings` over the library's own. */
-  const update = ({ settings }: { settings: LibraryInput['settings'] }) =>
+  const update = ({ settings }: UpdateProps) =>
     asAdmin({
       method: 'PUT',
       url: `/api/libraries/${state.library}`,

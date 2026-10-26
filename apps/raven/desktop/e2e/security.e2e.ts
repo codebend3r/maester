@@ -31,8 +31,10 @@ const INLINE_HASH = /^script-src 'self'( 'sha256-[A-Za-z0-9+/=]+')+$/u
 const NAVIGATION_KEY = 'ravenE2eNavigation'
 const ELSEWHERE = 'https://example.com/'
 
+type StatusForProps = { host: string }
+
 /** What the web host answers a request sent with `host` as its `Host`, from outside the app. */
-const statusFor = ({ host }: { host: string }) =>
+const statusFor = ({ host }: StatusForProps) =>
   new Promise<number>((resolve, reject) => {
     const outgoing = request(
       { host: '127.0.0.1', port: WEB_HOST_PORT, path: '/', headers: { host } },

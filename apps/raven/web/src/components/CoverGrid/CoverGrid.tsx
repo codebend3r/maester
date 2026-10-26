@@ -16,21 +16,18 @@ import { pageItemOf } from '@/lib/prefetchItem'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/CoverGrid/CoverGrid.module.scss'
 
-/**
- * One cover and nothing else: the picture is the link to its page, named
- * by its title since no words show, and grows a little toward the pointer.
- */
-const Cover = ({
-  entry,
-  title,
-  link,
-  children,
-}: {
+type CoverProps = {
   entry: string
   title: string
   link: Pick<ComponentProps<typeof CardLink>, 'to' | 'state' | 'prefetchItem'>
   children: ReactNode
-}) => {
+}
+
+/**
+ * One cover and nothing else: the picture is the link to its page, named
+ * by its title since no words show, and grows a little toward the pointer.
+ */
+const Cover = ({ entry, title, link, children }: CoverProps) => {
   const select = useSelectable({ key: entry, title })
   return (
     <li className={styles.cover} data-entry={entry} {...select.rootProps}>
@@ -48,17 +45,21 @@ const Cover = ({
   )
 }
 
+type CoverListProps = { posters: boolean; children: ReactNode }
+
 /** The grid of covers, posters or frame grabs, side by side with little between. */
-const CoverList = ({ posters, children }: { posters: boolean; children: ReactNode }) => (
+const CoverList = ({ posters, children }: CoverListProps) => (
   <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid}>{children}</ul>
 )
+
+type MediaCoversProps = { items: MediaItem[]; posters: boolean }
 
 /**
  * A library's videos as nothing but their covers, each opening the video's
  * page, or the player for one with no page: posters for a library that is
  * matched, frame grabs for one that is not.
  */
-export const MediaCovers = ({ items, posters }: { items: MediaItem[]; posters: boolean }) => (
+export const MediaCovers = ({ items, posters }: MediaCoversProps) => (
   <CoverList posters={posters}>
     {items.map((media) => (
       <Cover
@@ -73,8 +74,10 @@ export const MediaCovers = ({ items, posters }: { items: MediaItem[]; posters: b
   </CoverList>
 )
 
+type ShowCoversProps = { shows: ShowEntry[] }
+
 /** A TV library's shows as nothing but their posters, each opening the show's page. */
-export const ShowCovers = ({ shows }: { shows: ShowEntry[] }) => (
+export const ShowCovers = ({ shows }: ShowCoversProps) => (
   <CoverList posters>
     {shows.map(({ show }) => (
       <Cover
@@ -92,8 +95,10 @@ export const ShowCovers = ({ shows }: { shows: ShowEntry[] }) => (
 /** How many blank covers stand in: a screen's worth at 1440 wide. */
 const SKELETON_COUNT = 24
 
+type CoverGridSkeletonProps = { posters: boolean }
+
 /** The covers while they are on their way: blank pictures in their places. */
-export const CoverGridSkeleton = ({ posters }: { posters: boolean }) => (
+export const CoverGridSkeleton = ({ posters }: CoverGridSkeletonProps) => (
   <CoverList posters={posters}>
     {Array.from({ length: SKELETON_COUNT }, (_, index) => (
       <li key={index} className={styles.cover}>

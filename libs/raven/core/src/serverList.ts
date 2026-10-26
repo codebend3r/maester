@@ -9,6 +9,12 @@ export const SERVERS_CAP = 20
  */
 export const serverNameFor = (origin: string): string => origin.slice(origin.indexOf('//') + 2)
 
+type RenamedServersProps<T extends { id: string; name: string }> = {
+  servers: readonly T[]
+  id: string
+  name: string
+}
+
 /**
  * `servers` with the one `id` names given the name typed, tidied by `cleanName`; null when the
  * name will not do (blank, past `NAME_MAX`, or holding a hidden character) or no server has
@@ -18,11 +24,7 @@ export const renamedServers = <T extends { id: string; name: string }>({
   servers,
   id,
   name,
-}: {
-  servers: readonly T[]
-  id: string
-  name: string
-}): T[] | null => {
+}: RenamedServersProps<T>): T[] | null => {
   const cleaned = cleanName(name)
   if (cleaned === null || !servers.some((server) => server.id === id)) return null
   return servers.map((server) => (server.id === id ? { ...server, name: cleaned } : server))

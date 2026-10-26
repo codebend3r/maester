@@ -7,13 +7,15 @@ const REFUSED = {
   message: 'Raven could not read its own reply.',
 }
 
+type BridgeOfProps = {
+  request?: (request: unknown) => Promise<unknown>
+  dropFiles?: (files: readonly unknown[]) => Promise<unknown>
+}
+
 const bridgeOf = ({
   request = async () => ({ type: DESKTOP_REPLIES.done }),
   dropFiles = async () => ({ type: DESKTOP_REPLIES.done }),
-}: {
-  request?: (request: unknown) => Promise<unknown>
-  dropFiles?: (files: readonly unknown[]) => Promise<unknown>
-} = {}) => {
+}: BridgeOfProps = {}) => {
   const listeners: ((event: unknown) => void)[] = []
   return {
     request: mock(request),

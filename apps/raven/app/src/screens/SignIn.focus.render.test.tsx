@@ -11,7 +11,9 @@ import type * as NavigationFocus from '@/test/navigationFocus'
 import { askedFor, resetTestScreen } from '@/test/navigationFocus'
 
 const mockGetLock = jest.fn<() => Promise<LockState>>()
-const mockSignIn = jest.fn<(input: { email: string; password: string }) => Promise<AuthOutcome>>()
+type MockSignInCallbackProps = { email: string; password: string }
+
+const mockSignIn = jest.fn<(input: MockSignInCallbackProps) => Promise<AuthOutcome>>()
 
 // The layouts pick their variant once, as they load, so the TV is set before anything does.
 jest.mock('react-native/Libraries/Utilities/Platform', () => {

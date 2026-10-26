@@ -4,24 +4,36 @@ import type { DownloadService } from '@/main/downloads/downloadService'
 import { type AccountTickets, TICKET_OUTCOMES } from '@/main/servers/accountTickets'
 import { startRefusalOf } from '@/main/servers/serverSources'
 
+type PlayProps = { mediaId: number; at: number; next: readonly number[] }
+
 export type ServerTitles = {
   /**
    * What the native player needs to play a title of the server: a ready download of it as a
    * granted file, which plays with no server, else the server's title, once its first ticket
    * says the page's account may play it. `at` and `next` come back as the page sent them.
    */
-  play: (input: { mediaId: number; at: number; next: readonly number[] }) => Promise<DesktopReply>
+  play: (input: PlayProps) => Promise<DesktopReply>
 }
 
-const titleReply = ({
-  source,
-  at,
-  next,
-}: {
+type TitleReplyProps = {
   source: Extract<DesktopReply, { type: typeof DESKTOP_REPLIES.title }>['source']
   at: number
   next: readonly number[]
-}): DesktopReply => ({ type: DESKTOP_REPLIES.title, source, resumeAt: at, next: [...next] })
+}
+
+const titleReply = ({ source, at, next }: TitleReplyProps): DesktopReply => ({
+  type: DESKTOP_REPLIES.title,
+  source,
+  resumeAt: at,
+  next: [...next],
+})
+
+type CreateServerTitlesProps = {
+  /** The one server, read at each call. */
+  server: () => ServerEntry
+  downloads: Pick<DownloadService, 'openTitle'>
+  tickets: Pick<AccountTickets, 'ticketFor'>
+}
 
 /**
  * Server titles for the page's native player. Main mints the first ticket before it answers, so
@@ -32,12 +44,7 @@ export const createServerTitles = ({
   server,
   downloads,
   tickets,
-}: {
-  /** The one server, read at each call. */
-  server: () => ServerEntry
-  downloads: Pick<DownloadService, 'openTitle'>
-  tickets: Pick<AccountTickets, 'ticketFor'>
-}): ServerTitles => {
+}: CreateServerTitlesProps): ServerTitles => {
   const play: ServerTitles['play'] = async ({ mediaId, at, next }) => {
     const { id: serverId, name } = server()
     const fileId = await downloads.openTitle({ serverId, mediaId })

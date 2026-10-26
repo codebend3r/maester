@@ -44,19 +44,21 @@ type SecretStep = { kind: typeof STEPS.pin | typeof STEPS.admin; server: AppServ
 
 type Step = { kind: typeof STEPS.account } | SecretStep | { kind: typeof STEPS.ticketsOff }
 
+type UnlockProps = { api: ApiClient; secret: string }
+
 /** What the PIN step and the admin step each ask for, and the call that sends it. */
 const SECRET_STEPS = {
   [STEPS.pin]: {
     prompt: COPY.pinPrompt,
     label: COPY.pin,
     isNumeric: true,
-    unlock: ({ api, secret }: { api: ApiClient; secret: string }) => api.unlock(secret),
+    unlock: ({ api, secret }: UnlockProps) => api.unlock(secret),
   },
   [STEPS.admin]: {
     prompt: COPY.adminPrompt,
     label: COPY.adminPassword,
     isNumeric: false,
-    unlock: ({ api, secret }: { api: ApiClient; secret: string }) => api.unlockAdmin(secret),
+    unlock: ({ api, secret }: UnlockProps) => api.unlockAdmin(secret),
   },
 } as const satisfies Record<SecretStep['kind'], unknown>
 
@@ -108,7 +110,9 @@ export const SignIn = () => {
     goHome()
   }
 
-  const submitAccount = ({ typedPassword = password }: { typedPassword?: string } = {}) => {
+  type SubmitAccountProps = { typedPassword?: string }
+
+  const submitAccount = ({ typedPassword = password }: SubmitAccountProps = {}) => {
     const trimmed = email.trim()
     if (trimmed === '' || typedPassword === '') {
       setError(COPY.badAccount)
@@ -137,7 +141,9 @@ export const SignIn = () => {
     })
   }
 
-  const submitSecret = ({ step: { kind, server }, text }: { step: SecretStep; text: string }) =>
+  type SubmitSecretProps = { step: SecretStep; text: string }
+
+  const submitSecret = ({ step: { kind, server }, text }: SubmitSecretProps) =>
     run(async () => {
       const api = apiFor(server)
       await SECRET_STEPS[kind].unlock({ api, secret: text })

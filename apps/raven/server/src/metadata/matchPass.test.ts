@@ -162,7 +162,9 @@ describe('a matching pass', () => {
   })
 
   it('searches with adult titles for a film TMDB leaves out, taking only its own title', async () => {
-    const ask = ({ title, year }: { title: string; year: number }) =>
+    type AskProps = { title: string; year: number }
+
+    const ask = ({ title, year }: AskProps) =>
       pass().resolve({
         type: 'movie',
         fix: { kind: 'none' },
@@ -274,15 +276,13 @@ describe('a matching pass', () => {
 
 describe('looking up the other titles of a show', () => {
   const database = testDatabase('raven-match-pass-aliases-')
-  const show = ({
-    id,
-    title,
-    alternativeTitles = [],
-  }: {
+  type ShowProps = {
     id: number
     title: string
     alternativeTitles?: string[]
-  }) => ({
+  }
+
+  const show = ({ id, title, alternativeTitles = [] }: ShowProps) => ({
     id,
     title,
     first: '1970-01-01',
@@ -338,15 +338,13 @@ describe('looking up the other titles of a show', () => {
 
 describe('looking up the other titles of a show known only by an alternative', () => {
   const database = testDatabase('raven-match-pass-alias-only-')
-  const show = ({
-    id,
-    title,
-    alternativeTitles = [],
-  }: {
+  type ShowProps = {
     id: number
     title: string
     alternativeTitles?: string[]
-  }) => ({
+  }
+
+  const show = ({ id, title, alternativeTitles = [] }: ShowProps) => ({
     id,
     title,
     first: '1970-01-01',

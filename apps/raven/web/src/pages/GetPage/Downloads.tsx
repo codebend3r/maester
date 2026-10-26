@@ -4,18 +4,17 @@ import { LATEST_RELEASE, webAppAddress } from '@/pages/GetPage/links'
 import { type OperatingSystem, PLATFORMS } from '@/pages/GetPage/platforms'
 import styles from '@/pages/GetPage/Downloads.module.scss'
 
+type PlatformCardProps = {
+  platform: (typeof PLATFORMS)[number]
+  isYours: boolean
+}
+
 /**
  * A system's card: its name, what it needs, and a download for each of its
  * files. The viewer's own system is outlined and marked, and its first file
  * wears the accent.
  */
-const PlatformCard = ({
-  platform,
-  isYours,
-}: {
-  platform: (typeof PLATFORMS)[number]
-  isYours: boolean
-}) => {
+const PlatformCard = ({ platform, isYours }: PlatformCardProps) => {
   const nameId = useId()
   return (
     <article
@@ -100,12 +99,14 @@ const WebCard = () => {
   )
 }
 
+type DownloadsProps = { id: string; system: OperatingSystem | undefined }
+
 /**
  * Get raven: a card for each system the desktop app is offered on, the
  * viewer's own outlined, then the web app's. `id` is the section's, for the
  * links that jump to it.
  */
-export const Downloads = ({ id, system }: { id: string; system: OperatingSystem | undefined }) => {
+export const Downloads = ({ id, system }: DownloadsProps) => {
   const titleId = useId()
   return (
     <section id={id} className={styles.downloads} aria-labelledby={titleId}>

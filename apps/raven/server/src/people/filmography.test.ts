@@ -18,17 +18,14 @@ const row = (
   ...fields,
 })
 
-const summary = ({
-  id,
-  title,
-  type = 'movie',
-  year = 1999,
-}: {
+type SummaryProps = {
   id: number
   title: string
   type?: ItemType
   year?: number
-}): ItemSummary => ({
+}
+
+const summary = ({ id, title, type = 'movie', year = 1999 }: SummaryProps): ItemSummary => ({
   id,
   type,
   title,

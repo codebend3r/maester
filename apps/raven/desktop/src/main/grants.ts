@@ -41,7 +41,9 @@ const attempt = async <T>(run: () => Promise<T>): Promise<T | null> => {
   }
 }
 
-export const createGrants = ({ fs, newId }: { fs: GrantFs; newId: () => string }): Grants => {
+type CreateGrantsProps = { fs: GrantFs; newId: () => string }
+
+export const createGrants = ({ fs, newId }: CreateGrantsProps): Grants => {
   const byId = new Map<string, Readonly<GrantedFile>>()
   const idByPath = new Map<string, string>()
 

@@ -4,18 +4,17 @@
  */
 export const SHUFFLE_LENGTH = 50
 
+type ShuffledProps<T> = {
+  items: readonly T[]
+  roll?: () => number
+}
+
 /**
  * `items` in a random order, every order as likely as the next: each item
  * drops in at a random place among those dealt before it. `roll` is the die,
  * 0 up to 1, so a test can load it.
  */
-export const shuffled = <T>({
-  items,
-  roll = Math.random,
-}: {
-  items: readonly T[]
-  roll?: () => number
-}): T[] =>
+export const shuffled = <T>({ items, roll = Math.random }: ShuffledProps<T>): T[] =>
   items.reduce<T[]>(
     (dealt, item, index) => dealt.toSpliced(Math.floor(roll() * (index + 1)), 0, item),
     [],

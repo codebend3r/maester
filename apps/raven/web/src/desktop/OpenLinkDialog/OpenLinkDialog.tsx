@@ -42,8 +42,10 @@ const outcomeOf = (reply: DesktopReply): Outcome => {
   }
 }
 
+type OpenLinkDialogProps = { onClose: () => void }
+
 /** File > Open Link: a pasted Raven link or watch page goes to main, which reads it. */
-export const OpenLinkDialog = ({ onClose }: { onClose: () => void }) => {
+export const OpenLinkDialog = ({ onClose }: OpenLinkDialogProps) => {
   const { client } = useDesktop()
   const openReply = useOpenReply()
   const { dialog, close, keepKeys } = useModal()

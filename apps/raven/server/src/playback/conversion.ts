@@ -23,14 +23,16 @@ export const streamModeOf = (mode: string | undefined): StreamMode => {
   return mode
 }
 
+type RefuseWhatSettingsTurnOffProps = {
+  playback: PlaybackSettings
+  mode: StreamMode
+}
+
 /** Refuses a conversion the playback settings turn off. */
 export const refuseWhatSettingsTurnOff = ({
   playback,
   mode,
-}: {
-  playback: PlaybackSettings
-  mode: StreamMode
-}): void => {
+}: RefuseWhatSettingsTurnOffProps): void => {
   if (playback.transcoding === TRANSCODINGS.off) {
     throw new ForbiddenException('Server conversion is off in Settings; only direct play is on.')
   }
@@ -41,14 +43,16 @@ export const refuseWhatSettingsTurnOff = ({
 
 type StreamSize = (typeof STREAM_QUALITIES)[StreamQuality]
 
+type StreamSizeOfProps = {
+  quality: string | undefined
+  mode: StreamMode
+}
+
 /** The size a viewer asked a transcode for, or null for the server's settings. */
 export const streamSizeOf = ({
   quality,
   mode,
-}: {
-  quality: string | undefined
-  mode: StreamMode
-}): { key: StreamQuality; size: StreamSize } | null => {
+}: StreamSizeOfProps): { key: StreamQuality; size: StreamSize } | null => {
   if (quality == null) return null
   if (!isStreamQuality(quality)) {
     throw new BadRequestException('quality must be one of the listed sizes')
@@ -59,23 +63,22 @@ export const streamSizeOf = ({
   return { key: quality, size: STREAM_QUALITIES[quality] }
 }
 
-/** The server's setting is the ceiling a viewer's pick can not lift. */
-export const capHeight = ({
-  size,
-  maxHeight,
-}: {
+type CapHeightProps = {
   size: StreamSize | null
   maxHeight: number
-}): number => Math.min(size?.height ?? maxHeight, maxHeight)
+}
 
-/** The audio track asked for by its `0:a:N` index, or the file's default when none is. */
-export const audioTrackOf = ({
-  tracks,
-  audio,
-}: {
+/** The server's setting is the ceiling a viewer's pick can not lift. */
+export const capHeight = ({ size, maxHeight }: CapHeightProps): number =>
+  Math.min(size?.height ?? maxHeight, maxHeight)
+
+type AudioTrackOfProps = {
   tracks: MediaTracks
   audio: string | undefined
-}): AudioTrack | null => {
+}
+
+/** The audio track asked for by its `0:a:N` index, or the file's default when none is. */
+export const audioTrackOf = ({ tracks, audio }: AudioTrackOfProps): AudioTrack | null => {
   const chosen = audio == null ? tracks.defaultAudio : wholeNumber(audio)
   const track = tracks.audio.find((candidate) => candidate.index === chosen) ?? null
   if (audio != null && !track) throw new BadRequestException(`No audio track ${audio}`)
@@ -89,18 +92,20 @@ export const sizeOnDisk = async (file: MediaFile): Promise<number> => {
   return info.size
 }
 
+type VideoEncodingOfProps = {
+  ffmpeg: Pick<FfmpegService, 'canTonemap' | 'videoEncoder'>
+  file: MediaFile
+  mode: StreamMode
+  playback: PlaybackSettings
+}
+
 /** How the video is encoded: a remux encodes nothing, a transcode tone maps HDR when it can. */
 export const videoEncodingOf = async ({
   ffmpeg,
   file,
   mode,
   playback,
-}: {
-  ffmpeg: Pick<FfmpegService, 'canTonemap' | 'videoEncoder'>
-  file: MediaFile
-  mode: StreamMode
-  playback: PlaybackSettings
-}): Promise<{ tonemap: boolean; encoder: VideoEncoder }> => {
+}: VideoEncodingOfProps): Promise<{ tonemap: boolean; encoder: VideoEncoder }> => {
   if (mode !== PLAYBACK_MODES.transcode) return { tonemap: false, encoder: SOFTWARE }
   const tonemap = file.hdr && playback.tonemap && (await ffmpeg.canTonemap())
   return { tonemap, encoder: await ffmpeg.videoEncoder() }

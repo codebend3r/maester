@@ -18,10 +18,13 @@ import {
 } from '@/test/fixtures'
 import { renderLibraryPage } from '@/test/libraryPage'
 
-const file = ({ id, title, duration = 60 }: { id: number; title: string; duration?: number }) =>
-  mediaItem({ id, title, duration })
+type FileProps = { id: number; title: string; duration?: number }
 
-const movie = ({ id, title }: { id: number; title: string }) =>
+const file = ({ id, title, duration = 60 }: FileProps) => mediaItem({ id, title, duration })
+
+type MovieProps = { id: number; title: string }
+
+const movie = ({ id, title }: MovieProps) =>
   matchedMovie({ id, title, item: itemSummary({ id: id * 10, title }) })
 
 const bar = () => screen.getByRole('region', { name: 'Selection' })
@@ -52,17 +55,19 @@ describe('LibraryPage select mode', () => {
 
   afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
 
+  type OpenProps = {
+    kind?: LibraryKind
+    route?: string
+    settings?: Partial<LibrarySettings>
+    items?: MediaItem[]
+  }
+
   const open = ({
     kind = 'other',
     route = '/libraries/2',
     settings = {},
     items = [file({ id: 1, title: 'Alpha' }), file({ id: 2, title: 'Bravo' })],
-  }: {
-    kind?: LibraryKind
-    route?: string
-    settings?: Partial<LibrarySettings>
-    items?: MediaItem[]
-  } = {}) => {
+  }: OpenProps = {}) => {
     spies.get.mockImplementation(async () =>
       library({ id: 2, name: 'Films', settings: { ...library().settings, kind, ...settings } }),
     )

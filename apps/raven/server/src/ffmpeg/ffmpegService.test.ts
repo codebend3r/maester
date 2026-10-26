@@ -139,7 +139,9 @@ describe('FfmpegService', () => {
   })
 
   describe('choosing how transcodes encode', () => {
-    const encoderWith = ({ tool, hwAccel }: { tool: string; hwAccel: HwAccel }) =>
+    type EncoderWithProps = { tool: string; hwAccel: HwAccel }
+
+    const encoderWith = ({ tool, hwAccel }: EncoderWithProps) =>
       new FfmpegService(
         {
           ...readServerConfig({}),

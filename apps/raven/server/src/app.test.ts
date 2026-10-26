@@ -633,7 +633,9 @@ describe('the media server', () => {
     })
 
     describe('history', () => {
-      const entryFor = async ({ id, watchedOnly }: { id: number; watchedOnly?: boolean }) =>
+      type EntryForProps = { id: number; watchedOnly?: boolean }
+
+      const entryFor = async ({ id, watchedOnly }: EntryForProps) =>
         (await api().listHistory({ libraryId: library.id, limit: 100, watchedOnly })).find(
           (entry) => entry.media.id === id,
         )
@@ -891,7 +893,9 @@ describe('live updates', () => {
       const reader = response.body?.getReader()
       if (!reader) throw new Error('no body to read')
       const decoder = new TextDecoder()
-      const readUntil = async ({ text, read }: { text: string; read: string }): Promise<string> => {
+      type ReadUntilProps = { text: string; read: string }
+
+      const readUntil = async ({ text, read }: ReadUntilProps): Promise<string> => {
         if (read.includes(text)) return read
         const chunk = await reader.read()
         if (chunk.done) throw new Error(`the stream ended before "${text}": ${read}`)

@@ -20,15 +20,13 @@ import { mediaItemFor } from '@/test/mediaItem'
 import { canPlayFor } from '@/platform/canPlay'
 import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 
-const planOn = ({
-  platform,
-  media,
-  transcoding = TRANSCODINGS.on,
-}: {
+type PlanOnProps = {
   platform: AppPlatform
   media: MediaItem
   transcoding?: PlaybackSettings['transcoding']
-}) =>
+}
+
+const planOn = ({ platform, media, transcoding = TRANSCODINGS.on }: PlanOnProps) =>
   planPlayback({
     media,
     ...canPlayFor(platform),
@@ -36,13 +34,13 @@ const planOn = ({
     policy: { directPlay: DIRECT_PLAYS.auto, transcoding },
   })
 
-const planOnIos = ({
-  media,
-  transcoding,
-}: {
+type PlanOnIosProps = {
   media: MediaItem
   transcoding?: PlaybackSettings['transcoding']
-}) => planOn({ platform: APP_PLATFORMS.ios, media, transcoding })
+}
+
+const planOnIos = ({ media, transcoding }: PlanOnIosProps) =>
+  planOn({ platform: APP_PLATFORMS.ios, media, transcoding })
 
 /** ffprobe's name for a container no table lists, which only this file carries. */
 const UNLISTED = { avi: 'avi' } as const
@@ -234,7 +232,9 @@ describe('canPlayFor on Android TV', () => {
       AUDIO_CODECS.flac,
       AUDIO_CODECS.mp3,
     ]
-    const firstWay = ({ container, audioCodec }: { container: string; audioCodec: string }) =>
+    type FirstWayProps = { container: string; audioCodec: string }
+
+    const firstWay = ({ container, audioCodec }: FirstWayProps) =>
       planOnTv(
         mediaItemFor({ container, videoCodec: VIDEO_CODECS.h264, videoBitDepth: 8, audioCodec }),
       ).modes[0] ?? null
@@ -299,7 +299,9 @@ describe('canPlayFor on Android TV', () => {
 })
 
 describe('canPlaySurely, for a viewer who would rather not try a maybe', () => {
-  const sureOn = ({ platform, media }: { platform: AppPlatform; media: MediaItem }) =>
+  type SureOnProps = { platform: AppPlatform; media: MediaItem }
+
+  const sureOn = ({ platform, media }: SureOnProps) =>
     planPlayback({
       media,
       canPlay: canPlayFor(platform).canPlaySurely,

@@ -22,17 +22,15 @@ import { HomeHero } from '@/pages/HomePage/HomeHero'
 import { featuredOf } from '@/pages/HomePage/featured'
 import styles from '@/pages/HomePage/HomePage.module.scss'
 
-/** A row of cards under its ruled heading, or a line saying it has none yet. */
-const Shelf = ({
-  title,
-  isEmpty,
-  children,
-}: {
+type ShelfProps = {
   title: ReactNode
   isEmpty: boolean
   /** The cards, each its own `li`. */
   children: ReactNode
-}) => {
+}
+
+/** A row of cards under its ruled heading, or a line saying it has none yet. */
+const Shelf = ({ title, isEmpty, children }: ShelfProps) => {
   const id = useId()
   return (
     <section className={styles.shelf} aria-labelledby={id}>
@@ -46,20 +44,18 @@ const Shelf = ({
   )
 }
 
+type LibraryShelfProps = {
+  shelf: HomeShelf
+  library: Library
+  query?: string
+}
+
 /**
  * A library's row, laid out as the library lays it out: posters, shows or
  * frame grabs. Its heading opens the library, on `query` when the row is
  * what a search found, so the library lists every match.
  */
-const LibraryShelf = ({
-  shelf,
-  library,
-  query = '',
-}: {
-  shelf: HomeShelf
-  library: Library
-  query?: string
-}) => {
+const LibraryShelf = ({ shelf, library, query = '' }: LibraryShelfProps) => {
   const { kind, ratingsSource } = library.settings
   const matchType = matchTypeFor(kind)
   const to = query
@@ -127,8 +123,10 @@ const HeroSkeleton = () => (
   </Loading>
 )
 
+type SkeletonShelvesProps = { label: string; count: number }
+
 /** Rows of cards standing in while they are read. */
-const SkeletonShelves = ({ label, count }: { label: string; count: number }) => (
+const SkeletonShelves = ({ label, count }: SkeletonShelvesProps) => (
   <Loading label={label}>
     {Array.from({ length: count }, (_, index) => (
       <section key={index} className={styles.shelf}>
@@ -141,8 +139,10 @@ const SkeletonShelves = ({ label, count }: { label: string; count: number }) => 
   </Loading>
 )
 
+type SearchResultsProps = { query: string; libraries: Library[] }
+
 /** What a search from home found: a row for each library holding a match, in the side menu's order. */
-const SearchResults = ({ query, libraries }: { query: string; libraries: Library[] }) => {
+const SearchResults = ({ query, libraries }: SearchResultsProps) => {
   const results = useQuery(homeSearchQuery(query))
   const shelves = withLibraries({ shelves: results.data ?? [], libraries })
   return (
@@ -168,14 +168,13 @@ const SearchResults = ({ query, libraries }: { query: string; libraries: Library
   )
 }
 
-/** The hero's titles in turn, then what is being watched, then each pinned library's newest. */
-const Shelves = ({
-  libraries,
-  areLibrariesPending,
-}: {
+type ShelvesProps = {
   libraries: Library[]
   areLibrariesPending: boolean
-}) => {
+}
+
+/** The hero's titles in turn, then what is being watched, then each pinned library's newest. */
+const Shelves = ({ libraries, areLibrariesPending }: ShelvesProps) => {
   const home = useQuery(homeQuery)
   const hero = useQuery(heroQuery)
   const shelves = withLibraries({ shelves: home.data?.shelves ?? [], libraries })

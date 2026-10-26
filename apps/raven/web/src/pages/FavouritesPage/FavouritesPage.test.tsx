@@ -110,13 +110,12 @@ describe('FavouritesPage', () => {
     /** Where the page's address stands, so a test can see what rides in it. */
     const Address = () => <output data-testid="address">{useLocation().search}</output>
 
-    const serve = ({
-      entries,
-      route = '/favourites',
-    }: {
+    type ServeProps = {
       entries: PosterEntry[]
       route?: string
-    }) => {
+    }
+
+    const serve = ({ entries, route = '/favourites' }: ServeProps) => {
       const spy = spyOn(api, 'listFavourites').mockImplementation(async () => entries)
       renderWithProviders({
         ui: (

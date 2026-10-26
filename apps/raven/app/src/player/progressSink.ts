@@ -13,6 +13,13 @@ export const watchAppHide: WatchHide = (save) => {
   return () => subscription.remove()
 }
 
+type ProgressSinkForProps = {
+  api: ApiClient
+  mediaId: number
+  libraryId: number
+  queryClient: QueryClient
+}
+
 /**
  * Where the viewer's progress goes, as the web's watch page sends it: the play once frames
  * flow, each spot saved, and, once the player goes, the item's page, Home and Continue
@@ -24,12 +31,7 @@ export const progressSinkFor = ({
   mediaId,
   libraryId,
   queryClient,
-}: {
-  api: ApiClient
-  mediaId: number
-  libraryId: number
-  queryClient: QueryClient
-}): ProgressSink => {
+}: ProgressSinkForProps): ProgressSink => {
   let lastSave: Promise<unknown> = Promise.resolve()
   return {
     started: () => {

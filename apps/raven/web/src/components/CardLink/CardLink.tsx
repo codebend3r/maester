@@ -11,6 +11,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { prefetchItemHandlers } from '@/lib/prefetchItem'
 import { type Follow, useCardLinks } from '@/stores/cardLinks'
 
+type CardLinksProps = { children: ReactNode }
+
 /**
  * Follows the card links inside, with one hold on the router for the whole
  * app. Each of react-router's `Link`s takes its own, a handful of hooks and
@@ -19,7 +21,7 @@ import { type Follow, useCardLinks } from '@/stores/cardLinks'
  * so no card draws again when the address changes. It goes in
  * `useCardLinks` as this mounts, and the links inside draw once it is there.
  */
-export const CardLinks = ({ children }: { children: ReactNode }) => {
+export const CardLinks = ({ children }: CardLinksProps) => {
   const navigate = useNavigate()
   const location = useLocation()
   const latest = useRef({ navigate, location })

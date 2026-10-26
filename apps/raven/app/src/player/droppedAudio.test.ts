@@ -88,7 +88,9 @@ const hearAll = (hearings: readonly AudioHearing[]) =>
     { heard: null, judged: [] },
   )
 
-const loaded = ({ place, picked }: { place: number | null; picked: number }): AudioHearing => ({
+type LoadedProps = { place: number | null; picked: number }
+
+const loaded = ({ place, picked }: LoadedProps): AudioHearing => ({
   type: AUDIO_HEARINGS.loaded,
   attempt: ATTEMPT,
   reported: pickedAt(picked),

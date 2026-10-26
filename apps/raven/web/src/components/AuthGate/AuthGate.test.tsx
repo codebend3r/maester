@@ -25,15 +25,17 @@ import { Where } from '@/test/authPage'
 import { FILE_ID } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
 
+type RenderGateProps = {
+  authConfig?: AuthConfig | null
+  isSignedIn?: boolean
+  route?: string
+}
+
 const renderGate = ({
   authConfig = readyConfig,
   isSignedIn = true,
   route = '/libraries/3?x=1',
-}: {
-  authConfig?: AuthConfig | null
-  isSignedIn?: boolean
-  route?: string
-} = {}) => {
+}: RenderGateProps = {}) => {
   useAuthSession.setState({
     status: AUTH_SESSION_STATUSES.ready,
     session: isSignedIn ? SIGNED_IN : null,
@@ -53,7 +55,9 @@ const renderGate = ({
   })
 }
 
-const refused = ({ status, reason }: { status: number; reason: ApiError['refusal'] }) =>
+type RefusedProps = { status: number; reason: ApiError['refusal'] }
+
+const refused = ({ status, reason }: RefusedProps) =>
   new ApiError({ status, message: 'Refused', refusal: reason })
 
 describe('AuthGate', () => {

@@ -17,6 +17,16 @@ type Entry = {
   answered: { accountId: string | null } | null
 }
 
+type MembershipLookupsCurrentProps = { token: string }
+
+type MembershipLookupsForgetProps = { accountId: string }
+
+type MembershipLookupsSettleProps = { key: string; entry: Entry }
+
+type MembershipLookupsAskProps = { token: string }
+
+type MembershipLookupsStoreProps = { key: string; entry: Entry; now: number }
+
 /**
  * `current_membership` lookups, shared. Callers with the same token share
  * one lookup while it is in flight, and its answer is reused until the TTL
@@ -32,7 +42,7 @@ export class MembershipLookups {
     @Inject(MEMBERSHIP_TTL) private readonly ttlMs: number,
   ) {}
 
-  current({ token }: { token: string }): Promise<Account | null> {
+  current({ token }: MembershipLookupsCurrentProps): Promise<Account | null> {
     const key = createHash('sha256').update(token).digest(AUTH_ENCODINGS.base64url)
     const now = Date.now()
     const held = this.entries.get(key)
@@ -50,7 +60,7 @@ export class MembershipLookups {
    * token's account is not known yet, and one may have begun before the
    * change it is forgotten for.
    */
-  forget({ accountId }: { accountId: string }): void {
+  forget({ accountId }: MembershipLookupsForgetProps): void {
     this.entries.forEach((entry, key) => {
       if (entry.answered === null || entry.answered.accountId === accountId)
         this.entries.delete(key)
@@ -58,7 +68,7 @@ export class MembershipLookups {
   }
 
   /** Notes whose membership the lookup found, or drops it once it fails, so a failure is never reused. */
-  private async settle({ key, entry }: { key: string; entry: Entry }): Promise<void> {
+  private async settle({ key, entry }: MembershipLookupsSettleProps): Promise<void> {
     try {
       const account = await entry.result
       entry.answered = { accountId: account?.id ?? null }
@@ -68,11 +78,11 @@ export class MembershipLookups {
   }
 
   /** The backend's answer, a failure thrown before it returns a promise included, as a promise. */
-  private async ask({ token }: { token: string }): Promise<Account | null> {
+  private async ask({ token }: MembershipLookupsAskProps): Promise<Account | null> {
     return this.backend.current({ token })
   }
 
-  private store({ key, entry, now }: { key: string; entry: Entry; now: number }): void {
+  private store({ key, entry, now }: MembershipLookupsStoreProps): void {
     this.entries.delete(key)
     if (this.entries.size >= MAX_LOOKUPS) {
       this.entries.forEach((held, heldKey) => {

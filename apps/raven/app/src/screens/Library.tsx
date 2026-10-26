@@ -49,17 +49,16 @@ const COPY = {
   search: 'Search',
 } as const
 
+type LibraryToolbarProps = {
+  settings: LibrarySettings
+  onChange: (change: LibraryChoice) => void
+}
+
 /**
  * Sort, its direction, view and, in the grouped view, the grouping, as the web's toolbar
  * offers them: each the library's type's own, so a sort it cannot use is never offered.
  */
-const LibraryToolbar = ({
-  settings,
-  onChange,
-}: {
-  settings: LibrarySettings
-  onChange: (change: LibraryChoice) => void
-}) => {
+const LibraryToolbar = ({ settings, onChange }: LibraryToolbarProps) => {
   const parts = sortParts(settings.sort)
   return (
     <>
@@ -103,23 +102,19 @@ const LibraryToolbar = ({
   )
 }
 
-/**
- * What the library holds: its shows and the files no show was found for, or its files, of
- * those the search finds. The server searches, as it does for the web.
- */
-const useListing = ({
-  queries,
-  library,
-  settings,
-  search,
-  seed,
-}: {
+type UseListingProps = {
   queries: AppQueries['queries']
   library: LibraryRecord
   settings: LibrarySettings
   search: string
   seed: number
-}) => {
+}
+
+/**
+ * What the library holds: its shows and the files no show was found for, or its files, of
+ * those the search finds. The server searches, as it does for the web.
+ */
+const useListing = ({ queries, library, settings, search, seed }: UseListingProps) => {
   const isShowList = listsShows(settings.kind)
   const listing = { libraryId: library.id, search, sort: settings.sort, seed }
   const shows = useQuery({ ...queries.showListQuery(listing), enabled: isShowList })
@@ -137,19 +132,17 @@ const useListing = ({
   return { listed, error: query.error, isStandIn: query.isPlaceholderData }
 }
 
+type LibraryGridProps = {
+  session: AppQueries
+  library: LibraryRecord
+  asked: string
+}
+
 /**
  * A library once it is known: its cards, laid out as this device last left it, of those its
  * search finds. The search starts on the one it was opened with.
  */
-const LibraryGrid = ({
-  session: { server, api, queries },
-  library,
-  asked,
-}: {
-  session: AppQueries
-  library: LibraryRecord
-  asked: string
-}) => {
+const LibraryGrid = ({ session: { server, api, queries }, library, asked }: LibraryGridProps) => {
   const router = useRouter()
   const view = useLibraryView({ serverId: server.id, library })
   const search = useSearch({ initial: asked })
@@ -218,8 +211,10 @@ const LibraryGrid = ({
   )
 }
 
+type LibraryNoticeProps = { notice: string }
+
 /** The grid's frame with only a line in it: while the library is read, or when it is not there. */
-const LibraryNotice = ({ notice }: { notice: string }) => {
+const LibraryNotice = ({ notice }: LibraryNoticeProps) => {
   const router = useRouter()
   return (
     <Grid
@@ -237,15 +232,13 @@ const LibraryNotice = ({ notice }: { notice: string }) => {
   )
 }
 
-const ServerLibrary = ({
-  session,
-  id,
-  asked,
-}: {
+type ServerLibraryProps = {
   session: AppQueries
   id: number | null
   asked: string
-}) => {
+}
+
+const ServerLibrary = ({ session, id, asked }: ServerLibraryProps) => {
   const queryClient = useQueryClient()
   const { queries } = session
   // The libraries Home read already hold this one, so the page opens on that while it is read.

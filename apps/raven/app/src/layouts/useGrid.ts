@@ -13,23 +13,20 @@ import {
 } from '@/layouts/gridRows'
 import { useReduceMotion } from '@/stores/reduceMotion'
 
+type UseGridProps = {
+  sections: readonly GridSection[]
+  columnsOf: (shape: CardShape) => number
+  heightOf: (row: GridRow) => number
+  top: number
+}
+
 /**
  * What both grids share: the rows the sections cut into, which buckets are open (none, to
  * start, as the web's), and the jump, which scrolls to a card, opening its bucket first and
  * scrolling once the bucket's rows are drawn. `top` is how far down the list its first row
  * starts.
  */
-export const useGrid = ({
-  sections,
-  columnsOf,
-  heightOf,
-  top,
-}: {
-  sections: readonly GridSection[]
-  columnsOf: (shape: CardShape) => number
-  heightOf: (row: GridRow) => number
-  top: number
-}) => {
+export const useGrid = ({ sections, columnsOf, heightOf, top }: UseGridProps) => {
   const isReduced = useReduceMotion((state) => state.isReduced)
   const list = useRef<FlatList<GridRow>>(null)
   // A card jumped to in a bucket that was shut, scrolled to once the bucket's rows are drawn.
@@ -37,7 +34,9 @@ export const useGrid = ({
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set())
   const rows = gridRowsOf({ sections, open, columnsOf })
 
-  const scrollTo = ({ card, shown }: { card: string; shown: readonly GridRow[] }): boolean => {
+  type ScrollToProps = { card: string; shown: readonly GridRow[] }
+
+  const scrollTo = ({ card, shown }: ScrollToProps): boolean => {
     const index = shown.findIndex(
       (row) => row.kind === GRID_ROWS.cards && row.cards.some(({ key }) => key === card),
     )

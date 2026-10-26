@@ -10,16 +10,18 @@ import {
 } from '@/components/UnlockDialog/UnlockDialog'
 import { renderWithProviders } from '@/test/render'
 
+type RenderDialogProps = {
+  secret?: UnlockSecret
+  hint?: string
+  unlock?: (entered: string) => Promise<unknown>
+}
+
 /** Renders the dialog for `secret`, noting each host callback in `calls` as it runs. */
 const renderDialog = ({
   secret = 'pin',
   hint,
   unlock = async () => ({ available: true, unlocked: true }),
-}: {
-  secret?: UnlockSecret
-  hint?: string
-  unlock?: (entered: string) => Promise<unknown>
-} = {}) => {
+}: RenderDialogProps = {}) => {
   const calls: string[] = []
   const entered: string[] = []
   renderWithProviders({
@@ -43,8 +45,10 @@ const renderDialog = ({
   return { calls, entered }
 }
 
+type RefusingWithProps = { status: number; message: string }
+
 const refusingWith =
-  ({ status, message }: { status: number; message: string }) =>
+  ({ status, message }: RefusingWithProps) =>
   async () => {
     throw new ApiError({ status, message })
   }
@@ -55,23 +59,24 @@ const openDialog = () => {
   return dialog
 }
 
+type WaitUntilClosedProps = { dialog: HTMLDialogElement }
+
 /**
  * Retries on a boolean, never an element: a failed `expect(element)` makes Bun print the whole
  * happy-dom node graph, which blocks the event loop for seconds and timed the tests out under load.
  */
-const waitUntilClosed = async ({ dialog }: { dialog: HTMLDialogElement }) => {
+const waitUntilClosed = async ({ dialog }: WaitUntilClosedProps) => {
   await waitFor(() => expect(dialog.open).toBe(false))
   expect(screen.queryByRole('dialog')).toBeNull()
 }
 
-/** A host that asks for the admin password, then the PIN, keying the dialog by its secret. */
-const AdminThenPin = ({
-  unlock,
-  calls,
-}: {
+type AdminThenPinProps = {
   unlock: (entered: string) => Promise<unknown>
   calls: string[]
-}) => {
+}
+
+/** A host that asks for the admin password, then the PIN, keying the dialog by its secret. */
+const AdminThenPin = ({ unlock, calls }: AdminThenPinProps) => {
   const [secret, setSecret] = useState<UnlockSecret | null>('adminPassword')
   return (
     secret && (

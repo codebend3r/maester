@@ -7,7 +7,9 @@ import { BLANK_ITEM, type FetchedItem } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
-const movie = ({ tmdbId, title }: { tmdbId: string; title: string }): FetchedItem => ({
+type MovieProps = { tmdbId: string; title: string }
+
+const movie = ({ tmdbId, title }: MovieProps): FetchedItem => ({
   ...BLANK_ITEM,
   type: 'movie',
   tmdbId,

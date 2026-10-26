@@ -41,7 +41,9 @@ export const parseVersion = (text: string): ReleaseVersion | null => {
   return { major, minor, patch }
 }
 
-export const compareVersions = ({ a, b }: { a: ReleaseVersion; b: ReleaseVersion }): number =>
+type CompareVersionsProps = { a: ReleaseVersion; b: ReleaseVersion }
+
+export const compareVersions = ({ a, b }: CompareVersionsProps): number =>
   [a.major - b.major, a.minor - b.minor, a.patch - b.patch].find(
     (difference) => difference !== 0,
   ) ?? 0
@@ -81,14 +83,13 @@ export const parseRunning = (text: string): RunningVersion | null => {
   return PRERELEASE_PATTERN.test(suffix) ? { version, isPrerelease: true } : null
 }
 
-// A prerelease sits below its own release and above everything older.
-const isNewer = ({
-  candidate,
-  running,
-}: {
+type IsNewerProps = {
   candidate: ReleaseVersion
   running: RunningVersion
-}): boolean => {
+}
+
+// A prerelease sits below its own release and above everything older.
+const isNewer = ({ candidate, running }: IsNewerProps): boolean => {
   const difference = compareVersions({ a: candidate, b: running.version })
   return difference > 0 || (difference === 0 && running.isPrerelease)
 }
@@ -107,18 +108,17 @@ const candidateOf = (release: unknown): Candidate | null => {
   return hasApp ? { version, text } : null
 }
 
+type FindUpdateProps = {
+  releases: unknown
+  current: string
+}
+
 /**
  * The highest full release that carries the dmg, against the running version. The page
  * link is built from the tag, never taken from the reply. Current only when such a release
  * was seen; with none, there is nothing to say the running version is the newest.
  */
-export const findUpdate = ({
-  releases,
-  current,
-}: {
-  releases: unknown
-  current: string
-}): UpdateCheck => {
+export const findUpdate = ({ releases, current }: FindUpdateProps): UpdateCheck => {
   if (!isList(releases)) return failed(UPDATE_PROBLEMS.unreadable)
   const highest = releases.reduce<Candidate | null>((best, release) => {
     const candidate = candidateOf(release)
@@ -145,18 +145,17 @@ const LINK_PATTERN = /<([^<>]*)>\s*;\s*rel="([^"]*)"/g
 
 const parseUrl = (text: string): URL | null => (URL.canParse(text) ? new URL(text) : null)
 
+type NextPageUrlProps = {
+  link: string | null
+  start: string
+}
+
 /**
  * The next page of the releases list from a `Link` header, only when it is the same list:
  * GitHub's own (whose next links name the repository by id) or, for the test hook, the
  * list the check started from. Null for anything else, which ends the walk.
  */
-export const nextPageUrl = ({
-  link,
-  start,
-}: {
-  link: string | null
-  start: string
-}): string | null => {
+export const nextPageUrl = ({ link, start }: NextPageUrlProps): string | null => {
   const raw =
     [...(link ?? '').matchAll(LINK_PATTERN)].find(([, , rel = '']) =>
       rel.split(' ').includes('next'),
@@ -171,10 +170,12 @@ export const nextPageUrl = ({
   return isGithubList || isStartList ? next.href : null
 }
 
-export type UpdateFetch = (input: {
+type UpdateFetchProps = {
   url: string
   init: { headers: Record<string, string>; signal: AbortSignal }
-}) => Promise<{
+}
+
+export type UpdateFetch = (input: UpdateFetchProps) => Promise<{
   status: number
   headers: { get: (name: string) => string | null }
   text: () => Promise<string>
@@ -184,13 +185,23 @@ type PageRead =
   | { ok: true; releases: unknown[]; next: string | null; chars: number }
   | { ok: false; problem: string }
 
+type LinkOfProps = { get: (name: string) => string | null }
+
 /** The header GitHub names the next page of the list in. */
-const linkOf = (headers: { get: (name: string) => string | null }): string | null => {
+const linkOf = (headers: LinkOfProps): string | null => {
   try {
     return headers.get(HTTP_HEADERS.link)
   } catch {
     return null
   }
+}
+
+type ReadPageProps = {
+  fetch: UpdateFetch
+  url: string
+  init: Parameters<UpdateFetch>[0]['init']
+  start: string
+  charsLeft: number
 }
 
 const readPage = async ({
@@ -199,13 +210,7 @@ const readPage = async ({
   init,
   start,
   charsLeft,
-}: {
-  fetch: UpdateFetch
-  url: string
-  init: Parameters<UpdateFetch>[0]['init']
-  start: string
-  charsLeft: number
-}): Promise<PageRead> => {
+}: ReadPageProps): Promise<PageRead> => {
   // Through `then`, so a fetch that throws before returning its promise is a rejection too.
   const response = await Promise.resolve()
     .then(() => fetch({ url, init }))
@@ -226,6 +231,17 @@ const readPage = async ({
   return { ok: true, releases: parsed, next, chars: text.length }
 }
 
+type WalkProps = {
+  fetch: UpdateFetch
+  url: string
+  init: Parameters<UpdateFetch>[0]['init']
+  start: string
+  current: string
+  seen: unknown[]
+  pagesLeft: number
+  charsLeft: number
+}
+
 /**
  * Pages through the list until a newer release shows, the list ends or the page bound is
  * reached. GitHub orders the list by tag name, so neither a run of build releases nor
@@ -241,16 +257,7 @@ const walk = async ({
   seen,
   pagesLeft,
   charsLeft,
-}: {
-  fetch: UpdateFetch
-  url: string
-  init: Parameters<UpdateFetch>[0]['init']
-  start: string
-  current: string
-  seen: unknown[]
-  pagesLeft: number
-  charsLeft: number
-}): Promise<UpdateCheck> => {
+}: WalkProps): Promise<UpdateCheck> => {
   const page = await readPage({ fetch, url, init, start, charsLeft })
   if (!page.ok) return failed(page.problem)
   const releases = [...seen, ...page.releases]
@@ -269,16 +276,18 @@ const walk = async ({
   })
 }
 
+type CheckForUpdatesProps = {
+  fetch: UpdateFetch
+  url: string
+  current: string
+}
+
 /** Asks GitHub for its releases, and never throws: every failure is a problem to show. */
 export const checkForUpdates = async ({
   fetch,
   url,
   current,
-}: {
-  fetch: UpdateFetch
-  url: string
-  current: string
-}): Promise<UpdateCheck> => {
+}: CheckForUpdatesProps): Promise<UpdateCheck> => {
   // One deadline for every page, so the whole check is bounded, not each request.
   const init = {
     headers: {
@@ -299,16 +308,14 @@ export const checkForUpdates = async ({
   })
 }
 
-/** Due at launch when on and never run or unreadable, a day old, or ahead of the clock. */
-export const isCheckDue = ({
-  isEnabled,
-  checkedAt,
-  now,
-}: {
+type IsCheckDueProps = {
   isEnabled: boolean
   checkedAt: number | null
   now: number
-}): boolean => {
+}
+
+/** Due at launch when on and never run or unreadable, a day old, or ahead of the clock. */
+export const isCheckDue = ({ isEnabled, checkedAt, now }: IsCheckDueProps): boolean => {
   if (!isEnabled) return false
   if (checkedAt === null || !Number.isFinite(checkedAt)) return true
   return checkedAt > now || now - checkedAt >= CHECK_INTERVAL_MS

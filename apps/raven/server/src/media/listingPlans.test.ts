@@ -12,11 +12,13 @@ import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
 const STONE: FetchedSaga = { tmdbId: '1001', name: 'The Stone Collection' }
 
-type Read = (from: {
+type ReadProps = {
   database: DatabaseService
   libraryId: number
   itemIds: readonly number[]
-}) => unknown
+}
+
+type Read = (from: ReadProps) => unknown
 
 const account = TEST_ACCOUNTS.b
 
@@ -99,8 +101,10 @@ describe.each([
   const database = testDatabase('raven-plans-')
   const state = { libraryId: 0, itemIds: new Array<number>() }
 
+  type AddMovieProps = { title: string; files: readonly string[] }
+
   /** A movie of a saga, with a file for each name, as matching leaves it. */
-  const addMovie = ({ title, files }: { title: string; files: readonly string[] }): void => {
+  const addMovie = ({ title, files }: AddMovieProps): void => {
     const { metadata } = repositories(database.get())
     const itemId = metadata.save({
       item: { ...BLANK_ITEM, type: 'movie', tmdbId: title, number: null, title, saga: STONE },

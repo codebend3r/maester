@@ -29,13 +29,12 @@ const DOCUMENTARY = {
   file: 'Dahmer on Dahmer A Serial Killer Speaks (2017) WEBDL-1080p.mp4',
 } as const
 
-const checked = <T>({
-  value,
-  guard,
-}: {
+type CheckedProps<T> = {
   value: unknown
   guard: (value: unknown) => value is T
-}): T => {
+}
+
+const checked = <T>({ value, guard }: CheckedProps<T>): T => {
   if (!guard(value)) throw new Error(`Unexpected response: ${JSON.stringify(value)}`)
   return value
 }

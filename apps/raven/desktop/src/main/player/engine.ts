@@ -10,13 +10,12 @@ export type EngineMode = (typeof ENGINE_MODES)[keyof typeof ENGINE_MODES]
 
 const ENGINE_HOOK = 'RAVEN_DESKTOP_MPV'
 
-export const engineModeFrom = ({
-  isPackaged,
-  env,
-}: {
+type EngineModeFromProps = {
   isPackaged: boolean
   env: Readonly<Record<string, string | undefined>>
-}): EngineMode => {
+}
+
+export const engineModeFrom = ({ isPackaged, env }: EngineModeFromProps): EngineMode => {
   if (isPackaged) return ENGINE_MODES.window
   const requested = env[ENGINE_HOOK]
   if (requested === ENGINE_MODES.headless || requested === ENGINE_MODES.off) return requested
@@ -25,15 +24,13 @@ export const engineModeFrom = ({
 
 const ADDON = 'raven_mpv.node'
 
-export const addonPathFor = ({
-  isPackaged,
-  appPath,
-  resourcesPath,
-}: {
+type AddonPathForProps = {
   isPackaged: boolean
   appPath: string
   resourcesPath: string
-}) => {
+}
+
+export const addonPathFor = ({ isPackaged, appPath, resourcesPath }: AddonPathForProps) => {
   if (isPackaged) return join(resourcesPath, 'mpv', 'darwin-arm64', ADDON)
   return join(appPath, '..', '..', '..', 'libs', 'raven', 'mpv', 'resources', 'darwin-arm64', ADDON)
 }
@@ -58,12 +55,14 @@ export const HEADLESS_OPTIONS = [
   { name: MPV_OPTIONS.voNullFps, value: 60 },
 ] as const satisfies readonly MpvOption[]
 
+type EngineOptionsForProps = { surface: MpvSurface }
+
 /**
  * What main sets on a surface's mpv as it opens, before the service exists. The hardened
  * options are not among them: the service sets those itself and refuses every load when
  * it cannot, whatever the surface.
  */
-export const engineOptionsFor = ({ surface }: { surface: MpvSurface }): readonly MpvOption[] => {
+export const engineOptionsFor = ({ surface }: EngineOptionsForProps): readonly MpvOption[] => {
   switch (surface.kind) {
     case MPV_SURFACE_KINDS.headless:
       return HEADLESS_OPTIONS
@@ -87,17 +86,19 @@ export type OpenedEngine<T> =
   | { status: typeof ENGINE_STATUSES.native; engine: T }
   | { status: typeof ENGINE_STATUSES.unavailable; message: string }
 
+type OpenEngineProps<T> = {
+  mode: EngineMode
+  surfaceFor: (mode: Exclude<EngineMode, typeof ENGINE_MODES.off>) => MpvSurface
+  open: (surface: MpvSurface) => Promise<T>
+  warn: (message: string) => void
+}
+
 export const openEngine = async <T>({
   mode,
   surfaceFor,
   open,
   warn,
-}: {
-  mode: EngineMode
-  surfaceFor: (mode: Exclude<EngineMode, typeof ENGINE_MODES.off>) => MpvSurface
-  open: (surface: MpvSurface) => Promise<T>
-  warn: (message: string) => void
-}): Promise<OpenedEngine<T>> => {
+}: OpenEngineProps<T>): Promise<OpenedEngine<T>> => {
   if (mode === ENGINE_MODES.off) {
     return { status: ENGINE_STATUSES.unavailable, message: ENGINE_MESSAGES.off }
   }

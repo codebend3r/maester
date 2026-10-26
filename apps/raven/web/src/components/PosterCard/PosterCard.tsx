@@ -29,6 +29,16 @@ import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/PosterCard/PosterCard.module.scss'
 
+type PosterFrameProps = {
+  media: MediaItem
+  poster?: ItemSummary | null
+  sizes: PosterSizes
+  /** Off where the card's note already says. */
+  withWatched?: boolean
+  /** On where the poster is large enough to carry the heart as well. */
+  withFavourite?: boolean
+}
+
 /**
  * The picture a poster card shows, with where playback stopped along its
  * foot and its marks in the top corner: the heart for a favourite, then the
@@ -40,15 +50,7 @@ export const PosterFrame = ({
   sizes,
   withWatched = true,
   withFavourite = false,
-}: {
-  media: MediaItem
-  poster?: ItemSummary | null
-  sizes: PosterSizes
-  /** Off where the card's note already says. */
-  withWatched?: boolean
-  /** On where the poster is large enough to carry the heart as well. */
-  withFavourite?: boolean
-}) => (
+}: PosterFrameProps) => (
   <span className={styles.frame}>
     <PosterImage media={media} poster={poster} sizes={sizes} />
     <ResumeBar media={media} className={styles.resume} />
@@ -61,6 +63,20 @@ export const PosterFrame = ({
 
 const backdropOf = (item: ItemSummary | null | undefined): string | null =>
   item ? api.itemImageUrl({ id: item.id, kind: 'backdrop', version: item.backdropVersion }) : null
+
+type PosterCardProps = {
+  media: MediaItem
+  /** The item whose poster the card shows, when not the video's own: an episode's season. */
+  poster?: ItemSummary | null
+  /** How wide the list holding the card shows its poster. */
+  sizes: PosterSizes
+  /** What the library matches its files to, for the menu's Fix match. */
+  matchType?: MatchItemType | null
+  /** Whose score the card shows, from the library's settings. */
+  ratingsSource?: RatingSource
+  /** The order the listing is in, whose value the card shows. */
+  sort?: MediaSort
+}
 
 /**
  * A movie as a poster, its title and facts beneath. A matched card opens the
@@ -76,19 +92,7 @@ export const PosterCard = ({
   sort,
   poster,
   sizes,
-}: {
-  media: MediaItem
-  /** The item whose poster the card shows, when not the video's own: an episode's season. */
-  poster?: ItemSummary | null
-  /** How wide the list holding the card shows its poster. */
-  sizes: PosterSizes
-  /** What the library matches its files to, for the menu's Fix match. */
-  matchType?: MatchItemType | null
-  /** Whose score the card shows, from the library's settings. */
-  ratingsSource?: RatingSource
-  /** The order the listing is in, whose value the card shows. */
-  sort?: MediaSort
-}) => {
+}: PosterCardProps) => {
   const menu = useCardMenu({ media, matchType })
   // The card's poster item's backdrop, else the video's own.
   const hover = useHoverBackdrop(backdropOf(poster) ?? backdropOf(media.item))

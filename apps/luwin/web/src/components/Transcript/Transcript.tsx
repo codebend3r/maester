@@ -5,7 +5,9 @@ import styles from '@/components/Transcript/Transcript.module.scss'
 import { ENTRY_KINDS, type Entry } from '@/lib/entries'
 import { useChat } from '@/stores/chat'
 
-const EntryView = ({ entry }: { entry: Entry }) => {
+type EntryViewProps = { entry: Entry }
+
+const EntryView = ({ entry }: EntryViewProps) => {
   switch (entry.kind) {
     case ENTRY_KINDS.said:
       return <p className={styles.said}>{entry.text}</p>

@@ -9,14 +9,16 @@ import {
 } from '@raven/core'
 import { useState } from 'react'
 
+type UseTableSortProps<T, K extends string> = {
+  rows: readonly T[]
+  columns: Record<K, SortColumn<T>>
+}
+
 /** Click-to-sort state for a table whose rows are all loaded. */
 export const useTableSort = <T, K extends string>({
   rows,
   columns,
-}: {
-  rows: readonly T[]
-  columns: Record<K, SortColumn<T>>
-}): {
+}: UseTableSortProps<T, K>): {
   sorted: T[]
   active: ActiveSort<K> | null
   toggle: (key: K) => void

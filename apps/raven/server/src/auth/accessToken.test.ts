@@ -6,11 +6,9 @@ const TOKEN = 'test-access-token'
 const session = `base64-${Buffer.from(JSON.stringify({ access_token: TOKEN, refresh_token: 'never-returned' })).toString(AUTH_ENCODINGS.base64url)}`
 const cookie = `${AUTH_COOKIE}=${session}`
 
-const read = ({
-  authorization,
-  header = cookie,
-  method = AUTH_METHODS.get,
-}: { authorization?: string; header?: string; method?: string } = {}) =>
+type ReadProps = { authorization?: string; header?: string; method?: string }
+
+const read = ({ authorization, header = cookie, method = AUTH_METHODS.get }: ReadProps = {}) =>
   accessTokenOf({ method, authorization, cookie: header })
 
 describe('raven access token boundary', () => {

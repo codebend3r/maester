@@ -6,20 +6,18 @@ import { Loading } from '@/components/Skeleton/Skeleton'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/components/RouteState/RouteState.module.scss'
 
+type RouteStateProps = {
+  state: RoutePending
+  noun: string
+  shape: ReactNode
+}
+
 /**
  * What a page shows while what its address names is missing, failing or on
  * its way; on its way, `shape` stands in for the page in grey. A failure is
  * a panel with the reason in it, under the way back.
  */
-export const RouteState = ({
-  state,
-  noun,
-  shape,
-}: {
-  state: RoutePending
-  noun: string
-  shape: ReactNode
-}) => {
+export const RouteState = ({ state, noun, shape }: RouteStateProps) => {
   switch (state.state) {
     case ROUTE_STATES.missing:
       return <NotFoundPage />

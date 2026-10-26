@@ -8,14 +8,13 @@ import { itemSummary, mediaItem, showEntry } from '@/test/fixtures'
 const strip = (scale: ReturnType<typeof jumpScale>): string[] =>
   scale?.marks.map((mark) => (scale.entries.has(mark.key) ? mark.label : `(${mark.label})`)) ?? []
 
-/** The entries under the mark labelled `label`. */
-const under = ({
-  scale,
-  label,
-}: {
+type UnderProps = {
   scale: ReturnType<typeof jumpScale>
   label: string
-}): string[] => {
+}
+
+/** The entries under the mark labelled `label`. */
+const under = ({ scale, label }: UnderProps): string[] => {
   const mark = scale?.marks.find((each) => each.label === label)
   return [...(scale?.entries.get(mark?.key ?? '') ?? [])]
 }
@@ -139,7 +138,9 @@ describe('jumpScale', () => {
   })
 
   it("steps scores by whole points, written the way the library's source writes them", () => {
-    const rated = ({ value, id }: { value: number; id: number }) =>
+    type RatedProps = { value: number; id: number }
+
+    const rated = ({ value, id }: RatedProps) =>
       movie({
         id,
         item: itemSummary({

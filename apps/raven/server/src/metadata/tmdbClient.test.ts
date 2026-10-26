@@ -26,15 +26,14 @@ const respond =
     return next()
   }
 
-const json = ({
-  body,
-  status = 200,
-  headers = {},
-}: {
+type JsonProps = {
   body: unknown
   status?: number
   headers?: Record<string, string>
-}) => new Response(JSON.stringify(body), { status, headers })
+}
+
+const json = ({ body, status = 200, headers = {} }: JsonProps) =>
+  new Response(JSON.stringify(body), { status, headers })
 
 describe('TmdbClient', () => {
   it('reads a movie with its credits, rating, content rating and pictures', async () => {
@@ -128,7 +127,9 @@ describe('TmdbClient', () => {
   })
 
   it('takes a logo with no language when none is in the language, and never an SVG', () => {
-    const logo = ({ path, language }: { path: string; language: string | null }) => ({
+    type LogoProps = { path: string; language: string | null }
+
+    const logo = ({ path, language }: LogoProps) => ({
       file_path: path,
       iso_639_1: language,
     })
@@ -563,7 +564,9 @@ describe('toPerson and person', () => {
     title: 'A Film',
     ...fields,
   })
-  const withCredits = ({ cast = [], crew = [] }: { cast?: unknown[]; crew?: unknown[] }) => ({
+  type WithCreditsProps = { cast?: unknown[]; crew?: unknown[] }
+
+  const withCredits = ({ cast = [], crew = [] }: WithCreditsProps) => ({
     id: 5,
     name: 'Someone',
     combined_credits: { cast, crew },

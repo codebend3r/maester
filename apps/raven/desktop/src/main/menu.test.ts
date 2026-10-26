@@ -2,7 +2,9 @@ import { DESKTOP_EVENTS, type DesktopEvent, PAGE_PATHS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { type MenuEntry, menuTemplate } from '@/main/menu'
 
-const setup = ({ isDevelopment = false }: { isDevelopment?: boolean } = {}) => {
+type SetupProps = { isDevelopment?: boolean }
+
+const setup = ({ isDevelopment = false }: SetupProps = {}) => {
   const sent: DesktopEvent[] = []
   const dialogs = { opened: 0 }
   const devTools = { toggles: 0 }
@@ -41,13 +43,12 @@ const setup = ({ isDevelopment = false }: { isDevelopment?: boolean } = {}) => {
 const everyItem = (entries: readonly MenuEntry[]): MenuEntry[] =>
   entries.flatMap((entry) => [entry, ...everyItem(entry.submenu ?? [])])
 
-const topLevel = ({
-  template,
-  name,
-}: {
+type TopLevelProps = {
   template: readonly MenuEntry[]
   name: string
-}): MenuEntry => {
+}
+
+const topLevel = ({ template, name }: TopLevelProps): MenuEntry => {
   const found = template.find((entry) => (entry.label ?? entry.role) === name)
   if (found === undefined) throw new Error(`no ${name} menu`)
   return found
@@ -58,7 +59,9 @@ const click = (entry: MenuEntry): void => {
   entry.click()
 }
 
-const itemOf = ({ menu, label }: { menu: MenuEntry; label: string }): MenuEntry => {
+type ItemOfProps = { menu: MenuEntry; label: string }
+
+const itemOf = ({ menu, label }: ItemOfProps): MenuEntry => {
   const found = (menu.submenu ?? []).find((entry) => entry.label === label)
   if (found === undefined) throw new Error(`no ${label} item`)
   return found

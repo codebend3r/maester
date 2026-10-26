@@ -10,15 +10,17 @@ import { renderWithProviders } from '@/test/render'
 
 const ACCEPT = 'Accept Archie: The Man Who Became Cary Grant (2023) for Archie'
 
+type CardProps = {
+  accept?: (tmdbId: string) => Promise<unknown>
+  onFix?: () => void
+  suggestion?: AiSuggestion
+}
+
 const card = ({
   accept = async () => undefined,
   onFix = () => undefined,
   suggestion = aiSuggestion(),
-}: {
-  accept?: (tmdbId: string) => Promise<unknown>
-  onFix?: () => void
-  suggestion?: AiSuggestion
-} = {}) =>
+}: CardProps = {}) =>
   renderWithProviders({
     ui: <AiSuggestionCard suggestion={suggestion} subject="Archie" accept={accept} onFix={onFix} />,
   })

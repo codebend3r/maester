@@ -4,12 +4,14 @@ import { SearchField } from '@/components/SearchField/SearchField'
 import { useAddressSearch } from '@/lib/useSearch'
 import styles from '@/components/SiteSearch/SiteSearch.module.scss'
 
+type SiteSearchProps = { className?: string }
+
 /**
  * The search through every library at the top of every page. Its results
  * are home's: on home the box rides in the address as `?q=`, and anywhere
  * else a search opens home on it.
  */
-export const SiteSearch = ({ className }: { className?: string }) => {
+export const SiteSearch = ({ className }: SiteSearchProps) => {
   const id = useId()
   const search = useAddressSearch({ page: '/' })
   return (

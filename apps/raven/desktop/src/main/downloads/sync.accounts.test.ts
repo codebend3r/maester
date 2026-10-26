@@ -11,13 +11,12 @@ describe('what an account watched', () => {
   const asA: Pending = { play: true, position: 300, furthest: 300, at: NOW, accountId: ACCOUNT_A }
   const asB: Pending = { ...asA, position: 40, furthest: 40, accountId: ACCOUNT_B }
   const playOf = (mediaId: number): AllowedCall => ({ name: CALL_NAMES.recordPlay, mediaId })
-  const progressOf = ({
-    mediaId,
-    position,
-  }: {
+  type ProgressOfProps = {
     mediaId: number
     position: number
-  }): AllowedCall => ({
+  }
+
+  const progressOf = ({ mediaId, position }: ProgressOfProps): AllowedCall => ({
     name: CALL_NAMES.saveProgress,
     mediaId,
     position,

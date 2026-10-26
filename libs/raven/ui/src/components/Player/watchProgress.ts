@@ -11,6 +11,15 @@ type ProgressStep = {
   saveAt: number | null
 }
 
+type ProgressStepOfProps = {
+  state: VideoState
+  previous: VideoState
+  hasStarted: boolean
+  lastSaved: number
+  position: number
+  duration: number | null
+}
+
 /**
  * Whether playback has just started and what to save, from one state to the next. Nothing is
  * saved before it starts, so a player that never played leaves the resume spot alone. The end
@@ -24,14 +33,7 @@ export const progressStepOf = ({
   lastSaved,
   position,
   duration,
-}: {
-  state: VideoState
-  previous: VideoState
-  hasStarted: boolean
-  lastSaved: number
-  position: number
-  duration: number | null
-}): ProgressStep => {
+}: ProgressStepOfProps): ProgressStep => {
   const isStarting = !hasStarted && !state.paused && !state.waiting
   const at = (() => {
     if (!hasStarted && !isStarting) return null

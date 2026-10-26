@@ -56,7 +56,9 @@ let folder = ''
 let clock = 1_800_000_000_000
 let fixture: FixtureServer | null = null
 
-const start = async ({ accounts }: { accounts: FixtureAccounts }) => {
+type StartProps = { accounts: FixtureAccounts }
+
+const start = async ({ accounts }: StartProps) => {
   const clip = join(folder, 'clip.mkv')
   await writeFile(clip, Buffer.alloc(256, 7))
   const started = await startFixtureServer({
@@ -72,15 +74,13 @@ const bearer = (token: string) => ({ [AUTH_HEADERS.authorization]: `${AUTH_SCHEM
 
 const jsonOf = async (response: Response): Promise<unknown> => response.json()
 
-const grant = ({
-  server,
-  kind,
-  body,
-}: {
+type GrantProps = {
   server: FixtureServer
   kind: string
   body: Record<string, string>
-}) =>
+}
+
+const grant = ({ server, kind, body }: GrantProps) =>
   fetch(`${server.origin}${AUTH_V1.token}?${GRANT_PARAM}=${kind}`, {
     method: SERVER_METHODS.post,
     headers: JSON_HEADERS,
@@ -103,7 +103,9 @@ const signIn = async (server: FixtureServer) => {
 const ticketPathOf = (mediaId: number) =>
   AUTH_PATHS.ticket.replace(`:${AUTH_PARAMS.id}`, String(mediaId))
 
-const logout = ({ server, access }: { server: FixtureServer; access: string }) =>
+type LogoutProps = { server: FixtureServer; access: string }
+
+const logout = ({ server, access }: LogoutProps) =>
   fetch(`${server.origin}${AUTH_V1.logout}`, {
     method: SERVER_METHODS.post,
     headers: bearer(access),
@@ -119,7 +121,9 @@ const unlockCookie = async (server: FixtureServer) => {
   return (response.headers.get(HTTP_HEADERS.setCookie) ?? '').split(';')[0] ?? ''
 }
 
-const mint = async ({ server, access }: { server: FixtureServer; access: string }) => {
+type MintProps = { server: FixtureServer; access: string }
+
+const mint = async ({ server, access }: MintProps) => {
   const response = await fetch(`${server.origin}${ticketPathOf(FIXTURE_MEDIA.first)}`, {
     method: SERVER_METHODS.post,
     headers: { ...bearer(access), [AUTH_HEADERS.cookie]: await unlockCookie(server) },
@@ -127,22 +131,25 @@ const mint = async ({ server, access }: { server: FixtureServer; access: string 
   return { response, body: await jsonOf(response) }
 }
 
-const fileWith = ({
-  server,
-  ticket,
-  mediaId = FIXTURE_MEDIA.first,
-}: {
+type FileWithProps = {
   server: FixtureServer
   ticket: string
   mediaId?: number
-}) => fetch(`${server.origin}${MEDIA_PATHS.file(mediaId)}?${MEDIA_TICKET_PARAM}=${ticket}`)
+}
 
-const sidecarWith = ({ server, ticket }: { server: FixtureServer; ticket: string }) =>
+const fileWith = ({ server, ticket, mediaId = FIXTURE_MEDIA.first }: FileWithProps) =>
+  fetch(`${server.origin}${MEDIA_PATHS.file(mediaId)}?${MEDIA_TICKET_PARAM}=${ticket}`)
+
+type SidecarWithProps = { server: FixtureServer; ticket: string }
+
+const sidecarWith = ({ server, ticket }: SidecarWithProps) =>
   fetch(
     `${server.origin}${MEDIA_PATHS.sidecar(FIXTURE_MEDIA.first)}?${MEDIA_TICKET_PARAM}=${ticket}`,
   )
 
-const ticketOf = async ({ server, access }: { server: FixtureServer; access: string }) => {
+type TicketOfProps = { server: FixtureServer; access: string }
+
+const ticketOf = async ({ server, access }: TicketOfProps) => {
   const { body } = await mint({ server, access })
   if (!isMediaTicket(body)) throw new Error('No ticket')
   return body

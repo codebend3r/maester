@@ -7,8 +7,10 @@ import { HTTP_HEADERS } from '@/shared/httpHeaders'
 export const ORIGIN = 'http://192.168.1.5:3000'
 export const MINUTE = 60_000
 
+type FsErrorProps = { code: string; syscall?: string }
+
 /** A Node file system error, as `errorText` reads one. */
-export const fsError = ({ code, syscall = 'open' }: { code: string; syscall?: string }): Error =>
+export const fsError = ({ code, syscall = 'open' }: FsErrorProps): Error =>
   Object.assign(new Error(`${code}: failed, ${syscall} '/data/downloads/secret'`), {
     code,
     syscall,
@@ -33,8 +35,9 @@ export const ticks = async (count: number): Promise<void> => {
 
 const parentOf = (path: string): string => path.slice(0, path.lastIndexOf('/'))
 
-const isUnder = ({ path, dir }: { path: string; dir: string }): boolean =>
-  path === dir || path.startsWith(`${dir}/`)
+type IsUnderProps = { path: string; dir: string }
+
+const isUnder = ({ path, dir }: IsUnderProps): boolean => path === dir || path.startsWith(`${dir}/`)
 
 /**
  * The downloads folder in memory: binary files as chunks, subtitles as text, folders as
@@ -166,22 +169,19 @@ export const brokenBody = (chunks: Uint8Array[]): ReadableStream<Uint8Array> => 
 const rangeStartOf = (headers: Record<string, string>): number =>
   Number(/^bytes=(\d+)-$/u.exec(headers.Range ?? '')?.[1] ?? 0)
 
+type AnswerFromProps = {
+  request: FetchRequest
+  size: number
+  sent: number
+  bodyOf: (chunks: Uint8Array[]) => ReadableStream<Uint8Array>
+}
+
 /**
  * A file of `size` bytes served from the request's `Range`, 206 for a range and 200 for the
  * whole, with the length of the rest promised: `sent` of the bytes asked for go into the body
  * `bodyOf` makes.
  */
-const answerFrom = ({
-  request,
-  size,
-  sent,
-  bodyOf,
-}: {
-  request: FetchRequest
-  size: number
-  sent: number
-  bodyOf: (chunks: Uint8Array[]) => ReadableStream<Uint8Array>
-}): Answer => {
+const answerFrom = ({ request, size, sent, bodyOf }: AnswerFromProps): Answer => {
   const from = rangeStartOf(request.headers)
   const length = Math.min(sent, size - from)
   const body = bodyOf(length > 0 ? [new Uint8Array(length)] : [])
@@ -195,15 +195,19 @@ const answerFrom = ({
       }
 }
 
+type ServingProps = { size: number; sent?: number; isEnding?: boolean }
+
 /** `sent` of the bytes asked for arrive, then the body ends when `isEnding`, or waits. */
 export const serving =
-  ({ size, sent = size, isEnding = true }: { size: number; sent?: number; isEnding?: boolean }) =>
+  ({ size, sent = size, isEnding = true }: ServingProps) =>
   (request: FetchRequest): Answer =>
     answerFrom({ request, size, sent, bodyOf: isEnding ? whole : held })
 
+type CuttingProps = { size: number; sent: number }
+
 /** `sent` of the bytes asked for arrive, then the server ends the response mid-file. */
 export const cutting =
-  ({ size, sent }: { size: number; sent: number }) =>
+  ({ size, sent }: CuttingProps) =>
   (request: FetchRequest): Answer =>
     answerFrom({ request, size, sent, bodyOf: brokenBody })
 

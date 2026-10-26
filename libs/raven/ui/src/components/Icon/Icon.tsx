@@ -72,20 +72,30 @@ export type IconName =
  */
 type Drawing = { stroke: string; fill?: string; marks?: string }
 
-const roundRect = ({ x, y, w, h, r }: { x: number; y: number; w: number; h: number; r: number }) =>
+type RoundRectProps = { x: number; y: number; w: number; h: number; r: number }
+
+const roundRect = ({ x, y, w, h, r }: RoundRectProps) =>
   `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 -${r} ${r}h-${w - 2 * r}a${r} ${r} 0 0 1 -${r} -${r}v-${h - 2 * r}a${r} ${r} 0 0 1 ${r} -${r}z`
 
-const circle = ({ cx, cy, r }: { cx: number; cy: number; r: number }) =>
+type CircleProps = { cx: number; cy: number; r: number }
+
+const circle = ({ cx, cy, r }: CircleProps) =>
   `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 -${2 * r} 0z`
 
+type SparkProps = { cx: number; cy: number; r: number }
+
 /** A four-pointed spark, the mark inside the anime icons and the wand. */
-const spark = ({ cx, cy, r }: { cx: number; cy: number; r: number }) =>
+const spark = ({ cx, cy, r }: SparkProps) =>
   `M${cx} ${cy - r}c${r * 0.15} ${r * 0.6} ${r * 0.4} ${r * 0.85} ${r} ${r}c-${r * 0.6} ${r * 0.15} -${r * 0.85} ${r * 0.4} -${r} ${r}c-${r * 0.15} -${r * 0.6} -${r * 0.4} -${r * 0.85} -${r} -${r}c${r * 0.6} -${r * 0.15} ${r * 0.85} -${r * 0.4} ${r} -${r}z`
 
-const smallHeart = ({ cx, cy }: { cx: number; cy: number }) =>
+type SmallHeartProps = { cx: number; cy: number }
+
+const smallHeart = ({ cx, cy }: SmallHeartProps) =>
   `M${cx} ${cy + 2.3}s-3-1.9-3-4a1.6 1.6 0 0 1 3-.9 1.6 1.6 0 0 1 3 .9c0 2.1-3 4-3 4z`
 
-const smallPlay = ({ x, y, h }: { x: number; y: number; h: number }) =>
+type SmallPlayProps = { x: number; y: number; h: number }
+
+const smallPlay = ({ x, y, h }: SmallPlayProps) =>
   `M${x} ${y + 0.5}v${h - 1}a.6.6 0 0 0 .9.5l${h * 0.8} -${h / 2 - 0.5}a.6.6 0 0 0 0-1l-${h * 0.8} -${h / 2 - 0.5}a.6.6 0 0 0 -.9.5z`
 
 // The frames the film and TV icons share; each variant draws its mark inside one.
@@ -388,13 +398,15 @@ export const ICON_NAMES: readonly IconName[] = Object.keys(DRAWINGS).filter(isIc
 /** How wide an icon is: pixels, or ems of the text it sits in, to grow and shrink with it. */
 export type IconSize = number | `${number}em`
 
+type IconProps = { name: IconName; size?: IconSize }
+
 /**
  * Line icons with a soft tint under their main shape, which doubles while
  * the control around them is pointed at; a control marks itself current by
  * setting `--icon-tint`. Decorative by default: pair them with text or an
  * aria-label on the control.
  */
-export const Icon = ({ name, size = 20 }: { name: IconName; size?: IconSize }) => {
+export const Icon = ({ name, size = 20 }: IconProps) => {
   const { stroke, fill, marks } = DRAWINGS[name]
   return (
     <svg

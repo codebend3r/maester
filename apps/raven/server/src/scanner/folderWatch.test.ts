@@ -4,14 +4,13 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { type WatchFolder, type Watching, watchEachFolder, watchTree } from '@/scanner/folderWatch'
 
-/** Resolves once `check` holds, polling, or fails after `ms`. */
-const eventually = async ({
-  check,
-  ms = 5_000,
-}: {
+type EventuallyProps = {
   check: () => boolean
   ms?: number
-}): Promise<void> => {
+}
+
+/** Resolves once `check` holds, polling, or fails after `ms`. */
+const eventually = async ({ check, ms = 5_000 }: EventuallyProps): Promise<void> => {
   const until = Date.now() + ms
   const poll = async (): Promise<void> => {
     if (check()) return

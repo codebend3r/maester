@@ -15,6 +15,14 @@ const Address = () => {
   return <p data-testid="address">{`${pathname}${search}`}</p>
 }
 
+type RenderLibraryPageProps = {
+  route?: string
+  behind?: string[]
+  libraries?: Library[] | null
+  adminLock?: AdminLock
+  account?: Account
+}
+
 /**
  * Opens a library's page at `route`, routed as the app routes it: All at
  * the library's own address, each other tab beneath it, and the player.
@@ -29,13 +37,7 @@ export const renderLibraryPage = ({
   libraries = null,
   adminLock,
   account,
-}: {
-  route?: string
-  behind?: string[]
-  libraries?: Library[] | null
-  adminLock?: AdminLock
-  account?: Account
-} = {}) =>
+}: RenderLibraryPageProps = {}) =>
   renderWithProviders({
     ui: (
       <>

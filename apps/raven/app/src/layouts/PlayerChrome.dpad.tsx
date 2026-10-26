@@ -62,11 +62,13 @@ const useRemote = (respond: (event: TVRemoteEvent) => void) => {
   useTVEventHandler(listener)
 }
 
+type UseFadeProps = { isVisible: boolean; isReduced: boolean }
+
 /**
  * The controls' opacity, and whether they are drawn: they fade in as they appear and are drawn
  * until they have faded out, or appear and go at once when the system asks for less motion.
  */
-const useFade = ({ isVisible, isReduced }: { isVisible: boolean; isReduced: boolean }) => {
+const useFade = ({ isVisible, isReduced }: UseFadeProps) => {
   const [opacity] = useState(() => new Animated.Value(isVisible ? 1 : 0))
   // Where the last fade came to rest: the controls stay drawn while one runs out from it.
   const [hasRestedVisible, setRestedVisible] = useState(isVisible)
@@ -85,6 +87,12 @@ const useFade = ({ isVisible, isReduced }: { isVisible: boolean; isReduced: bool
   return { opacity, isDrawn: isVisible || (!isReduced && hasRestedVisible) }
 }
 
+type ScrubberProps = {
+  view: Focusable
+  transport: Transport
+  onScrubbing: (isScrubbing: boolean) => void
+}
+
 /**
  * Where the video is, as a line the remote stands on: while it has the focus, left and right
  * skip ten seconds (the chrome hears them) and a press plays or pauses. It asks for the focus as
@@ -92,15 +100,7 @@ const useFade = ({ isVisible, isReduced }: { isVisible: boolean; isReduced: bool
  * still sliding in, when only the preferred focus, set with the view, takes. TalkBack reads it as
  * the time of the length and skips by its own gesture.
  */
-const Scrubber = ({
-  view,
-  transport,
-  onScrubbing,
-}: {
-  view: Focusable
-  transport: Transport
-  onScrubbing: (isScrubbing: boolean) => void
-}) => {
+const Scrubber = ({ view, transport, onScrubbing }: ScrubberProps) => {
   const [isOpening, setOpening] = useState(true)
   const { position, onSeek, onTogglePlay } = transport
   const styles = useStyles()
@@ -222,8 +222,10 @@ const Controls = ({
   )
 }
 
+type ControlsCatcherProps = { onPress: () => void }
+
 /** While the controls are hidden, the one thing on screen to hold the remote's focus. */
-const ControlsCatcher = ({ onPress }: { onPress: () => void }) => {
+const ControlsCatcher = ({ onPress }: ControlsCatcherProps) => {
   const catcher: Focusable = useRef(null)
   useFocusOnMount({ view: catcher })
   return (

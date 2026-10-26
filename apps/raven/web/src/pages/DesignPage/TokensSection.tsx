@@ -5,8 +5,10 @@ import styles from '@/pages/DesignPage/TokensSection.module.scss'
 
 const SAMPLE_TEXT = 'The raven reads every folder'
 
+type TokenSampleProps = { name: string; sample: Sample }
+
 /** A token drawn at its true size, read through var() so it is the live value. */
-const TokenSample = ({ name, sample }: { name: string; sample: Sample }) => {
+const TokenSample = ({ name, sample }: TokenSampleProps) => {
   const value = `var(${name})`
   switch (sample) {
     case SAMPLES.bar:
@@ -86,7 +88,9 @@ const TokenSample = ({ name, sample }: { name: string; sample: Sample }) => {
   }
 }
 
-export const TokensSection = ({ tokens }: { tokens: readonly DesignToken[] }) => (
+type TokensSectionProps = { tokens: readonly DesignToken[] }
+
+export const TokensSection = ({ tokens }: TokensSectionProps) => (
   <DesignSection
     id="tokens"
     intro="Read straight from globals.scss, so a token added there shows up here, drawn at its true size. Component styles use only these values. Point at an easing curve to see it move."

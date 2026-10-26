@@ -2,16 +2,14 @@ import { type MediaItem, RESOLUTIONS, type Resolution, resolutionLabel } from '@
 import type { ReactNode } from 'react'
 import styles from '@/components/ResolutionChip/ResolutionChip.module.scss'
 
-/** A short label on glass over a picture: a resolution, HDR. */
-export const PictureChip = ({
-  label,
-  className,
-  children,
-}: {
+type PictureChipProps = {
   label?: string
   className?: string
   children: ReactNode
-}) => (
+}
+
+/** A short label on glass over a picture: a resolution, HDR. */
+export const PictureChip = ({ label, className, children }: PictureChipProps) => (
   <span className={className ? `${styles.chip} ${className}` : styles.chip} aria-label={label}>
     {children}
   </span>
@@ -28,8 +26,10 @@ const TIERS: Record<Resolution, string | undefined> = {
   [RESOLUTIONS.uhd8k]: styles.uhd8k,
 }
 
+type ResolutionChipProps = { media: MediaItem }
+
 /** A video's resolution as a compact mark over its picture, coloured by its tier. */
-export const ResolutionChip = ({ media }: { media: MediaItem }) => {
+export const ResolutionChip = ({ media }: ResolutionChipProps) => {
   const resolution = resolutionLabel(media)
   if (resolution == null) return null
   return (

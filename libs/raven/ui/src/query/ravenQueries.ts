@@ -33,6 +33,20 @@ const LIVE_STREAMS_POLL_MS = 2000
  */
 export const ravenQueriesFor = (api: ApiClient) => {
   const playerQueries = playerQueriesFor(api)
+  type RavenQueriesForHistoryQueryProps = {
+    libraryId: number | null
+    show: HistoryShow
+    limit: number
+  }
+
+  type RavenQueriesForMatchSearchQueryProps = {
+    type: MatchItemType
+    query: string
+    year: number | null
+    libraryId: number | null
+    subject: MatchSubject | null
+  }
+
   return {
     librariesQuery: queryOptions({
       queryKey: queryKeys.libraries,
@@ -61,15 +75,7 @@ export const ravenQueriesFor = (api: ApiClient) => {
         placeholderData: keepPreviousData,
       }),
 
-    historyQuery: ({
-      libraryId,
-      show,
-      limit,
-    }: {
-      libraryId: number | null
-      show: HistoryShow
-      limit: number
-    }) =>
+    historyQuery: ({ libraryId, show, limit }: RavenQueriesForHistoryQueryProps) =>
       queryOptions({
         queryKey: queryKeys.history({ libraryId, show, limit }),
         queryFn:
@@ -213,13 +219,7 @@ export const ravenQueriesFor = (api: ApiClient) => {
       year,
       libraryId,
       subject,
-    }: {
-      type: MatchItemType
-      query: string
-      year: number | null
-      libraryId: number | null
-      subject: MatchSubject | null
-    }) =>
+    }: RavenQueriesForMatchSearchQueryProps) =>
       queryOptions({
         queryKey: queryKeys.matchSearch({ type, query, year, libraryId, subject }),
         queryFn:

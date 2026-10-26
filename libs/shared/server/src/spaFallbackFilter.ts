@@ -3,6 +3,11 @@ import { type ArgumentsHost, Catch, type ExceptionFilter, NotFoundException } fr
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@/http'
 
+type SpaFallbackFilterProps = {
+  indexPath: string | null
+  serverPrefixes: readonly string[]
+}
+
 /**
  * Client-side routes have no file behind them, so any GET outside the
  * server's own prefixes that would 404 gets the web app's index.html and the
@@ -16,13 +21,7 @@ export class SpaFallbackFilter implements ExceptionFilter {
   private readonly indexPath: string | null
   private readonly serverPrefixes: readonly string[]
 
-  constructor({
-    indexPath,
-    serverPrefixes,
-  }: {
-    indexPath: string | null
-    serverPrefixes: readonly string[]
-  }) {
+  constructor({ indexPath, serverPrefixes }: SpaFallbackFilterProps) {
     this.indexPath = indexPath
     this.serverPrefixes = serverPrefixes
   }

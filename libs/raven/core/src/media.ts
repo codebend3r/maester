@@ -64,14 +64,13 @@ export const RESOLUTIONS = {
 
 export type Resolution = (typeof RESOLUTIONS)[keyof typeof RESOLUTIONS]
 
-/** "8K", "4K", "1080p", "720p", "480p", "320p" or "SD", from the frame size. */
-export const resolutionLabel = ({
-  width,
-  height,
-}: {
+type ResolutionLabelProps = {
   width: number | null
   height: number | null
-}): Resolution | null => {
+}
+
+/** "8K", "4K", "1080p", "720p", "480p", "320p" or "SD", from the frame size. */
+export const resolutionLabel = ({ width, height }: ResolutionLabelProps): Resolution | null => {
   if (width == null || height == null) return null
   // Scope and letterboxed encodes shave height, so width decides as well:
   // 1920x800 is a 1080p file, not a 800p one.

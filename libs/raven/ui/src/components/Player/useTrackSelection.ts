@@ -26,17 +26,16 @@ export type TrackSelection = {
   pickSubtitle: (id: string | null) => void
 }
 
+type UseTrackSelectionProps = {
+  mediaId: number
+  api: ApiClient
+}
+
 /**
  * Which audio and subtitle tracks play. A pick by hand wins over the
  * remembered preferences, and is remembered for the next video.
  */
-export const useTrackSelection = ({
-  mediaId,
-  api,
-}: {
-  mediaId: number
-  api: ApiClient
-}): TrackSelection => {
+export const useTrackSelection = ({ mediaId, api }: UseTrackSelectionProps): TrackSelection => {
   const audioLanguage = usePlayerPrefs((prefs) => prefs.audioLanguage)
   const subtitlePrefs = usePlayerPrefs((prefs) => prefs.subtitles)
   const setAudioLanguage = usePlayerPrefs((prefs) => prefs.setAudioLanguage)

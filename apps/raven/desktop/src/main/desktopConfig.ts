@@ -88,8 +88,10 @@ const NO_CONFIG: StoredConfig = { version: 1, output: DEFAULT_OUTPUT_SETTINGS }
  */
 export type FixedServer = { origin: string; aliases: readonly string[] }
 
+type NamesServerProps = { server: FixedServer; origin: string }
+
 /** Whether `origin` names the fixed server: its own origin, or one of its aliases. */
-export const namesServer = ({ server, origin }: { server: FixedServer; origin: string }): boolean =>
+export const namesServer = ({ server, origin }: NamesServerProps): boolean =>
   origin === server.origin || server.aliases.includes(origin)
 
 /** The server as main reads it, with the name Raven says. */
@@ -98,45 +100,42 @@ export const serverOf = (config: DesktopConfig): ServerEntry => ({
   name: SERVER_NAME,
 })
 
-/** The server when `serverId` is its id; null for any other, such as a server an older version kept. */
-export const serverById = ({
-  config,
-  serverId,
-}: {
+type ServerByIdProps = {
   config: DesktopConfig
   serverId: string
-}): ServerEntry | null => (config.server.id === serverId ? serverOf(config) : null)
+}
 
-export const setOutput = ({
-  config,
-  output,
-}: {
+/** The server when `serverId` is its id; null for any other, such as a server an older version kept. */
+export const serverById = ({ config, serverId }: ServerByIdProps): ServerEntry | null =>
+  config.server.id === serverId ? serverOf(config) : null
+
+type SetOutputProps = {
   config: DesktopConfig
   output: OutputSettings
-}): DesktopConfig => ({
+}
+
+export const setOutput = ({ config, output }: SetOutputProps): DesktopConfig => ({
   ...config,
   output,
 })
 
-/** The account the page signed in with now, kept as the last one. */
-export const setLastAccount = ({
-  config,
-  accountId,
-}: {
+type SetLastAccountProps = {
   config: DesktopConfig
   accountId: string
-}): DesktopConfig => ({
+}
+
+/** The account the page signed in with now, kept as the last one. */
+export const setLastAccount = ({ config, accountId }: SetLastAccountProps): DesktopConfig => ({
   ...config,
   lastAccountId: accountId,
 })
 
-export const setUpdates = ({
-  config,
-  updates,
-}: {
+type SetUpdatesProps = {
   config: DesktopConfig
   updates: UpdateSettings
-}): DesktopConfig => ({
+}
+
+export const setUpdates = ({ config, updates }: SetUpdatesProps): DesktopConfig => ({
   ...config,
   updates,
 })
@@ -156,19 +155,17 @@ export const pickOutput = (output: OutputSettings): OutputSettings => ({
  */
 export type UpgradedConfig = { config: DesktopConfig; adopted: string[]; isChanged: boolean }
 
+type FromListProps = {
+  servers: readonly ServerRecord[]
+  server: FixedServer
+  newId: () => string
+}
+
 /**
  * The id the fixed server goes by: the first kept server that names it, so its downloads keep
  * their files, owed plays and sync; else a new one. The other servers that name it are adopted.
  */
-const fromList = ({
-  servers,
-  server,
-  newId,
-}: {
-  servers: readonly ServerRecord[]
-  server: FixedServer
-  newId: () => string
-}): { id: string; adopted: string[] } => {
+const fromList = ({ servers, server, newId }: FromListProps): { id: string; adopted: string[] } => {
   const ids = [
     ...new Set(servers.filter(({ origin }) => namesServer({ server, origin })).map(({ id }) => id)),
   ]
@@ -193,17 +190,19 @@ const updatesOf = (stored: StoredConfig): UpdateSettings => {
   }
 }
 
+type ConfigForProps = {
+  stored: StoredConfig
+  id: string
+  origin: string
+  lastAccountId?: string | null
+}
+
 const configFor = ({
   stored,
   id,
   origin,
   lastAccountId = null,
-}: {
-  stored: StoredConfig
-  id: string
-  origin: string
-  lastAccountId?: string | null
-}): DesktopConfig => ({
+}: ConfigForProps): DesktopConfig => ({
   version: 5,
   output: pickOutput(stored.output),
   server: { id, origin },
@@ -211,20 +210,18 @@ const configFor = ({
   lastAccountId,
 })
 
+type UpgradeConfigProps = {
+  stored: StoredConfig
+  server: FixedServer
+  newId: () => string
+}
+
 /**
  * Any version, as version 5 for the fixed server. A version 5 server keeps its id and its last
  * account whatever origin the build names now, so its downloads stay filed where they are and
  * nothing has to move: only the origin is written anew.
  */
-export const upgradeConfig = ({
-  stored,
-  server,
-  newId,
-}: {
-  stored: StoredConfig
-  server: FixedServer
-  newId: () => string
-}): UpgradedConfig => {
+export const upgradeConfig = ({ stored, server, newId }: UpgradeConfigProps): UpgradedConfig => {
   const { origin } = server
   switch (stored.version) {
     case 1:
@@ -253,19 +250,21 @@ export const upgradeConfig = ({
   }
 }
 
+type LoadConfigProps = {
+  fs: StateFs
+  file: string
+  now: () => number
+  server: FixedServer
+  newId: () => string
+}
+
 export const loadConfig = async ({
   fs,
   file,
   now,
   server,
   newId,
-}: {
-  fs: StateFs
-  file: string
-  now: () => number
-  server: FixedServer
-  newId: () => string
-}): Promise<UpgradedConfig> =>
+}: LoadConfigProps): Promise<UpgradedConfig> =>
   upgradeConfig({
     stored: await loadJson({ fs, file, now, guard: isStoredConfig, empty: NO_CONFIG }),
     server,

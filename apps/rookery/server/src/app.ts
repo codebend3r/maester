@@ -27,6 +27,13 @@ const SERVER_PREFIXES = ['/api/', '/internal/', '/auth/']
 /** Why a write was refused before reaching its route. */
 export const WRITE_ERRORS = { jsonRequired: 'json_required' } as const
 
+type CreateAppProps = {
+  config: ServerConfig
+  plexTv?: PlexTv
+  clock?: Clock
+  quiet?: boolean
+}
+
 /**
  * The configured application, not yet listening, so a test can drive it
  * through `inject` exactly as `main.ts` serves it.
@@ -36,12 +43,7 @@ export const createApp = async ({
   plexTv = new HttpPlexTv(),
   clock = systemClock,
   quiet = false,
-}: {
-  config: ServerConfig
-  plexTv?: PlexTv
-  clock?: Clock
-  quiet?: boolean
-}): Promise<NestFastifyApplication> => {
+}: CreateAppProps): Promise<NestFastifyApplication> => {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule.register({ config, plexTv, clock }),
     new FastifyAdapter(),

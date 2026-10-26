@@ -16,7 +16,9 @@ export type ResolvedTracks = {
 const CACHE_MS = 10 * 60 * 1000
 const CACHE_LIMIT = 200
 
-const sidecarTrack = ({ sidecar, index }: { sidecar: Sidecar; index: number }): SubtitleTrack => ({
+type SidecarTrackProps = { sidecar: Sidecar; index: number }
+
+const sidecarTrack = ({ sidecar, index }: SidecarTrackProps): SubtitleTrack => ({
   id: `external-${index}`,
   source: 'external',
   codec: sidecar.codec,

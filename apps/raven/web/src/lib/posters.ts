@@ -81,6 +81,11 @@ const needsOwnWidth = (sizes: PosterSizes): boolean =>
     (width) => width === POSTER_OWN_WIDTH || width < NARROWEST[sizes] * window.devicePixelRatio,
   )
 
+type PosterSourcesProps = {
+  item: Pick<ItemSummary, 'id' | 'posterVersion'>
+  sizes: PosterSizes
+}
+
 /**
  * An item's poster as an `img`'s `src`, `srcSet` and `sizes`, so the browser
  * picks the width `sizes` needs; just its `src` where it would pick that
@@ -89,10 +94,7 @@ const needsOwnWidth = (sizes: PosterSizes): boolean =>
 export const posterSources = ({
   item,
   sizes,
-}: {
-  item: Pick<ItemSummary, 'id' | 'posterVersion'>
-  sizes: PosterSizes
-}): { src: string; srcSet?: string; sizes?: PosterSizes } | null => {
+}: PosterSourcesProps): { src: string; srcSet?: string; sizes?: PosterSizes } | null => {
   const src = api.itemImageUrl({ id: item.id, kind: 'poster', version: item.posterVersion })
   if (!src) return null
   if (needsOwnWidth(sizes)) return { src }

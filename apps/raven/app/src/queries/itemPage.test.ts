@@ -19,7 +19,9 @@ const COOKIE = { [AUTH_HEADERS.cookie]: 'raven_unlock=u.1' }
 const pictures = { api: itemApi(), headersFor: () => COOKIE }
 const at = (path: string) => ({ uri: `${NAS.origin}${path}`, headers: COOKIE })
 
-const movie = ({ versions = [BUSBOYS_FILE] }: { versions?: typeof BUSBOYS.versions } = {}) =>
+type MovieProps = { versions?: typeof BUSBOYS.versions }
+
+const movie = ({ versions = [BUSBOYS_FILE] }: MovieProps = {}) =>
   playablePage({
     kind: ITEM_TYPES.movie,
     details: { ...BUSBOYS, versions },
@@ -89,13 +91,12 @@ describe('playablePage', () => {
   it("heads an episode with its show and number, its still, and the show's backdrop once read", () => {
     const [primary] = GOOD_NEWS_ABOUT_HELL.versions
     if (primary === undefined) throw new Error('the episode has a file')
-    const episode = ({
-      show = null,
-      isShowPending = false,
-    }: {
+    type EpisodeProps = {
       show?: typeof SEVERANCE | null
       isShowPending?: boolean
-    }) =>
+    }
+
+    const episode = ({ show = null, isShowPending = false }: EpisodeProps) =>
       playablePage({
         kind: ITEM_TYPES.episode,
         details: GOOD_NEWS_ABOUT_HELL,

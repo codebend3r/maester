@@ -36,21 +36,19 @@ const day = new Intl.DateTimeFormat(undefined, {
   year: 'numeric',
 })
 
+type MediaRowProps = {
+  media: MediaItem
+  movies: boolean
+  matchType: MatchItemType | null
+}
+
 /**
  * One video as a table row, its small poster or frame grab before its
  * title; a right click on either opens the row's menu. The picture is a
  * second way to the same place, so it stays out of the tab order and the
  * reading order. In a Movies library the title opens the movie's page.
  */
-const MediaRow = ({
-  media,
-  movies,
-  matchType,
-}: {
-  media: MediaItem
-  movies: boolean
-  matchType: MatchItemType | null
-}) => {
+const MediaRow = ({ media, movies, matchType }: MediaRowProps) => {
   const menu = useCardMenu({ media, matchType, inline: true })
   const { title, year } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
@@ -137,7 +135,9 @@ type Column =
   | 'changed'
   | 'released'
 
-const score = ({ media, source }: { media: MediaItem; source: RatingSource }): number | null =>
+type ScoreProps = { media: MediaItem; source: RatingSource }
+
+const score = ({ media, source }: ScoreProps): number | null =>
   media.item?.ratings.find((rating) => rating.source === source)?.value ?? null
 
 const COLUMNS: Record<Column, SortColumn<MediaItem>> = {
@@ -172,33 +172,29 @@ const COLUMNS: Record<Column, SortColumn<MediaItem>> = {
   },
 }
 
+type MediaListProps = {
+  items: MediaItem[]
+  /** A Movies library: titles open the movie's page, and the ratings and release date get columns. */
+  movies?: boolean
+  /** What the library matches its files to, for the menu's Fix match. */
+  matchType?: MatchItemType | null
+}
+
 /**
  * Every video as a row of facts, each column sortable with a click (the
  * library's own order comes back on the third). The columns go by the room
  * the table has: a narrow one keeps title, length and resolution, then
  * drops resolution too, so titles have room to read.
  */
-export const MediaList = ({
-  items,
-  movies = false,
-  matchType = null,
-}: {
-  items: MediaItem[]
-  /** A Movies library: titles open the movie's page, and the ratings and release date get columns. */
-  movies?: boolean
-  /** What the library matches its files to, for the menu's Fix match. */
-  matchType?: MatchItemType | null
-}) => {
+export const MediaList = ({ items, movies = false, matchType = null }: MediaListProps) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: items, columns: COLUMNS })
-  const header = ({
-    key,
-    label,
-    className,
-  }: {
+  type HeaderProps = {
     key: Column
     label: string
     className?: string
-  }) => (
+  }
+
+  const header = ({ key, label, className }: HeaderProps) => (
     <SortHeader key={key} sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
       {label}
     </SortHeader>

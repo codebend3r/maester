@@ -3,17 +3,16 @@ import { useId } from 'react'
 import { Icon } from '@raven/ui'
 import styles from '@/components/LibraryDialog/IconPicker.module.scss'
 
+type IconPickerProps = {
+  value: LibraryIconName
+  onChange: (icon: LibraryIconName) => void
+}
+
 /**
  * Every icon a library can wear, as a tile each: a radio kept out of sight,
  * its label the tile. The caller's fieldset names the group.
  */
-export const IconPicker = ({
-  value,
-  onChange,
-}: {
-  value: LibraryIconName
-  onChange: (icon: LibraryIconName) => void
-}) => {
+export const IconPicker = ({ value, onChange }: IconPickerProps) => {
   const name = useId()
   return (
     <div className={styles.icons}>

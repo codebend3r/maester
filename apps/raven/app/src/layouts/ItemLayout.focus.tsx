@@ -50,7 +50,9 @@ type Opens = ItemLayoutProps['onOpen']
 /** What every focusable part of the page tells it on focus, so the opening focus is let go. */
 type Settles = { onSettle: () => void }
 
-const Heading = ({ title }: { title: string }) => {
+type HeadingProps = { title: string }
+
+const Heading = ({ title }: HeadingProps) => {
   const styles = useStyles()
   return (
     <Text accessibilityRole="header" style={styles.heading}>
@@ -90,7 +92,9 @@ const ActionButton = ({
   )
 }
 
-const ProgressLine = ({ progress }: { progress: NonNullable<ItemHero['progress']> }) => {
+type ProgressLineProps = { progress: NonNullable<ItemHero['progress']> }
+
+const ProgressLine = ({ progress }: ProgressLineProps) => {
   const styles = useStyles()
   return (
     <View style={styles.progress}>
@@ -164,8 +168,10 @@ const Hero = ({
   )
 }
 
+type RailProps = { title: string; children: ReactNode }
+
 /** A titled row the remote moves along, scrolled as the focus moves. */
-const Rail = ({ title, children }: { title: string; children: ReactNode }) => {
+const Rail = ({ title, children }: RailProps) => {
   const styles = useStyles()
   return (
     <FocusBand>

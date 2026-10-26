@@ -12,18 +12,16 @@ import { AccountService } from '@/sessions/accountService'
 import { SessionsRepository } from '@/sessions/sessionsRepository'
 import { UsersRepository } from '@/users/usersRepository'
 
+type AppModuleRegisterProps = {
+  config: ServerConfig
+  plexTv: PlexTv
+  clock: Clock
+}
+
 /** Takes its dependencies as arguments so a test can swap in a fake plex.tv and a movable clock. */
 @Module({})
 export class AppModule {
-  static register({
-    config,
-    plexTv,
-    clock,
-  }: {
-    config: ServerConfig
-    plexTv: PlexTv
-    clock: Clock
-  }): DynamicModule {
+  static register({ config, plexTv, clock }: AppModuleRegisterProps): DynamicModule {
     return {
       module: AppModule,
       controllers: [AuthController, InternalController, HealthController],

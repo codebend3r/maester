@@ -4,18 +4,17 @@ import { type Ranges, VIDEO_EVENTS, type VideoEvent } from '@/components/Player/
 export const rangesFrom = (ranges: readonly { start: number; end: number }[]): Ranges =>
   ranges.map(({ start, end }): [number, number] => [start, end])
 
+type FromPlayerEventProps = {
+  event: PlayerEvent
+  buffered: Ranges
+}
+
 /**
  * What mpv's events mean to the video reducer. `buffered` is the last ranges
  * seen, which every clock tick carries along as the html engine's does. Tracks
  * and errors are the engine's own business, not the reducer's.
  */
-export const fromPlayerEvent = ({
-  event,
-  buffered,
-}: {
-  event: PlayerEvent
-  buffered: Ranges
-}): VideoEvent | null => {
+export const fromPlayerEvent = ({ event, buffered }: FromPlayerEventProps): VideoEvent | null => {
   switch (event.type) {
     case PLAYER_EVENTS.time:
       return { type: VIDEO_EVENTS.moved, time: event.time, buffered }

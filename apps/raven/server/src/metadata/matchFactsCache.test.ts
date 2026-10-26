@@ -15,12 +15,12 @@ describe('MatchFactsCache', () => {
     vi.useRealTimers()
   })
 
-  const setUp = ({
-    held,
-  }: {
+  type SetUpProps = {
     /** A path whose calls wait until `until` settles. */
     held?: { path: string; until: Promise<void> }
-  } = {}) => {
+  }
+
+  const setUp = ({ held }: SetUpProps = {}) => {
     const tmdb = fakeTmdb({
       movies: [
         { id: 949, title: 'Heat', released: '1995-12-15', runtime: 170 },

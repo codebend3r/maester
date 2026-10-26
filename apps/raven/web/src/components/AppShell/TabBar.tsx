@@ -7,18 +7,15 @@ import { useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/components/AppShell/TabBar.module.scss'
 
-/** A tab: its icon over its name, marked as current when the location matches any of its patterns. */
-const Tab = ({
-  to,
-  patterns,
-  icon,
-  label,
-}: {
+type TabProps = {
   to: string
   patterns: readonly string[]
   icon: IconName
   label: string
-}) => {
+}
+
+/** A tab: its icon over its name, marked as current when the location matches any of its patterns. */
+const Tab = ({ to, patterns, icon, label }: TabProps) => {
   const isCurrent = useIsCurrent(patterns)
   return (
     <Link to={to} className={styles.tab} aria-current={isCurrent ? 'page' : undefined}>

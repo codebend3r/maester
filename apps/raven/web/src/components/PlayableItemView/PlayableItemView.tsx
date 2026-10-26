@@ -137,6 +137,17 @@ const timeLeft = (media: MediaItem): HeaderProgress | undefined => {
   return fraction > 0 && left ? { fraction, label: `${left} left` } : undefined
 }
 
+type PlayableItemViewProps = {
+  kind: keyof typeof PLAYABLE
+  /** The item with every file this browser may see, in any library. */
+  details: ItemDetails
+  /** The files on the one card, in the one library, the page is for. */
+  versions: MediaItem[]
+  /** The item's files in that library, on every card. */
+  everyCard: MediaItem[]
+  primary: MediaItem
+}
+
 /**
  * A movie's or an episode's page once the item, the library's files it
  * shows and the version Play starts are known: the header with Play,
@@ -153,16 +164,7 @@ export const PlayableItemView = ({
   versions,
   everyCard,
   primary,
-}: {
-  kind: keyof typeof PLAYABLE
-  /** The item with every file this browser may see, in any library. */
-  details: ItemDetails
-  /** The files on the one card, in the one library, the page is for. */
-  versions: MediaItem[]
-  /** The item's files in that library, on every card. */
-  everyCard: MediaItem[]
-  primary: MediaItem
-}) => {
+}: PlayableItemViewProps) => {
   const details = { ...item, versions }
   const config: PlayableConfig = PLAYABLE[kind]
   const titleId = useId()

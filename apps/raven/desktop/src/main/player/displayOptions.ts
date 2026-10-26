@@ -1,18 +1,22 @@
 import { MPV_PROPERTIES } from '@raven/mpv'
 import type { MpvOption } from '@/main/player/outputOptions'
 
-export const displayOptions = ({
-  refreshRate,
-  edrHeadroom,
-}: {
+type DisplayOptionsProps = {
   refreshRate: number
   edrHeadroom: number
-}): MpvOption[] => [
+}
+
+export const displayOptions = ({ refreshRate, edrHeadroom }: DisplayOptionsProps): MpvOption[] => [
   ...(Number.isFinite(refreshRate) && refreshRate > 0
     ? [{ name: MPV_PROPERTIES.displayFpsOverride, value: refreshRate }]
     : []),
   { name: MPV_PROPERTIES.targetColorspaceHint, value: edrHeadroom > 1 ? 'yes' : 'no' },
 ]
+
+type DisplayReadingProps = {
+  frequency: number
+  display: () => { refreshRate: number; edrHeadroom: number }
+}
 
 /**
  * The display the window is on: Electron's frequency for it, else what the surface reads
@@ -22,10 +26,7 @@ export const displayOptions = ({
 export const displayReading = ({
   frequency,
   display,
-}: {
-  frequency: number
-  display: () => { refreshRate: number; edrHeadroom: number }
-}): { refreshRate: number; edrHeadroom: number } | null => {
+}: DisplayReadingProps): { refreshRate: number; edrHeadroom: number } | null => {
   try {
     const { refreshRate, edrHeadroom } = display()
     const isKnown = Number.isFinite(frequency) && frequency > 0

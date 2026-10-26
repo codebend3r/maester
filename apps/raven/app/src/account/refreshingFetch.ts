@@ -2,6 +2,8 @@ import { AUTH_HEADERS, AUTH_SCHEME, type FetchLike } from '@raven/core'
 
 const SIGNED_OUT_STATUS = 401
 
+type RefreshingFetchProps = { fetch: FetchLike; refresh: () => Promise<string | null> }
+
 /**
  * A `fetch` that answers a 401 to a call carrying a token with one refresh and one repeat of
  * that call. It sits under the API client, which reads the refusal off the response it hands
@@ -9,7 +11,7 @@ const SIGNED_OUT_STATUS = 401
  * as it is.
  */
 export const refreshingFetch =
-  ({ fetch, refresh }: { fetch: FetchLike; refresh: () => Promise<string | null> }): FetchLike =>
+  ({ fetch, refresh }: RefreshingFetchProps): FetchLike =>
   async (url, init = {}) => {
     const response = await fetch(url, init)
     const isSigned = (init.headers?.[AUTH_HEADERS.authorization] ?? null) !== null

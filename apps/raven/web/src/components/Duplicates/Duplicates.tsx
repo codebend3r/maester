@@ -23,8 +23,10 @@ import { afterSplit, queryKeys } from '@raven/ui/headless'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/Duplicates/Duplicates.module.scss'
 
+type PosterProps = { entry: PosterEntry }
+
 /** The card's poster, opening its page. */
-const Poster = ({ entry }: { entry: PosterEntry }) => (
+const Poster = ({ entry }: PosterProps) => (
   <Link
     {...cardLink({ media: entry.media, hasPages: true })}
     className={styles.poster}
@@ -35,8 +37,10 @@ const Poster = ({ entry }: { entry: PosterEntry }) => (
   </Link>
 )
 
+type FilesProps = { card: DuplicateCard }
+
 /** A card's files, best first, each with the cut its name reads as. */
-const Files = ({ card }: { card: DuplicateCard }) => (
+const Files = ({ card }: FilesProps) => (
   <ul className={styles.files} aria-label="Files">
     {card.files.map(({ media, cut }) => {
       const facts = [cut?.label ?? 'Standard', ...versionFacts(media)]
@@ -59,16 +63,14 @@ const Files = ({ card }: { card: DuplicateCard }) => (
   </ul>
 )
 
-/** The two ways to split a card of several files, and a word on whether Smart split apart can tell its files apart. */
-const Splits = ({
-  card,
-  busy,
-  onSplit,
-}: {
+type SplitsProps = {
   card: DuplicateCard
   busy: boolean
   onSplit: (how: SplitHow) => void
-}) => {
+}
+
+/** The two ways to split a card of several files, and a word on whether Smart split apart can tell its files apart. */
+const Splits = ({ card, busy, onSplit }: SplitsProps) => {
   const canTellApart = canSplitByCut(card.files)
   return (
     <>
@@ -89,6 +91,15 @@ const Splits = ({
   )
 }
 
+type OnSplitProps = { mediaId: number; how: SplitHow }
+
+type MovieDuplicateProps = {
+  movie: Duplicate
+  busy: boolean
+  onSplit: (split: OnSplitProps) => void
+  onJoin: () => void
+}
+
 /**
  * A movie with more than one file: its poster and title, then its cards.
  * While its files share one card, that card's files and the ways to split
@@ -96,17 +107,7 @@ const Splits = ({
  * several files splittable again, and Put back together for them all.
  * Splitting and putting back wait for the admin lock to be off.
  */
-const MovieDuplicate = ({
-  movie,
-  busy,
-  onSplit,
-  onJoin,
-}: {
-  movie: Duplicate
-  busy: boolean
-  onSplit: (split: { mediaId: number; how: SplitHow }) => void
-  onJoin: () => void
-}) => {
+const MovieDuplicate = ({ movie, busy, onSplit, onJoin }: MovieDuplicateProps) => {
   const headingId = useId()
   const [own] = movie.cards
   if (!own) return null
@@ -186,6 +187,11 @@ const MovieDuplicate = ({
   )
 }
 
+type DuplicatesProps = {
+  library: Library
+  listing: DuplicatesListing
+}
+
 /**
  * A movie library's Duplicates: each movie with more than one file, its
  * cards and the files on them. Split apart gives every file of a card a
@@ -193,20 +199,16 @@ const MovieDuplicate = ({
  * copies of one cut together. A split movie stays, its cards listed, with
  * Put back together.
  */
-export const Duplicates = ({
-  library,
-  listing,
-}: {
-  library: Library
-  listing: DuplicatesListing
-}) => {
+export const Duplicates = ({ library, listing }: DuplicatesProps) => {
   const queryClient = useQueryClient()
   const settle = (updated: DuplicatesListing) => {
     queryClient.setQueryData(queryKeys.duplicates(library.id), updated)
     return afterSplit({ queryClient, libraryId: library.id })
   }
+  type SplitMutationFnProps = { mediaId: number; how: SplitHow }
+
   const split = useMutation({
-    mutationFn: ({ mediaId, how }: { mediaId: number; how: SplitHow }) =>
+    mutationFn: ({ mediaId, how }: SplitMutationFnProps) =>
       api.splitDuplicate({ libraryId: library.id, mediaId, how }),
     onSuccess: settle,
   })

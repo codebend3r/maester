@@ -128,13 +128,15 @@ const MemberRow = ({ member, isBusy, isAsking, onAct, onAsk, onCancel }: RowProp
   )
 }
 
+type UsersSectionProps = { userId: string }
+
 /**
  * Who may use this raven, for its owner `userId`: the accounts in three tabs
  * by access, each row with what can be done to it. The server's say-so wins
  * over the account's own flag: a refusal as not the owner takes the section
  * away.
  */
-export const UsersSection = ({ userId }: { userId: string }) => {
+export const UsersSection = ({ userId }: UsersSectionProps) => {
   const headingId = useId()
   const { members, setStatus } = useMembers({ userId })
   const [tab, setTab] = useState<MemberStatus>(MEMBER_STATUSES.pending)
@@ -151,7 +153,9 @@ export const UsersSection = ({ userId }: { userId: string }) => {
     members.data?.filter((member) => member.status === status) ?? []
   const shown = withStatus(tab)
 
-  const act = ({ member, action }: { member: Account; action: ActionKey }) => {
+  type ActProps = { member: Account; action: ActionKey }
+
+  const act = ({ member, action }: ActProps) => {
     setAsking(null)
     setStatus.mutate({ id: member.id, change: { status: ACTIONS[action].status } })
   }

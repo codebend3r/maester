@@ -28,8 +28,10 @@ const TABS: ReadonlyArray<readonly [QueryKey, unknown]> = [
   [queryKeys.showLists(2), { shows: [], unmatched: [] }],
 ]
 
+type SetUpProps = { media?: MediaItem }
+
 /** The hook for video 7 of library 2, its library's tabs already cached. */
-const setUp = ({ media = mediaItem() }: { media?: MediaItem } = {}) => {
+const setUp = ({ media = mediaItem() }: SetUpProps = {}) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   TABS.forEach(([key, empty]) => client.setQueryData(key, empty))
   client.setQueryData(queryKeys.inProgress(3), [])

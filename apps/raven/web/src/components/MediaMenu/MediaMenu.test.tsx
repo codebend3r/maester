@@ -8,14 +8,13 @@ import { api } from '@/lib/api'
 import { itemDetails, itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
-/** The card owns the open state so a right click can open the menu too. */
-const Harness = ({
-  media,
-  matchType = null,
-}: {
+type HarnessProps = {
   media: MediaItem
   matchType?: MatchItemType | null
-}) => {
+}
+
+/** The card owns the open state so a right click can open the menu too. */
+const Harness = ({ media, matchType = null }: HarnessProps) => {
   const [open, setOpen] = useState(false)
   return <MediaMenu media={media} open={open} onOpenChange={setOpen} matchType={matchType} />
 }

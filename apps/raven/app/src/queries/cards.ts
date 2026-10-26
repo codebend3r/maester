@@ -75,11 +75,13 @@ export const imageOf = ({
   return api.itemImageUrl({ id: item.id, kind, version })
 }
 
+type VideoTargetProps = { media: MediaItem; hasPages: boolean }
+
 /**
  * Where a video's card goes, as the web's card links decide: its item's page in the card's
  * library where `hasPages`, naming the file of a card a movie was split onto, else the player.
  */
-const videoTarget = ({ media, hasPages }: { media: MediaItem; hasPages: boolean }): RouteTarget => {
+const videoTarget = ({ media, hasPages }: VideoTargetProps): RouteTarget => {
   const destination = cardDestination({ media, hasPages })
   switch (destination.kind) {
     case CARD_DESTINATIONS.page:
@@ -127,7 +129,9 @@ export const videoCard = ({
   target: videoTarget({ media, hasPages }),
 })
 
-const sortedLine = ({ media, order }: { media: MediaItem; order: Order }): string | null =>
+type SortedLineProps = { media: MediaItem; order: Order }
+
+const sortedLine = ({ media, order }: SortedLineProps): string | null =>
   order === null ? null : sortFact({ media, ...order })
 
 /**

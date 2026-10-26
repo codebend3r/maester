@@ -26,18 +26,15 @@ export type ButtonSize = (typeof BUTTON_SIZES)[keyof typeof BUTTON_SIZES]
 /** A large button's icon is in ems, so it shrinks with the button on a phone. */
 const ICON_SIZES = { regular: 18, large: '1.15em' } as const satisfies Record<ButtonSize, IconSize>
 
-/** A caller's className adds placement (grid area, alignment) on top of the button's own look. */
-const classes = ({
-  tone,
-  size,
-  iconOnly,
-  extra,
-}: {
+type ClassesProps = {
   tone: ButtonTone
   size: ButtonSize
   iconOnly: boolean
   extra: string | undefined
-}): string =>
+}
+
+/** A caller's className adds placement (grid area, alignment) on top of the button's own look. */
+const classes = ({ tone, size, iconOnly, extra }: ClassesProps): string =>
   [
     styles.button,
     styles[tone],

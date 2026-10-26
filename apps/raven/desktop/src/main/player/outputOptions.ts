@@ -39,20 +39,24 @@ const AO_CHOICES = {
 
 type AoChoice = (typeof AO_CHOICES)[keyof typeof AO_CHOICES]
 
-const ao = ({ value, canChooseAo }: { value: AoChoice; canChooseAo: boolean }): MpvOption[] =>
+type AoProps = { value: AoChoice; canChooseAo: boolean }
+
+const ao = ({ value, canChooseAo }: AoProps): MpvOption[] =>
   canChooseAo ? [{ name: MPV_OPTIONS.ao, value }] : []
 
 export const isVolumeFixedFor = carriesPassthrough
+
+type OutputOptionsProps = {
+  output: OutputSettings
+  devices: readonly AudioDevice[]
+  canChooseAo: boolean
+}
 
 export const outputOptions = ({
   output,
   devices,
   canChooseAo,
-}: {
-  output: OutputSettings
-  devices: readonly AudioDevice[]
-  canChooseAo: boolean
-}): MpvOption[] => {
+}: OutputOptionsProps): MpvOption[] => {
   const isKnownDevice =
     output.device === AUDIO_DEVICES.auto || devices.some((device) => device.name === output.device)
   const device: MpvOption = {
@@ -97,12 +101,14 @@ export const outputOptions = ({
   ]
 }
 
+type ReadProps = {
+  name: typeof MPV_PROPERTIES.audioDeviceList
+}
+
 /** The engine's audio devices, or none without an engine or when it cannot list them. */
 export const readDevices = async (
   mpv: {
-    read: (input: {
-      name: typeof MPV_PROPERTIES.audioDeviceList
-    }) => Promise<MpvPropertyValue<typeof MPV_PROPERTIES.audioDeviceList>>
+    read: (input: ReadProps) => Promise<MpvPropertyValue<typeof MPV_PROPERTIES.audioDeviceList>>
   } | null,
 ): Promise<AudioDevice[]> => {
   if (mpv === null) return []

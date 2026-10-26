@@ -52,6 +52,8 @@ export type ErrorReporter = {
   send: (diagnostics: PlaybackDiagnostics) => Promise<unknown>
 }
 
+type OnEngineErrorProps = { reason: PlayerErrorReason; message: string }
+
 export type PlayerServices = {
   title: PlayerTitle
   progress: ProgressSink
@@ -77,5 +79,5 @@ export type PlayerServices = {
   /** Without it Unplayable offers no Report this error. */
   report?: ErrorReporter
   /** The native engine's error, before Unplayable shows it, for a host that can recover (a relocked library). */
-  onEngineError?: (error: { reason: PlayerErrorReason; message: string }) => void
+  onEngineError?: (error: OnEngineErrorProps) => void
 }

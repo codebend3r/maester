@@ -24,8 +24,10 @@ import {
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
+type LibraryViewProps = { library: Library; section: LibrarySection }
+
 /** The page once its library is known, open at one of its tabs. */
-const LibraryView = ({ library, section }: { library: Library; section: LibrarySection }) => {
+const LibraryView = ({ library, section }: LibraryViewProps) => {
   const titleId = useId()
   // A locked library's videos are not asked for until this browser has the PIN.
   const lock = useLibraryLock(library)

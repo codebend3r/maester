@@ -6,6 +6,11 @@ import styles from '@/components/JumpPicker/JumpPicker.module.scss'
 /** A link the keyboard reaches: not a picture link hidden from it and from screen readers. */
 const FOCUSABLE_LINK = 'a[href]:not([aria-hidden="true"]):not([tabindex="-1"])'
 
+type JumpToProps = {
+  scope: HTMLElement | null
+  keys: ReadonlySet<string>
+}
+
 /**
  * Brings the first card under a mark into view: whichever of `keys` the
  * page shows first, as a list re-sorted by its headers shows them in its
@@ -14,13 +19,7 @@ const FOCUSABLE_LINK = 'a[href]:not([aria-hidden="true"]):not([tabindex="-1"])'
  * there; a picture link kept out of the tab order is passed over. Once
  * there, the card is held at the top while the cards around it are drawn.
  */
-const jumpTo = ({
-  scope,
-  keys,
-}: {
-  scope: HTMLElement | null
-  keys: ReadonlySet<string>
-}): void => {
+const jumpTo = ({ scope, keys }: JumpToProps): void => {
   const entry = [...(scope?.querySelectorAll<HTMLElement>('[data-entry]') ?? [])].find((card) =>
     keys.has(card.dataset.entry ?? ''),
   )
@@ -33,6 +32,11 @@ const jumpTo = ({
   holdInPlace({ card: entry, top: 0, afterScroll: smooth })
 }
 
+type JumpPickerProps = {
+  scale: JumpScale
+  scope: RefObject<HTMLElement | null>
+}
+
 /**
  * A strip down the right edge of the screen, where it stays as the page
  * scrolls, of the steps the listing's order runs through: the alphabet for
@@ -41,13 +45,7 @@ const jumpTo = ({
  * under is there but cannot be pressed, so the strip keeps its shape.
  * `scope` is what holds the cards, each marked with its `data-entry`.
  */
-export const JumpPicker = ({
-  scale,
-  scope,
-}: {
-  scale: JumpScale
-  scope: RefObject<HTMLElement | null>
-}) => (
+export const JumpPicker = ({ scale, scope }: JumpPickerProps) => (
   <nav className={styles.picker} aria-label={JUMP_SCALE_LABELS[scale.field]}>
     {scale.unit && (
       <p className={styles.unit} aria-hidden="true">

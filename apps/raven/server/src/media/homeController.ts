@@ -25,6 +25,14 @@ const SHELF_SIZE = 8
 /** How many of a library's matches a search from home shows; the library's own search lists them all. */
 const SEARCH_SHELF_SIZE = 16
 
+type HomeControllerShelfProps = {
+  library: LibraryRecord
+  search: string
+  sort: MediaSort
+  limit: number
+  account: AccountKey
+}
+
 /** The home page cuts across libraries, as favourites do, so it hangs off its own root. */
 @Controller('api/home')
 export class HomeController {
@@ -44,13 +52,7 @@ export class HomeController {
     sort,
     limit,
     account,
-  }: {
-    library: LibraryRecord
-    search: string
-    sort: MediaSort
-    limit: number
-    account: AccountKey
-  }): HomeShelf {
+  }: HomeControllerShelfProps): HomeShelf {
     const listing = { libraryId: id, search, sort, limit, account }
     return listsShows(settings.kind)
       ? { libraryId: id, type: 'shows', shows: this.media.listShows(listing) }

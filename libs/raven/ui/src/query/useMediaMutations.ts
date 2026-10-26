@@ -5,6 +5,8 @@ import { afterFavourites, afterWatched } from '@/query/invalidate'
 import { useOptimisticMutation } from '@/query/optimistic'
 import { mutationKeys, queryKeys } from '@/query/queryClient'
 
+type UseServerMediaMutationsProps = { api: ApiClient; media: MediaItem }
+
 /**
  * Marking a favourite or a watched mark, deleting a video and fetching its
  * details again, with every cached list patched in place so the grid
@@ -15,7 +17,7 @@ import { mutationKeys, queryKeys } from '@/query/queryClient'
  * the item pages and home; marks in a run settle together, so every library
  * refetches after them.
  */
-export const useServerMediaMutations = ({ api, media }: { api: ApiClient; media: MediaItem }) => {
+export const useServerMediaMutations = ({ api, media }: UseServerMediaMutationsProps) => {
   const queryClient = useQueryClient()
   const lists = { queryKey: queryKeys.mediaLists(media.libraryId) }
   const library = { queryKey: queryKeys.library(media.libraryId) }
@@ -75,7 +77,12 @@ export const useServerMediaMutations = ({ api, media }: { api: ApiClient; media:
   return { favourite, watched, remove, refresh }
 }
 
+type MediaMutationsForProps = { api: ApiClient }
+
+type MediaMutationsForUseMediaMutationsProps = { media: MediaItem }
+
 /** The media-mutation hook over one server's `api`, for a host with one server. */
-export const mediaMutationsFor = ({ api }: { api: ApiClient }) => ({
-  useMediaMutations: ({ media }: { media: MediaItem }) => useServerMediaMutations({ api, media }),
+export const mediaMutationsFor = ({ api }: MediaMutationsForProps) => ({
+  useMediaMutations: ({ media }: MediaMutationsForUseMediaMutationsProps) =>
+    useServerMediaMutations({ api, media }),
 })

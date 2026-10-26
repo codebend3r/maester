@@ -26,13 +26,12 @@ import {
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
-const detailsFor = ({
-  summary,
-  overrides,
-}: {
+type DetailsForProps = {
   summary: ItemSummary
   overrides: Partial<ItemDetails>
-}): ItemDetails => ({
+}
+
+const detailsFor = ({ summary, overrides }: DetailsForProps): ItemDetails => ({
   ...summary,
   tmdbId: String(summary.id),
   imdbId: null,
@@ -105,7 +104,9 @@ const SEVERANCE_SUMMARY = summaryFor({
 })
 const SHOW = { id: SEVERANCE_SUMMARY.id, title: SEVERANCE_SUMMARY.title }
 
-const seasonFor = ({ id, season }: { id: number; season: number }): SeasonSummary => ({
+type SeasonForProps = { id: number; season: number }
+
+const seasonFor = ({ id, season }: SeasonForProps): SeasonSummary => ({
   ...summaryFor({
     id,
     type: ITEM_TYPES.season,
@@ -120,17 +121,14 @@ const seasonFor = ({ id, season }: { id: number; season: number }): SeasonSummar
   watchedCount: 0,
 })
 
-const episodeFor = ({
-  id,
-  episode,
-  title,
-  fileId,
-}: {
+type EpisodeForProps = {
   id: number
   episode: number
   title: string
   fileId: number
-}): EpisodeSummary => {
+}
+
+const episodeFor = ({ id, episode, title, fileId }: EpisodeForProps): EpisodeSummary => {
   const summary = summaryFor({
     id,
     type: ITEM_TYPES.episode,
@@ -234,22 +232,26 @@ const WRITES: Record<string, (body: unknown) => Answer> = {
   }),
 }
 
-/** What the server answers `method` at `path` with, sent `body`. */
-const answerFor = ({
-  method,
-  path,
-  body,
-}: {
+type AnswerForProps = {
   method: string
   path: string
   body: unknown
-}): Answer => {
+}
+
+/** What the server answers `method` at `path` with, sent `body`. */
+const answerFor = ({ method, path, body }: AnswerForProps): Answer => {
   if (method !== APP_CALL_METHODS.get) return WRITES[path]?.(body) ?? NOT_FOUND
   const read = READS[path]
   return read === undefined ? NOT_FOUND : { status: STATUSES.ok, body: read }
 }
 
 const bodyOf = (body: string | undefined): unknown => (body === undefined ? null : JSON.parse(body))
+
+type ItemApiProps = {
+  hear?: (request: HeardRequest) => void
+  writes?: () => Promise<void>
+  reads?: (path: string) => Promise<void>
+}
 
 /**
  * Busboys, Severance, its first season and that season's first episode, behind the app's
@@ -261,11 +263,7 @@ export const itemApi = ({
   hear = () => undefined,
   writes = async () => undefined,
   reads = async () => undefined,
-}: {
-  hear?: (request: HeardRequest) => void
-  writes?: () => Promise<void>
-  reads?: (path: string) => Promise<void>
-} = {}): ApiClient =>
+}: ItemApiProps = {}): ApiClient =>
   createApiClient({
     baseUrl: NAS.origin,
     fetch: allowlistedFetch({

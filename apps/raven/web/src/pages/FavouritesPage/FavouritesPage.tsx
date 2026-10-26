@@ -41,14 +41,13 @@ const kindOf = (media: MediaItem): Kind => {
   }
 }
 
-/** The kinds among `titles` and `entries`, in the filter's order. */
-const kindsIn = ({
-  titles,
-  entries,
-}: {
+type KindsInProps = {
   titles: readonly ItemSummary[]
   entries: readonly PosterEntry[]
-}): Kind[] =>
+}
+
+/** The kinds among `titles` and `entries`, in the filter's order. */
+const kindsIn = ({ titles, entries }: KindsInProps): Kind[] =>
   KINDS.filter(
     (kind) =>
       titles.some((item) => titleKindOf(item) === kind) ||

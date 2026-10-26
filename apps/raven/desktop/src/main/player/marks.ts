@@ -14,6 +14,14 @@ const NS_PER_MS = 1e6
 
 const COLD_OPEN_STAGES = { none: 'none', waiting: 'waiting', done: 'done' } as const
 
+type CreateMarksProps = {
+  isEnabled: boolean
+  now: () => number
+  write: (line: string) => void
+  timers: Timers
+  histogram: () => Histogram
+}
+
 /**
  * The budget marks (P5 Ruling 14, P7 Ruling 13): the first frame after each load, the cold
  * open to its first frame, and the main thread's p99 event loop delay while a video plays.
@@ -24,13 +32,7 @@ export const createMarks = ({
   write,
   timers,
   histogram: makeHistogram,
-}: {
-  isEnabled: boolean
-  now: () => number
-  write: (line: string) => void
-  timers: Timers
-  histogram: () => Histogram
-}) => {
+}: CreateMarksProps) => {
   let loadedAt: number | null = null
   // The cold open is measured once a run: `waiting` from the first early `opened` until
   // its first frame, `done` after, so neither a later open nor a later frame measures again.

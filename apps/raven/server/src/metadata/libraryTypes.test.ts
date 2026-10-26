@@ -35,13 +35,12 @@ type Injected = {
   json: () => unknown
 }
 
-const shape = <T>({
-  response,
-  guard,
-}: {
+type ShapeProps<T> = {
   response: Injected
   guard: (value: unknown) => value is T
-}): T => {
+}
+
+const shape = <T>({ response, guard }: ShapeProps<T>): T => {
   const body: unknown = response.json()
   if (!guard(body)) throw new Error(`Unexpected body: ${response.rawPayload.toString()}`)
   return body
@@ -121,18 +120,15 @@ describe('matching by library type', () => {
     await app().get(MetadataService).whenIdle()
     await app().get(ThumbnailService).whenIdle()
   }
-  /** Saves a library's type as Edit does, and waits for the matching it sets off. */
-  const saveKind = async ({
-    id,
-    name,
-    path,
-    kind,
-  }: {
+  type SaveKindProps = {
     id: number
     name: string
     path: string
     kind: string
-  }): Promise<void> => {
+  }
+
+  /** Saves a library's type as Edit does, and waits for the matching it sets off. */
+  const saveKind = async ({ id, name, path, kind }: SaveKindProps): Promise<void> => {
     const response = await asAdmin({
       method: 'PUT',
       url: `/api/libraries/${id}`,

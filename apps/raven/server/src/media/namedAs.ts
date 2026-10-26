@@ -10,16 +10,23 @@ import {
   titleFromFileName,
 } from '@raven/core'
 
+type NamedAsProps = {
+  kind: LibraryKind
+  fileName: string
+  folder: string
+}
+
 /** What a name says a file is, by its library's type. Extras and libraries that are not matched keep the tidied name. */
 export const namedAs = ({
   kind,
   fileName,
   folder,
-}: {
-  kind: LibraryKind
-  fileName: string
-  folder: string
-}): { title: string; year: number | null; edition: string | null; match: MatchState } => {
+}: NamedAsProps): {
+  title: string
+  year: number | null
+  edition: string | null
+  match: MatchState
+} => {
   const type = matchTypeFor(kind)
   if (type == null || isExtra({ fileName, folder })) {
     return {

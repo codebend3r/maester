@@ -29,13 +29,15 @@ const lastLine = (text: string): string =>
     .findLast((line) => line.trim() !== '')
     ?.trim() ?? 'ffmpeg failed'
 
+type FfmpegTimeoutErrorProps = { tool: string; seconds: number }
+
 /**
  * ffmpeg or ffprobe ran out of time. Almost always the share being slow to
  * read rather than anything wrong with the file, so callers retry later
  * instead of recording a failure.
  */
 export class FfmpegTimeoutError extends Error {
-  constructor({ tool, seconds }: { tool: string; seconds: number }) {
+  constructor({ tool, seconds }: FfmpegTimeoutErrorProps) {
     super(`${tool} gave up after ${seconds}s; the file or the share is slow to read`)
     this.name = 'FfmpegTimeoutError'
   }
@@ -62,6 +64,8 @@ export const FFMPEG_SIGNALS = { kill: 'SIGKILL' } as const satisfies Record<stri
 
 /** A running ffmpeg whose output is read as it is written. */
 export type FfmpegStream = ChildProcessByStdio<null, Readable, Readable>
+
+type FfmpegServiceSpawnTrackedProps = { args: string[]; purpose: string }
 
 /** Everything that shells out to ffmpeg or ffprobe goes through here. */
 @Injectable()
@@ -156,7 +160,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     return this.spawnTracked({ args, purpose: 'segment run' })
   }
 
-  private spawnTracked({ args, purpose }: { args: string[]; purpose: string }): FfmpegStream {
+  private spawnTracked({ args, purpose }: FfmpegServiceSpawnTrackedProps): FfmpegStream {
     const child = spawn(this.config.ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
     const stderr = { tail: '' }
     child.stderr.on('data', (chunk: Buffer) => {

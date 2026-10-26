@@ -354,14 +354,13 @@ export const showBody = (show: FakeShow): Record<string, unknown> => ({
   },
 })
 
-/** A season as `/tv/{id}/season/{n}` answers it, with its episodes. */
-export const seasonBody = ({
-  show,
-  number,
-}: {
+type SeasonBodyProps = {
   show: FakeShow
   number: number
-}): Record<string, unknown> => ({
+}
+
+/** A season as `/tv/{id}/season/{n}` answers it, with its episodes. */
+export const seasonBody = ({ show, number }: SeasonBodyProps): Record<string, unknown> => ({
   id: show.id * 100 + number,
   season_number: number,
   name: number === 0 ? 'Specials' : `Season ${number}`,
@@ -392,15 +391,13 @@ export const seasonBody = ({
   })),
 })
 
-const json = ({
-  body,
-  status = 200,
-  headers = {},
-}: {
+type JsonProps = {
   body: unknown
   status?: number
   headers?: Record<string, string>
-}): Response =>
+}
+
+const json = ({ body, status = 200, headers = {} }: JsonProps): Response =>
   new Response(JSON.stringify(body), {
     status,
     headers: { [HEADERS.contentType]: CONTENT_TYPES.json, ...headers },
@@ -416,19 +413,24 @@ const searchWords = (title: string): string =>
     .trim()
 
 /** OMDb's answer for an IMDb id, as its `Ratings` strings. */
-export type FakeOmdb = Record<
-  string,
-  { imdb?: string; rottenTomatoes?: string; metacritic?: string }
->
+type FakeOmdb = Record<string, { imdb?: string; rottenTomatoes?: string; metacritic?: string }>
 
 /**
  * MDBList's answer for a title, keyed `movie:<tmdb id>` or `show:<tmdb id>`:
  * each score as MDBList's 0 to 100 `score`, and the IMDb vote count.
  */
-export type FakeMdblist = Record<
+type FakeMdblist = Record<
   string,
   { imdb?: number; rottenTomatoes?: number; metacritic?: number; imdbVotes?: number }
 >
+
+type FakeTmdbProps = {
+  movies: FakeMovie[]
+  shows?: FakeShow[]
+  people?: FakePerson[]
+  omdb?: FakeOmdb
+  mdblist?: FakeMdblist
+}
 
 /**
  * TMDB in miniature: searches by a title or alternative title holding the
@@ -447,13 +449,7 @@ export const fakeTmdb = ({
   people = [keanuReeves],
   omdb = {},
   mdblist = {},
-}: {
-  movies: FakeMovie[]
-  shows?: FakeShow[]
-  people?: FakePerson[]
-  omdb?: FakeOmdb
-  mdblist?: FakeMdblist
-}) => {
+}: FakeTmdbProps) => {
   const calls: string[] = []
   const failing: string[] = []
   const state = {
@@ -712,7 +708,9 @@ export const fakeTmdb = ({
           ? state.movies.some((entry) => entry.id === id)
           : state.shows.some((entry) => entry.id === id)
       if (!known) return json({ body: { status_code: 34 }, status: 404 })
-      const picture = ({ name, language }: { name: string; language: string | null }) => ({
+      type PictureProps = { name: string; language: string | null }
+
+      const picture = ({ name, language }: PictureProps) => ({
         file_path: `/${name}${id}.jpg`,
         width: 2000,
         height: 3000,

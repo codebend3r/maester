@@ -16,7 +16,7 @@ const PICTURE_SHAPES = { poster: 'poster', still: 'still', none: 'none' } as con
 type PictureShape = (typeof PICTURE_SHAPES)[keyof typeof PICTURE_SHAPES]
 
 /** The picture beside the title: a poster, or an episode's still, and the video it plays if it plays one. */
-export type HeaderPicture = {
+type HeaderPicture = {
   shape: Exclude<PictureShape, typeof PICTURE_SHAPES.none>
   /** null for none yet: the title's first letter stands in. */
   url: string | null
@@ -41,18 +41,17 @@ export type HeaderProgress = { fraction: number; label: string }
 export const pictureBackdrop = (url: string | null): HeaderBackdrop | null =>
   url == null ? null : { type: HEADER_BACKDROP_TYPES.picture, url, srcSet: null }
 
+type ItemBackdropProps = {
+  id: number
+  version: string | null
+}
+
 /**
  * An item's own backdrop behind its header, at each width an image CDN
  * makes of it so a phone fetches one no wider than its screen; none while
  * it has none.
  */
-export const itemBackdrop = ({
-  id,
-  version,
-}: {
-  id: number
-  version: string | null
-}): HeaderBackdrop | null => {
+export const itemBackdrop = ({ id, version }: ItemBackdropProps): HeaderBackdrop | null => {
   const url = api.itemImageUrl({ id, kind: 'backdrop', version })
   if (url == null) return null
   return {
@@ -62,8 +61,10 @@ export const itemBackdrop = ({
   }
 }
 
+type BackdropPictureProps = { backdrop: HeaderBackdrop }
+
 // The page's largest picture, so it is fetched ahead of what lazy lists ask for.
-const BackdropPicture = ({ backdrop }: { backdrop: HeaderBackdrop }) => {
+const BackdropPicture = ({ backdrop }: BackdropPictureProps) => {
   switch (backdrop.type) {
     case HEADER_BACKDROP_TYPES.picture:
       return (
@@ -92,11 +93,13 @@ const BackdropPicture = ({ backdrop }: { backdrop: HeaderBackdrop }) => {
   }
 }
 
+type BackdropProps = { backdrop: HeaderBackdrop }
+
 /**
  * The picture behind the top of the page, faded into the night at its foot
  * and its left, where the title reads. Decorative, and it takes no clicks.
  */
-const Backdrop = ({ backdrop }: { backdrop: HeaderBackdrop }) => (
+const Backdrop = ({ backdrop }: BackdropProps) => (
   <div className={styles.backdrop} aria-hidden="true">
     <BackdropPicture backdrop={backdrop} />
   </div>
@@ -115,7 +118,9 @@ const PICTURES = {
   still: `${styles.picture} ${styles.still}`,
 } as const satisfies Record<HeaderPicture['shape'], string | undefined>
 
-const Picture = ({ picture, title }: { picture: HeaderPicture; title: string }) => {
+type PictureProps = { picture: HeaderPicture; title: string }
+
+const Picture = ({ picture, title }: PictureProps) => {
   const className = PICTURES[picture.shape]
   const content = picture.url ? (
     <img src={picture.url} alt="" decoding="async" fetchPriority="high" />
@@ -138,12 +143,14 @@ const Picture = ({ picture, title }: { picture: HeaderPicture; title: string }) 
   )
 }
 
+type TitleArtProps = { title: string; logo: string | null }
+
 /**
  * The title as its logo, else in display type. A logo that fails to load
  * falls back to the words. The shadow falls from a wrapper, so it follows
  * the logo as drawn, recoloured or not.
  */
-const TitleArt = ({ title, logo }: { title: string; logo: string | null }) => {
+const TitleArt = ({ title, logo }: TitleArtProps) => {
   const [hasFailed, setFailed] = useState(false)
   if (!logo || hasFailed) return title
   return (
@@ -158,8 +165,10 @@ const TitleArt = ({ title, logo }: { title: string; logo: string | null }) => {
   )
 }
 
+type ProgressProps = { progress: HeaderProgress }
+
 /** A thin line of how far through it is, its words beside it. */
-const Progress = ({ progress }: { progress: HeaderProgress }) => (
+const Progress = ({ progress }: ProgressProps) => (
   <p className={styles.progress}>
     <span className={styles.track} aria-hidden="true">
       <span
@@ -171,12 +180,14 @@ const Progress = ({ progress }: { progress: HeaderProgress }) => (
   </p>
 )
 
+type DottedProps = { parts: readonly string[] }
+
 /**
  * Parts of a line, a quiet dot between each, for a line of facts. A part
  * never breaks, and a line that wraps does so after a dot, so the next
  * starts flush. The line's own element sets its colour and size.
  */
-export const Dotted = ({ parts }: { parts: readonly string[] }) =>
+export const Dotted = ({ parts }: DottedProps) =>
   parts.map((part, index) => (
     <Fragment key={part}>
       <span className={styles.part}>
@@ -192,6 +203,36 @@ export const Dotted = ({ parts }: { parts: readonly string[] }) =>
   ))
 
 const NO_EYEBROW: readonly string[] = []
+
+type ItemHeaderProps = {
+  titleId: string
+  title: string
+  /** What the item is, above its title: "Show", a season's show, "Saga · 3 movies". */
+  eyebrow?: readonly string[]
+  /** "Directed by ...", "Created by ...". */
+  byline: string | null
+  contentRating: string | null
+  facts: readonly string[]
+  ratings: readonly Rating[]
+  /** Left out for a page with no picture beside its title. */
+  picture?: HeaderPicture
+  backdrop: HeaderBackdrop | null
+  /** The title as art, shown in its place: a movie's or show's logo. */
+  logo?: string | null
+  /** Where the page goes back to, over the backdrop's top corner. */
+  back: BackFallback
+  /** The library the item lives in, linked above its title; left out where the page has none. */
+  library?: BackFallback
+  /** A line of how far through the item the viewer is, where the page has one. */
+  progress?: HeaderProgress
+  /**
+   * The page's own actions: Play, favourite, Watched, Select. One whose label
+   * cannot shrink marks itself `data-wide`, and the row makes room for it.
+   */
+  children?: ReactNode
+  /** The actions that change the item: the editors, Fix match, the file's menu. */
+  manage?: ReactNode
+}
 
 /**
  * The top of a movie, show, season, episode or saga page: the way back in
@@ -220,35 +261,7 @@ export const ItemHeader = ({
   progress,
   children,
   manage,
-}: {
-  titleId: string
-  title: string
-  /** What the item is, above its title: "Show", a season's show, "Saga · 3 movies". */
-  eyebrow?: readonly string[]
-  /** "Directed by ...", "Created by ...". */
-  byline: string | null
-  contentRating: string | null
-  facts: readonly string[]
-  ratings: readonly Rating[]
-  /** Left out for a page with no picture beside its title. */
-  picture?: HeaderPicture
-  backdrop: HeaderBackdrop | null
-  /** The title as art, shown in its place: a movie's or show's logo. */
-  logo?: string | null
-  /** Where the page goes back to, over the backdrop's top corner. */
-  back: BackFallback
-  /** The library the item lives in, linked above its title; left out where the page has none. */
-  library?: BackFallback
-  /** A line of how far through the item the viewer is, where the page has one. */
-  progress?: HeaderProgress
-  /**
-   * The page's own actions: Play, favourite, Watched, Select. One whose label
-   * cannot shrink marks itself `data-wide`, and the row makes room for it.
-   */
-  children?: ReactNode
-  /** The actions that change the item: the editors, Fix match, the file's menu. */
-  manage?: ReactNode
-}) => (
+}: ItemHeaderProps) => (
   <header className={backdrop ? `${styles.hero} ${styles.withBackdrop}` : styles.hero}>
     {backdrop && <Backdrop backdrop={backdrop} />}
     <div className={styles.top}>
@@ -302,12 +315,14 @@ export const ItemHeader = ({
   </header>
 )
 
+type ItemHeaderSkeletonProps = { picture: PictureShape }
+
 /**
  * The header while its item is on its way, laid out as the header itself:
  * the way back, its picture's place, then lines for the title, the byline
  * and facts, and the buttons.
  */
-export const ItemHeaderSkeleton = ({ picture }: { picture: PictureShape }) => (
+export const ItemHeaderSkeleton = ({ picture }: ItemHeaderSkeletonProps) => (
   <div className={styles.hero}>
     <div className={styles.top}>
       <Bone shape="button" />

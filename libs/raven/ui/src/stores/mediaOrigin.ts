@@ -17,7 +17,9 @@ type MediaOriginState = {
 /** How long a pick is trusted before the origins are probed again. */
 export const PICK_FRESH_MS = 600_000
 
-export const isFreshPick = ({ pick, now }: { pick: MediaPick | null; now: number }): boolean => {
+type IsFreshPickProps = { pick: MediaPick | null; now: number }
+
+export const isFreshPick = ({ pick, now }: IsFreshPickProps): boolean => {
   if (!pick) return false
   const age = now - pick.at
   return age >= 0 && age < PICK_FRESH_MS

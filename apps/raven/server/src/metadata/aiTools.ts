@@ -54,9 +54,11 @@ export const AI_INPUT_BOUNDS = {
   queryLength: 200,
 } as const
 
+type WholeWithinProps = { min: number; max: number }
+
 /** A whole number from `min` to `max`: a year, a season. */
 const wholeWithin =
-  ({ min, max }: { min: number; max: number }) =>
+  ({ min, max }: WholeWithinProps) =>
   (value: unknown): value is number =>
     isNumber(value) && Number.isInteger(value) && value >= min && value <= max
 

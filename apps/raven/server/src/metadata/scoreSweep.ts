@@ -93,6 +93,41 @@ const WAKE_NOTES = {
 const afterMidnight = (now: Date): Date =>
   new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 1))
 
+type ScoreSweepWakeAtProps = {
+  at: Date
+  pause: ScorePause['reason'] | null
+  why: keyof typeof WAKE_NOTES
+}
+
+type ScoreSweepForgetFailuresProps = {
+  answeredBy: ReadonlySet<Asked>
+  hasRunOut: boolean
+}
+
+type ScoreSweepCountRequestFailuresProps = {
+  round: Round
+  failedIds: readonly number[]
+}
+
+type ScoreSweepSourceRoundProps = {
+  source: ScoreSource
+  before: string
+  isCurrent: () => boolean
+  fetch: (title: DueScores) => Promise<boolean>
+}
+
+type ScoreSweepDueProps = {
+  asked: Asked
+  before: string
+  limit: number
+}
+
+type ScoreSweepListDueProps = {
+  asked: Asked
+  before: string
+  limit: number
+}
+
 /**
  * Tops up the scores that are missing or a month old, and those a library's
  * Refresh asked for, on a queue of its own so a top-up waiting days on a
@@ -209,15 +244,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** Kicks a drain at `at`, saying why the sweep waits when `pause` names a reason. */
-  private wakeAt({
-    at,
-    pause,
-    why,
-  }: {
-    at: Date
-    pause: ScorePause['reason'] | null
-    why: keyof typeof WAKE_NOTES
-  }): void {
+  private wakeAt({ at, pause, why }: ScoreSweepWakeAtProps): void {
     const resumesAt = at.toISOString()
     this.state.pause = pause == null ? null : { reason: pause, resumesAt }
     if (this.state.isClosed) return
@@ -277,13 +304,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    * out of titles to ask, it also forgets those of a source whose due titles
    * have all failed, so the next drain is not left with nothing to ask.
    */
-  private forgetFailures({
-    answeredBy,
-    hasRunOut,
-  }: {
-    answeredBy: ReadonlySet<Asked>
-    hasRunOut: boolean
-  }): void {
+  private forgetFailures({ answeredBy, hasRunOut }: ScoreSweepForgetFailuresProps): void {
     const before = scoresDueBefore()
     const kept = (asked: Asked): ReadonlySet<number> => {
       const failed = this.state.failed[asked]
@@ -301,13 +322,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    * up each title with `REQUEST_TRIES` of them, the first a day old or more:
    * its request goes, and it keeps the scores it had.
    */
-  private countRequestFailures({
-    round,
-    failedIds,
-  }: {
-    round: Round
-    failedIds: readonly number[]
-  }): void {
+  private countRequestFailures({ round, failedIds }: ScoreSweepCountRequestFailuresProps): void {
     if (round.asked !== (this.scores.settler()?.provider ?? 'tmdb')) return
     const now = Date.now()
     const failed = new Set(failedIds)
@@ -386,17 +401,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** A score source's round: its due titles as of `before`, as far as its calls left today go. */
-  private sourceRound({
-    source,
-    before,
-    isCurrent,
-    fetch,
-  }: {
-    source: ScoreSource
-    before: string
-    isCurrent: () => boolean
-    fetch: (title: DueScores) => Promise<boolean>
-  }): Round {
+  private sourceRound({ source, before, isCurrent, fetch }: ScoreSweepSourceRoundProps): Round {
     const { provider } = source
     return {
       asked: provider,
@@ -432,15 +437,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** The titles due from `asked` but those it failed on, as far as `limit` goes. */
-  private due({
-    asked,
-    before,
-    limit,
-  }: {
-    asked: Asked
-    before: string
-    limit: number
-  }): DueScores[] {
+  private due({ asked, before, limit }: ScoreSweepDueProps): DueScores[] {
     const skip = this.state.failed[asked]
     return this.listDue({ asked, before, limit: limit + skip.size })
       .filter((title) => !skip.has(title.itemId))
@@ -448,15 +445,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** What `asked` has due, in the order it is asked: a source's due scores, or the titles a Refresh asked for. */
-  private listDue({
-    asked,
-    before,
-    limit,
-  }: {
-    asked: Asked
-    before: string
-    limit: number
-  }): DueScores[] {
+  private listDue({ asked, before, limit }: ScoreSweepListDueProps): DueScores[] {
     return asked === 'tmdb'
       ? this.metadata.requestedTitles(limit)
       : this.metadata.scoresDue({ provider: asked, before, limit })

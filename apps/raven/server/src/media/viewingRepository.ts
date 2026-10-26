@@ -19,6 +19,39 @@ type HistoryRow = {
   marked: number
 }
 
+type ViewingRepositorySetFavouriteProps = {
+  id: number
+  favourite: boolean
+  account: AccountKey
+}
+
+type ViewingRepositoryNotePlayProps = {
+  id: number
+  position: number
+  at: Date
+  account: AccountKey
+}
+
+type ViewingRepositoryRecordPlayProps = {
+  id: number
+  account: AccountKey
+  at?: Date
+}
+
+type ViewingRepositoryReportProps = {
+  id: number
+  position: number
+  account: AccountKey
+  at?: Date
+}
+
+type ViewingRepositoryHistoryProps = {
+  libraryId: number
+  limit: number
+  watchedOnly?: boolean
+  account: AccountKey
+}
+
 /**
  * What an account did with a video: favourites, plays and the history they
  * make, and the spot to resume from. Every row is the account's own.
@@ -44,15 +77,7 @@ export class ViewingRepository {
    * the PIN is entered, but unmarking always goes through, so a favourite
    * left behind in a library locked since can still be cleared.
    */
-  setFavourite({
-    id,
-    favourite,
-    account,
-  }: {
-    id: number
-    favourite: boolean
-    account: AccountKey
-  }): FavouriteOutcome {
+  setFavourite({ id, favourite, account }: ViewingRepositorySetFavouriteProps): FavouriteOutcome {
     return this.db.transaction(() => {
       const row = this.db
         .prepare<[number], { locked: number }>(
@@ -84,17 +109,7 @@ export class ViewingRepository {
    * playing again after Mark as unwatched starts a new play. The play lasts
    * until `at`, and has got at least as far as `position`.
    */
-  private notePlay({
-    id,
-    position,
-    at,
-    account,
-  }: {
-    id: number
-    position: number
-    at: Date
-    account: AccountKey
-  }): void {
+  private notePlay({ id, position, at, account }: ViewingRepositoryNotePlayProps): void {
     const since = new Date(at.getTime() - SITTING_MS).toISOString()
     const latest = this.db
       .prepare<[ByAccount, number, string, string], { id: number }>(
@@ -121,15 +136,7 @@ export class ViewingRepository {
   }
 
   /** A video started playing. False when there is no such video. */
-  recordPlay({
-    id,
-    account,
-    at = new Date(),
-  }: {
-    id: number
-    account: AccountKey
-    at?: Date
-  }): boolean {
+  recordPlay({ id, account, at = new Date() }: ViewingRepositoryRecordPlayProps): boolean {
     return this.db.transaction(() => {
       if (!this.exists(id)) return false
       this.notePlay({ id, position: 0, at, account })
@@ -150,17 +157,7 @@ export class ViewingRepository {
    * library with progress saving off records no spot, not even the clearing
    * of a finished video, so turning it back on resumes from the spots it had.
    */
-  report({
-    id,
-    position,
-    account,
-    at = new Date(),
-  }: {
-    id: number
-    position: number
-    account: AccountKey
-    at?: Date
-  }): boolean {
+  report({ id, position, account, at = new Date() }: ViewingRepositoryReportProps): boolean {
     return this.db.transaction(() => {
       const target = this.db
         .prepare<
@@ -209,12 +206,7 @@ export class ViewingRepository {
     limit,
     watchedOnly = false,
     account,
-  }: {
-    libraryId: number
-    limit: number
-    watchedOnly?: boolean
-    account: AccountKey
-  }): HistoryEntry[] {
+  }: ViewingRepositoryHistoryProps): HistoryEntry[] {
     const rows = this.db
       .prepare<[ByAccount, number, number], HistoryRow>(
         `SELECT pl.media_id AS id, MAX(pl.played_at) AS last_played_at,

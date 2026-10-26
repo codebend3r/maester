@@ -3,6 +3,8 @@ import { playerQueryKeys } from '@raven/ui/headless'
 import { useEffect } from 'react'
 import { onAccessTokenChange } from '@/stores/authSession'
 
+type UseTicketFollowsSessionProps = { mediaId: number }
+
 /**
  * Mints the open title a new media ticket whenever the session's token is
  * refreshed. An account ticket lasts no longer than the token it was minted
@@ -11,7 +13,7 @@ import { onAccessTokenChange } from '@/stores/authSession'
  * timer renews it, and the next seek or range would be refused. A disabled
  * ticket query, a player with no media origin to use it on, is left alone.
  */
-export const useTicketFollowsSession = ({ mediaId }: { mediaId: number }): void => {
+export const useTicketFollowsSession = ({ mediaId }: UseTicketFollowsSessionProps): void => {
   const queryClient = useQueryClient()
   useEffect(
     () =>

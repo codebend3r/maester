@@ -19,8 +19,10 @@ const initials = (name: string): string =>
 
 const score = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 })
 
+type ScoreProps = { rating: number }
+
 /** A reviewer's score out of 10, in the serif, read out in full. */
-const Score = ({ rating }: { rating: number }) => (
+const Score = ({ rating }: ScoreProps) => (
   <span className={styles.score}>
     <span aria-hidden="true">
       {score.format(rating)}
@@ -30,7 +32,9 @@ const Score = ({ rating }: { rating: number }) => (
   </span>
 )
 
-const Avatar = ({ review }: { review: Review }) => {
+type AvatarProps = { review: Review }
+
+const Avatar = ({ review }: AvatarProps) => {
   const [failed, setFailed] = useState(false)
   const url = api.reviewAvatarUrl({ reviewId: review.id, avatarVersion: review.avatarVersion })
   return (
@@ -44,8 +48,10 @@ const Avatar = ({ review }: { review: Review }) => {
   )
 }
 
+type ReviewDialogProps = { review: Review; onClose: () => void }
+
 /** The whole review, as paragraphs, with a link to it on TMDB. Never rendered as HTML. */
-const ReviewDialog = ({ review, onClose }: { review: Review; onClose: () => void }) => {
+const ReviewDialog = ({ review, onClose }: ReviewDialogProps) => {
   const dialog = useRef<HTMLDialogElement>(null)
   const id = useId()
   useEffect(() => {
@@ -74,7 +80,9 @@ const ReviewDialog = ({ review, onClose }: { review: Review; onClose: () => void
   )
 }
 
-const ReviewCard = ({ review }: { review: Review }) => {
+type ReviewCardProps = { review: Review }
+
+const ReviewCard = ({ review }: ReviewCardProps) => {
   const [open, setOpen] = useState(false)
   return (
     <li className={styles.card}>
@@ -93,12 +101,14 @@ const ReviewCard = ({ review }: { review: Review }) => {
   )
 }
 
+type ReviewCardsProps = { reviews: readonly Review[] }
+
 /**
  * Reviews by TMDB members, newest first, up to ten, each a card on the
  * canopy: who wrote it and when, their score out of 10, the first lines,
  * and Read for the whole thing.
  */
-export const ReviewCards = ({ reviews }: { reviews: readonly Review[] }) => {
+export const ReviewCards = ({ reviews }: ReviewCardsProps) => {
   const id = useId()
   if (reviews.length === 0) return null
   return (

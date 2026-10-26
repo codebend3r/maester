@@ -9,7 +9,9 @@ import { TIME_AGO_STYLES, formatBitrate, formatBytes, timeAgo } from '@/format'
 import { resolutionLabel } from '@/media'
 import { sortParts } from '@/sortFields'
 
-type Fact = (args: { media: MediaItem; now: Date }) => string | null
+type FactProps = { media: MediaItem; now: Date }
+
+type Fact = (args: FactProps) => string | null
 
 const added: Fact = ({ media, now }) =>
   `Added ${timeAgo({ at: media.addedAt, now, style: TIME_AGO_STYLES.long })}`
@@ -37,31 +39,32 @@ const FIELD_FACTS: Record<SortFieldName, Fact> = {
   random: none,
 }
 
+type SortFactProps = {
+  media: MediaItem
+  sort: MediaSort
+  now?: Date
+}
+
 /**
  * The value a video's card shows for the order its listing is in, so the
  * order explains itself: "Added 3 days ago", "4.9 GB", "12.3 Mb/s", "2160p".
  * Null when the card shows it already or the file has not been probed yet.
  */
-export const sortFact = ({
-  media,
-  sort,
-  now = new Date(),
-}: {
-  media: MediaItem
+export const sortFact = ({ media, sort, now = new Date() }: SortFactProps): string | null =>
+  FIELD_FACTS[sortParts(sort).field]({ media, now })
+
+type ShowSortFactProps = {
+  entry: ShowEntry
   sort: MediaSort
   now?: Date
-}): string | null => FIELD_FACTS[sortParts(sort).field]({ media, now })
+}
 
 /** The same for a show: when its newest episode came, or its files' mean bitrate, for the sorts by those. */
 export const showSortFact = ({
   entry,
   sort,
   now = new Date(),
-}: {
-  entry: ShowEntry
-  sort: MediaSort
-  now?: Date
-}): string | null => {
+}: ShowSortFactProps): string | null => {
   const { field } = sortParts(sort)
   switch (field) {
     case SORT_FIELD_NAMES.added:

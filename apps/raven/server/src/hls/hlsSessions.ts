@@ -42,17 +42,17 @@ export const HLS_SESSION_CAP = 8
 /** A session unasked for this long is forgotten: no ticket that opened it is still good. */
 const HLS_RECORD_MS = MEDIA_TICKET_SECONDS * 1000
 
+type SegmentsPastKeepingProps = {
+  segments: Iterable<number>
+  furthest: number
+}
+
 /**
  * The segments a session lets go of once `furthest` is asked for: all but
  * the last `HLS_KEPT_SEGMENTS` at or behind it.
  */
-export const segmentsPastKeeping = ({
-  segments,
-  furthest,
-}: {
-  segments: Iterable<number>
-  furthest: number
-}): number[] => [...segments].filter((n) => n <= furthest - HLS_KEPT_SEGMENTS)
+export const segmentsPastKeeping = ({ segments, furthest }: SegmentsPastKeepingProps): number[] =>
+  [...segments].filter((n) => n <= furthest - HLS_KEPT_SEGMENTS)
 
 /** What a request for a session that ended while it waited is told. */
 const sessionEnded = (): NotFoundException =>
@@ -105,18 +105,17 @@ const ready = <T>(value: T): Step<T> => ({ kind: STEPS.ready, value })
 
 const SIGNAL_EVENTS = { abort: 'abort' } as const
 
+type UntilOrGoneProps = {
+  until: Promise<void>
+  signal: AbortSignal | undefined
+}
+
 /**
  * Waits for `until`, or rejects with the signal's reason once the request's
  * client has gone, so a request nobody reads any more starts no run when
  * its wait ends. What `until` settles with later is let go.
  */
-const untilOrGone = ({
-  until,
-  signal,
-}: {
-  until: Promise<void>
-  signal: AbortSignal | undefined
-}): Promise<void> => {
+const untilOrGone = ({ until, signal }: UntilOrGoneProps): Promise<void> => {
   if (!signal) return until
   return new Promise<void>((resolve, reject) => {
     const gone = () => reject(signal.reason)
@@ -139,6 +138,78 @@ const waitThenRetry = <T>(until: Promise<unknown>): Step<T> => ({
     },
   ),
 })
+
+type HlsSessionsMintProps = {
+  mediaId: number
+  asked: StreamQuality | null
+  source: HlsSource
+  /**
+   * For a source whose seek lands mid-GOP (MPEG-TS), its keyframes as
+   * far as they are known when a run starts; null for any other.
+   */
+  keyframesFor: (() => readonly number[] | null) | null
+}
+
+type HlsSessionsGetProps = { mediaId: number; session: string }
+
+type HlsSessionsInitProps = { session: string; signal?: AbortSignal }
+
+type HlsSessionsSegmentProps = {
+  session: string
+  n: number
+  signal?: AbortSignal
+}
+
+type HlsSessionsDropProps = { mediaId: number }
+
+type HlsSessionsEnqueueProps<T> = { entry: Entry; work: () => Promise<T> }
+
+type HlsSessionsInTurnProps<T> = { entry: Entry; work: () => Promise<T> }
+
+type HlsSessionsServeProps = {
+  entry: Entry
+  n: number
+  misses: number
+  signal: AbortSignal | undefined
+}
+
+type HlsSessionsLocateProps = { entry: Entry; n: number }
+
+type HlsSessionsCutInitProps = {
+  entry: Entry
+  canStart: boolean
+  signal: AbortSignal | undefined
+}
+
+type HlsSessionsInitStepProps = {
+  entry: Entry
+  canStart: boolean
+}
+
+type HlsSessionsRestartProps = { entry: Entry; from: number }
+
+type HlsSessionsStopRunProps = { entry: Entry; reason: Error }
+
+type HlsSessionsLaunchProps = {
+  entry: Entry
+  from: number
+  folder: string
+  dialect: HlsDialect
+}
+
+type HlsSessionsSeekKeyframesOfProps = {
+  entry: Entry
+  from: number
+}
+
+type HlsSessionsRecordProps = {
+  entry: Entry
+  n: number
+  path: string
+  isFirst: boolean
+}
+
+type HlsSessionsPruneProps = { entry: Entry; n: number }
 
 /**
  * The HLS streams being played: each a session whose segments one ffmpeg
@@ -184,21 +255,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Opens a session. Nothing runs until a segment is asked for. */
-  mint({
-    mediaId,
-    asked,
-    source,
-    keyframesFor,
-  }: {
-    mediaId: number
-    asked: StreamQuality | null
-    source: HlsSource
-    /**
-     * For a source whose seek lands mid-GOP (MPEG-TS), its keyframes as
-     * far as they are known when a run starts; null for any other.
-     */
-    keyframesFor: (() => readonly number[] | null) | null
-  }): HlsSession {
+  mint({ mediaId, asked, source, keyframesFor }: HlsSessionsMintProps): HlsSession {
     const kept = [...this.entries.values()]
     if (kept.length >= HLS_SESSION_CAP) {
       this.end(
@@ -227,7 +284,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** The session, when it is kept and plays this media. */
-  get({ mediaId, session }: { mediaId: number; session: string }): HlsSession | null {
+  get({ mediaId, session }: HlsSessionsGetProps): HlsSession | null {
     const entry = this.entries.get(session)
     if (!entry || entry.session.mediaId !== mediaId) return null
     this.touch(entry)
@@ -241,7 +298,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
    * one, and then starts one at segment 0 itself. `signal` is the
    * request's: once it aborts, the init is no longer waited for.
    */
-  async init({ session, signal }: { session: string; signal?: AbortSignal }): Promise<Uint8Array> {
+  async init({ session, signal }: HlsSessionsInitProps): Promise<Uint8Array> {
     return this.cutInit({ entry: this.entryOf(session), canStart: false, signal })
   }
 
@@ -250,15 +307,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
    * request's: once it aborts, the request decides nothing more, so a
    * client that left starts and kills no run.
    */
-  async segment({
-    session,
-    n,
-    signal,
-  }: {
-    session: string
-    n: number
-    signal?: AbortSignal
-  }): Promise<Uint8Array> {
+  async segment({ session, n, signal }: HlsSessionsSegmentProps): Promise<Uint8Array> {
     const entry = this.entryOf(session)
     if (!Number.isInteger(n) || n < 0 || n >= entry.session.plan.boundaries.length) {
       throw new NotFoundException(`No segment ${n} in this stream`)
@@ -267,7 +316,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Forgets every session playing a media, whose file is gone. */
-  drop({ mediaId }: { mediaId: number }): void {
+  drop({ mediaId }: HlsSessionsDropProps): void {
     ;[...this.entries.values()]
       .filter((entry) => entry.session.mediaId === mediaId)
       .forEach((entry) => this.end(entry))
@@ -284,7 +333,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Runs `work` once every decision queued before it is done. */
-  private enqueue<T>({ entry, work }: { entry: Entry; work: () => Promise<T> }): Promise<T> {
+  private enqueue<T>({ entry, work }: HlsSessionsEnqueueProps<T>): Promise<T> {
     const result = entry.turn.then(() => {
       if (!this.isKept(entry)) throw sessionEnded()
       return work()
@@ -294,7 +343,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** A request's decision: it counts as the session being asked for, before and after. */
-  private async inTurn<T>({ entry, work }: { entry: Entry; work: () => Promise<T> }): Promise<T> {
+  private async inTurn<T>({ entry, work }: HlsSessionsInTurnProps<T>): Promise<T> {
     this.touch(entry)
     try {
       return await this.enqueue({ entry, work })
@@ -315,17 +364,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** `misses` counts the files listed for `n` that could not be read. */
-  private async serve({
-    entry,
-    n,
-    misses,
-    signal,
-  }: {
-    entry: Entry
-    n: number
-    misses: number
-    signal: AbortSignal | undefined
-  }): Promise<Uint8Array> {
+  private async serve({ entry, n, misses, signal }: HlsSessionsServeProps): Promise<Uint8Array> {
     const step = await this.inTurn({
       entry,
       work: async () => {
@@ -348,7 +387,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Where segment `n` is, or what to wait for before asking again. */
-  private async locate({ entry, n }: { entry: Entry; n: number }): Promise<Step<string>> {
+  private async locate({ entry, n }: HlsSessionsLocateProps): Promise<Step<string>> {
     const run = entry.run
     if (run) run.ask(n)
     const path = entry.written.get(n)
@@ -371,15 +410,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     return waitThenRetry(fresh.waitFor(n))
   }
 
-  private async cutInit({
-    entry,
-    canStart,
-    signal,
-  }: {
-    entry: Entry
-    canStart: boolean
-    signal: AbortSignal | undefined
-  }): Promise<Uint8Array> {
+  private async cutInit({ entry, canStart, signal }: HlsSessionsCutInitProps): Promise<Uint8Array> {
     const step = await this.inTurn({
       entry,
       work: async () => {
@@ -392,13 +423,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     return this.cutInit({ entry, canStart: hasTimedOut, signal })
   }
 
-  private async initStep({
-    entry,
-    canStart,
-  }: {
-    entry: Entry
-    canStart: boolean
-  }): Promise<Step<Uint8Array>> {
+  private async initStep({ entry, canStart }: HlsSessionsInitStepProps): Promise<Step<Uint8Array>> {
     if (entry.init) return ready(entry.init)
     if (entry.initSource) {
       // Read when asked, so a failed read is tried again on the next request.
@@ -441,7 +466,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     })
   }
 
-  private async restart({ entry, from }: { entry: Entry; from: number }): Promise<SegmentRun> {
+  private async restart({ entry, from }: HlsSessionsRestartProps): Promise<SegmentRun> {
     await this.stopRun({ entry, reason: new RunReplaced() })
     const dialect = await this.ffmpeg.hlsDialect()
     entry.runs += 1
@@ -459,7 +484,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Takes the session's run off it and stops it, failing its waiters with `reason`. */
-  private async stopRun({ entry, reason }: { entry: Entry; reason: Error }): Promise<void> {
+  private async stopRun({ entry, reason }: HlsSessionsStopRunProps): Promise<void> {
     const run = entry.run
     entry.run = null
     if (run) await run.stop(reason)
@@ -471,17 +496,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     entry.launches.clear()
   }
 
-  private launch({
-    entry,
-    from,
-    folder,
-    dialect,
-  }: {
-    entry: Entry
-    from: number
-    folder: string
-    dialect: HlsDialect
-  }): SegmentRun {
+  private launch({ entry, from, folder, dialect }: HlsSessionsLaunchProps): SegmentRun {
     const child = this.ffmpeg.segment(
       hlsArgs({
         source: entry.session,
@@ -510,10 +525,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   private seekKeyframesOf({
     entry,
     from,
-  }: {
-    entry: Entry
-    from: number
-  }): readonly number[] | null {
+  }: HlsSessionsSeekKeyframesOfProps): readonly number[] | null {
     if (!entry.keyframesFor) return null
     const keyframes = entry.keyframesFor()
     if (keyframes == null && from > 0 && !entry.hasWarnedOfSeek) {
@@ -526,17 +538,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Lists a segment a run has written whole, and its run's first file as the init's source. */
-  private record({
-    entry,
-    n,
-    path,
-    isFirst,
-  }: {
-    entry: Entry
-    n: number
-    path: string
-    isFirst: boolean
-  }): void {
+  private record({ entry, n, path, isFirst }: HlsSessionsRecordProps): void {
     if (entry.written.has(n)) {
       // Another run's copy is whole and may be being read; this one is spare.
       rm(path, { force: true }).catch(() => undefined)
@@ -547,7 +549,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Deletes all but the last `HLS_KEPT_SEGMENTS` at or behind the furthest asked for. */
-  private async prune({ entry, n }: { entry: Entry; n: number }): Promise<void> {
+  private async prune({ entry, n }: HlsSessionsPruneProps): Promise<void> {
     const furthest = Math.max(n, entry.run?.furthest ?? n)
     const paths = segmentsPastKeeping({ segments: entry.written.keys(), furthest })
       // The asked-for one is about to be read, and the init may still be cut from its source.

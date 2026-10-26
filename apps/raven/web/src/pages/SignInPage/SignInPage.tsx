@@ -23,14 +23,18 @@ const failureCopy = (error: unknown): string => {
   }
 }
 
-const SignInForm = ({ returnPath }: { returnPath: string }) => {
+type SignInFormProps = { returnPath: string }
+
+const SignInForm = ({ returnPath }: SignInFormProps) => {
   const navigate = useNavigate()
   const isReady = useAuthSession((state) => state.client !== null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isShown, setShown] = useState(false)
+  type SignInMutationFnProps = { email: string; password: string }
+
   const signIn = useMutation({
-    mutationFn: (credentials: { email: string; password: string }) =>
+    mutationFn: (credentials: SignInMutationFnProps) =>
       callAuth((client) => client.signInWithPassword(credentials)),
     onSuccess: () => navigate(returnPath, { replace: true }),
   })

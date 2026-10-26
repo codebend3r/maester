@@ -17,6 +17,8 @@ import styles from '@/components/SagaDeck/SagaDeck.module.scss'
  */
 const STACKED_SHOWN = 4
 
+type SagaDeckProps = { saga: Saga; to: string }
+
 /**
  * A saga as a deck of its posters, the first movie on top. Pointed at or
  * focused, the deck fans out like a hand of cards, and the saga's cover
@@ -26,7 +28,7 @@ const STACKED_SHOWN = 4
  * deck are asked for only once it first fans out, so a long saga costs the
  * page four pictures, not dozens.
  */
-const SagaDeck = ({ saga, to }: { saga: Saga; to: string }) => {
+const SagaDeck = ({ saga, to }: SagaDeckProps) => {
   const cover = sagaCover(saga)
   const hover = useHoverBackdrop(cover && api.sagaPictureUrl(cover))
   const select = useSelectable({ key: sagaEntryKey(saga), title: saga.name })
@@ -73,8 +75,10 @@ const SagaDeck = ({ saga, to }: { saga: Saga; to: string }) => {
   )
 }
 
+type SagaDecksProps = { libraryId: number; sagas: readonly Saga[] }
+
 /** A library's sagas side by side, each a deck. */
-export const SagaDecks = ({ libraryId, sagas }: { libraryId: number; sagas: readonly Saga[] }) => (
+export const SagaDecks = ({ libraryId, sagas }: SagaDecksProps) => (
   <ul className={styles.decks}>
     {sagas.map((saga) => (
       <SagaDeck key={saga.tmdbId} saga={saga} to={sagaPath({ libraryId, saga })} />

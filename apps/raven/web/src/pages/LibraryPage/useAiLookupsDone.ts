@@ -15,6 +15,11 @@ const isBusy = (health: MetadataHealth | undefined): boolean =>
   health.ai !== METADATA_SERVICE_STATES.off &&
   (health.aiPending > 0 || (health.tmdb === METADATA_SERVICE_STATES.ok && health.pending > 0))
 
+type UseAiLookupsDoneProps = {
+  libraryId: number
+  files: readonly MediaItem[]
+}
+
 /**
  * The AI lookups run after a matching pass, once nothing is pending, so the
  * Not matched tab calls this to see what they find. While the server is
@@ -22,13 +27,7 @@ const isBusy = (health: MetadataHealth | undefined): boolean =>
  * seconds. Once it goes from busy to idle, the listing and the library's
  * count are read again: a lookup over between two reads is caught too.
  */
-export const useAiLookupsDone = ({
-  libraryId,
-  files,
-}: {
-  libraryId: number
-  files: readonly MediaItem[]
-}): void => {
+export const useAiLookupsDone = ({ libraryId, files }: UseAiLookupsDoneProps): void => {
   const queryClient = useQueryClient()
   const health = useQuery({
     ...metadataHealthQuery,

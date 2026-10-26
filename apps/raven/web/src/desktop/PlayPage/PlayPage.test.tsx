@@ -60,14 +60,16 @@ const PASSTHROUGH: OutputSettings = {
 
 const DONE = { type: DESKTOP_REPLIES.done } as const satisfies DesktopReply
 
+type PlayMainProps = {
+  describeFile?: (fileId: string) => DesktopReply
+  output?: OutputSettings | null
+}
+
 /** Main describing each file with `describe`, answering `output` for the sound, and done to the rest. */
 const playMain = ({
   describeFile = (fileId) => ({ type: DESKTOP_REPLIES.file, file: fileId === A ? CLIP_A : CLIP_B }),
   output = null,
-}: {
-  describeFile?: (fileId: string) => DesktopReply
-  output?: OutputSettings | null
-} = {}) =>
+}: PlayMainProps = {}) =>
   fakeClient({
     request: async (request: DesktopRequest) => {
       if (request.type === DESKTOP_REQUESTS.describeFile) return describeFile(request.fileId)

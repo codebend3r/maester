@@ -22,14 +22,13 @@ const show: FetchedItem = {
   title: 'Andor',
 }
 
-/** A browser that sees every library but `hidden`, and an item when a library it sees holds it. */
-const viewerHiding = ({
-  hidden,
-  metadata,
-}: {
+type ViewerHidingProps = {
   hidden: number
   metadata: MetadataRepository
-}): Viewer => {
+}
+
+/** A browser that sees every library but `hidden`, and an item when a library it sees holds it. */
+const viewerHiding = ({ hidden, metadata }: ViewerHidingProps): Viewer => {
   const seesLibrary = (libraryId: number): boolean => libraryId !== hidden
   const seesItem = (itemId: number): boolean => {
     const holding = metadata.librariesHolding(itemId)
@@ -54,7 +53,9 @@ describe("a page's children", () => {
     }).id
     const { metadata } = stores()
     const index = new MediaIndex(database.get())
-    const file = ({ libraryId, path }: { libraryId: number; path: string }) => {
+    type FileProps = { libraryId: number; path: string }
+
+    const file = ({ libraryId, path }: FileProps) => {
       const root = libraryId === state.open ? '/tv' : '/private'
       const id = index.insert({
         libraryId,
@@ -89,13 +90,12 @@ describe("a page's children", () => {
       ],
     })
     state.seasons = [seasonOne.id, seasonTwo.id]
-    const episode = ({
-      season,
-      number,
-    }: {
+    type EpisodeProps = {
       season: { episodes: Map<number, number> }
       number: number
-    }) => season.episodes.get(number) ?? -1
+    }
+
+    const episode = ({ season, number }: EpisodeProps) => season.episodes.get(number) ?? -1
     // Episode 1 is in both libraries, the open copy watched part way; episode 2 only in the
     // locked one; episode 3 has no file. Season 2's only episode sits in the locked library.
     metadata.link({
@@ -196,13 +196,12 @@ describe("a page's children", () => {
       account: TEST_ACCOUNTS.a,
     })
     const [seasonOne = -1] = state.seasons
-    const watchedAmong = ({
-      hidden,
-      account = TEST_ACCOUNTS.a,
-    }: {
+    type WatchedAmongProps = {
       hidden: number
       account?: AccountKey
-    }) => {
+    }
+
+    const watchedAmong = ({ hidden, account = TEST_ACCOUNTS.a }: WatchedAmongProps) => {
       const viewer = viewerHiding({ hidden, metadata })
       const read = { viewer, metadata, media, account }
       return {

@@ -34,13 +34,12 @@ const serverReplying = (replies: Reply[], onCall: (call: number) => void = () =>
     ),
   )
 
-const signedInWith = ({
-  refresh,
-  signOut = async () => ({ error: null }),
-}: {
+type SignedInWithProps = {
   refresh: AuthClient['refreshSession']
   signOut?: AuthClient['signOut']
-}) => {
+}
+
+const signedInWith = ({ refresh, signOut = async () => ({ error: null }) }: SignedInWithProps) => {
   const stale = fakeSession({ accessToken: 'stale' })
   const fake = fakeAuthClient({ session: stale, calls: { refreshSession: refresh, signOut } })
   useAuthSession.setState({

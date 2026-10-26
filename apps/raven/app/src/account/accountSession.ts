@@ -13,9 +13,11 @@ import { secretStore } from '@/servers/deviceSecretStore'
 import { secretStateStorage } from '@/servers/secretStore'
 import { RAVEN_SERVER } from '@/servers/ravenServer'
 
+type SignInProps = { email: string; password: string }
+
 type AccountSessionState = {
   session: AccountSession | null
-  signIn: (input: { email: string; password: string }) => Promise<AuthOutcome>
+  signIn: (input: SignInProps) => Promise<AuthOutcome>
   /** A new access token, or null when there is none to give (signed out, or Supabase unreachable). */
   refresh: () => Promise<string | null>
   signOut: () => void

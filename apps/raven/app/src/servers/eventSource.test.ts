@@ -34,7 +34,9 @@ const fakeSources = () => {
       },
     }
   }
-  const say = ({ source, type, data }: { source: Made | undefined; type: string; data?: string }) =>
+  type SayProps = { source: Made | undefined; type: string; data?: string }
+
+  const say = ({ source, type, data }: SayProps) =>
     (source?.heard ?? [])
       .filter((entry) => entry.type === type)
       .forEach(({ listener }) => listener({ type, data }))

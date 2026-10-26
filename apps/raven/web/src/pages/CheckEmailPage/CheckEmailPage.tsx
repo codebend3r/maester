@@ -11,7 +11,9 @@ import { useCooldown } from '@/lib/useCooldown'
 import { useAuthSession } from '@/stores/authSession'
 import styles from '@/pages/CheckEmailPage/CheckEmailPage.module.scss'
 
-const Resend = ({ address }: { address: string }) => {
+type ResendProps = { address: string }
+
+const Resend = ({ address }: ResendProps) => {
   const isReady = useAuthSession((state) => state.client !== null)
   const cooldown = useCooldown()
   const resend = useMutation({

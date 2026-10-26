@@ -42,13 +42,15 @@ const ALIAS_LOOKUPS = 5
 /** How far from the name's year a result can be to have them looked up: as far as `pickMatch` reaches. */
 const ALIAS_YEARS_APART = 3
 
+type AliasTierProps = { result: SearchResult; name: string }
+
 /**
  * How soon a result's other titles are looked up: 0 when a title starts with
  * the name's words (Archie (2023) is "Archie: The Man Who Became Cary Grant"
  * in its own country), 1 when none contains the name, so TMDB found it by an
  * alternative title ("Expired" finds Loveland), 2 when one holds it mid-title.
  */
-const aliasTier = ({ result, name }: { result: SearchResult; name: string }): 0 | 1 | 2 => {
+const aliasTier = ({ result, name }: AliasTierProps): 0 | 1 | 2 => {
   const titles = [result.title, result.originalTitle].flatMap((title) =>
     title == null ? [] : [`${foldTitle(title)} `],
   )
@@ -80,6 +82,65 @@ export type MatchPassDeps = {
   files: MatchFiles
   scores: Scores
   logger: Logger
+}
+
+type MatchPassResolveProps = {
+  type: MatchItemType
+  fix: FixMatch
+  ids: NameIds
+  nfoPath: string | null
+  titles: readonly SearchTitle[]
+  /** The TMDB id the AI lookup chose for the group, being sure; null when it was not asked, unsure, or chose nothing. */
+  decided?: string | null
+}
+
+type MatchPassFromIdsProps = {
+  type: MatchItemType
+  ids: NameIds
+  nfoPath: string | null
+}
+
+type MatchPassIdFromIdsProps = {
+  ids: NameIds
+  type: MatchItemType
+}
+
+type MatchPassSearchEachProps = {
+  type: MatchItemType
+  titles: readonly SearchTitle[]
+}
+
+type MatchPassSearchProps = {
+  type: MatchItemType
+  title: string
+  year: number | null
+  country?: string | null
+}
+
+type MatchPassAliasesOfProps = {
+  type: MatchItemType
+  title: string
+  year: number | null
+  results: readonly SearchResult[]
+}
+
+type MatchPassEnsureProps = {
+  type: MatchItemType
+  tmdbId: string
+}
+
+type MatchPassEnsureSeasonProps = {
+  showId: number
+  showTmdbId: string
+  number: number
+}
+
+type MatchPassEpisodeForProps = {
+  season: SeasonData
+  showId: number
+  showTmdbId: string
+  number: number
+  title: string | null
 }
 
 /**
@@ -120,15 +181,7 @@ export class MatchPass {
     nfoPath,
     titles,
     decided = null,
-  }: {
-    type: MatchItemType
-    fix: FixMatch
-    ids: NameIds
-    nfoPath: string | null
-    titles: readonly SearchTitle[]
-    /** The TMDB id the AI lookup chose for the group, being sure; null when it was not asked, unsure, or chose nothing. */
-    decided?: string | null
-  }): Promise<Resolved> {
+  }: MatchPassResolveProps): Promise<Resolved> {
     if (fix.kind === FIX_MATCH_KINDS.notAMatch) return { kind: RESOLVED_KINDS.unmatched }
     const tmdbId =
       fix.kind === FIX_MATCH_KINDS.tmdb
@@ -147,15 +200,7 @@ export class MatchPass {
   }
 
   /** The id a name gives, or else the NFO beside it. */
-  private async fromIds({
-    type,
-    ids,
-    nfoPath,
-  }: {
-    type: MatchItemType
-    ids: NameIds
-    nfoPath: string | null
-  }): Promise<string | null> {
+  private async fromIds({ type, ids, nfoPath }: MatchPassFromIdsProps): Promise<string | null> {
     const fromName = await this.idFromIds({ ids, type })
     if (fromName != null || nfoPath == null) return fromName
     const nfoIds = await this.nfos.get({ key: nfoPath, make: () => readNfoIds(nfoPath) })
@@ -163,16 +208,12 @@ export class MatchPass {
   }
 
   /** TMDB's id for the first id a name or NFO gives, as a movie or a show. */
-  private async idFromIds({
-    ids,
-    type,
-  }: {
-    ids: NameIds
-    type: MatchItemType
-  }): Promise<string | null> {
+  private async idFromIds({ ids, type }: MatchPassIdFromIdsProps): Promise<string | null> {
     if (ids.tmdb != null) return ids.tmdb
     const { tmdb } = this.deps
-    const pick = (found: { movies: string[]; shows: string[] }): string | null =>
+    type PickProps = { movies: string[]; shows: string[] }
+
+    const pick = (found: PickProps): string | null =>
       (type === ITEM_TYPES.movie ? found.movies[0] : found.shows[0]) ?? null
     if (type === ITEM_TYPES.show && ids.tvdb != null) {
       return pick(await tmdb.find({ id: ids.tvdb, source: TMDB_EXTERNAL_SOURCES.tvdbId }))
@@ -187,13 +228,7 @@ export class MatchPass {
   }
 
   /** The first of `titles` a search finds a sure answer for. */
-  private searchEach({
-    type,
-    titles,
-  }: {
-    type: MatchItemType
-    titles: readonly SearchTitle[]
-  }): Promise<string | null> {
+  private searchEach({ type, titles }: MatchPassSearchEachProps): Promise<string | null> {
     return titles.reduce<Promise<string | null>>(
       (previous, title) => previous.then((found) => found ?? this.search({ type, ...title })),
       Promise.resolve(null),
@@ -205,23 +240,17 @@ export class MatchPass {
     title,
     year,
     country = null,
-  }: {
-    type: MatchItemType
-    title: string
-    year: number | null
-    country?: string | null
-  }): Promise<string | null> {
+  }: MatchPassSearchProps): Promise<string | null> {
     const { tmdb } = this.deps
     return this.searches.get({
       key: `${type}|${foldTitle(title)}|${year ?? ''}|${country ?? ''}`,
       make: async () => {
-        const ask = ({
-          query,
-          includeAdult = false,
-        }: {
+        type AskProps = {
           query: string
           includeAdult?: boolean
-        }): Promise<SearchResult[]> =>
+        }
+
+        const ask = ({ query, includeAdult = false }: AskProps): Promise<SearchResult[]> =>
           type === ITEM_TYPES.movie
             ? tmdb.searchMovies({ query, year, includeAdult })
             : tmdb.searchShows({ query, year })
@@ -268,12 +297,7 @@ export class MatchPass {
     title,
     year,
     results,
-  }: {
-    type: MatchItemType
-    title: string
-    year: number | null
-    results: readonly SearchResult[]
-  }): Promise<Map<string, string[]>> {
+  }: MatchPassAliasesOfProps): Promise<Map<string, string[]>> {
     const name = foldTitle(title)
     const near = results
       .filter(
@@ -298,13 +322,7 @@ export class MatchPass {
   }
 
   /** The stored movie or show for a TMDB id, fetched first when raven does not have it; null when TMDB has no such one. */
-  private ensure({
-    type,
-    tmdbId,
-  }: {
-    type: MatchItemType
-    tmdbId: string
-  }): Promise<number | null> {
+  private ensure({ type, tmdbId }: MatchPassEnsureProps): Promise<number | null> {
     const { tmdb, metadata, scores } = this.deps
     return this.fetches.get({
       key: `${type}:${tmdbId}`,
@@ -329,15 +347,7 @@ export class MatchPass {
    * A show's season, stored already, fetched once a pass, or made up when
    * TMDB has no such season.
    */
-  ensureSeason({
-    showId,
-    showTmdbId,
-    number,
-  }: {
-    showId: number
-    showTmdbId: string
-    number: number
-  }): Promise<SeasonData> {
+  ensureSeason({ showId, showTmdbId, number }: MatchPassEnsureSeasonProps): Promise<SeasonData> {
     const { tmdb, metadata } = this.deps
     return this.seasons.get({
       key: `${showId}:${number}`,
@@ -372,13 +382,7 @@ export class MatchPass {
     showTmdbId,
     number,
     title,
-  }: {
-    season: SeasonData
-    showId: number
-    showTmdbId: string
-    number: number
-    title: string | null
-  }): Promise<number> {
+  }: MatchPassEpisodeForProps): Promise<number> {
     const { tmdb, metadata } = this.deps
     const known = season.episodes.get(number)
     if (known != null) return known

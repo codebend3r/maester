@@ -5,8 +5,10 @@ import { AUTH_SESSION_STATUSES, type AuthSessionState, useAuthSession } from '@/
 
 type SessionView = Pick<AuthSessionState, 'status' | 'session'>
 
+type IsSameForMainProps = { before: SessionView; after: SessionView }
+
 /** Whether two reads of the session hand main the same thing; a booting one hands it nothing. */
-const isSameForMain = ({ before, after }: { before: SessionView; after: SessionView }) =>
+const isSameForMain = ({ before, after }: IsSameForMainProps) =>
   before.status === after.status &&
   (before.session?.accessToken ?? null) === (after.session?.accessToken ?? null) &&
   (before.session?.userId ?? null) === (after.session?.userId ?? null)

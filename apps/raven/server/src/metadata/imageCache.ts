@@ -48,11 +48,34 @@ const exists = async (path: string): Promise<boolean> =>
     () => false,
   )
 
-const temporary = ({ dir, extension }: { dir: string; extension: string }): string =>
+type TemporaryProps = { dir: string; extension: string }
+
+const temporary = ({ dir, extension }: TemporaryProps): string =>
   join(dir, `.${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`)
 
 export const contentTypeOf = (path: string): string =>
   path.toLowerCase().endsWith('.png') ? RAVEN_CONTENT_TYPES.png : RAVEN_CONTENT_TYPES.jpeg
+
+type ImageCacheOnceProps = {
+  key: string
+  make: () => Promise<string | null>
+}
+
+type ImageCacheWarnOnceProps = { key: string; message: string }
+
+type ImageCacheTmdbProps = { path: string; width: ImageWidth }
+
+type ImageCacheLocalProps = {
+  itemId: number
+  kind: string
+  source: string
+  width: ImageWidth
+}
+
+type ImageCacheSweepProps = {
+  tmdbPaths: ReadonlySet<string>
+  itemIds: ReadonlySet<number>
+}
 
 /**
  * Posters, backdrops, photos and stills on disk beside the thumbnails, each
@@ -91,13 +114,7 @@ export class ImageCache {
   }
 
   /** Runs `make` once per key at a time; later callers wait on the same promise. */
-  private once({
-    key,
-    make,
-  }: {
-    key: string
-    make: () => Promise<string | null>
-  }): Promise<string | null> {
+  private once({ key, make }: ImageCacheOnceProps): Promise<string | null> {
     const running = this.working.get(key)
     if (running) return running
     const started = make().finally(() => this.working.delete(key))
@@ -105,14 +122,14 @@ export class ImageCache {
     return started
   }
 
-  private warnOnce({ key, message }: { key: string; message: string }): void {
+  private warnOnce({ key, message }: ImageCacheWarnOnceProps): void {
     if (this.warned.has(key)) return
     this.warned.add(key)
     this.logger.warn(message)
   }
 
   /** A TMDB picture's cached file at `width`, downloaded on first use; null when TMDB cannot serve it. */
-  tmdb({ path, width }: { path: string; width: ImageWidth }): Promise<string | null> {
+  tmdb({ path, width }: ImageCacheTmdbProps): Promise<string | null> {
     if (!TMDB_IMAGE_PATH.test(path)) return Promise.resolve(null)
     const size = `w${width}`
     const dir = join(this.root, 'tmdb', size)
@@ -149,17 +166,7 @@ export class ImageCache {
   }
 
   /** A picture beside the media, scaled once to `width`; null when it is gone or will not decode. */
-  local({
-    itemId,
-    kind,
-    source,
-    width,
-  }: {
-    itemId: number
-    kind: string
-    source: string
-    width: ImageWidth
-  }): Promise<string | null> {
+  local({ itemId, kind, source, width }: ImageCacheLocalProps): Promise<string | null> {
     return this.once({
       key: `${itemId}-${kind}-${width}`,
       make: async () => {
@@ -201,13 +208,7 @@ export class ImageCache {
    * Removes cached pictures nothing points at any more: TMDB files no item
    * or person uses, and local scales of items that are gone.
    */
-  async sweep({
-    tmdbPaths,
-    itemIds,
-  }: {
-    tmdbPaths: ReadonlySet<string>
-    itemIds: ReadonlySet<number>
-  }): Promise<void> {
+  async sweep({ tmdbPaths, itemIds }: ImageCacheSweepProps): Promise<void> {
     await Promise.all(
       KEPT_WIDTHS.map(async (width) => {
         const dir = join(this.root, 'tmdb', `w${width}`)

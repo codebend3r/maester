@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import { logoTone, toneOfPixels } from '@/lib/logoTone'
 
+type PixelsProps = { grey: number; alpha: number; count: number }
+
 /** RGBA bytes for pixels of one grey, at one opacity. */
-const pixels = ({ grey, alpha, count }: { grey: number; alpha: number; count: number }) =>
+const pixels = ({ grey, alpha, count }: PixelsProps) =>
   Array.from({ length: count }, () => [grey, grey, grey, alpha]).flat()
 
 describe('toneOfPixels', () => {

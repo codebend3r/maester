@@ -6,6 +6,10 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
 
 const PAYLOAD = /^(\d+)\.(\d+)$/
 
+type MediaTicketsIssueProps = { id: number; now?: number }
+
+type MediaTicketsVerifyProps = { ticket: string; id: number; now?: number }
+
 /**
  * Signs and checks the ticket that lets a media request through without a
  * cookie, for the origins a browser cannot send one to. A ticket names one
@@ -20,7 +24,7 @@ export class MediaTickets {
     return this.config.mediaPlane.secret != null
   }
 
-  issue({ id, now = Date.now() }: { id: number; now?: number }): MediaTicket {
+  issue({ id, now = Date.now() }: MediaTicketsIssueProps): MediaTicket {
     if (!Number.isSafeInteger(id) || id <= 0) throw new Error(`${id} is not a media id`)
     const expiresAt = now + MEDIA_TICKET_SECONDS * 1000
     const payload = `${id}.${expiresAt}`
@@ -29,7 +33,7 @@ export class MediaTickets {
     return { ticket: `${Buffer.from(payload).toString('base64url')}.${signature}`, expiresAt }
   }
 
-  verify({ ticket, id, now = Date.now() }: { ticket: string; id: number; now?: number }): boolean {
+  verify({ ticket, id, now = Date.now() }: MediaTicketsVerifyProps): boolean {
     const parts = ticket.split('.')
     if (parts.length !== 2) return false
     const [encoded = '', given = ''] = parts

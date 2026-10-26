@@ -11,19 +11,22 @@ import type { ServerCallResult } from '@/main/servers/serverCalls'
 const SERVER_ID = '00000000-0000-4000-8000-000000000001'
 const OTHER_ID = '00000000-0000-4000-8000-000000000002'
 
-const minted = ({ count }: { count: number }): ServerCallResult => ({
+type MintedProps = { count: number }
+
+const minted = ({ count }: MintedProps): ServerCallResult => ({
   ok: true,
   status: 200,
   body: JSON.stringify({ ticket: `account.t${count}`, expiresAt: 1 }),
 })
 
-const setup = ({
-  answer = minted,
-  isSignedIn = true,
-}: {
-  answer?: (input: { count: number }) => ServerCallResult | Promise<ServerCallResult>
+type AnswerProps = { count: number }
+
+type SetupProps = {
+  answer?: (input: AnswerProps) => ServerCallResult | Promise<ServerCallResult>
   isSignedIn?: boolean
-} = {}) => {
+}
+
+const setup = ({ answer = minted, isSignedIn = true }: SetupProps = {}) => {
   const clock = { now: 1_000_000 }
   const made: { serverId: string; call: AllowedCall }[] = []
   const asked: string[] = []
@@ -45,7 +48,9 @@ const setup = ({
 
 const TITLE = { serverId: SERVER_ID, mediaId: 7, isFresh: false } as const
 
-const refusal = ({ status, reason }: { status: number; reason: string }): ServerCallResult => ({
+type RefusalProps = { status: number; reason: string }
+
+const refusal = ({ status, reason }: RefusalProps): ServerCallResult => ({
   ok: true,
   status,
   body: JSON.stringify({ reason, message: 'no' }),

@@ -19,7 +19,9 @@ import {
 import { configFor } from '@/main/test/configFakes'
 import type { StateFs } from '@/main/stateStore'
 
-const idFor = ({ n }: { n: number }): string =>
+type IdForProps = { n: number }
+
+const idFor = ({ n }: IdForProps): string =>
   `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`
 
 const ORIGIN = 'https://raven.example.ts.net'
@@ -28,8 +30,10 @@ const SERVER = { origin: ORIGIN, aliases: [ALIAS] }
 const NEW_ID = idFor({ n: 99 })
 const newId = () => NEW_ID
 
+type ListedForProps = { n: number; origin: string }
+
 /** A server as versions 2 to 4 kept it: more fields than version 5 reads. */
-const listedFor = ({ n, origin }: { n: number; origin: string }) => ({
+const listedFor = ({ n, origin }: ListedForProps) => ({
   id: idFor({ n }),
   origin,
   name: `Server ${n}`,
@@ -40,10 +44,14 @@ const UPDATES = { isEnabled: false, checkedAt: 5 }
 
 const CONFIG = configFor({ id: idFor({ n: 1 }), origin: ORIGIN })
 
-const missing = ({ path }: { path: string }): Error =>
+type MissingProps = { path: string }
+
+const missing = ({ path }: MissingProps): Error =>
   Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), { code: 'ENOENT' })
 
-const fakeFs = ({ initial }: { initial: Record<string, string> }) => {
+type FakeFsProps = { initial: Record<string, string> }
+
+const fakeFs = ({ initial }: FakeFsProps) => {
   const files = new Map(Object.entries(initial))
   const fs: StateFs = {
     readFile: async (path) => {
@@ -290,8 +298,9 @@ describe('serverOf and serverById', () => {
 describe('loadConfig', () => {
   const FILE = `/data/${CONFIG_FILE}`
   const now = () => 1700000000000
-  const load = ({ fs }: { fs: StateFs }) =>
-    loadConfig({ fs, file: FILE, now, server: SERVER, newId })
+  type LoadProps = { fs: StateFs }
+
+  const load = ({ fs }: LoadProps) => loadConfig({ fs, file: FILE, now, server: SERVER, newId })
 
   it('reads a version 4 file, adopting a second server that names the same one', async () => {
     const written = {

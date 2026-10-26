@@ -6,13 +6,15 @@ import { TICKET_SUPPORT, ticketSupportOf } from '@/servers/tickets'
 
 const EMPTY_HOME: Home = { inProgress: [], shelves: [] }
 
+type ApiOfProps = {
+  home?: Home
+  ticket?: (id: number) => Promise<MediaTicket>
+}
+
 const apiOf = ({
   home = EMPTY_HOME,
   ticket = async () => ({ ticket: 't', expiresAt: 1 }),
-}: {
-  home?: Home
-  ticket?: (id: number) => Promise<MediaTicket>
-}) => {
+}: ApiOfProps) => {
   const asked: number[] = []
   return {
     asked,

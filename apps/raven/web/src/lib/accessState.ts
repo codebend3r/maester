@@ -74,6 +74,12 @@ const accountState = (account: QueryView<Account>): AccessState => {
   }
 }
 
+type AccessStateOfProps = {
+  config: QueryView<AuthConfig>
+  session: SessionView
+  account: QueryView<Account>
+}
+
 /**
  * Whether the viewer may see raven, from what the server says about accounts,
  * who is signed in and what `/api/me` answered. A failure to reach the server
@@ -81,15 +87,7 @@ const accountState = (account: QueryView<Account>): AccessState => {
  * account already read stays through a failed read of it, but not through a
  * refusal.
  */
-export const accessStateOf = ({
-  config,
-  session,
-  account,
-}: {
-  config: QueryView<AuthConfig>
-  session: SessionView
-  account: QueryView<Account>
-}): AccessState => {
+export const accessStateOf = ({ config, session, account }: AccessStateOfProps): AccessState => {
   if (config.data === undefined) {
     return { kind: config.error ? ACCESS_KINDS.failed : ACCESS_KINDS.loading }
   }

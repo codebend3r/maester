@@ -73,26 +73,24 @@ type Draft = {
 type Calls = Pick<ServerCalls, 'call'>
 type Server = { calls: Calls; serverId: string; serverName: string }
 
-export const episodeLabel = ({
-  season,
-  episode,
-  title,
-}: {
+type EpisodeLabelProps = {
   season: number | null
   episode: number | null
   title: string
-}): string => {
+}
+
+export const episodeLabel = ({ season, episode, title }: EpisodeLabelProps): string => {
   const code = season === null || episode === null ? null : episodeCode({ season, episode })
   return code === null ? title : `${code} ${title}`
 }
 
-const episodeOrder = ({
-  season,
-  episode,
-}: {
+type EpisodeOrderProps = {
   season: number | null
   episode: number | null
-}): number => (season ?? 0) * 10_000 + (episode ?? 0)
+}
+
+const episodeOrder = ({ season, episode }: EpisodeOrderProps): number =>
+  (season ?? 0) * 10_000 + (episode ?? 0)
 
 /** An episode, its season and its show share one group, whichever of them was asked for. */
 const showGroupKey = ({ id, type, show }: Pick<ItemSummary, 'id' | 'type' | 'show'>): string => {
@@ -103,7 +101,9 @@ const showGroupKey = ({ id, type, show }: Pick<ItemSummary, 'id' | 'type' | 'sho
 
 const movieGroupKey = (media: MediaItem): string => `movie:${media.id}`
 
-const sagaGroupKey = ({ libraryId, tmdbId }: { libraryId: number; tmdbId: string }): string =>
+type SagaGroupKeyProps = { libraryId: number; tmdbId: string }
+
+const sagaGroupKey = ({ libraryId, tmdbId }: SagaGroupKeyProps): string =>
   `saga:${libraryId}:${tmdbId}`
 
 /** Both episodes of a two-episode file name that one file as their `primary`: it is fetched once, as the first. */
@@ -124,8 +124,10 @@ const fail = ({ reason, message }: Pick<Failure, 'reason' | 'message'>): Read<ne
   failure: { ok: false, reason, message },
 })
 
+type IsAccountRefusedProps = { status: number; body: string }
+
 /** Whether a 401 or 403 is the account refused, rather than the server's accounts being down. */
-const isAccountRefused = (result: { status: number; body: string }): boolean => {
+const isAccountRefused = (result: IsAccountRefusedProps): boolean => {
   const reason = refusalAt({ ...result, statuses: ACCOUNT_REFUSAL_STATUSES })
   return reason !== null && reason !== AUTH_REFUSALS.unavailable
 }
@@ -192,13 +194,12 @@ const draftOfMedia = (media: MediaItem): Draft => {
   }
 }
 
-const draftOfShow = async ({
-  server,
-  details,
-}: {
+type DraftOfShowProps = {
   server: Server
   details: ItemDetails
-}): Promise<Read<Draft>> => {
+}
+
+const draftOfShow = async ({ server, details }: DraftOfShowProps): Promise<Read<Draft>> => {
   const seasonIds = details.children.flatMap((child) =>
     child.type === ITEM_TYPES.season ? [child.id] : [],
   )
@@ -229,13 +230,12 @@ const draftOfShow = async ({
   }
 }
 
-const draftOfItem = async ({
-  server,
-  details,
-}: {
+type DraftOfItemProps = {
   server: Server
   details: ItemDetails
-}): Promise<Read<Draft>> => {
+}
+
+const draftOfItem = async ({ server, details }: DraftOfItemProps): Promise<Read<Draft>> => {
   const first = details.versions[0]
   switch (details.type) {
     case ITEM_TYPES.movie: {
@@ -282,13 +282,12 @@ const draftOfItem = async ({
   }
 }
 
-const draftOf = async ({
-  server,
-  target,
-}: {
+type DraftOfProps = {
   server: Server
   target: DownloadTarget
-}): Promise<Read<Draft>> => {
+}
+
+const draftOf = async ({ server, target }: DraftOfProps): Promise<Read<Draft>> => {
   switch (target.kind) {
     case DOWNLOAD_TARGET_KINDS.media: {
       const media = await read({
@@ -333,14 +332,16 @@ const draftOf = async ({
   }
 }
 
+type WatchedPercentsProps = {
+  server: Server
+  libraryIds: number[]
+}
+
 /** Each library's `watchedPercent`, read once however many files it holds. */
 const watchedPercents = ({
   server,
   libraryIds,
-}: {
-  server: Server
-  libraryIds: number[]
-}): Promise<Read<Record<number, number>>> =>
+}: WatchedPercentsProps): Promise<Read<Record<number, number>>> =>
   libraryIds.reduce<Promise<Read<Record<number, number>>>>(
     async (previous, libraryId) => {
       const soFar = await previous

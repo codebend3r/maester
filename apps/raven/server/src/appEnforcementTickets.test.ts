@@ -74,29 +74,35 @@ describe('account tickets on the media paths', () => {
   const owner = () =>
     headersFor({ fixture: tickets, caller: CALLER_KINDS.owner, via: TOKEN_CARRIERS.bearer })
 
-  const mint = ({
-    route,
-    headers,
-  }: {
+  type MintProps = {
     route: typeof ROUTES.mediaTicket | typeof ROUTES.accountTicket
     headers: Record<string, string>
-  }) =>
+  }
+
+  const mint = ({ route, headers }: MintProps) =>
     plane.app.inject({
       method: route.method,
       url: pathOf({ route, params: { id: plane.ids.video } }),
       headers,
     })
 
-  const ticketOf = async ({
-    route,
-    headers,
-  }: {
+  type TicketOfProps = {
     route: typeof ROUTES.mediaTicket | typeof ROUTES.accountTicket
     headers: Record<string, string>
-  }): Promise<string> => {
+  }
+
+  const ticketOf = async ({ route, headers }: TicketOfProps): Promise<string> => {
     const body: unknown = (await mint({ route, headers })).json()
     if (!isMediaTicket(body)) throw new Error('No ticket was minted')
     return body.ticket
+  }
+
+  type RedeemProps = {
+    ticket: string
+    route?: Route
+    params?: Record<string, number | string>
+    method?: RouteMethod
+    headers?: Record<string, string>
   }
 
   const redeem = ({
@@ -105,15 +111,12 @@ describe('account tickets on the media paths', () => {
     params = { id: plane.ids.video },
     method = ROUTE_METHODS.get,
     headers = {},
-  }: {
-    ticket: string
-    route?: Route
-    params?: Record<string, number | string>
-    method?: RouteMethod
-    headers?: Record<string, string>
-  }) => plane.app.inject({ method, url: withTicket({ route, params, ticket }), headers })
+  }: RedeemProps) =>
+    plane.app.inject({ method, url: withTicket({ route, params, ticket }), headers })
 
-  const unlockAsOwner = async ({ headers }: { headers: Record<string, string> }) => {
+  type UnlockAsOwnerProps = { headers: Record<string, string> }
+
+  const unlockAsOwner = async ({ headers }: UnlockAsOwnerProps) => {
     const unlocking = await plane.app.inject({
       method: ROUTES.unlock.method,
       url: ROUTES.unlock.path,
@@ -124,8 +127,10 @@ describe('account tickets on the media paths', () => {
     return { ...headers, [AUTH_HEADERS.cookie]: cookieSet(unlocking) }
   }
 
+  type SetLockedProps = { isLocked: boolean }
+
   /** Locks or opens the library as the owner, past the PIN, as a locked library's settings are changed. */
-  const setLocked = async ({ isLocked }: { isLocked: boolean }) => {
+  const setLocked = async ({ isLocked }: SetLockedProps) => {
     const response = await plane.app.inject({
       method: ROUTES.updateLibrary.method,
       url: pathOf({ route: ROUTES.updateLibrary, params: { id: plane.ids.library } }),

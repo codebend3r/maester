@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { MP4_BOXES, segmentFileName, segmentNumberOf, splitSegmentFile } from '@/hls/segmentFiles'
 
-const box = ({ type, body }: { type: string; body: number[] }): number[] => {
+type BoxProps = { type: string; body: number[] }
+
+const box = ({ type, body }: BoxProps): number[] => {
   const size = 8 + body.length
   return [
     (size >>> 24) & 0xff,
@@ -15,8 +17,10 @@ const box = ({ type, body }: { type: string; body: number[] }): number[] => {
 
 const LARGE_SIZE = 1
 
+type LargeBoxProps = { type: string; body: number[] }
+
 /** A box whose size sits in the 64-bit field after its type. */
-const largeBox = ({ type, body }: { type: string; body: number[] }): number[] => {
+const largeBox = ({ type, body }: LargeBoxProps): number[] => {
   const size = 16 + body.length
   return [
     0,

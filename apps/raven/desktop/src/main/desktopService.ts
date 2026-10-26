@@ -110,7 +110,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   const idByKey = new Map<string, string>()
   const entryById = new Map<string, RecentEntry>()
 
-  const recentIdFor = ({ entry }: { entry: RecentEntry }): string => {
+  type RecentIdForProps = { entry: RecentEntry }
+
+  const recentIdFor = ({ entry }: RecentIdForProps): string => {
     const key = recentKey(entry)
     const known = idByKey.get(key)
     const recentId = known ?? deps.newId()
@@ -119,9 +121,11 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     return recentId
   }
 
+  type TitleOfProps = { path: string; name: string }
+
   // A download's video is `video.<container>` in a folder named by its media id, so its title
   // and its server come from the download service, and any other file names itself.
-  const titleOf = ({ path, name }: { path: string; name: string }): string =>
+  const titleOf = ({ path, name }: TitleOfProps): string =>
     deps.downloads.labelOf({ path }) ?? titleFromFileName(name)
 
   const fromOf = (path: string): string =>
@@ -163,13 +167,15 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     }
   }
 
+  type NextAfterProps = {
+    file: GrantedFile
+    queue: readonly string[]
+  }
+
   const nextAfter = async ({
     file,
     queue,
-  }: {
-    file: GrantedFile
-    queue: readonly string[]
-  }): Promise<{ fileId: string; label: string; queue: string[] } | null> => {
+  }: NextAfterProps): Promise<{ fileId: string; label: string; queue: string[] } | null> => {
     const index = queue.findIndex((fileId) => grants.fileOf(fileId) !== null)
     const queued = index === -1 ? null : grants.fileOf(queue[index] ?? '')
     if (queued !== null) {
@@ -279,22 +285,23 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     return Promise.race([factsOf(path), timeout.promise]).finally(() => deps.timers.clear(timer))
   }
 
+  type ShareOfProps = { state: PlayerState; path: string }
+
   // A recent's bar must agree with where playback starts, so a file replaced on disk shows none.
   // Only a file with a saved position needs the check; the rest are not started either way.
-  const shareOf = async ({ state, path }: { state: PlayerState; path: string }) => {
+  const shareOf = async ({ state, path }: ShareOfProps) => {
     if (!state.resume.some((entry) => entry.path === path)) return null
     const file = await factsWithin(path)
     if (file === null) return null
     return watchedShare({ state, file })
   }
 
-  const viewOf = async ({
-    state,
-    entry,
-  }: {
+  type ViewOfProps = {
     state: PlayerState
     entry: RecentEntry
-  }): Promise<RecentView> => ({
+  }
+
+  const viewOf = async ({ state, entry }: ViewOfProps): Promise<RecentView> => ({
     recentId: recentIdFor({ entry }),
     label: titleOf({ path: entry.path, name: basename(entry.path) }),
     from: fromOf(entry.path),
@@ -311,7 +318,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     }
   }
 
-  const forgetRecentIds = ({ keys }: { keys: readonly string[] }): void => {
+  type ForgetRecentIdsProps = { keys: readonly string[] }
+
+  const forgetRecentIds = ({ keys }: ForgetRecentIdsProps): void => {
     keys.forEach((key) => {
       const recentId = idByKey.get(key)
       idByKey.delete(key)
@@ -319,7 +328,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     })
   }
 
-  const openRecent = async ({ recentId }: { recentId: string }): Promise<DesktopReply> => {
+  type OpenRecentProps = { recentId: string }
+
+  const openRecent = async ({ recentId }: OpenRecentProps): Promise<DesktopReply> => {
     const entry = entryById.get(recentId)
     if (entry === undefined) return refused(MESSAGES.unknownRecent)
     const result = await grants.grant(entry.path)
@@ -327,7 +338,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     return { type: DESKTOP_REPLIES.play, target: { fileId: result.file.fileId, queue: [] } }
   }
 
-  const dropRecent = ({ recentId }: { recentId: string }): DesktopReply => {
+  type DropRecentProps = { recentId: string }
+
+  const dropRecent = ({ recentId }: DropRecentProps): DesktopReply => {
     const entry = entryById.get(recentId)
     if (entry === undefined) return DONE
     const key = recentKey(entry)

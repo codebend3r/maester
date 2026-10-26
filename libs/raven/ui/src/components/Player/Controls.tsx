@@ -6,12 +6,16 @@ import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Playe
 import { Scrubber } from '@/components/Player/Scrubber'
 import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
 
-const volumeIcon = ({ volume, muted }: { volume: number; muted: boolean }): IconName => {
+type VolumeIconProps = { volume: number; muted: boolean }
+
+const volumeIcon = ({ volume, muted }: VolumeIconProps): IconName => {
   if (muted || volume === 0) return 'muted'
   return volume < 0.5 ? 'volumeLow' : 'volume'
 }
 
-const muteLabel = ({ isVolumeFixed, muted }: { isVolumeFixed: boolean; muted: boolean }) => {
+type MuteLabelProps = { isVolumeFixed: boolean; muted: boolean }
+
+const muteLabel = ({ isVolumeFixed, muted }: MuteLabelProps) => {
   if (isVolumeFixed) return FIXED_VOLUME_NOTE
   return muted ? 'Unmute (m)' : 'Mute (m)'
 }
@@ -26,20 +30,16 @@ const MENU_ICONS = {
 const classes = (...names: ReadonlyArray<string | false | undefined>): string =>
   names.filter(Boolean).join(' ')
 
-/** A round button for the bar; every one carries its own label. */
-const ControlButton = ({
-  label,
-  onClick,
-  className,
-  disabled,
-  children,
-}: {
+type ControlButtonProps = {
   label: string
   onClick: () => void
   className?: string
   disabled?: boolean
   children: ReactNode
-}) => (
+}
+
+/** A round button for the bar; every one carries its own label. */
+const ControlButton = ({ label, onClick, className, disabled, children }: ControlButtonProps) => (
   <button
     type="button"
     className={classes(styles.button, className)}
@@ -75,23 +75,19 @@ const Pill = ({
   </button>
 )
 
-/**
- * A pill naming a menu and what it is set to, "Subtitles · English". The
- * quality pill's tip shows only its value, "4K · Direct play".
- */
-const MenuPill = ({
-  section,
-  value,
-  open,
-  buttonRef,
-  onToggle,
-}: {
+type MenuPillProps = {
   section: MenuSection
   value: string | null
   open: boolean
   buttonRef: RefObject<HTMLButtonElement | null> | undefined
   onToggle: (section: MenuSection) => void
-}) => {
+}
+
+/**
+ * A pill naming a menu and what it is set to, "Subtitles · English". The
+ * quality pill's tip shows only its value, "4K · Direct play".
+ */
+const MenuPill = ({ section, value, open, buttonRef, onToggle }: MenuPillProps) => {
   const title = MENU_TITLES[section]
   const showsTitle = section !== MENU_SECTIONS.playback || value == null
   return (
@@ -113,11 +109,13 @@ const MenuPill = ({
   )
 }
 
+type EndTimeProps = { duration: number | null; endsAt: string | null }
+
 /**
  * The video's length, or with a press the clock time it ends at; the
  * length comes first. Nothing shows while the length is unknown.
  */
-const EndTime = ({ duration, endsAt }: { duration: number | null; endsAt: string | null }) => {
+const EndTime = ({ duration, endsAt }: EndTimeProps) => {
   const [showsEndTime, setShowsEndTime] = useState(false)
   if (duration == null || endsAt == null) return null
   const length = formatDuration(duration)
@@ -135,20 +133,18 @@ const EndTime = ({ duration, endsAt }: { duration: number | null; endsAt: string
   )
 }
 
+type NextButtonProps = {
+  upNext: string | null
+  countdown: number | null
+  onNext: () => void
+}
+
 /**
  * Next, at the end of the transport whether or not anything is up next: it
  * plays what is up next now. In the video's last seconds, with autoplay on,
  * a ring round it fills as the countdown to what is up next runs out.
  */
-const NextButton = ({
-  upNext,
-  countdown,
-  onNext,
-}: {
-  upNext: string | null
-  countdown: number | null
-  onNext: () => void
-}) => {
+const NextButton = ({ upNext, countdown, onNext }: NextButtonProps) => {
   const label = upNext == null ? 'Nothing up next' : `Next: ${upNext}`
   return (
     <button

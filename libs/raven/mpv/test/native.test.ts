@@ -85,15 +85,13 @@ const harness = async () => {
       listeners.forEach((listener) => listener(event))
     },
   })
-  const eventAfter = async ({
-    type,
-    action,
-    matches = () => true,
-  }: {
+  type EventAfterProps = {
     type: MpvEvent['type']
     action: () => Promise<void>
     matches?: (event: MpvEvent) => boolean
-  }) => {
+  }
+
+  const eventAfter = async ({ type, action, matches = () => true }: EventAfterProps) => {
     let remove = () => {}
     const event = new Promise<MpvEvent>((resolveEvent, reject) => {
       const timer = setTimeout(() => {
@@ -135,13 +133,12 @@ const load = async (value: Awaited<ReturnType<typeof harness>>) => {
     action: () => value.player.command({ args: [MPV_COMMANDS.loadfile, clip] }),
   })
 }
-const positionNear = async ({
-  player,
-  remaining = 100,
-}: {
+type PositionNearProps = {
   player: Mpv
   remaining?: number
-}): Promise<number> => {
+}
+
+const positionNear = async ({ player, remaining = 100 }: PositionNearProps): Promise<number> => {
   const position = await player.read({ name: MPV_PROPERTIES.timePos })
   if (position !== null && Math.abs(position - 4) < 0.25) return position
   if (remaining === 0) throw new Error('Seek never reached target')

@@ -23,6 +23,13 @@ type QueryPick<TData, TKey extends QueryKey> = (
   queries: RavenQueries,
 ) => FetchQueryOptions<TData, Error, TData, TKey>
 
+type AskingProps<TData, TKey extends QueryKey> = {
+  name: string
+  key: QueryKey
+  pick: QueryPick<TData, TKey>
+  call: (api: ApiClient) => Promise<unknown>
+}
+
 /**
  * A query, the key it is filed under, and the call it makes, so a query
  * asks the server just as calling the client does.
@@ -32,12 +39,7 @@ const asking = <TData, TKey extends QueryKey>({
   key,
   pick,
   call,
-}: {
-  name: string
-  key: QueryKey
-  pick: QueryPick<TData, TKey>
-  call: (api: ApiClient) => Promise<unknown>
-}) => ({
+}: AskingProps<TData, TKey>) => ({
   name,
   key,
   keyOf: (queries: RavenQueries): QueryKey => pick(queries).queryKey,
@@ -46,16 +48,14 @@ const asking = <TData, TKey extends QueryKey>({
   call,
 })
 
-/** A query still waiting on what it needs, and the key it is filed under meanwhile. */
-const waiting = <TData, TKey extends QueryKey>({
-  name,
-  key,
-  pick,
-}: {
+type WaitingProps<TData, TKey extends QueryKey> = {
   name: string
   key: QueryKey
   pick: QueryPick<TData, TKey>
-}) => ({
+}
+
+/** A query still waiting on what it needs, and the key it is filed under meanwhile. */
+const waiting = <TData, TKey extends QueryKey>({ name, key, pick }: WaitingProps<TData, TKey>) => ({
   name,
   key,
   keyOf: (queries: RavenQueries): QueryKey => pick(queries).queryKey,

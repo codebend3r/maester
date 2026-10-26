@@ -48,6 +48,8 @@ type NativeTarget = {
   }
 }
 
+type AddProductFileProps = { group: string; target: string; sourceTree: string }
+
 /**
  * The part of the `xcode` package's project Expo hands a mod that the plugin calls. The
  * package ships no types; these are its own methods, with their own positional signatures.
@@ -59,10 +61,7 @@ type XcodeProjectApi = {
     defaultName: string,
     comment: string,
   ) => { uuid: string }
-  addProductFile: (
-    path: string,
-    options: { group: string; target: string; sourceTree: string },
-  ) => { fileRef: string }
+  addProductFile: (path: string, options: AddProductFileProps) => { fileRef: string }
   addToPbxNativeTargetSection: (target: NativeTarget) => void
   addToPbxProjectSection: (target: NativeTarget) => void
   addPbxGroup: (files: string[], name: string, path: string) => { uuid: string }
@@ -123,14 +122,16 @@ const TEST_SETTINGS = {
   ),
 } as const
 
+type SchemeOfProps = {
+  target: string
+  project: string
+}
+
 /** A shared scheme whose Test action runs the bundle, which `xcodebuild test` needs. */
 const schemeOf = ({
   target,
   project,
-}: {
-  target: string
-  project: string
-}): string => `<?xml version="1.0" encoding="UTF-8"?>
+}: SchemeOfProps): string => `<?xml version="1.0" encoding="UTF-8"?>
 <Scheme LastUpgradeVersion = "1600" version = "1.7">
    <BuildAction parallelizeBuildables = "YES" buildImplicitDependencies = "YES">
    </BuildAction>

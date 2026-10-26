@@ -61,18 +61,22 @@ type Body =
 
 const ROUTE_KINDS = { numbered: 'numbered', fixed: 'fixed' } as const
 
+type ReadProps = { id: number; body: Body }
+
+type RouteReadProps = { body: Body }
+
 type Route =
   | {
       kind: typeof ROUTE_KINDS.numbered
       method: ServerMethod
       pattern: RegExp
-      read: (input: { id: number; body: Body }) => AllowedCall | null
+      read: (input: ReadProps) => AllowedCall | null
     }
   | {
       kind: typeof ROUTE_KINDS.fixed
       method: ServerMethod
       path: string
-      read: (input: { body: Body }) => AllowedCall | null
+      read: (input: RouteReadProps) => AllowedCall | null
     }
 
 const NONE = { kind: BODY_KINDS.none } as const satisfies Body
@@ -86,13 +90,17 @@ const readBody = (body: string | null): Body => {
 
 const ID_PARAM = `:${AUTH_PARAMS.id}`
 
+type WithIdProps = { path: string; id: string }
+
 /** An account route's path with its `:id` filled in. */
-const withId = ({ path, id }: { path: string; id: string }): string => path.replace(ID_PARAM, id)
+const withId = ({ path, id }: WithIdProps): string => path.replace(ID_PARAM, id)
+
+type BareCallbackProps = { body: Body }
 
 /** Only for the calls that take no body: anything sent along refuses the call. */
 const bare =
   (call: AllowedCall) =>
-  ({ body }: { body: Body }): AllowedCall | null =>
+  ({ body }: BareCallbackProps): AllowedCall | null =>
     body.kind === BODY_KINDS.none ? call : null
 
 // Matched on the whole string, digits only, so no query, fragment, dot segment,
@@ -159,23 +167,23 @@ const ROUTES: readonly Route[] = [
   },
 ]
 
+type IdOfProps = { pattern: RegExp; path: string }
+
 /** The id a numbered route captured, when it is an id written the one way it can be. */
-const idOf = ({ pattern, path }: { pattern: RegExp; path: string }): number | null => {
+const idOf = ({ pattern, path }: IdOfProps): number | null => {
   const digits = pattern.exec(path)?.[1] ?? null
   if (digits === null) return null
   const id = Number(digits)
   return isMediaId(id) && String(id) === digits ? id : null
 }
 
-const matchRoute = ({
-  route,
-  path,
-  body,
-}: {
+type MatchRouteProps = {
   route: Route
   path: string
   body: Body
-}): AllowedCall | null => {
+}
+
+const matchRoute = ({ route, path, body }: MatchRouteProps): AllowedCall | null => {
   switch (route.kind) {
     case ROUTE_KINDS.fixed:
       return route.path === path ? route.read({ body }) : null
@@ -190,19 +198,17 @@ const matchRoute = ({
   }
 }
 
+type MatchCallProps = {
+  method: string
+  path: string
+  body: string | null
+}
+
 /**
  * One of the allowlisted calls, read from its request, or null for anything else. Main reads back
  * each request it built, so a value that slipped past the types never reaches a path.
  */
-export const matchCall = ({
-  method,
-  path,
-  body,
-}: {
-  method: string
-  path: string
-  body: string | null
-}): AllowedCall | null => {
+export const matchCall = ({ method, path, body }: MatchCallProps): AllowedCall | null => {
   const read = readBody(body)
   if (read.kind === BODY_KINDS.bad) return null
   return ROUTES.reduce<AllowedCall | null>(

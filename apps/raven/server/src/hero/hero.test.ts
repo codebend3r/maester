@@ -16,13 +16,12 @@ import { fakeTmdb } from '@/test/fakeTmdb'
 
 const HERO_COUNT = 2
 
-const shape = <T>({
-  response,
-  guard,
-}: {
+type ShapeProps<T> = {
   response: { rawPayload: Buffer; json: () => unknown }
   guard: (value: unknown) => value is T
-}): T => {
+}
+
+const shape = <T>({ response, guard }: ShapeProps<T>): T => {
   const body: unknown = response.json()
   if (!guard(body)) throw new Error(`Unexpected body: ${response.rawPayload.toString()}`)
   return body
@@ -57,15 +56,13 @@ describe('home hero', () => {
   }
   const hero = async (): Promise<Hero> =>
     shape({ response: await app().inject({ method: 'GET', url: '/api/home/hero' }), guard: isHero })
-  const pick = ({
-    itemId,
-    isShown,
-    asAdmin = true,
-  }: {
+  type PickProps = {
     itemId: number
     isShown: boolean
     asAdmin?: boolean
-  }) =>
+  }
+
+  const pick = ({ itemId, isShown, asAdmin = true }: PickProps) =>
     asAdmin
       ? injectAs({ app: app(), cookie: state.admin })({
           method: 'PUT',
@@ -219,21 +216,27 @@ describe('home hero', () => {
           headers: { cookie: state.admin },
         }),
       )
+    type AsProps = { isAdmin: boolean; pin: string | null }
+
     /**
      * A browser by its cookies: the admin's, the PIN's, both, or neither. The PIN's alone is the
      * admin lock back on while the unlock still stands.
      */
-    const as = ({ isAdmin, pin }: { isAdmin: boolean; pin: string | null }) => ({
+    const as = ({ isAdmin, pin }: AsProps) => ({
       cookie: cookies(isAdmin ? state.admin : undefined, pin ?? undefined),
     })
-    const setInHero = ({ cookie, inHero }: { cookie: string; inHero: boolean }) =>
+    type SetInHeroProps = { cookie: string; inHero: boolean }
+
+    const setInHero = ({ cookie, inHero }: SetInHeroProps) =>
       app().inject({
         method: 'PUT',
         url: `/api/libraries/${state.vault}/hero`,
         payload: { inHero },
         headers: { cookie },
       })
-    const heroFor = async (browser: { cookie: string }): Promise<string[]> =>
+    type HeroForProps = { cookie: string }
+
+    const heroFor = async (browser: HeroForProps): Promise<string[]> =>
       titlesOf(
         shape({
           response: await app().inject({ method: 'GET', url: '/api/home/hero', headers: browser }),
@@ -274,7 +277,9 @@ describe('home hero', () => {
         position: 10,
         audio: null,
       })
-      const inProgress = async (browser: { cookie: string }): Promise<number[]> =>
+      type InProgressProps = { cookie: string }
+
+      const inProgress = async (browser: InProgressProps): Promise<number[]> =>
         (await apiFor({ app: app(), cookie: browser.cookie }).getHome()).inProgress.map(
           ({ media }) => media.id,
         )

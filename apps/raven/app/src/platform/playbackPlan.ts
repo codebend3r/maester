@@ -19,6 +19,15 @@ export type PlaybackPrefs = Pick<AppPrefsValues, 'shouldPreferDirectPlay' | 'isT
 /** Why a file has no way to play once this device's Settings took the transcode away. */
 export const TRANSCODING_OFF_HERE = "Transcoding is off in this device's Settings."
 
+type PlanForProps = {
+  platform: AppPlatform
+  media: MediaItem
+  tracks: MediaTracks | null
+  policy: PlaybackPolicy
+  prefs: PlaybackPrefs
+  shouldDrawCaptions: boolean
+}
+
 /**
  * The ways to play a video on a platform, as core's `planPlayback` plans them from the
  * platform's table under the server's policy narrowed by `prefs`, never widened: with
@@ -39,14 +48,7 @@ export const planFor = ({
   policy,
   prefs,
   shouldDrawCaptions,
-}: {
-  platform: AppPlatform
-  media: MediaItem
-  tracks: MediaTracks | null
-  policy: PlaybackPolicy
-  prefs: PlaybackPrefs
-  shouldDrawCaptions: boolean
-}): PlaybackPlan => {
+}: PlanForProps): PlaybackPlan => {
   const { canPlay, canPlaySurely, canStream } = canPlayFor(platform)
   const isTranscodeTaken = !prefs.isTranscodeAllowed && policy.transcoding === TRANSCODINGS.on
   const policyHere = isTranscodeTaken ? { ...policy, transcoding: TRANSCODINGS.remuxOnly } : policy

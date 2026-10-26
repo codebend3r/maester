@@ -46,8 +46,10 @@ const comparable = (title: string): string => {
   return NON_LATIN_LETTER.test(title) ? lowered : foldTitle(title) || lowered
 }
 
+type EditDistanceProps = { a: readonly string[]; b: readonly string[] }
+
 /** How many single-character edits turn `a` into `b`. */
-const editDistance = ({ a, b }: { a: readonly string[]; b: readonly string[] }): number => {
+const editDistance = ({ a, b }: EditDistanceProps): number => {
   const first = Array.from({ length: b.length + 1 }, (_, index) => index)
   const last = a.reduce(
     (above, charA, row) =>
@@ -67,21 +69,27 @@ const editDistance = ({ a, b }: { a: readonly string[]; b: readonly string[] }):
   return last[b.length] ?? 0
 }
 
+type SimilarityProps = { a: string; b: string }
+
 /** 1 for the same text, falling with each edit, by the longer's length. */
-const similarity = ({ a, b }: { a: string; b: string }): number => {
+const similarity = ({ a, b }: SimilarityProps): number => {
   const charsA = [...a]
   const charsB = [...b]
   const longer = Math.max(charsA.length, charsB.length)
   return longer === 0 ? 0 : 1 - editDistance({ a: charsA, b: charsB }) / longer
 }
 
-const titleScore = ({ wanted, names }: { wanted: string; names: readonly string[] }): number => {
+type TitleScoreProps = { wanted: string; names: readonly string[] }
+
+const titleScore = ({ wanted, names }: TitleScoreProps): number => {
   const folded = names.map(comparable)
   if (folded.includes(wanted)) return 1
   return PARTIAL_TITLE * Math.max(0, ...folded.map((name) => similarity({ a: wanted, b: name })))
 }
 
-const yearScore = ({ asked, released }: { asked: number; released: number | null }): number => {
+type YearScoreProps = { asked: number; released: number | null }
+
+const yearScore = ({ asked, released }: YearScoreProps): number => {
   if (released == null) return 0
   const gap = Math.abs(released - asked)
   if (gap === 0) return 1
@@ -102,19 +110,18 @@ const fitNumbers = (file: EpisodeNumbers): EpisodeNumbers => ({
   year: file.year,
 })
 
+type ShowFitProps = {
+  files: readonly EpisodeNumbers[]
+  facts: ShowFacts
+}
+
 /**
  * 1 when every numbered file fits the show: its season holds its episode,
  * or it is in season 1 within the show's total (numbered straight through),
  * or its absolute number is within the total. Season 0 and unnumbered files
  * are left out; null when none is left.
  */
-const showFit = ({
-  files,
-  facts,
-}: {
-  files: readonly EpisodeNumbers[]
-  facts: ShowFacts
-}): number | null => {
+const showFit = ({ files, facts }: ShowFitProps): number | null => {
   const numbered = files
     .map(fitNumbers)
     .filter((file) => file.season !== 0 && (file.episodes.length > 0 || file.absolute != null))
@@ -131,13 +138,12 @@ const showFit = ({
   return numbered.every(fits) ? 1 : 0
 }
 
-const movieFit = ({
-  duration,
-  runtime,
-}: {
+type MovieFitProps = {
   duration: number | null
   runtime: number | null
-}): number | null => {
+}
+
+const movieFit = ({ duration, runtime }: MovieFitProps): number | null => {
   if (duration == null || runtime == null) return null
   const gap = Math.abs(duration / 60 - runtime)
   if (gap <= 10) return 1
@@ -145,13 +151,12 @@ const movieFit = ({
   return 0
 }
 
-const fitScore = ({
-  onDisk,
-  facts,
-}: {
+type FitScoreProps = {
   onDisk: OnDisk | null
   facts: MatchFacts | undefined
-}): number | null => {
+}
+
+const fitScore = ({ onDisk, facts }: FitScoreProps): number | null => {
   if (onDisk == null || facts == null) return null
   if (onDisk.type === ITEM_TYPES.show && facts.type === ITEM_TYPES.show)
     return showFit({ files: onDisk.files, facts })
@@ -181,6 +186,21 @@ const settleCloseCall = (scores: readonly number[]): number[] => {
   )
 }
 
+type ScoreCandidatesProps = {
+  /** The searched title. */
+  title: string
+  /** The searched year; null when none was asked. */
+  year: number | null
+  /** The country the subject's name or the searched title gives, as TMDB writes it: `GB`. */
+  country: string | null
+  results: readonly SearchResult[]
+  /** The library type's first tier; one that filters nothing for no library. */
+  tier: CandidateTier
+  onDisk: OnDisk | null
+  /** The details read for some results, by TMDB id. */
+  facts: ReadonlyMap<string, MatchFacts>
+}
+
 /**
  * How sure Fix match is of each result, from 0 to 100, in the order given:
  * the title, scaled by how well the year, what is on disk, the library's
@@ -194,20 +214,7 @@ export const scoreCandidates = ({
   tier,
   onDisk,
   facts,
-}: {
-  /** The searched title. */
-  title: string
-  /** The searched year; null when none was asked. */
-  year: number | null
-  /** The country the subject's name or the searched title gives, as TMDB writes it: `GB`. */
-  country: string | null
-  results: readonly SearchResult[]
-  /** The library type's first tier; one that filters nothing for no library. */
-  tier: CandidateTier
-  onDisk: OnDisk | null
-  /** The details read for some results, by TMDB id. */
-  facts: ReadonlyMap<string, MatchFacts>
-}): number[] => {
+}: ScoreCandidatesProps): number[] => {
   const wanted = comparable(title)
   const isElsewhere = (result: SearchResult): boolean =>
     country != null && result.countries.length > 0 && !result.countries.includes(country)
@@ -221,14 +228,14 @@ export const scoreCandidates = ({
       ],
     }),
   )
-  // Popularity only tells apart results that share the title and are not ruled out by country.
-  const isPopularityMeasured = ({
-    result,
-    index,
-  }: {
+  type IsPopularityMeasuredProps = {
     result: SearchResult
     index: number
-  }): boolean => titles[index] === 1 && !isElsewhere(result)
+  }
+
+  // Popularity only tells apart results that share the title and are not ruled out by country.
+  const isPopularityMeasured = ({ result, index }: IsPopularityMeasuredProps): boolean =>
+    titles[index] === 1 && !isElsewhere(result)
   const mostPopular = Math.max(
     0,
     ...results.flatMap((result, index) =>

@@ -149,10 +149,12 @@ const LOCKED = { reason: 'locked', message: 'Vhagar locked this library again.' 
 const fakeServers = () => {
   const held: (() => void)[] = []
   const flags = { shouldHold: false }
-  const resolve = async (source: {
+  type ResolveProps = {
     serverId: string
     mediaId: number
-  }): Promise<ResolvedSource> => {
+  }
+
+  const resolve = async (source: ResolveProps): Promise<ResolvedSource> => {
     if (flags.shouldHold) {
       flags.shouldHold = false
       await new Promise<void>((resume) => {
@@ -263,13 +265,12 @@ const createFakeMpv = () => {
     }
     resolve()
   }
-  const reply = ({
-    entry,
-    onReply = ignoreReply,
-  }: {
+  type ReplyProps = {
     entry: string
     onReply?: (reply: MpvReply) => void
-  }) =>
+  }
+
+  const reply = ({ entry, onReply = ignoreReply }: ReplyProps) =>
     new Promise<void>((resolve, reject) => {
       if (flags.isDestroyed) {
         reject(new Error('mpv is destroyed'))
@@ -285,6 +286,8 @@ const createFakeMpv = () => {
     held.splice(0).forEach((request) => request.reject(new Error(message)))
   }
 
+  type ControlReadProps<K extends MpvProperty> = { name: K }
+
   const control: MpvControl = {
     command: async ({ args, onReply }) => {
       const entry = args.join(' ')
@@ -299,7 +302,7 @@ const createFakeMpv = () => {
       timeline.push(entry)
       await reply({ entry })
     },
-    read: async <K extends MpvProperty>({ name }: { name: K }) => {
+    read: async <K extends MpvProperty>({ name }: ControlReadProps<K>) => {
       reads.push(name)
       timeline.push(`read ${name}`)
       await reply({ entry: `read ${name}` })
@@ -415,11 +418,13 @@ const FILE_SIDECARS = [
 const fileOf = (fileId: string) =>
   fileId === FILE_ID ? { fileId, path: '/m/Film.mkv', name: 'Film.mkv', size: 1, mtimeMs: 1 } : null
 
-const setup = ({
-  timers,
-  sidecarsOf = () => [],
-  refusedAccount = () => null,
-}: { timers?: Timers; sidecarsOf?: SidecarsOf; refusedAccount?: AccountRefusalReader } = {}) => {
+type SetupProps = {
+  timers?: Timers
+  sidecarsOf?: SidecarsOf
+  refusedAccount?: AccountRefusalReader
+}
+
+const setup = ({ timers, sidecarsOf = () => [], refusedAccount = () => null }: SetupProps = {}) => {
   const mpv = createFakeMpv()
   const clock = createFakeTimers()
   const servers = fakeServers()
@@ -1951,7 +1956,9 @@ describe('createPlayerService', () => {
   })
 
   describe('a server title its server leaves waiting', () => {
-    const waiting = ({ service, data }: { service: PlayerService; data: boolean }) =>
+    type WaitingProps = { service: PlayerService; data: boolean }
+
+    const waiting = ({ service, data }: WaitingProps) =>
       service.receive({ type: 'property', name: 'paused-for-cache', data })
     const stalls = (pending: ReturnType<typeof createTimedTimers>['pending']) =>
       [...pending.values()].filter(({ ms }) => ms === SERVER_STALL_MS)

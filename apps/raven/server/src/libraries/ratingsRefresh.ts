@@ -5,6 +5,14 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 import { ScoreSweep } from '@/metadata/scoreSweep'
 import { ScannerService } from '@/scanner/scannerService'
 
+type RatingsRefreshStartProps = { libraryId: number; since?: string }
+
+type RatingsRefreshAfterQuickScanProps = {
+  libraryId: number
+  since: string
+  job: { isCancelled: boolean }
+}
+
 /**
  * A library's ratings: Update ratings asks for the score of every movie and
  * show that has none from the source the library shows, and a quick scan
@@ -34,7 +42,7 @@ export class RatingsRefresh {
    * settle a request it asks for nothing, and so does a library with no
    * unrated titles: either finishes at once.
    */
-  start({ libraryId, since = '' }: { libraryId: number; since?: string }): void {
+  start({ libraryId, since = '' }: RatingsRefreshStartProps): void {
     const at = new Date().toISOString()
     // An update whose last title left outside the sweep is over, so this one starts anew.
     this.libraries.finishRatingsRefreshes(at)
@@ -66,11 +74,7 @@ export class RatingsRefresh {
     libraryId,
     since,
     job,
-  }: {
-    libraryId: number
-    since: string
-    job: { isCancelled: boolean }
-  }): Promise<void> {
+  }: RatingsRefreshAfterQuickScanProps): Promise<void> {
     await this.scanner.whenIdle(libraryId)
     if (this.quickScans.get(libraryId) === job) this.quickScans.delete(libraryId)
     if (job.isCancelled || !this.libraries.get(libraryId)) return

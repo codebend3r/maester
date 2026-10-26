@@ -23,16 +23,14 @@ const SHOWS: ReadonlyArray<{ show: HistoryShow; label: string }> = [
   { show: HISTORY_SHOWS.all, label: 'All played' },
 ]
 
-/** One day's videos under its heading, each with how far it got and when. */
-const HistoryDaySection = ({
-  id,
-  label,
-  entries,
-}: {
+type HistoryDaySectionProps = {
   id: string
   label: string
   entries: HistoryEntry[]
-}) => {
+}
+
+/** One day's videos under its heading, each with how far it got and when. */
+const HistoryDaySection = ({ id, label, entries }: HistoryDaySectionProps) => {
   const notes = new Map(entries.map((entry) => [entry.media.id, historyNote(entry)]))
   return (
     <section className={styles.day} aria-labelledby={id}>

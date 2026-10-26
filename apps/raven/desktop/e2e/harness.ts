@@ -33,8 +33,10 @@ const QUIT_OUTCOMES = { closed: 'closed', timeout: 'timeout' } as const
  */
 const NO_SERVER = 'http://127.0.0.1:9'
 
+type ServerEnvProps = { origin: string }
+
 /** What points main's `/api` at a fixture, and lets the page sign in at its stand-in Auth. */
-export const serverEnv = ({ origin }: { origin: string }): Record<string, string> => ({
+export const serverEnv = ({ origin }: ServerEnvProps): Record<string, string> => ({
   [DESKTOP_ENV.serverOrigin]: origin,
   [AUTH_ORIGIN_HOOK]: origin,
 })
@@ -68,12 +70,16 @@ export const removeDir = async (path: string): Promise<void> => {
 const isMissing = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === ERROR_CODES.enoent
 
+type LogPathForProps = { userData: string }
+
 /** main's log under the test hook's userData (Ruling 11). */
-export const logPathFor = ({ userData }: { userData: string }): string =>
+export const logPathFor = ({ userData }: LogPathForProps): string =>
   join(userData, 'logs', LOG_FILE)
 
+type ReadLogProps = { userData: string }
+
 /** The lines main has written to its log so far; none before it has made the file. */
-export const readLog = async ({ userData }: { userData: string }): Promise<string[]> => {
+export const readLog = async ({ userData }: ReadLogProps): Promise<string[]> => {
   const text = await readFile(logPathFor({ userData }), 'utf8').catch((error: unknown) => {
     if (isMissing(error)) return ''
     throw error
@@ -135,19 +141,17 @@ const readOutput = (app: ElectronApplication): Output => {
   return { lines: () => [...lines] }
 }
 
+type MarkWithinProps = {
+  launched: Launched
+  name: string
+  ms: number
+}
+
 /**
  * The first `raven-<name>` mark main printed in this run, waiting up to `ms` for it, and
  * failing with a clear error when it has not come or the app quit first.
  */
-export const markWithin = ({
-  launched: { marks },
-  name,
-  ms,
-}: {
-  launched: Launched
-  name: string
-  ms: number
-}): Promise<number> =>
+export const markWithin = ({ launched: { marks }, name, ms }: MarkWithinProps): Promise<number> =>
   new Promise((resolve, reject) => {
     const settle = (finish: () => void) => {
       clearTimeout(timer)
@@ -167,12 +171,16 @@ export const markWithin = ({
     check()
   })
 
+type LaunchMarkWithinProps = { launched: Launched; ms: number }
+
 /** main's launch mark, printed at ready-to-show, so it is never far behind the window. */
-export const launchMarkWithin = ({ launched, ms }: { launched: Launched; ms: number }) =>
+export const launchMarkWithin = ({ launched, ms }: LaunchMarkWithinProps) =>
   markWithin({ launched, name: 'launch-ms', ms })
 
+type CloseAppProps = { app: ElectronApplication }
+
 /** Quits the app as a person would and waits for its process to end, killing it past the deadline. */
-export const closeApp = async ({ app }: { app: ElectronApplication }): Promise<void> => {
+export const closeApp = async ({ app }: CloseAppProps): Promise<void> => {
   if (hasExited(app)) return
   const deadline = new AbortController()
   const outcome = await Promise.race([
@@ -188,16 +196,18 @@ export const closeApp = async ({ app }: { app: ElectronApplication }): Promise<v
 /** Headless mpv (`vo=null`, `ao=null`), or none, which is the html fallback's run (Ruling 15). */
 export type MpvMode = typeof ENGINE_MODES.headless | typeof ENGINE_MODES.off
 
-export const launchApp = async ({
-  userData,
-  mpv = ENGINE_MODES.headless,
-  env = {},
-}: {
+type LaunchAppProps = {
   userData: string
   mpv?: MpvMode
   /** Extra variables for main, such as a test hook, merged last. */
   env?: Readonly<Record<string, string>>
-}): Promise<Launched> => {
+}
+
+export const launchApp = async ({
+  userData,
+  mpv = ENGINE_MODES.headless,
+  env = {},
+}: LaunchAppProps): Promise<Launched> => {
   const app = await _electron.launch({
     // Chromium's fake audio sink: playback is clocked by the audio output, so a real device
     // whose clock has stalled (an asleep USB interface) would freeze `currentTime` at 0.
@@ -222,18 +232,15 @@ export const launchApp = async ({
   return { app, page, marks, output }
 }
 
-/** Launches the app, runs `run` against it and always quits it after, so no process outlives a test. */
-export const withApp = async <T>({
-  userData,
-  mpv,
-  env,
-  run,
-}: {
+type WithAppProps<T> = {
   userData: string
   mpv?: MpvMode
   env?: Readonly<Record<string, string>>
   run: (launched: Launched) => Promise<T>
-}): Promise<T> => {
+}
+
+/** Launches the app, runs `run` against it and always quits it after, so no process outlives a test. */
+export const withApp = async <T>({ userData, mpv, env, run }: WithAppProps<T>): Promise<T> => {
   const launched = await launchApp({ userData, mpv, env })
   const result = await run(launched).catch(async (error: unknown) => {
     await closeApp({ app: launched.app }).catch(() => undefined)
@@ -243,21 +250,22 @@ export const withApp = async <T>({
   return result
 }
 
-/** The event Finder sends for "Open With" and a double-click, emitted on the running app. */
-export const openFile = async ({
-  app,
-  path,
-}: {
+type OpenFileProps = {
   app: ElectronApplication
   path: string
-}): Promise<void> => {
+}
+
+/** The event Finder sends for "Open With" and a double-click, emitted on the running app. */
+export const openFile = async ({ app, path }: OpenFileProps): Promise<void> => {
   await app.evaluate(({ app: electronApp }, file) => {
     electronApp.emit('open-file', { preventDefault: () => undefined }, file)
   }, path)
 }
 
+type OpenUrlProps = { app: ElectronApplication; url: string }
+
 /** The event macOS sends for a `raven://` link, emitted on the running app. */
-export const openUrl = async ({ app, url }: { app: ElectronApplication; url: string }) => {
+export const openUrl = async ({ app, url }: OpenUrlProps) => {
   await app.evaluate(({ app: electronApp }, link) => {
     electronApp.emit('open-url', { preventDefault: () => undefined }, link)
   }, url)
@@ -265,11 +273,13 @@ export const openUrl = async ({ app, url }: { app: ElectronApplication; url: str
 
 const BROWSER_OPENS_KEY = 'ravenE2eBrowserOpens'
 
+type StubBrowserProps = { app: ElectronApplication }
+
 /**
  * Records what main hands the browser instead of opening it. main reads
  * `shell.openExternal` at each call, so the stand-in takes its place.
  */
-export const stubBrowser = async ({ app }: { app: ElectronApplication }): Promise<void> => {
+export const stubBrowser = async ({ app }: StubBrowserProps): Promise<void> => {
   await app.evaluate(({ shell }, key) => {
     Reflect.set(globalThis, key, [])
     const open = async (...args: unknown[]) => {
@@ -284,8 +294,10 @@ export const stubBrowser = async ({ app }: { app: ElectronApplication }): Promis
   }, BROWSER_OPENS_KEY)
 }
 
+type BrowserOpensProps = { app: ElectronApplication }
+
 /** What main handed the browser since `stubBrowser`, in order. */
-export const browserOpens = async ({ app }: { app: ElectronApplication }): Promise<string[]> => {
+export const browserOpens = async ({ app }: BrowserOpensProps): Promise<string[]> => {
   const opened = await app.evaluate((_modules, key) => {
     const value: unknown = Reflect.get(globalThis, key)
     return value
@@ -293,6 +305,11 @@ export const browserOpens = async ({ app }: { app: ElectronApplication }): Promi
   return Array.isArray(opened)
     ? opened.filter((item): item is string => typeof item === 'string')
     : []
+}
+
+type RequestFromPageProps = {
+  page: Page
+  request: Record<string, string | null>
 }
 
 /**
@@ -303,10 +320,7 @@ export const browserOpens = async ({ app }: { app: ElectronApplication }): Promi
 export const requestFromPage = async ({
   page,
   request,
-}: {
-  page: Page
-  request: Record<string, string | null>
-}): Promise<DesktopReply | null> => {
+}: RequestFromPageProps): Promise<DesktopReply | null> => {
   const reply = await page.evaluate(async (sent) => {
     if (!('ravenDesktop' in window)) return null
     const bridge = window.ravenDesktop
@@ -318,14 +332,16 @@ export const requestFromPage = async ({
   return isDesktopReply(reply) ? reply : null
 }
 
+type WatchedPercentProps = {
+  page: Page
+  label: string
+}
+
 /** The share of `label` main has stored as watched, in whole percent, as On this Mac labels it. */
 export const watchedPercent = async ({
   page,
   label,
-}: {
-  page: Page
-  label: string
-}): Promise<number | null> => {
+}: WatchedPercentProps): Promise<number | null> => {
   const reply = await requestFromPage({ page, request: { type: DESKTOP_REQUESTS.listRecents } })
   if (reply === null || reply.type !== DESKTOP_REPLIES.recents) return null
   const recent = reply.recents.find((entry) => entry.label === label)
@@ -333,20 +349,26 @@ export const watchedPercent = async ({
   return Math.round(recent.watched * 100)
 }
 
+type HeadingProps = { page: Page; name: string }
+
 /** A page's main heading, by its exact name. */
-export const heading = ({ page, name }: { page: Page; name: string }) =>
+export const heading = ({ page, name }: HeadingProps) =>
   page.getByRole('heading', { name, exact: true, level: 1 })
 
+type SideLinkProps = { page: Page; name: string }
+
 /** A link in the side menu, by its exact name. */
-export const sideLink = ({ page, name }: { page: Page; name: string }) =>
+export const sideLink = ({ page, name }: SideLinkProps) =>
   page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true })
+
+type DismissMenuTipProps = { page: Page }
 
 /**
  * The side menu's first-visit tip rises over its lower links on a window as short as CI's, so a
  * test puts it away before it clicks them, as a person would. Once put away it stays away, so a
  * later launch on the same profile has none.
  */
-const dismissMenuTip = async ({ page }: { page: Page }): Promise<void> => {
+const dismissMenuTip = async ({ page }: DismissMenuTipProps): Promise<void> => {
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
   const tip = page.getByRole('complementary', { name: 'Tip' })
   if ((await tip.count()) === 0) return
@@ -354,18 +376,22 @@ const dismissMenuTip = async ({ page }: { page: Page }): Promise<void> => {
   await expect(tip).toHaveCount(0)
 }
 
+type ExpectOfflineProps = { page: Page }
+
 /**
  * The frame Raven opens with no server to reach: Downloads, with only the pages that need
  * none in the side menu.
  */
-export const expectOffline = async ({ page }: { page: Page }): Promise<void> => {
+export const expectOffline = async ({ page }: ExpectOfflineProps): Promise<void> => {
   await expect(heading({ page, name: 'Downloads' })).toBeVisible()
   await expect(sideLink({ page, name: 'Home' })).toHaveCount(0)
   await dismissMenuTip({ page })
 }
 
+type SignInProps = { page: Page }
+
 /** Signs the fixture's account in through the web's own sign-in page and waits for Home. */
-export const signIn = async ({ page }: { page: Page }): Promise<void> => {
+export const signIn = async ({ page }: SignInProps): Promise<void> => {
   await expect(heading({ page, name: 'Welcome back' })).toBeVisible()
   await page.getByRole('textbox', { name: 'Email' }).fill(FIXTURE_ACCOUNT.email)
   await page.getByRole('textbox', { name: 'Password' }).fill(FIXTURE_ACCOUNT.password)

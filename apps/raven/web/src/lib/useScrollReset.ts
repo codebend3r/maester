@@ -19,16 +19,14 @@ export const ENTRY_SELECTOR = '[data-entry]:not(details:not([open]) *)'
 const cardsOnPage = (): HTMLElement[] =>
   Array.from(document.querySelectorAll<HTMLElement>(ENTRY_SELECTOR))
 
-/** Where among `cards` the first to reach below the top of the screen is, found by halves. */
-const firstBelowTop = ({
-  cards,
-  low,
-  high,
-}: {
+type FirstBelowTopProps = {
   cards: readonly HTMLElement[]
   low: number
   high: number
-}): number => {
+}
+
+/** Where among `cards` the first to reach below the top of the screen is, found by halves. */
+const firstBelowTop = ({ cards, low, high }: FirstBelowTopProps): number => {
   if (low >= high) return low
   const middle = Math.floor((low + high) / 2)
   const isBelow = (cards[middle]?.getBoundingClientRect().bottom ?? 0) > 0

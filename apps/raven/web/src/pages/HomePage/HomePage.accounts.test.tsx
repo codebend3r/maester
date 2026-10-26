@@ -20,7 +20,9 @@ const { ada, bo } = TEST_ACCOUNTS
 
 const PATHS = { home: '/api/home', libraries: '/api/libraries' } as const
 
-const watching = ({ id, title }: { id: number; title: string }): Home => ({
+type WatchingProps = { id: number; title: string }
+
+const watching = ({ id, title }: WatchingProps): Home => ({
   inProgress: [{ media: mediaItem({ id, title, position: 60 }), poster: null }],
   shelves: [],
 })

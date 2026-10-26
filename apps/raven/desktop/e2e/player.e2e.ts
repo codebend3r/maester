@@ -37,8 +37,10 @@ const expectClockAdvancing = async (page: Page) => {
     .toBeGreaterThan(1)
 }
 
+type DistanceFromProps = { page: Page; seconds: number }
+
 /** How far the video is from `seconds`, or Infinity before there is a video. */
-const distanceFrom = async ({ page, seconds }: { page: Page; seconds: number }) => {
+const distanceFrom = async ({ page, seconds }: DistanceFromProps) => {
   const facts = await videoFacts(page)
   return facts === null ? Number.POSITIVE_INFINITY : Math.abs(facts.currentTime - seconds)
 }
@@ -54,16 +56,14 @@ const openLocal = async (page: Page) => {
 
 const DRAG_EVENTS = { enter: 'dragenter', drop: 'drop' } as const
 
-/** Sends the window a drag event carrying a File the page made. */
-const forgedDrag = ({
-  page,
-  type,
-  name,
-}: {
+type ForgedDragProps = {
   page: Page
   type: (typeof DRAG_EVENTS)[keyof typeof DRAG_EVENTS]
   name: string
-}) =>
+}
+
+/** Sends the window a drag event carrying a File the page made. */
+const forgedDrag = ({ page, type, name }: ForgedDragProps) =>
   page.evaluate(
     ({ eventType, fileName }) => {
       const transfer = new DataTransfer()
@@ -77,11 +77,13 @@ const forgedDrag = ({
 
 const dropOverlay = (page: Page) => page.getByText('Drop to play')
 
+type DropForgedFileOnLocalProps = { page: Page; name: string }
+
 /**
  * Drags a File the page made over On this Mac until its "Drop to play" shows, which proves the
  * drop listener is attached, then drops it: main refuses it with a notice.
  */
-const dropForgedFileOnLocal = async ({ page, name }: { page: Page; name: string }) => {
+const dropForgedFileOnLocal = async ({ page, name }: DropForgedFileOnLocalProps) => {
   await expect(async () => {
     await forgedDrag({ page, type: DRAG_EVENTS.enter, name })
     await expect(dropOverlay(page)).toBeVisible({ timeout: 500 })
@@ -90,11 +92,13 @@ const dropForgedFileOnLocal = async ({ page, name }: { page: Page; name: string 
   await expect(dropOverlay(page)).toBeHidden()
 }
 
+type DropForgedFileProps = { page: Page; name: string }
+
 /**
  * Drags and drops a File the page made over a video that has played for a while, so the
  * window's drop listener is long attached; the watch route shows no overlay to wait for.
  */
-const dropForgedFile = async ({ page, name }: { page: Page; name: string }) => {
+const dropForgedFile = async ({ page, name }: DropForgedFileProps) => {
   await forgedDrag({ page, type: DRAG_EVENTS.enter, name })
   await forgedDrag({ page, type: DRAG_EVENTS.drop, name })
 }

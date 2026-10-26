@@ -154,10 +154,14 @@ export type ResolvedSource = { ok: true; target: LoadTarget } | { ok: false; mes
 export type AccountRefusalReader = (
   target: ServerTarget,
 ) => { reason: PlayerErrorReason; message: string } | null
-export type FailureExplainer = (input: {
+type FailureExplainerProps = {
   target: ServerTarget
   phase: ShowingPhase
-}) => Promise<{ reason: PlayerErrorReason; message: string }>
+}
+
+export type FailureExplainer = (
+  input: FailureExplainerProps,
+) => Promise<{ reason: PlayerErrorReason; message: string }>
 
 export const OBSERVED = [
   MPV_PROPERTIES.timePos,
@@ -184,21 +188,19 @@ const OPEN_FILE = '<file>'
 /** What a warning says in place of a relayed title's base or the secret inside it. */
 const RELAYED = '<relay>'
 
+type ResolveSourceWithProps = {
+  grants: Pick<Grants, 'fileOf'>
+  servers: {
+    resolve: (
+      source: Extract<PlayerSource, { kind: typeof PLAYER_SOURCE_KINDS.server }>,
+    ) => Promise<ResolvedSource>
+  }
+  /** The subtitle files that belong to a granted file, keyed by its `fileId`. */
+  sidecarsOf: (fileId: string) => readonly LocalSidecar[]
+}
+
 export const resolveSourceWith =
-  ({
-    grants,
-    servers,
-    sidecarsOf,
-  }: {
-    grants: Pick<Grants, 'fileOf'>
-    servers: {
-      resolve: (
-        source: Extract<PlayerSource, { kind: typeof PLAYER_SOURCE_KINDS.server }>,
-      ) => Promise<ResolvedSource>
-    }
-    /** The subtitle files that belong to a granted file, keyed by its `fileId`. */
-    sidecarsOf: (fileId: string) => readonly LocalSidecar[]
-  }) =>
+  ({ grants, servers, sidecarsOf }: ResolveSourceWithProps) =>
   async (source: PlayerSource): Promise<ResolvedSource> => {
     switch (source.kind) {
       case PLAYER_SOURCE_KINDS.server:
@@ -222,6 +224,10 @@ export const resolveSourceWith =
     }
   }
 
+type ApplyOutputProps = { output: OutputSettings; devices: readonly AudioDevice[] }
+
+type ApplyDisplayProps = { refreshRate: number; edrHeadroom: number }
+
 export type PlayerService = {
   handle: (command: PlayerCommand) => Promise<PlayerOutcome>
   receive: (event: MpvEvent) => void
@@ -234,8 +240,8 @@ export type PlayerService = {
    * destroyed, so no budget outlives the engine.
    */
   dispose: () => void
-  applyOutput: (input: { output: OutputSettings; devices: readonly AudioDevice[] }) => Promise<void>
-  applyDisplay: (input: { refreshRate: number; edrHeadroom: number }) => Promise<void>
+  applyOutput: (input: ApplyOutputProps) => Promise<void>
+  applyDisplay: (input: ApplyDisplayProps) => Promise<void>
 }
 
 type Range = { start: number; end: number }
@@ -256,12 +262,14 @@ const ENGINE_GONE: PlayerOutcome = {
 /** mpv's `%len%` quoting, so a value may hold `,` or `=` without ending the option. */
 const quoted = (value: string): string => `%${new TextEncoder().encode(value).length}%${value}`
 
+type LoadfileOptionsForProps = { target: LoadTarget; start: number }
+
 /**
  * The `loadfile` options for a target: where it starts, and for a server title the
  * redirect and reconnect limits and the network timeout, which mpv applies
  * to this file alone (sidecars added while it plays included) and drops when it ends.
  */
-const loadfileOptionsFor = ({ target, start }: { target: LoadTarget; start: number }): string => {
+const loadfileOptionsFor = ({ target, start }: LoadfileOptionsForProps): string => {
   switch (target.kind) {
     case PLAYER_SOURCE_KINDS.file:
       return `start=${start}`
@@ -323,10 +331,13 @@ const subAddArgs = ({ location, title, language }: Sidecar): string[] => [
   language,
 ]
 
-const clamp = ({ value, min, max }: { value: number; min: number; max: number }) =>
-  Math.min(max, Math.max(min, value))
+type ClampProps = { value: number; min: number; max: number }
 
-const hasMoved = ({ shown, next }: { shown: readonly Range[] | null; next: readonly Range[] }) =>
+const clamp = ({ value, min, max }: ClampProps) => Math.min(max, Math.max(min, value))
+
+type HasMovedProps = { shown: readonly Range[] | null; next: readonly Range[] }
+
+const hasMoved = ({ shown, next }: HasMovedProps) =>
   shown === null ||
   shown.length !== next.length ||
   next.some((range, position) => {
@@ -366,18 +377,7 @@ const numbersOf = (command: PlayerCommand): number[] => {
   }
 }
 
-export const createPlayerService = ({
-  mpv: unguarded,
-  resolveSource,
-  explain,
-  refusedAccount,
-  canChooseAo,
-  timers,
-  serverStallMs = SERVER_STALL_MS,
-  onActivity: reportActivity,
-  onFirstFrame: reportFirstFrame,
-  warn: reportWarning,
-}: {
+type CreatePlayerServiceProps = {
   mpv: MpvControl
   resolveSource: ReturnType<typeof resolveSourceWith>
   explain: FailureExplainer
@@ -389,7 +389,20 @@ export const createPlayerService = ({
   onActivity: (activity: PlayerActivity) => void
   onFirstFrame: () => void
   warn: (message: string) => void
-}): PlayerService => {
+}
+
+export const createPlayerService = ({
+  mpv: unguarded,
+  resolveSource,
+  explain,
+  refusedAccount,
+  canChooseAo,
+  timers,
+  serverStallMs = SERVER_STALL_MS,
+  onActivity: reportActivity,
+  onFirstFrame: reportFirstFrame,
+  warn: reportWarning,
+}: CreatePlayerServiceProps): PlayerService => {
   // What the newest load opened, and its ticket, which an ending explains and a server's
   // removal stops.
   let opened: LoadTarget | null = null
@@ -658,13 +671,15 @@ export const createPlayerService = ({
       Promise.resolve(),
     )
 
+  type ReadOrProps<K extends MpvProperty> = {
+    name: K
+    fallback: MpvPropertyValue<K>
+  }
+
   const readOr = async <K extends MpvProperty>({
     name,
     fallback,
-  }: {
-    name: K
-    fallback: MpvPropertyValue<K>
-  }): Promise<MpvPropertyValue<K>> => {
+  }: ReadOrProps<K>): Promise<MpvPropertyValue<K>> => {
     try {
       return await mpv.read({ name })
     } catch (error) {
@@ -706,14 +721,13 @@ export const createPlayerService = ({
     }
   }
 
-  /** Adds a title's sidecars one at a time, in order; false when overtaken. */
-  const addSidecars = ({
-    sidecars,
-    token,
-  }: {
+  type AddSidecarsProps = {
     sidecars: readonly Sidecar[]
     token: number
-  }): Promise<boolean> =>
+  }
+
+  /** Adds a title's sidecars one at a time, in order; false when overtaken. */
+  const addSidecars = ({ sidecars, token }: AddSidecarsProps): Promise<boolean> =>
     sidecars.reduce<Promise<boolean>>(async (chain, sidecar, position) => {
       if (!(await chain)) return false
       try {
@@ -723,6 +737,12 @@ export const createPlayerService = ({
       }
       return token === epoch
     }, Promise.resolve(true))
+
+  type SidecarsWithinBudgetProps = {
+    sidecars: readonly Sidecar[]
+    kind: LoadTarget['kind']
+    token: number
+  }
 
   /**
    * Waits for a title's sidecars, but no longer than `SIDECAR_BUDGET_MS`: a slow
@@ -734,11 +754,10 @@ export const createPlayerService = ({
     sidecars,
     kind,
     token,
-  }: {
-    sidecars: readonly Sidecar[]
-    kind: LoadTarget['kind']
-    token: number
-  }): Promise<{ isCurrent: boolean; pending: Promise<boolean> | null }> => {
+  }: SidecarsWithinBudgetProps): Promise<{
+    isCurrent: boolean
+    pending: Promise<boolean> | null
+  }> => {
     const budget: { handle: unknown } = { handle: null }
     const late = new Promise<typeof SIDECAR_LATE>((resolve) => {
       budget.handle = timers.set({ run: () => resolve(SIDECAR_LATE), ms: SIDECAR_BUDGET_MS })
@@ -754,20 +773,18 @@ export const createPlayerService = ({
     }
   }
 
+  type SelectLateSubtitleProps = {
+    pending: Promise<boolean>
+    token: number
+    id: string
+  }
+
   /**
    * The subtitle the load asked for may be a sidecar that came after the budget: once the
    * late sidecars are in, it is selected, unless the file changed or the page picked
    * another meanwhile, even one mpv has not answered yet.
    */
-  const selectLateSubtitle = async ({
-    pending,
-    token,
-    id,
-  }: {
-    pending: Promise<boolean>
-    token: number
-    id: string
-  }) => {
+  const selectLateSubtitle = async ({ pending, token, id }: SelectLateSubtitleProps) => {
     const picks = subtitlePicks
     const isWanted = () => token === epoch && subtitlePicks === picks && wanted.subtitle === id
     const isCurrent = await pending
@@ -865,17 +882,16 @@ export const createPlayerService = ({
     })
   }
 
+  type EmitFailureProps = {
+    failure: { reason: PlayerErrorReason; message: string }
+    during: ShowingPhase
+  }
+
   /**
    * An error the page hears: as it is for a file, or as the server explains it for a
    * server title, unless something newer overtook the ending while the server answered.
    */
-  const emitFailure = ({
-    failure,
-    during,
-  }: {
-    failure: { reason: PlayerErrorReason; message: string }
-    during: ShowingPhase
-  }) => {
+  const emitFailure = ({ failure, during }: EmitFailureProps) => {
     const asked = serverOpened()
     if (asked === null) {
       emit({ type: PLAYER_EVENTS.error, ...failure })
@@ -900,7 +916,9 @@ export const createPlayerService = ({
     })
   }
 
-  const onEndFile = ({ reason, error }: { reason: string; error: number }) => {
+  type OnEndFileProps = { reason: string; error: number }
+
+  const onEndFile = ({ reason, error }: OnEndFileProps) => {
     if (answeredGeneration !== generation) return
     if (reason === MPV_END_FILE_REASONS.redirect) {
       onRedirect()

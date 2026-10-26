@@ -164,6 +164,13 @@ export const isPackagedPath = (file: string): boolean =>
   file === PACKAGED_PATHS.dist ||
   file.startsWith(`${PACKAGED_PATHS.dist}/`)
 
+type AdHocAppsProps = {
+  platform: string
+  signing: Signing
+  outputPaths: readonly string[]
+  appName: string
+}
+
 /**
  * The packaged apps to sign ad hoc: none off macOS, and none when an identity signs the app
  * through osxSign after the packager is done. The fuses plugin re-signs right after flipping
@@ -176,12 +183,7 @@ export const adHocApps = ({
   signing,
   outputPaths,
   appName,
-}: {
-  platform: string
-  signing: Signing
-  outputPaths: readonly string[]
-  appName: string
-}): string[] => {
+}: AdHocAppsProps): string[] => {
   if (platform !== PLATFORMS.darwin || signing.osxSign !== undefined) return []
   return outputPaths.map((folder) => join(folder, `${appName}.app`))
 }

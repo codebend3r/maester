@@ -16,6 +16,19 @@ const mostPopular = (results: readonly SearchResult[]): SearchResult | null =>
     null,
   )
 
+type PickMatchProps = {
+  type: MatchItemType
+  title: string
+  year: number | null
+  /** The country the name gives, as TMDB writes it: `GB` for "(UK)". */
+  country?: string | null
+  results: readonly SearchResult[]
+  /** The other titles TMDB knows a result by, by its id: Loveland (2022) is also `Expired`. */
+  aliases?: ReadonlyMap<string, readonly string[]>
+  /** Whether a lone result in the name's year counts whatever its title. */
+  canTakeLoneResult?: boolean
+}
+
 /**
  * The search result a parsed name is, or null when raven cannot be sure.
  *
@@ -44,18 +57,7 @@ export const pickMatch = ({
   results,
   aliases = new Map(),
   canTakeLoneResult = true,
-}: {
-  type: MatchItemType
-  title: string
-  year: number | null
-  /** The country the name gives, as TMDB writes it: `GB` for "(UK)". */
-  country?: string | null
-  results: readonly SearchResult[]
-  /** The other titles TMDB knows a result by, by its id: Loveland (2022) is also `Expired`. */
-  aliases?: ReadonlyMap<string, readonly string[]>
-  /** Whether a lone result in the name's year counts whatever its title. */
-  canTakeLoneResult?: boolean
-}): SearchResult | null => {
+}: PickMatchProps): SearchResult | null => {
   const wanted = foldTitle(title)
   const fromThere = (result: SearchResult): boolean =>
     country == null || result.countries.includes(country)

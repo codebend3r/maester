@@ -7,15 +7,26 @@ import {
   videoReducer,
 } from '@/components/Player/videoState'
 
-const clamp = ({ value, min, max }: { value: number; min: number; max: number }): number =>
-  Math.min(max, Math.max(min, value))
+type ClampProps = { value: number; min: number; max: number }
+
+const clamp = ({ value, min, max }: ClampProps): number => Math.min(max, Math.max(min, value))
+
+type BufferedRangesProps = { element: HTMLVideoElement; shift: number }
 
 /** A <video>'s buffered ranges on the file's clock. */
-const bufferedRanges = ({ element, shift }: { element: HTMLVideoElement; shift: number }): Ranges =>
+const bufferedRanges = ({ element, shift }: BufferedRangesProps): Ranges =>
   Array.from({ length: element.buffered.length }, (_, index): [number, number] => [
     Math.max(0, element.buffered.start(index) - shift),
     Math.max(0, element.buffered.end(index) - shift),
   ])
+
+type UseVideoStateProps = {
+  videoRef: RefObject<HTMLVideoElement | null>
+  shift: number
+  startAt: number
+  /** The file's length as the probe found it, which wins over the element's. */
+  knownDuration: number | null
+}
 
 /**
  * The element's state as the stage draws it, kept in step with its events.
@@ -23,18 +34,7 @@ const bufferedRanges = ({ element, shift }: { element: HTMLVideoElement; shift: 
  * new one picks up there; `playing` whether to keep playing across one.
  * A converted stream runs `shift` seconds ahead of the file.
  */
-export const useVideoState = ({
-  videoRef,
-  shift,
-  startAt,
-  knownDuration,
-}: {
-  videoRef: RefObject<HTMLVideoElement | null>
-  shift: number
-  startAt: number
-  /** The file's length as the probe found it, which wins over the element's. */
-  knownDuration: number | null
-}) => {
+export const useVideoState = ({ videoRef, shift, startAt, knownDuration }: UseVideoStateProps) => {
   const [state, dispatch] = useReducer(videoReducer, startAt, initialVideoState)
   const position = useRef(startAt)
   // The first source autoplays.

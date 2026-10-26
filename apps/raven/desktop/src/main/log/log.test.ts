@@ -30,7 +30,9 @@ type FsOp = keyof LogFs
 type Call = { op: FsOp; args: unknown[] }
 type Refusal = { op: FsOp; path: string }
 
-const fsError = ({ code, path }: { code: string; path: string }): Error =>
+type FsErrorProps = { code: string; path: string }
+
+const fsError = ({ code, path }: FsErrorProps): Error =>
   Object.assign(new Error(`${code}: refused, '${path}'`), { code })
 
 const bytes = (text: string): number => Buffer.byteLength(text)
@@ -129,10 +131,9 @@ const createFakeTimers = () => {
   return { timers, fire, pending, delays }
 }
 
-const setup = ({
-  files = {},
-  onError,
-}: { files?: Record<string, string>; onError?: (error: unknown) => void } = {}) => {
+type SetupProps = { files?: Record<string, string>; onError?: (error: unknown) => void }
+
+const setup = ({ files = {}, onError }: SetupProps = {}) => {
   const fake = createFakeFs(files)
   const clock = createFakeTimers()
   const errors: unknown[] = []
@@ -147,8 +148,9 @@ const setup = ({
   return { ...fake, ...clock, log, errors, time }
 }
 
-const ops = ({ calls, wanted }: { calls: Call[]; wanted: FsOp[] }) =>
-  calls.filter((call) => wanted.includes(call.op))
+type OpsProps = { calls: Call[]; wanted: FsOp[] }
+
+const ops = ({ calls, wanted }: OpsProps) => calls.filter((call) => wanted.includes(call.op))
 
 const lines = (text: string | undefined): string[] =>
   (text ?? '').split('\n').filter((line) => line !== '')
@@ -322,8 +324,10 @@ describe('redact', () => {
       'apikey',
     ]
 
+    type FormsProps = { name: string; secret: string }
+
     // Each secret as plain text, JSON, JSON inside a JSON string, util.inspect and a URL.
-    const forms = ({ name, secret }: { name: string; secret: string }): string[] => [
+    const forms = ({ name, secret }: FormsProps): string[] => [
       `${name}=${secret}`,
       `${name}: ${secret}`,
       JSON.stringify({ [name]: secret, x: 1 }),

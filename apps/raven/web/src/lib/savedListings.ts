@@ -39,6 +39,14 @@ const isRecord = object({
   ),
 })
 
+type SaveListingsProps = {
+  store: ListingStore
+  scope: string
+  queryClient: QueryClient
+  libraries: ListedLibrary[]
+  now?: number
+}
+
 /** Keeps every cacheable library's cached listing under `scope`. */
 export const saveListings = async ({
   store,
@@ -46,13 +54,7 @@ export const saveListings = async ({
   queryClient,
   libraries,
   now = Date.now(),
-}: {
-  store: ListingStore
-  scope: string
-  queryClient: QueryClient
-  libraries: ListedLibrary[]
-  now?: number
-}): Promise<void> => {
+}: SaveListingsProps): Promise<void> => {
   const listings = libraries.filter(isCacheable).flatMap((library) => {
     const queryKey = listingKeyOf(library)
     const data = queryClient.getQueryData(queryKey)
@@ -62,6 +64,14 @@ export const saveListings = async ({
       : [{ libraryId: library.id, sort: library.settings.sort, updatedAt, data }]
   })
   await store.write({ scope, record: { version: ravenVersion, savedAt: now, listings } })
+}
+
+type RestoreListingsProps = {
+  store: ListingStore
+  scope: string
+  queryClient: QueryClient
+  libraries: ListedLibrary[]
+  now?: number
 }
 
 /**
@@ -76,13 +86,7 @@ export const restoreListings = async ({
   queryClient,
   libraries,
   now = Date.now(),
-}: {
-  store: ListingStore
-  scope: string
-  queryClient: QueryClient
-  libraries: ListedLibrary[]
-  now?: number
-}): Promise<void> => {
+}: RestoreListingsProps): Promise<void> => {
   const record = await store.read(scope)
   if (!isRecord(record) || record.version !== ravenVersion || now - record.savedAt > MAX_AGE_MS) {
     return
@@ -98,6 +102,12 @@ export const restoreListings = async ({
 
 const keepers = new Set<() => void>()
 
+type KeepListingsSavedProps = {
+  store: ListingStore
+  scope: string
+  queryClient: QueryClient
+}
+
 /**
  * Saves the listings again after the cache changes, at most once every few
  * seconds. Returns what stops it.
@@ -106,11 +116,7 @@ export const keepListingsSaved = ({
   store,
   scope,
   queryClient,
-}: {
-  store: ListingStore
-  scope: string
-  queryClient: QueryClient
-}): (() => void) => {
+}: KeepListingsSavedProps): (() => void) => {
   let timer: ReturnType<typeof setTimeout> | null = null
   const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
     if (event.type !== 'updated' || event.action.type !== 'success') return
@@ -142,6 +148,14 @@ export const keepListingsSaved = ({
  */
 export const stopKeepingListings = (): void => [...keepers].forEach((stop) => stop())
 
+type KeepListingsProps = {
+  store: ListingStore
+  scope: string
+  queryClient: QueryClient
+  libraries: ListedLibrary[]
+  signal: AbortSignal
+}
+
 /**
  * Puts back what was saved, then keeps the cache saved and reads the rest of
  * the libraries in the background until `signal` aborts.
@@ -152,13 +166,7 @@ export const keepListings = async ({
   queryClient,
   libraries,
   signal,
-}: {
-  store: ListingStore
-  scope: string
-  queryClient: QueryClient
-  libraries: ListedLibrary[]
-  signal: AbortSignal
-}): Promise<void> => {
+}: KeepListingsProps): Promise<void> => {
   await restoreListings({ store, scope, queryClient, libraries })
   if (signal.aborted) return
   signal.addEventListener('abort', keepListingsSaved({ store, scope, queryClient }), { once: true })

@@ -12,6 +12,10 @@ export const CONTROLS_LINGER_SECONDS = { min: 3, max: 10, initial: 5 } as const
 const withinLinger = (seconds: number): number =>
   Math.min(CONTROLS_LINGER_SECONDS.max, Math.max(CONTROLS_LINGER_SECONDS.min, Math.round(seconds)))
 
+type SetVolumeProps = { volume: number; muted: boolean }
+
+type SetSubtitlesProps = { on: boolean; language: string | null }
+
 type PlayerPrefs = {
   volume: number
   muted: boolean
@@ -27,9 +31,9 @@ type PlayerPrefs = {
   controlsLingerSeconds: number
   /** Whether what is up next starts by itself once the video ends. */
   autoplay: boolean
-  setVolume: ({ volume, muted }: { volume: number; muted: boolean }) => void
+  setVolume: ({ volume, muted }: SetVolumeProps) => void
   setCaptionScale: (captionScale: number) => void
-  setSubtitles: (subtitles: { on: boolean; language: string | null }) => void
+  setSubtitles: (subtitles: SetSubtitlesProps) => void
   setAudioLanguage: (audioLanguage: string | null) => void
   setOpensInRavenPlayer: (isOn: boolean) => void
   setControlsLingerSeconds: (seconds: number) => void

@@ -59,12 +59,14 @@ export type AuthOutcome =
 
 type SupabaseConfig = { supabaseUrl: string; publishableKey: string }
 
+type ReadSupabaseConfigProps = {
+  origin: string
+}
+
 /** The raven server's public sign-in settings (the same ones the web reads), or null when it has none. */
 const readSupabaseConfig = async ({
   origin,
-}: {
-  origin: string
-}): Promise<SupabaseConfig | null> => {
+}: ReadSupabaseConfigProps): Promise<SupabaseConfig | null> => {
   const response = await fetch(`${origin}${AUTH_PATHS.config}`, {
     headers: { [HEADERS.accept]: JSON_TYPE },
   })
@@ -73,17 +75,19 @@ const readSupabaseConfig = async ({
   return { supabaseUrl: body.supabaseUrl, publishableKey: body.publishableKey }
 }
 
+type RequestTokenProps = {
+  origin: string
+  grant: (typeof GRANT_TYPES)[keyof typeof GRANT_TYPES]
+  body: Record<string, string>
+  email: string
+}
+
 const requestToken = async ({
   origin,
   grant,
   body,
   email,
-}: {
-  origin: string
-  grant: (typeof GRANT_TYPES)[keyof typeof GRANT_TYPES]
-  body: Record<string, string>
-  email: string
-}): Promise<AuthOutcome> => {
+}: RequestTokenProps): Promise<AuthOutcome> => {
   try {
     const config = await readSupabaseConfig({ origin })
     if (config === null) return { kind: AUTH_OUTCOMES.unreachable }
@@ -120,24 +124,25 @@ const requestToken = async ({
   }
 }
 
+type SignInWithPasswordProps = {
+  origin: string
+  email: string
+  password: string
+}
+
 export const signInWithPassword = ({
   origin,
   email,
   password,
-}: {
-  origin: string
-  email: string
-  password: string
-}): Promise<AuthOutcome> =>
+}: SignInWithPasswordProps): Promise<AuthOutcome> =>
   requestToken({ origin, grant: GRANT_TYPES.password, body: { email, password }, email })
 
-export const refreshSession = ({
-  origin,
-  session,
-}: {
+type RefreshSessionProps = {
   origin: string
   session: AccountSession
-}): Promise<AuthOutcome> =>
+}
+
+export const refreshSession = ({ origin, session }: RefreshSessionProps): Promise<AuthOutcome> =>
   requestToken({
     origin,
     grant: GRANT_TYPES.refresh,

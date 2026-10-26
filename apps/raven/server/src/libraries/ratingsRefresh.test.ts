@@ -55,8 +55,10 @@ describe("a library's ratings", () => {
     return { id, itemIds }
   }
 
+  type SweepWithProps = { tmdb: TmdbClient }
+
   /** The real sweep, with no score source that has a key, and `tmdb` for TMDB's own score. */
-  const sweepWith = ({ tmdb }: { tmdb: TmdbClient }): ScoreSweep => {
+  const sweepWith = ({ tmdb }: SweepWithProps): ScoreSweep => {
     const config = readServerConfig({})
     const scores = new Scores(
       metadata(),
@@ -201,7 +203,9 @@ describe("a library's ratings", () => {
       return { scanning, gate }
     }
     const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
-    const addTitle = ({ libraryId, name }: { libraryId: number; name: string }): void => {
+    type AddTitleProps = { libraryId: number; name: string }
+
+    const addTitle = ({ libraryId, name }: AddTitleProps): void => {
       const index = new MediaIndex(database.get())
       const itemId = metadata().save({
         item: { ...BLANK_ITEM, type: 'movie', tmdbId: name, number: null, title: name },

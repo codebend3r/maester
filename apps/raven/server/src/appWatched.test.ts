@@ -45,29 +45,30 @@ describe('marking videos watched', () => {
   /** A browser holding `cookie`, or none: the admin lock is on for it either way. */
   const api = (cookie?: string): ApiClient => apiFor({ app: app(), cookie })
   const admin = (): ApiClient => apiFor({ app: app(), cookie: state.admin })
-  const put = ({ body, cookie }: { body: unknown; cookie?: string }) =>
+  type PutProps = { body: unknown; cookie?: string }
+
+  const put = ({ body, cookie }: PutProps) =>
     app().inject({
       method: 'PUT',
       url: '/api/watched',
       payload: body === undefined ? undefined : JSON.stringify(body),
       headers: { [HEADERS.contentType]: CONTENT_TYPES.json, ...(cookie ? { cookie } : {}) },
     })
-  const setWatched = ({
-    watched,
-    targets,
-    cookie,
-  }: {
+  type SetWatchedProps = {
     watched: boolean
     targets: WatchTarget[]
     cookie?: string
-  }) => api(cookie).setWatched({ watched, targets })
-  const watchedFile = async ({
-    name,
-    cookie,
-  }: {
+  }
+
+  const setWatched = ({ watched, targets, cookie }: SetWatchedProps) =>
+    api(cookie).setWatched({ watched, targets })
+  type WatchedFileProps = {
     name: string
     cookie?: string
-  }): Promise<boolean> => (await api(cookie).getMedia(id(name))).watched
+  }
+
+  const watchedFile = async ({ name, cookie }: WatchedFileProps): Promise<boolean> =>
+    (await api(cookie).getMedia(id(name))).watched
   const childrenOf = async (name: string): Promise<ItemChild[]> =>
     (await api().getItem(item(name))).children
   const createLibrary = async (input: LibraryInput): Promise<number> => {
@@ -117,7 +118,9 @@ describe('marking videos watched', () => {
       .db.prepare<[], { id: number; file_name: string }>('SELECT id, file_name FROM media')
       .all()
       .forEach((row) => state.ids.set(row.file_name, row.id))
-    const movie = ({ title, tmdbId }: { title: string; tmdbId: string }): void => {
+    type MovieProps = { title: string; tmdbId: string }
+
+    const movie = ({ title, tmdbId }: MovieProps): void => {
       state.items.set(
         title,
         metadata.save({
@@ -129,15 +132,13 @@ describe('marking videos watched', () => {
     movie({ title: 'Heat (1995)', tmdbId: '949' })
     movie({ title: 'Ronin (1998)', tmdbId: '2000' })
     movie({ title: 'Lesson One', tmdbId: '7001' })
-    const show = ({
-      title,
-      tmdbId,
-      files: names,
-    }: {
+    type ShowProps = {
       title: string
       tmdbId: string
       files: string[]
-    }) => {
+    }
+
+    const show = ({ title, tmdbId, files: names }: ShowProps) => {
       const fetched: FetchedItem = {
         ...localSeason({ showTmdbId: tmdbId, number: 1 }),
         type: 'show',

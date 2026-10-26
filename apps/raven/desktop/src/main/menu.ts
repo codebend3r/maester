@@ -7,7 +7,7 @@ import {
 } from '@raven/core'
 import type { MenuItemConstructorOptions } from 'electron'
 
-export type MenuActions = {
+type MenuActions = {
   openDialog: () => void
   send: (event: DesktopEvent) => void
   toggleDevTools: () => void
@@ -36,6 +36,12 @@ const PLAYBACK = [
   { label: 'Video Info', action: MENU_PLAYER_ACTIONS.stats },
 ] as const satisfies readonly { label: string; action: MenuPlayerAction }[]
 
+type MenuTemplateProps = {
+  appName: string
+  isDevelopment: boolean
+  actions: MenuActions
+}
+
 /**
  * The menus from the spec's "Menus" table. Every accelerator holds a modifier:
  * single keys stay with the page, or a menu would take Space and the arrows from
@@ -45,11 +51,7 @@ export const menuTemplate = ({
   appName,
   isDevelopment,
   actions,
-}: {
-  appName: string
-  isDevelopment: boolean
-  actions: MenuActions
-}): MenuEntry[] => {
+}: MenuTemplateProps): MenuEntry[] => {
   const player = (action: MenuPlayerAction) => () =>
     actions.send({ type: DESKTOP_EVENTS.player, action })
 

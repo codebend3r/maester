@@ -96,6 +96,14 @@ const historyLimit = (asked: string | undefined): number => {
     : HISTORY_LIMIT.fallback
 }
 
+type LibrariesControllerWithStatusProps = {
+  record: LibraryRecord
+  canSee: boolean
+  isAdmin: boolean
+}
+
+type LibrariesControllerSagasOfProps = { id: number; request: FastifyRequest }
+
 @Controller('api/libraries')
 @PrivateBy('library')
 export class LibrariesController {
@@ -136,15 +144,7 @@ export class LibrariesController {
    * the public ones ask the lock, while the guarded ones, and creating a
    * library, pass true, as whoever reaches them sees it all.
    */
-  private withStatus({
-    record,
-    canSee,
-    isAdmin,
-  }: {
-    record: LibraryRecord
-    canSee: boolean
-    isAdmin: boolean
-  }): Library {
+  private withStatus({ record, canSee, isAdmin }: LibrariesControllerWithStatusProps): Library {
     const scan = this.scanner.status(record.id)
     const ratingsRefresh = this.ratings.status(record.id)
     if (canSee && isAdmin) {
@@ -484,7 +484,7 @@ export class LibrariesController {
   }
 
   /** Its sagas of two movies or more; none in a library that is not matched to movies. */
-  private sagasOf({ id, request }: { id: number; request: FastifyRequest }): Saga[] {
+  private sagasOf({ id, request }: LibrariesControllerSagasOfProps): Saga[] {
     const record = this.find(id)
     return matchTypeFor(record.settings.kind) === ITEM_TYPES.movie
       ? this.media.listSagas({ libraryId: id, account: this.accounts.keyOf({ request }) })

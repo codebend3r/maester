@@ -35,12 +35,18 @@ export const safeReturnPath = (value: string | null): string => {
   return isAuthPath(url.pathname) ? HOME_PATH : value
 }
 
-export const signInPath = ({ returnTo }: { returnTo: string }): string =>
+type SignInPathProps = { returnTo: string }
+
+export const signInPath = ({ returnTo }: SignInPathProps): string =>
   `${AUTH_ROUTES.signIn}?${new URLSearchParams({ [AUTH_QUERY.returnTo]: returnTo })}`
 
-export const checkEmailPath = ({ email }: { email: string }): string =>
+type CheckEmailPathProps = { email: string }
+
+export const checkEmailPath = ({ email }: CheckEmailPathProps): string =>
   `${AUTH_ROUTES.checkEmail}?${new URLSearchParams({ [AUTH_QUERY.email]: email })}`
 
+type ConfirmUrlProps = { webUrl: string }
+
 /** Where an email link lands: raven's confirm route on its own web address. */
-export const confirmUrl = ({ webUrl }: { webUrl: string }): string =>
+export const confirmUrl = ({ webUrl }: ConfirmUrlProps): string =>
   `${webUrl.replace(/\/+$/, '')}${AUTH_ROUTES.confirm}`

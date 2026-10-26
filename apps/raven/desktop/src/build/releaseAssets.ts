@@ -17,7 +17,9 @@ export const SOURCE_BUNDLE = join(
   'source-bundle',
 )
 
-export const releaseAssetNames = ({ version }: { version: string }) =>
+type ReleaseAssetNamesProps = { version: string }
+
+export const releaseAssetNames = ({ version }: ReleaseAssetNamesProps) =>
   ({
     dmg: `raven-player-${version}-arm64.dmg`,
     zip: `raven-player-${version}-arm64.zip`,
@@ -40,7 +42,9 @@ export const sourcesFrom = (argv: readonly string[]): string => {
 
 const run = promisify(execFile)
 
-const sha256Of = async ({ path }: { path: string }): Promise<string> => {
+type Sha256OfProps = { path: string }
+
+const sha256Of = async ({ path }: Sha256OfProps): Promise<string> => {
   const hasher = new Bun.CryptoHasher('sha256')
   await Bun.file(path)
     .stream()
@@ -54,13 +58,15 @@ const sha256Of = async ({ path }: { path: string }): Promise<string> => {
   return hasher.digest('hex')
 }
 
+type WriteReleaseAssetsProps = {
+  project: string
+  sources: string
+}
+
 const writeReleaseAssets = async ({
   project,
   sources,
-}: {
-  project: string
-  sources: string
-}): Promise<number> => {
+}: WriteReleaseAssetsProps): Promise<number> => {
   const version = versionOf(JSON.parse(await readFile(join(project, 'package.json'), 'utf8')))
   const names = releaseAssetNames({ version })
   const release = join(project, RELEASE_DIR)

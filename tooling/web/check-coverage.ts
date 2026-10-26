@@ -13,7 +13,9 @@ const METRICS = [
   { name: 'functions', hit: 'FNH', found: 'FNF' },
 ] as const satisfies ReadonlyArray<{ name: string; hit: Counter; found: Counter }>
 
-const readFloor = ({ name, value }: { name: string; value: string | undefined }): number => {
+type ReadFloorProps = { name: string; value: string | undefined }
+
+const readFloor = ({ name, value }: ReadFloorProps): number => {
   const floor = Number(value)
   if (!/^\d+(\.\d+)?$/.test(value ?? '') || floor > 100) {
     throw new Error(`--${name} needs a percentage from 0 to 100, got ${value ?? 'nothing'}`)

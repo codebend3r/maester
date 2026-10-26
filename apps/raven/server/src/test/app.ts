@@ -14,16 +14,18 @@ export const isRouteMethod = (value: string): value is RouteMethod =>
 /** A watcher that never fires, for tests that scan by hand. */
 export const NOT_WATCHING = { watchFolder: () => ({ close: () => undefined }) }
 
+type EventuallyProps<T> = {
+  read: () => Promise<T>
+  check: (value: T) => boolean
+  ms?: number
+}
+
 /** Resolves with `read()` once `check` holds for it, polling, or fails after `ms`. */
 export const eventually = async <T>({
   read,
   check,
   ms = 10_000,
-}: {
-  read: () => Promise<T>
-  check: (value: T) => boolean
-  ms?: number
-}): Promise<T> => {
+}: EventuallyProps<T>): Promise<T> => {
   const until = Date.now() + ms
   const poll = async (): Promise<T> => {
     const value = await read()
@@ -47,14 +49,13 @@ export const holdOpen = () => {
   return { gate, opened, reached }
 }
 
-/** A route with its `:name` placeholders filled in from `values`, keyed by the names. */
-export const routePath = ({
-  route,
-  values,
-}: {
+type RoutePathProps = {
   route: string
   values: Record<string, string | number>
-}): string =>
+}
+
+/** A route with its `:name` placeholders filled in from `values`, keyed by the names. */
+export const routePath = ({ route, values }: RoutePathProps): string =>
   Object.entries(values).reduce(
     (path, [name, value]) => path.replace(`:${name}`, String(value)),
     route,
@@ -63,11 +64,13 @@ export const routePath = ({
 /** What Chrome offers over https: the browser that reaches raven through Netlify. */
 export const BROWSER_ENCODINGS = 'gzip, deflate, br, zstd'
 
-/** A response's body as a browser's fetch hands it over, unpacked from whatever it was sent in. */
-export const decodedBody = (response: {
+type DecodedBodyProps = {
   headers: Record<string, unknown>
   rawPayload: Buffer
-}): Buffer => {
+}
+
+/** A response's body as a browser's fetch hands it over, unpacked from whatever it was sent in. */
+export const decodedBody = (response: DecodedBodyProps): Buffer => {
   const encoding = response.headers[HEADERS.contentEncoding]
   if (encoding === ENCODINGS.br) return brotliDecompressSync(response.rawPayload)
   if (encoding === ENCODINGS.gzip) return gunzipSync(response.rawPayload)
@@ -85,8 +88,10 @@ export const keysOf = (value: unknown): string[] => {
 /** Strong enough for the admin lock, so the tests' servers can turn it off. */
 export const ADMIN_PASSWORD = 'Raven-Admin-2026'
 
+type CookieSetProps = { headers: Record<string, unknown> }
+
 /** The cookie a response sets, as a browser sends it back: its name and value, no attributes. */
-export const cookieSet = (response: { headers: Record<string, unknown> }): string => {
+export const cookieSet = (response: CookieSetProps): string => {
   const header = response.headers[HEADERS.setCookie]
   return typeof header === 'string' ? (header.split(';')[0] ?? '') : ''
 }
@@ -104,12 +109,14 @@ export const adminCookie = async (app: NestFastifyApplication): Promise<string> 
 /** One request by hand, as `app.inject` takes it. */
 export type InjectOptions = Exclude<Parameters<NestFastifyApplication['inject']>[0], string>
 
+type InjectAsProps = { app: NestFastifyApplication; cookie: string }
+
 /**
  * `app.inject` as a browser holding `cookie` sends it: the cookie goes with
  * every request, as it goes with every call of `apiFor`'s client.
  */
 export const injectAs =
-  ({ app, cookie }: { app: NestFastifyApplication; cookie: string }) =>
+  ({ app, cookie }: InjectAsProps) =>
   (options: InjectOptions) =>
     app.inject({ ...options, headers: { ...options.headers, cookie } })
 
@@ -117,16 +124,18 @@ export const injectAs =
 export const cookies = (...given: (string | undefined)[]): string =>
   given.filter((cookie) => !!cookie).join('; ')
 
+type TestConfigProps = {
+  dataDir: string
+  mediaDir: string
+  webDir?: string | null
+}
+
 /** A test's server: no scan on start, no rescans, the CPU encoder, and the admin password above. */
 export const testConfig = ({
   dataDir,
   mediaDir,
   webDir = null,
-}: {
-  dataDir: string
-  mediaDir: string
-  webDir?: string | null
-}): ServerConfig => ({
+}: TestConfigProps): ServerConfig => ({
   ...readServerConfig({}),
   hwAccel: 'none',
   dataDir,

@@ -20,14 +20,16 @@ import { ERROR_NAMES } from '@/errorMessage'
 import { RAVEN_HEADERS } from '@/http'
 import { type RateLimit, createRateLimit } from '@/scanner/concurrency'
 
+type MetadataFetchProps = {
+  url: string
+  init: { headers: Record<string, string>; signal: AbortSignal }
+}
+
 /**
  * The slice of `fetch` metadata uses, injected so tests answer for TMDB and
  * OMDb and never touch the network.
  */
-export type MetadataFetch = (request: {
-  url: string
-  init: { headers: Record<string, string>; signal: AbortSignal }
-}) => Promise<Response>
+export type MetadataFetch = (request: MetadataFetchProps) => Promise<Response>
 
 /** The DI token the fetch is provided under. */
 export const METADATA_FETCH = Symbol('METADATA_FETCH')
@@ -40,8 +42,10 @@ export const TMDB_SEGMENTS = { movie: 'movie', show: 'tv' } as const satisfies R
   string
 >
 
+type SourceOfProps = { type: MatchItemType; tmdbId: string }
+
 /** A library's movie can be catalogued by TMDB as a TV documentary. Keep the namespaces distinct. */
-const sourceOf = ({ type, tmdbId }: { type: MatchItemType; tmdbId: string }) =>
+const sourceOf = ({ type, tmdbId }: SourceOfProps) =>
   type === ITEM_TYPES.movie && isTvMovieId(tmdbId)
     ? { type: ITEM_TYPES.show, tmdbId: tmdbId.slice(TMDB_MATCH_PREFIXES.tvMovie.length) }
     : { type, tmdbId }
@@ -84,11 +88,13 @@ export const TMDB_ERROR_KINDS = {
 
 export type TmdbErrorKind = (typeof TMDB_ERROR_KINDS)[keyof typeof TMDB_ERROR_KINDS]
 
+type TmdbErrorProps = { kind: TmdbErrorKind; message: string }
+
 /** 401 is a wrong token, 404 an id TMDB no longer has, and anything else TMDB being away. */
 export class TmdbError extends Error {
   readonly kind: TmdbErrorKind
 
-  constructor({ kind, message }: { kind: TmdbErrorKind; message: string }) {
+  constructor({ kind, message }: TmdbErrorProps) {
     super(message)
     this.name = 'TmdbError'
     this.kind = kind
@@ -304,18 +310,17 @@ const toImages = (entries: unknown): TmdbImage[] =>
 /** A logo raven shows is a PNG, whose ground is clear; an SVG is passed over. */
 const isClearLogo = (logo: TmdbImage): boolean => logo.path.endsWith('.png')
 
+type PickLogoProps = {
+  logos: unknown
+  language: string
+}
+
 /**
  * The logo a page shows for its title: a clear one, in `language` before
  * one with no language, TMDB's most voted first. Anything not a plain TMDB
  * file is passed over.
  */
-export const pickLogo = ({
-  logos,
-  language,
-}: {
-  logos: unknown
-  language: string
-}): string | null => {
+export const pickLogo = ({ logos, language }: PickLogoProps): string | null => {
   const clear = toImages(logos).filter(isClearLogo)
   return (
     (
@@ -333,14 +338,13 @@ const toSaga = (value: unknown): FetchedSaga | null => {
   return tmdbId == null || name == null ? null : { tmdbId, name }
 }
 
-/** A movie's saga and logo, from `/movie/{id}` with its images appended. */
-const toMovieExtras = ({
-  movie,
-  language,
-}: {
+type ToMovieExtrasProps = {
   movie: Record<string, unknown>
   language: string
-}): MovieExtras => ({
+}
+
+/** A movie's saga and logo, from `/movie/{id}` with its images appended. */
+const toMovieExtras = ({ movie, language }: ToMovieExtrasProps): MovieExtras => ({
   saga: toSaga(movie.belongs_to_collection),
   logo: pickLogo({ logos: record(movie.images).logos, language }),
 })
@@ -430,7 +434,9 @@ const person = (
     : null
 }
 
-const castCredits = ({ cast, job }: { cast: unknown; job: 'cast' | 'guest' }): FetchedCredit[] =>
+type CastCreditsProps = { cast: unknown; job: 'cast' | 'guest' }
+
+const castCredits = ({ cast, job }: CastCreditsProps): FetchedCredit[] =>
   records(cast)
     .toSorted((a, b) => (number(a.order) ?? 0) - (number(b.order) ?? 0))
     .slice(0, CAST_LIMIT)
@@ -447,6 +453,11 @@ const crewCredits = (crew: unknown): FetchedCredit[] =>
     return found && job ? [{ ...found, job, role }] : []
   })
 
+type MovieCertificationProps = {
+  releaseDates: unknown
+  country: string
+}
+
 /**
  * The content rating for `country`, then for the US: the theatrical
  * release's certification first, any other after.
@@ -454,10 +465,7 @@ const crewCredits = (crew: unknown): FetchedCredit[] =>
 const movieCertification = ({
   releaseDates,
   country,
-}: {
-  releaseDates: unknown
-  country: string
-}): { rating: string | null; released: string | null } => {
+}: MovieCertificationProps): { rating: string | null; released: string | null } => {
   const forCountry = (code: string) => {
     const dates = records(
       records(record(releaseDates).results).find((entry) => entry.iso_3166_1 === code)
@@ -480,14 +488,13 @@ const tmdbRating = (entry: Record<string, unknown>): FetchedItem['rating'] => {
   return value != null && votes != null && votes > 0 ? { value, votes } : null
 }
 
-/** The content rating for `country`, then for the US, from a show's `content_ratings`. */
-const showCertification = ({
-  ratings,
-  country,
-}: {
+type ShowCertificationProps = {
   ratings: unknown
   country: string
-}): string | null => {
+}
+
+/** The content rating for `country`, then for the US, from a show's `content_ratings`. */
+const showCertification = ({ ratings, country }: ShowCertificationProps): string | null => {
   const results = records(record(ratings).results)
   const forCountry = (code: string) =>
     results
@@ -513,17 +520,15 @@ const aggregateCredits = (credits: Record<string, unknown>): FetchedCredit[] => 
   ),
 ]
 
-/** A show with its aggregate credits, content ratings, external ids and images appended. */
-export const toShow = ({
-  body,
-  country,
-  language,
-}: {
+type ToShowProps = {
   body: unknown
   country: string
   /** ISO 639-1, for the logo: `en`. */
   language: string
-}): FetchedItem | null => {
+}
+
+/** A show with its aggregate credits, content ratings, external ids and images appended. */
+export const toShow = ({ body, country, language }: ToShowProps): FetchedItem | null => {
   const show = record(body)
   const tmdbId = idOf(show.id)
   const title = text(show.name)
@@ -615,17 +620,15 @@ export const toSeason = (
   }
 }
 
-/** A movie with its credits, release dates and external ids appended. */
-const toMovie = ({
-  body,
-  country,
-  language,
-}: {
+type ToMovieProps = {
   body: unknown
   country: string
   /** ISO 639-1, for the logo: `en`. */
   language: string
-}): FetchedItem | null => {
+}
+
+/** A movie with its credits, release dates and external ids appended. */
+const toMovie = ({ body, country, language }: ToMovieProps): FetchedItem | null => {
   const movie = record(body)
   const tmdbId = idOf(movie.id)
   const title = text(movie.title)
@@ -670,16 +673,18 @@ const toMovie = ({
 const mediaTypeOf = (value: unknown): MatchItemType | null =>
   value === 'movie' ? 'movie' : value === 'tv' ? 'show' : null
 
+type ToPersonCreditProps = {
+  entry: Record<string, unknown>
+  department: string
+  role: string | null
+}
+
 /** One entry of `combined_credits`, or null for one raven leaves out. */
 const toPersonCredit = ({
   entry,
   department,
   role,
-}: {
-  entry: Record<string, unknown>
-  department: string
-  role: string | null
-}): Omit<FetchedPersonCredit, 'position'> | null => {
+}: ToPersonCreditProps): Omit<FetchedPersonCredit, 'position'> | null => {
   const type = mediaTypeOf(entry.media_type)
   const creditId = idOf(entry.credit_id)
   const tmdbId = idOf(entry.id)
@@ -764,6 +769,47 @@ const retryAfterMs = (header: string | null): number => {
   return Number.isFinite(seconds) && seconds >= 0 ? Math.min(seconds, 30) * 1000 : 1000
 }
 
+type TmdbClientGetProps = {
+  path: string
+  params?: Record<string, string>
+}
+
+type TmdbClientSearchMoviesProps = {
+  query: string
+  year: number | null
+  /** Takes in titles TMDB keeps out of an ordinary search. */
+  includeAdult?: boolean
+}
+
+type TmdbClientSearchShowsProps = {
+  query: string
+  year: number | null
+}
+
+type TmdbClientSeasonProps = {
+  showTmdbId: string
+  number: number
+}
+
+type TmdbClientFindProps = {
+  id: string
+  source: TmdbExternalSource
+}
+
+type TmdbClientAlternativeTitlesProps = {
+  type: MatchItemType
+  tmdbId: string
+}
+
+type TmdbClientMatchFactsProps = { type: MatchItemType; tmdbId: string }
+
+type TmdbClientScoreProps = {
+  type: MatchItemType
+  tmdbId: string
+}
+
+type TmdbClientImagesProps = { type: MatchItemType; tmdbId: string }
+
 /**
  * TMDB's API v3, read with a bearer token. Keeps to 20 calls a second with
  * at most 4 in flight, waits out a 429 and halves its rate after one, and
@@ -808,13 +854,7 @@ export class TmdbClient {
     return this.config.metadataLanguage.slice(0, 2)
   }
 
-  private async get({
-    path,
-    params = {},
-  }: {
-    path: string
-    params?: Record<string, string>
-  }): Promise<unknown> {
+  private async get({ path, params = {} }: TmdbClientGetProps): Promise<unknown> {
     const token = this.config.tmdbApiToken
     if (token == null || this.status.refused) {
       throw new TmdbError({
@@ -886,12 +926,7 @@ export class TmdbClient {
     query,
     year,
     includeAdult = false,
-  }: {
-    query: string
-    year: number | null
-    /** Takes in titles TMDB keeps out of an ordinary search. */
-    includeAdult?: boolean
-  }): Promise<SearchResult[]> {
+  }: TmdbClientSearchMoviesProps): Promise<SearchResult[]> {
     const body = await this.get({
       path: TMDB_SEARCH_ROUTES.movie,
       params: {
@@ -919,13 +954,7 @@ export class TmdbClient {
     ]
   }
 
-  async searchShows({
-    query,
-    year,
-  }: {
-    query: string
-    year: number | null
-  }): Promise<SearchResult[]> {
+  async searchShows({ query, year }: TmdbClientSearchShowsProps): Promise<SearchResult[]> {
     const body = await this.get({
       path: TMDB_SEARCH_ROUTES.show,
       params: {
@@ -959,10 +988,7 @@ export class TmdbClient {
   async season({
     showTmdbId,
     number: seasonNumber,
-  }: {
-    showTmdbId: string
-    number: number
-  }): Promise<{ season: FetchedItem; episodes: FetchedItem[] }> {
+  }: TmdbClientSeasonProps): Promise<{ season: FetchedItem; episodes: FetchedItem[] }> {
     const body = await this.get({
       path: `/tv/${encodeURIComponent(showTmdbId)}/season/${seasonNumber}`,
       params: {
@@ -980,13 +1006,7 @@ export class TmdbClient {
   }
 
   /** TMDB's ids for an IMDb or TVDB id, by kind. */
-  async find({
-    id,
-    source,
-  }: {
-    id: string
-    source: TmdbExternalSource
-  }): Promise<{ movies: string[]; shows: string[] }> {
+  async find({ id, source }: TmdbClientFindProps): Promise<{ movies: string[]; shows: string[] }> {
     const body = record(
       await this.get({
         path: `/find/${encodeURIComponent(id)}`,
@@ -999,13 +1019,7 @@ export class TmdbClient {
   }
 
   /** The other titles TMDB knows a movie or show by: a country's own, a working title, a translation. */
-  async alternativeTitles({
-    type,
-    tmdbId,
-  }: {
-    type: MatchItemType
-    tmdbId: string
-  }): Promise<string[]> {
+  async alternativeTitles({ type, tmdbId }: TmdbClientAlternativeTitlesProps): Promise<string[]> {
     const source = sourceOf({ type, tmdbId })
     const body = record(
       await this.get({
@@ -1021,7 +1035,7 @@ export class TmdbClient {
    * show's seasons and episode total, or a movie's runtime, and its other
    * titles, in one call.
    */
-  async matchFacts({ type, tmdbId }: { type: MatchItemType; tmdbId: string }): Promise<MatchFacts> {
+  async matchFacts({ type, tmdbId }: TmdbClientMatchFactsProps): Promise<MatchFacts> {
     const source = sourceOf({ type, tmdbId })
     const body = record(
       await this.get({
@@ -1054,13 +1068,7 @@ export class TmdbClient {
   }
 
   /** A movie's or show's TMDB score alone, in one call with nothing appended; null when it has none. */
-  async score({
-    type,
-    tmdbId,
-  }: {
-    type: MatchItemType
-    tmdbId: string
-  }): Promise<FetchedItem['rating']> {
+  async score({ type, tmdbId }: TmdbClientScoreProps): Promise<FetchedItem['rating']> {
     const body = await this.get({
       path: `/${type === ITEM_TYPES.movie ? 'movie' : 'tv'}/${encodeURIComponent(tmdbId)}`,
     })
@@ -1071,7 +1079,7 @@ export class TmdbClient {
    * Every poster, backdrop and PNG logo TMDB holds for a movie or show, in
    * the language details come in and without text, most voted first.
    */
-  async images({ type, tmdbId }: { type: MatchItemType; tmdbId: string }): Promise<TmdbImages> {
+  async images({ type, tmdbId }: TmdbClientImagesProps): Promise<TmdbImages> {
     const source = sourceOf({ type, tmdbId })
     const body = record(
       await this.get({

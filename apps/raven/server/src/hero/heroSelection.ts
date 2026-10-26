@@ -26,6 +26,25 @@ const distinct = (candidates: readonly Candidate[]): Candidate[] =>
 const hasArtwork = (item: ItemSummary | null): item is ItemSummary =>
   item != null && item.posterVersion != null && item.backdropVersion != null
 
+type HeroSelectionCandidatesProps = {
+  library: LibraryRecord
+  itemIds: readonly number[]
+  account: AccountKey
+}
+
+type HeroSelectionNewestInProps = {
+  library: LibraryRecord
+  account: AccountKey
+}
+
+type HeroSelectionEntriesProps = { viewer: Viewer; account: AccountKey }
+
+type HeroSelectionCanPickProps = {
+  itemId: number
+  viewer: Viewer
+  account: AccountKey
+}
+
 /**
  * What home's hero shows, from the pinned libraries the caller may see that
  * are not left out of it, and never from a locked one. The movies and shows the admin picked, in the order
@@ -64,15 +83,7 @@ export class HeroSelection {
   }
 
   /** The titles among `itemIds` that `library` holds and the hero can lay out, in the order given. */
-  private candidates({
-    library,
-    itemIds,
-    account,
-  }: {
-    library: LibraryRecord
-    itemIds: readonly number[]
-    account: AccountKey
-  }): Candidate[] {
+  private candidates({ library, itemIds, account }: HeroSelectionCandidatesProps): Candidate[] {
     if (itemIds.length === 0) return []
     const { id: libraryId, settings } = library
     if (listsShows(settings.kind)) {
@@ -98,13 +109,7 @@ export class HeroSelection {
   }
 
   /** `library`'s most recently released titles, newest first. */
-  private newestIn({
-    library,
-    account,
-  }: {
-    library: LibraryRecord
-    account: AccountKey
-  }): Candidate[] {
+  private newestIn({ library, account }: HeroSelectionNewestInProps): Candidate[] {
     const type = listsShows(library.settings.kind) ? ITEM_TYPES.show : ITEM_TYPES.movie
     const itemIds = this.media.newestReleased({
       libraryId: library.id,
@@ -119,7 +124,7 @@ export class HeroSelection {
     return candidates.map(({ itemId, entry }) => ({ ...entry, line: blurbs.get(itemId) ?? null }))
   }
 
-  entries({ viewer, account }: { viewer: Viewer; account: AccountKey }): Hero {
+  entries({ viewer, account }: HeroSelectionEntriesProps): Hero {
     const pinned = this.pinnedFor(viewer)
     const picked = this.picks.picks()
     const chosen =
@@ -137,15 +142,7 @@ export class HeroSelection {
   }
 
   /** Whether `itemId` is a movie or show held by a pinned library `viewer` may see, so the admin may pick it. */
-  canPick({
-    itemId,
-    viewer,
-    account,
-  }: {
-    itemId: number
-    viewer: Viewer
-    account: AccountKey
-  }): boolean {
+  canPick({ itemId, viewer, account }: HeroSelectionCanPickProps): boolean {
     return this.pinnedFor(viewer).some(
       (library) => this.candidates({ library, itemIds: [itemId], account }).length > 0,
     )

@@ -5,12 +5,14 @@ import { usePlaybackPolicy } from '@raven/ui/headless'
 import { playbackSettingsQuery } from '@/lib/queries'
 import styles from '@/components/PlaybackNote/PlaybackNote.module.scss'
 
+type PlaybackNoteProps = { media: MediaItem }
+
 /**
  * Warns when this browser cannot play a video at all, as the server's
  * playback settings have it. Nothing when it plays, directly or converted
  * on the server, as most 4K files are, or before those settings are known.
  */
-export const PlaybackNote = ({ media }: { media: MediaItem }) => {
+export const PlaybackNote = ({ media }: PlaybackNoteProps) => {
   const policy = usePlaybackPolicy({ queries: { playbackSettingsQuery } })
   if (!policy) return null
   const plan = planPlayback({

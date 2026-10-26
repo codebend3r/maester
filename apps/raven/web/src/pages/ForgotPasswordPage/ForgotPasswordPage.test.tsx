@@ -17,7 +17,9 @@ type ResetResult = Awaited<ReturnType<AuthClient['resetPasswordForEmail']>>
 
 const sent = (): ResetResult => ({ data: {}, error: null })
 
-const refused = ({ code, status }: { code: string; status: number }): ResetResult => ({
+type RefusedProps = { code: string; status: number }
+
+const refused = ({ code, status }: RefusedProps): ResetResult => ({
   data: null,
   error: new AuthApiError('Words from the server', status, code),
 })

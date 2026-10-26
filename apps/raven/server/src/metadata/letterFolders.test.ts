@@ -29,13 +29,12 @@ type Injected = {
   json: () => unknown
 }
 
-const shape = <T>({
-  response,
-  guard,
-}: {
+type ShapeProps<T> = {
   response: Injected
   guard: (value: unknown) => value is T
-}): T => {
+}
+
+const shape = <T>({ response, guard }: ShapeProps<T>): T => {
   const body: unknown = response.json()
   if (!guard(body)) throw new Error(`Unexpected body: ${response.rawPayload.toString()}`)
   return body
@@ -149,15 +148,13 @@ describe('letter and group folders', () => {
     (await mediaOf(state.shows)).find((item) => item.fileName === 'Andor - S01E01 - Kassa.mp4')
   const showTitles = async (): Promise<string[]> =>
     (await showsOf(state.shows)).shows.map((entry) => entry.show.title)
-  const createLibrary = async ({
-    name,
-    path,
-    kind,
-  }: {
+  type CreateLibraryProps = {
     name: string
     path: string
     kind: 'shows' | 'movies' | 'other'
-  }): Promise<number> =>
+  }
+
+  const createLibrary = async ({ name, path, kind }: CreateLibraryProps): Promise<number> =>
     shape({
       response: await asAdmin({
         method: 'POST',

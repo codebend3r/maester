@@ -32,6 +32,13 @@ const untilIdle = async (): Promise<void> => {
   await idle()
 }
 
+type WarmLibrariesProps = {
+  queryClient: QueryClient
+  libraries: ListedLibrary[]
+  signal: AbortSignal
+  wait?: () => Promise<void>
+}
+
 /**
  * Reads each cacheable library's listing into the cache, one after another,
  * each when the browser is idle, so opening a library later draws from the
@@ -43,12 +50,7 @@ export const warmLibraries = ({
   libraries,
   signal,
   wait = untilIdle,
-}: {
-  queryClient: QueryClient
-  libraries: ListedLibrary[]
-  signal: AbortSignal
-  wait?: () => Promise<void>
-}): Promise<void> =>
+}: WarmLibrariesProps): Promise<void> =>
   libraries.filter(isCacheable).reduce(
     (previous, library) =>
       previous.then(async () => {

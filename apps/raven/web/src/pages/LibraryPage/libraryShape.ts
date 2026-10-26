@@ -22,6 +22,11 @@ export type ListingState =
 /** What Play, Shuffle and the jump strip see while nothing is listed yet. */
 export const NOTHING_LISTED: Listing = { shows: [], files: [] }
 
+type PlayQueueProps = {
+  settings: LibrarySettings
+  listing: Listing
+}
+
 /**
  * What Play and Shuffle start: a show's next episode first, then the files
  * in the order the page shows them. Shuffle deals every show's next episode
@@ -32,10 +37,7 @@ export const NOTHING_LISTED: Listing = { shows: [], files: [] }
 export const playQueue = ({
   settings,
   listing,
-}: {
-  settings: LibrarySettings
-  listing: Listing
-}): {
+}: PlayQueueProps): {
   playable: boolean
   first: () => MediaItem | undefined
   shuffled: () => MediaItem[]

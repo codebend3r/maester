@@ -19,7 +19,9 @@ const HOME = { isPlaying: false, isShowing: false } as const
 const PLAYING = { isPlaying: true, isShowing: true } as const
 const PAUSED = { isPlaying: false, isShowing: true } as const
 
-const metric = ({ kb, cpu }: { kb: number; cpu: number }): MetricLike => ({
+type MetricProps = { kb: number; cpu: number }
+
+const metric = ({ kb, cpu }: MetricProps): MetricLike => ({
   memory: { workingSetSize: kb },
   cpu: { percentCPUUsage: cpu },
 })

@@ -19,6 +19,8 @@ export const SYNC_DEBOUNCE_MS = 2000
 /** While anything is pending, the server is tried again this often. */
 export const SYNC_RETRY_MS = 300_000
 
+type AccountIdOfProps = { serverId: string }
+
 export type SyncDeps = {
   store: DownloadsStore
   calls: Pick<ServerCalls, 'call'>
@@ -27,16 +29,20 @@ export type SyncDeps = {
   /** How often the server is tried again; `SYNC_RETRY_MS` unless main's test hook shortens it. */
   retryMs: number
   /** The account signed in to a server, as the page's session names it; null when none is. */
-  accountIdOf: (input: { serverId: string }) => string | null
+  accountIdOf: (input: AccountIdOfProps) => string | null
 }
+
+type TouchProps = { downloadId: string }
+
+type RunForProps = { downloadIds: readonly string[] }
 
 export type Sync = {
   /** A download has something new pending; it goes out once the debounce has run. */
-  touch: (input: { downloadId: string }) => void
+  touch: (input: TouchProps) => void
   /** Sends what every download, and every removed one, has pending now; settles once the answers are in. */
   runAll: () => Promise<void>
   /** Sends what these downloads have pending now; settles once the answers are in. */
-  runFor: (input: { downloadIds: readonly string[] }) => Promise<void>
+  runFor: (input: RunForProps) => Promise<void>
   /**
    * Clears every timer; a send already out finishes and is not followed up. Quitting waits on
    * it through the server calls' `settleWrites`, which settles before the stores flush, and a
@@ -163,15 +169,19 @@ export const createSync = ({
 
   const dueOf = (owing: Owing): Due | null => dueIn(store.read(), owing)
 
+  type IsSendableProps = { serverId: string; pending: Pending }
+
   /**
    * Whether what is pending may go to its server now: what was noted for no account goes to
    * whoever is signed in, and an account's only while that account is.
    */
-  const isSendable = ({ serverId, pending }: { serverId: string; pending: Pending }): boolean =>
+  const isSendable = ({ serverId, pending }: IsSendableProps): boolean =>
     pending.accountId === null || pending.accountId === accountIdOf({ serverId })
 
+  type DeliverProps = { due: Due; call: AllowedCall }
+
   /** Sends one call; `taken` when the server took it, so what it carried can be cleared. */
-  const deliver = async ({ due, call }: { due: Due; call: AllowedCall }): Promise<Delivery> => {
+  const deliver = async ({ due, call }: DeliverProps): Promise<Delivery> => {
     // Read again before each call: the account may have signed out while the last was out.
     if (!isSendable(due)) return DELIVERIES.waiting
     const result = await calls.call({
@@ -202,12 +212,14 @@ export const createSync = ({
     return DELIVERIES.denied
   }
 
+  type NotTakenProps = { due: Due; delivery: Delivery }
+
   /**
    * What a call that was not taken leaves: a download keeps its pending for the next round (a
    * relocked library hears it after the unlock), and an owed item the server denies goes, since
    * no later download will ever clear it. False when the server could not be reached.
    */
-  const notTaken = ({ due, delivery }: { due: Due; delivery: Delivery }): boolean => {
+  const notTaken = ({ due, delivery }: NotTakenProps): boolean => {
     const { owing } = due
     if (delivery === DELIVERIES.denied && owing.kind === OWING_KINDS.owed) {
       store.update((state) => dropOwed(state, owing))
@@ -215,22 +227,19 @@ export const createSync = ({
     return delivery !== DELIVERIES.unreachable
   }
 
+  type ClearSentProps = {
+    due: Due
+    sentPlay: boolean
+    sentPosition: number | null
+    sentFurthest: number | null
+  }
+
   /**
    * Clears what the server took. A download removed while its call was out, or whose account
    * signed out meanwhile, has moved its pending to `owed`, so it is cleared there, never sent
    * twice, and what the download now holds for another account is left alone.
    */
-  const clearSent = ({
-    due,
-    sentPlay,
-    sentPosition,
-    sentFurthest,
-  }: {
-    due: Due
-    sentPlay: boolean
-    sentPosition: number | null
-    sentFurthest: number | null
-  }): void => {
+  const clearSent = ({ due, sentPlay, sentPosition, sentFurthest }: ClearSentProps): void => {
     const sent = { sentPlay, sentPosition, sentFurthest }
     const { owing, serverId, mediaId } = due
     const { accountId } = due.pending
@@ -242,8 +251,10 @@ export const createSync = ({
     })
   }
 
+  type WarnFailedProps = { label: string | null }
+
   const warnFailed =
-    ({ label }: { label: string | null }) =>
+    ({ label }: WarnFailedProps) =>
     (error: unknown): void => {
       const what = label === null ? '' : ` of ${loggable(label)}`
       warn(`Raven could not tell its server what was watched${what}: ${loggable(errorText(error))}`)
@@ -316,8 +327,9 @@ export const createSync = ({
     return true
   }
 
-  const isSendableNow = (item: { serverId: string; pending: Pending }): boolean =>
-    hasPending(item) && isSendable(item)
+  type IsSendableNowProps = { serverId: string; pending: Pending }
+
+  const isSendableNow = (item: IsSendableNowProps): boolean => hasPending(item) && isSendable(item)
 
   /** Whether anything could go now; what waits on an account goes when that account signs in. */
   const isAnythingPending = (): boolean => {
@@ -445,6 +457,13 @@ export const createSync = ({
   return { touch, runAll, runFor, dispose }
 }
 
+type SettleWithinProps = {
+  work: Promise<void>
+  timers: Timers
+  ms: number
+  warn: (message: string) => void
+}
+
 /**
  * Waits for `work`, or `ms` at most, whichever comes first, and never rejects: a deletion that
  * waited on the server goes ahead whatever became of the wait.
@@ -454,12 +473,7 @@ export const settleWithin = async ({
   timers,
   ms,
   warn,
-}: {
-  work: Promise<void>
-  timers: Timers
-  ms: number
-  warn: (message: string) => void
-}): Promise<void> => {
+}: SettleWithinProps): Promise<void> => {
   const waited: { handle: unknown } = { handle: undefined }
   const timedOut = new Promise<void>((resolve) => {
     waited.handle = timers.set({ run: resolve, ms })

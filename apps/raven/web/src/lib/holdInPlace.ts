@@ -15,6 +15,12 @@ type Hold = {
   y: number
 }
 
+type HoldInPlaceProps = {
+  card: Element
+  top: number
+  afterScroll?: boolean
+}
+
 /**
  * Keeps `card` `top` px from the top of the screen while the cards around
  * it are drawn. A grid skips its offscreen cards (`content-visibility`),
@@ -24,15 +30,7 @@ type Hold = {
  * out a smooth scroll first, which would carry the card off again. What it
  * returns stops it sooner.
  */
-export const holdInPlace = ({
-  card,
-  top,
-  afterScroll = false,
-}: {
-  card: Element
-  top: number
-  afterScroll?: boolean
-}): (() => void) => {
+export const holdInPlace = ({ card, top, afterScroll = false }: HoldInPlaceProps): (() => void) => {
   const viewer = new AbortController()
   VIEWER_INPUT.forEach((type) =>
     window.addEventListener(type, () => viewer.abort(), { passive: true, signal: viewer.signal }),

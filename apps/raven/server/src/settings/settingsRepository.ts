@@ -28,6 +28,20 @@ export const SETTINGS_KEYS = {
 /** The owner who took over the viewing recorded before accounts, and when. */
 const isViewingRecord = object({ ownerId: isAccountId, adoptedAt: isString })
 
+type SettingsRepositoryStoredProps = { key: string }
+
+type SettingsRepositoryReadProps = { key: string }
+
+type SettingsRepositoryWriteProps = { key: string; value: unknown }
+
+type SettingsRepositoryMergedProps<T> = { key: string; defaults: T; guard: Guard<T> }
+
+type SettingsRepositorySecretAtProps = { key: string }
+
+type SettingsRepositoryMarkAccountsEnforcedProps = { at: Date }
+
+type SettingsRepositoryMarkViewingOwnerProps = { ownerId: string; at: Date }
+
 /** Server-wide settings, one JSON value per key, each read with its defaults filled in. */
 @Injectable()
 export class SettingsRepository {
@@ -37,19 +51,19 @@ export class SettingsRepository {
     return this.database.db
   }
 
-  private stored({ key }: { key: string }): string | null {
+  private stored({ key }: SettingsRepositoryStoredProps): string | null {
     const row = this.db
       .prepare<[string], { value: string }>('SELECT value FROM settings WHERE key = ?')
       .get(key)
     return row?.value ?? null
   }
 
-  private read({ key }: { key: string }): Record<string, unknown> | null {
+  private read({ key }: SettingsRepositoryReadProps): Record<string, unknown> | null {
     const json = this.stored({ key })
     return json === null ? null : parseJsonAs({ json, guard: isRecord })
   }
 
-  private write({ key, value }: { key: string; value: unknown }): void {
+  private write({ key, value }: SettingsRepositoryWriteProps): void {
     this.db
       .prepare(
         `INSERT INTO settings (key, value) VALUES (?, ?)
@@ -59,7 +73,7 @@ export class SettingsRepository {
   }
 
   /** The stored value over the defaults, every field present; one that no longer reads falls back to the defaults. */
-  private merged<T>({ key, defaults, guard }: { key: string; defaults: T; guard: Guard<T> }): T {
+  private merged<T>({ key, defaults, guard }: SettingsRepositoryMergedProps<T>): T {
     const merged = { ...defaults, ...this.read({ key }) }
     return guard(merged) ? merged : defaults
   }
@@ -113,7 +127,7 @@ export class SettingsRepository {
     return this.secretAt({ key: SETTINGS_KEYS.pictures })
   }
 
-  private secretAt({ key }: { key: string }): string {
+  private secretAt({ key }: SettingsRepositorySecretAtProps): string {
     const stored = this.read({ key })?.secret ?? null
     if (isString(stored) && stored !== '') return stored
     const secret = randomBytes(32).toString('base64url')
@@ -130,7 +144,7 @@ export class SettingsRepository {
   }
 
   /** Remembers the first start with accounts ready; later starts keep the first date. */
-  markAccountsEnforced({ at }: { at: Date }): void {
+  markAccountsEnforced({ at }: SettingsRepositoryMarkAccountsEnforcedProps): void {
     if (this.accountsEnforcedAt() !== null) return
     this.write({ key: SETTINGS_KEYS.accounts, value: { enforcedAt: at.toISOString() } })
   }
@@ -147,7 +161,7 @@ export class SettingsRepository {
   }
 
   /** Records the owner who adopted the viewing from before accounts. */
-  markViewingOwner({ ownerId, at }: { ownerId: string; at: Date }): void {
+  markViewingOwner({ ownerId, at }: SettingsRepositoryMarkViewingOwnerProps): void {
     this.write({ key: SETTINGS_KEYS.viewing, value: { ownerId, adoptedAt: at.toISOString() } })
   }
 }

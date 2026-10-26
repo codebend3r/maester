@@ -31,23 +31,27 @@ export const subtitleOptionsOf = (tracks: MediaTracks): TrackOption[] => [
   ...showable(tracks).map((track) => ({ key: track.id, label: labelText(subtitleLabel(track)) })),
 ]
 
+type AudioPlaceForProps = {
+  mode: PlaybackMode
+  tracks: MediaTracks
+  audio: number | null
+}
+
 /**
  * Which of the player's audio tracks to play, by its place among them, or null to leave the
  * choice to the player. Direct play switches among the file's own tracks, which AVPlayer keeps
  * in the file's order. A stream carries only the one track the session asked the server for.
  */
-export const audioPlaceFor = ({
-  mode,
-  tracks,
-  audio,
-}: {
-  mode: PlaybackMode
-  tracks: MediaTracks
-  audio: number | null
-}): number | null => {
+export const audioPlaceFor = ({ mode, tracks, audio }: AudioPlaceForProps): number | null => {
   if (mode !== PLAYBACK_MODES.direct || audio === null) return null
   const place = tracks.audio.findIndex((track) => track.index === audio)
   return place < 0 ? null : place
+}
+
+type SubtitlePlaceForProps = {
+  mode: PlaybackMode
+  tracks: MediaTracks
+  subtitle: string | null
 }
 
 /**
@@ -59,11 +63,7 @@ export const subtitlePlaceFor = ({
   mode,
   tracks,
   subtitle,
-}: {
-  mode: PlaybackMode
-  tracks: MediaTracks
-  subtitle: string | null
-}): number | null => {
+}: SubtitlePlaceForProps): number | null => {
   if (mode === PLAYBACK_MODES.direct || subtitle === null) return null
   const place = showable(tracks).findIndex((track) => track.id === subtitle)
   return place < 0 ? null : place

@@ -1,3 +1,5 @@
+type FakeMediaErrorProps = { code: number; message: string }
+
 /**
  * happy-dom has no MediaError, which the player reads a failed video's
  * codes from. This stands in for it with the browser's codes.
@@ -10,7 +12,7 @@ export class FakeMediaError {
   readonly code: number
   readonly message: string
 
-  constructor({ code, message }: { code: number; message: string }) {
+  constructor({ code, message }: FakeMediaErrorProps) {
     this.code = code
     this.message = message
   }

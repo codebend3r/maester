@@ -75,6 +75,8 @@ type StreamResponse = {
   body: ReadableStream<Uint8Array<ArrayBuffer>> | null
 }
 
+type FetchProps = { signal: AbortSignal }
+
 /**
  * Where the media source comes from and how the video is pointed at it. The
  * environment is made for one video, so `attach` needs only the source, of
@@ -86,7 +88,7 @@ export type StreamEnvironment<S extends MediaSourceLike = MediaSourceLike> = {
   createMediaSource: () => S | null
   /** Points the video at the source; the returned function lets go of it again. */
   attach: (source: S) => () => void
-  fetch: (url: string, init: { signal: AbortSignal }) => Promise<StreamResponse>
+  fetch: (url: string, init: FetchProps) => Promise<StreamResponse>
 }
 
 export type StreamSession = { destroy: () => void }
@@ -152,21 +154,21 @@ const rangesOf = (ranges: Ranges): Array<[number, number]> =>
     ranges.end(index),
   ])
 
-const rangeAt = ({ ranges, time }: { ranges: Ranges; time: number }): [number, number] | null =>
+type RangeAtProps = { ranges: Ranges; time: number }
+
+const rangeAt = ({ ranges, time }: RangeAtProps): [number, number] | null =>
   rangesOf(ranges).find(
     ([start, end]) => start - EDGE_SECONDS <= time && time < end - EDGE_SECONDS,
   ) ?? null
 
-/** Resolves on the first of `types`; the returned promise never rejects. */
-const nextEvent = ({
-  target,
-  types,
-  signal,
-}: {
+type NextEventProps = {
   target: VideoLike
   types: string[]
   signal: AbortSignal | null
-}): Promise<void> =>
+}
+
+/** Resolves on the first of `types`; the returned promise never rejects. */
+const nextEvent = ({ target, types, signal }: NextEventProps): Promise<void> =>
   new Promise((resolve) => {
     if (signal?.aborted ?? false) {
       resolve()
@@ -228,17 +230,7 @@ export const browserEnvironment = (video: HTMLVideoElement): StreamEnvironment<M
   now: () => performance.now(),
 })
 
-export const createStreamSession = <S extends MediaSourceLike>({
-  video,
-  mime,
-  duration,
-  start,
-  url,
-  onError,
-  onUnreachable,
-  onSlow,
-  environment,
-}: {
+type CreateStreamSessionProps<S extends MediaSourceLike> = {
   video: VideoLike
   mime: string
   /** The file's duration, so the timeline is whole before the stream reaches the end. */
@@ -255,7 +247,19 @@ export const createStreamSession = <S extends MediaSourceLike>({
   /** The connection carries this stream slower than it plays. Called at most once. */
   onSlow?: (delivery: Delivery) => void
   environment: StreamEnvironment<S>
-}): StreamSession => {
+}
+
+export const createStreamSession = <S extends MediaSourceLike>({
+  video,
+  mime,
+  duration,
+  start,
+  url,
+  onError,
+  onUnreachable,
+  onSlow,
+  environment,
+}: CreateStreamSessionProps<S>): StreamSession => {
   const state: SessionState = {
     generation: 0,
     destroyed: false,
@@ -279,17 +283,19 @@ export const createStreamSession = <S extends MediaSourceLike>({
     if (buffer.updating) await updateEnd(buffer)
   }
 
+  type EvictBehindProps = {
+    buffer: SourceBufferLike
+    generation: number
+    keepBehind?: number
+    interval?: number
+  }
+
   const evictBehind = async ({
     buffer,
     generation,
     keepBehind = KEEP_BEHIND_SECONDS,
     interval = EVICT_INTERVAL_SECONDS,
-  }: {
-    buffer: SourceBufferLike
-    generation: number
-    keepBehind?: number
-    interval?: number
-  }): Promise<boolean> => {
+  }: EvictBehindProps): Promise<boolean> => {
     const cutoff = video.currentTime - keepBehind
     const first = rangesOf(buffer.buffered)[0]
     if (!first || cutoff - first[0] <= interval) return false
@@ -312,14 +318,13 @@ export const createStreamSession = <S extends MediaSourceLike>({
     return range ? range[1] - video.currentTime : 0
   }
 
-  /** Waits for the playhead to move on while a minute is already buffered. */
-  const waitForRoom = async ({
-    buffer,
-    generation,
-  }: {
+  type WaitForRoomProps = {
     buffer: SourceBufferLike
     generation: number
-  }): Promise<void> => {
+  }
+
+  /** Waits for the playhead to move on while a minute is already buffered. */
+  const waitForRoom = async ({ buffer, generation }: WaitForRoomProps): Promise<void> => {
     if (!current(generation) || ahead(buffer) < MAX_AHEAD_SECONDS) return
     // Held back, delivery runs at the pace of playback, not the connection.
     state.meter = null
@@ -338,8 +343,10 @@ export const createStreamSession = <S extends MediaSourceLike>({
     )
   }
 
+  type MeasureProps = { buffer: SourceBufferLike; bytes: number }
+
   /** Counts an appended chunk, and once a window is timed, judges the connection by it. */
-  const measure = ({ buffer, bytes }: { buffer: SourceBufferLike; bytes: number }) => {
+  const measure = ({ buffer, bytes }: MeasureProps) => {
     const now = environment.now()
     const edge = deliveredEdge(buffer)
     const meter = state.meter
@@ -363,15 +370,13 @@ export const createStreamSession = <S extends MediaSourceLike>({
     onSlow?.({ delivered: bits / seconds, needed: arrived > 0 ? bits / arrived : null })
   }
 
-  const append = async ({
-    buffer,
-    chunk,
-    generation,
-  }: {
+  type AppendProps = {
     buffer: SourceBufferLike
     chunk: Uint8Array<ArrayBuffer>
     generation: number
-  }): Promise<void> => {
+  }
+
+  const append = async ({ buffer, chunk, generation }: AppendProps): Promise<void> => {
     if (!current(generation)) return
     // Prune even when delivery never gets a minute ahead. Otherwise old
     // frames occupy the quota while a slower stream is trying to catch up.
@@ -401,15 +406,13 @@ export const createStreamSession = <S extends MediaSourceLike>({
     }
   }
 
-  const pump = async ({
-    reader,
-    buffer,
-    generation,
-  }: {
+  type PumpProps = {
     reader: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>>
     buffer: SourceBufferLike
     generation: number
-  }): Promise<void> => {
+  }
+
+  const pump = async ({ reader, buffer, generation }: PumpProps): Promise<void> => {
     if (!current(generation)) {
       await reader.cancel().catch(() => undefined)
       return
@@ -474,8 +477,10 @@ export const createStreamSession = <S extends MediaSourceLike>({
     }
   }
 
+  type ReachableProps = { buffer: SourceBufferLike; time: number }
+
   /** Whether the running stream will reach `time` (file time) soon without help. */
-  const reachable = ({ buffer, time }: { buffer: SourceBufferLike; time: number }): boolean => {
+  const reachable = ({ buffer, time }: ReachableProps): boolean => {
     const from = state.streamingFrom
     if (from == null) return false
     const edge = deliveredEdge(buffer) - STREAM_TIME_SHIFT

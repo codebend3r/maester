@@ -16,9 +16,10 @@ const NOT_IN_THE_COPY: ReadonlySet<string> = new Set([
   'bug_reports',
 ])
 
+type KeyOfProps = { table: string; index: string | null }
+
 /** A `sqlite_stat1` row's table and index, as one comparable key. */
-const keyOf = ({ table, index }: { table: string; index: string | null }): string =>
-  `${table} ${index ?? '(no index)'}`
+const keyOf = ({ table, index }: KeyOfProps): string => `${table} ${index ?? '(no index)'}`
 
 describe("the real server's statistics the plan tests copy", () => {
   const database = testDatabase('raven-statistics-copy-')

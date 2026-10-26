@@ -17,6 +17,12 @@ export type NativeFetch = (
   init: FetchInit & { credentials: typeof FETCH_CREDENTIALS.omit },
 ) => Promise<FetchResponse & { url: string; headers: { get: (name: string) => string | null } }>
 
+type ServerFetchForProps = {
+  server: AppServer
+  jar: CookieJar
+  fetch: NativeFetch
+}
+
 /**
  * The `fetch` a server's `ApiClient` runs on. `credentials: 'omit'` keeps the system's
  * shared cookie store out of it (iOS turns off `HTTPShouldHandleCookies`, Android hands
@@ -24,15 +30,7 @@ export type NativeFetch = (
  * ones the server sets. Both stay on the server's API, the cookies' `Path=/api`: a media
  * origin's address is never sent them, and neither it nor a redirect to it sets them.
  */
-export const serverFetchFor = ({
-  server,
-  jar,
-  fetch,
-}: {
-  server: AppServer
-  jar: CookieJar
-  fetch: NativeFetch
-}): FetchLike => {
+export const serverFetchFor = ({ server, jar, fetch }: ServerFetchForProps): FetchLike => {
   const isOwnApi = (address: string): boolean => isServerApi({ server, address })
   return async (url, init = {}) => {
     const cookie = isOwnApi(url) ? cookieHeaderOf(await jar.read(server.id)) : null

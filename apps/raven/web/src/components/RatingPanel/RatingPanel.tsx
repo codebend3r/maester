@@ -70,7 +70,9 @@ const SOURCES = {
 
 const barWidth = (rating: Rating): string => `${Math.min(100, Math.max(0, rating.value * 10))}%`
 
-const RatingItem = ({ rating }: { rating: Rating }) => {
+type RatingItemProps = { rating: Rating }
+
+const RatingItem = ({ rating }: RatingItemProps) => {
   const source = SOURCES[rating.source]
   const score = source.score(rating)
   return (
@@ -98,12 +100,14 @@ const RatingItem = ({ rating }: { rating: Rating }) => {
   )
 }
 
+type RatingBadgeProps = { rating: Rating; isBare?: boolean }
+
 /**
  * One score where a card or a row has a line for it: the panel's score,
  * scale and name in a small frame, its bar along the frame's foot. `isBare`
  * keeps only the score, for a table whose column header already names the source.
  */
-export const RatingBadge = ({ rating, isBare = false }: { rating: Rating; isBare?: boolean }) => {
+export const RatingBadge = ({ rating, isBare = false }: RatingBadgeProps) => {
   const source = SOURCES[rating.source]
   const score = source.score(rating)
   return (
@@ -125,12 +129,14 @@ export const RatingBadge = ({ rating, isBare = false }: { rating: Rating; isBare
   )
 }
 
+type RatingPanelProps = { ratings: readonly Rating[] }
+
 /**
  * A movie's scores in one framed panel: each source's score over a bar in
  * its colour and its name, with the full name and what the number means in
  * a tooltip on hover or focus. A source with no score is left out.
  */
-export const RatingPanel = ({ ratings }: { ratings: readonly Rating[] }) => {
+export const RatingPanel = ({ ratings }: RatingPanelProps) => {
   const scored = SOURCE_ORDER.flatMap(
     (source) => ratings.find((each) => each.source === source) ?? [],
   )
@@ -148,6 +154,11 @@ export const RatingPanel = ({ ratings }: { ratings: readonly Rating[] }) => {
 const inSourceOrder = (ratings: readonly Rating[]): Rating[] =>
   SOURCE_ORDER.flatMap((source) => ratings.find((each) => each.source === source) ?? [])
 
+type RatingChipProps = {
+  ratings: readonly Rating[]
+  lead?: RatingSource
+}
+
 /**
  * Every score a title has, as one chip: the lead score, TMDB's unless the
  * caller names another, and how many more there are. Pointing at it or
@@ -155,13 +166,7 @@ const inSourceOrder = (ratings: readonly Rating[]): Rating[] =>
  * The popover grows upward so a card that clips what lies below it keeps it.
  * A title with a single score gets the chip alone.
  */
-export const RatingChip = ({
-  ratings,
-  lead = RATING_SOURCES.tmdb,
-}: {
-  ratings: readonly Rating[]
-  lead?: RatingSource
-}) => {
+export const RatingChip = ({ ratings, lead = RATING_SOURCES.tmdb }: RatingChipProps) => {
   const scored = inSourceOrder(ratings)
   const first = pickScore({ ratings: scored, source: lead }) ?? scored[0]
   if (!first) return null

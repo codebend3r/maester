@@ -98,10 +98,14 @@ const urisIn = (playlist: string): string[] =>
 const extinfsIn = (playlist: string): number[] =>
   [...playlist.matchAll(/^#EXTINF:([\d.]+),$/gm)].map((match) => Number(match[1]))
 
-const attributeOf = ({ playlist, name }: { playlist: string; name: string }): string | null =>
+type AttributeOfProps = { playlist: string; name: string }
+
+const attributeOf = ({ playlist, name }: AttributeOfProps): string | null =>
   new RegExp(`${name}=("[^"]*"|[^,\\n]*)`).exec(playlist)?.[1]?.replace(/"/g, '') ?? null
 
-const ffprobe = async ({ path, args }: { path: string; args: string[] }): Promise<string> =>
+type FfprobeProps = { path: string; args: string[] }
+
+const ffprobe = async ({ path, args }: FfprobeProps): Promise<string> =>
   (await run('ffprobe', ['-v', 'error', ...args, '-of', 'csv=p=0', path])).stdout.trim()
 
 describe('the HLS route', () => {
@@ -125,7 +129,9 @@ describe('the HLS route', () => {
   }
   const ticketFor = (id: number): string => app().get(MediaTickets).issue({ id }).ticket
 
-  const get = ({ url, cookie }: { url: string; cookie?: string }) =>
+  type GetProps = { url: string; cookie?: string }
+
+  const get = ({ url, cookie }: GetProps) =>
     app().inject({
       method: HTTP_METHODS.get,
       url,
@@ -135,17 +141,19 @@ describe('the HLS route', () => {
       },
     })
 
+  type MasterUrlProps = {
+    clip: Clip
+    mode: StreamMode
+    ticket?: string | null
+    query?: Record<string, string>
+  }
+
   const masterUrl = ({
     clip,
     mode,
     ticket = ticketFor(state.ids[clip]),
     query = {},
-  }: {
-    clip: Clip
-    mode: StreamMode
-    ticket?: string | null
-    query?: Record<string, string>
-  }): string => {
+  }: MasterUrlProps): string => {
     const path = HLS_PATHS.master.replace(`:${HLS_PARAMS.id}`, String(state.ids[clip]))
     const params = {
       [HLS_PARAMS.mode]: mode,
@@ -155,8 +163,10 @@ describe('the HLS route', () => {
     return `${path}?${toQueryString(params)}`
   }
 
+  type MasterProps = { clip: Clip; mode: StreamMode }
+
   /** The master playlist and the URIs in it, asked for with a ticket. */
-  const master = async ({ clip, mode }: { clip: Clip; mode: StreamMode }) => {
+  const master = async ({ clip, mode }: MasterProps) => {
     const response = await get({ url: masterUrl({ clip, mode }) })
     expect(response.statusCode).toBe(200)
     const playlist = decodedBody(response).toString()
@@ -171,7 +181,9 @@ describe('the HLS route', () => {
     return { response, playlist, uris: urisIn(playlist) }
   }
 
-  const videoPlaylist = async ({ clip, mode }: { clip: Clip; mode: StreamMode }) => {
+  type VideoPlaylistProps = { clip: Clip; mode: StreamMode }
+
+  const videoPlaylist = async ({ clip, mode }: VideoPlaylistProps) => {
     const { uris } = await master({ clip, mode })
     const variant = uris.find((uri) => uri.includes('/video.m3u8')) ?? ''
     return playlistAt(variant)
@@ -541,16 +553,14 @@ describe('the HLS route', () => {
     const ticket = `?${MEDIA_TICKET_PARAM}=${encodeURIComponent(ticketFor(state.ids.rich))}`
     const otherTicket = `?${MEDIA_TICKET_PARAM}=${encodeURIComponent(ticketFor(state.ids.late))}`
     const unknown = 'A'.repeat(22)
-    /** A route of the rich clip's session `at`, filled in with `values`, with its ticket. */
-    const rich = ({
-      route,
-      at,
-      values = {},
-    }: {
+    type RichProps = {
       route: string
       at: string
       values?: Record<string, string | number>
-    }) =>
+    }
+
+    /** A route of the rich clip's session `at`, filled in with `values`, with its ticket. */
+    const rich = ({ route, at, values = {} }: RichProps) =>
       `${routePath({ route, values: { [HLS_PARAMS.id]: state.ids.rich, [HLS_PARAMS.session]: at, ...values } })}${ticket}`
     const asked = await Promise.all(
       [

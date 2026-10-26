@@ -73,7 +73,9 @@ const connectionFacts = (connection: unknown): DeviceFacts['connection'] => {
   }
 }
 
-const sizeOrNull = ({ width, height }: { width: number; height: number }) =>
+type SizeOrNullProps = { width: number; height: number }
+
+const sizeOrNull = ({ width, height }: SizeOrNullProps) =>
   width > 0 && height > 0 ? { width, height } : null
 
 /** The browser and machine, as far as they say; read at the press of the button. */
@@ -101,10 +103,18 @@ export const readDevice = (): DeviceFacts => {
   }
 }
 
-const asked = ({ type, canPlay }: { type: string; canPlay: CanPlay }): CodecSupport => ({
+type AskedProps = { type: string; canPlay: CanPlay }
+
+const asked = ({ type, canPlay }: AskedProps): CodecSupport => ({
   type,
   isSupported: canPlay(type),
 })
+
+type CodecSupportProps = {
+  media: MediaItem | null
+  canPlay: CanPlay
+  canStream: CanPlay
+}
 
 /**
  * The browser's answers for this file: its container, video and audio as
@@ -115,11 +125,7 @@ export const codecSupport = ({
   media,
   canPlay,
   canStream,
-}: {
-  media: MediaItem | null
-  canPlay: CanPlay
-  canStream: CanPlay
-}): PlaybackDiagnostics['support'] => {
+}: CodecSupportProps): PlaybackDiagnostics['support'] => {
   const hasMediaSource = typeof window !== 'undefined' && 'MediaSource' in window
   const hasManagedMediaSource = typeof window !== 'undefined' && 'ManagedMediaSource' in window
   if (!media) return { play: [], stream: [], hasMediaSource, hasManagedMediaSource }
@@ -174,6 +180,17 @@ const trackFacts = ({
   }
 }
 
+type GatherDiagnosticsProps = {
+  title: string
+  problems: string[]
+  resumeAt: number
+  context: ReportContext
+  pick: MediaPick | null
+  isProbingOrigins: boolean
+  appVersion: string | null
+  now?: Date
+}
+
 /**
  * Everything that might say why a video would not play, gathered in one go
  * when the viewer presses Report this error, with no ticket left in it.
@@ -187,16 +204,7 @@ export const gatherDiagnostics = ({
   isProbingOrigins,
   appVersion,
   now = new Date(),
-}: {
-  title: string
-  problems: string[]
-  resumeAt: number
-  context: ReportContext
-  pick: MediaPick | null
-  isProbingOrigins: boolean
-  appVersion: string | null
-  now?: Date
-}): PlaybackDiagnostics =>
+}: GatherDiagnosticsProps): PlaybackDiagnostics =>
   withoutTickets({
     title,
     problems,

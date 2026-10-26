@@ -25,16 +25,17 @@ const isSignupAlert = (value: unknown): value is SignupAlert =>
 // Hashing first gives timingSafeEqual the equal lengths it requires.
 const digest = (value: string) => createHash('sha256').update(value).digest()
 
-const isSameSecret = ({ given, expected }: { given: string; expected: string }) =>
+type IsSameSecretProps = { given: string; expected: string }
+
+const isSameSecret = ({ given, expected }: IsSameSecretProps) =>
   timingSafeEqual(digest(given), digest(expected))
 
-const composeAlert = ({
-  alert,
-  settingsUrl,
-}: {
+type ComposeAlertProps = {
   alert: SignupAlert
   settingsUrl: string
-}): AlertMessage => {
+}
+
+const composeAlert = ({ alert, settingsUrl }: ComposeAlertProps): AlertMessage => {
   switch (alert.status) {
     case ENROLMENT_STATUSES.approved:
       return {
@@ -53,7 +54,9 @@ const composeAlert = ({
   }
 }
 
-const readBody = async ({ request }: { request: Request }): Promise<unknown> => {
+type ReadBodyProps = { request: Request }
+
+const readBody = async ({ request }: ReadBodyProps): Promise<unknown> => {
   try {
     return await request.json()
   } catch {
@@ -61,17 +64,19 @@ const readBody = async ({ request }: { request: Request }): Promise<unknown> => 
   }
 }
 
+type HandleSignupAlertProps = {
+  request: Request
+  secret: string
+  settingsUrl: string
+  send: (message: AlertMessage) => Promise<void>
+}
+
 export const handleSignupAlert = async ({
   request,
   secret,
   settingsUrl,
   send,
-}: {
-  request: Request
-  secret: string
-  settingsUrl: string
-  send: (message: AlertMessage) => Promise<void>
-}) => {
+}: HandleSignupAlertProps) => {
   if (request.method !== HTTP_METHODS.post) return new Response(null, { status: 405 })
   const given = request.headers.get(SIGNUP_ALERT_HEADER) ?? ''
   if (!isSameSecret({ given, expected: secret })) return new Response(null, { status: 401 })

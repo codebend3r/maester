@@ -32,7 +32,9 @@ const isMissing = (error: unknown): boolean =>
   'code' in error &&
   error.code === ERROR_CODES.enoent
 
-const sizeOf = async ({ path }: { path: string }): Promise<number> => {
+type SizeOfProps = { path: string }
+
+const sizeOf = async ({ path }: SizeOfProps): Promise<number> => {
   try {
     return (await stat(path)).size
   } catch (error) {
@@ -54,7 +56,9 @@ const isRavenRunning = async (): Promise<boolean> => {
   }
 }
 
-const bytesOf = async ({ path }: { path: string }): Promise<Uint8Array | null> => {
+type BytesOfProps = { path: string }
+
+const bytesOf = async ({ path }: BytesOfProps): Promise<Uint8Array | null> => {
   try {
     return await readFile(path)
   } catch (error) {
@@ -63,28 +67,31 @@ const bytesOf = async ({ path }: { path: string }): Promise<Uint8Array | null> =
   }
 }
 
+type LinesAfterProps = { path: string; from: number }
+
 /** The lines written after `from`, the rotated file's included when the log rotated meanwhile. */
-const linesAfter = async ({ path, from }: { path: string; from: number }): Promise<string[]> => {
+const linesAfter = async ({ path, from }: LinesAfterProps): Promise<string[]> => {
   const live = await bytesOf({ path })
   if (live === null) return []
   const rotated = live.length < from ? await bytesOf({ path: `${path}.1` }) : null
   return logLinesSince({ live, rotated, from })
 }
 
-const waitUntil = async ({
-  isDone,
-  deadline,
-}: {
+type WaitUntilProps = {
   isDone: () => Promise<boolean>
   deadline: number
-}): Promise<boolean> => {
+}
+
+const waitUntil = async ({ isDone, deadline }: WaitUntilProps): Promise<boolean> => {
   if (await isDone()) return true
   if (Date.now() >= deadline) return false
   await sleep(POLL_MS)
   return waitUntil({ isDone, deadline })
 }
 
-const smoke = async ({ project }: { project: string }): Promise<number> => {
+type SmokeProps = { project: string }
+
+const smoke = async ({ project }: SmokeProps): Promise<number> => {
   const app = join(project, PACKAGED_APP)
   if (!existsSync(app)) {
     console.error('Run bunx nx run @raven/desktop:make first.')
@@ -111,11 +118,15 @@ const smoke = async ({ project }: { project: string }): Promise<number> => {
     lifecycle.hasExited = true
   })
   const state = { lines: new Array<string>() }
-  const gapsFor = async ({ stage }: { stage: SmokeStage }) => {
+  type GapsForProps = { stage: SmokeStage }
+
+  const gapsFor = async ({ stage }: GapsForProps) => {
     state.lines = await linesAfter({ path: logPath, from })
     return smokeGaps({ lines: state.lines, stage, version })
   }
-  const fail = ({ stage, why }: { stage: SmokeStage; why: string[] }): number => {
+  type FailProps = { stage: SmokeStage; why: string[] }
+
+  const fail = ({ stage, why }: FailProps): number => {
     console.error(`Raven failed the packaged smoke at the ${stage} stage. Missing:`)
     why.forEach((gap) => console.error(`  ${gap}`))
     console.error('New log lines:')

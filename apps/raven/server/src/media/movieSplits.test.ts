@@ -22,7 +22,9 @@ const PROBE = {
 
 const TRACKS = { audio: [], subtitles: [], defaultAudio: null, frameRate: 24 }
 
-const movie = ({ tmdbId, title }: { tmdbId: string; title: string }): FetchedItem => ({
+type MovieProps = { tmdbId: string; title: string }
+
+const movie = ({ tmdbId, title }: MovieProps): FetchedItem => ({
   ...BLANK_ITEM,
   type: 'movie',
   tmdbId,
@@ -38,8 +40,10 @@ describe('splitting a movie library’s duplicates', () => {
   const splits = () => new MovieSplits(database.get(), media())
   const id = (name: string): number => state.ids.get(name) ?? -1
 
+  type AddMovieProps = { title: string; files: readonly string[] }
+
   /** A movie and a file for each name, the first the biggest, so best. */
-  const addMovie = ({ title, files }: { title: string; files: readonly string[] }): number => {
+  const addMovie = ({ title, files }: AddMovieProps): number => {
     const { metadata } = repositories(database.get())
     const index = new MediaIndex(database.get())
     const itemId = metadata.save({ item: movie({ tmdbId: title, title }) })

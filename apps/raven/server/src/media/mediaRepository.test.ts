@@ -57,7 +57,9 @@ describe('listing a library', () => {
   const database = testDatabase('raven-sort-')
   const state = { libraryId: 0 }
   const media = () => repositories(database.get()).media
-  const titles = ({ sort, seed }: { sort: MediaSort; seed?: number }): string[] =>
+  type TitlesProps = { sort: MediaSort; seed?: number }
+
+  const titles = ({ sort, seed }: TitlesProps): string[] =>
     media()
       .list({ libraryId: state.libraryId, sort, seed, account: TEST_ACCOUNTS.a })
       .map((item) => item.title)
@@ -160,17 +162,20 @@ describe('listing a library', () => {
   })
 })
 
-const fetched = ({
-  type,
-  tmdbId,
-  title,
-  number = null,
-}: {
+type FetchedProps = {
   type: ItemType
   tmdbId: string
   title: string
   number?: number | null
-}): FetchedItem => ({ ...BLANK_ITEM, type, tmdbId, number, title })
+}
+
+const fetched = ({ type, tmdbId, title, number = null }: FetchedProps): FetchedItem => ({
+  ...BLANK_ITEM,
+  type,
+  tmdbId,
+  number,
+  title,
+})
 
 describe("listing a TV library's shows", () => {
   const database = testDatabase('raven-shows-')
@@ -179,14 +184,13 @@ describe("listing a TV library's shows", () => {
   const fileName = (id: number | null): string =>
     id == null ? 'none' : (media().get({ id, account: TEST_ACCOUNTS.a })?.fileName ?? 'gone')
 
-  /** A show with an episode file for each `[season, episode]`. */
-  const addShow = ({
-    title,
-    episodes,
-  }: {
+  type AddShowProps = {
     title: string
     episodes: ReadonlyArray<[number, number]>
-  }): number => {
+  }
+
+  /** A show with an episode file for each `[season, episode]`. */
+  const addShow = ({ title, episodes }: AddShowProps): number => {
     const { metadata } = repositories(database.get())
     const index = new MediaIndex(database.get())
     const showId = metadata.save({ item: fetched({ type: 'show', tmdbId: title, title }) })
@@ -414,7 +418,9 @@ describe('listing what is in progress', () => {
       state.ids.set(name, id)
     })
     const viewing = new ViewingRepository(database.get(), media())
-    const watch = ({ name, position, at }: { name: string; position: number; at: string }) =>
+    type WatchProps = { name: string; position: number; at: string }
+
+    const watch = ({ name, position, at }: WatchProps) =>
       viewing.report({
         id: state.ids.get(name) ?? -1,
         position,
@@ -463,15 +469,13 @@ describe('what is watched, card by card', () => {
   const viewing = () => new ViewingRepository(database.get(), media())
   const index = () => new MediaIndex(database.get())
 
-  const addFile = ({
-    libraryId,
-    name,
-    height = 1080,
-  }: {
+  type AddFileProps = {
     libraryId: number
     name: string
     height?: number
-  }): number => {
+  }
+
+  const addFile = ({ libraryId, name, height = 1080 }: AddFileProps): number => {
     const id = index().insert({
       libraryId,
       kind: 'other',
@@ -484,18 +488,20 @@ describe('what is watched, card by card', () => {
     })
     return id
   }
+  type AddMovieProps = {
+    title: string
+    heights: readonly number[]
+    libraryId?: number
+    saga?: FetchedSaga | null
+  }
+
   /** A movie with a file for each height, best first once listed. */
   const addMovie = ({
     title,
     heights,
     libraryId = state.libraryId,
     saga = null,
-  }: {
-    title: string
-    heights: readonly number[]
-    libraryId?: number
-    saga?: FetchedSaga | null
-  }): { itemId: number; ids: number[] } => {
+  }: AddMovieProps): { itemId: number; ids: number[] } => {
     const { metadata } = repositories(database.get())
     const itemId = metadata.save({
       item: { ...fetched({ type: 'movie', tmdbId: title, title }), saga },
@@ -504,14 +510,13 @@ describe('what is watched, card by card', () => {
     metadata.link({ mediaIds: ids, itemIds: [itemId] })
     return { itemId, ids }
   }
-  /** A show whose episodes are numbered 1 to `count`; `shared` is one file holding episodes 1 and 2. */
-  const addShow = ({
-    title,
-    count,
-  }: {
+  type AddShowProps = {
     title: string
     count: number
-  }): { showId: number; episodeIds: number[] } => {
+  }
+
+  /** A show whose episodes are numbered 1 to `count`; `shared` is one file holding episodes 1 and 2. */
+  const addShow = ({ title, count }: AddShowProps): { showId: number; episodeIds: number[] } => {
     const { metadata } = repositories(database.get())
     const showId = metadata.save({ item: fetched({ type: 'show', tmdbId: title, title }) })
     const seasonId = metadata.save({
@@ -531,15 +536,13 @@ describe('what is watched, card by card', () => {
     )
     return { showId, episodeIds }
   }
-  const filesOf = ({
-    episodeId,
-    libraryId = state.libraryId,
-    heights,
-  }: {
+  type FilesOfProps = {
     episodeId: number
     libraryId?: number
     heights: readonly number[]
-  }): number[] => {
+  }
+
+  const filesOf = ({ episodeId, libraryId = state.libraryId, heights }: FilesOfProps): number[] => {
     const ids = heights.map((height) =>
       addFile({ libraryId, name: `episode ${episodeId} ${height}p`, height }),
     )
@@ -549,7 +552,9 @@ describe('what is watched, card by card', () => {
   const finish = (id: number): void => {
     viewing().report({ id, position: 60, account: TEST_ACCOUNTS.a })
   }
-  const mark = ({ id, watched }: { id: number; watched: boolean }): void => {
+  type MarkProps = { id: number; watched: boolean }
+
+  const mark = ({ id, watched }: MarkProps): void => {
     new WatchedRepository(database.get()).set({
       cards: new WatchedCards(database.get(), repositories(database.get()).metadata).resolve({
         targets: [{ kind: 'media', id }],

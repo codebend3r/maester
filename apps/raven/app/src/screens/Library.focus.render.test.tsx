@@ -100,7 +100,9 @@ const layOut = async () => {
     }, Promise.resolve())
 }
 
-const renderLibrary = async ({ id }: { id: number }) => {
+type RenderLibraryProps = { id: number }
+
+const renderLibrary = async ({ id }: RenderLibraryProps) => {
   mockParams.mockReturnValue({ [APP_ROUTE_PARAMS.id]: String(id) })
   const rendered = await renderScreen({ ui: <Library /> })
   await layOut()

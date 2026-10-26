@@ -8,17 +8,18 @@ import { entry, id, SERVER_A, SERVER_B, stateOf } from '@/main/test/downloadEntr
 const USER_DATA = '/data'
 const ready = { kind: DOWNLOAD_STATUS_KINDS.ready } as const
 
-const dirOf = ({ serverId, mediaId }: { serverId: string; mediaId: number }): string =>
+type DirOfProps = { serverId: string; mediaId: number }
+
+const dirOf = ({ serverId, mediaId }: DirOfProps): string =>
   entryDirFor({ userData: USER_DATA, serverId, mediaId })
 
-/** Folders by path; a rename moves one, and fails for a source that is not there. */
-const fakeFs = ({
-  folders,
-  isBroken = false,
-}: {
+type FakeFsProps = {
   folders: readonly string[]
   isBroken?: boolean
-}) => {
+}
+
+/** Folders by path; a rename moves one, and fails for a source that is not there. */
+const fakeFs = ({ folders, isBroken = false }: FakeFsProps) => {
   const present = new Set(folders)
   const made: string[] = []
   const fs: AdoptFs = {
@@ -35,15 +36,13 @@ const fakeFs = ({
   return { fs, present, made }
 }
 
-const settle = ({
-  state,
-  fs,
-  adopted = [SERVER_B],
-}: {
+type SettleProps = {
   state: DownloadsState
   fs: AdoptFs
   adopted?: readonly string[]
-}) => {
+}
+
+const settle = ({ state, fs, adopted = [SERVER_B] }: SettleProps) => {
   const warnings: string[] = []
   return {
     warnings,

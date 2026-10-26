@@ -11,6 +11,17 @@ import styles from '@/components/AiSuggestionCard/AiSuggestionCard.module.scss'
 const suggestedName = (suggestion: AiSuggestion): string =>
   suggestion.year == null ? suggestion.title : `${suggestion.title} (${suggestion.year})`
 
+type AiSuggestionCardProps = {
+  suggestion: AiSuggestion
+  /** What the suggestion is for, named in the buttons' labels: the show folder, or the file. */
+  subject: string
+  /** Points the files at `tmdbId`, as Fix match does. */
+  accept: (tmdbId: string) => Promise<unknown>
+  onFix: () => void
+  /** The Fix match button, for focus to come back to once its dialog closes. */
+  fixRef?: Ref<HTMLButtonElement>
+}
+
 /**
  * What the AI lookup suggests for files it was not sure of: the poster, the
  * title and year, and the reason it gave. Accept points the files at it with
@@ -24,16 +35,7 @@ export const AiSuggestionCard = ({
   accept,
   onFix,
   fixRef,
-}: {
-  suggestion: AiSuggestion
-  /** What the suggestion is for, named in the buttons' labels: the show folder, or the file. */
-  subject: string
-  /** Points the files at `tmdbId`, as Fix match does. */
-  accept: (tmdbId: string) => Promise<unknown>
-  onFix: () => void
-  /** The Fix match button, for focus to come back to once its dialog closes. */
-  fixRef?: Ref<HTMLButtonElement>
-}) => {
+}: AiSuggestionCardProps) => {
   const titleId = useId()
   const queryClient = useQueryClient()
   const accepting = useMutation({

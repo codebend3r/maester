@@ -66,11 +66,14 @@ export const systemOf = (userAgent: string): OperatingSystem | undefined => {
   return undefined
 }
 
+type DetectSystemProps = {
+  query: string | null
+  userAgent: string
+}
+
 /** The system to offer first: the one `?os=` names, to try each, else the browser's own. */
 export const detectSystem = ({
   query,
   userAgent,
-}: {
-  query: string | null
-  userAgent: string
-}): OperatingSystem | undefined => (isOperatingSystem(query) ? query : systemOf(userAgent))
+}: DetectSystemProps): OperatingSystem | undefined =>
+  isOperatingSystem(query) ? query : systemOf(userAgent)

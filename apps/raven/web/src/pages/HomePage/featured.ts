@@ -57,15 +57,13 @@ const quality = (media: MediaItem): string | null => {
   return label === '' ? null : label
 }
 
-const fromMedia = ({
-  media,
-  line,
-  library,
-}: {
+type FromMediaProps = {
   media: MediaItem
   line: string | null
   library: Library
-}): Featured[] => {
+}
+
+const fromMedia = ({ media, line, library }: FromMediaProps): Featured[] => {
   const { item } = media
   if (!item) return []
   const artwork = artworkOf(item)
@@ -89,15 +87,13 @@ const fromMedia = ({
   ]
 }
 
-const fromShow = ({
-  entry,
-  line,
-  library,
-}: {
+type FromShowProps = {
   entry: ShowEntry
   line: string | null
   library: Library
-}): Featured[] => {
+}
+
+const fromShow = ({ entry, line, library }: FromShowProps): Featured[] => {
   const { show, next } = entry
   const artwork = artworkOf(show)
   if (!artwork) return []
@@ -118,14 +114,13 @@ const fromShow = ({
   ]
 }
 
-/** The hero's entry as the slide it is, or nothing when its library is not among `libraries` or its pictures have no address. */
-const featuredFrom = ({
-  entry,
-  libraries,
-}: {
+type FeaturedFromProps = {
   entry: HeroEntry
   libraries: readonly Library[]
-}): Featured[] => {
+}
+
+/** The hero's entry as the slide it is, or nothing when its library is not among `libraries` or its pictures have no address. */
+const featuredFrom = ({ entry, libraries }: FeaturedFromProps): Featured[] => {
   const library = libraries.find(({ id }) => id === entry.libraryId)
   if (!library) return []
   switch (entry.type) {
@@ -140,16 +135,16 @@ const featuredFrom = ({
   }
 }
 
+type FeaturedOfProps = {
+  hero: Hero
+  libraries: readonly Library[]
+}
+
 /**
  * What home's hero takes turns with, as the server chose and ordered it: the
  * admin's picks, else each pinned library's newest release. The server holds
  * it to `HERO_COUNT`; this only gives each title its pictures' addresses and
  * its buttons.
  */
-export const featuredOf = ({
-  hero,
-  libraries,
-}: {
-  hero: Hero
-  libraries: readonly Library[]
-}): Featured[] => hero.flatMap((entry) => featuredFrom({ entry, libraries }))
+export const featuredOf = ({ hero, libraries }: FeaturedOfProps): Featured[] =>
+  hero.flatMap((entry) => featuredFrom({ entry, libraries }))

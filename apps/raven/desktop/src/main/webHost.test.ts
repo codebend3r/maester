@@ -66,19 +66,15 @@ const listen = (handler: (request: IncomingMessage, response: ServerResponse) =>
 
 type Reply = { status: number; headers: IncomingHttpHeaders; body: string }
 
-const ask = ({
-  port,
-  path,
-  method = HTTP_METHODS.get,
-  headers = {},
-  body = '',
-}: {
+type AskProps = {
   port: number
   path: string
   method?: string
   headers?: Record<string, string>
   body?: string
-}) =>
+}
+
+const ask = ({ port, path, method = HTTP_METHODS.get, headers = {}, body = '' }: AskProps) =>
   new Promise<Reply>((resolve, reject) => {
     const outgoing = request(
       {
@@ -102,21 +98,22 @@ const ask = ({
 
 type Heard = { method: string; url: string; headers: IncomingHttpHeaders; body: string }
 
+type AnswerProps = { heard: Heard; response: ServerResponse }
+
 /** A stand-in for raven's server: keeps each request it hears and answers with `answer`. */
 const upstream = async (
-  answer: (input: { heard: Heard; response: ServerResponse }) => void = ({ response }) => {
+  answer: (input: AnswerProps) => void = ({ response }) => {
     response.writeHead(200, { [HTTP_HEADERS.contentType]: 'application/json' })
     response.end('{"ok":true}')
   },
 ) => {
   const heard: Heard[] = []
-  const hear = async ({
-    incoming,
-    response,
-  }: {
+  type HearProps = {
     incoming: IncomingMessage
     response: ServerResponse
-  }) => {
+  }
+
+  const hear = async ({ incoming, response }: HearProps) => {
     const entry = {
       method: incoming.method ?? '',
       url: incoming.url ?? '',
@@ -134,11 +131,13 @@ const upstream = async (
 
 const NO_TIMERS: Timers = { set: () => 0, clear: () => {} }
 
+type HostProps = { serverOrigin?: string; authOrigin?: string | null; timers?: Timers }
+
 const host = async ({
   serverOrigin = 'http://127.0.0.1:1',
   authOrigin = null,
   timers = NO_TIMERS,
-}: { serverOrigin?: string; authOrigin?: string | null; timers?: Timers } = {}) => {
+}: HostProps = {}) => {
   const reads: string[] = []
   const warnings: string[] = []
   const notes: string[] = []

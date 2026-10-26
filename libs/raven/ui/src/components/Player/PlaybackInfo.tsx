@@ -40,17 +40,17 @@ const METHODS: Record<PlaybackMode, string> = {
   transcode: 'Transcode',
 }
 
-const dimensions = ({ width, height }: { width: number; height: number }): string =>
-  `${width}×${height}`
+type DimensionsProps = { width: number; height: number }
 
-/** The probe's name for the range once it is in, the index's HDR flag until then. */
-const rangeLabel = ({
-  media,
-  video,
-}: {
+const dimensions = ({ width, height }: DimensionsProps): string => `${width}×${height}`
+
+type RangeLabelProps = {
   media: MediaItem
   video: VideoStream | null
-}): string | null => {
+}
+
+/** The probe's name for the range once it is in, the index's HDR flag until then. */
+const rangeLabel = ({ media, video }: RangeLabelProps): string | null => {
   if (video) return VIDEO_RANGE_LABELS[video.range]
   if (media.videoCodec == null) return null
   return media.hdr ? 'HDR' : 'SDR'
@@ -80,16 +80,14 @@ const useLiveStats = (read: () => EngineStats): EngineStats => {
   return stats
 }
 
-/** A titled group of terms and values; a fact with no value is left out. */
-const Facts = ({
-  title,
-  facts,
-  note = null,
-}: {
+type FactsProps = {
   title: string
   facts: readonly Fact[]
   note?: string | null
-}) => (
+}
+
+/** A titled group of terms and values; a fact with no value is left out. */
+const Facts = ({ title, facts, note = null }: FactsProps) => (
   <section className={styles.section}>
     <h3 className={styles.title}>{title}</h3>
     <dl className={styles.facts}>
@@ -108,8 +106,10 @@ const Facts = ({
   </section>
 )
 
+type ConversionProps = { file: PlaybackFile; mode: StreamMode }
+
 /** What the server turns the file into, by the playback settings it streams with. */
-const Conversion = ({ file: { media, api }, mode }: { file: PlaybackFile; mode: StreamMode }) => {
+const Conversion = ({ file: { media, api }, mode }: ConversionProps) => {
   const settings = useQuery(playerQueriesFor(api).playbackSettings).data?.settings ?? null
   const transcoded = settings
     ? `H.264, re-encoded up to ${settings.maxHeight === 2160 ? '4K' : `${settings.maxHeight}p`} at ${settings.quality} quality`
@@ -132,16 +132,14 @@ const Conversion = ({ file: { media, api }, mode }: { file: PlaybackFile; mode: 
   )
 }
 
-/** The file on disk: the index's figures at once, the probe's detail once it is read. */
-const OriginalFile = ({
-  file: { media, api },
-  tracks,
-  audio,
-}: {
+type OriginalFileProps = {
   file: PlaybackFile
   tracks: MediaTracks | null
   audio: number | null
-}) => {
+}
+
+/** The file on disk: the index's figures at once, the probe's detail once it is read. */
+const OriginalFile = ({ file: { media, api }, tracks, audio }: OriginalFileProps) => {
   const streams = useQuery(playerQueriesFor(api).streams(media.id))
   const video = streams.data?.video ?? null
   const sound = streams.data?.audio.find((stream) => stream.index === audio) ?? null
@@ -193,6 +191,18 @@ const OriginalFile = ({
   )
 }
 
+type PlaybackInfoProps = {
+  readStats: () => EngineStats
+  mode: PlaybackMode
+  /** Why this is a transcode, when the connection is the reason. */
+  steppedDown?: StepDown | null
+  file: PlaybackFile | null
+  tracks: MediaTracks | null
+  /** The audio track playing. */
+  audio: number | null
+  onClose: () => void
+}
+
 /**
  * The detail behind the settings menu's last line: how the video reaches
  * the browser, how the picture is doing, and what the file is. A panel
@@ -206,17 +216,7 @@ export const PlaybackInfo = ({
   tracks,
   audio,
   onClose,
-}: {
-  readStats: () => EngineStats
-  mode: PlaybackMode
-  /** Why this is a transcode, when the connection is the reason. */
-  steppedDown?: StepDown | null
-  file: PlaybackFile | null
-  tracks: MediaTracks | null
-  /** The audio track playing. */
-  audio: number | null
-  onClose: () => void
-}) => {
+}: PlaybackInfoProps) => {
   const heading = useId()
   const stats = useLiveStats(readStats)
   return (

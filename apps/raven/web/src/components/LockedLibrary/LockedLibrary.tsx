@@ -2,8 +2,10 @@ import { Button, Icon } from '@raven/ui'
 import { useUnlockPrompt } from '@raven/ui/headless'
 import styles from '@/components/LockedLibrary/LockedLibrary.module.scss'
 
+type LockedLibraryProps = { name: string; available: boolean }
+
 /** Stands where a locked library's videos would be, until the PIN is entered. */
-export const LockedLibrary = ({ name, available }: { name: string; available: boolean }) => {
+export const LockedLibrary = ({ name, available }: LockedLibraryProps) => {
   const ask = useUnlockPrompt((state) => state.ask)
   return (
     <section className={styles.locked} aria-label="Locked">

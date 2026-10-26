@@ -26,13 +26,15 @@ const GATEWAY_STATUSES = { badGateway: 502, unavailable: 503, timeout: 504 } as 
 
 const isGatewayStatus = oneOf(Object.values(GATEWAY_STATUSES))
 
+type IsUnreachableAnswerProps = { status: number; body: unknown }
+
 /**
  * Whether an answer says the server is out of reach rather than answering: Raven's web
  * host said so, or a proxy in front of it (a Funnel with the NAS down) gave a gateway status
  * with a body that is not JSON, which the server itself never sends. `body` is null when the
  * body did not parse.
  */
-export const isUnreachableAnswer = ({ status, body }: { status: number; body: unknown }): boolean =>
+export const isUnreachableAnswer = ({ status, body }: IsUnreachableAnswerProps): boolean =>
   isServerUnreachableBody(body) || (isGatewayStatus(status) && body === null)
 
 /** Raven's own pages, which a browser does not have. */

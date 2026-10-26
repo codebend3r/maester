@@ -18,19 +18,15 @@ import { itemSummary, library, matchedMovie } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { WatchProbe } from '@/test/watchProbe'
 
-const movie = ({
-  id,
-  title,
-  year,
-  backdropVersion = null,
-  watched = false,
-}: {
+type MovieProps = {
   id: number
   title: string
   year: number
   backdropVersion?: string | null
   watched?: boolean
-}) =>
+}
+
+const movie = ({ id, title, year, backdropVersion = null, watched = false }: MovieProps) =>
   matchedMovie({
     id,
     title,
@@ -50,7 +46,9 @@ const RINGS: Saga = {
   ],
 }
 
-const backdropOf = ({ id, version }: { id: number; version: string }) =>
+type BackdropOfProps = { id: number; version: string }
+
+const backdropOf = ({ id, version }: BackdropOfProps) =>
   document.querySelector(`img[src*="/api/pictures/items/${id}/backdrop/${version}"]`)
 
 describe('SagaPage', () => {
@@ -63,17 +61,19 @@ describe('SagaPage', () => {
 
   afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
 
+  type OpenProps = {
+    route?: string
+    settings?: Partial<LibrarySettings>
+    backdrop?: SagaBackdrop
+    adminLock?: AdminLock
+  }
+
   const open = ({
     route = '/libraries/2/sagas/119',
     settings = {},
     backdrop = DEFAULT_SAGA_BACKDROP,
     adminLock,
-  }: {
-    route?: string
-    settings?: Partial<LibrarySettings>
-    backdrop?: SagaBackdrop
-    adminLock?: AdminLock
-  } = {}) => {
+  }: OpenProps = {}) => {
     spies.get.mockImplementation(async () =>
       library({
         id: 2,

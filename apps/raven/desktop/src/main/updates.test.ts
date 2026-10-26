@@ -19,17 +19,19 @@ import {
   type UpdateFetch,
 } from '@/main/updates'
 
+type ReleaseProps = {
+  tag: string
+  draft?: boolean
+  prerelease?: boolean
+  assets?: string[]
+}
+
 const release = ({
   tag,
   draft = false,
   prerelease = false,
   assets = [dmgNameFor(tag.slice(1))],
-}: {
-  tag: string
-  draft?: boolean
-  prerelease?: boolean
-  assets?: string[]
-}) => ({
+}: ReleaseProps) => ({
   tag_name: tag,
   draft,
   prerelease,
@@ -140,8 +142,10 @@ const CURRENT: UpdateCheck = { ok: true, finding: { kind: 'current' } }
 const UNLISTED: UpdateCheck = { ok: false, problem: UPDATE_PROBLEMS.unlisted }
 const UNREADABLE: UpdateCheck = { ok: false, problem: UPDATE_PROBLEMS.unreadable }
 
+type BuildsProps = { version: string; count: number }
+
 /** `count` build releases of `version`, as `main-smoke-test.yml` tags them, none with the app. */
-const builds = ({ version, count }: { version: string; count: number }) =>
+const builds = ({ version, count }: BuildsProps) =>
   Array.from({ length: count }, (_, index) =>
     release({ tag: `v${version}.${count - index}`, assets: [] }),
   )
@@ -329,7 +333,9 @@ const serving = (pages: Record<string, Reply>) => {
 
 const replying = (reply: Reply) => serving({ [RELEASES_URL]: reply })
 
-const check = ({ fetch, current = '0.5.4' }: { fetch: UpdateFetch; current?: string }) =>
+type CheckProps = { fetch: UpdateFetch; current?: string }
+
+const check = ({ fetch, current = '0.5.4' }: CheckProps) =>
   checkForUpdates({ fetch, url: RELEASES_URL, current })
 
 const pageUrl = (page: number) =>

@@ -69,14 +69,13 @@ export const AUDIO_CODECS = {
 export const codecLabel = (codec: string | null): string =>
   codec == null ? 'Unknown' : (CODEC_LABELS[codec] ?? codec.toUpperCase())
 
-/** "H.264 High", "AAC LC"; the profile alone when it names the codec already: "DTS-HD MA". */
-export const codecWithProfile = ({
-  codec,
-  profile,
-}: {
+type CodecWithProfileProps = {
   codec: string | null
   profile: string | null
-}): string | null => {
+}
+
+/** "H.264 High", "AAC LC"; the profile alone when it names the codec already: "DTS-HD MA". */
+export const codecWithProfile = ({ codec, profile }: CodecWithProfileProps): string | null => {
   if (codec == null) return null
   const label = codecLabel(codec)
   if (profile == null) return label
@@ -114,19 +113,18 @@ export const containerMimeType = (container: string): string | null => {
   return types[container] ?? null
 }
 
+type VideoCodecStringProps = {
+  codec: string
+  bitDepth: number | null
+}
+
 /**
  * An RFC 6381 codec string for the video track. The profile and level are
  * representative rather than exact (the index keeps codec and bit depth, not
  * the full profile), picked high enough that a "yes" means the file will
  * really decode: High@4.0 for 8-bit H.264, Main 10@5.1 for 10-bit HEVC.
  */
-export const videoCodecString = ({
-  codec,
-  bitDepth,
-}: {
-  codec: string
-  bitDepth: number | null
-}): string | null => {
+export const videoCodecString = ({ codec, bitDepth }: VideoCodecStringProps): string | null => {
   const deep = (bitDepth ?? 8) > 8
   const strings: Record<string, readonly [string, string]> = {
     h264: ['avc1.640028', 'avc1.6E0028'],
@@ -155,19 +153,18 @@ export const audioCodecString = (codec: string): string | null => {
   return strings[codec] ?? null
 }
 
+type CheckDirectPlayProps = {
+  media: MediaItem
+  canPlay: CanPlay
+}
+
 /**
  * Can this client play the file exactly as it sits on disk? Container, video
  * and audio are asked about separately so a "no" can say which part is the
  * problem. A file that has not been probed yet is judged on its container
  * alone and given the benefit of the doubt.
  */
-export const checkDirectPlay = ({
-  media,
-  canPlay,
-}: {
-  media: MediaItem
-  canPlay: CanPlay
-}): DirectPlayCheck => {
+export const checkDirectPlay = ({ media, canPlay }: CheckDirectPlayProps): DirectPlayCheck => {
   const mime = containerMimeType(media.container)
   if (mime == null || !canPlay(mime)) {
     return {
@@ -212,12 +209,14 @@ const COPYABLE_VIDEO: ReadonlySet<string> = new Set(['h264', 'hevc', 'av1', 'vp9
 /** Every converted stream's audio is stereo AAC. */
 const STREAM_AUDIO = 'mp4a.40.2'
 
+type StreamMimeTypeProps = { media: MediaItem; mode: StreamMode }
+
 /**
  * The MIME type a converted stream is fed to Media Source Extensions as.
  * A transcode is always 8-bit H.264; a remux keeps the file's video, or is
  * assumed to be H.264 when the file has not been probed yet.
  */
-export const streamMimeType = ({ media, mode }: { media: MediaItem; mode: StreamMode }): string => {
+export const streamMimeType = ({ media, mode }: StreamMimeTypeProps): string => {
   const video =
     mode === PLAYBACK_MODES.transcode || media.videoCodec == null
       ? videoCodecString({ codec: 'h264', bitDepth: 8 })
@@ -248,6 +247,15 @@ export type PlaybackPlan = {
 /** The server's playback settings a plan follows: whether to force the original file, and what it will convert. */
 export type PlaybackPolicy = Pick<PlaybackSettings, 'directPlay' | 'transcoding'>
 
+type PlanPlaybackProps = {
+  media: MediaItem
+  canPlay: CanPlay
+  canStream: CanPlay
+  /** Whether the chosen audio track is the one the file plays by default. */
+  defaultAudio: boolean
+  policy: PlaybackPolicy
+}
+
 /**
  * How to play a file here. Direct play when the browser takes the file as
  * it is and the default audio track is wanted; otherwise a remux when the
@@ -266,14 +274,7 @@ export const planPlayback = ({
   canStream,
   defaultAudio,
   policy,
-}: {
-  media: MediaItem
-  canPlay: CanPlay
-  canStream: CanPlay
-  /** Whether the chosen audio track is the one the file plays by default. */
-  defaultAudio: boolean
-  policy: PlaybackPolicy
-}): PlaybackPlan => {
+}: PlanPlaybackProps): PlaybackPlan => {
   const check = checkDirectPlay({ media, canPlay })
   const direct = check.playable && defaultAudio
   const remux =
@@ -305,19 +306,18 @@ export const planPlayback = ({
   }
 }
 
+type OfferedQualitiesProps = {
+  media: MediaItem
+  maxHeight: number
+}
+
 /**
  * The sizes a viewer can convert a file down to: the ones smaller than the
  * file, in frame and in bitrate where the file's is known, and not over the
  * height the server's settings cap a transcode at. Largest first. A file
  * not probed yet has no size to be under, so it is offered every one.
  */
-export const offeredQualities = ({
-  media,
-  maxHeight,
-}: {
-  media: MediaItem
-  maxHeight: number
-}): StreamQuality[] =>
+export const offeredQualities = ({ media, maxHeight }: OfferedQualitiesProps): StreamQuality[] =>
   isStreamQuality.values
     .filter((key) => {
       const size = STREAM_QUALITIES[key]

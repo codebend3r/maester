@@ -19,7 +19,9 @@ class PingController {
 @Module({ controllers: [PingController] })
 class TestModule {}
 
-const boot = async ({ webDir }: { webDir: string | null }): Promise<NestFastifyApplication> => {
+type BootProps = { webDir: string | null }
+
+const boot = async ({ webDir }: BootProps): Promise<NestFastifyApplication> => {
   const app = await NestFactory.create<NestFastifyApplication>(TestModule, new FastifyAdapter(), {
     logger: false,
   })

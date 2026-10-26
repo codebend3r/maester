@@ -6,7 +6,9 @@ import { browser } from '@/lib/browser'
 import { ERROR_MESSAGES, LoginPage } from '@/pages/LoginPage/LoginPage'
 import { renderAt } from '@/test/render'
 
-const json = ({ body, status = 200 }: { body: unknown; status?: number }) =>
+type JsonProps = { body: unknown; status?: number }
+
+const json = ({ body, status = 200 }: JsonProps) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { [HEADERS.contentType]: CONTENT_TYPES.json },

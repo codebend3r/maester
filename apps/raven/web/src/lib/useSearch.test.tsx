@@ -5,9 +5,11 @@ import { MemoryRouter, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAddressSearch } from '@/lib/useSearch'
 
 describe('useAddressSearch', () => {
+  type InRouterCallbackProps = { children: ReactNode }
+
   const inRouter =
     (route: string) =>
-    ({ children }: { children: ReactNode }) => (
+    ({ children }: InRouterCallbackProps) => (
       <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
     )
 

@@ -115,10 +115,9 @@ const Address = () => {
 /** Stands in for the page behind the person's, where Back should land. */
 const Behind = () => <p>Behind</p>
 
-const renderPerson = ({
-  route = '/people/7',
-  behind = [],
-}: { route?: string; behind?: string[] } = {}) =>
+type RenderPersonProps = { route?: string; behind?: string[] }
+
+const renderPerson = ({ route = '/people/7', behind = [] }: RenderPersonProps = {}) =>
   renderWithProviders({
     ui: (
       <>

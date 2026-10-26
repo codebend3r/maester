@@ -44,8 +44,10 @@ const heldBody = (chunks: Uint8Array[]): ReadableStream<Uint8Array> =>
 
 const reply = (input: Reply): Reply => input
 
+type FakeFetchProps = { replies: Reply[]; error?: unknown }
+
 /** A fetch that answers `replies` in order, or rejects with `error`, and records every call. */
-const fakeFetch = ({ replies, error }: { replies: Reply[]; error?: unknown }) => {
+const fakeFetch = ({ replies, error }: FakeFetchProps) => {
   const calls: { url: string; headers: Record<string, string> }[] = []
   const fetch: StreamFetch = async ({ url, headers }) => {
     calls.push({ url, headers })
@@ -62,14 +64,13 @@ const fakeFetch = ({ replies, error }: { replies: Reply[]; error?: unknown }) =>
   return { fetch, calls }
 }
 
-/** A part file over an array of chunks. */
-const fakePart = ({
-  disk = [],
-  failAppend,
-}: {
+type FakePartProps = {
   disk?: Uint8Array[]
   failAppend?: unknown
-} = {}) => {
+}
+
+/** A part file over an array of chunks. */
+const fakePart = ({ disk = [], failAppend }: FakePartProps = {}) => {
   const chunks = [...disk]
   const flags = { closes: 0, truncates: 0 }
   const part: PartFile = {
@@ -94,6 +95,17 @@ const sizeOf = (chunks: Uint8Array[]): number =>
 
 const URL_OF_FILE = 'http://192.168.1.5:3000/media/42/file?ticket=abc'
 
+type RunProps = {
+  fetch: StreamFetch
+  part: PartFile
+  expectedSize: number
+  signal?: AbortSignal
+  timers?: ReturnType<typeof fakeTimers>['timers']
+  now?: () => number
+  stallMs?: number
+  onProgress?: (bytes: number) => void
+}
+
 const run = ({
   fetch,
   part,
@@ -103,16 +115,7 @@ const run = ({
   now = () => 0,
   stallMs,
   onProgress = () => undefined,
-}: {
-  fetch: StreamFetch
-  part: PartFile
-  expectedSize: number
-  signal?: AbortSignal
-  timers?: ReturnType<typeof fakeTimers>['timers']
-  now?: () => number
-  stallMs?: number
-  onProgress?: (bytes: number) => void
-}): Promise<FetchOutcome> =>
+}: RunProps): Promise<FetchOutcome> =>
   fetchToFile({
     fetch,
     url: URL_OF_FILE,
@@ -535,7 +538,9 @@ describe('a full disk', () => {
 })
 
 describe('a refusal', () => {
-  const refused = async ({ status, disk = [] }: { status: number; disk?: Uint8Array[] }) => {
+  type RefusedProps = { status: number; disk?: Uint8Array[] }
+
+  const refused = async ({ status, disk = [] }: RefusedProps) => {
     const { fetch } = fakeFetch({ replies: [reply({ status, body: bodyOf([bytesOf(3)]) })] })
     const { part, flags, chunks } = fakePart({ disk })
     const outcome = await run({ fetch, part, expectedSize: 10 })

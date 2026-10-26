@@ -4,6 +4,13 @@ import { createMenuHub } from '@/desktop/menuHub'
 import { listenForPlayer } from '@/desktop/playerConnection'
 import { useDesktopBridge } from '@/stores/desktop'
 
+type StartDesktopProps = {
+  bridge: unknown
+  root: HTMLElement
+  /** The window main's player port is posted to. */
+  target: Pick<Window, 'addEventListener' | 'removeEventListener'>
+}
+
 /**
  * Inside Raven, puts its bridge in `useDesktopBridge` and marks the page as the app's,
  * which its title bar inset reads; in a browser it does nothing. Called once, before the first
@@ -11,16 +18,7 @@ import { useDesktopBridge } from '@/stores/desktop'
  * answers the page's `ready` is heard. Returns what stops it listening for that hand-over, for a
  * page that goes away without unloading, as a test's does.
  */
-export const startDesktop = ({
-  bridge,
-  root,
-  target,
-}: {
-  bridge: unknown
-  root: HTMLElement
-  /** The window main's player port is posted to. */
-  target: Pick<Window, 'addEventListener' | 'removeEventListener'>
-}): (() => void) => {
+export const startDesktop = ({ bridge, root, target }: StartDesktopProps): (() => void) => {
   const client = clientFor(bridge)
   if (client === null) return () => {}
   const player = listenForPlayer({ target, origin: PAGE_ORIGIN })

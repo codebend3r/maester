@@ -51,15 +51,17 @@ afterEach(async () => {
   )
 })
 
+type BootProps = {
+  publicUrl?: string
+  cookieDomain?: string | null
+  webDir?: string | null
+}
+
 const boot = async ({
   publicUrl = ROOKERY,
   cookieDomain = null,
   webDir = null,
-}: {
-  publicUrl?: string
-  cookieDomain?: string | null
-  webDir?: string | null
-} = {}): Promise<Harness> => {
+}: BootProps = {}): Promise<Harness> => {
   const root = await mkdtemp(join(tmpdir(), 'rookery-app-'))
   const config: ServerConfig = {
     ...readServerConfig({
@@ -87,7 +89,9 @@ const setCookies = (response: Injected): string[] => {
   return header == null ? [] : Array.isArray(header) ? header : [String(header)]
 }
 
-const cookieNamed = ({ response, name }: { response: Injected; name: string }): string => {
+type CookieNamedProps = { response: Injected; name: string }
+
+const cookieNamed = ({ response, name }: CookieNamedProps): string => {
   const found = setCookies(response).find((cookie) => cookie.startsWith(`${name}=`))
   if (!found) throw new Error(`no ${name} cookie in ${JSON.stringify(setCookies(response))}`)
   return found
@@ -96,7 +100,9 @@ const cookieNamed = ({ response, name }: { response: Injected; name: string }): 
 const valueOf = (cookie: string): string =>
   cookie.slice(cookie.indexOf('=') + 1).split(';')[0] ?? ''
 
-const start = async ({ harness, returnTo }: { harness: Harness; returnTo?: string }) => {
+type StartProps = { harness: Harness; returnTo?: string }
+
+const start = async ({ harness, returnTo }: StartProps) => {
   const response = await harness.app.inject({
     method: 'POST',
     url: '/api/auth/plex/start',
@@ -106,23 +112,23 @@ const start = async ({ harness, returnTo }: { harness: Harness; returnTo?: strin
   return { response, pin }
 }
 
-const callback = ({ harness, pinCookie }: { harness: Harness; pinCookie: string | null }) =>
+type CallbackProps = { harness: Harness; pinCookie: string | null }
+
+const callback = ({ harness, pinCookie }: CallbackProps) =>
   harness.app.inject({
     method: 'GET',
     url: CALLBACK_PATH,
     headers: pinCookie ? { cookie: `${PIN_COOKIE}=${pinCookie}` } : {},
   })
 
-/** A full sign-in as `account`; returns the callback's response and the session token. */
-const signIn = async ({
-  harness,
-  account = alice,
-  returnTo = `${LUWIN}/`,
-}: {
+type SignInProps = {
   harness: Harness
   account?: PlexAccount
   returnTo?: string
-}) => {
+}
+
+/** A full sign-in as `account`; returns the callback's response and the session token. */
+const signIn = async ({ harness, account = alice, returnTo = `${LUWIN}/` }: SignInProps) => {
   const started = await start({ harness, returnTo })
   const pin: PlexPin | undefined = started.pin
   if (!pin) throw new Error('no PIN created')
@@ -135,22 +141,22 @@ const signIn = async ({
   return { response, token }
 }
 
-const me = ({ harness, token }: { harness: Harness; token: string }) =>
+type MeProps = { harness: Harness; token: string }
+
+const me = ({ harness, token }: MeProps) =>
   harness.app.inject({
     method: 'GET',
     url: '/api/me',
     headers: { cookie: `other=1; ${SESSION_COOKIE}=${token}` },
   })
 
-const lookup = ({
-  harness,
-  token,
-  bearer = SERVICE_TOKEN,
-}: {
+type LookupProps = {
   harness: Harness
   token?: unknown
   bearer?: string | null
-}) =>
+}
+
+const lookup = ({ harness, token, bearer = SERVICE_TOKEN }: LookupProps) =>
   harness.app.inject({
     method: 'POST',
     url: '/internal/session',
@@ -160,7 +166,9 @@ const lookup = ({
 
 const db = (harness: Harness) => harness.app.get(DatabaseService).db
 
-const count = ({ harness, table }: { harness: Harness; table: string }): number =>
+type CountProps = { harness: Harness; table: string }
+
+const count = ({ harness, table }: CountProps): number =>
   Number(db(harness).prepare(`SELECT COUNT(*) FROM ${table}`).pluck().get())
 
 describe('starting a sign-in', () => {

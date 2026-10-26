@@ -86,60 +86,65 @@ describe('open responses once access goes', () => {
   type Reader = ReadableStreamDefaultReader<Uint8Array>
   type Drained = { received: number; isCut: boolean }
 
-  const pause = ({ ms }: { ms: number }) =>
+  type PauseProps = { ms: number }
+
+  const pause = ({ ms }: PauseProps) =>
     new Promise<void>((resolve) => {
       setTimeout(resolve, Math.max(0, ms))
     })
 
-  const readerOf = ({ response }: { response: Response }): Reader => {
+  type ReaderOfProps = { response: Response }
+
+  const readerOf = ({ response }: ReaderOfProps): Reader => {
     if (response.body === null) throw new Error('no body to read')
     return response.body.getReader()
   }
 
-  /** Reads to the end; `isCut` when a read fails, as it does on a response destroyed mid-body. */
-  const drain = async ({
-    reader,
-    received,
-  }: {
+  type DrainProps = {
     reader: Reader
     received: number
-  }): Promise<Drained> => {
+  }
+
+  /** Reads to the end; `isCut` when a read fails, as it does on a response destroyed mid-body. */
+  const drain = async ({ reader, received }: DrainProps): Promise<Drained> => {
     const chunk = await reader.read().catch(() => null)
     if (chunk === null) return { received, isCut: true }
     if (chunk.done) return { received, isCut: false }
     return drain({ reader, received: received + chunk.value.byteLength })
   }
 
-  /** Whether `text` arrives before the body ends. */
-  const readUntil = async ({
-    reader,
-    text,
-    read = '',
-  }: {
+  type ReadUntilProps = {
     reader: Reader
     text: string
     read?: string
-  }): Promise<boolean> => {
+  }
+
+  /** Whether `text` arrives before the body ends. */
+  const readUntil = async ({ reader, text, read = '' }: ReadUntilProps): Promise<boolean> => {
     if (read.includes(text)) return true
     const chunk = await reader.read()
     if (chunk.done) return false
     return readUntil({ reader, text, read: read + new TextDecoder().decode(chunk.value) })
   }
 
+  type DrainWithinProps = { reader: Reader; ms: number }
+
   /** What `drain` found within `ms`, or null when the body was still open then. */
-  const drainWithin = ({ reader, ms }: { reader: Reader; ms: number }): Promise<Drained | null> =>
+  const drainWithin = ({ reader, ms }: DrainWithinProps): Promise<Drained | null> =>
     Promise.race([drain({ reader, received: 0 }), pause({ ms }).then(() => null)])
+
+  type OpenBodyProps = {
+    path: string
+    headers?: Record<string, string>
+    signal: AbortSignal
+  }
 
   /** Opens `path` and reads its first chunk, then leaves the rest unread, as a slow player does. */
   const openBody = async ({
     path,
     headers = {},
     signal,
-  }: {
-    path: string
-    headers?: Record<string, string>
-    signal: AbortSignal
-  }): Promise<{ reader: Reader; received: number }> => {
+  }: OpenBodyProps): Promise<{ reader: Reader; received: number }> => {
     const response = await fetch(`${base}${path}`, { headers, signal })
     expect(response.status).toBe(200)
     const reader = readerOf({ response })
@@ -153,7 +158,9 @@ describe('open responses once access goes', () => {
   const setFriend = ({ status }: MemberStatusChange) =>
     open.ownerApi.setMemberStatus({ id: AUTH_TEST_IDS.friend, change: { status } })
 
-  const ticketFor = async ({ headers }: { headers: Record<string, string> }): Promise<string> => {
+  type TicketForProps = { headers: Record<string, string> }
+
+  const ticketFor = async ({ headers }: TicketForProps): Promise<string> => {
     const response = await open.app.inject({
       method: ROUTES.accountTicket.method,
       url: pathOf({ route: ROUTES.accountTicket, params: { id: open.ids.video } }),
@@ -164,8 +171,10 @@ describe('open responses once access goes', () => {
     return body.ticket
   }
 
+  type ShortTicketProps = { id: string }
+
   /** A ticket minted from a token of `SHORT_TOKEN_SECONDS`, and when that token expires. */
-  const shortTicket = async ({ id }: { id: string }) => {
+  const shortTicket = async ({ id }: ShortTicketProps) => {
     const token = await live.mint({ id, expiresIn: SHORT_TOKEN_SECONDS })
     return {
       ticket: await ticketFor({ headers: bearerHeaders({ token }) }),
@@ -173,7 +182,9 @@ describe('open responses once access goes', () => {
     }
   }
 
-  const fileWith = ({ ticket }: { ticket: string }) =>
+  type FileWithProps = { ticket: string }
+
+  const fileWith = ({ ticket }: FileWithProps) =>
     withTicket({ route: ROUTES.file, params: { id: open.ids.video }, ticket })
 
   it('refuses the event stream to anyone without an account', async () => {

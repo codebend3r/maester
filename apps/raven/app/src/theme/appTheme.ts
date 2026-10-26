@@ -8,11 +8,13 @@ const { numbers, colours: rootColours } = nativeTokens(
   Object.fromEntries(designTokens.map(({ name, value }) => [name, value])),
 )
 
+type TokenOfProps<T> = { tokens: Readonly<Record<string, T>>; name: string }
+
 /**
  * The token `name` from `tokens`. One the stylesheets dropped or renamed fails the app as
  * it loads, and every render test with it, rather than painting the screen with nothing.
  */
-const tokenOf = <T>({ tokens, name }: { tokens: Readonly<Record<string, T>>; name: string }): T => {
+const tokenOf = <T>({ tokens, name }: TokenOfProps<T>): T => {
   const value = tokens[name]
   if (value === undefined) throw new Error(`raven's app has no design token ${name}`)
   return value
@@ -65,7 +67,9 @@ const overPictureOf = (palette: Palette): Palette => ({
   muted: fixed(OVER_PICTURE_TOKENS.muted),
 })
 
-const appThemeFor = ({ id, tone }: { id: ThemeId; tone: ThemeTone }): AppTheme => {
+type AppThemeForProps = { id: ThemeId; tone: ThemeTone }
+
+const appThemeFor = ({ id, tone }: AppThemeForProps): AppTheme => {
   const palette = paletteOf(id)
   return { id, palette, overPicture: overPictureOf(palette), tone }
 }

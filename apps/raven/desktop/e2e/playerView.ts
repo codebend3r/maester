@@ -7,8 +7,10 @@ export const wake = async (page: Page): Promise<void> => {
   await page.mouse.move(160, 140)
 }
 
+type ExpectButtonProps = { page: Page; name: string }
+
 /** Waits for a control of the player, woken first. */
-export const expectButton = async ({ page, name }: { page: Page; name: string }) => {
+export const expectButton = async ({ page, name }: ExpectButtonProps) => {
   await wake(page)
   await expect(page.getByRole('button', { name })).toBeVisible()
 }
@@ -28,8 +30,10 @@ export const expectClockAdvancing = async (page: Page): Promise<void> => {
     .toBeGreaterThan(1)
 }
 
+type DistanceFromProps = { page: Page; seconds: number }
+
 /** How far the clock is from `seconds`, or Infinity before there is one. */
-export const distanceFrom = async ({ page, seconds }: { page: Page; seconds: number }) => {
+export const distanceFrom = async ({ page, seconds }: DistanceFromProps) => {
   const now = await clockOf(page)
   return now === null ? Number.POSITIVE_INFINITY : Math.abs(now - seconds)
 }
@@ -40,14 +44,16 @@ export const expectNative = async (page: Page): Promise<void> => {
   await expect(page.locator('html')).toHaveAttribute('data-surface', 'native')
 }
 
+type ExpectPlayingNativelyProps = {
+  page: Page
+  title: string
+}
+
 /** mpv plays `title`, the player's heading, and its clock moves. */
 export const expectPlayingNatively = async ({
   page,
   title,
-}: {
-  page: Page
-  title: string
-}): Promise<void> => {
+}: ExpectPlayingNativelyProps): Promise<void> => {
   await expect(heading({ page, name: title })).toBeVisible()
   await expectNative(page)
   await expectButton({ page, name: 'Pause (k)' })

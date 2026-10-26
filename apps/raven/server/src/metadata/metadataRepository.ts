@@ -198,6 +198,56 @@ const toDueScores = (row: DueRow): DueScores[] =>
 
 const genresOf = (json: string): string[] => parseJsonAs({ json, guard: isStringArray }) ?? []
 
+type MetadataRepositoryFindProps = {
+  type: ItemType
+  tmdbId: string
+}
+
+type MetadataRepositoryChildProps = {
+  parentId: number
+  number: number
+}
+
+type MetadataRepositorySaveProps = { item: FetchedItem; parentId?: number | null }
+
+type MetadataRepositorySaveSeasonProps = {
+  showId: number
+  number: number
+  season: FetchedItem
+  episodes: readonly FetchedItem[]
+}
+
+type MetadataRepositorySaveShowLogoProps = { itemId: number; logo: string | null }
+
+type MetadataRepositorySaveScoresProps = {
+  itemId: number
+  provider: ScoreProvider
+  scores: readonly ExternalScore[]
+}
+
+type MetadataRepositorySaveTmdbRatingProps = { itemId: number; rating: FetchedItem['rating'] }
+
+type MetadataRepositoryScoresDueProps = {
+  provider: ScoreProvider
+  before: string
+  limit: number
+}
+
+type MetadataRepositoryIsScoreDueProps = {
+  itemId: number
+  provider: ScoreProvider
+  before: string
+}
+
+type MetadataRepositoryLinkProps = { mediaIds: readonly number[]; itemIds: readonly number[] }
+
+type MetadataRepositoryStaleProps = {
+  type: ItemType
+  before: string
+  recentBefore: string
+  releasedAfter: string
+}
+
 /** Movies, shows, seasons and episodes as TMDB describes them, with their people, scores and pictures. */
 @Injectable()
 export class MetadataRepository {
@@ -212,13 +262,7 @@ export class MetadataRepository {
   }
 
   /** The stored item for a TMDB id, and when it was fetched. */
-  find({
-    type,
-    tmdbId,
-  }: {
-    type: ItemType
-    tmdbId: string
-  }): { id: number; fetchedAt: string } | null {
+  find({ type, tmdbId }: MetadataRepositoryFindProps): { id: number; fetchedAt: string } | null {
     const row = this.db
       .prepare<[string, string], { id: number; fetched_at: string }>(
         'SELECT id, fetched_at FROM items WHERE type = ? AND tmdb_id = ?',
@@ -323,10 +367,7 @@ export class MetadataRepository {
   child({
     parentId,
     number,
-  }: {
-    parentId: number
-    number: number
-  }): { id: number; tmdbId: string; fetchedAt: string } | null {
+  }: MetadataRepositoryChildProps): { id: number; tmdbId: string; fetchedAt: string } | null {
     const row = this.db
       .prepare<[number, number], { id: number; tmdb_id: string; fetched_at: string }>(
         'SELECT id, tmdb_id, fetched_at FROM items WHERE parent_id = ? AND number = ? ORDER BY id LIMIT 1',
@@ -385,7 +426,7 @@ export class MetadataRepository {
    * fields, its TMDB pictures, its TMDB score, and its credits, with the
    * people they name. Pictures from beside the media stay.
    */
-  save({ item, parentId = null }: { item: FetchedItem; parentId?: number | null }): number {
+  save({ item, parentId = null }: MetadataRepositorySaveProps): number {
     return this.db.transaction(() => {
       const row = this.db
         .prepare<unknown[], { id: number }>(
@@ -487,17 +528,11 @@ export class MetadataRepository {
    * one transaction, and answers with the season and every episode under it
    * by number, those raven made up before included.
    */
-  saveSeason({
-    showId,
-    number,
-    season,
-    episodes,
-  }: {
-    showId: number
+  saveSeason({ showId, number, season, episodes }: MetadataRepositorySaveSeasonProps): {
+    id: number
     number: number
-    season: FetchedItem
-    episodes: readonly FetchedItem[]
-  }): { id: number; number: number; episodes: Map<number, number> } {
+    episodes: Map<number, number>
+  } {
     return this.db.transaction(() => {
       const id = this.save({ item: season, parentId: showId })
       episodes.forEach((episode) => this.save({ item: episode, parentId: id }))
@@ -662,7 +697,7 @@ export class MetadataRepository {
   }
 
   /** Notes TMDB's logo for a show, or that it has none. */
-  saveShowLogo({ itemId, logo }: { itemId: number; logo: string | null }): void {
+  saveShowLogo({ itemId, logo }: MetadataRepositorySaveShowLogoProps): void {
     this.db.transaction(() => {
       this.db.prepare('UPDATE items SET logo_checked = 1 WHERE id = ?').run(itemId)
       this.images.setTmdbLogo({ itemId, logo })
@@ -761,15 +796,7 @@ export class MetadataRepository {
    * writes over an MDBList score only once MDBList's answer is due again, so
    * scores from an MDBList that has gone away do not freeze.
    */
-  saveScores({
-    itemId,
-    provider,
-    scores,
-  }: {
-    itemId: number
-    provider: ScoreProvider
-    scores: readonly ExternalScore[]
-  }): void {
+  saveScores({ itemId, provider, scores }: MetadataRepositorySaveScoresProps): void {
     this.db.transaction(() => {
       const stamped = this.db
         .prepare(`UPDATE items SET ${FETCHED_AT[provider]} = ? WHERE id = ?`)
@@ -798,7 +825,7 @@ export class MetadataRepository {
   }
 
   /** Replaces an item's TMDB score, or drops it for none; nothing for an item that has gone. */
-  saveTmdbRating({ itemId, rating }: { itemId: number; rating: FetchedItem['rating'] }): void {
+  saveTmdbRating({ itemId, rating }: MetadataRepositorySaveTmdbRatingProps): void {
     this.db.transaction(() => {
       this.db.prepare(`DELETE FROM ratings WHERE item_id = ? AND source = 'tmdb'`).run(itemId)
       if (rating == null) return
@@ -815,15 +842,7 @@ export class MetadataRepository {
    * Movies and shows whose scores from `provider` are due, in the order they
    * are fetched, as far as `limit` goes: those a Refresh asked for first.
    */
-  scoresDue({
-    provider,
-    before,
-    limit,
-  }: {
-    provider: ScoreProvider
-    before: string
-    limit: number
-  }): DueScores[] {
+  scoresDue({ provider, before, limit }: MetadataRepositoryScoresDueProps): DueScores[] {
     return this.db
       .prepare<{ local: string; before: string; limit: number }, DueRow>(
         `SELECT id, type, tmdb_id, imdb_id, ${requestedFrom(provider)} AS requested FROM items
@@ -900,15 +919,7 @@ export class MetadataRepository {
   }
 
   /** Whether an item's scores from `provider` are still due, by the rule `scoresDue` lists them by. */
-  isScoreDue({
-    itemId,
-    provider,
-    before,
-  }: {
-    itemId: number
-    provider: ScoreProvider
-    before: string
-  }): boolean {
+  isScoreDue({ itemId, provider, before }: MetadataRepositoryIsScoreDueProps): boolean {
     return !!this.db
       .prepare<{ id: number; local: string; before: string }, { id: number }>(
         `SELECT id FROM items WHERE id = @id AND ${scoresDueWhere(provider)}`,
@@ -1008,7 +1019,7 @@ export class MetadataRepository {
    * matched to another movie leaves its split behind, as that split was of
    * the old movie's cards; one matched to the same item again keeps it.
    */
-  link({ mediaIds, itemIds }: { mediaIds: readonly number[]; itemIds: readonly number[] }): void {
+  link({ mediaIds, itemIds }: MetadataRepositoryLinkProps): void {
     this.db.transaction(() => {
       const unsplit = this.db.prepare<{ mediaId: number; itemIds: string }>(
         `UPDATE media SET split = NULL
@@ -1045,12 +1056,7 @@ export class MetadataRepository {
     before,
     recentBefore,
     releasedAfter,
-  }: {
-    type: ItemType
-    before: string
-    recentBefore: string
-    releasedAfter: string
-  }): Array<{ id: number; tmdbId: string }> {
+  }: MetadataRepositoryStaleProps): Array<{ id: number; tmdbId: string }> {
     return this.db
       .prepare<[string, string, string, string], { id: number; tmdb_id: string }>(
         `SELECT id, tmdb_id FROM items

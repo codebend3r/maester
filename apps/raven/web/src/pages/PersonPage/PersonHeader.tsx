@@ -34,19 +34,18 @@ const todayHere = (): string => {
   return `${now.getFullYear()}-${twoDigits(now.getMonth() + 1)}-${twoDigits(now.getDate())}`
 }
 
+type LifeLineProps = {
+  profile: PersonProfile | null
+  today: string
+}
+
 /**
  * When and where they were born, then their age now or the day they died
  * and their age then: "Born November 21, 2000 in Santa Monica, California,
  * USA · 25 years old". A part TMDB leaves out is left out; null with no
  * birthday.
  */
-export const lifeLine = ({
-  profile,
-  today,
-}: {
-  profile: PersonProfile | null
-  today: string
-}): string | null => {
+export const lifeLine = ({ profile, today }: LifeLineProps): string | null => {
   const birthday = profile?.birthday ?? null
   const born = birthday == null ? null : formatDay(birthday)
   if (profile == null || born == null) return null
@@ -66,12 +65,14 @@ export const lifeLine = ({
 /** A pixel the clamp can leave between the two heights with nothing hidden, as each rounds on its own. */
 const ROUNDING_PX = 1
 
+type BiographyProps = { text: string }
+
 /**
  * Their biography, four lines of it, with More to read the rest when four
  * hide any. That hangs on the width the page leaves it, so it is measured
  * once laid out and again as the width changes.
  */
-const Biography = ({ text }: { text: string }) => {
+const Biography = ({ text }: BiographyProps) => {
   const id = useId()
   const paragraph = useRef<HTMLParagraphElement>(null)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -110,20 +111,18 @@ const Biography = ({ text }: { text: string }) => {
   )
 }
 
+type PersonHeaderProps = {
+  person: PersonDetails
+  headingId: string
+  eyebrow: string | null
+}
+
 /**
  * Who they are: the way back, their photo or initials, the eyebrow over
  * their name, when and where they were born, their biography, and where
  * IMDb and TMDB keep them.
  */
-export const PersonHeader = ({
-  person,
-  headingId,
-  eyebrow,
-}: {
-  person: PersonDetails
-  headingId: string
-  eyebrow: string | null
-}) => {
+export const PersonHeader = ({ person, headingId, eyebrow }: PersonHeaderProps) => {
   const photo = api.photoUrl({ personId: person.id, photoVersion: person.photoVersion })
   const { profile } = person
   const life = lifeLine({ profile, today: todayHere() })

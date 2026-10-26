@@ -9,19 +9,17 @@ import {
 import { sagaCover, sagaFacts, sagaPath, sagaPictures, sagaRuntime, sagaTargets } from '@/sagas'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 
+type SagaProps = {
+  items: ReadonlyArray<Partial<ItemSummary> | null>
+  durations?: ReadonlyArray<number | null>
+  backdrop?: SagaBackdrop
+}
+
 /**
  * A saga whose movie n is file n, matched to item 10n titled "Part n" with
  * `items[n - 1]` laid over it, or to no item where that is null.
  */
-const saga = ({
-  items,
-  durations = [],
-  backdrop = DEFAULT_SAGA_BACKDROP,
-}: {
-  items: ReadonlyArray<Partial<ItemSummary> | null>
-  durations?: ReadonlyArray<number | null>
-  backdrop?: SagaBackdrop
-}): Saga => ({
+const saga = ({ items, durations = [], backdrop = DEFAULT_SAGA_BACKDROP }: SagaProps): Saga => ({
   tmdbId: '119',
   name: 'The Lord of the Rings Collection',
   backdrop,

@@ -49,6 +49,13 @@ afterEach(() => {
 
 const refusalBody = (reason: string) => JSON.stringify({ reason, message: 'no' })
 
+type AnswerProps = { heard: Heard; count: number }
+
+type SetupProps = {
+  answer?: (input: AnswerProps) => Answer
+  outcomes?: TicketOutcome[]
+}
+
 /**
  * A relay on a real loopback socket over an in-process fake upstream: each request the upstream
  * hears is kept, and `answer` says what it sends back.
@@ -67,10 +74,7 @@ const setup = ({
     body: 'abcd',
   }),
   outcomes = [],
-}: {
-  answer?: (input: { heard: Heard; count: number }) => Answer
-  outcomes?: TicketOutcome[]
-} = {}) => {
+}: SetupProps = {}) => {
   const heard: Heard[] = []
   const asked: { serverId: string; mediaId: number; isFresh: boolean }[] = []
   const warnings: string[] = []

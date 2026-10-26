@@ -14,13 +14,12 @@ import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
-const closeAfterWork = async ({
-  app,
-  libraryId,
-}: {
+type CloseAfterWorkProps = {
   app: NestFastifyApplication | null
   libraryId: number
-}): Promise<void> => {
+}
+
+const closeAfterWork = async ({ app, libraryId }: CloseAfterWorkProps): Promise<void> => {
   if (!app) return
   // Stop producers before draining work, while the database and media still exist.
   app.get(LibraryWatcher).onModuleDestroy()

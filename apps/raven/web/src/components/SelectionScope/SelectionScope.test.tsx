@@ -96,7 +96,9 @@ describe('SelectionScope', () => {
 
   it('redraws a card only for its own key', () => {
     const renders: Record<string, number> = { a: 0, b: 0 }
-    const Card = ({ id }: { id: string }) => {
+    type CardProps = { id: string }
+
+    const Card = ({ id }: CardProps) => {
       const selected = useSelection((state) => state.keys.has(id))
       useEffect(() => {
         renders[id] = (renders[id] ?? 0) + 1

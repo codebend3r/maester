@@ -9,6 +9,8 @@ type Method = (typeof METHODS)[number]
 
 const isMethod = (value: string): value is Method => METHODS.some((method) => method === value)
 
+type InjectFetchProps = { app: NestFastifyApplication; cookie?: string }
+
 /**
  * `fetch` for the API client, answered by the app in-process through
  * `inject`, so a test drives the real client against the real controllers
@@ -16,7 +18,7 @@ const isMethod = (value: string): value is Method => METHODS.some((method) => me
  * so does the browser's offer of compression, unpacked as its fetch would.
  */
 export const injectFetch =
-  ({ app, cookie }: { app: NestFastifyApplication; cookie?: string }): FetchLike =>
+  ({ app, cookie }: InjectFetchProps): FetchLike =>
   async (url, init = {}) => {
     const method = init.method ?? 'GET'
     if (!isMethod(method)) throw new Error(`The API client sent ${method}, which no route takes`)
@@ -43,11 +45,11 @@ export const injectFetch =
     }
   }
 
-/** The client every raven app uses, talking to `app` as a browser holding `cookie` would. */
-export const apiFor = ({
-  app,
-  cookie,
-}: {
+type ApiForProps = {
   app: NestFastifyApplication
   cookie?: string
-}): ApiClient => createApiClient({ fetch: injectFetch({ app, cookie }) })
+}
+
+/** The client every raven app uses, talking to `app` as a browser holding `cookie` would. */
+export const apiFor = ({ app, cookie }: ApiForProps): ApiClient =>
+  createApiClient({ fetch: injectFetch({ app, cookie }) })

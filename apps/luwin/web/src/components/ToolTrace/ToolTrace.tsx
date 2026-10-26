@@ -9,8 +9,10 @@ const pretty = (text: string): string => {
   }
 }
 
+type ToolTraceProps = { tools: ToolCall[] }
+
 /** Each tool call a turn made, its arguments and what it answered, folded until opened. */
-export const ToolTrace = ({ tools }: { tools: ToolCall[] }) => (
+export const ToolTrace = ({ tools }: ToolTraceProps) => (
   <details className={styles.trace}>
     <summary className={styles.summary}>
       {tools.length} tool {tools.length === 1 ? 'call' : 'calls'}:{' '}

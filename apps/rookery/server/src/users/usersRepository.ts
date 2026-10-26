@@ -30,6 +30,10 @@ const toUser = (row: UserRow): User => ({
   thumb: row.thumb,
 })
 
+type UsersRepositorySignInWithPlexProps = { account: PlexAccount; now: Date }
+
+type UsersRepositoryTouchProps = { id: string; now: Date }
+
 @Injectable()
 export class UsersRepository {
   constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
@@ -58,7 +62,7 @@ export class UsersRepository {
    * The user behind a Plex account, created on first sign-in. Each sign-in
    * refreshes the name, email and picture from what Plex says now.
    */
-  signInWithPlex({ account, now }: { account: PlexAccount; now: Date }): User {
+  signInWithPlex({ account, now }: UsersRepositorySignInWithPlexProps): User {
     const at = now.toISOString()
     return this.db.transaction((): User => {
       const login = this.db
@@ -101,7 +105,7 @@ export class UsersRepository {
     })()
   }
 
-  touch({ id, now }: { id: string; now: Date }): void {
+  touch({ id, now }: UsersRepositoryTouchProps): void {
     this.db.prepare('UPDATE users SET last_seen_at = ? WHERE id = ?').run(now.toISOString(), id)
   }
 }

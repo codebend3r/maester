@@ -36,6 +36,8 @@ import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 /** How long main holds an expanded link for the page to answer. */
 export const ASK_TTL_MS = 600_000
 
+type IsSignedInProps = { serverId: string }
+
 type DownloadAsksDeps = {
   store: DownloadsStore
   config: ConfigStore
@@ -51,14 +53,22 @@ type DownloadAsksDeps = {
   /** The downloads as the page reads them, which a confirmation answers. */
   list: () => DesktopReply
   /** Whether the page is signed in to the server, so main has an account to ask with. */
-  isSignedIn: (input: { serverId: string }) => boolean
+  isSignedIn: (input: IsSignedInProps) => boolean
 }
 
+type AskProps = { serverId: string; target: DownloadTarget }
+
+type RetryAskProps = { askId: string }
+
+type ConfirmProps = { askId: string; autoDelete: boolean }
+
+type DeclineProps = { askId: string }
+
 export type DownloadAsks = {
-  ask: (input: { serverId: string; target: DownloadTarget }) => Promise<DesktopReply>
-  retryAsk: (input: { askId: string }) => Promise<DesktopReply>
-  confirm: (input: { askId: string; autoDelete: boolean }) => Promise<DesktopReply>
-  decline: (input: { askId: string }) => DesktopReply
+  ask: (input: AskProps) => Promise<DesktopReply>
+  retryAsk: (input: RetryAskProps) => Promise<DesktopReply>
+  confirm: (input: ConfirmProps) => Promise<DesktopReply>
+  decline: (input: DeclineProps) => DesktopReply
   /** Drops every held ask. */
   clear: () => void
 }
@@ -77,19 +87,21 @@ const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refu
 const isStorable = ({ media }: ExpandedFile): boolean =>
   isMediaId(media.id) && isContainerName(media.container) && isFileSize(media.size)
 
+type EntryOfProps = {
+  file: ExpandedFile
+  downloadId: string
+  serverId: string
+  autoDelete: boolean
+  createdAt: number
+}
+
 const entryOf = ({
   file,
   downloadId,
   serverId,
   autoDelete,
   createdAt,
-}: {
-  file: ExpandedFile
-  downloadId: string
-  serverId: string
-  autoDelete: boolean
-  createdAt: number
-}): DownloadEntry => ({
+}: EntryOfProps): DownloadEntry => ({
   downloadId,
   serverId,
   mediaId: file.media.id,
@@ -153,14 +165,18 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     }
   }
 
+  type StatusOfProps = {
+    expansion: Expansion
+    serverName: string
+  }
+
   /** The ask's status, or why there is no ask to hold. */
   const statusOf = async ({
     expansion,
     serverName,
-  }: {
-    expansion: Expansion
-    serverName: string
-  }): Promise<{ ok: true; status: DownloadAskStatus } | { ok: false; message: string }> => {
+  }: StatusOfProps): Promise<
+    { ok: true; status: DownloadAskStatus } | { ok: false; message: string }
+  > => {
     if (expansion.ok) {
       const unstorable = expansion.files.find((file) => !isStorable(file))
       if (unstorable !== undefined) {
@@ -188,15 +204,13 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     }
   }
 
-  const askReply = ({
-    askId,
-    server,
-    status,
-  }: {
+  type AskReplyProps = {
     askId: string
     server: Server
     status: DownloadAskStatus
-  }): DesktopReply => ({
+  }
+
+  const askReply = ({ askId, server, status }: AskReplyProps): DesktopReply => ({
     type: DESKTOP_REPLIES.downloadAsk,
     ask: {
       askId,
@@ -207,16 +221,14 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     },
   })
 
-  /** Holds the ask until the page signs in; a confirmation meanwhile is refused with why. */
-  const holdForAccount = ({
-    askId,
-    server,
-    target,
-  }: {
+  type HoldForAccountProps = {
     askId: string
     server: Server
     target: DownloadTarget
-  }): DesktopReply => {
+  }
+
+  /** Holds the ask until the page signs in; a confirmation meanwhile is refused with why. */
+  const holdForAccount = ({ askId, server, target }: HoldForAccountProps): DesktopReply => {
     const expansion: Expansion = {
       ok: false,
       reason: EXPAND_REASONS.account,
@@ -226,16 +238,18 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     return askReply({ askId, server, status: { kind: DOWNLOAD_ASK_KINDS.account } })
   }
 
+  type ExpandUnderProps = {
+    askId: string
+    server: Server
+    target: DownloadTarget
+  }
+
   /** Expands `target` and holds it under `askId`; a refusal holds nothing, so a retry of it is gone. */
   const expandUnder = async ({
     askId,
     server,
     target,
-  }: {
-    askId: string
-    server: Server
-    target: DownloadTarget
-  }): Promise<DesktopReply> => {
+  }: ExpandUnderProps): Promise<DesktopReply> => {
     const { serverId, serverName } = server
     // Main lists the files with the page's account, so a page signed out signs in first.
     if (!deps.isSignedIn({ serverId })) return holdForAccount({ askId, server, target })
