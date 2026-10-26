@@ -21,16 +21,14 @@ import {
 } from '@raven/core'
 import { Subject } from 'rxjs'
 import { type MockInstance, afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { ACCOUNT_PASS_MS, type PassAccess } from '@/auth/accountPasses'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { type FfmpegStream, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, mediaClockOf } from '@/ffmpeg/probe'
 import { HLS_CAPABILITY_PREFIX, isHlsCapability } from '@/hls/hlsCapability'
-import type { HlsClock } from '@/hls/hlsClock'
 import {
-  HLS_CAPABILITY_MS,
   HLS_INIT_GRACE_MS,
   HLS_SESSION_CAP,
-  type HlsAccess,
   type HlsSession,
   HlsSessions,
   segmentsPastKeeping,
@@ -40,6 +38,7 @@ import { type SegmentPlan, remuxPlan, transcodePlan } from '@/hls/segmentPlan'
 import { HLS_SEGMENT_WAIT_MS, RUN_EVENTS, RUN_SIGNALS } from '@/hls/segmentRun'
 import { eventually, testConfig } from '@/test/app'
 import { AUTH_TEST_IDS } from '@/test/auth'
+import { manualClock } from '@/test/clock'
 import { encodeClip, encodeRichClip } from '@/test/clips'
 import { mdatOf, videoTfdt } from '@/test/mp4'
 
@@ -88,30 +87,6 @@ class WatchedFfmpeg extends FfmpegService {
       .map(({ child }) => child)
       .filter((child) => child.exitCode === null && child.signalCode === null)
   }
-}
-
-/** A clock that moves only when the test says, firing what falls due. */
-const manualClock = () => {
-  const state = { now: 0, timers: new Set<{ at: number; run: () => void }>() }
-  const clock: HlsClock = {
-    now: () => state.now,
-    after: ({ ms, run: fire }) => {
-      const timer = { at: state.now + ms, run: fire }
-      state.timers.add(timer)
-      return () => {
-        state.timers.delete(timer)
-      }
-    },
-  }
-  const advance = (ms: number): void => {
-    state.now += ms
-    const due = [...state.timers].filter((timer) => timer.at <= state.now)
-    due.forEach((timer) => {
-      state.timers.delete(timer)
-      timer.run()
-    })
-  }
-  return { clock, advance, pending: () => state.timers.size }
 }
 
 type ArgAfterProps = { args: string[]; flag: string }
@@ -243,7 +218,7 @@ describe('HlsSessions', () => {
     startTime?: number
     frameRate?: number | null
     keyframesFor?: (() => readonly number[] | null) | null
-    access?: HlsAccess | null
+    access?: PassAccess | null
   }
 
   const mintIn = ({
@@ -1001,7 +976,7 @@ describe('HlsSessions', () => {
         capability: sessions.get({ mediaId: 1, session: session.id, key: capability }) !== null,
         plain: sessions.get({ mediaId: 1, session: plain.id }) !== null,
       })
-      const hourly = Array.from({ length: HLS_CAPABILITY_MS / HOUR_MS - 1 }, () => {
+      const hourly = Array.from({ length: ACCOUNT_PASS_MS / HOUR_MS - 1 }, () => {
         advance(HOUR_MS)
         return isOpen()
       })

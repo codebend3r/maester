@@ -21,10 +21,11 @@ import type { createTokenVerifier } from '@/auth/tokenVerifier'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import type { HlsSource } from '@/ffmpeg/hlsArgs'
-import type { HlsClock } from '@/hls/hlsClock'
 import { HlsSessions } from '@/hls/hlsSessions'
+import { FilePasses } from '@/media/filePasses'
 import { testConfig } from '@/test/app'
 import { AUTH_TEST_CONFIG, AUTH_TEST_FAILURES, AUTH_TEST_IDS, authFixture } from '@/test/auth'
+import { STILL_CLOCK } from '@/test/clock'
 
 const RECHECK_MS = 60_000
 /** Longer than one recheck, so a test sees a recheck pass before the token runs out. */
@@ -279,8 +280,6 @@ describe('an HLS session opened with an account ticket', () => {
     bitrate: null,
     tonemap: false,
   }
-  /** No session rests or is forgotten here: only its account's rechecks end it. */
-  const STILL: HlsClock = { now: () => Date.now(), after: () => () => undefined }
   /** Each test's sessions and data folder, let go once it is done. */
   const made: { sessions: HlsSessions[]; dirs: string[] } = { sessions: [], dirs: [] }
 
@@ -299,7 +298,8 @@ describe('an HLS session opened with an account ticket', () => {
     const hls = new HlsSessions(
       config,
       new FfmpegService(config, { playback: () => DEFAULT_PLAYBACK_SETTINGS }),
-      STILL,
+      // No session rests or is forgotten here: only its account's rechecks end it.
+      STILL_CLOCK,
     )
     made.sessions = [...made.sessions, hls]
     made.dirs = [...made.dirs, dataDir]
@@ -341,6 +341,51 @@ describe('an HLS session opened with an account ticket', () => {
 
   it('keeps the session through an outage until the last-known token expires', async () => {
     const { fixture, isOpen } = await minted()
+    fixture.state.failure = AUTH_TEST_FAILURES.network
+    await vi.advanceTimersByTimeAsync(TOKEN_MS - 1)
+    expect(isOpen()).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(isOpen()).toBe(false)
+  })
+})
+
+describe("a direct file's pass, held by the account ticket that opened it", () => {
+  const TICKET = 'account.0123456789abcdefghijklmnopqrstuvwxyzABCDEFG'
+  const MEDIA = 1
+
+  /** A pass held as the friend's ticket's first `file` request holds it, and whether it still opens the file. */
+  const held = async () => {
+    const env = await setup()
+    // Only the account's rechecks end it here: its deadline never comes.
+    const passes = new FilePasses(STILL_CLOCK, env.sessions, env.rechecks)
+    const request = {}
+    env.sessions.bindTicket({ request, session: await env.signIn(), unlockedUntil: null })
+    passes.hold({ request, ticket: TICKET, mediaId: MEDIA })
+    const isOpen = (): boolean => passes.grantOf({ ticket: TICKET, mediaId: MEDIA }) !== null
+    return { ...env, isOpen }
+  }
+
+  it('ends the pass at the next recheck once the account is removed', async () => {
+    const { isOpen, setStatus } = await held()
+    await vi.advanceTimersByTimeAsync(RECHECK_MS / 2)
+    setStatus({ status: MEMBER_STATUSES.revoked })
+    await vi.advanceTimersByTimeAsync(RECHECK_MS / 2 - 1)
+    expect(isOpen()).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(isOpen()).toBe(false)
+  })
+
+  it('ends the pass at the next recheck when the lookup answers for another account', async () => {
+    const { fixture, isOpen } = await held()
+    fixture.state.failure = AUTH_TEST_FAILURES.wrongAccount
+    await vi.advanceTimersByTimeAsync(RECHECK_MS - 1)
+    expect(isOpen()).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(isOpen()).toBe(false)
+  })
+
+  it('keeps the pass through an outage until the last-known token expires', async () => {
+    const { fixture, isOpen } = await held()
     fixture.state.failure = AUTH_TEST_FAILURES.network
     await vi.advanceTimersByTimeAsync(TOKEN_MS - 1)
     expect(isOpen()).toBe(true)

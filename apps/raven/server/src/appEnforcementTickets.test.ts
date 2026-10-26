@@ -239,23 +239,26 @@ describe('account tickets on the media paths', () => {
     }
   })
 
-  it('keeps a ticket minted past the PIN playing after the owner locks again, until it expires', async () => {
+  it('keeps a ticket minted past the PIN playing after the owner locks again: on its pass once it opened its file, else until it expires', async () => {
     await setLocked({ isLocked: true })
     try {
       const unlocked = await unlockAsOwner({ headers: await owner() })
-      const ticket = await ticketOf({ route: ROUTES.accountTicket, headers: unlocked })
+      const played = await ticketOf({ route: ROUTES.accountTicket, headers: unlocked })
+      const unplayed = await ticketOf({ route: ROUTES.accountTicket, headers: unlocked })
       const relocked = await plane.app.inject({
         method: ROUTES.relock.method,
         url: ROUTES.relock.path,
         headers: unlocked,
       })
       expect(relocked.statusCode).toBeLessThan(300)
-      expect((await redeem({ ticket, headers: FIRST_BYTES })).statusCode).toBe(206)
+      expect((await redeem({ ticket: played, headers: FIRST_BYTES })).statusCode).toBe(206)
       vi.useFakeTimers({ toFake: ['Date'] })
       try {
         vi.setSystemTime(Date.now() + TICKET_MS + 1_000)
+        // The pass carries the unlock the ticket was minted under, as an HLS session's capability does.
+        expect((await redeem({ ticket: played, headers: FIRST_BYTES })).statusCode).toBe(206)
         expect(
-          outcomeOf({ response: await redeem({ ticket, headers: FIRST_BYTES }) }),
+          outcomeOf({ response: await redeem({ ticket: unplayed, headers: FIRST_BYTES }) }),
         ).toMatchObject({ status: 401, reason: AUTH_REFUSALS.signedOut })
       } finally {
         vi.useRealTimers()

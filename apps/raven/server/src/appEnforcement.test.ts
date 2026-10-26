@@ -22,6 +22,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { createApp } from '@/app'
 import { CONTROLLERS } from '@/appModule'
 import { ACCOUNT_REQUIREMENTS } from '@/auth/accountGuard'
+import { PASS_KINDS } from '@/auth/accountPasses'
 import { AuthSessions } from '@/auth/authSessions'
 import { MEMBERSHIP_TTL_MS } from '@/auth/membershipLookups'
 import { RAVEN_CACHE_POLICIES } from '@/http'
@@ -50,8 +51,8 @@ import {
 } from '@/test/auth'
 import {
   CALLER_KINDS,
-  HLS_CAPABILITY_ROUTES,
   type CallerKind,
+  PASS_ROUTES,
   ROUTES,
   type Route,
   TOKEN_CARRIERS,
@@ -143,12 +144,16 @@ it('declares every route exactly as the inventory says', () => {
 /** The open routes whose address is their own permission: they answer only a current version. */
 const CAPABILITY_ROUTES: ReadonlySet<Route> = new Set([ROUTES.itemPicture, ROUTES.photoPicture])
 
-it("opens only an HLS session's own routes to its capability", () => {
-  const opened = routeMarks(CONTROLLERS)
-    .filter(({ isOpenedByCapability }) => isOpenedByCapability)
-    .map(({ method, path, account }) => ({ method, path, account }))
-    .toSorted(byRoute)
-  expect(opened).toEqual(HLS_CAPABILITY_ROUTES.toSorted(byRoute))
+it("opens only an HLS session's own routes to its capability, and only `file` to a ticket's pass", () => {
+  const marks = routeMarks(CONTROLLERS)
+  const kinds = Object.values(PASS_KINDS)
+  const opened = kinds.map((kind) =>
+    marks
+      .filter(({ pass }) => pass === kind)
+      .map(({ method, path, account }) => ({ method, path, account }))
+      .toSorted(byRoute),
+  )
+  expect(opened).toEqual(kinds.map((kind) => PASS_ROUTES[kind].toSorted(byRoute)))
 })
 
 describe('the default-deny gate', () => {

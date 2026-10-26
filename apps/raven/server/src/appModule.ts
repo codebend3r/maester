@@ -23,7 +23,7 @@ import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { BrowseController } from '@/fs/browseController'
 import { HealthController } from '@/health/healthController'
 import { HlsController } from '@/hls/hlsController'
-import { HLS_CLOCK, SYSTEM_CLOCK } from '@/hls/hlsClock'
+import { CLOCK, SYSTEM_CLOCK } from '@/clock'
 import { HlsSessions } from '@/hls/hlsSessions'
 import { KeyframesService } from '@/hls/keyframesService'
 import { ItemsController } from '@/items/itemsController'
@@ -38,10 +38,11 @@ import { RatingsRefresh } from '@/libraries/ratingsRefresh'
 import { LockController } from '@/lock/lockController'
 import { LockGuard } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
-import { FavouritesController } from '@/media/favouritesController'
 import { HeroController } from '@/hero/heroController'
 import { HeroRepository } from '@/hero/heroRepository'
 import { HeroSelection } from '@/hero/heroSelection'
+import { FavouritesController } from '@/media/favouritesController'
+import { FilePasses } from '@/media/filePasses'
 import { HomeController } from '@/media/homeController'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaController } from '@/media/mediaController'
@@ -224,8 +225,9 @@ export class AppModule {
         ThumbnailService,
         TracksService,
         KeyframesService,
-        { provide: HLS_CLOCK, useValue: SYSTEM_CLOCK },
+        { provide: CLOCK, useValue: SYSTEM_CLOCK },
         HlsSessions,
+        FilePasses,
         SubtitlesService,
         MediaArtifacts,
         ScannerService,

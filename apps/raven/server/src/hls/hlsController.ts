@@ -25,13 +25,13 @@ import {
 import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, wholeNumber } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AccessRechecks } from '@/auth/accessRechecks'
+import { OpenedByPass, PASS_KINDS, ticketAccessOf } from '@/auth/accountPasses'
 import { authFailure } from '@/auth/authFailure'
-import { AuthSessions, CALLERS } from '@/auth/authSessions'
+import { AuthSessions } from '@/auth/authSessions'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
-import { OpenedByCapability } from '@/hls/hlsCapability'
 import { type HlsPath, sessionUris } from '@/hls/hlsUris'
-import { type HlsAccess, type HlsSession, HlsSessions, noSuchSession } from '@/hls/hlsSessions'
+import { type HlsSession, HlsSessions, noSuchSession } from '@/hls/hlsSessions'
 import { KeyframesService } from '@/hls/keyframesService'
 import {
   masterPlaylist,
@@ -217,7 +217,8 @@ export class HlsController {
         tonemap,
       },
       keyframesFor,
-      access: this.accessOf({ request }),
+      // Only an account ticket's session has a pass; any other caller's needs no capability.
+      access: ticketAccessOf({ request, callers: this.callers, rechecks: this.rechecks }),
     })
 
     const uris = sessionUris({ session, key: keyFor({ session, ticket }) })
@@ -243,7 +244,7 @@ export class HlsController {
 
   /** Every segment of the session's plan, behind its init. */
   @MediaPlane()
-  @OpenedByCapability()
+  @OpenedByPass(PASS_KINDS.capability)
   @Get(routeOf(HLS_PATHS.video))
   async video(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
@@ -261,7 +262,7 @@ export class HlsController {
   }
 
   @MediaPlane()
-  @OpenedByCapability()
+  @OpenedByPass(PASS_KINDS.capability)
   @Get(routeOf(HLS_PATHS.init))
   async init(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
@@ -281,7 +282,7 @@ export class HlsController {
   }
 
   @MediaPlane()
-  @OpenedByCapability()
+  @OpenedByPass(PASS_KINDS.capability)
   @Get(routeOf(HLS_PATHS.segment))
   async segment(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
@@ -305,7 +306,7 @@ export class HlsController {
 
   /** A text subtitle track as six-second WebVTT segments, timed as the video playlist is. */
   @MediaPlane()
-  @OpenedByCapability()
+  @OpenedByPass(PASS_KINDS.capability)
   @Get(routeOf(HLS_PATHS.subtitles))
   async subtitlePlaylist(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
@@ -334,7 +335,7 @@ export class HlsController {
    * onto the file's own clock, which the video keeps.
    */
   @MediaPlane()
-  @OpenedByCapability()
+  @OpenedByPass(PASS_KINDS.capability)
   @Get(routeOf(HLS_PATHS.subtitleSegment))
   async subtitleSegment(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
@@ -400,21 +401,6 @@ export class HlsController {
     const opened = isHlsSessionId(session) ? this.sessions.get({ mediaId: id, session, key }) : null
     if (!opened) throw noSuchSession()
     return opened
-  }
-
-  /**
-   * What a session opened by `request` stands for: the account and unlock
-   * of the account ticket that opened it, rechecked as an open response's
-   * is, or null for any other caller, whose session needs no capability.
-   */
-  private accessOf({ request }: { request: FastifyRequest }): HlsAccess | null {
-    const caller = this.callers.callerOf({ request })
-    if (caller.kind !== CALLERS.ticket) return null
-    return {
-      account: caller.session.account,
-      unlockedUntil: caller.unlockedUntil,
-      ended: this.rechecks.ended({ request }),
-    }
   }
 
   /** A track a rendition can show: a picture track has none. */

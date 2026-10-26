@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { ServiceUnavailableException } from '@nestjs/common'
 import { FFMPEG_SIGNALS, type FfmpegStream } from '@/ffmpeg/ffmpegService'
-import type { HlsClock } from '@/hls/hlsClock'
+import type { Clock } from '@/clock'
 import { segmentNumberOf } from '@/hls/segmentFiles'
 
 /** How many segments a run may finish past the furthest one asked for before it is paused. */
@@ -43,7 +43,7 @@ type SegmentRunProps = {
   from: number
   /** The plan's last segment, after which the run ends rather than pauses. */
   last: number
-  clock: HlsClock
+  clock: Clock
   /** Told of each segment the run finishes, and its file. */
   onSegment: ({ n, path }: OnSegmentProps) => void
   /** Told once ffmpeg has exited, whether it finished or was killed. */
@@ -62,7 +62,7 @@ export class SegmentRun {
   private readonly child: FfmpegStream
   private readonly folder: string
   private readonly last: number
-  private readonly clock: HlsClock
+  private readonly clock: Clock
   private readonly onSegment: ({ n, path }: OnSegmentProps) => void
   private readonly onEnd: () => void
   /** The next segment it finishes. */

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
+  AUTH_HEADERS,
   HLS_PARAMS,
   HLS_PATHS,
   MEDIA_PROBE_BYTES,
@@ -11,7 +12,7 @@ import {
   isMediaTicket,
 } from '@raven/core'
 import { CONTENT_TYPES, ENCODINGS, HEADERS, HTTP_METHODS, CACHE_POLICIES } from '@shared/server'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import type { ServerConfig } from '@/config'
 import { MediaIndex } from '@/media/mediaIndex'
@@ -429,6 +430,23 @@ describe('the media plane routes', () => {
       expect(response.statusCode).toBe(200)
       expect(response.headers[CORS_HEADERS.allowOrigin]).toBe(NETLIFY)
       expect(response.headers[CORS_HEADERS.exposeHeaders]).toBe(EXPOSED)
+    })
+
+    it('holds no pass with accounts off: a ticket that opened its file is refused once it expires (423)', async () => {
+      const url = `/api/media/${locked()}/file?t=${await ticketFor(locked())}`
+      const range = { [HEADERS.range]: 'bytes=0-99' }
+      expect((await asBrowser({ url, headers: range })).statusCode).toBe(206)
+      vi.useFakeTimers({ toFake: ['Date'] })
+      try {
+        vi.setSystemTime(Date.now() + SIX_HOURS + 1_000)
+        const expired = await asBrowser({
+          url,
+          headers: { ...range, [AUTH_HEADERS.cookie]: on().admin },
+        })
+        expect(expired.statusCode).toBe(423)
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('refuses the stream with a ticket for another video, an expired one and a tampered one (423)', async () => {

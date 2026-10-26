@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import { ACCOUNT_TICKET_SECONDS, AUTH_REFUSALS, type MediaTicket } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
+import type { PassGrant } from '@/auth/accountPasses'
 import { authFailure } from '@/auth/authFailure'
 import { AUTH_ENCODINGS } from '@/auth/accessToken'
 import { AuthSessions, CALLERS, requireApproved } from '@/auth/authSessions'
@@ -12,8 +13,6 @@ const TICKET_MS = ACCOUNT_TICKET_SECONDS * 1000
 const MAX_TICKETS = 2048
 const MAX_ACCOUNT_TICKETS = 32
 
-type Session = ReturnType<AuthSessions['sessionOf']>
-
 type Entry = {
   id: number
   accountId: string
@@ -21,9 +20,6 @@ type Entry = {
   expiresAt: number
   unlockedUntil: number | null
 }
-
-/** What a redeemed ticket stands for: the session it was minted from, rechecked, and the PIN unlock it was minted under. */
-type Redemption = { session: Session; unlockedUntil: number | null }
 
 type AccountTicketsIssueProps = {
   id: number
@@ -84,15 +80,24 @@ export class AccountTickets {
     return { ticket, expiresAt }
   }
 
-  async redeem({ ticket, id, now = Date.now() }: AccountTicketsRedeemProps): Promise<Redemption> {
+  /**
+   * What a live ticket for media `id` stands for: the account of the
+   * session it was minted from, rechecked, and the PIN unlock it was minted
+   * under. Null for a ticket that opens nothing (unknown, for another
+   * media, or expired), which may still have a pass; a refused account
+   * throws its refusal.
+   */
+  async redeem({
+    ticket,
+    id,
+    now = Date.now(),
+  }: AccountTicketsRedeemProps): Promise<PassGrant | null> {
     const entry = this.entries.get(ticket)
-    if (entry === undefined || entry.id !== id || entry.expiresAt <= now) {
-      throw authFailure(AUTH_REFUSALS.signedOut)
-    }
+    if (entry === undefined || entry.id !== id || entry.expiresAt <= now) return null
     // Recheck with the user's JWT on every redemption, so removal takes effect
     // before the next range, stream or subtitle request, without privileged keys.
-    const session = await this.sessions.authenticate({ token: entry.token })
-    requireApproved(session.account)
-    return { session, unlockedUntil: entry.unlockedUntil }
+    const { account } = await this.sessions.authenticate({ token: entry.token })
+    requireApproved(account)
+    return { account, unlockedUntil: entry.unlockedUntil }
   }
 }

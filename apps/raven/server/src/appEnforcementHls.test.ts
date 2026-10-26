@@ -17,9 +17,9 @@ import {
   toQueryString,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { ACCOUNT_PASS_MS } from '@/auth/accountPasses'
 import { MEMBERSHIP_TTL_MS } from '@/auth/membershipLookups'
 import { HLS_CAPABILITY_PREFIX } from '@/hls/hlsCapability'
-import { HLS_CAPABILITY_MS } from '@/hls/hlsSessions'
 import { cookieSet, eventually, routePath } from '@/test/app'
 import { AUTH_TEST_FAILURES, AUTH_TEST_IDS, authFixture, bearerHeaders } from '@/test/auth'
 import {
@@ -269,6 +269,52 @@ describe("an account's HLS session", () => {
     status: typeof MEMBER_STATUSES.approved | typeof MEMBER_STATUSES.revoked
   }) => plane.ownerApi.setMemberStatus({ id, change: { status } })
 
+  // These move the clock ahead and back first, so a membership answer cached while it was ahead
+  // must never hide what the tests after them check.
+  it("carries the owner's PIN unlock into the session, and answers 423 once it lapses", async () => {
+    await setLocked({ isLocked: true })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const start = Date.now()
+      const owner = bearerHeaders({
+        token: await fixture.mint({ id: AUTH_TEST_IDS.owner, expiresIn: LONG_TOKEN_SECONDS }),
+      })
+      const { headers, lapsesAt } = await unlockAsOwner({ headers: owner })
+      // Opened a minute after the unlock, so the capability's deadline falls after the unlock lapses.
+      vi.setSystemTime(start + 60_000)
+      const opened = await open({ caller: CALLER_KINDS.owner, id: plane.ids.video, headers })
+      const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
+      expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
+      vi.setSystemTime(lapsesAt)
+      expect(await statusesOf({ urls })).toEqual(urls.map(() => LOCKED_STATUS))
+    } finally {
+      vi.useRealTimers()
+      await setLocked({ isLocked: false })
+    }
+  })
+
+  it('ends the session at its capability deadline, however busy it kept', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const start = Date.now()
+      const member = bearerHeaders({
+        token: await fixture.mint({ id: AUTH_TEST_IDS.friend, expiresIn: LONG_TOKEN_SECONDS }),
+      })
+      const opened = await open({
+        caller: CALLER_KINDS.member,
+        id: plane.ids.video,
+        headers: member,
+      })
+      const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
+      vi.setSystemTime(start + ACCOUNT_PASS_MS - 1)
+      expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
+      vi.setSystemTime(start + ACCOUNT_PASS_MS)
+      expect(await statusesOf({ urls })).toEqual([404, 404, 404, 404, 404])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('names its own capability on every URI, never the ticket, and plays on it alone', async () => {
     const first = await open({ caller: CALLER_KINDS.member, id: plane.ids.video })
     const second = await open({ caller: CALLER_KINDS.member, id: plane.ids.video })
@@ -484,51 +530,5 @@ describe("an account's HLS session", () => {
       fixture.state.failure = AUTH_TEST_FAILURES.none
     }
     expect((await get({ url: video })).statusCode).toBe(404)
-  })
-
-  // The clock jumps ahead from here on, and a membership answer cached ahead of real time is
-  // reused until real time catches up, so these come last.
-  it("carries the owner's PIN unlock into the session, and answers 423 once it lapses", async () => {
-    await setLocked({ isLocked: true })
-    vi.useFakeTimers({ toFake: ['Date'] })
-    try {
-      const start = Date.now()
-      const owner = bearerHeaders({
-        token: await fixture.mint({ id: AUTH_TEST_IDS.owner, expiresIn: LONG_TOKEN_SECONDS }),
-      })
-      const { headers, lapsesAt } = await unlockAsOwner({ headers: owner })
-      // Opened a minute after the unlock, so the capability's deadline falls after the unlock lapses.
-      vi.setSystemTime(start + 60_000)
-      const opened = await open({ caller: CALLER_KINDS.owner, id: plane.ids.video, headers })
-      const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
-      expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
-      vi.setSystemTime(lapsesAt)
-      expect(await statusesOf({ urls })).toEqual(urls.map(() => LOCKED_STATUS))
-    } finally {
-      vi.useRealTimers()
-      await setLocked({ isLocked: false })
-    }
-  })
-
-  it('ends the session at its capability deadline, however busy it kept', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] })
-    try {
-      const start = Date.now()
-      const member = bearerHeaders({
-        token: await fixture.mint({ id: AUTH_TEST_IDS.friend, expiresIn: LONG_TOKEN_SECONDS }),
-      })
-      const opened = await open({
-        caller: CALLER_KINDS.member,
-        id: plane.ids.video,
-        headers: member,
-      })
-      const urls = sessionRoutes({ id: opened.id, session: opened.session, key: opened.capability })
-      vi.setSystemTime(start + HLS_CAPABILITY_MS - 1)
-      expect(await statusesOf({ urls })).toEqual([200, 200, 200, 200, 200])
-      vi.setSystemTime(start + HLS_CAPABILITY_MS)
-      expect(await statusesOf({ urls })).toEqual([404, 404, 404, 404, 404])
-    } finally {
-      vi.useRealTimers()
-    }
   })
 })
