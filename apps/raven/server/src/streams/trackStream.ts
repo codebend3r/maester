@@ -1,6 +1,6 @@
 import type { PlaybackMode, StreamQuality } from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
-import type { AccessRechecks } from '@/auth/accessRechecks'
+import type { Observable } from 'rxjs'
 import { type AuthSessions, accountOf } from '@/auth/authSessions'
 import { RAVEN_HEADERS } from '@/http'
 import type { StreamClient, StreamSessions } from '@/streams/streamSessions'
@@ -34,7 +34,8 @@ export const clientOf = ({ request, auth }: ClientOfProps): StreamClient => {
 
 type TrackStreamProps = {
   sessions: StreamSessions
-  rechecks: Pick<AccessRechecks, 'ended'>
+  /** What ends the response: emits once its access is gone. */
+  ended: Observable<void>
   auth: Pick<AuthSessions, 'callerOf'>
   mediaId: number
   mode: PlaybackMode
@@ -46,13 +47,14 @@ type TrackStreamProps = {
 
 /**
  * Registers a media response as part of its client's stream until it
- * closes, and destroys it once its account loses access. Destroyed, never
- * ended: a clean end short of the length promised leaves the client
- * waiting on the rest, while a reset makes it ask again by range.
+ * closes, and destroys it once `ended` emits: its account's recheck, and on
+ * `file` the end of the pass that opened it too. Destroyed, never ended: a
+ * clean end short of the length promised leaves the client waiting on the
+ * rest, while a reset makes it ask again by range.
  */
 export const trackStream = ({
   sessions,
-  rechecks,
+  ended,
   auth,
   mediaId,
   mode,
@@ -76,9 +78,9 @@ export const trackStream = ({
     client: clientOf({ request, auth }),
     connection,
   })
-  const recheck = rechecks.ended({ request }).subscribe(() => connection.close())
+  const watch = ended.subscribe(() => connection.close())
   reply.raw.on(RESPONSE_EVENTS.close, () => {
     release()
-    recheck.unsubscribe()
+    watch.unsubscribe()
   })
 }

@@ -466,7 +466,7 @@ describe('the media plane routes', () => {
         (
           await asBrowser({
             url: `/api/media/${locked()}/file`,
-            headers: { ...range, cookie: admin },
+            headers: { ...range, [AUTH_HEADERS.cookie]: admin },
           })
         ).statusCode,
       ).toBe(423)

@@ -25,9 +25,10 @@ import {
 import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, wholeNumber } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AccessRechecks } from '@/auth/accessRechecks'
-import { OpenedByPass, PASS_KINDS, ticketAccessOf } from '@/auth/accountPasses'
+import { OpenedByPass, PASS_KINDS } from '@/auth/accountPasses'
 import { authFailure } from '@/auth/authFailure'
 import { AuthSessions } from '@/auth/authSessions'
+import { TicketAccesses } from '@/auth/ticketAccesses'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
 import { type HlsPath, sessionUris } from '@/hls/hlsUris'
@@ -44,7 +45,7 @@ import { subtitleSegmentVtt, subtitleSpanOf, subtitleWindowsOf } from '@/hls/sub
 import { variantOf, videoStringOf } from '@/hls/variant'
 import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { PrivateBy } from '@/lock/lockGuard'
-import { LockService, PRIVACIES } from '@/lock/lockService'
+import { PRIVACIES } from '@/lock/lockService'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import {
@@ -139,7 +140,7 @@ export class HlsController {
     @Inject(HlsSessions) private readonly sessions: HlsSessions,
     @Inject(StreamSessions) private readonly streams: StreamSessions,
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
-    @Inject(LockService) private readonly lock: LockService,
+    @Inject(TicketAccesses) private readonly accesses: Pick<TicketAccesses, 'accessOf'>,
     @Inject(AuthSessions) private readonly callers: AuthSessions,
   ) {}
 
@@ -219,13 +220,7 @@ export class HlsController {
       },
       keyframesFor,
       // Only an account ticket's session has a pass; any other caller's needs no capability.
-      access: ticketAccessOf({
-        request,
-        mediaId: id,
-        callers: this.callers,
-        rechecks: this.rechecks,
-        lock: this.lock,
-      }),
+      access: this.accesses.accessOf({ request, mediaId: id }),
     })
 
     const uris = sessionUris({ session, key: keyFor({ session, ticket }) })
@@ -452,7 +447,7 @@ export class HlsController {
     if (body == null) return
     trackStream({
       sessions: this.streams,
-      rechecks: this.rechecks,
+      ended: this.rechecks.ended({ request }),
       auth: this.callers,
       mediaId: session.mediaId,
       mode: session.mode,

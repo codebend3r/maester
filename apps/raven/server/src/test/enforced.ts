@@ -15,6 +15,7 @@ import {
   PICTURE_PATHS,
   createApiClient,
   isAuthRefusal,
+  isMediaTicket,
 } from '@raven/core'
 import { CACHE_POLICIES, CONTENT_TYPES, HEADERS } from '@shared/server'
 import { createApp } from '@/app'
@@ -24,7 +25,7 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
-import { NOT_WATCHING, ROUTE_METHODS, testConfig } from '@/test/app'
+import { NOT_WATCHING, ROUTE_METHODS, cookieSet, testConfig } from '@/test/app'
 import {
   AUTH_TEST_CONFIG,
   AUTH_TEST_IDS,
@@ -279,6 +280,9 @@ export const outcomeOf = ({
   }
 }
 
+/** The movies library `createEnforcedApp` makes. */
+const LIBRARY_NAME = 'Enforced'
+
 const MATRIX = { id: 603, title: 'The Matrix', released: '1999-03-31' } as const
 
 const ANDOR: FakeShow = {
@@ -355,7 +359,7 @@ export const createEnforcedApp = async ({
     accessToken: () => ownerToken,
   })
   const library = await ownerApi.createLibrary({
-    name: 'Enforced',
+    name: LIBRARY_NAME,
     paths: [mediaDir],
     settings: { kind: LIBRARY_KINDS.movies },
   })
@@ -452,4 +456,101 @@ export const addLeftovers = async ({ enforced }: AddLeftoversProps): Promise<Lef
     throw new Error('The enforced movies library did not list its extra files')
   }
   return { unmatched: unmatched.id, duplicate: duplicate.media.id }
+}
+
+/**
+ * Two days: a token that outlives every jump of a test's clock and every
+ * unlock, so no recheck ends what it opened for want of a live one.
+ */
+export const LONG_TOKEN_SECONDS = 2 * 24 * 60 * 60
+
+type Enforced = Awaited<ReturnType<typeof createEnforcedApp>>
+
+/** The ticket `route` mints for media `id` with `headers`: an account ticket, or the legacy one. */
+export const mintedTicket = async ({
+  app,
+  route = ROUTES.accountTicket,
+  id,
+  headers,
+}: {
+  app: NestFastifyApplication
+  route?: typeof ROUTES.accountTicket | typeof ROUTES.mediaTicket
+  id: number
+  headers: Record<string, string>
+}): Promise<string> => {
+  const response = await app.inject({
+    method: route.method,
+    url: pathOf({ route, params: { id } }),
+    headers,
+  })
+  const body: unknown = response.json()
+  if (!isMediaTicket(body)) throw new Error('No ticket was minted')
+  return body.ticket
+}
+
+/**
+ * The PIN's moves on a server `createEnforcedApp` made with `libraryPin`
+ * `pin`: unlocking it, locking it again as the Lock button does, and
+ * locking or opening the movies library past it as the owner.
+ */
+export const pinMoves = ({
+  enforced,
+  fixture,
+  pin,
+}: {
+  enforced: Pick<Enforced, 'app' | 'mediaDir' | 'ids'>
+  fixture: AuthFixture
+  pin: string
+}) => {
+  const { app } = enforced
+  const answered = ({ response, what }: { response: { statusCode: number }; what: string }) => {
+    if (response.statusCode !== 200) throw new Error(`${what} answered ${response.statusCode}`)
+  }
+
+  /** `headers` with the unlock cookie the PIN earns them, and when that unlock lapses. */
+  const unlock = async ({ headers }: { headers: Record<string, string> }) => {
+    const response = await app.inject({
+      method: ROUTES.unlock.method,
+      url: ROUTES.unlock.path,
+      headers,
+      payload: { pin },
+    })
+    answered({ response, what: 'The unlock' })
+    const cookie = cookieSet(response)
+    const [, value = ''] = cookie.split('=')
+    const [expires = ''] = value.split('.')
+    return { headers: { ...headers, [AUTH_HEADERS.cookie]: cookie }, lapsesAt: Number(expires) }
+  }
+
+  /** Locks the PIN again with `headers`, as the Lock button does. */
+  const relock = async ({ headers }: { headers: Record<string, string> }): Promise<void> => {
+    const response = await app.inject({
+      method: ROUTES.relock.method,
+      url: ROUTES.relock.path,
+      headers,
+    })
+    answered({ response, what: 'The relock' })
+  }
+
+  /** Locks or opens the movies library as the owner, past the PIN, as its settings are changed. */
+  const setLocked = async ({ isLocked }: { isLocked: boolean }): Promise<void> => {
+    const bearer = await headersFor({
+      fixture,
+      caller: CALLER_KINDS.owner,
+      via: TOKEN_CARRIERS.bearer,
+    })
+    const response = await app.inject({
+      method: ROUTES.updateLibrary.method,
+      url: pathOf({ route: ROUTES.updateLibrary, params: { id: enforced.ids.library } }),
+      headers: (await unlock({ headers: bearer })).headers,
+      payload: {
+        name: LIBRARY_NAME,
+        paths: [enforced.mediaDir],
+        settings: { kind: LIBRARY_KINDS.movies, locked: isLocked },
+      },
+    })
+    answered({ response, what: 'The library' })
+  }
+
+  return { unlock, relock, setLocked }
 }

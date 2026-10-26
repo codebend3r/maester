@@ -281,7 +281,7 @@ export class AccountGuard implements CanActivate {
   /** Holds the account a ticket or a pass stands for to the route's requirement, and binds it. */
   private admitGrant({ request, grant, requirement }: AccountGuardAdmitGrantProps): void {
     admit({ requirement, account: grant.account })
-    this.sessions.bindTicket({ request, session: grant, unlockedUntil: grant.unlockedUntil })
+    this.sessions.bindTicket({ request, grant })
   }
 
   /** Authenticates Bearer, or the session cookie on a GET or HEAD, and binds its session. */

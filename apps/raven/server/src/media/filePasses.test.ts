@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { ACCOUNT_PASS_MS } from '@/auth/accountPasses'
 import { ACCOUNT_TICKET_PREFIX } from '@/auth/accountTickets'
 import { AuthSessions } from '@/auth/authSessions'
+import { TicketAccesses } from '@/auth/ticketAccesses'
 import type { Clock } from '@/clock'
 import { HLS_CAPABILITY_PREFIX } from '@/hls/hlsCapability'
 import { FILE_PASS_CAP, FILE_PASSES_PER_ACCOUNT, FilePasses } from '@/media/filePasses'
@@ -53,14 +54,14 @@ const setup = ({ clock = manualClock().clock }: { clock?: Clock } = {}) => {
       () =>
         mediaId === LOCKED_MEDIA,
   }
-  const passes = new FilePasses(clock, callers, rechecks, lock)
+  const passes = new FilePasses(clock, new TicketAccesses(callers, rechecks, lock))
   /** A request the account gate bound to an account ticket of `account`'s, minted under `unlockedUntil`. */
   const ticketRequest = ({
     account = FRIEND,
     unlockedUntil = null,
   }: { account?: Account; unlockedUntil?: number | null } = {}) => {
     const request = {}
-    callers.bindTicket({ request, session: { account }, unlockedUntil })
+    callers.bindTicket({ request, grant: { account, unlockedUntil } })
     return request
   }
   /** Holds a fresh ticket of `account`'s on `mediaId`, as its first `file` request does. */
@@ -71,10 +72,15 @@ const setup = ({ clock = manualClock().clock }: { clock?: Clock } = {}) => {
   }: { account?: Account; mediaId?: number; unlockedUntil?: number | null } = {}) => {
     const request = ticketRequest({ account, unlockedUntil })
     const ticket = newTicket()
-    passes.hold({ request, ticket, mediaId })
+    const told = { isEnded: false }
+    passes.hold({ request, ticket, mediaId }).subscribe(() => {
+      told.isEnded = true
+    })
     return {
       ticket,
       mediaId,
+      /** Whether what `hold` answered has told the response the pass ended. */
+      hasEnded: () => told.isEnded,
       isOpen: () => passes.grantOf({ ticket, mediaId }) !== null,
       isWatched: () => watched.get(request)?.observed ?? false,
       end: () => {
@@ -226,5 +232,41 @@ describe('the passes account tickets earn on a direct file', () => {
     expect([locked.isOpen(), locked.isWatched()]).toEqual([false, false])
     expect([unlocked.isOpen(), unlocked.isWatched()]).toEqual([true, true])
     expect(theirs.isOpen()).toBe(true)
+  })
+
+  it('tells the responses a pass opened as it ends, however it ends, and a caller with no pass never', () => {
+    const { clock, advance } = manualClock()
+    const { passes, held, relocks, ticketRequest } = setup({ clock })
+    const relocked = held({ mediaId: LOCKED_MEDIA, unlockedUntil: UNLOCKED_UNTIL })
+    const dropped = held({ mediaId: MEDIA + 1 })
+    const removed = held()
+    const lapsed = held()
+    const request = ticketRequest()
+    const ticket = newTicket()
+    const ranges = [0, 1].map(() => {
+      const range = { isEnded: false }
+      passes.hold({ request, ticket, mediaId: MEDIA }).subscribe(() => {
+        range.isEnded = true
+      })
+      return range
+    })
+    const unpassed = { isEnded: false }
+    passes.hold({ request: {}, ticket: newTicket(), mediaId: MEDIA }).subscribe(() => {
+      unpassed.isEnded = true
+    })
+
+    relocks.next(FRIEND.id)
+    passes.drop({ mediaId: MEDIA + 1 })
+    removed.end()
+    expect([relocked, dropped, removed].map((pass) => pass.hasEnded())).toEqual([true, true, true])
+    expect([lapsed.hasEnded(), ...ranges.map((range) => range.isEnded)]).toEqual([
+      false,
+      false,
+      false,
+    ])
+
+    advance(ACCOUNT_PASS_MS)
+    expect([lapsed.hasEnded(), ...ranges.map((range) => range.isEnded)]).toEqual([true, true, true])
+    expect(unpassed.isEnded).toBe(false)
   })
 })

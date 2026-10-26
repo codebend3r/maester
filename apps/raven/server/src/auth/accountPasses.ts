@@ -2,11 +2,8 @@ import { SetMetadata } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { type Account, isString } from '@raven/core'
 import { sameSecret } from '@shared/server'
-import { type Observable, filter, map } from 'rxjs'
-import type { AccessRechecks } from '@/auth/accessRechecks'
-import { type AuthSessions, CALLERS } from '@/auth/authSessions'
+import type { Observable } from 'rxjs'
 import type { Clock } from '@/clock'
-import type { LockService } from '@/lock/lockService'
 import type { MarkTargets } from '@/routeMarks'
 
 /**
@@ -54,40 +51,6 @@ export type AccountPass = {
   grantFor: ({ given, mediaId }: { given: unknown; mediaId: number }) => PassGrant | null
   /** Ends the pass, once: stops its recheck, its relocks and its timers, and tells its holder. */
   end: () => void
-}
-
-/**
- * What a request an account ticket opened stands for, to open a pass on
- * media `mediaId` with: the account and unlock the ticket carried,
- * rechecked as an open response is, and the PIN's relocks of that account.
- * Null for any other caller, which earns no pass.
- */
-export const ticketAccessOf = ({
-  request,
-  mediaId,
-  callers,
-  rechecks,
-  lock,
-}: {
-  request: object
-  mediaId: number
-  callers: Pick<AuthSessions, 'callerOf'>
-  rechecks: Pick<AccessRechecks, 'ended'>
-  lock: Pick<LockService, 'relocks' | 'unlockNeedOf'>
-}): PassAccess | null => {
-  const caller = callers.callerOf({ request })
-  if (caller.kind !== CALLERS.ticket) return null
-  const { account } = caller.session
-  return {
-    account,
-    unlockedUntil: caller.unlockedUntil,
-    ended: rechecks.ended({ request }),
-    relocked: lock.relocks.pipe(
-      filter((accountId) => accountId === account.id),
-      map(() => undefined),
-    ),
-    needsUnlock: lock.unlockNeedOf({ mediaId }),
-  }
 }
 
 export const openPass = ({

@@ -168,7 +168,7 @@ type HlsSessionsMintProps = {
    */
   keyframesFor: (() => readonly number[] | null) | null
   /** The account an account ticket opened it for; null for any other caller. */
-  access?: PassAccess | null
+  access: PassAccess | null
 }
 
 type HlsSessionsGetProps = { mediaId: number; session: string; key?: unknown }
@@ -288,7 +288,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Opens a session. Nothing runs until a segment is asked for. */
-  mint({ mediaId, asked, source, keyframesFor, access = null }: HlsSessionsMintProps): HlsSession {
+  mint({ mediaId, asked, source, keyframesFor, access }: HlsSessionsMintProps): HlsSession {
     const kept = [...this.entries.values()]
     if (kept.length >= HLS_SESSION_CAP) {
       this.end(
