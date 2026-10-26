@@ -36,6 +36,7 @@ import type { VideoSurface } from '@/layouts/playerKit'
 import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
 import { planFor } from '@/platform/playbackPlan'
 import { mediaSourcesFor } from '@/player/mediaSources'
+import { isServerDrop } from '@/player/playerErrors'
 import { progressSinkFor, watchAppHide } from '@/player/progressSink'
 import {
   AUDIO_HEARINGS,
@@ -152,6 +153,9 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
       }),
     [media, tracks, policy, shouldPreferDirectPlay, isTranscodeAllowed],
   )
+  const [video, dispatchVideo] = useReducer(videoReducer, resumeAt, initialVideoState)
+  const [isPaused, setPaused] = useState(false)
+  const position = useRef(resumeAt)
   const { state, dispatch } = usePlaybackSession({
     media,
     modes: plan.modes,
@@ -159,11 +163,11 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
     audio: preferredAudio({ tracks, language: audioLanguage }),
     problems: plan.problems,
     sources: mediaSourcesFor(session.server),
+    // AVPlayer says it waits at the end of a file too, and the viewer's pause is no stall.
+    isWaiting: video.waiting && !isPaused && !video.ended,
+    clock: video.time,
   })
-  const [video, dispatchVideo] = useReducer(videoReducer, resumeAt, initialVideoState)
-  const position = useRef(resumeAt)
   const [duration, setDuration] = useState(media.duration)
-  const [isPaused, setPaused] = useState(false)
   const player = useRef<VideoRef>(null)
   // A refetched video is a new object; the sink, and the save it waits on, stay the same.
   const { id: mediaId, libraryId } = media
@@ -282,7 +286,14 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
             setPaused(true)
             dispatchVideo({ type: VIDEO_EVENTS.ended })
           },
-          onError: () => dispatch({ type: SESSION_EVENTS.failed, attempt, at: position.current }),
+          // The server letting go of the source (a ticket past its life, an HLS session it ended)
+          // opens the same way again from the spot; any other failure steps down the ladder.
+          onError: (failure) =>
+            dispatch({
+              type: isServerDrop(failure) ? SESSION_EVENTS.dropped : SESSION_EVENTS.failed,
+              attempt,
+              at: position.current,
+            }),
           onAudioTracks: ({ audioTracks }) =>
             hear({ type: AUDIO_HEARINGS.tracks, attempt, reported: audioTracks }),
           onLoad: ({ duration: length, audioTracks }) => {

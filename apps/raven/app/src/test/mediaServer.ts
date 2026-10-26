@@ -1,6 +1,7 @@
 import {
   APP_CALL_METHODS,
   APP_CLIENT_CALLS,
+  AUTH_REFUSALS,
   type ApiClient,
   MEDIA_ORIGIN_KINDS,
   MEDIA_PROBE_BYTES,
@@ -26,9 +27,18 @@ export const TICKETS = ['tkt.first', 'tkt.second', 'tkt.third'] as const
 /** The NAS's PIN cookie, which the jar holds. */
 export const NAS_COOKIES: ServerCookies = { [SERVER_COOKIES.unlock]: 'u.1' }
 
+/** The reason the server gives when it is the account it refuses. */
+const ACCOUNT_REASONS: Readonly<Record<number, string>> = {
+  [STATUSES.unauthorized]: AUTH_REFUSALS.signedOut,
+  [STATUSES.forbidden]: AUTH_REFUSALS.revoked,
+}
+
 const refusalOf = (status: number): Answer => ({
   status,
-  body: { message: status === STATUSES.locked ? 'This library is locked.' : 'No ticket.' },
+  body: {
+    message: status === STATUSES.locked ? 'This library is locked.' : 'No ticket.',
+    ...(ACCOUNT_REASONS[status] === undefined ? {} : { reason: ACCOUNT_REASONS[status] }),
+  },
 })
 
 type MediaServerProps = {

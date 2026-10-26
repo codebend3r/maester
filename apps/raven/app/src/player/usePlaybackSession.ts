@@ -7,6 +7,15 @@ import { useCookieVersion } from '@/stores/cookieVersion'
 /** How long a source may take to load before the ladder steps down from it. */
 export const LOAD_TIMEOUT_MS = 15_000
 
+/**
+ * How long a direct play may wait for data before it is opened again from the spot. The server
+ * keeps a file's ticket opening it past the ticket's five minutes, so this is the safety net for
+ * a pass that ended (its 12 hours, an account recheck, the pass cap, a restart) and for a stall
+ * of any other kind: AVPlayer answered a file's refused ranges (401) with a dozen seconds of
+ * retries and then a stall it never reported as an error, so the stall is the only word of it.
+ */
+export const STALL_REOPEN_MS = 10_000
+
 export const SESSION_COPY = {
   starting: 'Starting',
   exhausted: "This video didn't start in any of the ways the server offers.",
@@ -25,6 +34,7 @@ export const SESSION_EVENTS = {
   sourced: 'sourced',
   loaded: 'loaded',
   failed: 'failed',
+  dropped: 'dropped',
   timedOut: 'timedOut',
   audioPicked: 'audioPicked',
   retried: 'retried',
@@ -44,6 +54,8 @@ type Ladder = {
   attempt: number
   /** The plan's reasons a way is missing, shown once every way has failed. */
   problems: readonly string[]
+  /** The spot this way was last opened again from, after the server let go of it; null before. */
+  reopenedAt: number | null
 }
 
 export type SessionState =
@@ -57,6 +69,7 @@ type SessionEvent =
   | { type: typeof SESSION_EVENTS.sourced; attempt: number; outcome: SourceOutcome }
   | { type: typeof SESSION_EVENTS.loaded; attempt: number }
   | { type: typeof SESSION_EVENTS.failed; attempt: number; at: number }
+  | { type: typeof SESSION_EVENTS.dropped; attempt: number; at: number }
   | { type: typeof SESSION_EVENTS.timedOut; attempt: number }
   | { type: typeof SESSION_EVENTS.audioPicked; audio: number | null; at: number }
   | { type: typeof SESSION_EVENTS.retried }
@@ -88,7 +101,16 @@ export const initialSession = ({
 }: InitialSessionProps): SessionState =>
   modes.length === 0
     ? failedWith({ problems, fallback: SESSION_COPY.noWay })
-    : { phase: SESSION_PHASES.sourcing, modes, step: 0, at, audio, attempt: 0, problems }
+    : {
+        phase: SESSION_PHASES.sourcing,
+        modes,
+        step: 0,
+        at,
+        audio,
+        attempt: 0,
+        problems,
+        reopenedAt: null,
+      }
 
 /** The way being tried, or null once every way has failed. */
 export const modeOf = (state: SessionState): PlaybackMode | null =>
@@ -112,6 +134,7 @@ const sourcing = ({ ladder, step, at }: SourcingProps): SessionState => ({
   audio: ladder.audio,
   attempt: ladder.attempt + 1,
   problems: ladder.problems,
+  reopenedAt: step === ladder.step ? ladder.reopenedAt : null,
 })
 
 type StepDownProps = { ladder: Ladder; at: number }
@@ -128,6 +151,14 @@ const stepDown = ({ ladder, at }: StepDownProps): SessionState => {
 }
 
 /**
+ * Whether the way being played has played on since it was last opened again, so the server's
+ * letting go of it is one more lapse of a long play (a file pass or an HLS session the server
+ * ended or forgot) rather than a source that fails wherever it is opened.
+ */
+const hasPlayedOn = ({ ladder, at }: { ladder: Ladder; at: number }): boolean =>
+  ladder.reopenedAt === null || at > ladder.reopenedAt
+
+/**
  * Whether a way is left below the one tried now. Only then does a slow load step down: the last
  * way gets all the time it takes, as a transcode on a NAS may need longer than
  * `LOAD_TIMEOUT_MS` for its first segment, and the server waits for it up to its own limit.
@@ -139,7 +170,11 @@ export const hasWayBelow = (state: SessionState): boolean =>
  * The ladder, as the web's: the plan's first way, then the next whenever one fails to start or
  * to decode, or, while a way is left below, has not loaded within `LOAD_TIMEOUT_MS`, each from
  * the spot it got to. A remux the server refuses (its 409, keyframes too far apart to cut)
- * fails like any other, so the transcode below it is next.
+ * fails like any other, so the transcode below it is next. A source the server lets go of while
+ * it plays (`dropped`: its file pass or its HLS session ended, forgotten or lost to a restart)
+ * is opened again the same way from the spot, with a source handed out afresh, so a film longer
+ * than a pass plays to its end; only a refusal of that source shows. One the server lets
+ * go of before it loaded, or again before it played on from its reopening, fails as any other.
  */
 export const sessionReducer = (state: SessionState, event: SessionEvent): SessionState => {
   if (state.phase === SESSION_PHASES.failed) return state
@@ -156,6 +191,15 @@ export const sessionReducer = (state: SessionState, event: SessionEvent): Sessio
     case SESSION_EVENTS.failed:
       if (event.attempt !== state.attempt || state.phase === SESSION_PHASES.refused) return state
       return stepDown({ ladder: state, at: event.at })
+    case SESSION_EVENTS.dropped:
+      if (event.attempt !== state.attempt || state.phase === SESSION_PHASES.refused) return state
+      if (state.phase !== SESSION_PHASES.playing || !hasPlayedOn({ ladder: state, at: event.at }))
+        return stepDown({ ladder: state, at: event.at })
+      return sourcing({
+        ladder: { ...state, reopenedAt: event.at },
+        step: state.step,
+        at: event.at,
+      })
     case SESSION_EVENTS.timedOut:
       if (
         state.phase !== SESSION_PHASES.loading ||
@@ -214,12 +258,18 @@ type UsePlaybackSessionProps = {
   audio: number | null
   problems: readonly string[]
   sources: MediaSources
+  /** Whether the player is waiting for data, as its buffering says. */
+  isWaiting: boolean
+  /** Where the video is, in seconds, as the screen draws it: a stall lasts only while it stands still. */
+  clock: number
 }
 
 /**
  * Plays `media` down its plan's ladder: asks `sources` for each way's source in turn, steps
- * down when the player says one failed or it has not loaded in time, and asks again after a
- * refusal once the server's cookies change, as an unlock changes them.
+ * down when the player says one failed or it has not loaded in time, opens a direct play again
+ * from its `clock` once it has waited for data (`isWaiting`) `STALL_REOPEN_MS` with the clock
+ * standing still, and asks again
+ * after a refusal once the server's cookies change, as an unlock changes them.
  */
 export const usePlaybackSession = ({
   media,
@@ -228,6 +278,8 @@ export const usePlaybackSession = ({
   audio,
   problems,
   sources,
+  isWaiting,
+  clock,
 }: UsePlaybackSessionProps): { state: SessionState; dispatch: (event: SessionEvent) => void } => {
   const [state, dispatch] = useReducer(
     sessionReducer,
@@ -237,6 +289,8 @@ export const usePlaybackSession = ({
   const phase = state.phase
   const attempt = phase === SESSION_PHASES.failed ? null : state.attempt
   const isTimed = hasWayBelow(state)
+  const isDirectStall =
+    isWaiting && phase === SESSION_PHASES.playing && modeOf(state) === PLAYBACK_MODES.direct
 
   const ask = useEffectEvent((asked: number) => {
     const status = { isCurrent: true }
@@ -270,6 +324,15 @@ export const usePlaybackSession = ({
     )
     return () => clearTimeout(timer)
   }, [phase, attempt, isTimed])
+
+  useEffect(() => {
+    if (!isDirectStall || attempt === null) return undefined
+    const timer = setTimeout(
+      () => dispatch({ type: SESSION_EVENTS.dropped, attempt, at: clock }),
+      STALL_REOPEN_MS,
+    )
+    return () => clearTimeout(timer)
+  }, [isDirectStall, attempt, clock])
 
   useEffect(() => {
     if (phase !== SESSION_PHASES.refused) return undefined

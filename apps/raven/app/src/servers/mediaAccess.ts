@@ -1,6 +1,8 @@
 import {
   ACCESS_REFUSALS,
   APP_CALL_METHODS,
+  AUTH_REFUSALS,
+  type AuthRefusal,
   type AccessRefusal,
   type AccessRefusalReason,
   ApiError,
@@ -9,6 +11,7 @@ import {
   MEDIA_ORIGIN_KINDS,
   MEDIA_PROBE_BYTES,
   MEDIA_PROBE_TIMEOUT_MS,
+  MEDIA_TICKET_PARAM,
   type MaxHeight,
   type MediaAccess,
   type MediaItem,
@@ -22,6 +25,7 @@ import {
   pickOrigin,
   serverOriginOf,
   ticketRenewAt,
+  toQueryString,
 } from '@raven/core'
 
 import { checkAppCall } from '@/servers/allowlist'
@@ -79,14 +83,46 @@ export type MediaSources = {
   close: () => void
 }
 
+/** What a player says when the server refuses the account its media is played under. */
+export const ACCOUNT_ACCESS_MESSAGES = {
+  signInAgain: (name: string): string => `Sign in to ${name} again.`,
+  removed: (name: string): string => `Your access to ${name} was removed.`,
+} as const
+
+type AccountAccessMessageOfProps = { reason: AuthRefusal['reason']; name: string }
+
+/**
+ * The words for media the server refused the account on `name` for; null for `unavailable`,
+ * accounts being down, which is an outage rather than a refusal of this one. An account sent back
+ * to waiting has lost the access it had, as a revoked one has.
+ */
+const accountAccessMessageOf = ({ reason, name }: AccountAccessMessageOfProps): string | null => {
+  switch (reason) {
+    case AUTH_REFUSALS.signedOut:
+      return ACCOUNT_ACCESS_MESSAGES.signInAgain(name)
+    case AUTH_REFUSALS.pending:
+    case AUTH_REFUSALS.revoked:
+    case AUTH_REFUSALS.notOwner:
+      return ACCOUNT_ACCESS_MESSAGES.removed(name)
+    case AUTH_REFUSALS.unavailable:
+      return null
+    default: {
+      const unreachable: never = reason
+      return unreachable
+    }
+  }
+}
+
 export const MEDIA_ACCESS_MESSAGES = {
   locked: (name: string): string => `This video's library on ${name} is locked.`,
   gone: (name: string): string => `${name} no longer has this video.`,
   unreachable: (name: string): string => `${name} can't be reached.`,
   unreadable: (name: string): string => `${name} sent something raven can't read.`,
-  account: (name: string): string => `${name} signs in with accounts, which the app can't do yet.`,
+  account: ACCOUNT_ACCESS_MESSAGES.signInAgain,
 } as const satisfies Record<AccessRefusalReason, (name: string) => string>
 
+const UNAUTHORIZED_STATUS = 401
+const FORBIDDEN_STATUS = 403
 const NOT_FOUND_STATUS = 404
 const SERVER_ERROR_STATUS = 500
 
@@ -110,6 +146,26 @@ const accessRefusal = ({ reason, server }: AccessRefusalProps): AccessRefusal =>
   message: MEDIA_ACCESS_MESSAGES[reason](server.name),
 })
 
+type AccountRefusalOfProps = { error: ApiError; server: AppServer }
+
+/**
+ * A `401` or `403` to a ticket is the account's refusal, in raven player's words; the server's
+ * fetch has already refreshed the token once for the first. Accounts being down is an outage.
+ */
+const accountRefusalOf = ({ error, server }: AccountRefusalOfProps): TicketRead => {
+  const reason =
+    error.refusal?.reason ??
+    (error.status === UNAUTHORIZED_STATUS ? AUTH_REFUSALS.signedOut : AUTH_REFUSALS.revoked)
+  const message = accountAccessMessageOf({ reason, name: server.name })
+  return {
+    kind: TICKET_READS.refused,
+    refusal:
+      message === null
+        ? accessRefusal({ reason: ACCESS_REFUSALS.unreachable, server })
+        : { ok: false, reason: ACCESS_REFUSALS.account, message },
+  }
+}
+
 type RefusalOfProps = { error: unknown; server: AppServer }
 
 const refusalOf = ({ error, server }: RefusalOfProps): TicketRead => {
@@ -120,12 +176,21 @@ const refusalOf = ({ error, server }: RefusalOfProps): TicketRead => {
   // Anything but the server's own answer, a failed network above all, is an outage.
   if (!(error instanceof ApiError)) return refused(ACCESS_REFUSALS.unreachable)
   if (error.status === TICKETS_OFF_STATUS) return { kind: TICKET_READS.off }
+  if (error.status === UNAUTHORIZED_STATUS || error.status === FORBIDDEN_STATUS) {
+    return accountRefusalOf({ error, server })
+  }
   if (error.status === LOCKED_STATUS) return refused(ACCESS_REFUSALS.locked)
   if (error.status === NOT_FOUND_STATUS) return refused(ACCESS_REFUSALS.gone)
   // A proxy in front of a restarting server answers 502 or 504.
   if (error.status >= SERVER_ERROR_STATUS) return refused(ACCESS_REFUSALS.unreachable)
   return refused(ACCESS_REFUSALS.unreadable)
 }
+
+type WithTicketProps = { uri: string; ticket: string }
+
+/** `uri` carrying `ticket`, as core's media URLs carry one: the last of its query. */
+const withTicket = ({ uri, ticket }: WithTicketProps): string =>
+  `${uri}${uri.includes('?') ? '&' : '?'}${toQueryString({ [MEDIA_TICKET_PARAM]: ticket })}`
 
 type MediaAccessForProps = {
   api: ApiClient
@@ -148,8 +213,11 @@ type MediaAccessForProps = {
  * server that lists no origin, has none answering, or hands out no ticket (the 503 of one
  * without `RAVEN_MEDIA_SECRET`) plays from its own address with its cookies as headers, which
  * `cookieHeadersFor` gives only to its own API. A transcode from the `public` origin, away
- * from home, asks for the size `awayMaxHeight` reads at the moment, Settings' cap. Nothing here
- * logs: a ticket is only ever in the source's address.
+ * from home, asks for the size `awayMaxHeight` reads at the moment, Settings' cap. A signed-in
+ * account (`readAccessToken`) that has no origin to play from plays from the server's own
+ * address by its ticket, never by its Bearer, and a ticket the server refuses it (`401`, `403`)
+ * is the account's refusal in core's words. Nothing here logs: a ticket is only ever in the
+ * source's address.
  */
 export const mediaAccessFor = ({
   api,
@@ -288,6 +356,23 @@ export const mediaAccessFor = ({
     return { ok: true, source: { uri, headers } }
   }
 
+  type OwnAddressSourceProps = { request: SourceRequest; ticket: string }
+
+  /**
+   * With no origin to play from, a signed-in account plays from the server's own address by its
+   * ticket, never by its Bearer: the native player sends that header as it was, and the token
+   * ends within the hour while a film runs longer. A server without accounts sends cookies.
+   */
+  const ownAddressSource = async ({
+    request,
+    ticket,
+  }: OwnAddressSourceProps): Promise<SourceOutcome> => {
+    if (readAccessToken() === null) return cookieSource(request)
+    const uri = withTicket({ uri: uriFor({ request, access: null }), ticket })
+    checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
+    return { ok: true, source: { uri, headers: {} } }
+  }
+
   const sourceFor = async (request: SourceRequest): Promise<SourceOutcome> => {
     const [origin, read] = await Promise.all([pickOf(), ticketFor(request.media.id)])
     switch (read.kind) {
@@ -296,7 +381,7 @@ export const mediaAccessFor = ({
       case TICKET_READS.off:
         return cookieSource(request)
       case TICKET_READS.issued: {
-        if (origin === null) return cookieSource(request)
+        if (origin === null) return ownAddressSource({ request, ticket: read.ticket })
         const uri = uriFor({ request, access: { origin, ticket: read.ticket } })
         checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
         return { ok: true, source: { uri, headers: {} } }

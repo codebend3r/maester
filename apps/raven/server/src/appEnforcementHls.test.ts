@@ -7,10 +7,12 @@ import {
   HLS_PARAMS,
   HLS_PATHS,
   LOCKED_STATUS,
+  MEDIA_ORIGIN_KINDS,
   MEDIA_TICKET_PARAM,
   MEMBER_STATUSES,
   PLAYBACK_MODES,
   SUBTITLE_SOURCES,
+  createApiClient,
   toQueryString,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -330,6 +332,31 @@ describe("an account's HLS session", () => {
         urls: sessionRoutes({ id: first.id, session: first.session, key: first.capability }),
       }),
     ).toEqual([200, 200, 200, 200, 200])
+  })
+
+  it('names only the capability in the playlists of a master the device app opens by account ticket', async () => {
+    const ticket = await ticketFor({ caller: CALLER_KINDS.member, id: plane.ids.video })
+    // The master as the app's `mediaAccessFor` builds it, through core's client, on the origin it picked.
+    const client = createApiClient({
+      baseUrl: BASE,
+      fetch: () => Promise.reject(new Error('unused')),
+    })
+    const master = client.hlsUrl({
+      id: plane.ids.video,
+      mode: PLAYBACK_MODES.remux,
+      audio: 0,
+      quality: null,
+      access: { origin: { kind: MEDIA_ORIGIN_KINDS.lan, url: BASE }, ticket },
+    })
+    const opened = await get({ url: master.slice(BASE.length) })
+    expect(opened.statusCode).toBe(200)
+    const playlists = await Promise.all(urisIn(opened.body).map((url) => get({ url })))
+    const named = [opened.body, ...playlists.map(({ body }) => body)].flatMap(urisIn)
+    const [capability = ''] = named.map((uri) => keyOf(uri) ?? '')
+    expect(named.length).toBeGreaterThan(3)
+    expect(capability.startsWith(HLS_CAPABILITY_PREFIX)).toBe(true)
+    expect(named.map(keyOf)).toEqual(named.map(() => capability))
+    expect(named.join('\n')).not.toContain(ticket)
   })
 
   it("opens nothing of another account's session or another media with it", async () => {

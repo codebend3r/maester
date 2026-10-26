@@ -195,3 +195,62 @@ describe('the playback ladder', () => {
     )
   })
 })
+
+describe('the ladder when the server lets go of a source mid-play', () => {
+  const ACCOUNT_REFUSED: AccessRefusal = {
+    ok: false,
+    reason: ACCESS_REFUSALS.account,
+    message: 'Sign in to nas:8080 again.',
+  }
+
+  const dropped = ({ state, at }: { state: SessionState; at: number }): SessionState =>
+    sessionReducer(state, { type: SESSION_EVENTS.dropped, attempt: attemptOf(state), at })
+
+  it('opens the same way again from the spot reached, for a source to be handed out afresh', () => {
+    const streaming = loaded(sourced(opened({ modes: [remux, transcode] })))
+    const reopened = dropped({ state: streaming, at: 4210.5 })
+    expect(reopened).toMatchObject({ phase: SESSION_PHASES.sourcing, at: 4210.5, attempt: 1 })
+    expect(modeOf(reopened)).toBe(remux)
+    const filePlay = dropped({ state: loaded(sourced(opened())), at: 3301 })
+    expect(modeOf(filePlay)).toBe(direct)
+    expect(filePlay).toMatchObject({ phase: SESSION_PHASES.sourcing, at: 3301, attempt: 1 })
+  })
+
+  it('reopens again once the reopened way has played on, for as long as a film lasts', () => {
+    const first = dropped({ state: loaded(sourced(opened({ modes: [remux] }))), at: 600 })
+    const second = dropped({ state: loaded(sourced(first)), at: 1800 })
+    expect(modeOf(second)).toBe(remux)
+    expect(second).toMatchObject({ phase: SESSION_PHASES.sourcing, at: 1800, attempt: 2 })
+  })
+
+  it('steps down from a reopened way that lets go again before it has played on, as a real failure', () => {
+    const reopened = dropped({
+      state: loaded(sourced(opened({ modes: [remux, transcode] }))),
+      at: 600,
+    })
+    const again = dropped({ state: loaded(sourced(reopened)), at: 600 })
+    expect(modeOf(again)).toBe(transcode)
+    expect(again).toMatchObject({ phase: SESSION_PHASES.sourcing, at: 600 })
+  })
+
+  it('steps down from a source the server lets go of before it ever loaded', () => {
+    const next = dropped({ state: sourced(opened({ modes: [remux, transcode] })), at: RESUME_AT })
+    expect(modeOf(next)).toBe(transcode)
+  })
+
+  it('shows the refusal when the reopen itself is refused, and ignores an earlier source', () => {
+    const playing = loaded(sourced(opened({ modes: [remux, transcode] })))
+    expect(sessionReducer(playing, { type: SESSION_EVENTS.dropped, attempt: 7, at: 900 })).toBe(
+      playing,
+    )
+    const reopened = dropped({ state: playing, at: 900 })
+    const refused = sessionReducer(reopened, {
+      type: SESSION_EVENTS.sourced,
+      attempt: attemptOf(reopened),
+      outcome: ACCOUNT_REFUSED,
+    })
+    expect(refused).toMatchObject({ phase: SESSION_PHASES.refused, refusal: ACCOUNT_REFUSED })
+    expect(noticeOf(refused)).toBe(ACCOUNT_REFUSED.message)
+    expect(modeOf(refused)).toBe(remux)
+  })
+})
