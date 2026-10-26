@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   type Duplicate,
   type DuplicateCard,
+  type DuplicateFile,
   type Duplicates as DuplicatesListing,
   type Library,
   type PosterEntry,
@@ -13,9 +14,10 @@ import {
   plural,
   versionFacts,
 } from '@raven/core'
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
+import { ConfirmDelete } from '@/components/ConfirmDelete/ConfirmDelete'
 import { Button } from '@raven/ui'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { api } from '@/lib/api'
@@ -37,29 +39,46 @@ const Poster = ({ entry }: PosterProps) => (
   </Link>
 )
 
+type FileRowProps = { file: DuplicateFile }
+
+/** One file: the cut its name reads as, its facts and name, and, with the admin lock off, Delete. */
+const FileRow = ({ file: { media, cut } }: FileRowProps) => {
+  const [confirming, setConfirming] = useState(false)
+  const facts = [cut?.label ?? 'Standard', ...versionFacts(media)]
+  return (
+    <li className={styles.file}>
+      <span className={styles.facts}>
+        {facts.map((fact, index) => (
+          <span
+            key={`${index}:${fact}`}
+            className={index === 0 && cut != null ? styles.cut : undefined}
+          >
+            {fact}
+          </span>
+        ))}
+      </span>
+      <span className={styles.fileName}>{media.fileName}</span>
+      <AdminOnly>
+        <Button
+          icon="trash"
+          className={styles.remove}
+          aria-label={`Delete ${media.fileName}`}
+          onClick={() => setConfirming(true)}
+        />
+        {confirming && <ConfirmDelete media={media} onClose={() => setConfirming(false)} />}
+      </AdminOnly>
+    </li>
+  )
+}
+
 type FilesProps = { card: DuplicateCard }
 
-/** A card's files, best first, each with the cut its name reads as. */
+/** A card's files, best first. */
 const Files = ({ card }: FilesProps) => (
   <ul className={styles.files} aria-label="Files">
-    {card.files.map(({ media, cut }) => {
-      const facts = [cut?.label ?? 'Standard', ...versionFacts(media)]
-      return (
-        <li key={media.id} className={styles.file}>
-          <span className={styles.facts}>
-            {facts.map((fact, index) => (
-              <span
-                key={`${index}:${fact}`}
-                className={index === 0 && cut != null ? styles.cut : undefined}
-              >
-                {fact}
-              </span>
-            ))}
-          </span>
-          <span className={styles.fileName}>{media.fileName}</span>
-        </li>
-      )
-    })}
+    {card.files.map((file) => (
+      <FileRow key={file.media.id} file={file} />
+    ))}
   </ul>
 )
 
@@ -105,7 +124,7 @@ type MovieDuplicateProps = {
  * While its files share one card, that card's files and the ways to split
  * it; once split, each card under its own title, any that still holds
  * several files splittable again, and Put back together for them all.
- * Splitting and putting back wait for the admin lock to be off.
+ * Splitting, putting back and deleting a file wait for the admin lock to be off.
  */
 const MovieDuplicate = ({ movie, busy, onSplit, onJoin }: MovieDuplicateProps) => {
   const headingId = useId()

@@ -64,6 +64,20 @@ const LISTING: DuplicatesListing = [
   heatMovie,
 ]
 
+/** Alexander once its WEBDL copy is deleted. */
+const WITHOUT_WEBDL: DuplicatesListing[number] = {
+  itemId: 40,
+  cards: [
+    {
+      entry: { media: { ...theatrical, versions: 2 }, poster: alexander },
+      files: [
+        { media: theatrical, cut: null },
+        { media: finalCut, cut: FINAL_CUT },
+      ],
+    },
+  ],
+}
+
 /** Alexander after Smart split apart: its own card keeps the two plain copies, the Final Cut has one. */
 const AFTER_SPLIT: DuplicatesListing = [
   {
@@ -93,6 +107,7 @@ describe('the Duplicates tab', () => {
     list: spyOn(api, 'listDuplicates'),
     split: spyOn(api, 'splitDuplicate'),
     join: spyOn(api, 'joinSplit'),
+    remove: spyOn(api, 'deleteMedia'),
   }
 
   afterEach(() => {
@@ -249,7 +264,50 @@ describe('the Duplicates tab', () => {
     )
   })
 
-  it('leaves splitting and putting back together out while the admin lock is on', async () => {
+  it('asks before deleting a file, then deletes it from the server and drops it from the list', async () => {
+    spies.remove.mockImplementation(async () => {
+      spies.list.mockImplementation(async () => [WITHOUT_WEBDL, heatMovie])
+    })
+    await show()
+    await userEvent.click(
+      within(movie('Alexander')).getByRole('button', {
+        name: 'Delete Alexander (2004) WEBDL-1080p.mkv',
+      }),
+    )
+    expect(spies.remove).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toHaveTextContent('Delete Alexander (2004)?')
+    expect(screen.getByRole('dialog')).toHaveTextContent('Alexander (2004) WEBDL-1080p.mkv')
+    await userEvent.click(screen.getByRole('button', { name: 'Delete for good' }))
+    await waitFor(() => expect(spies.remove).toHaveBeenCalledWith(6))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(await within(movie('Alexander')).findByText('2004 · 2 files')).toBeInTheDocument()
+  })
+
+  it('keeps the file when the confirmation is cancelled', async () => {
+    await show()
+    await userEvent.click(
+      within(movie('Heat')).getByRole('button', { name: 'Delete Heat (1995) 2160p HEVC.mkv' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(spies.remove).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('says why a file was not deleted', async () => {
+    spies.remove.mockImplementation(async () => {
+      throw new ApiError({ status: 500, message: 'Could not delete the file.' })
+    })
+    await show()
+    await userEvent.click(
+      within(movie('Heat')).getByRole('button', { name: 'Delete Heat (1995) 2160p HEVC.mkv' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Delete for good' }))
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(
+      'Could not delete the file.',
+    )
+  })
+
+  it('leaves splitting, putting back together and deleting out while the admin lock is on', async () => {
     spies.list.mockImplementation(async () => AFTER_SPLIT)
     renderWithProviders({
       ui: <SectionView library={library({ id: 2, name: 'Films' })} section="duplicates" />,
@@ -257,7 +315,9 @@ describe('the Duplicates tab', () => {
     })
     expect(await screen.findByRole('article', { name: 'Alexander' })).toBeInTheDocument()
     expect(screen.getByRole('article', { name: 'Heat' })).toBeInTheDocument()
-    expect(screen.queryAllByRole('button', { name: /split apart|put back together/i })).toEqual([])
+    expect(
+      screen.queryAllByRole('button', { name: /split apart|put back together|delete/i }),
+    ).toEqual([])
   })
 
   it('says when no movie holds more than one file', async () => {

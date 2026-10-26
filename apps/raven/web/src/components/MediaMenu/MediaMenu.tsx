@@ -1,4 +1,4 @@
-import { type UseMutationResult, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import {
   type AiMatch,
   ITEM_TYPES,
@@ -8,9 +8,10 @@ import {
   type MediaItem,
   mediaLabel,
 } from '@raven/core'
-import { Fragment, type RefObject, useEffect, useId, useRef, useState } from 'react'
+import { Fragment, type RefObject, useId, useRef, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button, Icon, type IconName } from '@raven/ui'
+import { ConfirmDelete } from '@/components/ConfirmDelete/ConfirmDelete'
+import { Icon, type IconName } from '@raven/ui'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { ImageEditorDialog } from '@/components/ImageEditor/ImageEditorDialog'
 import { api } from '@/lib/api'
@@ -27,57 +28,6 @@ import styles from '@/components/MediaMenu/MediaMenu.module.scss'
  * movie's page, it is always there.
  */
 export const MENU_HOST = styles.host
-
-type ConfirmDeleteProps = {
-  media: MediaItem
-  remove: UseMutationResult<void, Error, void>
-  onClose: () => void
-  onDeleted?: () => void
-}
-
-/** Deleting is the one action here that cannot be undone, so it asks first. */
-const ConfirmDelete = ({ media, remove, onClose, onDeleted }: ConfirmDeleteProps) => {
-  const dialog = useRef<HTMLDialogElement>(null)
-  const id = useId()
-
-  useEffect(() => {
-    dialog.current?.showModal()
-  }, [])
-
-  return (
-    <dialog ref={dialog} className={styles.dialog} aria-labelledby={id} onClose={onClose}>
-      <div className={styles.dialogBody}>
-        <h2 id={id} className={styles.dialogTitle}>
-          Delete {mediaLabel(media)}?
-        </h2>
-        <p className={styles.hint}>This removes the file from disk. It cannot be undone.</p>
-        {remove.isError && (
-          <p role="alert" className={styles.error}>
-            {remove.error.message}
-          </p>
-        )}
-        <div className={styles.actions}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button
-            tone="danger"
-            icon="trash"
-            disabled={remove.isPending}
-            onClick={() =>
-              remove.mutate(undefined, {
-                onSuccess: () => {
-                  onClose()
-                  onDeleted?.()
-                },
-              })
-            }
-          >
-            Delete for good
-          </Button>
-        </div>
-      </div>
-    </dialog>
-  )
-}
 
 /**
  * Whose pictures Edit images changes: a movie's own, or an episode's show's;
@@ -196,7 +146,7 @@ const MenuBody = ({
   const [confirming, setConfirming] = useState(false)
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
-  const { favourite, watched, remove, refresh } = useMediaMutations({ media })
+  const { favourite, watched, refresh } = useMediaMutations({ media })
   // A locked library's videos are never marked, but one marked before it locked can be unmarked.
   const canFavourite = useCanFavourite(media.libraryId) || media.favourite
   const matchable = matchType != null && media.match !== MATCH_STATES.off
@@ -298,7 +248,6 @@ const MenuBody = ({
       {confirming && (
         <ConfirmDelete
           media={media}
-          remove={remove}
           onDeleted={onDeleted}
           onClose={() => {
             setConfirming(false)
