@@ -4,7 +4,7 @@ import { MediaIndex } from '@/media/mediaIndex'
 import { LOCAL, localEpisode, localSeason } from '@/metadata/localItems'
 import { MatchFiles } from '@/metadata/matchFiles'
 import type { ExternalScore } from '@/metadata/scoreSources'
-import { BLANK_ITEM, type FetchedItem, type FetchedPerson } from '@/metadata/tmdbClient'
+import { BLANK_ITEM, type FetchedItem, type FetchedPerson } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { peopleRepositoryOf, repositories } from '@/test/repositories'
 

@@ -4,7 +4,7 @@ import { FAVOURITE_OUTCOMES } from '@/media/favouriteOutcomes'
 import { MediaIndex } from '@/media/mediaIndex'
 import { TitleFavourites } from '@/media/titleFavourites'
 import { localEpisode, localSeason } from '@/metadata/localItems'
-import type { FetchedItem } from '@/metadata/tmdbClient'
+import type { FetchedItem } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 

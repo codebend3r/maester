@@ -14,7 +14,8 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { imageScaleArgs } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { RAVEN_CONTENT_TYPES } from '@/http'
-import { METADATA_FETCH, type MetadataFetch, TMDB_IMAGE_PATH } from '@/metadata/tmdbClient'
+import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
+import { TMDB_IMAGE_PATH } from '@/metadata/tmdbShapes'
 import { type Gate, createGate } from '@/scanner/concurrency'
 
 /** What a picture is for: an item's, or a person's photo. */

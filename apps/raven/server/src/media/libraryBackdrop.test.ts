@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
-import { BLANK_ITEM } from '@/metadata/tmdbClient'
+import { BLANK_ITEM } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { repositories } from '@/test/repositories'
 

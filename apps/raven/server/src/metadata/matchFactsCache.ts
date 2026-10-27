@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import type { MatchItemType } from '@raven/core'
-import { type MatchFacts, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import type { MatchFacts } from '@/metadata/tmdbShapes'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const MOST_KEPT = 500

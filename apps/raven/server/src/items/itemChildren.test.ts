@@ -10,7 +10,7 @@ import { WatchedCards } from '@/media/watchedCards'
 import { WatchedRepository } from '@/media/watchedRepository'
 import { localEpisode, localSeason } from '@/metadata/localItems'
 import { MetadataRepository } from '@/metadata/metadataRepository'
-import type { FetchedItem } from '@/metadata/tmdbClient'
+import type { FetchedItem } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 

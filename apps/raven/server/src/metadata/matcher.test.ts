@@ -1,7 +1,7 @@
 import { TIER_SETS } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import { pickByTiers, pickMatch } from '@/metadata/matcher'
-import type { SearchResult } from '@/metadata/tmdbClient'
+import type { SearchResult } from '@/metadata/tmdbShapes'
 
 const result = (overrides: Partial<SearchResult>): SearchResult => ({
   tmdbId: '1',

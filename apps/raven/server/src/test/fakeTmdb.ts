@@ -4,8 +4,8 @@ import {
   type MetadataFetch,
   TMDB_EXTERNAL_SOURCES,
   TMDB_SEARCH_ROUTES,
-  TMDB_SEGMENTS,
 } from '@/metadata/tmdbClient'
+import { TMDB_SEGMENTS } from '@/metadata/tmdbShapes'
 
 /** The hosts the fake answers for besides TMDB's API. */
 const HOSTS = {

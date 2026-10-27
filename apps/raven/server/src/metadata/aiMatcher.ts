@@ -23,7 +23,8 @@ import type { MatchFile } from '@/metadata/matchFiles'
 import { movieSearchTitles, readShowFile, showSearchTitles } from '@/metadata/matchers'
 import { notFound } from '@/metadata/matchPass'
 import { filePlace } from '@/metadata/places'
-import { type SearchResult, TmdbClient } from '@/metadata/tmdbClient'
+import { TmdbClient } from '@/metadata/tmdbClient'
+import type { SearchResult } from '@/metadata/tmdbShapes'
 
 /** The reasons a turn stops that it tells apart. */
 export const STOP_REASONS = {

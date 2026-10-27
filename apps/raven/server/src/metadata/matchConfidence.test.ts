@@ -1,7 +1,7 @@
 import { type CandidateTier, TIER_SETS } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import { type EpisodeNumbers, type OnDisk, scoreCandidates } from '@/metadata/matchConfidence'
-import type { MatchFacts, SearchResult } from '@/metadata/tmdbClient'
+import type { MatchFacts, SearchResult } from '@/metadata/tmdbShapes'
 
 const result = (
   fields: Pick<SearchResult, 'tmdbId' | 'title'> & Partial<SearchResult>,
