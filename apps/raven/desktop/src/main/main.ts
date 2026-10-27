@@ -1,56 +1,44 @@
 import { randomBytes, randomUUID } from 'node:crypto'
-import { createReadStream } from 'node:fs'
-import {
-  appendFile,
-  mkdir,
-  open,
-  readdir,
-  readFile,
-  realpath,
-  rename,
-  rm,
-  stat,
-  statfs,
-  writeFile,
-} from 'node:fs/promises'
+import { mkdir, readdir, realpath, rename, stat, statfs, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { monitorEventLoopDelay } from 'node:perf_hooks'
-import { Readable } from 'node:stream'
 import { setTimeout as sleep } from 'node:timers/promises'
 import {
   DESKTOP_EVENTS,
   type DesktopEvent,
   type DesktopReply,
   FILE_SCHEME,
-  PAGE_ORIGIN,
-  PLAYER_SOURCE_KINDS,
   VIDEO_EXTENSIONS,
-  WEB_HOST_PORT,
 } from '@raven/core'
-import { MPV_PROPERTIES, MPV_SURFACE_KINDS, type Mpv, type MpvSurface, openMpv } from '@raven/mpv'
 import {
   app,
   BrowserWindow,
   clipboard,
   crashReporter,
   dialog,
-  ipcMain,
   Menu,
-  MessageChannelMain,
-  type MessagePortMain,
   net,
   type OpenDialogOptions,
   powerMonitor,
-  powerSaveBlocker,
   protocol,
   screen,
   session,
   shell,
 } from 'electron'
-import { APP_ICON, PLATFORMS } from '@/build/forgeOptions'
+import { APP_ICON } from '@/build/forgeOptions'
 import { createPageAccount } from '@/main/accounts/pageAccount'
 import { createServerSignal } from '@/main/accounts/serverSignal'
+import { createAppLog } from '@/main/appLog'
+import {
+  answerRequests,
+  openWindow,
+  PRODUCT_NAME,
+  secureContents,
+  serveFiles,
+  showWindowButtons,
+  startWebHost,
+} from '@/main/appWindow'
 import {
   BUDGET_WINDOW_MS,
   budgetWindowFrom,
@@ -60,10 +48,8 @@ import {
 } from '@/main/budgets'
 import {
   CONFIG_FILE,
-  type ConfigStore,
   type FixedServer,
   loadConfig,
-  type ServerEntry,
   namesServer,
   serverById,
   serverOf,
@@ -72,98 +58,50 @@ import {
 import { createDesktopService, type DesktopService } from '@/main/desktopService'
 import { diagnosticsText, readEngineDiagnostics, unavailableReason } from '@/main/diagnostics'
 import { settleDownloads } from '@/main/downloads/adopt'
-import { createDownloadService, type DownloadService } from '@/main/downloads/downloadService'
+import { createDownloadService } from '@/main/downloads/downloadService'
 import { DOWNLOADS_FILE } from '@/main/downloads/downloadState'
 import { DOWNLOADS_DEBOUNCE_MS, loadDownloads } from '@/main/downloads/downloadStore'
-import type { PartFile, StreamFetch } from '@/main/downloads/fetchFile'
-import { createMediaAccess, type ProbeFetch } from '@/main/downloads/mediaAccess'
+import { createMediaAccess } from '@/main/downloads/mediaAccess'
 import { SYNC_RETRY_MS } from '@/main/downloads/sync'
-import { createFileHandler } from '@/main/fileProtocol'
-import { createGrants, type Grants } from '@/main/grants'
+import { createGrants } from '@/main/grants'
 import { createHelpActions } from '@/main/help'
 import { errorText } from '@/main/log/errorText'
-import { createLog, logFsFrom, SILENT_LOG } from '@/main/log/log'
-import { describedFileId, logsDirFor, openLine } from '@/main/log/opens'
+import { logsDirFor } from '@/main/log/opens'
 import { menuTemplate } from '@/main/menu'
+import { fetchDownload, fetchProbe, fetchRelayed, fetchReleases } from '@/main/netFetches'
+import { exists, makeDir, openPart, removeTree, sizeOf, TEXT_FS } from '@/main/nodeFs'
 import { createOpenBatch, eventForOpen, launchPaths } from '@/main/openBatch'
-import { CLEAR, createActivity } from '@/main/player/activity'
-import { createConnector } from '@/main/player/connector'
-import { displayReading } from '@/main/player/displayOptions'
-import {
-  addonPathFor,
-  ENGINE_MESSAGES,
-  ENGINE_MODES,
-  ENGINE_STATUSES,
-  engineModeFrom,
-  engineOptionsFor,
-  openEngine,
-} from '@/main/player/engine'
-import { createEngineSlot, watchService } from '@/main/player/engineSlot'
+import { ENGINE_STATUSES } from '@/main/player/engine'
 import { createMarks } from '@/main/player/marks'
 import { readDevices } from '@/main/player/outputOptions'
-import type { PortLike } from '@/main/player/playerPort'
-import { resolveSourceWith } from '@/main/player/loadTarget'
 import {
-  createPlayerService,
-  type PlayerActivity,
-  type PlayerService,
-} from '@/main/player/playerService'
-import { createSleepGuard } from '@/main/player/sleepGuard'
-import { setWindowBounds } from '@/main/playerState'
+  attachPlayer,
+  engineMode,
+  type NativeEngine,
+  type WindowPlayer,
+} from '@/main/player/windowPlayer'
 import { createQuitGate } from '@/main/quitGate'
 import { createQuitMark } from '@/main/quitMark'
-import { createRequestHandler } from '@/main/requestHandler'
-import {
-  isPageUrl,
-  isPermissionAllowed,
-  isTrustedSender,
-  navigationFor,
-  windowOpenFor,
-} from '@/main/security'
 import { createAccountTickets } from '@/main/servers/accountTickets'
 import { createLinkOpener } from '@/main/servers/linkOpener'
-import {
-  createMediaRelay,
-  listenOnLoopback,
-  type MediaRelay,
-  type UpstreamFetch,
-} from '@/main/servers/mediaRelay'
+import { createMediaRelay, listenOnLoopback } from '@/main/servers/mediaRelay'
 import { createServerCalls, fetchThrough } from '@/main/servers/serverCalls'
 import { clearFormerPartitions, PARTITIONS_DIR } from '@/main/servers/formerSessions'
 import { createPageUnlock } from '@/main/servers/pageUnlock'
 import { createServerSources } from '@/main/servers/serverSources'
 import { createServerTitles } from '@/main/servers/serverTitles'
 import {
-  CLOSE_TIMEOUTS,
-  closeTimeoutFor,
   createShutdown,
-  DESTROY_MS,
   endAfterLog,
   HARD_EXITS,
   hardExitFor,
   QUIT_FLUSH_MS,
 } from '@/main/shutdown'
-import {
-  createJsonStore,
-  createStateStore,
-  isMissingFile,
-  loadState,
-  type StateFs,
-  type StateStore,
-} from '@/main/stateStore'
+import { createJsonStore, createStateStore, loadState } from '@/main/stateStore'
 import { createNodeTimers } from '@/main/timers'
 import { createMenuCheck, createUpdateService, updateSourceFrom } from '@/main/updateService'
-import { checkForUpdates, type UpdateFetch } from '@/main/updates'
-import {
-  createWebHostHandler,
-  listenWebHost,
-  LOOPBACK_ADDRESSES,
-  WEB_HOST_READY,
-  webHostFailureText,
-  webRootFor,
-} from '@/main/webHost'
-import { authOriginFrom, linkOriginsFrom, serverOriginFrom } from '@/main/origins'
-import { placeWindow } from '@/main/windowBounds'
+import { checkForUpdates } from '@/main/updates'
+import { linkOriginsFrom, serverOriginFrom } from '@/main/origins'
 import { IPC_CHANNELS } from '@/shared/hostNames'
 
 const launchedAt = performance.now()
@@ -172,7 +110,6 @@ const USER_DATA_HOOK = 'RAVEN_DESKTOP_USER_DATA'
 /** Where an older Raven kept its own sign-ins, encrypted: the page signs in now. */
 const FORMER_ACCOUNTS_DIR = 'accounts'
 
-const PRODUCT_NAME = 'Raven'
 const STORE_NOTICES = {
   state: 'Raven could not save your recent videos.',
   config: 'Raven could not save its settings.',
@@ -181,63 +118,8 @@ const STORE_NOTICES = {
 // Finder sends one `open-file` per file; this gathers a multi-file open into one batch.
 const OPEN_BATCH_MS = 100
 const STATE_DEBOUNCE_MS = 2000
-// raven's night, so the window never flashes white before the page paints.
-const NIGHT = '#15201e'
 
 const timers = createNodeTimers()
-
-type FetchBareProps = {
-  url: string
-  init: { headers: Record<string, string>; signal: AbortSignal }
-}
-
-// No cookie rides along, a redirect fails rather than carry the request elsewhere, and
-// nothing is cached: the releases list, a media origin's probe and a ticketed download.
-const fetchBare = ({ url, init }: FetchBareProps) =>
-  net.fetch(url, { ...init, credentials: 'omit', redirect: 'error', cache: 'no-store' })
-
-const fetchReleases: UpdateFetch = fetchBare
-
-/** The relay's requests to a server: the ticket rides on the URL, never a cookie, and a redirect fails. */
-const fetchRelayed: UpstreamFetch = ({ url, method, headers, signal }) =>
-  net.fetch(url, {
-    method,
-    headers,
-    signal,
-    credentials: 'omit',
-    redirect: 'error',
-    cache: 'no-store',
-  })
-
-/**
- * A media origin's probe, which `mediaAccess` times over the whole body. The timeout's signal
- * aborts the body's read too, so a probe that stalls mid-body fails at the timeout.
- */
-const fetchProbe: ProbeFetch = ({ url, timeoutMs }) =>
-  fetchBare({ url, init: { headers: {}, signal: AbortSignal.timeout(timeoutMs) } })
-
-/** A download's `.part`, opened to append; its size is read from disk each time. */
-const openPart = async (path: string): Promise<PartFile> => {
-  const handle = await open(path, 'a+')
-  return {
-    size: async () => (await handle.stat()).size,
-    append: (chunk) => handle.appendFile(chunk),
-    truncate: () => handle.truncate(0),
-    // On disk before the bytes it holds are counted, so a crash leaves a part the resume can trust.
-    close: () => handle.datasync().finally(() => handle.close()),
-  }
-}
-
-type ShowWindowButtonsProps = {
-  window: BrowserWindow
-  isVisible: boolean
-}
-
-/** The traffic lights are macOS's; elsewhere there is nothing to show or hide. */
-const showWindowButtons = ({ window, isVisible }: ShowWindowButtonsProps): void => {
-  if (process.platform !== PLATFORMS.darwin) return
-  window.setWindowButtonVisibility(isVisible)
-}
 
 // A test hook: a packaged app never reads it, so the environment cannot move its data.
 const userDataOverrideOf = (): string | null => {
@@ -254,43 +136,19 @@ app.setPath('crashDumps', join(userData, 'Crashpad'))
 crashReporter.start({ uploadToServer: false })
 app.setAppLogsPath(logsDirFor({ home: app.getPath('home'), userDataOverride }))
 
-// A second instance hands its files to the first and quits. It keeps no log: it would write
-// a false launch into the first one's file and rotate that file from two processes.
+// A second instance hands its files to the first and quits.
 const isPrimary = app.requestSingleInstanceLock()
 
-const log = isPrimary
-  ? createLog({
-      dir: app.getPath('logs'),
-      fs: logFsFrom({ mkdir, stat, appendFile, rename, rm }),
-      now: Date.now,
-      timers,
-      onError: (error) => {
-        console.error('Raven could not write its log.', error)
-      },
-    })
-  : SILENT_LOG
-
-const warn = (message: string): void => {
-  log.warn(message)
-  if (!app.isPackaged) console.warn(message)
-}
-
-type ReportErrorProps = { text: string; error: unknown }
-
-const reportError = ({ text, error }: ReportErrorProps): void => {
-  const message = `${text} ${errorText(error)}`
-  log.error(message)
-  if (!app.isPackaged) console.error(message)
-}
+const appLog = createAppLog({
+  isPrimary,
+  isPackaged: app.isPackaged,
+  dir: app.getPath('logs'),
+  timers,
+})
+const { log, warn, reportError, mark } = appLog
 
 const reportEndFailure = (error: unknown): void => {
   console.error('Raven could not end.', error)
-}
-
-/** A budget mark (Ruling 13): always logged, and on stdout unpackaged, where e2e reads it. */
-const mark = (line: string): void => {
-  log.mark(line.trim())
-  if (!app.isPackaged) process.stdout.write(line)
 }
 
 const startApp = (): void => {
@@ -469,17 +327,12 @@ const startApp = (): void => {
   launchPaths({ argv: process.argv, isDefaultApp: process.defaultApp }).forEach(fileBatch.push)
 
   const stateFile = join(userData, 'player-state.json')
-  const stateFs: StateFs = {
-    readFile: (path) => readFile(path, 'utf8'),
-    writeFile: ({ path, data }) => writeFile(path, data, 'utf8'),
-    rename: ({ from, to }) => rename(from, to),
-  }
 
   const createService = async (): Promise<DesktopService> => {
     const store = createStateStore({
-      fs: stateFs,
+      fs: TEXT_FS,
       file: stateFile,
-      initial: await loadState({ fs: stateFs, file: stateFile, now: Date.now }),
+      initial: await loadState({ fs: TEXT_FS, file: stateFile, now: Date.now }),
       timers,
       debounceMs: STATE_DEBOUNCE_MS,
       onError: (error) => {
@@ -489,7 +342,7 @@ const startApp = (): void => {
     })
     const configFile = join(userData, CONFIG_FILE)
     const loadedConfig = await loadConfig({
-      fs: stateFs,
+      fs: TEXT_FS,
       file: configFile,
       now: Date.now,
       server: fixedServer,
@@ -497,7 +350,7 @@ const startApp = (): void => {
     })
     // Written on the next tick after a change.
     const config = createJsonStore({
-      fs: stateFs,
+      fs: TEXT_FS,
       file: configFile,
       initial: loadedConfig.config,
       timers,
@@ -513,21 +366,16 @@ const startApp = (): void => {
     // it removes is open; the removals go on while the window opens.
     const formerSessions = await clearFormerPartitions({
       dir: join(userData, PARTITIONS_DIR),
-      fs: {
-        readdir: (path) => readdir(path),
-        remove: (path) => rm(path, { recursive: true, force: true }),
-      },
+      fs: { readdir: (path) => readdir(path), remove: removeTree },
       timers,
       warn,
     })
     formerSessions.removing.catch((error: unknown) => {
       warn(`Raven could not clear its old server sessions: ${errorText(error)}`)
     })
-    rm(join(userData, FORMER_ACCOUNTS_DIR), { recursive: true, force: true }).catch(
-      (error: unknown) => {
-        warn(`Raven could not clear its old sign-ins: ${errorText(error)}`)
-      },
-    )
+    removeTree(join(userData, FORMER_ACCOUNTS_DIR)).catch((error: unknown) => {
+      warn(`Raven could not clear its old sign-ins: ${errorText(error)}`)
+    })
     const grants = createGrants({ fs: { realpath, stat }, newId: randomUUID })
     // The page enters the library PIN, so main's own calls carry the unlock cookie it holds.
     const pageUnlock = createPageUnlock({ cookies: session.defaultSession.cookies, warn })
@@ -581,9 +429,9 @@ const startApp = (): void => {
     // reached through a link (a temporary folder on macOS) would otherwise match none of them.
     const downloadsUserData = await realpath(userData).catch(() => userData)
     const downloadsFile = join(userData, DOWNLOADS_FILE)
-    const loadedDownloads = await loadDownloads({ fs: stateFs, file: downloadsFile, now: Date.now })
+    const loadedDownloads = await loadDownloads({ fs: TEXT_FS, file: downloadsFile, now: Date.now })
     const downloadsStore = createJsonStore({
-      fs: stateFs,
+      fs: TEXT_FS,
       file: downloadsFile,
       initial: loadedDownloads.state,
       timers,
@@ -600,33 +448,19 @@ const startApp = (): void => {
       serverId: theServer().id,
       adopted: loadedConfig.adopted,
       userData: downloadsUserData,
-      fs: {
-        mkdir: (path) => mkdir(path, { recursive: true }).then(() => undefined),
-        rename: ({ from, to }) => rename(from, to),
-        exists: (path) =>
-          stat(path).then(
-            () => true,
-            () => false,
-          ),
-      },
+      fs: { mkdir: makeDir, rename: ({ from, to }) => rename(from, to), exists },
       warn,
     })
     downloadsStore.update(() => settled)
     await downloadsStore.flush()
     // The server keeps its id from launch to launch only once the config holding it is saved.
     if (loadedConfig.isChanged) config.update((current) => ({ ...current }))
-    // The ticket in the URL is the file's only key, so a download sends no cookie.
-    const fetchDownload: StreamFetch = ({ url, headers, signal }) =>
-      fetchBare({ url, init: { headers, signal } })
     const downloads = createDownloadService({
       store: downloadsStore,
       config,
       calls: serverCalls,
       userData: downloadsUserData,
-      space: {
-        mkdir: (path) => mkdir(path, { recursive: true }).then(() => undefined),
-        statfs: (path) => statfs(path),
-      },
+      space: { mkdir: makeDir, statfs: (path) => statfs(path) },
       timers,
       now: Date.now,
       newId: randomUUID,
@@ -644,20 +478,13 @@ const startApp = (): void => {
       }),
       fetch: fetchDownload,
       fs: {
-        mkdir: (path) => mkdir(path, { recursive: true }).then(() => undefined),
+        mkdir: makeDir,
         rename: ({ from, to }) => rename(from, to),
-        rm: (path) => rm(path, { recursive: true, force: true }),
+        rm: removeTree,
         readdir: (path) => readdir(path),
         openPart,
         writeFile: ({ path, text }) => writeFile(path, text, 'utf8'),
-        size: (path) =>
-          stat(path).then(
-            ({ size }) => size,
-            (error: unknown) => {
-              if (isMissingFile(error)) return 0
-              throw error
-            },
-          ),
+        size: sizeOf,
       },
       showItemInFolder: (path) => shell.showItemInFolder(path),
       ready: app.whenReady(),
@@ -832,10 +659,10 @@ const startApp = (): void => {
     // they are, and the wake starts them again.
     powerMonitor.on('suspend', () => downloads.onSuspend())
     powerMonitor.on('resume', () => downloads.onResume())
-    await startWebHost({ serverOrigin: fixedServer.origin })
+    await startWebHost({ serverOrigin: fixedServer.origin, timers, appLog })
     serveFiles({ grants })
-    secureContents()
-    answerRequests({ service, grants })
+    secureContents({ warn })
+    answerRequests({ service, grants, appLog })
 
     const help = createHelpActions({
       folders: { logs: app.getPath('logs'), crashDumps: app.getPath('crashDumps') },
@@ -901,7 +728,7 @@ const startApp = (): void => {
       applicationVersion: app.getVersion(),
     })
 
-    const window = openWindow({ store })
+    const window = openWindow({ store, launchedAt, appLog })
     window.once('ready-to-show', () => {
       launch.isWindowReady = true
     })
@@ -925,6 +752,9 @@ const startApp = (): void => {
       budgets,
       downloads,
       serverOfId,
+      timers,
+      info: (message) => log.info(message),
+      warn,
     })
     // A quit holds the window open while it flushes, so no budget timer may fire meanwhile.
     app.once('before-quit', () => budgets.dispose())
@@ -943,473 +773,6 @@ const startApp = (): void => {
 
   // One window: closing it quits, which runs the quit gate.
   app.on('window-all-closed', () => app.quit())
-}
-
-type StartWebHostProps = { serverOrigin: string }
-
-/**
- * The web app, served from the loopback web host with `/api` passed on to the server. A
- * custom scheme cannot hold it: Chromium keeps no `document.cookie` there, where the web's
- * Supabase session lives. The port is fixed, so when another app holds it Raven says
- * so and quits rather than move the page to an origin with none of its sign-in or settings.
- */
-const startWebHost = async ({ serverOrigin }: StartWebHostProps): Promise<void> => {
-  // A test hook too: an unpackaged run may let the page sign in at a stand-in Supabase Auth.
-  const authOrigin = authOriginFrom({ isPackaged: app.isPackaged, env: process.env, warn })
-  const handler = createWebHostHandler({
-    root: webRootFor({
-      isPackaged: app.isPackaged,
-      appPath: app.getAppPath(),
-      resourcesPath: process.resourcesPath,
-    }),
-    serverOrigin,
-    authOrigin,
-    readFile: (path) => readFile(path),
-    timers,
-    warn,
-    info: (message) => log.info(message),
-  })
-  try {
-    await listenWebHost({
-      createServer: (listener) => createServer(listener),
-      handler,
-      port: WEB_HOST_PORT,
-      addresses: LOOPBACK_ADDRESSES,
-      warn,
-    })
-  } catch (error) {
-    dialog.showErrorBox('Raven could not open', webHostFailureText(error))
-    throw error
-  }
-  log.info(`${WEB_HOST_READY} at ${PAGE_ORIGIN}, /api goes to ${serverOrigin}`)
-}
-
-type ServeFilesProps = { grants: Grants }
-
-const serveFiles = ({ grants }: ServeFilesProps): void => {
-  protocol.handle(
-    FILE_SCHEME,
-    createFileHandler({
-      grants,
-      stat: (path) =>
-        stat(path).then(
-          ({ size }) => ({ size }),
-          () => null,
-        ),
-      readRange: ({ path, start, end }) => Readable.toWeb(createReadStream(path, { start, end })),
-    }),
-  )
-}
-
-const openInBrowser = (url: string): void => {
-  shell.openExternal(url).catch((error: unknown) => {
-    warn(`Raven could not open a link in the browser. ${errorText(error)}`)
-  })
-}
-
-const secureContents = (): void => {
-  session.defaultSession.setPermissionRequestHandler((_contents, permission, callback) => {
-    callback(isPermissionAllowed(permission))
-  })
-  session.defaultSession.setPermissionCheckHandler((_contents, permission) =>
-    isPermissionAllowed(permission),
-  )
-
-  type KeepOnPageProps = { url: string; preventDefault: () => void }
-
-  // A navigation, or a redirect on the way to one, stays on the page or goes to the browser.
-  const keepOnPage = (event: KeepOnPageProps): void => {
-    const decision = navigationFor(event.url)
-    if (decision.isAllowed) return
-    event.preventDefault()
-    if (decision.shouldOpenExternally) openInBrowser(event.url)
-  }
-
-  app.on('web-contents-created', (_event, contents) => {
-    contents.on('will-navigate', keepOnPage)
-    contents.on('will-redirect', keepOnPage)
-    contents.on('will-attach-webview', (event) => event.preventDefault())
-    contents.setWindowOpenHandler(({ url }) => {
-      const decision = windowOpenFor(url)
-      if (decision.shouldOpenExternally) openInBrowser(url)
-      return { action: decision.action }
-    })
-  })
-}
-
-type AnswerRequestsProps = { service: DesktopService; grants: Grants }
-
-const answerRequests = ({ service, grants }: AnswerRequestsProps) => {
-  const answer = createRequestHandler({
-    isTrustedSender,
-    // The page describes a file as it opens it, so this is where a local open is logged.
-    handle: (envelope) => {
-      const fileId = describedFileId(envelope)
-      const file = fileId === null ? null : grants.fileOf(fileId)
-      if (file !== null) log.info(openLine({ kind: PLAYER_SOURCE_KINDS.file, path: file.path }))
-      return service.handle(envelope)
-    },
-    warn,
-  })
-  ipcMain.handle(IPC_CHANNELS.request, (event, payload: unknown) =>
-    answer({ frameUrl: event.senderFrame?.url ?? null, payload }),
-  )
-}
-
-type OpenWindowProps = { store: StateStore }
-
-const openWindow = ({ store }: OpenWindowProps): BrowserWindow => {
-  const bounds = placeWindow({
-    saved: store.read().window,
-    displays: screen.getAllDisplays(),
-    primary: screen.getPrimaryDisplay(),
-  })
-  const window = new BrowserWindow({
-    ...bounds,
-    minWidth: 320,
-    minHeight: 240,
-    show: false,
-    titleBarStyle: 'hiddenInset',
-    backgroundColor: NIGHT,
-    title: PRODUCT_NAME,
-    webPreferences: {
-      preload: join(app.getAppPath(), 'dist', 'preload', 'preload.cjs'),
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      webviewTag: false,
-      spellcheck: false,
-    },
-  })
-
-  window.once('ready-to-show', () => {
-    window.show()
-    mark(`raven-launch-ms ${Math.round(performance.now() - launchedAt)}\n`)
-  })
-
-  const remember = (): void => {
-    // Full screen and minimised bounds are not where the window should reopen.
-    if (window.isFullScreen() || window.isMinimized()) return
-    const current = window.getBounds()
-    const displayId = screen.getDisplayMatching(current).id
-    store.update((state) => setWindowBounds({ state, bounds: { ...current, displayId } }))
-  }
-  window.on('moved', remember)
-  window.on('resized', remember)
-
-  window
-    .loadURL(`${PAGE_ORIGIN}/`)
-    .then(() => log.info(`Raven loaded ${PAGE_ORIGIN}/`))
-    .catch((error: unknown) => {
-      reportError({ text: 'Raven could not load its page.', error })
-    })
-  return window
-}
-
-type NativeEngine = { mpv: Mpv; service: PlayerService }
-type WindowPlayer = ReturnType<typeof attachPlayer>
-
-// A test hook too: an unpackaged run reads `RAVEN_DESKTOP_MPV` (`headless` or `off`).
-const engineMode = () => engineModeFrom({ isPackaged: app.isPackaged, env: process.env })
-
-/** Electron's port behind the bridge's `PortLike`, so the bridge never sees Electron. */
-const portLike = (port: MessagePortMain): PortLike => ({
-  onMessage: (listener) => {
-    port.on('message', (event) => listener(event.data))
-  },
-  onClose: (listener) => {
-    port.on('close', listener)
-  },
-  post: (message) => port.postMessage(message),
-  start: () => port.start(),
-  close: () => port.close(),
-})
-
-const isPageLive = (window: BrowserWindow): boolean =>
-  !window.isDestroyed() &&
-  !window.webContents.isDestroyed() &&
-  isPageUrl(window.webContents.getURL())
-
-type DisplayOfProps = { window: BrowserWindow; mpv: Mpv }
-
-/** The display the window is on, read for mpv; null once mpv is gone. */
-const displayOf = ({ window, mpv }: DisplayOfProps) => {
-  if (window.isDestroyed()) return null
-  return displayReading({
-    frequency: screen.getDisplayMatching(window.getBounds()).displayFrequency,
-    display: () => mpv.display(),
-  })
-}
-
-type ApplyDisplayToProps = {
-  window: BrowserWindow
-  engine: NativeEngine
-}
-
-const applyDisplayTo = async ({ window, engine }: ApplyDisplayToProps): Promise<void> => {
-  const reading = displayOf({ window, mpv: engine.mpv })
-  if (reading === null) return
-  await engine.service.applyDisplay(reading)
-}
-
-type AttachPlayerProps = {
-  window: BrowserWindow
-  grants: Grants
-  config: ConfigStore
-  sources: ReturnType<typeof createServerSources>
-  serverOfId: (serverId: string) => ServerEntry | null
-  relay: Pick<MediaRelay, 'closeAll'>
-  marks: ReturnType<typeof createMarks>
-  budgets: ReturnType<typeof createBudgets>
-  downloads: Pick<DownloadService, 'sidecarsOf' | 'notePlaying'>
-}
-
-/**
- * One window's player: its engine (opened once, under the page), the port hand-over,
- * what playing does to the window and the display, and the close that waits for mpv.
- */
-const attachPlayer = ({
-  window,
-  grants,
-  config,
-  sources,
-  relay,
-  marks,
-  budgets,
-  downloads,
-  serverOfId,
-}: AttachPlayerProps) => {
-  const mode = engineMode()
-  // mpv's events arrive from the moment it opens; the service exists a moment later.
-  const sink: { service: PlayerService | null } = { service: null }
-  const servers = {
-    resolve: async (source: Parameters<typeof sources.resolve>[0]) => {
-      const resolved = await sources.resolve(source)
-      const server = serverOfId(source.serverId)
-      if (resolved.ok && server !== null) {
-        log.info(
-          openLine({
-            kind: PLAYER_SOURCE_KINDS.server,
-            serverName: server.name,
-            mediaId: source.mediaId,
-          }),
-        )
-      }
-      return resolved
-    },
-  }
-  const resolveFrom = resolveSourceWith({ grants, servers, sidecarsOf: downloads.sidecarsOf })
-  // Told as each load begins, in the order the loads come: a server title that resolves
-  // slowly must not clear a download loaded after it.
-  const resolveSource: typeof resolveFrom = (source) => {
-    downloads.notePlaying({
-      fileId: source.kind === PLAYER_SOURCE_KINDS.file ? source.fileId : null,
-    })
-    return resolveFrom(source)
-  }
-  const sleepGuard = createSleepGuard({
-    start: () => powerSaveBlocker.start('prevent-display-sleep'),
-    stop: (id) => powerSaveBlocker.stop(id),
-  })
-  // The budgets read both halves of the activity, which arrive one callback at a time.
-  let latest: PlayerActivity = { isPlaying: false, isShowing: false }
-  const activity = createActivity({
-    onPlaying: (isPlaying) => {
-      sleepGuard.set(isPlaying)
-      marks.playing(isPlaying)
-      latest = { ...latest, isPlaying }
-      budgets.report(latest)
-    },
-    onShowing: (isShowing) => {
-      latest = { ...latest, isShowing }
-      budgets.report(latest)
-      if (!isShowing) downloads.notePlaying({ fileId: null })
-      // The title is gone from the screen, so its relay secret is retired with it.
-      if (!isShowing) relay.closeAll()
-      if (window.isDestroyed()) return
-      window.setBackgroundColor(isShowing ? CLEAR : NIGHT)
-      // A page with no video shows the traffic lights, whatever the player last asked for.
-      if (!isShowing) showWindowButtons({ window, isVisible: true })
-    },
-  })
-
-  const surfaceFor = (kind: MpvSurface['kind']): MpvSurface =>
-    kind === MPV_SURFACE_KINDS.window ? { kind, handle: window.getNativeWindowHandle() } : { kind }
-
-  const openNative = async (surface: MpvSurface): Promise<NativeEngine> => {
-    const mpv = await openMpv({
-      surface,
-      // Always explicit: the addon and libmpv sit outside the bundle (Ruling 2).
-      addonPath: addonPathFor({
-        isPackaged: app.isPackaged,
-        appPath: app.getAppPath(),
-        resourcesPath: process.resourcesPath,
-      }),
-      onEvent: (event) => {
-        if (sink.service !== null) sink.service.receive(event)
-      },
-    })
-    try {
-      await Promise.all(engineOptionsFor({ surface }).map((option) => mpv.set(option)))
-      // Made before anything can load: it hardens mpv first and refuses loads if that fails.
-      const service = createPlayerService({
-        mpv,
-        resolveSource,
-        explain: sources.explain,
-        refusedAccount: sources.refusedAccount,
-        canChooseAo: mode === ENGINE_MODES.window,
-        timers,
-        onActivity: activity.report,
-        onFirstFrame: marks.firstFrame,
-        warn,
-      })
-      sink.service = service
-      const engine = { mpv, service: marks.tracking(service) }
-      await service.applyOutput({ output: config.read().output, devices: await readDevices(mpv) })
-      await applyDisplayTo({ window, engine })
-      return engine
-    } catch (error) {
-      await mpv.destroy()
-      throw error
-    }
-  }
-
-  const openLogged = async (surface: MpvSurface): Promise<NativeEngine> => {
-    const opened = await openNative(surface)
-    const ffmpeg = await opened.mpv
-      .read({ name: MPV_PROPERTIES.ffmpegVersion })
-      .catch(() => 'unknown')
-    log.info(`video engine ready: ${opened.mpv.version}, FFmpeg ${ffmpeg}`)
-    return opened
-  }
-
-  // Why there is no engine, for Copy Diagnostics. The message the engine fell back with, not
-  // the error behind it, which the log keeps: a failed dlopen names the addon's path.
-  let engineNote: string | null = null
-  const engine = createEngineSlot<NativeEngine>({
-    open: async () => {
-      try {
-        const opened = await openEngine({
-          mode,
-          surfaceFor,
-          open: openLogged,
-          warn: (message) => warn(`Raven could not open its video engine: ${message}`),
-        })
-        if (opened.status === ENGINE_STATUSES.unavailable) engineNote = opened.message
-        return opened
-      } catch (error) {
-        engineNote = ENGINE_MESSAGES.unavailable
-        throw error
-      }
-    },
-    destroyOf: ({ mpv, service }) => {
-      service.dispose()
-      return mpv.destroy()
-    },
-    watch: ({ engine: opened, onDied }) =>
-      watchService({
-        engine: opened,
-        onDied: () => {
-          engineNote = ENGINE_MESSAGES.unavailable
-          onDied()
-        },
-      }),
-    warn,
-  })
-
-  const connector = createConnector({
-    engine: engine.get,
-    channel: () => {
-      const { port1, port2 } = new MessageChannelMain()
-      return { local: portLike(port1), remote: port2 }
-    },
-    post: ({ connection, ports }) => {
-      if (!isPageLive(window)) throw new Error('its page is gone.')
-      window.webContents.postMessage(IPC_CHANNELS.player, connection, ports)
-    },
-    warn,
-    timers,
-  })
-
-  const startEngine = () => {
-    engine.get().catch((error: unknown) => {
-      warn(`Raven could not open its video engine: ${errorText(error)}`)
-    })
-  }
-  // Whichever comes first of this and the page's `ready` (through the connector).
-  window.once('ready-to-show', startEngine)
-
-  const followDisplay = () => {
-    const current = engine.current()
-    if (current === null) return
-    applyDisplayTo({ window, engine: current }).catch((error: unknown) => {
-      warn(`Raven could not follow the display: ${errorText(error)}`)
-    })
-  }
-  window.on('moved', followDisplay)
-  window.on('enter-full-screen', followDisplay)
-  window.on('leave-full-screen', followDisplay)
-  screen.on('display-added', followDisplay)
-  screen.on('display-removed', followDisplay)
-  screen.on('display-metrics-changed', followDisplay)
-
-  // A new page load drops the port the last page's `ready` is still waiting on the engine for.
-  // Handed over late, it would reach the new page, which keeps the first port it gets, and
-  // the new page's own `ready` would then close it under it.
-  window.webContents.on('did-navigate', () => {
-    connector.disconnect()
-  })
-
-  // A crashed page holds no port; stop what it was playing until its reload asks again, and put
-  // the window back for a page with no video even when the service had nothing left to stop.
-  window.webContents.on('render-process-gone', () => {
-    connector.disconnect()
-    activity.hide()
-  })
-
-  // Each page load starts with no video, whatever the last one left the window showing.
-  const connect = () => {
-    activity.hide()
-    return connector.connect()
-  }
-
-  // The window goes only once mpv has stopped drawing into it.
-  window.on(
-    'close',
-    createQuitGate({
-      isDirty: engine.isAlive,
-      flush: engine.destroy,
-      timeoutMs: DESTROY_MS,
-      quit: () => window.close(),
-      exit: () => {
-        const ending = closeTimeoutFor({ isEngineAlive: engine.isAlive() })
-        switch (ending) {
-          case CLOSE_TIMEOUTS.quitApp:
-            // The app's gate flushes the stores, then ends the process however it must.
-            app.quit()
-            return
-          case CLOSE_TIMEOUTS.destroyWindow:
-            window.destroy()
-            return
-          default: {
-            const unreachable: never = ending
-            return unreachable
-          }
-        }
-      },
-      wait: (ms) => sleep(ms),
-    }),
-  )
-  window.on('closed', () => {
-    connector.disconnect()
-    sleepGuard.set(false)
-    marks.playing(false)
-    screen.off('display-added', followDisplay)
-    screen.off('display-removed', followDisplay)
-    screen.off('display-metrics-changed', followDisplay)
-  })
-
-  return { engine, connect, engineNote: () => engineNote }
 }
 
 if (isPrimary) {
