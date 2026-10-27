@@ -87,14 +87,25 @@
   display: grid;
 }
 
+// The facts and the name, with Delete at the end of the row.
 .file {
   display: grid;
-  gap: var(--space-0);
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'facts remove'
+    'name remove';
+  align-items: center;
+  gap: var(--space-0) var(--space-2);
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--color-line);
 }
 
+.remove {
+  grid-area: remove;
+}
+
 .facts {
+  grid-area: facts;
   display: grid;
   grid-auto-flow: column;
   justify-content: start;
@@ -109,6 +120,7 @@
 }
 
 .fileName {
+  grid-area: name;
   color: var(--color-lichen);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
