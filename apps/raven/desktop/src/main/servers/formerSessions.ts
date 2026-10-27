@@ -1,7 +1,7 @@
 import { join } from 'node:path'
-import { isOpaqueId, isRecord } from '@raven/core'
+import { isOpaqueId } from '@raven/core'
 import { loggable } from '@/main/servers/serverCalls'
-import { ERROR_CODES, type Timers } from '@/main/stateStore'
+import { isMissingFile, type Timers } from '@/main/stateStore'
 import { messageOf } from '@/shared/messageOf'
 
 /** The folder under userData where Electron keeps each `persist:` partition. */
@@ -23,8 +23,6 @@ export const formerPartitions = ({ names }: FormerPartitionsProps): string[] =>
     const id = PARTITION_FOLDER.exec(name)?.[1] ?? null
     return id !== null && isOpaqueId(id)
   })
-
-const isMissing = (error: unknown): boolean => isRecord(error) && error.code === ERROR_CODES.enoent
 
 /**
  * How long launch waits to list the partitions folder; a slow disk skips the cleanup this time
@@ -53,7 +51,7 @@ export const clearFormerPartitions = async ({
   warn,
 }: ClearFormerPartitionsProps): Promise<{ removing: Promise<void> }> => {
   const listing = fs.readdir(dir).catch((error: unknown): readonly string[] => {
-    if (!isMissing(error)) {
+    if (!isMissingFile(error)) {
       warn(`Raven could not read its server sessions: ${loggable(messageOf(error))}`)
     }
     return []
