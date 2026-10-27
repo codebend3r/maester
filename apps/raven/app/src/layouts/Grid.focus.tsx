@@ -25,10 +25,9 @@ import {
 import { GRID_ROWS, type GridRow, gridColumnsOf } from '@/layouts/gridRows'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useGrid } from '@/layouts/useGrid'
-import { TV_SIZES, tvSize } from '@/theme/tvSizes'
+import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
-const GUTTER = TV_SIZES.space8
 const GAP = TV_SIZES.space5
 
 /** A row of the list and tiles views is at least this wide, so a TV holds three. */
@@ -171,7 +170,7 @@ const Grid = ({
   const styles = useStyles()
   const isRows = isRowView(view)
   const { columnsOf, widthOf } = gridColumnsOf({
-    room: screen.width - 2 * GUTTER,
+    room: screen.width - 2 * TV_GUTTER,
     gap: GAP,
     leastOf: (shape) => (isRows ? LEAST_ROW_WIDTH : focusCardWidthOf(shape)),
   })
@@ -334,7 +333,7 @@ const useStyles = themedStyles((colours) =>
       flexShrink: 0,
       gap: TV_SIZES.space2,
       paddingTop: TV_SIZES.space6,
-      paddingHorizontal: GUTTER,
+      paddingHorizontal: TV_GUTTER,
       paddingBottom: TV_SIZES.space2,
     },
     title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
@@ -358,7 +357,7 @@ const useStyles = themedStyles((colours) =>
     markEmpty: { color: colours.line },
     focused: { borderColor: colours.text, backgroundColor: colours.quiet },
     listSlot: { flex: 1 },
-    content: { paddingHorizontal: GUTTER, paddingBottom: TV_SIZES.space6 },
+    content: { paddingHorizontal: TV_GUTTER, paddingBottom: TV_SIZES.space6 },
     bucketRow: { justifyContent: 'center' },
     bucket: {
       flexDirection: 'row',

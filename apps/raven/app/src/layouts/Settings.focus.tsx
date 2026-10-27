@@ -14,7 +14,8 @@ import type {
   SettingsToggleProps,
 } from '@/layouts/settingsKit'
 import { usePlateStyles } from '@/layouts/tvControls'
-import { TV_SIZES } from '@/theme/tvSizes'
+import { OPACITIES } from '@/theme/appTheme'
+import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
 /** What a TV toggle says it is set to. */
@@ -147,7 +148,7 @@ const useStyles = themedStyles((colours) =>
     page: {
       gap: TV_SIZES.space5,
       paddingVertical: TV_SIZES.space6,
-      paddingHorizontal: TV_SIZES.space8,
+      paddingHorizontal: TV_GUTTER,
     },
     title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
     section: { gap: TV_SIZES.space3 },
@@ -163,6 +164,6 @@ const useStyles = themedStyles((colours) =>
       paddingVertical: TV_SIZES.space2,
     },
     button: { alignSelf: 'flex-start' },
-    off: { opacity: 0.5 },
+    off: { opacity: OPACITIES.disabled },
   }),
 )

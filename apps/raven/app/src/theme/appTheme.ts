@@ -113,3 +113,6 @@ export const SIZES = {
 
 /** A set of the shared scale's lengths: `SIZES`, or the TV layouts' sized to the screen. */
 export type Sizes = Record<keyof typeof SIZES, number>
+
+/** How faint a control is drawn while a finger holds it, and while it is turned off. */
+export const OPACITIES = { pressed: 0.6, disabled: 0.5 } as const

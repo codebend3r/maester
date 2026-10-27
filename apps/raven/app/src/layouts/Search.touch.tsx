@@ -18,7 +18,7 @@ import {
   type SearchKit,
   type SearchLayoutProps,
 } from '@/layouts/searchKit'
-import { SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
 
 /**
@@ -137,7 +137,7 @@ const useStyles = themedStyles((colours) =>
       justifyContent: 'center',
     },
     clearText: { color: colours.muted, fontSize: SIZES.textLg },
-    pressed: { opacity: 0.6 },
+    pressed: { opacity: OPACITIES.pressed },
     results: { gap: SIZES.space4, paddingTop: SIZES.space2 },
     notice: { color: colours.muted, fontSize: SIZES.text, paddingHorizontal: SIZES.space3 },
   }),

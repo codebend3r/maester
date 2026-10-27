@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet } from 'react-native'
 
 import { Text } from '@/layouts/Text'
-import { SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 
 /** The way back, and what it is called aloud without its arrow. */
@@ -42,6 +42,6 @@ const useStyles = themedStyles((colours) =>
     },
     label: { color: colours.muted, fontSize: SIZES.text },
     raisedLabel: { color: colours.text },
-    pressed: { opacity: 0.6 },
+    pressed: { opacity: OPACITIES.pressed },
   }),
 )

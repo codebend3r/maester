@@ -26,7 +26,7 @@ import {
 } from '@/layouts/playerKit'
 import { TouchBack } from '@/layouts/TouchBack'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
-import { SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { pictureStyles } from '@/theme/useTheme'
 
 const { Picker, ToolButton } = touchPicker
@@ -306,7 +306,7 @@ const useStyles = pictureStyles((colours) =>
     },
     // The same dark glass as the skips, larger: the web's play is on-picture too, in every theme.
     roundLarge: { minWidth: SIZES.controlLarge * 1.5, minHeight: SIZES.controlLarge * 1.5 },
-    pressed: { opacity: 0.6 },
+    pressed: { opacity: OPACITIES.pressed },
     glyph: { color: colours.text, fontSize: SIZES.text, fontWeight: '600' },
     glyphLarge: { fontSize: SIZES.textXl },
     captionSlot: {

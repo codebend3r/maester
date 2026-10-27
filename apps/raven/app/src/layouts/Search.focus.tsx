@@ -9,7 +9,7 @@ import {
   type SearchLayoutProps,
 } from '@/layouts/searchKit'
 import { NOTHING_ON_FOCUS, PlateButton, TvTextField } from '@/layouts/tvControls'
-import { TV_SIZES } from '@/theme/tvSizes'
+import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
 /**
@@ -77,7 +77,7 @@ const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     ground: { flex: 1, backgroundColor: colours.ground },
     page: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
-    header: { gap: TV_SIZES.space3, paddingHorizontal: TV_SIZES.space8 },
+    header: { gap: TV_SIZES.space3, paddingHorizontal: TV_GUTTER },
     title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
     notice: { color: colours.muted, fontSize: TV_SIZES.textLg },
     box: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space2 },
