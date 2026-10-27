@@ -1,19 +1,10 @@
 import { createHash } from 'node:crypto'
 import { mkdir, readFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isString, listOf, object, type Infer } from '@raven/core'
-
-export const PLATFORMS = {
-  darwin: 'darwin',
-  win32: 'win32',
-} as const satisfies Record<string, NodeJS.Platform>
-export const ARCHITECTURES = {
-  arm64: 'arm64',
-  x64: 'x64',
-} as const satisfies Record<string, NodeJS.Architecture>
-/** The platform a native build is for, as its provenance records it. */
-export const BUILD_TARGETS = { darwinArm64: 'darwin-arm64', win32X64: 'win32-x64' } as const
+import { ARCHITECTURES, NATIVE_TARGETS, PLATFORMS } from '@/target'
+import type { NativeTarget } from '@/target'
 
 /** The patches applied to mpv's sources, in order; the build's provenance records each one's digest. */
 export const PATCHES = [
@@ -27,9 +18,15 @@ export const SHIPPED_LIBRARIES = ['libMoltenVK.dylib', 'libmpv.2.dylib'] as cons
 export const project = fileURLToPath(new URL('../..', import.meta.url))
 export const work = resolve(project, 'native-build')
 export const prefix = resolve(work, 'prefix')
-export const resources = resolve(project, `resources/${BUILD_TARGETS.darwinArm64}`)
-/** Where the Windows libmpv lands: the prebuilt DLL, its headers and their provenance. */
-export const windowsResources = resolve(project, `resources/${BUILD_TARGETS.win32X64}`)
+
+type ResourcesOfProps = {
+  target: NativeTarget
+}
+
+/** Where a target's runtime files land: the addon, libmpv and their provenance. */
+const resourcesOf = ({ target }: ResourcesOfProps) => resolve(project, 'resources', target)
+export const resources = resourcesOf({ target: NATIVE_TARGETS.darwinArm64 })
+export const windowsResources = resourcesOf({ target: NATIVE_TARGETS.win32X64 })
 const isSourceShape = object({
   name: isString,
   repository: isString,
@@ -129,6 +126,15 @@ export const inSequence = async <T>({ items, each }: InSequenceProps<T>): Promis
     await each(item)
   }, Promise.resolve())
 }
+
+export const isWindows = () => process.platform === PLATFORMS.win32
+
+// Windows' tar is bsdtar in System32. A Git for Windows bash puts GNU tar first on PATH,
+// and that one reads `D:\\...` as a host name.
+const ENV_NAMES = { systemRoot: 'SystemRoot' } as const
+export const TAR = isWindows()
+  ? join(process.env[ENV_NAMES.systemRoot] ?? 'C:\\Windows', 'System32', 'tar.exe')
+  : 'tar'
 
 export const requireMacArm = () => {
   if (process.platform !== PLATFORMS.darwin || process.arch !== ARCHITECTURES.arm64)

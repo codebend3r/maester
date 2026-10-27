@@ -46,4 +46,5 @@ export const prebuilt = async (): Promise<Prebuilt> => {
 export const WINDOWS_FILES = {
   libmpv: 'libmpv-2.dll',
   headers: 'include/mpv',
+  addon: 'raven_mpv.node',
 } as const

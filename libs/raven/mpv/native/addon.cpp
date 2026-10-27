@@ -1,7 +1,7 @@
 #include <napi.h>
 #include <uv.h>
 #include <mpv/client.h>
-#import "surface.h"
+#include "surface.h"
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -155,7 +155,18 @@ struct Player {
         wake(this);
     }
 
-    void disconnect() { isAlive = false; }
+    // Under the callback lock, so once this returns no wake() is between its isAlive check
+    // and its call into the TSFN.
+    void disconnect() {
+        std::lock_guard<std::mutex> lock(callbackMutex);
+        isAlive = false;
+    }
+    void releaseCallback() {
+        std::lock_guard<std::mutex> lock(callbackMutex);
+        if (!hasCallbackReference) return;
+        hasCallbackReference = false;
+        napi_release_threadsafe_function(callback, napi_tsfn_abort);
+    }
     void terminate() {
         std::call_once(termination, [this] {
             if (handle) {
@@ -166,11 +177,7 @@ struct Player {
                 handle = nullptr;
                 --handleCount;
             }
-            std::lock_guard<std::mutex> lock(callbackMutex);
-            if (hasCallbackReference) {
-                hasCallbackReference = false;
-                napi_release_threadsafe_function(callback, napi_tsfn_abort);
-            }
+            releaseCallback();
         });
     }
     void removeCleanupHook() {
@@ -184,6 +191,10 @@ struct Player {
         auto owner = static_cast<std::shared_ptr<Player> *>(data);
         auto player = *owner;
         player->disconnect();
+        // Let go of the TSFN here, on the loop thread, while the environment still owns it.
+        // Node's own cleanup hook frees the TSFN while the engine terminates on its thread,
+        // so a release from there would touch freed memory: an access violation on Windows.
+        player->releaseCallback();
         // Removing the hook updates Node's exit counters and immediate queue, which only the
         // loop thread may touch: from the terminating thread it can hang or abort exit. The
         // engine terminates off the loop, then this handle wakes the loop to finish there.
@@ -301,9 +312,9 @@ public:
                 option("ao", "null");
             } else {
                 option("vo", "gpu-next");
-                option("gpu-api", "vulkan");
-                option("gpu-context", "moltenvk");
-                int64_t wid = (int64_t)(__bridge void *)player->surface.layer();
+                option("gpu-api", player->surface.gpuApi());
+                if (auto context = player->surface.gpuContext()) option("gpu-context", context);
+                int64_t wid = player->surface.wid();
                 check(env, mpv_set_option(player->handle, "wid", MPV_FORMAT_INT64, &wid));
             }
             check(env, mpv_initialize(player->handle));
@@ -349,9 +360,7 @@ public:
         auto owner = player;
         std::thread([owner] {
             owner->terminate();
-            if (owner->surface.content) {
-                dispatch_async(dispatch_get_main_queue(), ^{ owner->surface.detach(); });
-            }
+            owner->surface.detachFromAnyThread();
         }).detach();
     }
     void command(const Napi::CallbackInfo &info) {
@@ -413,7 +422,7 @@ public:
         auto result = Napi::Object::New(info.Env());
         result.Set("refreshRate", player->surface.refreshRate());
         result.Set("edrHeadroom", player->surface.edrHeadroom());
-        result.Set("sortRepairs", (double)player->surface.view.sortRepairs);
+        result.Set("sortRepairs", (double)player->surface.sortRepairs());
         return result;
     }
     static Napi::Object init(Napi::Env env, Napi::Object exports) {

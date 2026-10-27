@@ -1,16 +1,8 @@
 import { cp, mkdir, rm } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { auditWindows } from '@/build/auditWindows'
-import {
-  BUILD_TARGETS,
-  checkedDownload,
-  output,
-  PLATFORMS,
-  run,
-  windowsResources,
-  work,
-  write,
-} from '@/build/context'
+import { checkedDownload, output, TAR, run, windowsResources, work, write } from '@/build/context'
+import { NATIVE_TARGETS } from '@/target'
 import { prebuilt, WINDOWS_FILES } from '@/build/windowsLock'
 
 /**
@@ -19,24 +11,16 @@ import { prebuilt, WINDOWS_FILES } from '@/build/windowsLock'
  * may come from. bsdtar reads 7z archives, on macOS and as Windows' own `tar`.
  */
 
-// Windows' tar is bsdtar in System32. A Git for Windows bash puts GNU tar first on PATH,
-// and that one reads `D:\...` as a host name.
-const ENV_NAMES = { systemRoot: 'SystemRoot' } as const
-const TAR =
-  process.platform === PLATFORMS.win32
-    ? join(process.env[ENV_NAMES.systemRoot] ?? 'C:\\Windows', 'System32', 'tar.exe')
-    : 'tar'
-
 export const fetchWindowsLibmpv = async () => {
   const locked = await prebuilt()
-  const archive = resolve(work, `archives/libmpv-${BUILD_TARGETS.win32X64}.7z`)
+  const archive = resolve(work, `archives/libmpv-${NATIVE_TARGETS.win32X64}.7z`)
   await checkedDownload({
     path: archive,
     url: locked.url,
     sha256: locked.sha256,
     what: locked.name,
   })
-  const extracted = resolve(work, `libmpv-${BUILD_TARGETS.win32X64}`)
+  const extracted = resolve(work, `libmpv-${NATIVE_TARGETS.win32X64}`)
   await rm(extracted, { recursive: true, force: true })
   await mkdir(extracted, { recursive: true })
   await run({ args: [TAR, '-xf', archive, '-C', extracted] })
@@ -56,7 +40,7 @@ export const fetchWindowsLibmpv = async () => {
     content:
       JSON.stringify(
         {
-          platform: BUILD_TARGETS.win32X64,
+          platform: NATIVE_TARGETS.win32X64,
           revision: await output({ args: ['git', 'rev-parse', 'HEAD'] }),
           prebuilt: locked,
         },

@@ -1,5 +1,4 @@
 import { createRequire } from 'node:module'
-import { fileURLToPath } from 'node:url'
 import {
   type Infer,
   isBoolean,
@@ -16,6 +15,7 @@ import {
   type MpvProperty,
   type MpvPropertyValue,
 } from '@/properties'
+import { localAddonPath } from '@/target'
 
 export const MPV_EVENTS = {
   property: 'property',
@@ -139,17 +139,19 @@ type OpenMpvProps = {
   surface: MpvSurface
   onEvent: (event: MpvEvent) => void
   addonPath?: string
-  loadAddon?: (path: string) => unknown
+  /** Loads the addon; a test's fake stands in for the whole lookup. */
+  loadAddon?: () => unknown
 }
 
 /** Main-process API only. The renderer must use the allowlisted PlayerCommand bridge, never this API. */
 export const openMpv = async ({
   surface,
   onEvent,
-  addonPath = fileURLToPath(new URL('../resources/darwin-arm64/raven_mpv.node', import.meta.url)),
-  loadAddon = createRequire(import.meta.url),
+  addonPath,
+  // The checkout's own build is looked up only when the host names no path of its own.
+  loadAddon = () => createRequire(import.meta.url)(addonPath ?? localAddonPath()),
 }: OpenMpvProps) => {
-  const addon: unknown = loadAddon(addonPath)
+  const addon: unknown = loadAddon()
   if (!isNativeAddon(addon)) throw new Error('Invalid raven mpv addon')
   const major = Math.floor(addon.apiVersion / 65536)
   const minor = addon.apiVersion % 65536
