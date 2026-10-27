@@ -7,7 +7,9 @@ import {
   type SubtitleTrack,
 } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
-import { PLAYER_MESSAGES, type ServerTarget, PLAYER_PHASES } from '@/main/player/playerService'
+import type { ServerTarget } from '@/main/player/loadTarget'
+import { PLAYER_PHASES } from '@/main/player/phases'
+import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import { TICKET_OUTCOMES, type TicketOutcome } from '@/main/servers/accountTickets'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import type { MediaRelay } from '@/main/servers/mediaRelay'

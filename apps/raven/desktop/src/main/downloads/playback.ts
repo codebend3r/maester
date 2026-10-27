@@ -17,7 +17,7 @@ import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { downloadsDirFor, sidecarPathFor, videoPathFor } from '@/main/downloads/space'
 import type { GrantedFile, Grants } from '@/main/grants'
 import { errorText } from '@/main/log/errorText'
-import type { LocalSidecar } from '@/main/player/playerService'
+import type { LocalSidecar } from '@/main/player/loadTarget'
 import { refused } from '@/main/replies'
 import {
   type FileFacts,
