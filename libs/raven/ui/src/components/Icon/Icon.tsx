@@ -1,71 +1,6 @@
 import type { LibraryIconName } from '@raven/core'
 import styles from '@/components/Icon/Icon.module.scss'
 
-/** Every icon a library can wear, and the app's own. */
-export type IconName =
-  | LibraryIconName
-  | 'back'
-  | 'plus'
-  | 'rescan'
-  | 'edit'
-  | 'close'
-  | 'check'
-  | 'folder'
-  | 'up'
-  | 'down'
-  | 'grip'
-  | 'expand'
-  | 'download'
-  | 'alert'
-  | 'copy'
-  | 'search'
-  | 'trash'
-  | 'more'
-  | 'heart'
-  | 'play'
-  | 'pause'
-  | 'rewind'
-  | 'forward'
-  | 'volume'
-  | 'volumeLow'
-  | 'muted'
-  | 'captions'
-  | 'settings'
-  | 'fullscreen'
-  | 'fullscreenExit'
-  | 'keyboard'
-  | 'pin'
-  | 'grid'
-  | 'covers'
-  | 'list'
-  | 'tiles'
-  | 'grouped'
-  | 'shuffle'
-  | 'history'
-  | 'next'
-  | 'skipNext'
-  | 'skipPrevious'
-  | 'wand'
-  | 'image'
-  | 'ascending'
-  | 'descending'
-  | 'libraries'
-  | 'home'
-  | 'playback'
-  | 'file-play'
-  | 'convert'
-  | 'resize'
-  | 'gauge'
-  | 'chip'
-  | 'sun'
-  | 'reset'
-  | 'split'
-  | 'merge'
-  | 'sidebar'
-  | 'lock'
-  | 'unlock'
-  | 'signOut'
-
 /**
  * An icon's drawing, up to three paths: the outline, the soft tint under its
  * main shape, and the solid marks (sparks, hearts, notes, dots).
@@ -128,7 +63,11 @@ const FOOTBALL =
 const STOP = 'M8.6 3.5h6.8l5.1 5.1v6.8l-5.1 5.1H8.6l-5.1-5.1V8.6z'
 const EARCUPS = `${roundRect({ x: 4, y: 14, w: 4, h: 6.5, r: 1.5 })}${roundRect({ x: 16, y: 14, w: 4, h: 6.5, r: 1.5 })}`
 
-const DRAWINGS: Record<IconName, Drawing> = {
+/**
+ * Every icon's drawing: the ones a library can wear, which `LibraryIconName`
+ * holds this table to, and the app's own.
+ */
+const DRAWINGS = {
   home: {
     stroke:
       'M4 10.6a2 2 0 0 1 .7-1.5l6-5.1a2 2 0 0 1 2.6 0l6 5.1a2 2 0 0 1 .7 1.5V18a2 2 0 0 1-2 2h-3v-5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v5H6a2 2 0 0 1-2-2z',
@@ -376,7 +315,10 @@ const DRAWINGS: Record<IconName, Drawing> = {
     marks: circle({ cx: 12, cy: 9.5, r: 2 }),
   },
   audiobook: { stroke: `${BOOK}M12 6.5v13`, fill: BOOK },
-}
+} satisfies Record<LibraryIconName, Drawing> & Record<string, Drawing>
+
+/** Every icon a library can wear, and the app's own. */
+export type IconName = keyof typeof DRAWINGS
 
 /** Arrows nudge their own way under the pointer instead of popping. */
 const NUDGES: Partial<Record<IconName, string>> = {
@@ -407,7 +349,9 @@ type IconProps = { name: IconName; size?: IconSize }
  * aria-label on the control.
  */
 export const Icon = ({ name, size = 20 }: IconProps) => {
-  const { stroke, fill, marks } = DRAWINGS[name]
+  // Each entry is its own literal shape; read through `Drawing` so the optional paths are plain.
+  const drawing: Drawing = DRAWINGS[name]
+  const { stroke, fill, marks } = drawing
   return (
     <svg
       width={size}

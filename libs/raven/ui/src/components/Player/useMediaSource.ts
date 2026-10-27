@@ -138,7 +138,7 @@ export const useMediaSource = ({
     },
   })
 
-  type AttachUseEffectEventCallbackProps = {
+  type AttachProps = {
     element: HTMLVideoElement
     source: VideoSource
     duration: number | null
@@ -148,7 +148,7 @@ export const useMediaSource = ({
 
   // Starts the source where playback is, playing on if it was.
   const attach = useEffectEvent(
-    ({ element, source, duration, isRemote }: AttachUseEffectEventCallbackProps): (() => void) => {
+    ({ element, source, duration, isRemote }: AttachProps): (() => void) => {
       const from = position.current
       const play = () => {
         if (playing.current) element.play()?.catch(() => onRefused())

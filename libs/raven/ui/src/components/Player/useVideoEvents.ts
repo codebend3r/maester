@@ -32,11 +32,9 @@ type UseVideoEventsProps = {
  * hook can hand over closures over its current props without resubscribing.
  */
 export const useVideoEvents = ({ videoRef, on }: UseVideoEventsProps): void => {
-  type HandleUseEffectEventCallbackProps = { name: MediaEventName; element: HTMLVideoElement }
+  type HandleProps = { name: MediaEventName; element: HTMLVideoElement }
 
-  const handle = useEffectEvent(({ name, element }: HandleUseEffectEventCallbackProps) =>
-    on[name]?.(element),
-  )
+  const handle = useEffectEvent(({ name, element }: HandleProps) => on[name]?.(element))
   useEffect(() => {
     const element = videoRef.current
     if (!element) return undefined
