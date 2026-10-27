@@ -44,6 +44,24 @@ export const managementOf = ({
   }
 }
 
+type CannotManageNoteProps = {
+  mode: ManagementMode
+  /** What managing would do, after "to" or "can": "add a library". */
+  action: string
+  /** Where the admin lock is turned off, after "off"; the Settings page says "below". */
+  lockPlace?: string
+}
+
+/** Why a viewer who may not manage cannot `action`, and with the admin lock, how to. */
+export const cannotManageNote = ({
+  mode,
+  action,
+  lockPlace = 'in Settings',
+}: CannotManageNoteProps): string =>
+  mode === MANAGEMENT_MODES.adminLock
+    ? `Turn the admin lock off ${lockPlace} to ${action}.`
+    : `Only the owner can ${action}.`
+
 export const useManagement = (): ReturnType<typeof managementOf> =>
   managementOf({ access: useAccessState(), adminLock: useAdminLock() })
 

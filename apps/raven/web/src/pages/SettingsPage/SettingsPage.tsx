@@ -1,20 +1,16 @@
-import { type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  ADMIN_LOCK_STATES,
-  type AdminLock,
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,
   DISPLAY_CHOICES,
   type DisplaySettings,
   PLAYBACK_CHOICES,
   type PlaybackSettings,
-  plural,
 } from '@raven/core'
-import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button, type IconName } from '@raven/ui'
+import { Button } from '@raven/ui'
 import {
-  CONTROLS_LINGER_SECONDS,
   edit,
   mutationKeys,
   queryKeys,
@@ -22,21 +18,25 @@ import {
   usePlayerPrefs,
 } from '@raven/ui/headless'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
-import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { api } from '@/lib/api'
 import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
-import { adminLockQuery, displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
+import { displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
 import { DesktopSettings } from '@/desktop/settings/DesktopSettings'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'
+import { AdminLockSection } from '@/pages/SettingsPage/AdminLockSection'
+import { AdvancedSection } from '@/pages/SettingsPage/AdvancedSection'
+import {
+  type Choices,
+  Setting,
+  SettingsSection,
+  SettingsSkeleton,
+} from '@/pages/SettingsPage/Setting'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { UsersSection } from '@/pages/SettingsPage/UsersSection'
 import { useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
-
-/** Every value a setting takes, with its words; a value added in `@raven/core` cannot go unlabelled. */
-type Choices<V extends string | number> = Record<V, { label: string; hint: string }>
 
 const TITLES: Choices<DisplaySettings['titles']> = {
   logo: {
@@ -109,135 +109,6 @@ const ENCODER_NAMES = {
   videotoolbox: 'VideoToolbox',
 }
 
-type SettingProps<V extends string | number> = {
-  label: string
-  icon: IconName
-  values: readonly V[]
-  choices: Choices<V>
-  value: V
-  onChange: (value: V) => void
-}
-
-/** One setting as a group of radio cards, each with a line saying what it means; the chosen one is filled. */
-const Setting = <V extends string | number>({
-  label,
-  icon,
-  values,
-  choices,
-  value,
-  onChange,
-}: SettingProps<V>) => {
-  const name = useId()
-  return (
-    <fieldset className={styles.setting}>
-      <legend className={styles.legend}>
-        <Titled icon={icon}>{label}</Titled>
-      </legend>
-      <div className={styles.choices}>
-        {values.map((choice) => (
-          <label key={String(choice)} className={styles.choice}>
-            <input
-              type="radio"
-              name={name}
-              checked={choice === value}
-              onChange={() => onChange(choice)}
-            />
-            <span className={styles.choiceLabel}>{choices[choice].label}</span>
-            <span className={styles.choiceHint}>{choices[choice].hint}</span>
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  )
-}
-
-type SettingsSkeletonProps = { count: number }
-
-/** `count` settings on their way: each a title over a card or two. */
-const SettingsSkeleton = ({ count }: SettingsSkeletonProps) =>
-  Array.from({ length: count }, (_, index) => (
-    <span key={index} className={styles.choices}>
-      <Bone shape="text" width="short" />
-      <Bone shape="heading" />
-      <Bone shape="heading" />
-    </span>
-  ))
-
-type SettingsSectionProps<T> = {
-  icon: IconName
-  title: string
-  hint: string
-  isResetting: boolean
-  query: UseQueryResult<T>
-  shape: ReactNode
-  saveError: Error | null
-  browser?: ReactNode
-  children: (data: T) => ReactNode
-}
-
-/**
- * One source of settings: its heading and what it covers, that the admin
- * lock keeps them as they are, why they could not be read or saved, `shape`
- * while they are read, and its settings once known. One fieldset holds them
- * all, disabled while the admin lock is on or a reset is saving. `browser`
- * holds what this browser keeps for itself, after and outside that fieldset,
- * so neither the admin lock nor the server's answer has a say in it.
- */
-const SettingsSection = <T,>({
-  icon,
-  title,
-  hint,
-  isResetting,
-  query,
-  shape,
-  saveError,
-  browser,
-  children,
-}: SettingsSectionProps<T>) => {
-  const headingId = useId()
-  const { mode, canManage } = useManagement()
-  return (
-    <section className={styles.section} aria-labelledby={headingId}>
-      <header className={styles.sectionHead}>
-        <h2 id={headingId} className={styles.heading}>
-          <Titled icon={icon}>{title}</Titled>
-        </h2>
-        <p className={styles.help}>
-          {hint}
-          {!canManage && (
-            <>
-              {' '}
-              <span>
-                {mode === MANAGEMENT_MODES.adminLock
-                  ? 'Turn the admin lock off below to change these.'
-                  : 'Only the owner can change these.'}
-              </span>
-            </>
-          )}
-        </p>
-      </header>
-      {query.isError && (
-        <p className={styles.error} role="alert">
-          {query.error.message}
-        </p>
-      )}
-      {saveError && (
-        <p className={styles.error} role="alert">
-          Could not save: {saveError.message}
-        </p>
-      )}
-      {/* The section names these already, so the fieldset is no group of its own to a screen reader. */}
-      {query.data !== undefined && (
-        <fieldset role="none" className={styles.settings} disabled={!canManage || isResetting}>
-          {children(query.data)}
-        </fieldset>
-      )}
-      {query.isPending && <Loading label="Reading the settings">{shape}</Loading>}
-      {browser}
-    </section>
-  )
-}
-
 /**
  * Playback that this browser keeps for itself. Off by default: a page cannot
  * tell whether Raven is installed, and a `raven://` link nothing
@@ -264,242 +135,6 @@ const BrowserPlayback = () => {
           to Raven on a title's page. Turn it on only where Raven is installed.
         </span>
       </label>
-    </section>
-  )
-}
-
-/**
- * Settings few need, which this browser keeps for itself, so neither the
- * admin lock nor Reset to defaults has a say in them. For now, how long the
- * player's controls linger.
- */
-const AdvancedSection = () => {
-  const ids = { heading: useId(), linger: useId() }
-  const lingerSeconds = usePlayerPrefs((prefs) => prefs.controlsLingerSeconds)
-  const setLingerSeconds = usePlayerPrefs((prefs) => prefs.setControlsLingerSeconds)
-  const lingerWords = `${lingerSeconds} seconds`
-  return (
-    <section className={styles.section} aria-labelledby={ids.heading}>
-      <header className={styles.sectionHead}>
-        <h2 id={ids.heading} className={styles.heading}>
-          <Titled icon="settings">Advanced</Titled>
-        </h2>
-        <p className={styles.help}>For this browser only.</p>
-      </header>
-      <div className={styles.setting}>
-        <label htmlFor={ids.linger} className={styles.legend}>
-          <Titled icon="playback">Hide the player's controls after</Titled>
-        </label>
-        <div className={styles.slider}>
-          <input
-            id={ids.linger}
-            type="range"
-            className={styles.range}
-            min={CONTROLS_LINGER_SECONDS.min}
-            max={CONTROLS_LINGER_SECONDS.max}
-            step={1}
-            value={lingerSeconds}
-            aria-valuetext={lingerWords}
-            onChange={(event) => setLingerSeconds(Number(event.target.value))}
-          />
-          {/* The slider's own value text says it to a screen reader. */}
-          <span className={styles.sliderValue} aria-hidden="true">
-            {lingerWords}
-          </span>
-        </div>
-        <p className={styles.hint}>
-          How long the controls and the cursor stay over the video once the mouse, the keys and
-          clicks go quiet, from {CONTROLS_LINGER_SECONDS.min} to {CONTROLS_LINGER_SECONDS.max}{' '}
-          seconds.
-        </p>
-      </div>
-    </section>
-  )
-}
-
-type CountdownProps = { deadline: number }
-
-/** Whole seconds until `deadline`, counted down as they pass. */
-const Countdown = ({ deadline }: CountdownProps) => {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000)
-    return () => window.clearInterval(timer)
-  }, [])
-  const seconds = Math.max(0, Math.ceil((deadline - now) / 1_000))
-  return plural({ n: seconds, one: 'second', many: 'seconds' })
-}
-
-type AdminLockHintProps = { lock: AdminLock; readAt: number }
-
-/** What the admin lock's toggle says under it; `readAt` is when the lock was read, its countdown's start. */
-const AdminLockHint = ({ lock, readAt }: AdminLockHintProps) => {
-  switch (lock.state) {
-    case ADMIN_LOCK_STATES.on:
-      return lock.available ? (
-        'Turning it off asks for the admin password.'
-      ) : (
-        <>
-          Set <code>ADMIN_PASSWORD</code> in raven's <code>.env</code> to turn it off.
-        </>
-      )
-    case ADMIN_LOCK_STATES.turningOn:
-      return (
-        <>
-          Turns on in <Countdown deadline={readAt + lock.remainingMs} />. Until then, turning it off
-          needs no password.
-        </>
-      )
-    case ADMIN_LOCK_STATES.off:
-      return 'Off in this browser until it is turned back on, through refreshes, restarts and redeploys. Turned on, it waits a moment first, so a slip costs no password.'
-    default: {
-      const unknown: never = lock
-      return unknown
-    }
-  }
-}
-
-/**
- * The admin lock, at the foot of the page. It holds in every browser until
- * the admin password is entered there. Turned back on, it waits a moment
- * before it holds, and unticked again in that moment it needs no password,
- * so a slip of the finger costs nothing.
- */
-const AdminLockSection = () => {
-  const headingId = useId()
-  const passwordId = useId()
-  const queryClient = useQueryClient()
-  const lock = useQuery(adminLockQuery)
-  const current = lock.data
-  const [isAsking, setAsking] = useState(false)
-  const [password, setPassword] = useState('')
-  const passwordInput = useRef<HTMLInputElement>(null)
-  const settle = (next: AdminLock) => queryClient.setQueryData(queryKeys.adminLock, next)
-  const unlock = useMutation({
-    mutationFn: (entered: string) => api.unlockAdmin(entered),
-    onSuccess: (next) => {
-      settle(next)
-      setAsking(false)
-    },
-    onSettled: () => setPassword(''),
-  })
-  const turnOn = useMutation({ mutationFn: () => api.lockAdmin(), onSuccess: settle })
-  const keepOff = useMutation({
-    mutationFn: () => api.keepAdminUnlocked(),
-    onSuccess: settle,
-    // Too late, it holds already: read again, it asks for the password.
-    onError: () => queryClient.invalidateQueries({ queryKey: queryKeys.adminLock }),
-  })
-  const busy = unlock.isPending || turnOn.isPending || keepOff.isPending
-  const failure = turnOn.error ?? keepOff.error
-  const isAskingNow = isAsking && current?.state === ADMIN_LOCK_STATES.on
-
-  useEffect(() => {
-    if (isAskingNow) passwordInput.current?.focus()
-  }, [isAskingNow])
-
-  type ToggleProps = { from: AdminLock; checked: boolean }
-
-  const toggle = ({ from, checked }: ToggleProps): void => {
-    switch (from.state) {
-      case ADMIN_LOCK_STATES.on:
-        unlock.reset()
-        setAsking(!checked)
-        return
-      case ADMIN_LOCK_STATES.turningOn:
-        if (!checked) keepOff.mutate()
-        return
-      case ADMIN_LOCK_STATES.off:
-        if (checked) turnOn.mutate()
-        return
-      default: {
-        const unknown: never = from
-        return unknown
-      }
-    }
-  }
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    unlock.mutate(password)
-  }
-
-  return (
-    <section className={styles.section} aria-labelledby={headingId}>
-      <header className={styles.sectionHead}>
-        <h2 id={headingId} className={styles.heading}>
-          <Titled icon="lock">Admin</Titled>
-        </h2>
-        <p className={styles.help}>
-          On in every browser until the admin password is entered there. While it is on, raven can
-          be watched but not managed: no library is added, edited, scanned or matched, no match,
-          metadata or image is changed, the settings above stay as they are, and no video is deleted
-          or has its file's path shown. Locked libraries are hidden altogether, so nothing asks for
-          their PIN.
-        </p>
-      </header>
-      {lock.isError && (
-        <p className={styles.error} role="alert">
-          {lock.error.message}
-        </p>
-      )}
-      {failure && (
-        <p className={styles.error} role="alert">
-          {failure.message}
-        </p>
-      )}
-      {lock.isPending && (
-        <Loading label="Reading the admin lock">
-          <SettingsSkeleton count={1} />
-        </Loading>
-      )}
-      {current && (
-        <label className={styles.lock}>
-          <input
-            type="checkbox"
-            className={styles.switch}
-            checked={current.state !== ADMIN_LOCK_STATES.off && !isAskingNow}
-            disabled={busy || (current.state === ADMIN_LOCK_STATES.on && !current.available)}
-            onChange={(event) => toggle({ from: current, checked: event.target.checked })}
-          />
-          <span className={styles.choiceLabel}>Admin lock</span>
-          <span className={styles.choiceHint}>
-            <AdminLockHint lock={current} readAt={lock.dataUpdatedAt} />
-          </span>
-        </label>
-      )}
-      {isAskingNow && (
-        <form className={styles.password} onSubmit={submit}>
-          <label htmlFor={passwordId} className={styles.passwordLabel}>
-            Admin password
-          </label>
-          <input
-            ref={passwordInput}
-            id={passwordId}
-            className={styles.passwordInput}
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          {unlock.isError && (
-            <p role="alert" className={styles.error}>
-              {unlock.error.message}
-            </p>
-          )}
-          <div className={styles.actions}>
-            <Button onClick={() => setAsking(false)}>Cancel</Button>
-            <Button
-              type="submit"
-              tone="primary"
-              icon="unlock"
-              disabled={password === '' || unlock.isPending}
-            >
-              Turn off
-            </Button>
-          </div>
-        </form>
-      )}
     </section>
   )
 }
