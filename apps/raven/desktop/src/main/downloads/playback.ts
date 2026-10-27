@@ -23,6 +23,7 @@ import {
   type FileFacts,
   forgetResume,
   type PlayerState,
+  readFacts as readFileFacts,
   RECENT_KINDS,
   removeRecent,
   resumeFor,
@@ -436,10 +437,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   /** Reads a ready download's file for its share watched; a file that cannot be read shows none. */
   const readFacts = async (entry: DownloadEntry): Promise<boolean> => {
     const path = videoPathOf(entry)
-    const facts = await deps.stat(path).then(
-      ({ size, mtimeMs }): FileFacts | null => ({ path, size, mtimeMs }),
-      () => null,
-    )
+    const facts = await readFileFacts({ stat: deps.stat, path })
     // A download removed while its file was read keeps nothing.
     if (facts === null || entryById(store.read(), { downloadId: entry.downloadId }) === null) {
       return false
