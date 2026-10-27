@@ -22,7 +22,7 @@ import {
 import { WEB_DIST } from '@/build/forgeOptions'
 import { errorText } from '@/main/log/errorText'
 import { quietly } from '@/main/log/quietly'
-import { ERROR_CODES, type Timers } from '@/main/stateStore'
+import { ERROR_CODES, errorCodeOf, type Timers } from '@/main/stateStore'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { HTTP_STATUSES } from '@/shared/httpStatuses'
 import { URL_PROTOCOLS } from '@/shared/playLink'
@@ -184,10 +184,7 @@ const isInside = ({ root, path }: IsInsideProps): boolean =>
  * Why a connection failed. Node tries both of `localhost`'s addresses and, when both refuse,
  * throws an `AggregateError` with no message, so its code says it instead.
  */
-const reasonOf = (error: unknown): string =>
-  error instanceof Error && 'code' in error && typeof error.code === 'string'
-    ? error.code
-    : errorText(error)
+const reasonOf = (error: unknown): string => errorCodeOf(error) ?? errorText(error)
 
 /** The headers a message's `Connection` names, which belong to that one connection too. */
 const connectionNamed = (headers: IncomingHttpHeaders): ReadonlySet<string> =>
@@ -418,17 +415,16 @@ const closeServer = (server: Server) =>
   })
 
 /** What `listen` fails with for an address this Mac does not have, such as `::1` with IPv6 off. */
-const MISSING_ADDRESS_CODES: ReadonlySet<unknown> = new Set([
+const MISSING_ADDRESS_CODES: ReadonlySet<string | null> = new Set([
   ERROR_CODES.addressNotAvailable,
   ERROR_CODES.familyNotSupported,
 ])
 
-const isMissingAddress = (error: unknown): boolean =>
-  error instanceof Error && 'code' in error && MISSING_ADDRESS_CODES.has(error.code)
+const isMissingAddress = (error: unknown): boolean => MISSING_ADDRESS_CODES.has(errorCodeOf(error))
 
 /** What the person is told when the web host cannot listen, and Raven quits. */
 export const webHostFailureText = (error: unknown): string =>
-  error instanceof Error && 'code' in error && error.code === ERROR_CODES.addressInUse
+  errorCodeOf(error) === ERROR_CODES.addressInUse
     ? `Another app is using port ${WEB_HOST_PORT} on this Mac. Quit it, then open Raven again.`
     : `Raven could not start serving its page: ${errorText(error)}`
 

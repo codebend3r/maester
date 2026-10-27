@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { isMissingFile, type Timers } from '@/main/stateStore'
+import { errorCodeOf, isMissingFile, type Timers } from '@/main/stateStore'
 
 export const LOG_FILE = 'raven.log'
 export const LOG_MAX_BYTES = 1_048_576
@@ -288,11 +288,8 @@ export const rotationMoves = ({
 
 type FsOp = keyof LogFs
 
-const errorCode = (error: unknown): string => {
-  if (!(error instanceof Error)) return 'unknown'
-  if ('code' in error && typeof error.code === 'string') return error.code
-  return error.name
-}
+const errorCode = (error: unknown): string =>
+  errorCodeOf(error) ?? (error instanceof Error ? error.name : 'unknown')
 
 type LogWriteErrorProps = { op: FsOp; cause: unknown }
 

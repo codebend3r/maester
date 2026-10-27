@@ -21,7 +21,7 @@ import { API_PATHS, MEDIA_FILE_PATH, subtitlePathOf } from '@/main/servers/allow
 import { accountRefusalOf, readShort } from '@/main/servers/authRefusals'
 import { loggable } from '@/main/servers/serverCalls'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { HTTP_STATUSES } from '@/shared/httpStatuses'
+import { HTTP_STATUSES, isSuccessStatus } from '@/shared/httpStatuses'
 
 /** The relay listens here alone, so nothing off this Mac can reach it. */
 export const RELAY_HOST = '127.0.0.1'
@@ -148,8 +148,6 @@ type Load = {
 type Request = { loadId: string; controller: AbortController }
 
 type Upstream = Awaited<ReturnType<UpstreamFetch>>
-
-const isSuccess = (status: number): boolean => status >= 200 && status < 300
 
 const discard = async (upstream: Upstream): Promise<void> => {
   if (upstream.body === null) return
@@ -360,7 +358,7 @@ export const createMediaRelay = ({
     }
     // The file served again after a refusal (the owner let the account back in): it plays on,
     // so its end is a plain one.
-    if (path === MEDIA_FILE_PATH && isSuccess(upstream.status) && isCurrent(load)) {
+    if (path === MEDIA_FILE_PATH && isSuccessStatus(upstream.status) && isCurrent(load)) {
       refusal = null
     }
     response.writeHead(upstream.status, passedHeaders(upstream))

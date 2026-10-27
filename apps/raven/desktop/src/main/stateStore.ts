@@ -47,13 +47,17 @@ export type JsonStoreOptions<T> = {
 /** The `code` of the Node system errors Raven tells apart. */
 export const ERROR_CODES = {
   enoent: 'ENOENT',
+  noSpace: 'ENOSPC',
   addressInUse: 'EADDRINUSE',
   addressNotAvailable: 'EADDRNOTAVAIL',
   familyNotSupported: 'EAFNOSUPPORT',
 } as const
 
-export const isMissingFile = (error: unknown): boolean =>
-  error instanceof Error && 'code' in error && error.code === ERROR_CODES.enoent
+/** The `code` a Node system error carries; null for an error without one, or anything else thrown. */
+export const errorCodeOf = (error: unknown): string | null =>
+  error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : null
+
+export const isMissingFile = (error: unknown): boolean => errorCodeOf(error) === ERROR_CODES.enoent
 
 /** Never throws: whatever cannot be read as a `T` is kept aside and the app starts with `empty`. */
 /** What a JSON file held: nothing, a value its guard accepts, or something else, now set aside. */
