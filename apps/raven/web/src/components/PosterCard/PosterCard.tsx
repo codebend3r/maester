@@ -12,6 +12,7 @@ import {
   pickScore,
   sortFact,
   watchLink,
+  ITEM_IMAGE_KINDS,
 } from '@raven/core'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
@@ -62,7 +63,13 @@ export const PosterFrame = ({
 )
 
 const backdropOf = (item: ItemSummary | null | undefined): string | null =>
-  item ? api.itemImageUrl({ id: item.id, kind: 'backdrop', version: item.backdropVersion }) : null
+  item
+    ? api.itemImageUrl({
+        id: item.id,
+        kind: ITEM_IMAGE_KINDS.backdrop,
+        version: item.backdropVersion,
+      })
+    : null
 
 type PosterCardProps = {
   media: MediaItem

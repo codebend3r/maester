@@ -15,6 +15,7 @@ import {
   resolutionLabel,
   showYears,
   watchLink,
+  ITEM_IMAGE_KINDS,
 } from '@raven/core'
 import { api } from '@/lib/api'
 
@@ -40,10 +41,14 @@ export type Featured = {
  * an item missing either, which the hero would have nothing to show for.
  */
 const artworkOf = (item: ItemSummary): { poster: string; backdrop: string } | null => {
-  const poster = api.itemImageUrl({ id: item.id, kind: 'poster', version: item.posterVersion })
+  const poster = api.itemImageUrl({
+    id: item.id,
+    kind: ITEM_IMAGE_KINDS.poster,
+    version: item.posterVersion,
+  })
   const backdrop = api.itemImageUrl({
     id: item.id,
-    kind: 'backdrop',
+    kind: ITEM_IMAGE_KINDS.backdrop,
     version: item.backdropVersion,
   })
   return poster && backdrop ? { poster, backdrop } : null

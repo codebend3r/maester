@@ -10,6 +10,7 @@ import {
   showYears,
   watchedStateOf,
   watchPageOf,
+  ITEM_IMAGE_KINDS,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
@@ -40,7 +41,11 @@ type UseShowCardProps = {
 const useShowCard = ({ entry, ratingsSource, sort }: UseShowCardProps) => {
   const { show, next } = entry
   const hover = useHoverBackdrop(
-    api.itemImageUrl({ id: show.id, kind: 'backdrop', version: show.backdropVersion }),
+    api.itemImageUrl({
+      id: show.id,
+      kind: ITEM_IMAGE_KINDS.backdrop,
+      version: show.backdropVersion,
+    }),
   )
   const select = useSelectable({ key: showEntryKey(show), title: show.title })
   const code = next?.item ? episodeCode(next.item) : null

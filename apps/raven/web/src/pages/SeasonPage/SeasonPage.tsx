@@ -16,6 +16,9 @@ import {
   watchLink,
   watchedCountLabel,
   watchedStateOf,
+  WATCH_TARGET_KINDS,
+  ITEM_IMAGE_KINDS,
+  WATCHED_STATES,
 } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
@@ -59,8 +62,8 @@ type EpisodeRowProps = { episode: EpisodeSummary }
 const EpisodeRow = ({ episode }: EpisodeRowProps) => {
   const select = useSelectable({ key: episodeEntryKey(episode), title: episode.title })
   const toggle = useWatchedToggle({
-    state: episode.watched ? 'watched' : 'unwatched',
-    targets: [{ kind: 'item', id: episode.id, libraryId: null }],
+    state: episode.watched ? WATCHED_STATES.watched : WATCHED_STATES.unwatched,
+    targets: [{ kind: WATCH_TARGET_KINDS.item, id: episode.id, libraryId: null }],
   })
   const file = episode.primary ?? undefined
   const picture = episodeStillUrl({ api, episode })
@@ -134,7 +137,7 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
   const hasFiles = episodes.some((episode) => episode.primary != null)
   const toggle = useWatchedToggle({
     state: watchedStateOf({ watched: watchedCount, total: count }),
-    targets: [{ kind: 'item', id: season.id, libraryId: null }],
+    targets: [{ kind: WATCH_TARGET_KINDS.item, id: season.id, libraryId: null }],
   })
   const watchedWords = watchedCountLabel({ watched: watchedCount, total: count })
   const favourite = useItemFavourite({ item: season })
@@ -143,7 +146,7 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
       {...sourceOf(
         episodes.map((episode) => [
           episodeEntryKey(episode),
-          [{ kind: 'item', id: episode.id, libraryId: null }],
+          [{ kind: WATCH_TARGET_KINDS.item, id: episode.id, libraryId: null }],
         ]),
       )}
     >
@@ -160,7 +163,11 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
           progress={count > 0 ? { fraction: watchedCount / count, label: watchedWords } : undefined}
           picture={{
             shape: 'poster',
-            url: api.itemImageUrl({ id: season.id, kind: 'poster', version: season.posterVersion }),
+            url: api.itemImageUrl({
+              id: season.id,
+              kind: ITEM_IMAGE_KINDS.poster,
+              version: season.posterVersion,
+            }),
           }}
           backdrop={itemBackdrop({ id: show.id, version: show.backdropVersion })}
         >

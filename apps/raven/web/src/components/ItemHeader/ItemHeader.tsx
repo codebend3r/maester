@@ -1,4 +1,4 @@
-import type { Rating, SlideshowMotion, watchLink } from '@raven/core'
+import { type Rating, type SlideshowMotion, type watchLink, ITEM_IMAGE_KINDS } from '@raven/core'
 import { Fragment, type ReactNode, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@raven/ui'
@@ -52,7 +52,7 @@ type ItemBackdropProps = {
  * it has none.
  */
 export const itemBackdrop = ({ id, version }: ItemBackdropProps): HeaderBackdrop | null => {
-  const url = api.itemImageUrl({ id, kind: 'backdrop', version })
+  const url = api.itemImageUrl({ id, kind: ITEM_IMAGE_KINDS.backdrop, version })
   if (url == null) return null
   return {
     type: HEADER_BACKDROP_TYPES.picture,

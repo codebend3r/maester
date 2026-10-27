@@ -1,4 +1,4 @@
-import { type ItemSummary, POSTER_OWN_WIDTH } from '@raven/core'
+import { type ItemSummary, POSTER_OWN_WIDTH, ITEM_IMAGE_KINDS } from '@raven/core'
 import { api } from '@/lib/api'
 
 /**
@@ -95,7 +95,11 @@ export const posterSources = ({
   item,
   sizes,
 }: PosterSourcesProps): { src: string; srcSet?: string; sizes?: PosterSizes } | null => {
-  const src = api.itemImageUrl({ id: item.id, kind: 'poster', version: item.posterVersion })
+  const src = api.itemImageUrl({
+    id: item.id,
+    kind: ITEM_IMAGE_KINDS.poster,
+    version: item.posterVersion,
+  })
   if (!src) return null
   if (needsOwnWidth(sizes)) return { src }
   const srcSet = api.posterSrcSet({ id: item.id, version: item.posterVersion })

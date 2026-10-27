@@ -11,6 +11,7 @@ import {
   resumeAtFor,
   routeState,
   watchLink,
+  PLAYER_SOURCE_KINDS,
 } from '@raven/core'
 import { useState } from 'react'
 import {
@@ -26,6 +27,7 @@ import {
   type PlayerServices,
   useHostPlayer,
   usePlayerPrefs,
+  ENGINE_KINDS,
 } from '@raven/ui/headless'
 import { useReprobe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { DesktopWatch } from '@/desktop/DesktopWatch/DesktopWatch'
@@ -230,7 +232,12 @@ const BrowserWatch = ({ services, media, mediaPlane }: BrowserWatchProps) => {
   const isHosting = useHostPlayer(services)
   return (
     isHosting && (
-      <Player engine={{ kind: 'html', source: { kind: 'server', media, api, mediaPlane } }} />
+      <Player
+        engine={{
+          kind: ENGINE_KINDS.html,
+          source: { kind: PLAYER_SOURCE_KINDS.server, media, api, mediaPlane },
+        }}
+      />
     )
   )
 }
