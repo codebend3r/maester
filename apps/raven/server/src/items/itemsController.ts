@@ -16,11 +16,8 @@ import {
   Res,
 } from '@nestjs/common'
 import {
-  type ChoosableImageKind,
   IMAGE_SOURCES,
-  ITEM_IMAGE_KINDS,
   ITEM_TYPES,
-  type ImageOption,
   isFavouriteChange,
   isImageChoice,
   isItemImageKind,
@@ -35,6 +32,7 @@ import {
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { isChoosableImageKind } from '@/items/imageKinds'
+import { imageOptionsOf, NO_TMDB_IMAGES } from '@/items/imageOptions'
 import { itemChildren } from '@/items/itemChildren'
 import { ItemPictureFiles, pictureWidth } from '@/items/itemPictureFiles'
 import { sendImage } from '@/items/sendImage'
@@ -279,45 +277,8 @@ export class ItemsController {
     const fetched =
       this.tmdb.enabled && !isLocal(item.tmdbId)
         ? await this.tmdb.images({ type, tmdbId: item.tmdbId }).catch(tmdbUnavailable)
-        : { poster: [], backdrop: [], logo: [] }
-    const options = (kind: ChoosableImageKind): ImageOption[] => {
-      const current = this.stored.image({ itemId: id, kind })
-      const local = this.stored.imageFrom({ itemId: id, kind, source: STORED_IMAGE_SOURCES.local })
-      const own = this.stored.imageFrom({ itemId: id, kind, source: STORED_IMAGE_SOURCES.tmdb })
-      const tmdb = fetched[kind]
-      // TMDB's own choice is offered even when the images call left it out.
-      const listed =
-        own != null && !tmdb.some((image) => image.path === own)
-          ? [{ path: own, width: null, height: null, language: null }, ...tmdb]
-          : tmdb
-      return [
-        ...(local == null
-          ? []
-          : [
-              {
-                source: IMAGE_SOURCES.local,
-                ref: local,
-                width: null,
-                height: null,
-                language: null,
-                current: current?.source === STORED_IMAGE_SOURCES.local,
-              },
-            ]),
-        ...listed.map((image) => ({
-          source: IMAGE_SOURCES.tmdb,
-          ref: image.path,
-          width: image.width,
-          height: image.height,
-          language: image.language,
-          current: current?.source !== STORED_IMAGE_SOURCES.local && current?.ref === image.path,
-        })),
-      ]
-    }
-    return {
-      poster: options(ITEM_IMAGE_KINDS.poster),
-      backdrop: options(ITEM_IMAGE_KINDS.backdrop),
-      logo: options(ITEM_IMAGE_KINDS.logo),
-    }
+        : NO_TMDB_IMAGES
+    return imageOptionsOf({ itemId: id, stored: this.stored, fetched })
   }
 
   /** Edit images: `{ source: 'tmdb', ref }` shows that picture of TMDB's; `{ source: 'local' }` goes back to the one beside the media, or TMDB's own. */
