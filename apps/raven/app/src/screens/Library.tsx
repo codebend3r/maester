@@ -29,13 +29,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ShelfCard } from '@/queries/cards'
 import { type Listing, librarySectionsOf } from '@/queries/libraryGrid'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
-import { useAccessToken } from '@/account/accountSession'
-import { useServerCookies } from '@/queries/useServerCookies'
+import { usePictures } from '@/queries/usePictures'
 import { Grid, Picker, SearchField, ToolButton } from '@/layouts'
 import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
 import { appViewsFor, useLibraryView } from '@/screens/useLibraryView'
 import type { LibraryChoice } from '@/stores/libraryViews'
-import { cookieHeadersFor } from '@/servers/serverHeaders'
 
 const COPY = {
   library: 'Library',
@@ -154,19 +152,12 @@ const LibraryGrid = ({ session: { server, api, queries }, library, asked }: Libr
     search: search.query,
     seed: view.seed,
   })
-  const cookies = useServerCookies(server)
-  const accessToken = useAccessToken()
+  const pictures = usePictures({ server, api })
 
   const sections =
-    listed === null || cookies === null
+    listed === null || pictures === null
       ? []
-      : librarySectionsOf({
-          settings,
-          listing: listed,
-          api,
-          headersFor: cookieHeadersFor({ server, cookies, accessToken }),
-          now: new Date(),
-        })
+      : librarySectionsOf({ settings, listing: listed, now: new Date(), ...pictures })
   // Nothing matches only once the server says so, not while the last search stands in.
   const empty =
     listed === null || isStandIn

@@ -5,11 +5,9 @@ import { useRouter } from 'expo-router'
 import type { ShelfCard } from '@/queries/cards'
 import { libraryShelvesOf } from '@/queries/homeShelves'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
-import { useAccessToken } from '@/account/accountSession'
-import { useServerCookies } from '@/queries/useServerCookies'
+import { usePictures } from '@/queries/usePictures'
 import { SearchLayout, Shelf } from '@/layouts'
 import { ROUTE_TARGETS, hrefOf } from '@/routes'
-import { cookieHeadersFor } from '@/servers/serverHeaders'
 
 const COPY = {
   title: 'Search',
@@ -30,18 +28,12 @@ const ServerSearch = ({ session: { server, api, queries } }: ServerSearchProps) 
   // An empty query is a skipToken: a cleared box asks the server nothing.
   const results = useQuery(queries.homeSearchQuery(query))
   const libraries = useQuery(queries.librariesQuery)
-  const cookies = useServerCookies(server)
-  const accessToken = useAccessToken()
+  const pictures = usePictures({ server, api })
 
   const shelves =
-    !isAsked || results.data === undefined || libraries.data === undefined || cookies === null
+    !isAsked || results.data === undefined || libraries.data === undefined || pictures === null
       ? []
-      : libraryShelvesOf({
-          shelves: results.data,
-          libraries: libraries.data,
-          api,
-          headersFor: cookieHeadersFor({ server, cookies, accessToken }),
-        })
+      : libraryShelvesOf({ shelves: results.data, libraries: libraries.data, ...pictures })
   const notice = ((): string | null => {
     if (!isAsked) return null
     const failure = results.error ?? libraries.error
@@ -49,7 +41,7 @@ const ServerSearch = ({ session: { server, api, queries } }: ServerSearchProps) 
     if (shelves.length > 0) return null
     // The last search's answer stands in while this one is read: it says nothing of this one.
     const isRead =
-      results.isSuccess && !results.isPlaceholderData && libraries.isSuccess && cookies !== null
+      results.isSuccess && !results.isPlaceholderData && libraries.isSuccess && pictures !== null
     return isRead ? nothingMatches(query) : COPY.searching
   })()
 
