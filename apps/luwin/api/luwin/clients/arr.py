@@ -8,10 +8,10 @@ on a title's copy needn't know which arr holds it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 
-from luwin.clients.base import HttpClient
+from luwin.clients.base import Downable, HttpClient
 
 if TYPE_CHECKING:
     from luwin.clients.seerr import MediaDetails
@@ -274,3 +274,65 @@ class ArrClient(HttpClient):
         scope, key = self.history_scope
         rows = await self.get_json(f"{self.api}/history/{scope}", params={key: media_id})
         return sorted((HistoryEvent.from_api(r) for r in rows), key=lambda e: e.date, reverse=True)
+
+
+def roomy(path: str) -> list[RootFolder]:
+    """A fake arr's root folder has room unless a test says otherwise: 8 of 16 TB free."""
+    return [RootFolder(path, 8_000_000_000_000, 16_000_000_000_000)]
+
+
+@dataclass
+class FakeArr(Downable):
+    """What the fake Radarr and Sonarr share: the shared verbs over in-memory records, each
+    write remembered so a test can see what was done. A fake adds its kind's lookups."""
+
+    service: ClassVar[str]
+
+    host: str = "fake"
+    base_url: str = ""
+    roots: list[RootFolder] = field(default_factory=list)
+    disks: list[DiskSpace] = field(default_factory=list)
+    queue_items: list[QueueItem] = field(default_factory=list)
+    # Download history per movie or series id, newest first.
+    events: dict[int, list[HistoryEvent]] = field(default_factory=dict)
+    file_list: list[MediaFile] = field(default_factory=list)
+    failed: list[int] = field(default_factory=list)
+    removed: list[int] = field(default_factory=list)  # queue ids, blocklisted
+    searched: list[list[int]] = field(default_factory=list)
+    deleted: list[int] = field(default_factory=list)
+
+    async def root_folders(self) -> list[RootFolder]:
+        self.refuse_if_down("/api/v3/rootfolder")
+        return list(self.roots)
+
+    async def disk_space(self) -> list[DiskSpace]:
+        self.refuse_if_down("/api/v3/diskspace")
+        return list(self.disks)
+
+    async def queue(self) -> list[QueueItem]:
+        self.refuse_if_down("/api/v3/queue")
+        return list(self.queue_items)
+
+    async def remove_from_queue(self, queue_id: int, *, blocklist: bool = True) -> None:
+        self.refuse_if_down(f"/api/v3/queue/{queue_id}")
+        gone = next(q for q in self.queue_items if q.id == queue_id)
+        self.removed.append(queue_id)
+        # A download goes with every record of it (a season pack is one per episode).
+        self.queue_items = [q for q in self.queue_items if q.download_id != gone.download_id]
+
+    async def history(self, media_id: int) -> list[HistoryEvent]:
+        return list(self.events.get(media_id, []))
+
+    async def files(self, media_id: int) -> list[MediaFile]:
+        return [f for f in self.file_list if f.media_id == media_id]
+
+    async def delete_file(self, file_id: int) -> None:
+        self.deleted.append(file_id)
+        self.file_list = [f for f in self.file_list if f.id != file_id]
+
+    async def search(self, ids: list[int]) -> int:
+        self.searched.append(list(ids))
+        return len(self.searched)
+
+    async def mark_failed(self, history_id: int) -> None:
+        self.failed.append(history_id)
