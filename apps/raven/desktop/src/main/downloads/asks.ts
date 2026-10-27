@@ -23,6 +23,7 @@ import {
   type DownloadsState,
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
+import { DONE, refused } from '@/main/replies'
 import {
   EXPAND_MESSAGES,
   EXPAND_REASONS,
@@ -77,8 +78,6 @@ export type DownloadAsks = {
 type HeldAsk = { serverId: string; target: DownloadTarget; expansion: Expansion; at: number }
 
 type Server = { serverId: string; serverName: string }
-
-const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
 
 /**
  * Each file becomes `<mediaId>/video.<container>` on disk, so both must be safe to name a file
@@ -326,7 +325,7 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
 
   const decline: DownloadAsks['decline'] = ({ askId }) => {
     asks.delete(askId)
-    return { type: DESKTOP_REPLIES.done }
+    return DONE
   }
 
   return { ask, retryAsk, confirm, decline, clear: () => asks.clear() }
