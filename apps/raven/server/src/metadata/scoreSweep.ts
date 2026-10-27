@@ -5,10 +5,11 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common'
+import { RATINGS_REFRESH_STATES, type RatingsRefresh } from '@raven/core'
 import { errorMessage } from '@/errorMessage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { notFound } from '@/metadata/matchPass'
-import type { ScoreProvider, ScoreSource } from '@/metadata/scoreSources'
+import { SCORE_PROVIDERS, type ScoreSource } from '@/metadata/scoreSources'
 import { Scores } from '@/metadata/scores'
 import { type DueScores, ScoresRepository, scoresDueBefore } from '@/metadata/scoresRepository'
 import { TmdbClient } from '@/metadata/tmdbClient'
@@ -46,11 +47,24 @@ export const REQUEST_PATIENCE_MS = 24 * 60 * 60 * 1000
 /** The failures counted on one requested title: how many, and when the first and the last were. */
 type RequestFailures = { count: number; firstAt: number; lastAt: number }
 
+/** Why a Refresh waits, as the contract names it: the day's calls spent, or no source answering. */
+type PauseReason = Extract<
+  RatingsRefresh,
+  { state: typeof RATINGS_REFRESH_STATES.waiting }
+>['reason']
+
+const PAUSE_REASONS = {
+  budget: 'budget',
+  unavailable: 'unavailable',
+} as const satisfies Record<PauseReason, PauseReason>
+
 /** Why the sweep stopped with scores still due, and when it starts again. */
-export type ScorePause = { reason: 'budget' | 'unavailable'; resumesAt: string }
+export type ScorePause = { reason: PauseReason; resumesAt: string }
 
 /** Who a round asks: a score source, or TMDB alone for a Refresh's titles while no score source has a usable key. */
-type Asked = ScoreProvider | 'tmdb'
+const ASKED = { ...SCORE_PROVIDERS, tmdb: 'tmdb' } as const
+
+type Asked = (typeof ASKED)[keyof typeof ASKED]
 
 /** The titles due from whoever a round asks, and how each is asked for while that one is still the one to ask. */
 type Round = {
@@ -71,7 +85,15 @@ type Round = {
  * another still has calls (`someSpent`); with no source left with calls
  * (`budget`); or having asked and got no answer at all (`unavailable`).
  */
-type Stop = 'done' | 'requests' | 'someSpent' | 'budget' | 'unavailable'
+const STOPS = {
+  done: 'done',
+  requests: 'requests',
+  someSpent: 'someSpent',
+  budget: 'budget',
+  unavailable: 'unavailable',
+} as const
+
+type Stop = (typeof STOPS)[keyof typeof STOPS]
 
 /**
  * How a drain's rounds ended: on a round with failures and no answer, or
@@ -80,7 +102,9 @@ type Stop = 'done' | 'requests' | 'someSpent' | 'budget' | 'unavailable'
 type Drained = { isSilent: boolean; answeredBy: ReadonlySet<Asked> }
 
 /** What became of one title in a round. */
-type Outcome = 'answered' | 'failed' | 'skipped'
+const OUTCOMES = { answered: 'answered', failed: 'failed', skipped: 'skipped' } as const
+
+type Outcome = (typeof OUTCOMES)[keyof typeof OUTCOMES]
 
 /** What the log says when the sweep sets its next wake, before the time. */
 const WAKE_NOTES = {
@@ -207,7 +231,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    */
   requestsPause(): ScorePause | null {
     if (this.isSettlerSpent()) {
-      return { reason: 'budget', resumesAt: afterMidnight(new Date()).toISOString() }
+      return { reason: PAUSE_REASONS.budget, resumesAt: afterMidnight(new Date()).toISOString() }
     }
     return this.state.pause
   }
@@ -216,25 +240,25 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     this.state.pause = null
     const stop = await this.drainOnce().catch((error: unknown) => {
       this.logger.error(`Topping up scores failed: ${errorMessage(error)}`)
-      return 'unavailable' as const
+      return STOPS.unavailable
     })
     if (this.state.wake) clearTimeout(this.state.wake)
     this.state.wake = null
     const retry = new Date(Date.now() + RETRY_MS)
     switch (stop) {
-      case 'done':
+      case STOPS.done:
         return
-      case 'requests':
-        this.wakeAt({ at: retry, pause: 'unavailable', why: 'requests' })
+      case STOPS.requests:
+        this.wakeAt({ at: retry, pause: PAUSE_REASONS.unavailable, why: 'requests' })
         return
-      case 'someSpent':
+      case STOPS.someSpent:
         this.wakeAt({ at: afterMidnight(new Date()), pause: null, why: 'spent' })
         return
-      case 'budget':
-        this.wakeAt({ at: afterMidnight(new Date()), pause: 'budget', why: 'spent' })
+      case STOPS.budget:
+        this.wakeAt({ at: afterMidnight(new Date()), pause: PAUSE_REASONS.budget, why: 'spent' })
         return
-      case 'unavailable':
-        this.wakeAt({ at: retry, pause: 'unavailable', why: 'unavailable' })
+      case STOPS.unavailable:
+        this.wakeAt({ at: retry, pause: PAUSE_REASONS.unavailable, why: 'unavailable' })
         return
       default: {
         const unknown: never = stop
@@ -264,13 +288,13 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   private async drainOnce(): Promise<Stop> {
     const { isSilent, answeredBy } = await this.topUp(new Set())
     // The database closes with the app.
-    if (this.state.isClosed) return 'done'
+    if (this.state.isClosed) return STOPS.done
     this.forgetFailures({ answeredBy, hasRunOut: !isSilent })
     this.settle()
-    if (isSilent && answeredBy.size === 0) return 'unavailable'
-    if (this.stored.hasRequests() && !this.isSettlerSpent()) return 'requests'
-    if (!this.isWaitingForMidnight()) return 'done'
-    return this.scores.primary() == null ? 'budget' : 'someSpent'
+    if (isSilent && answeredBy.size === 0) return STOPS.unavailable
+    if (this.stored.hasRequests() && !this.isSettlerSpent()) return STOPS.requests
+    if (!this.isWaitingForMidnight()) return STOPS.done
+    return this.scores.primary() == null ? STOPS.budget : STOPS.someSpent
   }
 
   /**
@@ -313,7 +337,11 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
       const due = this.listDue({ asked, before, limit: failed.size + 1 })
       return due.every((title) => failed.has(title.itemId)) ? new Set() : failed
     }
-    this.state.failed = { mdblist: kept('mdblist'), omdb: kept('omdb'), tmdb: kept('tmdb') }
+    this.state.failed = {
+      mdblist: kept(ASKED.mdblist),
+      omdb: kept(ASKED.omdb),
+      tmdb: kept(ASKED.tmdb),
+    }
   }
 
   /**
@@ -323,7 +351,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    * its request goes, and it keeps the scores it had.
    */
   private countRequestFailures({ round, failedIds }: ScoreSweepCountRequestFailuresProps): void {
-    if (round.asked !== (this.scores.settler()?.provider ?? 'tmdb')) return
+    if (round.asked !== (this.scores.settler()?.provider ?? ASKED.tmdb)) return
     const now = Date.now()
     const failed = new Set(failedIds)
     const counts = round.due
@@ -420,10 +448,10 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** The titles a Refresh asked for, each settled by TMDB's score alone, while no score source has a usable key. */
   private tmdbRound(): Round | null {
-    const due = this.due({ asked: 'tmdb', before: scoresDueBefore(), limit: TMDB_ROUND })
+    const due = this.due({ asked: ASKED.tmdb, before: scoresDueBefore(), limit: TMDB_ROUND })
     if (due.length === 0) return null
     return {
-      asked: 'tmdb',
+      asked: ASKED.tmdb,
       due,
       isDue: ({ itemId }) => this.stored.isRequested(itemId),
       isCurrent: () => this.scores.settler() == null,
@@ -446,7 +474,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** What `asked` has due, in the order it is asked: a source's due scores, or the titles a Refresh asked for. */
   private listDue({ asked, before, limit }: ScoreSweepListDueProps): DueScores[] {
-    return asked === 'tmdb'
+    return asked === ASKED.tmdb
       ? this.stored.requestedTitles(limit)
       : this.stored.scoresDue({ provider: asked, before, limit })
   }
@@ -490,22 +518,22 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
       limit: AT_ONCE,
       fn: async (title): Promise<Outcome> => {
         if (this.state.isClosed || streak.failedInARow >= GIVE_UP_AFTER || !isCurrent()) {
-          return 'skipped'
+          return OUTCOMES.skipped
         }
-        if (!isDue(title)) return 'skipped'
+        if (!isDue(title)) return OUTCOMES.skipped
         if (await fetch(title)) {
           streak.failedInARow = 0
-          return 'answered'
+          return OUTCOMES.answered
         }
-        if (this.state.isClosed || isSpent() || !isCurrent()) return 'skipped'
+        if (this.state.isClosed || isSpent() || !isCurrent()) return OUTCOMES.skipped
         streak.failedInARow += 1
-        return 'failed'
+        return OUTCOMES.failed
       },
     })
     return {
-      answered: outcomes.filter((outcome) => outcome === 'answered').length,
+      answered: outcomes.filter((outcome) => outcome === OUTCOMES.answered).length,
       failedIds: due.flatMap((title, index) =>
-        outcomes[index] === 'failed' ? [title.itemId] : [],
+        outcomes[index] === OUTCOMES.failed ? [title.itemId] : [],
       ),
     }
   }

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
-import type { RatingsRefresh as RatingsRefreshStatus } from '@raven/core'
+import { RATINGS_REFRESH_STATES, type RatingsRefresh as RatingsRefreshStatus } from '@raven/core'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { ScoreSweep } from '@/metadata/scoreSweep'
 import { ScoresRepository } from '@/metadata/scoresRepository'
@@ -104,17 +104,17 @@ export class RatingsRefresh {
    */
   status(libraryId: number): RatingsRefreshStatus {
     const { startedAt, total, finishedAt } = this.libraries.ratingsRefresh(libraryId)
-    if (startedAt == null) return { state: 'idle', finishedAt }
+    if (startedAt == null) return { state: RATINGS_REFRESH_STATES.idle, finishedAt }
     const left = this.scores.requestsLeft(libraryId)
     if (left === 0) {
       const at = new Date().toISOString()
       this.libraries.finishRatingsRefreshes(at)
-      return { state: 'idle', finishedAt: at }
+      return { state: RATINGS_REFRESH_STATES.idle, finishedAt: at }
     }
     const progress = { done: Math.max(0, total - left), total, startedAt }
     const pause = this.scoreSweep.requestsPause()
     return pause == null
-      ? { state: 'running', ...progress }
-      : { state: 'waiting', ...progress, ...pause }
+      ? { state: RATINGS_REFRESH_STATES.running, ...progress }
+      : { state: RATINGS_REFRESH_STATES.waiting, ...progress, ...pause }
   }
 }

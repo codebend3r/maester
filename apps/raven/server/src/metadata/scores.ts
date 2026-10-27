@@ -1,9 +1,17 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
+import { METADATA_SERVICE_STATES } from '@raven/core'
 import { errorMessage } from '@/errorMessage'
 import { MdblistClient } from '@/metadata/mdblistClient'
 import { OmdbClient } from '@/metadata/omdbClient'
 import { ScoresRepository } from '@/metadata/scoresRepository'
-import type { ExternalScore, ScoreProvider, ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
+import {
+  SCORE_ANSWERS,
+  SCORE_PROVIDERS,
+  type ScoreAnswer,
+  type ScoreProvider,
+  type ScoreSource,
+  type ScoreTitle,
+} from '@/metadata/scoreSources'
 
 const NAMES = { omdb: 'OMDb', mdblist: 'MDBList' } as const satisfies Record<ScoreProvider, string>
 
@@ -48,7 +56,11 @@ export class Scores {
     const primary = this.primary()
     if (primary == null) return false
     const answer = await this.ask({ source: primary, itemId, title })
-    if (answer === 'unknown' && primary.provider === 'mdblist' && this.omdb.enabled()) {
+    if (
+      answer === SCORE_ANSWERS.unknown &&
+      primary.provider === SCORE_PROVIDERS.mdblist &&
+      this.omdb.enabled()
+    ) {
       await this.ask({ source: this.omdb, itemId, title })
     }
     return answer != null
@@ -79,22 +91,18 @@ export class Scores {
   /** The sources with a key whose calls for today are spent, which midnight UTC brings back. */
   spent(): ScoreSource[] {
     return [this.mdblist, this.omdb].filter(
-      (source) => source.state() !== 'off' && source.remaining() === 0,
+      (source) => source.state() !== METADATA_SERVICE_STATES.off && source.remaining() === 0,
     )
   }
 
   /** What `source` answers, saved under its name; null when the call failed. */
-  private async ask({
-    source,
-    itemId,
-    title,
-  }: ScoresAskProps): Promise<ExternalScore[] | 'unknown' | null> {
+  private async ask({ source, itemId, title }: ScoresAskProps): Promise<ScoreAnswer | null> {
     try {
       const answer = await source.lookUp(title)
       this.scores.saveScores({
         itemId,
         provider: source.provider,
-        scores: answer === 'unknown' ? [] : answer,
+        scores: answer === SCORE_ANSWERS.unknown ? [] : answer,
       })
       if (this.settler() === source) this.scores.clearRequest(itemId)
       return answer

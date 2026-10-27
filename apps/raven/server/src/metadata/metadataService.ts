@@ -660,7 +660,10 @@ export class MetadataService implements OnApplicationBootstrap {
       kind,
       type,
       place: group.place,
-      fix: tmdbId == null ? { kind: 'not-a-match' } : { kind: 'tmdb', tmdbId },
+      fix:
+        tmdbId == null
+          ? { kind: FIX_MATCH_KINDS.notAMatch }
+          : { kind: FIX_MATCH_KINDS.tmdb, tmdbId },
       files: group.files,
     })
     await this.pictures.clearUp()
