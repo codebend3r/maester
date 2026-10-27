@@ -1,3 +1,4 @@
+import { HTTP_METHODS, isSeconds, isTrackIndex } from '@/contract'
 import { watchPageOf } from '@/itemLinks'
 import { isDownloadTarget, isMediaId, PLAY_LINK_MAX_NEXT } from '@/playLink'
 import { isOutputSettings, isPlayerSource } from '@/player'
@@ -8,6 +9,7 @@ import {
   isNumber,
   isString,
   listOf,
+  matching,
   nullable,
   object,
   oneOf,
@@ -24,8 +26,7 @@ export const ENGINE_STOPPED = "Raven's video engine stopped. Open the video agai
 const OPAQUE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 /** What `crypto.randomUUID()` returns: the only handle the page ever holds for a file. */
-export const isOpaqueId = (value: unknown): value is string =>
-  isString(value) && OPAQUE_ID.test(value)
+export const isOpaqueId = matching(OPAQUE_ID)
 
 export const fileUrlFor = (fileId: string): string => `${FILE_SCHEME}://${fileId}`
 
@@ -80,14 +81,6 @@ export const readWatchQuery = (search: string): WatchQuery => {
   return { at: WHOLE_NUMBER.test(at) ? Number(at) : 0, next: isQueue ? next : [] }
 }
 
-export const HTTP_METHODS = {
-  get: 'GET',
-  head: 'HEAD',
-  put: 'PUT',
-  post: 'POST',
-  delete: 'DELETE',
-} as const
-
 /** The methods a server call may use; the app's own protocols also answer HEAD. */
 export const SERVER_METHODS = {
   get: HTTP_METHODS.get,
@@ -96,12 +89,10 @@ export const SERVER_METHODS = {
 } as const
 
 /** A container becomes `video.<container>` on disk, so only a short lowercase name passes. */
-export const isContainerName = (value: unknown): value is string =>
-  isString(value) && /^[a-z0-9]{1,8}$/u.test(value)
+export const isContainerName = matching(/^[a-z0-9]{1,8}$/u)
 
 /** A sidecar's track id becomes `subtitles/<trackId>.vtt` on disk, so only the server's `external-<n>` passes. */
-export const isSidecarTrackId = (value: unknown): value is string =>
-  isString(value) && /^external-\d+$/u.test(value)
+export const isSidecarTrackId = matching(/^external-\d+$/u)
 
 export const DOWNLOAD_KINDS = {
   movie: 'movie',
@@ -231,16 +222,9 @@ export const isPageSession = object({
 
 export type PageSession = Infer<typeof isPageSession>
 
-/** Where a title starts: a number of seconds, 0 or more. */
-const isStart = (value: unknown): value is number => isNumber(value) && value >= 0
-
 /** The titles that play after one, at most as many as a play link carries. */
 const isUpNext = (value: unknown): value is number[] =>
   listOf(isMediaId)(value) && value.length <= PLAY_LINK_MAX_NEXT
-
-/** An audio track's index as a pick names it: a whole number, 0 or more. */
-export const isTrackIndex = (value: unknown): value is number =>
-  isNumber(value) && Number.isInteger(value) && value >= 0
 
 export const isTrackChoice = object({ audio: nullable(isNumber), subtitle: nullable(isString) })
 
@@ -408,7 +392,7 @@ export const isDesktopRequest = union(
   object({
     type: oneOf([DESKTOP_REQUESTS.playTitle]),
     mediaId: isMediaId,
-    at: isStart,
+    at: isSeconds,
     next: isUpNext,
   }),
 )
@@ -466,7 +450,7 @@ export const isDesktopReply = union(
   object({
     type: oneOf([DESKTOP_REPLIES.title]),
     source: isPlayerSource,
-    resumeAt: isStart,
+    resumeAt: isSeconds,
     next: isUpNext,
   }),
   object({

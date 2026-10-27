@@ -7,6 +7,7 @@ import {
   isString,
   keyOf,
   listOf,
+  matching,
   nullable,
   object,
   oneOf,
@@ -50,7 +51,7 @@ export const isItemMetadataChange = exactPartial({
 export type ItemMetadataChange = Infer<typeof isItemMetadataChange>
 
 /** TMDB's ids are digits, which raven keeps as text. */
-export const isTmdbId = (value: unknown): value is string => isString(value) && /^\d+$/.test(value)
+export const isTmdbId = matching(/^\d+$/)
 
 /** A TV documentary kept as a movie uses a separate namespace from TMDB's movie ids. */
 export const TMDB_MATCH_PREFIXES = { tvMovie: 'tv:' } as const

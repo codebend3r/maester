@@ -35,7 +35,7 @@ export const isHistory = listOf(isHistoryEntry)
  */
 
 /** A spot in a file, in seconds from its start. */
-const isSeconds = (value: unknown): value is number => isNumber(value) && value >= 0
+export const isSeconds = (value: unknown): value is number => isNumber(value) && value >= 0
 
 /** `PUT /api/media/:id/progress`: where playback got to. */
 export const isProgressChange = object({
@@ -44,8 +44,8 @@ export const isProgressChange = object({
 
 export type ProgressChange = Infer<typeof isProgressChange>
 
-/** An audio track's place among the file's, as ffmpeg's `0:a:N` counts them. */
-const isTrackIndex = (value: unknown): value is number =>
+/** An audio track's place among the file's, as ffmpeg's `0:a:N` counts them: a whole number, 0 or more. */
+export const isTrackIndex = (value: unknown): value is number =>
   isNumber(value) && Number.isInteger(value) && value >= 0
 
 /**

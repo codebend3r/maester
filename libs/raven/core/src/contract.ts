@@ -12,6 +12,7 @@
 export * from '@/contract/auth'
 export * from '@/contract/duplicates'
 export * from '@/contract/home'
+export * from '@/contract/http'
 export * from '@/contract/images'
 export * from '@/contract/items'
 export * from '@/contract/libraries'

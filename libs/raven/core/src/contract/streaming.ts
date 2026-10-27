@@ -1,5 +1,5 @@
 import { isMediaItem } from '@/contract/items'
-import { type Infer, isNumber, isString, listOf, nullable, object, oneOf } from '@/schema'
+import { type Infer, isNumber, isString, listOf, matching, nullable, object, oneOf } from '@/schema'
 
 /**
  * How a file reaches the player: the original bytes, a remux with the video
@@ -114,8 +114,7 @@ export const HLS_COPY_AUDIO_CODECS = {
 export const HLS_COPY_AUDIO = Object.values(HLS_COPY_AUDIO_CODECS)
 
 /** A session id is 16 random bytes in base64url without padding. */
-export const isHlsSessionId = (value: unknown): value is string =>
-  isString(value) && /^[A-Za-z0-9_-]{22}$/.test(value)
+export const isHlsSessionId = matching(/^[A-Za-z0-9_-]{22}$/)
 
 /**
  * A video the server is sending to one browser or device right now, as the

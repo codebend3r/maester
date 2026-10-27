@@ -64,6 +64,12 @@ export const listOf =
 
 export const isStringArray = listOf(isString)
 
+/** A string `pattern` matches: an id, a token or a name of a fixed form. `pattern` must not be global, which would keep a `lastIndex` between calls. */
+export const matching =
+  (pattern: RegExp): Guard<string> =>
+  (value): value is string =>
+    isString(value) && pattern.test(value)
+
 /** Whatever passes any of `guards`. */
 export const union =
   <const G extends readonly Guard<unknown>[]>(...guards: G): Guard<Infer<G[number]>> =>

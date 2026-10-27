@@ -1,4 +1,5 @@
-import { type Infer, isBoolean, isString, listOf, object, oneOf, union } from '@/schema'
+import { HTTP_METHODS } from '@/contract/http'
+import { type Infer, isBoolean, isString, listOf, matching, object, oneOf, union } from '@/schema'
 
 export const MEMBER_STATUSES = {
   pending: 'pending',
@@ -23,7 +24,11 @@ export const AUTH_HEADERS = {
 } as const
 export const AUTH_SCHEME = 'Bearer'
 export const AUTH_API_PREFIX = '/api/'
-export const AUTH_METHODS = { get: 'GET', head: 'HEAD', post: 'POST' } as const
+export const AUTH_METHODS = {
+  get: HTTP_METHODS.get,
+  head: HTTP_METHODS.head,
+  post: HTTP_METHODS.post,
+} as const
 /**
  * The query key a media ticket travels in, on the file and sidecar URLs,
  * and an HLS session's capability on the URIs its playlists name.
@@ -47,8 +52,9 @@ export const AUTH_ROUTES = {
   pending: '/pending',
 } as const
 
-export const isAccountId = (value: unknown): value is string =>
-  isString(value) && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+export const isAccountId = matching(
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+)
 
 export const isAuthConfig = union(
   object({ state: oneOf([AUTH_CONFIG_STATES.off, AUTH_CONFIG_STATES.unavailable]) }),
