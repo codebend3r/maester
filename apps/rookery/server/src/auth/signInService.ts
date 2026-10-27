@@ -11,6 +11,7 @@ import {
   PlexUnavailable,
   plexAuthUrl,
 } from '@/plex/plexTv'
+import { ROUTES } from '@/routes'
 import { SessionsRepository } from '@/sessions/sessionsRepository'
 import { UsersRepository } from '@/users/usersRepository'
 
@@ -28,8 +29,6 @@ export const SIGN_IN_RESULT_KINDS = { signedIn: 'signed_in', failed: 'failed' } 
 export type SignInResult =
   | { kind: typeof SIGN_IN_RESULT_KINDS.signedIn; token: string; returnTo: string }
   | { kind: typeof SIGN_IN_RESULT_KINDS.failed; error: SignInError; returnTo: string | null }
-
-export const CALLBACK_PATH = '/auth/plex/callback'
 
 /** The web app's pages the server sends a browser to. */
 export const PAGE_PATHS = { home: '/', login: '/login' } as const
@@ -79,7 +78,7 @@ export class SignInService {
       pendingId,
       authUrl: plexAuthUrl({
         code: pin.code,
-        forwardUrl: `${this.config.publicUrl}${CALLBACK_PATH}`,
+        forwardUrl: `${this.config.publicUrl}${ROUTES.callback}`,
       }),
     }
   }
