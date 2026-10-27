@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Frame } from '@/components/Frame/Frame'
 import { type User, fetchMe } from '@/lib/api'
+import { ROUTES } from '@/lib/routes'
 import styles from '@/pages/HomePage/HomePage.module.scss'
 
 const HOME_STATE_KINDS = { loading: 'loading', signedIn: 'signed_in', failed: 'failed' } as const
@@ -21,7 +22,7 @@ export const HomePage = () => {
       (user) =>
         user
           ? setState({ kind: HOME_STATE_KINDS.signedIn, user })
-          : navigate('/login', { replace: true }),
+          : navigate(ROUTES.login, { replace: true }),
       () => setState({ kind: HOME_STATE_KINDS.failed }),
     )
   }, [navigate])
@@ -43,7 +44,7 @@ export const HomePage = () => {
           <p className={styles.lede}>
             luwin and the rest of maester know you by this account. The sign-in lasts 30 days.
           </p>
-          <Link className={styles.signOut} to="/logout">
+          <Link className={styles.signOut} to={ROUTES.logout}>
             Sign out
           </Link>
         </>

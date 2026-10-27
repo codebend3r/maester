@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Frame } from '@/components/Frame/Frame'
 import { signOut } from '@/lib/api'
 import { browser } from '@/lib/browser'
+import { ROUTES, QUERY_PARAMS } from '@/lib/routes'
 import styles from '@/pages/LogoutPage/LogoutPage.module.scss'
 
 /**
@@ -12,7 +13,7 @@ import styles from '@/pages/LogoutPage/LogoutPage.module.scss'
  */
 export const LogoutPage = () => {
   const [params] = useSearchParams()
-  const returnTo = params.get('return_to')
+  const returnTo = params.get(QUERY_PARAMS.returnTo)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export const LogoutPage = () => {
       <h1 className={styles.title}>Signing out</h1>
       {failed ? (
         <p role="alert" className={styles.error}>
-          rookery could not sign you out. <Link to="/">Try again from the start.</Link>
+          rookery could not sign you out. <Link to={ROUTES.home}>Try again from the start.</Link>
         </p>
       ) : (
         <p className={styles.lede}>One moment.</p>

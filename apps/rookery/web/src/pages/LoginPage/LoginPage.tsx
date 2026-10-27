@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Frame } from '@/components/Frame/Frame'
 import { AUTH_ERRORS, AuthError, type AuthErrorCode, isAuthErrorCode, startSignIn } from '@/lib/api'
 import { browser } from '@/lib/browser'
+import { QUERY_PARAMS } from '@/lib/routes'
 import styles from '@/pages/LoginPage/LoginPage.module.scss'
 
 /** What went wrong, keyed by the `error` the server puts on `/login`, or by `AuthError.code`. */
@@ -28,8 +29,8 @@ const errorIn = (value: string | null): AuthErrorCode | null => {
  */
 export const LoginPage = () => {
   const [params] = useSearchParams()
-  const returnTo = params.get('return_to')
-  const [error, setError] = useState(errorIn(params.get('error')))
+  const returnTo = params.get(QUERY_PARAMS.returnTo)
+  const [error, setError] = useState(errorIn(params.get(QUERY_PARAMS.error)))
   const [busy, setBusy] = useState(false)
 
   const begin = () => {
