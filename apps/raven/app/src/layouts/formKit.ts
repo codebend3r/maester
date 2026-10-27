@@ -48,12 +48,14 @@ export type FormKit = {
   useFormStyles: () => FormStyles
 }
 
+type KeyboardForProps = Pick<FieldProps, 'isNumeric' | 'isSecret' | 'isEmail'>
+
 /** The keyboard a field opens: digits for a PIN, plain for a password, a web address's otherwise. */
 export const keyboardFor = ({
   isNumeric = false,
   isSecret = false,
   isEmail = false,
-}: Pick<FieldProps, 'isNumeric' | 'isSecret' | 'isEmail'>): KeyboardTypeOptions => {
+}: KeyboardForProps): KeyboardTypeOptions => {
   if (isNumeric) return 'number-pad'
   if (isEmail) return 'email-address'
   return isSecret ? 'default' : 'url'

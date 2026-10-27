@@ -108,6 +108,17 @@ const Scrubber = ({ view, transport, onScrubbing }: ScrubberProps) => {
   )
 }
 
+type ControlsProps = Pick<
+  PlayerChromeProps,
+  'title' | 'transport' | 'audio' | 'subtitles' | 'onBack'
+> & {
+  /** Whether the controls are showing, not fading out: each time they come back the line asks for the focus. */
+  isVisible: boolean
+  onScrubbing: (isScrubbing: boolean) => void
+  onPicking: (isPicking: boolean) => void
+  onBottomHeight: (height: number) => void
+}
+
 /**
  * The controls over the video, dark in every theme as the web's: the title along the top; the
  * time and the line along the bottom, over play and pause, the track pickers and Back, on the
@@ -125,13 +136,7 @@ const Controls = ({
   onPicking,
   onBottomHeight,
   isVisible,
-}: Pick<PlayerChromeProps, 'title' | 'transport' | 'audio' | 'subtitles' | 'onBack'> & {
-  /** Whether the controls are showing, not fading out: each time they come back the line asks for the focus. */
-  isVisible: boolean
-  onScrubbing: (isScrubbing: boolean) => void
-  onPicking: (isPicking: boolean) => void
-  onBottomHeight: (height: number) => void
-}) => {
+}: ControlsProps) => {
   const scrubber: Focusable = useRef(null)
   const styles = useStyles()
   // Brought back while they fade out, the controls are still drawn, and the hidden state's
@@ -210,6 +215,8 @@ const ControlsCatcher = ({ onPress }: ControlsCatcherProps) => {
   )
 }
 
+type DpadPlayerProps = PlayerChromeProps & { surface: VideoSurface }
+
 /**
  * raven's own controls over ExoPlayer, driven by the d-pad. They fade once the video has played
  * untouched for the viewer's linger, and any key brings them back; they stay up while it is
@@ -226,7 +233,7 @@ const DpadPlayer = ({
   audio,
   subtitles,
   onBack,
-}: PlayerChromeProps & { surface: VideoSurface }) => {
+}: DpadPlayerProps) => {
   // Only the remote's handler reads whether the line has the focus, so it is no render's concern.
   const isScrubbing = useRef(false)
   const [isPicking, setPicking] = useState(false)
