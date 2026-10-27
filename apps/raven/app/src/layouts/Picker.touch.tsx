@@ -11,7 +11,7 @@ import {
   pickerLabelOf,
 } from '@/layouts/gridKit'
 import { Text } from '@/layouts/Text'
-import { SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themeNow, themedStyles } from '@/theme/useTheme'
 
 type OpenPickerSheetProps<K extends string> = Pick<
@@ -96,7 +96,7 @@ const useStyles = themedStyles((colours) =>
       borderRadius: SIZES.radius,
       backgroundColor: colours.quiet,
     },
-    pressed: { opacity: 0.6 },
+    pressed: { opacity: OPACITIES.pressed },
     label: { color: colours.muted, fontSize: SIZES.textSm },
     value: { color: colours.text, fontSize: SIZES.textSm, fontWeight: '600' },
   }),

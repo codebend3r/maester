@@ -4,10 +4,8 @@ import { StyleSheet, View } from 'react-native'
 import { Text } from '@/layouts/Text'
 import { PLAYER_COPY, type PlayerChromeProps } from '@/layouts/playerKit'
 import { PlateButton } from '@/layouts/tvControls'
-import { TV_SIZES } from '@/theme/tvSizes'
+import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { pictureStyles } from '@/theme/useTheme'
-
-const GUTTER = TV_SIZES.space8
 
 type PlayerNoticeProps = Pick<PlayerChromeProps, 'title' | 'notice' | 'onBack'>
 
@@ -53,7 +51,7 @@ const useStyles = pictureStyles((colours) =>
       flex: 1,
       justifyContent: 'center',
       gap: TV_SIZES.space4,
-      paddingHorizontal: GUTTER,
+      paddingHorizontal: TV_GUTTER,
       backgroundColor: colours.ground,
     },
     title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },

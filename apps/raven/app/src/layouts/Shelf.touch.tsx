@@ -16,7 +16,7 @@ import {
   seeAllLabelOf,
 } from '@/layouts/shelfKit'
 import { Logo } from '@/layouts/Logo'
-import { SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 
 /** Card widths in points: about two and a half posters across a phone, more on a tablet. */
@@ -189,7 +189,7 @@ const useStyles = themedStyles((colours) =>
     },
     shelfTitle: { flexShrink: 1, color: colours.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
     seeAll: { color: colours.muted, fontSize: SIZES.textSm, fontWeight: '600' },
-    pressed: { opacity: 0.6 },
+    pressed: { opacity: OPACITIES.pressed },
     row: { gap: SIZES.space3, paddingHorizontal: SIZES.space3 },
   }),
 )

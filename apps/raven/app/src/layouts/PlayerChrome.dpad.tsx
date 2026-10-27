@@ -29,12 +29,10 @@ import { pressedKeyOf, remoteAnswerOf } from '@/layouts/remoteKeys'
 import { PlateButton } from '@/layouts/tvControls'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
-import { TV_SIZES } from '@/theme/tvSizes'
+import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { pictureStyles } from '@/theme/useTheme'
 
 const { Picker } = focusPicker
-
-const GUTTER = TV_SIZES.space8
 
 /** How dark the ground is laid over the picture under the controls. */
 const SCRIM_OPACITY = 0.45
@@ -303,7 +301,7 @@ const DpadPlayer = ({
           pointerEvents="none"
           style={[
             styles.captionSlot,
-            { paddingBottom: isVisible ? GUTTER + bottomHeight + TV_SIZES.space4 : GUTTER },
+            { paddingBottom: isVisible ? TV_GUTTER + bottomHeight + TV_SIZES.space4 : TV_GUTTER },
           ]}
         >
           <CaptionText caption={caption} fontSize={TV_SIZES.textLg} />
@@ -330,7 +328,7 @@ const useStyles = pictureStyles((colours) =>
       backgroundColor: colours.ground,
       opacity: SCRIM_OPACITY,
     },
-    frame: { flex: 1, justifyContent: 'space-between', padding: GUTTER },
+    frame: { flex: 1, justifyContent: 'space-between', padding: TV_GUTTER },
     title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
     bottom: { gap: TV_SIZES.space3 },
     timeline: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
@@ -364,7 +362,7 @@ const useStyles = pictureStyles((colours) =>
       ...StyleSheet.absoluteFill,
       alignItems: 'center',
       justifyContent: 'flex-end',
-      paddingHorizontal: GUTTER,
+      paddingHorizontal: TV_GUTTER,
     },
     noticeSlot: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
     notice: {

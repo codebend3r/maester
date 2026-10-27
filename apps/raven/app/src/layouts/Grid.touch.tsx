@@ -20,7 +20,7 @@ import {
 } from '@/layouts/gridKit'
 import { GRID_ROWS, type GridRow, gridColumnsOf } from '@/layouts/gridRows'
 import { useGrid } from '@/layouts/useGrid'
-import { SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 
 const GUTTER = SIZES.space3
@@ -294,7 +294,7 @@ const useStyles = themedStyles((colours) =>
     line: { color: colours.muted, fontSize: SIZES.textSm },
     toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space1 },
     notice: { color: colours.muted, fontSize: SIZES.text },
-    pressed: { opacity: 0.6 },
+    pressed: { opacity: OPACITIES.pressed },
     bucket: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space1 },
     chevron: { color: colours.muted, fontSize: SIZES.text, width: SIZES.space3 },
     bucketTitle: {
