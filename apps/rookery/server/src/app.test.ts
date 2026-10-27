@@ -8,12 +8,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { WRITE_ERRORS, createApp } from '@/app'
 import { SESSION_ERRORS } from '@/auth/authController'
 import { PIN_COOKIE, SESSION_COOKIE } from '@/auth/cookies'
-import { CALLBACK_PATH, PAGE_PATHS, SIGN_IN_ERRORS } from '@/auth/signInService'
+import { PAGE_PATHS, SIGN_IN_ERRORS } from '@/auth/signInService'
 import { addMs } from '@/clock'
 import { ENV_VARS, type ServerConfig, readServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import { HEALTH_STATUSES } from '@/health/healthController'
 import type { PlexAccount, PlexPin } from '@/plex/plexTv'
+import { ROUTES } from '@/routes'
 import { SESSION_KINDS, hashToken } from '@/sessions/sessionsRepository'
 import { FakePlexTv } from '@/test/fakePlexTv'
 
@@ -105,7 +106,7 @@ type StartProps = { harness: Harness; returnTo?: string }
 const start = async ({ harness, returnTo }: StartProps) => {
   const response = await harness.app.inject({
     method: 'POST',
-    url: '/api/auth/plex/start',
+    url: ROUTES.start,
     payload: returnTo == null ? {} : { return_to: returnTo },
   })
   const pin = harness.plex.pins.at(-1)
@@ -117,7 +118,7 @@ type CallbackProps = { harness: Harness; pinCookie: string | null }
 const callback = ({ harness, pinCookie }: CallbackProps) =>
   harness.app.inject({
     method: 'GET',
-    url: CALLBACK_PATH,
+    url: ROUTES.callback,
     headers: pinCookie ? { cookie: `${PIN_COOKIE}=${pinCookie}` } : {},
   })
 
@@ -146,7 +147,7 @@ type MeProps = { harness: Harness; token: string }
 const me = ({ harness, token }: MeProps) =>
   harness.app.inject({
     method: 'GET',
-    url: '/api/me',
+    url: ROUTES.me,
     headers: { cookie: `other=1; ${SESSION_COOKIE}=${token}` },
   })
 
@@ -159,7 +160,7 @@ type LookupProps = {
 const lookup = ({ harness, token, bearer = SERVICE_TOKEN }: LookupProps) =>
   harness.app.inject({
     method: 'POST',
-    url: '/internal/session',
+    url: ROUTES.session,
     headers: bearer == null ? {} : { authorization: `Bearer ${bearer}` },
     payload: token === undefined ? {} : { token },
   })
@@ -184,7 +185,7 @@ describe('starting a sign-in', () => {
     expect(authUrl.searchParams.get('clientID')).toBe('maester')
     expect(authUrl.searchParams.get('code')).toBe(pin?.code ?? 'no pin')
     expect(authUrl.searchParams.get('context[device][product]')).toBe('maester')
-    expect(authUrl.searchParams.get('forwardUrl')).toBe(`${ROOKERY}${CALLBACK_PATH}`)
+    expect(authUrl.searchParams.get('forwardUrl')).toBe(`${ROOKERY}${ROUTES.callback}`)
 
     const cookie = cookieNamed({ response, name: PIN_COOKIE })
     expect(cookie).toContain('Path=/auth/plex')
@@ -343,7 +344,7 @@ describe('signing out', () => {
 
     const response = await harness.app.inject({
       method: 'POST',
-      url: '/api/auth/logout',
+      url: ROUTES.logout,
       headers: { cookie: `${SESSION_COOKIE}=${token}` },
       payload: { return_to: `${LUWIN}/` },
     })
@@ -361,7 +362,7 @@ describe('signing out', () => {
     const harness = await boot()
     const response = await harness.app.inject({
       method: 'POST',
-      url: '/api/auth/logout',
+      url: ROUTES.logout,
       payload: { return_to: 'https://evil.example/' },
     })
     expect(response.json()).toEqual({ next: PAGE_PATHS.login })
@@ -371,7 +372,7 @@ describe('signing out', () => {
     const harness = await boot()
     const response = await harness.app.inject({
       method: 'POST',
-      url: '/api/auth/logout',
+      url: ROUTES.logout,
       headers: { [HEADERS.contentType]: 'text/plain' },
       payload: '{}',
     })
@@ -383,7 +384,7 @@ describe('signing out', () => {
 describe('/api/me', () => {
   it('is 401 without a session, and never cached', async () => {
     const harness = await boot()
-    const response = await harness.app.inject({ method: 'GET', url: '/api/me' })
+    const response = await harness.app.inject({ method: 'GET', url: ROUTES.me })
     expect(response.statusCode).toBe(401)
     expect(response.json()).toEqual({ reason: SESSION_ERRORS.signedOut })
     expect(response.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
@@ -498,7 +499,7 @@ describe('serving the web app', () => {
 
   it('answers /health without a session', async () => {
     const harness = await boot()
-    const response = await harness.app.inject({ method: 'GET', url: '/health' })
+    const response = await harness.app.inject({ method: 'GET', url: ROUTES.health })
     expect(response.json()).toEqual({ status: HEALTH_STATUSES.ok })
   })
 })

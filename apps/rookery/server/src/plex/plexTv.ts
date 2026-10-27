@@ -1,4 +1,5 @@
 import { CONTENT_TYPES, HTTP_METHODS, HEADERS } from '@shared/server'
+import { isRecord } from '@/guards'
 
 /**
  * Plex's PIN sign-in, as plex.tv documents it for third-party apps: create a
@@ -55,9 +56,6 @@ export const plexAuthUrl = ({ code, forwardUrl }: PlexAuthUrlProps): string =>
     'context[device][product]': PLEX_PRODUCT,
     forwardUrl,
   }).toString()}`
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value != null && !Array.isArray(value)
 
 const text = (value: unknown): string | null =>
   typeof value === 'string' && value !== '' ? value : null
