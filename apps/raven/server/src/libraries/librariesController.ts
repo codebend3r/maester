@@ -104,6 +104,8 @@ type LibrariesControllerWithStatusProps = {
 
 type LibrariesControllerSagasOfProps = { id: number; request: FastifyRequest }
 
+type LibrariesControllerCommandedProps = { id: number; act: (id: number) => void }
+
 @Controller('api/libraries')
 @PrivateBy('library')
 export class LibrariesController {
@@ -162,10 +164,22 @@ export class LibrariesController {
     }
   }
 
+  /** A library as whoever may manage raven sees it: folders, picture and scan failure included. */
+  private managed(record: LibraryRecord): Library {
+    return this.withStatus({ record, canSee: true, isAdmin: true })
+  }
+
   private find(id: number): LibraryRecord {
     const record = this.libraries.get(id)
     if (!record) throw new NotFoundException(`No library ${id}`)
     return record
+  }
+
+  /** An admin's command on a library: `act` runs once the library is found, and the answer is the library as the admin sees it. */
+  private commanded({ id, act }: LibrariesControllerCommandedProps): Library {
+    const record = this.find(id)
+    act(id)
+    return this.managed(record)
   }
 
   /** Every library, but a locked one the viewer may not see: all of them unless the caller can manage. */
@@ -210,7 +224,7 @@ export class LibrariesController {
     const record = this.libraries.create(this.parseLockable(body))
     this.scanner.scan(record.id)
     this.watcher.sync()
-    return this.withStatus({ record, canSee: true, isAdmin: true })
+    return this.managed(record)
   }
 
   /**
@@ -237,7 +251,7 @@ export class LibrariesController {
     }
     if (!samePaths({ before: before.paths, after: record.paths })) this.scanner.scan(id)
     this.watcher.sync()
-    return this.withStatus({ record, canSee: true, isAdmin: true })
+    return this.managed(record)
   }
 
   /**
@@ -330,18 +344,14 @@ export class LibrariesController {
   @Post(':id/scan/cancel')
   @HttpCode(200)
   cancelScan(@Param('id', ParseIntPipe) id: number): Library {
-    const record = this.find(id)
-    this.scanner.cancel(id)
-    return this.withStatus({ record, canSee: true, isAdmin: true })
+    return this.commanded({ id, act: (libraryId) => this.scanner.cancel(libraryId) })
   }
 
   @AdminOnly()
   @Post(':id/scan')
   @HttpCode(200)
   scan(@Param('id', ParseIntPipe) id: number): Library {
-    const record = this.find(id)
-    this.scanner.scan(id)
-    return this.withStatus({ record, canSee: true, isAdmin: true })
+    return this.commanded({ id, act: (libraryId) => this.scanner.scan(libraryId) })
   }
 
   /**
@@ -353,9 +363,7 @@ export class LibrariesController {
   @Post(':id/quick-scan')
   @HttpCode(200)
   quickScan(@Param('id', ParseIntPipe) id: number): Library {
-    const record = this.find(id)
-    this.ratings.quickScan(id)
-    return this.withStatus({ record, canSee: true, isAdmin: true })
+    return this.commanded({ id, act: (libraryId) => this.ratings.quickScan(libraryId) })
   }
 
   /** Cancels a quick scan, and the scores that would follow it. */
@@ -363,9 +371,7 @@ export class LibrariesController {
   @Post(':id/quick-scan/cancel')
   @HttpCode(200)
   cancelQuickScan(@Param('id', ParseIntPipe) id: number): Library {
-    const record = this.find(id)
-    this.ratings.cancelQuickScan(id)
-    return this.withStatus({ record, canSee: true, isAdmin: true })
+    return this.commanded({ id, act: (libraryId) => this.ratings.cancelQuickScan(libraryId) })
   }
 
   /**
@@ -377,9 +383,7 @@ export class LibrariesController {
   @Post(':id/ratings')
   @HttpCode(200)
   updateRatings(@Param('id', ParseIntPipe) id: number): Library {
-    const record = this.find(id)
-    this.ratings.start({ libraryId: id })
-    return this.withStatus({ record, canSee: true, isAdmin: true })
+    return this.commanded({ id, act: (libraryId) => this.ratings.start({ libraryId }) })
   }
 
   /** Cancels Update ratings: the titles still waiting are not asked for. */
@@ -387,9 +391,7 @@ export class LibrariesController {
   @Post(':id/ratings/cancel')
   @HttpCode(200)
   cancelRatings(@Param('id', ParseIntPipe) id: number): Library {
-    const record = this.find(id)
-    this.ratings.cancel(id)
-    return this.withStatus({ record, canSee: true, isAdmin: true })
+    return this.commanded({ id, act: (libraryId) => this.ratings.cancel(libraryId) })
   }
 
   /**
@@ -409,7 +411,7 @@ export class LibrariesController {
     }
     this.metadata.retryUnmatched(id)
     // Read again, so the count of files not matched is the one after the retry.
-    return this.withStatus({ record: this.find(id), canSee: true, isAdmin: true })
+    return this.managed(this.find(id))
   }
 
   /** The library's played videos, last played first; `watched=true` keeps the ones watched. */
