@@ -19,11 +19,11 @@ import { parseJson } from '@/main/parseJson'
 import {
   type AccountRefusalReader,
   type FailureExplainer,
-  PLAYER_MESSAGES,
-  PLAYER_PHASES,
   type ResolvedSource,
   type ServerTarget,
-} from '@/main/player/playerService'
+} from '@/main/player/loadTarget'
+import { PLAYER_PHASES } from '@/main/player/phases'
+import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import {
   type AccountTickets,
   TICKET_OUTCOMES,

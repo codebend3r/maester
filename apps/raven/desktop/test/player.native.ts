@@ -61,15 +61,14 @@ import type { ServerEntry } from '@/main/desktopConfig'
 import { addonPathFor } from '@/main/player/engine'
 import {
   type AccountRefusalReader,
-  createPlayerService,
   type FailureExplainer,
-  PLAYER_MESSAGES,
   type LocalSidecar,
-  type PlayerOutcome,
   resolveSourceWith,
-  SIDECAR_BUDGET_MS,
   type ServerTarget,
-} from '@/main/player/playerService'
+} from '@/main/player/loadTarget'
+import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
+import { createPlayerService, type PlayerOutcome } from '@/main/player/playerService'
+import { SIDECAR_BUDGET_MS } from '@/main/player/sidecars'
 import { tracksFromMpv } from '@/main/player/tracksFromMpv'
 import { createAccountTickets } from '@/main/servers/accountTickets'
 import {

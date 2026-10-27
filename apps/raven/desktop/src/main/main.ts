@@ -102,11 +102,11 @@ import { createEngineSlot, watchService } from '@/main/player/engineSlot'
 import { createMarks } from '@/main/player/marks'
 import { readDevices } from '@/main/player/outputOptions'
 import type { PortLike } from '@/main/player/playerPort'
+import { resolveSourceWith } from '@/main/player/loadTarget'
 import {
   createPlayerService,
   type PlayerActivity,
   type PlayerService,
-  resolveSourceWith,
 } from '@/main/player/playerService'
 import { createSleepGuard } from '@/main/player/sleepGuard'
 import { setWindowBounds } from '@/main/playerState'
