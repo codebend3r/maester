@@ -40,6 +40,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isUser = (value: unknown): value is User =>
   isRecord(value) && typeof value.id === 'string' && typeof value.display_name === 'string'
 
+/** The server's routes this app calls. */
+export const API_ROUTES = {
+  start: '/api/auth/plex/start',
+  logout: '/api/auth/logout',
+  me: '/api/me',
+} as const
+
 /** What a write carries; the server refuses anything but JSON. */
 export const HTTP_METHODS = { post: 'POST' } as const
 export const HEADERS = { contentType: 'content-type' } as const
@@ -64,10 +71,9 @@ type StartSignInProps = { returnTo: string | null }
 
 /** Starts a Plex sign-in; resolves to the Plex page the browser goes to next. */
 export const startSignIn = async ({ returnTo }: StartSignInProps): Promise<string> => {
-  const response = await postJson({
-    url: '/api/auth/plex/start',
-    body: withReturnTo(returnTo),
-  }).catch(() => null)
+  const response = await postJson({ url: API_ROUTES.start, body: withReturnTo(returnTo) }).catch(
+    () => null,
+  )
   if (response == null) throw new AuthError(AUTH_ERRORS.unreachable)
   if (response.status === 503) throw new AuthError(AUTH_ERRORS.plexUnavailable)
   const authUrl = isRecord(response.body) ? response.body.auth_url : null
@@ -79,7 +85,7 @@ type SignOutProps = { returnTo: string | null }
 
 /** Ends the session; resolves to where the browser goes next, which the server has checked. */
 export const signOut = async ({ returnTo }: SignOutProps): Promise<string> => {
-  const response = await postJson({ url: '/api/auth/logout', body: withReturnTo(returnTo) })
+  const response = await postJson({ url: API_ROUTES.logout, body: withReturnTo(returnTo) })
   const next = isRecord(response.body) ? response.body.next : null
   if (!response.ok || typeof next !== 'string') throw new AuthError(AUTH_ERRORS.unreachable)
   return next
@@ -87,7 +93,7 @@ export const signOut = async ({ returnTo }: SignOutProps): Promise<string> => {
 
 /** The signed-in user, or null when there is no session. */
 export const fetchMe = async (): Promise<User | null> => {
-  const response = await fetch('/api/me')
+  const response = await fetch(API_ROUTES.me)
   if (response.status === 401) return null
   const body: unknown = await response.json().catch(() => null)
   const user = isRecord(body) ? body.user : null
