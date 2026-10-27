@@ -6,7 +6,7 @@ import {
   ITEM_TYPES,
   type MatchItemType,
 } from '@raven/core'
-import type { SearchResult } from '@/metadata/tmdbClient'
+import type { SearchResult } from '@/metadata/tmdbShapes'
 
 /** The most popular of `results`, TMDB's own order (popularity first) breaking a tie. */
 const mostPopular = (results: readonly SearchResult[]): SearchResult | null =>

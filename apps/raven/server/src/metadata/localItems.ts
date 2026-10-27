@@ -1,4 +1,5 @@
-import { BLANK_ITEM, type FetchedItem } from '@/metadata/tmdbClient'
+import { ITEM_TYPES } from '@raven/core'
+import { BLANK_ITEM, type FetchedItem } from '@/metadata/tmdbShapes'
 
 /** Items raven made up for episodes and seasons TMDB does not list; never fetched. */
 export const LOCAL = 'local:'
@@ -13,7 +14,7 @@ type LocalSeasonProps = {
 /** A season TMDB does not list, so its files still have somewhere to sit. */
 export const localSeason = ({ showTmdbId, number }: LocalSeasonProps): FetchedItem => ({
   ...BLANK_ITEM,
-  type: 'season',
+  type: ITEM_TYPES.season,
   tmdbId: `${LOCAL}${showTmdbId}:S${number}`,
   number,
   title: number === 0 ? 'Specials' : `Season ${number}`,
@@ -34,7 +35,7 @@ export const localEpisode = ({
   title,
 }: LocalEpisodeProps): FetchedItem => ({
   ...BLANK_ITEM,
-  type: 'episode',
+  type: ITEM_TYPES.episode,
   tmdbId: `${LOCAL}${showTmdbId}:S${season}E${number}`,
   number,
   title: title ?? `Episode ${number}`,

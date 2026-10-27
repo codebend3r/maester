@@ -21,7 +21,8 @@ import {
   RETRY_MS,
   ScoreSweep,
 } from '@/metadata/scoreSweep'
-import { BLANK_ITEM, type MetadataFetch, type TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { type MetadataFetch, type TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { BLANK_ITEM } from '@/metadata/tmdbShapes'
 import { ScannerService } from '@/scanner/scannerService'
 import { adminCookie, holdOpen, NOT_WATCHING, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'

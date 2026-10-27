@@ -18,12 +18,12 @@ import { OnceEach } from '@/metadata/onceEach'
 import { PassGuard } from '@/metadata/passGuard'
 import type { Scores } from '@/metadata/scores'
 import {
-  type SearchResult,
   TMDB_ERROR_KINDS,
   TMDB_EXTERNAL_SOURCES,
   type TmdbClient,
   TmdbError,
 } from '@/metadata/tmdbClient'
+import type { SearchResult } from '@/metadata/tmdbShapes'
 
 export const notFound = (error: unknown): boolean =>
   error instanceof TmdbError && error.kind === TMDB_ERROR_KINDS.notFound

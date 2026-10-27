@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BLANK_ITEM, type FetchedPerson, type FetchedPersonCredit } from '@/metadata/tmdbClient'
+import { BLANK_ITEM, type FetchedPerson, type FetchedPersonCredit } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { peopleRepositoryOf, pictureVersionsOf, repositories } from '@/test/repositories'
 

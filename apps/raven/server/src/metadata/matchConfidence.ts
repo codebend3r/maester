@@ -7,7 +7,7 @@ import {
   type ParsedEpisodeName,
   ITEM_TYPES,
 } from '@raven/core'
-import type { MatchFacts, SearchResult } from '@/metadata/tmdbClient'
+import type { MatchFacts, SearchResult } from '@/metadata/tmdbShapes'
 
 /** A show file's numbers, and the year its name gives, as `parseEpisodeName` reads them. */
 export type EpisodeNumbers = Pick<ParsedEpisodeName, 'season' | 'episodes' | 'absolute' | 'year'>

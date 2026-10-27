@@ -8,7 +8,7 @@ import {
 } from '@raven/core'
 import { groupBy } from '@/groupBy'
 import type { LocalCredit } from '@/metadata/metadataRepository'
-import { yearOf } from '@/metadata/tmdbClient'
+import { yearOf } from '@/metadata/tmdbShapes'
 import type { FilmographyRow } from '@/people/peopleRepository'
 
 /** Crew jobs that are no work on the title: a thank-you in the credits, a dedication. */

@@ -3,7 +3,7 @@ import type { ProbeResult } from '@/ffmpeg/probe'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MatchFiles } from '@/metadata/matchFiles'
-import { BLANK_ITEM } from '@/metadata/tmdbClient'
+import { BLANK_ITEM } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { repositories } from '@/test/repositories'
 

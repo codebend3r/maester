@@ -26,7 +26,7 @@ import { ItemImagesRepository, lineOf } from '@/metadata/itemImagesRepository'
 import { PictureVersions } from '@/metadata/pictureVersions'
 import { LOCAL } from '@/metadata/localItems'
 import type { ExternalScore, ScoreProvider, ScoreTitle } from '@/metadata/scoreSources'
-import type { FetchedItem, FetchedSaga, MovieExtras } from '@/metadata/tmdbClient'
+import type { FetchedItem, FetchedSaga, MovieExtras } from '@/metadata/tmdbShapes'
 
 /** The column that notes when each provider last answered for an item. */
 const FETCHED_AT = {

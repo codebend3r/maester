@@ -7,7 +7,7 @@ import type { AccountKey } from '@/media/viewingAccountKeys'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { WatchedCards } from '@/media/watchedCards'
 import { PLAY_KINDS, WatchedRepository } from '@/media/watchedRepository'
-import { BLANK_ITEM, type FetchedItem } from '@/metadata/tmdbClient'
+import { BLANK_ITEM, type FetchedItem } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 

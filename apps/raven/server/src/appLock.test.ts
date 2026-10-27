@@ -23,7 +23,7 @@ import type { Privacy } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
-import { BLANK_ITEM } from '@/metadata/tmdbClient'
+import { BLANK_ITEM } from '@/metadata/tmdbShapes'
 import { routeMarks } from '@/routeMarks'
 import { ScannerService } from '@/scanner/scannerService'
 import {
