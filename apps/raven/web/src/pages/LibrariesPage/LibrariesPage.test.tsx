@@ -702,7 +702,7 @@ describe('LibrariesPage', () => {
     spies.list.mockImplementation(async () => [])
     renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })
     expect(
-      await screen.findByText('Turn the admin lock off in Settings to add one.'),
+      await screen.findByText('Turn the admin lock off in Settings to add a library.'),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add library' })).toBeNull()
   })

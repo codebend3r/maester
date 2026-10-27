@@ -1,10 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { KINDS, type Library, plural } from '@raven/core'
-import { type DragEvent, useId, useState } from 'react'
+import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
-import { Button, Icon } from '@raven/ui'
+import { Button } from '@raven/ui'
 import {
   LibraryActionErrors,
   LibraryActions,
@@ -15,7 +15,7 @@ import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { RatingsStatus } from '@/components/RatingsStatus/RatingsStatus'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
-import { MANAGEMENT_MODES, useCanManage, useManagement } from '@/lib/management'
+import { cannotManageNote, useCanManage, useManagement } from '@/lib/management'
 import { api } from '@/lib/api'
 import {
   afterHeroLibraries,
@@ -29,12 +29,10 @@ import { libraryPollDelay } from '@/lib/libraryPolling'
 import { LIBRARY_LOCK_STATES, lockState } from '@/lib/libraryLock'
 import { useLibraryOrdering } from '@/lib/useLibraryOrdering'
 import { librariesQuery, lockQuery } from '@/lib/queries'
+import { OrderedLibraries } from '@/pages/LibrariesPage/OrderedLibraries'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
 const count = new Intl.NumberFormat()
-
-/** Firefox starts no drag that sets no data. */
-const DRAG_DATA_TYPE = 'text/plain'
 
 /** How many libraries there are and how many videos they hold between them. */
 const summaryOf = (libraries: readonly Library[]): string =>
@@ -212,58 +210,6 @@ const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
   )
 }
 
-type ThinLibraryRowProps = {
-  library: Library
-  place: { isFirst: boolean; isLast: boolean; onMove: (step: number) => void }
-  isDragging: boolean
-  drag: {
-    onStart: (event: DragEvent) => void
-    onOver: (event: DragEvent) => void
-    onEnd: () => void
-  }
-}
-
-/**
- * A library in edit mode, down to a thin line: a grip, its icon and name, and
- * a button each to move it up or down, for the keyboard and for a touch
- * screen. The line itself drags; whichever line it is held over takes its place.
- */
-const ThinLibraryRow = ({ library, place, isDragging, drag }: ThinLibraryRowProps) => (
-  // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- dragging is the pointer's way; the move buttons are the keyboard's
-  <li
-    className={isDragging ? `${styles.thin} ${styles.dragging}` : styles.thin}
-    draggable
-    onDragStart={drag.onStart}
-    onDragOver={drag.onOver}
-    onDrop={(event) => event.preventDefault()}
-    onDragEnd={drag.onEnd}
-  >
-    <span className={styles.grip} aria-hidden="true">
-      <Icon name="grip" size={18} />
-    </span>
-    <span className={styles.thinWell}>
-      <LibraryIcon settings={library.settings} size={18} />
-    </span>
-    <span className={styles.thinName}>{library.name}</span>
-    <span className={styles.moves}>
-      <Button
-        icon="up"
-        tone="ghost"
-        aria-label={`Move ${library.name} up`}
-        disabled={place.isFirst}
-        onClick={() => place.onMove(-1)}
-      />
-      <Button
-        icon="down"
-        tone="ghost"
-        aria-label={`Move ${library.name} down`}
-        disabled={place.isLast}
-        onClick={() => place.onMove(1)}
-      />
-    </span>
-  </li>
-)
-
 /** Three cards on their way, each a line for its name over one for its counts. */
 const RowsSkeleton = () => (
   <Loading label="Gathering your libraries">
@@ -299,7 +245,6 @@ export const LibrariesPage = () => {
   })
   // The ones opened, kept while the cards are thin so they open again after.
   const [openIds, setOpenIds] = useState<ReadonlySet<number>>(new Set())
-  const [draggingId, setDraggingId] = useState<number | null>(null)
   const ordering = useLibraryOrdering({ libraries: libraries.data ?? [] })
 
   // Whether this browser holds the PIN, asked only when some library is locked.
@@ -351,11 +296,7 @@ export const LibrariesPage = () => {
               Add library
             </Button>
           ) : (
-            <p>
-              {mode === MANAGEMENT_MODES.adminLock
-                ? 'Turn the admin lock off in Settings to add one.'
-                : 'Only the owner can add a library.'}
-            </p>
+            <p>{cannotManageNote({ mode, action: 'add a library' })}</p>
           )}
           {dialog}
         </div>
@@ -405,57 +346,28 @@ export const LibrariesPage = () => {
           {ordering.failure.message}
         </p>
       )}
-      {libraries.isPending ? (
-        <RowsSkeleton />
-      ) : (
-        <ul
-          className={styles.list}
-          aria-label={ordering.isEditing ? 'Libraries, in order' : undefined}
-        >
-          {ordering.ordered.map((library, index) =>
-            ordering.isEditing ? (
-              <ThinLibraryRow
-                key={library.id}
-                library={library}
-                isDragging={draggingId === library.id}
-                place={{
-                  isFirst: index === 0,
-                  isLast: index === ordering.ordered.length - 1,
-                  onMove: (step) => ordering.move({ id: library.id, to: index + step }),
-                }}
-                drag={{
-                  onStart: (event) => {
-                    event.dataTransfer.effectAllowed = 'move'
-                    event.dataTransfer.setData(DRAG_DATA_TYPE, String(library.id))
-                    setDraggingId(library.id)
-                  },
-                  onOver: (event) => {
-                    event.preventDefault()
-                    if (draggingId === null || draggingId === library.id) return
-                    ordering.move({ id: draggingId, to: index })
-                  },
-                  onEnd: () => setDraggingId(null),
-                }}
-              />
-            ) : (
-              <LibraryRow
-                key={library.id}
-                library={library}
-                isOpen={openIds.has(library.id)}
-                onToggle={() =>
-                  setOpenIds((current) =>
-                    current.has(library.id)
-                      ? new Set([...current].filter((id) => id !== library.id))
-                      : new Set([...current, library.id]),
-                  )
-                }
-                isShut={
-                  lockState({ locked: library.settings.locked, lock: lock.data }).state !==
-                  LIBRARY_LOCK_STATES.open
-                }
-              />
-            ),
-          )}
+      {libraries.isPending && <RowsSkeleton />}
+      {!libraries.isPending && ordering.isEditing && <OrderedLibraries ordering={ordering} />}
+      {!libraries.isPending && !ordering.isEditing && (
+        <ul className={styles.list}>
+          {ordering.ordered.map((library) => (
+            <LibraryRow
+              key={library.id}
+              library={library}
+              isOpen={openIds.has(library.id)}
+              onToggle={() =>
+                setOpenIds((current) =>
+                  current.has(library.id)
+                    ? new Set([...current].filter((id) => id !== library.id))
+                    : new Set([...current, library.id]),
+                )
+              }
+              isShut={
+                lockState({ locked: library.settings.locked, lock: lock.data }).state !==
+                LIBRARY_LOCK_STATES.open
+              }
+            />
+          ))}
         </ul>
       )}
       {dialog}
