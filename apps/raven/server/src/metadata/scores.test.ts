@@ -44,7 +44,8 @@ describe('asking for scores', () => {
   const metadata = () => repositories(database.get()).metadata
   type ScoresProps = { omdb: ScoreSource; mdblist: ScoreSource }
 
-  const scores = ({ omdb, mdblist }: ScoresProps) => new Scores(metadata(), omdb, mdblist)
+  const scores = ({ omdb, mdblist }: ScoresProps) =>
+    new Scores(repositories(database.get()).scores, omdb, mdblist)
   const movie = (tmdbId: string) => ({
     itemId: metadata().save({
       item: { ...BLANK_ITEM, type: 'movie', tmdbId, number: null, title: tmdbId, imdbId: 'tt1' },

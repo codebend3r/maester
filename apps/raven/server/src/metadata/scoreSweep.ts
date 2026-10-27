@@ -8,9 +8,9 @@ import {
 import { errorMessage } from '@/errorMessage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { notFound } from '@/metadata/matchPass'
-import { type DueScores, MetadataRepository, scoresDueBefore } from '@/metadata/metadataRepository'
 import type { ScoreProvider, ScoreSource } from '@/metadata/scoreSources'
 import { Scores } from '@/metadata/scores'
+import { type DueScores, ScoresRepository, scoresDueBefore } from '@/metadata/scoresRepository'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 
@@ -161,7 +161,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   constructor(
-    @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
+    @Inject(ScoresRepository) private readonly stored: ScoresRepository,
     @Inject(Scores) private readonly scores: Scores,
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(TmdbClient) private readonly tmdb: Pick<TmdbClient, 'score' | 'enabled'>,
@@ -268,7 +268,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     this.forgetFailures({ answeredBy, hasRunOut: !isSilent })
     this.settle()
     if (isSilent && answeredBy.size === 0) return 'unavailable'
-    if (this.metadata.hasRequests() && !this.isSettlerSpent()) return 'requests'
+    if (this.stored.hasRequests() && !this.isSettlerSpent()) return 'requests'
     if (!this.isWaitingForMidnight()) return 'done'
     return this.scores.primary() == null ? 'budget' : 'someSpent'
   }
@@ -338,7 +338,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
       count >= REQUEST_TRIES && now - firstAt >= REQUEST_PATIENCE_MS ? [itemId] : [],
     )
     givenUp.forEach((itemId) => {
-      this.metadata.clearRequest(itemId)
+      this.stored.clearRequest(itemId)
       this.logger.warn(
         `Gave up on item ${itemId} for a Refresh after a day of failed calls; it keeps the scores it had.`,
       )
@@ -356,16 +356,16 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    * source can settle a request at all, every Refresh stops waiting.
    */
   private settle(): void {
-    if (!this.canSettle() && this.metadata.hasRequests()) {
-      this.metadata.clearRequests()
+    if (!this.canSettle() && this.stored.hasRequests()) {
+      this.stored.clearRequests()
       this.logger.warn(
         'No source can answer a Refresh now, so it stops waiting; its titles keep the scores they had.',
       )
     }
     const settler = this.scores.settler()
-    if (settler != null) this.metadata.settleRequests(settler.provider)
+    if (settler != null) this.stored.settleRequests(settler.provider)
     this.state.requestFailures = new Map(
-      [...this.state.requestFailures].filter(([itemId]) => this.metadata.isRequested(itemId)),
+      [...this.state.requestFailures].filter(([itemId]) => this.stored.isRequested(itemId)),
     )
     this.libraries.finishRatingsRefreshes(new Date().toISOString())
   }
@@ -406,7 +406,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     return {
       asked: provider,
       due: this.due({ asked: provider, before, limit: source.remaining() }),
-      isDue: ({ itemId }) => this.metadata.isScoreDue({ itemId, provider, before }),
+      isDue: ({ itemId }) => this.stored.isScoreDue({ itemId, provider, before }),
       isCurrent,
       isSpent: () => source.remaining() === 0,
       fetch: async (title) => {
@@ -425,12 +425,12 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     return {
       asked: 'tmdb',
       due,
-      isDue: ({ itemId }) => this.metadata.isRequested(itemId),
+      isDue: ({ itemId }) => this.stored.isRequested(itemId),
       isCurrent: () => this.scores.settler() == null,
       isSpent: () => false,
       fetch: async (title) => {
         if (!(await this.fetchTmdbScore(title))) return false
-        this.metadata.clearRequest(title.itemId)
+        this.stored.clearRequest(title.itemId)
         return true
       },
     }
@@ -447,8 +447,8 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   /** What `asked` has due, in the order it is asked: a source's due scores, or the titles a Refresh asked for. */
   private listDue({ asked, before, limit }: ScoreSweepListDueProps): DueScores[] {
     return asked === 'tmdb'
-      ? this.metadata.requestedTitles(limit)
-      : this.metadata.scoresDue({ provider: asked, before, limit })
+      ? this.stored.requestedTitles(limit)
+      : this.stored.scoresDue({ provider: asked, before, limit })
   }
 
   /**
@@ -460,7 +460,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     try {
       const rating = await this.tmdb.score({ type, tmdbId })
       if (this.state.isClosed) return false
-      this.metadata.saveTmdbRating({ itemId, rating })
+      this.stored.saveTmdbRating({ itemId, rating })
       return true
     } catch (error) {
       if (notFound(error)) return true
@@ -523,7 +523,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
       .spent()
       .some(
         (source) =>
-          this.metadata.scoresDue({ provider: source.provider, before, limit: 1 }).length > 0,
+          this.stored.scoresDue({ provider: source.provider, before, limit: 1 }).length > 0,
       )
   }
 }

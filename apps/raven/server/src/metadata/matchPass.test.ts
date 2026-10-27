@@ -57,13 +57,13 @@ describe('a matching pass', () => {
   })
   const pass = (prefer: readonly CandidateTier[] = TIER_SETS.any): MatchPass => {
     const config = { ...readServerConfig({}), tmdbApiToken: 'test-token' }
-    const { metadata } = repositories(database.get())
+    const { metadata, scores } = repositories(database.get())
     return new MatchPass({
       tmdb: new TmdbClient(config, tmdb.fetch),
       metadata,
       files: new MatchFiles(database.get(), metadata),
       scores: new Scores(
-        metadata,
+        scores,
         new OmdbClient(config, tmdb.fetch),
         new MdblistClient(config, tmdb.fetch),
       ),
@@ -312,13 +312,13 @@ describe('looking up the other titles of a show', () => {
 
   it('looks first at the results whose titles start with the name, so a sixth result is not missed', async () => {
     const config = { ...readServerConfig({}), tmdbApiToken: 'test-token' }
-    const { metadata } = repositories(database.get())
+    const { metadata, scores } = repositories(database.get())
     const pass = new MatchPass({
       tmdb: new TmdbClient(config, tmdb.fetch),
       metadata,
       files: new MatchFiles(database.get(), metadata),
       scores: new Scores(
-        metadata,
+        scores,
         new OmdbClient(config, tmdb.fetch),
         new MdblistClient(config, tmdb.fetch),
       ),
@@ -370,13 +370,13 @@ describe('looking up the other titles of a show known only by an alternative', (
 
   it('looks at a result that does not contain the name before those that hold it mid-title', async () => {
     const config = { ...readServerConfig({}), tmdbApiToken: 'test-token' }
-    const { metadata } = repositories(database.get())
+    const { metadata, scores } = repositories(database.get())
     const pass = new MatchPass({
       tmdb: new TmdbClient(config, tmdb.fetch),
       metadata,
       files: new MatchFiles(database.get(), metadata),
       scores: new Scores(
-        metadata,
+        scores,
         new OmdbClient(config, tmdb.fetch),
         new MdblistClient(config, tmdb.fetch),
       ),

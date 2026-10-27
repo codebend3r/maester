@@ -50,7 +50,7 @@ describe('matching by library type', () => {
       tmdbApiToken: 'test-token',
       hwAccel: 'none' as const,
     }
-    const { images, metadata } = repositories(database.get())
+    const { images, metadata, scores } = repositories(database.get())
     const files = new MatchFiles(database.get(), metadata)
     const ffmpeg = new FfmpegService(config, new SettingsRepository(database.get()))
     const cache = new ImageCache(config, tmdb.fetch, ffmpeg)
@@ -61,7 +61,7 @@ describe('matching by library type', () => {
         metadata,
         files,
         scores: new Scores(
-          metadata,
+          scores,
           new OmdbClient(config, tmdb.fetch),
           new MdblistClient(config, tmdb.fetch),
         ),
