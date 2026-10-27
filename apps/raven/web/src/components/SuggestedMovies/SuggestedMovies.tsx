@@ -1,4 +1,11 @@
-import { type AiSuggestion, type MediaItem, type UnmatchedFile, plural } from '@raven/core'
+import {
+  type AiSuggestion,
+  type MediaItem,
+  type UnmatchedFile,
+  plural,
+  MATCH_SUBJECT_KINDS,
+  ITEM_TYPES,
+} from '@raven/core'
 import { useId, useRef, useState } from 'react'
 import { AiSuggestionCard } from '@/components/AiSuggestionCard/AiSuggestionCard'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
@@ -63,12 +70,12 @@ const SuggestedMovieEntry = ({ entry, libraryId }: SuggestedMovieEntryProps) => 
       />
       {isFixing && (
         <FixMatchDialog
-          type="movie"
+          type={ITEM_TYPES.movie}
           title={file.title}
           year={file.year}
           fileName={file.fileName}
           libraryId={libraryId}
-          subject={{ kind: 'media', id: file.id }}
+          subject={{ kind: MATCH_SUBJECT_KINDS.media, id: file.id }}
           match={pointAt}
           onClose={() => setIsFixing(false)}
         />

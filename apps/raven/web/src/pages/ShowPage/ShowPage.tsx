@@ -14,6 +14,10 @@ import {
   showFacts,
   watchLink,
   watchedStateOf,
+  WATCH_TARGET_KINDS,
+  MATCH_SUBJECT_KINDS,
+  ITEM_IMAGE_KINDS,
+  ITEM_TYPES,
 } from '@raven/core'
 import { useId, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -107,7 +111,7 @@ const ShowView = ({ details }: ShowViewProps) => {
   const marks = seasonsWatched(seasons)
   const toggle = useWatchedToggle({
     state: watchedStateOf(marks),
-    targets: [{ kind: 'item', id: details.id, libraryId: null }],
+    targets: [{ kind: WATCH_TARGET_KINDS.item, id: details.id, libraryId: null }],
   })
 
   return (
@@ -115,7 +119,7 @@ const ShowView = ({ details }: ShowViewProps) => {
       {...sourceOf(
         seasons.map((season) => [
           seasonEntryKey(season),
-          [{ kind: 'item', id: season.id, libraryId: null }],
+          [{ kind: WATCH_TARGET_KINDS.item, id: season.id, libraryId: null }],
         ]),
       )}
     >
@@ -128,7 +132,11 @@ const ShowView = ({ details }: ShowViewProps) => {
           title={details.title}
           logo={
             showsLogo
-              ? api.itemImageUrl({ id: details.id, kind: 'logo', version: details.logoVersion })
+              ? api.itemImageUrl({
+                  id: details.id,
+                  kind: ITEM_IMAGE_KINDS.logo,
+                  version: details.logoVersion,
+                })
               : null
           }
           byline={createdBy(details)}
@@ -139,7 +147,7 @@ const ShowView = ({ details }: ShowViewProps) => {
             shape: 'poster',
             url: api.itemImageUrl({
               id: details.id,
-              kind: 'poster',
+              kind: ITEM_IMAGE_KINDS.poster,
               version: details.posterVersion,
             }),
           }}
@@ -223,11 +231,11 @@ const ShowView = ({ details }: ShowViewProps) => {
         <AdminOnly>
           {fixing && (
             <FixMatchDialog
-              type="show"
+              type={ITEM_TYPES.show}
               title={details.title}
               year={details.year}
               libraryId={libraryId}
-              subject={{ kind: 'item', id: details.id }}
+              subject={{ kind: MATCH_SUBJECT_KINDS.item, id: details.id }}
               aiMatch={details.aiMatch}
               allowNone={false}
               match={(tmdbId) =>

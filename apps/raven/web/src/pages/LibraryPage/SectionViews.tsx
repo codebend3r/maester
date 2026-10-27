@@ -8,22 +8,22 @@ import {
   type MediaItem,
   type PosterEntry,
   type UnmatchedFile,
-  type WatchTarget,
   emptyListingMessage,
   finishedNote,
   isScanning,
   jumpScale,
   matchTypeFor,
-  mediaEntryKey,
   queueLink,
   sagaEntryKey,
   sagaTargets,
   showEntryKey,
   watchLink,
+  WATCH_TARGET_KINDS,
 } from '@raven/core'
 import { type ReactNode, useDeferredValue, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ButtonLink } from '@raven/ui'
+import { HISTORY_SHOWS } from '@raven/ui/headless'
 import { Duplicates } from '@/components/Duplicates/Duplicates'
 import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
@@ -31,12 +31,17 @@ import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
-import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionScope'
+import {
+  type SelectionEntry,
+  SelectionScope,
+  mediaEntryOf,
+  sourceOf,
+} from '@/components/SelectionScope/SelectionScope'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { Spinner } from '@/components/Spinner/Spinner'
 import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
-import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
+import { cannotManageNote, useManagement } from '@/lib/management'
 import {
   duplicatesQuery,
   historyQuery,
@@ -105,12 +110,7 @@ const EntryGrid = ({ library, entries }: EntryGridProps) => {
   const matchType = matchTypeFor(library.settings.kind)
   const posters = new Map(entries.map(({ media, poster }) => [media.id, poster]))
   return (
-    <SelectableCards
-      entries={entries.map(({ media }) => [
-        mediaEntryKey(media),
-        [{ kind: 'media', id: media.id }],
-      ])}
-    >
+    <SelectableCards entries={entries.map(({ media }) => mediaEntryOf(media))}>
       <MediaGrid
         items={entries.map((entry) => entry.media)}
         posters={matchType != null}
@@ -209,14 +209,11 @@ const AllSection = ({ library }: AllSectionProps) => {
 
   // Every card the listing holds, those in a closed bucket too.
   const entries = [
-    ...listed.shows.map((entry): [string, WatchTarget[]] => [
+    ...listed.shows.map((entry): SelectionEntry => [
       showEntryKey(entry.show),
-      [{ kind: 'item', id: entry.show.id, libraryId: library.id }],
+      [{ kind: WATCH_TARGET_KINDS.item, id: entry.show.id, libraryId: library.id }],
     ]),
-    ...listed.files.map((media): [string, WatchTarget[]] => [
-      mediaEntryKey(media),
-      [{ kind: 'media', id: media.id }],
-    ]),
+    ...listed.files.map(mediaEntryOf),
   ]
 
   return (
@@ -346,9 +343,10 @@ type NotMatchedHintProps = {
 const notMatchedHint = ({ matchType, management }: NotMatchedHintProps): string => {
   const title = matchType ?? 'title'
   if (!management.canManage) {
-    return management.mode === MANAGEMENT_MODES.adminLock
-      ? `Turn the admin lock off in Settings to point these at the right ${title}.`
-      : `Only the owner can point these at the right ${title}.`
+    return cannotManageNote({
+      mode: management.mode,
+      action: `point these at the right ${title}`,
+    })
   }
   if (matchType === ITEM_TYPES.show) {
     return 'Choose Fix match beside a show to point its folder at the right show.'
@@ -439,7 +437,7 @@ type FinishedSectionProps = { library: Library }
 const FinishedSection = ({ library }: FinishedSectionProps) => {
   const matchType = matchTypeFor(library.settings.kind)
   const query = useQuery(
-    historyQuery({ libraryId: library.id, show: 'watched', limit: FINISHED_LIMIT }),
+    historyQuery({ libraryId: library.id, show: HISTORY_SHOWS.watched, limit: FINISHED_LIMIT }),
   )
   return (
     <SectionBody
@@ -452,12 +450,7 @@ const FinishedSection = ({ library }: FinishedSectionProps) => {
       {(entries) => {
         const notes = new Map(entries.map((entry) => [entry.media.id, finishedNote({ entry })]))
         return (
-          <SelectableCards
-            entries={entries.map(({ media }) => [
-              mediaEntryKey(media),
-              [{ kind: 'media', id: media.id }],
-            ])}
-          >
+          <SelectableCards entries={entries.map(({ media }) => mediaEntryOf(media))}>
             <MediaTiles
               items={entries.map((entry) => entry.media)}
               note={(media) => notes.get(media.id) ?? null}
@@ -478,7 +471,7 @@ const FinishedSection = ({ library }: FinishedSectionProps) => {
   )
 }
 
-type SECTION_VIEWSCallbackProps = { library: Library }
+type SectionProps = { library: Library }
 
 /** Each tab's content. */
 const SECTION_VIEWS = {
@@ -489,7 +482,7 @@ const SECTION_VIEWS = {
   'not-matched': NotMatchedSection,
   duplicates: DuplicatesSection,
   finished: FinishedSection,
-} as const satisfies Record<LibrarySection, (props: SECTION_VIEWSCallbackProps) => ReactNode>
+} as const satisfies Record<LibrarySection, (props: SectionProps) => ReactNode>
 
 type SectionViewProps = {
   library: Library

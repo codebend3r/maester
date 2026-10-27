@@ -1,4 +1,4 @@
-import type { WatchTarget } from '@raven/core'
+import { type MediaItem, WATCH_TARGET_KINDS, type WatchTarget, mediaEntryKey } from '@raven/core'
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 import {
@@ -16,10 +16,17 @@ import {
 /** A card outside any scope reads from this one, which never starts selecting. */
 const idle = createSelectionStore()
 
+/** A card's key and what marking it marks. */
+export type SelectionEntry = readonly [string, readonly WatchTarget[]]
+
+/** A video's card as a selection entry: marking it marks the video. */
+export const mediaEntryOf = (media: MediaItem): SelectionEntry => [
+  mediaEntryKey(media),
+  [{ kind: WATCH_TARGET_KINDS.media, id: media.id }],
+]
+
 /** A `SelectionSource` from each card's key with what it marks. */
-export const sourceOf = (
-  entries: readonly (readonly [string, readonly WatchTarget[]])[],
-): SelectionSource => {
+export const sourceOf = (entries: readonly SelectionEntry[]): SelectionSource => {
   const targets = new Map(entries)
   return { resolve: (key) => targets.get(key) ?? [], allKeys: () => [...targets.keys()] }
 }
@@ -31,11 +38,9 @@ export const sourceOf = (
  * The scope goes in `useSelectionScopes` as this mounts, and the cards
  * inside draw once it is there, so none draws twice to find it.
  */
-export const SelectionScope = ({
-  resolve,
-  allKeys,
-  children,
-}: SelectionSource & { children: ReactNode }) => {
+type SelectionScopeProps = SelectionSource & { children: ReactNode }
+
+export const SelectionScope = ({ resolve, allKeys, children }: SelectionScopeProps) => {
   const latest = useRef({ resolve, allKeys })
   useLayoutEffect(() => {
     latest.current = { resolve, allKeys }

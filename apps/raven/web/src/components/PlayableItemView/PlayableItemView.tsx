@@ -18,6 +18,7 @@ import {
   movieFacts,
   progressOf,
   watchLink,
+  ITEM_IMAGE_KINDS,
 } from '@raven/core'
 import { useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -188,12 +189,15 @@ export const PlayableItemView = ({
   const play = watchLink({ media: primary })
   const playPicture = { ...play, label: `Play ${details.title}` }
   const still =
-    api.itemImageUrl({ id: details.id, kind: 'still', version: details.backdropVersion }) ??
-    api.thumbnailUrl(primary)
+    api.itemImageUrl({
+      id: details.id,
+      kind: ITEM_IMAGE_KINDS.still,
+      version: details.backdropVersion,
+    }) ?? api.thumbnailUrl(primary)
   const showBackdrop = show.data
     ? api.itemImageUrl({
         id: show.data.id,
-        kind: 'backdrop',
+        kind: ITEM_IMAGE_KINDS.backdrop,
         version: show.data.backdropVersion,
       })
     : null
@@ -216,7 +220,11 @@ export const PlayableItemView = ({
         progress={config.showsTimeLeft ? timeLeft(primary) : undefined}
         logo={
           showsLogo
-            ? api.itemImageUrl({ id: details.id, kind: 'logo', version: details.logoVersion })
+            ? api.itemImageUrl({
+                id: details.id,
+                kind: ITEM_IMAGE_KINDS.logo,
+                version: details.logoVersion,
+              })
             : null
         }
         {...(config.pictures === PAGE_PICTURES.posterAndBackdrop
@@ -225,7 +233,7 @@ export const PlayableItemView = ({
                 shape: 'poster',
                 url: api.itemImageUrl({
                   id: details.id,
-                  kind: 'poster',
+                  kind: ITEM_IMAGE_KINDS.poster,
                   version: details.posterVersion,
                 }),
                 play: playPicture,

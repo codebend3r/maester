@@ -7,6 +7,7 @@ import {
   type MatchItemType,
   type MediaItem,
   mediaLabel,
+  MATCH_SUBJECT_KINDS,
 } from '@raven/core'
 import { Fragment, type RefObject, useId, useRef, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
@@ -34,8 +35,9 @@ export const MENU_HOST = styles.host
  * none for a file matched to nothing.
  */
 const artworkOf = (item: ItemSummary | null): { id: number; kind: MatchItemType } | null => {
-  if (item?.type === ITEM_TYPES.movie) return { id: item.id, kind: 'movie' }
-  if (item?.type === ITEM_TYPES.episode && item.show) return { id: item.show.id, kind: 'show' }
+  if (item?.type === ITEM_TYPES.movie) return { id: item.id, kind: ITEM_TYPES.movie }
+  if (item?.type === ITEM_TYPES.episode && item.show)
+    return { id: item.show.id, kind: ITEM_TYPES.show }
   return null
 }
 
@@ -275,7 +277,7 @@ const MenuBody = ({
           fileName={media.fileName}
           aiMatch={aiMatch ?? itemDetails.data?.aiMatch ?? null}
           libraryId={media.libraryId}
-          subject={{ kind: 'media', id: media.id }}
+          subject={{ kind: MATCH_SUBJECT_KINDS.media, id: media.id }}
           match={(tmdbId) => api.setMatch({ mediaId: media.id, tmdbId })}
           onMatched={onMatched}
           onClose={() => {
