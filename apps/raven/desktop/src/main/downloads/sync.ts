@@ -13,6 +13,7 @@ import { errorText } from '@/main/log/errorText'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import type { Timers } from '@/main/stateStore'
+import { isSuccessStatus } from '@/shared/httpStatuses'
 
 /** A play or a position waits this long before it goes out, so a playing download reports as a stream would. */
 export const SYNC_DEBOUNCE_MS = 2000
@@ -51,8 +52,6 @@ export type Sync = {
    */
   dispose: () => void
 }
-
-const isSuccess = (status: number): boolean => status >= 200 && status < 300
 
 /** The statuses that say the server will never take this, or not yet, and are worth a line in the log. */
 const isLogged = (status: number): boolean => status === 403 || status === 404
@@ -196,7 +195,7 @@ export const createSync = ({
       return DELIVERIES.unreachable
     }
     const key = keyOf(due.owing)
-    if (isSuccess(result.status)) {
+    if (isSuccessStatus(result.status)) {
       unreachable.delete(due.serverId)
       logged.delete(key)
       return DELIVERIES.taken

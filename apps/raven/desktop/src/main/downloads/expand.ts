@@ -23,7 +23,7 @@ import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import { ACCOUNT_REFUSAL_STATUSES, refusalAt } from '@/main/servers/authRefusals'
 import { CALL_MESSAGES, type ServerCalls } from '@/main/servers/serverCalls'
-import { HTTP_STATUSES } from '@/shared/httpStatuses'
+import { HTTP_STATUSES, isSuccessStatus } from '@/shared/httpStatuses'
 
 export const DOWNLOAD_MAX_FILES = 500
 
@@ -117,8 +117,6 @@ const oncePerFile = (entries: readonly Entry[]): Entry[] => [
     .values(),
 ]
 
-const isSuccess = (status: number): boolean => status >= 200 && status < 300
-
 const fail = ({ reason, message }: Pick<Failure, 'reason' | 'message'>): Read<never> => ({
   ok: false,
   failure: { ok: false, reason, message },
@@ -151,7 +149,7 @@ const read = async <T>({
   if (result.status === HTTP_STATUSES.notFound) {
     return fail({ reason: EXPAND_REASONS.gone, message: EXPAND_MESSAGES.gone(serverName) })
   }
-  if (!isSuccess(result.status)) {
+  if (!isSuccessStatus(result.status)) {
     return fail({
       reason: EXPAND_REASONS.unreachable,
       message: CALL_MESSAGES.unreachable(serverName),

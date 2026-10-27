@@ -17,7 +17,7 @@ import {
 } from '@/build/smokeVerdict'
 import { LOG_FILE } from '@/main/log/log'
 import { logsDirFor } from '@/main/log/opens'
-import { ERROR_CODES } from '@/main/stateStore'
+import { isMissingFile } from '@/main/stateStore'
 
 const POLL_MS = 250
 const RUNNING_PATTERN = 'Raven.app/Contents/MacOS/Raven'
@@ -26,19 +26,13 @@ const MARKS = ['raven-launch-ms ', 'raven-quit-ms '] as const
 const execFileAsync = promisify(execFile)
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-const isMissing = (error: unknown): boolean =>
-  typeof error === 'object' &&
-  error !== null &&
-  'code' in error &&
-  error.code === ERROR_CODES.enoent
-
 type SizeOfProps = { path: string }
 
 const sizeOf = async ({ path }: SizeOfProps): Promise<number> => {
   try {
     return (await stat(path)).size
   } catch (error) {
-    if (isMissing(error)) return 0
+    if (isMissingFile(error)) return 0
     throw error
   }
 }
@@ -62,7 +56,7 @@ const bytesOf = async ({ path }: BytesOfProps): Promise<Uint8Array | null> => {
   try {
     return await readFile(path)
   } catch (error) {
-    if (isMissing(error)) return null
+    if (isMissingFile(error)) return null
     throw error
   }
 }
