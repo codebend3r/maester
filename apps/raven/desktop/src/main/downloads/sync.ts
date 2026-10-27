@@ -1,3 +1,4 @@
+import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
 import {
   clearOwed,
   clearPending,
@@ -473,17 +474,9 @@ export const settleWithin = async ({
   ms,
   warn,
 }: SettleWithinProps): Promise<void> => {
-  const waited: { handle: unknown } = { handle: undefined }
-  const timedOut = new Promise<void>((resolve) => {
-    waited.handle = timers.set({ run: resolve, ms })
-  })
-  try {
-    await Promise.race([work, timedOut])
-  } catch (error) {
-    warn(
-      `Raven could not finish telling its server what was watched: ${loggable(errorText(error))}`,
-    )
-  } finally {
-    timers.clear(waited.handle)
-  }
+  const bounded = await within({ task: work, ms, timers })
+  if (bounded.outcome !== BOUNDED_OUTCOMES.failed) return
+  warn(
+    `Raven could not finish telling its server what was watched: ${loggable(errorText(bounded.error))}`,
+  )
 }

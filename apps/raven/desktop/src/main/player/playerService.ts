@@ -28,6 +28,7 @@ import {
   type MpvPropertyValue,
   type MpvTrack,
 } from '@raven/mpv'
+import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
 import type { Grants } from '@/main/grants'
 import { displayOptions } from '@/main/player/displayOptions'
 import { HARDENED_OPTIONS } from '@/main/player/engine'
@@ -109,9 +110,6 @@ export const guardedMpv = (mpv: MpvControl): MpvControl => ({
 
 /** How long a server title's first snapshot waits for its sidecars before it goes on. */
 export const SIDECAR_BUDGET_MS = 3000
-
-/** What the sidecars' race answers when the budget runs out first. */
-const SIDECAR_LATE = 'late'
 
 /**
  * How long a server title may wait on its server without the clock moving before the
@@ -758,18 +756,20 @@ export const createPlayerService = ({
     isCurrent: boolean
     pending: Promise<boolean> | null
   }> => {
-    const budget: { handle: unknown } = { handle: null }
-    const late = new Promise<typeof SIDECAR_LATE>((resolve) => {
-      budget.handle = timers.set({ run: () => resolve(SIDECAR_LATE), ms: SIDECAR_BUDGET_MS })
-    })
     const adding = addSidecars({ sidecars, token })
-    try {
-      const outcome = await Promise.race([adding, late])
-      if (outcome !== SIDECAR_LATE) return { isCurrent: outcome && token === epoch, pending: null }
-      warn(`${kind} sidecars are slow; the title starts without them`)
-      return { isCurrent: token === epoch, pending: adding }
-    } finally {
-      timers.clear(budget.handle)
+    const bounded = await within({ task: adding, ms: SIDECAR_BUDGET_MS, timers })
+    switch (bounded.outcome) {
+      case BOUNDED_OUTCOMES.answered:
+        return { isCurrent: bounded.result && token === epoch, pending: null }
+      case BOUNDED_OUTCOMES.late:
+        warn(`${kind} sidecars are slow; the title starts without them`)
+        return { isCurrent: token === epoch, pending: adding }
+      case BOUNDED_OUTCOMES.failed:
+        throw bounded.error
+      default: {
+        const unreachable: never = bounded
+        return unreachable
+      }
     }
   }
 
