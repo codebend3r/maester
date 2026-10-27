@@ -1,9 +1,22 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { METADATA_SERVICE_STATES, type MetadataServiceState, isRecord, isString } from '@raven/core'
+import {
+  METADATA_SERVICE_STATES,
+  type MetadataServiceState,
+  RATING_SOURCES,
+  isRecord,
+  isString,
+} from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { ERROR_NAMES } from '@/errorMessage'
-import type { ExternalScore, ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
+import {
+  type ExternalScore,
+  SCORE_ANSWERS,
+  SCORE_PROVIDERS,
+  type ScoreAnswer,
+  type ScoreSource,
+  type ScoreTitle,
+} from '@/metadata/scoreSources'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 
 const API = 'https://www.omdbapi.com/'
@@ -15,9 +28,9 @@ const TIMEOUT_MS = 10_000
 
 /** OMDb's names for each source, and how its string reads: "7.5/10", "85%", "74/100". */
 const SOURCES: Record<string, { source: ExternalScore['source']; scale: number }> = {
-  'Internet Movie Database': { source: 'imdb', scale: 1 },
-  'Rotten Tomatoes': { source: 'rottenTomatoes', scale: 10 },
-  Metacritic: { source: 'metacritic', scale: 10 },
+  'Internet Movie Database': { source: RATING_SOURCES.imdb, scale: 1 },
+  'Rotten Tomatoes': { source: RATING_SOURCES.rottenTomatoes, scale: 10 },
+  Metacritic: { source: RATING_SOURCES.metacritic, scale: 10 },
 }
 
 /** The scores in an OMDb answer, each brought to a mark out of 10. */
@@ -45,7 +58,7 @@ const today = (): string => new Date().toISOString().slice(0, 10)
  */
 @Injectable()
 export class OmdbClient implements ScoreSource {
-  readonly provider = 'omdb'
+  readonly provider = SCORE_PROVIDERS.omdb
   private readonly budget = { day: today(), used: 0 }
   private readonly status: { error: string | null; refused: boolean } = {
     error: null,
@@ -86,8 +99,8 @@ export class OmdbClient implements ScoreSource {
   }
 
   /** OMDb is asked by IMDb id, so a title without one is not known to it. */
-  async lookUp({ imdbId }: ScoreTitle): Promise<ExternalScore[] | 'unknown'> {
-    if (imdbId == null) return 'unknown'
+  async lookUp({ imdbId }: ScoreTitle): Promise<ScoreAnswer> {
+    if (imdbId == null) return SCORE_ANSWERS.unknown
     return this.ratings(imdbId)
   }
 
