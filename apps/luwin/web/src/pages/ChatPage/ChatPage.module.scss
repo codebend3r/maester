@@ -52,7 +52,9 @@
   gap: var(--space-3);
 }
 
-.chat > :first-child {
+// A grid itself, so the transcript's empty-state message can centre in the scrolling row.
+.conversation {
+  display: grid;
   overflow-y: auto;
 }
 
