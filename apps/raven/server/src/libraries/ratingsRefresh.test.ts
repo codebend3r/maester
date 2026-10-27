@@ -21,6 +21,7 @@ describe("a library's ratings", () => {
   const database = testDatabase('raven-ratings-refresh-')
   const libraries = () => new LibrariesRepository(database.get())
   const metadata = () => repositories(database.get()).metadata
+  const scores = () => repositories(database.get()).scores
   const scanner = () => ({
     quickScanNow: vi.fn<ScannerService['quickScanNow']>(),
     whenIdle: vi.fn<ScannerService['whenIdle']>(async () => undefined),
@@ -61,12 +62,12 @@ describe("a library's ratings", () => {
   /** The real sweep, with no score source that has a key, and `tmdb` for TMDB's own score. */
   const sweepWith = ({ tmdb }: SweepWithProps): ScoreSweep => {
     const config = readServerConfig({})
-    const scores = new Scores(
-      metadata(),
+    const fetching = new Scores(
+      scores(),
       new OmdbClient(config, refusing),
       new MdblistClient(config, refusing),
     )
-    return new ScoreSweep(metadata(), scores, libraries(), tmdb)
+    return new ScoreSweep(scores(), fetching, libraries(), tmdb)
   }
 
   beforeAll(() => database.open())
@@ -77,11 +78,11 @@ describe("a library's ratings", () => {
     const sweep = sweepWith({
       tmdb: new TmdbClient({ ...readServerConfig({}), tmdbApiToken: null }, refusing),
     })
-    new RatingsRefresh(libraries(), metadata(), scanner(), sweep).start({ libraryId: id })
+    new RatingsRefresh(libraries(), scores(), scanner(), sweep).start({ libraryId: id })
     await sweep.whenIdle()
     sweep.onModuleDestroy()
 
-    expect(metadata().requestsLeft(id)).toBe(0)
+    expect(scores().requestsLeft(id)).toBe(0)
     expect(libraries().ratingsRefresh(id)).toEqual({
       startedAt: null,
       total: 0,
@@ -94,13 +95,13 @@ describe("a library's ratings", () => {
     const tmdb = new TmdbClient({ ...readServerConfig({}), tmdbApiToken: 'wrong-token' }, refusing)
     await expect(tmdb.score({ type: 'movie', tmdbId: '1' })).rejects.toThrow('refused')
     const sweep = sweepWith({ tmdb })
-    const refresh = new RatingsRefresh(libraries(), metadata(), scanner(), sweep)
+    const refresh = new RatingsRefresh(libraries(), scores(), scanner(), sweep)
 
     refresh.start({ libraryId: id })
     await sweep.whenIdle()
     sweep.onModuleDestroy()
 
-    expect(metadata().requestsLeft(id)).toBe(0)
+    expect(scores().requestsLeft(id)).toBe(0)
     expect(refresh.status(id)).toEqual({ state: 'idle', finishedAt: expect.any(String) })
   })
 
@@ -110,7 +111,7 @@ describe("a library's ratings", () => {
       itemIds: [deleted = -1, refreshed = -1],
     } = library('Leaving')
     const sweep = { kick: vi.fn(), canSettle: () => true, requestsPause: () => null }
-    const refresh = new RatingsRefresh(libraries(), metadata(), scanner(), sweep)
+    const refresh = new RatingsRefresh(libraries(), scores(), scanner(), sweep)
 
     refresh.start({ libraryId: id })
     expect(refresh.status(id)).toEqual({
@@ -125,7 +126,7 @@ describe("a library's ratings", () => {
     expect(refresh.status(id)).toMatchObject({ state: 'running', done: 1, total: 2 })
 
     // As Refresh details' answer from the source that settles it would.
-    metadata().clearRequest(refreshed)
+    scores().clearRequest(refreshed)
     expect(refresh.status(id)).toEqual({ state: 'idle', finishedAt: expect.any(String) })
     expect(libraries().ratingsRefresh(id)).toMatchObject({ startedAt: null, total: 2 })
   })
@@ -135,25 +136,25 @@ describe("a library's ratings", () => {
       id,
       itemIds: [rated = -1],
     } = library('Rated')
-    metadata().saveScores({
+    scores().saveScores({
       itemId: rated,
       provider: 'mdblist',
       scores: [{ source: 'imdb', value: 7.5, votes: 100 }],
     })
     const sweep = { kick: vi.fn(), canSettle: () => true, requestsPause: () => null }
-    const refresh = new RatingsRefresh(libraries(), metadata(), scanner(), sweep)
+    const refresh = new RatingsRefresh(libraries(), scores(), scanner(), sweep)
 
     refresh.start({ libraryId: id })
 
-    expect(metadata().requestsLeft(id)).toBe(1)
+    expect(scores().requestsLeft(id)).toBe(1)
     expect(refresh.status(id)).toMatchObject({ state: 'running', done: 0, total: 1 })
-    expect(metadata().isRequested(rated)).toBe(false)
+    expect(scores().isRequested(rated)).toBe(false)
   })
 
   it('adds to an update under way the titles that have no rating since', () => {
     const { id } = library('Adding')
     const sweep = { kick: vi.fn(), canSettle: () => true, requestsPause: () => null }
-    const refresh = new RatingsRefresh(libraries(), metadata(), scanner(), sweep)
+    const refresh = new RatingsRefresh(libraries(), scores(), scanner(), sweep)
     refresh.start({ libraryId: id })
     const index = new MediaIndex(database.get())
     const added = metadata().save({
@@ -179,13 +180,13 @@ describe("a library's ratings", () => {
     const { id } = library('Cancelled')
     const other = library('Other')
     const sweep = { kick: vi.fn(), canSettle: () => true, requestsPause: () => null }
-    const refresh = new RatingsRefresh(libraries(), metadata(), scanner(), sweep)
+    const refresh = new RatingsRefresh(libraries(), scores(), scanner(), sweep)
     refresh.start({ libraryId: id })
     refresh.start({ libraryId: other.id })
 
     refresh.cancel(id)
 
-    expect(metadata().requestsLeft(id)).toBe(0)
+    expect(scores().requestsLeft(id)).toBe(0)
     expect(refresh.status(id)).toEqual({ state: 'idle', finishedAt: expect.any(String) })
     expect(refresh.status(other.id)).toMatchObject({ state: 'running', total: 2 })
   })
@@ -227,7 +228,7 @@ describe("a library's ratings", () => {
       const { id } = library('Quick')
       const { scanning, gate } = scanEndingLater()
       const sweep = { kick: vi.fn(), canSettle: () => true, requestsPause: () => null }
-      const refresh = new RatingsRefresh(libraries(), metadata(), scanning, sweep)
+      const refresh = new RatingsRefresh(libraries(), scores(), scanning, sweep)
 
       // The two titles the library holds were matched before this scan began.
       await settle()
@@ -237,7 +238,7 @@ describe("a library's ratings", () => {
       gate.release()
       await settle()
 
-      expect(metadata().requestsLeft(id)).toBe(1)
+      expect(scores().requestsLeft(id)).toBe(1)
       expect(refresh.status(id)).toMatchObject({ state: 'running', total: 1 })
       expect(sweep.kick).toHaveBeenCalled()
     })
@@ -246,7 +247,7 @@ describe("a library's ratings", () => {
       const { id } = library('Quick cancelled')
       const { scanning, gate } = scanEndingLater()
       const sweep = { kick: vi.fn(), canSettle: () => true, requestsPause: () => null }
-      const refresh = new RatingsRefresh(libraries(), metadata(), scanning, sweep)
+      const refresh = new RatingsRefresh(libraries(), scores(), scanning, sweep)
 
       refresh.quickScan(id)
       addTitle({ libraryId: id, name: 'Quick-cancelled-new' })
@@ -255,7 +256,7 @@ describe("a library's ratings", () => {
       await settle()
 
       expect(scanning.cancel).toHaveBeenCalledWith(id)
-      expect(metadata().requestsLeft(id)).toBe(0)
+      expect(scores().requestsLeft(id)).toBe(0)
       expect(sweep.kick).not.toHaveBeenCalled()
     })
   })
@@ -263,13 +264,13 @@ describe("a library's ratings", () => {
   it('starts anew when pressed after its last title left outside the sweep, unread', () => {
     const { id, itemIds } = library('Again')
     const sweep = { kick: vi.fn(), canSettle: () => true, requestsPause: () => null }
-    const refresh = new RatingsRefresh(libraries(), metadata(), scanner(), sweep)
+    const refresh = new RatingsRefresh(libraries(), scores(), scanner(), sweep)
 
     refresh.start({ libraryId: id })
-    itemIds.forEach((itemId) => metadata().clearRequest(itemId))
+    itemIds.forEach((itemId) => scores().clearRequest(itemId))
     refresh.start({ libraryId: id })
 
-    expect(metadata().requestsLeft(id)).toBe(2)
+    expect(scores().requestsLeft(id)).toBe(2)
     expect(refresh.status(id)).toMatchObject({ state: 'running', done: 0, total: 2 })
   })
 })

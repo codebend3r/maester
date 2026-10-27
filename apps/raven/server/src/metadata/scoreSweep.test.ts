@@ -130,6 +130,7 @@ const askedFor = (lookUp: ReturnType<typeof fakeSource>['lookUp']): string[] =>
 describe('the score sweep', () => {
   const database = testDatabase('raven-score-sweep-')
   const metadata = () => repositories(database.get()).metadata
+  const scores = () => repositories(database.get()).scores
   const sweeps: ScoreSweep[] = []
   type SweepWithProps = {
     omdb: ScoreSource
@@ -142,7 +143,7 @@ describe('the score sweep', () => {
     mdblist,
     tmdb = { score: tmdbAnswering(), enabled: true },
   }: SweepWithProps) => {
-    const repository = metadata()
+    const repository = scores()
     const libraries = new LibrariesRepository(database.get())
     const sweep = new ScoreSweep(repository, new Scores(repository, omdb, mdblist), libraries, tmdb)
     sweeps.push(sweep)
@@ -725,7 +726,7 @@ describe('the score sweep', () => {
     expect(tmdbScore.mock.calls.map(([asked]) => asked.tmdbId)).toEqual(['2'])
     expect([fresh, requested, never].map(tmdbScoreOf)).toEqual([null, 7.5, null])
     expect(rows(requested)).toEqual([{ source: 'rottenTomatoes', value: 9.1, provider: 'mdblist' }])
-    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(scores().requestsLeft(libraryId)).toBe(0)
     expect(isFinished(libraryId)).toBe(true)
   })
 
@@ -747,7 +748,7 @@ describe('the score sweep', () => {
     expect(mdblist.lookUp).toHaveBeenCalledTimes(2)
     const [third = ''] = askedFor(omdb.lookUp)
     expect(askedFor(mdblist.lookUp)).not.toContain(third)
-    expect(metadata().requestsLeft(libraryId)).toBe(1)
+    expect(scores().requestsLeft(libraryId)).toBe(1)
     expect(isFinished(libraryId)).toBe(false)
     expect(sweep.pause()).toBeNull()
     expect(sweep.requestsPause()).toEqual({ reason: 'budget', resumesAt: MIDNIGHT })
@@ -756,7 +757,7 @@ describe('the score sweep', () => {
     await sweep.whenIdle()
     expect(askedFor(mdblist.lookUp).slice(2)).toEqual([third])
     expect(omdb.lookUp).toHaveBeenCalledOnce()
-    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(scores().requestsLeft(libraryId)).toBe(0)
     expect(isFinished(libraryId)).toBe(true)
     expect(sweep.requestsPause()).toBeNull()
   })
@@ -771,7 +772,7 @@ describe('the score sweep', () => {
     await sweep.whenIdle()
 
     expect(askedFor(omdb.lookUp)).toEqual(['1'])
-    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(scores().requestsLeft(libraryId)).toBe(0)
     expect(isFinished(libraryId)).toBe(true)
   })
 
@@ -788,7 +789,7 @@ describe('the score sweep', () => {
 
     expect(tmdbScore).toHaveBeenCalledOnce()
     expect(tmdbScoreOf(only)).toBe(7.5)
-    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(scores().requestsLeft(libraryId)).toBe(0)
     expect(isFinished(libraryId)).toBe(true)
     expect(sweep.pause()).toBeNull()
   })
@@ -808,7 +809,7 @@ describe('the score sweep', () => {
     await sweep.whenIdle()
 
     expect(askedFor(mdblist.lookUp).toSorted()).toEqual(['1', '2', '3'])
-    expect(metadata().requestsLeft(libraryId)).toBe(1)
+    expect(scores().requestsLeft(libraryId)).toBe(1)
     expect(sweep.requestsPause()).toEqual({
       reason: 'unavailable',
       resumesAt: new Date(Date.now() + RETRY_MS).toISOString(),
@@ -821,7 +822,7 @@ describe('the score sweep', () => {
     await vi.advanceTimersByTimeAsync(1000)
     await sweep.whenIdle()
     expect(askedFor(mdblist.lookUp).slice(3)).toEqual(['1'])
-    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(scores().requestsLeft(libraryId)).toBe(0)
     expect(isFinished(libraryId)).toBe(true)
 
     await vi.advanceTimersByTimeAsync(2 * RETRY_MS)
@@ -831,7 +832,7 @@ describe('the score sweep', () => {
   it('gives up a requested title MDBList always fails on only after a day, keeping its scores, and finishes', async () => {
     fakeClock()
     const [failing = -1, other = -1] = movies(['1', '2'])
-    metadata().saveScores({ itemId: failing, provider: 'mdblist', scores: [rottenTomatoes(7)] })
+    scores().saveScores({ itemId: failing, provider: 'mdblist', scores: [rottenTomatoes(7)] })
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     stampMdblist({ itemId: failing, at: yesterday })
     stampMdblist({ itemId: other, at: yesterday })
@@ -851,11 +852,11 @@ describe('the score sweep', () => {
     // Asked 15 minutes after a drain that answered, 30 after one that did not.
     await vi.advanceTimersByTimeAsync(REQUEST_PATIENCE_MS - RETRY_MS)
     expect(tries()).toBeGreaterThan(REQUEST_TRIES)
-    expect(metadata().requestsLeft(libraryId)).toBe(1)
+    expect(scores().requestsLeft(libraryId)).toBe(1)
 
     await vi.advanceTimersByTimeAsync(2 * RETRY_MS)
     await sweep.whenIdle()
-    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(scores().requestsLeft(libraryId)).toBe(0)
     expect(isFinished(libraryId)).toBe(true)
     expect(rows(failing)).toEqual([{ source: 'rottenTomatoes', value: 7, provider: 'mdblist' }])
 
@@ -876,12 +877,12 @@ describe('the score sweep', () => {
     await sweep.whenIdle()
     await vi.advanceTimersByTimeAsync(2 * 60 * 60 * 1000)
     expect(mdblist.lookUp.mock.calls.length).toBeGreaterThan(2 * REQUEST_TRIES)
-    expect(metadata().requestsLeft(libraryId)).toBe(2)
+    expect(scores().requestsLeft(libraryId)).toBe(2)
 
     mdblist.state.answer = () => [rottenTomatoes(9.1)]
     await vi.advanceTimersByTimeAsync(2 * RETRY_MS)
     await sweep.whenIdle()
-    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(scores().requestsLeft(libraryId)).toBe(0)
     expect(isFinished(libraryId)).toBe(true)
   })
 
@@ -955,7 +956,7 @@ describe('the score sweep', () => {
 
     expect(score).not.toHaveBeenCalled()
     expect(warn).not.toHaveBeenCalled()
-    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(scores().requestsLeft(libraryId)).toBe(0)
     warn.mockRestore()
   })
 
@@ -1001,7 +1002,7 @@ describe('the score sweep', () => {
 
     // The first title is asked in OMDb's own round, with TMDB's score fetched again.
     expect(events).toEqual(['tmdb:1', 'tmdb:2', 'mdblist:2', 'tmdb:1', 'omdb:1'])
-    expect(metadata().requestsLeft(libraryId)).toBe(1)
+    expect(scores().requestsLeft(libraryId)).toBe(1)
   })
 
   it('stops every Refresh with one log line once no source can settle it', async () => {
@@ -1020,7 +1021,7 @@ describe('the score sweep', () => {
     await sweep.whenIdle()
 
     expect(tmdb.score).not.toHaveBeenCalled()
-    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(scores().requestsLeft(libraryId)).toBe(0)
     expect(isFinished(libraryId)).toBe(true)
     expect(warn).toHaveBeenCalledOnce()
     warn.mockRestore()
@@ -1055,14 +1056,14 @@ describe('the score sweep', () => {
     sweep.kick()
     await sweep.whenIdle()
     expect(omdb.lookUp).toHaveBeenCalledOnce()
-    expect(metadata().requestsLeft(libraryId)).toBe(1)
+    expect(scores().requestsLeft(libraryId)).toBe(1)
 
     mdblist.refuse()
     sweep.kick()
     await sweep.whenIdle()
 
     expect(omdb.lookUp).toHaveBeenCalledOnce()
-    expect(metadata().requestsLeft(libraryId)).toBe(0)
+    expect(scores().requestsLeft(libraryId)).toBe(0)
     expect(isFinished(libraryId)).toBe(true)
   })
 

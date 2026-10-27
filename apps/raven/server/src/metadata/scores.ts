@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { errorMessage } from '@/errorMessage'
 import { MdblistClient } from '@/metadata/mdblistClient'
-import { MetadataRepository } from '@/metadata/metadataRepository'
 import { OmdbClient } from '@/metadata/omdbClient'
+import { ScoresRepository } from '@/metadata/scoresRepository'
 import type { ExternalScore, ScoreProvider, ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
 
 const NAMES = { omdb: 'OMDb', mdblist: 'MDBList' } as const satisfies Record<ScoreProvider, string>
@@ -27,7 +27,7 @@ export class Scores {
   private readonly logger = new Logger(Scores.name)
 
   constructor(
-    @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
+    @Inject(ScoresRepository) private readonly scores: ScoresRepository,
     @Inject(OmdbClient) private readonly omdb: ScoreSource,
     @Inject(MdblistClient) private readonly mdblist: ScoreSource,
   ) {}
@@ -91,12 +91,12 @@ export class Scores {
   }: ScoresAskProps): Promise<ExternalScore[] | 'unknown' | null> {
     try {
       const answer = await source.lookUp(title)
-      this.metadata.saveScores({
+      this.scores.saveScores({
         itemId,
         provider: source.provider,
         scores: answer === 'unknown' ? [] : answer,
       })
-      if (this.settler() === source) this.metadata.clearRequest(itemId)
+      if (this.settler() === source) this.scores.clearRequest(itemId)
       return answer
     } catch (error) {
       this.logger.warn(

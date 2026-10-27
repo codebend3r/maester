@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import type { RatingsRefresh as RatingsRefreshStatus } from '@raven/core'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
-import { MetadataRepository } from '@/metadata/metadataRepository'
 import { ScoreSweep } from '@/metadata/scoreSweep'
+import { ScoresRepository } from '@/metadata/scoresRepository'
 import { ScannerService } from '@/scanner/scannerService'
 
 type RatingsRefreshStartProps = { libraryId: number; since?: string }
@@ -29,7 +29,7 @@ export class RatingsRefresh {
 
   constructor(
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
-    @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
+    @Inject(ScoresRepository) private readonly scores: ScoresRepository,
     @Inject(ScannerService)
     private readonly scanner: Pick<ScannerService, 'quickScanNow' | 'whenIdle' | 'cancel'>,
     @Inject(ScoreSweep)
@@ -93,7 +93,7 @@ export class RatingsRefresh {
    * and it is over as of now. Scores already fetched stay.
    */
   cancel(libraryId: number): void {
-    this.metadata.clearLibraryRequests(libraryId)
+    this.scores.clearLibraryRequests(libraryId)
     this.libraries.finishRatingsRefreshes(new Date().toISOString())
   }
 
@@ -105,7 +105,7 @@ export class RatingsRefresh {
   status(libraryId: number): RatingsRefreshStatus {
     const { startedAt, total, finishedAt } = this.libraries.ratingsRefresh(libraryId)
     if (startedAt == null) return { state: 'idle', finishedAt }
-    const left = this.metadata.requestsLeft(libraryId)
+    const left = this.scores.requestsLeft(libraryId)
     if (left === 0) {
       const at = new Date().toISOString()
       this.libraries.finishRatingsRefreshes(at)

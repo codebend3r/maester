@@ -215,6 +215,7 @@ describe('the pictures that stand for an item', () => {
 describe('the libraries holding each item, and the people cleared up', () => {
   const database = testDatabase('raven-holding-each-')
   const metadata = () => repositories(database.get()).metadata
+  const scores = () => repositories(database.get()).scores
   const ids = { shows: 0, films: 0, show: 0, episode: 0, movie: 0, bare: 0 }
 
   type FileProps = { libraryId: number; root: string; name: string }
@@ -318,18 +319,22 @@ describe('the libraries holding each item, and the people cleared up', () => {
         { library_id: ids.shows, item_id: ids.movie },
       ].toSorted((a, b) => a.item_id - b.item_id),
     )
-    expect(stored.requestsLeft(ids.shows)).toBe(2)
-    expect(stored.requestsLeft(ids.films)).toBe(0)
-    expect(stored.isRequested(filmsOnly)).toBe(false)
+    expect(scores().requestsLeft(ids.shows)).toBe(2)
+    expect(scores().requestsLeft(ids.films)).toBe(0)
+    expect(scores().isRequested(filmsOnly)).toBe(false)
 
-    stored.clearRequest(ids.movie)
-    expect(stored.requestsLeft(ids.shows)).toBe(1)
-    expect(stored.isRequested(ids.movie)).toBe(false)
-    expect(stored.requestedTitles(10).map((title) => title.itemId)).toEqual([ids.show])
+    scores().clearRequest(ids.movie)
+    expect(scores().requestsLeft(ids.shows)).toBe(1)
+    expect(scores().isRequested(ids.movie)).toBe(false)
+    expect(
+      scores()
+        .requestedTitles(10)
+        .map((title) => title.itemId),
+    ).toEqual([ids.show])
 
     libraries.remove(ids.shows)
     expect(requested()).toEqual([])
-    expect(stored.hasRequests()).toBe(false)
+    expect(scores().hasRequests()).toBe(false)
   })
 
   it('keeps a person with no credits whose filmography was fetched lately, and their credits go with them', () => {
@@ -394,6 +399,7 @@ describe('the libraries holding each item, and the people cleared up', () => {
 describe("each provider's scores", () => {
   const database = testDatabase('raven-scores-')
   const metadata = () => repositories(database.get()).metadata
+  const scores = () => repositories(database.get()).scores
   const DAY_MS = 24 * 60 * 60 * 1000
   const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS).toISOString()
 
@@ -443,7 +449,7 @@ describe("each provider's scores", () => {
 
   it("keeps MDBList's Rotten Tomatoes score when OMDb sends none", () => {
     const id = title({ tmdbId: '900' })
-    const stored = metadata()
+    const stored = scores()
     stored.saveScores({
       itemId: id,
       provider: 'mdblist',
@@ -462,7 +468,7 @@ describe("each provider's scores", () => {
 
   it("never writes OMDb's IMDb score over MDBList's", () => {
     const id = title({ tmdbId: '901' })
-    const stored = metadata()
+    const stored = scores()
     stored.saveScores({
       itemId: id,
       provider: 'mdblist',
@@ -478,7 +484,7 @@ describe("each provider's scores", () => {
 
   it("lets OMDb write over MDBList's scores once MDBList's answer is due again, keeping those OMDb does not send", () => {
     const id = title({ tmdbId: '906' })
-    const stored = metadata()
+    const stored = scores()
     stored.saveScores({
       itemId: id,
       provider: 'mdblist',
@@ -501,7 +507,7 @@ describe("each provider's scores", () => {
 
   it("writes MDBList's Rotten Tomatoes score over OMDb's", () => {
     const id = title({ tmdbId: '902' })
-    const stored = metadata()
+    const stored = scores()
     stored.saveScores({
       itemId: id,
       provider: 'omdb',
@@ -528,7 +534,7 @@ describe("each provider's scores", () => {
         rating: { value: 7.1, votes: 50 },
       },
     })
-    const stored = metadata()
+    const stored = scores()
     stored.saveScores({
       itemId: id,
       provider: 'omdb',
@@ -558,7 +564,7 @@ describe("each provider's scores", () => {
     const id = title({ tmdbId: '904' })
     metadata().remove(id)
     expect(() =>
-      metadata().saveScores({
+      scores().saveScores({
         itemId: id,
         provider: 'mdblist',
         scores: [score({ source: 'rottenTomatoes', value: 9.1 })],
@@ -569,7 +575,7 @@ describe("each provider's scores", () => {
 
   it("puts MDBList's never-asked titles lacking a critics' score first, then the never-asked, then the oldest", () => {
     database.get().db.prepare('DELETE FROM items').run()
-    const stored = metadata()
+    const stored = scores()
     const complete = title({ tmdbId: '910' })
     stored.saveScores({
       itemId: complete,
@@ -610,7 +616,7 @@ describe("each provider's scores", () => {
 
   it("lists OMDb's titles with an IMDb id that it and MDBList have not answered lately, or MDBList does not know, longest unasked first", () => {
     database.get().db.prepare('DELETE FROM items').run()
-    const stored = metadata()
+    const stored = scores()
     const scoredByMdblist = (itemId: number) =>
       stored.saveScores({
         itemId,
@@ -683,7 +689,7 @@ describe("each provider's scores", () => {
     })
     const isDue = () =>
       (['mdblist', 'omdb'] as const).map((provider) =>
-        stored.isScoreDue({ itemId: fresh, provider, before: daysAgo(30) }),
+        scores().isScoreDue({ itemId: fresh, provider, before: daysAgo(30) }),
       )
     expect(isDue()).toEqual([false, false])
 
@@ -699,21 +705,21 @@ describe("each provider's scores", () => {
 
     expect(isDue()).toEqual([true, true])
     expect(
-      stored
+      scores()
         .scoresDue({ provider: 'mdblist', before: daysAgo(30), limit: 10 })
         .map((item) => [item.itemId, item.isRequested]),
     ).toEqual([
       [fresh, true],
       [never, false],
     ])
-    stored.saveScores({ itemId: fresh, provider: 'mdblist', scores: [] })
+    scores().saveScores({ itemId: fresh, provider: 'mdblist', scores: [] })
     expect(isDue()).toEqual([false, true])
-    stored.settleRequests('omdb')
-    expect(stored.requestsLeft(libraryId)).toBe(1)
-    stored.saveScores({ itemId: fresh, provider: 'omdb', scores: [] })
+    scores().settleRequests('omdb')
+    expect(scores().requestsLeft(libraryId)).toBe(1)
+    scores().saveScores({ itemId: fresh, provider: 'omdb', scores: [] })
     expect(isDue()).toEqual([false, false])
-    stored.settleRequests('omdb')
-    expect(stored.requestsLeft(libraryId)).toBe(0)
+    scores().settleRequests('omdb')
+    expect(scores().requestsLeft(libraryId)).toBe(0)
   })
 
   it("replaces an item's TMDB score alone, and drops it for none", () => {
@@ -728,23 +734,23 @@ describe("each provider's scores", () => {
         rating: { value: 7.1, votes: 50 },
       },
     })
-    stored.saveScores({
+    scores().saveScores({
       itemId: id,
       provider: 'omdb',
       scores: [score({ source: 'imdb', value: 8 })],
     })
 
-    stored.saveTmdbRating({ itemId: id, rating: { value: 7.4, votes: 60 } })
+    scores().saveTmdbRating({ itemId: id, rating: { value: 7.4, votes: 60 } })
     expect(rows(id)).toEqual([
       { source: 'imdb', value: 8, votes: null, provider: 'omdb' },
       { source: 'tmdb', value: 7.4, votes: 60, provider: 'tmdb' },
     ])
-    stored.saveTmdbRating({ itemId: id, rating: null })
+    scores().saveTmdbRating({ itemId: id, rating: null })
     expect(rows(id)).toEqual([{ source: 'imdb', value: 8, votes: null, provider: 'omdb' }])
 
     stored.remove(id)
     expect(() =>
-      stored.saveTmdbRating({ itemId: id, rating: { value: 7, votes: 1 } }),
+      scores().saveTmdbRating({ itemId: id, rating: { value: 7, votes: 1 } }),
     ).not.toThrow()
     expect(rows(id)).toEqual([])
   })
