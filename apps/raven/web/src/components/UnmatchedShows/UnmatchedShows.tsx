@@ -4,6 +4,8 @@ import {
   type UnmatchedShow,
   plural,
   unmatchedShowsOf,
+  MATCH_SUBJECT_KINDS,
+  ITEM_TYPES,
 } from '@raven/core'
 import { type ReactNode, useId, useRef, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
@@ -86,11 +88,11 @@ const UnmatchedShowEntry = ({ group, renderFiles, suggestionOf }: UnmatchedShowE
       </section>
       {isFixing && first && (
         <FixMatchDialog
-          type="show"
+          type={ITEM_TYPES.show}
           title={group.title}
           year={null}
           libraryId={first.libraryId}
-          subject={{ kind: 'media', id: first.id }}
+          subject={{ kind: MATCH_SUBJECT_KINDS.media, id: first.id }}
           match={(tmdbId) => api.setMatch({ mediaId: first.id, tmdbId })}
           onClose={() => setIsFixing(false)}
         />

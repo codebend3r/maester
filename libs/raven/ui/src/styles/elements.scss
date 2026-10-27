@@ -428,13 +428,13 @@ $field: "input:not([type='checkbox'], [type='radio'], [type='range'], [type='col
 :where(meter)::-webkit-meter-optimum-value,
 :where(meter)::-webkit-meter-suboptimum-value,
 :where(meter)::-webkit-meter-even-less-good-value {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-bark);
 }
 
 :where(progress)::-moz-progress-bar,
 :where(meter)::-moz-meter-bar {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-bark);
 }
 

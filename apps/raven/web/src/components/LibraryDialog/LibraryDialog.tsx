@@ -18,7 +18,7 @@ import {
   validateLibraryInput,
   withLibraryKind,
 } from '@raven/core'
-import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
+import { type FormEvent, type ReactNode, useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Icon } from '@raven/ui'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
@@ -27,6 +27,7 @@ import { api } from '@/lib/api'
 import { afterLibrarySaved } from '@raven/ui/headless'
 import { lockQuery, metadataHealthQuery } from '@/lib/queries'
 import { RATING_SOURCE_LABELS } from '@/lib/ratingSources'
+import { useModal } from '@/lib/useModal'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
 
 type PathLayoutLabelProps = {
@@ -43,6 +44,52 @@ const pathLayoutLabel = ({ layout, groups }: PathLayoutLabelProps): string => {
     : `group folders (${groups})`
 }
 
+type SettingToggleProps = {
+  id: string
+  label: string
+  checked: boolean
+  disabled?: boolean
+  onChange: (checked: boolean) => void
+  /** The line under the label, which the box is described by. */
+  hint: ReactNode
+  /** What follows the hint, kept apart from it: the layouts read so far. */
+  children?: ReactNode
+}
+
+/** One of the library's switches: its box, its label beside it and its hint under them. */
+const SettingToggle = ({
+  id,
+  label,
+  checked,
+  disabled = false,
+  onChange,
+  hint,
+  children,
+}: SettingToggleProps) => (
+  <div className={styles.setting}>
+    <input
+      id={id}
+      type="checkbox"
+      className={styles.checkbox}
+      checked={checked}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.checked)}
+      aria-describedby={`${id}-hint`}
+    />
+    <label htmlFor={id}>{label}</label>
+    {children === undefined ? (
+      <p id={`${id}-hint`} className={styles.settingHint}>
+        {hint}
+      </p>
+    ) : (
+      <div className={styles.layoutHint}>
+        <p id={`${id}-hint`}>{hint}</p>
+        {children}
+      </div>
+    )}
+  </div>
+)
+
 type LibraryDialogProps = { library?: Library; onClose: () => void }
 
 /**
@@ -53,7 +100,7 @@ type LibraryDialogProps = { library?: Library; onClose: () => void }
  * Escape; closing hands focus back to whatever opened it.
  */
 export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
-  const dialog = useRef<HTMLDialogElement>(null)
+  const { dialog } = useModal()
   const ids = {
     name: useId(),
     errors: useId(),
@@ -77,10 +124,7 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
   const isAiOff = metadata.data?.ai === METADATA_SERVICE_STATES.off
   const lock = useQuery(lockQuery)
   const lockable = !!lock.data?.available
-
-  useEffect(() => {
-    dialog.current?.showModal()
-  }, [])
+  const isMatched = matchTypeFor(settings.kind) != null
 
   const refresh = () => afterLibrarySaved(queryClient)
 
@@ -252,80 +296,43 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
 
           <fieldset className={styles.group}>
             <legend>Settings</legend>
-            <div className={styles.setting}>
-              <input
-                id={`${ids.settings}-progress`}
-                type="checkbox"
-                className={styles.checkbox}
-                checked={settings.saveProgress}
-                onChange={(event) =>
-                  setSettings((current) => ({ ...current, saveProgress: event.target.checked }))
-                }
-                aria-describedby={`${ids.settings}-progress-hint`}
-              />
-              <label htmlFor={`${ids.settings}-progress`}>Save where each video stopped</label>
-              <p id={`${ids.settings}-progress-hint`} className={styles.settingHint}>
-                Leave a video and come back to pick up where you stopped. Turning this off keeps
-                saved spots for later.
-              </p>
-            </div>
-            <div className={styles.setting}>
-              <input
-                id={`${ids.settings}-pinned`}
-                type="checkbox"
-                className={styles.checkbox}
-                checked={settings.pinned}
-                onChange={(event) =>
-                  setSettings((current) => ({ ...current, pinned: event.target.checked }))
-                }
-                aria-describedby={`${ids.settings}-pinned-hint`}
-              />
-              <label htmlFor={`${ids.settings}-pinned`}>Pin to the side menu</label>
-              <p id={`${ids.settings}-pinned-hint`} className={styles.settingHint}>
-                Pinned libraries get their own link in the side menu.
-              </p>
-            </div>
-            <div className={styles.setting}>
-              <input
-                id={`${ids.settings}-refresh`}
-                type="checkbox"
-                className={styles.checkbox}
-                checked={settings.autoRefresh}
-                onChange={(event) =>
-                  setSettings((current) => ({ ...current, autoRefresh: event.target.checked }))
-                }
-                aria-describedby={`${ids.settings}-refresh-hint`}
-              />
-              <label htmlFor={`${ids.settings}-refresh`}>Refresh automatically</label>
-              <p id={`${ids.settings}-refresh-hint`} className={styles.settingHint}>
-                Watch the folders and take in videos as they are added, removed, renamed or
-                replaced, and quick-scan the library every few minutes for a share that does not
-                report its changes. A video replaced under its own name waits for a rescan.
-              </p>
-            </div>
-            <div className={styles.setting}>
-              <input
-                id={`${ids.settings}-locked`}
-                type="checkbox"
-                className={styles.checkbox}
-                checked={settings.locked}
-                disabled={!lockable && !settings.locked}
-                onChange={(event) =>
-                  setSettings((current) => ({ ...current, locked: event.target.checked }))
-                }
-                aria-describedby={`${ids.settings}-locked-hint`}
-              />
-              <label htmlFor={`${ids.settings}-locked`}>Lock with the PIN</label>
-              <p id={`${ids.settings}-locked-hint`} className={styles.settingHint}>
-                {lockable &&
-                  'Keep its videos private: they stay hidden until the PIN is entered in this browser.'}
-                {!lockable && (
+            <SettingToggle
+              id={`${ids.settings}-progress`}
+              label="Save where each video stopped"
+              checked={settings.saveProgress}
+              onChange={(saveProgress) => setSettings((current) => ({ ...current, saveProgress }))}
+              hint="Leave a video and come back to pick up where you stopped. Turning this off keeps saved spots for later."
+            />
+            <SettingToggle
+              id={`${ids.settings}-pinned`}
+              label="Pin to the side menu"
+              checked={settings.pinned}
+              onChange={(pinned) => setSettings((current) => ({ ...current, pinned }))}
+              hint="Pinned libraries get their own link in the side menu."
+            />
+            <SettingToggle
+              id={`${ids.settings}-refresh`}
+              label="Refresh automatically"
+              checked={settings.autoRefresh}
+              onChange={(autoRefresh) => setSettings((current) => ({ ...current, autoRefresh }))}
+              hint="Watch the folders and take in videos as they are added, removed, renamed or replaced, and quick-scan the library every few minutes for a share that does not report its changes. A video replaced under its own name waits for a rescan."
+            />
+            <SettingToggle
+              id={`${ids.settings}-locked`}
+              label="Lock with the PIN"
+              checked={settings.locked}
+              disabled={!lockable && !settings.locked}
+              onChange={(locked) => setSettings((current) => ({ ...current, locked }))}
+              hint={
+                lockable ? (
+                  'Keep its videos private: they stay hidden until the PIN is entered in this browser.'
+                ) : (
                   <>
                     Set <code>LIBRARY_PIN</code> in raven's <code>.env</code> to lock a library.
                   </>
-                )}
-              </p>
-            </div>
+                )
+              }
+            />
             <div className={styles.watched}>
               <label htmlFor={`${ids.settings}-watched`}>Watched at</label>
               <span className={styles.percent}>
@@ -354,39 +361,29 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
                 spot clears there too. Set low, a video gives up its spot early.
               </p>
             </div>
-            {matchTypeFor(settings.kind) != null && (
-              <div className={styles.setting}>
-                <input
-                  id={`${ids.settings}-layout`}
-                  type="checkbox"
-                  className={styles.checkbox}
-                  checked={settings.folderLayout === FOLDER_LAYOUTS.auto}
-                  onChange={(event) =>
-                    setSettings((current) => ({
-                      ...current,
-                      folderLayout: event.target.checked ? 'auto' : 'flat',
-                    }))
-                  }
-                  aria-describedby={`${ids.settings}-layout-hint`}
-                />
-                <label htmlFor={`${ids.settings}-layout`}>Read letter and group folders</label>
-                <div className={styles.layoutHint}>
-                  <p id={`${ids.settings}-layout-hint`}>
-                    Shows and movies inside letter folders (A, B, #) and group folders such as
-                    Requests are read as titles of their own. Turn this off when those folder names
-                    are the titles.
-                  </p>
-                  {!!library && library.layouts.length > 0 && (
-                    <ul className={styles.layouts}>
-                      {library.layouts.map((entry) => (
-                        <li key={entry.path}>{`${entry.path}: ${pathLayoutLabel(entry)}`}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
+            {isMatched && (
+              <SettingToggle
+                id={`${ids.settings}-layout`}
+                label="Read letter and group folders"
+                checked={settings.folderLayout === FOLDER_LAYOUTS.auto}
+                onChange={(isAuto) =>
+                  setSettings((current) => ({
+                    ...current,
+                    folderLayout: isAuto ? FOLDER_LAYOUTS.auto : FOLDER_LAYOUTS.flat,
+                  }))
+                }
+                hint="Shows and movies inside letter folders (A, B, #) and group folders such as Requests are read as titles of their own. Turn this off when those folder names are the titles."
+              >
+                {!!library && library.layouts.length > 0 && (
+                  <ul className={styles.layouts}>
+                    {library.layouts.map((entry) => (
+                      <li key={entry.path}>{`${entry.path}: ${pathLayoutLabel(entry)}`}</li>
+                    ))}
+                  </ul>
+                )}
+              </SettingToggle>
             )}
-            {matchTypeFor(settings.kind) != null && (
+            {isMatched && (
               <div className={styles.watched}>
                 <label htmlFor={`${ids.settings}-ratings`}>Ratings shown</label>
                 <select

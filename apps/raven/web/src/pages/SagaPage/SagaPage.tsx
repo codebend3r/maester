@@ -5,7 +5,6 @@ import {
   ROUTE_STATES,
   SAGA_BACKDROP_TYPES,
   type Saga,
-  mediaEntryKey,
   routeState,
   sagaCover,
   sagaFacts,
@@ -32,7 +31,7 @@ import { RouteState } from '@/components/RouteState/RouteState'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
 import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
-import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionScope'
+import { SelectionScope, mediaEntryOf, sourceOf } from '@/components/SelectionScope/SelectionScope'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
 import { LIBRARY_LOCK_STATES, useLibraryLock } from '@/lib/libraryLock'
@@ -125,11 +124,7 @@ const SagaView = ({ library, sagaId }: SagaViewProps) => {
 
   return (
     <OwnBackdrop>
-      <SelectionScope
-        {...sourceOf(
-          saga.media.map((media) => [mediaEntryKey(media), [{ kind: 'media', id: media.id }]]),
-        )}
-      >
+      <SelectionScope {...sourceOf(saga.media.map(mediaEntryOf))}>
         <section className={styles.page} aria-labelledby={titleId}>
           <ItemHeader
             back={{ to: sectionPath({ libraryId: library.id, section: 'sagas' }), label: 'Sagas' }}
