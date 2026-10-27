@@ -23,6 +23,7 @@ import {
   clearRecents,
   type FileFacts,
   type PlayerState,
+  readFacts,
   type RecentEntry,
   recentKey,
   removeRecentByKey,
@@ -266,13 +267,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   const factsOf = (path: string): Promise<FileFacts | null> => {
     const pending = checking.get(path)
     if (pending !== undefined) return pending
-    const check = deps
-      .stat(path)
-      .then(
-        ({ size, mtimeMs }): FileFacts | null => ({ path, size, mtimeMs }),
-        () => null,
-      )
-      .finally(() => checking.delete(path))
+    const check = readFacts({ stat: deps.stat, path }).finally(() => checking.delete(path))
     checking.set(path, check)
     return check
   }
