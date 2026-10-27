@@ -1,7 +1,7 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { AUTH_ERRORS, CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@/lib/api'
+import { API_ROUTES, AUTH_ERRORS, CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@/lib/api'
 import { browser } from '@/lib/browser'
 import { ERROR_MESSAGES, LoginPage } from '@/pages/LoginPage/LoginPage'
 import { renderAt } from '@/test/render'
@@ -41,7 +41,7 @@ describe('LoginPage', () => {
 
     await waitFor(() => expect(goTo).toHaveBeenCalledWith('https://app.plex.tv/auth#?code=abc'))
     const [url, init = {}] = fetch.mock.calls[0] ?? []
-    expect(url).toBe('/api/auth/plex/start')
+    expect(url).toBe(API_ROUTES.start)
     expect(init.method).toBe(HTTP_METHODS.post)
     expect(new Headers(init.headers).get(HEADERS.contentType)).toBe(CONTENT_TYPES.json)
     expect(init.body).toBe(JSON.stringify({ return_to: 'https://luwin.example.com/' }))
