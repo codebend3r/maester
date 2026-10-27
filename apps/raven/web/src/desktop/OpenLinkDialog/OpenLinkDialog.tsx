@@ -3,7 +3,7 @@ import { Button, Icon } from '@raven/ui'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { handled } from '@/desktop/handled'
 import { useOpenReply } from '@/desktop/openReply'
-import { useModal } from '@/desktop/useModal'
+import { useModal } from '@/lib/useModal'
 import { useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/DesktopDialog.module.scss'
 

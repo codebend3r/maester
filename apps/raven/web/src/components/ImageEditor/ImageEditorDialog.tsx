@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import type { MatchItemType } from '@raven/core'
-import { useEffect, useRef } from 'react'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { itemQuery, librariesQuery } from '@/lib/queries'
+import { useModal } from '@/lib/useModal'
 import styles from '@/components/ImageEditor/ImageEditor.module.scss'
 
 type ImageEditorDialogProps = {
@@ -16,13 +16,9 @@ type ImageEditorDialogProps = {
  * in a dialog over the page, for a movie, or for an episode's show.
  */
 export const ImageEditorDialog = ({ itemId, itemKind, onClose }: ImageEditorDialogProps) => {
-  const dialog = useRef<HTMLDialogElement>(null)
+  const { dialog } = useModal()
   const details = useQuery(itemQuery(itemId))
   const libraries = useQuery(librariesQuery)
-
-  useEffect(() => {
-    dialog.current?.showModal()
-  }, [])
 
   return (
     <dialog ref={dialog} className={styles.dialog} aria-label="Edit images" onClose={onClose}>

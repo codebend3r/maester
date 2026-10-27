@@ -8,13 +8,14 @@ import {
   type MatchSubject,
   confidenceTierOf,
 } from '@raven/core'
-import { type FormEvent, useEffect, useId, useRef } from 'react'
+import { type FormEvent, useId } from 'react'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button, Icon } from '@raven/ui'
 import { SearchField } from '@/components/SearchField/SearchField'
 import { api } from '@/lib/api'
 import { afterMatch, useSearch } from '@raven/ui/headless'
 import { matchSearchQuery } from '@/lib/queries'
+import { useModal } from '@/lib/useModal'
 import styles from '@/components/FixMatchDialog/FixMatchDialog.module.scss'
 
 const NOT_A: Record<MatchItemType, string> = { movie: 'Not a movie', show: 'Not a show' }
@@ -127,7 +128,7 @@ export const FixMatchDialog = <T,>({
   onClose,
   onMatched,
 }: FixMatchDialogProps<T>) => {
-  const dialog = useRef<HTMLDialogElement>(null)
+  const { dialog } = useModal()
   const ids = { title: useId(), note: useId(), query: useId(), year: useId(), results: useId() }
   const queryClient = useQueryClient()
   // The year is half the search, so it settles as the title does.
@@ -136,10 +137,6 @@ export const FixMatchDialog = <T,>({
     year: useSearch({ initial: year == null ? '' : String(year) }),
   }
   const asked = { query: typed.title.query, year: yearFrom(typed.year.query) }
-
-  useEffect(() => {
-    dialog.current?.showModal()
-  }, [])
 
   const results = useQuery(
     matchSearchQuery({
