@@ -14,7 +14,7 @@ import type {
   SettingsSectionProps,
   SettingsToggleProps,
 } from '@/layouts/settingsKit'
-import { SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
 
 const SettingsPage = ({ title, onBack, children }: SettingsPageProps) => {
@@ -151,7 +151,7 @@ const useStyles = themedStyles((colours) =>
       borderRadius: SIZES.radius,
       backgroundColor: colours.quiet,
     },
-    pressed: { opacity: 0.6 },
-    off: { opacity: 0.5 },
+    pressed: { opacity: OPACITIES.pressed },
+    off: { opacity: OPACITIES.disabled },
   }),
 )

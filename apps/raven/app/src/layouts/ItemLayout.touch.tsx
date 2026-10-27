@@ -25,7 +25,7 @@ import {
 } from '@/layouts/itemKit'
 import { isTablet } from '@/layouts/screenSizes'
 import { LINE_RATIO } from '@/layouts/textHeights'
-import { SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 
 /** How wide the heading's picture stands: a poster, or an episode's wider still. */
@@ -413,7 +413,7 @@ const useStyles = themedStyles((colours) =>
       borderWidth: SIZES.focusRing,
     },
     actionLabel: { fontSize: SIZES.text, fontWeight: 'bold' },
-    pressed: { opacity: 0.6 },
+    pressed: { opacity: OPACITIES.pressed },
     tagline: { color: colours.text, fontSize: SIZES.text, fontStyle: 'italic' },
     summary: {
       color: colours.text,

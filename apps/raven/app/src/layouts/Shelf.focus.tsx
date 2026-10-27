@@ -21,7 +21,7 @@ import {
   seeAllLabelOf,
 } from '@/layouts/shelfKit'
 import { Logo } from '@/layouts/Logo'
-import { TV_SIZES } from '@/theme/tvSizes'
+import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
 /** Where the Settings entry sits on Home, a place no shelf's card shares. */
@@ -256,16 +256,16 @@ const useStyles = themedStyles((colours) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: TV_SIZES.space5,
-      paddingHorizontal: TV_SIZES.space8,
+      paddingHorizontal: TV_GUTTER,
     },
     pageTitle: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-    notice: { color: colours.muted, fontSize: TV_SIZES.textLg, paddingHorizontal: TV_SIZES.space8 },
+    notice: { color: colours.muted, fontSize: TV_SIZES.textLg, paddingHorizontal: TV_GUTTER },
     shelf: { gap: TV_SIZES.space1 },
     titleRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: TV_SIZES.space3,
-      paddingHorizontal: TV_SIZES.space8,
+      paddingHorizontal: TV_GUTTER,
     },
     shelfTitle: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
     seeAll: {
@@ -280,7 +280,7 @@ const useStyles = themedStyles((colours) =>
     focusedLabel: { color: colours.text },
     row: {
       gap: TV_SIZES.space5,
-      paddingHorizontal: TV_SIZES.space8,
+      paddingHorizontal: TV_GUTTER,
       paddingVertical: TV_SIZES.space4,
     },
   }),

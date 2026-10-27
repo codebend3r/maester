@@ -22,10 +22,8 @@ import {
   playLabelOf,
 } from '@/layouts/itemKit'
 import { LINE_RATIO } from '@/layouts/textHeights'
-import { TV_SIZES, tvSize } from '@/theme/tvSizes'
+import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
-
-const GUTTER = TV_SIZES.space8
 
 /** The heading's picture in points on a 1920 by 1080 point screen: a poster, or a still. */
 const HERO_WIDTHS = {
@@ -332,8 +330,8 @@ const useStyles = themedStyles((colours) =>
     backdrop: { position: 'absolute', top: 0, left: 0, right: 0, opacity: BACKDROP_OPACITY },
     scroll: { flex: 1 },
     page: { gap: TV_SIZES.space5, paddingTop: TV_SIZES.space6, paddingBottom: TV_SIZES.space6 },
-    padded: { paddingHorizontal: GUTTER },
-    notice: { justifyContent: 'center', paddingHorizontal: GUTTER },
+    padded: { paddingHorizontal: TV_GUTTER },
+    notice: { justifyContent: 'center', paddingHorizontal: TV_GUTTER },
     hero: { flexDirection: 'row', alignItems: 'flex-start', gap: TV_SIZES.space6 },
     words: { flex: 1, maxWidth: WORDS_WIDTH, gap: TV_SIZES.space2 },
     eyebrow: { color: colours.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
@@ -370,7 +368,7 @@ const useStyles = themedStyles((colours) =>
     focused: { borderColor: colours.text },
     section: { gap: TV_SIZES.space1 },
     heading: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-    row: { gap: TV_SIZES.space5, paddingHorizontal: GUTTER, paddingVertical: TV_SIZES.space4 },
+    row: { gap: TV_SIZES.space5, paddingHorizontal: TV_GUTTER, paddingVertical: TV_SIZES.space4 },
     versions: { gap: TV_SIZES.space2, paddingTop: TV_SIZES.space2 },
     version: {
       alignSelf: 'flex-start',
