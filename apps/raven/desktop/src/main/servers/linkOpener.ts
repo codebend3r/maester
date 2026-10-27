@@ -1,6 +1,7 @@
 import { DESKTOP_REPLIES, type DesktopReply, watchPathFor } from '@raven/core'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import { quietly } from '@/main/log/quietly'
+import { DONE, refused } from '@/main/replies'
 import { loggable } from '@/main/servers/serverCalls'
 import { readDownloadLink, readPlayLink } from '@/shared/playLink'
 
@@ -45,7 +46,7 @@ export const createLinkOpener = ({
 
   const otherServer = (): DesktopReply => {
     safeWarn('Raven refused a link to another server')
-    return { type: DESKTOP_REPLIES.refused, message: LINK_MESSAGES.otherServer }
+    return refused(LINK_MESSAGES.otherServer)
   }
 
   const open: LinkOpener['open'] = async ({ link }) => {
@@ -60,14 +61,14 @@ export const createLinkOpener = ({
       return downloads.ask({ serverId: serverId(), target: download.target })
     }
     safeWarn(`Raven could not read a link: ${loggable(link.slice(0, LINK_LOG_MAX))}`)
-    return { type: DESKTOP_REPLIES.refused, message: LINK_MESSAGES.unreadable }
+    return refused(LINK_MESSAGES.unreadable)
   }
 
   return {
     open,
     openBatch: async (links) => {
       const [first, ...dropped] = links
-      if (first === undefined) return { type: DESKTOP_REPLIES.done }
+      if (first === undefined) return DONE
       // A page can fire links in a burst; acting on each would stack asks or move the page over and over.
       if (dropped.length > 0) {
         safeWarn(`Raven opened the first of ${links.length} links and dropped ${dropped.length}`)

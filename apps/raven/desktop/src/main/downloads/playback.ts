@@ -18,6 +18,7 @@ import { downloadsDirFor, sidecarPathFor, videoPathFor } from '@/main/downloads/
 import type { GrantedFile, Grants } from '@/main/grants'
 import { errorText } from '@/main/log/errorText'
 import type { LocalSidecar } from '@/main/player/playerService'
+import { refused } from '@/main/replies'
 import {
   type FileFacts,
   forgetResume,
@@ -166,8 +167,6 @@ export type DownloadPlayback = {
   /** The queue's `onRemoved`: what names a removed download goes, its recent and resume spot too. */
   forget: (entries: readonly DownloadEntry[]) => void
 }
-
-const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
 
 /** A granted file one side of the player is on, and the download whose video it is, if any. */
 type Slot = { fileId: string | null; downloadId: string | null }
