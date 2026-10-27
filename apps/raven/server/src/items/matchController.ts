@@ -11,7 +11,6 @@ import {
   Put,
   Query,
   Res,
-  ServiceUnavailableException,
 } from '@nestjs/common'
 import {
   type CandidateTier,
@@ -49,13 +48,9 @@ import { type OnDisk, scoreCandidates } from '@/metadata/matchConfidence'
 import { MatchFactsCache } from '@/metadata/matchFactsCache'
 import { type MatchFile, MatchFiles } from '@/metadata/matchFiles'
 import { MetadataService } from '@/metadata/metadataService'
-import { TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { TmdbClient } from '@/metadata/tmdbClient'
+import { requireTmdb, tmdbUnavailable } from '@/metadata/tmdbGate'
 import { type SearchResult, TMDB_IMAGE_PATH } from '@/metadata/tmdbShapes'
-
-const tmdbFailure = (error: unknown): never => {
-  if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
-  throw error
-}
 
 /** A file a search's subject stands for, as its score reads it. */
 type SubjectFile = Pick<
@@ -140,12 +135,6 @@ export class MatchController {
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
 
-  private requireTmdb(): void {
-    if (!this.tmdb.enabled) {
-      throw new ServiceUnavailableException('Set TMDB_API_TOKEN to search TMDB.')
-    }
-  }
-
   /**
    * TMDB's results for Fix match, each with how sure raven is of it, best
    * first. With `libraryId`, those that fit the library type's first tier
@@ -170,12 +159,12 @@ export class MatchController {
     if (!typed.title) throw new BadRequestException('Search for a title.')
     const preferred = this.preferredBy({ libraryId, request })
     const subject = subjectFrom({ mediaId, itemId })
-    this.requireTmdb()
+    requireTmdb({ tmdb: this.tmdb, toDo: 'search TMDB' })
     const parsedYear = Number.parseInt(year ?? '', 10)
     const asked = { query: typed.title, year: Number.isInteger(parsedYear) ? parsedYear : null }
     const results = await (
       type === ITEM_TYPES.movie ? this.tmdb.searchMovies(asked) : this.tmdb.searchShows(asked)
-    ).catch(tmdbFailure)
+    ).catch(tmdbUnavailable)
     const rank = (result: SearchResult): number => (fitsTier({ tier: preferred, result }) ? 0 : 1)
     const ordered = results.toSorted((a, b) => rank(a) - rank(b))
     const { onDisk, country } = this.onDiskOf({ type, subject, request })
@@ -360,8 +349,8 @@ export class MatchController {
     if (isTvMovieId(tmdbId) && matchTypeFor(kind) !== ITEM_TYPES.movie) {
       throw new BadRequestException('A TV documentary movie match needs a movie library.')
     }
-    if (tmdbId != null) this.requireTmdb()
-    await this.service.fixMatch({ mediaId: id, tmdbId }).catch(tmdbFailure)
+    if (tmdbId != null) requireTmdb({ tmdb: this.tmdb, toDo: 'search TMDB' })
+    await this.service.fixMatch({ mediaId: id, tmdbId }).catch(tmdbUnavailable)
     const updated = this.media.get({ id, account })
     if (!updated) throw new NotFoundException(`No media ${id}`)
     return updated
