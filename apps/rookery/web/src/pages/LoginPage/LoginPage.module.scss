@@ -24,7 +24,10 @@
   border: 0;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background-color 120ms ease-out;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background-color 120ms ease-out;
+  }
 
   &:hover:not(:disabled) {
     background: var(--color-plex-hover);
