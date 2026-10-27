@@ -37,6 +37,7 @@ import {
 import { downloadsDirFor, readSpace, type SpaceFs } from '@/main/downloads/space'
 import { createSync, settleWithin } from '@/main/downloads/sync'
 import { errorText } from '@/main/log/errorText'
+import { DONE, refused } from '@/main/replies'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import type { Timers } from '@/main/stateStore'
 
@@ -132,8 +133,6 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
 /** The list as both the `downloads` reply and the `downloads` event carry it. */
 type DownloadsList = Extract<DesktopEvent, { type: typeof DESKTOP_EVENTS.downloads }>
 
-const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
-
 type ViewStatusOfProps = {
   status: EntryStatus
   serverName: string
@@ -164,6 +163,9 @@ export const viewStatusOf = ({ status, serverName }: ViewStatusOfProps): Downloa
     }
   }
 }
+
+/** The reply to a request naming a download the list no longer holds. */
+const UNKNOWN_DOWNLOAD = refused(DOWNLOAD_MESSAGES.unknown)
 
 export const createDownloadService = (deps: DownloadServiceDeps): DownloadService => {
   const { store, config } = deps
@@ -352,22 +354,20 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
 
   const isKnown = (downloadId: string): boolean => entryById(store.read(), { downloadId }) !== null
 
-  const unknown = (): DesktopReply => refused(DOWNLOAD_MESSAGES.unknown)
-
   const pause: DownloadService['pause'] = async ({ downloadId }) => {
-    if (!isKnown(downloadId)) return unknown()
+    if (!isKnown(downloadId)) return UNKNOWN_DOWNLOAD
     await queue.pause({ downloadId })
     return list()
   }
 
   const resume: DownloadService['resume'] = ({ downloadId }) => {
-    if (!isKnown(downloadId)) return unknown()
+    if (!isKnown(downloadId)) return UNKNOWN_DOWNLOAD
     queue.resume({ downloadId })
     return list()
   }
 
   const retry: DownloadService['retry'] = ({ downloadId }) => {
-    if (!isKnown(downloadId)) return unknown()
+    if (!isKnown(downloadId)) return UNKNOWN_DOWNLOAD
     queue.retry({ downloadId })
     return list()
   }
@@ -398,13 +398,13 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
 
   // The viewer's own Delete removes whatever is playing.
   const remove: DownloadService['remove'] = async ({ downloadId }) => {
-    if (!isKnown(downloadId)) return unknown()
+    if (!isKnown(downloadId)) return UNKNOWN_DOWNLOAD
     await removeAfterSync({ downloadId, isKept: () => false })
     return list()
   }
 
   const setAutoDeleteOf: DownloadService['setAutoDelete'] = ({ downloadId, autoDelete }) => {
-    if (!isKnown(downloadId)) return unknown()
+    if (!isKnown(downloadId)) return UNKNOWN_DOWNLOAD
     const at = deps.now()
     change((state) => setAutoDelete(state, { downloadId, autoDelete, at }))
     if (autoDelete) deleteClock.schedule({ downloadId })
@@ -446,7 +446,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     const dir = downloadsDirFor({ userData: deps.userData })
     await deps.space.mkdir(dir)
     deps.showItemInFolder(dir)
-    return { type: DESKTOP_REPLIES.done }
+    return DONE
   }
 
   type KeepLastAccountProps = {

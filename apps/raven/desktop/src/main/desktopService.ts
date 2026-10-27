@@ -31,6 +31,7 @@ import {
   trackPickFor,
   watchedShare,
 } from '@/main/playerState'
+import { DONE, refused } from '@/main/replies'
 import type { LinkOpener } from '@/main/servers/linkOpener'
 import type { ServerTitles } from '@/main/servers/serverTitles'
 import type { StateStore, Timers } from '@/main/stateStore'
@@ -85,10 +86,6 @@ export type DesktopService = {
   /** A batch of links main was handed (`open-url`); the opener acts on the first. */
   openLinks: (links: readonly string[]) => Promise<DesktopReply>
 }
-
-const DONE = { type: DESKTOP_REPLIES.done } as const satisfies DesktopReply
-
-const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
 
 const messageFor = (reason: GrantRefusal): string => {
   switch (reason) {
