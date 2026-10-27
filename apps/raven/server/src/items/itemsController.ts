@@ -14,7 +14,6 @@ import {
   Put,
   Query,
   Res,
-  ServiceUnavailableException,
 } from '@nestjs/common'
 import {
   type ChoosableImageKind,
@@ -53,7 +52,8 @@ import { ItemRefresher } from '@/metadata/itemRefresher'
 import { isLocal } from '@/metadata/localItems'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
-import { TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { TmdbClient } from '@/metadata/tmdbClient'
+import { requireTmdb, tmdbUnavailable } from '@/metadata/tmdbGate'
 import { TMDB_IMAGE_PATH } from '@/metadata/tmdbShapes'
 import { ROUTE_PARAMS } from '@/requestParts'
 
@@ -129,14 +129,10 @@ export class ItemsController {
       throw new BadRequestException('Only a show can be re-pointed here.')
     }
     if (!isShowMatchChoice(body)) throw new BadRequestException('tmdbId must be a TMDB id')
-    if (!this.tmdb.enabled)
-      throw new ServiceUnavailableException('Set TMDB_API_TOKEN to search TMDB.')
+    requireTmdb({ tmdb: this.tmdb, toDo: 'search TMDB' })
     const moved = await this.service
       .fixShowMatch({ showId: id, tmdbId: body.tmdbId })
-      .catch((error: unknown) => {
-        if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
-        throw error
-      })
+      .catch(tmdbUnavailable)
     if (moved == null) throw new NotFoundException('TMDB has no show with that id.')
     return this.details({ id: moved, request })
   }
@@ -225,16 +221,9 @@ export class ItemsController {
     @Req() request: FastifyRequest,
   ): Promise<ItemDetails> {
     this.requireItem(id)
-    if (!this.tmdb.enabled) {
-      throw new ServiceUnavailableException('Set TMDB_API_TOKEN to fetch details from TMDB.')
-    }
-    try {
-      const kept = await this.refresher.refresh(id)
-      if (!kept) throw new NotFoundException('TMDB no longer has this; it will be matched again.')
-    } catch (error) {
-      if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
-      throw error
-    }
+    requireTmdb({ tmdb: this.tmdb, toDo: 'fetch details from TMDB' })
+    const kept = await this.refresher.refresh(id).catch(tmdbUnavailable)
+    if (!kept) throw new NotFoundException('TMDB no longer has this; it will be matched again.')
     return this.details({ id, request })
   }
 
@@ -289,10 +278,7 @@ export class ItemsController {
     }
     const fetched =
       this.tmdb.enabled && !isLocal(item.tmdbId)
-        ? await this.tmdb.images({ type, tmdbId: item.tmdbId }).catch((error: unknown) => {
-            if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
-            throw error
-          })
+        ? await this.tmdb.images({ type, tmdbId: item.tmdbId }).catch(tmdbUnavailable)
         : { poster: [], backdrop: [], logo: [] }
     const options = (kind: ChoosableImageKind): ImageOption[] => {
       const current = this.stored.image({ itemId: id, kind })
