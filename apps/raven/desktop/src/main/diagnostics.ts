@@ -1,4 +1,5 @@
 import { MPV_PROPERTIES } from '@raven/mpv'
+import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
 import {
   ENGINE_MESSAGES,
   ENGINE_MODES,
@@ -52,16 +53,19 @@ type ReadWithinProps = {
 
 // A reading that rejects is absent (nothing playing); one that never answers is unknown.
 const readWithin = async ({ read, ms }: ReadWithinProps): Promise<string | null> => {
-  const deadline = Promise.withResolvers<string>()
-  const timer = setTimeout(() => deadline.resolve(UNKNOWN), ms)
   // Through `then`, so a read that throws before returning its promise is a rejection too.
-  const reading = Promise.resolve()
-    .then(read)
-    .catch(() => null)
-  try {
-    return await Promise.race([reading, deadline.promise])
-  } finally {
-    clearTimeout(timer)
+  const bounded = await within({ task: Promise.resolve().then(read), ms })
+  switch (bounded.outcome) {
+    case BOUNDED_OUTCOMES.answered:
+      return bounded.result
+    case BOUNDED_OUTCOMES.failed:
+      return null
+    case BOUNDED_OUTCOMES.late:
+      return UNKNOWN
+    default: {
+      const unreachable: never = bounded
+      return unreachable
+    }
   }
 }
 
