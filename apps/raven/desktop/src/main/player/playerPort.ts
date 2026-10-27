@@ -5,7 +5,8 @@ import {
   isPlayerRequest,
   PLAYER_REFUSAL_REASONS,
 } from '@raven/core'
-import { PLAYER_MESSAGES, type PlayerService } from '@/main/player/playerService'
+import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
+import type { PlayerService } from '@/main/player/playerService'
 import { messageOf } from '@/shared/messageOf'
 
 /** The few things the bridge needs of a `MessagePortMain`, so `bun test` can hand it a fake. */
