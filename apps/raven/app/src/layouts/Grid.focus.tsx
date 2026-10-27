@@ -13,7 +13,7 @@ import { Text } from '@/layouts/Text'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
 import { focusCardWidthOf, FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
-import { useOpenerFocus, useScreenFocusScope } from '@/layouts/focus'
+import { useOpenerFocus, useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
   CHEVRONS,
@@ -54,7 +54,6 @@ type RowCardProps = {
   hasPicture: boolean
   isPreferred: boolean
   jump: JumpFocus | null
-  onFocused: () => void
   onPress: () => void
 }
 
@@ -62,18 +61,19 @@ type RowCardProps = {
  * A card of the list or tiles view, the remote's to move to: a row of words, ringed while
  * focused. It takes the focus back when the page it opened goes back, as a `FocusCard` does.
  */
-const RowCard = ({ card, hasPicture, isPreferred, jump, onFocused, onPress }: RowCardProps) => {
+const RowCard = ({ card, hasPicture, isPreferred, jump, onPress }: RowCardProps) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
   const styles = useStyles()
   useJumpFocus({ jump, view: pressable })
   const { remember } = useOpenerFocus({ place: card.key, view: pressable })
+  const { settle } = useOpeningFocus()
   return (
     <Pressable
       ref={pressable}
       accessibilityLabel={card.title}
       accessibilityRole="button"
       hasTVPreferredFocus={isPreferred}
-      onFocus={onFocused}
+      onFocus={settle}
       onPress={() => {
         remember()
         onPress()
@@ -252,7 +252,6 @@ const Grid = ({
                     hasPicture={view === LIBRARY_VIEWS.tiles}
                     isPreferred={card.key === preferred}
                     jump={jumpOf(card)}
-                    onFocused={settle}
                     onPress={() => onOpen(card)}
                   />
                 </View>
@@ -262,7 +261,6 @@ const Grid = ({
                   card={card}
                   isPreferred={card.key === preferred}
                   jump={jumpOf(card)}
-                  onFocused={settle}
                   onPress={() => onOpen(card)}
                   width={widthOf(row.shape)}
                 />
