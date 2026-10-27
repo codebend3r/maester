@@ -76,6 +76,7 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { OmdbClient } from '@/metadata/omdbClient'
 import { Scores } from '@/metadata/scores'
+import { ScoresRepository } from '@/metadata/scoresRepository'
 import { ScoreSweep } from '@/metadata/scoreSweep'
 import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
 import { Filmographies } from '@/people/filmographies'
@@ -192,6 +193,7 @@ export class AppModule {
         PictureVersions,
         ItemImagesRepository,
         ItemPictureFiles,
+        ScoresRepository,
         MetadataRepository,
         PeopleRepository,
         ItemOverrides,

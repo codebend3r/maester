@@ -14,14 +14,10 @@ import {
   Put,
   Query,
   Res,
-  ServiceUnavailableException,
 } from '@nestjs/common'
 import {
-  type ChoosableImageKind,
   IMAGE_SOURCES,
-  ITEM_IMAGE_KINDS,
   ITEM_TYPES,
-  type ImageOption,
   isFavouriteChange,
   isImageChoice,
   isItemImageKind,
@@ -36,6 +32,7 @@ import {
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { isChoosableImageKind } from '@/items/imageKinds'
+import { imageOptionsOf, NO_TMDB_IMAGES } from '@/items/imageOptions'
 import { itemChildren } from '@/items/itemChildren'
 import { ItemPictureFiles, pictureWidth } from '@/items/itemPictureFiles'
 import { sendImage } from '@/items/sendImage'
@@ -53,7 +50,8 @@ import { ItemRefresher } from '@/metadata/itemRefresher'
 import { isLocal } from '@/metadata/localItems'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
-import { TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { TmdbClient } from '@/metadata/tmdbClient'
+import { requireTmdb, tmdbUnavailable } from '@/metadata/tmdbGate'
 import { TMDB_IMAGE_PATH } from '@/metadata/tmdbShapes'
 import { ROUTE_PARAMS } from '@/requestParts'
 
@@ -129,14 +127,10 @@ export class ItemsController {
       throw new BadRequestException('Only a show can be re-pointed here.')
     }
     if (!isShowMatchChoice(body)) throw new BadRequestException('tmdbId must be a TMDB id')
-    if (!this.tmdb.enabled)
-      throw new ServiceUnavailableException('Set TMDB_API_TOKEN to search TMDB.')
+    requireTmdb({ tmdb: this.tmdb, toDo: 'search TMDB' })
     const moved = await this.service
       .fixShowMatch({ showId: id, tmdbId: body.tmdbId })
-      .catch((error: unknown) => {
-        if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
-        throw error
-      })
+      .catch(tmdbUnavailable)
     if (moved == null) throw new NotFoundException('TMDB has no show with that id.')
     return this.details({ id: moved, request })
   }
@@ -225,16 +219,9 @@ export class ItemsController {
     @Req() request: FastifyRequest,
   ): Promise<ItemDetails> {
     this.requireItem(id)
-    if (!this.tmdb.enabled) {
-      throw new ServiceUnavailableException('Set TMDB_API_TOKEN to fetch details from TMDB.')
-    }
-    try {
-      const kept = await this.refresher.refresh(id)
-      if (!kept) throw new NotFoundException('TMDB no longer has this; it will be matched again.')
-    } catch (error) {
-      if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
-      throw error
-    }
+    requireTmdb({ tmdb: this.tmdb, toDo: 'fetch details from TMDB' })
+    const kept = await this.refresher.refresh(id).catch(tmdbUnavailable)
+    if (!kept) throw new NotFoundException('TMDB no longer has this; it will be matched again.')
     return this.details({ id, request })
   }
 
@@ -289,49 +276,9 @@ export class ItemsController {
     }
     const fetched =
       this.tmdb.enabled && !isLocal(item.tmdbId)
-        ? await this.tmdb.images({ type, tmdbId: item.tmdbId }).catch((error: unknown) => {
-            if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
-            throw error
-          })
-        : { poster: [], backdrop: [], logo: [] }
-    const options = (kind: ChoosableImageKind): ImageOption[] => {
-      const current = this.stored.image({ itemId: id, kind })
-      const local = this.stored.imageFrom({ itemId: id, kind, source: STORED_IMAGE_SOURCES.local })
-      const own = this.stored.imageFrom({ itemId: id, kind, source: STORED_IMAGE_SOURCES.tmdb })
-      const tmdb = fetched[kind]
-      // TMDB's own choice is offered even when the images call left it out.
-      const listed =
-        own != null && !tmdb.some((image) => image.path === own)
-          ? [{ path: own, width: null, height: null, language: null }, ...tmdb]
-          : tmdb
-      return [
-        ...(local == null
-          ? []
-          : [
-              {
-                source: IMAGE_SOURCES.local,
-                ref: local,
-                width: null,
-                height: null,
-                language: null,
-                current: current?.source === STORED_IMAGE_SOURCES.local,
-              },
-            ]),
-        ...listed.map((image) => ({
-          source: IMAGE_SOURCES.tmdb,
-          ref: image.path,
-          width: image.width,
-          height: image.height,
-          language: image.language,
-          current: current?.source !== STORED_IMAGE_SOURCES.local && current?.ref === image.path,
-        })),
-      ]
-    }
-    return {
-      poster: options(ITEM_IMAGE_KINDS.poster),
-      backdrop: options(ITEM_IMAGE_KINDS.backdrop),
-      logo: options(ITEM_IMAGE_KINDS.logo),
-    }
+        ? await this.tmdb.images({ type, tmdbId: item.tmdbId }).catch(tmdbUnavailable)
+        : NO_TMDB_IMAGES
+    return imageOptionsOf({ itemId: id, stored: this.stored, fetched })
   }
 
   /** Edit images: `{ source: 'tmdb', ref }` shows that picture of TMDB's; `{ source: 'local' }` goes back to the one beside the media, or TMDB's own. */

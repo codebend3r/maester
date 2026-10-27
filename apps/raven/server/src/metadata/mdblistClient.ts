@@ -1,18 +1,32 @@
 import { Inject, Injectable } from '@nestjs/common'
 import {
   type MatchItemType,
+  METADATA_SERVICE_STATES,
   type MetadataServiceState,
+  RATING_SOURCES,
   isNumber,
   isRecord,
   isString,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
-import type { ExternalScore, ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
+import { ERROR_NAMES } from '@/errorMessage'
+import { RAVEN_HEADERS } from '@/http'
+import {
+  type ExternalScore,
+  SCORE_ANSWERS,
+  SCORE_PROVIDERS,
+  type ScoreAnswer,
+  type ScoreSource,
+  type ScoreTitle,
+} from '@/metadata/scoreSources'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 import { createRateLimit } from '@/scanner/concurrency'
 
 const API = 'https://api.mdblist.com'
+
+/** The header MDBList counts the day's calls left in. */
+const MDBLIST_HEADERS = { remaining: 'x-ratelimit-remaining' } as const
 
 const TIMEOUT_MS = 10_000
 
@@ -50,9 +64,9 @@ const isUnknownTitle = (status: number): boolean => status === 404
 
 /** MDBList's names for each source we keep. Its `score` is 0 to 100 whatever the source counts in. */
 const SOURCES = new Map<string, ExternalScore['source']>([
-  ['imdb', 'imdb'],
-  ['tomatoes', 'rottenTomatoes'],
-  ['metacritic', 'metacritic'],
+  ['imdb', RATING_SOURCES.imdb],
+  ['tomatoes', RATING_SOURCES.rottenTomatoes],
+  ['metacritic', RATING_SOURCES.metacritic],
 ])
 
 /** The scores in an MDBList answer, each brought to a mark out of 10. */
@@ -95,8 +109,8 @@ type IsDaySpentProps = { body: unknown; headers: Headers }
  */
 const isDaySpent = ({ body, headers }: IsDaySpentProps): boolean =>
   (isRecord(body) && body.error === DAILY_LIMIT_ERROR) ||
-  (wholeHeader(headers.get('retry-after')) ?? 0) > BURST_WAIT_SECONDS ||
-  wholeHeader(headers.get('x-ratelimit-remaining')) === 0
+  (wholeHeader(headers.get(RAVEN_HEADERS.retryAfter)) ?? 0) > BURST_WAIT_SECONDS ||
+  wholeHeader(headers.get(MDBLIST_HEADERS.remaining)) === 0
 
 type MdblistClientNoteReportedProps = { headers: Headers; atCall: number }
 
@@ -112,7 +126,7 @@ type MdblistClientNoteReportedProps = { headers: Headers; atCall: number }
  */
 @Injectable()
 export class MdblistClient implements ScoreSource {
-  readonly provider = 'mdblist'
+  readonly provider = SCORE_PROVIDERS.mdblist
   private readonly limit = createRateLimit({ perSecond: 3, inFlight: 2 })
   /**
    * Today's calls, and the calls left MDBList last reported: as of the call
@@ -161,19 +175,19 @@ export class MdblistClient implements ScoreSource {
 
   /** Notes the calls left that an answer to call `atCall` reports, unless a later call's is known. */
   private noteReported({ headers, atCall }: MdblistClientNoteReportedProps): void {
-    const left = wholeHeader(headers.get('x-ratelimit-remaining'))
+    const left = wholeHeader(headers.get(MDBLIST_HEADERS.remaining))
     const { reported } = this.budget
     if (left == null || (reported != null && reported.atCall > atCall)) return
     this.budget.reported = { left, atCall }
   }
 
   state(): MetadataServiceState {
-    if (this.config.mdblistApiKey == null) return 'off'
-    return this.status.error == null ? 'ok' : 'failing'
+    if (this.config.mdblistApiKey == null) return METADATA_SERVICE_STATES.off
+    return this.status.error == null ? METADATA_SERVICE_STATES.ok : METADATA_SERVICE_STATES.failing
   }
 
-  /** The scores MDBList has for a TMDB id; `'unknown'` when it knows nothing of it. */
-  async lookUp({ type, tmdbId }: ScoreTitle): Promise<ExternalScore[] | 'unknown'> {
+  /** The scores MDBList has for a TMDB id; `SCORE_ANSWERS.unknown` when it knows nothing of it. */
+  async lookUp({ type, tmdbId }: ScoreTitle): Promise<ScoreAnswer> {
     const key = this.config.mdblistApiKey
     if (key == null || !this.enabled()) throw new Error('MDBList is not available right now.')
     this.budget.used += 1
@@ -181,7 +195,7 @@ export class MdblistClient implements ScoreSource {
     const atCall = this.budget.used
     const url = mdblistUrl({ type, tmdbId, key })
 
-    const attempt = async (retriesLeft: number): Promise<ExternalScore[] | 'unknown'> => {
+    const attempt = async (retriesLeft: number): Promise<ScoreAnswer> => {
       const response = await this.limit
         .run(() =>
           this.fetch({
@@ -194,7 +208,7 @@ export class MdblistClient implements ScoreSource {
         )
         .catch((error: unknown) => {
           this.status.error =
-            error instanceof Error && error.name === 'TimeoutError'
+            error instanceof Error && error.name === ERROR_NAMES.timeoutError
               ? 'MDBList did not answer within 10 seconds.'
               : 'MDBList could not be reached.'
           throw new Error(this.status.error)
@@ -212,13 +226,13 @@ export class MdblistClient implements ScoreSource {
           throw new Error(this.status.error)
         }
         if (retriesLeft > 0) {
-          await sleep(retryAfterMs(response.headers.get('retry-after')))
+          await sleep(retryAfterMs(response.headers.get(RAVEN_HEADERS.retryAfter)))
           return attempt(retriesLeft - 1)
         }
       }
       if (isUnknownTitle(response.status)) {
         this.status.error = null
-        return 'unknown'
+        return SCORE_ANSWERS.unknown
       }
       if (!response.ok) {
         this.status.error = `MDBList answered ${response.status}.`

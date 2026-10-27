@@ -133,7 +133,7 @@ describe('libraries', () => {
 
   it('remembers a Refresh, and finishes each with no title left waiting, or none asked for', () => {
     const libraries = new LibrariesRepository(database.get())
-    const { metadata } = repositories(database.get())
+    const { metadata, scores } = repositories(database.get())
     const index = new MediaIndex(database.get())
     const library = (name: string): { id: number; itemId: number } => {
       const { id } = libraries.create({ name, paths: [`/${name}`], settings: { kind: 'movies' } })
@@ -164,8 +164,8 @@ describe('libraries', () => {
     expect(libraries.startRatingsRefresh({ id: unasked, at, shouldAsk: false })).toBe(0)
     expect(libraries.ratingsRefresh(waiting)).toEqual({ startedAt: at, total: 1, finishedAt: null })
     expect(libraries.ratingsRefresh(unasked)).toEqual({ startedAt: null, total: 0, finishedAt: at })
-    expect(metadata.requestsLeft(unasked)).toBe(0)
-    metadata.clearRequest(doneItem)
+    expect(scores.requestsLeft(unasked)).toBe(0)
+    scores.clearRequest(doneItem)
 
     const finished = '2026-10-17T09:05:00.000Z'
     libraries.finishRatingsRefreshes(finished)
