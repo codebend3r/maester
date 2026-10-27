@@ -13,6 +13,7 @@ import {
   titleFromFileName,
 } from '@raven/core'
 import type { PageAccount } from '@/main/accounts/pageAccount'
+import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
 import { type ConfigStore, pickOutput, serverOf } from '@/main/desktopConfig'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import { grantNext } from '@/main/folder'
@@ -276,10 +277,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     return check
   }
 
-  const factsWithin = (path: string): Promise<FileFacts | null> => {
-    const timeout = Promise.withResolvers<null>()
-    const timer = deps.timers.set({ run: () => timeout.resolve(null), ms: RECENT_CHECK_MS })
-    return Promise.race([factsOf(path), timeout.promise]).finally(() => deps.timers.clear(timer))
+  const factsWithin = async (path: string): Promise<FileFacts | null> => {
+    const bounded = await within({ task: factsOf(path), ms: RECENT_CHECK_MS, timers: deps.timers })
+    return bounded.outcome === BOUNDED_OUTCOMES.answered ? bounded.result : null
   }
 
   type ShareOfProps = { state: PlayerState; path: string }

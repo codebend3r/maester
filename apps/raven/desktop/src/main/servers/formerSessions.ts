@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { isOpaqueId } from '@raven/core'
+import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
 import { loggable } from '@/main/servers/serverCalls'
 import { isMissingFile, type Timers } from '@/main/stateStore'
 import { messageOf } from '@/shared/messageOf'
@@ -11,9 +12,6 @@ export const PARTITIONS_DIR = 'Partitions'
 // partition; Electron 44 names its folder by its name past `persist:`, escaped: `server%3A<id>`.
 // Main's calls now carry the page's own unlock, so none of them is read any more.
 const PARTITION_FOLDER = /^server%3A(.+)$/u
-
-/** How a step that races its budget ends. */
-const RACE_OUTCOMES = { late: 'late' } as const
 
 type FormerPartitionsProps = { names: readonly string[] }
 
@@ -56,18 +54,23 @@ export const clearFormerPartitions = async ({
     }
     return []
   })
-  const budget: { handle: unknown } = { handle: null }
-  const late = new Promise<typeof RACE_OUTCOMES.late>((resolve) => {
-    budget.handle = timers.set({ run: () => resolve(RACE_OUTCOMES.late), ms: FORMER_LIST_MS })
-  })
-  const names = await Promise.race([listing, late]).finally(() => timers.clear(budget.handle))
-  if (names === RACE_OUTCOMES.late) {
-    warn(
-      `Raven did not list its server sessions within ${FORMER_LIST_MS} ms, so it clears none this time`,
-    )
-    return { removing: Promise.resolve() }
+  const listed = await within({ task: listing, ms: FORMER_LIST_MS, timers })
+  switch (listed.outcome) {
+    case BOUNDED_OUTCOMES.answered:
+      break
+    case BOUNDED_OUTCOMES.late:
+      warn(
+        `Raven did not list its server sessions within ${FORMER_LIST_MS} ms, so it clears none this time`,
+      )
+      return { removing: Promise.resolve() }
+    case BOUNDED_OUTCOMES.failed:
+      throw listed.error
+    default: {
+      const unreachable: never = listed
+      return unreachable
+    }
   }
-  const removals = formerPartitions({ names }).map((name) =>
+  const removals = formerPartitions({ names: listed.result }).map((name) =>
     fs.remove(join(dir, name)).catch((error: unknown) => {
       warn(`Raven could not clear ${name}: ${loggable(messageOf(error))}`)
     }),
