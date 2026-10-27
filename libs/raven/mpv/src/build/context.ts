@@ -11,6 +11,15 @@ export const ARCHITECTURES = {
 /** The platform a native build is for, as its provenance records it. */
 export const BUILD_TARGETS = { darwinArm64: 'darwin-arm64' } as const
 
+/** The patches applied to mpv's sources, in order; the build's provenance records each one's digest. */
+export const PATCHES = [
+  '0001-player-add-moltenvk-context.patch',
+  '0002-moltenvk-resize.patch',
+] as const
+
+/** The libraries shipped under `resources/lib`, each finding the other by `@rpath`. */
+export const SHIPPED_LIBRARIES = ['libMoltenVK.dylib', 'libmpv.2.dylib'] as const
+
 export const project = fileURLToPath(new URL('../..', import.meta.url))
 export const work = resolve(project, 'native-build')
 export const prefix = resolve(work, 'prefix')
@@ -80,6 +89,19 @@ export const write = async ({ path, content }: WriteProps) => {
   await mkdir(dirname(path), { recursive: true })
   await Bun.write(path, content)
 }
+type InSequenceProps<T> = {
+  items: readonly T[]
+  each: (item: T) => Promise<void>
+}
+
+/** Runs `each` over `items` one at a time, in order: the build steps share one prefix, and the archives one disk. */
+export const inSequence = async <T>({ items, each }: InSequenceProps<T>): Promise<void> => {
+  await items.reduce(async (previous, item) => {
+    await previous
+    await each(item)
+  }, Promise.resolve())
+}
+
 export const requireMacArm = () => {
   if (process.platform !== PLATFORMS.darwin || process.arch !== ARCHITECTURES.arm64)
     throw new Error('Native playback supports macOS arm64 only')

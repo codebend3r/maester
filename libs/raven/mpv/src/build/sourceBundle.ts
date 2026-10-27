@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import {
   BUILD_TARGETS,
   digest,
+  inSequence,
   output,
   project,
   resources,
@@ -17,17 +18,15 @@ export const refreshSourceBundle = async () => {
   const bundle = resolve(work, 'source-bundle')
   await mkdir(bundle, { recursive: true })
   await rm(resolve(bundle, 'raven-mpv'), { recursive: true, force: true })
-  await ['native', 'src', 'test'].reduce(async (previous, name) => {
-    await previous
-    await cp(resolve(project, name), resolve(bundle, 'raven-mpv', name), { recursive: true })
-  }, Promise.resolve())
-  await ['package.json', 'tsconfig.json', 'tsconfig.build.json', 'README.md'].reduce(
-    async (previous, name) => {
-      await previous
-      await cp(resolve(project, name), resolve(bundle, 'raven-mpv', name))
-    },
-    Promise.resolve(),
-  )
+  await inSequence({
+    items: ['native', 'src', 'test'],
+    each: (name) =>
+      cp(resolve(project, name), resolve(bundle, 'raven-mpv', name), { recursive: true }),
+  })
+  await inSequence({
+    items: ['package.json', 'tsconfig.json', 'tsconfig.build.json', 'README.md'],
+    each: (name) => cp(resolve(project, name), resolve(bundle, 'raven-mpv', name)),
+  })
   await cp(resolve(project, '../../../bun.lock'), resolve(bundle, 'bun.lock'))
   const archive = resolve(bundle, 'raven-repository.tar.gz')
   await run({ args: ['git', 'archive', '--format=tar.gz', `--output=${archive}`, 'HEAD'] })

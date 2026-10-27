@@ -1,6 +1,19 @@
 import { expect, test } from 'bun:test'
-import { isSource, sources } from '@/build/context'
+import { inSequence, isSource, sources } from '@/build/context'
 import { nodeHeaders } from '@/build/nodeHeaders'
+
+test('inSequence runs each step after the one before it has finished', async () => {
+  const order: string[] = []
+  await inSequence({
+    items: ['slow', 'quick'],
+    each: async (name) => {
+      order.push(`${name} starts`)
+      await new Promise((settle) => setTimeout(settle, name === 'slow' ? 20 : 0))
+      order.push(`${name} ends`)
+    },
+  })
+  expect(order).toEqual(['slow starts', 'slow ends', 'quick starts', 'quick ends'])
+})
 
 test('source lock names the complete native graph using immutable upstream archives and digests', async () => {
   const locked = await sources()
