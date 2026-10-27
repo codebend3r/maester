@@ -1,8 +1,9 @@
 import { type Review, timeAgo } from '@raven/core'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { Button } from '@raven/ui'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
+import { useModal } from '@/lib/useModal'
 import styles from '@/components/ReviewCards/ReviewCards.module.scss'
 
 /** How many reviews a page shows. */
@@ -52,11 +53,8 @@ type ReviewDialogProps = { review: Review; onClose: () => void }
 
 /** The whole review, as paragraphs, with a link to it on TMDB. Never rendered as HTML. */
 const ReviewDialog = ({ review, onClose }: ReviewDialogProps) => {
-  const dialog = useRef<HTMLDialogElement>(null)
+  const { dialog } = useModal()
   const id = useId()
-  useEffect(() => {
-    dialog.current?.showModal()
-  }, [])
   return (
     <dialog ref={dialog} className={styles.dialog} aria-labelledby={id} onClose={onClose}>
       <div className={styles.dialogBody}>

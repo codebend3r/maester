@@ -7,9 +7,10 @@ import {
   sagaCover,
   sagaPictures,
 } from '@raven/core'
-import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
+import { type FormEvent, useId, useState } from 'react'
 import { Button } from '@raven/ui'
 import { api } from '@/lib/api'
+import { useModal } from '@/lib/useModal'
 import { afterSagaBackdrop } from '@raven/ui/headless'
 import styles from '@/pages/SagaPage/SagaBackdropDialog.module.scss'
 
@@ -37,7 +38,7 @@ type SagaBackdropDialogProps = {
  * is. A native modal <dialog> traps focus and closes on Escape.
  */
 export const SagaBackdropDialog = ({ libraryId, saga, onClose }: SagaBackdropDialogProps) => {
-  const dialog = useRef<HTMLDialogElement>(null)
+  const { dialog } = useModal()
   const ids = { title: useId(), choice: useId(), cover: useId() }
   const queryClient = useQueryClient()
   const [choice, setChoice] = useState<Choice>(
@@ -46,10 +47,6 @@ export const SagaBackdropDialog = ({ libraryId, saga, onClose }: SagaBackdropDia
   // The cover the page shows, so a pick whose movie has left the saga starts
   // on the one standing in for it, and kept while the motions are tried.
   const [coverId, setCoverId] = useState(sagaCover(saga)?.id ?? null)
-
-  useEffect(() => {
-    dialog.current?.showModal()
-  }, [])
 
   const chosen = (): SagaBackdrop | null => {
     if (choice !== CHOICES.off) return { type: SAGA_BACKDROP_TYPES.slideshow, motion: choice }

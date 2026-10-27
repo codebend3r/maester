@@ -1,7 +1,8 @@
 import { type MediaItem, mediaLabel } from '@raven/core'
-import { useEffect, useId, useRef } from 'react'
+import { useId } from 'react'
 import { Button } from '@raven/ui'
 import { useMediaMutations } from '@/lib/useMediaMutations'
+import { useModal } from '@/lib/useModal'
 import styles from '@/components/ConfirmDelete/ConfirmDelete.module.scss'
 
 type ConfirmDeleteProps = {
@@ -16,13 +17,9 @@ type ConfirmDeleteProps = {
  * held here, so a list of files holds one only while its dialog is open.
  */
 export const ConfirmDelete = ({ media, onClose, onDeleted }: ConfirmDeleteProps) => {
-  const dialog = useRef<HTMLDialogElement>(null)
+  const { dialog } = useModal()
   const { remove } = useMediaMutations({ media })
   const id = useId()
-
-  useEffect(() => {
-    dialog.current?.showModal()
-  }, [])
 
   return (
     <dialog ref={dialog} className={styles.dialog} aria-labelledby={id} onClose={onClose}>
