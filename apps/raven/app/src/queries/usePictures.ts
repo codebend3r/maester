@@ -1,0 +1,20 @@
+import { useAccessToken } from '@/account/accountSession'
+import type { Pictures } from '@/queries/cards'
+import type { AppQueries } from '@/queries/useAppQueries'
+import { useServerCookies } from '@/queries/useServerCookies'
+import { cookieHeadersFor } from '@/servers/serverHeaders'
+
+type UsePicturesProps = Pick<AppQueries, 'server' | 'api'>
+
+/**
+ * Where a screen's pictures come from on the active server, with the headers each request for
+ * one carries: the server's cookies and the account's token, on its own API only. Null until the
+ * jar has first answered, so a screen waits and no picture is asked for twice; it follows the
+ * jar's changes (an unlock) and the token's refresh.
+ */
+export const usePictures = ({ server, api }: UsePicturesProps): Pictures | null => {
+  const cookies = useServerCookies(server)
+  const accessToken = useAccessToken()
+  if (cookies === null) return null
+  return { api, headersFor: cookieHeadersFor({ server, cookies, accessToken }) }
+}
