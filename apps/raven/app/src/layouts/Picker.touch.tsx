@@ -14,6 +14,11 @@ import { Text } from '@/layouts/Text'
 import { SIZES } from '@/theme/appTheme'
 import { themeNow, themedStyles } from '@/theme/useTheme'
 
+type OpenPickerSheetProps<K extends string> = Pick<
+  PickerProps<K>,
+  'label' | 'options' | 'onChoose' | 'isOverPicture'
+> & { anchor: RefObject<ComponentRef<typeof View> | null> }
+
 /**
  * Opens the system's action sheet for a picker, on an iPad as a popover pointing at `anchor`'s
  * view when it has one, light or dark as the theme's ground is, and dark over the video.
@@ -24,9 +29,7 @@ export const openPickerSheet = <K extends string>({
   onChoose,
   isOverPicture = false,
   anchor,
-}: Pick<PickerProps<K>, 'label' | 'options' | 'onChoose' | 'isOverPicture'> & {
-  anchor: RefObject<ComponentRef<typeof View> | null>
-}) => {
+}: OpenPickerSheetProps<K>) => {
   const node = anchor.current === null ? null : findNodeHandle(anchor.current)
   ActionSheetIOS.showActionSheetWithOptions(
     {

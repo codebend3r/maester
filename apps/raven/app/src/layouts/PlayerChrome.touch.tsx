@@ -45,15 +45,13 @@ const GLYPHS = {
   forward: `${SKIP_SECONDS} \u21BB`,
 } as const
 
+type ScrubberProps = Pick<Transport, 'position' | 'onSeek'> & { duration: number }
+
 /**
  * Where the video is, as a line to drag along: the finger's spot shows as it moves and is sought
  * on letting go. VoiceOver reads it as the time of the length, and skips by a swipe.
  */
-const Scrubber = ({
-  position,
-  duration,
-  onSeek,
-}: Pick<Transport, 'position' | 'onSeek'> & { duration: number }) => {
+const Scrubber = ({ position, duration, onSeek }: ScrubberProps) => {
   const [width, setWidth] = useState(0)
   const [dragged, setDragged] = useState<number | null>(null)
   const styles = useStyles()

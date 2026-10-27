@@ -45,6 +45,19 @@ const useFieldStyles = themedStyles((colours) =>
   }),
 )
 
+type TvTextFieldProps = {
+  label: string
+  value: string
+  onChangeText: (text: string) => void
+  onSubmit: (text: string) => void
+  isPreferred: boolean
+  onFocused?: () => void
+  frameStyle?: StyleProp<ViewStyle>
+} & Pick<
+  TextInputProps,
+  'placeholder' | 'placeholderTextColor' | 'keyboardType' | 'returnKeyType' | 'secureTextEntry'
+>
+
 /**
  * A text field the remote selects, which opens the platform's own keyboard. The keyboard reports
  * the text back as it is typed; leaving it with Menu cancels the edit, and the native field goes
@@ -62,18 +75,7 @@ export const TvTextField = ({
   onFocused = NOTHING_ON_FOCUS,
   frameStyle,
   ...input
-}: {
-  label: string
-  value: string
-  onChangeText: (text: string) => void
-  onSubmit: (text: string) => void
-  isPreferred: boolean
-  onFocused?: () => void
-  frameStyle?: StyleProp<ViewStyle>
-} & Pick<
-  TextInputProps,
-  'placeholder' | 'placeholderTextColor' | 'keyboardType' | 'returnKeyType' | 'secureTextEntry'
->) => {
+}: TvTextFieldProps) => {
   const [isFocused, setFocused] = useState(false)
   const frame = useRef<ComponentRef<typeof View>>(null)
   const tvFormStyles = useTvFormStyles()

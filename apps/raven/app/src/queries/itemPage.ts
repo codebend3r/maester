@@ -89,7 +89,12 @@ export type ItemPage = {
 
 const CAST_TITLES = { everyone: 'Cast & Crew', guests: 'Guest stars & crew' } as const
 
-const castOf = ({ details, api, headersFor }: Pictures & { details: ItemDetails }) =>
+/** An item and where its pictures come from. */
+type DetailsProps = Pictures & { details: ItemDetails }
+
+type CastOfProps = DetailsProps
+
+const castOf = ({ details, api, headersFor }: CastOfProps) =>
   castMembers(details.credits).map((member): PersonCard => ({
     key: String(member.personId),
     name: member.name,
@@ -98,7 +103,9 @@ const castOf = ({ details, api, headersFor }: Pictures & { details: ItemDetails 
     picture: pictureAt({ uri: api.photoUrl(member), headersFor }),
   }))
 
-const posterOf = ({ details, api, headersFor }: Pictures & { details: ItemDetails }) => ({
+type PosterOfProps = DetailsProps
+
+const posterOf = ({ details, api, headersFor }: PosterOfProps) => ({
   shape: CARD_SHAPES.poster,
   picture: pictureAt({
     uri: imageOf({ api, item: details, kind: ITEM_IMAGE_KINDS.poster }),
@@ -106,11 +113,9 @@ const posterOf = ({ details, api, headersFor }: Pictures & { details: ItemDetail
   }),
 })
 
-const backdropOf = ({
-  details,
-  api,
-  headersFor,
-}: Pictures & { details: ItemDetails | null }): Picture | null =>
+type BackdropOfProps = Pictures & { details: ItemDetails | null }
+
+const backdropOf = ({ details, api, headersFor }: BackdropOfProps): Picture | null =>
   pictureAt({ uri: imageOf({ api, item: details, kind: ITEM_IMAGE_KINDS.backdrop }), headersFor })
 
 /** A line of facts, or null when it has none to say. */
@@ -122,12 +127,9 @@ const timeLeft = (media: MediaItem): Progress | null => {
   return label === null ? null : { fraction: progressOf(media), label }
 }
 
-const pageOf = ({
-  hero,
-  details,
-  ...rest
-}: Pictures &
-  Partial<Omit<ItemPage, 'hero' | 'cast'>> & { hero: ItemHero; details: ItemDetails }) => ({
+type PageOfProps = DetailsProps & Partial<Omit<ItemPage, 'hero' | 'cast'>> & { hero: ItemHero }
+
+const pageOf = ({ hero, details, ...rest }: PageOfProps) => ({
   hero,
   file: rest.file ?? [],
   versions: rest.versions ?? [],
@@ -137,13 +139,13 @@ const pageOf = ({
   cast: castOf({ details, ...rest }),
 })
 
+/** A playable item, the details as the one library shows them (`shown`) and the file Play starts. */
+type PlayableHeroProps = DetailsProps & { shown: ItemDetails; primary: MediaItem }
+
+type MovieHeroProps = PlayableHeroProps
+
 /** A movie's heading: its poster and backdrop, director, rating and facts. */
-const movieHero = ({
-  details,
-  shown,
-  primary,
-  ...pictures
-}: Pictures & { details: ItemDetails; shown: ItemDetails; primary: MediaItem }): ItemHero => ({
+const movieHero = ({ details, shown, primary, ...pictures }: MovieHeroProps): ItemHero => ({
   eyebrow: null,
   title: details.title,
   byline: directedBy(details),
@@ -155,6 +157,13 @@ const movieHero = ({
   tagline: details.tagline,
   summary: details.summary,
 })
+
+type EpisodeHeroProps = PlayableHeroProps & {
+  /** An episode's show, once read; null while it is read, when it cannot be, and for a movie. */
+  show: ItemDetails | null
+  /** Whether an episode's show is still being read. */
+  isShowPending: boolean
+}
 
 /**
  * An episode's heading: its still, else a frame of its file, under its show's backdrop, and
@@ -168,13 +177,7 @@ const episodeHero = ({
   show,
   isShowPending,
   ...pictures
-}: Pictures & {
-  details: ItemDetails
-  shown: ItemDetails
-  primary: MediaItem
-  show: ItemDetails | null
-  isShowPending: boolean
-}): ItemHero => {
+}: EpisodeHeroProps): ItemHero => {
   const still = pictureAt({
     uri:
       pictures.api.itemImageUrl({
@@ -198,6 +201,12 @@ const episodeHero = ({
   }
 }
 
+type PlayablePageProps = Omit<EpisodeHeroProps, 'shown'> & {
+  kind: typeof ITEM_TYPES.movie | typeof ITEM_TYPES.episode
+  versions: MediaItem[]
+  tracks: MediaTracks | undefined
+}
+
 /**
  * A movie's or an episode's page, for the files of the one library and card it shows:
  * `versions`, and `primary`, the one Play starts. Either says how much of `primary` is left.
@@ -211,17 +220,7 @@ export const playablePage = ({
   isShowPending,
   tracks,
   ...pictures
-}: Pictures & {
-  kind: typeof ITEM_TYPES.movie | typeof ITEM_TYPES.episode
-  details: ItemDetails
-  versions: MediaItem[]
-  primary: MediaItem
-  /** An episode's show, once read; null while it is read, when it cannot be, and for a movie. */
-  show: ItemDetails | null
-  /** Whether an episode's show is still being read. */
-  isShowPending: boolean
-  tracks: MediaTracks | undefined
-}): ItemPage => {
+}: PlayablePageProps): ItemPage => {
   const isEpisode = kind === ITEM_TYPES.episode
   const shown = { ...details, versions }
   const hero = isEpisode
@@ -247,8 +246,10 @@ export const playablePage = ({
   })
 }
 
+type ShowPageProps = DetailsProps
+
 /** A show's page: its poster and backdrop, creator, years and network, then its seasons. */
-export const showPage = ({ details, ...pictures }: Pictures & { details: ItemDetails }): ItemPage =>
+export const showPage = ({ details, ...pictures }: ShowPageProps): ItemPage =>
   pageOf({
     hero: {
       eyebrow: 'Show',
@@ -278,16 +279,14 @@ export const showPage = ({ details, ...pictures }: Pictures & { details: ItemDet
     ...pictures,
   })
 
+type SeasonPageProps = Pictures & { season: ItemDetails; show: ItemDetails | null }
+
 /**
  * A season's page: its poster under its show's backdrop, which waits for `show` to be read,
  * how much of it is watched, then its episodes on disk in order, each opening its page in the
  * library of the file it plays.
  */
-export const seasonPage = ({
-  season,
-  show,
-  ...pictures
-}: Pictures & { season: ItemDetails; show: ItemDetails | null }): ItemPage => {
+export const seasonPage = ({ season, show, ...pictures }: SeasonPageProps): ItemPage => {
   const episodes = episodesOf(season)
   const { watched, total } = episodesWatched(episodes)
   return pageOf({

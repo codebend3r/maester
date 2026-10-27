@@ -81,11 +81,13 @@ const Shelves = ({ title, notice, onSearch, onSettings, children }: ShelvesProps
   )
 }
 
+type ShelfTitleProps = Pick<ShelfProps, 'shelf' | 'onOpenLibrary'>
+
 /**
  * A shelf's title, and beside a library's the way into the library, as the web's shelf
  * heading links to it.
  */
-const ShelfTitle = ({ shelf, onOpenLibrary }: Pick<ShelfProps, 'shelf' | 'onOpenLibrary'>) => {
+const ShelfTitle = ({ shelf, onOpenLibrary }: ShelfTitleProps) => {
   const { libraryId } = shelf
   const styles = useStyles()
   return (
