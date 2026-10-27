@@ -284,22 +284,7 @@ class Agent:
                 reply.text = TRUNCATED_REPLY
                 break
 
-            results = []
-            for block in tool_uses:
-                outcome = await self.runner.run(ctx, block.name, block.input)
-                reply.tool_calls.append(
-                    {"name": block.name, "input": block.input, "ok": not outcome.is_error}
-                )
-                if on_tool:
-                    on_tool(ToolTrace(block.name, block.input, not outcome.is_error, outcome.text))
-                if isinstance(outcome.status, AwaitingConfirmation):
-                    reply.pending_ids.append(outcome.status.pending_id)
-                if outcome.choices:  # the latest picker wins
-                    reply.choices = list(outcome.choices)
-                reply.notices.extend(outcome.notices)
-                seen = {t.key for t in reply.titles}
-                reply.titles.extend(t for t in outcome.titles if t.key not in seen)
-                results.append(outcome.as_result_block(block.id))
+            results = await self._run_tools(ctx, tool_uses, reply, on_tool)
             messages.append({"role": "user", "content": results})
             self.store.append_message(
                 user_id, "user", self._stub_results(results), estimate_tokens(results)
@@ -308,6 +293,33 @@ class Agent:
             reply.text = (
                 reply.text or "I ran out of steps on that one; try asking for a smaller piece."
             )
+
+    async def _run_tools(
+        self,
+        ctx: ToolContext,
+        tool_uses: list[Any],
+        reply: AgentReply,
+        on_tool: Callable[[ToolTrace], Any] | None,
+    ) -> list[dict[str, Any]]:
+        """Run the model's tool calls in order, recording what each did into `reply`; the
+        result blocks to send back."""
+        results = []
+        for block in tool_uses:
+            outcome = await self.runner.run(ctx, block.name, block.input)
+            reply.tool_calls.append(
+                {"name": block.name, "input": block.input, "ok": not outcome.is_error}
+            )
+            if on_tool:
+                on_tool(ToolTrace(block.name, block.input, not outcome.is_error, outcome.text))
+            if isinstance(outcome.status, AwaitingConfirmation):
+                reply.pending_ids.append(outcome.status.pending_id)
+            if outcome.choices:  # the latest picker wins
+                reply.choices = list(outcome.choices)
+            reply.notices.extend(outcome.notices)
+            seen = {t.key for t in reply.titles}
+            reply.titles.extend(t for t in outcome.titles if t.key not in seen)
+            results.append(outcome.as_result_block(block.id))
+        return results
 
     async def _stream_turn(
         self,
