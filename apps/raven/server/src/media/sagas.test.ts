@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MovieSplits } from '@/media/movieSplits'
-import { BLANK_ITEM, type FetchedSaga } from '@/metadata/tmdbClient'
+import { BLANK_ITEM, type FetchedSaga } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 

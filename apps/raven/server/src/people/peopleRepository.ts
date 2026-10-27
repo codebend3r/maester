@@ -4,7 +4,7 @@ import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
 import { PictureVersions } from '@/metadata/pictureVersions'
-import type { FetchedPerson, FetchedPersonCredit } from '@/metadata/tmdbClient'
+import type { FetchedPerson, FetchedPersonCredit } from '@/metadata/tmdbShapes'
 
 /** One of a person's TMDB credits as stored, with raven's item for its title. */
 export type FilmographyRow = Pick<

@@ -1,16 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { RAVEN_HEADERS } from '@/http'
-import {
-  type MetadataFetch,
-  TmdbClient,
-  TmdbError,
-  mergeCredits,
-  pickLogo,
-  toPerson,
-  toSeason,
-  toShow,
-} from '@/metadata/tmdbClient'
+import { type MetadataFetch, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { mergeCredits, pickLogo, toPerson, toSeason, toShow } from '@/metadata/tmdbShapes'
 import { fakeTmdb, keanuReeves, movieBody, personBody, seasonBody, showBody } from '@/test/fakeTmdb'
 
 const config = (token: string | null = 'secret-token') => ({

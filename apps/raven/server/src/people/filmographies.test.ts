@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { BLANK_ITEM, type FetchedPerson, TmdbError } from '@/metadata/tmdbClient'
+import { TmdbError } from '@/metadata/tmdbClient'
+import { BLANK_ITEM, type FetchedPerson } from '@/metadata/tmdbShapes'
 import {
   DEADLINE_MS,
   FAILURE_MEMORY_MS,

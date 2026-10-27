@@ -13,7 +13,7 @@ import {
   type PathLayout,
 } from '@raven/core'
 import { isAiConfidence } from '@/metadata/aiDecisions'
-import type { SearchResult } from '@/metadata/tmdbClient'
+import type { SearchResult } from '@/metadata/tmdbShapes'
 
 /**
  * What the AI lookup is told of a group left unmatched: never a path

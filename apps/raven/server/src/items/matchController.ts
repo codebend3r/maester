@@ -49,7 +49,8 @@ import { type OnDisk, scoreCandidates } from '@/metadata/matchConfidence'
 import { MatchFactsCache } from '@/metadata/matchFactsCache'
 import { type MatchFile, MatchFiles } from '@/metadata/matchFiles'
 import { MetadataService } from '@/metadata/metadataService'
-import { type SearchResult, TMDB_IMAGE_PATH, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { type SearchResult, TMDB_IMAGE_PATH } from '@/metadata/tmdbShapes'
 
 const tmdbFailure = (error: unknown): never => {
   if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)

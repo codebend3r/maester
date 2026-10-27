@@ -53,7 +53,8 @@ import { ItemRefresher } from '@/metadata/itemRefresher'
 import { isLocal } from '@/metadata/localItems'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
-import { TMDB_IMAGE_PATH, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { TMDB_IMAGE_PATH } from '@/metadata/tmdbShapes'
 import { ROUTE_PARAMS } from '@/requestParts'
 
 type ItemsControllerDetailsProps = { id: number; request: FastifyRequest }

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { ExternalScore, ScoreProvider, ScoreSource } from '@/metadata/scoreSources'
 import { Scores } from '@/metadata/scores'
-import { BLANK_ITEM } from '@/metadata/tmdbClient'
+import { BLANK_ITEM } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { repositories } from '@/test/repositories'
 
