@@ -12,8 +12,9 @@ import {
 import { sameSecret } from '@shared/server'
 import type { FastifyRequest } from 'fastify'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
-import type { PublicUser } from '@/auth/authController'
-import { AccountService } from '@/sessions/accountService'
+import { isRecord } from '@/guards'
+import { ROUTES } from '@/routes'
+import { AccountService, type PublicUser, toPublicUser } from '@/sessions/accountService'
 import { SESSION_KINDS } from '@/sessions/sessionsRepository'
 
 /** Why `/internal/session` refused before looking the token up. */
@@ -35,14 +36,14 @@ export type SessionInfo = {
  * stays out of access logs. The proxy should not expose `/internal/*`; the
  * service token guards it either way.
  */
-@Controller('internal')
+@Controller()
 export class InternalController {
   constructor(
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(AccountService) private readonly accounts: AccountService,
   ) {}
 
-  @Post('session')
+  @Post(ROUTES.session)
   @HttpCode(200)
   session(@Req() request: FastifyRequest, @Body() body: unknown): SessionInfo {
     const header = request.headers.authorization ?? ''
@@ -50,16 +51,12 @@ export class InternalController {
     if (!given || !sameSecret({ given, expected: this.config.serviceToken })) {
       throw new UnauthorizedException({ reason: INTERNAL_ERRORS.serviceToken })
     }
-    const token =
-      typeof body === 'object' && body != null && 'token' in body && typeof body.token === 'string'
-        ? body.token
-        : null
+    const token = isRecord(body) && typeof body.token === 'string' ? body.token : null
     if (!token) throw new BadRequestException({ reason: INTERNAL_ERRORS.tokenRequired })
     const account = this.accounts.forToken(token)
     if (account.kind !== SESSION_KINDS.live) throw new NotFoundException({ reason: account.kind })
-    const { id, displayName, email, thumb } = account.user
     return {
-      user: { id, display_name: displayName, email, thumb },
+      user: toPublicUser(account.user),
       plex: account.plex,
       expires_at: account.expiresAt,
     }

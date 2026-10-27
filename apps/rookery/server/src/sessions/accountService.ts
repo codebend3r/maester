@@ -9,6 +9,21 @@ export type Account =
   | { kind: typeof SESSION_KINDS.unknown }
   | { kind: typeof SESSION_KINDS.expired }
 
+/** A user as the routes answer with them: the wire names, nothing from the login rows. */
+export type PublicUser = {
+  id: string
+  display_name: string
+  email: string | null
+  thumb: string | null
+}
+
+export const toPublicUser = ({ id, displayName, email, thumb }: User): PublicUser => ({
+  id,
+  display_name: displayName,
+  email,
+  thumb,
+})
+
 @Injectable()
 export class AccountService {
   constructor(
