@@ -96,6 +96,11 @@ type PlayedShareOfProps = { at: number; duration: number }
 export const playedShareOf = ({ at, duration }: PlayedShareOfProps): `${number}%` =>
   duration > 0 ? `${(within({ value: at, length: duration }) / duration) * 100}%` : '0%'
 
+type ScrubberAccessibilityOfProps = Pick<Transport, 'position' | 'onSeek'> & {
+  shown: number
+  duration: number
+}
+
 /**
  * What a screen reader makes of a scrubber: the time `shown` of the length, and a skip either
  * way from where the video is, so VoiceOver and TalkBack drive it as the remote and the thumb do.
@@ -105,7 +110,7 @@ export const scrubberAccessibilityOf = ({
   shown,
   duration,
   onSeek,
-}: Pick<Transport, 'position' | 'onSeek'> & { shown: number; duration: number }) => ({
+}: ScrubberAccessibilityOfProps) => ({
   accessible: true,
   accessibilityActions: SEEK_ACTION_LIST,
   accessibilityLabel: PLAYER_COPY.seek,

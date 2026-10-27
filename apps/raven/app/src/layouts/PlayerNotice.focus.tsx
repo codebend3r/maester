@@ -9,17 +9,15 @@ import { pictureStyles } from '@/theme/useTheme'
 
 const GUTTER = TV_SIZES.space8
 
+type PlayerNoticeProps = Pick<PlayerChromeProps, 'title' | 'notice' | 'onBack'>
+
 /**
  * A TV player while there is nothing to play (opening, refused, or no way left): the title and
  * the line stand alone with Back, which takes the remote's focus as it appears and lets go once
  * it has had it. Both TV chromes draw it until the video has a source. It is dark in every
  * theme, as the web's page for a video that cannot play, like the player it stands in for.
  */
-export const PlayerNotice = ({
-  title,
-  notice,
-  onBack,
-}: Pick<PlayerChromeProps, 'title' | 'notice' | 'onBack'>) => {
+export const PlayerNotice = ({ title, notice, onBack }: PlayerNoticeProps) => {
   const [isOpening, setOpening] = useState(true)
   const styles = useStyles()
   return (

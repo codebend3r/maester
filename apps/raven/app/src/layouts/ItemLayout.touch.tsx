@@ -292,8 +292,10 @@ const Cast = ({ title, cast }: CastProps) => (
   </Rail>
 )
 
+type TopProps = Pick<ItemPage['hero'], 'backdrop'> & { onBack: () => void }
+
 /** The backdrop across the top, under the way back; without one, room for the way back. */
-const Top = ({ backdrop, onBack }: Pick<ItemPage['hero'], 'backdrop'> & { onBack: () => void }) => {
+const Top = ({ backdrop, onBack }: TopProps) => {
   const styles = useStyles()
   const screen = useWindowDimensions()
   const insets = useSafeAreaInsets()
