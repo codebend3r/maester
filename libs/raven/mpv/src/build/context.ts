@@ -4,12 +4,16 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isString, listOf, object, type Infer } from '@raven/core'
 
-const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, NodeJS.Platform>
+export const PLATFORMS = {
+  darwin: 'darwin',
+  win32: 'win32',
+} as const satisfies Record<string, NodeJS.Platform>
 export const ARCHITECTURES = {
   arm64: 'arm64',
+  x64: 'x64',
 } as const satisfies Record<string, NodeJS.Architecture>
 /** The platform a native build is for, as its provenance records it. */
-export const BUILD_TARGETS = { darwinArm64: 'darwin-arm64' } as const
+export const BUILD_TARGETS = { darwinArm64: 'darwin-arm64', win32X64: 'win32-x64' } as const
 
 /** The patches applied to mpv's sources, in order; the build's provenance records each one's digest. */
 export const PATCHES = [
@@ -23,7 +27,9 @@ export const SHIPPED_LIBRARIES = ['libMoltenVK.dylib', 'libmpv.2.dylib'] as cons
 export const project = fileURLToPath(new URL('../..', import.meta.url))
 export const work = resolve(project, 'native-build')
 export const prefix = resolve(work, 'prefix')
-export const resources = resolve(project, 'resources/darwin-arm64')
+export const resources = resolve(project, `resources/${BUILD_TARGETS.darwinArm64}`)
+/** Where the Windows libmpv lands: the prebuilt DLL, its headers and their provenance. */
+export const windowsResources = resolve(project, `resources/${BUILD_TARGETS.win32X64}`)
 const isSourceShape = object({
   name: isString,
   repository: isString,
@@ -49,6 +55,28 @@ export const sources = async () => {
   )
   if (!listOf(isSource)(value)) throw new Error('Invalid native source lock')
   return value
+}
+
+type CheckedDownloadProps = {
+  path: string
+  url: string
+  sha256: string
+  /** What is being fetched, for the error. */
+  what: string
+}
+
+/** Downloads a pinned file once; a cached or fetched copy whose digest differs fails. */
+export const checkedDownload = async ({ path, url, sha256, what }: CheckedDownloadProps) => {
+  const file = Bun.file(path)
+  if (await file.exists()) {
+    if (digest(await file.bytes()) !== sha256) throw new Error(`Cached digest mismatch: ${what}`)
+    return
+  }
+  const response = await fetch(url, { signal: AbortSignal.timeout(120000) })
+  if (!response.ok) throw new Error(`Download failed: ${what} (${response.status})`)
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (digest(bytes) !== sha256) throw new Error(`Digest mismatch: ${what}`)
+  await write({ path, content: bytes })
 }
 
 type RunProps = {

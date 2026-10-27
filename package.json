@@ -52,6 +52,7 @@
     "lint:ts": "nx run-many -t lint:ts",
     "lint-staged": "lint-staged",
     "mpv:native": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} nx run-many -p @raven/mpv -t audit:native test:native",
+    "mpv:native:windows": "nx run @raven/mpv:audit:native:windows",
     "one-command-per-script": "nx run maester:one-command-per-script",
     "sandbox:luwin": "nx run-many -t sandbox -p @luwin/api @luwin/web",
     "spellcheck": "nx run maester:spellcheck",

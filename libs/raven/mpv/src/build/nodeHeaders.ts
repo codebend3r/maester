@@ -1,6 +1,6 @@
 import { cp, mkdir, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { digest, resources, run, work, write } from '@/build/context'
+import { checkedDownload, resources, run, work, write } from '@/build/context'
 
 // Header digest matches Node's official v24.19.0/SHASUMS256.txt.
 // The license digest was measured from the corresponding official tagged source.
@@ -16,31 +16,11 @@ export const nodeHeaders = {
   },
 } as const
 
-type CheckedDownloadProps = {
-  path: string
-  url: string
-  sha256: string
-}
-
-const checkedDownload = async ({ path, url, sha256 }: CheckedDownloadProps) => {
-  const file = Bun.file(path)
-  if (await file.exists()) {
-    if (digest(await file.bytes()) !== sha256)
-      throw new Error('Cached Node source checksum mismatch')
-    return
-  }
-  const response = await fetch(url, { signal: AbortSignal.timeout(120000) })
-  if (!response.ok) throw new Error(`Node source download failed (${response.status})`)
-  const bytes = new Uint8Array(await response.arrayBuffer())
-  if (digest(bytes) !== sha256) throw new Error('Node source checksum mismatch')
-  await write({ path, content: bytes })
-}
-
 export const fetchNodeHeaderSources = async () => {
   const archive = resolve(work, 'archives/node-headers.tar.gz')
   const license = resolve(work, 'archives/node-LICENSE')
-  await checkedDownload({ path: archive, ...nodeHeaders.archive })
-  await checkedDownload({ path: license, ...nodeHeaders.license })
+  await checkedDownload({ path: archive, ...nodeHeaders.archive, what: 'Node headers' })
+  await checkedDownload({ path: license, ...nodeHeaders.license, what: 'Node license' })
   return { archive, license }
 }
 
