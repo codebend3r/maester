@@ -77,7 +77,7 @@ class SeerrClient(HttpClient):
         ]
 
     async def media_details(self, media_type: str, tmdb_id: int) -> MediaDetails:
-        path = f"/api/v1/{'movie' if media_type == 'movie' else 'tv'}/{tmdb_id}"
+        path = f"/api/v1/{media_type}/{tmdb_id}"
         return MediaDetails.from_api(media_type, await self.get_json(path))
 
     async def collection(self, collection_id: int) -> Collection:
