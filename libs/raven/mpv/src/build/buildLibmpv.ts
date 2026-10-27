@@ -8,12 +8,15 @@ import { libmpvLinkLibraries, RPATHS, withLinkLibraries } from '@/build/linkage'
 import {
   BUILD_TARGETS,
   digest,
+  inSequence,
   output,
+  PATCHES,
   prefix,
   project,
   requireMacArm,
   resources,
   run,
+  SHIPPED_LIBRARIES,
   work,
   write,
 } from '@/build/context'
@@ -52,20 +55,22 @@ await rm(resolve(work, 'sources'), { recursive: true, force: true })
 await rm(prefix, { recursive: true, force: true })
 await rm(resources, { recursive: true, force: true })
 await mkdir(prefix, { recursive: true })
-await locked.reduce(async (previous, source) => {
-  await previous
-  await mkdir(src(source.name), { recursive: true })
-  await run({
-    args: [
-      'tar',
-      '-xzf',
-      resolve(work, 'archives', `${source.name}.tar.gz`),
-      '--strip-components=1',
-      '-C',
-      src(source.name),
-    ],
-  })
-}, Promise.resolve())
+await inSequence({
+  items: locked,
+  each: async (source) => {
+    await mkdir(src(source.name), { recursive: true })
+    await run({
+      args: [
+        'tar',
+        '-xzf',
+        resolve(work, 'archives', `${source.name}.tar.gz`),
+        '--strip-components=1',
+        '-C',
+        src(source.name),
+      ],
+    })
+  },
+})
 
 type MesonProps = {
   name: string
@@ -131,24 +136,26 @@ const cmake = async ({ name, options }: CmakeProps) => {
 // Stage every MoltenVK dependency from checked archives. Its fetchDependencies script
 // clones full repositories, so we reproduce its staging/build steps without network.
 const mvk = src('moltenvk')
-await [
-  'cereal',
-  'SPIRV-Cross',
-  'SPIRV-Headers',
-  'SPIRV-Tools',
-  'Volk',
-  'Vulkan-Headers',
-  'Vulkan-Tools',
-].reduce(async (previous, name) => {
-  await previous
-  const source = locked.find((entry) => entry.name === name)
-  if (!source) throw new Error(`Missing MoltenVK source: ${name}`)
-  const revision = (
-    await Bun.file(resolve(mvk, 'ExternalRevisions', `${name}_repo_revision`)).text()
-  ).trim()
-  if (revision !== source.commit) throw new Error(`MoltenVK revision mismatch: ${name}`)
-  await cp(src(name), resolve(mvk, 'External', name), { recursive: true })
-}, Promise.resolve())
+await inSequence({
+  items: [
+    'cereal',
+    'SPIRV-Cross',
+    'SPIRV-Headers',
+    'SPIRV-Tools',
+    'Volk',
+    'Vulkan-Headers',
+    'Vulkan-Tools',
+  ],
+  each: async (name) => {
+    const source = locked.find((entry) => entry.name === name)
+    if (!source) throw new Error(`Missing MoltenVK source: ${name}`)
+    const revision = (
+      await Bun.file(resolve(mvk, 'ExternalRevisions', `${name}_repo_revision`)).text()
+    ).trim()
+    if (revision !== source.commit) throw new Error(`MoltenVK revision mismatch: ${name}`)
+    await cp(src(name), resolve(mvk, 'External', name), { recursive: true })
+  },
+})
 await cp(src('SPIRV-Headers'), resolve(mvk, 'External/SPIRV-Tools/external/spirv-headers'), {
   recursive: true,
 })
@@ -162,10 +169,10 @@ await run({
     resolve(mvk, 'External/SPIRV-Tools'),
   ],
 })
-await moltenvkBuildCommands({ source: mvk, buildRoot: work }).reduce(async (previous, command) => {
-  await previous
-  await run({ ...command, env })
-}, Promise.resolve())
+await inSequence({
+  items: moltenvkBuildCommands({ source: mvk, buildRoot: work }),
+  each: (command) => run({ ...command, env }),
+})
 await mkdir(resolve(prefix, 'lib/pkgconfig'), { recursive: true })
 await mkdir(resolve(prefix, 'include'), { recursive: true })
 await cp(
@@ -229,10 +236,10 @@ await cmake({
     '-DENABLE_GLSLANG_BINARIES=OFF',
   ],
 })
-await ['fast_float', 'jinja', 'markupsafe', 'Vulkan-Headers'].reduce(async (previous, name) => {
-  await previous
-  await cp(src(name), resolve(src('libplacebo'), '3rdparty', name), { recursive: true })
-}, Promise.resolve())
+await inSequence({
+  items: ['fast_float', 'jinja', 'markupsafe', 'Vulkan-Headers'],
+  each: (name) => cp(src(name), resolve(src('libplacebo'), '3rdparty', name), { recursive: true }),
+})
 await meson({
   name: 'libplacebo',
   options: [
@@ -295,23 +302,19 @@ await run({
 await run({ args: ['make', '-j', jobs], cwd: src('ffmpeg'), env })
 await run({ args: ['make', 'install'], cwd: src('ffmpeg'), env })
 
-const patch = resolve(project, 'native/patches/0001-player-add-moltenvk-context.patch')
+// The first patch is MPVKit's own, so the copy here must match theirs byte for byte.
+const patch = resolve(project, 'native/patches', PATCHES[0])
 if (
   digest(await Bun.file(patch).bytes()) !==
   digest(
-    await Bun.file(
-      resolve(
-        src('mpvkit'),
-        'Sources/BuildScripts/patch/libmpv/0001-player-add-moltenvk-context.patch',
-      ),
-    ).bytes(),
+    await Bun.file(resolve(src('mpvkit'), 'Sources/BuildScripts/patch/libmpv', PATCHES[0])).bytes(),
   )
 )
   throw new Error('MPVKit patch provenance mismatch')
-await ['0001-player-add-moltenvk-context.patch', '0002-moltenvk-resize.patch'].reduce(
-  async (previous, name) => {
-    await previous
-    await run({
+await inSequence({
+  items: PATCHES,
+  each: (name) =>
+    run({
       args: [
         'patch',
         '-p1',
@@ -321,10 +324,8 @@ await ['0001-player-add-moltenvk-context.patch', '0002-moltenvk-resize.patch'].r
         resolve(project, 'native/patches', name),
       ],
       cwd: src('mpv'),
-    })
-  },
-  Promise.resolve(),
-)
+    }),
+})
 await meson({
   name: 'mpv',
   stepEnv: withLinkLibraries({ env, libraries: libmpvLinkLibraries }),
@@ -379,18 +380,20 @@ await run({
   ],
 })
 // Each library resolves its sibling without DYLD_LIBRARY_PATH or a host Vulkan loader.
-await ['libMoltenVK.dylib', 'libmpv.2.dylib'].reduce(async (previous, name) => {
-  await previous
-  const path = resolve(resources, 'lib', name)
-  const commands = await output({ args: ['otool', '-l', path] })
-  const rpaths = [...commands.matchAll(/cmd LC_RPATH\s+cmdsize \d+\s+path (\S+) /g)].map(
-    (match) => match[1],
-  )
-  await rpaths.reduce(async (prior, rpath) => {
-    await prior
-    await run({ args: ['install_name_tool', '-delete_rpath', rpath, path] })
-  }, Promise.resolve())
-}, Promise.resolve())
+await inSequence({
+  items: SHIPPED_LIBRARIES,
+  each: async (name) => {
+    const path = resolve(resources, 'lib', name)
+    const commands = await output({ args: ['otool', '-l', path] })
+    const rpaths = [...commands.matchAll(/cmd LC_RPATH\s+cmdsize \d+\s+path (\S+) /g)].map(
+      (match) => match[1],
+    )
+    await inSequence({
+      items: rpaths,
+      each: (rpath) => run({ args: ['install_name_tool', '-delete_rpath', rpath, path] }),
+    })
+  },
+})
 await run({
   args: [
     'install_name_tool',
@@ -399,10 +402,11 @@ await run({
     resolve(resources, 'lib/libmpv.2.dylib'),
   ],
 })
-await ['libMoltenVK.dylib', 'libmpv.2.dylib'].reduce(async (previous, name) => {
-  await previous
-  await run({ args: ['codesign', '--force', '--sign', '-', resolve(resources, 'lib', name)] })
-}, Promise.resolve())
+await inSequence({
+  items: SHIPPED_LIBRARIES,
+  each: (name) =>
+    run({ args: ['codesign', '--force', '--sign', '-', resolve(resources, 'lib', name)] }),
+})
 
 const sourceBundle = resolve(work, 'source-bundle')
 await rm(sourceBundle, { recursive: true, force: true })
@@ -411,24 +415,26 @@ await write({
   path: resolve(resources, 'provenance/sources.json'),
   content: JSON.stringify(locked, null, 2) + '\n',
 })
-await locked.reduce(async (previous, source) => {
-  await previous
-  const paths = Array.from(
-    new Bun.Glob('**/{LICENSE*,COPYING*,COPYRIGHT*,Copyright*,NOTICE*,FTL.TXT}').scanSync({
-      cwd: src(source.name),
-      onlyFiles: true,
-    }),
-  )
-  if (paths.length === 0) throw new Error(`No license notices found for ${source.name}`)
-  await paths
-    .filter((path) => !path.includes('_build/'))
-    .reduce(async (prior, path) => {
-      await prior
-      const destination = resolve(resources, 'provenance/licenses', source.name, path)
-      await mkdir(dirname(destination), { recursive: true })
-      await cp(resolve(src(source.name), path), destination)
-    }, Promise.resolve())
-}, Promise.resolve())
+await inSequence({
+  items: locked,
+  each: async (source) => {
+    const paths = Array.from(
+      new Bun.Glob('**/{LICENSE*,COPYING*,COPYRIGHT*,Copyright*,NOTICE*,FTL.TXT}').scanSync({
+        cwd: src(source.name),
+        onlyFiles: true,
+      }),
+    )
+    if (paths.length === 0) throw new Error(`No license notices found for ${source.name}`)
+    await inSequence({
+      items: paths.filter((path) => !path.includes('_build/')),
+      each: async (path) => {
+        const destination = resolve(resources, 'provenance/licenses', source.name, path)
+        await mkdir(dirname(destination), { recursive: true })
+        await cp(resolve(src(source.name), path), destination)
+      },
+    })
+  },
+})
 await write({
   path: resolve(resources, 'provenance/build.json'),
   content:
@@ -441,12 +447,10 @@ await write({
         sdk,
         clang: await output({ args: [env.CC, '--version'] }),
         patches: await Promise.all(
-          ['0001-player-add-moltenvk-context.patch', '0002-moltenvk-resize.patch'].map(
-            async (name) => ({
-              name,
-              sha256: digest(await Bun.file(resolve(project, 'native/patches', name)).bytes()),
-            }),
-          ),
+          PATCHES.map(async (name) => ({
+            name,
+            sha256: digest(await Bun.file(resolve(project, 'native/patches', name)).bytes()),
+          })),
         ),
       },
       null,

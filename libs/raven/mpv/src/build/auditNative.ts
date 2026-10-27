@@ -6,7 +6,9 @@ import { parseDefinitions, parseImports, symbolProblems, type AuditedFile } from
 import {
   ARCHITECTURES,
   digest,
+  inSequence,
   output,
+  PATCHES,
   project,
   requireMacArm,
   resources,
@@ -41,12 +43,14 @@ export const auditNative = async ({ requireAddon = true }: AuditNativeProps = {}
     ...(requireAddon ? ['raven_mpv.node' as const] : []),
   ]
   const locked = await sources()
-  await locked.reduce(async (previous, source) => {
-    await previous
-    const file = Bun.file(resolve(work, 'source-bundle/archives', `${source.name}.tar.gz`))
-    if (!(await file.exists()) || digest(await file.bytes()) !== source.sha256)
-      throw new Error(`Missing matching source archive: ${source.name}`)
-  }, Promise.resolve())
+  await inSequence({
+    items: locked,
+    each: async (source) => {
+      const file = Bun.file(resolve(work, 'source-bundle/archives', `${source.name}.tar.gz`))
+      if (!(await file.exists()) || digest(await file.bytes()) !== source.sha256)
+        throw new Error(`Missing matching source archive: ${source.name}`)
+    },
+  })
   const provenance: unknown = JSON.parse(
     await Bun.file(resolve(resources, 'provenance/sources.json')).text(),
   )
@@ -70,23 +74,25 @@ export const auditNative = async ({ requireAddon = true }: AuditNativeProps = {}
   )
     throw new Error('Native source receipt mismatch')
   const patches = await Promise.all(
-    ['0001-player-add-moltenvk-context.patch', '0002-moltenvk-resize.patch'].map(async (name) => ({
+    PATCHES.map(async (name) => ({
       name,
       sha256: digest(await Bun.file(resolve(project, 'native/patches', name)).bytes()),
     })),
   )
   if (JSON.stringify(build.patches) !== JSON.stringify(patches))
     throw new Error('Native patch provenance mismatch')
-  await locked.reduce(async (previous, source) => {
-    await previous
-    const notices = Array.from(
-      new Bun.Glob('**/*').scanSync({
-        cwd: resolve(resources, 'provenance/licenses', source.name),
-        onlyFiles: true,
-      }),
-    )
-    if (notices.length === 0) throw new Error(`Missing license notices: ${source.name}`)
-  }, Promise.resolve())
+  await inSequence({
+    items: locked,
+    each: async (source) => {
+      const notices = Array.from(
+        new Bun.Glob('**/*').scanSync({
+          cwd: resolve(resources, 'provenance/licenses', source.name),
+          onlyFiles: true,
+        }),
+      )
+      if (notices.length === 0) throw new Error(`Missing license notices: ${source.name}`)
+    },
+  })
   if (requireAddon) {
     if (
       digest(

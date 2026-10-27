@@ -8,7 +8,9 @@ from luwin.tools.gaps import find_gaps, gaps_in
 from tests.playback_world import stock
 
 NOW = datetime(2026, 9, 27, tzinfo=UTC)
-AIRED, FUTURE = NOW - timedelta(days=400), NOW + timedelta(days=30)
+AIRED = NOW - timedelta(days=400)
+# `find_gaps` reads the real clock, so an episode yet to air must be ahead of today, not of NOW.
+FUTURE = datetime.now(UTC) + timedelta(days=30)
 
 
 def episode(id, season, number, *, has_file=True, monitored=True, aired=AIRED):

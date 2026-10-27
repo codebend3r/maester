@@ -6,12 +6,24 @@ import {
   isString,
   keyOf,
   listOf,
+  matching,
   nullable,
   object,
   oneOf,
   optional,
   union,
 } from '@/schema'
+
+describe('matching', () => {
+  const isDigits = matching(/^\d+$/)
+
+  it('takes a string the pattern matches, and nothing else', () => {
+    expect(isDigits('603')).toBe(true)
+    expect(isDigits('tv:603')).toBe(false)
+    expect(isDigits(603)).toBe(false)
+    expect(isDigits(null)).toBe(false)
+  })
+})
 
 describe('oneOf', () => {
   const isSize = oneOf(['small', 'large', 3])
