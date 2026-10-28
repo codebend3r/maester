@@ -1,6 +1,6 @@
 {
   "name": "@raven/desktop",
-  "version": "0.7.6",
+  "version": "0.7.7",
   "private": true,
   "description": "Raven: local videos under raven's own controls",
   "type": "module",
