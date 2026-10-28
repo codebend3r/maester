@@ -236,6 +236,8 @@ describe('AppShell', () => {
       'trophy',
       'youtube',
       'video',
+      'music',
+      'audiobook',
     ])
   })
 

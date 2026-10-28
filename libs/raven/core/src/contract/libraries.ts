@@ -88,6 +88,8 @@ export const LIBRARY_KINDS = {
   sports: 'sports',
   youtube: 'youtube',
   other: 'other',
+  music: 'music',
+  audiobooks: 'audiobooks',
 } as const
 
 export const isLibraryKind = oneOf(Object.values(LIBRARY_KINDS))

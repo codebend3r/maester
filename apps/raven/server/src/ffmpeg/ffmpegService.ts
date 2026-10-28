@@ -101,8 +101,9 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
 
   /**
    * The seconds of the file's video keyframes, ascending and cut to three
-   * decimals. ffprobe lists packets without decoding them, but it still
-   * reads the whole file, so it has its own time limit.
+   * decimals; `V` reads the real video, never cover art. ffprobe lists
+   * packets without decoding them, but it still reads the whole file, so it
+   * has its own time limit.
    */
   async probeKeyframes(path: string): Promise<number[]> {
     try {
@@ -112,7 +113,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
           '-v',
           'error',
           '-select_streams',
-          'v:0',
+          'V:0',
           '-show_entries',
           'packet=pts_time,flags',
           '-of',

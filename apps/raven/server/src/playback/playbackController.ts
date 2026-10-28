@@ -20,6 +20,7 @@ import {
   type MediaTracks,
   STREAM_TIME_SHIFT,
   TRANSCODINGS,
+  isAudioContainer,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS, wholeNumber, CACHE_POLICIES } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
@@ -193,6 +194,7 @@ export class PlaybackController {
         start: from,
         mode: streamMode,
         audio: chosen?.index ?? null,
+        audioOnly: isAudioContainer(file.container),
         videoCodec: file.videoCodec,
         tonemap,
         streamShift: STREAM_TIME_SHIFT,

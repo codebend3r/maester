@@ -8,7 +8,14 @@ import {
   STREAM_TIME_SHIFT,
   type StreamMode,
 } from '@raven/core'
-import { QUIET, type TranscodeQuality, copyVideo, secondsArg, transcodeVideo } from '@/ffmpeg/args'
+import {
+  QUIET,
+  type TranscodeQuality,
+  VIDEO_STREAM,
+  copyVideo,
+  secondsArg,
+  transcodeVideo,
+} from '@/ffmpeg/args'
 import type { VideoEncoder } from '@/ffmpeg/encoder'
 import { type HlsDialect, SEGMENT_CLOCKS } from '@/ffmpeg/ffmpegVersion'
 import { SEGMENT_FILE_PATTERN } from '@/hls/segmentFiles'
@@ -233,7 +240,7 @@ export const hlsArgs = ({
     '-copypriorss',
     '0',
     '-map',
-    '0:v:0',
+    VIDEO_STREAM,
     ...(audio == null ? [] : ['-map', `${cut.audioInput}:a:${audio.index}`]),
     ...video.output,
     ...cut.video,

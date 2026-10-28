@@ -1,4 +1,9 @@
-/** Extensions the scanner indexes. Anything else under a library path is ignored. */
+/** What a library holds: videos, or audio files. Its type decides which. */
+export const MEDIA_TYPES = { video: 'video', audio: 'audio' } as const
+
+export type MediaType = (typeof MEDIA_TYPES)[keyof typeof MEDIA_TYPES]
+
+/** Extensions the scanner indexes in a video library. Anything else under a library path is ignored. */
 export const VIDEO_EXTENSIONS: readonly string[] = [
   '3gp',
   'avi',
@@ -17,6 +22,30 @@ export const VIDEO_EXTENSIONS: readonly string[] = [
   'wmv',
 ]
 
+/** Extensions the scanner indexes in an audio library. */
+const AUDIO_EXTENSIONS: readonly string[] = [
+  'aac',
+  'aif',
+  'aiff',
+  'ape',
+  'dsf',
+  'flac',
+  'm4a',
+  'm4b',
+  'mp3',
+  'oga',
+  'ogg',
+  'opus',
+  'wav',
+  'wv',
+]
+
+/** The extensions each type of media is indexed by. */
+export const MEDIA_EXTENSIONS = {
+  [MEDIA_TYPES.video]: VIDEO_EXTENSIONS,
+  [MEDIA_TYPES.audio]: AUDIO_EXTENSIONS,
+} as const satisfies Record<MediaType, readonly string[]>
+
 /** The lowercased extension without its dot, or '' when the name has none. */
 export const extensionOf = (fileName: string): string => {
   const dot = fileName.lastIndexOf('.')
@@ -26,6 +55,9 @@ export const extensionOf = (fileName: string): string => {
 export const isVideoFile = (fileName: string): boolean =>
   VIDEO_EXTENSIONS.includes(extensionOf(fileName))
 
+/** Whether a container, as `containerOf` names it, is an audio file's. */
+export const isAudioContainer = (container: string): boolean => AUDIO_EXTENSIONS.includes(container)
+
 /**
  * The container a file is played back as. Taken from the extension rather
  * than ffprobe's `format_name`, which reports 'matroska,webm' for both .mkv
@@ -34,7 +66,14 @@ export const isVideoFile = (fileName: string): boolean =>
  */
 export const containerOf = (fileName: string): string => {
   const extension = extensionOf(fileName)
-  const aliases: Record<string, string> = { m4v: 'mp4', mpeg: 'mpg', mts: 'm2ts' }
+  const aliases: Record<string, string> = {
+    m4v: 'mp4',
+    mpeg: 'mpg',
+    mts: 'm2ts',
+    m4b: 'm4a',
+    oga: 'ogg',
+    aif: 'aiff',
+  }
   return aliases[extension] ?? extension
 }
 

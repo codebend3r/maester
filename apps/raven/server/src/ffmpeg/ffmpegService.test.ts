@@ -108,7 +108,7 @@ describe('FfmpegService', () => {
   it("lists a file's video keyframes from ffprobe's packets, without decoding", async () => {
     expect(await service('packets').probeKeyframes('/media/a.mkv')).toEqual([0, 2])
     expect(await readFile(join(state.dir, 'packets.args'), 'utf8')).toBe(
-      '-v error -select_streams v:0 -show_entries packet=pts_time,flags -of csv=p=0 /media/a.mkv\n',
+      '-v error -select_streams V:0 -show_entries packet=pts_time,flags -of csv=p=0 /media/a.mkv\n',
     )
   })
 

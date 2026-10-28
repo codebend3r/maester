@@ -77,7 +77,7 @@ describe('hlsArgs', () => {
       '-copypriorss',
       '0',
       '-map',
-      '0:v:0',
+      '0:V:0',
       '-map',
       '0:a:1',
       '-c:v',

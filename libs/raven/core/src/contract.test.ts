@@ -177,7 +177,7 @@ describe('isLibrary', () => {
   })
 
   it('rejects a library whose type is not one of the three', () => {
-    expect(isLibrary({ ...library(), settings: { ...library().settings, kind: 'music' } })).toBe(
+    expect(isLibrary({ ...library(), settings: { ...library().settings, kind: 'podcasts' } })).toBe(
       false,
     )
   })

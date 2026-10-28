@@ -5,7 +5,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common'
-import { SCAN_KINDS, SCAN_STATES, type ScanStatus } from '@raven/core'
+import { SCAN_KINDS, SCAN_STATES, type ScanStatus, extensionsFor } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import { errorMessage } from '@/errorMessage'
@@ -570,6 +570,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     const indexed = this.index.forLibrary(library.id)
     const walk = await walkVideos({
       roots: library.paths,
+      extensions: extensionsFor(library.settings.kind),
       places: scope.kind === SCOPE_KINDS.places ? scope.places : library.paths,
       signal,
       onFound,

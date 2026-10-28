@@ -59,6 +59,7 @@ it('delivers one-second remux fragments even when the source keyframes are six s
         start: 0,
         mode: PLAYBACK_MODES.remux,
         audio: 0,
+        audioOnly: false,
         videoCodec: 'h264',
         tonemap: false,
         streamShift: 1,
@@ -84,6 +85,77 @@ it('delivers one-second remux fragments even when the source keyframes are six s
     ])
     expect(decoded.stderr).toBe('')
     expect(Number(decoded.stdout.trim())).toBe(192)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('streams an audio file with cover art as one-second fragments of its audio alone', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'raven-fragments-'))
+  try {
+    const cover = join(root, 'cover.jpg')
+    await run('ffmpeg', [
+      '-v',
+      'error',
+      '-f',
+      'lavfi',
+      '-i',
+      'color=red:size=64x64',
+      '-frames:v',
+      '1',
+      cover,
+    ])
+    const input = join(root, 'song.mp3')
+    await run('ffmpeg', [
+      '-v',
+      'error',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=sample_rate=44100:duration=8',
+      '-i',
+      cover,
+      '-map',
+      '0',
+      '-map',
+      '1',
+      '-c:a',
+      'libmp3lame',
+      '-c:v',
+      'copy',
+      '-disposition:v:0',
+      'attached_pic',
+      input,
+    ])
+    const { stdout } = await run(
+      'ffmpeg',
+      streamArgs({
+        input,
+        start: 0,
+        mode: PLAYBACK_MODES.remux,
+        audio: 0,
+        audioOnly: true,
+        videoCodec: null,
+        tonemap: false,
+        streamShift: 1,
+      }),
+      { encoding: 'buffer', maxBuffer: 8 * 1024 * 1024 },
+    )
+    const fragments = boxes({ bytes: stdout }).filter((type) => type === BOX_TYPES.fragment)
+    expect(fragments.length).toBeGreaterThanOrEqual(8)
+    expect(fragments.length).toBeLessThanOrEqual(10)
+    const output = join(root, 'stream.mp4')
+    await writeFile(output, stdout)
+    const streams = await run('ffprobe', [
+      '-v',
+      'error',
+      '-show_entries',
+      'stream=codec_type,codec_name',
+      '-of',
+      'csv=p=0',
+      output,
+    ])
+    expect(streams.stdout.trim()).toBe('aac,audio')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

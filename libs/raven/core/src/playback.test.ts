@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   type PlaybackPolicy,
   checkDirectPlay,
+  containerMimeType,
   offeredQualities,
   planPlayback,
   streamMimeType,
@@ -238,10 +239,50 @@ describe('streamMimeType', () => {
     )
   })
 
+  it('streams an audio file as AAC audio alone', () => {
+    const media = mediaItem({ container: 'flac', videoCodec: null, audioCodec: 'flac' })
+    expect(streamMimeType({ media, mode: 'remux' })).toBe('audio/mp4; codecs="mp4a.40.2"')
+  })
+
   it('leaves the audio out when the file has none', () => {
     expect(streamMimeType({ media: mediaItem({ audioCodec: null }), mode: 'remux' })).toBe(
       'video/mp4; codecs="avc1.640028"',
     )
+  })
+})
+
+describe('containerMimeType', () => {
+  it('serves audio files as their audio types', () => {
+    expect(containerMimeType('mp3')).toBe('audio/mpeg')
+    expect(containerMimeType('m4a')).toBe('audio/mp4')
+    expect(containerMimeType('flac')).toBe('audio/flac')
+    expect(containerMimeType('opus')).toBe('audio/ogg')
+    expect(containerMimeType('ape')).toBeNull()
+  })
+})
+
+describe('an audio file', () => {
+  const flac = mediaItem({
+    container: 'flac',
+    videoCodec: null,
+    videoBitDepth: null,
+    width: null,
+    height: null,
+    audioCodec: 'flac',
+    bitrate: 900_000,
+  })
+  const standard: PlaybackPolicy = { directPlay: 'auto', transcoding: 'on' }
+
+  it('plays as it is where it can, and is otherwise converted once, with no transcode', () => {
+    const everything = (): boolean => true
+    const nothing = (): boolean => false
+    const base = { media: flac, canStream: everything, defaultAudio: true, policy: standard }
+    expect(planPlayback({ ...base, canPlay: everything }).modes).toEqual(['direct', 'remux'])
+    expect(planPlayback({ ...base, canPlay: nothing }).modes).toEqual(['remux'])
+  })
+
+  it('is offered no sizes to convert down to', () => {
+    expect(offeredQualities({ media: flac, maxHeight: 2160 })).toEqual([])
   })
 })
 

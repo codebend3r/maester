@@ -1,7 +1,7 @@
 import type { Dirent } from 'node:fs'
 import { lstat, readdir, stat } from 'node:fs/promises'
 import { basename, join, relative, sep } from 'node:path'
-import { extensionOf, isVideoFile } from '@raven/core'
+import { extensionOf } from '@raven/core'
 import { type Gate, createGate, mapWithConcurrency } from '@/scanner/concurrency'
 
 /**
@@ -43,7 +43,14 @@ const isSample = (fileName: string): boolean => {
   return /(^|[-._ ])sample$/i.test(stem)
 }
 
-const isIndexed = (fileName: string): boolean => isVideoFile(fileName) && !isSample(fileName)
+type IsIndexedProps = {
+  fileName: string
+  /** The extensions the library indexes: its videos, or its audio files. */
+  extensions: readonly string[]
+}
+
+const isIndexed = ({ fileName, extensions }: IsIndexedProps): boolean =>
+  extensions.includes(extensionOf(fileName)) && !isSample(fileName)
 
 /** A video file a walk found, with what the scanner diffs against the index. */
 export type FoundFile = {
@@ -110,9 +117,9 @@ const classify = async ({ dir, entry, gate }: ClassifyProps): Promise<EntryKind 
   return target?.isFile() ? ENTRY_KINDS.file : null
 }
 
-type ListProps = { dir: string; gate: Gate }
+type ListProps = { dir: string; gate: Gate; extensions: readonly string[] }
 
-const list = async ({ dir, gate }: ListProps): Promise<Listing> => {
+const list = async ({ dir, gate, extensions }: ListProps): Promise<Listing> => {
   try {
     const entries = await gate.run(() => readdir(dir, { withFileTypes: true }))
     const kinds = await Promise.all(
@@ -125,7 +132,10 @@ const list = async ({ dir, gate }: ListProps): Promise<Listing> => {
         .filter(({ kind }) => kind === ENTRY_KINDS.dir)
         .map(({ entry }) => join(dir, entry.name)),
       files: kinds
-        .filter(({ kind, entry }) => kind === ENTRY_KINDS.file && isIndexed(entry.name))
+        .filter(
+          ({ kind, entry }) =>
+            kind === ENTRY_KINDS.file && isIndexed({ fileName: entry.name, extensions }),
+        )
         .map(({ entry }) => join(dir, entry.name)),
       error: null,
     }
@@ -140,12 +150,19 @@ type WalkTreeProps = {
   root: string
   limit: number
   gate: Gate
+  extensions: readonly string[]
   /** Told how many videos each folder held, as each is read. */
   onFound?: (count: number) => void
 }
 
 /** Breadth-first, one level at a time, so no more than `limit` folders are open at once. */
-const walkTree = async ({ root, limit, gate, onFound }: WalkTreeProps): Promise<Tree> => {
+const walkTree = async ({
+  root,
+  limit,
+  gate,
+  extensions,
+  onFound,
+}: WalkTreeProps): Promise<Tree> => {
   const level = async ({
     dirs,
     files,
@@ -157,7 +174,7 @@ const walkTree = async ({ root, limit, gate, onFound }: WalkTreeProps): Promise<
       items: dirs,
       limit,
       fn: async (dir) => {
-        const listing = await list({ dir, gate })
+        const listing = await list({ dir, gate, extensions })
         if (listing.files.length > 0) onFound?.(listing.files.length)
         return listing
       },
@@ -170,7 +187,7 @@ const walkTree = async ({ root, limit, gate, onFound }: WalkTreeProps): Promise<
     })
   }
 
-  const top = await list({ dir: root, gate })
+  const top = await list({ dir: root, gate, extensions })
   if (top.error) return { files: [], folders: [], errors: [top.error], readable: false }
   if (top.files.length > 0) onFound?.(top.files.length)
   const rest = await level({ dirs: top.dirs, files: top.files, folders: [root], errors: [] })
@@ -188,7 +205,8 @@ export const foldersUnder = async ({
   root,
   limit = 16,
   gate = SCAN_FILESYSTEM,
-}: FoldersUnderProps): Promise<string[]> => (await walkTree({ root, limit, gate })).folders
+}: FoldersUnderProps): Promise<string[]> =>
+  (await walkTree({ root, limit, gate, extensions: [] })).folders
 
 type KindOfProps = {
   place: string
@@ -217,23 +235,32 @@ type LookAtProps = {
   root: string
   limit: number
   gate: Gate
+  extensions: readonly string[]
   onFound?: (count: number) => void
 }
 
 /**
- * The videos at one place under a library path. A folder is walked and a
+ * The media files at one place under a library path. A folder is walked and a
  * file taken as it is. A place that is not there holds nothing, so what the
  * index had there has gone, unless its library path is missing too, which
  * says the share is down rather than the files deleted.
  */
-const lookAt = async ({ place, root, limit, gate, onFound }: LookAtProps): Promise<Look> => {
+const lookAt = async ({
+  place,
+  root,
+  limit,
+  gate,
+  extensions,
+  onFound,
+}: LookAtProps): Promise<Look> => {
   const kind = await kindOf({ place, root, gate })
   if (kind === ENTRY_KINDS.dir) {
-    const tree = await walkTree({ root: place, limit, gate, onFound })
+    const tree = await walkTree({ root: place, limit, gate, extensions, onFound })
     return { files: tree.files, errors: tree.errors, unreadable: tree.readable ? null : place }
   }
   if (kind === ENTRY_KINDS.file) {
-    return { files: isIndexed(basename(place)) ? [place] : [], errors: [], unreadable: null }
+    const files = isIndexed({ fileName: basename(place), extensions }) ? [place] : []
+    return { files, errors: [], unreadable: null }
   }
   const rootThere =
     place !== root && (await kindOf({ place: root, root, gate })) === ENTRY_KINDS.dir
@@ -245,6 +272,8 @@ export type KnownStats = Pick<FoundFile, 'size' | 'mtimeMs'>
 
 type WalkVideosProps = {
   roots: readonly string[]
+  /** The extensions the library indexes, by its type: `extensionsFor`. */
+  extensions: readonly string[]
   places?: readonly string[]
   limit?: number
   gate?: Gate
@@ -257,7 +286,7 @@ type WalkVideosProps = {
 }
 
 /**
- * Every video file at the given places under a library's paths, with the
+ * Every media file of the library's type at the given places under its paths, with the
  * size and mtime the scanner diffs against the index; a full scan's places
  * are the paths themselves. Places outside the paths, or in a folder the
  * walk skips, are passed over. A file reachable from two overlapping paths
@@ -268,6 +297,7 @@ type WalkVideosProps = {
  */
 export const walkVideos = async ({
   roots,
+  extensions,
   places = roots,
   limit = 16,
   gate: sharedGate = SCAN_FILESYSTEM,
@@ -292,7 +322,7 @@ export const walkVideos = async ({
       })
       .map(async ({ place, root }) => ({
         root,
-        ...(await lookAt({ place, root, limit, gate, onFound })),
+        ...(await lookAt({ place, root, limit, gate, extensions, onFound })),
       })),
   )
   const seen = new Set<string>()

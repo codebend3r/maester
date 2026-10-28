@@ -13,6 +13,7 @@ import {
   type VideoRange,
   isStreamQuality,
 } from '@/contract'
+import { isAudioContainer } from '@/media'
 
 /**
  * Asks the client whether it can decode a MIME type such as
@@ -93,7 +94,8 @@ export const VIDEO_RANGE_LABELS = {
 /**
  * The MIME type a container is served and checked as. MOV and M4V are the
  * same ISO media format as MP4, and browsers that refuse video/quicktime
- * play the bytes fine as video/mp4.
+ * play the bytes fine as video/mp4. An audio file's is its audio type; an
+ * Opus file is Ogg inside.
  */
 export const containerMimeType = (container: string): string | null => {
   const types: Record<string, string> = {
@@ -109,6 +111,14 @@ export const containerMimeType = (container: string): string | null => {
     wmv: 'video/x-ms-wmv',
     flv: 'video/x-flv',
     mpg: 'video/mpeg',
+    mp3: 'audio/mpeg',
+    m4a: 'audio/mp4',
+    aac: 'audio/aac',
+    flac: 'audio/flac',
+    ogg: 'audio/ogg',
+    opus: 'audio/ogg',
+    wav: 'audio/wav',
+    aiff: 'audio/aiff',
   }
   return types[container] ?? null
 }
@@ -214,9 +224,11 @@ type StreamMimeTypeProps = { media: MediaItem; mode: StreamMode }
 /**
  * The MIME type a converted stream is fed to Media Source Extensions as.
  * A transcode is always 8-bit H.264; a remux keeps the file's video, or is
- * assumed to be H.264 when the file has not been probed yet.
+ * assumed to be H.264 when the file has not been probed yet. An audio
+ * file's stream is its audio alone.
  */
 export const streamMimeType = ({ media, mode }: StreamMimeTypeProps): string => {
+  if (isAudioContainer(media.container)) return `audio/mp4; codecs="${STREAM_AUDIO}"`
   const video =
     mode === PLAYBACK_MODES.transcode || media.videoCodec == null
       ? videoCodecString({ codec: 'h264', bitDepth: 8 })
@@ -281,7 +293,9 @@ export const planPlayback = ({
     policy.transcoding !== TRANSCODINGS.off &&
     (media.videoCodec == null || COPYABLE_VIDEO.has(media.videoCodec)) &&
     canStream(streamMimeType({ media, mode: PLAYBACK_MODES.remux }))
+  // An audio file has no video to transcode, so its remux is its only conversion.
   const transcode =
+    !isAudioContainer(media.container) &&
     policy.transcoding === TRANSCODINGS.on &&
     canStream(streamMimeType({ media, mode: PLAYBACK_MODES.transcode }))
   // Forced, the original file is sent whatever the check says. Only another
@@ -315,19 +329,22 @@ type OfferedQualitiesProps = {
  * The sizes a viewer can convert a file down to: the ones smaller than the
  * file, in frame and in bitrate where the file's is known, and not over the
  * height the server's settings cap a transcode at. Largest first. A file
- * not probed yet has no size to be under, so it is offered every one.
+ * not probed yet has no size to be under, so it is offered every one. An
+ * audio file has no frame, so it is offered none.
  */
 export const offeredQualities = ({ media, maxHeight }: OfferedQualitiesProps): StreamQuality[] =>
-  isStreamQuality.values
-    .filter((key) => {
-      const size = STREAM_QUALITIES[key]
-      return (
-        size.height <= maxHeight &&
-        size.height <= (media.height ?? Infinity) &&
-        size.bitrate < (media.bitrate ?? Infinity)
-      )
-    })
-    .toSorted((a, b) => STREAM_QUALITIES[b].bitrate - STREAM_QUALITIES[a].bitrate)
+  isAudioContainer(media.container)
+    ? []
+    : isStreamQuality.values
+        .filter((key) => {
+          const size = STREAM_QUALITIES[key]
+          return (
+            size.height <= maxHeight &&
+            size.height <= (media.height ?? Infinity) &&
+            size.bitrate < (media.bitrate ?? Infinity)
+          )
+        })
+        .toSorted((a, b) => STREAM_QUALITIES[b].bitrate - STREAM_QUALITIES[a].bitrate)
 
 /** What each mode means for the viewer, for the settings menu. */
 export const describeMode = (mode: PlaybackMode): string => {
