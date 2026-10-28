@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
-import { DESKTOP_EVENTS, DESKTOP_REPLIES, DESKTOP_REQUESTS, type DesktopEvent } from '@raven/core'
+import {
+  DESKTOP_EVENTS,
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  type DesktopEvent,
+  WINDOW_CHROMES,
+} from '@raven/core'
 import { clientFor } from '@/desktop/client'
 
 const REFUSED = {
@@ -24,6 +30,7 @@ const bridgeOf = ({
       listeners.push(listener)
       return () => undefined
     },
+    windowChrome: WINDOW_CHROMES.drawn,
     push: (event: unknown) => listeners.forEach((listener) => listener(event)),
   }
 }
@@ -32,6 +39,10 @@ describe('clientFor', () => {
   const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
 
   afterEach(() => warn.mockClear())
+
+  it("carries the bridge's window chrome", () => {
+    expect(clientFor(bridgeOf())?.windowChrome).toBe(WINDOW_CHROMES.drawn)
+  })
 
   it('has no client where there is no bridge, as in a browser', () => {
     expect(clientFor(undefined)).toBeNull()

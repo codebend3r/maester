@@ -102,6 +102,7 @@ import { createNodeTimers } from '@/main/timers'
 import { createMenuCheck, createUpdateService, updateSourceFrom } from '@/main/updateService'
 import { checkForUpdates } from '@/main/updates'
 import { linkOriginsFrom, serverOriginFrom } from '@/main/origins'
+import { controlWindow } from '@/main/windowChrome'
 import { IPC_CHANNELS } from '@/shared/hostNames'
 
 const launchedAt = performance.now()
@@ -586,6 +587,11 @@ const startApp = (): void => {
         const window = liveWindow()
         if (window === null) return
         showWindowButtons({ window, isVisible })
+      },
+      controlWindow: (action) => {
+        const window = liveWindow()
+        if (window === null) return
+        controlWindow({ window, action })
       },
       config,
       links: createLinkOpener({

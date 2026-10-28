@@ -11,6 +11,7 @@ import { useOpenReply } from '@/desktop/openReply'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { useFollowServerReach, useReturnWhenReached } from '@/desktop/serverReach'
 import { useFileDrop } from '@/desktop/useFileDrop'
+import { WindowControls } from '@/desktop/WindowControls/WindowControls'
 import { useDesktop } from '@/stores/desktop'
 import { useDownloadAsk } from '@/stores/downloadAsk'
 import { handled } from '@/desktop/handled'
@@ -83,6 +84,7 @@ export const DesktopHost = () => {
 
   return (
     <>
+      <WindowControls />
       {isOpenLinkShown && <OpenLinkDialog onClose={() => setIsOpenLinkShown(false)} />}
       {shownAsk !== null && (
         <DownloadDialog key={shownAsk.instance} ask={shownAsk.ask} onClose={closeAsk} />

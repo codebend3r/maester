@@ -1,9 +1,20 @@
-import { PAGE_ORIGIN, PLAYER_CONNECTION_STATUSES, WINDOW_MESSAGE_TYPES } from '@raven/core'
+import {
+  PAGE_ORIGIN,
+  PLAYER_CONNECTION_STATUSES,
+  WINDOW_CHROMES,
+  WINDOW_MESSAGE_TYPES,
+} from '@raven/core'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { startDesktop } from '@/desktop/startDesktop'
 import { useDesktopBridge } from '@/stores/desktop'
 
 const noop = () => undefined
+const bridgeWith = (windowChrome: string) => ({
+  request: noop,
+  dropFiles: noop,
+  subscribe: noop,
+  windowChrome,
+})
 
 // A page left listening would take the player port another test hands over.
 const stops: Array<() => void> = []
@@ -22,14 +33,19 @@ describe('startDesktop', () => {
     expect(document.documentElement.dataset.desktop).toBeUndefined()
   })
 
-  it("keeps Raven's bridge and marks the page as the app's", () => {
-    started({ request: noop, dropFiles: noop, subscribe: noop })
+  it("keeps Raven's bridge and marks the page as the app's, with its window chrome", () => {
+    started(bridgeWith(WINDOW_CHROMES.inset))
     expect(useDesktopBridge.getState().desktop).not.toBeNull()
-    expect(document.documentElement.dataset.desktop).toBe('')
+    expect(document.documentElement.dataset.desktop).toBe(WINDOW_CHROMES.inset)
+  })
+
+  it('marks a page that draws its own window controls', () => {
+    started(bridgeWith(WINDOW_CHROMES.drawn))
+    expect(document.documentElement.dataset.desktop).toBe(WINDOW_CHROMES.drawn)
   })
 
   it("hears main's player hand-over from the first render on", () => {
-    started({ request: noop, dropFiles: noop, subscribe: noop })
+    started(bridgeWith(WINDOW_CHROMES.inset))
     window.dispatchEvent(
       new MessageEvent('message', {
         data: {

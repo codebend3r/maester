@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { FILE_SCHEME, PAGE_ORIGIN, PLAYER_SOURCE_KINDS, WEB_HOST_PORT } from '@raven/core'
 import { app, BrowserWindow, dialog, ipcMain, protocol, screen, session, shell } from 'electron'
-import { PLATFORMS } from '@/build/forgeOptions'
+import { WINDOW_CHROMES, windowChromeFor } from '@raven/core'
 import type { AppLog } from '@/main/appLog'
 import type { DesktopService } from '@/main/desktopService'
 import { createFileHandler } from '@/main/fileProtocol'
@@ -26,6 +26,7 @@ import {
 } from '@/main/webHost'
 import { authOriginFrom } from '@/main/origins'
 import { placeWindow } from '@/main/windowBounds'
+import { chromeOptionsFor } from '@/main/windowChrome'
 import { IPC_CHANNELS } from '@/shared/hostNames'
 
 export const PRODUCT_NAME = 'Raven'
@@ -37,9 +38,9 @@ type ShowWindowButtonsProps = {
   isVisible: boolean
 }
 
-/** The traffic lights are macOS's; elsewhere there is nothing to show or hide. */
+/** The traffic lights are an inset chrome's; a page that draws its own hides them itself. */
 export const showWindowButtons = ({ window, isVisible }: ShowWindowButtonsProps): void => {
-  if (process.platform !== PLATFORMS.darwin) return
+  if (windowChromeFor({ platform: process.platform }) !== WINDOW_CHROMES.inset) return
   window.setWindowButtonVisibility(isVisible)
 }
 
@@ -194,7 +195,7 @@ export const openWindow = ({
     minWidth: 320,
     minHeight: 240,
     show: false,
-    titleBarStyle: 'hiddenInset',
+    ...chromeOptionsFor({ chrome: windowChromeFor({ platform: process.platform }) }),
     backgroundColor: NIGHT,
     title: PRODUCT_NAME,
     webPreferences: {

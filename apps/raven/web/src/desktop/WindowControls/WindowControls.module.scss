@@ -1,0 +1,47 @@
+// The controls sit in the title bar strip's height, over the page as it scrolls and over
+// the player, and stay clickable inside the strip that drags the window.
+.controls {
+  position: fixed;
+  inset: 0 0 auto auto;
+  z-index: 7;
+  display: grid;
+  grid-auto-flow: column;
+  height: var(--titlebar-inset);
+  -webkit-app-region: no-drag;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: opacity 200ms var(--ease-out);
+  }
+}
+
+.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.control,
+.close {
+  display: grid;
+  place-items: center;
+  width: calc(var(--titlebar-inset) * 1.5);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-bark);
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: calc(var(--border-thick) * -1);
+  }
+}
+
+.control:hover {
+  background: var(--color-hover);
+}
+
+// The window's way out reads as the one action it is when the pointer is on it.
+.close:hover {
+  background: var(--color-leaf);
+  color: var(--color-on-leaf);
+}

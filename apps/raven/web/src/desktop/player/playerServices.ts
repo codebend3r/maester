@@ -15,6 +15,7 @@ import type { DesktopClient } from '@/desktop/client'
 import { handled } from '@/desktop/handled'
 import type { MenuHub } from '@/desktop/menuHub'
 import { playPathOf } from '@/desktop/paths'
+import { useWindowChrome } from '@/stores/windowChrome'
 
 /** What the page leaves in `location.state` when it opens a file: the files to play after it. */
 export const isPlayState = object({ queue: listOf(isOpaqueId) })
@@ -79,8 +80,11 @@ export const windowPartsFor = ({
       }),
   },
   chrome: {
-    shown: (isShown) =>
-      handled(client.request({ type: DESKTOP_REQUESTS.windowButtons, isVisible: isShown })),
+    shown: (isShown) => {
+      // macOS's traffic lights through main, and the page's own controls where it draws them.
+      useWindowChrome.getState().setShown(isShown)
+      handled(client.request({ type: DESKTOP_REQUESTS.windowButtons, isVisible: isShown }))
+    },
   },
 })
 

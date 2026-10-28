@@ -19,6 +19,7 @@ import {
   playerActionFor,
 } from '@/desktop/player/playerServices'
 import { DL_1, DL_2, fakeClient, FILE_ID, sentOfType, settled } from '@/test/desktop'
+import { useWindowChrome } from '@/stores/windowChrome'
 
 const FILE: LocalFile = {
   fileId: FILE_ID,
@@ -118,6 +119,7 @@ describe('fileServicesFor', () => {
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.windowButtons })).toEqual([
       { type: DESKTOP_REQUESTS.windowButtons, isVisible: false },
     ])
+    expect(useWindowChrome.getState().isShown).toBe(false)
   })
 
   it('says why a video cannot play per engine', () => {

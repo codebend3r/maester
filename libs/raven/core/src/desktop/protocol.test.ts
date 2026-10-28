@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  WINDOW_ACTIONS,
   DESKTOP_EVENTS,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
@@ -216,6 +217,9 @@ describe('isDesktopRequest', () => {
     [{ type: DESKTOP_REQUESTS.saveTracks, fileId: id, audio: null, subtitle: null }],
     [{ type: DESKTOP_REQUESTS.saveTracks, fileId: id, audio: 0, subtitle: null }],
     [{ type: DESKTOP_REQUESTS.windowButtons, isVisible: false }],
+    [{ type: DESKTOP_REQUESTS.windowControl, action: WINDOW_ACTIONS.minimize }],
+    [{ type: DESKTOP_REQUESTS.windowControl, action: WINDOW_ACTIONS.maximize }],
+    [{ type: DESKTOP_REQUESTS.windowControl, action: WINDOW_ACTIONS.close }],
     [{ type: DESKTOP_REQUESTS.readOutput }],
     [
       {
@@ -307,6 +311,7 @@ describe('isDesktopRequest', () => {
       { type: DESKTOP_REQUESTS.saveTracks, fileId: '/m/a.mkv', audio: 1, subtitle: null },
     ],
     ['a string for the window buttons', { type: DESKTOP_REQUESTS.windowButtons, isVisible: 'yes' }],
+    ['an unknown window action', { type: DESKTOP_REQUESTS.windowControl, action: 'fullscreen' }],
     ['partial output settings', { type: DESKTOP_REQUESTS.writeOutput, output: { profile: 'pcm' } }],
     ['the server call the page no longer makes', { type: 'serverCall', serverId: id }],
     [

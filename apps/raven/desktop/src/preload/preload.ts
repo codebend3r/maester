@@ -3,6 +3,7 @@ import {
   type InvokeEnvelope,
   PAGE_ORIGIN,
   type RavenDesktopBridge,
+  windowChromeFor,
 } from '@raven/core'
 import { contextBridge, type IpcRendererEvent, ipcRenderer, webUtils } from 'electron'
 import { dropPaths } from '@/preload/dropPaths'
@@ -34,6 +35,8 @@ const bridge = {
       ipcRenderer.removeListener(IPC_CHANNELS.event, handler)
     }
   },
+  // Main makes the window from the same platform, so the page draws exactly what is missing.
+  windowChrome: windowChromeFor({ platform: process.platform }),
 } satisfies RavenDesktopBridge
 
 // Only the web host's page gets the bridge. Main refuses any other frame too, and the window
