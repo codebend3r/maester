@@ -25,6 +25,7 @@
     "app:prebuild:tvos": "nx run @raven/app:prebuild:tvos",
     "app:server": "nx run @raven/server:dev",
     "app:start": "nx run @raven/app:start",
+    "ci:app:android-tv": "bash scripts/ci_app_android_tv.sh",
     "ci:docker": "bash scripts/ci_docker.sh",
     "claude-audit": "bash scripts/audit_claude_md.sh",
     "build": "nx run-many -t build",

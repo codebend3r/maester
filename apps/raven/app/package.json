@@ -321,6 +321,20 @@
         ],
         "cache": true
       },
+      "e2e:android-tv": {
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "env": "APP_VARIANT"
+          },
+          {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+          },
+          "{workspaceRoot}/apps/raven/server/src/**/*"
+        ],
+        "cache": true
+      },
       "dev:ios": {
         "continuous": true,
         "cache": false,
