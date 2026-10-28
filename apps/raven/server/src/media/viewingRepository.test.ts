@@ -164,6 +164,21 @@ describe('play history', () => {
     expect(watchedIds(libraryId)).toEqual([finished])
   })
 
+  it('counts the watched videos its history lists, and only the account’s own', () => {
+    const libraryId = createLibrary('counted')
+    const finished = addMinute({ libraryId, name: 'finished' })
+    const started = addMinute({ libraryId, name: 'started' })
+    const theirs = addMinute({ libraryId, name: 'theirs' })
+    viewing().report({ id: finished, position: 60, at: at(0), account: TEST_ACCOUNTS.a })
+    viewing().report({ id: finished, position: 60, at: at(90), account: TEST_ACCOUNTS.a })
+    viewing().report({ id: started, position: 10, at: at(5), account: TEST_ACCOUNTS.a })
+    viewing().report({ id: theirs, position: 60, at: at(5), account: TEST_ACCOUNTS.b })
+    expect(viewing().finishedCount({ libraryId, account: TEST_ACCOUNTS.a })).toBe(
+      watchedIds(libraryId).length,
+    )
+    expect(viewing().finishedCount({ libraryId, account: TEST_ACCOUNTS.b })).toBe(1)
+  })
+
   it('never counts a video it cannot measure as watched', () => {
     const libraryId = createLibrary('unprobed')
     const id = add({ libraryId, name: 'unknown length' })

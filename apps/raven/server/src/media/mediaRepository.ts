@@ -106,6 +106,12 @@ const FROM_MEDIA = `
 
 const SELECT_MEDIA = `${SELECT_COLUMNS}${FROM_MEDIA}`
 
+/** A video `account` has a saved spot in, in a library that saves progress: what is in progress. */
+const IN_PROGRESS = 'p.media_id IS NOT NULL AND l.save_progress = 1'
+
+/** A video `account` favoured, in a library that is not locked. */
+const FAVOURITE = 'f.media_id IS NOT NULL AND l.locked = 0'
+
 /**
  * What sets a split movie file's card apart: the cut Smart split apart
  * gave it, else the cut or release its name reads as. Null for a file on
@@ -319,6 +325,19 @@ type MediaRepositoryListFavouritesProps = {
 }
 
 type MediaRepositoryListSagasProps = { libraryId: number; account: AccountKey }
+
+type MediaRepositoryCountInProgressProps = { libraryId: number; account: AccountKey }
+
+type MediaRepositoryCountFavouritesProps = { libraryId: number; account: AccountKey }
+
+type MediaRepositoryCountSagasProps = { libraryId: number; account: AccountKey }
+
+type MediaRepositoryCountWhereProps = { where: string; libraryId: number; account: AccountKey }
+
+type MediaRepositorySagaGroupsProps = { libraryId: number; account: AccountKey }
+
+/** A saga as its movies make it, before the library's pick of backdrop is put on it. */
+type SagaGroup = Omit<Saga, 'backdrop'>
 
 /**
  * The videos as a client sees them: listings, a show's next episode, an
@@ -664,7 +683,7 @@ export class MediaRepository {
     return this.items(
       this.db
         .prepare<{ libraryId: number | null; account: AccountKey }, MediaRow>(
-          `${SELECT_MEDIA} WHERE p.media_id IS NOT NULL AND l.save_progress = 1
+          `${SELECT_MEDIA} WHERE ${IN_PROGRESS}
               AND (@libraryId IS NULL OR m.library_id = @libraryId)
             ORDER BY p.updated_at DESC, m.id DESC`,
         )
@@ -720,7 +739,7 @@ export class MediaRepository {
     return this.items(
       this.db
         .prepare<{ libraryId: number | null; account: AccountKey }, MediaRow>(
-          `${SELECT_MEDIA} WHERE f.media_id IS NOT NULL AND l.locked = 0
+          `${SELECT_MEDIA} WHERE ${FAVOURITE}
               AND (@libraryId IS NULL OR m.library_id = @libraryId)
             ORDER BY f.added_at DESC, m.id DESC`,
         )
@@ -728,14 +747,34 @@ export class MediaRepository {
     )
   }
 
+  /** How many of a library's videos match `where`, over the same rows its listings read. */
+  private countWhere({ where, libraryId, account }: MediaRepositoryCountWhereProps): number {
+    return (
+      this.db
+        .prepare<[ByAccount, number], { count: number }>(
+          `SELECT COUNT(*) AS count${FROM_MEDIA} WHERE ${where} AND m.library_id = ?`,
+        )
+        .get({ account }, libraryId)?.count ?? 0
+    )
+  }
+
+  /** How many videos `listInProgress` lists for the library, without reading them. */
+  countInProgress({ libraryId, account }: MediaRepositoryCountInProgressProps): number {
+    return this.countWhere({ where: IN_PROGRESS, libraryId, account })
+  }
+
+  /** How many videos `listFavourites` lists for the library, without reading them. */
+  countFavourites({ libraryId, account }: MediaRepositoryCountFavouritesProps): number {
+    return this.countWhere({ where: FAVOURITE, libraryId, account })
+  }
+
   /**
-   * A library's sagas: each TMDB collection two or more of its movies belong
-   * to, by name, with the backdrop the library picked for it and those
-   * movies oldest first, one entry each, its best file. A movie split onto
-   * several cards is still one movie, so a single movie of a collection is
-   * no saga yet, however many cards it has.
+   * Each TMDB collection two or more of a library's movies belong to, with
+   * those movies oldest first, one entry each, its best file. A movie split
+   * onto several cards is still one movie, so a single movie of a
+   * collection is no saga yet, however many cards it has.
    */
-  listSagas({ libraryId, account }: MediaRepositoryListSagasProps): Saga[] {
+  private sagaGroups({ libraryId, account }: MediaRepositorySagaGroupsProps): SagaGroup[] {
     const movies = this.items(
       this.db
         .prepare<[ByAccount, number], MediaRow>(
@@ -749,16 +788,25 @@ export class MediaRepository {
         .all({ account }, libraryId),
     )
     const sagas = this.metadata.sagasOf(movies.flatMap((media) => media.item?.id ?? []))
-    const backdrops = this.sagaBackdrops.ofLibrary(libraryId)
     const grouped = movies.reduce((groups, media) => {
       const saga = media.item ? sagas.get(media.item.id) : undefined
       if (!saga) return groups
       const held = groups.get(saga.tmdbId)?.media ?? []
-      const backdrop = backdrops.get(saga.tmdbId) ?? DEFAULT_SAGA_BACKDROP
-      return groups.set(saga.tmdbId, { ...saga, backdrop, media: [...held, media] })
-    }, new Map<string, Saga>())
-    return [...grouped.values()]
-      .filter((saga) => saga.media.length > 1)
+      return groups.set(saga.tmdbId, { ...saga, media: [...held, media] })
+    }, new Map<string, SagaGroup>())
+    return [...grouped.values()].filter((saga) => saga.media.length > 1)
+  }
+
+  /** A library's sagas, by name, each with the backdrop the library picked for it. */
+  listSagas({ libraryId, account }: MediaRepositoryListSagasProps): Saga[] {
+    const backdrops = this.sagaBackdrops.ofLibrary(libraryId)
+    return this.sagaGroups({ libraryId, account })
+      .map((saga) => ({ ...saga, backdrop: backdrops.get(saga.tmdbId) ?? DEFAULT_SAGA_BACKDROP }))
       .toSorted((a, b) => a.name.localeCompare(b.name))
+  }
+
+  /** How many sagas `listSagas` lists for the library, without their backdrops. */
+  countSagas({ libraryId, account }: MediaRepositoryCountSagasProps): number {
+    return this.sagaGroups({ libraryId, account }).length
   }
 }

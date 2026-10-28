@@ -33,6 +33,8 @@ const READS = {
     }),
   'its sagas': ({ database, libraryId }) =>
     repositories(database).media.listSagas({ libraryId, account }),
+  'its count of sagas': ({ database, libraryId }) =>
+    repositories(database).media.countSagas({ libraryId, account }),
   'its duplicates': ({ database, libraryId }) =>
     new MovieSplits(database, repositories(database).media).list({ libraryId, account }),
 } as const satisfies Record<string, Read>
@@ -49,6 +51,15 @@ const VIEWING_READS = {
     new ViewingRepository(database, repositories(database).media).history({
       libraryId,
       limit: 10,
+      account,
+    }),
+  'its count in progress': ({ database, libraryId }) =>
+    repositories(database).media.countInProgress({ libraryId, account }),
+  'its count of favourites': ({ database, libraryId }) =>
+    repositories(database).media.countFavourites({ libraryId, account }),
+  'its finished count': ({ database, libraryId }) =>
+    new ViewingRepository(database, repositories(database).media).finishedCount({
+      libraryId,
       account,
     }),
   'its watched episodes': ({ database, itemIds }) =>
@@ -68,11 +79,11 @@ const CASCADE_BY_INDEX =
 /**
  * A spot or favourite found by its primary key, account first, or by its
  * video's index with the account too, which a WITHOUT ROWID table's index
- * carries; or a play by `plays_account`. SQLite says EXISTS where it runs
- * an `EXISTS` as a join.
+ * carries, covering when a count needs nothing else; or a play by
+ * `plays_account`. SQLite says EXISTS where it runs an `EXISTS` as a join.
  */
 const BY_ACCOUNT =
-  /^SEARCH ((p|f) USING PRIMARY KEY \(account_id=\?|(p|f) USING INDEX (playback_progress|favourites)_media \(media_id=\? AND account_id=\?\)|pl( EXISTS)? USING (COVERING )?INDEX plays_account \(account_id=\?)/
+  /^SEARCH ((p|f) USING PRIMARY KEY \(account_id=\?|(p|f) USING (COVERING )?INDEX (playback_progress|favourites)_media \(media_id=\? AND account_id=\?\)|pl( EXISTS)? USING (COVERING )?INDEX plays_account \(account_id=\?)/
 
 /** How `FIRST_ITEM` finds a file's first item, `z`: by the file's own key. */
 const FIRST_ITEM_BY_KEY = /^SEARCH z USING (COVERING )?INDEX \w+ \(media_id=\?\)$/

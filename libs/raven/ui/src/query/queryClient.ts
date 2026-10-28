@@ -117,6 +117,8 @@ export const queryKeys = {
   ],
   /** The prefix every history of a library, or of all of them, shares. */
   historyLists: (libraryId: number | null) => ['libraries', libraryId, 'history'],
+  /** How much each of a library's tabs holds, under the library's key so whatever reads the libraries again reads it again too. */
+  libraryCounts: (libraryId: number) => ['libraries', libraryId, 'counts'],
   /** A library's tabs beside its listing: in progress, favourites, sagas, files not matched. */
   inProgress: (libraryId: number) => ['libraries', libraryId, 'in-progress'],
   libraryFavourites: (libraryId: number) => ['libraries', libraryId, 'favourites'],

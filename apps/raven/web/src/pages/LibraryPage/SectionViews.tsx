@@ -59,15 +59,12 @@ import {
   NOTHING_LISTED,
   playQueue,
 } from '@/pages/LibraryPage/libraryShape'
-import type { LibrarySection } from '@/pages/LibraryPage/librarySections'
+import { FINISHED_LIMIT, type LibrarySection } from '@/pages/LibraryPage/librarySections'
 import { useAiLookupsDone } from '@/pages/LibraryPage/useAiLookupsDone'
 import { useLibraryListing } from '@/pages/LibraryPage/useLibraryListing'
 import { useLibraryView } from '@/pages/LibraryPage/useLibraryView'
 import { POLL_MS, anyPending, useMatchingPassDone } from '@/pages/LibraryPage/useMatchingPassDone'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
-
-/** How many finished videos the tab shows; the History page has the rest. */
-const FINISHED_LIMIT = 48
 
 /** A tab's `empty`: `message` when its list has nothing in it. */
 const whenEmpty =

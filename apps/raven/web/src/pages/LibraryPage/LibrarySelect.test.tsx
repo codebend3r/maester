@@ -11,6 +11,7 @@ import { api } from '@/lib/api'
 import {
   itemSummary,
   library,
+  libraryCounts,
   matchedMovie,
   mediaItem,
   metadataHealth,
@@ -42,6 +43,7 @@ describe('LibraryPage select mode', () => {
     history: spyOn(api, 'listHistory'),
     health: spyOn(api, 'getMetadataHealth'),
     set: spyOn(api, 'setWatched'),
+    counts: spyOn(api, 'getLibraryCounts'),
   }
 
   beforeEach(() => {
@@ -51,6 +53,7 @@ describe('LibraryPage select mode', () => {
     spies.history.mockImplementation(async () => [])
     spies.health.mockImplementation(async () => metadataHealth())
     spies.set.mockImplementation(async () => undefined)
+    spies.counts.mockImplementation(async () => libraryCounts())
   })
 
   afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))

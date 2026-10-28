@@ -352,11 +352,16 @@ describe('createApiClient', () => {
         body: [{ ...mediaItem(), aiSuggestion: null }],
         call: (client) => client.listUnmatched(3),
       }),
+      await asked({
+        body: { inProgress: 1, favourites: 2, sagas: 3, duplicates: 4, finished: 5 },
+        call: (client) => client.getLibraryCounts(3),
+      }),
     ]).toEqual([
       'http://nas:8484/api/libraries/3/in-progress',
       'http://nas:8484/api/libraries/3/favourites',
       'http://nas:8484/api/libraries/3/sagas',
       'http://nas:8484/api/libraries/3/unmatched',
+      'http://nas:8484/api/libraries/3/counts',
     ])
   })
 

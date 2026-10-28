@@ -134,9 +134,10 @@ const viewingOf = async ({ api }: ViewingOfProps) => {
       api.listShows({ libraryId: tv.library }),
       api.shuffleEpisodes(tv.show),
     ])
-  const [unmatched, duplicates] = await Promise.all([
+  const [unmatched, duplicates, counts] = await Promise.all([
     api.listUnmatched(library),
     api.listDuplicates(library),
+    api.getLibraryCounts(library),
   ])
   return {
     movie: viewOf(movie),
@@ -152,6 +153,7 @@ const viewingOf = async ({ api }: ViewingOfProps) => {
     duplicates: duplicates.map(({ cards }) =>
       cards.map(({ files }) => files.map(({ media }) => cardOf(media))),
     ),
+    counts,
     searched: found.flatMap((shelf) =>
       shelf.type === HOME_SHELF_TYPES.media ? shelf.media.map(cardOf) : [],
     ),
@@ -231,6 +233,7 @@ describe('each account sees only its own viewing', () => {
           ],
         ],
       ],
+      counts: { inProgress: 3, favourites: 3, sagas: 0, duplicates: 1, finished: 0 },
       searched: [{ id: video, ...spot }],
       isShowFavourite: true,
       seasonWatchedCounts: [1],
@@ -264,6 +267,7 @@ describe('each account sees only its own viewing', () => {
           ],
         ],
       ],
+      counts: { inProgress: 0, favourites: 0, sagas: 0, duplicates: 1, finished: 0 },
       searched: [{ id: video, ...NOBODYS }],
       isShowFavourite: false,
       seasonWatchedCounts: [0],
@@ -288,6 +292,7 @@ describe('each account sees only its own viewing', () => {
       { route: ROUTES.sagas, params: { id: library } },
       { route: ROUTES.unmatched, params: { id: library } },
       { route: ROUTES.duplicates, params: { id: library } },
+      { route: ROUTES.libraryCounts, params: { id: library } },
       { route: ROUTES.media, params: { id: video } },
       { route: ROUTES.item, params: { id: tv.show } },
       { route: ROUTES.nextEpisode, params: { id: tv.show } },

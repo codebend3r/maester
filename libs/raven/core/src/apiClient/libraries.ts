@@ -7,6 +7,7 @@ import {
   isDuplicates,
   isHistory,
   isLibrary,
+  isLibraryCounts,
   isLibraryList,
   isMediaList,
   isPosterEntries,
@@ -16,6 +17,7 @@ import {
   isUnmatchedList,
   type JoinRequest,
   type Library,
+  type LibraryCounts,
   type LibraryHeroChange,
   type LibraryInput,
   type LibraryOrder,
@@ -178,6 +180,10 @@ export const libraryCalls = ({ send, expect, libraryGet }: Transport) => ({
       }),
       guard: isShowListing,
     }),
+
+  /** How much each of a library's tabs holds for this account, but All and Not matched, which the library counts. */
+  getLibraryCounts: (libraryId: number): Promise<LibraryCounts> =>
+    libraryGet({ libraryId, path: 'counts', guard: isLibraryCounts }),
 
   /** A library's videos with a saved spot, the most recently watched first, each with its poster. */
   listInProgress: (libraryId: number): Promise<PosterEntry[]> =>
