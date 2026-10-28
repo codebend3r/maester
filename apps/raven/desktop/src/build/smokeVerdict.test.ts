@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'bun:test'
-import { logLinesSince, SMOKE_STAGES, smokeGaps, withoutTestHooks } from '@/build/smokeVerdict'
+import { join } from 'node:path'
+import { DESKTOP_PLATFORMS } from '@raven/core'
+import {
+  isRavenListed,
+  logLinesSince,
+  SMOKE_STAGES,
+  SMOKE_STOP_NAMES,
+  smokeGaps,
+  smokePathsFor,
+  withoutTestHooks,
+} from '@/build/smokeVerdict'
 
 const LAUNCH =
   '2026-10-16T12:00:00.000Z info launch Raven 0.5.4 (packaged), Electron 44.7.0, macOS 27.0.0'
@@ -116,5 +126,84 @@ describe('logLinesSince', () => {
 
   it('reads nothing when nothing was written', () => {
     expect(logLinesSince({ live: bytes(OLD), rotated: null, from: OLD.length })).toEqual([])
+  })
+})
+
+describe('smokePathsFor', () => {
+  const project = '/repo/apps/raven/desktop'
+
+  it("launches the app bundle's executable and reads the pinned macOS logs folder", () => {
+    expect(
+      smokePathsFor({
+        platform: DESKTOP_PLATFORMS.mac,
+        project,
+        home: '/Users/a',
+        appData: undefined,
+      }),
+    ).toEqual({
+      app: join(project, 'out', 'Raven-darwin-arm64', 'Raven.app'),
+      executable: join(
+        project,
+        'out',
+        'Raven-darwin-arm64',
+        'Raven.app',
+        'Contents',
+        'MacOS',
+        'Raven',
+      ),
+      logsDir: join('/Users/a', 'Library', 'Logs', 'raven'),
+    })
+  })
+
+  it("launches Raven.exe and reads the logs under %APPDATA%'s raven folder on Windows", () => {
+    expect(
+      smokePathsFor({
+        platform: DESKTOP_PLATFORMS.windows,
+        project,
+        home: '/Users/a',
+        appData: '/Users/a/AppData/Roaming',
+      }),
+    ).toEqual({
+      app: join(project, 'out', 'Raven-win32-x64'),
+      executable: join(project, 'out', 'Raven-win32-x64', 'Raven.exe'),
+      logsDir: join('/Users/a/AppData/Roaming', 'raven', 'logs'),
+    })
+  })
+
+  it('falls back to the roaming folder under home when %APPDATA% is not set', () => {
+    expect(
+      smokePathsFor({
+        platform: DESKTOP_PLATFORMS.windows,
+        project,
+        home: '/Users/a',
+        appData: undefined,
+      }).logsDir,
+    ).toBe(join('/Users/a', 'AppData', 'Roaming', 'raven', 'logs'))
+  })
+})
+
+describe('SMOKE_STOP_NAMES', () => {
+  it('quits macOS on SIGTERM and Windows on WM_CLOSE', () => {
+    expect(SMOKE_STOP_NAMES).toEqual({ mac: 'SIGTERM', windows: 'WM_CLOSE' })
+  })
+})
+
+describe('isRavenListed', () => {
+  it('finds Raven in the CSV tasklist prints, whatever the case', () => {
+    expect(
+      isRavenListed(
+        '"Raven.exe","4120","Console","1","98,304 K"\r\n"raven.exe","4180","Console","1","40,112 K"\r\n',
+      ),
+    ).toBe(true)
+  })
+
+  it('finds nothing in the INFO line tasklist prints when no process matches', () => {
+    expect(
+      isRavenListed('INFO: No tasks are running which match the specified criteria.\r\n'),
+    ).toBe(false)
+  })
+
+  it('does not take another image whose name only contains Raven', () => {
+    expect(isRavenListed('"NotRaven.exe","4120","Console","1","98,304 K"\r\n')).toBe(false)
   })
 })

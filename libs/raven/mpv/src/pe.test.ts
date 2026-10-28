@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { PE_MACHINES, readPe } from '@/build/pe'
+import { PE_MACHINES, readPe } from '@/pe'
 
 // A 64-bit PE with one section holding an import table, an export table and their
 // names: the smallest file the reader has to understand.

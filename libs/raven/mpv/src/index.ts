@@ -19,3 +19,5 @@ export {
   type MpvTrack,
 } from '@/properties'
 export { NATIVE_TARGETS, nativeTargetOf, type NativeTarget } from '@/target'
+export { PE_MACHINES, readPe } from '@/pe'
+export { ADDON_DLLS, importProblems, isPrebuilt } from '@/windows'

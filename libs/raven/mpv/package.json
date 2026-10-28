@@ -76,7 +76,8 @@
         "{projectRoot}/native/windows.lock.json",
         "{projectRoot}/src/target.ts",
         "{projectRoot}/src/build/context.ts",
-        "{projectRoot}/src/build/pe.ts",
+        "{projectRoot}/src/pe.ts",
+        "{projectRoot}/src/windows.ts",
         "{projectRoot}/src/build/windowsLock.ts",
         "{projectRoot}/src/build/auditWindows.ts",
         "{workspaceRoot}/tsconfig.base.json"

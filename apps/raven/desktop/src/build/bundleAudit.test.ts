@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'bun:test'
 import { join } from 'node:path'
+import { PE_MACHINES } from '@raven/mpv'
 import {
   auditMachO,
+  auditPe,
   type AuditedFile,
+  type AuditedPe,
   bundleProblems,
   fileProblems,
+  isPeFile,
   MACH_O_READS,
   MPV_IN_APP,
+  MPV_IN_WINDOWS_APP,
   WEB_IN_APP,
+  WINDOWS_EXE,
+  windowsBundleProblems,
   parseArchs,
   parseIsExecutable,
   parseLinks,
@@ -357,5 +364,93 @@ describe('auditMachO', () => {
       `${RELATIVE} is not signed: code object is not signed at all`,
     ])
     expect(audited.file).not.toBeNull()
+  })
+})
+
+const LOCKED_SHA256 = 'a'.repeat(64)
+const ADDON = join(MPV_IN_WINDOWS_APP, 'raven_mpv.node')
+const LIBMPV = join(MPV_IN_WINDOWS_APP, 'libmpv-2.dll')
+const WINDOWS_PRESENT = [WINDOWS_EXE, ADDON, LIBMPV, join('resources', 'dist', 'index.html')]
+
+const auditedPe = (overrides: Partial<AuditedPe>): AuditedPe => ({
+  relative: ADDON,
+  machine: PE_MACHINES.x64,
+  imports: ['KERNEL32.dll', 'libmpv-2.dll', 'node.exe'],
+  sha256: 'b'.repeat(64),
+  ...overrides,
+})
+
+const WINDOWS_FILES_AS_BUILT = [
+  auditedPe({}),
+  auditedPe({ relative: LIBMPV, imports: ['KERNEL32.dll', 'vulkan-1.dll'], sha256: LOCKED_SHA256 }),
+]
+
+type WindowsProblemsProps = { files: readonly AuditedPe[]; present?: readonly string[] }
+
+const windowsProblems = ({ files, present = WINDOWS_PRESENT }: WindowsProblemsProps) =>
+  windowsBundleProblems({
+    files,
+    exists: (relative) => present.includes(relative),
+    libmpvSha256: LOCKED_SHA256,
+  })
+
+describe('isPeFile', () => {
+  it('takes the addon and DLLs, in any case, and leaves the rest', () => {
+    expect(
+      ['raven_mpv.node', 'libmpv-2.dll', 'X.DLL', 'build.json', 'mpv'].filter(isPeFile),
+    ).toEqual(['raven_mpv.node', 'libmpv-2.dll', 'X.DLL'])
+  })
+})
+
+describe('windowsBundleProblems', () => {
+  it('passes the app as built: the exe, the page, an x64 addon on Windows, libmpv and Node, the locked libmpv', () => {
+    expect(windowsProblems({ files: WINDOWS_FILES_AS_BUILT })).toEqual([])
+  })
+
+  it('names what is missing from the app', () => {
+    expect(windowsProblems({ files: [], present: [] })).toEqual([
+      'Raven.exe is missing from the app',
+      `${ADDON} is missing from the app`,
+      `${LIBMPV} is missing from the app`,
+      `${join('resources', 'dist', 'index.html')} is missing from the app`,
+    ])
+  })
+
+  it('says which addon or DLL is not x64', () => {
+    const arm64 = 0xaa64
+    expect(
+      windowsProblems({
+        files: [auditedPe({ machine: arm64 }), ...WINDOWS_FILES_AS_BUILT.slice(1)],
+      }),
+    ).toEqual([`${ADDON} is not x64`])
+  })
+
+  it('names an import the addon has beyond Windows, libmpv and Node', () => {
+    expect(
+      windowsProblems({
+        files: [
+          auditedPe({ imports: ['KERNEL32.dll', 'libmpv-2.dll', 'avcodec-62.dll'] }),
+          ...WINDOWS_FILES_AS_BUILT.slice(1),
+        ],
+      }),
+    ).toEqual([`${ADDON} imports avcodec-62.dll, which neither Windows nor the app ships`])
+  })
+
+  it('refuses a libmpv the lock does not pin', () => {
+    const other = 'c'.repeat(64)
+    expect(
+      windowsProblems({ files: [auditedPe({}), auditedPe({ relative: LIBMPV, sha256: other })] }),
+    ).toEqual([
+      `${LIBMPV} is not the locked libmpv: sha256 ${other}, the lock says ${LOCKED_SHA256}`,
+    ])
+  })
+})
+
+describe('auditPe', () => {
+  it('names a file that does not read as a PE file', () => {
+    expect(auditPe({ relative: ADDON, bytes: new Uint8Array(8) })).toEqual({
+      file: null,
+      problems: [`${ADDON} could not be read: Not a PE file: no DOS header`],
+    })
   })
 })

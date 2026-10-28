@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { isPrebuilt, prebuilt } from '@/build/windowsLock'
+import { prebuilt } from '@/build/windowsLock'
+import { isPrebuilt } from '@/windows'
 
 describe('the Windows libmpv lock', () => {
   test('names one release archive by digest, with the DLL digest inside it', async () => {

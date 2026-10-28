@@ -1,21 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { exportProblems, importProblems, REQUIRED_EXPORTS } from '@/build/auditWindows'
-
-describe('importProblems', () => {
-  test('allows Windows, the CRT api sets and the Vulkan loader, in any case', () => {
-    expect(
-      importProblems({
-        imports: ['KERNEL32.dll', 'user32.dll', 'api-ms-win-crt-heap-l1-1-0.dll', 'vulkan-1.dll'],
-      }),
-    ).toEqual([])
-  })
-
-  test('names every DLL that should have been linked in', () => {
-    expect(
-      importProblems({ imports: ['KERNEL32.dll', 'avcodec-62.dll', 'libplacebo-351.dll'] }),
-    ).toEqual(['avcodec-62.dll', 'libplacebo-351.dll'])
-  })
-})
+import { exportProblems, REQUIRED_EXPORTS } from '@/build/auditWindows'
 
 describe('exportProblems', () => {
   test('answers nothing when every required export is there', () => {

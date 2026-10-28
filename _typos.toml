@@ -22,3 +22,5 @@ loca = "loca"
 trak = "trak"
 # A simulator's or device's id, as `xcrun simctl` names it.
 udid = "udid"
+# tasklist's `/FO` (format) flag, which the Windows packaged smoke passes.
+fo = "fo"

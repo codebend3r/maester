@@ -1,15 +1,23 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, rm, symlink } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { promisify } from 'node:util'
+import { DESKTOP_PLATFORMS, desktopPlatformFor } from '@raven/core'
+import { isPrebuilt } from '@raven/mpv'
 import {
   auditMachO,
+  auditPe,
   bundleProblems,
+  isPeFile,
+  MPV_IN_WINDOWS_APP,
   PACKAGED_APP,
   signatureProblems,
   type ToolRun,
+  WINDOWS_APP,
+  WINDOWS_LOCK,
+  windowsBundleProblems,
 } from '@/build/bundleAudit'
 import { versionOf } from '@/build/dmgMaker'
 import { listSignables, SIGNABLE_KINDS } from '@/build/machO'
@@ -71,7 +79,7 @@ const auditFiles = async ({ app, paths }: AuditFilesProps) => {
 
 type AuditProps = { project: string }
 
-const audit = async ({ project }: AuditProps): Promise<number> => {
+const auditMac = async ({ project }: AuditProps): Promise<number> => {
   const app = join(project, PACKAGED_APP)
   if (!existsSync(app)) {
     console.error('Run bunx nx run @raven/desktop:make first.')
@@ -115,6 +123,55 @@ const audit = async ({ project }: AuditProps): Promise<number> => {
   return 0
 }
 
+type EnginePathsProps = { engine: string }
+
+const enginePaths = async ({ engine }: EnginePathsProps): Promise<string[]> => {
+  if (!existsSync(engine)) return []
+  const names = await readdir(engine, { recursive: true })
+  return names.filter(isPeFile).map((name) => join(engine, name))
+}
+
+const auditWindows = async ({ project }: AuditProps): Promise<number> => {
+  const app = join(project, WINDOWS_APP)
+  if (!existsSync(app)) {
+    console.error('Run bunx nx run @raven/desktop:make first.')
+    return 1
+  }
+  const lock: unknown = JSON.parse(await readFile(join(project, WINDOWS_LOCK), 'utf8'))
+  if (!isPrebuilt(lock)) {
+    console.error(`${WINDOWS_LOCK} is not a valid Windows libmpv lock.`)
+    return 1
+  }
+  const paths = await enginePaths({ engine: join(app, MPV_IN_WINDOWS_APP) })
+  const audited = await Promise.all(
+    paths.map(async (path) =>
+      auditPe({ relative: relative(app, path), bytes: await readFile(path) }),
+    ),
+  )
+  const problems = [
+    ...windowsBundleProblems({
+      files: audited.flatMap(({ file }) => (file === null ? [] : [file])),
+      exists: (relativePath) => existsSync(join(app, relativePath)),
+      libmpvSha256: lock.libmpvSha256,
+    }),
+    ...audited.flatMap((file) => file.problems),
+  ]
+  if (problems.length > 0) {
+    problems.forEach((problem) => console.error(problem))
+    return 1
+  }
+  process.stdout.write(
+    `Raven bundle: ${paths.length} PE files of the video engine, all x64, loading only Windows and the app, with the locked libmpv.\n`,
+  )
+  return 0
+}
+
+const AUDITS = {
+  [DESKTOP_PLATFORMS.mac]: auditMac,
+  [DESKTOP_PLATFORMS.windows]: auditWindows,
+} as const
+
 if (import.meta.main) {
+  const audit = AUDITS[desktopPlatformFor({ platform: process.platform })]
   process.exitCode = await audit({ project: join(import.meta.dirname, '..', '..') })
 }
