@@ -41,6 +41,8 @@ type PlayerPrefs = {
   autoplay: boolean
   /** How many seconds the countdown to what is up next runs before it plays. */
   autoplayCountdownSeconds: number
+  /** Whether a known intro is skipped without asking, once per title, with a moment to undo it. */
+  autoSkipIntro: boolean
   setVolume: ({ volume, muted }: SetVolumeProps) => void
   setCaptionScale: (captionScale: number) => void
   setSubtitles: (subtitles: SetSubtitlesProps) => void
@@ -49,11 +51,12 @@ type PlayerPrefs = {
   setControlsLingerSeconds: (seconds: number) => void
   setAutoplay: (isOn: boolean) => void
   setAutoplayCountdownSeconds: (seconds: number) => void
+  setAutoSkipIntro: (isOn: boolean) => void
 }
 
 /**
  * Volume, subtitles, audio language, how long the controls linger,
- * autoplay and its countdown carry over from one video to the next, and across visits.
+ * autoplay and its countdown, and skipping intros carry over from one video to the next, and across visits.
  */
 export const usePlayerPrefs = create<PlayerPrefs>()(
   devtools(
@@ -68,6 +71,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         controlsLingerSeconds: CONTROLS_LINGER_SECONDS.initial,
         autoplay: true,
         autoplayCountdownSeconds: AUTOPLAY_COUNTDOWN_SECONDS.initial,
+        autoSkipIntro: false,
         setVolume: ({ volume, muted }) => set({ volume, muted }),
         setCaptionScale: (captionScale) => set({ captionScale }),
         setSubtitles: (subtitles) => set({ subtitles }),
@@ -80,6 +84,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           set({
             autoplayCountdownSeconds: within({ seconds, range: AUTOPLAY_COUNTDOWN_SECONDS }),
           }),
+        setAutoSkipIntro: (isOn) => set({ autoSkipIntro: isOn }),
       }),
       {
         name: PLAYER_PREFS_KEY,
@@ -95,6 +100,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           controlsLingerSeconds,
           autoplay,
           autoplayCountdownSeconds,
+          autoSkipIntro,
         }) => ({
           volume,
           muted,
@@ -105,6 +111,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           controlsLingerSeconds,
           autoplay,
           autoplayCountdownSeconds,
+          autoSkipIntro,
         }),
       },
     ),

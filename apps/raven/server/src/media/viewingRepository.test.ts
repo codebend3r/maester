@@ -232,6 +232,29 @@ describe('play history', () => {
     expect(watchedIds(libraryId)).toEqual([id])
   })
 
+  it('counts reaching the credits as watching the whole video, short of the percentage', () => {
+    const libraryId = createLibrary('credits')
+    const id = add({ libraryId, name: 'film' })
+    index().saveProbe({
+      id,
+      probe: MINUTE,
+      tracks: { audio: [], subtitles: [], defaultAudio: null, frameRate: 24 },
+      chapters: [
+        { start: 0, end: 40, title: 'The Story' },
+        { start: 40, end: 60, title: 'End Credits' },
+      ],
+    })
+    viewing().report({ id, position: 39, at: at(0), account: TEST_ACCOUNTS.a })
+    expect(positionOf(id)).toBe(39)
+    expect(watchedIds(libraryId)).toEqual([])
+    viewing().report({ id, position: 41, at: at(1), account: TEST_ACCOUNTS.a })
+    expect(positionOf(id)).toBe(0)
+    expect(watchedIds(libraryId)).toEqual([id])
+    expect(viewing().history({ libraryId, limit: 100, account: TEST_ACCOUNTS.a })[0]).toMatchObject(
+      { furthest: 60 },
+    )
+  })
+
   it('clears the spot where a lower percentage says, and keeps one a higher percentage allows', () => {
     const halfway = createLibrary('halfway')
     libraries().update({

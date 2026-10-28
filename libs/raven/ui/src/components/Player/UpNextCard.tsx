@@ -13,6 +13,8 @@ type UpNextCardProps = {
   countdown: number | null
   /** Whole seconds until it plays by itself; null when it waits for a click. */
   secondsLeft: number | null
+  /** The credits end before the file does: a scene follows them. */
+  hasSceneAfter: boolean
   onPlay: () => void
   onDismiss: () => void
 }
@@ -20,12 +22,14 @@ type UpNextCardProps = {
 /**
  * What plays next, offered in the video's last seconds above the bar: its
  * picture, its name and where it falls, how long until it plays by itself,
- * Play now, and Watch credits to put the card away for this title.
+ * whether a scene follows the credits, Play now, and Watch credits to put
+ * the card away for this title.
  */
 export const UpNextCard = ({
   next,
   countdown,
   secondsLeft,
+  hasSceneAfter,
   onPlay,
   onDismiss,
 }: UpNextCardProps) => {
@@ -47,6 +51,7 @@ export const UpNextCard = ({
           Plays in {secondsWords(secondsLeft)}
         </p>
       )}
+      {hasSceneAfter && <p className={styles.scene}>A scene follows the credits</p>}
       <p className={styles.actions}>
         <Button tone="primary" icon="play" onClick={onPlay}>
           {isNextSeason ? 'Play next season' : 'Play now'}
