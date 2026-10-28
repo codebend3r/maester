@@ -44,6 +44,7 @@ While the version is `0.y.z`, breaking changes may go in a `minor`. A literal re
 - `patch` on a prerelease (`1.2.0-rc.1`) releases it (`1.2.0`) rather than skipping to `1.2.1`.
 - It refuses a dirty tree, an invalid version, a version that does not move forward by semver precedence, and a tag that already exists. Nothing is written when it refuses.
 - `build` refuses a commit that already has a version tag, and a prerelease, which gets no builds.
+- `build` skips a number whose tag sits on a commit HEAD does not contain, which a force push to `main` leaves behind: the rewritten merge counts to the same N, so it takes the next free one.
 - It warns when the branch is not the remote's default branch.
 
 ## Undo before pushing
