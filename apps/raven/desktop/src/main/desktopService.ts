@@ -13,6 +13,7 @@ import {
   titleFromFileName,
 } from '@raven/core'
 import type { PageAccount } from '@/main/accounts/pageAccount'
+import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
 import { type ConfigStore, pickOutput, serverOf } from '@/main/desktopConfig'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import { grantNext } from '@/main/folder'
@@ -22,6 +23,7 @@ import {
   clearRecents,
   type FileFacts,
   type PlayerState,
+  readFacts,
   type RecentEntry,
   recentKey,
   removeRecentByKey,
@@ -31,6 +33,7 @@ import {
   trackPickFor,
   watchedShare,
 } from '@/main/playerState'
+import { DONE, refused } from '@/main/replies'
 import type { LinkOpener } from '@/main/servers/linkOpener'
 import type { ServerTitles } from '@/main/servers/serverTitles'
 import type { StateStore, Timers } from '@/main/stateStore'
@@ -85,10 +88,6 @@ export type DesktopService = {
   /** A batch of links main was handed (`open-url`); the opener acts on the first. */
   openLinks: (links: readonly string[]) => Promise<DesktopReply>
 }
-
-const DONE = { type: DESKTOP_REPLIES.done } as const satisfies DesktopReply
-
-const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
 
 const messageFor = (reason: GrantRefusal): string => {
   switch (reason) {
@@ -268,21 +267,14 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   const factsOf = (path: string): Promise<FileFacts | null> => {
     const pending = checking.get(path)
     if (pending !== undefined) return pending
-    const check = deps
-      .stat(path)
-      .then(
-        ({ size, mtimeMs }): FileFacts | null => ({ path, size, mtimeMs }),
-        () => null,
-      )
-      .finally(() => checking.delete(path))
+    const check = readFacts({ stat: deps.stat, path }).finally(() => checking.delete(path))
     checking.set(path, check)
     return check
   }
 
-  const factsWithin = (path: string): Promise<FileFacts | null> => {
-    const timeout = Promise.withResolvers<null>()
-    const timer = deps.timers.set({ run: () => timeout.resolve(null), ms: RECENT_CHECK_MS })
-    return Promise.race([factsOf(path), timeout.promise]).finally(() => deps.timers.clear(timer))
+  const factsWithin = async (path: string): Promise<FileFacts | null> => {
+    const bounded = await within({ task: factsOf(path), ms: RECENT_CHECK_MS, timers: deps.timers })
+    return bounded.outcome === BOUNDED_OUTCOMES.answered ? bounded.result : null
   }
 
   type ShareOfProps = { state: PlayerState; path: string }

@@ -18,28 +18,28 @@ import {
   type MpvTrack,
   propertyGuards,
 } from '@raven/mpv'
+import { engineOptionsFor, HARDENED_OPTIONS } from '@/main/player/engine'
+import { guardedMpv, type MpvControl, PER_FILE_OPTIONS } from '@/main/player/guardedMpv'
 import {
   type AccountRefusalReader,
-  BUFFERED_MS,
-  createPlayerService,
   type FailureExplainer,
-  guardedMpv,
   type LocalSidecar,
-  type MpvControl,
-  OBSERVED,
-  PER_FILE_OPTIONS,
-  PLAYER_MESSAGES,
-  type PlayerActivity,
-  type PlayerService,
   type ResolvedSource,
   resolveSourceWith,
-  SERVER_STALL_MS,
   type ServerTarget,
-  SIDECAR_BUDGET_MS,
+} from '@/main/player/loadTarget'
+import { PLAYER_PHASES } from '@/main/player/phases'
+import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
+import {
+  BUFFERED_MS,
+  createPlayerService,
+  OBSERVED,
+  type PlayerActivity,
+  type PlayerService,
+  SERVER_STALL_MS,
   TIME_MS,
-  PLAYER_PHASES,
 } from '@/main/player/playerService'
-import { engineOptionsFor, HARDENED_OPTIONS } from '@/main/player/engine'
+import { SIDECAR_BUDGET_MS } from '@/main/player/sidecars'
 import type { Timers } from '@/main/stateStore'
 
 const mpvTrack = (fields: Pick<MpvTrack, 'id' | 'type'> & Partial<MpvTrack>): MpvTrack => ({

@@ -12,3 +12,6 @@ export const HTTP_STATUSES = {
   badGateway: 502,
   unavailable: 503,
 } as const
+
+/** Whether a status is a 2xx: the server took the request. */
+export const isSuccessStatus = (status: number): boolean => status >= 200 && status < 300

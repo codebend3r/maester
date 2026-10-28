@@ -1,4 +1,5 @@
 import { PLAYER_CONNECTION_STATUSES, type PlayerConnectionStatus } from '@raven/core'
+import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
 import { ENGINE_MESSAGES, ENGINE_STATUSES, type OpenedEngine } from '@/main/player/engine'
 import { connectPort, type PortLike } from '@/main/player/playerPort'
 import type { PlayerService } from '@/main/player/playerService'
@@ -59,16 +60,21 @@ export const createConnector = <T extends { service: PlayerService }, R>({
   }
 
   // An engine that never settles must not leave the page waiting forever.
-  const openWithin = (): Promise<OpenedEngine<T>> => {
-    const deadline = Promise.withResolvers<OpenedEngine<T>>()
-    const timer = timers.set({
-      run: () => {
+  const openWithin = async (): Promise<OpenedEngine<T>> => {
+    const bounded = await within({ task: open(), ms: OPEN_MS, timers })
+    switch (bounded.outcome) {
+      case BOUNDED_OUTCOMES.answered:
+        return bounded.result
+      case BOUNDED_OUTCOMES.late:
         warn(`Raven's video engine did not open within ${OPEN_MS} ms.`)
-        deadline.resolve(UNAVAILABLE)
-      },
-      ms: OPEN_MS,
-    })
-    return Promise.race([open(), deadline.promise]).finally(() => timers.clear(timer))
+        return UNAVAILABLE
+      case BOUNDED_OUTCOMES.failed:
+        throw bounded.error
+      default: {
+        const unreachable: never = bounded
+        return unreachable
+      }
+    }
   }
 
   type HandProps = { opened: OpenedEngine<T> }

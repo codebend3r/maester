@@ -3,10 +3,9 @@ import type { PortLike } from '@/main/player/playerPort'
 import type {
   AccountRefusalReader,
   FailureExplainer,
-  PlayerOutcome,
-  PlayerService,
   ResolvedSource,
-} from '@/main/player/playerService'
+} from '@/main/player/loadTarget'
+import type { PlayerOutcome, PlayerService } from '@/main/player/playerService'
 import type { Timers } from '@/main/stateStore'
 
 const OK: PlayerOutcome = { ok: true }

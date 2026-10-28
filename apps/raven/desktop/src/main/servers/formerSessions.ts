@@ -1,7 +1,8 @@
 import { join } from 'node:path'
-import { isOpaqueId, isRecord } from '@raven/core'
+import { isOpaqueId } from '@raven/core'
+import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
 import { loggable } from '@/main/servers/serverCalls'
-import { ERROR_CODES, type Timers } from '@/main/stateStore'
+import { isMissingFile, type Timers } from '@/main/stateStore'
 import { messageOf } from '@/shared/messageOf'
 
 /** The folder under userData where Electron keeps each `persist:` partition. */
@@ -12,9 +13,6 @@ export const PARTITIONS_DIR = 'Partitions'
 // Main's calls now carry the page's own unlock, so none of them is read any more.
 const PARTITION_FOLDER = /^server%3A(.+)$/u
 
-/** How a step that races its budget ends. */
-const RACE_OUTCOMES = { late: 'late' } as const
-
 type FormerPartitionsProps = { names: readonly string[] }
 
 /** The folders in `names` that are an older Raven's server partitions. */
@@ -23,8 +21,6 @@ export const formerPartitions = ({ names }: FormerPartitionsProps): string[] =>
     const id = PARTITION_FOLDER.exec(name)?.[1] ?? null
     return id !== null && isOpaqueId(id)
   })
-
-const isMissing = (error: unknown): boolean => isRecord(error) && error.code === ERROR_CODES.enoent
 
 /**
  * How long launch waits to list the partitions folder; a slow disk skips the cleanup this time
@@ -53,23 +49,28 @@ export const clearFormerPartitions = async ({
   warn,
 }: ClearFormerPartitionsProps): Promise<{ removing: Promise<void> }> => {
   const listing = fs.readdir(dir).catch((error: unknown): readonly string[] => {
-    if (!isMissing(error)) {
+    if (!isMissingFile(error)) {
       warn(`Raven could not read its server sessions: ${loggable(messageOf(error))}`)
     }
     return []
   })
-  const budget: { handle: unknown } = { handle: null }
-  const late = new Promise<typeof RACE_OUTCOMES.late>((resolve) => {
-    budget.handle = timers.set({ run: () => resolve(RACE_OUTCOMES.late), ms: FORMER_LIST_MS })
-  })
-  const names = await Promise.race([listing, late]).finally(() => timers.clear(budget.handle))
-  if (names === RACE_OUTCOMES.late) {
-    warn(
-      `Raven did not list its server sessions within ${FORMER_LIST_MS} ms, so it clears none this time`,
-    )
-    return { removing: Promise.resolve() }
+  const listed = await within({ task: listing, ms: FORMER_LIST_MS, timers })
+  switch (listed.outcome) {
+    case BOUNDED_OUTCOMES.answered:
+      break
+    case BOUNDED_OUTCOMES.late:
+      warn(
+        `Raven did not list its server sessions within ${FORMER_LIST_MS} ms, so it clears none this time`,
+      )
+      return { removing: Promise.resolve() }
+    case BOUNDED_OUTCOMES.failed:
+      throw listed.error
+    default: {
+      const unreachable: never = listed
+      return unreachable
+    }
   }
-  const removals = formerPartitions({ names }).map((name) =>
+  const removals = formerPartitions({ names: listed.result }).map((name) =>
     fs.remove(join(dir, name)).catch((error: unknown) => {
       warn(`Raven could not clear ${name}: ${loggable(messageOf(error))}`)
     }),

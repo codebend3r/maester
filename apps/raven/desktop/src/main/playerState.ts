@@ -68,6 +68,18 @@ export type PlayerState = Infer<typeof isPlayerState>
 
 export type FileFacts = { path: string; size: number; mtimeMs: number }
 
+type ReadFactsProps = {
+  stat: (path: string) => Promise<{ size: number; mtimeMs: number }>
+  path: string
+}
+
+/** The file as the state keys it, or null when it cannot be read. */
+export const readFacts = ({ stat, path }: ReadFactsProps): Promise<FileFacts | null> =>
+  stat(path).then(
+    ({ size, mtimeMs }): FileFacts | null => ({ path, size, mtimeMs }),
+    () => null,
+  )
+
 export const EMPTY_STATE: PlayerState = {
   version: 1,
   recents: [],

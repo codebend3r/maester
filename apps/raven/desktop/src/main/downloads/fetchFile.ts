@@ -1,9 +1,9 @@
 import { AUTH_REFUSALS, LOCKED_STATUS } from '@raven/core'
 import type { AccountRefusal } from '@/main/downloads/downloadMessages'
 import { ACCOUNT_REFUSAL_STATUSES, readShort, refusalAt } from '@/main/servers/authRefusals'
-import type { Timers } from '@/main/stateStore'
+import { ERROR_CODES, errorCodeOf, type Timers } from '@/main/stateStore'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { HTTP_STATUSES } from '@/shared/httpStatuses'
+import { HTTP_STATUSES, isSuccessStatus } from '@/shared/httpStatuses'
 
 export const PROGRESS_STEP_BYTES = 8 * 1024 ** 2
 export const PROGRESS_STEP_MS = 1000
@@ -105,8 +105,7 @@ const failure = ({ reason, status = null, refusal = null, bytes }: FailureProps)
 const isAbortError = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
 
-const isNoSpace = (error: unknown): boolean =>
-  typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOSPC'
+const isNoSpace = (error: unknown): boolean => errorCodeOf(error) === ERROR_CODES.noSpace
 
 const CONTENT_RANGE = /^bytes (\d+)-(\d+)\/(?:\d+|\*)$/u
 
@@ -133,7 +132,7 @@ const promisedSize = ({ from, headers }: PromisedSizeProps): number | null => {
 }
 
 const refusalFor = (status: number): { reason: FailureReason; status: number } | null => {
-  if (status >= 200 && status < 300) return null
+  if (isSuccessStatus(status)) return null
   switch (status) {
     case HTTP_STATUSES.unauthorized:
       return { reason: FETCH_REASONS.unauthorized, status }

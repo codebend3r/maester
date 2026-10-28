@@ -1,7 +1,5 @@
-import { basename } from 'node:path'
 import {
   type AudioDevice,
-  ENGINE_STOPPED,
   isNumber,
   isTrackIndex,
   type OutputSettings,
@@ -14,7 +12,6 @@ import {
   type PlayerErrorReason,
   type PlayerEvent,
   type PlayerRefusalReason,
-  type PlayerSource,
 } from '@raven/core'
 import {
   MPV_CHOICES,
@@ -22,96 +19,39 @@ import {
   MPV_END_FILE_REASONS,
   MPV_EVENTS,
   MPV_PROPERTIES,
-  type Mpv,
   type MpvEvent,
   type MpvProperty,
-  type MpvPropertyValue,
   type MpvTrack,
 } from '@raven/mpv'
-import type { Grants } from '@/main/grants'
+import { clamp, numbersOf } from '@/main/player/commandNumbers'
 import { displayOptions } from '@/main/player/displayOptions'
 import { HARDENED_OPTIONS } from '@/main/player/engine'
+import { guardedMpv, type MpvControl } from '@/main/player/guardedMpv'
 import {
-  isVolumeFixedFor,
-  MPV_OPTIONS,
-  type MpvOption,
-  outputOptions,
-} from '@/main/player/outputOptions'
+  type AccountRefusalReader,
+  type FailureExplainer,
+  type LoadTarget,
+  loadfileOptionsFor,
+  locationOf,
+  type ResolveSource,
+  type ServerTarget,
+  sidecarsOfTarget,
+  withoutTarget,
+} from '@/main/player/loadTarget'
+import { isVolumeFixedFor, MPV_OPTIONS, outputOptions } from '@/main/player/outputOptions'
+import { type Phase, PLAYER_PHASES, type ShowingPhase } from '@/main/player/phases'
+import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
+import { createQuietMpv } from '@/main/player/quietMpv'
+import { createSidecarAdder } from '@/main/player/sidecars'
+import { createThrottle } from '@/main/player/throttle'
 import { aidFor, sidFor, tracksFromMpv } from '@/main/player/tracksFromMpv'
 import type { Timers } from '@/main/stateStore'
 import { messageOf } from '@/shared/messageOf'
 
-export type MpvControl = Pick<Mpv, 'command' | 'set' | 'read' | 'observe'>
 export type PlayerOutcome =
   | { ok: true }
   | { ok: false; reason: PlayerRefusalReason; message: string }
 export type PlayerActivity = { isPlaying: boolean; isShowing: boolean }
-
-export const PLAYER_MESSAGES = {
-  notOpen: 'That video is no longer open. Open it again from On this Mac or Downloads.',
-  cannotOpen: 'Raven could not open this video.',
-  stopped: 'Raven could not keep playing this video.',
-  engineStopped: ENGINE_STOPPED,
-  noTrack: 'That track is not in this video.',
-  failed: 'Raven could not do that.',
-  /** A server title's failure when the server could not say why; the source names the server when it can. */
-  lost: 'Raven lost its connection to the server. Where you stopped last is saved there.',
-} as const
-
-/**
- * Sent with every server title. lavf must not follow a redirect, which would carry the
- * server's cookie to wherever it points (Ruling 14). mpv has lavf reconnect a dropped
- * stream after 0, 1, 3 and 7 s and gives every read 60 s: these keep 0, 1 and 3 s (a
- * Wi-Fi blip) and 15 s a read, so a server that went away stops its title about 4 s
- * after the last byte. One that hangs would cost seven reads (about 2 minutes), so the
- * service's stall budget (`SERVER_STALL_MS`) ends the title first.
- * `stream-lavf-o` is applied after mpv's own lavf defaults, so it overrides them.
- */
-const SERVER_LOAD_OPTIONS = {
-  lavf: 'max_redirects=0,reconnect_delay_max=3',
-  networkTimeout: 15,
-} as const
-
-/**
- * Options a server title carries on its own `loadfile`, never set globally: mpv reads
- * them as it opens a stream, not when a command is sent, so a global value set for the
- * next title could ride on the request of the one before. Per-file values also end with
- * their file, and a global set would override them.
- */
-export const PER_FILE_OPTIONS = ['http-header-fields', 'stream-lavf-o', 'network-timeout'] as const
-
-/**
- * Any way of naming a per-file option outside `loadfile`: itself, its list suffixes
- * (`-append`, `-set`, ...) and its `file-local-options/` or `options/` paths.
- */
-const namesPerFileOption = (name: string): boolean =>
-  PER_FILE_OPTIONS.some((option) => name.includes(option))
-
-/**
- * mpv as the service reaches it: a per-file option set, changed or cycled by any route
- * but the `loadfile` options fails before mpv hears of it.
- */
-export const guardedMpv = (mpv: MpvControl): MpvControl => ({
-  ...mpv,
-  set: async (option) => {
-    if (namesPerFileOption(option.name)) {
-      throw new Error(`${option.name} is set per file, never globally`)
-    }
-    await mpv.set(option)
-  },
-  command: async (input) => {
-    const [name = ''] = input.args
-    const named = name === MPV_COMMANDS.loadfile ? undefined : input.args.find(namesPerFileOption)
-    if (named !== undefined) throw new Error(`${named} is set per file, never globally`)
-    await mpv.command(input)
-  },
-})
-
-/** How long a server title's first snapshot waits for its sidecars before it goes on. */
-export const SIDECAR_BUDGET_MS = 3000
-
-/** What the sidecars' race answers when the budget runs out first. */
-const SIDECAR_LATE = 'late'
 
 /**
  * How long a server title may wait on its server without the clock moving before the
@@ -119,49 +59,6 @@ const SIDECAR_LATE = 'late'
  * and then sends nothing hold the page for about two minutes.
  */
 export const SERVER_STALL_MS = 30_000
-
-/** Where a title is in its life: `dead` once mpv stopped for good. */
-export const PLAYER_PHASES = {
-  idle: 'idle',
-  loading: 'loading',
-  loaded: 'loaded',
-  dead: 'dead',
-} as const
-type Phase = (typeof PLAYER_PHASES)[keyof typeof PLAYER_PHASES]
-type ShowingPhase = typeof PLAYER_PHASES.loading | typeof PLAYER_PHASES.loaded
-
-export type ServerTarget = {
-  kind: typeof PLAYER_SOURCE_KINDS.server
-  serverId: string
-  mediaId: number
-  url: string
-  sidecars: readonly { url: string; title: string; language: string }[]
-  /** The loopback relay load this title plays through. Its base names the load's secret, which warnings blank. */
-  relay: { loadId: string; base: string }
-}
-export type LocalSidecar = { path: string; title: string; language: string }
-type FileTarget = {
-  kind: typeof PLAYER_SOURCE_KINDS.file
-  path: string
-  sidecars: readonly LocalSidecar[]
-}
-type LoadTarget = FileTarget | ServerTarget
-export type ResolvedSource = { ok: true; target: LoadTarget } | { ok: false; message: string }
-/**
- * The account failure the relay saw for a server title, read synchronously, or null: a title
- * refused mid-play says access was removed, never that the connection was lost.
- */
-export type AccountRefusalReader = (
-  target: ServerTarget,
-) => { reason: PlayerErrorReason; message: string } | null
-type FailureExplainerProps = {
-  target: ServerTarget
-  phase: ShowingPhase
-}
-
-export type FailureExplainer = (
-  input: FailureExplainerProps,
-) => Promise<{ reason: PlayerErrorReason; message: string }>
 
 export const OBSERVED = [
   MPV_PROPERTIES.timePos,
@@ -182,47 +79,6 @@ const EOF_SHORT_S = 5
 
 /** How far a buffered range edge must move before the page hears of it. */
 const BUFFERED_STEP_S = 0.5
-
-/** What a warning says in place of the open file's path or name. */
-const OPEN_FILE = '<file>'
-/** What a warning says in place of a relayed title's base or the secret inside it. */
-const RELAYED = '<relay>'
-
-type ResolveSourceWithProps = {
-  grants: Pick<Grants, 'fileOf'>
-  servers: {
-    resolve: (
-      source: Extract<PlayerSource, { kind: typeof PLAYER_SOURCE_KINDS.server }>,
-    ) => Promise<ResolvedSource>
-  }
-  /** The subtitle files that belong to a granted file, keyed by its `fileId`. */
-  sidecarsOf: (fileId: string) => readonly LocalSidecar[]
-}
-
-export const resolveSourceWith =
-  ({ grants, servers, sidecarsOf }: ResolveSourceWithProps) =>
-  async (source: PlayerSource): Promise<ResolvedSource> => {
-    switch (source.kind) {
-      case PLAYER_SOURCE_KINDS.server:
-        return servers.resolve(source)
-      case PLAYER_SOURCE_KINDS.file: {
-        const file = grants.fileOf(source.fileId)
-        if (file === null) return { ok: false, message: PLAYER_MESSAGES.notOpen }
-        return {
-          ok: true,
-          target: {
-            kind: PLAYER_SOURCE_KINDS.file,
-            path: file.path,
-            sidecars: sidecarsOf(source.fileId),
-          },
-        }
-      }
-      default: {
-        const unreachable: never = source
-        return unreachable
-      }
-    }
-  }
 
 type ApplyOutputProps = { output: OutputSettings; devices: readonly AudioDevice[] }
 
@@ -259,82 +115,6 @@ const ENGINE_GONE: PlayerOutcome = {
   message: PLAYER_MESSAGES.engineStopped,
 }
 
-/** mpv's `%len%` quoting, so a value may hold `,` or `=` without ending the option. */
-const quoted = (value: string): string => `%${new TextEncoder().encode(value).length}%${value}`
-
-type LoadfileOptionsForProps = { target: LoadTarget; start: number }
-
-/**
- * The `loadfile` options for a target: where it starts, and for a server title the
- * redirect and reconnect limits and the network timeout, which mpv applies
- * to this file alone (sidecars added while it plays included) and drops when it ends.
- */
-const loadfileOptionsFor = ({ target, start }: LoadfileOptionsForProps): string => {
-  switch (target.kind) {
-    case PLAYER_SOURCE_KINDS.file:
-      return `start=${start}`
-    case PLAYER_SOURCE_KINDS.server:
-      return [
-        `start=${start}`,
-        `stream-lavf-o=${quoted(SERVER_LOAD_OPTIONS.lavf)}`,
-        `network-timeout=${SERVER_LOAD_OPTIONS.networkTimeout}`,
-      ].join(',')
-    default: {
-      const unreachable: never = target
-      return unreachable
-    }
-  }
-}
-
-const locationOf = (target: LoadTarget): string => {
-  switch (target.kind) {
-    case PLAYER_SOURCE_KINDS.file:
-      return target.path
-    case PLAYER_SOURCE_KINDS.server:
-      return target.url
-    default: {
-      const unreachable: never = target
-      return unreachable
-    }
-  }
-}
-
-type Sidecar = { location: string; title: string; language: string }
-
-/** What `sub-add` is given for each of a target's sidecars: a URL for a server, a path for a file. */
-const sidecarsOfTarget = (target: LoadTarget): readonly Sidecar[] => {
-  switch (target.kind) {
-    case PLAYER_SOURCE_KINDS.file:
-      return target.sidecars.map(({ path, title, language }) => ({
-        location: path,
-        title,
-        language,
-      }))
-    case PLAYER_SOURCE_KINDS.server:
-      return target.sidecars.map(({ url, title, language }) => ({
-        location: url,
-        title,
-        language,
-      }))
-    default: {
-      const unreachable: never = target
-      return unreachable
-    }
-  }
-}
-
-const subAddArgs = ({ location, title, language }: Sidecar): string[] => [
-  MPV_COMMANDS.subAdd,
-  location,
-  'auto',
-  title,
-  language,
-]
-
-type ClampProps = { value: number; min: number; max: number }
-
-const clamp = ({ value, min, max }: ClampProps) => Math.min(max, Math.max(min, value))
-
 type HasMovedProps = { shown: readonly Range[] | null; next: readonly Range[] }
 
 const hasMoved = ({ shown, next }: HasMovedProps) =>
@@ -349,37 +129,9 @@ const hasMoved = ({ shown, next }: HasMovedProps) =>
     )
   })
 
-/** The numbers a command carries, which must be finite before any of them is used. */
-const numbersOf = (command: PlayerCommand): number[] => {
-  switch (command.type) {
-    case PLAYER_COMMANDS.load:
-      return [command.start, ...(command.audio === null ? [] : [command.audio])]
-    case PLAYER_COMMANDS.seek:
-      return [command.time]
-    case PLAYER_COMMANDS.audio:
-      return command.index === null ? [] : [command.index]
-    case PLAYER_COMMANDS.volume:
-      return [command.volume]
-    case PLAYER_COMMANDS.speed:
-      return [command.rate]
-    case PLAYER_COMMANDS.subtitleScale:
-      return [command.scale]
-    case PLAYER_COMMANDS.play:
-    case PLAYER_COMMANDS.pause:
-    case PLAYER_COMMANDS.subtitle:
-    case PLAYER_COMMANDS.stats:
-    case PLAYER_COMMANDS.stop:
-      return []
-    default: {
-      const unreachable: never = command
-      return unreachable
-    }
-  }
-}
-
 type CreatePlayerServiceProps = {
   mpv: MpvControl
-  resolveSource: ReturnType<typeof resolveSourceWith>
+  resolveSource: ResolveSource
   explain: FailureExplainer
   refusedAccount: AccountRefusalReader
   canChooseAo: boolean
@@ -406,26 +158,10 @@ export const createPlayerService = ({
   // What the newest load opened, and its ticket, which an ending explains and a server's
   // removal stops.
   let opened: LoadTarget | null = null
-  // mpv's warnings name the file it plays and its sidecars, which the log must not hold
-  // (Ruling 12). Whole paths go first so a name inside one is not replaced on its own.
-  // A relayed title's base holds its load's secret, which the log must not hold either.
-  const withoutOpenFile = (message: string): string => {
-    if (opened === null) return message
-    if (opened.kind === PLAYER_SOURCE_KINDS.server) {
-      const { base } = opened.relay
-      const secret = base.slice(base.lastIndexOf('/') + 1)
-      return [base, secret]
-        .filter((name) => name !== '')
-        .reduce((text, name) => text.replaceAll(name, RELAYED), message)
-    }
-    const paths = [opened.path, ...opened.sidecars.map(({ path }) => path)]
-    const named = [...paths, ...paths.map((path) => basename(path))].filter((name) => name !== '')
-    return named.reduce((text, name) => text.replaceAll(name, OPEN_FILE), message)
-  }
   // These run inside the wrapper's event drain, so nothing they throw may escape.
   const warn = (message: string) => {
     try {
-      reportWarning(withoutOpenFile(message))
+      reportWarning(withoutTarget({ target: opened, message }))
     } catch {
       // A warning that cannot be written has nowhere left to go.
     }
@@ -487,11 +223,7 @@ export const createPlayerService = ({
   let isSeeking = false
   let isWaiting = false
   let bufferedShown: readonly Range[] | null = null
-  let bufferedLatest: readonly Range[] | null = null
-  let bufferedTimer: unknown = null
-  let timeTimer: unknown = null
   let stallTimer: unknown = null
-  let timeHeld: number | null = null
   // The newest time handed to the page, sent or held, and a count of the seeks sent, so
   // a time read that answers late cannot step the clock back unless a seek moved it.
   let shownTime: number | null = null
@@ -513,11 +245,23 @@ export const createPlayerService = ({
     emit({ type: PLAYER_EVENTS.tracks, tracks: tracksFromMpv({ list: trackList, frameRate }) })
   }
 
+  const buffered = createThrottle<readonly Range[]>({
+    timers,
+    ms: BUFFERED_MS,
+    show: (ranges) => {
+      if (!hasMoved({ shown: bufferedShown, next: ranges })) return false
+      bufferedShown = ranges
+      emit({
+        type: PLAYER_EVENTS.buffered,
+        ranges: ranges.map(({ start, end }) => ({ start, end })),
+      })
+      return true
+    },
+  })
+
   const clearBuffered = () => {
-    if (bufferedTimer !== null) timers.clear(bufferedTimer)
-    bufferedTimer = null
+    buffered.clear()
     bufferedShown = null
-    bufferedLatest = null
   }
 
   /** What the newest load opened, when it is a server title. */
@@ -529,29 +273,23 @@ export const createPlayerService = ({
     stallTimer = null
   }
 
+  const time = createThrottle<number>({
+    timers,
+    ms: TIME_MS,
+    show: (value) => {
+      emit({ type: PLAYER_EVENTS.time, time: value })
+      return true
+    },
+  })
+
   const clearTime = () => {
-    if (timeTimer !== null) timers.clear(timeTimer)
-    timeTimer = null
-    timeHeld = null
+    time.clear()
     shownTime = null
   }
 
-  const showTime = (time: number) => {
-    shownTime = time
-    if (timeTimer !== null) {
-      timeHeld = time
-      return
-    }
-    emit({ type: PLAYER_EVENTS.time, time })
-    timeTimer = timers.set({
-      run: () => {
-        timeTimer = null
-        const held = timeHeld
-        timeHeld = null
-        if (held !== null) showTime(held)
-      },
-      ms: TIME_MS,
-    })
+  const showTime = (value: number) => {
+    shownTime = value
+    time.push(value)
   }
 
   const resetFile = () => {
@@ -626,29 +364,6 @@ export const createPlayerService = ({
     stallTimer = timers.set({ run: () => onServerStalled(token), ms: serverStallMs })
   }
 
-  const showBuffered = (ranges: readonly Range[]) => {
-    if (!hasMoved({ shown: bufferedShown, next: ranges })) return
-    bufferedShown = ranges
-    emit({ type: PLAYER_EVENTS.buffered, ranges: ranges.map(({ start, end }) => ({ start, end })) })
-    bufferedTimer = timers.set({
-      run: () => {
-        bufferedTimer = null
-        const latest = bufferedLatest
-        bufferedLatest = null
-        if (latest !== null) showBuffered(latest)
-      },
-      ms: BUFFERED_MS,
-    })
-  }
-
-  const onBuffered = (ranges: readonly Range[]) => {
-    if (bufferedTimer !== null) {
-      bufferedLatest = ranges
-      return
-    }
-    showBuffered(ranges)
-  }
-
   const updateWaiting = () => {
     const next = isPausedForCache || isSeeking
     if (next === isWaiting) return
@@ -657,36 +372,7 @@ export const createPlayerService = ({
     emit({ type: PLAYER_EVENTS.waiting, waiting: next })
   }
 
-  const setQuietly = async ({ name, value }: MpvOption) => {
-    try {
-      await mpv.set({ name, value })
-    } catch (error) {
-      warn(`mpv set ${name} failed: ${messageOf(error)}`)
-    }
-  }
-
-  const setEach = (options: readonly MpvOption[]) =>
-    options.reduce<Promise<void>>(
-      (chain, option) => chain.then(() => setQuietly(option)),
-      Promise.resolve(),
-    )
-
-  type ReadOrProps<K extends MpvProperty> = {
-    name: K
-    fallback: MpvPropertyValue<K>
-  }
-
-  const readOr = async <K extends MpvProperty>({
-    name,
-    fallback,
-  }: ReadOrProps<K>): Promise<MpvPropertyValue<K>> => {
-    try {
-      return await mpv.read({ name })
-    } catch (error) {
-      warn(`mpv read ${name} failed: ${messageOf(error)}`)
-      return fallback
-    }
-  }
+  const { set: setQuietly, setEach, readOr, harden } = createQuietMpv({ mpv, warn })
 
   const aidOf = (index: number | null) => {
     if (index === null || !isTrackIndex(index)) return MPV_CHOICES.auto
@@ -698,8 +384,8 @@ export const createPlayerService = ({
     return sidFor({ list: trackList, id }) ?? 'no'
   }
 
-  const seekTarget = (time: number) =>
-    clamp({ value: time, min: 0, max: duration ?? Number.POSITIVE_INFINITY })
+  const seekTarget = (value: number) =>
+    clamp({ value, min: 0, max: duration ?? Number.POSITIVE_INFINITY })
 
   /**
    * The target counts as the time from the moment it is sent, since the eof a seek to the
@@ -710,7 +396,7 @@ export const createPlayerService = ({
     const previous = lastTime
     const token = epoch
     lastTime = target
-    timeHeld = null
+    time.drop()
     shownTime = null
     seeks += 1
     try {
@@ -721,57 +407,12 @@ export const createPlayerService = ({
     }
   }
 
-  type AddSidecarsProps = {
-    sidecars: readonly Sidecar[]
-    token: number
-  }
-
-  /** Adds a title's sidecars one at a time, in order; false when overtaken. */
-  const addSidecars = ({ sidecars, token }: AddSidecarsProps): Promise<boolean> =>
-    sidecars.reduce<Promise<boolean>>(async (chain, sidecar, position) => {
-      if (!(await chain)) return false
-      try {
-        await mpv.command({ args: subAddArgs(sidecar) })
-      } catch (error) {
-        warn(`mpv sub-add of sidecar ${position} failed: ${messageOf(error)}`)
-      }
-      return token === epoch
-    }, Promise.resolve(true))
-
-  type SidecarsWithinBudgetProps = {
-    sidecars: readonly Sidecar[]
-    kind: LoadTarget['kind']
-    token: number
-  }
-
-  /**
-   * Waits for a title's sidecars, but no longer than `SIDECAR_BUDGET_MS`: a slow
-   * server or disk must not hold the first events back. Late sidecars still go in, in order, and
-   * reach the page through `track-list`; `pending` is that chain when it outlasted the
-   * budget, and `isCurrent` is false when the load was overtaken.
-   */
-  const sidecarsWithinBudget = async ({
-    sidecars,
-    kind,
-    token,
-  }: SidecarsWithinBudgetProps): Promise<{
-    isCurrent: boolean
-    pending: Promise<boolean> | null
-  }> => {
-    const budget: { handle: unknown } = { handle: null }
-    const late = new Promise<typeof SIDECAR_LATE>((resolve) => {
-      budget.handle = timers.set({ run: () => resolve(SIDECAR_LATE), ms: SIDECAR_BUDGET_MS })
-    })
-    const adding = addSidecars({ sidecars, token })
-    try {
-      const outcome = await Promise.race([adding, late])
-      if (outcome !== SIDECAR_LATE) return { isCurrent: outcome && token === epoch, pending: null }
-      warn(`${kind} sidecars are slow; the title starts without them`)
-      return { isCurrent: token === epoch, pending: adding }
-    } finally {
-      timers.clear(budget.handle)
-    }
-  }
+  const sidecarAdder = createSidecarAdder({
+    mpv,
+    timers,
+    warn,
+    isCurrent: (token) => token === epoch,
+  })
 
   type SelectLateSubtitleProps = {
     pending: Promise<boolean>
@@ -802,7 +443,7 @@ export const createPlayerService = ({
     const sidecars =
       opened === null || toAdd.length === 0
         ? { isCurrent: true, pending: null }
-        : await sidecarsWithinBudget({ sidecars: toAdd, kind: opened.kind, token })
+        : await sidecarAdder.addWithinBudget({ sidecars: toAdd, kind: opened.kind, token })
     if (!sidecars.isCurrent) return
     const list = await readOr({ name: MPV_PROPERTIES.trackList, fallback: [] })
     const fps = await readOr({ name: MPV_PROPERTIES.containerFps, fallback: null })
@@ -998,14 +639,14 @@ export const createPlayerService = ({
     const token = epoch
     const seeksBefore = seeks
     const show = async () => {
-      const time = await readOr({ name: MPV_PROPERTIES.timePos, fallback: null })
-      if (token !== epoch || time === null) return
+      const read = await readOr({ name: MPV_PROPERTIES.timePos, fallback: null })
+      if (token !== epoch || read === null) return
       // A seek sent during the read makes it stale; that seek's playback-restart reads again.
       if (seeks !== seeksBefore) return
-      if (shownTime !== null && time < shownTime) return
-      if (stallTimer !== null && time !== lastTime) restartStall()
-      lastTime = time
-      showTime(time)
+      if (shownTime !== null && read < shownTime) return
+      if (stallTimer !== null && read !== lastTime) restartStall()
+      lastTime = read
+      showTime(read)
     }
     show()
       .catch((error: unknown) => {
@@ -1062,7 +703,7 @@ export const createPlayerService = ({
         emitTracks()
         return
       case MPV_PROPERTIES.demuxerCacheState:
-        onBuffered(event.data?.['seekable-ranges'] ?? [])
+        buffered.push(event.data?.['seekable-ranges'] ?? [])
         return
       default:
         return
@@ -1177,14 +818,14 @@ export const createPlayerService = ({
     }
   }
 
-  const seek = async (time: number) => {
+  const seek = async (value: number) => {
     if (phase === PLAYER_PHASES.loading) {
-      pendingSeek = Math.max(0, time)
+      pendingSeek = Math.max(0, value)
       return OK
     }
     if (phase !== PLAYER_PHASES.loaded) return OK
     pendingSeek = null
-    await sendSeek(seekTarget(time))
+    await sendSeek(seekTarget(value))
     return OK
   }
 
@@ -1294,17 +935,6 @@ export const createPlayerService = ({
 
   // Sent before anything else, so mpv applies it before any loadfile. It fails closed:
   // a failed set refuses every load.
-  const harden = async (options: readonly MpvOption[]): Promise<boolean> => {
-    const [first, ...rest] = options
-    if (first === undefined) return true
-    try {
-      await mpv.set(first)
-    } catch (error) {
-      warn(`mpv set ${first.name} failed: ${messageOf(error)}`)
-      return false
-    }
-    return harden(rest)
-  }
   const hardening = harden(HARDENED_OPTIONS)
 
   OBSERVED.forEach((name) => mpv.observe({ name }))

@@ -17,11 +17,13 @@ import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { downloadsDirFor, sidecarPathFor, videoPathFor } from '@/main/downloads/space'
 import type { GrantedFile, Grants } from '@/main/grants'
 import { errorText } from '@/main/log/errorText'
-import type { LocalSidecar } from '@/main/player/playerService'
+import type { LocalSidecar } from '@/main/player/loadTarget'
+import { refused } from '@/main/replies'
 import {
   type FileFacts,
   forgetResume,
   type PlayerState,
+  readFacts as readFileFacts,
   RECENT_KINDS,
   removeRecent,
   resumeFor,
@@ -166,8 +168,6 @@ export type DownloadPlayback = {
   /** The queue's `onRemoved`: what names a removed download goes, its recent and resume spot too. */
   forget: (entries: readonly DownloadEntry[]) => void
 }
-
-const refused = (message: string): DesktopReply => ({ type: DESKTOP_REPLIES.refused, message })
 
 /** A granted file one side of the player is on, and the download whose video it is, if any. */
 type Slot = { fileId: string | null; downloadId: string | null }
@@ -437,10 +437,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   /** Reads a ready download's file for its share watched; a file that cannot be read shows none. */
   const readFacts = async (entry: DownloadEntry): Promise<boolean> => {
     const path = videoPathOf(entry)
-    const facts = await deps.stat(path).then(
-      ({ size, mtimeMs }): FileFacts | null => ({ path, size, mtimeMs }),
-      () => null,
-    )
+    const facts = await readFileFacts({ stat: deps.stat, path })
     // A download removed while its file was read keeps nothing.
     if (facts === null || entryById(store.read(), { downloadId: entry.downloadId }) === null) {
       return false
