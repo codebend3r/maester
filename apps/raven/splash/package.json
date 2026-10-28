@@ -1,0 +1,56 @@
+{
+  "name": "@raven/splash",
+  "version": "0.7.5",
+  "private": true,
+  "description": "raven's front door: download Raven for the desktop or open the web app",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint:css": "gale \"src/**/*.scss\"",
+    "lint:css:fix": "gale --fix \"src/**/*.scss\"",
+    "lint:ts": "oxlint",
+    "lint:ts:fix": "oxlint --fix",
+    "preview": "vite preview",
+    "test": "bun test --dots",
+    "test:watch": "bun test --dots --watch",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@fontsource-variable/instrument-sans": "5.3.0",
+    "@fontsource/young-serif": "5.3.0"
+  },
+  "devDependencies": {
+    "@codebend3r/gale": "0.3.1",
+    "@types/bun": "1.4.2",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "sass": "1.104.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  },
+  "nx": {
+    "projectType": "application",
+    "tags": [
+      "scope:web",
+      "lang:ts"
+    ],
+    "includedScripts": [
+      "dev",
+      "build",
+      "preview",
+      "typecheck",
+      "lint:ts",
+      "lint:ts:fix",
+      "lint:css",
+      "lint:css:fix",
+      "format",
+      "format:check",
+      "test",
+      "test:watch"
+    ]
+  }
+}

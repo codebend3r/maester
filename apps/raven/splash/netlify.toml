@@ -1,0 +1,18 @@
+# raven's splash page at maester.netlify.app. The site's package directory is
+# apps/raven/splash and its base directory the repo root, where bun.lock is:
+# Netlify installs and builds there, so the paths below are from the root.
+
+[build]
+command = "bun run build:raven:splash"
+publish = "apps/raven/splash/dist"
+
+[build.environment]
+BUN_VERSION = "1.4.2"
+BUN_FLAGS = "--frozen-lockfile"
+NX_DAEMON = "false"
+
+# Vite hashes every file under assets/.
+[[headers]]
+for = "/assets/*"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"

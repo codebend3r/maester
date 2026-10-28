@@ -1,0 +1,76 @@
+// The versions page: one entry per release, its files and its notes.
+.versions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'pitch'
+    'status'
+    'list';
+  gap: var(--space-6);
+}
+
+.versions-status {
+  grid-area: status;
+}
+
+.version-list {
+  grid-area: list;
+  display: grid;
+  gap: var(--space-5);
+}
+
+.version {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+  grid-template-areas:
+    'heading files'
+    'date files'
+    'notes files';
+  align-content: start;
+  gap: var(--space-1) var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+
+  @media (max-width: 40rem) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'heading'
+      'date'
+      'files'
+      'notes';
+  }
+}
+
+.version-heading {
+  grid-area: heading;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  line-height: var(--line-heading);
+}
+
+.version-date {
+  grid-area: date;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.version-files {
+  grid-area: files;
+  display: grid;
+  align-content: start;
+  max-width: 28rem;
+}
+
+.version-notes {
+  grid-area: notes;
+  justify-self: start;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  text-underline-offset: 0.2em;
+
+  &:hover {
+    color: var(--color-bark);
+  }
+}

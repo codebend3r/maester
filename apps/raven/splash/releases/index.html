@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#15201e" />
+    <meta name="description" content="Every version of Raven for Mac, with its downloads." />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Every version of Raven</title>
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="/">
+        <img src="/brand/raven-mark-on-dark.svg" alt="" width="36" height="39" />
+        <span>raven</span>
+      </a>
+      <nav class="masthead-links" aria-label="Project">
+        <a href="https://github.com/codebend3r/maester">Source</a>
+        <a href="https://github.com/codebend3r/maester/releases">Releases</a>
+      </nav>
+    </header>
+
+    <main class="page">
+      <section class="versions">
+        <div class="pitch">
+          <h1>Every version</h1>
+          <p>
+            Each release of Raven for Mac, newest first, with its files. The app checks for the next
+            one itself, so you only need one of these.
+          </p>
+        </div>
+        <p class="fine versions-status" id="versions-status">Asking GitHub for the list.</p>
+        <ul class="version-list" id="versions"></ul>
+      </section>
+    </main>
+
+    <footer class="colophon">
+      <p>raven is open source. The code, the roadmap and every release are on GitHub.</p>
+      <p>
+        <a href="https://github.com/codebend3r/maester">github.com/codebend3r/maester</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/versions.ts"></script>
+  </body>
+</html>

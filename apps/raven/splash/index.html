@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#15201e" />
+    <meta
+      name="description"
+      content="raven plays the videos on your own disk: in the browser, or in the Raven app for Mac."
+    />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>raven</title>
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="/">
+        <img src="/brand/raven-mark-on-dark.svg" alt="" width="36" height="39" />
+        <span>raven</span>
+      </a>
+      <nav class="masthead-links" aria-label="Project">
+        <a href="https://github.com/codebend3r/maester">Source</a>
+        <a href="https://github.com/codebend3r/maester/releases">Releases</a>
+      </nav>
+    </header>
+
+    <main class="page">
+      <section class="hero">
+        <div class="pitch">
+          <h1>Your videos, played from your own disk.</h1>
+          <p>
+            Point raven at the folders you keep your videos in. It indexes them, makes a thumbnail
+            for each, and plays them straight from the file, converting only what the player cannot
+            play as it is.
+          </p>
+          <div class="actions">
+            <details class="download" id="download">
+              <summary class="action action-primary">Download for Mac</summary>
+              <ul class="download-menu" id="download-menu">
+                <li>
+                  <a class="file-link" href="https://github.com/codebend3r/maester/releases/latest">
+                    <span>Latest release on GitHub</span>
+                  </a>
+                </li>
+              </ul>
+            </details>
+            <a class="action action-quiet" href="https://raven-player.netlify.app">
+              Open the web app
+            </a>
+          </div>
+          <p class="fine" id="release-note">
+            <span>Apple silicon. Windows is next. </span><a href="/releases/">Every version</a>
+          </p>
+        </div>
+
+        <figure class="stage" aria-hidden="true">
+          <div class="frame">
+            <div class="scene"></div>
+            <div class="chrome">
+              <span class="title">Tonight's film</span>
+              <span class="timeline"><span class="played"></span></span>
+              <span class="clock">1:12:40</span>
+            </div>
+          </div>
+          <ul class="shelf">
+            <li class="poster poster-a"></li>
+            <li class="poster poster-b"></li>
+            <li class="poster poster-c"></li>
+            <li class="poster poster-d"></li>
+            <li class="poster poster-e"></li>
+          </ul>
+        </figure>
+      </section>
+
+      <section class="facts" aria-label="What raven does">
+        <dl>
+          <div class="fact">
+            <dt>Plays what you already have</dt>
+            <dd>
+              Films, shows, home video, anything in a folder. Titles and posters come from TMDB,
+              matched to your files.
+            </dd>
+          </div>
+          <div class="fact">
+            <dt>Direct from disk</dt>
+            <dd>
+              A file the player can handle is streamed as it is. Only what it cannot play is remuxed
+              or transcoded, on the fly, on your own machine.
+            </dd>
+          </div>
+          <div class="fact">
+            <dt>Yours alone</dt>
+            <dd>
+              Accounts you approve, a PIN for the libraries you keep private, and a history of what
+              each viewer watched. Nothing leaves your network unless you say so.
+            </dd>
+          </div>
+          <div class="fact">
+            <dt>On every screen</dt>
+            <dd>
+              The web app in any browser, the Raven app on a Mac with its own player, and the device
+              app for iPhone, iPad, Apple TV and Android TV.
+            </dd>
+          </div>
+        </dl>
+      </section>
+    </main>
+
+    <footer class="colophon">
+      <p>raven is open source. The code, the roadmap and every release are on GitHub.</p>
+      <p>
+        <a href="https://github.com/codebend3r/maester">github.com/codebend3r/maester</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

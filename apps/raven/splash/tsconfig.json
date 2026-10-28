@@ -1,0 +1,12 @@
+{
+  // A static page: Vite, TypeScript and SCSS, no React.
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["bun"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "vite.config.ts", "../../../tooling/web/assets.d.ts"]
+}

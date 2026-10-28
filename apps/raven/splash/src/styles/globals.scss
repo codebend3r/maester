@@ -1,0 +1,128 @@
+// raven's tokens, the subset this page uses, with the values of the web app's
+// default theme (libs/raven/ui/src/styles/globals.scss) so the splash looks
+// like the product it opens.
+:root {
+  --color-night: #15201e;
+  --color-canopy: #1c2b28;
+  --color-canopy-hi: #223430;
+  --color-deep: #0f1816;
+  --color-moss: #2c3e3a;
+  --color-moss-hi: #364a45;
+  --color-bark: #e6e1d6;
+  --color-lichen: #9db0a8;
+  --color-birch: #cfdcd2;
+  --color-leaf: #a8262f;
+  --color-leaf-hi: #b8303a;
+  --color-on-leaf: #ffffff;
+  --color-leaf-bright: #d8414a;
+  --color-fern: #8fcf9f;
+  --color-amber: #e3b45f;
+  --color-stage: #000000;
+  --color-line: color-mix(in srgb, var(--color-bark) 10%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--color-bark) 16%, transparent);
+  --color-bark-faint: rgb(241 236 226 / 22%);
+  --color-on-picture: #f1ece2;
+  --color-on-picture-soft: rgb(246 242 234 / 85%);
+  --fade-from-bottom: linear-gradient(to top, rgb(0 0 0 / 75%), rgb(0 0 0 / 0%));
+  --shadow-poster: 0 14px 30px rgb(0 0 0 / 25%);
+  --shadow-hero: 0 40px 80px rgb(0 0 0 / 45%);
+
+  --space-0: 0.25rem;
+  --space-1: 0.5rem;
+  --space-2: 0.75rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2rem;
+  --space-6: 3rem;
+  --space-7: 4rem;
+  --space-8: 5rem;
+  --space-10: 7rem;
+  --gutter: clamp(1.25rem, 4vw, 3.5rem);
+  --section-gap: clamp(3rem, 5vw, 4.5rem);
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  --font-display: 'Young Serif', georgia, serif;
+  --font-body: 'Instrument Sans Variable', system-ui, sans-serif;
+
+  --font-size-xs: 0.8rem;
+  --font-size-sm: 0.9rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.75rem;
+  --font-size-title: clamp(2.75rem, 1.5rem + 5vw, 5.25rem);
+
+  --line-display: 0.95;
+  --line-heading: 1.05;
+  --line-body: 1.5;
+  --line-relaxed: 1.6;
+
+  --tracking-display: -0.02em;
+  --tracking-tight: -0.01em;
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --max-width: 76rem;
+  --measure: 34rem;
+  --control-size-tall: 3rem;
+  --focus-ring: 2px solid var(--color-bark);
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-night);
+  color: var(--color-bark);
+  font-family: var(--font-body);
+  font-size: var(--font-size-md);
+  line-height: var(--line-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+p,
+dl,
+dt,
+dd,
+ul,
+figure {
+  margin: 0;
+}
+
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+  }
+}
