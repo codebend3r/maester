@@ -21,7 +21,7 @@ import {
   seeAllLabelOf,
 } from '@/layouts/shelfKit'
 import { Logo } from '@/layouts/Logo'
-import { TV_SIZES } from '@/theme/tvSizes'
+import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
 /** Where the Settings entry sits on Home, a place no shelf's card shares. */
@@ -30,19 +30,19 @@ const SETTINGS_PLACE = 'settings'
 type MenuRowProps = {
   label: string
   onPress: () => void
-  onFocused: () => void
   ref?: Ref<ComponentRef<typeof Pressable>>
 }
 
 /** One row of the side menu: a link the remote moves down, its edge and fill showing focus. */
-const MenuRow = ({ label, onPress, onFocused, ref }: MenuRowProps) => {
+const MenuRow = ({ label, onPress, ref }: MenuRowProps) => {
+  const { settle } = useOpeningFocus()
   const styles = useStyles()
   return (
     <Pressable
       ref={ref}
       accessibilityLabel={label}
       accessibilityRole="link"
-      onFocus={onFocused}
+      onFocus={settle}
       onPress={onPress}
       style={({ focused }) => [styles.menuRow, focused && styles.focusedLink]}
     >
@@ -55,20 +55,19 @@ const MenuRow = ({ label, onPress, onFocused, ref }: MenuRowProps) => {
   )
 }
 
-type SettingsEntryProps = { onPress: () => void; onFocused: () => void }
+type SettingsEntryProps = { onPress: () => void }
 
 /**
  * The way into Settings, which takes the remote's focus back when Settings goes, as a card does
  * for the screen it opened: Android TV restores nothing on its own.
  */
-const SettingsEntry = ({ onPress, onFocused }: SettingsEntryProps) => {
+const SettingsEntry = ({ onPress }: SettingsEntryProps) => {
   const view = useRef<ComponentRef<typeof Pressable>>(null)
   const { remember } = useOpenerFocus({ place: SETTINGS_PLACE, view })
   return (
     <MenuRow
       ref={view}
       label={SETTINGS_ENTRY.label}
-      onFocused={onFocused}
       onPress={() => {
         remember()
         onPress()
@@ -77,37 +76,26 @@ const SettingsEntry = ({ onPress, onFocused }: SettingsEntryProps) => {
   )
 }
 
+type SideMenuProps = Pick<ShelvesProps, 'onSearch' | 'onSettings' | 'onOpenLibrary' | 'libraries'>
+
 /**
  * The side menu, as the web's: the search, then the pinned libraries under their heading, and
  * Settings at the foot. It is the left column of Home on a TV, the remote's way to every library.
  */
-const SideMenu = ({
-  libraries,
-  onSearch,
-  onSettings,
-  onOpenLibrary,
-  onFocused,
-}: Pick<ShelvesProps, 'onSearch' | 'onSettings' | 'onOpenLibrary' | 'libraries'> & {
-  onFocused: () => void
-}) => {
+const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: SideMenuProps) => {
   const styles = useStyles()
   return (
     <ScrollView contentContainerStyle={styles.menuContent} style={styles.menu}>
-      <MenuRow label={SEARCH_EVERY_LIBRARY.text} onFocused={onFocused} onPress={onSearch} />
+      <MenuRow label={SEARCH_EVERY_LIBRARY.text} onPress={onSearch} />
       {libraries.length > 0 && (
         <Text accessibilityRole="header" style={styles.menuHeading}>
           {PINNED_HEADING}
         </Text>
       )}
       {libraries.map((library: MenuLibrary) => (
-        <MenuRow
-          key={library.id}
-          label={library.name}
-          onFocused={onFocused}
-          onPress={() => onOpenLibrary(library.id)}
-        />
+        <MenuRow key={library.id} label={library.name} onPress={() => onOpenLibrary(library.id)} />
       ))}
-      <SettingsEntry onFocused={onFocused} onPress={onSettings} />
+      <SettingsEntry onPress={onSettings} />
     </ScrollView>
   )
 }
@@ -128,14 +116,14 @@ const Shelves = ({
   onOpenLibrary,
   children,
 }: ShelvesProps) => {
-  const { settle } = useScreenFocusScope()
+  // Home's hold on its screen's focus; the menu's rows and the shelves' cards spend the opening focus themselves.
+  useScreenFocusScope()
   const styles = useStyles()
   return (
     <View style={styles.screen}>
       {!isLoading && (
         <SideMenu
           libraries={libraries}
-          onFocused={settle}
           onOpenLibrary={onOpenLibrary}
           onSearch={onSearch}
           onSettings={onSettings}
@@ -155,16 +143,15 @@ const Shelves = ({
   )
 }
 
+type ShelfTitleProps = Pick<ShelfProps, 'shelf' | 'onOpenLibrary'>
+
 /**
  * A shelf's title, and after a library's the way into the library, which the remote reaches
  * above the row, as the web's shelf heading links to it.
  */
-const ShelfTitle = ({
-  shelf,
-  onOpenLibrary,
-  onFocused,
-}: Pick<ShelfProps, 'shelf' | 'onOpenLibrary'> & { onFocused: () => void }) => {
+const ShelfTitle = ({ shelf, onOpenLibrary }: ShelfTitleProps) => {
   const { libraryId } = shelf
+  const { settle } = useOpeningFocus()
   const styles = useStyles()
   return (
     <View style={styles.titleRow}>
@@ -175,7 +162,7 @@ const ShelfTitle = ({
         <Pressable
           accessibilityLabel={seeAllLabelOf(shelf.title)}
           accessibilityRole="link"
-          onFocus={onFocused}
+          onFocus={settle}
           onPress={() => onOpenLibrary(libraryId)}
           style={({ focused }) => [styles.seeAll, focused && styles.focusedLink]}
         >
@@ -201,11 +188,11 @@ const placeOf = ({ shelf, card }: PlaceOfProps): string => `${shelf.key}/${card.
  * a card: the first, or the one it last left there.
  */
 const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) => {
-  const { isOpening, settle } = useOpeningFocus()
+  const { isOpening } = useOpeningFocus()
   const styles = useStyles()
   return (
     <View style={styles.shelf}>
-      <ShelfTitle onFocused={settle} onOpenLibrary={onOpenLibrary} shelf={shelf} />
+      <ShelfTitle onOpenLibrary={onOpenLibrary} shelf={shelf} />
       {shelf.cards.length === 0 ? (
         <Text style={styles.notice}>{NOTHING_HERE}</Text>
       ) : (
@@ -220,7 +207,6 @@ const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) =>
                 key={card.key}
                 card={card}
                 isPreferred={isOpening && isFirst && index === 0}
-                onFocused={settle}
                 onPress={() => onOpen(card)}
                 place={placeOf({ shelf, card })}
                 width={focusCardWidthOf(card.shape)}
@@ -270,16 +256,16 @@ const useStyles = themedStyles((colours) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: TV_SIZES.space5,
-      paddingHorizontal: TV_SIZES.space8,
+      paddingHorizontal: TV_GUTTER,
     },
     pageTitle: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-    notice: { color: colours.muted, fontSize: TV_SIZES.textLg, paddingHorizontal: TV_SIZES.space8 },
+    notice: { color: colours.muted, fontSize: TV_SIZES.textLg, paddingHorizontal: TV_GUTTER },
     shelf: { gap: TV_SIZES.space1 },
     titleRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: TV_SIZES.space3,
-      paddingHorizontal: TV_SIZES.space8,
+      paddingHorizontal: TV_GUTTER,
     },
     shelfTitle: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
     seeAll: {
@@ -294,7 +280,7 @@ const useStyles = themedStyles((colours) =>
     focusedLabel: { color: colours.text },
     row: {
       gap: TV_SIZES.space5,
-      paddingHorizontal: TV_SIZES.space8,
+      paddingHorizontal: TV_GUTTER,
       paddingVertical: TV_SIZES.space4,
     },
   }),

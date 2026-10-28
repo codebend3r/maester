@@ -40,3 +40,6 @@ export const TV_SIZES = {
   focusRing: tvSize(SIZES.focusRing),
   tvFocusRing: tvSize(SIZES.tvFocusRing),
 } as const satisfies Sizes
+
+/** The title-safe margin every TV layout keeps from the screen's sides. */
+export const TV_GUTTER = TV_SIZES.space8

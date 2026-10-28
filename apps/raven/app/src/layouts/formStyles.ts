@@ -2,7 +2,7 @@ import { StyleSheet } from 'react-native'
 
 import { BODY_FONT } from '@/theme/fonts'
 import { BUTTON_TONES, type ButtonTone } from '@/layouts/formKit'
-import { type Palette, SIZES, type Sizes } from '@/theme/appTheme'
+import { OPACITIES, type Palette, SIZES, type Sizes } from '@/theme/appTheme'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
@@ -62,7 +62,7 @@ const formStylesFor = ({ sizes, colours }: FormStylesForProps) =>
     checkTick: { color: colours.onAccent, fontSize: sizes.text, fontWeight: 'bold' },
     checkText: { color: colours.text, fontSize: sizes.text },
     focused: { borderColor: colours.text },
-    disabled: { opacity: 0.5 },
+    disabled: { opacity: OPACITIES.disabled },
     note: { color: colours.muted, fontSize: sizes.text },
     notice: { color: colours.notice, fontSize: sizes.textLg },
     error: { color: colours.error, fontSize: sizes.text },

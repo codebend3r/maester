@@ -30,7 +30,9 @@ const IN_PROGRESS_KEY = 'in-progress'
  * A video in progress, wide: a movie on its backdrop, an episode on its own frame grab, as
  * neither a season nor an episode has a backdrop of its own, else the show's backdrop.
  */
-const continueCard = ({ entry, api, headersFor }: Pictures & { entry: PosterEntry }): ShelfCard => {
+type ContinueCardProps = Pictures & { entry: PosterEntry }
+
+const continueCard = ({ entry, api, headersFor }: ContinueCardProps): ShelfCard => {
   const { media, poster } = entry
   const uri =
     imageOf({ api, item: media.item, kind: ITEM_IMAGE_KINDS.backdrop }) ??
@@ -46,11 +48,9 @@ const continueCard = ({ entry, api, headersFor }: Pictures & { entry: PosterEntr
   })
 }
 
-const libraryCards = ({
-  shelf,
-  library,
-  ...pictures
-}: Pictures & { shelf: HomeShelf; library: Library }): ShelfCard[] => {
+type LibraryCardsProps = Pictures & { shelf: HomeShelf; library: Library }
+
+const libraryCards = ({ shelf, library, ...pictures }: LibraryCardsProps): ShelfCard[] => {
   switch (shelf.type) {
     case HOME_SHELF_TYPES.shows:
       return shelf.shows.map((entry) => showCard({ entry, ...pictures }))
@@ -65,6 +65,11 @@ const libraryCards = ({
   }
 }
 
+type LibraryShelvesOfProps = Pictures & {
+  shelves: readonly HomeShelf[]
+  libraries: readonly Library[]
+}
+
 /**
  * A shelf for each library's row, under the library's name, in the server's order: Home's
  * newest arrivals, or what a search found. A row for a library not in the list is left out.
@@ -73,13 +78,15 @@ export const libraryShelvesOf = ({
   shelves,
   libraries,
   ...pictures
-}: Pictures & { shelves: readonly HomeShelf[]; libraries: readonly Library[] }): ShelfView[] =>
+}: LibraryShelvesOfProps): ShelfView[] =>
   withLibraries({ shelves, libraries }).map(({ shelf, library }) => ({
     key: `library:${library.id}`,
     title: library.name,
     libraryId: library.id,
     cards: libraryCards({ shelf, library, ...pictures }),
   }))
+
+type HomeShelvesOfProps = Pictures & { home: Home; libraries: readonly Library[] }
 
 /**
  * Home's shelves as the web lays them out: what is being watched, then each pinned
@@ -89,7 +96,7 @@ export const homeShelvesOf = ({
   home,
   libraries,
   ...pictures
-}: Pictures & { home: Home; libraries: readonly Library[] }): ShelfView[] => {
+}: HomeShelvesOfProps): ShelfView[] => {
   const continuing: ShelfView[] =
     home.inProgress.length === 0
       ? []

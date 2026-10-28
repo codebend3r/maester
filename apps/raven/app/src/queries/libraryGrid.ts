@@ -46,8 +46,10 @@ const SECTION_KEYS = { all: 'all', shows: 'shows' } as const
 
 type Cards = Pictures & { settings: LibrarySettings; now: Date }
 
+type FileCardsProps = Cards & { files: MediaItem[] }
+
 /** A library's videos as its type draws them, each saying what it is sorted by. */
-const fileCards = ({ settings, now, files, ...pictures }: Cards & { files: MediaItem[] }) => ({
+const fileCards = ({ settings, now, files, ...pictures }: FileCardsProps) => ({
   shape: videoShapeFor(settings.kind),
   cards: files.map((media) =>
     libraryVideoCard({
@@ -64,7 +66,7 @@ const videos = (n: number): string => plural({ n, one: 'video', many: 'videos' }
 /**
  * A library of files: one run, or the grouped view's buckets, as the web's `MediaGroups` cuts them.
  */
-const fileSections = ({ files, ...cards }: Cards & { files: MediaItem[] }): GridSection[] => {
+const fileSections = ({ files, ...cards }: FileCardsProps): GridSection[] => {
   if (cards.settings.view !== LIBRARY_VIEWS.grouped) {
     return [{ key: SECTION_KEYS.all, title: null, count: null, ...fileCards({ files, ...cards }) }]
   }
@@ -80,6 +82,8 @@ const fileSections = ({ files, ...cards }: Cards & { files: MediaItem[] }): Grid
   })
 }
 
+type ShowSectionsProps = Cards & Listing
+
 /**
  * A TV library: its shows, then each show folder whose files no show was found for, as the
  * web's Not matched bucket lists them. With nothing unmatched the shows are one open run;
@@ -91,7 +95,7 @@ const showSections = ({
   settings,
   now,
   ...pictures
-}: Cards & Listing): GridSection[] => {
+}: ShowSectionsProps): GridSection[] => {
   const order = { sort: settings.sort, now }
   const shown: GridSection[] =
     shows.length === 0
@@ -116,14 +120,13 @@ const showSections = ({
   return [...shown, ...folders]
 }
 
+type LibrarySectionsOfProps = Cards & { listing: Listing }
+
 /**
  * A library's listing as its grid lays it out, by its settings, which are already coherent
  * with its type, so a TV library is never grouped.
  */
-export const librarySectionsOf = ({
-  listing,
-  ...cards
-}: Cards & { listing: Listing }): GridSection[] =>
+export const librarySectionsOf = ({ listing, ...cards }: LibrarySectionsOfProps): GridSection[] =>
   listsShows(cards.settings.kind)
     ? showSections({ ...listing, ...cards })
     : fileSections({ files: listing.files, ...cards })

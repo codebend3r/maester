@@ -4,7 +4,7 @@ import { Text } from '@/layouts/Text'
 import type { ShelfCard } from '@/queries/cards'
 import { CardPicture } from '@/layouts/Card'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
-import { SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 
 /** How tall a touch card's caption stands, from its picture's foot: its title, then its line. */
@@ -45,7 +45,7 @@ export const TouchCard = ({ card, width, onPress }: TouchCardProps) => {
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     card: { gap: SIZES.space1 },
-    pressed: { opacity: 0.6 },
+    pressed: { opacity: OPACITIES.pressed },
     title: {
       color: colours.text,
       fontSize: SIZES.textSm,

@@ -1,6 +1,5 @@
 import { formatDuration } from '@raven/core'
-import { usePlayerPrefs } from '@raven/ui/headless'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   Animated,
   type GestureResponderEvent,
@@ -26,14 +25,11 @@ import {
   within,
 } from '@/layouts/playerKit'
 import { TouchBack } from '@/layouts/TouchBack'
-import { useReduceMotion } from '@/stores/reduceMotion'
-import { SIZES } from '@/theme/appTheme'
+import { useControlsLinger } from '@/layouts/useControlsLinger'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { pictureStyles } from '@/theme/useTheme'
 
 const { Picker, ToolButton } = touchPicker
-
-/** How long the controls take to fade, where motion is allowed. */
-const FADE_MS = 200
 
 /** How dark the ground is laid over the picture under the controls. */
 const SCRIM_OPACITY = 0.45
@@ -49,15 +45,13 @@ const GLYPHS = {
   forward: `${SKIP_SECONDS} \u21BB`,
 } as const
 
+type ScrubberProps = Pick<Transport, 'position' | 'onSeek'> & { duration: number }
+
 /**
  * Where the video is, as a line to drag along: the finger's spot shows as it moves and is sought
  * on letting go. VoiceOver reads it as the time of the length, and skips by a swipe.
  */
-const Scrubber = ({
-  position,
-  duration,
-  onSeek,
-}: Pick<Transport, 'position' | 'onSeek'> & { duration: number }) => {
+const Scrubber = ({ position, duration, onSeek }: ScrubberProps) => {
   const [width, setWidth] = useState(0)
   const [dragged, setDragged] = useState<number | null>(null)
   const styles = useStyles()
@@ -174,35 +168,9 @@ const PlayerChrome = ({
   onBack,
 }: PlayerChromeProps) => {
   const insets = useSafeAreaInsets()
-  const lingerSeconds = usePlayerPrefs((prefs) => prefs.controlsLingerSeconds)
-  const isReduced = useReduceMotion((state) => state.isReduced)
-  const [isShown, setShown] = useState(true)
-  const [stirredAt, setStirredAt] = useState(() => Date.now())
-  const [opacity] = useState(() => new Animated.Value(1))
   const styles = useStyles()
   const isPlaying = transport !== null && !transport.isPaused
-  // Only a video that plays hides its controls: paused, opening or ended, they stay up.
-  const isVisible = isShown || !isPlaying
-
-  useEffect(() => {
-    if (!isShown || !isPlaying) return undefined
-    const left = Math.max(0, stirredAt + lingerSeconds * 1000 - Date.now())
-    const timer = setTimeout(() => setShown(false), left)
-    return () => clearTimeout(timer)
-  }, [isShown, isPlaying, lingerSeconds, stirredAt])
-
-  useEffect(() => {
-    const toValue = isVisible ? 1 : 0
-    if (isReduced) {
-      opacity.setValue(toValue)
-      return undefined
-    }
-    const fade = Animated.timing(opacity, { toValue, duration: FADE_MS, useNativeDriver: true })
-    fade.start()
-    return () => fade.stop()
-  }, [isVisible, isReduced, opacity])
-
-  const stir = () => setStirredAt(Date.now())
+  const { isVisible, opacity, stir, toggle } = useControlsLinger({ isPlaying })
   const sides = {
     paddingTop: insets.top + SIZES.space2,
     paddingBottom: insets.bottom + SIZES.space2,
@@ -228,10 +196,7 @@ const PlayerChrome = ({
         accessibilityLabel={isVisible ? PLAYER_COPY.hideControls : PLAYER_COPY.showControls}
         accessibilityRole="button"
         disabled={!isPlaying}
-        onPress={() => {
-          stir()
-          setShown(!isVisible)
-        }}
+        onPress={toggle}
         style={StyleSheet.absoluteFill}
       />
       {notice !== null && (
@@ -341,7 +306,7 @@ const useStyles = pictureStyles((colours) =>
     },
     // The same dark glass as the skips, larger: the web's play is on-picture too, in every theme.
     roundLarge: { minWidth: SIZES.controlLarge * 1.5, minHeight: SIZES.controlLarge * 1.5 },
-    pressed: { opacity: 0.6 },
+    pressed: { opacity: OPACITIES.pressed },
     glyph: { color: colours.text, fontSize: SIZES.text, fontWeight: '600' },
     glyphLarge: { fontSize: SIZES.textXl },
     captionSlot: {

@@ -6,12 +6,10 @@ import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
 import { type PlayerChromeKit, type PlayerChromeProps } from '@/layouts/playerKit'
 import { pictureStyles } from '@/theme/useTheme'
 
+type InfoOfProps = Pick<PlayerChromeProps, 'title' | 'summary' | 'artwork'>
+
 /** What the system's info panel shows: the title, the synopsis and the poster, where known. */
-const infoOf = ({
-  title,
-  summary,
-  artwork,
-}: Pick<PlayerChromeProps, 'title' | 'summary' | 'artwork'>): VideoMetadata => ({
+const infoOf = ({ title, summary, artwork }: InfoOfProps): VideoMetadata => ({
   title,
   ...(summary === null ? {} : { description: summary }),
   ...(artwork === null ? {} : { imageUri: artwork }),

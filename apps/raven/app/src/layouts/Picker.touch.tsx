@@ -11,8 +11,13 @@ import {
   pickerLabelOf,
 } from '@/layouts/gridKit'
 import { Text } from '@/layouts/Text'
-import { SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themeNow, themedStyles } from '@/theme/useTheme'
+
+type OpenPickerSheetProps<K extends string> = Pick<
+  PickerProps<K>,
+  'label' | 'options' | 'onChoose' | 'isOverPicture'
+> & { anchor: RefObject<ComponentRef<typeof View> | null> }
 
 /**
  * Opens the system's action sheet for a picker, on an iPad as a popover pointing at `anchor`'s
@@ -24,9 +29,7 @@ export const openPickerSheet = <K extends string>({
   onChoose,
   isOverPicture = false,
   anchor,
-}: Pick<PickerProps<K>, 'label' | 'options' | 'onChoose' | 'isOverPicture'> & {
-  anchor: RefObject<ComponentRef<typeof View> | null>
-}) => {
+}: OpenPickerSheetProps<K>) => {
   const node = anchor.current === null ? null : findNodeHandle(anchor.current)
   ActionSheetIOS.showActionSheetWithOptions(
     {
@@ -93,7 +96,7 @@ const useStyles = themedStyles((colours) =>
       borderRadius: SIZES.radius,
       backgroundColor: colours.quiet,
     },
-    pressed: { opacity: 0.6 },
+    pressed: { opacity: OPACITIES.pressed },
     label: { color: colours.muted, fontSize: SIZES.textSm },
     value: { color: colours.text, fontSize: SIZES.textSm, fontWeight: '600' },
   }),

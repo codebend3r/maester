@@ -4,9 +4,8 @@ import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native'
 import { Text } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture } from '@/layouts/Card'
-import { useOpenerFocus } from '@/layouts/focus'
+import { useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
-import { NOTHING_ON_FOCUS } from '@/layouts/tvControls'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { TV_SIZES, tvSize } from '@/theme/tvSizes'
@@ -36,7 +35,6 @@ type FocusCardProps = {
   width: number
   isPreferred: boolean
   jump?: JumpFocus | null
-  onFocused?: () => void
   onPress: () => void
 }
 
@@ -46,7 +44,7 @@ type FocusCardProps = {
  * `isPreferred` asks the remote's focus for it as the screen opens; `jump` takes the focus
  * once per jump that lands on it, and coming back to the screen takes it back to the card that
  * was pressed. `place` is where the card sits on its screen, unique there: the card's own key,
- * or more where one title can sit in two places. `onFocused` hears each time it gets the focus.
+ * or more where one title can sit in two places. Taking the focus spends the screen's opening focus.
  */
 export const FocusCard = ({
   card,
@@ -54,12 +52,12 @@ export const FocusCard = ({
   width,
   isPreferred,
   jump = null,
-  onFocused = NOTHING_ON_FOCUS,
   onPress,
 }: FocusCardProps) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
   useJumpFocus({ jump, view: pressable })
   const { remember } = useOpenerFocus({ place, view: pressable })
+  const { settle } = useOpeningFocus()
   const isReduced = useReduceMotion((state) => state.isReduced)
   const [isFocused, setFocused] = useState(false)
   const [scale] = useState(() => new Animated.Value(1))
@@ -91,7 +89,7 @@ export const FocusCard = ({
       onFocus={() => {
         setFocused(true)
         grow(FOCUS_SCALE)
-        onFocused()
+        settle()
       }}
       onPress={() => {
         remember()

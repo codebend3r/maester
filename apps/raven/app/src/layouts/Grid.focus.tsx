@@ -13,7 +13,7 @@ import { Text } from '@/layouts/Text'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
 import { focusCardWidthOf, FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
-import { useOpenerFocus, useScreenFocusScope } from '@/layouts/focus'
+import { useOpenerFocus, useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
   CHEVRONS,
@@ -25,10 +25,9 @@ import {
 import { GRID_ROWS, type GridRow, gridColumnsOf } from '@/layouts/gridRows'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useGrid } from '@/layouts/useGrid'
-import { TV_SIZES, tvSize } from '@/theme/tvSizes'
+import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
-const GUTTER = TV_SIZES.space8
 const GAP = TV_SIZES.space5
 
 /** A row of the list and tiles views is at least this wide, so a TV holds three. */
@@ -54,7 +53,6 @@ type RowCardProps = {
   hasPicture: boolean
   isPreferred: boolean
   jump: JumpFocus | null
-  onFocused: () => void
   onPress: () => void
 }
 
@@ -62,18 +60,19 @@ type RowCardProps = {
  * A card of the list or tiles view, the remote's to move to: a row of words, ringed while
  * focused. It takes the focus back when the page it opened goes back, as a `FocusCard` does.
  */
-const RowCard = ({ card, hasPicture, isPreferred, jump, onFocused, onPress }: RowCardProps) => {
+const RowCard = ({ card, hasPicture, isPreferred, jump, onPress }: RowCardProps) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
   const styles = useStyles()
   useJumpFocus({ jump, view: pressable })
   const { remember } = useOpenerFocus({ place: card.key, view: pressable })
+  const { settle } = useOpeningFocus()
   return (
     <Pressable
       ref={pressable}
       accessibilityLabel={card.title}
       accessibilityRole="button"
       hasTVPreferredFocus={isPreferred}
-      onFocus={onFocused}
+      onFocus={settle}
       onPress={() => {
         remember()
         onPress()
@@ -171,7 +170,7 @@ const Grid = ({
   const styles = useStyles()
   const isRows = isRowView(view)
   const { columnsOf, widthOf } = gridColumnsOf({
-    room: screen.width - 2 * GUTTER,
+    room: screen.width - 2 * TV_GUTTER,
     gap: GAP,
     leastOf: (shape) => (isRows ? LEAST_ROW_WIDTH : focusCardWidthOf(shape)),
   })
@@ -252,7 +251,6 @@ const Grid = ({
                     hasPicture={view === LIBRARY_VIEWS.tiles}
                     isPreferred={card.key === preferred}
                     jump={jumpOf(card)}
-                    onFocused={settle}
                     onPress={() => onOpen(card)}
                   />
                 </View>
@@ -262,7 +260,6 @@ const Grid = ({
                   card={card}
                   isPreferred={card.key === preferred}
                   jump={jumpOf(card)}
-                  onFocused={settle}
                   onPress={() => onOpen(card)}
                   width={widthOf(row.shape)}
                 />
@@ -336,7 +333,7 @@ const useStyles = themedStyles((colours) =>
       flexShrink: 0,
       gap: TV_SIZES.space2,
       paddingTop: TV_SIZES.space6,
-      paddingHorizontal: GUTTER,
+      paddingHorizontal: TV_GUTTER,
       paddingBottom: TV_SIZES.space2,
     },
     title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
@@ -360,7 +357,7 @@ const useStyles = themedStyles((colours) =>
     markEmpty: { color: colours.line },
     focused: { borderColor: colours.text, backgroundColor: colours.quiet },
     listSlot: { flex: 1 },
-    content: { paddingHorizontal: GUTTER, paddingBottom: TV_SIZES.space6 },
+    content: { paddingHorizontal: TV_GUTTER, paddingBottom: TV_SIZES.space6 },
     bucketRow: { justifyContent: 'center' },
     bucket: {
       flexDirection: 'row',

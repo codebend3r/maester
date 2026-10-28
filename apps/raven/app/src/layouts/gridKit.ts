@@ -68,12 +68,13 @@ export type PickerKit = {
   ToolButton: (props: ToolButtonProps) => ReactNode
 }
 
+type ChosenLabelOfProps<K extends string> = Pick<PickerProps<K>, 'options' | 'value'>
+
 /** What the option chosen now is called: "Title". */
 export const chosenLabelOf = <K extends string>({
   options,
   value,
-}: Pick<PickerProps<K>, 'options' | 'value'>): string =>
-  options.find(({ key }) => key === value)?.label ?? ''
+}: ChosenLabelOfProps<K>): string => options.find(({ key }) => key === value)?.label ?? ''
 
 /** A picker's button as it is read out: "Sort: Title". */
 export const pickerLabelOf = <K extends string>(props: PickerProps<K>): string =>

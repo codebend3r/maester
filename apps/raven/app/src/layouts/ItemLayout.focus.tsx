@@ -7,7 +7,7 @@ import type { ItemHero, ItemPage, PersonCard, VersionRow } from '@/queries/itemP
 import { CardPicture } from '@/layouts/Card'
 import { FocusBand } from '@/layouts/FocusBand'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
-import { useScreenFocusScope } from '@/layouts/focus'
+import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import { useToneStyles } from '@/layouts/formStyles'
 import {
   ITEM_HEADINGS,
@@ -22,10 +22,8 @@ import {
   playLabelOf,
 } from '@/layouts/itemKit'
 import { LINE_RATIO } from '@/layouts/textHeights'
-import { TV_SIZES, tvSize } from '@/theme/tvSizes'
+import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
-
-const GUTTER = TV_SIZES.space8
 
 /** The heading's picture in points on a 1920 by 1080 point screen: a poster, or a still. */
 const HERO_WIDTHS = {
@@ -47,9 +45,6 @@ const BACKDROP_OPACITY = 0.3
 
 type Opens = ItemLayoutProps['onOpen']
 
-/** What every focusable part of the page tells it on focus, so the opening focus is let go. */
-type Settles = { onSettle: () => void }
-
 type HeadingProps = { title: string }
 
 const Heading = ({ title }: HeadingProps) => {
@@ -61,15 +56,15 @@ const Heading = ({ title }: HeadingProps) => {
   )
 }
 
+type ActionButtonProps = { action: ItemAction; isFirst: boolean }
+
 /**
  * Play, filled as the one action the page is for, or a mark, ticked while it is on, ringed
- * while focused. `isPreferred` asks the remote's focus for it as the page opens.
+ * while focused. The first takes the remote's focus as the page opens, and lets go once
+ * anything on the page has had it, so a button that changes after a mark leaves the viewer put.
  */
-const ActionButton = ({
-  action,
-  isPreferred,
-  onSettle,
-}: Settles & { action: ItemAction; isPreferred: boolean }) => {
+const ActionButton = ({ action, isFirst }: ActionButtonProps) => {
+  const { isOpening, settle } = useOpeningFocus()
   const styles = useStyles()
   const toneStyles = useToneStyles()
   const look = actionLookOf(action)
@@ -78,8 +73,8 @@ const ActionButton = ({
       accessibilityLabel={action.label}
       accessibilityRole={look.role}
       accessibilityState={look.state}
-      hasTVPreferredFocus={isPreferred}
-      onFocus={onSettle}
+      hasTVPreferredFocus={isOpening && isFirst}
+      onFocus={settle}
       onPress={action.onPress}
       style={({ focused }) => [
         styles.action,
@@ -106,23 +101,18 @@ const ProgressLine = ({ progress }: ProgressLineProps) => {
   )
 }
 
-/**
- * The heading over the backdrop: the picture beside the names, facts and summary, then the
- * actions in a row, the first taking the remote's focus while the page opens.
- */
-const Hero = ({
-  hero,
-  actions,
-  file,
-  isOpening,
-  onSettle,
-}: Settles & {
+type HeroProps = {
   hero: ItemHero
   /** The actions, or null while what Play starts is still being read. */
   actions: ItemAction[] | null
   file: ItemPage['file']
-  isOpening: boolean
-}) => {
+}
+
+/**
+ * The heading over the backdrop: the picture beside the names, facts and summary, then the
+ * actions in a row, the first taking the remote's focus while the page opens.
+ */
+const Hero = ({ hero, actions, file }: HeroProps) => {
   const styles = useStyles()
   const facts = heroFactsOf(hero)
   return (
@@ -149,12 +139,7 @@ const Hero = ({
         {actions !== null && (
           <View style={styles.actions}>
             {actions.map((action, index) => (
-              <ActionButton
-                key={action.key}
-                action={action}
-                isPreferred={isOpening && index === 0}
-                onSettle={onSettle}
-              />
+              <ActionButton key={action.key} action={action} isFirst={index === 0} />
             ))}
           </View>
         )}
@@ -191,20 +176,16 @@ const Rail = ({ title, children }: RailProps) => {
   )
 }
 
+type CardRowProps = { title: string; cards: ShelfCard[]; onOpen: Opens }
+
 /** A row of cards the remote moves along, under its heading. */
-const CardRow = ({
-  title,
-  cards,
-  onOpen,
-  onSettle,
-}: Settles & { title: string; cards: ShelfCard[]; onOpen: Opens }) => (
+const CardRow = ({ title, cards, onOpen }: CardRowProps) => (
   <Rail title={title}>
     {cards.map((card) => (
       <FocusCard
         key={card.key}
         card={card}
         isPreferred={false}
-        onFocused={onSettle}
         onPress={() => onOpen(card.target)}
         width={focusCardWidthOf(card.shape)}
       />
@@ -212,11 +193,10 @@ const CardRow = ({
   </Rail>
 )
 
-const Versions = ({
-  versions,
-  onOpen,
-  onSettle,
-}: Settles & { versions: VersionRow[]; onOpen: Opens }) => {
+type VersionsProps = { versions: VersionRow[]; onOpen: Opens }
+
+const Versions = ({ versions, onOpen }: VersionsProps) => {
+  const { settle } = useOpeningFocus()
   const styles = useStyles()
   return (
     <FocusBand>
@@ -228,7 +208,7 @@ const Versions = ({
               key={version.key}
               accessibilityLabel={playLabelOf(version.fileName)}
               accessibilityRole="button"
-              onFocus={onSettle}
+              onFocus={settle}
               onPress={() => onOpen(version.target)}
               style={({ focused }) => [styles.version, focused && styles.focused]}
             >
@@ -244,8 +224,11 @@ const Versions = ({
   )
 }
 
+type PersonProps = { person: PersonCard }
+
 /** A person the remote can move to, so the row scrolls along with the focus. */
-const Person = ({ person, onSettle }: Settles & { person: PersonCard }) => {
+const Person = ({ person }: PersonProps) => {
+  const { settle } = useOpeningFocus()
   const styles = useStyles()
   const [isFocused, setFocused] = useState(false)
   return (
@@ -258,7 +241,7 @@ const Person = ({ person, onSettle }: Settles & { person: PersonCard }) => {
       onBlur={() => setFocused(false)}
       onFocus={() => {
         setFocused(true)
-        onSettle()
+        settle()
       }}
       style={styles.person}
     >
@@ -287,9 +270,8 @@ const Person = ({ person, onSettle }: Settles & { person: PersonCard }) => {
 const ItemLayout = ({ page, actions, isPlayPending, onOpen }: ItemLayoutProps) => {
   const styles = useStyles()
   const screen = useWindowDimensions()
-  // Preferred focus is for the opening only: once anything here has had the focus, a button
-  // that changes or mounts again leaves the viewer where they are.
-  const { isOpening, settle } = useScreenFocusScope()
+  // The page's hold on its screen's focus; each part below reads the opening focus itself.
+  useScreenFocusScope()
   return (
     <View style={styles.ground}>
       {page.hero.backdrop !== null && (
@@ -302,41 +284,23 @@ const ItemLayout = ({ page, actions, isPlayPending, onOpen }: ItemLayoutProps) =
       <ScrollView contentContainerStyle={styles.page} style={styles.scroll}>
         <FocusBand>
           <View style={styles.padded}>
-            <Hero
-              actions={isPlayPending ? null : actions}
-              file={page.file}
-              hero={page.hero}
-              isOpening={isOpening}
-              onSettle={settle}
-            />
+            <Hero actions={isPlayPending ? null : actions} file={page.file} hero={page.hero} />
           </View>
         </FocusBand>
         {/* The rows wait for the actions, so nothing below can take the opening focus from Play. */}
         {!isPlayPending && (
           <>
             {page.seasons.length > 0 && (
-              <CardRow
-                cards={page.seasons}
-                onOpen={onOpen}
-                onSettle={settle}
-                title={ITEM_HEADINGS.seasons}
-              />
+              <CardRow cards={page.seasons} onOpen={onOpen} title={ITEM_HEADINGS.seasons} />
             )}
             {page.episodes.length > 0 && (
-              <CardRow
-                cards={page.episodes}
-                onOpen={onOpen}
-                onSettle={settle}
-                title={ITEM_HEADINGS.episodes}
-              />
+              <CardRow cards={page.episodes} onOpen={onOpen} title={ITEM_HEADINGS.episodes} />
             )}
-            {page.versions.length > 0 && (
-              <Versions onOpen={onOpen} onSettle={settle} versions={page.versions} />
-            )}
+            {page.versions.length > 0 && <Versions onOpen={onOpen} versions={page.versions} />}
             {page.cast.length > 0 && (
               <Rail title={page.castTitle}>
                 {page.cast.map((person) => (
-                  <Person key={person.key} onSettle={settle} person={person} />
+                  <Person key={person.key} person={person} />
                 ))}
               </Rail>
             )}
@@ -366,8 +330,8 @@ const useStyles = themedStyles((colours) =>
     backdrop: { position: 'absolute', top: 0, left: 0, right: 0, opacity: BACKDROP_OPACITY },
     scroll: { flex: 1 },
     page: { gap: TV_SIZES.space5, paddingTop: TV_SIZES.space6, paddingBottom: TV_SIZES.space6 },
-    padded: { paddingHorizontal: GUTTER },
-    notice: { justifyContent: 'center', paddingHorizontal: GUTTER },
+    padded: { paddingHorizontal: TV_GUTTER },
+    notice: { justifyContent: 'center', paddingHorizontal: TV_GUTTER },
     hero: { flexDirection: 'row', alignItems: 'flex-start', gap: TV_SIZES.space6 },
     words: { flex: 1, maxWidth: WORDS_WIDTH, gap: TV_SIZES.space2 },
     eyebrow: { color: colours.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
@@ -404,7 +368,7 @@ const useStyles = themedStyles((colours) =>
     focused: { borderColor: colours.text },
     section: { gap: TV_SIZES.space1 },
     heading: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-    row: { gap: TV_SIZES.space5, paddingHorizontal: GUTTER, paddingVertical: TV_SIZES.space4 },
+    row: { gap: TV_SIZES.space5, paddingHorizontal: TV_GUTTER, paddingVertical: TV_SIZES.space4 },
     versions: { gap: TV_SIZES.space2, paddingTop: TV_SIZES.space2 },
     version: {
       alignSelf: 'flex-start',

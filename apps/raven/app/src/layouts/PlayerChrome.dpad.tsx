@@ -1,5 +1,4 @@
 import { formatDuration } from '@raven/core'
-import { usePlayerPrefs } from '@raven/ui/headless'
 import { type ComponentRef, type RefObject, useEffect, useRef, useState } from 'react'
 import {
   Animated,
@@ -29,16 +28,11 @@ import {
 import { pressedKeyOf, remoteAnswerOf } from '@/layouts/remoteKeys'
 import { PlateButton } from '@/layouts/tvControls'
 import { requestTVFocus } from '@/layouts/tvFocus'
-import { useReduceMotion } from '@/stores/reduceMotion'
-import { TV_SIZES } from '@/theme/tvSizes'
+import { useControlsLinger } from '@/layouts/useControlsLinger'
+import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { pictureStyles } from '@/theme/useTheme'
 
 const { Picker } = focusPicker
-
-const GUTTER = TV_SIZES.space8
-
-/** How long the controls take to fade, where motion is allowed. */
-const FADE_MS = 200
 
 /** How dark the ground is laid over the picture under the controls. */
 const SCRIM_OPACITY = 0.45
@@ -60,31 +54,6 @@ const useRemote = (respond: (event: TVRemoteEvent) => void) => {
   })
   const [listener] = useState(() => (event: TVRemoteEvent) => latest.current(event))
   useTVEventHandler(listener)
-}
-
-type UseFadeProps = { isVisible: boolean; isReduced: boolean }
-
-/**
- * The controls' opacity, and whether they are drawn: they fade in as they appear and are drawn
- * until they have faded out, or appear and go at once when the system asks for less motion.
- */
-const useFade = ({ isVisible, isReduced }: UseFadeProps) => {
-  const [opacity] = useState(() => new Animated.Value(isVisible ? 1 : 0))
-  // Where the last fade came to rest: the controls stay drawn while one runs out from it.
-  const [hasRestedVisible, setRestedVisible] = useState(isVisible)
-  useEffect(() => {
-    const toValue = isVisible ? 1 : 0
-    if (isReduced) {
-      opacity.setValue(toValue)
-      return undefined
-    }
-    const fade = Animated.timing(opacity, { toValue, duration: FADE_MS, useNativeDriver: true })
-    fade.start(({ finished }) => {
-      if (finished) setRestedVisible(isVisible)
-    })
-    return () => fade.stop()
-  }, [isVisible, isReduced, opacity])
-  return { opacity, isDrawn: isVisible || (!isReduced && hasRestedVisible) }
 }
 
 type ScrubberProps = {
@@ -137,6 +106,17 @@ const Scrubber = ({ view, transport, onScrubbing }: ScrubberProps) => {
   )
 }
 
+type ControlsProps = Pick<
+  PlayerChromeProps,
+  'title' | 'transport' | 'audio' | 'subtitles' | 'onBack'
+> & {
+  /** Whether the controls are showing, not fading out: each time they come back the line asks for the focus. */
+  isVisible: boolean
+  onScrubbing: (isScrubbing: boolean) => void
+  onPicking: (isPicking: boolean) => void
+  onBottomHeight: (height: number) => void
+}
+
 /**
  * The controls over the video, dark in every theme as the web's: the title along the top; the
  * time and the line along the bottom, over play and pause, the track pickers and Back, on the
@@ -154,13 +134,7 @@ const Controls = ({
   onPicking,
   onBottomHeight,
   isVisible,
-}: Pick<PlayerChromeProps, 'title' | 'transport' | 'audio' | 'subtitles' | 'onBack'> & {
-  /** Whether the controls are showing, not fading out: each time they come back the line asks for the focus. */
-  isVisible: boolean
-  onScrubbing: (isScrubbing: boolean) => void
-  onPicking: (isPicking: boolean) => void
-  onBottomHeight: (height: number) => void
-}) => {
+}: ControlsProps) => {
   const scrubber: Focusable = useRef(null)
   const styles = useStyles()
   // Brought back while they fade out, the controls are still drawn, and the hidden state's
@@ -239,6 +213,8 @@ const ControlsCatcher = ({ onPress }: ControlsCatcherProps) => {
   )
 }
 
+type DpadPlayerProps = PlayerChromeProps & { surface: VideoSurface }
+
 /**
  * raven's own controls over ExoPlayer, driven by the d-pad. They fade once the video has played
  * untouched for the viewer's linger, and any key brings them back; they stay up while it is
@@ -255,34 +231,22 @@ const DpadPlayer = ({
   audio,
   subtitles,
   onBack,
-}: PlayerChromeProps & { surface: VideoSurface }) => {
-  const lingerSeconds = usePlayerPrefs((prefs) => prefs.controlsLingerSeconds)
-  const isReduced = useReduceMotion((state) => state.isReduced)
-  const [isShown, setShown] = useState(true)
-  const [stirredAt, setStirredAt] = useState(() => Date.now())
-  const [isScrubbing, setScrubbing] = useState(false)
+}: DpadPlayerProps) => {
+  // Only the remote's handler reads whether the line has the focus, so it is no render's concern.
+  const isScrubbing = useRef(false)
   const [isPicking, setPicking] = useState(false)
   const [bottomHeight, setBottomHeight] = useState(0)
   const styles = useStyles()
   const isPlaying = transport !== null && !transport.isPaused
-  // Only a video that plays hides its controls: paused, opening or ended, they stay up.
-  const isVisible = isShown || !isPlaying
-  const { opacity, isDrawn } = useFade({ isVisible, isReduced })
+  const { isVisible, isDrawn, opacity, show } = useControlsLinger({
+    isPlaying,
+    isHeld: isPicking,
+  })
 
+  // The line goes with the controls, and its blur may not be heard as it does.
   useEffect(() => {
-    if (!isShown || !isPlaying || isPicking) return undefined
-    const left = Math.max(0, stirredAt + lingerSeconds * 1000 - Date.now())
-    const timer = setTimeout(() => {
-      setShown(false)
-      setScrubbing(false)
-    }, left)
-    return () => clearTimeout(timer)
-  }, [isShown, isPlaying, isPicking, lingerSeconds, stirredAt])
-
-  const show = () => {
-    setStirredAt(Date.now())
-    setShown(true)
-  }
+    if (!isVisible) isScrubbing.current = false
+  }, [isVisible])
 
   useRemote((event) => {
     const key = pressedKeyOf(event)
@@ -292,7 +256,7 @@ const DpadPlayer = ({
     const { seekBy, shouldTogglePlay } = remoteAnswerOf({
       key,
       isShown: isVisible,
-      isScrubbing,
+      isScrubbing: isScrubbing.current,
       isPaused: transport.isPaused,
     })
     if (seekBy !== 0) transport.onSeek(transport.position + seekBy)
@@ -323,7 +287,9 @@ const DpadPlayer = ({
             onBottomHeight={setBottomHeight}
             onPicking={setPicking}
             isVisible={isVisible}
-            onScrubbing={setScrubbing}
+            onScrubbing={(isOnLine) => {
+              isScrubbing.current = isOnLine
+            }}
             subtitles={subtitles}
             title={title}
             transport={transport}
@@ -335,7 +301,7 @@ const DpadPlayer = ({
           pointerEvents="none"
           style={[
             styles.captionSlot,
-            { paddingBottom: isVisible ? GUTTER + bottomHeight + TV_SIZES.space4 : GUTTER },
+            { paddingBottom: isVisible ? TV_GUTTER + bottomHeight + TV_SIZES.space4 : TV_GUTTER },
           ]}
         >
           <CaptionText caption={caption} fontSize={TV_SIZES.textLg} />
@@ -362,7 +328,7 @@ const useStyles = pictureStyles((colours) =>
       backgroundColor: colours.ground,
       opacity: SCRIM_OPACITY,
     },
-    frame: { flex: 1, justifyContent: 'space-between', padding: GUTTER },
+    frame: { flex: 1, justifyContent: 'space-between', padding: TV_GUTTER },
     title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
     bottom: { gap: TV_SIZES.space3 },
     timeline: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
@@ -396,7 +362,7 @@ const useStyles = pictureStyles((colours) =>
       ...StyleSheet.absoluteFill,
       alignItems: 'center',
       justifyContent: 'flex-end',
-      paddingHorizontal: GUTTER,
+      paddingHorizontal: TV_GUTTER,
     },
     noticeSlot: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
     notice: {

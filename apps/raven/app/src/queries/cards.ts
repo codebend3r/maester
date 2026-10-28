@@ -56,20 +56,17 @@ export type Pictures = {
  */
 type Order = { sort: MediaSort; now: Date } | null
 
-export const pictureAt = ({
-  uri,
-  headersFor,
-}: Pick<Pictures, 'headersFor'> & { uri: string | null }) =>
+type PictureAtProps = Pick<Pictures, 'headersFor'> & { uri: string | null }
+
+export const pictureAt = ({ uri, headersFor }: PictureAtProps) =>
   uri === null ? null : { uri, headers: headersFor(uri) }
 
-export const imageOf = ({
-  api,
-  item,
-  kind,
-}: Pick<Pictures, 'api'> & {
+type ImageOfProps = Pick<Pictures, 'api'> & {
   item: ItemSummary | null
   kind: typeof ITEM_IMAGE_KINDS.poster | typeof ITEM_IMAGE_KINDS.backdrop
-}): string | null => {
+}
+
+export const imageOf = ({ api, item, kind }: ImageOfProps): string | null => {
   if (item === null) return null
   const version = kind === ITEM_IMAGE_KINDS.poster ? item.posterVersion : item.backdropVersion
   return api.itemImageUrl({ id: item.id, kind, version })
@@ -100,6 +97,15 @@ const videoTarget = ({ media, hasPages }: VideoTargetProps): RouteTarget => {
   }
 }
 
+type VideoCardProps = Pick<Pictures, 'headersFor'> & {
+  media: MediaItem
+  title: string
+  line: string | null
+  shape: CardShape
+  uri: string | null
+  hasPages: boolean
+}
+
 /**
  * A card for one video: what it shows is the caller's, the rest comes from the video. A card
  * `hasPages` opens its item's page; any other plays the video, as the web's frame cards do.
@@ -112,14 +118,7 @@ export const videoCard = ({
   uri,
   hasPages,
   headersFor,
-}: Pick<Pictures, 'headersFor'> & {
-  media: MediaItem
-  title: string
-  line: string | null
-  shape: CardShape
-  uri: string | null
-  hasPages: boolean
-}): ShelfCard => ({
+}: VideoCardProps): ShelfCard => ({
   key: mediaEntryKey(media),
   title,
   line,
@@ -134,16 +133,16 @@ type SortedLineProps = { media: MediaItem; order: Order }
 const sortedLine = ({ media, order }: SortedLineProps): string | null =>
   order === null ? null : sortFact({ media, ...order })
 
+/** A video's card as its library lists it: the video, and the order its grid is in, if any. */
+type MediaCardProps = Pictures & { media: MediaItem; order?: Order }
+
 /**
  * A movie as its poster, else its frame grab, as the web's poster card draws it, under its
  * year or the value its grid is sorted by.
  */
-const movieCard = ({
-  media,
-  api,
-  headersFor,
-  order = null,
-}: Pictures & { media: MediaItem; order?: Order }): ShelfCard => {
+type MovieCardProps = MediaCardProps
+
+const movieCard = ({ media, api, headersFor, order = null }: MovieCardProps): ShelfCard => {
   const { title, year } = cardTitle(media)
   return videoCard({
     media,
@@ -161,12 +160,9 @@ const movieCard = ({
  * Any other video as its frame grab and its length, as the web's media card draws it; it plays
  * at once, as the web's frame cards in a library with no pages do.
  */
-export const frameCard = ({
-  media,
-  api,
-  headersFor,
-  order = null,
-}: Pictures & { media: MediaItem; order?: Order }): ShelfCard =>
+type FrameCardProps = MediaCardProps
+
+export const frameCard = ({ media, api, headersFor, order = null }: FrameCardProps): ShelfCard =>
   videoCard({
     media,
     title: mediaLabel(media),
@@ -183,20 +179,16 @@ const isMovieKind = (kind: LibraryKind): boolean => matchTypeFor(kind) === ITEM_
 export const videoShapeFor = (kind: LibraryKind): CardShape =>
   isMovieKind(kind) ? CARD_SHAPES.poster : CARD_SHAPES.wide
 
+type LibraryVideoCardProps = MediaCardProps & { kind: LibraryKind }
+
 /** A video as its library's type draws it: `movieCard` in a Movies library, else `frameCard`. */
-export const libraryVideoCard = ({
-  kind,
-  ...card
-}: Pictures & { kind: LibraryKind; media: MediaItem; order?: Order }): ShelfCard =>
+export const libraryVideoCard = ({ kind, ...card }: LibraryVideoCardProps): ShelfCard =>
   isMovieKind(kind) ? movieCard(card) : frameCard(card)
 
+type ShowCardProps = Pictures & { entry: ShowEntry; order?: Order }
+
 /** A show as its poster, under the years it ran or the value its grid is sorted by. */
-export const showCard = ({
-  entry,
-  api,
-  headersFor,
-  order = null,
-}: Pictures & { entry: ShowEntry; order?: Order }): ShelfCard => ({
+export const showCard = ({ entry, api, headersFor, order = null }: ShowCardProps): ShelfCard => ({
   key: showEntryKey(entry.show),
   title: entry.show.title,
   line:

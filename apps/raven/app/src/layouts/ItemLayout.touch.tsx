@@ -25,7 +25,7 @@ import {
 } from '@/layouts/itemKit'
 import { isTablet } from '@/layouts/screenSizes'
 import { LINE_RATIO } from '@/layouts/textHeights'
-import { SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 
 /** How wide the heading's picture stands: a poster, or an episode's wider still. */
@@ -292,8 +292,10 @@ const Cast = ({ title, cast }: CastProps) => (
   </Rail>
 )
 
+type TopProps = Pick<ItemPage['hero'], 'backdrop'> & { onBack: () => void }
+
 /** The backdrop across the top, under the way back; without one, room for the way back. */
-const Top = ({ backdrop, onBack }: Pick<ItemPage['hero'], 'backdrop'> & { onBack: () => void }) => {
+const Top = ({ backdrop, onBack }: TopProps) => {
   const styles = useStyles()
   const screen = useWindowDimensions()
   const insets = useSafeAreaInsets()
@@ -411,7 +413,7 @@ const useStyles = themedStyles((colours) =>
       borderWidth: SIZES.focusRing,
     },
     actionLabel: { fontSize: SIZES.text, fontWeight: 'bold' },
-    pressed: { opacity: 0.6 },
+    pressed: { opacity: OPACITIES.pressed },
     tagline: { color: colours.text, fontSize: SIZES.text, fontStyle: 'italic' },
     summary: {
       color: colours.text,
