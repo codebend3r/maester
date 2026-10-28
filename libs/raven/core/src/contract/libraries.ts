@@ -324,6 +324,23 @@ export const isRefreshingRatings = (library: Library): boolean =>
 export const isLibraryList = listOf(isLibrary)
 
 /**
+ * `GET /api/libraries/:id/counts`: how much each tab beside All and Not
+ * matched holds for the caller, those two being counted on the library
+ * itself. Sagas and duplicates are 0 in a library not matched to movies,
+ * which has neither tab; finished counts every video watched, though the
+ * tab lists only the most recent.
+ */
+export const isLibraryCounts = object({
+  inProgress: isNumber,
+  favourites: isNumber,
+  sagas: isNumber,
+  duplicates: isNumber,
+  finished: isNumber,
+})
+
+export type LibraryCounts = Infer<typeof isLibraryCounts>
+
+/**
  * What a client sends to create a library or replace its name and paths.
  * Settings left out keep their defaults on create and their current values
  * on update, so a client can change one without knowing the rest.

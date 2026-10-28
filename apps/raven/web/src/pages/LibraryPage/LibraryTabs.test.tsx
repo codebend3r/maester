@@ -13,6 +13,7 @@ import {
   aiSuggestion,
   itemSummary,
   library,
+  libraryCounts,
   matchedMovie,
   mediaItem,
   metadataHealth,
@@ -36,6 +37,7 @@ describe('LibraryPage tabs', () => {
     sagas: spyOn(api, 'listSagas'),
     unmatched: spyOn(api, 'listUnmatched'),
     duplicates: spyOn(api, 'listDuplicates'),
+    counts: spyOn(api, 'getLibraryCounts'),
     history: spyOn(api, 'listHistory'),
     lockState: spyOn(api, 'getLock'),
     health: spyOn(api, 'getMetadataHealth'),
@@ -50,6 +52,7 @@ describe('LibraryPage tabs', () => {
     spies.sagas.mockImplementation(async () => [])
     spies.unmatched.mockImplementation(async () => [])
     spies.duplicates.mockImplementation(async () => [])
+    spies.counts.mockImplementation(async () => libraryCounts())
     spies.history.mockImplementation(async () => [])
     spies.lockState.mockImplementation(async () => ({ available: false, unlocked: false }))
     spies.health.mockImplementation(async () => metadataHealth())
@@ -111,7 +114,7 @@ describe('LibraryPage tabs', () => {
     expect(screen.getByRole('link', { name: 'All' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('counts the videos beside All and the files not matched beside Not matched, and no other tab', async () => {
+  it('counts what every tab holds, the library counting All and Not matched and the account the rest', async () => {
     spies.get.mockImplementation(async () =>
       library({
         id: 2,
@@ -121,19 +124,47 @@ describe('LibraryPage tabs', () => {
         settings: { ...library().settings, kind: 'movies' },
       }),
     )
+    spies.counts.mockImplementation(async () =>
+      libraryCounts({ inProgress: 2, favourites: 5, sagas: 7, duplicates: 4, finished: 1500 }),
+    )
     renderLibraryPage()
     const all = await screen.findByRole('link', { name: 'All' })
     expect(all).toHaveTextContent('All1,204')
+    expect(await screen.findByRole('link', { name: 'Duplicates' })).toHaveTextContent('Duplicates4')
     expect(screen.getByRole('link', { name: 'Not matched' })).toHaveTextContent('Not matched3')
-    expect(screen.getByRole('link', { name: 'In progress' })).toHaveTextContent(/^In progress$/)
+    expect(screen.getByRole('link', { name: 'In progress' })).toHaveTextContent('In progress2')
+    expect(screen.getByRole('link', { name: 'Favourites' })).toHaveTextContent('Favourites5')
+    expect(screen.getByRole('link', { name: 'Sagas' })).toHaveTextContent('Sagas7')
+    expect(screen.getByRole('link', { name: 'Recently finished' })).toHaveTextContent(
+      'Recently finished48+',
+    )
+    expect(spies.counts).toHaveBeenCalledWith(2)
     // The header says the counts aloud, so beside the tabs they are for the eye.
     expect(within(all).getByText('1,204')).toHaveAttribute('aria-hidden', 'true')
   })
 
-  it('leaves Not matched uncounted while every file is matched', async () => {
+  it('counts Not matched as 0 while every file is matched, as every other tab counts', async () => {
     open()
     expect(await screen.findByRole('link', { name: 'Not matched' })).toHaveTextContent(
-      /^Not matched$/,
+      'Not matched0',
+    )
+    expect(screen.getByRole('link', { name: 'All' })).toHaveTextContent('All12')
+  })
+
+  it('marks each tab with its own icon', async () => {
+    open()
+    const links = within(await screen.findByRole('navigation', { name: 'Sections' })).getAllByRole(
+      'link',
+    )
+    const icons = links.map((link) => link.querySelector('svg')?.getAttribute('data-icon') ?? null)
+    expect(icons).toEqual(['grid', 'playback', 'heart', 'covers', 'alert', 'copy', 'check'])
+  })
+
+  it('leaves the tabs the account counts uncounted while their counts are on their way', async () => {
+    spies.counts.mockImplementation(() => new Promise(() => undefined))
+    open()
+    expect(await screen.findByRole('link', { name: 'In progress' })).toHaveTextContent(
+      /^In progress$/,
     )
     expect(screen.getByRole('link', { name: 'All' })).toHaveTextContent('All12')
   })

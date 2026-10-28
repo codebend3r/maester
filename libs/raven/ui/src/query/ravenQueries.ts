@@ -86,6 +86,13 @@ export const ravenQueriesFor = (api: ApiClient) => {
         placeholderData: keepPreviousData,
       }),
 
+    /** How much each tab holds; under the library's key, so whatever reads the libraries again reads it again too. */
+    libraryCountsQuery: (libraryId: number) =>
+      queryOptions({
+        queryKey: queryKeys.libraryCounts(libraryId),
+        queryFn: () => api.getLibraryCounts(libraryId),
+      }),
+
     inProgressQuery: (libraryId: number) =>
       queryOptions({
         queryKey: queryKeys.inProgress(libraryId),

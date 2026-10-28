@@ -1,4 +1,11 @@
-import { ITEM_TYPES, type Library, type LibraryKind, matchTypeFor } from '@raven/core'
+import {
+  ITEM_TYPES,
+  type Library,
+  type LibraryCounts,
+  type LibraryKind,
+  matchTypeFor,
+} from '@raven/core'
+import type { IconName } from '@raven/ui'
 
 /**
  * The tabs of a library's page, in order. Each but All is its own address
@@ -24,39 +31,85 @@ const matchedToMovies = (kind: LibraryKind): boolean => matchTypeFor(kind) === I
 
 const matched = (kind: LibraryKind): boolean => matchTypeFor(kind) != null
 
-/** What a tab's count reads from: the counts the library itself carries. */
-type Counted = Pick<Library, 'itemCount' | 'unmatchedCount'>
+/**
+ * Every count a tab can show: those the library carries, and the account's
+ * own from its counts.
+ */
+export type Tallies = Pick<Library, 'itemCount' | 'unmatchedCount'> & LibraryCounts
 
-/** A tab whose count would take its own listing to read, so it shows none. */
-const uncounted = (): number | null => null
+/** How many finished videos Recently finished lists; the History page has the rest. */
+export const FINISHED_LIMIT = 48
 
 /**
- * What each tab is called, which types of library have it, and the count
- * beside it. Sagas and Duplicates are only where files are matched to
- * movies, and Not matched wherever files are matched at all. Only All and
- * Not matched are counted, from the library's own counts, Not matched while
- * it holds any; every other count would take that tab's listing to read.
+ * What each tab is called, the icon that tells it apart (all a narrow
+ * screen shows of it), which types of library have it, the tally its count
+ * reads, and the most it lists, past which the count reads as that many
+ * and more. Sagas and Duplicates are only where files are matched to
+ * movies, and Not matched wherever files are matched at all.
  */
 export const SECTIONS = {
-  all: { label: 'All', isFor: always, count: (library: Counted) => library.itemCount },
-  'in-progress': { label: 'In progress', isFor: always, count: uncounted },
-  favourites: { label: 'Favourites', isFor: always, count: uncounted },
-  sagas: { label: 'Sagas', isFor: matchedToMovies, count: uncounted },
+  all: { label: 'All', icon: 'grid', isFor: always, tally: 'itemCount', most: null },
+  'in-progress': {
+    label: 'In progress',
+    icon: 'playback',
+    isFor: always,
+    tally: 'inProgress',
+    most: null,
+  },
+  favourites: {
+    label: 'Favourites',
+    icon: 'heart',
+    isFor: always,
+    tally: 'favourites',
+    most: null,
+  },
+  sagas: { label: 'Sagas', icon: 'covers', isFor: matchedToMovies, tally: 'sagas', most: null },
   'not-matched': {
     label: 'Not matched',
+    icon: 'alert',
     isFor: matched,
-    count: (library: Counted) => (library.unmatchedCount > 0 ? library.unmatchedCount : null),
+    tally: 'unmatchedCount',
+    most: null,
   },
-  duplicates: { label: 'Duplicates', isFor: matchedToMovies, count: uncounted },
-  finished: { label: 'Recently finished', isFor: always, count: uncounted },
+  duplicates: {
+    label: 'Duplicates',
+    icon: 'copy',
+    isFor: matchedToMovies,
+    tally: 'duplicates',
+    most: null,
+  },
+  finished: {
+    label: 'Recently finished',
+    icon: 'check',
+    isFor: always,
+    tally: 'finished',
+    most: FINISHED_LIMIT,
+  },
 } as const satisfies Record<
   LibrarySection,
   {
     label: string
+    icon: IconName
     isFor: (kind: LibraryKind) => boolean
-    count: (library: Counted) => number | null
+    tally: keyof Tallies
+    most: number | null
   }
 >
+
+const count = new Intl.NumberFormat()
+
+type CountTextProps = {
+  section: LibrarySection
+  tallies: Partial<Tallies>
+}
+
+/** The count beside a tab, `48+` past the most it lists; null while its tally is on its way. */
+export const countText = ({ section, tallies }: CountTextProps): string | null => {
+  const { tally, most } = SECTIONS[section]
+  const n = tallies[tally]
+  if (n == null) return null
+  return most != null && n > most ? `${count.format(most)}+` : count.format(n)
+}
 
 type HasSectionProps = {
   kind: LibraryKind

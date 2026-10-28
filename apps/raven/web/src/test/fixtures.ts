@@ -5,6 +5,7 @@ import {
   type ItemDetails,
   type ItemSummary,
   type Library,
+  type LibraryCounts,
   type LiveStream,
   type MediaItem,
   type MetadataHealth,
@@ -49,6 +50,16 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   },
   backdrop: null,
   ratingsRefresh: { state: 'idle', finishedAt: null },
+  ...overrides,
+})
+
+/** A library's tab counts for the account, every tab empty unless told. */
+export const libraryCounts = (overrides: Partial<LibraryCounts> = {}): LibraryCounts => ({
+  inProgress: 0,
+  favourites: 0,
+  sagas: 0,
+  duplicates: 0,
+  finished: 0,
   ...overrides,
 })
 

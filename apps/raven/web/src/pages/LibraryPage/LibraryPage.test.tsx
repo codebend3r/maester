@@ -12,7 +12,14 @@ import type {
 import { api } from '@/lib/api'
 import { useUnlockPrompt } from '@raven/ui/headless'
 import { POSTER_SIZES } from '@/lib/posters'
-import { library, matchedMovie, mediaItem, metadataHealth, showEntry } from '@/test/fixtures'
+import {
+  library,
+  libraryCounts,
+  matchedMovie,
+  mediaItem,
+  metadataHealth,
+  showEntry,
+} from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderLibraryPage } from '@/test/libraryPage'
 import { pollFast } from '@/test/polls'
@@ -31,6 +38,7 @@ describe('LibraryPage', () => {
     lockState: spyOn(api, 'getLock'),
     lock: spyOn(api, 'lock'),
     ratings: spyOn(api, 'updateLibraryRatings'),
+    counts: spyOn(api, 'getLibraryCounts').mockImplementation(async () => libraryCounts()),
   }
   const state: { sent: LibraryViewChange[]; listed: Array<{ sort?: MediaSort; seed?: number }> } = {
     sent: [],
@@ -479,6 +487,7 @@ describe('LibraryPage for TV shows', () => {
     list: spyOn(api, 'listMedia'),
     health: spyOn(api, 'getMetadataHealth'),
     match: spyOn(api, 'matchLibrary'),
+    counts: spyOn(api, 'getLibraryCounts').mockImplementation(async () => libraryCounts()),
   }
 
   afterEach(() => {

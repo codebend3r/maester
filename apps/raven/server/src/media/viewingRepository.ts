@@ -52,6 +52,11 @@ type ViewingRepositoryHistoryProps = {
   account: AccountKey
 }
 
+type ViewingRepositoryFinishedCountProps = {
+  libraryId: number
+  account: AccountKey
+}
+
 /**
  * What an account did with a video: favourites, plays and the history they
  * make, and the spot to resume from. Every row is the account's own.
@@ -244,5 +249,20 @@ export class ViewingRepository {
           ]
         : []
     })
+  }
+
+  /** How many of a library's videos `account` has watched, by the rule of `fileWatched`: every one its history lists as watched. */
+  finishedCount({ libraryId, account }: ViewingRepositoryFinishedCountProps): number {
+    return (
+      this.db
+        .prepare<[ByAccount, number], { count: number }>(
+          `SELECT COUNT(*) AS count
+             FROM (SELECT DISTINCT pl.media_id FROM plays pl WHERE pl.account_id = @account) played
+             JOIN media m ON m.id = played.media_id
+             JOIN libraries l ON l.id = m.library_id
+            WHERE m.library_id = ? AND ${fileWatched('m')}`,
+        )
+        .get({ account }, libraryId)?.count ?? 0
+    )
   }
 }

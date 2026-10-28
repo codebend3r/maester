@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'bun:test'
+import { libraryCounts } from '@/test/fixtures'
 import {
+  FINISHED_LIMIT,
   LIBRARY_SECTIONS,
   type LibrarySection,
   SECTIONS,
+  countText,
   sectionFrom,
   sectionPath,
   sectionsFor,
@@ -46,19 +49,41 @@ describe('the tabs of a library', () => {
     expect(sectionPath({ libraryId: 4, section: 'not-matched' })).toBe('/libraries/4/not-matched')
   })
 
-  it("counts All and Not matched from the library's own counts, and no other tab", () => {
-    const counts = { itemCount: 1204, unmatchedCount: 3 }
-    const countOf = (section: LibrarySection) => SECTIONS[section].count(counts)
+  it("counts All and Not matched from the library, and the rest from the account's counts once they come", () => {
+    const library = { itemCount: 1204, unmatchedCount: 0 }
+    const counts = { inProgress: 2, favourites: 5, sagas: 3, duplicates: 4, finished: 31 }
+    const countOf = (section: LibrarySection) =>
+      countText({ section, tallies: { ...library, ...counts } })
     expect(Object.values(LIBRARY_SECTIONS).map(countOf)).toEqual([
-      1204,
+      '1,204',
+      '2',
+      '5',
+      '3',
+      '0',
+      '4',
+      '31',
+    ])
+    const waiting = (section: LibrarySection) => countText({ section, tallies: library })
+    expect(Object.values(LIBRARY_SECTIONS).map(waiting)).toEqual([
+      '1,204',
       null,
       null,
       null,
-      3,
+      '0',
       null,
       null,
     ])
-    expect(SECTIONS['not-matched'].count({ itemCount: 1204, unmatchedCount: 0 })).toBeNull()
-    expect(SECTIONS.all.count({ itemCount: 0, unmatchedCount: 0 })).toBe(0)
+  })
+
+  it('counts Recently finished up to the most it lists, and that many and more past it', () => {
+    const finished = (n: number) =>
+      countText({ section: 'finished', tallies: libraryCounts({ finished: n }) })
+    expect(finished(FINISHED_LIMIT)).toBe('48')
+    expect(finished(1500)).toBe('48+')
+  })
+
+  it('gives every tab an icon of its own', () => {
+    const icons = Object.values(LIBRARY_SECTIONS).map((section) => SECTIONS[section].icon)
+    expect(new Set(icons).size).toBe(icons.length)
   })
 })

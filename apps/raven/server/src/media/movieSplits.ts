@@ -99,6 +99,18 @@ export class MovieSplits {
       .all(libraryId)
   }
 
+  /** The library's movie files, a list per movie, only the movies holding more than one. */
+  private duplicated(libraryId: number): FileRow[][] {
+    return [
+      ...groupBy({ rows: this.files(libraryId), key: (row) => String(row.item_id) }).values(),
+    ].filter((files) => files.length > 1)
+  }
+
+  /** How many movies `list` lists, without reading their files or posters. */
+  count(libraryId: number): number {
+    return this.duplicated(libraryId).length
+  }
+
   /**
    * The movies with more than one file in the library, by title, each with
    * its cards: one while its files share it, more once split apart, the
@@ -107,11 +119,9 @@ export class MovieSplits {
    * `account` sees it.
    */
   list({ libraryId, account }: MovieSplitsListProps): Duplicates {
-    const movies = [
-      ...groupBy({ rows: this.files(libraryId), key: (row) => String(row.item_id) }).values(),
-    ].flatMap((files) => {
+    const movies = this.duplicated(libraryId).flatMap((files) => {
       const [first] = files
-      if (!first || files.length < 2) return []
+      if (!first) return []
       const cards = [...groupBy({ rows: files, key: cardOf }).values()].toSorted(
         (a, b) => Number(a[0]?.entry !== '') - Number(b[0]?.entry !== ''),
       )

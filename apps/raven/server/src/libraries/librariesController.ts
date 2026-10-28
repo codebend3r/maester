@@ -19,6 +19,7 @@ import {
   type Duplicates,
   type HistoryEntry,
   type Library,
+  type LibraryCounts,
   type LibraryInput,
   type MediaItem,
   type MediaListParams,
@@ -95,6 +96,10 @@ const historyLimit = (asked: string | undefined): number => {
     ? Math.min(Math.max(limit, 1), HISTORY_LIMIT.most)
     : HISTORY_LIMIT.fallback
 }
+
+/** Whether the library's files are matched to movies: only such a library has sagas and duplicates. */
+const isMovieLibrary = (record: LibraryRecord): boolean =>
+  matchTypeFor(record.settings.kind) === ITEM_TYPES.movie
 
 type LibrariesControllerWithStatusProps = {
   record: LibraryRecord
@@ -461,6 +466,24 @@ export class LibrariesController {
     })
   }
 
+  /**
+   * How much each of its tabs holds for the caller, but All and Not matched,
+   * which the library counts. Each is counted without reading the listing.
+   */
+  @Get(':id/counts')
+  counts(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): LibraryCounts {
+    const record = this.find(id)
+    const account = this.accounts.keyOf({ request })
+    const isMovies = isMovieLibrary(record)
+    return {
+      inProgress: this.media.countInProgress({ libraryId: id, account }),
+      favourites: this.media.countFavourites({ libraryId: id, account }),
+      sagas: isMovies ? this.media.countSagas({ libraryId: id, account }) : 0,
+      duplicates: isMovies ? this.splits.count(id) : 0,
+      finished: this.viewing.finishedCount({ libraryId: id, account }),
+    }
+  }
+
   /** Its videos with a saved spot, the most recently watched first, each with its card's poster. */
   @Get(':id/in-progress')
   listInProgress(
@@ -487,8 +510,7 @@ export class LibrariesController {
 
   /** Its sagas of two movies or more; none in a library that is not matched to movies. */
   private sagasOf({ id, request }: LibrariesControllerSagasOfProps): Saga[] {
-    const record = this.find(id)
-    return matchTypeFor(record.settings.kind) === ITEM_TYPES.movie
+    return isMovieLibrary(this.find(id))
       ? this.media.listSagas({ libraryId: id, account: this.accounts.keyOf({ request }) })
       : []
   }
@@ -544,7 +566,7 @@ export class LibrariesController {
   /** A library matched to movies; the others keep each file on its own card, with nothing to split. */
   private findMovies(id: number): LibraryRecord {
     const record = this.find(id)
-    if (matchTypeFor(record.settings.kind) !== ITEM_TYPES.movie) {
+    if (!isMovieLibrary(record)) {
       throw new BadRequestException('Only a library of movies has duplicates to split.')
     }
     return record
@@ -556,8 +578,7 @@ export class LibrariesController {
     @Param('id', ParseIntPipe) id: number,
     @Req() request: FastifyRequest,
   ): Duplicates {
-    const record = this.find(id)
-    return matchTypeFor(record.settings.kind) === ITEM_TYPES.movie
+    return isMovieLibrary(this.find(id))
       ? this.splits.list({ libraryId: id, account: this.accounts.keyOf({ request }) })
       : []
   }

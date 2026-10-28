@@ -84,6 +84,7 @@ export const ROUTES = {
   setLibraryInHero: { method: PUT, path: '/api/libraries/:id/hero', account: owner },
   updateLibrary: { method: PUT, path: '/api/libraries/:id', account: owner },
   deleteLibrary: { method: DELETE, path: '/api/libraries/:id', account: owner },
+  libraryCounts: { method: GET, path: '/api/libraries/:id/counts', account: approved },
   duplicates: { method: GET, path: '/api/libraries/:id/duplicates', account: approved },
   joinDuplicates: { method: POST, path: '/api/libraries/:id/duplicates/join', account: owner },
   splitDuplicates: { method: POST, path: '/api/libraries/:id/duplicates/split', account: owner },
