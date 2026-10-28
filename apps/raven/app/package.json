@@ -335,6 +335,29 @@
         ],
         "cache": true
       },
+      "e2e:tvos": {
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "env": "APP_VARIANT"
+          },
+          {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+          },
+          {
+            "env": "DEVELOPER_DIR"
+          },
+          {
+            "env": "TVOS_SIMULATOR"
+          },
+          {
+            "runtime": "xcodebuild -version"
+          },
+          "{workspaceRoot}/apps/raven/server/src/**/*"
+        ],
+        "cache": true
+      },
       "dev:ios": {
         "continuous": true,
         "cache": false,
