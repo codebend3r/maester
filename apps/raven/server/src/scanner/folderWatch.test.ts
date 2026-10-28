@@ -1,8 +1,15 @@
+import { watch as watchFs } from 'node:fs'
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { type WatchFolder, type Watching, watchEachFolder, watchTree } from '@/scanner/folderWatch'
+import {
+  type WatchFolder,
+  type WatchOne,
+  type Watching,
+  watchEachFolder,
+  watchTree,
+} from '@/scanner/folderWatch'
 
 type EventuallyProps = {
   check: () => boolean
@@ -88,5 +95,70 @@ describe.each(WAYS)('watching %s', (_way, watchFolder) => {
     })
     await eventually({ check: () => errors.length > 0 })
     watch.close()
+  })
+})
+
+describe('watching folder by folder on a slow share', () => {
+  const FOLDERS = 12
+
+  type BlockProps = { ms: number }
+
+  /** Holds the thread as a watch over a network share does while the system sets it up. */
+  const block = ({ ms }: BlockProps): void => {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+  }
+
+  const state: { root: string; watched: string[]; watch: Watching | null } = {
+    root: '',
+    watched: [],
+    watch: null,
+  }
+
+  const slowWatchOne: WatchOne = ({ folder, listener }) => {
+    block({ ms: 15 })
+    state.watched.push(folder)
+    return watchFs(folder, { persistent: false }, listener)
+  }
+
+  beforeEach(async () => {
+    state.root = await mkdtemp(join(tmpdir(), 'raven-watch-'))
+    await Promise.all(
+      Array.from({ length: FOLDERS }, (_, index) =>
+        mkdir(join(state.root, `Show ${index}`), { recursive: true }),
+      ),
+    )
+    state.watched = []
+  })
+
+  afterEach(async () => {
+    state.watch?.close()
+    await rm(state.root, { recursive: true, force: true })
+  })
+
+  it('gives the event loop a turn between one folder and the next', async () => {
+    state.watch = watchEachFolder({
+      root: state.root,
+      onChange: () => undefined,
+      onError: () => undefined,
+      watchOne: slowWatchOne,
+    })
+    await eventually({ check: () => state.watched.length > 0 })
+    // The root and its twelve folders: a timer got its turn before they were all watched.
+    expect(state.watched.length).toBeLessThan(FOLDERS + 1)
+    await eventually({ check: () => state.watched.length === FOLDERS + 1 })
+  })
+
+  it('stops watching the rest once closed', async () => {
+    state.watch = watchEachFolder({
+      root: state.root,
+      onChange: () => undefined,
+      onError: () => undefined,
+      watchOne: slowWatchOne,
+    })
+    await eventually({ check: () => state.watched.length > 0 })
+    state.watch.close()
+    const watchedWhenClosed = state.watched.length
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(state.watched.length).toBe(watchedWhenClosed)
   })
 })
