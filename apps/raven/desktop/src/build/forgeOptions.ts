@@ -5,7 +5,7 @@ import { join } from 'node:path'
  * tsconfig `paths`, so this file imports nothing from the project.
  */
 
-export const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, NodeJS.Platform>
+const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, NodeJS.Platform>
 
 /**
  * The web app's build, from this project's folder. Forge copies it into the app's resources

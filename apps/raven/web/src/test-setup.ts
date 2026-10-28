@@ -20,6 +20,7 @@ import { useSelectionScopes } from '@/stores/selectionScope'
 import { useServerReach } from '@/stores/serverReach'
 import { useSideMenu } from '@/stores/sideMenu'
 import { useTheme } from '@/stores/theme'
+import { useWindowChrome } from '@/stores/windowChrome'
 import { resetBrowserSupport } from '@/test/canPlay'
 import { FakeEventSource } from '@/test/eventSource'
 import { pacePolls, resetPolls } from '@/test/polls'
@@ -42,6 +43,7 @@ const initialDownloadAsk = useDownloadAsk.getInitialState()
 const initialDragging = useDragging.getInitialState()
 const initialServerReach = useServerReach.getInitialState()
 const initialToasts = useToasts.getInitialState()
+const initialWindowChrome = useWindowChrome.getInitialState()
 
 // Bun test does not unmount between tests the way vitest globals do. The
 // stores reset after the unmount, or a store still subscribed to redraws
@@ -66,6 +68,7 @@ afterEach(() => {
   useDragging.setState(initialDragging, true)
   useServerReach.setState(initialServerReach, true)
   useToasts.setState(initialToasts, true)
+  useWindowChrome.setState(initialWindowChrome, true)
   delete document.documentElement.dataset.desktop
   resetBrowserSupport()
   FakeEventSource.opened = []

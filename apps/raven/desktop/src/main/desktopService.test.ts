@@ -310,7 +310,17 @@ const setup = ({
   const errors: unknown[] = []
   const written: OutputSettings[] = []
   const buttons: boolean[] = []
-  const spies = { recentDocuments, cleared: 0, ready: 0, dialogCalls: 0, errors, written, buttons }
+  const windowActions: string[] = []
+  const spies = {
+    recentDocuments,
+    cleared: 0,
+    ready: 0,
+    dialogCalls: 0,
+    errors,
+    written,
+    buttons,
+    windowActions,
+  }
   const clock = { now: 5000 }
   const statCalls: string[] = []
   const pendingTimers = new Map<number, () => void>()
@@ -433,6 +443,9 @@ const setup = ({
     },
     setWindowButtons: (isVisible) => {
       spies.buttons.push(isVisible)
+    },
+    controlWindow: (action) => {
+      spies.windowActions.push(action)
     },
   })
   return {
@@ -943,6 +956,28 @@ describe('saveTracks', () => {
     expect(await saveTracks({ service, fileId, audio: 1.5, subtitle: null })).toEqual(refused)
     expect(await saveTracks({ service, fileId, audio: -1, subtitle: null })).toEqual(refused)
     expect(store.read().tracks).toEqual([])
+  })
+})
+
+describe('windowControl', () => {
+  it('passes the action on and replies done', async () => {
+    const { service, spies } = setup({ files: {} })
+    expect(
+      await service.handle({
+        kind: 'page',
+        request: { type: 'windowControl', action: 'maximize' },
+      }),
+    ).toEqual({ type: 'done' })
+    await service.handle({ kind: 'page', request: { type: 'windowControl', action: 'close' } })
+    expect(spies.windowActions).toEqual(['maximize', 'close'])
+  })
+
+  it('refuses an action it does not know', async () => {
+    const { service, spies } = setup({ files: {} })
+    expect(
+      await service.handle({ kind: 'page', request: { type: 'windowControl', action: 'hide' } }),
+    ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
+    expect(spies.windowActions).toEqual([])
   })
 })
 

@@ -286,6 +286,15 @@ export const UPDATE_WORDS = {
   failed: 'Raven could not check for updates.',
 } as const
 
+/** What a page-drawn window control asks of the window; maximize restores a maximized one. */
+export const WINDOW_ACTIONS = {
+  minimize: 'minimize',
+  maximize: 'maximize',
+  close: 'close',
+} as const
+
+export type WindowAction = (typeof WINDOW_ACTIONS)[keyof typeof WINDOW_ACTIONS]
+
 export const DESKTOP_REQUESTS = {
   ready: 'ready',
   openDialog: 'openDialog',
@@ -297,6 +306,7 @@ export const DESKTOP_REQUESTS = {
   clearRecents: 'clearRecents',
   saveTracks: 'saveTracks',
   windowButtons: 'windowButtons',
+  windowControl: 'windowControl',
   readOutput: 'readOutput',
   writeOutput: 'writeOutput',
   openLink: 'openLink',
@@ -352,6 +362,10 @@ export const isDesktopRequest = union(
     subtitle: nullable(isString),
   }),
   object({ type: oneOf([DESKTOP_REQUESTS.windowButtons]), isVisible: isBoolean }),
+  object({
+    type: oneOf([DESKTOP_REQUESTS.windowControl]),
+    action: oneOf(Object.values(WINDOW_ACTIONS)),
+  }),
   object({ type: oneOf([DESKTOP_REQUESTS.readOutput]) }),
   object({ type: oneOf([DESKTOP_REQUESTS.writeOutput]), output: isOutputSettings }),
   object({ type: oneOf([DESKTOP_REQUESTS.openLink]), link: isString }),

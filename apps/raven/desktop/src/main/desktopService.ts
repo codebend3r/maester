@@ -11,6 +11,7 @@ import {
   type OutputSettings,
   type RecentView,
   titleFromFileName,
+  type WindowAction,
 } from '@raven/core'
 import type { PageAccount } from '@/main/accounts/pageAccount'
 import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
@@ -72,6 +73,7 @@ export type DesktopServiceDeps = {
     write: (output: OutputSettings) => Promise<void>
   }
   setWindowButtons: (isVisible: boolean) => void
+  controlWindow: (action: WindowAction) => void
   config: ConfigStore
   links: LinkOpener
   updates: UpdateService
@@ -380,6 +382,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return saveTracks(request)
       case DESKTOP_REQUESTS.windowButtons:
         deps.setWindowButtons(request.isVisible)
+        return DONE
+      case DESKTOP_REQUESTS.windowControl:
+        deps.controlWindow(request.action)
         return DONE
       case DESKTOP_REQUESTS.readOutput:
         return { type: DESKTOP_REPLIES.output, ...(await deps.output.read()) }

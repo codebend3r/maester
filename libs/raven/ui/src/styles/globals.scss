@@ -236,6 +236,12 @@ body {
   --titlebar-inset: 1.75rem;
 }
 
+// A frameless window (Windows) has no title bar at all: the page draws its controls in a
+// strip of this height, which also drags the window.
+:root[data-desktop='drawn'] {
+  --titlebar-inset: 2rem;
+}
+
 // A desktop host draws the video under the page, so the page lets it through.
 :root[data-surface='native'] {
   --color-stage: transparent;
