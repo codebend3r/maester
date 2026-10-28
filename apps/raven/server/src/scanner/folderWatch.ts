@@ -2,6 +2,7 @@ import { type FSWatcher, type WatchEventType, type WatchListener, statSync, watc
 import { join } from 'node:path'
 import { isRecord } from '@raven/core'
 import { ERROR_CODES } from '@/errorMessage'
+import { mapWithConcurrency } from '@/scanner/concurrency'
 import { foldersUnder, isUnder } from '@/scanner/walk'
 
 /** The `fs.watch` event a folder watch follows up. */
@@ -116,13 +117,17 @@ export const watchEachFolder = ({
   }
 
   /** Watches each folder in turn, letting the event loop run between one and the next, until closed. */
-  const addAll = (folders: readonly string[]): Promise<void> =>
-    folders.reduce<Promise<void>>(async (before, folder) => {
-      await before
-      if (state.closed) return
-      add(folder)
-      await nextTurn()
-    }, Promise.resolve())
+  const addAll = async (folders: readonly string[]): Promise<void> => {
+    await mapWithConcurrency({
+      items: folders,
+      limit: 1,
+      fn: async (folder) => {
+        if (state.closed) return
+        add(folder)
+        await nextTurn()
+      },
+    })
+  }
 
   /** A changed path that is a folder now gets watched, with everything under it; one gone is let go. */
   const follow = async (path: string) => {
