@@ -179,7 +179,8 @@
           },
           {
             "runtime": "xcodebuild -version"
-          }
+          },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
         ],
         "outputs": [
           "{projectRoot}/ios",
@@ -205,7 +206,8 @@
           },
           {
             "runtime": "xcodebuild -version"
-          }
+          },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
         ],
         "outputs": [
           "{projectRoot}/ios",
@@ -225,7 +227,11 @@
           },
           {
             "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          }
+          },
+          {
+            "env": "ORG_GRADLE_PROJECT_reactNativeArchitectures"
+          },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
         ],
         "outputs": [
           "{projectRoot}/android"
@@ -250,7 +256,8 @@
           },
           {
             "runtime": "xcodebuild -version"
-          }
+          },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
         ],
         "outputs": [
           "{projectRoot}/ios"
@@ -275,7 +282,8 @@
           },
           {
             "runtime": "xcodebuild -version"
-          }
+          },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
         ],
         "outputs": [
           "{projectRoot}/ios"
@@ -294,7 +302,8 @@
           },
           {
             "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          }
+          },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
         ],
         "outputs": [
           "{projectRoot}/android"
@@ -317,6 +326,50 @@
           {
             "runtime": "xcodebuild -version"
           },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
+          "{workspaceRoot}/apps/raven/server/src/**/*"
+        ],
+        "cache": true
+      },
+      "e2e:android-tv": {
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "env": "APP_VARIANT"
+          },
+          {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+          },
+          {
+            "env": "ORG_GRADLE_PROJECT_reactNativeArchitectures"
+          },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
+          "{workspaceRoot}/.github/actions/raven-android-avd/**/*",
+          "{workspaceRoot}/apps/raven/server/src/**/*"
+        ],
+        "cache": true
+      },
+      "e2e:tvos": {
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "env": "APP_VARIANT"
+          },
+          {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+          },
+          {
+            "env": "DEVELOPER_DIR"
+          },
+          {
+            "env": "TVOS_SIMULATOR"
+          },
+          {
+            "runtime": "xcodebuild -version"
+          },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
           "{workspaceRoot}/apps/raven/server/src/**/*"
         ],
         "cache": true

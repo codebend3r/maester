@@ -1,0 +1,132 @@
+name: 🗃️ App build caches
+
+# Builds raven's device app on main and saves what the next build reads: ccache's
+# objects, CocoaPods' and Gradle's downloads, Gradle's build cache, Homebrew's and apt's
+# packages, and the Android TV emulator's snapshot. A pull request's caches are scoped
+# to its own ref, so when each PR saved its own the repo's cache filled with copies;
+# main's are readable by every PR, whose app jobs in pull-request-checks.yml only
+# restore. The two set up through the same actions, raven-app-setup and
+# raven-android-avd, so the caches match. It runs when what the native projects or those
+# actions are made from changes, weekly so the compile caches follow the sources and are
+# never evicted for going unused, and by hand.
+on:
+  push:
+    branches: [main]
+    paths:
+      - bun.lock
+      - apps/raven/app/package.json
+      - apps/raven/app/app.config.ts
+      - apps/raven/app/plugins/**
+      - .github/actions/raven-app-setup/**
+      - .github/actions/raven-android-avd/**
+      - .github/workflows/app-caches.yml
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+# actions: write deletes the cache entries a save supersedes.
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+  # As pull-request-checks.yml's. Node runs Metro and the tooling, not the native compile,
+  # so a difference would not leave a PR's compile caches unmatched.
+  APP_NODE_VERSION: 24.21.0
+
+jobs:
+  build:
+    name: ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: 📱 iPhone and iPad caches
+            id: ios
+            runner: macos-26
+          - name: 📺 Apple TV caches
+            id: tvos
+            runner: macos-26
+          - name: 📺 Android TV caches
+            id: android-tv
+            runner: ubuntu-24.04
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+
+      - name: 🧰 Set up the app build
+        id: setup
+        uses: ./.github/actions/raven-app-setup
+        with:
+          platform: ${{ matrix.platform.id }}
+          node-version: ${{ env.APP_NODE_VERSION }}
+
+      # Past Nx's cache, which would otherwise restore the build and compile nothing.
+      - name: 🔨 Build
+        run: bunx nx run @raven/app:build:${{ matrix.platform.id }} --excludeTaskDependencies --skip-nx-cache
+
+      - name: 📊 ccache
+        run: ccache --show-stats
+
+      # An exact-key cache is saved only when it was not restored, since a save under an
+      # existing key fails. ccache's key, and Gradle's, are per run.
+      - name: 💾 Save the packages
+        if: steps.setup.outputs.packages-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.setup.outputs.packages-path }}
+          key: ${{ steps.setup.outputs.packages-key }}
+
+      - name: 💾 Save the dependencies
+        if: steps.setup.outputs.dependencies-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.setup.outputs.dependencies-path }}
+          key: ${{ steps.setup.outputs.dependencies-key }}
+
+      - name: 💾 Save ccache
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.setup.outputs.ccache-path }}
+          key: ${{ steps.setup.outputs.ccache-key }}
+
+      # Main's newest entry is the one every PR restores; the older ones only fill the cache.
+      - name: 🧹 Delete superseded caches
+        uses: ./.github/actions/delete-superseded-caches
+        with:
+          keep: ${{ steps.setup.outputs.supersedes }}
+
+  android-tv-avd:
+    name: 📺 Android TV emulator cache
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+
+      # Makes and boots the AVD when main has no snapshot under the current key; when it
+      # has one, only checks, rather than downloading 2.7 GB to learn it.
+      - name: 📺 Android TV AVD
+        id: avd
+        uses: ./.github/actions/raven-android-avd
+        with:
+          lookup-only: 'true'
+
+      - name: 💾 Save the Android TV AVD
+        if: steps.avd.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.avd.outputs.path }}
+          key: ${{ steps.avd.outputs.key }}
+
+      - name: 🧹 Delete superseded caches
+        uses: ./.github/actions/delete-superseded-caches
+        with:
+          keep: ${{ steps.avd.outputs.supersedes }}

@@ -550,15 +550,8 @@ jobs:
     needs: app-affected
     if: needs.app-affected.outputs.affected == 'true'
     runs-on: macos-26
-    # One Release build of React Native from cold (it is not cached) and the remote flow.
+    # One Release build of React Native, its compile cached by ccache, and the remote flow.
     timeout-minutes: 60
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-      HOMEBREW_NO_AUTO_UPDATE: '1'
-      # The flow reaches the accountless fixture over plain http on the loopback. The
-      # development variant allows it, and Expo bundles its address into this test build.
-      APP_VARIANT: development
-      EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN: http://127.0.0.1:8490
     steps:
       # The PR's head commit, so the artifact name below matches the commit that was built.
       - name: 📥 Checkout exact PR head
@@ -566,46 +559,14 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      # Bun's version comes from `packageManager` in package.json.
-      - name: 🍞 Set up Bun
-        uses: oven-sh/setup-bun@v2
+      # Bun, Node, the build caches restored from what app-caches.yml saved on main,
+      # ffmpeg, ccache, the build environment, the install and the libraries (built once, so
+      # the fixture server and the app build below skip their own).
+      - name: 🧰 Set up the app build
+        uses: ./.github/actions/raven-app-setup
         with:
-          bun-version-file: package.json
-
-      - name: 🟩 Set up Node
-        uses: actions/setup-node@v7
-        with:
+          platform: tvos
           node-version: ${{ env.APP_NODE_VERSION }}
-
-      # The fixture server encodes its clips and probes them with ffmpeg and ffprobe.
-      - name: 🎞️ Install ffmpeg
-        run: brew install ffmpeg
-
-      # CocoaPods' downloaded specs and sources, keyed on the lockfile that pins the pods'
-      # versions. `expo prebuild --clean` rebuilds ios/ and Pods/, so only the downloads
-      # are worth keeping.
-      - name: 🗃️ CocoaPods cache
-        uses: actions/cache@v6
-        with:
-          path: ~/Library/Caches/CocoaPods
-          key: cocoapods-${{ runner.os }}-tvos-${{ hashFiles('bun.lock', 'apps/raven/app/package.json') }}
-
-      # CocoaPods fetches the Hermes tarball with plain curl, which reads ~/.curlrc and,
-      # without one, waits out a stalled mirror for as long as the job lasts. This drops a
-      # transfer that stays under 100 KB/s for 30 seconds and tries it again.
-      - name: 🐢 Retry stalled downloads
-        run: printf 'speed-limit = 102400\nspeed-time = 30\nretry = 5\n' > ~/.curlrc
-
-      # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
-      - name: 📦 Install
-        run: bun install --frozen-lockfile
-
-      # The fixture server and the app build are two Nx processes that would each run the
-      # libraries' `build` (it starts with `rm -rf dist`) at once, so the server could import
-      # `dist` between `tsc` and `tsc-alias`, while it still holds `@/` paths. Build them once
-      # here; the two commands below skip their own dependency builds.
-      - name: 🧱 Build the libraries
-        run: bunx nx run-many -t build -p @raven/core @raven/ui @shared/server
 
       # A real raven server with a locked film library and an open series library, started
       # while the app builds. It prints its ready line once its libraries are scanned.
@@ -616,6 +577,10 @@ jobs:
       # ios/ and installs the pods, so the pods are checked right after.
       - name: 📺 Build for the Apple TV simulator
         run: bunx nx run @raven/app:build:tvos --excludeTaskDependencies
+
+      # How much of the compile ccache served, to tell a warm cache from a cold one.
+      - name: 📊 ccache
+        run: ccache --show-stats
 
       # `expo prebuild` exits 0 when `pod install` fails, so the pods are checked by hand:
       # CocoaPods writes Pods/Manifest.lock as a copy of Podfile.lock once it has installed.
@@ -690,15 +655,8 @@ jobs:
     needs: app-affected
     if: needs.app-affected.outputs.affected == 'true'
     runs-on: macos-26
-    # One Release build of React Native from cold (it is not cached) and the flows.
+    # One Release build of React Native, its compile cached by ccache, and the flows.
     timeout-minutes: 60
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-      HOMEBREW_NO_AUTO_UPDATE: '1'
-      # The flows reach the accountless fixture over plain http on the loopback. The
-      # development variant allows it, and Expo bundles its address into this test build.
-      APP_VARIANT: development
-      EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN: http://127.0.0.1:8490
     steps:
       # The PR's head commit, so the artifact names below match the commit that was built.
       - name: 📥 Checkout exact PR head
@@ -706,46 +664,14 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      # Bun's version comes from `packageManager` in package.json.
-      - name: 🍞 Set up Bun
-        uses: oven-sh/setup-bun@v2
+      # Bun, Node, the build caches restored from what app-caches.yml saved on main,
+      # ffmpeg, ccache, the build environment, the install and the libraries (built once, so
+      # the fixture server and the app build below skip their own).
+      - name: 🧰 Set up the app build
+        uses: ./.github/actions/raven-app-setup
         with:
-          bun-version-file: package.json
-
-      - name: 🟩 Set up Node
-        uses: actions/setup-node@v7
-        with:
+          platform: ios
           node-version: ${{ env.APP_NODE_VERSION }}
-
-      # The fixture server encodes its clips and probes them with ffmpeg and ffprobe.
-      - name: 🎞️ Install ffmpeg
-        run: brew install ffmpeg
-
-      # CocoaPods' downloaded specs and sources, keyed on the lockfile that pins the pods'
-      # versions. `expo prebuild --clean` rebuilds ios/ and Pods/, so only the downloads
-      # are worth keeping.
-      - name: 🗃️ CocoaPods cache
-        uses: actions/cache@v6
-        with:
-          path: ~/Library/Caches/CocoaPods
-          key: cocoapods-${{ runner.os }}-ios-${{ hashFiles('bun.lock', 'apps/raven/app/package.json') }}
-
-      # CocoaPods fetches the Hermes tarball with plain curl, which reads ~/.curlrc and,
-      # without one, waits out a stalled mirror for as long as the job lasts. This drops a
-      # transfer that stays under 100 KB/s for 30 seconds and tries it again.
-      - name: 🐢 Retry stalled downloads
-        run: printf 'speed-limit = 102400\nspeed-time = 30\nretry = 5\n' > ~/.curlrc
-
-      # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
-      - name: 📦 Install
-        run: bun install --frozen-lockfile
-
-      # The fixture server and the app build are two Nx processes that would each run the
-      # libraries' `build` (it starts with `rm -rf dist`) at once, so the server could import
-      # `dist` between `tsc` and `tsc-alias`, while it still holds `@/` paths. Build them once
-      # here; the two commands below skip their own dependency builds.
-      - name: 🧱 Build the libraries
-        run: bunx nx run-many -t build -p @raven/core @raven/ui @shared/server
 
       # The fixture server, the simulator's boot and Maestro's download do not depend on
       # the build, so they start before it and finish while it compiles. Each runs in the
@@ -788,6 +714,10 @@ jobs:
       # and installs the pods, so the pods are checked right after.
       - name: 📱 Build for the iPhone and iPad simulator
         run: bunx nx run @raven/app:build:ios --excludeTaskDependencies
+
+      # How much of the compile ccache served, to tell a warm cache from a cold one.
+      - name: 📊 ccache
+        run: ccache --show-stats
 
       - name: 🔎 Check the iPhone and iPad pods
         working-directory: apps/raven/app/ios
@@ -866,24 +796,9 @@ jobs:
     needs: app-affected
     if: needs.app-affected.outputs.affected == 'true'
     runs-on: ubuntu-24.04
-    # A Release build of React Native from cold, the emulator's boot and the flows.
+    # A Release build of React Native, its compile cached by ccache and Gradle, the
+    # emulator's boot and the flows.
     timeout-minutes: 60
-    env:
-      # The flows reach the accountless fixture over plain http on the loopback. The
-      # development variant allows it, and Expo bundles its address into this test build.
-      APP_VARIANT: development
-      EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN: http://127.0.0.1:8490
-      # The emulator both runner steps start, its build pinned to the one the flows were
-      # written on (36.5.11), so the AVD cache's key can name everything its snapshot was
-      # made with.
-      EMULATOR_BUILD: '15261927'
-      EMULATOR_CORES: '4'
-      # The action writes this verbatim to hw.ramSize, an integer in MiB. A suffix
-      # makes the emulator fall back to 1024 MiB instead of allocating the requested RAM.
-      EMULATOR_RAM: '4096'
-      EMULATOR_OPTIONS: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-      # Android TV, API 36 (the app's target SDK), x86_64 for KVM, at 960 by 540 dp.
-      AVD_IMAGE: system-images;android-36;android-tv;x86_64
     steps:
       # The PR's head commit, so the artifact name below matches the commit that was built.
       - name: 📥 Checkout exact PR head
@@ -891,46 +806,27 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      # Bun's version comes from `packageManager` in package.json.
-      - name: 🍞 Set up Bun
-        uses: oven-sh/setup-bun@v2
+      # Bun, Node, JDK 17 (Gradle and Maestro run on it; the runner's Android SDK is
+      # ANDROID_HOME already), the build caches restored from what app-caches.yml saved on
+      # main, ffmpeg, ccache, the build environment (an x86_64-only APK), the install and
+      # the libraries.
+      - name: 🧰 Set up the app build
+        uses: ./.github/actions/raven-app-setup
         with:
-          bun-version-file: package.json
-
-      - name: 🟩 Set up Node
-        uses: actions/setup-node@v7
-        with:
+          platform: android-tv
           node-version: ${{ env.APP_NODE_VERSION }}
-
-      # The runner's Android SDK is ANDROID_HOME already; Gradle and Maestro run on its JDK 17.
-      - name: ☕ Use JDK 17
-        run: echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
-
-      # The fixture server encodes its clips and probes them with ffmpeg and ffprobe.
-      - name: 🎞️ Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
-
-      # Gradle's downloads, keyed on the lockfile, which pins React Native, Expo and the
-      # native modules android/ is generated from.
-      - name: 🗃️ Gradle cache
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('bun.lock', 'apps/raven/app/package.json') }}
-
-      # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
-      - name: 📦 Install
-        run: bun install --frozen-lockfile
 
       # Runs `prebuild:android-tv` first, which regenerates android/ with the leanback
       # launcher, then Gradle's Release APK.
       - name: 📺 Build the Android TV APK
-        run: bunx nx run @raven/app:build:android-tv
+        run: bunx nx run @raven/app:build:android-tv --excludeTaskDependencies
 
-      # The Release APK, signed with the debug key Expo's template sets up, for sideloading
-      # the PR's build by hand.
+      # How much of the compile ccache served, to tell a warm cache from a cold one.
+      - name: 📊 ccache
+        run: ccache --show-stats
+
+      # The Release APK, signed with the debug key Expo's template sets up. It holds only
+      # x86_64 code, so it installs on an x86_64 emulator, not on a TV.
       - name: 📤 Android TV APK
         uses: actions/upload-artifact@v7
         with:
@@ -938,83 +834,18 @@ jobs:
           path: apps/raven/app/android/app/build/outputs/apk/release
           if-no-files-found: error
 
-      # The emulator runs on KVM, which the runner's user may not open until a udev rule
-      # lets it.
-      - name: 🧩 Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      # The AVD cache's key names everything its snapshot is made from: the system image's
-      # revision (the runner always installs the newest, which this reads from the same
-      # repository), the emulator build, the cores, the RAM and a hash of the options. A
-      # snapshot from anything else would not load and the emulator would cold boot every run.
-      # Bump the `v1` to throw the cache away by hand.
-      - name: 🔑 AVD cache key
-        id: avd-key
-        run: |
-          revision="$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null | awk -F'|' -v image="$AVD_IMAGE" '{ gsub(/ /, "", $1); gsub(/ /, "", $2) } $1 == image { print $2; exit }')"
-          test -n "$revision"
-          options="$(echo "$EMULATOR_OPTIONS" | sha256sum | cut -c1-12)"
-          echo "key=avd-v1-android-tv-36-x86_64-tv_1080p-image$revision-emulator$EMULATOR_BUILD-$EMULATOR_CORES-cores-$EMULATOR_RAM-$options" >> "$GITHUB_OUTPUT"
-
-      # The Android TV AVD with a booted snapshot, so a later run boots from it in seconds.
-      - name: 🗃️ Android TV AVD cache
-        id: avd-cache
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: ${{ steps.avd-key.outputs.key }}
-
-      # Only on a cache miss: makes the AVD, boots it once and saves the snapshot. The runner
-      # unlocks the screen with `adb shell input keyevent 82` the moment the boot completes,
-      # and that call sometimes exits 255 while the Android TV image is still settling, which
-      # fails the step with a healthy emulator. The second attempt below retries it, and
-      # reuses the AVD the first one made.
-      - name: 📺 Make the Android TV AVD
-        id: make-avd
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        continue-on-error: true
-        # reactivecircus/android-emulator-runner v2.38.0
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
-        with:
-          api-level: 36
-          target: android-tv
-          arch: x86_64
-          profile: tv_1080p
-          emulator-build: ${{ env.EMULATOR_BUILD }}
-          cores: ${{ env.EMULATOR_CORES }}
-          ram-size: ${{ env.EMULATOR_RAM }}
-          force-avd-creation: false
-          emulator-options: ${{ env.EMULATOR_OPTIONS }}
-          disable-animations: false
-          script: echo "Saved the Android TV AVD's snapshot"
-
-      - name: 📺 Make the Android TV AVD again
-        if: steps.make-avd.outcome == 'failure'
-        # reactivecircus/android-emulator-runner v2.38.0
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
-        with:
-          api-level: 36
-          target: android-tv
-          arch: x86_64
-          profile: tv_1080p
-          emulator-build: ${{ env.EMULATOR_BUILD }}
-          cores: ${{ env.EMULATOR_CORES }}
-          ram-size: ${{ env.EMULATOR_RAM }}
-          force-avd-creation: false
-          emulator-options: ${{ env.EMULATOR_OPTIONS }}
-          disable-animations: false
-          script: echo "Saved the Android TV AVD's snapshot"
+      # The Android TV emulator's settings and KVM, and the AVD with its booted snapshot,
+      # restored from what app-caches.yml saved on main (a PR's own 2.7 GB copy would be its
+      # alone), or made and booted once on a miss.
+      - name: 📺 Android TV AVD
+        id: avd
+        uses: ./.github/actions/raven-android-avd
 
       # A real raven server with a locked film library and an open series library, in the
       # background for the flows. It prints its ready line once its libraries are scanned.
       - name: 🗄️ Start the fixture server
         run: |
-          bunx nx run @raven/server:serve:fixture > "$RUNNER_TEMP/fixture.log" 2>&1 &
+          bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
           for _ in $(seq 1 90); do
             if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
               grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
@@ -1049,15 +880,15 @@ jobs:
         env:
           MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
         with:
-          api-level: 36
-          target: android-tv
-          arch: x86_64
-          profile: tv_1080p
-          emulator-build: ${{ env.EMULATOR_BUILD }}
-          cores: ${{ env.EMULATOR_CORES }}
-          ram-size: ${{ env.EMULATOR_RAM }}
+          api-level: ${{ steps.avd.outputs.api-level }}
+          target: ${{ steps.avd.outputs.target }}
+          arch: ${{ steps.avd.outputs.arch }}
+          profile: ${{ steps.avd.outputs.profile }}
+          emulator-build: ${{ steps.avd.outputs.emulator-build }}
+          cores: ${{ steps.avd.outputs.cores }}
+          ram-size: ${{ steps.avd.outputs.ram-size }}
           force-avd-creation: false
-          emulator-options: -no-snapshot-save ${{ env.EMULATOR_OPTIONS }}
+          emulator-options: -no-snapshot-save ${{ steps.avd.outputs.emulator-options }}
           disable-animations: true
           disable-spellchecker: true
           script: |
