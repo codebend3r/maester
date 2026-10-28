@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
-import { watchLink } from '@raven/core'
+import { RESOLUTIONS, watchLink } from '@raven/core'
 import { type Featured } from '@/pages/HomePage/featured'
 import { HERO_MS, HomeHero, LESS_MOTION, titleSize } from '@/pages/HomePage/HomeHero'
 import { matchedMovie } from '@/test/fixtures'
@@ -12,7 +12,8 @@ const arrival = (id: number): Featured => ({
   backdrop: `/backdrop-${id}.jpg`,
   eyebrow: 'Featured in Films',
   title: `Movie ${id}`,
-  facts: ['2024', '2h 46m', '4K HDR'],
+  facts: ['2024', '2h 46m'],
+  picture: { resolution: RESOLUTIONS.uhd, isHdr: true },
   line: `What happens in ${id}.`,
   play: watchLink({ media: matchedMovie({ id }) }),
   details: `/movies/${id + 100}?library=2`,
@@ -82,7 +83,9 @@ describe('HomeHero', () => {
       'href',
       '/movies/101?library=2',
     )
-    expect(within(slide()).getByText('2024 · 2h 46m · 4K HDR')).toBeInTheDocument()
+    // The resolution wears the chip every page marks it with, and still reads as words.
+    const resolution = within(slide()).getByLabelText('Video resolution: 4K')
+    expect(resolution.closest('p')).toHaveTextContent('2024 · 2h 46m · 4K HDR')
     expect(slide()).toHaveAccessibleName('1 of 3')
     expect(within(hero()).getByText('1 / 3')).toBeInTheDocument()
     // The others' words keep the hero their height, out of reach.

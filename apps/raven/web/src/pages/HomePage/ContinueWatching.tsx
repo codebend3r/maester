@@ -70,7 +70,7 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
   const page = cardLink({ media, hasPages: true })
   const hasPage = page.state == null
   const hasPoster = poster?.posterVersion != null
-  const hasResolution = resolutionLabel(media) != null
+  const resolution = resolutionLabel(media)
 
   return (
     <li className={`${styles.tile} ${menu.hostClass}`}>
@@ -102,10 +102,10 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
         ) : (
           <span className={styles.title}>{title}</span>
         )}
-        {(line || hasResolution) && (
+        {(line || resolution != null) && (
           <span className={styles.line}>
             {line && <span>{line}</span>}
-            <ResolutionChip media={media} />
+            <ResolutionChip resolution={resolution} />
           </span>
         )}
         {left && (

@@ -50,6 +50,7 @@ import { useItemFavourite } from '@/lib/useItemFavourite'
 import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
+import { FactText } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/pages/SeasonPage/SeasonPage.module.scss'
 
 type EpisodeRowProps = { episode: EpisodeSummary }
@@ -101,7 +102,11 @@ const EpisodeRow = ({ episode }: EpisodeRowProps) => {
         </p>
         {facts.length > 0 && (
           <span className={styles.facts}>
-            <Dotted parts={facts} />
+            <Dotted
+              parts={facts.map((fact) => (
+                <FactText key={fact} fact={fact} />
+              ))}
+            />
           </span>
         )}
         {episode.summary && <p className={styles.overview}>{episode.summary}</p>}

@@ -1,3 +1,5 @@
+import { oneOf } from '@/schema'
+
 /** What a library holds: videos, or audio files. Its type decides which. */
 export const MEDIA_TYPES = { video: 'video', audio: 'audio' } as const
 
@@ -102,6 +104,23 @@ export const RESOLUTIONS = {
 } as const
 
 export type Resolution = (typeof RESOLUTIONS)[keyof typeof RESOLUTIONS]
+
+export const isResolution = oneOf(Object.values(RESOLUTIONS))
+
+/** A fact split at its leading resolution: `4K HDR` is 4K and `HDR`; one with none keeps it all as `rest`. */
+type ResolutionSplit = { resolution: Resolution | null; rest: string }
+
+/**
+ * A fact's leading resolution, apart from what follows it: the facts the
+ * pages share put the resolution first (`1080p (HEVC) HDR`, `4K HDR`), so a
+ * client that marks the resolution apart reads it off the front.
+ */
+export const splitResolution = (fact: string): ResolutionSplit => {
+  const [first = '', ...rest] = fact.split(' ')
+  return isResolution(first)
+    ? { resolution: first, rest: rest.join(' ') }
+    : { resolution: null, rest: fact }
+}
 
 type ResolutionLabelProps = {
   width: number | null

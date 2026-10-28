@@ -8,6 +8,7 @@ import {
 } from '@raven/core'
 import { Bucket } from '@/components/Bucket/Bucket'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
+import { FactText } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/components/MediaGroups/MediaGroups.module.scss'
 
 const count = new Intl.NumberFormat()
@@ -34,7 +35,7 @@ export const MediaGroups = ({
     {groupMedia({ items, by }).map((group) => (
       <Bucket
         key={group.key}
-        label={group.label}
+        label={<FactText fact={group.label} />}
         count={`${count.format(group.items.length)} ${group.items.length === 1 ? 'video' : 'videos'}`}
       >
         <MediaGrid

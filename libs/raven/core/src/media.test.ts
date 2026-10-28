@@ -5,6 +5,7 @@ import {
   isAudioContainer,
   isVideoFile,
   resolutionLabel,
+  splitResolution,
   titleFromFileName,
 } from '@/media'
 
@@ -70,5 +71,19 @@ describe('resolutionLabel', () => {
     [{ width: null, height: null }, null],
   ] as const)('labels %j as %s', (size, label) => {
     expect(resolutionLabel(size)).toBe(label)
+  })
+})
+
+describe('splitResolution', () => {
+  it.each([
+    ['1080p', { resolution: '1080p', rest: '' }],
+    ['4K HDR', { resolution: '4K', rest: 'HDR' }],
+    ['1080p (HEVC) HDR', { resolution: '1080p', rest: '(HEVC) HDR' }],
+    ['SD', { resolution: 'SD', rest: '' }],
+    ['2h 58m', { resolution: null, rest: '2h 58m' }],
+    ['4Kids', { resolution: null, rest: '4Kids' }],
+    ['', { resolution: null, rest: '' }],
+  ] as const)('splits %j', (fact, split) => {
+    expect(splitResolution(fact)).toEqual(split)
   })
 })

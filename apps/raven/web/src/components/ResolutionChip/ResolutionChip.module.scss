@@ -1,4 +1,6 @@
 // Glass of the ground with a hairline, so it reads over a pale picture too.
+// It sets its own face, so a grouped heading's serif leaves it the body
+// face it wears in a table or a line of facts.
 .chip {
   display: inline-grid;
   padding: var(--space-0) var(--space-1);
@@ -7,6 +9,7 @@
   box-shadow: inset 0 0 0 1px var(--color-line);
   backdrop-filter: blur(8px);
   color: var(--color-bark);
+  font-family: var(--font-body);
   font-size: var(--font-size-2xs);
   font-weight: 700;
   line-height: var(--line-tight);
@@ -48,4 +51,12 @@
 
 .uhd8k {
   background: var(--color-resolution-8k);
+}
+
+// A fact led by its resolution: the chip, then the rest of it on its line.
+.fact {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: var(--space-0);
+  align-items: center;
 }

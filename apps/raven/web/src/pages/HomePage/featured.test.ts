@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import type { Hero } from '@raven/core'
+import { type Hero, RESOLUTIONS } from '@raven/core'
 import { featuredOf } from '@/pages/HomePage/featured'
 import { itemSummary, library, matchedMovie, mediaItem, showEntry } from '@/test/fixtures'
 
@@ -113,7 +113,8 @@ describe('featuredOf', () => {
       backdrop: '/api/pictures/items/105/backdrop/b5',
       eyebrow: 'Featured in Films',
       title: 'Movie 5',
-      facts: ['2026', '2h 46m', '4K HDR'],
+      facts: ['2026', '2h 46m'],
+      picture: { resolution: RESOLUTIONS.uhd, isHdr: true },
       details: '/movies/105?library=2',
     })
     expect(featured?.play).toEqual({
@@ -125,9 +126,9 @@ describe('featuredOf', () => {
   it('leaves out the facts a file has not been probed for', () => {
     const movie = arrival({ id: 6, addedAt: '2026-10-10T00:00:00.000Z' })
     const bare = { ...movie, duration: null, width: null, height: null }
-    expect(
-      featuredOf({ hero: [movieEntry({ media: bare })], libraries: LIBRARIES })[0]?.facts,
-    ).toEqual(['2026'])
+    const [featured] = featuredOf({ hero: [movieEntry({ media: bare })], libraries: LIBRARIES })
+    expect(featured?.facts).toEqual(['2026'])
+    expect(featured?.picture).toBeNull()
   })
 
   it('says how long a show has run and how much of it there is, and plays what is next', () => {
@@ -138,6 +139,7 @@ describe('featuredOf', () => {
       eyebrow: 'Featured in Series',
       title: 'Show 9',
       facts: ['2022 to 2025', '9 episodes'],
+      picture: null,
       details: '/shows/9',
     })
     expect(featured?.play?.to).toBe('/watch/12')

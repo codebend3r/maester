@@ -10,6 +10,7 @@ import {
   watchLink,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
+import type { ReactNode } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { Dotted } from '@/components/ItemHeader/ItemHeader'
@@ -17,6 +18,7 @@ import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
+import { PictureFact } from '@/components/ResolutionChip/ResolutionChip'
 import { PartlyWatched } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { POSTER_SIZES } from '@/lib/posters'
@@ -44,15 +46,17 @@ const standings = (media: readonly MediaItem[]): Standing[] => {
 }
 
 /** "2001 · 2h 58m · 4K HDR": the year, how long it runs, and its picture. */
-const filmFacts = (media: MediaItem): string[] => {
+const filmFacts = (media: MediaItem): ReactNode[] => {
   const { year } = cardTitle(media)
   const resolution = resolutionLabel(media)
   return [
     year == null ? null : String(year),
     formatRuntime(media.duration),
-    resolution && (media.hdr ? `${resolution} HDR` : resolution),
+    resolution && (
+      <PictureFact key="picture" resolution={resolution} rest={media.hdr ? 'HDR' : null} />
+    ),
     media.versions > 1 ? `${media.versions} versions` : null,
-  ].filter((fact): fact is string => fact != null)
+  ].filter((fact) => fact != null)
 }
 
 type SagaFilmProps = {

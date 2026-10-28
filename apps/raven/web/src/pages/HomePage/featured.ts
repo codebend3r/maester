@@ -6,6 +6,7 @@ import {
   type ItemSummary,
   type Library,
   type MediaItem,
+  type Resolution,
   type ShowEntry,
   type WatchState,
   cardLink,
@@ -27,8 +28,10 @@ export type Featured = {
   /** Where it is: "Featured in Movies". */
   eyebrow: string
   title: string
-  /** The year, the length and the quality, or a show's years and episodes. */
+  /** The year and the length, or a show's years and episodes. */
   facts: string[]
+  /** A movie's resolution and whether it is HDR; null for a show, or a file not yet probed. */
+  picture: Picture | null
   /** Its summary, else its tagline; null when it has neither. */
   line: string | null
   /** The video Play starts, handed over; null when a show has nothing left to watch. */
@@ -56,10 +59,12 @@ const artworkOf = (item: ItemSummary): { poster: string; backdrop: string } | nu
 
 const isFact = (fact: string | null): fact is string => fact != null && fact !== ''
 
-/** "4K HDR", "1080p", or null before the file is probed. */
-const quality = (media: MediaItem): string | null => {
-  const label = [resolutionLabel(media), media.hdr ? 'HDR' : null].filter(isFact).join(' ')
-  return label === '' ? null : label
+type Picture = { resolution: Resolution | null; isHdr: boolean }
+
+/** 4K and HDR, 1080p alone, or null before the file is probed. */
+const pictureOf = (media: MediaItem): Picture | null => {
+  const resolution = resolutionLabel(media)
+  return resolution == null && !media.hdr ? null : { resolution, isHdr: media.hdr }
 }
 
 type FromMediaProps = {
@@ -80,11 +85,8 @@ const fromMedia = ({ media, line, library }: FromMediaProps): Featured[] => {
       ...artwork,
       eyebrow: `Featured in ${library.name}`,
       title,
-      facts: [
-        year == null ? null : String(year),
-        formatRuntime(media.duration),
-        quality(media),
-      ].filter(isFact),
+      facts: [year == null ? null : String(year), formatRuntime(media.duration)].filter(isFact),
+      picture: pictureOf(media),
       line,
       play: watchLink({ media }),
       details: cardLink({ media, hasPages: true }).to,
@@ -112,6 +114,7 @@ const fromShow = ({ entry, line, library }: FromShowProps): Featured[] => {
         showYears({ year: show.year, endedYear: entry.endedYear }),
         plural({ n: entry.episodes, one: 'episode', many: 'episodes' }),
       ].filter(isFact),
+      picture: null,
       line,
       play: next ? watchLink({ media: next }) : null,
       details: `/shows/${show.id}`,

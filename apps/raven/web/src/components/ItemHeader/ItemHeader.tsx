@@ -8,6 +8,7 @@ import { RatingPanel } from '@/components/RatingPanel/RatingPanel'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { Slideshow } from '@/components/Slideshow/Slideshow'
 import { api } from '@/lib/api'
+import { FactText } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/components/ItemHeader/ItemHeader.module.scss'
 
 /** What sits beside the title: a poster, an episode's still, or no picture at all. */
@@ -180,16 +181,17 @@ const Progress = ({ progress }: ProgressProps) => (
   </p>
 )
 
-type DottedProps = { parts: readonly string[] }
+type DottedProps = { parts: readonly ReactNode[] }
 
 /**
  * Parts of a line, a quiet dot between each, for a line of facts. A part
  * never breaks, and a line that wraps does so after a dot, so the next
- * starts flush. The line's own element sets its colour and size.
+ * starts flush. The line's own element sets its colour and size. The parts
+ * are a fixed list in a fixed order, so their place keys them.
  */
 export const Dotted = ({ parts }: DottedProps) =>
   parts.map((part, index) => (
-    <Fragment key={part}>
+    <Fragment key={index}>
       <span className={styles.part}>
         {part}
         {index < parts.length - 1 && (
@@ -299,7 +301,11 @@ export const ItemHeader = ({
                 <wbr />
               </>
             )}
-            <Dotted parts={facts} />
+            <Dotted
+              parts={facts.map((fact) => (
+                <FactText key={fact} fact={fact} />
+              ))}
+            />
           </p>
         )}
         <RatingPanel ratings={ratings} />

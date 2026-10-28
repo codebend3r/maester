@@ -4,7 +4,8 @@ import { Icon } from '@raven/ui'
 import styles from '@/components/Bucket/Bucket.module.scss'
 
 type BucketProps = {
-  label: string
+  /** Text, or text with a mark: a resolution's group wears its chip. */
+  label: ReactNode
   /** "1,189 videos", "113 shows". */
   count: string
   children: ReactNode

@@ -20,6 +20,7 @@ import { Tabs } from '@/components/Tabs/Tabs'
 import { api } from '@/lib/api'
 import { EDITED_PARTS, afterItemEdited } from '@raven/ui/headless'
 import { itemImagesQuery } from '@/lib/queries'
+import { WordFact } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/components/ImageEditor/ImageEditor.module.scss'
 
 const KIND_LABELS: Record<ChoosableImageKind, string> = {
@@ -164,17 +165,18 @@ export const ImageEditor = ({
           </p>
           <ul className={styles.versions}>
             {details.versions.map((version) => {
-              const facts = [
-                version.edition ?? 'Standard',
-                ...versionFacts(version),
-                libraryName(version.libraryId),
-              ].filter((fact) => fact !== '')
+              const edition = version.edition ?? 'Standard'
+              const library = libraryName(version.libraryId)
               return (
                 <li key={version.id} className={styles.version}>
                   <span className={styles.facts}>
-                    {facts.map((fact) => (
-                      <span key={fact}>{fact}</span>
+                    {edition !== '' && <span>{edition}</span>}
+                    {versionFacts(version).map((fact) => (
+                      <span key={fact}>
+                        <WordFact fact={fact} />
+                      </span>
                     ))}
+                    {library !== '' && <span>{library}</span>}
                   </span>
                   <span className={styles.file}>{version.fileName}</span>
                 </li>

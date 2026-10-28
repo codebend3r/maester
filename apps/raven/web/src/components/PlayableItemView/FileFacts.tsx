@@ -1,5 +1,6 @@
 import { type MediaItem, type MediaTracks, allFileFacts } from '@raven/core'
 import { useId } from 'react'
+import { FactText } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/components/PlayableItemView/FileFacts.module.scss'
 
 type FileFactsProps = {
@@ -24,7 +25,9 @@ export const FileFacts = ({ media, tracks, className }: FileFactsProps) => {
         {allFileFacts({ media, tracks }).map((fact) => (
           <div key={fact.label} className={styles.fact}>
             <dt>{fact.label}</dt>
-            <dd>{fact.value}</dd>
+            <dd>
+              <FactText fact={fact.value} />
+            </dd>
           </div>
         ))}
       </dl>
