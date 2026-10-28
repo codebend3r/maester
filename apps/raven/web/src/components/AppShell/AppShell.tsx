@@ -21,7 +21,7 @@ import { useServerEvents } from '@/lib/useServerEvents'
 import { ravenVersion } from '@/lib/version'
 import { useInProgressCount } from '@/desktop/downloadsApi'
 import { usePageBackdrop } from '@raven/ui/headless'
-import { useIsDesktop } from '@/stores/desktop'
+import { useComputerName, useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import { useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
@@ -80,16 +80,17 @@ const CountedIcon = ({ icon, count }: CountedIconProps) => (
 
 type DesktopNavItemsProps = { isIconsOnly: boolean }
 
-/** Raven's own rows: the files on this Mac, and the downloads with how many are under way. */
+/** Raven's own rows: the files on this computer, and the downloads with how many are under way. */
 const DesktopNavItems = ({ isIconsOnly }: DesktopNavItemsProps) => {
   const inProgress = useInProgressCount()
+  const computer = useComputerName()
   return (
     <>
       <NavItem
         to={DESKTOP_PATHS.local}
         patterns={[DESKTOP_PATHS.local]}
         icon={<Icon name="file-play" />}
-        label="On this Mac"
+        label={`On this ${computer}`}
         isIconsOnly={isIconsOnly}
       />
       <NavItem

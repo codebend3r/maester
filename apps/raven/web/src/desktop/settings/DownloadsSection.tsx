@@ -4,6 +4,7 @@ import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { handled } from '@/desktop/handled'
 import { useChangeDownloads, useDownloads, useSpace } from '@/desktop/downloadsApi'
 import { Section } from '@/desktop/settings/Section'
+import { useComputerName } from '@/stores/desktop'
 import styles from '@/desktop/settings/DesktopSettings.module.scss'
 import settings from '@/pages/SettingsPage/SettingsPage.module.scss'
 
@@ -11,6 +12,7 @@ import settings from '@/pages/SettingsPage/SettingsPage.module.scss'
 export const DownloadsSection = () => {
   const downloads = useDownloads()
   const space = useSpace()
+  const computer = useComputerName()
   const change = useChangeDownloads()
   const askButton = useRef<HTMLButtonElement>(null)
   const showButton = useRef<HTMLButtonElement>(null)
@@ -59,7 +61,7 @@ export const DownloadsSection = () => {
       : `Delete all downloads? ${formatBytes(used)} will be freed.`
 
   return (
-    <Section icon="download" title="Downloads" help="What Raven keeps on this Mac.">
+    <Section icon="download" title="Downloads" help={`What Raven keeps on this ${computer}.`}>
       {downloads.isError && (
         <p className={settings.error} role="alert">
           {downloads.error.message}
@@ -88,7 +90,7 @@ export const DownloadsSection = () => {
       )}
       {space.data !== undefined && (
         <p className={settings.hint}>
-          {`${formatBytes(space.data.used)} of downloads, ${formatBytes(space.data.free)} free on this Mac.`}
+          {`${formatBytes(space.data.used)} of downloads, ${formatBytes(space.data.free)} free on this ${computer}.`}
         </p>
       )}
       {isAsking ? (

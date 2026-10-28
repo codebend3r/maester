@@ -6,11 +6,15 @@ import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { setTimeout as sleep } from 'node:timers/promises'
 import {
   DESKTOP_EVENTS,
+  DESKTOP_PLATFORMS,
   type DesktopEvent,
   type DesktopReply,
+  desktopPlatformFor,
+  SYSTEM_NAMES,
   FILE_SCHEME,
   VIDEO_EXTENSIONS,
 } from '@raven/core'
+import { nativeTargetOf } from '@raven/mpv'
 import {
   app,
   BrowserWindow,
@@ -70,7 +74,7 @@ import { logsDirFor } from '@/main/log/opens'
 import { menuTemplate } from '@/main/menu'
 import { fetchDownload, fetchProbe, fetchRelayed, fetchReleases } from '@/main/netFetches'
 import { exists, makeDir, openPart, removeTree, sizeOf, TEXT_FS } from '@/main/nodeFs'
-import { createOpenBatch, eventForOpen, launchPaths } from '@/main/openBatch'
+import { createOpenBatch, eventForOpen, launchPaths, linksFromArgv } from '@/main/openBatch'
 import { ENGINE_STATUSES } from '@/main/player/engine'
 import { createMarks } from '@/main/player/marks'
 import { readDevices } from '@/main/player/outputOptions'
@@ -104,6 +108,7 @@ import { checkForUpdates } from '@/main/updates'
 import { linkOriginsFrom, serverOriginFrom } from '@/main/origins'
 import { controlWindow } from '@/main/windowChrome'
 import { IPC_CHANNELS } from '@/shared/hostNames'
+import { LINK_SCHEME } from '@/shared/playLink'
 
 const launchedAt = performance.now()
 
@@ -121,6 +126,8 @@ const OPEN_BATCH_MS = 100
 const STATE_DEBOUNCE_MS = 2000
 
 const timers = createNodeTimers()
+const platform = desktopPlatformFor({ platform: process.platform })
+const nativeTarget = nativeTargetOf({ platform: process.platform, arch: process.arch })
 
 // A test hook: a packaged app never reads it, so the environment cannot move its data.
 const userDataOverrideOf = (): string | null => {
@@ -135,7 +142,14 @@ app.setPath('userData', userData)
 // Before the reporter starts, which reads the path once (Ruling 11). Nothing is uploaded.
 app.setPath('crashDumps', join(userData, 'Crashpad'))
 crashReporter.start({ uploadToServer: false })
-app.setAppLogsPath(logsDirFor({ home: app.getPath('home'), userDataOverride }))
+app.setAppLogsPath(
+  logsDirFor({
+    platform,
+    home: app.getPath('home'),
+    userData,
+    hasUserDataOverride: userDataOverride !== null,
+  }),
+)
 
 // A second instance hands its files to the first and quits.
 const isPrimary = app.requestSingleInstanceLock()
@@ -238,7 +252,7 @@ const startApp = (): void => {
     const engine = currentEngine()
     return diagnosticsText({
       app: { version: app.getVersion(), isPackaged: app.isPackaged, arch: process.arch },
-      os: process.getSystemVersion(),
+      system: { name: SYSTEM_NAMES[platform], version: process.getSystemVersion() },
       versions: {
         electron: process.versions.electron,
         chrome: process.versions.chrome,
@@ -311,7 +325,13 @@ const startApp = (): void => {
   app.on('second-instance', (_event, argv) => {
     reveal()
     launchPaths({ argv, isDefaultApp: process.defaultApp }).forEach(fileBatch.push)
+    linksFromArgv(argv).forEach(linkBatch.push)
   })
+  // Forge writes the scheme into macOS's Info.plist only; Windows learns it from the app. Only
+  // packaged, so a development run never claims the person's links for itself.
+  if (platform === DESKTOP_PLATFORMS.windows && app.isPackaged) {
+    app.setAsDefaultProtocolClient(LINK_SCHEME)
+  }
 
   // Registered here so a cold launch from Finder or a link still reaches them.
   app.on('will-finish-launching', () => {
@@ -326,6 +346,7 @@ const startApp = (): void => {
     })
   })
   launchPaths({ argv: process.argv, isDefaultApp: process.defaultApp }).forEach(fileBatch.push)
+  linksFromArgv(process.argv).forEach(linkBatch.push)
 
   const stateFile = join(userData, 'player-state.json')
 
@@ -511,7 +532,12 @@ const startApp = (): void => {
     const updates = createUpdateService({
       config,
       check: () =>
-        checkForUpdates({ fetch: fetchReleases, url: updateSource.url, current: app.getVersion() }),
+        checkForUpdates({
+          fetch: fetchReleases,
+          url: updateSource.url,
+          current: app.getVersion(),
+          target: nativeTarget,
+        }),
       current: app.getVersion(),
       now: Date.now,
       openExternal: (url) => shell.openExternal(url),
@@ -586,7 +612,7 @@ const startApp = (): void => {
       setWindowButtons: (isVisible) => {
         const window = liveWindow()
         if (window === null) return
-        showWindowButtons({ window, isVisible })
+        showWindowButtons({ window, isVisible, platform })
       },
       controlWindow: (action) => {
         const window = liveWindow()
@@ -706,6 +732,7 @@ const startApp = (): void => {
         menuTemplate({
           appName: PRODUCT_NAME,
           isDevelopment: !app.isPackaged,
+          platform,
           actions: {
             openDialog: () => {
               service
@@ -734,7 +761,7 @@ const startApp = (): void => {
       applicationVersion: app.getVersion(),
     })
 
-    const window = openWindow({ store, launchedAt, appLog })
+    const window = openWindow({ store, launchedAt, appLog, platform })
     window.once('ready-to-show', () => {
       launch.isWindowReady = true
     })
@@ -759,6 +786,8 @@ const startApp = (): void => {
       downloads,
       serverOfId,
       timers,
+      platform,
+      nativeTarget,
       info: (message) => log.info(message),
       warn,
     })
@@ -783,7 +812,7 @@ const startApp = (): void => {
 
 if (isPrimary) {
   log.info(
-    `launch Raven ${app.getVersion()} (${app.isPackaged ? 'packaged' : 'unpackaged'}), Electron ${process.versions.electron}, macOS ${process.getSystemVersion()}`,
+    `launch Raven ${app.getVersion()} (${app.isPackaged ? 'packaged' : 'unpackaged'}), Electron ${process.versions.electron}, ${SYSTEM_NAMES[platform]} ${process.getSystemVersion()}`,
   )
   startApp()
 } else {

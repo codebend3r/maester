@@ -1,6 +1,13 @@
 import { setTimeout as sleep } from 'node:timers/promises'
-import { PLAYER_SOURCE_KINDS } from '@raven/core'
-import { MPV_PROPERTIES, MPV_SURFACE_KINDS, type Mpv, type MpvSurface, openMpv } from '@raven/mpv'
+import { type DesktopPlatform, PLAYER_SOURCE_KINDS } from '@raven/core'
+import {
+  MPV_PROPERTIES,
+  MPV_SURFACE_KINDS,
+  type Mpv,
+  type MpvSurface,
+  type NativeTarget,
+  openMpv,
+} from '@raven/mpv'
 import {
   app,
   BrowserWindow,
@@ -104,6 +111,9 @@ type AttachPlayerProps = {
   budgets: ReturnType<typeof createBudgets>
   downloads: Pick<DownloadService, 'sidecarsOf' | 'notePlaying'>
   timers: Timers
+  platform: DesktopPlatform
+  /** The addon build this process loads, or null where raven has none. */
+  nativeTarget: NativeTarget | null
   info: (message: string) => void
   warn: (message: string) => void
 }
@@ -123,6 +133,8 @@ export const attachPlayer = ({
   downloads,
   serverOfId,
   timers,
+  platform,
+  nativeTarget,
   info,
   warn,
 }: AttachPlayerProps) => {
@@ -176,7 +188,7 @@ export const attachPlayer = ({
       if (window.isDestroyed()) return
       window.setBackgroundColor(isShowing ? CLEAR : NIGHT)
       // A page with no video shows the traffic lights, whatever the player last asked for.
-      if (!isShowing) showWindowButtons({ window, isVisible: true })
+      if (!isShowing) showWindowButtons({ window, isVisible: true, platform })
     },
   })
 
@@ -188,6 +200,7 @@ export const attachPlayer = ({
       surface,
       // Always explicit: the addon and libmpv sit outside the bundle (Ruling 2).
       addonPath: addonPathFor({
+        target: nativeTarget,
         isPackaged: app.isPackaged,
         appPath: app.getAppPath(),
         resourcesPath: process.resourcesPath,
@@ -205,6 +218,7 @@ export const attachPlayer = ({
         explain: sources.explain,
         refusedAccount: sources.refusedAccount,
         canChooseAo: mode === ENGINE_MODES.window,
+        platform,
         timers,
         onActivity: activity.report,
         onFirstFrame: marks.firstFrame,

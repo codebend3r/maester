@@ -1,10 +1,16 @@
-import { DESKTOP_EVENTS, type DesktopEvent, PAGE_PATHS } from '@raven/core'
+import {
+  DESKTOP_EVENTS,
+  DESKTOP_PLATFORMS,
+  type DesktopEvent,
+  type DesktopPlatform,
+  PAGE_PATHS,
+} from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { type MenuEntry, menuTemplate } from '@/main/menu'
 
-type SetupProps = { isDevelopment?: boolean }
+type SetupProps = { isDevelopment?: boolean; platform?: DesktopPlatform }
 
-const setup = ({ isDevelopment = false }: SetupProps = {}) => {
+const setup = ({ isDevelopment = false, platform = DESKTOP_PLATFORMS.mac }: SetupProps = {}) => {
   const sent: DesktopEvent[] = []
   const dialogs = { opened: 0 }
   const devTools = { toggles: 0 }
@@ -13,6 +19,7 @@ const setup = ({ isDevelopment = false }: SetupProps = {}) => {
   const template = menuTemplate({
     appName: 'Raven',
     isDevelopment,
+    platform,
     actions: {
       openDialog: () => {
         dialogs.opened += 1
@@ -258,5 +265,61 @@ describe('menuTemplate', () => {
     expect(help).toEqual({ showLogs: 1, showCrashReports: 1, copyDiagnostics: 0 })
     click(itemOf({ menu, label: 'Copy Diagnostics' }))
     expect(help).toEqual({ showLogs: 1, showCrashReports: 1, copyDiagnostics: 1 })
+  })
+})
+
+describe('menuTemplate on Windows', () => {
+  const windows = () => setup({ platform: DESKTOP_PLATFORMS.windows })
+
+  type RolesOfProps = { template: readonly MenuEntry[]; name: string }
+
+  const rolesOf = ({ template, name }: RolesOfProps) =>
+    (topLevel({ template, name }).submenu ?? []).map(
+      (entry) => entry.role ?? entry.type ?? entry.label,
+    )
+
+  it('has no app menu', () => {
+    const { template } = windows()
+    expect(template.map((entry) => entry.label ?? entry.role)).toEqual([
+      'File',
+      'Playback',
+      'View',
+      'Window',
+      'Help',
+    ])
+  })
+
+  it('ends File with Settings, Check for Updates and Quit, and no recent documents', () => {
+    const { template } = windows()
+    expect(rolesOf({ template, name: 'File' })).toEqual([
+      'Open…',
+      'Open Link…',
+      'separator',
+      'Settings…',
+      'Check for Updates…',
+      'separator',
+      'close',
+      'quit',
+    ])
+  })
+
+  it('keeps the accelerators', () => {
+    const { template, sent, updates } = windows()
+    const file = topLevel({ template, name: 'File' })
+    expect(itemOf({ menu: file, label: 'Open…' }).accelerator).toBe('CommandOrControl+O')
+    expect(itemOf({ menu: file, label: 'Open Link…' }).accelerator).toBe('CommandOrControl+L')
+    const settings = itemOf({ menu: file, label: 'Settings…' })
+    expect(settings.accelerator).toBe('CommandOrControl+,')
+    click(settings)
+    click(itemOf({ menu: file, label: 'Check for Updates…' }))
+    expect(sent).toEqual([{ type: DESKTOP_EVENTS.navigate, to: PAGE_PATHS.settings }])
+    expect(updates.checks).toBe(1)
+  })
+
+  it('leaves out the roles only macOS has', () => {
+    const roles = everyItem(windows().template).map((entry) => entry.role)
+    ;['about', 'hide', 'hideOthers', 'unhide', 'recentDocuments'].forEach((role) => {
+      expect(roles).not.toContain(role)
+    })
   })
 })

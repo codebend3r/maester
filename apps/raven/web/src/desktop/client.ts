@@ -5,8 +5,8 @@ import {
   type DesktopRequest,
   isDesktopEvent,
   isDesktopReply,
+  type DesktopPlatform,
   isRavenDesktopBridge,
-  type WindowChrome,
 } from '@raven/core'
 
 /** The page's one door to main, with every reply and event checked on the way in. */
@@ -14,8 +14,8 @@ export type DesktopClient = {
   request: (request: DesktopRequest) => Promise<DesktopReply>
   dropFiles: (files: readonly File[]) => Promise<DesktopReply>
   subscribe: (listener: (event: DesktopEvent) => void) => () => void
-  /** Whether the page draws the window's controls, as on Windows, or macOS does. */
-  windowChrome: WindowChrome
+  /** The system Raven runs on, which says who draws the window's controls and names the computer. */
+  platform: DesktopPlatform
 }
 
 const UNREADABLE = {
@@ -46,7 +46,7 @@ export const refusalText = ({ reply, fallback }: RefusalTextProps): string =>
 export const clientFor = (bridge: unknown): DesktopClient | null => {
   if (!isRavenDesktopBridge(bridge)) return null
   return {
-    windowChrome: bridge.windowChrome,
+    platform: bridge.platform,
     request: (request) => replyOf(() => bridge.request(request)),
     dropFiles: (files) => replyOf(() => bridge.dropFiles(files)),
     subscribe: (listener) =>

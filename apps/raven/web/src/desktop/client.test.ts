@@ -3,8 +3,8 @@ import {
   DESKTOP_EVENTS,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
+  DESKTOP_PLATFORMS,
   type DesktopEvent,
-  WINDOW_CHROMES,
 } from '@raven/core'
 import { clientFor } from '@/desktop/client'
 
@@ -30,7 +30,7 @@ const bridgeOf = ({
       listeners.push(listener)
       return () => undefined
     },
-    windowChrome: WINDOW_CHROMES.drawn,
+    platform: DESKTOP_PLATFORMS.windows,
     push: (event: unknown) => listeners.forEach((listener) => listener(event)),
   }
 }
@@ -40,8 +40,8 @@ describe('clientFor', () => {
 
   afterEach(() => warn.mockClear())
 
-  it("carries the bridge's window chrome", () => {
-    expect(clientFor(bridgeOf())?.windowChrome).toBe(WINDOW_CHROMES.drawn)
+  it("carries the bridge's platform", () => {
+    expect(clientFor(bridgeOf())?.platform).toBe(DESKTOP_PLATFORMS.windows)
   })
 
   it('has no client where there is no bridge, as in a browser', () => {

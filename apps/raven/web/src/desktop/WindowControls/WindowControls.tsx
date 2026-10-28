@@ -1,4 +1,10 @@
-import { DESKTOP_REQUESTS, WINDOW_ACTIONS, WINDOW_CHROMES, type WindowAction } from '@raven/core'
+import {
+  DESKTOP_REQUESTS,
+  WINDOW_ACTIONS,
+  WINDOW_CHROMES,
+  type WindowAction,
+  windowChromeFor,
+} from '@raven/core'
 import { Icon, type IconName } from '@raven/ui'
 import { handled } from '@/desktop/handled'
 import { useDesktop } from '@/stores/desktop'
@@ -19,7 +25,7 @@ const CONTROLS = [
 export const WindowControls = () => {
   const { client } = useDesktop()
   const isShown = useWindowChrome((state) => state.isShown)
-  if (client.windowChrome !== WINDOW_CHROMES.drawn) return null
+  if (windowChromeFor({ platform: client.platform }) !== WINDOW_CHROMES.drawn) return null
 
   return (
     <nav

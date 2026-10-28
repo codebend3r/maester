@@ -1,6 +1,8 @@
 import { extname, join } from 'node:path'
 import {
+  DESKTOP_PLATFORMS,
   DESKTOP_REQUESTS,
+  type DesktopPlatform,
   ENVELOPE_KINDS,
   isInvokeEnvelope,
   PLAYER_SOURCE_KINDS,
@@ -30,15 +32,26 @@ export const openLine = (opened: OpenedTitle): string => {
 }
 
 type LogsDirForProps = {
+  platform: DesktopPlatform
   home: string
-  userDataOverride: string | null
+  /** The profile in use, the test hook's when it is set. */
+  userData: string
+  hasUserDataOverride: boolean
 }
 
-/** Where the log goes: Electron's pinned logs path, or `<userData>/logs` under the test hook. */
-export const logsDirFor = ({ home, userDataOverride }: LogsDirForProps): string =>
-  userDataOverride === null
+/**
+ * Where the log goes: macOS's logs folder, pinned, or `<userData>/logs`, which is Electron's
+ * own on Windows (`%APPDATA%\raven\logs`) and the test hook's everywhere.
+ */
+export const logsDirFor = ({
+  platform,
+  home,
+  userData,
+  hasUserDataOverride,
+}: LogsDirForProps): string =>
+  platform === DESKTOP_PLATFORMS.mac && !hasUserDataOverride
     ? join(home, 'Library', 'Logs', 'raven')
-    : join(userDataOverride, 'logs')
+    : join(userData, 'logs')
 
 /** The file a page asks to describe, which it does as it opens one; null for anything else. */
 export const describedFileId = (envelope: unknown): string | null => {

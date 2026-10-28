@@ -21,7 +21,8 @@ export type EngineDiagnostics =
 
 export type DiagnosticsInput = {
   app: { version: string; isPackaged: boolean; arch: string }
-  os: string
+  /** The system's name and version, as `SYSTEM_NAMES` gives the name. */
+  system: { name: string; version: string }
   versions: { electron: string; chrome: string; node: string }
   engine: EngineDiagnostics
   displayHz: number | null
@@ -148,14 +149,14 @@ const engineLines = ({ engine, displayHz }: EngineLinesProps): string[] => {
 /** What Copy Diagnostics puts on the clipboard (Ruling 15): versions and readings, never a path, origin or cookie. */
 export const diagnosticsText = ({
   app,
-  os,
+  system,
   versions,
   engine,
   displayHz,
 }: DiagnosticsInput): string =>
   [
     `Raven ${app.version} (${app.isPackaged ? 'packaged' : 'unpackaged'}, ${app.arch})`,
-    `macOS ${os}`,
+    `${system.name} ${system.version}`,
     `Electron ${versions.electron}, Chromium ${versions.chrome}, Node ${versions.node}`,
     ...engineLines({ engine, displayHz }),
     '',

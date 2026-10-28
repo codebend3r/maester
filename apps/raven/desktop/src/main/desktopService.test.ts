@@ -724,7 +724,7 @@ describe('describeFile', () => {
 
   it("names the pages a video is opened again from, which the app's page has", () => {
     expect(MESSAGES.notOpen).toBe(
-      'That video is no longer open. Open it again from On this Mac or Downloads.',
+      'That video is no longer open. Open it again from the files on this computer or from Downloads.',
     )
   })
 

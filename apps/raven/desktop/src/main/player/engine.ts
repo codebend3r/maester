@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { MPV_SURFACE_KINDS, type MpvSurface } from '@raven/mpv'
+import { MPV_SURFACE_KINDS, type MpvSurface, type NativeTarget } from '@raven/mpv'
 import { MPV_OPTIONS, type MpvOption } from '@/main/player/outputOptions'
 import { messageOf } from '@/shared/messageOf'
 
@@ -25,14 +25,22 @@ export const engineModeFrom = ({ isPackaged, env }: EngineModeFromProps): Engine
 const ADDON = 'raven_mpv.node'
 
 type AddonPathForProps = {
+  /** The build this process can load, or null where raven has none. */
+  target: NativeTarget | null
   isPackaged: boolean
   appPath: string
   resourcesPath: string
 }
 
-export const addonPathFor = ({ isPackaged, appPath, resourcesPath }: AddonPathForProps) => {
-  if (isPackaged) return join(resourcesPath, 'mpv', 'darwin-arm64', ADDON)
-  return join(appPath, '..', '..', '..', 'libs', 'raven', 'mpv', 'resources', 'darwin-arm64', ADDON)
+export const addonPathFor = ({
+  target,
+  isPackaged,
+  appPath,
+  resourcesPath,
+}: AddonPathForProps): string => {
+  if (target === null) throw new Error('Raven has no video engine for this system.')
+  if (isPackaged) return join(resourcesPath, 'mpv', target, ADDON)
+  return join(appPath, '..', '..', '..', 'libs', 'raven', 'mpv', 'resources', target, ADDON)
 }
 
 /**

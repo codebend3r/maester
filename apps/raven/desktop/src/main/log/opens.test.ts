@@ -1,3 +1,4 @@
+import { DESKTOP_PLATFORMS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { describedFileId, logsDirFor, openLine } from '@/main/log/opens'
 
@@ -33,14 +34,37 @@ describe('openLine', () => {
 })
 
 describe('logsDirFor', () => {
-  it('is the pinned logs folder in the home folder', () => {
-    expect(logsDirFor({ home: '/Users/a', userDataOverride: null })).toBe(
-      '/Users/a/Library/Logs/raven',
-    )
+  it('is the pinned logs folder in the home folder on macOS', () => {
+    expect(
+      logsDirFor({
+        platform: DESKTOP_PLATFORMS.mac,
+        home: '/Users/a',
+        userData: '/Users/a/Library/Application Support/raven',
+        hasUserDataOverride: false,
+      }),
+    ).toBe('/Users/a/Library/Logs/raven')
+  })
+
+  it('is inside userData on Windows', () => {
+    expect(
+      logsDirFor({
+        platform: DESKTOP_PLATFORMS.windows,
+        home: '/Users/a',
+        userData: '/Users/a/AppData/Roaming/raven',
+        hasUserDataOverride: false,
+      }),
+    ).toBe('/Users/a/AppData/Roaming/raven/logs')
   })
 
   it('is inside the test hook userData', () => {
-    expect(logsDirFor({ home: '/Users/a', userDataOverride: '/tmp/u' })).toBe('/tmp/u/logs')
+    expect(
+      logsDirFor({
+        platform: DESKTOP_PLATFORMS.mac,
+        home: '/Users/a',
+        userData: '/tmp/u',
+        hasUserDataOverride: true,
+      }),
+    ).toBe('/tmp/u/logs')
   })
 })
 

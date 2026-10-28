@@ -40,12 +40,13 @@ import type { ServerTitles } from '@/main/servers/serverTitles'
 import type { StateStore, Timers } from '@/main/stateStore'
 import { UPDATE_COPY, type UpdateService } from '@/main/updateService'
 import { MAX_QUEUE } from '@/shared/hostNames'
+import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 
 export const MESSAGES = {
   notVideo: 'Raven opens video files only.',
   missing: 'That file could not be found.',
   nothingDropped: 'Drop a video file to play it.',
-  notOpen: 'That video is no longer open. Open it again from On this Mac or Downloads.',
+  notOpen: PLAYER_MESSAGES.notOpen,
   unknownRecent: 'That video is no longer in your recents.',
   unknownRequest: 'Raven does not understand that request.',
   failed: 'Raven could not do that. Try again.',

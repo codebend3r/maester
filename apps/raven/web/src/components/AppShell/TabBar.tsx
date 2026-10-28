@@ -3,7 +3,7 @@ import { Icon, type IconName } from '@raven/ui'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
-import { useIsDesktop } from '@/stores/desktop'
+import { useComputerName, useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/components/AppShell/TabBar.module.scss'
 
@@ -35,6 +35,7 @@ const Tab = ({ to, patterns, icon, label }: TabProps) => {
  */
 export const TabBar = () => {
   const isDesktop = useIsDesktop()
+  const computer = useComputerName()
   const isOffline = useServerReach((state) => state.isOffline)
   return (
     <nav className={styles.tabs} aria-label="Tabs">
@@ -60,7 +61,7 @@ export const TabBar = () => {
             to={DESKTOP_PATHS.local}
             patterns={[DESKTOP_PATHS.local]}
             icon="file-play"
-            label="This Mac"
+            label={`This ${computer}`}
           />
           <Tab
             to={DESKTOP_PATHS.downloads}

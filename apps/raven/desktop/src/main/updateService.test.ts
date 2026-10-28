@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { NATIVE_TARGETS } from '@raven/mpv'
 import type { DesktopConfig, UpdateSettings } from '@/main/desktopConfig'
 import { SERVER, configFor } from '@/main/test/configFakes'
 import { createJsonStore, type StateFs } from '@/main/stateStore'
@@ -12,8 +13,8 @@ import {
   updateSourceFrom,
 } from '@/main/updateService'
 import {
+  appAssetNameFor,
   checkForUpdates,
-  dmgNameFor,
   RELEASES_URL,
   UPDATE_PROBLEMS,
   type UpdateCheck,
@@ -25,6 +26,7 @@ const FILE = '/data/desktop-config.json'
 const NOW = 1_700_000_000_000
 const HOUR = 3_600_000
 const CURRENT = '0.5.4'
+const MAC = NATIVE_TARGETS.darwinArm64
 const PAGE = 'https://github.com/codebend3r/maester/releases/tag/v0.6.0'
 
 const NEWER: UpdateCheck = {
@@ -237,7 +239,8 @@ describe('a list with no Raven release in it', () => {
 
   it('stores the problem, claims nothing found, announces nothing and warns', async () => {
     const { service, announced, warnings } = setup({
-      check: () => checkForUpdates({ fetch: onlyBuilds, url: RELEASES_URL, current: CURRENT }),
+      check: () =>
+        checkForUpdates({ fetch: onlyBuilds, url: RELEASES_URL, current: CURRENT, target: MAC }),
     })
     await service.atLaunch()
     expect(announced).toEqual([])
@@ -253,7 +256,8 @@ describe('a list with no Raven release in it', () => {
 
   it('tells the menu it could not check, never that this is the newest', async () => {
     const { service } = setup({
-      check: () => checkForUpdates({ fetch: onlyBuilds, url: RELEASES_URL, current: CURRENT }),
+      check: () =>
+        checkForUpdates({ fetch: onlyBuilds, url: RELEASES_URL, current: CURRENT, target: MAC }),
     })
     const dialog = updateDialogFor({ check: await service.checkNow(), current: CURRENT })
     expect(dialog).toMatchObject({
@@ -288,7 +292,7 @@ describe('a list with no Raven release in it', () => {
                 tag_name: 'v0.6.0',
                 draft: false,
                 prerelease: false,
-                assets: [{ name: dmgNameFor('0.6.0') }],
+                assets: [{ name: appAssetNameFor({ version: '0.6.0', target: MAC }) }],
               },
             ]),
         }
@@ -300,7 +304,8 @@ describe('a list with no Raven release in it', () => {
       return { ...response, headers: { get: () => `<${PAGE_2}>; rel="next"` } }
     }
     const { service, announced } = setup({
-      check: () => checkForUpdates({ fetch: paged, url: RELEASES_URL, current: CURRENT }),
+      check: () =>
+        checkForUpdates({ fetch: paged, url: RELEASES_URL, current: CURRENT, target: MAC }),
     })
     await service.atLaunch()
     expect(announced).toEqual(['0.6.0'])

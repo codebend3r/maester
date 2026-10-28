@@ -1,4 +1,4 @@
-import { DESKTOP_REQUESTS, WINDOW_ACTIONS, WINDOW_CHROMES } from '@raven/core'
+import { DESKTOP_PLATFORMS, DESKTOP_REQUESTS, WINDOW_ACTIONS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -8,13 +8,13 @@ import { asPlayingDesktop, fakeClient } from '@/test/desktop'
 
 describe('WindowControls', () => {
   it('draws nothing where macOS draws the controls', () => {
-    asPlayingDesktop({ client: fakeClient({ windowChrome: WINDOW_CHROMES.inset }) })
+    asPlayingDesktop({ client: fakeClient({ platform: DESKTOP_PLATFORMS.mac }) })
     render(<WindowControls />)
     expect(screen.queryByRole('navigation', { name: 'Window' })).toBeNull()
   })
 
   it('asks main to minimize, maximize and close a window the page draws the controls of', async () => {
-    const client = fakeClient({ windowChrome: WINDOW_CHROMES.drawn })
+    const client = fakeClient({ platform: DESKTOP_PLATFORMS.windows })
     asPlayingDesktop({ client })
     render(<WindowControls />)
     await userEvent.click(screen.getByRole('button', { name: 'Minimize' }))
@@ -28,7 +28,7 @@ describe('WindowControls', () => {
   })
 
   it("hides with the player's own controls and comes back with them", () => {
-    asPlayingDesktop({ client: fakeClient({ windowChrome: WINDOW_CHROMES.drawn }) })
+    asPlayingDesktop({ client: fakeClient({ platform: DESKTOP_PLATFORMS.windows }) })
     render(<WindowControls />)
     const controls = screen.getByRole('navigation', { name: 'Window' })
     act(() => useWindowChrome.getState().setShown(false))

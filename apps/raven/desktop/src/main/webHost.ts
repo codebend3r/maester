@@ -425,7 +425,7 @@ const isMissingAddress = (error: unknown): boolean => MISSING_ADDRESS_CODES.has(
 /** What the person is told when the web host cannot listen, and Raven quits. */
 export const webHostFailureText = (error: unknown): string =>
   errorCodeOf(error) === ERROR_CODES.addressInUse
-    ? `Another app is using port ${WEB_HOST_PORT} on this Mac. Quit it, then open Raven again.`
+    ? `Another app is using port ${WEB_HOST_PORT} on this computer. Quit it, then open Raven again.`
     : `Raven could not start serving its page: ${errorText(error)}`
 
 type ListenWebHostProps = {
@@ -454,12 +454,13 @@ export const listenWebHost = async ({
       return [...listening, await listenOn({ createServer, handler, port, address, warn })]
     } catch (error) {
       if (isMissingAddress(error)) {
-        quietly(warn)(`the web host left out ${address}, which this Mac does not have`)
+        quietly(warn)(`the web host left out ${address}, which this computer does not have`)
         return listening
       }
       await Promise.all(listening.map(closeServer))
       throw error
     }
   }, Promise.resolve([]))
-  if (opened.length === 0) throw new Error('This Mac has no loopback address to serve the page on.')
+  if (opened.length === 0)
+    throw new Error('This computer has no loopback address to serve the page on.')
 }

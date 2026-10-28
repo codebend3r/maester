@@ -8,8 +8,40 @@ export type RavenDesktopBridge = {
   request: (request: unknown) => Promise<unknown>
   dropFiles: (files: readonly unknown[]) => Promise<unknown>
   subscribe: (listener: (event: unknown) => void) => () => void
-  windowChrome: WindowChrome
+  platform: DesktopPlatform
 }
+
+/** The systems Raven runs on, as the page and main name them. */
+export const DESKTOP_PLATFORMS = { mac: 'mac', windows: 'windows' } as const
+
+export type DesktopPlatform = (typeof DESKTOP_PLATFORMS)[keyof typeof DESKTOP_PLATFORMS]
+
+const isDesktopPlatform = (value: unknown): value is DesktopPlatform =>
+  Object.values(DESKTOP_PLATFORMS).some((platform) => platform === value)
+
+// Node's name for Windows; core has no Node types, so it is spelled here.
+const WINDOWS_PLATFORM = 'win32'
+
+type DesktopPlatformForProps = {
+  /** Node's `process.platform`. */
+  platform: string
+}
+
+/** The system a Raven process runs on, from Node's name for it. */
+export const desktopPlatformFor = ({ platform }: DesktopPlatformForProps): DesktopPlatform =>
+  platform === WINDOWS_PLATFORM ? DESKTOP_PLATFORMS.windows : DESKTOP_PLATFORMS.mac
+
+/** What logs and diagnostics call the system, before its version. */
+export const SYSTEM_NAMES = {
+  [DESKTOP_PLATFORMS.mac]: 'macOS',
+  [DESKTOP_PLATFORMS.windows]: 'Windows',
+} as const satisfies Record<DesktopPlatform, string>
+
+/** What the page calls the computer, in "On this Mac" and "free on this PC". */
+export const COMPUTER_NAMES = {
+  [DESKTOP_PLATFORMS.mac]: 'Mac',
+  [DESKTOP_PLATFORMS.windows]: 'PC',
+} as const satisfies Record<DesktopPlatform, string>
 
 /**
  * Who draws the window's controls. `inset`: macOS's traffic lights, over a page that runs
@@ -20,19 +52,19 @@ export const WINDOW_CHROMES = { inset: 'inset', drawn: 'drawn' } as const
 
 export type WindowChrome = (typeof WINDOW_CHROMES)[keyof typeof WINDOW_CHROMES]
 
-const isWindowChrome = (value: unknown): value is WindowChrome =>
-  Object.values(WINDOW_CHROMES).some((chrome) => chrome === value)
-
-// Node's name for Windows; core has no Node types, so it is spelled here.
-const WINDOWS_PLATFORM = 'win32'
+/** Each system's window chrome: macOS keeps its traffic lights; Windows' frameless window has the page's. */
+const WINDOW_CHROME_OF = {
+  [DESKTOP_PLATFORMS.mac]: WINDOW_CHROMES.inset,
+  [DESKTOP_PLATFORMS.windows]: WINDOW_CHROMES.drawn,
+} as const satisfies Record<DesktopPlatform, WindowChrome>
 
 type WindowChromeForProps = {
-  platform: string
+  platform: DesktopPlatform
 }
 
 /** The chrome Raven's window has on this platform. */
 export const windowChromeFor = ({ platform }: WindowChromeForProps): WindowChrome =>
-  platform === WINDOWS_PLATFORM ? WINDOW_CHROMES.drawn : WINDOW_CHROMES.inset
+  WINDOW_CHROME_OF[platform]
 
 const isFunction = (value: unknown): value is (...args: never[]) => unknown =>
   typeof value === 'function'
@@ -47,5 +79,5 @@ export const isRavenDesktopBridge = (value: unknown): value is RavenDesktopBridg
   isFunction(value.dropFiles) &&
   'subscribe' in value &&
   isFunction(value.subscribe) &&
-  'windowChrome' in value &&
-  isWindowChrome(value.windowChrome)
+  'platform' in value &&
+  isDesktopPlatform(value.platform)

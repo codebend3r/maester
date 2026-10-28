@@ -403,7 +403,8 @@ test.describe.serial('playing a local file through mpv', () => {
 
         const { replies, events, strays } = await trafficOf({ page })
         const unknown = 'Raven does not understand that command.'
-        const notOpen = 'That video is no longer open. Open it again from On this Mac or Downloads.'
+        const notOpen =
+          'That video is no longer open. Open it again from the files on this computer or from Downloads.'
         expect(replies).toEqual([
           { id: 9001, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: unknown },
           { id: 9002, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: unknown },

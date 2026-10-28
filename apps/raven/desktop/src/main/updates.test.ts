@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { NATIVE_TARGETS } from '@raven/mpv'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import {
   CHECK_INTERVAL_MS,
@@ -9,8 +10,8 @@ import {
   RELEASES_URL,
   UPDATE_PROBLEMS,
   checkForUpdates,
+  appAssetNameFor,
   compareVersions,
-  dmgNameFor,
   findUpdate,
   isCheckDue,
   isGithubRelease,
@@ -26,11 +27,13 @@ type ReleaseProps = {
   assets?: string[]
 }
 
+const MAC = NATIVE_TARGETS.darwinArm64
+
 const release = ({
   tag,
   draft = false,
   prerelease = false,
-  assets = [dmgNameFor(tag.slice(1))],
+  assets = [appAssetNameFor({ version: tag.slice(1), target: MAC })],
 }: ReleaseProps) => ({
   tag_name: tag,
   draft,
@@ -51,8 +54,11 @@ describe('the constants', () => {
     expect(MAX_RELEASES_CHARS).toBe(2 * 1024 * 1024)
   })
 
-  it('names the dmg the release workflow attaches', () => {
-    expect(dmgNameFor('0.6.0')).toBe('raven-player-0.6.0-arm64.dmg')
+  it('names the app the release workflow attaches for each target', () => {
+    expect(appAssetNameFor({ version: '0.6.0', target: MAC })).toBe('raven-player-0.6.0-arm64.dmg')
+    expect(appAssetNameFor({ version: '0.6.0', target: NATIVE_TARGETS.win32X64 })).toBe(
+      'raven-player-0.6.0-x64-setup.exe',
+    )
   })
 })
 
@@ -159,15 +165,37 @@ describe('findUpdate', () => {
       release({ tag: 'v0.6.1', assets: [] }),
       release({ tag: 'v0.6.0' }),
     ]
-    expect(findUpdate({ releases, current: '0.5.4' })).toEqual(newer('0.6.0'))
+    expect(findUpdate({ target: MAC, releases, current: '0.5.4' })).toEqual(newer('0.6.0'))
+  })
+
+  it("offers Windows the highest release that carries the installer, not the Mac's dmg", () => {
+    const releases = [
+      release({ tag: 'v0.6.1' }),
+      release({ tag: 'v0.6.0', assets: ['raven-player-0.6.0-x64-setup.exe'] }),
+    ]
+    expect(findUpdate({ target: NATIVE_TARGETS.win32X64, releases, current: '0.5.4' })).toEqual(
+      newer('0.6.0'),
+    )
+  })
+
+  it('offers nothing to a system raven has no build for', () => {
+    expect(
+      findUpdate({ target: null, releases: [release({ tag: 'v0.6.0' })], current: '0.5.4' }),
+    ).toEqual(UNLISTED)
   })
 
   it('skips a release whose dmg is for another version or is not the arm64 dmg', () => {
     const releases = [
-      release({ tag: 'v0.6.1', assets: [dmgNameFor('0.6.0'), 'raven-player-0.6.1-arm64.zip'] }),
+      release({
+        tag: 'v0.6.1',
+        assets: [
+          appAssetNameFor({ version: '0.6.0', target: MAC }),
+          'raven-player-0.6.1-arm64.zip',
+        ],
+      }),
       release({ tag: 'v0.6.0' }),
     ]
-    expect(findUpdate({ releases, current: '0.5.4' })).toEqual(newer('0.6.0'))
+    expect(findUpdate({ target: MAC, releases, current: '0.5.4' })).toEqual(newer('0.6.0'))
   })
 
   it('finds v0.10.0 listed after the v0.9 releases, as GitHub orders tags', () => {
@@ -179,58 +207,62 @@ describe('findUpdate', () => {
       release({ tag: 'v0.10.0' }),
       release({ tag: 'v0.1.0' }),
     ]
-    expect(findUpdate({ releases, current: '0.9.3' })).toEqual(newer('0.10.0'))
+    expect(findUpdate({ target: MAC, releases, current: '0.9.3' })).toEqual(newer('0.10.0'))
   })
 
   it('compares versions as numbers', () => {
     const releases = [release({ tag: 'v9.9.9' }), release({ tag: 'v10.0.0' })]
-    expect(findUpdate({ releases, current: '9.9.9' })).toEqual(newer('10.0.0'))
+    expect(findUpdate({ target: MAC, releases, current: '9.9.9' })).toEqual(newer('10.0.0'))
   })
 
   it('is current when the release it saw is the running one or older', () => {
     const releases = [release({ tag: 'v0.5.4' }), release({ tag: 'v0.5.3' })]
-    expect(findUpdate({ releases, current: '0.5.4' })).toEqual(CURRENT)
-    expect(findUpdate({ releases: [release({ tag: 'v0.5.3' })], current: '0.5.4' })).toEqual(
-      CURRENT,
-    )
+    expect(findUpdate({ target: MAC, releases, current: '0.5.4' })).toEqual(CURRENT)
+    expect(
+      findUpdate({ target: MAC, releases: [release({ tag: 'v0.5.3' })], current: '0.5.4' }),
+    ).toEqual(CURRENT)
   })
 
   it('never claims current when no release in the list carries the app', () => {
-    expect(findUpdate({ releases: [], current: '0.5.4' })).toEqual(UNLISTED)
+    expect(findUpdate({ target: MAC, releases: [], current: '0.5.4' })).toEqual(UNLISTED)
     expect(
-      findUpdate({ releases: builds({ version: '0.5.4', count: 40 }), current: '0.5.4' }),
+      findUpdate({
+        target: MAC,
+        releases: builds({ version: '0.5.4', count: 40 }),
+        current: '0.5.4',
+      }),
     ).toEqual(UNLISTED)
   })
 
   it('skips a tag with leading zeros', () => {
     const releases = [release({ tag: 'v01.2.3' })]
-    expect(findUpdate({ releases, current: '0.5.4' })).toEqual(UNLISTED)
+    expect(findUpdate({ target: MAC, releases, current: '0.5.4' })).toEqual(UNLISTED)
   })
 
   it('skips a tag without its leading v', () => {
     const releases = [{ ...release({ tag: 'v0.6.0' }), tag_name: '0.6.0' }]
-    expect(findUpdate({ releases, current: '0.5.4' })).toEqual(UNLISTED)
+    expect(findUpdate({ target: MAC, releases, current: '0.5.4' })).toEqual(UNLISTED)
   })
 
   it('counts a current version that does not parse as 0.0.0', () => {
     const releases = [release({ tag: 'v0.0.1' })]
-    expect(findUpdate({ releases, current: 'dev' })).toEqual(newer('0.0.1'))
+    expect(findUpdate({ target: MAC, releases, current: 'dev' })).toEqual(newer('0.0.1'))
   })
 
   describe('from a prerelease', () => {
     it('offers its own release', () => {
       const releases = [release({ tag: 'v0.6.0' }), release({ tag: 'v0.5.4' })]
-      expect(findUpdate({ releases, current: '0.6.0-rc.1' })).toEqual(newer('0.6.0'))
+      expect(findUpdate({ target: MAC, releases, current: '0.6.0-rc.1' })).toEqual(newer('0.6.0'))
     })
 
     it('never offers an older release', () => {
       const releases = [release({ tag: 'v0.5.4' }), release({ tag: 'v0.5.3' })]
-      expect(findUpdate({ releases, current: '0.6.0-rc.1' })).toEqual(CURRENT)
+      expect(findUpdate({ target: MAC, releases, current: '0.6.0-rc.1' })).toEqual(CURRENT)
     })
 
     it('offers a later release', () => {
       const releases = [release({ tag: 'v0.6.1' }), release({ tag: 'v0.5.4' })]
-      expect(findUpdate({ releases, current: '0.6.0-rc.2' })).toEqual(newer('0.6.1'))
+      expect(findUpdate({ target: MAC, releases, current: '0.6.0-rc.2' })).toEqual(newer('0.6.1'))
     })
   })
 
@@ -242,18 +274,18 @@ describe('findUpdate', () => {
         url: 'https://evil.example/',
       },
     ]
-    expect(findUpdate({ releases, current: '0.5.4' })).toEqual(newer('0.6.0'))
+    expect(findUpdate({ target: MAC, releases, current: '0.5.4' })).toEqual(newer('0.6.0'))
   })
 
   it('skips entries that are not releases', () => {
     const releases = [null, { tag_name: 3 }, 'v9.0.0', release({ tag: 'v0.6.0' })]
-    expect(findUpdate({ releases, current: '0.5.4' })).toEqual(newer('0.6.0'))
+    expect(findUpdate({ target: MAC, releases, current: '0.5.4' })).toEqual(newer('0.6.0'))
   })
 
   it.each([null, {}, { message: 'x' }, 'v0.6.0', 3])(
     'is unreadable for a reply of %p',
     (releases) => {
-      expect(findUpdate({ releases, current: '0.5.4' })).toEqual(UNREADABLE)
+      expect(findUpdate({ target: MAC, releases, current: '0.5.4' })).toEqual(UNREADABLE)
     },
   )
 })
@@ -336,7 +368,7 @@ const replying = (reply: Reply) => serving({ [RELEASES_URL]: reply })
 type CheckProps = { fetch: UpdateFetch; current?: string }
 
 const check = ({ fetch, current = '0.5.4' }: CheckProps) =>
-  checkForUpdates({ fetch, url: RELEASES_URL, current })
+  checkForUpdates({ fetch, url: RELEASES_URL, current, target: MAC })
 
 const pageUrl = (page: number) =>
   `https://api.github.com/repositories/1388607730/releases?per_page=100&page=${page}`

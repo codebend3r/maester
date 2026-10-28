@@ -9,8 +9,11 @@ import {
 
 export const MAX_LINK_LENGTH = 4096
 
+/** The scheme of Raven's own links, which the app registers as their handler. */
+export const LINK_SCHEME = 'raven'
+
 /** `URL.protocol` for the schemes a link or a server address may use. */
-export const URL_PROTOCOLS = { http: 'http:', https: 'https:', raven: 'raven:' } as const
+export const URL_PROTOCOLS = { http: 'http:', https: 'https:', raven: `${LINK_SCHEME}:` } as const
 const ROOT_PATH = '/'
 
 // `new URL` silently drops tabs and newlines and ignores zero-width characters

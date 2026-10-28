@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'bun:test'
 import {
   DESKTOP_PATHS,
+  DESKTOP_PLATFORMS,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   type DesktopReply,
   type RecentView,
 } from '@raven/core'
 import { Toaster } from '@raven/ui'
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { LocalPage } from '@/desktop/LocalPage/LocalPage'
@@ -75,6 +76,14 @@ describe('LocalPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Choose a video' }))
     await waitFor(() => expect(where()).toBe(playPathOf(FILE_ID)))
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.openDialog })).toHaveLength(1)
+  })
+
+  it('is On this Mac on macOS and On this PC on Windows', () => {
+    renderPage()
+    expect(screen.getByRole('heading', { level: 1, name: 'On this Mac' })).toBeInTheDocument()
+    cleanup()
+    renderPage(fakeClient({ platform: DESKTOP_PLATFORMS.windows }))
+    expect(screen.getByRole('heading', { level: 1, name: 'On this PC' })).toBeInTheDocument()
   })
 
   it('shows where to drop a video, and lights up while one is dragged over', () => {

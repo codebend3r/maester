@@ -1,5 +1,6 @@
 import {
   type AudioDevice,
+  type DesktopPlatform,
   isNumber,
   isTrackIndex,
   type OutputSettings,
@@ -135,6 +136,8 @@ type CreatePlayerServiceProps = {
   explain: FailureExplainer
   refusedAccount: AccountRefusalReader
   canChooseAo: boolean
+  /** Which of mpv's audio outputs `canChooseAo` picks from. */
+  platform: DesktopPlatform
   timers: Timers
   /** `SERVER_STALL_MS` unless a test needs it short. */
   serverStallMs?: number
@@ -149,6 +152,7 @@ export const createPlayerService = ({
   explain,
   refusedAccount,
   canChooseAo,
+  platform,
   timers,
   serverStallMs = SERVER_STALL_MS,
   onActivity: reportActivity,
@@ -959,7 +963,7 @@ export const createPlayerService = ({
     applyOutput: async ({ output, devices }) => {
       if (phase === PLAYER_PHASES.dead) return
       isVolumeFixed = isVolumeFixedFor(output)
-      await setEach(outputOptions({ output, devices, canChooseAo }))
+      await setEach(outputOptions({ output, devices, canChooseAo, platform }))
       if (phase !== PLAYER_PHASES.loaded) return
       try {
         await mpv.command({ args: [MPV_COMMANDS.aoReload] })

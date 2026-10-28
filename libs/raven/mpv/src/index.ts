@@ -18,3 +18,4 @@ export {
   type MpvPropertyValue,
   type MpvTrack,
 } from '@/properties'
+export { NATIVE_TARGETS, nativeTargetOf, type NativeTarget } from '@/target'

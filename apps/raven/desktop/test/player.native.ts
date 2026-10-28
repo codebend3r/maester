@@ -11,6 +11,7 @@ import { runInNewContext } from 'node:vm'
 import {
   AUTH_PARAMS,
   AUTH_PATHS,
+  desktopPlatformFor,
   isNumber,
   isRecord,
   isString,
@@ -33,6 +34,7 @@ import {
   MPV_PROPERTIES,
   MPV_TRACK_TYPES,
   type MpvEvent,
+  nativeTargetOf,
   openMpv,
 } from '@raven/mpv'
 import { CLIP_SECONDS, type Clips, makeClips, makeTrackClip } from '@/e2e/clips'
@@ -97,7 +99,12 @@ const DESTROY_MS = 5000
 const SETTLE_MS = 300
 
 const project = resolve(import.meta.dirname, '..')
-const addonPath = addonPathFor({ isPackaged: false, appPath: project, resourcesPath: '' })
+const addonPath = addonPathFor({
+  target: nativeTargetOf({ platform: process.platform, arch: process.arch }),
+  isPackaged: false,
+  appPath: project,
+  resourcesPath: '',
+})
 
 const isFunction = (value: unknown): value is (...args: unknown[]) => unknown =>
   typeof value === 'function'
@@ -292,6 +299,7 @@ const openHarness = async ({
     explain,
     refusedAccount,
     canChooseAo: false,
+    platform: desktopPlatformFor({ platform: process.platform }),
     timers: createNodeTimers(),
     ...(serverStallMs === undefined ? {} : { serverStallMs }),
     onActivity: () => {},

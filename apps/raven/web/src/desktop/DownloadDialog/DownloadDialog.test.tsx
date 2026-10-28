@@ -1,6 +1,7 @@
 import { describe, expect, it, mock, spyOn } from 'bun:test'
 import {
   AUTH_ROUTES,
+  DESKTOP_PLATFORMS,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   DOWNLOAD_ASK_KINDS,
@@ -75,6 +76,11 @@ const renderDialog = ({ ask, client = fakeClient() }: RenderDialogProps) => {
 }
 
 describe('DownloadDialog', () => {
+  it('says the room left on this PC on Windows', () => {
+    renderDialog({ ask: readyOf(), client: fakeClient({ platform: DESKTOP_PLATFORMS.windows }) })
+    expect(screen.getByText('400.0 GB free on this PC.')).toBeInTheDocument()
+  })
+
   it('asks before downloading, with the room it takes, and downloads as chosen', async () => {
     const { client, onClose } = renderDialog({ ask: readyOf() })
     expect(screen.getByText('Download Severance (9 episodes, 18.0 GB)?')).toBeInTheDocument()
