@@ -1,31 +1,23 @@
 import { describe, expect, it } from 'bun:test'
 import { join } from 'node:path'
 import { NATIVE_TARGETS } from '@raven/mpv'
-import {
-  madeFilesFor,
-  releaseAssetNames,
-  sha256Sums,
-  SOURCE_BUNDLE,
-  sourcesFrom,
-} from '@/build/releaseAssets'
+import { madeFilesFor, releaseAssetNames, SOURCE_BUNDLE, sourcesFrom } from '@/build/releaseAssets'
 import { appAssetNameFor } from '@/main/updates'
 
 describe('releaseAssetNames', () => {
-  it('names the four macOS assets without spaces', () => {
+  it('names the three macOS assets without spaces', () => {
     expect(releaseAssetNames({ version: '0.6.0', target: NATIVE_TARGETS.darwinArm64 })).toEqual({
       app: 'raven-player-0.6.0-arm64.dmg',
       zip: 'raven-player-0.6.0-arm64.zip',
       sources: 'raven-player-0.6.0-sources.tar.gz',
-      sums: 'SHA256SUMS',
     })
   })
 
-  it('names the four Windows assets without spaces', () => {
+  it('names the two Windows assets without spaces and ships no sources tarball', () => {
     expect(releaseAssetNames({ version: '0.6.0', target: NATIVE_TARGETS.win32X64 })).toEqual({
       app: 'raven-player-0.6.0-x64-setup.exe',
       zip: 'raven-player-0.6.0-x64.zip',
-      sources: 'raven-player-0.6.0-sources.tar.gz',
-      sums: 'SHA256SUMS',
+      sources: null,
     })
   })
 
@@ -52,21 +44,6 @@ describe('madeFilesFor', () => {
       app: join('squirrel.windows', 'x64', 'Raven-0.6.0 Setup.exe'),
       zip: join('zip', 'win32', 'x64', 'Raven-win32-x64-0.6.0.zip'),
     })
-  })
-})
-
-describe('sha256Sums', () => {
-  it('writes one shasum line per asset, sorted by name', () => {
-    expect(
-      sha256Sums([
-        { name: 'b', sha256: '2' },
-        { name: 'a', sha256: '1' },
-      ]),
-    ).toBe('1  a\n2  b\n')
-  })
-
-  it('writes nothing for no assets', () => {
-    expect(sha256Sums([])).toBe('')
   })
 })
 
