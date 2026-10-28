@@ -1,7 +1,8 @@
-import { type FSWatcher, type WatchEventType, statSync, watch } from 'node:fs'
+import { type FSWatcher, type WatchEventType, type WatchListener, statSync, watch } from 'node:fs'
 import { join } from 'node:path'
 import { isRecord } from '@raven/core'
 import { ERROR_CODES } from '@/errorMessage'
+import { mapWithConcurrency } from '@/scanner/concurrency'
 import { foldersUnder, isUnder } from '@/scanner/walk'
 
 /** The `fs.watch` event a folder watch follows up. */
@@ -47,14 +48,37 @@ export const watchTree: WatchFolder = ({ root, onChange, onError }) => {
   }
 }
 
+type WatchOneProps = { folder: string; listener: WatchListener<string> }
+
+/** One folder's own watch, set up synchronously: `fs.watch`, or a test's slower stand-in. */
+export type WatchOne = (args: WatchOneProps) => FSWatcher
+
+const watchOneFolder: WatchOne = ({ folder, listener }) =>
+  watch(folder, { persistent: false }, listener)
+
+/** Lets the event loop answer what waits (requests, timers) before the next synchronous step. */
+const nextTurn = (): Promise<void> => new Promise((resolve) => setImmediate(resolve))
+
+type WatchEachFolderProps = WatchFolderProps & { watchOne?: WatchOne }
+
 /**
  * Linux's inotify watches one folder at a time, and Node's own recursive
  * watch there stats and watches every file synchronously, which a big
  * library on a network share cannot afford. So each folder is watched by
  * itself, found by the same walk a scan does, and a folder that turns up
  * is walked and watched in turn; one that goes is let go.
+ *
+ * Each watch blocks the event loop while the kernel looks the folder up,
+ * a network round trip on a cifs share (1 to 50 ms on Vhagar), so the
+ * folders are watched one per turn of the loop: thousands of them at once
+ * would hold every request for half a minute.
  */
-export const watchEachFolder: WatchFolder = ({ root, onChange, onError }) => {
+export const watchEachFolder = ({
+  root,
+  onChange,
+  onError,
+  watchOne = watchOneFolder,
+}: WatchEachFolderProps): Watching => {
   const watchers = new Map<string, FSWatcher>()
   const state = { closed: false }
 
@@ -69,11 +93,14 @@ export const watchEachFolder: WatchFolder = ({ root, onChange, onError }) => {
   const add = (folder: string) => {
     if (state.closed || watchers.has(folder)) return
     try {
-      const watcher = watch(folder, { persistent: false }, (event, name) => {
-        const path = name == null ? folder : join(folder, name)
-        onChange(path)
-        // Only a rename adds or takes away a folder; a change is a file being written.
-        if (event === WATCH_EVENTS.rename) void follow(path)
+      const watcher = watchOne({
+        folder,
+        listener: (event, name) => {
+          const path = name == null ? folder : join(folder, name)
+          onChange(path)
+          // Only a rename adds or takes away a folder; a change is a file being written.
+          if (event === WATCH_EVENTS.rename) void follow(path)
+        },
       })
       // A folder deleted under the watch errors here; only the root's matters.
       watcher.on('error', (error) => {
@@ -89,17 +116,30 @@ export const watchEachFolder: WatchFolder = ({ root, onChange, onError }) => {
     }
   }
 
+  /** Watches each folder in turn, letting the event loop run between one and the next, until closed. */
+  const addAll = async (folders: readonly string[]): Promise<void> => {
+    await mapWithConcurrency({
+      items: folders,
+      limit: 1,
+      fn: async (folder) => {
+        if (state.closed) return
+        add(folder)
+        await nextTurn()
+      },
+    })
+  }
+
   /** A changed path that is a folder now gets watched, with everything under it; one gone is let go. */
   const follow = async (path: string) => {
     const folders = await foldersUnder({ root: path })
     if (folders.length === 0) forget(path)
-    folders.forEach(add)
+    await addAll(folders)
   }
 
   const start = async () => {
     const folders = await foldersUnder({ root })
     if (folders.length === 0) onError(new Error(`Could not read ${root}.`))
-    folders.forEach(add)
+    await addAll(folders)
   }
 
   void start()
