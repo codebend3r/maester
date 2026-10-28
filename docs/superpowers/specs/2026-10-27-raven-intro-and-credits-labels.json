@@ -1,0 +1,1790 @@
+[
+ {
+  "title": "Buffy the Vampire Slayer",
+  "file": "vermithor/Media/TV/B/Buffy the Vampire Slayer/Season 2/Buffy the Vampire Slayer - S02E02 - Some Assembly Required WEBDL-1080p.mkv",
+  "duration": 2654,
+  "video": "hevc 1920x1080,mjpeg 400x250",
+  "gb": 0.5,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 8.2,
+   "headMB": 117,
+   "tailSeconds": 5.4,
+   "tailMB": 79,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 191,
+    "end": 241
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 190.6,
+    "end": 243.5
+   },
+   "endTheme": {
+    "start": 2611.4,
+    "end": 2651.4
+   }
+  }
+ },
+ {
+  "title": "Buffy the Vampire Slayer",
+  "file": "vermithor/Media/TV/B/Buffy the Vampire Slayer/Season 2/Buffy the Vampire Slayer - S02E03 - School Hard WEBDL-1080p.mkv",
+  "duration": 2693,
+  "video": "hevc 1920x1080,mjpeg 400x250",
+  "gb": 0.5,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 7.5,
+   "headMB": 124,
+   "tailSeconds": 4.8,
+   "tailMB": 52,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 218,
+    "end": 267
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 215.7,
+    "end": 269.2
+   },
+   "endTheme": {
+    "start": 2650.3,
+    "end": 2690.3
+   }
+  }
+ },
+ {
+  "title": "Buffy the Vampire Slayer",
+  "file": "vermithor/Media/TV/B/Buffy the Vampire Slayer/Season 2/Buffy the Vampire Slayer - S02E04 - Inca Mummy Girl WEBDL-1080p.mkv",
+  "duration": 2695,
+  "video": "hevc 1920x1080,mjpeg 400x250",
+  "gb": 0.6,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 7.7,
+   "headMB": 140,
+   "tailSeconds": 4.8,
+   "tailMB": 59,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 296,
+    "end": 347
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 294.6,
+    "end": 348.1
+   },
+   "endTheme": {
+    "start": 2652.8,
+    "end": 2692.0
+   }
+  }
+ },
+ {
+  "title": "Severance",
+  "file": "vermithor/Media/TV/S/Severance/Season 2/Severance - S02E02 - Goodbye, Mrs. Selvig WEBDL-1080p.mkv",
+  "duration": 2781,
+  "video": "h264 1918x802",
+  "gb": 3.7,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 18.3,
+   "headMB": 829,
+   "tailSeconds": 13.3,
+   "tailMB": 434,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": null,
+   "note": "intro beyond the 10 minute window, not labelled to the second"
+  },
+  "detected": {
+   "intro": null,
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Severance",
+  "file": "vermithor/Media/TV/S/Severance/Season 2/Severance - S02E03 - Who Is Alive HDTV-1080p.mkv",
+  "duration": 3230,
+  "video": "hevc 1918x802",
+  "gb": 0.5,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 5.1,
+   "headMB": 108,
+   "tailSeconds": 3.6,
+   "tailMB": 78,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": null,
+   "note": "intro beyond the 10 minute window, not labelled to the second"
+  },
+  "detected": {
+   "intro": null,
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Severance",
+  "file": "vermithor/Media/TV/S/Severance/Season 2/Severance - S02E04 - Woe’s Hollow WEBDL-1080p.mkv",
+  "duration": 3056,
+  "video": "h264 1918x802",
+  "gb": 4.1,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 21.2,
+   "headMB": 755,
+   "tailSeconds": 10.2,
+   "tailMB": 453,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": null,
+   "note": "intro beyond the 10 minute window, not labelled to the second"
+  },
+  "detected": {
+   "intro": null,
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Succession",
+  "file": "vermithor/Media/TV/S/Succession/Season 2/Succession - S02E02 - Vaulter WEBDL-1080p.mkv",
+  "duration": 3716,
+  "video": "h264 1920x1080",
+  "gb": 5.2,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 18.1,
+   "headMB": 872,
+   "tailSeconds": 8.3,
+   "tailMB": 354,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 367,
+    "end": 452
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 359.6,
+    "end": 451.6
+   },
+   "endTheme": {
+    "start": 3447.5,
+    "end": 3474.7
+   }
+  }
+ },
+ {
+  "title": "Succession",
+  "file": "vermithor/Media/TV/S/Succession/Season 2/Succession - S02E03 - Hunting WEBDL-1080p.mkv",
+  "duration": 3674,
+  "video": "h264 1920x1080",
+  "gb": 4.7,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 15.1,
+   "headMB": 765,
+   "tailSeconds": 9.2,
+   "tailMB": 377,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 205,
+    "end": 290
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 197.5,
+    "end": 289.5
+   },
+   "endTheme": {
+    "start": 3581.7,
+    "end": 3608.9
+   }
+  }
+ },
+ {
+  "title": "Succession",
+  "file": "vermithor/Media/TV/S/Succession/Season 2/Succession - S02E04 - Safe Room WEBDL-1080p.mkv",
+  "duration": 3632,
+  "video": "h264 1920x1080",
+  "gb": 4.6,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 19.7,
+   "headMB": 771,
+   "tailSeconds": 9.9,
+   "tailMB": 391,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 241,
+    "end": 330
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 239.6,
+    "end": 329.0
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Stranger Things",
+  "file": "vermithor/Media/TV/S/Stranger Things/Season 2/Stranger Things - S02E02 - Chapter Two - Trick or Treat, Freak Bluray-1080p Remux.mkv",
+  "duration": 3287,
+  "video": "h264 1920x1080",
+  "gb": 14,
+  "chapters": [
+   "0 Chapter 1",
+   "603 Chapter 2",
+   "1205 Chapter 3",
+   "1804 Chapter 4",
+   "2404 Chapter 5",
+   "3165 Chapter 6"
+  ],
+  "cost": {
+   "headSeconds": 76.2,
+   "headMB": 2592,
+   "tailSeconds": 87.7,
+   "tailMB": 1281,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 348,
+    "end": 410
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 349.0,
+    "end": 409.8
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Stranger Things",
+  "file": "vermithor/Media/TV/S/Stranger Things/Season 2/Stranger Things - S02E03 - Chapter Three - The Pollywog Bluray-1080p Remux.mkv",
+  "duration": 2985,
+  "video": "h264 1920x1080",
+  "gb": 13.1,
+  "chapters": [
+   "0 Chapter 1",
+   "606 Chapter 2",
+   "1203 Chapter 3",
+   "1803 Chapter 4",
+   "2413 Chapter 5",
+   "2867 Chapter 6"
+  ],
+  "cost": {
+   "headSeconds": 109.3,
+   "headMB": 2654,
+   "tailSeconds": 77.4,
+   "tailMB": 1372,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 197,
+    "end": 258
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 195.9,
+    "end": 256.7
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Stranger Things",
+  "file": "vermithor/Media/TV/S/Stranger Things/Season 2/Stranger Things - S02E04 - Chapter Four - Will the Wise Bluray-1080p Remux.mkv",
+  "duration": 2706,
+  "video": "h264 1920x1080",
+  "gb": 11.7,
+  "chapters": [
+   "0 Chapter 1",
+   "613 Chapter 2",
+   "1203 Chapter 3",
+   "1803 Chapter 4",
+   "2403 Chapter 5",
+   "2583 Chapter 6"
+  ],
+  "cost": {
+   "headSeconds": 132.4,
+   "headMB": 2663,
+   "tailSeconds": 79.3,
+   "tailMB": 1328,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 78,
+    "end": 139
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 77.6,
+    "end": 136.7
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Brooklyn Nine-Nine",
+  "file": "syrax/Media/Sitcoms/Brooklyn Nine-Nine/Season 2/Brooklyn Nine-Nine - S02E02 - Chocolate Milk WEBDL-1080p.mkv",
+  "duration": 1299,
+  "video": "h264 1920x1080",
+  "gb": 0.9,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 2.8,
+   "headMB": 227,
+   "tailSeconds": 2.3,
+   "tailMB": 182,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 72,
+    "end": 92
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 70.1,
+    "end": 90.3
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Brooklyn Nine-Nine",
+  "file": "syrax/Media/Sitcoms/Brooklyn Nine-Nine/Season 2/Brooklyn Nine-Nine - S02E03 - The Jimmy Jab Games WEBDL-1080p.mkv",
+  "duration": 1306,
+  "video": "h264 1920x1080",
+  "gb": 1,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 2.8,
+   "headMB": 253,
+   "tailSeconds": 2.3,
+   "tailMB": 202,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 71,
+    "end": 91
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 69.4,
+    "end": 89.5
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Brooklyn Nine-Nine",
+  "file": "syrax/Media/Sitcoms/Brooklyn Nine-Nine/Season 2/Brooklyn Nine-Nine - S02E04 - Halloween II WEBDL-1080p.mkv",
+  "duration": 1299,
+  "video": "h264 1920x1080",
+  "gb": 0.9,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 2.5,
+   "headMB": 154,
+   "tailSeconds": 2.5,
+   "tailMB": 220,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 43,
+    "end": 63
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 41.0,
+    "end": 61.2
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Friends",
+  "file": "syrax/Media/Sitcoms/Friends/Season 10/Friends - S10E02 - The One Where Ross Is Fine HDTV-1080p.mkv",
+  "duration": 1760,
+  "video": "h264 1920x1080",
+  "gb": 2.3,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 5.8,
+   "headMB": 600,
+   "tailSeconds": 6.1,
+   "tailMB": 478,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 130,
+    "end": 175
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 127.9,
+    "end": 174.2
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Friends",
+  "file": "syrax/Media/Sitcoms/Friends/Season 10/Friends - S10E03 - The One with Ross' Tan HDTV-1080p.mkv",
+  "duration": 1453,
+  "video": "h264 1920x1080",
+  "gb": 2.3,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 17.7,
+   "headMB": 539,
+   "tailSeconds": 22,
+   "tailMB": 497,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 77,
+    "end": 122
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 75.2,
+    "end": 121.5
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Friends",
+  "file": "syrax/Media/Sitcoms/Friends/Season 10/Friends - S10E04 - The One with the Cake HDTV-1080p.mkv",
+  "duration": 1377,
+  "video": "h264 1920x1080",
+  "gb": 2.3,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 6.2,
+   "headMB": 556,
+   "tailSeconds": 28.7,
+   "tailMB": 432,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 71,
+    "end": null
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 68.7,
+    "end": 96.5
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Frieren - Beyond Journey's End",
+  "file": "vermithor/Media/Anime Shows/F/Frieren - Beyond Journey's End/Season 1/Frieren - Beyond Journey's End - (0002) S01E002 - It Didn't Have to Be Magic Bluray-1080p Remux.mkv",
+  "duration": 1561,
+  "video": "h264 1920x1080",
+  "gb": 7.5,
+  "chapters": [
+   "0 Opening",
+   "90 Part A",
+   "675 Part B",
+   "1460 Ending",
+   "1550 Preview"
+  ],
+  "cost": {
+   "headSeconds": 78.5,
+   "headMB": 1879,
+   "tailSeconds": 46.1,
+   "tailMB": 1467,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 0,
+    "end": 90
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 0,
+    "end": 89.0
+   },
+   "endTheme": {
+    "start": 1458.3,
+    "end": 1548.2
+   }
+  }
+ },
+ {
+  "title": "Frieren - Beyond Journey's End",
+  "file": "vermithor/Media/Anime Shows/F/Frieren - Beyond Journey's End/Season 1/Frieren - Beyond Journey's End - (0003) S01E003 - Killing Magic Bluray-1080p Remux.mkv",
+  "duration": 1471,
+  "video": "h264 1920x1080",
+  "gb": 7,
+  "chapters": [
+   "0 Opening",
+   "90 Part A",
+   "621 Part B",
+   "1370 Ending",
+   "1460 Preview"
+  ],
+  "cost": {
+   "headSeconds": 89.9,
+   "headMB": 1772,
+   "tailSeconds": 52.4,
+   "tailMB": 1370,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 0,
+    "end": 90
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 0,
+    "end": 96.1
+   },
+   "endTheme": {
+    "start": 1368.4,
+    "end": 1458.3
+   }
+  }
+ },
+ {
+  "title": "Frieren - Beyond Journey's End",
+  "file": "vermithor/Media/Anime Shows/F/Frieren - Beyond Journey's End/Season 1/Frieren - Beyond Journey's End - (0004) S01E004 - The Land Where Souls Rest Bluray-1080p Remux.mkv",
+  "duration": 1561,
+  "video": "h264 1920x1080",
+  "gb": 7.5,
+  "chapters": [
+   "0 Opening",
+   "90 Part A",
+   "621 Part B",
+   "1460 Ending",
+   "1550 Preview"
+  ],
+  "cost": {
+   "headSeconds": 95.5,
+   "headMB": 1876,
+   "tailSeconds": 67,
+   "tailMB": 1475,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 0,
+    "end": 90
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 0,
+    "end": 96.1
+   },
+   "endTheme": {
+    "start": 1459.1,
+    "end": 1548.9
+   }
+  }
+ },
+ {
+  "title": "Attack on Titan",
+  "file": "vermithor/Media/Anime Shows/A/Attack on Titan/Season 2/Attack on Titan - (0027) S02E002 - I'm Home Bluray-1080p.mkv",
+  "duration": 1452,
+  "video": "h264 1920x1080",
+  "gb": 6.1,
+  "chapters": [
+   "0 Chapter 01",
+   "86 Chapter 02",
+   "176 Chapter 03",
+   "795 Chapter 04",
+   "1331 Chapter 05",
+   "1421 Chapter 06"
+  ],
+  "cost": {
+   "headSeconds": 86.8,
+   "headMB": 1567,
+   "tailSeconds": 78.8,
+   "tailMB": 1353,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 86,
+    "end": 176
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 85.1,
+    "end": 181.3
+   },
+   "endTheme": {
+    "start": 1330.5,
+    "end": 1439.0
+   }
+  }
+ },
+ {
+  "title": "Attack on Titan",
+  "file": "vermithor/Media/Anime Shows/A/Attack on Titan/Season 2/Attack on Titan - (0028) S02E003 - Southwestward Bluray-1080p.mkv",
+  "duration": 1452,
+  "video": "h264 1920x1080",
+  "gb": 6.1,
+  "chapters": [
+   "0 Chapter 01",
+   "178 Chapter 02",
+   "268 Chapter 03",
+   "646 Chapter 04",
+   "1331 Chapter 05",
+   "1421 Chapter 06"
+  ],
+  "cost": {
+   "headSeconds": 76.6,
+   "headMB": 1671,
+   "tailSeconds": 68.9,
+   "tailMB": 1296,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 178,
+    "end": 268
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 177.0,
+    "end": 273.2
+   },
+   "endTheme": {
+    "start": 1330.2,
+    "end": 1438.7
+   }
+  }
+ },
+ {
+  "title": "Attack on Titan",
+  "file": "vermithor/Media/Anime Shows/A/Attack on Titan/Season 2/Attack on Titan - (0029) S02E004 - Soldier Bluray-1080p.mkv",
+  "duration": 1452,
+  "video": "h264 1920x1080",
+  "gb": 6.1,
+  "chapters": [
+   "0 Chapter 01",
+   "91 Chapter 02",
+   "720 Chapter 03",
+   "1331 Chapter 04",
+   "1421 Chapter 05"
+  ],
+  "cost": {
+   "headSeconds": 73.5,
+   "headMB": 1536,
+   "tailSeconds": 87.3,
+   "tailMB": 1301,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 0,
+    "end": 91
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 0,
+    "end": 95.0
+   },
+   "endTheme": {
+    "start": 1330.4,
+    "end": 1429.5
+   }
+  }
+ },
+ {
+  "title": "Game of Thrones",
+  "file": "meleys/Media/4K TV/Game of Thrones/Season 2/Game of Thrones - S02E02 - The Night Lands Bluray-2160p Remux.mkv",
+  "duration": 3213,
+  "video": "hevc 3840x2160",
+  "gb": 27.3,
+  "chapters": [
+   "0 Chapter 1",
+   "116 Chapter 2",
+   "499 Chapter 3",
+   "1054 Chapter 4",
+   "1460 Chapter 5",
+   "1922 Chapter 6",
+   "2354 Chapter 7",
+   "3132 Chapter 8"
+  ],
+  "cost": {
+   "headSeconds": 103.9,
+   "headMB": 5328,
+   "tailSeconds": 65.9,
+   "tailMB": 2957,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 0,
+    "end": 116
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 0,
+    "end": 114.4
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Game of Thrones",
+  "file": "meleys/Media/4K TV/Game of Thrones/Season 2/Game of Thrones - S02E03 - What Is Dead May Never Die Bluray-2160p Remux.mkv",
+  "duration": 3168,
+  "video": "hevc 3840x2160",
+  "gb": 26.8,
+  "chapters": [
+   "0 Chapter 1",
+   "116 Chapter 2",
+   "559 Chapter 3",
+   "1147 Chapter 4",
+   "1704 Chapter 5",
+   "2104 Chapter 6",
+   "2534 Chapter 7",
+   "3088 Chapter 8"
+  ],
+  "cost": {
+   "headSeconds": 110.3,
+   "headMB": 4936,
+   "tailSeconds": 37.8,
+   "tailMB": 2050,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 0,
+    "end": 116
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 0.1,
+    "end": 114.6
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Game of Thrones",
+  "file": "meleys/Media/4K TV/Game of Thrones/Season 2/Game of Thrones - S02E04 - Garden of Bones Bluray-2160p Remux.mkv",
+  "duration": 3044,
+  "video": "hevc 3840x2160",
+  "gb": 26.1,
+  "chapters": [
+   "0 Chapter 1",
+   "116 Chapter 2",
+   "667 Chapter 3",
+   "1120 Chapter 4",
+   "1549 Chapter 5",
+   "1923 Chapter 6",
+   "2393 Chapter 7",
+   "2963 Chapter 8"
+  ],
+  "cost": {
+   "headSeconds": 91.6,
+   "headMB": 5032,
+   "tailSeconds": 56.6,
+   "tailMB": 2585,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 0,
+    "end": 116
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 0,
+    "end": 114.4
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Better Call Saul",
+  "file": "meleys/Media/4K TV/Better Call Saul/Season 2/Better Call Saul - S02E02 - Cobbler WEBRip-2160p Proper.mkv",
+  "duration": 2852,
+  "video": "h264 3840x2160",
+  "gb": 8.1,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 32.2,
+   "headMB": 1626,
+   "tailSeconds": 21.7,
+   "tailMB": 1088,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 393,
+    "end": 411
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 391.2,
+    "end": 409.7
+   },
+   "endTheme": {
+    "start": 2802.3,
+    "end": 2849.3
+   }
+  }
+ },
+ {
+  "title": "Better Call Saul",
+  "file": "meleys/Media/4K TV/Better Call Saul/Season 2/Better Call Saul - S02E03 - Amarillo WEBRip-2160p.mkv",
+  "duration": 2541,
+  "video": "h264 3840x2160",
+  "gb": 8.2,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 31.8,
+   "headMB": 1575,
+   "tailSeconds": 25,
+   "tailMB": 1222,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 321,
+    "end": 340
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 319.8,
+    "end": 338.3
+   },
+   "endTheme": {
+    "start": 2490.8,
+    "end": 2536.0
+   }
+  }
+ },
+ {
+  "title": "Better Call Saul",
+  "file": "meleys/Media/4K TV/Better Call Saul/Season 2/Better Call Saul - S02E04 - Gloves Off WEBRip-2160p.mkv",
+  "duration": 2604,
+  "video": "h264 3840x2160",
+  "gb": 7.7,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 31.9,
+   "headMB": 1620,
+   "tailSeconds": 19.5,
+   "tailMB": 977,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 120,
+    "end": 139
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 118.6,
+    "end": 137.2
+   },
+   "endTheme": {
+    "start": 2553.4,
+    "end": 2600.5
+   }
+  }
+ },
+ {
+  "title": "Barry",
+  "file": "vermithor/Media/TV/B/Barry/Season 2/Barry - S02E02 - The Power of No WEBDL-1080p.mkv",
+  "duration": 1799,
+  "video": "h264 1920x1080",
+  "gb": 0.8,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 15.8,
+   "headMB": 199,
+   "tailSeconds": 5.3,
+   "tailMB": 140,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": null,
+   "note": "no intro"
+  },
+  "detected": {
+   "intro": null,
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Barry",
+  "file": "vermithor/Media/TV/B/Barry/Season 2/Barry - S02E03 - Past = Present x Future Over Yesterday WEBDL-1080p.mkv",
+  "duration": 1944,
+  "video": "h264 1920x1080",
+  "gb": 2.3,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 17.5,
+   "headMB": 585,
+   "tailSeconds": 9.8,
+   "tailMB": 343,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": null,
+   "note": "no intro"
+  },
+  "detected": {
+   "intro": null,
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Barry",
+  "file": "vermithor/Media/TV/B/Barry/Season 2/Barry - S02E04 - What!! WEBDL-1080p.mkv",
+  "duration": 2028,
+  "video": "h264 1920x1080",
+  "gb": 2.4,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 36.2,
+   "headMB": 614,
+   "tailSeconds": 26.9,
+   "tailMB": 361,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": null,
+   "note": "no intro"
+  },
+  "detected": {
+   "intro": null,
+   "endTheme": null
+  }
+ },
+ {
+  "title": "The Bear",
+  "file": "vermithor/Media/TV/B/The Bear/Season 2/The Bear - S02E02 - Pasta WEBDL-1080p.mkv",
+  "duration": 1800,
+  "video": "h264 1920x1080",
+  "gb": 1.3,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 12.3,
+   "headMB": 334,
+   "tailSeconds": 7.5,
+   "tailMB": 226,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": null,
+   "note": "no intro"
+  },
+  "detected": {
+   "intro": null,
+   "endTheme": null
+  }
+ },
+ {
+  "title": "The Bear",
+  "file": "vermithor/Media/TV/B/The Bear/Season 2/The Bear - S02E03 - Sundae WEBDL-1080p.mkv",
+  "duration": 1553,
+  "video": "h264 1920x1080",
+  "gb": 1.1,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 10.7,
+   "headMB": 290,
+   "tailSeconds": 12.4,
+   "tailMB": 200,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": null,
+   "note": "no intro"
+  },
+  "detected": {
+   "intro": null,
+   "endTheme": null
+  }
+ },
+ {
+  "title": "The Bear",
+  "file": "vermithor/Media/TV/B/The Bear/Season 2/The Bear - S02E04 - Honeydew WEBDL-1080p.mkv",
+  "duration": 1766,
+  "video": "h264 1920x1080",
+  "gb": 1.2,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 26.5,
+   "headMB": 308,
+   "tailSeconds": 11.1,
+   "tailMB": 214,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": null,
+   "note": "no intro"
+  },
+  "detected": {
+   "intro": null,
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Hell's Kitchen (US)",
+  "file": "caraxes/Media/Reality TV Shows/Hell's Kitchen (US)/Season 18/Hell's Kitchen (US) - S18E02 - A Fond Farewell WEBDL-1080p.mkv",
+  "duration": 2588,
+  "video": "h264 1920x1080",
+  "gb": 3.4,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 10.9,
+   "headMB": 778,
+   "tailSeconds": 6.1,
+   "tailMB": 463,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 306,
+    "end": 337
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 304.6,
+    "end": 335.0
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Hell's Kitchen (US)",
+  "file": "caraxes/Media/Reality TV Shows/Hell's Kitchen (US)/Season 18/Hell's Kitchen (US) - S18E03 - Hell's Riders WEBDL-1080p.mkv",
+  "duration": 2588,
+  "video": "h264 1920x1080",
+  "gb": 3.4,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 10.3,
+   "headMB": 776,
+   "tailSeconds": 6.4,
+   "tailMB": 462,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 215,
+    "end": 246
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 214.0,
+    "end": 244.3
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Hell's Kitchen (US)",
+  "file": "caraxes/Media/Reality TV Shows/Hell's Kitchen (US)/Season 18/Hell's Kitchen (US) - S18E04 - Hell Freezes Over WEBDL-1080p.mkv",
+  "duration": 2588,
+  "video": "h264 1920x1080",
+  "gb": 3.4,
+  "chapters": [],
+  "cost": {
+   "headSeconds": 10.2,
+   "headMB": 771,
+   "tailSeconds": 6.6,
+   "tailMB": 468,
+   "picturesSeconds": null
+  },
+  "label": {
+   "intro": {
+    "start": 214,
+    "end": 246
+   },
+   "note": null
+  },
+  "detected": {
+   "intro": {
+    "start": 213.4,
+    "end": 243.5
+   },
+   "endTheme": null
+  }
+ },
+ {
+  "title": "Iron Man (2008)",
+  "file": "vhagar/Media/4K Movies/I/Iron Man (2008)/Iron Man (2008) 2160p HEVC.mkv",
+  "duration": 7582,
+  "video": "hevc 3840x1608",
+  "gb": 21.9,
+  "chapters": [
+   "0 Start",
+   "281 Las Vegas",
+   "653 Puttering",
+   "1028 Survived",
+   "1583 The Plans",
+   "1989 What Progress",
+   "2541 Home",
+   "2941 Pundits",
+   "3179 Industry",
+   "3915 Morning After",
+   "4524 New Grids",
+   "5101 Allies",
+   "5450 Pepper:Accomplice",
+   "5766 Old Inventions",
+   "6160 Underpowered",
+   "6832 Official Statement",
+   "7058 End Credits"
+  ],
+  "cost": {
+   "headSeconds": null,
+   "headMB": null,
+   "tailSeconds": 30.8,
+   "tailMB": 1939,
+   "picturesSeconds": 23.3
+  },
+  "label": {
+   "credits": 7058,
+   "source": "chapter End Credits"
+  },
+  "detected": {
+   "credits": {
+    "monochrome": false,
+    "creditsStart": 7088,
+    "crawl": [
+     7148,
+     7538
+    ],
+    "scenesAfter": [
+     [
+      7128,
+      7147
+     ],
+     [
+      7539,
+      7568
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "title": "Toy Story 3 (2010)",
+  "file": "meleys/Media/Family Movies/T/Toy Story 3 (2010)/Toy Story 3 (2010) WEBDL-1080p.mkv",
+  "duration": 6153,
+  "video": "h264 1920x1080",
+  "gb": 8.5,
+  "chapters": [
+   "0 00:00:00.000",
+   "294 00:04:53.543",
+   "380 00:06:20.255",
+   "697 00:11:37.405",
+   "917 00:15:17.166",
+   "1114 00:18:34.196",
+   "1164 00:19:23.871",
+   "1577 00:26:17.117",
+   "1739 00:28:59.404",
+   "1908 00:31:47.822",
+   "2002 00:33:22.333",
+   "2150 00:35:50.064",
+   "2250 00:37:30.123",
+   "2411 00:40:11.325",
+   "2473 00:41:12.637",
+   "2617 00:43:37.490",
+   "2689 00:44:49.270",
+   "2900 00:48:19.521",
+   "3148 00:52:28.061",
+   "3232 00:53:51.895",
+   "3432 00:57:11.970",
+   "3501 00:58:20.705",
+   "3670 01:01:09.999",
+   "3727 01:02:06.639",
+   "3777 01:02:57.023",
+   "3995 01:06:35.032",
+   "4282 01:11:21.735",
+   "4557 01:15:57.261",
+   "4656 01:17:35.817",
+   "4783 01:19:43.195",
+   "4982 01:23:01.935",
+   "5100 01:24:59.594",
+   "5296 01:28:15.582",
+   "5658 01:34:18.277"
+  ],
+  "cost": {
+   "headSeconds": null,
+   "headMB": null,
+   "tailSeconds": 13.7,
+   "tailMB": 1097,
+   "picturesSeconds": 15.9
+  },
+  "label": {
+   "credits": 5656,
+   "source": "contact sheet, 15 s frames refined by eye"
+  },
+  "detected": {
+   "credits": {
+    "monochrome": false,
+    "creditsStart": 5923,
+    "crawl": [
+     5923,
+     6135
+    ],
+    "scenesAfter": [
+     [
+      6136,
+      6152
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "title": "Up (2009)",
+  "file": "meleys/Media/Family Movies/U/Up (2009)/Up (2009) WEBDL-1080p.mkv",
+  "duration": 5768,
+  "video": "h264 1920x1080",
+  "gb": 11.4,
+  "chapters": [
+   "0 Newsreel",
+   "159 Meet Ellie",
+   "434 Married Life",
+   "697 Carl Alone",
+   "813 Construction Zone",
+   "922 Russell",
+   "1056 Carl's Mistake",
+   "1225 Carl Goes Up",
+   "1471 Interrupted",
+   "1584 Storm",
+   "1683 Where Are We?",
+   "1780 Stuck",
+   "2000 The Journey Begins",
+   "2060 Hunting Dogs",
+   "2114 Kevin",
+   "2390 Dug",
+   "2555 Talking Dogs",
+   "2681 Ditch 'em",
+   "2777 Campfire",
+   "2959 Hunters Come to Camp",
+   "3141 Muntz",
+   "3324 Dinner",
+   "3634 Pursuit",
+   "3859 Stuff I Remember Most",
+   "3974 Muntz Takes Kevin",
+   "4138 Paradise Falls",
+   "4221 Message From Ellie",
+   "4415 Cleaning House",
+   "4524 Rescue Russell",
+   "4673 Rescue Kevin",
+   "4786 Old Man Fight",
+   "4914 Dogfight",
+   "5003 Atop the Dirigible",
+   "5163 Back Home",
+   "5342 Credits"
+  ],
+  "cost": {
+   "headSeconds": null,
+   "headMB": null,
+   "tailSeconds": 18,
+   "tailMB": 1528,
+   "picturesSeconds": 21.6
+  },
+  "label": {
+   "credits": 5342,
+   "source": "chapter Credits"
+  },
+  "detected": {
+   "credits": {
+    "monochrome": false,
+    "creditsStart": null,
+    "crawl": null,
+    "scenesAfter": []
+   }
+  }
+ },
+ {
+  "title": "Hangover, The (2009)",
+  "file": "vhagar/Media/4K Movies/H/Hangover, The (2009)/Hangover, The (2009) WEBDL-2160p.mkv",
+  "duration": 5744,
+  "video": "hevc 3840x2160",
+  "gb": 18,
+  "chapters": [],
+  "cost": {
+   "headSeconds": null,
+   "headMB": null,
+   "tailSeconds": 20.3,
+   "tailMB": 2694,
+   "picturesSeconds": 75.1
+  },
+  "label": {
+   "credits": 5510,
+   "source": "contact sheet, 15 s frames refined by eye"
+  },
+  "detected": {
+   "credits": {
+    "monochrome": false,
+    "creditsStart": 5636,
+    "crawl": [
+     5636,
+     5743
+    ],
+    "scenesAfter": []
+   }
+  }
+ },
+ {
+  "title": "Knives Out (2019)",
+  "file": "vhagar/Media/4K Movies/K/Knives Out (2019)/Knives Out (2019) 2160p HEVC.mkv",
+  "duration": 7825,
+  "video": "hevc 3840x2076,mjpeg 400x500",
+  "gb": 33.5,
+  "chapters": [],
+  "cost": {
+   "headSeconds": null,
+   "headMB": null,
+   "tailSeconds": 46.5,
+   "tailMB": 2931,
+   "picturesSeconds": 26.8
+  },
+  "label": {
+   "credits": 7520,
+   "source": "contact sheet, 15 s frames refined by eye"
+  },
+  "detected": {
+   "credits": {
+    "monochrome": false,
+    "creditsStart": 7518,
+    "crawl": [
+     7518,
+     7807
+    ],
+    "scenesAfter": []
+   }
+  }
+ },
+ {
+  "title": "Oldboy (Oldeuboi) (2003)",
+  "file": "vhagar/Media/4K Movies/O/Oldboy (Oldeuboi) (2003)/Oldboy (Oldeuboi) (2003) 2160p HEVC.mkv",
+  "duration": 7195,
+  "video": "hevc 3840x1632",
+  "gb": 56.6,
+  "chapters": [
+   "0 Chapter 1",
+   "359 Chapter 2",
+   "736 Chapter 3",
+   "1089 Chapter 4",
+   "1721 Chapter 5",
+   "2038 Chapter 6",
+   "2557 Chapter 7",
+   "2857 Chapter 8",
+   "3166 Chapter 9",
+   "3660 Chapter 10",
+   "4358 Chapter 11",
+   "4767 Chapter 12",
+   "5351 Chapter 13",
+   "6056 Chapter 14",
+   "6567 Chapter 15"
+  ],
+  "cost": {
+   "headSeconds": null,
+   "headMB": null,
+   "tailSeconds": 39.3,
+   "tailMB": 5504,
+   "picturesSeconds": 44.2
+  },
+  "label": {
+   "credits": 7060,
+   "source": "contact sheet, 15 s frames refined by eye"
+  },
+  "detected": {
+   "credits": {
+    "monochrome": false,
+    "creditsStart": null,
+    "crawl": null,
+    "scenesAfter": []
+   }
+  }
+ },
+ {
+  "title": "Guardians of the Galaxy Vol. 2 (2017)",
+  "file": "meleys/Media/Movies/G/Guardians of the Galaxy Vol. 2 (2017)/Guardians of the Galaxy Vol. 2 (2017) WEBDL-1080p.mkv",
+  "duration": 8146,
+  "video": "h264 1920x808",
+  "gb": 10.6,
+  "chapters": [
+   "0 00:00:00.000",
+   "596 00:09:56.179",
+   "910 00:15:10.118",
+   "1334 00:22:14.083",
+   "1954 00:32:33.702",
+   "2212 00:36:52.127",
+   "2549 00:42:29.172",
+   "2883 00:48:03.464",
+   "3199 00:53:18.904",
+   "3526 00:58:45.939",
+   "3952 01:05:52.240",
+   "4272 01:11:12.435",
+   "4724 01:18:43.594",
+   "5035 01:23:55.322",
+   "5425 01:30:24.753",
+   "5976 01:39:36.179",
+   "6426 01:47:06.211",
+   "6862 01:54:21.605",
+   "7134 01:58:53.710",
+   "7633 02:07:13.459"
+  ],
+  "cost": {
+   "headSeconds": null,
+   "headMB": null,
+   "tailSeconds": 14.3,
+   "tailMB": 1141,
+   "picturesSeconds": 15.8
+  },
+  "label": {
+   "credits": 7633,
+   "source": "contact sheet, 15 s frames refined by eye"
+  },
+  "detected": {
+   "credits": {
+    "monochrome": false,
+    "creditsStart": null,
+    "crawl": null,
+    "scenesAfter": []
+   }
+  }
+ },
+ {
+  "title": "Ant-Man (2015)",
+  "file": "meleys/Media/Movies/A/Ant-Man (2015)/Ant-Man (2015) WEBDL-1080p.mp4",
+  "duration": 7027,
+  "video": "h264 1920x1080",
+  "gb": 26.1,
+  "chapters": [
+   "0 Chapter 01",
+   "129 Chapter 02",
+   "520 Chapter 03",
+   "925 Chapter 04",
+   "1200 Chapter 05",
+   "1670 Chapter 06",
+   "1987 Chapter 07",
+   "2334 Chapter 08",
+   "2676 Chapter 09",
+   "2962 Chapter 10",
+   "3464 Chapter 11",
+   "3649 Chapter 12",
+   "3992 Chapter 13",
+   "5001 Chapter 14",
+   "5661 Chapter 15",
+   "6454 Chapter 16"
+  ],
+  "cost": {
+   "headSeconds": null,
+   "headMB": null,
+   "tailSeconds": 175.1,
+   "tailMB": 709,
+   "picturesSeconds": 59.5
+  },
+  "label": {
+   "credits": 6450,
+   "source": "contact sheet, 15 s frames refined by eye"
+  },
+  "detected": {
+   "credits": {
+    "monochrome": false,
+    "creditsStart": 6620,
+    "crawl": [
+     6620,
+     7024
+    ],
+    "scenesAfter": []
+   }
+  }
+ },
+ {
+  "title": "Citizen Kane (1941)",
+  "file": "meleys/Media/Movies/C/Citizen Kane (1941)/Citizen Kane (1941) WEBDL-1080p.mkv",
+  "duration": 7173,
+  "video": "h264 1920x1080",
+  "gb": 32.7,
+  "chapters": [
+   "0 Final Word",
+   "192 News on the March",
+   "750 Rosebud Dead or Alive",
+   "863 She Won't Talk",
+   "1038 Thatcher Library",
+   "1116 Leaving Home",
+   "1375 Newspaper Fun",
+   "1634 Might Have Been Great",
+   "1790 Bernstein's Memory",
+   "1942 The New York Daily Inquirer",
+   "2244 Declaration of Principles",
+   "2389 Newspaper Party",
+   "2709 Social Announcement",
+   "2966 Life with Emily",
+   "3310 Susan Alexander",
+   "3636 Campaign Speech",
+   "3825 Love Nest Confrontation",
+   "4249 Love on His Terms",
+   "4528 Night at the Opera (I)",
+   "4655 Negative Review",
+   "4972 Trying to Prove Things",
+   "5116 Singing Lessons",
+   "5348 Night at the Opera (II)",
+   "5549 Suicide Attempt",
+   "5899 Life at Xanadu",
+   "6040 Everglades Picnic",
+   "6225 Susan Walks Out",
+   "6427 Destroying Susan's Room",
+   "6688 Jigsaw Puzzle",
+   "6890 Rosebud",
+   "7032 Cast and End Credits"
+  ],
+  "cost": {
+   "headSeconds": null,
+   "headMB": null,
+   "tailSeconds": 42.8,
+   "tailMB": 4043,
+   "picturesSeconds": 55.2
+  },
+  "label": {
+   "credits": 7032,
+   "source": "chapter Cast and End Credits"
+  },
+  "detected": {
+   "credits": {
+    "monochrome": true,
+    "creditsStart": null,
+    "crawl": null,
+    "scenesAfter": []
+   }
+  }
+ },
+ {
+  "title": "Deadpool (2016)",
+  "file": "meleys/Media/Movies/D/Deadpool (2016)/Deadpool (2016) WEBDL-1080p.mkv",
+  "duration": 6486,
+  "video": "h264 1920x1080",
+  "gb": 24,
+  "chapters": [
+   "0 Chapter 1",
+   "185 Chapter 2",
+   "353 Chapter 3",
+   "571 Chapter 4",
+   "799 Chapter 5",
+   "1009 Chapter 6",
+   "1213 Chapter 7",
+   "1326 Chapter 8",
+   "1630 Chapter 9",
+   "1919 Chapter 10",
+   "2212 Chapter 11",
+   "2466 Chapter 12",
+   "2686 Chapter 13",
+   "2817 Chapter 14",
+   "3011 Chapter 15",
+   "3198 Chapter 16",
+   "3333 Chapter 17",
+   "3548 Chapter 18",
+   "3785 Chapter 19",
+   "4026 Chapter 20",
+   "4156 Chapter 21",
+   "4350 Chapter 22",
+   "4606 Chapter 23",
+   "4844 Chapter 24",
+   "5153 Chapter 25",
+   "5464 Chapter 26",
+   "5687 Chapter 27",
+   "5993 Chapter 28"
+  ],
+  "cost": {
+   "headSeconds": null,
+   "headMB": null,
+   "tailSeconds": 57.5,
+   "tailMB": 3178,
+   "picturesSeconds": 46.8
+  },
+  "label": {
+   "credits": 6060,
+   "source": "contact sheet, 15 s frames refined by eye"
+  },
+  "detected": {
+   "credits": {
+    "monochrome": false,
+    "creditsStart": 6156,
+    "crawl": [
+     6156,
+     6416
+    ],
+    "scenesAfter": [
+     [
+      6418,
+      6449
+     ],
+     [
+      6454,
+      6483
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "title": "Anchorman The Legend of Ron Burgundy (2004)",
+  "file": "meleys/Media/Movies/A/Anchorman The Legend of Ron Burgundy (2004)/Anchorman The Legend of Ron Burgundy (2004) Remux-1080p.mkv",
+  "duration": 5843,
+  "video": "h264 1920x1080",
+  "gb": 29.3,
+  "chapters": [
+   "0 Meet Ron Burgundy",
+   "221 Channel 4 News Team",
+   "349 Pool Party",
+   "683 Man's Best Friend",
+   "780 Who's That Lady",
+   "1052 Numero 2",
+   "1232 Taking a Run at the New Girl",
+   "1509 Tickets to the Gun Show",
+   "1873 The Jazz Flute",
+   "2195 Pleasure Town",
+   "2336 The Definition of Love",
+   "2619 Breaking Up with the News Team",
+   "2913 The Bad Man Punts Baxter",
+   "3136 Veronica's Big Break",
+   "3638 Anchorman Rumble",
+   "4007 Bad Hair",
+   "4197 Ron Gets Canned",
+   "4416 The Downward Spiral",
+   "5006 Bear Fight",
+   "5560 End Credits"
+  ],
+  "cost": {
+   "headSeconds": null,
+   "headMB": null,
+   "tailSeconds": 52.5,
+   "tailMB": 4428,
+   "picturesSeconds": 63.2
+  },
+  "label": {
+   "credits": 5560,
+   "source": "chapter End Credits"
+  },
+  "detected": {
+   "credits": {
+    "monochrome": false,
+    "creditsStart": 5560,
+    "crawl": [
+     5698,
+     5789
+    ],
+    "scenesAfter": [
+     [
+      5595,
+      5634
+     ],
+     [
+      5680,
+      5697
+     ],
+     [
+      5702,
+      5722
+     ],
+     [
+      5792,
+      5832
+     ]
+    ]
+   }
+  }
+ }
+]
