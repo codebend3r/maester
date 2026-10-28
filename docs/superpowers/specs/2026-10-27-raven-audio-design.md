@@ -1,6 +1,6 @@
 # raven: audio libraries, and a standalone music player
 
-Date: 2026-10-27. Status: draft, written as a spike; its four spikes ran on 2026-10-27 and their results are in section "Spikes". Nothing here is approved or built yet.
+Date: 2026-10-27. Status: approved on 2026-10-27, building as ten PRs; PR 1 is built. Written as a spike, its four spikes ran on 2026-10-27 and their results are in section "Spikes".
 
 ## Why
 
@@ -39,8 +39,8 @@ This spike maps what each project does today, what assumes video, what can be re
   - `/file` serves any file with ranges, but `containerMimeType` (`libs/raven/core/src/playback.ts:98-114`) knows no audio container, so it answers `application/octet-stream` and clients judge the file unplayable.
   - `/stream` always maps `-map 0:v:0` (`ffmpeg/args.ts:305`) and says `video/mp4` with H.264 (`playback.ts:219`): with no picture it fails after the 200; with cover art it remuxes an mjpeg frame into fMP4.
 
-    > [!WARNING]
-    > This bug already hits videos whose first video stream is cover art: their remux or transcode is broken today. PR 1 fixes it.
+    > [!NOTE]
+    > This spike first read the `0:v:0` map as breaking videos whose first video stream is cover art. Checked in PR 1, ffmpeg lists cover art after the real video in MP4, MOV and Matroska files (an MP4's `covr` atom and an MKV attachment alike), so no video was affected. An audio file with a cover was: `0:v:0` took the picture for its video. PR 1 maps `0:V:0`, which never takes an attached picture, everywhere.
 
   - HLS refuses with 422 (`hls/hlsController.ts:179`) and is video-shaped throughout (`hlsArgs.ts:236`, `hls/variant.ts:31`, `-select_streams v:0`).
   - Audio transcoding exists only as stereo AAC 192k (`args.ts:309`) beside video.
@@ -122,9 +122,13 @@ New kinds in `LIBRARY_KINDS`, each with `KIND_RULES` and a `KINDS` label and ico
 | `audiobooks` | `audiobook` | none at first     | yes          | One book per folder or one `.m4b`       |
 | `podcasts`   | `podcast`   | none              | yes          | Later: feeds are a separate subsystem   |
 
-`KindRules` gains what an audio kind changes: the kind of media it holds (`video` or `audio`, which picks the extensions, probe, thumbnails and player), its listing (`media`, `shows`, `albums`), and whether it saves progress by default. `matches` widens from `MatchItemType` to a provider plus type. Music's sorts are artist, album, year, added, title; its groupings are artist, genre, decade, format (lossless or not); its views are covers, list and table. `resolution` and `codec` drop out for audio.
+`music` and `audiobooks` are in `LIBRARY_KINDS` since PR 1; `podcasts` joins with the spec that covers feeds, since a kind in the type picker with nothing behind it would be a promise raven cannot keep.
 
-Podcasts (RSS subscription, episode downloads to the server) are a subsystem of their own and are left out of this plan, beyond reserving the kind.
+`KindRules` gains what an audio kind changes: the kind of media it holds (`media`: `video` or `audio`, which picks the extensions, probe, thumbnails and player; PR 1), whether it saves progress by default (`saveProgress`; PR 1), and its listing (`media`, `shows`, `albums`; PR 2). `matches` widens from `MatchItemType` to a provider plus type. Music's sorts are artist, album, year, added, title; its groupings are artist, genre, decade, format (lossless or not); its views are covers, list and table. `resolution` and `codec` drop out for audio.
+
+Podcasts (RSS subscription, episode downloads to the server) are a subsystem of their own and are left out of this plan; the `podcasts` name and its icon are kept for that spec.
+
+Until PR 2 adds artists and albums, PR 1's audio rules stand: no resolution, release or rating sorts; codec and month groupings; a list grouped by the month each file came in.
 
 ### 2. Scanning and tags
 
@@ -174,7 +178,9 @@ Playback adds no route: a track plays from `/file` (direct) or `/stream` (transc
 ### 6. Streaming fixes
 
 - `containerMimeType` learns `audio/mpeg`, `audio/mp4`, `audio/flac`, `audio/ogg`, `audio/wav`, `audio/aiff`; `CONTAINERS` gains the audio containers; `canPlay` probes with an `<audio>` element for audio.
-- `streamArgs` maps `0:v:0?` only for a file with a real video stream, never an `attached_pic`, which fixes the existing cover-art bug for videos too. An audio transcode targets AAC in fMP4 (`audio/mp4`), or Opus in WebM, with a bitrate the client asks for (`STREAM_QUALITIES` gains audio steps: 128, 256, 320 kbps and lossless). Lossless sources stay direct play wherever the client can decode them.
+- Every video map is `0:V:0` (`VIDEO_STREAM`), the first video stream that is not an attached picture: thumbnails, `/stream`, HLS and the keyframe probe (PR 1).
+- An audio file's `/stream` maps its audio alone, as AAC 192k in fragmented MP4 (`audio/mp4`), fragmented every second rather than at each keyframe, since every audio frame is one (PR 1). Its plan is direct play, then that stream; there is no transcode and no size to offer (PR 1).
+- A bitrate the client asks for (`STREAM_QUALITIES` gains audio steps: 128, 256, 320 kbps) comes with the player's settings in PR 4. Lossless sources stay direct play wherever the client can decode them.
 - HLS is not needed for music at first: `/file` with ranges plays and seeks every format the client decodes, and `/stream` covers the rest. HLS stays for video.
 
 ### 7. The queue player, shared by every raven client
@@ -281,7 +287,7 @@ A new raven client, `@raven/music` in `apps/raven/music`, with the same server, 
 ## Out of scope
 
 - Non-goals: licensed catalog streaming, a music store, and uploads from a phone to the server.
-- Non-goals: podcast feeds (RSS subscription and episode downloads); the `podcasts` kind is reserved, nothing more.
+- Non-goals: podcast feeds (RSS subscription and episode downloads), and the `podcasts` kind, which comes with them.
 - Non-goals: the AI matcher for music, and audio features from Essentia, until the mixes in PR 10 prove they need them.
 - Non-goals: true gapless on the web through Web Audio; two preloaded `<audio>` elements come first.
 
@@ -292,12 +298,15 @@ Ten stacked PRs, one commit each, thermo-reviewed. PRs 1 to 7 bring music to eve
 > [!TIP]
 > Ten PRs, not 22, at the owner's request (2026-10-27). Each PR carries a whole layer or a whole client, so PRs 2, 4 and 7 may run to about 100 files each; the owner chose ten PRs over the usual 50-file limit.
 
+> [!TIP]
+> PR 1 was built on the spec's own branch, `audio-library-support`, and ships with this spec in #310. The scanner's indexing by type moved into it from PR 2, so the new audio extensions had a user (the dead-code check) and a music library already scans and plays as a list of files on the web and the desktop. The audio bitrate steps moved to PR 4, beside the settings menu that offers them. `@raven/app` plays no audio file until PR 6: its play tables and HLS are video-only.
+
 | PR | Projects | What it carries |
 | -- | -------- | --------------- |
-| 1. Audio playback foundations | core, server | Streams pick the real video stream (never an `attached_pic`) in `/stream`, HLS, keyframes and thumbnails, fixing cover-art videos today; audio extensions, containers and MIME types; `music` and `audiobooks` kinds with `KIND_RULES`, labels and kind-picker copy; audio transcodes in `/stream` and audio qualities in the planner |
-| 2. Music library on the server | core, server | `AudioTags` from the probe; a kind's extensions in the scanner; no frame grabs for audio; embedded and folder cover art; the migration for `artists`, `albums`, `tracks` and credits, filled from tags, grouped by folder when tags are missing; the music routes and pictures; `ROUTES` rows, `APP_CLIENT_CALLS` entries and an audio file in the enforced fixture |
+| 1. Audio playback foundations (built, #310) | core, server, web | `0:V:0` for every video map, so an attached picture is never taken for video; audio extensions, containers and MIME types; `music` and `audiobooks` kinds with `KIND_RULES`, labels and kind-picker copy; a kind's extensions in the scanner; an audio file's `/stream` as its audio alone, and its plan with no transcode or sizes |
+| 2. Music library on the server | core, server | `AudioTags` from the probe; no frame grabs for audio; embedded and folder cover art; the migration for `artists`, `albums`, `tracks` and credits, filled from tags, grouped by folder when tags are missing; the music routes and pictures; `ROUTES` rows, `APP_CLIENT_CALLS` entries and an audio file in the enforced fixture |
 | 3. MusicBrainz matching | server, core, web | `MusicMatcher` behind a one-request-a-second gate; Cover Art Archive as an image source; Fix match for albums |
-| 4. Queue player and music on the web | core, ui, web | `queue.ts` and its tests; the `audioQueue` store and persistent audio host; the html audio engine with preloading and Media Session; music listings, artist and album pages, the now-playing bar, Now Playing and the queue page |
+| 4. Queue player and music on the web | core, ui, web | `queue.ts` and its tests; the `audioQueue` store and persistent audio host; the html audio engine with preloading and Media Session; audio bitrate steps in `STREAM_QUALITIES` and the player's settings; music listings, artist and album pages, the now-playing bar, Now Playing and the queue page |
 | 5. Music on Raven for macOS | mpv, desktop, web | The audio surface kind; mpv playlist, gapless and ReplayGain; "showing" apart from "playing" in main; `prevent-app-suspension`; Now Playing and remote commands in the addon; album and playlist downloads |
 | 6. Music in the device app | audio, app, core | `@raven/audio`, the local Expo module over `AVQueuePlayer` and Media3; music screens in touch and focus layouts; the now-playing bar; background playback and the lock screen on phones through it, and through `react-native-video` on the TVs; the audio rows in `canPlay.ts` |
 | 7. Playlists, lyrics, listens and audiobooks | server, core, ui, web, app | Per-account playlists everywhere; lyrics from tags, sidecars and LRCLIB; listens at 50% or four minutes; audiobook chapters from `.m4b`, resume and speed |
@@ -454,7 +463,7 @@ Taken with the owner on 2026-10-27:
 > Music gets its own tables (`artists`, `albums`, `tracks` and the credit tables), not new types in `items`, which is bound to TMDB ids (section 3).
 
 > [!TIP]
-> Podcasts are left out: the `podcasts` kind is reserved, and a later spec covers feeds.
+> Podcasts are left out: a later spec covers feeds and adds the `podcasts` kind.
 
 > [!TIP]
 > The standalone player is a raven client, `@raven/music` in `apps/raven/music`, on raven's server, accounts, library and play history.
