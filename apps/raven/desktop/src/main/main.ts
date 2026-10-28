@@ -108,7 +108,7 @@ import { createNodeTimers } from '@/main/timers'
 import { createMenuCheck, createUpdateService, updateSourceFrom } from '@/main/updateService'
 import { checkForUpdates } from '@/main/updates'
 import { linkOriginsFrom, serverOriginFrom } from '@/main/origins'
-import { controlWindow } from '@/main/windowChrome'
+import { controlWindow, createWindowResizer } from '@/main/windowChrome'
 import { IPC_CHANNELS } from '@/shared/hostNames'
 import { LINK_SCHEME } from '@/shared/playLink'
 
@@ -240,6 +240,7 @@ const startApp = (): void => {
       warn(`Raven could not reach its window. ${errorText(error)}`)
     }
   }
+  const resizer = createWindowResizer()
   const liveWindow = (): BrowserWindow | null => {
     const window = windows.current
     if (window === null || window.isDestroyed()) return null
@@ -630,6 +631,16 @@ const startApp = (): void => {
         const window = liveWindow()
         if (window === null) return
         controlWindow({ window, action })
+      },
+      startWindowResize: ({ edge, at }) => {
+        const window = liveWindow()
+        if (window === null) return
+        resizer.start({ window, edge, at })
+      },
+      moveWindowResize: ({ to }) => {
+        const window = liveWindow()
+        if (window === null) return
+        resizer.move({ window, to })
       },
       config,
       links: createLinkOpener({

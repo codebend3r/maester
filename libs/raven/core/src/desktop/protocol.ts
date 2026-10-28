@@ -295,6 +295,20 @@ export const WINDOW_ACTIONS = {
 
 export type WindowAction = (typeof WINDOW_ACTIONS)[keyof typeof WINDOW_ACTIONS]
 
+/** The edge or corner a page-drawn resize handle drags. */
+export const WINDOW_EDGES = {
+  top: 'top',
+  right: 'right',
+  bottom: 'bottom',
+  left: 'left',
+  topLeft: 'topLeft',
+  topRight: 'topRight',
+  bottomRight: 'bottomRight',
+  bottomLeft: 'bottomLeft',
+} as const
+
+export type WindowEdge = (typeof WINDOW_EDGES)[keyof typeof WINDOW_EDGES]
+
 export const DESKTOP_REQUESTS = {
   ready: 'ready',
   openDialog: 'openDialog',
@@ -307,6 +321,8 @@ export const DESKTOP_REQUESTS = {
   saveTracks: 'saveTracks',
   windowButtons: 'windowButtons',
   windowControl: 'windowControl',
+  startWindowResize: 'startWindowResize',
+  moveWindowResize: 'moveWindowResize',
   readOutput: 'readOutput',
   writeOutput: 'writeOutput',
   openLink: 'openLink',
@@ -366,6 +382,14 @@ export const isDesktopRequest = union(
     type: oneOf([DESKTOP_REQUESTS.windowControl]),
     action: oneOf(Object.values(WINDOW_ACTIONS)),
   }),
+  // A drag on a resize handle: where it began, in screen coordinates, then where it is now.
+  object({
+    type: oneOf([DESKTOP_REQUESTS.startWindowResize]),
+    edge: oneOf(Object.values(WINDOW_EDGES)),
+    x: isNumber,
+    y: isNumber,
+  }),
+  object({ type: oneOf([DESKTOP_REQUESTS.moveWindowResize]), x: isNumber, y: isNumber }),
   object({ type: oneOf([DESKTOP_REQUESTS.readOutput]) }),
   object({ type: oneOf([DESKTOP_REQUESTS.writeOutput]), output: isOutputSettings }),
   object({ type: oneOf([DESKTOP_REQUESTS.openLink]), link: isString }),

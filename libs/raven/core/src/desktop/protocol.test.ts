@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
   WINDOW_ACTIONS,
+  WINDOW_EDGES,
   DESKTOP_EVENTS,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
@@ -220,6 +221,8 @@ describe('isDesktopRequest', () => {
     [{ type: DESKTOP_REQUESTS.windowControl, action: WINDOW_ACTIONS.minimize }],
     [{ type: DESKTOP_REQUESTS.windowControl, action: WINDOW_ACTIONS.maximize }],
     [{ type: DESKTOP_REQUESTS.windowControl, action: WINDOW_ACTIONS.close }],
+    [{ type: DESKTOP_REQUESTS.startWindowResize, edge: WINDOW_EDGES.bottomRight, x: 900, y: 700 }],
+    [{ type: DESKTOP_REQUESTS.moveWindowResize, x: 920.5, y: 712 }],
     [{ type: DESKTOP_REQUESTS.readOutput }],
     [
       {
@@ -312,6 +315,11 @@ describe('isDesktopRequest', () => {
     ],
     ['a string for the window buttons', { type: DESKTOP_REQUESTS.windowButtons, isVisible: 'yes' }],
     ['an unknown window action', { type: DESKTOP_REQUESTS.windowControl, action: 'fullscreen' }],
+    [
+      'an unknown resize edge',
+      { type: DESKTOP_REQUESTS.startWindowResize, edge: 'middle', x: 0, y: 0 },
+    ],
+    ['a resize with no point', { type: DESKTOP_REQUESTS.moveWindowResize, x: 10 }],
     ['partial output settings', { type: DESKTOP_REQUESTS.writeOutput, output: { profile: 'pcm' } }],
     ['the server call the page no longer makes', { type: 'serverCall', serverId: id }],
     [
