@@ -1,5 +1,5 @@
 import { el, link } from '@/dom'
-import { fileLabel, formatBytes } from '@/releases'
+import { formatBytes } from '@/releases'
 import type { ReleaseFile } from '@/releases'
 
 const CLASSES = { link: 'file-link', size: 'file-size' } as const
@@ -17,7 +17,7 @@ export const fileItem = ({ file }: FileItemProps): HTMLElement =>
         href: file.url,
         className: CLASSES.link,
         children: [
-          el({ tag: 'span', text: fileLabel({ file }) }),
+          el({ tag: 'span', text: file.label }),
           el({ tag: 'span', className: CLASSES.size, text: formatBytes({ bytes: file.bytes }) }),
         ],
       }),
