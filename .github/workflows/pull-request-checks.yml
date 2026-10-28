@@ -175,8 +175,10 @@ jobs:
         run: bunx nx run @raven/supabase:check:functions
       - name: Test Edge Functions
         run: bunx nx run @raven/supabase:test:functions
+      # No Mailpit: the checks send no mail, and its port 54324 sits in the runner's
+      # ephemeral range, where a stray connection can hold it and fail the bind.
       - name: Start local auth and database
-        run: bunx nx run @raven/supabase:db:start
+        run: bunx nx run @raven/supabase:db:start:ci
       - name: Test membership authorization
         run: bunx nx run @raven/supabase:test:db
       - name: Lint database
