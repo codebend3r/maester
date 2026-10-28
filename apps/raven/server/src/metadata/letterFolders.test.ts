@@ -17,6 +17,7 @@ import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
+import { StartupWork } from '@/startupWork'
 import { type InjectOptions, adminCookie, injectAs, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { fakeTmdb } from '@/test/fakeTmdb'
@@ -112,6 +113,7 @@ describe('letter and group folders', () => {
   /** A request by hand as the admin, for a route the admin lock holds back. */
   const asAdmin = (options: InjectOptions) => injectAs({ app: app(), cookie: state.admin })(options)
   const settle = async () => {
+    await app().get(StartupWork).whenDone()
     await app().get(ScannerService).whenIdle(state.shows)
     await app().get(ScannerService).whenIdle(state.moviesLibrary)
     await app().get(ScannerService).whenIdle(state.otherLibrary)

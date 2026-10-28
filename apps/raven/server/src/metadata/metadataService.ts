@@ -45,6 +45,7 @@ import { ScoreSweep } from '@/metadata/scoreSweep'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 import { type LayoutRow, indexedLayoutsOf, planRelayout } from '@/scanner/layout'
+import { StartupWork } from '@/startupWork'
 
 type DecisionPlacesOfProps = {
   type: MatchItemType
@@ -174,6 +175,7 @@ export class MetadataService implements OnApplicationBootstrap {
     @Inject(AiMatcher) private readonly aiMatcher: AiMatcher,
     @Inject(AiDecisions) private readonly decisions: AiDecisions,
     @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(StartupWork) private readonly startup: StartupWork,
   ) {
     this.matchers = createMatchers({ files, metadata, pictures, decisions })
   }
@@ -182,23 +184,30 @@ export class MetadataService implements OnApplicationBootstrap {
    * Files filed under another folder layout, or indexed before letter
    * folders were read, are placed again; names indexed before they were
    * parsed are read again; and every matched library gets a pass for what is
-   * pending.
+   * pending. Each library is a step of the work on boot of its own.
    */
   onApplicationBootstrap(): void {
-    this.metadata.resortTitles()
-    this.libraries.list().forEach((library) => {
-      try {
-        this.relayoutNow(library.id)
-      } catch (error) {
-        this.logger.error(
-          `Could not place the files of "${library.name}" again: ${errorMessage(error)}`,
-        )
-      }
-      const { kind } = library.settings
-      if (matchTypeFor(kind) == null) return
-      this.files.retitle({ libraryId: library.id, kind })
-      this.enqueue(library.id)
-    })
+    this.startup.add([
+      () => this.metadata.resortTitles(),
+      ...this.libraries.list().map((library) => () => this.prepare(library.id)),
+    ])
+  }
+
+  /** A library's share of the work on boot; one deleted before its turn has none. */
+  private prepare(libraryId: number): void {
+    const library = this.libraries.get(libraryId)
+    if (!library) return
+    try {
+      this.relayoutNow(library.id)
+    } catch (error) {
+      this.logger.error(
+        `Could not place the files of "${library.name}" again: ${errorMessage(error)}`,
+      )
+    }
+    const { kind } = library.settings
+    if (matchTypeFor(kind) == null) return
+    this.files.retitle({ libraryId: library.id, kind })
+    this.enqueue(library.id)
   }
 
   /**

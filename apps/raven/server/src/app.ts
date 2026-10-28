@@ -26,6 +26,8 @@ type CreateAppProps = {
   accessRecheckMs?: number
   /** How long a membership answer is reused; 5 s when left out. A test that changes an account under a token already used asks for 0. */
   membershipTtlMs?: number
+  /** Holds the work on boot until `StartupWork.release`, which `main.ts` calls once listening. */
+  shouldHoldStartupWork?: boolean
 }
 
 /**
@@ -42,6 +44,7 @@ export const createApp = async ({
   authKeys,
   accessRecheckMs,
   membershipTtlMs,
+  shouldHoldStartupWork,
 }: CreateAppProps): Promise<NestFastifyApplication> => {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule.register({
@@ -53,6 +56,7 @@ export const createApp = async ({
       authKeys,
       accessRecheckMs,
       membershipTtlMs,
+      shouldHoldStartupWork,
     }),
     new FastifyAdapter(),
     { logger: quiet ? false : ['log', 'warn', 'error'] },
