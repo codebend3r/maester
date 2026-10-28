@@ -33,7 +33,7 @@ else
   found=''
   while read -r id sha; do
     git cat-file -e "$sha^{commit}" 2> /dev/null || git fetch -q origin "$sha" 2> /dev/null || continue
-    git diff --quiet "$sha" HEAD -- libs/raven/mpv/native || continue
+    git diff --quiet "$sha" HEAD -- libs/raven/mpv/native libs/raven/mpv/src/build || continue
     if gh run download "$id" -n "raven-native-handoff-$sha" -D "$WORK" > /dev/null 2>&1; then
       tar -xf "$WORK/raven-native-handoff.tar"
       echo "Unpacked the handoff from run $id"

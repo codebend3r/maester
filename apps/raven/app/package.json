@@ -320,6 +320,7 @@
           {
             "runtime": "xcodebuild -version"
           },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
           "{workspaceRoot}/apps/raven/server/src/**/*"
         ],
         "cache": true
@@ -337,6 +338,8 @@
           {
             "env": "ORG_GRADLE_PROJECT_reactNativeArchitectures"
           },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
+          "{workspaceRoot}/.github/actions/raven-android-avd/**/*",
           "{workspaceRoot}/apps/raven/server/src/**/*"
         ],
         "cache": true
@@ -360,6 +363,7 @@
           {
             "runtime": "xcodebuild -version"
           },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
           "{workspaceRoot}/apps/raven/server/src/**/*"
         ],
         "cache": true

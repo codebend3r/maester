@@ -552,9 +552,6 @@ jobs:
     runs-on: macos-26
     # One Release build of React Native, its compile cached by ccache, and the remote flow.
     timeout-minutes: 60
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-      HOMEBREW_NO_AUTO_UPDATE: '1'
     steps:
       # The PR's head commit, so the artifact name below matches the commit that was built.
       - name: 📥 Checkout exact PR head
@@ -660,9 +657,6 @@ jobs:
     runs-on: macos-26
     # One Release build of React Native, its compile cached by ccache, and the flows.
     timeout-minutes: 60
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-      HOMEBREW_NO_AUTO_UPDATE: '1'
     steps:
       # The PR's head commit, so the artifact names below match the commit that was built.
       - name: 📥 Checkout exact PR head
@@ -825,7 +819,7 @@ jobs:
       # Runs `prebuild:android-tv` first, which regenerates android/ with the leanback
       # launcher, then Gradle's Release APK.
       - name: 📺 Build the Android TV APK
-        run: bunx nx run @raven/app:build:android-tv
+        run: bunx nx run @raven/app:build:android-tv --excludeTaskDependencies
 
       # How much of the compile ccache served, to tell a warm cache from a cold one.
       - name: 📊 ccache
@@ -851,7 +845,7 @@ jobs:
       # background for the flows. It prints its ready line once its libraries are scanned.
       - name: 🗄️ Start the fixture server
         run: |
-          bunx nx run @raven/server:serve:fixture > "$RUNNER_TEMP/fixture.log" 2>&1 &
+          bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
           for _ in $(seq 1 90); do
             if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
               grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"

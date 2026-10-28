@@ -34,6 +34,18 @@ outputs:
     value: ${{ steps.keys.outputs.ccache }}
   ccache-path:
     value: ${{ steps.keys.outputs.ccache-path }}
+  # Whether an exact key was restored, so a save is skipped when it would only fail.
+  packages-hit:
+    value: ${{ steps.packages.outputs.cache-hit }}
+  dependencies-hit:
+    value: ${{ steps.dependencies.outputs.cache-hit }}
+  # Each cache's key prefix, to delete the entries a save supersedes.
+  packages-prefix:
+    value: ${{ steps.keys.outputs.packages-prefix }}
+  dependencies-prefix:
+    value: ${{ steps.keys.outputs.dependencies-prefix }}
+  ccache-prefix:
+    value: ${{ steps.keys.outputs.ccache-restore }}
 runs:
   using: composite
   steps:
@@ -51,6 +63,8 @@ runs:
         case "$PLATFORM" in
           android-tv)
             echo "packages=apt-$ImageOS-$ImageVersion-ffmpeg-ccache-v1"
+            echo "packages-prefix=apt-"
+            echo "dependencies-prefix=gradle-$RUNNER_OS-"
             echo "packages-path=$HOME/apt-archives"
             echo "dependencies=gradle-$RUNNER_OS-$LOCK-$GITHUB_RUN_ID"
             printf 'dependencies-path<<LIST\n%s\n%s\nLIST\n' "$HOME/.gradle/caches" "$HOME/.gradle/wrapper"
@@ -59,6 +73,8 @@ runs:
             ;;
           ios | tvos)
             echo "packages=brew-$ImageOS-$ImageVersion-ffmpeg-ccache-v1"
+            echo "packages-prefix=brew-"
+            echo "dependencies-prefix=cocoapods-$RUNNER_OS-$PLATFORM-"
             echo "packages-path=$HOME/Library/Caches/Homebrew/downloads"
             echo "dependencies=cocoapods-$RUNNER_OS-$PLATFORM-$LOCK"
             echo "dependencies-path=$HOME/Library/Caches/CocoaPods"
@@ -85,12 +101,14 @@ runs:
         node-version: ${{ inputs.node-version }}
 
     - name: 🗃️ Packages
+      id: packages
       uses: actions/cache/restore@v6
       with:
         path: ${{ steps.keys.outputs.packages-path }}
         key: ${{ steps.keys.outputs.packages }}
 
     - name: 🗃️ Dependencies
+      id: dependencies
       uses: actions/cache/restore@v6
       with:
         path: ${{ steps.keys.outputs.dependencies-path }}
@@ -104,9 +122,9 @@ runs:
         key: ${{ steps.keys.outputs.ccache }}
         restore-keys: ${{ steps.keys.outputs.ccache-restore }}
 
-    # ffmpeg for the fixture server's clips, ccache for the compile. Expo's Podfile reads
-    # USE_CCACHE at `pod install` and points Xcode's compilers at React Native's ccache
-    # wrappers. CocoaPods fetches the Hermes tarball with plain curl, which without a
+    # The Xcode every Apple build and its ccache objects are made with. ffmpeg for the
+    # fixture server's clips, ccache for the compile. Expo's Podfile reads USE_CCACHE at
+    # `pod install` and points Xcode's compilers at React Native's ccache wrappers. CocoaPods fetches the Hermes tarball with plain curl, which without a
     # ~/.curlrc waits out a stalled mirror for as long as the job lasts; this one drops a
     # transfer under 100 KB/s for 30 seconds and tries it again.
     - name: 🍎 Apple build tools
@@ -121,10 +139,12 @@ runs:
         brew install ffmpeg ccache
         printf 'speed-limit = 102400\nspeed-time = 30\nretry = 5\n' > ~/.curlrc
         {
+          echo "DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer"
           echo "USE_CCACHE=1"
           echo "CCACHE_DIR=$CCACHE_PATH"
           echo "CCACHE_MAXSIZE=1500M"
         } >> "$GITHUB_ENV"
+        ccache --zero-stats
 
     # ffmpeg for the fixture server's clips, ccache for the compile, which React Native's
     # Android CMake uses whenever it is on the path. `org.gradle.caching` turns Gradle's build
@@ -148,6 +168,7 @@ runs:
           echo "CCACHE_MAXSIZE=1G"
           echo "ORG_GRADLE_PROJECT_reactNativeArchitectures=x86_64"
         } >> "$GITHUB_ENV"
+        ccache --zero-stats
 
     # The flows reach the accountless fixture over plain http on the loopback. The development
     # variant allows it, and Expo bundles the fixture's address into the build. Both are Nx
@@ -159,7 +180,6 @@ runs:
           echo "APP_VARIANT=development"
           echo "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490"
         } >> "$GITHUB_ENV"
-        ccache --zero-stats
 
     # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
     - name: 📦 Install

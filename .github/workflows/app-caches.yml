@@ -25,8 +25,10 @@ on:
     - cron: '0 6 * * 1'
   workflow_dispatch:
 
+# actions: write deletes the cache entries a save supersedes.
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: ${{ github.workflow }}
@@ -34,7 +36,8 @@ concurrency:
 
 env:
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-  # As pull-request-checks.yml's, which every other job there shares too.
+  # As pull-request-checks.yml's. Node runs Metro and the tooling, not the native compile,
+  # so a difference would not leave a PR's compile caches unmatched.
   APP_NODE_VERSION: 24.21.0
 
 jobs:
@@ -50,9 +53,6 @@ jobs:
             id: ios
           - name: 📺 Apple TV caches
             id: tvos
-    env:
-      # As pull-request-checks.yml's, which its desktop jobs share too.
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
@@ -71,13 +71,17 @@ jobs:
       - name: 📊 ccache
         run: ccache --show-stats
 
+      # The exact-key caches are saved only when they were not restored, since a save
+      # under an existing key fails.
       - name: 💾 Save Homebrew's packages
+        if: steps.setup.outputs.packages-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: ${{ steps.setup.outputs.packages-path }}
           key: ${{ steps.setup.outputs.packages-key }}
 
       - name: 💾 Save CocoaPods' downloads
+        if: steps.setup.outputs.dependencies-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: ${{ steps.setup.outputs.dependencies-path }}
@@ -88,6 +92,25 @@ jobs:
         with:
           path: ${{ steps.setup.outputs.ccache-path }}
           key: ${{ steps.setup.outputs.ccache-key }}
+
+      # The ccache and CocoaPods entries a save superseded, and Homebrew's from an older
+      # image: main's newest is the one every PR restores.
+      - name: 🧹 Delete superseded caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          KEEP: |
+            ${{ steps.setup.outputs.packages-prefix }} ${{ steps.setup.outputs.packages-key }}
+            ${{ steps.setup.outputs.dependencies-prefix }} ${{ steps.setup.outputs.dependencies-key }}
+            ${{ steps.setup.outputs.ccache-prefix }} ${{ steps.setup.outputs.ccache-key }}
+        run: |
+          while read -r prefix key; do
+            [ -n "$prefix" ] || continue
+            # Only once the entry kept is really there: a save that failed only warns.
+            gh cache list --ref "$GITHUB_REF" --key "$key" --json key --jq ".[] | select(.key == \"$key\") | .key" | grep -q . || continue
+            gh cache list --ref "$GITHUB_REF" --key "$prefix" --limit 100 --json id,key --jq ".[] | select(.key != \"$key\") | .id" |
+              while read -r id; do gh cache delete "$id"; done
+          done <<< "$KEEP"
 
   android-tv:
     name: 📺 Android TV caches
@@ -112,6 +135,7 @@ jobs:
         run: ccache --show-stats
 
       - name: 💾 Save apt's packages
+        if: steps.setup.outputs.packages-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: ${{ steps.setup.outputs.packages-path }}
@@ -140,3 +164,23 @@ jobs:
         with:
           path: ${{ steps.avd.outputs.path }}
           key: ${{ steps.avd.outputs.key }}
+
+      # The ccache, Gradle and AVD entries a save superseded, and apt's from an older image:
+      # main's newest is the one every PR restores.
+      - name: 🧹 Delete superseded caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          KEEP: |
+            ${{ steps.setup.outputs.packages-prefix }} ${{ steps.setup.outputs.packages-key }}
+            ${{ steps.setup.outputs.dependencies-prefix }} ${{ steps.setup.outputs.dependencies-key }}
+            ${{ steps.setup.outputs.ccache-prefix }} ${{ steps.setup.outputs.ccache-key }}
+            avd- ${{ steps.avd.outputs.key }}
+        run: |
+          while read -r prefix key; do
+            [ -n "$prefix" ] || continue
+            # Only once the entry kept is really there: a save that failed only warns.
+            gh cache list --ref "$GITHUB_REF" --key "$key" --json key --jq ".[] | select(.key == \"$key\") | .key" | grep -q . || continue
+            gh cache list --ref "$GITHUB_REF" --key "$prefix" --limit 100 --json id,key --jq ".[] | select(.key != \"$key\") | .id" |
+              while read -r id; do gh cache delete "$id"; done
+          done <<< "$KEEP"
