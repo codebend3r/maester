@@ -11,12 +11,14 @@
   },
   "scripts": {
     "audit:native": "bun src/build/auditNative.ts",
+    "audit:native:windows": "bun src/build/auditWindows.ts",
     "build": "bun run --sequential build:clean build:compile build:aliases",
     "build:aliases": "tsc-alias -p tsconfig.build.json",
     "build:clean": "rm -rf dist",
     "build:compile": "tsc -p tsconfig.build.json",
     "build:native": "bun src/build/buildAddon.ts",
     "fetch:libmpv": "bun src/build/buildLibmpv.ts",
+    "fetch:libmpv:windows": "bun src/build/fetchWindowsLibmpv.ts",
     "fetch:sources": "bun src/build/fetchSources.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
@@ -61,7 +63,9 @@
       "fetch:libmpv",
       "build:native",
       "test:native",
-      "audit:native"
+      "audit:native",
+      "fetch:libmpv:windows",
+      "audit:native:windows"
     ],
     "targets": {
       "fetch:sources": {
@@ -132,6 +136,46 @@
         "dependsOn": [
           "^build",
           "build:native"
+        ]
+      },
+      "fetch:libmpv:windows": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "{projectRoot}/native/windows.lock.json",
+          "{projectRoot}/src/build/context.ts",
+          "{projectRoot}/src/build/pe.ts",
+          "{projectRoot}/src/build/windowsLock.ts",
+          "{projectRoot}/src/build/auditWindows.ts",
+          "{projectRoot}/src/build/fetchWindowsLibmpv.ts",
+          "{workspaceRoot}/tsconfig.base.json"
+        ],
+        "outputs": [
+          "{projectRoot}/native-build/archives/libmpv-win32-x64.7z",
+          "{projectRoot}/resources/win32-x64"
+        ]
+      },
+      "audit:native:windows": {
+        "cache": true,
+        "dependsOn": [
+          "^build",
+          "fetch:libmpv:windows"
+        ],
+        "inputs": [
+          "{projectRoot}/native/windows.lock.json",
+          "{projectRoot}/src/build/context.ts",
+          "{projectRoot}/src/build/pe.ts",
+          "{projectRoot}/src/build/windowsLock.ts",
+          "{projectRoot}/src/build/auditWindows.ts",
+          "{projectRoot}/resources/win32-x64/libmpv-2.dll",
+          "{projectRoot}/resources/win32-x64/include/**/*",
+          "{projectRoot}/resources/win32-x64/provenance/build.json",
+          "{workspaceRoot}/tsconfig.base.json"
+        ],
+        "outputs": [
+          "{projectRoot}/resources/win32-x64/provenance/artifacts.json"
         ]
       }
     }

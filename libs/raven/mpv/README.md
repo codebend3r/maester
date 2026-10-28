@@ -5,6 +5,20 @@ library, not an IPC surface or a separate player process. The desktop service mu
 resolve grants/trusted servers and allowlist player commands before calling it.
 No web app code changes or native renderer integration are part of P3.
 
+## Windows libmpv
+
+The Windows port starts from a prebuilt libmpv rather than the source build above:
+`native/windows.lock.json` pins one `mpv-dev-x86_64` archive from
+[mpv-winbuild-cmake](https://github.com/shinchiro/mpv-winbuild-cmake) by its digest and
+the digest of the `libmpv-2.dll` inside it. `fetch:libmpv:windows` downloads it, extracts
+it with bsdtar (`tar` on macOS and on Windows), places the DLL and `include/mpv` under
+`resources/win32-x64` with `provenance/build.json`, and runs `audit:native:windows`:
+the DLL's digest matches the lock, its PE header says x64, it imports only Windows'
+own DLLs and the Vulkan loader (every other dependency is linked in), and it exports
+what the addon calls. The PR checks' `🪟 Windows libmpv` job does this on
+`windows-2025`. The archive carries no license notices; the build's own sources and
+licenses are in that repository at the pinned release.
+
 ## API and lifecycle
 
 `openMpv({ surface, onEvent })` loads only `resources/darwin-arm64/raven_mpv.node`,

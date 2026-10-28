@@ -8,6 +8,8 @@ ignore-hidden = false
 extend-exclude = [".git/"]
 
 [default.extend-words]
+# Windows' secur32.dll, in the Windows libmpv audit's import allowlist.
+secur = "secur"
 # ISO 639-2 language codes raven matches track languages against.
 fre = "fre"
 mis = "mis"
