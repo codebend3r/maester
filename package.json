@@ -35,6 +35,7 @@
     "desktop:dev": "nx run @raven/desktop:dev",
     "desktop:e2e": "nx run @raven/desktop:e2e",
     "desktop:make": "nx run @raven/desktop:make",
+    "desktop:release:assets": "nx run @raven/desktop:release:assets",
     "desktop:smoke:packaged": "nx run @raven/desktop:smoke:packaged",
     "desktop:test:native": "nx run @raven/desktop:test:native",
     "dev:luwin": "nx run-many -t dev -p @luwin/api @luwin/web",
