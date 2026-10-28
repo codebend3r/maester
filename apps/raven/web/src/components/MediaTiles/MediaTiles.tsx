@@ -18,6 +18,7 @@ import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
+import { FactText, WordFact } from '@/components/ResolutionChip/ResolutionChip'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
@@ -103,7 +104,11 @@ const MediaTile = ({ media, note, posters, withWatched, matchType, sort }: Media
         >
           {label}
         </CardLink>
-        {sorted && <span className={styles.sorted}>{sorted}</span>}
+        {sorted && (
+          <span className={styles.sorted}>
+            <FactText fact={sorted} />
+          </span>
+        )}
         <span className={styles.facts}>
           {media.favourite && (
             <span className={styles.fact}>
@@ -112,7 +117,7 @@ const MediaTile = ({ media, note, posters, withWatched, matchType, sort }: Media
           )}
           {facts.map((fact) => (
             <span key={fact} className={styles.fact}>
-              {fact}
+              <WordFact fact={fact} />
             </span>
           ))}
           <PartlyWatched media={media} />

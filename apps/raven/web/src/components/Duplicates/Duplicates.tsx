@@ -23,6 +23,7 @@ import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { api } from '@/lib/api'
 import { afterSplit, queryKeys } from '@raven/ui/headless'
 import { POSTER_SIZES } from '@/lib/posters'
+import { WordFact } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/components/Duplicates/Duplicates.module.scss'
 
 type PosterProps = { entry: PosterEntry }
@@ -44,16 +45,13 @@ type FileRowProps = { file: DuplicateFile }
 /** One file: the cut its name reads as, its facts and name, and, with the admin lock off, Delete. */
 const FileRow = ({ file: { media, cut } }: FileRowProps) => {
   const [confirming, setConfirming] = useState(false)
-  const facts = [cut?.label ?? 'Standard', ...versionFacts(media)]
   return (
     <li className={styles.file}>
       <span className={styles.facts}>
-        {facts.map((fact, index) => (
-          <span
-            key={`${index}:${fact}`}
-            className={index === 0 && cut != null ? styles.cut : undefined}
-          >
-            {fact}
+        <span className={cut == null ? undefined : styles.cut}>{cut?.label ?? 'Standard'}</span>
+        {versionFacts(media).map((fact) => (
+          <span key={fact}>
+            <WordFact fact={fact} />
           </span>
         ))}
       </span>

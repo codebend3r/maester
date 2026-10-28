@@ -18,10 +18,14 @@ import {
   resolutionLabel,
 } from '@raven/core'
 import { Button } from '@raven/ui'
-import { useId, useState } from 'react'
+import { type ReactNode, useId, useState } from 'react'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
-import { PictureChip, ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
+import {
+  PictureChip,
+  PictureFact,
+  ResolutionChip,
+} from '@/components/ResolutionChip/ResolutionChip'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useManagement } from '@/lib/management'
@@ -39,7 +43,7 @@ const MODE_LABELS = {
 /** Every converted stream's audio, whatever the track was. */
 const CONVERTED_AUDIO = 'AAC stereo'
 
-type Fact = { term: string; value: string | null }
+type Fact = { term: string; value: ReactNode }
 
 const joined = (parts: ReadonlyArray<string | null>): string =>
   parts.filter((part): part is string => !!part).join(' · ')
@@ -131,6 +135,7 @@ const StreamDetails = ({ id, stream, track }: StreamDetailsProps) => {
   const video = probe.data?.video ?? null
   const sound = probe.data?.audio.find(({ index }) => index === stream.audio) ?? null
   const range = video == null ? (media.hdr ? 'HDR' : null) : VIDEO_RANGE_LABELS[video.range]
+  const resolution = resolutionLabel(media)
   return (
     <div id={id} className={styles.details}>
       <Facts
@@ -146,7 +151,10 @@ const StreamDetails = ({ id, stream, track }: StreamDetailsProps) => {
         facts={[
           {
             term: 'Picture',
-            value: joined([resolutionLabel(media), range]),
+            value:
+              resolution == null && range == null ? null : (
+                <PictureFact resolution={resolution} rest={range} />
+              ),
           },
           {
             term: 'Codec',
@@ -241,7 +249,7 @@ const StreamRow = ({ stream }: StreamRowProps) => {
         </hgroup>
         <ul className={styles.tags} aria-label="How it plays">
           <li className={styles.chip}>
-            <ResolutionChip media={stream.media} />
+            <ResolutionChip resolution={resolutionLabel(stream.media)} />
           </li>
           {stream.media.hdr && (
             <li className={styles.chip}>

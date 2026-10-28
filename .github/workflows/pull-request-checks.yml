@@ -532,6 +532,12 @@ jobs:
           path: ~/Library/Caches/CocoaPods
           key: cocoapods-${{ runner.os }}-tvos-${{ hashFiles('bun.lock', 'apps/raven/app/package.json') }}
 
+      # CocoaPods fetches the Hermes tarball with plain curl, which reads ~/.curlrc and,
+      # without one, waits out a stalled mirror for as long as the job lasts. This drops a
+      # transfer that stays under 100 KB/s for 30 seconds and tries it again.
+      - name: 🐢 Retry stalled downloads
+        run: printf 'speed-limit = 102400\nspeed-time = 30\nretry = 5\n' > ~/.curlrc
+
       # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
       - name: 📦 Install
         run: bun install --frozen-lockfile
@@ -665,6 +671,12 @@ jobs:
         with:
           path: ~/Library/Caches/CocoaPods
           key: cocoapods-${{ runner.os }}-ios-${{ hashFiles('bun.lock', 'apps/raven/app/package.json') }}
+
+      # CocoaPods fetches the Hermes tarball with plain curl, which reads ~/.curlrc and,
+      # without one, waits out a stalled mirror for as long as the job lasts. This drops a
+      # transfer that stays under 100 KB/s for 30 seconds and tries it again.
+      - name: 🐢 Retry stalled downloads
+        run: printf 'speed-limit = 102400\nspeed-time = 30\nretry = 5\n' > ~/.curlrc
 
       # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
       - name: 📦 Install

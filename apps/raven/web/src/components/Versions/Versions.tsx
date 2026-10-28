@@ -1,8 +1,9 @@
-import { type Library, type MediaItem, versionFacts, watchPageOf } from '@raven/core'
+import { type Library, type MediaItem, isResolution, versionFacts, watchPageOf } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@raven/ui'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
+import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/components/Versions/Versions.module.scss'
 
 type VersionsProps = {
@@ -33,11 +34,15 @@ export const Versions = ({ versions, libraries }: VersionsProps) => {
           return (
             <li key={version.id} className={styles.version}>
               <span className={styles.facts}>
-                {facts.map((fact) => (
-                  <span key={fact} className={styles.chip}>
-                    {fact}
-                  </span>
-                ))}
+                {facts.map((fact) =>
+                  isResolution(fact) ? (
+                    <ResolutionChip key={fact} resolution={fact} />
+                  ) : (
+                    <span key={fact} className={styles.chip}>
+                      {fact}
+                    </span>
+                  ),
+                )}
               </span>
               <span className={styles.file}>{version.fileName}</span>
               <Link

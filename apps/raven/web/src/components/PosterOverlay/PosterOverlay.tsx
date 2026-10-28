@@ -1,5 +1,5 @@
 import { Icon } from '@raven/ui'
-import type { AppPath, MediaItem } from '@raven/core'
+import { type AppPath, type MediaItem, resolutionLabel } from '@raven/core'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/components/PosterOverlay/PosterOverlay.module.scss'
@@ -19,7 +19,7 @@ type PosterOverlayProps = {
 export const PosterOverlay = ({ media, play }: PosterOverlayProps) => (
   <span className={styles.overlay}>
     <span className={styles.quality}>
-      <ResolutionChip media={media} />
+      <ResolutionChip resolution={resolutionLabel(media)} />
     </span>
     {play && (
       <CardLink to={play.to} state={play.state} className={styles.play} aria-label={play.label}>

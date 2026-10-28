@@ -1,6 +1,7 @@
 import { Button, ButtonLink } from '@raven/ui'
-import { type KeyboardEvent, useEffect, useState, useSyncExternalStore } from 'react'
+import { Fragment, type KeyboardEvent, useEffect, useState, useSyncExternalStore } from 'react'
 import type { Featured } from '@/pages/HomePage/featured'
+import { PictureFact } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/pages/HomePage/HomeHero.module.scss'
 
 /** How long each arrival holds before the next takes its place. */
@@ -141,7 +142,23 @@ const Slide = ({ entry, place, isCurrent }: SlideProps) => (
           Details
         </ButtonLink>
       </div>
-      <p className={styles.facts}>{entry.facts.join(' · ')}</p>
+      <p className={styles.facts}>
+        {entry.facts.map((fact, index) => (
+          <Fragment key={fact}>
+            {index > 0 && <span aria-hidden="true"> · </span>}
+            {fact}
+          </Fragment>
+        ))}
+        {entry.picture && (
+          <>
+            {entry.facts.length > 0 && <span aria-hidden="true"> · </span>}
+            <PictureFact
+              resolution={entry.picture.resolution}
+              rest={entry.picture.isHdr ? 'HDR' : null}
+            />
+          </>
+        )}
+      </p>
     </div>
   </article>
 )

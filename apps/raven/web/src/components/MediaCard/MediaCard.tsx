@@ -18,7 +18,7 @@ import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark, FavouriteWords } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
-import { PictureChip } from '@/components/ResolutionChip/ResolutionChip'
+import { FactText, PictureChip, ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
@@ -26,9 +26,6 @@ import { api } from '@/lib/api'
 import { useSelectable } from '@/lib/useSelectable'
 import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import styles from '@/components/MediaCard/MediaCard.module.scss'
-
-/** A label on glass over the frame grab, with the words a screen reader hears for it. */
-type Badge = { text: string; label: string }
 
 type MediaCardProps = {
   media: MediaItem
@@ -59,11 +56,9 @@ export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => 
   const hasPage = page.state == null
   const sorted = sort ? sortFact({ media, sort }) : null
   const timeLeft = timeLeftOf(media)
+  // A listing sorted by resolution says it under the title, so the corner leaves it out.
   const resolution = resolutionLabel(media)
-  const badges = [
-    resolution == null ? null : { text: resolution, label: `Video resolution: ${resolution}` },
-    media.hdr ? { text: 'HDR', label: 'HDR' } : null,
-  ].filter((badge): badge is Badge => badge != null && badge.text !== sorted)
+  const cornerResolution = resolution === sorted ? null : resolution
   const facts = [
     formatRuntime(media.duration),
     media.videoCodec ? codecLabel(media.videoCodec) : null,
@@ -107,13 +102,10 @@ export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => 
             <WatchedMark decorative watched={media.watched} className={styles.watched} />
           </span>
         </CardLink>
-        {badges.length > 0 && (
+        {(cornerResolution != null || media.hdr) && (
           <span className={styles.badges}>
-            {badges.map((badge) => (
-              <PictureChip key={badge.text} label={badge.label}>
-                {badge.text}
-              </PictureChip>
-            ))}
+            <ResolutionChip resolution={cornerResolution} />
+            {media.hdr && <PictureChip label="HDR">HDR</PictureChip>}
           </span>
         )}
         <SelectCheckbox select={select} className={styles.select} />
@@ -128,7 +120,11 @@ export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => 
         >
           {label}
         </CardLink>
-        {sorted && <span className={styles.sorted}>{sorted}</span>}
+        {sorted && (
+          <span className={styles.sorted}>
+            <FactText fact={sorted} />
+          </span>
+        )}
         <span className={styles.facts}>
           {facts.map((fact) => (
             <span key={fact} className={styles.fact}>

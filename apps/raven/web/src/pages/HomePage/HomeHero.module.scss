@@ -142,6 +142,11 @@
 
 .facts {
   grid-area: facts;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  justify-content: start;
+  align-items: center;
   color: var(--color-lichen);
   font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
