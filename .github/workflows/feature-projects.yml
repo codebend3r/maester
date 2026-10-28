@@ -1,0 +1,39 @@
+name: 🗂️ Feature projects
+
+# Puts each pull request on its feature's GitHub Project, making the project
+# the first time a feature has a pull request. scripts/features.py says which
+# feature a PR belongs to; a `Feature: <name>` line in the PR body overrides
+# it. Status is In Progress while the PR is open and Done once it merges.
+on:
+  pull_request:
+    types: [opened, reopened, edited, ready_for_review, closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: feature-projects
+  cancel-in-progress: false
+
+jobs:
+  place:
+    name: 🗂️ Add the PR to its feature's project
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # GITHUB_TOKEN can't create or edit a user's projects, so this needs a
+    # token with the `project` scope. Forks get no secrets and are skipped.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+      - name: Sync the PR's feature project
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::PROJECTS_TOKEN is not set, so the PR stays off its feature project."
+            exit 0
+          fi
+          python3 scripts/sync_features.py --pr "$PR"

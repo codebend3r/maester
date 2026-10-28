@@ -5,6 +5,19 @@ description: Use when the "maester roadmap" GitHub Project board (github.com/use
 
 # Board sync
 
+> [!IMPORTANT]
+> The "maester roadmap" board was closed on 2026-10-27. Work is tracked as one GitHub Project per feature now (below). `sync_board.py` lists open boards only, so it would plan to create a new roadmap board: skip that step and apply only the issue and `docs/roadmap.md` steps.
+
+## Feature projects
+
+Each feature has its own project, and its pull requests are its stories: In Progress while open, Done once merged. `scripts/features.py` maps a PR's head branch to its feature, a `Feature: <name>` line in the PR body overrides that, and a PR matching neither becomes a feature of its own named after its title. Work with no PR yet goes in a feature's `stories` as a draft item.
+
+- The `🗂️ Feature projects` workflow runs `scripts/sync_features.py --pr <n>` on every PR event, with the `PROJECTS_TOKEN` secret (a token with the `project` scope)
+- To backfill or repair: `python3 scripts/sync_features.py` (open PRs and those merged in the last 5 days; `--days N`, `--dry-run`). It is idempotent
+- A new feature: add it to `FEATURES` with its branch prefixes before opening its first PR, or put the `Feature:` line in the PR body
+
+The rest of this skill covers the issues and `docs/roadmap.md`.
+
 The issues and their PRs are the source of truth, and the board and the checkboxes in `docs/roadmap.md` follow them. The board's built-in workflows are on but miss transitions: PR #77 closed three stories and they stayed In Progress. Audit the board; don't trust the automation.
 
 ## Pick the tool
