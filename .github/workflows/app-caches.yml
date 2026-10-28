@@ -1,0 +1,201 @@
+name: 🗃️ App build caches
+
+# Builds raven's device app on main and saves what the next build reads: ccache's
+# objects, CocoaPods' and Gradle's downloads, Gradle's build cache, Homebrew's and apt's
+# packages, and the Android TV emulator's snapshot. A pull request's caches are scoped
+# to its own ref, so when each PR saved its own the repo's 10 GB filled with copies;
+# main's are readable by every PR, whose app jobs in pull-request-checks.yml only
+# restore. It runs when what the native projects are made from changes, weekly so the
+# compile caches follow the sources and are never evicted for going unused, and by hand.
+on:
+  push:
+    branches: [main]
+    paths:
+      - bun.lock
+      - apps/raven/app/package.json
+      - apps/raven/app/app.config.ts
+      - apps/raven/app/plugins/**
+      - .github/actions/raven-app-caches/**
+      - .github/workflows/app-caches.yml
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+  APP_NODE_VERSION: 24.21.0
+  # As the PR's app jobs build, so the compile caches match theirs.
+  APP_VARIANT: development
+  EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN: http://127.0.0.1:8490
+
+jobs:
+  apple:
+    name: ${{ matrix.platform.name }}
+    runs-on: macos-26
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: 📱 iPhone and iPad caches
+            id: ios
+          - name: 📺 Apple TV caches
+            id: tvos
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 🟩 Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.APP_NODE_VERSION }}
+
+      - name: 🗃️ Build caches
+        uses: ./.github/actions/raven-app-caches
+        with:
+          platform: ${{ matrix.platform.id }}
+          save: 'true'
+
+      # As pull-request-checks.yml: curl's stall limit for CocoaPods' Hermes download.
+      - name: 🐢 Retry stalled downloads
+        run: printf 'speed-limit = 102400\nspeed-time = 30\nretry = 5\n' > ~/.curlrc
+
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      - name: 🧱 Build the libraries
+        run: bunx nx run-many -t build -p @raven/core @raven/ui @shared/server
+
+      # Past Nx's cache, which would otherwise restore the build and compile nothing.
+      - name: 🔨 Build for the simulator
+        run: bunx nx run @raven/app:build:${{ matrix.platform.id }} --excludeTaskDependencies --skip-nx-cache
+
+      - name: 📊 ccache
+        run: ccache --show-stats
+
+  android-tv:
+    name: 📺 Android TV caches
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      # As the PR's job, which these must match: its ABI, and its emulator, whose AVD
+      # cache key names everything the snapshot is made from.
+      ORG_GRADLE_PROJECT_reactNativeArchitectures: x86_64
+      EMULATOR_BUILD: '15261927'
+      EMULATOR_CORES: '4'
+      EMULATOR_RAM: '4096'
+      EMULATOR_OPTIONS: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+      AVD_IMAGE: system-images;android-36;android-tv;x86_64
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 🟩 Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.APP_NODE_VERSION }}
+
+      - name: ☕ Use JDK 17
+        run: echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+
+      - name: 🗃️ Build caches
+        uses: ./.github/actions/raven-app-caches
+        with:
+          platform: android-tv
+          save: 'true'
+
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      - name: 🧱 Build the libraries
+        run: bunx nx run-many -t build -p @raven/core @raven/ui @shared/server
+
+      # Past Nx's cache, which would otherwise restore the APK and compile nothing.
+      - name: 🔨 Build the Android TV APK
+        run: bunx nx run @raven/app:build:android-tv --excludeTaskDependencies --skip-nx-cache
+
+      - name: 📊 ccache
+        run: ccache --show-stats
+
+      # The steps below are the PR job's AVD steps, kept in step with them, so the key and
+      # the snapshot are the ones it restores.
+      - name: 🧩 Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: 🔑 AVD cache key
+        id: avd-key
+        run: |
+          revision="$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null | awk -F'|' -v image="$AVD_IMAGE" '{ gsub(/ /, "", $1); gsub(/ /, "", $2) } $1 == image { print $2; exit }')"
+          test -n "$revision"
+          options="$(echo "$EMULATOR_OPTIONS" | sha256sum | cut -c1-12)"
+          echo "key=avd-v1-android-tv-36-x86_64-tv_1080p-image$revision-emulator$EMULATOR_BUILD-$EMULATOR_CORES-cores-$EMULATOR_RAM-$options" >> "$GITHUB_OUTPUT"
+
+      - name: 🗃️ Android TV AVD cache
+        id: avd-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: ${{ steps.avd-key.outputs.key }}
+
+      # The runner's screen unlock can exit 255 while the image settles, failing a healthy
+      # emulator, so a second attempt retries it on the AVD the first made.
+      - name: 📺 Make the Android TV AVD
+        id: make-avd
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        # reactivecircus/android-emulator-runner v2.38.0
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 36
+          target: android-tv
+          arch: x86_64
+          profile: tv_1080p
+          emulator-build: ${{ env.EMULATOR_BUILD }}
+          cores: ${{ env.EMULATOR_CORES }}
+          ram-size: ${{ env.EMULATOR_RAM }}
+          force-avd-creation: false
+          emulator-options: ${{ env.EMULATOR_OPTIONS }}
+          disable-animations: false
+          script: echo "Saved the Android TV AVD's snapshot"
+
+      - name: 📺 Make the Android TV AVD again
+        if: steps.make-avd.outcome == 'failure'
+        # reactivecircus/android-emulator-runner v2.38.0
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 36
+          target: android-tv
+          arch: x86_64
+          profile: tv_1080p
+          emulator-build: ${{ env.EMULATOR_BUILD }}
+          cores: ${{ env.EMULATOR_CORES }}
+          ram-size: ${{ env.EMULATOR_RAM }}
+          force-avd-creation: false
+          emulator-options: ${{ env.EMULATOR_OPTIONS }}
+          disable-animations: false
+          script: echo "Saved the Android TV AVD's snapshot"

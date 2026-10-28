@@ -225,6 +225,9 @@
           },
           {
             "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+          },
+          {
+            "env": "ORG_GRADLE_PROJECT_reactNativeArchitectures"
           }
         ],
         "outputs": [

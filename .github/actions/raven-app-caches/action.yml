@@ -1,0 +1,162 @@
+name: 🗃️ raven app build caches
+description: >-
+  Installs ffmpeg and ccache from cached downloads and restores the caches a native
+  build of raven's device app reads: ccache's objects, and CocoaPods' downloads for an
+  Apple build or Gradle's for Android TV. Saves them only when asked.
+
+# Shared by the app jobs in pull-request-checks.yml, which only restore, and by
+# app-caches.yml, which builds on main and saves. A pull request's caches are scoped to
+# its own ref, so each PR saving its own copy filled the repo's 10 GB with duplicates;
+# main's are readable by every PR. ccache keys are per run, so main's newest wins, and an
+# older one is evicted as the repo's cache fills.
+inputs:
+  platform:
+    description: ios, tvos or android-tv
+    required: true
+  save:
+    description: "'true' to save the caches at the end of the job"
+    required: false
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    # The runner image pins Homebrew's and apt's package versions, so its name keys the
+    # downloads.
+    - name: 🔑 Cache keys
+      id: keys
+      shell: bash
+      run: |
+        echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+        echo "lock=${{ hashFiles('bun.lock', 'apps/raven/app/package.json') }}" >> "$GITHUB_OUTPUT"
+
+    # Apple: Homebrew's bottles, then CocoaPods' specs and sources.
+    - name: 🗃️ Homebrew downloads
+      if: inputs.platform != 'android-tv' && inputs.save == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ~/Library/Caches/Homebrew/downloads
+        key: brew-${{ steps.keys.outputs.image }}-ffmpeg-ccache-v1
+    - name: 🗃️ Homebrew downloads
+      if: inputs.platform != 'android-tv' && inputs.save != 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/Library/Caches/Homebrew/downloads
+        key: brew-${{ steps.keys.outputs.image }}-ffmpeg-ccache-v1
+
+    # The fixture server encodes its clips and probes them with ffmpeg and ffprobe; ccache
+    # keeps the native compile's objects between runs.
+    - name: 🎞️ Install ffmpeg and ccache
+      if: inputs.platform != 'android-tv'
+      shell: bash
+      env:
+        HOMEBREW_NO_AUTO_UPDATE: '1'
+        HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: '1'
+      run: brew install ffmpeg ccache
+
+    # `expo prebuild --clean` rebuilds ios/ and Pods/, so only the downloads are worth keeping.
+    - name: 🗃️ CocoaPods cache
+      if: inputs.platform != 'android-tv' && inputs.save == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ~/Library/Caches/CocoaPods
+        key: cocoapods-${{ runner.os }}-${{ inputs.platform }}-${{ steps.keys.outputs.lock }}
+    - name: 🗃️ CocoaPods cache
+      if: inputs.platform != 'android-tv' && inputs.save != 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/Library/Caches/CocoaPods
+        key: cocoapods-${{ runner.os }}-${{ inputs.platform }}-${{ steps.keys.outputs.lock }}
+        restore-keys: cocoapods-${{ runner.os }}-${{ inputs.platform }}-
+
+    # Expo's Podfile reads USE_CCACHE at `pod install` and points Xcode's compilers at
+    # React Native's ccache wrappers.
+    - name: ⚡ Use ccache for Xcode
+      if: inputs.platform != 'android-tv'
+      shell: bash
+      run: |
+        echo "USE_CCACHE=1" >> "$GITHUB_ENV"
+        echo "CCACHE_DIR=$HOME/Library/Caches/ccache" >> "$GITHUB_ENV"
+        echo "CCACHE_MAXSIZE=1500M" >> "$GITHUB_ENV"
+
+    # Android TV: apt's packages, kept in a folder the runner's user can save.
+    - name: 🗃️ apt downloads
+      if: inputs.platform == 'android-tv' && inputs.save == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ~/apt-archives
+        key: apt-${{ steps.keys.outputs.image }}-ffmpeg-ccache-v1
+    - name: 🗃️ apt downloads
+      if: inputs.platform == 'android-tv' && inputs.save != 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/apt-archives
+        key: apt-${{ steps.keys.outputs.image }}-ffmpeg-ccache-v1
+
+    - name: 🎞️ Install ffmpeg and ccache
+      if: inputs.platform == 'android-tv'
+      shell: bash
+      run: |
+        mkdir -p ~/apt-archives/partial
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends -o Dir::Cache::Archives="$HOME/apt-archives" ffmpeg ccache
+        sudo chown -R "$USER" ~/apt-archives
+
+    # Gradle's downloads and its build cache, which `org.gradle.caching` turns on for every
+    # build on the runner, since android/ is generated afresh by each prebuild. Per run,
+    # like ccache, so new build cache entries are kept.
+    - name: 🗃️ Gradle cache
+      if: inputs.platform == 'android-tv' && inputs.save == 'true'
+      uses: actions/cache@v6
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: gradle-${{ runner.os }}-${{ steps.keys.outputs.lock }}-${{ github.run_id }}
+        restore-keys: |
+          gradle-${{ runner.os }}-${{ steps.keys.outputs.lock }}-
+          gradle-${{ runner.os }}-
+    - name: 🗃️ Gradle cache
+      if: inputs.platform == 'android-tv' && inputs.save != 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: gradle-${{ runner.os }}-${{ steps.keys.outputs.lock }}-${{ github.run_id }}
+        restore-keys: |
+          gradle-${{ runner.os }}-${{ steps.keys.outputs.lock }}-
+          gradle-${{ runner.os }}-
+
+    # React Native's CMake setup uses ccache whenever it is on the path.
+    - name: ⚡ Use Gradle's build cache and ccache
+      if: inputs.platform == 'android-tv'
+      shell: bash
+      run: |
+        mkdir -p ~/.gradle
+        echo 'org.gradle.caching=true' >> ~/.gradle/gradle.properties
+        echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
+        echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+
+    - name: 🗃️ ccache
+      if: inputs.save == 'true'
+      uses: actions/cache@v6
+      with:
+        path: |
+          ~/Library/Caches/ccache
+          ~/.cache/ccache
+        key: ccache-${{ runner.os }}-${{ inputs.platform }}-${{ github.run_id }}
+        restore-keys: ccache-${{ runner.os }}-${{ inputs.platform }}-
+    - name: 🗃️ ccache
+      if: inputs.save != 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          ~/Library/Caches/ccache
+          ~/.cache/ccache
+        key: ccache-${{ runner.os }}-${{ inputs.platform }}-${{ github.run_id }}
+        restore-keys: ccache-${{ runner.os }}-${{ inputs.platform }}-
+
+    - name: 📊 Reset ccache's counters
+      shell: bash
+      run: ccache --zero-stats

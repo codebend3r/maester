@@ -74,6 +74,8 @@ if ! sdkmanager --list_installed 2> /dev/null | grep -q 'android-36;android-tv;a
   sdkmanager platform-tools emulator 'platforms;android-36' "$IMAGE"
 fi
 brew_install ffmpeg ffmpeg
+# React Native's CMake setup uses ccache whenever it is on the path.
+brew_install ccache ccache
 if ! command -v maestro > /dev/null; then
   brew tap mobile-dev-inc/tap
   brew install mobile-dev-inc/tap/maestro

@@ -15,6 +15,8 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 # Baked into the build and Nx inputs of build:tvos and e2e:tvos, as CI sets them.
 export APP_VARIANT=development
 export EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490
+# Expo's Podfile points Xcode's compilers at ccache, so a rebuild reuses unchanged objects.
+export USE_CCACHE=1
 # The simulator e2e:tvos tests on, by name.
 export TVOS_SIMULATOR=raven-tv
 
@@ -60,6 +62,7 @@ xcodebuild -version > /dev/null 2>&1 || {
 brew_install ffmpeg ffmpeg
 brew_install jq jq
 brew_install pod cocoapods
+brew_install ccache ccache
 # Babel loads babel.config.ts through Node's type stripping.
 node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || (major === 22 && minor >= 18) ? 0 : 1)' || {
   echo 'Needs Node 22.18 or newer.' >&2

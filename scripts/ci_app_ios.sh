@@ -15,6 +15,8 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 # Baked into the build and both Nx inputs of build:ios and e2e, as CI sets them.
 export APP_VARIANT=development
 export EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490
+# Expo's Podfile points Xcode's compilers at ccache, so a rebuild reuses unchanged objects.
+export USE_CCACHE=1
 export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000
 export MAESTRO_CLI_NO_ANALYTICS=1
 
@@ -60,6 +62,7 @@ xcodebuild -version > /dev/null 2>&1 || {
 brew_install ffmpeg ffmpeg
 brew_install jq jq
 brew_install pod cocoapods
+brew_install ccache ccache
 if ! command -v maestro > /dev/null; then
   brew tap mobile-dev-inc/tap
   brew install mobile-dev-inc/tap/maestro
