@@ -1,162 +1,123 @@
 name: 🗃️ raven app build caches
 description: >-
-  Installs ffmpeg and ccache from cached downloads and restores the caches a native
-  build of raven's device app reads: ccache's objects, and CocoaPods' downloads for an
-  Apple build or Gradle's for Android TV. Saves them only when asked.
+  Restores the caches a native build of raven's device app reads, then installs ffmpeg
+  and ccache: ccache's objects, Homebrew's or apt's packages, and CocoaPods' downloads
+  for an Apple build or Gradle's (with its build cache) for Android TV. Restores only;
+  its outputs are the keys app-caches.yml saves under.
 
-# Shared by the app jobs in pull-request-checks.yml, which only restore, and by
-# app-caches.yml, which builds on main and saves. A pull request's caches are scoped to
-# its own ref, so each PR saving its own copy filled the repo's 10 GB with duplicates;
-# main's are readable by every PR. ccache keys are per run, so main's newest wins, and an
-# older one is evicted as the repo's cache fills.
+# Shared by the app jobs in pull-request-checks.yml and by app-caches.yml, which builds on
+# main and saves. A pull request's caches are scoped to its own ref, so each PR saving its
+# own copy filled the repo's 10 GB with duplicates; main's are readable by every PR. The
+# ccache and Gradle keys are per run, so main's newest wins and older ones are evicted as
+# the repo's cache fills.
 inputs:
   platform:
     description: ios, tvos or android-tv
     required: true
-  save:
-    description: "'true' to save the caches at the end of the job"
-    required: false
-    default: 'false'
+# Each cache's key and path, for app-caches.yml to save under: a cache's version includes
+# its paths, so a save must name exactly the paths the restore did.
+outputs:
+  packages-key:
+    description: Homebrew's (Apple) or apt's (Android TV) packages
+    value: ${{ steps.keys.outputs.packages }}
+  packages-path:
+    value: ${{ steps.keys.outputs.packages-path }}
+  dependencies-key:
+    description: CocoaPods' (Apple) or Gradle's (Android TV) downloads
+    value: ${{ steps.keys.outputs.dependencies }}
+  dependencies-path:
+    value: ${{ steps.keys.outputs.dependencies-path }}
+  ccache-key:
+    description: ccache's objects
+    value: ${{ steps.keys.outputs.ccache }}
+  ccache-path:
+    value: ${{ steps.keys.outputs.ccache-path }}
 runs:
   using: composite
   steps:
-    # The runner image pins Homebrew's and apt's package versions, so its name keys the
-    # downloads.
+    # The runner image pins Homebrew's and apt's package versions, so its name keys them.
     - name: 🔑 Cache keys
       id: keys
       shell: bash
+      env:
+        PLATFORM: ${{ inputs.platform }}
+        LOCK: ${{ hashFiles('bun.lock', 'apps/raven/app/package.json') }}
       run: |
-        echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
-        echo "lock=${{ hashFiles('bun.lock', 'apps/raven/app/package.json') }}" >> "$GITHUB_OUTPUT"
+        # A Gradle key is per run, falling back to the newest for this lockfile, then any; a
+        # CocoaPods key is per lockfile, falling back to the newest for the platform.
+        if [ "$PLATFORM" = android-tv ]; then
+          {
+            echo "packages=apt-$ImageOS-$ImageVersion-ffmpeg-ccache-v1"
+            echo "packages-path=$HOME/apt-archives"
+            echo "dependencies=gradle-$RUNNER_OS-$LOCK-$GITHUB_RUN_ID"
+            echo "dependencies-near=gradle-$RUNNER_OS-$LOCK-"
+            echo "dependencies-any=gradle-$RUNNER_OS-"
+            printf 'dependencies-path<<PATHS\n%s\n%s\nPATHS\n' "$HOME/.gradle/caches" "$HOME/.gradle/wrapper"
+            echo "ccache-path=$HOME/.cache/ccache"
+          } >> "$GITHUB_OUTPUT"
+        else
+          {
+            echo "packages=brew-$ImageOS-$ImageVersion-ffmpeg-ccache-v1"
+            echo "packages-path=$HOME/Library/Caches/Homebrew/downloads"
+            echo "dependencies=cocoapods-$RUNNER_OS-$PLATFORM-$LOCK"
+            echo "dependencies-near=cocoapods-$RUNNER_OS-$PLATFORM-"
+            echo "dependencies-any=cocoapods-$RUNNER_OS-$PLATFORM-"
+            echo "dependencies-path=$HOME/Library/Caches/CocoaPods"
+            echo "ccache-path=$HOME/Library/Caches/ccache"
+          } >> "$GITHUB_OUTPUT"
+        fi
+        echo "ccache=ccache-$RUNNER_OS-$PLATFORM-$GITHUB_RUN_ID" >> "$GITHUB_OUTPUT"
 
-    # Apple: Homebrew's bottles, then CocoaPods' specs and sources.
-    - name: 🗃️ Homebrew downloads
-      if: inputs.platform != 'android-tv' && inputs.save == 'true'
-      uses: actions/cache@v6
-      with:
-        path: ~/Library/Caches/Homebrew/downloads
-        key: brew-${{ steps.keys.outputs.image }}-ffmpeg-ccache-v1
-    - name: 🗃️ Homebrew downloads
-      if: inputs.platform != 'android-tv' && inputs.save != 'true'
+    - name: 🗃️ Packages
       uses: actions/cache/restore@v6
       with:
-        path: ~/Library/Caches/Homebrew/downloads
-        key: brew-${{ steps.keys.outputs.image }}-ffmpeg-ccache-v1
+        path: ${{ steps.keys.outputs.packages-path }}
+        key: ${{ steps.keys.outputs.packages }}
 
-    # The fixture server encodes its clips and probes them with ffmpeg and ffprobe; ccache
-    # keeps the native compile's objects between runs.
+    # CocoaPods' specs and sources (`expo prebuild --clean` rebuilds ios/ and Pods/, so
+    # only the downloads are worth keeping), or Gradle's downloads and build cache.
+    - name: 🗃️ Dependencies
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.keys.outputs.dependencies-path }}
+        key: ${{ steps.keys.outputs.dependencies }}
+        restore-keys: |
+          ${{ steps.keys.outputs.dependencies-near }}
+          ${{ steps.keys.outputs.dependencies-any }}
+
+    - name: 🗃️ ccache
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.keys.outputs.ccache-path }}
+        key: ${{ steps.keys.outputs.ccache }}
+        restore-keys: ccache-${{ runner.os }}-${{ inputs.platform }}-
+
+    # ffmpeg for the fixture server's clips, ccache for the compile. Expo's Podfile reads
+    # USE_CCACHE at `pod install` and points Xcode's compilers at React Native's ccache
+    # wrappers; React Native's Android CMake uses ccache whenever it is on the path, and
+    # `org.gradle.caching` turns Gradle's build cache on for android/, which each prebuild
+    # generates afresh.
     - name: 🎞️ Install ffmpeg and ccache
-      if: inputs.platform != 'android-tv'
       shell: bash
       env:
+        PLATFORM: ${{ inputs.platform }}
+        CCACHE_PATH: ${{ steps.keys.outputs.ccache-path }}
         HOMEBREW_NO_AUTO_UPDATE: '1'
         HOMEBREW_NO_INSTALL_CLEANUP: '1'
         HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: '1'
-      run: brew install ffmpeg ccache
-
-    # `expo prebuild --clean` rebuilds ios/ and Pods/, so only the downloads are worth keeping.
-    - name: 🗃️ CocoaPods cache
-      if: inputs.platform != 'android-tv' && inputs.save == 'true'
-      uses: actions/cache@v6
-      with:
-        path: ~/Library/Caches/CocoaPods
-        key: cocoapods-${{ runner.os }}-${{ inputs.platform }}-${{ steps.keys.outputs.lock }}
-    - name: 🗃️ CocoaPods cache
-      if: inputs.platform != 'android-tv' && inputs.save != 'true'
-      uses: actions/cache/restore@v6
-      with:
-        path: ~/Library/Caches/CocoaPods
-        key: cocoapods-${{ runner.os }}-${{ inputs.platform }}-${{ steps.keys.outputs.lock }}
-        restore-keys: cocoapods-${{ runner.os }}-${{ inputs.platform }}-
-
-    # Expo's Podfile reads USE_CCACHE at `pod install` and points Xcode's compilers at
-    # React Native's ccache wrappers.
-    - name: ⚡ Use ccache for Xcode
-      if: inputs.platform != 'android-tv'
-      shell: bash
       run: |
-        echo "USE_CCACHE=1" >> "$GITHUB_ENV"
-        echo "CCACHE_DIR=$HOME/Library/Caches/ccache" >> "$GITHUB_ENV"
-        echo "CCACHE_MAXSIZE=1500M" >> "$GITHUB_ENV"
-
-    # Android TV: apt's packages, kept in a folder the runner's user can save.
-    - name: 🗃️ apt downloads
-      if: inputs.platform == 'android-tv' && inputs.save == 'true'
-      uses: actions/cache@v6
-      with:
-        path: ~/apt-archives
-        key: apt-${{ steps.keys.outputs.image }}-ffmpeg-ccache-v1
-    - name: 🗃️ apt downloads
-      if: inputs.platform == 'android-tv' && inputs.save != 'true'
-      uses: actions/cache/restore@v6
-      with:
-        path: ~/apt-archives
-        key: apt-${{ steps.keys.outputs.image }}-ffmpeg-ccache-v1
-
-    - name: 🎞️ Install ffmpeg and ccache
-      if: inputs.platform == 'android-tv'
-      shell: bash
-      run: |
-        mkdir -p ~/apt-archives/partial
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends -o Dir::Cache::Archives="$HOME/apt-archives" ffmpeg ccache
-        sudo chown -R "$USER" ~/apt-archives
-
-    # Gradle's downloads and its build cache, which `org.gradle.caching` turns on for every
-    # build on the runner, since android/ is generated afresh by each prebuild. Per run,
-    # like ccache, so new build cache entries are kept.
-    - name: 🗃️ Gradle cache
-      if: inputs.platform == 'android-tv' && inputs.save == 'true'
-      uses: actions/cache@v6
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: gradle-${{ runner.os }}-${{ steps.keys.outputs.lock }}-${{ github.run_id }}
-        restore-keys: |
-          gradle-${{ runner.os }}-${{ steps.keys.outputs.lock }}-
-          gradle-${{ runner.os }}-
-    - name: 🗃️ Gradle cache
-      if: inputs.platform == 'android-tv' && inputs.save != 'true'
-      uses: actions/cache/restore@v6
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: gradle-${{ runner.os }}-${{ steps.keys.outputs.lock }}-${{ github.run_id }}
-        restore-keys: |
-          gradle-${{ runner.os }}-${{ steps.keys.outputs.lock }}-
-          gradle-${{ runner.os }}-
-
-    # React Native's CMake setup uses ccache whenever it is on the path.
-    - name: ⚡ Use Gradle's build cache and ccache
-      if: inputs.platform == 'android-tv'
-      shell: bash
-      run: |
-        mkdir -p ~/.gradle
-        echo 'org.gradle.caching=true' >> ~/.gradle/gradle.properties
-        echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
-        echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
-
-    - name: 🗃️ ccache
-      if: inputs.save == 'true'
-      uses: actions/cache@v6
-      with:
-        path: |
-          ~/Library/Caches/ccache
-          ~/.cache/ccache
-        key: ccache-${{ runner.os }}-${{ inputs.platform }}-${{ github.run_id }}
-        restore-keys: ccache-${{ runner.os }}-${{ inputs.platform }}-
-    - name: 🗃️ ccache
-      if: inputs.save != 'true'
-      uses: actions/cache/restore@v6
-      with:
-        path: |
-          ~/Library/Caches/ccache
-          ~/.cache/ccache
-        key: ccache-${{ runner.os }}-${{ inputs.platform }}-${{ github.run_id }}
-        restore-keys: ccache-${{ runner.os }}-${{ inputs.platform }}-
-
-    - name: 📊 Reset ccache's counters
-      shell: bash
-      run: ccache --zero-stats
+        if [ "$PLATFORM" = android-tv ]; then
+          mkdir -p ~/apt-archives/partial ~/.gradle
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends -o Dir::Cache::Archives="$HOME/apt-archives" ffmpeg ccache
+          sudo chown -R "$USER" ~/apt-archives
+          echo 'org.gradle.caching=true' >> ~/.gradle/gradle.properties
+          echo "CCACHE_DIR=$CCACHE_PATH" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+        else
+          brew install ffmpeg ccache
+          echo "USE_CCACHE=1" >> "$GITHUB_ENV"
+          echo "CCACHE_DIR=$CCACHE_PATH" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=1500M" >> "$GITHUB_ENV"
+        fi
+        ccache --zero-stats

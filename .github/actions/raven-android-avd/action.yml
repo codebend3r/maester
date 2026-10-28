@@ -1,0 +1,36 @@
+name: 📺 raven Android TV AVD key
+description: >-
+  Lets the runner's user open KVM and names the Android TV AVD cache: the key the PR's
+  job restores and app-caches.yml saves under, so the two never drift apart.
+
+# The calling job sets the emulator's EMULATOR_BUILD, EMULATOR_CORES, EMULATOR_RAM,
+# EMULATOR_OPTIONS and AVD_IMAGE in its env, as the emulator runner steps read them too.
+outputs:
+  key:
+    description: The AVD cache's key
+    value: ${{ steps.key.outputs.key }}
+runs:
+  using: composite
+  steps:
+    # The emulator runs on KVM, which the runner's user may not open until a udev rule
+    # lets it.
+    - name: 🧩 Enable KVM
+      shell: bash
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+
+    # The key names everything the snapshot is made from: the system image's revision (the
+    # runner always installs the newest, which this reads from the same repository), the
+    # emulator build, the cores, the RAM and a hash of the options. A snapshot from anything
+    # else would not load and the emulator would cold boot every run. Bump the `v1` to throw
+    # the cache away by hand.
+    - name: 🔑 AVD cache key
+      id: key
+      shell: bash
+      run: |
+        revision="$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null | awk -F'|' -v image="$AVD_IMAGE" '{ gsub(/ /, "", $1); gsub(/ /, "", $2) } $1 == image { print $2; exit }')"
+        test -n "$revision"
+        options="$(echo "$EMULATOR_OPTIONS" | sha256sum | cut -c1-12)"
+        echo "key=avd-v1-android-tv-36-x86_64-tv_1080p-image$revision-emulator$EMULATOR_BUILD-$EMULATOR_CORES-cores-$EMULATOR_RAM-$options" >> "$GITHUB_OUTPUT"

@@ -939,26 +939,10 @@ jobs:
           path: apps/raven/app/android/app/build/outputs/apk/release
           if-no-files-found: error
 
-      # The emulator runs on KVM, which the runner's user may not open until a udev rule
-      # lets it.
-      - name: 🧩 Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      # The AVD cache's key names everything its snapshot is made from: the system image's
-      # revision (the runner always installs the newest, which this reads from the same
-      # repository), the emulator build, the cores, the RAM and a hash of the options. A
-      # snapshot from anything else would not load and the emulator would cold boot every run.
-      # Bump the `v1` to throw the cache away by hand.
+      # KVM for the emulator, and the AVD cache's key, shared with app-caches.yml.
       - name: 🔑 AVD cache key
         id: avd-key
-        run: |
-          revision="$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null | awk -F'|' -v image="$AVD_IMAGE" '{ gsub(/ /, "", $1); gsub(/ /, "", $2) } $1 == image { print $2; exit }')"
-          test -n "$revision"
-          options="$(echo "$EMULATOR_OPTIONS" | sha256sum | cut -c1-12)"
-          echo "key=avd-v1-android-tv-36-x86_64-tv_1080p-image$revision-emulator$EMULATOR_BUILD-$EMULATOR_CORES-cores-$EMULATOR_RAM-$options" >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/raven-android-avd
 
       # The Android TV AVD with a booted snapshot, so the run boots from it in seconds.
       # Restored only, from what app-caches.yml saved on main: a PR's own 2.7 GB copy would
