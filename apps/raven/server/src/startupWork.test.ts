@@ -49,4 +49,13 @@ describe('StartupWork', () => {
     await work.whenDone()
     expect(ran).toEqual(['library 2'])
   })
+
+  it('drops the steps still waiting once the app closes', async () => {
+    const work = new StartupWork(false)
+    const ran: string[] = []
+    work.add([() => ran.push('scan')])
+    work.onModuleDestroy()
+    await work.whenDone()
+    expect(ran).toEqual([])
+  })
 })

@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common'
 import { errorMessage } from '@/errorMessage'
 
 /** The DI token for whether the boot's own work waits for `main.ts` to say the server listens. */
@@ -26,40 +26,46 @@ const gap = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, ST
  * library and the next.
  */
 @Injectable()
-export class StartupWork {
+export class StartupWork implements OnModuleDestroy {
   private readonly logger = new Logger(StartupWork.name)
-  private readonly state: { release: () => void; tail: Promise<void> }
+  private open: () => void = () => undefined
+  private tail: Promise<void>
+  private isClosed = false
 
   constructor(@Inject(STARTUP_HELD) isHeld: boolean) {
-    const released = { release: (): void => undefined }
-    const listening = isHeld
+    this.tail = isHeld
       ? new Promise<void>((resolve) => {
-          released.release = resolve
+          this.open = resolve
         })
       : Promise.resolve()
-    this.state = { release: () => released.release(), tail: listening }
   }
 
   /** The server listens: the steps added so far, and any added later, may run. */
   release(): void {
-    this.state.release()
+    this.open()
+  }
+
+  /** The database closes with the app, so a step still waiting then never runs. */
+  onModuleDestroy(): void {
+    this.isClosed = true
   }
 
   /** Queues `steps` to run in order, a gap apart, after every step added before them. */
   add(steps: ReadonlyArray<() => void>): void {
-    this.state.tail = steps.reduce(
+    this.tail = steps.reduce(
       (before, step) => before.then(gap).then(() => this.runStep(step)),
-      this.state.tail,
+      this.tail,
     )
   }
 
   /** Resolves once every step added so far has run. */
   whenDone(): Promise<void> {
-    return this.state.tail
+    return this.tail
   }
 
   /** A step that throws is logged, and the next still runs. */
   private runStep(step: () => void): void {
+    if (this.isClosed) return
     try {
       step()
     } catch (error) {
