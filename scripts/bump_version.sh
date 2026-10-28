@@ -19,8 +19,9 @@
 # `build` is CI's, run after every merge into main: it tags HEAD vX.Y.Z.N, the
 # Nth build of X.Y.Z, and writes nothing, since four numbers are not semver and
 # the files stay at X.Y.Z. N is the number of commits on main since vX.Y.Z, so
-# merges that build at the same time each get their own. A build tag counts as its X.Y.Z, so the next bump
-# drops the build number: 0.3.1.5 patch -> 0.3.2.
+# merges that build at the same time each get their own; a number whose tag sits
+# on a commit main lost to a force push is skipped. A build tag counts as its
+# X.Y.Z, so the next bump drops the build number: 0.3.1.5 patch -> 0.3.2.
 set -euo pipefail
 
 SEMVER_RE='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
@@ -28,7 +29,7 @@ SEMVER_RE='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(
 BUILD_RE='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.[1-9][0-9]*$'
 
 usage() {
-  sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -136,6 +137,14 @@ if [ "$target" = build ]; then
   # One version per commit: a release commit already has its own.
   on_head=$(git tag --points-at HEAD --list 'v[0-9]*' | tr '\n' ' ')
   [ -z "$on_head" ] || die "HEAD is already tagged ${on_head% }"
+  # A force push to main can leave a build tag on a commit main no longer has,
+  # holding the number this commit counts to. Step past it, so the rewrite
+  # costs a skipped number instead of a failed build.
+  while orphan=$(git rev-parse -q --verify "refs/tags/v$next^{commit}") \
+    && ! git merge-base --is-ancestor "$orphan" HEAD; do
+    echo "! v$next is on $(git rev-parse --short "$orphan"), which HEAD does not contain; skipping it" >&2
+    next="$current.$((${next##*.} + 1))"
+  done
 else
   [ "$(compare "$next" "$current")" = 1 ] || die "$next does not move forward from $current"
 fi
