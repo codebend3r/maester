@@ -15,21 +15,25 @@ import { refusalText } from '@/desktop/client'
 import { outputQuery } from '@/desktop/output'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { Section } from '@/desktop/settings/Section'
-import { useDesktop } from '@/stores/desktop'
+import { useComputerName, useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/settings/DesktopSettings.module.scss'
 import settings from '@/pages/SettingsPage/SettingsPage.module.scss'
 
-const PROFILES = {
+type ProfilesForProps = { computer: string }
+
+const profilesFor = ({
+  computer,
+}: ProfilesForProps): Record<AudioProfile, { label: string; hint: string }> => ({
   pcm: {
     label: 'Speakers or TV',
-    hint: 'Sound decoded on this Mac, up to 7.1, for whatever is plugged in.',
+    hint: `Sound decoded on this ${computer}, up to 7.1, for whatever is plugged in.`,
   },
   passthrough: {
     label: 'Receiver passthrough',
     hint: 'Dolby Digital and DTS go to the receiver as they are, for it to decode.',
   },
   headphones: { label: 'Headphones', hint: 'Mixed down to stereo, or spatial on AirPods.' },
-} as const satisfies Record<AudioProfile, { label: string; hint: string }>
+})
 
 const FORMAT_LABELS = {
   ac3: 'Dolby Digital (AC3)',
@@ -41,9 +45,11 @@ const UNSAVED = 'Raven could not save the sound output. Try again.'
 
 type OutputPick = { id: number; apply: (base: OutputSettings) => OutputSettings }
 
-/** How Raven sends sound from this Mac: mpv's audio output, passthrough and device. */
+/** How Raven sends sound from this computer: mpv's audio output, passthrough and device. */
 export const ThisComputerSection = () => {
   const { client } = useDesktop()
+  const computer = useComputerName()
+  const profiles = profilesFor({ computer })
   const queryClient = useQueryClient()
   const ids = { profile: useId(), device: useId(), note: useId() }
   const [status, setStatus] = useState('')
@@ -116,7 +122,11 @@ export const ThisComputerSection = () => {
   const isDeviceListMissing = !isEngineReady || devices.length === 0
 
   return (
-    <Section icon="volume" title="This computer" help="How Raven sends sound from this Mac.">
+    <Section
+      icon="volume"
+      title="This computer"
+      help={`How Raven sends sound from this ${computer}.`}
+    >
       {read.isError && (
         <p className={settings.error} role="alert">
           {read.error.message}
@@ -140,8 +150,8 @@ export const ThisComputerSection = () => {
                     checked={shown.profile === profile}
                     onChange={() => choose({ profile })}
                   />
-                  <span className={settings.choiceLabel}>{PROFILES[profile].label}</span>
-                  <span className={settings.choiceHint}>{PROFILES[profile].hint}</span>
+                  <span className={settings.choiceLabel}>{profiles[profile].label}</span>
+                  <span className={settings.choiceHint}>{profiles[profile].hint}</span>
                 </label>
               ))}
             </div>

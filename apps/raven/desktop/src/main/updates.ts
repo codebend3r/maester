@@ -1,4 +1,5 @@
 import { isBoolean, isString, listOf, object } from '@raven/core'
+import { NATIVE_TARGETS, type NativeTarget } from '@raven/mpv'
 import { parseJson } from '@/main/parseJson'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 
@@ -16,8 +17,30 @@ const UPDATE_TIMEOUT_MS = 10_000
 export const MAX_RELEASES_CHARS = 2_097_152
 export const MAX_RELEASE_PAGES = 5
 
-/** The asset the release workflow attaches; a release without it has no app to offer yet. */
-export const dmgNameFor = (version: string): string => `raven-player-${version}-arm64.dmg`
+type AppAssetNameForProps = {
+  version: string
+  target: NativeTarget
+}
+
+/**
+ * The app the release workflow attaches for a target: the dmg for Apple silicon, the installer
+ * for Windows. A release without it has no app to offer that target yet.
+ */
+export const appAssetNameFor = ({ version, target }: AppAssetNameForProps): string => {
+  switch (target) {
+    case NATIVE_TARGETS.darwinArm64:
+      return `raven-player-${version}-arm64.dmg`
+    case NATIVE_TARGETS.win32X64:
+      return `raven-player-${version}-x64-setup.exe`
+    default: {
+      const unreachable: never = target
+      return unreachable
+    }
+  }
+}
+
+/** The build a check looks for in each release; null where raven has none, which no release carries. */
+type UpdateTarget = NativeTarget | null
 
 export const isGithubRelease = object({
   tag_name: isString,
@@ -98,30 +121,38 @@ const isAnything = (_value: unknown): _value is unknown => true
 
 const isList = listOf(isAnything)
 
-const candidateOf = (release: unknown): Candidate | null => {
+type CandidateOfProps = {
+  release: unknown
+  target: UpdateTarget
+}
+
+const candidateOf = ({ release, target }: CandidateOfProps): Candidate | null => {
+  if (target === null) return null
   if (!isGithubRelease(release) || release.draft || release.prerelease) return null
   if (!release.tag_name.startsWith('v')) return null
   const version = parseVersion(release.tag_name)
   if (!version) return null
   const text = release.tag_name.slice(1)
-  const hasApp = release.assets.some((asset) => asset.name === dmgNameFor(text))
+  const app = appAssetNameFor({ version: text, target })
+  const hasApp = release.assets.some((asset) => asset.name === app)
   return hasApp ? { version, text } : null
 }
 
 type FindUpdateProps = {
   releases: unknown
   current: string
+  target: UpdateTarget
 }
 
 /**
- * The highest full release that carries the dmg, against the running version. The page
+ * The highest full release that carries the target's app, against the running version. The page
  * link is built from the tag, never taken from the reply. Current only when such a release
  * was seen; with none, there is nothing to say the running version is the newest.
  */
-export const findUpdate = ({ releases, current }: FindUpdateProps): UpdateCheck => {
+export const findUpdate = ({ releases, current, target }: FindUpdateProps): UpdateCheck => {
   if (!isList(releases)) return failed(UPDATE_PROBLEMS.unreadable)
   const highest = releases.reduce<Candidate | null>((best, release) => {
-    const candidate = candidateOf(release)
+    const candidate = candidateOf({ release, target })
     if (!candidate) return best
     if (!best) return candidate
     return compareVersions({ a: candidate.version, b: best.version }) > 0 ? candidate : best
@@ -237,6 +268,7 @@ type WalkProps = {
   init: Parameters<UpdateFetch>[0]['init']
   start: string
   current: string
+  target: UpdateTarget
   seen: unknown[]
   pagesLeft: number
   charsLeft: number
@@ -254,6 +286,7 @@ const walk = async ({
   init,
   start,
   current,
+  target,
   seen,
   pagesLeft,
   charsLeft,
@@ -261,7 +294,7 @@ const walk = async ({
   const page = await readPage({ fetch, url, init, start, charsLeft })
   if (!page.ok) return failed(page.problem)
   const releases = [...seen, ...page.releases]
-  const found = findUpdate({ releases, current })
+  const found = findUpdate({ releases, current, target })
   const hasNewer = found.ok && found.finding.kind === UPDATE_FINDING_KINDS.newer
   if (hasNewer || page.next === null || pagesLeft <= 1) return found
   return walk({
@@ -270,6 +303,7 @@ const walk = async ({
     init,
     start,
     current,
+    target,
     seen: releases,
     pagesLeft: pagesLeft - 1,
     charsLeft: charsLeft - page.chars,
@@ -280,6 +314,7 @@ type CheckForUpdatesProps = {
   fetch: UpdateFetch
   url: string
   current: string
+  target: UpdateTarget
 }
 
 /** Asks GitHub for its releases, and never throws: every failure is a problem to show. */
@@ -287,6 +322,7 @@ export const checkForUpdates = async ({
   fetch,
   url,
   current,
+  target,
 }: CheckForUpdatesProps): Promise<UpdateCheck> => {
   // One deadline for every page, so the whole check is bounded, not each request.
   const init = {
@@ -302,6 +338,7 @@ export const checkForUpdates = async ({
     init,
     start: url,
     current,
+    target,
     seen: [],
     pagesLeft: MAX_RELEASE_PAGES,
     charsLeft: MAX_RELEASES_CHARS,

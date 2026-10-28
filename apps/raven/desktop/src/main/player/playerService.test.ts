@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  DESKTOP_PLATFORMS,
   type OutputSettings,
   PLAYER_EVENTS,
   type PlayerCommand,
@@ -439,6 +440,7 @@ const setup = ({ timers, sidecarsOf = () => [], refusedAccount = () => null }: S
     explain: explainer.explain,
     refusedAccount,
     canChooseAo: false,
+    platform: DESKTOP_PLATFORMS.mac,
     timers: timers ?? clock.timers,
     onActivity: (next) => {
       activity.push(next)
@@ -507,6 +509,7 @@ describe('hardening', () => {
       explain: fakeExplain().explain,
       refusedAccount: () => null,
       canChooseAo: false,
+      platform: DESKTOP_PLATFORMS.mac,
       timers: createFakeTimers().timers,
       onActivity: () => {},
       onFirstFrame: () => {},
@@ -529,6 +532,7 @@ describe('hardening', () => {
       explain: fakeExplain().explain,
       refusedAccount: () => null,
       canChooseAo: false,
+      platform: DESKTOP_PLATFORMS.mac,
       timers: createFakeTimers().timers,
       onActivity: () => {},
       onFirstFrame: () => {},
@@ -1539,6 +1543,7 @@ describe('createPlayerService', () => {
         explain: fakeExplain().explain,
         refusedAccount: () => null,
         canChooseAo: false,
+        platform: DESKTOP_PLATFORMS.mac,
         timers: createFakeTimers().timers,
         onActivity: () => {
           throw new Error('activity')

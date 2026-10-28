@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import type { MpvSurface } from '@raven/mpv'
+import { type MpvSurface, NATIVE_TARGETS } from '@raven/mpv'
 import {
   addonPathFor,
   ENGINE_MESSAGES,
@@ -41,6 +41,7 @@ test('engineOptionsFor paces only the headless output; a window gets nothing', (
 test('addonPathFor', () => {
   expect(
     addonPathFor({
+      target: NATIVE_TARGETS.darwinArm64,
       isPackaged: false,
       appPath: '/repo/apps/raven/desktop',
       resourcesPath: '/Applications/Raven.app/Contents/Resources',
@@ -48,11 +49,42 @@ test('addonPathFor', () => {
   ).toBe('/repo/libs/raven/mpv/resources/darwin-arm64/raven_mpv.node')
   expect(
     addonPathFor({
+      target: NATIVE_TARGETS.darwinArm64,
       isPackaged: true,
       appPath: '/Applications/Raven.app/Contents/Resources/app.asar',
       resourcesPath: '/Applications/Raven.app/Contents/Resources',
     }),
   ).toBe('/Applications/Raven.app/Contents/Resources/mpv/darwin-arm64/raven_mpv.node')
+})
+
+test('addonPathFor names the Windows build on Windows', () => {
+  expect(
+    addonPathFor({
+      target: NATIVE_TARGETS.win32X64,
+      isPackaged: false,
+      appPath: '/repo/apps/raven/desktop',
+      resourcesPath: '/Raven/resources',
+    }),
+  ).toBe('/repo/libs/raven/mpv/resources/win32-x64/raven_mpv.node')
+  expect(
+    addonPathFor({
+      target: NATIVE_TARGETS.win32X64,
+      isPackaged: true,
+      appPath: '/Raven/resources/app.asar',
+      resourcesPath: '/Raven/resources',
+    }),
+  ).toBe('/Raven/resources/mpv/win32-x64/raven_mpv.node')
+})
+
+test('addonPathFor refuses a system raven has no build for', () => {
+  expect(() =>
+    addonPathFor({
+      target: null,
+      isPackaged: true,
+      appPath: '/opt/raven/resources/app.asar',
+      resourcesPath: '/opt/raven/resources',
+    }),
+  ).toThrow('Raven has no video engine for this system.')
 })
 
 const windowSurface: MpvSurface = { kind: 'window', handle: Buffer.alloc(8) }

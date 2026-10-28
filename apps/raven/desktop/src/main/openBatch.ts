@@ -2,6 +2,7 @@ import { isAbsolute } from 'node:path'
 import { DESKTOP_EVENTS, DESKTOP_REPLIES, type DesktopEvent, type DesktopReply } from '@raven/core'
 import type { Timers } from '@/main/stateStore'
 import { MAX_QUEUE } from '@/shared/hostNames'
+import { URL_PROTOCOLS } from '@/shared/playLink'
 
 // The first item plays and the rest queue, so a batch past this has nowhere to go.
 const BATCH_CAP = MAX_QUEUE + 1
@@ -48,9 +49,18 @@ export const createOpenBatch = <T>({
   }
 }
 
-/** The files a launch was asked to open: absolute paths after the executable, never switches. */
+const isLink = (arg: string): boolean => arg.toLowerCase().startsWith(URL_PROTOCOLS.raven)
+
+/** The files a launch was asked to open: absolute paths after the executable, never switches or links. */
 export const pathsFromArgv = (argv: readonly string[]): string[] =>
-  argv.slice(1).filter((arg) => !arg.startsWith('-') && isAbsolute(arg))
+  argv.slice(1).filter((arg) => !arg.startsWith('-') && !isLink(arg) && isAbsolute(arg))
+
+/**
+ * The `raven:` links a launch was asked to open. Windows hands a link to the app in its
+ * arguments, on a cold launch and to the running app through `second-instance`; macOS sends
+ * `open-url` instead.
+ */
+export const linksFromArgv = (argv: readonly string[]): string[] => argv.slice(1).filter(isLink)
 
 type LaunchPathsProps = {
   argv: readonly string[]

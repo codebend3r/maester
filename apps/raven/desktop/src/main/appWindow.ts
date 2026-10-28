@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { FILE_SCHEME, PAGE_ORIGIN, PLAYER_SOURCE_KINDS, WEB_HOST_PORT } from '@raven/core'
 import { app, BrowserWindow, dialog, ipcMain, protocol, screen, session, shell } from 'electron'
-import { WINDOW_CHROMES, windowChromeFor } from '@raven/core'
+import { type DesktopPlatform, WINDOW_CHROMES, windowChromeFor } from '@raven/core'
 import type { AppLog } from '@/main/appLog'
 import type { DesktopService } from '@/main/desktopService'
 import { createFileHandler } from '@/main/fileProtocol'
@@ -36,11 +36,16 @@ export const NIGHT = '#15201e'
 type ShowWindowButtonsProps = {
   window: BrowserWindow
   isVisible: boolean
+  platform: DesktopPlatform
 }
 
 /** The traffic lights are an inset chrome's; a page that draws its own hides them itself. */
-export const showWindowButtons = ({ window, isVisible }: ShowWindowButtonsProps): void => {
-  if (windowChromeFor({ platform: process.platform }) !== WINDOW_CHROMES.inset) return
+export const showWindowButtons = ({
+  window,
+  isVisible,
+  platform,
+}: ShowWindowButtonsProps): void => {
+  if (windowChromeFor({ platform }) !== WINDOW_CHROMES.inset) return
   window.setWindowButtonVisibility(isVisible)
 }
 
@@ -177,6 +182,7 @@ type OpenWindowProps = {
   /** When main began, so the launch mark measures to the first frame. */
   launchedAt: number
   appLog: Pick<AppLog, 'log' | 'mark' | 'reportError'>
+  platform: DesktopPlatform
 }
 
 /** The one window, placed where it was last, shown on its first frame and loading the page. */
@@ -184,6 +190,7 @@ export const openWindow = ({
   store,
   launchedAt,
   appLog: { log, mark, reportError },
+  platform,
 }: OpenWindowProps): BrowserWindow => {
   const bounds = placeWindow({
     saved: store.read().window,
@@ -195,7 +202,7 @@ export const openWindow = ({
     minWidth: 320,
     minHeight: 240,
     show: false,
-    ...chromeOptionsFor({ chrome: windowChromeFor({ platform: process.platform }) }),
+    ...chromeOptionsFor({ chrome: windowChromeFor({ platform }) }),
     backgroundColor: NIGHT,
     title: PRODUCT_NAME,
     webPreferences: {

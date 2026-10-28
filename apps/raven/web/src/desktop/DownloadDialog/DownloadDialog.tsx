@@ -16,7 +16,7 @@ import { useOpenReply } from '@/desktop/openReply'
 import { useModal } from '@/lib/useModal'
 import { api } from '@/lib/api'
 import { signInPath } from '@/lib/authRoutes'
-import { useDesktop } from '@/stores/desktop'
+import { useComputerName, useDesktop } from '@/stores/desktop'
 import { declineAsk } from '@/stores/downloadAsk'
 import styles from '@/desktop/DesktopDialog.module.scss'
 
@@ -51,6 +51,7 @@ type ReadyDialogProps = {
 /** Asks before the title's files are fetched; leaving it any way but Download declines. */
 const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
   const { client } = useDesktop()
+  const computer = useComputerName()
   const openReply = useOpenReply()
   const { dialog, close, keepKeys } = useModal()
   const isConfirmed = useRef(false)
@@ -82,7 +83,7 @@ const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
   const noun = nounFor({ kind: status.downloadKind, files: status.files })
   const question = `Download ${status.title} (${status.files} ${noun}, ${formatBytes(status.bytes)})?`
   const room = status.canFit
-    ? `${formatBytes(status.free)} free on this Mac.`
+    ? `${formatBytes(status.free)} free on this ${computer}.`
     : `Needs ${formatBytes(status.bytes)}; ${formatBytes(status.free)} free.`
 
   return (

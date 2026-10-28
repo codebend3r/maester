@@ -4,6 +4,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { DESKTOP_PLATFORMS } from '@raven/core'
 import { PACKAGED_APP } from '@/build/bundleAudit'
 import { versionOf } from '@/build/dmgMaker'
 import {
@@ -96,7 +97,14 @@ const smoke = async ({ project }: SmokeProps): Promise<number> => {
     return 1
   }
   const version = versionOf(JSON.parse(await readFile(join(project, 'package.json'), 'utf8')))
-  const logPath = join(logsDirFor({ home: homedir(), userDataOverride: null }), LOG_FILE)
+  const home = homedir()
+  const logsDir = logsDirFor({
+    platform: DESKTOP_PLATFORMS.mac,
+    home,
+    userData: join(home, 'Library', 'Application Support', 'raven'),
+    hasUserDataOverride: false,
+  })
+  const logPath = join(logsDir, LOG_FILE)
   const from = await sizeOf({ path: logPath })
   const child = spawn(join(app, 'Contents', 'MacOS', 'Raven'), [], {
     env: withoutTestHooks({ env: process.env }),

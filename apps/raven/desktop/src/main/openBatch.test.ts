@@ -1,6 +1,12 @@
 import { DESKTOP_EVENTS, DESKTOP_REPLIES, PLAYER_SOURCE_KINDS, TITLE_REFUSALS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
-import { createOpenBatch, eventForOpen, launchPaths, pathsFromArgv } from '@/main/openBatch'
+import {
+  createOpenBatch,
+  eventForOpen,
+  launchPaths,
+  linksFromArgv,
+  pathsFromArgv,
+} from '@/main/openBatch'
 import type { Timers } from '@/main/stateStore'
 import { MAX_QUEUE } from '@/shared/hostNames'
 
@@ -135,6 +141,44 @@ describe('launchPaths', () => {
         isDefaultApp: false,
       }),
     ).toEqual(['/m/Film.mkv'])
+  })
+
+  it('never takes a raven link for a file to open', () => {
+    expect(
+      launchPaths({
+        argv: ['/Raven/Raven.exe', 'raven:/play?media=7', '/m/Film.mkv'],
+        isDefaultApp: false,
+      }),
+    ).toEqual(['/m/Film.mkv'])
+    expect(
+      launchPaths({
+        argv: ['/usr/local/bin/electron', '/src/apps/raven/desktop', 'raven://play?media=7'],
+        isDefaultApp: true,
+      }),
+    ).toEqual([])
+  })
+})
+
+describe('linksFromArgv', () => {
+  it('picks the raven links out of a Windows launch, past the executable and its switches', () => {
+    expect(
+      linksFromArgv([
+        'C:\\Program Files\\Raven\\Raven.exe',
+        '--allow-file-access-from-files',
+        'raven://play?server=https%3A%2F%2Fvhagar.example&media=7',
+        'C:\\Videos\\Film.mkv',
+        'RAVEN://download?server=https%3A%2F%2Fvhagar.example&media=8',
+      ]),
+    ).toEqual([
+      'raven://play?server=https%3A%2F%2Fvhagar.example&media=7',
+      'RAVEN://download?server=https%3A%2F%2Fvhagar.example&media=8',
+    ])
+  })
+
+  it('finds none in a launch with only files', () => {
+    expect(linksFromArgv(['/Applications/Raven.app/Contents/MacOS/Raven', '/m/Film.mkv'])).toEqual(
+      [],
+    )
   })
 })
 

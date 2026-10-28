@@ -1,3 +1,4 @@
+import { COMPUTER_NAMES, DESKTOP_PLATFORMS } from '@raven/core'
 import { create } from 'zustand'
 import { createJSONStorage, devtools, persist } from 'zustand/middleware'
 import { STORE_KEYS } from '@/stores/storage'
@@ -27,6 +28,12 @@ export const useDesktopBridge = create<DesktopBridge>()(
 
 /** Whether the page runs inside Raven. */
 export const useIsDesktop = (): boolean => useDesktopBridge((state) => state.desktop !== null)
+
+/** What the copy calls the computer Raven runs on: "Mac", or "PC" on Windows. */
+export const useComputerName = (): (typeof COMPUTER_NAMES)[keyof typeof COMPUTER_NAMES] =>
+  useDesktopBridge(
+    (state) => COMPUTER_NAMES[state.desktop?.client.platform ?? DESKTOP_PLATFORMS.mac],
+  )
 
 /** The bridge, for what renders only inside Raven. */
 export const useDesktop = (): Desktop => {

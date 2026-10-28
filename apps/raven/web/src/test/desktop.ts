@@ -6,11 +6,11 @@ import {
   type DesktopRequest,
   type DownloadView,
   type SpaceView,
+  DESKTOP_PLATFORMS,
   DOWNLOAD_STATUS_KINDS,
   DOWNLOAD_KINDS,
   PLAYER_CONNECTION_STATUSES,
   type PlayerEvent,
-  WINDOW_CHROMES,
 } from '@raven/core'
 import type { NativePlayer } from '@raven/ui/headless'
 import { mock } from 'bun:test'
@@ -51,16 +51,16 @@ export const viewOf = (overrides: Partial<DownloadView> = {}): DownloadView => (
 })
 
 /** A client whose calls are recorded; `emit` pushes an event to whoever subscribed. */
-type FakeClientProps = Partial<Pick<DesktopClient, 'request' | 'dropFiles' | 'windowChrome'>>
+type FakeClientProps = Partial<Pick<DesktopClient, 'request' | 'dropFiles' | 'platform'>>
 
 export const fakeClient = ({
   request = async () => DONE,
   dropFiles = async () => DONE,
-  windowChrome = WINDOW_CHROMES.inset,
+  platform = DESKTOP_PLATFORMS.mac,
 }: FakeClientProps = {}) => {
   const listeners = new Set<(event: DesktopEvent) => void>()
   return {
-    windowChrome,
+    platform,
     request: mock<DesktopClient['request']>(request),
     dropFiles: mock<DesktopClient['dropFiles']>(dropFiles),
     subscribe: mock<DesktopClient['subscribe']>((listener) => {

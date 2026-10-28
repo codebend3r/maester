@@ -4,6 +4,7 @@ import {
   ADMIN_LOCK_STATES,
   type AdminLock,
   DESKTOP_PATHS,
+  DESKTOP_PLATFORMS,
   DOWNLOAD_STATUS_KINDS,
   isLibraryKind,
   KINDS,
@@ -558,6 +559,22 @@ describe('AppShell', () => {
     renderShell({ route: '/' })
     expect(within(nav()).queryByRole('link', { name: 'Downloads' })).toBeNull()
     expect(document.querySelector('.titlebar')).toBeNull()
+  })
+
+  it('names the files on this PC on Windows', () => {
+    asDesktop({ ...downloadsMain(), platform: DESKTOP_PLATFORMS.windows })
+    useServerReach.setState({ isOffline: true })
+    renderShell({ route: '/libraries' })
+    expect(
+      within(nav())
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['raven', 'On this PC', 'Downloads', 'Settings'])
+    expect(
+      within(tabs())
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['This PC', 'Downloads', 'Settings'])
   })
 
   it('keeps only what needs no server while Raven cannot reach it', () => {

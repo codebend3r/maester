@@ -7,13 +7,13 @@ import { handled } from '@/desktop/handled'
 import { useOpenReply } from '@/desktop/openReply'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { watchedLabel } from '@/desktop/watched'
-import { useDesktop } from '@/stores/desktop'
+import { useComputerName, useDesktop } from '@/stores/desktop'
 import { useDragging } from '@/stores/dragging'
 import styles from '@/desktop/LocalPage/LocalPage.module.scss'
 
 const NO_RECENTS = 'Raven could not list your recent videos.'
 
-/** The videos opened from this Mac lately, newest first. */
+/** The videos opened from this computer lately, newest first. */
 const useRecents = () => {
   const { client } = useDesktop()
   return useQuery({
@@ -28,11 +28,12 @@ const useRecents = () => {
 }
 
 /**
- * On this Mac: a video file from this computer, chosen or dropped anywhere on the window, plays
+ * On this Mac (On this PC on Windows): a video file from this computer, chosen or dropped anywhere on the window, plays
  * in Raven, and the ones opened lately wait here with how far they were watched.
  */
 export const LocalPage = () => {
   const { client } = useDesktop()
+  const computer = useComputerName()
   const queryClient = useQueryClient()
   const openReply = useOpenReply()
   const showNotice = useToasts((state) => state.show)
@@ -68,7 +69,7 @@ export const LocalPage = () => {
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
       <header className={styles.header}>
-        <h1 id={ids.title}>On this Mac</h1>
+        <h1 id={ids.title}>{`On this ${computer}`}</h1>
         <p className={styles.hint}>Play a video file from this computer in Raven.</p>
       </header>
       <section

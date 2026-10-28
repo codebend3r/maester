@@ -11,7 +11,7 @@ import { ENGINE_MESSAGES } from '@/main/player/engine'
 
 const NATIVE = {
   app: { version: '0.5.4', isPackaged: true, arch: 'arm64' },
-  os: '26.0.1',
+  system: { name: 'macOS', version: '26.0.1' },
   versions: { electron: '44.7.0', chrome: '146.0.7680.65', node: '24.11.1' },
   engine: {
     kind: 'native',
@@ -31,6 +31,11 @@ const UNAVAILABLE = {
 } as const satisfies DiagnosticsInput
 
 describe('diagnosticsText', () => {
+  it('names Windows by its own name', () => {
+    const windows = { ...UNAVAILABLE, system: { name: 'Windows', version: '10.0.26100' } }
+    expect(diagnosticsText(windows).split('\n')[1]).toBe('Windows 10.0.26100')
+  })
+
   it('lists the app, the system and a native engine in six lines', () => {
     expect(diagnosticsText(NATIVE)).toBe(
       [

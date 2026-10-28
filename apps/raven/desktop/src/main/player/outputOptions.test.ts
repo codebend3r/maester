@@ -1,11 +1,13 @@
 import { expect, test } from 'bun:test'
-import type { OutputSettings } from '@raven/core'
+import { DESKTOP_PLATFORMS, type OutputSettings } from '@raven/core'
 import {
   isVolumeFixedFor,
   MPV_OPTIONS,
   outputOptions,
   readDevices,
 } from '@/main/player/outputOptions'
+
+const MAC = DESKTOP_PLATFORMS.mac
 
 const devices = [
   { name: 'auto', description: 'Autoselect device' },
@@ -29,7 +31,7 @@ const pcm = [
 ]
 
 test('pcm', () => {
-  expect(outputOptions({ output: base, devices, canChooseAo: true })).toEqual(pcm)
+  expect(outputOptions({ output: base, devices, canChooseAo: true, platform: MAC })).toEqual(pcm)
 })
 
 test('passthrough joins the formats and fixes the volume', () => {
@@ -38,6 +40,7 @@ test('passthrough joins the formats and fixes the volume', () => {
       output: { ...base, profile: 'passthrough' },
       devices,
       canChooseAo: true,
+      platform: MAC,
     }),
   ).toEqual([
     { name: 'audio-device', value: 'auto' },
@@ -57,13 +60,19 @@ test('passthrough with no formats behaves as pcm', () => {
       output: { ...base, profile: 'passthrough', passthrough: [] },
       devices,
       canChooseAo: true,
+      platform: MAC,
     }),
   ).toEqual(pcm)
 })
 
 test('headphones downmix to stereo, or go spatial through avfoundation', () => {
   expect(
-    outputOptions({ output: { ...base, profile: 'headphones' }, devices, canChooseAo: true }),
+    outputOptions({
+      output: { ...base, profile: 'headphones' },
+      devices,
+      canChooseAo: true,
+      platform: MAC,
+    }),
   ).toEqual([
     { name: 'audio-device', value: 'auto' },
     { name: 'audio-spdif', value: '' },
@@ -77,6 +86,7 @@ test('headphones downmix to stereo, or go spatial through avfoundation', () => {
       output: { ...base, profile: 'headphones', spatial: true },
       devices,
       canChooseAo: true,
+      platform: MAC,
     }),
   ).toEqual([
     { name: 'audio-device', value: 'auto' },
@@ -93,15 +103,17 @@ test('a known device is kept and an unknown one becomes auto', () => {
     output: { ...base, device: 'coreaudio/AppleUSBAudio' },
     devices,
     canChooseAo: true,
+    platform: MAC,
   })
   expect(known[0]).toEqual({ name: 'audio-device', value: 'coreaudio/AppleUSBAudio' })
   const unknown = outputOptions({
     output: { ...base, device: 'coreaudio/Unplugged' },
     devices,
     canChooseAo: true,
+    platform: MAC,
   })
   expect(unknown[0]).toEqual({ name: 'audio-device', value: 'auto' })
-  const withoutList = outputOptions({ output: base, devices: [], canChooseAo: true })
+  const withoutList = outputOptions({ output: base, devices: [], canChooseAo: true, platform: MAC })
   expect(withoutList[0]).toEqual({ name: 'audio-device', value: 'auto' })
 })
 
@@ -113,9 +125,29 @@ test('canChooseAo false leaves every ao entry out', () => {
     { ...base, profile: 'headphones', spatial: true },
   ] as const satisfies readonly OutputSettings[]
   profiles.forEach((output) => {
-    const options = outputOptions({ output, devices, canChooseAo: false })
+    const options = outputOptions({ output, devices, canChooseAo: false, platform: MAC })
     expect(options.some((option) => option.name === MPV_OPTIONS.ao)).toBe(false)
     expect(options.length).toBeGreaterThan(0)
+  })
+})
+
+test('Windows plays every profile through WASAPI, spatial headphones included', () => {
+  const profiles = [
+    { ...base },
+    { ...base, profile: 'passthrough' },
+    { ...base, profile: 'headphones' },
+    { ...base, profile: 'headphones', spatial: true },
+  ] as const satisfies readonly OutputSettings[]
+  profiles.forEach((output) => {
+    const options = outputOptions({
+      output,
+      devices,
+      canChooseAo: true,
+      platform: DESKTOP_PLATFORMS.windows,
+    })
+    expect(options.filter((option) => option.name === MPV_OPTIONS.ao)).toEqual([
+      { name: 'ao', value: 'wasapi' },
+    ])
   })
 })
 
@@ -133,7 +165,7 @@ const passthroughOf = (formats: OutputSettings['passthrough']): OutputSettings =
 })
 
 const spdifOf = (output: OutputSettings) =>
-  outputOptions({ output, devices, canChooseAo: true }).find(
+  outputOptions({ output, devices, canChooseAo: true, platform: MAC }).find(
     (option) => option.name === MPV_OPTIONS.audioSpdif,
   )?.value ?? null
 
@@ -149,7 +181,7 @@ test('a passthrough config of uncarried formats behaves as pcm and leaves the vo
   const uncarried: OutputSettings['passthrough'][] = [['truehd'], ['eac3', 'dts-hd']]
   uncarried.forEach((formats) => {
     const output = passthroughOf(formats)
-    expect(outputOptions({ output, devices, canChooseAo: true })).toEqual(pcm)
+    expect(outputOptions({ output, devices, canChooseAo: true, platform: MAC })).toEqual(pcm)
     expect(isVolumeFixedFor(output)).toBe(false)
   })
 })
@@ -160,6 +192,7 @@ test('spatial only applies to headphones', () => {
       output: { ...base, profile, spatial: true },
       devices,
       canChooseAo: true,
+      platform: MAC,
     })
     expect(options).not.toContainEqual({ name: 'ao', value: 'avfoundation,coreaudio' })
     expect(options).toContainEqual({ name: 'ao', value: 'coreaudio,avfoundation' })

@@ -637,7 +637,7 @@ describe('webHostFailureText', () => {
       syscall: 'listen',
     })
     expect(webHostFailureText(taken)).toBe(
-      'Another app is using port 47484 on this Mac. Quit it, then open Raven again.',
+      'Another app is using port 47484 on this computer. Quit it, then open Raven again.',
     )
   })
 
@@ -704,7 +704,7 @@ describe('listenWebHost', () => {
     return server
   }
 
-  it('leaves out an address this Mac does not have, with a warning', async () => {
+  it('leaves out an address this computer does not have, with a warning', async () => {
     const port = await freePort()
     const warnings: string[] = []
     await listenWebHost({
@@ -722,7 +722,7 @@ describe('listenWebHost', () => {
       outgoing.end()
     })
     expect(answer).toBe('raven')
-    expect(warnings).toEqual(['the web host left out ::1, which this Mac does not have'])
+    expect(warnings).toEqual(['the web host left out ::1, which this computer does not have'])
   })
 
   it('fails when it has no address at all', async () => {
