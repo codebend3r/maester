@@ -181,8 +181,8 @@ const BrowserPlayback = ({ isDesktop }: BrowserPlaybackProps) => {
         />
         <span className={styles.choiceLabel}>Skip intros automatically</span>
         <span className={styles.choiceHint}>
-          Jumps past an intro the file's chapters mark, once per episode, with a moment to undo it.
-          Off, Skip intro waits for a click.
+          Jumps past an episode's intro, once per episode, with a moment to undo it. Off, Skip intro
+          waits for a click.
         </span>
       </label>
       {!isDesktop && (
@@ -409,6 +409,24 @@ const ServerSettings = () => {
                   {effective.tonemapAvailable
                     ? 'Colours are mapped for an SDR screen; off, HDR goes out as it is and looks flat.'
                     : 'This ffmpeg cannot tone map, so HDR goes out as it is whatever this says.'}
+                </span>
+              </label>
+            </fieldset>
+            <fieldset className={styles.setting}>
+              <legend className={styles.legend}>
+                <Titled icon="skipNext">Intros</Titled>
+              </legend>
+              <label className={styles.choice}>
+                <input
+                  type="checkbox"
+                  checked={current.detectMarkers}
+                  onChange={(event) => save.mutate({ detectMarkers: event.target.checked })}
+                />
+                <span className={styles.choiceLabel}>Find intros</span>
+                <span className={styles.choiceHint}>
+                  Listens to each season in the background for the intro its episodes share, so
+                  players offer Skip intro. It waits while a video is converted for someone
+                  watching. Chapters named Opening or the like count either way.
                 </span>
               </label>
             </fieldset>

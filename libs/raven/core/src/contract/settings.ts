@@ -57,6 +57,8 @@ export const isPlaybackSettings = object({
   hwAccel: isHwAccel,
   /** Whether HDR is tone mapped to SDR on a transcode when the build can. */
   tonemap: isBoolean,
+  /** Whether the server listens to each season in the background for the intro its episodes share. */
+  detectMarkers: isBoolean,
 })
 
 export type PlaybackSettings = Infer<typeof isPlaybackSettings>
@@ -68,6 +70,7 @@ export const DEFAULT_PLAYBACK_SETTINGS: PlaybackSettings = {
   quality: QUALITIES.medium,
   hwAccel: HW_ACCELS.auto,
   tonemap: true,
+  detectMarkers: true,
 }
 
 /** A change sends any of the fields; each given must be a value the setting takes. */

@@ -39,6 +39,15 @@ export type ServerConfig = ListenConfig & {
   keyframeProbeTimeoutSeconds: number
   /** Thumbnail width in pixels; the height follows the aspect ratio. */
   thumbnailWidth: number
+  /** Whether seasons are listened to in the background for their intros; the admin can still turn it off. */
+  markerDetection: boolean
+  /** How many seasons are analysed at once. */
+  markerConcurrency: number
+  /**
+   * How long one fingerprint or shot change run may take. It decodes up to
+   * 15 minutes of a file, which on a 4K remux over a share reads gigabytes.
+   */
+  markerTimeoutSeconds: number
   /** Quick-scan every library on boot, picking up whatever changed while the server was down. */
   scanOnStart: boolean
   /** Quick-scan every library that refreshes automatically this often; 0 turns the timer off. */
@@ -108,6 +117,9 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   ffmpegTimeoutSeconds: Math.max(1, wholeNumber(env.FFMPEG_TIMEOUT_SECONDS) ?? 90),
   keyframeProbeTimeoutSeconds: Math.max(1, wholeNumber(env.KEYFRAME_PROBE_TIMEOUT_SECONDS) ?? 1800),
   thumbnailWidth: Math.max(160, wholeNumber(env.THUMBNAIL_WIDTH) ?? 480),
+  markerDetection: flag({ value: env.MARKER_DETECTION, fallback: true }),
+  markerConcurrency: Math.max(1, wholeNumber(env.MARKER_CONCURRENCY) ?? 1),
+  markerTimeoutSeconds: Math.max(1, wholeNumber(env.MARKER_TIMEOUT_SECONDS) ?? 900),
   scanOnStart: flag({ value: env.SCAN_ON_START, fallback: true }),
   quickScanIntervalMinutes: wholeNumber(env.QUICK_SCAN_INTERVAL_MINUTES) ?? 10,
   heroCount: Math.max(1, wholeNumber(env.HERO_COUNT) ?? 10),

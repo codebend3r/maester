@@ -52,6 +52,7 @@ describe('playback settings', () => {
       quality: 'medium',
       hwAccel: 'auto',
       tonemap: true,
+      detectMarkers: true,
     })
     expect(initial.effective.encoder).toBe('software')
     expect(typeof initial.effective.tonemapAvailable).toBe('boolean')

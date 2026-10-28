@@ -15,6 +15,7 @@ import {
   MATCH_STATES,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
+import { MarkerDetection } from '@/markers/markerDetection'
 import { errorMessage } from '@/errorMessage'
 import { groupBy } from '@/groupBy'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
@@ -176,6 +177,7 @@ export class MetadataService implements OnApplicationBootstrap {
     @Inject(AiDecisions) private readonly decisions: AiDecisions,
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(StartupWork) private readonly startup: StartupWork,
+    @Inject(MarkerDetection) private readonly markers: Pick<MarkerDetection, 'kick'>,
   ) {
     this.matchers = createMatchers({ files, metadata, pictures, decisions })
   }
@@ -466,6 +468,8 @@ export class MetadataService implements OnApplicationBootstrap {
     await this.matchAndClearUp(libraryId)
     this.database.refreshStatistics()
     this.scoreSweep.kick()
+    // Detection needs the episodes in their seasons, which the pass just placed.
+    this.markers.kick()
   }
 
   private async matchAndClearUp(libraryId: number): Promise<void> {

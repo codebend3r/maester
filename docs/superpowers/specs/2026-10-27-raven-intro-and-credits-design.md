@@ -5,7 +5,8 @@ verdicts as written. Written from research on how Plex, Jellyfin and Emby do
 it and a survey of raven's scanner and player. The three spikes ran on
 2026-10-28; their findings and verdicts are under Research findings, and
 they change the chapter patterns, the head window and how films find their
-credits.
+credits. PR 5 measured intro detection on Vhagar at 87% and replaced the
+shot change snap with an alignment offset (under Spike 1).
 
 ## Why
 
@@ -261,10 +262,11 @@ which already draws them.
    the most partners; confidence is the share of partners that agree within
    2 s. Below `MIN_INTRO_CONFIDENCE`, no marker.
 4. Refine both ends: snap to a chapter start within 10 s if the file has
-   one, else to the nearest shot change within 8 s (`select='gt(scene,0.3)'`
-   over just those seconds), so the skip lands on a clean cut. Spike 1 found
-   music that bleeds across the cut, and anime title cards that share the
-   opening's last sting, put raw boundaries 4 to 7 s off.
+   one, else move the audio's time 0.75 s later, past the run's lead (each
+   Chromaprint point sums up the two seconds or so of audio after its
+   timestamp). Spike 1 planned a snap to the nearest shot change within 8 s;
+   PR 5 measured it on Vhagar and it scored worse than none (see PR 5's
+   measurement below), so it was dropped.
 5. A season of one episode, or specials with no partners, gets no
    fingerprint marker, only chapter markers if it has them.
 
@@ -607,6 +609,27 @@ that costs almost nothing:
    not sufficient, for a show like it.
 
 Friends' special episode stays a miss; that is what Edit markers is for.
+
+**PR 5's measurement.** On Vhagar, over the same 30 labelled episodes and
+the 9 with no intro, through `bun run markers:accuracy`:
+
+| Boundaries | Within 2 s at both ends | Markers on no intro |
+| --- | --- | --- |
+| Raw audio run, chapter snap | 21 of 30 (70%) | 0 of 9 |
+| Chapter snap, nearest shot change within 8 s | 16 of 30 (53%) | 0 of 9 |
+| Chapter snap, 0.75 s past the run's lead | **26 of 30 (87%)** | 0 of 9 |
+
+An intro is all cuts, so the nearest one is often inside it. The raw runs
+were early by 1 to 2 s at both ends on most shows, which is the
+fingerprint's own lead; any offset from 0.5 to 2 s scores 24 to 26. The four
+misses are Succession's theme under the cold open (7 s early) and Buffy's
+ends, which fall on fades no cut detection sees. Severance's intros sit past
+every episode's first window, so no season mate matches and the wider second
+pass never starts; its episodes get no marker, which is the safe failure.
+
+> [!TIP]
+> Decided in PR 5: the alignment offset replaces the shot change snap. It
+> clears the 85% bar and decodes no video at all.
 
 > [!IMPORTANT]
 > Spike 1 is a **go with conditions**: PR 5 ships the chapter snap, the

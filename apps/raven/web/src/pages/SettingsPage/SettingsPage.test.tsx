@@ -78,7 +78,15 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('radio', { name: /^1080p/ })).toBeChecked()
     expect(screen.getByRole('radio', { name: /^Auto/ })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: /Tone map HDR/ })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /^Find intros/ })).toBeChecked()
     expect(screen.getByText('Transcodes encode with VideoToolbox right now.')).toBeInTheDocument()
+  })
+
+  it('stops finding intros once the admin turns it off', async () => {
+    servePlayback(STATE)
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null })
+    await userEvent.click(await screen.findByRole('checkbox', { name: /^Find intros/ }))
+    await waitFor(() => expect(spies.set).toHaveBeenCalledWith({ detectMarkers: false }))
   })
 
   it('marks the section and each setting with an icon of its own', async () => {
@@ -88,7 +96,16 @@ describe('SettingsPage', () => {
     expect(iconOf(await screen.findByRole('heading', { name: 'Display' }))).toBe('image')
     await screen.findByRole('group', { name: 'Movie titles' })
     const icons = screen.getAllByRole('group').map(iconOf)
-    expect(icons).toEqual(['file-play', 'convert', 'resize', 'gauge', 'chip', 'sun', 'film'])
+    expect(icons).toEqual([
+      'file-play',
+      'convert',
+      'resize',
+      'gauge',
+      'chip',
+      'sun',
+      'skipNext',
+      'film',
+    ])
   })
 
   it('puts every setting back to its default on a second click', async () => {

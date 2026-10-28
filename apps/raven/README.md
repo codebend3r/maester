@@ -628,6 +628,9 @@ raven app imports `@raven/core` and `@raven/ui/headless` and answers the direct-
 | `THUMBNAIL_WIDTH`             | `480`                          |                                              |
 | `FFMPEG_TIMEOUT_SECONDS`      | `90`                           | Per ffprobe or thumbnail run                 |
 | `KEYFRAME_PROBE_TIMEOUT_SECONDS` | `1800`                      | Per keyframe probe, which reads the whole file |
+| `MARKER_DETECTION`            | `on`                           | Find each season's intro in the background; `off` stops it whatever the admin's setting says |
+| `MARKER_CONCURRENCY`          | `1`                            | Seasons analysed at once                     |
+| `MARKER_TIMEOUT_SECONDS`      | `900`                          | Per fingerprint run, which decodes up to 15 minutes of a file |
 | `FFMPEG_PATH`, `FFPROBE_PATH` | `ffmpeg`, `ffprobe`            |                                              |
 | `TMDB_API_TOKEN`              | unset                          | TMDB's API Read Access Token or API key; unset turns metadata off |
 | `METADATA_LANGUAGE`           | `en-US`                        | Language for titles and summaries            |
