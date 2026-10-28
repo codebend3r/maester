@@ -43,6 +43,7 @@ import { SettingsMenu } from '@/components/Player/SettingsMenu'
 import { ShortcutsDialog } from '@/components/Player/ShortcutsDialog'
 import { OVERLAYS, type Overlay, usePlayerActions } from '@/components/Player/usePlayerActions'
 import { useBezel, useFullscreen, useIdle, useNow } from '@/components/Player/useStageChrome'
+import { UpNextCard } from '@/components/Player/UpNextCard'
 import { useUpNext } from '@/components/Player/useUpNext'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
@@ -288,8 +289,8 @@ export const PlayerChrome = ({
     })
   }
 
-  // The countdown keeps the controls up, so the ring it fills can be seen.
-  const chromeShown = idle.active || upNext.countdown != null
+  // The up next card keeps the controls up, so it and the ring it fills can be seen.
+  const chromeShown = idle.active || upNext.isCardShown
   const about = aboutLine({ media, label, mode, context: title.context ?? null })
 
   // The scrubber and the clock keep what they showed while the controls are
@@ -406,6 +407,21 @@ export const PlayerChrome = ({
         settingsButton={menuButton}
         upNext={nextLink?.label ?? null}
         countdown={upNext.countdown}
+        card={
+          upNext.isCardShown &&
+          nextLink && (
+            <UpNextCard
+              next={nextLink}
+              countdown={upNext.countdown}
+              secondsLeft={upNext.secondsLeft}
+              onPlay={upNext.playNext}
+              onDismiss={() => {
+                upNext.dismiss()
+                engine.focusSurface()
+              }}
+            />
+          )
+        }
         endsAt={endsAtLabel({ now, time: held.time, duration, rate: state.rate })}
         onRestart={() => controls.act({ type: PLAYER_ACTIONS.seekToEdge, edge: SEEK_EDGES.start })}
         onNext={upNext.playNext}

@@ -334,6 +334,42 @@ describe('Open videos in Raven on SettingsPage', () => {
   })
 })
 
+describe('Autoplay on SettingsPage', () => {
+  const spies = { get: spyOn(api, 'getPlaybackSettings') }
+
+  beforeEach(() => spies.get.mockImplementation(async () => STATE))
+  afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
+
+  const slider = () => screen.getByRole('slider', { name: 'Count down to what is up next for' })
+
+  it('switches autoplay, on at first, as the Playback menu does', async () => {
+    renderWithProviders({ ui: <SettingsPage />, playback: null })
+    const autoplay = screen.getByRole('checkbox', { name: /^Autoplay/ })
+    expect(autoplay).toBeChecked()
+    await userEvent.click(autoplay)
+    expect(usePlayerPrefs.getState().autoplay).toBe(false)
+  })
+
+  it('sets how long the countdown runs, from 5 to 60 seconds, 15 at first', () => {
+    renderWithProviders({ ui: <SettingsPage />, playback: null })
+    const playback = screen.getByRole('region', { name: 'Playback' })
+    expect(within(playback).getByRole('slider')).toBe(slider())
+    expect(slider()).toHaveValue('15')
+    expect(slider()).toHaveAttribute('min', '5')
+    expect(slider()).toHaveAttribute('max', '60')
+    fireEvent.change(slider(), { target: { value: '30' } })
+    expect(usePlayerPrefs.getState().autoplayCountdownSeconds).toBe(30)
+    expect(within(playback).getByText('30 seconds')).toBeInTheDocument()
+  })
+
+  it('keeps a countdown set out of range within its ends', () => {
+    usePlayerPrefs.getState().setAutoplayCountdownSeconds(90)
+    expect(usePlayerPrefs.getState().autoplayCountdownSeconds).toBe(60)
+    usePlayerPrefs.getState().setAutoplayCountdownSeconds(2.4)
+    expect(usePlayerPrefs.getState().autoplayCountdownSeconds).toBe(5)
+  })
+})
+
 describe('Advanced on SettingsPage', () => {
   const spies = { get: spyOn(api, 'getPlaybackSettings') }
 
@@ -478,6 +514,8 @@ describe('SettingsPage inside Raven', () => {
     renderWithProviders({ ui: <SettingsPage />, playback: null })
     await screen.findByRole('radio', { name: /Remux only/ })
     expect(screen.queryByRole('checkbox', { name: /^Open videos in Raven/ })).toBeNull()
+    expect(screen.getByRole('heading', { name: 'This app' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /^Autoplay/ })).toBeChecked()
     expect(screen.getByRole('region', { name: 'Downloads' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'This computer' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Updates' })).toBeInTheDocument()

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import {
   ACCOUNT_TICKET_SECONDS,
+  ITEM_TYPES,
   type MediaItem,
   type MediaTracks,
   PLAY_LINK_MAX_NEXT,
@@ -21,7 +22,7 @@ import { api } from '@/lib/api'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { fakeAccount } from '@/test/authClient'
 import { setBrowserSupport } from '@/test/canPlay'
-import { bugReport, mediaItem } from '@/test/fixtures'
+import { bugReport, itemSummary, mediaItem } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 import { ravenVersion } from '@/lib/version'
@@ -423,6 +424,55 @@ describe('WatchPlayer sessions', () => {
     if (!video) throw new Error('no video')
     fireEvent(video, new Event('ended'))
     expect(await screen.findByText('Playing 8, then')).toBeInTheDocument()
+  })
+
+  it("offers the next season's first episode at a season's end, and waits for a click", async () => {
+    const season: ViewingSession = { kind: SESSION_KINDS.season }
+    const firstOfNext = mediaItem({
+      id: 20,
+      container: 'mp4',
+      item: itemSummary({
+        type: ITEM_TYPES.episode,
+        title: 'Return',
+        show: { id: 3, title: 'Busboys' },
+        season: 2,
+        episode: 1,
+      }),
+    })
+    const asked = spyOn(api, 'nextInSession').mockImplementation(async ({ session }) =>
+      session.kind === SESSION_KINDS.show ? firstOfNext : null,
+    )
+    spies.push(asked)
+    usePlayerPrefs.setState({ autoplay: true })
+    const playing = mediaItem({ container: 'mp4' })
+    const { container } = renderWithProviders({
+      ui: (
+        <Routes>
+          <Route
+            path="/"
+            element={<Player media={playing} session={season} upNext={[]} backTo="/libraries/2" />}
+          />
+          <Route path="watch/:id" element={<WatchProbe />} />
+        </Routes>
+      ),
+    })
+    expect(await screen.findByRole('link', { name: /^Up next: Busboys/ })).toHaveAttribute(
+      'href',
+      '/watch/20',
+    )
+    expect(asked).toHaveBeenCalledWith({ id: 7, session: season })
+    expect(asked).toHaveBeenCalledWith({ id: 7, session: { kind: SESSION_KINDS.show } })
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    video.currentTime = (playing.duration ?? 0) - 5
+    fireEvent(video, new Event('timeupdate'))
+    const card = screen.getByRole('region', { name: 'Busboys · S02E01 · Return' })
+    expect(within(card).getByText('Next season')).toBeInTheDocument()
+    expect(within(card).getByText('Season 2, Episode 1')).toBeInTheDocument()
+    fireEvent(video, new Event('ended'))
+    expect(screen.queryByText(/^Playing 20/)).toBeNull()
+    await userEvent.click(within(card).getByRole('button', { name: 'Play next season' }))
+    expect(await screen.findByText('Playing 20, then')).toBeInTheDocument()
   })
 
   it('asks the server nothing for a video played on its own', async () => {

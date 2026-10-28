@@ -27,6 +27,22 @@
   pointer-events: none;
 }
 
+// The up next card keeps to the right, in a row of its own above the
+// timeline, so it never covers the bar. The row is there only with the card,
+// or its gap would lift the bar.
+.withCard {
+  grid-template-areas:
+    'card card card card card card card card card'
+    'timeline timeline timeline timeline timeline timeline timeline timeline timeline'
+    'restart back play forward next ends . volume pills';
+}
+
+.card {
+  grid-area: card;
+  display: grid;
+  justify-items: end;
+}
+
 // The time played sits before the scrubber, on its line.
 .timeline {
   grid-area: timeline;
@@ -92,30 +108,6 @@
 
   > * {
     grid-area: mark;
-  }
-}
-
-.ring {
-  width: 100%;
-  height: 100%;
-  fill: none;
-  // The countdown fills clockwise from the top.
-  transform: rotate(-90deg);
-}
-
-.ringTrack {
-  stroke: var(--color-bark-faint);
-  stroke-width: 1.5;
-}
-
-.ringFill {
-  stroke: var(--color-on-picture);
-  stroke-width: 2;
-  stroke-linecap: round;
-
-  @media (prefers-reduced-motion: no-preference) {
-    // Smooths the steps between the video's time updates.
-    transition: stroke-dashoffset 250ms linear;
   }
 }
 
@@ -265,6 +257,18 @@
       'restart back play forward next .'
       'volume pills pills pills pills pills';
     padding: var(--space-6) var(--space-3) var(--space-3);
+  }
+
+  .withCard {
+    grid-template-areas:
+      'card card card card card card'
+      'timeline timeline timeline timeline timeline timeline'
+      'restart back play forward next .'
+      'volume pills pills pills pills pills';
+  }
+
+  .card {
+    justify-items: stretch;
   }
 
   .button {

@@ -26,6 +26,21 @@ export type PlayerFavourite = {
   toggle: () => void
 }
 
+/** What plays after the title, as the header, the Next button and the up next card offer it. */
+export type UpNext = {
+  to: string
+  state: unknown
+  label: string
+  /** A pick from a shuffle rather than the next in turn. */
+  isShuffled?: boolean
+  /** The card's line under the label: "Season 2, Episode 4". */
+  detail?: string | null
+  /** The card's picture. */
+  posterUrl?: string | null
+  /** The next season's first episode, after a season played on its own: offered, never played by itself. */
+  isNextSeason?: boolean
+}
+
 export type PlayerTitle = {
   label: string
   /**
@@ -36,8 +51,8 @@ export type PlayerTitle = {
   duration: number | null
   resumeAt: number
   backTo: string
-  /** What plays after this one; `isShuffled` for a pick from a shuffle rather than the next in turn. */
-  next: { to: string; state: unknown; label: string; isShuffled?: boolean } | null
+  /** What plays after this one. */
+  next: UpNext | null
 }
 
 /** A track pick a person made by hand: an audio index and a subtitle id. */

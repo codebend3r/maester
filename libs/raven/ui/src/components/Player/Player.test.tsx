@@ -11,7 +11,6 @@ import { useState } from 'react'
 import { Route, Routes, useNavigationType } from 'react-router-dom'
 import { Player } from '@/components/Player/Player'
 import type { PlayerFavourite, PlayerTitle } from '@/components/Player/PlayerServices'
-import { AUTOPLAY_COUNTDOWN_SECONDS } from '@/components/Player/useUpNext'
 import { api } from '@/test/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
@@ -78,6 +77,14 @@ afterEach(() => {
 })
 
 const press = (key: string) => fireEvent.keyDown(window, { key })
+
+type TimeToProps = { video: HTMLVideoElement; time: number }
+
+/** Moves the video to `time`, as playback reaching it would. */
+const timeTo = ({ video, time }: TimeToProps) => {
+  video.currentTime = time
+  fireEvent(video, new Event('timeupdate'))
+}
 
 describe('Player', () => {
   // Safari's answer to Matroska: no.
@@ -401,8 +408,8 @@ describe('the player controls', () => {
     expect(await screen.findByText('Playing the next video')).toBeInTheDocument()
   })
 
-  it('counts down to what is up next only in the last seconds', () => {
-    usePlayerPrefs.setState({ autoplay: true })
+  it('counts down to what is up next only in the last seconds, for as long as the viewer set', () => {
+    usePlayerPrefs.setState({ autoplay: true, autoplayCountdownSeconds: 20 })
     const { container } = renderWithProviders({
       ui: (
         <TestPlayer
@@ -414,12 +421,136 @@ describe('the player controls', () => {
     })
     const video = container.querySelector('video')
     if (!video) throw new Error('no video')
-    video.currentTime = 600
-    fireEvent(video, new Event('timeupdate'))
+    timeTo({ video, time: 600 })
     expect(container.querySelector('[data-countdown]')).toBeNull()
-    video.currentTime = 5812.768 - AUTOPLAY_COUNTDOWN_SECONDS / 2
-    fireEvent(video, new Event('timeupdate'))
+    expect(screen.queryByRole('region', { name: 'Busboys 2 (2027)' })).toBeNull()
+    timeTo({ video, time: 5812.768 - 10 })
     expect(container.querySelector('[data-countdown]')).toHaveAttribute('data-countdown', '0.5')
+    const card = screen.getByRole('region', { name: 'Busboys 2 (2027)' })
+    expect(within(card).getByText('Plays in 10 seconds')).toBeInTheDocument()
+  })
+
+  it('offers what is up next on a card, which Play now plays and Watch credits puts away', async () => {
+    usePlayerPrefs.setState({ autoplay: true })
+    const { container } = renderWithProviders({
+      ui: (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <TestPlayer
+                media={mediaItem({ container: 'mp4' })}
+                next={{
+                  to: '/watch/8',
+                  state: null,
+                  label: 'Busboys · S01E02 · Pilot, Part 2',
+                  detail: 'Season 1, Episode 2',
+                  posterUrl: '/thumbs/8.jpg',
+                }}
+                backTo="/libraries/2"
+              />
+            }
+          />
+          <Route path="watch/:id" element={<p>Playing the next video</p>} />
+        </Routes>
+      ),
+    })
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    timeTo({ video, time: 5812.768 - 5 })
+    const card = screen.getByRole('region', { name: 'Busboys · S01E02 · Pilot, Part 2' })
+    expect(within(card).getByText('Up next')).toBeInTheDocument()
+    expect(within(card).getByText('Season 1, Episode 2')).toBeInTheDocument()
+    expect(card.querySelector('img')).toHaveAttribute('src', '/thumbs/8.jpg')
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Watch credits' }))
+    expect(screen.queryByRole('region', { name: /^Busboys/ })).toBeNull()
+    // The card stays away for this title; the end still plays what is next.
+    timeTo({ video, time: 5812.768 - 2 })
+    expect(screen.queryByRole('region', { name: /^Busboys/ })).toBeNull()
+    fireEvent(video, new Event('ended'))
+    expect(await screen.findByText('Playing the next video')).toBeInTheDocument()
+  })
+
+  it('plays what is up next from the card at once', async () => {
+    const { container } = renderWithProviders({
+      ui: (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <TestPlayer
+                media={mediaItem({ container: 'mp4' })}
+                next={{ to: '/watch/8', state: null, label: 'Busboys 2 (2027)' }}
+                backTo="/libraries/2"
+              />
+            }
+          />
+          <Route path="watch/:id" element={<p>Playing the next video</p>} />
+        </Routes>
+      ),
+    })
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    timeTo({ video, time: 5812.768 - 5 })
+    await userEvent.click(screen.getByRole('button', { name: 'Play now' }))
+    expect(await screen.findByText('Playing the next video')).toBeInTheDocument()
+  })
+
+  it('shows the card without a countdown while autoplay is off', () => {
+    usePlayerPrefs.setState({ autoplay: false })
+    const { container } = renderWithProviders({
+      ui: (
+        <TestPlayer
+          media={mediaItem({ container: 'mp4' })}
+          next={{ to: '/watch/8', state: null, label: 'Busboys 2 (2027)' }}
+          backTo="/libraries/2"
+        />
+      ),
+    })
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    timeTo({ video, time: 5812.768 - 5 })
+    expect(screen.getByRole('region', { name: 'Busboys 2 (2027)' })).toBeInTheDocument()
+    expect(screen.queryByText(/^Plays in/)).toBeNull()
+    expect(container.querySelector('[data-countdown]')).toBeNull()
+  })
+
+  it('offers the next season after a season played on its own, but never plays it by itself', async () => {
+    usePlayerPrefs.setState({ autoplay: true })
+    const { container } = renderWithProviders({
+      ui: (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <TestPlayer
+                media={mediaItem({ container: 'mp4' })}
+                next={{
+                  to: '/watch/20',
+                  state: null,
+                  label: 'Busboys · S02E01 · Return',
+                  detail: 'Season 2, Episode 1',
+                  isNextSeason: true,
+                }}
+                backTo="/libraries/2"
+              />
+            }
+          />
+          <Route path="watch/:id" element={<p>Playing the next video</p>} />
+        </Routes>
+      ),
+    })
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    timeTo({ video, time: 5812.768 - 5 })
+    const card = screen.getByRole('region', { name: 'Busboys · S02E01 · Return' })
+    expect(within(card).getByText('Next season')).toBeInTheDocument()
+    expect(container.querySelector('[data-countdown]')).toBeNull()
+    fireEvent(video, new Event('ended'))
+    expect(screen.queryByText('Playing the next video')).toBeNull()
+    await userEvent.click(within(card).getByRole('button', { name: 'Play next season' }))
+    expect(await screen.findByText('Playing the next video')).toBeInTheDocument()
   })
 
   it('offers no next video when none came with it, and Next has nothing to press', () => {
