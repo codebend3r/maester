@@ -15,15 +15,16 @@ import {
   type MpvEvent,
 } from '@/mpv'
 import { MPV_CHOICES, MPV_PROPERTIES, MPV_TRACK_TYPES, propertyGuards } from '@/properties'
-import { project } from '@/build/context'
+import { isWindows, project } from '@/build/context'
 import { isCleanupMode } from '@/test/cleanupModes'
 
 const directory = await mkdtemp(resolve(tmpdir(), 'raven-mpv-native-'))
 const clip = resolve(directory, 'tracks.mkv')
 const sidecar = resolve(directory, 'sidecar.srt')
 await writeFile(sidecar, '1\n00:00:00,000 --> 00:00:10,000\nNative subtitle fixture\n')
+// macOS tests use the source-built ffmpeg; Windows has no source build and takes the runner's.
 const ffmpeg = spawn(
-  resolve(project, 'native-build/prefix/bin/ffmpeg'),
+  isWindows() ? 'ffmpeg' : resolve(project, 'native-build/prefix/bin/ffmpeg'),
   [
     '-hide_banner',
     '-loglevel',
@@ -70,7 +71,7 @@ const exitCode = await new Promise<number | null>((resolveExit, reject) => {
   ffmpeg.once('error', reject)
   ffmpeg.once('close', resolveExit)
 })
-if (exitCode !== 0) throw new Error('Source-built ffmpeg could not generate native fixtures')
+if (exitCode !== 0) throw new Error('ffmpeg could not generate native fixtures')
 after(async () => {
   await rm(directory, { recursive: true, force: true })
 })

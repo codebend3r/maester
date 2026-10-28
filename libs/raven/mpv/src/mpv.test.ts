@@ -50,7 +50,7 @@ const fixture = ({ version = 'mpv 0.41.0', apiVersion = 131077 } = {}) => {
     },
   }
   const events: MpvEvent[] = []
-  const loadAddon = (_path: string) => ({
+  const loadAddon = () => ({
     apiVersion,
     create: (_surface: unknown, callback: (event: unknown) => void) => {
       receive = callback

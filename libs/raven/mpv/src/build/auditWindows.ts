@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { isRecord } from '@raven/core'
-import { BUILD_TARGETS, digest, project, windowsResources, write } from '@/build/context'
+import { digest, project, windowsResources, write } from '@/build/context'
+import { NATIVE_TARGETS } from '@/target'
 import { PE_MACHINES, readPe } from '@/build/pe'
 import { prebuilt, WINDOWS_FILES } from '@/build/windowsLock'
 
@@ -42,6 +43,8 @@ const SYSTEM_DLLS = [
   'ws2_32.dll',
 ] as const
 const API_SET_PREFIX = 'api-ms-win-'
+/** What the addon may import beyond Windows' own: libmpv beside it, and Node's exports. */
+const ADDON_DLLS = ['libmpv-2.dll', 'node.exe'] as const
 
 /** What the addon calls, so a DLL missing one cannot pass as libmpv. */
 export const REQUIRED_EXPORTS = [
@@ -63,13 +66,19 @@ const REQUIRED_HEADERS = ['client.h', 'render.h'] as const
 
 type ImportProblemsProps = {
   imports: readonly string[]
+  /** DLLs of our own the file may import, beside Windows'. */
+  allowed?: readonly string[]
 }
 
-/** The imports that are not Windows' own. */
-export const importProblems = ({ imports }: ImportProblemsProps): readonly string[] =>
+/** The imports that are neither Windows' own nor allowed. */
+export const importProblems = ({ imports, allowed = [] }: ImportProblemsProps): readonly string[] =>
   imports.filter((name) => {
     const lower = name.toLowerCase()
-    return !lower.startsWith(API_SET_PREFIX) && !SYSTEM_DLLS.some((dll) => dll === lower)
+    return (
+      !lower.startsWith(API_SET_PREFIX) &&
+      !SYSTEM_DLLS.some((dll) => dll === lower) &&
+      !allowed.some((dll) => dll === lower)
+    )
   })
 
 type ExportProblemsProps = {
@@ -80,6 +89,24 @@ type ExportProblemsProps = {
 export const exportProblems = ({ exports }: ExportProblemsProps): readonly string[] =>
   REQUIRED_EXPORTS.filter((name) => !exports.includes(name))
 
+type AuditedFile = {
+  file: string
+  sha256: string
+  imports: readonly string[]
+}
+
+/** The addon, when it has been built: x64, and loading only libmpv beside it and Node. */
+const auditAddon = async (): Promise<readonly AuditedFile[]> => {
+  const file = Bun.file(resolve(windowsResources, WINDOWS_FILES.addon))
+  if (!(await file.exists())) return []
+  const bytes = await file.bytes()
+  const info = readPe({ bytes })
+  if (info.machine !== PE_MACHINES.x64) throw new Error('The addon is not x64')
+  const problems = importProblems({ imports: info.imports, allowed: ADDON_DLLS })
+  if (problems.length > 0) throw new Error(`Unexpected import in the addon: ${problems.join(', ')}`)
+  return [{ file: WINDOWS_FILES.addon, sha256: digest(bytes), imports: info.imports }]
+}
+
 export const auditWindows = async () => {
   const locked = await prebuilt()
   const build: unknown = JSON.parse(
@@ -87,7 +114,7 @@ export const auditWindows = async () => {
   )
   if (
     !isRecord(build) ||
-    build.platform !== BUILD_TARGETS.win32X64 ||
+    build.platform !== NATIVE_TARGETS.win32X64 ||
     JSON.stringify(build.prebuilt) !== JSON.stringify(locked)
   )
     throw new Error('Windows libmpv provenance does not match lock')
@@ -109,12 +136,13 @@ export const auditWindows = async () => {
   )
   const absent = headers.filter(({ isPresent }) => !isPresent).map(({ name }) => name)
   if (absent.length > 0) throw new Error(`Missing libmpv headers: ${absent.join(', ')}`)
+  const addon = await auditAddon()
   await write({
     path: resolve(windowsResources, 'provenance/artifacts.json'),
     content:
       JSON.stringify(
         {
-          files: [{ file: WINDOWS_FILES.libmpv, sha256, imports: info.imports }],
+          files: [{ file: WINDOWS_FILES.libmpv, sha256, imports: info.imports }, ...addon],
           windowsLockSha256: digest(
             await Bun.file(resolve(project, 'native/windows.lock.json')).bytes(),
           ),

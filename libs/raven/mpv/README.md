@@ -19,6 +19,14 @@ what the addon calls. The PR checks' `🪟 Windows libmpv` job does this on
 `windows-2025`. The archive carries no license notices; the build's own sources and
 licenses are in that repository at the pinned release.
 
+`build:native:windows` builds the same addon with MSVC and Ninja (run it from a Developer
+Command Prompt): `addon.cpp` is shared with macOS,
+`surface_win.cpp` hands mpv the BrowserWindow's HWND with `gpu-api=d3d11`, and the import
+library comes from the DLL's own export list, since the DLL was built with MinGW. The addon
+loads `libmpv-2.dll` from beside itself. `test:native:windows` runs the headless tests with
+the runner's ffmpeg. `nativeTargetOf` picks `resources/darwin-arm64` or `resources/win32-x64`
+for the running process.
+
 ## API and lifecycle
 
 `openMpv({ surface, onEvent })` loads only `resources/darwin-arm64/raven_mpv.node`,

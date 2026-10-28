@@ -6,7 +6,6 @@ import { auditNative } from '@/build/auditNative'
 import { moltenvkBuildCommands } from '@/build/moltenvk'
 import { libmpvLinkLibraries, RPATHS, withLinkLibraries } from '@/build/linkage'
 import {
-  BUILD_TARGETS,
   digest,
   inSequence,
   output,
@@ -20,6 +19,7 @@ import {
   work,
   write,
 } from '@/build/context'
+import { NATIVE_TARGETS } from '@/target'
 
 requireMacArm()
 // No installation or global Xcode selection here. CI supplies its own scoped toolchain.
@@ -440,7 +440,7 @@ await write({
   content:
     JSON.stringify(
       {
-        platform: BUILD_TARGETS.darwinArm64,
+        platform: NATIVE_TARGETS.darwinArm64,
         revision: await output({ args: ['git', 'rev-parse', 'HEAD'] }),
         sources: digest(JSON.stringify(locked)),
         xcode: await output({ args: ['xcodebuild', '-version'] }),

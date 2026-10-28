@@ -3,8 +3,8 @@ import { isRecord, isString, listOf, object } from '@raven/core'
 import { nodeHeaders } from '@/build/nodeHeaders'
 import { RPATHS } from '@/build/linkage'
 import { parseDefinitions, parseImports, symbolProblems, type AuditedFile } from '@/build/symbols'
+import { ARCHITECTURES } from '@/target'
 import {
-  ARCHITECTURES,
   digest,
   inSequence,
   output,

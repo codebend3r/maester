@@ -5,6 +5,7 @@ import { isMainThread, Worker, workerData } from 'node:worker_threads'
 import { isNumber, isRecord, object } from '@raven/core'
 import { MPV_COMMANDS, MPV_SURFACE_KINDS } from '@/mpv'
 import { MPV_PROPERTIES } from '@/properties'
+import { localAddonPath } from '@/target'
 import { CLEANUP_MODES, isCleanupMode } from '@/test/cleanupModes'
 
 const ignoreEvent = () => {}
@@ -19,7 +20,7 @@ type Handle = {
 }
 const isHandle = (value: unknown): value is Handle =>
   isRecord(value) && ['command', 'set', 'observe', 'destroy'].every((key) => isFunction(value[key]))
-const addon: unknown = createRequire(import.meta.url)('../resources/darwin-arm64/raven_mpv.node')
+const addon: unknown = createRequire(import.meta.url)(localAddonPath())
 if (!isRecord(addon) || !isFunction(addon.create) || !isFunction(addon.lifecycleCounts))
   throw new Error('Invalid native cleanup-test binding')
 const { create, lifecycleCounts } = addon

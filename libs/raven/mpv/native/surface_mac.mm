@@ -1,7 +1,27 @@
-#import "surface.h"
+#include "surface.h"
+#import <Cocoa/Cocoa.h>
+#import <QuartzCore/CAMetalLayer.h>
 #import <QuartzCore/QuartzCore.h>
 #import <objc/runtime.h>
 #include <stdexcept>
+
+// BrowserWindow's handle is an NSView pointer, not an NSWindow pointer.
+@interface RavenVideoView : NSView
+@property(nonatomic) NSUInteger sortRepairs;
+@property(nonatomic) BOOL isRepairingSort;
+- (void)updateDrawable;
+@end
+
+struct RavenSurfaceState {
+    __strong NSView *content = nil;
+    __strong RavenVideoView *view = nil;
+    Class originalClass = Nil;
+    Class hookedClass = Nil;
+};
+
+RavenSurface::RavenSurface() : state(std::make_unique<RavenSurfaceState>()) {}
+// Defined here, where RavenSurfaceState is complete, for the unique_ptr.
+RavenSurface::~RavenSurface() = default;
 
 static char surfaceKey;
 
@@ -48,6 +68,10 @@ static void repairSort(NSView *content) {
 }
 
 void RavenSurface::attach(void *nativeView) {
+    auto &content = state->content;
+    auto &view = state->view;
+    auto &originalClass = state->originalClass;
+    auto &hookedClass = state->hookedClass;
     if (![NSThread isMainThread]) throw std::runtime_error("Video surface requires the macOS main thread");
     NSView *native = (__bridge NSView *)nativeView;
     NSWindow *window = native.window;
@@ -85,19 +109,43 @@ void RavenSurface::attach(void *nativeView) {
     [view updateDrawable];
 }
 
-void RavenSurface::detach() {
-    if (!content) return;
+// Undoes attach: the content view gets its class and subviews back. Main thread only.
+static void detachViews(NSView *content, RavenVideoView *view, Class originalClass, Class hookedClass) {
     objc_setAssociatedObject(content, &surfaceKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (object_getClass(content) == hookedClass) object_setClass(content, originalClass);
     [view removeFromSuperview];
-    view = nil;
-    content = nil;
 }
 
-CAMetalLayer *RavenSurface::layer() const { return (CAMetalLayer *)view.layer; }
+void RavenSurface::detach() {
+    if (!state->content) return;
+    detachViews(state->content, state->view, state->originalClass, state->hookedClass);
+    state->view = nil;
+    state->content = nil;
+}
+
+bool RavenSurface::isAttached() const { return state->content != nil; }
+
+// AppKit views are released on the main thread; a GC finalizer runs elsewhere. The block
+// holds the views and classes themselves, never this surface, which its Player may free
+// before the main queue gets to it.
+void RavenSurface::detachFromAnyThread() {
+    if (!state->content) return;
+    NSView *content = state->content;
+    RavenVideoView *view = state->view;
+    Class originalClass = state->originalClass;
+    Class hookedClass = state->hookedClass;
+    state->view = nil;
+    state->content = nil;
+    dispatch_async(dispatch_get_main_queue(), ^{ detachViews(content, view, originalClass, hookedClass); });
+}
+
+int64_t RavenSurface::wid() const { return (int64_t)(__bridge void *)(CAMetalLayer *)state->view.layer; }
+const char *RavenSurface::gpuApi() const { return "vulkan"; }
+const char *RavenSurface::gpuContext() const { return "moltenvk"; }
+unsigned RavenSurface::sortRepairs() const { return (unsigned)state->view.sortRepairs; }
 
 double RavenSurface::refreshRate() const {
-    NSScreen *screen = view.window.screen;
+    NSScreen *screen = state->view.window.screen;
     if (!screen) return 0;
     NSNumber *number = screen.deviceDescription[@"NSScreenNumber"];
     CGDisplayModeRef mode = CGDisplayCopyDisplayMode(number.unsignedIntValue);
@@ -107,6 +155,6 @@ double RavenSurface::refreshRate() const {
 }
 
 double RavenSurface::edrHeadroom() const {
-    NSScreen *screen = view.window.screen;
+    NSScreen *screen = state->view.window.screen;
     return screen ? screen.maximumPotentialExtendedDynamicRangeColorComponentValue : 1;
 }

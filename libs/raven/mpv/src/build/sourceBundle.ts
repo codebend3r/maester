@@ -1,16 +1,7 @@
 import { cp, mkdir, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import {
-  BUILD_TARGETS,
-  digest,
-  inSequence,
-  output,
-  project,
-  resources,
-  run,
-  work,
-  write,
-} from '@/build/context'
+import { digest, inSequence, output, project, resources, run, work, write } from '@/build/context'
+import { NATIVE_TARGETS } from '@/target'
 import { isRecord } from '@raven/core'
 
 /** Refresh head-specific application sources even when pinned native dependencies came from CI cache. */
@@ -41,7 +32,7 @@ export const refreshSourceBundle = async () => {
   )
   const path = resolve(resources, 'provenance/build.json')
   const previous: unknown = JSON.parse(await Bun.file(path).text())
-  if (!isRecord(previous) || previous.platform !== BUILD_TARGETS.darwinArm64)
+  if (!isRecord(previous) || previous.platform !== NATIVE_TARGETS.darwinArm64)
     throw new Error('Invalid native build provenance')
   await write({
     path,
