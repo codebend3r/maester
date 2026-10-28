@@ -19,6 +19,7 @@ import { mapWithConcurrency } from '@/scanner/concurrency'
 import { layoutsOf, withTitleRoots } from '@/scanner/layout'
 import { type Reconciled, changesAnything, reconcile } from '@/scanner/reconcile'
 import { type KnownStats, type WalkResult, isUnder, outermost, walkVideos } from '@/scanner/walk'
+import { StartupWork } from '@/startupWork'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 const IDLE: ScanStatus = {
@@ -217,10 +218,14 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(MetadataService) private readonly metadata: MetadataService,
     @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(StartupWork) private readonly startup: StartupWork,
   ) {}
 
+  /** The scans on boot are steps of the work on boot, a library each, so the server listens first. */
   onApplicationBootstrap(): void {
-    if (this.config.scanOnStart) this.quickScanAll()
+    if (this.config.scanOnStart) {
+      this.startup.add(this.libraries.list().map((library) => () => this.quickScan(library.id)))
+    }
     if (this.config.quickScanIntervalMinutes > 0) {
       this.timer = setInterval(
         () => this.quickScanRefreshing(),
@@ -242,11 +247,6 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     const remembered: ScanStatus = { ...IDLE, finishedAt: fullScannedAt, quickScannedAt }
     this.statuses.set(libraryId, remembered)
     return remembered
-  }
-
-  /** Every library, on boot: whatever changed while the server was down. */
-  quickScanAll(): void {
-    this.libraries.list().forEach((library) => this.quickScan(library.id))
   }
 
   /** The libraries that refresh automatically, on the timer. */

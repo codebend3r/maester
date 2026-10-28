@@ -18,6 +18,7 @@ import { Scores } from '@/metadata/scores'
 import { ScoreSweep } from '@/metadata/scoreSweep'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { mapWithConcurrency } from '@/scanner/concurrency'
+import { StartupWork } from '@/startupWork'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -40,13 +41,17 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(Scores) private readonly scores: Scores,
     @Inject(ScoreSweep) private readonly scoreSweep: ScoreSweep,
     @Inject(ItemPictures) private readonly pictures: ItemPictures,
+    @Inject(StartupWork) private readonly startup: StartupWork,
   ) {}
 
-  /** The sweep runs on the metadata queue at start, behind the first passes, and daily after. */
+  /**
+   * The sweep runs on the metadata queue at start, behind the first passes,
+   * which are steps of the work on boot before it, and daily after.
+   */
   onApplicationBootstrap(): void {
     if (!this.tmdb.enabled) return
     const sweep = () => this.service.schedule({ key: 'sweep', task: () => this.sweep() })
-    sweep()
+    this.startup.add([sweep])
     this.timer = setInterval(sweep, DAY_MS)
     this.timer.unref()
   }

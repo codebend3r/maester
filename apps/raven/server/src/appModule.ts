@@ -94,6 +94,7 @@ import { LibraryWatcher, WATCH_OPTIONS, type WatchOptions } from '@/scanner/libr
 import { ScannerService } from '@/scanner/scannerService'
 import { SettingsController } from '@/settings/settingsController'
 import { SettingsRepository } from '@/settings/settingsRepository'
+import { STARTUP_HELD, StartupWork } from '@/startupWork'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 export const CONTROLLERS = [
@@ -137,6 +138,8 @@ type AppModuleRegisterProps = {
   authKeys?: JWTVerifyGetKey
   accessRecheckMs?: number
   membershipTtlMs?: number
+  /** Holds the work on boot until `main.ts` says the server listens; a test's app runs it at once. */
+  shouldHoldStartupWork?: boolean
 }
 
 /**
@@ -155,6 +158,7 @@ export class AppModule {
     authKeys,
     accessRecheckMs = DEFAULT_ACCESS_RECHECK_MS,
     membershipTtlMs = MEMBERSHIP_TTL_MS,
+    shouldHoldStartupWork = false,
   }: AppModuleRegisterProps): DynamicModule {
     assertRoutesMarked(CONTROLLERS)
     return {
@@ -186,6 +190,8 @@ export class AppModule {
         { provide: METADATA_FETCH, useValue: metadataFetch },
         { provide: AI_FETCH, useValue: aiFetch },
         { provide: WATCH_OPTIONS, useValue: { ...DEFAULT_WATCH, ...watch } },
+        { provide: STARTUP_HELD, useValue: shouldHoldStartupWork },
+        StartupWork,
         DatabaseService,
         ServerEvents,
         LibrariesRepository,
