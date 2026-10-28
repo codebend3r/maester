@@ -37,6 +37,7 @@ from luwin.clients.seerr.models import (
     Season,
     SeerrUser,
     ServerOptions,
+    int_or_none,
 )
 
 __all__ = [
@@ -69,4 +70,5 @@ __all__ = [
     "SeerrClient",
     "SeerrUser",
     "ServerOptions",
+    "int_or_none",
 ]

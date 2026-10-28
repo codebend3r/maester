@@ -68,7 +68,9 @@ def _year(raw: dict[str, Any]) -> int | None:
     return int(date[:4]) if date[:4].isdigit() else None
 
 
-def _int_or_none(value: Any) -> int | None:
+def int_or_none(value: Any) -> int | None:
+    """An id Seerr may leave out, or render as "" (its webhook template writes every value
+    as a string)."""
     return int(value) if value not in (None, "") else None
 
 
@@ -224,16 +226,14 @@ class MediaDetails:
             rating_key_4k=info.get("ratingKey4k") or None,
             arr=ArrRef.from_media(info, is_4k=False),
             arr_4k=ArrRef.from_media(info, is_4k=True),
-            tvdb_id=_int_or_none(
-                (raw.get("externalIds") or {}).get("tvdbId") or info.get("tvdbId")
-            ),
-            collection_id=_int_or_none((raw.get("collection") or {}).get("id")),
+            tvdb_id=int_or_none((raw.get("externalIds") or {}).get("tvdbId") or info.get("tvdbId")),
+            collection_id=int_or_none((raw.get("collection") or {}).get("id")),
             seasons=tuple(seasons),
             keyword_ids=frozenset(int(k["id"]) for k in raw.get("keywords") or []),
             genre_ids=frozenset(int(g["id"]) for g in raw.get("genres") or []),
             original_language=raw.get("originalLanguage") or "",
-            media_id=_int_or_none(info.get("id")),
-            runtime_minutes=_int_or_none(
+            media_id=int_or_none(info.get("id")),
+            runtime_minutes=int_or_none(
                 raw.get("runtime") or next(iter(raw.get("episodeRunTime") or []), None)
             ),
         )
@@ -287,7 +287,7 @@ class MediaRequest:
             is_4k=is_4k,
             requested_by_id=int((raw.get("requestedBy") or {}).get("id", 0)),
             seasons=tuple(int(s["seasonNumber"]) for s in raw.get("seasons") or []),
-            tvdb_id=_int_or_none(media.get("tvdbId")),
+            tvdb_id=int_or_none(media.get("tvdbId")),
             media_status=MediaStatus(
                 media.get("status4k" if is_4k else "status", MediaStatus.UNKNOWN)
             ),

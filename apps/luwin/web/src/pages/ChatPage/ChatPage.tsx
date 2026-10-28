@@ -69,7 +69,9 @@ export const ChatPage = () => {
         </aside>
       )}
       <main className={styles.chat}>
-        <Transcript />
+        <section className={styles.conversation} aria-label="Transcript">
+          <Transcript />
+        </section>
         <Composer />
       </main>
     </div>

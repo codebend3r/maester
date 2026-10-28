@@ -27,16 +27,12 @@ from typing import Any
 from luwin.agent.tools import spec_of
 from luwin.approvals import ask_about_request, decide_request, decision_dm, request_subject
 from luwin.clients import ClientError, Services
-from luwin.clients.seerr import MediaRequest, RequestStatus
+from luwin.clients.seerr import MediaRequest, RequestStatus, int_or_none
 from luwin.media import Copy, Titled, version_label
 from luwin.notify import DirectMessage, Notice
 from luwin.store import Store
 
 log = logging.getLogger("luwin.seerr")
-
-
-def _int_or_none(value: Any) -> int | None:
-    return int(value) if value not in (None, "") else None
 
 
 @dataclass(frozen=True)
@@ -74,9 +70,9 @@ class SeerrNotification:
             type=str(raw["notification_type"]),
             subject=raw.get("subject") or "",
             media_type=media.get("media_type") or None,
-            tmdb_id=_int_or_none(media.get("tmdbId")),
-            request_id=_int_or_none(request.get("request_id")),
-            issue_id=_int_or_none(issue.get("issue_id")),
+            tmdb_id=int_or_none(media.get("tmdbId")),
+            request_id=int_or_none(request.get("request_id")),
+            issue_id=int_or_none(issue.get("issue_id")),
         )
 
 

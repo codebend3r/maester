@@ -13,6 +13,8 @@ import {
 import { readCookie, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { isRecord } from '@/guards'
+import { ROUTES } from '@/routes'
 import {
   PIN_COOKIE,
   SESSION_COOKIE,
@@ -22,14 +24,13 @@ import {
   sessionCookie,
 } from '@/auth/cookies'
 import {
-  CALLBACK_PATH,
   PAGE_PATHS,
   SIGN_IN_ERRORS,
   SIGN_IN_RESULT_KINDS,
   SignInService,
 } from '@/auth/signInService'
 import { PlexUnavailable } from '@/plex/plexTv'
-import { AccountService } from '@/sessions/accountService'
+import { AccountService, type PublicUser, toPublicUser } from '@/sessions/accountService'
 import { SESSION_KINDS } from '@/sessions/sessionsRepository'
 
 /** The headers these routes set that `@shared/server`'s `HEADERS` does not name. */
@@ -38,16 +39,8 @@ const REPLY_HEADERS = { location: 'location' } as const
 /** Why a route that needs a session refused the request. */
 export const SESSION_ERRORS = { signedOut: 'signed_out' } as const
 
-export type PublicUser = {
-  id: string
-  display_name: string
-  email: string | null
-  thumb: string | null
-}
-
 /** `return_to` from a JSON body, unchecked; `SignInService.returnTo` decides if it is safe. */
-const returnToIn = (body: unknown): unknown =>
-  typeof body === 'object' && body != null && 'return_to' in body ? body.return_to : undefined
+const returnToIn = (body: unknown): unknown => (isRecord(body) ? body.return_to : undefined)
 
 const sessionToken = (request: FastifyRequest): string | null =>
   readCookie({ header: request.headers.cookie, name: SESSION_COOKIE })
@@ -60,7 +53,7 @@ export class AuthController {
     @Inject(AccountService) private readonly accounts: AccountService,
   ) {}
 
-  @Post('api/auth/plex/start')
+  @Post(ROUTES.start)
   @HttpCode(200)
   async start(
     @Body() body: unknown,
@@ -80,7 +73,7 @@ export class AuthController {
     }
   }
 
-  @Get(CALLBACK_PATH.slice(1))
+  @Get(ROUTES.callback)
   async callback(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     const result = await this.signIn.complete({
       pendingId: readCookie({ header: request.headers.cookie, name: PIN_COOKIE }),
@@ -105,7 +98,7 @@ export class AuthController {
       .send()
   }
 
-  @Post('api/auth/logout')
+  @Post(ROUTES.logout)
   @HttpCode(200)
   logout(
     @Body() body: unknown,
@@ -117,13 +110,12 @@ export class AuthController {
     return { next: this.signIn.returnTo({ value: returnToIn(body), fallback: PAGE_PATHS.login }) }
   }
 
-  @Get('api/me')
+  @Get(ROUTES.me)
   me(@Req() request: FastifyRequest): { user: PublicUser } {
     const account = this.accounts.forToken(sessionToken(request))
     if (account.kind !== SESSION_KINDS.live) {
       throw new UnauthorizedException({ reason: SESSION_ERRORS.signedOut })
     }
-    const { id, displayName, email, thumb } = account.user
-    return { user: { id, display_name: displayName, email, thumb } }
+    return { user: toPublicUser(account.user) }
   }
 }
