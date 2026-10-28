@@ -7,7 +7,7 @@ name: 🗃️ App build caches
 # main's are readable by every PR, whose app jobs in pull-request-checks.yml only
 # restore. The two set up through the same actions, raven-app-setup and
 # raven-android-avd, so the caches match. It runs when what the native projects or those
-# settings are made from changes, weekly so the compile caches follow the sources and are
+# actions are made from changes, weekly so the compile caches follow the sources and are
 # never evicted for going unused, and by hand.
 on:
   push:
@@ -20,7 +20,6 @@ on:
       - .github/actions/raven-app-setup/**
       - .github/actions/raven-android-avd/**
       - .github/workflows/app-caches.yml
-      - .github/workflows/pull-request-checks.yml
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:
@@ -93,24 +92,11 @@ jobs:
           path: ${{ steps.setup.outputs.ccache-path }}
           key: ${{ steps.setup.outputs.ccache-key }}
 
-      # The ccache and CocoaPods entries a save superseded, and Homebrew's from an older
-      # image: main's newest is the one every PR restores.
+      # Main's newest entry is the one every PR restores; the older ones only fill the cache.
       - name: 🧹 Delete superseded caches
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          KEEP: |
-            ${{ steps.setup.outputs.packages-prefix }} ${{ steps.setup.outputs.packages-key }}
-            ${{ steps.setup.outputs.dependencies-prefix }} ${{ steps.setup.outputs.dependencies-key }}
-            ${{ steps.setup.outputs.ccache-prefix }} ${{ steps.setup.outputs.ccache-key }}
-        run: |
-          while read -r prefix key; do
-            [ -n "$prefix" ] || continue
-            # Only once the entry kept is really there: a save that failed only warns.
-            gh cache list --ref "$GITHUB_REF" --key "$key" --json key --jq ".[] | select(.key == \"$key\") | .key" | grep -q . || continue
-            gh cache list --ref "$GITHUB_REF" --key "$prefix" --limit 100 --json id,key --jq ".[] | select(.key != \"$key\") | .id" |
-              while read -r id; do gh cache delete "$id"; done
-          done <<< "$KEEP"
+        uses: ./.github/actions/delete-superseded-caches
+        with:
+          keep: ${{ steps.setup.outputs.supersedes }}
 
   android-tv:
     name: 📺 Android TV caches
@@ -153,10 +139,13 @@ jobs:
           path: ${{ steps.setup.outputs.ccache-path }}
           key: ${{ steps.setup.outputs.ccache-key }}
 
-      # Makes and boots the AVD when main has no snapshot under the current key.
+      # Makes and boots the AVD when main has no snapshot under the current key; when it
+      # has one, only checks, rather than downloading 2.7 GB to learn it.
       - name: 📺 Android TV AVD
         id: avd
         uses: ./.github/actions/raven-android-avd
+        with:
+          lookup-only: 'true'
 
       - name: 💾 Save the Android TV AVD
         if: steps.avd.outputs.cache-hit != 'true'
@@ -165,22 +154,10 @@ jobs:
           path: ${{ steps.avd.outputs.path }}
           key: ${{ steps.avd.outputs.key }}
 
-      # The ccache, Gradle and AVD entries a save superseded, and apt's from an older image:
-      # main's newest is the one every PR restores.
+      # Main's newest entry is the one every PR restores; the older ones only fill the cache.
       - name: 🧹 Delete superseded caches
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          KEEP: |
-            ${{ steps.setup.outputs.packages-prefix }} ${{ steps.setup.outputs.packages-key }}
-            ${{ steps.setup.outputs.dependencies-prefix }} ${{ steps.setup.outputs.dependencies-key }}
-            ${{ steps.setup.outputs.ccache-prefix }} ${{ steps.setup.outputs.ccache-key }}
+        uses: ./.github/actions/delete-superseded-caches
+        with:
+          keep: |
+            ${{ steps.setup.outputs.supersedes }}
             avd- ${{ steps.avd.outputs.key }}
-        run: |
-          while read -r prefix key; do
-            [ -n "$prefix" ] || continue
-            # Only once the entry kept is really there: a save that failed only warns.
-            gh cache list --ref "$GITHUB_REF" --key "$key" --json key --jq ".[] | select(.key == \"$key\") | .key" | grep -q . || continue
-            gh cache list --ref "$GITHUB_REF" --key "$prefix" --limit 100 --json id,key --jq ".[] | select(.key != \"$key\") | .id" |
-              while read -r id; do gh cache delete "$id"; done
-          done <<< "$KEEP"

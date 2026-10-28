@@ -43,22 +43,16 @@ if [ ! -x "$SDK_TOOLS/sdkmanager" ]; then
   brew install --cask android-commandlinetools
   /opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager --sdk_root="$ANDROID_HOME" 'cmdline-tools;latest' < <(yes)
 fi
-if ! sdkmanager --list_installed 2> /dev/null | grep -q 'android-36;android-tv;arm64-v8a'; then
+if ! sdkmanager --list_installed 2> /dev/null | grep -qF "${IMAGE#system-images;}"; then
   echo 'Installing the SDK packages and the Android TV system image (about 1.5 GB)'
   sdkmanager --licenses > /dev/null
   sdkmanager platform-tools emulator 'platforms;android-36' "$IMAGE"
 fi
-brew_install ffmpeg ffmpeg
 # React Native's CMake setup uses ccache whenever it is on the path.
-brew_install ccache ccache
+require_app_tools
 install_maestro
-require_node
 
-step 'Install'
-bun install --frozen-lockfile
-
-build_libraries
-start_fixture
+prepare_app
 
 step 'Start the Android TV emulator'
 if ! emulator -list-avds | grep -qx "$AVD"; then

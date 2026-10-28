@@ -39,13 +39,9 @@ outputs:
     value: ${{ steps.packages.outputs.cache-hit }}
   dependencies-hit:
     value: ${{ steps.dependencies.outputs.cache-hit }}
-  # Each cache's key prefix, to delete the entries a save supersedes.
-  packages-prefix:
-    value: ${{ steps.keys.outputs.packages-prefix }}
-  dependencies-prefix:
-    value: ${{ steps.keys.outputs.dependencies-prefix }}
-  ccache-prefix:
-    value: ${{ steps.keys.outputs.ccache-restore }}
+  supersedes:
+    description: One "<prefix> <key>" line per cache, for delete-superseded-caches
+    value: ${{ steps.keys.outputs.supersedes }}
 runs:
   using: composite
   steps:
@@ -62,32 +58,43 @@ runs:
       run: |
         case "$PLATFORM" in
           android-tv)
-            echo "packages=apt-$ImageOS-$ImageVersion-ffmpeg-ccache-v1"
-            echo "packages-prefix=apt-"
-            echo "dependencies-prefix=gradle-$RUNNER_OS-"
-            echo "packages-path=$HOME/apt-archives"
-            echo "dependencies=gradle-$RUNNER_OS-$LOCK-$GITHUB_RUN_ID"
-            printf 'dependencies-path<<LIST\n%s\n%s\nLIST\n' "$HOME/.gradle/caches" "$HOME/.gradle/wrapper"
-            printf 'dependencies-restore<<LIST\n%s\n%s\nLIST\n' "gradle-$RUNNER_OS-$LOCK-" "gradle-$RUNNER_OS-"
-            echo "ccache-path=$HOME/.cache/ccache"
+            packages_prefix=apt-
+            packages_path="$HOME/apt-archives"
+            dependencies_prefix="gradle-$RUNNER_OS-"
+            dependencies="gradle-$RUNNER_OS-$LOCK-$GITHUB_RUN_ID"
+            dependencies_path="$HOME/.gradle/caches"$'\n'"$HOME/.gradle/wrapper"
+            dependencies_restore="gradle-$RUNNER_OS-$LOCK-"$'\n'"gradle-$RUNNER_OS-"
+            ccache_path="$HOME/.cache/ccache"
             ;;
           ios | tvos)
-            echo "packages=brew-$ImageOS-$ImageVersion-ffmpeg-ccache-v1"
-            echo "packages-prefix=brew-"
-            echo "dependencies-prefix=cocoapods-$RUNNER_OS-$PLATFORM-"
-            echo "packages-path=$HOME/Library/Caches/Homebrew/downloads"
-            echo "dependencies=cocoapods-$RUNNER_OS-$PLATFORM-$LOCK"
-            echo "dependencies-path=$HOME/Library/Caches/CocoaPods"
-            echo "dependencies-restore=cocoapods-$RUNNER_OS-$PLATFORM-"
-            echo "ccache-path=$HOME/Library/Caches/ccache"
+            packages_prefix=brew-
+            packages_path="$HOME/Library/Caches/Homebrew/downloads"
+            dependencies_prefix="cocoapods-$RUNNER_OS-$PLATFORM-"
+            dependencies="cocoapods-$RUNNER_OS-$PLATFORM-$LOCK"
+            dependencies_path="$HOME/Library/Caches/CocoaPods"
+            dependencies_restore="cocoapods-$RUNNER_OS-$PLATFORM-"
+            ccache_path="$HOME/Library/Caches/ccache"
             ;;
           *)
             echo "Unknown platform: $PLATFORM (ios, tvos or android-tv)" >&2
             exit 1
             ;;
-        esac >> "$GITHUB_OUTPUT"
-        echo "ccache=ccache-$RUNNER_OS-$PLATFORM-$GITHUB_RUN_ID" >> "$GITHUB_OUTPUT"
-        echo "ccache-restore=ccache-$RUNNER_OS-$PLATFORM-" >> "$GITHUB_OUTPUT"
+        esac
+        packages="$packages_prefix$ImageOS-$ImageVersion-ffmpeg-ccache-v1"
+        ccache_prefix="ccache-$RUNNER_OS-$PLATFORM-"
+        ccache="$ccache_prefix$GITHUB_RUN_ID"
+        {
+          echo "packages=$packages"
+          echo "packages-path=$packages_path"
+          echo "dependencies=$dependencies"
+          printf 'dependencies-path<<LIST\n%s\nLIST\n' "$dependencies_path"
+          printf 'dependencies-restore<<LIST\n%s\nLIST\n' "$dependencies_restore"
+          echo "ccache=$ccache"
+          echo "ccache-path=$ccache_path"
+          echo "ccache-restore=$ccache_prefix"
+          printf 'supersedes<<LIST\n%s %s\n%s %s\n%s %s\nLIST\n' \
+            "$packages_prefix" "$packages" "$dependencies_prefix" "$dependencies" "$ccache_prefix" "$ccache"
+        } >> "$GITHUB_OUTPUT"
 
     # Bun's version comes from `packageManager` in package.json.
     - name: 🍞 Set up Bun
@@ -122,11 +129,13 @@ runs:
         key: ${{ steps.keys.outputs.ccache }}
         restore-keys: ${{ steps.keys.outputs.ccache-restore }}
 
-    # The Xcode every Apple build and its ccache objects are made with. ffmpeg for the
-    # fixture server's clips, ccache for the compile. Expo's Podfile reads USE_CCACHE at
-    # `pod install` and points Xcode's compilers at React Native's ccache wrappers. CocoaPods fetches the Hermes tarball with plain curl, which without a
-    # ~/.curlrc waits out a stalled mirror for as long as the job lasts; this one drops a
-    # transfer under 100 KB/s for 30 seconds and tries it again.
+    # ffmpeg for the fixture server's clips, and ccache for the compile: Expo's Podfile reads
+    # USE_CCACHE at `pod install` and points Xcode's compilers at React Native's wrappers.
+    # DEVELOPER_DIR is the Xcode every Apple build, and so its ccache objects, are made with.
+    #
+    # CocoaPods fetches the Hermes tarball with plain curl, which without a ~/.curlrc waits
+    # out a stalled mirror for as long as the job lasts; this one drops a transfer under
+    # 100 KB/s for 30 seconds and tries it again.
     - name: 🍎 Apple build tools
       if: inputs.platform != 'android-tv'
       shell: bash
@@ -144,7 +153,7 @@ runs:
           echo "CCACHE_DIR=$CCACHE_PATH"
           echo "CCACHE_MAXSIZE=1500M"
         } >> "$GITHUB_ENV"
-        ccache --zero-stats
+        CCACHE_DIR="$CCACHE_PATH" ccache --zero-stats
 
     # ffmpeg for the fixture server's clips, ccache for the compile, which React Native's
     # Android CMake uses whenever it is on the path. `org.gradle.caching` turns Gradle's build
@@ -168,7 +177,7 @@ runs:
           echo "CCACHE_MAXSIZE=1G"
           echo "ORG_GRADLE_PROJECT_reactNativeArchitectures=x86_64"
         } >> "$GITHUB_ENV"
-        ccache --zero-stats
+        CCACHE_DIR="$CCACHE_PATH" ccache --zero-stats
 
     # The flows reach the accountless fixture over plain http on the loopback. The development
     # variant allows it, and Expo bundles the fixture's address into the build. Both are Nx

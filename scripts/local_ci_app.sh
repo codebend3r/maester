@@ -88,19 +88,33 @@ find_runtime() {
   SIM_RUNTIME="$(xcrun simctl list -j runtimes "$1" | jq -r --arg sdk "$SIM_SDK" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier // empty')"
 }
 
+# The tools every app build needs: ffmpeg for the fixture's clips, ccache for the
+# compile, and Node for Babel.
+require_app_tools() {
+  brew_install ffmpeg ffmpeg
+  brew_install ccache ccache
+  require_node
+}
+
+# prepare_app: once the tools are in, the install, the libraries and the fixture server.
+prepare_app() {
+  step 'Install'
+  bun install --frozen-lockfile
+
+  build_libraries
+  start_fixture
+}
+
 # prepare_apple_app <iOS|tvOS> <sdk>: the tools, the simulator runtime matching Xcode's
-# SDK (SIM_RUNTIME, downloaded when there is none, about 8 GB), the install, the
-# libraries and the fixture server. ccache is on, through Expo's Podfile, so a rebuild
-# reuses unchanged objects.
+# SDK (SIM_RUNTIME, downloaded when there is none, about 8 GB), then prepare_app. ccache
+# is on, through Expo's Podfile, so a rebuild reuses unchanged objects.
 prepare_apple_app() {
   step 'Tools'
   require_apple_silicon
   require_xcode
-  brew_install ffmpeg ffmpeg
+  require_app_tools
   brew_install jq jq
   brew_install pod cocoapods
-  brew_install ccache ccache
-  require_node
   export USE_CCACHE=1
   SIM_SDK="$(xcrun --sdk "$2" --show-sdk-version)"
   find_runtime "$1"
@@ -111,11 +125,7 @@ prepare_apple_app() {
   fi
   [ -n "$SIM_RUNTIME" ] || { echo "No $1 $SIM_SDK simulator runtime, even after the download." >&2; exit 1; }
 
-  step 'Install'
-  bun install --frozen-lockfile
-
-  build_libraries
-  start_fixture
+  prepare_app
 }
 
 # boot_simulator <name> <device type>: sets SIM_DEVICE to the simulator of that name on

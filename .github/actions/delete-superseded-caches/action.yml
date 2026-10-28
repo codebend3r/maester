@@ -1,0 +1,30 @@
+name: 🧹 Delete superseded caches
+description: >-
+  Deletes the current ref's cache entries a save superseded: for each "<prefix> <key>"
+  line, every entry under the prefix but the key, once that key is really saved.
+
+# app-caches.yml saves under per-run keys (ccache, Gradle) and per-image or per-lockfile
+# keys (packages, CocoaPods, the AVD), and main's newest entry is the one every PR
+# restores, so the older ones only fill the repo's cache. The job needs `actions: write`.
+inputs:
+  keep:
+    description: One "<prefix> <key>" line per cache family
+    required: true
+runs:
+  using: composite
+  steps:
+    # A save that failed only warns, so a family is skipped until its kept key exists. A
+    # delete may race another job's, or GitHub's own eviction, so a failed one is ignored.
+    - name: 🧹 Delete superseded caches
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        KEEP: ${{ inputs.keep }}
+      run: |
+        while read -r prefix key; do
+          [ -n "$prefix" ] || continue
+          gh cache list --ref "$GITHUB_REF" --key "$key" --json key --jq ".[] | select(.key == \"$key\") | .key" | grep -q . || continue
+          gh cache list --ref "$GITHUB_REF" --key "$prefix" --limit 100 --json id,key --jq ".[] | select(.key != \"$key\") | .id" |
+            while read -r id; do gh cache delete "$id" || true; done
+        done <<< "$KEEP"

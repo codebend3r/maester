@@ -8,6 +8,11 @@ description: >-
 # The single definition of the emulator, shared by the PR's Android TV job and by
 # app-caches.yml, which saves the snapshot on main. The key names everything the snapshot
 # is made from, so a snapshot from anything else is never restored to cold boot.
+inputs:
+  lookup-only:
+    description: "'true' to only check whether the snapshot is cached, without downloading it"
+    required: false
+    default: 'false'
 outputs:
   key:
     value: ${{ steps.avd.outputs.key }}
@@ -84,6 +89,7 @@ runs:
       with:
         path: ${{ steps.avd.outputs.path }}
         key: ${{ steps.avd.outputs.key }}
+        lookup-only: ${{ inputs.lookup-only }}
 
     # Only on a cache miss: makes the AVD and boots it once, which leaves the snapshot. The
     # runner unlocks the screen with `adb shell input keyevent 82` the moment the boot

@@ -17,8 +17,8 @@ if [ -z "${JAVA_HOME:-}" ] && [ -d /opt/homebrew/opt/openjdk/libexec/openjdk.jdk
   export JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home
 fi
 
-install_maestro
 prepare_apple_app iOS iphonesimulator
+install_maestro
 
 # CI's iPhone 16, or the runtime's newest iPhone when it has none.
 step 'Boot the iPhone simulator'
