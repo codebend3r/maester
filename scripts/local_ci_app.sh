@@ -90,7 +90,7 @@ find_runtime() {
 
 # The tools every app build needs: ffmpeg for the fixture's clips, ccache for the
 # compile, and Node for Babel.
-require_app_tools() {
+require_build_tools() {
   brew_install ffmpeg ffmpeg
   brew_install ccache ccache
   require_node
@@ -112,7 +112,7 @@ require_apple_tools() {
   step 'Tools'
   require_apple_silicon
   require_xcode
-  require_app_tools
+  require_build_tools
   brew_install jq jq
   brew_install pod cocoapods
   export USE_CCACHE=1

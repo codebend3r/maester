@@ -49,7 +49,7 @@ if ! sdkmanager --list_installed 2> /dev/null | grep -qF "${IMAGE#system-images;
   sdkmanager platform-tools emulator 'platforms;android-36' "$IMAGE"
 fi
 # React Native's CMake setup uses ccache whenever it is on the path.
-require_app_tools
+require_build_tools
 install_maestro
 
 prepare_app

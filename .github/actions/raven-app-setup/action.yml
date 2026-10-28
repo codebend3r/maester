@@ -67,7 +67,9 @@ runs:
             ccache_path="$HOME/.cache/ccache"
             ;;
           ios | tvos)
-            packages_prefix=brew-
+            # Per platform: the iPhone and Apple TV legs run on the same image, but each
+            # deletes its family's other entries, and a runner image rollout can split them.
+            packages_prefix="brew-$PLATFORM-"
             packages_path="$HOME/Library/Caches/Homebrew/downloads"
             dependencies_prefix="cocoapods-$RUNNER_OS-$PLATFORM-"
             dependencies="cocoapods-$RUNNER_OS-$PLATFORM-$LOCK"
