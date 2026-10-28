@@ -85,7 +85,8 @@ describe('listing a library', () => {
         file: { path: `/m/${video.name}.mp4`, root: '/m', size: video.size, mtimeMs: 1 },
       })
       database.get().db.prepare('UPDATE media SET added_at = ? WHERE id = ?').run(video.addedAt, id)
-      if (video.probe) index.saveProbe({ id, probe: { ...PROBE, ...video.probe }, tracks: TRACKS })
+      if (video.probe)
+        index.saveProbe({ id, probe: { ...PROBE, ...video.probe }, tracks: TRACKS, chapters: [] })
     })
   })
 
@@ -221,7 +222,7 @@ describe("listing a TV library's shows", () => {
         kind: 'shows',
         file: { path: `/tv/${name}`, root: '/tv', size: 100, mtimeMs: 1 },
       })
-      index.saveProbe({ id, probe: PROBE, tracks: TRACKS })
+      index.saveProbe({ id, probe: PROBE, tracks: TRACKS, chapters: [] })
       metadata.link({ mediaIds: [id], itemIds: [episodeId] })
       state.ids.set(name, id)
     })
@@ -454,7 +455,7 @@ describe('listing what is in progress', () => {
         kind: 'other',
         file: { path: `/m/${name}.mp4`, root: '/m', size: 100, mtimeMs: 1 },
       })
-      index.saveProbe({ id, probe: PROBE, tracks: TRACKS })
+      index.saveProbe({ id, probe: PROBE, tracks: TRACKS, chapters: [] })
       state.ids.set(name, id)
     })
     const viewing = new ViewingRepository(database.get(), media())
@@ -525,6 +526,7 @@ describe('what is watched, card by card', () => {
       id,
       probe: { ...PROBE, width: (height * 16) / 9, height },
       tracks: TRACKS,
+      chapters: [],
     })
     return id
   }

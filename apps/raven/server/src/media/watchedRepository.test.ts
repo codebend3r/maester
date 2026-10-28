@@ -70,6 +70,7 @@ describe('marking cards watched', () => {
           bitrate: 5_000_000,
         },
         tracks: TRACKS,
+        chapters: [],
       })
     }
     return id

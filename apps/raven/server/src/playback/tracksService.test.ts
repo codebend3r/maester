@@ -71,7 +71,7 @@ describe('TracksService', () => {
       defaultAudio: 0,
       frameRate: 24,
     }
-    index().saveProbe({ id, probe: PROBE, tracks: stored })
+    index().saveProbe({ id, probe: PROBE, tracks: stored, chapters: [] })
     const resolved = await tracksWith('/nowhere/ffprobe').tracksFor(fileOf(id))
     expect(resolved.tracks.audio.map((track) => track.title)).toEqual(['Stored'])
   })

@@ -9,11 +9,12 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common'
-import { ENCODER_KINDS, HW_ACCELS } from '@raven/core'
+import { type Chapter, ENCODER_KINDS, HW_ACCELS } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { encoderTestArgs } from '@/ffmpeg/args'
+import { parseChapters } from '@/ffmpeg/chapters'
 import { SOFTWARE, type VideoEncoder, encoderCandidates } from '@/ffmpeg/encoder'
 import { type HlsDialect, hlsDialectOf, toolMismatch } from '@/ffmpeg/ffmpegVersion'
 import { parseKeyframes } from '@/ffmpeg/keyframes'
@@ -81,12 +82,12 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(SettingsRepository) private readonly settings: Pick<SettingsRepository, 'playback'>,
   ) {}
 
-  /** ffprobe's full `-show_format -show_streams` report, parsed but unchecked. */
+  /** ffprobe's full `-show_format -show_streams -show_chapters` report, parsed but unchecked. */
   async probeJson(path: string): Promise<unknown> {
     try {
       const { stdout } = await run(
         this.config.ffprobePath,
-        ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', path],
+        ['-v', 'error', '-show_format', '-show_streams', '-show_chapters', '-of', 'json', path],
         { maxBuffer: 16 * 1024 * 1024, timeout: this.config.ffmpegTimeoutSeconds * 1000 },
       )
       const parsed: unknown = JSON.parse(stdout)
@@ -134,12 +135,14 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  /** One ffprobe run, read twice: what the index keeps, and the file's tracks. */
-  async probeFile(path: string): Promise<{ probe: ProbeResult; tracks: FileTracks }> {
+  /** One ffprobe run, read three ways: what the index keeps, the file's tracks and its chapters. */
+  async probeFile(
+    path: string,
+  ): Promise<{ probe: ProbeResult; tracks: FileTracks; chapters: Chapter[] }> {
     const output = await this.probeJson(path)
     const probe = parseProbe(output)
     if (!probe) throw new Error('No audio or video streams')
-    return { probe, tracks: parseTracks(output) }
+    return { probe, tracks: parseTracks(output), chapters: parseChapters(output) }
   }
 
   /**

@@ -6,7 +6,7 @@ export const WatchProbe = () => {
   const id = Number(useParams().id)
   const handed = readWatchState({ state: useLocation().state, id })
   const after = (handed?.upNext ?? []).map((media) => media.id).join(', ')
-  const session = handed?.session
+  const session = handed?.session ?? null
   const saga = session?.kind === SESSION_KINDS.saga ? ` in saga ${session.sagaId}` : ''
   return <p>{`Playing ${id}${saga}, then ${after}`}</p>
 }

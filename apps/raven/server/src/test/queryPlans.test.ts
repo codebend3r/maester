@@ -5,8 +5,8 @@ import { PRODUCTION_STATISTICS } from '@/test/queryPlans'
 /**
  * Tables the copy has no statistics for, as `ANALYZE` gives an empty table
  * none: `ai_decisions` was empty on the real server, and `saga_backdrops`,
- * `person_credits`, `score_requests` and `bug_reports` came after the copy
- * was taken.
+ * `person_credits`, `score_requests`, `bug_reports` and `media_markers` came
+ * after the copy was taken.
  */
 const NOT_IN_THE_COPY: ReadonlySet<string> = new Set([
   'ai_decisions',
@@ -14,6 +14,7 @@ const NOT_IN_THE_COPY: ReadonlySet<string> = new Set([
   'person_credits',
   'score_requests',
   'bug_reports',
+  'media_markers',
 ])
 
 type KeyOfProps = { table: string; index: string | null }

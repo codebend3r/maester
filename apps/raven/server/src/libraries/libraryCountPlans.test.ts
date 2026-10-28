@@ -79,7 +79,9 @@ describe.each([
         file: { path: `/m/${name}`, root: '/m', size: 1, mtimeMs: 1 },
       }),
     )
-    ids.slice(1).forEach((id) => index.saveProbe({ id, probe: PROBE, tracks: TRACKS }))
+    ids
+      .slice(1)
+      .forEach((id) => index.saveProbe({ id, probe: PROBE, tracks: TRACKS, chapters: [] }))
     new MatchFiles(database.get(), repositories(database.get()).metadata).setMatch({
       ids: ids.slice(0, 1),
       match: 'unmatched',

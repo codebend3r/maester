@@ -88,6 +88,7 @@ import { SubtitlesService } from '@/playback/subtitlesService'
 import { StreamsController } from '@/streams/streamsController'
 import { StreamSessions } from '@/streams/streamSessions'
 import { TracksService } from '@/playback/tracksService'
+import { MarkersService } from '@/markers/markersService'
 import { assertRoutesMarked } from '@/routeMarks'
 import { watchFolder } from '@/scanner/folderWatch'
 import { LibraryWatcher, WATCH_OPTIONS, type WatchOptions } from '@/scanner/libraryWatcher'
@@ -233,6 +234,7 @@ export class AppModule {
         FfmpegService,
         ThumbnailService,
         TracksService,
+        MarkersService,
         KeyframesService,
         { provide: CLOCK, useValue: SYSTEM_CLOCK },
         HlsSessions,

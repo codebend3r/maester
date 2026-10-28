@@ -668,12 +668,14 @@ export class MediaRepository {
 
   /** The film after `media`'s in saga `sagaId` of its library, oldest first, as the saga's page lists them. */
   private nextInSaga({ media, sagaId, account }: MediaRepositoryNextInSagaProps): MediaItem | null {
-    const films = this.sagaGroups({ libraryId: media.libraryId, account }).find(
-      (saga) => saga.tmdbId === sagaId,
-    )?.media
-    const at =
-      films?.findIndex((film) => film.item != null && film.item.id === media.item?.id) ?? -1
-    return at < 0 ? null : (films?.[at + 1] ?? null)
+    const films =
+      this.sagaGroups({ libraryId: media.libraryId, account }).find(
+        (saga) => saga.tmdbId === sagaId,
+      )?.media ?? []
+    const at = films.findIndex(
+      (film) => film.item != null && film.item.id === (media.item?.id ?? null),
+    )
+    return at < 0 ? null : (films[at + 1] ?? null)
   }
 
   /**

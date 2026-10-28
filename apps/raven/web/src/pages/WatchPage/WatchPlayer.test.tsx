@@ -3,6 +3,7 @@ import {
   ACCOUNT_TICKET_SECONDS,
   ITEM_TYPES,
   type MediaItem,
+  type MediaMarkers,
   type MediaTracks,
   PLAY_LINK_MAX_NEXT,
   SESSION_KINDS,
@@ -26,6 +27,8 @@ import { bugReport, itemSummary, mediaItem } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 import { ravenVersion } from '@/lib/version'
+
+const NO_MARKERS: MediaMarkers = { intro: null, credits: null, chapters: [] }
 
 const SINGLE: ViewingSession = { kind: SESSION_KINDS.single }
 const QUEUE: ViewingSession = { kind: SESSION_KINDS.queue }
@@ -62,8 +65,12 @@ const TRACKS: MediaTracks = {
 }
 
 const spies: Array<{ mockRestore: () => void }> = []
-const stubTracks = (tracks: MediaTracks = TRACKS) =>
-  spies.push(spyOn(api, 'getTracks').mockImplementation(async () => tracks))
+/** What the player reads beside the video: its tracks, and its markers, none by default. */
+const stubPlayerReads = (tracks: MediaTracks = TRACKS) =>
+  spies.push(
+    spyOn(api, 'getTracks').mockImplementation(async () => tracks),
+    spyOn(api, 'getMarkers').mockImplementation(async () => NO_MARKERS),
+  )
 
 afterEach(() => {
   cleanup()
@@ -237,7 +244,7 @@ describe('Player progress', () => {
   })
 
   it('reads the lists again only once the last position is saved, so they show the new spot', async () => {
-    stubTracks()
+    stubPlayerReads()
     spies.push(spyOn(api, 'recordPlay').mockImplementation(async () => undefined))
     const saving = held<void>()
     const saveSpy = spyOn(api, 'saveProgress').mockImplementation(() => saving.promise)
@@ -271,7 +278,7 @@ describe('Player progress', () => {
 
 describe('Player history', () => {
   it('records a play the first time the video plays, and only then', async () => {
-    stubTracks()
+    stubPlayerReads()
     const played = spyOn(api, 'recordPlay').mockImplementation(async () => undefined)
     const { container } = renderWithProviders({
       ui: (
@@ -314,7 +321,7 @@ describe('shared player capability module', () => {
 })
 
 describe('WatchPage favourite', () => {
-  beforeEach(() => stubTracks())
+  beforeEach(() => stubPlayerReads())
 
   it('favourites the video while it plays, showing the heart before the server answers', async () => {
     // The server's copy of the video, which a favourite changes and every read returns.
@@ -352,7 +359,7 @@ describe('WatchPage favourite', () => {
 })
 
 describe('WatchPlayer up next', () => {
-  beforeEach(() => stubTracks())
+  beforeEach(() => stubPlayerReads())
 
   it('plays the next video in line once this one ends, and offers it sooner', async () => {
     const upNext = [
@@ -389,7 +396,7 @@ describe('WatchPlayer up next', () => {
 })
 
 describe('WatchPlayer sessions', () => {
-  beforeEach(() => stubTracks())
+  beforeEach(() => stubPlayerReads())
 
   it('plays the next of the session, as the server finds it, once this one ends', async () => {
     const show: ViewingSession = { kind: SESSION_KINDS.show }
@@ -493,6 +500,34 @@ describe('WatchPlayer sessions', () => {
   })
 })
 
+describe('WatchPlayer markers', () => {
+  it("reads the video's markers and breaks the timeline at its chapters", async () => {
+    const markers = spyOn(api, 'getMarkers').mockImplementation(async () => ({
+      ...NO_MARKERS,
+      chapters: [
+        { start: 0, end: 2906.384, title: 'Opening' },
+        { start: 2906.384, end: 5812.768, title: 'Part B' },
+      ],
+    }))
+    spies.push(
+      markers,
+      spyOn(api, 'getTracks').mockImplementation(async () => TRACKS),
+    )
+    const { container } = renderWithProviders({
+      ui: (
+        <Player
+          media={mediaItem({ container: 'mp4' })}
+          session={SINGLE}
+          upNext={[]}
+          backTo="/libraries/2"
+        />
+      ),
+    })
+    await waitFor(() => expect(container.querySelector('[style*="mask"]')).not.toBeNull())
+    expect(markers).toHaveBeenCalledWith(7)
+  })
+})
+
 describe('WatchPlayer Open in Raven', () => {
   const opened = () => {
     const open = spyOn(ravenPlayer, 'open').mockImplementation(() => {})
@@ -520,7 +555,7 @@ describe('WatchPlayer Open in Raven', () => {
       .map((button) => button.textContent)
       .filter((name) => name !== 'Back')
 
-  beforeEach(() => stubTracks())
+  beforeEach(() => stubPlayerReads())
 
   it('offers nothing on Unplayable while this browser has not asked for it', async () => {
     setBrowserSupport(() => false)

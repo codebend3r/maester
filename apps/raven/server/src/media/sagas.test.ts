@@ -52,7 +52,7 @@ describe("a library's sagas", () => {
         kind: 'movies',
         file: { path: `/m/${title}/${name}`, root: '/m', size: 1000 - position, mtimeMs: 1 },
       })
-      index.saveProbe({ id: fileId, probe: PROBE, tracks: TRACKS })
+      index.saveProbe({ id: fileId, probe: PROBE, tracks: TRACKS, chapters: [] })
       metadata.link({ mediaIds: [fileId], itemIds: [itemId] })
       state.ids.set(name, fileId)
     })
@@ -96,12 +96,15 @@ describe("a library's sagas", () => {
     const next = (name: string) => {
       const playing = media().get({ id: id(name), account: TEST_ACCOUNTS.a })
       if (!playing) throw new Error(`no ${name}`)
-      return media().nextInSession({ media: playing, session, account: TEST_ACCOUNTS.a })?.fileName
+      return (
+        media().nextInSession({ media: playing, session, account: TEST_ACCOUNTS.a })?.fileName ??
+        null
+      )
     }
     expect(next('Fellowship.mkv')).toBe('Two Towers.mkv')
     expect(next('Two Towers.mkv')).toBe('Return 2160p.mkv')
-    expect(next('Return 1080p.mkv')).toBeUndefined()
-    expect(next('Return 2160p.mkv')).toBeUndefined()
+    expect(next('Return 1080p.mkv')).toBeNull()
+    expect(next('Return 2160p.mkv')).toBeNull()
   })
 
   it('plays nothing next in a saga the film is not in', () => {

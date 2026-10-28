@@ -15,6 +15,7 @@ import {
 import {
   AUTH_CONFIG_STATES,
   type AuthConfig,
+  type MediaMarkers,
   type MediaStreams,
   type MediaTicket,
   type MediaTracks,
@@ -32,6 +33,7 @@ import { streamArgs } from '@/ffmpeg/args'
 import { FFMPEG_SIGNALS, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { parseStreams } from '@/ffmpeg/streams'
 import { KeyframesService } from '@/hls/keyframesService'
+import { MarkersService } from '@/markers/markersService'
 import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { PrivateBy } from '@/lock/lockGuard'
 import { SettingsRepository } from '@/settings/settingsRepository'
@@ -55,7 +57,7 @@ import { ROUTE_PARAMS } from '@/requestParts'
 
 /**
  * What a player needs beyond the file itself: the tracks to choose from,
- * subtitles as WebVTT, and a converted stream for files or tracks the
+ * the intro, credits and chapters, subtitles as WebVTT, and a converted stream for files or tracks the
  * browser cannot play directly.
  */
 @Controller('api/media')
@@ -74,6 +76,7 @@ export class PlaybackController {
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
     @Inject(AuthSessions) private readonly callers: AuthSessions,
     @Inject(KeyframesService) private readonly keyframes: KeyframesService,
+    @Inject(MarkersService) private readonly markers: MarkersService,
   ) {}
 
   private fileOf(id: number): MediaFile {
@@ -109,6 +112,12 @@ export class PlaybackController {
     const { tracks } = await this.tracks.tracksFor(file)
     this.warmKeyframes(file)
     return tracks
+  }
+
+  /** The intro, credits and chapters the player skips and rolls on by. */
+  @Get(':id/markers')
+  listMarkers(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number): Promise<MediaMarkers> {
+    return this.markers.markersFor(this.fileOf(id))
   }
 
   /**

@@ -1,10 +1,13 @@
 import { basename, dirname, relative } from 'node:path'
 import { Inject, Injectable } from '@nestjs/common'
 import {
+  type Chapter,
   type LibraryKind,
+  type Marker,
   type MediaTracks,
   type ThumbnailState,
   containerOf,
+  isChapter,
   isMediaTracks,
   isNumber,
   isThumbnailState,
@@ -12,7 +15,9 @@ import {
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
+import { chapterMarkers } from '@/ffmpeg/chapters'
 import type { ProbeResult } from '@/ffmpeg/probe'
+import { forgetDetectedMarkers, offerMarkers, readMarkers } from '@/markers/markerRows'
 import { namedAs } from '@/media/namedAs'
 import type { IndexedFile, Reconciled } from '@/scanner/reconcile'
 import type { FoundFile } from '@/scanner/walk'
@@ -53,6 +58,8 @@ type FileRow = {
 
 const isKeyframes = listOf(isNumber)
 
+const isChapters = listOf(isChapter)
+
 /** Its name, and the folder it sits in under the folder its titles sit in (a library path, or a letter or group folder). */
 const placeOf = (file: FoundFile): { fileName: string; folder: string } => ({
   fileName: basename(file.path),
@@ -86,7 +93,14 @@ type MediaIndexApplyProps = {
   changes: Reconciled
 }
 
-type MediaIndexSaveProbeProps = { id: number; probe: ProbeResult; tracks: MediaTracks }
+type MediaIndexSaveProbeProps = {
+  id: number
+  probe: ProbeResult
+  tracks: MediaTracks
+  chapters: readonly Chapter[]
+}
+
+type MediaIndexSaveChaptersProps = { id: number; chapters: readonly Chapter[] }
 
 type MediaIndexSaveProbeErrorProps = { id: number; error: string }
 
@@ -202,15 +216,20 @@ export class MediaIndex {
     return Number(result.lastInsertRowid)
   }
 
-  /** The file was replaced on disk: forget what the old one held so it gets probed again. */
+  /**
+   * The file was replaced on disk: forget what the old one held so it gets
+   * probed again, its chapters and the markers they or a detector gave it
+   * included. An admin's own markers stay.
+   */
   markChanged({ id, size, mtimeMs, at = new Date() }: MediaIndexMarkChangedProps): void {
     this.db
       .prepare(
         `UPDATE media SET size = ?, mtime_ms = ?, probed = 0, probe_error = NULL, thumbnail = 'pending',
-                tracks = NULL, keyframes = NULL, changed_at = ?
+                tracks = NULL, keyframes = NULL, chapters = NULL, changed_at = ?
           WHERE id = ?`,
       )
       .run(size, Math.round(mtimeMs), at.toISOString(), id)
+    forgetDetectedMarkers({ db: this.db, mediaId: id })
   }
 
   /**
@@ -267,28 +286,31 @@ export class MediaIndex {
     })()
   }
 
-  /** What a probe found, and the tracks it found. */
-  saveProbe({ id, probe, tracks }: MediaIndexSaveProbeProps): void {
-    this.db
-      .prepare(
-        `UPDATE media SET probed = 1, probe_error = NULL, duration = ?, width = ?, height = ?,
-                video_codec = ?, video_bit_depth = ?, hdr = ?, audio_codec = ?, audio_channels = ?,
-                bitrate = ?, tracks = ?
-          WHERE id = ?`,
-      )
-      .run(
-        probe.duration,
-        probe.width,
-        probe.height,
-        probe.videoCodec,
-        probe.videoBitDepth,
-        probe.hdr ? 1 : 0,
-        probe.audioCodec,
-        probe.audioChannels,
-        probe.bitrate,
-        JSON.stringify(tracks),
-        id,
-      )
+  /** What a probe found: the file's facts, its tracks, its chapters and the markers they name. */
+  saveProbe({ id, probe, tracks, chapters }: MediaIndexSaveProbeProps): void {
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `UPDATE media SET probed = 1, probe_error = NULL, duration = ?, width = ?, height = ?,
+                  video_codec = ?, video_bit_depth = ?, hdr = ?, audio_codec = ?, audio_channels = ?,
+                  bitrate = ?, tracks = ?
+            WHERE id = ?`,
+        )
+        .run(
+          probe.duration,
+          probe.width,
+          probe.height,
+          probe.videoCodec,
+          probe.videoBitDepth,
+          probe.hdr ? 1 : 0,
+          probe.audioCodec,
+          probe.audioChannels,
+          probe.bitrate,
+          JSON.stringify(tracks),
+          id,
+        )
+      this.saveChapters({ id, chapters })
+    })()
   }
 
   saveProbeError({ id, error }: MediaIndexSaveProbeErrorProps): void {
@@ -308,6 +330,27 @@ export class MediaIndex {
 
   saveTracks({ id, tracks }: MediaIndexSaveTracksProps): void {
     this.db.prepare('UPDATE media SET tracks = ? WHERE id = ?').run(JSON.stringify(tracks), id)
+  }
+
+  /** The chapters a probe stored, or null when the file's have not been read yet (or no longer read). */
+  storedChapters(id: number): Chapter[] | null {
+    const row = this.db
+      .prepare<[number], { chapters: string | null }>('SELECT chapters FROM media WHERE id = ?')
+      .get(id)
+    const chapters = row?.chapters ?? null
+    if (chapters === null) return null
+    return parseJsonAs({ json: chapters, guard: isChapters })
+  }
+
+  /** The file's chapters, and the intro and credits their titles name. */
+  saveChapters({ id, chapters }: MediaIndexSaveChaptersProps): void {
+    this.db.prepare('UPDATE media SET chapters = ? WHERE id = ?').run(JSON.stringify(chapters), id)
+    offerMarkers({ db: this.db, mediaId: id, markers: chapterMarkers(chapters) })
+  }
+
+  /** The intro and credits stored for the file, each null when it has none. */
+  storedMarkers(id: number): { intro: Marker | null; credits: Marker | null } {
+    return readMarkers({ db: this.db, mediaId: id })
   }
 
   /** The video keyframes a probe stored, in seconds, or null when none are stored (or they no longer read). */

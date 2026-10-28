@@ -199,7 +199,8 @@ describe('what each library holds, and the order they come in', () => {
         kind: 'movies',
         file: { path: `/${name}/${position}.mkv`, root: `/${name}`, size: 1, mtimeMs: 1 },
       })
-      if (frame) index.saveProbe({ id: fileId, probe: { ...PROBE, ...frame }, tracks: TRACKS })
+      if (frame)
+        index.saveProbe({ id: fileId, probe: { ...PROBE, ...frame }, tracks: TRACKS, chapters: [] })
       return fileId
     })
     return { id, files }
