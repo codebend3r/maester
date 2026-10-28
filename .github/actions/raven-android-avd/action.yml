@@ -1,19 +1,76 @@
-name: 📺 raven Android TV AVD key
+name: 📺 raven Android TV AVD
 description: >-
-  Lets the runner's user open KVM and names the Android TV AVD cache: the key the PR's
-  job restores and app-caches.yml saves under, so the two never drift apart.
+  The Android TV emulator the app's flows run on: its settings, KVM, the AVD with a
+  booted snapshot restored from the cache, or made and booted once on a miss. Restores
+  only; its outputs are the cache's key and path, for app-caches.yml to save, and the
+  settings the flows' emulator step starts it with.
 
-# The calling job sets the emulator's EMULATOR_BUILD, EMULATOR_CORES, EMULATOR_RAM,
-# EMULATOR_OPTIONS and AVD_IMAGE in its env, as the emulator runner steps read them too.
+# The single definition of the emulator, shared by the PR's Android TV job and by
+# app-caches.yml, which saves the snapshot on main. The key names everything the snapshot
+# is made from, so a snapshot from anything else is never restored to cold boot.
 outputs:
   key:
-    description: The AVD cache's key
-    value: ${{ steps.key.outputs.key }}
+    value: ${{ steps.avd.outputs.key }}
+  path:
+    value: ${{ steps.avd.outputs.path }}
+  cache-hit:
+    value: ${{ steps.restore.outputs.cache-hit }}
+  api-level:
+    value: ${{ steps.avd.outputs.api-level }}
+  target:
+    value: ${{ steps.avd.outputs.target }}
+  arch:
+    value: ${{ steps.avd.outputs.arch }}
+  profile:
+    value: ${{ steps.avd.outputs.profile }}
+  emulator-build:
+    value: ${{ steps.avd.outputs.emulator-build }}
+  cores:
+    value: ${{ steps.avd.outputs.cores }}
+  ram-size:
+    value: ${{ steps.avd.outputs.ram-size }}
+  emulator-options:
+    value: ${{ steps.avd.outputs.emulator-options }}
 runs:
   using: composite
   steps:
-    # The emulator runs on KVM, which the runner's user may not open until a udev rule
-    # lets it.
+    # Android TV at API 36 (the app's target SDK), x86_64 for KVM, at 960 by 540 dp, on the
+    # emulator build the flows were written on (36.5.11). The runner writes the RAM verbatim
+    # to hw.ramSize, an integer in MiB: a suffix makes it fall back to 1024 MiB. The key adds
+    # the system image's revision (the runner always installs the newest, which this reads
+    # from the same repository) and a hash of the options. Bump the `v1` to throw the cache
+    # away by hand.
+    - name: 🔑 AVD settings and key
+      id: avd
+      shell: bash
+      env:
+        API_LEVEL: '36'
+        TARGET: android-tv
+        ARCH: x86_64
+        PROFILE: tv_1080p
+        EMULATOR_BUILD: '15261927'
+        CORES: '4'
+        RAM_SIZE: '4096'
+        OPTIONS: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+      run: |
+        image="system-images;android-$API_LEVEL;$TARGET;$ARCH"
+        revision="$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null | awk -F'|' -v image="$image" '{ gsub(/ /, "", $1); gsub(/ /, "", $2) } $1 == image { print $2; exit }')"
+        test -n "$revision"
+        options_hash="$(echo "$OPTIONS" | sha256sum | cut -c1-12)"
+        {
+          echo "key=avd-v1-$TARGET-$API_LEVEL-$ARCH-$PROFILE-image$revision-emulator$EMULATOR_BUILD-$CORES-cores-$RAM_SIZE-$options_hash"
+          printf 'path<<LIST\n%s\n%s\nLIST\n' "$HOME/.android/avd/*" "$HOME/.android/adb*"
+          echo "api-level=$API_LEVEL"
+          echo "target=$TARGET"
+          echo "arch=$ARCH"
+          echo "profile=$PROFILE"
+          echo "emulator-build=$EMULATOR_BUILD"
+          echo "cores=$CORES"
+          echo "ram-size=$RAM_SIZE"
+          echo "emulator-options=$OPTIONS"
+        } >> "$GITHUB_OUTPUT"
+
+    # The emulator runs on KVM, which the runner's user may not open until a udev rule lets it.
     - name: 🧩 Enable KVM
       shell: bash
       run: |
@@ -21,16 +78,50 @@ runs:
         sudo udevadm control --reload-rules
         sudo udevadm trigger --name-match=kvm
 
-    # The key names everything the snapshot is made from: the system image's revision (the
-    # runner always installs the newest, which this reads from the same repository), the
-    # emulator build, the cores, the RAM and a hash of the options. A snapshot from anything
-    # else would not load and the emulator would cold boot every run. Bump the `v1` to throw
-    # the cache away by hand.
-    - name: 🔑 AVD cache key
-      id: key
-      shell: bash
-      run: |
-        revision="$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null | awk -F'|' -v image="$AVD_IMAGE" '{ gsub(/ /, "", $1); gsub(/ /, "", $2) } $1 == image { print $2; exit }')"
-        test -n "$revision"
-        options="$(echo "$EMULATOR_OPTIONS" | sha256sum | cut -c1-12)"
-        echo "key=avd-v1-android-tv-36-x86_64-tv_1080p-image$revision-emulator$EMULATOR_BUILD-$EMULATOR_CORES-cores-$EMULATOR_RAM-$options" >> "$GITHUB_OUTPUT"
+    - name: 🗃️ Android TV AVD cache
+      id: restore
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.avd.outputs.path }}
+        key: ${{ steps.avd.outputs.key }}
+
+    # Only on a cache miss: makes the AVD and boots it once, which leaves the snapshot. The
+    # runner unlocks the screen with `adb shell input keyevent 82` the moment the boot
+    # completes, and that call sometimes exits 255 while the Android TV image is still
+    # settling, which fails the step with a healthy emulator. The second attempt retries it,
+    # and reuses the AVD the first one made.
+    - name: 📺 Make the Android TV AVD
+      id: make
+      if: steps.restore.outputs.cache-hit != 'true'
+      continue-on-error: true
+      # reactivecircus/android-emulator-runner v2.38.0
+      uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+      with:
+        api-level: ${{ steps.avd.outputs.api-level }}
+        target: ${{ steps.avd.outputs.target }}
+        arch: ${{ steps.avd.outputs.arch }}
+        profile: ${{ steps.avd.outputs.profile }}
+        emulator-build: ${{ steps.avd.outputs.emulator-build }}
+        cores: ${{ steps.avd.outputs.cores }}
+        ram-size: ${{ steps.avd.outputs.ram-size }}
+        force-avd-creation: false
+        emulator-options: ${{ steps.avd.outputs.emulator-options }}
+        disable-animations: false
+        script: echo "Booted the Android TV AVD once"
+
+    - name: 📺 Make the Android TV AVD again
+      if: steps.make.outcome == 'failure'
+      # reactivecircus/android-emulator-runner v2.38.0
+      uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+      with:
+        api-level: ${{ steps.avd.outputs.api-level }}
+        target: ${{ steps.avd.outputs.target }}
+        arch: ${{ steps.avd.outputs.arch }}
+        profile: ${{ steps.avd.outputs.profile }}
+        emulator-build: ${{ steps.avd.outputs.emulator-build }}
+        cores: ${{ steps.avd.outputs.cores }}
+        ram-size: ${{ steps.avd.outputs.ram-size }}
+        force-avd-creation: false
+        emulator-options: ${{ steps.avd.outputs.emulator-options }}
+        disable-animations: false
+        script: echo "Booted the Android TV AVD once"

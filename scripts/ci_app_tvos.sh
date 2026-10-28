@@ -6,8 +6,8 @@
 #   bun run ci:app:tvos                         every step
 #   bun run ci:app:tvos -- --skip-nx-cache      the flow for real, even on a cached pass
 set -euo pipefail
-# shellcheck source=scripts/local_ci.sh
-source "$(dirname "$0")/local_ci.sh"
+# shellcheck source=scripts/local_ci_app.sh
+source "$(dirname "$0")/local_ci_app.sh"
 
 # Expo's Podfile points Xcode's compilers at ccache, so a rebuild reuses unchanged objects.
 export USE_CCACHE=1

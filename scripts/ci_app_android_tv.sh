@@ -7,13 +7,16 @@
 #   bun run ci:app:android-tv                         every step
 #   bun run ci:app:android-tv -- --skip-nx-cache      the flows for real, even on a cached pass
 set -euo pipefail
-# shellcheck source=scripts/local_ci.sh
-source "$(dirname "$0")/local_ci.sh"
+# shellcheck source=scripts/local_ci_app.sh
+source "$(dirname "$0")/local_ci_app.sh"
 
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 # Gradle runs on Android Studio's JDK, as apps/raven/app/CLAUDE.md says.
 export JAVA_HOME="${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}"
+# React Native compiles its native code once per ABI, four by default; the emulator here
+# is arm64, so the build makes only that. An Nx input of the build and the flows.
+export ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a
 export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000
 export MAESTRO_CLI_NO_ANALYTICS=1
 FAILURE_HINT="Maestro's screenshots and logs: ~/.maestro/tests; $FAILURE_HINT"
@@ -31,17 +34,20 @@ fi
 if ! command -v sdkmanager > /dev/null; then
   echo 'Installing the Android SDK command-line tools'
   brew install --cask android-commandlinetools
-  yes | /opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager --sdk_root="$ANDROID_HOME" 'cmdline-tools;latest'
+  # Fed by process substitution, not a pipe: `yes` dies of SIGPIPE when the manager exits,
+  # which pipefail would turn into the script's failure.
+  /opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager --sdk_root="$ANDROID_HOME" 'cmdline-tools;latest' < <(yes)
 fi
 if ! sdkmanager --list_installed 2> /dev/null | grep -q 'android-36;android-tv;arm64-v8a'; then
   echo 'Installing the SDK packages and the Android TV system image (about 1.5 GB)'
-  yes | sdkmanager --licenses > /dev/null
+  sdkmanager --licenses > /dev/null < <(yes)
   sdkmanager platform-tools emulator 'platforms;android-36' "$IMAGE"
 fi
 brew_install ffmpeg ffmpeg
 # React Native's CMake setup uses ccache whenever it is on the path.
 brew_install ccache ccache
 install_maestro
+require_node
 
 step 'Install'
 bun install --frozen-lockfile

@@ -17,17 +17,17 @@ The flow is not Maestro (it cannot drive tvOS) but an XCUITest, `apps/raven/app/
 
 ## What it does
 
-| Step                        | What runs                                                                                                                                                          | Nx cached    |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
-| Tools                       | Installs what is missing with Homebrew: `ffmpeg`, `jq`, `cocoapods`, `ccache`. Downloads the tvOS simulator runtime matching Xcode's SDK when there is none (8 GB) | no           |
-| Install                     | `bun install --frozen-lockfile`                                                                                                                                    | no           |
-| Build the libraries         | `nx run-many -t build -p @raven/core @raven/ui @shared/server`, once, so the server and the build do not both rebuild them                                         | yes          |
-| Start the fixture server    | `@raven/server:serve:fixture` in the background on `:8490`, unless something already listens there                                                                 | no, a server |
-| Build                       | `@raven/app:build:tvos`, which runs `prebuild:tvos` (`EXPO_TV=1 expo prebuild`, `pod install`, the test target) and then `xcodebuild`'s Release build              | yes          |
-| Check the pods              | `ios/` is the TV project (`SDKROOT = appletvos`) and `Podfile.lock` matches `Pods/Manifest.lock`, since `expo prebuild` exits 0 when `pod install` fails           | no, instant  |
-| Wait for the fixture        | Its `raven fixture server ready` line, up to three minutes                                                                                                         | no           |
-| Boot the Apple TV simulator | Reuses the simulator `raven-tv` on the SDK's runtime, or makes one (CI's Apple TV 4K, 3rd generation), boots it and installs `raven.app`                           | no           |
-| Apple TV end to end         | `@raven/app:e2e:tvos`: `xcodebuild test` of `RavenRemoteTests` on `raven-tv`, then a screenshot of where it ended                                                  | yes          |
+| Step                        | What runs                                                                                                                                                                                          | Nx cached    |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Tools                       | Installs what is missing with Homebrew: `ffmpeg`, `jq`, `cocoapods`, `ccache`; checks for Node 22.18 or newer. Downloads the tvOS simulator runtime matching Xcode's SDK when there is none (8 GB) | no           |
+| Install                     | `bun install --frozen-lockfile`                                                                                                                                                                    | no           |
+| Build the libraries         | `nx run-many -t build -p @raven/core @raven/ui @shared/server`, once, so the server and the build do not both rebuild them                                                                         | yes          |
+| Start the fixture server    | `@raven/server:serve:fixture` in the background on `:8490`, unless something already listens there                                                                                                 | no, a server |
+| Build                       | `@raven/app:build:tvos`, which runs `prebuild:tvos` (`EXPO_TV=1 expo prebuild`, `pod install`, the test target) and then `xcodebuild`'s Release build                                              | yes          |
+| Check the pods              | `ios/` is the TV project (`SDKROOT = appletvos`) and `Podfile.lock` matches `Pods/Manifest.lock`, since `expo prebuild` exits 0 when `pod install` fails                                           | no, instant  |
+| Wait for the fixture        | Its `raven fixture server ready` line, up to three minutes                                                                                                                                         | no           |
+| Boot the Apple TV simulator | Reuses the simulator `raven-tv` on the SDK's runtime, or makes one (CI's Apple TV 4K, 3rd generation), boots it and installs `raven.app`                                                           | no           |
+| Apple TV end to end         | `@raven/app:e2e:tvos`: `xcodebuild test` of `RavenRemoteTests` on `raven-tv`, then a screenshot of where it ended                                                                                  | yes          |
 
 It sets `APP_VARIANT=development`, `EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490`, `DEVELOPER_DIR` (`/Applications/Xcode.app/Contents/Developer` unless set) and `TVOS_SIMULATOR=raven-tv`. All four are Nx inputs, so the cache keys stay the same run to run. The fixture server stops when the script ends, pass or fail; the simulator stays booted.
 

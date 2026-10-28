@@ -28,9 +28,12 @@ if [ -f libs/raven/mpv/resources/darwin-arm64/raven_mpv.node ]; then
 else
   brew_install gh gh
   gh auth status > /dev/null || { echo 'Sign in to GitHub first: gh auth login' >&2; exit 1; }
-  # The handoff CI's desktop-native job packs lives one day, so the newest run that has it wins.
+  # The handoff CI's desktop-native job packs lives one day, so the newest run that has it
+  # wins, among runs whose addon sources match this checkout's.
   found=''
   while read -r id sha; do
+    git cat-file -e "$sha^{commit}" 2> /dev/null || git fetch -q origin "$sha" 2> /dev/null || continue
+    git diff --quiet "$sha" HEAD -- libs/raven/mpv/native || continue
     if gh run download "$id" -n "raven-native-handoff-$sha" -D "$WORK" > /dev/null 2>&1; then
       tar -xf "$WORK/raven-native-handoff.tar"
       echo "Unpacked the handoff from run $id"
@@ -39,7 +42,7 @@ else
     fi
   done < <(gh run list --workflow pull-request-checks.yml --limit 20 --json databaseId,headSha --jq '.[] | "\(.databaseId) \(.headSha)"')
   if [ -z "$found" ]; then
-    echo 'No run from the last day has the libmpv handoff. Build it with bun run mpv:native (the full native toolchain, see the get-started skill).' >&2
+    echo 'No run from the last day has a libmpv handoff built from these addon sources. Build it with bun run mpv:native (the full native toolchain, see the get-started skill).' >&2
     exit 1
   fi
 fi

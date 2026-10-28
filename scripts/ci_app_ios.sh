@@ -6,8 +6,8 @@
 #   bun run ci:app:ios                         every step
 #   bun run ci:app:ios -- --skip-nx-cache      the flows for real, even on a cached pass
 set -euo pipefail
-# shellcheck source=scripts/local_ci.sh
-source "$(dirname "$0")/local_ci.sh"
+# shellcheck source=scripts/local_ci_app.sh
+source "$(dirname "$0")/local_ci_app.sh"
 
 # Expo's Podfile points Xcode's compilers at ccache, so a rebuild reuses unchanged objects.
 export USE_CCACHE=1
@@ -38,7 +38,7 @@ start_fixture
 
 # CI's iPhone 16, or the runtime's newest iPhone when it has none.
 step 'Boot the iPhone simulator'
-type="$(xcrun simctl list -j runtimes iOS | jq -r --arg runtime "$runtime" '.runtimes[] | select(.identifier == $runtime) | [.supportedDeviceTypes[] | select(.productFamily == "iPhone")] | (map(select(.identifier | endswith(".iPhone-16"))) + .) | first | .identifier')"
+type="$(xcrun simctl list -j runtimes iOS | jq -er --arg runtime "$runtime" '.runtimes[] | select(.identifier == $runtime) | [.supportedDeviceTypes[] | select(.productFamily == "iPhone")] | (map(select(.identifier | endswith(".iPhone-16"))) + .) | first | .identifier')"
 device="$(boot_simulator raven-phone "$runtime" "$type")"
 
 step 'Build for the iPhone and iPad simulator'
