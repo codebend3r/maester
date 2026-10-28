@@ -13,7 +13,8 @@ source "$(dirname "$0")/local_ci_app.sh"
 export TVOS_SIMULATOR=raven-tv
 FAILURE_HINT="The test's result bundle: apps/raven/app/build/tvos-e2e/Logs/Test; $FAILURE_HINT"
 
-prepare_apple_app tvOS appletvsimulator
+require_apple_tools tvOS appletvsimulator
+prepare_app
 
 step 'Build for the Apple TV simulator'
 CURL_HOME="$WORK" bunx nx run @raven/app:build:tvos --excludeTaskDependencies

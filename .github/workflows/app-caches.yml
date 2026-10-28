@@ -40,9 +40,9 @@ env:
   APP_NODE_VERSION: 24.21.0
 
 jobs:
-  apple:
+  build:
     name: ${{ matrix.platform.name }}
-    runs-on: macos-26
+    runs-on: ${{ matrix.platform.runner }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -50,8 +50,13 @@ jobs:
         platform:
           - name: 📱 iPhone and iPad caches
             id: ios
+            runner: macos-26
           - name: 📺 Apple TV caches
             id: tvos
+            runner: macos-26
+          - name: 📺 Android TV caches
+            id: android-tv
+            runner: ubuntu-24.04
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
@@ -64,22 +69,22 @@ jobs:
           node-version: ${{ env.APP_NODE_VERSION }}
 
       # Past Nx's cache, which would otherwise restore the build and compile nothing.
-      - name: 🔨 Build for the simulator
+      - name: 🔨 Build
         run: bunx nx run @raven/app:build:${{ matrix.platform.id }} --excludeTaskDependencies --skip-nx-cache
 
       - name: 📊 ccache
         run: ccache --show-stats
 
-      # The exact-key caches are saved only when they were not restored, since a save
-      # under an existing key fails.
-      - name: 💾 Save Homebrew's packages
+      # An exact-key cache is saved only when it was not restored, since a save under an
+      # existing key fails. ccache's key, and Gradle's, are per run.
+      - name: 💾 Save the packages
         if: steps.setup.outputs.packages-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: ${{ steps.setup.outputs.packages-path }}
           key: ${{ steps.setup.outputs.packages-key }}
 
-      - name: 💾 Save CocoaPods' downloads
+      - name: 💾 Save the dependencies
         if: steps.setup.outputs.dependencies-hit != 'true'
         uses: actions/cache/save@v6
         with:
@@ -98,46 +103,13 @@ jobs:
         with:
           keep: ${{ steps.setup.outputs.supersedes }}
 
-  android-tv:
-    name: 📺 Android TV caches
+  android-tv-avd:
+    name: 📺 Android TV emulator cache
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
-
-      - name: 🧰 Set up the app build
-        id: setup
-        uses: ./.github/actions/raven-app-setup
-        with:
-          platform: android-tv
-          node-version: ${{ env.APP_NODE_VERSION }}
-
-      # Past Nx's cache, which would otherwise restore the APK and compile nothing.
-      - name: 🔨 Build the Android TV APK
-        run: bunx nx run @raven/app:build:android-tv --excludeTaskDependencies --skip-nx-cache
-
-      - name: 📊 ccache
-        run: ccache --show-stats
-
-      - name: 💾 Save apt's packages
-        if: steps.setup.outputs.packages-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ steps.setup.outputs.packages-path }}
-          key: ${{ steps.setup.outputs.packages-key }}
-
-      - name: 💾 Save Gradle's downloads and build cache
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ steps.setup.outputs.dependencies-path }}
-          key: ${{ steps.setup.outputs.dependencies-key }}
-
-      - name: 💾 Save ccache
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ steps.setup.outputs.ccache-path }}
-          key: ${{ steps.setup.outputs.ccache-key }}
 
       # Makes and boots the AVD when main has no snapshot under the current key; when it
       # has one, only checks, rather than downloading 2.7 GB to learn it.
@@ -154,10 +126,7 @@ jobs:
           path: ${{ steps.avd.outputs.path }}
           key: ${{ steps.avd.outputs.key }}
 
-      # Main's newest entry is the one every PR restores; the older ones only fill the cache.
       - name: 🧹 Delete superseded caches
         uses: ./.github/actions/delete-superseded-caches
         with:
-          keep: |
-            ${{ steps.setup.outputs.supersedes }}
-            avd- ${{ steps.avd.outputs.key }}
+          keep: ${{ steps.avd.outputs.supersedes }}

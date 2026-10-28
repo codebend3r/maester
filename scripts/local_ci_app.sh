@@ -105,10 +105,10 @@ prepare_app() {
   start_fixture
 }
 
-# prepare_apple_app <iOS|tvOS> <sdk>: the tools, the simulator runtime matching Xcode's
-# SDK (SIM_RUNTIME, downloaded when there is none, about 8 GB), then prepare_app. ccache
-# is on, through Expo's Podfile, so a rebuild reuses unchanged objects.
-prepare_apple_app() {
+# require_apple_tools <iOS|tvOS> <sdk>: the tools and the simulator runtime matching
+# Xcode's SDK (SIM_RUNTIME, downloaded when there is none, about 8 GB). ccache is on,
+# through Expo's Podfile, so a rebuild reuses unchanged objects.
+require_apple_tools() {
   step 'Tools'
   require_apple_silicon
   require_xcode
@@ -124,8 +124,6 @@ prepare_apple_app() {
     find_runtime "$1"
   fi
   [ -n "$SIM_RUNTIME" ] || { echo "No $1 $SIM_SDK simulator runtime, even after the download." >&2; exit 1; }
-
-  prepare_app
 }
 
 # boot_simulator <name> <device type>: sets SIM_DEVICE to the simulator of that name on

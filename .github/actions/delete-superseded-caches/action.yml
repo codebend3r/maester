@@ -13,8 +13,9 @@ inputs:
 runs:
   using: composite
   steps:
-    # A save that failed only warns, so a family is skipped until its kept key exists. A
-    # delete may race another job's, or GitHub's own eviction, so a failed one is ignored.
+    # A save that failed only warns, so a family is skipped until its kept key exists. The
+    # caches are saved by now, so a failed listing skips the family and a failed delete (one
+    # that raced another job's, or GitHub's own eviction) is ignored.
     - name: 🧹 Delete superseded caches
       shell: bash
       env:
@@ -24,7 +25,8 @@ runs:
       run: |
         while read -r prefix key; do
           [ -n "$prefix" ] || continue
-          gh cache list --ref "$GITHUB_REF" --key "$key" --json key --jq ".[] | select(.key == \"$key\") | .key" | grep -q . || continue
-          gh cache list --ref "$GITHUB_REF" --key "$prefix" --limit 100 --json id,key --jq ".[] | select(.key != \"$key\") | .id" |
-            while read -r id; do gh cache delete "$id" || true; done
+          kept="$(gh cache list --ref "$GITHUB_REF" --key "$key" --json key --jq ".[] | select(.key == \"$key\") | .key")" || continue
+          [ -n "$kept" ] || continue
+          ids="$(gh cache list --ref "$GITHUB_REF" --key "$prefix" --limit 100 --json id,key --jq ".[] | select(.key != \"$key\") | .id")" || continue
+          for id in $ids; do gh cache delete "$id" || true; done
         done <<< "$KEEP"

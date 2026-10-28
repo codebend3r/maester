@@ -18,6 +18,9 @@ outputs:
     value: ${{ steps.avd.outputs.key }}
   path:
     value: ${{ steps.avd.outputs.path }}
+  supersedes:
+    description: The "<prefix> <key>" line for delete-superseded-caches
+    value: ${{ steps.avd.outputs.supersedes }}
   cache-hit:
     value: ${{ steps.restore.outputs.cache-hit }}
   api-level:
@@ -62,8 +65,10 @@ runs:
         revision="$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null | awk -F'|' -v image="$image" '{ gsub(/ /, "", $1); gsub(/ /, "", $2) } $1 == image { print $2; exit }')"
         test -n "$revision"
         options_hash="$(echo "$OPTIONS" | sha256sum | cut -c1-12)"
+        key="avd-v1-$TARGET-$API_LEVEL-$ARCH-$PROFILE-image$revision-emulator$EMULATOR_BUILD-$CORES-cores-$RAM_SIZE-$options_hash"
         {
-          echo "key=avd-v1-$TARGET-$API_LEVEL-$ARCH-$PROFILE-image$revision-emulator$EMULATOR_BUILD-$CORES-cores-$RAM_SIZE-$options_hash"
+          echo "key=$key"
+          echo "supersedes=avd- $key"
           printf 'path<<LIST\n%s\n%s\nLIST\n' "$HOME/.android/avd/*" "$HOME/.android/adb*"
           echo "api-level=$API_LEVEL"
           echo "target=$TARGET"
