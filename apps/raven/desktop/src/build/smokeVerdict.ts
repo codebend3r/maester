@@ -1,3 +1,7 @@
+import { join } from 'node:path'
+import { DESKTOP_PLATFORMS, type DesktopPlatform } from '@raven/core'
+import { PACKAGED_APP, WINDOWS_APP, WINDOWS_EXE } from '@/build/bundleAudit'
+import { logsDirFor } from '@/main/log/opens'
 import { WEB_HOST_READY } from '@/main/webHost'
 
 export const SMOKE_START_MS = 30_000
@@ -79,3 +83,71 @@ export const logLinesSince = ({ live, rotated, from }: LogLinesSinceProps): stri
   if (live.length >= from) return linesOf(live.subarray(from))
   return [...linesOf(rotated?.subarray(from) ?? new Uint8Array()), ...linesOf(live)]
 }
+
+/**
+ * How the smoke asks Raven to quit, as the failures name it. macOS sends SIGTERM, which
+ * Electron answers with `app.quit()`. Windows delivers no signal to a GUI app: Node's
+ * `child.kill()` ends it at once through TerminateProcess, so it could never log its quit.
+ * `taskkill` without `/F` posts WM_CLOSE to its window instead, which closes the window,
+ * and closing Raven's one window quits it as a person would.
+ */
+export const SMOKE_STOP_NAMES = {
+  [DESKTOP_PLATFORMS.mac]: 'SIGTERM',
+  [DESKTOP_PLATFORMS.windows]: 'WM_CLOSE',
+} as const satisfies Record<DesktopPlatform, string>
+
+/** The folder Electron's userData sits in, `%APPDATA%` on Windows. */
+const RAVEN_DATA = 'raven'
+
+type SmokePathsForProps = {
+  platform: DesktopPlatform
+  project: string
+  home: string
+  /** `%APPDATA%`, which Windows sets; unused on macOS. */
+  appData: string | undefined
+}
+
+/** The packaged app to look for, the executable to launch and the folder its log goes to. */
+export const smokePathsFor = ({ platform, project, home, appData }: SmokePathsForProps) => {
+  switch (platform) {
+    case DESKTOP_PLATFORMS.mac: {
+      const app = join(project, PACKAGED_APP)
+      return {
+        app,
+        executable: join(app, 'Contents', 'MacOS', 'Raven'),
+        logsDir: logsDirFor({
+          platform,
+          home,
+          userData: join(home, 'Library', 'Application Support', RAVEN_DATA),
+          hasUserDataOverride: false,
+        }),
+      }
+    }
+    case DESKTOP_PLATFORMS.windows: {
+      const app = join(project, WINDOWS_APP)
+      return {
+        app,
+        executable: join(app, WINDOWS_EXE),
+        logsDir: logsDirFor({
+          platform,
+          home,
+          userData: join(appData ?? join(home, 'AppData', 'Roaming'), RAVEN_DATA),
+          hasUserDataOverride: false,
+        }),
+      }
+    }
+    default: {
+      const unreachable: never = platform
+      return unreachable
+    }
+  }
+}
+
+/** What `tasklist /FO CSV /NH` prints a process's line with: its image name, quoted. */
+const RAVEN_TASK = `"${WINDOWS_EXE}",`
+
+/** Whether `tasklist /FO CSV /NH` lists a Raven; with none it prints only an INFO line. */
+export const isRavenListed = (tasklist: string): boolean =>
+  tasklist
+    .split(/\r?\n/)
+    .some((line) => line.trim().toLowerCase().startsWith(RAVEN_TASK.toLowerCase()))

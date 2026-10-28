@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { mkdir, readdir, realpath, rename, stat, statfs, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -101,6 +102,7 @@ import {
   hardExitFor,
   QUIT_FLUSH_MS,
 } from '@/main/shutdown'
+import { squirrelStepFor, takeSquirrelStep } from '@/main/squirrel'
 import { createJsonStore, createStateStore, loadState } from '@/main/stateStore'
 import { createNodeTimers } from '@/main/timers'
 import { createMenuCheck, createUpdateService, updateSourceFrom } from '@/main/updateService'
@@ -125,8 +127,18 @@ const STORE_NOTICES = {
 const OPEN_BATCH_MS = 100
 const STATE_DEBOUNCE_MS = 2000
 
-const timers = createNodeTimers()
 const platform = desktopPlatformFor({ platform: process.platform })
+// Squirrel's installer runs Raven on each install event and waits for it to exit, so such a
+// launch does its step and quits before anything starts.
+const isLaunch = takeSquirrelStep({
+  step: squirrelStepFor({ platform, argv: process.argv, execPath: process.execPath }),
+  run: ({ command, args, done }) => {
+    spawn(command, args, { detached: true, stdio: 'ignore' }).on('close', done).on('error', done)
+  },
+  quit: () => app.quit(),
+})
+
+const timers = createNodeTimers()
 const nativeTarget = nativeTargetOf({ platform: process.platform, arch: process.arch })
 
 // A test hook: a packaged app never reads it, so the environment cannot move its data.
@@ -152,7 +164,7 @@ app.setAppLogsPath(
 )
 
 // A second instance hands its files to the first and quits.
-const isPrimary = app.requestSingleInstanceLock()
+const isPrimary = isLaunch && app.requestSingleInstanceLock()
 
 const appLog = createAppLog({
   isPrimary,
@@ -815,7 +827,7 @@ if (isPrimary) {
     `launch Raven ${app.getVersion()} (${app.isPackaged ? 'packaged' : 'unpackaged'}), Electron ${process.versions.electron}, ${SYSTEM_NAMES[platform]} ${process.getSystemVersion()}`,
   )
   startApp()
-} else {
+} else if (isLaunch) {
   // Another Raven is running; it receives this launch's files through `second-instance`.
   app.quit()
 }

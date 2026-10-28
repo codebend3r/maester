@@ -6,6 +6,7 @@ import { SCAN_STATES, isLibrary } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { ScannerService } from '@/scanner/scannerService'
+import { ThumbnailService } from '@/thumbnails/thumbnailService'
 import { adminCookie, injectAs, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 
@@ -38,6 +39,8 @@ describe('cancelling a scan', () => {
   })
 
   afterAll(async () => {
+    // A cancelled scan's thumbnails may still be writing into the data folder.
+    await state.app?.get(ThumbnailService).whenIdle()
     await state.app?.close()
     await rm(state.root, { recursive: true, force: true })
   })

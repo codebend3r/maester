@@ -6,6 +6,7 @@ import {
   adHocApps,
   APP_ICON,
   DOCUMENT_UTIS,
+  WINDOWS_ICON,
   type DocumentUti,
   documentTypes,
   FUSES,
@@ -162,14 +163,28 @@ describe('adHocApps', () => {
 
   it('signs nothing off macOS', () => {
     expect(adHocApps({ platform: 'linux', signing: {}, outputPaths, appName: 'Raven' })).toEqual([])
+    expect(
+      adHocApps({
+        platform: 'win32',
+        signing: {},
+        outputPaths: ['/o/Raven-win32-x64'],
+        appName: 'Raven',
+      }),
+    ).toEqual([])
   })
 })
 
 describe('APP_ICON', () => {
   const project = join(import.meta.dir, '..', '..')
 
-  it.each(['icns', 'png'])('is a .%s the app ships with', (extension) => {
+  it.each(['icns', 'ico', 'png'])('is a .%s the app ships with', (extension) => {
     expect(existsSync(join(project, `${APP_ICON}.${extension}`))).toBe(true)
+  })
+})
+
+describe('WINDOWS_ICON', () => {
+  it("is the .ico beside the app icon, which Squirrel's setup exe shows", () => {
+    expect(WINDOWS_ICON).toBe(`${APP_ICON}.ico`)
   })
 })
 

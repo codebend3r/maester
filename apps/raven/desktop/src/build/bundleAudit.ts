@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, sep } from 'node:path'
+import { ADDON_DLLS, importProblems, PE_MACHINES, readPe } from '@raven/mpv'
 import { WEB_DIST } from '@/build/forgeOptions'
-import { MPV_MACH_O } from '@/build/stageMpv'
+import { MPV_MACH_O, MPV_PE, STAGE_TARGETS, WINDOWS_MPV_FILES } from '@/build/stageMpv'
 
 export const PACKAGED_APP = join('out', 'Raven-darwin-arm64', 'Raven.app')
-export const MPV_IN_APP = join('Contents', 'Resources', 'mpv', 'darwin-arm64')
+export const MPV_IN_APP = join('Contents', 'Resources', 'mpv', STAGE_TARGETS.darwinArm64)
 /** The web app's build, which the web host serves the window. */
 export const WEB_IN_APP = join('Contents', 'Resources', basename(WEB_DIST))
 const WEB_PAGE = 'index.html'
@@ -276,4 +278,99 @@ export const auditMachO = async ({
     },
     problems: signature,
   }
+}
+
+/** The packaged Windows app's folder, beside its `Raven.exe`. */
+export const WINDOWS_APP = join('out', 'Raven-win32-x64')
+export const WINDOWS_EXE = 'Raven.exe'
+export const MPV_IN_WINDOWS_APP = join('resources', 'mpv', STAGE_TARGETS.win32X64)
+const WEB_IN_WINDOWS_APP = join('resources', basename(WEB_DIST))
+/** The lock that pins the Windows libmpv, from this project's folder. */
+export const WINDOWS_LOCK = join(
+  '..',
+  '..',
+  '..',
+  'libs',
+  'raven',
+  'mpv',
+  'native',
+  'windows.lock.json',
+)
+const PE_EXTENSIONS = ['.node', '.dll'] as const
+
+/** Whether a file of the engine's folder is code Windows loads: an addon or a DLL. */
+export const isPeFile = (name: string): boolean => {
+  const lower = name.toLowerCase()
+  return PE_EXTENSIONS.some((extension) => lower.endsWith(extension))
+}
+
+/** A PE file of the engine, with `relative` to the app's folder. */
+export type AuditedPe = {
+  relative: string
+  machine: number
+  imports: readonly string[]
+  sha256: string
+}
+
+type AuditPeProps = { relative: string; bytes: Uint8Array }
+
+/** One PE file of the engine; a file that does not read as one is a problem that names it. */
+export const auditPe = ({
+  relative,
+  bytes,
+}: AuditPeProps): { file: AuditedPe | null; problems: string[] } => {
+  try {
+    const { machine, imports } = readPe({ bytes })
+    const sha256 = createHash('sha256').update(bytes).digest('hex')
+    return { file: { relative, machine, imports, sha256 }, problems: [] }
+  } catch (error) {
+    return { file: null, problems: [`${relative} could not be read: ${failureText(error)}`] }
+  }
+}
+
+type PeProblemsProps = { file: AuditedPe; libmpvSha256: string }
+
+const peProblems = ({ file, libmpvSha256 }: PeProblemsProps): string[] => {
+  const name = basename(file.relative).toLowerCase()
+  const arch = file.machine === PE_MACHINES.x64 ? [] : [`${file.relative} is not x64`]
+  const imports =
+    name === WINDOWS_MPV_FILES.addon
+      ? importProblems({ imports: file.imports, allowed: ADDON_DLLS }).map(
+          (dll) => `${file.relative} imports ${dll}, which neither Windows nor the app ships`,
+        )
+      : []
+  const digest =
+    name === WINDOWS_MPV_FILES.libmpv && file.sha256 !== libmpvSha256
+      ? [
+          `${file.relative} is not the locked libmpv: sha256 ${file.sha256}, the lock says ${libmpvSha256}`,
+        ]
+      : []
+  return [...arch, ...imports, ...digest]
+}
+
+type WindowsBundleProblemsProps = {
+  files: readonly AuditedPe[]
+  exists: (relative: string) => boolean
+  /** The DLL's digest in the Windows libmpv lock. */
+  libmpvSha256: string
+}
+
+/**
+ * The packaged Windows app, relative to its folder: the exe, the page and the engine are
+ * there, every addon and DLL of the engine is x64, the addon loads only Windows, libmpv
+ * and Node, and libmpv is the one the lock pins.
+ */
+export const windowsBundleProblems = ({
+  files,
+  exists,
+  libmpvSha256,
+}: WindowsBundleProblemsProps): string[] => {
+  const missing = [
+    WINDOWS_EXE,
+    ...MPV_PE.map((name) => join(MPV_IN_WINDOWS_APP, name)),
+    join(WEB_IN_WINDOWS_APP, WEB_PAGE),
+  ]
+    .filter((relative) => !exists(relative))
+    .map((relative) => `${relative} is missing from the app`)
+  return [...missing, ...files.flatMap((file) => peProblems({ file, libmpvSha256 }))]
 }

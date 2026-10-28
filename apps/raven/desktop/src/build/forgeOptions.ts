@@ -15,9 +15,14 @@ export const WEB_DIST = join('..', 'web', 'dist')
 
 /**
  * The raven logo as the app icon, from this project's folder and without an extension: the
- * packager adds `.icns`, and an unpackaged launch puts the `.png` in the Dock.
+ * packager adds `.icns` on macOS and `.ico` on Windows, and an unpackaged launch puts the
+ * `.png` in the Dock. The `.ico` is made from the `.png` with ImageMagick:
+ * `magick icon.png -depth 8 -define icon:auto-resize=256,128,64,48,32,16 icon.ico`.
  */
 export const APP_ICON = join('resources', 'icon')
+
+/** The icon Squirrel's setup exe carries, which needs the `.ico` by its full name. */
+export const WINDOWS_ICON = `${APP_ICON}.ico`
 
 /** The packager's paths for what goes in the asar. */
 const PACKAGED_PATHS = { project: '', manifest: '/package.json', dist: '/dist' } as const

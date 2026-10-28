@@ -2,7 +2,7 @@ import { resolve } from 'node:path'
 import { auditWindows } from '@/build/auditWindows'
 import { compileAddon } from '@/build/compileAddon'
 import { isWindows, windowsResources, work, write } from '@/build/context'
-import { readPe } from '@/build/pe'
+import { readPe } from '@/pe'
 import { WINDOWS_FILES } from '@/build/windowsLock'
 import { ARCHITECTURES } from '@/target'
 
