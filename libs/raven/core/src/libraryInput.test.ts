@@ -103,9 +103,9 @@ describe('validateLibraryInput', () => {
 
   it('rejects a type that is not one of the three', () => {
     const result = validateLibraryInput({
-      name: 'Music',
-      paths: ['/media/music'],
-      settings: { kind: 'music' },
+      name: 'Podcasts',
+      paths: ['/media/podcasts'],
+      settings: { kind: 'podcasts' },
     })
     expect(result).toEqual({ ok: false, errors: ['Type is not one of the choices.'] })
   })

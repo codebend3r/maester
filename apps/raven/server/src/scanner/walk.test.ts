@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { LIBRARY_KINDS, VIDEO_EXTENSIONS, extensionsFor } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { type Gate, createGate } from '@/scanner/concurrency'
 import { outermost, walkVideos } from '@/scanner/walk'
@@ -22,6 +23,11 @@ describe('walkVideos', () => {
     await writeFile(at('Movies', '.trash', 'old.mp4'), 'x')
     await writeFile(at('TV', 'Show', 'Season 1', 'Show - S01E01.mp4'), 'x'.repeat(20))
     await symlink(at('TV', 'Show', 'Season 1', 'Show - S01E01.mp4'), at('Movies', 'linked.mp4'))
+    await mkdir(at('Music', 'Artist', 'Album (2001)'), { recursive: true })
+    await writeFile(at('Music', 'Artist', 'Album (2001)', '01 - Song.flac'), 'x')
+    await writeFile(at('Music', 'Artist', 'Album (2001)', '02 - Song.mp3'), 'x')
+    await writeFile(at('Music', 'Artist', 'Album (2001)', 'cover.jpg'), 'x')
+    await writeFile(at('Music', 'Artist', 'Album (2001)', 'Video.mkv'), 'x')
   })
 
   afterAll(async () => {
@@ -29,7 +35,10 @@ describe('walkVideos', () => {
   })
 
   it('finds videos, skipping samples, NAS litter, and hidden folders', async () => {
-    const result = await walkVideos({ roots: [at('Movies'), at('TV')] })
+    const result = await walkVideos({
+      extensions: VIDEO_EXTENSIONS,
+      roots: [at('Movies'), at('TV')],
+    })
     const found = result.files.map((file) => file.path.slice(state.root.length)).toSorted()
     expect(found).toEqual([
       '/Movies/Heat (1995)/Heat (1995).mkv',
@@ -43,16 +52,41 @@ describe('walkVideos', () => {
     expect(result.unreadable).toEqual([])
   })
 
+  it("indexes only the extensions of the library's type", async () => {
+    const album = at('Music', 'Artist', 'Album (2001)')
+    const music = await walkVideos({
+      extensions: extensionsFor(LIBRARY_KINDS.music),
+      roots: [at('Music')],
+    })
+    expect(music.files.map((file) => file.path).toSorted()).toEqual([
+      join(album, '01 - Song.flac'),
+      join(album, '02 - Song.mp3'),
+    ])
+    const videos = await walkVideos({ extensions: VIDEO_EXTENSIONS, roots: [at('Music')] })
+    expect(videos.files.map((file) => file.path)).toEqual([join(album, 'Video.mkv')])
+    const oneFile = await walkVideos({
+      extensions: extensionsFor(LIBRARY_KINDS.music),
+      roots: [at('Music')],
+      places: [join(album, 'Video.mkv')],
+    })
+    expect(oneFile.files).toEqual([])
+  })
+
   it('reads nothing once its signal is aborted, so a cancelled scan ends quickly', async () => {
     const abort = new AbortController()
     abort.abort()
-    const result = await walkVideos({ roots: [at('Movies'), at('TV')], signal: abort.signal })
+    const result = await walkVideos({
+      extensions: VIDEO_EXTENSIONS,
+      roots: [at('Movies'), at('TV')],
+      signal: abort.signal,
+    })
     expect(result.files).toEqual([])
   })
 
   it('tells how many videos each folder held as it reads it, adding up to what it found', async () => {
     const counts: number[] = []
     const result = await walkVideos({
+      extensions: VIDEO_EXTENSIONS,
       roots: [at('Movies'), at('TV')],
       onFound: (count) => counts.push(count),
     })
@@ -61,7 +95,7 @@ describe('walkVideos', () => {
   })
 
   it('reports a path that does not exist instead of throwing', async () => {
-    const result = await walkVideos({ roots: [at('Nope'), at('TV')] })
+    const result = await walkVideos({ extensions: VIDEO_EXTENSIONS, roots: [at('Nope'), at('TV')] })
     expect(result.unreadable).toEqual([at('Nope')])
     expect(result.files).toHaveLength(1)
   })
@@ -83,8 +117,8 @@ describe('walkVideos', () => {
         }),
     }
     const [movies, tv] = await Promise.all([
-      walkVideos({ roots: [at('Movies')], gate }),
-      walkVideos({ roots: [at('TV')], gate }),
+      walkVideos({ extensions: VIDEO_EXTENSIONS, roots: [at('Movies')], gate }),
+      walkVideos({ extensions: VIDEO_EXTENSIONS, roots: [at('TV')], gate }),
     ])
     expect(movies.files).toHaveLength(2)
     expect(tv.files).toHaveLength(1)
@@ -104,6 +138,7 @@ describe('walkVideos', () => {
       },
     }
     const result = await walkVideos({
+      extensions: VIDEO_EXTENSIONS,
       roots: [at('Movies')],
       gate,
       known: (path) => (path.endsWith('.mkv') ? { size: 99, mtimeMs: 7 } : null),
@@ -120,7 +155,10 @@ describe('walkVideos', () => {
   })
 
   it('reports a file under overlapping paths once', async () => {
-    const result = await walkVideos({ roots: [at('TV'), at('TV', 'Show')] })
+    const result = await walkVideos({
+      extensions: VIDEO_EXTENSIONS,
+      roots: [at('TV'), at('TV', 'Show')],
+    })
     expect(result.files).toHaveLength(1)
     expect(result.files[0]?.root).toBe(at('TV'))
   })
@@ -129,7 +167,11 @@ describe('walkVideos', () => {
     const roots = () => [at('Movies'), at('TV')]
 
     it('walks a folder that changed, keeping the library path as the root', async () => {
-      const result = await walkVideos({ roots: roots(), places: [at('TV', 'Show')] })
+      const result = await walkVideos({
+        extensions: VIDEO_EXTENSIONS,
+        roots: roots(),
+        places: [at('TV', 'Show')],
+      })
       expect(result.files.map((file) => [file.path, file.root])).toEqual([
         [at('TV', 'Show', 'Season 1', 'Show - S01E01.mp4'), at('TV')],
       ])
@@ -138,6 +180,7 @@ describe('walkVideos', () => {
 
     it('takes a file as it is, and leaves out what the walk would skip', async () => {
       const result = await walkVideos({
+        extensions: VIDEO_EXTENSIONS,
         roots: roots(),
         places: [
           at('Movies', 'Heat (1995)', 'Heat (1995).mkv'),
@@ -153,12 +196,17 @@ describe('walkVideos', () => {
     })
 
     it('finds nothing where a place has gone, and says nothing of it', async () => {
-      const result = await walkVideos({ roots: roots(), places: [at('Movies', 'Gone (2001)')] })
+      const result = await walkVideos({
+        extensions: VIDEO_EXTENSIONS,
+        roots: roots(),
+        places: [at('Movies', 'Gone (2001)')],
+      })
       expect(result).toEqual({ files: [], unreadable: [], errors: [] })
     })
 
     it('reports the library path when it is missing too, so the index keeps what it had', async () => {
       const result = await walkVideos({
+        extensions: VIDEO_EXTENSIONS,
         roots: [at('Unmounted')],
         places: [at('Unmounted', 'Gone (2001)')],
       })

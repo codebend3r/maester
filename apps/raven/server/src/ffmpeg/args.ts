@@ -4,6 +4,13 @@ import { SOFTWARE, type VideoEncoder } from '@/ffmpeg/encoder'
 export const QUIET = ['-hide_banner', '-loglevel', 'error', '-nostdin']
 
 /**
+ * The file's first real video stream. The capital `V` passes over an
+ * attached picture, the cover art an MKV, MP4 or audio file can carry, which
+ * `v` would take for the video when it comes first.
+ */
+export const VIDEO_STREAM = '0:V:0'
+
+/**
  * PQ or HLG down to SDR BT.709, so an HDR frame does not come out grey and
  * washed out. Needs ffmpeg built with zimg (`zscale`), which Debian's ffmpeg
  * and jellyfin-ffmpeg both are and Homebrew's is not; the caller checks.
@@ -53,7 +60,7 @@ export const thumbnailArgs = ({
   '-i',
   input,
   '-map',
-  '0:v:0',
+  VIDEO_STREAM,
   '-an',
   '-sn',
   '-dn',
@@ -109,6 +116,9 @@ const ceiling = (bitrate: number | null): string[] =>
 
 /** Video flags: those before `-i`, and the encoding after it. */
 type VideoArgs = { input: string[]; output: string[] }
+
+/** No video at all, for an audio file. */
+const NO_VIDEO: VideoArgs = { input: [], output: [] }
 
 /** A remux's video, copied. Safari and AVPlayer only play HEVC in MP4 under the hvc1 tag. */
 export const copyVideo = (videoCodec: string | null): VideoArgs => ({
@@ -254,6 +264,8 @@ type StreamArgsProps = {
   mode: StreamMode
   /** The `0:a:N` track to play, or null when the file has no audio. */
   audio: number | null
+  /** Whether the file is an audio file, whose stream carries its audio alone. */
+  audioOnly: boolean
   videoCodec: string | null
   tonemap: boolean
   streamShift: number
@@ -276,12 +288,15 @@ type StreamArgsProps = {
  * `remux` copies the video and converts only the audio, which costs little
  * more than reading the file. `transcode` re-encodes the video to H.264 as
  * well, at most 1080p, tone mapped when the source is HDR and ffmpeg can.
+ * An audio file's stream is its audio alone, converted, in fragments cut by
+ * time, since every audio frame is a keyframe.
  */
 export const streamArgs = ({
   input,
   start,
   mode,
   audio,
+  audioOnly,
   videoCodec,
   tonemap,
   streamShift,
@@ -290,10 +305,12 @@ export const streamArgs = ({
   quality = 'medium',
   bitrate = null,
 }: StreamArgsProps): string[] => {
-  const video =
-    mode === PLAYBACK_MODES.remux
+  const video = ((): VideoArgs => {
+    if (audioOnly) return NO_VIDEO
+    return mode === PLAYBACK_MODES.remux
       ? copyVideo(videoCodec)
       : transcodeVideo({ encoder, videoCodec, tonemap, maxHeight, quality, bitrate })
+  })()
   return [
     ...QUIET,
     ...video.input,
@@ -302,8 +319,7 @@ export const streamArgs = ({
     '-start_at_zero',
     '-i',
     input,
-    '-map',
-    '0:v:0',
+    ...(audioOnly ? [] : ['-map', VIDEO_STREAM]),
     ...(audio == null ? [] : ['-map', `0:a:${audio}`]),
     ...video.output,
     ...(audio == null ? [] : ['-c:a', 'aac', '-ac', '2', '-b:a', '192k']),
@@ -324,7 +340,9 @@ export const streamArgs = ({
     '-f',
     'mp4',
     '-movflags',
-    'frag_keyframe+empty_moov+default_base_moof+frag_discont',
+    audioOnly
+      ? 'empty_moov+default_base_moof+frag_discont'
+      : 'frag_keyframe+empty_moov+default_base_moof+frag_discont',
     // A remux cannot shorten the source GOP. Flush at least every second
     // even between keyframes so slow reads do not hold several seconds of A/V.
     '-frag_duration',

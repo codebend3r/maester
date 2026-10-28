@@ -88,7 +88,7 @@ describe('LibraryDialog', () => {
     const type = screen.getByRole('group', { name: 'Type' })
     expect(await screen.findByText('TMDB_API_TOKEN')).toBeInTheDocument()
     expect(type).toHaveAccessibleDescription(
-      "Set TMDB_API_TOKEN in raven's .env for posters and details.",
+      "Set TMDB_API_TOKEN in raven's .env for posters and details. Music and audiobooks take audio files instead of videos.",
     )
   })
 
@@ -99,7 +99,7 @@ describe('LibraryDialog', () => {
       const type = screen.getByRole('group', { name: 'Type' })
       expect(await screen.findByText('ANTHROPIC_API_KEY')).toBeInTheDocument()
       expect(type).toHaveAccessibleDescription(
-        "Set TMDB_API_TOKEN in raven's .env for posters and details. Set ANTHROPIC_API_KEY in raven's .env to look up titles the matcher misses.",
+        "Set TMDB_API_TOKEN in raven's .env for posters and details. Music and audiobooks take audio files instead of videos. Set ANTHROPIC_API_KEY in raven's .env to look up titles the matcher misses.",
       )
     } finally {
       served.health = NO_TMDB
@@ -113,7 +113,7 @@ describe('LibraryDialog', () => {
       const type = screen.getByRole('group', { name: 'Type' })
       expect(await screen.findByText('ANTHROPIC_API_KEY')).toBeInTheDocument()
       expect(type).toHaveAccessibleDescription(
-        "Movies, TV shows, anime, family, documentaries and sporting events get posters and details from TMDB. Set ANTHROPIC_API_KEY in raven's .env to look up titles the matcher misses.",
+        "Movies, TV shows, anime, family, documentaries and sporting events get posters and details from TMDB. Music and audiobooks take audio files instead of videos. Set ANTHROPIC_API_KEY in raven's .env to look up titles the matcher misses.",
       )
     } finally {
       served.health = NO_TMDB
@@ -248,6 +248,8 @@ describe('LibraryDialog', () => {
       'sports',
       'youtube',
       'other',
+      'music',
+      'audiobooks',
     ])
     await userEvent.type(screen.getByLabelText('Name'), 'Anime')
     await userEvent.type(screen.getByLabelText('Folder path'), '/media/Anime')

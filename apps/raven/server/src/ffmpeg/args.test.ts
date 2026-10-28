@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { VideoEncoder } from '@/ffmpeg/encoder'
 import {
   TONEMAP_FILTER,
+  VIDEO_STREAM,
   streamArgs,
   subtitleFileArgs,
   subtitleWindowArgs,
@@ -10,6 +11,16 @@ import {
   thumbnailSeek,
   transcodeBitrate,
 } from '@/ffmpeg/args'
+
+type AfterProps = { args: string[]; flag: string }
+
+const after = ({ args, flag }: AfterProps): string | undefined => args[args.indexOf(flag) + 1]
+
+describe('VIDEO_STREAM', () => {
+  it('is the first video stream that is not an attached picture', () => {
+    expect(VIDEO_STREAM).toBe('0:V:0')
+  })
+})
 
 describe('thumbnailSeek', () => {
   it('lands a tenth of the way in', () => {
@@ -33,6 +44,7 @@ describe('thumbnailArgs', () => {
     })
     expect(args.indexOf('-ss')).toBeLessThan(args.indexOf('-i'))
     expect(args).toContain('thumbnail=n=24,scale=w=480:h=-2')
+    expect(after({ args, flag: '-map' })).toBe(VIDEO_STREAM)
     expect(args.at(-1)).toBe('/t/1.jpg')
   })
 
@@ -54,13 +66,11 @@ describe('streamArgs', () => {
     input: '/m/a.mkv',
     start: 61.5,
     audio: 2,
+    audioOnly: false,
     videoCodec: 'hevc',
     tonemap: false,
     streamShift: 1,
   }
-  type AfterProps = { args: string[]; flag: string }
-
-  const after = ({ args, flag }: AfterProps): string | undefined => args[args.indexOf(flag) + 1]
 
   describe('on a GPU', () => {
     const vaapi: VideoEncoder = { kind: 'vaapi', device: '/dev/dri/renderD128' }
@@ -118,6 +128,7 @@ describe('streamArgs', () => {
     expect(args.indexOf('-ss')).toBeLessThan(args.indexOf('-i'))
     expect(after({ args, flag: '-ss' })).toBe('61.5')
     expect(args).toContain('-copyts')
+    expect(after({ args, flag: '-map' })).toBe(VIDEO_STREAM)
     expect(args).toContain('0:a:2')
     expect(after({ args, flag: '-c:v' })).toBe('copy')
     expect(after({ args, flag: '-tag:v' })).toBe('hvc1')
@@ -134,6 +145,7 @@ describe('streamArgs', () => {
       start: 0,
       mode: 'transcode',
       audio: 0,
+      audioOnly: false,
       videoCodec: 'hevc',
       tonemap: false,
       streamShift: 1,
@@ -147,6 +159,7 @@ describe('streamArgs', () => {
       start: 0,
       mode: 'transcode',
       audio: 0,
+      audioOnly: false,
       videoCodec: 'hevc',
       tonemap: false,
       streamShift: 1,
@@ -197,6 +210,21 @@ describe('streamArgs', () => {
     expect(args.filter((arg) => arg === '-map')).toHaveLength(1)
     expect(args).not.toContain('-tag:v')
   })
+
+  it.each(['remux', 'transcode'] as const)(
+    'streams an audio file as its audio alone, fragmented by time, on a %s',
+    (mode) => {
+      const args = streamArgs({ ...base, mode, audio: 0, audioOnly: true, videoCodec: null })
+      expect(args).not.toContain(VIDEO_STREAM)
+      expect(args).not.toContain('-c:v')
+      expect(args).not.toContain('-vf')
+      expect(args.filter((arg) => arg === '-map')).toHaveLength(1)
+      expect(after({ args, flag: '-map' })).toBe('0:a:0')
+      expect(after({ args, flag: '-c:a' })).toBe('aac')
+      expect(after({ args, flag: '-movflags' })).not.toContain('frag_keyframe')
+      expect(after({ args, flag: '-frag_duration' })).toBe('1000000')
+    },
+  )
 })
 
 describe('transcodeBitrate', () => {

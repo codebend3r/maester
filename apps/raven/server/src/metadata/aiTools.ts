@@ -194,6 +194,8 @@ const LIBRARY_WORDS = {
   sports: 'Sporting events: recorded events such as UFC cards, matched as movies',
   youtube: 'YouTube videos',
   other: 'Other',
+  music: 'Music',
+  audiobooks: 'Audiobooks',
 } as const satisfies Record<LibraryKind, string>
 
 const LAYOUT_WORDS = {

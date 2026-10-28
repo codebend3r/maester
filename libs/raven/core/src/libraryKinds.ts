@@ -22,10 +22,15 @@ import {
   isMediaGroupBy,
   isSortFieldName,
 } from '@/contract'
+import { MEDIA_EXTENSIONS, MEDIA_TYPES, type MediaType } from '@/media'
 import { sortParts } from '@/sortFields'
 
 /** What a type of library can do: the one place each rule about each type lives. */
 export type KindRules = {
+  /** What its files are: videos, or audio files. */
+  media: MediaType
+  /** Whether a new library saves the spot each file was left at. */
+  saveProgress: boolean
   /** What its files are matched to on TMDB; null for a library that is never matched. */
   matches: MatchItemType | null
   /** The search results it prefers, tier by tier: a key of `TIER_SETS`. */
@@ -58,6 +63,8 @@ const without = <T>({ all, left }: WithoutProps<T>): T[] =>
 
 /** A library of movies starts grouped into matched and not. */
 const MOVIE_RULES = {
+  media: MEDIA_TYPES.video,
+  saveProgress: true,
   matches: ITEM_TYPES.movie,
   prefer: TIER_SET_NAMES.any,
   fields: isSortFieldName.values,
@@ -73,6 +80,8 @@ const MOVIE_RULES = {
  * no sort on a field only a file has.
  */
 const SHOW_RULES = {
+  media: MEDIA_TYPES.video,
+  saveProgress: true,
   matches: ITEM_TYPES.show,
   prefer: TIER_SET_NAMES.any,
   fields: without({ all: isSortFieldName.values, left: FILE_FIELDS }),
@@ -84,6 +93,8 @@ const SHOW_RULES = {
 
 /** A library that is never matched has no years, scores or match to sort or group by. */
 const UNMATCHED_RULES = {
+  media: MEDIA_TYPES.video,
+  saveProgress: true,
   matches: null,
   prefer: TIER_SET_NAMES.any,
   fields: without({ all: isSortFieldName.values, left: MATCHED_FIELDS }),
@@ -94,11 +105,31 @@ const UNMATCHED_RULES = {
 } as const satisfies KindRules
 
 /**
+ * A library of audio files is never matched yet, and has no frame to sort
+ * or group by. It starts as a list grouped by the month each file came in.
+ */
+const AUDIO_RULES = {
+  media: MEDIA_TYPES.audio,
+  saveProgress: true,
+  matches: null,
+  prefer: TIER_SET_NAMES.any,
+  fields: without({
+    all: isSortFieldName.values,
+    left: [...MATCHED_FIELDS, SORT_FIELD_NAMES.resolution],
+  }),
+  views: isLibraryView.values,
+  groupings: [MEDIA_GROUPINGS.codec, MEDIA_GROUPINGS.month],
+  view: LIBRARY_VIEWS.list,
+  groupBy: MEDIA_GROUPINGS.month,
+} as const satisfies KindRules
+
+/**
  * Anime and family films and shows are matched on TMDB like any movie or
  * show, and documentaries as movies, as Radarr files them, each preferring
  * the results of its own kind. Sporting events are matched as movies too,
  * as TMDB lists events like UFC cards. YouTube videos are not there to
- * match, so they are read like Other.
+ * match, so they are read like Other. A song starts from its beginning each
+ * time, so music saves no spot; an audiobook does.
  */
 export const KIND_RULES = {
   movies: MOVIE_RULES,
@@ -111,6 +142,8 @@ export const KIND_RULES = {
   sports: MOVIE_RULES,
   youtube: UNMATCHED_RULES,
   other: UNMATCHED_RULES,
+  music: { ...AUDIO_RULES, saveProgress: false },
+  audiobooks: AUDIO_RULES,
 } as const satisfies Record<LibraryKind, KindRules>
 
 /**
@@ -141,6 +174,10 @@ type MatchesAlikeProps = {
 export const matchesAlike = ({ before, after }: MatchesAlikeProps): boolean =>
   matchTypeFor(before) === matchTypeFor(after) &&
   KIND_RULES[before].prefer === KIND_RULES[after].prefer
+
+/** The extensions a library of `kind` indexes. */
+export const extensionsFor = (kind: LibraryKind): readonly string[] =>
+  MEDIA_EXTENSIONS[KIND_RULES[kind].media]
 
 /** The types of library that are matched against TMDB. */
 export const MATCHED_KINDS: readonly LibraryKind[] = isLibraryKind.values.filter(
@@ -202,6 +239,7 @@ export const coherentSettings = (settings: LibrarySettings): LibrarySettings => 
 export const defaultLibrarySettings = (kind: LibraryKind): LibrarySettings => ({
   ...DEFAULT_LIBRARY_SETTINGS,
   kind,
+  saveProgress: KIND_RULES[kind].saveProgress,
   view: KIND_RULES[kind].view,
   groupBy: KIND_RULES[kind].groupBy,
 })
@@ -231,6 +269,8 @@ export const KINDS: Record<LibraryKind, { label: string; icon: LibraryIconName }
   sports: { label: 'Sporting events', icon: 'trophy' },
   youtube: { label: 'YouTube videos', icon: 'youtube' },
   other: { label: 'Other', icon: 'video' },
+  music: { label: 'Music', icon: 'music' },
+  audiobooks: { label: 'Audiobooks', icon: 'audiobook' },
 }
 
 /** What each icon stands for, as Edit library names it. */

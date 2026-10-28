@@ -7,6 +7,7 @@ import {
   MATCHED_KINDS,
   coherentSettings,
   defaultLibrarySettings,
+  extensionsFor,
   firstTierFor,
   groupingsFor,
   libraryIconOf,
@@ -36,6 +37,20 @@ describe('defaultLibrarySettings', () => {
       groupBy: 'match',
     })
     expect(defaultLibrarySettings('other')).toEqual(DEFAULT_LIBRARY_SETTINGS)
+  })
+
+  it('lists a new audio library by the month its files came in, saving spots only for audiobooks', () => {
+    expect(defaultLibrarySettings('music')).toMatchObject({
+      kind: 'music',
+      view: 'list',
+      groupBy: 'month',
+      saveProgress: false,
+    })
+    expect(defaultLibrarySettings('audiobooks')).toMatchObject({
+      view: 'list',
+      groupBy: 'month',
+      saveProgress: true,
+    })
   })
 
   it('counts a play as watched at 95% unless a library says otherwise', () => {
@@ -119,6 +134,8 @@ describe('the rules for each type of library', () => {
       ['sports', 'movie'],
       ['youtube', null],
       ['other', null],
+      ['music', null],
+      ['audiobooks', null],
     ])
   })
 
@@ -147,6 +164,8 @@ describe('the rules for each type of library', () => {
       ['sports', 'any'],
       ['youtube', 'any'],
       ['other', 'any'],
+      ['music', 'any'],
+      ['audiobooks', 'any'],
     ])
     expect(tiersFor('animeShows')).toBe(TIER_SETS.anime)
     expect(tiersFor('movies')).toBe(TIER_SETS.any)
@@ -239,5 +258,30 @@ describe('libraryIconOf', () => {
     expect(libraryIconOf({ kind: 'movies', icon: 'trophy' })).toBe('trophy')
     expect(libraryIconOf({ kind: 'sports', icon: null })).toBe('trophy')
     expect(libraryIconOf({ kind: 'movies', icon: null })).toBe('film')
+  })
+})
+
+describe('extensionsFor', () => {
+  it('indexes videos in a video library and audio files in an audio one', () => {
+    expect(extensionsFor('movies')).toContain('mkv')
+    expect(extensionsFor('movies')).not.toContain('flac')
+    ;(['music', 'audiobooks'] as const).forEach((kind) => {
+      expect(extensionsFor(kind)).toEqual(expect.arrayContaining(['flac', 'mp3', 'm4a', 'm4b']))
+      expect(extensionsFor(kind)).not.toContain('mkv')
+    })
+  })
+})
+
+describe('the rules for an audio library', () => {
+  it('has no frame, score or match to sort or group by', () => {
+    const settings = coherentSettings({
+      ...defaultLibrarySettings('music'),
+      sort: 'resolution-high',
+      groupBy: 'resolution',
+    })
+    expect(settings.sort).toBe(DEFAULT_LIBRARY_SETTINGS.sort)
+    expect(settings.groupBy).toBe('month')
+    expect(groupingsFor('music')).toEqual(['codec', 'month'])
+    expect(KIND_RULES.music.matches).toBeNull()
   })
 })

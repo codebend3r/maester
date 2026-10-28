@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'bun:test'
-import { containerOf, isVideoFile, resolutionLabel, titleFromFileName } from '@/media'
+import {
+  MEDIA_EXTENSIONS,
+  containerOf,
+  isAudioContainer,
+  isVideoFile,
+  resolutionLabel,
+  titleFromFileName,
+} from '@/media'
 
 describe('isVideoFile', () => {
   it.each(['a.mkv', 'b.MP4', 'c.m4v', 'd.webm', 'e.ts'])('accepts %s', (name) => {
@@ -16,6 +23,23 @@ describe('containerOf', () => {
     expect(containerOf('x.m4v')).toBe('mp4')
     expect(containerOf('x.MKV')).toBe('mkv')
     expect(containerOf('x.mts')).toBe('m2ts')
+    expect(containerOf('x.m4b')).toBe('m4a')
+    expect(containerOf('x.oga')).toBe('ogg')
+    expect(containerOf('x.AIF')).toBe('aiff')
+  })
+})
+
+describe('isAudioContainer', () => {
+  it('knows every audio extension once folded into its container', () => {
+    MEDIA_EXTENSIONS.audio.forEach((extension) => {
+      expect(isAudioContainer(containerOf(`x.${extension}`))).toBe(true)
+    })
+  })
+
+  it('takes no video container for audio', () => {
+    MEDIA_EXTENSIONS.video.forEach((extension) => {
+      expect(isAudioContainer(containerOf(`x.${extension}`))).toBe(false)
+    })
   })
 })
 

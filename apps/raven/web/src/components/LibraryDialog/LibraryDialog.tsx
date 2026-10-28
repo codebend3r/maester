@@ -149,13 +149,13 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
     onError: (error) => setErrors([error.message]),
   })
 
-  // A new library takes the view and grouping its type starts with; one
-  // being edited keeps its own where the new type can show them.
+  // A new library takes the view, grouping and saved spots its type starts
+  // with; one being edited keeps its own where the new type can show them.
   const pickKind = (kind: LibraryKind) =>
     setSettings((current) => {
       if (library) return withLibraryKind({ settings: current, kind })
-      const { view, groupBy } = defaultLibrarySettings(kind)
-      return { ...current, kind, view, groupBy }
+      const { view, groupBy, saveProgress } = defaultLibrarySettings(kind)
+      return { ...current, kind, view, groupBy, saveProgress }
     })
 
   const addPath = (path: string) => {
@@ -227,7 +227,8 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
                 </>
               ) : (
                 'Movies, TV shows, anime, family, documentaries and sporting events get posters and details from TMDB.'
-              )}
+              )}{' '}
+              Music and audiobooks take audio files instead of videos.
             </p>
             {isAiOff && (
               <p id={`${ids.kind}-ai-hint`} className={styles.hint}>
