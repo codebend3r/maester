@@ -1,18 +1,16 @@
 import { type Fingerprint, type SharedRun, sharedRun } from '@/markers/fingerprintMatch'
 
-/** Two runs within this many seconds at the start are the same intro. */
+/** Two runs starting within this many seconds of each other are the same one. */
 const AGREE_S = 2
 
-/** Below this share of partners agreeing, an episode gets no intro. */
-const MIN_INTRO_CONFIDENCE = 0.5
+/** Below this share of partners agreeing, an episode gets no run. */
+const MIN_CONFIDENCE = 0.5
 
-/** An intro runs this long at most; anything longer is a recap or a shared scene. */
-const INTRO_BOUNDS = { min: 15, max: 130 } as const
+/** One episode's fingerprint over the stretch being matched: its head for intros, its tail for credits. */
+export type SeasonEpisode = { id: number; heard: Fingerprint }
 
-export type SeasonEpisode = { id: number; head: Fingerprint }
-
-/** An episode's intro, in seconds of its file, and the share of its partners that agree. */
-export type FoundIntro = { start: number; end: number; confidence: number }
+/** The run an episode shares with its season mates, in seconds of its file, and the share of its partners that agree. */
+export type FoundRun = { start: number; end: number; confidence: number }
 
 type PartnersOfProps = { index: number; count: number }
 
@@ -40,15 +38,21 @@ type SideOfProps = { run: SharedRun; isOwn: boolean }
 const sideOf = ({ run, isOwn }: SideOfProps): Side =>
   isOwn ? { start: run.start, end: run.end } : { start: run.theirStart, end: run.theirEnd }
 
+type MatchSeasonProps = {
+  episodes: readonly SeasonEpisode[]
+  /** The shortest and longest run worth keeping, in seconds. */
+  bounds: { min: number; max: number }
+}
+
 /**
- * The intro of each episode of one season, by the audio they share near
- * their start. Each episode is compared with its partners; its intro is the
- * run that the most partners agree on (starting within 2 s), the longest of
- * those, and its confidence the share of partners that agree. An episode
- * whose confidence falls short, or which shares nothing, gets none: a wrong
- * intro costs more than a missing one.
+ * The run of audio each episode of one season shares with the others: the
+ * intro near their start, the end theme near their end. Each episode is
+ * compared with its partners; its run is the one the most partners agree on
+ * (starting within 2 s), the longest of those, and its confidence the share
+ * of partners that agree. An episode whose confidence falls short, or which
+ * shares nothing, gets none: a wrong marker costs more than a missing one.
  */
-export const seasonIntros = (episodes: readonly SeasonEpisode[]): Map<number, FoundIntro> => {
+export const matchSeason = ({ episodes, bounds }: MatchSeasonProps): Map<number, FoundRun> => {
   const count = episodes.length
   const pairs = new Map<string, SharedRun | null>()
   type RunBetweenProps = { a: number; b: number }
@@ -62,9 +66,9 @@ export const seasonIntros = (episodes: readonly SeasonEpisode[]): Map<number, Fo
       cached !== undefined
         ? cached
         : sharedRun({
-            own: episodes[first]?.head ?? { start: 0, points: [] },
-            theirs: episodes[second]?.head ?? { start: 0, points: [] },
-            bounds: INTRO_BOUNDS,
+            own: episodes[first]?.heard ?? { start: 0, points: [] },
+            theirs: episodes[second]?.heard ?? { start: 0, points: [] },
+            bounds,
           })
     pairs.set(key, run)
     return run == null ? null : sideOf({ run, isOwn: a === first })
@@ -87,9 +91,9 @@ export const seasonIntros = (episodes: readonly SeasonEpisode[]): Map<number, Fo
       )[0]
     if (best == null || partners.length === 0) return found
     const confidence = best.agreeing.length / partners.length
-    if (confidence < MIN_INTRO_CONFIDENCE) return found
+    if (confidence < MIN_CONFIDENCE) return found
     return found.set(episode.id, { start: best.side.start, end: best.side.end, confidence })
-  }, new Map<number, FoundIntro>())
+  }, new Map<number, FoundRun>())
 }
 
 /** A chapter start this close wins over the audio's own boundary. */

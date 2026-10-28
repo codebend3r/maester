@@ -6,7 +6,9 @@ it and a survey of raven's scanner and player. The three spikes ran on
 2026-10-28; their findings and verdicts are under Research findings, and
 they change the chapter patterns, the head window and how films find their
 credits. PR 5 measured intro detection on Vhagar at 87% and replaced the
-shot change snap with an alignment offset (under Spike 1).
+shot change snap with an alignment offset (under Spike 1). PR 6 measured
+credits detection on Vhagar: end themes on 15 of 39 episodes, and films
+never early (under Spike 2).
 
 ## Why
 
@@ -274,17 +276,21 @@ which already draws them.
 
 - **Episodes**: the same fingerprint match over the last
   `min(20% of duration, 6 min)` (`tail` region), since many shows reuse an
-  end theme (14 of 39 sample episodes). Where it finds nothing, the episode
-  rolls on at the file's end, as today.
+  end theme (14 of 39 sample episodes). Both ends are placed as an intro's
+  are (`snapBoundary`), and a theme ending less than 10 s before the file
+  does runs to its end, since what follows is a logo, not a scene. Where it
+  finds nothing, the episode rolls on at the file's end, as today.
 - **Films**: a named credits chapter first. Without one, the crawl score
   (spike 2): the last 15 minutes, keyframes only (`-skip_frame nokey`), one
   frame a second at 320 px, a frame counting as crawl when its mean
   saturation is 3 or less and 60% or more of it is dark. The credits start
   at the crawl's start at the latest: the score is late on films whose
   credits open with title cards, photos or art, never early. An unnamed
-  last chapter does not move it (it was 67 s early on Deadpool). Picture
-  after the crawl marks a post credits scene (`end` < duration). Detecting
-  the true start before the crawl waits for a text detection spike.
+  last chapter does not move it (it was 67 s early on Deadpool). Ten
+  seconds or more of picture after the crawl marks a post credits scene
+  (`end` < duration). A film whose chapters (or an admin) already name its
+  credits skips the pass. Detecting the true start before the crawl waits
+  for a text detection spike.
 - A credits marker always ends at or before the file's end; `end` well
   before the duration means content follows.
 
@@ -758,8 +764,33 @@ offer Watch credits, not to skip to a scene.
 **Cost.** The tail picture pass reads the same bytes as the tail
 fingerprint (about bitrate times 15 minutes, 1 to 5.5 GB) and took 16 to
 75 s, 4K HEVC included, because `-skip_frame nokey` decodes keyframes only.
-Run it in the same ffmpeg invocation as the tail fingerprint and the film
-pays one read.
+A film needs no tail fingerprint (films share no end theme), so the picture
+pass is its only read.
+
+**PR 6's measurement.** On Vhagar, through `bun run markers:accuracy`, with
+the detector as shipped:
+
+| What | Result |
+| --- | --- |
+| Intros (unchanged) | 26 of 30 within 2 s, 0 of 9 false |
+| End themes found | 15 of 39 episodes (spike 2: 14) |
+| End themes against a credits chapter | 3 of 3 exact (Frieren), 0 early |
+| Film crawl alone | 2 of 11 within 10 s, 0 early, 5 late, 4 none |
+| Film credits as shipped (named chapter first, then the crawl) | 5 of 11 within 10 s, 0 early, 4 late, 2 none |
+
+The end themes found are Buffy, Better Call Saul, Frieren and Attack on
+Titan (all 3 each), Succession (2 of 3) and one Game of Thrones episode
+(at 0.5 confidence). Shows with songs or new score over the credits get
+none and roll on at the file's end. The crawl is never early, so a late
+start only shows the up next card later. Toy Story 3's last 16 s of picture
+read as a scene after the credits, so its card says one follows; Ant-Man's
+dark post credits scene reads as crawl and is missed. The picture pass took
+28 to 98 s a film on Vhagar.
+
+> [!TIP]
+> Decided in PR 6: episodes get end theme credits, films get named
+> chapters and the crawl floor. Detected film credits before the crawl wait
+> for the text detection spike.
 
 ### Spike 3: Apple TV
 
@@ -835,7 +866,7 @@ first two ship value before any detector exists.
    fingerprints, the cache, the admin setting, the chapter and shot change
    snaps, the second pass; 85% on the spike's fixture before it merges.
 6. **Credits detection**, after spike 2: end themes for episodes; named
-   chapters and the crawl floor for films.
+   chapters and the crawl floor for films; the accuracy script scores both.
 7. **Admin tools**: the Markers panel, Re-analyze, library status.
 8. **Device app**: headless hooks, touch and d-pad chrome, and on Apple TV
    contextual actions through a `bun patch` of react-native-video and

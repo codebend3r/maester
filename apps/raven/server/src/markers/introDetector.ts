@@ -1,33 +1,18 @@
 import { MARKER_KINDS, MARKER_SOURCES, type Marker } from '@raven/core'
-import type { Fingerprint } from '@/markers/fingerprintMatch'
 import {
-  type FoundIntro,
-  type SeasonEpisode,
-  seasonIntros,
-  snapBoundary,
-} from '@/markers/seasonIntros'
+  type HeardSeason,
+  type ListenWindow,
+  type PlacedRun,
+  type SeasonDetectorInput,
+  type SeasonFile,
+  type SeasonMarkers,
+  hearSeason,
+  markersOf,
+} from '@/markers/seasonListen'
+import { type FoundRun, matchSeason, snapBoundary } from '@/markers/seasonMatch'
 
-/** A stretch of a file to analyse, in seconds. */
-type Stretch = { path: string; start: number; seconds: number }
-
-/** What detection needs ffmpeg for: `FfmpegService`, or a stand-in in tests. */
-export type IntroTools = {
-  fingerprint: (stretch: Stretch) => Promise<number[]>
-}
-
-/** A kept head fingerprint: how many seconds from the start it covers, and its points. */
-export type StoredHead = { seconds: number; points: readonly number[] }
-
-/** One episode of a season, in the season's order. */
-export type DetectEpisode = {
-  id: number
-  path: string
-  duration: number
-  /** Where the file's chapters start, in seconds. */
-  chapterStarts: readonly number[]
-  /** Its kept head fingerprint, or null when none is kept. */
-  head: StoredHead | null
-}
+/** An intro runs this long at most; anything longer is a recap or a shared scene. */
+const INTRO_BOUNDS = { min: 15, max: 130 } as const
 
 /** The first pass listens to the first quarter, or 10 minutes, whichever is shorter. */
 const headSeconds = (duration: number): number => Math.min(duration * 0.25, 600)
@@ -39,112 +24,82 @@ const headSeconds = (duration: number): number => Math.min(duration * 0.25, 600)
  */
 const wideSeconds = (duration: number): number => Math.min(duration / 3, 900)
 
-type DetectSeasonIntrosProps = {
-  episodes: readonly DetectEpisode[]
-  tools: IntroTools
-  /** Told each fingerprint made, to keep it. */
-  onHead: (head: KeptHead) => void
-  /** The episodes whose intros are wanted; the rest only lend their audio. All, when left out. */
-  only?: ReadonlySet<number>
-}
+const fromStart = (seconds: number): ListenWindow => ({ seconds, startOf: () => 0 })
 
-/** A head fingerprint just made, and whose it is. */
-type KeptHead = StoredHead & { id: number }
-
-type HeadOfProps = { episode: DetectEpisode; seconds: number }
-
-/** The intro of each episode found, and the episodes that could not be analysed. */
-export type SeasonDetection = { intros: Map<number, Marker>; failed: Set<number> }
+type DetectSeasonIntrosProps = SeasonDetectorInput
 
 /**
  * The intro of each episode of a season. Each episode's head is
  * fingerprinted (or its kept fingerprint read), the season matched
- * (`seasonIntros`), an episode left without an intro while its season mates
+ * (`matchSeason`), an episode left without an intro while its season mates
  * found theirs heard again over a wider window, and both ends of each intro
- * moved onto a clean cut: a chapter start within 10 s, else a shot change
- * within 8 s. An episode whose audio cannot be read is left out and listed
- * as failed; the rest go on without it.
+ * placed (`snapBoundary`). An episode whose audio cannot be read is left
+ * out and listed as failed; the rest go on without it.
  */
 export const detectSeasonIntros = async ({
-  episodes,
+  files,
+  kept,
   tools,
-  onHead,
+  onMade,
   only,
-}: DetectSeasonIntrosProps): Promise<SeasonDetection> => {
-  const failed = new Set<number>()
-  const headOf = async ({ episode, seconds }: HeadOfProps): Promise<Fingerprint | null> => {
-    if (episode.head != null && episode.head.seconds >= seconds - 1) {
-      return { start: 0, points: episode.head.points }
-    }
-    try {
-      const points = await tools.fingerprint({ path: episode.path, start: 0, seconds })
-      onHead({ id: episode.id, seconds, points })
-      return { start: 0, points }
-    } catch {
-      failed.add(episode.id)
-      return null
-    }
-  }
-  const heads = await episodes.reduce<Promise<SeasonEpisode[]>>(async (previous, episode) => {
-    const listened = await previous
-    const head = await headOf({ episode, seconds: headSeconds(episode.duration) })
-    return head == null ? listened : [...listened, { id: episode.id, head }]
-  }, Promise.resolve([]))
-  const first = seasonIntros(heads)
-  const missing = episodes.filter(
-    (episode) =>
-      !first.has(episode.id) &&
-      !failed.has(episode.id) &&
-      wideSeconds(episode.duration) > headSeconds(episode.duration) + 1,
+}: DetectSeasonIntrosProps): Promise<SeasonMarkers> => {
+  const first = await hearSeason({
+    files,
+    kept,
+    tools,
+    onMade,
+    windowOf: ({ duration }) => fromStart(headSeconds(duration)),
+  })
+  const found = matchSeason({ episodes: first.heard, bounds: INTRO_BOUNDS })
+  const missing = files.filter(
+    ({ id, duration }) =>
+      !found.has(id) && !first.failed.has(id) && wideSeconds(duration) > headSeconds(duration) + 1,
   )
-  const found =
-    first.size === 0 || missing.length === 0
-      ? first
-      : await secondPass({ heads, first, missing, headOf })
-  const intros = episodes.reduce((done, episode) => {
-    const intro = found.get(episode.id)
-    if (intro == null || (only !== undefined && !only.has(episode.id))) return done
-    return done.set(episode.id, markerOf({ intro, chapterStarts: episode.chapterStarts }))
-  }, new Map<number, Marker>())
-  return { intros, failed }
+  const all =
+    found.size === 0 || missing.length === 0
+      ? { found, failed: first.failed }
+      : await secondPass({ first, found, missing, input: { files, kept, tools, onMade } })
+  return {
+    markers: markersOf({ files, found: all.found, only, markerOf: introMarker }),
+    failed: all.failed,
+  }
 }
 
 type SecondPassProps = {
-  heads: readonly SeasonEpisode[]
-  first: Map<number, FoundIntro>
-  missing: readonly DetectEpisode[]
-  headOf: (head: HeadOfProps) => Promise<Fingerprint | null>
+  first: HeardSeason
+  found: ReadonlyMap<number, FoundRun>
+  missing: readonly SeasonFile[]
+  input: Omit<SeasonDetectorInput, 'only'>
 }
 
 /** Hears each missing episode over the wider window and matches the season again, keeping only what that finds for them. */
-const secondPass = async ({
-  heads,
-  first,
-  missing,
-  headOf,
-}: SecondPassProps): Promise<Map<number, FoundIntro>> => {
-  const widened = await missing.reduce<Promise<Map<number, Fingerprint>>>(
-    async (previous, episode) => {
-      const wide = await previous
-      const head = await headOf({ episode, seconds: wideSeconds(episode.duration) })
-      return head == null ? wide : wide.set(episode.id, head)
-    },
-    Promise.resolve(new Map()),
-  )
-  const again = seasonIntros(heads.map(({ id, head }) => ({ id, head: widened.get(id) ?? head })))
-  return missing.reduce((found, { id }) => {
-    const intro = again.get(id)
-    return intro == null ? found : found.set(id, intro)
-  }, new Map(first))
+const secondPass = async ({ first, found, missing, input }: SecondPassProps) => {
+  const wide = await hearSeason({
+    ...input,
+    files: missing,
+    windowOf: ({ duration }) => fromStart(wideSeconds(duration)),
+  })
+  const widened = new Map(wide.heard.map(({ id, heard }) => [id, heard]))
+  const again = matchSeason({
+    episodes: first.heard.map(({ id, heard }) => ({ id, heard: widened.get(id) ?? heard })),
+    bounds: INTRO_BOUNDS,
+  })
+  return {
+    found: missing.reduce((all, { id }) => {
+      const run = again.get(id)
+      return run == null ? all : all.set(id, run)
+    }, new Map(found)),
+    failed: new Set([...first.failed, ...wide.failed]),
+  }
 }
 
-type MarkerOfProps = { intro: FoundIntro; chapterStarts: readonly number[] }
+type IntroMarkerProps = PlacedRun
 
-/** The intro as a marker, both ends where the picture changes. */
-const markerOf = ({ intro, chapterStarts }: MarkerOfProps): Marker => ({
+/** The intro as a marker, both ends placed. */
+const introMarker = ({ run, file }: IntroMarkerProps): Marker => ({
   kind: MARKER_KINDS.intro,
-  start: snapBoundary({ time: intro.start, chapterStarts }),
-  end: snapBoundary({ time: intro.end, chapterStarts }),
+  start: snapBoundary({ time: run.start, chapterStarts: file.chapterStarts }),
+  end: snapBoundary({ time: run.end, chapterStarts: file.chapterStarts }),
   source: MARKER_SOURCES.fingerprint,
-  confidence: intro.confidence,
+  confidence: run.confidence,
 })

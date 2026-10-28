@@ -5,23 +5,19 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common'
+import { MARKER_KINDS, MARKER_SOURCES } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
-import {
-  type DetectEpisode,
-  type IntroTools,
-  type SeasonDetection,
-  type StoredHead,
-  detectSeasonIntros,
-} from '@/markers/introDetector'
-import { type EpisodeFile, MarkerJobs } from '@/markers/markerJobs'
+import { detectFilmCredits } from '@/markers/creditsDetector'
+import type { KeptFingerprint } from '@/markers/fingerprintMatch'
+import { type EpisodeFile, type FilmFile, MarkerJobs } from '@/markers/markerJobs'
+import { REGIONS, type Region } from '@/markers/seasonListen'
+import { type FoundMarkers, detectSeasonMarkers } from '@/markers/seasonMarkers'
 import { createTaskQueue } from '@/scanner/concurrency'
 import { SettingsRepository } from '@/settings/settingsRepository'
 
-type RunProps = { season: readonly EpisodeFile[]; only?: ReadonlySet<number> }
-
-/** How long a season waits, each time, while ffmpeg converts a file for someone watching. */
+/** How long a job waits, each time, while ffmpeg converts a file for someone watching. */
 export const YIELD_MS = 30_000
 
 type Grouped = { primaries: EpisodeFile[]; extras: { at: number; file: EpisodeFile }[] }
@@ -38,14 +34,25 @@ const byEpisode = (files: readonly EpisodeFile[]): Grouped =>
     { primaries: [], extras: [] },
   )
 
+type RunJobProps<File extends { id: number }> = {
+  /** What the job is, for the log. */
+  label: string
+  /** The job's files, read once playback has given way, so they are current. */
+  load: () => readonly File[]
+  detect: (files: readonly File[]) => Promise<FoundMarkers>
+}
+
+type RunProps = { season: readonly EpisodeFile[]; only?: ReadonlySet<number> }
+
 /**
- * Finds each season's intro in the background, a season at a time, after
- * a match pass has placed episodes in their seasons, and again on boot for
- * whatever was waiting when the server stopped: the database holds the
- * state, so nothing is lost to a restart or a recreated container. A
- * season waits while ffmpeg converts a file for someone watching, so
- * detection never starves a viewer. `MARKER_DETECTION=off` or the admin's
- * Detect intros setting turns it off.
+ * Finds each season's intro and credits, and each film's credits, in the
+ * background, a season or film at a time, after a match pass has placed
+ * episodes in their seasons, and again on boot for whatever was waiting
+ * when the server stopped: the database holds the state, so nothing is
+ * lost to a restart or a recreated container. Each job waits while ffmpeg
+ * converts a file for someone watching, so detection never starves a
+ * viewer. `MARKER_DETECTION=off` or the admin's Find intros and credits
+ * setting turns it off.
  */
 @Injectable()
 export class MarkerDetection implements OnApplicationBootstrap, OnModuleDestroy {
@@ -57,7 +64,7 @@ export class MarkerDetection implements OnApplicationBootstrap, OnModuleDestroy 
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(MarkerJobs) private readonly jobs: MarkerJobs,
     @Inject(FfmpegService)
-    private readonly ffmpeg: Pick<FfmpegService, 'fingerprint' | 'isConverting'>,
+    private readonly ffmpeg: Pick<FfmpegService, 'fingerprint' | 'pictureStats' | 'isConverting'>,
     @Inject(SettingsRepository) private readonly settings: Pick<SettingsRepository, 'playback'>,
   ) {
     this.queue = createTaskQueue({ concurrency: config.markerConcurrency })
@@ -71,14 +78,31 @@ export class MarkerDetection implements OnApplicationBootstrap, OnModuleDestroy 
     this.isStopping = true
   }
 
-  /** Queues every season waiting for detection; one already queued or running is left as it is. */
+  /** Queues every season and film waiting for detection; one already queued or running is left as it is. */
   kick(): void {
     if (!this.isOn()) return
-    this.jobs
-      .seasonsDue()
-      .forEach((seasonId) =>
-        this.queue.push({ key: `season:${seasonId}`, task: () => this.analyse(seasonId) }),
-      )
+    this.jobs.seasonsDue().forEach((seasonId) =>
+      this.queue.push({
+        key: `season:${seasonId}`,
+        task: () =>
+          this.runJob({
+            label: `season ${seasonId}`,
+            load: () => this.jobs.episodesOf(seasonId),
+            detect: (files) => this.detectSeason(files),
+          }),
+      }),
+    )
+    this.jobs.filmsDue().forEach((film) =>
+      this.queue.push({
+        key: `media:${film.id}`,
+        task: () =>
+          this.runJob({
+            label: film.path,
+            load: () => [film],
+            detect: () => this.detectFilm(film),
+          }),
+      }),
+    )
   }
 
   whenIdle(): Promise<void> {
@@ -95,21 +119,47 @@ export class MarkerDetection implements OnApplicationBootstrap, OnModuleDestroy 
     await this.givePlaybackWay()
   }
 
-  private async analyse(seasonId: number): Promise<void> {
+  /** One job: wait for playback, detect, and mark every file done or failed; a job that throws fails all its files. */
+  private async runJob<File extends { id: number }>({
+    label,
+    load,
+    detect,
+  }: RunJobProps<File>): Promise<void> {
     await this.givePlaybackWay()
     if (this.isStopping || !this.isOn()) return
-    const files = this.jobs.episodesOf(seasonId)
+    const files = load()
+    const ids = files.map(({ id }) => id)
     try {
-      const { intros, failed } = await this.detect(files)
-      this.jobs.finish({ ids: files.map(({ id }) => id), intros, failed })
+      const { markers, failed } = await detect(files)
+      this.jobs.finish({ ids, markers, failed })
     } catch (error) {
-      this.logger.warn(`Intro detection failed for season ${seasonId}: ${errorMessage(error)}`)
-      this.jobs.finish({
-        ids: files.map(({ id }) => id),
-        intros: new Map(),
-        failed: new Set(files.map(({ id }) => id)),
-      })
+      this.logger.warn(`Marker detection failed for ${label}: ${errorMessage(error)}`)
+      this.jobs.finish({ ids, markers: new Map(), failed: new Set(ids) })
     }
+  }
+
+  /** A film's credits by its crawl, unless its chapters or an admin already name them. */
+  private async detectFilm(film: FilmFile): Promise<FoundMarkers> {
+    const shouldLook = this.jobs.wouldTake({
+      id: film.id,
+      kind: MARKER_KINDS.credits,
+      source: MARKER_SOURCES.visual,
+    })
+    const credits = shouldLook
+      ? await detectFilmCredits({ path: film.path, duration: film.duration, tools: this.ffmpeg })
+      : null
+    return { markers: new Map(credits === null ? [] : [[film.id, [credits]]]), failed: new Set() }
+  }
+
+  private keptOf(files: readonly EpisodeFile[]): Record<Region, Map<number, KeptFingerprint>> {
+    const of = (region: Region) =>
+      new Map(
+        files.flatMap(({ id }) => {
+          const kept = this.jobs.stored({ id, region })
+          return kept === null ? [] : [[id, kept] as const]
+        }),
+      )
+    return { [REGIONS.head]: of(REGIONS.head), [REGIONS.tail]: of(REGIONS.tail) }
   }
 
   /**
@@ -117,38 +167,27 @@ export class MarkerDetection implements OnApplicationBootstrap, OnModuleDestroy 
    * version of an episode in its place, so a second file of an episode is
    * matched against the same neighbours rather than against its twin.
    */
-  private async detect(files: readonly EpisodeFile[]): Promise<SeasonDetection> {
-    const heads = new Map<number, StoredHead | null>(
-      files.map(({ id }) => [id, this.jobs.storedHead(id)]),
-    )
-    const tools: IntroTools = {
-      fingerprint: (stretch) => this.ffmpeg.fingerprint(stretch),
-    }
+  private async detectSeason(files: readonly EpisodeFile[]): Promise<FoundMarkers> {
+    const kept = this.keptOf(files)
     const run = ({ season, only }: RunProps) =>
-      detectSeasonIntros({
+      detectSeasonMarkers({
         ...(only !== undefined && { only }),
-        episodes: season.map((file): DetectEpisode => ({
-          ...file,
-          head: heads.get(file.id) ?? null,
-        })),
-        tools,
-        onHead: ({ id, seconds, points }) => {
-          heads.set(id, { seconds, points })
-          this.jobs.saveHead({ id, seconds, points })
+        files: season,
+        kept,
+        tools: this.ffmpeg,
+        onMade: (made) => {
+          kept[made.region].set(made.id, { seconds: made.seconds, points: made.points })
+          this.jobs.save(made)
         },
       })
     const { primaries, extras } = byEpisode(files)
     const first = await run({ season: primaries })
-    return extras.reduce<Promise<SeasonDetection>>(async (previous, { at, file }) => {
+    return extras.reduce<Promise<FoundMarkers>>(async (previous, { at, file }) => {
       const done = await previous
-      const { intros, failed } = await run({
-        season: primaries.with(at, file),
-        only: new Set([file.id]),
-      })
-      const intro = intros.get(file.id)
+      const more = await run({ season: primaries.with(at, file), only: new Set([file.id]) })
       return {
-        intros: intro == null ? done.intros : new Map(done.intros).set(file.id, intro),
-        failed: failed.has(file.id) ? new Set(done.failed).add(file.id) : done.failed,
+        markers: new Map([...done.markers, ...more.markers]),
+        failed: more.failed.has(file.id) ? new Set([...done.failed, file.id]) : done.failed,
       }
     }, Promise.resolve(first))
   }
