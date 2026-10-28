@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Runs the 🎬 Desktop end to end check from pull-request-checks.yml on this Mac:
+# Playwright drives the unpackaged Raven against the fixture servers and fake Auth
+# the tests start themselves. The run is an Nx target, so an unchanged pass replays
+# from the cache. A missing tool is installed with Homebrew first; Xcode itself
+# cannot be, so its absence stops here. Without libmpv's addon, CI's native handoff
+# is downloaded from a recent run.
+#
+#   bun run ci:desktop:e2e                         every step
+#   bun run ci:desktop:e2e -- --skip-nx-cache      the tests for real, even on a cached pass
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+# `xcodebuild -version` is in the target's Nx cache key, and fails under the Command
+# Line Tools that xcode-select may point at.
+export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+
+ADDON=libs/raven/mpv/resources/darwin-arm64/raven_mpv.node
+SOURCE_FFMPEG=libs/raven/mpv/native-build/prefix/bin/ffmpeg
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/raven-ci-desktop-e2e.XXXXXX")"
+
+step() { printf '\n=== %s ===\n' "$1"; }
+
+on_exit() {
+  local status=$?
+  if [ "$status" -ne 0 ]; then
+    echo 'Failed. Playwright traces: apps/raven/desktop/test-results (bunx playwright show-trace <trace.zip>)' >&2
+  fi
+}
+trap on_exit EXIT
+
+brew_install() {
+  local command="$1" formula="$2"
+  if ! command -v "$command" > /dev/null; then
+    echo "Installing $formula"
+    brew install "$formula"
+  fi
+}
+
+step 'Tools'
+test "$(uname -m)" = arm64 || { echo 'Needs a Mac with Apple silicon.' >&2; exit 1; }
+xcodebuild -version > /dev/null 2>&1 || {
+  echo "No Xcode at $DEVELOPER_DIR: install it from the App Store, open it once and accept the license." >&2
+  exit 1
+}
+brew_install ffmpeg ffmpeg
+
+step 'Install'
+bun install --frozen-lockfile
+
+step 'libmpv'
+if [ -f "$ADDON" ]; then
+  echo "Using $ADDON"
+else
+  brew_install gh gh
+  gh auth status > /dev/null || { echo 'Sign in to GitHub first: gh auth login' >&2; exit 1; }
+  # The handoff CI's desktop-native job packs lives one day, so the newest run that has it wins.
+  found=''
+  while read -r id sha; do
+    if gh run download "$id" -n "raven-native-handoff-$sha" -D "$WORK" > /dev/null 2>&1; then
+      tar -xf "$WORK/raven-native-handoff.tar"
+      echo "Unpacked the handoff from run $id"
+      found=yes
+      break
+    fi
+  done < <(gh run list --workflow pull-request-checks.yml --limit 20 --json databaseId,headSha --jq '.[] | "\(.databaseId) \(.headSha)"')
+  if [ -z "$found" ]; then
+    echo 'No run from the last day has the libmpv handoff. Build it with bun run mpv:native (the full native toolchain, see the get-started skill).' >&2
+    exit 1
+  fi
+fi
+
+# The ffmpeg that makes the test clips: CI's source-built one when the handoff brought it.
+if [ -x "$SOURCE_FFMPEG" ]; then
+  export RAVEN_E2E_FFMPEG="$PWD/$SOURCE_FFMPEG"
+else
+  RAVEN_E2E_FFMPEG="$(command -v ffmpeg)"
+  export RAVEN_E2E_FFMPEG
+fi
+
+step 'Desktop end to end'
+bunx nx run @raven/desktop:e2e "$@"
