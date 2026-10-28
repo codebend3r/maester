@@ -1,10 +1,11 @@
 # raven's intro and credits: skip the intro, roll on at the credits
 
-Date: 2026-10-27. Status: draft, written from research on how Plex, Jellyfin
-and Emby do it and a survey of raven's scanner and player. The three spikes
-ran on 2026-10-28; their findings and verdicts are under Research findings,
-and they change the chapter patterns, the head window and how films find
-their credits. Not yet reviewed.
+Date: 2026-10-27. Status: approved on 2026-10-28, review points and spike
+verdicts as written. Written from research on how Plex, Jellyfin and Emby do
+it and a survey of raven's scanner and player. The three spikes ran on
+2026-10-28; their findings and verdicts are under Research findings, and
+they change the chapter patterns, the head window and how films find their
+credits.
 
 ## Why
 
@@ -329,15 +330,19 @@ export const SESSION_KINDS = {
 | `saga` | saga Play all, a film of a saga | next film of the saga | after the last film |
 | `queue` | Shuffle (show, season, library) | next of the shuffled queue it already carries | after the queue |
 
-- `GET /api/media/:id/next?session=<kind>&scope=<id>` returns the next
-  `MediaItem` or null, using `mediaRepository`'s existing episode order
-  (`season_number = 0` last, then season and episode, best file first).
-  `queue` keeps today's `upNext` list in router state; it is already
-  bounded by `SHUFFLE_LENGTH`.
-- `isWatchState` gains `session` (a discriminated union on `kind`), and
-  `watchLink` takes it. `upNext` stays for `queue` only. Every entry point in
-  the table above passes its session; today's saga links move from `upNext`
-  lists to `saga` sessions.
+- `GET /api/media/:id/next?session=<kind>&scope=<sagaId>` returns the next
+  `MediaItem` or null, from the playing file's own library, using
+  `mediaRepository`'s existing episode order (`season_number = 0` last,
+  then season and episode, best file first). Only `saga` needs `scope`:
+  the playing episode names its own season and show. `queue` keeps today's
+  `upNext` list in router state; it is already bounded by `SHUFFLE_LENGTH`.
+- `isWatchState` gains `session` (a discriminated union on `kind`) in place
+  of `isShuffled`, and `watchLink` takes it. `upNext` stays for `queue`
+  only. A link that names no session gets `sessionOf(media)`: `show` for an
+  episode, `single` for anything else, which is also what a refresh or a
+  direct visit plays in. So the show page, episode page, cards and Continue
+  watching need no change; the season page passes `season`, the saga page
+  `saga`, and Shuffle `queue`.
 - The end of a `season` session offers Next season without a countdown,
   since the viewer chose one season.
 
@@ -794,7 +799,8 @@ first two ship value before any detector exists.
    links moved off `upNext`. Episodes now roll on at the end of the file.
 2. **The 15 second countdown.** `autoplayCountdownSeconds` (default 15) and
    the Autoplay settings on the Settings page; the `UpNextCard` at the
-   file's end.
+   file's end, and Next season without a countdown at a `season` session's
+   end.
 3. **Markers storage and chapters.** Migrations, `-show_chapters`,
    `parseChapters`, chapter markers, `GET /api/media/:id/markers`, the
    contract, chapters on the `Scrubber`. Files with named chapters get skip

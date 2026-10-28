@@ -1,4 +1,11 @@
-import { type ItemType, MEDIA_SORTS, type MediaSort, SHUFFLE_LENGTH } from '@raven/core'
+import {
+  type ItemType,
+  MEDIA_SORTS,
+  type MediaSort,
+  SESSION_KINDS,
+  SHUFFLE_LENGTH,
+  type ViewingSession,
+} from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import type { Viewer } from '@/lock/lockService'
@@ -313,6 +320,39 @@ describe("listing a TV library's shows", () => {
         })?.id ?? null,
       ),
     ).toBe('Special - S01E01.mkv')
+  })
+
+  it('rolls a show on across its seasons, specials last, and a season only to its end', () => {
+    addShow({
+      title: 'Binge',
+      episodes: [
+        [0, 1],
+        [2, 1],
+        [1, 2],
+        [1, 1],
+        [0, 2],
+      ],
+    })
+    type NextProps = { name: string; session: ViewingSession }
+    const next = ({ name, session }: NextProps) => {
+      const playing = media().get({ id: state.ids.get(name) ?? -1, account: TEST_ACCOUNTS.a })
+      if (!playing) throw new Error(`no ${name}`)
+      return fileName(
+        media().nextInSession({ media: playing, session, account: TEST_ACCOUNTS.a })?.id ?? null,
+      )
+    }
+    const show = { kind: SESSION_KINDS.show } as const
+    const season = { kind: SESSION_KINDS.season } as const
+    expect(next({ name: 'Binge - S01E01.mkv', session: show })).toBe('Binge - S01E02.mkv')
+    expect(next({ name: 'Binge - S01E02.mkv', session: show })).toBe('Binge - S02E01.mkv')
+    expect(next({ name: 'Binge - S02E01.mkv', session: show })).toBe('Binge - S00E01.mkv')
+    expect(next({ name: 'Binge - S00E01.mkv', session: show })).toBe('Binge - S00E02.mkv')
+    expect(next({ name: 'Binge - S00E02.mkv', session: show })).toBe('none')
+    expect(next({ name: 'Binge - S01E01.mkv', session: season })).toBe('Binge - S01E02.mkv')
+    expect(next({ name: 'Binge - S01E02.mkv', session: season })).toBe('none')
+    expect(next({ name: 'Binge - S01E01.mkv', session: { kind: SESSION_KINDS.single } })).toBe(
+      'none',
+    )
   })
 
   it('deals every episode of a show, watched or not, as the die falls', () => {

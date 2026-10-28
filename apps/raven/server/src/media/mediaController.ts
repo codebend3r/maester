@@ -1,6 +1,7 @@
 import { createReadStream } from 'node:fs'
 import { stat, unlink } from 'node:fs/promises'
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -31,6 +32,8 @@ import {
   isString,
   MEDIA_TICKET_PARAM,
   PLAYBACK_MODES,
+  SESSION_PARAMS,
+  readSessionQuery,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
@@ -121,6 +124,27 @@ export class MediaController {
   @Get(':id')
   get(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): MediaItem {
     return this.find({ id, account: this.accounts.keyOf({ request }) })
+  }
+
+  /**
+   * What plays after this video in the session the query names, from the
+   * same library, for the player's up next; null at the session's end.
+   */
+  @Get(':id/next')
+  next(
+    @Param('id', ParseIntPipe) id: number,
+    @Query(SESSION_PARAMS.session) session: unknown,
+    @Query(SESSION_PARAMS.scope) scope: unknown,
+    @Req() request: FastifyRequest,
+  ): MediaItem | null {
+    const viewing = readSessionQuery({ session, scope })
+    if (!viewing) throw new BadRequestException('session must name a viewing session')
+    const account = this.accounts.keyOf({ request })
+    return this.media.nextInSession({
+      media: this.find({ id, account }),
+      session: viewing,
+      account,
+    })
   }
 
   /** Where the file lives, for the card's menu: the one call that hands a client a path. */

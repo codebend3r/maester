@@ -4,6 +4,7 @@ import {
   type Library,
   ROUTE_STATES,
   SAGA_BACKDROP_TYPES,
+  SESSION_KINDS,
   type Saga,
   routeState,
   sagaCover,
@@ -120,7 +121,7 @@ const SagaView = ({ library, sagaId }: SagaViewProps) => {
   const [count, ...span] = sagaFacts(saga)
   const watchedCount = saga.media.filter((media) => media.watched).length
   const backdrop = headerBackdrop(saga)
-  const [first, ...rest] = saga.media
+  const [first] = saga.media
 
   return (
     <OwnBackdrop>
@@ -155,7 +156,14 @@ const SagaView = ({ library, sagaId }: SagaViewProps) => {
             }
           >
             {first && (
-              <ButtonLink tone="primary" icon="play" {...watchLink({ media: first, upNext: rest })}>
+              <ButtonLink
+                tone="primary"
+                icon="play"
+                {...watchLink({
+                  media: first,
+                  session: { kind: SESSION_KINDS.saga, sagaId: saga.tmdbId },
+                })}
+              >
                 Play all
               </ButtonLink>
             )}
@@ -173,7 +181,11 @@ const SagaView = ({ library, sagaId }: SagaViewProps) => {
             <SectionHeading id={filmsId} aside="Release order">
               In order
             </SectionHeading>
-            <SagaFilms media={saga.media} ratingsSource={library.settings.ratingsSource} />
+            <SagaFilms
+              media={saga.media}
+              sagaId={saga.tmdbId}
+              ratingsSource={library.settings.ratingsSource}
+            />
           </section>
           <AdminOnly>
             {isEditing && (

@@ -10,8 +10,10 @@ import {
   type PosterEntry,
   type Saga,
   type ShowEntry,
+  SESSION_KINDS,
   SHUFFLE_LENGTH,
   THUMBNAIL_STATES,
+  type ViewingSession,
   isMatchState,
   isThumbnailState,
   readCut,
@@ -286,6 +288,25 @@ type MediaRepositoryNewestReleasedProps = {
 type MediaRepositoryNextEpisodeProps = {
   showId: number
   libraryIds: readonly number[]
+  account: AccountKey
+}
+
+type MediaRepositoryNextInSessionProps = {
+  media: MediaItem
+  session: ViewingSession
+  account: AccountKey
+}
+
+type MediaRepositoryNextInShowProps = {
+  mediaId: number
+  libraryId: number
+  isSeasonOnly: boolean
+  account: AccountKey
+}
+
+type MediaRepositoryNextInSagaProps = {
+  media: MediaItem
+  sagaId: string
   account: AccountKey
 }
 
@@ -573,6 +594,86 @@ export class MediaRepository {
   nextEpisode({ showId, libraryIds, account }: MediaRepositoryNextEpisodeProps): MediaItem | null {
     const next = this.nextUnwatched({ showIds: [showId], libraryIds, account }).get(showId)
     return next == null ? null : this.get({ id: next, account })
+  }
+
+  /**
+   * What plays after `media` in `session`, from the same library: the next
+   * episode of its season or its show, or the next film of its saga; null
+   * at the session's end, and for a session whose next is not the server's.
+   */
+  nextInSession({ media, session, account }: MediaRepositoryNextInSessionProps): MediaItem | null {
+    switch (session.kind) {
+      case SESSION_KINDS.season:
+      case SESSION_KINDS.show:
+        return this.nextInShow({
+          mediaId: media.id,
+          libraryId: media.libraryId,
+          isSeasonOnly: session.kind === SESSION_KINDS.season,
+          account,
+        })
+      case SESSION_KINDS.saga:
+        return this.nextInSaga({ media, sagaId: session.sagaId, account })
+      case SESSION_KINDS.single:
+      case SESSION_KINDS.queue:
+        return null
+      default: {
+        const unknown: never = session
+        return unknown
+      }
+    }
+  }
+
+  /**
+   * The best file in `libraryId` of the episode after `mediaId`'s, in show
+   * order: specials last, then by season and episode. A file of several
+   * episodes counts as its last. `isSeasonOnly` stops at its season's end.
+   */
+  private nextInShow({
+    mediaId,
+    libraryId,
+    isSeasonOnly,
+    account,
+  }: MediaRepositoryNextInShowProps): MediaItem | null {
+    const row = this.db
+      .prepare<{ mediaId: number; libraryId: number; isSeasonOnly: number }, { media_id: number }>(
+        `WITH current AS (
+           SELECT s.id AS season_id, s.parent_id AS show_id,
+                  s.number AS season_number, e.number AS episode_number
+             FROM media_items mi
+             JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
+             JOIN shown_items s ON s.id = e.parent_id
+            WHERE mi.media_id = @mediaId
+            ORDER BY s.number = 0 DESC, s.number DESC, e.number DESC
+            LIMIT 1),
+         files AS (
+           SELECT m.id AS media_id, s.number AS season_number, e.number AS episode_number,
+                  COALESCE(m.width * m.height, 0) AS pixels
+             FROM current c
+             JOIN shown_items s ON s.parent_id = c.show_id
+                               AND (@isSeasonOnly = 0 OR s.id = c.season_id)
+             JOIN shown_items e ON e.parent_id = s.id AND e.type = 'episode'
+             JOIN media_items mi ON mi.item_id = e.id
+             JOIN media m ON m.id = mi.media_id
+            WHERE m.library_id = @libraryId)
+         SELECT f.media_id
+           FROM files f, current c
+          WHERE (f.season_number = 0, f.season_number, f.episode_number)
+                > (c.season_number = 0, c.season_number, c.episode_number)
+          ORDER BY f.season_number = 0, f.season_number, f.episode_number, f.pixels DESC, f.media_id
+          LIMIT 1`,
+      )
+      .get({ mediaId, libraryId, isSeasonOnly: isSeasonOnly ? 1 : 0 })
+    return row ? this.get({ id: row.media_id, account }) : null
+  }
+
+  /** The film after `media`'s in saga `sagaId` of its library, oldest first, as the saga's page lists them. */
+  private nextInSaga({ media, sagaId, account }: MediaRepositoryNextInSagaProps): MediaItem | null {
+    const films = this.sagaGroups({ libraryId: media.libraryId, account }).find(
+      (saga) => saga.tmdbId === sagaId,
+    )?.media
+    const at =
+      films?.findIndex((film) => film.item != null && film.item.id === media.item?.id) ?? -1
+    return at < 0 ? null : (films?.[at + 1] ?? null)
   }
 
   /**

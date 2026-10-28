@@ -1,7 +1,16 @@
-import { ITEM_TYPES, type ItemSummary, type MediaItem, isMediaItem, isMediaList } from '@/contract'
+import {
+  ITEM_TYPES,
+  type ItemSummary,
+  type MediaItem,
+  SESSION_KINDS,
+  type ViewingSession,
+  isMediaItem,
+  isMediaList,
+  isViewingSession,
+} from '@/contract'
 import { primaryVersion } from '@/items'
 import { toQueryString } from '@/query'
-import { type Infer, isBoolean, object } from '@/schema'
+import { type Infer, object } from '@/schema'
 
 /** An address in the app, from its root. */
 export type AppPath = `/${string}`
@@ -116,45 +125,51 @@ export const episodeBackPath = ({ item, libraryId }: EpisodeBackPathProps): stri
 }
 
 /**
- * What a link to the player hands over in router state: the video, the ones
- * to play after it, and whether they were shuffled rather than lined up in turn.
+ * The session a video plays in when its link names none: an episode rolls
+ * on through its show, anything else plays on its own.
  */
-const isWatchState = object({ media: isMediaItem, upNext: isMediaList, isShuffled: isBoolean })
+export const sessionOf = (media: MediaItem): ViewingSession =>
+  media.item?.type === ITEM_TYPES.episode
+    ? { kind: SESSION_KINDS.show }
+    : { kind: SESSION_KINDS.single }
+
+/**
+ * What a link to the player hands over in router state: the video, the
+ * session it plays in, and for a queue the videos a shuffle dealt after it.
+ */
+const isWatchState = object({ media: isMediaItem, session: isViewingSession, upNext: isMediaList })
 
 export type WatchState = Infer<typeof isWatchState>
 
 type WatchLinkProps = {
   media: MediaItem
+  session?: ViewingSession
   upNext?: WatchState['upNext']
-  isShuffled?: boolean
 }
 
 /**
  * The link to play a video, with the video riding along in router state so
- * the player starts without fetching it again, and any to play after it, in
- * turn, as Play all hands over a saga, or as a shuffle dealt them.
+ * the player starts without fetching it again, and the session it plays in,
+ * `sessionOf`'s unless the page names one. A queue's link carries the videos
+ * to play after it.
  */
 export const watchLink = ({
   media,
+  session = sessionOf(media),
   upNext = [],
-  isShuffled = false,
 }: WatchLinkProps): { to: AppPath; state: WatchState } => ({
   to: watchPageOf(media.id),
-  state: { media, upNext, isShuffled },
+  state: { media, session, upNext },
 })
 
 type QueueLinkProps = {
   queue: readonly MediaItem[]
-  isShuffled?: boolean
 }
 
-/** The link to play the first of `queue`, with the rest to play after it; null for an empty queue. */
-export const queueLink = ({
-  queue,
-  isShuffled = false,
-}: QueueLinkProps): { to: AppPath; state: WatchState } | null => {
+/** The link to play the first of a shuffled `queue`, with the rest after it; null for an empty queue. */
+export const queueLink = ({ queue }: QueueLinkProps): { to: AppPath; state: WatchState } | null => {
   const [media, ...upNext] = queue
-  return media ? watchLink({ media, upNext, isShuffled }) : null
+  return media ? watchLink({ media, session: { kind: SESSION_KINDS.queue }, upNext }) : null
 }
 
 type ReadWatchStateProps = {

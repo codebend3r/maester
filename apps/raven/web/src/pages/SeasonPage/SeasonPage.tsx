@@ -4,6 +4,8 @@ import {
   type EpisodeSummary,
   type ItemDetails,
   ROUTE_STATES,
+  SESSION_KINDS,
+  type ViewingSession,
   episodeCode,
   episodeEntryKey,
   episodeRowFacts,
@@ -52,6 +54,9 @@ import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { FactText } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/pages/SeasonPage/SeasonPage.module.scss'
+
+/** A season's page plays the rest of that season, then stops. */
+const SEASON_SESSION: ViewingSession = { kind: SESSION_KINDS.season }
 
 type EpisodeRowProps = { episode: EpisodeSummary }
 
@@ -117,7 +122,7 @@ const EpisodeRow = ({ episode }: EpisodeRowProps) => {
           <WatchedToggle {...toggle} label={`Watched ${episode.title}`} isLabelShown={false} />
           {file && (
             <Link
-              {...watchLink({ media: file })}
+              {...watchLink({ media: file, session: SEASON_SESSION })}
               className={styles.play}
               aria-label={`Play ${episode.title}`}
             >
@@ -177,7 +182,11 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
           backdrop={itemBackdrop({ id: show.id, version: show.backdropVersion })}
         >
           {nextFile && (
-            <ButtonLink tone="primary" icon="play" {...watchLink({ media: nextFile })}>
+            <ButtonLink
+              tone="primary"
+              icon="play"
+              {...watchLink({ media: nextFile, session: SEASON_SESSION })}
+            >
               {nextCode ? `Play ${nextCode}` : 'Play'}
             </ButtonLink>
           )}

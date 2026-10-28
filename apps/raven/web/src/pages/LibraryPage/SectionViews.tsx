@@ -224,7 +224,7 @@ const AllSection = ({ library }: AllSectionProps) => {
           playable={queue.playable}
           onPlay={() => watch(queue.first())}
           onShuffle={() => {
-            const link = queueLink({ queue: queue.shuffled(), isShuffled: true })
+            const link = queueLink({ queue: queue.shuffled() })
             if (link) navigate(link.to, { state: link.state })
           }}
         />

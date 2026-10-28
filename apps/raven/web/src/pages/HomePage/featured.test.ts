@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { type Hero, RESOLUTIONS } from '@raven/core'
+import { type Hero, RESOLUTIONS, SESSION_KINDS } from '@raven/core'
 import { featuredOf } from '@/pages/HomePage/featured'
 import { itemSummary, library, matchedMovie, mediaItem, showEntry } from '@/test/fixtures'
 
@@ -119,7 +119,7 @@ describe('featuredOf', () => {
     })
     expect(featured?.play).toEqual({
       to: '/watch/5',
-      state: { media: hdr, upNext: [], isShuffled: false },
+      state: { media: hdr, session: { kind: SESSION_KINDS.single }, upNext: [] },
     })
   })
 

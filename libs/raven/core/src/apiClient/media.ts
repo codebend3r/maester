@@ -6,17 +6,30 @@ import {
   type MediaItem,
   type MediaLocation,
   type ProgressReport,
+  type ViewingSession,
   type WatchedChange,
+  sessionQueryOf,
 } from '@/contract'
+import { toQueryString } from '@/query'
+import { nullable } from '@/schema'
 
 type SaveProgressProps = { id: number } & ProgressReport
 
 type SetFavouriteProps = { id: number; favourite: boolean }
 
+type NextInSessionProps = { id: number; session: ViewingSession }
+
 /** One video: what it is, where it is, and the viewer's own marks on it. */
 export const mediaCalls = ({ send, expect }: Transport) => ({
   getMedia: (id: number): Promise<MediaItem> =>
     expect({ request: send({ path: `/api/media/${id}` }), guard: isMediaItem }),
+
+  /** What plays after video `id` in `session`, in the same library; null at the session's end. */
+  nextInSession: ({ id, session }: NextInSessionProps): Promise<MediaItem | null> =>
+    expect({
+      request: send({ path: `/api/media/${id}/next?${toQueryString(sessionQueryOf(session))}` }),
+      guard: nullable(isMediaItem),
+    }),
 
   /** Where the video's file lives; listings leave the path out. */
   getMediaLocation: (id: number): Promise<MediaLocation> =>

@@ -16,6 +16,7 @@ import {
   type PlayerSource,
   TITLE_REFUSALS,
   watchLink,
+  SESSION_KINDS,
   watchPageOf,
   watchPathFor,
 } from '@raven/core'
@@ -180,7 +181,11 @@ describe('WatchPage inside Raven', () => {
 
   it('names the titles a card handed over as the ones after it', async () => {
     const client = titleMain()
-    const { to, state } = watchLink({ media: MEDIA, upNext: [NEXT] })
+    const { to, state } = watchLink({
+      media: MEDIA,
+      session: { kind: SESSION_KINDS.queue },
+      upNext: [NEXT],
+    })
     renderPlayers({ client, player: nativeOf(fakePlayer()), route: to, state })
     await screen.findByRole('heading', { name: 'Busboys (2026)' })
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.playTitle })).toEqual([
@@ -535,7 +540,11 @@ describe('WatchPage inside Raven', () => {
   })
 
   it('plays the next title in place of this one when the Playback menu says next', async () => {
-    const { to, state } = watchLink({ media: MEDIA, upNext: [NEXT] })
+    const { to, state } = watchLink({
+      media: MEDIA,
+      session: { kind: SESSION_KINDS.queue },
+      upNext: [NEXT],
+    })
     const client = titleMain()
     const { menu } = renderPlayers({
       client,

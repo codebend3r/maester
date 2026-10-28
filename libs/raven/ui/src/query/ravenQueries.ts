@@ -6,6 +6,8 @@ import {
   type MatchItemType,
   type MatchSubject,
   type MediaSort,
+  type ViewingSession,
+  asksServerForNext,
 } from '@raven/core'
 import { LISTING_GC_MS, queryKeys } from '@/query/queryClient'
 import { playerQueriesFor } from '@/lib/playerQueries'
@@ -38,6 +40,7 @@ export const ravenQueriesFor = (api: ApiClient) => {
     show: HistoryShow
     limit: number
   }
+  type RavenQueriesForNextInSessionQueryProps = { id: number; session: ViewingSession }
 
   type RavenQueriesForMatchSearchQueryProps = {
     type: MatchItemType
@@ -162,6 +165,13 @@ export const ravenQueriesFor = (api: ApiClient) => {
       queryOptions({
         queryKey: queryKeys.mediaItem(id),
         queryFn: id == null ? skipToken : () => api.getMedia(id),
+      }),
+
+    /** What plays after a video in its session; a session whose next is not the server's asks nothing. */
+    nextInSessionQuery: ({ id, session }: RavenQueriesForNextInSessionQueryProps) =>
+      queryOptions({
+        queryKey: queryKeys.nextInSession({ id, session }),
+        queryFn: asksServerForNext(session) ? () => api.nextInSession({ id, session }) : skipToken,
       }),
 
     /** A file's tracks only change when the file does, and the scan stores them. */

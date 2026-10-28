@@ -174,16 +174,16 @@ describe('SagaPage', () => {
     expect(backdropOf({ id: 80, version: 'b1' })).toBeNull()
   })
 
-  it('plays every movie one after another from Play all', async () => {
+  it('plays every movie one after another from Play all, in the saga', async () => {
     open()
     await userEvent.click(await screen.findByRole('link', { name: 'Play all' }))
-    expect(await screen.findByText('Playing 7, then 8, 9')).toBeInTheDocument()
+    expect(await screen.findByText('Playing 7 in saga 119, then')).toBeInTheDocument()
   })
 
-  it('plays the movies after the one picked from its row', async () => {
+  it('plays the movies after the one picked from its row, in the saga', async () => {
     open()
     await userEvent.click(await screen.findByRole('link', { name: 'Play The Two Towers' }))
-    expect(await screen.findByText('Playing 8, then 9')).toBeInTheDocument()
+    expect(await screen.findByText('Playing 8 in saga 119, then')).toBeInTheDocument()
   })
 
   it("leaves the saga's backdrop up when a movie is pointed at", async () => {

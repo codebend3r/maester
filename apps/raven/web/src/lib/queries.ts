@@ -20,6 +20,7 @@ export const {
   heroPicksQuery,
   homeSearchQuery,
   mediaQuery,
+  nextInSessionQuery,
   tracksQuery,
   mediaStreamsQuery,
   mediaLocationQuery,

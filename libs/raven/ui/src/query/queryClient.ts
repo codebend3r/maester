@@ -3,6 +3,7 @@ import {
   type MatchItemType,
   type MatchSubject,
   type MediaSort,
+  type ViewingSession,
   ApiError,
   isLockedError,
 } from '@raven/core'
@@ -41,6 +42,8 @@ type QueryKeysMediaProps = {
   sort: MediaSort
   seed: number
 }
+
+type QueryKeysNextInSessionProps = { id: number; session: ViewingSession }
 
 type QueryKeysShowsProps = {
   libraryId: number
@@ -98,6 +101,8 @@ export const queryKeys = {
   mediaItem: (id: number | null) => ['media', id],
   /** Where a video's file lives, for its menu. */
   mediaLocation: (id: number) => ['media', id, 'location'],
+  /** What plays after a video in a session, under the video's key so reading it again reads this again too. */
+  nextInSession: ({ id, session }: QueryKeysNextInSessionProps) => ['media', id, 'next', session],
   favourites: ['favourites'],
   favouriteTitles: ['favourites', 'titles'],
   /** What is in progress and each pinned library's newest arrivals. */
