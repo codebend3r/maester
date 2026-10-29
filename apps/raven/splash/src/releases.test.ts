@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 
-import { fileLabel, formatBytes, formatDate, parseReleases } from '@/releases'
+import {
+  PLATFORMS,
+  downloadMenu,
+  formatBytes,
+  formatDate,
+  parseReleases,
+  platformList,
+  platformOf,
+} from '@/releases'
+import type { Release } from '@/releases'
 
 type AssetProps = {
   name: string
@@ -14,62 +23,71 @@ const asset = ({ name, size = 155_000_000 }: AssetProps) => ({
 })
 
 const latest = {
+  tag_name: 'v0.8.0',
+  published_at: '2026-10-29T18:00:00Z',
+  assets: [
+    asset({ name: 'SHA256SUMS', size: 290 }),
+    asset({ name: 'raven-player-0.8.0-sources.tar.gz' }),
+    asset({ name: 'raven-player-0.8.0-arm64.dmg' }),
+    asset({ name: 'raven-player-0.8.0-x64-setup.exe', size: 120_000_000 }),
+    asset({ name: 'raven-player-0.8.0-x64.zip', size: 130_000_000 }),
+  ],
+}
+
+const older = {
   tag_name: 'v0.7.5',
   published_at: '2026-10-26T18:00:00Z',
   assets: [
-    asset({ name: 'SHA256SUMS', size: 290 }),
-    asset({ name: 'raven-player-0.7.5-sources.tar.gz' }),
     asset({ name: 'raven-player-0.7.5-arm64.zip', size: 139_000_000 }),
     asset({ name: 'raven-player-0.7.5-arm64.dmg' }),
   ],
 }
 
-const older = {
-  tag_name: 'v0.7.4',
-  published_at: '2026-10-20T12:00:00Z',
-  assets: [
-    asset({ name: 'raven-player-0.7.4-arm64.dmg' }),
-    asset({ name: 'raven-player-0.7.4-x64.dmg' }),
-  ],
-}
+const url = (name: string) => `https://example.test/${name}`
 
 describe('parseReleases', () => {
   test('keeps the Raven downloads of each release, in GitHub order', () => {
     expect(parseReleases({ releases: [latest, older] })).toEqual([
+      {
+        version: '0.8.0',
+        date: '2026-10-29T18:00:00Z',
+        notesUrl: 'https://github.com/codebend3r/maester/releases/tag/v0.8.0',
+        files: [
+          {
+            platform: PLATFORMS.mac,
+            label: 'Mac, disk image',
+            url: url('raven-player-0.8.0-arm64.dmg'),
+            bytes: 155_000_000,
+          },
+          {
+            platform: PLATFORMS.windows,
+            label: 'Windows, installer',
+            url: url('raven-player-0.8.0-x64-setup.exe'),
+            bytes: 120_000_000,
+          },
+          {
+            platform: PLATFORMS.windows,
+            label: 'Windows, zip archive',
+            url: url('raven-player-0.8.0-x64.zip'),
+            bytes: 130_000_000,
+          },
+        ],
+      },
       {
         version: '0.7.5',
         date: '2026-10-26T18:00:00Z',
         notesUrl: 'https://github.com/codebend3r/maester/releases/tag/v0.7.5',
         files: [
           {
-            arch: 'arm64',
-            kind: 'zip',
-            url: 'https://example.test/raven-player-0.7.5-arm64.zip',
+            platform: PLATFORMS.mac,
+            label: 'Mac, zip archive',
+            url: url('raven-player-0.7.5-arm64.zip'),
             bytes: 139_000_000,
           },
           {
-            arch: 'arm64',
-            kind: 'dmg',
-            url: 'https://example.test/raven-player-0.7.5-arm64.dmg',
-            bytes: 155_000_000,
-          },
-        ],
-      },
-      {
-        version: '0.7.4',
-        date: '2026-10-20T12:00:00Z',
-        notesUrl: 'https://github.com/codebend3r/maester/releases/tag/v0.7.4',
-        files: [
-          {
-            arch: 'arm64',
-            kind: 'dmg',
-            url: 'https://example.test/raven-player-0.7.4-arm64.dmg',
-            bytes: 155_000_000,
-          },
-          {
-            arch: 'x64',
-            kind: 'dmg',
-            url: 'https://example.test/raven-player-0.7.4-x64.dmg',
+            platform: PLATFORMS.mac,
+            label: 'Mac, disk image',
+            url: url('raven-player-0.7.5-arm64.dmg'),
             bytes: 155_000_000,
           },
         ],
@@ -97,26 +115,59 @@ describe('parseReleases', () => {
     expect(parseReleases({ releases: { message: 'rate limited' } })).toEqual([])
   })
 
-  test('skips a file of an unknown architecture or kind', () => {
+  test('skips a file the release workflow does not make', () => {
     const release = {
       ...latest,
       assets: [
-        asset({ name: 'raven-player-0.7.5-riscv.dmg' }),
-        asset({ name: 'raven-player-0.7.5-arm64.pkg' }),
+        asset({ name: 'raven-player-0.8.0-riscv.dmg' }),
+        asset({ name: 'raven-player-0.8.0-arm64.pkg' }),
       ],
     }
     expect(parseReleases({ releases: [release] })).toEqual([])
   })
 })
 
+const parsed = (release: unknown): Release => {
+  const [first] = parseReleases({ releases: [release] })
+  if (first === undefined) throw new Error('the release carries no download')
+  return first
+}
+
+const WINDOWS_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+const MAC_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+
+describe('platformOf', () => {
+  test('reads Windows from the user agent and offers the Mac app to everyone else', () => {
+    expect(platformOf({ userAgent: WINDOWS_AGENT })).toBe(PLATFORMS.windows)
+    expect(platformOf({ userAgent: MAC_AGENT })).toBe(PLATFORMS.mac)
+    expect(platformOf({ userAgent: 'Mozilla/5.0 (X11; Linux x86_64)' })).toBe(PLATFORMS.mac)
+  })
+})
+
+describe('downloadMenu', () => {
+  test("names the visitor's platform and lists its files first", () => {
+    const menu = downloadMenu({ release: parsed(latest), platform: PLATFORMS.windows })
+    expect(menu.title).toBe('Download for Windows')
+    expect(menu.files.map((file) => file.label)).toEqual([
+      'Windows, installer',
+      'Windows, zip archive',
+      'Mac, disk image',
+    ])
+  })
+
+  test('offers the platform a release has when it has nothing for the visitor', () => {
+    const menu = downloadMenu({ release: parsed(older), platform: PLATFORMS.windows })
+    expect(menu.title).toBe('Download for Mac')
+    expect(menu.files).toHaveLength(2)
+  })
+})
+
 describe('labels', () => {
-  test('names a file by its architecture and kind', () => {
-    expect(fileLabel({ file: { arch: 'arm64', kind: 'dmg', url: '', bytes: 0 } })).toBe(
-      'Apple silicon, disk image',
+  test('writes out the computers a release has files for', () => {
+    expect(platformList({ release: parsed(latest) })).toBe(
+      'Macs with Apple silicon and Windows PCs',
     )
-    expect(fileLabel({ file: { arch: 'x64', kind: 'zip', url: '', bytes: 0 } })).toBe(
-      'Intel, zip archive',
-    )
+    expect(platformList({ release: parsed(older) })).toBe('Macs with Apple silicon')
   })
 
   test('rounds sizes to megabytes', () => {

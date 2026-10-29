@@ -5,25 +5,44 @@ import '@/styles/page.scss'
 
 import { byId, el, link } from '@/dom'
 import { fileItem } from '@/fileItem'
-import { PATHS, fetchReleases, formatDate } from '@/releases'
+import {
+  PATHS,
+  downloadMenu,
+  fetchReleases,
+  formatDate,
+  platformList,
+  platformOf,
+} from '@/releases'
 
-const IDS = { menu: 'download-menu', note: 'release-note', download: 'download' } as const
+const IDS = {
+  menu: 'download-menu',
+  note: 'release-note',
+  download: 'download',
+  title: 'download-title',
+} as const
 const EVENTS = { click: 'click', keydown: 'keydown' } as const
 const ESCAPE = 'Escape'
 
 // The menu lists the releases page until GitHub answers; the latest release's
-// files replace it, and the line under it names the version.
+// files replace it, the visitor's platform first and named on the button, and
+// the line under it names the version.
 const showLatestRelease = async (): Promise<void> => {
   const menu = byId({ id: IDS.menu })
   const note = byId({ id: IDS.note })
-  if (menu === null || note === null) return
+  const title = byId({ id: IDS.title })
+  if (menu === null || note === null || title === null) return
   const [latest] = await fetchReleases()
   if (latest === undefined) return
-  menu.replaceChildren(...latest.files.map((file) => fileItem({ file })))
+  const offer = downloadMenu({
+    release: latest,
+    platform: platformOf({ userAgent: navigator.userAgent }),
+  })
+  title.textContent = offer.title
+  menu.replaceChildren(...offer.files.map((file) => fileItem({ file })))
   note.replaceChildren(
     el({
       tag: 'span',
-      text: `Version ${latest.version}, released ${formatDate({ date: latest.date })}. `,
+      text: `Version ${latest.version} for ${platformList({ release: latest })}, released ${formatDate({ date: latest.date })}. `,
     }),
     link({ href: PATHS.versions, text: 'Every version' }),
   )
