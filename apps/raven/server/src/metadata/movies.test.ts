@@ -236,12 +236,12 @@ describe('movie metadata', () => {
     expect(items.find((item) => item.title === 'Unknown Thing')?.item).toBeNull()
   })
 
-  it('starts a Movies library grouped into matched and not', async () => {
+  it('starts a Movies library in a grid, grouping by matched and not when grouped', async () => {
     const library = shape({
       response: await app().inject({ method: 'GET', url: `/api/libraries/${state.library}` }),
       guard: isLibrary,
     })
-    expect(library.settings).toMatchObject({ kind: 'movies', view: 'grouped', groupBy: 'match' })
+    expect(library.settings).toMatchObject({ kind: 'movies', view: 'grid', groupBy: 'match' })
   })
 
   it('gathers the movies of one TMDB collection into a saga, oldest first, and no lone one', async () => {
@@ -659,8 +659,9 @@ describe('movie metadata', () => {
   it('offers every picture a movie could show, and keeps the chosen one through a refresh', async () => {
     const matrix = (await list()).find((item) => item.item?.title === 'The Matrix')
     const id = matrix?.item?.id
+    const images = `/api/items/${id}/images?library=${state.library}`
     const options = shape({
-      response: await asAdmin({ method: 'GET', url: `/api/items/${id}/images` }),
+      response: await asAdmin({ method: 'GET', url: images }),
       guard: isItemImageOptions,
     })
     // The poster beside the files comes first and is the current one; TMDB's own poster is listed too.
@@ -680,14 +681,23 @@ describe('movie metadata', () => {
       response: await asAdmin({
         method: 'PUT',
         url: `/api/items/${id}/images/poster`,
-        payload: { source: 'tmdb', ref: '/alt603.jpg' },
+        payload: { libraryId: state.library, choice: { source: 'tmdb', ref: '/alt603.jpg' } },
       }),
       guard: isItemDetails,
     })
-    expect(chosen.posterVersion).not.toBe(matrix?.item?.posterVersion)
+    const ownPoster = matrix?.item?.posterVersion ?? null
+    const shownPoster =
+      (chosen.libraryPictures ?? []).find((pictures) => pictures.libraryId === state.library)
+        ?.posterVersion ?? null
+    expect(shownPoster).not.toBe(ownPoster)
+    // The title's own poster, on a page reached from no library, stays as it was.
+    expect(chosen.posterVersion).toBe(ownPoster)
+    expect((await list()).find((item) => item.item?.id === id)?.item?.posterVersion ?? null).toBe(
+      shownPoster,
+    )
     const poster = await app().inject({
       method: 'GET',
-      url: `/api/items/${id}/images/poster?v=${chosen.posterVersion}`,
+      url: `/api/pictures/items/${id}/poster/${shownPoster ?? ''}`,
     })
     expect(poster.rawPayload.equals(FAKE_JPEG)).toBe(true)
     expect(tmdb.state.calls.some((url) => url.includes('/alt603.jpg'))).toBe(true)
@@ -697,7 +707,7 @@ describe('movie metadata', () => {
 
     await asAdmin({ method: 'POST', url: `/api/items/${id}/refresh` })
     const after = shape({
-      response: await asAdmin({ method: 'GET', url: `/api/items/${id}/images` }),
+      response: await asAdmin({ method: 'GET', url: images }),
       guard: isItemImageOptions,
     })
     expect(after.poster.find((option) => option.current)?.ref).toBe('/alt603.jpg')
@@ -706,18 +716,30 @@ describe('movie metadata', () => {
       response: await asAdmin({
         method: 'PUT',
         url: `/api/items/${id}/images/poster`,
-        payload: { source: 'local' },
+        payload: { libraryId: state.library, choice: { source: 'local' } },
       }),
       guard: isItemDetails,
     })
-    expect(back.posterVersion).toBe(matrix?.item?.posterVersion)
+    expect(
+      (back.libraryPictures ?? []).find((pictures) => pictures.libraryId === state.library)
+        ?.posterVersion ?? null,
+    ).toBe(ownPoster)
 
     const refused = await asAdmin({
       method: 'PUT',
       url: `/api/items/${id}/images/poster`,
-      payload: { source: 'tmdb', ref: 'https://evil.example/x.jpg' },
+      payload: {
+        libraryId: state.library,
+        choice: { source: 'tmdb', ref: 'https://evil.example/x.jpg' },
+      },
     })
     expect(refused.statusCode).toBe(400)
+    const elsewhere = await asAdmin({
+      method: 'PUT',
+      url: `/api/items/${id}/images/poster`,
+      payload: { libraryId: state.library + 100, choice: { source: 'local' } },
+    })
+    expect(elsewhere.statusCode).toBe(400)
   })
 
   it('writes metadata over TMDB’s, keeps it through a refresh, and gives it back on null', async () => {

@@ -4,7 +4,10 @@ import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
 import { PictureVersions } from '@/metadata/pictureVersions'
 
-/** `chosen` is what Edit images picked, a TMDB path; it beats a local picture, which beats TMDB's own. */
+/**
+ * `chosen` is what Edit images picked for one library's card, a TMDB path;
+ * it beats a local picture, which beats TMDB's own.
+ */
 export const STORED_IMAGE_SOURCES = { ...IMAGE_SOURCES, chosen: 'chosen' } as const
 
 type StoredImageSource = (typeof STORED_IMAGE_SOURCES)[keyof typeof STORED_IMAGE_SOURCES]
@@ -12,11 +15,26 @@ type StoredImageSource = (typeof STORED_IMAGE_SOURCES)[keyof typeof STORED_IMAGE
 /** Where an item's picture comes from: a file beside the media wins over TMDB's. */
 export type ImageRef = { source: StoredImageSource; ref: string }
 
-/** The picture each item shows for `kind`: the chosen one first, then local, then TMDB's. */
+/**
+ * The picture each item shows for `kind` in library `@library`: the one
+ * chosen there first, then local, then TMDB's. With no library, as on an
+ * item's own page reached from no library, the chosen ones are passed over.
+ */
 const IMAGE_REFS = `
-  SELECT item_id, source, ref FROM item_images
-   WHERE kind = ? AND item_id IN (SELECT value FROM json_each(?))
-   ORDER BY item_id, CASE source WHEN 'chosen' THEN 0 WHEN 'local' THEN 1 ELSE 2 END`
+  SELECT item_id, source, ref FROM (
+    SELECT item_id, 'chosen' AS source, ref, 0 AS rank FROM library_item_images
+     WHERE library_id = @library AND kind = @kind
+       AND item_id IN (SELECT value FROM json_each(@ids))
+    UNION ALL
+    SELECT item_id, source, ref, CASE source WHEN 'local' THEN 1 ELSE 2 END AS rank
+      FROM item_images
+     WHERE kind = @kind AND source <> 'chosen'
+       AND item_id IN (SELECT value FROM json_each(@ids)))
+   ORDER BY item_id, rank`
+
+type ImageRefsParams = { library: number | null; kind: string; ids: string }
+
+type ImageRefRow = { item_id: number; source: string; ref: string }
 
 /** An item and the two above it, where it has them: an episode's season and show. */
 export type ItemLine = { id: number; parent: number | null; grandparent: number | null }
@@ -33,7 +51,12 @@ type ItemImagesRepositorySetLocalImagesProps = {
   images: Partial<Record<ItemImageKind, string>>
 }
 
-type ItemImagesRepositoryImageProps = { itemId: number; kind: ItemImageKind }
+type ItemImagesRepositoryImageProps = {
+  itemId: number
+  kind: ItemImageKind
+  /** The library whose card it is; null for none, which shows no library's choice. */
+  libraryId: number | null
+}
 
 type ItemImagesRepositoryImageFromProps = {
   itemId: number
@@ -44,8 +67,14 @@ type ItemImagesRepositoryImageFromProps = {
 type ItemImagesRepositoryChooseImageProps = {
   itemId: number
   kind: ItemImageKind
+  libraryId: number
   ref: string | null
 }
+
+type ItemImagesRepositoryCandidatesProps = { itemId: number; kind: ItemImageKind }
+
+/** A picture an item is shown with somewhere, and the version its address names it by. */
+type PictureCandidate = { image: ImageRef; version: string }
 
 type ItemImagesRepositorySetTmdbLogoProps = { itemId: number; logo: string | null }
 
@@ -56,7 +85,14 @@ type ItemImagesRepositoryReplaceImageProps = {
   ref: string | null
 }
 
-type ItemImagesRepositoryVersionsProps = { ids: readonly number[]; kind: ItemImageKind }
+type ItemImagesRepositoryVersionsProps = {
+  ids: readonly number[]
+  kind: ItemImageKind
+  /** The library whose cards these are; null for none, which shows no library's choice. */
+  libraryId: number | null
+}
+
+type ItemImagesRepositoryBackdropForProps = { itemId: number; libraryId: number | null }
 
 /**
  * The pictures each item holds, from TMDB, from beside the media and from
@@ -85,11 +121,11 @@ export class ItemImagesRepository {
     })()
   }
 
-  /** The picture an item shows for `kind`, or null when it has none. */
-  image({ itemId, kind }: ItemImagesRepositoryImageProps): ImageRef | null {
+  /** The picture an item shows for `kind` in `libraryId`, or null when it has none. */
+  image({ itemId, kind, libraryId }: ItemImagesRepositoryImageProps): ImageRef | null {
     const row = this.db
-      .prepare<[string, string], { item_id: number; source: string; ref: string }>(IMAGE_REFS)
-      .get(kind, JSON.stringify([itemId]))
+      .prepare<ImageRefsParams, ImageRefRow>(IMAGE_REFS)
+      .get({ library: libraryId, kind, ids: JSON.stringify([itemId]) })
     if (!row) return null
     return { source: toImageSource(row.source), ref: row.ref }
   }
@@ -105,9 +141,44 @@ export class ItemImagesRepository {
     )
   }
 
-  /** Edit images: the item shows TMDB's picture at `ref` for `kind` from now on, or, for null, whatever it would by itself. */
-  chooseImage({ itemId, kind, ref }: ItemImagesRepositoryChooseImageProps): void {
-    this.replaceImage({ itemId, kind, source: STORED_IMAGE_SOURCES.chosen, ref })
+  /**
+   * Edit images: the item's card in `libraryId` shows TMDB's picture at
+   * `ref` for `kind` from now on, or, for null, whatever it would by itself.
+   * Every other library's card keeps its own.
+   */
+  chooseImage({ itemId, kind, libraryId, ref }: ItemImagesRepositoryChooseImageProps): void {
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `DELETE FROM library_item_images WHERE library_id = ? AND item_id = ? AND kind = ?`,
+        )
+        .run(libraryId, itemId, kind)
+      if (ref != null) {
+        this.db
+          .prepare(
+            `INSERT INTO library_item_images (library_id, item_id, kind, ref) VALUES (?, ?, ?, ?)`,
+          )
+          .run(libraryId, itemId, kind, ref)
+      }
+    })()
+  }
+
+  /**
+   * Every picture an item is shown with for `kind`: its own, and each one a
+   * library chose, so a picture's address finds the one it names.
+   */
+  candidates({ itemId, kind }: ItemImagesRepositoryCandidatesProps): PictureCandidate[] {
+    const own = this.image({ itemId, kind, libraryId: null })
+    const chosen = this.db
+      .prepare<[number, string], { ref: string }>(
+        `SELECT DISTINCT ref FROM library_item_images WHERE item_id = ? AND kind = ?`,
+      )
+      .all(itemId, kind)
+      .map((row): ImageRef => ({ source: STORED_IMAGE_SOURCES.chosen, ref: row.ref }))
+    return [...(own == null ? [] : [own]), ...chosen].map((image) => ({
+      image,
+      version: this.pictureVersions.item({ id: itemId, kind, ...image }),
+    }))
   }
 
   /** Keeps TMDB's logo for a movie, or, for null, notes that TMDB has none. */
@@ -134,11 +205,11 @@ export class ItemImagesRepository {
     })()
   }
 
-  /** The version of the picture each item shows for `kind`; one with none is left out. */
-  versions({ ids, kind }: ItemImagesRepositoryVersionsProps): Map<number, string> {
+  /** The version of the picture each item shows for `kind` in `libraryId`; one with none is left out. */
+  versions({ ids, kind, libraryId }: ItemImagesRepositoryVersionsProps): Map<number, string> {
     const rows = this.db
-      .prepare<[string, string], { item_id: number; source: string; ref: string }>(IMAGE_REFS)
-      .all(kind, JSON.stringify(ids))
+      .prepare<ImageRefsParams, ImageRefRow>(IMAGE_REFS)
+      .all({ library: libraryId, kind, ids: JSON.stringify(ids) })
     return rows.reduce(
       (versions, row) =>
         versions.has(row.item_id)
@@ -171,12 +242,15 @@ export class ItemImagesRepository {
 
   /**
    * The backdrop that stands for an item: its own, else the nearest above
-   * it with one, so an episode shows its show's. null when there is none up
-   * the line.
+   * it with one, so an episode shows its show's, as `libraryId` shows it.
+   * null when there is none up the line.
    */
-  backdropFor(itemId: number): { id: number; version: string } | null {
+  backdropFor({
+    itemId,
+    libraryId,
+  }: ItemImagesRepositoryBackdropForProps): { id: number; version: string } | null {
     const ids = this.lines([itemId]).flatMap(lineOf)
-    const versions = this.versions({ ids, kind: 'backdrop' })
+    const versions = this.versions({ ids, kind: ITEM_IMAGE_KINDS.backdrop, libraryId })
     const found = ids.flatMap((id) => {
       const version = versions.get(id)
       return version == null ? [] : [{ id, version }]

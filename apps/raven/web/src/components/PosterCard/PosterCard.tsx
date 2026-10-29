@@ -10,7 +10,7 @@ import {
   formatRuntime,
   mediaEntryKey,
   pickScore,
-  sortFact,
+  cardSortFact,
   watchLink,
   ITEM_IMAGE_KINDS,
 } from '@raven/core'
@@ -111,9 +111,9 @@ export const PosterCard = ({
   const link = cardLink({ media, hasPages: true })
   const hasPage = link.state == null
   const pageItem = hasPage ? (media.item?.id ?? null) : null
-  const sorted = sort ? sortFact({ media, sort }) : null
+  const { sorted, isYearSaid } = cardSortFact({ media, sort })
   const facts = [
-    year == null ? null : String(year),
+    year == null || isYearSaid ? null : String(year),
     media.versions > 1 ? `${media.versions} versions` : null,
     year == null && media.versions === 1 ? formatRuntime(media.duration) : null,
     media.match === MATCH_STATES.unmatched ? 'Not matched' : null,

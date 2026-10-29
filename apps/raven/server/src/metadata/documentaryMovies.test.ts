@@ -164,7 +164,10 @@ describe('TV documentaries in movie libraries', () => {
       expect(await details()).toMatchObject({ type: ITEM_TYPES.movie, tmdbId: DOCUMENTARY.key })
       const images = checked({
         value: (
-          await running.current.admin({ method: 'GET', url: `/api/items/${itemId}/images` })
+          await running.current.admin({
+            method: 'GET',
+            url: `/api/items/${itemId}/images?library=${library.id}`,
+          })
         ).json(),
         guard: isItemImageOptions,
       })

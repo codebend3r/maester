@@ -47,7 +47,8 @@ describe('ImageEditor', () => {
       ui: (
         <ImageEditor
           details={itemDetails(overrides)}
-          libraries={[library({ id: 2, name: 'Films' })]}
+          libraries={[library({ id: 2, name: 'Films' }), library({ id: 3, name: '4K Films' })]}
+          libraryId={2}
           itemKind={itemKind}
           onDone={() => {
             state.done += 1
@@ -111,6 +112,7 @@ describe('ImageEditor', () => {
     expect(spies.choose.mock.calls[0]?.[0]).toEqual({
       id: 40,
       kind: 'poster',
+      libraryId: 2,
       choice: { source: 'tmdb', ref: '/p2.jpg' },
     })
     await waitFor(() =>
@@ -121,6 +123,7 @@ describe('ImageEditor', () => {
     expect(spies.choose.mock.calls[1]?.[0]).toEqual({
       id: 40,
       kind: 'poster',
+      libraryId: 2,
       choice: { source: 'local' },
     })
   })
@@ -137,6 +140,7 @@ describe('ImageEditor', () => {
     expect(spies.choose.mock.calls[0]?.[0]).toEqual({
       id: 40,
       kind: 'logo',
+      libraryId: 2,
       choice: { source: 'tmdb', ref: '/l2.png' },
     })
   })
@@ -165,6 +169,40 @@ describe('ImageEditor', () => {
         .getAllByRole('tab')
         .map((tab) => tab.textContent),
     ).toEqual(['Poster2', 'Backdrop1', 'Logo2'])
+  })
+
+  it("asks which library's pictures to choose for a title several hold, and keeps to that one", async () => {
+    open({
+      overrides: {
+        versions: [
+          matchedMovie({ id: 1, libraryId: 2, fileName: 'Avatar (2009) Bluray-1080p.mkv' }),
+          matchedMovie({ id: 2, libraryId: 3, fileName: 'Avatar (2009) Remux-2160p.mkv' }),
+        ],
+        libraryPictures: [
+          { libraryId: 2, posterVersion: 'hd', backdropVersion: null, logoVersion: null },
+          { libraryId: 3, posterVersion: 'uhd', backdropVersion: null, logoVersion: null },
+        ],
+      },
+    })
+    const menu = await screen.findByRole('combobox', { name: 'Pictures for' })
+    expect(menu).toHaveValue('2')
+    expect(spies.options.mock.calls[0]?.[0] ?? null).toEqual({ id: 40, libraryId: 2 })
+    expect(screen.getByText('Avatar (2009) Bluray-1080p.mkv')).toBeInTheDocument()
+    expect(screen.queryByText('Avatar (2009) Remux-2160p.mkv')).toBeNull()
+
+    await userEvent.selectOptions(menu, '3')
+    await waitFor(() =>
+      expect(spies.options.mock.calls.map(([asked]) => asked)).toContainEqual({
+        id: 40,
+        libraryId: 3,
+      }),
+    )
+    expect(await screen.findByText('Avatar (2009) Remux-2160p.mkv')).toBeInTheDocument()
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Poster: TMDB, 2000 by 3000, English' }),
+    )
+    await waitFor(() => expect(spies.choose).toHaveBeenCalledTimes(1))
+    expect(spies.choose.mock.calls[0]?.[0] ?? null).toMatchObject({ id: 40, libraryId: 3 })
   })
 
   it('lists the linked files that share the pictures, and closes with Done', async () => {

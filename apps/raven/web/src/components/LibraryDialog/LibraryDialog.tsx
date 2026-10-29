@@ -316,7 +316,7 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
               label="Refresh automatically"
               checked={settings.autoRefresh}
               onChange={(autoRefresh) => setSettings((current) => ({ ...current, autoRefresh }))}
-              hint="Watch the folders and take in videos as they are added, removed, renamed or replaced, and quick-scan the library every few minutes for a share that does not report its changes. A video replaced under its own name waits for a rescan."
+              hint="Watch the folders and take in videos as they are added, removed, renamed or replaced, and, for a share mounted from another machine, which never reports the changes made there, check it for new videos every few minutes. A video replaced under its own name waits for a rescan."
             />
             <SettingToggle
               id={`${ids.settings}-locked`}

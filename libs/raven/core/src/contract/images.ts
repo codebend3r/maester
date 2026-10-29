@@ -102,6 +102,17 @@ export const isImageChoice = union(
 
 export type ImageChoice = Infer<typeof isImageChoice>
 
+/**
+ * `PUT /api/items/:id/images/:kind`: the picture one library's cards of a
+ * title show. Every other library holding it keeps its own.
+ */
+export const isLibraryImageChoice = object({ libraryId: isNumber, choice: isImageChoice })
+
+export type LibraryImageChoice = Infer<typeof isLibraryImageChoice>
+
+/** The query Edit images is asked with: the library whose cards' pictures it chooses. */
+export const ITEM_QUERY_PARAMS = { library: 'library' } as const
+
 /** The parameters a capability picture address names. */
 export const PICTURE_PARAMS = { id: 'id', kind: 'kind', version: 'version' } as const
 

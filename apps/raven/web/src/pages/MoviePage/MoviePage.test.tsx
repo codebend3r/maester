@@ -322,7 +322,7 @@ describe('MoviePage', () => {
     expect(screen.queryByRole('heading', { name: 'Edit images' })).toBeNull()
     await userEvent.click(button)
     expect(await screen.findByRole('heading', { name: 'Edit images' })).toBeInTheDocument()
-    expect(images).toHaveBeenCalledWith(40)
+    expect(images).toHaveBeenCalledWith({ id: 40, libraryId: 2 })
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(screen.queryByRole('heading', { name: 'Edit images' })).toBeNull()
     images.mockRestore()

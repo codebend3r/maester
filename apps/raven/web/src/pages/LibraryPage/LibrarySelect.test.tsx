@@ -118,7 +118,7 @@ describe('LibraryPage select mode', () => {
 
   it('selects a range in the order a sorted list shows, not the order of the data', async () => {
     open({
-      settings: { view: 'list' },
+      route: '/libraries/2?view=list',
       items: [
         file({ id: 1, title: 'Alpha', duration: 30 }),
         file({ id: 2, title: 'Bravo', duration: 10 }),
@@ -147,7 +147,8 @@ describe('LibraryPage select mode', () => {
 
   it('selects all, the cards in closed buckets included', async () => {
     open({
-      settings: { view: 'grouped', groupBy: 'resolution' },
+      settings: { groupBy: 'resolution' },
+      route: '/libraries/2?view=grouped',
       items: [
         mediaItem({ id: 1, title: 'Wide', width: 3840, height: 2160 }),
         mediaItem({ id: 2, title: 'Full', width: 1920, height: 1080 }),
@@ -291,7 +292,7 @@ describe('LibraryPage select mode', () => {
   )
 
   it('selects a file from the tiles view', async () => {
-    open({ settings: { view: 'tiles' } })
+    open({ route: '/libraries/2?view=tiles' })
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Alpha' }))
     expect(count()).toHaveTextContent('1 selected')
   })

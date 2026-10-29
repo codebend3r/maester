@@ -11,7 +11,7 @@ import {
   mediaEntryKey,
   mediaLabel,
   resolutionLabel,
-  sortFact,
+  cardSortFact,
 } from '@raven/core'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
@@ -52,9 +52,9 @@ const MediaTile = ({ media, note, posters, withWatched, matchType, sort }: Media
   const { year } = cardTitle(media)
   const label = posters ? cardTitle(media).title : mediaLabel(media)
   const select = useSelectable({ key: mediaEntryKey(media), title: label })
-  const sorted = sort ? sortFact({ media, sort }) : null
+  const { sorted, isYearSaid } = cardSortFact({ media, sort })
   const facts = [
-    posters && year != null ? String(year) : null,
+    posters && year != null && !isYearSaid ? String(year) : null,
     posters && media.versions > 1 ? `${media.versions} versions` : null,
     formatRuntime(media.duration),
     resolutionLabel(media),

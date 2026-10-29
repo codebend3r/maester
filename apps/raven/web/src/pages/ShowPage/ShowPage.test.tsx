@@ -68,7 +68,7 @@ describe('ShowPage', () => {
   })
 
   it("shows the title as the show's logo", async () => {
-    open({ details: { ...SEVERANCE, logoVersion: 'abc' } })
+    open({ details: { ...SEVERANCE, logoVersion: 'abc', libraryPictures: [] } })
     const heading = await screen.findByRole('heading', { level: 1, name: 'Severance' })
     expect(heading.querySelector('img')).toHaveAttribute(
       'src',

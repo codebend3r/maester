@@ -16,7 +16,10 @@ const outOfTen = (rating: Rating): string => rating.value.toFixed(1)
 /**
  * How each source reads: its name in full, the short label under its score,
  * what its number means, and the scale the score is on. `shown` follows the
- * score on screen, `spoken` follows it in the label.
+ * score on screen, `spoken` follows it in the label. `isNamedOnCards` puts
+ * the short label on a card's badge too; the Metascore, which libraries
+ * show by default, goes without it, so a TMDB score standing in still says
+ * whose it is.
  */
 const SOURCES = {
   rottenTomatoes: {
@@ -27,6 +30,7 @@ const SOURCES = {
     shown: '%',
     spoken: '%',
     className: styles.rottenTomatoes,
+    isNamedOnCards: true,
   },
   imdb: {
     site: RATING_SOURCE_LABELS.imdb,
@@ -36,6 +40,7 @@ const SOURCES = {
     shown: '/10',
     spoken: ' out of 10',
     className: styles.imdb,
+    isNamedOnCards: true,
   },
   metacritic: {
     site: RATING_SOURCE_LABELS.metacritic,
@@ -45,6 +50,7 @@ const SOURCES = {
     shown: '/100',
     spoken: ' out of 100',
     className: styles.metacritic,
+    isNamedOnCards: false,
   },
   tmdb: {
     site: RATING_SOURCE_LABELS.tmdb,
@@ -54,6 +60,7 @@ const SOURCES = {
     shown: '/10',
     spoken: ' out of 10',
     className: styles.tmdb,
+    isNamedOnCards: true,
   },
 } as const satisfies Record<
   RatingSource,
@@ -65,6 +72,7 @@ const SOURCES = {
     shown: string
     spoken: string
     className: string | undefined
+    isNamedOnCards: boolean
   }
 >
 
@@ -100,6 +108,15 @@ const RatingItem = ({ rating }: RatingItemProps) => {
   )
 }
 
+type BadgeShapeProps = { isBare: boolean; isNamed: boolean }
+
+/** The badge's frame: the score alone, the score and its scale, or both and the label. */
+const badgeShape = ({ isBare, isNamed }: BadgeShapeProps): string => {
+  if (isBare) return styles.badgeBare ?? ''
+  if (!isNamed) return styles.badgeUnnamed ?? ''
+  return ''
+}
+
 type RatingBadgeProps = { rating: Rating; isBare?: boolean }
 
 /**
@@ -110,14 +127,15 @@ type RatingBadgeProps = { rating: Rating; isBare?: boolean }
 export const RatingBadge = ({ rating, isBare = false }: RatingBadgeProps) => {
   const source = SOURCES[rating.source]
   const score = source.score(rating)
+  const shape = badgeShape({ isBare, isNamed: source.isNamedOnCards })
   return (
-    <span className={`${styles.badge} ${isBare ? styles.badgeBare : ''} ${source.className}`}>
+    <span className={`${styles.badge} ${shape} ${source.className}`}>
       <span className="visually-hidden">{`${source.site}: ${score}${source.spoken}`}</span>
       <span className={styles.badgeScore} aria-hidden="true">
         <span className={styles.badgeValue}>{score}</span>
         {!isBare && <span className={styles.badgeScale}>{source.shown}</span>}
       </span>
-      {!isBare && (
+      {!isBare && source.isNamedOnCards && (
         <span className={styles.badgeLabel} aria-hidden="true">
           {source.label}
         </span>

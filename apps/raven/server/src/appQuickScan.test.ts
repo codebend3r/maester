@@ -112,6 +112,24 @@ describe('a quick scan', () => {
     expect(byName(await listMedia()).get('Collateral (2004).mp4')?.duration).toBeCloseTo(4, 0)
   })
 
+  it('checks quietly: nothing new leaves no quick scan time, a new video moves it on', async () => {
+    const { scan: before } = await library()
+    const scanner = app().get(ScannerService)
+
+    scanner.checkForChanges(state.libraryId)
+    expect((await library()).scan.state).toBe('idle')
+    await settle()
+    expect((await library()).scan.quickScannedAt).toBe(before.quickScannedAt)
+
+    await encodeClip({ path: at('Manhunter (1986).mp4'), seconds: 2 })
+    scanner.checkForChanges(state.libraryId)
+    await settle()
+    expect(byName(await listMedia()).has('Manhunter (1986).mp4')).toBe(true)
+    const { scan: after } = await library()
+    expect(after.state).toBe('idle')
+    expect(after.quickScannedAt).not.toBe(before.quickScannedAt)
+  })
+
   it('still says when each scan was after a restart', async () => {
     const { scan: before } = await library()
     await state.app?.close()

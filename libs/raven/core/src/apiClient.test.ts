@@ -231,14 +231,19 @@ describe('createApiClient', () => {
       logo: [],
     }
     const { client, calls } = clientReturning(respond({ body: options }))
-    await expect(client.getItemImages(9)).resolves.toEqual(options)
-    expect(calls[0]?.url).toBe('http://nas:8484/api/items/9/images')
+    await expect(client.getItemImages({ id: 9, libraryId: 2 })).resolves.toEqual(options)
+    expect(calls[0]?.url ?? null).toBe('http://nas:8484/api/items/9/images?library=2')
 
     const chosen = clientReturning(respond({ body: itemDetails() }))
-    await chosen.client.chooseItemImage({ id: 9, kind: 'backdrop', choice: { source: 'local' } })
+    await chosen.client.chooseItemImage({
+      id: 9,
+      kind: 'backdrop',
+      libraryId: 2,
+      choice: { source: 'local' },
+    })
     expect(chosen.calls[0]).toMatchObject({
       url: 'http://nas:8484/api/items/9/images/backdrop',
-      init: { method: 'PUT', body: '{"source":"local"}' },
+      init: { method: 'PUT', body: '{"libraryId":2,"choice":{"source":"local"}}' },
     })
 
     const option = options.poster[0]

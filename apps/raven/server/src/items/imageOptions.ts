@@ -13,21 +13,25 @@ export const NO_TMDB_IMAGES: TmdbImages = { poster: [], backdrop: [], logo: [] }
 
 type ImageOptionsOfProps = {
   itemId: number
+  /** The library whose cards' pictures are being chosen. */
+  libraryId: number
   stored: Pick<ItemImagesRepository, 'image' | 'imageFrom'>
   fetched: TmdbImages
 }
 
 /**
  * Edit images: every poster, backdrop and logo a movie or show could show,
- * the one beside the media first, then TMDB's, with the current one marked.
+ * the one beside the media first, then TMDB's, with the one `libraryId`
+ * shows marked.
  */
 export const imageOptionsOf = ({
   itemId,
+  libraryId,
   stored,
   fetched,
 }: ImageOptionsOfProps): ItemImageOptions => {
   const options = (kind: ChoosableImageKind): ImageOption[] => {
-    const current = stored.image({ itemId, kind })
+    const current = stored.image({ itemId, kind, libraryId })
     const local = stored.imageFrom({ itemId, kind, source: STORED_IMAGE_SOURCES.local })
     const own = stored.imageFrom({ itemId, kind, source: STORED_IMAGE_SOURCES.tmdb })
     const tmdb = fetched[kind]

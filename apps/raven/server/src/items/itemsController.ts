@@ -17,10 +17,11 @@ import {
 } from '@nestjs/common'
 import {
   IMAGE_SOURCES,
+  ITEM_QUERY_PARAMS,
   ITEM_TYPES,
   isFavouriteChange,
-  isImageChoice,
   isItemImageKind,
+  isLibraryImageChoice,
   isItemMetadataChange,
   isMatchItemType,
   isShowMatchChoice,
@@ -57,6 +58,8 @@ import { ROUTE_PARAMS } from '@/requestParts'
 
 type ItemsControllerDetailsProps = { id: number; request: FastifyRequest }
 
+type ItemsControllerRequireHolderProps = { id: number; libraryId: number | undefined }
+
 /** Movies, shows, seasons and episodes: their pages, their pictures, and fetching them again. */
 @Controller('api/items')
 @PrivateBy('item')
@@ -81,6 +84,14 @@ export class ItemsController {
     if (!this.metadata.get(id)) throw new NotFoundException(`No item ${id}`)
   }
 
+  /** The library whose pictures Edit images works on, which must hold the item. */
+  private requireHolder({ id, libraryId }: ItemsControllerRequireHolderProps): number {
+    if (libraryId == null || !this.metadata.librariesHolding(id).includes(libraryId)) {
+      throw new BadRequestException('Name a library that holds this title.')
+    }
+    return libraryId
+  }
+
   /** The item's page, with only the files, children and AI note this caller may see. */
   private details({ id, request }: ItemsControllerDetailsProps): ItemDetails {
     const details = this.metadata.details(id)
@@ -89,6 +100,12 @@ export class ItemsController {
     const account = this.accounts.keyOf({ request })
     return {
       ...details,
+      libraryPictures: this.metadata.libraryPictures({
+        id,
+        libraryIds: this.metadata
+          .librariesHolding(id)
+          .filter((libraryId) => viewer.seesLibrary(libraryId)),
+      }),
       aiMatch: this.service.aiMatchFor({
         id,
         type: details.type,
@@ -263,13 +280,19 @@ export class ItemsController {
 
   /**
    * Edit images: every poster, backdrop and logo a movie or show could show,
-   * the one beside the media first, then TMDB's, with the current one marked.
+   * the one beside the media first, then TMDB's, with the one `?library=`
+   * shows marked.
    */
   @AdminOnly()
   @Get(':id/images')
-  async imageOptions(@Param('id', ParseIntPipe) id: number): Promise<ItemImageOptions> {
+  async imageOptions(
+    @Param('id', ParseIntPipe) id: number,
+    @Query(ITEM_QUERY_PARAMS.library, new ParseIntPipe({ optional: true }))
+    library: number | undefined,
+  ): Promise<ItemImageOptions> {
     const item = this.metadata.get(id)
     if (!item) throw new NotFoundException(`No item ${id}`)
+    const libraryId = this.requireHolder({ id, libraryId: library })
     const { type } = item
     if (!isMatchItemType(type)) {
       throw new BadRequestException('Only a movie or show has pictures to choose from.')
@@ -278,10 +301,14 @@ export class ItemsController {
       this.tmdb.enabled && !isLocal(item.tmdbId)
         ? await this.tmdb.images({ type, tmdbId: item.tmdbId }).catch(tmdbUnavailable)
         : NO_TMDB_IMAGES
-    return imageOptionsOf({ itemId: id, stored: this.stored, fetched })
+    return imageOptionsOf({ itemId: id, libraryId, stored: this.stored, fetched })
   }
 
-  /** Edit images: `{ source: 'tmdb', ref }` shows that picture of TMDB's; `{ source: 'local' }` goes back to the one beside the media, or TMDB's own. */
+  /**
+   * Edit images, for one library's cards of the title alone: `{ source:
+   * 'tmdb', ref }` shows that picture of TMDB's there; `{ source: 'local' }`
+   * goes back to the one beside the media, or TMDB's own.
+   */
   @AdminOnly()
   @Put(':id/images/:kind')
   async chooseImage(
@@ -292,16 +319,20 @@ export class ItemsController {
   ): Promise<ItemDetails> {
     if (!isChoosableImageKind(kind)) throw new NotFoundException(`No ${kind} pictures to choose`)
     this.requireItem(id)
-    if (!isImageChoice(body)) {
-      throw new BadRequestException('Send { source: "tmdb", ref } or { source: "local" }')
+    if (!isLibraryImageChoice(body)) {
+      throw new BadRequestException(
+        'Send { libraryId, choice: { source: "tmdb", ref } } or { libraryId, choice: { source: "local" } }',
+      )
     }
-    if (body.source === IMAGE_SOURCES.tmdb && !TMDB_IMAGE_PATH.test(body.ref)) {
+    const { choice } = body
+    if (choice.source === IMAGE_SOURCES.tmdb && !TMDB_IMAGE_PATH.test(choice.ref)) {
       throw new BadRequestException('ref must be a TMDB image path')
     }
     this.stored.chooseImage({
       itemId: id,
       kind,
-      ref: body.source === IMAGE_SOURCES.tmdb ? body.ref : null,
+      libraryId: this.requireHolder({ id, libraryId: body.libraryId }),
+      ref: choice.source === IMAGE_SOURCES.tmdb ? choice.ref : null,
     })
     return this.details({ id, request })
   }
@@ -337,7 +368,12 @@ export class ItemsController {
   ): Promise<void> {
     if (!isItemImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
     const width = pictureWidth({ kind, asked })
-    const path = await this.pictureFiles.pathOf({ id, kind, width })
+    const path = await this.pictureFiles.pathOf({
+      id,
+      kind,
+      width,
+      image: this.stored.image({ itemId: id, kind, libraryId: null }),
+    })
     await sendImage({ reply, path, version })
   }
 }

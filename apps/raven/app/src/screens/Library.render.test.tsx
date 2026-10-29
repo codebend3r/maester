@@ -250,6 +250,10 @@ describe('Library on a phone or tablet', () => {
 
   it("shows the server's grouping as folded buckets, each opening on a press", async () => {
     mockServer.libraries = [GROUPED_FILMS]
+    // A library opens on its grid; the grouped view is picked here.
+    useLibraryViews.setState({
+      choices: { [`${NAS.id}/${FILMS.id}`]: { view: LIBRARY_VIEWS.grouped } },
+    })
     await renderLibrary({ id: FILMS.id })
 
     const matched = await screen.findByRole('button', { name: 'Matched, 3 videos' })
@@ -263,6 +267,10 @@ describe('Library on a phone or tablet', () => {
   it('offers only the views and groupings the type has', async () => {
     const asked = sheets({ answer: null })
     mockServer.libraries = [GROUPED_FILMS]
+    // A library opens on its grid; the grouped view is picked here.
+    useLibraryViews.setState({
+      choices: { [`${NAS.id}/${FILMS.id}`]: { view: LIBRARY_VIEWS.grouped } },
+    })
     await renderLibrary({ id: FILMS.id })
     await screen.findByRole('button', { name: 'Matched, 3 videos' })
 
@@ -305,6 +313,10 @@ describe('Library on a phone or tablet', () => {
 
   it("stands a bucket's heading taller for the viewer's larger text, so its title is not cut", async () => {
     mockServer.libraries = [GROUPED_FILMS]
+    // A library opens on its grid; the grouped view is picked here.
+    useLibraryViews.setState({
+      choices: { [`${NAS.id}/${FILMS.id}`]: { view: LIBRARY_VIEWS.grouped } },
+    })
     const headingHeight = async () =>
       StyleSheet.flatten(
         (await screen.findByRole('button', { name: 'Matched, 3 videos' })).props.style,

@@ -74,6 +74,7 @@ export const details = (overrides: Partial<ItemDetails>): ItemDetails => ({
   reviews: [],
   versions: [],
   children: [],
+  libraryPictures: [],
   ...overrides,
 })
 

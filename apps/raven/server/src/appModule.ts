@@ -92,7 +92,7 @@ import { MarkersService } from '@/markers/markersService'
 import { MarkerJobs } from '@/markers/markerJobs'
 import { MarkerDetection } from '@/markers/markerDetection'
 import { assertRoutesMarked } from '@/routeMarks'
-import { watchFolder } from '@/scanner/folderWatch'
+import { isNetworkShare, watchFolder } from '@/scanner/folderWatch'
 import { LibraryWatcher, WATCH_OPTIONS, type WatchOptions } from '@/scanner/libraryWatcher'
 import { ScannerService } from '@/scanner/scannerService'
 import { SettingsController } from '@/settings/settingsController'
@@ -129,6 +129,7 @@ export const CONTROLLERS = [
 /** Folders stay still for 2 s before a refresh. */
 const DEFAULT_WATCH: WatchOptions = {
   watchFolder,
+  isNetworkShare,
   quietMs: 2_000,
 }
 

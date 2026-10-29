@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import {
   DEFAULT_SAGA_BACKDROP,
   ITEM_TYPES,
+  type ItemSummary,
   LIBRARY_BACKDROP_TYPES,
   type LibraryBackdrop,
   MEDIA_SORTS,
@@ -87,7 +88,7 @@ const SELECT_COLUMNS = `
          f.added_at AS favourited_at,
          i.id AS item_id, i.type AS item_type, i.title AS item_title,
          i.original_title AS item_original_title, i.sort_title AS item_sort_title,
-         i.year AS item_year, t.title AS item_tmdb_title,
+         i.year AS item_year, i.released AS item_released, t.title AS item_tmdb_title,
          t.original_title AS item_tmdb_original_title,
          CASE WHEN i.type = 'movie'
               THEN (SELECT COUNT(*) FROM media_items x CROSS JOIN media y ON y.id = x.media_id
@@ -172,9 +173,13 @@ type ShowRow = {
 
 const SHOW_BY_TITLE = 'sh.sort_title COLLATE NOCASE, sh.id'
 
+/** The day a show first aired, else its year alone. */
+const SHOW_RELEASED = 'COALESCE(sh.released, CAST(sh.year AS TEXT))'
+
 /**
  * A show's listing order: by its files' mean bitrate for the bitrate sorts,
- * and by title for the others that only mean something per file.
+ * by the day it first aired for the release sorts, and by title for the
+ * others that only mean something per file.
  */
 const SHOW_ORDER_BY: Record<MediaSort, string> = {
   title: SHOW_BY_TITLE,
@@ -189,8 +194,8 @@ const SHOW_ORDER_BY: Record<MediaSort, string> = {
   'bitrate-low': `bitrate IS NULL, bitrate, ${SHOW_BY_TITLE}`,
   'resolution-high': SHOW_BY_TITLE,
   'resolution-low': SHOW_BY_TITLE,
-  'year-new': `sh.year IS NULL, sh.year DESC, ${SHOW_BY_TITLE}`,
-  'year-old': `sh.year IS NULL, sh.year, ${SHOW_BY_TITLE}`,
+  'year-new': `${SHOW_RELEASED} IS NULL, ${SHOW_RELEASED} DESC, ${SHOW_BY_TITLE}`,
+  'year-old': `${SHOW_RELEASED} IS NULL, ${SHOW_RELEASED}, ${SHOW_BY_TITLE}`,
   'rating-high': `score IS NULL, score DESC, ${SHOW_BY_TITLE}`,
   'rating-low': `score IS NULL, score, ${SHOW_BY_TITLE}`,
   random: SHOW_BY_TITLE,
@@ -224,10 +229,49 @@ const sqlLimit = ({ sort, limit }: SqlLimitProps): number =>
 
 const YEAR = 'COALESCE(item_year, year)'
 
+/** A card's library and the item on it, if any. */
+type CardItem = { libraryId: number; itemId: number | null }
+
+/** The items one library's cards hold. */
+type LibraryItems = { ids: number[]; libraryId: number }
+
+type InEachLibraryProps = {
+  entries: readonly CardItem[]
+  /** The summaries of `ids` as `libraryId`'s cards show them, keyed by id. */
+  lookup: (asked: LibraryItems) => Map<number, ItemSummary>
+}
+
+/**
+ * Each entry's item as its own library shows it, in order: `lookup` runs
+ * once per library, since each can choose its own pictures for a title.
+ */
+const inEachLibrary = ({ entries, lookup }: InEachLibraryProps): Array<ItemSummary | null> => {
+  const byLibrary = new Map(
+    [...new Set(entries.map((entry) => entry.libraryId))].map((libraryId) => [
+      libraryId,
+      lookup({
+        libraryId,
+        ids: entries.flatMap((entry) =>
+          entry.libraryId === libraryId && entry.itemId != null ? [entry.itemId] : [],
+        ),
+      }),
+    ]),
+  )
+  return entries.map(({ libraryId, itemId }) =>
+    itemId == null ? null : (byLibrary.get(libraryId)?.get(itemId) ?? null),
+  )
+}
+
+/**
+ * The day a title came out, as `YYYY-MM-DD`, else its year alone, which
+ * sorts as the start of that year.
+ */
+const RELEASED = `COALESCE(item_released, CAST(${YEAR} AS TEXT))`
+
 /**
  * ORDER BY for each sort, over the listing's columns. Ties fall back to
- * title. Bitrate, resolution and year are unknown for some files, and those
- * go last either way. Random lists by title here and is shuffled after.
+ * title. Bitrate, resolution and release are unknown for some files, and
+ * those go last either way. Random lists by title here and is shuffled after.
  */
 const ORDER_BY: Record<MediaSort, string> = {
   title: BY_TITLE,
@@ -242,8 +286,8 @@ const ORDER_BY: Record<MediaSort, string> = {
   'bitrate-low': `bitrate IS NULL, bitrate, ${BY_TITLE}`,
   'resolution-high': `width * height IS NULL, width * height DESC, ${BY_TITLE}`,
   'resolution-low': `width * height IS NULL, width * height, ${BY_TITLE}`,
-  'year-new': `${YEAR} IS NULL, ${YEAR} DESC, ${BY_TITLE}`,
-  'year-old': `${YEAR} IS NULL, ${YEAR}, ${BY_TITLE}`,
+  'year-new': `${RELEASED} IS NULL, ${RELEASED} DESC, ${BY_TITLE}`,
+  'year-old': `${RELEASED} IS NULL, ${RELEASED}, ${BY_TITLE}`,
   'rating-high': `score IS NULL, score DESC, ${BY_TITLE}`,
   'rating-low': `score IS NULL, score, ${BY_TITLE}`,
   random: BY_TITLE,
@@ -381,15 +425,16 @@ export class MediaRepository {
     return this.database.db
   }
 
-  /** Items for rows, each with its item's summary attached. */
+  /**
+   * Items for rows, each with its item's summary attached, as its own
+   * library shows it: a title in two libraries can have two posters.
+   */
   private items(rows: readonly MediaRow[]): MediaItem[] {
-    const summaries = this.metadata.summaries(
-      rows.flatMap((row) => (row.item_id == null ? [] : [row.item_id])),
-    )
-    return rows.map((row) => ({
-      ...toItem(row),
-      item: row.item_id == null ? null : (summaries.get(row.item_id) ?? null),
-    }))
+    const summaries = inEachLibrary({
+      entries: rows.map((row) => ({ libraryId: row.library_id, itemId: row.item_id })),
+      lookup: (asked) => this.metadata.summaries(asked),
+    })
+    return rows.map((row, index) => ({ ...toItem(row), item: summaries[index] ?? null }))
   }
 
   /**
@@ -529,7 +574,7 @@ export class MediaRepository {
       )
       .all({ account }, libraryId, only, only, pattern, pattern, sqlLimit({ sort, limit }))
     const listedIds = rows.map((row) => row.id)
-    const summaries = this.metadata.summaries(listedIds)
+    const summaries = this.metadata.summaries({ ids: listedIds, libraryId })
     const next = this.nextUnwatched({ showIds: listedIds, libraryIds: [libraryId], account })
     const episodes = new Map(
       this.getMany({ ids: [...next.values()], account }).map((item) => [item.id, item]),
@@ -815,22 +860,27 @@ export class MediaRepository {
       )
       .get(libraryId)
     if (!newest) return null
-    const backdrop = newest.item_id == null ? null : this.images.backdropFor(newest.item_id)
+    const backdrop =
+      newest.item_id == null ? null : this.images.backdropFor({ itemId: newest.item_id, libraryId })
     if (backdrop) return { type: LIBRARY_BACKDROP_TYPES.item, ...backdrop }
     return newest.thumbnail === THUMBNAIL_STATES.ready
       ? { type: LIBRARY_BACKDROP_TYPES.thumbnail, id: newest.id, version: newest.mtime_ms }
       : null
   }
 
-  /** Each video with the item whose poster its card shows, by `MetadataRepository.posterItems`. */
+  /**
+   * Each video with the item whose poster its card shows, by
+   * `MetadataRepository.posterItems`, as the video's own library shows it.
+   */
   withPosters(videos: readonly MediaItem[]): PosterEntry[] {
-    const posters = this.metadata.posterItems(
-      videos.flatMap((media) => (media.item ? [media.item.id] : [])),
-    )
-    return videos.map((media) => ({
-      media,
-      poster: media.item ? (posters.get(media.item.id) ?? null) : null,
-    }))
+    const posters = inEachLibrary({
+      entries: videos.map((media) => ({
+        libraryId: media.libraryId,
+        itemId: media.item?.id ?? null,
+      })),
+      lookup: (asked) => this.metadata.posterItems(asked),
+    })
+    return videos.map((media, index) => ({ media, poster: posters[index] ?? null }))
   }
 
   /**

@@ -154,5 +154,6 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   ],
   versions: [matchedMovie()],
   children: [],
+  libraryPictures: [],
   ...overrides,
 })

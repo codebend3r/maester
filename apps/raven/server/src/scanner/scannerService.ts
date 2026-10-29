@@ -1,10 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  type OnApplicationBootstrap,
-  type OnModuleDestroy,
-} from '@nestjs/common'
+import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common'
 import { SCAN_KINDS, SCAN_STATES, type ScanStatus, extensionsFor } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
@@ -36,18 +30,31 @@ const IDLE: ScanStatus = {
 const SCOPE_KINDS = { library: 'library', quick: 'quick', places: 'places' } as const
 
 /**
+ * Why a quick scan runs: a check on the watcher's timer, the scan on boot,
+ * or one the admin asked for. A check shows in the status, and counts as a
+ * quick scan, only once it finds something new, and leaves a file whose
+ * probe timed out to a scan someone starts; one the admin asked for stays
+ * under way until the new videos are matched.
+ */
+export const QUICK_SCAN_REASONS = { check: 'check', boot: 'boot', asked: 'asked' } as const
+
+type QuickScanReason = (typeof QUICK_SCAN_REASONS)[keyof typeof QUICK_SCAN_REASONS]
+
+/** Quietest first: two scans waiting as one keep the louder reason. */
+const LOUDNESS: readonly QuickScanReason[] = [
+  QUICK_SCAN_REASONS.check,
+  QUICK_SCAN_REASONS.boot,
+  QUICK_SCAN_REASONS.asked,
+]
+
+/**
  * What a scan looks at: every path of the library, reading every file (a
  * full scan); every path, reading only the files it does not know, and
  * those at `places` (a quick scan); or just the places that changed.
  */
 export type Scope =
   | { kind: typeof SCOPE_KINDS.library }
-  | {
-      kind: typeof SCOPE_KINDS.quick
-      places: readonly string[]
-      /** A quick scan the admin started: it stays under way until the new videos are matched. */
-      shouldWaitForMatching?: boolean
-    }
+  | { kind: typeof SCOPE_KINDS.quick; places: readonly string[]; reason: QuickScanReason }
   | { kind: typeof SCOPE_KINDS.places; places: readonly string[] }
 
 type MergeScopesProps = { waiting: Scope | null; scope: Scope }
@@ -63,16 +70,11 @@ export const mergeScopes = ({ waiting, scope }: MergeScopesProps): Scope => {
     return { kind: SCOPE_KINDS.library }
   }
   const places = outermost([...waiting.places, ...scope.places])
-  if (waiting.kind === SCOPE_KINDS.quick || scope.kind === SCOPE_KINDS.quick) {
-    const shouldWaitForMatching =
-      (waiting.kind === SCOPE_KINDS.quick && waiting.shouldWaitForMatching === true) ||
-      (scope.kind === SCOPE_KINDS.quick && scope.shouldWaitForMatching === true)
-    return {
-      kind: SCOPE_KINDS.quick,
-      places,
-      ...(shouldWaitForMatching ? { shouldWaitForMatching } : {}),
-    }
-  }
+  const reasons = new Set(
+    [waiting, scope].flatMap((each) => (each.kind === SCOPE_KINDS.quick ? [each.reason] : [])),
+  )
+  const reason = LOUDNESS.findLast((each) => reasons.has(each))
+  if (reason != null) return { kind: SCOPE_KINDS.quick, places, reason }
   return { kind: SCOPE_KINDS.places, places }
 }
 
@@ -163,7 +165,7 @@ type ScannerServiceFinishFullScanProps = {
 type ScannerServiceQuickScanLibraryProps = {
   library: LibraryRecord
   places: readonly string[]
-  shouldWaitForMatching: boolean
+  reason: QuickScanReason
   signal: AbortSignal
 }
 
@@ -195,18 +197,19 @@ type ScannerServiceProbeProps = {
  * freshly probed file to the thumbnail queue, and the library to metadata
  * for matching. Scans are incremental (an unchanged size and mtime skips
  * ffprobe). A full scan reads every file and runs only when asked: Rescan,
- * a new library, or a change of its folders. A quick scan, on boot and on
- * a timer, reads only the folders and the files it does not know, so it
+ * a new library, or a change of its folders. A quick scan, on boot or when
+ * asked, reads only the folders and the files it does not know, so it
  * takes in new, renamed and deleted files at a fraction of the cost, never
  * taking over the scan status; a file replaced under its name waits for a
- * full scan. A refresh looks only at the places the watcher saw change.
+ * full scan. A refresh looks only at the places the watcher saw change, and
+ * a check (the watcher's timer, for a library no watch hears of) is a quick
+ * scan that keeps out of sight until it finds something.
  */
 @Injectable()
-export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
+export class ScannerService implements OnApplicationBootstrap {
   private readonly logger = new Logger(ScannerService.name)
   private readonly statuses = new Map<number, ScanStatus>()
   private readonly slots = new Map<number, Slot>()
-  private timer: NodeJS.Timeout | null = null
 
   constructor(
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
@@ -226,17 +229,6 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     if (this.config.scanOnStart) {
       this.startup.add(this.libraries.list().map((library) => () => this.quickScan(library.id)))
     }
-    if (this.config.quickScanIntervalMinutes > 0) {
-      this.timer = setInterval(
-        () => this.quickScanRefreshing(),
-        this.config.quickScanIntervalMinutes * 60_000,
-      )
-      this.timer.unref()
-    }
-  }
-
-  onModuleDestroy(): void {
-    if (this.timer) clearInterval(this.timer)
   }
 
   /** The library's live status; before anything has run this process, what its record remembers. */
@@ -249,14 +241,6 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     return remembered
   }
 
-  /** The libraries that refresh automatically, on the timer. */
-  private quickScanRefreshing(): void {
-    this.libraries
-      .list()
-      .filter((library) => library.settings.autoRefresh)
-      .forEach((library) => this.quickScan(library.id))
-  }
-
   /** Starts a full scan, or queues one behind the scan under way, and returns the status. */
   scan(libraryId: number): ScanStatus {
     this.request({ libraryId, scope: { kind: SCOPE_KINDS.library } })
@@ -265,7 +249,18 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** Starts a quick scan, or queues one behind the scan under way. */
   quickScan(libraryId: number): void {
-    this.request({ libraryId, scope: { kind: SCOPE_KINDS.quick, places: [] } })
+    this.request({
+      libraryId,
+      scope: { kind: SCOPE_KINDS.quick, places: [], reason: QUICK_SCAN_REASONS.boot },
+    })
+  }
+
+  /** A quiet quick scan, or one queued behind the scan under way: see `QUICK_SCAN_REASONS`. */
+  checkForChanges(libraryId: number): void {
+    this.request({
+      libraryId,
+      scope: { kind: SCOPE_KINDS.quick, places: [], reason: QUICK_SCAN_REASONS.check },
+    })
   }
 
   /**
@@ -275,7 +270,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   quickScanNow(libraryId: number): ScanStatus {
     this.request({
       libraryId,
-      scope: { kind: SCOPE_KINDS.quick, places: [], shouldWaitForMatching: true },
+      scope: { kind: SCOPE_KINDS.quick, places: [], reason: QUICK_SCAN_REASONS.asked },
     })
     return this.status(libraryId)
   }
@@ -354,7 +349,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         return this.quickScanLibrary({
           library,
           places: scope.places,
-          shouldWaitForMatching: scope.shouldWaitForMatching === true,
+          reason: scope.reason,
           signal,
         })
       case SCOPE_KINDS.places:
@@ -451,36 +446,53 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   /**
    * A quick scan: every path, reading only the files the index does not
    * know, and those at `places`. The status keeps the last full scan's
-   * progress and outcome; only its quick scan time moves on.
+   * progress and outcome; only its quick scan time moves on. A quiet one
+   * takes the status, and the time, only once it finds something new.
    */
   private async quickScanLibrary({
     library,
     places,
-    shouldWaitForMatching,
+    reason,
     signal,
   }: ScannerServiceQuickScanLibraryProps): Promise<void> {
-    this.update({
-      libraryId: library.id,
-      patch: {
-        state: SCAN_STATES.walking,
-        kind: SCAN_KINDS.quick,
-        found: 0,
-        processed: 0,
-        startedAt: new Date().toISOString(),
-        error: null,
-      },
-    })
+    const isQuiet = reason === QUICK_SCAN_REASONS.check
+    const begin = () =>
+      this.update({
+        libraryId: library.id,
+        patch: {
+          state: SCAN_STATES.walking,
+          kind: SCAN_KINDS.quick,
+          found: 0,
+          processed: 0,
+          startedAt: new Date().toISOString(),
+          error: null,
+        },
+      })
+    if (!isQuiet) begin()
     try {
-      const { walk, changes, toProbe } = await this.reindex({
+      const reindexed = await this.reindex({
         library,
-        scope: { kind: SCOPE_KINDS.quick, places },
+        scope: { kind: SCOPE_KINDS.quick, places, reason },
         signal,
-        onFound: (count) =>
+        onFound: (count) => {
+          if (isQuiet) return
           this.update({
             libraryId: library.id,
             patch: { found: this.status(library.id).found + count },
-          }),
+          })
+        },
       })
+      const { walk, changes } = reindexed
+      // A check leaves a probe that timed out to a scan someone starts.
+      const retried = new Set(changes.unprobed.map(({ id }) => id))
+      const toProbe = isQuiet
+        ? reindexed.toProbe.filter(({ id }) => !retried.has(id))
+        : reindexed.toProbe
+      const isNew = changesAnything(changes) || toProbe.length > 0
+      if (isQuiet) {
+        if (!isNew) return
+        begin()
+      }
       this.update({
         libraryId: library.id,
         patch: {
@@ -489,7 +501,6 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
           processed: walk.files.length - toProbe.length,
         },
       })
-      const isNew = changesAnything(changes) || toProbe.length > 0
       if (isNew) {
         this.metadata.enqueue(library.id)
         await this.probe({
@@ -511,7 +522,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         )
         return
       }
-      if (isNew && shouldWaitForMatching) {
+      if (isNew && reason === QUICK_SCAN_REASONS.asked) {
         this.update({ libraryId: library.id, patch: { state: SCAN_STATES.matching } })
         await untilAborted({ signal, until: this.metadata.whenIdle() })
         if (signal.aborted) return

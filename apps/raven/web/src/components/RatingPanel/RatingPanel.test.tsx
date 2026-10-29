@@ -114,4 +114,10 @@ describe('RatingBadge', () => {
     expect(container.textContent).toBe('Rotten Tomatoes: 92%92')
     expect(container.textContent).not.toMatch(/tomatometer/i)
   })
+
+  it('shows a Metascore and its scale without the word, still naming it for a screen reader', () => {
+    const metascore = { source: 'metacritic', kind: 'critic', value: 5.7, votes: null } as const
+    const { container } = render(<RatingBadge rating={metascore} />)
+    expect(container.textContent).toBe('Metacritic: 57 out of 10057/100')
+  })
 })

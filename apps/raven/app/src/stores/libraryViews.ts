@@ -5,6 +5,7 @@ import {
   isMediaGroupBy,
   isMediaSort,
   isRecord,
+  withoutView,
 } from '@raven/core'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
@@ -57,6 +58,13 @@ const choicesOf = (saved: unknown): Choices => {
   )
 }
 
+/**
+ * The choices as they are stored: a view picked holds while the app is open, and the
+ * library opens on its type's own the next time it starts (`openingSettings`).
+ */
+const withoutViews = (choices: Choices): Choices =>
+  Object.fromEntries(Object.entries(choices).map(([key, choice]) => [key, withoutView(choice)]))
+
 /** Holds the place of the storage until `configureLibraryViews`, as the player prefs do. */
 const UNCONFIGURED: StateStorage = {
   getItem: () => null,
@@ -68,7 +76,8 @@ const UNCONFIGURED: StateStorage = {
  * How each library is sorted, laid out and grouped on this device. The web saves such a
  * change to the server (`PUT /api/libraries/:id/view`, `@ForViewers()`), for every viewer;
  * that write is not one of the spec's, so the app's allowlist leaves it out. So the app
- * keeps a per-device, per-library choice here, persisted to AsyncStorage, falls back to the
+ * keeps a per-device, per-library choice here, persisted to AsyncStorage but for the view,
+ * which holds only while the app is open (see `withoutViews`), falls back to the
  * server's settings for anything not chosen, and passes the two through `coherentSettings`,
  * so a choice the library's type cannot show, or no longer can, gives way to its own.
  */
@@ -85,8 +94,8 @@ export const useLibraryViews = create<LibraryViews>()(
       name: LIBRARY_VIEWS_KEY,
       storage: createJSONStorage(() => UNCONFIGURED),
       skipHydration: true,
-      partialize: ({ choices }) => ({ choices }),
-      merge: (saved, current) => ({ ...current, choices: choicesOf(saved) }),
+      partialize: ({ choices }) => ({ choices: withoutViews(choices) }),
+      merge: (saved, current) => ({ ...current, choices: withoutViews(choicesOf(saved)) }),
     },
   ),
 )

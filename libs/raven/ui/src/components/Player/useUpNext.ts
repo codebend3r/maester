@@ -33,7 +33,7 @@ const countdownSpan = ({
 
 type CountdownAtProps = {
   time: number
-  span: { start: number; end: number } | null
+  span: ReturnType<typeof countdownSpan>
 }
 
 /** How far the countdown has run, 0 to 1; null before it starts. */

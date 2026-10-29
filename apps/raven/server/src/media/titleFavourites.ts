@@ -108,7 +108,7 @@ export class TitleFavourites {
       .all({ account })
       .map((row) => row.item_id)
       .filter((itemId) => this.isOpen({ itemId, locked }))
-    const summaries = this.metadata.summaries(ids)
+    const summaries = this.metadata.summaries({ ids, libraryId: null })
     return ids.flatMap((id) => summaries.get(id) ?? [])
   }
 }

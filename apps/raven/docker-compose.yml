@@ -22,10 +22,12 @@ services:
       - path: .env
         required: false
     environment:
-      # Quick-scan every library that refreshes automatically on a timer
-      # (minutes), taking in new, renamed and deleted videos without reading
-      # the files it knows; 0 means only on boot. A full scan runs only on
-      # Rescan, a new library or a change of its folders.
+      # Check, this often (minutes), the libraries that refresh automatically
+      # but whose folders no watch hears of (a share mounted from another
+      # machine, or folders that cannot be watched), taking in new, renamed
+      # and deleted videos without reading the files it knows. A check shows
+      # only once it finds something; 0 means only on boot. A full scan runs
+      # only on Full scan, a new library or a change of its folders.
       - QUICK_SCAN_INTERVAL_MINUTES=10
     # Transcode on an Intel GPU: pass its render node in and join the group
     # that owns it on the host (`stat -c %g /dev/dri/renderD128`). /api/health

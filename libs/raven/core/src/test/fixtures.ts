@@ -183,6 +183,7 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   ],
   versions: [mediaItem({ match: 'matched', year: 1999, item: itemSummary() })],
   children: [],
+  libraryPictures: [],
   ...overrides,
 })
 

@@ -9,6 +9,7 @@ import {
   ITEM_TYPES,
   type ItemDetails,
   type ItemSummary,
+  type LibraryPictures,
   type ItemType,
   type MatchItemType,
   type PersonDetails,
@@ -125,6 +126,22 @@ type MetadataRepositoryStaleProps = {
   releasedAfter: string
 }
 
+type MetadataRepositorySummariesProps = {
+  ids: readonly number[]
+  /** The library whose cards these are; null for none, which shows no library's choice. */
+  libraryId: number | null
+}
+
+type MetadataRepositoryPosterItemsProps = MetadataRepositorySummariesProps
+
+type MetadataRepositoryPicturesProps = {
+  id: number
+  type: ItemType
+  libraryId: number | null
+}
+
+type MetadataRepositoryLibraryPicturesProps = { id: number; libraryIds: readonly number[] }
+
 /** Movies, shows, seasons and episodes as TMDB describes them, with their people and pictures; their scores are `ScoresRepository`'s. */
 @Injectable()
 export class MetadataRepository {
@@ -185,7 +202,7 @@ export class MetadataRepository {
       )
       .all(parentId)
       .map((row) => row.id)
-    const summaries = this.summaries(ids)
+    const summaries = this.summaries({ ids, libraryId: null })
     return ids.flatMap((id) => summaries.get(id) ?? [])
   }
 
@@ -218,7 +235,7 @@ export class MetadataRepository {
     }
   > {
     if (ids.length === 0) return new Map()
-    const stills = this.images.versions({ ids, kind: 'still' })
+    const stills = this.images.versions({ ids, kind: ITEM_IMAGE_KINDS.still, libraryId: null })
     return new Map(
       this.db
         .prepare<
@@ -433,8 +450,11 @@ export class MetadataRepository {
     )()
   }
 
-  /** What a card needs for each item, keyed by id. */
-  summaries(ids: readonly number[]): Map<number, ItemSummary> {
+  /**
+   * What a card needs for each item, keyed by id, with the pictures
+   * `libraryId`'s cards show; with no library, the item's own.
+   */
+  summaries({ ids, libraryId }: MetadataRepositorySummariesProps): Map<number, ItemSummary> {
     if (ids.length === 0) return new Map()
     const unique = [...new Set(ids)]
     const ratings = this.scores.ratingsFor(unique)
@@ -450,8 +470,12 @@ export class MetadataRepository {
           WHERE i.id IN (SELECT value FROM json_each(?))`,
       )
       .all(JSON.stringify(unique))
-    const posters = this.images.versions({ ids: unique, kind: 'poster' })
-    const backdrops = this.images.versions({ ids: unique, kind: 'backdrop' })
+    const posters = this.images.versions({ ids: unique, kind: ITEM_IMAGE_KINDS.poster, libraryId })
+    const backdrops = this.images.versions({
+      ids: unique,
+      kind: ITEM_IMAGE_KINDS.backdrop,
+      libraryId,
+    })
     return new Map(
       rows.flatMap((row): Array<[number, ItemSummary]> => {
         if (!isItemType(row.type)) return []
@@ -488,12 +512,13 @@ export class MetadataRepository {
   /**
    * The item whose poster stands for each item: its own, else its parent's,
    * else its grandparent's, so an episode shows its season's poster and a
-   * season without one its show's. An item with none up the line is left out.
+   * season without one its show's, as `libraryId`'s cards show them. An
+   * item with none up the line is left out.
    */
-  posterItems(ids: readonly number[]): Map<number, ItemSummary> {
+  posterItems({ ids, libraryId }: MetadataRepositoryPosterItemsProps): Map<number, ItemSummary> {
     if (ids.length === 0) return new Map()
     const lines = this.images.lines(ids)
-    const summaries = this.summaries(lines.flatMap(lineOf))
+    const summaries = this.summaries({ ids: lines.flatMap(lineOf), libraryId })
     return new Map(
       lines.flatMap((line): Array<[number, ItemSummary]> => {
         const poster = lineOf(line)
@@ -574,10 +599,18 @@ export class MetadataRepository {
     )
   }
 
-  /** An item's page, apart from its files, its children, the AI note and its favourite mark, which the caller adds. */
-  details(id: number): Omit<ItemDetails, 'versions' | 'children' | 'aiMatch' | 'favourite'> | null {
+  /**
+   * An item's page, apart from its files, its children, the AI note, its
+   * favourite mark and each library's pictures, which the caller adds.
+   */
+  details(
+    id: number,
+  ): Omit<
+    ItemDetails,
+    'versions' | 'children' | 'aiMatch' | 'favourite' | 'libraryPictures'
+  > | null {
     const row = this.db.prepare<[number], ItemRow>('SELECT * FROM shown_items WHERE id = ?').get(id)
-    const summary = this.summaries([id]).get(id)
+    const summary = this.summaries({ ids: [id], libraryId: null }).get(id)
     if (!row || !summary) return null
     return {
       ...summary,
@@ -592,19 +625,43 @@ export class MetadataRepository {
       runtime: row.runtime,
       studio: row.studio,
       genres: genresOf(row.genres),
-      // An episode has a still where the others have a backdrop.
-      backdropVersion:
-        this.images
-          .versions({
-            ids: [id],
-            kind:
-              row.type === ITEM_TYPES.episode ? ITEM_IMAGE_KINDS.still : ITEM_IMAGE_KINDS.backdrop,
-          })
-          .get(id) ?? null,
-      logoVersion: this.images.versions({ ids: [id], kind: ITEM_IMAGE_KINDS.logo }).get(id) ?? null,
+      ...this.pictures({ id, type: summary.type, libraryId: null }),
       credits: this.credits(id),
       reviews: this.reviews(id),
     }
+  }
+
+  /**
+   * The versions of the pictures an item's page shows, as `libraryId`
+   * shows them; with no library, its own. An episode has a still where the
+   * others have a backdrop.
+   */
+  private pictures({
+    id,
+    type,
+    libraryId,
+  }: MetadataRepositoryPicturesProps): Pick<ItemDetails, 'backdropVersion' | 'logoVersion'> {
+    const backdrop =
+      type === ITEM_TYPES.episode ? ITEM_IMAGE_KINDS.still : ITEM_IMAGE_KINDS.backdrop
+    return {
+      backdropVersion:
+        this.images.versions({ ids: [id], kind: backdrop, libraryId }).get(id) ?? null,
+      logoVersion:
+        this.images.versions({ ids: [id], kind: ITEM_IMAGE_KINDS.logo, libraryId }).get(id) ?? null,
+    }
+  }
+
+  /** The pictures an item's page shows in each of `libraryIds`, which can each choose their own. */
+  libraryPictures({ id, libraryIds }: MetadataRepositoryLibraryPicturesProps): LibraryPictures[] {
+    const type = this.get(id)?.type ?? null
+    if (type == null) return []
+    return libraryIds.map((libraryId) => ({
+      libraryId,
+      posterVersion:
+        this.images.versions({ ids: [id], kind: ITEM_IMAGE_KINDS.poster, libraryId }).get(id) ??
+        null,
+      ...this.pictures({ id, type, libraryId }),
+    }))
   }
 
   /** An item's reviews by TMDB members, newest first, at most ten. */
@@ -673,7 +730,10 @@ export class MetadataRepository {
           ORDER BY i.released DESC, i.title`,
       )
       .all(id, id)
-    const summaries = this.summaries(credits.map((credit) => credit.item_id))
+    const summaries = this.summaries({
+      ids: credits.map((credit) => credit.item_id),
+      libraryId: null,
+    })
     return {
       id: row.id,
       tmdbId: row.tmdb_id,
@@ -847,6 +907,7 @@ export class MetadataRepository {
       this.db
         .prepare<[], { ref: string }>(
           `SELECT ref FROM item_images WHERE source IN ('tmdb', 'chosen')
+           UNION SELECT ref FROM library_item_images
            UNION SELECT photo AS ref FROM people WHERE photo IS NOT NULL`,
         )
         .all()

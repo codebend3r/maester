@@ -4,12 +4,12 @@ import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { type ApiClient, type MediaItem, parseServerEvent } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { MetadataService } from '@/metadata/metadataService'
 import { LibraryWatcher } from '@/scanner/libraryWatcher'
 import { ScannerService } from '@/scanner/scannerService'
-import { adminCookie, eventually, testConfig } from '@/test/app'
+import { NOT_WATCHING, adminCookie, eventually, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -27,6 +27,15 @@ const closeAfterWork = async ({ app, libraryId }: CloseAfterWorkProps): Promise<
   await app.get(MetadataService).whenIdle()
   await app.get(ThumbnailService).whenIdle()
   await app.close()
+}
+
+/** The libraries the watcher's timer would check now. */
+const checked = (app: NestFastifyApplication): number[] => {
+  const check = vi.spyOn(app.get(ScannerService), 'checkForChanges').mockImplementation(() => {})
+  app.get(LibraryWatcher).checkUnheard()
+  const ids = check.mock.calls.map(([id]) => id)
+  check.mockRestore()
+  return ids
 }
 
 /** As a browser with the admin lock off, so the library can be added and edited. */
@@ -69,6 +78,10 @@ describe('refreshing a library as its folders change', () => {
   afterAll(async () => {
     await closeAfterWork(state)
     await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
+  })
+
+  it('leaves its timer alone, as the watch hears of every change on this disk', () => {
+    expect(checked(app())).toEqual([])
   })
 
   it('takes in a video added to a folder under it', async () => {
@@ -197,6 +210,10 @@ describe('a library whose folders cannot be watched', () => {
     ])
   })
 
+  it("is checked on the watcher's timer", () => {
+    expect(checked(app())).toEqual([state.libraryId])
+  })
+
   it('is watched again once a library is saved', async () => {
     const before = state.watches.length
     state.failing = false
@@ -205,5 +222,39 @@ describe('a library whose folders cannot be watched', () => {
       input: { name: 'Unwatched again', paths: [media()] },
     })
     expect(state.watches.length).toBe(before + 1)
+  })
+})
+
+/** As a browser with the admin lock off, so the library can be added. */
+describe('a library on a share mounted from another machine', () => {
+  const state: { root: string; libraryId: number; app: NestFastifyApplication | null } = {
+    root: '',
+    libraryId: 0,
+    app: null,
+  }
+
+  beforeAll(async () => {
+    state.root = await mkdtemp(join(tmpdir(), 'raven-share-'))
+    await encodeClip({ path: join(state.root, 'media', 'Heat (1995).mp4'), seconds: 2 })
+    state.app = await createApp({
+      config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
+      quiet: true,
+      watch: { ...NOT_WATCHING, isNetworkShare: async () => true },
+    })
+    await state.app.init()
+    const api = apiFor({ app: state.app, cookie: await adminCookie(state.app) })
+    const created = await api.createLibrary({ name: 'Shared', paths: [join(state.root, 'media')] })
+    state.libraryId = created.id
+    await state.app.get(ScannerService).whenIdle(created.id)
+  })
+
+  afterAll(async () => {
+    await closeAfterWork(state)
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
+  })
+
+  it("is checked on the watcher's timer, as its watch hears nothing done on the other machine", () => {
+    if (!state.app) throw new Error('app not started')
+    expect(checked(state.app)).toEqual([state.libraryId])
   })
 })

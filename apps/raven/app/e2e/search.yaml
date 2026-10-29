@@ -45,8 +45,8 @@ tags:
 - extendedWaitUntil:
     visible: Nothing here matches "nowhere".
     timeout: 30000
-# Cleared, the library lists everything again, in the grouped view the fixture keeps.
+# Cleared, the library lists everything again, on its grid.
 - tapOn: Clear search
 - extendedWaitUntil:
-    visible: Matched, 1 video
+    visible: Kestrel Point
     timeout: 30000

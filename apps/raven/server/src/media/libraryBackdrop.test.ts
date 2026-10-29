@@ -59,7 +59,7 @@ describe("a library's backdrop", () => {
     expect(backdrop()).toEqual({
       type: 'item',
       id: movieId,
-      version: stored.summaries([movieId]).get(movieId)?.backdropVersion,
+      version: stored.summaries({ ids: [movieId], libraryId: null }).get(movieId)?.backdropVersion,
     })
   })
 })

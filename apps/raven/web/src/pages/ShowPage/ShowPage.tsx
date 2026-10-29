@@ -8,6 +8,7 @@ import {
   createdBy,
   episodeCode,
   itemPath,
+  picturesIn,
   seasonEntryKey,
   seasonsOf,
   seasonsWatched,
@@ -100,11 +101,14 @@ const ShowView = ({ details }: ShowViewProps) => {
   const favourite = useItemFavourite({ item: details })
   // A logo until Settings says to spell titles out, as a fresh install does.
   const showsLogo = useQuery(displaySettingsQuery).data?.titles !== TITLE_DISPLAYS.text
-  const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId
-  const libraryName = useQuery(librariesQuery).data?.find((entry) => entry.id === libraryId)?.name
+  const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId ?? null
+  const known = useQuery(librariesQuery).data ?? []
+  const libraryName = known.find((entry) => entry.id === libraryId)?.name ?? 'Library'
+  // Each library holding the show can choose its own pictures.
+  const pictures = picturesIn({ details, libraryId })
   const library = {
     to: libraryId == null ? '/libraries' : `/libraries/${libraryId}`,
-    label: libraryName ?? 'Library',
+    label: libraryName,
   }
   const code = next.data?.item ? episodeCode(next.data.item) : null
   const seasons = seasonsOf(details)
@@ -135,7 +139,7 @@ const ShowView = ({ details }: ShowViewProps) => {
               ? api.itemImageUrl({
                   id: details.id,
                   kind: ITEM_IMAGE_KINDS.logo,
-                  version: details.logoVersion,
+                  version: pictures.logoVersion,
                 })
               : null
           }
@@ -148,10 +152,10 @@ const ShowView = ({ details }: ShowViewProps) => {
             url: api.itemImageUrl({
               id: details.id,
               kind: ITEM_IMAGE_KINDS.poster,
-              version: details.posterVersion,
+              version: pictures.posterVersion,
             }),
           }}
-          backdrop={itemBackdrop({ id: details.id, version: details.backdropVersion })}
+          backdrop={itemBackdrop({ id: details.id, version: pictures.backdropVersion })}
           manage={
             <AdminOnly>
               <Button
@@ -195,7 +199,8 @@ const ShowView = ({ details }: ShowViewProps) => {
           {editingImages && (
             <ImageEditor
               details={details}
-              libraries={[]}
+              libraries={known}
+              libraryId={libraryId}
               itemKind="show"
               onDone={() => setEditingImages(false)}
             />

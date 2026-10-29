@@ -2,6 +2,7 @@ import type { Transport } from '@/apiClient/transport'
 import {
   type ChoosableImageKind,
   type FavouriteChange,
+  ITEM_QUERY_PARAMS,
   type ImageChoice,
   isItemDetails,
   isItemImageOptions,
@@ -13,10 +14,12 @@ import {
   type ItemImageOptions,
   type ItemMetadataChange,
   type ItemMetadataState,
+  type LibraryImageChoice,
   type MediaItem,
   type PersonDetails,
   type ShowMatchChoice,
 } from '@/contract'
+import { toQueryString } from '@/query'
 import { nullable } from '@/schema'
 
 type SetItemFavouriteProps = {
@@ -31,9 +34,16 @@ type SetItemMetadataProps = {
   change: ItemMetadataChange
 }
 
+type GetItemImagesProps = {
+  id: number
+  /** The library whose cards' pictures are being chosen. */
+  libraryId: number
+}
+
 type ChooseItemImageProps = {
   id: number
   kind: ChoosableImageKind
+  libraryId: number
   choice: ImageChoice
 }
 
@@ -103,14 +113,26 @@ export const itemCalls = ({ send, expect }: Transport) => ({
       guard: isItemDetails,
     }),
 
-  /** Every poster and backdrop a movie or show could show, the current one marked. */
-  getItemImages: (id: number): Promise<ItemImageOptions> =>
-    expect({ request: send({ path: `/api/items/${id}/images` }), guard: isItemImageOptions }),
-
-  /** Edit images: the item shows `choice` for `kind` from now on; refreshes keep it. */
-  chooseItemImage: ({ id, kind, choice }: ChooseItemImageProps): Promise<ItemDetails> =>
+  /** Every poster and backdrop a movie or show could show, the one `libraryId` shows marked. */
+  getItemImages: ({ id, libraryId }: GetItemImagesProps): Promise<ItemImageOptions> =>
     expect({
-      request: send({ path: `/api/items/${id}/images/${kind}`, method: 'PUT', body: choice }),
+      request: send({
+        path: `/api/items/${id}/images?${toQueryString({ [ITEM_QUERY_PARAMS.library]: String(libraryId) })}`,
+      }),
+      guard: isItemImageOptions,
+    }),
+
+  /**
+   * Edit images: the item's cards in `libraryId` show `choice` for `kind`
+   * from now on, and refreshes keep it; other libraries keep their own.
+   */
+  chooseItemImage: ({ id, kind, libraryId, choice }: ChooseItemImageProps): Promise<ItemDetails> =>
+    expect({
+      request: send({
+        path: `/api/items/${id}/images/${kind}`,
+        method: 'PUT',
+        body: { libraryId, choice } satisfies LibraryImageChoice,
+      }),
       guard: isItemDetails,
     }),
 

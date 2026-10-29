@@ -41,6 +41,8 @@ export const PRODUCTION_STATISTICS = [
   ['items', 'items_parent', '53629 11 2'],
   ['items', 'sqlite_autoindex_items_1', '53629 13408 1'],
   ['libraries', null, '11'],
+  ['library_item_images', 'library_item_images_item', '1 1 1'],
+  ['library_item_images', 'sqlite_autoindex_library_item_images_1', '1 1 1 1'],
   ['library_paths', 'sqlite_autoindex_library_paths_1', '17 2 1'],
   ['match_overrides', 'sqlite_autoindex_match_overrides_1', '5 2 1'],
   ['media', 'media_library_added', '60708 5519 35'],

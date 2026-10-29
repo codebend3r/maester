@@ -148,7 +148,8 @@ export const aiSuggestion = (overrides: Partial<AiSuggestion> = {}): AiSuggestio
   ...overrides,
 })
 
-export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails => ({
+/** A movie's page, before its pictures in each library. */
+const ownItemDetails = (overrides: Partial<ItemDetails>): Omit<ItemDetails, 'libraryPictures'> => ({
   ...itemSummary(),
   tmdbId: '1001',
   imdbId: 'tt1001',
@@ -176,6 +177,25 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   children: [],
   ...overrides,
 })
+
+/**
+ * A movie's page, its pictures listed for the library its file is in, the
+ * same as its own unless `overrides` lists others.
+ */
+export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails => {
+  const details = ownItemDetails(overrides)
+  return {
+    ...details,
+    libraryPictures: overrides.libraryPictures ?? [
+      {
+        libraryId: 2,
+        posterVersion: details.posterVersion,
+        backdropVersion: details.backdropVersion,
+        logoVersion: details.logoVersion,
+      },
+    ],
+  }
+}
 
 export const showEntry = (overrides: Partial<ShowEntry> = {}): ShowEntry => ({
   show: itemSummary({ id: 4, type: 'show', title: 'Severance', year: 2022, posterVersion: 'p1' }),

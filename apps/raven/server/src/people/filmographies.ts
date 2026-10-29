@@ -100,7 +100,7 @@ export class Filmographies {
         rows,
         holding: this.metadata.librariesHoldingEach(itemIds),
         sees,
-        summaries: this.metadata.summaries(itemIds),
+        summaries: this.metadata.summaries({ ids: itemIds, libraryId: null }),
         localCredits,
       }),
     }
