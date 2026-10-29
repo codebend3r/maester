@@ -1,5 +1,15 @@
 import { isMediaItem } from '@/contract/items'
-import { type Infer, isNumber, isString, listOf, matching, nullable, object, oneOf } from '@/schema'
+import {
+  type Infer,
+  isNumber,
+  isString,
+  listOf,
+  matching,
+  nullable,
+  object,
+  oneOf,
+  union,
+} from '@/schema'
 
 /**
  * How a file reaches the player: the original bytes, a remux with the video
@@ -17,6 +27,16 @@ export const isStreamMode = oneOf([PLAYBACK_MODES.remux, PLAYBACK_MODES.transcod
 export type StreamMode = Infer<typeof isStreamMode>
 
 export const STREAM_MODES = isStreamMode.values
+
+/** Why a client asks for a file: to play it, or to keep a copy of it, as Raven's downloads do. */
+export const STREAM_PURPOSES = { play: 'play', download: 'download' } as const
+
+export const isStreamPurpose = oneOf(Object.values(STREAM_PURPOSES))
+
+export type StreamPurpose = Infer<typeof isStreamPurpose>
+
+/** The query key a file request names its purpose in; a request without one plays. */
+export const MEDIA_PURPOSE_PARAM = 'purpose'
 
 /**
  * The sizes a viewer can ask a transcode for: the frame it is scaled down
@@ -117,14 +137,13 @@ export const HLS_COPY_AUDIO = Object.values(HLS_COPY_AUDIO_CODECS)
 export const isHlsSessionId = matching(/^[A-Za-z0-9_-]{22}$/)
 
 /**
- * A video the server is sending to one browser or device right now, as the
- * admin's Streams page lists it. `browser` and `device` are read from the
- * User-Agent header, so they are the client's own word for itself;
- * `address` is where the requests came from, which behind a proxy is the
- * address the proxy forwards. `position` is the last spot the player
+ * What every live stream says, watched or downloaded. `browser` and `device`
+ * are read from the User-Agent header, so they are the client's own word for
+ * itself; `address` is where the requests came from, which behind a proxy is
+ * the address the proxy forwards. `position` is the last spot the player
  * reported, in seconds, and null until it reports one.
  */
-export const isLiveStream = object({
+const LIVE_STREAM_FIELDS = {
   id: isString,
   media: isMediaItem,
   libraryName: isString,
@@ -147,9 +166,27 @@ export const isLiveStream = object({
   sendRate: nullable(isNumber),
   /** The size the viewer asked a transcode for; null for the server's own settings and for the other modes. */
   quality: nullable(isStreamQuality),
-})
+}
+
+/**
+ * A video the server is sending to one browser or device right now, as the
+ * admin's Streams page lists it: a play, or a download, which also says how
+ * far into the file it has been sent, in bytes, counting the part it already
+ * had when it resumed.
+ */
+export const isLiveStream = union(
+  object({ ...LIVE_STREAM_FIELDS, purpose: oneOf([STREAM_PURPOSES.play]) }),
+  object({
+    ...LIVE_STREAM_FIELDS,
+    purpose: oneOf([STREAM_PURPOSES.download]),
+    received: isNumber,
+  }),
+)
 
 export type LiveStream = Infer<typeof isLiveStream>
+
+/** A live stream that is a download. */
+export type LiveDownload = Extract<LiveStream, { purpose: typeof STREAM_PURPOSES.download }>
 
 export const isLiveStreamList = listOf(isLiveStream)
 

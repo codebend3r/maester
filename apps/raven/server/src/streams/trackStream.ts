@@ -1,4 +1,4 @@
-import type { PlaybackMode, StreamQuality } from '@raven/core'
+import type { PlaybackMode, StreamPurpose, StreamQuality } from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import { type AuthSessions, accountOf } from '@/auth/authSessions'
@@ -37,10 +37,13 @@ type TrackStreamProps = {
   /** What ends the response: emits once its access is gone. */
   ended: Observable<void>
   auth: Pick<AuthSessions, 'callerOf'>
+  purpose: StreamPurpose
   mediaId: number
   mode: PlaybackMode
   quality: StreamQuality | null
   audio: number | null
+  /** The offset into the file the response starts at. */
+  from: number
   request: FastifyRequest
   reply: FastifyReply
 }
@@ -56,10 +59,12 @@ export const trackStream = ({
   sessions,
   ended,
   auth,
+  purpose,
   mediaId,
   mode,
   quality,
   audio,
+  from,
   request,
   reply,
 }: TrackStreamProps): void => {
@@ -71,12 +76,14 @@ export const trackStream = ({
     written: () => socket?.bytesWritten ?? 0,
   }
   const release = sessions.open({
+    purpose,
     mediaId,
     mode,
     quality,
     audio,
     client: clientOf({ request, auth }),
     connection,
+    from,
   })
   const watch = ended.subscribe(() => connection.close())
   reply.raw.on(RESPONSE_EVENTS.close, () => {

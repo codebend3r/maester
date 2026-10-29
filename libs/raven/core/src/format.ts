@@ -38,6 +38,15 @@ export const formatBitrate = (bitsPerSecond: number | null): string | null => {
     : `${Math.round(bitsPerSecond / 1000)} kb/s`
 }
 
+/** "12.4 MB/s", or "640 KB/s" under a megabyte, for how fast a download is coming; null until measured. */
+export const formatByteRate = (bitsPerSecond: number | null): string | null => {
+  if (bitsPerSecond == null) return null
+  const bytesPerSecond = bitsPerSecond / 8
+  return bytesPerSecond >= 1_000_000
+    ? `${(bytesPerSecond / 1_000_000).toFixed(1)} MB/s`
+    : `${Math.round(bytesPerSecond / 1000)} KB/s`
+}
+
 /** "Mono", "Stereo", "5.1", "7.1", or "N ch" for anything unusual. */
 export const formatChannels = (channels: number | null): string | null => {
   if (channels == null || channels <= 0) return null

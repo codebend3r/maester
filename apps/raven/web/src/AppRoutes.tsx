@@ -21,6 +21,7 @@ import { SeasonPage } from '@/pages/SeasonPage/SeasonPage'
 import { SagaPage } from '@/pages/SagaPage/SagaPage'
 import { StreamsPage } from '@/pages/StreamsPage/StreamsPage'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
+import { ShortcutsPage } from '@/pages/ShortcutsPage/ShortcutsPage'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { PendingPage } from '@/pages/PendingPage/PendingPage'
@@ -62,6 +63,7 @@ export const AppRoutes = () => {
             <Route path="streams" element={<StreamsPage />} />
             <Route path="reports" element={<BugReportsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path={PAGE_PATHS.shortcuts} element={<ShortcutsPage />} />
             <Route path="design" element={<DesignPage />} />
             {isDesktop && (
               <>

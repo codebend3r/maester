@@ -44,7 +44,11 @@ describe('episodeBackPath', () => {
 
 describe('watchPageOf', () => {
   it("names a video's page under the watch path", () => {
-    expect(PAGE_PATHS).toEqual({ settings: '/settings', watch: '/watch' })
+    expect(PAGE_PATHS).toEqual({
+      settings: '/settings',
+      shortcuts: '/shortcuts',
+      watch: '/watch',
+    })
     expect(watchPageOf(9)).toBe('/watch/9')
   })
 })

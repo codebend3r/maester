@@ -46,7 +46,7 @@ export const LibraryHeader = ({ titleId, library, actions, isShut }: LibraryHead
           {unmatched > 0 && ` · ${count.format(unmatched)} not matched`}
         </p>
         <div className={styles.status}>
-          <ScanStatus scan={library.scan} />
+          <ScanStatus scan={library.scan} expected={library.itemCount} />
           <RatingsStatus refresh={library.ratingsRefresh} />
         </div>
         <div className={styles.actions}>

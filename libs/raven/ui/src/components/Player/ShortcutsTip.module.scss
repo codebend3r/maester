@@ -1,0 +1,60 @@
+// A see-through layer over the stage whose padding parks the tip top right,
+// under the title bar's end and clear of the control bar.
+.layer {
+  grid-area: stage;
+  position: relative;
+  z-index: 3;
+  display: grid;
+  align-items: start;
+  justify-items: end;
+  padding: calc(var(--space-8) + var(--space-4) + var(--titlebar-inset)) var(--space-4)
+    var(--space-10);
+  pointer-events: none;
+}
+
+// Dark glass over the picture in every theme, like the shortcut list it teaches.
+.tip {
+  display: grid;
+  grid-template-areas:
+    'heading'
+    'list'
+    'dismiss';
+  gap: var(--space-3);
+  width: min(26rem, 100%);
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--color-picture-glass);
+  color: var(--color-on-picture);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: var(--filter-glass);
+  pointer-events: auto;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: rise 300ms var(--ease-out) backwards;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--space-2)));
+  }
+}
+
+.heading {
+  grid-area: heading;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.list {
+  grid-area: list;
+}
+
+.dismiss {
+  grid-area: dismiss;
+  justify-self: end;
+}

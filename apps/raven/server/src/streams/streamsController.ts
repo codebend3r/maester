@@ -9,7 +9,7 @@ import {
   Post,
   Req,
 } from '@nestjs/common'
-import type { LiveStream } from '@raven/core'
+import { type LiveStream, STREAM_PURPOSES } from '@raven/core'
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import type { FastifyRequest } from 'fastify'
 import { AdminOnly } from '@/admin/adminGuard'
@@ -39,22 +39,29 @@ export class StreamsController {
     return this.sessions.list().flatMap((session): LiveStream[] => {
       const media = this.media.get({ id: session.mediaId, account })
       if (media == null) return []
+      const stream = {
+        id: session.id,
+        media,
+        libraryName: this.libraries.get(media.libraryId)?.name ?? '',
+        mode: session.mode,
+        ...describeClient(session.client.userAgent),
+        address: session.client.address,
+        startedAt: new Date(session.startedAt).toISOString(),
+        lastSeenAt: new Date(session.lastSeenAt).toISOString(),
+        position: session.position,
+        viewer: session.client.viewer?.email ?? null,
+        audio: session.audio,
+        sendRate: session.sendRate,
+        quality: session.quality,
+      }
       return [
-        {
-          id: session.id,
-          media,
-          libraryName: this.libraries.get(media.libraryId)?.name ?? '',
-          mode: session.mode,
-          ...describeClient(session.client.userAgent),
-          address: session.client.address,
-          startedAt: new Date(session.startedAt).toISOString(),
-          lastSeenAt: new Date(session.lastSeenAt).toISOString(),
-          position: session.position,
-          viewer: session.client.viewer?.email ?? null,
-          audio: session.audio,
-          sendRate: session.sendRate,
-          quality: session.quality,
-        },
+        session.purpose === STREAM_PURPOSES.download
+          ? {
+              ...stream,
+              purpose: STREAM_PURPOSES.download,
+              received: Math.min(session.reached, media.size),
+            }
+          : { ...stream, purpose: STREAM_PURPOSES.play },
       ]
     })
   }

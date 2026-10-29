@@ -2,7 +2,13 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
-import { type ApiClient, type MediaItem, PLAYBACK_MODES } from '@raven/core'
+import {
+  type ApiClient,
+  MEDIA_PURPOSE_PARAM,
+  type MediaItem,
+  PLAYBACK_MODES,
+  STREAM_PURPOSES,
+} from '@raven/core'
 import { HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
@@ -81,6 +87,7 @@ describe('who is streaming', () => {
       expect.objectContaining({
         media: expect.objectContaining({ id: videoId() }),
         libraryName: 'Films',
+        purpose: STREAM_PURPOSES.play,
         mode: PLAYBACK_MODES.direct,
         browser: 'Chrome 141',
         device: 'Mac',
@@ -124,6 +131,26 @@ describe('who is streaming', () => {
   it('lists the stream again once the player asks again', async () => {
     await play()
     expect(await admin().listLiveStreams()).toHaveLength(1)
+  })
+
+  it('lists a download apart from the play, with how far into the file it has been sent', async () => {
+    const fetched = await app().inject({
+      method: 'GET',
+      url: `/api/media/${videoId()}/file?${MEDIA_PURPOSE_PARAM}=${STREAM_PURPOSES.download}`,
+      headers: { ...asViewer, [HEADERS.range]: 'bytes=50-' },
+    })
+    expect(fetched.statusCode).toBe(206)
+
+    const streams = await admin().listLiveStreams()
+    expect(streams.map(({ purpose }) => purpose)).toEqual([
+      STREAM_PURPOSES.play,
+      STREAM_PURPOSES.download,
+    ])
+    const download = streams.find((stream) => stream.purpose === STREAM_PURPOSES.download)
+    if (download?.purpose !== STREAM_PURPOSES.download) throw new Error('no download listed')
+    expect(download.received).toBeGreaterThanOrEqual(50)
+    expect(download.received).toBeLessThanOrEqual(state.video?.size ?? 0)
+    await admin().stopStream(download.id)
   })
 
   it('shows the folders of a library only with the admin lock off', async () => {

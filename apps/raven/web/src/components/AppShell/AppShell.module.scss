@@ -113,17 +113,72 @@
   min-width: 0;
 }
 
-// Libraries and Settings, then raven's version and the toggle under a rule.
+// Under a rule where the libraries end: the Manage button, Libraries to
+// Settings, then raven's version and the toggle under a fainter rule.
 .dock {
   grid-area: dock;
   display: grid;
   gap: var(--space-2);
-  padding-inline: var(--space-1);
+  padding: var(--space-2) var(--space-1) 0;
+  border-top: 1px solid var(--color-line);
+}
+
+// Folds the group under it away, in the open menu and down to its icons alike.
+.manageToggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'label chevron';
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--space-5);
+  padding: var(--space-0) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-lichen);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-hover);
+    color: var(--color-bark);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+
+  &[aria-expanded='false'] .chevron {
+    rotate: -90deg;
+  }
+}
+
+.manageLabel {
+  grid-area: label;
+  justify-self: start;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.chevron {
+  grid-area: chevron;
+  display: grid;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .chevron {
+    transition: rotate 200ms var(--ease-out);
+  }
 }
 
 .manage {
   display: grid;
   gap: var(--space-0);
+
+  &[hidden] {
+    display: none;
+  }
 }
 
 .foot {
@@ -255,6 +310,12 @@
 
   .navLink {
     grid-template-columns: auto;
+    justify-content: center;
+  }
+
+  .manageToggle {
+    grid-template-columns: auto;
+    grid-template-areas: 'chevron';
     justify-content: center;
   }
 

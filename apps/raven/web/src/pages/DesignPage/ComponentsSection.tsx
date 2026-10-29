@@ -158,10 +158,10 @@ export const ComponentsSection = () => (
 
     <Specimen name="ScanStatus">
       <ul className={styles.cards}>
-        {SAMPLE_SCANS.map(({ label, scan }) => (
+        {SAMPLE_SCANS.map(({ label, scan, expected }) => (
           <li key={label} className={styles.card}>
             <span className={styles.eyebrowLabel}>{label}</span>
-            <ScanStatus scan={scan} />
+            <ScanStatus scan={scan} expected={expected} />
           </li>
         ))}
       </ul>

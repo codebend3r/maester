@@ -43,6 +43,8 @@ type PlayerPrefs = {
   autoplayCountdownSeconds: number
   /** Whether a known intro is skipped without asking, once per title, with a moment to undo it. */
   autoSkipIntro: boolean
+  /** Whether the first video's tip about the keyboard has shown; it shows once, ever. */
+  hasSeenShortcutsTip: boolean
   setVolume: ({ volume, muted }: SetVolumeProps) => void
   setCaptionScale: (captionScale: number) => void
   setSubtitles: (subtitles: SetSubtitlesProps) => void
@@ -52,11 +54,13 @@ type PlayerPrefs = {
   setAutoplay: (isOn: boolean) => void
   setAutoplayCountdownSeconds: (seconds: number) => void
   setAutoSkipIntro: (isOn: boolean) => void
+  markShortcutsTipSeen: () => void
 }
 
 /**
  * Volume, subtitles, audio language, how long the controls linger,
- * autoplay and its countdown, and skipping intros carry over from one video to the next, and across visits.
+ * autoplay and its countdown, skipping intros, and whether the keyboard tip
+ * has shown carry over from one video to the next, and across visits.
  */
 export const usePlayerPrefs = create<PlayerPrefs>()(
   devtools(
@@ -72,6 +76,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         autoplay: true,
         autoplayCountdownSeconds: AUTOPLAY_COUNTDOWN_SECONDS.initial,
         autoSkipIntro: false,
+        hasSeenShortcutsTip: false,
         setVolume: ({ volume, muted }) => set({ volume, muted }),
         setCaptionScale: (captionScale) => set({ captionScale }),
         setSubtitles: (subtitles) => set({ subtitles }),
@@ -85,6 +90,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
             autoplayCountdownSeconds: within({ seconds, range: AUTOPLAY_COUNTDOWN_SECONDS }),
           }),
         setAutoSkipIntro: (isOn) => set({ autoSkipIntro: isOn }),
+        markShortcutsTipSeen: () => set({ hasSeenShortcutsTip: true }),
       }),
       {
         name: PLAYER_PREFS_KEY,
@@ -101,6 +107,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           autoplay,
           autoplayCountdownSeconds,
           autoSkipIntro,
+          hasSeenShortcutsTip,
         }) => ({
           volume,
           muted,
@@ -112,6 +119,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           autoplay,
           autoplayCountdownSeconds,
           autoSkipIntro,
+          hasSeenShortcutsTip,
         }),
       },
     ),

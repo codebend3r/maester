@@ -141,7 +141,7 @@ describe('AppShell', () => {
     )
   })
 
-  it('leads with the logo, Home and Favourites, then the pinned libraries, with Libraries, Streams, Bug reports and Settings last', async () => {
+  it('leads with the logo, Home and Favourites, then the pinned libraries, with Libraries, Streams, Bug reports, Settings and Shortcuts last', async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
     renderShell({ route: '/' })
     await within(nav()).findByRole('link', { name: 'Movies' })
@@ -158,6 +158,7 @@ describe('AppShell', () => {
       'Streams',
       'Bug reports',
       'Settings',
+      'Shortcuts',
     ])
   })
 
@@ -314,6 +315,41 @@ describe('AppShell', () => {
     expect(toggle()).toHaveAttribute('aria-expanded', 'true')
     await userEvent.hover(within(nav()).getByRole('link', { name: 'Favourites' }))
     expect(screen.queryByText('Favourites', { selector: '[aria-hidden]' })).toBeNull()
+  })
+
+  it('keeps Shortcuts in the menu with Manage folded, and opens its page', async () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell({ route: '/' })
+    const shortcuts = await within(nav()).findByRole('link', { name: 'Shortcuts' })
+    expect(shortcuts).toHaveAttribute('href', PAGE_PATHS.shortcuts)
+    expect(iconOf(shortcuts)).toBe('keyboard')
+    await userEvent.click(within(nav()).getByRole('button', { name: 'Manage' }))
+    expect(within(nav()).getByRole('link', { name: 'Shortcuts' })).toBeInTheDocument()
+    await userEvent.click(within(nav()).getByRole('button', { name: 'Manage' }))
+  })
+
+  it('folds Libraries to Settings away under Manage, open or down to its icons, and keeps it so', async () => {
+    spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
+    renderShell({ route: '/' })
+    await within(nav()).findByRole('link', { name: 'Movies' })
+    const manage = within(nav()).getByRole('button', { name: 'Manage' })
+    expect(manage).toHaveAttribute('aria-expanded', 'true')
+    expect(within(nav()).getByRole('link', { name: 'Settings' })).toBeVisible()
+
+    await userEvent.click(manage)
+    expect(manage).toHaveAttribute('aria-expanded', 'false')
+    expect(within(nav()).queryByRole('link', { name: 'Libraries' })).toBeNull()
+    expect(within(nav()).queryByRole('link', { name: 'Settings' })).toBeNull()
+    expect(within(nav()).getByRole('link', { name: 'Movies' })).toBeInTheDocument()
+    expect(useSideMenu.getState().isManageFolded).toBe(true)
+
+    await userEvent.click(toggle())
+    const folded = within(nav()).getByRole('button', { name: 'Manage' })
+    expect(folded).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(folded)
+    expect(within(nav()).getByRole('link', { name: 'Settings' })).toBeInTheDocument()
+    expect(useSideMenu.getState().isManageFolded).toBe(false)
+    await userEvent.click(toggle())
   })
 
   it("shows raven's version beside the toggle while the menu is open", async () => {
@@ -529,6 +565,7 @@ describe('AppShell', () => {
       DESKTOP_PATHS.local,
       DESKTOP_PATHS.downloads,
       PAGE_PATHS.settings,
+      PAGE_PATHS.shortcuts,
     ])
     expect(
       within(tabs())
@@ -569,7 +606,7 @@ describe('AppShell', () => {
       within(nav())
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['raven', 'On this PC', 'Downloads', 'Settings'])
+    ).toEqual(['raven', 'On this PC', 'Downloads', 'Settings', 'Shortcuts'])
     expect(
       within(tabs())
         .getAllByRole('link')
@@ -585,7 +622,7 @@ describe('AppShell', () => {
       within(nav())
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['raven', 'On this Mac', 'Downloads', 'Settings'])
+    ).toEqual(['raven', 'On this Mac', 'Downloads', 'Settings', 'Shortcuts'])
     expect(
       within(tabs())
         .getAllByRole('link')

@@ -567,10 +567,10 @@ describe('createMediaAccess', () => {
 })
 
 describe('fileUrlFor', () => {
-  it('puts the encoded ticket on the origin it was read for', () => {
+  it('puts the encoded ticket and the download purpose on the origin it was read for', () => {
     const access: Access = { url: LAN.url, ticket: 'a b/c+d=' }
     expect(fileUrlFor({ access, mediaId: 7 })).toBe(
-      `${LAN.url}/api/media/7/file?t=${encodeURIComponent('a b/c+d=')}`,
+      `${LAN.url}/api/media/7/file?t=${encodeURIComponent('a b/c+d=')}&purpose=download`,
     )
   })
 

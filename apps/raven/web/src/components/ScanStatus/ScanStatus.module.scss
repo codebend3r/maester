@@ -47,6 +47,44 @@
   }
 }
 
+// With nothing to measure against, a short stretch of the fill sweeps across,
+// so a long walk still shows it is moving.
+.bar:indeterminate {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-leaf-bright) 50%,
+    transparent 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 40% 100%;
+  background-position: 0 0;
+
+  &::-webkit-progress-bar {
+    background: transparent;
+  }
+
+  &::-moz-progress-bar {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bar:indeterminate {
+    animation: sweep 1.4s var(--ease-out) infinite;
+  }
+}
+
+@keyframes sweep {
+  from {
+    background-position: -40% 0;
+  }
+
+  to {
+    background-position: 140% 0;
+  }
+}
+
 .error {
   color: var(--color-bark);
   overflow-wrap: anywhere;

@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type AudioTrack,
+  type LiveDownload,
   type LiveStream,
   PLAYBACK_MODES,
   type PlaybackMode,
+  STREAM_PURPOSES,
   STREAM_QUALITIES,
   type StreamQuality,
   VIDEO_RANGE_LABELS,
@@ -11,6 +13,8 @@ import {
   codecLabel,
   codecWithProfile,
   formatBitrate,
+  formatByteRate,
+  formatBytes,
   formatChannels,
   formatDuration,
   mediaLabel,
@@ -33,6 +37,7 @@ import { api } from '@/lib/api'
 import { liveStreamsQuery, mediaStreamsQuery, tracksQuery } from '@/lib/queries'
 import { queryKeys } from '@raven/ui/headless'
 import styles from '@/pages/StreamsPage/StreamsPage.module.scss'
+import { PageTitle } from '@/components/PageTitle/PageTitle'
 
 const MODE_LABELS = {
   [PLAYBACK_MODES.direct]: 'Direct play',
@@ -101,7 +106,7 @@ type FactsProps = { title: string; facts: readonly Fact[] }
 /** A titled group of terms and values; a fact with no value is left out. */
 const Facts = ({ title, facts }: FactsProps) => (
   <section className={styles.panel}>
-    <h3 className={styles.panelTitle}>{title}</h3>
+    <h4 className={styles.panelTitle}>{title}</h4>
     <dl className={styles.facts}>
       {facts.flatMap(({ term, value }) =>
         value == null
@@ -195,6 +200,63 @@ const StreamDetails = ({ id, stream, track }: StreamDetailsProps) => {
   )
 }
 
+type UseStopProps = { stream: LiveStream }
+
+/** Stop cuts the connections; the client is free to ask again, and the list shows it if it does. */
+const useStop = ({ stream }: UseStopProps) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.stopStream(stream.id),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.liveStreams }),
+  })
+}
+
+type CardTopProps = { stream: LiveStream; title: string }
+
+/** A card's picture, its name and who is asking for it, from where. */
+const CardTop = ({ stream, title }: CardTopProps) => {
+  const thumbnail = api.thumbnailUrl(stream.media)
+  return (
+    <>
+      <span className={styles.frame}>
+        {thumbnail && (
+          <img
+            className={styles.thumbnail}
+            src={thumbnail}
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
+        )}
+      </span>
+      <hgroup className={styles.naming}>
+        <h3 className={styles.title}>{title}</h3>
+        <p className={styles.byline}>
+          {stream.viewer != null && (
+            <>
+              <span className={styles.avatar} aria-hidden="true">
+                {stream.viewer.charAt(0).toUpperCase()}
+              </span>{' '}
+            </>
+          )}
+          <span>{watcherWords({ stream })}</span>
+          <span aria-hidden="true"> · </span>
+          <span>{stream.libraryName}</span>
+        </p>
+      </hgroup>
+    </>
+  )
+}
+
+type StopErrorProps = { error: Error | null }
+
+const StopError = ({ error }: StopErrorProps) =>
+  error != null && (
+    <p className={styles.error} role="alert">
+      Could not stop it: {error.message}
+    </p>
+  )
+
 type StreamRowProps = { stream: LiveStream }
 
 /**
@@ -205,48 +267,18 @@ type StreamRowProps = { stream: LiveStream }
  * the list shows it if it does.
  */
 const StreamRow = ({ stream }: StreamRowProps) => {
-  const queryClient = useQueryClient()
   const [isOpen, setIsOpen] = useState(false)
   const detailsId = useId()
   const tracks = useQuery(tracksQuery(stream.media.id))
-  const stop = useMutation({
-    mutationFn: () => api.stopStream(stream.id),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.liveStreams }),
-  })
+  const stop = useStop({ stream })
   const title = mediaLabel(stream.media)
-  const thumbnail = api.thumbnailUrl(stream.media)
   const track = tracks.data?.audio.find(({ index }) => index === stream.audio) ?? null
   const rate = formatBitrate(stream.sendRate)
 
   return (
     <li className={styles.row}>
       <div className={styles.overview}>
-        <span className={styles.frame}>
-          {thumbnail && (
-            <img
-              className={styles.thumbnail}
-              src={thumbnail}
-              alt=""
-              loading="lazy"
-              decoding="async"
-            />
-          )}
-        </span>
-        <hgroup className={styles.naming}>
-          <h2 className={styles.title}>{title}</h2>
-          <p className={styles.byline}>
-            {stream.viewer != null && (
-              <>
-                <span className={styles.avatar} aria-hidden="true">
-                  {stream.viewer.charAt(0).toUpperCase()}
-                </span>{' '}
-              </>
-            )}
-            <span>{watcherWords({ stream })}</span>
-            <span aria-hidden="true"> · </span>
-            <span>{stream.libraryName}</span>
-          </p>
-        </hgroup>
+        <CardTop stream={stream} title={title} />
         <ul className={styles.tags} aria-label="How it plays">
           <li className={styles.chip}>
             <ResolutionChip resolution={resolutionLabel(stream.media)} />
@@ -295,12 +327,149 @@ const StreamRow = ({ stream }: StreamRowProps) => {
         </div>
       </div>
       {isOpen && <StreamDetails id={detailsId} stream={stream} track={track} />}
-      {stop.isError && (
-        <p className={styles.error} role="alert">
-          Could not stop it: {stop.error.message}
-        </p>
-      )}
+      <StopError error={stop.error} />
     </li>
+  )
+}
+
+type DownloadRowProps = { stream: LiveDownload }
+
+/**
+ * One download as a card: its picture, name and who is fetching it, the
+ * picture's tags and the file's size, how much of the file has been sent
+ * and how fast it is coming, in megabytes a second, and Stop. A stopped
+ * download is the client's to resume, and the list shows it if it does.
+ */
+const DownloadRow = ({ stream }: DownloadRowProps) => {
+  const stop = useStop({ stream })
+  const amountId = useId()
+  const title = mediaLabel(stream.media)
+  const { size } = stream.media
+  const { received } = stream
+
+  return (
+    <li className={styles.row}>
+      <div className={styles.overview}>
+        <CardTop stream={stream} title={title} />
+        <ul className={styles.tags} aria-label="What it downloads">
+          <li className={styles.chip}>
+            <ResolutionChip resolution={resolutionLabel(stream.media)} />
+          </li>
+          {stream.media.hdr && (
+            <li className={styles.chip}>
+              <PictureChip>HDR</PictureChip>
+            </li>
+          )}
+          <li className={styles.tag}>{formatBytes(size)}</li>
+        </ul>
+        <div className={styles.download}>
+          <progress
+            className={styles.gauge}
+            max={size}
+            value={received}
+            aria-labelledby={amountId}
+          />
+          <p id={amountId} className={styles.time}>
+            {`${formatBytes(received)} of ${formatBytes(size)}`}
+          </p>
+          <p className={styles.rate}>
+            <span className="visually-hidden">Download rate </span>
+            {formatByteRate(stream.sendRate) ?? 'Measuring'}
+          </p>
+        </div>
+        <div className={styles.actions}>
+          <Button
+            tone="danger"
+            icon="close"
+            disabled={stop.isPending}
+            onClick={() => stop.mutate()}
+          >
+            <span aria-hidden="true">Stop</span>
+            <span className="visually-hidden">
+              Stop downloading {title} to {stream.device}
+            </span>
+          </Button>
+        </div>
+      </div>
+      <StopError error={stop.error} />
+    </li>
+  )
+}
+
+type SectionProps = {
+  heading: string
+  /** How many there are, or the line for none. */
+  summary: string
+  children: ReactNode
+}
+
+/** One kind of stream under its heading and count, its cards below when it has any. */
+const Section = ({ heading, summary, children }: SectionProps) => {
+  const headingId = useId()
+  return (
+    <section className={styles.section} aria-labelledby={headingId}>
+      <hgroup className={styles.heading}>
+        <h2 id={headingId} className={styles.sectionTitle}>
+          {heading}
+        </h2>
+        <p className={styles.summary}>{summary}</p>
+      </hgroup>
+      {children}
+    </section>
+  )
+}
+
+type CountedProps = { n: number; one: string; many: string; none: string }
+
+const counted = ({ n, one, many, none }: CountedProps): string =>
+  n === 0 ? none : plural({ n, one, many })
+
+const isDownload = (stream: LiveStream): stream is LiveDownload =>
+  stream.purpose === STREAM_PURPOSES.download
+
+type SectionsProps = { streams: readonly LiveStream[] }
+
+/** The streams being watched over the downloads, each kind in a section of its own. */
+const Sections = ({ streams }: SectionsProps) => {
+  const downloads = streams.filter(isDownload)
+  const plays = streams.filter((stream) => !isDownload(stream))
+  return (
+    <>
+      <Section
+        heading="Streaming"
+        summary={counted({
+          n: plays.length,
+          one: 'stream',
+          many: 'streams',
+          none: 'Nobody is streaming right now',
+        })}
+      >
+        {plays.length > 0 && (
+          <ul className={styles.list}>
+            {plays.map((stream) => (
+              <StreamRow key={stream.id} stream={stream} />
+            ))}
+          </ul>
+        )}
+      </Section>
+      <Section
+        heading="Downloading"
+        summary={counted({
+          n: downloads.length,
+          one: 'download',
+          many: 'downloads',
+          none: 'Nothing is downloading right now',
+        })}
+      >
+        {downloads.length > 0 && (
+          <ul className={styles.list}>
+            {downloads.map((stream) => (
+              <DownloadRow key={stream.id} stream={stream} />
+            ))}
+          </ul>
+        )}
+      </Section>
+    </>
   )
 }
 
@@ -319,9 +488,11 @@ const RowsSkeleton = () => (
 )
 
 /**
- * `/streams`: what the server is sending right now, one card per viewer and
- * video, newest last, with who is watching, on what, how it plays and how
- * far along it is, and Stop on each. It is for the admin, or the owner once
+ * `/streams`: what the server is sending right now, in two sections: the
+ * streams being watched, one card per viewer and video, newest last, with
+ * who is watching, on what, how it plays and how far along it is, and the
+ * downloads Raven is fetching, with how much has come and how fast. Each
+ * card has Stop. It is for the admin, or the owner once
  * accounts are on, so it asks only while the viewer may manage, and says so
  * otherwise. The list is read every couple of seconds.
  */
@@ -344,26 +515,11 @@ export const StreamsPage = () => {
     <section className={styles.page}>
       <header className={styles.header}>
         <BackButton fallback={HOME} className={styles.back} />
-        <hgroup className={styles.heading}>
-          <h1>Streams</h1>
-          {streams.data && (
-            <p className={styles.summary}>
-              {streams.data.length === 0
-                ? 'Nobody is streaming right now'
-                : plural({ n: streams.data.length, one: 'stream', many: 'streams' })}
-            </p>
-          )}
-        </hgroup>
+        <PageTitle icon="playback">Streams</PageTitle>
       </header>
       {streams.isError && <p role="alert">The server did not answer: {streams.error.message}</p>}
       {streams.isPending && <RowsSkeleton />}
-      {streams.data && streams.data.length > 0 && (
-        <ul className={styles.list}>
-          {streams.data.map((stream) => (
-            <StreamRow key={stream.id} stream={stream} />
-          ))}
-        </ul>
-      )}
+      {streams.data && <Sections streams={streams.data} />}
     </section>
   )
 }

@@ -11,7 +11,7 @@ import userEvent from '@testing-library/user-event'
 import { api } from '@/lib/api'
 import { StreamsPage } from '@/pages/StreamsPage/StreamsPage'
 import { fakeAccount } from '@/test/authClient'
-import { itemSummary, liveStream, mediaItem } from '@/test/fixtures'
+import { itemSummary, liveDownload, liveStream, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
 const TRACKS: MediaTracks = {
@@ -182,10 +182,47 @@ describe('StreamsPage', () => {
     expect(await screen.findByText('Starting')).toBeInTheDocument()
   })
 
-  it('says so when nobody is streaming', async () => {
+  it('says so when nobody is streaming and nothing is downloading', async () => {
     spies.list.mockImplementation(async () => [])
     renderWithProviders({ ui: <StreamsPage /> })
     expect(await screen.findByText('Nobody is streaming right now')).toBeInTheDocument()
+    expect(screen.getByText('Nothing is downloading right now')).toBeInTheDocument()
+  })
+
+  it('lists a download under Downloading, apart from the streams, with how much has come and how fast', async () => {
+    spies.list.mockImplementation(async () => [
+      liveStream({ id: 'watching' }),
+      liveDownload({
+        id: 'fetching',
+        media: mediaItem({ title: 'Slow Horses', size: 4_000_000_000 }),
+        received: 1_000_000_000,
+        sendRate: 99_200_000,
+      }),
+    ])
+    renderWithProviders({ ui: <StreamsPage /> })
+
+    const streaming = await screen.findByRole('region', { name: 'Streaming' })
+    const downloading = screen.getByRole('region', { name: 'Downloading' })
+    expect(within(streaming).getByText('1 stream')).toBeInTheDocument()
+    expect(within(downloading).getByText('1 download')).toBeInTheDocument()
+    expect(within(streaming).queryByText(/Slow Horses/)).toBeNull()
+    expect(within(downloading).getByRole('heading', { name: /Slow Horses/ })).toBeInTheDocument()
+    expect(within(downloading).getByText('1.0 GB of 4.0 GB')).toBeInTheDocument()
+    expect(within(downloading).getByRole('progressbar')).toHaveAttribute('value', '1000000000')
+    expect(within(downloading).getByText('12.4 MB/s')).toBeInTheDocument()
+  })
+
+  it('says Measuring until a download has a rate, and stops it by its id', async () => {
+    spies.list.mockImplementation(async () => [liveDownload({ id: 'fetching' })])
+    spies.stop.mockImplementation(async () => undefined)
+    renderWithProviders({ ui: <StreamsPage /> })
+    expect(await screen.findByText('Measuring')).toBeInTheDocument()
+
+    spies.list.mockImplementation(async () => [])
+    await userEvent.click(screen.getByRole('button', { name: /^Stop downloading .* to Mac$/ }))
+
+    expect(spies.stop).toHaveBeenCalledWith('fetching')
+    expect(await screen.findByText('Nothing is downloading right now')).toBeInTheDocument()
   })
 
   it('stops a stream by its id and reads the list again', async () => {

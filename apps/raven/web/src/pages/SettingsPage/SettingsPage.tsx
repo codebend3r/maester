@@ -38,6 +38,7 @@ import { UsersSection } from '@/pages/SettingsPage/UsersSection'
 import { useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
+import { PageTitle } from '@/components/PageTitle/PageTitle'
 
 const TITLES: Choices<DisplaySettings['titles']> = {
   logo: {
@@ -212,9 +213,9 @@ const OfflineSettings = () => {
   return (
     <section className={styles.page} aria-labelledby={titleId}>
       <header className={styles.header}>
-        <h1 id={titleId} className={styles.title}>
+        <PageTitle id={titleId} icon="settings" className={styles.title}>
           Settings
-        </h1>
+        </PageTitle>
       </header>
       <DesktopSettings />
       <AdvancedSection />
@@ -296,9 +297,9 @@ const ServerSettings = () => {
     <section className={styles.page} aria-labelledby={titleId}>
       <header className={styles.header}>
         <BackButton fallback={HOME} className={styles.back} />
-        <h1 id={titleId} className={styles.title}>
+        <PageTitle id={titleId} icon="settings" className={styles.title}>
           Settings
-        </h1>
+        </PageTitle>
         <AdminOnly>
           {settings &&
             (isConfirming ? (

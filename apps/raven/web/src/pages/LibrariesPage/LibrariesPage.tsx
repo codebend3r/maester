@@ -31,6 +31,7 @@ import { useLibraryOrdering } from '@/lib/useLibraryOrdering'
 import { librariesQuery, lockQuery } from '@/lib/queries'
 import { OrderedLibraries } from '@/pages/LibrariesPage/OrderedLibraries'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
+import { PageTitle } from '@/components/PageTitle/PageTitle'
 
 const count = new Intl.NumberFormat()
 
@@ -188,7 +189,7 @@ const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
               </ul>
             )}
             <div className={styles.status}>
-              <ScanStatus scan={library.scan} />
+              <ScanStatus scan={library.scan} expected={library.itemCount} />
               <RatingsStatus refresh={library.ratingsRefresh} />
               <LibraryActionErrors actions={actions} className={styles.error} />
               <AdminOnly>
@@ -309,7 +310,7 @@ export const LibrariesPage = () => {
       <header className={styles.header}>
         <BackButton fallback={HOME} className={styles.back} />
         <hgroup className={styles.heading}>
-          <h1>Libraries</h1>
+          <PageTitle icon="libraries">Libraries</PageTitle>
           {libraries.data && <p className={styles.summary}>{summaryOf(libraries.data)}</p>}
         </hgroup>
         <AdminOnly>

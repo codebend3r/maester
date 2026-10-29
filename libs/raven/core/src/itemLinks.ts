@@ -16,7 +16,11 @@ import { type Infer, object } from '@/schema'
 export type AppPath = `/${string}`
 
 /** The app's pages that raven names from outside a page's own links: the desktop menu and links. */
-export const PAGE_PATHS = { settings: '/settings', watch: '/watch' } as const
+export const PAGE_PATHS = {
+  settings: '/settings',
+  shortcuts: '/shortcuts',
+  watch: '/watch',
+} as const
 
 /** The page that plays a video. */
 export const watchPageOf = (mediaId: number): AppPath => `${PAGE_PATHS.watch}/${mediaId}`

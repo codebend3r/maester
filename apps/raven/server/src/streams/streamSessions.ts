@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
-import type { Account, PlaybackMode, StreamQuality } from '@raven/core'
+import {
+  type Account,
+  type PlaybackMode,
+  STREAM_PURPOSES,
+  type StreamPurpose,
+  type StreamQuality,
+} from '@raven/core'
 
 /**
  * Who is asking: where the requests come from, what the client calls
@@ -28,8 +34,15 @@ const RATE_WINDOW_MS = 10_000
 /** The bytes a stream had sent by a moment, for the rate between two of them. */
 type Sample = { at: number; sent: number }
 
+/**
+ * An open response's byte counts: what its socket had written when it
+ * opened and at the last look, and the file offset it started at.
+ */
+type Tracked = { first: number; last: number; from: number }
+
 type Session = {
   id: string
+  purpose: StreamPurpose
   mediaId: number
   mode: PlaybackMode
   quality: StreamQuality | null
@@ -40,13 +53,16 @@ type Session = {
   audio: number | null
   /** Bytes sent across every response so far, closed ones included. */
   sent: number
+  /** The furthest offset into the file any response has reached. */
+  reached: number
   samples: Sample[]
-  connections: Map<StreamConnection, number>
+  connections: Map<StreamConnection, Tracked>
 }
 
 export type StreamSession = Pick<
   Session,
   | 'id'
+  | 'purpose'
   | 'mediaId'
   | 'mode'
   | 'quality'
@@ -58,13 +74,23 @@ export type StreamSession = Pick<
 > & {
   /** Bits per second over the last `RATE_WINDOW_MS`, or null until two looks apart. */
   sendRate: number | null
+  /** The furthest offset into the file sent so far. */
+  reached: number
 }
 
-type KeyOfProps = { mediaId: number; client: StreamClient }
+type KeyOfProps = { purpose: StreamPurpose; mediaId: number; client: StreamClient }
 
-/** Two accounts on one browser are two streams. */
-const keyOf = ({ mediaId, client }: KeyOfProps): string =>
-  `${mediaId}\n${client.address}\n${client.userAgent}\n${client.viewer?.id ?? ''}`
+/** Two accounts on one browser are two streams, and a download beside a play of the same video is another. */
+const keyOf = ({ purpose, mediaId, client }: KeyOfProps): string =>
+  `${purpose}\n${mediaId}\n${client.address}\n${client.userAgent}\n${client.viewer?.id ?? ''}`
+
+type NoteProps = { session: Session; tracked: Tracked; written: number }
+
+/** Counts what a response wrote since the last look, and how far into the file that took it. */
+const note = ({ session, tracked, written }: NoteProps): void => {
+  session.sent += Math.max(0, written - tracked.last)
+  session.reached = Math.max(session.reached, tracked.from + written - tracked.first)
+}
 
 const rateOf = (samples: readonly Sample[]): number | null => {
   const first = samples.at(0)
@@ -74,12 +100,15 @@ const rateOf = (samples: readonly Sample[]): number | null => {
 }
 
 type StreamSessionsOpenProps = {
+  purpose: StreamPurpose
   mediaId: number
   mode: PlaybackMode
   quality: StreamQuality | null
   audio: number | null
   client: StreamClient
   connection: StreamConnection
+  /** The offset into the file the response starts at: its range's first byte, 0 for a whole file. */
+  from: number
   now?: number
 }
 
@@ -113,17 +142,20 @@ export class StreamSessions {
    * play, which leaves the one the player last reported.
    */
   open({
+    purpose,
     mediaId,
     mode,
     quality,
     audio,
     client,
     connection,
+    from,
     now = Date.now(),
   }: StreamSessionsOpenProps): () => void {
-    const key = keyOf({ mediaId, client })
+    const key = keyOf({ purpose, mediaId, client })
     const session = this.sessions.get(key) ?? {
       id: randomUUID(),
+      purpose,
       mediaId,
       mode,
       quality,
@@ -133,19 +165,22 @@ export class StreamSessions {
       position: null,
       audio,
       sent: 0,
+      reached: 0,
       samples: [{ at: now, sent: 0 }],
-      connections: new Map<StreamConnection, number>(),
+      connections: new Map<StreamConnection, Tracked>(),
     }
     session.mode = mode
     session.quality = quality
     session.audio = audio ?? session.audio
     session.lastSeenAt = now
-    session.connections.set(connection, connection.written())
+    const written = connection.written()
+    session.connections.set(connection, { first: written, last: written, from })
+    session.reached = Math.max(session.reached, from)
     this.sessions.set(key, session)
     return () => {
       // A range request may close between two looks; what it sent still counts.
-      const before = session.connections.get(connection)
-      if (before != null) session.sent += Math.max(0, connection.written() - before)
+      const tracked = session.connections.get(connection)
+      if (tracked != null) note({ session, tracked, written: connection.written() })
       session.connections.delete(connection)
     }
   }
@@ -156,7 +191,7 @@ export class StreamSessions {
    * stopped.
    */
   report({ mediaId, client, position, audio, now = Date.now() }: StreamSessionsReportProps): void {
-    const session = this.sessions.get(keyOf({ mediaId, client }))
+    const session = this.sessions.get(keyOf({ purpose: STREAM_PURPOSES.play, mediaId, client }))
     if (session == null) return
     session.position = position
     session.audio = audio ?? session.audio
@@ -174,6 +209,7 @@ export class StreamSessions {
       .map(
         ({
           id,
+          purpose,
           mediaId,
           mode,
           quality,
@@ -183,8 +219,10 @@ export class StreamSessions {
           position,
           audio,
           samples,
+          reached,
         }) => ({
           id,
+          purpose,
           mediaId,
           mode,
           quality,
@@ -194,6 +232,7 @@ export class StreamSessions {
           position,
           audio,
           sendRate: rateOf(samples),
+          reached,
         }),
       )
   }
@@ -214,11 +253,11 @@ export class StreamSessions {
    * Each look also notes the bytes sent so far, for the send rate.
    */
   private sample({ session, now }: StreamSessionsSampleProps): void {
-    session.connections.forEach((before, connection) => {
+    session.connections.forEach((tracked, connection) => {
       const written = connection.written()
-      if (written === before) return
-      session.sent += written - before
-      session.connections.set(connection, written)
+      if (written === tracked.last) return
+      note({ session, tracked, written })
+      session.connections.set(connection, { ...tracked, last: written })
       session.lastSeenAt = now
     })
     session.samples = [
