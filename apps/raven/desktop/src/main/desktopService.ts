@@ -41,6 +41,7 @@ import type { StateStore, Timers } from '@/main/stateStore'
 import { UPDATE_COPY, type UpdateService } from '@/main/updateService'
 import { MAX_QUEUE } from '@/shared/hostNames'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
+import type { WindowResizeMove, WindowResizeStart } from '@/main/windowChrome'
 
 export const MESSAGES = {
   notVideo: 'Raven opens video files only.',
@@ -75,6 +76,8 @@ export type DesktopServiceDeps = {
   }
   setWindowButtons: (isVisible: boolean) => void
   controlWindow: (action: WindowAction) => void
+  startWindowResize: (start: WindowResizeStart) => void
+  moveWindowResize: (move: WindowResizeMove) => void
   config: ConfigStore
   links: LinkOpener
   updates: UpdateService
@@ -386,6 +389,12 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return DONE
       case DESKTOP_REQUESTS.windowControl:
         deps.controlWindow(request.action)
+        return DONE
+      case DESKTOP_REQUESTS.startWindowResize:
+        deps.startWindowResize({ edge: request.edge, at: { x: request.x, y: request.y } })
+        return DONE
+      case DESKTOP_REQUESTS.moveWindowResize:
+        deps.moveWindowResize({ to: { x: request.x, y: request.y } })
         return DONE
       case DESKTOP_REQUESTS.readOutput:
         return { type: DESKTOP_REPLIES.output, ...(await deps.output.read()) }

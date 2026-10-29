@@ -311,6 +311,7 @@ const setup = ({
   const written: OutputSettings[] = []
   const buttons: boolean[] = []
   const windowActions: string[] = []
+  const resizes: unknown[] = []
   const spies = {
     recentDocuments,
     cleared: 0,
@@ -320,6 +321,7 @@ const setup = ({
     written,
     buttons,
     windowActions,
+    resizes,
   }
   const clock = { now: 5000 }
   const statCalls: string[] = []
@@ -446,6 +448,12 @@ const setup = ({
     },
     controlWindow: (action) => {
       spies.windowActions.push(action)
+    },
+    startWindowResize: (start) => {
+      spies.resizes.push(start)
+    },
+    moveWindowResize: (move) => {
+      spies.resizes.push(move)
     },
   })
   return {
@@ -978,6 +986,34 @@ describe('windowControl', () => {
       await service.handle({ kind: 'page', request: { type: 'windowControl', action: 'hide' } }),
     ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
     expect(spies.windowActions).toEqual([])
+  })
+})
+
+describe('window resize', () => {
+  it('passes a drag on a resize handle on as an edge and screen points', async () => {
+    const { service, spies } = setup({ files: {} })
+    expect(
+      await service.handle({
+        kind: 'page',
+        request: { type: 'startWindowResize', edge: 'bottomRight', x: 900, y: 700 },
+      }),
+    ).toEqual({ type: 'done' })
+    await service.handle({ kind: 'page', request: { type: 'moveWindowResize', x: 940, y: 690 } })
+    expect(spies.resizes).toEqual([
+      { edge: 'bottomRight', at: { x: 900, y: 700 } },
+      { to: { x: 940, y: 690 } },
+    ])
+  })
+
+  it('refuses an edge it does not know', async () => {
+    const { service, spies } = setup({ files: {} })
+    expect(
+      await service.handle({
+        kind: 'page',
+        request: { type: 'startWindowResize', edge: 'middle', x: 0, y: 0 },
+      }),
+    ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
+    expect(spies.resizes).toEqual([])
   })
 })
 

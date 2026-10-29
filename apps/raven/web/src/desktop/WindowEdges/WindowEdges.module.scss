@@ -1,0 +1,59 @@
+// A frame of handles around the window, each the thickness of a native resize border.
+// The frame lets every click through; only the handles take the pointer, above the
+// window controls and the strip that drags the window.
+.edges {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  grid-template:
+    'top-left top top-right' var(--space-0)
+    'left . right' 1fr
+    'bottom-left bottom bottom-right' var(--space-0) / var(--space-0) 1fr var(--space-0);
+  pointer-events: none;
+}
+
+.handle {
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.top {
+  grid-area: top;
+  cursor: ns-resize;
+}
+
+.bottom {
+  grid-area: bottom;
+  cursor: ns-resize;
+}
+
+.left {
+  grid-area: left;
+  cursor: ew-resize;
+}
+
+.right {
+  grid-area: right;
+  cursor: ew-resize;
+}
+
+.topLeft {
+  grid-area: top-left;
+  cursor: nwse-resize;
+}
+
+.bottomRight {
+  grid-area: bottom-right;
+  cursor: nwse-resize;
+}
+
+.topRight {
+  grid-area: top-right;
+  cursor: nesw-resize;
+}
+
+.bottomLeft {
+  grid-area: bottom-left;
+  cursor: nesw-resize;
+}

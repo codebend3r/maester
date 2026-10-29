@@ -25,14 +25,15 @@ branch. After a bottom PR merges, the rest restack with `rebase-stack`.
 | 6   | #314         | `raven-windows-packaging` | `raven-windows-main`      | Windows port 5 of 6: `stage:mpv` by platform, a Windows installer maker, `bundleAudit` for PE files, `releaseAssets` adds the setup `.exe` (unsigned)                                                                           | Opus 5.5   | high   | 4 to 5 h      |
 | 7   | #315         | `raven-windows-ci`        | `raven-windows-packaging` | Windows port 6 of 6: the Windows jobs run `make`, the audit and the smoke on top of the native tests (e2e stays macOS-only), a Windows build in `desktop-release.yml`, Windows notes in `CLAUDE.md` and the desktop spec        | Sonnet 5.5 | medium | 2 to 3 h      |
 | 8   | #320         | `raven-windows-splash`    | `raven-windows-ci`        | The splash offers the Windows download: files read by a table of release name suffixes, the button names the visitor's platform and lists its files first                                                                       | Opus 5.5   | medium | 1 h (spent)   |
+| 9   | #322         | `raven-windows-resize`    | `raven-windows-splash`    | Resize handles for the frameless window: eight page-drawn edge and corner handles capture the pointer and send screen points; main resizes from the bounds the drag started at, down to the minimum size                        | Opus 5.5   | medium | 2 to 3 h      |
 
-Each PR also costs one review (RTime). Stack total: about 24 h of work plus 8 × RTime.
+Each PR also costs one review (RTime). Stack total: about 27 h of work plus 9 × RTime.
 
 ## Gates and caveats
 
 - **The real-GPU check gates rows 4 to 7.** The spike (`raven-windows-spike`, never merged) proved on `windows-2025`, which renders with WARP, that mpv in the BrowserWindow's own HWND draws under a transparent Electron page and the page keeps the mouse. It has not run on a physical Windows GPU. If a real GPU reorders the stacking, the fallback is mpv's render API into a shared texture Chromium composites: a new row of 2 to 3 days.
 - The Windows packaged app (installer, zip, audit and smoke) passed on `windows-2025` on #314; that runner has no physical GPU, so the check above still stands.
-- **A transparent frameless window on Windows has no native resize edges or Snap layouts** (row 4's window): the page needs its own resize handles, in row 5 or a row of its own.
+- **A transparent frameless window on Windows has no native resize edges or Snap layouts** (row 4's window): row 9 draws the page's own resize handles; Snap layouts stay out of reach without a native frame.
 - **Row 3 carries the variance**: up to 10 h if MSVC fights the MinGW-built DLL's import library or the N-API headers.
 - Intel Macs are out of scope (last shipped 2020; macOS 26 is the last release for them).
 - The Netlify site `maester` for row 1 has to be created by hand: base directory the repo root, package directory `apps/raven/splash`.

@@ -221,14 +221,16 @@ export const openWindow = ({
   })
 
   const remember = (): void => {
-    // Full screen and minimised bounds are not where the window should reopen.
-    if (window.isFullScreen() || window.isMinimized()) return
+    // Full screen, maximized and minimised bounds are not where the window should reopen.
+    if (window.isFullScreen() || window.isMaximized() || window.isMinimized()) return
     const current = window.getBounds()
     const displayId = screen.getDisplayMatching(current).id
     store.update((state) => setWindowBounds({ state, bounds: { ...current, displayId } }))
   }
   window.on('moved', remember)
-  window.on('resized', remember)
+  // Not 'resized': on Windows that fires only after a native resize, never after the
+  // setBounds a page-drawn resize handle drives. The store debounces the writes.
+  window.on('resize', remember)
 
   window
     .loadURL(`${PAGE_ORIGIN}/`)
