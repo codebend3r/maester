@@ -11,6 +11,7 @@ import { useId, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button } from '@raven/ui'
 import {
+  AUTOPLAY_COUNTDOWN_SECONDS,
   edit,
   mutationKeys,
   queryKeys,
@@ -109,32 +110,80 @@ const ENCODER_NAMES = {
   videotoolbox: 'VideoToolbox',
 }
 
+type BrowserPlaybackProps = { isDesktop: boolean }
+
 /**
- * Playback that this browser keeps for itself. Off by default: a page cannot
- * tell whether Raven is installed, and a `raven://` link nothing
- * handles does nothing in Chrome and shows an error in Safari.
+ * Playback that this browser, or Raven, keeps for itself: autoplay and how
+ * long its countdown runs, and in a browser Open videos in Raven. That is
+ * off by default: a page cannot tell whether Raven is installed, and a
+ * `raven://` link nothing handles does nothing in Chrome and shows an error
+ * in Safari.
  */
-const BrowserPlayback = () => {
+const BrowserPlayback = ({ isDesktop }: BrowserPlaybackProps) => {
+  const countdownId = useId()
   const opensInRavenPlayer = usePlayerPrefs((prefs) => prefs.opensInRavenPlayer)
   const setOpensInRavenPlayer = usePlayerPrefs((prefs) => prefs.setOpensInRavenPlayer)
+  const autoplay = usePlayerPrefs((prefs) => prefs.autoplay)
+  const setAutoplay = usePlayerPrefs((prefs) => prefs.setAutoplay)
+  const countdownSeconds = usePlayerPrefs((prefs) => prefs.autoplayCountdownSeconds)
+  const setCountdownSeconds = usePlayerPrefs((prefs) => prefs.setAutoplayCountdownSeconds)
+  const countdownWords = `${countdownSeconds} seconds`
   // Headed rather than grouped: the section's groups are the server's settings.
   return (
     <section className={styles.setting}>
       <h3 className={styles.subheading}>
-        <Titled icon="globe">This browser</Titled>
+        <Titled icon="globe">{isDesktop ? 'This app' : 'This browser'}</Titled>
       </h3>
       <label className={styles.choice}>
         <input
           type="checkbox"
-          checked={opensInRavenPlayer}
-          onChange={(event) => setOpensInRavenPlayer(event.target.checked)}
+          checked={autoplay}
+          onChange={(event) => setAutoplay(event.target.checked)}
         />
-        <span className={styles.choiceLabel}>Open videos in Raven</span>
+        <span className={styles.choiceLabel}>Autoplay</span>
         <span className={styles.choiceHint}>
-          Offers Raven for videos this browser cannot play, in the player's settings, and Download
-          to Raven on a title's page. Turn it on only where Raven is installed.
+          Plays the next episode, the saga's next film or the shuffle's next pick once the countdown
+          at the end runs out. Off, the up next card waits for Play now.
         </span>
       </label>
+      <label htmlFor={countdownId} className={styles.legend}>
+        <Titled icon="playback">Count down to what is up next for</Titled>
+      </label>
+      <div className={styles.slider}>
+        <input
+          id={countdownId}
+          type="range"
+          className={styles.range}
+          min={AUTOPLAY_COUNTDOWN_SECONDS.min}
+          max={AUTOPLAY_COUNTDOWN_SECONDS.max}
+          step={1}
+          value={countdownSeconds}
+          aria-valuetext={countdownWords}
+          onChange={(event) => setCountdownSeconds(Number(event.target.value))}
+        />
+        {/* The slider's own value text says it to a screen reader. */}
+        <span className={styles.sliderValue} aria-hidden="true">
+          {countdownWords}
+        </span>
+      </div>
+      <p className={styles.hint}>
+        How long before the end the up next card shows, and with autoplay on how long it counts
+        down, from {AUTOPLAY_COUNTDOWN_SECONDS.min} to {AUTOPLAY_COUNTDOWN_SECONDS.max} seconds.
+      </p>
+      {!isDesktop && (
+        <label className={styles.choice}>
+          <input
+            type="checkbox"
+            checked={opensInRavenPlayer}
+            onChange={(event) => setOpensInRavenPlayer(event.target.checked)}
+          />
+          <span className={styles.choiceLabel}>Open videos in Raven</span>
+          <span className={styles.choiceHint}>
+            Offers Raven for videos this browser cannot play, in the player's settings, and Download
+            to Raven on a title's page. Turn it on only where Raven is installed.
+          </span>
+        </label>
+      )}
     </section>
   )
 }
@@ -283,7 +332,7 @@ const ServerSettings = () => {
         query={playback}
         shape={<SettingsSkeleton count={Object.keys(DEFAULT_PLAYBACK_SETTINGS).length} />}
         saveError={save.failure}
-        browser={!isDesktop && <BrowserPlayback />}
+        browser={<BrowserPlayback isDesktop={isDesktop} />}
       >
         {({ settings: current, effective }) => (
           <>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   cardTitle,
   episodeCode,
+  episodePlace,
   formatScore,
   itemLabel,
   mediaLabel,
@@ -100,6 +101,28 @@ describe('mediaLabel and cardTitle', () => {
     })
     expect(cardTitle(episode)).toEqual({ title: mediaLabel(episode), year: null })
     expect(cardTitle(episode).title).toContain('The Acolyte')
+  })
+})
+
+describe('episodePlace', () => {
+  const episode = (season: number) =>
+    mediaItem({
+      item: itemSummary({
+        type: ITEM_TYPES.episode,
+        show: { id: 3, title: 'The Acolyte' },
+        season,
+        episode: 4,
+      }),
+    })
+
+  it('names the season and episode, and a special by its number alone', () => {
+    expect(episodePlace(episode(2))).toBe('Season 2, Episode 4')
+    expect(episodePlace(episode(0))).toBe('Special 4')
+  })
+
+  it('names nothing for a film or an unmatched file', () => {
+    expect(episodePlace(mediaItem({ item: itemSummary() }))).toBeNull()
+    expect(episodePlace(mediaItem({ title: 'Clip' }))).toBeNull()
   })
 })
 

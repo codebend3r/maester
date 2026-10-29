@@ -8,9 +8,17 @@ export const PLAYER_PREFS_KEY = 'raven-player'
 /** How many seconds the player's controls linger once nothing stirs: the slider's ends and where it starts. */
 export const CONTROLS_LINGER_SECONDS = { min: 3, max: 10, initial: 5 } as const
 
-/** A whole number of seconds within the slider's ends. */
-const withinLinger = (seconds: number): number =>
-  Math.min(CONTROLS_LINGER_SECONDS.max, Math.max(CONTROLS_LINGER_SECONDS.min, Math.round(seconds)))
+/** How many seconds the countdown to what is up next runs: the slider's ends and where it starts. */
+export const AUTOPLAY_COUNTDOWN_SECONDS = { min: 5, max: 60, initial: 15 } as const
+
+type WithinProps = {
+  seconds: number
+  range: { min: number; max: number }
+}
+
+/** A whole number of seconds within a slider's ends. */
+const within = ({ seconds, range }: WithinProps): number =>
+  Math.min(range.max, Math.max(range.min, Math.round(seconds)))
 
 type SetVolumeProps = { volume: number; muted: boolean }
 
@@ -29,8 +37,10 @@ type PlayerPrefs = {
   opensInRavenPlayer: boolean
   /** How many seconds the controls and cursor linger after the last mouse move, key press or click. */
   controlsLingerSeconds: number
-  /** Whether what is up next starts by itself once the video ends. */
+  /** Whether what is up next starts by itself once the countdown to it runs out. */
   autoplay: boolean
+  /** How many seconds the countdown to what is up next runs before it plays. */
+  autoplayCountdownSeconds: number
   setVolume: ({ volume, muted }: SetVolumeProps) => void
   setCaptionScale: (captionScale: number) => void
   setSubtitles: (subtitles: SetSubtitlesProps) => void
@@ -38,11 +48,12 @@ type PlayerPrefs = {
   setOpensInRavenPlayer: (isOn: boolean) => void
   setControlsLingerSeconds: (seconds: number) => void
   setAutoplay: (isOn: boolean) => void
+  setAutoplayCountdownSeconds: (seconds: number) => void
 }
 
 /**
- * Volume, subtitles, audio language, how long the controls linger and
- * autoplay carry over from one video to the next, and across visits.
+ * Volume, subtitles, audio language, how long the controls linger,
+ * autoplay and its countdown carry over from one video to the next, and across visits.
  */
 export const usePlayerPrefs = create<PlayerPrefs>()(
   devtools(
@@ -56,14 +67,19 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         opensInRavenPlayer: false,
         controlsLingerSeconds: CONTROLS_LINGER_SECONDS.initial,
         autoplay: true,
+        autoplayCountdownSeconds: AUTOPLAY_COUNTDOWN_SECONDS.initial,
         setVolume: ({ volume, muted }) => set({ volume, muted }),
         setCaptionScale: (captionScale) => set({ captionScale }),
         setSubtitles: (subtitles) => set({ subtitles }),
         setAudioLanguage: (audioLanguage) => set({ audioLanguage }),
         setOpensInRavenPlayer: (isOn) => set({ opensInRavenPlayer: isOn }),
         setControlsLingerSeconds: (seconds) =>
-          set({ controlsLingerSeconds: withinLinger(seconds) }),
+          set({ controlsLingerSeconds: within({ seconds, range: CONTROLS_LINGER_SECONDS }) }),
         setAutoplay: (isOn) => set({ autoplay: isOn }),
+        setAutoplayCountdownSeconds: (seconds) =>
+          set({
+            autoplayCountdownSeconds: within({ seconds, range: AUTOPLAY_COUNTDOWN_SECONDS }),
+          }),
       }),
       {
         name: PLAYER_PREFS_KEY,
@@ -78,6 +94,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           opensInRavenPlayer,
           controlsLingerSeconds,
           autoplay,
+          autoplayCountdownSeconds,
         }) => ({
           volume,
           muted,
@@ -87,6 +104,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           opensInRavenPlayer,
           controlsLingerSeconds,
           autoplay,
+          autoplayCountdownSeconds,
         }),
       },
     ),

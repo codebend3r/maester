@@ -1,6 +1,7 @@
 import { formatDuration } from '@raven/core'
 import { type ComponentPropsWithRef, type ReactNode, type RefObject, useId, useState } from 'react'
 import { Icon, type IconName } from '@/components/Icon/Icon'
+import { CountdownRing } from '@/components/Player/CountdownRing'
 import styles from '@/components/Player/Controls.module.scss'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
 import { Scrubber } from '@/components/Player/Scrubber'
@@ -155,21 +156,7 @@ const NextButton = ({ upNext, countdown, onNext }: NextButtonProps) => {
       disabled={upNext == null}
       onClick={onNext}
     >
-      {countdown != null && (
-        <svg className={styles.ring} viewBox="0 0 44 44" aria-hidden="true" focusable="false">
-          <circle className={styles.ringTrack} cx="22" cy="22" r="20" />
-          <circle
-            className={styles.ringFill}
-            cx="22"
-            cy="22"
-            r="20"
-            pathLength={1}
-            strokeDasharray={1}
-            strokeDashoffset={1 - countdown}
-            data-countdown={countdown}
-          />
-        </svg>
-      )}
+      {countdown != null && <CountdownRing countdown={countdown} />}
       <Icon name="skipNext" size={22} />
     </button>
   )
@@ -199,6 +186,8 @@ export type ControlsProps = {
   upNext: string | null
   /** How far the countdown to what is up next has run, 0 to 1; null while none runs. */
   countdown: number | null
+  /** The up next card, above the timeline at the right, while it shows. */
+  card?: ReactNode
   /**
    * "Ends at 2:20 AM": when the video ends at this speed; null while its
    * length is unknown. The bar shows the length until it is pressed.
@@ -217,7 +206,8 @@ export type ControlsProps = {
 }
 
 /**
- * The bar along the bottom: the time played beside the timeline, then the
+ * The bar along the bottom: the up next card at its right while it shows,
+ * the time played beside the timeline, then the
  * transport (back to the start, back 10 seconds, play, forward 10 seconds,
  * next) and the video's length or end time on the left, and volume and glass
  * icon pills for subtitles, audio, quality and full screen on the right.
@@ -239,6 +229,7 @@ export const Controls = ({
   settingsButton,
   upNext,
   countdown,
+  card,
   endsAt,
   onRestart,
   onNext,
@@ -258,7 +249,8 @@ export const Controls = ({
   }
   const fullscreenLabel = fullscreen ? 'Exit full screen' : 'Full screen'
   return (
-    <div className={classes(styles.controls, !shown && styles.hidden)}>
+    <div className={classes(styles.controls, !!card && styles.withCard, !shown && styles.hidden)}>
+      {!!card && <div className={styles.card}>{card}</div>}
       <div className={styles.timeline}>
         <span className={styles.elapsed}>{formatDuration(time)}</span>
         <Scrubber

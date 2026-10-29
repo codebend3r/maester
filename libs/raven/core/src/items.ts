@@ -44,6 +44,17 @@ export const mediaLabel = (media: MediaItem): string => {
   return media.year == null ? media.title : `${media.title} (${media.year})`
 }
 
+/**
+ * Where an episode falls in its show, as the up next card says it: "Season
+ * 2, Episode 4", or "Special 3" for season 0. Null for anything else.
+ */
+export const episodePlace = (media: MediaItem): string | null => {
+  const item = media.item
+  if (item?.type !== ITEM_TYPES.episode || item.season == null || item.episode == null) return null
+  if (item.season === 0) return `Special ${item.episode}`
+  return `Season ${item.season}, Episode ${item.episode}`
+}
+
 /** The version Play starts: a saved spot wins, so Play resumes where the viewer stopped, in whichever version. */
 export const primaryVersion = (versions: readonly MediaItem[]): MediaItem | undefined =>
   versions.find((version) => version.position > 0) ?? versions[0]

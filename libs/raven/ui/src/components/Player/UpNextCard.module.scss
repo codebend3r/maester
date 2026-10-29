@@ -1,0 +1,113 @@
+// Dark glass over the picture in every theme, as the rest of the player's
+// chrome is: the picture on the left, the words and the actions beside it.
+.card {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  grid-template-areas:
+    'poster lead'
+    'poster title'
+    'poster detail'
+    'poster countdown'
+    'poster actions';
+  gap: var(--space-0) var(--space-3);
+  align-content: start;
+  width: min(28rem, 100%);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-picture-glass);
+  color: var(--color-on-picture);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: var(--filter-glass);
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: rise 300ms var(--ease-out) backwards;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2));
+  }
+}
+
+.poster {
+  grid-area: poster;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+}
+
+.lead {
+  grid-area: lead;
+  color: var(--color-on-picture-soft);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.title {
+  grid-area: title;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  line-height: var(--line-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail {
+  grid-area: detail;
+  color: var(--color-on-picture-soft);
+  font-size: var(--font-size-sm);
+}
+
+.countdown {
+  grid-area: countdown;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+  align-items: center;
+  color: var(--color-on-picture-soft);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.ring {
+  display: grid;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.actions {
+  grid-area: actions;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
+}
+
+.dismiss {
+  color: var(--color-on-picture);
+}
+
+// On a phone the picture gives the words the room.
+@media (max-width: 30rem) {
+  .card {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'lead'
+      'title'
+      'detail'
+      'countdown'
+      'actions';
+  }
+
+  .poster {
+    display: none;
+  }
+}

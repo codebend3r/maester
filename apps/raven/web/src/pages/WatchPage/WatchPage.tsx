@@ -7,6 +7,7 @@ import {
   type RouteQuery,
   SESSION_KINDS,
   type ViewingSession,
+  episodePlace,
   mediaLabel,
   playLinkFor,
   readWatchState,
@@ -52,6 +53,9 @@ const LINK_LIFE = {
   account: `up to ${ACCOUNT_TICKET_SECONDS / 60} minutes`,
   legacy: `${MEDIA_TICKET_SECONDS / 3600} hours`,
 } as const
+
+/** Where a season played on its own looks for the next season's first episode. */
+const SHOW_SESSION = { kind: SESSION_KINDS.show } as const satisfies ViewingSession
 
 /** Where a video that cannot play goes back to. */
 const LIBRARIES_PATH = '/libraries'
@@ -150,9 +154,18 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
   const opensInRavenPlayer = usePlayerPrefs((prefs) => prefs.opensInRavenPlayer)
   const isShuffled = session.kind === SESSION_KINDS.queue
   const queued = isShuffled ? upNext : []
-  const found = useQuery(nextInSessionQuery({ id: media.id, session })).data ?? null
+  const inSession = useQuery(nextInSessionQuery({ id: media.id, session }))
+  const found = inSession.data ?? null
   const [first, ...after] = queued
   const next = first ?? found
+  // A season played on its own ends with its last episode; the show's next is then the next season's first.
+  const isSeasonOver = session.kind === SESSION_KINDS.season && inSession.data === null
+  const nextSeason =
+    useQuery({
+      ...nextInSessionQuery({ id: media.id, session: SHOW_SESSION }),
+      enabled: isSeasonOver,
+    }).data ?? null
+  const offered = next ?? (isSeasonOver ? nextSeason : null)
   const mediaPlane = useMediaPlane({ api, mediaId: media.id, reprobe: useReprobe() })
   useTicketFollowsSession({ mediaId: media.id })
   const hasAccounts = (useQuery(authConfigQuery).data?.state ?? null) === AUTH_CONFIG_STATES.ready
@@ -173,11 +186,14 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
       duration: media.duration,
       resumeAt: resumeAtFor({ at: 0, media }),
       backTo,
-      next: next
+      next: offered
         ? {
-            ...watchLink({ media: next, session, upNext: after }),
-            label: mediaLabel(next),
+            ...watchLink({ media: offered, session, upNext: after }),
+            label: mediaLabel(offered),
             isShuffled,
+            detail: episodePlace(offered),
+            posterUrl: api.thumbnailUrl(offered),
+            isNextSeason: next === null,
           }
         : null,
     },
