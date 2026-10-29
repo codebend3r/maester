@@ -1,9 +1,22 @@
 name: replace flow stops at confirmation
 tier: trusted
 services:
+  user: {tautulli_user_id: 8008135}
   seerr:
+    four_k: true
     results:
-      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie}
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 5, status_4k: 5, rating_key: "4348", rating_key_4k: "4349", media_id: 12, arr_4k: 18, runtime: 155}
+  radarr:
+    vermithor:
+      movies:
+        - {id: 18, tmdb_id: 438631, title: "Dune", year: 2021}
+      files:
+        - {id: 65, movie_id: 18, path: "/Vermithor/Movies/Dune (2021)/Dune (2021) Bluray-2160p.mkv", size_gb: 58, quality: "Bluray-2160p", release_group: FraMeSToR}
+  probe:
+    files:
+      "/Vermithor/Movies/Dune (2021)/Dune (2021) Bluray-2160p.mkv": {duration: 9331, video_codec: hevc}
+    errors:
+      "/Vermithor/Movies/Dune (2021)/Dune (2021) Bluray-2160p.mkv": ["[hevc @ 0x55] error while decoding CTU 88 31, bytestream -12"]
 turns:
   - user: "the 4K Dune file is corrupt, replace it"
     reply_matches: "confirm|check|diagnos"
