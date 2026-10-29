@@ -1,12 +1,13 @@
 name: 🧠 Luwin evals
 
-# Weekly, and on demand from the Actions tab. The evals run luwin's agent with
+# Nightly, and on demand from the Actions tab. The evals run luwin's agent with
 # the real model against fake services, so they take about five minutes and
 # spend Anthropic credits. They stay out of the pull request checks for that
 # reason. A failed run emails whoever last touched the schedule.
 on:
   schedule:
-    - cron: '0 9 * * 1'
+    # 07:00 UTC is 3 a.m. in Toronto during daylight time (EDT), 2 a.m. in winter.
+    - cron: '0 7 * * *'
   workflow_dispatch:
 
 permissions:

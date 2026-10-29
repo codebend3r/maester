@@ -40,6 +40,7 @@ from luwin.clients.radarr import Movie
 from luwin.clients.raven import RavenTitle
 from luwin.clients.sabnzbd import Download
 from luwin.clients.seerr import (
+    ArrRef,
     ArrServer,
     Collection,
     MediaDetails,
@@ -61,6 +62,7 @@ import luwin.tools  # noqa: F401  isort: skip
 EVAL_USER = "eval-user"
 # The Plex server luwin reads (`PLEX_URL`): the first host's, watched by its Tautulli.
 PLEX_ID = "library-plex"
+UHD_SERVER_ID = 9  # Seerr's id for the 4K Radarr and Sonarr a `four_k` case lists
 ARR_URLS = {"radarr": "http://{host}.lan:7878", "sonarr": "http://{host}.lan:8989"}
 
 
@@ -88,6 +90,8 @@ def _title(r: dict[str, Any]) -> tuple[SearchResult, MediaDetails]:
         status_4k=status_4k,
         rating_key=r.get("rating_key"),
         rating_key_4k=r.get("rating_key_4k"),
+        # `arr_4k` is the title's id in the 4K Radarr or Sonarr (`four_k` seeds those).
+        arr_4k=ArrRef(UHD_SERVER_ID, int(r["arr_4k"])) if "arr_4k" in r else None,
         media_id=r.get("media_id"),
         runtime_minutes=r.get("runtime"),
         tvdb_id=r.get("tvdb_id"),
@@ -126,7 +130,9 @@ def _seerr(seed: dict[str, Any], seerr_user_id: int, hosts: list[str]) -> FakeSe
     # Seerr's 4K servers, when the case has them, point at the last host's arrs.
     uhd_host = hosts[-1]
     four_k = {
-        kind: [ArrServer(9, f"{kind} 4K", True, True, ARR_URLS[kind].format(host=uhd_host))]
+        kind: [
+            ArrServer(UHD_SERVER_ID, f"{kind} 4K", True, True, ARR_URLS[kind].format(host=uhd_host))
+        ]
         for kind in ("radarr", "sonarr")
     }
     by_id = {result.tmdb_id: result for result, _ in titles}
