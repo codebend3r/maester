@@ -6,8 +6,10 @@ name: 🧠 Luwin evals
 # reason. A failed run emails whoever last touched the schedule.
 on:
   schedule:
-    # 07:00 UTC is 3 a.m. in Toronto during daylight time (EDT), 2 a.m. in winter.
-    - cron: '0 7 * * *'
+    # 07:17 UTC is 3:17 a.m. in Toronto during daylight time (EDT), 2:17 a.m. in
+    # winter. Off the hour because GitHub delays, and sometimes drops, scheduled
+    # runs that start on it.
+    - cron: '17 7 * * *'
   workflow_dispatch:
 
 permissions:
