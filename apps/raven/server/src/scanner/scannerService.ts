@@ -623,8 +623,8 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
       fn: async ({ id, path }) => {
         if (signal.aborted) return
         try {
-          const { probe, tracks } = await this.ffmpeg.probeFile(path)
-          this.index.saveProbe({ id, probe, tracks })
+          const { probe, tracks, chapters } = await this.ffmpeg.probeFile(path)
+          this.index.saveProbe({ id, probe, tracks, chapters })
           this.thumbnails.enqueue(id)
         } catch (error) {
           if (!(error instanceof FfmpegTimeoutError)) {

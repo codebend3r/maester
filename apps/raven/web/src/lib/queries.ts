@@ -21,6 +21,7 @@ export const {
   homeSearchQuery,
   mediaQuery,
   nextInSessionQuery,
+  markersQuery,
   tracksQuery,
   mediaStreamsQuery,
   mediaLocationQuery,

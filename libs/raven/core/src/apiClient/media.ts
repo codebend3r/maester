@@ -3,8 +3,10 @@ import {
   type FavouriteChange,
   isMediaItem,
   isMediaLocation,
+  isMediaMarkers,
   type MediaItem,
   type MediaLocation,
+  type MediaMarkers,
   type ProgressReport,
   type ViewingSession,
   type WatchedChange,
@@ -30,6 +32,10 @@ export const mediaCalls = ({ send, expect }: Transport) => ({
       request: send({ path: `/api/media/${id}/next?${toQueryString(sessionQueryOf(session))}` }),
       guard: nullable(isMediaItem),
     }),
+
+  /** The video's intro, credits and chapters, as far as the server knows them. */
+  getMarkers: (id: number): Promise<MediaMarkers> =>
+    expect({ request: send({ path: `/api/media/${id}/markers` }), guard: isMediaMarkers }),
 
   /** Where the video's file lives; listings leave the path out. */
   getMediaLocation: (id: number): Promise<MediaLocation> =>

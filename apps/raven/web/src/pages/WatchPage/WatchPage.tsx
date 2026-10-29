@@ -39,7 +39,7 @@ import { PlayerMessage } from '@/desktop/player/PlayerMessage'
 import { api } from '@/lib/api'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from 'react-router-dom'
-import { authConfigQuery, mediaQuery, nextInSessionQuery } from '@/lib/queries'
+import { authConfigQuery, markersQuery, mediaQuery, nextInSessionQuery } from '@/lib/queries'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { useRouteId } from '@/lib/routeQuery'
 import { useMediaMutations } from '@/lib/useMediaMutations'
@@ -166,6 +166,8 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
       enabled: isSeasonOver,
     }).data ?? null
   const offered = next ?? (isSeasonOver ? nextSeason : null)
+  // Playback never waits on these: the chapters and markers show once they come.
+  const markers = useQuery(markersQuery(media.id)).data ?? null
   const mediaPlane = useMediaPlane({ api, mediaId: media.id, reprobe: useReprobe() })
   useTicketFollowsSession({ mediaId: media.id })
   const hasAccounts = (useQuery(authConfigQuery).data?.state ?? null) === AUTH_CONFIG_STATES.ready
@@ -186,6 +188,7 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
       duration: media.duration,
       resumeAt: resumeAtFor({ at: 0, media }),
       backTo,
+      markers,
       next: offered
         ? {
             ...watchLink({ media: offered, session, upNext: after }),

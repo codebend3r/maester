@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
+import { dirname, extname } from 'node:path'
 import { promisify } from 'node:util'
 
 const run = promisify(execFile)
@@ -67,6 +67,44 @@ export const encodeClip = async ({
     ...(startAt == null ? [] : ['-output_ts_offset', String(startAt)]),
     path,
   ])
+}
+
+type AddChaptersProps = {
+  path: string
+  chapters: ReadonlyArray<{ start: number; end: number; title: string }>
+}
+
+/** Rewrites a clip in place with `chapters`, times in seconds, as a remux with named chapters carries them. */
+export const addChapters = async ({ path, chapters }: AddChaptersProps): Promise<void> => {
+  const metadata = `${path}.ffmetadata`
+  const chaptered = `${path}.chaptered${extname(path)}`
+  const lines = chapters.flatMap(({ start, end, title }) => [
+    '[CHAPTER]',
+    'TIMEBASE=1/1000',
+    `START=${Math.round(start * 1000)}`,
+    `END=${Math.round(end * 1000)}`,
+    `title=${title}`,
+  ])
+  await writeFile(metadata, [';FFMETADATA1', ...lines, ''].join('\n'))
+  await run('ffmpeg', [
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-y',
+    '-i',
+    path,
+    '-i',
+    metadata,
+    '-map_metadata',
+    '1',
+    '-map_chapters',
+    '1',
+    '-c',
+    'copy',
+    chaptered,
+  ])
+  await rename(chaptered, path)
+  await rm(metadata)
 }
 
 type EncodeRichClipProps = {

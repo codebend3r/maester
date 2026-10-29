@@ -1,4 +1,5 @@
 import type {
+  MediaMarkers,
   PlaybackDiagnostics,
   PlayerAction,
   PlayerErrorReason,
@@ -53,6 +54,8 @@ export type PlayerTitle = {
   backTo: string
   /** What plays after this one. */
   next: UpNext | null
+  /** The file's intro, credits and chapters; null or left out while unknown, as for a local file. */
+  markers?: MediaMarkers | null
 }
 
 /** A track pick a person made by hand: an audio index and a subtitle id. */

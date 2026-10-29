@@ -99,6 +99,8 @@ export const queryKeys = {
   /** Every video's own queries: the item, its tracks, subtitles and location. */
   allMedia: ['media'],
   mediaItem: (id: number | null) => ['media', id],
+  /** A video's intro, credits and chapters, for the player. */
+  markers: (id: number) => ['media', id, 'markers'],
   /** Where a video's file lives, for its menu. */
   mediaLocation: (id: number) => ['media', id, 'location'],
   /** What plays after a video in a session, under the video's key so reading it again reads this again too. */

@@ -291,6 +291,7 @@ export const PlayerChrome = ({
 
   // The up next card keeps the controls up, so it and the ring it fills can be seen.
   const chromeShown = idle.active || upNext.isCardShown
+  const chapterStarts = title.markers?.chapters.map(({ start }) => start) ?? []
   const about = aboutLine({ media, label, mode, context: title.context ?? null })
 
   // The scrubber and the clock keep what they showed while the controls are
@@ -388,6 +389,7 @@ export const PlayerChrome = ({
         time={held.time}
         duration={duration}
         buffered={held.buffered}
+        chapters={chapterStarts}
         volume={volume}
         muted={muted}
         isVolumeFixed={isVolumeFixed}

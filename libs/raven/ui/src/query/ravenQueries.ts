@@ -174,6 +174,14 @@ export const ravenQueriesFor = (api: ApiClient) => {
         queryFn: asksServerForNext(session) ? () => api.nextInSession({ id, session }) : skipToken,
       }),
 
+    /** A file's markers change only when its file does or a detector or an admin finds new ones, so they are read once a session. */
+    markersQuery: (id: number) =>
+      queryOptions({
+        queryKey: queryKeys.markers(id),
+        queryFn: () => api.getMarkers(id),
+        staleTime: Infinity,
+      }),
+
     /** A file's tracks only change when the file does, and the scan stores them. */
     tracksQuery: playerQueries.tracks,
 

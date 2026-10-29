@@ -22,13 +22,14 @@ type TestPlayerProps = {
   media: MediaItem
   backTo: string
   next?: PlayerTitle['next']
+  markers?: PlayerTitle['markers']
   favourite?: PlayerFavourite
 }
 
 /** A host as the web's is: new services on every render, the player only once they are in the store. */
-const TestPlayer = ({ media, backTo, next = null, favourite }: TestPlayerProps) => {
+const TestPlayer = ({ media, backTo, next = null, markers = null, favourite }: TestPlayerProps) => {
   const isHosting = useHostPlayer({
-    title: { label: media.title, duration: media.duration, resumeAt: 0, backTo, next },
+    title: { label: media.title, duration: media.duration, resumeAt: 0, backTo, next, markers },
     posterUrl: null,
     escape: null,
     progress: { started: () => {}, save: () => {}, left: () => {} },
@@ -551,6 +552,26 @@ describe('the player controls', () => {
     expect(screen.queryByText('Playing the next video')).toBeNull()
     await userEvent.click(within(card).getByRole('button', { name: 'Play next season' }))
     expect(await screen.findByText('Playing the next video')).toBeInTheDocument()
+  })
+
+  it("breaks the timeline at the file's chapters", () => {
+    const { container } = renderWithProviders({
+      ui: (
+        <TestPlayer
+          media={mediaItem({ container: 'mp4' })}
+          backTo="/libraries/2"
+          markers={{
+            intro: null,
+            credits: null,
+            chapters: [
+              { start: 0, end: 2906.384, title: 'Opening' },
+              { start: 2906.384, end: 5812.768, title: 'Part B' },
+            ],
+          }}
+        />
+      ),
+    })
+    expect(container.querySelector('.rail')?.getAttribute('style') ?? '').toContain('50%')
   })
 
   it('offers no next video when none came with it, and Next has nothing to press', () => {

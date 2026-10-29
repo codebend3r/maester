@@ -47,6 +47,7 @@ describe('play history', () => {
       id,
       probe: MINUTE,
       tracks: { audio: [], subtitles: [], defaultAudio: null, frameRate: 24 },
+      chapters: [],
     })
     return id
   }

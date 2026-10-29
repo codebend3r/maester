@@ -58,7 +58,7 @@ describe('splitting a movie library’s duplicates', () => {
           mtimeMs: 1,
         },
       })
-      index.saveProbe({ id: fileId, probe: PROBE, tracks: TRACKS })
+      index.saveProbe({ id: fileId, probe: PROBE, tracks: TRACKS, chapters: [] })
       metadata.link({ mediaIds: [fileId], itemIds: [itemId] })
       state.ids.set(name, fileId)
     })
