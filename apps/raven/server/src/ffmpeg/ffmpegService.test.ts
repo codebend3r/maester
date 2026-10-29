@@ -38,6 +38,12 @@ describe('FfmpegService', () => {
     await chmod(join(state.dir, 'ffmpeg-5'), 0o755)
     await chmod(join(state.dir, 'ffprobe-9'), 0o755)
     await writeFile(join(state.dir, 'renderD128'), '')
+    // Prints its arguments, then two raw fingerprint points: 1 and 0xffffffff.
+    await writeFile(
+      join(state.dir, 'chromaprint'),
+      '#!/bin/sh\necho "$@" > "$0.args"\nprintf "\\001\\000\\000\\000\\377\\377\\377\\377"\n',
+    )
+    await chmod(join(state.dir, 'chromaprint'), 0o755)
     await chmod(join(state.dir, 'works'), 0o755)
     await chmod(join(state.dir, 'slow'), 0o755)
     await chmod(join(state.dir, 'broken'), 0o755)
@@ -55,6 +61,7 @@ describe('FfmpegService', () => {
         ffmpegPath: join(state.dir, tool),
         ffmpegTimeoutSeconds: 1,
         keyframeProbeTimeoutSeconds: 1,
+        markerTimeoutSeconds: 1,
       },
       { playback: () => DEFAULT_PLAYBACK_SETTINGS },
     )
@@ -103,6 +110,28 @@ describe('FfmpegService', () => {
     const failure = service('broken').probeFile('/media/a.mkv')
     await expect(failure).rejects.toThrow('Invalid data found when processing input')
     await expect(failure).rejects.not.toBeInstanceOf(FfmpegTimeoutError)
+  })
+
+  it("reads a file's head as raw Chromaprint points, four bytes each, from its first audio track", async () => {
+    const points = await service('chromaprint').fingerprint({
+      path: '/m/a.mkv',
+      start: 0,
+      seconds: 600,
+    })
+    expect(points).toEqual([1, 0xffffffff])
+    const args = await readFile(join(state.dir, 'chromaprint.args'), 'utf8')
+    expect(args).toContain(
+      '-ss 0 -t 600 -i /m/a.mkv -map 0:a:0 -ac 1 -f chromaprint -fp_format raw -',
+    )
+  })
+
+  it("reports a fingerprint run's failure and timeout as the other runs do", async () => {
+    await expect(
+      service('broken').fingerprint({ path: '/m/a.mkv', start: 0, seconds: 600 }),
+    ).rejects.toThrow('Invalid data found when processing input')
+    await expect(
+      service('slow').fingerprint({ path: '/m/a.mkv', start: 0, seconds: 600 }),
+    ).rejects.toBeInstanceOf(FfmpegTimeoutError)
   })
 
   it("lists a file's video keyframes from ffprobe's packets, without decoding", async () => {

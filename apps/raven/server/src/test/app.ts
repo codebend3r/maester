@@ -130,7 +130,10 @@ type TestConfigProps = {
   webDir?: string | null
 }
 
-/** A test's server: no scan on start, no rescans, the CPU encoder, and the admin password above. */
+/**
+ * A test's server: no scan on start, no rescans, no intro detection in the
+ * background, the CPU encoder, and the admin password above.
+ */
 export const testConfig = ({
   dataDir,
   mediaDir,
@@ -143,5 +146,6 @@ export const testConfig = ({
   browseRoot: mediaDir,
   scanOnStart: false,
   quickScanIntervalMinutes: 0,
+  markerDetection: false,
   adminPassword: ADMIN_PASSWORD,
 })

@@ -1,6 +1,13 @@
 import { MARKER_KINDS, MARKER_SOURCES, type Marker, type MarkerSource, isMarker } from '@raven/core'
 import type Sqlite from 'better-sqlite3'
 
+/** Where a file stands in detection: waiting, analysed (markers found or not), or failed. */
+export const MARKER_STATES = {
+  pending: 'pending',
+  done: 'done',
+  failed: 'failed',
+} as const
+
 /** The sources strongest first, as `MARKER_SOURCES` lists them. */
 const STRENGTH: readonly MarkerSource[] = Object.values(MARKER_SOURCES)
 

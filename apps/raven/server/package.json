@@ -17,7 +17,8 @@
     "start": "node dist/main.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsgo --noEmit",
+    "markers:accuracy": "tsx src/markers/introAccuracy.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.133.0",
@@ -53,6 +54,7 @@
       "build",
       "dev",
       "serve:fixture",
+      "markers:accuracy",
       "typecheck",
       "lint:ts",
       "lint:ts:fix",
@@ -68,6 +70,9 @@
         "dependsOn": [
           "^build"
         ]
+      },
+      "markers:accuracy": {
+        "cache": false
       }
     }
   }

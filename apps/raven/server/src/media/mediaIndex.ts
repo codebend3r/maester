@@ -17,7 +17,12 @@ import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
 import { chapterMarkers } from '@/ffmpeg/chapters'
 import type { ProbeResult } from '@/ffmpeg/probe'
-import { forgetDetectedMarkers, offerMarkers, readMarkers } from '@/markers/markerRows'
+import {
+  MARKER_STATES,
+  forgetDetectedMarkers,
+  offerMarkers,
+  readMarkers,
+} from '@/markers/markerRows'
 import { namedAs } from '@/media/namedAs'
 import type { IndexedFile, Reconciled } from '@/scanner/reconcile'
 import type { FoundFile } from '@/scanner/walk'
@@ -218,18 +223,20 @@ export class MediaIndex {
 
   /**
    * The file was replaced on disk: forget what the old one held so it gets
-   * probed again, its chapters and the markers they or a detector gave it
-   * included. An admin's own markers stay.
+   * probed again, its chapters, the markers they or a detector gave it and
+   * its fingerprint included, and detection runs again. An admin's own
+   * markers stay.
    */
   markChanged({ id, size, mtimeMs, at = new Date() }: MediaIndexMarkChangedProps): void {
     this.db
       .prepare(
         `UPDATE media SET size = ?, mtime_ms = ?, probed = 0, probe_error = NULL, thumbnail = 'pending',
-                tracks = NULL, keyframes = NULL, chapters = NULL, changed_at = ?
+                tracks = NULL, keyframes = NULL, chapters = NULL, markers = ?, changed_at = ?
           WHERE id = ?`,
       )
-      .run(size, Math.round(mtimeMs), at.toISOString(), id)
+      .run(size, Math.round(mtimeMs), MARKER_STATES.pending, at.toISOString(), id)
     forgetDetectedMarkers({ db: this.db, mediaId: id })
+    this.db.prepare('DELETE FROM media_fingerprints WHERE media_id = ?').run(id)
   }
 
   /**

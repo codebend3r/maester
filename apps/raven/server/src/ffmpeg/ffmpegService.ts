@@ -1,5 +1,6 @@
 import { type ChildProcessByStdio, execFile, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { setPriority } from 'node:os'
 import type { Readable } from 'node:stream'
 import { promisify } from 'node:util'
 import {
@@ -59,6 +60,11 @@ const failureText = (error: unknown): string => {
   }
   return error instanceof Error ? error.message : String(error)
 }
+
+/** `nice`'s lowest priority. */
+const LOWEST_PRIORITY = 19
+
+type FfmpegServiceFingerprintProps = { path: string; start: number; seconds: number }
 
 /** The signals raven sends an ffmpeg it started. */
 export const FFMPEG_SIGNALS = { kill: 'SIGKILL' } as const satisfies Record<string, NodeJS.Signals>
@@ -133,6 +139,75 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
       }
       throw new Error(failureText(error), { cause: error })
     }
+  }
+
+  /**
+   * The Chromaprint points of the file's first audio track from `start`,
+   * for `seconds`: ffmpeg's `chromaprint` muxer, raw, one 32 bit point per
+   * `POINT_SECONDS`.
+   */
+  async fingerprint({ path, start, seconds }: FfmpegServiceFingerprintProps): Promise<number[]> {
+    const out = await this.analyse([
+      '-hide_banner',
+      '-nostdin',
+      '-v',
+      'error',
+      '-ss',
+      String(start),
+      '-t',
+      String(seconds),
+      '-i',
+      path,
+      '-map',
+      '0:a:0',
+      '-ac',
+      '1',
+      '-f',
+      'chromaprint',
+      '-fp_format',
+      'raw',
+      '-',
+    ])
+    return Array.from({ length: Math.floor(out.length / 4) }, (_, index) =>
+      out.readUInt32LE(index * 4),
+    )
+  }
+
+  /** Whether ffmpeg is converting a file for someone watching, which background analysis gives way to. */
+  isConverting(): boolean {
+    return this.streams.size > 0
+  }
+
+  /**
+   * An ffmpeg run whose stdout is the answer, at the lowest CPU priority:
+   * analysis is background work, and gives way to playback's own ffmpeg.
+   */
+  private analyse(args: string[]): Promise<Buffer> {
+    const seconds = this.config.markerTimeoutSeconds
+    return new Promise((resolve, reject) => {
+      const child = execFile(
+        this.config.ffmpegPath,
+        args,
+        { encoding: 'buffer', timeout: seconds * 1000, maxBuffer: 64 * 1024 * 1024 },
+        (error, stdout, stderr) => {
+          if (error == null) {
+            resolve(stdout)
+            return
+          }
+          if (wasKilled(error)) {
+            reject(new FfmpegTimeoutError({ tool: 'ffmpeg', seconds }))
+            return
+          }
+          const said = lastLine(stderr.toString())
+          reject(new Error(said === '' ? error.message : said, { cause: error }))
+        },
+      )
+      try {
+        if (child.pid !== undefined) setPriority(child.pid, LOWEST_PRIORITY)
+      } catch {
+        // A platform that will not lower it runs the analysis at normal priority.
+      }
+    })
   }
 
   /** One ffprobe run, read three ways: what the index keeps, the file's tracks and its chapters. */

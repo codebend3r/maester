@@ -89,6 +89,8 @@ import { StreamsController } from '@/streams/streamsController'
 import { StreamSessions } from '@/streams/streamSessions'
 import { TracksService } from '@/playback/tracksService'
 import { MarkersService } from '@/markers/markersService'
+import { MarkerJobs } from '@/markers/markerJobs'
+import { MarkerDetection } from '@/markers/markerDetection'
 import { assertRoutesMarked } from '@/routeMarks'
 import { watchFolder } from '@/scanner/folderWatch'
 import { LibraryWatcher, WATCH_OPTIONS, type WatchOptions } from '@/scanner/libraryWatcher'
@@ -235,6 +237,8 @@ export class AppModule {
         ThumbnailService,
         TracksService,
         MarkersService,
+        MarkerJobs,
+        MarkerDetection,
         KeyframesService,
         { provide: CLOCK, useValue: SYSTEM_CLOCK },
         HlsSessions,
