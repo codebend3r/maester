@@ -216,7 +216,8 @@ const setup = ({
   }
 }
 
-const fileUrl = (n: number, ticket = 'one'): string => `${ORIGIN}/api/media/${n}/file?t=${ticket}`
+const fileUrl = (n: number, ticket = 'one'): string =>
+  `${ORIGIN}/api/media/${n}/file?t=${ticket}&purpose=download`
 
 const refused = (status: number): Answer => ({ status, body: null })
 
@@ -686,7 +687,7 @@ describe('an account ticket', () => {
   type AccountFileUrlProps = { n: number; ticket?: string }
 
   const accountFileUrl = ({ n, ticket = 'account.one' }: AccountFileUrlProps): string =>
-    `${ORIGIN}/api/media/${n}/file?t=${ticket}`
+    `${ORIGIN}/api/media/${n}/file?t=${ticket}&purpose=download`
 
   it('fetches the subtitles and the file with one account ticket, through the bare fetch', async () => {
     const world = setup({
@@ -894,7 +895,7 @@ describe('an account ticket', () => {
     await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
     expect(world.network.requests.map(({ url }) => url)).toEqual([
       `${ORIGIN}/api/media/1/subtitles/external-0?t=account.one`,
-      `${ORIGIN}/api/media/1/file?t=account.one`,
+      `${ORIGIN}/api/media/1/file?t=account.one&purpose=download`,
     ])
     expect(world.drive.texts.get(`${dirOf(1)}/subtitles/external-0.vtt`)).toBe('WEBVTT')
     expect(entryById(world.store.read(), { downloadId: idOf(1) })?.sidecars ?? null).toEqual([
@@ -917,7 +918,7 @@ describe('a response the server cuts mid-file', () => {
   type MintedUrlProps = { n: number; read: number }
 
   const mintedUrl = ({ n, read }: MintedUrlProps): string =>
-    `${ORIGIN}/api/media/${n}/file?t=account.${n}.${read}`
+    `${ORIGIN}/api/media/${n}/file?t=account.${n}.${read}&purpose=download`
   type RequestsOfProps = { world: ReturnType<typeof setup>; n: number }
 
   const requestsOf = ({ world, n }: RequestsOfProps) =>

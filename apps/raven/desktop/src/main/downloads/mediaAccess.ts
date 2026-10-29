@@ -5,10 +5,12 @@ import {
   isSidecarTrackId,
   MEDIA_PROBE_BYTES,
   MEDIA_PROBE_TIMEOUT_MS,
+  MEDIA_PURPOSE_PARAM,
   MEDIA_TICKET_PARAM,
   type MediaOrigin,
   type OriginProbe,
   pickOrigin,
+  STREAM_PURPOSES,
   toQueryString,
 } from '@raven/core'
 import { SIGNAL_EVENTS } from '@/main/bounded'
@@ -128,17 +130,24 @@ type MediaUrlForProps = {
   access: Access
   mediaId: number
   path: string
+  query?: Record<string, string>
 }
 
-const mediaUrlFor = ({ access, mediaId, path }: MediaUrlForProps): string => {
+const mediaUrlFor = ({ access, mediaId, path, query = {} }: MediaUrlForProps): string => {
   if (!isMediaId(mediaId)) throw new RangeError('A download needs a media id')
-  return `${access.url}${API_PATHS.media}/${mediaId}/${path}?${toQueryString({ [MEDIA_TICKET_PARAM]: access.ticket })}`
+  return `${access.url}${API_PATHS.media}/${mediaId}/${path}?${toQueryString({ [MEDIA_TICKET_PARAM]: access.ticket, ...query })}`
 }
 
 type FileUrlForProps = { access: Access; mediaId: number }
 
+/** Names itself a download, so the server's Streams page lists it apart from what is being watched. */
 export const fileUrlFor = ({ access, mediaId }: FileUrlForProps): string =>
-  mediaUrlFor({ access, mediaId, path: MEDIA_FILE_PATH })
+  mediaUrlFor({
+    access,
+    mediaId,
+    path: MEDIA_FILE_PATH,
+    query: { [MEDIA_PURPOSE_PARAM]: STREAM_PURPOSES.download },
+  })
 
 type SidecarUrlForProps = {
   access: Access

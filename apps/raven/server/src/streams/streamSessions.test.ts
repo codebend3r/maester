@@ -1,4 +1,4 @@
-import { PLAYBACK_MODES } from '@raven/core'
+import { PLAYBACK_MODES, STREAM_PURPOSES } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import {
   IDLE_MS,
@@ -29,39 +29,47 @@ describe('StreamSessions', () => {
     const second = connection()
     const other = connection()
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: first.open,
+      from: 0,
       now: 0,
     })
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: second.open,
+      from: 0,
       now: 1000,
     })
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: BEN,
       connection: other.open,
+      from: 0,
       now: 1000,
     })
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 2,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: other.open,
+      from: 0,
       now: 1000,
     })
 
@@ -77,21 +85,25 @@ describe('StreamSessions', () => {
   it('takes the way a video is sent from the latest request', () => {
     const sessions = new StreamSessions()
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: connection().open,
+      from: 0,
       now: 0,
     })
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.transcode,
       quality: null,
       audio: null,
       client: ANNA,
       connection: connection().open,
+      from: 0,
       now: 1,
     })
     expect(sessions.list({ now: 2 }).map(({ mode }) => mode)).toEqual([PLAYBACK_MODES.transcode])
@@ -100,12 +112,14 @@ describe('StreamSessions', () => {
   it('keeps the position the player reports, and ignores a report for no stream', () => {
     const sessions = new StreamSessions()
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: connection().open,
+      from: 0,
       now: 0,
     })
     sessions.report({ mediaId: 1, client: ANNA, position: 42, audio: null, now: 5000 })
@@ -121,21 +135,25 @@ describe('StreamSessions', () => {
     const sessions = new StreamSessions()
     const quiet = connection()
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: quiet.open,
+      from: 0,
       now: 0,
     })
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 2,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: BEN,
       connection: connection().open,
+      from: 0,
       now: 0,
     })
     sessions.report({ mediaId: 2, client: BEN, position: 10, audio: null, now: IDLE_MS - 1 })
@@ -147,12 +165,14 @@ describe('StreamSessions', () => {
     const sessions = new StreamSessions()
     const sending = connection()
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.transcode,
       quality: null,
       audio: null,
       client: ANNA,
       connection: sending.open,
+      from: 0,
       now: 0,
     })
 
@@ -170,30 +190,36 @@ describe('StreamSessions', () => {
     const second = connection()
     const released = connection()
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: first.open,
+      from: 0,
       now: 0,
     })
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: second.open,
+      from: 0,
       now: 0,
     })
     const release = sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: released.open,
+      from: 0,
       now: 0,
     })
     release()
@@ -211,23 +237,27 @@ describe('StreamSessions', () => {
   it('starts a new stream when a stopped client asks again', () => {
     const sessions = new StreamSessions()
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: connection().open,
+      from: 0,
       now: 0,
     })
     const [before] = sessions.list({ now: 1 })
     sessions.stop(before?.id ?? '')
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: connection().open,
+      from: 0,
       now: 10,
     })
 
@@ -242,12 +272,14 @@ describe('StreamSessions', () => {
     const dev: StreamClient = { ...ANNA, viewer: { id: 'dev-id', email: 'dev@example.com' } }
     ;[cara, dev].forEach((client) =>
       sessions.open({
+        purpose: STREAM_PURPOSES.play,
         mediaId: 1,
         mode: PLAYBACK_MODES.direct,
         quality: null,
         audio: null,
         client,
         connection: connection().open,
+        from: 0,
         now: 0,
       }),
     )
@@ -264,12 +296,14 @@ describe('StreamSessions', () => {
   it('keeps the audio a converted stream asked for until the player reports another', () => {
     const sessions = new StreamSessions()
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.remux,
       quality: null,
       audio: 2,
       client: ANNA,
       connection: connection().open,
+      from: 0,
       now: 0,
     })
     sessions.report({ mediaId: 1, client: ANNA, position: 5, audio: null, now: 1 })
@@ -278,12 +312,14 @@ describe('StreamSessions', () => {
     sessions.report({ mediaId: 1, client: ANNA, position: 6, audio: 1, now: 3 })
     // A range request of direct play names no track, so it keeps the one reported.
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: connection().open,
+      from: 0,
       now: 4,
     })
     expect(sessions.list({ now: 5 })[0]).toMatchObject({ audio: 1, mode: PLAYBACK_MODES.direct })
@@ -292,22 +328,26 @@ describe('StreamSessions', () => {
   it('keeps the size a transcode asked for, and drops it for another mode', () => {
     const sessions = new StreamSessions()
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.transcode,
       quality: 'high720',
       audio: 0,
       client: ANNA,
       connection: connection().open,
+      from: 0,
       now: 0,
     })
     expect(sessions.list({ now: 1 })[0]?.quality).toBe('high720')
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.remux,
       quality: null,
       audio: 0,
       client: ANNA,
       connection: connection().open,
+      from: 0,
       now: 2,
     })
     expect(sessions.list({ now: 3 })[0]?.quality).toBeNull()
@@ -318,21 +358,25 @@ describe('StreamSessions', () => {
     const open = connection()
     const short = connection()
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: open.open,
+      from: 0,
       now: 0,
     })
     const release = sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: short.open,
+      from: 0,
       now: 0,
     })
 
@@ -350,12 +394,14 @@ describe('StreamSessions', () => {
     const sessions = new StreamSessions()
     const sending = connection()
     const release = sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: sending.open,
+      from: 0,
       now: 0,
     })
     sending.state.sent = 500_000
@@ -368,12 +414,14 @@ describe('StreamSessions', () => {
   it('has no send rate before a second look', () => {
     const sessions = new StreamSessions()
     sessions.open({
+      purpose: STREAM_PURPOSES.play,
       mediaId: 1,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
       client: ANNA,
       connection: connection().open,
+      from: 0,
       now: 0,
     })
     expect(sessions.list({ now: 0 })[0]?.sendRate).toBeNull()
@@ -381,5 +429,50 @@ describe('StreamSessions', () => {
 
   it('has nothing to stop for an id that is not live', () => {
     expect(new StreamSessions().stop('nothing')).toBe(false)
+  })
+
+  it('keeps a download apart from a play of the same video by the same client', () => {
+    const sessions = new StreamSessions()
+    const opened = (purpose: (typeof STREAM_PURPOSES)[keyof typeof STREAM_PURPOSES]) =>
+      sessions.open({
+        purpose,
+        mediaId: 1,
+        mode: PLAYBACK_MODES.direct,
+        quality: null,
+        audio: null,
+        client: ANNA,
+        connection: connection().open,
+        from: 0,
+        now: 0,
+      })
+    opened(STREAM_PURPOSES.play)
+    opened(STREAM_PURPOSES.download)
+    expect(sessions.list({ now: 0 }).map(({ purpose }) => purpose)).toEqual([
+      STREAM_PURPOSES.play,
+      STREAM_PURPOSES.download,
+    ])
+  })
+
+  it('reaches as far into the file as a response starting at its range has sent', () => {
+    const sessions = new StreamSessions()
+    const resumed = connection()
+    resumed.state.sent = 100
+    const release = sessions.open({
+      purpose: STREAM_PURPOSES.download,
+      mediaId: 1,
+      mode: PLAYBACK_MODES.direct,
+      quality: null,
+      audio: null,
+      client: ANNA,
+      connection: resumed.open,
+      from: 5000,
+      now: 0,
+    })
+    expect(sessions.list({ now: 0 })[0]?.reached).toBe(5000)
+    resumed.state.sent = 1100
+    expect(sessions.list({ now: 1000 })[0]?.reached).toBe(6000)
+    resumed.state.sent = 1600
+    release()
+    expect(sessions.list({ now: 2000 })[0]?.reached).toBe(6500)
   })
 })

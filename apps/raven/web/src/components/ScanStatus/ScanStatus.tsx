@@ -12,22 +12,51 @@ const since = (iso: string): string => {
   return new Date(iso).toLocaleDateString()
 }
 
-/** While the walk looks: how many videos it has found so far, once it has found any. */
-const lookingNote = (found: number): string =>
-  found === 0
-    ? 'Looking through the folders'
-    : `Looking through the folders, ${plural({ n: found, one: 'video', many: 'videos' })} found so far`
+/** The bar's fill, or no value for a bar that sweeps, with nothing to measure against. */
+type Bar = { max: number; value: number | undefined }
 
-/** What the running scan is doing: walking the folders, indexing what it found, or waiting for the new videos to be matched. */
-const progressNote = (scan: Status): string => {
+type Progress = { note: string; bar: Bar }
+
+const SWEEP: Bar = { max: 1, value: undefined }
+
+const videos = (n: number): string => plural({ n, one: 'video', many: 'videos' })
+
+type ProgressOfProps = { scan: Status; expected: number }
+
+/**
+ * What the running scan is doing, in words and as a bar. The walk counts
+ * what it has found against the library's count before the scan, when it
+ * has one, and sweeps for a new library; the indexing counts against what the
+ * walk found; the matching, which has no count, sweeps.
+ */
+const progressOf = ({ scan, expected }: ProgressOfProps): Progress => {
   switch (scan.state) {
-    case SCAN_STATES.walking:
-      return lookingNote(scan.found)
+    case SCAN_STATES.walking: {
+      if (scan.found === 0) {
+        return {
+          note: 'Looking through the folders',
+          bar: expected > 0 ? { max: expected, value: 0 } : SWEEP,
+        }
+      }
+      if (expected === 0) {
+        return {
+          note: `Looking through the folders, ${videos(scan.found)} found so far`,
+          bar: SWEEP,
+        }
+      }
+      return {
+        note: `Looking through the folders, ${count.format(scan.found)} of about ${videos(expected)} found`,
+        bar: { max: Math.max(expected, scan.found), value: scan.found },
+      }
+    }
     case SCAN_STATES.matching:
-      return 'Matching the new videos'
+      return { note: 'Matching the new videos', bar: SWEEP }
     case SCAN_STATES.idle:
     case SCAN_STATES.indexing:
-      return `Indexing ${count.format(scan.processed)} of ${count.format(scan.found)}`
+      return {
+        note: `Indexing ${count.format(scan.processed)} of ${count.format(scan.found)}`,
+        bar: { max: Math.max(scan.found, 1), value: scan.processed },
+      }
     default: {
       const unreachable: never = scan.state
       return unreachable
@@ -48,27 +77,28 @@ const scannedNote = ({ finishedAt, quickScannedAt }: Status): string | null => {
   ].join(' · ')
 }
 
-type ScanStatusProps = { scan: Status }
+type ScanStatusProps = {
+  scan: Status
+  /** The library's video count before the scan, which a full scan's walk is measured against; 0 for none. */
+  expected: number
+}
 
 /**
  * Live scan progress, a bar with what the scan is doing beside it, or when
  * the library was last brought up to date.
  */
-export const ScanStatus = ({ scan }: ScanStatusProps) => {
+export const ScanStatus = ({ scan, expected }: ScanStatusProps) => {
   const scanned = scannedNote(scan)
+  const { note, bar } = progressOf({ scan, expected })
   return (
     <div className={styles.status} aria-live="polite">
       {isScanning(scan) ? (
         <div className={styles.scanning}>
-          <span className={styles.note}>{progressNote(scan)}</span>
+          <span className={styles.note}>{note}</span>
           <progress
             className={styles.bar}
-            max={Math.max(scan.found, 1)}
-            value={
-              scan.state === SCAN_STATES.walking || scan.state === SCAN_STATES.matching
-                ? undefined
-                : scan.processed
-            }
+            max={bar.max}
+            value={bar.value}
             aria-label="Scan progress"
           />
         </div>

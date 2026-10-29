@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   type PlayerAction,
   type SkipStep,
+  essentialShortcutRows,
   shortcutFor,
   shortcutRows,
   stepCaptionScale,
@@ -133,5 +134,18 @@ describe('shortcutRows', () => {
     expect(keysOf(false)).not.toContain('i')
     expect(keysOf(false).slice(-2)).toEqual(['?', 'Esc'])
     expect(keysOf(true).filter((keys) => keys !== 'i')).toEqual(keysOf(false))
+  })
+})
+
+describe('essentialShortcutRows', () => {
+  it('teaches play, skip, volume, full screen and subtitles, then where the rest are', () => {
+    expect(essentialShortcutRows().map((row) => row.keys.join(' '))).toEqual([
+      'k Space',
+      'j l ← →',
+      '↑ ↓',
+      'f',
+      'c',
+      '?',
+    ])
   })
 })

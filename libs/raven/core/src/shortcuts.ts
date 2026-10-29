@@ -87,31 +87,34 @@ export const shortcutFor = ({ key, metaKey, ctrlKey, altKey }: KeyPress): Player
   return FIXED[named] ?? null
 }
 
-type ShortcutRow = {
+export type ShortcutRow = {
   keys: readonly string[]
   action: string
   /** Listed only by a player whose engine has the video info overlay. */
   isStats?: boolean
+  /** Among the few the first video's tip teaches. */
+  isEssential?: boolean
 }
 
 /** Every row the `?` dialog can show, in YouTube's order. */
 const SHORTCUT_ROWS: readonly ShortcutRow[] = [
-  { keys: ['k', 'Space'], action: 'Play or pause' },
+  { keys: ['k', 'Space'], action: 'Play or pause', isEssential: true },
   {
     keys: ['j', 'l', '←', '→'],
     action: 'Back or forward 10 seconds, up to 30 when pressed quickly',
+    isEssential: true,
   },
-  { keys: ['↑', '↓'], action: 'Volume up or down' },
+  { keys: ['↑', '↓'], action: 'Volume up or down', isEssential: true },
   { keys: ['m'], action: 'Mute' },
-  { keys: ['f'], action: 'Full screen' },
-  { keys: ['c'], action: 'Subtitles on or off' },
+  { keys: ['f'], action: 'Full screen', isEssential: true },
+  { keys: ['c'], action: 'Subtitles on or off', isEssential: true },
   { keys: ['+', '-'], action: 'Bigger or smaller subtitles' },
   { keys: ['0', '9'], action: 'Jump to 0% to 90%' },
   { keys: ['Home', 'End'], action: 'Start or end' },
   { keys: [',', '.'], action: 'Pause, then one frame back or forward' },
   { keys: ['<', '>'], action: 'Slower or faster' },
   { keys: ['i'], action: 'Video info', isStats: true },
-  { keys: ['?'], action: 'These shortcuts' },
+  { keys: ['?'], action: 'All shortcuts', isEssential: true },
   { keys: ['Esc'], action: 'Close, leave full screen, or back to the library' },
 ]
 
@@ -120,6 +123,10 @@ type ShortcutRowsProps = { canShowStats: boolean }
 /** The rows the `?` dialog shows for a player that can or cannot show video info. */
 export const shortcutRows = ({ canShowStats }: ShortcutRowsProps): readonly ShortcutRow[] =>
   SHORTCUT_ROWS.filter((row) => canShowStats || row.isStats !== true)
+
+/** The few rows the tip on a viewer's first video teaches, `?` for the rest last. */
+export const essentialShortcutRows = (): readonly ShortcutRow[] =>
+  SHORTCUT_ROWS.filter((row) => row.isEssential === true)
 
 export const SPEEDS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4]
 

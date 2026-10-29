@@ -41,10 +41,12 @@ import { Preloader } from '@/components/Player/Preloader'
 import { playingAudio } from '@/components/Player/selection'
 import { SettingsMenu } from '@/components/Player/SettingsMenu'
 import { ShortcutsDialog } from '@/components/Player/ShortcutsDialog'
+import { ShortcutsTip } from '@/components/Player/ShortcutsTip'
 import { OVERLAYS, type Overlay, usePlayerActions } from '@/components/Player/usePlayerActions'
 import { useBezel, useFullscreen, useIdle, useNow } from '@/components/Player/useStageChrome'
 import { SkipButton } from '@/components/Player/SkipButton'
 import { UpNextCard } from '@/components/Player/UpNextCard'
+import { useShortcutsTip } from '@/components/Player/useShortcutsTip'
 import { useSkipIntro } from '@/components/Player/useSkipIntro'
 import { useUpNext } from '@/components/Player/useUpNext'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
@@ -204,6 +206,11 @@ export const PlayerChrome = ({
       document.title = previousTitle
     }
   }, [label])
+
+  const shortcutsTip = useShortcutsTip({
+    isPlaying: !state.paused,
+    isListOpen: overlay === OVERLAYS.shortcuts,
+  })
 
   const isResumeShown = resumedAt !== null
   useEffect(() => {
@@ -517,6 +524,7 @@ export const PlayerChrome = ({
           {...(handoff && { onHandoff: () => handOff(handoff), handoffLabel: handoff.label })}
         />
       )}
+      {shortcutsTip.isShown && <ShortcutsTip onDismiss={shortcutsTip.dismiss} />}
       {overlay === OVERLAYS.shortcuts && (
         <ShortcutsDialog
           canShowStats={!!actions.toggleStats}

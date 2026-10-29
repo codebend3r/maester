@@ -29,10 +29,13 @@ import {
   isProgressChange,
   isProgressReport,
   isRecord,
+  isStreamPurpose,
   isString,
+  MEDIA_PURPOSE_PARAM,
   MEDIA_TICKET_PARAM,
   PLAYBACK_MODES,
   SESSION_PARAMS,
+  STREAM_PURPOSES,
   readSessionQuery,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
@@ -262,6 +265,8 @@ export class MediaController {
    * account ticket that opens the file earns a pass, so the native player's
    * later ranges, which carry that same ticket, outlive its five minutes; a
    * range still streaming as that pass ends is cut, as a recheck cuts it.
+   * Raven's downloads name themselves with `?purpose=download`, so the
+   * Streams page lists them apart; anything else is a play.
    */
   @MediaPlane()
   @OpenedByPass(PASS_KINDS.ticket)
@@ -269,6 +274,7 @@ export class MediaController {
   async file(
     @Param('id', ParseIntPipe) id: number,
     @Query(MEDIA_TICKET_PARAM) ticket: unknown,
+    @Query(MEDIA_PURPOSE_PARAM) purpose: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
@@ -276,20 +282,22 @@ export class MediaController {
     const info = await stat(file.path).catch(() => null)
     if (!info?.isFile()) throw new NotFoundException('The file is no longer on disk')
     const passEnded = this.passes.hold({ request, ticket, mediaId: id })
+    const size = info.size
+    const range = parseRange({ header: request.headers.range, size })
 
     trackStream({
       sessions: this.streams,
       ended: merge(this.rechecks.ended({ request }), passEnded),
       auth: this.callers,
+      purpose: isStreamPurpose(purpose) ? purpose : STREAM_PURPOSES.play,
       mediaId: id,
       mode: PLAYBACK_MODES.direct,
       quality: null,
       audio: null,
+      from: range == null || range === RANGE_OUTCOMES.unsatisfiable ? 0 : range.start,
       request,
       reply,
     })
-    const size = info.size
-    const range = parseRange({ header: request.headers.range, size })
     reply
       .header(RAVEN_HEADERS.acceptRanges, RANGE_UNITS.bytes)
       .header(HEADERS.contentType, containerMimeType(file.container) ?? CONTENT_TYPES.octetStream)

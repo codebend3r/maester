@@ -21,6 +21,7 @@ import { ContinueWatching } from '@/pages/HomePage/ContinueWatching'
 import { HomeHero } from '@/pages/HomePage/HomeHero'
 import { featuredOf } from '@/pages/HomePage/featured'
 import styles from '@/pages/HomePage/HomePage.module.scss'
+import { PageTitle } from '@/components/PageTitle/PageTitle'
 
 type ShelfProps = {
   title: ReactNode
@@ -226,9 +227,9 @@ export const HomePage = () => {
     <section className={styles.page} aria-labelledby={titleId}>
       <header className={styles.header}>
         <BackButton fallback={null} className={styles.back} />
-        <h1 id={titleId} className={styles.title}>
+        <PageTitle id={titleId} icon="home" className={styles.title}>
           Home
-        </h1>
+        </PageTitle>
       </header>
 
       {query ? (

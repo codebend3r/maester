@@ -9,6 +9,7 @@ import { TitleCard } from '@/components/TitleCard/TitleCard'
 import { POSTER_SIZES } from '@/lib/posters'
 import { favouriteTitlesQuery, favouritesQuery } from '@/lib/queries'
 import styles from '@/pages/FavouritesPage/FavouritesPage.module.scss'
+import { PageTitle } from '@/components/PageTitle/PageTitle'
 
 /** What a favourite can be, in the order the filter offers them. */
 const KINDS = ['shows', 'seasons', 'movies', 'episodes', 'other'] as const
@@ -82,7 +83,9 @@ export const FavouritesPage = () => {
     <section className={styles.page} aria-labelledby={id}>
       <BackButton fallback={HOME} />
       <header className={styles.header}>
-        <h1 id={id}>Favourites</h1>
+        <PageTitle id={id} icon="heart">
+          Favourites
+        </PageTitle>
         {isSuccess && (
           <p className={styles.count}>
             {plural({ n: shown, one: 'favourite', many: 'favourites' })}

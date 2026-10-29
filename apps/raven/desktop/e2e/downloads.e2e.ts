@@ -126,9 +126,9 @@ type FileFetchesProps = {
   mediaId: number
 }
 
-/** Every fetch of a title's file a listener heard, its ticket already left out of the path. */
+/** Every download of a title's file a listener heard, its ticket already left out of the path. */
 const fileFetches = ({ requests, mediaId }: FileFetchesProps) =>
-  requestsTo({ requests, method: SERVER_METHODS.get, path: MEDIA_PATHS.file(mediaId) })
+  requestsTo({ requests, method: SERVER_METHODS.get, path: MEDIA_PATHS.download(mediaId) })
 
 /** A body read as JSON, or null; never an error, which would print the body. */
 const parseJson = (text: string | null): unknown => {

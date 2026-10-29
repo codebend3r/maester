@@ -12,6 +12,7 @@ import {
   isMediaTracks,
   ITEM_TYPES,
   MEDIA_PROBE_BYTES,
+  MEDIA_PURPOSE_PARAM,
   MEDIA_TICKET_PARAM,
   MEDIA_TICKET_SECONDS,
   type MediaItem,
@@ -19,6 +20,7 @@ import {
   type MediaTracks,
   SERVER_COOKIES,
   SERVER_METHODS,
+  STREAM_PURPOSES,
   SUBTITLE_SOURCES,
 } from '@raven/core'
 import {
@@ -70,6 +72,8 @@ const API_ROUTES = {
 export const MEDIA_PATHS = {
   item: (mediaId: number) => `/api/media/${mediaId}`,
   file: (mediaId: number) => `/api/media/${mediaId}/file`,
+  download: (mediaId: number) =>
+    `/api/media/${mediaId}/file?${MEDIA_PURPOSE_PARAM}=${STREAM_PURPOSES.download}`,
   sidecar: (mediaId: number) => `/api/media/${mediaId}/subtitles/external-0`,
   ticket: (mediaId: number) => `/api/media/${mediaId}/ticket`,
   progress: (mediaId: number) => `/api/media/${mediaId}/progress`,

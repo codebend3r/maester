@@ -529,7 +529,7 @@ describe('PlayerChrome seams for a native host', () => {
     // The web has no overlay, so `i` stays the page's.
     expect(fireEvent.keyDown(window, { key: 'i' })).toBe(true)
     fireEvent.keyDown(window, { key: '?' })
-    expect(screen.getByText('These shortcuts')).toBeInTheDocument()
+    expect(screen.getByText('All shortcuts')).toBeInTheDocument()
     expect(screen.queryByText('Video info')).toBeNull()
   })
 

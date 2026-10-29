@@ -10,6 +10,7 @@ import { watchedLabel } from '@/desktop/watched'
 import { useComputerName, useDesktop } from '@/stores/desktop'
 import { useDragging } from '@/stores/dragging'
 import styles from '@/desktop/LocalPage/LocalPage.module.scss'
+import { PageTitle } from '@/components/PageTitle/PageTitle'
 
 const NO_RECENTS = 'Raven could not list your recent videos.'
 
@@ -69,7 +70,7 @@ export const LocalPage = () => {
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
       <header className={styles.header}>
-        <h1 id={ids.title}>{`On this ${computer}`}</h1>
+        <PageTitle id={ids.title} icon="file-play">{`On this ${computer}`}</PageTitle>
         <p className={styles.hint}>Play a video file from this computer in Raven.</p>
       </header>
       <section

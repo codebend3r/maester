@@ -19,6 +19,7 @@ import { useManagement } from '@/lib/management'
 import { api } from '@/lib/api'
 import { bugReportsQuery } from '@/lib/queries'
 import styles from '@/pages/BugReportsPage/BugReportsPage.module.scss'
+import { PageTitle } from '@/components/PageTitle/PageTitle'
 
 const STATUS_LABELS = {
   [BUG_REPORT_STATUSES.new]: 'New',
@@ -221,7 +222,7 @@ export const BugReportsPage = () => {
       <header className={styles.header}>
         <BackButton fallback={HOME} className={styles.back} />
         <hgroup className={styles.heading}>
-          <h1>Bug reports</h1>
+          <PageTitle icon="alert">Bug reports</PageTitle>
           {reports.data && <p className={styles.summary}>{summaryOf(reports.data)}</p>}
         </hgroup>
       </header>

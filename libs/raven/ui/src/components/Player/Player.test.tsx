@@ -933,6 +933,58 @@ describe('the player chrome', () => {
     expect(screen.getByRole('button', { name: 'Pause (k)' })).toBeInTheDocument()
   })
 
+  it('teaches the keys once, when the first video ever starts, and never again', async () => {
+    usePlayerPrefs.setState({ hasSeenShortcutsTip: false })
+    const first = renderWithProviders({
+      ui: <TestPlayer media={uhd} backTo="/libraries/2" />,
+    })
+    const video = first.container.querySelector('video')
+    if (!video) throw new Error('no video')
+    expect(screen.queryByRole('complementary', { name: 'Play with your keyboard' })).toBeNull()
+    act(() => {
+      video.dispatchEvent(new Event('play'))
+      video.dispatchEvent(new Event('playing'))
+    })
+    const tip = screen.getByRole('complementary', { name: 'Play with your keyboard' })
+    expect(within(tip).getByText('Play or pause')).toBeInTheDocument()
+    expect(within(tip).getByText('All shortcuts')).toBeInTheDocument()
+    expect(usePlayerPrefs.getState().hasSeenShortcutsTip).toBe(true)
+    // The keys it teaches still work while it shows.
+    press('l')
+    expect(video.currentTime).toBe(10)
+    await userEvent.click(within(tip).getByRole('button', { name: 'Got it' }))
+    expect(screen.queryByRole('complementary', { name: 'Play with your keyboard' })).toBeNull()
+    first.unmount()
+
+    const second = renderWithProviders({
+      ui: <TestPlayer media={uhd} backTo="/libraries/2" />,
+    })
+    const again = second.container.querySelector('video')
+    if (!again) throw new Error('no video')
+    act(() => {
+      again.dispatchEvent(new Event('play'))
+      again.dispatchEvent(new Event('playing'))
+    })
+    expect(screen.queryByRole('complementary', { name: 'Play with your keyboard' })).toBeNull()
+  })
+
+  it('puts the keyboard tip away once the full list is opened', () => {
+    usePlayerPrefs.setState({ hasSeenShortcutsTip: false })
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={uhd} backTo="/libraries/2" />,
+    })
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    act(() => {
+      video.dispatchEvent(new Event('play'))
+      video.dispatchEvent(new Event('playing'))
+    })
+    press('?')
+    expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeInTheDocument()
+    press('Escape')
+    expect(screen.queryByRole('complementary', { name: 'Play with your keyboard' })).toBeNull()
+  })
+
   it('skips either way from the bar, further on quick presses, and back to the start', async () => {
     const { container } = renderWithProviders({
       ui: <TestPlayer media={uhd} backTo="/libraries/2" />,

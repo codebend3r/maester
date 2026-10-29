@@ -18,6 +18,7 @@ import {
 import { handled } from '@/desktop/handled'
 import { DownloadRow } from '@/desktop/DownloadsPage/DownloadRow'
 import styles from '@/desktop/DownloadsPage/DownloadsPage.module.scss'
+import { PageTitle } from '@/components/PageTitle/PageTitle'
 
 const EMPTY = 'Nothing downloaded yet. Choose Download on a movie, show or saga to keep it here.'
 
@@ -104,9 +105,15 @@ export const DownloadsPage = () => {
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
       <header className={styles.header}>
-        <h1 id={ids.title} ref={title} tabIndex={-1} className={styles.title}>
+        <PageTitle
+          id={ids.title}
+          ref={title}
+          tabIndex={-1}
+          icon="download"
+          className={styles.title}
+        >
           Downloads
-        </h1>
+        </PageTitle>
         <div className={styles.tools}>
           {bulks.map((bulk) => (
             <Button

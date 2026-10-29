@@ -1,0 +1,37 @@
+.list {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.keys {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-0);
+}
+
+.key {
+  min-width: 1.75rem;
+  padding: 0.1rem var(--space-1);
+  border: 1px solid color-mix(in srgb, var(--color-on-picture) 16%, transparent);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-on-picture) 8%, transparent);
+  box-shadow: none;
+  color: var(--color-on-picture);
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
+.action {
+  color: var(--color-on-picture-soft);
+  font-size: var(--font-size-sm);
+}

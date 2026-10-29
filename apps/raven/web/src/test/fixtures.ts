@@ -1,11 +1,13 @@
 import {
   BUG_REPORT_STATUSES,
+  STREAM_PURPOSES,
   type AiSuggestion,
   type BugReport,
   type ItemDetails,
   type ItemSummary,
   type Library,
   type LibraryCounts,
+  type LiveDownload,
   type LiveStream,
   type MediaItem,
   type MetadataHealth,
@@ -233,8 +235,11 @@ export const review = (overrides: Partial<Review> = {}): Review => ({
   ...overrides,
 })
 
-export const liveStream = (overrides: Partial<LiveStream> = {}): LiveStream => ({
+type LivePlay = Extract<LiveStream, { purpose: typeof STREAM_PURPOSES.play }>
+
+export const liveStream = (overrides: Partial<LivePlay> = {}): LivePlay => ({
   id: 'stream-1',
+  purpose: STREAM_PURPOSES.play,
   media: mediaItem(),
   libraryName: 'Films',
   mode: 'direct',
@@ -248,6 +253,13 @@ export const liveStream = (overrides: Partial<LiveStream> = {}): LiveStream => (
   audio: null,
   sendRate: null,
   quality: null,
+  ...overrides,
+})
+
+export const liveDownload = (overrides: Partial<LiveDownload> = {}): LiveDownload => ({
+  ...liveStream({ position: null }),
+  purpose: STREAM_PURPOSES.download,
+  received: 0,
   ...overrides,
 })
 

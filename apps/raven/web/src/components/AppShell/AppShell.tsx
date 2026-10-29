@@ -1,4 +1,4 @@
-import { DESKTOP_PATHS } from '@raven/core'
+import { DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { type ReactNode, useId } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
@@ -23,7 +23,7 @@ import { useInProgressCount } from '@/desktop/downloadsApi'
 import { usePageBackdrop } from '@raven/ui/headless'
 import { useComputerName, useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
-import { useSideMenu } from '@/stores/sideMenu'
+import { SIDE_MENU_KEY, useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
 
 type NavItemProps = {
@@ -105,6 +105,44 @@ const DesktopNavItems = ({ isIconsOnly }: DesktopNavItemsProps) => {
   )
 }
 
+type ManageGroupProps = { isIconsOnly: boolean; children: ReactNode }
+
+/**
+ * Libraries to Settings under a Manage button that folds them away and
+ * remembers it, the menu open or down to its icons, where the button keeps
+ * only its chevron and names itself in a tooltip.
+ */
+const ManageGroup = ({ isIconsOnly, children }: ManageGroupProps) => {
+  const groupId = useId()
+  const isFolded = useSideMenu((state) => state.isManageFolded)
+  const toggleManage = useSideMenu((state) => state.toggleManage)
+  return (
+    <>
+      <NavTip text={`${isFolded ? 'Show' : 'Hide'} Manage`} isOn={isIconsOnly}>
+        {(handlers) => (
+          <button
+            type="button"
+            className={styles.manageToggle}
+            aria-expanded={!isFolded}
+            aria-controls={groupId}
+            aria-label={isIconsOnly ? 'Manage' : undefined}
+            onClick={toggleManage}
+            {...handlers}
+          >
+            {!isIconsOnly && <span className={styles.manageLabel}>Manage</span>}
+            <span className={styles.chevron}>
+              <Icon name="expand" size={16} />
+            </span>
+          </button>
+        )}
+      </NavTip>
+      <div id={groupId} className={styles.manage} hidden={isFolded}>
+        {children}
+      </div>
+    </>
+  )
+}
+
 /**
  * What keeps the pages in step with the server while the frame is open: its
  * changes, and the admin lock coming on or going off. Left out while raven
@@ -136,8 +174,9 @@ const ShortcutTip = ({ onDismiss }: ShortcutTipProps) => (
  * holds still as the page scrolls: the logo, Home and Favourites, then
  * under a Pinned heading the pinned libraries, each with its type's icon
  * (with a lock on it for a locked one, whatever its type), an open one
- * marked instead of Libraries. Libraries and Settings sit at its foot, over
- * raven's version and the toggle. The menu collapses to its icons with B or
+ * marked instead of Libraries. Libraries and Settings sit at its foot, under
+ * a rule and a Manage button that folds them away, open menu or icons alone,
+ * then Shortcuts, which never folds, over raven's version and the toggle. The menu collapses to its icons with B or
  * the toggle and stays that way across visits; on a medium screen it is
  * down to its icons whatever the toggle says, so there the toggle and B
  * step aside. A phone has no side menu but a tab bar along the foot of the
@@ -169,7 +208,7 @@ export const AppShell = () => {
     isAnyOf({ patterns: libraryPages(library.id), pathname }),
   )
 
-  useKeyShortcut({ key: 'b', onPress: isMediumScreen ? ignore : toggle })
+  useKeyShortcut({ key: SIDE_MENU_KEY, onPress: isMediumScreen ? ignore : toggle })
   useScrollReset()
 
   return (
@@ -232,7 +271,7 @@ export const AppShell = () => {
           )}
         </div>
         <div className={styles.dock}>
-          <div className={styles.manage}>
+          <ManageGroup isIconsOnly={isIconsOnly}>
             {!isOffline && (
               <>
                 <NavItem
@@ -268,7 +307,14 @@ export const AppShell = () => {
               label="Settings"
               isIconsOnly={isIconsOnly}
             />
-          </div>
+          </ManageGroup>
+          <NavItem
+            to={PAGE_PATHS.shortcuts}
+            patterns={[PAGE_PATHS.shortcuts]}
+            icon={<Icon name="keyboard" />}
+            label="Shortcuts"
+            isIconsOnly={isIconsOnly}
+          />
           {!isMediumScreen && (
             <div className={styles.foot}>
               <div className={styles.toggle}>

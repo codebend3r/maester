@@ -101,9 +101,24 @@ export const SAMPLE_MEDIA: MediaItem[] = [
   }),
 ]
 
-export const SAMPLE_SCANS: Array<{ label: string; scan: ScanStatus }> = [
+export const SAMPLE_SCANS: Array<{ label: string; scan: ScanStatus; expected: number }> = [
+  {
+    label: 'Looking',
+    expected: 1240,
+    scan: {
+      state: 'walking',
+      kind: 'full',
+      found: 530,
+      processed: 0,
+      startedAt: '2026-10-09T12:00:00.000Z',
+      finishedAt: null,
+      quickScannedAt: null,
+      error: null,
+    },
+  },
   {
     label: 'Scanning',
+    expected: 1240,
     scan: {
       state: 'indexing',
       kind: 'full',
@@ -117,6 +132,7 @@ export const SAMPLE_SCANS: Array<{ label: string; scan: ScanStatus }> = [
   },
   {
     label: 'Done',
+    expected: 1240,
     scan: {
       state: 'idle',
       kind: 'full',
@@ -130,6 +146,7 @@ export const SAMPLE_SCANS: Array<{ label: string; scan: ScanStatus }> = [
   },
   {
     label: 'Failed',
+    expected: 0,
     scan: {
       state: 'idle',
       kind: 'full',

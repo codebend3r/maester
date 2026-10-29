@@ -23,6 +23,16 @@
   font-variant-numeric: tabular-nums;
 }
 
+// Streaming over Downloading, each a heading and its count over its cards.
+.section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  font-size: var(--font-size-xl);
+}
+
 .list {
   display: grid;
   gap: var(--space-2);
@@ -146,6 +156,30 @@
 
 .bar {
   height: var(--space-1);
+}
+
+// A download's line: how much has come, and how fast, in megabytes a second.
+.download {
+  grid-area: progress;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.gauge {
+  width: 100%;
+}
+
+.rate {
+  padding: var(--space-0) var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-moss);
+  color: var(--color-bark);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .time {
