@@ -18,15 +18,6 @@ import {
 import {
   type Duplicates,
   type HistoryEntry,
-  type Library,
-  type LibraryCounts,
-  type LibraryInput,
-  type MediaItem,
-  type MediaListParams,
-  type PosterEntry,
-  type Saga,
-  type SagaBackdrop,
-  type ShowListing,
   isJoinRequest,
   isLibraryHeroChange,
   isLibraryOrder,
@@ -34,15 +25,26 @@ import {
   isRecord,
   isSagaBackdrop,
   isSplitRequest,
+  ITEM_TYPES,
+  type Library,
+  type LibraryCounts,
+  type LibraryInput,
+  MATCH_SOURCES,
+  matcherFor,
   matchesAlike,
   matchTypeFor,
+  type MediaItem,
+  type MediaListParams,
   mediaListQuery,
+  METADATA_SERVICE_STATES,
+  type PosterEntry,
+  type Saga,
+  SAGA_BACKDROP_TYPES,
+  type SagaBackdrop,
   sagaPictures,
+  type ShowListing,
   type UnmatchedFile,
   validateLibraryInput,
-  ITEM_TYPES,
-  METADATA_SERVICE_STATES,
-  SAGA_BACKDROP_TYPES,
 } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
@@ -408,10 +410,14 @@ export class LibrariesController {
   @HttpCode(200)
   rematch(@Param('id', ParseIntPipe) id: number): Library {
     const record = this.find(id)
-    if (matchTypeFor(record.settings.kind) == null) {
-      throw new BadRequestException('Only a library of movies or shows is matched.')
+    const matcher = matcherFor(record.settings.kind)
+    if (matcher === null) {
+      throw new BadRequestException('Only a library of movies, shows or music is matched.')
     }
-    if (this.metadata.health().tmdb === METADATA_SERVICE_STATES.off) {
+    if (
+      matcher.by === MATCH_SOURCES.tmdb &&
+      this.metadata.health().tmdb === METADATA_SERVICE_STATES.off
+    ) {
       throw new ServiceUnavailableException('Set TMDB_API_TOKEN to match files.')
     }
     this.metadata.retryUnmatched(id)

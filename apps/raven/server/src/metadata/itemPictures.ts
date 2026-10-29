@@ -61,7 +61,7 @@ export class ItemPictures {
     @Inject(MatchFiles) private readonly files: MatchFiles,
     @Inject(ImageCache) private readonly images: ImageCache,
     @Inject(ItemImagesRepository) private readonly stored: ItemImagesRepository,
-    @Inject(MusicRepository) private readonly music: Pick<MusicRepository, 'albumIds'>,
+    @Inject(MusicRepository) private readonly music: Pick<MusicRepository, 'keptCovers'>,
   ) {}
 
   /**
@@ -164,6 +164,6 @@ export class ItemPictures {
 
   /** Removes items and people nothing uses any more, then the pictures only they showed; an album's cover stays while it does. */
   async clearUp(): Promise<void> {
-    await this.images.sweep({ ...this.metadata.clearUp(), albumIds: this.music.albumIds() })
+    await this.images.sweep({ ...this.metadata.clearUp(), ...this.music.keptCovers() })
   }
 }

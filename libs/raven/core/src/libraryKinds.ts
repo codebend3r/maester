@@ -27,6 +27,15 @@ import {
 import { MEDIA_EXTENSIONS, MEDIA_TYPES, type MediaType } from '@/media'
 import { sortParts } from '@/sortFields'
 
+/** Who a library's files are matched by: TMDB for films and shows, MusicBrainz for albums. */
+export const MATCH_SOURCES = { tmdb: 'tmdb', musicBrainz: 'musicBrainz' } as const
+
+/** How a type of library is matched: a TMDB type, MusicBrainz, or not at all. */
+export type KindMatcher =
+  | { by: typeof MATCH_SOURCES.tmdb; type: MatchItemType }
+  | { by: typeof MATCH_SOURCES.musicBrainz }
+  | null
+
 /** What a type of library can do: the one place each rule about each type lives. */
 export type KindRules = {
   /** What its files are: videos, or audio files. */
@@ -35,8 +44,8 @@ export type KindRules = {
   saveProgress: boolean
   /** What its page lists: files, shows, or albums. */
   listing: LibraryListing
-  /** What its files are matched to on TMDB; null for a library that is never matched. */
-  matches: MatchItemType | null
+  /** How its files are matched: to a TMDB type, to MusicBrainz releases, or never. */
+  matcher: KindMatcher
   /** The search results it prefers, tier by tier: a key of `TIER_SETS`. */
   prefer: TierSet
   /** The fields it can sort its videos on, in the order a menu offers them. */
@@ -70,7 +79,7 @@ const MOVIE_RULES = {
   media: MEDIA_TYPES.video,
   saveProgress: true,
   listing: LIBRARY_LISTINGS.media,
-  matches: ITEM_TYPES.movie,
+  matcher: { by: MATCH_SOURCES.tmdb, type: ITEM_TYPES.movie },
   prefer: TIER_SET_NAMES.any,
   fields: isSortFieldName.values,
   views: isLibraryView.values,
@@ -88,7 +97,7 @@ const SHOW_RULES = {
   media: MEDIA_TYPES.video,
   saveProgress: true,
   listing: LIBRARY_LISTINGS.shows,
-  matches: ITEM_TYPES.show,
+  matcher: { by: MATCH_SOURCES.tmdb, type: ITEM_TYPES.show },
   prefer: TIER_SET_NAMES.any,
   fields: without({ all: isSortFieldName.values, left: FILE_FIELDS }),
   views: without({ all: isLibraryView.values, left: [LIBRARY_VIEWS.grouped] }),
@@ -102,7 +111,7 @@ const UNMATCHED_RULES = {
   media: MEDIA_TYPES.video,
   saveProgress: true,
   listing: LIBRARY_LISTINGS.media,
-  matches: null,
+  matcher: null,
   prefer: TIER_SET_NAMES.any,
   fields: without({ all: isSortFieldName.values, left: MATCHED_FIELDS }),
   views: isLibraryView.values,
@@ -112,15 +121,15 @@ const UNMATCHED_RULES = {
 } as const satisfies KindRules
 
 /**
- * A library of audio files is never matched yet, and has no frame to sort
- * or group by. Its files list as before the albums page lands, as a list
- * grouped by the month each file came in.
+ * A library of audio files has no frame to sort or group by. Its files
+ * list as before the albums page lands, as a list grouped by the month
+ * each file came in.
  */
 const AUDIO_RULES = {
   media: MEDIA_TYPES.audio,
   saveProgress: true,
   listing: LIBRARY_LISTINGS.media,
-  matches: null,
+  matcher: null,
   prefer: TIER_SET_NAMES.any,
   fields: without({
     all: isSortFieldName.values,
@@ -151,16 +160,27 @@ export const KIND_RULES = {
   sports: MOVIE_RULES,
   youtube: UNMATCHED_RULES,
   other: UNMATCHED_RULES,
-  music: { ...AUDIO_RULES, saveProgress: false, listing: LIBRARY_LISTINGS.albums },
+  music: {
+    ...AUDIO_RULES,
+    saveProgress: false,
+    listing: LIBRARY_LISTINGS.albums,
+    matcher: { by: MATCH_SOURCES.musicBrainz },
+  },
   audiobooks: AUDIO_RULES,
 } as const satisfies Record<LibraryKind, KindRules>
 
+/** How a library of `kind` is matched: by TMDB, by MusicBrainz, or never. */
+export const matcherFor = (kind: LibraryKind): KindMatcher => KIND_RULES[kind].matcher
+
 /**
  * What a library's files are matched to on TMDB, by its type's rules; null
- * for a type that is never matched. Two types with the same answer read
- * their files the same way.
+ * for a type that is never matched there. Two types with the same answer
+ * read their files the same way.
  */
-export const matchTypeFor = (kind: LibraryKind): MatchItemType | null => KIND_RULES[kind].matches
+export const matchTypeFor = (kind: LibraryKind): MatchItemType | null => {
+  const matcher = matcherFor(kind)
+  return matcher?.by === MATCH_SOURCES.tmdb ? matcher.type : null
+}
 
 /** The tiers a library of `kind` searches TMDB's results in, in order. */
 export const tiersFor = (kind: LibraryKind): readonly CandidateTier[] =>

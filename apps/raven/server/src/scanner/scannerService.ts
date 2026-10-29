@@ -415,10 +415,7 @@ export class ScannerService implements OnApplicationBootstrap {
           processed: walk.files.length - toProbe.length,
         },
       })
-      // Matching needs only names, so new files are matched while they are
-      // probed, and the files that went are cleared up after.
-      this.metadata.enqueue(library.id)
-      await this.probe({
+      await this.probeAndMatch({
         libraryId: library.id,
         media,
         toProbe,
@@ -524,8 +521,7 @@ export class ScannerService implements OnApplicationBootstrap {
         },
       })
       if (isNew) {
-        this.metadata.enqueue(library.id)
-        await this.probe({
+        await this.probeAndMatch({
           libraryId: library.id,
           media,
           toProbe,
@@ -580,8 +576,7 @@ export class ScannerService implements OnApplicationBootstrap {
         signal,
       })
       if (!changesAnything(changes) && toProbe.length === 0) return
-      this.metadata.enqueue(library.id)
-      await this.probe({
+      await this.probeAndMatch({
         libraryId: library.id,
         media,
         toProbe,
@@ -676,6 +671,30 @@ export class ScannerService implements OnApplicationBootstrap {
         return this.music.index({ id, libraryId, path })
       default: {
         const unknown: never = media
+        return unknown
+      }
+    }
+  }
+
+  /**
+   * Probes the files and queues the library's matching around it: a video
+   * library's before, since matching films needs only names, so new files
+   * are matched while they are probed; an audio library's after, since its
+   * albums come from the tags the probe reads. The files that went are
+   * cleared up by the pass either way.
+   */
+  private async probeAndMatch(props: ScannerServiceProbeProps): Promise<void> {
+    switch (props.media) {
+      case MEDIA_TYPES.video:
+        this.metadata.enqueue(props.libraryId)
+        return this.probe(props)
+      case MEDIA_TYPES.audio:
+        await this.probe(props)
+        // A cancelled scan leaves its albums pending for the next one.
+        if (!props.signal.aborted) this.metadata.enqueue(props.libraryId)
+        return
+      default: {
+        const unknown: never = props.media
         return unknown
       }
     }

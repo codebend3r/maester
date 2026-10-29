@@ -1,7 +1,7 @@
 import { HEADERS } from '@shared/server'
 import { mkdirSync } from 'node:fs'
 import { readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import {
   BACKDROP_OWN_WIDTH,
@@ -66,6 +66,14 @@ type ImageCacheWarnOnceProps = { key: string; message: string }
 
 type ImageCacheTmdbProps = { path: string; width: ImageWidth }
 
+type ImageCacheDownloadedProps = {
+  /** Where the picture is kept; its folder exists. */
+  target: string
+  url: string
+  /** What the picture is, for the warning when it cannot be had. */
+  what: string
+}
+
 type ImageCacheLocalProps = {
   itemId: number
   kind: string
@@ -92,10 +100,18 @@ type ImageCacheSweepProps = {
   tmdbPaths: ReadonlySet<string>
   itemIds: ReadonlySet<number>
   albumIds: ReadonlySet<number>
+  /** The release ids whose archive covers albums still show. */
+  coverArtIds: ReadonlySet<string>
 }
 
 /** The folders under `images/` that hold pictures scaled from files beside or inside the media. */
 const SCALED_DIRS = { local: 'local', albums: 'albums' } as const
+
+/** The item or album a scale belongs to: what its file name starts with, before the mtime. */
+const ownerOf = (file: string): number => Number(file.split('-')[0])
+
+/** The folder under `images/` that holds the Cover Art Archive's covers as fetched, named by release id. */
+const COVER_ART_DIR = 'cover-art'
 
 /**
  * Posters, backdrops, photos and stills on disk beside the thumbnails, each
@@ -125,9 +141,8 @@ export class ImageCache {
     KEPT_WIDTHS.forEach((width) =>
       mkdirSync(join(this.root, 'tmdb', `w${width}`), { recursive: true }),
     )
-    Object.values(SCALED_DIRS).forEach((dir) =>
-      mkdirSync(join(this.root, dir), { recursive: true }),
-    )
+    const scaled: readonly string[] = [...Object.values(SCALED_DIRS), COVER_ART_DIR]
+    scaled.forEach((dir) => mkdirSync(join(this.root, dir), { recursive: true }))
   }
 
   /** Poster warming outlives a match, so shutdown must wait for its queued writes too. */
@@ -154,32 +169,53 @@ export class ImageCache {
   tmdb({ path, width }: ImageCacheTmdbProps): Promise<string | null> {
     if (!TMDB_IMAGE_PATH.test(path)) return Promise.resolve(null)
     const size = `w${width}`
-    const dir = join(this.root, 'tmdb', size)
-    const target = join(dir, path.slice(1))
+    return this.downloaded({
+      target: join(this.root, 'tmdb', size, path.slice(1)),
+      url: `https://image.tmdb.org/t/p/${size}${path}`,
+      what: `${size}${path}`,
+    })
+  }
+
+  /**
+   * The Cover Art Archive's front cover of a release, at its 500 pixel
+   * size, downloaded on first use; null when the archive has none. The
+   * album's narrower covers are scaled from it.
+   */
+  coverArt(mbid: string): Promise<string | null> {
+    return this.downloaded({
+      target: join(this.root, COVER_ART_DIR, `${mbid}.jpg`),
+      url: `https://coverartarchive.org/release/${encodeURIComponent(mbid)}/front-500`,
+      what: `the cover of release ${mbid}`,
+    })
+  }
+
+  /** A picture fetched from `url` into `target` once; null when it cannot be had, warned of once. */
+  private downloaded({ target, url, what }: ImageCacheDownloadedProps): Promise<string | null> {
     return this.once({
       key: target,
       make: async () => {
         if (await exists(target)) return target
         return this.downloads.run(async () => {
           const response = await this.fetch({
-            url: `https://image.tmdb.org/t/p/${size}${path}`,
+            url,
             init: {
               headers: { [HEADERS.accept]: RAVEN_CONTENT_TYPES.anyImage },
               signal: AbortSignal.timeout(TIMEOUT_MS),
             },
           }).catch(() => null)
           if (!response?.ok) {
-            this.warnOnce({ key: path, message: `TMDB could not serve ${size}${path}` })
+            this.warnOnce({ key: url, message: `Could not fetch ${what}` })
             return null
           }
-          const temp = temporary({ dir, extension: path.endsWith('.png') ? 'png' : 'jpg' })
+          const dir = dirname(target)
+          const temp = temporary({ dir, extension: target.endsWith('.png') ? 'png' : 'jpg' })
           try {
             await writeFile(temp, Buffer.from(await response.arrayBuffer()))
             await rename(temp, target)
             return target
           } catch (error) {
             await rm(temp, { force: true })
-            this.warnOnce({ key: path, message: `Could not cache ${path}: ${String(error)}` })
+            this.warnOnce({ key: url, message: `Could not cache ${what}: ${String(error)}` })
             return null
           }
         })
@@ -252,7 +288,7 @@ export class ImageCache {
    * Removes cached pictures nothing points at any more: TMDB files no item
    * or person uses, and scales of items and albums that are gone.
    */
-  async sweep({ tmdbPaths, itemIds, albumIds }: ImageCacheSweepProps): Promise<void> {
+  async sweep({ tmdbPaths, itemIds, albumIds, coverArtIds }: ImageCacheSweepProps): Promise<void> {
     await Promise.all(
       KEPT_WIDTHS.map(async (width) => {
         const dir = join(this.root, 'tmdb', `w${width}`)
@@ -266,14 +302,18 @@ export class ImageCache {
     )
     await Promise.all(
       [
-        { dir: SCALED_DIRS.local, kept: itemIds },
-        { dir: SCALED_DIRS.albums, kept: albumIds },
-      ].map(async ({ dir: name, kept }) => {
+        { dir: SCALED_DIRS.local, isKept: (file: string) => itemIds.has(ownerOf(file)) },
+        { dir: SCALED_DIRS.albums, isKept: (file: string) => albumIds.has(ownerOf(file)) },
+        {
+          dir: COVER_ART_DIR,
+          isKept: (file: string) => coverArtIds.has(file.replace(/\.jpg$/, '')),
+        },
+      ].map(async ({ dir: name, isKept }) => {
         const dir = join(this.root, name)
         const names = await readdir(dir).catch((): string[] => [])
         await Promise.all(
           names
-            .filter((file) => !file.startsWith('.') && !kept.has(Number(file.split('-')[0])))
+            .filter((file) => !file.startsWith('.') && !isKept(file))
             .map((file) => rm(join(dir, file), { force: true })),
         )
       }),

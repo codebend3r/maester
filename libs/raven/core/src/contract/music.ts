@@ -1,3 +1,4 @@
+import { isMatchState } from '@/contract/items'
 import {
   type Infer,
   isBoolean,
@@ -5,6 +6,7 @@ import {
   isString,
   isStringArray,
   listOf,
+  matching,
   nullable,
   object,
   oneOf,
@@ -67,6 +69,8 @@ export const isAlbumSummary = object({
   duration: isNumber,
   /** Changes with the cover, so its address caches for good; null while the album has none. */
   coverVersion: nullable(isString),
+  /** How far matching to MusicBrainz got: see `MatchState`; `off` never applies to an album. */
+  match: isMatchState,
   /** When its first track came in. */
   addedAt: isString,
 })
@@ -137,3 +141,30 @@ export const isArtistDetails = object({
 })
 
 export type ArtistDetails = Infer<typeof isArtistDetails>
+
+/** A MusicBrainz release id: a UUID. */
+export const isMbid = matching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+
+/** One of MusicBrainz's releases, offered by Fix match for an album. */
+export const isAlbumMatchCandidate = object({
+  mbid: isMbid,
+  title: isString,
+  /** The release's artists as MusicBrainz credits them, joined: "A feat. B". */
+  artist: isString,
+  year: nullable(isNumber),
+  trackCount: nullable(isNumber),
+  type: isAlbumType,
+  /** The release's country, ISO 3166-1, when MusicBrainz says. */
+  country: nullable(isString),
+  /** How sure Fix match is that this is the album: a whole number from 0 to 100. */
+  confidence: isNumber,
+})
+
+export type AlbumMatchCandidate = Infer<typeof isAlbumMatchCandidate>
+
+export const isAlbumMatchCandidateList = listOf(isAlbumMatchCandidate)
+
+/** `PUT /api/albums/:id/match`: the release the album is, or null for none that MusicBrainz lists. */
+export const isAlbumMatchChoice = object({ mbid: nullable(isMbid) })
+
+export type AlbumMatchChoice = Infer<typeof isAlbumMatchChoice>

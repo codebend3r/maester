@@ -80,6 +80,8 @@ import { ScoresRepository } from '@/metadata/scoresRepository'
 import { ScoreSweep } from '@/metadata/scoreSweep'
 import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
 import { AlbumCovers } from '@/music/albumCovers'
+import { AlbumMatching } from '@/music/albumMatching'
+import { MusicBrainzClient } from '@/music/musicBrainzClient'
 import { AudioReader } from '@/music/audioReader'
 import {
   AlbumsController,
@@ -235,6 +237,8 @@ export class AppModule {
         AudioReader,
         AlbumCovers,
         MusicIndexer,
+        MusicBrainzClient,
+        AlbumMatching,
         MatchFiles,
         AiDecisions,
         TmdbClient,

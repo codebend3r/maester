@@ -169,6 +169,10 @@ export type RateLimit = {
   reset: () => void
 }
 
+/** Resolves after `ms`. */
+export const sleep = (ms: number): Promise<void> =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms))
+
 type CreateRateLimitProps = {
   perSecond: number
   inFlight: number
@@ -185,7 +189,7 @@ export const createRateLimit = ({
   perSecond,
   inFlight,
   now = Date.now,
-  sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  sleep: wait = sleep,
 }: CreateRateLimitProps): RateLimit => {
   const gate = createGate({ limit: inFlight })
   const state = { rate: perSecond, next: 0 }
@@ -193,8 +197,8 @@ export const createRateLimit = ({
   const turn = async (): Promise<void> => {
     const at = Math.max(now(), state.next)
     state.next = at + 1000 / state.rate
-    const wait = at - now()
-    if (wait > 0) await sleep(wait)
+    const pause = at - now()
+    if (pause > 0) await wait(pause)
   }
 
   return {

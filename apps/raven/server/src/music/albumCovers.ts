@@ -44,6 +44,10 @@ export class AlbumCovers {
       }
       case COVER_SOURCES.file:
         return this.images.album({ albumId: id, source: cover.ref, width })
+      case COVER_SOURCES.coverArtArchive: {
+        const fetched = await this.images.coverArt(cover.ref)
+        return fetched === null ? null : this.images.album({ albumId: id, source: fetched, width })
+      }
       default: {
         const unknown: never = cover.source
         return unknown

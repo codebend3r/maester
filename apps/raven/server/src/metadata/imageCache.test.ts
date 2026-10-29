@@ -184,6 +184,7 @@ describe('the image cache', () => {
       tmdbPaths: new Set(['/kept.jpg']),
       itemIds: new Set([7, 8]),
       albumIds: new Set(),
+      coverArtIds: new Set(),
     })
     expect(await Promise.all(kept.map((path) => exists(path ?? '')))).toEqual([true, true, true])
     expect(await Promise.all(gone.map((path) => exists(path ?? '')))).toEqual([false, false, false])

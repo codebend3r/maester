@@ -1,6 +1,7 @@
 /** Header names in lower case, as Node hands incoming ones over, so they index `request.headers` too. */
 export const HEADERS = {
   accept: 'accept',
+  userAgent: 'user-agent',
   acceptEncoding: 'accept-encoding',
   cacheControl: 'cache-control',
   contentEncoding: 'content-encoding',

@@ -1,6 +1,6 @@
 # raven: audio libraries, and a standalone music player
 
-Date: 2026-10-27. Status: approved on 2026-10-27, building as ten PRs; PRs 1 and 2 are built. Written as a spike, its four spikes ran on 2026-10-27 and their results are in section "Spikes".
+Date: 2026-10-27. Status: approved on 2026-10-27, building as ten PRs; PRs 1 to 3 are built. Written as a spike, its four spikes ran on 2026-10-27 and their results are in section "Spikes".
 
 ## Why
 
@@ -299,6 +299,9 @@ Ten stacked PRs, one commit each, thermo-reviewed. PRs 1 to 7 bring music to eve
 > Ten PRs, not 22, at the owner's request (2026-10-27). Each PR carries a whole layer or a whole client, so PRs 2, 4 and 7 may run to about 100 files each; the owner chose ten PRs over the usual 50-file limit.
 
 > [!TIP]
+> PR 3 built on 2026-10-29. Albums are matched by `AlbumMatching`, a service of its own that `MetadataService` dispatches to for an audio library, rather than a `KindMatcher`, whose file-and-item shape fits nothing about albums; the scanner queues an audio library's matching after the probe, since the albums come from the tags it reads, where a video library's is queued before. AcoustID fingerprinting stays out until a key is configured, as decided. The Fix match page for albums comes with the album page in PR 4; the routes and the client calls are here.
+
+> [!TIP]
 > PR 2 built on 2026-10-29 as planned, with three changes. The tags come from `music-metadata` alone (the scan-time spike's answer), so `parseProbe` is untouched and an audio file never reaches ffprobe; its one audio track, codec and duration come from the same read. An album's cover is served lazily as a capability picture (`PICTURE_PATHS.album`), scaled by ffmpeg from the file that embeds it or the picture in its folder, so a scan copies no bytes; Cover Art Archive joins in PR 3. The `tracks` listing pages (`musicListQuery`: `limit` up to 500, `offset`), since a music library holds tens of thousands of rows. `KindRules` gained `listing` (`media`, `shows`, `albums`), which PR 4 reads for the library page. Playlists and the album and artist favourites wait for PR 7, with the rest of the viewing tables.
 
 > [!TIP]
@@ -308,7 +311,7 @@ Ten stacked PRs, one commit each, thermo-reviewed. PRs 1 to 7 bring music to eve
 | -- | -------- | --------------- |
 | 1. Audio playback foundations (built, #310) | core, server, web | `0:V:0` for every video map, so an attached picture is never taken for video; audio extensions, containers and MIME types; `music` and `audiobooks` kinds with `KIND_RULES`, labels and kind-picker copy; a kind's extensions in the scanner; an audio file's `/stream` as its audio alone, and its plan with no transcode or sizes |
 | 2. Music library on the server (built, `raven-audio`) | core, server | `AudioTags` read with `music-metadata`; no frame grabs for audio; embedded and folder cover art as capability pictures; the migration for `artists`, `albums`, `tracks` and credits, filled from tags, grouped by folder when tags are missing; the music routes; `ROUTES` rows, `APP_CLIENT_CALLS` entries and a locked music library in the lock suite |
-| 3. MusicBrainz matching | server, core, web | `MusicMatcher` behind a one-request-a-second gate; Cover Art Archive as an image source; Fix match for albums |
+| 3. MusicBrainz matching (built, `raven-music-matching`) | server, core | `MusicBrainzClient` behind a one-request-a-second gate with raven's `User-Agent`; `AlbumMatching` takes a sure search (`CONFIDENCE_STRONG`) and fills in what the tags lacked; the Cover Art Archive as a cover source for a matched album with none; `GET /api/albums/:id/match/search` and `PUT /api/albums/:id/match` for Fix match, whose page lands with the album page in PR 4; Retry unmatched covers music libraries |
 | 4. Queue player and music on the web | core, ui, web | `queue.ts` and its tests; the `audioQueue` store and persistent audio host; the html audio engine with preloading and Media Session; audio bitrate steps in `STREAM_QUALITIES` and the player's settings; music listings, artist and album pages, the now-playing bar, Now Playing and the queue page |
 | 5. Music on Raven for macOS | mpv, desktop, web | The audio surface kind; mpv playlist, gapless and ReplayGain; "showing" apart from "playing" in main; `prevent-app-suspension`; Now Playing and remote commands in the addon; album and playlist downloads |
 | 6. Music in the device app | audio, app, core | `@raven/audio`, the local Expo module over `AVQueuePlayer` and Media3; music screens in touch and focus layouts; the now-playing bar; background playback and the lock screen on phones through it, and through `react-native-video` on the TVs; the audio rows in `canPlay.ts` |
