@@ -9,6 +9,9 @@ import type { PlayerHeading } from '@/layouts/playerHeading'
 /** How far a skip button moves, in seconds, as the web's Back 10 and Forward 10 do. */
 export const SKIP_SECONDS = 10
 
+/** What plays after the video, an episode's next in its show, and how to play it now. */
+export type PlayerNext = { label: string; onPlay: () => void }
+
 /** A track picker: what it offers, which is picked, and what to do with a pick; the chrome names it. */
 export type TrackPicker = Omit<PickerProps<string>, 'label'>
 
@@ -47,6 +50,8 @@ export type PlayerChromeProps = {
   transport: Transport | null
   audio: TrackPicker | null
   subtitles: TrackPicker | null
+  /** The next episode, once the server has named one; null for a film or the show's last. */
+  next: PlayerNext | null
   /** Hands the video to Picture in Picture; null where the player cannot. */
   onPictureInPicture: (() => void) | null
   onBack: () => void
@@ -68,6 +73,7 @@ export const PLAYER_COPY = {
   play: 'Play',
   leave: 'Back',
   pause: 'Pause',
+  next: 'Next episode',
   back: (seconds: number) => `Back ${seconds} seconds`,
   forward: (seconds: number) => `Forward ${seconds} seconds`,
   seek: 'Position',

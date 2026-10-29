@@ -18,6 +18,7 @@ import type { ReactVideoProps } from 'react-native-video'
 import { SelectedTrackType } from 'react-native-video'
 
 import { PLAYER_COPY } from '@/layouts/playerKit'
+import { APP_ROUTES } from '@/routes'
 import { REMOTE_KEYS } from '@/layouts/remoteKeys'
 import type * as PlatformModule from '@/platform/platform'
 import { APP_ROUTE_PARAMS } from '@/routes'
@@ -36,6 +37,8 @@ import {
   BUSBOYS_UNSUBTITLED,
   CUE_TEXT,
   DUAL_COMMENTARY,
+  GOOD_NEWS_MP4,
+  HALF_LOOP_MP4,
   playerApi,
 } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
@@ -49,6 +52,7 @@ import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@/test/vid
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 const mockBack = jest.fn()
+const mockReplace = jest.fn()
 const mockParams = jest.fn((): Record<string, string> => ({
   [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_UNSUBTITLED.id),
 }))
@@ -82,7 +86,7 @@ jest.mock('react-native-video', () =>
   jest.requireActual<typeof VideoMockModule>('@/test/videoMock').videoModuleMock(),
 )
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), back: mockBack }),
+  useRouter: () => ({ push: jest.fn(), back: mockBack, replace: mockReplace }),
   useLocalSearchParams: () => mockParams(),
 }))
 const mockApi = jest.fn((_server: AppServer) =>
@@ -205,6 +209,7 @@ describe('Player on Android TV', () => {
     usePlayerPrefs.setState({
       subtitles: { on: false, language: null },
       controlsLingerSeconds: CONTROLS_LINGER_SECONDS.initial,
+      autoplay: true,
     })
     const server = { ...NAS, id: `5b2d1f0e-8c3a-4f6b-9d7e-${String(++servers).padStart(12, '0')}` }
     useActiveServer.setState({ servers: [server], activeId: server.id })
@@ -439,5 +444,64 @@ describe('Player on Android TV', () => {
     expect(mockBack).toHaveBeenCalled()
     unmount()
     await waitFor(() => expect(savedSpots().at(-1)).toEqual({ position: 42, audio: AUDIO_PLAYED }))
+  })
+
+  /** Where the next episode's play goes, in the current one's place. */
+  const nextHref = {
+    pathname: APP_ROUTES.play,
+    params: { [APP_ROUTE_PARAMS.mediaId]: String(HALF_LOOP_MP4.id) },
+  }
+
+  it("offers an episode's next on Next, which plays it in this one's place", async () => {
+    await playing({ id: GOOD_NEWS_MP4.id })
+    const next = await screen.findByRole('button', {
+      name: `${PLAYER_COPY.next} S01E02 Half Loop`,
+    })
+    await fireEvent.press(next)
+    expect(mockReplace).toHaveBeenCalledWith(nextHref)
+    expect(mockBack).not.toHaveBeenCalled()
+  })
+
+  it('plays the next episode by itself once this one ends, while autoplay is on', async () => {
+    const props = await playing({ id: GOOD_NEWS_MP4.id })
+    await screen.findByRole('button', { name: `${PLAYER_COPY.next} S01E02 Half Loop` })
+    if (props.onEnd === undefined) throw new Error('The player hears no end')
+    await act(async () => props.onEnd?.())
+    expect(mockReplace).toHaveBeenCalledTimes(1)
+    expect(mockReplace).toHaveBeenCalledWith(nextHref)
+  })
+
+  it('waits on Next at the end with autoplay off', async () => {
+    usePlayerPrefs.setState({ autoplay: false })
+    const props = await playing({ id: GOOD_NEWS_MP4.id })
+    await screen.findByRole('button', { name: `${PLAYER_COPY.next} S01E02 Half Loop` })
+    await act(async () => props.onEnd?.())
+    expect(mockReplace).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: PLAYER_COPY.play })).toBeTruthy()
+  })
+
+  it("offers nothing after a show's last episode, nor after a film", async () => {
+    await playing({ id: HALF_LOOP_MP4.id })
+    await untilIdle(shown.client)
+    expect(screen.queryByRole('button', { name: /^Next episode/u })).toBeNull()
+    expect(
+      mockServer.heard.some(({ path }) =>
+        path.startsWith(
+          pathFor({ path: APP_CLIENT_CALLS.nextInSession.path, id: HALF_LOOP_MP4.id }),
+        ),
+      ),
+    ).toBe(true)
+    await cleanup()
+    mockServer.heard = []
+    await playing({ id: BUSBOYS_UNSUBTITLED.id })
+    await untilIdle(shown.client)
+    expect(screen.queryByRole('button', { name: /^Next episode/u })).toBeNull()
+    expect(
+      mockServer.heard.some(({ path }) =>
+        path.startsWith(
+          pathFor({ path: APP_CLIENT_CALLS.nextInSession.path, id: BUSBOYS_UNSUBTITLED.id }),
+        ),
+      ),
+    ).toBe(false)
   })
 })

@@ -3,6 +3,8 @@ import {
   type ItemDetails,
   type MediaItem,
   ROUTE_STATES,
+  SESSION_KINDS,
+  type ViewingSession,
   WATCHED_STATES,
   WATCH_TARGET_KINDS,
   type WatchedState,
@@ -33,18 +35,29 @@ import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
 import { ItemLayout, ItemNotice, Loading } from '@/layouts'
 import { type CheckState, ITEM_ACTIONS, type ItemAction } from '@/layouts/itemKit'
-import { APP_ROUTE_PARAMS, ROUTE_TARGETS, type RouteTarget, hrefOf } from '@/routes'
+import { APP_ROUTE_PARAMS, ROUTE_TARGETS, type RouteTarget, hrefOf, itemTarget } from '@/routes'
 
 const COPY = {
   opening: 'Opening the title',
   missing: 'This title is not on the server.',
   play: 'Play',
+  nextEpisode: 'Next episode',
   markWatched: 'Mark watched',
   watched: 'Watched',
   favourite: 'Favourite',
 } as const
 
-const ACTION_KEYS = { play: 'play', favourite: 'favourite', watched: 'watched' } as const
+const ACTION_KEYS = {
+  play: 'play',
+  next: 'next',
+  favourite: 'favourite',
+  watched: 'watched',
+  show: 'show',
+  season: 'season',
+} as const
+
+/** An episode rolls on through its show, so its next is the show's next in turn. */
+const SHOW_SESSION = { kind: SESSION_KINDS.show } as const satisfies ViewingSession
 
 /** A Watched toggle reads as ticked for all of it, half ticked for some, as the web's does. */
 const WATCHED_CHECKS = {
@@ -104,6 +117,52 @@ const watchedOf = ({ state, onToggle }: WatchedOfProps): ItemAction => ({
 const playNextLabel = (code: string | null): string =>
   code === null ? COPY.play : `${COPY.play} ${code}`
 
+type NextOfProps = { media: MediaItem; context: ItemContext }
+
+/** "Next S01E03": the episode after this one in its show, played from where the server saved. */
+const nextOf = ({ media, context }: NextOfProps): ItemAction => {
+  const code = media.item === null ? null : episodeCode(media.item)
+  return {
+    kind: ITEM_ACTIONS.play,
+    key: ACTION_KEYS.next,
+    label: code === null ? COPY.nextEpisode : `Next ${code}`,
+    onPress: () => context.onOpen({ kind: ROUTE_TARGETS.play, mediaId: media.id, at: 0 }),
+  }
+}
+
+type LinkOfProps = { key: string; title: string; itemId: number; context: ItemContext }
+
+/** "Go to Severance", "Go to Season 1": the way from an episode back up to its show or season. */
+const linkOf = ({ key, title, itemId, context }: LinkOfProps): ItemAction => ({
+  kind: ITEM_ACTIONS.link,
+  key,
+  label: `Go to ${title}`,
+  onPress: () => context.onOpen(itemTarget(itemId)),
+})
+
+type EpisodeLinksOfProps = {
+  details: ItemDetails
+  /** The episode's show, once read; its seasons name the one this episode is in. */
+  show: ItemDetails | null
+  context: ItemContext
+}
+
+/**
+ * An episode's links up: its show, and its season once the show's page has said which item
+ * that is, since an episode names its season only by number.
+ */
+const episodeLinksOf = ({ details, show, context }: EpisodeLinksOfProps): ItemAction[] => {
+  if (details.show === null) return []
+  const season =
+    show === null ? undefined : seasonsOf(show).find((each) => each.season === details.season)
+  return [
+    linkOf({ key: ACTION_KEYS.show, title: details.show.title, itemId: details.show.id, context }),
+    ...(season === undefined
+      ? []
+      : [linkOf({ key: ACTION_KEYS.season, title: season.title, itemId: season.id, context })]),
+  ]
+}
+
 type MarksOfProps = {
   details: ItemDetails
   favourite: ReturnType<typeof useServerItemFavourite>
@@ -132,8 +191,9 @@ type PlayableItemProps = {
 
 /**
  * A movie or an episode once the library's files it shows are known: Play, or Resume where it
- * stopped, then Favourite where its library allows one, then Watched, each mark shown before
- * the server answers.
+ * stopped, an episode's Next once the server names one, then Favourite where its library allows
+ * one, then Watched, each mark shown before the server answers, and an episode's links up to its
+ * show and season last.
  */
 const PlayableItem = ({
   kind,
@@ -144,13 +204,18 @@ const PlayableItem = ({
   context,
 }: PlayableItemProps) => {
   const { queries } = session
+  const isEpisode = kind === ITEM_TYPES.episode
   const { favourite, watched } = useServerMediaMutations({ api: session.api, media: primary })
   const libraries = useQuery(queries.librariesQuery)
   const tracks = useQuery(queries.tracksQuery(primary.id))
-  // An episode sits under its show's backdrop.
-  const show = useQuery(
-    queries.itemQuery(kind === ITEM_TYPES.episode ? (details.show?.id ?? null) : null),
-  )
+  // An episode sits under its show's backdrop, and its links up name the show's seasons.
+  const show = useQuery(queries.itemQuery(isEpisode ? (details.show?.id ?? null) : null))
+  // Only an episode has a next; a film asks nothing.
+  const next = useQuery({
+    ...queries.nextInSessionQuery({ id: primary.id, session: SHOW_SESSION }),
+    enabled: isEpisode,
+  })
+  const nextFile = next.data ?? null
   // A locked library's videos are never marked, but one marked before it locked can be unmarked.
   const canFavourite =
     canFavouriteIn({ libraries: libraries.data ?? [], libraryId: primary.libraryId }) ||
@@ -172,11 +237,13 @@ const PlayableItem = ({
       label: primary.position > 0 ? `Resume from ${formatDuration(primary.position)}` : COPY.play,
       context,
     }),
+    ...(nextFile === null ? [] : [nextOf({ media: nextFile, context })]),
     ...(canFavourite ? [favouriteOf({ isOn: primary.favourite, onToggle: favourite.mutate })] : []),
     watchedOf({
       state: primary.watched ? WATCHED_STATES.watched : WATCHED_STATES.unwatched,
       onToggle: () => watched.mutate(!primary.watched),
     }),
+    ...(isEpisode ? episodeLinksOf({ details, show: show.data ?? null, context }) : []),
   ]
   return (
     <ItemLayout

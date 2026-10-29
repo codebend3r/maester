@@ -164,6 +164,7 @@ const PlayerChrome = ({
   transport,
   audio,
   subtitles,
+  next,
   onPictureInPicture,
   onBack,
 }: PlayerChromeProps) => {
@@ -226,6 +227,14 @@ const PlayerChrome = ({
               {audio !== null && <Picker isOverPicture label={PLAYER_COPY.audio} {...audio} />}
               {subtitles !== null && (
                 <Picker isOverPicture label={PLAYER_COPY.subtitles} {...subtitles} />
+              )}
+              {next !== null && (
+                <ToolButton
+                  accessibilityLabel={next.label}
+                  isOverPicture
+                  label={PLAYER_COPY.next}
+                  onPress={next.onPlay}
+                />
               )}
               {onPictureInPicture !== null && (
                 <ToolButton

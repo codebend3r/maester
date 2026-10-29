@@ -54,6 +54,7 @@ export const APP_CLIENT_CALLS = {
   albumCover: { method: get, path: PICTURE_PATHS.album },
 
   getMedia: { method: get, path: '/api/media/:id' },
+  nextInSession: { method: get, path: '/api/media/:id/next' },
   getTracks: { method: get, path: '/api/media/:id/tracks' },
   getStreams: { method: get, path: '/api/media/:id/streams' },
   getMediaTicket: { method: get, path: '/api/media/:id/ticket' },

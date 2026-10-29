@@ -1,13 +1,17 @@
 import {
   ACCESS_REFUSALS,
   ITEM_IMAGE_KINDS,
+  ITEM_TYPES,
   type MediaItem,
   type MediaTracks,
   type PlaybackMode,
   type PlaybackPolicy,
   ROUTE_STATES,
+  SESSION_KINDS,
   type SubtitleTrack,
+  type ViewingSession,
   activeCues,
+  episodeCode,
   mediaLabel,
   resumeAtFor,
   routeIdOf,
@@ -33,7 +37,7 @@ import { SelectedTrackType, type VideoRef } from 'react-native-video'
 
 import { Loading, PlayerChrome, shouldDrawCaptions } from '@/layouts'
 import { NO_HEADING } from '@/layouts/playerHeading'
-import type { VideoSurface } from '@/layouts/playerKit'
+import { PLAYER_COPY, type VideoSurface } from '@/layouts/playerKit'
 import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
 import { planFor } from '@/platform/playbackPlan'
 import { mediaSourcesFor } from '@/player/mediaSources'
@@ -65,7 +69,7 @@ import {
 import { imageOf } from '@/queries/cards'
 import { usePlayerHeading } from '@/queries/usePlayerHeading'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
-import { APP_ROUTE_PARAMS, secondsOf } from '@/routes'
+import { APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf, secondsOf } from '@/routes'
 import { useAppPrefs } from '@/stores/appPrefs'
 
 const COPY = {
@@ -75,6 +79,15 @@ const COPY = {
 
 /** How often the player says where it is, in milliseconds: often enough for a smooth clock. */
 const PROGRESS_EVERY_MS = 250
+
+/** An episode rolls on through its show, so its next is the show's next in turn. */
+const SHOW_SESSION = { kind: SESSION_KINDS.show } as const satisfies ViewingSession
+
+/** "Next episode, S01E03 Half Loop": what the Next button is called aloud. */
+const nextLabelOf = (next: MediaItem): string =>
+  [PLAYER_COPY.next, next.item === null ? null : episodeCode(next.item), next.title]
+    .filter((part): part is string => part !== null)
+    .join(' ')
 
 type CaptionsForProps = {
   mode: PlaybackMode | null
@@ -124,16 +137,42 @@ type PlayingProps = {
   at: number
   session: AppQueries
   onBack: () => void
+  /** Plays another video in this one's place. */
+  onPlayNext: (next: MediaItem) => void
 }
 
 /**
  * One video down its plan's ladder, under the platform's chrome: the session asks for each way's
  * source and steps down from the spot when one fails, the player's events drive the shared
- * video state, and that state drives the progress the server hears.
+ * video state, and that state drives the progress the server hears. An episode's next in its
+ * show is on the chrome's Next, and plays by itself once this one ends while autoplay is on.
  */
-const Playing = ({ media, tracks, summary, policy, at, session, onBack }: PlayingProps) => {
+const Playing = ({
+  media,
+  tracks,
+  summary,
+  policy,
+  at,
+  session,
+  onBack,
+  onPlayNext,
+}: PlayingProps) => {
   const queryClient = useQueryClient()
   const audioLanguage = usePlayerPrefs((prefs) => prefs.audioLanguage)
+  const autoplay = usePlayerPrefs((prefs) => prefs.autoplay)
+  // Only an episode has a next; a film asks nothing.
+  const next = useQuery({
+    ...session.queries.nextInSessionQuery({ id: media.id, session: SHOW_SESSION }),
+    enabled: media.item?.type === ITEM_TYPES.episode,
+  })
+  const nextMedia = next.data ?? null
+  // The end and a press of Next can both ask in one tick; the player leaves once.
+  const hasLeft = useRef(false)
+  const playNext = () => {
+    if (nextMedia === null || hasLeft.current) return
+    hasLeft.current = true
+    onPlayNext(nextMedia)
+  }
   const subtitlePrefs = usePlayerPrefs((prefs) => prefs.subtitles)
   const setAudioLanguage = usePlayerPrefs((prefs) => prefs.setAudioLanguage)
   const setSubtitles = usePlayerPrefs((prefs) => prefs.setSubtitles)
@@ -294,6 +333,7 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
           onEnd: () => {
             setPaused(true)
             dispatchVideo({ type: VIDEO_EVENTS.ended })
+            if (autoplay) playNext()
           },
           // The server letting go of the source (a ticket past its life, an HLS session it ended)
           // opens the same way again from the spot; any other failure steps down the ladder.
@@ -348,6 +388,7 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
                 onChoose: pickAudio,
               }
         }
+        next={nextMedia === null ? null : { label: nextLabelOf(nextMedia), onPlay: playNext }}
         notice={noticeOf(state)}
         onBack={onBack}
         onPictureInPicture={source === null ? null : enterPictureInPicture}
@@ -379,10 +420,11 @@ type ReadyPlayerProps = {
   at: number
   session: AppQueries
   onBack: () => void
+  onPlayNext: (next: MediaItem) => void
 }
 
 /** A video once the server's playback settings and its tracks are known. */
-const ReadyPlayer = ({ media, at, session, onBack }: ReadyPlayerProps) => {
+const ReadyPlayer = ({ media, at, session, onBack, onPlayNext }: ReadyPlayerProps) => {
   const policy = usePlaybackPolicy({ queries: session.queries })
   const tracks = useQuery(session.queries.tracksQuery(media.id))
   // Read before the source is handed over, which carries the synopsis on a TV: a source that
@@ -397,6 +439,7 @@ const ReadyPlayer = ({ media, at, session, onBack }: ReadyPlayerProps) => {
       at={at}
       media={media}
       onBack={onBack}
+      onPlayNext={onPlayNext}
       policy={policy}
       session={session}
       summary={details.data?.summary ?? null}
@@ -420,6 +463,7 @@ const Waiting = ({ notice, onBack }: WaitingProps) => (
     onBack={onBack}
     onPictureInPicture={null}
     heading={NO_HEADING}
+    next={null}
     subtitles={null}
     summary={null}
     surface={null}
@@ -437,6 +481,9 @@ type ServerPlayerProps = {
 const ServerPlayer = ({ session, mediaId, at }: ServerPlayerProps) => {
   const router = useRouter()
   const onBack = () => router.back()
+  // The next takes this video's place, so Back from it still goes to the page that pressed Play.
+  const onPlayNext = (next: MediaItem) =>
+    router.replace(hrefOf({ kind: ROUTE_TARGETS.play, mediaId: next.id, at: 0 }))
   const page = routeState({ id: mediaId, query: useQuery(session.queries.mediaQuery(mediaId)) })
   switch (page.state) {
     case ROUTE_STATES.missing:
@@ -452,6 +499,7 @@ const ServerPlayer = ({ session, mediaId, at }: ServerPlayerProps) => {
           at={at}
           media={page.data}
           onBack={onBack}
+          onPlayNext={onPlayNext}
           session={session}
         />
       )

@@ -24,8 +24,8 @@ import {
   pathFor,
   responseOf,
 } from '@/test/fixtureFetch'
-import { FILMS, NAS } from '@/test/homeServer'
-import { BUSBOYS } from '@/test/itemServer'
+import { FILMS, NAS, SERIES } from '@/test/homeServer'
+import { BUSBOYS, GOOD_NEWS, GOOD_NEWS_ABOUT_HELL, HALF_LOOP, SEVERANCE } from '@/test/itemServer'
 import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 import { SUBTITLE_CODECS } from '@/test/subtitleCodecs'
 
@@ -88,6 +88,27 @@ const UNSUBTITLED_TRACKS: MediaTracks = { ...TRACKS, subtitles: [] }
 /** The film as an MP4 with no subtitles and two audio tracks. */
 export const BUSBOYS_DUAL = { ...BUSBOYS_MP4, id: 22, fileName: 'Busboys (2026) Dual.mp4' }
 
+/** Severance's first episode as an MP4 an Android TV plays as it is, never started. */
+export const GOOD_NEWS_MP4 = mediaItemFor({
+  ...BUSBOYS_UNSUBTITLED,
+  id: 23,
+  libraryId: SERIES.id,
+  title: GOOD_NEWS_ABOUT_HELL.title,
+  fileName: 'Severance - S01E01 - Good News About Hell.mp4',
+  duration: 3300,
+  position: 0,
+  item: GOOD_NEWS.primary?.item ?? null,
+})
+
+/** The episode after it, which the server names as the show's next in turn. */
+export const HALF_LOOP_MP4 = mediaItemFor({
+  ...GOOD_NEWS_MP4,
+  id: 24,
+  title: HALF_LOOP.title,
+  fileName: 'Severance - S01E02 - Half Loop.mp4',
+  item: HALF_LOOP.primary?.item ?? null,
+})
+
 /** The dual MP4's second audio track, a Japanese commentary. */
 export const DUAL_COMMENTARY = {
   index: 1,
@@ -117,6 +138,8 @@ const FILES = [
   { media: BUSBOYS_MP4, tracks: TRACKS },
   { media: BUSBOYS_UNSUBTITLED, tracks: UNSUBTITLED_TRACKS },
   { media: BUSBOYS_DUAL, tracks: DUAL_TRACKS },
+  { media: GOOD_NEWS_MP4, tracks: UNSUBTITLED_TRACKS },
+  { media: HALF_LOOP_MP4, tracks: UNSUBTITLED_TRACKS },
 ] as const
 
 const {
@@ -127,6 +150,7 @@ const {
   getPlaybackSettings,
   getMediaOrigins,
   listLibraries,
+  nextInSession,
   recordPlay,
   saveProgress,
   subtitles,
@@ -146,8 +170,13 @@ const READS: Record<string, unknown> = {
     ]),
   ),
   [pathFor({ path: getItem.path, id: BUSBOYS.id })]: BUSBOYS,
+  [pathFor({ path: getItem.path, id: GOOD_NEWS_ABOUT_HELL.id })]: GOOD_NEWS_ABOUT_HELL,
+  [pathFor({ path: getItem.path, id: HALF_LOOP.id })]: HALF_LOOP,
+  [pathFor({ path: getItem.path, id: SEVERANCE.id })]: SEVERANCE,
+  [pathFor({ path: nextInSession.path, id: GOOD_NEWS_MP4.id })]: HALF_LOOP_MP4,
+  [pathFor({ path: nextInSession.path, id: HALF_LOOP_MP4.id })]: null,
   [getMediaOrigins.path]: { origins: [] },
-  [listLibraries.path]: [WATCHED_AT_90],
+  [listLibraries.path]: [WATCHED_AT_90, SERIES],
   [busboysPath(subtitles.path).replace(TRACK_PARAM, SUBTITLE_ID)]: VTT,
 }
 

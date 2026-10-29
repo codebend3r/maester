@@ -111,7 +111,7 @@ const Scrubber = ({ view, transport, onScrubbing }: ScrubberProps) => {
 
 type ControlsProps = Pick<
   PlayerChromeProps,
-  'heading' | 'transport' | 'audio' | 'subtitles' | 'onBack'
+  'heading' | 'transport' | 'audio' | 'subtitles' | 'next' | 'onBack'
 > & {
   /** Whether the controls are showing, not fading out: each time they come back the line asks for the focus. */
   isVisible: boolean
@@ -214,8 +214,8 @@ const Heading = ({ heading }: HeadingProps) => {
 
 /**
  * The controls over the video, dark in every theme as the web's: the title along the top; the
- * time and the line along the bottom, over play and pause, the track pickers and Back, on the
- * player's glass, with the lists they open. The line takes the remote's focus
+ * time and the line along the bottom, over play and pause, an episode's Next, the track pickers
+ * and Back, on the player's glass, with the lists they open. The line takes the remote's focus
  * as they appear, so a press of left or right goes on skipping; the buttons are a band, so Down
  * from the line lands on the first of them rather than on the one under the thumb.
  */
@@ -224,6 +224,7 @@ const Controls = ({
   transport,
   audio,
   subtitles,
+  next,
   onBack,
   onScrubbing,
   onPicking,
@@ -262,6 +263,9 @@ const Controls = ({
                 label={transport.isPaused ? PLAYER_COPY.play : PLAYER_COPY.pause}
                 onPress={transport.onTogglePlay}
               />
+            )}
+            {next !== null && (
+              <PlateButton icon="skipNext" isOverPicture label={next.label} onPress={next.onPlay} />
             )}
             {audio !== null && (
               <TrackButton
@@ -321,6 +325,7 @@ const DpadPlayer = ({
   transport,
   audio,
   subtitles,
+  next,
   onBack,
 }: DpadPlayerProps) => {
   // Only the remote's handler reads whether the line has the focus, so it is no render's concern.
@@ -384,6 +389,7 @@ const DpadPlayer = ({
           <Controls
             audio={audio}
             heading={heading}
+            next={next}
             onBack={onBack}
             onBottomHeight={setBottomHeight}
             onPicking={setPicking}

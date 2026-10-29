@@ -10,8 +10,11 @@ import type { RouteTarget } from '@/routes'
 /** How far a mark is on, as React Native says it to a screen reader: on, off, or `mixed`. */
 export type CheckState = NonNullable<AccessibilityState['checked']>
 
-/** What an action on an item's page is: Play, or a mark the viewer turns on and off. */
-export const ITEM_ACTIONS = { play: 'play', toggle: 'toggle' } as const
+/**
+ * What an action on an item's page is: Play, a mark the viewer turns on and off, or a link to
+ * another page (an episode's show and season).
+ */
+export const ITEM_ACTIONS = { play: 'play', toggle: 'toggle', link: 'link' } as const
 
 export type ItemAction =
   | { kind: typeof ITEM_ACTIONS.play; key: string; label: string; onPress: () => void }
@@ -23,6 +26,7 @@ export type ItemAction =
       isOn: CheckState
       onPress: () => void
     }
+  | { kind: typeof ITEM_ACTIONS.link; key: string; label: string; onPress: () => void }
 
 export type ItemLayoutProps = {
   page: ItemPage
@@ -71,7 +75,7 @@ const ON_MARK = '✓ '
 
 /**
  * How an action's button looks and is read out: Play filled as the one action the page is for,
- * a mark as a checkbox in the quiet tone, ticked while it is on.
+ * a mark as a checkbox in the quiet tone, ticked while it is on, a link in the ghost tone.
  */
 export const actionLookOf = (
   action: ItemAction,
@@ -91,6 +95,8 @@ export const actionLookOf = (
         state: { checked: action.isOn },
         text: action.isOn === true ? `${ON_MARK}${action.label}` : action.label,
       }
+    case ITEM_ACTIONS.link:
+      return { tone: BUTTON_TONES.ghost, role: 'link', state: undefined, text: action.label }
     default: {
       const unknown: never = action
       return unknown
