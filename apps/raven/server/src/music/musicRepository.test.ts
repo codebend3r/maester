@@ -1,0 +1,417 @@
+import { LIBRARY_KINDS, MUSIC_SORTS, type MusicSort, musicListQuery } from '@raven/core'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { MediaIndex } from '@/media/mediaIndex'
+import type { AudioFormat, AudioTags } from '@/music/audioReader'
+import { COVER_SOURCES, MusicRepository } from '@/music/musicRepository'
+import { testDatabase } from '@/test/database'
+import { pictureVersionsOf } from '@/test/repositories'
+
+const NO_TAGS: AudioTags = {
+  title: null,
+  artists: [],
+  album: null,
+  albumArtists: [],
+  trackNumber: null,
+  disc: null,
+  year: null,
+  originalYear: null,
+  genres: [],
+  isCompilation: false,
+  label: null,
+  isrc: null,
+  recordingMbid: null,
+  releaseMbid: null,
+  releaseGroupMbid: null,
+  artistMbids: [],
+  albumArtistMbids: [],
+  releaseTypes: [],
+  replayGain: { trackGain: null, trackPeak: null, albumGain: null, albumPeak: null },
+  hasCover: false,
+}
+
+const FLAC: AudioFormat = { sampleRate: 44100, bitDepth: 16, isLossless: true }
+
+const LIST = musicListQuery.decode({})
+
+describe('MusicRepository', () => {
+  const database = testDatabase('raven-music-')
+  const state = { library: 0, other: 0, ids: new Map<string, number>() }
+  const repository = () => new MusicRepository(database.get(), pictureVersionsOf(database.get()))
+
+  type AddFileProps = { libraryId?: number; path: string; tags: Partial<AudioTags>; at?: Date }
+
+  /** A file in the index, read and filed as the scanner would. */
+  const addFile = ({ libraryId = state.library, path, tags, at }: AddFileProps): number => {
+    const index = new MediaIndex(database.get())
+    const id = index.insert({
+      libraryId,
+      kind: LIBRARY_KINDS.music,
+      file: { path, root: '/music', size: 1, mtimeMs: 1 },
+      at,
+    })
+    index.saveProbe({
+      id,
+      probe: {
+        duration: 200,
+        width: null,
+        height: null,
+        videoCodec: null,
+        videoBitDepth: null,
+        hdr: false,
+        audioCodec: 'flac',
+        audioChannels: 2,
+        bitrate: 900000,
+      },
+      tracks: { audio: [], subtitles: [], defaultAudio: null, frameRate: null },
+      chapters: [],
+    })
+    repository().record({
+      mediaId: id,
+      libraryId,
+      path,
+      tags: { ...NO_TAGS, ...tags },
+      format: FLAC,
+      folderCover: null,
+      at,
+    })
+    state.ids.set(path, id)
+    return id
+  }
+
+  beforeAll(async () => {
+    await database.open()
+    const libraries = new LibrariesRepository(database.get())
+    state.library = libraries.create({
+      name: 'Music',
+      paths: ['/music'],
+      settings: { kind: LIBRARY_KINDS.music },
+    }).id
+    state.other = libraries.create({
+      name: 'More music',
+      paths: ['/more'],
+      settings: { kind: LIBRARY_KINDS.music },
+    }).id
+    const okComputer = {
+      album: 'OK Computer',
+      albumArtists: ['Radiohead'],
+      artists: ['Radiohead'],
+      releaseMbid: 'rel-ok',
+      year: 1997,
+      genres: ['Alternative Rock'],
+      label: 'Parlophone',
+    }
+    addFile({
+      path: '/music/Radiohead/OK Computer/01 Airbag.flac',
+      tags: { ...okComputer, title: 'Airbag', trackNumber: 1, hasCover: true },
+      at: new Date('2026-01-01T00:00:00Z'),
+    })
+    addFile({
+      path: '/music/Radiohead/OK Computer/02 Paranoid Android.flac',
+      tags: { ...okComputer, title: 'Paranoid Android', trackNumber: 2 },
+      at: new Date('2026-01-02T00:00:00Z'),
+    })
+    // A two-disc album with no ids, where a guest sings on one track.
+    const kid = { album: 'Kid A', albumArtists: ['Radiohead'], year: 2000 }
+    addFile({
+      path: '/music/Radiohead/Kid A/CD 01/01 Everything.flac',
+      tags: {
+        ...kid,
+        title: 'Everything in Its Right Place',
+        artists: ['Radiohead'],
+        disc: 1,
+        trackNumber: 1,
+      },
+    })
+    addFile({
+      path: '/music/Radiohead/Kid A/CD 02/01 Guest.flac',
+      tags: {
+        ...kid,
+        title: 'A Guest Appears',
+        artists: ['Radiohead', 'Guest Singer'],
+        disc: 2,
+        trackNumber: 1,
+      },
+    })
+    // An untagged file, filed by its folder.
+    addFile({ path: '/music/Unknown Band/Demo Tape/take 1.flac', tags: {} })
+    // The same artist in another library.
+    addFile({
+      libraryId: state.other,
+      path: '/more/Radiohead/Amnesiac/01 Pyramid Song.flac',
+      tags: {
+        album: 'Amnesiac',
+        albumArtists: ['Radiohead'],
+        artists: ['Radiohead'],
+        year: 2001,
+        title: 'Pyramid Song',
+      },
+    })
+  })
+
+  afterAll(database.close)
+
+  it('lists a library’s albums with their credits, counts and lengths, by title', () => {
+    const albums = repository().listAlbums({ libraryId: state.library, ...LIST })
+    expect(
+      albums.map(({ title, artists, trackCount, duration, year, coverVersion }) => ({
+        title,
+        artists: artists.map(({ name }) => name),
+        trackCount,
+        duration,
+        year,
+        hasCover: coverVersion !== null,
+      })),
+    ).toEqual([
+      {
+        title: 'Demo Tape',
+        artists: ['Unknown Band'],
+        trackCount: 1,
+        duration: 200,
+        year: null,
+        hasCover: false,
+      },
+      {
+        title: 'Kid A',
+        artists: ['Radiohead'],
+        trackCount: 2,
+        duration: 400,
+        year: 2000,
+        hasCover: false,
+      },
+      {
+        title: 'OK Computer',
+        artists: ['Radiohead'],
+        trackCount: 2,
+        duration: 400,
+        year: 1997,
+        hasCover: true,
+      },
+    ])
+  })
+
+  it('sorts albums by artist, year and when they came, and searches titles and artists', () => {
+    type TitlesProps = { sort: MusicSort; search?: string }
+    const titles = ({ sort, search = '' }: TitlesProps) =>
+      repository()
+        .listAlbums({ libraryId: state.library, ...LIST, sort, search })
+        .map(({ title }) => title)
+    expect(titles({ sort: MUSIC_SORTS.artist })).toEqual(['OK Computer', 'Kid A', 'Demo Tape'])
+    expect(titles({ sort: MUSIC_SORTS.year })).toEqual(['OK Computer', 'Kid A', 'Demo Tape'])
+    expect(titles({ sort: MUSIC_SORTS.added })[0]).toBe('Demo Tape')
+    expect(titles({ sort: MUSIC_SORTS.title, search: 'radio' })).toEqual(['Kid A', 'OK Computer'])
+    expect(titles({ sort: MUSIC_SORTS.title, search: 'kid' })).toEqual(['Kid A'])
+  })
+
+  it('lists the artists credited in the library, with how many of its albums and tracks are theirs', () => {
+    expect(
+      repository()
+        .listArtists({ libraryId: state.library, ...LIST })
+        .map(({ name, albumCount, trackCount }) => ({ name, albumCount, trackCount })),
+    ).toEqual([
+      { name: 'Guest Singer', albumCount: 0, trackCount: 1 },
+      { name: 'Radiohead', albumCount: 2, trackCount: 4 },
+      // Filed by its folder, the folder above is its album's artist.
+      { name: 'Unknown Band', albumCount: 1, trackCount: 1 },
+    ])
+  })
+
+  it('pages the tracks in the order asked, with the whole count', () => {
+    const first = repository().listTracks({
+      libraryId: state.library,
+      ...LIST,
+      sort: MUSIC_SORTS.artist,
+      limit: 2,
+      offset: 0,
+    })
+    expect(first.total).toBe(5)
+    expect(first.tracks.map(({ title }) => title)).toEqual(['Airbag', 'Paranoid Android'])
+    const next = repository().listTracks({
+      libraryId: state.library,
+      ...LIST,
+      sort: MUSIC_SORTS.artist,
+      limit: 2,
+      offset: 2,
+    })
+    expect(next.tracks.map(({ title, disc }) => `${disc}:${title}`)).toEqual([
+      '1:Everything in Its Right Place',
+      '2:A Guest Appears',
+    ])
+    expect(
+      repository()
+        .listTracks({ libraryId: state.library, ...LIST, search: 'guest' })
+        .tracks.map(({ title }) => title),
+    ).toEqual(['A Guest Appears'])
+  })
+
+  it('reads a track as the queue needs it: its file facts, its artists and its album', () => {
+    const page = repository().listTracks({ libraryId: state.library, ...LIST, search: 'Airbag' })
+    expect(page.tracks[0]).toMatchObject({
+      id: state.ids.get('/music/Radiohead/OK Computer/01 Airbag.flac'),
+      libraryId: state.library,
+      title: 'Airbag',
+      disc: 1,
+      number: 1,
+      duration: 200,
+      artists: [{ name: 'Radiohead' }],
+      container: 'flac',
+      codec: 'flac',
+      bitrate: 900000,
+      sampleRate: 44100,
+      bitDepth: 16,
+      isLossless: true,
+    })
+  })
+
+  it('gives an album’s page its tracks in disc order, its discs, label and genres', () => {
+    const [, kidA, okComputer] = repository().listAlbums({ libraryId: state.library, ...LIST })
+    const details = repository().album(okComputer?.id ?? 0)
+    expect(details).toMatchObject({
+      label: 'Parlophone',
+      genres: ['Alternative Rock'],
+      mbid: 'rel-ok',
+      discCount: 1,
+    })
+    expect(details?.tracks.map(({ number, title }) => `${number} ${title}`)).toEqual([
+      '1 Airbag',
+      '2 Paranoid Android',
+    ])
+    const twoDiscs = repository().album(kidA?.id ?? 0)
+    expect(twoDiscs?.discCount).toBe(2)
+    expect(twoDiscs?.tracks.map(({ artists }) => artists.map(({ name }) => name))).toEqual([
+      ['Radiohead'],
+      ['Radiohead', 'Guest Singer'],
+    ])
+    expect(repository().album(999)).toBeNull()
+  })
+
+  it('gives an artist’s page their albums across libraries, and what they appear on, hiding libraries the caller may not see', () => {
+    const radiohead = repository()
+      .listArtists({ libraryId: state.library, ...LIST })
+      .find(({ name }) => name === 'Radiohead')
+    const page = repository().artist({ id: radiohead?.id ?? 0, seesLibrary: () => true })
+    expect(page?.albums.map(({ title }) => title)).toEqual(['OK Computer', 'Kid A', 'Amnesiac'])
+    expect(page?.appearsOn).toEqual([])
+    expect(page?.artist).toMatchObject({ name: 'Radiohead', albumCount: 3, trackCount: 5 })
+    const hidden = repository().artist({
+      id: radiohead?.id ?? 0,
+      seesLibrary: (libraryId) => libraryId !== state.other,
+    })
+    expect(hidden?.albums.map(({ title }) => title)).toEqual(['OK Computer', 'Kid A'])
+    expect(hidden?.artist.albumCount).toBe(2)
+    const guest = repository()
+      .listArtists({ libraryId: state.library, ...LIST })
+      .find(({ name }) => name === 'Guest Singer')
+    const guestPage = repository().artist({ id: guest?.id ?? 0, seesLibrary: () => true })
+    expect(guestPage?.albums).toEqual([])
+    expect(guestPage?.appearsOn.map(({ title }) => title)).toEqual(['Kid A'])
+    expect(repository().artist({ id: 999, seesLibrary: () => true })).toBeNull()
+  })
+
+  it('finds an album’s cover by its current version and no other, in the file that embeds it', () => {
+    const okComputer = repository()
+      .listAlbums({ libraryId: state.library, ...LIST })
+      .find(({ title }) => title === 'OK Computer')
+    const version = okComputer?.coverVersion ?? ''
+    expect(repository().cover({ id: okComputer?.id ?? 0, version })).toEqual({
+      source: COVER_SOURCES.embedded,
+      ref: String(state.ids.get('/music/Radiohead/OK Computer/01 Airbag.flac')),
+    })
+    expect(repository().cover({ id: okComputer?.id ?? 0, version: 'stale' })).toBeNull()
+    expect(repository().libraryOfAlbum(okComputer?.id ?? 0)).toBe(state.library)
+    expect(repository().libraryOfAlbum(999)).toBeNull()
+  })
+
+  it('takes a folder cover for an album with none, and keeps the one it has', () => {
+    const path = '/music/Unknown Band/Demo Tape/take 2.flac'
+    const id = addFile({ path, tags: {} })
+    const folderCover = '/music/Unknown Band/Demo Tape/cover.jpg'
+    const recordWith = (cover: string | null) =>
+      repository().record({
+        mediaId: id,
+        libraryId: state.library,
+        path,
+        tags: NO_TAGS,
+        format: FLAC,
+        folderCover: cover,
+      })
+    recordWith(folderCover)
+    const demo = () =>
+      repository()
+        .listAlbums({ libraryId: state.library, ...LIST })
+        .find(({ title }) => title === 'Demo Tape')
+    const version = demo()?.coverVersion ?? ''
+    expect(repository().cover({ id: demo()?.id ?? 0, version })).toEqual({
+      source: COVER_SOURCES.file,
+      ref: folderCover,
+    })
+    recordWith('/music/Unknown Band/Demo Tape/front.jpg')
+    expect(demo()?.coverVersion).toBe(version)
+  })
+
+  it('credits an album by its tags once a file names its artists, over credits that stood in from the folder', () => {
+    addFile({
+      path: '/music/Unknown Band/Demo Tape/take 4.flac',
+      tags: { albumArtists: ['The Unknowns'] },
+    })
+    const demo = repository()
+      .listAlbums({ libraryId: state.library, ...LIST })
+      .find(({ title }) => title === 'Demo Tape')
+    expect(demo?.artists.map(({ name }) => name)).toEqual(['The Unknowns'])
+  })
+
+  it('learns an artist’s id from a later file, and never makes a second artist for it', () => {
+    addFile({
+      path: '/music/Unknown Band/Demo Tape/take 3.flac',
+      tags: { artists: ['Unknown Band'], artistMbids: ['band-1'] },
+    })
+    const artists = repository().listArtists({ libraryId: state.library, ...LIST })
+    expect(artists.filter(({ name }) => name === 'Unknown Band')).toMatchObject([
+      { mbid: 'band-1' },
+    ])
+  })
+
+  it('moves a file read again to the album its tags now name, and prunes what is left empty', () => {
+    const path = '/music/Radiohead/Kid A/CD 02/01 Guest.flac'
+    const id = state.ids.get(path) ?? 0
+    repository().record({
+      mediaId: id,
+      libraryId: state.library,
+      path,
+      tags: { ...NO_TAGS, album: 'Kid B', albumArtists: ['Radiohead'], artists: ['Radiohead'] },
+      format: FLAC,
+      folderCover: null,
+    })
+    const titles = repository()
+      .listAlbums({ libraryId: state.library, ...LIST })
+      .map(({ title }) => title)
+    expect(titles).toContain('Kid B')
+    expect(
+      repository()
+        .listArtists({ libraryId: state.library, ...LIST })
+        .map(({ name }) => name),
+    ).not.toContain('Guest Singer')
+  })
+
+  it('drops an album with its last file, and forgets a cover that was in a file now gone', () => {
+    const airbag = state.ids.get('/music/Radiohead/OK Computer/01 Airbag.flac') ?? 0
+    new MediaIndex(database.get()).remove([airbag])
+    repository().prune()
+    const okComputer = repository()
+      .listAlbums({ libraryId: state.library, ...LIST })
+      .find(({ title }) => title === 'OK Computer')
+    expect(okComputer).toMatchObject({ trackCount: 1, coverVersion: null })
+    const paranoid = state.ids.get('/music/Radiohead/OK Computer/02 Paranoid Android.flac') ?? 0
+    new MediaIndex(database.get()).remove([paranoid])
+    repository().prune()
+    expect(
+      repository()
+        .listAlbums({ libraryId: state.library, ...LIST })
+        .map(({ title }) => title),
+    ).not.toContain('OK Computer')
+    expect(repository().albumIds().size).toBe(
+      repository().listAlbums({ libraryId: state.library, ...LIST }).length +
+        repository().listAlbums({ libraryId: state.other, ...LIST }).length,
+    )
+  })
+})

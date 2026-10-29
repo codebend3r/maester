@@ -57,6 +57,11 @@ type PhotoUrlProps = {
   photoVersion: string | null
 }
 
+type AlbumCoverUrlProps = {
+  albumId: number
+  coverVersion: string | null
+}
+
 type ImageOptionUrlProps = {
   id: number
   kind: ChoosableImageKind
@@ -189,6 +194,16 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
             path: PICTURE_PATHS.photo
               .replace(`:${PICTURE_PARAMS.id}`, String(personId))
               .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(photoVersion)),
+          }),
+
+    /** An album's cover; null while the album has none. Versioned, so cached for good. */
+    albumCoverUrl: ({ albumId, coverVersion }: AlbumCoverUrlProps): string | null =>
+      coverVersion == null
+        ? null
+        : pictureAt({
+            path: PICTURE_PATHS.album
+              .replace(`:${PICTURE_PARAMS.id}`, String(albumId))
+              .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(coverVersion)),
           }),
 
     /** A Fix match result's poster, through the server's image cache. */

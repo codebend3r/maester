@@ -511,8 +511,8 @@ describe('migrations', () => {
 
   it('moves the libraries still on TMDB scores to Metacritic, keeping any other choice', () => {
     const before = new Sqlite(join(state.dir, 'raven.db'))
-    MIGRATIONS.slice(0, -2).forEach((sql) => before.exec(sql))
-    before.pragma(`user_version = ${MIGRATIONS.length - 2}`)
+    MIGRATIONS.slice(0, 35).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 35')
     before.exec(
       `INSERT INTO libraries (id, name, created_at, ratings_source) VALUES (1, 'Films', '2026-01-01', 'tmdb');
        INSERT INTO libraries (id, name, created_at, ratings_source) VALUES (2, 'Shows', '2026-01-01', 'imdb');`,
@@ -529,8 +529,8 @@ describe('migrations', () => {
 
   it('gives a picture chosen for a title to each library holding it, and keeps none for the title', () => {
     const before = new Sqlite(join(state.dir, 'raven.db'))
-    MIGRATIONS.slice(0, -1).forEach((sql) => before.exec(sql))
-    before.pragma(`user_version = ${MIGRATIONS.length - 1}`)
+    MIGRATIONS.slice(0, 36).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 36')
     before.exec(
       `INSERT INTO libraries (id, name, created_at) VALUES (1, '4K Movies', '2026-01-01'), (2, 'Movies', '2026-01-01'), (3, 'Other', '2026-01-01');
        INSERT INTO items (id, type, tmdb_id, title, sort_title, fetched_at) VALUES (1, 'show', '9', 'Andor', 'Andor', '2026-01-01');

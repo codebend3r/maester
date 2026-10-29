@@ -73,10 +73,29 @@ type ImageCacheLocalProps = {
   width: ImageWidth
 }
 
+type ImageCacheAlbumProps = {
+  albumId: number
+  /** The file the cover is read from: the one that embeds it, or the picture itself. */
+  source: string
+  width: ImageWidth
+}
+
+type ImageCacheScaledProps = {
+  dir: (typeof SCALED_DIRS)[keyof typeof SCALED_DIRS]
+  /** What names the picture's owner in the file name, up to the mtime: `<item>-<kind>-`, `<album>-`. */
+  prefix: string
+  source: string
+  width: ImageWidth
+}
+
 type ImageCacheSweepProps = {
   tmdbPaths: ReadonlySet<string>
   itemIds: ReadonlySet<number>
+  albumIds: ReadonlySet<number>
 }
+
+/** The folders under `images/` that hold pictures scaled from files beside or inside the media. */
+const SCALED_DIRS = { local: 'local', albums: 'albums' } as const
 
 /**
  * Posters, backdrops, photos and stills on disk beside the thumbnails, each
@@ -106,7 +125,9 @@ export class ImageCache {
     KEPT_WIDTHS.forEach((width) =>
       mkdirSync(join(this.root, 'tmdb', `w${width}`), { recursive: true }),
     )
-    mkdirSync(join(this.root, 'local'), { recursive: true })
+    Object.values(SCALED_DIRS).forEach((dir) =>
+      mkdirSync(join(this.root, dir), { recursive: true }),
+    )
   }
 
   /** Poster warming outlives a match, so shutdown must wait for its queued writes too. */
@@ -168,13 +189,35 @@ export class ImageCache {
 
   /** A picture beside the media, scaled once to `width`; null when it is gone or will not decode. */
   local({ itemId, kind, source, width }: ImageCacheLocalProps): Promise<string | null> {
+    return this.scaled({ dir: SCALED_DIRS.local, prefix: `${itemId}-${kind}-`, source, width })
+  }
+
+  /**
+   * An album's cover, scaled once to `width` from the file that holds it:
+   * the picture in its folder, or a track that embeds one, whose attached
+   * picture is the one frame ffmpeg reads off it. Null when the file is
+   * gone or will not decode.
+   */
+  album({ albumId, source, width }: ImageCacheAlbumProps): Promise<string | null> {
+    return this.scaled({ dir: SCALED_DIRS.albums, prefix: `${albumId}-`, source, width })
+  }
+
+  /**
+   * A picture scaled from `source` into `dir` as `<prefix><mtime>-<width>.jpg`,
+   * made once; scales of the file before it changed go when a new one is made.
+   */
+  private scaled({
+    dir: name,
+    prefix,
+    source,
+    width,
+  }: ImageCacheScaledProps): Promise<string | null> {
     return this.once({
-      key: `${itemId}-${kind}-${width}`,
+      key: `${name}/${prefix}${width}`,
       make: async () => {
         const info = await stat(source).catch(() => null)
         if (!info?.isFile()) return null
-        const dir = join(this.root, 'local')
-        const prefix = `${itemId}-${kind}-`
+        const dir = join(this.root, name)
         const current = `${prefix}${Math.round(info.mtimeMs)}-`
         const target = join(dir, `${current}${width}.jpg`)
         if (await exists(target)) return target
@@ -194,11 +237,11 @@ export class ImageCache {
           return null
         }
         // Scales of the picture before it changed, at any width, and any named before widths were.
-        const names = await readdir(dir).catch((): string[] => [])
+        const files = await readdir(dir).catch((): string[] => [])
         await Promise.all(
-          names
-            .filter((name) => name.startsWith(prefix) && !name.startsWith(current))
-            .map((name) => rm(join(dir, name), { force: true })),
+          files
+            .filter((file) => file.startsWith(prefix) && !file.startsWith(current))
+            .map((file) => rm(join(dir, file), { force: true })),
         )
         return target
       },
@@ -207,9 +250,9 @@ export class ImageCache {
 
   /**
    * Removes cached pictures nothing points at any more: TMDB files no item
-   * or person uses, and local scales of items that are gone.
+   * or person uses, and scales of items and albums that are gone.
    */
-  async sweep({ tmdbPaths, itemIds }: ImageCacheSweepProps): Promise<void> {
+  async sweep({ tmdbPaths, itemIds, albumIds }: ImageCacheSweepProps): Promise<void> {
     await Promise.all(
       KEPT_WIDTHS.map(async (width) => {
         const dir = join(this.root, 'tmdb', `w${width}`)
@@ -221,12 +264,19 @@ export class ImageCache {
         )
       }),
     )
-    const dir = join(this.root, 'local')
-    const names = await readdir(dir).catch((): string[] => [])
     await Promise.all(
-      names
-        .filter((name) => !name.startsWith('.') && !itemIds.has(Number(name.split('-')[0])))
-        .map((name) => rm(join(dir, name), { force: true })),
+      [
+        { dir: SCALED_DIRS.local, kept: itemIds },
+        { dir: SCALED_DIRS.albums, kept: albumIds },
+      ].map(async ({ dir: name, kept }) => {
+        const dir = join(this.root, name)
+        const names = await readdir(dir).catch((): string[] => [])
+        await Promise.all(
+          names
+            .filter((file) => !file.startsWith('.') && !kept.has(Number(file.split('-')[0])))
+            .map((file) => rm(join(dir, file), { force: true })),
+        )
+      }),
     )
   }
 }

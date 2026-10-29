@@ -77,6 +77,11 @@ export const isLibraryView = oneOf(Object.values(LIBRARY_VIEWS))
 
 export type LibraryView = Infer<typeof isLibraryView>
 
+/** What a library's page lists: its files, its shows with the files no show was found for after, or its albums. */
+export const LIBRARY_LISTINGS = { media: 'media', shows: 'shows', albums: 'albums' } as const
+
+export type LibraryListing = (typeof LIBRARY_LISTINGS)[keyof typeof LIBRARY_LISTINGS]
+
 export const LIBRARY_KINDS = {
   movies: 'movies',
   shows: 'shows',

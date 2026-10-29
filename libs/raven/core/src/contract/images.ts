@@ -124,4 +124,5 @@ export const PICTURE_PARAMS = { id: 'id', kind: 'kind', version: 'version' } as 
 export const PICTURE_PATHS = {
   item: '/api/pictures/items/:id/:kind/:version',
   photo: '/api/pictures/people/:id/:version',
+  album: '/api/pictures/albums/:id/:version',
 } as const

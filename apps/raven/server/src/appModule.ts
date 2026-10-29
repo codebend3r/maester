@@ -79,6 +79,15 @@ import { Scores } from '@/metadata/scores'
 import { ScoresRepository } from '@/metadata/scoresRepository'
 import { ScoreSweep } from '@/metadata/scoreSweep'
 import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
+import { AlbumCovers } from '@/music/albumCovers'
+import { AudioReader } from '@/music/audioReader'
+import {
+  AlbumsController,
+  ArtistsController,
+  LibraryMusicController,
+} from '@/music/musicController'
+import { MusicIndexer } from '@/music/musicIndexer'
+import { MusicRepository } from '@/music/musicRepository'
 import { Filmographies } from '@/people/filmographies'
 import { PeopleRepository } from '@/people/peopleRepository'
 import { PlaybackController } from '@/playback/playbackController'
@@ -117,6 +126,9 @@ export const CONTROLLERS = [
   PeopleController,
   PicturesController,
   ReviewsController,
+  LibraryMusicController,
+  AlbumsController,
+  ArtistsController,
   SettingsController,
   EventsController,
   LockController,
@@ -219,6 +231,10 @@ export class AppModule {
         WatchedCards,
         WatchedRepository,
         MediaIndex,
+        MusicRepository,
+        AudioReader,
+        AlbumCovers,
+        MusicIndexer,
         MatchFiles,
         AiDecisions,
         TmdbClient,

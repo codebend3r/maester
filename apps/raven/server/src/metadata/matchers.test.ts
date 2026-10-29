@@ -54,7 +54,7 @@ describe('matching by library type', () => {
     const files = new MatchFiles(database.get(), metadata)
     const ffmpeg = new FfmpegService(config, new SettingsRepository(database.get()))
     const cache = new ImageCache(config, tmdb.fetch, ffmpeg)
-    const pictures = new ItemPictures(metadata, files, cache, images)
+    const pictures = new ItemPictures(metadata, files, cache, images, { albumIds: () => new Set() })
     const pass = () =>
       new MatchPass({
         tmdb: new TmdbClient(config, tmdb.fetch),

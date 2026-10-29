@@ -137,12 +137,17 @@ it('declares every route exactly as the inventory says', () => {
       ROUTES.ping,
       ROUTES.itemPicture,
       ROUTES.photoPicture,
+      ROUTES.albumCover,
     ].toSorted(byRoute),
   )
 })
 
 /** The open routes whose address is their own permission: they answer only a current version. */
-const CAPABILITY_ROUTES: ReadonlySet<Route> = new Set([ROUTES.itemPicture, ROUTES.photoPicture])
+const CAPABILITY_ROUTES: ReadonlySet<Route> = new Set([
+  ROUTES.itemPicture,
+  ROUTES.photoPicture,
+  ROUTES.albumCover,
+])
 
 it("opens only an HLS session's own routes to its capability, and only `file` to a ticket's pass", () => {
   const marks = routeMarks(CONTROLLERS)

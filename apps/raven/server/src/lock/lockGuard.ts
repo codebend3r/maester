@@ -25,6 +25,7 @@ const NOT_FOUND: Record<Privacy, string> = {
   library: 'No library',
   media: 'No media',
   item: 'No item',
+  album: 'No album',
 }
 
 /** What a route says about the lock: what its `:id` names, or that it holds nothing back. */

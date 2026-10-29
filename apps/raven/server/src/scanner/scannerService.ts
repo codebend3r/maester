@@ -1,5 +1,13 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common'
-import { SCAN_KINDS, SCAN_STATES, type ScanStatus, extensionsFor } from '@raven/core'
+import {
+  KIND_RULES,
+  MEDIA_TYPES,
+  type MediaType,
+  SCAN_KINDS,
+  SCAN_STATES,
+  type ScanStatus,
+  extensionsFor,
+} from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import { errorMessage } from '@/errorMessage'
@@ -9,6 +17,7 @@ import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRe
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaIndex, type ProbeTarget } from '@/media/mediaIndex'
 import { MetadataService } from '@/metadata/metadataService'
+import { MusicIndexer } from '@/music/musicIndexer'
 import { mapWithConcurrency } from '@/scanner/concurrency'
 import { layoutsOf, withTitleRoots } from '@/scanner/layout'
 import { type Reconciled, changesAnything, reconcile } from '@/scanner/reconcile'
@@ -185,10 +194,20 @@ type ScannerServiceReindexProps = {
 }
 
 type ScannerServiceProbeProps = {
+  libraryId: number
+  /** What the library's files are: videos go to ffprobe, audio files to the music indexer. */
+  media: MediaType
   toProbe: readonly ProbeTarget[]
   /** Aborted by a cancel: the files not yet started stay unprobed, for the next scan. */
   signal: AbortSignal
   onProbed: () => void
+}
+
+type ScannerServiceProbeOneProps = {
+  libraryId: number
+  media: MediaType
+  id: number
+  path: string
 }
 
 /**
@@ -220,6 +239,7 @@ export class ScannerService implements OnApplicationBootstrap {
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(MetadataService) private readonly metadata: MetadataService,
+    @Inject(MusicIndexer) private readonly music: MusicIndexer,
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(StartupWork) private readonly startup: StartupWork,
   ) {}
@@ -377,7 +397,7 @@ export class ScannerService implements OnApplicationBootstrap {
       },
     })
     try {
-      const { walk, changes, toProbe } = await this.reindex({
+      const { walk, changes, toProbe, media } = await this.reindex({
         library,
         scope: { kind: SCOPE_KINDS.library },
         signal,
@@ -399,6 +419,8 @@ export class ScannerService implements OnApplicationBootstrap {
       // probed, and the files that went are cleared up after.
       this.metadata.enqueue(library.id)
       await this.probe({
+        libraryId: library.id,
+        media,
         toProbe,
         signal,
         onProbed: () =>
@@ -482,7 +504,7 @@ export class ScannerService implements OnApplicationBootstrap {
           })
         },
       })
-      const { walk, changes } = reindexed
+      const { walk, changes, media } = reindexed
       // A check leaves a probe that timed out to a scan someone starts.
       const retried = new Set(changes.unprobed.map(({ id }) => id))
       const toProbe = isQuiet
@@ -504,6 +526,8 @@ export class ScannerService implements OnApplicationBootstrap {
       if (isNew) {
         this.metadata.enqueue(library.id)
         await this.probe({
+          libraryId: library.id,
+          media,
           toProbe,
           signal,
           onProbed: () =>
@@ -550,14 +574,20 @@ export class ScannerService implements OnApplicationBootstrap {
     signal,
   }: ScannerServiceRefreshPlacesProps): Promise<void> {
     try {
-      const { walk, changes, toProbe } = await this.reindex({
+      const { walk, changes, toProbe, media } = await this.reindex({
         library,
         scope: { kind: SCOPE_KINDS.places, places },
         signal,
       })
       if (!changesAnything(changes) && toProbe.length === 0) return
       this.metadata.enqueue(library.id)
-      await this.probe({ toProbe, signal, onProbed: () => undefined })
+      await this.probe({
+        libraryId: library.id,
+        media,
+        toProbe,
+        signal,
+        onProbed: () => undefined,
+      })
       if (signal.aborted) return
       this.logger.log(`Refreshed "${library.name}": ${summary({ walk, changes, toProbe })}`)
     } catch (error) {
@@ -577,6 +607,8 @@ export class ScannerService implements OnApplicationBootstrap {
     walk: WalkResult
     changes: Reconciled
     toProbe: ProbeTarget[]
+    /** What the library's files are, as its type says at the moment they are filed. */
+    media: MediaType
   }> {
     const indexed = this.index.forLibrary(library.id)
     const walk = await walkVideos({
@@ -623,20 +655,47 @@ export class ScannerService implements OnApplicationBootstrap {
     if (changesAnything(changes)) this.database.refreshStatistics()
     await this.artifacts.discard(changes.gone)
     if (changesAnything(changes)) this.events.libraryChanged(library.id)
-    return { walk, changes, toProbe }
+    return { walk, changes, toProbe, media: KIND_RULES[kind].media }
+  }
+
+  /** A video goes to ffprobe and the thumbnail queue; an audio file to the music indexer, which grabs no frame. */
+  private async probeOne({
+    libraryId,
+    media,
+    id,
+    path,
+  }: ScannerServiceProbeOneProps): Promise<void> {
+    switch (media) {
+      case MEDIA_TYPES.video: {
+        const { probe, tracks, chapters } = await this.ffmpeg.probeFile(path)
+        this.index.saveProbe({ id, probe, tracks, chapters })
+        this.thumbnails.enqueue(id)
+        return
+      }
+      case MEDIA_TYPES.audio:
+        return this.music.index({ id, libraryId, path })
+      default: {
+        const unknown: never = media
+        return unknown
+      }
+    }
   }
 
   /** Probes each file a few at a time. A timeout leaves the file unprobed, so the next scan tries it again. */
-  private async probe({ toProbe, signal, onProbed }: ScannerServiceProbeProps): Promise<void> {
+  private async probe({
+    libraryId,
+    media,
+    toProbe,
+    signal,
+    onProbed,
+  }: ScannerServiceProbeProps): Promise<void> {
     await mapWithConcurrency({
       items: toProbe,
       limit: this.config.probeConcurrency,
       fn: async ({ id, path }) => {
         if (signal.aborted) return
         try {
-          const { probe, tracks, chapters } = await this.ffmpeg.probeFile(path)
-          this.index.saveProbe({ id, probe, tracks, chapters })
-          this.thumbnails.enqueue(id)
+          await this.probeOne({ libraryId, media, id, path })
         } catch (error) {
           if (!(error instanceof FfmpegTimeoutError)) {
             this.index.saveProbeError({ id, error: errorMessage(error) })

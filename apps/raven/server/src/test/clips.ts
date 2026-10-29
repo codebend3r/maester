@@ -222,3 +222,77 @@ export const jpegSize = (jpeg: Buffer): { width: number; height: number } => {
   }
   return read(2)
 }
+
+type EncodeTrackProps = {
+  path: string
+  seconds?: number
+  /** The tags written into the file; each one left out stays unwritten. */
+  tags?: Partial<
+    Record<
+      | 'title'
+      | 'artist'
+      | 'album'
+      | 'album_artist'
+      | 'track'
+      | 'disc'
+      | 'date'
+      | 'genre'
+      | 'compilation'
+      | 'MUSICBRAINZ_ALBUMID'
+      | 'MUSICBRAINZ_TRACKID'
+      | 'MUSICBRAINZ_ARTISTID',
+      string
+    >
+  >
+  /** A JPEG to embed as the cover, as `encodeImage` writes one. */
+  cover?: string | null
+}
+
+/**
+ * Encodes a short tone as a tagged audio file, so the suite exercises the
+ * real tag reader. The extension picks the codec: `.mp3`, `.flac`, `.m4a`
+ * (AAC) or `.ogg` (Vorbis). A `cover` is embedded as an attached picture.
+ */
+export const encodeTrack = async ({
+  path,
+  seconds = 2,
+  tags = {},
+  cover = null,
+}: EncodeTrackProps): Promise<void> => {
+  const codecs: Record<string, string> = {
+    mp3: 'libmp3lame',
+    flac: 'flac',
+    m4a: 'aac',
+    ogg: 'libvorbis',
+  }
+  const codec = codecs[extname(path).slice(1)] ?? 'libmp3lame'
+  await mkdir(dirname(path), { recursive: true })
+  await run('ffmpeg', [
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-y',
+    '-f',
+    'lavfi',
+    '-i',
+    `sine=frequency=440:sample_rate=44100:duration=${seconds}`,
+    ...(cover == null
+      ? []
+      : [
+          '-i',
+          cover,
+          '-map',
+          '0:a',
+          '-map',
+          '1:v',
+          '-c:v',
+          'copy',
+          '-disposition:v:0',
+          'attached_pic',
+        ]),
+    '-c:a',
+    codec,
+    ...Object.entries(tags).flatMap(([key, value]) => ['-metadata', `${key}=${value}`]),
+    path,
+  ])
+}
