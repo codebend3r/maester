@@ -38,6 +38,7 @@ describe('playablePage', () => {
     const { hero } = movie()
     expect(hero).toEqual({
       eyebrow: null,
+      logo: null,
       title: 'Busboys',
       byline: 'Directed by Mark Kimball',
       rating: 'R',
@@ -108,7 +109,8 @@ describe('playablePage', () => {
         ...pictures,
       })
     const { hero, castTitle } = episode({ isShowPending: true })
-    expect(hero.eyebrow).toBe('Severance · Season 1 · Episode 1')
+    expect(hero.eyebrow).toBe('Severance · S01 · E01')
+    expect(hero.logo).toBeNull()
     expect(hero.poster).toEqual({
       shape: CARD_SHAPES.wide,
       picture: at('/api/pictures/items/6/still/s6'),

@@ -2,7 +2,6 @@ import { formatDuration } from '@raven/core'
 import { type ComponentRef, type RefObject, useEffect, useRef, useState } from 'react'
 import {
   Animated,
-  Image,
   Pressable,
   StyleSheet,
   type TVRemoteEvent,
@@ -12,11 +11,11 @@ import {
 import Video from 'react-native-video'
 
 import { Text } from '@/layouts/Text'
+import { TitleArt } from '@/layouts/TitleArt'
 import { useFocusOnMount } from '@/layouts/focus'
 import { FocusBand } from '@/layouts/FocusBand'
 import { PickerList, usePickerList } from '@/layouts/Picker.focus'
 import { CaptionText } from '@/layouts/PlayerCaption'
-import type { Picture } from '@/queries/cards'
 import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
 import {
   PLAYER_COPY,
@@ -150,42 +149,6 @@ const TrackButton = ({ icon, label, picker, onPicking }: TrackButtonProps) => {
 /** How tall a show's title art stands over the video; its width follows the art's own shape. */
 const LOGO_HEIGHT = TV_SIZES.space8 * 1.5
 
-/** A logo's width for its height until the art says its own: title art runs wide. */
-const LOGO_RATIO = 3
-
-type ShowNameProps = { name: string; logo: Picture | null }
-
-/**
- * The show: its title art where it has some, at the art's own width and flush left, said as its
- * name; its name in type where it has none, or the art fails to load.
- */
-const ShowName = ({ name, logo }: ShowNameProps) => {
-  const styles = useStyles()
-  const [ratio, setRatio] = useState<number>(LOGO_RATIO)
-  const [failed, setFailed] = useState<string | null>(null)
-  if (logo === null || failed === logo.uri) {
-    return (
-      <Text numberOfLines={1} style={styles.show}>
-        {name}
-      </Text>
-    )
-  }
-  return (
-    <Image
-      accessibilityLabel={name}
-      accessibilityRole="image"
-      accessible
-      onError={() => setFailed(logo.uri)}
-      onLoad={({ nativeEvent: { source } }) => {
-        if (source.width > 0 && source.height > 0) setRatio(source.width / source.height)
-      }}
-      resizeMode="contain"
-      source={logo}
-      style={{ height: LOGO_HEIGHT, width: LOGO_HEIGHT * ratio, maxWidth: TV_SIZES.measure }}
-    />
-  )
-}
-
 type HeadingProps = Pick<PlayerChromeProps, 'heading'>
 
 /**
@@ -196,12 +159,30 @@ const Heading = ({ heading }: HeadingProps) => {
   const styles = useStyles()
   return (
     <View accessibilityRole="header" style={styles.heading}>
-      {heading.show !== null && <ShowName logo={heading.logo} name={heading.show} />}
+      {heading.show !== null && (
+        <TitleArt
+          height={LOGO_HEIGHT}
+          logo={heading.logo}
+          maxWidth={TV_SIZES.measure}
+          name={heading.show}
+          textStyle={styles.show}
+        />
+      )}
       {heading.place !== null && <Text style={styles.place}>{heading.place}</Text>}
       <View style={styles.titleRow}>
-        <Text numberOfLines={2} style={heading.show === null ? styles.show : styles.title}>
-          {heading.title}
-        </Text>
+        {heading.show === null ? (
+          <TitleArt
+            height={LOGO_HEIGHT}
+            logo={heading.logo}
+            maxWidth={TV_SIZES.measure}
+            name={heading.title}
+            textStyle={styles.show}
+          />
+        ) : (
+          <Text numberOfLines={2} style={styles.title}>
+            {heading.title}
+          </Text>
+        )}
         {heading.length !== null && (
           <View style={styles.chip}>
             <Text style={styles.chipText}>{heading.length}</Text>
@@ -418,8 +399,8 @@ const DpadPlayer = ({
 }
 
 const PlayerChrome = (props: PlayerChromeProps) => {
-  const { title, surface, notice, onBack } = props
-  if (surface === null) return <PlayerNotice notice={notice} onBack={onBack} title={title} />
+  const { heading, surface, notice, onBack } = props
+  if (surface === null) return <PlayerNotice heading={heading} notice={notice} onBack={onBack} />
   return <DpadPlayer {...props} surface={surface} />
 }
 

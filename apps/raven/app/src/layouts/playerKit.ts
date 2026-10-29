@@ -10,7 +10,7 @@ import type { PlayerHeading } from '@/layouts/playerHeading'
 export const SKIP_SECONDS = 10
 
 /** What plays after the video, an episode's next in its show, and how to play it now. */
-export type PlayerNext = { label: string; onPlay: () => void }
+type PlayerNext = { label: string; onPlay: () => void }
 
 /** A track picker: what it offers, which is picked, and what to do with a pick; the chrome names it. */
 export type TrackPicker = Omit<PickerProps<string>, 'label'>

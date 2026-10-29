@@ -9,7 +9,6 @@ import {
   castMembers,
   createdBy,
   directedBy,
-  episodeByline,
   episodeEntryKey,
   episodeFacts,
   episodeRowFacts,
@@ -39,6 +38,7 @@ import {
   imageOf,
   pictureAt,
 } from '@/queries/cards'
+import { episodeMarkOf } from '@/queries/episodeMark'
 import { ROUTE_TARGETS, type RouteTarget, itemTarget } from '@/routes'
 
 /** How far through something the viewer is, and what that is in words. */
@@ -46,8 +46,10 @@ type Progress = { fraction: number; label: string }
 
 /** What heads an item's page: its pictures, its names and its facts. */
 export type ItemHero = {
-  /** The small line over the title: "Show", or an episode's show and number. */
+  /** The small line over the title: "Show", or an episode's show and place; its show's name is left to `logo` where there is art. */
   eyebrow: string | null
+  /** An episode's show's title art, drawn over the eyebrow where it has some. */
+  logo: Picture | null
   title: string
   byline: string | null
   /** The content rating, "R". */
@@ -153,6 +155,7 @@ const movieHero = ({ details, shown, primary, ...pictures }: MovieHeroProps): It
   byline: directedBy(details),
   rating: details.contentRating,
   facts: movieFacts({ details: shown, primary }),
+  logo: null,
   progress: timeLeft(primary),
   poster: posterOf({ details, ...pictures }),
   backdrop: backdropOf({ details, ...pictures }),
@@ -168,9 +171,10 @@ type EpisodeHeroProps = PlayableHeroProps & {
 }
 
 /**
- * An episode's heading: its still, else a frame of its file, under its show's backdrop, and
- * its show and number. The still stands in for a show with no backdrop, or one that could not
- * be read, but not while the show is still being read.
+ * An episode's heading: its still, else a frame of its file, under its show's backdrop, its
+ * show's title art over its place in short ("S02 · E05"), or its show's name there while it
+ * has no art. The still stands in for a show with no backdrop, or one that could not be read,
+ * but not while the show is still being read.
  */
 const episodeHero = ({
   details,
@@ -189,8 +193,26 @@ const episodeHero = ({
       }) ?? pictures.api.thumbnailUrl(primary),
     headersFor: pictures.headersFor,
   })
+  const logoVersion = show?.logoVersion ?? null
+  const logo =
+    show === null || logoVersion === null
+      ? null
+      : pictureAt({
+          uri: pictures.api.itemImageUrl({
+            id: show.id,
+            kind: ITEM_IMAGE_KINDS.logo,
+            version: logoVersion,
+          }),
+          headersFor: pictures.headersFor,
+        })
+  const mark = episodeMarkOf({ season: details.season, episode: details.episode })
   return {
-    eyebrow: lineOrNull(episodeByline(details)),
+    eyebrow: lineOrNull(
+      [logo === null ? (details.show?.title ?? null) : null, mark]
+        .filter((part): part is string => part !== null)
+        .join(' · '),
+    ),
+    logo,
     title: details.title,
     byline: null,
     rating: null,
@@ -266,6 +288,7 @@ export const showPage = ({ details, ...pictures }: ShowPageProps): ItemPage =>
   pageOf({
     hero: {
       eyebrow: 'Show',
+      logo: null,
       title: details.title,
       byline: createdBy(details),
       rating: details.contentRating,
@@ -305,6 +328,7 @@ export const seasonPage = ({ season, show, ...pictures }: SeasonPageProps): Item
   return pageOf({
     hero: {
       eyebrow: season.show?.title ?? null,
+      logo: null,
       title: season.title,
       byline: null,
       rating: show?.contentRating ?? null,

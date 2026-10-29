@@ -9,6 +9,7 @@ import {
   MEDIA_GROUPINGS,
   MEDIA_SORTS,
   type MediaSort,
+  type PosterEntry,
   type ShowEntry,
   type ShowListing,
   createApiClient,
@@ -96,7 +97,7 @@ export const libraryPath = ({ call, library, sort, search }: LibraryPathProps): 
 /** What a viewer types in Films' search box to find Busboys, and to find nothing. */
 export const FILM_SEARCHES = { busboys: 'bus', nothing: 'zzz' } as const
 
-const { getLibrary, listLibraries, listMedia, listShows } = APP_CLIENT_CALLS
+const { getLibrary, listInProgress, listLibraries, listMedia, listShows } = APP_CLIENT_CALLS
 
 /** Films sorted by title, then newest first, and searched; Series by title. */
 const ANSWERS: Record<string, unknown> = {
@@ -126,6 +127,14 @@ const ANSWERS: Record<string, unknown> = {
     search: FILM_SEARCHES.nothing,
   })]: [],
   [libraryPath({ call: listShows, library: SERIES, sort: MEDIA_SORTS.title })]: SHOWS,
+  [libraryPath({ call: listInProgress, library: FILMS })]: [],
+  [libraryPath({ call: listInProgress, library: SERIES })]: [],
+}
+
+/** Night Train, stopped twenty minutes in, as Films' in-progress route lists it. */
+export const NIGHT_TRAIN_IN_PROGRESS: PosterEntry = {
+  media: { ...NIGHT_TRAIN, position: 1200 },
+  poster: null,
 }
 
 /** Films as it would be once a viewer on the web groups it by match. */
@@ -141,6 +150,8 @@ type LibraryApiProps = {
   libraries?: () => Library[]
   /** What each answer waits on, by its path and query, so a test can look while it waits. */
   reads?: (path: string) => Promise<void>
+  /** What Films has in progress; nothing unless a test says. */
+  inProgress?: () => PosterEntry[]
 }
 
 /**
@@ -151,6 +162,7 @@ export const libraryApi = ({
   record = () => undefined,
   libraries = () => [],
   reads = async () => undefined,
+  inProgress = () => [],
 }: LibraryApiProps = {}): ApiClient =>
   createApiClient({
     baseUrl: NAS.origin,
@@ -162,7 +174,11 @@ export const libraryApi = ({
         const override = libraries().find(
           (library) => path === libraryPath({ call: getLibrary, library }),
         )
-        const body = override ?? ANSWERS[path]
+        const body =
+          override ??
+          (path === libraryPath({ call: listInProgress, library: FILMS })
+            ? inProgress()
+            : ANSWERS[path])
         return responseOf(body === undefined ? NOT_FOUND : { status: STATUSES.ok, body })
       },
     }),

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { Icon } from '@/layouts/Icon'
 import { Text } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
@@ -21,7 +22,10 @@ import {
 import { GRID_ROWS, type GridRow, gridColumnsOf } from '@/layouts/gridRows'
 import { useGrid } from '@/layouts/useGrid'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
-import { themedStyles } from '@/theme/useTheme'
+import { themedStyles, useTheme } from '@/theme/useTheme'
+
+/** How wide the library's icon stands beside its name. */
+const TITLE_ICON = SIZES.textXl * 1.25
 
 const GUTTER = SIZES.space3
 const GAP = SIZES.space3
@@ -129,6 +133,7 @@ const JumpStrip = ({ jump, room, fontScale, onJump }: JumpStripProps) => {
  */
 const Grid = ({
   title,
+  icon,
   line,
   notice,
   search,
@@ -142,6 +147,7 @@ const Grid = ({
   const screen = useWindowDimensions()
   const insets = useSafeAreaInsets()
   const styles = useStyles()
+  const text = useTheme((theme) => theme.palette.text)
   const [top, setTop] = useState(0)
   // The strip's slot runs between the top and bottom insets; until it is laid out, that is
   // the window's height between them.
@@ -250,9 +256,12 @@ const Grid = ({
             style={styles.header}
           >
             <TouchBack onPress={onBack} />
-            <Text accessibilityRole="header" style={styles.title}>
-              {title}
-            </Text>
+            <View style={styles.titleRow}>
+              {icon !== null && <Icon colour={text} name={icon} size={TITLE_ICON} />}
+              <Text accessibilityRole="header" style={styles.title}>
+                {title}
+              </Text>
+            </View>
             {line !== null && <Text style={styles.line}>{line}</Text>}
             {search}
             <View style={styles.toolbar}>{toolbar}</View>
@@ -290,6 +299,7 @@ const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     ground: { flex: 1, backgroundColor: colours.ground },
     header: { gap: SIZES.space2, paddingBottom: SIZES.space4 },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space2 },
     title: { color: colours.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
     line: { color: colours.muted, fontSize: SIZES.textSm },
     toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space1 },

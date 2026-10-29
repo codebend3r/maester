@@ -203,7 +203,7 @@ describe('Item on a phone or tablet', () => {
     await renderItem({ [APP_ROUTE_PARAMS.id]: String(GOOD_NEWS_ABOUT_HELL.id) })
 
     expect(await screen.findByRole('header', { name: 'Good News About Hell' })).toBeTruthy()
-    expect(screen.getByText('Severance · Season 1 · Episode 1')).toBeTruthy()
+    expect(screen.getByText('Severance · S01 · E01')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
   })
 

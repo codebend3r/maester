@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { APP_CLIENT_CALLS, MAX_HEIGHTS, THEMES, themeOf } from '@raven/core'
 import { fireEvent, screen } from '@testing-library/react-native'
-import { ActionSheetIOS, StyleSheet } from 'react-native'
+import { ActionSheetIOS, StyleSheet, processColor } from 'react-native'
 
-import { LOGO_MARKS } from '@/layouts/Logo'
+import { LAUNCH_LOOK, LOGO_TEST_IDS, logoColoursOf } from '@/layouts/Logo'
 import { Home } from '@/screens/Home'
 import { Settings } from '@/screens/Settings'
 import type { AppServer } from '@/servers/serverList'
@@ -82,6 +82,9 @@ describe('Settings on a phone or tablet', () => {
     const after = appThemeOf(LIGHT_THEME.id)
     const colourOf = (name: string): unknown =>
       StyleSheet.flatten(screen.getByRole('header', { name }).props.style)?.color ?? null
+    /** What the mark's body is painted with: the brush react-native-svg hands the native path. */
+    const markBody = (): unknown => screen.getByTestId(LOGO_TEST_IDS.body).props.fill
+    const brushOf = (colour: string): object => ({ payload: processColor(colour) })
     answerSheet(LIGHT_THEME.name)
     await renderScreen({
       ui: (
@@ -94,15 +97,18 @@ describe('Settings on a phone or tablet', () => {
     await screen.findByRole('header', { name: 'Films' })
     expect(colourOf('Home')).toBe(before.palette.text)
     expect(colourOf('Settings')).toBe(before.palette.text)
-    expect(screen.getByRole('image', { name: 'raven' }).props.source).toBe(LOGO_MARKS[before.tone])
+    expect(markBody()).toMatchObject(
+      brushOf(logoColoursOf({ look: LAUNCH_LOOK, theme: before }).body),
+    )
 
     await fireEvent.press(screen.getByRole('button', { name: `Theme: ${themeOf(before.id).name}` }))
     expect(colourOf('Home')).toBe(after.palette.text)
     expect(colourOf('Films')).toBe(after.palette.text)
     expect(colourOf('Settings')).toBe(after.palette.text)
     expect(after.palette.text).not.toBe(before.palette.text)
-    expect(screen.getByRole('image', { name: 'raven' }).props.source).toBe(LOGO_MARKS[after.tone])
-    expect(LOGO_MARKS[after.tone]).not.toBe(LOGO_MARKS[before.tone])
+    expect(markBody()).toMatchObject(
+      brushOf(logoColoursOf({ look: LAUNCH_LOOK, theme: after }).body),
+    )
   })
 
   it('turns direct play preference and transcoding off and on', async () => {

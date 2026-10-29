@@ -1,6 +1,7 @@
 import {
   type Library as LibraryRecord,
   type LibrarySettings,
+  type PosterEntry,
   KINDS,
   LIBRARY_VIEWS,
   GROUPING_LABELS,
@@ -13,6 +14,7 @@ import {
   isScanning,
   isString,
   jumpScale,
+  libraryIconOf,
   listsShows,
   plural,
   reversedSort,
@@ -25,9 +27,11 @@ import {
 import { useSearch } from '@raven/ui/headless'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { type ReactNode, useState } from 'react'
 
 import type { ShelfCard } from '@/queries/cards'
-import { type Listing, librarySectionsOf } from '@/queries/libraryGrid'
+import { CONTINUE_WATCHING } from '@/queries/homeShelves'
+import { type Listing, continueSectionsOf, librarySectionsOf } from '@/queries/libraryGrid'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
 import { Grid, Loading, Picker, SearchField, ToolButton } from '@/layouts'
@@ -39,6 +43,8 @@ const COPY = {
   library: 'Library',
   opening: 'Opening the library',
   missing: 'This library is not on the server.',
+  nothingInProgress: 'Nothing in progress here yet.',
+  showPage: (page: string) => `Show ${page}`,
   gathering: { shows: 'Gathering the shows', videos: 'Gathering the videos' },
   sort: 'Sort',
   order: 'Order',
@@ -46,6 +52,37 @@ const COPY = {
   groupBy: 'Group by',
   search: 'Search',
 } as const
+
+/**
+ * The two pages a library opens on: what is being watched in it, for picking up where one left
+ * off, and the library itself, its listing sorted, laid out and searched.
+ */
+const LIBRARY_PAGES = { continue: 'continue', library: 'library' } as const
+
+type LibraryPage = (typeof LIBRARY_PAGES)[keyof typeof LIBRARY_PAGES]
+
+const PAGE_NAMES = {
+  [LIBRARY_PAGES.continue]: CONTINUE_WATCHING,
+  [LIBRARY_PAGES.library]: COPY.library,
+} as const satisfies Record<LibraryPage, string>
+
+/** The page the other one's button leads to. */
+const otherPageOf = (page: LibraryPage): LibraryPage =>
+  page === LIBRARY_PAGES.continue ? LIBRARY_PAGES.library : LIBRARY_PAGES.continue
+
+type PageToggleProps = { page: LibraryPage; onChange: (page: LibraryPage) => void }
+
+/** The one press from either page to the other: named for where it goes. */
+const PageToggle = ({ page, onChange }: PageToggleProps) => {
+  const other = otherPageOf(page)
+  return (
+    <ToolButton
+      accessibilityLabel={COPY.showPage(PAGE_NAMES[other])}
+      label={PAGE_NAMES[other]}
+      onPress={() => onChange(other)}
+    />
+  )
+}
 
 type LibraryToolbarProps = {
   settings: LibrarySettings
@@ -130,17 +167,97 @@ const useListing = ({ queries, library, settings, search, seed }: UseListingProp
   return { listed, error: query.error, isStandIn: query.isPlaceholderData }
 }
 
-type LibraryGridProps = {
+type ContinueGridProps = {
+  session: AppQueries
+  library: LibraryRecord
+  entries: readonly PosterEntry[]
+  toggle: ReactNode
+}
+
+/**
+ * A library's Continue watching page: its videos with a saved spot, most recently watched
+ * first, wide as Home's shelf draws them, under the library's name and the way to its listing.
+ */
+const ContinueGrid = ({
+  session: { server, api },
+  library,
+  entries,
+  toggle,
+}: ContinueGridProps) => {
+  const router = useRouter()
+  const pictures = usePictures({ server, api })
+  const sections = pictures === null ? [] : continueSectionsOf({ entries, ...pictures })
+  return (
+    <Grid
+      icon={libraryIconOf(library.settings)}
+      jump={null}
+      line={`${CONTINUE_WATCHING}, ${plural({ n: entries.length, one: 'video', many: 'videos' })}`}
+      notice={entries.length === 0 ? COPY.nothingInProgress : null}
+      onBack={() => router.back()}
+      onOpen={({ target }) => router.push(hrefOf(target))}
+      search={null}
+      sections={sections}
+      title={library.name}
+      toolbar={toggle}
+      view={LIBRARY_VIEWS.grid}
+    />
+  )
+}
+
+type LibraryPagesProps = {
   session: AppQueries
   library: LibraryRecord
   asked: string
 }
 
 /**
+ * A library's two pages, Continue watching and the library itself, with the one press between
+ * them. It opens on Continue watching while anything in it is in progress, so a show is picked
+ * up in one press, and on the library otherwise; a search handed over opens the library too.
+ */
+const LibraryPages = ({ session, library, asked }: LibraryPagesProps) => {
+  const router = useRouter()
+  const inProgress = useQuery(session.queries.inProgressQuery(library.id))
+  const [chosen, setChosen] = useState<LibraryPage | null>(null)
+  const entries = inProgress.data ?? null
+  if (entries === null && inProgress.isPending && chosen === null) {
+    return <Loading label={COPY.opening} onBack={() => router.back()} />
+  }
+  const isContinuing = asked === '' && entries !== null && entries.length > 0
+  const page = chosen ?? (isContinuing ? LIBRARY_PAGES.continue : LIBRARY_PAGES.library)
+  const toggle = <PageToggle onChange={setChosen} page={page} />
+  switch (page) {
+    case LIBRARY_PAGES.continue:
+      return (
+        <ContinueGrid entries={entries ?? []} library={library} session={session} toggle={toggle} />
+      )
+    case LIBRARY_PAGES.library:
+      return <LibraryGrid asked={asked} library={library} session={session} toggle={toggle} />
+    default: {
+      const unknown: never = page
+      return unknown
+    }
+  }
+}
+
+type LibraryGridProps = {
+  session: AppQueries
+  library: LibraryRecord
+  asked: string
+  /** The way to the Continue watching page, first in the toolbar. */
+  toggle: ReactNode
+}
+
+/**
  * A library once it is known: its cards, laid out as this device last left it, of those its
  * search finds. The search starts on the one it was opened with.
  */
-const LibraryGrid = ({ session: { server, api, queries }, library, asked }: LibraryGridProps) => {
+const LibraryGrid = ({
+  session: { server, api, queries },
+  library,
+  asked,
+  toggle,
+}: LibraryGridProps) => {
   const router = useRouter()
   const view = useLibraryView({ serverId: server.id, library })
   const search = useSearch({ initial: asked })
@@ -188,6 +305,7 @@ const LibraryGrid = ({ session: { server, api, queries }, library, asked }: Libr
 
   return (
     <Grid
+      icon={libraryIconOf(library.settings)}
       jump={jump}
       line={`${KINDS[settings.kind].label}, ${plural({ n: library.itemCount, one: 'video', many: 'videos' })}`}
       notice={notice}
@@ -196,7 +314,12 @@ const LibraryGrid = ({ session: { server, api, queries }, library, asked }: Libr
       search={<SearchField label={`${COPY.search} ${library.name}`} search={search} />}
       sections={sections}
       title={library.name}
-      toolbar={<LibraryToolbar onChange={view.change} settings={settings} />}
+      toolbar={
+        <>
+          {toggle}
+          <LibraryToolbar onChange={view.change} settings={settings} />
+        </>
+      }
       view={settings.view}
     />
   )
@@ -209,6 +332,7 @@ const LibraryNotice = ({ notice }: LibraryNoticeProps) => {
   const router = useRouter()
   return (
     <Grid
+      icon={null}
       jump={null}
       line={null}
       notice={notice}
@@ -250,7 +374,7 @@ const ServerLibrary = ({ session, id, asked }: ServerLibraryProps) => {
     case ROUTE_STATES.loading:
       return <Loading label={COPY.opening} onBack={() => router.back()} />
     case ROUTE_STATES.ready:
-      return <LibraryGrid key={page.data.id} asked={asked} library={page.data} session={session} />
+      return <LibraryPages key={page.data.id} asked={asked} library={page.data} session={session} />
     default: {
       const unknown: never = page
       return unknown

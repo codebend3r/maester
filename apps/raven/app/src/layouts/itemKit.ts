@@ -1,3 +1,4 @@
+import type { IconName } from '@raven/ui/iconDrawings'
 import type { ReactNode } from 'react'
 import type { AccessibilityRole, AccessibilityState } from 'react-native'
 
@@ -16,22 +17,31 @@ export type CheckState = NonNullable<AccessibilityState['checked']>
  */
 export const ITEM_ACTIONS = { play: 'play', toggle: 'toggle', link: 'link' } as const
 
+/** What every action shares: its icon, what it is called aloud, and the few words beside the icon, if any. */
+type ActionFace = {
+  key: string
+  icon: IconName
+  label: string
+  /** What stands beside the icon: a time, a code, a name; null for the icon alone. */
+  text: string | null
+  onPress: () => void
+}
+
 export type ItemAction =
-  | { kind: typeof ITEM_ACTIONS.play; key: string; label: string; onPress: () => void }
-  | {
+  | (ActionFace & { kind: typeof ITEM_ACTIONS.play })
+  | (ActionFace & {
       kind: typeof ITEM_ACTIONS.toggle
-      key: string
-      label: string
       /** Whether the mark is on; `mixed` for a show or season only partly watched. */
       isOn: CheckState
-      onPress: () => void
-    }
-  | { kind: typeof ITEM_ACTIONS.link; key: string; label: string; onPress: () => void }
+    })
+  | (ActionFace & { kind: typeof ITEM_ACTIONS.link })
 
 export type ItemLayoutProps = {
   page: ItemPage
-  /** Play, when the page knows what it starts, then the marks. */
+  /** Play, when the page knows what it starts, an episode's Next, then the marks. */
   actions: ItemAction[]
+  /** The way up from an episode to its show and its season, on a row of their own. */
+  links: ItemAction[]
   /**
    * Whether what Play starts is still being read, as a show's next episode is. A TV draws no
    * action and no row until it is known, so Play is there to take the opening focus.
@@ -70,12 +80,10 @@ export const episodeLabelOf = (episode: EpisodeRow): string =>
     .filter((part): part is string => part !== null)
     .join(', ')
 
-/** What sits before a mark's label while it is on. */
-const ON_MARK = '✓ '
-
 /**
  * How an action's button looks and is read out: Play filled as the one action the page is for,
- * a mark as a checkbox in the quiet tone, ticked while it is on, a link in the ghost tone.
+ * a mark as a checkbox in the quiet tone, filled while it is on, a link in the ghost tone. Each
+ * shows its icon, with its few words beside it where it has any.
  */
 export const actionLookOf = (
   action: ItemAction,
@@ -83,20 +91,23 @@ export const actionLookOf = (
   tone: ButtonTone
   role: AccessibilityRole
   state: AccessibilityState | undefined
-  text: string
+  icon: IconName
+  text: string | null
 } => {
+  const { icon, text } = action
   switch (action.kind) {
     case ITEM_ACTIONS.play:
-      return { tone: BUTTON_TONES.primary, role: 'button', state: undefined, text: action.label }
+      return { tone: BUTTON_TONES.primary, role: 'button', state: undefined, icon, text }
     case ITEM_ACTIONS.toggle:
       return {
-        tone: BUTTON_TONES.quiet,
+        tone: action.isOn === true ? BUTTON_TONES.primary : BUTTON_TONES.quiet,
         role: 'checkbox',
         state: { checked: action.isOn },
-        text: action.isOn === true ? `${ON_MARK}${action.label}` : action.label,
+        icon,
+        text,
       }
     case ITEM_ACTIONS.link:
-      return { tone: BUTTON_TONES.ghost, role: 'link', state: undefined, text: action.label }
+      return { tone: BUTTON_TONES.ghost, role: 'link', state: undefined, icon, text }
     default: {
       const unknown: never = action
       return unknown

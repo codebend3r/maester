@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from 'react-native'
 
+import { Icon } from '@/layouts/Icon'
 import { Text } from '@/layouts/Text'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
@@ -26,7 +27,10 @@ import { GRID_ROWS, type GridRow, gridColumnsOf } from '@/layouts/gridRows'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useGrid } from '@/layouts/useGrid'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
-import { themedStyles } from '@/theme/useTheme'
+import { themedStyles, useTheme } from '@/theme/useTheme'
+
+/** How wide the library's icon stands beside its name: the name's own size, larger. */
+const TITLE_ICON = TV_SIZES.textXl * 1.25
 
 const GAP = TV_SIZES.space5
 
@@ -163,6 +167,7 @@ const firstKeyOf = (rows: readonly GridRow[]): string | null => {
  */
 const Grid = ({
   title,
+  icon,
   line,
   notice,
   search,
@@ -174,6 +179,7 @@ const Grid = ({
 }: GridProps) => {
   const screen = useWindowDimensions()
   const styles = useStyles()
+  const text = useTheme((theme) => theme.palette.text)
   const isRows = isRowView(view)
   const { columnsOf, widthOf } = gridColumnsOf({
     room: screen.width - 2 * TV_GUTTER,
@@ -288,9 +294,12 @@ const Grid = ({
   return (
     <View style={styles.ground}>
       <View onFocus={settle} style={styles.header}>
-        <Text accessibilityRole="header" style={styles.title}>
-          {title}
-        </Text>
+        <View style={styles.titleRow}>
+          {icon !== null && <Icon colour={text} name={icon} size={TITLE_ICON} />}
+          <Text accessibilityRole="header" style={styles.title}>
+            {title}
+          </Text>
+        </View>
         {line !== null && <Text style={styles.line}>{line}</Text>}
         <View style={styles.toolbar}>
           {search}
@@ -351,6 +360,7 @@ const useStyles = themedStyles((colours) =>
       paddingHorizontal: TV_GUTTER,
       paddingBottom: TV_SIZES.space2,
     },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
     title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
     line: { color: colours.muted, fontSize: TV_SIZES.textLg },
     toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: TV_SIZES.space3 },

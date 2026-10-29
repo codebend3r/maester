@@ -32,7 +32,7 @@ const IN_PROGRESS_KEY = 'in-progress'
  */
 type ContinueCardProps = Pictures & { entry: PosterEntry }
 
-const continueCard = ({ entry, api, headersFor }: ContinueCardProps): ShelfCard => {
+export const continueCard = ({ entry, api, headersFor }: ContinueCardProps): ShelfCard => {
   const { media, poster } = entry
   const uri =
     imageOf({ api, item: media.item, kind: ITEM_IMAGE_KINDS.backdrop }) ??

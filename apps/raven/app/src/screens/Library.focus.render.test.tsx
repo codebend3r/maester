@@ -3,6 +3,7 @@ import {
   APP_CLIENT_CALLS,
   type Library as LibraryRecord,
   MEDIA_SORTS,
+  type PosterEntry,
   JUMP_SCALE_LABELS,
   LIBRARY_VIEWS,
   SORT_FIELD_LABELS,
@@ -18,7 +19,13 @@ import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
-import { FILM_SEARCHES, GROUPED_FILMS, libraryApi, libraryPath } from '@/test/libraryServer'
+import {
+  FILM_SEARCHES,
+  GROUPED_FILMS,
+  NIGHT_TRAIN_IN_PROGRESS,
+  libraryApi,
+  libraryPath,
+} from '@/test/libraryServer'
 import type * as NavigationFocus from '@/test/navigationFocus'
 import {
   askedFor,
@@ -29,11 +36,14 @@ import {
 import { renderScreen } from '@/test/renderScreen'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
-const mockParams = jest.fn(() => ({ [APP_ROUTE_PARAMS.id]: String(FILMS.id) }))
+const mockParams = jest.fn((): Record<string, string> => ({
+  [APP_ROUTE_PARAMS.id]: String(FILMS.id),
+}))
 /** What the server heard, and the libraries it answers with in place of its own, per test. */
-const mockServer: { requests: string[]; libraries: LibraryRecord[] } = {
+const mockServer: { requests: string[]; libraries: LibraryRecord[]; inProgress: PosterEntry[] } = {
   requests: [],
   libraries: [],
+  inProgress: [],
 }
 const mockApi = jest.fn((_server: AppServer) =>
   libraryApi({
@@ -41,6 +51,7 @@ const mockApi = jest.fn((_server: AppServer) =>
       mockServer.requests = [...mockServer.requests, path]
     },
     libraries: () => mockServer.libraries,
+    inProgress: () => mockServer.inProgress,
   }),
 )
 
@@ -114,6 +125,7 @@ describe('Library on a TV', () => {
     jest.restoreAllMocks()
     mockServer.requests = []
     mockServer.libraries = []
+    mockServer.inProgress = []
     resetTestScreen()
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
     useLibraryViews.setState({ choices: {} })
@@ -331,5 +343,40 @@ describe('Library on a TV', () => {
     await leaveTestScreen()
     await returnToTestScreen()
     expect(askedFor()).toEqual(['Busboys'])
+  })
+
+  it('opens on Continue watching while something is in progress, its card first, one press from the library', async () => {
+    mockServer.inProgress = [NIGHT_TRAIN_IN_PROGRESS]
+    await renderLibrary({ id: FILMS.id })
+    expect(await screen.findByText('Continue watching, 1 video')).toBeTruthy()
+    expect(preferred(FILM_TITLES)).toEqual(['Night Train'])
+    expect(screen.queryByRole('button', { name: 'Ashfall Gate' })).toBeNull()
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Show Library' }))
+    await layOut()
+    expect(await screen.findByRole('button', { name: 'Ashfall Gate' })).toBeTruthy()
+    expect(screen.getByText(/^Movies, \d+ videos$/u)).toBeTruthy()
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Show Continue watching' }))
+    await layOut()
+    expect(await screen.findByText('Continue watching, 1 video')).toBeTruthy()
+  })
+
+  it('opens on the library when nothing is in progress, and still offers Continue watching', async () => {
+    await renderLibrary({ id: FILMS.id })
+    expect(await screen.findByRole('button', { name: 'Ashfall Gate' })).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Show Continue watching' }))
+    expect(await screen.findByText('Nothing in progress here yet.')).toBeTruthy()
+  })
+
+  it('opens on the library when handed a search, whatever is in progress', async () => {
+    mockServer.inProgress = [NIGHT_TRAIN_IN_PROGRESS]
+    mockParams.mockReturnValue({
+      [APP_ROUTE_PARAMS.id]: String(FILMS.id),
+      [APP_ROUTE_PARAMS.query]: FILM_SEARCHES.busboys,
+    })
+    await renderScreen({ ui: <Library /> })
+    await layOut()
+    expect(await screen.findByRole('button', { name: 'Busboys' })).toBeTruthy()
   })
 })

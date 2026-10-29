@@ -30,6 +30,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import type { Pictures } from '@/queries/cards'
+import { episodeMarkOf } from '@/queries/episodeMark'
 import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
@@ -81,7 +82,10 @@ type PlayOfProps = {
 const playOf = ({ media, label, context }: PlayOfProps): ItemAction => ({
   kind: ITEM_ACTIONS.play,
   key: ACTION_KEYS.play,
+  icon: 'play',
   label,
+  // Play alone is its icon; Resume shows the spot, and a show's Play the episode's code.
+  text: label === COPY.play ? null : label.replace(`${COPY.play} `, ''),
   onPress: () =>
     context.onOpen({ kind: ROUTE_TARGETS.play, mediaId: media.id, at: media.position }),
 })
@@ -94,7 +98,9 @@ type FavouriteOfProps = {
 const favouriteOf = ({ isOn, onToggle }: FavouriteOfProps): ItemAction => ({
   kind: ITEM_ACTIONS.toggle,
   key: ACTION_KEYS.favourite,
+  icon: 'heart',
   label: COPY.favourite,
+  text: null,
   isOn,
   onPress: () => onToggle(!isOn),
 })
@@ -108,7 +114,9 @@ type WatchedOfProps = {
 const watchedOf = ({ state, onToggle }: WatchedOfProps): ItemAction => ({
   kind: ITEM_ACTIONS.toggle,
   key: ACTION_KEYS.watched,
+  icon: 'check',
   label: state === WATCHED_STATES.watched ? COPY.watched : COPY.markWatched,
+  text: null,
   isOn: WATCHED_CHECKS[state],
   onPress: onToggle,
 })
@@ -125,18 +133,29 @@ const nextOf = ({ media, context }: NextOfProps): ItemAction => {
   return {
     kind: ITEM_ACTIONS.play,
     key: ACTION_KEYS.next,
+    icon: 'skipNext',
     label: code === null ? COPY.nextEpisode : `Next ${code}`,
+    text: code,
     onPress: () => context.onOpen({ kind: ROUTE_TARGETS.play, mediaId: media.id, at: 0 }),
   }
 }
 
-type LinkOfProps = { key: string; title: string; itemId: number; context: ItemContext }
+type LinkOfProps = {
+  key: string
+  title: string
+  /** What stands beside the icon: the show's name, a season's code. */
+  text: string
+  itemId: number
+  context: ItemContext
+}
 
 /** "Go to Severance", "Go to Season 1": the way from an episode back up to its show or season. */
-const linkOf = ({ key, title, itemId, context }: LinkOfProps): ItemAction => ({
+const linkOf = ({ key, title, text, itemId, context }: LinkOfProps): ItemAction => ({
   kind: ITEM_ACTIONS.link,
   key,
+  icon: 'up',
   label: `Go to ${title}`,
+  text,
   onPress: () => context.onOpen(itemTarget(itemId)),
 })
 
@@ -156,10 +175,24 @@ const episodeLinksOf = ({ details, show, context }: EpisodeLinksOfProps): ItemAc
   const season =
     show === null ? undefined : seasonsOf(show).find((each) => each.season === details.season)
   return [
-    linkOf({ key: ACTION_KEYS.show, title: details.show.title, itemId: details.show.id, context }),
+    linkOf({
+      key: ACTION_KEYS.show,
+      title: details.show.title,
+      text: details.show.title,
+      itemId: details.show.id,
+      context,
+    }),
     ...(season === undefined
       ? []
-      : [linkOf({ key: ACTION_KEYS.season, title: season.title, itemId: season.id, context })]),
+      : [
+          linkOf({
+            key: ACTION_KEYS.season,
+            title: season.title,
+            text: episodeMarkOf({ season: season.season, episode: null }) ?? season.title,
+            itemId: season.id,
+            context,
+          }),
+        ]),
   ]
 }
 
@@ -243,11 +276,11 @@ const PlayableItem = ({
       state: primary.watched ? WATCHED_STATES.watched : WATCHED_STATES.unwatched,
       onToggle: () => watched.mutate(!primary.watched),
     }),
-    ...(isEpisode ? episodeLinksOf({ details, show: show.data ?? null, context }) : []),
   ]
   return (
     <ItemLayout
       actions={actions}
+      links={isEpisode ? episodeLinksOf({ details, show: show.data ?? null, context }) : []}
       isPlayPending={false}
       onBack={context.onBack}
       onOpen={context.onOpen}
@@ -290,6 +323,7 @@ const ShowItem = ({ details, session, context }: ShowItemProps) => {
   return (
     <ItemLayout
       actions={actions}
+      links={[]}
       isPlayPending={next.isPending}
       onBack={context.onBack}
       onOpen={context.onOpen}
@@ -326,6 +360,7 @@ const SeasonItem = ({ details, session, context }: SeasonItemProps) => {
   return (
     <ItemLayout
       actions={actions}
+      links={[]}
       isPlayPending={false}
       onBack={context.onBack}
       onOpen={context.onOpen}

@@ -1,6 +1,7 @@
-import { ITEM_TYPES, type MediaItem, episodePlace, formatRuntime, mediaLabel } from '@raven/core'
+import { ITEM_TYPES, type MediaItem, formatRuntime, mediaLabel } from '@raven/core'
 
 import type { Picture } from '@/queries/cards'
+import { episodeMarkOf } from '@/queries/episodeMark'
 
 /**
  * The player's title as lines: an episode's show over its season and number, then its own name;
@@ -9,6 +10,7 @@ import type { Picture } from '@/queries/cards'
  */
 export type PlayerHeading = {
   show: string | null
+  /** The show's title art, or a film's own, drawn in place of its name where it has one. */
   logo: Picture | null
   place: string | null
   title: string
@@ -17,7 +19,7 @@ export type PlayerHeading = {
 
 type PlayerHeadingOfProps = { media: MediaItem; logo: Picture | null }
 
-/** The heading over a playing video: "Slow Horses", "Season 1, Episode 3", "Bad Tradecraft". */
+/** The heading over a playing video: "Slow Horses", "S01 · E03", "Bad Tradecraft". */
 export const playerHeadingOf = ({ media, logo }: PlayerHeadingOfProps): PlayerHeading => {
   const { item } = media
   const length = formatRuntime(media.duration)
@@ -25,12 +27,12 @@ export const playerHeadingOf = ({ media, logo }: PlayerHeadingOfProps): PlayerHe
     return {
       show: item.show?.title ?? null,
       logo,
-      place: episodePlace(media),
+      place: episodeMarkOf({ season: item.season, episode: item.episode }),
       title: item.title,
       length,
     }
   }
-  return { show: null, logo: null, place: null, title: mediaLabel(media), length }
+  return { show: null, logo, place: null, title: mediaLabel(media), length }
 }
 
 /** The heading of the player's page while nothing plays: no title at all. */

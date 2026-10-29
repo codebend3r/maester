@@ -22,7 +22,15 @@ const infoOf = ({ title, summary, artwork }: InfoOfProps): VideoMetadata => ({
  * transport owns the remote's focus, and Menu leaves the player. While there is nothing to play
  * it is the TV's notice with Back.
  */
-const PlayerChrome = ({ title, summary, artwork, surface, notice, onBack }: PlayerChromeProps) => {
+const PlayerChrome = ({
+  title,
+  heading,
+  summary,
+  artwork,
+  surface,
+  notice,
+  onBack,
+}: PlayerChromeProps) => {
   const source = surface?.source ?? null
   const styles = useStyles()
   // The source is the video: a new object of the same values must not reload it.
@@ -31,7 +39,7 @@ const PlayerChrome = ({ title, summary, artwork, surface, notice, onBack }: Play
       source === null ? undefined : { ...source, metadata: infoOf({ title, summary, artwork }) },
     [source, title, summary, artwork],
   )
-  if (surface === null) return <PlayerNotice notice={notice} onBack={onBack} title={title} />
+  if (surface === null) return <PlayerNotice heading={heading} notice={notice} onBack={onBack} />
   return (
     <View style={styles.ground}>
       <Video

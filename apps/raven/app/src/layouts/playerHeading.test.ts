@@ -24,7 +24,7 @@ describe('playerHeadingOf', () => {
     expect(playerHeadingOf({ media: episode({ season: 1 }), logo: LOGO })).toEqual({
       show: 'Slow Horses',
       logo: LOGO,
-      place: 'Season 1, Episode 3',
+      place: 'S01 · E03',
       title: 'Bad Tradecraft',
       length: '42m',
     })
@@ -34,14 +34,14 @@ describe('playerHeadingOf', () => {
     expect(playerHeadingOf({ media: episode({ season: 0 }), logo: null }).place).toBe('Special 3')
   })
 
-  it('gives a film its name and year alone, with its length and no art', () => {
+  it('gives a film its name and year alone, with its length and its own art', () => {
     const media = mediaItemFor({
       duration: 7380,
       item: summaryFor({ id: 4, title: 'Valhalla Rising', year: 2010 }),
     })
     expect(playerHeadingOf({ media, logo: LOGO })).toEqual({
       show: null,
-      logo: null,
+      logo: LOGO,
       place: null,
       title: 'Valhalla Rising (2010)',
       length: '2h 3m',
